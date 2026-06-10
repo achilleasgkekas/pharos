@@ -48,13 +48,22 @@ async function getInfo() {
     storage,
     ai: {
       // What the user picked (may differ from effective if no key yet)
-      selectedProvider: (doc?.aiProvider as 'ollama' | 'anthropic') || 'ollama',
+      selectedProvider: ((doc?.aiProvider as string) || 'ollama') as 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom',
       effectiveProvider: cfg.provider,
       ollamaHost: cfg.ollamaHost,
       ollamaModel: cfg.ollamaModel,
       ollamaVisionModel: cfg.ollamaVisionModel,
       anthropicModel: cfg.anthropicModel,
       hasKey: !!(doc?.anthropicApiKey || process.env.ANTHROPIC_API_KEY),
+      openaiModel: cfg.openaiModel,
+      hasOpenaiKey: !!cfg.openaiApiKey,
+      geminiModel: cfg.geminiModel,
+      hasGeminiKey: !!cfg.geminiApiKey,
+      openrouterModel: cfg.openrouterModel,
+      hasOpenrouterKey: !!cfg.openrouterApiKey,
+      customBaseUrl: cfg.customBaseUrl,
+      customModel: cfg.customModel,
+      hasCustomKey: !!cfg.customApiKey,
       confirmBulk: doc?.aiConfirmBulk !== false, // cost guard, default ON
       installed, // [{ name, sizeGB }]
     },

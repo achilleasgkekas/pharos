@@ -15,14 +15,25 @@ import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
 
+type ProviderId = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
+
 type AiInfo = {
-  selectedProvider: 'ollama' | 'anthropic';
-  effectiveProvider: 'ollama' | 'anthropic';
+  selectedProvider: ProviderId;
+  effectiveProvider: ProviderId;
   ollamaHost: string;
   ollamaModel: string;
   ollamaVisionModel: string;
   anthropicModel: string;
   hasKey: boolean;
+  openaiModel: string;
+  hasOpenaiKey: boolean;
+  geminiModel: string;
+  hasGeminiKey: boolean;
+  openrouterModel: string;
+  hasOpenrouterKey: boolean;
+  customBaseUrl: string;
+  customModel: string;
+  hasCustomKey: boolean;
   confirmBulk: boolean;
   installed: { name: string; sizeGB: number }[];
 };
@@ -50,17 +61,22 @@ const MODEL_SUGGESTIONS: { name: string; note: string; vision: boolean }[] = [
 ];
 
 const CLAUDE_SUGGESTIONS = ['claude-sonnet-4-5-20250929', 'claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'];
+const OPENAI_SUGGESTIONS = ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini'];
+const GEMINI_SUGGESTIONS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+const OPENROUTER_SUGGESTIONS = ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonnet', 'google/gemini-2.0-flash-001'];
 
 // Mirror of the server-side vision detection (lib/aiConfig.ts) for inline warnings.
 const isVisionName = (name: string) => /vl|vision|llava|minicpm-v|moondream|bakllava|llama3\.2-vision/i.test(name);
 
-type TabId = 'general' | 'ai' | 'storage' | 'data' | 'notifications';
+type TabId = 'general' | 'money' | 'ai' | 'network' | 'storage' | 'data' | 'notifications';
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'general', label: 'General', icon: <SlidersHorizontal size={15} /> },
+  { id: 'money', label: 'Money', icon: <CreditCard size={15} /> },
   { id: 'ai', label: 'AI', icon: <Sparkles size={15} /> },
-  { id: 'storage', label: 'Storage & data', icon: <HardDrive size={15} /> },
-  { id: 'data', label: 'Stores & cards', icon: <StoreIcon size={15} /> },
+  { id: 'network', label: 'Network', icon: <Globe size={15} /> },
+  { id: 'storage', label: 'Storage & backup', icon: <HardDrive size={15} /> },
+  { id: 'data', label: 'Stores & lists', icon: <StoreIcon size={15} /> },
   { id: 'notifications', label: 'Notifications', icon: <Bell size={15} /> },
 ];
 
@@ -145,10 +161,6 @@ export function SettingsClient({ info }: { info: Info }) {
 
               <DefaultsManager settings={info.settings} />
 
-              <BudgetsManager settings={info.settings} />
-
-              <UnifiManager />
-
               <Section title="About">
                 <Row label="Version">
                   <span style={{ fontFamily: 'var(--font-mono)' }}>v0.1.0 dev</span>
@@ -165,6 +177,13 @@ export function SettingsClient({ info }: { info: Info }) {
             </>
           )}
 
+          {tab === 'money' && (
+            <>
+              <BudgetsManager settings={info.settings} />
+              <CardsManager cards={info.cardList} />
+            </>
+          )}
+
           {tab === 'ai' && (
             <>
               <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
@@ -172,6 +191,8 @@ export function SettingsClient({ info }: { info: Info }) {
               <AiPromptsManager prompts={info.prompts} />
             </>
           )}
+
+          {tab === 'network' && <UnifiManager />}
 
           {tab === 'storage' && (
             <>
@@ -193,7 +214,6 @@ export function SettingsClient({ info }: { info: Info }) {
           {tab === 'data' && (
             <>
               <StoresManager stores={info.stores} />
-              <CardsManager cards={info.cardList} />
               <ListsManager lists={info.lists} />
             </>
           )}
@@ -207,14 +227,64 @@ export function SettingsClient({ info }: { info: Info }) {
 
 // ─── AI engine settings ─────────────────────────────────────────────────────
 
+/** Key + model inputs shared by every cloud provider panel. */
+function CloudKeyModel({
+  hasKey, keyValue, onKey, keyPlaceholder, model, onModel, suggestions, hint,
+}: {
+  hasKey: boolean;
+  keyValue: string;
+  onKey: (v: string) => void;
+  keyPlaceholder: string;
+  model: string;
+  onModel: (v: string) => void;
+  suggestions: string[];
+  hint?: string;
+}) {
+  return (
+    <div className="space-y-3 pt-1">
+      <Field label={`API key ${hasKey ? '(saved ✓ — leave blank to keep)' : ''}`}>
+        <input
+          type="password"
+          value={keyValue}
+          onChange={(e) => onKey(e.target.value)}
+          placeholder={hasKey ? '••••••••••••  (saved)' : keyPlaceholder}
+          autoComplete="off"
+          className={inputClass}
+          style={{ fontFamily: 'var(--font-mono)' }}
+        />
+      </Field>
+      <Field label="Model">
+        <input value={model} onChange={(e) => onModel(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {suggestions.map((m) => (
+            <button key={m} type="button" onClick={() => onModel(m)} className="text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors" style={{ fontFamily: 'var(--font-mono)' }}>
+              {m}
+            </button>
+          ))}
+        </div>
+        {hint && <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{hint}</p>}
+      </Field>
+    </div>
+  );
+}
+
 function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   const [pending, startTransition] = useTransition();
-  const [provider, setProvider] = useState<'ollama' | 'anthropic'>(ai.selectedProvider);
+  const [provider, setProvider] = useState<ProviderId>(ai.selectedProvider);
   const [ollamaHost, setOllamaHost] = useState(ai.ollamaHost);
   const [ollamaModel, setOllamaModel] = useState(ai.ollamaModel);
   const [visionModel, setVisionModel] = useState(ai.ollamaVisionModel);
   const [anthropicModel, setAnthropicModel] = useState(ai.anthropicModel);
   const [apiKey, setApiKey] = useState('');
+  const [openaiModel, setOpenaiModel] = useState(ai.openaiModel);
+  const [openaiKey, setOpenaiKey] = useState('');
+  const [geminiModel, setGeminiModel] = useState(ai.geminiModel);
+  const [geminiKey, setGeminiKey] = useState('');
+  const [openrouterModel, setOpenrouterModel] = useState(ai.openrouterModel);
+  const [openrouterKey, setOpenrouterKey] = useState('');
+  const [customBaseUrl, setCustomBaseUrl] = useState(ai.customBaseUrl);
+  const [customModel, setCustomModel] = useState(ai.customModel);
+  const [customKey, setCustomKey] = useState('');
   const [pullName, setPullName] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [test, setTest] = useState<string | null>(null);
@@ -227,11 +297,24 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
     fd.set('ollamaModel', ollamaModel.trim());
     fd.set('ollamaVisionModel', visionModel.trim());
     fd.set('anthropicModel', anthropicModel.trim());
+    fd.set('openaiModel', openaiModel.trim());
+    fd.set('geminiModel', geminiModel.trim());
+    fd.set('openrouterModel', openrouterModel.trim());
+    fd.set('customBaseUrl', customBaseUrl.trim());
+    fd.set('customModel', customModel.trim());
     if (apiKey.trim()) fd.set('anthropicApiKey', apiKey.trim());
+    if (openaiKey.trim()) fd.set('openaiApiKey', openaiKey.trim());
+    if (geminiKey.trim()) fd.set('geminiApiKey', geminiKey.trim());
+    if (openrouterKey.trim()) fd.set('openrouterApiKey', openrouterKey.trim());
+    if (customKey.trim()) fd.set('customApiKey', customKey.trim());
     setMsg(null);
     startTransition(async () => {
       await saveAiConfig(fd);
       setApiKey('');
+      setOpenaiKey('');
+      setGeminiKey('');
+      setOpenrouterKey('');
+      setCustomKey('');
       setMsg('Saved ✓');
       setTimeout(() => setMsg(null), 2500);
     });
@@ -262,10 +345,14 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
     <Section title="AI engine" icon={<Sparkles size={15} />}>
       {/* Provider toggle */}
       <Row label="Provider">
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           {([
             { v: 'ollama', label: 'Ollama', icon: <Server size={13} /> },
-            { v: 'anthropic', label: 'Anthropic (Claude)', icon: <Cloud size={13} /> },
+            { v: 'anthropic', label: 'Anthropic', icon: <Cloud size={13} /> },
+            { v: 'openai', label: 'OpenAI', icon: <Cloud size={13} /> },
+            { v: 'gemini', label: 'Gemini', icon: <Cloud size={13} /> },
+            { v: 'openrouter', label: 'OpenRouter', icon: <Cloud size={13} /> },
+            { v: 'custom', label: 'Custom', icon: <Plug size={13} /> },
           ] as const).map((p) => (
             <button
               key={p.v}
@@ -284,9 +371,17 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
         </div>
       </Row>
 
-      {provider === 'anthropic' && !ai.hasKey && (
+      {((provider === 'anthropic' && !ai.hasKey) ||
+        (provider === 'openai' && !ai.hasOpenaiKey) ||
+        (provider === 'gemini' && !ai.hasGeminiKey) ||
+        (provider === 'openrouter' && !ai.hasOpenrouterKey)) && (
         <p className="text-[11px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
-          No API key saved yet — parsing falls back to Local until you add one.
+          No API key saved yet — parsing falls back to Ollama until you add one.
+        </p>
+      )}
+      {provider !== 'ollama' && provider !== 'anthropic' && (
+        <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          Note: the AI command bar (navbar) still needs Anthropic — this provider runs the parsing (receipts, statements, products).
         </p>
       )}
 
@@ -449,6 +544,76 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
           <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             Used for receipts, statements & product specs. Images + text both supported by Claude.
           </p>
+        </div>
+      )}
+
+      {/* OpenAI panel */}
+      {provider === 'openai' && (
+        <CloudKeyModel
+          hasKey={ai.hasOpenaiKey}
+          keyValue={openaiKey}
+          onKey={setOpenaiKey}
+          keyPlaceholder="sk-..."
+          model={openaiModel}
+          onModel={setOpenaiModel}
+          suggestions={OPENAI_SUGGESTIONS}
+          hint="Pick a vision-capable model (gpt-4o / gpt-4o-mini) so receipt images parse too."
+        />
+      )}
+
+      {/* Gemini panel */}
+      {provider === 'gemini' && (
+        <CloudKeyModel
+          hasKey={ai.hasGeminiKey}
+          keyValue={geminiKey}
+          onKey={setGeminiKey}
+          keyPlaceholder="AIza..."
+          model={geminiModel}
+          onModel={setGeminiModel}
+          suggestions={GEMINI_SUGGESTIONS}
+          hint="Gemini Flash models read images natively — good cheap default."
+        />
+      )}
+
+      {/* OpenRouter panel */}
+      {provider === 'openrouter' && (
+        <CloudKeyModel
+          hasKey={ai.hasOpenrouterKey}
+          keyValue={openrouterKey}
+          onKey={setOpenrouterKey}
+          keyPlaceholder="sk-or-..."
+          model={openrouterModel}
+          onModel={setOpenrouterModel}
+          suggestions={OPENROUTER_SUGGESTIONS}
+          hint="One key, every model — use provider/model ids from openrouter.ai/models."
+        />
+      )}
+
+      {/* Custom OpenAI-compatible server panel */}
+      {provider === 'custom' && (
+        <div className="space-y-3 pt-1">
+          <Field label="Base URL (OpenAI-compatible)">
+            <input
+              value={customBaseUrl}
+              onChange={(e) => setCustomBaseUrl(e.target.value)}
+              placeholder="http://localhost:1234/v1"
+              className={inputClass}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+            <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+              Works with LM Studio, Groq, Mistral, DeepSeek, vLLM… anything speaking the OpenAI chat API.
+            </p>
+          </Field>
+          <CloudKeyModel
+            hasKey={ai.hasCustomKey}
+            keyValue={customKey}
+            onKey={setCustomKey}
+            keyPlaceholder="(optional for local servers)"
+            model={customModel}
+            onModel={setCustomModel}
+            suggestions={[]}
+            hint="Model id exactly as the server expects it."
+          />
         </div>
       )}
 

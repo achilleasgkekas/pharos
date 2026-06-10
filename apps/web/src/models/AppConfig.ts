@@ -31,6 +31,17 @@ const AppConfigSchema = new Schema(
     // User-editable dropdown lists (category taxonomies). Map taxonomyKey → string[].
     lists: { type: Schema.Types.Mixed, default: {} },
 
+    // ── Extra AI providers (key + model each; provider picked via aiProvider) ──
+    openaiApiKey: { type: String, default: '' },
+    openaiModel: { type: String, default: '' },
+    geminiApiKey: { type: String, default: '' },
+    geminiModel: { type: String, default: '' },
+    openrouterApiKey: { type: String, default: '' },
+    openrouterModel: { type: String, default: '' },
+    customBaseUrl: { type: String, default: '' }, // any OpenAI-compatible server
+    customApiKey: { type: String, default: '' },
+    customModel: { type: String, default: '' },
+
     // ── Network (UniFi Controller on the gateway — read-only local user) ──
     unifiHost: { type: String, default: '' }, // e.g. 10.0.1.1
     unifiUser: { type: String, default: '' },

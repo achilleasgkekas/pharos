@@ -89,23 +89,31 @@ export async function pullOllamaModel(name: string): Promise<{ ok: boolean; erro
 
 /** Persist the AI backend settings (singleton config doc). */
 export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean }> {
-  const provider = String(formData.get('provider') || 'ollama');
+  const PROVIDERS = ['ollama', 'anthropic', 'openai', 'gemini', 'openrouter', 'custom'];
+  const rawProvider = String(formData.get('provider') || 'ollama');
+  const provider = PROVIDERS.includes(rawProvider) ? rawProvider : 'ollama';
   const ollamaHost = String(formData.get('ollamaHost') || '').trim().replace(/\/$/, '');
   const ollamaModel = String(formData.get('ollamaModel') || '').trim();
   const ollamaVisionModel = String(formData.get('ollamaVisionModel') || '').trim();
-  const anthropicModel = String(formData.get('anthropicModel') || '').trim();
-  const anthropicApiKey = String(formData.get('anthropicApiKey') || '').trim();
 
   await connectDB();
   const update: Record<string, unknown> = {
-    aiProvider: provider === 'anthropic' ? 'anthropic' : 'ollama',
+    aiProvider: provider,
     ollamaHost,
     ollamaModel,
     ollamaVisionModel,
-    anthropicModel: anthropicModel || 'claude-sonnet-4-5-20250929',
+    anthropicModel: String(formData.get('anthropicModel') || '').trim() || 'claude-sonnet-4-5-20250929',
+    openaiModel: String(formData.get('openaiModel') || '').trim(),
+    geminiModel: String(formData.get('geminiModel') || '').trim(),
+    openrouterModel: String(formData.get('openrouterModel') || '').trim(),
+    customBaseUrl: String(formData.get('customBaseUrl') || '').trim().replace(/\/$/, ''),
+    customModel: String(formData.get('customModel') || '').trim(),
   };
-  // Only overwrite the key when a new one is typed (blank = keep the existing one).
-  if (anthropicApiKey) update.anthropicApiKey = anthropicApiKey;
+  // Keys: only overwrite when a new one is typed (blank = keep the existing one).
+  for (const k of ['anthropicApiKey', 'openaiApiKey', 'geminiApiKey', 'openrouterApiKey', 'customApiKey'] as const) {
+    const v = String(formData.get(k) || '').trim();
+    if (v) update[k] = v;
+  }
 
   await AppConfig.updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
   invalidateAiConfigCache();

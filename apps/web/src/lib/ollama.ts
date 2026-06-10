@@ -4,6 +4,7 @@ import { STORE_NAMES } from './stores';
 import { resolveStore } from './storeService';
 import { getAiConfig } from './aiConfig';
 import { anthropicJSON } from './anthropic';
+import { openaiCompatJSON, geminiJSON } from './aiProviders';
 import { getPromptOverride } from './prompts';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
@@ -35,21 +36,37 @@ function stripFences(raw: string): string {
  * Run a vision+text prompt and return parsed JSON. Throws with a clear message
  * on transport / model / JSON errors so callers can surface it to the user.
  */
+/** Route a JSON task to the configured CLOUD provider, or null → caller uses Ollama. */
+async function cloudJSON(
+  cfg: Awaited<ReturnType<typeof getAiConfig>>,
+  system: string,
+  user: string,
+  imagesBase64?: string[]
+): Promise<{ json: unknown; raw: string; model: string } | null> {
+  switch (cfg.provider) {
+    case 'anthropic':
+      return anthropicJSON({ apiKey: cfg.anthropicApiKey, model: cfg.anthropicModel, system, user, imagesBase64 });
+    case 'openai':
+      return openaiCompatJSON({ baseUrl: 'https://api.openai.com/v1', apiKey: cfg.openaiApiKey, model: cfg.openaiModel, system, user, imagesBase64 });
+    case 'openrouter':
+      return openaiCompatJSON({ baseUrl: 'https://openrouter.ai/api/v1', apiKey: cfg.openrouterApiKey, model: cfg.openrouterModel, system, user, imagesBase64 });
+    case 'custom':
+      return openaiCompatJSON({ baseUrl: cfg.customBaseUrl, apiKey: cfg.customApiKey, model: cfg.customModel, system, user, imagesBase64 });
+    case 'gemini':
+      return geminiJSON({ apiKey: cfg.geminiApiKey, model: cfg.geminiModel, system, user, imagesBase64 });
+    default:
+      return null; // ollama
+  }
+}
+
 export async function runVisionJSON(
   systemPrompt: string,
   userPrompt: string,
   imagesBase64: string[]
 ): Promise<{ json: unknown; raw: string; model: string }> {
   const cfg = await getAiConfig();
-  if (cfg.provider === 'anthropic') {
-    return anthropicJSON({
-      apiKey: cfg.anthropicApiKey,
-      model: cfg.anthropicModel,
-      system: systemPrompt,
-      user: userPrompt,
-      imagesBase64,
-    });
-  }
+  const cloud = await cloudJSON(cfg, systemPrompt, userPrompt, imagesBase64);
+  if (cloud) return cloud;
   // Vision tasks must run on a vision-capable model, not the active text model.
   const visionModel = cfg.ollamaVisionModel;
   const response = await clientFor(cfg.ollamaHost).chat({
@@ -75,14 +92,8 @@ export async function runTextJSON(
   opts?: { numCtx?: number }
 ): Promise<{ json: unknown; raw: string; model: string }> {
   const cfg = await getAiConfig();
-  if (cfg.provider === 'anthropic') {
-    return anthropicJSON({
-      apiKey: cfg.anthropicApiKey,
-      model: cfg.anthropicModel,
-      system: systemPrompt,
-      user: userPrompt,
-    });
-  }
+  const cloud = await cloudJSON(cfg, systemPrompt, userPrompt);
+  if (cloud) return cloud;
   const response = await clientFor(cfg.ollamaHost).chat({
     model: cfg.ollamaModel,
     keep_alive: KEEP_ALIVE,
@@ -574,7 +585,9 @@ export async function isOllamaHealthy(): Promise<boolean> {
  *  just because no local Ollama is running. */
 export async function isAiReady(): Promise<boolean> {
   const cfg = await getAiConfig();
-  if (cfg.provider === 'anthropic') return !!cfg.anthropicApiKey;
+  // getAiConfig already falls back to 'ollama' when a cloud provider is
+  // half-configured, so a non-ollama provider here is ready by definition.
+  if (cfg.provider !== 'ollama') return true;
   return isOllamaHealthy();
 }
 

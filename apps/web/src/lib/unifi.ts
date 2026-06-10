@@ -20,6 +20,7 @@ export type UnifiDevice = {
   clients: number;
   cpu: number | null;
   mem: number | null;
+  tempC: number | null; // CPU temperature (gateways report it; APs usually don't)
 };
 
 export type UnifiSnapshot = {
@@ -162,6 +163,7 @@ type DeviceRow = {
   uptime?: number;
   num_sta?: number;
   'system-stats'?: { cpu?: string; mem?: string };
+  temperatures?: { name?: string; type?: string; value?: number }[];
 };
 type ClientRow = { network?: string; essid?: string; is_wired?: boolean };
 
@@ -193,6 +195,10 @@ export async function getUnifiSnapshot(): Promise<UnifiSnapshot> {
       clients: d.num_sta || 0,
       cpu: d['system-stats']?.cpu != null ? Number(d['system-stats'].cpu) : null,
       mem: d['system-stats']?.mem != null ? Number(d['system-stats'].mem) : null,
+      tempC: (() => {
+        const t = d.temperatures?.find((x) => x.type === 'cpu') ?? d.temperatures?.[0];
+        return t?.value != null ? Math.round(t.value * 10) / 10 : null;
+      })(),
     }));
     const cls = clients.data || [];
     const byNet = new Map<string, number>();

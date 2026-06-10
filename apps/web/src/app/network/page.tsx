@@ -128,6 +128,12 @@ export default async function NetworkPage() {
                   <div><span className="text-[color:var(--color-text-faint)] block">Version</span><span className="truncate block">{d.version || '—'}</span></div>
                   {d.cpu != null && <div><span className="text-[color:var(--color-text-faint)] block">CPU</span>{d.cpu}%</div>}
                   {d.mem != null && <div><span className="text-[color:var(--color-text-faint)] block">RAM</span>{d.mem}%</div>}
+                  {d.tempC != null && (
+                    <div>
+                      <span className="text-[color:var(--color-text-faint)] block">Temp</span>
+                      <span className={d.tempC >= 80 ? 'text-[color:var(--color-red)]' : d.tempC >= 70 ? 'text-[color:var(--color-gold)]' : ''}>{d.tempC}°C</span>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
