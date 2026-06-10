@@ -14,6 +14,14 @@ const AUTH_BASE = `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0`;
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const SCOPE = 'Files.ReadWrite offline_access openid profile';
 
+// Built-in public client so the user registers NOTHING — they just sign in. This
+// is Microsoft's own "Microsoft Graph Command Line Tools" first-party public
+// client (no secret, device-code capable, personal + work accounts). Same pattern
+// rclone uses. A power user can still supply their own client id (then the consent
+// screen says "Pharos" instead) — handled transparently below.
+export const DEFAULT_CLIENT_ID = '14d82eec-204b-4c2f-b7e8-296a70dab67e';
+const resolveClient = (id?: string) => (id && id.trim()) || DEFAULT_CLIENT_ID;
+
 export type DeviceCode = {
   ok: boolean;
   error?: string;
@@ -24,14 +32,14 @@ export type DeviceCode = {
   expiresIn?: number;
 };
 
-/** Step 1: ask Microsoft for a device code the user types at the verification URL. */
-export async function startDeviceCode(clientId: string): Promise<DeviceCode> {
-  if (!clientId) return { ok: false, error: 'Enter the Application (client) ID first' };
+/** Step 1: ask Microsoft for a device code the user types at the verification URL.
+ *  clientId is optional — empty → the built-in public client (zero setup). */
+export async function startDeviceCode(clientId?: string): Promise<DeviceCode> {
   try {
     const res = await fetch(`${AUTH_BASE}/devicecode`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: clientId, scope: SCOPE }),
+      body: new URLSearchParams({ client_id: resolveClient(clientId), scope: SCOPE }),
       signal: AbortSignal.timeout(15000),
     });
     const j = (await res.json()) as Record<string, unknown>;
@@ -51,16 +59,17 @@ export async function startDeviceCode(clientId: string): Promise<DeviceCode> {
 
 /** Step 2: poll once — returns 'pending' until the user finishes signing in. */
 export async function pollDeviceToken(
-  clientId: string,
+  clientId: string | undefined,
   deviceCode: string
 ): Promise<{ status: 'ok' | 'pending' | 'error'; error?: string; account?: string }> {
+  const cid = resolveClient(clientId);
   try {
     const res = await fetch(`${AUTH_BASE}/token`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        client_id: clientId,
+        client_id: cid,
         device_code: deviceCode,
       }),
       signal: AbortSignal.timeout(15000),
@@ -69,9 +78,10 @@ export async function pollDeviceToken(
     if (res.ok && j.refresh_token) {
       const account = await accountName(String(j.access_token));
       await connectDB();
+      // Persist the EFFECTIVE client id (default or custom) so refreshes use it.
       await AppConfig.updateOne(
         { key: 'singleton' },
-        { $set: { onedriveClientId: clientId, onedriveRefreshToken: String(j.refresh_token), onedriveAccount: account } },
+        { $set: { onedriveClientId: cid, onedriveRefreshToken: String(j.refresh_token), onedriveAccount: account } },
         { upsert: true }
       );
       return { status: 'ok', account };

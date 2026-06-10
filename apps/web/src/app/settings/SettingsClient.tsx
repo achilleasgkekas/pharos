@@ -869,14 +869,15 @@ function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
 
 // ─── File storage (PDFs) — local + remote mirror + naming templates ───────────
 
-// OneDrive setup wizard: guide the Azure app registration → device-code sign-in.
+// OneDrive setup: zero-config by default (built-in public client → just sign in).
+// "Use your own Azure app" is an optional advanced path for a branded consent.
 function OnedriveWizard({ account }: { account: string }) {
   const [pending, startTransition] = useTransition();
   const [connected, setConnected] = useState(!!account);
   const [acct, setAcct] = useState(account);
+  const [advanced, setAdvanced] = useState(false);
   const [clientId, setClientId] = useState('');
-  const [showGuide, setShowGuide] = useState(!account);
-  const [code, setCode] = useState<{ userCode: string; url: string; device: string; interval: number } | null>(null);
+  const [code, setCode] = useState<{ userCode: string; url: string; device: string } | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -885,16 +886,15 @@ function OnedriveWizard({ account }: { account: string }) {
   function connect() {
     setStatus(null);
     startTransition(async () => {
-      const r = await startOnedriveAuth(clientId);
+      const r = await startOnedriveAuth(clientId); // empty → built-in client
       if (!r.ok || !r.deviceCode) { setStatus(`✗ ${r.error}`); return; }
-      setCode({ userCode: r.userCode!, url: r.verificationUri!, device: r.deviceCode, interval: r.interval || 5 });
+      setCode({ userCode: r.userCode!, url: r.verificationUri!, device: r.deviceCode });
       setStatus('Waiting for you to sign in…');
-      // poll until the user finishes at microsoft.com/devicelogin
       pollRef.current = setInterval(async () => {
         const p = await pollOnedriveAuth(clientId, r.deviceCode!);
         if (p.status === 'ok') {
           if (pollRef.current) clearInterval(pollRef.current);
-          setConnected(true); setAcct(p.account || ''); setCode(null); setStatus('Connected ✓'); setShowGuide(false);
+          setConnected(true); setAcct(p.account || ''); setCode(null); setStatus('Connected ✓');
         } else if (p.status === 'error') {
           if (pollRef.current) clearInterval(pollRef.current);
           setStatus(`✗ ${p.error}`); setCode(null);
@@ -905,7 +905,7 @@ function OnedriveWizard({ account }: { account: string }) {
   function disconnect() {
     startTransition(async () => {
       await disconnectOnedriveAccount();
-      setConnected(false); setAcct(''); setShowGuide(true);
+      setConnected(false); setAcct('');
     });
   }
 
@@ -923,26 +923,32 @@ function OnedriveWizard({ account }: { account: string }) {
 
   return (
     <div className="pt-1 space-y-3">
-      <button onClick={() => setShowGuide((s) => !s)} className="text-[11px] text-[color:var(--color-cyan)] hover:underline">
-        {showGuide ? '▾' : '▸'} How to register the free Azure app (one-time)
-      </button>
-      {showGuide && (
-        <ol className="text-[11px] text-[color:var(--color-text-dim)] space-y-1 list-decimal pl-4 leading-relaxed">
-          <li>Go to <a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline">Azure → App registrations</a> → <b>New registration</b>.</li>
-          <li>Name it <code>Pharos</code>. Supported accounts: <b>Personal Microsoft accounts</b> (or Any org + personal). No redirect URI needed. Register.</li>
-          <li>Open <b>Authentication</b> → <b>Allow public client flows</b> → <b>Yes</b> → Save.</li>
-          <li>Copy the <b>Application (client) ID</b> from Overview and paste it below.</li>
-        </ol>
-      )}
-
-      <Field label="Application (client) ID">
-        <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
-      </Field>
-
       {!code ? (
-        <button onClick={connect} disabled={pending || !clientId.trim()} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Cloud size={13} />} Connect OneDrive
-        </button>
+        <>
+          <p className="text-[11px] text-[color:var(--color-text-dim)]">
+            No setup needed — click below and sign in with your Microsoft account. (Consent shows as &quot;Microsoft Graph Command Line Tools&quot;.)
+          </p>
+          <button onClick={connect} disabled={pending} className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
+            {pending ? <Loader2 size={13} className="animate-spin" /> : <Cloud size={13} />} Connect OneDrive
+          </button>
+
+          <div>
+            <button onClick={() => setAdvanced((s) => !s)} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)]">
+              {advanced ? '▾' : '▸'} Use your own Azure app (optional — branded consent)
+            </button>
+            {advanced && (
+              <div className="mt-2 space-y-2">
+                <ol className="text-[10px] text-[color:var(--color-text-faint)] space-y-0.5 list-decimal pl-4 leading-relaxed">
+                  <li><a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline">Azure → App registrations</a> → New registration → personal accounts, no redirect URI.</li>
+                  <li>Authentication → Allow public client flows → Yes → Save. Copy the client id.</li>
+                </ol>
+                <Field label="Application (client) ID">
+                  <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+                </Field>
+              </div>
+            )}
+          </div>
+        </>
       ) : (
         <div className="bg-[color:var(--color-surface-2)] border border-[color:var(--color-cyan)]/40 rounded-lg px-3 py-3 text-xs space-y-1.5">
           <p>1. Open <a href={code.url} target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline font-semibold">{code.url}</a></p>
