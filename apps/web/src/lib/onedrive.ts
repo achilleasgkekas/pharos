@@ -9,7 +9,12 @@ import { AppConfig } from '@/models/AppConfig';
 // once at microsoft.com/devicelogin. We keep only the refresh token and mint
 // short-lived access tokens on demand. Uploads go to /Apps/Pharos in their drive.
 
-const TENANT = 'common'; // personal + work/school accounts
+// 'consumers' = personal Microsoft accounts (personal OneDrive). The 'common'
+// endpoint routed personal accounts through an org-style flow whose http://localhost
+// redirect misfired ("must include a response_type"). 'consumers' uses the
+// microsoft.com/link device flow that completes cleanly for MSA accounts.
+// (Work/school OneDrive would need 'organizations' — not the home-user case here.)
+const TENANT = 'consumers';
 const AUTH_BASE = `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0`;
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const SCOPE = 'Files.ReadWrite offline_access openid profile';
