@@ -455,21 +455,24 @@ export async function getSyncManifest(): Promise<{ ok: boolean; error?: string; 
   return { ok: true, items: await buildSyncManifest(s) };
 }
 
-/** Upload one chunk (the client loops over chunks to show progress). */
-export async function syncOnedriveBatch(items: { filePath: string; rel: string }[]): Promise<{ pushed: number; failed: number; errors: string[] }> {
-  let pushed = 0;
+/** Upload one chunk (the client loops over chunks to show progress). A file whose
+ *  local copy is gone (ENOENT) is SKIPPED, not failed — there's nothing to upload. */
+export async function syncOnedriveBatch(items: { filePath: string; rel: string }[]): Promise<{ pushed: number; failed: number; skipped: number; errors: string[] }> {
+  let pushed = 0, failed = 0, skipped = 0;
   const errors: string[] = [];
   for (const it of items) {
     try {
       const data = await readFile(it.filePath);
       const r = await uploadToOnedrive(it.rel, data);
       if (r.ok) pushed++;
-      else if (errors.length < 5) errors.push(`${it.rel}: ${r.error}`);
+      else { failed++; if (errors.length < 5) errors.push(`${it.rel}: ${r.error}`); }
     } catch (err) {
-      if (errors.length < 5) errors.push(`${it.rel}: ${(err as Error).message}`);
+      const msg = (err as Error).message;
+      if (/ENOENT|no such file/i.test(msg)) skipped++; // local file missing — not a sync failure
+      else { failed++; if (errors.length < 5) errors.push(`${it.rel}: ${msg}`); }
     }
   }
-  return { pushed, failed: items.length - pushed, errors };
+  return { pushed, failed, skipped, errors };
 }
 
 /** One-shot sync (used for SMB/FTP — single connection. OneDrive uses the batched

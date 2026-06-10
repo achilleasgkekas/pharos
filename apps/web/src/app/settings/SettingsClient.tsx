@@ -1037,17 +1037,18 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
       const items = man.items;
       const total = items.length;
       if (!total) { setMsg('Nothing to sync.'); setSyncing(false); return; }
-      let pushed = 0, failed = 0;
+      let pushed = 0, failed = 0, skipped = 0;
       const errs: string[] = [];
       const CHUNK = 8;
       for (let i = 0; i < total; i += CHUNK) {
         const r = await syncOnedriveBatch(items.slice(i, i + CHUNK));
         pushed += r.pushed;
         failed += r.failed;
+        skipped += r.skipped;
         if (errs.length < 3) errs.push(...r.errors.slice(0, 3 - errs.length));
         setMsg(`Syncing ${Math.min(i + CHUNK, total)}/${total}… (${pushed} ok${failed ? `, ${failed} failed` : ''})`);
       }
-      setMsg(`Synced ${pushed}/${total} ✓${failed ? ` · ${failed} failed${errs[0] ? ` — ${errs[0]}` : ''}` : ''}`);
+      setMsg(`Synced ${pushed}/${total} ✓${skipped ? ` · ${skipped} skipped (missing locally)` : ''}${failed ? ` · ${failed} failed${errs[0] ? ` — ${errs[0]}` : ''}` : ''}`);
       setSyncing(false);
       return;
     }
