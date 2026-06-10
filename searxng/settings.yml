@@ -1,0 +1,22 @@
+# SearXNG config for Homepage — self-hosted metasearch used by the app for
+# "AI fill without a link" (web search) and finding product photos (image search).
+# Merges over SearXNG defaults; only the bits we need are overridden.
+use_default_settings: true
+
+server:
+  # Required by SearXNG. Local-only service, but keep it non-default.
+  secret_key: "homepage_searxng_2f9c7b1e6a4d8350c1ab7e90f3d264a5"
+  # Server-to-server JSON calls from the app must not be rate-limited as "bots".
+  limiter: false
+  image_proxy: false
+
+search:
+  # JSON is disabled by default — enable it so the app can query the API.
+  formats:
+    - html
+    - json
+  safe_search: 0
+  autocomplete: ""
+
+ui:
+  static_use_hash: true

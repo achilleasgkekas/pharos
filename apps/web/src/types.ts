@@ -1,0 +1,219 @@
+export type SerializedPriceEntry = {
+  _id: string;
+  price: number;
+  store: string;
+  url: string;
+  currency: string;
+  date: string;
+  inStock: boolean;
+};
+
+export type SerializedItem = {
+  _id: string;
+  num: string;
+  title: string;
+  category: string;
+  status: string;
+  specs: string;
+  notes: string;
+  tags: string[];
+  currentPrice: number;
+  purchasedPrice: number | null;
+  purchasedAt: string | null;
+  purchasedFrom: string;
+  targetPrice: number | null;
+  priceHistory: SerializedPriceEntry[];
+  links: { label: string; url: string; price?: number | null }[];
+  receiptIds: string[];
+  photos: string[];
+  warrantyUntil: string | null;
+  serialNumber: string;
+  location: string;
+  aiFilledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SerializedStep = {
+  _id: string;
+  text: string;
+  done: boolean;
+};
+
+export type SerializedTask = {
+  _id: string;
+  title: string;
+  description: string;
+  content: string;
+  steps: SerializedStep[];
+  tags: string[];
+  status: string;
+  priority: string;
+  num: string;
+  dueDate: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SerializedLineItem = {
+  _id: string;
+  name: string;
+  refinedName: string;
+  qty: number;
+  price: number;
+  vatRate: number;
+  matchedItemId: string | null;
+};
+
+export type SerializedReceipt = {
+  _id: string;
+  store: string;
+  date: string;
+  total: number;
+  subtotal: number;
+  vatAmount: number;
+  warrantyMonths: number;
+  currency: string;
+  paymentMethod: string;
+  lineItems: SerializedLineItem[];
+  itemIds: string[];
+  filePath: string;
+  fileType: string;
+  thumbPath: string;
+  fileSize: number;
+  aiModel: string;
+  aiParsedAt: string | null;
+  verified: boolean;
+  archived: boolean;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SerializedExpense = {
+  _id: string;
+  kind: 'income' | 'expense';
+  vendor: string;
+  vendorKey: string;
+  category: string;
+  amount: number;
+  currency: string;
+  date: string;
+  period: string;
+  recurring: boolean;
+  recurringCycle: 'monthly' | 'quarterly' | 'yearly' | 'weekly' | '';
+  filePath: string;
+  fileType: string;
+  thumbPath: string;
+  fileSize: number;
+  paymentMethod: string;
+  notes: string;
+  aiModel: string;
+  aiParsedAt: string | null;
+  verified: boolean;
+  createdAt: string;
+  updatedAt: string;
+  // Computed (not stored): % deviation from the vendor-series median when unusual
+  // (e.g. an electricity bill 2× the usual). Set by getExpenseData.
+  anomaly?: number;
+};
+
+export type SerializedVoucher = {
+  _id: string;
+  title: string;
+  code: string;
+  store: string;
+  discount: string;
+  expiresAt: string | null;
+  used: boolean;
+  url: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SerializedCard = {
+  _id: string;
+  name: string;
+  last4: string;
+  bank: string;
+  kind: string;
+  type: string;
+  color: string;
+  creditLimit: number;
+  notes: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SerializedSubscription = {
+  _id: string;
+  name: string;
+  provider: string;
+  category: string;
+  amount: number;
+  currency: string;
+  billingCycle: string;
+  startDate: string;
+  nextRenewal: string | null;
+  cancelledAt: string | null;
+  active: boolean;
+  paymentMethod: string;
+  notes: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SerializedTransaction = {
+  _id: string;
+  date: string;
+  description: string;
+  amount: number;
+  category: string;
+  installmentInfo: {
+    currentInstallment: number;
+    totalInstallments: number;
+    originalPurchase: string;
+    // Manual override: when set, this charge groups into the named plan regardless
+    // of its (differently-worded) description. Set by "merge into another plan".
+    planKey?: string | null;
+  } | null;
+  matchedItemIds: string[];
+  matchedReceiptId: string | null;
+};
+
+export type SerializedStatement = {
+  _id: string;
+  card: string;
+  last4: string;
+  cardId: string | null;
+  period: string;
+  statementDate: string;
+  dueDate: string | null;
+  totalAmount: number;
+  minimumPayment: number;
+  paidAmount: number;
+  currency: string;
+  transactions: SerializedTransaction[];
+  filePath: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SerializedPhase = {
+  _id: string;
+  num: string;
+  title: string;
+  content: string;
+  notes: string;
+  status: string;
+  estimatedHours: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

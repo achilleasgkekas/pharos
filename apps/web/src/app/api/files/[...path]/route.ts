@@ -1,0 +1,58 @@
+import { readFile } from '@/lib/storage';
+import { NextRequest, NextResponse } from 'next/server';
+
+const CONTENT_TYPES: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  heic: 'image/heic',
+  pdf: 'application/pdf',
+  // Email-body receipts are stored as .html — serve as text/html so they RENDER in
+  // the detail iframe instead of downloading (octet-stream forces a download).
+  html: 'text/html; charset=utf-8',
+  htm: 'text/html; charset=utf-8',
+};
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+
+  // Reject path traversal — storage is WireGuard-only but defense in depth
+  if (path.some((seg) => seg === '..' || seg.includes('\0'))) {
+    return new NextResponse('Bad request', { status: 400 });
+  }
+
+  const relativePath = path.join('/');
+
+  try {
+    const buffer = await readFile(relativePath);
+    const ext = relativePath.split('.').pop()?.toLowerCase() ?? '';
+    const contentType = CONTENT_TYPES[ext] ?? 'application/octet-stream';
+    const filename = relativePath.split('/').pop() ?? 'file';
+    const isHtml = ext === 'html' || ext === 'htm';
+    const headers: Record<string, string> = {
+      'Content-Type': contentType,
+      // inline so PDFs/images/html render in an <iframe>/<img> instead of downloading
+      'Content-Disposition': `inline; filename="${filename}"`,
+      // Images/PDFs are content-addressed (unique hash name, never mutated) → cache
+      // hard. HTML is the exception: it was briefly served as octet-stream before the
+      // content-type fix, so an 'immutable' entry would pin that wrong response (and a
+      // forced download) for a year. Make HTML always revalidate so the corrected
+      // content-type is picked up. private: personal data, no shared proxy.
+      'Cache-Control': isHtml ? 'private, no-cache, must-revalidate' : 'private, max-age=31536000, immutable',
+    };
+    if (isHtml) {
+      // Email HTML is untrusted (could carry tracking scripts) — render it with no
+      // JS at all. Images/inline styles still load so the receipt looks right.
+      headers['Content-Security-Policy'] = "script-src 'none'; frame-ancestors 'self'";
+      headers['X-Content-Type-Options'] = 'nosniff';
+    }
+    return new NextResponse(new Uint8Array(buffer), { headers });
+  } catch {
+    return new NextResponse('Not found', { status: 404 });
+  }
+}

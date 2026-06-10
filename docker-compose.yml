@@ -1,0 +1,134 @@
+name: homepage
+
+services:
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: homepage-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/homepage?authSource=admin
+      # Ollama runs NATIVE on the Mac host (Apple Neural Engine) — reach it via host gateway
+      OLLAMA_HOST: http://host.docker.internal:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5vl:7b}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
+      # FlareSolverr (headless Chromium) for Cloudflare-protected shops like Skroutz
+      SOLVER_URL: ${SOLVER_URL:-http://flaresolverr:8191}
+      # SearXNG metasearch for web/image search (AI fill without a link, product photos)
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+      STORAGE_ROOT: /storage
+      NODE_ENV: production
+      # Stable key so Server Action IDs survive rebuilds (open tabs don't break)
+      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-mltJ8VGKy1JnduymANqXDApMi+XPObwHeX35DkISa1M=}
+    volumes:
+      # Persist user binary files (receipts, statements) on the host.
+      # Later this path becomes the NFS mount from the DS923+ NAS.
+      - ./data/storage:/storage
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+
+  mongo:
+    image: mongo:7
+    container_name: homepage-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:-changeme}
+      MONGO_INITDB_DATABASE: homepage
+    volumes:
+      - mongo-data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # DB admin UI. Opt-in: `docker compose --profile tools up -d mongo-express` → :8081
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: homepage-mongo-ui
+    restart: unless-stopped
+    profiles: ["tools"]
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER:-admin}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASS:-changeme}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: ${ME_USER:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_PASS:-changeme}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  # Headless-Chromium proxy that solves Cloudflare "Just a moment" JS challenges, so the
+  # app + scraper can read bot-protected shops (Skroutz, etc.). Reached at :8191.
+  # Opt-in (heavy, ~450MB): `docker compose --profile scraper up -d flaresolverr`.
+  # Needed only for URL-import / price-scrape from Cloudflare shops; comes up with the scraper.
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: homepage-flaresolverr
+    restart: unless-stopped
+    profiles: ["scraper"]
+    environment:
+      LOG_LEVEL: ${FLARESOLVERR_LOG_LEVEL:-info}
+      TZ: ${TZ:-Europe/Athens}
+    ports:
+      - "8191:8191"
+
+  # Self-hosted metasearch (web + image). Used for "AI fill without a link" and
+  # finding product photos. Local, privacy-first, no API key. Reached at :8888.
+  searxng:
+    image: searxng/searxng:latest
+    container_name: homepage-searxng
+    restart: unless-stopped
+    ports:
+      - "8888:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8888/
+      UWSGI_WORKERS: ${SEARXNG_WORKERS:-2}
+      UWSGI_THREADS: ${SEARXNG_THREADS:-2}
+
+  # Price tracking worker. Opt-in: `docker compose --profile scraper up -d`
+  scraper:
+    build:
+      context: ./services/scraper
+      dockerfile: Dockerfile
+    container_name: homepage-scraper
+    restart: unless-stopped
+    profiles: ["scraper"]
+    environment:
+      MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/homepage?authSource=admin
+      OLLAMA_HOST: http://host.docker.internal:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5vl:7b}
+      SOLVER_URL: ${SOLVER_URL:-http://flaresolverr:8191}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
+      SCRAPER_CRON: ${SCRAPER_CRON:-0 */6 * * *}
+      PRICE_DROP_ALERT_PCT: ${PRICE_DROP_ALERT_PCT:-10}
+      NTFY_URL: ${NTFY_URL:-https://ntfy.sh}
+      NTFY_TOPIC: ${NTFY_TOPIC:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      flaresolverr:
+        condition: service_started
+
+volumes:
+  mongo-data:
+    driver: local

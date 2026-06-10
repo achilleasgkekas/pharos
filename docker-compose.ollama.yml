@@ -1,0 +1,36 @@
+# ─── Fully-Dockerized Ollama override ──────────────────────────────────────
+# Runs Ollama INSIDE Docker instead of native on the Mac host.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.ollama.yml up -d
+#
+# ⚠️  Trade-off (measured on this Mac mini M4 16GB):
+#       native (Metal/ANE):  ~7s warm  / ~14s cold
+#       docker (CPU-only):  ~18s warm  / ~255s COLD (4+ min first request!)
+#     Docker has NO access to Apple Metal/Neural Engine, so it runs on CPU.
+#     Mitigated by OLLAMA_KEEP_ALIVE=30m (keeps the model warm between uses).
+#
+# Before using: quit the native Ollama app so port 11434 is free.
+# Models are shared from ~/.ollama, so nothing is re-downloaded.
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: homepage-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    environment:
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+    volumes:
+      # Reuse the host's already-pulled models (no re-download)
+      - ${HOME}/.ollama:/root/.ollama
+
+  web:
+    # Point the app at the in-network Ollama container instead of the host
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ollama:
+        condition: service_started
