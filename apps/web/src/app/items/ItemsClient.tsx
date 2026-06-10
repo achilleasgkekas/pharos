@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { PricePanel } from '@/components/PricePanel';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
 import { Layers, Receipt as ReceiptIcon, CreditCard } from 'lucide-react';
@@ -558,6 +559,7 @@ export function ItemsClient({
       {selectedItem && (
         <ItemDetailModal
           item={selectedItem}
+          view={view}
           plans={plansByItem.get(selectedItem._id) ?? []}
           unlinkedPlans={unlinkedPlans}
           receipts={selectedItem.receiptIds.map((id) => receiptMap.get(id)).filter((r): r is ReceiptRef => !!r)}
@@ -1063,6 +1065,7 @@ function fileUrl(filePath: string) {
 
 function ItemDetailModal({
   item,
+  view,
   plans,
   unlinkedPlans,
   receipts,
@@ -1070,6 +1073,7 @@ function ItemDetailModal({
   onItemUpdated,
 }: {
   item: SerializedItem;
+  view: ItemView;
   plans: InstallmentPlan[];
   unlinkedPlans: InstallmentPlan[];
   receipts: ReceiptRef[];
@@ -1437,6 +1441,9 @@ function ItemDetailModal({
         </div>
       </div>
 
+      {/* Shopping: clear price panel (best now / lowest / target + verdict + log) */}
+      {view === 'shopping' && <div className="mb-4"><PricePanel item={item} onChanged={() => router.refresh()} /></div>}
+
       {/* Tabs: Details (editable form) | Price history (chart) */}
       {item.priceHistory.length > 0 ? (
         <>
@@ -1452,7 +1459,7 @@ function ItemDetailModal({
                 )}
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                {t === 'details' ? 'Details' : `Price history · ${item.priceHistory.length}`}
+                {t === 'details' ? 'Details' : `Full history · ${item.priceHistory.length}`}
               </button>
             ))}
           </div>

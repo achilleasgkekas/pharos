@@ -821,3 +821,22 @@ export async function addPriceEntry(
   });
   revalidatePath('/items');
 }
+
+/** Log an observed price for an item (manual "I saw it at €X" — also used by the AI
+ *  command bar). Appends to the history and updates the current price. */
+export async function logItemPrice(
+  id: string,
+  price: number,
+  store: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!(price > 0)) return { ok: false, error: 'Price must be greater than 0' };
+  await connectDB();
+  const r = await Item.findByIdAndUpdate(id, {
+    $push: { priceHistory: { price, store: store.trim() || 'manual', date: new Date() } },
+    $set: { currentPrice: price },
+  });
+  if (!r) return { ok: false, error: 'Item not found' };
+  revalidatePath('/items');
+  revalidatePath('/shopping');
+  return { ok: true };
+}

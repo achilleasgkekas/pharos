@@ -11,7 +11,7 @@ import { Expense } from '@/models/Expense';
 import { Receipt } from '@/models/Receipt';
 import { Statement } from '@/models/Statement';
 import { addExpense } from './expenses/actions';
-import { importItemFromUrl } from './items/actions';
+import { importItemFromUrl, logItemPrice } from './items/actions';
 import { getAppSettings } from '@/lib/appSettings';
 import { cur } from '@/lib/money';
 import { searchAll } from './search-actions';
@@ -86,6 +86,19 @@ const TOOLS: AnthropicTool[] = [
         url: { type: 'string', description: 'Product page URL. If the user pastes a link, ALWAYS pass it here: the item is then auto-filled from the page (title, specs, price, photos) and, if it matches an item the user already has, the link + price are added to that existing item (multi-store price tracking) instead of creating a duplicate.' },
       },
       required: ['title'],
+    },
+  },
+  {
+    name: 'log_price',
+    description: "Record a price you spotted for a shopping item (e.g. 'the U7 Pro dropped to 270 at xpatit'). Appends to the item's price history so the trend, lowest-ever and deal status update.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        item: { type: 'string', description: 'Name of the item to log a price for (fuzzy-matched against the wishlist).' },
+        price: { type: 'number' },
+        store: { type: 'string', description: 'Where the price was seen (optional).' },
+      },
+      required: ['item', 'price'],
     },
   },
   {
@@ -209,6 +222,18 @@ async function execute(name: string, input: Record<string, unknown>): Promise<{ 
       }
       await Item.create({ title: s(input, 'title'), status, category: s(input, 'category') || 'other', currentPrice: n(input, 'price') });
       return { summary: `item "${s(input, 'title')}"`, content: `Added item "${s(input, 'title')}"` };
+    }
+    case 'log_price': {
+      const name = s(input, 'query') || s(input, 'item');
+      const price = n(input, 'price');
+      if (!name || !(price > 0)) return { summary: 'price', content: 'Need an item name and a price greater than 0.' };
+      const rx = new RegExp(name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const it = await Item.findOne({ title: rx }).select('_id title').lean();
+      if (!it) return { summary: 'price', content: `No item matching "${name}".` };
+      const r = await logItemPrice(String(it._id), price, s(input, 'store'));
+      return r.ok
+        ? { summary: `price ${it.title}`, content: `Logged ${cur()}${price}${s(input, 'store') ? ` at ${s(input, 'store')}` : ''} for "${it.title}".` }
+        : { summary: 'price failed', content: r.error || 'Could not log the price.' };
     }
     case 'get_overview': {
       const mk = today().slice(0, 7);
