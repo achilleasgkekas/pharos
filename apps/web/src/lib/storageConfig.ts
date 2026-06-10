@@ -4,14 +4,14 @@ import { AppConfig } from '@/models/AppConfig';
 import type { RemoteConfig } from './remoteStorage';
 import { DEFAULT_FOLDER_TEMPLATE, DEFAULT_NAME_TEMPLATE } from './storagePath';
 
-export type StorageBackend = 'local' | 'ftp' | 'smb';
+export type StorageBackend = 'local' | 'ftp' | 'smb' | 'onedrive';
 
 export type StorageConfig = {
   backend: StorageBackend;
   mirror: boolean; // auto-push on receipt/statement verify
   folderTemplate: string;
   fileNameTemplate: string;
-  remote: RemoteConfig; // valid when backend !== 'local'
+  remote: RemoteConfig; // valid when backend is ftp/smb
   hasPass: boolean;
 };
 
@@ -23,7 +23,9 @@ export async function getStorageConfig(): Promise<StorageConfig> {
   await connectDB();
   const doc = await AppConfig.findOne({ key: 'singleton' }).lean();
   const backend: StorageBackend =
-    doc?.storageBackend === 'ftp' || doc?.storageBackend === 'smb' ? doc.storageBackend : 'local';
+    doc?.storageBackend === 'ftp' || doc?.storageBackend === 'smb' || doc?.storageBackend === 'onedrive'
+      ? doc.storageBackend
+      : 'local';
   const v: StorageConfig = {
     backend,
     mirror: !!doc?.storageMirror,

@@ -65,7 +65,12 @@ const AppConfigSchema = new Schema(
     // ── File storage (PDFs/images) ──
     // Local is ALWAYS the working copy (serving, thumbnails, AI). A remote backend is
     // an organized MIRROR/backup the user can sync to (SMB/FTP now, cloud later).
-    storageBackend: { type: String, enum: ['local', 'ftp', 'smb'], default: 'local' },
+    storageBackend: { type: String, enum: ['local', 'ftp', 'smb', 'onedrive'], default: 'local' },
+    // OneDrive (Microsoft Graph) — device-code OAuth. We store only the client id
+    // and the rotating refresh token (server-only, never sent to the client).
+    onedriveClientId: { type: String, default: '' },
+    onedriveRefreshToken: { type: String, default: '' },
+    onedriveAccount: { type: String, default: '' }, // display: which account is linked
     storageMirror: { type: Boolean, default: false }, // also push a copy on verify
     remoteHost: { type: String, default: '' },
     remotePort: { type: Number, default: 0 }, // 0 → backend default (21 ftp / 445 smb)

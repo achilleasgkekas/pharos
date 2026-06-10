@@ -40,6 +40,7 @@ import { getStores, invalidateStoreCache, type StoreLite } from '@/lib/storeServ
 import { anthropicTest } from '@/lib/anthropic';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
 import { getUnifiSnapshot, invalidateUnifiConfig, runUnifiSpeedtest } from '@/lib/unifi';
+import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
 import { sendNtfyTo } from '@/lib/notify';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
@@ -349,11 +350,13 @@ export type StorageInfo = {
   remoteShare: string;
   remoteBasePath: string;
   remoteSecure: boolean;
+  onedriveAccount: string; // '' when not connected
 };
 
 /** Storage config for the Settings editor — never includes the password. */
 export async function getStorageInfo(): Promise<StorageInfo> {
   const s = await getStorageConfig();
+  const creds = await getOnedriveCreds();
   return {
     backend: s.backend,
     mirror: s.mirror,
@@ -366,6 +369,7 @@ export async function getStorageInfo(): Promise<StorageInfo> {
     remoteShare: s.remote.share ?? '',
     remoteBasePath: s.remote.basePath ?? '',
     remoteSecure: !!s.remote.secure,
+    onedriveAccount: creds?.account || '',
   };
 }
 
@@ -373,7 +377,7 @@ export async function saveStorageConfig(formData: FormData): Promise<{ ok: boole
   await connectDB();
   const backend = String(formData.get('storageBackend') || 'local');
   const update: Record<string, unknown> = {
-    storageBackend: backend === 'ftp' || backend === 'smb' ? backend : 'local',
+    storageBackend: ['ftp', 'smb', 'onedrive'].includes(backend) ? backend : 'local',
     storageMirror: formData.get('storageMirror') === 'true',
     folderTemplate: String(formData.get('folderTemplate') || '').trim() || DEFAULT_FOLDER_TEMPLATE,
     fileNameTemplate: String(formData.get('fileNameTemplate') || '').trim() || DEFAULT_NAME_TEMPLATE,
@@ -417,7 +421,8 @@ export type SyncResult = { ok: boolean; pushed: number; failed: number; skipped:
 export async function syncToRemote(): Promise<SyncResult> {
   const s = await getStorageConfig();
   if (s.backend === 'local') return { ok: false, pushed: 0, failed: 0, skipped: 0, error: 'Set a remote backend first', errors: [] };
-  if (!s.remote.host) return { ok: false, pushed: 0, failed: 0, skipped: 0, error: 'No remote host configured', errors: [] };
+  if (s.backend !== 'onedrive' && !s.remote.host) return { ok: false, pushed: 0, failed: 0, skipped: 0, error: 'No remote host configured', errors: [] };
+  if (s.backend === 'onedrive' && !(await getOnedriveCreds())) return { ok: false, pushed: 0, failed: 0, skipped: 0, error: 'Connect OneDrive first', errors: [] };
   await connectDB();
 
   const files: RemoteFile[] = [];
@@ -516,6 +521,17 @@ export async function syncToRemote(): Promise<SyncResult> {
     } catch {
       skipped++;
     }
+  }
+
+  if (s.backend === 'onedrive') {
+    let pushed = 0;
+    const errors: string[] = [];
+    for (const f of files) {
+      const r = await uploadToOnedrive(f.remoteRelPath, f.data);
+      if (r.ok) pushed++;
+      else if (errors.length < 5) errors.push(`${f.remoteRelPath}: ${r.error}`);
+    }
+    return { ok: pushed === files.length, pushed, failed: files.length - pushed, skipped, errors };
   }
 
   const res = await pushBatchToRemote(s.remote, files);
@@ -989,4 +1005,37 @@ export async function triggerSpeedtest(): Promise<{ ok: boolean; error?: string 
   const r = await runUnifiSpeedtest();
   if (r.ok) revalidatePath('/network');
   return r;
+}
+
+// ─── OneDrive wizard (Microsoft Graph device-code auth) ──────────────────────
+
+/** Step 1 of the wizard: get a device code for the user to enter at microsoft.com/devicelogin. */
+export async function startOnedriveAuth(clientId: string): Promise<DeviceCode> {
+  return startDeviceCode(clientId.trim());
+}
+
+/** Step 2: poll until the user finishes signing in (returns 'pending' meanwhile). */
+export async function pollOnedriveAuth(clientId: string, deviceCode: string): Promise<{ status: 'ok' | 'pending' | 'error'; error?: string; account?: string }> {
+  const r = await pollDeviceToken(clientId.trim(), deviceCode);
+  if (r.status === 'ok') {
+    invalidateStorageConfig();
+    revalidatePath('/settings');
+  }
+  return r;
+}
+
+export async function getOnedriveStatus(): Promise<{ connected: boolean; account: string }> {
+  const c = await getOnedriveCreds();
+  return { connected: !!c, account: c?.account || '' };
+}
+
+export async function disconnectOnedriveAccount(): Promise<{ ok: boolean }> {
+  await disconnectOnedrive();
+  invalidateStorageConfig();
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
+export async function testOnedriveConnection(): Promise<{ ok: boolean; error?: string; drive?: string }> {
+  return testOnedrive();
 }

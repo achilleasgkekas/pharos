@@ -1,6 +1,7 @@
 import 'server-only';
 import { getStorageConfig } from './storageConfig';
 import { pushToRemote } from './remoteStorage';
+import { uploadToOnedrive } from './onedrive';
 import { readFile } from './storage';
 import { renderStoragePath } from './storagePath';
 
@@ -35,7 +36,8 @@ export async function mirrorFileToRemote(meta: MirrorMeta, filePath: string): Pr
   try {
     if (!filePath) return;
     const s = await getStorageConfig();
-    if (s.backend === 'local' || !s.mirror || !s.remote.host) return;
+    if (s.backend === 'local' || !s.mirror) return;
+    if (s.backend !== 'onedrive' && !s.remote.host) return;
     const data = await readFile(filePath);
     const dateStr = meta.date ? new Date(meta.date).toISOString().slice(0, 10) : '';
     const rel = renderStoragePath(s.folderTemplate, s.fileNameTemplate, {
@@ -47,7 +49,7 @@ export async function mirrorFileToRemote(meta: MirrorMeta, filePath: string): Pr
       original: baseNoExt(filePath),
       ext: extOf(filePath),
     });
-    const r = await pushToRemote(s.remote, data, rel);
+    const r = s.backend === 'onedrive' ? await uploadToOnedrive(rel, data) : await pushToRemote(s.remote, data, rel);
     if (!r.ok) console.warn(`[mirror] push failed for ${filePath}: ${r.error}`);
   } catch (err) {
     console.warn(`[mirror] ${filePath}: ${(err as Error).message}`);

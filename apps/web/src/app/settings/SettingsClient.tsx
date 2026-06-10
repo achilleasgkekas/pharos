@@ -9,7 +9,7 @@ import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, s
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
-import { saveDefaults, saveNtfy, sendTestNtfy, runAlertChecks, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, getUnifiInfo, saveUnifiConfig, testUnifiConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type UnifiInfo } from './actions';
+import { saveDefaults, saveNtfy, sendTestNtfy, runAlertChecks, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, getUnifiInfo, saveUnifiConfig, testUnifiConnection, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type UnifiInfo } from './actions';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
@@ -869,6 +869,92 @@ function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
 
 // ─── File storage (PDFs) — local + remote mirror + naming templates ───────────
 
+// OneDrive setup wizard: guide the Azure app registration → device-code sign-in.
+function OnedriveWizard({ account }: { account: string }) {
+  const [pending, startTransition] = useTransition();
+  const [connected, setConnected] = useState(!!account);
+  const [acct, setAcct] = useState(account);
+  const [clientId, setClientId] = useState('');
+  const [showGuide, setShowGuide] = useState(!account);
+  const [code, setCode] = useState<{ userCode: string; url: string; device: string; interval: number } | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  function connect() {
+    setStatus(null);
+    startTransition(async () => {
+      const r = await startOnedriveAuth(clientId);
+      if (!r.ok || !r.deviceCode) { setStatus(`✗ ${r.error}`); return; }
+      setCode({ userCode: r.userCode!, url: r.verificationUri!, device: r.deviceCode, interval: r.interval || 5 });
+      setStatus('Waiting for you to sign in…');
+      // poll until the user finishes at microsoft.com/devicelogin
+      pollRef.current = setInterval(async () => {
+        const p = await pollOnedriveAuth(clientId, r.deviceCode!);
+        if (p.status === 'ok') {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setConnected(true); setAcct(p.account || ''); setCode(null); setStatus('Connected ✓'); setShowGuide(false);
+        } else if (p.status === 'error') {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setStatus(`✗ ${p.error}`); setCode(null);
+        }
+      }, (r.interval || 5) * 1000);
+    });
+  }
+  function disconnect() {
+    startTransition(async () => {
+      await disconnectOnedriveAccount();
+      setConnected(false); setAcct(''); setShowGuide(true);
+    });
+  }
+
+  if (connected) {
+    return (
+      <div className="pt-1 flex items-center justify-between gap-3 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2.5">
+        <span className="text-xs flex items-center gap-2">
+          <Cloud size={14} className="text-[color:var(--color-accent)]" />
+          Connected{acct ? ` as ${acct}` : ''} · uploads go to <code className="text-[color:var(--color-cyan)]">/Apps/Pharos</code>
+        </span>
+        <button onClick={disconnect} disabled={pending} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] disabled:opacity-50">disconnect</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pt-1 space-y-3">
+      <button onClick={() => setShowGuide((s) => !s)} className="text-[11px] text-[color:var(--color-cyan)] hover:underline">
+        {showGuide ? '▾' : '▸'} How to register the free Azure app (one-time)
+      </button>
+      {showGuide && (
+        <ol className="text-[11px] text-[color:var(--color-text-dim)] space-y-1 list-decimal pl-4 leading-relaxed">
+          <li>Go to <a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline">Azure → App registrations</a> → <b>New registration</b>.</li>
+          <li>Name it <code>Pharos</code>. Supported accounts: <b>Personal Microsoft accounts</b> (or Any org + personal). No redirect URI needed. Register.</li>
+          <li>Open <b>Authentication</b> → <b>Allow public client flows</b> → <b>Yes</b> → Save.</li>
+          <li>Copy the <b>Application (client) ID</b> from Overview and paste it below.</li>
+        </ol>
+      )}
+
+      <Field label="Application (client) ID">
+        <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+      </Field>
+
+      {!code ? (
+        <button onClick={connect} disabled={pending || !clientId.trim()} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Cloud size={13} />} Connect OneDrive
+        </button>
+      ) : (
+        <div className="bg-[color:var(--color-surface-2)] border border-[color:var(--color-cyan)]/40 rounded-lg px-3 py-3 text-xs space-y-1.5">
+          <p>1. Open <a href={code.url} target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline font-semibold">{code.url}</a></p>
+          <p>2. Enter this code: <span className="text-[color:var(--color-accent)] font-bold text-base tracking-widest" style={{ fontFamily: 'var(--font-mono)' }}>{code.userCode}</span></p>
+          <p className="text-[10px] text-[color:var(--color-text-faint)] flex items-center gap-1.5"><Loader2 size={11} className="animate-spin" /> Waiting… this connects automatically once you finish.</p>
+        </div>
+      )}
+      {status && <p className={cn('text-[11px]', status.startsWith('✗') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>{status}</p>}
+    </div>
+  );
+}
+
 function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Info['counts'] }) {
   const [pending, startTransition] = useTransition();
   const [backend, setBackend] = useState<StorageInfo['backend']>(storage.backend);
@@ -927,7 +1013,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
   function doTest() {
     setTest('testing…');
     startTransition(async () => {
-      const r = await testRemoteConnection();
+      const r = backend === 'onedrive' ? await testOnedriveConnection() : await testRemoteConnection();
       setTest(r.ok ? 'Connection OK ✓' : `Failed: ${r.error}`);
     });
   }
@@ -945,15 +1031,16 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
   return (
     <Section title="File storage" icon={<HardDrive size={15} />}>
       <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
-        Files are always kept locally (fast serving + AI). Optionally mirror an organized copy to your NAS over SMB/FTP. Cloud (OneDrive/Drive/Dropbox) is coming next.
+        Files are always kept locally (fast serving + AI). Optionally mirror an organized copy to your NAS over SMB/FTP, or to OneDrive.
       </p>
 
       <Row label="Backend">
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           {([
             { v: 'local', label: 'Local only', icon: <HardDrive size={13} /> },
             { v: 'smb', label: 'SMB (NAS)', icon: <Server size={13} /> },
             { v: 'ftp', label: 'FTP', icon: <Globe size={13} /> },
+            { v: 'onedrive', label: 'OneDrive', icon: <Cloud size={13} /> },
           ] as const).map((b) => (
             <button
               key={b.v}
@@ -972,7 +1059,9 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
         </div>
       </Row>
 
-      {backend !== 'local' && (
+      {backend === 'onedrive' && <OnedriveWizard account={storage.onedriveAccount} />}
+
+      {(backend === 'smb' || backend === 'ftp') && (
         <div className="grid sm:grid-cols-2 gap-3 pt-1">
           <Field label="Host / IP">
             <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="192.168.10.20" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
