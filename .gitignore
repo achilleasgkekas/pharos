@@ -31,3 +31,6 @@ yarn-error.log*
 
 # data exports
 tracker-export.json
+
+# email import (Gmail Takeout MBOX — personal, never commit)
+.email-import/

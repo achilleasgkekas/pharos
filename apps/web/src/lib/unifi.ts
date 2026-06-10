@@ -27,6 +27,22 @@ export type UnifiDevice = {
   overheating: boolean;
   poeMaxW: number | null; // PoE power budget (switches/gateways)
   uplinkTo: string; // name of the device this one uplinks through
+  radios: UnifiRadio[]; // WiFi bands (APs)
+  ports: UnifiPort[]; // physical ports that are up (gateways/switches)
+};
+
+export type UnifiRadio = {
+  band: string; // '2.4' | '5' | '6'
+  channel: number | null;
+  clients: number;
+  utilization: number | null; // channel utilization % (congestion)
+  txPower: number | null; // dBm
+};
+
+export type UnifiPort = {
+  name: string;
+  speedMbps: number; // negotiated link speed
+  poeW: number | null; // PoE draw, null if not a PoE port
 };
 
 export type UnifiClient = {
@@ -259,6 +275,8 @@ type DeviceRow = {
   temperatures?: { name?: string; type?: string; value?: number }[];
   uplink?: { uplink_device_name?: string };
   'speedtest-status'?: { xput_download?: number; xput_upload?: number; latency?: number; rundate?: number; server?: { city?: string; country?: string } };
+  radio_table_stats?: { radio?: string; channel?: number; 'user-num_sta'?: number; num_sta?: number; cu_total?: number; tx_power?: number }[];
+  port_table?: { name?: string; speed?: number; up?: boolean; poe_enable?: boolean; poe_power?: string }[];
 };
 type ClientRow = {
   name?: string;
@@ -318,6 +336,20 @@ export async function getUnifiSnapshot(): Promise<UnifiSnapshot> {
       overheating: !!d.overheating,
       poeMaxW: d.total_max_power ?? null,
       uplinkTo: d.uplink?.uplink_device_name || '',
+      radios: (d.radio_table_stats || []).map((r) => ({
+        band: r.radio === 'ng' ? '2.4' : r.radio === '6e' ? '6' : '5', // ng=2.4, na/ax=5, 6e=6
+        channel: r.channel ?? null,
+        clients: r['user-num_sta'] ?? r.num_sta ?? 0,
+        utilization: r.cu_total ?? null,
+        txPower: r.tx_power ?? null,
+      })).sort((a, b) => Number(a.band) - Number(b.band)),
+      ports: (d.port_table || [])
+        .filter((p) => p.up)
+        .map((p) => ({
+          name: p.name || '',
+          speedMbps: p.speed || 0,
+          poeW: p.poe_enable && p.poe_power ? Number(p.poe_power) : null,
+        })),
     }));
     const cls = clients.data || [];
     const byNet = new Map<string, number>();

@@ -176,6 +176,36 @@ export default async function NetworkPage() {
                   )}
                   {d.poeMaxW != null && d.poeMaxW > 0 && <Stat label="PoE max">{d.poeMaxW}W</Stat>}
                 </div>
+
+                {/* WiFi radios (APs) */}
+                {d.radios.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-[color:var(--color-border)] flex flex-wrap gap-1.5">
+                    {d.radios.map((r) => (
+                      <span key={r.band} className="text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]" style={mono} title={`${r.txPower != null ? `${r.txPower} dBm · ` : ''}${r.clients} clients`}>
+                        <span className="text-[color:var(--color-text)] font-semibold">{r.band}G</span>
+                        {r.channel != null && <span className="text-[color:var(--color-text-faint)]"> ch{r.channel}</span>}
+                        <span className="text-[color:var(--color-text-dim)]"> · {r.clients}</span>
+                        {r.utilization != null && (
+                          <span className={r.utilization >= 60 ? 'text-[color:var(--color-red)]' : r.utilization >= 35 ? 'text-[color:var(--color-gold)]' : 'text-[color:var(--color-accent)]'}> · {r.utilization}%</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Active ports (gateways/switches) */}
+                {d.ports.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-[color:var(--color-border)] flex flex-wrap gap-1.5">
+                    {d.ports.map((p, pi) => (
+                      <span key={pi} className="text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]" style={mono} title={p.name}>
+                        <span className="text-[color:var(--color-accent)]">●</span>{' '}
+                        <span className="text-[color:var(--color-text-dim)]">{p.name.replace(/^Port /, 'P')}</span>{' '}
+                        <span className={p.speedMbps >= 2500 ? 'text-[color:var(--color-cyan)] font-semibold' : 'text-[color:var(--color-text-faint)]'}>{p.speedMbps >= 1000 ? `${p.speedMbps / 1000}G` : `${p.speedMbps}M`}</span>
+                        {p.poeW != null && p.poeW > 0 && <span className="text-[color:var(--color-gold)]"> ⚡{p.poeW}W</span>}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
