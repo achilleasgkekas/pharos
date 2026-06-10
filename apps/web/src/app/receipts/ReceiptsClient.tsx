@@ -18,6 +18,7 @@ import {
   List as ListIcon,
   SlidersHorizontal,
   Archive,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -30,6 +31,7 @@ import { useOpenParam } from '@/components/useOpenParam';
 import { Camera } from 'lucide-react';
 import type { SerializedReceipt, SerializedCard } from '@/types';
 import { uploadReceipt, updateReceipt, deleteReceipt, addReceiptItemsToLibrary, rescanReceipt, importEmailInbox, archiveReceipt } from './actions';
+import { QuickVerify } from './QuickVerify';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueRescanReceipts, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -111,6 +113,13 @@ export function ReceiptsClient({
     [receipts]
   );
   const failedCount = failedReceipts.length;
+
+  // Quick-verify queue: parsed (has a total or items) but not yet confirmed.
+  const toVerify = useMemo(
+    () => receipts.filter((r) => !r.verified && !r.archived && (r.total > 0 || (r.lineItems?.length ?? 0) > 0)),
+    [receipts]
+  );
+  const [quickVerify, setQuickVerify] = useState(false);
 
   // Re-scan all failed receipts in small server-side batches (each ~a few min) so a
   // single request never times out; loop from the client until none remain.
@@ -341,8 +350,14 @@ export function ReceiptsClient({
             >
               find duplicates
             </button>
-            {unverified > 0 && (
-              <span className="text-[color:var(--color-gold)]">{unverified} unverified</span>
+            {toVerify.length > 0 && (
+              <button
+                onClick={() => setQuickVerify(true)}
+                className="flex items-center gap-1.5 text-[color:var(--color-accent)] hover:opacity-80 transition-opacity font-semibold"
+                title="Rapidly review and confirm the parsed receipts, one at a time"
+              >
+                <Zap size={13} /> Quick verify ({toVerify.length})
+              </button>
             )}
             {failedCount > 0 && (
               <button
@@ -497,6 +512,17 @@ export function ReceiptsClient({
 
       {/* Duplicate finder + merge */}
       <DuplicatesModal open={showDupes} onClose={() => setShowDupes(false)} />
+
+      {/* Rapid review queue */}
+      {quickVerify && (
+        <QuickVerify
+          receipts={toVerify}
+          stores={storeNames}
+          onClose={() => setQuickVerify(false)}
+          onOpenFull={(r) => { setQuickVerify(false); setSelected(r); }}
+          onChanged={() => router.refresh()}
+        />
+      )}
     </main>
   );
 }

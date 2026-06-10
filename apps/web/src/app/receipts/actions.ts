@@ -239,6 +239,34 @@ export async function updateReceipt(
   revalidatePath('/receipts');
 }
 
+/** Confirm a receipt fast from Quick-verify: updates only the headline fields
+ *  (store/date/total/net/VAT) + marks verified — leaves line items untouched. */
+export async function quickVerifyReceipt(
+  id: string,
+  fields: { store: string; date: string; total: number; subtotal?: number; vatAmount?: number }
+): Promise<{ ok: boolean }> {
+  await connectDB();
+  const doc = await Receipt.findByIdAndUpdate(
+    id,
+    {
+      $set: {
+        store: fields.store.trim() || 'Unknown store',
+        date: safeDate(fields.date),
+        total: Number(fields.total) || 0,
+        subtotal: Number(fields.subtotal) || 0,
+        vatAmount: Number(fields.vatAmount) || 0,
+        verified: true,
+      },
+    },
+    { new: true, select: 'store date total filePath verified' }
+  ).lean();
+  if (doc?.filePath) {
+    void mirrorFileToRemote({ kind: 'receipts', store: doc.store, date: doc.date, total: doc.total, id: doc._id }, doc.filePath);
+  }
+  revalidatePath('/receipts');
+  return { ok: true };
+}
+
 export type RescanResult = {
   ok: boolean;
   aiUsed: boolean;
