@@ -39,6 +39,7 @@ import { Types } from 'mongoose';
 import { getStores, invalidateStoreCache, type StoreLite } from '@/lib/storeService';
 import { anthropicTest } from '@/lib/anthropic';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
+import { getUnifiSnapshot, invalidateUnifiConfig } from '@/lib/unifi';
 import { sendNtfyTo } from '@/lib/notify';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
@@ -926,4 +927,41 @@ export async function emptyTrash(): Promise<{ ok: boolean; purged: number }> {
     }
   }
   return { ok: true, purged };
+}
+
+// ─── Network (UniFi Controller) ──────────────────────────────────────────────
+
+export type UnifiInfo = { host: string; user: string; hasPass: boolean; enabled: boolean };
+
+export async function getUnifiInfo(): Promise<UnifiInfo> {
+  await connectDB();
+  const doc = await AppConfig.findOne({ key: 'singleton' }).select('unifiHost unifiUser unifiPass unifiEnabled').lean();
+  return {
+    host: doc?.unifiHost || '',
+    user: doc?.unifiUser || '',
+    hasPass: !!doc?.unifiPass,
+    enabled: !!doc?.unifiEnabled,
+  };
+}
+
+export async function saveUnifiConfig(formData: FormData): Promise<{ ok: boolean }> {
+  await connectDB();
+  const host = String(formData.get('host') || '').trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const user = String(formData.get('user') || '').trim();
+  const pass = String(formData.get('pass') || ''); // blank = keep the stored one
+  const enabled = formData.get('enabled') === 'true';
+  const update: Record<string, unknown> = { unifiHost: host, unifiUser: user, unifiEnabled: enabled };
+  if (pass) update.unifiPass = pass;
+  await AppConfig.updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
+  invalidateUnifiConfig();
+  revalidatePath('/settings');
+  revalidatePath('/network');
+  return { ok: true };
+}
+
+/** Login + read the controller once — proves host/user/pass work. */
+export async function testUnifiConnection(): Promise<{ ok: boolean; error?: string; devices?: number; wan?: string }> {
+  const snap = await getUnifiSnapshot();
+  if (!snap.ok) return { ok: false, error: snap.error === 'not-configured' ? 'Fill in host/user/pass, enable, and Save first' : snap.error };
+  return { ok: true, devices: snap.devices.length, wan: snap.wan.status };
 }

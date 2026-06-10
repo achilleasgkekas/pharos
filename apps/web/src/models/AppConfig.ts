@@ -30,6 +30,12 @@ const AppConfigSchema = new Schema(
     defaultVatRate: { type: Number, default: 24 }, // fallback VAT/sales-tax % when a receipt doesn't show one
     // User-editable dropdown lists (category taxonomies). Map taxonomyKey → string[].
     lists: { type: Schema.Types.Mixed, default: {} },
+
+    // ── Network (UniFi Controller on the gateway — read-only local user) ──
+    unifiHost: { type: String, default: '' }, // e.g. 10.0.1.1
+    unifiUser: { type: String, default: '' },
+    unifiPass: { type: String, default: '' },
+    unifiEnabled: { type: Boolean, default: false },
     // Monthly budget per expense category. Map category → € amount.
     budgets: { type: Schema.Types.Mixed, default: {} },
 

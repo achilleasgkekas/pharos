@@ -9,7 +9,7 @@ import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, s
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
-import { saveDefaults, saveNtfy, sendTestNtfy, runAlertChecks, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow } from './actions';
+import { saveDefaults, saveNtfy, sendTestNtfy, runAlertChecks, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, getUnifiInfo, saveUnifiConfig, testUnifiConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type UnifiInfo } from './actions';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
@@ -146,6 +146,8 @@ export function SettingsClient({ info }: { info: Info }) {
               <DefaultsManager settings={info.settings} />
 
               <BudgetsManager settings={info.settings} />
+
+              <UnifiManager />
 
               <Section title="About">
                 <Row label="Version">
@@ -926,6 +928,83 @@ const saveBtn =
   'flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 transition-opacity disabled:opacity-50';
 const ghostBtn =
   'flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50';
+
+// ─── Network (UniFi Controller) ──────────────────────────────────────────────
+
+function UnifiManager() {
+  const [pending, startTransition] = useTransition();
+  const [info, setInfo] = useState<UnifiInfo | null>(null);
+  const [host, setHost] = useState('');
+  const [user, setUser] = useState('');
+  const [pass, setPass] = useState('');
+  const [enabled, setEnabled] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    startTransition(async () => {
+      const i = await getUnifiInfo();
+      setInfo(i);
+      setHost(i.host);
+      setUser(i.user);
+      setEnabled(i.enabled);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function save() {
+    setMsg(null);
+    const fd = new FormData();
+    fd.set('host', host);
+    fd.set('user', user);
+    fd.set('pass', pass);
+    fd.set('enabled', String(enabled));
+    startTransition(async () => {
+      await saveUnifiConfig(fd);
+      setPass('');
+      setMsg('Saved ✓');
+    });
+  }
+  function test() {
+    setMsg('Testing…');
+    startTransition(async () => {
+      const r = await testUnifiConnection();
+      setMsg(r.ok ? `✓ Connected — ${r.devices} devices, WAN ${r.wan}` : `✗ ${r.error}`);
+    });
+  }
+
+  return (
+    <Section title="Network (UniFi)" icon={<Globe size={15} />}>
+      <p className="text-xs text-[color:var(--color-text-dim)] mb-3">
+        Read-only view of your UniFi gateway (devices, clients, WAN) on the /network page. Use a <b>local-only Viewer</b> user from the controller — not your cloud account.
+      </p>
+      <div className="grid sm:grid-cols-3 gap-3 mb-3">
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>Gateway host / IP</span>
+          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="10.0.1.1" className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>Username</span>
+          <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="viewer" className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>Password {info?.hasPass ? '(saved — blank keeps it)' : ''}</span>
+          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={info?.hasPass ? '••••••••' : ''} className={inputClass} />
+        </label>
+      </div>
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="flex items-center gap-2 text-xs text-[color:var(--color-text-dim)]">
+          <Switch checked={enabled} onChange={setEnabled} /> Enabled
+        </span>
+        <button onClick={save} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
+          Save
+        </button>
+        <button onClick={test} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50">
+          Test connection
+        </button>
+        {msg && <span className={cn('text-[11px]', msg.startsWith('✗') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
+      </div>
+    </Section>
+  );
+}
 
 function BudgetsManager({ settings }: { settings: AppSettings }) {
   const [pending, startTransition] = useTransition();
