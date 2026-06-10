@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import {
   Package, ShoppingCart, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
-  Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, Wifi,
+  Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, Wifi, CalendarDays,
 } from 'lucide-react';
 import { cn } from './ui/cn';
 import { useTheme } from './ThemeProvider';
@@ -24,6 +24,7 @@ const MONEY: NavLink[] = [
   { href: '/statements', label: 'Statements', icon: CreditCard },
   { href: '/subscriptions', label: 'Subscriptions', icon: CalendarClock },
   { href: '/vouchers', label: 'Vouchers', icon: Ticket },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
 ];
 const PLAN: NavLink[] = [
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },

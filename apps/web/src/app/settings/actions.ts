@@ -200,6 +200,16 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   if (expiring.length)
     lines.push(`🛡 ${expiring.length} warranty expiring ≤${s.warrantyAlertDays}d: ${expiring.slice(0, 5).map((w) => `${w.title} (${w.days}d)`).join(', ')}`);
 
+  // Network: offline UniFi devices / WAN trouble (only when the integration is on).
+  const net = await getUnifiSnapshot();
+  if (net.ok) {
+    const offline = net.devices.filter((d) => !d.online);
+    if (offline.length) lines.push(`📡 ${offline.length} network device(s) OFFLINE: ${offline.map((d) => d.name).join(', ')}`);
+    if (net.wan.status !== 'ok') lines.push(`🌐 WAN status: ${net.wan.status}`);
+  } else if (net.error && net.error !== 'not-configured') {
+    lines.push(`📡 UniFi unreachable: ${net.error.slice(0, 80)}`);
+  }
+
   const summary = lines.length ? lines.join('\n') : 'All clear — nothing to report.';
   let sent = false;
   if (lines.length && s.ntfyEnabled && s.ntfyUrl) {
