@@ -29,7 +29,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
         <Dialog.Overlay className={cn('fixed inset-0 z-50', isFull ? 'bg-[color:var(--color-bg)]' : 'bg-black/70')} />
         <Dialog.Content
           className={cn(
-            'fixed z-50 bg-[color:var(--color-surface)] outline-none overflow-y-auto',
+            'fixed z-50 bg-[color:var(--color-surface)] outline-none overflow-y-auto overscroll-contain',
             isFull
               ? 'inset-0 bg-[color:var(--color-bg)]'
               : cn(

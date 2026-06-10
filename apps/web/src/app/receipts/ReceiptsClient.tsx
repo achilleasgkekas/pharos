@@ -908,10 +908,22 @@ function ReceiptDetailModal({
               />
             </a>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 max-w-full overflow-hidden">
+              {/* Mobile: a static thumbnail + tap-to-open (iOS Safari can't render a
+                  PDF inside an iframe). Desktop: the live iframe preview. */}
+              {receipt.thumbPath ? (
+                <a href={fileUrl(receipt.filePath)} target="_blank" rel="noopener noreferrer" className="md:hidden block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={fileUrl(receipt.thumbPath)} alt={receipt.store} className="w-full max-h-[55vh] object-contain rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]" />
+                </a>
+              ) : (
+                <a href={fileUrl(receipt.filePath)} target="_blank" rel="noopener noreferrer" className="md:hidden flex flex-col items-center justify-center gap-2 h-40 rounded-xl border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-cyan)]">
+                  <FileText size={28} strokeWidth={1.5} /> <span className="text-xs">Tap to open the PDF</span>
+                </a>
+              )}
               <iframe
                 src={`${fileUrl(receipt.filePath)}#toolbar=0&navpanes=0`}
-                className="w-full h-[55vh] md:h-auto md:aspect-[3/4] rounded-xl border border-[color:var(--color-border)] bg-white"
+                className="hidden md:block w-full md:aspect-[3/4] rounded-xl border border-[color:var(--color-border)] bg-white"
                 title={receipt.store}
               />
               <a
@@ -942,22 +954,23 @@ function ReceiptDetailModal({
               <Input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
             </Field>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <Field label={`Total incl. VAT (${cur()})`}>
-              <div className="flex items-center gap-1.5">
-                <Input type="number" step="0.01" value={form.total} onChange={(e) => setForm((p) => ({ ...p, total: e.target.value }))} />
-                <button
-                  type="button"
-                  onClick={fillTotalsFromItems}
-                  disabled={form.lineItems.length === 0}
-                  title="Fill total / net / VAT from the sum of the line items below"
-                  className="shrink-0 px-2 py-2 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)] text-[11px] leading-none hover:border-[color:var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ fontFamily: 'var(--font-mono)' }}
-                >
-                  ∑ items
-                </button>
-              </div>
-            </Field>
+          {/* Total — the key number, on its own wide row so it's never cramped */}
+          <Field label={`Total incl. VAT (${cur()})`}>
+            <div className="flex items-center gap-2">
+              <Input type="number" step="0.01" value={form.total} onChange={(e) => setForm((p) => ({ ...p, total: e.target.value }))} className="flex-1 min-w-0 text-base font-semibold" />
+              <button
+                type="button"
+                onClick={fillTotalsFromItems}
+                disabled={form.lineItems.length === 0}
+                title="Fill total / net / VAT from the sum of the line items below"
+                className="shrink-0 px-2.5 py-2 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)] text-[11px] leading-none hover:border-[color:var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ fontFamily: 'var(--font-mono)' }}
+              >
+                ∑ items
+              </button>
+            </div>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Payment">
               <CardSelect cards={cards} value={form.paymentMethod} onChange={(v) => setForm((p) => ({ ...p, paymentMethod: v }))} />
             </Field>

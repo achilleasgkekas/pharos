@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { SiteNav } from '@/components/SiteNav';
 import { Providers } from '@/components/Providers';
@@ -12,6 +12,15 @@ export const metadata: Metadata = {
   description: 'PHAROS, your Asset & Resource Oversight System. Oversight on everything you own: equipment, receipts, installments, network. Self-hosted.',
   // PWA: installable from the phone's "Add to Home Screen" (pairs with app/manifest.ts)
   appleWebApp: { capable: true, title: 'PHAROS', statusBarStyle: 'black-translucent' },
+};
+
+// App-like on mobile: stop iOS from auto-zooming when you tap a small input and
+// stop accidental pinch-zoom while editing a receipt. (This is a private PWA.)
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 // Apply the saved theme before paint to avoid a flash of the wrong theme.
