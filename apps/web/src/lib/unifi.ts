@@ -64,6 +64,7 @@ export function invalidateUnifiConfig(): void {
   cfgCache = null;
   session = null;
   snapCache = null;
+  loginBackoff = null; // user saved new credentials → try fresh immediately
 }
 
 /** Minimal https JSON request that tolerates the gateway's self-signed cert. */
@@ -100,8 +101,14 @@ function rawRequest(
 let session: { host: string; cookie: string; t: number } | null = null;
 const SESSION_TTL = 20 * 60 * 1000;
 
+// Failed-login backoff: UniFi locks accounts after a few bad attempts, and every
+// /network load triggers a login — so after a failure we STOP trying for a while
+// instead of hammering the gateway and extending its lockout window.
+let loginBackoff: { until: number; error: string } | null = null;
+
 async function login(cfg: UnifiConfig): Promise<string> {
   if (session && session.host === cfg.host && Date.now() - session.t < SESSION_TTL) return session.cookie;
+  if (loginBackoff && Date.now() < loginBackoff.until) throw new Error(loginBackoff.error);
   const body = JSON.stringify({ username: cfg.user, password: cfg.pass });
   const res = await rawRequest(cfg.host, '/api/auth/login', {
     method: 'POST',
@@ -116,8 +123,14 @@ async function login(cfg: UnifiConfig): Promise<string> {
     } catch {
       /* non-JSON error body */
     }
-    throw new Error(msg);
+    const locked = /locked|attempt limit/i.test(msg);
+    loginBackoff = {
+      until: Date.now() + (locked ? 5 * 60_000 : 45_000),
+      error: locked ? `${msg} — pausing login attempts for 5 min so the lock can clear` : msg,
+    };
+    throw new Error(loginBackoff.error);
   }
+  loginBackoff = null;
   const setCookie = res.headers['set-cookie'];
   const cookies = (Array.isArray(setCookie) ? setCookie : [setCookie || '']).map((c) => String(c).split(';')[0]).filter(Boolean);
   if (!cookies.length) throw new Error('login OK but no session cookie returned');
