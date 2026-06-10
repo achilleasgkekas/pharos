@@ -34,7 +34,6 @@ import type { SerializedItem } from '@/types';
 import { VIEW_CONFIG, type ItemView } from '@/lib/itemStatus';
 import { type InstallmentPlan } from '@/lib/installments';
 import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
-import dynamic from 'next/dynamic';
 import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
 import { createItem, updateItem, deleteItem, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillSpecs, convertItemToTask } from './actions';
@@ -42,23 +41,6 @@ import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { linkPlanToItem, unlinkPlanByKey } from '../statements/actions';
-
-// Recharts (~100KB) only renders inside an item's "Price history" tab, so load it
-// on demand — the inventory list itself ships without the charting library.
-const PriceHistoryChart = dynamic(
-  () => import('@/components/PriceHistoryChart').then((m) => m.PriceHistoryChart),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        className="h-[260px] grid place-items-center text-xs text-[color:var(--color-text-faint)]"
-        style={{ fontFamily: 'var(--font-mono)' }}
-      >
-        Loading chart…
-      </div>
-    ),
-  }
-);
 
 const CATEGORIES = [
   { value: 'network', label: 'Network' },
@@ -1086,7 +1068,6 @@ function ItemDetailModal({
   const [aiFilling, setAiFilling] = useState(false);
   const [specsFilling, setSpecsFilling] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ text: string; href?: string; tone: 'ok' | 'err' } | null>(null);
-  const [tab, setTab] = useState<'details' | 'history'>('details');
   const [showLinkPicker, setShowLinkPicker] = useState(false);
 
   function handleAiFill() {
@@ -1441,57 +1422,15 @@ function ItemDetailModal({
         </div>
       </div>
 
-      {/* Shopping: clear price panel (best now / lowest / target + verdict + log) */}
-      {view === 'shopping' && <div className="mb-4"><PricePanel item={item} onChanged={() => router.refresh()} /></div>}
-
-      {/* Tabs: Details (editable form) | Price history (chart) */}
-      {item.priceHistory.length > 0 ? (
-        <>
-          <div className="flex gap-1 mb-4 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-xl p-1 w-fit">
-            {(['details', 'history'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={cn(
-                  'px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all',
-                  tab === t ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
-                )}
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                {t === 'details' ? 'Details' : `Full history · ${item.priceHistory.length}`}
-              </button>
-            ))}
-          </div>
-          {tab === 'details' ? (
-            <ItemForm key={`f-${item._id}-${item.updatedAt}`} item={item} onSuccess={onClose} onDelete={handleDelete} deletePending={pending} />
-          ) : (
-            <div>
-              <PriceHistoryChart history={item.priceHistory} />
-              <div className="space-y-1.5 mt-3">
-                {[...item.priceHistory]
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .map((entry) => (
-                    <div
-                      key={entry._id}
-                      className="flex items-center justify-between text-xs bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2"
-                    >
-                      <span className="font-semibold text-[color:var(--color-text)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                        {cur()}{entry.price}
-                      </span>
-                      <span className="text-[color:var(--color-text-dim)]">{entry.store}</span>
-                      <span className="text-[color:var(--color-text-faint)]">
-                        {new Date(entry.date).toLocaleDateString('en-GB')}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-        </>
-      ) : (
-        <ItemForm key={`f-${item._id}-${item.updatedAt}`} item={item} onSuccess={onClose} onDelete={handleDelete} deletePending={pending} />
+      {/* Price: ONE home — summary + verdict + log + (folded) full per-store history.
+          Shopping gets the full summary; an owned item only shows its history if any. */}
+      {(view === 'shopping' || item.priceHistory.length > 0) && (
+        <div className="mb-4">
+          <PricePanel item={item} summary={view === 'shopping'} onChanged={() => router.refresh()} />
+        </div>
       )}
+
+      <ItemForm key={`f-${item._id}-${item.updatedAt}`} item={item} onSuccess={onClose} onDelete={handleDelete} deletePending={pending} />
     </Modal>
   );
 }

@@ -1,9 +1,13 @@
 'use client';
 import { useState, useMemo, useTransition } from 'react';
+import dynamic from 'next/dynamic';
 import { cur } from '@/lib/money';
-import { Target, Plus, TrendingDown, TrendingUp, Check, Loader2 } from 'lucide-react';
+import { Plus, TrendingDown, TrendingUp, Check, Loader2, ChevronDown } from 'lucide-react';
 import type { SerializedItem } from '@/types';
 import { logItemPrice } from '@/app/items/actions';
+
+// Recharts is heavy — only pulled in when the user opens "Full history".
+const PriceHistoryChart = dynamic(() => import('@/components/PriceHistoryChart').then((m) => m.PriceHistoryChart), { ssr: false });
 
 function linkHost(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
@@ -74,12 +78,14 @@ function Sparkline({ points, target }: { points: number[]; target: number | null
 const money = (n: number) => `${cur()}${Math.round(n * 100) / 100}`;
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
-export function PricePanel({ item, onChanged }: { item: SerializedItem; onChanged?: () => void }) {
+export function PricePanel({ item, summary = true, onChanged }: { item: SerializedItem; summary?: boolean; onChanged?: () => void }) {
   const s = useMemo(() => priceStatus(item), [item]);
   const [pending, startTransition] = useTransition();
   const [logging, setLogging] = useState(false);
+  const [showFull, setShowFull] = useState(false);
   const [price, setPrice] = useState('');
   const [store, setStore] = useState('');
+  const sortedHist = useMemo(() => [...(item.priceHistory ?? [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [item.priceHistory]);
 
   const stores = useMemo(() => [...new Set((item.links ?? []).map((l) => l.label).filter(Boolean))], [item.links]);
   const v = VERDICT_META[s.verdict];
@@ -94,65 +100,101 @@ export function PricePanel({ item, onChanged }: { item: SerializedItem; onChange
     });
   }
 
+  const hasHistory = sortedHist.length > 0;
+
   return (
     <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <span className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>Price</span>
-        {v.label && (
+        <span className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          {summary ? 'Price' : 'Price history'}
+        </span>
+        {summary && v.label && (
           <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${v.cls}`} style={{ fontFamily: 'var(--font-mono)' }}>
             {v.icon && <v.icon size={12} />}{v.label}
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2.5">
-        <Stat label="Best now" value={s.bestNow ? money(s.bestNow.price) : '—'} sub={s.bestNow && s.bestNow.store !== 'current' ? s.bestNow.store : ''} />
-        <Stat label="Lowest ever" value={s.lowestEver ? money(s.lowestEver.price) : '—'} sub={s.lowestEver ? fmtDate(s.lowestEver.date) : ''} accent="accent" />
-        <Stat
-          label="Your target"
-          value={s.target ? money(s.target) : '—'}
-          sub={toGo != null ? (toGo <= 0 ? 'reached ✓' : `${money(toGo)} to go`) : 'not set'}
-        />
-      </div>
+      {summary && (
+        <>
+          <div className="grid grid-cols-3 gap-2.5">
+            <Stat label="Best now" value={s.bestNow ? money(s.bestNow.price) : '—'} sub={s.bestNow && s.bestNow.store !== 'current' ? s.bestNow.store : ''} />
+            <Stat label="Lowest ever" value={s.lowestEver ? money(s.lowestEver.price) : '—'} sub={s.lowestEver ? fmtDate(s.lowestEver.date) : ''} accent="accent" />
+            <Stat
+              label="Your target"
+              value={s.target ? money(s.target) : '—'}
+              sub={toGo != null ? (toGo <= 0 ? 'reached ✓' : `${money(toGo)} to go`) : 'not set'}
+            />
+          </div>
 
-      {s.hist.length >= 2 && (
-        <div className="mt-3">
-          <Sparkline points={s.hist.map((h) => h.price)} target={s.target} />
-        </div>
+          {s.hist.length >= 2 && (
+            <div className="mt-3">
+              <Sparkline points={s.hist.map((h) => h.price)} target={s.target} />
+            </div>
+          )}
+
+          {!logging ? (
+            <button
+              onClick={() => setLogging(true)}
+              className="mt-3 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors"
+            >
+              <Plus size={13} /> Log a price
+            </button>
+          ) : (
+            <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+              <input
+                autoFocus
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submit()}
+                placeholder={`${cur()} price`}
+                className="w-24 text-xs px-2.5 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none"
+                style={{ fontFamily: 'var(--font-mono)' }}
+              />
+              <input
+                value={store}
+                onChange={(e) => setStore(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submit()}
+                list="price-stores"
+                placeholder="store"
+                className="w-28 text-xs px-2.5 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none"
+              />
+              <datalist id="price-stores">{stores.map((st) => <option key={st} value={st} />)}</datalist>
+              <button onClick={submit} disabled={pending || !(Number(price) > 0)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
+                {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+              </button>
+              <button onClick={() => setLogging(false)} className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">cancel</button>
+            </div>
+          )}
+        </>
       )}
 
-      {!logging ? (
-        <button
-          onClick={() => setLogging(true)}
-          className="mt-3 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors"
-        >
-          <Plus size={13} /> Log a price
-        </button>
-      ) : (
-        <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-          <input
-            autoFocus
-            type="number"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
-            placeholder={`${cur()} price`}
-            className="w-24 text-xs px-2.5 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none"
+      {/* Full per-store history — folded away (the summary above is the day-to-day view). */}
+      {hasHistory && (
+        <div className={summary ? 'mt-3 pt-3 border-t border-[color:var(--color-border)]' : ''}>
+          <button
+            onClick={() => setShowFull((f) => !f)}
+            className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
             style={{ fontFamily: 'var(--font-mono)' }}
-          />
-          <input
-            value={store}
-            onChange={(e) => setStore(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
-            list="price-stores"
-            placeholder="store"
-            className="w-28 text-xs px-2.5 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none"
-          />
-          <datalist id="price-stores">{stores.map((st) => <option key={st} value={st} />)}</datalist>
-          <button onClick={submit} disabled={pending || !(Number(price) > 0)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
-            {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+          >
+            <ChevronDown size={13} className={`transition-transform ${showFull ? 'rotate-180' : ''}`} />
+            Full history · {sortedHist.length} {summary ? 'checks' : ''}
           </button>
-          <button onClick={() => setLogging(false)} className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">cancel</button>
+          {showFull && (
+            <div className="mt-3">
+              <PriceHistoryChart history={item.priceHistory} />
+              <div className="space-y-1.5 mt-3 max-h-48 overflow-y-auto">
+                {sortedHist.map((entry, i) => (
+                  <div key={entry._id || i} className="flex items-center justify-between text-xs bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2">
+                    <span className="font-semibold text-[color:var(--color-text)]" style={{ fontFamily: 'var(--font-mono)' }}>{cur()}{entry.price}</span>
+                    <span className="text-[color:var(--color-text-dim)]">{entry.store}</span>
+                    <span className="text-[color:var(--color-text-faint)]">{new Date(entry.date).toLocaleDateString('en-GB')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
