@@ -822,6 +822,15 @@ export async function addPriceEntry(
   revalidatePath('/items');
 }
 
+/** Set (or clear) the target price from the price panel, without opening the form. */
+export async function setItemTarget(id: string, target: number | null): Promise<{ ok: boolean }> {
+  await connectDB();
+  await Item.findByIdAndUpdate(id, { $set: { targetPrice: target && target > 0 ? target : null } });
+  revalidatePath('/items');
+  revalidatePath('/shopping');
+  return { ok: true };
+}
+
 /** Log an observed price for an item (manual "I saw it at €X" — also used by the AI
  *  command bar). Appends to the history and updates the current price. */
 export async function logItemPrice(
