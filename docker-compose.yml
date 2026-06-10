@@ -78,7 +78,9 @@ services:
   # Opt-in (heavy, ~450MB): `docker compose --profile scraper up -d flaresolverr`.
   # Needed only for URL-import / price-scrape from Cloudflare shops; comes up with the scraper.
   flaresolverr:
-    image: ghcr.io/flaresolverr/flaresolverr:latest
+    # 21hsmw fork has working arm64 images; the upstream ghcr image crash-loops on
+    # Apple Silicon ("Xvfb display did not open"). Pulls amd64 elsewhere fine.
+    image: 21hsmw/flaresolverr:nodriver
     container_name: homepage-flaresolverr
     restart: unless-stopped
     profiles: ["scraper"]
