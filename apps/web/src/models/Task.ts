@@ -1,4 +1,5 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
+import { softDeletePlugin } from '@/lib/softDelete';
 
 const StepSchema = new Schema(
   {
@@ -33,6 +34,8 @@ const TaskSchema = new Schema(
   },
   { timestamps: true }
 );
+
+TaskSchema.plugin(softDeletePlugin);
 
 export type TaskDoc = InferSchemaType<typeof TaskSchema> & { _id: string };
 

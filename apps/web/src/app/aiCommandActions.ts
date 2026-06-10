@@ -272,9 +272,10 @@ async function execute(name: string, input: Record<string, unknown>): Promise<{ 
       const id = s(input, 'id');
       const Model = modelFor(type);
       if (!Model || !/^[a-f\d]{24}$/i.test(id)) return { summary: 'delete failed', content: 'Need a valid type + id (use search_data first).' };
-      await (Model as typeof Item).deleteOne({ _id: id });
+      // Soft delete → recoverable from the Trash (Settings → Storage & data).
+      await (Model as typeof Item).updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
       revalidatePath('/items'); revalidatePath('/shopping'); revalidatePath('/tasks'); revalidatePath('/subscriptions');
-      return { summary: `deleted ${type}`, content: `Deleted the ${type}.` };
+      return { summary: `deleted ${type}`, content: `Deleted the ${type} (recoverable from Settings → Trash for 30 days).` };
     }
     default:
       return { summary: name, content: `Unknown tool ${name}` };

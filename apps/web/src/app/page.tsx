@@ -43,12 +43,13 @@ async function getStats() {
     Statement.find().lean(),
     Item.find().select('title').lean(),
     isAiReady(),
+    // aggregate() bypasses the soft-delete query middleware → filter trashed docs here
     Item.aggregate([
-      { $match: { status: { $in: SHOPPING_STATUSES, $ne: 'deferred' } } },
+      { $match: { status: { $in: SHOPPING_STATUSES, $ne: 'deferred' }, deletedAt: null } },
       { $group: { _id: null, total: { $sum: '$currentPrice' } } },
     ]),
     Item.aggregate([
-      { $match: { purchasedPrice: { $ne: null } } },
+      { $match: { purchasedPrice: { $ne: null }, deletedAt: null } },
       { $group: { _id: null, total: { $sum: '$purchasedPrice' } } },
     ]),
   ]);

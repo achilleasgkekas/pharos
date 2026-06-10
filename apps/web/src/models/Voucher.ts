@@ -1,4 +1,5 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
+import { softDeletePlugin } from '@/lib/softDelete';
 
 const VoucherSchema = new Schema(
   {
@@ -13,6 +14,8 @@ const VoucherSchema = new Schema(
   },
   { timestamps: true }
 );
+
+VoucherSchema.plugin(softDeletePlugin);
 
 export type VoucherDoc = InferSchemaType<typeof VoucherSchema> & { _id: string };
 

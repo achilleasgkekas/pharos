@@ -34,7 +34,8 @@ import { TAXONOMY_META, normalizeList, type TaxonomyKey } from '@/lib/taxonomies
 import { getStorageConfig, invalidateStorageConfig, type StorageBackend } from '@/lib/storageConfig';
 import { pushBatchToRemote, testRemote, type RemoteFile } from '@/lib/remoteStorage';
 import { renderStoragePath, DEFAULT_FOLDER_TEMPLATE, DEFAULT_NAME_TEMPLATE } from '@/lib/storagePath';
-import { readFile } from '@/lib/storage';
+import { readFile, deleteFile } from '@/lib/storage';
+import { Types } from 'mongoose';
 import { getStores, invalidateStoreCache, type StoreLite } from '@/lib/storeService';
 import { anthropicTest } from '@/lib/anthropic';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
@@ -607,8 +608,8 @@ function storeKey(raw: string): string {
 export async function findDuplicateStores(): Promise<StoreDupGroup[]> {
   await connectDB();
   const [rAgg, iAgg, storeDocs] = await Promise.all([
-    Receipt.aggregate([{ $group: { _id: '$store', n: { $sum: 1 } } }]),
-    Item.aggregate([{ $match: { purchasedFrom: { $nin: ['', null] } } }, { $group: { _id: '$purchasedFrom', n: { $sum: 1 } } }]),
+    Receipt.aggregate([{ $match: { deletedAt: null } }, { $group: { _id: '$store', n: { $sum: 1 } } }]),
+    Item.aggregate([{ $match: { purchasedFrom: { $nin: ['', null] }, deletedAt: null } }, { $group: { _id: '$purchasedFrom', n: { $sum: 1 } } }]),
     Store.find().select('name').lean(),
   ]);
 
@@ -820,4 +821,109 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
   revalidatePath('/settings');
   revalidatePath('/');
   return { ok: true, restored };
+}
+
+// ─── Trash (soft-deleted records) ────────────────────────────────────────────
+// Deletes everywhere in the app are now SOFT (deletedAt set); this is the one
+// place that restores or permanently purges them. Auto-purge after 30 days.
+
+export type TrashRow = { type: TrashType; id: string; title: string; subtitle: string; deletedAt: string };
+export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'task';
+
+const TRASH_MODELS: Record<TrashType, typeof Item> = {
+  item: Item,
+  receipt: Receipt as unknown as typeof Item,
+  expense: Expense as unknown as typeof Item,
+  subscription: Subscription as unknown as typeof Item,
+  voucher: Voucher as unknown as typeof Item,
+  task: Task as unknown as typeof Item,
+};
+const TRASH_RETENTION_DAYS = 30;
+
+function trashLabel(type: TrashType, d: Record<string, unknown>): { title: string; subtitle: string } {
+  switch (type) {
+    case 'item': return { title: String(d.title || '—'), subtitle: String(d.category || '') };
+    case 'receipt': return { title: String(d.store || '—'), subtitle: `€${d.total ?? 0} · ${d.date ? new Date(d.date as string).toLocaleDateString('en-GB') : ''}` };
+    case 'expense': return { title: String(d.vendor || d.category || '—'), subtitle: `${d.kind} · €${d.amount ?? 0}` };
+    case 'subscription': return { title: String(d.name || '—'), subtitle: `€${d.amount ?? 0}/${d.billingCycle || ''}` };
+    case 'voucher': return { title: String(d.title || '—'), subtitle: String(d.store || '') };
+    case 'task': return { title: String(d.title || '—'), subtitle: String(d.status || '') };
+  }
+}
+
+/** List everything in the Trash (and silently purge entries older than 30 days). */
+export async function getTrash(): Promise<TrashRow[]> {
+  await connectDB();
+  const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 86400000);
+  const rows: TrashRow[] = [];
+  for (const [type, Model] of Object.entries(TRASH_MODELS) as [TrashType, typeof Item][]) {
+    const docs = await Model.find({ deletedAt: { $ne: null } }).setOptions({ withDeleted: true }).lean();
+    for (const d of docs as unknown as Record<string, unknown>[]) {
+      const deletedAt = new Date(d.deletedAt as string);
+      if (deletedAt < cutoff) {
+        await purgeFromTrash(type, String(d._id));
+        continue;
+      }
+      const { title, subtitle } = trashLabel(type, d);
+      rows.push({ type, id: String(d._id), title, subtitle, deletedAt: deletedAt.toISOString() });
+    }
+  }
+  return rows.sort((a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime());
+}
+
+/** Bring a trashed record back exactly as it was (files + links were never touched). */
+export async function restoreFromTrash(type: TrashType, id: string): Promise<{ ok: boolean }> {
+  const Model = TRASH_MODELS[type];
+  if (!Model) return { ok: false };
+  await connectDB();
+  await Model.updateOne({ _id: id }, { $set: { deletedAt: null } });
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+/** Permanently delete: doc + its binary files + dangling cross-references. */
+export async function purgeFromTrash(type: TrashType, id: string): Promise<{ ok: boolean }> {
+  const Model = TRASH_MODELS[type];
+  if (!Model) return { ok: false };
+  await connectDB();
+  const doc = (await Model.findById(id).setOptions({ withDeleted: true }).lean()) as Record<string, unknown> | null;
+  if (!doc) return { ok: true };
+  const oid = new Types.ObjectId(id);
+
+  if (type === 'receipt' || type === 'expense') {
+    for (const fp of [doc.filePath, doc.thumbPath]) if (fp) await deleteFile(String(fp)).catch(() => {});
+  }
+  if (type === 'receipt') {
+    await Item.updateMany({ receiptIds: oid }, { $pull: { receiptIds: oid } });
+  }
+  if (type === 'item') {
+    for (const p of (doc.photos as string[] | undefined) ?? []) await deleteFile(p).catch(() => {});
+    await Receipt.updateMany({ itemIds: oid }, { $pull: { itemIds: oid } });
+    await Receipt.updateMany(
+      { 'lineItems.matchedItemId': oid },
+      { $set: { 'lineItems.$[el].matchedItemId': null } },
+      { arrayFilters: [{ 'el.matchedItemId': oid }] }
+    );
+    await Statement.updateMany(
+      { 'transactions.matchedItemIds': oid },
+      { $pull: { 'transactions.$[].matchedItemIds': oid } }
+    );
+  }
+  await Model.deleteOne({ _id: id });
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+/** Empty the whole Trash (permanent). */
+export async function emptyTrash(): Promise<{ ok: boolean; purged: number }> {
+  await connectDB();
+  let purged = 0;
+  for (const [type, Model] of Object.entries(TRASH_MODELS) as [TrashType, typeof Item][]) {
+    const docs = await Model.find({ deletedAt: { $ne: null } }).setOptions({ withDeleted: true }).select('_id').lean();
+    for (const d of docs as unknown as { _id: unknown }[]) {
+      await purgeFromTrash(type, String(d._id));
+      purged++;
+    }
+  }
+  return { ok: true, purged };
 }

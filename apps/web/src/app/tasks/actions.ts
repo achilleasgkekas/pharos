@@ -48,7 +48,8 @@ export async function updateTaskStatus(id: string, status: string) {
 
 export async function deleteTask(id: string) {
   await connectDB();
-  await Task.findByIdAndDelete(id);
+  // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
+  await Task.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
   revalidatePath('/tasks');
 }
 

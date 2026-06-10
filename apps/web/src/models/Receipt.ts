@@ -1,4 +1,5 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
+import { softDeletePlugin } from '@/lib/softDelete';
 
 const LineItemSchema = new Schema(
   {
@@ -46,6 +47,8 @@ const ReceiptSchema = new Schema(
   },
   { timestamps: true }
 );
+
+ReceiptSchema.plugin(softDeletePlugin);
 
 export type ReceiptDoc = InferSchemaType<typeof ReceiptSchema> & { _id: string };
 

@@ -1,4 +1,5 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
+import { softDeletePlugin } from '@/lib/softDelete';
 
 const PriceEntrySchema = new Schema(
   {
@@ -66,6 +67,8 @@ const ItemSchema = new Schema(
 );
 
 ItemSchema.index({ title: 'text', specs: 'text', notes: 'text' });
+
+ItemSchema.plugin(softDeletePlugin);
 
 export type ItemDoc = InferSchemaType<typeof ItemSchema> & { _id: string };
 

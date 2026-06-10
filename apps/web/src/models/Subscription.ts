@@ -1,4 +1,5 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
+import { softDeletePlugin } from '@/lib/softDelete';
 
 const SubscriptionSchema = new Schema(
   {
@@ -26,6 +27,8 @@ const SubscriptionSchema = new Schema(
   },
   { timestamps: true }
 );
+
+SubscriptionSchema.plugin(softDeletePlugin);
 
 export type SubscriptionDoc = InferSchemaType<typeof SubscriptionSchema> & { _id: string };
 

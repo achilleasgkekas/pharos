@@ -92,20 +92,9 @@ export async function updateItem(id: string, formData: FormData) {
 
 export async function deleteItem(id: string) {
   await connectDB();
-  await Item.findByIdAndDelete(id);
-
-  // Clear dangling references so receipts/statements don't point at a ghost item
-  const oid = new Types.ObjectId(id);
-  await Receipt.updateMany({ itemIds: oid }, { $pull: { itemIds: oid } });
-  await Receipt.updateMany(
-    { 'lineItems.matchedItemId': oid },
-    { $set: { 'lineItems.$[el].matchedItemId': null } },
-    { arrayFilters: [{ 'el.matchedItemId': oid }] }
-  );
-  await Statement.updateMany(
-    { 'transactions.matchedItemIds': oid },
-    { $pull: { 'transactions.$[].matchedItemIds': oid } }
-  );
+  // Soft delete → Trash (Settings → Storage & data). Receipt/statement links stay
+  // intact so a restore is lossless; purging from the Trash clears them for real.
+  await Item.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
 
   revalidatePath('/items');
   revalidatePath('/shopping');

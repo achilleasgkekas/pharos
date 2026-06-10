@@ -107,6 +107,7 @@ export async function toggleSubscriptionActive(id: string, active: boolean) {
 
 export async function deleteSubscription(id: string) {
   await connectDB();
-  await Subscription.findByIdAndDelete(id);
+  // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
+  await Subscription.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
   revalidatePath('/subscriptions');
 }

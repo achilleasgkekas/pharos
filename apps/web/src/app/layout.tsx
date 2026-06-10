@@ -10,6 +10,8 @@ import { isAiReady } from '@/lib/ollama';
 export const metadata: Metadata = {
   title: 'PHAROS · Personal Hub',
   description: 'PHAROS, your Asset & Resource Oversight System. Oversight on everything you own: equipment, receipts, installments, network. Self-hosted.',
+  // PWA: installable from the phone's "Add to Home Screen" (pairs with app/manifest.ts)
+  appleWebApp: { capable: true, title: 'PHAROS', statusBarStyle: 'black-translucent' },
 };
 
 // Apply the saved theme before paint to avoid a flash of the wrong theme.

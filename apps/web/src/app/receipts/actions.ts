@@ -462,24 +462,10 @@ export async function backfillReceiptThumbs(limit = 12): Promise<number> {
 
 export async function deleteReceipt(id: string) {
   await connectDB();
-  const receipt = await Receipt.findById(id);
-  if (receipt?.filePath) {
-    try {
-      await deleteFile(receipt.filePath);
-    } catch {
-      // file already gone — proceed with doc deletion
-    }
-  }
-  if (receipt?.thumbPath) {
-    try {
-      await deleteFile(receipt.thumbPath);
-    } catch {
-      /* thumb already gone */
-    }
-  }
-  await Receipt.findByIdAndDelete(id);
-  // Drop the back-reference from any linked items
-  await Item.updateMany({ receiptIds: new Types.ObjectId(id) }, { $pull: { receiptIds: new Types.ObjectId(id) } });
+  // Soft delete → Trash (Settings → Storage & data). Files and item links stay
+  // intact so a restore brings everything back; purging from the Trash deletes
+  // the files and drops the references for real.
+  await Receipt.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
   revalidatePath('/receipts');
   revalidatePath('/items');
 }

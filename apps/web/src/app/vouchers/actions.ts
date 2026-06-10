@@ -69,6 +69,7 @@ export async function toggleVoucherUsed(id: string, used: boolean) {
 
 export async function deleteVoucher(id: string) {
   await connectDB();
-  await Voucher.findByIdAndDelete(id);
+  // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
+  await Voucher.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
   revalidatePath('/vouchers');
 }

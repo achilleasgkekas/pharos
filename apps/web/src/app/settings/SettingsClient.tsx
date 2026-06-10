@@ -9,7 +9,7 @@ import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, s
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
-import { saveDefaults, saveNtfy, sendTestNtfy, runAlertChecks, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, saveList, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry } from './actions';
+import { saveDefaults, saveNtfy, sendTestNtfy, runAlertChecks, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow } from './actions';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
@@ -184,6 +184,7 @@ export function SettingsClient({ info }: { info: Info }) {
                 </div>
                 <BackupRestore />
               </Section>
+              <TrashManager />
             </>
           )}
 
@@ -1125,6 +1126,97 @@ function NotificationsManager({ settings }: { settings: AppSettings }) {
 }
 
 // ─── Backup / restore ────────────────────────────────────────────────────────
+
+// ─── Trash (soft-deleted records) ────────────────────────────────────────────
+
+function TrashManager() {
+  const [rows, setRows] = useState<TrashRow[] | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [busyId, setBusyId] = useState('');
+  const confirm = useConfirm();
+
+  function load() {
+    startTransition(async () => setRows(await getTrash()));
+  }
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function restore(r: TrashRow) {
+    setBusyId(r.id);
+    startTransition(async () => {
+      await restoreFromTrash(r.type, r.id);
+      setRows((p) => (p ?? []).filter((x) => x.id !== r.id));
+      setBusyId('');
+    });
+  }
+  async function purge(r: TrashRow) {
+    const ok = await confirm({
+      title: 'Delete forever?',
+      message: `"${r.title}" will be permanently deleted (files included). This cannot be undone.`,
+      confirmLabel: 'Delete forever',
+      danger: true,
+    });
+    if (!ok) return;
+    setBusyId(r.id);
+    startTransition(async () => {
+      await purgeFromTrash(r.type, r.id);
+      setRows((p) => (p ?? []).filter((x) => x.id !== r.id));
+      setBusyId('');
+    });
+  }
+  async function empty() {
+    const ok = await confirm({
+      title: 'Empty the Trash?',
+      message: `${rows?.length ?? 0} records will be permanently deleted (files included). This cannot be undone.`,
+      confirmLabel: 'Empty Trash',
+      danger: true,
+    });
+    if (!ok) return;
+    startTransition(async () => {
+      await emptyTrash();
+      setRows([]);
+    });
+  }
+
+  return (
+    <Section title={`Trash${rows?.length ? ` (${rows.length})` : ''}`} icon={<Trash2 size={15} />}>
+      <p className="text-xs text-[color:var(--color-text-dim)] mb-3">
+        Deleted records land here and auto-purge after 30 days. Restore brings them back exactly as they were.
+      </p>
+      {rows === null ? (
+        <p className="text-xs text-[color:var(--color-text-faint)]"><Loader2 size={13} className="inline animate-spin" /> Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="text-xs text-[color:var(--color-text-faint)] italic">Trash is empty.</p>
+      ) : (
+        <>
+          <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+            {rows.map((r) => (
+              <div key={`${r.type}-${r.id}`} className="flex items-center gap-2.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2">
+                <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-text-faint)] bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded px-1.5 py-0.5 shrink-0" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {r.type}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs font-medium truncate block">{r.title}</span>
+                  <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {r.subtitle} · deleted {new Date(r.deletedAt).toLocaleDateString('en-GB')}
+                  </span>
+                </div>
+                <button onClick={() => restore(r)} disabled={pending && busyId === r.id} className="text-[11px] text-[color:var(--color-accent)] hover:underline disabled:opacity-50 shrink-0">
+                  restore
+                </button>
+                <button onClick={() => purge(r)} disabled={pending && busyId === r.id} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] disabled:opacity-50 shrink-0">
+                  delete forever
+                </button>
+              </div>
+            ))}
+          </div>
+          <button onClick={empty} disabled={pending} className="mt-3 text-xs px-3 py-1.5 rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-red)] hover:border-[color:var(--color-red)] transition-colors disabled:opacity-50">
+            Empty Trash ({rows.length})
+          </button>
+        </>
+      )}
+    </Section>
+  );
+}
 
 function BackupRestore() {
   const [pending, startTransition] = useTransition();

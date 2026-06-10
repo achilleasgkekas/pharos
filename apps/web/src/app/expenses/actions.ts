@@ -287,9 +287,8 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
 export async function deleteExpense(id: string): Promise<{ ok: boolean }> {
   try {
     await connectDB();
-    const exp = await Expense.findById(id).lean();
-    await Expense.deleteOne({ _id: id });
-    for (const fp of [exp?.filePath, exp?.thumbPath]) if (fp) await deleteFile(fp).catch(() => {});
+    // Soft delete → Trash (Settings → Storage & data). Files stay until purge.
+    await Expense.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
     revalidatePath('/expenses');
     revalidatePath('/income');
     return { ok: true };
