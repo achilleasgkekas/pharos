@@ -39,7 +39,7 @@ import { Types } from 'mongoose';
 import { getStores, invalidateStoreCache, type StoreLite } from '@/lib/storeService';
 import { anthropicTest } from '@/lib/anthropic';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
-import { getUnifiSnapshot, invalidateUnifiConfig } from '@/lib/unifi';
+import { getUnifiSnapshot, invalidateUnifiConfig, runUnifiSpeedtest } from '@/lib/unifi';
 import { sendNtfyTo } from '@/lib/notify';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
@@ -982,4 +982,11 @@ export async function testUnifiConnection(): Promise<{ ok: boolean; error?: stri
   const snap = await getUnifiSnapshot();
   if (!snap.ok) return { ok: false, error: snap.error === 'not-configured' ? 'Fill in host/user/pass, enable, and Save first' : snap.error };
   return { ok: true, devices: snap.devices.length, wan: snap.wan.status };
+}
+
+/** Kick off a WAN speedtest on the gateway (result shows on the next /network load). */
+export async function triggerSpeedtest(): Promise<{ ok: boolean; error?: string }> {
+  const r = await runUnifiSpeedtest();
+  if (r.ok) revalidatePath('/network');
+  return r;
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getUnifiSnapshot, type UnifiDevice } from '@/lib/unifi';
-import { Wifi, Router, Network as NetworkIcon, Cable, Settings, RefreshCw } from 'lucide-react';
+import { SpeedtestButton, ClientTable } from './NetworkClient';
+import { Wifi, Router, Network as NetworkIcon, Cable, Settings, RefreshCw, Gauge, ShieldCheck, AlertTriangle, Lock } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,15 @@ function deviceKind(type: string): string {
   return 'Gateway';
 }
 
+function Stat({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <span className="text-[color:var(--color-text-faint)] block">{label}</span>
+      {children}
+    </div>
+  );
+}
+
 export default async function NetworkPage() {
   const snap = await getUnifiSnapshot();
 
@@ -42,9 +52,12 @@ export default async function NetworkPage() {
             </span>
           )}
         </h1>
-        <Link href="/network" prefetch={false} className="flex items-center gap-1.5 text-xs text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors" style={mono}>
-          <RefreshCw size={13} /> refresh
-        </Link>
+        <div className="flex items-center gap-3">
+          {snap.ok && <SpeedtestButton />}
+          <Link href="/network" prefetch={false} className="flex items-center gap-1.5 text-xs text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors" style={mono}>
+            <RefreshCw size={13} /> refresh
+          </Link>
+        </div>
       </div>
 
       {!snap.ok ? (
@@ -72,33 +85,49 @@ export default async function NetworkPage() {
         </div>
       ) : (
         <>
-          {/* WAN banner */}
-          <div className="mb-5 rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-surface)] to-[color:var(--color-surface-2)] p-5 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className={`h-2.5 w-2.5 rounded-full ${snap.wan.status === 'ok' ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-red)]'}`} />
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)]" style={mono}>WAN</p>
-                <p className="font-bold text-lg" style={display}>{snap.wan.status === 'ok' ? 'Online' : snap.wan.status}</p>
+          {/* WAN / Internet banner */}
+          <div className="mb-5 rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-surface)] to-[color:var(--color-surface-2)] p-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className={`h-2.5 w-2.5 rounded-full ${snap.wan.status === 'ok' ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-red)]'}`} />
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)]" style={mono}>
+                    Internet {snap.wan.isp && `· ${snap.wan.isp}`} {snap.wan.asn && <span className="opacity-60">{snap.wan.asn}</span>}
+                  </p>
+                  <p className="font-bold text-lg" style={display}>{snap.wan.status === 'ok' ? 'Online' : snap.wan.status}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs" style={mono}>
+                {snap.wan.ip && <Stat label="Public IP"><span className="text-[color:var(--color-text)]">{snap.wan.ip}</span></Stat>}
+                {snap.wan.latency != null && <Stat label="Latency"><span className="text-[color:var(--color-text)]">{snap.wan.latency} ms</span></Stat>}
+                {snap.wan.uptimeSec > 0 && <Stat label="WAN uptime"><span className="text-[color:var(--color-text)]">{uptimeLabel(snap.wan.uptimeSec)}</span></Stat>}
+                {snap.wan.availability != null && (
+                  <Stat label="Availability">
+                    <span className={snap.wan.availability >= 99.9 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-gold)]'}>{snap.wan.availability.toFixed(1)}%</span>
+                  </Stat>
+                )}
+                {snap.wan.drops != null && (
+                  <Stat label="Drops">
+                    <span className={snap.wan.drops > 0 ? 'text-[color:var(--color-gold)]' : 'text-[color:var(--color-text)]'}>{snap.wan.drops}</span>
+                  </Stat>
+                )}
+                <Stat label="Clients"><span className="text-[color:var(--color-text)]">{snap.clientsTotal} ({snap.clientsWireless} wifi · {snap.clientsWired} wired)</span></Stat>
               </div>
             </div>
-            <div className="flex gap-6 text-xs" style={mono}>
-              {snap.wan.ip && (
-                <div>
-                  <span className="text-[color:var(--color-text-faint)] block mb-0.5">Public IP</span>
-                  <span className="text-[color:var(--color-text)]">{snap.wan.ip}</span>
-                </div>
-              )}
-              {snap.wan.latency != null && (
-                <div>
-                  <span className="text-[color:var(--color-text-faint)] block mb-0.5">Latency</span>
-                  <span className="text-[color:var(--color-text)]">{snap.wan.latency} ms</span>
-                </div>
-              )}
-              <div>
-                <span className="text-[color:var(--color-text-faint)] block mb-0.5">Clients</span>
-                <span className="text-[color:var(--color-text)]">{snap.clientsTotal} ({snap.clientsWireless} wifi · {snap.clientsWired} wired)</span>
+
+            {/* Speedtest row */}
+            {snap.wan.speedtest && (
+              <div className="mt-4 pt-4 border-t border-[color:var(--color-border)] flex flex-wrap items-center gap-x-6 gap-y-2 text-xs" style={mono}>
+                <span className="flex items-center gap-1.5 text-[color:var(--color-cyan)]"><Gauge size={13} /> Last speedtest</span>
+                <Stat label="Download"><span className="text-[color:var(--color-accent)] font-bold">{snap.wan.speedtest.down} Mbps</span></Stat>
+                <Stat label="Upload"><span className="text-[color:var(--color-cyan)] font-bold">{snap.wan.speedtest.up} Mbps</span></Stat>
+                <Stat label="Ping"><span className="text-[color:var(--color-text)]">{snap.wan.speedtest.ping} ms</span></Stat>
+                {snap.wan.speedtest.server && <Stat label="Server"><span className="text-[color:var(--color-text-dim)]">{snap.wan.speedtest.server}</span></Stat>}
+                {snap.wan.speedtest.runAt > 0 && (
+                  <Stat label="When"><span className="text-[color:var(--color-text-dim)]">{new Date(snap.wan.speedtest.runAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></Stat>
+                )}
               </div>
-            </div>
+            )}
           </div>
 
           {/* Devices */}
@@ -114,8 +143,14 @@ export default async function NetworkPage() {
                       {deviceIcon(d.type)}
                     </span>
                     <div>
-                      <p className="font-semibold text-sm leading-tight">{d.name}</p>
-                      <p className="text-[10px] text-[color:var(--color-text-faint)]" style={mono}>{deviceKind(d.type)} · {d.model}</p>
+                      <p className="font-semibold text-sm leading-tight flex items-center gap-1.5">
+                        {d.name}
+                        {d.upgradable && <span title="Firmware update available"><ShieldCheck size={12} className="text-[color:var(--color-gold)]" /></span>}
+                        {d.overheating && <span title="Overheating"><AlertTriangle size={12} className="text-[color:var(--color-red)]" /></span>}
+                      </p>
+                      <p className="text-[10px] text-[color:var(--color-text-faint)]" style={mono}>
+                        {deviceKind(d.type)} · {d.model}{d.uplinkTo ? ` · ↑ ${d.uplinkTo}` : ''}
+                      </p>
                     </div>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${d.online ? 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10' : 'text-[color:var(--color-red)] bg-[color:var(--color-red)]/10'}`} style={mono}>
@@ -123,37 +158,63 @@ export default async function NetworkPage() {
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-[11px]" style={mono}>
-                  <div><span className="text-[color:var(--color-text-faint)] block">Uptime</span>{uptimeLabel(d.uptimeSec)}</div>
-                  <div><span className="text-[color:var(--color-text-faint)] block">Clients</span>{d.clients}</div>
-                  <div><span className="text-[color:var(--color-text-faint)] block">Version</span><span className="truncate block">{d.version || '—'}</span></div>
-                  {d.cpu != null && <div><span className="text-[color:var(--color-text-faint)] block">CPU</span>{d.cpu}%</div>}
-                  {d.mem != null && <div><span className="text-[color:var(--color-text-faint)] block">RAM</span>{d.mem}%</div>}
+                  <Stat label="Uptime">{uptimeLabel(d.uptimeSec)}</Stat>
+                  <Stat label="Clients">{d.clients}</Stat>
+                  <Stat label="Version"><span className="truncate block">{d.version || '—'}</span></Stat>
+                  {d.cpu != null && <Stat label="CPU">{d.cpu}%</Stat>}
+                  {d.mem != null && <Stat label="RAM">{d.mem}%</Stat>}
                   {d.tempC != null && (
-                    <div>
-                      <span className="text-[color:var(--color-text-faint)] block">Temp</span>
+                    <Stat label="Temp">
                       <span className={d.tempC >= 80 ? 'text-[color:var(--color-red)]' : d.tempC >= 70 ? 'text-[color:var(--color-gold)]' : ''}>{d.tempC}°C</span>
-                    </div>
+                    </Stat>
                   )}
+                  {d.loadAvg != null && <Stat label="Load">{d.loadAvg.toFixed(2)}</Stat>}
+                  {d.satisfaction != null && (
+                    <Stat label="Health">
+                      <span className={d.satisfaction >= 90 ? 'text-[color:var(--color-accent)]' : d.satisfaction >= 70 ? 'text-[color:var(--color-gold)]' : 'text-[color:var(--color-red)]'}>{d.satisfaction}%</span>
+                    </Stat>
+                  )}
+                  {d.poeMaxW != null && d.poeMaxW > 0 && <Stat label="PoE max">{d.poeMaxW}W</Stat>}
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Clients per network */}
-          {snap.byNetwork.length > 0 && (
-            <>
-              <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-3" style={mono}>
-                Clients by network
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {snap.byNetwork.map((n) => (
-                  <span key={n.name} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface)] border border-[color:var(--color-border)]" style={mono}>
-                    {n.name} <span className="text-[color:var(--color-accent)] font-bold">{n.n}</span>
-                  </span>
-                ))}
+          {/* Client table */}
+          <div className="mb-6">
+            <ClientTable clients={snap.clients} />
+          </div>
+
+          {/* Networks + VPN */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {snap.byNetwork.length > 0 && (
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-3" style={mono}>Clients by network</p>
+                <div className="flex flex-wrap gap-2">
+                  {snap.byNetwork.map((n) => (
+                    <span key={n.name} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface)] border border-[color:var(--color-border)]" style={mono}>
+                      {n.name} <span className="text-[color:var(--color-accent)] font-bold">{n.n}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
-            </>
-          )}
+            )}
+            {snap.vpn && (
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-3" style={mono}>VPN</p>
+                <div className="flex flex-wrap gap-2 text-xs" style={mono}>
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[color:var(--color-surface)] border border-[color:var(--color-border)]">
+                    <Lock size={12} className={snap.vpn.remoteUser ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]'} />
+                    Remote users <span className={snap.vpn.remoteUser ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]'}>{snap.vpn.remoteUser ? 'on' : 'off'}</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[color:var(--color-surface)] border border-[color:var(--color-border)]">
+                    <NetworkIcon size={12} className={snap.vpn.siteToSite ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]'} />
+                    Site-to-site <span className={snap.vpn.siteToSite ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]'}>{snap.vpn.siteToSite ? `${snap.vpn.siteToSiteActive} active` : 'off'}</span>
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
 
           <p className="text-[10px] text-[color:var(--color-text-faint)] mt-6" style={mono}>
             via UniFi Controller @ local gateway · snapshot {new Date(snap.fetchedAt).toLocaleTimeString('en-GB')} · cached 30s
