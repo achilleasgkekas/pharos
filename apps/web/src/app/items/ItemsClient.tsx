@@ -1515,6 +1515,10 @@ function ItemForm({
     });
   }
 
+  // Owned (received/installed) → "Paid" is what matters. Shopping → a single
+  // "Price"; the target + store comparison live in the PricePanel above.
+  const owned = ['received', 'installed'].includes(form.status);
+
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
       {/* Title */}
@@ -1547,39 +1551,22 @@ function ItemForm({
         </select>
       </Field>
 
-      {/* Prices */}
-      <Field label={`Current price (${cur()})`}>
-        <Input
-          type="number"
-          step="0.01"
-          min="0"
-          value={form.currentPrice}
-          onChange={set('currentPrice')}
-          placeholder="0"
-        />
-      </Field>
-      <Field label={`Purchased (${cur()})`}>
-        <Input
-          type="number"
-          step="0.01"
-          min="0"
-          value={form.purchasedPrice}
-          onChange={set('purchasedPrice')}
-          placeholder="if purchased"
-        />
-      </Field>
-
-      {/* Target price — price-tracker alert */}
-      <Field label={`🎯 Target price (${cur()})`}>
-        <Input
-          type="number"
-          step="0.01"
-          min="0"
-          value={form.targetPrice}
-          onChange={set('targetPrice')}
-          placeholder="e.g. 280 — flags a deal"
-        />
-      </Field>
+      {/* Prices — one field that fits the item: what you PAID (owned) vs the
+          current PRICE (wishlist). Target + store comparison are in the price panel. */}
+      {owned ? (
+        <>
+          <Field label={`Paid (${cur()})`}>
+            <Input type="number" step="0.01" min="0" value={form.purchasedPrice} onChange={set('purchasedPrice')} placeholder="what it cost you" />
+          </Field>
+          <Field label={`Current value (${cur()})`}>
+            <Input type="number" step="0.01" min="0" value={form.currentPrice} onChange={set('currentPrice')} placeholder="worth now (optional)" />
+          </Field>
+        </>
+      ) : (
+        <Field label={`Price (${cur()})`}>
+          <Input type="number" step="0.01" min="0" value={form.currentPrice} onChange={set('currentPrice')} placeholder="current price (or add store links below)" />
+        </Field>
+      )}
 
       {/* Purchased from */}
       <Field label="Purchased from">

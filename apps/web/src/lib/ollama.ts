@@ -154,8 +154,9 @@ Schema:
 
 Rules:
 - store: ALWAYS identify it — this is critical. Look at the logo, the largest text at the top, the website/domain, the tax id (VAT no. / ΑΦΜ / USt-IdNr / SIRET), the products' brand, and any footer URL. Prefer the commercial brand over the legal entity (drop suffixes like "Ltd"/"Inc"/"GmbH"/"SARL"/"SA"/"Srl"/"ΑΕ"/"ΕΠΕ"/"ΜΟΝ. ΙΚΕ").
-- If it matches one of these KNOWN stores, return that EXACT name: ${STORE_NAMES.join(', ')}. (e.g. a DJI product bought online → "DJI Store".)
-- Never leave store empty. If truly unknown, return the most prominent name you can read.
+- Return a name from this KNOWN list ONLY when that store's own brand, logo, or website domain is ACTUALLY printed on the receipt: ${STORE_NAMES.join(', ')}. (e.g. a kotsovolos.gr footer → "Κωτσόβολος".)
+- CRITICAL — do NOT GUESS. If the printed company/legal name (often a Greek ΑΦΜ-registered name like "ΚΑΠΕΤΑΝΟΠΟΥΛΟΣ ΔΑΝΙΗΛΙΔΟΥ") is not one you can confidently tie to a brand above, return THAT printed name VERBATIM. Never substitute a different well-known store you were not actually shown — the app maps legal names to brands itself.
+- Never leave store empty. If truly unknown, return the most prominent name printed at the top.
 - warrantyMonths: only if the receipt explicitly states a warranty period (e.g. "2 years warranty", "Εγγύηση 24 μήνες", "24 Monate Garantie", "garantie 2 ans"); otherwise 0.
 - date: CRITICAL — always find it. Scan the WHOLE image (usually top or top-right, near the document number) for a date label ("Date", "ΗΜΕΡΟΜΗΝΙΑ"/"ΗΜ. ΕΚΔΟΣΗΣ", "Datum", "Fecha", "Data") or a bare date pattern. Output it as YYYY-MM-DD. Read the YEAR digits carefully (e.g. 23/09/2025 → "2025-09-23", NOT 2018 or 2026). Only leave it empty if no date is printed anywhere.
 - Date order: most of the world is DAY-FIRST (DD/MM/YYYY — all of Europe, including Greece); the US is MONTH-FIRST (MM/DD/YYYY). If the first group is >12 it must be the day. e.g. a European "03/04/2026" = 3 April → "2026-04-03".
