@@ -9,7 +9,7 @@ import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, s
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
-import { saveDefaults, saveNtfy, sendTestNtfy, runAlertChecks, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, getUnifiInfo, saveUnifiConfig, testUnifiConnection, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type UnifiInfo } from './actions';
+import { saveDefaults, saveNtfy, sendTestNtfy, runAlertChecks, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, getUnifiInfo, saveUnifiConfig, testUnifiConnection, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type UnifiInfo } from './actions';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
@@ -871,9 +871,9 @@ function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
 
 // OneDrive setup: zero-config by default (built-in public client → just sign in).
 // "Use your own Azure app" is an optional advanced path for a branded consent.
-function OnedriveWizard({ account }: { account: string }) {
+function OnedriveWizard({ connected: initialConnected, account }: { connected: boolean; account: string }) {
   const [pending, startTransition] = useTransition();
-  const [connected, setConnected] = useState(!!account);
+  const [connected, setConnected] = useState(initialConnected);
   const [acct, setAcct] = useState(account);
   const [advanced, setAdvanced] = useState(false);
   const [clientId, setClientId] = useState('');
@@ -976,6 +976,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
   const [secure, setSecure] = useState(storage.remoteSecure);
   const [msg, setMsg] = useState<string | null>(null);
   const [test, setTest] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const preview = (() => {
     try {
@@ -1024,9 +1025,34 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
     });
   }
 
-  function doSync() {
-    setMsg('Syncing… (this can take a while)');
+  async function doSync() {
     setTest(null);
+    // OneDrive: upload in chunks so the UI shows live progress and survives Graph
+    // throttling (a one-shot upload of hundreds of files silently dropped some).
+    if (backend === 'onedrive') {
+      setSyncing(true);
+      setMsg('Preparing…');
+      const man = await getSyncManifest();
+      if (!man.ok) { setMsg(`✗ ${man.error}`); setSyncing(false); return; }
+      const items = man.items;
+      const total = items.length;
+      if (!total) { setMsg('Nothing to sync.'); setSyncing(false); return; }
+      let pushed = 0, failed = 0;
+      const errs: string[] = [];
+      const CHUNK = 8;
+      for (let i = 0; i < total; i += CHUNK) {
+        const r = await syncOnedriveBatch(items.slice(i, i + CHUNK));
+        pushed += r.pushed;
+        failed += r.failed;
+        if (errs.length < 3) errs.push(...r.errors.slice(0, 3 - errs.length));
+        setMsg(`Syncing ${Math.min(i + CHUNK, total)}/${total}… (${pushed} ok${failed ? `, ${failed} failed` : ''})`);
+      }
+      setMsg(`Synced ${pushed}/${total} ✓${failed ? ` · ${failed} failed${errs[0] ? ` — ${errs[0]}` : ''}` : ''}`);
+      setSyncing(false);
+      return;
+    }
+    // SMB/FTP: single connection, one-shot.
+    setMsg('Syncing… (this can take a while)');
     startTransition(async () => {
       const r = await syncToRemote();
       if (r.ok) setMsg(`Synced ${r.pushed} file(s)${r.skipped ? ` · ${r.skipped} skipped` : ''} ✓`);
@@ -1065,7 +1091,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
         </div>
       </Row>
 
-      {backend === 'onedrive' && <OnedriveWizard account={storage.onedriveAccount} />}
+      {backend === 'onedrive' && <OnedriveWizard connected={storage.onedriveConnected} account={storage.onedriveAccount} />}
 
       {(backend === 'smb' || backend === 'ftp') && (
         <div className="grid sm:grid-cols-2 gap-3 pt-1">
@@ -1139,8 +1165,8 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
           </button>
         )}
         {backend !== 'local' && (
-          <button type="button" onClick={doSync} disabled={pending} className={ghostBtn}>
-            <RefreshCw size={13} /> Sync {counts.receipts + counts.statements} files now
+          <button type="button" onClick={doSync} disabled={pending || syncing} className={ghostBtn}>
+            {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Sync files now
           </button>
         )}
         {test && (

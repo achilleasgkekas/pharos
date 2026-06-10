@@ -81,7 +81,8 @@ export async function pollDeviceToken(
     });
     const j = (await res.json()) as Record<string, unknown>;
     if (res.ok && j.refresh_token) {
-      const account = await accountName(String(j.access_token));
+      // Prefer the id_token claims (no extra Graph permission needed); fall back to /me.
+      const account = accountFromIdToken(String(j.id_token || '')) || (await accountName(String(j.access_token)));
       await connectDB();
       // Persist the EFFECTIVE client id (default or custom) so refreshes use it.
       await AppConfig.updateOne(
@@ -96,6 +97,20 @@ export async function pollDeviceToken(
     return { status: 'error', error: String(j.error_description || j.error || `HTTP ${res.status}`) };
   } catch (err) {
     return { status: 'error', error: (err as Error).message };
+  }
+}
+
+/** Pull the email/name out of the id_token JWT (middle segment is base64url JSON). */
+function accountFromIdToken(idToken: string): string {
+  try {
+    const payload = idToken.split('.')[1];
+    if (!payload) return '';
+    const json = JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')) as {
+      preferred_username?: string; email?: string; name?: string;
+    };
+    return json.preferred_username || json.email || json.name || '';
+  } catch {
+    return '';
   }
 }
 
@@ -159,17 +174,27 @@ export async function uploadToOnedrive(relPath: string, data: Buffer): Promise<{
     if (!creds) return { ok: false, error: 'OneDrive not connected' };
     const token = await accessTokenFor(creds.clientId, creds.refreshToken);
     const clean = relPath.split('/').map((s) => encodeURIComponent(s)).join('/');
-    const res = await fetch(`${GRAPH}/me/drive/root:/Apps/Pharos/${clean}:/content`, {
-      method: 'PUT',
-      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream' },
-      body: new Uint8Array(data),
-      signal: AbortSignal.timeout(60000),
-    });
-    if (!res.ok) {
+    const url = `${GRAPH}/me/drive/root:/Apps/Pharos/${clean}:/content`;
+
+    // Graph throttles bursts (429) and occasionally 503s. Honour Retry-After and
+    // retry a few times — this is the usual reason a bulk sync drops some files.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream' },
+        body: new Uint8Array(data),
+        signal: AbortSignal.timeout(60000),
+      });
+      if (res.ok) return { ok: true };
+      if ((res.status === 429 || res.status === 503) && attempt < 3) {
+        const wait = Math.min(30, Number(res.headers.get('retry-after')) || (attempt + 1) * 3);
+        await new Promise((r) => setTimeout(r, wait * 1000));
+        continue;
+      }
       const body = await res.text().catch(() => '');
       return { ok: false, error: `Graph HTTP ${res.status}: ${body.slice(0, 160)}` };
     }
-    return { ok: true };
+    return { ok: false, error: 'throttled — retries exhausted' };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }

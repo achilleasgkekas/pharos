@@ -350,7 +350,8 @@ export type StorageInfo = {
   remoteShare: string;
   remoteBasePath: string;
   remoteSecure: boolean;
-  onedriveAccount: string; // '' when not connected
+  onedriveConnected: boolean; // a refresh token is stored (status, independent of name)
+  onedriveAccount: string; // display name/email, '' if we couldn't capture it
 };
 
 /** Storage config for the Settings editor — never includes the password. */
@@ -369,6 +370,7 @@ export async function getStorageInfo(): Promise<StorageInfo> {
     remoteShare: s.remote.share ?? '',
     remoteBasePath: s.remote.basePath ?? '',
     remoteSecure: !!s.remote.secure,
+    onedriveConnected: !!creds,
     onedriveAccount: creds?.account || '',
   };
 }
@@ -416,124 +418,76 @@ function baseNoExt(p: string): string {
 
 export type SyncResult = { ok: boolean; pushed: number; failed: number; skipped: number; error?: string; errors: string[] };
 
-/** Mirror all (non-archived) receipt + statement files to the configured remote,
- *  organized by the naming/folder templates. Local copies are untouched. */
+/** Every local file that should be mirrored, with its rendered remote path. Cheap
+ *  (no file reads) so the client can show a real "X / total" progress bar. */
+async function buildSyncManifest(s: Awaited<ReturnType<typeof getStorageConfig>>): Promise<{ filePath: string; rel: string }[]> {
+  await connectDB();
+  const out: { filePath: string; rel: string }[] = [];
+  const rel = (kind: 'receipts' | 'statements' | 'expenses', store: string, date: string | Date | undefined, total: number, id: unknown, fp: string) =>
+    renderStoragePath(s.folderTemplate, s.fileNameTemplate, {
+      kind,
+      store,
+      date: date ? new Date(date).toISOString().slice(0, 10) : '',
+      total,
+      id: shortId(id),
+      original: baseNoExt(fp),
+      ext: extOf(fp),
+    });
+
+  const receipts = (await Receipt.find({ archived: { $ne: true }, filePath: { $nin: ['', null] } }).select('store date total filePath').lean()) as Array<Record<string, unknown>>;
+  for (const r of receipts) out.push({ filePath: String(r.filePath), rel: rel('receipts', String(r.store || ''), r.date as string, Number(r.total || 0), r._id, String(r.filePath)) });
+
+  const statements = (await Statement.find({ filePath: { $nin: ['', null] } }).select('card period totalAmount statementDate filePath').lean()) as Array<Record<string, unknown>>;
+  for (const st of statements) out.push({ filePath: String(st.filePath), rel: rel('statements', String(st.card || ''), (st.statementDate as string) || `${st.period || ''}-01`, Number(st.totalAmount || 0), st._id, String(st.filePath)) });
+
+  const exps = (await Expense.find({ filePath: { $nin: ['', null] } }).select('kind vendor amount date filePath').lean()) as Array<Record<string, unknown>>;
+  for (const e of exps) out.push({ filePath: String(e.filePath), rel: rel('expenses', String(e.vendor || e.kind || ''), e.date as string, Number(e.amount || 0), e._id, String(e.filePath)) });
+
+  return out;
+}
+
+/** The list of files to sync (for the progress bar). Backend-agnostic. */
+export async function getSyncManifest(): Promise<{ ok: boolean; error?: string; items: { filePath: string; rel: string }[] }> {
+  const s = await getStorageConfig();
+  if (s.backend === 'local') return { ok: false, error: 'Set a remote backend first', items: [] };
+  if (s.backend === 'onedrive' && !(await getOnedriveCreds())) return { ok: false, error: 'Connect OneDrive first', items: [] };
+  if (s.backend !== 'onedrive' && !s.remote.host) return { ok: false, error: 'No remote host configured', items: [] };
+  return { ok: true, items: await buildSyncManifest(s) };
+}
+
+/** Upload one chunk (the client loops over chunks to show progress). */
+export async function syncOnedriveBatch(items: { filePath: string; rel: string }[]): Promise<{ pushed: number; failed: number; errors: string[] }> {
+  let pushed = 0;
+  const errors: string[] = [];
+  for (const it of items) {
+    try {
+      const data = await readFile(it.filePath);
+      const r = await uploadToOnedrive(it.rel, data);
+      if (r.ok) pushed++;
+      else if (errors.length < 5) errors.push(`${it.rel}: ${r.error}`);
+    } catch (err) {
+      if (errors.length < 5) errors.push(`${it.rel}: ${(err as Error).message}`);
+    }
+  }
+  return { pushed, failed: items.length - pushed, errors };
+}
+
+/** One-shot sync (used for SMB/FTP — single connection. OneDrive uses the batched
+ *  path above so the UI can show progress and survive throttling). */
 export async function syncToRemote(): Promise<SyncResult> {
   const s = await getStorageConfig();
   if (s.backend === 'local') return { ok: false, pushed: 0, failed: 0, skipped: 0, error: 'Set a remote backend first', errors: [] };
-  if (s.backend !== 'onedrive' && !s.remote.host) return { ok: false, pushed: 0, failed: 0, skipped: 0, error: 'No remote host configured', errors: [] };
-  if (s.backend === 'onedrive' && !(await getOnedriveCreds())) return { ok: false, pushed: 0, failed: 0, skipped: 0, error: 'Connect OneDrive first', errors: [] };
-  await connectDB();
-
+  if (!s.remote.host) return { ok: false, pushed: 0, failed: 0, skipped: 0, error: 'No remote host configured', errors: [] };
+  const manifest = await buildSyncManifest(s);
   const files: RemoteFile[] = [];
   let skipped = 0;
-
-  const receipts = (await Receipt.find({ archived: { $ne: true } }).select('store date total filePath').lean()) as Array<{
-    _id: unknown;
-    store?: string;
-    date?: string | Date;
-    total?: number;
-    filePath?: string;
-  }>;
-  for (const r of receipts) {
-    const fp = String(r.filePath || '');
-    if (!fp) {
-      skipped++;
-      continue;
-    }
+  for (const it of manifest) {
     try {
-      const data = await readFile(fp);
-      const dateStr = r.date ? new Date(r.date).toISOString().slice(0, 10) : '';
-      const rel = renderStoragePath(s.folderTemplate, s.fileNameTemplate, {
-        kind: 'receipts',
-        store: String(r.store || ''),
-        date: dateStr,
-        total: Number(r.total || 0),
-        id: shortId(r._id),
-        original: baseNoExt(fp),
-        ext: extOf(fp),
-      });
-      files.push({ data, remoteRelPath: rel });
+      files.push({ data: await readFile(it.filePath), remoteRelPath: it.rel });
     } catch {
       skipped++;
     }
   }
-
-  const statements = (await Statement.find({ filePath: { $ne: '' } }).select('card period totalAmount statementDate filePath').lean()) as Array<{
-    _id: unknown;
-    card?: string;
-    period?: string;
-    totalAmount?: number;
-    statementDate?: string | Date;
-    filePath?: string;
-  }>;
-  for (const st of statements) {
-    const fp = String(st.filePath || '');
-    if (!fp) {
-      skipped++;
-      continue;
-    }
-    try {
-      const data = await readFile(fp);
-      const dateStr = st.statementDate ? new Date(st.statementDate).toISOString().slice(0, 10) : `${st.period || ''}-01`;
-      const rel = renderStoragePath(s.folderTemplate, s.fileNameTemplate, {
-        kind: 'statements',
-        store: String(st.card || ''),
-        date: dateStr,
-        total: Number(st.totalAmount || 0),
-        id: shortId(st._id),
-        original: baseNoExt(fp),
-        ext: extOf(fp),
-      });
-      files.push({ data, remoteRelPath: rel });
-    } catch {
-      skipped++;
-    }
-  }
-
-  const exps = (await Expense.find({ filePath: { $ne: '' } }).select('kind vendor amount date filePath').lean()) as Array<{
-    _id: unknown;
-    kind?: string;
-    vendor?: string;
-    amount?: number;
-    date?: string | Date;
-    filePath?: string;
-  }>;
-  for (const e of exps) {
-    const fp = String(e.filePath || '');
-    if (!fp) {
-      skipped++;
-      continue;
-    }
-    try {
-      const data = await readFile(fp);
-      const dateStr = e.date ? new Date(e.date).toISOString().slice(0, 10) : '';
-      const rel = renderStoragePath(s.folderTemplate, s.fileNameTemplate, {
-        kind: 'expenses',
-        store: String(e.vendor || e.kind || ''),
-        date: dateStr,
-        total: Number(e.amount || 0),
-        id: shortId(e._id),
-        original: baseNoExt(fp),
-        ext: extOf(fp),
-      });
-      files.push({ data, remoteRelPath: rel });
-    } catch {
-      skipped++;
-    }
-  }
-
-  if (s.backend === 'onedrive') {
-    let pushed = 0;
-    const errors: string[] = [];
-    for (const f of files) {
-      const r = await uploadToOnedrive(f.remoteRelPath, f.data);
-      if (r.ok) pushed++;
-      else if (errors.length < 5) errors.push(`${f.remoteRelPath}: ${r.error}`);
-    }
-    return { ok: pushed === files.length, pushed, failed: files.length - pushed, skipped, errors };
-  }
-
   const res = await pushBatchToRemote(s.remote, files);
   return { ok: res.failed === 0, pushed: res.pushed, failed: res.failed, skipped, errors: res.errors };
 }
