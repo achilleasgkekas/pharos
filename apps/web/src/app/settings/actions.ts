@@ -39,6 +39,8 @@ import { Types } from 'mongoose';
 import { getStores, invalidateStoreCache, type StoreLite } from '@/lib/storeService';
 import { anthropicTest } from '@/lib/anthropic';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
+import { requireAdmin } from '@/lib/auth';
+import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
 import { getUnifiSnapshot, invalidateUnifiConfig, runUnifiSpeedtest } from '@/lib/unifi';
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
 import { sendNtfyTo } from '@/lib/notify';
@@ -67,6 +69,7 @@ export async function listOllamaModels(): Promise<OllamaModel[]> {
 
 /** Download a model into the local Ollama (blocks until done — can take minutes). */
 export async function pullOllamaModel(name: string): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
   const n = name.trim();
   if (!n) return { ok: false, error: 'No model name' };
   // Model refs look like "qwen2.5vl:7b" or "library/name:tag" — reject anything else
@@ -93,6 +96,7 @@ export async function pullOllamaModel(name: string): Promise<{ ok: boolean; erro
 
 /** Persist the AI backend settings (singleton config doc). */
 export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean }> {
+  await requireAdmin();
   const PROVIDERS = ['ollama', 'anthropic', 'openai', 'gemini', 'openrouter', 'custom'];
   const rawProvider = String(formData.get('provider') || 'ollama');
   const provider = PROVIDERS.includes(rawProvider) ? rawProvider : 'ollama';
@@ -123,6 +127,37 @@ export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean }>
   invalidateAiConfigCache();
   invalidateOllamaHealth(); // model/provider changed → re-probe on next render
   revalidatePath('/settings');
+  return { ok: true };
+}
+
+/** Master AI switch. When off, the whole app runs AI-free. */
+export async function setAiEnabled(value: boolean): Promise<{ ok: boolean }> {
+  await requireAdmin();
+  await connectDB();
+  await AppConfig.updateOne({ key: 'singleton' }, { $set: { aiEnabled: !!value } }, { upsert: true });
+  invalidateAiConfigCache();
+  invalidateOllamaHealth();
+  revalidatePath('/', 'layout'); // navbar dot + onboarding banner update app-wide
+  return { ok: true };
+}
+
+/** Toggle one AI feature on/off (absent key = on). */
+export async function setAiFeature(key: string, value: boolean): Promise<{ ok: boolean }> {
+  await requireAdmin();
+  if (!AI_FEATURE_KEYS.includes(key as AiFeatureKey)) return { ok: false };
+  await connectDB();
+  await AppConfig.updateOne({ key: 'singleton' }, { $set: { [`aiFeatures.${key}`]: !!value } }, { upsert: true });
+  invalidateAiConfigCache();
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
+/** Permanently hide the "set up AI" onboarding banner (any signed-in user). */
+export async function dismissAiOnboarding(): Promise<{ ok: boolean }> {
+  await connectDB();
+  await AppConfig.updateOne({ key: 'singleton' }, { $set: { aiOnboardingDismissed: true } }, { upsert: true });
+  invalidateAiConfigCache();
+  revalidatePath('/', 'layout');
   return { ok: true };
 }
 
@@ -286,6 +321,7 @@ export async function getPromptsForEditor(): Promise<PromptEditorEntry[]> {
 
 /** Save an override for one prompt. Empty / identical-to-default → clears the override. */
 export async function savePrompt(key: string, text: string): Promise<{ ok: boolean }> {
+  await requireAdmin();
   const k = key as PromptKey;
   if (!PROMPT_META.some((m) => m.key === k)) return { ok: false };
   await connectDB();
@@ -304,6 +340,7 @@ export async function savePrompt(key: string, text: string): Promise<{ ok: boole
 
 /** Drop a prompt's override → back to the built-in default. */
 export async function resetPrompt(key: string): Promise<{ ok: boolean }> {
+  await requireAdmin();
   const k = key as PromptKey;
   if (!PROMPT_META.some((m) => m.key === k)) return { ok: false };
   await connectDB();
@@ -327,6 +364,7 @@ export async function getScraperAi(): Promise<ScraperAiConfig> {
 }
 
 export async function saveScraperAi(formData: FormData): Promise<{ ok: boolean }> {
+  await requireAdmin();
   await connectDB();
   const provider = String(formData.get('scraperProvider') || 'ollama') === 'anthropic' ? 'anthropic' : 'ollama';
   const model = String(formData.get('scraperModel') || '').trim();
@@ -379,6 +417,7 @@ export async function getStorageInfo(): Promise<StorageInfo> {
 }
 
 export async function saveStorageConfig(formData: FormData): Promise<{ ok: boolean }> {
+  await requireAdmin();
   await connectDB();
   const backend = String(formData.get('storageBackend') || 'local');
   const update: Record<string, unknown> = {
@@ -481,6 +520,7 @@ export async function syncOnedriveBatch(items: { filePath: string; rel: string }
 /** One-shot sync (used for SMB/FTP — single connection. OneDrive uses the batched
  *  path above so the UI can show progress and survive throttling). */
 export async function syncToRemote(): Promise<SyncResult> {
+  await requireAdmin();
   const s = await getStorageConfig();
   if (s.backend === 'local') return { ok: false, pushed: 0, failed: 0, skipped: 0, error: 'Set a remote backend first', errors: [] };
   if (!s.remote.host) return { ok: false, pushed: 0, failed: 0, skipped: 0, error: 'No remote host configured', errors: [] };
@@ -723,6 +763,7 @@ const BACKUP_MODELS = {
 
 /** Export every collection's documents as a single JSON string (for download). */
 export async function exportData(): Promise<string> {
+  await requireAdmin();
   await connectDB();
   const entries = await Promise.all(
     Object.entries(BACKUP_MODELS).map(async ([key, Model]) => [key, await (Model as typeof Item).find().lean()] as const)
@@ -795,6 +836,7 @@ function isSafeStoredPath(p: unknown): boolean {
 
 /** Restore from a backup JSON — upserts each document by _id (merges, never duplicates). */
 export async function importData(json: string): Promise<{ ok: boolean; restored: number; error?: string }> {
+  await requireAdmin();
   let data: { collections?: Record<string, unknown[]> };
   try {
     data = JSON.parse(json);
@@ -896,6 +938,7 @@ export async function restoreFromTrash(type: TrashType, id: string): Promise<{ o
 
 /** Permanently delete: doc + its binary files + dangling cross-references. */
 export async function purgeFromTrash(type: TrashType, id: string): Promise<{ ok: boolean }> {
+  await requireAdmin();
   const Model = TRASH_MODELS[type];
   if (!Model) return { ok: false };
   await connectDB();
@@ -929,6 +972,7 @@ export async function purgeFromTrash(type: TrashType, id: string): Promise<{ ok:
 
 /** Empty the whole Trash (permanent). */
 export async function emptyTrash(): Promise<{ ok: boolean; purged: number }> {
+  await requireAdmin();
   await connectDB();
   let purged = 0;
   for (const [type, Model] of Object.entries(TRASH_MODELS) as [TrashType, typeof Item][]) {
@@ -957,6 +1001,7 @@ export async function getUnifiInfo(): Promise<UnifiInfo> {
 }
 
 export async function saveUnifiConfig(formData: FormData): Promise<{ ok: boolean }> {
+  await requireAdmin();
   await connectDB();
   const host = String(formData.get('host') || '').trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
   const user = String(formData.get('user') || '').trim();
@@ -989,6 +1034,7 @@ export async function triggerSpeedtest(): Promise<{ ok: boolean; error?: string 
 
 /** Step 1 of the wizard: get a device code for the user to enter at microsoft.com/devicelogin. */
 export async function startOnedriveAuth(clientId: string): Promise<DeviceCode> {
+  await requireAdmin();
   return startDeviceCode(clientId.trim());
 }
 
@@ -1008,6 +1054,7 @@ export async function getOnedriveStatus(): Promise<{ connected: boolean; account
 }
 
 export async function disconnectOnedriveAccount(): Promise<{ ok: boolean }> {
+  await requireAdmin();
   await disconnectOnedrive();
   invalidateStorageConfig();
   revalidatePath('/settings');

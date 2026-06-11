@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Job } from '@/models/Job';
 import { ensureProcessor } from '@/lib/jobRunner';
 import { getAiConfig } from '@/lib/aiConfig';
+import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { AppConfig } from '@/models/AppConfig';
 
 /** Cost-guard info for a bulk AI run: whether to confirm + the active provider/model
@@ -42,6 +43,7 @@ export async function enqueueRescanReceipts(
   useOcr = true
 ): Promise<{ ok: boolean }> {
   if (!itemIds.length) return { ok: false };
+  if (!(await isFeatureEnabled('receipts'))) return { ok: false };
   await connectDB();
   await Job.create({
     kind: 'rescan-receipts',
@@ -64,6 +66,7 @@ export async function enqueueAiFillItems(
   title: string
 ): Promise<{ ok: boolean }> {
   if (!itemIds.length) return { ok: false };
+  if (!(await isFeatureEnabled('itemsImport'))) return { ok: false };
   await connectDB();
   await Job.create({
     kind: 'ai-fill-items',

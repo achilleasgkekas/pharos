@@ -5,11 +5,15 @@ import { useState, useRef, useEffect } from 'react';
 import {
   Package, ShoppingCart, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
   Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, Wifi, CalendarDays,
+  LogOut, UserRound,
 } from 'lucide-react';
 import { cn } from './ui/cn';
 import { useTheme } from './ThemeProvider';
 import { PharosMark } from './PharosMark';
 import { AiCommandBar } from './AiCommandBar';
+import { logoutAction } from '@/app/login/actions';
+
+type SessionUser = { name: string; role: 'admin' | 'member' };
 
 type NavLink = { href: string; label: string; icon: typeof Package };
 
@@ -88,7 +92,48 @@ function NavGroup({ label, links }: { label: string; links: NavLink[] }) {
   );
 }
 
-export function SiteNav({ aiReady = false }: { aiReady?: boolean }) {
+function UserMenu({ user }: { user: SessionUser }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors"
+        aria-label="Account"
+      >
+        <UserRound size={17} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-44 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 p-1">
+          <div className="px-2.5 py-2 border-b border-[color:var(--color-border)] mb-1">
+            <p className="text-sm font-medium truncate">{user.name}</p>
+            <p className="text-[11px] text-[color:var(--color-text-faint)] uppercase" style={{ fontFamily: 'var(--font-mono)' }}>
+              {user.role}
+            </p>
+          </div>
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)] transition-colors"
+            >
+              <LogOut size={15} /> Sign out
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: SessionUser }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggle } = useTheme();
@@ -137,6 +182,7 @@ export function SiteNav({ aiReady = false }: { aiReady?: boolean }) {
           >
             <Settings size={17} />
           </Link>
+          {user && <UserMenu user={user} />}
           <button onClick={() => setMobileOpen((v) => !v)} className="lg:hidden p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Menu">
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>

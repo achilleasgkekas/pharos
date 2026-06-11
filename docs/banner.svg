@@ -1,0 +1,68 @@
+<svg width="1200" height="360" viewBox="0 0 1200 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PHAROS — Personal Hub, Asset & Resource Oversight System">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0b0f12"/>
+      <stop offset="1" stop-color="#0a0a0a"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#00ff88"/>
+      <stop offset="0.5" stop-color="#00d4ff"/>
+      <stop offset="1" stop-color="#a55eea"/>
+    </linearGradient>
+    <radialGradient id="beam" cx="0.5" cy="0.5" r="0.5">
+      <stop stop-color="#00ff88" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#00ff88" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0V42" fill="none" stroke="#ffffff" stroke-opacity="0.035" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="360" fill="url(#bg)"/>
+  <rect width="1200" height="360" fill="url(#grid)"/>
+  <circle cx="170" cy="150" r="190" fill="url(#beam)"/>
+
+  <!-- Lighthouse mark (PharosMark, scaled ×6.4) -->
+  <g transform="translate(62 65) scale(6.4)" fill="none" filter="url(#glow)">
+    <path d="M12 7 L4.5 3.6" stroke="url(#brand)" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+    <path d="M12 7 L19.5 3.6" stroke="url(#brand)" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+    <path d="M9.4 20.5 L10.4 10.5 H13.6 L14.6 20.5 Z" stroke="url(#brand)" stroke-width="1.7" stroke-linejoin="round"/>
+    <path d="M9.7 14.6 H14.3" stroke="url(#brand)" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M9.9 10.5 H14.1" stroke="url(#brand)" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M7.6 20.5 H16.4" stroke="url(#brand)" stroke-width="1.8" stroke-linecap="round"/>
+    <circle cx="12" cy="7.4" r="3" fill="#00ff88" opacity="0.22"/>
+    <circle cx="12" cy="7.4" r="1.9" fill="#00ff88"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="240" y="150" font-family="'Outfit','Segoe UI',sans-serif" font-size="84" font-weight="800" letter-spacing="14" fill="#f5f5f5">PHAROS</text>
+  <text x="244" y="196" font-family="'IBM Plex Mono',monospace" font-size="20" letter-spacing="3" fill="#999999">Personal Hub · Asset &amp; Resource Oversight System</text>
+  <text x="244" y="232" font-family="'Manrope',sans-serif" font-size="22" fill="#00d4ff">One light over everything you run.</text>
+
+  <!-- Accent underline -->
+  <rect x="244" y="252" width="430" height="4" rx="2" fill="url(#brand)"/>
+
+  <!-- Feature chips -->
+  <g font-family="'IBM Plex Mono',monospace" font-size="15" fill="#cfcfcf">
+    <g transform="translate(244 290)">
+      <rect width="150" height="34" rx="17" fill="#141414" stroke="#2a2a2a"/>
+      <text x="20" y="22">Self-hosted</text>
+    </g>
+    <g transform="translate(406 290)">
+      <rect width="168" height="34" rx="17" fill="#141414" stroke="#2a2a2a"/>
+      <text x="20" y="22">AI optional</text>
+    </g>
+    <g transform="translate(586 290)">
+      <rect width="150" height="34" rx="17" fill="#141414" stroke="#2a2a2a"/>
+      <text x="20" y="22">Open source</text>
+    </g>
+    <g transform="translate(748 290)">
+      <rect width="196" height="34" rx="17" fill="#141414" stroke="#2a2a2a"/>
+      <text x="20" y="22">Next.js · MongoDB</text>
+    </g>
+  </g>
+</svg>

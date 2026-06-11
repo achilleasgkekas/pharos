@@ -2,6 +2,7 @@
 import { connectDB } from '@/lib/db';
 import { Subscription } from '@/models/Subscription';
 import { suggestSubscription, type ParsedSubscription } from '@/lib/ollama';
+import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { addDays, addMonths, addWeeks, addYears, isBefore } from 'date-fns';
@@ -12,6 +13,7 @@ export type SuggestResult =
 
 /** Ask the local AI to fill in details for a known subscription by name. */
 export async function suggestSubscriptionInfo(name: string): Promise<SuggestResult> {
+  if (!(await isFeatureEnabled('subscriptions'))) return { ok: false, error: 'Subscription autofill (AI) is turned off.' };
   if (!name.trim()) return { ok: false, error: 'Type a name first' };
   try {
     const { parsed } = await suggestSubscription(name.trim());

@@ -65,6 +65,9 @@ export async function runVisionJSON(
   imagesBase64: string[]
 ): Promise<{ json: unknown; raw: string; model: string }> {
   const cfg = await getAiConfig();
+  // Master switch off → never hit a provider. Call sites gate per-feature first and
+  // give friendly messages; this is the last-resort guard so nothing slips through.
+  if (!cfg.aiEnabled) throw new Error('AI is turned off');
   const cloud = await cloudJSON(cfg, systemPrompt, userPrompt, imagesBase64);
   if (cloud) return cloud;
   // Vision tasks must run on a vision-capable model, not the active text model.
@@ -92,6 +95,7 @@ export async function runTextJSON(
   opts?: { numCtx?: number }
 ): Promise<{ json: unknown; raw: string; model: string }> {
   const cfg = await getAiConfig();
+  if (!cfg.aiEnabled) throw new Error('AI is turned off');
   const cloud = await cloudJSON(cfg, systemPrompt, userPrompt);
   if (cloud) return cloud;
   const response = await clientFor(cfg.ollamaHost).chat({

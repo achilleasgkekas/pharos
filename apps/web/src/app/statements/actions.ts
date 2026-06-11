@@ -6,6 +6,7 @@ import { saveFile, deleteFile, readFile } from '@/lib/storage';
 import { extractPdfText, looksLikeScannedPdf } from '@/lib/pdf';
 import { ocrPdf } from '@/lib/ocr';
 import { parseStatementText, categorizeTransactions } from '@/lib/ollama';
+import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { safeDate, safeDateOrNull } from '@/lib/dates';
 import { normalizeLast4, detectCardType, buildCardLabel } from '@/lib/cards';
 import { mirrorFileToRemote } from '@/lib/mirror';
@@ -272,6 +273,7 @@ export async function deleteTransaction(statementId: string, transactionId: stri
 
 /** AI auto-categorize all transactions of a statement (groceries, electronics, ...). */
 export async function categorizeStatement(statementId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!(await isFeatureEnabled('statementCategorize'))) return { ok: false, error: 'Auto-categorize (AI) is turned off.' };
   await connectDB();
   const stmt = await Statement.findById(statementId);
   if (!stmt) return { ok: false, error: 'Not found' };
@@ -504,6 +506,18 @@ export async function importStatementPdf(formData: FormData): Promise<ImportResu
     });
     revalidatePath('/statements');
     return { ok: true, id: String(stmt._id), aiUsed: false, txCount: 0, aiError: 'Scanned PDF with no text' };
+  }
+
+  // Statement-AI off → store an empty draft for manual entry (don't hit a provider).
+  if (!(await isFeatureEnabled('statements'))) {
+    await connectDB();
+    const stmt = await Statement.create({
+      card: 'Unknown card', period: fallbackPeriod, statementDate: new Date(),
+      totalAmount: 0, filePath: relativePath,
+      notes: 'AI is off — enter manually.',
+    });
+    revalidatePath('/statements');
+    return { ok: true, id: String(stmt._id), aiUsed: false, txCount: 0, aiError: 'AI is off' };
   }
 
   // AI parse

@@ -7,6 +7,7 @@ import { Statement } from '@/models/Statement';
 import { Task } from '@/models/Task';
 import { fetchPageText } from '@/lib/scrape';
 import { parseProductFromPage } from '@/lib/ollama';
+import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { searchWeb, searchImages } from '@/lib/search';
 import { type ItemView } from '@/lib/itemStatus';
 import { saveFile, deleteFile } from '@/lib/storage';
@@ -341,6 +342,7 @@ export async function aiFillItem(itemId: string): Promise<{
   item?: SerializedItem;
   error?: string;
 }> {
+  if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, checked: 0, filled: [], lowest: null, error: 'Product AI-fill is turned off.' };
   await connectDB();
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, checked: 0, filled: [], lowest: null, error: 'Item not found' };
@@ -493,6 +495,7 @@ export async function aiFillItem(itemId: string): Promise<{
 export async function aiFillItemsBulk(
   itemIds: string[]
 ): Promise<{ ok: boolean; results: { id: string; ok: boolean; filled: string[]; error?: string }[] }> {
+  if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, results: [] };
   const ids = itemIds.slice(0, 5); // bound wall-time per call (~5 × up-to-30s)
   const results: { id: string; ok: boolean; filled: string[]; error?: string }[] = [];
   for (const id of ids) {
@@ -513,6 +516,7 @@ export async function aiFillItemsBulk(
 export async function aiFillSpecs(
   itemId: string
 ): Promise<{ ok: boolean; specs?: string; item?: SerializedItem; error?: string }> {
+  if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, error: 'AI specs is turned off.' };
   await connectDB();
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, error: 'Item not found' };
@@ -603,6 +607,7 @@ function normTitle(t: string): string {
  * record the price instead of creating a duplicate.
  */
 export async function importItemFromUrl(url: string, view: ItemView): Promise<ImportItemResult> {
+  if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, error: 'Product import (AI) is turned off.' };
   let page;
   try {
     page = await fetchPageText(url);
@@ -702,6 +707,7 @@ export type ItemPreview =
 
 /** Fetch + AI-parse a product URL WITHOUT saving (the preview step). */
 export async function previewItemFromUrl(url: string): Promise<ItemPreview> {
+  if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, error: 'Product import (AI) is turned off.' };
   let page;
   try {
     page = await fetchPageText(url);

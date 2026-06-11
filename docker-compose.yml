@@ -28,6 +28,10 @@ services:
       # Stable key so Server Action IDs survive rebuilds (open tabs don't break).
       # Secret — must be provided via .env (no committed default).
       NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:?set NEXT_SERVER_ACTIONS_ENCRYPTION_KEY in .env}
+      # Signs the login session cookie. Secret — required for auth to work.
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
+      # Set true only behind an HTTPS reverse proxy (else the cookie won't set over HTTP).
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
     volumes:
       # Persist user binary files (receipts, statements) on the host.
       # Later this path becomes the NFS mount from the DS923+ NAS.

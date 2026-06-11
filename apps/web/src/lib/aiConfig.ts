@@ -20,6 +20,10 @@ export type AiConfig = {
   customBaseUrl: string;
   customApiKey: string; // optional — local servers often need none
   customModel: string;
+  // ── Optional-AI controls (the app works fully without AI) ──
+  aiEnabled: boolean; // master switch
+  aiFeatures: Record<string, boolean>; // per-feature overrides; ABSENT key = enabled
+  aiOnboardingDismissed: boolean; // hide the "set up AI" banner
 };
 
 // Model-name hints for "this can see images". Used to let an explicitly-chosen
@@ -54,6 +58,9 @@ export async function getAiConfig(): Promise<AiConfig> {
     customBaseUrl?: string;
     customApiKey?: string;
     customModel?: string;
+    aiEnabled?: boolean;
+    aiFeatures?: Record<string, boolean>;
+    aiOnboardingDismissed?: boolean;
   } | null = null;
   try {
     await connectDB();
@@ -84,6 +91,9 @@ export async function getAiConfig(): Promise<AiConfig> {
     customBaseUrl: (doc?.customBaseUrl || '').trim().replace(/\/$/, ''),
     customApiKey: doc?.customApiKey || '',
     customModel: doc?.customModel || '',
+    aiEnabled: doc?.aiEnabled !== false, // default ON for existing installs
+    aiFeatures: (doc?.aiFeatures as Record<string, boolean>) || {},
+    aiOnboardingDismissed: !!doc?.aiOnboardingDismissed,
   };
   // Half-configured cloud provider → quiet fallback to Ollama.
   if (

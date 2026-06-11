@@ -6,6 +6,9 @@ import { CurrencyInit } from '@/components/CurrencyInit';
 import { getAppSettings } from '@/lib/appSettings';
 import { currencySymbol } from '@/lib/money';
 import { isAiReady } from '@/lib/ollama';
+import { getCurrentUser } from '@/lib/auth';
+import { getAiConfig } from '@/lib/aiConfig';
+import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
 
 export const metadata: Metadata = {
   title: 'PHAROS · Personal Hub',
@@ -31,11 +34,26 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Auth gate at the layout level: chrome (nav) only renders for signed-in users,
+  // so /login and /setup are chrome-less. Middleware already blocks unauthenticated
+  // navigation; this just keeps the shell consistent.
+  const user = await getCurrentUser();
   // Read the display currency once per request → set server symbol + hand to the client.
   const { currency } = await getAppSettings();
   const symbol = currencySymbol(currency);
-  // AI status for the navbar dot (provider-aware: Anthropic = has key; Ollama = reachable).
-  const aiReady = await isAiReady();
+  // Navbar dot = EFFECTIVE AI state (master switch on AND a provider is reachable).
+  // Onboarding nudge: show when signed in, AI isn't usable, and not yet dismissed.
+  let aiReady = false;
+  let banner: 'off' | 'no-provider' | null = null;
+  if (user) {
+    const cfg = await getAiConfig();
+    const providerReady = await isAiReady();
+    aiReady = cfg.aiEnabled && providerReady;
+    if (!cfg.aiOnboardingDismissed) {
+      if (!cfg.aiEnabled) banner = 'off';
+      else if (!providerReady) banner = 'no-provider';
+    }
+  }
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -50,7 +68,12 @@ export default async function RootLayout({
       <body>
         <CurrencyInit symbol={symbol} />
         <Providers>
-          <SiteNav aiReady={aiReady} />
+          {/* SiteNav renders only for signed-in users (chrome-less /login, /setup).
+              Keep `children` in a STABLE sibling position so flipping auth state
+              (e.g. when the setup wizard signs you in mid-flow) doesn't remount the
+              page subtree and reset client state. */}
+          {user && <SiteNav aiReady={aiReady} user={{ name: user.name || 'account', role: user.role }} />}
+          {user && banner && <AiOnboardingBanner reason={banner} />}
           {children}
         </Providers>
       </body>

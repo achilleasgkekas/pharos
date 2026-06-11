@@ -1,6 +1,7 @@
 'use server';
 import { connectDB } from '@/lib/db';
 import { getAiConfig } from '@/lib/aiConfig';
+import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { anthropicRaw, type AnthropicMessage, type AnthropicTool, type AnthropicBlock } from '@/lib/anthropic';
 import { suggestSubscription } from '@/lib/ollama';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -327,6 +328,7 @@ export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 /** Run a multi-turn conversation through Claude + tools. The client keeps the
  *  history (text turns) and sends it whole each call. Needs the Anthropic provider. */
 export async function runAiCommand(history: ChatTurn[]): Promise<AiCommandResult> {
+  if (!(await isFeatureEnabled('commandBar'))) return { ok: false, reply: '', actions: [], error: 'The AI command bar is turned off in Settings → AI.' };
   const turns = (history || []).filter((t) => t && typeof t.content === 'string' && t.content.trim());
   if (!turns.length) return { ok: false, reply: '', actions: [], error: 'Empty command' };
 

@@ -1,16 +1,19 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, setAiEnabled, setAiFeature } from './actions';
+import { AI_FEATURES } from '@/lib/aiFeatures';
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
 import { saveDefaults, saveNtfy, sendTestNtfy, runAlertChecks, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, getUnifiInfo, saveUnifiConfig, testUnifiConnection, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type UnifiInfo } from './actions';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
+import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, changeOwnPassword, type UserRow } from './users.actions';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
@@ -36,6 +39,9 @@ type AiInfo = {
   hasCustomKey: boolean;
   confirmBulk: boolean;
   installed: { name: string; sizeGB: number }[];
+  enabled: boolean; // AI master switch
+  features: Record<string, boolean>; // per-feature overrides (absent = on)
+  ready: boolean; // provider-aware readiness
 };
 
 type Info = {
@@ -68,9 +74,11 @@ const OPENROUTER_SUGGESTIONS = ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonn
 // Mirror of the server-side vision detection (lib/aiConfig.ts) for inline warnings.
 const isVisionName = (name: string) => /vl|vision|llava|minicpm-v|moondream|bakllava|llama3\.2-vision/i.test(name);
 
-type TabId = 'general' | 'money' | 'ai' | 'network' | 'storage' | 'data' | 'notifications';
+type TabId = 'general' | 'money' | 'ai' | 'network' | 'storage' | 'data' | 'notifications' | 'users';
 
-const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
+type CurrentUser = { id: string; name: string; role: 'admin' | 'member' };
+
+const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
   { id: 'general', label: 'General', icon: <SlidersHorizontal size={15} /> },
   { id: 'money', label: 'Money', icon: <CreditCard size={15} /> },
   { id: 'ai', label: 'AI', icon: <Sparkles size={15} /> },
@@ -78,16 +86,27 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'storage', label: 'Storage & backup', icon: <HardDrive size={15} /> },
   { id: 'data', label: 'Stores & lists', icon: <StoreIcon size={15} /> },
   { id: 'notifications', label: 'Notifications', icon: <Bell size={15} /> },
+  { id: 'users', label: 'Users', icon: <Users size={15} />, adminOnly: true },
 ];
 
-export function SettingsClient({ info }: { info: Info }) {
+export function SettingsClient({ info, currentUser }: { info: Info; currentUser: CurrentUser }) {
   const { theme, setTheme } = useTheme();
   const [tab, setTab] = useState<TabId>('general');
+  const isAdmin = currentUser.role === 'admin';
+  const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
+  const searchParams = useSearchParams();
 
-  // Restore the last-open tab (survives reloads). Read on mount to avoid SSR mismatch.
+  // A ?tab= deep-link (e.g. from the "Set up AI" banner) wins; otherwise restore the
+  // last-open tab from localStorage. Read on mount to avoid an SSR mismatch.
   useEffect(() => {
+    const fromUrl = searchParams.get('tab');
+    if (fromUrl && visibleTabs.some((t) => t.id === fromUrl)) {
+      setTab(fromUrl as TabId);
+      return;
+    }
     const saved = typeof window !== 'undefined' ? window.localStorage.getItem('settingsTab') : null;
-    if (saved && TABS.some((t) => t.id === saved)) setTab(saved as TabId);
+    if (saved && visibleTabs.some((t) => t.id === saved)) setTab(saved as TabId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function go(id: TabId) {
@@ -111,7 +130,7 @@ export function SettingsClient({ info }: { info: Info }) {
         {/* Tab navigation — sidebar on desktop, scrollable pills on mobile */}
         <nav className="md:w-52 md:shrink-0">
           <div className="flex md:flex-col gap-1.5 overflow-x-auto md:overflow-visible md:sticky md:top-20 pb-1 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
-            {TABS.map((t) => (
+            {visibleTabs.map((t) => (
               <button
                 key={t.id}
                 onClick={() => go(t.id)}
@@ -161,6 +180,8 @@ export function SettingsClient({ info }: { info: Info }) {
 
               <DefaultsManager settings={info.settings} />
 
+              <SelfPasswordCard />
+
               <Section title="About">
                 <Row label="Version">
                   <span style={{ fontFamily: 'var(--font-mono)' }}>v0.1.0 dev</span>
@@ -186,6 +207,7 @@ export function SettingsClient({ info }: { info: Info }) {
 
           {tab === 'ai' && (
             <>
+              <AiMasterAndFeatures ai={info.ai} canEdit={isAdmin} />
               <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
               <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} />
               <AiPromptsManager prompts={info.prompts} />
@@ -219,9 +241,97 @@ export function SettingsClient({ info }: { info: Info }) {
           )}
 
           {tab === 'notifications' && <NotificationsManager settings={info.settings} />}
+
+          {tab === 'users' && isAdmin && <UsersManager currentUserId={currentUser.id} />}
         </div>
       </div>
     </main>
+  );
+}
+
+// ─── AI master switch + per-feature toggles ─────────────────────────────────
+
+function AiStatusChip({ status }: { status: 'ready' | 'no-provider' | 'disabled' }) {
+  const map = {
+    ready: { label: 'ready', cls: 'text-[color:var(--color-accent)] border-[color:var(--color-accent)]' },
+    'no-provider': { label: 'no provider', cls: 'text-[color:var(--color-gold)] border-[color:var(--color-gold)]' },
+    disabled: { label: 'off', cls: 'text-[color:var(--color-text-faint)] border-[color:var(--color-border)]' },
+  }[status];
+  return (
+    <span className={cn('text-[9px] uppercase px-1.5 py-0.5 rounded-full border', map.cls)} style={{ fontFamily: 'var(--font-mono)' }}>
+      {map.label}
+    </span>
+  );
+}
+
+function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) {
+  const [enabled, setEnabled] = useState(ai.enabled);
+  const [features, setFeatures] = useState<Record<string, boolean>>(ai.features);
+  const [, startTransition] = useTransition();
+
+  function toggleMaster(v: boolean) {
+    setEnabled(v);
+    startTransition(() => void setAiEnabled(v));
+  }
+  function toggleFeature(key: string, v: boolean) {
+    setFeatures((f) => ({ ...f, [key]: v }));
+    startTransition(() => void setAiFeature(key, v));
+  }
+  function statusOf(key: string): 'ready' | 'no-provider' | 'disabled' {
+    if (!enabled || features[key] === false) return 'disabled';
+    return ai.ready ? 'ready' : 'no-provider';
+  }
+
+  const areas = [...new Set(AI_FEATURES.map((f) => f.area))];
+
+  return (
+    <Section title="AI features" icon={<Sparkles size={15} />}>
+      <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
+        The app works fully without AI. Turn the whole engine off, or pick exactly which features use it.
+      </p>
+
+      <div className="flex items-center justify-between rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2.5 mb-3">
+        <div>
+          <div className="text-sm font-medium">Enable AI features</div>
+          <div className="text-xs text-[color:var(--color-text-faint)]">Master switch for everything below.</div>
+        </div>
+        {canEdit ? (
+          <Switch checked={enabled} onChange={toggleMaster} />
+        ) : (
+          <span className="text-xs text-[color:var(--color-text-faint)]">{enabled ? 'On' : 'Off'}</span>
+        )}
+      </div>
+
+      <div className={cn('space-y-3', !enabled && 'opacity-50 pointer-events-none')}>
+        {areas.map((area) => (
+          <div key={area}>
+            <div className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+              {area}
+            </div>
+            <div className="space-y-1.5">
+              {AI_FEATURES.filter((f) => f.area === area).map((f) => (
+                <div key={f.key} className="flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium flex items-center gap-2">
+                      {f.label}
+                      <AiStatusChip status={statusOf(f.key)} />
+                    </div>
+                    <div className="text-xs text-[color:var(--color-text-faint)]">{f.description}</div>
+                  </div>
+                  {canEdit && <Switch checked={features[f.key] !== false} onChange={(v) => toggleFeature(f.key, v)} />}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {enabled && !ai.ready && (
+        <p className="text-[11px] text-[color:var(--color-gold)] mt-3">
+          ⚠ No AI provider is reachable yet. Configure one below for these features to work.
+        </p>
+      )}
+    </Section>
   );
 }
 
@@ -1913,6 +2023,141 @@ function CardsManager({ cards }: { cards: SerializedCard[] }) {
         <button onClick={() => openEdit()} className="mt-3 flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)]">
           <Plus size={13} /> Add card
         </button>
+      )}
+    </Section>
+  );
+}
+
+// ─── Users & access ───────────────────────────────────────────────────────
+
+function UsersManager({ currentUserId }: { currentUserId: string }) {
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pending, startTransition] = useTransition();
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ username: '', name: '', password: '', role: 'member' });
+  const [error, setError] = useState('');
+  const confirm = useConfirm();
+
+  const reload = () => startTransition(async () => { setUsers(await listUsers()); setLoading(false); });
+  useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  function add() {
+    setError('');
+    const fd = new FormData();
+    Object.entries(form).forEach(([k, v]) => fd.set(k, v));
+    startTransition(async () => {
+      const res = await createUser(fd);
+      if (res.ok) { setAdding(false); setForm({ username: '', name: '', password: '', role: 'member' }); reload(); }
+      else setError(res.error || 'Failed');
+    });
+  }
+  async function remove(u: UserRow) {
+    const ok = await confirm({ title: 'Delete user', message: `Delete "${u.username}"? This cannot be undone.`, confirmLabel: 'Delete', danger: true });
+    if (!ok) return;
+    startTransition(async () => { const r = await deleteUser(u.id); if (!r.ok) setError(r.error || 'Failed'); reload(); });
+  }
+  function toggleRole(u: UserRow) {
+    startTransition(async () => { const r = await setUserRole(u.id, u.role === 'admin' ? 'member' : 'admin'); if (!r.ok) setError(r.error || 'Failed'); reload(); });
+  }
+  function resetPwd(u: UserRow) {
+    const pwd = window.prompt(`New password for "${u.username}" (min 8 chars):`);
+    if (!pwd) return;
+    startTransition(async () => { const r = await changeUserPassword(u.id, pwd); setError(r.ok ? '' : (r.error || 'Failed')); });
+  }
+
+  return (
+    <Section title="Users & access" icon={<Users size={15} />}>
+      <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
+        Everyone shares the same data. Admins manage users + system settings; members just use the app.
+      </p>
+      {loading ? (
+        <p className="text-xs text-[color:var(--color-text-faint)]">Loading…</p>
+      ) : (
+        <div className="space-y-1.5">
+          {users.map((u) => (
+            <div key={u.id} className="flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2">
+              <span className={cn('w-2 h-2 rounded-full shrink-0', u.role === 'admin' ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]')} />
+              <div className="min-w-0 flex-1">
+                <span className="text-sm font-medium">{u.username}</span>
+                {u.name && <span className="text-xs text-[color:var(--color-text-dim)] ml-2">{u.name}</span>}
+                {u.id === currentUserId && <span className="text-[10px] text-[color:var(--color-accent)] ml-2" style={{ fontFamily: 'var(--font-mono)' }}>you</span>}
+              </div>
+              <button onClick={() => toggleRole(u)} title="Toggle role" style={{ fontFamily: 'var(--font-mono)' }}
+                className={cn('text-[10px] px-2 py-0.5 rounded-full border uppercase', u.role === 'admin' ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] text-[color:var(--color-text-dim)]')}>
+                {u.role}
+              </button>
+              <button onClick={() => resetPwd(u)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] p-1" title="Reset password"><KeyRound size={13} /></button>
+              {u.id !== currentUserId && <button onClick={() => remove(u)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] p-1" title="Delete"><Trash2 size={13} /></button>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-xs text-[color:var(--color-red)] mt-2">{error}</p>}
+
+      {adding ? (
+        <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] space-y-2.5">
+          <div className="grid grid-cols-2 gap-2">
+            <input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} placeholder="username *" className={inputClass} />
+            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="display name" className={inputClass} />
+            <input value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} type="password" placeholder="password (min 8) *" className={inputClass} />
+            <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} className={selectClass}>
+              <option value="member">member</option>
+              <option value="admin">admin</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={add} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Create user</button>
+            <button onClick={() => { setAdding(false); setError(''); }} className={ghostBtn}><X size={13} /> Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)} className="mt-3 flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)]">
+          <UserPlus size={13} /> Add user
+        </button>
+      )}
+    </Section>
+  );
+}
+
+/** "Change my own password" — available to every signed-in user (incl. members). */
+function SelfPasswordCard() {
+  const [open, setOpen] = useState(false);
+  const [oldPwd, setOldPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function submit() {
+    setMsg(null);
+    startTransition(async () => {
+      const r = await changeOwnPassword(oldPwd, newPwd);
+      if (r.ok) { setMsg({ ok: true, text: 'Password changed ✓' }); setOldPwd(''); setNewPwd(''); setOpen(false); }
+      else setMsg({ ok: false, text: r.error || 'Failed' });
+    });
+  }
+
+  return (
+    <Section title="Your password" icon={<KeyRound size={15} />}>
+      {open ? (
+        <div className="space-y-2.5">
+          <input value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} type="password" placeholder="current password" className={inputClass} />
+          <input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} type="password" placeholder="new password (min 8)" className={inputClass} />
+          <div className="flex items-center gap-2">
+            <button onClick={submit} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Update</button>
+            <button onClick={() => { setOpen(false); setMsg(null); }} className={ghostBtn}><X size={13} /> Cancel</button>
+            {msg && <span className={cn('text-[11px]', msg.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]')}>{msg.text}</span>}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[color:var(--color-text-dim)]">Change the password for your account.</span>
+          <div className="flex items-center gap-2">
+            {msg && <span className={cn('text-[11px]', msg.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]')}>{msg.text}</span>}
+            <button onClick={() => setOpen(true)} className={ghostBtn}><KeyRound size={13} /> Change password</button>
+          </div>
+        </div>
       )}
     </Section>
   );

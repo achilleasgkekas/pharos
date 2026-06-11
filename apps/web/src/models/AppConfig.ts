@@ -20,6 +20,14 @@ const AppConfigSchema = new Schema(
     // Cost guard: confirm (with a rough cost estimate) before starting a BULK AI job.
     // On by default so cloud (Anthropic) runs never start by accident.
     aiConfirmBulk: { type: Boolean, default: true },
+    // ── AI master switch + per-feature toggles ──
+    // The app is fully usable with AI off. `aiEnabled` is the master switch;
+    // `aiFeatures` is a map featureKey→boolean where an ABSENT key means ON (so new
+    // features default enabled without a migration). `aiOnboardingDismissed` hides
+    // the "set up AI" banner once the user dismisses it.
+    aiEnabled: { type: Boolean, default: true },
+    aiFeatures: { type: Schema.Types.Mixed, default: {} },
+    aiOnboardingDismissed: { type: Boolean, default: false },
 
     // ── Defaults & alerts ──
     defaultItemView: { type: String, enum: ['grid', 'list'], default: 'grid' },

@@ -4,6 +4,7 @@ import { Receipt } from '@/models/Receipt';
 import { Item } from '@/models/Item';
 import { saveFile, deleteFile, readFile } from '@/lib/storage';
 import { parseReceipt, parseReceiptText } from '@/lib/ollama';
+import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { extractPdfText, looksLikeScannedPdf } from '@/lib/pdf';
 import { ocrImage, looksLikeUsableOcr } from '@/lib/ocr';
 import { pdfFirstPageJpeg } from '@/lib/pdfThumb';
@@ -195,7 +196,10 @@ export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
   }
 
   // Parse: text PDF → embedded text; scanned PDF → rasterize + OCR; image → OCR-first.
-  const { parsed, raw, model, aiError } = await runReceiptParse(bytes, ext, isPdf, 'auto');
+  // When receipt-AI is off, skip parsing entirely and save a draft to fill in manually.
+  const { parsed, raw, model, aiError } = (await isFeatureEnabled('receipts'))
+    ? await runReceiptParse(bytes, ext, isPdf, 'auto')
+    : { parsed: null, raw: '', model: 'ai-off', aiError: 'AI is off — saved as a draft to fill in manually.' };
 
   try {
     await connectDB();

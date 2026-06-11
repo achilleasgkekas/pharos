@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Voucher } from '@/models/Voucher';
 import { safeDateOrNull } from '@/lib/dates';
 import { parseVoucherText, parseVoucherImage, type ParsedVoucher } from '@/lib/ollama';
+import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -15,6 +16,7 @@ function aiError(err: unknown): string {
 
 /** Parse a pasted voucher/coupon text with AI → form fields (no save). */
 export async function scanVoucherText(text: string): Promise<ScanVoucherResult> {
+  if (!(await isFeatureEnabled('vouchers'))) return { ok: false, error: 'Voucher scanning (AI) is turned off.' };
   if (!text.trim()) return { ok: false, error: 'Paste some voucher text first' };
   try {
     const { parsed } = await parseVoucherText(text);
@@ -26,6 +28,7 @@ export async function scanVoucherText(text: string): Promise<ScanVoucherResult> 
 
 /** OCR/vision-parse a voucher screenshot/photo with AI → form fields (no save). */
 export async function scanVoucherImage(formData: FormData): Promise<ScanVoucherResult> {
+  if (!(await isFeatureEnabled('vouchers'))) return { ok: false, error: 'Voucher scanning (AI) is turned off.' };
   const file = formData.get('file');
   if (!file || !(file instanceof File) || file.size === 0) return { ok: false, error: 'No image' };
   try {

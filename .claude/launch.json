@@ -6,13 +6,7 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "apps/web"],
       "port": 3000,
-      "autoPort": true,
-      "env": {
-        "MONGO_URI": "mongodb://admin:changeme@localhost:27017/homepage?authSource=admin",
-        "OLLAMA_HOST": "http://localhost:11434",
-        "OLLAMA_MODEL": "qwen2.5vl:7b",
-        "STORAGE_ROOT": "/tmp/homepage-storage"
-      }
+      "autoPort": true
     }
   ]
 }

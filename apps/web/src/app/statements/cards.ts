@@ -2,6 +2,7 @@
 import { connectDB } from '@/lib/db';
 import { Card } from '@/models/Card';
 import { parseCardImage, type ParsedCard } from '@/lib/ollama';
+import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
@@ -9,6 +10,7 @@ export type ScanCardResult = { ok: true; data: ParsedCard } | { ok: false; error
 
 /** OCR a payment-card photo with the local AI and return its details. */
 export async function scanCard(formData: FormData): Promise<ScanCardResult> {
+  if (!(await isFeatureEnabled('cards'))) return { ok: false, error: 'Card scanning (AI) is turned off.' };
   const file = formData.get('file');
   if (!file || !(file instanceof File) || file.size === 0) {
     return { ok: false, error: 'No image' };

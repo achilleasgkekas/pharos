@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
 import { saveFile, deleteFile } from '@/lib/storage';
 import { parseExpenseText, parseExpenseImage } from '@/lib/ollama';
+import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { extractPdfText, looksLikeScannedPdf } from '@/lib/pdf';
 import { ocrImage, looksLikeUsableOcr } from '@/lib/ocr';
 import { pdfFirstPageJpeg } from '@/lib/pdfThumb';
@@ -167,7 +168,10 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
     return { ok: false, error: `Could not save file: ${(err as Error).message}` };
   }
 
-  const { parsed, raw, model, aiError } = await runExpenseParse(bytes, ext, isPdf, false);
+  // When expense-AI is off, skip parsing and keep the upload as a draft to fill in manually.
+  const { parsed, raw, model, aiError } = (await isFeatureEnabled('expenses'))
+    ? await runExpenseParse(bytes, ext, isPdf, false)
+    : { parsed: null, raw: '', model: 'ai-off', aiError: 'AI is off — saved as a draft to fill in manually.' };
 
   try {
     await connectDB();

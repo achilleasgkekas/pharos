@@ -1,7 +1,23 @@
 # Security notes
 
-Posture: self-hosted, single-user, reached over WireGuard/LAN. No app-level
-auth by design. The notes below cover the hardening pass of 2026-06-11.
+Posture: self-hosted, multi-account household hub behind an app login, typically
+reached over WireGuard/LAN. The notes below cover the 2026-06-11 hardening pass and
+the authentication layer added afterwards.
+
+## Authentication
+
+- **App login required.** `middleware.ts` (edge) verifies a signed session JWT on
+  every request and gates everything — including served files at `/api/files`.
+  Unauthenticated page requests redirect to `/login`; API/file requests get a 401.
+- **First-run wizard** (`/setup`) creates the first admin when zero users exist;
+  more accounts (admin / member roles) are managed in Settings → Users.
+- **Passwords**: `scrypt` via `node:crypto` (no native deps), stored as a
+  self-describing hash, compared with `timingSafeEqual`.
+- **Sessions**: `jose` HS256 JWT in an httpOnly, `sameSite=lax` cookie signed with
+  `AUTH_SECRET`. Set `AUTH_COOKIE_SECURE=true` when served over HTTPS. Rotating
+  `AUTH_SECRET` invalidates all sessions (everyone re-logs-in).
+- **Server actions**: middleware blocks unauthenticated calls; system-settings and
+  user-management actions additionally enforce `requireAdmin()`.
 
 ## Applied in code/config (live after the next rebuild)
 
@@ -56,8 +72,10 @@ docker compose up -d --build
   bind to `127.0.0.1`, so only `web:3000` faces the LAN (the accepted VPN-only,
   no-auth posture anyway). The firewall would only add a second layer in front of
   that one port.
-- **No app auth** — accepted (VPN-only). If `web:3000` is ever exposed beyond the
-  VPN, front it with an authenticated reverse proxy.
+- **App auth is now in place** (see above), so `web:3000` no longer relies solely on
+  VPN-only network isolation. Still, if you expose it to the public internet, also
+  enable `AUTH_COOKIE_SECURE=true` behind HTTPS and consider a reverse proxy with
+  rate-limiting. No password-reset email flow yet — an admin resets others' passwords.
 - **Plaintext secrets in Mongo** (AI keys, OneDrive token, SMB/FTP/UniFi pass) —
   acceptable only while Mongo is loopback-bound + strong password. Encrypt-at-rest
   is the next step if the threat model widens.

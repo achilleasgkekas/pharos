@@ -5,19 +5,20 @@ import { Statement } from '@/models/Statement';
 import { Subscription } from '@/models/Subscription';
 import { Card } from '@/models/Card';
 import { AppConfig } from '@/models/AppConfig';
-import { isOllamaHealthy } from '@/lib/ollama';
+import { isOllamaHealthy, isAiReady } from '@/lib/ollama';
 import { getAiConfig } from '@/lib/aiConfig';
 import { getAppSettings } from '@/lib/appSettings';
 import { getStores } from '@/lib/storeService';
 import { SettingsClient } from './SettingsClient';
 import { listOllamaModels, getPromptsForEditor, getScraperAi, getStorageInfo, getListsForEditor } from './actions';
+import { requireUser } from '@/lib/auth';
 import type { SerializedCard } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
 async function getInfo() {
   await connectDB();
-  const [items, receipts, statements, subscriptions, cards, cardList, ollamaUp, cfg, installed, doc, stores, settings, prompts, scraperAi, storage] =
+  const [items, receipts, statements, subscriptions, cards, cardList, ollamaUp, aiReady, cfg, installed, doc, stores, settings, prompts, scraperAi, storage] =
     await Promise.all([
       Item.countDocuments(),
       Receipt.countDocuments(),
@@ -26,6 +27,7 @@ async function getInfo() {
       Card.countDocuments(),
       Card.find().sort({ name: 1 }).lean(),
       isOllamaHealthy(),
+      isAiReady(),
       getAiConfig(),
       listOllamaModels(),
       AppConfig.findOne({ key: 'singleton' }).lean(),
@@ -66,11 +68,16 @@ async function getInfo() {
       hasCustomKey: !!cfg.customApiKey,
       confirmBulk: doc?.aiConfirmBulk !== false, // cost guard, default ON
       installed, // [{ name, sizeGB }]
+      // Optional-AI controls
+      enabled: doc?.aiEnabled !== false, // master switch, default ON
+      features: (doc?.aiFeatures as Record<string, boolean>) || {},
+      ready: aiReady, // provider-aware readiness (drives per-feature status chips)
     },
   };
 }
 
 export default async function SettingsPage() {
+  const me = await requireUser();
   const info = await getInfo();
-  return <SettingsClient info={info} />;
+  return <SettingsClient info={info} currentUser={{ id: me.id, name: me.name, role: me.role }} />;
 }
