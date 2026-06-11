@@ -5,7 +5,7 @@ import { AppConfig } from '@/models/AppConfig';
 import { hashPassword, setSessionCookie, requireAdmin } from '@/lib/auth';
 import { invalidateAiConfigCache } from '@/lib/aiConfig';
 import { invalidateAppSettings } from '@/lib/appSettings';
-import { saveAiConfig } from '@/app/settings/actions';
+import { saveAiConfig, saveUnifiConfig } from '@/app/settings/actions';
 
 /** Step 1 — create the first account (admin) and sign them in. Only works on first run. */
 export async function createFirstAdmin(formData: FormData): Promise<{ ok: boolean; error?: string }> {
@@ -55,4 +55,16 @@ export async function finishWithoutAi(): Promise<{ ok: boolean }> {
   await AppConfig.updateOne({ key: 'singleton' }, { $set: { aiEnabled: false } }, { upsert: true });
   invalidateAiConfigCache();
   return { ok: true };
+}
+
+/** Step 4 — optionally connect a UniFi controller (reuses the main settings writer,
+ *  enabling the integration). Skipped if host/user are blank. */
+export async function saveSetupUnifi(host: string, user: string, pass: string): Promise<{ ok: boolean }> {
+  await requireAdmin();
+  const fd = new FormData();
+  fd.set('host', host);
+  fd.set('user', user);
+  fd.set('pass', pass);
+  fd.set('enabled', 'true');
+  return saveUnifiConfig(fd);
 }
