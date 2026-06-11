@@ -41,6 +41,7 @@ import { anthropicTest } from '@/lib/anthropic';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
 import { requireAdmin } from '@/lib/auth';
 import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
+import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel, type AiProviderId } from '@/lib/aiModels';
 import { getUnifiSnapshot, invalidateUnifiConfig, runUnifiSpeedtest } from '@/lib/unifi';
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
 import { sendNtfyTo } from '@/lib/notify';
@@ -128,6 +129,96 @@ export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean }>
   invalidateOllamaHealth(); // model/provider changed → re-probe on next render
   revalidatePath('/settings');
   return { ok: true };
+}
+
+/** Fetch the available models from a provider's API (using the typed or saved key),
+ *  annotated with approximate cost ($/1M) + a "recommended" flag. Keys never leave
+ *  the server. OpenRouter returns LIVE pricing; the rest use the static table. */
+export async function fetchProviderModels(
+  provider: string,
+  key?: string,
+  baseUrl?: string
+): Promise<{ ok: boolean; models?: FetchedModel[]; error?: string }> {
+  await requireAdmin();
+  const cfg = await getAiConfig();
+  const savedKey = (p: string): string =>
+    p === 'anthropic' ? cfg.anthropicApiKey
+    : p === 'openai' ? cfg.openaiApiKey
+    : p === 'gemini' ? cfg.geminiApiKey
+    : p === 'openrouter' ? cfg.openrouterApiKey
+    : p === 'custom' ? cfg.customApiKey
+    : '';
+  const k = (key || '').trim() || savedKey(provider);
+  const rec = PROVIDER_RECOMMEND[provider as AiProviderId]?.model;
+  const sig = () => AbortSignal.timeout(15000);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  try {
+    let entries: { id: string; live?: { in: number; out: number } }[] = [];
+
+    if (provider === 'anthropic') {
+      if (!k) return { ok: false, error: 'Enter or save an Anthropic key first' };
+      const res = await fetch('https://api.anthropic.com/v1/models?limit=200', {
+        headers: { 'x-api-key': k, 'anthropic-version': '2023-06-01' },
+        signal: sig(),
+      });
+      if (!res.ok) return { ok: false, error: `Anthropic HTTP ${res.status}` };
+      const d = (await res.json()) as { data?: { id: string }[] };
+      entries = (d.data || []).map((m) => ({ id: m.id }));
+    } else if (provider === 'openai') {
+      if (!k) return { ok: false, error: 'Enter or save an OpenAI key first' };
+      const res = await fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${k}` }, signal: sig() });
+      if (!res.ok) return { ok: false, error: `OpenAI HTTP ${res.status}` };
+      const d = (await res.json()) as { data?: { id: string }[] };
+      entries = (d.data || [])
+        .map((m) => ({ id: m.id }))
+        .filter((m) => /^(gpt-4|o1|o3|o4|chatgpt)/.test(m.id) && !/audio|realtime|transcribe|tts|search|embedding|image/.test(m.id));
+    } else if (provider === 'gemini') {
+      if (!k) return { ok: false, error: 'Enter or save a Gemini key first' };
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(k)}&pageSize=200`, { signal: sig() });
+      if (!res.ok) return { ok: false, error: `Gemini HTTP ${res.status}` };
+      const d = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] };
+      entries = (d.models || [])
+        .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+        .map((m) => ({ id: m.name.replace(/^models\//, '') }))
+        .filter((m) => /gemini/.test(m.id) && !/embedding|aqa/.test(m.id));
+    } else if (provider === 'openrouter') {
+      const res = await fetch('https://openrouter.ai/api/v1/models', { headers: k ? { Authorization: `Bearer ${k}` } : {}, signal: sig() });
+      if (!res.ok) return { ok: false, error: `OpenRouter HTTP ${res.status}` };
+      const d = (await res.json()) as { data?: { id: string; pricing?: { prompt?: string; completion?: string } }[] };
+      entries = (d.data || []).map((m) => {
+        const hasP = m.pricing && m.pricing.prompt != null;
+        const live = hasP ? { in: r2(Number(m.pricing!.prompt) * 1e6 || 0), out: r2(Number(m.pricing!.completion) * 1e6 || 0) } : undefined;
+        return { id: m.id, live };
+      });
+    } else if (provider === 'custom') {
+      const base = (baseUrl || cfg.customBaseUrl || '').trim().replace(/\/$/, '');
+      if (!base) return { ok: false, error: 'Enter the base URL first' };
+      const res = await fetch(`${base}/models`, { headers: k ? { Authorization: `Bearer ${k}` } : {}, signal: sig() });
+      if (!res.ok) return { ok: false, error: `Server HTTP ${res.status}` };
+      const d = (await res.json()) as { data?: { id: string }[] };
+      entries = (d.data || []).map((m) => ({ id: m.id }));
+    } else {
+      return { ok: false, error: 'This provider has no model list' };
+    }
+
+    const models: FetchedModel[] = entries
+      .filter((e) => e.id)
+      .map((e) => {
+        const price = e.live || priceForModel(e.id);
+        return { id: e.id, in: price?.in ?? null, out: price?.out ?? null, vision: looksVisionModel(e.id), recommended: e.id === rec };
+      });
+    models.sort((a, b) =>
+      (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0) ||
+      (b.in != null ? 1 : 0) - (a.in != null ? 1 : 0) ||
+      a.id.localeCompare(b.id)
+    );
+    if (!models.length) return { ok: false, error: 'No models returned' };
+    return { ok: true, models: models.slice(0, 120) };
+  } catch (err) {
+    const m = (err as Error).message || String(err);
+    return { ok: false, error: /timeout|aborted/i.test(m) ? 'Request timed out' : m.slice(0, 140) };
+  }
 }
 
 /** Master AI switch. When off, the whole app runs AI-free. */

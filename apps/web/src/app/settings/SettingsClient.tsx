@@ -1,13 +1,14 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound } from 'lucide-react';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, setAiEnabled, setAiFeature } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { AI_FEATURES } from '@/lib/aiFeatures';
+import { PROVIDER_RECOMMEND, SCRAPER_RECOMMEND, type FetchedModel } from '@/lib/aiModels';
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
@@ -209,7 +210,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             <>
               <AiMasterAndFeatures ai={info.ai} canEdit={isAdmin} />
               <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
-              <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} />
+              <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} hasAnthropicKey={info.ai.hasKey} />
               <AiPromptsManager prompts={info.prompts} />
             </>
           )}
@@ -338,9 +339,114 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
 // ─── AI engine settings ─────────────────────────────────────────────────────
 
 /** Key + model inputs shared by every cloud provider panel. */
-function CloudKeyModel({
-  hasKey, keyValue, onKey, keyPlaceholder, model, onModel, suggestions, hint,
+/** Model field with a "Load models" button that pulls the provider's live list
+ *  (cost per 1M tokens + a ★ recommended pick). Falls back to suggestion chips. */
+function ModelPicker({
+  provider, model, onModel, typedKey, hasKey, baseUrl, suggestions, recommend, hint,
 }: {
+  provider: ProviderId;
+  model: string;
+  onModel: (v: string) => void;
+  typedKey: string;
+  hasKey: boolean;
+  baseUrl?: string;
+  suggestions: string[];
+  recommend?: { model: string; reason: string };
+  hint?: string;
+}) {
+  const [models, setModels] = useState<FetchedModel[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  // OpenRouter lists models without a key; custom needs only a base URL; the rest need a key.
+  const canLoad = provider === 'openrouter' || provider === 'custom' || hasKey || !!typedKey.trim();
+
+  async function load() {
+    setErr('');
+    setLoading(true);
+    try {
+      const r = await fetchProviderModels(provider, typedKey.trim() || undefined, baseUrl?.trim() || undefined);
+      if (r.ok && r.models) setModels(r.models);
+      else setErr(r.error || 'Failed to load models');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Field label="Model">
+      <input value={model} onChange={(e) => onModel(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading || !canLoad}
+          className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50"
+        >
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Load models
+        </button>
+        {recommend && (
+          <button
+            type="button"
+            onClick={() => onModel(recommend.model)}
+            title={recommend.reason}
+            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-accent)]/50 text-[color:var(--color-accent)]"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
+            <Star size={10} /> {recommend.model}
+          </button>
+        )}
+        {!canLoad && <span className="text-[10px] text-[color:var(--color-text-faint)]">add a key to load models</span>}
+      </div>
+      {recommend && (
+        <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5">
+          Recommended: <span className="text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>{recommend.model}</span> — {recommend.reason}
+        </p>
+      )}
+      {err && <p className="text-[10px] text-[color:var(--color-red)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{err}</p>}
+
+      {models ? (
+        <>
+          <div className="mt-2 max-h-60 overflow-auto rounded-lg border border-[color:var(--color-border)] divide-y divide-[color:var(--color-border)]">
+            {models.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => onModel(m.id)}
+                className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-[color:var(--color-surface-2)]', model === m.id && 'bg-[color:var(--color-surface-2)]')}
+              >
+                {m.recommended && <Star size={11} className="text-[color:var(--color-accent)] shrink-0" />}
+                <span className="text-[11px] min-w-0 flex-1 truncate" style={{ fontFamily: 'var(--font-mono)' }}>{m.id}</span>
+                {m.vision && <span className="text-[9px] px-1 py-0.5 rounded bg-[color:var(--color-surface-3)] text-[color:var(--color-text-faint)] shrink-0">vision</span>}
+                <span className="text-[10px] text-[color:var(--color-text-dim)] shrink-0 tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {m.in == null ? '—' : m.in === 0 && m.out === 0 ? 'free' : `$${m.in}/$${m.out}`}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="text-[9px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+            $ = input/output per 1M tokens · approximate (OpenRouter is live)
+          </p>
+        </>
+      ) : (
+        suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {suggestions.map((m) => (
+              <button key={m} type="button" onClick={() => onModel(m)} className="text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors" style={{ fontFamily: 'var(--font-mono)' }}>
+                {m}
+              </button>
+            ))}
+          </div>
+        )
+      )}
+      {hint && <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{hint}</p>}
+    </Field>
+  );
+}
+
+function CloudKeyModel({
+  provider, hasKey, keyValue, onKey, keyPlaceholder, model, onModel, suggestions, hint, baseUrl,
+}: {
+  provider: ProviderId;
   hasKey: boolean;
   keyValue: string;
   onKey: (v: string) => void;
@@ -349,6 +455,7 @@ function CloudKeyModel({
   onModel: (v: string) => void;
   suggestions: string[];
   hint?: string;
+  baseUrl?: string;
 }) {
   return (
     <div className="space-y-3 pt-1">
@@ -363,17 +470,17 @@ function CloudKeyModel({
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       </Field>
-      <Field label="Model">
-        <input value={model} onChange={(e) => onModel(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {suggestions.map((m) => (
-            <button key={m} type="button" onClick={() => onModel(m)} className="text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors" style={{ fontFamily: 'var(--font-mono)' }}>
-              {m}
-            </button>
-          ))}
-        </div>
-        {hint && <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{hint}</p>}
-      </Field>
+      <ModelPicker
+        provider={provider}
+        model={model}
+        onModel={onModel}
+        typedKey={keyValue}
+        hasKey={hasKey}
+        baseUrl={baseUrl}
+        suggestions={suggestions}
+        recommend={PROVIDER_RECOMMEND[provider]}
+        hint={hint}
+      />
     </div>
   );
 }
@@ -612,27 +719,15 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               style={{ fontFamily: 'var(--font-mono)' }}
             />
           </Field>
-          <Field label="Model">
-            <input
-              value={anthropicModel}
-              onChange={(e) => setAnthropicModel(e.target.value)}
-              className={inputClass}
-              style={{ fontFamily: 'var(--font-mono)' }}
-            />
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {CLAUDE_SUGGESTIONS.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setAnthropicModel(m)}
-                  className="text-[10px] px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors"
-                  style={{ fontFamily: 'var(--font-mono)' }}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          </Field>
+          <ModelPicker
+            provider="anthropic"
+            model={anthropicModel}
+            onModel={setAnthropicModel}
+            typedKey={apiKey}
+            hasKey={ai.hasKey}
+            suggestions={CLAUDE_SUGGESTIONS}
+            recommend={PROVIDER_RECOMMEND.anthropic}
+          />
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -660,6 +755,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
       {/* OpenAI panel */}
       {provider === 'openai' && (
         <CloudKeyModel
+          provider="openai"
           hasKey={ai.hasOpenaiKey}
           keyValue={openaiKey}
           onKey={setOpenaiKey}
@@ -674,6 +770,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
       {/* Gemini panel */}
       {provider === 'gemini' && (
         <CloudKeyModel
+          provider="gemini"
           hasKey={ai.hasGeminiKey}
           keyValue={geminiKey}
           onKey={setGeminiKey}
@@ -688,6 +785,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
       {/* OpenRouter panel */}
       {provider === 'openrouter' && (
         <CloudKeyModel
+          provider="openrouter"
           hasKey={ai.hasOpenrouterKey}
           keyValue={openrouterKey}
           onKey={setOpenrouterKey}
@@ -715,6 +813,8 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             </p>
           </Field>
           <CloudKeyModel
+            provider="custom"
+            baseUrl={customBaseUrl}
             hasKey={ai.hasCustomKey}
             keyValue={customKey}
             onKey={setCustomKey}
@@ -784,7 +884,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
 
 // ─── Scraper AI (separate provider/model) ────────────────────────────────────
 
-function ScraperAiSettings({ scraperAi, installed }: { scraperAi: ScraperAiConfig; installed: { name: string; sizeGB: number }[] }) {
+function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperAi: ScraperAiConfig; installed: { name: string; sizeGB: number }[]; hasAnthropicKey: boolean }) {
   const [pending, startTransition] = useTransition();
   const [provider, setProvider] = useState<'ollama' | 'anthropic'>(scraperAi.provider);
   const [model, setModel] = useState(scraperAi.model);
@@ -851,12 +951,20 @@ function ScraperAiSettings({ scraperAi, installed }: { scraperAi: ScraperAiConfi
           </p>
         </Field>
       ) : (
-        <Field label="Scraper model">
-          <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="claude-3-5-haiku-latest" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
-          <p className="text-[10px] text-[color:var(--color-gold)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
-            ⚠ Uses the Anthropic key saved above. Every 6h pass hits the API for each link — cloud calls cost money. Prefer a cheap model (Haiku) or keep this Local.
+        <div className="space-y-2">
+          <ModelPicker
+            provider="anthropic"
+            model={model}
+            onModel={setModel}
+            typedKey=""
+            hasKey={hasAnthropicKey}
+            suggestions={['claude-3-5-haiku-latest', 'claude-3-haiku-20240307']}
+            recommend={SCRAPER_RECOMMEND.anthropic}
+          />
+          <p className="text-[10px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            ⚠ Uses the Anthropic key from the AI engine above. Every 6h pass hits the API per link — prefer a cheap model (Haiku) or keep this Local.
           </p>
-        </Field>
+        </div>
       )}
 
       <div className="flex items-center gap-3 pt-2 border-t border-[color:var(--color-border)] mt-1">
