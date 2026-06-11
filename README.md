@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/banner.svg" alt="PHAROS — Personal Hub · Asset & Resource Oversight System" width="100%">
+<img src="docs/banner.png" alt="PHAROS - Personal Hub, Asset and Resource Oversight System" width="100%">
 
 <p>
   <a href="LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-00ff88"></a>
