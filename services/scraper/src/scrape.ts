@@ -1,6 +1,8 @@
 // Fetch a product page and reduce it to text + JSON-LD for the LLM.
 // Standalone copy of the web app's lib/scrape.ts (kept in sync intentionally).
 
+import { assertPublicUrl } from './ssrf';
+
 export type ScrapedPage = {
   url: string;
   title: string;
@@ -108,7 +110,7 @@ function extractPrimaryPrice(html: string): string {
 }
 
 export async function fetchPageText(url: string): Promise<ScrapedPage> {
-  if (!/^https?:\/\//i.test(url)) throw new Error('The URL must start with http(s)://');
+  await assertPublicUrl(url); // SSRF guard (scheme + private/internal target)
 
   const res = await fetch(url, {
     headers: {

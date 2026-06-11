@@ -157,10 +157,16 @@ async function runReceiptParse(bytes: Buffer, ext: string, isPdf: boolean, mode:
  * and store a draft Receipt (verified: false) for the user to confirm.
  * Degrades gracefully if Ollama is offline — creates an empty draft.
  */
+// Matches next.config serverActions.bodySizeLimit; also bounds in-memory buffering + OCR.
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+
 export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
   const file = formData.get('file');
   if (!file || !(file instanceof File) || file.size === 0) {
     return { ok: false, error: 'No file found' };
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return { ok: false, error: 'File too large (max 15MB)' };
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());

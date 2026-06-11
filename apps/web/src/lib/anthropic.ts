@@ -16,6 +16,15 @@ function stripFences(raw: string): string {
   return raw.replace(/```json\s*|```\s*$/gi, '').replace(/```\s*$/g, '').trim();
 }
 
+/** Scrub the API key (and any sk-ant-… token) out of an error string before it
+ *  bubbles up to a UI message or log. Defense in depth: the API doesn't echo the
+ *  key, but error bodies/strings shouldn't be able to carry it either. */
+function redactKey(s: string, apiKey: string): string {
+  let out = s;
+  if (apiKey && apiKey.length > 8) out = out.split(apiKey).join('[redacted]');
+  return out.replace(/sk-ant-[A-Za-z0-9_-]+/g, '[redacted]');
+}
+
 type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; source: { type: 'base64'; media_type: ImageMedia; data: string } };
@@ -62,7 +71,7 @@ export async function anthropicJSON(opts: {
     } catch {
       detail = (await res.text()).slice(0, 200);
     }
-    throw new Error(`Anthropic ${res.status}: ${detail}`);
+    throw new Error(`Anthropic ${res.status}: ${redactKey(detail, opts.apiKey)}`);
   }
 
   const data = (await res.json()) as { content?: { type: string; text?: string }[] };
@@ -108,7 +117,7 @@ export async function anthropicRaw(opts: {
     } catch {
       detail = (await res.text()).slice(0, 200);
     }
-    throw new Error(`Anthropic ${res.status}: ${detail}`);
+    throw new Error(`Anthropic ${res.status}: ${redactKey(detail, opts.apiKey)}`);
   }
   const data = (await res.json()) as { content?: AnthropicBlock[]; stop_reason?: string };
   return { content: data.content ?? [], stopReason: data.stop_reason ?? 'end_turn' };

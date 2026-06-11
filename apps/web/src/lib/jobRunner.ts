@@ -70,7 +70,18 @@ async function runJobLoop(
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
+  // NOTE: on timeout we return `fallback` but the underlying work keeps running
+  // (no AbortSignal threads into rescanReceipt/aiFillItem), so a slow item may
+  // still complete its DB write later. That's benign here (it writes the same
+  // record's parse result); the loop has already moved on. We DO clear the timer
+  // when the real promise wins, so a long job doesn't pile up 120s timers, and
+  // swallow any late rejection defensively.
+  p.catch(() => {});
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([p.finally(() => clearTimeout(timer)), timeout]);
 }
 
 async function runOne(kind: string, id: string, useOcr: boolean): Promise<{ ok: boolean; detail: string }> {

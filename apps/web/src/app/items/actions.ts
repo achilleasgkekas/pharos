@@ -10,6 +10,7 @@ import { parseProductFromPage } from '@/lib/ollama';
 import { searchWeb, searchImages } from '@/lib/search';
 import { type ItemView } from '@/lib/itemStatus';
 import { saveFile, deleteFile } from '@/lib/storage';
+import { assertPublicUrl } from '@/lib/ssrf';
 import { revalidatePath } from 'next/cache';
 import { safeRevalidate } from '@/lib/revalidate';
 import { Types } from 'mongoose';
@@ -220,6 +221,7 @@ type WithPhotos = { photos: string[] };
 async function attachImagesFromUrl(item: WithPhotos, url: string, max = 4): Promise<number> {
   let html: string;
   try {
+    await assertPublicUrl(url);
     const res = await fetch(url, {
       headers: { 'User-Agent': UA, Accept: 'text/html' },
       redirect: 'follow',
@@ -235,10 +237,12 @@ async function attachImagesFromUrl(item: WithPhotos, url: string, max = 4): Prom
   for (const imgUrl of extractImageUrls(html, url)) {
     if (added >= max) break;
     try {
+      await assertPublicUrl(imgUrl);
       const ir = await fetch(imgUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000) });
       if (!ir.ok) continue;
       const ct = (ir.headers.get('content-type') || '').toLowerCase();
       if (!ct.startsWith('image/')) continue;
+      if (Number(ir.headers.get('content-length') || 0) > 20_000_000) continue; // 20MB cap
       const buf = Buffer.from(await ir.arrayBuffer());
       if (buf.length < 3000) continue; // skip 1px trackers / placeholders
       let ext = ct.split('/')[1]?.split(';')[0] || 'jpg';
@@ -257,10 +261,12 @@ async function attachImagesFromUrl(item: WithPhotos, url: string, max = 4): Prom
 /** Download ONE direct image URL (e.g. from image search) and attach it. */
 async function attachOneImage(item: WithPhotos, imgUrl: string): Promise<boolean> {
   try {
+    await assertPublicUrl(imgUrl);
     const ir = await fetch(imgUrl, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(15000) });
     if (!ir.ok) return false;
     const ct = (ir.headers.get('content-type') || '').toLowerCase();
     if (!ct.startsWith('image/')) return false;
+    if (Number(ir.headers.get('content-length') || 0) > 20_000_000) return false; // 20MB cap
     const buf = Buffer.from(await ir.arrayBuffer());
     if (buf.length < 3000) return false; // skip trackers/placeholders
     let ext = ct.split('/')[1]?.split(';')[0] || 'jpg';

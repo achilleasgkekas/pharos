@@ -46,9 +46,14 @@ export async function GET(
       'Cache-Control': isHtml ? 'private, no-cache, must-revalidate' : 'private, max-age=31536000, immutable',
     };
     if (isHtml) {
-      // Email HTML is untrusted (could carry tracking scripts) — render it with no
-      // JS at all. Images/inline styles still load so the receipt looks right.
-      headers['Content-Security-Policy'] = "script-src 'none'; frame-ancestors 'self'";
+      // Email HTML is untrusted. Lock it down: no scripts, and default-src 'none'
+      // so nothing phones home. Only same-origin + data: images and inline styles
+      // load (enough to render). External images are blocked on purpose — they'd
+      // be tracking-pixel beacons firing on every open. form-action/base-uri none
+      // stop a clicked form or <base> from exfiltrating. To allow remote logos,
+      // change img-src to "'self' data: https:" (re-enables beaconing).
+      headers['Content-Security-Policy'] =
+        "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; font-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
       headers['X-Content-Type-Options'] = 'nosniff';
     }
     return new NextResponse(new Uint8Array(buffer), { headers });

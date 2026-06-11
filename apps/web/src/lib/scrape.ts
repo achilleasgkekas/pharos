@@ -3,6 +3,8 @@
  * Prefers schema.org JSON-LD Product data (accurate), falls back to stripped HTML.
  */
 
+import { assertPublicUrl } from '@/lib/ssrf';
+
 export type ScrapedPage = {
   url: string;
   title: string;
@@ -111,9 +113,9 @@ function extractPrimaryPrice(html: string): string {
 }
 
 export async function fetchPageText(url: string): Promise<ScrapedPage> {
-  if (!/^https?:\/\//i.test(url)) {
-    throw new Error('The URL must start with http(s)://');
-  }
+  // SSRF guard: reject non-http(s) and any private/loopback/internal target
+  // (also covers the FlareSolverr retry path below, which fetches the same URL).
+  await assertPublicUrl(url);
 
   const res = await fetch(url, {
     headers: {

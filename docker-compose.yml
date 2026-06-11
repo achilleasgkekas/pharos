@@ -8,6 +8,9 @@ services:
     container_name: homepage-web
     restart: unless-stopped
     ports:
+      # Bound to all interfaces so the UI is reachable from phones over the
+      # WireGuard VPN / LAN. This is the only service that needs to be. If you
+      # ever want it LAN-restricted, front it with an authenticated reverse proxy.
       - "3000:3000"
     environment:
       MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/homepage?authSource=admin
@@ -22,8 +25,9 @@ services:
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
       STORAGE_ROOT: /storage
       NODE_ENV: production
-      # Stable key so Server Action IDs survive rebuilds (open tabs don't break)
-      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-mltJ8VGKy1JnduymANqXDApMi+XPObwHeX35DkISa1M=}
+      # Stable key so Server Action IDs survive rebuilds (open tabs don't break).
+      # Secret — must be provided via .env (no committed default).
+      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:?set NEXT_SERVER_ACTIONS_ENCRYPTION_KEY in .env}
     volumes:
       # Persist user binary files (receipts, statements) on the host.
       # Later this path becomes the NFS mount from the DS923+ NAS.
@@ -41,7 +45,10 @@ services:
     container_name: homepage-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      # Loopback only: containers reach Mongo via the internal network ("mongo"),
+      # so the host port never needs to face the LAN. (Use an SSH tunnel for a
+      # local mongosh.) Previously 0.0.0.0 → any LAN host could connect.
+      - "127.0.0.1:27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:-changeme}
@@ -62,7 +69,8 @@ services:
     restart: unless-stopped
     profiles: ["tools"]
     ports:
-      - "8081:8081"
+      # Loopback only — DB admin UI must never face the LAN.
+      - "127.0.0.1:8081:8081"
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER:-admin}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASS:-changeme}
@@ -88,7 +96,9 @@ services:
       LOG_LEVEL: ${FLARESOLVERR_LOG_LEVEL:-info}
       TZ: ${TZ:-Europe/Athens}
     ports:
-      - "8191:8191"
+      # Loopback only — reached internally as http://flaresolverr:8191. Exposing
+      # it to the LAN would offer an open headless-browser SSRF proxy.
+      - "127.0.0.1:8191:8191"
 
   # Self-hosted metasearch (web + image). Used for "AI fill without a link" and
   # finding product photos. Local, privacy-first, no API key. Reached at :8888.
@@ -97,7 +107,9 @@ services:
     container_name: homepage-searxng
     restart: unless-stopped
     ports:
-      - "8888:8080"
+      # Loopback only — reached internally as http://searxng:8080. With the rate
+      # limiter off, an exposed instance is an open metasearch proxy.
+      - "127.0.0.1:8888:8080"
     volumes:
       - ./searxng:/etc/searxng:rw
     environment:

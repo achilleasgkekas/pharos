@@ -13,7 +13,13 @@ import type { Schema, Query } from 'mongoose';
 export function softDeletePlugin(schema: Schema): void {
   schema.add({ deletedAt: { type: Date, default: null, index: true } });
 
-  const HOOKS = ['find', 'findOne', 'findOneAndUpdate', 'findOneAndDelete', 'countDocuments', 'distinct'] as const;
+  // Also covers bulk update/delete so trashed docs aren't rewritten or removed by
+  // merges/reference-cleanups. Trash ops that DO target trashed docs (restore /
+  // purge / restore-import) pass .setOptions({ withDeleted: true }) to opt out.
+  const HOOKS = [
+    'find', 'findOne', 'findOneAndUpdate', 'findOneAndDelete', 'countDocuments', 'distinct',
+    'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 'replaceOne',
+  ] as const;
   for (const hook of HOOKS) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     schema.pre(hook as any, function (this: Query<unknown, unknown>, next: () => void) {

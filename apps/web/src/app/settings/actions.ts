@@ -69,6 +69,9 @@ export async function listOllamaModels(): Promise<OllamaModel[]> {
 export async function pullOllamaModel(name: string): Promise<{ ok: boolean; error?: string }> {
   const n = name.trim();
   if (!n) return { ok: false, error: 'No model name' };
+  // Model refs look like "qwen2.5vl:7b" or "library/name:tag" — reject anything else
+  // so an absurd name can't be flung at the Ollama pull endpoint.
+  if (n.length > 100 || !/^[a-z0-9._/:-]+$/i.test(n)) return { ok: false, error: 'Invalid model name' };
   try {
     const host = (await getAiConfig()).ollamaHost || OLLAMA_HOST;
     const res = await fetch(`${host}/api/pull`, {
@@ -732,7 +735,10 @@ export async function exportData(): Promise<string> {
 /** Build a CSV string (quote fields containing commas/quotes/newlines). */
 function toCSV(headers: string[], rows: (string | number)[][]): string {
   const esc = (v: string | number) => {
-    const s = String(v ?? '');
+    let s = String(v ?? '');
+    // CSV-injection guard: a leading =,+,-,@,tab,CR makes Excel/Sheets evaluate the
+    // cell as a formula. Prefix with ' so a malicious vendor/note stays plain text.
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return [headers.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
@@ -778,6 +784,15 @@ export async function saveBudgets(budgets: Record<string, number>): Promise<{ ok
   return { ok: true };
 }
 
+/** A stored file reference is safe only if it's a contained relative path. A
+ *  tampered backup must not be able to point filePath/thumbPath/photos at e.g.
+ *  ../../etc/passwd, which would then be served or unlinked by purge. */
+function isSafeStoredPath(p: unknown): boolean {
+  if (typeof p !== 'string' || !p || p.includes('\0')) return false;
+  if (p.startsWith('/') || /^[a-zA-Z]:/.test(p)) return false; // absolute
+  return !p.split(/[/\\]/).some((seg) => seg === '..'); // no traversal
+}
+
 /** Restore from a backup JSON — upserts each document by _id (merges, never duplicates). */
 export async function importData(json: string): Promise<{ ok: boolean; restored: number; error?: string }> {
   let data: { collections?: Record<string, unknown[]> };
@@ -800,8 +815,14 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
       void __v;
       void createdAt;
       void updatedAt;
+      // Drop tampered file references so a malicious backup can't aim purge/serve
+      // at arbitrary files (defense in depth on top of storage.ts containment).
+      for (const k of ['filePath', 'thumbPath'] as const) {
+        if (k in rest && !isSafeStoredPath(rest[k])) delete rest[k];
+      }
+      if (Array.isArray(rest.photos)) rest.photos = rest.photos.filter(isSafeStoredPath);
       try {
-        if (_id) await (Model as typeof Item).updateOne({ _id }, { $set: rest }, { upsert: true });
+        if (_id) await (Model as typeof Item).updateOne({ _id }, { $set: rest }, { upsert: true }).setOptions({ withDeleted: true });
         else await (Model as typeof Item).create(rest);
         restored++;
       } catch {
@@ -868,7 +889,7 @@ export async function restoreFromTrash(type: TrashType, id: string): Promise<{ o
   const Model = TRASH_MODELS[type];
   if (!Model) return { ok: false };
   await connectDB();
-  await Model.updateOne({ _id: id }, { $set: { deletedAt: null } });
+  await Model.updateOne({ _id: id }, { $set: { deletedAt: null } }).setOptions({ withDeleted: true });
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -901,7 +922,7 @@ export async function purgeFromTrash(type: TrashType, id: string): Promise<{ ok:
       { $pull: { 'transactions.$[].matchedItemIds': oid } }
     );
   }
-  await Model.deleteOne({ _id: id });
+  await Model.deleteOne({ _id: id }).setOptions({ withDeleted: true });
   revalidatePath('/', 'layout');
   return { ok: true };
 }

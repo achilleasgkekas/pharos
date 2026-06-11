@@ -142,10 +142,14 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
 export type UploadExpenseResult = { ok: true; id: string; aiUsed: boolean; aiError?: string } | { ok: false; error: string };
 
 /** Upload + scan a bill/payslip → draft Expense (verified:false) for the user to confirm. */
+// Matches next.config serverActions.bodySizeLimit; also bounds in-memory buffering + OCR.
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+
 export async function uploadExpense(formData: FormData): Promise<UploadExpenseResult> {
   const file = formData.get('file');
   const kind = asKind(formData.get('kind'));
   if (!file || !(file instanceof File) || file.size === 0) return { ok: false, error: 'No file found' };
+  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: 'File too large (max 15MB)' };
 
   const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
   const isPdf = ext === 'pdf' || file.type === 'application/pdf';

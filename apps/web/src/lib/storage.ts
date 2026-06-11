@@ -6,6 +6,22 @@ const STORAGE_ROOT = process.env.STORAGE_ROOT ?? path.join(process.cwd(), 'stora
 
 export type StorageBucket = 'receipts' | 'statements' | 'equipment' | 'expenses';
 
+/**
+ * Resolve a caller-supplied relative path and guarantee it stays inside
+ * STORAGE_ROOT. Defends against `..` traversal and absolute paths reaching
+ * readFile/deleteFile from any source (route params, DB-stored filePath that a
+ * restore/import could have tampered with). Throws if it escapes the root.
+ */
+function resolveWithinStorage(relativePath: string): string {
+  const root = path.resolve(STORAGE_ROOT);
+  const full = path.resolve(root, relativePath || '');
+  const rel = path.relative(root, full);
+  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error('Path escapes storage root');
+  }
+  return full;
+}
+
 export async function saveFile(
   bucket: StorageBucket,
   buffer: Buffer,
@@ -31,11 +47,9 @@ export async function saveFile(
 }
 
 export async function readFile(relativePath: string): Promise<Buffer> {
-  const fullPath = path.join(STORAGE_ROOT, relativePath);
-  return fs.readFile(fullPath);
+  return fs.readFile(resolveWithinStorage(relativePath));
 }
 
 export async function deleteFile(relativePath: string): Promise<void> {
-  const fullPath = path.join(STORAGE_ROOT, relativePath);
-  await fs.unlink(fullPath);
+  await fs.unlink(resolveWithinStorage(relativePath));
 }
