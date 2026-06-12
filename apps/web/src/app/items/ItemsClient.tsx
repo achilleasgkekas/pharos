@@ -958,8 +958,14 @@ function ItemCard({
             <div className="flex items-center gap-2 flex-wrap mt-1.5 text-[10px]" style={{ fontFamily: 'var(--font-mono)' }}>
               {best && (
                 <span className="text-[color:var(--color-text-dim)]">
-                  best <span className="text-[color:var(--color-accent)] font-semibold">{cur()}{best.price}</span>
-                  <span className="text-[color:var(--color-text-faint)]"> · {best.store}</span>
+                  {best.price !== item.currentPrice ? (
+                    <>
+                      best <span className="text-[color:var(--color-accent)] font-semibold">{cur()}{best.price}</span>
+                      <span className="text-[color:var(--color-text-faint)]"> · {best.store}</span>
+                    </>
+                  ) : (
+                    <span className="text-[color:var(--color-text-faint)]">at {best.store}</span>
+                  )}
                 </span>
               )}
               {item.targetPrice ? (
@@ -1151,11 +1157,10 @@ function ItemDetailModal({
             )}
           </div>
 
-          <h2 className="text-xl md:text-2xl font-bold leading-tight" style={{ fontFamily: 'var(--font-display)' }}>
-            {item.title}
-          </h2>
-
-          {/* Price block */}
+          {/* Purchase price (owned only). For wishlist items the PricePanel below is
+              the single price home — no duplicate price/target/where-to-buy up here. */}
+          {view === 'inventory' && (
+            <>
           <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex items-end justify-between gap-4">
             <div>
               <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -1196,6 +1201,8 @@ function ItemDetailModal({
                 : `Target ${cur()}${item.targetPrice}${lowestKnown(item) != null ? ` · best known ${cur()}${lowestKnown(item)}` : ''}`}
             </div>
           ) : null}
+            </>
+          )}
 
           {/* AI fill from web + convert to task */}
           <div className="flex flex-wrap items-center gap-2">
@@ -1271,8 +1278,8 @@ function ItemDetailModal({
             )}
           </div>
 
-          {/* Where to buy — links as store buttons, each with its current price */}
-          {item.links.length > 0 && (
+          {/* Where to buy (owned items only — wishlist shows store links in the PricePanel below) */}
+          {view === 'inventory' && item.links.length > 0 && (
             <div>
               <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                 Where to buy
