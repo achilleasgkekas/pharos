@@ -76,10 +76,8 @@ docker compose up -d --build
   VPN-only network isolation. Still, if you expose it to the public internet, also
   enable `AUTH_COOKIE_SECURE=true` behind HTTPS and consider a reverse proxy with
   rate-limiting. No password-reset email flow yet — an admin resets others' passwords.
-- **Plaintext secrets in Mongo** (AI keys, OneDrive token, SMB/FTP/UniFi pass) —
+- **Plaintext secrets in Mongo** (AI keys, OneDrive token, SMB/FTP pass) —
   acceptable only while Mongo is loopback-bound + strong password. Encrypt-at-rest
   is the next step if the threat model widens.
 - **postcss (moderate)** — build-time only, bundled inside `next`; not runtime
   reachable. npm's only "fix" downgrades next to 9.x, so left as-is.
-- **UniFi `rejectUnauthorized:false`** — required for the gateway's self-signed
-  cert; scoped to the configured host.

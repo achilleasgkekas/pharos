@@ -50,11 +50,6 @@ const AppConfigSchema = new Schema(
     customApiKey: { type: String, default: '' },
     customModel: { type: String, default: '' },
 
-    // ── Network (UniFi Controller on the gateway — read-only local user) ──
-    unifiHost: { type: String, default: '' }, // e.g. 10.0.1.1
-    unifiUser: { type: String, default: '' },
-    unifiPass: { type: String, default: '' },
-    unifiEnabled: { type: Boolean, default: false },
     // Monthly budget per expense category. Map category → € amount.
     budgets: { type: Schema.Types.Mixed, default: {} },
 

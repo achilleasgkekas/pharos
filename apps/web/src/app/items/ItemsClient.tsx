@@ -1157,10 +1157,7 @@ function ItemDetailModal({
             )}
           </div>
 
-          {/* Purchase price (owned only). For wishlist items the PricePanel below is
-              the single price home — no duplicate price/target/where-to-buy up here. */}
-          {view === 'inventory' && (
-            <>
+          {/* Price — top-right of the product (paid for owned, current for wishlist) */}
           <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex items-end justify-between gap-4">
             <div>
               <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -1201,8 +1198,6 @@ function ItemDetailModal({
                 : `Target ${cur()}${item.targetPrice}${lowestKnown(item) != null ? ` · best known ${cur()}${lowestKnown(item)}` : ''}`}
             </div>
           ) : null}
-            </>
-          )}
 
           {/* AI fill from web + convert to task */}
           <div className="flex flex-wrap items-center gap-2">
@@ -1534,7 +1529,7 @@ function ItemForm({
           value={form.title}
           onChange={set('title')}
           required
-          placeholder="e.g. UniFi U7 Pro"
+          placeholder="e.g. Logitech MX Master 3S"
         />
       </Field>
 
@@ -1611,7 +1606,7 @@ function ItemForm({
         <Input
           value={form.tags}
           onChange={set('tags')}
-          placeholder="network, unifi, ap"
+          placeholder="gaming, ssd, ram"
         />
       </Field>
       <Field label="Num">

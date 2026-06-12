@@ -12,7 +12,7 @@
 
 **One private dashboard for everything you own and spend.**
 
-*Inventory · receipts · expenses · credit-card installments · subscriptions · vouchers · tasks · network — with optional AI that reads your documents for you.*
+*Inventory · receipts · expenses · credit-card installments · subscriptions · vouchers · tasks — with optional AI that reads your documents for you.*
 
 </div>
 
@@ -23,7 +23,7 @@
 PHAROS is a self-hosted personal hub. Drop in a receipt photo or a bank-statement
 PDF and (optionally) AI reads the vendor, amount, VAT, line items and installment
 plans. Track your gear, what you still want to buy (with multi-store price
-tracking), recurring bills, warranties, and your home network — all on your own
+tracking), recurring bills, warranties — all on your own
 hardware, behind your own login.
 
 **AI is entirely optional.** Every feature has a manual path, and you choose whether
@@ -46,8 +46,6 @@ setup when you're ready.
   plans to the products you bought, tracks payoff across months.
 - **Money calendar** — one 3-month agenda of renewals, installments, bills, and
   warranty/voucher expiries.
-- **Network** — live read-only view of your UniFi gateway (WAN, devices, clients,
-  temperatures) with ntfy alerts when a device goes offline.
 - **AI command bar** — "add a Netflix subscription", "show this month's stats" in
   plain language (optional; needs a cloud provider).
 - **Built for safety** — soft-delete Trash (30-day recovery), backups, SMB/FTP
@@ -119,7 +117,7 @@ built-in prompt is editable from Settings.
 - **Passwords** are hashed with `scrypt` (`node:crypto`, no native deps); sessions are
   signed JWTs in an httpOnly cookie. Set `AUTH_COOKIE_SECURE=true` behind HTTPS.
 - **Secrets** (AI keys, remote passwords) are stored server-side and never sent to
-  the client. Network integration uses a read-only local UniFi user.
+  the client.
 - **Untrusted email-HTML receipts** are served with `script-src 'none'` + `nosniff`.
 - Still best run behind a VPN / trusted reverse proxy — see [SECURITY.md](SECURITY.md).
 

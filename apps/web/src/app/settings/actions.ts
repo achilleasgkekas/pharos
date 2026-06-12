@@ -42,7 +42,6 @@ import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
 import { requireAdmin } from '@/lib/auth';
 import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel, type AiProviderId } from '@/lib/aiModels';
-import { getUnifiSnapshot, invalidateUnifiConfig, runUnifiSpeedtest } from '@/lib/unifi';
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
 import { sendNtfyTo } from '@/lib/notify';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -337,16 +336,6 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   if (dueThisMonth > 0) lines.push(`💳 installments this month: ${cur()}${dueThisMonth.toFixed(0)} (${plans.length} plans)`);
   if (expiring.length)
     lines.push(`🛡 ${expiring.length} warranty expiring ≤${s.warrantyAlertDays}d: ${expiring.slice(0, 5).map((w) => `${w.title} (${w.days}d)`).join(', ')}`);
-
-  // Network: offline UniFi devices / WAN trouble (only when the integration is on).
-  const net = await getUnifiSnapshot();
-  if (net.ok) {
-    const offline = net.devices.filter((d) => !d.online);
-    if (offline.length) lines.push(`📡 ${offline.length} network device(s) OFFLINE: ${offline.map((d) => d.name).join(', ')}`);
-    if (net.wan.status !== 'ok') lines.push(`🌐 WAN status: ${net.wan.status}`);
-  } else if (net.error && net.error !== 'not-configured') {
-    lines.push(`📡 UniFi unreachable: ${net.error.slice(0, 80)}`);
-  }
 
   const summary = lines.length ? lines.join('\n') : 'All clear — nothing to report.';
   let sent = false;
@@ -1074,51 +1063,6 @@ export async function emptyTrash(): Promise<{ ok: boolean; purged: number }> {
     }
   }
   return { ok: true, purged };
-}
-
-// ─── Network (UniFi Controller) ──────────────────────────────────────────────
-
-export type UnifiInfo = { host: string; user: string; hasPass: boolean; enabled: boolean };
-
-export async function getUnifiInfo(): Promise<UnifiInfo> {
-  await connectDB();
-  const doc = await AppConfig.findOne({ key: 'singleton' }).select('unifiHost unifiUser unifiPass unifiEnabled').lean();
-  return {
-    host: doc?.unifiHost || '',
-    user: doc?.unifiUser || '',
-    hasPass: !!doc?.unifiPass,
-    enabled: !!doc?.unifiEnabled,
-  };
-}
-
-export async function saveUnifiConfig(formData: FormData): Promise<{ ok: boolean }> {
-  await requireAdmin();
-  await connectDB();
-  const host = String(formData.get('host') || '').trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const user = String(formData.get('user') || '').trim();
-  const pass = String(formData.get('pass') || ''); // blank = keep the stored one
-  const enabled = formData.get('enabled') === 'true';
-  const update: Record<string, unknown> = { unifiHost: host, unifiUser: user, unifiEnabled: enabled };
-  if (pass) update.unifiPass = pass;
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
-  invalidateUnifiConfig();
-  revalidatePath('/settings');
-  revalidatePath('/network');
-  return { ok: true };
-}
-
-/** Login + read the controller once — proves host/user/pass work. */
-export async function testUnifiConnection(): Promise<{ ok: boolean; error?: string; devices?: number; wan?: string }> {
-  const snap = await getUnifiSnapshot();
-  if (!snap.ok) return { ok: false, error: snap.error === 'not-configured' ? 'Fill in host/user/pass, enable, and Save first' : snap.error };
-  return { ok: true, devices: snap.devices.length, wan: snap.wan.status };
-}
-
-/** Kick off a WAN speedtest on the gateway (result shows on the next /network load). */
-export async function triggerSpeedtest(): Promise<{ ok: boolean; error?: string }> {
-  const r = await runUnifiSpeedtest();
-  if (r.ok) revalidatePath('/network');
-  return r;
 }
 
 // ─── OneDrive wizard (Microsoft Graph device-code auth) ──────────────────────

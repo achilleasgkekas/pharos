@@ -9,7 +9,7 @@ import { isAiReady } from '@/lib/ollama';
 import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
-import { Package, ShoppingCart, ListChecks, BarChart3, Receipt as ReceiptIcon, CalendarClock, CreditCard, ArrowRight, Wallet, Banknote, Wifi, CalendarDays } from 'lucide-react';
+import { Package, ShoppingCart, ListChecks, BarChart3, Receipt as ReceiptIcon, CalendarClock, CreditCard, ArrowRight, Wallet, Banknote, CalendarDays } from 'lucide-react';
 import { PharosMark } from '@/components/PharosMark';
 
 export const dynamic = 'force-dynamic';
@@ -139,7 +139,6 @@ export default async function HomePage() {
           <NavCard href="/subscriptions" title="Subscriptions" count={stats.subscriptionCount} description="Recurring expenses + renewals" color="red" icon={<CalendarClock size={20} />} />
           <NavCard href="/tasks" title="Tasks" count={stats.openTasks} description="Kanban planner with notes + checklists" color="cyan" icon={<ListChecks size={20} />} />
           <NavCard href="/reports" title="Reports" count={null} description="Charts: spend, categories, warranties, installments" color="gold" icon={<BarChart3 size={20} />} />
-          <NavCard href="/network" title="Network" count={null} description="Gateway, APs & clients — live from the UniFi controller" color="cyan" icon={<Wifi size={20} />} />
           <NavCard href="/calendar" title="Calendar" count={null} description="What's coming up: renewals, installments, bills, expiries" color="purple" icon={<CalendarDays size={20} />} />
         </div>
       </section>

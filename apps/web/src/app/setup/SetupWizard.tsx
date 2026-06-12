@@ -1,15 +1,15 @@
 'use client';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { User as UserIcon, Lock, Check, ArrowRight, Sparkles, SkipForward, Sun, Moon, Wifi } from 'lucide-react';
-import { createFirstAdmin, saveSetupBasics, saveSetupAi, finishWithoutAi, saveSetupUnifi } from './actions';
+import { User as UserIcon, Lock, Check, ArrowRight, Sparkles, SkipForward, Sun, Moon } from 'lucide-react';
+import { createFirstAdmin, saveSetupBasics, saveSetupAi, finishWithoutAi } from './actions';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PharosMark } from '@/components/PharosMark';
 import { useTheme } from '@/components/ThemeProvider';
 import { CURRENCIES } from '@/lib/money';
 
-const STEPS = ['Account', 'Basics', 'AI', 'Network', 'Done'];
+const STEPS = ['Account', 'Basics', 'AI', 'Done'];
 
 const SELECT_CLS =
   'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-sm text-[color:var(--color-text)] px-3 py-2 focus:outline-none focus:border-[color:var(--color-accent)]';
@@ -43,10 +43,6 @@ export function SetupWizard() {
   const [baseUrl, setBaseUrl] = useState('');
   const meta = PROVIDERS.find((p) => p.id === provider)!;
 
-  // Step 4 (UniFi) state
-  const [unifiHost, setUnifiHost] = useState('');
-  const [unifiUser, setUnifiUser] = useState('');
-  const [unifiPass, setUnifiPass] = useState('');
 
   function submitAdmin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -106,13 +102,6 @@ export function SetupWizard() {
     });
   }
 
-  function submitUnifi() {
-    setError('');
-    start(async () => {
-      if (unifiHost.trim() && unifiUser.trim()) await saveSetupUnifi(unifiHost, unifiUser, unifiPass);
-      setStep(5);
-    });
-  }
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-10">
@@ -235,30 +224,9 @@ export function SetupWizard() {
             </div>
           )}
 
-          {/* Step 4 — UniFi network (optional) */}
-          {step === 4 && (
-            <div className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold flex items-center gap-1.5"><Wifi size={15} className="text-[color:var(--color-accent)]" /> Network · UniFi (optional)</h2>
-              <p className="text-xs text-[color:var(--color-text-dim)]">
-                Connect your UniFi gateway to see WAN status, devices and clients live. Use a read-only <strong>local</strong> account, not your UI cloud login. You can add this later in Settings.
-              </p>
-              <Input value={unifiHost} onChange={(e) => setUnifiHost(e.target.value)} placeholder="Controller host (e.g. 10.0.1.1)" />
-              <Input value={unifiUser} onChange={(e) => setUnifiUser(e.target.value)} icon={<UserIcon size={15} />} placeholder="Local username" />
-              <Input value={unifiPass} onChange={(e) => setUnifiPass(e.target.value)} type="password" icon={<Lock size={15} />} placeholder="Password" />
-              {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
-              <div className="flex gap-2 mt-2">
-                <Button variant="ghost" size="md" onClick={() => setStep(5)} disabled={pending}>
-                  <SkipForward size={14} /> Skip
-                </Button>
-                <Button variant="primary" size="md" onClick={submitUnifi} disabled={pending} className="flex-1 justify-center">
-                  {pending ? 'Saving…' : 'Add UniFi'} <ArrowRight size={16} />
-                </Button>
-              </div>
-            </div>
-          )}
 
-          {/* Step 5 — done */}
-          {step === 5 && (
+          {/* Step 4 — done */}
+          {step === 4 && (
             <div className="flex flex-col items-center text-center gap-3 py-2">
               <span className="flex items-center justify-center h-12 w-12 rounded-full bg-[color:var(--color-accent)] text-black">
                 <Check size={24} />
