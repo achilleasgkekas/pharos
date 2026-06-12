@@ -120,7 +120,7 @@ export default async function HomePage() {
           Personal Hub <span className="text-[color:var(--color-accent)]">·</span> Asset &amp; Resource Oversight System
         </p>
         <p className="text-[color:var(--color-text-dim)] mt-3 max-w-2xl mx-auto text-base md:text-lg leading-relaxed">
-          Oversight on everything you own: equipment, receipts, installments, price-tracking and your network. Self-hosted on your own machine.
+          Oversight on everything you own: equipment, receipts, installments, price-tracking and subscriptions. Self-hosted on your own machine.
         </p>
       </section>
 

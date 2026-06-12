@@ -12,7 +12,7 @@ import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
 
 export const metadata: Metadata = {
   title: 'PHAROS · Personal Hub',
-  description: 'PHAROS, your Asset & Resource Oversight System. Oversight on everything you own: equipment, receipts, installments, network. Self-hosted.',
+  description: 'PHAROS, your Asset & Resource Oversight System. Oversight on everything you own: equipment, receipts, installments and price tracking. Self-hosted.',
   // PWA: installable from the phone's "Add to Home Screen" (pairs with app/manifest.ts)
   appleWebApp: { capable: true, title: 'PHAROS', statusBarStyle: 'black-translucent' },
 };
