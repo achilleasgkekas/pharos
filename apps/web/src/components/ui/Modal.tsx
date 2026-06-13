@@ -78,7 +78,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
                   </button>
                 </div>
               )}
-              <div className="px-6 py-5">{children}</div>
+              <div className="px-4 py-5 md:px-6">{children}</div>
             </>
           )}
         </Dialog.Content>

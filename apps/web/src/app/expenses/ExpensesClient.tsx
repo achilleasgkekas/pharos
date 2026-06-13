@@ -346,7 +346,7 @@ function AnomalyBadge({ anomaly }: { anomaly?: number }) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{label}</span>
       {children}
     </label>

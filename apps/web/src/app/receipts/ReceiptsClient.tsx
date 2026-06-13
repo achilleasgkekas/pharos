@@ -913,9 +913,9 @@ function ReceiptDetailModal({
           </span>
         )}
       </div>
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Image preview */}
-        <div>
+        <div className="min-w-0">
           {!receipt.filePath ? (
             <div className="w-full h-[55vh] md:aspect-[3/4] md:h-auto rounded-xl border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] grid place-items-center text-center px-6">
               <div>
@@ -965,7 +965,7 @@ function ReceiptDetailModal({
         </div>
 
         {/* Edit form */}
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Store">
               <SearchableSelect
@@ -1046,7 +1046,7 @@ function ReceiptDetailModal({
                         value={li.refinedName}
                         onChange={(e) => updateLine(i, 'refinedName', e.target.value)}
                         placeholder="Proper product name (AI)"
-                        className="flex-1 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-2 py-1.5 text-xs font-medium focus:outline-none focus:border-[color:var(--color-accent)]"
+                        className="flex-1 min-w-0 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-2 py-1.5 text-xs font-medium focus:outline-none focus:border-[color:var(--color-accent)]"
                       />
                       <input
                         value={li.qty}
@@ -1082,12 +1082,12 @@ function ReceiptDetailModal({
                       </button>
                     </div>
                     {/* Raw text + computed net/VAT for this item */}
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <input
                         value={li.name}
                         onChange={(e) => updateLine(i, 'name', e.target.value)}
                         placeholder="raw receipt text"
-                        className="flex-1 bg-transparent border-0 px-2 py-0.5 text-[10px] text-[color:var(--color-text-faint)] focus:outline-none focus:text-[color:var(--color-text-dim)]"
+                        className="flex-1 min-w-0 bg-transparent border-0 px-2 py-0.5 text-[10px] text-[color:var(--color-text-faint)] focus:outline-none focus:text-[color:var(--color-text-dim)]"
                         style={{ fontFamily: 'var(--font-mono)' }}
                       />
                       <div
@@ -1174,7 +1174,7 @@ function ReceiptDetailModal({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="min-w-0">
       <label
         className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5"
         style={{ fontFamily: 'var(--font-mono)' }}

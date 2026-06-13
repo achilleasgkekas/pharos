@@ -1706,7 +1706,7 @@ function ItemForm({
 
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={className}>
+    <div className={`min-w-0 ${className ?? ''}`}>
       <label
         className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5"
         style={{ fontFamily: 'var(--font-mono)' }}
