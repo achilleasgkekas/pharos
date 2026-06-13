@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SESSION_COOKIE, verifySession } from '@/lib/session';
+import { SESSION_COOKIE, verifySession, signSession, shouldRefresh, sessionCookieOptions } from '@/lib/session';
 
 // Auth gate. Runs on the Edge runtime, so it imports ONLY lib/session.ts (jose —
 // no node:crypto, no Mongoose). First-run detection (zero users) is NOT done here
 // (can't reach Mongo at the edge) — the /login page redirects to /setup instead.
 export async function middleware(req: NextRequest) {
   const claims = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
-  if (claims) return NextResponse.next();
+  if (claims) {
+    const res = NextResponse.next();
+    // Sliding idle window: re-issue the cookie once it's past halfway, so active use
+    // keeps you signed in but an idle session expires after SESSION_IDLE_HOURS.
+    if (shouldRefresh(claims.exp)) {
+      res.cookies.set(SESSION_COOKIE, await signSession(claims), sessionCookieOptions());
+    }
+    return res;
+  }
 
   const { pathname, search } = req.nextUrl;
   // API + file requests (incl. /api/files): 401, never an HTML redirect — a login

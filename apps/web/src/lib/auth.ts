@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation';
 import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   SESSION_COOKIE,
-  SESSION_MAX_AGE,
+  sessionCookieOptions,
   signSession,
   verifySession,
   type Role,
@@ -73,14 +73,7 @@ export async function requireAdmin(): Promise<SessionUser> {
 export async function setSessionCookie(claims: SessionClaims): Promise<void> {
   const token = await signSession(claims);
   const store = await cookies();
-  store.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    // App is often reached over plain-HTTP LAN/WireGuard → opt-in secure behind TLS.
-    secure: process.env.AUTH_COOKIE_SECURE === 'true',
-    path: '/',
-    maxAge: SESSION_MAX_AGE,
-  });
+  store.set(SESSION_COOKIE, token, sessionCookieOptions());
 }
 
 export async function clearSessionCookie(): Promise<void> {

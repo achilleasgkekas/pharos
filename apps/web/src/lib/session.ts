@@ -4,11 +4,28 @@
 import { SignJWT, jwtVerify } from 'jose';
 
 export type Role = 'admin' | 'member';
-export type SessionClaims = { sub: string; role: Role; name: string };
+export type SessionClaims = { sub: string; role: Role; name: string; exp?: number };
 
-// Cookie shared by middleware (read) + auth.ts (set/clear).
+// Cookie shared by middleware (read/refresh) + auth.ts (set/clear).
 export const SESSION_COOKIE = 'pharos_session';
-export const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days, in seconds
+
+// Idle window: the session expires after this long WITHOUT activity. The middleware
+// slides it forward on each request, so an actively-used session stays alive but an
+// idle one (overnight, a long downtime) logs out. Tune with SESSION_IDLE_HOURS.
+const IDLE_HOURS = Math.min(8760, Math.max(0.25, Number(process.env.SESSION_IDLE_HOURS) || 12));
+export const SESSION_MAX_AGE = Math.round(IDLE_HOURS * 3600); // seconds
+
+/** Cookie attributes shared by every place that sets the session cookie. */
+export function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    // App is often reached over plain-HTTP LAN/WireGuard → opt-in secure behind TLS.
+    secure: process.env.AUTH_COOKIE_SECURE === 'true',
+    path: '/',
+    maxAge: SESSION_MAX_AGE,
+  };
+}
 
 function getSecret(): Uint8Array | null {
   const s = process.env.AUTH_SECRET;
@@ -33,7 +50,7 @@ export async function signSession(claims: SessionClaims): Promise<string> {
     .sign(secret);
 }
 
-/** Verify a token → claims, or null on any failure (missing secret, bad sig, expired). Never throws. */
+/** Verify a token → claims (incl. exp), or null on any failure. Never throws. */
 export async function verifySession(token: string | undefined | null): Promise<SessionClaims | null> {
   if (!token) return null;
   const secret = getSecret();
@@ -44,8 +61,17 @@ export async function verifySession(token: string | undefined | null): Promise<S
     if (!sub) return null;
     const role: Role = payload.role === 'admin' ? 'admin' : 'member';
     const name = typeof payload.name === 'string' ? payload.name : '';
-    return { sub, role, name };
+    return { sub, role, name, exp: typeof payload.exp === 'number' ? payload.exp : undefined };
   } catch {
     return null;
   }
+}
+
+/** Should the cookie be re-issued? True once the token is past the first half of its
+ *  idle window (sliding refresh), OR when it outlives the current window — e.g. an old
+ *  long-lived cookie after SESSION_IDLE_HOURS was shortened, which we shrink on sight. */
+export function shouldRefresh(exp: number | undefined): boolean {
+  if (!exp) return false;
+  const remaining = exp - Math.floor(Date.now() / 1000);
+  return remaining < SESSION_MAX_AGE / 2 || remaining > SESSION_MAX_AGE;
 }

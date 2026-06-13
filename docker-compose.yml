@@ -32,6 +32,8 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
       # Set true only behind an HTTPS reverse proxy (else the cookie won't set over HTTP).
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      # Session idle timeout (hours) — logs out after this long without activity.
+      SESSION_IDLE_HOURS: ${SESSION_IDLE_HOURS:-12}
     volumes:
       # Persist user binary files (receipts, statements) on the host.
       # Later this path becomes the NFS mount from the DS923+ NAS.
