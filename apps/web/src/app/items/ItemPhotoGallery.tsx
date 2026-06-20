@@ -3,7 +3,7 @@ import { useState, useRef, useTransition } from 'react';
 import { ImagePlus, Trash2, Star, Loader2, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { shrinkImage } from '@/lib/clientImage';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { uploadItemPhotos, deleteItemPhoto, setItemCover, fetchItemPhotosFromUrl } from './actions';
+import { uploadItemPhotos, deleteItemPhoto, setItemCover, fetchItemPhotos } from './actions';
 
 function fileUrl(p: string) {
   return `/api/files/${p.split('/').map(encodeURIComponent).join('/')}`;
@@ -26,7 +26,7 @@ export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { 
     setMsg(null);
     setFetching(true);
     startTransition(async () => {
-      const r = await fetchItemPhotosFromUrl(itemId);
+      const r = await fetchItemPhotos(itemId);
       setFetching(false);
       setPhotos(r.photos);
       setMsg(r.ok ? `✓ Fetched ${r.added} image${r.added === 1 ? '' : 's'}` : (r.error ?? 'Failed'));
@@ -38,11 +38,11 @@ export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { 
       type="button"
       onClick={handleFetch}
       disabled={fetching || uploading}
-      title="Fetch images from the product link"
+      title="Search the web (and the product link) for product photos"
       className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors disabled:opacity-50"
     >
       {fetching ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-      {fetching ? 'Fetching…' : 'Fetch from link'}
+      {fetching ? 'Fetching…' : 'Fetch photos'}
     </button>
   );
 

@@ -2,7 +2,7 @@
 import { useState, useMemo, useTransition } from 'react';
 import dynamic from 'next/dynamic';
 import { cur } from '@/lib/money';
-import { Plus, TrendingDown, TrendingUp, Check, Loader2, ChevronDown, ExternalLink, Target, Pencil } from 'lucide-react';
+import { Plus, TrendingDown, TrendingUp, Check, Loader2, ChevronDown, ExternalLink, Target, Pencil, Search } from 'lucide-react';
 import type { SerializedItem } from '@/types';
 import { logItemPrice, setItemTarget } from '@/app/items/actions';
 
@@ -60,7 +60,7 @@ const VERDICT_META: Record<Verdict, { label: string; cls: string; icon?: typeof 
 
 const money = (n: number) => `${cur()}${Math.round(n * 100) / 100}`;
 
-export function PricePanel({ item, summary = true, onChanged }: { item: SerializedItem; summary?: boolean; onChanged?: () => void }) {
+export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: { item: SerializedItem; summary?: boolean; onChanged?: () => void; onSearchOnline?: () => void }) {
   const s = useMemo(() => priceStatus(item), [item]);
   const [pending, startTransition] = useTransition();
   const [logging, setLogging] = useState(false);
@@ -188,8 +188,13 @@ export function PricePanel({ item, summary = true, onChanged }: { item: Serializ
               </button>
             )}
 
+            {onSearchOnline && (
+              <button onClick={onSearchOnline} className="flex items-center gap-1 ml-auto text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors">
+                <Search size={13} /> search online
+              </button>
+            )}
             {!logging && (
-              <button onClick={() => setLogging(true)} className="flex items-center gap-1 ml-auto text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors">
+              <button onClick={() => setLogging(true)} className={`flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors ${onSearchOnline ? '' : 'ml-auto'}`}>
                 <Plus size={13} /> log a price
               </button>
             )}

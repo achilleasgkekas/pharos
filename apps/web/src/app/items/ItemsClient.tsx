@@ -21,6 +21,8 @@ import {
   LayoutGrid,
   List as ListIcon,
   SlidersHorizontal,
+  Merge,
+  ImagePlus,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -36,11 +38,13 @@ import { type InstallmentPlan } from '@/lib/installments';
 import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
-import { createItem, updateItem, deleteItem, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillSpecs, convertItemToTask } from './actions';
+import { createItem, updateItem, deleteItem, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, convertItemToTask, type DupItem } from './actions';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { linkPlanToItem, unlinkPlanByKey } from '../statements/actions';
+import { ItemDuplicatesModal, MergeItemsPicker } from './ItemDuplicatesModal';
+import { PriceSearchPanel } from '@/components/PriceSearchPanel';
 
 const CATEGORIES = [
   { value: 'network', label: 'Network' },
@@ -181,6 +185,10 @@ export function ItemsClient({
   };
   const [selectedItem, setSelectedItem] = useState<SerializedItem | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showDupes, setShowDupes] = useState(false);
+  const [showMerge, setShowMerge] = useState(false); // manual merge of the selected items
+  const [mergeKeep, setMergeKeep] = useState('');
+  const [merging, startMerge] = useTransition();
   const { refresh } = useJobs();
   const confirm = useConfirm();
 
@@ -285,6 +293,45 @@ export function ItemsClient({
     });
   }
   const selectAllFiltered = () => setSelectedIds(new Set(filtered.map((i) => i._id)));
+
+  // Manual merge of the selected items — covers different-title dupes that the
+  // auto "find duplicates" (grouped by title) would miss.
+  const mergeCandidates: DupItem[] = useMemo(
+    () =>
+      items
+        .filter((i) => selectedIds.has(i._id))
+        .map((i) => ({
+          _id: i._id,
+          title: i.title,
+          num: i.num ?? '',
+          status: i.status,
+          currentPrice: i.currentPrice || 0,
+          links: i.links?.length ?? 0,
+          photos: i.photos?.length ?? 0,
+          receipts: i.receiptIds?.length ?? 0,
+          thumbPath: i.photos?.[0] ?? '',
+        })),
+    [items, selectedIds]
+  );
+  function openMerge() {
+    if (selectedIds.size < 2) return;
+    setMergeKeep(mergeCandidates[0]?._id ?? '');
+    setShowMerge(true);
+  }
+  function handleManualMerge() {
+    const keep = mergeKeep || mergeCandidates[0]?._id;
+    if (!keep) return;
+    const drops = [...selectedIds].filter((id) => id !== keep);
+    if (drops.length === 0) return;
+    startMerge(async () => {
+      const r = await mergeItems(keep, drops);
+      if (r.ok) {
+        setShowMerge(false);
+        exitSelectMode();
+        refresh();
+      }
+    });
+  }
 
   // Shopping est. cost (active items only) — inventory shows no totals.
   const shoppingBudget = items
@@ -426,10 +473,19 @@ export function ItemsClient({
                     {selectedIds.size > 0 && (
                       <button
                         onClick={handleBulkAi}
-                        title="AI fill-from-web the SELECTED items (prices, specs, tags, photos). Starts a background job — watch progress in the widget, bottom-right."
+                        title="AI fill-from-web the SELECTED items — everything (info + prices + photos). Starts a background job — watch progress in the widget, bottom-right."
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-accent)] text-[color:var(--color-accent)] hover:opacity-80 transition-colors"
                       >
-                        <Sparkles size={14} /> AI fill {selectedIds.size}
+                        <Sparkles size={14} /> AI fill all {selectedIds.size}
+                      </button>
+                    )}
+                    {selectedIds.size >= 2 && (
+                      <button
+                        onClick={openMerge}
+                        title="Merge the selected products into one (keep the most complete; the rest go to Trash)."
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-purple)] text-[color:var(--color-purple)] hover:opacity-80 transition-colors"
+                      >
+                        <Merge size={14} /> Merge {selectedIds.size}
                       </button>
                     )}
                     <button
@@ -452,6 +508,16 @@ export function ItemsClient({
                   </button>
                 )}
               </div>
+            )}
+            {items.length > 1 && !selectMode && (
+              <button
+                onClick={() => setShowDupes(true)}
+                title="Find duplicate products (same title) and merge them"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-purple)] hover:border-[color:var(--color-purple)] transition-colors"
+                style={{ fontFamily: 'var(--font-mono)' }}
+              >
+                <Merge size={14} /> Duplicates
+              </button>
             )}
             {/* Grid / list toggle */}
             <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">
@@ -561,6 +627,27 @@ export function ItemsClient({
           <div className="flex-1 h-px bg-[color:var(--color-border)]" />
         </div>
         <ItemForm defaultStatus={cfg.defaultStatus} onSuccess={() => setShowCreate(false)} />
+      </Modal>
+
+      {/* Find duplicate products (auto-grouped by title) */}
+      <ItemDuplicatesModal open={showDupes} onClose={() => setShowDupes(false)} />
+
+      {/* Manual merge of the selected products */}
+      <Modal open={showMerge} onClose={() => setShowMerge(false)} title={`Merge ${mergeCandidates.length} products`} size="lg">
+        <div className="space-y-4">
+          <p className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            Pick the one to <b>keep</b>; the others merge into it (links, photos, price history, receipts) and go to Trash.
+          </p>
+          <MergeItemsPicker items={mergeCandidates} keepId={mergeKeep} onKeep={setMergeKeep} />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => setShowMerge(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleManualMerge} disabled={merging || mergeCandidates.length < 2}>
+              {merging ? <Loader2 size={14} className="animate-spin" /> : <Merge size={14} />} Merge {mergeCandidates.length} → 1
+            </Button>
+          </div>
+        </div>
       </Modal>
     </main>
   );
@@ -1071,17 +1158,21 @@ function ItemDetailModal({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
-  const [aiFilling, setAiFilling] = useState(false);
-  const [specsFilling, setSpecsFilling] = useState(false);
+  const [aiAllFilling, setAiAllFilling] = useState(false);
+  const [infoFilling, setInfoFilling] = useState(false);
+  const [photoFetching, setPhotoFetching] = useState(false);
+  const [showPriceSearch, setShowPriceSearch] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ text: string; href?: string; tone: 'ok' | 'err' } | null>(null);
   const [showLinkPicker, setShowLinkPicker] = useState(false);
+  const busy = pending || aiAllFilling || infoFilling || photoFetching;
 
+  // Combined "AI fill all" — info + prices + photos in one shot.
   function handleAiFill() {
     setActionMsg(null);
-    setAiFilling(true);
+    setAiAllFilling(true);
     startTransition(async () => {
       const r = await aiFillItem(item._id);
-      setAiFilling(false);
+      setAiAllFilling(false);
       if (!r.ok || !r.item) {
         setActionMsg({ text: r.error ?? 'AI fill failed', tone: 'err' });
         return;
@@ -1093,19 +1184,38 @@ function ItemDetailModal({
     });
   }
 
-  function handleAiFillSpecs() {
+  // Info only — specs / category / tags (additive). Never touches prices or photos.
+  function handleAiFillInfo() {
     setActionMsg(null);
-    setSpecsFilling(true);
+    setInfoFilling(true);
     startTransition(async () => {
-      const r = await aiFillSpecs(item._id);
-      setSpecsFilling(false);
+      const r = await aiFillInfo(item._id);
+      setInfoFilling(false);
       if (!r.ok || !r.item) {
-        setActionMsg({ text: r.error ?? 'Could not fill specs', tone: 'err' });
+        setActionMsg({ text: r.error ?? 'Could not fill info', tone: 'err' });
         return;
       }
       onItemUpdated(r.item); // re-seeds the form (keyed by updatedAt)
       router.refresh();
-      setActionMsg({ text: '✓ Specs updated from the web', tone: 'ok' });
+      const what = r.filled.length ? r.filled.join(', ') : 'nothing new';
+      setActionMsg({ text: `✓ Info filled: ${what}`, tone: 'ok' });
+    });
+  }
+
+  // Photos only.
+  function handlePhotoFetch() {
+    setActionMsg(null);
+    setPhotoFetching(true);
+    startTransition(async () => {
+      const r = await fetchItemPhotos(item._id);
+      setPhotoFetching(false);
+      if (!r.ok) {
+        setActionMsg({ text: r.error ?? 'No photos found', tone: 'err' });
+        return;
+      }
+      onItemUpdated({ ...item, photos: r.photos, updatedAt: new Date().toISOString() }); // re-key the gallery
+      router.refresh();
+      setActionMsg({ text: `✓ Fetched ${r.added} photo${r.added === 1 ? '' : 's'}`, tone: 'ok' });
     });
   }
 
@@ -1139,10 +1249,11 @@ function ItemDetailModal({
   const hasPayment = plans.length > 0 || item.receiptIds.length > 0 || unlinkedPlans.length > 0;
 
   return (
+    <>
     <Modal open onClose={onClose} title={item.title} size="2xl">
       {/* Hero: product photos + key facts at a glance */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-        <ItemPhotoGallery key={`g-${item._id}-${item.updatedAt}`} itemId={item._id} photos={item.photos} canFetch={item.links.length > 0} />
+        <ItemPhotoGallery key={`g-${item._id}-${item.updatedAt}`} itemId={item._id} photos={item.photos} canFetch={false} />
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 flex-wrap">
@@ -1199,39 +1310,58 @@ function ItemDetailModal({
             </div>
           ) : null}
 
-          {/* AI fill from web + convert to task */}
+          {/* Separate enrichment actions: photos / info / prices — plus a combined "fill all" */}
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={handleAiFill}
-              disabled={pending || aiFilling || specsFilling}
-              title="Read this item's links (or search the web) and fill in whatever the AI finds"
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50"
+              onClick={handlePhotoFetch}
+              disabled={busy}
+              title="Fetch product photos (image search + the product page)"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors disabled:opacity-50"
             >
-              {aiFilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
-              {aiFilling ? 'Filling…' : 'AI fill from web'}
+              {photoFetching ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
+              {photoFetching ? 'Photos…' : 'Fetch photos'}
             </button>
             <button
               type="button"
-              onClick={handleAiFillSpecs}
-              disabled={pending || aiFilling || specsFilling}
-              title="Fill/refresh just the specs from the web"
+              onClick={handleAiFillInfo}
+              disabled={busy}
+              title="AI fill the product info — specs, category and tags. Fills blanks; never touches prices or photos."
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-gold)] hover:border-[color:var(--color-gold)] transition-colors disabled:opacity-50"
             >
-              {specsFilling ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-              {specsFilling ? 'Specs…' : 'AI specs'}
+              {infoFilling ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+              {infoFilling ? 'Info…' : 'AI fill info'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPriceSearch(true)}
+              disabled={busy}
+              title="Search the web for prices and pick which shops to track"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50"
+            >
+              <Search size={13} /> Search prices
+            </button>
+            <button
+              type="button"
+              onClick={handleAiFill}
+              disabled={busy}
+              title="One shot: AI fill info + prices + photos together"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-purple)] hover:border-[color:var(--color-purple)] transition-colors disabled:opacity-50"
+            >
+              {aiAllFilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+              {aiAllFilling ? 'Filling…' : 'AI fill all'}
             </button>
             <button
               type="button"
               onClick={handleConvertToTask}
-              disabled={pending || aiFilling || specsFilling}
+              disabled={busy}
               title="Create a task carrying this product's links (no link back to the item)"
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-border-light)] transition-colors disabled:opacity-50"
             >
               <ListPlus size={13} /> Convert to task
             </button>
           </div>
-          {aiFilling && (
+          {(aiAllFilling || infoFilling) && (
             <p className="text-[10px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
               {item.links.length === 0
                 ? 'Searching the web'
@@ -1428,12 +1558,21 @@ function ItemDetailModal({
           Shopping gets the full summary; an owned item only shows its history if any. */}
       {(view === 'shopping' || item.priceHistory.length > 0) && (
         <div className="mb-4">
-          <PricePanel item={item} summary={view === 'shopping'} onChanged={() => router.refresh()} />
+          <PricePanel item={item} summary={view === 'shopping'} onChanged={() => router.refresh()} onSearchOnline={() => setShowPriceSearch(true)} />
         </div>
       )}
 
       <ItemForm key={`f-${item._id}-${item.updatedAt}`} item={item} onSuccess={onClose} onDelete={handleDelete} deletePending={pending} />
     </Modal>
+    {showPriceSearch && (
+      <PriceSearchPanel
+        item={item}
+        open={showPriceSearch}
+        onClose={() => setShowPriceSearch(false)}
+        onAdded={(it) => onItemUpdated(it)}
+      />
+    )}
+    </>
   );
 }
 

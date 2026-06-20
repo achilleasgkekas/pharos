@@ -281,21 +281,43 @@ async function attachOneImage(item: WithPhotos, imgUrl: string): Promise<boolean
   }
 }
 
+/** Fetch product photos: image-search by title first (works even with no link),
+ *  then product-page images from the given URLs. Mutates item.photos; caller saves.
+ *  Returns how many were attached. */
+async function fillPhotos(item: WithPhotos & { title: string }, targetUrls: string[]): Promise<number> {
+  let added = 0;
+  for (const im of await searchImages(item.title, 6)) {
+    if (added >= 3) break;
+    if (await attachOneImage(item, im.imgSrc)) added++;
+  }
+  if (added === 0) {
+    for (const url of targetUrls) {
+      const a = await attachImagesFromUrl(item, url, 4);
+      if (a > 0) {
+        added = a;
+        break;
+      }
+    }
+  }
+  return added;
+}
+
 /**
- * Auto-fetch product photos from the item's link: read the page, pull the
- * canonical product images (og:image / JSON-LD), download and attach them.
+ * Explicit "Fetch photos" action: image-search by title, falling back to images on
+ * the product pages. Appends new photos. Works even when the item has no link, and
+ * never touches specs/prices/tags — one of the three separate enrichment actions.
  */
-export async function fetchItemPhotosFromUrl(
+export async function fetchItemPhotos(
   itemId: string
 ): Promise<{ ok: boolean; added: number; photos: string[]; error?: string }> {
   await connectDB();
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, added: 0, photos: [], error: 'Item not found' };
 
-  const link = (item.links ?? []).find((l) => l.url && /^https?:\/\//i.test(l.url));
-  if (!link) return { ok: false, added: 0, photos: [...item.photos], error: 'This product has no link to fetch from' };
-
-  const added = await attachImagesFromUrl(item, link.url!, 4);
+  const targetUrls = (item.links ?? [])
+    .map((l) => l.url)
+    .filter((u): u is string => !!u && /^https?:\/\//i.test(u));
+  const added = await fillPhotos(item, targetUrls);
   if (added > 0) await item.save();
   revalidatePath('/items');
   revalidatePath('/shopping');
@@ -442,20 +464,7 @@ export async function aiFillItem(itemId: string): Promise<{
   // attach images for an item whose product we couldn't even confirm (same garbage
   // risk as the field guard, e.g. bare-domain-only links).
   if (item.photos.length === 0 && okCount > 0) {
-    let added = 0;
-    for (const im of await searchImages(item.title, 6)) {
-      if (added >= 3) break;
-      if (await attachOneImage(item, im.imgSrc)) added++;
-    }
-    if (added === 0) {
-      for (const t of targets) {
-        const a = await attachImagesFromUrl(item, t.url, 4);
-        if (a > 0) {
-          added = a;
-          break;
-        }
-      }
-    }
+    const added = await fillPhotos(item, targets.map((t) => t.url));
     if (added > 0) filled.add('photos');
   }
 
@@ -545,6 +554,82 @@ export async function aiFillSpecs(
   return { ok: true, specs: parsed.specs, item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined };
 }
 
+/**
+ * AI fill INFO only — reads the item's links (or top web-search hits) and fills
+ * EMPTY specs, an 'other' category, and merges in keyword tags. Additive: never
+ * clobbers what you set, and never touches links/prices/currentPrice/photos. One of
+ * the three separate enrichment actions (photos / info / prices).
+ */
+export async function aiFillInfo(
+  itemId: string
+): Promise<{ ok: boolean; filled: string[]; item?: SerializedItem; error?: string }> {
+  if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, filled: [], error: 'Product AI is turned off.' };
+  await connectDB();
+  const item = await Item.findById(itemId);
+  if (!item) return { ok: false, filled: [], error: 'Item not found' };
+
+  let targets: string[] = (item.links ?? [])
+    .map((l) => l.url)
+    .filter((u): u is string => !!u && /^https?:\/\//i.test(u));
+  let webDiscovered = false;
+  if (targets.length === 0) {
+    const q = `${item.title} ${item.category !== 'other' ? item.category : ''}`.trim();
+    const results = await searchWeb(q, 8);
+    targets = results
+      .filter((r) => /^https?:\/\//i.test(r.url) && !/youtube|facebook|reddit|pinterest|instagram|tiktok/i.test(r.url))
+      .slice(0, 3)
+      .map((r) => r.url);
+    webDiscovered = true;
+  }
+
+  const filled = new Set<string>();
+  let okCount = 0;
+  for (const url of targets) {
+    let parsed;
+    try {
+      const page = await fetchPageText(url);
+      parsed = (await parseProductFromPage(page)).parsed;
+    } catch {
+      continue;
+    }
+    if (!productMatchesItem(item.title, parsed)) continue;
+    okCount++;
+    if (!item.specs && parsed.specs) {
+      item.specs = parsed.specs;
+      filled.add('specs');
+    }
+    if (item.category === 'other' && parsed.category && parsed.category !== 'other') {
+      item.category = parsed.category;
+      filled.add('category');
+    }
+    if (parsed.tags?.length) {
+      const seen = new Set((item.tags ?? []).map((t) => t.toLowerCase()));
+      for (const raw of parsed.tags) {
+        const tag = raw.trim().toLowerCase().replace(/\s+/g, '-').slice(0, 24);
+        if (tag && !seen.has(tag) && item.tags.length < 8) {
+          item.tags.push(tag);
+          seen.add(tag);
+          filled.add('tags');
+        }
+      }
+      if (filled.has('tags')) item.markModified('tags');
+    }
+    break; // info from the first matching page is enough
+  }
+
+  if (filled.size > 0) item.aiFilledAt = new Date();
+  await item.save();
+  revalidatePath('/items');
+  revalidatePath('/shopping');
+  const fresh = await Item.findById(itemId).lean();
+  return {
+    ok: okCount > 0,
+    filled: [...filled],
+    item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined,
+    error: okCount > 0 ? undefined : webDiscovered ? 'Web search found nothing usable for this title.' : 'Could not read any of the links.',
+  };
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -599,6 +684,38 @@ function normUrl(u: string): string {
 /** Normalize a product title for fuzzy matching. */
 function normTitle(t: string): string {
   return (t || '').toLowerCase().replace(/[^a-z0-9α-ωά-ώ]+/gi, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Map a URL host to a friendly store name — kept in sync with the scraper's
+ *  storeFromUrl so prices added here group with scraper-added ones under one store. */
+function storeFromUrl(url: string): string {
+  let host = '';
+  try {
+    host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return 'unknown';
+  }
+  const map: Record<string, string> = {
+    'skroutz.gr': 'Skroutz', 'skroutz.eu': 'Skroutz', 'xpatit.gr': 'xpatit.gr',
+    'e-shop.gr': 'e-shop.gr', 'i-system.gr': 'i-system.gr', 'plaisio.gr': 'Πλαίσιο',
+    'public.gr': 'Public', 'kotsovolos.gr': 'Κωτσόβολος', 'you.gr': 'you.gr',
+    'amazon.de': 'Amazon.de', 'amazon.com': 'Amazon', 'aliexpress.com': 'AliExpress',
+    'fs.com': 'FS.com', 'eu.store.ui.com': 'EU Store (Ubiquiti)', 'store.ui.com': 'Ubiquiti Store',
+  };
+  if (map[host]) return map[host];
+  for (const key of Object.keys(map)) if (host.endsWith(key)) return map[key];
+  return host;
+}
+
+/** Lowest known price across an item's store links + price history (>0), or null. */
+function lowestKnownPrice(item: {
+  links?: { price?: number | null }[];
+  priceHistory?: { price: number }[];
+}): number | null {
+  const vals: number[] = [];
+  for (const l of item.links ?? []) if (l.price && l.price > 0) vals.push(l.price);
+  for (const h of item.priceHistory ?? []) if (h.price > 0) vals.push(h.price);
+  return vals.length ? Math.min(...vals) : null;
 }
 
 /**
@@ -860,4 +977,303 @@ export async function logItemPrice(
   revalidatePath('/items');
   revalidatePath('/shopping');
   return { ok: true };
+}
+
+// ─── Merge duplicate products ────────────────────────────────────────────────
+
+export type DupItem = {
+  _id: string;
+  title: string;
+  num: string;
+  status: string;
+  currentPrice: number;
+  links: number;
+  photos: number;
+  receipts: number;
+  thumbPath: string;
+};
+export type ItemDupGroup = { key: string; items: DupItem[] };
+
+const STATUS_RANK: Record<string, number> = {
+  installed: 6, received: 5, ordered: 4, decided: 3, researching: 2, deferred: 1, sold: 0, broken: 0,
+};
+
+/**
+ * Find clusters of likely-duplicate items by normalized title. Sorts the most
+ * complete one first in each group (most receipts, photos, status, links) so the UI
+ * can default to keeping it. (Items arriving from receipts vs URL-import with
+ * different titles won't cluster here — the select-mode "Merge" covers those.)
+ */
+export async function findDuplicateItems(): Promise<ItemDupGroup[]> {
+  await connectDB();
+  const items = await Item.find({ deletedAt: null })
+    .select('title num status currentPrice links photos receiptIds')
+    .lean();
+
+  const groups = new Map<string, DupItem[]>();
+  for (const it of items as Array<Record<string, unknown>>) {
+    const key = normTitle(String(it.title ?? ''));
+    if (key.length < 3) continue;
+    const photos = Array.isArray(it.photos) ? (it.photos as string[]) : [];
+    const entry: DupItem = {
+      _id: String(it._id),
+      title: String(it.title ?? 'Untitled'),
+      num: String(it.num ?? ''),
+      status: String(it.status ?? 'researching'),
+      currentPrice: Number(it.currentPrice) || 0,
+      links: Array.isArray(it.links) ? it.links.length : 0,
+      photos: photos.length,
+      receipts: Array.isArray(it.receiptIds) ? it.receiptIds.length : 0,
+      thumbPath: photos[0] ?? '',
+    };
+    const list = groups.get(key);
+    if (list) list.push(entry);
+    else groups.set(key, [entry]);
+  }
+
+  const out: ItemDupGroup[] = [];
+  for (const [key, list] of groups) {
+    if (list.length < 2) continue;
+    list.sort(
+      (a, b) =>
+        b.receipts - a.receipts ||
+        b.photos - a.photos ||
+        (STATUS_RANK[b.status] ?? 0) - (STATUS_RANK[a.status] ?? 0) ||
+        b.links - a.links
+    );
+    out.push({ key, items: list });
+  }
+  out.sort((a, b) => b.items.length - a.items.length);
+  return out;
+}
+
+/**
+ * Merge duplicate items into one. Backfills empty fields on the survivor, unions
+ * its arrays (tags/links/priceHistory/photos/receiptIds), re-points every reference
+ * (Receipt.itemIds, Receipt.lineItems[].matchedItemId, Statement.transactions[].
+ * matchedItemIds) at the survivor, then soft-deletes the duplicates to Trash. Their
+ * photo paths are released to the survivor (so a future purge won't delete shared files).
+ */
+export async function mergeItems(
+  keepId: string,
+  dropIds: string[]
+): Promise<{ ok: boolean; merged: number; error?: string }> {
+  await connectDB();
+  const keep = await Item.findById(keepId);
+  if (!keep) return { ok: false, merged: 0, error: 'Item to keep not found' };
+  const targets = dropIds.filter((id) => id && id !== keepId);
+  const drops = await Item.find({ _id: { $in: targets } });
+  if (drops.length === 0) return { ok: false, merged: 0, error: 'No items to merge' };
+
+  const keepOid = new Types.ObjectId(String(keep._id));
+
+  for (const d of drops) {
+    // Backfill empty scalars — never clobber what the survivor already has.
+    if (!keep.num && d.num) keep.num = d.num;
+    if (keep.category === 'other' && d.category && d.category !== 'other') keep.category = d.category;
+    if (!keep.specs && d.specs) keep.specs = d.specs;
+    if (!keep.notes && d.notes) keep.notes = d.notes;
+    if (!keep.purchasedFrom && d.purchasedFrom) keep.purchasedFrom = d.purchasedFrom;
+    if (keep.purchasedPrice == null && d.purchasedPrice != null) keep.purchasedPrice = d.purchasedPrice;
+    if (keep.purchasedAt == null && d.purchasedAt != null) keep.purchasedAt = d.purchasedAt;
+    if (keep.targetPrice == null && d.targetPrice != null) keep.targetPrice = d.targetPrice;
+    if (keep.warrantyUntil == null && d.warrantyUntil != null) keep.warrantyUntil = d.warrantyUntil;
+    if (!keep.serialNumber && d.serialNumber) keep.serialNumber = d.serialNumber;
+    if (!keep.location && d.location) keep.location = d.location;
+
+    // Union tags (dedup case-insensitively, cap 8)
+    const seenTags = new Set((keep.tags ?? []).map((t) => t.toLowerCase()));
+    for (const raw of d.tags ?? []) {
+      const low = String(raw).toLowerCase();
+      if (low && !seenTags.has(low) && keep.tags.length < 8) {
+        keep.tags.push(raw);
+        seenTags.add(low);
+      }
+    }
+    // Union links (dedup by normUrl; backfill a null price from a dup)
+    for (const l of d.links ?? []) {
+      if (!l.url) continue;
+      const existing = keep.links.find((k) => k.url && normUrl(k.url) === normUrl(l.url!));
+      if (existing) {
+        if (existing.price == null && l.price != null) existing.price = l.price;
+      } else {
+        keep.links.push({ label: l.label, url: l.url, price: l.price ?? null });
+      }
+    }
+    // Concat price history (plain objects — don't reparent another doc's subdocs)
+    for (const h of d.priceHistory ?? []) {
+      keep.priceHistory.push({
+        price: h.price,
+        store: h.store,
+        url: h.url ?? '',
+        currency: h.currency,
+        date: h.date,
+        inStock: h.inStock,
+      } as (typeof keep.priceHistory)[number]);
+    }
+    for (const p of d.photos ?? []) if (!keep.photos.includes(p)) keep.photos.push(p);
+    // Union receiptIds
+    for (const rid of d.receiptIds ?? []) {
+      if (!keep.receiptIds.some((x) => String(x) === String(rid))) keep.receiptIds.push(rid);
+    }
+  }
+
+  const lowest = lowestKnownPrice(keep);
+  if (lowest != null) keep.currentPrice = lowest;
+
+  keep.markModified('tags');
+  keep.markModified('links');
+  keep.markModified('priceHistory');
+  keep.markModified('photos');
+  keep.markModified('receiptIds');
+  await keep.save();
+
+  for (const d of drops) {
+    const dOid = new Types.ObjectId(String(d._id));
+    // Re-point references → survivor.
+    await Receipt.updateMany({ itemIds: dOid }, { $addToSet: { itemIds: keepOid } });
+    await Receipt.updateMany({ itemIds: dOid }, { $pull: { itemIds: dOid } });
+    await Receipt.updateMany(
+      { 'lineItems.matchedItemId': dOid },
+      { $set: { 'lineItems.$[el].matchedItemId': keepOid } },
+      { arrayFilters: [{ 'el.matchedItemId': dOid }] }
+    );
+    await Statement.updateMany(
+      { 'transactions.matchedItemIds': dOid },
+      { $addToSet: { 'transactions.$[t].matchedItemIds': keepOid } },
+      { arrayFilters: [{ 't.matchedItemIds': dOid }] }
+    );
+    await Statement.updateMany(
+      { 'transactions.matchedItemIds': dOid },
+      { $pull: { 'transactions.$[t].matchedItemIds': dOid } },
+      { arrayFilters: [{ 't.matchedItemIds': dOid }] }
+    );
+    // Soft-delete the duplicate + release its photo paths (files now live on `keep`,
+    // so a later Trash purge of this shell won't delete the shared files).
+    await Item.updateOne({ _id: d._id }, { $set: { deletedAt: new Date(), photos: [] } });
+  }
+
+  revalidatePath('/items');
+  revalidatePath('/shopping');
+  revalidatePath('/receipts');
+  revalidatePath('/statements');
+  return { ok: true, merged: drops.length };
+}
+
+// ─── Interactive online price search (pick a shop to track) ──────────────────
+
+export type PriceCandidate = {
+  store: string;
+  url: string;
+  price: number;
+  currency: string;
+  inStock: boolean;
+  title: string;
+  alreadyLinked: boolean;
+  error?: string;
+};
+
+/**
+ * Search the web for shops selling this item and read a price from each — for the
+ * interactive "pick which shops to track" picker. Reads up to 5 shops (each = a page
+ * fetch + 1 AI call), relevance-guarded. NO DB writes. Per-shop failures (e.g.
+ * Cloudflare) come back as `error` rows so the UI can show them instead of dropping.
+ */
+export async function searchItemPriceCandidates(
+  itemId: string,
+  queryOverride?: string
+): Promise<{ ok: boolean; candidates: PriceCandidate[]; error?: string }> {
+  if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, candidates: [], error: 'Product AI is turned off.' };
+  await connectDB();
+  const item = await Item.findById(itemId).lean();
+  if (!item) return { ok: false, candidates: [], error: 'Item not found' };
+
+  const q = (queryOverride || item.title || '').trim();
+  if (!q) return { ok: false, candidates: [], error: 'Nothing to search for' };
+
+  const results = await searchWeb(q, 8);
+  const urls = results
+    .map((r) => r.url)
+    .filter((u) => /^https?:\/\//i.test(u) && !/youtube|facebook|reddit|pinterest|instagram|tiktok|wikipedia/i.test(u))
+    .filter((u, i, arr) => arr.findIndex((x) => normUrl(x) === normUrl(u)) === i) // dedup
+    .slice(0, 5); // cap AI cost
+
+  const linked = new Set(
+    (item.links ?? []).map((l: { url?: string }) => (l.url ? normUrl(l.url) : '')).filter(Boolean)
+  );
+
+  const candidates: PriceCandidate[] = [];
+  for (const url of urls) {
+    try {
+      const page = await fetchPageText(url);
+      const parsed = (await parseProductFromPage(page)).parsed;
+      if (!productMatchesItem(item.title, parsed)) continue; // unrelated search hit
+      candidates.push({
+        store: parsed.store || storeFromUrl(url),
+        url,
+        price: parsed.price > 0 ? parsed.price : 0,
+        currency: parsed.currency || 'EUR',
+        inStock: true,
+        title: parsed.title || page.title || '',
+        alreadyLinked: linked.has(normUrl(url)),
+      });
+    } catch (err) {
+      const msg = (err as Error).message || String(err);
+      candidates.push({
+        store: storeFromUrl(url),
+        url,
+        price: 0,
+        currency: 'EUR',
+        inStock: false,
+        title: '',
+        alreadyLinked: linked.has(normUrl(url)),
+        error: /cloudflare|solver|challenge|just a moment/i.test(msg)
+          ? 'Behind Cloudflare — start the price-scraper profile'
+          : msg.slice(0, 80),
+      });
+    }
+  }
+  return { ok: true, candidates };
+}
+
+/**
+ * Add the user-picked shops as tracked store links (store + URL + price) plus a
+ * price-history point each. They then show in "Where to buy" and are re-scraped
+ * every 6h by the scraper (it tracks every item with a link).
+ */
+export async function addPriceLinks(
+  itemId: string,
+  picks: { store: string; url: string; price: number; currency?: string }[]
+): Promise<{ ok: boolean; item?: SerializedItem; added: number; error?: string }> {
+  await connectDB();
+  const item = await Item.findById(itemId);
+  if (!item) return { ok: false, added: 0, error: 'Item not found' };
+
+  let added = 0;
+  for (const pick of picks) {
+    if (!pick.url || !/^https?:\/\//i.test(pick.url)) continue;
+    const price = pick.price > 0 ? pick.price : null;
+    const store = pick.store || storeFromUrl(pick.url);
+    const existing = item.links.find((l) => l.url && normUrl(l.url) === normUrl(pick.url));
+    if (existing) {
+      if (price != null) existing.price = price;
+    } else {
+      item.links.push({ label: store, url: pick.url, price });
+    }
+    if (price != null) {
+      item.priceHistory.push({ price, store, url: pick.url, date: new Date() } as (typeof item.priceHistory)[number]);
+    }
+    added++;
+  }
+  if (added === 0) return { ok: false, added: 0, error: 'Nothing to add' };
+
+  const lowest = lowestKnownPrice(item);
+  if (lowest != null) item.currentPrice = lowest;
+  item.markModified('links');
+  item.markModified('priceHistory');
+  await item.save();
+  revalidatePath('/items');
+  revalidatePath('/shopping');
+  const fresh = await Item.findById(itemId).lean();
+  return { ok: true, added, item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined };
 }
