@@ -12,6 +12,19 @@ import { cn } from '@/components/ui/cn';
 type Msg = ChatTurn & { actions?: { name: string; summary: string }[]; error?: boolean };
 type Mode = 'search' | 'ai';
 
+// Minimal inline markdown for assistant replies: **bold** + line breaks.
+// The model answers in markdown; the bubble used to show the raw ** asterisks.
+function renderRich(text: string) {
+  return text.split('\n').map((line, li, arr) => (
+    <span key={li}>
+      {line.split(/(\*\*[^*]+\*\*)/g).map((p, pi) =>
+        /^\*\*[^*]+\*\*$/.test(p) ? <strong key={pi}>{p.slice(2, -2)}</strong> : p
+      )}
+      {li < arr.length - 1 && <br />}
+    </span>
+  ));
+}
+
 const EXAMPLES = [
   'Add a YouTube Premium subscription',
   'Πρόσθεσε έξοδο ΔΕΗ 84€',
@@ -246,7 +259,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
                         : 'bg-[color:var(--color-surface-2)] text-[color:var(--color-text)]'
                   )}
                 >
-                  {m.content}
+                  {m.role === 'assistant' ? renderRich(m.content) : m.content}
                   {m.actions && m.actions.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {m.actions.map((a, j) => (

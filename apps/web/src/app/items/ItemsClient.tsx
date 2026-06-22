@@ -285,7 +285,9 @@ export function ItemsClient({
     void enqueueAiFillItems(
       sel.map((i) => i._id),
       sel.map((i) => i.title),
-      `/${view}`,
+      // The inventory view lives at /items (not /inventory) — the widget's open
+      // arrow 404'd when it used `/${view}` verbatim.
+      view === 'shopping' ? '/shopping' : '/items',
       `AI fill · ${cfg.title}`
     ).then(() => {
       exitSelectMode();
