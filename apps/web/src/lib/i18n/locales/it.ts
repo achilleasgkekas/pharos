@@ -59,5 +59,23 @@ export const it: Partial<Dict> = {
   'common.deselectAll': 'Deseleziona tutto',
   'common.cannotUndo': 'Non può essere annullato.',
 
+  'home.heroA': 'Una luce su',
+  'home.heroB': 'tutto ciò che gestisci.',
+  'home.taglineA': 'Hub Personale',
+  'home.taglineB': 'Sistema di Supervisione di Beni e Risorse',
+  'home.subtitle': 'Supervisione su tutto ciò che possiedi: attrezzature, ricevute, rate, monitoraggio prezzi e abbonamenti. Self-hosted sulla tua macchina.',
+  'home.modules': 'Moduli',
+  'home.open': 'Apri',
+  'home.dInventory': 'Ciò che possiedo: attrezzature, numeri di serie, garanzie, ricevute',
+  'home.dShopping': 'Lista desideri, monitoraggio prezzi, confronto negozi',
+  'home.dReceipts': 'Archivio ricevute con IA (immagine + PDF + email)',
+  'home.dExpenses': 'Bollette che scansioni: affitto, utenze, carburante — per fornitore',
+  'home.dIncome': 'Stipendio e altre entrate — scansiona le buste paga',
+  'home.dStatements': 'Carte di credito e piani rateali',
+  'home.dSubscriptions': 'Spese ricorrenti + rinnovi',
+  'home.dTasks': 'Pianificatore Kanban con note + liste',
+  'home.dReports': 'Grafici: spese, categorie, garanzie, rate',
+  'home.dCalendar': 'In arrivo: rinnovi, rate, bollette, scadenze',
+
   'lang.language': 'Lingua',
 };

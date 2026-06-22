@@ -59,5 +59,23 @@ export const pt: Partial<Dict> = {
   'common.deselectAll': 'Desmarcar tudo',
   'common.cannotUndo': 'Não pode ser anulado.',
 
+  'home.heroA': 'Uma luz sobre',
+  'home.heroB': 'tudo o que geres.',
+  'home.taglineA': 'Centro Pessoal',
+  'home.taglineB': 'Sistema de Supervisão de Ativos e Recursos',
+  'home.subtitle': 'Supervisão de tudo o que possuis: equipamento, recibos, prestações, monitorização de preços e subscrições. Auto-alojado na tua própria máquina.',
+  'home.modules': 'Módulos',
+  'home.open': 'Abrir',
+  'home.dInventory': 'O que tenho: equipamento, números de série, garantias, recibos',
+  'home.dShopping': 'Lista de desejos, monitorização de preços, comparação de lojas',
+  'home.dReceipts': 'Cofre de recibos com IA (imagem + PDF + email)',
+  'home.dExpenses': 'Faturas que digitalizas: renda, serviços, combustível — por fornecedor',
+  'home.dIncome': 'Salário e outras receitas — digitaliza recibos de vencimento',
+  'home.dStatements': 'Cartões de crédito e prestações',
+  'home.dSubscriptions': 'Despesas recorrentes + renovações',
+  'home.dTasks': 'Planeador Kanban com notas + listas',
+  'home.dReports': 'Gráficos: gastos, categorias, garantias, prestações',
+  'home.dCalendar': 'O que aí vem: renovações, prestações, faturas, expirações',
+
   'lang.language': 'Idioma',
 };

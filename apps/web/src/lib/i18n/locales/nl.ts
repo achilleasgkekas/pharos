@@ -59,5 +59,23 @@ export const nl: Partial<Dict> = {
   'common.deselectAll': 'Alles deselecteren',
   'common.cannotUndo': 'Dit kan niet ongedaan worden gemaakt.',
 
+  'home.heroA': 'Eén licht over',
+  'home.heroB': 'alles wat je beheert.',
+  'home.taglineA': 'Persoonlijke Hub',
+  'home.taglineB': 'Systeem voor Toezicht op Bezit & Middelen',
+  'home.subtitle': 'Overzicht over alles wat je bezit: apparatuur, bonnen, termijnen, prijsvolging en abonnementen. Zelf gehost op je eigen machine.',
+  'home.modules': 'Modules',
+  'home.open': 'Openen',
+  'home.dInventory': 'Wat ik bezit: apparatuur, serienummers, garanties, bonnen',
+  'home.dShopping': 'Verlanglijst, prijsvolging, winkelvergelijking',
+  'home.dReceipts': 'AI-uitgelezen bonnenkluis (afbeelding + PDF + e-mail)',
+  'home.dExpenses': 'Rekeningen die je scant: huur, nutsvoorzieningen, brandstof — per leverancier',
+  'home.dIncome': 'Salaris & ander inkomen — scan loonstroken',
+  'home.dStatements': 'Creditcards & termijnplannen',
+  'home.dSubscriptions': 'Terugkerende uitgaven + verlengingen',
+  'home.dTasks': 'Kanban-planner met notities + checklists',
+  'home.dReports': 'Grafieken: uitgaven, categorieën, garanties, termijnen',
+  'home.dCalendar': 'Wat eraan komt: verlengingen, termijnen, rekeningen, vervaldatums',
+
   'lang.language': 'Taal',
 };

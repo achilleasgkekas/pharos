@@ -11,6 +11,7 @@ import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
 import { Package, ShoppingCart, ListChecks, BarChart3, Receipt as ReceiptIcon, CalendarClock, CreditCard, ArrowRight, Wallet, Banknote, CalendarDays } from 'lucide-react';
 import { PharosMark } from '@/components/PharosMark';
+import { getServerT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,6 +104,7 @@ const display = { fontFamily: 'var(--font-display)' } as const;
 
 export default async function HomePage() {
   const stats = await getStats();
+  const { t } = await getServerT();
 
   return (
     <main className="min-h-screen">
@@ -110,36 +112,36 @@ export default async function HomePage() {
       <section className="max-w-[1400px] mx-auto px-4 pt-12 pb-12 md:pt-20 text-center">
         <PharosMark size={40} className="text-[color:var(--color-accent)] mx-auto mb-5" />
         <h1 className="font-extrabold leading-[0.92] tracking-[-0.03em] text-[clamp(2.5rem,7vw,4.5rem)]" style={display}>
-          One light over
+          {t('home.heroA')}
           <br />
           <span className="bg-gradient-to-r from-[color:var(--color-accent)] via-[color:var(--color-cyan)] to-[color:var(--color-purple)] bg-clip-text text-transparent">
-            everything you run.
+            {t('home.heroB')}
           </span>
         </h1>
         <p className="mt-4 text-[11px] tracking-[0.22em] uppercase text-[color:var(--color-text-faint)]" style={mono}>
-          Personal Hub <span className="text-[color:var(--color-accent)]">·</span> Asset &amp; Resource Oversight System
+          {t('home.taglineA')} <span className="text-[color:var(--color-accent)]">·</span> {t('home.taglineB')}
         </p>
         <p className="text-[color:var(--color-text-dim)] mt-3 max-w-2xl mx-auto text-base md:text-lg leading-relaxed">
-          Oversight on everything you own: equipment, receipts, installments, price-tracking and subscriptions. Self-hosted on your own machine.
+          {t('home.subtitle')}
         </p>
       </section>
 
       {/* Modules */}
       <section className="max-w-[1400px] mx-auto px-4 pb-16">
         <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-3" style={mono}>
-          Modules
+          {t('home.modules')}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <NavCard href="/items" title="Inventory" count={stats.ownedCount} description="What I own: equipment, serials, warranties, receipts" color="cyan" icon={<Package size={20} />} />
-          <NavCard href="/shopping" title="Shopping" count={stats.shoppingCount} description="Wishlist, price tracking, store comparison" color="gold" icon={<ShoppingCart size={20} />} />
-          <NavCard href="/receipts" title="Receipts" count={stats.receiptCount} description="AI-parsed receipt vault (image + PDF + email)" color="purple" icon={<ReceiptIcon size={20} />} />
-          <NavCard href="/expenses" title="Expenses" count={null} description="Bills you scan: rent, utilities, fuel — by vendor" color="gold" icon={<Wallet size={20} />} />
-          <NavCard href="/income" title="Income" count={null} description="Salary & other money in — scan payslips" color="accent" icon={<Banknote size={20} />} />
-          <NavCard href="/statements" title="Statements" count={stats.statementCount} description="Credit cards & installment plans" color="accent" icon={<CreditCard size={20} />} />
-          <NavCard href="/subscriptions" title="Subscriptions" count={stats.subscriptionCount} description="Recurring expenses + renewals" color="red" icon={<CalendarClock size={20} />} />
-          <NavCard href="/tasks" title="Tasks" count={stats.openTasks} description="Kanban planner with notes + checklists" color="cyan" icon={<ListChecks size={20} />} />
-          <NavCard href="/reports" title="Reports" count={null} description="Charts: spend, categories, warranties, installments" color="gold" icon={<BarChart3 size={20} />} />
-          <NavCard href="/calendar" title="Calendar" count={null} description="What's coming up: renewals, installments, bills, expiries" color="purple" icon={<CalendarDays size={20} />} />
+          <NavCard href="/items" title={t('nav.inventory')} count={stats.ownedCount} description={t('home.dInventory')} open={t('home.open')} color="cyan" icon={<Package size={20} />} />
+          <NavCard href="/shopping" title={t('nav.shopping')} count={stats.shoppingCount} description={t('home.dShopping')} open={t('home.open')} color="gold" icon={<ShoppingCart size={20} />} />
+          <NavCard href="/receipts" title={t('nav.receipts')} count={stats.receiptCount} description={t('home.dReceipts')} open={t('home.open')} color="purple" icon={<ReceiptIcon size={20} />} />
+          <NavCard href="/expenses" title={t('nav.expenses')} count={null} description={t('home.dExpenses')} open={t('home.open')} color="gold" icon={<Wallet size={20} />} />
+          <NavCard href="/income" title={t('nav.income')} count={null} description={t('home.dIncome')} open={t('home.open')} color="accent" icon={<Banknote size={20} />} />
+          <NavCard href="/statements" title={t('nav.statements')} count={stats.statementCount} description={t('home.dStatements')} open={t('home.open')} color="accent" icon={<CreditCard size={20} />} />
+          <NavCard href="/subscriptions" title={t('nav.subscriptions')} count={stats.subscriptionCount} description={t('home.dSubscriptions')} open={t('home.open')} color="red" icon={<CalendarClock size={20} />} />
+          <NavCard href="/tasks" title={t('nav.tasks')} count={stats.openTasks} description={t('home.dTasks')} open={t('home.open')} color="cyan" icon={<ListChecks size={20} />} />
+          <NavCard href="/reports" title={t('nav.reports')} count={null} description={t('home.dReports')} open={t('home.open')} color="gold" icon={<BarChart3 size={20} />} />
+          <NavCard href="/calendar" title={t('nav.calendar')} count={null} description={t('home.dCalendar')} open={t('home.open')} color="purple" icon={<CalendarDays size={20} />} />
         </div>
       </section>
 
@@ -164,6 +166,7 @@ function NavCard({
   title,
   count,
   description,
+  open,
   color,
   icon,
 }: {
@@ -171,6 +174,7 @@ function NavCard({
   title: string;
   count: number | null;
   description: string;
+  open: string;
   color: keyof typeof NAV_COLORS;
   icon: React.ReactNode;
 }) {
@@ -206,7 +210,7 @@ function NavCard({
       </h3>
       <p className="relative text-sm text-[color:var(--color-text-dim)] mt-1 leading-relaxed">{description}</p>
       <div className="relative mt-4 flex items-center gap-1 text-xs text-[color:var(--color-text-faint)] group-hover:text-[color:var(--color-accent)] transition-colors" style={mono}>
-        Open <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+        {open} <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
       </div>
     </Link>
   );

@@ -62,6 +62,25 @@ export const en = {
   'common.deselectAll': 'Deselect all',
   'common.cannotUndo': 'This cannot be undone.',
 
+  // ── Home page ────────────────────────────────────────────────────────────
+  'home.heroA': 'One light over',
+  'home.heroB': 'everything you run.',
+  'home.taglineA': 'Personal Hub',
+  'home.taglineB': 'Asset & Resource Oversight System',
+  'home.subtitle': 'Oversight on everything you own: equipment, receipts, installments, price-tracking and subscriptions. Self-hosted on your own machine.',
+  'home.modules': 'Modules',
+  'home.open': 'Open',
+  'home.dInventory': 'What I own: equipment, serials, warranties, receipts',
+  'home.dShopping': 'Wishlist, price tracking, store comparison',
+  'home.dReceipts': 'AI-parsed receipt vault (image + PDF + email)',
+  'home.dExpenses': 'Bills you scan: rent, utilities, fuel — by vendor',
+  'home.dIncome': 'Salary & other money in — scan payslips',
+  'home.dStatements': 'Credit cards & installment plans',
+  'home.dSubscriptions': 'Recurring expenses + renewals',
+  'home.dTasks': 'Kanban planner with notes + checklists',
+  'home.dReports': 'Charts: spend, categories, warranties, installments',
+  'home.dCalendar': "What's coming up: renewals, installments, bills, expiries",
+
   // ── Language switcher ────────────────────────────────────────────────────
   'lang.language': 'Language',
 } as const;

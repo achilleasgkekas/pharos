@@ -59,5 +59,23 @@ export const fr: Partial<Dict> = {
   'common.deselectAll': 'Tout désélectionner',
   'common.cannotUndo': 'Action irréversible.',
 
+  'home.heroA': 'Une lumière sur',
+  'home.heroB': 'tout ce que vous gérez.',
+  'home.taglineA': 'Hub Personnel',
+  'home.taglineB': 'Système de Supervision des Actifs et Ressources',
+  'home.subtitle': 'Supervision de tout ce que vous possédez : équipement, reçus, échéances, suivi des prix et abonnements. Auto-hébergé sur votre propre machine.',
+  'home.modules': 'Modules',
+  'home.open': 'Ouvrir',
+  'home.dInventory': 'Ce que je possède : équipement, numéros de série, garanties, reçus',
+  'home.dShopping': 'Liste de souhaits, suivi des prix, comparaison de magasins',
+  'home.dReceipts': 'Coffre de reçus analysés par IA (image + PDF + email)',
+  'home.dExpenses': 'Factures que vous scannez : loyer, charges, carburant — par fournisseur',
+  'home.dIncome': 'Salaire et autres revenus — scannez les fiches de paie',
+  'home.dStatements': 'Cartes de crédit et échéanciers',
+  'home.dSubscriptions': 'Dépenses récurrentes + renouvellements',
+  'home.dTasks': 'Planificateur Kanban avec notes + listes',
+  'home.dReports': 'Graphiques : dépenses, catégories, garanties, échéances',
+  'home.dCalendar': 'À venir : renouvellements, échéances, factures, expirations',
+
   'lang.language': 'Langue',
 };

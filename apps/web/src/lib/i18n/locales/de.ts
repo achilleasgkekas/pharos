@@ -59,5 +59,23 @@ export const de: Partial<Dict> = {
   'common.deselectAll': 'Auswahl aufheben',
   'common.cannotUndo': 'Kann nicht rückgängig gemacht werden.',
 
+  'home.heroA': 'Ein Licht über',
+  'home.heroB': 'allem, was du verwaltest.',
+  'home.taglineA': 'Persönliche Zentrale',
+  'home.taglineB': 'System zur Überwachung von Vermögen & Ressourcen',
+  'home.subtitle': 'Überblick über alles, was du besitzt: Geräte, Belege, Raten, Preisverfolgung und Abos. Selbst gehostet auf deiner eigenen Maschine.',
+  'home.modules': 'Module',
+  'home.open': 'Öffnen',
+  'home.dInventory': 'Was ich besitze: Geräte, Seriennummern, Garantien, Belege',
+  'home.dShopping': 'Wunschliste, Preisverfolgung, Shop-Vergleich',
+  'home.dReceipts': 'KI-ausgelesenes Beleg-Archiv (Bild + PDF + E-Mail)',
+  'home.dExpenses': 'Rechnungen zum Scannen: Miete, Nebenkosten, Kraftstoff — nach Anbieter',
+  'home.dIncome': 'Gehalt & andere Einnahmen — Lohnabrechnungen scannen',
+  'home.dStatements': 'Kreditkarten & Ratenpläne',
+  'home.dSubscriptions': 'Wiederkehrende Ausgaben + Verlängerungen',
+  'home.dTasks': 'Kanban-Planer mit Notizen + Checklisten',
+  'home.dReports': 'Diagramme: Ausgaben, Kategorien, Garantien, Raten',
+  'home.dCalendar': 'Was ansteht: Verlängerungen, Raten, Rechnungen, Abläufe',
+
   'lang.language': 'Sprache',
 };
