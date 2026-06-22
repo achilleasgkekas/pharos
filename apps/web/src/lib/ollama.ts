@@ -244,7 +244,7 @@ Schema:
 }
 
 Rules:
-- card: the BANK + card network only (e.g. "Chase Visa", "Barclays Mastercard", "Mastercard", "Alpha Bank Visa"). NEVER use the cardholder's personal name (the ALL-CAPS holder name on the statement is the holder, not the card). If the bank is unclear, use just the network ("Mastercard"/"Visa").
+- card: the BANK + card network only (e.g. "Chase Visa", "Barclays Mastercard", "Πειραιώς Mastercard", "Alpha Bank Visa"). NEVER use the cardholder's personal name (the ALL-CAPS holder name on the statement is the holder, not the card). If the bank is unclear, use just the network ("Mastercard"/"Visa").
 - totalAmount: the CURRENT amount owed now — "New balance" / "Total amount due" / "ΝΕΟ ΥΠΟΛΟΙΠΟ" / "ΣΥΝΟΛΙΚΗ ΟΦΕΙΛΗ" / "ΠΛΗΡΩΤΕΟ ΠΟΣΟ" / "Neuer Saldo". NEVER the "Previous balance" / "ΠΡΟΗΓΟΥΜΕΝΟ ΥΠΟΛΟΙΠΟ". These appear close together — pick the NEW/current one.
 - Date order: most countries are DAY-FIRST (DD/MM/YYYY — all of Europe, incl. Greece): "03/04/2026" = 3 April 2026 → "2026-04-03" (NOT 4 March). The US is MONTH-FIRST. If the first group is >12 it must be the day. Read the YEAR exactly; do NOT assume the previous year.
 - statementDate: the issue date of THIS / the newest statement — "Statement date" / "ΗΜΕΡΟΜΗΝΙΑ ΕΚΔΟΣΗΣ". A statement header usually shows TWO dates side by side: the current issue date and, next to it, the PREVIOUS statement's date ("Previous statement" / "ΠΡΟΗΓΟΥΜΕΝΗ ΕΚΔΟΣΗ"). ALWAYS pick the LATER/more-recent of the two — that is the current issue date. NEVER the previous/earlier one.

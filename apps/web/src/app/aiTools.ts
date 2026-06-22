@@ -85,7 +85,7 @@ export const TOOLS: AnthropicTool[] = [
   },
   {
     name: 'log_price',
-    description: "Record a price you spotted for a shopping item (e.g. 'the U7 Pro dropped to 270 at xpatit'). Appends to the item's price history so the trend, lowest-ever and deal status update.",
+    description: "Record a price you spotted for a shopping item (e.g. 'the headphones dropped to 199 at the shop'). Appends to the item's price history so the trend, lowest-ever and deal status update.",
     input_schema: {
       type: 'object',
       properties: {

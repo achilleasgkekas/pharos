@@ -14,7 +14,7 @@
 #   RETENTION_DAYS=14
 #
 # Cron (every night at 03:30):
-#   30 3 * * * /Users/user/Desktop/homepage/scripts/backup.sh >> /tmp/homepage-backup.log 2>&1
+#   30 3 * * * /path/to/homepage/scripts/backup.sh >> /tmp/homepage-backup.log 2>&1
 #
 set -euo pipefail
 

@@ -20,7 +20,7 @@ export const KNOWN_STORES: KnownStore[] = [
   { name: 'e-shop.gr', aliases: ['e-shop', 'eshop'], url: 'https://www.e-shop.gr' },
   { name: 'EU Store (Ubiquiti)', aliases: ['ui.com', 'ubiquiti', 'eu store', 'eu.store.ui.com'], url: 'https://eu.store.ui.com' },
   { name: 'FS.com', aliases: ['fs.com', 'fiberstore'], url: 'https://www.fs.com' },
-  { name: 'TechLamb', aliases: ['techlamb', 'store', 'store', 'store', 'store', '000000000'], url: 'https://www.techlamb.gr' },
+  { name: 'TechLamb', aliases: ['techlamb'], url: 'https://www.techlamb.gr' },
   { name: 'e-wireless.gr', aliases: ['e-wireless', 'ewireless'], url: 'https://www.e-wireless.gr' },
   { name: 'techstores.gr', aliases: ['techstores'], url: 'https://www.techstores.gr' },
   { name: 'Apple Store', aliases: ['apple', 'apple store', 'apple.com'], url: 'https://www.apple.com' },

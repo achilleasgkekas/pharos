@@ -34,3 +34,17 @@ tracker-export.json
 
 # email import (Gmail Takeout MBOX — personal, never commit)
 .email-import/
+
+# personal working docs + setup notes (kept locally, never uploaded)
+CLAUDE.md
+BACKLOG.md
+PLANNING.md
+10G_Products_List_v3.md
+10G_Products_List_v2.md
+network_dashboard.html
+research/
+scripts/seed-10g.js
+scripts/seed-10g-v3.js
+services/scraper/_audit.ts
+.claude/settings.local.json
+.claude/settings.json

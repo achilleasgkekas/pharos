@@ -2,9 +2,9 @@ import { Schema, model, models, type Model, type InferSchemaType } from 'mongoos
 
 const CardSchema = new Schema(
   {
-    name: { type: String, required: true }, // "Mastercard"
+    name: { type: String, required: true }, // e.g. "Mastercard 1234"
     last4: { type: String, default: '' }, // "1234"
-    bank: { type: String, default: '' }, // "Bank"
+    bank: { type: String, default: '' }, // e.g. "Alpha Bank", "Chase"
     kind: {
       type: String,
       enum: ['credit', 'debit'],
