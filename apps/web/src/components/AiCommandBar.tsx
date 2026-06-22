@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { runAiCommand, type ChatTurn } from '@/app/aiCommandActions';
 import { searchAll, type SearchHit } from '@/app/search-actions';
 import { cn } from '@/components/ui/cn';
+import { useT } from './LocaleProvider';
 
 type Msg = ChatTurn & { actions?: { name: string; summary: string }[]; error?: boolean };
 type Mode = 'search' | 'ai';
@@ -42,7 +43,7 @@ const TYPE_ICON: Record<SearchHit['type'], React.ComponentType<{ size?: number; 
   voucher: Ticket,
 };
 
-export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscription' }: { placeholder?: string }) {
+export function AiCommandBar() {
   const [mode, setMode] = useState<Mode>('search');
   const [value, setValue] = useState('');
   const [open, setOpen] = useState(false);
@@ -54,6 +55,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
   const [searchPending, startSearch] = useTransition();
   const [hits, setHits] = useState<SearchHit[]>([]);
 
+  const t = useT();
   const router = useRouter();
   const wrapRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -159,7 +161,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
   const isAi = mode === 'ai';
   // Spotlight = AI mode + open: dim & blur the page and float the bar to center.
   const spotlight = isAi && open;
-  const ph = isAi ? placeholder : 'Search everything…  receipts, items, tasks';
+  const ph = isAi ? t('bar.aiPlaceholder') : t('bar.searchPlaceholder');
   const pending = isAi ? aiPending : searchPending;
 
   return (
@@ -201,7 +203,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
             <button
               type="button"
               onClick={() => switchMode('search')}
-              title="Search your data"
+              title={t('bar.searchTitle')}
               className={cn(
                 'grid place-items-center w-6 h-6 rounded-md transition-colors',
                 !isAi ? 'bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]'
@@ -212,7 +214,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
             <button
               type="button"
               onClick={() => switchMode('ai')}
-              title="Ask the AI"
+              title={t('bar.aiTitle')}
               className={cn(
                 'grid place-items-center w-6 h-6 rounded-md transition-colors',
                 isAi ? 'bg-[color:var(--color-cyan)]/15 text-[color:var(--color-cyan)]' : 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]'
@@ -247,7 +249,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
             </button>
           )}
           {isAi && messages.length > 0 && (
-            <button type="button" onClick={resetAi} title="New conversation" className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]">
+            <button type="button" onClick={resetAi} title={t('bar.newConversation')} className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]">
               <RotateCcw size={14} />
             </button>
           )}
@@ -270,7 +272,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
         <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 overflow-hidden">
           {messages.length === 0 && !aiPending && (
             <div className="p-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] px-1.5 mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>Try</p>
+              <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] px-1.5 mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{t('bar.try')}</p>
               {EXAMPLES.map((ex) => (
                 <button
                   key={ex}
@@ -311,7 +313,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
             {aiPending && (
               <div className="flex justify-start">
                 <div className="rounded-2xl px-3 py-2 bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] text-sm flex items-center gap-2">
-                  <Loader2 size={13} className="animate-spin" /> thinking…
+                  <Loader2 size={13} className="animate-spin" /> {t('bar.thinking')}
                 </div>
               </div>
             )}
@@ -323,7 +325,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
       {open && !isAi && value.trim().length >= 2 && (
         <div className="absolute left-0 right-0 top-full mt-2 z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 py-1.5">
           {hits.length === 0 ? (
-            <p className="px-4 py-3 text-xs text-[color:var(--color-text-faint)]">{searchPending ? 'Searching…' : 'No matches'}</p>
+            <p className="px-4 py-3 text-xs text-[color:var(--color-text-faint)]">{searchPending ? t('bar.searching') : t('bar.noMatches')}</p>
           ) : (
             hits.map((h) => {
               const Icon = TYPE_ICON[h.type];

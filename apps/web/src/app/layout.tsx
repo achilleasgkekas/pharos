@@ -10,6 +10,8 @@ import { getCurrentUser } from '@/lib/auth';
 import { getAiConfig } from '@/lib/aiConfig';
 import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
 import { headers } from 'next/headers';
+import { getServerT } from '@/lib/i18n/server';
+import { LocaleProvider } from '@/components/LocaleProvider';
 
 export const metadata: Metadata = {
   title: 'PHAROS · Personal Hub',
@@ -39,6 +41,8 @@ export default async function RootLayout({
   // so /login and /setup are chrome-less. Middleware already blocks unauthenticated
   // navigation; this just keeps the shell consistent.
   const user = await getCurrentUser();
+  // UI language for this request (cookie → default), handed to the client provider.
+  const { locale, dict } = await getServerT();
   // Keep /login and /setup chrome-less even when signed in — the setup wizard signs
   // you in at step 1, so `user` alone would leak the navbar onto steps 2-4. The path
   // comes from middleware (x-pathname header).
@@ -61,7 +65,7 @@ export default async function RootLayout({
     }
   }
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -73,6 +77,7 @@ export default async function RootLayout({
       </head>
       <body>
         <CurrencyInit symbol={symbol} />
+        <LocaleProvider locale={locale} dict={dict}>
         <Providers>
           {/* SiteNav renders only for signed-in users AND not on /login or /setup
               (those stay chrome-less even mid-wizard, once step 1 signs you in).
@@ -82,6 +87,7 @@ export default async function RootLayout({
           {user && !chromeless && banner && <AiOnboardingBanner reason={banner} />}
           {children}
         </Providers>
+        </LocaleProvider>
       </body>
     </html>
   );

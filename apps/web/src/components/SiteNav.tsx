@@ -12,42 +12,46 @@ import { useTheme } from './ThemeProvider';
 import { PharosMark } from './PharosMark';
 import { AiCommandBar } from './AiCommandBar';
 import { logoutAction } from '@/app/login/actions';
+import { useT } from './LocaleProvider';
+import { LanguageSwitcher } from './LanguageSwitcher';
+import type { TKey } from '@/lib/i18n';
 
 type SessionUser = { name: string; role: 'admin' | 'member' };
 
-type NavLink = { href: string; label: string; icon: typeof Package };
+type NavLink = { href: string; key: TKey; icon: typeof Package };
 
 const STUFF: NavLink[] = [
-  { href: '/items', label: 'Inventory', icon: Package },
-  { href: '/shopping', label: 'Shopping', icon: ShoppingCart },
+  { href: '/items', key: 'nav.inventory', icon: Package },
+  { href: '/shopping', key: 'nav.shopping', icon: ShoppingCart },
 ];
 const MONEY: NavLink[] = [
-  { href: '/receipts', label: 'Receipts', icon: ReceiptIcon },
-  { href: '/expenses', label: 'Expenses', icon: Wallet },
-  { href: '/income', label: 'Income', icon: Banknote },
-  { href: '/statements', label: 'Statements', icon: CreditCard },
-  { href: '/subscriptions', label: 'Subscriptions', icon: CalendarClock },
-  { href: '/vouchers', label: 'Vouchers', icon: Ticket },
-  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { href: '/receipts', key: 'nav.receipts', icon: ReceiptIcon },
+  { href: '/expenses', key: 'nav.expenses', icon: Wallet },
+  { href: '/income', key: 'nav.income', icon: Banknote },
+  { href: '/statements', key: 'nav.statements', icon: CreditCard },
+  { href: '/subscriptions', key: 'nav.subscriptions', icon: CalendarClock },
+  { href: '/vouchers', key: 'nav.vouchers', icon: Ticket },
+  { href: '/calendar', key: 'nav.calendar', icon: CalendarDays },
 ];
 const PLAN: NavLink[] = [
-  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { href: '/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/tasks', key: 'nav.tasks', icon: CheckSquare },
+  { href: '/reports', key: 'nav.reports', icon: BarChart3 },
 ];
 const ACTIVITY: NavLink[] = [
-  { href: '/jobs', label: 'Jobs', icon: Activity },
-  { href: '/history', label: 'AI history', icon: MessageSquare },
-  { href: '/trash', label: 'Trash', icon: Trash2 },
+  { href: '/jobs', key: 'nav.jobs', icon: Activity },
+  { href: '/history', key: 'nav.history', icon: MessageSquare },
+  { href: '/trash', key: 'nav.trash', icon: Trash2 },
 ];
-const GROUPS: { label: string; links: NavLink[] }[] = [
-  { label: 'Stuff', links: STUFF },
-  { label: 'Money', links: MONEY },
-  { label: 'Plan', links: PLAN },
-  { label: 'Activity', links: ACTIVITY },
+const GROUPS: { key: TKey; links: NavLink[] }[] = [
+  { key: 'nav.stuff', links: STUFF },
+  { key: 'nav.money', links: MONEY },
+  { key: 'nav.plan', links: PLAN },
+  { key: 'nav.activity', links: ACTIVITY },
 ];
 const ALL_LINKS = [...STUFF, ...MONEY, ...PLAN, ...ACTIVITY];
 
-function NavGroup({ label, links }: { label: string; links: NavLink[] }) {
+function NavGroup({ groupKey, links }: { groupKey: TKey; links: NavLink[] }) {
+  const t = useT();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -68,7 +72,7 @@ function NavGroup({ label, links }: { label: string; links: NavLink[] }) {
           active ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)]'
         )}
       >
-        {label}
+        {t(groupKey)}
         <ChevronDown size={13} className={cn('transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
@@ -87,7 +91,7 @@ function NavGroup({ label, links }: { label: string; links: NavLink[] }) {
                   isActive ? 'text-[color:var(--color-accent)] bg-[color:var(--color-surface-2)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
                 )}
               >
-                <Icon size={15} /> {l.label}
+                <Icon size={15} /> {t(l.key)}
               </Link>
             );
           })}
@@ -98,6 +102,7 @@ function NavGroup({ label, links }: { label: string; links: NavLink[] }) {
 }
 
 function UserMenu({ user }: { user: SessionUser }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -112,7 +117,7 @@ function UserMenu({ user }: { user: SessionUser }) {
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex items-center p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors"
-        aria-label="Account"
+        aria-label={t('nav.account')}
       >
         <UserRound size={17} />
       </button>
@@ -129,7 +134,7 @@ function UserMenu({ user }: { user: SessionUser }) {
               type="submit"
               className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)] transition-colors"
             >
-              <LogOut size={15} /> Sign out
+              <LogOut size={15} /> {t('nav.signOut')}
             </button>
           </form>
         </div>
@@ -139,6 +144,7 @@ function UserMenu({ user }: { user: SessionUser }) {
 }
 
 export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: SessionUser }) {
+  const t = useT();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggle } = useTheme();
@@ -148,7 +154,7 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
   // clip it to the navbar's height instead of covering the whole viewport.
   return (
     <header className="sticky top-0 z-40 border-b border-[color:var(--color-border)] bg-[color:var(--color-bg)]">
-      <div className="max-w-[1500px] mx-auto px-4 py-2.5 flex items-center gap-3">
+      <div className="max-w-[1400px] mx-auto px-4 py-2.5 flex items-center gap-3">
         {/* Logo */}
         <Link href="/" prefetch={false} title="PHAROS · Personal Hub · Asset & Resource Oversight System" className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
           <PharosMark size={22} className="text-[color:var(--color-accent)] shrink-0" />
@@ -159,13 +165,13 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
 
         {/* Central command bar */}
         <div className="flex-1 flex justify-center min-w-0">
-          <AiCommandBar placeholder="Ask Pharos…  add a subscription, show stats" />
+          <AiCommandBar />
         </div>
 
         {/* Grouped links (desktop) */}
         <nav className="hidden lg:flex items-center gap-0.5 shrink-0">
           {GROUPS.map((g) => (
-            <NavGroup key={g.label} label={g.label} links={g.links} />
+            <NavGroup key={g.key} groupKey={g.key} links={g.links} />
           ))}
         </nav>
 
@@ -174,11 +180,12 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
           <span
             className={cn('hidden sm:flex items-center gap-1.5 text-[11px] mr-1', aiReady ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]')}
             style={{ fontFamily: 'var(--font-mono)' }}
-            title={aiReady ? 'AI is reachable' : 'AI offline / not configured'}
+            title={aiReady ? t('ai.reachable') : t('ai.notConfigured')}
           >
             <span className={cn('h-1.5 w-1.5 rounded-full', aiReady ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]')} />
-            AI {aiReady ? 'online' : 'offline'}
+            {aiReady ? t('ai.online') : t('ai.offline')}
           </span>
+          <LanguageSwitcher />
           <button onClick={toggle} className="p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Toggle theme">
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
@@ -186,7 +193,7 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
             href="/settings"
             prefetch={false}
             className={cn('p-2 rounded-lg transition-colors', pathname.startsWith('/settings') ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)]')}
-            aria-label="Settings"
+            aria-label={t('nav.settings')}
           >
             <Settings size={17} />
           </Link>
@@ -211,7 +218,7 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
                 onClick={() => setMobileOpen(false)}
                 className={cn('flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all', active ? 'bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
               >
-                <Icon size={16} /> {link.label}
+                <Icon size={16} /> {t(link.key)}
               </Link>
             );
           })}
