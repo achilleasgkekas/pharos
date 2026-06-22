@@ -308,7 +308,7 @@ export function ReceiptsClient({
   );
 
   return (
-    <main className="max-w-[1500px] mx-auto px-4 py-6 pb-16">
+    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       {/* Header */}
       <div className="mb-5">
         <div className="flex items-end justify-between gap-4 flex-wrap">

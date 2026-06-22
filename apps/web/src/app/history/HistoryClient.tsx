@@ -63,7 +63,7 @@ export function HistoryClient({ conversations }: { conversations: ConversationRo
   }
 
   return (
-    <main className="max-w-[900px] mx-auto px-4 py-6 pb-24">
+    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       <div className="flex items-end justify-between gap-4 flex-wrap mb-1">
         <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2.5" style={{ fontFamily: 'var(--font-display)' }}>
           <MessageSquare size={24} className="text-[color:var(--color-cyan)]" />

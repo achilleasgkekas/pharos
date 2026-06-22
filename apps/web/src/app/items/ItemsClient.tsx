@@ -433,13 +433,13 @@ export function ItemsClient({
   );
 
   return (
-    <main className="max-w-[1500px] mx-auto px-4 py-6 pb-24">
+    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       {/* Page header */}
       <div className="mb-6 pb-4 border-b border-[color:var(--color-border)]">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div className="flex items-baseline gap-3 flex-wrap">
             <h1
-              className="text-3xl md:text-4xl font-bold tracking-tight"
+              className="text-2xl md:text-3xl font-bold"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               {cfg.title}

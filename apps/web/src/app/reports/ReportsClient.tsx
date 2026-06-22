@@ -80,7 +80,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
   const avgMonth = Math.round(spend12 / Math.max(1, data.monthlySpend.filter((m) => m.total > 0).length || 1));
 
   return (
-    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-16">
+    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       <div className="mb-6 flex items-end justify-between gap-4 flex-wrap">
         <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
           Reports

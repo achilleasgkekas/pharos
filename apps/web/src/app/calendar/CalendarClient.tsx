@@ -166,7 +166,7 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
   const recurringPinned = months[0].entries.filter((e) => e.pinned);
 
   return (
-    <main className="max-w-[900px] mx-auto px-4 py-6 pb-16">
+    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
         <h1 className="text-2xl md:text-3xl font-bold" style={display}>
           Calendar

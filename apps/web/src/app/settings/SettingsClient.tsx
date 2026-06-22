@@ -121,7 +121,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
   }
 
   return (
-    <main className="max-w-[1080px] mx-auto px-4 py-6 pb-16">
+    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       <div className="mb-5">
         <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
           Settings

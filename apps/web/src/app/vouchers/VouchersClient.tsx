@@ -115,7 +115,7 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
   );
 
   return (
-    <main className="max-w-[1500px] mx-auto px-4 py-6 pb-24">
+    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
