@@ -57,7 +57,7 @@ async function runJobLoop(
         detail: 'timed out',
       });
     } catch (e) {
-      res = { ok: false, detail: ((e as Error).message || 'failed').slice(0, 80) };
+      res = { ok: false, detail: ((e as Error).message || 'failed').slice(0, 300) };
     }
     await Job.updateOne(
       { _id: id },
@@ -90,23 +90,23 @@ async function runOne(kind: string, id: string, useOcr: boolean, label: string):
   if (kind === 'sync-onedrive') {
     // id = local filePath, label = remote rel path. Reuse the batch uploader for one file.
     const r = await syncOnedriveBatch([{ filePath: id, rel: label }]);
-    if (r.pushed) return { ok: true, detail: (label.split('/').pop() || 'uploaded').slice(0, 80) };
+    if (r.pushed) return { ok: true, detail: (label.split('/').pop() || 'uploaded').slice(0, 300) };
     if (r.skipped) return { ok: true, detail: 'skipped (local file missing)' };
-    return { ok: false, detail: (r.errors[0] || 'upload failed').slice(0, 80) };
+    return { ok: false, detail: (r.errors[0] || 'upload failed').slice(0, 300) };
   }
   if (kind === 'rescan-receipts') {
     const r = await rescanReceipt(id, useOcr);
     const ok = !!(r.ok && r.receipt && ((r.receipt.total ?? 0) > 0 || (r.receipt.lineItems?.length ?? 0) > 0));
     return {
       ok,
-      detail: (ok ? `${r.receipt!.store} ${cur()}${r.receipt!.total}` : r.aiError || r.error || 'still empty').slice(0, 80),
+      detail: (ok ? `${r.receipt!.store} ${cur()}${r.receipt!.total}` : r.aiError || r.error || 'still empty').slice(0, 300),
     };
   }
   if (kind === 'ai-fill-items') {
     const r = await aiFillItem(id);
     return {
       ok: !!(r.ok && r.filled.length > 0),
-      detail: (r.filled?.length ? r.filled.join(', ') : r.error || '—').slice(0, 80),
+      detail: (r.filled?.length ? r.filled.join(', ') : r.error || '—').slice(0, 300),
     };
   }
   return { ok: false, detail: 'unknown job kind' };

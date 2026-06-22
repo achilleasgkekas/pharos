@@ -7,7 +7,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/components/ui/cn';
-import { getJobs, enqueueOnedriveSync, dismissJob, getJobDetail, type JobRow, type JobDetail } from '@/app/jobActions';
+import { getJobs, enqueueOnedriveSync, dismissJob, getJobDetail, type JobRow, type JobDetail, type JobItemResult } from '@/app/jobActions';
 
 const KIND: Record<string, { label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
   'sync-onedrive': { label: 'OneDrive sync', Icon: UploadCloud },
@@ -196,11 +196,14 @@ export function JobsPageClient({
 }
 
 function JobDetailView({ d }: { d: JobDetail }) {
+  const [failedOnly, setFailedOnly] = useState(false);
   const meta = KIND[d.kind] ?? { label: d.kind, Icon: Activity };
   const Icon = meta.Icon;
   const failed = Math.max(0, d.done - d.ok);
   const hasOutcomes = d.results.length > 0;
-  const rows = hasOutcomes ? d.results : d.labels.map((label) => ({ label, ok: true, detail: '' }));
+  const failedResults = d.results.filter((r) => !r.ok);
+  const baseRows: JobItemResult[] = hasOutcomes ? d.results : d.labels.map((label) => ({ label, ok: true, detail: '' }));
+  const rows = hasOutcomes && failedOnly ? failedResults : baseRows;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -218,33 +221,59 @@ function JobDetailView({ d }: { d: JobDetail }) {
         {d.status === 'running' ? <Stat label="done" value={d.done} /> : <Stat label="failed" value={failed} tone={failed ? 'bad' : undefined} />}
       </div>
 
-      {d.error && <p className="text-xs text-[color:var(--color-red)] bg-[color:var(--color-red)]/10 rounded-lg px-3 py-2">{d.error}</p>}
+      {d.error && <p className="text-xs text-[color:var(--color-red)] bg-[color:var(--color-red)]/10 rounded-lg px-3 py-2 break-words">{d.error}</p>}
 
       <div>
-        <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-          {hasOutcomes ? `Items · ${rows.length}` : `Work list · ${d.itemCount}`}
-        </p>
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {hasOutcomes ? (failedOnly ? `Failed · ${failedResults.length}` : `Items · ${baseRows.length}`) : `Work list · ${d.itemCount}`}
+          </p>
+          {hasOutcomes && failedResults.length > 0 && (
+            <button
+              onClick={() => setFailedOnly((v) => !v)}
+              className={cn(
+                'text-[10px] px-2 py-0.5 rounded-full border transition-colors',
+                failedOnly
+                  ? 'border-[color:var(--color-red)]/40 text-[color:var(--color-red)] bg-[color:var(--color-red)]/10'
+                  : 'border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
+              )}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              {failedOnly ? 'show all' : `failed only · ${failedResults.length}`}
+            </button>
+          )}
+        </div>
         {rows.length === 0 ? (
-          <p className="text-xs text-[color:var(--color-text-faint)]">No items recorded.</p>
+          <p className="text-xs text-[color:var(--color-text-faint)]">{failedOnly ? 'No failures.' : 'No items recorded.'}</p>
         ) : (
           <div className="max-h-[42vh] overflow-y-auto rounded-lg border border-[color:var(--color-border)] divide-y divide-[color:var(--color-border)]">
-            {rows.map((r, i) => (
-              <div key={i} className="flex items-start gap-2 px-3 py-1.5">
-                {hasOutcomes ? (
-                  r.ok ? <CheckCircle2 size={13} className="text-[color:var(--color-accent)] shrink-0 mt-0.5" /> : <XCircle size={13} className="text-[color:var(--color-red)] shrink-0 mt-0.5" />
-                ) : (
-                  <span className="shrink-0 mt-1.5 w-1 h-1 rounded-full bg-[color:var(--color-text-faint)]" />
-                )}
-                <div className="min-w-0">
-                  <div className="text-xs text-[color:var(--color-text)] break-words">{r.label || '—'}</div>
-                  {r.detail && <div className="text-[10px] text-[color:var(--color-text-faint)] break-words" style={{ fontFamily: 'var(--font-mono)' }}>{r.detail}</div>}
+            {rows.map((r, i) => {
+              const bad = hasOutcomes && !r.ok;
+              return (
+                <div key={i} className={cn('flex items-start gap-2 px-3 py-2', bad && 'bg-[color:var(--color-red)]/[0.05]')}>
+                  {hasOutcomes ? (
+                    r.ok ? <CheckCircle2 size={13} className="text-[color:var(--color-accent)] shrink-0 mt-0.5" /> : <XCircle size={13} className="text-[color:var(--color-red)] shrink-0 mt-0.5" />
+                  ) : (
+                    <span className="shrink-0 mt-1.5 w-1 h-1 rounded-full bg-[color:var(--color-text-faint)]" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-xs text-[color:var(--color-text)] break-words">{r.label || '—'}</div>
+                    {r.detail && (
+                      <div
+                        className={cn('text-[10px] break-words mt-0.5', bad ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-text-faint)]')}
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      >
+                        {bad ? '⚠ ' : ''}{r.detail}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         {!hasOutcomes && d.status !== 'running' && (
-          <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5">Per-item outcomes weren&apos;t recorded for this older job — showing its work list.</p>
+          <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5">Per-item outcomes weren&apos;t recorded for this older job — showing its work list. Run it again to capture per-item results.</p>
         )}
       </div>
     </div>
