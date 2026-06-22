@@ -72,10 +72,15 @@ export async function createItem(formData: FormData) {
   const raw = Object.fromEntries(formData);
   const { links, tags, ...rest } = ItemFormSchema.parse(raw);
   await connectDB();
+  const parsedLinks = parseLinks(links);
+  // When store links carry prices, the headline price is DERIVED (cheapest link) —
+  // the manual price field is only a fallback for link-less items.
+  const cl = lowestKnownPrice({ links: parsedLinks });
   await Item.create({
     ...rest,
+    currentPrice: cl ?? rest.currentPrice,
     tags: parseTags(tags),
-    links: parseLinks(links),
+    links: parsedLinks,
   });
   revalidatePath('/items');
 }
@@ -84,10 +89,13 @@ export async function updateItem(id: string, formData: FormData) {
   const raw = Object.fromEntries(formData);
   const { links, tags, ...rest } = ItemFormSchema.parse(raw);
   await connectDB();
+  const parsedLinks = parseLinks(links);
+  const cl = lowestKnownPrice({ links: parsedLinks });
   await Item.findByIdAndUpdate(id, {
     ...rest,
+    currentPrice: cl ?? rest.currentPrice,
     tags: parseTags(tags),
-    links: parseLinks(links),
+    links: parsedLinks,
   });
   revalidatePath('/items');
 }
@@ -707,15 +715,15 @@ function storeFromUrl(url: string): string {
   return host;
 }
 
-/** Lowest known price across an item's store links + price history (>0), or null. */
-function lowestKnownPrice(item: {
-  links?: { price?: number | null }[];
-  priceHistory?: { price: number }[];
-}): number | null {
-  const vals: number[] = [];
-  for (const l of item.links ?? []) if (l.price && l.price > 0) vals.push(l.price);
-  for (const h of item.priceHistory ?? []) if (h.price > 0) vals.push(h.price);
-  return vals.length ? Math.min(...vals) : null;
+/** Cheapest CURRENT store-link price — this drives `currentPrice` (the headline /
+ *  list price). Price HISTORY is deliberately NOT included: history is for the
+ *  chart and the "lowest ever" range marker, not the price you can buy at now. So a
+ *  stale/old low (e.g. a seeded €475) never becomes the current price. Null when the
+ *  item has no priced store links (then currentPrice is left as-is / manual). */
+function lowestKnownPrice(item: { links?: { price?: number | null }[] }): number | null {
+  let lo = Infinity;
+  for (const l of item.links ?? []) if (l.price && l.price > 0) lo = Math.min(lo, l.price);
+  return lo < Infinity ? lo : null;
 }
 
 /**

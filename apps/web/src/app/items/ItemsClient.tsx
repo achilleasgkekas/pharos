@@ -917,7 +917,11 @@ function ItemRow({ item, view, plan, onClick, selected, onToggleSelect, selectMo
             {plan && <span className="text-[color:var(--color-purple)]">installments {plan.paidInstallments}/{plan.totalInstallments}</span>}
             {best && (
               <span className="text-[color:var(--color-text-dim)]">
-                best <span className="text-[color:var(--color-accent)]">{cur()}{best.price}</span>
+                {best.price !== item.currentPrice ? (
+                  <>best <span className="text-[color:var(--color-accent)]">{cur()}{best.price}</span></>
+                ) : (
+                  <>at <span className="text-[color:var(--color-text-faint)]">{best.store}</span></>
+                )}
               </span>
             )}
             {deal && <span className="text-[color:var(--color-accent)]">🎯 deal</span>}
@@ -1663,6 +1667,10 @@ function ItemForm({
   // Owned (received/installed) → "Paid" is what matters. Shopping → a single
   // "Price"; the target + store comparison live in the PricePanel above.
   const owned = ['received', 'installed'].includes(form.status);
+  // When the item has priced store links, the price is DERIVED (cheapest link), so
+  // the manual price field is redundant — show it read-only.
+  const linkPrices = links.map((l) => Number(l.price)).filter((p) => p > 0);
+  const cheapestLink = linkPrices.length ? Math.min(...linkPrices) : null;
 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
@@ -1707,6 +1715,13 @@ function ItemForm({
             <Input type="number" step="0.01" min="0" value={form.currentPrice} onChange={set('currentPrice')} placeholder="worth now (optional)" />
           </Field>
         </>
+      ) : cheapestLink != null ? (
+        <Field label={`Price (${cur()})`}>
+          <div className="text-sm px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] flex items-center justify-between gap-2">
+            <span className="font-semibold text-[color:var(--color-text)]">{cur()}{cheapestLink}</span>
+            <span className="text-[11px] text-[color:var(--color-text-faint)]">auto · cheapest of your store links</span>
+          </div>
+        </Field>
       ) : (
         <Field label={`Price (${cur()})`}>
           <Input type="number" step="0.01" min="0" value={form.currentPrice} onChange={set('currentPrice')} placeholder="current price (or add store links below)" />
