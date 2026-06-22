@@ -4,12 +4,16 @@ import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { anthropicRaw, type AnthropicMessage, type AnthropicBlock } from '@/lib/anthropic';
 import { revalidatePath } from 'next/cache';
 import { TOOLS, execute, SYSTEM, today } from './aiTools';
+import { connectDB } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
+import { Conversation } from '@/models/Conversation';
 
 export type AiCommandResult = {
   ok: boolean;
   reply: string;
   actions: { name: string; summary: string }[];
   error?: string;
+  conversationId?: string;
 };
 
 export type ChatTurn = { role: 'user' | 'assistant'; content: string };
@@ -17,7 +21,7 @@ export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 /** Run a multi-turn conversation through Claude + tools. The client keeps the
  *  history (text turns) and sends it whole each call. Needs the Anthropic provider.
  *  The tool registry + executor live in `./aiTools` (shared with the MCP route). */
-export async function runAiCommand(history: ChatTurn[]): Promise<AiCommandResult> {
+export async function runAiCommand(history: ChatTurn[], conversationId?: string): Promise<AiCommandResult> {
   if (!(await isFeatureEnabled('commandBar'))) return { ok: false, reply: '', actions: [], error: 'The AI command bar is turned off in Settings → AI.' };
   const turns = (history || []).filter((t) => t && typeof t.content === 'string' && t.content.trim());
   if (!turns.length) return { ok: false, reply: '', actions: [], error: 'Empty command' };
@@ -62,5 +66,27 @@ export async function runAiCommand(history: ChatTurn[]): Promise<AiCommandResult
   if (actions.length) {
     for (const p of ['/', '/expenses', '/income', '/subscriptions', '/tasks', '/items', '/shopping']) revalidatePath(p);
   }
-  return { ok: true, reply: reply || 'Done.', actions };
+
+  // Persist to the conversation history (best-effort — a DB hiccup must not eat the reply).
+  let convId = conversationId;
+  try {
+    await connectDB();
+    const user = await getCurrentUser();
+    const stored = [
+      ...turns.map((t) => ({ role: t.role, content: t.content })),
+      { role: 'assistant' as const, content: reply || 'Done.', actions },
+    ];
+    const title = turns.find((t) => t.role === 'user')?.content.trim().slice(0, 80) || 'Conversation';
+    const userTurns = stored.filter((m) => m.role === 'user').length;
+    if (convId) {
+      await Conversation.updateOne({ _id: convId }, { $set: { messages: stored, title, turns: userTurns } });
+    } else {
+      const doc = await Conversation.create({ userId: user?.id ?? null, title, messages: stored, turns: userTurns });
+      convId = String(doc._id);
+    }
+  } catch {
+    /* history is best-effort */
+  }
+
+  return { ok: true, reply: reply || 'Done.', actions, conversationId: convId };
 }

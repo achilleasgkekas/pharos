@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Job } from '@/models/Job';
 import { rescanReceipt } from '@/app/receipts/actions';
 import { aiFillItem } from '@/app/items/actions';
+import { syncOnedriveBatch } from '@/app/settings/actions';
 
 // ── In-process background worker ──────────────────────────────────────────────
 // Runs in the persistent Next standalone Node server, independent of any browser.
@@ -51,7 +52,7 @@ async function runJobLoop(
     await Job.updateOne({ _id: id }, { $set: { current: label } });
     let res: { ok: boolean; detail: string };
     try {
-      res = await withTimeout(runOne(kind, itemIds[i], useOcr), PER_ITEM_TIMEOUT, {
+      res = await withTimeout(runOne(kind, itemIds[i], useOcr, label), PER_ITEM_TIMEOUT, {
         ok: false,
         detail: 'timed out',
       });
@@ -84,7 +85,14 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([p.finally(() => clearTimeout(timer)), timeout]);
 }
 
-async function runOne(kind: string, id: string, useOcr: boolean): Promise<{ ok: boolean; detail: string }> {
+async function runOne(kind: string, id: string, useOcr: boolean, label: string): Promise<{ ok: boolean; detail: string }> {
+  if (kind === 'sync-onedrive') {
+    // id = local filePath, label = remote rel path. Reuse the batch uploader for one file.
+    const r = await syncOnedriveBatch([{ filePath: id, rel: label }]);
+    if (r.pushed) return { ok: true, detail: (label.split('/').pop() || 'uploaded').slice(0, 80) };
+    if (r.skipped) return { ok: true, detail: 'skipped (local file missing)' };
+    return { ok: false, detail: (r.errors[0] || 'upload failed').slice(0, 80) };
+  }
   if (kind === 'rescan-receipts') {
     const r = await rescanReceipt(id, useOcr);
     const ok = !!(r.ok && r.receipt && ((r.receipt.total ?? 0) > 0 || (r.receipt.lineItems?.length ?? 0) > 0));

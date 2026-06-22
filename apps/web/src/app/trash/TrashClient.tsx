@@ -1,0 +1,275 @@
+'use client';
+import { useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  Trash2, RotateCcw, Search, X, Package, Receipt as ReceiptIcon,
+  Wallet, CalendarClock, Ticket, CheckSquare, Loader2,
+} from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { cn } from '@/components/ui/cn';
+import { restoreFromTrash, purgeFromTrash, emptyTrash, type TrashRow, type TrashType } from '@/app/settings/actions';
+
+const TYPE_META: Record<TrashType, { label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
+  item: { label: 'Items', Icon: Package },
+  receipt: { label: 'Receipts', Icon: ReceiptIcon },
+  expense: { label: 'Money', Icon: Wallet },
+  subscription: { label: 'Subscriptions', Icon: CalendarClock },
+  voucher: { label: 'Vouchers', Icon: Ticket },
+  task: { label: 'Tasks', Icon: CheckSquare },
+};
+
+function ago(iso: string): string {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return 'just now';
+  const m = s / 60;
+  if (m < 60) return `${Math.floor(m)}m ago`;
+  const h = m / 60;
+  if (h < 24) return `${Math.floor(h)}h ago`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'yesterday' : `${d}d ago`;
+}
+
+// 30-day retention (mirrors getTrash); show how long until auto-purge.
+function purgesIn(iso: string): number {
+  const d = (new Date(iso).getTime() + 30 * 86400000 - Date.now()) / 86400000;
+  return Math.max(0, Math.ceil(d));
+}
+
+const key = (r: { type: TrashType; id: string }) => `${r.type}:${r.id}`;
+
+export function TrashClient({ rows }: { rows: TrashRow[] }) {
+  const router = useRouter();
+  const confirm = useConfirm();
+  const [pending, start] = useTransition();
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<TrashType | 'all'>('all');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const r of rows) c[r.type] = (c[r.type] ?? 0) + 1;
+    return c;
+  }, [rows]);
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter(
+      (r) =>
+        (typeFilter === 'all' || r.type === typeFilter) &&
+        (!q || r.title.toLowerCase().includes(q) || r.subtitle.toLowerCase().includes(q) || r.type.includes(q))
+    );
+  }, [rows, search, typeFilter]);
+
+  const allVisibleSelected = visible.length > 0 && visible.every((r) => selected.has(key(r)));
+
+  function toggle(r: TrashRow) {
+    setSelected((s) => {
+      const n = new Set(s);
+      const k = key(r);
+      n.has(k) ? n.delete(k) : n.add(k);
+      return n;
+    });
+  }
+  function toggleAll() {
+    setSelected((s) => {
+      if (allVisibleSelected) {
+        const n = new Set(s);
+        visible.forEach((r) => n.delete(key(r)));
+        return n;
+      }
+      return new Set([...s, ...visible.map(key)]);
+    });
+  }
+
+  async function restore(r: TrashRow) {
+    setBusy(key(r));
+    await restoreFromTrash(r.type, r.id);
+    setBusy(null);
+    setSelected((s) => { const n = new Set(s); n.delete(key(r)); return n; });
+    router.refresh();
+  }
+
+  async function purge(r: TrashRow) {
+    const ok = await confirm({ title: `Delete "${r.title}" forever?`, message: 'This permanently removes the record and its files. It cannot be undone.', confirmLabel: 'Delete forever', danger: true });
+    if (!ok) return;
+    setBusy(key(r));
+    await purgeFromTrash(r.type, r.id);
+    setBusy(null);
+    setSelected((s) => { const n = new Set(s); n.delete(key(r)); return n; });
+    router.refresh();
+  }
+
+  function selectedRows(): TrashRow[] {
+    return rows.filter((r) => selected.has(key(r)));
+  }
+
+  function restoreSelected() {
+    const sel = selectedRows();
+    if (!sel.length) return;
+    start(async () => {
+      for (const r of sel) await restoreFromTrash(r.type, r.id);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  async function purgeSelected() {
+    const sel = selectedRows();
+    if (!sel.length) return;
+    const ok = await confirm({ title: `Delete ${sel.length} item${sel.length > 1 ? 's' : ''} forever?`, message: 'This permanently removes them and their files. It cannot be undone.', confirmLabel: 'Delete forever', danger: true });
+    if (!ok) return;
+    start(async () => {
+      for (const r of sel) await purgeFromTrash(r.type, r.id);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  async function empty() {
+    const ok = await confirm({ title: 'Empty the whole Trash?', message: `Permanently delete all ${rows.length} item${rows.length > 1 ? 's' : ''}. This cannot be undone.`, confirmLabel: 'Empty Trash', danger: true });
+    if (!ok) return;
+    start(async () => {
+      await emptyTrash();
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  return (
+    <main className="max-w-[1100px] mx-auto px-4 py-6 pb-24">
+      {/* Header */}
+      <div className="flex items-end justify-between gap-4 flex-wrap mb-1">
+        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2.5" style={{ fontFamily: 'var(--font-display)' }}>
+          <Trash2 size={26} className="text-[color:var(--color-text-dim)]" />
+          Trash
+          <span className="text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {rows.length}
+          </span>
+        </h1>
+        {rows.length > 0 && (
+          <Button variant="danger" size="sm" onClick={empty} disabled={pending}>
+            <Trash2 size={14} /> Empty Trash
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-[color:var(--color-text-faint)] mb-5">
+        Deleted records rest here and are recoverable. Anything older than 30 days is purged automatically.
+      </p>
+
+      {rows.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[color:var(--color-border)] py-20 text-center">
+          <Trash2 size={32} className="mx-auto text-[color:var(--color-text-faint)] opacity-40" />
+          <p className="mt-3 text-sm text-[color:var(--color-text-dim)]">Trash is empty.</p>
+          <p className="text-xs text-[color:var(--color-text-faint)]">Deleting anything in Pharos lands it here first.</p>
+        </div>
+      ) : (
+        <>
+          {/* Filters */}
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--color-text-faint)]" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search trash…"
+                className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg pl-8 pr-3 py-1.5 text-sm outline-none focus:border-[color:var(--color-accent)]"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap mb-4" style={{ fontFamily: 'var(--font-mono)' }}>
+            <Chip active={typeFilter === 'all'} onClick={() => setTypeFilter('all')} label={`All ${rows.length}`} />
+            {(Object.keys(TYPE_META) as TrashType[])
+              .filter((t) => counts[t])
+              .map((t) => (
+                <Chip key={t} active={typeFilter === t} onClick={() => setTypeFilter(t)} label={`${TYPE_META[t].label} ${counts[t]}`} />
+              ))}
+          </div>
+
+          {/* Bulk bar */}
+          <div className="flex items-center justify-between gap-3 mb-3 text-xs">
+            <button onClick={toggleAll} className="text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              {allVisibleSelected ? 'deselect all' : `select all ${visible.length}`}
+            </button>
+            {selected.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-[color:var(--color-text-faint)]">{selected.size} selected</span>
+                <Button variant="secondary" size="sm" onClick={restoreSelected} disabled={pending}>
+                  <RotateCcw size={13} /> Restore
+                </Button>
+                <Button variant="danger" size="sm" onClick={purgeSelected} disabled={pending}>
+                  <Trash2 size={13} /> Delete
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* List */}
+          <div className="space-y-1.5">
+            {visible.map((r) => {
+              const k = key(r);
+              const { Icon } = TYPE_META[r.type];
+              const isBusy = busy === k;
+              const sel = selected.has(k);
+              const left = purgesIn(r.deletedAt);
+              return (
+                <div
+                  key={k}
+                  className={cn(
+                    'flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors',
+                    sel ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent)]/5' : 'border-[color:var(--color-border)] bg-[color:var(--color-surface)] hover:border-[color:var(--color-border-light)]'
+                  )}
+                >
+                  <input type="checkbox" checked={sel} onChange={() => toggle(r)} className="shrink-0 accent-[color:var(--color-accent)] w-4 h-4" />
+                  <Icon size={16} className="shrink-0 text-[color:var(--color-text-faint)]" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">{r.title}</div>
+                    <div className="text-[11px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+                      {r.subtitle ? `${r.subtitle} · ` : ''}deleted {ago(r.deletedAt)}{left <= 7 ? ` · purges in ${left}d` : ''}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => restore(r)}
+                    disabled={isBusy}
+                    title="Restore"
+                    className="shrink-0 grid place-items-center w-8 h-8 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-2)] transition-colors"
+                  >
+                    {isBusy ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
+                  </button>
+                  <button
+                    onClick={() => purge(r)}
+                    disabled={isBusy}
+                    title="Delete forever"
+                    className="shrink-0 grid place-items-center w-8 h-8 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)] transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              );
+            })}
+            {visible.length === 0 && (
+              <p className="text-center text-sm text-[color:var(--color-text-faint)] py-10">No matching items.</p>
+            )}
+          </div>
+        </>
+      )}
+    </main>
+  );
+}
+
+function Chip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'px-2.5 py-1 rounded-lg text-[11px] uppercase tracking-wide border transition-colors',
+        active
+          ? 'bg-[color:var(--color-accent)]/15 border-[color:var(--color-accent)]/40 text-[color:var(--color-accent)]'
+          : 'border-[color:var(--color-border)] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]'
+      )}
+    >
+      {label}
+    </button>
+  );
+}

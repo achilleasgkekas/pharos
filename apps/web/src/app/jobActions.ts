@@ -5,6 +5,7 @@ import { ensureProcessor } from '@/lib/jobRunner';
 import { getAiConfig } from '@/lib/aiConfig';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { AppConfig } from '@/models/AppConfig';
+import { getSyncManifest } from './settings/actions';
 
 /** Cost-guard info for a bulk AI run: whether to confirm + the active provider/model
  *  (so the client can show a rough cost estimate before starting a paid job). */
@@ -79,6 +80,57 @@ export async function enqueueAiFillItems(
   });
   void ensureProcessor();
   return { ok: true };
+}
+
+/** Queue a OneDrive sync as a background job — one file per work item, with live
+ *  progress. Runs through the same worker as the AI jobs (lib/jobRunner). */
+export async function enqueueOnedriveSync(): Promise<{ ok: boolean; error?: string; count?: number }> {
+  await connectDB();
+  if (await Job.countDocuments({ kind: 'sync-onedrive', status: 'running' })) {
+    return { ok: false, error: 'A sync is already running.' };
+  }
+  const manifest = await getSyncManifest();
+  if (!manifest.ok) return { ok: false, error: manifest.error || 'Sync is not available.' };
+  if (!manifest.items.length) return { ok: false, error: 'Nothing to sync.' };
+  await Job.create({
+    kind: 'sync-onedrive',
+    title: 'Sync to OneDrive',
+    href: '/jobs',
+    itemIds: manifest.items.map((i) => i.filePath),
+    labels: manifest.items.map((i) => i.rel),
+    total: manifest.items.length,
+    status: 'running',
+  });
+  void ensureProcessor();
+  return { ok: true, count: manifest.items.length };
+}
+
+export type JobRow = SerializedJob & { createdAt: string; finishedAt: string | null };
+
+/** All recent jobs (running first, then newest) — the full /jobs page view. */
+export async function getJobs(): Promise<JobRow[]> {
+  await connectDB();
+  void ensureProcessor(); // self-heal a running job after a server restart
+  const jobs = await Job.find({}).sort({ createdAt: -1 }).limit(60).lean();
+  const rows: JobRow[] = jobs.map((j) => ({
+    _id: String(j._id),
+    kind: j.kind,
+    title: j.title,
+    href: j.href ?? '',
+    status: j.status as SerializedJob['status'],
+    total: j.total ?? 0,
+    done: j.done ?? 0,
+    ok: j.ok ?? 0,
+    current: j.current ?? '',
+    lastLabel: j.lastLabel ?? '',
+    lastOk: j.lastOk ?? true,
+    lastDetail: j.lastDetail ?? '',
+    error: j.error ?? '',
+    createdAt: (j as { createdAt: Date }).createdAt.toISOString(),
+    finishedAt: j.finishedAt ? (j.finishedAt as Date).toISOString() : null,
+  }));
+  const rank = (s: string) => (s === 'running' ? 0 : 1);
+  return rows.sort((a, b) => rank(a.status) - rank(b.status) || (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 /** Running jobs + ones finished in the last 10 min (so the "done" state lingers

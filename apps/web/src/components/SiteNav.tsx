@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
   Package, ShoppingCart, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
   Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, CalendarDays,
-  LogOut, UserRound,
+  LogOut, UserRound, Activity, MessageSquare, Trash2,
 } from 'lucide-react';
 import { cn } from './ui/cn';
 import { useTheme } from './ThemeProvider';
@@ -34,12 +34,18 @@ const PLAN: NavLink[] = [
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
 ];
+const ACTIVITY: NavLink[] = [
+  { href: '/jobs', label: 'Jobs', icon: Activity },
+  { href: '/history', label: 'AI history', icon: MessageSquare },
+  { href: '/trash', label: 'Trash', icon: Trash2 },
+];
 const GROUPS: { label: string; links: NavLink[] }[] = [
   { label: 'Stuff', links: STUFF },
   { label: 'Money', links: MONEY },
   { label: 'Plan', links: PLAN },
+  { label: 'Activity', links: ACTIVITY },
 ];
-const ALL_LINKS = [...STUFF, ...MONEY, ...PLAN];
+const ALL_LINKS = [...STUFF, ...MONEY, ...PLAN, ...ACTIVITY];
 
 function NavGroup({ label, links }: { label: string; links: NavLink[] }) {
   const pathname = usePathname();
@@ -137,8 +143,11 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggle } = useTheme();
 
+  // Solid bg on the sticky navbar (no backdrop-filter): a backdrop-filter here would
+  // become the containing block for the AI spotlight's `fixed inset-0` backdrop and
+  // clip it to the navbar's height instead of covering the whole viewport.
   return (
-    <header className="sticky top-0 z-40 border-b border-[color:var(--color-border)] bg-[color:var(--color-bg)]/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-[color:var(--color-border)] bg-[color:var(--color-bg)]">
       <div className="max-w-[1500px] mx-auto px-4 py-2.5 flex items-center gap-3">
         {/* Logo */}
         <Link href="/" prefetch={false} title="PHAROS · Personal Hub · Asset & Resource Oversight System" className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">

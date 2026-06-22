@@ -49,6 +49,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
   // AI state
   const [aiPending, startAi] = useTransition();
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [convId, setConvId] = useState<string | undefined>(undefined); // persists this chat in /history
   // Search state
   const [searchPending, startSearch] = useTransition();
   const [hits, setHits] = useState<SearchHit[]>([]);
@@ -56,6 +57,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
   const router = useRouter();
   const wrapRef = useRef<HTMLDivElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Restore the last-used mode.
   useEffect(() => {
@@ -72,6 +74,15 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
     }
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+
+  // Close the AI spotlight on Escape, even when focus is inside the panel.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   // Keep the AI conversation scrolled to the newest message.
@@ -97,6 +108,8 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
     setValue('');
     setHits([]);
     setOpen(true);
+    // AI mode is a focused, full-screen "spotlight" — drop the cursor straight in.
+    if (m === 'ai') setTimeout(() => inputRef.current?.focus(), 0);
     try {
       localStorage.setItem('pharosSearchMode', m);
     } catch {}
@@ -118,7 +131,8 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
     setOpen(true);
     startAi(async () => {
       const history: ChatTurn[] = next.map((m) => ({ role: m.role, content: m.content }));
-      const r = await runAiCommand(history);
+      const r = await runAiCommand(history, convId);
+      if (r.conversationId) setConvId(r.conversationId);
       setMessages((m) => [
         ...m,
         { role: 'assistant', content: r.error ? r.error : r.reply || 'Done.', actions: r.actions, error: !!r.error },
@@ -131,6 +145,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
     setMessages([]);
     setValue('');
     setOpen(false);
+    setConvId(undefined); // next message starts a fresh conversation
   }
 
   function onEnter() {
@@ -142,11 +157,29 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
   }
 
   const isAi = mode === 'ai';
+  // Spotlight = AI mode + open: dim & blur the page and float the bar to center.
+  const spotlight = isAi && open;
   const ph = isAi ? placeholder : 'Search everything…  receipts, items, tasks';
   const pending = isAi ? aiPending : searchPending;
 
   return (
-    <div ref={wrapRef} className="relative w-full max-w-2xl">
+    <>
+      {/* Spotlight backdrop — dim + blur everything behind the AI bar. */}
+      {spotlight && (
+        <div
+          className="fixed inset-0 z-40 bg-[color:var(--color-bg)]/70 backdrop-blur-md"
+          onMouseDown={() => setOpen(false)}
+          aria-hidden
+        />
+      )}
+      <div
+        ref={wrapRef}
+        className={cn(
+          spotlight
+            ? 'fixed left-1/2 top-[14vh] z-50 -translate-x-1/2 w-[680px] max-w-[92vw]'
+            : 'relative w-full max-w-2xl'
+        )}
+      >
       {/* Bar */}
       <div className="relative group">
         {/* Gradient glow only in AI mode */}
@@ -188,6 +221,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
           </div>
 
           <input
+            ref={inputRef}
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
@@ -310,6 +344,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

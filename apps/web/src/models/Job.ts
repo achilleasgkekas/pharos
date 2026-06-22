@@ -5,7 +5,7 @@ import { Schema, model, models, type Model, type InferSchemaType } from 'mongoos
 // the same record. A single in-process worker (lib/jobRunner) does the actual work.
 const JobSchema = new Schema(
   {
-    kind: { type: String, enum: ['rescan-receipts', 'ai-fill-items'], required: true },
+    kind: { type: String, enum: ['rescan-receipts', 'ai-fill-items', 'sync-onedrive'], required: true },
     title: { type: String, required: true }, // "Re-scan receipts"
     href: { type: String, default: '' }, // page to open from the widget / notification
 
