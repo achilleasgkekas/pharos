@@ -45,9 +45,9 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   useEffect(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
-    }
+    // NOTE: do NOT auto-request the browser Notification permission here — an
+    // unsolicited permission prompt on page load is annoying. notify() only fires
+    // when permission is ALREADY 'granted', so this is opt-in by the browser.
     poll();
     const iv = setInterval(poll, 3000);
     return () => clearInterval(iv);

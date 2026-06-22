@@ -64,6 +64,7 @@ async function runJobLoop(
       {
         $set: { done: i + 1, current: '', lastLabel: label, lastOk: res.ok, lastDetail: res.detail },
         $inc: { ok: res.ok ? 1 : 0 },
+        $push: { results: { label, ok: res.ok, detail: res.detail } },
       }
     );
   }

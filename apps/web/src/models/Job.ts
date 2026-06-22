@@ -24,6 +24,12 @@ const JobSchema = new Schema(
     lastOk: { type: Boolean, default: true },
     lastDetail: { type: String, default: '' },
 
+    // Per-item outcome log, appended as the job runs — powers the job detail view.
+    results: {
+      type: [new Schema({ label: String, ok: Boolean, detail: String }, { _id: false })],
+      default: [],
+    },
+
     error: { type: String, default: '' },
     finishedAt: { type: Date, default: null },
   },
