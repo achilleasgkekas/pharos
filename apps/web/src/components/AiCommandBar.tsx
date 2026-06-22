@@ -168,6 +168,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
       {spotlight && (
         <div
           className="fixed inset-0 z-40 bg-[color:var(--color-bg)]/70 backdrop-blur-md"
+          style={{ animation: 'pharos-fade-in .18s ease-out' }}
           onMouseDown={() => setOpen(false)}
           aria-hidden
         />
@@ -179,6 +180,7 @@ export function AiCommandBar({ placeholder = 'Ask Pharos…  e.g. add a subscrip
             ? 'fixed left-1/2 top-[14vh] z-50 -translate-x-1/2 w-[680px] max-w-[92vw]'
             : 'relative w-full max-w-2xl'
         )}
+        style={spotlight ? { animation: 'pharos-spotlight-in .2s cubic-bezier(.2,.7,.3,1) both' } : undefined}
       >
       {/* Bar */}
       <div className="relative group">
