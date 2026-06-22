@@ -17,7 +17,7 @@ const SELECT_CLS =
 type Provider = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 const PROVIDERS: { id: Provider; label: string; needsKey: boolean; modelHint: string }[] = [
   { id: 'ollama', label: 'Ollama (local, free)', needsKey: false, modelHint: 'qwen2.5vl:7b' },
-  { id: 'anthropic', label: 'Anthropic (Claude)', needsKey: true, modelHint: 'claude-sonnet-4-5-20250929' },
+  { id: 'anthropic', label: 'Anthropic (Claude)', needsKey: true, modelHint: 'claude-sonnet-4-6' },
   { id: 'openai', label: 'OpenAI', needsKey: true, modelHint: 'gpt-4o-mini' },
   { id: 'gemini', label: 'Google Gemini', needsKey: true, modelHint: 'gemini-2.0-flash' },
   { id: 'openrouter', label: 'OpenRouter', needsKey: true, modelHint: 'openai/gpt-4o-mini' },

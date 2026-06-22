@@ -9,6 +9,7 @@ import { isAiReady } from '@/lib/ollama';
 import { getCurrentUser } from '@/lib/auth';
 import { getAiConfig } from '@/lib/aiConfig';
 import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
+import { headers } from 'next/headers';
 
 export const metadata: Metadata = {
   title: 'PHAROS · Personal Hub',
@@ -38,6 +39,11 @@ export default async function RootLayout({
   // so /login and /setup are chrome-less. Middleware already blocks unauthenticated
   // navigation; this just keeps the shell consistent.
   const user = await getCurrentUser();
+  // Keep /login and /setup chrome-less even when signed in — the setup wizard signs
+  // you in at step 1, so `user` alone would leak the navbar onto steps 2-4. The path
+  // comes from middleware (x-pathname header).
+  const pathname = (await headers()).get('x-pathname') || '';
+  const chromeless = pathname === '/login' || pathname === '/setup';
   // Read the display currency once per request → set server symbol + hand to the client.
   const { currency } = await getAppSettings();
   const symbol = currencySymbol(currency);
@@ -68,12 +74,12 @@ export default async function RootLayout({
       <body>
         <CurrencyInit symbol={symbol} />
         <Providers>
-          {/* SiteNav renders only for signed-in users (chrome-less /login, /setup).
+          {/* SiteNav renders only for signed-in users AND not on /login or /setup
+              (those stay chrome-less even mid-wizard, once step 1 signs you in).
               Keep `children` in a STABLE sibling position so flipping auth state
-              (e.g. when the setup wizard signs you in mid-flow) doesn't remount the
-              page subtree and reset client state. */}
-          {user && <SiteNav aiReady={aiReady} user={{ name: user.name || 'account', role: user.role }} />}
-          {user && banner && <AiOnboardingBanner reason={banner} />}
+              doesn't remount the page subtree and reset client state. */}
+          {user && !chromeless && <SiteNav aiReady={aiReady} user={{ name: user.name || 'account', role: user.role }} />}
+          {user && !chromeless && banner && <AiOnboardingBanner reason={banner} />}
           {children}
         </Providers>
       </body>
