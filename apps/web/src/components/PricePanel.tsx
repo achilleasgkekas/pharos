@@ -2,9 +2,11 @@
 import { useState, useMemo, useTransition } from 'react';
 import dynamic from 'next/dynamic';
 import { cur } from '@/lib/money';
-import { Plus, TrendingDown, TrendingUp, Check, Loader2, ChevronDown, ExternalLink, Target, Pencil, Search } from 'lucide-react';
+import { Plus, TrendingDown, TrendingUp, Check, Loader2, ChevronDown, ExternalLink, Target, Pencil, Search, RefreshCw, ArrowDown, ArrowUp, AlertTriangle } from 'lucide-react';
 import type { SerializedItem } from '@/types';
-import { logItemPrice, setItemTarget } from '@/app/items/actions';
+import { logItemPrice, setItemTarget, refreshItemPrices, type PriceRefresh } from '@/app/items/actions';
+import { getBulkAiGuard } from '@/app/jobActions';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 const PriceHistoryChart = dynamic(() => import('@/components/PriceHistoryChart').then((m) => m.PriceHistoryChart), { ssr: false });
 
@@ -22,8 +24,11 @@ function priceStatus(item: SerializedItem) {
     .map((l) => ({ store: l.label || linkHost(l.url), url: l.url, price: l.price as number }))
     .sort((a, b) => a.price - b.price);
 
+  // Headline best price = the cheapest ACTUAL store link. A standalone currentPrice
+  // (seeded or hand-entered, with no store behind it) must NOT undercut real store
+  // prices — it only fills in when there are no priced links at all.
   let bestNow: { price: number; store: string; url?: string } | null = stores[0] ? { ...stores[0] } : null;
-  if (item.currentPrice > 0 && (!bestNow || item.currentPrice < bestNow.price)) bestNow = { price: item.currentPrice, store: '' };
+  if (!bestNow && item.currentPrice > 0) bestNow = { price: item.currentPrice, store: '' };
 
   const hist = [...(item.priceHistory ?? [])].filter((h) => h.price > 0).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const prices = hist.map((h) => h.price);
@@ -91,6 +96,37 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
       setEditTarget(false);
       onChanged?.();
     });
+  }
+
+  const confirm = useConfirm();
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshResults, setRefreshResults] = useState<PriceRefresh[] | null>(null);
+  const linkCount = useMemo(() => (item.links ?? []).filter((l) => l.url && /^https?:\/\//i.test(l.url)).length, [item.links]);
+
+  // Re-check the item's ALREADY-tracked store links right now + show the diff.
+  async function runRefresh() {
+    const g = await getBulkAiGuard();
+    if (g.confirm) {
+      const ok = await confirm({
+        title: 'Refresh tracked prices?',
+        message:
+          g.provider === 'anthropic'
+            ? `Re-reads ${linkCount} store${linkCount === 1 ? '' : 's'} with ${g.model} (~$0.02 each).`
+            : `Re-reads ${linkCount} store${linkCount === 1 ? '' : 's'} with ${g.model}. Local, free but slow.`,
+        confirmLabel: 'Refresh',
+      });
+      if (!ok) return;
+    }
+    setRefreshing(true);
+    setRefreshResults(null);
+    const r = await refreshItemPrices(item._id);
+    setRefreshing(false);
+    if (!r.ok) {
+      setRefreshResults([{ store: '', url: '', oldPrice: null, newPrice: null, changed: 'error', error: r.error }]);
+      return;
+    }
+    setRefreshResults(r.results);
+    onChanged?.();
   }
 
   return (
@@ -188,17 +224,53 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
               </button>
             )}
 
-            {onSearchOnline && (
-              <button onClick={onSearchOnline} className="flex items-center gap-1 ml-auto text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors">
-                <Search size={13} /> search online
-              </button>
-            )}
-            {!logging && (
-              <button onClick={() => setLogging(true)} className={`flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors ${onSearchOnline ? '' : 'ml-auto'}`}>
-                <Plus size={13} /> log a price
-              </button>
-            )}
+            <div className="ml-auto flex items-center gap-3">
+              {linkCount >= 1 && (
+                <button onClick={runRefresh} disabled={refreshing} title="Re-check the stores you already track for price changes" className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors disabled:opacity-50">
+                  {refreshing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {refreshing ? 'refreshing…' : 'refresh prices'}
+                </button>
+              )}
+              {onSearchOnline && (
+                <button onClick={onSearchOnline} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors">
+                  <Search size={13} /> search online
+                </button>
+              )}
+              {!logging && (
+                <button onClick={() => setLogging(true)} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors">
+                  <Plus size={13} /> log a price
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Refresh-prices diff — per tracked store: down / up / unchanged / error */}
+          {refreshResults && (
+            <div className="mt-2.5 space-y-1">
+              {refreshResults.map((r, i) => (
+                <div key={i} className="flex items-center gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {r.changed === 'error' ? (
+                    <AlertTriangle size={11} className="text-[color:var(--color-gold)] shrink-0" />
+                  ) : r.changed === 'down' ? (
+                    <ArrowDown size={11} className="text-[color:var(--color-accent)] shrink-0" />
+                  ) : r.changed === 'up' ? (
+                    <ArrowUp size={11} className="text-[color:var(--color-gold)] shrink-0" />
+                  ) : (
+                    <Check size={11} className="text-[color:var(--color-text-faint)] shrink-0" />
+                  )}
+                  <span className="text-[color:var(--color-text-dim)] flex-1 truncate">{r.store || 'price'}</span>
+                  {r.changed === 'error' ? (
+                    <span className="text-[color:var(--color-gold)] truncate">{r.error}</span>
+                  ) : r.changed === 'same' ? (
+                    <span className="text-[color:var(--color-text-faint)]">unchanged{r.newPrice != null ? ` · ${money(r.newPrice)}` : ''}</span>
+                  ) : (
+                    <span className="text-[color:var(--color-text)]">
+                      {r.oldPrice != null ? money(r.oldPrice) : '—'} → <b>{r.newPrice != null ? money(r.newPrice) : '—'}</b>
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           {logging && (
             <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">

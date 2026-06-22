@@ -29,9 +29,10 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   // Gate everything EXCEPT: Next internals, the icon/manifest, the public auth
-  // routes (/login, /setup, /api/auth/*), and robots. Crucially this does NOT
-  // exclude all of /api — /api/files (receipts/PDFs) MUST stay gated.
+  // routes (/login, /setup, /api/auth/*), the MCP endpoint (does its own bearer
+  // auth — a connector has no cookie), and robots. Crucially this does NOT exclude
+  // all of /api — /api/files (receipts/PDFs) MUST stay gated.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|login|setup|api/auth|robots.txt).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|login|setup|api/auth|api/mcp|robots.txt).*)',
   ],
 };

@@ -98,6 +98,29 @@ A master switch turns AI on/off globally, and each feature (receipt scanning,
 statement parsing, product import, the command bar, …) has its own toggle. Every
 built-in prompt is editable from Settings.
 
+## Drive it from Claude (remote MCP)
+
+Pharos exposes a remote **MCP server** at `/api/mcp` (JSON-RPC over Streamable
+HTTP) so an external Claude — the mobile/desktop app, Claude Code, or MCP
+Inspector — can run the same commands as the in-app AI bar (add expense / income
+/ subscription / item / task, log a price, search, overview).
+
+1. **Settings → AI → Mobile / MCP → Generate token** (a per-user bearer token,
+   shown once).
+2. The endpoint is LAN/HTTP, so to reach it from your phone put it on **public
+   HTTPS** with a tunnel (Cloudflare Tunnel or Tailscale Funnel).
+3. Add it in Claude → Connectors → *Add custom connector* using the `https://…/api/mcp`
+   URL + the token. Custom connectors need a paid Claude plan; Claude.ai may
+   require OAuth for the URL (the token works today with MCP Inspector / Claude Code).
+
+Quick check with curl:
+
+```bash
+curl -s -X POST https://<host>/api/mcp \
+  -H "Authorization: Bearer <token>" -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
 ## Tech stack
 
 | Layer | Choice |

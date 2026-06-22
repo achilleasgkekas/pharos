@@ -1277,3 +1277,105 @@ export async function addPriceLinks(
   const fresh = await Item.findById(itemId).lean();
   return { ok: true, added, item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined };
 }
+
+// ─── Refresh the prices of an item's ALREADY-tracked store links ─────────────
+
+export type PriceRefresh = {
+  store: string;
+  url: string;
+  oldPrice: number | null;
+  newPrice: number | null;
+  changed: 'down' | 'up' | 'same' | 'error';
+  error?: string;
+};
+
+/**
+ * Re-check the item's EXISTING store links right now (on-demand, vs the 6h scraper):
+ * fetch each tracked URL, read its current price, update the link + price history, and
+ * return a per-store diff so the user sees what moved. Recomputes currentPrice.
+ */
+export async function refreshItemPrices(
+  itemId: string
+): Promise<{ ok: boolean; results: PriceRefresh[]; error?: string }> {
+  if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, results: [], error: 'Product AI is turned off.' };
+  await connectDB();
+  const item = await Item.findById(itemId);
+  if (!item) return { ok: false, results: [], error: 'Item not found' };
+
+  const links = (item.links ?? []).filter((l) => l.url && /^https?:\/\//i.test(l.url));
+  if (links.length === 0) return { ok: false, results: [], error: 'No tracked store links to refresh.' };
+
+  const results: PriceRefresh[] = [];
+  let anyChange = false;
+  for (const link of links) {
+    const store = link.label || storeFromUrl(link.url!);
+    const oldPrice = link.price ?? null;
+    try {
+      const page = await fetchPageText(link.url!);
+      const parsed = (await parseProductFromPage(page)).parsed;
+      if (!productMatchesItem(item.title, parsed)) {
+        results.push({ store, url: link.url!, oldPrice, newPrice: oldPrice, changed: 'error', error: 'Page no longer matches this product' });
+        continue;
+      }
+      const newPrice = parsed.price > 0 ? parsed.price : null;
+      if (newPrice == null) {
+        results.push({ store, url: link.url!, oldPrice, newPrice: oldPrice, changed: 'error', error: 'No price found on the page' });
+        continue;
+      }
+      let changed: PriceRefresh['changed'];
+      if (oldPrice == null) changed = 'same';
+      else if (newPrice < oldPrice) changed = 'down';
+      else if (newPrice > oldPrice) changed = 'up';
+      else changed = 'same';
+      link.price = newPrice;
+      if (oldPrice == null || newPrice !== oldPrice) {
+        item.priceHistory.push({ price: newPrice, store, url: link.url!, date: new Date() } as (typeof item.priceHistory)[number]);
+        anyChange = true;
+      }
+      results.push({ store, url: link.url!, oldPrice, newPrice, changed });
+    } catch (err) {
+      const msg = (err as Error).message || String(err);
+      results.push({
+        store,
+        url: link.url!,
+        oldPrice,
+        newPrice: oldPrice,
+        changed: 'error',
+        error: /cloudflare|solver|challenge|just a moment/i.test(msg)
+          ? 'Behind Cloudflare — start the price-scraper profile'
+          : msg.slice(0, 80),
+      });
+    }
+  }
+
+  const lowest = lowestKnownPrice(item);
+  if (lowest != null) item.currentPrice = lowest;
+  item.markModified('links');
+  if (anyChange) item.markModified('priceHistory');
+  await item.save();
+  revalidatePath('/items');
+  revalidatePath('/shopping');
+  return { ok: true, results };
+}
+
+/**
+ * One-time maintenance: recompute every item's currentPrice from its links + price
+ * history (lowest known). Fixes stale/seeded headline prices (e.g. a €475 with no
+ * store behind it) so the big number always reflects real, tracked prices.
+ */
+export async function recomputeAllItemPrices(): Promise<{ ok: boolean; updated: number }> {
+  await connectDB();
+  const items = await Item.find();
+  let updated = 0;
+  for (const it of items) {
+    const lo = lowestKnownPrice(it);
+    if (lo != null && lo !== it.currentPrice) {
+      it.currentPrice = lo;
+      await it.save();
+      updated++;
+    }
+  }
+  revalidatePath('/items');
+  revalidatePath('/shopping');
+  return { ok: true, updated };
+}

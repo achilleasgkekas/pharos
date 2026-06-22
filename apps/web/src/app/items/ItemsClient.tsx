@@ -1247,6 +1247,10 @@ function ItemDetailModal({
 
   const warranty = warrantyState(item.warrantyUntil);
   const hasPayment = plans.length > 0 || item.receiptIds.length > 0 || unlinkedPlans.length > 0;
+  // Headline price: what you paid (owned) or the cheapest REAL store link (shopping).
+  // Falls back to currentPrice only when there are no priced links — so a stale/seeded
+  // currentPrice (e.g. €475 with no store) never shows over the actual store prices.
+  const headlinePrice = item.purchasedPrice ? item.purchasedPrice : (bestLinkPrice(item)?.price ?? (item.currentPrice || 0));
 
   return (
     <>
@@ -1275,7 +1279,7 @@ function ItemDetailModal({
                 {item.purchasedPrice ? 'Paid' : 'Current price'}
               </div>
               <div className="text-3xl font-bold text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>
-                {item.purchasedPrice ? `${cur()}${item.purchasedPrice}` : item.currentPrice ? `${cur()}${item.currentPrice}` : '—'}
+                {headlinePrice > 0 ? `${cur()}${headlinePrice}` : '—'}
               </div>
               {item.purchasedFrom && (
                 <div className="text-xs text-[color:var(--color-text-dim)] mt-0.5">

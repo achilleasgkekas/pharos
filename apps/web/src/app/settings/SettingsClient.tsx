@@ -15,6 +15,8 @@ import type { AppSettings } from '@/lib/appSettings';
 import { saveDefaults, saveNtfy, sendTestNtfy, runAlertChecks, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow } from './actions';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
 import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, changeOwnPassword, type UserRow } from './users.actions';
+import { McpManager } from './McpManager';
+import { RecomputePricesButton } from './RecomputePricesButton';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
@@ -211,6 +213,9 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
               <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
               <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} hasAnthropicKey={info.ai.hasKey} />
               <AiPromptsManager prompts={info.prompts} />
+              <Section title="Mobile / MCP" icon={<Plug size={15} />}>
+                <McpManager />
+              </Section>
             </>
           )}
 
@@ -227,6 +232,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
                   <Stat label="Cards" value={info.counts.cards} />
                 </div>
                 <BackupRestore />
+                <RecomputePricesButton />
               </Section>
               <TrashManager />
             </>
