@@ -394,6 +394,18 @@ export const nl: Partial<Dict> = {
   'it.cost': 'gesch. kosten',
   'it.mergeN': 'Samenvoegen {n}',
   'it.duplicates': 'Duplicaten',
+  'it.best': 'beste',
+  'it.at': 'bij',
+  'it.paid': 'betaald',
+  'it.targetWord': 'doel',
+  'it.paidOff': 'afbetaald',
+  'it.installmentsXY': 'termijnen {paid}/{total}',
+  'it.wExpired': 'garantie verlopen',
+  'it.wLeft': 'garantie {n}m resterend',
+  'it.wUnder': 'onder garantie {n}m',
+  'it.deselect': 'Deselecteren',
+  'it.selectForAi': 'Selecteren voor AI',
+  'it.aiEnriched': 'AI-verrijkt {date}',
 
   'lang.language': 'Taal',
 };

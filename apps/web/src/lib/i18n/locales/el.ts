@@ -394,6 +394,18 @@ export const el: Partial<Dict> = {
   'it.cost': 'εκτ. κόστος',
   'it.mergeN': 'Συγχώνευση {n}',
   'it.duplicates': 'Διπλότυπα',
+  'it.best': 'καλύτερη',
+  'it.at': 'σε',
+  'it.paid': 'πλήρωσες',
+  'it.targetWord': 'στόχος',
+  'it.paidOff': 'εξοφλήθηκε',
+  'it.installmentsXY': 'δόσεις {paid}/{total}',
+  'it.wExpired': 'έληξε η εγγύηση',
+  'it.wLeft': 'εγγύηση {n}μ ακόμα',
+  'it.wUnder': 'σε εγγύηση {n}μ',
+  'it.deselect': 'Αποεπιλογή',
+  'it.selectForAi': 'Επιλογή για AI fill',
+  'it.aiEnriched': 'AI-εμπλουτισμός {date}',
 
   'lang.language': 'Γλώσσα',
 };

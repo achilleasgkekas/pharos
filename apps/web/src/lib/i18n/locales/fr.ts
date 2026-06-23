@@ -394,6 +394,18 @@ export const fr: Partial<Dict> = {
   'it.cost': 'coût est.',
   'it.mergeN': 'Fusionner {n}',
   'it.duplicates': 'Doublons',
+  'it.best': 'meilleur',
+  'it.at': 'chez',
+  'it.paid': 'payé',
+  'it.targetWord': 'cible',
+  'it.paidOff': 'remboursé',
+  'it.installmentsXY': 'échéances {paid}/{total}',
+  'it.wExpired': 'garantie expirée',
+  'it.wLeft': 'garantie {n}m restant',
+  'it.wUnder': 'sous garantie {n}m',
+  'it.deselect': 'Désélectionner',
+  'it.selectForAi': "Sélectionner pour l'IA",
+  'it.aiEnriched': 'Enrichi par IA {date}',
 
   'lang.language': 'Langue',
 };

@@ -36,7 +36,7 @@ import type { SerializedItem } from '@/types';
 import { VIEW_CONFIG, type ItemView } from '@/lib/itemStatus';
 import { type InstallmentPlan } from '@/lib/installments';
 import { useT } from '@/components/LocaleProvider';
-import type { TKey } from '@/lib/i18n';
+import type { TKey, TFunc } from '@/lib/i18n';
 
 // value → i18n key maps (so the const arrays stay untouched)
 const IT_STATUS_KEY: Record<string, TKey> = { researching: 'it.stResearching', decided: 'it.stDecided', ordered: 'it.stOrdered', received: 'it.stReceived', installed: 'it.stInstalled', deferred: 'it.stDeferred', sold: 'it.stSold', broken: 'it.stBroken' };
@@ -121,14 +121,14 @@ const textareaClass =
   'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-4 py-2 text-sm text-[color:var(--color-text)] placeholder:text-[color:var(--color-text-faint)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors resize-none';
 
 /** Warranty status → label + color for the list badge. */
-function warrantyState(until: string | null): { label: string; color: string } | null {
+function warrantyState(until: string | null, t: TFunc): { label: string; color: string } | null {
   if (!until) return null;
   const days = Math.ceil((new Date(until).getTime() - Date.now()) / 86400000);
   if (isNaN(days)) return null;
-  if (days < 0) return { label: 'warranty expired', color: 'var(--color-red)' };
+  if (days < 0) return { label: t('it.wExpired'), color: 'var(--color-red)' };
   const months = Math.max(1, Math.round(days / 30));
-  if (days <= 90) return { label: `warranty ${months}mo left`, color: 'var(--color-gold)' };
-  return { label: `under warranty ${months}mo`, color: 'var(--color-accent)' };
+  if (days <= 90) return { label: t('it.wLeft', { n: months }), color: 'var(--color-gold)' };
+  return { label: t('it.wUnder', { n: months }), color: 'var(--color-accent)' };
 }
 
 // ─── Main page component ───────────────────────────────────────────────────
@@ -875,10 +875,11 @@ type ItemCardProps = {
 
 // Compact horizontal row for the list layout
 function ItemRow({ item, view, plan, onClick, selected, onToggleSelect, selectMode }: ItemCardProps) {
+  const t = useT();
   const cover = item.photos[0];
   const best = view === 'shopping' ? bestLinkPrice(item) : null;
   const deal = view === 'shopping' && isDeal(item);
-  const w = warrantyState(item.warrantyUntil);
+  const w = warrantyState(item.warrantyUntil, t);
   const mainClick = selectMode ? onToggleSelect : onClick;
   return (
     <div
@@ -925,17 +926,17 @@ function ItemRow({ item, view, plan, onClick, selected, onToggleSelect, selectMo
           <div className="flex items-center gap-2 flex-wrap text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
             <span className="uppercase tracking-wider">{item.num ? `${item.num} / ` : ''}{item.category}</span>
             {w && <span style={{ color: w.color }}>{w.label}</span>}
-            {plan && <span className="text-[color:var(--color-purple)]">installments {plan.paidInstallments}/{plan.totalInstallments}</span>}
+            {plan && <span className="text-[color:var(--color-purple)]">{t('it.installmentsXY', { paid: plan.paidInstallments, total: plan.totalInstallments })}</span>}
             {best && (
               <span className="text-[color:var(--color-text-dim)]">
                 {best.price !== item.currentPrice ? (
-                  <>best <span className="text-[color:var(--color-accent)]">{cur()}{best.price}</span></>
+                  <>{t('it.best')} <span className="text-[color:var(--color-accent)]">{cur()}{best.price}</span></>
                 ) : (
-                  <>at <span className="text-[color:var(--color-text-faint)]">{best.store}</span></>
+                  <>{t('it.at')} <span className="text-[color:var(--color-text-faint)]">{best.store}</span></>
                 )}
               </span>
             )}
-            {deal && <span className="text-[color:var(--color-accent)]">🎯 deal</span>}
+            {deal && <span className="text-[color:var(--color-accent)]">🎯 {t('it.deal')}</span>}
           </div>
         </div>
       </button>
@@ -960,6 +961,7 @@ function ItemCard({
   onToggleSelect,
   selectMode,
 }: ItemCardProps) {
+  const t = useT();
   const cover = item.photos[0];
   const links = (item.links ?? []).slice(0, 3);
   const best = view === 'shopping' ? bestLinkPrice(item) : null;
@@ -985,7 +987,7 @@ function ItemCard({
             e.stopPropagation();
             onToggleSelect();
           }}
-          title={selected ? 'Deselect' : 'Select for AI fill'}
+          title={selected ? t('it.deselect') : t('it.selectForAi')}
           className={cn(
             'absolute top-2 left-2 z-10 w-6 h-6 rounded-md border flex items-center justify-center transition-colors',
             selected
@@ -1013,7 +1015,7 @@ function ItemCard({
             {item.aiFilledAt && (
               <span
                 className="flex items-center gap-0.5 text-[color:var(--color-accent)] shrink-0"
-                title={`AI-enriched ${new Date(item.aiFilledAt).toLocaleDateString('en-GB')}`}
+                title={t('it.aiEnriched', { date: new Date(item.aiFilledAt).toLocaleDateString('en-GB') })}
               >
                 <Sparkles size={9} /> AI
               </span>
@@ -1038,7 +1040,7 @@ function ItemCard({
             )}
             {item.purchasedPrice && item.purchasedPrice !== item.currentPrice && (
               <span className="text-[color:var(--color-text-faint)] text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-                paid {cur()}{item.purchasedPrice}
+                {t('it.paid')} {cur()}{item.purchasedPrice}
               </span>
             )}
             {trend != null && (
@@ -1062,22 +1064,22 @@ function ItemCard({
                 <span className="text-[color:var(--color-text-dim)]">
                   {best.price !== item.currentPrice ? (
                     <>
-                      best <span className="text-[color:var(--color-accent)] font-semibold">{cur()}{best.price}</span>
+                      {t('it.best')} <span className="text-[color:var(--color-accent)] font-semibold">{cur()}{best.price}</span>
                       <span className="text-[color:var(--color-text-faint)]"> · {best.store}</span>
                     </>
                   ) : (
-                    <span className="text-[color:var(--color-text-faint)]">at {best.store}</span>
+                    <span className="text-[color:var(--color-text-faint)]">{t('it.at')} {best.store}</span>
                   )}
                 </span>
               )}
               {item.targetPrice ? (
                 deal ? (
                   <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#00ff881a] text-[color:var(--color-accent)] border border-[#00ff8840] font-semibold uppercase tracking-wide">
-                    <Target size={9} /> deal ≤{cur()}{item.targetPrice}
+                    <Target size={9} /> {t('it.deal')} ≤{cur()}{item.targetPrice}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-0.5 text-[color:var(--color-text-faint)]">
-                    <Target size={9} /> target {cur()}{item.targetPrice}
+                    <Target size={9} /> {t('it.targetWord')} {cur()}{item.targetPrice}
                   </span>
                 )
               ) : null}
@@ -1092,7 +1094,7 @@ function ItemCard({
 
           <div className="flex items-center gap-1.5 flex-wrap mt-2">
             {(() => {
-              const w = warrantyState(item.warrantyUntil);
+              const w = warrantyState(item.warrantyUntil, t);
               return w ? (
                 <span
                   className="inline-block text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider"
@@ -1113,7 +1115,7 @@ function ItemCard({
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 <Layers size={9} />
-                {plan.done ? 'paid off' : `installments ${plan.paidInstallments}/${plan.totalInstallments}`}
+                {plan.done ? t('it.paidOff') : t('it.installmentsXY', { paid: plan.paidInstallments, total: plan.totalInstallments })}
               </span>
             )}
           </div>
@@ -1170,6 +1172,7 @@ function ItemDetailModal({
   onClose: () => void;
   onItemUpdated: (item: SerializedItem) => void;
 }) {
+  const t = useT();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
@@ -1260,7 +1263,7 @@ function ItemDetailModal({
     });
   }
 
-  const warranty = warrantyState(item.warrantyUntil);
+  const warranty = warrantyState(item.warrantyUntil, t);
   const hasPayment = plans.length > 0 || item.receiptIds.length > 0 || unlinkedPlans.length > 0;
   // Headline price: what you paid (owned) or the cheapest REAL store link (shopping).
   // Falls back to currentPrice only when there are no priced links — so a stale/seeded

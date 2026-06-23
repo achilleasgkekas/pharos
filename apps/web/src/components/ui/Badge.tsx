@@ -1,4 +1,13 @@
+'use client';
 import { cn } from './cn';
+import { useT } from '@/components/LocaleProvider';
+import type { TKey } from '@/lib/i18n';
+
+// status value → i18n key (item + task statuses; priorities fall back to English)
+const BADGE_KEY: Record<string, TKey> = {
+  researching: 'it.stResearching', decided: 'it.stDecided', ordered: 'it.stOrdered', received: 'it.stReceived', installed: 'it.stInstalled', deferred: 'it.stDeferred', sold: 'it.stSold', broken: 'it.stBroken',
+  todo: 'tk.todo', 'in-progress': 'tk.inProgress', done: 'tk.done', blocked: 'tk.blocked',
+};
 
 const STATUS_CONFIG: Record<string, { label: string; hex: string }> = {
   researching:   { label: 'Researching',  hex: '#666666' },
@@ -24,7 +33,9 @@ interface BadgeProps {
 }
 
 export function Badge({ status, className }: BadgeProps) {
+  const t = useT();
   const cfg = STATUS_CONFIG[status] ?? { label: status, hex: '#666666' };
+  const label = BADGE_KEY[status] ? t(BADGE_KEY[status]) : cfg.label;
   return (
     <span
       className={cn(
@@ -38,7 +49,7 @@ export function Badge({ status, className }: BadgeProps) {
         border: `1px solid ${cfg.hex}40`,
       }}
     >
-      {cfg.label}
+      {label}
     </span>
   );
 }

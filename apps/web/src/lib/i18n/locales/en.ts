@@ -411,6 +411,18 @@ export const en = {
   'it.cost': 'est. cost',
   'it.mergeN': 'Merge {n}',
   'it.duplicates': 'Duplicates',
+  'it.best': 'best',
+  'it.at': 'at',
+  'it.paid': 'paid',
+  'it.targetWord': 'target',
+  'it.paidOff': 'paid off',
+  'it.installmentsXY': 'installments {paid}/{total}',
+  'it.wExpired': 'warranty expired',
+  'it.wLeft': 'warranty {n}mo left',
+  'it.wUnder': 'under warranty {n}mo',
+  'it.deselect': 'Deselect',
+  'it.selectForAi': 'Select for AI fill',
+  'it.aiEnriched': 'AI-enriched {date}',
 
   // ── Language switcher ────────────────────────────────────────────────────
   'lang.language': 'Language',
