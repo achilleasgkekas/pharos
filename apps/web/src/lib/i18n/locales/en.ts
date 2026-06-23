@@ -283,6 +283,26 @@ export const en = {
   'sub.fPayment': 'Payment',
   'sub.fNotes': 'Notes',
 
+  // ── Tasks ────────────────────────────────────────────────────────────────
+  'tk.openTotal': '{open} open · {total} total',
+  'tk.board': 'Kanban board',
+  'tk.newTask': 'New task',
+  'tk.allTags': 'all tags',
+  'tk.todo': 'Todo',
+  'tk.inProgress': 'In Progress',
+  'tk.blocked': 'Blocked',
+  'tk.done': 'Done',
+  'tk.projectProgress': 'project progress',
+  'tk.donePct': '{done}/{total} done · {pct}%',
+  'tk.dropHere': 'drop here',
+  'tk.tasksCount': '{n} / {total} tasks',
+  'tk.titlePlaceholder': 'Task title...',
+  'tk.notesPlaceholder': 'Notes, links, anything... (you can add step checklists after creating)',
+  'tk.creating': 'Creating...',
+  'tk.createTask': 'Create task',
+  'tk.steps': 'Steps',
+  'tk.details': 'Details',
+
   // ── Language switcher ────────────────────────────────────────────────────
   'lang.language': 'Language',
 } as const;
