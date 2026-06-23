@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation';
 import type { SerializedExpense, SerializedCard } from '@/types';
 import { uploadExpense, updateExpense, addExpense, deleteExpense, rescanExpense } from './actions';
 import { useT } from '@/components/LocaleProvider';
+import type { TKey } from '@/lib/i18n';
 
 const CYCLES = ['', 'monthly', 'quarterly', 'yearly', 'weekly'] as const;
 
@@ -370,46 +371,47 @@ function toForm(e: SerializedExpense): FormState {
 }
 
 function FormFields({ form, set, cards, vendors, categories }: { form: FormState; set: (p: Partial<FormState>) => void; cards: SerializedCard[]; vendors: string[]; categories: string[] }) {
+  const t = useT();
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Vendor / payer">
-          <SearchableSelect value={form.vendor} onChange={(v) => set({ vendor: v })} options={vendors} placeholder="ΔΕΗ, landlord…" allowCustom />
+        <Field label={t('ex.fVendor')}>
+          <SearchableSelect value={form.vendor} onChange={(v) => set({ vendor: v })} options={vendors} placeholder={t('ex.fVendorPlaceholder')} allowCustom />
         </Field>
-        <Field label="Category">
+        <Field label={t('common.category')}>
           <select value={form.category} onChange={(e) => set({ category: e.target.value })} className={selectCls}>
             {categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </Field>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <Field label={`Amount (${cur()})`}>
+        <Field label={t('ex.fAmount', { cur: cur() })}>
           <Input type="number" step="0.01" value={form.amount} onChange={(e) => set({ amount: e.target.value })} />
         </Field>
-        <Field label="Date">
+        <Field label={t('ex.fDate')}>
           <Input type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} />
         </Field>
-        <Field label="Payment">
+        <Field label={t('sub.fPayment')}>
           <CardSelect cards={cards} value={form.paymentMethod} onChange={(v) => set({ paymentMethod: v })} />
         </Field>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
         <div className="flex items-center justify-between gap-2 rounded-lg border border-[color:var(--color-border)] px-3 py-2">
-          <span className="text-xs font-medium flex items-center gap-1.5"><Repeat size={13} className="text-[color:var(--color-purple)]" /> Recurring</span>
+          <span className="text-xs font-medium flex items-center gap-1.5"><Repeat size={13} className="text-[color:var(--color-purple)]" /> {t('ex.recurring')}</span>
           <button type="button" role="switch" aria-checked={form.recurring} onClick={() => set({ recurring: !form.recurring })} className={cn('relative w-9 h-5 rounded-full transition-colors shrink-0', form.recurring ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)]')}>
             <span className={cn('absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform', form.recurring && 'translate-x-4')} />
           </button>
         </div>
-        <Field label="Cycle">
+        <Field label={t('ex.fCycle')}>
           <select value={form.recurringCycle} onChange={(e) => set({ recurringCycle: e.target.value as FormState['recurringCycle'] })} className={selectCls} disabled={!form.recurring}>
-            {CYCLES.map((c) => <option key={c} value={c}>{c || '—'}</option>)}
+            {CYCLES.map((c) => <option key={c} value={c}>{c ? t(`cyc.${c}` as TKey) : '—'}</option>)}
           </select>
         </Field>
-        <Field label="Period (YYYY-MM)">
+        <Field label={t('ex.fPeriod')}>
           <Input value={form.period} onChange={(e) => set({ period: e.target.value })} placeholder="2026-06" />
         </Field>
       </div>
-      <Field label="Notes">
+      <Field label={t('v.fNotes')}>
         <textarea value={form.notes} onChange={(e) => set({ notes: e.target.value })} rows={2} className={selectCls} />
       </Field>
     </div>
@@ -420,6 +422,7 @@ function ExpenseDetail({ expense, cards, vendors, categories, seriesCount, onClo
   expense: SerializedExpense; cards: SerializedCard[]; vendors: string[]; categories: string[]; seriesCount: number;
   onClose: () => void; onChanged: () => void; confirm: ReturnType<typeof useConfirm>;
 }) {
+  const t = useT();
   const [form, setForm] = useState<FormState>(toForm(expense));
   const [pending, startTransition] = useTransition();
   const [rev, setRev] = useState(0);
@@ -440,20 +443,20 @@ function ExpenseDetail({ expense, cards, vendors, categories, seriesCount, onClo
     });
   }
   async function doDelete() {
-    const ok = await confirm({ title: 'Delete?', message: `Delete this ${expense.kind} record?`, confirmLabel: 'Delete', danger: true });
+    const ok = await confirm({ title: t('ex.deleteTitle'), message: t('ex.deleteBody'), confirmLabel: t('common.delete'), danger: true });
     if (!ok) return;
     startTransition(async () => { await deleteExpense(expense._id); onChanged(); onClose(); });
   }
 
   return (
-    <Modal open onClose={onClose} title={expense.vendor || 'Record'} size="2xl">
+    <Modal open onClose={onClose} title={expense.vendor || t('ex.recordFallback')} size="2xl">
       {expense.filePath && (
         <div className="flex items-center gap-2 mb-3 pb-3 border-b border-[color:var(--color-border)] text-xs flex-wrap">
-          <span className="text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>Re-scan:</span>
-          <button onClick={() => doRescan(false)} disabled={pending} className="px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)]">text</button>
-          <button onClick={() => doRescan(true)} disabled={pending} className="px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)]">OCR</button>
+          <span className="text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.rescan')}</span>
+          <button onClick={() => doRescan(false)} disabled={pending} className="px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)]">{t('ex.rescanText')}</button>
+          <button onClick={() => doRescan(true)} disabled={pending} className="px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)]">{t('ex.rescanOcr')}</button>
           {pending && <Loader2 size={13} className="animate-spin" />}
-          {seriesCount > 1 && <span className="ml-auto text-[color:var(--color-purple)] flex items-center gap-1"><Repeat size={12} /> {seriesCount} in this vendor series</span>}
+          {seriesCount > 1 && <span className="ml-auto text-[color:var(--color-purple)] flex items-center gap-1"><Repeat size={12} /> {t('ex.inSeries', { n: seriesCount })}</span>}
         </div>
       )}
       <div className="grid md:grid-cols-2 gap-6" key={rev}>
@@ -467,7 +470,7 @@ function ExpenseDetail({ expense, cards, vendors, categories, seriesCount, onClo
             ) : (
               <div className="space-y-2">
                 <iframe src={`${fileUrl(expense.filePath)}#toolbar=0&navpanes=0`} className="w-full h-[55vh] md:h-auto md:aspect-[3/4] rounded-xl border border-[color:var(--color-border)] bg-white" title={expense.vendor} />
-                <a href={fileUrl(expense.filePath)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 text-xs text-[color:var(--color-cyan)] hover:underline"><FileText size={12} /> Open in new tab</a>
+                <a href={fileUrl(expense.filePath)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 text-xs text-[color:var(--color-cyan)] hover:underline"><FileText size={12} /> {t('ex.openNewTab')}</a>
               </div>
             )
           ) : (
@@ -477,9 +480,9 @@ function ExpenseDetail({ expense, cards, vendors, categories, seriesCount, onClo
         <div className="order-1 md:order-2"><FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} /></div>
       </div>
       <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[color:var(--color-border)] flex-wrap">
-        <Button onClick={() => save(true)} disabled={pending}>{pending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Confirm</Button>
-        <button onClick={() => save(form.verified)} disabled={pending} className="text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)]">Save</button>
-        <button onClick={doDelete} disabled={pending} className="ml-auto flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-red)] hover:border-[color:var(--color-red)]"><Trash2 size={13} /> Delete</button>
+        <Button onClick={() => save(true)} disabled={pending}>{pending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} {t('common.confirm')}</Button>
+        <button onClick={() => save(form.verified)} disabled={pending} className="text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)]">{t('common.save')}</button>
+        <button onClick={doDelete} disabled={pending} className="ml-auto flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-red)] hover:border-[color:var(--color-red)]"><Trash2 size={13} /> {t('common.delete')}</button>
       </div>
     </Modal>
   );
@@ -492,16 +495,17 @@ function ExpenseCreate({ kind, cards, vendors, categories, onClose, onCreated }:
     kind, vendor: '', category: kind === 'income' ? 'salary' : 'other', amount: '', currency: 'EUR', date: iso, period: '',
     recurring: false, recurringCycle: '', paymentMethod: '', notes: '', verified: true,
   });
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const set = (p: Partial<FormState>) => setForm((f) => ({ ...f, ...p }));
   function save() {
     startTransition(async () => { await addExpense({ ...form, amount: Number(form.amount) || 0 }); onCreated(); });
   }
   return (
-    <Modal open onClose={onClose} title={`New ${kind}`} size="lg">
+    <Modal open onClose={onClose} title={t('ex.newRecord')} size="lg">
       <FormFields form={form} set={set} cards={cards} vendors={vendors} categories={categories} />
       <div className="flex items-center gap-2 pt-4 mt-4 border-t border-[color:var(--color-border)]">
-        <Button onClick={save} disabled={pending || !form.amount}>{pending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add</Button>
+        <Button onClick={save} disabled={pending || !form.amount}>{pending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} {t('common.add')}</Button>
         <button onClick={onClose} className="text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]"><X size={13} /></button>
       </div>
     </Modal>
