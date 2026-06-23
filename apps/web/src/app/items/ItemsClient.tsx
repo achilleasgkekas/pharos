@@ -1193,7 +1193,7 @@ function ItemDetailModal({
       const r = await aiFillItem(item._id);
       setAiAllFilling(false);
       if (!r.ok || !r.item) {
-        setActionMsg({ text: r.error ?? 'AI fill failed', tone: 'err' });
+        setActionMsg({ text: r.error ?? t('it.aiFillFailed'), tone: 'err' });
         return;
       }
       onItemUpdated(r.item); // re-seeds the form + gallery (keyed by updatedAt)
@@ -1252,9 +1252,9 @@ function ItemDetailModal({
 
   async function handleDelete() {
     const ok = await confirm({
-      title: 'Delete item',
-      message: `Delete "${item.title}"? This can't be undone.`,
-      confirmLabel: 'Delete',
+      title: t('it.deleteItem'),
+      message: t('it.confirmDeleteItem', { title: item.title }),
+      confirmLabel: t('common.delete'),
       danger: true,
     });
     if (!ok) return;
@@ -1295,7 +1295,7 @@ function ItemDetailModal({
           <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex items-end justify-between gap-4">
             <div>
               <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
-                {item.purchasedPrice ? 'Paid' : 'Current price'}
+                {item.purchasedPrice ? t('it.paidLabel') : t('it.currentPriceLabel')}
               </div>
               <div className="text-3xl font-bold text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-display)' }}>
                 {headlinePrice > 0 ? `${cur()}${headlinePrice}` : '—'}
@@ -1328,8 +1328,8 @@ function ItemDetailModal({
             >
               <Target size={13} className="shrink-0" />
               {isDeal(item)
-                ? `Deal! Best price has reached your target of ${cur()}${item.targetPrice}`
-                : `Target ${cur()}${item.targetPrice}${lowestKnown(item) != null ? ` · best known ${cur()}${lowestKnown(item)}` : ''}`}
+                ? t('it.dealReached', { x: `${cur()}${item.targetPrice}` })
+                : `${t('it.targetX', { x: `${cur()}${item.targetPrice}` })}${lowestKnown(item) != null ? ` · ${t('it.bestKnown', { y: `${cur()}${lowestKnown(item)}` })}` : ''}`}
             </div>
           ) : null}
 
@@ -1339,57 +1339,57 @@ function ItemDetailModal({
               type="button"
               onClick={handlePhotoFetch}
               disabled={busy}
-              title="Fetch product photos (image search + the product page)"
+              title={t('it.fetchPhotosTitle')}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors disabled:opacity-50"
             >
               {photoFetching ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
-              {photoFetching ? 'Photos…' : 'Fetch photos'}
+              {photoFetching ? t('it.photosShort') : t('it.fetchPhotos')}
             </button>
             <button
               type="button"
               onClick={handleAiFillInfo}
               disabled={busy}
-              title="AI fill the product info — specs, category and tags. Fills blanks; never touches prices or photos."
+              title={t('it.aiFillInfoTitle')}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-gold)] hover:border-[color:var(--color-gold)] transition-colors disabled:opacity-50"
             >
               {infoFilling ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-              {infoFilling ? 'Info…' : 'AI fill info'}
+              {infoFilling ? t('it.infoShort') : t('it.aiFillInfo')}
             </button>
             <button
               type="button"
               onClick={() => setShowPriceSearch(true)}
               disabled={busy}
-              title="Search the web for prices and pick which shops to track"
+              title={t('it.searchPricesTitle')}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50"
             >
-              <Search size={13} /> Search prices
+              <Search size={13} /> {t('it.searchPrices')}
             </button>
             <button
               type="button"
               onClick={handleAiFill}
               disabled={busy}
-              title="One shot: AI fill info + prices + photos together"
+              title={t('it.aiFillAllTitle')}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-purple)] hover:border-[color:var(--color-purple)] transition-colors disabled:opacity-50"
             >
               {aiAllFilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
-              {aiAllFilling ? 'Filling…' : 'AI fill all'}
+              {aiAllFilling ? t('it.filling') : t('it.aiFillAllBtn')}
             </button>
             <button
               type="button"
               onClick={handleConvertToTask}
               disabled={busy}
-              title="Create a task carrying this product's links (no link back to the item)"
+              title={t('it.convertTaskTitle')}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-border-light)] transition-colors disabled:opacity-50"
             >
-              <ListPlus size={13} /> Convert to task
+              <ListPlus size={13} /> {t('it.convertTask')}
             </button>
           </div>
           {(aiAllFilling || infoFilling) && (
             <p className="text-[10px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
               {item.links.length === 0
-                ? 'Searching the web'
-                : `Reading ${item.links.length} link${item.links.length === 1 ? '' : 's'}`}{' '}
-              + AI extracting…
+                ? t('it.searchingWeb')
+                : t('it.readingLinks', { n: item.links.length })}{' '}
+              {t('it.aiExtracting')}
             </p>
           )}
           {actionMsg && (
@@ -1403,7 +1403,7 @@ function ItemDetailModal({
               </span>
               {actionMsg.href && (
                 <a href={actionMsg.href} className="underline ml-1.5 text-[color:var(--color-cyan)]">
-                  open →
+                  {t('it.openArrow')}
                 </a>
               )}
             </p>
@@ -1430,7 +1430,7 @@ function ItemDetailModal({
           {view === 'inventory' && item.links.length > 0 && (
             <div>
               <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                Where to buy
+                {t('it.whereToBuy')}
               </p>
               <div className="flex flex-wrap gap-2">
               {item.links.map((link, i) => {
