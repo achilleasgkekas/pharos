@@ -37,11 +37,15 @@ The codebase is shared. The **single biggest divider is multi-tenancy** (§C).
 - **Decision:** registry (Docker Hub vs GHCR) + **license model** (MIT/Apache vs source-available/BSL vs closed). Affects whether the image is public.
 - **Size:** **Small. Easiest first win.**
 
-### C. Multi-tenancy (the divider)
-- **Goal:** many orgs in one deployment, hard isolation.
-- **Need:** `tenantId` on every model + index; tenant scoping in **every** query (middleware/helper so it cannot be forgotten); storage namespaced per tenant; per-tenant config (storage backend, AI keys, plan); admin/superadmin separation.
-- **Risk:** a single missed scope leaks another customer's financial documents. Needs tests + a default-deny query layer.
-- **Size:** **Large. Touches the whole codebase.** Prereq for SaaS.
+### C. Multi-tenancy (the divider) — model: **database-per-tenant**
+**Decision (Achilleas):** each tenant gets its **own database**, not a shared collection with `tenantId`. Tiers:
+- **Shared:** own DB on a **shared MongoDB cluster**. Cheaper. **DB-size quota** (fill up to a limit, then upgrade).
+- **Dedicated:** own MongoDB instance/cluster + dedicated app resources + **custom domain**. Pricier.
+
+- **Mechanism:** one cluster connection + `mongoose conn.useDb('tenant_<id>')` per request (shares the pool, cheap, strong logical isolation); a **tenant resolver** maps host/subdomain/custom-domain/session → tenant → DB; models registered per-connection. Today `lib/db.ts` is a single cached connection — this becomes a per-tenant connection/`useDb` layer.
+- **Need:** resolver, per-tenant config (storage backend, AI keys, plan, limits), `dbStats()` size metering + enforcement, per-tenant **backup/restore/export/delete** (DB-per-tenant makes these clean), migrations that run across **all** tenant DBs, superadmin console.
+- **Honest caveat:** DB-per-tenant = great isolation + clean per-tenant backup/quota, but MongoDB has a **per-cluster DB/collection ceiling** (Atlas ~ low thousands). Fine to start; if the free tier ever reaches tens of thousands of tenants, that tier might need pooled-schema while paid stays DB-per-tenant. The resolver hides which model a tenant uses, so decide later.
+- **Size:** **Large. Touches the whole data layer + every model.** Prereq for SaaS.
 
 ### D. Accounts & auth (web product grade)
 - **Have:** passwordHash + role + apiToken.
@@ -55,7 +59,8 @@ The codebase is shared. The **single biggest divider is multi-tenancy** (§C).
 ### F. Storage (per-location + URLs)
 - **Self-hosted:** keep local-first; optional toggle "expose my storage URLs" (OneDrive share-link / S3) for users who want direct links.
 - **SaaS:** serve via **our** app URLs behind auth; issue **signed/expiring URLs** for direct download/bandwidth offload; **never** raw storage links. `/api/files` becomes **backend-aware per tenant** (their OneDrive/S3 or our managed bucket).
-- **Need:** a real download/cache path (OneDrive currently has no GET), managed bucket (S3/R2), per-tenant quota accounting (ties to §E).
+- **Backends:** today local/SMB/FTP/OneDrive (push-only). Add **Amazon S3, Azure Blob, Cloudflare R2** as first-class, **tenant-selectable** backends behind the existing storage abstraction (each is "just another driver"). SaaS default = our managed bucket; higher tiers may bring-your-own (their S3/Azure).
+- **Need:** a real download/cache path (OneDrive currently has no GET), managed bucket (S3/R2/Azure), per-tenant quota accounting (ties to §E).
 - **Size:** Medium-Large.
 
 ### G. Integrations — inbound + outbound
@@ -108,6 +113,9 @@ The codebase is shared. The **single biggest divider is multi-tenancy** (§C).
 6. **First chat platforms:** Telegram (easiest) and/or Discord first?
 7. **AI billing model:** included quota + overage, or BYO-key (tenant pays Anthropic directly)?
 8. **Encryption scope:** at-rest only, or per-tenant document keys (stronger, more complex)?
+9. **Tenant DB model confirmation:** DB-per-tenant for shared + instance-per-tenant for dedicated (current plan, §C) — confirm, and pick the cluster (Atlas vs self-managed).
+10. **Custom domain (dedicated/top tier):** TLS strategy — wildcard `*.pharos.app` for subdomains + **on-demand certs** for customer domains (Caddy on-demand TLS, or Cloudflare for SaaS / Cloudflare Custom Hostnames). Domain → tenant mapping table.
+11. **Tiers & limits:** define the ladder (free 5 GB shared → paid shared bigger DB → dedicated + custom domain), and the DB-size thresholds that force an upgrade.
 
 ## 5. Parked / in-flight (not product-roadmap but tracked)
 - i18n rollout: Items / Receipts / Settings pages remaining.
