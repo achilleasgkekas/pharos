@@ -10,6 +10,8 @@ import { useOpenParam } from '@/components/useOpenParam';
 import { cn } from '@/components/ui/cn';
 import { shrinkImage } from '@/lib/clientImage';
 import type { SerializedVoucher } from '@/types';
+import { useT } from '@/components/LocaleProvider';
+import type { TKey } from '@/lib/i18n';
 import { createVoucher, updateVoucher, deleteVoucher, toggleVoucherUsed, scanVoucherText, scanVoucherImage } from './actions';
 
 const FILTERS = [
@@ -24,6 +26,7 @@ function daysUntil(dateStr: string | null): number | null {
 }
 
 export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) {
+  const t = useT();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
@@ -69,7 +72,7 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
     'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]';
   const filterControls = (
     <div className="space-y-4">
-      <Input icon={<Search size={14} />} placeholder="Search title, code, store..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <Input icon={<Search size={14} />} placeholder={t('v.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
       <div>
         <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>Status</p>
         <div className="flex flex-col gap-1">
@@ -83,7 +86,7 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
               )}
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              {f.label}
+              {f.value === 'all' ? t('common.all') : f.value === 'active' ? t('v.fActive') : t('v.fUsed')}
             </button>
           ))}
         </div>
@@ -97,9 +100,9 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
       <div>
         <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>Sort</p>
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={selCls} style={{ fontFamily: 'var(--font-mono)' }}>
-          <option value="expiry">Expiring soon</option>
-          <option value="store">Store A→Z</option>
-          <option value="title">Title A→Z</option>
+          <option value="expiry">{t('v.sortExpiry')}</option>
+          <option value="store">{t('v.sortStore')}</option>
+          <option value="title">{t('v.sortTitle')}</option>
         </select>
       </div>
       {anyF && (
@@ -119,9 +122,9 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
       <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            Vouchers
+            {t('nav.vouchers')}
             <span className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {vouchers.filter((v) => !v.used).length} active
+              {t('v.activeCount', { n: vouchers.filter((v) => !v.used).length })}
             </span>
           </h1>
         </div>
@@ -131,7 +134,7 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
               <button
                 key={v}
                 onClick={() => setLayout(v)}
-                title={v === 'grid' ? 'Grid' : 'List'}
+                title={v === 'grid' ? t('v.grid') : t('v.list')}
                 className={cn('px-2 py-1.5 rounded-md transition-colors', layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
               >
                 {icon}
@@ -139,7 +142,7 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
             ))}
           </div>
           <Button variant="primary" onClick={() => setShowCreate(true)}>
-            <Plus size={16} strokeWidth={2.5} /> New voucher
+            <Plus size={16} strokeWidth={2.5} /> {t('v.newVoucher')}
           </Button>
         </div>
       </div>
@@ -176,7 +179,7 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
         </div>
       </div>
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New voucher" size="xl">
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t('v.newVoucher')} size="xl">
         <VoucherForm onSuccess={() => setShowCreate(false)} />
       </Modal>
       {editing && (
@@ -189,6 +192,7 @@ export function VouchersClient({ vouchers }: { vouchers: SerializedVoucher[] }) 
 }
 
 function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: () => void }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
   const confirm = useConfirm();
@@ -203,7 +207,7 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
   }
 
   async function handleDelete() {
-    const ok = await confirm({ title: 'Delete voucher', message: `Delete "${voucher.title}"?`, confirmLabel: 'Delete', danger: true });
+    const ok = await confirm({ title: t('v.deleteVoucher'), message: t('v.confirmDelete', { title: voucher.title }), confirmLabel: t('common.delete'), danger: true });
     if (ok) startTransition(() => deleteVoucher(voucher._id));
   }
 
@@ -238,12 +242,12 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
       <div className="flex items-center gap-2 text-[10px] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
         {voucher.expiresAt ? (
           <span className={cn(expired ? 'text-[color:var(--color-red)]' : d! <= 7 ? 'text-[color:var(--color-gold)]' : 'text-[color:var(--color-text-faint)]')}>
-            {expired ? 'expired' : `expires in ${d}d`}
+            {expired ? t('v.expired') : t('v.expiresInD', { d: d ?? 0 })}
           </span>
         ) : (
-          <span className="text-[color:var(--color-text-faint)]">no expiry</span>
+          <span className="text-[color:var(--color-text-faint)]">{t('v.noExpiry')}</span>
         )}
-        {voucher.used && <span className="text-[color:var(--color-text-faint)]">· used</span>}
+        {voucher.used && <span className="text-[color:var(--color-text-faint)]">· {t('v.usedTag')}</span>}
       </div>
 
       <div className="flex items-center gap-1 pt-2 border-t border-[color:var(--color-border)]">
@@ -252,7 +256,7 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
           disabled={pending}
           className={cn('flex items-center gap-1 text-[10px] px-2 py-1 rounded-md transition-colors', voucher.used ? 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]' : 'text-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-2)]')}
         >
-          <Check size={12} /> {voucher.used ? 'mark unused' : 'mark used'}
+          <Check size={12} /> {voucher.used ? t('v.markUnused') : t('v.markUsed')}
         </button>
         <button onClick={onEdit} className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]" aria-label="Edit">
           <Pencil size={13} />
@@ -271,6 +275,7 @@ function VoucherCard({ voucher, onEdit }: { voucher: SerializedVoucher; onEdit: 
 }
 
 function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVoucher; onSuccess: () => void; onDeleted?: () => void }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
   const [form, setForm] = useState({
@@ -285,7 +290,7 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
 
   async function handleDelete() {
     if (!voucher) return;
-    const ok = await confirm({ title: 'Delete voucher', message: `Delete "${voucher.title}"?`, confirmLabel: 'Delete', danger: true });
+    const ok = await confirm({ title: t('v.deleteVoucher'), message: t('v.confirmDelete', { title: voucher.title }), confirmLabel: t('common.delete'), danger: true });
     if (ok) startTransition(async () => { await deleteVoucher(voucher._id); onDeleted?.(); });
   }
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -350,50 +355,50 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
       {!voucher && (
         <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3 space-y-2">
           <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-cyan)] flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-            <Sparkles size={12} /> Fill with AI
+            <Sparkles size={12} /> {t('v.fillAi')}
           </p>
           <textarea
             value={aiText}
             onChange={(e) => setAiText(e.target.value)}
             rows={2}
-            placeholder="Paste the coupon text / email here… (code, discount, expiry)"
+            placeholder={t('v.aiPlaceholder')}
             className="w-full bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
           />
           <div className="flex items-center gap-2 flex-wrap">
             <button type="button" onClick={scanText} disabled={pending || !aiText.trim()} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold disabled:opacity-50">
-              {pending ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} Scan text
+              {pending ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} {t('v.scanText')}
             </button>
             <button type="button" onClick={() => aiFileRef.current?.click()} disabled={pending} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] hover:border-[color:var(--color-cyan)] disabled:opacity-50">
-              <Upload size={13} /> Scan image
+              <Upload size={13} /> {t('v.scanImage')}
             </button>
             <input ref={aiFileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => scanImage(e.target.files?.[0])} />
             {aiMsg && <span className="text-[11px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>{aiMsg}</span>}
           </div>
         </div>
       )}
-      <Field label="Title *">
-        <Input value={form.title} onChange={set('title')} required placeholder="e.g. 10% off at Skroutz" />
+      <Field label={t('v.fTitle')}>
+        <Input value={form.title} onChange={set('title')} required placeholder={t('v.fTitlePlaceholder')} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Code">
+        <Field label={t('v.fCode')}>
           <Input value={form.code} onChange={set('code')} placeholder="SAVE10" style={{ fontFamily: 'var(--font-mono)' }} />
         </Field>
-        <Field label="Discount">
-          <Input value={form.discount} onChange={set('discount')} placeholder="10% / €5 / free shipping" />
+        <Field label={t('v.fDiscount')}>
+          <Input value={form.discount} onChange={set('discount')} placeholder={t('v.fDiscountPlaceholder')} />
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Store">
-          <Input value={form.store} onChange={set('store')} placeholder="Skroutz, Amazon..." />
+        <Field label={t('v.fStore')}>
+          <Input value={form.store} onChange={set('store')} placeholder={t('v.fStorePlaceholder')} />
         </Field>
-        <Field label="Expires">
+        <Field label={t('v.fExpires')}>
           <Input type="date" value={form.expiresAt} onChange={set('expiresAt')} />
         </Field>
       </div>
       <Field label="URL">
         <Input value={form.url} onChange={set('url')} placeholder="https://..." />
       </Field>
-      <Field label="Notes">
+      <Field label={t('v.fNotes')}>
         <textarea
           value={form.notes}
           onChange={set('notes')}
@@ -403,11 +408,11 @@ function VoucherForm({ voucher, onSuccess, onDeleted }: { voucher?: SerializedVo
       </Field>
       <div className="flex gap-3 pt-2">
         <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? 'Saving...' : voucher ? 'Save' : 'Create'}
+          {pending ? t('v.saving') : voucher ? t('common.save') : t('v.create')}
         </Button>
         {voucher && onDeleted && (
           <Button type="button" variant="danger" size="sm" className="ml-auto" onClick={handleDelete} disabled={pending}>
-            <Trash2 size={13} /> Delete
+            <Trash2 size={13} /> {t('common.delete')}
           </Button>
         )}
       </div>
