@@ -35,6 +35,13 @@ import { Layers, Receipt as ReceiptIcon, CreditCard } from 'lucide-react';
 import type { SerializedItem } from '@/types';
 import { VIEW_CONFIG, type ItemView } from '@/lib/itemStatus';
 import { type InstallmentPlan } from '@/lib/installments';
+import { useT } from '@/components/LocaleProvider';
+import type { TKey } from '@/lib/i18n';
+
+// value → i18n key maps (so the const arrays stay untouched)
+const IT_STATUS_KEY: Record<string, TKey> = { researching: 'it.stResearching', decided: 'it.stDecided', ordered: 'it.stOrdered', received: 'it.stReceived', installed: 'it.stInstalled', deferred: 'it.stDeferred', sold: 'it.stSold', broken: 'it.stBroken' };
+const IT_SORT_KEY: Record<string, TKey> = { default: 'it.sortDefault', recent: 'it.sortRecent', 'price-desc': 'it.sortPriceDesc', 'price-asc': 'it.sortPriceAsc', name: 'it.sortName' };
+const IT_FLAG_KEY: Record<string, TKey> = { deal: 'it.fDeals', photo: 'it.fPhoto', ai: 'it.fAi', links: 'it.fLinks', warranty: 'it.fWarranty' };
 import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
@@ -153,7 +160,9 @@ export function ItemsClient({
   categoryList?: string[];
 }) {
   if (categoryList.length) _itemCats = categoryList;
+  const t = useT();
   const cfg = VIEW_CONFIG[view];
+  const viewName = view === 'shopping' ? t('nav.shopping') : t('nav.inventory');
   const [filter, setFilter] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -354,8 +363,8 @@ export function ItemsClient({
   // Shared filter controls — rendered in the left sidebar (desktop) and a drawer (mobile)
   const filterControls = (
     <div className="space-y-4">
-      <Input icon={<Search size={14} />} placeholder="Search title, specs, tags..." value={search} onChange={(e) => setSearch(e.target.value)} />
-      <FilterGroup label="Status">
+      <Input icon={<Search size={14} />} placeholder={t('it.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
+      <FilterGroup label={t('common.status')}>
         <div className="flex flex-col gap-1">
           {cfg.statusFilters.map((f) => (
             <button
@@ -369,22 +378,22 @@ export function ItemsClient({
               )}
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              {f.label}
+              {f.value === '' ? t('common.all') : IT_STATUS_KEY[f.value] ? t(IT_STATUS_KEY[f.value]) : f.label}
             </button>
           ))}
         </div>
       </FilterGroup>
       {stores.length > 0 && (
-        <FilterGroup label="Store">
-          <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder="All stores" clearable size="sm" className="w-full" />
+        <FilterGroup label={t('v.fStore')}>
+          <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder={t('it.allStores')} clearable size="sm" className="w-full" />
         </FilterGroup>
       )}
       {categories.length > 1 && (
-        <FilterGroup label="Category">
-          <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder="All categories" clearable size="sm" className="w-full" />
+        <FilterGroup label={t('common.category')}>
+          <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
         </FilterGroup>
       )}
-      <FilterGroup label="Sort">
+      <FilterGroup label={t('common.sort')}>
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortKey)}
@@ -393,12 +402,12 @@ export function ItemsClient({
         >
           {SORT_OPTIONS.map((s) => (
             <option key={s.value} value={s.value}>
-              {s.label}
+              {IT_SORT_KEY[s.value] ? t(IT_SORT_KEY[s.value]) : s.label}
             </option>
           ))}
         </select>
       </FilterGroup>
-      <FilterGroup label="Show only">
+      <FilterGroup label={t('it.showOnly')}>
         <div className="flex flex-wrap gap-1.5">
           {FLAG_DEFS.filter((f) => !f.shoppingOnly || view === 'shopping').map((f) => {
             const on = flags.has(f.key);
@@ -414,7 +423,7 @@ export function ItemsClient({
                 )}
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                {f.label}
+                {IT_FLAG_KEY[f.key] ? t(IT_FLAG_KEY[f.key]) : f.label}
               </button>
             );
           })}
@@ -426,7 +435,7 @@ export function ItemsClient({
           className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          reset all filters
+          {t('common.resetFilters')}
         </button>
       )}
     </div>
@@ -442,30 +451,30 @@ export function ItemsClient({
               className="text-2xl md:text-3xl font-bold"
               style={{ fontFamily: 'var(--font-display)' }}
             >
-              {cfg.title}
+              {viewName}
             </h1>
             <span
               className="text-xs text-[color:var(--color-text-faint)] tracking-[0.1em]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              {items.length} {items.length === 1 ? 'item' : 'items'}
+              {items.length} {items.length === 1 ? t('it.item') : t('it.items')}
             </span>
           </div>
           <div className="flex items-center gap-3">
             {items.length > 0 && view === 'shopping' && (
               <div className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                est. cost{' '}
+                {t('it.cost')}{' '}
                 <span className="text-[color:var(--color-cyan)] font-semibold">{cur()}{shoppingBudget.toFixed(0)}</span>
               </div>
             )}
             {dealsCount > 0 && (
               <button
                 onClick={() => setFlags(new Set(['deal']))}
-                title="Show only items at/below their target price"
+                title={t('it.dealsTitle')}
                 className="flex items-center gap-1 text-xs text-[color:var(--color-accent)] hover:opacity-80"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                <Target size={13} /> {dealsCount} deal{dealsCount === 1 ? '' : 's'}
+                <Target size={13} /> {dealsCount} {dealsCount === 1 ? t('it.deal') : t('it.deals')}
               </button>
             )}
             {filtered.length > 0 && (
@@ -475,38 +484,38 @@ export function ItemsClient({
                     {selectedIds.size > 0 && (
                       <button
                         onClick={handleBulkAi}
-                        title="AI fill-from-web the SELECTED items — everything (info + prices + photos). Starts a background job — watch progress in the widget, bottom-right."
+                        title={t('it.aiFillTitle')}
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-accent)] text-[color:var(--color-accent)] hover:opacity-80 transition-colors"
                       >
-                        <Sparkles size={14} /> AI fill all {selectedIds.size}
+                        <Sparkles size={14} /> {t('it.aiFillAll', { n: selectedIds.size })}
                       </button>
                     )}
                     {selectedIds.size >= 2 && (
                       <button
                         onClick={openMerge}
-                        title="Merge the selected products into one (keep the most complete; the rest go to Trash)."
+                        title={t('it.mergeTitle')}
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-purple)] text-[color:var(--color-purple)] hover:opacity-80 transition-colors"
                       >
-                        <Merge size={14} /> Merge {selectedIds.size}
+                        <Merge size={14} /> {t('it.mergeN', { n: selectedIds.size })}
                       </button>
                     )}
                     <button
                       onClick={selectedIds.size === filtered.length ? clearSelection : selectAllFiltered}
                       className="px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors"
                     >
-                      {selectedIds.size === filtered.length ? 'deselect all' : `select all ${filtered.length}`}
+                      {selectedIds.size === filtered.length ? t('common.deselectAll') : t('trash.selectAllN', { n: filtered.length })}
                     </button>
                     <button onClick={exitSelectMode} className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-2">
-                      cancel
+                      {t('common.cancel')}
                     </button>
                   </>
                 ) : (
                   <button
                     onClick={() => setSelectMode(true)}
-                    title="Select multiple items (tap anywhere on a card) to AI fill them"
+                    title={t('it.selectTitle')}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors"
                   >
-                    <Check size={14} /> Select
+                    <Check size={14} /> {t('it.select')}
                   </button>
                 )}
               </div>
@@ -514,11 +523,11 @@ export function ItemsClient({
             {items.length > 1 && !selectMode && (
               <button
                 onClick={() => setShowDupes(true)}
-                title="Find duplicate products (same title) and merge them"
+                title={t('it.findDupTitle')}
                 className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-purple)] hover:border-[color:var(--color-purple)] transition-colors"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                <Merge size={14} /> Duplicates
+                <Merge size={14} /> {t('it.duplicates')}
               </button>
             )}
             {/* Grid / list toggle */}
@@ -530,7 +539,7 @@ export function ItemsClient({
                 <button
                   key={v}
                   onClick={() => setLayout(v)}
-                  title={v === 'grid' ? 'Grid' : 'List'}
+                  title={v === 'grid' ? t('v.grid') : t('v.list')}
                   className={cn(
                     'px-2.5 py-1.5 rounded-md transition-colors',
                     layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
@@ -541,7 +550,7 @@ export function ItemsClient({
               ))}
             </div>
             <Button variant="primary" onClick={() => setShowCreate(true)}>
-              <Plus size={16} strokeWidth={2.5} /> New
+              <Plus size={16} strokeWidth={2.5} /> {t('common.new')}
             </Button>
           </div>
         </div>
@@ -559,7 +568,7 @@ export function ItemsClient({
               className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              <SlidersHorizontal size={14} /> Filters {anyFilterActive && <span className="text-[color:var(--color-accent)]">•</span>}
+              <SlidersHorizontal size={14} /> {t('ex.filters')} {anyFilterActive && <span className="text-[color:var(--color-accent)]">•</span>}
             </button>
             {showFilters && (
               <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">{filterControls}</div>
@@ -619,7 +628,7 @@ export function ItemsClient({
       )}
 
       {/* Create modal */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title={`New · ${cfg.title}`} size="lg">
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t('it.newItem', { view: viewName })} size="lg">
         <UrlImport view={view} onImported={() => setShowCreate(false)} />
         <div className="flex items-center gap-3 my-5">
           <div className="flex-1 h-px bg-[color:var(--color-border)]" />
@@ -638,7 +647,7 @@ export function ItemsClient({
       <Modal open={showMerge} onClose={() => setShowMerge(false)} title={`Merge ${mergeCandidates.length} products`} size="lg">
         <div className="space-y-4">
           <p className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            Pick the one to <b>keep</b>; the others merge into it (links, photos, price history, receipts) and go to Trash.
+            {t('it.dupPick')}
           </p>
           <MergeItemsPicker items={mergeCandidates} keepId={mergeKeep} onKeep={setMergeKeep} />
           <div className="flex justify-end gap-2 pt-1">
