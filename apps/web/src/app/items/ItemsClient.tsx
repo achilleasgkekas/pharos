@@ -669,6 +669,7 @@ export function ItemsClient({
 type PreviewData = { title: string; price: number; store: string; specs: string; category: string; existing: { id: string; title: string } | null };
 
 function UrlImport({ view, onImported }: { view: ItemView; onImported: () => void }) {
+  const t = useT();
   const [url, setUrl] = useState('');
   const [pending, startTransition] = useTransition(); // preview fetch
   const [approving, startApprove] = useTransition(); // save
@@ -704,7 +705,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
         setMsg(r.error);
         return;
       }
-      setOkMsg(r.updated ? `✓ Updated existing: ${r.title}` : `✓ Added: ${r.title}`);
+      setOkMsg(r.updated ? t('it.updatedExisting', { title: r.title }) : t('it.added', { title: r.title }));
       setPreview(null);
       setUrl('');
       setTimeout(() => onImported(), 1200);
@@ -727,13 +728,13 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
             setUrl(e.target.value);
             if (preview) setPreview(null);
           }}
-          placeholder="https://... product page (Skroutz, EU Store, Amazon...)"
+          placeholder={t('it.urlPlaceholder')}
           onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handlePreview())}
           disabled={pending || approving}
         />
         <Button variant="primary" onClick={handlePreview} disabled={pending || approving || !url.trim()} className="shrink-0">
           {pending ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-          {pending ? 'Reading…' : 'Preview'}
+          {pending ? t('it.reading') : t('it.preview')}
         </Button>
       </div>
       {pending && (
@@ -775,10 +776,10 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
           <div className="flex items-center gap-2 mt-3">
             <Button variant="primary" onClick={handleApprove} disabled={approving} className="shrink-0">
               {approving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              {approving ? 'Adding…' : preview.existing ? 'Approve & update' : 'Approve & add'}
+              {approving ? t('it.adding') : preview.existing ? t('it.approveUpdate') : t('it.approveAdd')}
             </Button>
             <Button variant="ghost" onClick={() => setPreview(null)} disabled={approving}>
-              Discard
+              {t('it.discard')}
             </Button>
             <span className="text-[10px] text-[color:var(--color-text-faint)] ml-auto" style={{ fontFamily: 'var(--font-mono)' }}>
               photos fetched on approve
@@ -1631,6 +1632,7 @@ function ItemForm({
   onDelete?: () => void;
   deletePending?: boolean;
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState<ItemFormState>({
     title: item?.title ?? '',
@@ -1689,17 +1691,17 @@ function ItemForm({
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
       {/* Title */}
-      <Field label="Title *" className="md:col-span-2">
+      <Field label={t('it.fTitle')} className="md:col-span-2">
         <Input
           value={form.title}
           onChange={set('title')}
           required
-          placeholder="e.g. Logitech MX Master 3S"
+          placeholder={t('it.fTitlePlaceholder')}
         />
       </Field>
 
       {/* Category + Status */}
-      <Field label="Category">
+      <Field label={t('common.category')}>
         <select value={form.category} onChange={set('category')} className={selectClass}>
           {itemCategoryOptions(form.category).map((c) => (
             <option key={c.value} value={c.value}>
@@ -1708,11 +1710,11 @@ function ItemForm({
           ))}
         </select>
       </Field>
-      <Field label="Status">
+      <Field label={t('common.status')}>
         <select value={form.status} onChange={set('status')} className={selectClass}>
           {STATUSES.map((s) => (
             <option key={s.value} value={s.value}>
-              {s.label}
+              {IT_STATUS_KEY[s.value] ? t(IT_STATUS_KEY[s.value]) : s.label}
             </option>
           ))}
         </select>
@@ -1722,78 +1724,78 @@ function ItemForm({
           current PRICE (wishlist). Target + store comparison are in the price panel. */}
       {owned ? (
         <>
-          <Field label={`Paid (${cur()})`}>
-            <Input type="number" step="0.01" min="0" value={form.purchasedPrice} onChange={set('purchasedPrice')} placeholder="what it cost you" />
+          <Field label={t('it.fPaid', { cur: cur() })}>
+            <Input type="number" step="0.01" min="0" value={form.purchasedPrice} onChange={set('purchasedPrice')} placeholder={t('it.fPaidPlaceholder')} />
           </Field>
-          <Field label={`Current value (${cur()})`}>
-            <Input type="number" step="0.01" min="0" value={form.currentPrice} onChange={set('currentPrice')} placeholder="worth now (optional)" />
+          <Field label={t('it.fCurrentValue', { cur: cur() })}>
+            <Input type="number" step="0.01" min="0" value={form.currentPrice} onChange={set('currentPrice')} placeholder={t('it.fWorthPlaceholder')} />
           </Field>
         </>
       ) : cheapestLink != null ? (
-        <Field label={`Price (${cur()})`}>
+        <Field label={t('it.fPrice', { cur: cur() })}>
           <div className="text-sm px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] flex items-center justify-between gap-2">
             <span className="font-semibold text-[color:var(--color-text)]">{cur()}{cheapestLink}</span>
-            <span className="text-[11px] text-[color:var(--color-text-faint)]">auto · cheapest of your store links</span>
+            <span className="text-[11px] text-[color:var(--color-text-faint)]">{t('it.autoCheapest')}</span>
           </div>
         </Field>
       ) : (
-        <Field label={`Price (${cur()})`}>
-          <Input type="number" step="0.01" min="0" value={form.currentPrice} onChange={set('currentPrice')} placeholder="current price (or add store links below)" />
+        <Field label={t('it.fPrice', { cur: cur() })}>
+          <Input type="number" step="0.01" min="0" value={form.currentPrice} onChange={set('currentPrice')} placeholder={t('it.fPricePlaceholder')} />
         </Field>
       )}
 
       {/* Purchased from */}
-      <Field label="Purchased from">
+      <Field label={t('it.fPurchasedFrom')}>
         <Input
           value={form.purchasedFrom}
           onChange={set('purchasedFrom')}
-          placeholder="e.g. xpatit.gr, Amazon.de"
+          placeholder={t('it.fPurchasedPlaceholder')}
         />
       </Field>
 
       {/* Specs */}
-      <Field label="Specs" className="md:col-span-2">
+      <Field label={t('it.fSpecs')} className="md:col-span-2">
         <textarea
           value={form.specs}
           onChange={set('specs')}
           rows={3}
-          placeholder="Technical specs..."
+          placeholder={t('it.fSpecsPlaceholder')}
           className={textareaClass}
         />
       </Field>
 
       {/* Notes */}
-      <Field label="Notes" className="md:col-span-2">
+      <Field label={t('v.fNotes')} className="md:col-span-2">
         <textarea
           value={form.notes}
           onChange={set('notes')}
           rows={3}
-          placeholder="Personal notes..."
+          placeholder={t('it.fNotesPlaceholder')}
           className={textareaClass}
         />
       </Field>
 
       {/* Tags + Num */}
-      <Field label="Tags (comma)">
+      <Field label={t('it.fTags')}>
         <Input
           value={form.tags}
           onChange={set('tags')}
-          placeholder="gaming, ssd, ram"
+          placeholder={t('it.fTagsPlaceholder')}
         />
       </Field>
-      <Field label="Num">
+      <Field label={t('it.fNum')}>
         <Input value={form.num} onChange={set('num')} placeholder="01" />
       </Field>
-      <Field label="Serial Number">
+      <Field label={t('it.fSerial')}>
         <Input
           value={form.serialNumber}
           onChange={set('serialNumber')}
-          placeholder="SN..."
+          placeholder={t('it.fSerialPlaceholder')}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
       </Field>
-      <Field label="Location">
-        <Input value={form.location} onChange={set('location')} placeholder="e.g. Office rack U6, garage" />
+      <Field label={t('it.fLocation')}>
+        <Input value={form.location} onChange={set('location')} placeholder={t('it.fLocationPlaceholder')} />
       </Field>
 
       {/* Links editor */}
@@ -1803,7 +1805,7 @@ function ItemForm({
             className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
-            Links ({links.length})
+            {t('it.linksN', { n: links.length })}
           </label>
           <button
             type="button"
@@ -1811,7 +1813,7 @@ function ItemForm({
             className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
-            <Plus size={11} /> add
+            <Plus size={11} /> {t('common.add')}
           </button>
         </div>
         <div className="space-y-1.5">
@@ -1820,13 +1822,13 @@ function ItemForm({
               <input
                 value={l.label}
                 onChange={(e) => updateLink(i, 'label', e.target.value)}
-                placeholder="Label (e.g. EU Store)"
+                placeholder={t('it.fLinkLabel')}
                 className="w-32 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
               />
               <input
                 value={l.url}
                 onChange={(e) => updateLink(i, 'url', e.target.value)}
-                placeholder="https://..."
+                placeholder={t('it.fLinkUrl')}
                 className="flex-1 min-w-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
                 style={{ fontFamily: 'var(--font-mono)' }}
               />
@@ -1837,7 +1839,7 @@ function ItemForm({
                 value={l.price}
                 onChange={(e) => updateLink(i, 'price', e.target.value)}
                 placeholder={cur()}
-                title="Price at this store"
+                title={t('it.priceAtStore')}
                 className="w-20 shrink-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs text-[color:var(--color-accent)] focus:outline-none focus:border-[color:var(--color-accent)]"
                 style={{ fontFamily: 'var(--font-mono)' }}
               />
@@ -1851,7 +1853,7 @@ function ItemForm({
             </div>
           ))}
           {links.length === 0 && (
-            <p className="text-xs text-[color:var(--color-text-faint)] italic">No links</p>
+            <p className="text-xs text-[color:var(--color-text-faint)] italic">{t('it.noLinks')}</p>
           )}
         </div>
       </div>
@@ -1859,16 +1861,16 @@ function ItemForm({
       {/* Buttons */}
       <div className="flex gap-3 pt-2 md:col-span-2">
         <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? 'Saving...' : item ? 'Save' : 'Create'}
+          {pending ? t('v.saving') : item ? t('common.save') : t('v.create')}
         </Button>
         {onCancel && (
           <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
+            {t('common.cancel')}
           </Button>
         )}
         {onDelete && (
           <Button type="button" variant="danger" size="sm" className="ml-auto" onClick={onDelete} disabled={deletePending}>
-            <Trash2 size={13} /> Delete
+            <Trash2 size={13} /> {t('common.delete')}
           </Button>
         )}
       </div>
