@@ -1473,11 +1473,11 @@ function ItemDetailModal({
                   href={fileUrl(r.filePath)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={`Open receipt · ${r.store}`}
+                  title={t('it.openReceipt', { store: r.store })}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors"
                 >
                   <ReceiptIcon size={12} />
-                  {r.store || 'Receipt'}
+                  {r.store || t('it.receiptFallback')}
                   {r.total > 0 && <span className="text-[color:var(--color-text-faint)]">· {cur()}{r.total}</span>}
                   {r.fileType === 'pdf' && <span className="text-[9px] uppercase text-[color:var(--color-text-faint)]">pdf</span>}
                 </a>
@@ -1486,7 +1486,7 @@ function ItemDetailModal({
                   key={r._id}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-[color:var(--color-text-dim)]"
                 >
-                  <ReceiptIcon size={12} /> {r.store || 'Receipt'} {r.total > 0 && `· ${cur()}${r.total}`}
+                  <ReceiptIcon size={12} /> {r.store || t('it.receiptFallback')} {r.total > 0 && `· ${cur()}${r.total}`}
                 </span>
               )
             )}
@@ -1496,13 +1496,13 @@ function ItemDetailModal({
                 href="/receipts"
                 className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors"
               >
-                <ReceiptIcon size={12} /> {item.receiptIds.length} receipt{item.receiptIds.length === 1 ? '' : 's'}
+                <ReceiptIcon size={12} /> {t('it.receiptsN', { n: item.receiptIds.length })}
               </a>
             )}
             {plans.length > 0 && (
               <span className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg text-[color:var(--color-purple)]">
                 <CreditCard size={12} />
-                {plans.length} installment plan{plans.length === 1 ? '' : 's'}
+                {t('it.installmentPlans', { n: plans.length })}
               </span>
             )}
           </div>
@@ -1514,7 +1514,7 @@ function ItemDetailModal({
                   <button
                     onClick={() => startTransition(() => { unlinkPlanByKey(p.signature); })}
                     disabled={pending}
-                    title="Unlink this plan from the product"
+                    title={t('it.unlinkPlan')}
                     className="absolute top-1.5 right-1.5 w-5 h-5 rounded-md grid place-items-center bg-[color:var(--color-surface-3)] text-[color:var(--color-text-faint)] opacity-0 group-hover/plan:opacity-100 hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface)] transition-all disabled:opacity-50"
                   >
                     <X size={12} />
@@ -1532,18 +1532,18 @@ function ItemDetailModal({
                   onClick={() => setShowLinkPicker(true)}
                   className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-dashed border-[color:var(--color-border-light)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] hover:bg-[color:var(--color-surface-2)] transition-colors"
                 >
-                  <Link2 size={13} /> Link an installment plan
+                  <Link2 size={13} /> {t('it.linkPlan')}
                   <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                    ({unlinkedPlans.length} available)
+                    {t('it.available', { n: unlinkedPlans.length })}
                   </span>
                 </button>
               ) : (
                 <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] overflow-hidden">
                   <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--color-border)]">
                     <span className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-                      <Link2 size={11} className="text-[color:var(--color-cyan)]" /> Pick a plan to link
+                      <Link2 size={11} className="text-[color:var(--color-cyan)]" /> {t('it.pickPlan')}
                     </span>
-                    <button onClick={() => setShowLinkPicker(false)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]" title="Close">
+                    <button onClick={() => setShowLinkPicker(false)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]" title={t('common.close')}>
                       <X size={14} />
                     </button>
                   </div>

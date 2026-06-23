@@ -484,6 +484,14 @@ export const en = {
   'it.deleteItem': 'Delete item',
   'it.confirmDeleteItem': "Delete \"{title}\"? This can't be undone.",
   'it.aiFillFailed': 'AI fill failed',
+  'it.receiptFallback': 'Receipt',
+  'it.receiptsN': '{n} receipts',
+  'it.installmentPlans': '{n} installment plans',
+  'it.unlinkPlan': 'Unlink this plan from the product',
+  'it.openReceipt': 'Open receipt · {store}',
+  'it.available': '({n} available)',
+  'it.pickPlan': 'Pick a plan to link',
+  'it.linkPlan': 'Link an installment plan',
 
   // ── Price panel ──────────────────────────────────────────────────────────
   'pp.price': 'Price',
