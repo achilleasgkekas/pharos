@@ -9,26 +9,18 @@ import { Button } from '@/components/ui/Button';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
 import { restoreFromTrash, purgeFromTrash, emptyTrash, type TrashRow, type TrashType } from '@/app/settings/actions';
+import { useT } from '@/components/LocaleProvider';
+import { relTime } from '@/lib/i18n/format';
+import type { TKey } from '@/lib/i18n';
 
-const TYPE_META: Record<TrashType, { label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
-  item: { label: 'Items', Icon: Package },
-  receipt: { label: 'Receipts', Icon: ReceiptIcon },
-  expense: { label: 'Money', Icon: Wallet },
-  subscription: { label: 'Subscriptions', Icon: CalendarClock },
-  voucher: { label: 'Vouchers', Icon: Ticket },
-  task: { label: 'Tasks', Icon: CheckSquare },
+const TYPE_META: Record<TrashType, { labelKey: TKey; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
+  item: { labelKey: 'trash.tItem', Icon: Package },
+  receipt: { labelKey: 'trash.tReceipt', Icon: ReceiptIcon },
+  expense: { labelKey: 'trash.tExpense', Icon: Wallet },
+  subscription: { labelKey: 'trash.tSubscription', Icon: CalendarClock },
+  voucher: { labelKey: 'trash.tVoucher', Icon: Ticket },
+  task: { labelKey: 'trash.tTask', Icon: CheckSquare },
 };
-
-function ago(iso: string): string {
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return 'just now';
-  const m = s / 60;
-  if (m < 60) return `${Math.floor(m)}m ago`;
-  const h = m / 60;
-  if (h < 24) return `${Math.floor(h)}h ago`;
-  const d = Math.floor(h / 24);
-  return d === 1 ? 'yesterday' : `${d}d ago`;
-}
 
 // 30-day retention (mirrors getTrash); show how long until auto-purge.
 function purgesIn(iso: string): number {
@@ -41,6 +33,7 @@ const key = (r: { type: TrashType; id: string }) => `${r.type}:${r.id}`;
 export function TrashClient({ rows }: { rows: TrashRow[] }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const t = useT();
   const [pending, start] = useTransition();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<TrashType | 'all'>('all');
@@ -92,7 +85,7 @@ export function TrashClient({ rows }: { rows: TrashRow[] }) {
   }
 
   async function purge(r: TrashRow) {
-    const ok = await confirm({ title: `Delete "${r.title}" forever?`, message: 'This permanently removes the record and its files. It cannot be undone.', confirmLabel: 'Delete forever', danger: true });
+    const ok = await confirm({ title: t('trash.confirmDelete', { title: r.title }), message: t('trash.confirmDeleteBody'), confirmLabel: t('common.deleteForever'), danger: true });
     if (!ok) return;
     setBusy(key(r));
     await purgeFromTrash(r.type, r.id);
@@ -118,7 +111,7 @@ export function TrashClient({ rows }: { rows: TrashRow[] }) {
   async function purgeSelected() {
     const sel = selectedRows();
     if (!sel.length) return;
-    const ok = await confirm({ title: `Delete ${sel.length} item${sel.length > 1 ? 's' : ''} forever?`, message: 'This permanently removes them and their files. It cannot be undone.', confirmLabel: 'Delete forever', danger: true });
+    const ok = await confirm({ title: t('trash.confirmDeleteMany', { n: sel.length }), message: t('trash.confirmDeleteBody'), confirmLabel: t('common.deleteForever'), danger: true });
     if (!ok) return;
     start(async () => {
       for (const r of sel) await purgeFromTrash(r.type, r.id);
@@ -128,7 +121,7 @@ export function TrashClient({ rows }: { rows: TrashRow[] }) {
   }
 
   async function empty() {
-    const ok = await confirm({ title: 'Empty the whole Trash?', message: `Permanently delete all ${rows.length} item${rows.length > 1 ? 's' : ''}. This cannot be undone.`, confirmLabel: 'Empty Trash', danger: true });
+    const ok = await confirm({ title: t('trash.confirmEmpty'), message: t('trash.confirmEmptyBody'), confirmLabel: t('trash.empty'), danger: true });
     if (!ok) return;
     start(async () => {
       await emptyTrash();
@@ -143,26 +136,26 @@ export function TrashClient({ rows }: { rows: TrashRow[] }) {
       <div className="flex items-end justify-between gap-4 flex-wrap mb-1">
         <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2.5" style={{ fontFamily: 'var(--font-display)' }}>
           <Trash2 size={26} className="text-[color:var(--color-text-dim)]" />
-          Trash
+          {t('nav.trash')}
           <span className="text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {rows.length}
           </span>
         </h1>
         {rows.length > 0 && (
           <Button variant="danger" size="sm" onClick={empty} disabled={pending}>
-            <Trash2 size={14} /> Empty Trash
+            <Trash2 size={14} /> {t('trash.empty')}
           </Button>
         )}
       </div>
       <p className="text-xs text-[color:var(--color-text-faint)] mb-5">
-        Deleted records rest here and are recoverable. Anything older than 30 days is purged automatically.
+        {t('trash.intro')}
       </p>
 
       {rows.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--color-border)] py-20 text-center">
           <Trash2 size={32} className="mx-auto text-[color:var(--color-text-faint)] opacity-40" />
-          <p className="mt-3 text-sm text-[color:var(--color-text-dim)]">Trash is empty.</p>
-          <p className="text-xs text-[color:var(--color-text-faint)]">Deleting anything in Pharos lands it here first.</p>
+          <p className="mt-3 text-sm text-[color:var(--color-text-dim)]">{t('trash.isEmpty')}</p>
+          <p className="text-xs text-[color:var(--color-text-faint)]">{t('trash.emptyHint')}</p>
         </div>
       ) : (
         <>
@@ -173,33 +166,33 @@ export function TrashClient({ rows }: { rows: TrashRow[] }) {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search trash…"
+                placeholder={t('trash.searchPlaceholder')}
                 className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg pl-8 pr-3 py-1.5 text-sm outline-none focus:border-[color:var(--color-accent)]"
               />
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap mb-4" style={{ fontFamily: 'var(--font-mono)' }}>
-            <Chip active={typeFilter === 'all'} onClick={() => setTypeFilter('all')} label={`All ${rows.length}`} />
+            <Chip active={typeFilter === 'all'} onClick={() => setTypeFilter('all')} label={`${t('common.all')} ${rows.length}`} />
             {(Object.keys(TYPE_META) as TrashType[])
-              .filter((t) => counts[t])
-              .map((t) => (
-                <Chip key={t} active={typeFilter === t} onClick={() => setTypeFilter(t)} label={`${TYPE_META[t].label} ${counts[t]}`} />
+              .filter((ty) => counts[ty])
+              .map((ty) => (
+                <Chip key={ty} active={typeFilter === ty} onClick={() => setTypeFilter(ty)} label={`${t(TYPE_META[ty].labelKey)} ${counts[ty]}`} />
               ))}
           </div>
 
           {/* Bulk bar */}
           <div className="flex items-center justify-between gap-3 mb-3 text-xs">
             <button onClick={toggleAll} className="text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {allVisibleSelected ? 'deselect all' : `select all ${visible.length}`}
+              {allVisibleSelected ? t('common.deselectAll') : t('trash.selectAllN', { n: visible.length })}
             </button>
             {selected.size > 0 && (
               <div className="flex items-center gap-2">
-                <span className="text-[color:var(--color-text-faint)]">{selected.size} selected</span>
+                <span className="text-[color:var(--color-text-faint)]">{t('trash.selected', { n: selected.size })}</span>
                 <Button variant="secondary" size="sm" onClick={restoreSelected} disabled={pending}>
-                  <RotateCcw size={13} /> Restore
+                  <RotateCcw size={13} /> {t('common.restore')}
                 </Button>
                 <Button variant="danger" size="sm" onClick={purgeSelected} disabled={pending}>
-                  <Trash2 size={13} /> Delete
+                  <Trash2 size={13} /> {t('common.delete')}
                 </Button>
               </div>
             )}
@@ -226,13 +219,13 @@ export function TrashClient({ rows }: { rows: TrashRow[] }) {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">{r.title}</div>
                     <div className="text-[11px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
-                      {r.subtitle ? `${r.subtitle} · ` : ''}deleted {ago(r.deletedAt)}{left <= 7 ? ` · purges in ${left}d` : ''}
+                      {r.subtitle ? `${r.subtitle} · ` : ''}{t('trash.deleted', { ago: relTime(r.deletedAt, t) })}{left <= 7 ? ` · ${t('trash.purgesIn', { n: left })}` : ''}
                     </div>
                   </div>
                   <button
                     onClick={() => restore(r)}
                     disabled={isBusy}
-                    title="Restore"
+                    title={t('common.restore')}
                     className="shrink-0 grid place-items-center w-8 h-8 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-2)] transition-colors"
                   >
                     {isBusy ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
@@ -240,7 +233,7 @@ export function TrashClient({ rows }: { rows: TrashRow[] }) {
                   <button
                     onClick={() => purge(r)}
                     disabled={isBusy}
-                    title="Delete forever"
+                    title={t('common.deleteForever')}
                     className="shrink-0 grid place-items-center w-8 h-8 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)] transition-colors"
                   >
                     <X size={16} />
@@ -249,7 +242,7 @@ export function TrashClient({ rows }: { rows: TrashRow[] }) {
               );
             })}
             {visible.length === 0 && (
-              <p className="text-center text-sm text-[color:var(--color-text-faint)] py-10">No matching items.</p>
+              <p className="text-center text-sm text-[color:var(--color-text-faint)] py-10">{t('trash.noMatch')}</p>
             )}
           </div>
         </>

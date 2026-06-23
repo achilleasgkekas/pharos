@@ -81,6 +81,49 @@ export const en = {
   'home.dReports': 'Charts: spend, categories, warranties, installments',
   'home.dCalendar': "What's coming up: renewals, installments, bills, expiries",
 
+  // ── Relative time ────────────────────────────────────────────────────────
+  'time.justNow': 'just now',
+  'time.minutes': '{n}m ago',
+  'time.hours': '{n}h ago',
+  'time.yesterday': 'yesterday',
+  'time.days': '{n}d ago',
+
+  // ── Trash ────────────────────────────────────────────────────────────────
+  'trash.empty': 'Empty Trash',
+  'trash.intro': 'Deleted records rest here and are recoverable. Anything older than 30 days is purged automatically.',
+  'trash.isEmpty': 'Trash is empty.',
+  'trash.emptyHint': 'Deleting anything in Pharos lands it here first.',
+  'trash.searchPlaceholder': 'Search trash…',
+  'trash.tItem': 'Items',
+  'trash.tReceipt': 'Receipts',
+  'trash.tExpense': 'Money',
+  'trash.tSubscription': 'Subscriptions',
+  'trash.tVoucher': 'Vouchers',
+  'trash.tTask': 'Tasks',
+  'trash.selectAllN': 'select all {n}',
+  'trash.selected': '{n} selected',
+  'trash.deleted': 'deleted {ago}',
+  'trash.purgesIn': 'purges in {n}d',
+  'trash.noMatch': 'No matching items.',
+  'trash.confirmDelete': 'Delete "{title}" forever?',
+  'trash.confirmDeleteBody': 'This permanently removes the record and its files. It cannot be undone.',
+  'trash.confirmDeleteMany': 'Delete {n} selected items forever?',
+  'trash.confirmEmpty': 'Empty the whole Trash?',
+  'trash.confirmEmptyBody': 'Permanently delete everything in the Trash. This cannot be undone.',
+
+  // ── AI history ───────────────────────────────────────────────────────────
+  'history.clearAll': 'Clear all',
+  'history.intro': 'Every chat with the AI command bar is saved here.',
+  'history.empty': 'No conversations yet.',
+  'history.emptyHint': 'Ask the AI bar anything (the toggle up top) and it lands here.',
+  'history.searchPlaceholder': 'Search conversations…',
+  'history.prompt': '{n} prompt',
+  'history.prompts': '{n} prompts',
+  'history.confirmDelete': 'Delete this conversation?',
+  'history.confirmClear': 'Clear all AI history?',
+  'history.confirmClearBody': 'Permanently delete all conversations.',
+  'history.noMatch': 'No matching conversations.',
+
   // ── Language switcher ────────────────────────────────────────────────────
   'lang.language': 'Language',
 } as const;

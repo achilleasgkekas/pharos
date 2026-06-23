@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
 import { deleteConversation, clearConversations, type ConversationRow } from './actions';
+import { useT } from '@/components/LocaleProvider';
+import { relTime } from '@/lib/i18n/format';
 
 function renderRich(text: string) {
   return text.split('\n').map((line, li, arr) => (
@@ -18,18 +20,10 @@ function renderRich(text: string) {
   ));
 }
 
-function ago(iso: string): string {
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  const d = Math.floor(s / 86400);
-  return d === 1 ? 'yesterday' : `${d}d ago`;
-}
-
 export function HistoryClient({ conversations }: { conversations: ConversationRow[] }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const t = useT();
   const [pending, start] = useTransition();
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -43,7 +37,7 @@ export function HistoryClient({ conversations }: { conversations: ConversationRo
   }, [conversations, search]);
 
   async function del(id: string) {
-    const ok = await confirm({ title: 'Delete this conversation?', confirmLabel: 'Delete', danger: true });
+    const ok = await confirm({ title: t('history.confirmDelete'), confirmLabel: t('common.delete'), danger: true });
     if (!ok) return;
     start(async () => {
       await deleteConversation(id);
@@ -53,7 +47,7 @@ export function HistoryClient({ conversations }: { conversations: ConversationRo
   }
 
   async function clearAll() {
-    const ok = await confirm({ title: 'Clear all AI history?', message: `Permanently delete all ${conversations.length} conversations.`, confirmLabel: 'Clear all', danger: true });
+    const ok = await confirm({ title: t('history.confirmClear'), message: t('history.confirmClearBody'), confirmLabel: t('history.clearAll'), danger: true });
     if (!ok) return;
     start(async () => {
       await clearConversations();
@@ -67,24 +61,24 @@ export function HistoryClient({ conversations }: { conversations: ConversationRo
       <div className="flex items-end justify-between gap-4 flex-wrap mb-1">
         <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2.5" style={{ fontFamily: 'var(--font-display)' }}>
           <MessageSquare size={24} className="text-[color:var(--color-cyan)]" />
-          AI history
+          {t('nav.history')}
           <span className="text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {conversations.length}
           </span>
         </h1>
         {conversations.length > 0 && (
           <Button variant="danger" size="sm" onClick={clearAll} disabled={pending}>
-            <Trash2 size={14} /> Clear all
+            <Trash2 size={14} /> {t('history.clearAll')}
           </Button>
         )}
       </div>
-      <p className="text-xs text-[color:var(--color-text-faint)] mb-5">Every chat with the AI command bar is saved here.</p>
+      <p className="text-xs text-[color:var(--color-text-faint)] mb-5">{t('history.intro')}</p>
 
       {conversations.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--color-border)] py-20 text-center">
           <Sparkles size={32} className="mx-auto text-[color:var(--color-cyan)] opacity-40" />
-          <p className="mt-3 text-sm text-[color:var(--color-text-dim)]">No conversations yet.</p>
-          <p className="text-xs text-[color:var(--color-text-faint)]">Ask the AI bar anything (the ✨ toggle up top) and it lands here.</p>
+          <p className="mt-3 text-sm text-[color:var(--color-text-dim)]">{t('history.empty')}</p>
+          <p className="text-xs text-[color:var(--color-text-faint)]">{t('history.emptyHint')}</p>
         </div>
       ) : (
         <>
@@ -93,7 +87,7 @@ export function HistoryClient({ conversations }: { conversations: ConversationRo
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search conversations…"
+              placeholder={t('history.searchPlaceholder')}
               className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg pl-8 pr-3 py-1.5 text-sm outline-none focus:border-[color:var(--color-accent)]"
             />
           </div>
@@ -109,11 +103,11 @@ export function HistoryClient({ conversations }: { conversations: ConversationRo
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">{c.title}</div>
                         <div className="text-[11px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
-                          {c.turns} prompt{c.turns === 1 ? '' : 's'} · {ago(c.updatedAt)}{c.preview ? ` · ${c.preview}` : ''}
+                          {t(c.turns === 1 ? 'history.prompt' : 'history.prompts', { n: c.turns })} · {relTime(c.updatedAt, t)}{c.preview ? ` · ${c.preview}` : ''}
                         </div>
                       </div>
                     </button>
-                    <button onClick={() => del(c.id)} disabled={pending} title="Delete" className="shrink-0 grid place-items-center w-8 h-8 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)] transition-colors">
+                    <button onClick={() => del(c.id)} disabled={pending} title={t('common.delete')} className="shrink-0 grid place-items-center w-8 h-8 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)] transition-colors">
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -148,7 +142,7 @@ export function HistoryClient({ conversations }: { conversations: ConversationRo
                 </div>
               );
             })}
-            {visible.length === 0 && <p className="text-center text-sm text-[color:var(--color-text-faint)] py-10">No matching conversations.</p>}
+            {visible.length === 0 && <p className="text-center text-sm text-[color:var(--color-text-faint)] py-10">{t('history.noMatch')}</p>}
           </div>
         </>
       )}
