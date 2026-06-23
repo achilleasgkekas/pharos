@@ -48,6 +48,7 @@ import { OWNED_STATUSES } from '@/lib/itemStatus';
 import { createCard, updateCard, deleteCard, toggleCardActive, scanCard } from './cards';
 import { CreditCard as CreditCardIcon, Wallet, Power, Camera, ScanLine } from 'lucide-react';
 import { shrinkImage } from '@/lib/clientImage';
+import { useT } from '@/components/LocaleProvider';
 
 export type ItemOption = {
   _id: string;
@@ -86,6 +87,7 @@ export function StatementsClient({
   items: ItemOption[];
   ollamaUp: boolean;
 }) {
+  const t = useT();
   const [showCreate, setShowCreate] = useState(false);
   const [showCards, setShowCards] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -107,13 +109,13 @@ export function StatementsClient({
     const periods: string[] = [];
     let replacedWarning = false;
     for (let i = 0; i < total; i++) {
-      const base = ollamaUp ? 'Reading PDF + AI parsing' : 'Saving PDF (Ollama offline)';
+      const base = ollamaUp ? t('st.readingPdf') : t('st.savingPdf');
       setUploadMsg(total > 1 ? `${base} ${i + 1}/${total}...` : `${base}...`);
       const fd = new FormData();
       fd.set('file', list[i]);
       const res = await importStatementPdf(fd);
       if (!res.ok) {
-        setUploadMsg(`Error: ${res.error}`);
+        setUploadMsg(`${t('st.error')}: ${res.error}`);
         setUploading(false);
         return;
       }
@@ -128,12 +130,12 @@ export function StatementsClient({
     const months = periods.join(', ');
     setUploadMsg(
       lastAiError
-        ? `${lastAiError}. PDF saved, enter manually.`
+        ? `${lastAiError}. ${t('st.savedManual')}`
         : replacedWarning
-          ? `⚠ Imported as ${months} — this REPLACED an existing statement for that month. If the month is wrong, the date was misread: open it and fix the period.`
+          ? t('st.importedReplaced', { months })
           : total > 1
-            ? `✓ Imported ${imported} statements (${months}) · ${totalTx} transactions.`
-            : `✓ Imported ${months} · ${totalTx} transactions.`
+            ? t('st.importedN', { n: imported, months, tx: totalTx })
+            : t('st.imported', { months, tx: totalTx })
     );
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
@@ -187,7 +189,7 @@ export function StatementsClient({
       <div className="mb-5">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            Statements
+            {t('nav.statements')}
             <span
               className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]"
               style={{ fontFamily: 'var(--font-mono)' }}
@@ -198,7 +200,7 @@ export function StatementsClient({
           <div className="flex items-center gap-3">
             {statements.length > 0 && (
               <div className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                {balance < -0.001 ? 'credit ' : 'outstanding '}
+                {balance < -0.001 ? t('st.credit') : t('st.outstanding')}{' '}
                 <span
                   className={cn(
                     'font-semibold',
@@ -210,10 +212,10 @@ export function StatementsClient({
               </div>
             )}
             <Button variant="secondary" size="sm" onClick={() => setShowCards(true)}>
-              <Wallet size={14} /> Cards ({cards.length})
+              <Wallet size={14} /> {t('st.cards', { n: cards.length })}
             </Button>
             <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-              <Plus size={14} strokeWidth={2.5} /> New
+              <Plus size={14} strokeWidth={2.5} /> {t('common.new')}
             </Button>
           </div>
         </div>
@@ -240,10 +242,10 @@ export function StatementsClient({
         ) : (
           <div className="flex flex-col items-center gap-1.5 text-[color:var(--color-text-dim)]">
             <Upload size={24} />
-            <p className="text-sm font-medium text-[color:var(--color-text)]">Import statement PDFs</p>
+            <p className="text-sm font-medium text-[color:var(--color-text)]">{t('st.importTitle')}</p>
             <p className="text-xs text-[color:var(--color-text-faint)] flex items-center gap-1.5">
               <Sparkles size={11} className={ollamaUp ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)]'} />
-              {ollamaUp ? 'AI extracts transactions + installments automatically' : 'Ollama offline · will be saved for manual entry'}
+              {ollamaUp ? t('st.aiExtracts') : t('st.ollamaOffline')}
             </p>
           </div>
         )}
@@ -259,7 +261,7 @@ export function StatementsClient({
       {cardLabels.length > 1 && (
         <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
           <FilterChip active={cardFilter === 'all'} onClick={() => setCardFilter('all')}>
-            All cards
+            {t('st.allCards')}
           </FilterChip>
           {cardLabels.map((c) => (
             <FilterChip key={c} active={cardFilter === c} onClick={() => setCardFilter(c)}>
@@ -273,7 +275,7 @@ export function StatementsClient({
       {statements.length === 0 ? (
         <div className="text-center py-16 text-[color:var(--color-text-faint)]">
           <p className="text-5xl mb-4">💳</p>
-          <p className="text-sm">No statements yet. Upload a PDF or hit + to add manually.</p>
+          <p className="text-sm">{t('st.empty')}</p>
         </div>
       ) : (
         <div className="space-y-8">
@@ -348,6 +350,7 @@ function InstallmentOverview({
   items: ItemOption[];
   itemMap: Map<string, ItemOption>;
 }) {
+  const t = useT();
   const active = plans.filter((p) => !p.done);
   const done = plans.filter((p) => p.done);
   const [showDone, setShowDone] = useState(false);
@@ -362,7 +365,7 @@ function InstallmentOverview({
       <div className="flex items-center gap-2 mb-3">
         <Layers size={14} className="text-[color:var(--color-purple)]" />
         <h2 className="text-xs uppercase tracking-[0.15em] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
-          Active installment plans ({active.length})
+          {t('st.activePlans', { n: active.length })}
         </h2>
         {done.length > 0 && (
           <button
@@ -370,7 +373,7 @@ function InstallmentOverview({
             className="ml-auto text-[10px] text-[color:var(--color-cyan)] hover:underline"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
-            {showDone ? 'hide' : 'show'} completed ({done.length})
+            {showDone ? t('st.hideCompleted', { n: done.length }) : t('st.showCompleted', { n: done.length })}
           </button>
         )}
       </div>
@@ -382,13 +385,13 @@ function InstallmentOverview({
           ))}
         </div>
       ) : (
-        <p className="text-xs text-[color:var(--color-text-faint)]">No active plans — everything is paid off 🎉</p>
+        <p className="text-xs text-[color:var(--color-text-faint)]">{t('st.noPlans')}</p>
       )}
 
       {showDone && done.length > 0 && (
         <div className="mt-3 pt-3 border-t border-[color:var(--color-border)]">
           <h3 className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
-            Completed ({done.length})
+            {t('st.completed', { n: done.length })}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 items-start">
             {done.map((p) => (
@@ -629,9 +632,10 @@ function StatementRow({
   statement: SerializedStatement;
   onOpen: () => void;
 }) {
+  const t = useT();
   const credit = statement.totalAmount < -0.001;
   const remaining = statement.totalAmount - statement.paidAmount;
-  const installmentCount = statement.transactions.filter((t) => t.installmentInfo).length;
+  const installmentCount = statement.transactions.filter((tx) => tx.installmentInfo).length;
 
   return (
     <button
@@ -647,7 +651,7 @@ function StatementRow({
           className="hidden sm:flex items-center gap-1 text-[10px] text-[color:var(--color-purple)]"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          <Layers size={11} /> {installmentCount} installments
+          <Layers size={11} /> {t('st.installments', { n: installmentCount })}
         </span>
       )}
       <div className="text-right">
@@ -659,7 +663,7 @@ function StatementRow({
         </div>
         {credit ? (
           <div className="text-[10px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            credit
+            {t('st.credit')}
           </div>
         ) : (
           remaining > 0.001 && (

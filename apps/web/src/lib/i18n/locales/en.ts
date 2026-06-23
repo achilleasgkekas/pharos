@@ -350,6 +350,29 @@ export const en = {
   'ex.deleteBody': 'Delete this record?',
   'ex.newRecord': 'New entry',
 
+  // ── Statements (shell) ───────────────────────────────────────────────────
+  'st.outstanding': 'outstanding',
+  'st.credit': 'credit',
+  'st.cards': 'Cards ({n})',
+  'st.importTitle': 'Import statement PDFs',
+  'st.aiExtracts': 'AI extracts transactions + installments automatically',
+  'st.ollamaOffline': 'Ollama offline · will be saved for manual entry',
+  'st.readingPdf': 'Reading PDF + AI parsing',
+  'st.savingPdf': 'Saving PDF (Ollama offline)',
+  'st.error': 'Error',
+  'st.savedManual': 'PDF saved, enter manually.',
+  'st.importedReplaced': '⚠ Imported as {months} — this REPLACED an existing statement for that month. If the month is wrong, the date was misread: open it and fix the period.',
+  'st.importedN': '✓ Imported {n} statements ({months}) · {tx} transactions.',
+  'st.imported': '✓ Imported {months} · {tx} transactions.',
+  'st.allCards': 'All cards',
+  'st.empty': 'No statements yet. Upload a PDF or hit + to add manually.',
+  'st.activePlans': 'Active installment plans ({n})',
+  'st.showCompleted': 'show completed ({n})',
+  'st.hideCompleted': 'hide completed ({n})',
+  'st.noPlans': 'No active plans — everything is paid off 🎉',
+  'st.completed': 'Completed ({n})',
+  'st.installments': '{n} installments',
+
   // ── Language switcher ────────────────────────────────────────────────────
   'lang.language': 'Language',
 } as const;
