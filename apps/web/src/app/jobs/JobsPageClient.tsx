@@ -8,20 +8,15 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/components/ui/cn';
 import { getJobs, enqueueOnedriveSync, dismissJob, getJobDetail, type JobRow, type JobDetail, type JobItemResult } from '@/app/jobActions';
+import { useT } from '@/components/LocaleProvider';
+import { relTime } from '@/lib/i18n/format';
+import type { TKey } from '@/lib/i18n';
 
-const KIND: Record<string, { label: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
-  'sync-onedrive': { label: 'OneDrive sync', Icon: UploadCloud },
-  'rescan-receipts': { label: 'Receipt re-scan', Icon: ScanLine },
-  'ai-fill-items': { label: 'AI fill', Icon: Sparkles },
+const KIND: Record<string, { labelKey: TKey; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
+  'sync-onedrive': { labelKey: 'jobs.kSync', Icon: UploadCloud },
+  'rescan-receipts': { labelKey: 'jobs.kRescan', Icon: ScanLine },
+  'ai-fill-items': { labelKey: 'jobs.kFill', Icon: Sparkles },
 };
-
-function ago(iso: string): string {
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-}
 
 function dur(fromIso: string, toIso: string | null): string {
   const ms = (toIso ? new Date(toIso).getTime() : Date.now()) - new Date(fromIso).getTime();
@@ -39,6 +34,7 @@ export function JobsPageClient({
   initialJobs: JobRow[];
   sync: { ok: boolean; error?: string; count: number };
 }) {
+  const t = useT();
   const [jobs, setJobs] = useState<JobRow[]>(initialJobs);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
@@ -68,8 +64,8 @@ export function JobsPageClient({
     setMsg(null);
     start(async () => {
       const r = await enqueueOnedriveSync();
-      if (!r.ok) setMsg(r.error || 'Could not start sync.');
-      else setMsg(`Syncing ${r.count} file${r.count === 1 ? '' : 's'}…`);
+      if (!r.ok) setMsg(r.error || t('jobs.cannotStart'));
+      else setMsg(t('jobs.syncingN', { n: r.count ?? 0 }));
       await refresh();
     });
   }
@@ -86,41 +82,41 @@ export function JobsPageClient({
       <div className="flex items-end justify-between gap-4 flex-wrap mb-1">
         <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2.5" style={{ fontFamily: 'var(--font-display)' }}>
           <Activity size={24} className="text-[color:var(--color-accent)]" />
-          Jobs
+          {t('nav.jobs')}
           <span className="text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
             {jobs.length}
           </span>
         </h1>
         <button onClick={refresh} disabled={pending} className="flex items-center gap-1.5 text-xs text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]" style={{ fontFamily: 'var(--font-mono)' }}>
-          <RefreshCw size={13} className={cn(pending && 'animate-spin')} /> refresh
+          <RefreshCw size={13} className={cn(pending && 'animate-spin')} /> {t('common.refresh')}
         </button>
       </div>
       <p className="text-xs text-[color:var(--color-text-faint)] mb-5">
-        Background tasks run on the server and keep going if you close the tab. Start them here and watch live progress.
+        {t('jobs.intro')}
       </p>
 
       {/* Start a job */}
       <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 mb-6">
-        <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>Start a job</p>
+        <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>{t('jobs.startSection')}</p>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="grid place-items-center w-9 h-9 rounded-xl bg-[color:var(--color-cyan)]/10 text-[color:var(--color-cyan)] shrink-0">
               <UploadCloud size={18} />
             </span>
             <div className="min-w-0">
-              <div className="text-sm font-medium">Sync files to OneDrive</div>
+              <div className="text-sm font-medium">{t('jobs.syncTitle')}</div>
               <div className="text-[11px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
-                {sync.ok ? `${sync.count} file${sync.count === 1 ? '' : 's'} ready to mirror` : sync.error || 'Not available'}
+                {sync.ok ? t('jobs.filesReady', { n: sync.count }) : sync.error || t('jobs.notAvailable')}
               </div>
             </div>
           </div>
           {sync.ok ? (
             <Button variant="primary" size="md" onClick={startSync} disabled={pending || syncRunning}>
-              {syncRunning ? <><Loader2 size={14} className="animate-spin" /> Syncing…</> : <><UploadCloud size={14} /> Sync now</>}
+              {syncRunning ? <><Loader2 size={14} className="animate-spin" /> {t('jobs.syncing')}</> : <><UploadCloud size={14} /> {t('jobs.syncNow')}</>}
             </Button>
           ) : (
             <Link href="/settings" className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]">
-              <Settings size={13} /> Set up in Settings
+              <Settings size={13} /> {t('jobs.setUp')}
             </Link>
           )}
         </div>
@@ -131,18 +127,19 @@ export function JobsPageClient({
       {jobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--color-border)] py-16 text-center">
           <Activity size={30} className="mx-auto text-[color:var(--color-text-faint)] opacity-40" />
-          <p className="mt-3 text-sm text-[color:var(--color-text-dim)]">No jobs yet.</p>
-          <p className="text-xs text-[color:var(--color-text-faint)]">AI fills, receipt re-scans and syncs show up here.</p>
+          <p className="mt-3 text-sm text-[color:var(--color-text-dim)]">{t('jobs.empty')}</p>
+          <p className="text-xs text-[color:var(--color-text-faint)]">{t('jobs.emptyHint')}</p>
         </div>
       ) : (
         <div className="space-y-2">
           {jobs.map((j) => {
-            const meta = KIND[j.kind] ?? { label: j.kind, Icon: Activity };
-            const Icon = meta.Icon;
+            const meta = KIND[j.kind];
+            const Icon = meta?.Icon ?? Activity;
+            const kindLabel = meta ? t(meta.labelKey) : j.kind;
             const pct = j.total > 0 ? Math.round((j.done / j.total) * 100) : j.status === 'done' ? 100 : 0;
             const running = j.status === 'running';
             return (
-              <div key={j._id} onClick={() => openDetail(j._id)} title="View details" className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3 cursor-pointer hover:border-[color:var(--color-border-light)] transition-colors" style={{ fontFamily: 'var(--font-mono)' }}>
+              <div key={j._id} onClick={() => openDetail(j._id)} title={t('jobs.viewDetails')} className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3 cursor-pointer hover:border-[color:var(--color-border-light)] transition-colors" style={{ fontFamily: 'var(--font-mono)' }}>
                 <div className="flex items-center gap-2.5 mb-2">
                   <Icon size={16} className="shrink-0 text-[color:var(--color-text-dim)]" />
                   <div className="min-w-0 flex-1">
@@ -151,10 +148,10 @@ export function JobsPageClient({
                       <StatusBadge status={j.status} />
                     </div>
                     <div className="text-[10px] text-[color:var(--color-text-faint)]">
-                      {meta.label} · {running ? `started ${ago(j.createdAt)}` : j.finishedAt ? `finished ${ago(j.finishedAt)}` : ago(j.createdAt)}
+                      {kindLabel} · {running ? t('jobs.started', { ago: relTime(j.createdAt, t) }) : j.finishedAt ? t('jobs.finished', { ago: relTime(j.finishedAt, t) }) : relTime(j.createdAt, t)}
                     </div>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); dismiss(j._id); }} title={running ? 'Stop' : 'Dismiss'} className="shrink-0 grid place-items-center w-7 h-7 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)]">
+                  <button onClick={(e) => { e.stopPropagation(); dismiss(j._id); }} title={running ? t('jobs.stop') : t('jobs.dismiss')} className="shrink-0 grid place-items-center w-7 h-7 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)]">
                     <X size={15} />
                   </button>
                 </div>
@@ -167,9 +164,9 @@ export function JobsPageClient({
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-[color:var(--color-text-faint)]">
                   <span>
-                    {j.done}/{j.total}{!running && j.total > 0 ? ` · ${j.ok} ok` : ''}
+                    {j.done}/{j.total}{!running && j.total > 0 ? ` · ${t('jobs.okCount', { n: j.ok })}` : ''}
                   </span>
-                  {running && <span className="truncate max-w-[55%]">{j.current ? `↻ ${j.current}` : 'starting…'}</span>}
+                  {running && <span className="truncate max-w-[55%]">{j.current ? `↻ ${j.current}` : t('jobs.starting')}</span>}
                 </div>
                 {j.error && <p className="mt-1 text-[10px] text-[color:var(--color-red)] truncate">{j.error}</p>}
                 {!j.error && j.lastLabel && (
@@ -184,7 +181,7 @@ export function JobsPageClient({
         </div>
       )}
 
-      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detail?.title || 'Job'} size="lg">
+      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detail?.title || t('nav.jobs')} size="lg">
         {!detail ? (
           <div className="py-12 grid place-items-center text-[color:var(--color-text-faint)]"><Loader2 size={20} className="animate-spin" /></div>
         ) : (
@@ -196,9 +193,11 @@ export function JobsPageClient({
 }
 
 function JobDetailView({ d }: { d: JobDetail }) {
+  const t = useT();
   const [failedOnly, setFailedOnly] = useState(false);
-  const meta = KIND[d.kind] ?? { label: d.kind, Icon: Activity };
-  const Icon = meta.Icon;
+  const meta = KIND[d.kind];
+  const Icon = meta?.Icon ?? Activity;
+  const kindLabel = meta ? t(meta.labelKey) : d.kind;
   const failed = Math.max(0, d.done - d.ok);
   const hasOutcomes = d.results.length > 0;
   const failedResults = d.results.filter((r) => !r.ok);
@@ -207,18 +206,18 @@ function JobDetailView({ d }: { d: JobDetail }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-        <span className="flex items-center gap-1"><Icon size={12} /> {meta.label}</span>
+        <span className="flex items-center gap-1"><Icon size={12} /> {kindLabel}</span>
         <StatusBadge status={d.status} />
-        <span>started {ago(d.createdAt)}</span>
-        {d.finishedAt && <span>· finished {ago(d.finishedAt)}</span>}
-        <span>· took {dur(d.createdAt, d.finishedAt)}</span>
-        {d.kind === 'rescan-receipts' && <span>· {d.useOcr ? 'OCR' : 'text'} mode</span>}
+        <span>{t('jobs.started', { ago: relTime(d.createdAt, t) })}</span>
+        {d.finishedAt && <span>· {t('jobs.finished', { ago: relTime(d.finishedAt, t) })}</span>}
+        <span>· {t('jobs.took', { dur: dur(d.createdAt, d.finishedAt) })}</span>
+        {d.kind === 'rescan-receipts' && <span>· {d.useOcr ? t('jobs.ocrMode') : t('jobs.textMode')}</span>}
       </div>
 
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="total" value={d.total} />
-        <Stat label="ok" value={d.ok} tone="ok" />
-        {d.status === 'running' ? <Stat label="done" value={d.done} /> : <Stat label="failed" value={failed} tone={failed ? 'bad' : undefined} />}
+        <Stat label={t('jobs.total')} value={d.total} />
+        <Stat label={t('jobs.ok')} value={d.ok} tone="ok" />
+        {d.status === 'running' ? <Stat label={t('jobs.done')} value={d.done} /> : <Stat label={t('jobs.failed')} value={failed} tone={failed ? 'bad' : undefined} />}
       </div>
 
       {d.error && <p className="text-xs text-[color:var(--color-red)] bg-[color:var(--color-red)]/10 rounded-lg px-3 py-2 break-words">{d.error}</p>}
@@ -226,7 +225,7 @@ function JobDetailView({ d }: { d: JobDetail }) {
       <div>
         <div className="flex items-center justify-between mb-1.5">
           <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            {hasOutcomes ? (failedOnly ? `Failed · ${failedResults.length}` : `Items · ${baseRows.length}`) : `Work list · ${d.itemCount}`}
+            {hasOutcomes ? (failedOnly ? t('jobs.failedN', { n: failedResults.length }) : t('jobs.items', { n: baseRows.length })) : t('jobs.workList', { n: d.itemCount })}
           </p>
           {hasOutcomes && failedResults.length > 0 && (
             <button
@@ -239,12 +238,12 @@ function JobDetailView({ d }: { d: JobDetail }) {
               )}
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              {failedOnly ? 'show all' : `failed only · ${failedResults.length}`}
+              {failedOnly ? t('jobs.showAll') : t('jobs.failedOnly', { n: failedResults.length })}
             </button>
           )}
         </div>
         {rows.length === 0 ? (
-          <p className="text-xs text-[color:var(--color-text-faint)]">{failedOnly ? 'No failures.' : 'No items recorded.'}</p>
+          <p className="text-xs text-[color:var(--color-text-faint)]">{failedOnly ? t('jobs.noFailures') : t('jobs.noItems')}</p>
         ) : (
           <div className="max-h-[42vh] overflow-y-auto rounded-lg border border-[color:var(--color-border)] divide-y divide-[color:var(--color-border)]">
             {rows.map((r, i) => {
@@ -273,7 +272,7 @@ function JobDetailView({ d }: { d: JobDetail }) {
           </div>
         )}
         {!hasOutcomes && d.status !== 'running' && (
-          <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5">Per-item outcomes weren&apos;t recorded for this older job — showing its work list. Run it again to capture per-item results.</p>
+          <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5">{t('jobs.olderJob')}</p>
         )}
       </div>
     </div>
@@ -290,9 +289,10 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: 'ok
 }
 
 function StatusBadge({ status }: { status: 'running' | 'done' | 'error' }) {
+  const t = useT();
   if (status === 'running')
-    return <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-accent)]"><Loader2 size={10} className="animate-spin" /> running</span>;
+    return <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-accent)]"><Loader2 size={10} className="animate-spin" /> {t('jobs.running')}</span>;
   if (status === 'error')
-    return <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-red)]"><XCircle size={10} /> error</span>;
-  return <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)]"><CheckCircle2 size={10} className="text-[color:var(--color-accent)]" /> done</span>;
+    return <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-red)]"><XCircle size={10} /> {t('jobs.error')}</span>;
+  return <span className="flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)]"><CheckCircle2 size={10} className="text-[color:var(--color-accent)]" /> {t('jobs.done')}</span>;
 }
