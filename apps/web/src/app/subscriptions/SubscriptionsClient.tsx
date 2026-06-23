@@ -11,6 +11,8 @@ import { cn } from '@/components/ui/cn';
 import { CardSelect } from '@/components/CardSelect';
 import { useOpenParam } from '@/components/useOpenParam';
 import type { SerializedSubscription, SerializedCard } from '@/types';
+import { useT } from '@/components/LocaleProvider';
+import type { TKey } from '@/lib/i18n';
 import {
   createSubscription,
   updateSubscription,
@@ -82,6 +84,7 @@ export function SubscriptionsClient({
   const [editing, setEditing] = useState<SerializedSubscription | null>(null);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const t = useT();
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'cancelled'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'amount' | 'renewal'>('name');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
@@ -140,11 +143,11 @@ export function SubscriptionsClient({
   const fLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';
   const filterControls = (
     <div className="space-y-4">
-      <Input icon={<Search size={14} />} placeholder="Search name, provider..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <Input icon={<Search size={14} />} placeholder={t('sub.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
       <div>
-        <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>Status</p>
+        <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.status')}</p>
         <div className="flex flex-col gap-1">
-          {([['all', 'All'], ['active', 'Active'], ['cancelled', 'Cancelled']] as const).map(([v, l]) => (
+          {([['all', 'All'], ['active', 'Active'], ['cancelled', 'Cancelled']] as const).map(([v]) => (
             <button
               key={v}
               onClick={() => setStatusFilter(v)}
@@ -154,23 +157,23 @@ export function SubscriptionsClient({
               )}
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              {l}
+              {v === 'all' ? t('common.all') : v === 'active' ? t('v.fActive') : t('sub.fCancelled')}
             </button>
           ))}
         </div>
       </div>
       {categories.length > 1 && (
         <div>
-          <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>Category</p>
-          <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder="All categories" clearable size="sm" className="w-full" />
+          <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.category')}</p>
+          <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={categories} placeholder={t('sub.allCategories')} clearable size="sm" className="w-full" />
         </div>
       )}
       <div>
-        <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>Sort</p>
+        <p className={fLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.sort')}</p>
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={selectClass} style={{ fontFamily: 'var(--font-mono)' }}>
-          <option value="name">Name A→Z</option>
-          <option value="amount">Cost high→low</option>
-          <option value="renewal">Next renewal</option>
+          <option value="name">{t('sub.sortName')}</option>
+          <option value="amount">{t('sub.sortCost')}</option>
+          <option value="renewal">{t('sub.sortRenewal')}</option>
         </select>
       </div>
       {anyF && (
@@ -179,7 +182,7 @@ export function SubscriptionsClient({
           className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          reset filters
+          {t('common.resetFilters')}
         </button>
       )}
     </div>
@@ -191,12 +194,12 @@ export function SubscriptionsClient({
       <div className="mb-5">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            Subscriptions
+            {t('nav.subscriptions')}
             <span
               className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              {active.length} active
+              {t('v.activeCount', { n: active.length })}
             </span>
           </h1>
           <div className="flex items-center gap-4">
@@ -205,13 +208,13 @@ export function SubscriptionsClient({
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               <span>
-                monthly{' '}
+                {t('sub.monthly')}{' '}
                 <span className="text-[color:var(--color-accent)] font-semibold">
                   {cur()}{monthlyTotal.toFixed(2)}
                 </span>
               </span>
               <span>
-                yearly{' '}
+                {t('sub.yearly')}{' '}
                 <span className="text-[color:var(--color-gold)] font-semibold">
                   {cur()}{yearlyTotal.toFixed(0)}
                 </span>
@@ -222,7 +225,7 @@ export function SubscriptionsClient({
                 <button
                   key={v}
                   onClick={() => setLayout(v)}
-                  title={v === 'grid' ? 'Grid' : 'List'}
+                  title={v === 'grid' ? t('v.grid') : t('v.list')}
                   className={cn('px-2 py-1.5 rounded-md transition-colors', layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
                 >
                   {icon}
@@ -230,7 +233,7 @@ export function SubscriptionsClient({
               ))}
             </div>
             <Button variant="primary" onClick={() => setShowCreate(true)}>
-              <Plus size={16} strokeWidth={2.5} /> New
+              <Plus size={16} strokeWidth={2.5} /> {t('common.new')}
             </Button>
           </div>
         </div>
@@ -243,7 +246,7 @@ export function SubscriptionsClient({
             className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-3"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
-            Upcoming renewals (30 days)
+            {t('sub.upcoming')}
           </h3>
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
             {upcoming.map((s) => {
@@ -306,7 +309,7 @@ export function SubscriptionsClient({
       </div>
 
       {/* Create */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New Subscription" size="xl">
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t('sub.newSubscription')} size="xl">
         <SubForm cards={cards} onSuccess={() => setShowCreate(false)} />
       </Modal>
 
@@ -323,21 +326,22 @@ export function SubscriptionsClient({
 // ─── Sub Card ──────────────────────────────────────────────────────────────
 
 function SubCard({ sub, onEdit }: { sub: SerializedSubscription; onEdit: () => void }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
   const meta = categoryMeta(sub.category);
 
   async function handleDelete() {
     const ok = await confirm({
-      title: 'Delete subscription',
-      message: `Delete "${sub.name}"?`,
-      confirmLabel: 'Delete',
+      title: t('sub.deleteSubscription'),
+      message: t('sub.confirmDelete', { name: sub.name }),
+      confirmLabel: t('common.delete'),
       danger: true,
     });
     if (ok) startTransition(() => deleteSubscription(sub._id));
   }
   const d = daysUntil(sub.nextRenewal);
-  const cycleLabel = CYCLES.find((c) => c.value === sub.billingCycle)?.label ?? sub.billingCycle;
+  const cycleLabel = CYCLES.find((c) => c.value === sub.billingCycle) ? t(`cyc.${sub.billingCycle}` as TKey) : sub.billingCycle;
 
   return (
     <div className="group bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-4 hover:border-[color:var(--color-border-light)] transition-all">
@@ -380,7 +384,7 @@ function SubCard({ sub, onEdit }: { sub: SerializedSubscription; onEdit: () => v
           )}
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          renews {d < 0 ? 'overdue' : d === 0 ? 'today' : `in ${d}d`}
+          {t('sub.renews')} {d < 0 ? t('sub.overdue') : d === 0 ? t('sub.today') : t('sub.inD', { d })}
         </div>
       )}
 
@@ -432,6 +436,7 @@ function SubCard({ sub, onEdit }: { sub: SerializedSubscription; onEdit: () => v
 // ─── Sub Form ──────────────────────────────────────────────────────────────
 
 function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscription; cards: SerializedCard[]; onSuccess: () => void; onDeleted?: () => void }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
   const [form, setForm] = useState({
@@ -491,19 +496,19 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
 
   async function handleDelete() {
     if (!sub) return;
-    const ok = await confirm({ title: 'Delete subscription', message: `Delete "${sub.name}"?`, confirmLabel: 'Delete', danger: true });
+    const ok = await confirm({ title: t('sub.deleteSubscription'), message: t('sub.confirmDelete', { name: sub.name }), confirmLabel: t('common.delete'), danger: true });
     if (ok) startTransition(async () => { await deleteSubscription(sub._id); onDeleted?.(); });
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <Field label="Name *">
+      <Field label={t('sub.fName')}>
         <div className="flex gap-2">
           <Input
             value={form.name}
             onChange={set('name')}
             required
-            placeholder="e.g. YouTube Premium, Netflix, iCloud+"
+            placeholder={t('sub.fNamePlaceholder')}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -519,7 +524,7 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
             className="shrink-0"
           >
             {aiPending ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            AI fill
+            {t('v.fillAi')}
           </Button>
         </div>
         {aiMsg && (
@@ -529,10 +534,10 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
         )}
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Provider">
-          <Input value={form.provider} onChange={set('provider')} placeholder="Apple, Google..." />
+        <Field label={t('sub.fProvider')}>
+          <Input value={form.provider} onChange={set('provider')} placeholder={t('sub.fProviderPlaceholder')} />
         </Field>
-        <Field label="Category">
+        <Field label={t('sub.fCategory')}>
           <select value={form.category} onChange={set('category')} className={selectClass}>
             {subCategoryOptions(form.category).map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
@@ -541,29 +546,29 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label={`Amount (${cur()}) *`}>
+        <Field label={t('sub.fAmount', { cur: cur() })}>
           <Input type="number" step="0.01" min="0" value={form.amount} onChange={set('amount')} required placeholder="9.99" />
         </Field>
-        <Field label="Billing cycle">
+        <Field label={t('sub.fBillingCycle')}>
           <select value={form.billingCycle} onChange={set('billingCycle')} className={selectClass}>
             {CYCLES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
+              <option key={c.value} value={c.value}>{t(`cyc.${c.value}` as TKey)}</option>
             ))}
           </select>
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Start date">
+        <Field label={t('sub.fStartDate')}>
           <Input type="date" value={form.startDate} onChange={set('startDate')} />
         </Field>
-        <Field label="Payment">
+        <Field label={t('sub.fPayment')}>
           <CardSelect cards={cards} value={form.paymentMethod} onChange={(v) => setForm((p) => ({ ...p, paymentMethod: v }))} />
         </Field>
       </div>
       <Field label="URL">
         <Input value={form.url} onChange={set('url')} placeholder="https://..." />
       </Field>
-      <Field label="Notes">
+      <Field label={t('sub.fNotes')}>
         <textarea
           value={form.notes}
           onChange={set('notes')}
@@ -573,11 +578,11 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
       </Field>
       <div className="flex gap-3 pt-2">
         <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? 'Saving...' : sub ? 'Save' : 'Create'}
+          {pending ? t('v.saving') : sub ? t('common.save') : t('v.create')}
         </Button>
         {sub && onDeleted && (
           <Button type="button" variant="danger" size="sm" className="ml-auto" onClick={handleDelete} disabled={pending}>
-            <Trash2 size={13} /> Delete
+            <Trash2 size={13} /> {t('common.delete')}
           </Button>
         )}
       </div>

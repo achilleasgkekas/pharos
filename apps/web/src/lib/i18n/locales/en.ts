@@ -61,6 +61,10 @@ export const en = {
   'common.selectAll': 'Select all',
   'common.deselectAll': 'Deselect all',
   'common.cannotUndo': 'This cannot be undone.',
+  'common.status': 'Status',
+  'common.category': 'Category',
+  'common.sort': 'Sort',
+  'common.resetFilters': 'reset filters',
 
   // ── Home page ────────────────────────────────────────────────────────────
   'home.heroA': 'One light over',
@@ -243,6 +247,41 @@ export const en = {
   'v.fNotes': 'Notes',
   'v.saving': 'Saving...',
   'v.create': 'Create',
+
+  // ── Billing cycles (shared) ──────────────────────────────────────────────
+  'cyc.weekly': 'Weekly',
+  'cyc.monthly': 'Monthly',
+  'cyc.quarterly': 'Quarterly',
+  'cyc.yearly': 'Yearly',
+  'cyc.lifetime': 'Lifetime',
+
+  // ── Subscriptions ────────────────────────────────────────────────────────
+  'sub.monthly': 'monthly',
+  'sub.yearly': 'yearly',
+  'sub.upcoming': 'Upcoming renewals (30 days)',
+  'sub.fCancelled': 'Cancelled',
+  'sub.sortName': 'Name A→Z',
+  'sub.sortCost': 'Cost high→low',
+  'sub.sortRenewal': 'Next renewal',
+  'sub.allCategories': 'All categories',
+  'sub.searchPlaceholder': 'Search name, provider...',
+  'sub.newSubscription': 'New Subscription',
+  'sub.renews': 'renews',
+  'sub.overdue': 'overdue',
+  'sub.today': 'today',
+  'sub.inD': 'in {d}d',
+  'sub.deleteSubscription': 'Delete subscription',
+  'sub.confirmDelete': 'Delete "{name}"?',
+  'sub.fName': 'Name *',
+  'sub.fNamePlaceholder': 'e.g. YouTube Premium, Netflix, iCloud+',
+  'sub.fProvider': 'Provider',
+  'sub.fProviderPlaceholder': 'Apple, Google...',
+  'sub.fCategory': 'Category',
+  'sub.fAmount': 'Amount ({cur}) *',
+  'sub.fBillingCycle': 'Billing cycle',
+  'sub.fStartDate': 'Start date',
+  'sub.fPayment': 'Payment',
+  'sub.fNotes': 'Notes',
 
   // ── Language switcher ────────────────────────────────────────────────────
   'lang.language': 'Language',
