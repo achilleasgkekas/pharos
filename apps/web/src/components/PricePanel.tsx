@@ -7,6 +7,10 @@ import type { SerializedItem } from '@/types';
 import { logItemPrice, setItemTarget, refreshItemPrices, type PriceRefresh } from '@/app/items/actions';
 import { getBulkAiGuard } from '@/app/jobActions';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { useT } from '@/components/LocaleProvider';
+import type { TKey } from '@/lib/i18n';
+
+const VERDICT_KEY: Record<string, TKey> = { deal: 'pp.vDeal', dropping: 'pp.vDropping', rising: 'pp.vRising', good: 'pp.vGood', high: 'pp.vHigh' };
 
 const PriceHistoryChart = dynamic(() => import('@/components/PriceHistoryChart').then((m) => m.PriceHistoryChart), { ssr: false });
 
@@ -67,6 +71,7 @@ const money = (n: number) => `${cur()}${Math.round(n * 100) / 100}`;
 
 export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: { item: SerializedItem; summary?: boolean; onChanged?: () => void; onSearchOnline?: () => void }) {
   const s = useMemo(() => priceStatus(item), [item]);
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [logging, setLogging] = useState(false);
   const [editTarget, setEditTarget] = useState(false);
@@ -90,9 +95,9 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
     });
   }
   function saveTarget() {
-    const t = Number(targetVal);
+    const tv = Number(targetVal);
     startTransition(async () => {
-      await setItemTarget(item._id, t > 0 ? t : null);
+      await setItemTarget(item._id, tv > 0 ? tv : null);
       setEditTarget(false);
       onChanged?.();
     });
@@ -108,12 +113,12 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
     const g = await getBulkAiGuard();
     if (g.confirm) {
       const ok = await confirm({
-        title: 'Refresh tracked prices?',
+        title: t('pp.confirmRefresh'),
         message:
           g.provider === 'anthropic'
-            ? `Re-reads ${linkCount} store${linkCount === 1 ? '' : 's'} with ${g.model} (~$0.02 each).`
-            : `Re-reads ${linkCount} store${linkCount === 1 ? '' : 's'} with ${g.model}. Local, free but slow.`,
-        confirmLabel: 'Refresh',
+            ? t('pp.confirmRefreshCloud', { n: linkCount, model: g.model })
+            : t('pp.confirmRefreshLocal', { n: linkCount, model: g.model }),
+        confirmLabel: t('pp.refresh'),
       });
       if (!ok) return;
     }
@@ -133,11 +138,11 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
     <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
         <span className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-          {summary ? 'Price' : 'Price history'}
+          {summary ? t('pp.price') : t('pp.priceHistory')}
         </span>
         {summary && v.label && (
           <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${v.cls}`} style={{ fontFamily: 'var(--font-mono)' }}>
-            {v.icon && <v.icon size={12} />}{v.label}
+            {v.icon && <v.icon size={12} />}{t(VERDICT_KEY[s.verdict] ?? 'pp.vGood')}
           </span>
         )}
       </div>
@@ -151,13 +156,13 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
                 {s.bestNow ? money(s.bestNow.price) : '—'}
               </span>
               {s.bestNow?.store && (
-                <span className="text-xs text-[color:var(--color-text-dim)] pb-0.5">at {s.bestNow.store}</span>
+                <span className="text-xs text-[color:var(--color-text-dim)] pb-0.5">{t('it.at')} {s.bestNow.store}</span>
               )}
             </div>
             {s.trend !== 0 && (
               <span className={`inline-flex items-center gap-1 text-xs font-semibold ${s.trend < 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-gold)]'}`} style={{ fontFamily: 'var(--font-mono)' }}>
                 {s.trend < 0 ? <TrendingDown size={13} /> : <TrendingUp size={13} />}
-                {s.trend < 0 ? 'down' : 'up'} {money(Math.abs(s.trend))}
+                {s.trend < 0 ? t('pp.down') : t('pp.up')} {money(Math.abs(s.trend))}
               </span>
             )}
           </div>
@@ -176,9 +181,9 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
                 />
               </div>
               <div className="flex justify-between mt-1.5 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                <span className="text-[color:var(--color-accent)]">{money(s.lo!)} lowest</span>
-                {s.target != null && <span className="text-[color:var(--color-cyan)]">◆ target {money(s.target)}</span>}
-                <span>{money(s.hi!)} highest</span>
+                <span className="text-[color:var(--color-accent)]">{t('pp.lowest', { x: money(s.lo!) })}</span>
+                {s.target != null && <span className="text-[color:var(--color-cyan)]">{t('pp.targetBar', { x: money(s.target) })}</span>}
+                <span>{t('pp.highest', { x: money(s.hi!) })}</span>
               </div>
             </div>
           )}
@@ -186,14 +191,14 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
           {/* Where to buy — cheapest first, each opens the store */}
           {s.stores.length >= 1 && (
             <div className="mt-3.5">
-              <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>Where to buy</p>
+              <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{t('it.whereToBuy')}</p>
               <div className="space-y-1">
                 {s.stores.slice(0, 5).map((st, i) => (
                   <a key={i} href={st.url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 text-xs rounded-lg px-2.5 py-1.5 bg-[color:var(--color-surface-2)] hover:bg-[color:var(--color-surface-3)] transition-colors group">
                     <span className={`w-1.5 h-1.5 rounded-full ${i === 0 ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]'}`} />
                     <span className="flex-1 truncate text-[color:var(--color-text-dim)]">{st.store}</span>
-                    {i === 0 && s.stores.length > 1 && <span className="text-[9px] font-bold text-[color:var(--color-accent)] uppercase">cheapest</span>}
+                    {i === 0 && s.stores.length > 1 && <span className="text-[9px] font-bold text-[color:var(--color-accent)] uppercase">{t('pp.cheapest')}</span>}
                     <span className="font-bold text-[color:var(--color-text)]" style={{ fontFamily: 'var(--font-mono)' }}>{money(st.price)}</span>
                     <ExternalLink size={11} className="text-[color:var(--color-text-faint)] group-hover:text-[color:var(--color-cyan)]" />
                   </a>
@@ -208,17 +213,17 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
               <span className="flex items-center gap-1.5">
                 <Target size={13} className="text-[color:var(--color-cyan)]" />
                 <input autoFocus type="number" value={targetVal} onChange={(e) => setTargetVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveTarget()}
-                  placeholder={`${cur()} target`} className="w-24 text-xs px-2 py-1 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-cyan)] outline-none" style={{ fontFamily: 'var(--font-mono)' }} />
+                  placeholder={t('pp.targetPlaceholder', { cur: cur() })} className="w-24 text-xs px-2 py-1 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-cyan)] outline-none" style={{ fontFamily: 'var(--font-mono)' }} />
                 <button onClick={saveTarget} disabled={pending} className="text-[color:var(--color-accent)]"><Check size={14} /></button>
-                <button onClick={() => { setEditTarget(false); setTargetVal(s.target ? String(s.target) : ''); }} className="text-[color:var(--color-text-faint)]">cancel</button>
+                <button onClick={() => { setEditTarget(false); setTargetVal(s.target ? String(s.target) : ''); }} className="text-[color:var(--color-text-faint)]">{t('common.cancel')}</button>
               </span>
             ) : (
               <button onClick={() => setEditTarget(true)} className="flex items-center gap-1.5 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors">
                 <Target size={13} className="text-[color:var(--color-cyan)]" />
                 {s.target ? (
-                  <>target <b className="text-[color:var(--color-text)]">{money(s.target)}</b>{toGo != null && (toGo <= 0 ? <span className="text-[color:var(--color-accent)]"> · reached ✓</span> : <span className="text-[color:var(--color-text-faint)]"> · {money(toGo)} to go</span>)}</>
+                  <>{t('it.targetWord')} <b className="text-[color:var(--color-text)]">{money(s.target)}</b>{toGo != null && (toGo <= 0 ? <span className="text-[color:var(--color-accent)]"> · {t('pp.reached')}</span> : <span className="text-[color:var(--color-text-faint)]"> · {t('pp.toGo', { x: money(toGo) })}</span>)}</>
                 ) : (
-                  <>set a target</>
+                  <>{t('pp.setTarget')}</>
                 )}
                 <Pencil size={11} className="text-[color:var(--color-text-faint)]" />
               </button>
@@ -226,18 +231,18 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
 
             <div className="ml-auto flex items-center gap-3">
               {linkCount >= 1 && (
-                <button onClick={runRefresh} disabled={refreshing} title="Re-check the stores you already track for price changes" className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors disabled:opacity-50">
-                  {refreshing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {refreshing ? 'refreshing…' : 'refresh prices'}
+                <button onClick={runRefresh} disabled={refreshing} title={t('pp.refreshTitle')} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors disabled:opacity-50">
+                  {refreshing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {refreshing ? t('pp.refreshing') : t('pp.refreshPrices')}
                 </button>
               )}
               {onSearchOnline && (
                 <button onClick={onSearchOnline} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors">
-                  <Search size={13} /> search online
+                  <Search size={13} /> {t('pp.searchOnline')}
                 </button>
               )}
               {!logging && (
                 <button onClick={() => setLogging(true)} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors">
-                  <Plus size={13} /> log a price
+                  <Plus size={13} /> {t('pp.logPrice')}
                 </button>
               )}
             </div>
@@ -261,7 +266,7 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
                   {r.changed === 'error' ? (
                     <span className="text-[color:var(--color-gold)] truncate">{r.error}</span>
                   ) : r.changed === 'same' ? (
-                    <span className="text-[color:var(--color-text-faint)]">unchanged{r.newPrice != null ? ` · ${money(r.newPrice)}` : ''}</span>
+                    <span className="text-[color:var(--color-text-faint)]">{t('pp.unchanged')}{r.newPrice != null ? ` · ${money(r.newPrice)}` : ''}</span>
                   ) : (
                     <span className="text-[color:var(--color-text)]">
                       {r.oldPrice != null ? money(r.oldPrice) : '—'} → <b>{r.newPrice != null ? money(r.newPrice) : '—'}</b>
@@ -275,14 +280,14 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
           {logging && (
             <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
               <input autoFocus type="number" value={price} onChange={(e) => setPrice(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitPrice()}
-                placeholder={`${cur()} price`} className="w-24 text-xs px-2.5 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" style={{ fontFamily: 'var(--font-mono)' }} />
+                placeholder={t('pp.pricePlaceholder', { cur: cur() })} className="w-24 text-xs px-2.5 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" style={{ fontFamily: 'var(--font-mono)' }} />
               <input value={store} onChange={(e) => setStore(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitPrice()} list="price-stores"
-                placeholder="store" className="w-28 text-xs px-2.5 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" />
+                placeholder={t('pp.storePlaceholder')} className="w-28 text-xs px-2.5 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" />
               <datalist id="price-stores">{storeNames.map((st) => <option key={st} value={st} />)}</datalist>
               <button onClick={submitPrice} disabled={pending || !(Number(price) > 0)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
-                {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+                {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}
               </button>
-              <button onClick={() => setLogging(false)} className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">cancel</button>
+              <button onClick={() => setLogging(false)} className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">{t('common.cancel')}</button>
             </div>
           )}
         </>
@@ -293,7 +298,7 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
         <div className={summary ? 'mt-3.5 pt-3 border-t border-[color:var(--color-border)]' : ''}>
           <button onClick={() => setShowFull((f) => !f)} className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors" style={{ fontFamily: 'var(--font-mono)' }}>
             <ChevronDown size={13} className={`transition-transform ${showFull ? 'rotate-180' : ''}`} />
-            Full history · {sortedHist.length} {summary ? 'checks' : ''}
+            {t('pp.fullHistory', { n: sortedHist.length })}{summary ? ` ${t('pp.checks')}` : ''}
           </button>
           {showFull && (
             <div className="mt-3">
