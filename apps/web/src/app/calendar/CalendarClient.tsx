@@ -1,5 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useT } from '@/components/LocaleProvider';
+import type { TKey } from '@/lib/i18n';
 import { CalendarClock, Layers, ShieldCheck, Ticket, Wallet, Banknote, CalendarDays, List, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -147,6 +149,7 @@ function MonthGrid({ month }: { month: MonthBlock }) {
 }
 
 export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[]; dueThisMonth: number }) {
+  const t = useT();
   const [view, setView] = useState<View>('month');
   const [monthIdx, setMonthIdx] = useState(0);
 
@@ -169,11 +172,11 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
     <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
         <h1 className="text-2xl md:text-3xl font-bold" style={display}>
-          Calendar
-          <span className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]" style={mono}>next 3 months</span>
+          {t('nav.calendar')}
+          <span className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]" style={mono}>{t('cal.next3')}</span>
         </h1>
         <span className="text-xs text-[color:var(--color-text-dim)]" style={mono}>
-          due this month <span className="text-[color:var(--color-gold)] font-bold">{fmt(dueThisMonth)}</span>
+          {t('cal.dueThisMonth')} <span className="text-[color:var(--color-gold)] font-bold">{fmt(dueThisMonth)}</span>
         </span>
       </div>
 
@@ -190,14 +193,14 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
                 : 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
             )}
           >
-            {v.icon} {v.label}
+            {v.icon} {t(`cal.${v.id}` as TKey)}
           </button>
         ))}
       </div>
 
       {empty ? (
         <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-8 text-center text-sm text-[color:var(--color-text-dim)]">
-          Nothing scheduled — renewals, installments, recurring bills and expiries will show up here.
+          {t('cal.empty')}
         </div>
       ) : view === 'month' ? (
         <section>
@@ -208,9 +211,9 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
             <div className="text-center">
               <h2 className="text-sm font-bold uppercase tracking-[0.1em]" style={mono}>{m.label}</h2>
               <span className="text-[11px] text-[color:var(--color-text-faint)]" style={mono}>
-                {m.out > 0 && <>out <span className="text-[color:var(--color-red)]">{fmt(m.out)}</span></>}
-                {m.inc > 0 && <> · in <span className="text-[color:var(--color-accent)]">{fmt(m.inc)}</span></>}
-                {m.out === 0 && m.inc === 0 && 'nothing due'}
+                {m.out > 0 && <>{t('cal.out')} <span className="text-[color:var(--color-red)]">{fmt(m.out)}</span></>}
+                {m.inc > 0 && <> · {t('cal.in')} <span className="text-[color:var(--color-accent)]">{fmt(m.inc)}</span></>}
+                {m.out === 0 && m.inc === 0 && t('cal.nothingDue')}
               </span>
             </div>
             <button onClick={() => setMonthIdx((i) => Math.min(months.length - 1, i + 1))} disabled={monthIdx >= months.length - 1} className="p-1.5 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
@@ -225,12 +228,12 @@ export function CalendarClient({ months, dueThisMonth }: { months: MonthBlock[];
             <div className="flex items-baseline justify-between mb-2 pb-1.5 border-b border-[color:var(--color-border)]">
               <h2 className="text-sm font-bold uppercase tracking-[0.1em]" style={mono}>{mb.label}</h2>
               <span className="text-[11px] text-[color:var(--color-text-faint)]" style={mono}>
-                {mb.out > 0 && <>out <span className="text-[color:var(--color-red)]">{fmt(mb.out)}</span></>}
-                {mb.inc > 0 && <> · in <span className="text-[color:var(--color-accent)]">{fmt(mb.inc)}</span></>}
+                {mb.out > 0 && <>{t('cal.out')} <span className="text-[color:var(--color-red)]">{fmt(mb.out)}</span></>}
+                {mb.inc > 0 && <> · {t('cal.in')} <span className="text-[color:var(--color-accent)]">{fmt(mb.inc)}</span></>}
               </span>
             </div>
             {mb.entries.length === 0 ? (
-              <p className="text-xs text-[color:var(--color-text-faint)] italic py-2">Nothing scheduled.</p>
+              <p className="text-xs text-[color:var(--color-text-faint)] italic py-2">{t('cal.nothingScheduled')}</p>
             ) : (
               <div className="space-y-1.5">
                 {mb.entries.map((e, i) => <EntryRow key={i} e={e} />)}

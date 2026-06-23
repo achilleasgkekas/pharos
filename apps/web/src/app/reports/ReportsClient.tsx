@@ -1,5 +1,6 @@
 'use client';
 import { cur } from "@/lib/money";
+import { useT } from '@/components/LocaleProvider';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -75,6 +76,7 @@ function fmtDate(s: string): string {
 }
 
 export function ReportsClient({ data, months = 12 }: { data: Data; months?: number }) {
+  const t = useT();
   const s = data.summary;
   const spend12 = data.monthlySpend.reduce((a, m) => a + m.total, 0);
   const avgMonth = Math.round(spend12 / Math.max(1, data.monthlySpend.filter((m) => m.total > 0).length || 1));
@@ -83,7 +85,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
     <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       <div className="mb-6 flex items-end justify-between gap-4 flex-wrap">
         <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-          Reports
+          {t('nav.reports')}
         </h1>
         <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
           {[6, 12, 24].map((m) => (
@@ -102,29 +104,29 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
       <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-surface)] to-[color:var(--color-surface-2)] p-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>Net position</p>
+            <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netPosition')}</p>
             <p className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: s.ownedValue - s.installmentsRemaining >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
               {cur()}{(s.ownedValue - s.installmentsRemaining).toLocaleString('en-GB')}
             </p>
           </div>
           <div className="flex gap-5 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">Inventory value</span><span className="text-[color:var(--color-text)] text-sm">{cur()}{s.ownedValue.toLocaleString('en-GB')}</span></div>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">Owed · installments</span><span className="text-[color:var(--color-red)] text-sm">-{cur()}{s.installmentsRemaining.toLocaleString('en-GB')}</span></div>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">Card balance</span><span className="text-[color:var(--color-gold)] text-sm">{cur()}{s.outstanding.toLocaleString('en-GB')}</span></div>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.inventoryValue')}</span><span className="text-[color:var(--color-text)] text-sm">{cur()}{s.ownedValue.toLocaleString('en-GB')}</span></div>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.owed')}</span><span className="text-[color:var(--color-red)] text-sm">-{cur()}{s.installmentsRemaining.toLocaleString('en-GB')}</span></div>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.cardBalance')}</span><span className="text-[color:var(--color-gold)] text-sm">{cur()}{s.outstanding.toLocaleString('en-GB')}</span></div>
           </div>
         </div>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Stat icon={<ReceiptIcon size={14} />} label="Receipts total" value={`${cur()}${s.receiptsTotal.toLocaleString('en-GB')}`} sub={`${s.receiptsCount} receipts · ${cur()}${s.receiptsVat} VAT`} />
-        <Stat icon={<TrendingUp size={14} />} label="Spend / month avg" value={`${cur()}${avgMonth.toLocaleString('en-GB')}`} sub={`${cur()}${spend12.toLocaleString('en-GB')} last 12mo`} />
-        <Stat icon={<CreditCard size={14} />} label="Cards balance" value={`${cur()}${s.outstanding.toLocaleString('en-GB')}`} sub={`${s.installmentsCount} installments · ${cur()}${s.installmentsRemaining} left`} accent="var(--color-gold)" />
-        <Stat icon={<CalendarClock size={14} />} label="Subscriptions" value={`${cur()}${s.monthlySubs}/mo`} sub={`${cur()}${s.monthlySubs * 12}/yr`} />
+        <Stat icon={<ReceiptIcon size={14} />} label={t('reports.receiptsTotal')} value={`${cur()}${s.receiptsTotal.toLocaleString('en-GB')}`} sub={t('reports.receiptsSub', { n: s.receiptsCount, vat: `${cur()}${s.receiptsVat}` })} />
+        <Stat icon={<TrendingUp size={14} />} label={t('reports.spendAvg')} value={`${cur()}${avgMonth.toLocaleString('en-GB')}`} sub={t('reports.spendAvgSub', { x: `${cur()}${spend12.toLocaleString('en-GB')}` })} />
+        <Stat icon={<CreditCard size={14} />} label={t('reports.cardsBalance')} value={`${cur()}${s.outstanding.toLocaleString('en-GB')}`} sub={t('reports.cardsBalanceSub', { n: s.installmentsCount, x: `${cur()}${s.installmentsRemaining}` })} accent="var(--color-gold)" />
+        <Stat icon={<CalendarClock size={14} />} label={t('nav.subscriptions')} value={`${cur()}${s.monthlySubs}/mo`} sub={`${cur()}${s.monthlySubs * 12}/yr`} />
       </div>
 
       {/* Monthly spend — full width hero chart */}
-      <Card title="Monthly spend · last 12 months" className="mb-4">
+      <Card title={t('reports.cMonthlySpend')} className="mb-4">
         {spend12 === 0 ? (
           <Empty />
         ) : (
@@ -141,7 +143,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
               <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} />
               <Tooltip
                 contentStyle={tooltipStyle}
-                formatter={(v: number, _n, p) => [`${cur()}${v} · ${(p?.payload?.count ?? 0)} receipts`, 'spent']}
+                formatter={(v: number, _n, p) => [`${cur()}${v} · ${(p?.payload?.count ?? 0)} receipts`, t('reports.spent')]}
                 cursor={{ stroke: 'var(--color-accent)', strokeWidth: 1, strokeOpacity: 0.3 }}
               />
               <Area type="monotone" dataKey="total" stroke="#00ff88" strokeWidth={2} fill="url(#spendGrad)" />
@@ -151,20 +153,20 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
       </Card>
 
       {/* Income vs Expense (cash flow) */}
-      <Card title="Cash flow · income vs expense · last 12 months">
+      <Card title={t('reports.cCashFlow')}>
         {data.incomeExpense.every((m) => m.income === 0 && m.expense === 0) ? (
-          <Empty text="No income or expenses logged yet" />
+          <Empty text={t('reports.noCashFlow')} />
         ) : (
           <>
             <div className="flex flex-wrap gap-x-5 gap-y-1 mb-3 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
               <span className="text-[color:var(--color-text-dim)]">
-                This month: <span className="text-[color:var(--color-accent)]">+{cur()}{s.incomeMonth.toLocaleString('en-GB')}</span> in · <span className="text-[color:var(--color-red)]">-{cur()}{s.expenseMonth.toLocaleString('en-GB')}</span> out · net{' '}
+                {t('reports.thisMonth')} <span className="text-[color:var(--color-accent)]">+{cur()}{s.incomeMonth.toLocaleString('en-GB')}</span> {t('reports.in')} · <span className="text-[color:var(--color-red)]">-{cur()}{s.expenseMonth.toLocaleString('en-GB')}</span> {t('reports.out')} · {t('reports.net')}{' '}
                 <span className={s.incomeMonth - s.expenseMonth >= 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>
                   {cur()}{(s.incomeMonth - s.expenseMonth).toLocaleString('en-GB')}
                 </span>
               </span>
               <span className="text-[color:var(--color-text-dim)]">
-                This year: net{' '}
+                {t('reports.thisYear')} {t('reports.net')}{' '}
                 <span className={s.incomeYear - s.expenseYear >= 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>
                   {cur()}{(s.incomeYear - s.expenseYear).toLocaleString('en-GB')}
                 </span>
@@ -177,8 +179,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                 <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [`${cur()}${v.toLocaleString('en-GB')}`, n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="income" name="Income" radius={[5, 5, 0, 0]} fill="#00ff88" />
-                <Bar dataKey="expense" name="Expense" radius={[5, 5, 0, 0]} fill="#ff4757" />
+                <Bar dataKey="income" name={t('nav.income')} radius={[5, 5, 0, 0]} fill="#00ff88" />
+                <Bar dataKey="expense" name={t('reports.expense')} radius={[5, 5, 0, 0]} fill="#ff4757" />
               </BarChart>
             </ResponsiveContainer>
           </>
@@ -187,7 +189,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
 
       {/* Budget · this month (per category, actual vs budget) */}
       {data.budgetVsActual.length > 0 && (
-        <Card title="Budget · this month">
+        <Card title={t('reports.cBudget')}>
           <div className="space-y-2.5">
             {data.budgetVsActual.map((b) => {
               const pct = b.budget > 0 ? Math.min(100, Math.round((b.actual / b.budget) * 100)) : 0;
@@ -212,7 +214,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Upcoming installment obligations */}
-        <Card title="Upcoming installments · next 6 months">
+        <Card title={t('reports.cInstallments')}>
           {data.upcomingInstallments.every((m) => m.amount === 0) ? (
             <Empty text="No active installments" />
           ) : (
@@ -229,7 +231,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
 
         {/* Spending by store */}
-        <Card title="Spending by store · top 8">
+        <Card title={t('reports.cByStore')}>
           {data.spendByStore.length === 0 ? (
             <Empty />
           ) : (
@@ -249,7 +251,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
 
         {/* Spend by category (owned items) */}
-        <Card title="Inventory value by category">
+        <Card title={t('reports.cInvByCat')}>
           {data.spendByCategory.length === 0 ? (
             <Empty />
           ) : (
@@ -268,7 +270,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
 
         {/* Expenses by category (bills) */}
-        <Card title="Expenses by category">
+        <Card title={t('reports.cExpByCat')}>
           {data.expenseByCategory.length === 0 ? (
             <Empty text="No expenses logged yet" />
           ) : (
@@ -288,7 +290,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
 
         {/* Subscriptions monthly by category */}
-        <Card title={`Subscriptions (monthly ${cur()}) by category`}>
+        <Card title={t('reports.cSubsByCat', { cur: cur() })}>
           {data.subsByCategory.length === 0 ? (
             <Empty text="No active subscriptions" />
           ) : (
@@ -309,9 +311,9 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
 
         {/* Warranties expiring */}
-        <Card title="Warranties expiring · next 150 days">
+        <Card title={t('reports.cWarranties')}>
           {data.warrantiesExpiring.length === 0 ? (
-            <Empty text="Nothing expiring soon" />
+            <Empty text={t('reports.nothingExpiring')} />
           ) : (
             <div className="space-y-1.5">
               {data.warrantiesExpiring.map((w, i) => {
@@ -333,7 +335,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </Card>
 
         {/* Biggest purchases */}
-        <Card title="Biggest purchases">
+        <Card title={t('reports.cBiggest')}>
           {data.biggestPurchases.length === 0 ? (
             <Empty />
           ) : (
@@ -422,6 +424,7 @@ function Card({ title, children, className }: { title: string; children: React.R
   );
 }
 
-function Empty({ text = 'No data yet' }: { text?: string }) {
-  return <div className="h-[180px] flex items-center justify-center text-xs text-[color:var(--color-text-faint)]">{text}</div>;
+function Empty({ text }: { text?: string }) {
+  const t = useT();
+  return <div className="h-[180px] flex items-center justify-center text-xs text-[color:var(--color-text-faint)]">{text ?? t('reports.noData')}</div>;
 }
