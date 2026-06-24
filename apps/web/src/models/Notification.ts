@@ -8,7 +8,8 @@ const NotificationSchema = new Schema(
   {
     dedupeKey: { type: String, required: true, index: true },
     kind: { type: String, enum: ['deal', 'installment', 'warranty', 'system'], default: 'system', index: true },
-    title: { type: String, required: true },
+    title: { type: String, default: '' }, // optional — installments derive their heading in the bell
+
     body: { type: String, default: '' },
     href: { type: String, default: '' }, // deep-link opened on click
     read: { type: Boolean, default: false, index: true },

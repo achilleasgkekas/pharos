@@ -129,8 +129,10 @@ export async function getNotifications(): Promise<{ items: SerializedNotificatio
     lastGen = now;
     try {
       await generateNotifications();
-    } catch {
-      /* never let a generation hiccup break the bell */
+    } catch (e) {
+      // Don't break the bell, but make failures visible (this caught a silent
+      // insertMany validation error during development).
+      console.error('[notifications] generation failed:', e);
     }
   }
   const docs = (await Notification.find().sort({ read: 1, createdAt: -1 }).limit(40).lean()) as Array<Parameters<typeof serialize>[0]>;
