@@ -226,7 +226,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
               <AiSettings ai={info.ai} ollamaUp={info.ollamaUp} />
               <ScraperAiSettings scraperAi={info.scraperAi} installed={info.ai.installed} hasAnthropicKey={info.ai.hasKey} />
               <AiPromptsManager prompts={info.prompts} />
-              <Section title="Mobile / MCP" icon={<Plug size={15} />}>
+              <Section title={t('set.mobileMcpTitle')} icon={<Plug size={15} />}>
                 <McpManager />
               </Section>
             </>
@@ -270,10 +270,11 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 // ─── AI master switch + per-feature toggles ─────────────────────────────────
 
 function AiStatusChip({ status }: { status: 'ready' | 'no-provider' | 'disabled' }) {
+  const t = useT();
   const map = {
-    ready: { label: 'ready', cls: 'text-[color:var(--color-accent)] border-[color:var(--color-accent)]' },
-    'no-provider': { label: 'no provider', cls: 'text-[color:var(--color-gold)] border-[color:var(--color-gold)]' },
-    disabled: { label: 'off', cls: 'text-[color:var(--color-text-faint)] border-[color:var(--color-border)]' },
+    ready: { label: t('af.ready'), cls: 'text-[color:var(--color-accent)] border-[color:var(--color-accent)]' },
+    'no-provider': { label: t('af.noProvider'), cls: 'text-[color:var(--color-gold)] border-[color:var(--color-gold)]' },
+    disabled: { label: t('af.statusOff'), cls: 'text-[color:var(--color-text-faint)] border-[color:var(--color-border)]' },
   }[status];
   return (
     <span className={cn('text-[9px] uppercase px-1.5 py-0.5 rounded-full border', map.cls)} style={{ fontFamily: 'var(--font-mono)' }}>
@@ -282,7 +283,14 @@ function AiStatusChip({ status }: { status: 'ready' | 'no-provider' | 'disabled'
   );
 }
 
+const AREA_KEY: Record<string, TKey> = {
+  Documents: 'af.areaDocuments',
+  'Shopping & items': 'af.areaShopping',
+  Assistant: 'af.areaAssistant',
+};
+
 function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) {
+  const t = useT();
   const [enabled, setEnabled] = useState(ai.enabled);
   const [features, setFeatures] = useState<Record<string, boolean>>(ai.features);
   const [, startTransition] = useTransition();
@@ -303,20 +311,20 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
   const areas = [...new Set(AI_FEATURES.map((f) => f.area))];
 
   return (
-    <Section title="AI features" icon={<Sparkles size={15} />}>
+    <Section title={t('set.aiFeaturesTitle')} icon={<Sparkles size={15} />}>
       <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
-        The app works fully without AI. Turn the whole engine off, or pick exactly which features use it.
+        {t('set.aiFeaturesDesc')}
       </p>
 
       <div className="flex items-center justify-between rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2.5 mb-3">
         <div>
-          <div className="text-sm font-medium">Enable AI features</div>
-          <div className="text-xs text-[color:var(--color-text-faint)]">Master switch for everything below.</div>
+          <div className="text-sm font-medium">{t('set.enableAi')}</div>
+          <div className="text-xs text-[color:var(--color-text-faint)]">{t('set.enableAiDesc')}</div>
         </div>
         {canEdit ? (
           <Switch checked={enabled} onChange={toggleMaster} />
         ) : (
-          <span className="text-xs text-[color:var(--color-text-faint)]">{enabled ? 'On' : 'Off'}</span>
+          <span className="text-xs text-[color:var(--color-text-faint)]">{enabled ? t('set.on') : t('set.off')}</span>
         )}
       </div>
 
@@ -324,17 +332,17 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
         {areas.map((area) => (
           <div key={area}>
             <div className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-              {area}
+              {AREA_KEY[area] ? t(AREA_KEY[area]) : area}
             </div>
             <div className="space-y-1.5">
               {AI_FEATURES.filter((f) => f.area === area).map((f) => (
                 <div key={f.key} className="flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2">
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium flex items-center gap-2">
-                      {f.label}
+                      {t(('af.' + f.key) as TKey)}
                       <AiStatusChip status={statusOf(f.key)} />
                     </div>
-                    <div className="text-xs text-[color:var(--color-text-faint)]">{f.description}</div>
+                    <div className="text-xs text-[color:var(--color-text-faint)]">{t(('af.' + f.key + 'Desc') as TKey)}</div>
                   </div>
                   {canEdit && <Switch checked={features[f.key] !== false} onChange={(v) => toggleFeature(f.key, v)} />}
                 </div>
@@ -346,7 +354,7 @@ function AiMasterAndFeatures({ ai, canEdit }: { ai: AiInfo; canEdit: boolean }) 
 
       {enabled && !ai.ready && (
         <p className="text-[11px] text-[color:var(--color-gold)] mt-3">
-          ⚠ No AI provider is reachable yet. Configure one below for these features to work.
+          {t('set.noProviderWarn')}
         </p>
       )}
     </Section>
@@ -503,6 +511,7 @@ function CloudKeyModel({
 }
 
 function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [provider, setProvider] = useState<ProviderId>(ai.selectedProvider);
   const [ollamaHost, setOllamaHost] = useState(ai.ollamaHost);
@@ -576,7 +585,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   const installedNames = ai.installed.map((m) => m.name);
 
   return (
-    <Section title="AI engine" icon={<Sparkles size={15} />}>
+    <Section title={t('set.aiEngineTitle')} icon={<Sparkles size={15} />}>
       {/* Provider toggle */}
       <Row label="Provider">
         <div className="flex gap-1.5 flex-wrap">
@@ -902,6 +911,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
 // ─── Scraper AI (separate provider/model) ────────────────────────────────────
 
 function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperAi: ScraperAiConfig; installed: { name: string; sizeGB: number }[]; hasAnthropicKey: boolean }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [provider, setProvider] = useState<'ollama' | 'anthropic'>(scraperAi.provider);
   const [model, setModel] = useState(scraperAi.model);
@@ -921,7 +931,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
   }
 
   return (
-    <Section title="Scraper AI" icon={<Globe size={15} />}>
+    <Section title={t('set.scraperAiTitle')} icon={<Globe size={15} />}>
       <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
         The price scraper runs on its own schedule (every 6h). Give it a lighter/cheaper model than the rest of the app — price extraction is a simple text task.
       </p>
@@ -1001,8 +1011,9 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
 // ─── Editable AI prompts ─────────────────────────────────────────────────────
 
 function AiPromptsManager({ prompts }: { prompts: PromptEditorEntry[] }) {
+  const t = useT();
   return (
-    <Section title="AI prompts" icon={<MessageSquareCode size={15} />}>
+    <Section title={t('set.aiPromptsTitle')} icon={<MessageSquareCode size={15} />}>
       <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
         Every AI instruction the app sends. Edit one to tune extraction; reset any to restore the built-in default.
       </p>
