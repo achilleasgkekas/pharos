@@ -379,6 +379,7 @@ function ModelPicker({
   recommend?: { model: string; reason: string };
   hint?: string;
 }) {
+  const t = useT();
   const [models, setModels] = useState<FetchedModel[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -391,14 +392,14 @@ function ModelPicker({
     try {
       const r = await fetchProviderModels(provider, typedKey.trim() || undefined, baseUrl?.trim() || undefined);
       if (r.ok && r.models) setModels(r.models);
-      else setErr(r.error || 'Failed to load models');
+      else setErr(r.error || t('set.failedLoadModels'));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Field label="Model">
+    <Field label={t('set.modelField')}>
       <input value={model} onChange={(e) => onModel(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
       <div className="flex items-center gap-2 mt-2 flex-wrap">
         <button
@@ -407,7 +408,7 @@ function ModelPicker({
           disabled={loading || !canLoad}
           className="flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50"
         >
-          {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Load models
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} {t('set.loadModels')}
         </button>
         {recommend && (
           <button
@@ -420,11 +421,11 @@ function ModelPicker({
             <Star size={10} /> {recommend.model}
           </button>
         )}
-        {!canLoad && <span className="text-[10px] text-[color:var(--color-text-faint)]">add a key to load models</span>}
+        {!canLoad && <span className="text-[10px] text-[color:var(--color-text-faint)]">{t('set.addKeyToLoad')}</span>}
       </div>
       {recommend && (
         <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5">
-          Recommended: <span className="text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>{recommend.model}</span> — {recommend.reason}
+          {t('set.recommendedLabel')} <span className="text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>{recommend.model}</span> — {recommend.reason}
         </p>
       )}
       {err && <p className="text-[10px] text-[color:var(--color-red)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>{err}</p>}
@@ -449,7 +450,7 @@ function ModelPicker({
             ))}
           </div>
           <p className="text-[9px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
-            $ = input/output per 1M tokens · approximate (OpenRouter is live)
+            {t('set.tokenPricing')}
           </p>
         </>
       ) : (
@@ -482,9 +483,10 @@ function CloudKeyModel({
   hint?: string;
   baseUrl?: string;
 }) {
+  const t = useT();
   return (
     <div className="space-y-3 pt-1">
-      <Field label={`API key ${hasKey ? '(saved ✓ — leave blank to keep)' : ''}`}>
+      <Field label={`${t('set.apiKey')} ${hasKey ? t('set.apiKeySavedSuffix') : ''}`}>
         <input
           type="password"
           value={keyValue}
@@ -587,7 +589,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   return (
     <Section title={t('set.aiEngineTitle')} icon={<Sparkles size={15} />}>
       {/* Provider toggle */}
-      <Row label="Provider">
+      <Row label={t('set.provider')}>
         <div className="flex gap-1.5 flex-wrap">
           {([
             { v: 'ollama', label: 'Ollama', icon: <Server size={13} /> },
@@ -619,25 +621,25 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
         (provider === 'gemini' && !ai.hasGeminiKey) ||
         (provider === 'openrouter' && !ai.hasOpenrouterKey)) && (
         <p className="text-[11px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
-          No API key saved yet — parsing falls back to Ollama until you add one.
+          {t('set.noKeyFallback')}
         </p>
       )}
       {provider !== 'ollama' && provider !== 'anthropic' && (
         <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-          Note: the AI command bar (navbar) still needs Anthropic — this provider runs the parsing (receipts, statements, products).
+          {t('set.cmdBarNote')}
         </p>
       )}
 
       {/* Local (Ollama) panel */}
       {provider === 'ollama' && (
         <div className="space-y-3 pt-1">
-          <Row label="Status">
+          <Row label={t('set.aiStatus')}>
             <span className={ollamaUp ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>
-              ● {ollamaUp ? 'online' : 'offline / model not installed'}
+              ● {ollamaUp ? t('set.online') : t('set.offlineModel')}
             </span>
           </Row>
 
-          <Field label="Server URL (same machine or anywhere on the network)">
+          <Field label={t('set.serverUrl')}>
             <input
               value={ollamaHost}
               onChange={(e) => setOllamaHost(e.target.value)}
@@ -646,14 +648,14 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               style={{ fontFamily: 'var(--font-mono)' }}
             />
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
-              e.g. http://192.168.10.5:11434 for an Ollama on another box. Blank → the OLLAMA_HOST env.
+              {t('set.serverUrlHint')}
             </p>
           </Field>
 
-          <Field label="Text model (statements, specs)">
+          <Field label={t('set.textModel')}>
             {installedNames.length > 0 ? (
               <select value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} className={selectClass}>
-                {!installedNames.includes(ollamaModel) && <option value={ollamaModel}>{ollamaModel} (not installed)</option>}
+                {!installedNames.includes(ollamaModel) && <option value={ollamaModel}>{ollamaModel} {t('set.notInstalled')}</option>}
                 {ai.installed.map((m) => (
                   <option key={m.name} value={m.name}>
                     {m.name} · {m.sizeGB}GB
@@ -665,10 +667,10 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             )}
           </Field>
 
-          <Field label="Vision model (receipts, card scan)">
+          <Field label={t('set.visionModel')}>
             {installedNames.length > 0 ? (
               <select value={visionModel} onChange={(e) => setVisionModel(e.target.value)} className={selectClass}>
-                {!installedNames.includes(visionModel) && <option value={visionModel}>{visionModel} (not installed)</option>}
+                {!installedNames.includes(visionModel) && <option value={visionModel}>{visionModel} {t('set.notInstalled')}</option>}
                 {ai.installed.map((m) => (
                   <option key={m.name} value={m.name}>
                     {m.name} · {m.sizeGB}GB{isVisionName(m.name) ? '' : ' · text-only ⚠'}
@@ -680,17 +682,17 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             )}
             {visionModel && !isVisionName(visionModel) && (
               <p className="text-[10px] text-[color:var(--color-red)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
-                ⚠ This model can&apos;t read images — pick qwen2.5vl / minicpm-v / llava.
+                {t('set.visionWarn')}
               </p>
             )}
           </Field>
 
-          <Field label="Download a model">
+          <Field label={t('set.downloadModel')}>
             <div className="flex gap-1.5">
               <input
                 value={pullName}
                 onChange={(e) => setPullName(e.target.value)}
-                placeholder="e.g. qwen2.5vl:7b"
+                placeholder={t('set.modelPlaceholder')}
                 className={inputClass}
                 style={{ fontFamily: 'var(--font-mono)' }}
               />
@@ -700,7 +702,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
                 disabled={pending || !pullName.trim()}
                 className="flex items-center gap-1.5 shrink-0 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50"
               >
-                {pending ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Download
+                {pending ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} {t('set.download')}
               </button>
             </div>
             <div className="flex flex-wrap gap-1.5 mt-2">
@@ -724,8 +726,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               })}
             </div>
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-              Receipts/cards need a vision model (qwen2.5vl / minicpm-v / llava). Or run{' '}
-              <code className="text-[color:var(--color-cyan)]">ollama pull &lt;name&gt;</code> in a terminal.
+              {t('set.visionModelHint')}
             </p>
           </Field>
         </div>
@@ -734,7 +735,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
       {/* Anthropic panel */}
       {provider === 'anthropic' && (
         <div className="space-y-3 pt-1">
-          <Field label={`API key ${ai.hasKey ? '(saved ✓ — leave blank to keep)' : ''}`}>
+          <Field label={`${t('set.apiKey')} ${ai.hasKey ? t('set.apiKeySavedSuffix') : ''}`}>
             <input
               type="password"
               value={apiKey}
@@ -761,7 +762,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               disabled={pending}
               className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-cyan)] text-[color:var(--color-cyan)] transition-colors disabled:opacity-50"
             >
-              Test connection
+              {t('set.testConnection')}
             </button>
             {test && (
               <span
@@ -773,7 +774,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             )}
           </div>
           <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            Used for receipts, statements & product specs. Images + text both supported by Claude.
+            {t('set.anthropicNote')}
           </p>
         </div>
       )}
@@ -789,7 +790,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
           model={openaiModel}
           onModel={setOpenaiModel}
           suggestions={OPENAI_SUGGESTIONS}
-          hint="Pick a vision-capable model (gpt-4o / gpt-4o-mini) so receipt images parse too."
+          hint={t('set.openaiHint')}
         />
       )}
 
@@ -804,7 +805,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
           model={geminiModel}
           onModel={setGeminiModel}
           suggestions={GEMINI_SUGGESTIONS}
-          hint="Gemini Flash models read images natively — good cheap default."
+          hint={t('set.geminiHint')}
         />
       )}
 
@@ -819,14 +820,14 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
           model={openrouterModel}
           onModel={setOpenrouterModel}
           suggestions={OPENROUTER_SUGGESTIONS}
-          hint="One key, every model — use provider/model ids from openrouter.ai/models."
+          hint={t('set.openrouterHint')}
         />
       )}
 
       {/* Custom OpenAI-compatible server panel */}
       {provider === 'custom' && (
         <div className="space-y-3 pt-1">
-          <Field label="Base URL (OpenAI-compatible)">
+          <Field label={t('set.baseUrlOpenai')}>
             <input
               value={customBaseUrl}
               onChange={(e) => setCustomBaseUrl(e.target.value)}
@@ -835,7 +836,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               style={{ fontFamily: 'var(--font-mono)' }}
             />
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
-              Works with LM Studio, Groq, Mistral, DeepSeek, vLLM… anything speaking the OpenAI chat API.
+              {t('set.baseUrlHint')}
             </p>
           </Field>
           <CloudKeyModel
@@ -844,11 +845,11 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             hasKey={ai.hasCustomKey}
             keyValue={customKey}
             onKey={setCustomKey}
-            keyPlaceholder="(optional for local servers)"
+            keyPlaceholder={t('set.customKeyPlaceholder')}
             model={customModel}
             onModel={setCustomModel}
             suggestions={[]}
-            hint="Model id exactly as the server expects it."
+            hint={t('set.customHint')}
           />
         </div>
       )}
@@ -858,10 +859,10 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-medium flex items-center gap-1.5">
-              <ShieldCheck size={13} className="text-[color:var(--color-gold)]" /> Confirm before bulk AI
+              <ShieldCheck size={13} className="text-[color:var(--color-gold)]" /> {t('set.confirmBulk')}
             </p>
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">
-              Shows a cost estimate and asks before starting a bulk job — guards against accidental cloud charges.
+              {t('set.confirmBulkDesc')}
             </p>
           </div>
           <button
@@ -893,7 +894,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
           disabled={pending}
           className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
         >
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save AI settings
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.saveAi')}
         </button>
         {msg && (
           <span
@@ -935,7 +936,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
       <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
         The price scraper runs on its own schedule (every 6h). Give it a lighter/cheaper model than the rest of the app — price extraction is a simple text task.
       </p>
-      <Row label="Provider">
+      <Row label={t('set.provider')}>
         <div className="flex gap-1.5">
           {([
             { v: 'ollama', label: 'Ollama', icon: <Server size={13} /> },
@@ -959,11 +960,11 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
       </Row>
 
       {provider === 'ollama' ? (
-        <Field label="Scraper model">
+        <Field label={t('set.scraperModel')}>
           {installedNames.length > 0 ? (
             <select value={model} onChange={(e) => setModel(e.target.value)} className={selectClass}>
-              <option value="">Default (OLLAMA_MODEL env)</option>
-              {!installedNames.includes(model) && model && <option value={model}>{model} (not installed)</option>}
+              <option value="">{t('set.defaultOllamaEnv')}</option>
+              {!installedNames.includes(model) && model && <option value={model}>{model} {t('set.notInstalled')}</option>}
               {installed.map((m) => (
                 <option key={m.name} value={m.name}>
                   {m.name} · {m.sizeGB}GB{isVisionName(m.name) ? '' : ' · text'}
@@ -974,7 +975,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
             <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="qwen2.5:14b" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
           )}
           <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
-            Empty → falls back to the scraper&apos;s OLLAMA_MODEL env. A small text model (e.g. qwen2.5:7b) is plenty.
+            {t('set.scraperModelHint')}
           </p>
         </Field>
       ) : (
@@ -989,14 +990,14 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
             recommend={SCRAPER_RECOMMEND.anthropic}
           />
           <p className="text-[10px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            ⚠ Uses the Anthropic key from the AI engine above. Every 6h pass hits the API per link — prefer a cheap model (Haiku) or keep this Local.
+            {t('set.scraperAnthropicWarn')}
           </p>
         </div>
       )}
 
       <div className="flex items-center gap-3 pt-2 border-t border-[color:var(--color-border)] mt-1">
         <button type="button" onClick={save} disabled={pending} className={saveBtn}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save scraper AI
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.saveScraperAi')}
         </button>
         {msg && (
           <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -1015,7 +1016,7 @@ function AiPromptsManager({ prompts }: { prompts: PromptEditorEntry[] }) {
   return (
     <Section title={t('set.aiPromptsTitle')} icon={<MessageSquareCode size={15} />}>
       <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
-        Every AI instruction the app sends. Edit one to tune extraction; reset any to restore the built-in default.
+        {t('set.promptsDesc')}
       </p>
       <div className="space-y-2">
         {prompts.map((p) => (
@@ -1027,6 +1028,7 @@ function AiPromptsManager({ prompts }: { prompts: PromptEditorEntry[] }) {
 }
 
 function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [text, setText] = useState(entry.override || entry.defaultText);
@@ -1039,16 +1041,16 @@ function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
     startTransition(async () => {
       await savePrompt(entry.key, text);
       setOverridden(!!(text.trim() && text.trim() !== entry.defaultText.trim()));
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
       setTimeout(() => setMsg(null), 2000);
     });
   }
 
   async function reset() {
     const ok = await confirm({
-      title: 'Reset to default?',
-      message: `Restore the built-in "${entry.label}" prompt? Your custom version will be lost.`,
-      confirmLabel: 'Reset',
+      title: t('set.resetToDefaultQ'),
+      message: t('set.resetPromptConfirm', { label: entry.label }),
+      confirmLabel: t('set.resetBtn'),
       danger: true,
     });
     if (!ok) return;
@@ -1056,7 +1058,7 @@ function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
       await resetPrompt(entry.key);
       setText(entry.defaultText);
       setOverridden(false);
-      setMsg('Reset ✓');
+      setMsg(t('set.resetOk'));
       setTimeout(() => setMsg(null), 2000);
     });
   }
@@ -1076,7 +1078,7 @@ function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
                 className="text-[9px] px-1.5 py-0.5 rounded bg-[color:var(--color-gold)]/15 text-[color:var(--color-gold)] uppercase tracking-wider"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                edited
+                {t('set.edited')}
               </span>
             )}
           </div>
@@ -1096,10 +1098,10 @@ function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
           />
           <div className="flex items-center gap-2 flex-wrap">
             <button type="button" onClick={save} disabled={pending} className={saveBtn}>
-              {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+              {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}
             </button>
             <button type="button" onClick={reset} disabled={pending} className={ghostBtn}>
-              <RotateCcw size={13} /> Reset to default
+              <RotateCcw size={13} /> {t('set.resetDefault')}
             </button>
             {msg && (
               <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
