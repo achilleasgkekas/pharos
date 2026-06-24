@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { cn } from '@/components/ui/cn';
 import { useRouter } from 'next/navigation';
 import { findDuplicateReceipts, mergeReceipts, type DupGroup } from './actions';
+import { useT } from '@/components/LocaleProvider';
 
 function fileUrl(p: string) {
   return `/api/files/${p.split('/').map(encodeURIComponent).join('/')}`;
@@ -19,6 +20,7 @@ function fmtDate(s: string) {
 
 export function DuplicatesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
+  const t = useT();
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<DupGroup[]>([]);
   const [keepBy, setKeepBy] = useState<Record<string, string>>({});
@@ -58,23 +60,22 @@ export function DuplicatesModal({ open, onClose }: { open: boolean; onClose: () 
   const totalDupes = groups.reduce((s, g) => s + (g.receipts.length - 1), 0);
 
   return (
-    <Modal open={open} onClose={onClose} title="Find duplicate receipts" size="xl">
+    <Modal open={open} onClose={onClose} title={t('dup.title')} size="xl">
       {loading ? (
         <div className="py-16 flex flex-col items-center gap-3 text-[color:var(--color-text-dim)]">
           <Loader2 size={26} className="animate-spin" />
-          <p className="text-sm">Scanning for duplicates…</p>
+          <p className="text-sm">{t('dup.scanning')}</p>
         </div>
       ) : groups.length === 0 ? (
         <div className="py-16 text-center text-[color:var(--color-text-faint)]">
           <p className="text-5xl mb-3">✨</p>
-          <p className="text-sm">No duplicates found. Clean library!</p>
+          <p className="text-sm">{t('dup.none')}</p>
         </div>
       ) : (
         <div className="space-y-4">
           <p className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
             <Copy size={12} className="inline mr-1" />
-            {groups.length} group{groups.length === 1 ? '' : 's'} · {totalDupes} duplicate{totalDupes === 1 ? '' : 's'} to merge. Pick the
-            one to <b>keep</b> in each (defaults to the most complete); the rest merge into it.
+            {t('dup.intro', { groups: groups.length, dupes: totalDupes })}
           </p>
 
           {groups.map((grp) => {
@@ -94,12 +95,12 @@ export function DuplicatesModal({ open, onClose }: { open: boolean; onClose: () 
                   </span>
                   {merged ? (
                     <span className="text-[11px] text-[color:var(--color-accent)] flex items-center gap-1" style={{ fontFamily: 'var(--font-mono)' }}>
-                      <Check size={13} /> merged {merged}
+                      <Check size={13} /> {t('dup.merged', { n: merged })}
                     </span>
                   ) : (
                     <Button variant="primary" size="sm" onClick={() => handleMerge(grp)} disabled={busyKey === grp.key}>
                       {busyKey === grp.key ? <Loader2 size={13} className="animate-spin" /> : <Merge size={13} />}
-                      Merge {grp.receipts.length} → 1
+                      {t('dup.merge', { n: grp.receipts.length })}
                     </Button>
                   )}
                 </div>
@@ -139,14 +140,14 @@ export function DuplicatesModal({ open, onClose }: { open: boolean; onClose: () 
                           <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-1.5 text-[11px]">
                               {r.verified ? (
-                                <span className="text-[color:var(--color-accent)]">✓ verified</span>
+                                <span className="text-[color:var(--color-accent)]">{t('dup.verified')}</span>
                               ) : (
-                                <span className="text-[color:var(--color-gold)]">unverified</span>
+                                <span className="text-[color:var(--color-gold)]">{t('dup.unverified')}</span>
                               )}
-                              {isKeep && <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent)]">keep</span>}
+                              {isKeep && <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent)]">{t('dup.keep')}</span>}
                             </span>
                             <span className="block text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
-                              {r.lineItemCount} items · {r.itemCount} linked · {r.aiModel || 'manual'}
+                              {t('dup.itemStats', { items: r.lineItemCount, linked: r.itemCount, model: r.aiModel || 'manual' })}
                             </span>
                           </span>
                         </button>
@@ -161,7 +162,7 @@ export function DuplicatesModal({ open, onClose }: { open: boolean; onClose: () 
           {pending.length === 0 && (
             <div className="text-center pt-2">
               <Button variant="ghost" onClick={onClose}>
-                Done
+                {t('qv.done')}
               </Button>
             </div>
           )}

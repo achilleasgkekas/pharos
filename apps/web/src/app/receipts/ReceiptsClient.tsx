@@ -713,6 +713,7 @@ function ReceiptDetailModal({
   const [pending, startTransition] = useTransition();
   const isImage = receipt.fileType.startsWith('image/');
   const confirm = useConfirm();
+  const t = useT();
 
   const [addMsg, setAddMsg] = useState<string | null>(null);
   const [rescanMsg, setRescanMsg] = useState<string | null>(null);
@@ -741,13 +742,13 @@ function ReceiptDetailModal({
   // Re-run the AI scan on the stored file. The action returns the updated receipt,
   // so we re-sync the form (store/total/items) in place — no reopening needed.
   function handleRescan(useOcr: boolean) {
-    setRescanMsg(useOcr ? 'Re-scanning with OCR…' : 'Re-scanning…');
+    setRescanMsg(t('rc.rescanning'));
     startTransition(async () => {
       try {
         const r = await rescanReceipt(receipt._id, useOcr);
         if (r.ok && r.receipt) setForm(buildForm(r.receipt));
         setRescanMsg(
-          r.ok && r.aiUsed ? `Re-scanned ✓ (${r.model})` : `Failed: ${r.aiError || r.error || 'no result'}`
+          r.ok && r.aiUsed ? t('rc.rescannedOk', { model: r.model || '' }) : t('rc.rescanFailed', { err: r.aiError || r.error || 'no result' })
         );
       } catch (e) {
         // Catch a failed Server Action (e.g. stale bundle after a redeploy) so it
@@ -800,15 +801,15 @@ function ReceiptDetailModal({
   function handleAddToItems() {
     startTransition(async () => {
       const r = await addReceiptItemsToLibrary(receipt._id);
-      setAddMsg(r.ok ? `✓ ${r.created} new, ${r.linked} linked to Inventory` : r.error || 'Error');
+      setAddMsg(r.ok ? t('rc.addedToInventory', { created: r.created, linked: r.linked }) : r.error || 'Error');
     });
   }
 
   async function handleDelete() {
     const ok = await confirm({
-      title: 'Delete receipt',
-      message: `Delete receipt "${receipt.store}"?`,
-      confirmLabel: 'Delete',
+      title: t('rc.deleteReceipt'),
+      message: t('rc.confirmDeleteReceipt', { store: receipt.store }),
+      confirmLabel: t('common.delete'),
       danger: true,
     });
     if (!ok) return;
@@ -888,26 +889,26 @@ function ReceiptDetailModal({
         style={{ fontFamily: 'var(--font-mono)' }}
       >
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wide">Re-scan:</span>
+          <span className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wide">{t('rc.rescanLabel')}</span>
           <button
             onClick={() => handleRescan(true)}
             disabled={pending}
             className="text-[11px] px-2.5 py-1 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)] disabled:opacity-50"
           >
-            <Sparkles size={10} className="inline mr-0.5" /> OCR
+            <Sparkles size={10} className="inline mr-0.5" /> {t('rc.ocr')}
           </button>
           <button
             onClick={() => handleRescan(false)}
             disabled={pending}
             className="text-[11px] px-2.5 py-1 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)] hover:border-[color:var(--color-border-light)] hover:text-[color:var(--color-text)] disabled:opacity-50"
           >
-            no OCR
+            {t('rc.noOcr')}
           </button>
           {rescanMsg && <span className="text-[10px] text-[color:var(--color-text-dim)] truncate max-w-[200px]">{rescanMsg}</span>}
         </div>
         {receipt.aiModel && (
           <span className="text-[10px] text-[color:var(--color-text-faint)] flex items-center gap-1 shrink-0">
-            <Sparkles size={10} /> parsed by {receipt.aiModel}
+            <Sparkles size={10} /> {t('rc.parsedBy', { model: receipt.aiModel })}
           </span>
         )}
       </div>
@@ -942,7 +943,7 @@ function ReceiptDetailModal({
                 </a>
               ) : (
                 <a href={fileUrl(receipt.filePath)} target="_blank" rel="noopener noreferrer" className="md:hidden flex flex-col items-center justify-center gap-2 h-40 rounded-xl border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-cyan)]">
-                  <FileText size={28} strokeWidth={1.5} /> <span className="text-xs">Tap to open the PDF</span>
+                  <FileText size={28} strokeWidth={1.5} /> <span className="text-xs">{t('rc.tapToOpenPdf')}</span>
                 </a>
               )}
               <iframe
@@ -956,7 +957,7 @@ function ReceiptDetailModal({
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-1.5 text-xs text-[color:var(--color-cyan)] hover:underline"
               >
-                <FileText size={12} /> Open in new tab
+                <FileText size={12} /> {t('ex.openNewTab')}
               </a>
             </div>
           )}
@@ -965,50 +966,50 @@ function ReceiptDetailModal({
         {/* Edit form */}
         <div className="space-y-3 min-w-0">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Store">
+            <Field label={t('rc.fStore')}>
               <SearchableSelect
                 value={form.store}
                 onChange={(v) => setForm((p) => ({ ...p, store: v }))}
                 options={storeNames}
-                placeholder="pick or type a store"
+                placeholder={t('rc.fStorePlaceholder')}
                 allowCustom
               />
             </Field>
-            <Field label="Date">
+            <Field label={t('ex.fDate')}>
               <Input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
             </Field>
           </div>
           {/* Total — the key number, on its own wide row so it's never cramped */}
-          <Field label={`Total incl. VAT (${cur()})`}>
+          <Field label={t('rc.fTotal', { cur: cur() })}>
             <div className="flex items-center gap-2">
               <Input type="number" step="0.01" value={form.total} onChange={(e) => setForm((p) => ({ ...p, total: e.target.value }))} className="flex-1 min-w-0 text-base font-semibold" />
               <button
                 type="button"
                 onClick={fillTotalsFromItems}
                 disabled={form.lineItems.length === 0}
-                title="Fill total / net / VAT from the sum of the line items below"
+                title={t('rc.sumItemsTitle')}
                 className="shrink-0 px-2.5 py-2 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)] text-[11px] leading-none hover:border-[color:var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                ∑ items
+                {t('rc.sumItems')}
               </button>
             </div>
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Payment">
+            <Field label={t('sub.fPayment')}>
               <CardSelect cards={cards} value={form.paymentMethod} onChange={(v) => setForm((p) => ({ ...p, paymentMethod: v }))} />
             </Field>
-            <Field label="Warranty (months)">
+            <Field label={t('rc.fWarranty')}>
               <Input type="number" min="0" value={form.warrantyMonths} onChange={(e) => setForm((p) => ({ ...p, warrantyMonths: e.target.value }))} placeholder="24" />
             </Field>
           </div>
 
           {/* VAT breakdown */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Net (excl. VAT)">
+            <Field label={t('rc.fNet')}>
               <Input type="number" step="0.01" value={form.subtotal} onChange={(e) => setForm((p) => ({ ...p, subtotal: e.target.value }))} placeholder="net" />
             </Field>
-            <Field label={`VAT (${cur()})`}>
+            <Field label={t('rc.fVat', { cur: cur() })}>
               <Input type="number" step="0.01" value={form.vatAmount} onChange={(e) => setForm((p) => ({ ...p, vatAmount: e.target.value }))} placeholder="VAT" />
             </Field>
           </div>
@@ -1043,7 +1044,7 @@ function ReceiptDetailModal({
                       <input
                         value={li.refinedName}
                         onChange={(e) => updateLine(i, 'refinedName', e.target.value)}
-                        placeholder="Proper product name (AI)"
+                        placeholder={t('rc.itemNamePlaceholder')}
                         className="flex-1 min-w-0 bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-2 py-1.5 text-xs font-medium focus:outline-none focus:border-[color:var(--color-accent)]"
                       />
                       <input
@@ -1084,7 +1085,7 @@ function ReceiptDetailModal({
                       <input
                         value={li.name}
                         onChange={(e) => updateLine(i, 'name', e.target.value)}
-                        placeholder="raw receipt text"
+                        placeholder={t('rc.rawTextPlaceholder')}
                         className="flex-1 min-w-0 bg-transparent border-0 px-2 py-0.5 text-[10px] text-[color:var(--color-text-faint)] focus:outline-none focus:text-[color:var(--color-text-dim)]"
                         style={{ fontFamily: 'var(--font-mono)' }}
                       />
@@ -1092,7 +1093,7 @@ function ReceiptDetailModal({
                         className="shrink-0 flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)] whitespace-nowrap"
                         style={{ fontFamily: 'var(--font-mono)' }}
                       >
-                        <span>net {cur()}{net.toFixed(2)} · VAT {cur()}{vat.toFixed(2)} · gross</span>
+                        <span>{t('rc.netVatGross', { net: `${cur()}${net.toFixed(2)}`, vat: `${cur()}${vat.toFixed(2)}` })}</span>
                         <span className="text-[color:var(--color-text-dim)]">{cur()}</span>
                         <input
                           value={li.grossStr}
@@ -1115,7 +1116,7 @@ function ReceiptDetailModal({
             </div>
           </div>
 
-          <Field label="Notes">
+          <Field label={t('v.fNotes')}>
             <textarea
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
@@ -1134,7 +1135,7 @@ function ReceiptDetailModal({
                 disabled={pending}
                 className="w-full justify-center"
               >
-                <PackagePlus size={14} /> Add items to the Inventory
+                <PackagePlus size={14} /> {t('rc.addToInventory')}
               </Button>
               {addMsg && (
                 <p className="text-[10px] text-[color:var(--color-accent)] mt-1.5 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -1142,7 +1143,7 @@ function ReceiptDetailModal({
                 </p>
               )}
               <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1 text-center">
-                Creates/links Inventory items with proper names + links back to the receipt
+                {t('rc.addToInventoryHint')}
               </p>
             </div>
           )}
@@ -1150,18 +1151,18 @@ function ReceiptDetailModal({
           {/* Actions */}
           <div className="flex flex-wrap gap-2 pt-2 border-t border-[color:var(--color-border)]">
             <Button variant="primary" size="sm" onClick={() => save(true)} disabled={pending}>
-              <CheckCircle2 size={13} /> {receipt.verified ? 'Save' : 'Confirm'}
+              <CheckCircle2 size={13} /> {receipt.verified ? t('common.save') : t('common.confirm')}
             </Button>
             {receipt.verified && (
               <Button variant="secondary" size="sm" onClick={() => save(false)} disabled={pending}>
-                Unverify
+                {t('rc.unverify')}
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={handleArchive} disabled={pending} title={receipt.archived ? 'Restore — treat as a real receipt again' : 'Not a real receipt (shipping/order email) — hide it'}>
-              <Archive size={13} /> {receipt.archived ? 'Unarchive' : 'Not a receipt'}
+            <Button variant="ghost" size="sm" onClick={handleArchive} disabled={pending} title={receipt.archived ? t('rc.unarchiveTitle') : t('rc.archiveTitle')}>
+              <Archive size={13} /> {receipt.archived ? t('rc.unarchive') : t('rc.notReceipt')}
             </Button>
             <Button variant="danger" size="sm" onClick={handleDelete} disabled={pending} className="ml-auto">
-              <Trash2 size={13} /> Delete
+              <Trash2 size={13} /> {t('common.delete')}
             </Button>
           </div>
         </div>

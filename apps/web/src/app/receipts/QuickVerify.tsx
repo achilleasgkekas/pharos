@@ -6,6 +6,7 @@ import { cur } from '@/lib/money';
 import { Check, ArrowRight, Pencil, Archive, FileText, Loader2, Zap } from 'lucide-react';
 import type { SerializedReceipt } from '@/types';
 import { quickVerifyReceipt, archiveReceipt } from './actions';
+import { useT } from '@/components/LocaleProvider';
 
 function fileUrl(filePath: string) {
   const u = `/api/files/${filePath.split('/').map(encodeURIComponent).join('/')}`;
@@ -31,6 +32,7 @@ export function QuickVerify({
 }) {
   // Snapshot the queue once so it doesn't reshuffle as we verify items out of it.
   const queue = useMemo(() => receipts, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const t = useT();
   const [i, setI] = useState(0);
   const [pending, startTransition] = useTransition();
   const [store, setStore] = useState('');
@@ -92,10 +94,10 @@ export function QuickVerify({
       <div className="-mt-2">
         <div className="flex items-center justify-between mb-4">
           <span className="flex items-center gap-2 text-sm font-semibold" style={{ fontFamily: 'var(--font-display)' }}>
-            <Zap size={16} className="text-[color:var(--color-accent)]" /> Quick verify
+            <Zap size={16} className="text-[color:var(--color-accent)]" /> {t('qv.title')}
           </span>
           <span className="text-xs text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            {allDone ? `${done} verified` : `${i + 1} / ${total0} · ${done} done`}
+            {allDone ? t('qv.verifiedCount', { n: done }) : t('qv.progress', { i: i + 1, total: total0, done })}
           </span>
         </div>
 
@@ -107,9 +109,9 @@ export function QuickVerify({
         {allDone ? (
           <div className="text-center py-12">
             <Check size={40} className="mx-auto mb-3 text-[color:var(--color-accent)]" />
-            <p className="font-semibold text-lg" style={{ fontFamily: 'var(--font-display)' }}>All caught up</p>
-            <p className="text-sm text-[color:var(--color-text-dim)] mt-1">Verified {done} of {total0} this round.</p>
-            <button onClick={onClose} className="mt-5 text-xs px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90">Done</button>
+            <p className="font-semibold text-lg" style={{ fontFamily: 'var(--font-display)' }}>{t('qv.allCaught')}</p>
+            <p className="text-sm text-[color:var(--color-text-dim)] mt-1">{t('qv.verifiedRound', { done, total: total0 })}</p>
+            <button onClick={onClose} className="mt-5 text-xs px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90">{t('qv.done')}</button>
           </div>
         ) : r ? (
           <>
@@ -129,23 +131,23 @@ export function QuickVerify({
               {/* the 3 headline fields, editable */}
               <div className="space-y-3">
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>Store</span>
-                  <SearchableSelect value={store} onChange={setStore} options={stores} allowCustom placeholder="store" />
+                  <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('rc.fStore')}</span>
+                  <SearchableSelect value={store} onChange={setStore} options={stores} allowCustom placeholder={t('rc.fStorePlaceholder')} />
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block">
-                    <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>Date</span>
+                    <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.fDate')}</span>
                     <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full text-sm px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" />
                   </label>
                   <label className="block">
-                    <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>Total ({cur()})</span>
+                    <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('qv.total', { cur: cur() })}</span>
                     <input type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} className="w-full text-base font-semibold px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" style={{ fontFamily: 'var(--font-mono)' }} />
                   </label>
                 </div>
                 <p className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                  {r.lineItems?.length ?? 0} line item{(r.lineItems?.length ?? 0) === 1 ? '' : 's'}
+                  {t('qv.lineItems', { n: r.lineItems?.length ?? 0 })}
                   {r.lineItems?.length ? ` · ${r.lineItems.slice(0, 2).map((l) => l.refinedName || l.name).filter(Boolean).join(', ')}${r.lineItems.length > 2 ? '…' : ''}` : ''}
-                  {' · '}<button onClick={() => onOpenFull(r)} className="text-[color:var(--color-cyan)] hover:underline">edit items</button>
+                  {' · '}<button onClick={() => onOpenFull(r)} className="text-[color:var(--color-cyan)] hover:underline">{t('qv.editItems')}</button>
                 </p>
               </div>
             </div>
@@ -153,20 +155,20 @@ export function QuickVerify({
             {/* actions */}
             <div className="flex items-center gap-2 mt-5 pt-4 border-t border-[color:var(--color-border)] flex-wrap">
               <button onClick={verify} disabled={pending} className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
-                {pending ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Verify &amp; next
+                {pending ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} {t('qv.verifyNext')}
               </button>
               <button onClick={next} disabled={pending} className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-[color:var(--color-border)] hover:border-[color:var(--color-text-dim)] transition-colors disabled:opacity-50">
-                <ArrowRight size={15} /> Skip
+                <ArrowRight size={15} /> {t('qv.skip')}
               </button>
               <button onClick={() => onOpenFull(r)} className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-[color:var(--color-border)] hover:border-[color:var(--color-cyan)] text-[color:var(--color-cyan)] transition-colors">
-                <Pencil size={14} /> Edit fully
+                <Pencil size={14} /> {t('qv.editFully')}
               </button>
               <button onClick={archive} disabled={pending} className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-[color:var(--color-border)] hover:border-[color:var(--color-red)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-red)] transition-colors ml-auto disabled:opacity-50">
-                <Archive size={14} /> Not a receipt
+                <Archive size={14} /> {t('rc.notReceipt')}
               </button>
             </div>
             <p className="text-[10px] text-[color:var(--color-text-faint)] mt-3 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
-              Enter = verify · → = skip · E = edit · A = archive
+              {t('qv.keys')}
             </p>
           </>
         ) : null}
