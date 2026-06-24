@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Search, Check, X } from 'lucide-react';
 import { cn } from './cn';
+import { useT } from '@/components/LocaleProvider';
 
 /**
  * A dropdown with a built-in search box — for picking from long lists (stores,
@@ -28,6 +29,7 @@ export function SearchableSelect({
   size?: 'sm' | 'md';
   className?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -93,7 +95,7 @@ export function SearchableSelect({
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search…"
+              placeholder={t('common.searchDots')}
               className="flex-1 bg-transparent text-xs focus:outline-none text-[color:var(--color-text)]"
             />
           </div>

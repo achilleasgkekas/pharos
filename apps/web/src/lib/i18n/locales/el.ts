@@ -45,6 +45,7 @@ export const el: Partial<Dict> = {
   'common.new': 'Νέο',
   'common.add': 'Προσθήκη',
   'common.search': 'Αναζήτηση',
+  'common.searchDots': 'Αναζήτηση…',
   'common.close': 'Κλείσιμο',
   'common.back': 'Πίσω',
   'common.restore': 'Επαναφορά',

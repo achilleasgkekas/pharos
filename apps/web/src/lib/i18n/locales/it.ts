@@ -45,6 +45,7 @@ export const it: Partial<Dict> = {
   'common.new': 'Nuovo',
   'common.add': 'Aggiungi',
   'common.search': 'Cerca',
+  'common.searchDots': 'Cerca…',
   'common.close': 'Chiudi',
   'common.back': 'Indietro',
   'common.restore': 'Ripristina',

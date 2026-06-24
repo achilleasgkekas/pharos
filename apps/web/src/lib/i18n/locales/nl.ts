@@ -45,6 +45,7 @@ export const nl: Partial<Dict> = {
   'common.new': 'Nieuw',
   'common.add': 'Toevoegen',
   'common.search': 'Zoeken',
+  'common.searchDots': 'Zoeken…',
   'common.close': 'Sluiten',
   'common.back': 'Terug',
   'common.restore': 'Herstellen',

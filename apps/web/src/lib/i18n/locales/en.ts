@@ -51,6 +51,7 @@ export const en = {
   'common.new': 'New',
   'common.add': 'Add',
   'common.search': 'Search',
+  'common.searchDots': 'Search…',
   'common.close': 'Close',
   'common.back': 'Back',
   'common.restore': 'Restore',
