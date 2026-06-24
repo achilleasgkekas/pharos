@@ -667,6 +667,7 @@ export const en = {
   'set.noProviderWarn': '⚠ No AI provider is reachable yet. Configure one below for these features to work.',
   'set.aiEngineTitle': 'AI engine',
   'set.scraperAiTitle': 'Scraper AI',
+  'set.scraperIntro': 'The price scraper runs on its own schedule (every 6h). Give it a lighter/cheaper model than the rest of the app — price extraction is a simple text task.',
   'set.aiPromptsTitle': 'AI prompts',
   'set.mobileMcpTitle': 'Mobile / MCP',
   'af.areaDocuments': 'Documents',

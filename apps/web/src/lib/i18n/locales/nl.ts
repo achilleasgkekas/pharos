@@ -642,6 +642,7 @@ export const nl: Partial<Dict> = {
   'set.noProviderWarn': '⚠ Nog geen AI-provider bereikbaar. Stel er hieronder een in zodat deze functies werken.',
   'set.aiEngineTitle': 'AI-engine',
   'set.scraperAiTitle': 'Scraper-AI',
+  'set.scraperIntro': 'De prijs-scraper draait op zijn eigen schema (elke 6 uur). Geef hem een lichter/goedkoper model dan de rest van de app — een prijs extraheren is een eenvoudige teksttaak.',
   'set.aiPromptsTitle': 'AI-prompts',
   'set.mobileMcpTitle': 'Mobiel / MCP',
   'af.areaDocuments': 'Documenten',

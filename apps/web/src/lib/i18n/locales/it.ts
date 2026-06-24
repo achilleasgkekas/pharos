@@ -642,6 +642,7 @@ export const it: Partial<Dict> = {
   'set.noProviderWarn': '⚠ Nessun provider IA ancora raggiungibile. Configurane uno qui sotto perché queste funzioni operino.',
   'set.aiEngineTitle': 'Motore IA',
   'set.scraperAiTitle': 'IA dello scraper',
+  'set.scraperIntro': "Lo scraper dei prezzi gira secondo la propria pianificazione (ogni 6h). Dagli un modello più leggero/economico del resto dell'app — estrarre un prezzo è un semplice compito di testo.",
   'set.aiPromptsTitle': 'Prompt IA',
   'set.mobileMcpTitle': 'Mobile / MCP',
   'af.areaDocuments': 'Documenti',

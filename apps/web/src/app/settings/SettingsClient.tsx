@@ -934,7 +934,7 @@ function ScraperAiSettings({ scraperAi, installed, hasAnthropicKey }: { scraperA
   return (
     <Section title={t('set.scraperAiTitle')} icon={<Globe size={15} />}>
       <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
-        The price scraper runs on its own schedule (every 6h). Give it a lighter/cheaper model than the rest of the app — price extraction is a simple text task.
+        {t('set.scraperIntro')}
       </p>
       <Row label={t('set.provider')}>
         <div className="flex gap-1.5">

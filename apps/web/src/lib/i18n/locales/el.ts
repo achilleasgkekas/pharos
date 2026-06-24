@@ -642,6 +642,7 @@ export const el: Partial<Dict> = {
   'set.noProviderWarn': '⚠ Κανένας πάροχος AI δεν είναι προσβάσιμος ακόμα. Ρύθμισε έναν παρακάτω για να δουλέψουν αυτές οι λειτουργίες.',
   'set.aiEngineTitle': 'Μηχανή AI',
   'set.scraperAiTitle': 'AI scraper',
+  'set.scraperIntro': 'Ο scraper τιμών τρέχει με δικό του πρόγραμμα (κάθε 6 ώρες). Δώσ' του ελαφρύτερο/φθηνότερο μοντέλο από την υπόλοιπη εφαρμογή — η εξαγωγή τιμής είναι απλό text task.',
   'set.aiPromptsTitle': 'Prompts AI',
   'set.mobileMcpTitle': 'Κινητό / MCP',
   'af.areaDocuments': 'Έγγραφα',
