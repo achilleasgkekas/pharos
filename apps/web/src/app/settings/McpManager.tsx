@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Copy, Check, Loader2, KeyRound, RefreshCw, Trash2 } from 'lucide-react';
 import { getMcpStatus, generateApiToken, revokeApiToken } from './mcpActions';
+import { useT } from '@/components/LocaleProvider';
 
 const codeCls = 'flex-1 min-w-0 text-xs bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 truncate';
 const iconBtn = 'shrink-0 p-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors';
@@ -9,6 +10,7 @@ const labelCls = 'block text-[10px] uppercase tracking-wider text-[color:var(--c
 
 /** Settings card: a per-user bearer token + connector URL for the remote MCP server. */
 export function McpManager() {
+  const t = useT();
   const [hasToken, setHasToken] = useState<boolean | null>(null);
   const [token, setToken] = useState<string | null>(null); // returned once, right after generate
   const [copied, setCopied] = useState('');
@@ -47,42 +49,39 @@ export function McpManager() {
   return (
     <div className="space-y-4" style={{ fontFamily: 'inherit' }}>
       <p className="text-sm text-[color:var(--color-text-dim)]">
-        Drive Pharos from an external Claude (mobile app, Claude Code, MCP Inspector) by adding it as a remote MCP
-        server. It exposes the same commands as the in-app AI bar: add expense / income / subscription / item / task,
-        log a price, search, and an overview.
+        {t('mcp.intro')}
       </p>
 
       {/* Connector URL */}
       <div>
-        <span className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>Connector URL</span>
+        <span className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('mcp.connectorUrl')}</span>
         <div className="flex items-center gap-2">
           <code className={codeCls} style={{ fontFamily: 'var(--font-mono)' }}>{url}</code>
-          <button type="button" onClick={() => copy(url, 'url')} className={iconBtn} title="Copy URL">
+          <button type="button" onClick={() => copy(url, 'url')} className={iconBtn} title={t('mcp.copyUrl')}>
             {copied === 'url' ? <Check size={14} className="text-[color:var(--color-accent)]" /> : <Copy size={14} />}
           </button>
         </div>
         <p className="text-[11px] text-[color:var(--color-text-faint)] mt-1">
-          This is a LAN/HTTP address. To reach it from your phone it must be on <b>public HTTPS</b> — front it with a
-          tunnel (Cloudflare Tunnel or Tailscale Funnel) and use that <code>https://</code> URL in Claude.
+          {t('mcp.urlHint')}
         </p>
       </div>
 
       {/* Token */}
       <div>
-        <span className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>API token (Bearer)</span>
+        <span className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('mcp.apiToken')}</span>
         {token ? (
           <div className="space-y-1.5">
             <div className="flex items-center gap-2">
               <code className={`${codeCls} text-[color:var(--color-accent)]`} style={{ fontFamily: 'var(--font-mono)' }}>{token}</code>
-              <button type="button" onClick={() => copy(token, 'tok')} className={iconBtn} title="Copy token">
+              <button type="button" onClick={() => copy(token, 'tok')} className={iconBtn} title={t('mcp.copyToken')}>
                 {copied === 'tok' ? <Check size={14} className="text-[color:var(--color-accent)]" /> : <Copy size={14} />}
               </button>
             </div>
-            <p className="text-[11px] text-[color:var(--color-gold)]">Copy it now — it is not shown again.</p>
+            <p className="text-[11px] text-[color:var(--color-gold)]">{t('mcp.copyNow')}</p>
           </div>
         ) : (
           <p className="text-xs text-[color:var(--color-text-faint)]">
-            {hasToken === null ? 'Loading…' : hasToken ? 'A token is active. Rotate it to replace it (the old one stops working), or revoke it.' : 'No token yet — generate one to enable the connector.'}
+            {hasToken === null ? t('common.loading') : hasToken ? t('mcp.tokenActive') : t('mcp.noToken')}
           </p>
         )}
         <div className="flex items-center gap-2 mt-2">
@@ -93,7 +92,7 @@ export function McpManager() {
             className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-accent)] text-[color:var(--color-accent)] hover:opacity-80 transition-colors disabled:opacity-50"
           >
             {busy ? <Loader2 size={13} className="animate-spin" /> : hasToken ? <RefreshCw size={13} /> : <KeyRound size={13} />}
-            {hasToken ? 'Rotate token' : 'Generate token'}
+            {hasToken ? t('mcp.rotateToken') : t('mcp.generateToken')}
           </button>
           {hasToken && (
             <button
@@ -102,16 +101,14 @@ export function McpManager() {
               disabled={busy}
               className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-red)] hover:border-[color:var(--color-red)] transition-colors disabled:opacity-50"
             >
-              <Trash2 size={13} /> Revoke
+              <Trash2 size={13} /> {t('mcp.revoke')}
             </button>
           )}
         </div>
       </div>
 
       <p className="text-[11px] text-[color:var(--color-text-faint)]">
-        In Claude → Settings → Connectors → <b>Add custom connector</b>, paste the public <code>https://…/api/mcp</code> URL
-        and the token. Custom connectors need a paid Claude plan. If Claude requires OAuth for the URL, the token still
-        works today with MCP Inspector / Claude Code.
+        {t('mcp.addConnectorNote')}
       </p>
     </div>
   );

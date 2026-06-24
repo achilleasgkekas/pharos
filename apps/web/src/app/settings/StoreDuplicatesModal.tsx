@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useTransition } from 'react';
+import { useT } from '@/components/LocaleProvider';
 import { Loader2, Store as StoreIcon, Check, Merge, Copy } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -8,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { findDuplicateStores, mergeStores, type StoreDupGroup } from './actions';
 
 export function StoreDuplicatesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useT();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<StoreDupGroup[]>([]);
@@ -48,23 +50,22 @@ export function StoreDuplicatesModal({ open, onClose }: { open: boolean; onClose
   const totalVariants = groups.reduce((s, g) => s + (g.variants.length - 1), 0);
 
   return (
-    <Modal open={open} onClose={onClose} title="Find duplicate stores" size="xl">
+    <Modal open={open} onClose={onClose} title={t('set.findDuplicates')} size="xl">
       {loading ? (
         <div className="py-16 flex flex-col items-center gap-3 text-[color:var(--color-text-dim)]">
           <Loader2 size={26} className="animate-spin" />
-          <p className="text-sm">Scanning store names…</p>
+          <p className="text-sm">{t('sd.scanning')}</p>
         </div>
       ) : groups.length === 0 ? (
         <div className="py-16 text-center text-[color:var(--color-text-faint)]">
           <p className="text-5xl mb-3">✨</p>
-          <p className="text-sm">No duplicate stores found.</p>
+          <p className="text-sm">{t('sd.none')}</p>
         </div>
       ) : (
         <div className="space-y-4">
           <p className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
             <Copy size={12} className="inline mr-1" />
-            {groups.length} group{groups.length === 1 ? '' : 's'} · {totalVariants} variant{totalVariants === 1 ? '' : 's'} to merge. Pick
-            the <b>name to keep</b> in each; every receipt + item using the others is rewritten to it.
+            {t('sd.intro', { groups: groups.length, variants: totalVariants })}
           </p>
 
           {groups.map((grp) => {
@@ -81,16 +82,16 @@ export function StoreDuplicatesModal({ open, onClose }: { open: boolean; onClose
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <span className="text-xs font-semibold flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
                     <StoreIcon size={13} className="text-[color:var(--color-cyan)]" />
-                    {merged ? `→ ${keep}` : `Keep: ${keep}`}
+                    {merged ? `→ ${keep}` : t('sd.keepName', { name: keep })}
                   </span>
                   {merged ? (
                     <span className="text-[11px] text-[color:var(--color-accent)] flex items-center gap-1" style={{ fontFamily: 'var(--font-mono)' }}>
-                      <Check size={13} /> {merged} rewritten
+                      <Check size={13} /> {t('sd.rewritten', { n: merged })}
                     </span>
                   ) : (
                     <Button variant="primary" size="sm" onClick={() => handleMerge(grp)} disabled={busyKey === grp.key}>
                       {busyKey === grp.key ? <Loader2 size={13} className="animate-spin" /> : <Merge size={13} />}
-                      Merge {grp.variants.length} → 1
+                      {t('dup.merge', { n: grp.variants.length })}
                     </Button>
                   )}
                 </div>
@@ -122,11 +123,11 @@ export function StoreDuplicatesModal({ open, onClose }: { open: boolean; onClose
                           <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-1.5 text-xs font-medium truncate">
                               {v.name}
-                              {isKeep && <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent)]">keep</span>}
+                              {isKeep && <span className="text-[9px] uppercase tracking-wider text-[color:var(--color-accent)]">{t('dup.keep')}</span>}
                             </span>
                             <span className="block text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
-                              {v.receiptCount} receipt{v.receiptCount === 1 ? '' : 's'} · {v.itemCount} item{v.itemCount === 1 ? '' : 's'}
-                              {v.inList ? ' · in list' : ''}
+                              {t('sd.variantStats', { receipts: v.receiptCount, items: v.itemCount })}
+                              {v.inList ? ` · ${t('sd.inList')}` : ''}
                             </span>
                           </span>
                         </button>
@@ -141,7 +142,7 @@ export function StoreDuplicatesModal({ open, onClose }: { open: boolean; onClose
           {pending.length === 0 && (
             <div className="text-center pt-2">
               <Button variant="ghost" onClick={onClose}>
-                Done
+                {t('qv.done')}
               </Button>
             </div>
           )}
