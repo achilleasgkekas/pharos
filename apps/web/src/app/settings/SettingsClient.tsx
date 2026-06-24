@@ -20,6 +20,8 @@ import { RecomputePricesButton } from './RecomputePricesButton';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
+import { useT } from '@/components/LocaleProvider';
+import type { TKey } from '@/lib/i18n';
 
 type ProviderId = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 
@@ -91,8 +93,19 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boole
   { id: 'users', label: 'Users', icon: <Users size={15} />, adminOnly: true },
 ];
 
+const TAB_KEY: Record<TabId, TKey> = {
+  general: 'set.tabGeneral',
+  money: 'set.tabMoney',
+  ai: 'set.tabAi',
+  storage: 'set.tabStorage',
+  data: 'set.tabData',
+  notifications: 'set.tabNotifications',
+  users: 'set.tabUsers',
+};
+
 export function SettingsClient({ info, currentUser }: { info: Info; currentUser: CurrentUser }) {
   const { theme, setTheme } = useTheme();
+  const t = useT();
   const [tab, setTab] = useState<TabId>('general');
   const isAdmin = currentUser.role === 'admin';
   const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
@@ -124,7 +137,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
     <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
       <div className="mb-5">
         <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-          Settings
+          {t('nav.settings')}
         </h1>
       </div>
 
@@ -132,19 +145,19 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
         {/* Tab navigation — sidebar on desktop, scrollable pills on mobile */}
         <nav className="md:w-52 md:shrink-0">
           <div className="flex md:flex-col gap-1.5 overflow-x-auto md:overflow-visible md:sticky md:top-20 pb-1 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
-            {visibleTabs.map((t) => (
+            {visibleTabs.map((tb) => (
               <button
-                key={t.id}
-                onClick={() => go(t.id)}
+                key={tb.id}
+                onClick={() => go(tb.id)}
                 className={cn(
                   'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all shrink-0 md:w-full',
-                  tab === t.id
+                  tab === tb.id
                     ? 'bg-[color:var(--color-accent)] text-black'
                     : 'bg-[color:var(--color-surface-2)] md:bg-transparent border border-[color:var(--color-border)] md:border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
                 )}
               >
-                {t.icon}
-                {t.label}
+                {tb.icon}
+                {t(TAB_KEY[tb.id])}
               </button>
             ))}
           </div>
@@ -154,26 +167,26 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
         <div className="flex-1 min-w-0 space-y-4">
           {tab === 'general' && (
             <>
-              <Section title="Appearance" icon={<Sun size={15} />}>
+              <Section title={t('set.appearance')} icon={<Sun size={15} />}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-medium">Theme</div>
-                    <div className="text-xs text-[color:var(--color-text-faint)]">Dark or light mode</div>
+                    <div className="text-sm font-medium">{t('set.theme')}</div>
+                    <div className="text-xs text-[color:var(--color-text-faint)]">{t('set.themeDesc')}</div>
                   </div>
                   <div className="flex gap-1.5">
-                    {(['dark', 'light'] as Theme[]).map((t) => (
+                    {(['dark', 'light'] as Theme[]).map((th) => (
                       <button
-                        key={t}
-                        onClick={() => setTheme(t)}
+                        key={th}
+                        onClick={() => setTheme(th)}
                         className={cn(
-                          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all',
-                          theme === t
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                          theme === th
                             ? 'bg-[color:var(--color-accent)] text-black'
                             : 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
                         )}
                       >
-                        {t === 'dark' ? <Moon size={13} /> : <Sun size={13} />}
-                        {t}
+                        {th === 'dark' ? <Moon size={13} /> : <Sun size={13} />}
+                        {th === 'dark' ? t('set.dark') : t('set.light')}
                       </button>
                     ))}
                   </div>
@@ -184,16 +197,16 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
               <SelfPasswordCard />
 
-              <Section title="About">
-                <Row label="Version">
+              <Section title={t('set.about')}>
+                <Row label={t('set.version')}>
                   <span style={{ fontFamily: 'var(--font-mono)' }}>v0.1.0 dev</span>
                 </Row>
-                <Row label="Host">
+                <Row label={t('set.host')}>
                   <span className="text-[color:var(--color-text-dim)]">Mac mini M4 · Docker</span>
                 </Row>
-                <Row label="Privacy">
+                <Row label={t('set.privacy')}>
                   <span className="text-[color:var(--color-text-dim)]">
-                    {info.ai.effectiveProvider === 'anthropic' ? 'Hybrid · Claude API for heavy parses' : 'Local-first · no cloud AI calls'}
+                    {info.ai.effectiveProvider === 'anthropic' ? t('set.privacyHybrid') : t('set.privacyLocal')}
                   </span>
                 </Row>
               </Section>
@@ -1491,6 +1504,7 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
 }
 
 function DefaultsManager({ settings }: { settings: AppSettings }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [view, setView] = useState<'grid' | 'list'>(settings.defaultItemView);
   const [warrantyMonths, setWarrantyMonths] = useState(String(settings.defaultWarrantyMonths));
@@ -1511,17 +1525,17 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     setMsg(null);
     startTransition(async () => {
       await saveDefaults(fd);
-      setMsg('Saved ✓ — reloading…');
+      setMsg(t('set.savedReloading'));
       // Currency symbol is baked into the rendered tree → refresh so it applies everywhere.
       setTimeout(() => window.location.reload(), 600);
     });
   }
 
   return (
-    <Section title="Defaults & alerts" icon={<SlidersHorizontal size={15} />}>
+    <Section title={t('set.defaultsTitle')} icon={<SlidersHorizontal size={15} />}>
       <div className="grid sm:grid-cols-2 gap-4">
         <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>Currency</span>
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.currency')}</span>
           <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={inputClass}>
             {CURRENCIES.map((c) => (
               <option key={c.code} value={c.code}>
@@ -1531,35 +1545,35 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
           </select>
         </label>
         <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>Default VAT / sales-tax %</span>
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultVat')}</span>
           <input type="number" min="0" max="100" step="0.5" value={vatRate} onChange={(e) => setVatRate(e.target.value)} className={inputClass} />
         </label>
         <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>Default item view</span>
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultView')}</span>
           <select value={view} onChange={(e) => setView(e.target.value as 'grid' | 'list')} className={inputClass}>
-            <option value="grid">Grid</option>
-            <option value="list">List</option>
+            <option value="grid">{t('v.grid')}</option>
+            <option value="list">{t('v.list')}</option>
           </select>
         </label>
         <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>Default warranty (months)</span>
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.defaultWarranty')}</span>
           <input type="number" min="0" max="120" value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)} className={inputClass} />
         </label>
         <label className="block">
-          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>Warranty alert · days before expiry</span>
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.warrantyAlert')}</span>
           <input type="number" min="0" max="730" value={alertDays} onChange={(e) => setAlertDays(e.target.value)} className={inputClass} />
         </label>
         <div className="flex items-center justify-between gap-3 self-end pb-1">
           <span className="min-w-0">
-            <span className="text-xs font-medium block">Auto-add unknown stores</span>
-            <span className="text-[10px] text-[color:var(--color-text-faint)] block">New receipt store names join the list automatically.</span>
+            <span className="text-xs font-medium block">{t('set.autoAddStores')}</span>
+            <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.autoAddStoresDesc')}</span>
           </span>
           <Switch checked={autoAdd} onChange={setAutoAdd} />
         </div>
       </div>
       <div className="flex items-center gap-3 pt-3 border-t border-[color:var(--color-border)] mt-1">
         <button type="button" onClick={save} disabled={pending} className={saveBtn}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save defaults
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.saveDefaults')}
         </button>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
       </div>
