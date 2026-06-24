@@ -14,6 +14,7 @@ import { AiCommandBar } from './AiCommandBar';
 import { logoutAction } from '@/app/login/actions';
 import { useT } from './LocaleProvider';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { NotificationBell } from './NotificationBell';
 import type { TKey } from '@/lib/i18n';
 
 type SessionUser = { name: string; role: 'admin' | 'member' };
@@ -186,6 +187,7 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
             {aiReady ? t('ai.online') : t('ai.offline')}
           </span>
           <LanguageSwitcher />
+          {user && <NotificationBell />}
           <button onClick={toggle} className="p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Toggle theme">
             {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>

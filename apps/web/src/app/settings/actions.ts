@@ -45,6 +45,7 @@ import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel,
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
 import { sendNtfyTo } from '@/lib/notify';
 import { computeInstallmentPlans } from '@/lib/installments';
+import { generateNotifications } from '@/app/notifications/actions';
 import type { SerializedStatement } from '@/types';
 import { revalidatePath } from 'next/cache';
 
@@ -336,6 +337,13 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   if (dueThisMonth > 0) lines.push(`💳 installments this month: ${cur()}${dueThisMonth.toFixed(0)} (${plans.length} plans)`);
   if (expiring.length)
     lines.push(`🛡 ${expiring.length} warranty expiring ≤${s.warrantyAlertDays}d: ${expiring.slice(0, 5).map((w) => `${w.title} (${w.days}d)`).join(', ')}`);
+
+  // Also surface these alerts in the in-app notification bell.
+  try {
+    await generateNotifications();
+  } catch {
+    /* the bell is best-effort — never fail the ntfy check over it */
+  }
 
   const summary = lines.length ? lines.join('\n') : 'All clear — nothing to report.';
   let sent = false;
