@@ -1452,6 +1452,7 @@ const ghostBtn =
   'flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50';
 
 function BudgetsManager({ settings }: { settings: AppSettings }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [budgets, setBudgets] = useState<Record<string, string>>(() =>
     Object.fromEntries(settings.expenseCategories.map((c) => [c, settings.budgets[c] != null ? String(settings.budgets[c]) : '']))
@@ -1468,13 +1469,13 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
     }
     startTransition(async () => {
       await saveBudgets(out);
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
     });
   }
 
   return (
-    <Section title="Monthly budgets" icon={<SlidersHorizontal size={15} />}>
-      <p className="text-xs text-[color:var(--color-text-dim)] mb-3">A monthly limit per expense category. Tracked against actual spend in Reports.</p>
+    <Section title={t('set.budgetsTitle')} icon={<SlidersHorizontal size={15} />}>
+      <p className="text-xs text-[color:var(--color-text-dim)] mb-3">{t('set.budgetsDesc')}</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {settings.expenseCategories.map((c) => (
           <label key={c} className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
@@ -1494,9 +1495,9 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
       </div>
       <div className="flex items-center gap-3 mt-3">
         <button onClick={save} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
-          {pending ? 'Saving…' : 'Save budgets'}
+          {pending ? t('common.saving') : t('set.saveBudgets')}
         </button>
-        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>Total {cur()}{total.toLocaleString('en-GB')}/mo</span>
+        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.budgetTotal', { amount: `${cur()}${total.toLocaleString('en-GB')}` })}</span>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
       </div>
     </Section>
@@ -1852,27 +1853,27 @@ function BackupRestore() {
 // ─── Store list management (D3) ─────────────────────────────────────────────
 
 function StoresManager({ stores }: { stores: StoreLite[] }) {
+  const t = useT();
   const [adding, setAdding] = useState(false);
   const [showDupes, setShowDupes] = useState(false);
   return (
-    <Section title="Stores" icon={<StoreIcon size={15} />}>
+    <Section title={t('set.storesTitle')} icon={<StoreIcon size={15} />}>
       <p className="text-xs text-[color:var(--color-text-dim)] -mt-1">
-        Normalizes the store names on receipts. Unknown receipt stores are auto-added (flagged ⚡) for you to review,
-        rename or merge.
+        {t('set.storesDesc')}
       </p>
       <div className="flex justify-end gap-2">
         <button
           onClick={() => setShowDupes(true)}
           className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors"
-          title="Find variant store names (Viva/Vivawallet, Steam/Steampowered…) and merge them into one"
+          title={t('set.findDupStoresTitle')}
         >
-          <Copy size={12} /> Find duplicates
+          <Copy size={12} /> {t('set.findDuplicates')}
         </button>
         <button
           onClick={() => setAdding(true)}
           className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors"
         >
-          <Plus size={12} /> Add store
+          <Plus size={12} /> {t('set.addStore')}
         </button>
       </div>
       {adding && <StoreForm onDone={() => setAdding(false)} />}
@@ -1880,7 +1881,7 @@ function StoresManager({ stores }: { stores: StoreLite[] }) {
         {stores.map((s) => (
           <StoreRow key={s._id} store={s} />
         ))}
-        {stores.length === 0 && <p className="text-xs text-[color:var(--color-text-faint)] italic">No stores yet.</p>}
+        {stores.length === 0 && <p className="text-xs text-[color:var(--color-text-faint)] italic">{t('set.noStores')}</p>}
       </div>
       <StoreDuplicatesModal open={showDupes} onClose={() => setShowDupes(false)} />
     </Section>
@@ -1888,6 +1889,7 @@ function StoresManager({ stores }: { stores: StoreLite[] }) {
 }
 
 function StoreRow({ store }: { store: StoreLite }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
@@ -1895,7 +1897,7 @@ function StoreRow({ store }: { store: StoreLite }) {
   if (editing) return <StoreForm store={store} onDone={() => setEditing(false)} />;
 
   async function del() {
-    const ok = await confirm({ title: 'Delete store', message: `Delete "${store.name}"?`, confirmLabel: 'Delete', danger: true });
+    const ok = await confirm({ title: t('set.deleteStore'), message: t('set.confirmDeleteName', { name: store.name }), confirmLabel: t('common.delete'), danger: true });
     if (ok) startTransition(() => { void deleteStore(store._id!); });
   }
 
@@ -1905,7 +1907,7 @@ function StoreRow({ store }: { store: StoreLite }) {
         <div className="text-sm font-medium flex items-center gap-1.5">
           {store.name}
           {store.auto && (
-            <span title="Auto-added from a receipt — review" className="text-[9px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span title={t('set.autoReview')} className="text-[9px] text-[color:var(--color-gold)]" style={{ fontFamily: 'var(--font-mono)' }}>
               ⚡ auto
             </span>
           )}
@@ -1932,6 +1934,7 @@ function StoreRow({ store }: { store: StoreLite }) {
 }
 
 function StoreForm({ store, onDone }: { store?: StoreLite; onDone: () => void }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState(store?.name ?? '');
   const [aliases, setAliases] = useState((store?.aliases ?? []).join(', '));
@@ -1948,31 +1951,31 @@ function StoreForm({ store, onDone }: { store?: StoreLite; onDone: () => void })
     startTransition(async () => {
       const r = await saveStore(fd);
       if (r.ok) onDone();
-      else setErr(r.error ?? 'Failed');
+      else setErr(r.error ?? t('common.failed'));
     });
   }
 
   return (
     <div className="bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-2.5 space-y-2">
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Store name (canonical)" className={inputClass} />
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('set.storeNamePlaceholder')} className={inputClass} />
       <input
         value={aliases}
         onChange={(e) => setAliases(e.target.value)}
-        placeholder="aliases, comma-separated (lowercase match terms)"
+        placeholder={t('set.aliasesPlaceholder')}
         className={inputClass}
         style={{ fontFamily: 'var(--font-mono)' }}
       />
-      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://… (optional)" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t('set.urlPlaceholder')} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
       <div className="flex items-center gap-2">
         <button
           onClick={save}
           disabled={pending || !name.trim()}
           className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50"
         >
-          {pending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Save
+          {pending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} {t('common.save')}
         </button>
         <button onClick={onDone} className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]">
-          <X size={12} /> Cancel
+          <X size={12} /> {t('common.cancel')}
         </button>
         {err && (
           <span className="text-[10px] text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -1990,6 +1993,7 @@ const CARD_TYPES = ['mastercard', 'visa', 'amex', 'maestro', 'other'];
 const CARD_COLORS = ['#00d4ff', '#00ff88', '#ffd93d', '#a55eea', '#ff4757', '#ff9f43', '#54a0ff'];
 
 function CardsManager({ cards }: { cards: SerializedCard[] }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   const confirm = useConfirm();
@@ -2017,13 +2021,13 @@ function CardsManager({ cards }: { cards: SerializedCard[] }) {
     });
   }
   async function remove(c: SerializedCard) {
-    const ok = await confirm({ title: 'Delete card', message: `Delete "${c.name}"?`, confirmLabel: 'Delete', danger: true });
+    const ok = await confirm({ title: t('set.deleteCard'), message: t('set.confirmDeleteName', { name: c.name }), confirmLabel: t('common.delete'), danger: true });
     if (!ok) return;
     startTransition(() => void deleteCard(c._id));
   }
 
   return (
-    <Section title="Payment cards" icon={<CreditCard size={15} />}>
+    <Section title={t('set.cardsTitle')} icon={<CreditCard size={15} />}>
       <div className="space-y-1.5">
         {cards.map((c) => (
           <div key={c._id} className="flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2">
@@ -2039,38 +2043,38 @@ function CardsManager({ cards }: { cards: SerializedCard[] }) {
             <button onClick={() => remove(c)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] p-1"><Trash2 size={13} /></button>
           </div>
         ))}
-        {cards.length === 0 && <p className="text-xs text-[color:var(--color-text-faint)]">No cards yet.</p>}
+        {cards.length === 0 && <p className="text-xs text-[color:var(--color-text-faint)]">{t('set.noCards')}</p>}
       </div>
 
       {editing ? (
         <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] space-y-2.5">
           <div className="grid grid-cols-2 gap-2">
-            <input value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder="Card name *" className={inputClass} />
-            <input value={form.last4} onChange={(e) => set({ last4: e.target.value.slice(0, 4) })} placeholder="last 4" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
-            <input value={form.bank} onChange={(e) => set({ bank: e.target.value })} placeholder="bank (optional)" className={inputClass} />
-            <input type="number" value={form.creditLimit} onChange={(e) => set({ creditLimit: e.target.value })} placeholder="credit limit" className={inputClass} />
+            <input value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('set.cardNamePlaceholder')} className={inputClass} />
+            <input value={form.last4} onChange={(e) => set({ last4: e.target.value.slice(0, 4) })} placeholder={t('set.last4Placeholder')} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+            <input value={form.bank} onChange={(e) => set({ bank: e.target.value })} placeholder={t('set.bankPlaceholder')} className={inputClass} />
+            <input type="number" value={form.creditLimit} onChange={(e) => set({ creditLimit: e.target.value })} placeholder={t('set.creditLimitPlaceholder')} className={inputClass} />
             <select value={form.kind} onChange={(e) => set({ kind: e.target.value })} className={selectClass}>
-              <option value="credit">credit</option>
-              <option value="debit">debit</option>
+              <option value="credit">{t('set.credit')}</option>
+              <option value="debit">{t('set.debit')}</option>
             </select>
             <select value={form.type} onChange={(e) => set({ type: e.target.value })} className={selectClass}>
-              {CARD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              {CARD_TYPES.map((ct) => <option key={ct} value={ct}>{ct}</option>)}
             </select>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-[color:var(--color-text-faint)] uppercase mr-1" style={{ fontFamily: 'var(--font-mono)' }}>color</span>
+            <span className="text-[10px] text-[color:var(--color-text-faint)] uppercase mr-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.color')}</span>
             {CARD_COLORS.map((col) => (
               <button key={col} onClick={() => set({ color: col })} className={cn('w-5 h-5 rounded-full transition-transform', form.color === col && 'ring-2 ring-white scale-110')} style={{ background: col }} />
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={save} disabled={pending || !form.name.trim()} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save card</button>
-            <button onClick={() => setEditing(null)} className={ghostBtn}><X size={13} /> Cancel</button>
+            <button onClick={save} disabled={pending || !form.name.trim()} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.saveCard')}</button>
+            <button onClick={() => setEditing(null)} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
           </div>
         </div>
       ) : (
         <button onClick={() => openEdit()} className="mt-3 flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)]">
-          <Plus size={13} /> Add card
+          <Plus size={13} /> {t('set.addCard')}
         </button>
       )}
     </Section>
@@ -2172,6 +2176,7 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
 
 /** "Change my own password" — available to every signed-in user (incl. members). */
 function SelfPasswordCard() {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [oldPwd, setOldPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
@@ -2182,29 +2187,29 @@ function SelfPasswordCard() {
     setMsg(null);
     startTransition(async () => {
       const r = await changeOwnPassword(oldPwd, newPwd);
-      if (r.ok) { setMsg({ ok: true, text: 'Password changed ✓' }); setOldPwd(''); setNewPwd(''); setOpen(false); }
-      else setMsg({ ok: false, text: r.error || 'Failed' });
+      if (r.ok) { setMsg({ ok: true, text: t('set.passwordChanged') }); setOldPwd(''); setNewPwd(''); setOpen(false); }
+      else setMsg({ ok: false, text: r.error || t('common.failed') });
     });
   }
 
   return (
-    <Section title="Your password" icon={<KeyRound size={15} />}>
+    <Section title={t('set.yourPassword')} icon={<KeyRound size={15} />}>
       {open ? (
         <div className="space-y-2.5">
-          <input value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} type="password" placeholder="current password" className={inputClass} />
-          <input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} type="password" placeholder="new password (min 8)" className={inputClass} />
+          <input value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} type="password" placeholder={t('set.currentPwdPlaceholder')} className={inputClass} />
+          <input value={newPwd} onChange={(e) => setNewPwd(e.target.value)} type="password" placeholder={t('set.newPwdPlaceholder')} className={inputClass} />
           <div className="flex items-center gap-2">
-            <button onClick={submit} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Update</button>
-            <button onClick={() => { setOpen(false); setMsg(null); }} className={ghostBtn}><X size={13} /> Cancel</button>
+            <button onClick={submit} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.update')}</button>
+            <button onClick={() => { setOpen(false); setMsg(null); }} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
             {msg && <span className={cn('text-[11px]', msg.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]')}>{msg.text}</span>}
           </div>
         </div>
       ) : (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[color:var(--color-text-dim)]">Change the password for your account.</span>
+          <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.changePasswordDesc')}</span>
           <div className="flex items-center gap-2">
             {msg && <span className={cn('text-[11px]', msg.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]')}>{msg.text}</span>}
-            <button onClick={() => setOpen(true)} className={ghostBtn}><KeyRound size={13} /> Change password</button>
+            <button onClick={() => setOpen(true)} className={ghostBtn}><KeyRound size={13} /> {t('set.changePassword')}</button>
           </div>
         </div>
       )}
@@ -2215,9 +2220,10 @@ function SelfPasswordCard() {
 // ─── Editable dropdown lists (taxonomies) ─────────────────────────────────────
 
 function ListsManager({ lists }: { lists: ListEditorEntry[] }) {
+  const t = useT();
   return (
-    <Section title="Dropdown lists" icon={<SlidersHorizontal size={15} />}>
-      <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">Customize the category options shown in dropdowns across the app.</p>
+    <Section title={t('set.dropdownLists')} icon={<SlidersHorizontal size={15} />}>
+      <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">{t('set.dropdownListsDesc')}</p>
       <div className="space-y-3">
         {lists.map((l) => <ListEditor key={l.key} entry={l} />)}
       </div>
@@ -2226,6 +2232,7 @@ function ListsManager({ lists }: { lists: ListEditorEntry[] }) {
 }
 
 function ListEditor({ entry }: { entry: ListEditorEntry }) {
+  const t = useT();
   const [values, setValues] = useState<string[]>(entry.values);
   const [input, setInput] = useState('');
   const [pending, startTransition] = useTransition();
@@ -2239,7 +2246,7 @@ function ListEditor({ entry }: { entry: ListEditorEntry }) {
   function save(next: string[]) {
     startTransition(async () => {
       await saveList(entry.key, next);
-      setMsg('Saved ✓');
+      setMsg(t('common.savedOk'));
       setTimeout(() => setMsg(null), 1800);
     });
   }
@@ -2258,10 +2265,10 @@ function ListEditor({ entry }: { entry: ListEditorEntry }) {
         ))}
       </div>
       <div className="flex items-center gap-1.5">
-        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder="add a category…" className={cn(inputClass, 'text-xs py-1.5')} />
+        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder={t('set.addCategoryPlaceholder')} className={cn(inputClass, 'text-xs py-1.5')} />
         <button onClick={add} className={ghostBtn}><Plus size={13} /></button>
-        <button onClick={() => save(values)} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save</button>
-        <button onClick={() => { setValues(entry.default); save(entry.default); }} disabled={pending} title="Reset to default" className={ghostBtn}><RotateCcw size={13} /></button>
+        <button onClick={() => save(values)} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}</button>
+        <button onClick={() => { setValues(entry.default); save(entry.default); }} disabled={pending} title={t('set.resetDefault')} className={ghostBtn}><RotateCcw size={13} /></button>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
       </div>
     </div>
