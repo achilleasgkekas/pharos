@@ -1118,6 +1118,7 @@ function PromptEditor({ entry }: { entry: PromptEditorEntry }) {
 // OneDrive setup: zero-config by default (built-in public client → just sign in).
 // "Use your own Azure app" is an optional advanced path for a branded consent.
 function OnedriveWizard({ connected: initialConnected, account }: { connected: boolean; account: string }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [connected, setConnected] = useState(initialConnected);
   const [acct, setAcct] = useState(account);
@@ -1135,12 +1136,12 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
       const r = await startOnedriveAuth(clientId); // empty → built-in client
       if (!r.ok || !r.deviceCode) { setStatus(`✗ ${r.error}`); return; }
       setCode({ userCode: r.userCode!, url: r.verificationUri!, device: r.deviceCode });
-      setStatus('Waiting for you to sign in…');
+      setStatus(t('set.odSignIn'));
       pollRef.current = setInterval(async () => {
         const p = await pollOnedriveAuth(clientId, r.deviceCode!);
         if (p.status === 'ok') {
           if (pollRef.current) clearInterval(pollRef.current);
-          setConnected(true); setAcct(p.account || ''); setCode(null); setStatus('Connected ✓');
+          setConnected(true); setAcct(p.account || ''); setCode(null); setStatus(t('set.odConnectedOk'));
         } else if (p.status === 'error') {
           if (pollRef.current) clearInterval(pollRef.current);
           setStatus(`✗ ${p.error}`); setCode(null);
@@ -1160,9 +1161,9 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
       <div className="pt-1 flex items-center justify-between gap-3 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2.5">
         <span className="text-xs flex items-center gap-2">
           <Cloud size={14} className="text-[color:var(--color-accent)]" />
-          Connected{acct ? ` as ${acct}` : ''} · uploads go to <code className="text-[color:var(--color-cyan)]">/Apps/Pharos</code>
+          {acct ? t('set.odConnectedAs', { acct }) : t('set.odConnected')} <code className="text-[color:var(--color-cyan)]">/Apps/Pharos</code>
         </span>
-        <button onClick={disconnect} disabled={pending} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] disabled:opacity-50">disconnect</button>
+        <button onClick={disconnect} disabled={pending} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] disabled:opacity-50">{t('set.disconnect')}</button>
       </div>
     );
   }
@@ -1172,15 +1173,15 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
       {!code ? (
         <>
           <p className="text-[11px] text-[color:var(--color-text-dim)]">
-            No setup needed — click below and sign in with your Microsoft account. (Consent shows as &quot;Microsoft Graph Command Line Tools&quot;.)
+            {t('set.odNoSetup')}
           </p>
           <button onClick={connect} disabled={pending} className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
-            {pending ? <Loader2 size={13} className="animate-spin" /> : <Cloud size={13} />} Connect OneDrive
+            {pending ? <Loader2 size={13} className="animate-spin" /> : <Cloud size={13} />} {t('set.connectOnedrive')}
           </button>
 
           <div>
             <button onClick={() => setAdvanced((s) => !s)} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)]">
-              {advanced ? '▾' : '▸'} Use your own Azure app (optional — branded consent)
+              {advanced ? '▾' : '▸'} {t('set.useOwnAzure')}
             </button>
             {advanced && (
               <div className="mt-2 space-y-2">
@@ -1188,7 +1189,7 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
                   <li><a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline">Azure → App registrations</a> → New registration → personal accounts, no redirect URI.</li>
                   <li>Authentication → Allow public client flows → Yes → Save. Copy the client id.</li>
                 </ol>
-                <Field label="Application (client) ID">
+                <Field label={t('set.appClientId')}>
                   <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
                 </Field>
               </div>
@@ -1197,9 +1198,9 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
         </>
       ) : (
         <div className="bg-[color:var(--color-surface-2)] border border-[color:var(--color-cyan)]/40 rounded-lg px-3 py-3 text-xs space-y-1.5">
-          <p>1. Open <a href={code.url} target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline font-semibold">{code.url}</a></p>
-          <p>2. Enter this code: <span className="text-[color:var(--color-accent)] font-bold text-base tracking-widest" style={{ fontFamily: 'var(--font-mono)' }}>{code.userCode}</span></p>
-          <p className="text-[10px] text-[color:var(--color-text-faint)] flex items-center gap-1.5"><Loader2 size={11} className="animate-spin" /> Waiting… this connects automatically once you finish.</p>
+          <p>1. {t('set.odStep1')} <a href={code.url} target="_blank" rel="noreferrer" className="text-[color:var(--color-cyan)] hover:underline font-semibold">{code.url}</a></p>
+          <p>2. {t('set.odStep2')} <span className="text-[color:var(--color-accent)] font-bold text-base tracking-widest" style={{ fontFamily: 'var(--font-mono)' }}>{code.userCode}</span></p>
+          <p className="text-[10px] text-[color:var(--color-text-faint)] flex items-center gap-1.5"><Loader2 size={11} className="animate-spin" /> {t('set.odWaiting')}</p>
         </div>
       )}
       {status && <p className={cn('text-[11px]', status.startsWith('✗') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>{status}</p>}
@@ -1208,6 +1209,7 @@ function OnedriveWizard({ connected: initialConnected, account }: { connected: b
 }
 
 function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Info['counts'] }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [backend, setBackend] = useState<StorageInfo['backend']>(storage.backend);
   const [mirror, setMirror] = useState(storage.mirror);
@@ -1308,16 +1310,16 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
   }
 
   return (
-    <Section title="File storage" icon={<HardDrive size={15} />}>
+    <Section title={t('set.fileStorageTitle')} icon={<HardDrive size={15} />}>
       <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
-        Files are always kept locally (fast serving + AI). Optionally mirror an organized copy to your NAS over SMB/FTP, or to OneDrive.
+        {t('set.fileStorageDesc')}
       </p>
 
-      <Row label="Backend">
+      <Row label={t('set.backend')}>
         <div className="flex gap-1.5 flex-wrap">
           {([
-            { v: 'local', label: 'Local only', icon: <HardDrive size={13} /> },
-            { v: 'smb', label: 'SMB (NAS)', icon: <Server size={13} /> },
+            { v: 'local', label: t('set.localOnly'), icon: <HardDrive size={13} /> },
+            { v: 'smb', label: t('set.smbNas'), icon: <Server size={13} /> },
             { v: 'ftp', label: 'FTP', icon: <Globe size={13} /> },
             { v: 'onedrive', label: 'OneDrive', icon: <Cloud size={13} /> },
           ] as const).map((b) => (
@@ -1342,29 +1344,29 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
 
       {(backend === 'smb' || backend === 'ftp') && (
         <div className="grid sm:grid-cols-2 gap-3 pt-1">
-          <Field label="Host / IP">
+          <Field label={t('set.hostIp')}>
             <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="192.168.10.20" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
-          <Field label={`Port (blank → ${backend === 'smb' ? '445' : '21'})`}>
+          <Field label={t('set.portBlank', { default: backend === 'smb' ? '445' : '21' })}>
             <input value={port} onChange={(e) => setPort(e.target.value)} placeholder={backend === 'smb' ? '445' : '21'} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
           {backend === 'smb' && (
-            <Field label="Share name">
+            <Field label={t('set.shareName')}>
               <input value={share} onChange={(e) => setShare(e.target.value)} placeholder="home" className={inputClass} />
             </Field>
           )}
-          <Field label="Username">
+          <Field label={t('set.username')}>
             <input value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} autoComplete="off" />
           </Field>
-          <Field label={`Password ${storage.hasPass ? '(saved ✓ — blank keeps)' : ''}`}>
+          <Field label={storage.hasPass ? t('set.passwordSaved') : t('set.password')}>
             <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={storage.hasPass ? '••••••••' : ''} className={inputClass} autoComplete="off" />
           </Field>
-          <Field label="Base folder (optional)">
+          <Field label={t('set.baseFolder')}>
             <input value={basePath} onChange={(e) => setBasePath(e.target.value)} placeholder="Pharos" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
           {backend === 'ftp' && (
             <div className="flex items-center justify-between sm:col-span-2">
-              <span className="text-xs text-[color:var(--color-text-dim)]">FTPS (explicit TLS)</span>
+              <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.ftpsTls')}</span>
               <Switch checked={secure} onChange={setSecure} />
             </div>
           )}
@@ -1373,21 +1375,21 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
 
       <div className="pt-2 border-t border-[color:var(--color-border)] mt-1 space-y-3">
         <div className="flex items-center gap-2 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
-          <FolderTree size={12} /> File organization
+          <FolderTree size={12} /> {t('set.fileOrganization')}
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Folder template">
+          <Field label={t('set.folderTemplate')}>
             <input value={folderTpl} onChange={(e) => setFolderTpl(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
-          <Field label="Filename template">
+          <Field label={t('set.filenameTemplate')}>
             <input value={nameTpl} onChange={(e) => setNameTpl(e.target.value)} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
           </Field>
         </div>
         <div className="text-[10px] text-[color:var(--color-text-faint)] leading-relaxed" style={{ fontFamily: 'var(--font-mono)' }}>
-          Tokens: {TEMPLATE_TOKENS.map((t) => t.token).join('  ')}
+          {t('set.tokens')} {TEMPLATE_TOKENS.map((tok) => tok.token).join('  ')}
         </div>
         <div className="text-[11px] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2" style={{ fontFamily: 'var(--font-mono)' }}>
-          <span className="text-[color:var(--color-text-faint)]">preview: </span>
+          <span className="text-[color:var(--color-text-faint)]">{t('set.preview')} </span>
           <span className="text-[color:var(--color-cyan)] break-all">{preview}</span>
         </div>
       </div>
@@ -1395,8 +1397,8 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
       {backend !== 'local' && (
         <div className="flex items-center justify-between gap-3 pt-2">
           <div className="min-w-0">
-            <p className="text-xs font-medium">Auto-mirror on verify</p>
-            <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">Push each receipt/statement to the remote when you verify it.</p>
+            <p className="text-xs font-medium">{t('set.autoMirror')}</p>
+            <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">{t('set.autoMirrorDesc')}</p>
           </div>
           <Switch checked={mirror} onChange={setMirror} />
         </div>
@@ -1404,16 +1406,16 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
 
       <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[color:var(--color-border)] mt-1">
         <button type="button" onClick={save} disabled={pending} className={saveBtn}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}
         </button>
         {backend !== 'local' && (
           <button type="button" onClick={doTest} disabled={pending} className={ghostBtn}>
-            <Plug size={13} /> Test connection
+            <Plug size={13} /> {t('set.testConnection')}
           </button>
         )}
         {backend !== 'local' && (
           <button type="button" onClick={doSync} disabled={pending || syncing} className={ghostBtn}>
-            {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Sync files now
+            {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {t('set.syncNow')}
           </button>
         )}
         {test && (
@@ -1667,6 +1669,7 @@ function NotificationsManager({ settings }: { settings: AppSettings }) {
 // ─── Trash (soft-deleted records) ────────────────────────────────────────────
 
 function TrashManager() {
+  const t = useT();
   const [rows, setRows] = useState<TrashRow[] | null>(null);
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState('');
@@ -1687,9 +1690,9 @@ function TrashManager() {
   }
   async function purge(r: TrashRow) {
     const ok = await confirm({
-      title: 'Delete forever?',
-      message: `"${r.title}" will be permanently deleted (files included). This cannot be undone.`,
-      confirmLabel: 'Delete forever',
+      title: t('set.deleteForeverTitle'),
+      message: t('set.confirmPurge', { title: r.title }),
+      confirmLabel: t('common.deleteForever'),
       danger: true,
     });
     if (!ok) return;
@@ -1702,9 +1705,9 @@ function TrashManager() {
   }
   async function empty() {
     const ok = await confirm({
-      title: 'Empty the Trash?',
-      message: `${rows?.length ?? 0} records will be permanently deleted (files included). This cannot be undone.`,
-      confirmLabel: 'Empty Trash',
+      title: t('set.emptyTrashTitle'),
+      message: t('set.confirmEmpty', { n: rows?.length ?? 0 }),
+      confirmLabel: t('set.emptyTrashBtn'),
       danger: true,
     });
     if (!ok) return;
@@ -1715,14 +1718,15 @@ function TrashManager() {
   }
 
   return (
-    <Section title={`Trash${rows?.length ? ` (${rows.length})` : ''}`} icon={<Trash2 size={15} />}>
+    <Section title={`${t('set.trashTitle')}${rows?.length ? ` (${rows.length})` : ''}`} icon={<Trash2 size={15} />}>
       <p className="text-xs text-[color:var(--color-text-dim)] mb-3">
-        Deleted records land here and auto-purge after 30 days. Restore brings them back exactly as they were.
+        {t('set.trashDesc')}
       </p>
       {rows === null ? (
-        <p className="text-xs text-[color:var(--color-text-faint)]"><Loader2 size={13} className="inline animate-spin" /> Loading…</p>
+        <p className="text-xs text-[color:var(--color-text-faint)]"><Loader2 size={13} className="inline animate-spin" /> {t('common.loading')}</p>
       ) : rows.length === 0 ? (
-        <p className="text-xs text-[color:var(--color-text-faint)] italic">Trash is empty.</p>
+        <p className="text-xs text-[color:var(--color-text-faint)] italic">{t('set.trashEmpty')}</p>
+
       ) : (
         <>
           <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
@@ -1734,20 +1738,20 @@ function TrashManager() {
                 <div className="min-w-0 flex-1">
                   <span className="text-xs font-medium truncate block">{r.title}</span>
                   <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                    {r.subtitle} · deleted {new Date(r.deletedAt).toLocaleDateString('en-GB')}
+                    {r.subtitle} · {t('set.deletedOn', { date: new Date(r.deletedAt).toLocaleDateString('en-GB') })}
                   </span>
                 </div>
                 <button onClick={() => restore(r)} disabled={pending && busyId === r.id} className="text-[11px] text-[color:var(--color-accent)] hover:underline disabled:opacity-50 shrink-0">
-                  restore
+                  {t('set.restore')}
                 </button>
                 <button onClick={() => purge(r)} disabled={pending && busyId === r.id} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] disabled:opacity-50 shrink-0">
-                  delete forever
+                  {t('set.deleteForeverLower')}
                 </button>
               </div>
             ))}
           </div>
           <button onClick={empty} disabled={pending} className="mt-3 text-xs px-3 py-1.5 rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-red)] hover:border-[color:var(--color-red)] transition-colors disabled:opacity-50">
-            Empty Trash ({rows.length})
+            {t('set.emptyTrash', { n: rows.length })}
           </button>
         </>
       )}
@@ -1756,6 +1760,7 @@ function TrashManager() {
 }
 
 function BackupRestore() {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1774,7 +1779,7 @@ function BackupRestore() {
         a.download = `pharos-backup-${stamp}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        setMsg('✓ Backup downloaded');
+        setMsg(t('set.backupDownloaded'));
       } catch (e) {
         setMsg(`Export failed: ${(e as Error).message.slice(0, 80)}`);
       }
@@ -1783,18 +1788,18 @@ function BackupRestore() {
 
   async function handleFile(file: File) {
     const ok = await confirm({
-      title: 'Restore from backup?',
-      message: 'Merges the backup into your data (upsert by id). Records with the same id are overwritten. This cannot be undone.',
-      confirmLabel: 'Restore',
+      title: t('set.restoreTitle'),
+      message: t('set.restoreConfirm'),
+      confirmLabel: t('common.confirm'),
       danger: true,
     });
     if (fileRef.current) fileRef.current.value = '';
     if (!ok) return;
-    setMsg('Restoring…');
+    setMsg(t('set.restoring'));
     const text = await file.text();
     startTransition(async () => {
       const r = await importData(text);
-      setMsg(r.ok ? `✓ Restored ${r.restored} records` : `Failed: ${r.error}`);
+      setMsg(r.ok ? t('set.restored', { n: r.restored }) : `${t('common.failed')}: ${r.error}`);
     });
   }
 
@@ -1824,14 +1829,14 @@ function BackupRestore() {
   return (
     <div className="mt-4 pt-4 border-t border-[color:var(--color-border)]">
       <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
-        Backup
+        {t('set.backup')}
       </p>
       <div className="flex items-center gap-2 flex-wrap">
         <button type="button" onClick={handleExport} disabled={pending} className={cn(btn, 'text-[color:var(--color-accent)]')}>
-          {pending ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Export JSON
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} {t('set.exportJson')}
         </button>
         <button type="button" onClick={() => fileRef.current?.click()} disabled={pending} className={cn(btn, 'text-[color:var(--color-cyan)]')}>
-          <Upload size={13} /> Restore…
+          <Upload size={13} /> {t('set.restoreDots')}
         </button>
         <input
           ref={fileRef}
@@ -1847,7 +1852,7 @@ function BackupRestore() {
         )}
       </div>
       <div className="flex items-center gap-2 flex-wrap mt-2">
-        <span className="text-[10px] text-[color:var(--color-text-faint)] mr-1" style={{ fontFamily: 'var(--font-mono)' }}>Spreadsheet (CSV):</span>
+        <span className="text-[10px] text-[color:var(--color-text-faint)] mr-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.spreadsheetCsv')}</span>
         {(['receipts', 'expenses', 'items'] as const).map((k) => (
           <button key={k} type="button" onClick={() => handleCSV(k)} disabled={pending} className={cn(btn, 'text-[color:var(--color-text-dim)]')}>
             <Download size={12} /> {k}
@@ -1855,7 +1860,7 @@ function BackupRestore() {
         ))}
       </div>
       <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-        JSON backup = full restore (metadata only; binary files stay on disk). CSV = open in Excel/Sheets for an accountant or tax.
+        {t('set.backupNote')}
       </p>
     </div>
   );
