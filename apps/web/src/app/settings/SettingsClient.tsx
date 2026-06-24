@@ -236,13 +236,13 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
           {tab === 'storage' && (
             <>
               <StorageManager storage={info.storage} counts={info.counts} />
-              <Section title="Data" icon={<Database size={15} />}>
+              <Section title={t('set.dataSection')} icon={<Database size={15} />}>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <Stat label="Items" value={info.counts.items} />
-                  <Stat label="Receipts" value={info.counts.receipts} />
-                  <Stat label="Statements" value={info.counts.statements} />
-                  <Stat label="Subs" value={info.counts.subscriptions} />
-                  <Stat label="Cards" value={info.counts.cards} />
+                  <Stat label={t('set.statItems')} value={info.counts.items} />
+                  <Stat label={t('set.statReceipts')} value={info.counts.receipts} />
+                  <Stat label={t('set.statStatements')} value={info.counts.statements} />
+                  <Stat label={t('set.statSubs')} value={info.counts.subscriptions} />
+                  <Stat label={t('set.statCards')} value={info.counts.cards} />
                 </div>
                 <BackupRestore />
                 <RecomputePricesButton />
@@ -2095,6 +2095,7 @@ function CardsManager({ cards }: { cards: SerializedCard[] }) {
 // ─── Users & access ───────────────────────────────────────────────────────
 
 function UsersManager({ currentUserId }: { currentUserId: string }) {
+  const t = useT();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, startTransition] = useTransition();
@@ -2113,30 +2114,30 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
     startTransition(async () => {
       const res = await createUser(fd);
       if (res.ok) { setAdding(false); setForm({ username: '', name: '', password: '', role: 'member' }); reload(); }
-      else setError(res.error || 'Failed');
+      else setError(res.error || t('common.failed'));
     });
   }
   async function remove(u: UserRow) {
-    const ok = await confirm({ title: 'Delete user', message: `Delete "${u.username}"? This cannot be undone.`, confirmLabel: 'Delete', danger: true });
+    const ok = await confirm({ title: t('set.deleteUser'), message: t('set.confirmDeleteUser', { name: u.username }), confirmLabel: t('common.delete'), danger: true });
     if (!ok) return;
-    startTransition(async () => { const r = await deleteUser(u.id); if (!r.ok) setError(r.error || 'Failed'); reload(); });
+    startTransition(async () => { const r = await deleteUser(u.id); if (!r.ok) setError(r.error || t('common.failed')); reload(); });
   }
   function toggleRole(u: UserRow) {
-    startTransition(async () => { const r = await setUserRole(u.id, u.role === 'admin' ? 'member' : 'admin'); if (!r.ok) setError(r.error || 'Failed'); reload(); });
+    startTransition(async () => { const r = await setUserRole(u.id, u.role === 'admin' ? 'member' : 'admin'); if (!r.ok) setError(r.error || t('common.failed')); reload(); });
   }
   function resetPwd(u: UserRow) {
-    const pwd = window.prompt(`New password for "${u.username}" (min 8 chars):`);
+    const pwd = window.prompt(t('set.resetPwdPrompt', { name: u.username }));
     if (!pwd) return;
-    startTransition(async () => { const r = await changeUserPassword(u.id, pwd); setError(r.ok ? '' : (r.error || 'Failed')); });
+    startTransition(async () => { const r = await changeUserPassword(u.id, pwd); setError(r.ok ? '' : (r.error || t('common.failed'))); });
   }
 
   return (
-    <Section title="Users & access" icon={<Users size={15} />}>
+    <Section title={t('set.usersTitle')} icon={<Users size={15} />}>
       <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">
-        Everyone shares the same data. Admins manage users + system settings; members just use the app.
+        {t('set.usersDesc')}
       </p>
       {loading ? (
-        <p className="text-xs text-[color:var(--color-text-faint)]">Loading…</p>
+        <p className="text-xs text-[color:var(--color-text-faint)]">{t('common.loading')}</p>
       ) : (
         <div className="space-y-1.5">
           {users.map((u) => (
@@ -2145,14 +2146,14 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
               <div className="min-w-0 flex-1">
                 <span className="text-sm font-medium">{u.username}</span>
                 {u.name && <span className="text-xs text-[color:var(--color-text-dim)] ml-2">{u.name}</span>}
-                {u.id === currentUserId && <span className="text-[10px] text-[color:var(--color-accent)] ml-2" style={{ fontFamily: 'var(--font-mono)' }}>you</span>}
+                {u.id === currentUserId && <span className="text-[10px] text-[color:var(--color-accent)] ml-2" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.you')}</span>}
               </div>
-              <button onClick={() => toggleRole(u)} title="Toggle role" style={{ fontFamily: 'var(--font-mono)' }}
+              <button onClick={() => toggleRole(u)} title={t('set.toggleRole')} style={{ fontFamily: 'var(--font-mono)' }}
                 className={cn('text-[10px] px-2 py-0.5 rounded-full border uppercase', u.role === 'admin' ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] text-[color:var(--color-text-dim)]')}>
-                {u.role}
+                {u.role === 'admin' ? t('set.admin') : t('set.member')}
               </button>
-              <button onClick={() => resetPwd(u)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] p-1" title="Reset password"><KeyRound size={13} /></button>
-              {u.id !== currentUserId && <button onClick={() => remove(u)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] p-1" title="Delete"><Trash2 size={13} /></button>}
+              <button onClick={() => resetPwd(u)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] p-1" title={t('set.resetPassword')}><KeyRound size={13} /></button>
+              {u.id !== currentUserId && <button onClick={() => remove(u)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] p-1" title={t('common.delete')}><Trash2 size={13} /></button>}
             </div>
           ))}
         </div>
@@ -2163,22 +2164,22 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
       {adding ? (
         <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] space-y-2.5">
           <div className="grid grid-cols-2 gap-2">
-            <input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} placeholder="username *" className={inputClass} />
-            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="display name" className={inputClass} />
-            <input value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} type="password" placeholder="password (min 8) *" className={inputClass} />
+            <input value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} placeholder={t('set.usernamePlaceholder')} className={inputClass} />
+            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={t('set.displayNamePlaceholder')} className={inputClass} />
+            <input value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} type="password" placeholder={t('set.passwordPlaceholder')} className={inputClass} />
             <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} className={selectClass}>
-              <option value="member">member</option>
-              <option value="admin">admin</option>
+              <option value="member">{t('set.member')}</option>
+              <option value="admin">{t('set.admin')}</option>
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={add} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Create user</button>
-            <button onClick={() => { setAdding(false); setError(''); }} className={ghostBtn}><X size={13} /> Cancel</button>
+            <button onClick={add} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('set.createUser')}</button>
+            <button onClick={() => { setAdding(false); setError(''); }} className={ghostBtn}><X size={13} /> {t('common.cancel')}</button>
           </div>
         </div>
       ) : (
         <button onClick={() => setAdding(true)} className="mt-3 flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)]">
-          <UserPlus size={13} /> Add user
+          <UserPlus size={13} /> {t('set.addUser')}
         </button>
       )}
     </Section>
