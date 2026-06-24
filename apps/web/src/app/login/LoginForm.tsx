@@ -6,6 +6,7 @@ import { loginAction } from './actions';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PharosMark } from '@/components/PharosMark';
+import { useT } from '@/components/LocaleProvider';
 
 // Only follow same-origin paths, never protocol-relative (//evil.com) or absolute URLs.
 function safeNext(next: string | null): string {
@@ -14,6 +15,7 @@ function safeNext(next: string | null): string {
 }
 
 export function LoginForm() {
+  const t = useT();
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState('');
@@ -29,7 +31,7 @@ export function LoginForm() {
         router.replace(safeNext(params.get('next')));
         router.refresh();
       } else {
-        setError(res.error || 'Login failed');
+        setError(res.error || t('login.failed'));
       }
     });
   }
@@ -46,7 +48,7 @@ export function LoginForm() {
             Pharos
           </h1>
           <p className="text-xs text-[color:var(--color-text-faint)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
-            One light over everything you run.
+            {t('login.tagline')}
           </p>
         </div>
 
@@ -54,15 +56,15 @@ export function LoginForm() {
           onSubmit={onSubmit}
           className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 flex flex-col gap-3"
         >
-          <label className="text-xs font-medium text-[color:var(--color-text-dim)]">Username</label>
-          <Input name="username" autoFocus autoComplete="username" icon={<UserIcon size={15} />} placeholder="you" />
-          <label className="text-xs font-medium text-[color:var(--color-text-dim)] mt-1">Password</label>
+          <label className="text-xs font-medium text-[color:var(--color-text-dim)]">{t('set.username')}</label>
+          <Input name="username" autoFocus autoComplete="username" icon={<UserIcon size={15} />} placeholder={t('login.userPlaceholder')} />
+          <label className="text-xs font-medium text-[color:var(--color-text-dim)] mt-1">{t('set.password')}</label>
           <Input name="password" type="password" autoComplete="current-password" icon={<Lock size={15} />} placeholder="••••••••" />
 
           {error && <p className="text-xs text-[color:var(--color-red)] mt-1">{error}</p>}
 
           <Button type="submit" variant="primary" size="lg" disabled={pending} className="mt-3 justify-center">
-            {pending ? 'Signing in…' : 'Sign in'} <ArrowRight size={16} />
+            {pending ? t('login.signingIn') : t('login.signIn')} <ArrowRight size={16} />
           </Button>
         </form>
       </div>

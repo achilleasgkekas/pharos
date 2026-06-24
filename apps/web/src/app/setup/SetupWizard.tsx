@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { PharosMark } from '@/components/PharosMark';
 import { useTheme } from '@/components/ThemeProvider';
 import { CURRENCIES } from '@/lib/money';
+import { useT } from '@/components/LocaleProvider';
 
 const STEPS = ['Account', 'Basics', 'AI', 'Done'];
 
@@ -25,6 +26,7 @@ const PROVIDERS: { id: Provider; label: string; needsKey: boolean; modelHint: st
 ];
 
 export function SetupWizard() {
+  const t = useT();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [step, setStep] = useState(1);
@@ -51,7 +53,7 @@ export function SetupWizard() {
     start(async () => {
       const res = await createFirstAdmin(fd);
       if (res.ok) setStep(2);
-      else setError(res.error || 'Could not create the account.');
+      else setError(res.error || t('setup.couldNotCreate'));
     });
   }
 
@@ -109,9 +111,9 @@ export function SetupWizard() {
         <div className="flex flex-col items-center text-center mb-6">
           <PharosMark size={44} className="text-[color:var(--color-accent)]" />
           <h1 className="mt-3 tracking-[0.18em] uppercase text-lg" style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>
-            Welcome to Pharos
+            {t('setup.welcome')}
           </h1>
-          <p className="text-xs text-[color:var(--color-text-faint)] mt-1">Let&apos;s get your hub set up.</p>
+          <p className="text-xs text-[color:var(--color-text-faint)] mt-1">{t('setup.subtitle')}</p>
         </div>
 
         {/* Step indicator */}
@@ -141,14 +143,14 @@ export function SetupWizard() {
           {/* Step 1 — account */}
           {step === 1 && (
             <form onSubmit={submitAdmin} className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold mb-1">Create your admin account</h2>
-              <Input name="username" autoFocus autoComplete="username" icon={<UserIcon size={15} />} placeholder="username" />
-              <Input name="name" autoComplete="name" placeholder="Display name (optional)" />
-              <Input name="password" type="password" autoComplete="new-password" icon={<Lock size={15} />} placeholder="Password (min 8 chars)" />
-              <Input name="confirm" type="password" autoComplete="new-password" icon={<Lock size={15} />} placeholder="Confirm password" />
+              <h2 className="text-sm font-semibold mb-1">{t('setup.createAdmin')}</h2>
+              <Input name="username" autoFocus autoComplete="username" icon={<UserIcon size={15} />} placeholder={t('setup.usernamePlaceholder')} />
+              <Input name="name" autoComplete="name" placeholder={t('setup.displayName')} />
+              <Input name="password" type="password" autoComplete="new-password" icon={<Lock size={15} />} placeholder={t('setup.passwordMin')} />
+              <Input name="confirm" type="password" autoComplete="new-password" icon={<Lock size={15} />} placeholder={t('setup.confirmPassword')} />
               {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
               <Button type="submit" variant="primary" size="lg" disabled={pending} className="mt-2 justify-center">
-                {pending ? 'Creating…' : 'Create account'} <ArrowRight size={16} />
+                {pending ? t('setup.creating') : t('setup.createAccount')} <ArrowRight size={16} />
               </Button>
             </form>
           )}
@@ -156,9 +158,9 @@ export function SetupWizard() {
           {/* Step 2 — basics */}
           {step === 2 && (
             <div className="flex flex-col gap-4">
-              <h2 className="text-sm font-semibold">Basic preferences</h2>
+              <h2 className="text-sm font-semibold">{t('setup.basicPrefs')}</h2>
               <div>
-                <label className="text-xs font-medium text-[color:var(--color-text-dim)]">Currency</label>
+                <label className="text-xs font-medium text-[color:var(--color-text-dim)]">{t('set.currency')}</label>
                 <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={`${SELECT_CLS} mt-1`}>
                   {CURRENCIES.map((c) => (
                     <option key={c.code} value={c.code}>{c.code} · {c.symbol} · {c.label}</option>
@@ -166,24 +168,24 @@ export function SetupWizard() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-[color:var(--color-text-dim)]">Default VAT / sales tax %</label>
+                <label className="text-xs font-medium text-[color:var(--color-text-dim)]">{t('set.defaultVat')}</label>
                 <Input value={vat} onChange={(e) => setVat(e.target.value)} type="number" min={0} max={100} className="mt-1" />
               </div>
               <div>
-                <label className="text-xs font-medium text-[color:var(--color-text-dim)]">Theme</label>
+                <label className="text-xs font-medium text-[color:var(--color-text-dim)]">{t('set.theme')}</label>
                 <div className="flex gap-2 mt-1">
                   <Button variant={theme === 'dark' ? 'primary' : 'secondary'} size="sm" onClick={() => setTheme('dark')}>
-                    <Moon size={14} /> Dark
+                    <Moon size={14} /> {t('set.dark')}
                   </Button>
                   <Button variant={theme === 'light' ? 'primary' : 'secondary'} size="sm" onClick={() => setTheme('light')}>
-                    <Sun size={14} /> Light
+                    <Sun size={14} /> {t('set.light')}
                   </Button>
                 </div>
               </div>
               <div className="flex gap-2 mt-2">
-                <Button variant="ghost" size="md" onClick={() => setStep(3)} disabled={pending}>Skip</Button>
+                <Button variant="ghost" size="md" onClick={() => setStep(3)} disabled={pending}>{t('qv.skip')}</Button>
                 <Button variant="primary" size="md" onClick={submitBasics} disabled={pending} className="flex-1 justify-center">
-                  {pending ? 'Saving…' : 'Continue'} <ArrowRight size={16} />
+                  {pending ? t('common.saving') : t('setup.continue')} <ArrowRight size={16} />
                 </Button>
               </div>
             </div>
@@ -192,33 +194,33 @@ export function SetupWizard() {
           {/* Step 3 — AI (optional) */}
           {step === 3 && (
             <div className="flex flex-col gap-3">
-              <h2 className="text-sm font-semibold flex items-center gap-1.5"><Sparkles size={15} className="text-[color:var(--color-accent)]" /> AI features (optional)</h2>
+              <h2 className="text-sm font-semibold flex items-center gap-1.5"><Sparkles size={15} className="text-[color:var(--color-accent)]" /> {t('setup.aiFeaturesOpt')}</h2>
               <p className="text-xs text-[color:var(--color-text-dim)]">
-                AI auto-reads receipts, bills, statements and more. You can skip this and turn it on later from Settings — the app works fully without it.
+                {t('setup.aiBlurb')}
               </p>
               <div>
-                <label className="text-xs font-medium text-[color:var(--color-text-dim)]">Provider</label>
+                <label className="text-xs font-medium text-[color:var(--color-text-dim)]">{t('setup.provider')}</label>
                 <select value={provider} onChange={(e) => setProvider(e.target.value as Provider)} className={`${SELECT_CLS} mt-1`}>
                   {PROVIDERS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
                 </select>
               </div>
               {provider === 'ollama' && (
-                <Input value={host} onChange={(e) => setHost(e.target.value)} placeholder="Ollama URL (default http://localhost:11434)" />
+                <Input value={host} onChange={(e) => setHost(e.target.value)} placeholder={t('setup.ollamaUrl')} />
               )}
               {provider === 'custom' && (
-                <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="Base URL (e.g. http://localhost:1234/v1)" />
+                <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder={t('setup.baseUrlPlaceholder')} />
               )}
               {meta.needsKey && (
-                <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" icon={<Lock size={15} />} placeholder="API key" />
+                <Input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" icon={<Lock size={15} />} placeholder={t('setup.apiKey')} />
               )}
-              <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder={`Model (e.g. ${meta.modelHint})`} />
+              <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder={t('setup.modelHint', { hint: meta.modelHint })} />
               {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
               <div className="flex gap-2 mt-2">
                 <Button variant="ghost" size="md" onClick={skipAi} disabled={pending}>
-                  <SkipForward size={14} /> Without AI
+                  <SkipForward size={14} /> {t('setup.withoutAi')}
                 </Button>
                 <Button variant="primary" size="md" onClick={submitAi} disabled={pending} className="flex-1 justify-center">
-                  {pending ? 'Saving…' : 'Enable AI'} <ArrowRight size={16} />
+                  {pending ? t('common.saving') : t('setup.enableAiBtn')} <ArrowRight size={16} />
                 </Button>
               </div>
             </div>
@@ -231,10 +233,10 @@ export function SetupWizard() {
               <span className="flex items-center justify-center h-12 w-12 rounded-full bg-[color:var(--color-accent)] text-black">
                 <Check size={24} />
               </span>
-              <h2 className="text-base font-semibold">You&apos;re all set</h2>
-              <p className="text-xs text-[color:var(--color-text-dim)]">Your hub is ready. You can change anything later in Settings.</p>
+              <h2 className="text-base font-semibold">{t('setup.allSet')}</h2>
+              <p className="text-xs text-[color:var(--color-text-dim)]">{t('setup.allSetDesc')}</p>
               <Button variant="primary" size="lg" onClick={() => { router.replace('/'); router.refresh(); }} className="mt-2 justify-center w-full">
-                Go to dashboard <ArrowRight size={16} />
+                {t('setup.goDashboard')} <ArrowRight size={16} />
               </Button>
             </div>
           )}
