@@ -35,6 +35,7 @@ import { QuickVerify } from './QuickVerify';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueRescanReceipts, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { useT } from '@/components/LocaleProvider';
 import { DuplicatesModal } from './DuplicatesModal';
 import { useRouter } from 'next/navigation';
 
@@ -61,6 +62,7 @@ export function ReceiptsClient({
   storeNames: string[];
   emailInboxCount: number;
 }) {
+  const t = useT();
   const [selected, setSelected] = useState<SerializedReceipt | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
@@ -86,13 +88,13 @@ export function ReceiptsClient({
   async function handleImportEmail() {
     if (importing) return;
     setImporting(true);
-    setImportMsg('Importing from email…');
+    setImportMsg(t('rc.importing'));
     try {
       const r = await importEmailInbox();
       setImportMsg(
         r.ok
-          ? `Imported ${r.imported}${r.skipped ? `, ${r.skipped} skipped` : ''}. Now click “re-scan all (OCR)” to parse them.`
-          : r.error || 'Import failed'
+          ? t('rc.importedEmail', { n: r.imported })
+          : r.error || t('rc.importFailed')
       );
       router.refresh();
     } catch (e) {
@@ -132,12 +134,12 @@ export function ReceiptsClient({
     const g = await getBulkAiGuard();
     if (g.confirm) {
       const ok = await confirm({
-        title: `Re-scan ${failedReceipts.length} receipt${failedReceipts.length === 1 ? '' : 's'} with AI?`,
+        title: t('rc.rescanConfirm', { n: failedReceipts.length }),
         message:
           g.provider === 'anthropic'
-            ? `Cloud · ${g.model}. Rough cost ~$${(failedReceipts.length * 0.02).toFixed(2)} (≈$0.02/receipt). Background job.`
-            : `Local · ${g.model}. Free, but slow. Background job.`,
-        confirmLabel: 'Re-scan',
+            ? t('rc.rescanConfirmCloud', { model: g.model, cost: (failedReceipts.length * 0.02).toFixed(2) })
+            : t('rc.rescanConfirmLocal', { model: g.model }),
+        confirmLabel: t('common.confirm'),
       });
       if (!ok) return;
     }
@@ -209,7 +211,7 @@ export function ReceiptsClient({
     let failed = 0;
     let lastError: string | undefined;
     for (let i = 0; i < total; i++) {
-      const base = ollamaUp ? 'AI parsing' : 'Saving (AI offline)';
+      const base = ollamaUp ? t('rc.aiParsing') : t('rc.savingOffline');
       const tail = failed ? ` · ${failed} failed` : '';
       setUploadMsg(total > 1 ? `${base} ${i + 1}/${total}${tail}...` : `${base}...`);
       const processed = await shrinkImage(list[i]); // downscale big phone photos
@@ -234,11 +236,11 @@ export function ReceiptsClient({
     const okCount = total - failed;
     setUploadMsg(
       failed
-        ? `Imported ${okCount}/${total}. ${failed} failed${lastError ? `: ${lastError}` : ''}.`
+        ? t('rc.uploadResult', { ok: okCount, total, failed })
         : lastAiError
           ? `${lastAiError}. Saved for manual entry.`
           : total > 1
-            ? `Imported ${total} receipts ✓`
+            ? t('rc.importedOk', { n: total })
             : null
     );
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -258,17 +260,11 @@ export function ReceiptsClient({
   // Shared filter controls — left sidebar (desktop) + drawer (mobile)
   const filterControls = (
     <div className="space-y-4">
-      <Input icon={<Search size={14} />} placeholder="Search store, item, notes..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <Input icon={<Search size={14} />} placeholder={t('rc.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} />
       <div>
-        <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>Status</p>
+        <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.status')}</p>
         <div className="flex flex-col gap-1">
-          {([
-            ['all', 'All'],
-            ['verified', '✓ Verified'],
-            ['parsed', '✨ Parsed'],
-            ['failed', '⚠ Needs scan'],
-            ['archived', '🗄 Archived'],
-          ] as const).map(([v, label]) => (
+          {(['all', 'verified', 'parsed', 'failed', 'archived'] as const).map((v) => (
             <button
               key={v}
               onClick={() => setStatusFilter(v)}
@@ -278,30 +274,30 @@ export function ReceiptsClient({
               )}
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              {label}
+              {v === 'all' ? t('common.all') : v === 'verified' ? t('rc.stVerified') : v === 'parsed' ? t('rc.stParsed') : v === 'failed' ? t('rc.stNeedsScan') : t('rc.stArchived')}
             </button>
           ))}
         </div>
       </div>
       {stores.length > 0 && (
         <div>
-          <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>Store</p>
-          <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder="All stores" clearable size="sm" className="w-full" />
+          <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('v.fStore')}</p>
+          <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder={t('it.allStores')} clearable size="sm" className="w-full" />
         </div>
       )}
       <div>
-        <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>Sort</p>
+        <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.sort')}</p>
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)} className={selCls} style={{ fontFamily: 'var(--font-mono)' }}>
-          <option value="recent">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="total-desc">Total high→low</option>
-          <option value="total-asc">Total low→high</option>
-          <option value="store">Store A→Z</option>
+          <option value="recent">{t('rc.sortRecent')}</option>
+          <option value="oldest">{t('rc.sortOldest')}</option>
+          <option value="total-desc">{t('rc.sortTotalDesc')}</option>
+          <option value="total-asc">{t('rc.sortTotalAsc')}</option>
+          <option value="store">{t('rc.sortStore')}</option>
         </select>
       </div>
       {anyRFilter && (
         <button onClick={resetRFilters} className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline" style={{ fontFamily: 'var(--font-mono)' }}>
-          reset all filters
+          {t('common.resetFilters')}
         </button>
       )}
     </div>
@@ -313,7 +309,7 @@ export function ReceiptsClient({
       <div className="mb-5">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            Receipts
+            {t('nav.receipts')}
             <span
               className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]"
               style={{ fontFamily: 'var(--font-mono)' }}
@@ -333,7 +329,7 @@ export function ReceiptsClient({
                 <button
                   key={v}
                   onClick={() => setLayout(v)}
-                  title={v === 'grid' ? 'Grid' : 'List'}
+                  title={v === 'grid' ? t('v.grid') : t('v.list')}
                   className={cn(
                     'px-2 py-1 rounded-md transition-colors',
                     layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
@@ -346,17 +342,17 @@ export function ReceiptsClient({
             <button
               onClick={() => setShowDupes(true)}
               className="text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] transition-colors"
-              title="Scan for duplicate receipts (same store, day and total) and merge them"
+              title={t('rc.findDupTitle')}
             >
-              find duplicates
+              {t('rc.findDuplicates')}
             </button>
             {toVerify.length > 0 && (
               <button
                 onClick={() => setQuickVerify(true)}
                 className="flex items-center gap-1.5 text-[color:var(--color-accent)] hover:opacity-80 transition-opacity font-semibold"
-                title="Rapidly review and confirm the parsed receipts, one at a time"
+                title={t('rc.quickVerifyTitle')}
               >
-                <Zap size={13} /> Quick verify ({toVerify.length})
+                <Zap size={13} /> {t('rc.quickVerify', { n: toVerify.length })}
               </button>
             )}
             {failedCount > 0 && (
@@ -364,9 +360,9 @@ export function ReceiptsClient({
                 onClick={handleRescanFailed}
                 disabled={rescanBusy}
                 className="text-[color:var(--color-cyan)] hover:text-[color:var(--color-accent)] disabled:opacity-60"
-                title="Re-scan every unverified receipt that came out empty (€0 / no items), with auto-rotate OCR. Runs in the background."
+                title={t('rc.rescanTitle')}
               >
-                {rescanBusy ? 'Re-scanning…' : `${failedCount} failed · re-scan all (OCR)`}
+                {rescanBusy ? t('rc.rescanning') : t('rc.failedRescan', { n: failedCount })}
               </button>
             )}
             {emailInboxCount > 0 && (
@@ -374,9 +370,9 @@ export function ReceiptsClient({
                 onClick={handleImportEmail}
                 disabled={importing}
                 className="text-[color:var(--color-purple)] hover:text-[color:var(--color-accent)] disabled:opacity-60"
-                title="Import the receipt attachments extracted from your Gmail Takeout (scripts/extract-email-receipts.py) as draft receipts"
+                title={t('rc.importEmailTitle')}
               >
-                {importing ? 'Importing…' : `📧 import ${emailInboxCount} from email`}
+                {importing ? t('rc.importing') : t('rc.importEmail', { n: emailInboxCount })}
               </button>
             )}
             {importMsg && <span className="text-[color:var(--color-text-faint)]">{importMsg}</span>}
@@ -422,12 +418,12 @@ export function ReceiptsClient({
           <div className="flex flex-col items-center gap-2 text-[color:var(--color-text-dim)]">
             <Upload size={28} />
             <p className="text-sm font-medium text-[color:var(--color-text)]">
-              Drop receipts here or click
+              {t('rc.dropReceipts')}
             </p>
             <p className="text-xs text-[color:var(--color-text-faint)]">
               {ollamaUp
-                ? 'JPG/PNG/PDF · AI auto-parse (vendor, items, total)'
-                : 'JPG/PNG/PDF · manual entry (AI offline)'}
+                ? t('rc.aiAutoParse')
+                : t('rc.manualEntry')}
             </p>
             <button
               type="button"
@@ -437,7 +433,7 @@ export function ReceiptsClient({
               }}
               className="mt-2 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors"
             >
-              <Camera size={14} /> Take photo
+              <Camera size={14} /> {t('ex.takePhoto')}
             </button>
           </div>
         )}
@@ -470,7 +466,7 @@ export function ReceiptsClient({
               className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              <SlidersHorizontal size={14} /> Filters {anyRFilter && <span className="text-[color:var(--color-accent)]">•</span>}
+              <SlidersHorizontal size={14} /> {t('ex.filters')} {anyRFilter && <span className="text-[color:var(--color-accent)]">•</span>}
             </button>
             {showFilters && (
               <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">{filterControls}</div>
@@ -531,6 +527,7 @@ export function ReceiptsClient({
 
 // Compact horizontal row for the receipts list layout
 function ReceiptRow({ receipt, onClick }: { receipt: SerializedReceipt; onClick: () => void }) {
+  const t = useT();
   const isImage = receipt.fileType.startsWith('image/');
   const isHtml = receipt.fileType.includes('html');
   const empty = receipt.total === 0 && (receipt.lineItems?.length ?? 0) === 0;
@@ -560,10 +557,10 @@ function ReceiptRow({ receipt, onClick }: { receipt: SerializedReceipt; onClick:
       </div>
       <div className="min-w-0 flex-1">
         <span className="font-semibold text-sm truncate block" style={{ fontFamily: 'var(--font-display)' }}>
-          {receipt.store || 'Unknown store'}
+          {receipt.store || t('ex.unknown')}
         </span>
         <span className="text-[10px] text-[color:var(--color-text-faint)] block mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-          {isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB')} · {receipt.lineItems?.length ?? 0} items
+          {isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB')} · {receipt.lineItems?.length ?? 0} {t('it.items')}
           {receipt.fileType === 'pdf' ? ' · pdf' : isHtml ? ' · email' : ''}
         </span>
       </div>
@@ -594,6 +591,7 @@ function ReceiptCard({
   receipt: SerializedReceipt;
   onClick: () => void;
 }) {
+  const t = useT();
   const isImage = receipt.fileType.startsWith('image/');
   const isHtml = receipt.fileType.includes('html');
   return (
@@ -670,7 +668,7 @@ function ReceiptCard({
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {new Date(receipt.date).toLocaleDateString('en-GB')}
-          {receipt.lineItems.length > 0 && ` · ${receipt.lineItems.length} items`}
+          {receipt.lineItems.length > 0 && ` · ${receipt.lineItems.length} ${t('it.items')}`}
         </div>
       </div>
     </button>
