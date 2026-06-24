@@ -421,6 +421,7 @@ function PlanCardLinkable({
   allPlans: InstallmentPlan[];
   compact?: boolean;
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState('');
@@ -481,7 +482,7 @@ function PlanCardLinkable({
               >
                 <Package size={9} className="shrink-0" />
                 <span className="truncate max-w-[120px]">{x.title}</span>
-                <button onClick={() => removeItem(x.id)} disabled={pending} title="Remove this product" className="hover:text-[color:var(--color-red)] shrink-0">×</button>
+                <button onClick={() => removeItem(x.id)} disabled={pending} title={t('stm.removeProduct')} className="hover:text-[color:var(--color-red)] shrink-0">×</button>
               </span>
             ))}
           </div>
@@ -489,7 +490,7 @@ function PlanCardLinkable({
 
         {picking ? (
           <div className="bg-[color:var(--color-surface-3)] rounded-lg p-2 space-y-1">
-            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search inventory…" className={inputClass} />
+            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('stm.searchInventory')} className={inputClass} />
             <div className="max-h-32 overflow-y-auto space-y-0.5">
               {searchMatches.map((i) => (
                 <button
@@ -502,10 +503,10 @@ function PlanCardLinkable({
                   <span className="truncate">{i.title}</span>
                 </button>
               ))}
-              {searchMatches.length === 0 && <p className="text-[10px] text-[color:var(--color-text-faint)] italic px-2 py-1">No more inventory products</p>}
+              {searchMatches.length === 0 && <p className="text-[10px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noMoreInventory')}</p>}
             </div>
             <button onClick={() => { setPicking(false); setQuery(''); }} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
-              cancel
+              {t('stm.cancelLower')}
             </button>
           </div>
         ) : (
@@ -515,7 +516,7 @@ function PlanCardLinkable({
                 key={item._id}
                 onClick={() => addItem(item._id)}
                 disabled={pending}
-                title={`Price match: ${cur()}${price} ≈ ${cur()}${plan.totalAmount.toFixed(0)} plan total`}
+                title={t('stm.priceMatch', { price: `${cur()}${price}`, total: `${cur()}${plan.totalAmount.toFixed(0)}` })}
                 className="inline-flex items-center gap-1 text-[10px] text-[color:var(--color-cyan)] bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-1.5 py-0.5 hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)] transition-colors max-w-[160px]"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
@@ -529,11 +530,11 @@ function PlanCardLinkable({
               className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              <Link2 size={10} className="inline" /> {linkedItems.length ? 'add product' : suggestions.length ? 'other…' : 'link product'}
+              <Link2 size={10} className="inline" /> {linkedItems.length ? t('stm.addProduct') : suggestions.length ? t('stm.other') : t('stm.linkProduct')}
             </button>
             {linkedItems.length > 0 && (
               <button onClick={clearAll} disabled={pending} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                clear all
+                {t('stm.clearAll')}
               </button>
             )}
           </div>
@@ -547,6 +548,7 @@ function PlanCardLinkable({
 /** Merge two installment plans the bank printed with different wording across
  *  statements ("QUEST ONLINE" vs "QUEST ONLINE KALLITHEA") into one payoff plan. */
 function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans: InstallmentPlan[] }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -574,9 +576,9 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
     return (
       <div className="bg-[color:var(--color-surface-3)] rounded-lg p-2 space-y-1">
         <p className="text-[10px] text-[color:var(--color-text-faint)] px-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-          Merge this plan into…
+          {t('stm.mergeInto')}
         </p>
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search plans…" className={inputClass} />
+        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('stm.searchPlans')} className={inputClass} />
         <div className="max-h-32 overflow-y-auto space-y-0.5">
           {targets.map((p) => (
             <button
@@ -591,10 +593,10 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
               </span>
             </button>
           ))}
-          {targets.length === 0 && <p className="text-[10px] text-[color:var(--color-text-faint)] italic px-2 py-1">No other plans</p>}
+          {targets.length === 0 && <p className="text-[10px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noOtherPlans')}</p>}
         </div>
         <button onClick={() => { setOpen(false); setQ(''); }} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
-          cancel
+          {t('stm.cancelLower')}
         </button>
       </div>
     );
@@ -607,7 +609,7 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
         className="inline-flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-purple)] transition-colors disabled:opacity-40"
         style={{ fontFamily: 'var(--font-mono)' }}
       >
-        <GitMerge size={10} /> merge into…
+        <GitMerge size={10} /> {t('stm.mergeIntoBtn')}
       </button>
       {plan.merged && (
         <button
@@ -616,7 +618,7 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
           className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          unmerge
+          {t('stm.unmerge')}
         </button>
       )}
     </div>
@@ -693,6 +695,7 @@ function StatementDetail({
   itemMap: Map<string, ItemOption>;
   onClose: () => void;
 }) {
+  const t = useT();
   const [showPdf, setShowPdf] = useState(false);
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
@@ -710,26 +713,26 @@ function StatementDetail({
   // the fix for statements whose text layer dropped the "ΔΟΣΗ x/y" installment
   // column (so installments were never detected). Manual edits + links are kept.
   function handleRescan(useOcr: boolean) {
-    setRescanMsg(useOcr ? 'Re-scanning with OCR (all pages)…' : 'Re-scanning…');
+    setRescanMsg(useOcr ? t('stm.rescanningOcr') : t('rc.rescanning'));
     startTransition(async () => {
       const r = await rescanStatement(current._id, useOcr);
       if (r.ok && r.statement) {
         setCurrent(r.statement);
         setRev((v) => v + 1);
         setRescanMsg(
-          `Re-scanned ✓ — ${r.txCount ?? 0} txns · ${r.installmentsFound ?? 0} installments${r.usedOcr ? ' (OCR)' : ''}`
+          t('stm.rescanned', { tx: r.txCount ?? 0, inst: r.installmentsFound ?? 0 }) + (r.usedOcr ? ' (OCR)' : '')
         );
       } else {
-        setRescanMsg(`Failed: ${r.aiError || r.error || 'no result'}`);
+        setRescanMsg(t('rc.rescanFailed', { err: r.aiError || r.error || 'no result' }));
       }
     });
   }
 
   async function handleDeleteStatement() {
     const ok = await confirm({
-      title: 'Delete statement',
-      message: `Delete ${statementTitle(current)}?`,
-      confirmLabel: 'Delete',
+      title: t('stm.deleteStatement'),
+      message: t('stm.confirmDeleteStatement', { title: statementTitle(current) }),
+      confirmLabel: t('common.delete'),
       danger: true,
     });
     if (ok) startTransition(async () => { await deleteStatement(current._id); onClose(); });
@@ -740,7 +743,7 @@ function StatementDetail({
       {/* Overpaid highlight */}
       {credit && (
         <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-[#00ff8814] text-[color:var(--color-accent)] border border-[#00ff8833]" style={{ fontFamily: 'var(--font-mono)' }}>
-          credit balance — you overpaid by {cur()}{Math.abs(statement.totalAmount).toFixed(2)}
+          {t('stm.creditBalance', { amount: `${cur()}${Math.abs(statement.totalAmount).toFixed(2)}` })}
         </div>
       )}
 
@@ -758,7 +761,7 @@ function StatementDetail({
       <div className="flex items-center gap-4 flex-wrap text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
         {current.filePath && (
           <button onClick={() => setShowPdf((v) => !v)} className="flex items-center gap-1 text-[color:var(--color-cyan)] hover:underline">
-            <FileText size={12} /> {showPdf ? 'hide PDF' : 'view PDF'}
+            <FileText size={12} /> {showPdf ? t('stm.hidePdf') : t('stm.viewPdf')}
           </button>
         )}
         {current.transactions.length > 0 && (
@@ -767,14 +770,14 @@ function StatementDetail({
             disabled={pending}
             className="flex items-center gap-1 text-[color:var(--color-purple)] hover:opacity-80 disabled:opacity-50"
           >
-            <Sparkles size={12} /> AI categorize
+            <Sparkles size={12} /> {t('stm.aiCategorize')}
           </button>
         )}
         {current.filePath && (
           <span className="flex items-center gap-2">
-            <span className="flex items-center gap-1"><ScanLine size={12} /> re-scan:</span>
-            <button onClick={() => handleRescan(false)} disabled={pending} className="text-[color:var(--color-accent)] hover:opacity-80 disabled:opacity-50">text</button>
-            <button onClick={() => handleRescan(true)} disabled={pending} title="rasterize + OCR every page (finds installments the text layer dropped)" className="text-[color:var(--color-accent)] hover:opacity-80 disabled:opacity-50">OCR</button>
+            <span className="flex items-center gap-1"><ScanLine size={12} /> {t('stm.rescanLabel')}</span>
+            <button onClick={() => handleRescan(false)} disabled={pending} className="text-[color:var(--color-accent)] hover:opacity-80 disabled:opacity-50">{t('stm.text')}</button>
+            <button onClick={() => handleRescan(true)} disabled={pending} title={t('stm.ocrTitle')} className="text-[color:var(--color-accent)] hover:opacity-80 disabled:opacity-50">{t('rc.ocr')}</button>
           </span>
         )}
         {rescanMsg && <span className="text-[color:var(--color-text-dim)] normal-case">{rescanMsg}</span>}
@@ -789,7 +792,7 @@ function StatementDetail({
             title={statementTitle(current)}
           />
           <a href={fileUrl(current.filePath)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 text-[10px] text-[color:var(--color-cyan)] hover:underline" style={{ fontFamily: 'var(--font-mono)' }}>
-            <FileText size={10} /> open in new tab
+            <FileText size={10} /> {t('stm.openNewTab')}
           </a>
         </div>
       )}
@@ -811,6 +814,7 @@ function TransactionList({
   items: ItemOption[];
   itemMap: Map<string, ItemOption>;
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [adding, setAdding] = useState(false);
 
@@ -821,14 +825,14 @@ function TransactionList({
           className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          Transactions ({statement.transactions.length})
+          {t('stm.transactions', { n: statement.transactions.length })}
         </span>
         <button
           onClick={() => setAdding((v) => !v)}
           className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          <Plus size={11} /> add
+          <Plus size={11} /> {t('stm.add')}
         </button>
       </div>
 
@@ -837,19 +841,19 @@ function TransactionList({
       )}
 
       <div className="space-y-1">
-        {statement.transactions.map((t) => (
+        {statement.transactions.map((tx) => (
           <TransactionRow
-            key={t._id}
-            tx={t}
+            key={tx._id}
+            tx={tx}
             statementId={statement._id}
             items={items}
-            linkedItems={t.matchedItemIds.map((id) => itemMap.get(id)).filter((x): x is ItemOption => !!x)}
-            onDelete={() => startTransition(() => deleteTransaction(statement._id, t._id))}
+            linkedItems={tx.matchedItemIds.map((id) => itemMap.get(id)).filter((x): x is ItemOption => !!x)}
+            onDelete={() => startTransition(() => deleteTransaction(statement._id, tx._id))}
             pending={pending}
           />
         ))}
         {statement.transactions.length === 0 && !adding && (
-          <p className="text-xs text-[color:var(--color-text-faint)] italic py-2">No transactions</p>
+          <p className="text-xs text-[color:var(--color-text-faint)] italic py-2">{t('stm.noTransactions')}</p>
         )}
       </div>
     </div>
@@ -859,6 +863,7 @@ function TransactionList({
 /** Inline editor for a transaction's installment counter (x/y). Lets you add it
  *  manually when the statement didn't print it, so future statements can match. */
 function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; statementId: string }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [cur, setCur] = useState('');
@@ -882,7 +887,7 @@ function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; sta
         <input
           value={cur}
           onChange={(e) => setCur(e.target.value)}
-          placeholder="#"
+          placeholder={t('stm.installmentNum')}
           inputMode="numeric"
           className="w-8 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded px-1 py-0.5 text-[10px] text-center focus:outline-none focus:border-[color:var(--color-accent)]"
         />
@@ -890,12 +895,12 @@ function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; sta
         <input
           value={tot}
           onChange={(e) => setTot(e.target.value)}
-          placeholder="of"
+          placeholder={t('stm.installmentOf')}
           inputMode="numeric"
           className="w-8 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded px-1 py-0.5 text-[10px] text-center focus:outline-none focus:border-[color:var(--color-accent)]"
         />
         <button onClick={save} disabled={pending} className="text-[10px] text-[color:var(--color-accent)] hover:opacity-80">
-          save
+          {t('stm.save')}
         </button>
         <button onClick={() => setEditing(false)} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]">
           ×
@@ -906,7 +911,7 @@ function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; sta
   if (tx.installmentInfo) {
     return (
       <button onClick={open} className="inline-flex items-center gap-1 text-[10px] text-[color:var(--color-purple)] hover:opacity-80" style={{ fontFamily: 'var(--font-mono)' }}>
-        installment {tx.installmentInfo.currentInstallment}/{tx.installmentInfo.totalInstallments}
+        {t('stm.installmentCounter', { cur: tx.installmentInfo.currentInstallment, tot: tx.installmentInfo.totalInstallments })}
         <Pencil size={8} />
       </button>
     );
@@ -917,7 +922,7 @@ function InstallmentEditor({ tx, statementId }: { tx: SerializedTransaction; sta
       className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)] hover:underline transition-colors"
       style={{ fontFamily: 'var(--font-mono)' }}
     >
-      + set installment
+      {t('stm.setInstallment')}
     </button>
   );
 }
@@ -937,6 +942,7 @@ function TransactionRow({
   onDelete: () => void;
   pending: boolean;
 }) {
+  const t = useT();
   const credit = tx.amount < 0;
   return (
     <div className="group bg-[color:var(--color-surface-2)] rounded-lg px-3 py-2">
@@ -955,7 +961,7 @@ function TransactionRow({
             )}
             {credit && (
               <span className="text-[10px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
-                payment / credit
+                {t('stm.paymentCredit')}
               </span>
             )}
           </span>
@@ -997,6 +1003,7 @@ function InstallmentLink({
   items: ItemOption[];
   linkedItems?: ItemOption[];
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState('');
@@ -1020,7 +1027,7 @@ function InstallmentLink({
       const r = await linkInstallmentToItem(statementId, tx._id, itemId);
       setPicking(false);
       setQuery('');
-      if (r.ok) setMsg(`linked · ${r.linked} charge${r.linked === 1 ? '' : 's'} matched`);
+      if (r.ok) setMsg(t('stm.linkedCharges', { n: r.linked }));
     });
   }
   function clearAll() {
@@ -1046,7 +1053,7 @@ function InstallmentLink({
             </span>
           ))}
           <button onClick={clearAll} disabled={pending} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" style={{ fontFamily: 'var(--font-mono)' }}>
-            unlink all
+            {t('stm.unlinkAll')}
           </button>
         </div>
       )}
@@ -1057,7 +1064,7 @@ function InstallmentLink({
           className="flex items-center gap-1 text-[10px] text-[color:var(--color-cyan)] hover:opacity-80"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          <Link2 size={11} /> {msg || (linked.length ? 'add product' : 'link to product')}
+          <Link2 size={11} /> {msg || (linked.length ? t('stm.addProduct') : t('stm.linkToProduct'))}
         </button>
       ) : (
         <div className="bg-[color:var(--color-surface-3)] rounded-lg p-2 space-y-1.5">
@@ -1065,7 +1072,7 @@ function InstallmentLink({
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search product…"
+            placeholder={t('stm.searchProduct')}
             className={inputClass}
           />
           <div className="max-h-40 overflow-y-auto space-y-0.5">
@@ -1081,11 +1088,11 @@ function InstallmentLink({
               </button>
             ))}
             {matches.length === 0 && (
-              <p className="text-[10px] text-[color:var(--color-text-faint)] italic px-2 py-1">No products found</p>
+              <p className="text-[10px] text-[color:var(--color-text-faint)] italic px-2 py-1">{t('stm.noProductsFound')}</p>
             )}
           </div>
           <button onClick={() => { setPicking(false); setQuery(''); }} className="text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-1">
-            cancel
+            {t('stm.cancelLower')}
           </button>
         </div>
       )}
@@ -1094,6 +1101,7 @@ function InstallmentLink({
 }
 
 function AddTransactionForm({ statementId, onDone }: { statementId: string; onDone: () => void }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [installment, setInstallment] = useState(false);
 
@@ -1110,29 +1118,29 @@ function AddTransactionForm({ statementId, onDone }: { statementId: string; onDo
     <form onSubmit={handleSubmit} className="bg-[color:var(--color-surface-2)] rounded-lg p-3 mb-2 space-y-2">
       <div className="flex gap-2">
         <input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={cn(inputClass, 'w-32')} />
-        <input name="description" placeholder="Description" required className={cn(inputClass, 'flex-1')} />
+        <input name="description" placeholder={t('stm.description')} required className={cn(inputClass, 'flex-1')} />
         <input name="amount" type="number" step="0.01" placeholder={cur()} required className={cn(inputClass, 'w-20 text-right')} />
       </div>
       <div className="flex items-center gap-2">
-        <input name="category" placeholder="Category" className={cn(inputClass, 'flex-1')} />
+        <input name="category" placeholder={t('stm.category')} className={cn(inputClass, 'flex-1')} />
         <label className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-dim)] cursor-pointer" style={{ fontFamily: 'var(--font-mono)' }}>
           <input type="checkbox" checked={installment} onChange={(e) => setInstallment(e.target.checked)} className="accent-[color:var(--color-purple)]" />
-          installment
+          {t('stm.installment')}
         </label>
       </div>
       {installment && (
         <div className="flex gap-2 items-center">
-          <input name="currentInstallment" type="number" min="1" placeholder="current" className={cn(inputClass, 'w-24')} />
+          <input name="currentInstallment" type="number" min="1" placeholder={t('stm.current')} className={cn(inputClass, 'w-24')} />
           <span className="text-[color:var(--color-text-faint)] text-xs">/</span>
-          <input name="totalInstallments" type="number" min="1" placeholder="total" className={cn(inputClass, 'w-24')} />
+          <input name="totalInstallments" type="number" min="1" placeholder={t('stm.total')} className={cn(inputClass, 'w-24')} />
         </div>
       )}
       <div className="flex gap-2">
         <Button type="submit" size="sm" variant="primary" disabled={pending}>
-          {pending ? '...' : 'Add'}
+          {pending ? '...' : t('stm.addBtn')}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={onDone}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </form>
@@ -1161,6 +1169,7 @@ function StatementForm({
   onDelete?: () => void;
   deletePending?: boolean;
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState({
     card: statement?.card ?? (cards[0] ? cardLabel(cards[0]) : ''),
@@ -1190,10 +1199,10 @@ function StatementForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <Field label="Card *">
+      <Field label={t('stm.cardReq')}>
         {cards.length > 0 ? (
           <select value={form.card} onChange={set('card')} className={selectClass} required>
-            <option value="">— select card —</option>
+            <option value="">{t('stm.selectCard')}</option>
             {cards.map((c) => (
               <option key={c._id} value={cardLabel(c)}>
                 {cardLabel(c)}
@@ -1204,34 +1213,34 @@ function StatementForm({
             )}
           </select>
         ) : (
-          <Input value={form.card} onChange={set('card')} required placeholder="e.g. Visa Gold 1234" />
+          <Input value={form.card} onChange={set('card')} required placeholder={t('stm.cardPlaceholder')} />
         )}
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Period (YYYY-MM) *">
+        <Field label={t('stm.periodReq')}>
           <Input value={form.period} onChange={set('period')} required placeholder="2026-06" />
         </Field>
-        <Field label="Statement date">
+        <Field label={t('stm.statementDate')}>
           <Input type="date" value={form.statementDate} onChange={set('statementDate')} />
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Payment due">
+        <Field label={t('stm.paymentDue')}>
           <Input type="date" value={form.dueDate} onChange={set('dueDate')} />
         </Field>
-        <Field label={`Total amount (${cur()}) *`}>
+        <Field label={t('stm.totalAmount', { cur: cur() })}>
           <Input type="number" step="0.01" value={form.totalAmount} onChange={set('totalAmount')} required />
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label={`Minimum payment (${cur()})`}>
+        <Field label={t('stm.minPayment', { cur: cur() })}>
           <Input type="number" step="0.01" value={form.minimumPayment} onChange={set('minimumPayment')} />
         </Field>
-        <Field label={`Paid (${cur()})`}>
+        <Field label={t('stm.paid', { cur: cur() })}>
           <Input type="number" step="0.01" value={form.paidAmount} onChange={set('paidAmount')} />
         </Field>
       </div>
-      <Field label="Notes">
+      <Field label={t('v.fNotes')}>
         <textarea
           value={form.notes}
           onChange={set('notes')}
@@ -1241,11 +1250,11 @@ function StatementForm({
       </Field>
       <div className="flex gap-3 pt-2">
         <Button type="submit" variant="primary" disabled={pending}>
-          {pending ? 'Saving...' : statement ? 'Save' : 'Create'}
+          {pending ? t('common.saving') : statement ? t('common.save') : t('stm.create')}
         </Button>
         {onDelete && (
           <Button type="button" variant="danger" size="sm" className="ml-auto" onClick={onDelete} disabled={deletePending}>
-            <Trash2 size={13} /> Delete
+            <Trash2 size={13} /> {t('common.delete')}
           </Button>
         )}
       </div>
@@ -1284,6 +1293,7 @@ function CardsManager({
   cards: SerializedCard[];
   statements: SerializedStatement[];
 }) {
+  const t = useT();
   const [editing, setEditing] = useState<SerializedCard | null>(null);
   const [adding, setAdding] = useState(false);
 
@@ -1313,7 +1323,7 @@ function CardsManager({
     <div className="space-y-2">
       {cards.length === 0 && (
         <p className="text-sm text-[color:var(--color-text-faint)] text-center py-4">
-          You haven't added any cards. Add one so it shows up in the dropdown.
+          {t('stm.noCardsHint')}
         </p>
       )}
       {cards.map((c) => {
@@ -1338,13 +1348,13 @@ function CardsManager({
               </div>
               <div className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 {c.bank || c.type}
-                {spend && ` · charged ${cur()}${spend.total.toFixed(2)} (${spend.count})`}
-                {c.creditLimit > 0 && ` · limit ${cur()}${c.creditLimit}`}
+                {spend && ` · ${t('stm.charged', { amount: `${cur()}${spend.total.toFixed(2)}`, count: spend.count })}`}
+                {c.creditLimit > 0 && ` · ${t('stm.limit', { amount: `${cur()}${c.creditLimit}` })}`}
               </div>
             </div>
             <button
               onClick={() => toggleCardActive(c._id, !c.active)}
-              title={c.active ? 'Deactivate' : 'Activate'}
+              title={c.active ? t('stm.deactivate') : t('stm.activate')}
               className={cn(
                 'p-1.5 rounded-md transition-colors',
                 c.active ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]'
@@ -1362,13 +1372,14 @@ function CardsManager({
         );
       })}
       <Button variant="secondary" size="sm" onClick={() => setAdding(true)} className="w-full justify-center mt-2">
-        <Plus size={14} /> New card
+        <Plus size={14} /> {t('stm.newCard')}
       </Button>
     </div>
   );
 }
 
 function CardForm({ card, onDone }: { card?: SerializedCard; onDone: () => void }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState({
     name: card?.name ?? '',
@@ -1410,7 +1421,7 @@ function CardForm({ card, onDone }: { card?: SerializedCard; onDone: () => void 
         type: d.type || p.type,
         kind: d.kind || p.kind,
       }));
-      setScanMsg('✓ Scanned — check the details');
+      setScanMsg(t('stm.scanned'));
       if (cameraRef.current) cameraRef.current.value = '';
     });
   }
@@ -1418,9 +1429,9 @@ function CardForm({ card, onDone }: { card?: SerializedCard; onDone: () => void 
   async function handleDeleteCard() {
     if (!card) return;
     const ok = await confirm({
-      title: 'Delete card',
-      message: `Delete card "${form.name}"?`,
-      confirmLabel: 'Delete',
+      title: t('set.deleteCard'),
+      message: t('set.confirmDeleteName', { name: form.name }),
+      confirmLabel: t('common.delete'),
       danger: true,
     });
     if (ok)
@@ -1461,7 +1472,7 @@ function CardForm({ card, onDone }: { card?: SerializedCard; onDone: () => void 
           className="w-full justify-center"
         >
           {scanPending ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
-          {scanPending ? 'Scanning…' : 'Scan card with camera'}
+          {scanPending ? t('stm.scanning') : t('stm.scanCard')}
         </Button>
         {scanMsg && (
           <p className="text-[10px] text-[color:var(--color-accent)] mt-1.5 text-center" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -1470,18 +1481,18 @@ function CardForm({ card, onDone }: { card?: SerializedCard; onDone: () => void 
         )}
       </div>
 
-      <Field label="Card name *">
-        <Input value={form.name} onChange={set('name')} required placeholder="e.g. Visa Gold" />
+      <Field label={t('stm.cardNameField')}>
+        <Input value={form.name} onChange={set('name')} required placeholder={t('stm.cardNameEg')} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Last 4 digits">
+        <Field label={t('stm.last4Digits')}>
           <Input value={form.last4} onChange={set('last4')} maxLength={4} placeholder="1234" style={{ fontFamily: 'var(--font-mono)' }} />
         </Field>
-        <Field label="Bank">
-          <Input value={form.bank} onChange={set('bank')} placeholder="e.g. National Bank" />
+        <Field label={t('stm.bank')}>
+          <Input value={form.bank} onChange={set('bank')} placeholder={t('stm.bankEg')} />
         </Field>
       </div>
-      <Field label="Kind">
+      <Field label={t('stm.kind')}>
         <div className="flex gap-1.5">
           {(['credit', 'debit'] as const).map((k) => (
             <button
@@ -1489,37 +1500,37 @@ function CardForm({ card, onDone }: { card?: SerializedCard; onDone: () => void 
               key={k}
               onClick={() => setForm((p) => ({ ...p, kind: k }))}
               className={cn(
-                'flex-1 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all',
+                'flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all',
                 form.kind === k
                   ? 'bg-[color:var(--color-accent)] text-black'
                   : 'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]'
               )}
             >
-              {k}
+              {k === 'credit' ? t('set.credit') : t('set.debit')}
             </button>
           ))}
         </div>
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Type">
+        <Field label={t('stm.type')}>
           <select value={form.type} onChange={set('type')} className={selectClass}>
-            {CARD_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
+            {CARD_TYPES.map((ct) => (
+              <option key={ct.value} value={ct.value}>{ct.label}</option>
             ))}
           </select>
         </Field>
-        <Field label={`Limit (${cur()})`}>
+        <Field label={t('stm.limitField', { cur: cur() })}>
           <Input type="number" value={form.creditLimit} onChange={set('creditLimit')} placeholder="3000" />
         </Field>
       </div>
-      <Field label="Color">
+      <Field label={t('stm.color')}>
         <input type="color" value={form.color} onChange={set('color')} className="w-full h-9 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg cursor-pointer" />
       </Field>
       <div className="flex gap-2 pt-2">
         <Button type="submit" variant="primary" size="sm" disabled={pending}>
-          {pending ? '...' : card ? 'Update' : 'Create'}
+          {pending ? '...' : card ? t('stm.update') : t('stm.create')}
         </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={onDone}>Back</Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onDone}>{t('stm.back')}</Button>
         {card && (
           <Button
             type="button"
@@ -1529,7 +1540,7 @@ function CardForm({ card, onDone }: { card?: SerializedCard; onDone: () => void 
             onClick={handleDeleteCard}
             disabled={pending}
           >
-            <Trash2 size={13} /> Delete
+            <Trash2 size={13} /> {t('common.delete')}
           </Button>
         )}
       </div>
