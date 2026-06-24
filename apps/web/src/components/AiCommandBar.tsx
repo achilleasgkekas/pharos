@@ -159,21 +159,48 @@ export function AiCommandBar() {
   }
 
   const isAi = mode === 'ai';
-  // Spotlight = AI mode + open: dim & blur the page and float the bar to center.
+  // Beacon = AI mode + open: lightly light the page, float the bar to centre, and
+  // sweep a lighthouse beam behind it (see the beacon backdrop + pulse rings below).
   const spotlight = isAi && open;
   const ph = isAi ? t('bar.aiPlaceholder') : t('bar.searchPlaceholder');
   const pending = isAi ? aiPending : searchPending;
 
   return (
     <>
-      {/* Spotlight backdrop — dim + blur everything behind the AI bar. */}
+      {/* Beacon backdrop — the page stays lit (lightly dimmed), a lamp glows from
+          the bar, and a slow light beam sweeps across like a lighthouse. */}
       {spotlight && (
         <div
-          className="fixed inset-0 z-40 bg-[color:var(--color-bg)]/70 backdrop-blur-md"
-          style={{ animation: 'pharos-fade-in .18s ease-out' }}
+          className="fixed inset-0 z-40 overflow-hidden bg-[color:var(--color-bg)]/45 backdrop-blur-[2px]"
+          style={{ animation: 'pharos-fade-in .22s ease-out' }}
           onMouseDown={() => setOpen(false)}
           aria-hidden
-        />
+        >
+          {/* Lamp glow at the bar's resting spot (~16vh, top-center) */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(58vw 56vh at 50% 16vh, color-mix(in oklab, var(--color-cyan) 20%, transparent), transparent 62%)',
+            }}
+          />
+          {/* Rotating lighthouse beam — a narrow bright wedge sweeping from the bar,
+              faded toward the edges with a radial mask so it reads as light. */}
+          <div
+            className="absolute left-1/2 pharos-beacon-sweep"
+            style={{
+              top: '16vh',
+              width: 'min(150vmax, 2200px)',
+              height: 'min(150vmax, 2200px)',
+              marginLeft: 'calc(min(150vmax, 2200px) / -2)',
+              marginTop: 'calc(min(150vmax, 2200px) / -2)',
+              background:
+                'conic-gradient(from 0deg, transparent 0deg, color-mix(in oklab, var(--color-accent) 15%, transparent) 7deg, color-mix(in oklab, var(--color-cyan) 22%, transparent) 13deg, transparent 24deg, transparent 184deg, color-mix(in oklab, var(--color-purple) 12%, transparent) 192deg, transparent 205deg)',
+              WebkitMaskImage: 'radial-gradient(closest-side, #000 0%, transparent 72%)',
+              maskImage: 'radial-gradient(closest-side, #000 0%, transparent 72%)',
+            }}
+          />
+        </div>
       )}
       <div
         ref={wrapRef}
@@ -186,9 +213,21 @@ export function AiCommandBar() {
       >
       {/* Bar */}
       <div className="relative group">
-        {/* Gradient glow only in AI mode */}
+        {/* Beacon pulse — concentric rings expanding from the bar (spotlight only) */}
+        {spotlight && (
+          <>
+            <span aria-hidden className="pointer-events-none absolute -inset-px rounded-2xl border border-[color:var(--color-cyan)]/45 pharos-ring" />
+            <span aria-hidden className="pointer-events-none absolute -inset-px rounded-2xl border border-[color:var(--color-accent)]/35 pharos-ring" style={{ animationDelay: '1.3s' }} />
+          </>
+        )}
+        {/* Gradient glow only in AI mode — brighter once the beacon is lit */}
         {isAi && (
-          <div className="absolute -inset-[1.5px] rounded-2xl bg-gradient-to-r from-[color:var(--color-accent)] via-[color:var(--color-cyan)] to-[color:var(--color-purple)] opacity-50 group-focus-within:opacity-100 blur-[2px] transition-opacity" />
+          <div
+            className={cn(
+              'absolute -inset-[1.5px] rounded-2xl bg-gradient-to-r from-[color:var(--color-accent)] via-[color:var(--color-cyan)] to-[color:var(--color-purple)] group-focus-within:opacity-100 blur-[2px] transition-opacity',
+              spotlight ? 'opacity-90' : 'opacity-50'
+            )}
+          />
         )}
         <div
           className={cn(
