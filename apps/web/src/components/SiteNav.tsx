@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import {
-  Package, ShoppingCart, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
+  Package, ShoppingCart, ShoppingBasket, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
   Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, CalendarDays,
   LogOut, UserRound, Activity, MessageSquare, Trash2,
 } from 'lucide-react';
@@ -24,6 +24,7 @@ type NavLink = { href: string; key: TKey; icon: typeof Package };
 const STUFF: NavLink[] = [
   { href: '/items', key: 'nav.inventory', icon: Package },
   { href: '/shopping', key: 'nav.shopping', icon: ShoppingCart },
+  { href: '/shopping-list', key: 'nav.shoppingList', icon: ShoppingBasket },
 ];
 const MONEY: NavLink[] = [
   { href: '/receipts', key: 'nav.receipts', icon: ReceiptIcon },

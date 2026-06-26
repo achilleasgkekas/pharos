@@ -12,6 +12,7 @@ import { Item } from '@/models/Item';
 import { Expense } from '@/models/Expense';
 import { Receipt } from '@/models/Receipt';
 import { Statement } from '@/models/Statement';
+import { ShoppingListItem } from '@/models/ShoppingListItem';
 import { addExpense } from './expenses/actions';
 import { importItemFromUrl, logItemPrice } from './items/actions';
 import { getAppSettings } from '@/lib/appSettings';
@@ -67,6 +68,11 @@ export const TOOLS: AnthropicTool[] = [
     name: 'add_task',
     description: 'Add a to-do task.',
     input_schema: { type: 'object', properties: { title: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } }, required: ['title'] },
+  },
+  {
+    name: 'add_to_list',
+    description: 'Add an item to the standalone shopping list (things to buy, e.g. groceries). Use this for "add X to my list / shopping list".',
+    input_schema: { type: 'object', properties: { name: { type: 'string' }, quantity: { type: 'string', description: 'optional, e.g. "2" or "500g"' } }, required: ['name'] },
   },
   {
     name: 'add_item',
@@ -199,6 +205,12 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
       const tags = Array.isArray(input.tags) ? (input.tags as unknown[]).map(String) : [];
       await Task.create({ title: s(input, 'title'), tags, status: 'todo' });
       return { summary: `task "${s(input, 'title')}"`, content: `Added task "${s(input, 'title')}"` };
+    }
+    case 'add_to_list': {
+      const name = s(input, 'name').trim();
+      const quantity = s(input, 'quantity').trim();
+      await ShoppingListItem.create({ name, quantity, checked: false });
+      return { summary: `${name}${quantity ? ` (${quantity})` : ''} → list`, content: `Added "${name}"${quantity ? ` ×${quantity}` : ''} to your shopping list` };
     }
     case 'add_item': {
       const url = s(input, 'url').trim();

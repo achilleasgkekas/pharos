@@ -5,11 +5,12 @@ import { Task } from '@/models/Task';
 import { Receipt } from '@/models/Receipt';
 import { Subscription } from '@/models/Subscription';
 import { Statement } from '@/models/Statement';
+import { ShoppingListItem } from '@/models/ShoppingListItem';
 import { isAiReady } from '@/lib/ollama';
 import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
-import { Package, ShoppingCart, ListChecks, BarChart3, Receipt as ReceiptIcon, CalendarClock, CreditCard, ArrowRight, Wallet, Banknote, CalendarDays } from 'lucide-react';
+import { Package, ShoppingCart, ShoppingBasket, ListChecks, BarChart3, Receipt as ReceiptIcon, CalendarClock, CreditCard, ArrowRight, Wallet, Banknote, CalendarDays } from 'lucide-react';
 import { PharosMark } from '@/components/PharosMark';
 import { getServerT } from '@/lib/i18n/server';
 
@@ -27,6 +28,7 @@ async function getStats() {
     openTasks,
     receiptCount,
     subscriptionCount,
+    shoppingListCount,
     statements,
     itemTitles,
     ollamaUp,
@@ -41,6 +43,7 @@ async function getStats() {
     Task.countDocuments({ status: { $ne: 'done' } }),
     Receipt.countDocuments(),
     Subscription.countDocuments({ active: true }),
+    ShoppingListItem.countDocuments({ checked: false }),
     Statement.find().lean(),
     Item.find().select('title').lean(),
     isAiReady(),
@@ -88,6 +91,7 @@ async function getStats() {
     openTasks,
     receiptCount,
     subscriptionCount,
+    shoppingListCount,
     budget: budgetAgg[0]?.total ?? 0,
     spent: spentAgg[0]?.total ?? 0,
     statementCount: statements.length,
@@ -134,6 +138,7 @@ export default async function HomePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <NavCard href="/items" title={t('nav.inventory')} count={stats.ownedCount} description={t('home.dInventory')} open={t('home.open')} color="cyan" icon={<Package size={20} />} />
           <NavCard href="/shopping" title={t('nav.shopping')} count={stats.shoppingCount} description={t('home.dShopping')} open={t('home.open')} color="gold" icon={<ShoppingCart size={20} />} />
+          <NavCard href="/shopping-list" title={t('nav.shoppingList')} count={stats.shoppingListCount} description={t('home.dShoppingList')} open={t('home.open')} color="accent" icon={<ShoppingBasket size={20} />} />
           <NavCard href="/receipts" title={t('nav.receipts')} count={stats.receiptCount} description={t('home.dReceipts')} open={t('home.open')} color="purple" icon={<ReceiptIcon size={20} />} />
           <NavCard href="/expenses" title={t('nav.expenses')} count={null} description={t('home.dExpenses')} open={t('home.open')} color="gold" icon={<Wallet size={20} />} />
           <NavCard href="/income" title={t('nav.income')} count={null} description={t('home.dIncome')} open={t('home.open')} color="accent" icon={<Banknote size={20} />} />

@@ -551,6 +551,39 @@ export async function parseVoucherImage(imageBase64: string): Promise<{ parsed: 
   return { parsed: ParsedVoucherSchema.parse(json), raw, model };
 }
 
+// ─── Product photo → shopping-list entry ────────────────────────────────────
+
+export const ParsedProductPhotoSchema = z.object({
+  name: z.string().default(''),
+  brand: z.string().default(''),
+  category: z.string().default(''),
+  quantity: z.string().default(''),
+  notes: z.string().default(''),
+});
+export type ParsedProductPhoto = z.infer<typeof ParsedProductPhotoSchema>;
+
+export const PRODUCT_PHOTO_PROMPT = `You look at a PHOTO of a physical product — its packaging, label, box or the item on a shelf. The text may be in ANY language. Return ONLY JSON, no markdown:
+{
+  "name": "the concise product name a shopper would write on a list, e.g. 'Olive oil' / 'AA batteries' / 'Greek yoghurt'",
+  "brand": "the brand if clearly printed (empty otherwise)",
+  "category": "one of: groceries, household, electronics, health, pets, baby, drinks, other",
+  "quantity": "the size/amount if visible, e.g. '1L' / '500g' / 'pack of 6' (empty otherwise)",
+  "notes": "anything else useful, e.g. flavour/variant (empty otherwise)"
+}
+Rules:
+- name: short and shopping-list friendly (a generic name + variant), NOT the full marketing text. Prefer the local language of the label.
+- category: pick the single best fit from the list above.
+- if you can't read a clear product, return empty strings.`;
+
+export async function parseProductPhoto(imageBase64: string): Promise<{ parsed: ParsedProductPhoto; raw: string; model: string }> {
+  const { json, raw, model } = await runVisionJSON(
+    PRODUCT_PHOTO_PROMPT,
+    'Identify the product in this photo for a shopping list. Return the name, brand, category, quantity and notes as JSON.',
+    [imageBase64]
+  );
+  return { parsed: ParsedProductPhotoSchema.parse(json), raw, model };
+}
+
 // ─── Health / warmup ────────────────────────────────────────────────────────
 
 // Cache the health result so every page navigation doesn't re-ping Ollama — the
