@@ -71,10 +71,13 @@ List responses are wrapped: `{ "data": [ … ], "total": N, "limit": L, "offset"
 
 Creating a receipt is file-based (upload + AI scan); a multipart `scan/receipt` endpoint is the next addition (mirrors `scan/product`).
 
-### AI product scan (mobile camera)
-`POST /api/v1/scan/product` — multipart form, field **`file`** = product photo
-→ `{ data: { name, brand, category, quantity, notes } }`
-Returns a *suggested* entry only; have the user confirm, then `POST /api/v1/shopping-list`.
+### AI scan (mobile camera)
+- `POST /api/v1/scan/product` — multipart, field **`file`** = product photo
+  → `{ data: { name, brand, category, quantity, notes } }`
+  *Suggestion only* (no save); have the user confirm, then `POST /api/v1/shopping-list`.
+- `POST /api/v1/scan/receipt` — multipart, field **`file`** = receipt image/PDF
+  → `201 { receipt: { …, lineItems, aiUsed, aiError } }`
+  **Saves + parses + creates** the receipt (mirrors the web dropzone). The user can fix fields later via `PATCH` on the web, or just keep it.
 
 ### Shopping list (quick to-buy)
 - `GET /api/v1/shopping-list` → `{ items: [{ id, name, quantity, category, brand, note, checked, aiScanned, createdAt }] }`
@@ -89,6 +92,5 @@ Paths returned by the API (an item's `photo`, a receipt's `file`/`thumb`) are se
 `POST /api/mcp` — a JSON-RPC 2.0 (Streamable-HTTP) MCP server, same bearer token. Methods: `initialize`, `tools/list`, `tools/call`, `ping`. Add it in Claude as a custom connector (URL `https://<host>/api/mcp`) or test with MCP Inspector / Claude Code. See **Settings → Mobile / MCP**.
 
 ## Roadmap (next additions)
-- Multipart `scan/receipt` (snap a receipt → AI parse → create).
 - PATCH/DELETE for expenses & subscriptions.
 - Optional per-token scopes.
