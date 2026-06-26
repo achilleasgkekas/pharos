@@ -38,11 +38,11 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   const [items, setItems] = useState<SerializedListItem[]>(initialItems);
   const [, start] = useTransition();
   const cameraRef = useRef<HTMLInputElement>(null);
+  const idSeq = useRef(0); // collision-free temp ids for optimistic rows
 
   const [scanning, setScanning] = useState(false);
   const [scanErr, setScanErr] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [saving, setSaving] = useState(false);
 
   // Add modal (matches the "+ New" → modal pattern of the other pages)
   const [showAdd, setShowAdd] = useState(false);
@@ -91,17 +91,31 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
     }
   }
 
-  function addItem(d: Draft) {
+  function addItem(d: Draft, aiScanned = false) {
     const n = d.name.trim();
     if (!n) return;
-    const clean = { name: n, quantity: d.quantity.trim(), category: d.category.trim(), brand: d.brand.trim() };
+    const clean = { name: n, quantity: d.quantity.trim(), category: d.category.trim(), brand: d.brand.trim(), aiScanned };
+    // Make sure the new row is actually visible (a stale status/category filter would
+    // otherwise hide it → it looks like "I added it but it disappeared").
+    setStatusFilter('all');
+    setCatFilter('');
+    setScanErr(null);
+    const tmpId = 'tmp-' + Date.now() + '-' + idSeq.current++;
     const tmp: SerializedListItem = {
-      _id: 'tmp-' + Date.now(), ...clean, note: '', checked: false, aiScanned: false, createdAt: new Date().toISOString(),
+      _id: tmpId, ...clean, note: '', checked: false, createdAt: new Date().toISOString(),
     };
     setItems((p) => [tmp, ...p]);
     start(async () => {
-      await addListItem(clean);
-      await resync();
+      try {
+        const r = await addListItem(clean);
+        if (!r.ok) throw new Error(r.error || 'Could not save');
+        await resync(); // replace the optimistic row with the saved one
+      } catch (e) {
+        // Roll the optimistic row back and surface the error instead of leaving a
+        // phantom that vanishes on the next load.
+        setItems((p) => p.filter((x) => x._id !== tmpId));
+        setScanErr((e as Error).message.slice(0, 140));
+      }
     });
   }
 
@@ -181,17 +195,8 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   function addDraft() {
     if (!draft || !draft.name.trim()) return;
     const d = draft;
-    setSaving(true);
-    const tmp: SerializedListItem = {
-      _id: 'tmp-' + Date.now(), name: d.name.trim(), quantity: d.quantity.trim(), category: d.category.trim(), brand: d.brand.trim(), note: '', checked: false, aiScanned: true, createdAt: new Date().toISOString(),
-    };
-    setItems((p) => [tmp, ...p]);
     setDraft(null);
-    start(async () => {
-      await addListItem({ ...d, aiScanned: true });
-      await resync();
-      setSaving(false);
-    });
+    addItem(d, true); // optimistic + persist + rollback-on-failure, marked AI-scanned
   }
 
   const fLabel = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';
@@ -404,8 +409,8 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
               <input value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} className={inputCls} />
             </Field>
             <div className="flex items-center gap-2 pt-1">
-              <Button variant="primary" onClick={addDraft} disabled={!draft.name.trim() || saving}>
-                {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} {t('sl.addToList')}
+              <Button variant="primary" onClick={addDraft} disabled={!draft.name.trim()}>
+                <Check size={15} /> {t('sl.addToList')}
               </Button>
               <Button variant="ghost" onClick={() => setDraft(null)}>{t('common.cancel')}</Button>
             </div>

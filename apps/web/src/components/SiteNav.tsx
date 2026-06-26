@@ -52,12 +52,18 @@ const GROUPS: { key: TKey; links: NavLink[] }[] = [
 ];
 const ALL_LINKS = [...STUFF, ...MONEY, ...PLAN, ...ACTIVITY];
 
+/** Segment-aware active match. Plain `startsWith(href)` is wrong for sibling prefixes
+ *  like /shopping vs /shopping-list (the former would match the latter). */
+function navActive(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(href + '/');
+}
+
 function NavGroup({ groupKey, links }: { groupKey: TKey; links: NavLink[] }) {
   const t = useT();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const active = links.some((l) => pathname.startsWith(l.href));
+  const active = links.some((l) => navActive(pathname, l.href));
   useEffect(() => {
     function onDown(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -81,7 +87,7 @@ function NavGroup({ groupKey, links }: { groupKey: TKey; links: NavLink[] }) {
         <div className="absolute right-0 top-full mt-1 z-50 min-w-44 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 p-1">
           {links.map((l) => {
             const Icon = l.icon;
-            const isActive = pathname.startsWith(l.href);
+            const isActive = navActive(pathname, l.href);
             return (
               <Link
                 key={l.href}
@@ -211,7 +217,7 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
       {mobileOpen && (
         <nav className="lg:hidden border-t border-[color:var(--color-border)] px-4 py-2 grid grid-cols-2 sm:grid-cols-3 gap-1">
           {ALL_LINKS.map((link) => {
-            const active = pathname.startsWith(link.href);
+            const active = navActive(pathname, link.href);
             const Icon = link.icon;
             return (
               <Link
