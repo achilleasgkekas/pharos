@@ -167,67 +167,31 @@ export function AiCommandBar() {
 
   return (
     <>
-      {/* Beacon backdrop — the page stays lit (lightly dimmed), a lamp glows from
-          the bar, and a slow light beam sweeps across like a lighthouse. */}
+      {/* Calm backdrop — a soft dim + light blur, nothing flashy. Click to close. */}
       {spotlight && (
         <div
-          className="fixed inset-0 z-40 overflow-hidden bg-[color:var(--color-bg)]/45 backdrop-blur-[2px]"
-          style={{ animation: 'pharos-fade-in .22s ease-out' }}
+          className="fixed inset-0 z-40 bg-[color:var(--color-bg)]/55 backdrop-blur-[3px]"
+          style={{ animation: 'pharos-fade-in .15s ease-out' }}
           onMouseDown={() => setOpen(false)}
           aria-hidden
-        >
-          {/* Lamp glow at the bar's resting spot (~16vh, top-center) */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                'radial-gradient(58vw 56vh at 50% 16vh, color-mix(in oklab, var(--color-cyan) 20%, transparent), transparent 62%)',
-            }}
-          />
-          {/* Rotating lighthouse beam — a narrow bright wedge sweeping from the bar,
-              faded toward the edges with a radial mask so it reads as light. */}
-          <div
-            className="absolute left-1/2 pharos-beacon-sweep"
-            style={{
-              top: '16vh',
-              width: 'min(150vmax, 2200px)',
-              height: 'min(150vmax, 2200px)',
-              marginLeft: 'calc(min(150vmax, 2200px) / -2)',
-              marginTop: 'calc(min(150vmax, 2200px) / -2)',
-              background:
-                'conic-gradient(from 0deg, transparent 0deg, color-mix(in oklab, var(--color-accent) 15%, transparent) 7deg, color-mix(in oklab, var(--color-cyan) 22%, transparent) 13deg, transparent 24deg, transparent 184deg, color-mix(in oklab, var(--color-purple) 12%, transparent) 192deg, transparent 205deg)',
-              WebkitMaskImage: 'radial-gradient(closest-side, #000 0%, transparent 72%)',
-              maskImage: 'radial-gradient(closest-side, #000 0%, transparent 72%)',
-            }}
-          />
-        </div>
+        />
       )}
       <div
         ref={wrapRef}
         className={cn(
+          // Open (AI): a full-width sheet near the top on mobile, a centred card on
+          // larger screens. Plain opacity fade — no jump, no transform conflict.
           spotlight
-            ? 'fixed left-1/2 top-[14vh] z-50 -translate-x-1/2 w-[680px] max-w-[92vw]'
+            ? 'fixed z-50 top-3 inset-x-3 sm:inset-x-auto sm:top-[12vh] sm:left-1/2 sm:-translate-x-1/2 sm:w-[640px]'
             : 'relative w-full max-w-2xl'
         )}
-        style={spotlight ? { animation: 'pharos-spotlight-in .2s cubic-bezier(.2,.7,.3,1) both' } : undefined}
+        style={spotlight ? { animation: 'pharos-fade-in .16s ease-out both' } : undefined}
       >
       {/* Bar */}
       <div className="relative group">
-        {/* Beacon pulse — concentric rings expanding from the bar (spotlight only) */}
-        {spotlight && (
-          <>
-            <span aria-hidden className="pointer-events-none absolute -inset-px rounded-2xl border border-[color:var(--color-cyan)]/45 pharos-ring" />
-            <span aria-hidden className="pointer-events-none absolute -inset-px rounded-2xl border border-[color:var(--color-accent)]/35 pharos-ring" style={{ animationDelay: '1.3s' }} />
-          </>
-        )}
-        {/* Gradient glow only in AI mode — brighter once the beacon is lit */}
+        {/* Soft accent glow in AI mode (calmer when floating) */}
         {isAi && (
-          <div
-            className={cn(
-              'absolute -inset-[1.5px] rounded-2xl bg-gradient-to-r from-[color:var(--color-accent)] via-[color:var(--color-cyan)] to-[color:var(--color-purple)] group-focus-within:opacity-100 blur-[2px] transition-opacity',
-              spotlight ? 'opacity-90' : 'opacity-50'
-            )}
-          />
+          <div className="absolute -inset-[1.5px] rounded-2xl bg-gradient-to-r from-[color:var(--color-accent)] via-[color:var(--color-cyan)] to-[color:var(--color-purple)] opacity-40 group-focus-within:opacity-75 blur-[2px] transition-opacity" />
         )}
         <div
           className={cn(

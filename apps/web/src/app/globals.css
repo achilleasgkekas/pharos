@@ -106,28 +106,6 @@ body::before {
   to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
-/* ── Beacon Sweep — the AI bar opens like a lighthouse ──────────────────────
-   Instead of blacking out the page, a slow light beam sweeps from the bar and
-   concentric rings pulse out, on the PHAROS green→cyan→purple palette. */
-@keyframes pharos-beacon-sweep {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-/* GPU-composited: the conic-gradient is painted once, the layer just rotates. */
-.pharos-beacon-sweep { animation: pharos-beacon-sweep 7s linear infinite; will-change: transform; }
-
-@keyframes pharos-ring {
-  0% { transform: scale(1); opacity: 0.5; }
-  70% { opacity: 0; }
-  100% { transform: scale(2.1); opacity: 0; }
-}
-.pharos-ring { animation: pharos-ring 2.6s ease-out infinite; will-change: transform, opacity; }
-
-/* Respect users who prefer no motion: the beam/ring hold still. */
-@media (prefers-reduced-motion: reduce) {
-  .pharos-beacon-sweep, .pharos-ring { animation: none; }
-}
-
 ::selection {
   background: var(--color-accent);
   color: #000;
