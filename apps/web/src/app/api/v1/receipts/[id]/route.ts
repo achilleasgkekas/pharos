@@ -3,7 +3,7 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
 import { Receipt } from '@/models/Receipt';
-import { trimReceipt } from '../route';
+import { trimReceipt } from '../serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
