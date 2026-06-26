@@ -45,6 +45,6 @@ export const config = {
   // can stamp x-pathname) but pass straight through unauthenticated. Crucially this
   // does NOT exclude all of /api — /api/files (receipts/PDFs) MUST stay gated.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|api/auth|api/mcp|robots.txt).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|api/auth|api/mcp|api/v1|robots.txt).*)',
   ],
 };
