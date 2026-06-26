@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/apiAuth';
+import { listParams, withSince, iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
 import { Item } from '@/models/Item';
 
@@ -10,6 +11,7 @@ type ItemLean = {
   _id: unknown; num?: string; title: string; status?: string; category?: string;
   currentPrice?: number; purchasedPrice?: number | null; targetPrice?: number | null;
   specs?: string; warrantyUntil?: Date | string | null; tags?: string[]; photos?: string[];
+  updatedAt?: Date; deletedAt?: Date | null;
 };
 
 function trim(i: ItemLean) {
@@ -26,20 +28,27 @@ function trim(i: ItemLean) {
     warrantyUntil: i.warrantyUntil ? new Date(i.warrantyUntil).toISOString() : null,
     tags: i.tags ?? [],
     photo: i.photos?.[0] ?? null, // serve via /api/files/<photo>
+    updatedAt: iso(i.updatedAt),
+    deleted: !!i.deletedAt,
   };
 }
 
 const SHOPPING = ['researching', 'decided', 'ordered'];
 const OWNED = ['received', 'installed'];
 
-/** GET /api/v1/items?status=shopping|inventory|all → { items } */
+/** GET /api/v1/items?status=shopping|inventory|all&limit&offset&updatedSince → { items, total, limit, offset } */
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
-    const view = new URL(req.url).searchParams.get('status') || 'all';
-    const q = view === 'shopping' ? { status: { $in: SHOPPING } } : view === 'inventory' ? { status: { $in: OWNED } } : {};
-    const docs = (await Item.find(q).sort({ updatedAt: -1 }).limit(500).lean()) as ItemLean[];
-    return NextResponse.json({ items: docs.map(trim) });
+    const p = listParams(req);
+    const view = p.sp.get('status') || 'all';
+    const base = view === 'shopping' ? { status: { $in: SHOPPING } } : view === 'inventory' ? { status: { $in: OWNED } } : {};
+    const filter = withSince(base, p);
+    const find = Item.find(filter).sort({ updatedAt: -1 }).skip(p.offset).limit(p.limit);
+    const count = Item.countDocuments(filter);
+    if (p.updatedSince) { find.setOptions({ withDeleted: true }); count.setOptions({ withDeleted: true }); }
+    const [docs, total] = await Promise.all([find.lean() as Promise<ItemLean[]>, count]);
+    return NextResponse.json({ items: docs.map(trim), total, limit: p.limit, offset: p.offset });
   });
 }
 

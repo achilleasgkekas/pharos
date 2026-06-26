@@ -1,5 +1,9 @@
 import { readFile } from '@/lib/storage';
 import { NextRequest, NextResponse } from 'next/server';
+import { SESSION_COOKIE, verifySession } from '@/lib/session';
+import { bearerUser } from '@/lib/apiAuth';
+
+export const runtime = 'nodejs';
 
 const CONTENT_TYPES: Record<string, string> = {
   jpg: 'image/jpeg',
@@ -16,9 +20,14 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
+  // Auth: a browser sends the session cookie; the mobile app sends a Bearer token.
+  // The middleware lets bearer /api/files requests through, so the route is the guard.
+  const ok = (await verifySession(req.cookies.get(SESSION_COOKIE)?.value)) || (await bearerUser(req));
+  if (!ok) return new NextResponse('Unauthorized', { status: 401 });
+
   const { path } = await params;
 
   // Reject path traversal — storage is WireGuard-only but defense in depth
