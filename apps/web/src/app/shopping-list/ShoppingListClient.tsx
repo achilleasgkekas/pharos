@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useTransition, useMemo } from 'react';
-import { Camera, Plus, Check, Loader2, Trash2, Sparkles, ShoppingBasket, LayoutGrid, List as ListIcon, Search, SlidersHorizontal } from 'lucide-react';
+import { Camera, Plus, Check, Loader2, Trash2, Sparkles, ShoppingBasket, LayoutGrid, List as ListIcon, Search, SlidersHorizontal, CheckSquare } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -19,13 +19,23 @@ import {
 
 type Draft = { name: string; quantity: string; category: string; brand: string };
 type StatusFilter = 'all' | 'todo' | 'bought';
+type SortKey = 'recent' | 'name' | 'category';
 const mono = { fontFamily: 'var(--font-mono)' };
+const emptyDraft: Draft = { name: '', quantity: '', category: '', brand: '' };
+
+// Deterministic category accent — gives each category a stable colour (like the product cards' eyebrows).
+const PALETTE = ['var(--color-accent)', 'var(--color-cyan)', 'var(--color-purple)', 'var(--color-gold)', 'var(--color-red)'];
+function catColor(cat: string): string | null {
+  const c = cat.trim();
+  if (!c) return null;
+  let h = 0;
+  for (let i = 0; i < c.length; i++) h = (h * 31 + c.charCodeAt(i)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
 
 export function ShoppingListClient({ initialItems }: { initialItems: SerializedListItem[] }) {
   const t = useT();
   const [items, setItems] = useState<SerializedListItem[]>(initialItems);
-  const [name, setName] = useState('');
-  const [qty, setQty] = useState('');
   const [, start] = useTransition();
   const cameraRef = useRef<HTMLInputElement>(null);
 
@@ -34,12 +44,21 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // E-shop layout state (mirrors the other pages)
+  // Add modal (matches the "+ New" → modal pattern of the other pages)
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState<Draft>(emptyDraft);
+
+  // E-shop layout state
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [catFilter, setCatFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<SortKey>('recent');
   const [showFilters, setShowFilters] = useState(false);
+
+  // Bulk select
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const todo = useMemo(() => items.filter((i) => !i.checked), [items]);
   const done = useMemo(() => items.filter((i) => i.checked), [items]);
@@ -55,9 +74,14 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
     if (catFilter) list = list.filter((i) => (i.category || '').toLowerCase() === catFilter.toLowerCase());
     const q = search.trim().toLowerCase();
     if (q) list = list.filter((i) => i.name.toLowerCase().includes(q) || (i.brand || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
-    // Unchecked first, newest first within each group
-    return [...list].sort((a, b) => (a.checked ? 1 : 0) - (b.checked ? 1 : 0) || b.createdAt.localeCompare(a.createdAt));
-  }, [items, statusFilter, catFilter, search]);
+    return [...list].sort((a, b) => {
+      const c = (a.checked ? 1 : 0) - (b.checked ? 1 : 0); // unchecked first
+      if (c) return c;
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'category') return (a.category || '').localeCompare(b.category || '') || a.name.localeCompare(b.name);
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+  }, [items, statusFilter, catFilter, search, sortBy]);
 
   async function resync() {
     try {
@@ -67,20 +91,25 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
     }
   }
 
-  function quickAdd() {
-    const n = name.trim();
+  function addItem(d: Draft) {
+    const n = d.name.trim();
     if (!n) return;
-    const q = qty.trim();
-    setName('');
-    setQty('');
+    const clean = { name: n, quantity: d.quantity.trim(), category: d.category.trim(), brand: d.brand.trim() };
     const tmp: SerializedListItem = {
-      _id: 'tmp-' + Date.now(), name: n, quantity: q, category: '', brand: '', note: '', checked: false, aiScanned: false, createdAt: new Date().toISOString(),
+      _id: 'tmp-' + Date.now(), ...clean, note: '', checked: false, aiScanned: false, createdAt: new Date().toISOString(),
     };
     setItems((p) => [tmp, ...p]);
     start(async () => {
-      await addListItem({ name: n, quantity: q });
+      await addListItem(clean);
       await resync();
     });
+  }
+
+  function submitAdd() {
+    if (!addForm.name.trim()) return;
+    addItem(addForm);
+    setShowAdd(false);
+    setAddForm(emptyDraft);
   }
 
   function toggle(it: SerializedListItem) {
@@ -97,6 +126,39 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
     start(() => void clearChecked());
   }
 
+  // Bulk select
+  function toggleSelect(id: string) {
+    setSelectedIds((p) => {
+      const n = new Set(p);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+  function exitSelect() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }
+  function bulkDelete() {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    setItems((p) => p.filter((x) => !selectedIds.has(x._id)));
+    exitSelect();
+    start(async () => {
+      for (const id of ids) await deleteListItem(id);
+      await resync();
+    });
+  }
+  function bulkBought() {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    setItems((p) => p.map((x) => (selectedIds.has(x._id) ? { ...x, checked: true } : x)));
+    exitSelect();
+    start(async () => {
+      for (const id of ids) await toggleListItem(id, true);
+      await resync();
+    });
+  }
+
   async function onPhoto(file: File | undefined) {
     if (cameraRef.current) cameraRef.current.value = '';
     if (!file) return;
@@ -107,11 +169,8 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
       const fd = new FormData();
       fd.set('file', small);
       const r = await scanProductPhoto(fd);
-      if (r.ok) {
-        setDraft({ name: r.data.name, quantity: r.data.quantity, category: r.data.category, brand: r.data.brand });
-      } else {
-        setScanErr(r.error);
-      }
+      if (r.ok) setDraft({ name: r.data.name, quantity: r.data.quantity, category: r.data.category, brand: r.data.brand });
+      else setScanErr(r.error);
     } catch (e) {
       setScanErr((e as Error).message.slice(0, 120));
     } finally {
@@ -139,7 +198,7 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   const selCls =
     'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]';
   const statusLabel = (v: StatusFilter) => (v === 'all' ? t('common.all') : v === 'todo' ? t('sl.fToBuy') : t('sl.fBought'));
-  const anyF = statusFilter !== 'all' || !!catFilter || !!search;
+  const anyF = statusFilter !== 'all' || !!catFilter || !!search || sortBy !== 'recent';
 
   const filterControls = (
     <div className="space-y-4">
@@ -173,9 +232,17 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
           </select>
         </div>
       )}
+      <div>
+        <p className={fLabel} style={mono}>{t('common.sort')}</p>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)} className={selCls} style={mono}>
+          <option value="recent">{t('sl.sortRecent')}</option>
+          <option value="name">{t('sl.sortName')}</option>
+          <option value="category">{t('common.category')}</option>
+        </select>
+      </div>
       {anyF && (
         <button
-          onClick={() => { setStatusFilter('all'); setCatFilter(''); setSearch(''); }}
+          onClick={() => { setStatusFilter('all'); setCatFilter(''); setSearch(''); setSortBy('recent'); }}
           className="text-[0.65rem] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] underline"
           style={mono}
         >
@@ -198,23 +265,45 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
             )}
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">
-            {(['grid', 'list'] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => setLayout(v)}
-                title={v === 'grid' ? t('v.grid') : t('v.list')}
-                className={cn('px-2 py-1.5 rounded-md transition-colors', layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
-              >
-                {v === 'grid' ? <LayoutGrid size={14} /> : <ListIcon size={14} />}
-              </button>
-            ))}
+
+        {selectMode ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-[color:var(--color-text-dim)]" style={mono}>{t('sl.selected', { n: selectedIds.size })}</span>
+            <Button variant="secondary" size="sm" onClick={bulkBought} disabled={!selectedIds.size}>
+              <Check size={14} /> {t('sl.markBought')}
+            </Button>
+            <Button variant="danger" size="sm" onClick={bulkDelete} disabled={!selectedIds.size}>
+              <Trash2 size={14} /> {t('common.delete')}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={exitSelect}>{t('common.cancel')}</Button>
           </div>
-          <Button variant="primary" onClick={() => cameraRef.current?.click()} disabled={scanning}>
-            {scanning ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} {scanning ? t('sl.scanning') : t('sl.scanProduct')}
-          </Button>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">
+              {(['grid', 'list'] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setLayout(v)}
+                  title={v === 'grid' ? t('v.grid') : t('v.list')}
+                  className={cn('px-2 py-1.5 rounded-md transition-colors', layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
+                >
+                  {v === 'grid' ? <LayoutGrid size={14} /> : <ListIcon size={14} />}
+                </button>
+              ))}
+            </div>
+            {items.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => setSelectMode(true)}>
+                <CheckSquare size={14} /> {t('sl.select')}
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => cameraRef.current?.click()} disabled={scanning}>
+              {scanning ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} {scanning ? t('sl.scanning') : t('sl.scanProduct')}
+            </Button>
+            <Button variant="primary" onClick={() => { setAddForm(emptyDraft); setShowAdd(true); }}>
+              <Plus size={16} strokeWidth={2.5} /> {t('common.new')}
+            </Button>
+          </div>
+        )}
         <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
       </div>
 
@@ -235,31 +324,6 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
             {showFilters && <div className="mt-3 p-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">{filterControls}</div>}
           </div>
 
-          {/* Quick add */}
-          <div className="flex items-center gap-2 mb-4">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') quickAdd(); }}
-              placeholder={t('sl.addPlaceholder')}
-              className="flex-1 min-w-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-[color:var(--color-accent)]"
-            />
-            <input
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') quickAdd(); }}
-              placeholder={t('sl.qty')}
-              className="w-16 shrink-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl px-2 py-2.5 text-sm text-center outline-none focus:border-[color:var(--color-accent)]"
-            />
-            <button
-              onClick={quickAdd}
-              disabled={!name.trim()}
-              className="shrink-0 grid place-items-center w-10 h-10 rounded-xl bg-[color:var(--color-accent)] text-black disabled:opacity-40 hover:opacity-90"
-              aria-label={t('sl.add')}
-            >
-              <Plus size={18} />
-            </button>
-          </div>
           {scanErr && <p className="mb-3 text-xs text-[color:var(--color-red)]">{scanErr}</p>}
 
           {/* Items */}
@@ -272,15 +336,15 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
             <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-2')}>
               {visible.map((it) =>
                 layout === 'grid' ? (
-                  <Card key={it._id} it={it} onToggle={() => toggle(it)} onRemove={() => remove(it)} />
+                  <Card key={it._id} it={it} color={catColor(it.category)} selectMode={selectMode} selected={selectedIds.has(it._id)} onSelect={() => toggleSelect(it._id)} onToggle={() => toggle(it)} onRemove={() => remove(it)} />
                 ) : (
-                  <Row key={it._id} it={it} onToggle={() => toggle(it)} onRemove={() => remove(it)} />
+                  <Row key={it._id} it={it} color={catColor(it.category)} selectMode={selectMode} selected={selectedIds.has(it._id)} onSelect={() => toggleSelect(it._id)} onToggle={() => toggle(it)} onRemove={() => remove(it)} />
                 )
               )}
             </div>
           )}
 
-          {done.length > 0 && statusFilter !== 'todo' && (
+          {done.length > 0 && statusFilter !== 'todo' && !selectMode && (
             <div className="mt-5 text-right">
               <button onClick={clearBought} className="text-[11px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" style={mono}>
                 {t('sl.clearBought')}
@@ -289,6 +353,34 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
           )}
         </div>
       </div>
+
+      {/* Add an item (matches the other pages' "+ New" modal) */}
+      {showAdd && (
+        <Modal open onClose={() => setShowAdd(false)} title={t('sl.addTitle')} size="sm">
+          <div className="space-y-3">
+            <Field label={t('sl.name')}>
+              <input autoFocus value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={inputCls} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={t('sl.qty')}>
+                <input value={addForm.quantity} onChange={(e) => setAddForm({ ...addForm, quantity: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={inputCls} />
+              </Field>
+              <Field label={t('sl.category')}>
+                <input value={addForm.category} onChange={(e) => setAddForm({ ...addForm, category: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={inputCls} />
+              </Field>
+            </div>
+            <Field label={t('sl.brand')}>
+              <input value={addForm.brand} onChange={(e) => setAddForm({ ...addForm, brand: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }} className={inputCls} />
+            </Field>
+            <div className="flex items-center gap-2 pt-1">
+              <Button variant="primary" onClick={submitAdd} disabled={!addForm.name.trim()}>
+                <Plus size={15} /> {t('common.add')}
+              </Button>
+              <Button variant="ghost" onClick={() => setShowAdd(false)}>{t('common.cancel')}</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Verify a scanned product before adding */}
       {draft && (
@@ -312,12 +404,10 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
               <input value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} className={inputCls} />
             </Field>
             <div className="flex items-center gap-2 pt-1">
-              <button onClick={addDraft} disabled={!draft.name.trim() || saving} className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold disabled:opacity-50 hover:opacity-90">
+              <Button variant="primary" onClick={addDraft} disabled={!draft.name.trim() || saving}>
                 {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} {t('sl.addToList')}
-              </button>
-              <button onClick={() => setDraft(null)} className="text-sm px-3 py-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]">
-                {t('common.cancel')}
-              </button>
+              </Button>
+              <Button variant="ghost" onClick={() => setDraft(null)}>{t('common.cancel')}</Button>
             </div>
           </div>
         </Modal>
@@ -338,13 +428,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function CheckBox({ checked, onClick }: { checked: boolean; onClick: () => void }) {
+function Box({ checked, accent, onClick }: { checked: boolean; accent: boolean; onClick?: (e: React.MouseEvent) => void }) {
   return (
     <button
       onClick={onClick}
       className={cn(
         'shrink-0 grid place-items-center w-6 h-6 rounded-md border transition-colors',
-        checked ? 'bg-[color:var(--color-accent)] border-[color:var(--color-accent)] text-black' : 'border-[color:var(--color-border-light)] hover:border-[color:var(--color-accent)]'
+        checked ? 'bg-[color:var(--color-accent)] border-[color:var(--color-accent)] text-black' : accent ? 'border-[color:var(--color-accent)]' : 'border-[color:var(--color-border-light)] hover:border-[color:var(--color-accent)]'
       )}
       aria-label="toggle"
     >
@@ -353,56 +443,92 @@ function CheckBox({ checked, onClick }: { checked: boolean; onClick: () => void 
   );
 }
 
-function Chips({ it }: { it: SerializedListItem }) {
+function Meta({ it, color }: { it: SerializedListItem; color: string | null }) {
   if (!it.quantity && !it.category && !it.aiScanned) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-2">
+      {it.category && (
+        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-[color:var(--color-surface-2)]" style={{ color: color || 'var(--color-text-dim)' }}>
+          {it.category}
+        </span>
+      )}
       {it.quantity && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]" style={mono}>{it.quantity}</span>}
-      {it.category && <span className="text-[10px] text-[color:var(--color-text-faint)]">{it.category}</span>}
       {it.aiScanned && <span className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-0.5" style={mono}><Sparkles size={9} /> AI</span>}
     </div>
   );
 }
 
-/** Grid card — mirrors the product-card surface used across the app. */
-function Card({ it, onToggle, onRemove }: { it: SerializedListItem; onToggle: () => void; onRemove: () => void }) {
+type CardProps = {
+  it: SerializedListItem;
+  color: string | null;
+  selectMode: boolean;
+  selected: boolean;
+  onSelect: () => void;
+  onToggle: () => void;
+  onRemove: () => void;
+};
+
+/** Grid card — colour-coded by category, mirroring the product-card surface used across the app. */
+function Card({ it, color, selectMode, selected, onSelect, onToggle, onRemove }: CardProps) {
+  const struck = it.checked && !selectMode;
   return (
-    <div className={cn('group relative flex items-start gap-3 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-4 transition-colors hover:border-[color:var(--color-border-light)]', it.checked && 'opacity-60')}>
-      <CheckBox checked={it.checked} onClick={onToggle} />
-      <button onClick={onToggle} className="min-w-0 flex-1 text-left">
-        <span className={cn('block text-sm font-medium leading-snug break-words', it.checked && 'line-through')}>
-          {it.name}
-        </span>
+    <div
+      onClick={selectMode ? onSelect : undefined}
+      className={cn(
+        'group relative flex items-start gap-3 bg-[color:var(--color-surface)] border rounded-2xl p-4 pl-5 min-h-[84px] overflow-hidden transition-colors',
+        selectMode && 'cursor-pointer',
+        selected ? 'border-[color:var(--color-accent)] ring-1 ring-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]',
+        it.checked && !selected && 'opacity-60'
+      )}
+    >
+      {color && <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: color }} />}
+      <Box checked={selectMode ? selected : it.checked} accent={selectMode && selected} onClick={selectMode ? undefined : (e) => { e.stopPropagation(); onToggle(); }} />
+      <div className={cn('min-w-0 flex-1', !selectMode && 'cursor-pointer')} onClick={selectMode ? undefined : onToggle}>
+        <span className={cn('block text-[15px] font-semibold leading-snug break-words', struck && 'line-through')}>{it.name}</span>
         {it.brand && <span className="block text-xs text-[color:var(--color-text-faint)] mt-0.5 truncate">{it.brand}</span>}
-        <Chips it={it} />
-      </button>
-      <button onClick={onRemove} className="shrink-0 p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity" aria-label="remove">
-        <Trash2 size={14} />
-      </button>
+        <Meta it={it} color={color} />
+      </div>
+      {!selectMode && (
+        <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="shrink-0 p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity" aria-label="remove">
+          <Trash2 size={14} />
+        </button>
+      )}
     </div>
   );
 }
 
-/** List row — compact full-width line. */
-function Row({ it, onToggle, onRemove }: { it: SerializedListItem; onToggle: () => void; onRemove: () => void }) {
+/** List row — compact full-width line, same behaviour as the card. */
+function Row({ it, color, selectMode, selected, onSelect, onToggle, onRemove }: CardProps) {
+  const struck = it.checked && !selectMode;
   return (
-    <div className={cn('group flex items-center gap-3 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl px-3 py-2.5', it.checked && 'opacity-60')}>
-      <CheckBox checked={it.checked} onClick={onToggle} />
-      <button onClick={onToggle} className="min-w-0 flex-1 text-left">
-        <span className={cn('block text-sm font-medium truncate', it.checked && 'line-through')}>
+    <div
+      onClick={selectMode ? onSelect : undefined}
+      className={cn(
+        'group relative flex items-center gap-3 bg-[color:var(--color-surface)] border rounded-xl pl-4 pr-3 py-2.5 overflow-hidden transition-colors',
+        selectMode && 'cursor-pointer',
+        selected ? 'border-[color:var(--color-accent)] ring-1 ring-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]',
+        it.checked && !selected && 'opacity-60'
+      )}
+    >
+      {color && <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: color }} />}
+      <Box checked={selectMode ? selected : it.checked} accent={selectMode && selected} onClick={selectMode ? undefined : (e) => { e.stopPropagation(); onToggle(); }} />
+      <div className={cn('min-w-0 flex-1', !selectMode && 'cursor-pointer')} onClick={selectMode ? undefined : onToggle}>
+        <span className={cn('block text-sm font-medium truncate', struck && 'line-through')}>
           {it.name}
           {it.brand && <span className="text-[color:var(--color-text-faint)] font-normal"> · {it.brand}</span>}
         </span>
         {(it.quantity || it.category) && (
           <span className="flex items-center gap-1.5 mt-0.5">
+            {it.category && <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-[color:var(--color-surface-2)]" style={{ color: color || 'var(--color-text-dim)' }}>{it.category}</span>}
             {it.quantity && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]" style={mono}>{it.quantity}</span>}
-            {it.category && <span className="text-[10px] text-[color:var(--color-text-faint)]">{it.category}</span>}
           </span>
         )}
-      </button>
-      <button onClick={onRemove} className="shrink-0 p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity" aria-label="remove">
-        <Trash2 size={15} />
-      </button>
+      </div>
+      {!selectMode && (
+        <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="shrink-0 p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity" aria-label="remove">
+          <Trash2 size={15} />
+        </button>
+      )}
     </div>
   );
 }
