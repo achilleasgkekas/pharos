@@ -3,6 +3,7 @@ import { useState, useRef, useTransition, useMemo } from 'react';
 import { Camera, Plus, Check, X, Loader2, Trash2, Sparkles, ShoppingBasket } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
 import { useT } from '@/components/LocaleProvider';
 import { shrinkImage } from '@/lib/clientImage';
 import {
@@ -111,54 +112,52 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
   }
 
   return (
-    <main className="max-w-2xl mx-auto px-4 py-6 pb-28">
-      <div className="mb-4">
-        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" style={{ fontFamily: 'var(--font-display)' }}>
-          <ShoppingBasket size={26} className="text-[color:var(--color-accent)]" />
-          {t('nav.shoppingList')}
-          {todo.length > 0 && <span className="text-base font-normal text-[color:var(--color-text-faint)]">· {t('sl.toBuy', { n: todo.length })}</span>}
-        </h1>
+    <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
+      <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
+            {t('nav.shoppingList')}
+            {todo.length > 0 && (
+              <span className="ml-3 text-sm font-normal text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                {t('sl.toBuy', { n: todo.length })}
+              </span>
+            )}
+          </h1>
+        </div>
+        <Button variant="primary" onClick={() => cameraRef.current?.click()} disabled={scanning}>
+          {scanning ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />} {scanning ? t('sl.scanning') : t('sl.scanProduct')}
+        </Button>
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
       </div>
 
-      {/* Quick add + scan — sticky on mobile so it's always reachable */}
-      <div className="sticky top-16 z-10 -mx-4 px-4 py-2 bg-[color:var(--color-bg)]/85 backdrop-blur-sm border-b border-[color:var(--color-border)] mb-3">
-        <div className="flex items-center gap-2">
+      {/* List lives in a comfortable single column inside the standard page width */}
+      <div className="max-w-2xl">
+        {/* Quick add */}
+        <div className="flex items-center gap-2 mb-2">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') quickAdd(); }}
             placeholder={t('sl.addPlaceholder')}
-            className="flex-1 min-w-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl px-3.5 py-2.5 text-base outline-none focus:border-[color:var(--color-accent)]"
+            className="flex-1 min-w-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-[color:var(--color-accent)]"
           />
           <input
             value={qty}
             onChange={(e) => setQty(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') quickAdd(); }}
             placeholder={t('sl.qty')}
-            inputMode="text"
-            className="w-16 shrink-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl px-2 py-2.5 text-base text-center outline-none focus:border-[color:var(--color-accent)]"
+            className="w-16 shrink-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl px-2 py-2.5 text-sm text-center outline-none focus:border-[color:var(--color-accent)]"
           />
           <button
             onClick={quickAdd}
             disabled={!name.trim()}
-            className="shrink-0 grid place-items-center w-11 h-11 rounded-xl bg-[color:var(--color-accent)] text-black disabled:opacity-40 hover:opacity-90"
+            className="shrink-0 grid place-items-center w-10 h-10 rounded-xl bg-[color:var(--color-accent)] text-black disabled:opacity-40 hover:opacity-90"
             aria-label={t('sl.add')}
           >
-            <Plus size={20} />
+            <Plus size={18} />
           </button>
         </div>
-        <button
-          onClick={() => cameraRef.current?.click()}
-          disabled={scanning}
-          className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors disabled:opacity-60"
-        >
-          {scanning ? <Loader2 size={17} className="animate-spin" /> : <Camera size={17} />}
-          <span className="font-medium">{scanning ? t('sl.scanning') : t('sl.scanProduct')}</span>
-          <Sparkles size={13} className="text-[color:var(--color-accent)]" />
-        </button>
-        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPhoto(e.target.files?.[0])} />
-        {scanErr && <p className="mt-1.5 text-xs text-[color:var(--color-red)]">{scanErr}</p>}
-      </div>
+        {scanErr && <p className="mb-2 text-xs text-[color:var(--color-red)]">{scanErr}</p>}
 
       {/* To-buy */}
       {todo.length === 0 && done.length === 0 ? (
@@ -192,6 +191,7 @@ export function ShoppingListClient({ initialItems }: { initialItems: SerializedL
           </ul>
         </div>
       )}
+      </div>
 
       {/* Verify a scanned product before adding */}
       {draft && (

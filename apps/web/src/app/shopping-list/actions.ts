@@ -60,7 +60,7 @@ export async function getListItems(): Promise<SerializedListItem[]> {
 
 /** Vision-parse a product photo → suggested list entry (no save; the user verifies). */
 export async function scanProductPhoto(formData: FormData): Promise<ScanProductResult> {
-  if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, error: 'Product scanning (AI) is turned off.' };
+  if (!(await isFeatureEnabled('productPhoto'))) return { ok: false, error: 'Product photo scanning (AI) is turned off.' };
   const file = formData.get('file');
   if (!file || !(file instanceof File) || file.size === 0) return { ok: false, error: 'No image' };
   try {

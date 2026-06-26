@@ -667,6 +667,8 @@ export const pt: Partial<Dict> = {
   'af.subscriptionsDesc': 'Preenche fornecedor, preço e ciclo a partir do nome da subscrição.',
   'af.itemsImport': 'Importar produto e preenchimento IA',
   'af.itemsImportDesc': 'Importa artigos de um URL e preenche especificações, preço e fotos.',
+  'af.productPhoto': 'Digitalização de foto de produto',
+  'af.productPhotoDesc': 'Lê um produto a partir de uma foto da embalagem para a lista de compras.',
   'af.commandBar': 'Barra de comandos IA',
   'af.commandBarDesc': 'Assistente em linguagem natural na barra superior (adicionar despesas, artigos, tarefas…).',
   'set.provider': 'Fornecedor',

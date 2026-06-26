@@ -577,7 +577,7 @@ Rules:
 
 export async function parseProductPhoto(imageBase64: string): Promise<{ parsed: ParsedProductPhoto; raw: string; model: string }> {
   const { json, raw, model } = await runVisionJSON(
-    PRODUCT_PHOTO_PROMPT,
+    (await getPromptOverride('productPhoto')) ?? PRODUCT_PHOTO_PROMPT,
     'Identify the product in this photo for a shopping list. Return the name, brand, category, quantity and notes as JSON.',
     [imageBase64]
   );

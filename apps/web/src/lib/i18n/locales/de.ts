@@ -667,6 +667,8 @@ export const de: Partial<Dict> = {
   'af.subscriptionsDesc': 'Füllt Anbieter, Preis und Zyklus aus dem Abo-Namen.',
   'af.itemsImport': 'Produktimport & KI-Befüllung',
   'af.itemsImportDesc': 'Importiert Artikel aus einer URL und füllt Specs, Preis und Fotos.',
+  'af.productPhoto': 'Produktfoto-Scan',
+  'af.productPhotoDesc': 'Liest ein Produkt aus einem Foto seiner Verpackung für die Einkaufsliste.',
   'af.commandBar': 'KI-Befehlsleiste',
   'af.commandBarDesc': 'Assistent für natürliche Sprache in der oberen Leiste (Ausgaben, Artikel, Aufgaben hinzufügen…).',
   'set.provider': 'Anbieter',

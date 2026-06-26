@@ -692,6 +692,8 @@ export const en = {
   'af.subscriptionsDesc': 'Fill provider, price and cycle from a subscription name.',
   'af.itemsImport': 'Product import & AI-fill',
   'af.itemsImportDesc': 'Import items from a URL and fill specs, price and photos.',
+  'af.productPhoto': 'Product photo scan',
+  'af.productPhotoDesc': 'Read a product from a photo of its packaging for the shopping list.',
   'af.commandBar': 'AI command bar',
   'af.commandBarDesc': 'Natural-language assistant in the top bar (add expenses, items, tasks…).',
   // AI engine deep panels (provider/model/key/prompts)

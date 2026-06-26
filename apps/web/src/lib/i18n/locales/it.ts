@@ -667,6 +667,8 @@ export const it: Partial<Dict> = {
   'af.subscriptionsDesc': "Compila fornitore, prezzo e ciclo dal nome dell'abbonamento.",
   'af.itemsImport': 'Importa prodotto e compilazione IA',
   'af.itemsImportDesc': 'Importa articoli da un URL e compila specifiche, prezzo e foto.',
+  'af.productPhoto': 'Scansione foto prodotto',
+  'af.productPhotoDesc': 'Legge un prodotto da una foto della confezione per la lista della spesa.',
   'af.commandBar': 'Barra comandi IA',
   'af.commandBarDesc': 'Assistente in linguaggio naturale nella barra in alto (aggiungi spese, articoli, attività…).',
   'set.provider': 'Provider',

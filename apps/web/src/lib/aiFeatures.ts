@@ -11,6 +11,7 @@ export type AiFeatureKey =
   | 'cards'
   | 'subscriptions'
   | 'itemsImport'
+  | 'productPhoto'
   | 'commandBar';
 
 export type AiFeatureStatus = 'disabled' | 'no-provider' | 'ready';
@@ -25,6 +26,7 @@ export const AI_FEATURES: { key: AiFeatureKey; label: string; description: strin
   { key: 'cards', label: 'Card photo scan', description: 'Read name, last-4 and bank from a photo of a payment card.', area: 'Documents' },
   { key: 'subscriptions', label: 'Subscription autofill', description: 'Fill provider, price and cycle from a subscription name.', area: 'Shopping & items' },
   { key: 'itemsImport', label: 'Product import & AI-fill', description: 'Import items from a URL and fill specs, price and photos.', area: 'Shopping & items' },
+  { key: 'productPhoto', label: 'Product photo scan', description: 'Read a product from a photo of its packaging for the shopping list.', area: 'Shopping & items' },
   { key: 'commandBar', label: 'AI command bar', description: 'Natural-language assistant in the top bar (add expenses, items, tasks…).', area: 'Assistant' },
 ];
 

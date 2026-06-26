@@ -667,6 +667,8 @@ export const el: Partial<Dict> = {
   'af.subscriptionsDesc': 'Συμπληρώνει πάροχο, τιμή και κύκλο από το όνομα της συνδρομής.',
   'af.itemsImport': 'Εισαγωγή προϊόντος & AI-fill',
   'af.itemsImportDesc': 'Εισαγωγή ειδών από URL και συμπλήρωση specs, τιμής και φωτογραφιών.',
+  'af.productPhoto': 'Σάρωση φωτό προϊόντος',
+  'af.productPhotoDesc': 'Διαβάζει ένα προϊόν από φωτογραφία της συσκευασίας του για τη λίστα αγορών.',
   'af.commandBar': 'Μπάρα εντολών AI',
   'af.commandBarDesc': 'Βοηθός φυσικής γλώσσας στην πάνω μπάρα (πρόσθεσε έξοδα, είδη, εργασίες…).',
   'set.provider': 'Πάροχος',

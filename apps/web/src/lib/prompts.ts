@@ -1,7 +1,7 @@
 import { connectDB } from './db';
 import { AppConfig } from '@/models/AppConfig';
 
-export type PromptKey = 'receipt' | 'statement' | 'product' | 'card' | 'subscription' | 'category' | 'expense' | 'voucher' | 'scraperPrice';
+export type PromptKey = 'receipt' | 'statement' | 'product' | 'card' | 'subscription' | 'category' | 'expense' | 'voucher' | 'productPhoto' | 'scraperPrice';
 
 /** Default scraper price-extraction prompt. KEEP IN SYNC with the scraper's own copy at
  *  services/scraper/src/extract.ts (PROMPT). Shown here so Settings can display/reset it;
@@ -29,6 +29,7 @@ export const PROMPT_META: { key: PromptKey; label: string; where: string }[] = [
   { key: 'category', label: 'Transaction category', where: 'Statements: categorize transactions' },
   { key: 'expense', label: 'Expense / income', where: 'Expenses & Income: scan a bill / payslip' },
   { key: 'voucher', label: 'Voucher / coupon', where: 'Vouchers: scan a coupon' },
+  { key: 'productPhoto', label: 'Product photo', where: 'Shopping list: scan a product photo' },
   { key: 'scraperPrice', label: 'Scraper price', where: 'Price scraper service: extract current price' },
 ];
 

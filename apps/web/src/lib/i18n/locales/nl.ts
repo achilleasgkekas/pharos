@@ -667,6 +667,8 @@ export const nl: Partial<Dict> = {
   'af.subscriptionsDesc': 'Vult leverancier, prijs en cyclus in op basis van de abonnementsnaam.',
   'af.itemsImport': 'Productimport & AI-invullen',
   'af.itemsImportDesc': 'Importeert items uit een URL en vult specs, prijs en foto\'s in.',
+  'af.productPhoto': 'Productfoto scannen',
+  'af.productPhotoDesc': 'Leest een product uit een foto van de verpakking voor de boodschappenlijst.',
   'af.commandBar': 'AI-opdrachtbalk',
   'af.commandBarDesc': 'Assistent in natuurlijke taal in de bovenbalk (uitgaven, items, taken toevoegen…).',
   'set.provider': 'Provider',

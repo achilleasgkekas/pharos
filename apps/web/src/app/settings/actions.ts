@@ -22,6 +22,7 @@ import {
   CATEGORY_PROMPT,
   EXPENSE_PROMPT,
   VOUCHER_PROMPT,
+  PRODUCT_PHOTO_PROMPT,
 } from '@/lib/ollama';
 import {
   PROMPT_META,
@@ -384,6 +385,7 @@ const PROMPT_DEFAULTS: Record<PromptKey, string> = {
   category: CATEGORY_PROMPT,
   expense: EXPENSE_PROMPT,
   voucher: VOUCHER_PROMPT,
+  productPhoto: PRODUCT_PHOTO_PROMPT,
   scraperPrice: DEFAULT_SCRAPER_PRICE_PROMPT,
 };
 
