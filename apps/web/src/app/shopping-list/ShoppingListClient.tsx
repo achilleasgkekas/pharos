@@ -21,6 +21,7 @@ type Draft = { name: string; quantity: string; category: string; brand: string }
 type StatusFilter = 'all' | 'todo' | 'bought';
 type SortKey = 'recent' | 'name' | 'category';
 const mono = { fontFamily: 'var(--font-mono)' };
+const display = { fontFamily: 'var(--font-display)' }; // titles match every other page's cards
 const emptyDraft: Draft = { name: '', quantity: '', category: '', brand: '' };
 
 // Deterministic category accent — gives each category a stable colour (like the product cards' eyebrows).
@@ -448,15 +449,20 @@ function Box({ checked, accent, onClick }: { checked: boolean; accent: boolean; 
   );
 }
 
-function Meta({ it, color }: { it: SerializedListItem; color: string | null }) {
-  if (!it.quantity && !it.category && !it.aiScanned) return null;
+/** Mono uppercase category eyebrow — the same treatment as the inventory cards' eyebrow. */
+function Eyebrow({ category, color }: { category: string; color: string | null }) {
+  if (!category) return null;
+  return (
+    <span className="block text-[11px] uppercase tracking-[0.08em] mb-0.5 truncate" style={{ ...mono, color: color || 'var(--color-text-faint)' }}>
+      {category}
+    </span>
+  );
+}
+
+function Meta({ it }: { it: SerializedListItem }) {
+  if (!it.quantity && !it.aiScanned) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-2">
-      {it.category && (
-        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-[color:var(--color-surface-2)]" style={{ color: color || 'var(--color-text-dim)' }}>
-          {it.category}
-        </span>
-      )}
       {it.quantity && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]" style={mono}>{it.quantity}</span>}
       {it.aiScanned && <span className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-0.5" style={mono}><Sparkles size={9} /> AI</span>}
     </div>
@@ -489,9 +495,10 @@ function Card({ it, color, selectMode, selected, onSelect, onToggle, onRemove }:
       {color && <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: color }} />}
       <Box checked={selectMode ? selected : it.checked} accent={selectMode && selected} onClick={selectMode ? undefined : (e) => { e.stopPropagation(); onToggle(); }} />
       <div className={cn('min-w-0 flex-1', !selectMode && 'cursor-pointer')} onClick={selectMode ? undefined : onToggle}>
-        <span className={cn('block text-[15px] font-semibold leading-snug break-words', struck && 'line-through')}>{it.name}</span>
+        <Eyebrow category={it.category} color={color} />
+        <span className={cn('block text-sm font-semibold leading-snug break-words', struck && 'line-through')} style={display}>{it.name}</span>
         {it.brand && <span className="block text-xs text-[color:var(--color-text-faint)] mt-0.5 truncate">{it.brand}</span>}
-        <Meta it={it} color={color} />
+        <Meta it={it} />
       </div>
       {!selectMode && (
         <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="shrink-0 p-1.5 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity" aria-label="remove">
@@ -518,13 +525,13 @@ function Row({ it, color, selectMode, selected, onSelect, onToggle, onRemove }: 
       {color && <span className="absolute left-0 top-0 bottom-0 w-1" style={{ background: color }} />}
       <Box checked={selectMode ? selected : it.checked} accent={selectMode && selected} onClick={selectMode ? undefined : (e) => { e.stopPropagation(); onToggle(); }} />
       <div className={cn('min-w-0 flex-1', !selectMode && 'cursor-pointer')} onClick={selectMode ? undefined : onToggle}>
-        <span className={cn('block text-sm font-medium truncate', struck && 'line-through')}>
+        <span className={cn('block text-sm font-semibold truncate', struck && 'line-through')} style={display}>
           {it.name}
           {it.brand && <span className="text-[color:var(--color-text-faint)] font-normal"> · {it.brand}</span>}
         </span>
         {(it.quantity || it.category) && (
-          <span className="flex items-center gap-1.5 mt-0.5">
-            {it.category && <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-[color:var(--color-surface-2)]" style={{ color: color || 'var(--color-text-dim)' }}>{it.category}</span>}
+          <span className="flex items-center gap-2 mt-0.5">
+            {it.category && <span className="text-[10px] uppercase tracking-[0.08em]" style={{ ...mono, color: color || 'var(--color-text-faint)' }}>{it.category}</span>}
             {it.quantity && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[color:var(--color-surface-2)] text-[color:var(--color-text-dim)]" style={mono}>{it.quantity}</span>}
           </span>
         )}
