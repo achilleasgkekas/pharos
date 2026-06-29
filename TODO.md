@@ -35,11 +35,11 @@
 
 ## NEXT — distribution & API (χρήσιμα ό,τι κι αν γίνει με το SaaS)
 
-### 4. Publish Docker image (no git pull) ⬜
-- CI job στο `.github/workflows/ci.yml`: build + **push** `pharos:vX.Y.Z` + `:latest` σε Docker Hub ή GHCR (login secrets).
-- Version tagging.
-- `docker-compose.prod.yml` με `image:` αντί `build:` για το `web`.
-- Απόφαση: registry (Docker Hub vs GHCR) + license (ορίζει public/private image).
+### 4. Publish Docker image (no git pull) ✅ (Session 2026-06-29 — GHCR)
+- ✅ Registry: **GHCR** (`ghcr.io/achilleasgkekas/pharos`) — auth μέσω built-in `GITHUB_TOKEN`, μηδέν extra secrets.
+- ✅ `.github/workflows/release.yml`: push semver tag `v*.*.*` → publish `:X.Y.Z` `:X.Y` `:X` `:latest`· `workflow_dispatch` → `:edge`. Multi-arch **linux/amd64 + linux/arm64** (prod Proxmox/x86 + Mac arm64), GHA build cache.
+- ✅ `docker-compose.prod.yml` (self-contained, `image:` αντί `build:`, `PHAROS_IMAGE` override για version pin)· README quick-start «Run from the prebuilt image».
+- ΣΗΜ: ο `scraper` μένει build-from-source (opt-in)· δεν δημοσιεύεται image ακόμα. Image visibility (public/private) = ρύθμιση στο GitHub Packages μετά το πρώτο push· license decision δεν μπλοκάρει.
 
 ### 5. `/api/v1` REST API ⬜
 - Resources: `receipts`, `items`, `expenses`, `statements`, `subscriptions`, `vouchers`, `tasks` (CRUD + list/pagination).

@@ -75,6 +75,18 @@ docker compose --profile scraper up -d              # + price scraper + FlareSol
 docker compose --profile tools up -d mongo-express  # DB admin UI on :8081
 ```
 
+Run from the prebuilt image (no source checkout):
+
+```bash
+# Grab just docker-compose.prod.yml + .env onto the host, then:
+docker compose -f docker-compose.prod.yml pull   # pull ghcr.io/achilleasgkekas/pharos:latest
+docker compose -f docker-compose.prod.yml up -d   # web + mongo + searxng
+```
+
+Pin a version with `PHAROS_IMAGE=ghcr.io/achilleasgkekas/pharos:1.2.3` in `.env`.
+Update later with `pull && up -d`. The image is published to GHCR by the
+**Release image** workflow on every `v*.*.*` tag (`git tag v1.2.3 && git push --tags`).
+
 Local dev (outside Docker):
 
 ```bash

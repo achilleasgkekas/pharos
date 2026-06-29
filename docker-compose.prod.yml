@@ -1,0 +1,115 @@
+# Production stack — pulls the prebuilt web image from GHCR instead of building
+# from source. Deploy on any host with Docker + this file + a .env; no git clone
+# needed.
+#
+#   docker compose -f docker-compose.prod.yml pull        # fetch latest image
+#   docker compose -f docker-compose.prod.yml up -d        # start
+#
+# Pin a version by setting PHAROS_IMAGE in .env, e.g.
+#   PHAROS_IMAGE=ghcr.io/achilleasgkekas/pharos:1.2.3
+# Default is :latest.
+#
+# Required in .env: AUTH_SECRET, NEXT_SERVER_ACTIONS_ENCRYPTION_KEY, MONGO_USER, MONGO_PASS.
+# The scraper service is intentionally omitted — it still builds from source; run it
+# from the dev compose if you need price scraping (docker-compose.yml --profile scraper).
+
+services:
+  web:
+    image: ${PHAROS_IMAGE:-ghcr.io/achilleasgkekas/pharos:latest}
+    container_name: homepage-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      MONGO_URI: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/homepage?authSource=admin
+      # Ollama runs NATIVE on the host — reach it via the host gateway.
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5vl:7b}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
+      SOLVER_URL: ${SOLVER_URL:-http://flaresolverr:8191}
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+      STORAGE_ROOT: /storage
+      NODE_ENV: production
+      # Stable key so Server Action IDs survive restarts (open tabs don't break).
+      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:?set NEXT_SERVER_ACTIONS_ENCRYPTION_KEY in .env}
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env}
+      # Set true only behind an HTTPS reverse proxy.
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      SESSION_IDLE_HOURS: ${SESSION_IDLE_HOURS:-12}
+    volumes:
+      - ./data/storage:/storage
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+
+  mongo:
+    image: mongo:7
+    container_name: homepage-mongo
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:-changeme}
+      MONGO_INITDB_DATABASE: homepage
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Self-hosted metasearch (web + image) for "AI fill without a link" + product photos.
+  searxng:
+    image: searxng/searxng:latest
+    container_name: homepage-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8888/
+      UWSGI_WORKERS: ${SEARXNG_WORKERS:-2}
+      UWSGI_THREADS: ${SEARXNG_THREADS:-2}
+
+  # Cloudflare-challenge solver for URL-import / price-scrape from bot-protected shops.
+  # Opt-in: docker compose -f docker-compose.prod.yml --profile scraper up -d flaresolverr
+  flaresolverr:
+    image: 21hsmw/flaresolverr:nodriver
+    container_name: homepage-flaresolverr
+    restart: unless-stopped
+    profiles: ["scraper"]
+    environment:
+      LOG_LEVEL: ${FLARESOLVERR_LOG_LEVEL:-info}
+      TZ: ${TZ:-Europe/Athens}
+    ports:
+      - "127.0.0.1:8191:8191"
+
+  # DB admin UI. Opt-in: docker compose -f docker-compose.prod.yml --profile tools up -d mongo-express
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: homepage-mongo-ui
+    restart: unless-stopped
+    profiles: ["tools"]
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER:-admin}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASS:-changeme}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER:-admin}:${MONGO_PASS:-changeme}@mongo:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: ${ME_USER:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_PASS:-changeme}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
+    driver: local
