@@ -3,6 +3,7 @@ import { View, ActivityIndicator, SafeAreaView, Platform, StatusBar as RNStatusB
 import { StatusBar } from 'expo-status-bar';
 import { C } from './src/theme';
 import { loadSession, logout } from './src/api';
+import { registerForPush, unregisterForPush } from './src/push';
 import { AppBar, Drawer } from './src/nav';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { HomeScreen, type ScreenKey } from './src/screens/HomeScreen';
@@ -35,6 +36,8 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => { (async () => { setAuthed(await loadSession()); setReady(true); })(); }, []);
+  // Register this device for push once authenticated (no-op in Expo Go / without EAS creds).
+  useEffect(() => { if (authed) void registerForPush(); }, [authed]);
 
   if (!ready) {
     return <View style={s.splash}><StatusBar style="light" /><ActivityIndicator color={C.accent} /></View>;
@@ -43,7 +46,7 @@ export default function App() {
     return <View style={{ flex: 1 }}><StatusBar style="light" /><LoginScreen onLogin={() => setAuthed(true)} /></View>;
   }
 
-  async function signOut() { setDrawerOpen(false); await logout(); setScreen('home'); setAuthed(false); }
+  async function signOut() { setDrawerOpen(false); await unregisterForPush(); await logout(); setScreen('home'); setAuthed(false); }
 
   function body() {
     switch (screen) {

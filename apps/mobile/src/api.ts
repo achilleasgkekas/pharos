@@ -320,6 +320,14 @@ export function markNotificationRead(id?: string) {
   return request<{ ok: boolean }>('/api/v1/notifications', { method: 'PATCH', body: JSON.stringify(id ? { id } : {}) });
 }
 
+// ---- Push registration (Expo push token ↔ server) ----
+export function registerPush(token: string) {
+  return request<{ ok: boolean }>('/api/v1/push/register', { method: 'POST', body: JSON.stringify({ token }) });
+}
+export function unregisterPush(token: string) {
+  return request<{ ok: boolean }>('/api/v1/push/register', { method: 'DELETE', body: JSON.stringify({ token }) });
+}
+
 // ---- Edits (PATCH) ----
 const patch = (path: string, data: object) => request<{ ok: boolean }>(path, { method: 'PATCH', body: JSON.stringify(data) });
 export const updateExpense = (id: string, data: { vendor?: string; amount?: number; category?: string; kind?: string; date?: string }) => patch(`/api/v1/expenses/${id}`, data);

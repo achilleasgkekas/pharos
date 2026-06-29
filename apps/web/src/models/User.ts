@@ -16,6 +16,9 @@ const UserSchema = new Schema(
     // Personal API token (bearer) for the remote MCP endpoint. Null = no token.
     // NEVER sent to the client except once, right after generation.
     apiToken: { type: String, default: null, index: true },
+    // Expo push tokens for this user's mobile devices (one per device/install).
+    // Registered by the mobile app; used to deliver alert pushes.
+    pushTokens: { type: [String], default: [] },
   },
   { timestamps: true }
 );

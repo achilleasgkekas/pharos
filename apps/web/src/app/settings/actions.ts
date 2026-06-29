@@ -46,6 +46,7 @@ import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel,
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
 import { sendNtfyTo } from '@/lib/notify';
 import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '@/lib/notifiers';
+import { pushAllDevices } from '@/lib/expoPush';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { generateNotifications } from '@/app/notifications/actions';
 import type { SerializedStatement } from '@/types';
@@ -390,6 +391,8 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   if (lines.length) {
     const r = await dispatchAlert('Pharos alerts', summary);
     sent = r.sent > 0;
+    // Also push to registered mobile devices (best-effort; no-op if none / no creds).
+    void pushAllDevices('Pharos alerts', summary);
   }
   return { ok: true, sent, summary };
 }
