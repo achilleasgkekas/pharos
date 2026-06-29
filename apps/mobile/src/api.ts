@@ -163,3 +163,9 @@ export function fileSource(path: string | null): { uri: string; headers?: Record
   const uri = `${base}/api/files/${path.split('/').map(encodeURIComponent).join('/')}`;
   return token ? { uri, headers: { Authorization: `Bearer ${token}` } } : { uri };
 }
+
+// ---- AI command bar ----
+export type AiTurn = { role: 'user' | 'assistant'; content: string };
+export function aiCommand(messages: AiTurn[]) {
+  return request<{ reply: string; actions: { name: string; summary: string }[] }>('/api/v1/ai', { method: 'POST', body: JSON.stringify({ messages }) });
+}

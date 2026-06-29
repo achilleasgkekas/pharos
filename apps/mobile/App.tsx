@@ -3,7 +3,7 @@ import { View, ActivityIndicator, SafeAreaView, Platform, StatusBar as RNStatusB
 import { StatusBar } from 'expo-status-bar';
 import { C } from './src/theme';
 import { loadSession, logout } from './src/api';
-import { Header } from './src/ui';
+import { AppBar, Drawer } from './src/nav';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { HomeScreen, type ScreenKey } from './src/screens/HomeScreen';
 import { ShoppingScreen } from './src/screens/ShoppingScreen';
@@ -12,16 +12,18 @@ import { TasksScreen } from './src/screens/TasksScreen';
 import { MoneyScreen } from './src/screens/MoneyScreen';
 import { SubscriptionsScreen } from './src/screens/SubscriptionsScreen';
 import { ItemsScreen } from './src/screens/ItemsScreen';
+import { AssistantScreen } from './src/screens/AssistantScreen';
 
-const TITLES: Record<Exclude<ScreenKey, 'home'>, string> = {
-  shopping: 'Shopping list', receipts: 'Receipts', tasks: 'Tasks',
-  expenses: 'Expenses', income: 'Income', subscriptions: 'Subscriptions', items: 'Inventory',
+const TITLES: Record<ScreenKey, string> = {
+  home: 'Pharos', assistant: 'AI assistant', shopping: 'Shopping list', receipts: 'Receipts',
+  tasks: 'Tasks', expenses: 'Expenses', income: 'Income', subscriptions: 'Subscriptions', items: 'Inventory',
 };
 
 export default function App() {
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [screen, setScreen] = useState<ScreenKey>('home');
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => { (async () => { setAuthed(await loadSession()); setReady(true); })(); }, []);
 
@@ -32,10 +34,12 @@ export default function App() {
     return <View style={{ flex: 1 }}><StatusBar style="light" /><LoginScreen onLogin={() => setAuthed(true)} /></View>;
   }
 
-  async function signOut() { await logout(); setScreen('home'); setAuthed(false); }
+  async function signOut() { setDrawerOpen(false); await logout(); setScreen('home'); setAuthed(false); }
 
-  function body(k: Exclude<ScreenKey, 'home'>) {
-    switch (k) {
+  function body() {
+    switch (screen) {
+      case 'home': return <HomeScreen onOpen={setScreen} />;
+      case 'assistant': return <AssistantScreen />;
       case 'shopping': return <ShoppingScreen />;
       case 'receipts': return <ReceiptsScreen />;
       case 'tasks': return <TasksScreen />;
@@ -43,20 +47,22 @@ export default function App() {
       case 'income': return <MoneyScreen kind="income" />;
       case 'subscriptions': return <SubscriptionsScreen />;
       case 'items': return <ItemsScreen />;
+      default: return null;
     }
   }
 
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="light" />
-      {screen === 'home' ? (
-        <HomeScreen onOpen={setScreen} onSignOut={signOut} />
-      ) : (
-        <>
-          <Header title={TITLES[screen]} onBack={() => setScreen('home')} />
-          <View style={{ flex: 1 }}>{body(screen)}</View>
-        </>
-      )}
+      <AppBar title={TITLES[screen]} onMenu={() => setDrawerOpen(true)} />
+      <View style={{ flex: 1 }}>{body()}</View>
+      <Drawer
+        open={drawerOpen}
+        current={screen}
+        onClose={() => setDrawerOpen(false)}
+        onSelect={(k) => { setScreen(k); setDrawerOpen(false); }}
+        onSignOut={signOut}
+      />
     </SafeAreaView>
   );
 }

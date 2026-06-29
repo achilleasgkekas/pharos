@@ -4,10 +4,11 @@ import { C } from '../theme';
 import { money, Spinner, ErrorText } from '../ui';
 import { getOverview, type Overview } from '../api';
 
-export type ScreenKey = 'home' | 'shopping' | 'receipts' | 'tasks' | 'expenses' | 'income' | 'subscriptions' | 'items';
+export type ScreenKey = 'home' | 'shopping' | 'receipts' | 'tasks' | 'expenses' | 'income' | 'subscriptions' | 'items' | 'assistant';
 
 type Tile = { key: ScreenKey; label: string; count?: (o: Overview) => number; color: string };
 const TILES: Tile[] = [
+  { key: 'assistant', label: 'AI assistant', color: C.cyan },
   { key: 'shopping', label: 'Shopping list', count: (o) => o.counts.shoppingList, color: C.accent },
   { key: 'receipts', label: 'Receipts', count: (o) => o.counts.receipts, color: C.purple },
   { key: 'items', label: 'Inventory', count: (o) => o.counts.items, color: C.cyan },
@@ -17,7 +18,7 @@ const TILES: Tile[] = [
   { key: 'subscriptions', label: 'Subscriptions', count: (o) => o.counts.subscriptions, color: C.cyan },
 ];
 
-export function HomeScreen({ onOpen, onSignOut }: { onOpen: (k: ScreenKey) => void; onSignOut: () => void }) {
+export function HomeScreen({ onOpen }: { onOpen: (k: ScreenKey) => void }) {
   const [data, setData] = useState<Overview | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,14 +34,6 @@ export function HomeScreen({ onOpen, onSignOut }: { onOpen: (k: ScreenKey) => vo
 
   return (
     <ScrollView style={s.wrap} contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}>
-      <View style={s.head}>
-        <View>
-          <Text style={s.brand}>PHAROS</Text>
-          <Text style={s.sub}>Personal hub</Text>
-        </View>
-        <Pressable onPress={onSignOut} hitSlop={8}><Text style={s.signout}>Sign out</Text></Pressable>
-      </View>
-
       <ErrorText>{err}</ErrorText>
 
       {data && (
