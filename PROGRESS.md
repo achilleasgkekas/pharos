@@ -13,7 +13,7 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
 ## Κατάσταση
 - Mobile companion app (`apps/mobile`, Expo SDK 54) σε build-out προς parity. Web REST API v1 κάτω από `apps/web/src/app/api/v1/` (bearer auth).
 - MOBILE_PARITY roadmap: #1 edit ✅, #2 task statuses ✅, #3 receipt verify/edit ✅, #4 AI fill ✅, #5 statement detail ✅, #6 mobile Settings ✅.
-- #7 Activity — Trash ✅, Jobs ✅, History ✅, Alerts ✅. #8 push — in-app feed ✅· **remote-push delivery = Needs Achilleas** (EAS dev build + Apple APNs key· βλ. cont.⁶).
+- #7 Activity — Trash ✅, Jobs ✅, History ✅, Alerts ✅. #8 push — in-app feed ✅ + **push pipeline (token registry + Expo send + alert wiring) ✅**· λείπει ΜΟΝΟ EAS dev build + Apple APNs key = Needs Achilleas (βλ. cont.⁷).
 - **MOBILE_PARITY roadmap #1–#8 όλα ✅.** Επόμενα logical (όχι roadmap): mobile Receipts edit (line items/re-scan/archive), push delivery (γ) όταν έρθουν creds.
 
 ## 2026-06-29 (seed)
@@ -69,3 +69,10 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
   7. Settings → **theme toggle (light mode)** — ΜΕΓΑΛΟ refactor (το `C` palette είναι const-imported σε κάθε screen· θέλει theme context). Άφησέ το τελευταίο.
   8. Settings → AI engine/features/storage/OneDrive — power-user, χαμηλή προτεραιότητα για mobile.
 - Επόμενο task: **#1 παραπάνω — payment cards CRUD στο mobile Settings.** ΘΥΜΗΣΟΥ `docker builder prune -f` μετά το build + flaresolverr σβηστό + stage ΜΟΝΟ δικά σου αρχεία (το User.ts είναι του Αχιλλέα).
+
+## 2026-06-29 (cont.⁷ — #8 remote push pipeline, part γ buildable)
+- Context: ο Αχιλλέας («αποδέχομαι ό,τι χρειάζεται») ενέκρινε να φτιαχτεί το buildable κομμάτι του remote push· τα Apple/EAS creds τα αναλαμβάνει αυτός.
+- Τι: **server push pipeline ✅** — `User.pushTokens` (νέο field)· `lib/expoPush.ts` (`sendExpoPush` → Expo push service, chunks 100, validate `ExponentPushToken[...]`, never-throws· `pushAllDevices` διαβάζει όλα τα tokens)· `POST/DELETE /api/v1/push/register` (store/remove token στον bearer user)· wired fire-and-forget στο `runAlertChecks` δίπλα στο `dispatchAlert` (2 γραμμές, ΜΟΝΟ δικές μου). **mobile ✅** — `expo-notifications`+`expo-device`, `src/push.ts` `registerForPush`/`unregisterForPush` (permission→Expo token→register· πλήρως guarded: no-op σε Expo Go/simulator/χωρίς EAS projectId), κλήση on-auth + cleanup on-sign-out στο `App.tsx`. Commit `2156a83`.
+- Verify: tsc καθαρό (web+mobile)· IMG BUILD=0, login 200, restarts=0, prune μετά. Smoke (token από container, ποτέ printed): no-token→401, bad-format→400, valid `ExponentPushToken[...]`→200 + stored (count 1), DELETE→200 + remaining 0 (καθάρισα το test token → user data clean). ⚠ `oom=true` ξαναεμφανίστηκε (mongo OOM-killed στο build, recovered healthy) → ενισχύει το RAM-bump Needs-Achilleas.
+- **Needs Achilleas (ΜΟΝΟ αυτό λείπει για end-to-end push):** (α) `npx eas build --profile development --platform ios`, (β) Apple APNs key (Apple Developer → Keys → APNs· `eas credentials` το ανεβάζει). Μόλις υπάρχουν, το `registerForPush` παίρνει πραγματικό token → οι alerts (deals/installments/warranties) χτυπάνε το κινητό ΧΩΡΙΣ άλλο κώδικα.
+- Επόμενο task: η parallel-parity λίστα παραπάνω (#1 cards CRUD κ.λπ.). ΘΥΜΗΣΟΥ `docker builder prune -f` + flaresolverr σβηστό + stage ΜΟΝΟ δικά σου paths (πολλά αρχεία τα αγγίζει παράλληλη συνεδρία).
