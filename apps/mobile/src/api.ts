@@ -204,6 +204,13 @@ export async function getStatementTxns(id: string): Promise<StatementTxn[]> {
   return (await request<{ transactions: StatementTxn[] }>(`/api/v1/statements/${id}`)).transactions ?? [];
 }
 
+// ---- App settings (preferences + this-month budgets) ----
+export type BudgetRow = { category: string; limit: number; spent: number };
+export type AppSettings = { currency: string; defaultVatRate: number; period: string; budgets: BudgetRow[] };
+export async function getSettings(): Promise<AppSettings> {
+  return request<AppSettings>('/api/v1/settings');
+}
+
 // ---- Reports ----
 export type Reports = {
   currency: string;
