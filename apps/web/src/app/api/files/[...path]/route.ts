@@ -1,4 +1,5 @@
 import { readFile } from '@/lib/storage';
+import { recacheByPath } from '@/lib/mirror';
 import { NextRequest, NextResponse } from 'next/server';
 import { SESSION_COOKIE, verifySession } from '@/lib/session';
 import { bearerUser } from '@/lib/apiAuth';
@@ -38,7 +39,16 @@ export async function GET(
   const relativePath = path.join('/');
 
   try {
-    const buffer = await readFile(relativePath);
+    // Local is always the working copy. If it's missing (fresh host, restored DB)
+    // and OneDrive holds the mirror, pull it back on demand and cache it locally.
+    let buffer: Buffer;
+    try {
+      buffer = await readFile(relativePath);
+    } catch {
+      const recached = await recacheByPath(relativePath);
+      if (!recached) return new NextResponse('Not found', { status: 404 });
+      buffer = recached;
+    }
     const ext = relativePath.split('.').pop()?.toLowerCase() ?? '';
     const contentType = CONTENT_TYPES[ext] ?? 'application/octet-stream';
     const filename = relativePath.split('/').pop() ?? 'file';

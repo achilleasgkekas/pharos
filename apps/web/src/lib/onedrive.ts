@@ -200,6 +200,68 @@ export async function uploadToOnedrive(relPath: string, data: Buffer): Promise<{
   }
 }
 
+/**
+ * Download one file from OneDrive at /Apps/Pharos/<relPath>. Counterpart to
+ * uploadToOnedrive — used for on-demand re-cache when the local copy is missing
+ * (e.g. fresh host, restored DB). Returns the bytes or an error; never throws.
+ */
+export async function downloadFromOnedrive(relPath: string): Promise<{ ok: boolean; data?: Buffer; error?: string }> {
+  try {
+    const creds = await getOnedriveCreds();
+    if (!creds) return { ok: false, error: 'OneDrive not connected' };
+    const token = await accessTokenFor(creds.clientId, creds.refreshToken);
+    const clean = relPath.split('/').map((s) => encodeURIComponent(s)).join('/');
+    const url = `${GRAPH}/me/drive/root:/Apps/Pharos/${clean}:/content`;
+
+    // Graph 302-redirects to a pre-authed download URL (fetch follows it); honour
+    // Retry-After on the same 429/503 bursts the upload path handles.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const res = await fetch(url, {
+        headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(60000),
+      });
+      if (res.ok) return { ok: true, data: Buffer.from(await res.arrayBuffer()) };
+      if (res.status === 404) return { ok: false, error: 'not found on OneDrive' };
+      if ((res.status === 429 || res.status === 503) && attempt < 3) {
+        const wait = Math.min(30, Number(res.headers.get('retry-after')) || (attempt + 1) * 3);
+        await new Promise((r) => setTimeout(r, wait * 1000));
+        continue;
+      }
+      const body = await res.text().catch(() => '');
+      return { ok: false, error: `Graph HTTP ${res.status}: ${body.slice(0, 160)}` };
+    }
+    return { ok: false, error: 'throttled — retries exhausted' };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Create (or reuse) an anonymous, view-only share link for a file under
+ * /Apps/Pharos/<relPath>. Powers an optional "Open in OneDrive" action. Graph
+ * returns the existing link if one of the same type already exists.
+ */
+export async function createShareLink(relPath: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    const creds = await getOnedriveCreds();
+    if (!creds) return { ok: false, error: 'OneDrive not connected' };
+    const token = await accessTokenFor(creds.clientId, creds.refreshToken);
+    const clean = relPath.split('/').map((s) => encodeURIComponent(s)).join('/');
+    const url = `${GRAPH}/me/drive/root:/Apps/Pharos/${clean}:/createLink`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'view', scope: 'anonymous' }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const j = (await res.json().catch(() => ({}))) as { link?: { webUrl?: string }; error?: { message?: string } };
+    if (!res.ok || !j.link?.webUrl) return { ok: false, error: j.error?.message || `Graph HTTP ${res.status}` };
+    return { ok: true, url: j.link.webUrl };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 /** Connectivity check: refresh a token + read the drive name. */
 export async function testOnedrive(): Promise<{ ok: boolean; error?: string; drive?: string }> {
   try {

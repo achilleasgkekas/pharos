@@ -53,9 +53,10 @@
 - List/detail views (receipts, expenses, items), quick-add.
 - Token-based login.
 
-### 7. Storage extensions ⬜
-- `downloadFromOnedrive` (GET `/content`) — λείπει· χρειάζεται για on-demand cache + προαιρετικό «Open in OneDrive» (`createShareLink`).
-- Νέοι backends στο storage abstraction: **Amazon S3, Azure Blob, Cloudflare R2** (tenant-selectable drivers).
+### 7. Storage extensions 🔄
+- ✅ `downloadFromOnedrive` (GET `/content`) + `createShareLink` (`lib/onedrive.ts`). `lib/mirror.ts`: `recacheFromRemote`/`shareLinkFor` (templated-path aware) + `recacheByPath` (reverse-lookup owner doc). **On-demand cache wired** στο `/api/files/[...path]`: local miss + OneDrive backend → pull-back + write local + serve (Session 2026-06-29).
+- ⬜ «Open in OneDrive» UI button (έχει `shareLinkFor` έτοιμο — λείπει το action + κουμπί στα detail modals).
+- ⬜ Νέοι backends στο storage abstraction: **Amazon S3, Azure Blob, Cloudflare R2** (tenant-selectable drivers).
 
 ---
 
