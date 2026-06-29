@@ -102,3 +102,64 @@ export async function scanProduct(uri: string): Promise<ScannedProduct> {
   if (!res.ok || !json?.data) throw new Error(json?.error || `Scan failed (HTTP ${res.status})`);
   return json.data;
 }
+
+// ===================== Additional resources =====================
+export type Task = { id: string; title: string; status: string; priority: string; tags: string[]; dueDate: string | null; completedAt: string | null; updatedAt: string | null };
+export type Expense = { id: string; kind: string; vendor: string; category: string; amount: number; currency: string; date: string | null; period: string; recurring: boolean; file: string | null; thumb: string | null; verified: boolean };
+export type Subscription = { id: string; name: string; provider: string; category: string; amount: number; currency: string; billingCycle: string; nextRenewal: string | null; active: boolean };
+export type ReceiptSummary = { id: string; store: string; date: string | null; total: number; currency: string; itemCount: number; verified: boolean; archived: boolean; file: string | null; thumb: string | null };
+export type ReceiptLine = { name: string; qty: number; price: number; vatRate: number };
+export type ReceiptDetail = ReceiptSummary & { subtotal: number; vatAmount: number; paymentMethod: string; warrantyMonths: number; notes: string; lineItems: ReceiptLine[] };
+export type Item = { id: string; num: string; title: string; status: string; category: string; currentPrice: number; purchasedPrice: number | null; targetPrice: number | null; specs: string; warrantyUntil: string | null; tags: string[]; photo: string | null };
+
+// ---- Tasks ----
+export async function getTasks(status?: string): Promise<Task[]> {
+  const q = status ? `?status=${status}&limit=200` : '?limit=200';
+  return (await request<{ data: Task[] }>(`/api/v1/tasks${q}`)).data ?? [];
+}
+export function addTask(title: string) { return request<{ task: Task }>('/api/v1/tasks', { method: 'POST', body: JSON.stringify({ title }) }); }
+export function setTaskStatus(id: string, status: string) { return request<{ task: Task }>(`/api/v1/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }); }
+export function deleteTask(id: string) { return request<{ ok: boolean }>(`/api/v1/tasks/${id}`, { method: 'DELETE' }); }
+
+// ---- Expenses / income ----
+export async function getExpenses(kind: 'expense' | 'income'): Promise<Expense[]> {
+  return (await request<{ data: Expense[] }>(`/api/v1/expenses?kind=${kind}&limit=200`)).data ?? [];
+}
+export function addExpense(data: { vendor: string; amount: number; kind: 'expense' | 'income'; category?: string }) {
+  return request<{ expense: Expense }>('/api/v1/expenses', { method: 'POST', body: JSON.stringify(data) });
+}
+
+// ---- Subscriptions ----
+export async function getSubscriptions(): Promise<Subscription[]> {
+  return (await request<{ data: Subscription[] }>('/api/v1/subscriptions?limit=200')).data ?? [];
+}
+
+// ---- Receipts ----
+export async function getReceipts(): Promise<ReceiptSummary[]> {
+  return (await request<{ data: ReceiptSummary[] }>('/api/v1/receipts?limit=100')).data ?? [];
+}
+export async function getReceipt(id: string): Promise<ReceiptDetail> {
+  return (await request<{ receipt: ReceiptDetail }>(`/api/v1/receipts/${id}`)).receipt;
+}
+export async function scanReceipt(uri: string): Promise<ReceiptDetail & { aiUsed: boolean; aiError: string | null }> {
+  const fd = new FormData();
+  fd.append('file', { uri, name: 'receipt.jpg', type: 'image/jpeg' } as unknown as Blob);
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(base + '/api/v1/scan/receipt', { method: 'POST', headers, body: fd });
+  const json = (await res.json().catch(() => null)) as { receipt?: ReceiptDetail & { aiUsed: boolean; aiError: string | null }; error?: string } | null;
+  if (!res.ok || !json?.receipt) throw new Error(json?.error || `Scan failed (HTTP ${res.status})`);
+  return json.receipt;
+}
+
+// ---- Items / inventory ----
+export async function getItems(status: 'shopping' | 'inventory' | 'all' = 'all'): Promise<Item[]> {
+  return (await request<{ items: Item[] }>(`/api/v1/items?status=${status}&limit=300`)).items ?? [];
+}
+
+// ---- Files (bearer-protected). RN <Image> can attach the auth header via source.headers. ----
+export function fileSource(path: string | null): { uri: string; headers?: Record<string, string> } | undefined {
+  if (!path) return undefined;
+  const uri = `${base}/api/files/${path.split('/').map(encodeURIComponent).join('/')}`;
+  return token ? { uri, headers: { Authorization: `Bearer ${token}` } } : { uri };
+}

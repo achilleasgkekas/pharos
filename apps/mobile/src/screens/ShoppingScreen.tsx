@@ -71,8 +71,6 @@ export function ShoppingScreen() {
 
   return (
     <View style={s.wrap}>
-      <Text style={s.h1}>Shopping list</Text>
-
       <View style={s.addRow}>
         <TextInput
           value={name}
