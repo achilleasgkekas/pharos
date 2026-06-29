@@ -52,6 +52,7 @@ export const el: Partial<Dict> = {
   'common.refresh': 'Ανανέωση',
   'common.confirm': 'Επιβεβαίωση',
   'common.continue': 'Συνέχεια',
+  'common.openInOnedrive': 'Άνοιγμα στο OneDrive',
   'common.skip': 'Παράλειψη',
   'common.loading': 'Φόρτωση…',
   'common.all': 'Όλα',

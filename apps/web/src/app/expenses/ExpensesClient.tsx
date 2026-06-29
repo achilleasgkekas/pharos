@@ -17,6 +17,7 @@ import { shrinkImage } from '@/lib/clientImage';
 import { useRouter } from 'next/navigation';
 import type { SerializedExpense, SerializedCard } from '@/types';
 import { uploadExpense, updateExpense, addExpense, deleteExpense, rescanExpense } from './actions';
+import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 
@@ -456,6 +457,7 @@ function ExpenseDetail({ expense, cards, vendors, categories, seriesCount, onClo
           <button onClick={() => doRescan(false)} disabled={pending} className="px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)]">{t('ex.rescanText')}</button>
           <button onClick={() => doRescan(true)} disabled={pending} className="px-2 py-1 rounded-md bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)]">{t('ex.rescanOcr')}</button>
           {pending && <Loader2 size={13} className="animate-spin" />}
+          <OpenInOneDriveButton filePath={expense.filePath} />
           {seriesCount > 1 && <span className="ml-auto text-[color:var(--color-purple)] flex items-center gap-1"><Repeat size={12} /> {t('ex.inSeries', { n: seriesCount })}</span>}
         </div>
       )}

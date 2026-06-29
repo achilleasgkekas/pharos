@@ -48,6 +48,7 @@ import { OWNED_STATUSES } from '@/lib/itemStatus';
 import { createCard, updateCard, deleteCard, toggleCardActive, scanCard } from './cards';
 import { CreditCard as CreditCardIcon, Wallet, Power, Camera, ScanLine } from 'lucide-react';
 import { shrinkImage } from '@/lib/clientImage';
+import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useT } from '@/components/LocaleProvider';
 
 export type ItemOption = {
@@ -781,6 +782,7 @@ function StatementDetail({
           </span>
         )}
         {rescanMsg && <span className="text-[color:var(--color-text-dim)] normal-case">{rescanMsg}</span>}
+        <OpenInOneDriveButton filePath={current.filePath} />
       </div>
 
       {/* PDF preview */}

@@ -58,6 +58,7 @@ export const en = {
   'common.refresh': 'Refresh',
   'common.confirm': 'Confirm',
   'common.continue': 'Continue',
+  'common.openInOnedrive': 'Open in OneDrive',
   'common.skip': 'Skip',
   'common.loading': 'Loading…',
   'common.all': 'All',

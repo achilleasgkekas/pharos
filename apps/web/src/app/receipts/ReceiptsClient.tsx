@@ -31,6 +31,7 @@ import { useOpenParam } from '@/components/useOpenParam';
 import { Camera } from 'lucide-react';
 import type { SerializedReceipt, SerializedCard } from '@/types';
 import { uploadReceipt, updateReceipt, deleteReceipt, addReceiptItemsToLibrary, rescanReceipt, importEmailInbox, archiveReceipt } from './actions';
+import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { QuickVerify } from './QuickVerify';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueRescanReceipts, getBulkAiGuard } from '@/app/jobActions';
@@ -906,11 +907,14 @@ function ReceiptDetailModal({
           </button>
           {rescanMsg && <span className="text-[10px] text-[color:var(--color-text-dim)] truncate max-w-[200px]">{rescanMsg}</span>}
         </div>
-        {receipt.aiModel && (
-          <span className="text-[10px] text-[color:var(--color-text-faint)] flex items-center gap-1 shrink-0">
-            <Sparkles size={10} /> {t('rc.parsedBy', { model: receipt.aiModel })}
-          </span>
-        )}
+        <div className="flex items-center gap-3 shrink-0">
+          <OpenInOneDriveButton filePath={receipt.filePath} />
+          {receipt.aiModel && (
+            <span className="text-[10px] text-[color:var(--color-text-faint)] flex items-center gap-1">
+              <Sparkles size={10} /> {t('rc.parsedBy', { model: receipt.aiModel })}
+            </span>
+          )}
+        </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Image preview */}

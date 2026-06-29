@@ -55,7 +55,7 @@
 
 ### 7. Storage extensions 🔄
 - ✅ `downloadFromOnedrive` (GET `/content`) + `createShareLink` (`lib/onedrive.ts`). `lib/mirror.ts`: `recacheFromRemote`/`shareLinkFor` (templated-path aware) + `recacheByPath` (reverse-lookup owner doc). **On-demand cache wired** στο `/api/files/[...path]`: local miss + OneDrive backend → pull-back + write local + serve (Session 2026-06-29).
-- ⬜ «Open in OneDrive» UI button (έχει `shareLinkFor` έτοιμο — λείπει το action + κουμπί στα detail modals).
+- ✅ «Open in OneDrive» UI button (Session 2026-06-29): `lib/mirror.ts` `shareLinkByPath` (reverse-lookup owner) + `app/storage-actions.ts` (`onedriveEnabled`/`getOnedriveShareLink`) + **self-gating** `components/OpenInOneDriveButton.tsx` (renders μόνο όταν backend=onedrive — χωρίς prop-drilling) wired στα detail modals Receipts/Statements/Expenses. i18n key `common.openInOnedrive` (en+el).
 - ⬜ Νέοι backends στο storage abstraction: **Amazon S3, Azure Blob, Cloudflare R2** (tenant-selectable drivers).
 
 ---

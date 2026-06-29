@@ -129,3 +129,25 @@ export async function recacheByPath(relativePath: string): Promise<Buffer | null
 
   return null;
 }
+
+/** Reverse-look-up the owning document for a stored file and return an anonymous
+ *  view-only OneDrive link. Counterpart to recacheByPath for the "Open in OneDrive"
+ *  action. Null if no owner / non-OneDrive backend / link creation fails. */
+export async function shareLinkByPath(relativePath: string): Promise<string | null> {
+  const { connectDB } = await import('./db');
+  const { Receipt } = await import('@/models/Receipt');
+  const { Statement } = await import('@/models/Statement');
+  const { Expense } = await import('@/models/Expense');
+  await connectDB();
+
+  const rc = await Receipt.findOne({ filePath: relativePath }).select('store date total').lean();
+  if (rc) return shareLinkFor({ kind: 'receipts', store: rc.store, date: rc.date, total: rc.total, id: rc._id }, relativePath);
+
+  const st = await Statement.findOne({ filePath: relativePath }).select('card statementDate totalAmount').lean();
+  if (st) return shareLinkFor({ kind: 'statements', store: st.card, date: st.statementDate, total: st.totalAmount, id: st._id }, relativePath);
+
+  const ex = await Expense.findOne({ filePath: relativePath }).select('vendor date amount').lean();
+  if (ex) return shareLinkFor({ kind: 'expenses', store: ex.vendor, date: ex.date, total: ex.amount, id: ex._id }, relativePath);
+
+  return null;
+}
