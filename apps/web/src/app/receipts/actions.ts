@@ -334,46 +334,6 @@ export async function rescanReceipt(id: string, useOcr: boolean): Promise<Rescan
   return { ok: true, aiUsed: !!parsed, model, aiError, receipt: JSON.parse(JSON.stringify(receipt)) };
 }
 
-// "Failed" = empty (no items or €0) AND not yet OCR-attempted. Excluding already-OCR'd
-// ones makes the batch loop converge — a receipt that recovers a total/items but keeps
-// an unknown store (small vendor) is NOT re-queued forever.
-const FAILED_FILTER: Record<string, unknown> = {
-  aiModel: { $not: /ocr/i },
-  $or: [{ aiParsedAt: null }, { total: 0 }, { lineItems: { $size: 0 } }],
-};
-
-/** How many receipts are still un-OCR'd + empty (re-scan candidates). */
-export async function countFailedReceipts(): Promise<number> {
-  await connectDB();
-  return Receipt.countDocuments(FAILED_FILTER);
-}
-
-/** Re-scan a BATCH of failed receipts. Capped per call so one click can't run for
- *  10+ minutes and time out — the UI calls it until 0 remain. Returns how many it
- *  recovered + how many candidates are still left. */
-export async function rescanFailedBatch(
-  useOcr = true,
-  limit = 8
-): Promise<{ ok: boolean; recovered: number; processed: number; remaining: number }> {
-  await connectDB();
-  const filter = FAILED_FILTER;
-  const batch = await Receipt.find(filter).limit(limit).select('_id');
-  let recovered = 0;
-  for (const r of batch) {
-    try {
-      const res = await rescanReceipt(String(r._id), useOcr);
-      if (res.aiUsed) recovered++;
-    } catch {
-      // One bad receipt must not abort the batch. Mark it OCR-attempted so the
-      // converging loop doesn't pick it again, then move on.
-      await Receipt.findByIdAndUpdate(r._id, { aiModel: 'ocr-error' }).catch(() => {});
-    }
-  }
-  const remaining = await Receipt.countDocuments(filter);
-  revalidatePath('/receipts');
-  return { ok: true, recovered, processed: batch.length, remaining };
-}
-
 /**
  * Re-scan a batch of receipts by EXPLICIT ids (the client passes the current failed
  * set and loops over chunks — single pass, always terminates, even for receipts
