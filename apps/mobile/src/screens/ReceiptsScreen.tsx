@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Image, Pressable, FlatList, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Image, Pressable, FlatList, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getReceipts, getReceipt, scanReceipt, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
+import { getReceipts, getReceipt, scanReceipt, updateReceipt, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
 
 export function ReceiptsScreen() {
   const [rows, setRows] = useState<ReceiptSummary[]>([]);
@@ -13,6 +13,9 @@ export function ReceiptsScreen() {
   const [err, setErr] = useState<string | null>(null);
   const [detail, setDetail] = useState<ReceiptDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [eStore, setEStore] = useState('');
+  const [eTotal, setETotal] = useState('');
+  const [eVerified, setEVerified] = useState(false);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -21,10 +24,28 @@ export function ReceiptsScreen() {
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
+  // Prefill editable fields whenever a detail opens (tap or after a scan).
+  useEffect(() => {
+    if (detail) { setEStore(detail.store); setETotal(String(detail.total ?? 0)); setEVerified(detail.verified); }
+  }, [detail]);
+
   async function open(id: string) {
     setDetailLoading(true);
     try { setDetail(await getReceipt(id)); } catch (e) { setErr((e as Error).message); }
     finally { setDetailLoading(false); }
+  }
+  async function saveReceipt() {
+    if (!detail) return;
+    const id = detail.id;
+    const t = parseFloat(eTotal.replace(',', '.'));
+    setDetail(null);
+    try { await updateReceipt(id, { store: eStore.trim(), total: Number.isFinite(t) ? t : undefined, verified: eVerified }); await load(); } catch (e) { setErr((e as Error).message); }
+  }
+  async function archiveReceipt() {
+    if (!detail) return;
+    const id = detail.id;
+    setDetail(null);
+    try { await updateReceipt(id, { archived: true }); await load(); } catch (e) { setErr((e as Error).message); }
   }
 
   async function scan() {
@@ -82,7 +103,14 @@ export function ReceiptsScreen() {
             {detailLoading && !detail ? <ActivityIndicator color={C.accent} style={{ margin: 30 }} /> : detail ? (
               <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
                 {fileSource(detail.file) && <Image source={fileSource(detail.file)} style={s.bigImg} resizeMode="contain" />}
-                <View style={s.sumRow}><Text style={s.sumLabel}>Total</Text><Text style={s.sumVal}>{money(detail.total, detail.currency)}</Text></View>
+                <Text style={s.elabel}>STORE</Text>
+                <TextInput value={eStore} onChangeText={setEStore} style={s.einput} placeholderTextColor={C.faint} />
+                <Text style={s.elabel}>TOTAL ({detail.currency})</Text>
+                <TextInput value={eTotal} onChangeText={setETotal} keyboardType="decimal-pad" style={s.einput} placeholderTextColor={C.faint} />
+                <Pressable onPress={() => setEVerified((v) => !v)} style={s.toggle}>
+                  <View style={[s.tbox, eVerified && s.tboxOn]}>{eVerified && <Text style={s.tmark}>✓</Text>}</View>
+                  <Text style={s.tlabel}>Verified</Text>
+                </Pressable>
                 <Text style={s.dim}>{shortDate(detail.date)}{detail.paymentMethod ? `  ·  ${detail.paymentMethod}` : ''}</Text>
                 {detail.lineItems.length > 0 && (
                   <View style={s.lines}>
@@ -94,6 +122,10 @@ export function ReceiptsScreen() {
                     ))}
                   </View>
                 )}
+                <View style={s.mbtns}>
+                  <Pressable onPress={saveReceipt} style={s.save}><Text style={s.saveText}>Save</Text></Pressable>
+                  <Pressable onPress={archiveReceipt} style={s.del}><Text style={s.delText}>Not a receipt</Text></Pressable>
+                </View>
               </ScrollView>
             ) : null}
           </View>
@@ -128,4 +160,16 @@ const s = StyleSheet.create({
   lineRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 6 },
   lineName: { color: C.text, fontSize: 14, flex: 1 },
   linePrice: { color: C.dim, fontSize: 14 },
+  elabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
+  einput: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+  tbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
+  tboxOn: { backgroundColor: C.accent, borderColor: C.accent },
+  tmark: { color: '#000', fontSize: 15, fontWeight: '800' },
+  tlabel: { color: C.text, fontSize: 15 },
+  mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
+  save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
+  saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
+  del: { paddingVertical: 12, paddingHorizontal: 12 },
+  delText: { color: C.gold, fontSize: 15, fontWeight: '600' },
 });

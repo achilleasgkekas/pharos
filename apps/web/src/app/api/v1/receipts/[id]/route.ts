@@ -34,3 +34,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
   });
 }
+
+/** PATCH /api/v1/receipts/:id  { store?, date?, total?, subtotal?, vatAmount?, paymentMethod?, notes?, verified?, archived? } */
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  return withAuth(req, async () => {
+    const { id } = await params;
+    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const set: Record<string, unknown> = {};
+    if (typeof b.store === 'string' && b.store.trim()) set.store = b.store.trim();
+    if (b.date) { const d = new Date(String(b.date)); if (!Number.isNaN(d.getTime())) set.date = d; }
+    for (const k of ['total', 'subtotal', 'vatAmount'] as const) {
+      if (b[k] != null && Number.isFinite(Number(b[k]))) set[k] = Number(b[k]);
+    }
+    if (typeof b.paymentMethod === 'string') set.paymentMethod = b.paymentMethod;
+    if (typeof b.notes === 'string') set.notes = b.notes;
+    if (typeof b.verified === 'boolean') set.verified = b.verified;
+    if (typeof b.archived === 'boolean') set.archived = b.archived;
+    if (!Object.keys(set).length) return apiError('no valid fields');
+    await connectDB();
+    const doc = await Receipt.findByIdAndUpdate(id, { $set: set }, { new: true }).select('-rawAiResponse').lean();
+    if (!doc) return apiError('not found', 404);
+    return NextResponse.json({ ok: true, receipt: trimReceipt(doc as Parameters<typeof trimReceipt>[0]) });
+  });
+}
