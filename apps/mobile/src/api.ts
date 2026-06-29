@@ -281,6 +281,16 @@ export async function getHistory(): Promise<ConversationRow[]> {
   return (await request<{ rows: ConversationRow[] }>('/api/v1/history')).rows ?? [];
 }
 
+export type NotifKind = 'deal' | 'installment' | 'warranty' | 'system';
+export type NotificationRow = { _id: string; kind: NotifKind; title: string; body: string; href: string; read: boolean; createdAt: string };
+export async function getNotifications(): Promise<{ items: NotificationRow[]; unread: number }> {
+  return request<{ items: NotificationRow[]; unread: number }>('/api/v1/notifications');
+}
+/** Mark one notification read (pass id) or all read (omit). */
+export function markNotificationRead(id?: string) {
+  return request<{ ok: boolean }>('/api/v1/notifications', { method: 'PATCH', body: JSON.stringify(id ? { id } : {}) });
+}
+
 // ---- Edits (PATCH) ----
 const patch = (path: string, data: object) => request<{ ok: boolean }>(path, { method: 'PATCH', body: JSON.stringify(data) });
 export const updateExpense = (id: string, data: { vendor?: string; amount?: number; category?: string; kind?: string; date?: string }) => patch(`/api/v1/expenses/${id}`, data);

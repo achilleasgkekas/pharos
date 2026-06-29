@@ -4,12 +4,13 @@ import { C } from '../theme';
 import { shortDate, Spinner, ErrorText, Empty } from '../ui';
 import {
   getTrash, restoreTrash, purgeTrash, currentUser,
-  getJobs, getHistory,
-  type TrashRow, type TrashType, type JobRow, type ConversationRow,
+  getJobs, getHistory, getNotifications, markNotificationRead,
+  type TrashRow, type TrashType, type JobRow, type ConversationRow, type NotificationRow, type NotifKind,
 } from '../api';
 
-type Tab = 'trash' | 'jobs' | 'history';
+type Tab = 'alerts' | 'trash' | 'jobs' | 'history';
 const TABS: { key: Tab; label: string }[] = [
+  { key: 'alerts', label: 'Alerts' },
   { key: 'trash', label: 'Trash' },
   { key: 'jobs', label: 'Jobs' },
   { key: 'history', label: 'History' },
@@ -17,6 +18,9 @@ const TABS: { key: Tab; label: string }[] = [
 
 const TRASH_ICON: Record<TrashType, string> = {
   item: '📦', receipt: '🧾', expense: '💸', subscription: '🔁', voucher: '🎟', task: '✓',
+};
+const NOTIF_ICON: Record<NotifKind, string> = {
+  deal: '🏷', installment: '💳', warranty: '🛡', system: '🔔',
 };
 
 function relTime(iso: string | null | undefined): string {
@@ -31,7 +35,7 @@ function relTime(iso: string | null | undefined): string {
 }
 
 export function ActivityScreen() {
-  const [tab, setTab] = useState<Tab>('trash');
+  const [tab, setTab] = useState<Tab>('alerts');
   return (
     <View style={s.wrap}>
       <View style={s.tabs}>
@@ -41,10 +45,68 @@ export function ActivityScreen() {
           </Pressable>
         ))}
       </View>
+      {tab === 'alerts' && <AlertsTab />}
       {tab === 'trash' && <TrashTab />}
       {tab === 'jobs' && <JobsTab />}
       {tab === 'history' && <HistoryTab />}
     </View>
+  );
+}
+
+// ---- Alerts (in-app notification feed) ----
+function AlertsTab() {
+  const [items, setItems] = useState<NotificationRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setErr(null);
+    try { setItems((await getNotifications()).items); } catch (e) { setErr((e as Error).message); }
+  }, []);
+  useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
+  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+
+  async function readOne(it: NotificationRow) {
+    if (it.read) return;
+    setItems((p) => p.map((x) => (x._id === it._id ? { ...x, read: true } : x)));
+    try { await markNotificationRead(it._id); } catch { await load(); }
+  }
+  async function readAll() {
+    setItems((p) => p.map((x) => ({ ...x, read: true })));
+    try { await markNotificationRead(); } catch { await load(); }
+  }
+
+  const unread = items.filter((i) => !i.read).length;
+  if (loading) return <Spinner />;
+  return (
+    <>
+      <View style={s.alertHead}>
+        <Text style={[s.intro, { flex: 1, paddingRight: 0 }]}>Deals, installments due, and warranties expiring. Tap to mark read.</Text>
+        {unread > 0 && <Pressable onPress={readAll} style={s.markAll}><Text style={s.markAllText}>Mark all ({unread})</Text></Pressable>}
+      </View>
+      <ErrorText>{err}</ErrorText>
+      <FlatList
+        data={items}
+        keyExtractor={(r) => r._id}
+        contentContainerStyle={s.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+        ListEmptyComponent={<Empty>No alerts.</Empty>}
+        renderItem={({ item }) => (
+          <Pressable onPress={() => readOne(item)} style={[s.card, !item.read && s.unreadCard]}>
+            <View style={s.head}>
+              <Text style={s.icon}>{NOTIF_ICON[item.kind]}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.title} numberOfLines={2}>{item.title || item.kind}</Text>
+                {!!item.body && <Text style={s.preview} numberOfLines={3}>{item.body}</Text>}
+                <Text style={s.meta}>{relTime(item.createdAt)}</Text>
+              </View>
+              {!item.read && <View style={s.dot} />}
+            </View>
+          </Pressable>
+        )}
+      />
+    </>
   );
 }
 
@@ -232,8 +294,13 @@ const s = StyleSheet.create({
   tabText: { color: C.dim, fontSize: 13, fontWeight: '600' },
   tabTextOn: { color: C.accent, fontWeight: '700' },
   intro: { color: C.faint, fontSize: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, lineHeight: 17 },
+  alertHead: { flexDirection: 'row', alignItems: 'center', paddingRight: 16 },
+  markAll: { borderWidth: 1, borderColor: C.accent, borderRadius: 9, paddingVertical: 6, paddingHorizontal: 11 },
+  markAllText: { color: C.accent, fontSize: 12, fontWeight: '700' },
   list: { padding: 16, paddingTop: 4 },
   card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
+  unreadCard: { borderColor: '#00d4ff44', backgroundColor: '#00d4ff0a' },
+  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.cyan, marginTop: 4 },
   head: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   icon: { fontSize: 20, marginTop: 1 },
   title: { color: C.text, fontSize: 15, fontWeight: '600' },
