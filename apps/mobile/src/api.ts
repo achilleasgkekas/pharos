@@ -229,3 +229,9 @@ export const deleteItemRecord = (id: string) => del(`/api/v1/items/${id}`);
 export const deleteExpense = (id: string) => del(`/api/v1/expenses/${id}`);
 export const deleteSubscription = (id: string) => del(`/api/v1/subscriptions/${id}`);
 export const deleteVoucher = (id: string) => del(`/api/v1/vouchers/${id}`);
+
+// ---- Edits (PATCH) ----
+const patch = (path: string, data: object) => request<{ ok: boolean }>(path, { method: 'PATCH', body: JSON.stringify(data) });
+export const updateExpense = (id: string, data: { vendor?: string; amount?: number; category?: string; kind?: string; date?: string }) => patch(`/api/v1/expenses/${id}`, data);
+export const updateSubscription = (id: string, data: { name?: string; amount?: number; billingCycle?: string; active?: boolean }) => patch(`/api/v1/subscriptions/${id}`, data);
+export const updateVoucher = (id: string, data: { title?: string; code?: string; store?: string; used?: boolean }) => patch(`/api/v1/vouchers/${id}`, data);

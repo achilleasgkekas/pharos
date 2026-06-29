@@ -93,11 +93,13 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ---
 
 ## Roadmap (priority order)
-1. **Edit existing records** — PATCH + edit forms for tasks (statuses), expenses, subscriptions, vouchers, items. *(biggest gap: add+delete but no edit)*
-2. **Tasks statuses** — todo/in-progress/blocked/done (not just done). ← starting here
-3. **Receipt verify/edit** — edit fields + verify + re-scan.
+1. ✅ **Edit existing records** — tap-to-edit modals for Tasks, Expenses, Income, Subscriptions, Vouchers (PATCH endpoints + forms). *Remaining: Items edit.*
+2. ✅ **Tasks statuses** — todo/in-progress/blocked/done picker + status chips.
+3. **Receipt verify/edit** — edit fields + verify + re-scan. ← next
 4. **AI fill** — subscription-from-name, voucher scan, item URL import.
 5. **Statement transactions** — per-statement detail + installment plans.
 6. **Settings** — theme toggle, language, budgets, notification prefs.
 7. **Activity** — Trash (restore/purge), Jobs, History.
 8. **Push notifications** (needs device).
+
+> Progress: tap any row on Tasks / Expenses / Income / Subscriptions / Vouchers to **edit**; long-press to delete. Items still list+add+delete only.

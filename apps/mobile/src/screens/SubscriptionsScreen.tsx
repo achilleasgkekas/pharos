@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getSubscriptions, addSubscription, deleteSubscription, type Subscription } from '../api';
+import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, type Subscription } from '../api';
 
 export function SubscriptionsScreen() {
   const [rows, setRows] = useState<Subscription[]>([]);
@@ -11,6 +11,10 @@ export function SubscriptionsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Subscription | null>(null);
+  const [eName, setEName] = useState('');
+  const [eAmount, setEAmount] = useState('');
+  const [eActive, setEActive] = useState(true);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -33,6 +37,14 @@ export function SubscriptionsScreen() {
       { text: 'Delete', style: 'destructive', onPress: async () => { setRows((p) => p.filter((x) => x.id !== it.id)); try { await deleteSubscription(it.id); } catch { await load(); } } },
     ]);
   }
+  function openEdit(it: Subscription) { setEditing(it); setEName(it.name); setEAmount(String(it.amount)); setEActive(it.active); }
+  async function saveEdit() {
+    if (!editing) return;
+    const a = parseFloat(eAmount.replace(',', '.'));
+    const id = editing.id;
+    setEditing(null);
+    try { await updateSubscription(id, { name: eName.trim(), amount: Number.isFinite(a) ? a : undefined, active: eActive }); await load(); } catch (e) { setErr((e as Error).message); }
+  }
 
   if (loading) return <Spinner />;
   const active = rows.filter((r) => r.active);
@@ -53,7 +65,7 @@ export function SubscriptionsScreen() {
         ListHeaderComponent={rows.length ? <Text style={s.head}>{active.length} active</Text> : null}
         ListEmptyComponent={<Empty>No subscriptions.</Empty>}
         renderItem={({ item }) => (
-          <Pressable onLongPress={() => remove(item)} style={[s.row, !item.active && s.faded]}>
+          <Pressable onPress={() => openEdit(item)} onLongPress={() => remove(item)} style={[s.row, !item.active && s.faded]}>
             <View style={{ flex: 1 }}>
               <Text style={s.name}>{item.name}</Text>
               <Text style={s.meta}>{[item.billingCycle, item.nextRenewal ? `renews ${shortDate(item.nextRenewal)}` : '', !item.active ? 'cancelled' : ''].filter(Boolean).join('  ·  ')}</Text>
@@ -62,6 +74,26 @@ export function SubscriptionsScreen() {
           </Pressable>
         )}
       />
+
+      <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
+        <Pressable style={s.modalWrap} onPress={() => setEditing(null)}>
+          <Pressable style={s.modal} onPress={() => {}}>
+            <Text style={s.modalTitle}>Edit subscription</Text>
+            <Text style={s.mlabel}>NAME</Text>
+            <TextInput value={eName} onChangeText={setEName} style={s.minput} placeholderTextColor={C.faint} />
+            <Text style={s.mlabel}>AMOUNT</Text>
+            <TextInput value={eAmount} onChangeText={setEAmount} keyboardType="decimal-pad" style={s.minput} placeholderTextColor={C.faint} />
+            <Pressable onPress={() => setEActive((v) => !v)} style={s.toggle}>
+              <View style={[s.tbox, eActive && s.tboxOn]}>{eActive && <Text style={s.tmark}>✓</Text>}</View>
+              <Text style={s.tlabel}>Active</Text>
+            </Pressable>
+            <View style={s.mbtns}>
+              <Pressable onPress={saveEdit} style={s.save}><Text style={s.saveText}>Save</Text></Pressable>
+              <Pressable onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -79,4 +111,19 @@ const s = StyleSheet.create({
   name: { color: C.text, fontSize: 15, fontWeight: '600' },
   meta: { color: C.faint, fontSize: 12, marginTop: 3 },
   amount: { color: C.text, fontSize: 16, fontWeight: '700' },
+  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
+  modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
+  modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
+  mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
+  minput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
+  tbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
+  tboxOn: { backgroundColor: C.accent, borderColor: C.accent },
+  tmark: { color: '#000', fontSize: 15, fontWeight: '800' },
+  tlabel: { color: C.text, fontSize: 15 },
+  mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
+  save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
+  saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
+  delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
+  delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });
