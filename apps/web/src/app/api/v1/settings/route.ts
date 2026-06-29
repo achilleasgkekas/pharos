@@ -1,13 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/apiAuth';
+import { withAuth, apiError } from '@/lib/apiAuth';
 import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
-import { getAppSettings } from '@/lib/appSettings';
+import { AppConfig } from '@/models/AppConfig';
+import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** GET /api/v1/settings → app preferences + this-month budget usage (read-only, for the mobile Settings screen). */
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+
+/** This-month expense total per category (by period when set, else by date). */
+async function spentThisMonth(period: string, monthStart: Date, monthEnd: Date): Promise<Record<string, number>> {
+  const expenses = (await Expense.find({
+    kind: 'expense',
+    $or: [{ period }, { period: '', date: { $gte: monthStart, $lt: monthEnd } }],
+  })
+    .select('category amount')
+    .lean()) as { category?: string; amount?: number }[];
+  const spent: Record<string, number> = {};
+  for (const e of expenses) {
+    const c = e.category || 'other';
+    spent[c] = (spent[c] || 0) + (e.amount || 0);
+  }
+  return spent;
+}
+
+/** GET /api/v1/settings → app preferences + this-month budget usage. */
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
@@ -18,20 +37,7 @@ export async function GET(req: NextRequest) {
     const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-    // This-month expense total per category: by period when set, else by date.
-    const expenses = (await Expense.find({
-      kind: 'expense',
-      $or: [{ period }, { period: '', date: { $gte: monthStart, $lt: monthEnd } }],
-    })
-      .select('category amount')
-      .lean()) as { category?: string; amount?: number }[];
-
-    const spent: Record<string, number> = {};
-    for (const e of expenses) {
-      const c = e.category || 'other';
-      spent[c] = (spent[c] || 0) + (e.amount || 0);
-    }
+    const spent = await spentThisMonth(period, monthStart, monthEnd);
 
     // One row per category that has a budget, ordered most-over-budget first.
     const budgets = Object.entries(budgetMap)
@@ -46,8 +52,48 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       currency: s.currency,
       defaultVatRate: s.defaultVatRate,
+      defaultItemView: s.defaultItemView,
+      defaultWarrantyMonths: s.defaultWarrantyMonths,
+      warrantyAlertDays: s.warrantyAlertDays,
+      autoAddStores: s.autoAddStores,
+      ntfyUrl: s.ntfyUrl,
+      ntfyEnabled: s.ntfyEnabled,
+      expenseCategories: s.expenseCategories,
       period,
       budgets,
     });
+  });
+}
+
+/** PATCH /api/v1/settings → update preferences/defaults, ntfy, and/or budgets.
+ *  Mirrors the (non-admin-gated) web saveDefaults / saveNtfy / saveBudgets actions. */
+export async function PATCH(req: NextRequest) {
+  return withAuth(req, async () => {
+    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const set: Record<string, unknown> = {};
+
+    if (typeof b.currency === 'string' && b.currency.trim()) set.currency = b.currency.trim().toUpperCase().slice(0, 4);
+    if (b.defaultVatRate != null && Number.isFinite(Number(b.defaultVatRate))) set.defaultVatRate = clamp(Number(b.defaultVatRate), 0, 100);
+    if (b.defaultItemView != null) set.defaultItemView = b.defaultItemView === 'list' ? 'list' : 'grid';
+    if (b.defaultWarrantyMonths != null && Number.isFinite(Number(b.defaultWarrantyMonths))) set.defaultWarrantyMonths = clamp(Number(b.defaultWarrantyMonths), 0, 120);
+    if (b.warrantyAlertDays != null && Number.isFinite(Number(b.warrantyAlertDays))) set.warrantyAlertDays = clamp(Number(b.warrantyAlertDays), 0, 730);
+    if (typeof b.autoAddStores === 'boolean') set.autoAddStores = b.autoAddStores;
+    if (typeof b.ntfyUrl === 'string') set.ntfyUrl = b.ntfyUrl.trim();
+    if (typeof b.ntfyEnabled === 'boolean') set.ntfyEnabled = b.ntfyEnabled;
+
+    if (b.budgets && typeof b.budgets === 'object') {
+      const clean: Record<string, number> = {};
+      for (const [k, v] of Object.entries(b.budgets as Record<string, unknown>)) {
+        const n = Number(v);
+        if (k && Number.isFinite(n) && n > 0) clean[k.trim()] = Math.round(n * 100) / 100;
+      }
+      set.budgets = clean;
+    }
+
+    if (!Object.keys(set).length) return apiError('no valid fields');
+    await connectDB();
+    await AppConfig.updateOne({ key: 'singleton' }, { $set: set }, { upsert: true });
+    invalidateAppSettings();
+    return NextResponse.json({ ok: true });
   });
 }

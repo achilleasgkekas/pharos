@@ -206,9 +206,38 @@ export async function getStatementTxns(id: string): Promise<StatementTxn[]> {
 
 // ---- App settings (preferences + this-month budgets) ----
 export type BudgetRow = { category: string; limit: number; spent: number };
-export type AppSettings = { currency: string; defaultVatRate: number; period: string; budgets: BudgetRow[] };
+export type AppSettings = {
+  currency: string;
+  defaultVatRate: number;
+  defaultItemView: 'grid' | 'list';
+  defaultWarrantyMonths: number;
+  warrantyAlertDays: number;
+  autoAddStores: boolean;
+  ntfyUrl: string;
+  ntfyEnabled: boolean;
+  expenseCategories: string[];
+  period: string;
+  budgets: BudgetRow[];
+};
 export async function getSettings(): Promise<AppSettings> {
   return request<AppSettings>('/api/v1/settings');
+}
+export type SettingsPatch = Partial<{
+  currency: string;
+  defaultVatRate: number;
+  defaultItemView: 'grid' | 'list';
+  defaultWarrantyMonths: number;
+  warrantyAlertDays: number;
+  autoAddStores: boolean;
+  ntfyUrl: string;
+  ntfyEnabled: boolean;
+  budgets: Record<string, number>;
+}>;
+export function updateSettings(patch: SettingsPatch) {
+  return request<{ ok: boolean }>('/api/v1/settings', { method: 'PATCH', body: JSON.stringify(patch) });
+}
+export function testNotify() {
+  return request<{ ok: boolean }>('/api/v1/settings/test-notify', { method: 'POST' });
 }
 
 // ---- Reports ----
