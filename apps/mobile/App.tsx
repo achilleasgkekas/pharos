@@ -19,12 +19,13 @@ import { CalendarScreen } from './src/screens/CalendarScreen';
 import { ReportsScreen } from './src/screens/ReportsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { SearchScreen } from './src/screens/SearchScreen';
+import { ActivityScreen } from './src/screens/ActivityScreen';
 
 const TITLES: Record<ScreenKey, string> = {
   home: 'Pharos', assistant: 'AI assistant', shopping: 'Shopping list', receipts: 'Receipts',
   tasks: 'Tasks', expenses: 'Expenses', income: 'Income', subscriptions: 'Subscriptions', items: 'Inventory',
   vouchers: 'Vouchers', statements: 'Statements', calendar: 'Calendar', reports: 'Reports', settings: 'Settings',
-  search: 'Search',
+  search: 'Search', activity: 'Activity',
 };
 
 export default function App() {
@@ -61,6 +62,7 @@ export default function App() {
       case 'reports': return <ReportsScreen />;
       case 'settings': return <SettingsScreen onSignOut={signOut} />;
       case 'search': return <SearchScreen onOpen={setScreen} />;
+      case 'activity': return <ActivityScreen />;
       default: return null;
     }
   }

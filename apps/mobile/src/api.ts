@@ -241,6 +241,19 @@ export const deleteExpense = (id: string) => del(`/api/v1/expenses/${id}`);
 export const deleteSubscription = (id: string) => del(`/api/v1/subscriptions/${id}`);
 export const deleteVoucher = (id: string) => del(`/api/v1/vouchers/${id}`);
 
+// ---- Trash (soft-deleted records: restore / purge) ----
+export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'task';
+export type TrashRow = { type: TrashType; id: string; title: string; subtitle: string; deletedAt: string };
+export async function getTrash(): Promise<TrashRow[]> {
+  return (await request<{ rows: TrashRow[] }>('/api/v1/trash')).rows ?? [];
+}
+export function restoreTrash(type: TrashType, id: string) {
+  return request<{ ok: boolean }>(`/api/v1/trash/${type}/${id}`, { method: 'PATCH' });
+}
+export function purgeTrash(type: TrashType, id: string) {
+  return request<{ ok: boolean }>(`/api/v1/trash/${type}/${id}`, { method: 'DELETE' });
+}
+
 // ---- Edits (PATCH) ----
 const patch = (path: string, data: object) => request<{ ok: boolean }>(path, { method: 'PATCH', body: JSON.stringify(data) });
 export const updateExpense = (id: string, data: { vendor?: string; amount?: number; category?: string; kind?: string; date?: string }) => patch(`/api/v1/expenses/${id}`, data);

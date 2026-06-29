@@ -1046,7 +1046,7 @@ export async function getTrash(): Promise<TrashRow[]> {
     for (const d of docs as unknown as Record<string, unknown>[]) {
       const deletedAt = new Date(d.deletedAt as string);
       if (deletedAt < cutoff) {
-        await purgeFromTrash(type, String(d._id));
+        await purgeTrashEntry(type, String(d._id));
         continue;
       }
       const { title, subtitle } = trashLabel(type, d);
@@ -1066,9 +1066,16 @@ export async function restoreFromTrash(type: TrashType, id: string): Promise<{ o
   return { ok: true };
 }
 
-/** Permanently delete: doc + its binary files + dangling cross-references. */
+/** Permanently delete: doc + its binary files + dangling cross-references.
+ *  Admin-guarded entry point for server actions. */
 export async function purgeFromTrash(type: TrashType, id: string): Promise<{ ok: boolean }> {
   await requireAdmin();
+  return purgeTrashEntry(type, id);
+}
+
+/** Core purge logic WITHOUT an auth guard. Callers (server action or bearer API
+ *  route) must authorize first; the API route enforces admin via the bearer user. */
+export async function purgeTrashEntry(type: TrashType, id: string): Promise<{ ok: boolean }> {
   const Model = TRASH_MODELS[type];
   if (!Model) return { ok: false };
   await connectDB();
@@ -1108,7 +1115,7 @@ export async function emptyTrash(): Promise<{ ok: boolean; purged: number }> {
   for (const [type, Model] of Object.entries(TRASH_MODELS) as [TrashType, typeof Item][]) {
     const docs = await Model.find({ deletedAt: { $ne: null } }).setOptions({ withDeleted: true }).select('_id').lean();
     for (const d of docs as unknown as { _id: unknown }[]) {
-      await purgeFromTrash(type, String(d._id));
+      await purgeTrashEntry(type, String(d._id));
       purged++;
     }
   }

@@ -49,6 +49,7 @@ export function Drawer({
               </View>
             ))}
             <View style={{ marginTop: 14 }}>
+              <Item k="activity" label="🗑 Trash" />
               <Item k="settings" label="Settings" />
             </View>
           </ScrollView>
