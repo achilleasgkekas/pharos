@@ -254,6 +254,33 @@ export function purgeTrash(type: TrashType, id: string) {
   return request<{ ok: boolean }>(`/api/v1/trash/${type}/${id}`, { method: 'DELETE' });
 }
 
+// ---- Activity: background AI jobs (read-only) ----
+export type JobRow = {
+  _id: string;
+  kind: string;
+  title: string;
+  status: 'running' | 'done' | 'error';
+  total: number;
+  done: number;
+  ok: number;
+  current: string;
+  lastLabel: string;
+  lastDetail: string;
+  error: string;
+  createdAt: string;
+  finishedAt: string | null;
+};
+export async function getJobs(): Promise<JobRow[]> {
+  return (await request<{ rows: JobRow[] }>('/api/v1/jobs')).rows ?? [];
+}
+
+// ---- Activity: saved AI conversations (read-only) ----
+export type ConversationMsg = { role: 'user' | 'assistant'; content: string; actions?: { name: string; summary: string }[] };
+export type ConversationRow = { id: string; title: string; turns: number; updatedAt: string; preview: string; messages: ConversationMsg[] };
+export async function getHistory(): Promise<ConversationRow[]> {
+  return (await request<{ rows: ConversationRow[] }>('/api/v1/history')).rows ?? [];
+}
+
 // ---- Edits (PATCH) ----
 const patch = (path: string, data: object) => request<{ ok: boolean }>(path, { method: 'PATCH', body: JSON.stringify(data) });
 export const updateExpense = (id: string, data: { vendor?: string; amount?: number; category?: string; kind?: string; date?: string }) => patch(`/api/v1/expenses/${id}`, data);
