@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, type Subscription } from '../api';
+import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription } from '../api';
 
 export function SubscriptionsScreen() {
   const [rows, setRows] = useState<Subscription[]>([]);
@@ -22,6 +22,15 @@ export function SubscriptionsScreen() {
   }, []);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+
+  const [aiBusy, setAiBusy] = useState(false);
+  async function aiFill() {
+    const n = name.trim();
+    if (!n) return;
+    setAiBusy(true); setErr(null);
+    try { const d = await suggestSub(n); if (d.amount != null) setAmount(String(d.amount)); } catch (e) { setErr((e as Error).message); }
+    finally { setAiBusy(false); }
+  }
 
   async function add() {
     const n = name.trim();
@@ -54,6 +63,9 @@ export function SubscriptionsScreen() {
       <View style={s.addRow}>
         <TextInput value={name} onChangeText={setName} placeholder="name" placeholderTextColor={C.faint} style={[s.input, { flex: 2 }]} />
         <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="€/mo" placeholderTextColor={C.faint} style={[s.input, { flex: 1 }]} />
+        <Pressable onPress={aiFill} disabled={!name.trim() || aiBusy} style={[s.aiBtn, (!name.trim() || aiBusy) && s.dim]}>
+          {aiBusy ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.aiText}>✦</Text>}
+        </Pressable>
         <Pressable onPress={add} disabled={!name.trim() || !amount.trim()} style={[s.addBtn, (!name.trim() || !amount.trim()) && s.dim]}><Text style={s.addBtnText}>＋</Text></Pressable>
       </View>
       <ErrorText>{err}</ErrorText>
@@ -104,6 +116,8 @@ const s = StyleSheet.create({
   input: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: C.text, fontSize: 15 },
   addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   addBtnText: { color: '#000', fontSize: 24, fontWeight: '700' },
+  aiBtn: { width: 40, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
+  aiText: { color: C.cyan, fontSize: 18, fontWeight: '700' },
   dim: { opacity: 0.4 },
   head: { color: C.faint, fontSize: 11, letterSpacing: 1, marginBottom: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },

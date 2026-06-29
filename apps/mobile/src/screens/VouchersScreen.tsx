@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getVouchers, addVoucher, deleteVoucher, updateVoucher, type Voucher } from '../api';
+import { getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, type Voucher } from '../api';
 
 export function VouchersScreen() {
   const [rows, setRows] = useState<Voucher[]>([]);
@@ -22,6 +22,22 @@ export function VouchersScreen() {
   }, []);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+
+  const [showScan, setShowScan] = useState(false);
+  const [scanText, setScanText] = useState('');
+  const [scanBusy, setScanBusy] = useState(false);
+  async function doScan() {
+    const txt = scanText.trim();
+    if (!txt) return;
+    setScanBusy(true); setErr(null);
+    try {
+      const d = await scanVoucherText(txt);
+      if (d.title) setTitle(d.title);
+      if (d.code) setCode(d.code);
+      setShowScan(false); setScanText('');
+    } catch (e) { setErr((e as Error).message); }
+    finally { setScanBusy(false); }
+  }
 
   async function add() {
     const t = title.trim();
@@ -51,6 +67,7 @@ export function VouchersScreen() {
       <View style={s.addRow}>
         <TextInput value={title} onChangeText={setTitle} placeholder="title" placeholderTextColor={C.faint} style={[s.input, { flex: 2 }]} />
         <TextInput value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="code" placeholderTextColor={C.faint} style={[s.input, { flex: 1 }]} />
+        <Pressable onPress={() => setShowScan(true)} style={s.aiBtn}><Text style={s.aiText}>✦</Text></Pressable>
         <Pressable onPress={add} disabled={!title.trim()} style={[s.addBtn, !title.trim() && s.dim]}><Text style={s.addBtnText}>＋</Text></Pressable>
       </View>
       <ErrorText>{err}</ErrorText>
@@ -91,6 +108,22 @@ export function VouchersScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal visible={showScan} transparent animationType="fade" onRequestClose={() => setShowScan(false)}>
+        <Pressable style={s.modalWrap} onPress={() => setShowScan(false)}>
+          <Pressable style={s.modal} onPress={() => {}}>
+            <Text style={s.modalTitle}>✦ Scan a voucher</Text>
+            <Text style={s.mlabel}>PASTE THE COUPON TEXT</Text>
+            <TextInput value={scanText} onChangeText={setScanText} multiline placeholder="e.g. 15% off at Skroutz, code SAVE15, until 31/12" placeholderTextColor={C.faint} style={[s.minput, { minHeight: 90, textAlignVertical: 'top' }]} />
+            <View style={s.mbtns}>
+              <Pressable onPress={doScan} disabled={!scanText.trim() || scanBusy} style={[s.save, (!scanText.trim() || scanBusy) && s.dim]}>
+                {scanBusy ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>Fill</Text>}
+              </Pressable>
+              <Pressable onPress={() => setShowScan(false)} style={s.delBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -101,6 +134,9 @@ const s = StyleSheet.create({
   input: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: C.text, fontSize: 15 },
   addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   addBtnText: { color: '#000', fontSize: 24, fontWeight: '700' },
+  aiBtn: { width: 40, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
+  aiText: { color: C.cyan, fontSize: 18, fontWeight: '700' },
+  cancelText: { color: C.dim, fontSize: 15 },
   dim: { opacity: 0.4 },
   card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   faded: { opacity: 0.55 },
