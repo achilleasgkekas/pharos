@@ -6,4 +6,7 @@ export const DEFAULT_API_BASE = 'http://10.0.1.156:3000';
 export const STORE_KEYS = {
   token: 'pharos_token',
   base: 'pharos_base',
+  user: 'pharos_user',
 } as const;
+
+export const APP_VERSION = '1.0.0';

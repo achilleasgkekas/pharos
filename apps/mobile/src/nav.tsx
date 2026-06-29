@@ -6,7 +6,7 @@ import type { ScreenKey } from './screens/HomeScreen';
 const GROUPS: { title: string; items: { key: ScreenKey; label: string }[] }[] = [
   { title: 'Stuff', items: [{ key: 'shopping', label: 'Shopping list' }, { key: 'items', label: 'Inventory' }] },
   { title: 'Money', items: [{ key: 'receipts', label: 'Receipts' }, { key: 'expenses', label: 'Expenses' }, { key: 'income', label: 'Income' }, { key: 'subscriptions', label: 'Subscriptions' }, { key: 'vouchers', label: 'Vouchers' }, { key: 'statements', label: 'Statements' }] },
-  { title: 'Plan', items: [{ key: 'tasks', label: 'Tasks' }] },
+  { title: 'Plan', items: [{ key: 'tasks', label: 'Tasks' }, { key: 'calendar', label: 'Calendar' }, { key: 'reports', label: 'Reports' }] },
 ];
 
 export function AppBar({ title, onMenu }: { title: string; onMenu: () => void }) {
@@ -46,6 +46,9 @@ export function Drawer({
                 {g.items.map((it) => <Item key={it.key} k={it.key} label={it.label} />)}
               </View>
             ))}
+            <View style={{ marginTop: 14 }}>
+              <Item k="settings" label="Settings" />
+            </View>
           </ScrollView>
           <Pressable onPress={onSignOut} style={s.signout}><Text style={s.signoutText}>Sign out</Text></Pressable>
         </Pressable>

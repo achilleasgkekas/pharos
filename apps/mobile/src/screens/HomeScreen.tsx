@@ -4,7 +4,7 @@ import { C } from '../theme';
 import { money, Spinner, ErrorText } from '../ui';
 import { getOverview, type Overview } from '../api';
 
-export type ScreenKey = 'home' | 'shopping' | 'receipts' | 'tasks' | 'expenses' | 'income' | 'subscriptions' | 'items' | 'assistant' | 'vouchers' | 'statements';
+export type ScreenKey = 'home' | 'shopping' | 'receipts' | 'tasks' | 'expenses' | 'income' | 'subscriptions' | 'items' | 'assistant' | 'vouchers' | 'statements' | 'calendar' | 'reports' | 'settings';
 
 type Tile = { key: ScreenKey; label: string; count?: (o: Overview) => number; color: string };
 const TILES: Tile[] = [
@@ -18,6 +18,8 @@ const TILES: Tile[] = [
   { key: 'subscriptions', label: 'Subscriptions', count: (o) => o.counts.subscriptions, color: C.cyan },
   { key: 'vouchers', label: 'Vouchers', color: C.gold },
   { key: 'statements', label: 'Statements', color: C.purple },
+  { key: 'calendar', label: 'Calendar', color: C.cyan },
+  { key: 'reports', label: 'Reports', color: C.accent },
 ];
 
 export function HomeScreen({ onOpen }: { onOpen: (k: ScreenKey) => void }) {

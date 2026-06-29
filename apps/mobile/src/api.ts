@@ -16,28 +16,35 @@ export type ScannedProduct = { name: string; brand: string; category: string; qu
 // ---- Session (base URL + bearer token), persisted in SecureStore ----
 let base = DEFAULT_API_BASE;
 let token: string | null = null;
+let user: SessionUser | null = null;
 
 export function currentBase() { return base; }
+export function currentUser() { return user; }
 
 /** Load a saved session on app start. Returns true if a token is present. */
 export async function loadSession(): Promise<boolean> {
-  const [b, t] = await Promise.all([
+  const [b, t, u] = await Promise.all([
     SecureStore.getItemAsync(STORE_KEYS.base),
     SecureStore.getItemAsync(STORE_KEYS.token),
+    SecureStore.getItemAsync(STORE_KEYS.user),
   ]);
   if (b) base = b;
   token = t;
+  if (u) { try { user = JSON.parse(u) as SessionUser; } catch { /* ignore */ } }
   return !!token;
 }
 
 async function persist() {
   await SecureStore.setItemAsync(STORE_KEYS.base, base);
   if (token) await SecureStore.setItemAsync(STORE_KEYS.token, token);
+  if (user) await SecureStore.setItemAsync(STORE_KEYS.user, JSON.stringify(user));
 }
 
 export async function logout() {
   token = null;
+  user = null;
   await SecureStore.deleteItemAsync(STORE_KEYS.token);
+  await SecureStore.deleteItemAsync(STORE_KEYS.user);
 }
 
 function normBase(url: string) {
@@ -67,6 +74,7 @@ export async function login(serverUrl: string, username: string, password: strin
     body: JSON.stringify({ username, password }),
   });
   token = r.token;
+  user = r.user;
   await persist();
   return r.user;
 }
@@ -180,4 +188,20 @@ export async function getVouchers(): Promise<Voucher[]> {
 export type Statement = { id: string; card: string; last4: string; period: string; statementDate: string | null; dueDate: string | null; totalAmount: number; minimumPayment: number; paidAmount: number; currency: string; txnCount: number };
 export async function getStatements(): Promise<Statement[]> {
   return (await request<{ data: Statement[] }>('/api/v1/statements?limit=100')).data ?? [];
+}
+
+// ---- Reports ----
+export type Reports = {
+  currency: string;
+  thisMonth: { income: number; expense: number; net: number };
+  thisYear: { income: number; expense: number; net: number };
+  byCategory: { category: string; total: number }[];
+  monthly: { period: string; expense: number; income: number }[];
+};
+export function getReports() { return request<Reports>('/api/v1/reports'); }
+
+// ---- Calendar ----
+export type CalEvent = { date: string; kind: 'renewal' | 'voucher' | 'warranty'; label: string; amount?: number };
+export async function getCalendar(): Promise<{ currency: string; events: CalEvent[] }> {
+  return request<{ currency: string; days: number; events: CalEvent[] }>('/api/v1/calendar');
 }
