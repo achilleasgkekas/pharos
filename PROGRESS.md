@@ -12,8 +12,8 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
 
 ## Κατάσταση
 - Mobile companion app (`apps/mobile`, Expo SDK 54) σε build-out προς parity. Web REST API v1 κάτω από `apps/web/src/app/api/v1/` (bearer auth).
-- MOBILE_PARITY roadmap: #1 edit ✅, #2 task statuses ✅, #3 receipt verify/edit ✅, #4 AI fill ✅, #5 statement detail ✅.
-- Ανοιχτά: #6 mobile Settings (theme/budgets/notifications), #7 Activity (Trash/Jobs/History), #8 push notifications.
+- MOBILE_PARITY roadmap: #1 edit ✅, #2 task statuses ✅, #3 receipt verify/edit ✅, #4 AI fill ✅, #5 statement detail ✅, #6 mobile Settings ✅.
+- Ανοιχτά: #7 Activity (Trash/Jobs/History), #8 push notifications.
 
 ## 2026-06-29 (seed)
 - Τι: στήθηκε αυτό το log + το daily scheduled task `pharos-daily-dev`. Ολοκληρώθηκε το roadmap **#4 (AI fill)**: 3 νέα endpoints (`/api/v1/ai/subscription`, `/api/v1/scan/voucher`, `/api/v1/items/import`) + mobile UI (✦ buttons σε Subscriptions / Vouchers / Items add rows).
@@ -26,3 +26,8 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
 - ⚠ **Infra incident (διορθώθηκε):** η mongo OOM-crash-loop-άρισε (42 restarts, `oom=true`) γιατί (α) ~5 builds μάζεψαν **21GB build cache** (δίσκος 84%) και (β) έτρεχε το flaresolverr σε στενό 1.9GB RAM VM. Fix: `docker compose stop flaresolverr` + `docker builder prune -f` (έπεσε 21.7GB→0.5GB cache) → mongo healthy, web up.
 - **Needs Achilleas:** σκέψου να ανεβάσεις το Docker Desktop → Resources → **RAM** (π.χ. 4GB) ώστε το mongo+web+flaresolverr να μη χτυπάνε OOM. Το flaresolverr το άφησα ΣΒΗΣΤΟ· ξανάνοιξέ το με `docker compose --profile scraper up -d flaresolverr` αν το χρειάζεσαι.
 - Επόμενο task: **#6 — mobile Settings** (theme/currency, budgets view, notification toggles). Διάβασε `apps/web/src/app/settings/` + `getAppSettings`· πιθανό νέο read endpoint `GET /api/v1/settings`. ΘΥΜΗΣΟΥ `docker builder prune -f` μετά το build.
+
+## 2026-06-29 (cont.² — #6)
+- Τι: **#6 ✅** — `GET /api/v1/settings` (currency, defaultVatRate, period, budgets[] με this-month spent/limit per category, most-over πρώτα) + mobile `SettingsScreen`: νέα **PREFERENCES** (currency, VAT) + **BUDGETS · THIS MONTH** (per-category progress bars, κόκκινο όταν over· εμφανίζεται μόνο αν υπάρχουν budgets). Commit `d92b538`.
+- Verify: build χρειάστηκε 2η προσπάθεια (1η: transient Docker buildkit "rpc EOF" → είχε σηκώσει το παλιό image → settings 404· retry IMG BUILD=0). Τελικά no-token→401, με token → `currency=EUR · VAT=24% · 0 budgets` (ο χρήστης δεν έχει ορίσει budgets ακόμα· το section εμφανίζεται μόλις οριστούν στο web Settings → Money → Budgets). web restarts=0, mongo healthy, oom=false, cache pruned.
+- Επόμενο task: **#7 — Activity (Trash / Jobs / History) στο mobile.** Web πηγές: `/trash`, `/jobs`, `/history` (+ τα actions τους). Πρόσθεσε read endpoints (π.χ. `GET /api/v1/trash`, `GET /api/v1/jobs`) + restore/purge όπου ασφαλές· mobile screen με tabs. ΘΥΜΗΣΟΥ `docker builder prune -f` μετά το build + κράτα flaresolverr σβηστό.
