@@ -392,7 +392,7 @@ function SubCard({ sub, onEdit }: { sub: SerializedSubscription; onEdit: () => v
         <button
           onClick={onEdit}
           className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors"
-          aria-label="Edit"
+          aria-label={t('common.edit')}
         >
           <Pencil size={13} />
         </button>
@@ -415,7 +415,7 @@ function SubCard({ sub, onEdit }: { sub: SerializedSubscription; onEdit: () => v
             target="_blank"
             rel="noopener noreferrer"
             className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-cyan)] hover:bg-[color:var(--color-surface-2)] transition-colors"
-            aria-label="Open"
+            aria-label={t('common.open')}
           >
             <ExternalLink size={13} />
           </a>
@@ -424,7 +424,7 @@ function SubCard({ sub, onEdit }: { sub: SerializedSubscription; onEdit: () => v
           onClick={handleDelete}
           disabled={pending}
           className="ml-auto p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] hover:bg-[color:var(--color-surface-2)] transition-colors opacity-0 group-hover:opacity-100"
-          aria-label="Delete"
+          aria-label={t('common.delete')}
         >
           <Trash2 size={13} />
         </button>

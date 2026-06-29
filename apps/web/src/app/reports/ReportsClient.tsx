@@ -361,7 +361,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
       </div>
 
       {/* Installment payoff — full width */}
-      <Card title="Installment payoff" className="mt-4">
+      <Card title={t('reports.payoffTitle')} className="mt-4">
         {data.installmentPlans.length === 0 ? (
           <Empty />
         ) : (

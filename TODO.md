@@ -8,27 +8,28 @@
 
 ## NOW — τελείωμα προϊόντος (πριν οτιδήποτε product/SaaS)
 
-### 1. i18n — ολοκλήρωση μετάφρασης (8 γλώσσες) 🔄
-Έτοιμα ✅: navbar, AI command bar, homepage, language switcher, Jobs, Trash, AI history, Reports, Calendar (shell), Vouchers, Subscriptions, Tasks, Expenses/Income (πλήρες), Statements (shell), Items (shell).
-Απομένουν ⬜:
-- **Items — υπόλοιπο** (`app/items/ItemsClient.tsx`): `ItemRow`, `ItemCard` (status badges μέσω `IT_STATUS_KEY`, best price / deal / warranty κείμενα), `ItemDetailModal`, `ItemForm` (πεδία/placeholders), `UrlImport` (import-from-URL UI + μηνύματα), `Field`. + `components/PricePanel.tsx` (Best now / Lowest ever / target / verdict / log-a-price / where-to-buy / full-history).
-- **Receipts** (`app/receipts/ReceiptsClient.tsx`): όλο — dropzone, status filters, store filter, sort, grid/list κάρτες (`ReceiptRow`), detail modal (line-item editor net/VAT/gross, re-scan OCR/text bar, store SearchableSelect, warranty/payment, «Not a receipt»/archive), DuplicatesModal, QuickVerify (`receipts/QuickVerify.tsx`), import-email button, bulk re-scan.
-- **Settings** (`app/settings/SettingsClient.tsx` + sub-components) — το μεγαλύτερο: tabs (General/Appearance/Defaults/About, Money/Budgets/Cards, AI/engine/providers/prompts/scraper, Storage&backup/Trash/CSV, Stores&lists, Notifications/ntfy, Users, MCP/token). Πολλά labels/placeholders/help-texts.
-- **Statements — modals** (`app/statements/StatementsClient.tsx`): `StatementDetail`, `TransactionList`, `TransactionRow`, `InstallmentEditor`, `InstallmentLink`, `PlanCardLinkable`, `PlanMergeControl` (merge into…/unmerge), `AddTransactionForm`, `StatementForm`, `CardsManager`, `CardForm`.
-- **Calendar — server subs** (`app/calendar/page.tsx`): τα `push({sub})` («renews · {cycle}», «warranty expires», «expected · {cycle}», «{n} active plan(s)», label fallbacks) — θέλει thread του `getServerT()` στο helper που χτίζει τα months.
-- **Login / Setup wizard** (chrome-less σελίδες) — έλεγχος αν είναι μεταφρασμένες· μάλλον ακόμα EN.
-- **Deferred σε English-fallback (revisit pass):** enum labels (item categories `CATEGORY_LABELS`, subscription categories, task priorities `PRIORITIES`), transient AI-scan toasts (Reading…/Filled ✓), ονόματα μηνών σε ημερομηνίες (`periodLabel`, date formatting), 1-2 deep-editor placeholders.
-- **Έλεγχος:** μετά το τέλος, sweep για εναπομείναντα hardcoded αγγλικά (grep) + live verify Ελληνικά σε κάθε σελίδα.
+### 1. i18n — ολοκλήρωση μετάφρασης (8 γλώσσες) ✅ (Session 2026-06-29)
+Όλα τα user-facing strings wired σε `t()`. Keys σε **en + el** (τα άλλα 6 locales πέφτουν αυτόματα σε English μέσω του layered `resolveDict`). `tsc` καθαρό, sweep μηδέν εναπομείναντα hardcoded attributes.
+Έγιναν αυτό το session:
+- **Items** (`ItemsClient.tsx`): no-results, URL-import hints, «matches existing», price-trend tooltip, «now», «Purchase & payment». + **PricePanel** target tooltip (verdict labels ήταν ήδη μέσω `VERDICT_KEY`). + **ItemPhotoGallery** (πρόσθεσε `useT`: search-photos / set-cover / delete-photo titles).
+- **Receipts** (`ReceiptsClient.tsx`): upload/import status, empty states, receipt/receipts, confirm dialog, line-item editor (Items(n)/add/no-line-items), 4 status tooltips (`rc.tip*`).
+- **Settings** (`SettingsClient.tsx`): Notifications section + channels (`ChannelCard` πήρε `useT`), aria-labels, buttons, «Saved ✓», status words (Preparing…/Checking…/Nothing to sync.).
+- **Statements** (`StatementsClient.tsx`): modal titles + product fallback.
+- **Tasks** (`TasksClient.tsx`): TaskCard/TaskRow πήραν `useT` — Delete title/aria, add-step + notes placeholders.
+- **Subscriptions** (`SubscriptionsClient.tsx`): Edit/Open/Delete aria-labels.
+- **Reports** (`ReportsClient.tsx`): «Installment payoff» card title. **AiCommandBar**: Send aria-label.
+- **Calendar** (`calendar/page.tsx`): server-side `getServerT()` → renewals/installments/recurring/warranty/voucher sub+label strings + **localized month names**. (CalendarClient αμετάβλητο — η μετάφραση γίνεται server-side.)
+- Login/Setup wizard: επιβεβαιώθηκε ότι ήταν ήδη μεταφρασμένα.
+**Σκόπιμα deferred (English-fallback, χαμηλή αξία):** σύνθετα OneDrive sync-progress diagnostic toasts, weekday abbrevs (Mon/Tue) + short-date formatting στο calendar grid, brand labels (Mastercard/Visa) + config-example placeholders (Bot token/Chat id/Webhook URL), enum labels (`CATEGORY_LABELS`/`PRIORITIES`).
 
-### 2. AI-search-open redesign ⬜
-- Επιλογή concept: 🗼 Beacon Sweep / ⌘ Glass Console / 🌌 Aurora Veil / 🚀 Warp Dock / υβρίδιο.
-- Υλοποίηση στο `components/AiCommandBar.tsx` (το τωρινό spotlight δεν αρέσει).
+### 2. AI-search-open redesign ✅ (Session 2026-06-29 — 🗼 Beacon Sweep)
+- Concept: **🗼 Beacon Sweep** (on-brand με το lighthouse mark· ο χρήστης το διάλεξε).
+- Υλοποίηση στο `components/AiCommandBar.tsx`: όταν ανοίγει το AI mode (`spotlight = isAi && open`) → backdrop dim (χωρίς blur, η σελίδα μένει ζωντανή) + **rotating lighthouse beam** (conic-gradient στην παλέτα accent→cyan→purple, masked σε soft halo, `pharos-beam-spin` 7s) πίσω από το floating bar + **beacon-pulse ring** στο AI (Sparkles) toggle (`pharos-beacon-pulse`). Keyframes στο `globals.css`. tsc καθαρό.
 
-### 3. In-app notification center ⬜ (task #17)
-- `models/Notification.ts` (per-user/tenant, type, read, payload).
-- Bell icon στο navbar + unread count + dropdown.
-- Triggers: job completion + `runAlertChecks` (deals/installments/warranties).
-- ΣΗΜ: το ROADMAP §G το γενικεύει σε pluggable notifier (ntfy/Discord/Telegram/Slack/email/webhook) — χτίσε το ως framework, όχι μόνο in-app.
+### 3. In-app notification center + pluggable outbound notifier ✅ (Session 2026-06-29)
+- ✅ `models/Notification.ts` + bell στο navbar (`NotificationBell`) + unread count/dropdown + `notifications/actions.ts` (generate/get/mark-read/dismiss/clear).
+- ✅ **Pluggable outbound framework** (ROADMAP §G): `lib/notifiers.ts` (server senders) + `lib/notifiers.shared.ts` (client-safe types/metadata). Channels: **ntfy / Discord / Slack / Telegram / webhook** (όλα plain HTTP POST· email μέσω generic webhook → Zapier/n8n). Array σε `AppConfig.notifiers`· legacy `ntfyUrl`/`ntfyEnabled` migrate-άρονται on-read + κρατιούνται in-sync με το πρώτο ntfy channel.
+- ✅ `runAlertChecks` → `dispatchAlert()` (fan-out σε όλα τα enabled channels, never-throws, Promise.allSettled). Settings → Notifications: `NotificationsManager`/`ChannelCard` (add/remove/per-channel test/enable + «Check & notify now»). i18n-wired. tsc καθαρό.
 
 ---
 

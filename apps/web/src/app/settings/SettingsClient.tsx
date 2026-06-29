@@ -12,7 +12,8 @@ import { PROVIDER_RECOMMEND, SCRAPER_RECOMMEND, type FetchedModel } from '@/lib/
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
-import { saveDefaults, saveNtfy, sendTestNtfy, runAlertChecks, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow } from './actions';
+import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, testNotifierChannel, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow } from './actions';
+import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
 import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, changeOwnPassword, type UserRow } from './users.actions';
 import { McpManager } from './McpManager';
@@ -258,7 +259,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          {tab === 'notifications' && <NotificationsManager settings={info.settings} />}
+          {tab === 'notifications' && <NotificationsManager />}
 
           {tab === 'users' && isAdmin && <UsersManager currentUserId={currentUser.id} />}
         </div>
@@ -1597,63 +1598,181 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   );
 }
 
-function NotificationsManager({ settings }: { settings: AppSettings }) {
-  const [pending, startTransition] = useTransition();
-  const [url, setUrl] = useState(settings.ntfyUrl);
-  const [enabled, setEnabled] = useState(settings.ntfyEnabled);
-  const [msg, setMsg] = useState<string | null>(null);
+function newChannel(type: NotifierType): NotifierConfig {
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `n${Date.now()}`;
+  return { id, type, enabled: true, label: '', url: '', token: '', target: '' };
+}
 
-  function persist() {
-    const fd = new FormData();
-    fd.set('ntfyUrl', url);
-    fd.set('ntfyEnabled', String(enabled));
-    return saveNtfy(fd);
+function ChannelCard({
+  ch,
+  onChange,
+  onRemove,
+  onTest,
+  testing,
+  testMsg,
+}: {
+  ch: NotifierConfig;
+  onChange: (c: NotifierConfig) => void;
+  onRemove: () => void;
+  onTest: () => void;
+  testing: boolean;
+  testMsg?: string;
+}) {
+  const t = useT();
+  const meta = NOTIFIER_TYPES.find((nt) => nt.type === ch.type)!;
+  const set = (patch: Partial<NotifierConfig>) => onChange({ ...ch, ...patch });
+  return (
+    <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3 space-y-2.5">
+      <div className="flex items-center gap-2">
+        <select
+          value={ch.type}
+          onChange={(e) => set({ type: e.target.value as NotifierType })}
+          className={cn(inputClass, 'w-auto')}
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          {NOTIFIER_TYPES.map((nt) => (
+            <option key={nt.type} value={nt.type}>{nt.label}</option>
+          ))}
+        </select>
+        <input
+          value={ch.label || ''}
+          onChange={(e) => set({ label: e.target.value })}
+          placeholder={t('set.chLabelOptional')}
+          className={cn(inputClass, 'flex-1')}
+        />
+        <Switch checked={ch.enabled} onChange={(v) => set({ enabled: v })} />
+        <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label="Remove channel">
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      {meta.needs.includes('url') && (
+        <input
+          value={ch.url || ''}
+          onChange={(e) => set({ url: e.target.value })}
+          placeholder={ch.type === 'ntfy' ? 'https://ntfy.sh/your-topic' : 'Webhook URL'}
+          className={inputClass}
+          style={{ fontFamily: 'var(--font-mono)' }}
+        />
+      )}
+      {meta.needs.includes('token') && (
+        <input
+          value={ch.token || ''}
+          onChange={(e) => set({ token: e.target.value })}
+          placeholder="Bot token (123456:ABC-…)"
+          className={inputClass}
+          style={{ fontFamily: 'var(--font-mono)' }}
+        />
+      )}
+      {meta.needs.includes('target') && (
+        <input
+          value={ch.target || ''}
+          onChange={(e) => set({ target: e.target.value })}
+          placeholder="Chat id (e.g. 123456789)"
+          className={inputClass}
+          style={{ fontFamily: 'var(--font-mono)' }}
+        />
+      )}
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] text-[color:var(--color-text-faint)]">{meta.hint}</span>
+        <button type="button" onClick={onTest} disabled={testing} className={cn(ghostBtn, 'text-[color:var(--color-cyan)] py-1.5')}>
+          {testing ? <Loader2 size={12} className="animate-spin" /> : <Bell size={12} />} Test
+        </button>
+      </div>
+      {testMsg && (
+        <p className={cn('text-[11px]', testMsg.startsWith('Failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+          {testMsg}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function NotificationsManager() {
+  const [pending, startTransition] = useTransition();
+  const [channels, setChannels] = useState<NotifierConfig[] | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [testing, setTesting] = useState<string>('');
+  const [testMsgs, setTestMsgs] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    startTransition(async () => setChannels(await getNotifierChannels()));
+  }, []);
+
+  function update(id: string, c: NotifierConfig) {
+    setChannels((p) => (p ?? []).map((x) => (x.id === id ? c : x)));
+  }
+  function add() {
+    setChannels((p) => [...(p ?? []), newChannel('ntfy')]);
+  }
+  function remove(id: string) {
+    setChannels((p) => (p ?? []).filter((x) => x.id !== id));
   }
   function save() {
-    setMsg(null);
+    setMsg('Saving…');
     startTransition(async () => {
-      await persist();
+      await saveNotifierChannels(channels ?? []);
       setMsg('Saved ✓');
     });
   }
-  function test() {
-    setMsg('Sending…');
+  function testOne(c: NotifierConfig) {
+    setTesting(c.id);
+    setTestMsgs((p) => ({ ...p, [c.id]: '' }));
     startTransition(async () => {
-      await persist();
-      const r = await sendTestNtfy();
-      setMsg(r.ok ? 'Test sent ✓' : `Failed: ${r.error}`);
+      const r = await testNotifierChannel(c);
+      setTestMsgs((p) => ({ ...p, [c.id]: r.ok ? 'Test sent ✓' : `Failed: ${r.error}` }));
+      setTesting('');
     });
   }
   function check() {
     setMsg('Checking…');
     startTransition(async () => {
-      await persist();
+      await saveNotifierChannels(channels ?? []);
       const r = await runAlertChecks();
-      setMsg((r.sent ? '✓ Sent · ' : '(enable to send) · ') + r.summary.replace(/\n/g, ' · '));
+      setMsg((r.sent ? '✓ Sent · ' : '(no enabled channels) · ') + r.summary.replace(/\n/g, ' · '));
     });
   }
 
   return (
-    <Section title="Notifications (ntfy)" icon={<Bell size={15} />}>
+    <Section title="Notifications" icon={<Bell size={15} />}>
       <p className="text-xs text-[color:var(--color-text-dim)] -mt-1">
-        Push alerts for deals, installments due this month, and warranties expiring soon. Use a free <span className="text-[color:var(--color-cyan)]">ntfy.sh/your-topic</span> or a self-hosted ntfy server (install the ntfy app and subscribe to the topic).
+        Alerts for deals, installments due this month, and warranties expiring soon always show in the in-app{' '}
+        <span className="text-[color:var(--color-accent)]">bell</span>. Add channels below to also push them out — ntfy, Discord, Slack,
+        Telegram, or any webhook (route to email via Zapier/n8n).
       </p>
-      <label className="block">
-        <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>ntfy topic URL</span>
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://ntfy.sh/your-topic" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
-      </label>
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-medium">Enable notifications</span>
-        <Switch checked={enabled} onChange={setEnabled} />
+
+      <div className="space-y-2.5">
+        {channels === null ? (
+          <p className="text-xs text-[color:var(--color-text-faint)] py-4 flex items-center gap-2">
+            <Loader2 size={13} className="animate-spin" /> Loading channels…
+          </p>
+        ) : channels.length === 0 ? (
+          <p className="text-xs text-[color:var(--color-text-faint)] py-3">No outbound channels yet — alerts only show in the bell.</p>
+        ) : (
+          channels.map((c) => (
+            <ChannelCard
+              key={c.id}
+              ch={c}
+              onChange={(nc) => update(c.id, nc)}
+              onRemove={() => remove(c.id)}
+              onTest={() => testOne(c)}
+              testing={testing === c.id}
+              testMsg={testMsgs[c.id]}
+            />
+          ))
+        )}
       </div>
+
+      <button type="button" onClick={add} className={cn(ghostBtn, 'w-full justify-center')}>
+        <Plus size={13} /> Add channel
+      </button>
+
       <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-[color:var(--color-border)] mt-1">
-        <button type="button" onClick={save} disabled={pending} className={saveBtn}>
+        <button type="button" onClick={save} disabled={pending || channels === null} className={saveBtn}>
           {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
         </button>
-        <button type="button" onClick={test} disabled={pending || !url} className={cn(ghostBtn, 'text-[color:var(--color-cyan)]')}>
-          <Bell size={13} /> Test
-        </button>
-        <button type="button" onClick={check} disabled={pending} className={cn(ghostBtn, 'text-[color:var(--color-gold)]')}>
+        <button type="button" onClick={check} disabled={pending || channels === null} className={cn(ghostBtn, 'text-[color:var(--color-gold)]')}>
           <Sparkles size={13} /> Check & notify now
         </button>
       </div>

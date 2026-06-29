@@ -167,10 +167,11 @@ export function AiCommandBar() {
 
   return (
     <>
-      {/* Calm backdrop — a soft dim + light blur, nothing flashy. Click to close. */}
+      {/* Beacon backdrop — a light dim only, no blur: the page stays alive behind the
+          sweeping beam. Click to close. */}
       {spotlight && (
         <div
-          className="fixed inset-0 z-40 bg-[color:var(--color-bg)]/55 backdrop-blur-[3px]"
+          className="fixed inset-0 z-40 bg-[color:var(--color-bg)]/35"
           style={{ animation: 'pharos-fade-in .15s ease-out' }}
           onMouseDown={() => setOpen(false)}
           aria-hidden
@@ -189,6 +190,24 @@ export function AiCommandBar() {
       >
       {/* Bar */}
       <div className="relative group">
+        {/* Beacon Sweep — a rotating lighthouse beam radiates from behind the floating
+            bar (conic gradient on the PHAROS palette, masked to a soft halo). */}
+        {spotlight && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] overflow-hidden rounded-full"
+            style={{ maskImage: 'radial-gradient(circle, #000 6%, transparent 60%)', WebkitMaskImage: 'radial-gradient(circle, #000 6%, transparent 60%)' }}
+          >
+            <div
+              className="absolute inset-[-25%]"
+              style={{
+                background:
+                  'conic-gradient(from 0deg, transparent 0deg, color-mix(in srgb, var(--color-cyan) 34%, transparent) 12deg, color-mix(in srgb, var(--color-accent) 22%, transparent) 24deg, transparent 46deg, transparent 188deg, color-mix(in srgb, var(--color-purple) 16%, transparent) 202deg, transparent 224deg)',
+                animation: 'pharos-beam-spin 7s linear infinite',
+              }}
+            />
+          </div>
+        )}
         {/* Soft accent glow in AI mode (calmer when floating) */}
         {isAi && (
           <div className="absolute -inset-[1.5px] rounded-2xl bg-gradient-to-r from-[color:var(--color-accent)] via-[color:var(--color-cyan)] to-[color:var(--color-purple)] opacity-40 group-focus-within:opacity-75 blur-[2px] transition-opacity" />
@@ -218,6 +237,8 @@ export function AiCommandBar() {
               type="button"
               onClick={() => switchMode('ai')}
               title={t('bar.aiTitle')}
+              // While the beacon is open, the AI toggle pulses a beacon ring.
+              style={spotlight ? { animation: 'pharos-beacon-pulse 1.8s ease-out infinite' } : undefined}
               className={cn(
                 'grid place-items-center w-6 h-6 rounded-md transition-colors',
                 isAi ? 'bg-[color:var(--color-cyan)]/15 text-[color:var(--color-cyan)]' : 'text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]'
@@ -262,7 +283,7 @@ export function AiCommandBar() {
               onClick={() => send()}
               disabled={aiPending || !value.trim()}
               className="shrink-0 grid place-items-center w-8 h-8 rounded-xl bg-gradient-to-br from-[color:var(--color-accent)] to-[color:var(--color-cyan)] text-black disabled:opacity-40 hover:opacity-90 transition-opacity"
-              aria-label="Send"
+              aria-label={t('common.send')}
             >
               {aiPending ? <Loader2 size={15} className="animate-spin" /> : <ArrowUp size={15} />}
             </button>

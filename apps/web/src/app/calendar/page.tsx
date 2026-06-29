@@ -7,6 +7,8 @@ import { Expense } from '@/models/Expense';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
 import { CalendarClient, type Entry, type MonthBlock } from './CalendarClient';
+import { getServerT } from '@/lib/i18n/server';
+import type { TFunc, TKey } from '@/lib/i18n';
 
 // Money calendar — everything money-related coming up in the next 3 months:
 // subscription renewals, card installments, recurring bills/income, and warranty
@@ -24,7 +26,7 @@ function addCycle(d: Date, cycle: string): Date {
 }
 const mk = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
-async function getAgenda(): Promise<{ months: MonthBlock[]; dueThisMonth: number }> {
+async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBlock[]; dueThisMonth: number }> {
   await connectDB();
   const now = new Date();
   const windowStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -45,7 +47,7 @@ async function getAgenda(): Promise<{ months: MonthBlock[]; dueThisMonth: number
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
     return {
       key: mk(d),
-      label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+      label: d.toLocaleDateString(intlTag, { month: 'long', year: 'numeric' }),
       entries: [],
       out: 0,
       inc: 0,
@@ -70,7 +72,7 @@ async function getAgenda(): Promise<{ months: MonthBlock[]; dueThisMonth: number
     while (d < windowEnd && guard < 8) {
       guard++;
       if (d >= windowStart) {
-        push(d, { kind: 'renewal', label: s.name || 'Subscription', sub: `renews · ${s.billingCycle}`, amount: s.amount || 0 });
+        push(d, { kind: 'renewal', label: s.name || t('cal.lblSubscription'), sub: t('cal.subRenews', { cycle: t(`sub.${s.billingCycle || 'monthly'}` as TKey) }), amount: s.amount || 0 });
       }
       d = addCycle(d, s.billingCycle || 'monthly');
     }
@@ -83,7 +85,7 @@ async function getAgenda(): Promise<{ months: MonthBlock[]; dueThisMonth: number
     const amount = due.reduce((t, p) => t + p.perAmount, 0);
     if (amount > 0) {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      push(d, { pinned: true, kind: 'installments', label: 'Card installments', sub: `${due.length} active plan${due.length === 1 ? '' : 's'}`, amount });
+      push(d, { pinned: true, kind: 'installments', label: t('cal.lblInstallments'), sub: due.length === 1 ? t('cal.subPlan') : t('cal.subPlans', { n: due.length }), amount });
     }
   }
 
@@ -101,8 +103,8 @@ async function getAgenda(): Promise<{ months: MonthBlock[]; dueThisMonth: number
       if (d > now) {
         push(d, {
           kind: r.kind === 'income' ? 'income' : 'bill',
-          label: r.vendor || (r.kind === 'income' ? 'Income' : 'Bill'),
-          sub: `expected · ${r.recurringCycle}`,
+          label: r.vendor || t(r.kind === 'income' ? 'cal.lblIncome' : 'cal.lblBill'),
+          sub: t('cal.subExpected', { cycle: t(`sub.${r.recurringCycle}` as TKey) }),
           amount: r.amount || 0,
         });
       }
@@ -112,10 +114,10 @@ async function getAgenda(): Promise<{ months: MonthBlock[]; dueThisMonth: number
 
   // Expiries (no amount — just don't miss them).
   for (const i of items) {
-    push(new Date(i.warrantyUntil as unknown as string), { kind: 'warranty', label: i.title || 'Item', sub: 'warranty expires', amount: null });
+    push(new Date(i.warrantyUntil as unknown as string), { kind: 'warranty', label: i.title || t('cal.lblItem'), sub: t('cal.subWarranty'), amount: null });
   }
   for (const v of vouchers) {
-    push(new Date(v.expiresAt as unknown as string), { kind: 'voucher', label: v.title || 'Voucher', sub: `${v.store || ''} ${v.discount || ''} · expires`.trim(), amount: null });
+    push(new Date(v.expiresAt as unknown as string), { kind: 'voucher', label: v.title || t('cal.lblVoucher'), sub: t('cal.subVoucher', { store: v.store || '', discount: v.discount || '' }).trim(), amount: null });
   }
 
   for (const m of months) {
@@ -127,6 +129,8 @@ async function getAgenda(): Promise<{ months: MonthBlock[]; dueThisMonth: number
 }
 
 export default async function CalendarPage() {
-  const { months, dueThisMonth } = await getAgenda();
+  const { t, locale } = await getServerT();
+  const intlTag = ({ en: 'en-GB', el: 'el', es: 'es', fr: 'fr', de: 'de', it: 'it', pt: 'pt', nl: 'nl' } as Record<string, string>)[locale] ?? 'en-GB';
+  const { months, dueThisMonth } = await getAgenda(t, intlTag);
   return <CalendarClient months={months} dueThisMonth={dueThisMonth} />;
 }

@@ -172,7 +172,7 @@ export function PricePanel({ item, summary = true, onChanged, onSearchOnline }: 
             <div className="mt-3">
               <div className="relative h-1.5 rounded-full bg-gradient-to-r from-[color:var(--color-accent)]/40 via-[color:var(--color-gold)]/30 to-[color:var(--color-red)]/40">
                 {s.target != null && s.target >= s.lo! && s.target <= s.hi! && (
-                  <div className="absolute -top-1 w-0.5 h-3.5 bg-[color:var(--color-cyan)]" style={{ left: `${((s.target - s.lo!) / (s.hi! - s.lo!)) * 100}%` }} title={`target ${money(s.target)}`} />
+                  <div className="absolute -top-1 w-0.5 h-3.5 bg-[color:var(--color-cyan)]" style={{ left: `${((s.target - s.lo!) / (s.hi! - s.lo!)) * 100}%` }} title={t('pp.targetTip', { x: money(s.target) })} />
                 )}
                 <div
                   className="absolute -top-[3px] w-3 h-3 rounded-full bg-[color:var(--color-text)] border-2 border-[color:var(--color-surface)] shadow"

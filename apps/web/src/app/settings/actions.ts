@@ -45,6 +45,7 @@ import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel, type AiProviderId } from '@/lib/aiModels';
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
 import { sendNtfyTo } from '@/lib/notify';
+import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '@/lib/notifiers';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { generateNotifications } from '@/app/notifications/actions';
 import type { SerializedStatement } from '@/types';
@@ -300,6 +301,44 @@ export async function sendTestNtfy(): Promise<{ ok: boolean; error?: string }> {
   return ok ? { ok: true } : { ok: false, error: 'ntfy POST failed — check the URL' };
 }
 
+// ─── Pluggable notification channels ─────────────────────────────────────────
+
+/** Channels for the Settings editor (ntfy/Discord/Slack/Telegram/webhook). */
+export async function getNotifierChannels(): Promise<NotifierConfig[]> {
+  return getNotifiers();
+}
+
+/** Replace the whole channel list (single source of truth for outbound alerts).
+ *  Keeps the legacy ntfy fields in sync with the first ntfy channel for any code
+ *  still reading them. */
+export async function saveNotifierChannels(channels: NotifierConfig[]): Promise<{ ok: boolean }> {
+  await connectDB();
+  const clean = (Array.isArray(channels) ? channels : []).map((c, i) => ({
+    id: String(c.id || `n${i}`),
+    type: c.type,
+    enabled: c.enabled !== false,
+    label: (c.label || '').slice(0, 60),
+    url: (c.url || '').trim(),
+    token: (c.token || '').trim(),
+    target: (c.target || '').trim(),
+  }));
+  const firstNtfy = clean.find((c) => c.type === 'ntfy');
+  await AppConfig.updateOne(
+    { key: 'singleton' },
+    { $set: { notifiers: clean, ntfyUrl: firstNtfy?.url || '', ntfyEnabled: !!firstNtfy?.enabled } },
+    { upsert: true }
+  );
+  invalidateAppSettings();
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
+/** Send a one-off test to a single (possibly unsaved) channel config. */
+export async function testNotifierChannel(channel: NotifierConfig): Promise<{ ok: boolean; error?: string }> {
+  const ok = await testNotifier(channel);
+  return ok ? { ok: true } : { ok: false, error: 'Delivery failed — check the URL/token' };
+}
+
 /** Scan for deals, δόσεις due this month, and expiring warranties; ntfy a summary. */
 export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; summary: string }> {
   const s = await getAppSettings();
@@ -348,8 +387,9 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
 
   const summary = lines.length ? lines.join('\n') : 'All clear — nothing to report.';
   let sent = false;
-  if (lines.length && s.ntfyEnabled && s.ntfyUrl) {
-    sent = await sendNtfyTo(s.ntfyUrl, 'Pharos alerts', summary, { tags: ['bell'] });
+  if (lines.length) {
+    const r = await dispatchAlert('Pharos alerts', summary);
+    sent = r.sent > 0;
   }
   return { ok: true, sent, summary };
 }

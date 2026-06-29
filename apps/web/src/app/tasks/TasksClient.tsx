@@ -359,6 +359,7 @@ function TaskCard({
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
+  const t = useT();
   const prev = COLUMNS[colIndex - 1];
   const next = COLUMNS[colIndex + 1];
   const doneSteps = task.steps.filter((s) => s.done).length;
@@ -429,7 +430,7 @@ function TaskCard({
         </div>
         <button
           onClick={() => onDelete(task._id)}
-          title="Delete"
+          title={t('common.delete')}
           className="p-1 rounded opacity-0 group-hover:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-all"
         >
           <Trash2 size={13} />
@@ -508,6 +509,7 @@ function TaskCreateForm({ onClose }: { onClose: () => void }) {
 // ─── Task Row (list view) ──────────────────────────────────────────────────
 
 function TaskRow({ task, onOpen }: { task: SerializedTask; onOpen: () => void }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const isDone = task.status === 'done';
   const doneSteps = task.steps.filter((s) => s.done).length;
@@ -572,7 +574,7 @@ function TaskRow({ task, onOpen }: { task: SerializedTask; onOpen: () => void })
         onClick={handleDelete}
         disabled={pending}
         className="shrink-0 opacity-0 group-hover:opacity-100 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-all disabled:opacity-30"
-        aria-label="Delete"
+        aria-label={t('common.delete')}
       >
         <Trash2 size={14} />
       </button>
@@ -679,7 +681,7 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
                 value={newStep}
                 onChange={(e) => setNewStep(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddStep(); } }}
-                placeholder="Add a step..."
+                placeholder={t('tk.addStep')}
               />
               <Button type="button" variant="secondary" onClick={handleAddStep} disabled={!newStep.trim()} className="shrink-0">
                 <Plus size={14} /> {t('common.add')}
@@ -701,7 +703,7 @@ function TaskDetailModal({ task, onClose }: { task: SerializedTask; onClose: () 
             value={form.content}
             onChange={set('content')}
             rows={6}
-            placeholder="Notes, links, anything... (HTML from migrated phases is rendered above)"
+            placeholder={t('tk.notesPlaceholder')}
             className="w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[color:var(--color-accent)] resize-y"
           />
         </div>

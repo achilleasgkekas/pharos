@@ -106,6 +106,17 @@ body::before {
   to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
+/* Beacon Sweep — a lighthouse beam rotates behind the AI bar while it's open. */
+@keyframes pharos-beam-spin {
+  to { transform: rotate(360deg); }
+}
+/* Beacon pulse — an expanding ring radiating from the AI (Sparkles) toggle. */
+@keyframes pharos-beacon-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-cyan) 60%, transparent); }
+  70%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-cyan) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-cyan) 0%, transparent); }
+}
+
 ::selection {
   background: var(--color-accent);
   color: #000;

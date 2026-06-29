@@ -311,11 +311,11 @@ export function StatementsClient({
         </Modal>
       )}
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New Statement" size="md">
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t("stm.newStatement")} size="md">
         <StatementForm cards={cards} onSuccess={() => setShowCreate(false)} />
       </Modal>
 
-      <Modal open={showCards} onClose={() => setShowCards(false)} title="Manage Cards" size="xl">
+      <Modal open={showCards} onClose={() => setShowCards(false)} title={t("stm.manageCards")} size="xl">
         <CardsManager cards={cards} statements={statements} />
       </Modal>
     </main>
@@ -426,7 +426,7 @@ function PlanCardLinkable({
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState('');
 
-  const linkedItems = plan.itemIds.map((id) => ({ id, title: itemMap.get(id)?.title ?? 'product' }));
+  const linkedItems = plan.itemIds.map((id) => ({ id, title: itemMap.get(id)?.title ?? t("stm.product") }));
   const planItemSet = useMemo(() => new Set(plan.itemIds), [plan.itemIds]);
 
   // Owned products, not already on ANY plan, whose price ≈ this plan's total (±15%).

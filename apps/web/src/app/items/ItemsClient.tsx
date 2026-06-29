@@ -578,7 +578,7 @@ export function ItemsClient({
           {filtered.length === 0 ? (
             <div className="text-center py-24 text-[color:var(--color-text-faint)]">
               <p className="text-5xl mb-4">{cfg.emptyEmoji}</p>
-              <p className="text-sm">{items.length === 0 ? cfg.emptyText : 'No results found.'}</p>
+              <p className="text-sm">{items.length === 0 ? cfg.emptyText : t('it.noResults')}</p>
             </div>
           ) : layout === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -718,7 +718,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
         className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5"
         style={{ fontFamily: 'var(--font-mono)' }}
       >
-        <Sparkles size={11} className="text-[color:var(--color-accent)]" /> Import from URL · preview, then approve
+        <Sparkles size={11} className="text-[color:var(--color-accent)]" /> {t('it.importUrlHint')}
       </label>
       <div className="flex gap-2">
         <Input
@@ -739,7 +739,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
       </div>
       {pending && (
         <p className="text-[10px] text-[color:var(--color-cyan)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-          Fetching page + AI extracting product info…
+          {t('it.fetchingProduct')}
         </p>
       )}
       {msg && <p className="text-[10px] text-[color:var(--color-red)] mt-1.5">{msg}</p>}
@@ -754,7 +754,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
         <div className="mt-3 rounded-xl border border-[color:var(--color-accent)] bg-[color:var(--color-surface-2)] p-3">
           {preview.existing && (
             <p className="text-[10px] text-[color:var(--color-gold)] mb-2 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
-              ⚠ Matches existing &quot;{preview.existing.title}&quot; — approving updates it (records the price), no duplicate.
+              {t('it.matchesExisting', { title: preview.existing.title })}
             </p>
           )}
           <div className="flex items-start justify-between gap-3">
@@ -782,7 +782,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
               {t('it.discard')}
             </Button>
             <span className="text-[10px] text-[color:var(--color-text-faint)] ml-auto" style={{ fontFamily: 'var(--font-mono)' }}>
-              photos fetched on approve
+              {t('it.photosOnApprove')}
             </span>
           </div>
         </div>
@@ -1050,7 +1050,7 @@ function ItemCard({
                   'inline-flex items-center gap-0.5 text-[10px] font-semibold',
                   trend < 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'
                 )}
-                title={`Last change: ${trend < 0 ? 'down' : 'up'} ${cur()}${Math.abs(trend).toFixed(2)}`}
+                title={t('it.lastChange', { dir: trend < 0 ? t('pp.down') : t('pp.up'), x: `${cur()}${Math.abs(trend).toFixed(2)}` })}
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 {trend < 0 ? <TrendingDown size={11} /> : <TrendingUp size={11} />}{cur()}{Math.abs(trend).toFixed(0)}
@@ -1309,7 +1309,7 @@ function ItemDetailModal({
             </div>
             {item.purchasedPrice && item.currentPrice > 0 && item.currentPrice !== item.purchasedPrice && (
               <div className="text-right">
-                <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>now</div>
+                <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>{t('it.priceNow')}</div>
                 <div className="text-sm font-semibold" style={{ fontFamily: 'var(--font-mono)' }}>{cur()}{item.currentPrice}</div>
               </div>
             )}
@@ -1462,7 +1462,7 @@ function ItemDetailModal({
           {hasPayment && (
             <div className="pt-3 mt-1 border-t border-[color:var(--color-border)]">
           <h4 className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
-            Purchase &amp; payment
+            {t('it.purchasePayment')}
           </h4>
           <div className="flex flex-wrap gap-2 mb-3">
             {/* Each linked receipt opens its actual file (image/PDF) directly */}

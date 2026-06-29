@@ -199,6 +199,10 @@ export type Statement = { id: string; card: string; last4: string; period: strin
 export async function getStatements(): Promise<Statement[]> {
   return (await request<{ data: Statement[] }>('/api/v1/statements?limit=100')).data ?? [];
 }
+export type StatementTxn = { id: string; date: string | null; description: string; amount: number; category: string; installment: { current: number; total: number } | null };
+export async function getStatementTxns(id: string): Promise<StatementTxn[]> {
+  return (await request<{ transactions: StatementTxn[] }>(`/api/v1/statements/${id}`)).transactions ?? [];
+}
 
 // ---- Reports ----
 export type Reports = {

@@ -98,7 +98,7 @@ export function ReceiptsClient({
       );
       router.refresh();
     } catch (e) {
-      setImportMsg(`Failed: ${(e as Error).message.slice(0, 80)}`);
+      setImportMsg(t('rc.failedMsg', { m: (e as Error).message.slice(0, 80) }));
     } finally {
       setImporting(false);
     }
@@ -212,7 +212,7 @@ export function ReceiptsClient({
     let lastError: string | undefined;
     for (let i = 0; i < total; i++) {
       const base = ollamaUp ? t('rc.aiParsing') : t('rc.savingOffline');
-      const tail = failed ? ` · ${failed} failed` : '';
+      const tail = failed ? t('rc.failedTail', { n: failed }) : '';
       setUploadMsg(total > 1 ? `${base} ${i + 1}/${total}${tail}...` : `${base}...`);
       const processed = await shrinkImage(list[i]); // downscale big phone photos
       const fd = new FormData();
@@ -238,7 +238,7 @@ export function ReceiptsClient({
       failed
         ? t('rc.uploadResult', { ok: okCount, total, failed })
         : lastAiError
-          ? `${lastAiError}. Saved for manual entry.`
+          ? t('rc.savedManual', { err: lastAiError })
           : total > 1
             ? t('rc.importedOk', { n: total })
             : null
@@ -475,7 +475,7 @@ export function ReceiptsClient({
 
           <div className="flex items-center justify-between mb-3">
             <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
-              {visible.length} {visible.length === 1 ? 'receipt' : 'receipts'}
+              {visible.length} {visible.length === 1 ? t('rc.receiptOne') : t('rc.receiptMany')}
               {visible.length !== receipts.length ? ` / ${receipts.length}` : ''}
             </span>
           </div>
@@ -483,7 +483,7 @@ export function ReceiptsClient({
           {visible.length === 0 ? (
             <div className="text-center py-20 text-[color:var(--color-text-faint)]">
               <p className="text-5xl mb-4">🧾</p>
-              <p className="text-sm">{receipts.length === 0 ? 'No receipts yet.' : 'No receipts match these filters.'}</p>
+              <p className="text-sm">{receipts.length === 0 ? t('rc.emptyNone') : t('rc.emptyFiltered')}</p>
             </div>
           ) : layout === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -632,19 +632,19 @@ function ReceiptCard({
         {/* 3-state status so you know what still needs work (don't re-do done ones) */}
         <div className="absolute top-2 right-2">
           {receipt.archived ? (
-            <span title="Archived — not a real receipt" className="flex items-center justify-center w-6 h-6 rounded-full bg-black/50 border border-[color:var(--color-border)]">
+            <span title={t('rc.tipArchived')} className="flex items-center justify-center w-6 h-6 rounded-full bg-black/50 border border-[color:var(--color-border)]">
               <Archive size={12} className="text-[color:var(--color-text-faint)]" />
             </span>
           ) : receipt.verified ? (
-            <span title="Verified — done" className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00ff8820] border border-[#00ff8840]">
+            <span title={t('rc.tipVerified')} className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00ff8820] border border-[#00ff8840]">
               <CheckCircle2 size={13} className="text-[color:var(--color-accent)]" />
             </span>
           ) : receipt.total > 0 || (receipt.lineItems?.length ?? 0) > 0 ? (
-            <span title="AI-parsed — needs your review" className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00d4ff20] border border-[#00d4ff40]">
+            <span title={t('rc.tipParsed')} className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00d4ff20] border border-[#00d4ff40]">
               <Sparkles size={12} className="text-[color:var(--color-cyan)]" />
             </span>
           ) : (
-            <span title="Empty / failed — needs re-scan" className="flex items-center justify-center w-6 h-6 rounded-full bg-[#ffd93d20] border border-[#ffd93d40]">
+            <span title={t('rc.tipFailed')} className="flex items-center justify-center w-6 h-6 rounded-full bg-[#ffd93d20] border border-[#ffd93d40]">
               <AlertTriangle size={12} className="text-[color:var(--color-gold)]" />
             </span>
           )}
@@ -756,8 +756,8 @@ function ReceiptDetailModal({
         const m = (e as Error).message || 'request failed';
         setRescanMsg(
           /server action|fetch|chunk|deploy/i.test(m)
-            ? 'App was updated — reload the page (⌘/Ctrl+Shift+R) and try again.'
-            : `Failed: ${m.slice(0, 100)}`
+            ? t('rc.appUpdated')
+            : t('rc.failedMsg', { m: m.slice(0, 100) })
         );
       }
     });
@@ -768,9 +768,9 @@ function ReceiptDetailModal({
     let addToInventory = false;
     if (verified && form.lineItems.length > 0 && !alreadyAdded) {
       addToInventory = await confirm({
-        title: 'Add to Inventory?',
-        message: `Add the ${form.lineItems.length} items to the Inventory (with their proper names)?`,
-        confirmLabel: 'Add',
+        title: t('rc.addInvTitle'),
+        message: t('rc.addInvMsg', { n: form.lineItems.length }),
+        confirmLabel: t('common.add'),
       });
     }
     startTransition(async () => {
@@ -1021,14 +1021,14 @@ function ReceiptDetailModal({
                 className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                Items ({form.lineItems.length})
+                {t('rc.itemsCount', { n: form.lineItems.length })}
               </span>
               <button
                 onClick={addLine}
                 className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                <Plus size={11} /> add
+                <Plus size={11} /> {t('common.add')}
               </button>
             </div>
             <div className="space-y-2.5 max-h-64 overflow-y-auto">
@@ -1110,7 +1110,7 @@ function ReceiptDetailModal({
               })}
               {form.lineItems.length === 0 && (
                 <p className="text-xs text-[color:var(--color-text-faint)] italic py-2">
-                  No line items
+                  {t('rc.noLineItems')}
                 </p>
               )}
             </div>

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useTransition } from 'react';
+import { useT } from '@/components/LocaleProvider';
 import { ImagePlus, Trash2, Star, Loader2, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { shrinkImage } from '@/lib/clientImage';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -13,6 +14,7 @@ function fileUrl(p: string) {
 export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { itemId: string; photos: string[]; canFetch: boolean }) {
   const [photos, setPhotos] = useState<string[]>(initialPhotos);
   const [active, setActive] = useState(0);
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [uploading, setUploading] = useState(false);
   const [fetching, setFetching] = useState(false);
@@ -38,7 +40,7 @@ export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { 
       type="button"
       onClick={handleFetch}
       disabled={fetching || uploading}
-      title="Search the web (and the product link) for product photos"
+      title={t('it.searchPhotos')}
       className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-cyan)] hover:border-[color:var(--color-cyan)] transition-colors disabled:opacity-50"
     >
       {fetching ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
@@ -145,11 +147,11 @@ export function ItemPhotoGallery({ itemId, photos: initialPhotos, canFetch }: { 
         {/* Per-photo actions */}
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {active !== 0 && (
-            <button type="button" title="Set as cover" onClick={() => startTransition(async () => { const r = await setItemCover(itemId, hero); setPhotos(r.photos); setActive(0); })} disabled={pending} className="w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center hover:bg-black/75">
+            <button type="button" title={t('it.setCover')} onClick={() => startTransition(async () => { const r = await setItemCover(itemId, hero); setPhotos(r.photos); setActive(0); })} disabled={pending} className="w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center hover:bg-black/75">
               <Star size={13} />
             </button>
           )}
-          <button type="button" title="Delete photo" onClick={() => handleDelete(hero)} disabled={pending} className="w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center hover:bg-[color:var(--color-red)]">
+          <button type="button" title={t('it.deletePhoto')} onClick={() => handleDelete(hero)} disabled={pending} className="w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center hover:bg-[color:var(--color-red)]">
             <Trash2 size={13} />
           </button>
         </div>
