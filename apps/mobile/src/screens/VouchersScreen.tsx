@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { C } from '../theme';
 import { shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getVouchers, type Voucher } from '../api';
+import { getVouchers, addVoucher, type Voucher } from '../api';
 
 export function VouchersScreen() {
   const [rows, setRows] = useState<Voucher[]>([]);
+  const [title, setTitle] = useState('');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -17,10 +19,22 @@ export function VouchersScreen() {
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
+  async function add() {
+    const t = title.trim();
+    if (!t) return;
+    setTitle(''); setCode('');
+    try { await addVoucher({ title: t, code: code.trim() }); await load(); } catch (e) { setErr((e as Error).message); }
+  }
+
   if (loading) return <Spinner />;
 
   return (
     <View style={s.wrap}>
+      <View style={s.addRow}>
+        <TextInput value={title} onChangeText={setTitle} placeholder="title" placeholderTextColor={C.faint} style={[s.input, { flex: 2 }]} />
+        <TextInput value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="code" placeholderTextColor={C.faint} style={[s.input, { flex: 1 }]} />
+        <Pressable onPress={add} disabled={!title.trim()} style={[s.addBtn, !title.trim() && s.dim]}><Text style={s.addBtnText}>＋</Text></Pressable>
+      </View>
       <ErrorText>{err}</ErrorText>
       <FlatList
         data={rows}
@@ -45,6 +59,11 @@ export function VouchersScreen() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
+  addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
+  input: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: C.text, fontSize: 15 },
+  addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  addBtnText: { color: '#000', fontSize: 24, fontWeight: '700' },
+  dim: { opacity: 0.4 },
   card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   faded: { opacity: 0.55 },
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },

@@ -43,4 +43,20 @@ src/screens/         LoginScreen, DashboardScreen, ShoppingScreen
 - Needs the Pharos server reachable from the phone (same Wi-Fi, or a tunnel). The API token is
   the same one used by the MCP connector (Settings → Mobile / MCP regenerates/revokes it).
 - Camera scan needs camera permission (prompted on first use).
-- Built against Expo SDK 56. `npx tsc --noEmit` passes; run on a device/simulator to exercise it.
+- Built against Expo SDK 54 (Expo Go compatible). `npx tsc --noEmit` passes; run on a device to exercise it.
+
+## Build for the stores (EAS)
+
+Expo Go is for development. For real installable iOS/Android binaries, use EAS Build
+(`eas.json` is set up; bundle id `com.achilleas.pharos`):
+
+```bash
+npm i -g eas-cli      # once
+eas login             # your Expo account
+eas build --profile preview --platform android   # → installable .apk
+eas build --profile preview --platform ios        # → needs an Apple account / TestFlight
+```
+
+`preview` gives an internal-distribution build (APK / ad-hoc). `production` + `eas submit`
+publishes to the stores. Builds run on Expo's servers (~10-20 min) — this is a user-run step.
+

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/apiAuth';
+import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
 import { Voucher } from '@/models/Voucher';
@@ -32,5 +32,25 @@ export async function GET(req: NextRequest) {
     if (p.updatedSince) { find.setOptions({ withDeleted: true }); count.setOptions({ withDeleted: true }); }
     const [docs, total] = await Promise.all([find.lean() as Promise<VoucherLean[]>, count]);
     return NextResponse.json(listEnvelope(docs.map(trim), total, p));
+  });
+}
+
+/** POST /api/v1/vouchers  { title, code?, store?, discount?, expiresAt?, url?, notes? } */
+export async function POST(req: NextRequest) {
+  return withAuth(req, async () => {
+    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const title = String(b.title || '').trim();
+    if (!title) return apiError('title required');
+    await connectDB();
+    const doc = await Voucher.create({
+      title,
+      code: String(b.code || '').trim(),
+      store: String(b.store || '').trim(),
+      discount: String(b.discount || '').trim(),
+      expiresAt: b.expiresAt ? new Date(String(b.expiresAt)) : null,
+      url: String(b.url || '').trim(),
+      notes: String(b.notes || '').trim(),
+    });
+    return NextResponse.json({ voucher: trim(doc.toObject() as VoucherLean) }, { status: 201 });
   });
 }

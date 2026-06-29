@@ -141,6 +141,9 @@ export function addExpense(data: { vendor: string; amount: number; kind: 'expens
 export async function getSubscriptions(): Promise<Subscription[]> {
   return (await request<{ data: Subscription[] }>('/api/v1/subscriptions?limit=200')).data ?? [];
 }
+export function addSubscription(data: { name: string; amount: number; billingCycle?: string }) {
+  return request<{ subscription: Subscription }>('/api/v1/subscriptions', { method: 'POST', body: JSON.stringify(data) });
+}
 
 // ---- Receipts ----
 export async function getReceipts(): Promise<ReceiptSummary[]> {
@@ -164,6 +167,9 @@ export async function scanReceipt(uri: string): Promise<ReceiptDetail & { aiUsed
 export async function getItems(status: 'shopping' | 'inventory' | 'all' = 'all'): Promise<Item[]> {
   return (await request<{ items: Item[] }>(`/api/v1/items?status=${status}&limit=300`)).items ?? [];
 }
+export function createItem(data: { title: string; status?: string; category?: string; currentPrice?: number }) {
+  return request<{ item: Item }>('/api/v1/items', { method: 'POST', body: JSON.stringify(data) });
+}
 
 // ---- Files (bearer-protected). RN <Image> can attach the auth header via source.headers. ----
 export function fileSource(path: string | null): { uri: string; headers?: Record<string, string> } | undefined {
@@ -182,6 +188,9 @@ export function aiCommand(messages: AiTurn[]) {
 export type Voucher = { id: string; title: string; code: string; store: string; discount: string; expiresAt: string | null; used: boolean; url: string; notes: string };
 export async function getVouchers(): Promise<Voucher[]> {
   return (await request<{ data: Voucher[] }>('/api/v1/vouchers?limit=200')).data ?? [];
+}
+export function addVoucher(data: { title: string; code?: string; store?: string }) {
+  return request<{ voucher: Voucher }>('/api/v1/vouchers', { method: 'POST', body: JSON.stringify(data) });
 }
 
 // ---- Statements ----
