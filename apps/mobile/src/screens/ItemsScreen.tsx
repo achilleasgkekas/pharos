@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, FlatList, Pressable, RefreshControl, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { money, Spinner, ErrorText, Empty } from '../ui';
-import { getItems, createItem, deleteItemRecord, type Item } from '../api';
+import { getItems, createItem, deleteItemRecord, importItemUrl, type Item } from '../api';
 
 const FILTERS: { key: 'all' | 'inventory' | 'shopping'; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -25,11 +25,25 @@ export function ItemsScreen() {
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
+  const [importing, setImporting] = useState(false);
+  const isUrl = /^https?:\/\//i.test(title.trim());
+
   async function add() {
     const t = title.trim();
     if (!t) return;
+    if (isUrl) return importUrl(t);
     setTitle('');
     try { await createItem({ title: t }); setFilter('all'); await load(); } catch (e) { setErr((e as Error).message); }
+  }
+
+  async function importUrl(url: string) {
+    setImporting(true); setErr(null);
+    try {
+      const r = await importItemUrl(url, 'shopping');
+      setTitle(''); setFilter('shopping'); await load();
+      Alert.alert(r.updated ? 'Updated existing' : 'Added to shopping', `${r.title}${r.price ? `  ·  ${money(r.price)}` : ''}  ·  ${r.store}`);
+    } catch (e) { setErr((e as Error).message); }
+    finally { setImporting(false); }
   }
 
   function remove(it: Item) {
@@ -49,9 +63,12 @@ export function ItemsScreen() {
         ))}
       </View>
       <View style={s.addRow}>
-        <TextInput value={title} onChangeText={setTitle} onSubmitEditing={add} placeholder="Add an item…" placeholderTextColor={C.faint} style={s.input} />
-        <Pressable onPress={add} disabled={!title.trim()} style={[s.addBtn, !title.trim() && s.dim]}><Text style={s.addBtnText}>＋</Text></Pressable>
+        <TextInput value={title} onChangeText={setTitle} onSubmitEditing={add} autoCapitalize="none" autoCorrect={false} placeholder="Add an item or paste a link…" placeholderTextColor={C.faint} style={s.input} />
+        <Pressable onPress={add} disabled={!title.trim() || importing} style={[s.addBtn, isUrl && s.importBtn, (!title.trim() || importing) && s.dim]}>
+          {importing ? <ActivityIndicator color="#000" /> : <Text style={s.addBtnText}>{isUrl ? '✦' : '＋'}</Text>}
+        </Pressable>
       </View>
+      {isUrl && <Text style={s.hint}>✦ AI will fetch this link and add it to Shopping</Text>}
       <ErrorText>{err}</ErrorText>
       {loading ? <Spinner /> : (
         <FlatList
@@ -84,7 +101,9 @@ const s = StyleSheet.create({
   addRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
   input: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: C.text, fontSize: 15 },
   addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  importBtn: { backgroundColor: C.cyan },
   addBtnText: { color: '#000', fontSize: 24, fontWeight: '700' },
+  hint: { color: C.cyan, fontSize: 11, paddingHorizontal: 16, paddingBottom: 8, marginTop: -2 },
   dim: { opacity: 0.4 },
   filters: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },

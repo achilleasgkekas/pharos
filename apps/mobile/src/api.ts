@@ -246,3 +246,8 @@ export type ParsedVoucherData = { title?: string; code?: string; store?: string;
 export async function scanVoucherText(text: string): Promise<ParsedVoucherData> {
   return (await request<{ data: ParsedVoucherData }>('/api/v1/scan/voucher', { method: 'POST', body: JSON.stringify({ text }) })).data;
 }
+export type ImportedItem = { id: string; title: string; price: number; store: string; updated: boolean };
+export async function importItemUrl(url: string, view: 'shopping' | 'inventory' = 'shopping'): Promise<ImportedItem> {
+  const r = await request<{ id: string; title: string; price: number; store: string; updated: boolean }>('/api/v1/items/import', { method: 'POST', body: JSON.stringify({ url, view }) });
+  return { id: r.id, title: r.title, price: r.price, store: r.store, updated: r.updated };
+}
