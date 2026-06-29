@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, RefreshControl, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getVouchers, addVoucher, type Voucher } from '../api';
+import { getVouchers, addVoucher, deleteVoucher, type Voucher } from '../api';
 
 export function VouchersScreen() {
   const [rows, setRows] = useState<Voucher[]>([]);
@@ -26,6 +26,13 @@ export function VouchersScreen() {
     try { await addVoucher({ title: t, code: code.trim() }); await load(); } catch (e) { setErr((e as Error).message); }
   }
 
+  function remove(it: Voucher) {
+    Alert.alert('Delete', `Delete "${it.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { setRows((p) => p.filter((x) => x.id !== it.id)); try { await deleteVoucher(it.id); } catch { await load(); } } },
+    ]);
+  }
+
   if (loading) return <Spinner />;
 
   return (
@@ -43,14 +50,14 @@ export function VouchersScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={<Empty>No vouchers.</Empty>}
         renderItem={({ item }) => (
-          <View style={[s.card, item.used && s.faded]}>
+          <Pressable onLongPress={() => remove(item)} style={[s.card, item.used && s.faded]}>
             <View style={s.top}>
               <Text style={s.title} numberOfLines={2}>{item.title}</Text>
               {!!item.discount && <Text style={s.discount}>{item.discount}</Text>}
             </View>
             <Text style={s.meta}>{[item.store, item.expiresAt ? `exp ${shortDate(item.expiresAt)}` : '', item.used ? 'used' : ''].filter(Boolean).join('  ·  ')}</Text>
             {!!item.code && <View style={s.codeBox}><Text style={s.code}>{item.code}</Text></View>}
-          </View>
+          </Pressable>
         )}
       />
     </View>

@@ -214,3 +214,17 @@ export type CalEvent = { date: string; kind: 'renewal' | 'voucher' | 'warranty';
 export async function getCalendar(): Promise<{ currency: string; events: CalEvent[] }> {
   return request<{ currency: string; days: number; events: CalEvent[] }>('/api/v1/calendar');
 }
+
+// ---- Global search ----
+export type SearchHit = { type: string; id: string; title: string; subtitle: string };
+export async function search(q: string): Promise<SearchHit[]> {
+  if (q.trim().length < 2) return [];
+  return (await request<{ hits: SearchHit[] }>(`/api/v1/search?q=${encodeURIComponent(q.trim())}`)).hits ?? [];
+}
+
+// ---- Deletes (soft → Trash) ----
+const del = (path: string) => request<{ ok: boolean }>(path, { method: 'DELETE' });
+export const deleteItemRecord = (id: string) => del(`/api/v1/items/${id}`);
+export const deleteExpense = (id: string) => del(`/api/v1/expenses/${id}`);
+export const deleteSubscription = (id: string) => del(`/api/v1/subscriptions/${id}`);
+export const deleteVoucher = (id: string) => del(`/api/v1/vouchers/${id}`);

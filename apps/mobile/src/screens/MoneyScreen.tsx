@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, RefreshControl, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getExpenses, addExpense, type Expense } from '../api';
+import { getExpenses, addExpense, deleteExpense, type Expense } from '../api';
 
 export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [rows, setRows] = useState<Expense[]>([]);
@@ -25,6 +25,13 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
     if (!v || !Number.isFinite(n)) return;
     setVendor(''); setAmount('');
     try { await addExpense({ vendor: v, amount: n, kind }); await load(); } catch (e) { setErr((e as Error).message); }
+  }
+
+  function remove(it: Expense) {
+    Alert.alert('Delete', `Delete "${it.vendor}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { setRows((p) => p.filter((x) => x.id !== it.id)); try { await deleteExpense(it.id); } catch { await load(); } } },
+    ]);
   }
 
   if (loading) return <Spinner />;
@@ -51,13 +58,13 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={<Empty>Nothing here yet.</Empty>}
         renderItem={({ item }) => (
-          <View style={s.row}>
+          <Pressable onLongPress={() => remove(item)} style={s.row}>
             <View style={{ flex: 1 }}>
               <Text style={s.vendor}>{item.vendor || '—'}</Text>
               <Text style={s.meta}>{[item.category, shortDate(item.date), item.recurring ? 'recurring' : ''].filter(Boolean).join('  ·  ')}</Text>
             </View>
             <Text style={[s.amount, { color: kind === 'income' ? C.accent : C.text }]}>{money(item.amount, item.currency)}</Text>
-          </View>
+          </Pressable>
         )}
       />
     </View>

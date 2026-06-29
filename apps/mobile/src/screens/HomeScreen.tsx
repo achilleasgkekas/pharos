@@ -4,7 +4,7 @@ import { C } from '../theme';
 import { money, Spinner, ErrorText } from '../ui';
 import { getOverview, type Overview } from '../api';
 
-export type ScreenKey = 'home' | 'shopping' | 'receipts' | 'tasks' | 'expenses' | 'income' | 'subscriptions' | 'items' | 'assistant' | 'vouchers' | 'statements' | 'calendar' | 'reports' | 'settings';
+export type ScreenKey = 'home' | 'shopping' | 'receipts' | 'tasks' | 'expenses' | 'income' | 'subscriptions' | 'items' | 'assistant' | 'vouchers' | 'statements' | 'calendar' | 'reports' | 'settings' | 'search';
 
 type Tile = { key: ScreenKey; label: string; count?: (o: Overview) => number; color: string };
 const TILES: Tile[] = [

@@ -18,11 +18,13 @@ import { StatementsScreen } from './src/screens/StatementsScreen';
 import { CalendarScreen } from './src/screens/CalendarScreen';
 import { ReportsScreen } from './src/screens/ReportsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { SearchScreen } from './src/screens/SearchScreen';
 
 const TITLES: Record<ScreenKey, string> = {
   home: 'Pharos', assistant: 'AI assistant', shopping: 'Shopping list', receipts: 'Receipts',
   tasks: 'Tasks', expenses: 'Expenses', income: 'Income', subscriptions: 'Subscriptions', items: 'Inventory',
   vouchers: 'Vouchers', statements: 'Statements', calendar: 'Calendar', reports: 'Reports', settings: 'Settings',
+  search: 'Search',
 };
 
 export default function App() {
@@ -58,6 +60,7 @@ export default function App() {
       case 'calendar': return <CalendarScreen />;
       case 'reports': return <ReportsScreen />;
       case 'settings': return <SettingsScreen onSignOut={signOut} />;
+      case 'search': return <SearchScreen onOpen={setScreen} />;
       default: return null;
     }
   }
@@ -65,7 +68,7 @@ export default function App() {
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="light" />
-      <AppBar title={TITLES[screen]} onMenu={() => setDrawerOpen(true)} />
+      <AppBar title={TITLES[screen]} onMenu={() => setDrawerOpen(true)} onSearch={() => setScreen('search')} />
       <View style={{ flex: 1 }}>{body()}</View>
       <Drawer
         open={drawerOpen}

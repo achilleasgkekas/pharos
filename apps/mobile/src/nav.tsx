@@ -9,11 +9,12 @@ const GROUPS: { title: string; items: { key: ScreenKey; label: string }[] }[] = 
   { title: 'Plan', items: [{ key: 'tasks', label: 'Tasks' }, { key: 'calendar', label: 'Calendar' }, { key: 'reports', label: 'Reports' }] },
 ];
 
-export function AppBar({ title, onMenu }: { title: string; onMenu: () => void }) {
+export function AppBar({ title, onMenu, onSearch }: { title: string; onMenu: () => void; onSearch?: () => void }) {
   return (
     <View style={s.bar}>
       <Pressable onPress={onMenu} hitSlop={12} style={s.menuBtn}><Text style={s.menu}>☰</Text></Pressable>
       <Text style={s.title} numberOfLines={1}>{title}</Text>
+      {onSearch && <Pressable onPress={onSearch} hitSlop={12} style={s.menuBtn}><Text style={s.searchIcon}>🔍</Text></Pressable>}
       <PharosMark size={20} />
     </View>
   );
@@ -39,6 +40,7 @@ export function Drawer({
           </View>
           <ScrollView style={{ flex: 1 }}>
             <Item k="home" label="Home" />
+            <Item k="search" label="🔍 Search" />
             <Item k="assistant" label="✦ AI assistant" />
             {GROUPS.map((g) => (
               <View key={g.title} style={{ marginTop: 14 }}>
@@ -61,6 +63,7 @@ const s = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, gap: 6 },
   menuBtn: { width: 38, height: 36, alignItems: 'center', justifyContent: 'center' },
   menu: { color: C.text, fontSize: 22, lineHeight: 24 },
+  searchIcon: { fontSize: 16 },
   title: { flex: 1, color: C.text, fontSize: 19, fontWeight: '800' },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', flexDirection: 'row' },
   panel: { width: 270, maxWidth: '82%', backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border, paddingTop: 60, paddingHorizontal: 12, paddingBottom: 24 },

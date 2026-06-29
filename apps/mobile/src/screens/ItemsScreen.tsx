@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, FlatList, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, TextInput, FlatList, Pressable, RefreshControl, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { money, Spinner, ErrorText, Empty } from '../ui';
-import { getItems, createItem, type Item } from '../api';
+import { getItems, createItem, deleteItemRecord, type Item } from '../api';
 
 const FILTERS: { key: 'all' | 'inventory' | 'shopping'; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -32,6 +32,13 @@ export function ItemsScreen() {
     try { await createItem({ title: t }); setFilter('all'); await load(); } catch (e) { setErr((e as Error).message); }
   }
 
+  function remove(it: Item) {
+    Alert.alert('Delete', `Delete "${it.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { setRows((p) => p.filter((x) => x.id !== it.id)); try { await deleteItemRecord(it.id); } catch { await load(); } } },
+    ]);
+  }
+
   return (
     <View style={s.wrap}>
       <View style={s.filters}>
@@ -56,14 +63,14 @@ export function ItemsScreen() {
           renderItem={({ item }) => {
             const price = item.purchasedPrice ?? item.currentPrice;
             return (
-              <View style={s.row}>
+              <Pressable onLongPress={() => remove(item)} style={s.row}>
                 <View style={{ flex: 1 }}>
                   {!!item.category && <Text style={s.eyebrow}>{item.category.toUpperCase()}</Text>}
                   <Text style={s.title}>{item.title}</Text>
                   <Text style={s.meta}>{item.status}</Text>
                 </View>
                 {price > 0 && <Text style={s.price}>{money(price)}</Text>}
-              </View>
+              </Pressable>
             );
           }}
         />

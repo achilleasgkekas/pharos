@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, RefreshControl, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getSubscriptions, addSubscription, type Subscription } from '../api';
+import { getSubscriptions, addSubscription, deleteSubscription, type Subscription } from '../api';
 
 export function SubscriptionsScreen() {
   const [rows, setRows] = useState<Subscription[]>([]);
@@ -27,6 +27,13 @@ export function SubscriptionsScreen() {
     try { await addSubscription({ name: n, amount: a, billingCycle: 'monthly' }); await load(); } catch (e) { setErr((e as Error).message); }
   }
 
+  function remove(it: Subscription) {
+    Alert.alert('Delete', `Delete "${it.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { setRows((p) => p.filter((x) => x.id !== it.id)); try { await deleteSubscription(it.id); } catch { await load(); } } },
+    ]);
+  }
+
   if (loading) return <Spinner />;
   const active = rows.filter((r) => r.active);
 
@@ -46,13 +53,13 @@ export function SubscriptionsScreen() {
         ListHeaderComponent={rows.length ? <Text style={s.head}>{active.length} active</Text> : null}
         ListEmptyComponent={<Empty>No subscriptions.</Empty>}
         renderItem={({ item }) => (
-          <View style={[s.row, !item.active && s.faded]}>
+          <Pressable onLongPress={() => remove(item)} style={[s.row, !item.active && s.faded]}>
             <View style={{ flex: 1 }}>
               <Text style={s.name}>{item.name}</Text>
               <Text style={s.meta}>{[item.billingCycle, item.nextRenewal ? `renews ${shortDate(item.nextRenewal)}` : '', !item.active ? 'cancelled' : ''].filter(Boolean).join('  ·  ')}</Text>
             </View>
             <Text style={s.amount}>{money(item.amount, item.currency)}</Text>
-          </View>
+          </Pressable>
         )}
       />
     </View>
