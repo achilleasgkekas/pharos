@@ -127,6 +127,7 @@ export async function getTasks(status?: string): Promise<Task[]> {
 }
 export function addTask(title: string) { return request<{ task: Task }>('/api/v1/tasks', { method: 'POST', body: JSON.stringify({ title }) }); }
 export function setTaskStatus(id: string, status: string) { return request<{ task: Task }>(`/api/v1/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }); }
+export function updateTask(id: string, data: { title?: string; status?: string; priority?: string }) { return request<{ task: Task }>(`/api/v1/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
 export function deleteTask(id: string) { return request<{ ok: boolean }>(`/api/v1/tasks/${id}`, { method: 'DELETE' }); }
 
 // ---- Expenses / income ----

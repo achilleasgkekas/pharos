@@ -1,8 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { Spinner, ErrorText, Empty } from '../ui';
-import { getTasks, addTask, setTaskStatus, deleteTask, type Task } from '../api';
+import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task } from '../api';
+
+const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
+const SC: Record<string, string> = { todo: C.faint, 'in-progress': C.cyan, blocked: C.red, done: C.accent };
+const slabel = (st: string) => st.replace('-', ' ').toUpperCase();
 
 export function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -10,6 +14,9 @@ export function TasksScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Task | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editStatus, setEditStatus] = useState<string>('todo');
 
   const load = useCallback(async () => {
     setErr(null);
@@ -29,10 +36,19 @@ export function TasksScreen() {
     setTasks((p) => p.map((x) => (x.id === it.id ? { ...x, status: next } : x)));
     try { await setTaskStatus(it.id, next); } catch { await load(); }
   }
-  function remove(it: Task) {
-    Alert.alert('Delete', `Delete "${it.title}"?`, [
+  function openEdit(it: Task) { setEditing(it); setEditTitle(it.title); setEditStatus(it.status); }
+  async function saveEdit() {
+    if (!editing || !editTitle.trim()) return;
+    const id = editing.id;
+    setEditing(null);
+    try { await updateTask(id, { title: editTitle.trim(), status: editStatus }); await load(); } catch (e) { setErr((e as Error).message); }
+  }
+  function removeEditing() {
+    if (!editing) return;
+    const id = editing.id;
+    Alert.alert('Delete', `Delete "${editing.title}"?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { setTasks((p) => p.filter((x) => x.id !== it.id)); try { await deleteTask(it.id); } catch { await load(); } } },
+      { text: 'Delete', style: 'destructive', onPress: async () => { setEditing(null); setTasks((p) => p.filter((x) => x.id !== id)); try { await deleteTask(id); } catch { await load(); } } },
     ]);
   }
 
@@ -55,16 +71,42 @@ export function TasksScreen() {
         renderItem={({ item }) => {
           const done = item.status === 'done';
           return (
-            <Pressable onPress={() => toggle(item)} onLongPress={() => remove(item)} style={s.row}>
-              <View style={[s.check, done && s.checkOn]}>{done && <Text style={s.mark}>✓</Text>}</View>
-              <View style={{ flex: 1 }}>
+            <View style={s.row}>
+              <Pressable onPress={() => toggle(item)} hitSlop={8} style={[s.check, done && s.checkOn]}>{done && <Text style={s.mark}>✓</Text>}</Pressable>
+              <Pressable onPress={() => openEdit(item)} style={{ flex: 1 }}>
                 <Text style={[s.title, done && s.struck]}>{item.title}</Text>
-                <Text style={s.meta}>{item.status.toUpperCase()}{item.priority !== 'normal' ? `  ·  ${item.priority}` : ''}{item.tags.length ? `  ·  ${item.tags.join(', ')}` : ''}</Text>
-              </View>
-            </Pressable>
+                <View style={s.metaRow}>
+                  <View style={[s.chip, { borderColor: SC[item.status] }]}><Text style={[s.chipText, { color: SC[item.status] }]}>{slabel(item.status)}</Text></View>
+                  {item.priority !== 'normal' && <Text style={s.pri}>{item.priority}</Text>}
+                  {item.tags.length > 0 && <Text style={s.tags} numberOfLines={1}>#{item.tags.join(' #')}</Text>}
+                </View>
+              </Pressable>
+            </View>
           );
         }}
       />
+
+      <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
+        <Pressable style={s.modalWrap} onPress={() => setEditing(null)}>
+          <Pressable style={s.modal} onPress={() => {}}>
+            <Text style={s.modalTitle}>Edit task</Text>
+            <Text style={s.label}>TITLE</Text>
+            <TextInput value={editTitle} onChangeText={setEditTitle} style={s.modalInput} placeholderTextColor={C.faint} />
+            <Text style={s.label}>STATUS</Text>
+            <View style={s.statuses}>
+              {STATUSES.map((st) => (
+                <Pressable key={st} onPress={() => setEditStatus(st)} style={[s.statusBtn, editStatus === st && { backgroundColor: SC[st], borderColor: SC[st] }]}>
+                  <Text style={[s.statusText, editStatus === st && { color: '#000' }]}>{slabel(st)}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={s.modalBtns}>
+              <Pressable onPress={saveEdit} disabled={!editTitle.trim()} style={[s.save, !editTitle.trim() && s.dim]}><Text style={s.saveText}>Save</Text></Pressable>
+              <Pressable onPress={removeEditing} style={s.del}><Text style={s.delText}>Delete</Text></Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -82,5 +124,22 @@ const s = StyleSheet.create({
   mark: { color: '#000', fontSize: 15, fontWeight: '800' },
   title: { color: C.text, fontSize: 15, fontWeight: '600' },
   struck: { textDecorationLine: 'line-through', color: C.dim },
-  meta: { color: C.faint, fontSize: 11, marginTop: 3, letterSpacing: 0.5 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 },
+  chip: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  chipText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  pri: { color: C.gold, fontSize: 11 },
+  tags: { color: C.faint, fontSize: 11, flex: 1 },
+  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
+  modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
+  modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
+  label: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 14, marginBottom: 6 },
+  modalInput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
+  statuses: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  statusBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  statusText: { color: C.dim, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  modalBtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
+  save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
+  saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
+  del: { paddingVertical: 12, paddingHorizontal: 12 },
+  delText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });
