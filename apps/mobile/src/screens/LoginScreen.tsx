@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable, ActivityIndicator, StyleSheet, Keyboa
 import { C } from '../theme';
 import { DEFAULT_API_BASE } from '../config';
 import { login, type SessionUser } from '../api';
+import { PharosMark } from '../PharosMark';
 
 export function LoginScreen({ onLogin }: { onLogin: (u: SessionUser) => void }) {
   const [server, setServer] = useState(DEFAULT_API_BASE);
@@ -28,6 +29,7 @@ export function LoginScreen({ onLogin }: { onLogin: (u: SessionUser) => void }) 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.wrap}>
       <View style={s.inner}>
+        <View style={{ alignItems: 'center', marginBottom: 10 }}><PharosMark size={48} /></View>
         <Text style={s.brand}>PHAROS</Text>
         <Text style={s.tagline}>One light over everything you run.</Text>
 

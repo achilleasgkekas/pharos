@@ -169,3 +169,15 @@ export type AiTurn = { role: 'user' | 'assistant'; content: string };
 export function aiCommand(messages: AiTurn[]) {
   return request<{ reply: string; actions: { name: string; summary: string }[] }>('/api/v1/ai', { method: 'POST', body: JSON.stringify({ messages }) });
 }
+
+// ---- Vouchers ----
+export type Voucher = { id: string; title: string; code: string; store: string; discount: string; expiresAt: string | null; used: boolean; url: string; notes: string };
+export async function getVouchers(): Promise<Voucher[]> {
+  return (await request<{ data: Voucher[] }>('/api/v1/vouchers?limit=200')).data ?? [];
+}
+
+// ---- Statements ----
+export type Statement = { id: string; card: string; last4: string; period: string; statementDate: string | null; dueDate: string | null; totalAmount: number; minimumPayment: number; paidAmount: number; currency: string; txnCount: number };
+export async function getStatements(): Promise<Statement[]> {
+  return (await request<{ data: Statement[] }>('/api/v1/statements?limit=100')).data ?? [];
+}

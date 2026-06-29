@@ -13,10 +13,13 @@ import { MoneyScreen } from './src/screens/MoneyScreen';
 import { SubscriptionsScreen } from './src/screens/SubscriptionsScreen';
 import { ItemsScreen } from './src/screens/ItemsScreen';
 import { AssistantScreen } from './src/screens/AssistantScreen';
+import { VouchersScreen } from './src/screens/VouchersScreen';
+import { StatementsScreen } from './src/screens/StatementsScreen';
 
 const TITLES: Record<ScreenKey, string> = {
   home: 'Pharos', assistant: 'AI assistant', shopping: 'Shopping list', receipts: 'Receipts',
   tasks: 'Tasks', expenses: 'Expenses', income: 'Income', subscriptions: 'Subscriptions', items: 'Inventory',
+  vouchers: 'Vouchers', statements: 'Statements',
 };
 
 export default function App() {
@@ -47,6 +50,8 @@ export default function App() {
       case 'income': return <MoneyScreen kind="income" />;
       case 'subscriptions': return <SubscriptionsScreen />;
       case 'items': return <ItemsScreen />;
+      case 'vouchers': return <VouchersScreen />;
+      case 'statements': return <StatementsScreen />;
       default: return null;
     }
   }
