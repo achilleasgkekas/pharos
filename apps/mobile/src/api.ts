@@ -287,6 +287,7 @@ export const updateExpense = (id: string, data: { vendor?: string; amount?: numb
 export const updateSubscription = (id: string, data: { name?: string; amount?: number; billingCycle?: string; active?: boolean }) => patch(`/api/v1/subscriptions/${id}`, data);
 export const updateVoucher = (id: string, data: { title?: string; code?: string; store?: string; used?: boolean }) => patch(`/api/v1/vouchers/${id}`, data);
 export const updateReceipt = (id: string, data: { store?: string; total?: number; date?: string; verified?: boolean; archived?: boolean; paymentMethod?: string }) => patch(`/api/v1/receipts/${id}`, data);
+export const updateItem = (id: string, data: { title?: string; status?: string; category?: string; currentPrice?: number; targetPrice?: number | null; specs?: string }) => patch(`/api/v1/items/${id}`, data);
 
 // ---- AI fill ----
 export type ParsedSub = { provider?: string; amount?: number; billingCycle?: string; category?: string; currency?: string; notes?: string; url?: string };

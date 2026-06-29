@@ -1,14 +1,16 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { money, Spinner, ErrorText, Empty } from '../ui';
-import { getItems, createItem, deleteItemRecord, importItemUrl, type Item } from '../api';
+import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, type Item } from '../api';
 
 const FILTERS: { key: 'all' | 'inventory' | 'shopping'; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'inventory', label: 'Owned' },
   { key: 'shopping', label: 'Shopping' },
 ];
+
+const STATUSES = ['researching', 'decided', 'ordered', 'received', 'installed', 'sold', 'broken', 'deferred'];
 
 export function ItemsScreen() {
   const [rows, setRows] = useState<Item[]>([]);
@@ -53,6 +55,45 @@ export function ItemsScreen() {
     ]);
   }
 
+  const [editing, setEditing] = useState<Item | null>(null);
+  const [eTitle, setETitle] = useState('');
+  const [eStatus, setEStatus] = useState('researching');
+  const [eCategory, setECategory] = useState('');
+  const [ePrice, setEPrice] = useState('');
+  const [eTarget, setETarget] = useState('');
+  const [eSpecs, setESpecs] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  function openEdit(it: Item) {
+    setEditing(it);
+    setETitle(it.title);
+    setEStatus(it.status || 'researching');
+    setECategory(it.category || '');
+    setEPrice(it.currentPrice ? String(it.currentPrice) : '');
+    setETarget(it.targetPrice != null ? String(it.targetPrice) : '');
+    setESpecs(it.specs || '');
+  }
+  async function saveEdit() {
+    if (!editing) return;
+    const id = editing.id;
+    const price = parseFloat(ePrice.replace(',', '.'));
+    const target = eTarget.trim() ? parseFloat(eTarget.replace(',', '.')) : null;
+    setSaving(true); setErr(null);
+    try {
+      await updateItem(id, {
+        title: eTitle.trim(),
+        status: eStatus,
+        category: eCategory.trim(),
+        currentPrice: Number.isFinite(price) ? price : undefined,
+        targetPrice: target != null && Number.isFinite(target) ? target : null,
+        specs: eSpecs.trim(),
+      });
+      setEditing(null);
+      await load();
+    } catch (e) { setErr((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
   return (
     <View style={s.wrap}>
       <View style={s.filters}>
@@ -80,7 +121,7 @@ export function ItemsScreen() {
           renderItem={({ item }) => {
             const price = item.purchasedPrice ?? item.currentPrice;
             return (
-              <Pressable onLongPress={() => remove(item)} style={s.row}>
+              <Pressable onPress={() => openEdit(item)} onLongPress={() => remove(item)} style={s.row}>
                 <View style={{ flex: 1 }}>
                   {!!item.category && <Text style={s.eyebrow}>{item.category.toUpperCase()}</Text>}
                   <Text style={s.title}>{item.title}</Text>
@@ -92,6 +133,46 @@ export function ItemsScreen() {
           }}
         />
       )}
+
+      <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
+        <Pressable style={s.modalWrap} onPress={() => setEditing(null)}>
+          <Pressable style={s.modal} onPress={() => {}}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <Text style={s.modalTitle}>Edit item</Text>
+              <Text style={s.mlabel}>TITLE</Text>
+              <TextInput value={eTitle} onChangeText={setETitle} style={s.minput} placeholderTextColor={C.faint} />
+              <Text style={s.mlabel}>STATUS</Text>
+              <View style={s.statusWrap}>
+                {STATUSES.map((st) => (
+                  <Pressable key={st} onPress={() => setEStatus(st)} style={[s.sChip, eStatus === st && s.sChipOn]}>
+                    <Text style={[s.sChipText, eStatus === st && s.sChipTextOn]}>{st}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={s.mlabel}>CATEGORY</Text>
+              <TextInput value={eCategory} onChangeText={setECategory} autoCapitalize="none" style={s.minput} placeholder="e.g. networking" placeholderTextColor={C.faint} />
+              <View style={s.priceRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.mlabel}>PRICE</Text>
+                  <TextInput value={ePrice} onChangeText={setEPrice} keyboardType="decimal-pad" style={s.minput} placeholder="0" placeholderTextColor={C.faint} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.mlabel}>TARGET</Text>
+                  <TextInput value={eTarget} onChangeText={setETarget} keyboardType="decimal-pad" style={s.minput} placeholder="—" placeholderTextColor={C.faint} />
+                </View>
+              </View>
+              <Text style={s.mlabel}>SPECS</Text>
+              <TextInput value={eSpecs} onChangeText={setESpecs} multiline style={[s.minput, s.specs]} placeholder="notes / specs" placeholderTextColor={C.faint} />
+              <View style={s.mbtns}>
+                <Pressable onPress={saveEdit} disabled={saving || !eTitle.trim()} style={[s.save, (saving || !eTitle.trim()) && s.dim]}>
+                  {saving ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>Save</Text>}
+                </Pressable>
+                <Pressable onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
+              </View>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -115,4 +196,21 @@ const s = StyleSheet.create({
   title: { color: C.text, fontSize: 15, fontWeight: '600', marginTop: 2 },
   meta: { color: C.faint, fontSize: 12, marginTop: 2 },
   price: { color: C.accent, fontSize: 16, fontWeight: '700' },
+  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 },
+  modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20, maxHeight: '88%' },
+  modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
+  mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
+  minput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
+  specs: { minHeight: 64, textAlignVertical: 'top' },
+  priceRow: { flexDirection: 'row', gap: 12 },
+  statusWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  sChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 9, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
+  sChipOn: { backgroundColor: C.accent, borderColor: C.accent },
+  sChipText: { color: C.dim, fontSize: 12, fontWeight: '600' },
+  sChipTextOn: { color: '#000' },
+  mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22 },
+  save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 26, minWidth: 96, alignItems: 'center' },
+  saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
+  delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
+  delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });

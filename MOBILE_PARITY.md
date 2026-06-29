@@ -20,7 +20,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 |-----|--------|
 | Grid/list, e-shop sidebar filters (status/store/category/sort/flags), select-mode + bulk AI fill | 🟡 list + All/Owned/Shopping filter |
 | Add item + **URL import** (fetch + AI parse → preview → approve), dedup | 🟡 add by title only (no URL import / AI) |
-| Item detail: specs, **PricePanel** (best price, where-to-buy, price position, log price, search online, full history chart), links, photos, warranty, purchase & payment, **link to installment plan**, AI specs, convert-to-task | ❌ no detail / edit / price tracking |
+| Item detail: specs, **PricePanel** (best price, where-to-buy, price position, log price, search online, full history chart), links, photos, warranty, purchase & payment, **link to installment plan**, AI specs, convert-to-task | 🟡 tap-to-edit (title, status, category, price, target, specs); no PricePanel / photos / links / warranty |
 | Delete | ✅ long-press delete |
 
 ## Shopping list (`/shopping-list`)
@@ -93,7 +93,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ---
 
 ## Roadmap (priority order)
-1. ✅ **Edit existing records** — tap-to-edit modals for Tasks, Expenses, Income, Subscriptions, Vouchers (PATCH endpoints + forms). *Remaining: Items edit.*
+1. ✅ **Edit existing records** — tap-to-edit modals for Tasks, Expenses, Income, Subscriptions, Vouchers, **Items** (PATCH endpoints + forms).
 2. ✅ **Tasks statuses** — todo/in-progress/blocked/done picker + status chips.
 3. **Receipt verify/edit** — edit fields + verify + re-scan. ← next
 4. **AI fill** — subscription-from-name, voucher scan, item URL import.
@@ -102,4 +102,4 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 7. **Activity** — Trash (restore/purge), Jobs, History.
 8. **Push notifications** (needs device).
 
-> Progress: tap any row on Tasks / Expenses / Income / Subscriptions / Vouchers to **edit**; long-press to delete. Items still list+add+delete only.
+> Progress: tap any row on Tasks / Expenses / Income / Subscriptions / Vouchers / **Items** to **edit**; long-press to delete. Items edit covers title, status, category, price, target, specs (no price-tracking / photos / links yet).
