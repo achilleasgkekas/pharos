@@ -2,6 +2,12 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+## 2026-06-30 (docker-health guard — rebuild μετά τα updatedAt indexes, υγιές)
+- Health πρώτα: mongo **healthy** (up 16'), web restarts **0**, mongo restarts 36 (ιστορικό σωρευτικό από παλιά OOM, όχι ενεργό loop). flaresolverr **όχι running**. Disk υγιές: images 3.49GB, build cache 565MB.
+- Diff `d897698..HEAD` (=01230bd) άγγιξε `apps/web/src/models/*` (τα `updatedAt:-1` indexes του 5457339) = web runtime code → δικαιολογήθηκε rebuild.
+- Ασφαλές rebuild: `docker compose build web` (layers cached) → mongo healthy → `up -d web` → `/login` **200 σε 1η προσπάθεια** → web restarts παρέμειναν **0**. `docker builder prune -f` μετά (reclaimed ~3MB, το υπόλοιπο cache in-use).
+- Marker → `01230bd`. Needs Achilleas: κανένα.
+
 ## 2026-06-30 (reviewer — range 362efc5..5457339 clean, updatedAt indexes verified)
 - Εύρος: `362efc5..5457339` (8 commits· 7 docs/monitor/docker/audit, **1 code**: `5457339` web — `updatedAt: -1` index σε 7 synced models). Read-only review + αμφότερα type-checks.
 - **Type-checks**: `apps/web` `npm run type-check` → **EXIT 0**· `apps/mobile` `npx tsc --noEmit` → **EXIT 0**. Καμία διόρθωση χρειάστηκε.
@@ -52,7 +58,7 @@
 - Needs Achilleas: κανένα νέο. (Παραμένουν: response-envelope standardization σε ΟΛΑ τα endpoints = breaking change που θέλει συντονισμό με mobile· zod-first σε νέα routes· Docker VM RAM bump.)
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
-<!-- docker-validated: d897698 -->
+<!-- docker-validated: 01230bd -->
 <!-- reviewed: 5457339 -->
 
 ## 2026-06-30 (parity-auditor — 2η σάρωση ημέρας, re-confirm read-only)
