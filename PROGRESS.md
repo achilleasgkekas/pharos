@@ -2,6 +2,22 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+## 2026-06-30 (parity-auditor — 3η σάρωση ημέρας, re-confirm read-only)
+- Read-only re-audit web↔mobile από τον κώδικα (όχι docs). Μηδέν app code, μηδέν Docker, μηδέν AI jobs. Inventory: **46 v1 route files** (login + 45 bearer), **16 mobile screens**, **78** exported api fns.
+- mobile `npx tsc --noEmit` → **EXIT 0** (καθαρό → κανένα P1 type-gap).
+- **Endpoint coverage 1:1**: grep των v1 paths στο mobile `api.ts` ταιριάζει με ΟΛΟ το route list → κανένα «web endpoint χωρίς mobile consumer» gap· ό,τι λείπει χρειάζεται **νέο/επεκταμένο** endpoint.
+- **Επαλήθευσα ξανά από directory listings + κώδικα και τα 5 GAP ως γνήσια:**
+  - Receipts re-scan (P2/M): `api/v1/receipts/[id]/` = {route.ts, add-to-library} → κανένα rescan → valid TODO (AI cost → δομικό verify μόνο).
+  - Items convert-to-task (P3/S): `api/v1/items/[id]/` = {route.ts, link-plan, plans, price} → κανένα convert-to-task → valid (no AI).
+  - Items AI specs (P3/M): ίδιο listing → κανένα ai-fill → valid (AI cost).
+  - Expenses/Income full-field edit (P3/S): `PATCH /api/v1/expenses/[id]` (route.ts:11-29, διάβασα το body) δέχεται ΜΟΝΟ vendor/amount/category/kind/notes/date → ΛΕΙΠΟΥΝ period/recurring/recurringCycle/paymentMethod → «PARTIAL» ισχύει (builder επεκτείνει ΠΡΩΤΑ το PATCH).
+  - Notifications unread badge (P3/S): pure-mobile UI· `GET /api/v1/notifications` υπάρχει + γυρνά ήδη `unread` (api.ts:412) → valid.
+- **Πρώην P1 = DONE**: Statements installment-plan overview (route `statements/plans` υπάρχει, api.ts:274 το καλεί). Πυρήνας parity κλειστός (μηδέν P1/S).
+- **Από το προηγ. parity audit (`afbccb3`) μόνο 1 code commit άγγιξε web runtime**: `5457339` (updatedAt indexes = db perf, ΟΧΙ parity) → queue σωστά αμετάβλητο.
+- **Σύνολο: 0 DONE-corrections, 5 GAP (1 P2 + 4 P3), 0 νέα NEEDS DECISION.**
+- **Top 3 για τον builder:** (1) Receipts re-scan OCR/text [P2/M, AI → δομικό verify], (2) Items convert-to-task [P3/S, no AI], (3) Expenses/Income full-field edit [P3/S, no AI — επέκταση PATCH πρώτα].
+- Staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (explicit paths, όχι `-A`). Καμία αλλαγή σε app code/secrets/.env.
+
 ## 2026-06-30 (docker-health guard — rebuild μετά τα updatedAt indexes, υγιές)
 - Health πρώτα: mongo **healthy** (up 16'), web restarts **0**, mongo restarts 36 (ιστορικό σωρευτικό από παλιά OOM, όχι ενεργό loop). flaresolverr **όχι running**. Disk υγιές: images 3.49GB, build cache 565MB.
 - Diff `d897698..HEAD` (=01230bd) άγγιξε `apps/web/src/models/*` (τα `updatedAt:-1` indexes του 5457339) = web runtime code → δικαιολογήθηκε rebuild.
