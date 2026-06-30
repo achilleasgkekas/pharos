@@ -3,24 +3,51 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
-## Σύνοψη audit (2026-06-30· re-audit confirm βραδινό· re-confirm late 46 route files· re-confirm #4 2026-06-30 — μηδέν app-code commit ενδιάμεσα)
+## Σύνοψη audit (2026-06-30 βραδινό re-audit — ΟΛΑ τα 5 αρχικά items DONE· 2 νέα P3 items προστέθηκαν)
 
-Re-confirm #4: επανέλεγχος ολόκληρης της `/api/v1` (46 route files). `git log af7fdc5..HEAD -- apps/web/src` → **κενό** (κανένα app-code commit από τότε που στήθηκε η ουρά· μόνο docs). Άρα και τα 5 items παραμένουν αυτόλεξη valid + αμετάβλητα. Επαληθεύτηκαν ξανά από τον κώδικα: (α) κανένα model δεν έχει `index({ updatedAt })` → P2#1, (β) `GET /items` γυρνά `{ items }` όχι `listEnvelope {data}` (route.ts:51) → P2#3, (γ) `POST /items` δέχεται αυθαίρετο `status` ενώ το PATCH κάνει `STATUS.includes()` (8 τιμές πλέον: +sold/broken) → P2#2, (δ) `shopping-list/[id]` το μόνο [id] route χωρίς 24-hex guard, σιωπηλό success σε not-found → P3#4. Μηδέν νέο εύρημα.
+**Καθοριστικό εύρημα αυτού του run: η αρχική ουρά (5 items) είναι πλέον ΟΛΗ DONE.** Ο builder υλοποίησε τα 4 ανοιχτά (commits `5457339` index-updatedAt, `4ead61b` whitelist-status, `261a4fb` shopping-list id-guard, `9b34b44` body-coercion helpers) ΚΑΙ το P2#3 (GET /items listEnvelope, commit `c3c9fae`) — το οποίο ήταν ακόμα stale-marked TODO. Το επαλήθευσα από τον κώδικα: `GET /items` γυρνά τώρα `listEnvelope({data})` (route.ts:53) + ο mobile consumer διαβάζει `.data` (`apps/mobile/src/api.ts:205`), άρα συμβατό end-to-end → το μάρκαρα DONE.
 
-Re-audit (προηγ.): η ουρά (5 items, 0 P1 / 3 P2 / 2 P3) **επιβεβαιώθηκε αμετάβλητη** — τίποτα δεν χτίστηκε ενδιάμεσα (commits μόνο docs + το `df8c87a` statements/plans, additive, ήδη reviewed). Σαρώθηκαν ξανά **46 route files** (45 bearer + login): όλα καλο-γραμμένα (withAuth, id 24-hex guard, `req.json().catch(()=>({}))`, .lean(), clean 400/403/404). Μηδέν νέο εύρημα.
+**Νέο fresh scan (46 route files + 10 models + apiList/apiAuth/serialize):** βρέθηκαν **2 μικρά P3 (polish) items** — και τα δύο dedup/consistency, μηδέν correctness ρίσκο:
+1. 4 routes (scan/product, scan/receipt, shopping-list, items POST) επιστρέφουν inline `NextResponse.json({ error }, { status: 400 })` αντί για το shared `apiError()` helper (πανομοιότυπο shape· καθαρό consistency).
+2. Η normalization των receipt lineItems (`{ name: refinedName||name, qty, price, vatRate }` + `LineLean` type) είναι copy-paste σε **3** routes (scan/receipt, receipts/[id] GET, receipts/[id]/rescan) → shared serializer στο `receipts/serialize.ts`.
 
-Η `/api/v1` επιφάνεια είναι σε καλή κατάσταση. Δεν βρέθηκε P1 (correctness/security/data) θέμα:
+Η `/api/v1` επιφάνεια παραμένει σε πολύ καλή κατάσταση. Μηδέν P1/P2 εύρημα αυτόν τον γύρο:
 
 - **Type safety**: `npm run type-check` → **exit 0**. Μηδέν `any` / `@ts-ignore` στα routes· χρήση `unknown` + στοχευμένα casts. Καθαρό.
 - **Auth**: ΟΛΑ τα `/api/v1` routes περνούν από `withAuth` (`lib/apiAuth.ts`) εκτός του `auth/login` (σωστά). Το `User.apiToken` (hot lookup σε κάθε request) είναι indexed. Καθαρό.
 - **Error handling**: ομοιόμορφο try/catch μέσω `withAuth` → καθαρό 500· κάθε body read κάνει `req.json().catch(() => ({}))` (δεν σκάει σε κακό JSON)· μηδέν swallowed catches. Καθαρό.
 - **Reads**: όλα τα list endpoints κάνουν `.lean()` + `skip/limit` pagination (1..200). Καλό.
 
-Τα ευρήματα παρακάτω είναι P2 (consistency) και P3 (polish). Η ευρεία standardization του response envelope σε ΟΛΑ τα endpoints (breaking change που συντονίζεται με το mobile) πάει στο `## Needs Achilleas` του PROGRESS, ΟΧΙ εδώ.
+Τα 2 νέα ενεργά items παρακάτω είναι P3 (polish, dedup). Η ευρεία standardization του response envelope σε ΟΛΑ τα endpoints (breaking change που συντονίζεται με το mobile) παραμένει στο `## Needs Achilleas` του PROGRESS, ΟΧΙ εδώ.
 
 ---
 
 ## Web Debt Queue
+
+### Receipt lineItems serializer — dedup σε 3 routes
+- Priority: P3
+- Size: S
+- Area: shared
+- Files: apps/web/src/app/api/v1/receipts/serialize.ts, apps/web/src/app/api/v1/scan/receipt/route.ts, apps/web/src/app/api/v1/receipts/[id]/route.ts, apps/web/src/app/api/v1/receipts/[id]/rescan/route.ts
+- Depends on: none
+- Acceptance:
+  - Το ίδιο normalization `lines.map((l) => ({ name: l.refinedName || l.name || '', qty: l.qty ?? 1, price: l.price ?? 0, vatRate: l.vatRate ?? 0 }))` + ο τύπος `LineLean` (`{ name?; refinedName?; qty?; price?; vatRate? }`) είναι copy-paste σε 3 GET/POST receipt routes (scan/receipt, receipts/[id] GET, receipts/[id]/rescan). Εξάγεται ένας shared helper (π.χ. `serializeLineItems(lines)` + ο τύπος) στο `receipts/serialize.ts` (όπου ζει ήδη το `trimReceipt`/`ReceiptLean`) και τον καλούν τα 3 routes.
+  - Το output shape ανά line μένει ΑΚΡΙΒΩΣ ίδιο (name/qty/price/vatRate, ίδια fallbacks)· μηδέν αλλαγή στο response. Το PATCH (receipts/[id]) έχει ΔΙΑΦΟΡΕΤΙΚΟ inbound mapping (`numOr`, `refinedName:''`) → ΔΕΝ το αγγίζεις.
+  - npm run type-check exits 0
+- Status: TODO
+
+### Inline error → shared apiError() helper (4 routes)
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/v1/scan/product/route.ts, apps/web/src/app/api/v1/scan/receipt/route.ts, apps/web/src/app/api/v1/shopping-list/route.ts, apps/web/src/app/api/v1/items/route.ts
+- Depends on: none
+- Acceptance:
+  - 4 routes επιστρέφουν inline `return NextResponse.json({ error: ... }, { status: 400 })` ενώ υπάρχει το shared `apiError(message, status=400)` (`lib/apiAuth.ts`) που παράγει ΠΑΝΟΜΟΙΟΤΥΠΟ `{ error }` shape και το χρησιμοποιούν ήδη 33 routes. Αντικαθίστανται με `return apiError(r.error)` / `apiError('title required')`.
+  - Το `auth/login` ΕΞΑΙΡΕΙΤΑΙ σκόπιμα (auth boundary, δικό του error handling) — μην το αλλάξεις.
+  - Μηδέν αλλαγή σε status codes ή error messages· καθαρό consistency. Αν κάποιο route μείνει χωρίς άλλη χρήση του `NextResponse`, καθάρισε το import.
+  - npm run type-check exits 0
+- Status: TODO
 
 ### Index updatedAt στα synced models
 - Priority: P2
@@ -59,7 +86,7 @@ Re-audit (προηγ.): η ουρά (5 items, 0 P1 / 3 P2 / 2 P3) **επιβεβ
   - Είτε (α) align το items σε `listEnvelope` (`{ data }`) ΚΑΙ ενημέρωση του mobile consumer (`apps/mobile/src/api.ts`, όπου διαβάζει `.items`) ώστε να μη σπάσει, είτε (β) αν το breaking δεν είναι αποδεκτό τώρα, καταγραφή της απόκλισης ως σχόλιο στο route + στο `## Needs Achilleas` και κλείσιμο του item.
   - Όποια επιλογή: το web + το mobile συμφωνούν στο key· μηδέν runtime σπάσιμο στο mobile items list.
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (2026-06-30· commit `c3c9fae`) — επιλέχθηκε (α): `GET /items` γυρνά πλέον `listEnvelope({data})` (route.ts:53) ΚΑΙ ο mobile consumer ενημερώθηκε να διαβάζει `.data` (`apps/mobile/src/api.ts:205`). Επαληθεύτηκε από τον κώδικα σε αυτό το run· ήταν stale-marked TODO. Συμβατό end-to-end, μηδέν runtime break.
 
 ### shopping-list/[id] — id validation + 404
 - Priority: P3
