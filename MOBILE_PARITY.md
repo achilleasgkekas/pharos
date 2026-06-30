@@ -73,7 +73,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Settings (`/settings`)
 | Web | Mobile |
 |-----|--------|
-| 7 tabs: appearance/defaults, budgets/cards, **AI engine/features/prompts**, storage/backup/CSV/trash/OneDrive, stores/lists, **ntfy notifications** | 🟡 account + **editable preferences** (currency, VAT, warranty months/alert, auto-add stores) + **editable budgets** + **ntfy URL/enable/test** + server/version. No theme/language, cards, AI engine, storage, stores/lists |
+| 7 tabs: appearance/defaults, budgets/cards, **AI engine/features/prompts**, storage/backup/CSV/trash/OneDrive, stores/lists, **ntfy notifications** | 🟡 account + **editable preferences** (currency, VAT, warranty months/alert, auto-add stores) + **editable budgets** + **payment cards CRUD** (add/edit/delete/toggle, color/kind/type/last4/limit) + **ntfy URL/enable/test** + server/version. No theme/language, AI engine, storage, stores/lists |
 
 ## Activity
 | Web | Mobile |
@@ -98,7 +98,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 3. **Receipt verify/edit** — edit fields + verify + re-scan. ← next
 4. **AI fill** — subscription-from-name, voucher scan, item URL import.
 5. **Statement transactions** — per-statement detail + installment plans.
-6. 🟡 **Settings** — editable preferences (currency/VAT/warranty/auto-add), editable budgets, ntfy URL/enable/test ✅. *Remaining: theme toggle, language, payment cards, AI engine, storage, stores/lists.*
+6. 🟡 **Settings** — editable preferences (currency/VAT/warranty/auto-add), editable budgets, payment cards CRUD, ntfy URL/enable/test ✅. *Remaining: theme toggle, language, AI engine, storage, stores/lists.*
 7. **Activity** — Trash (restore/purge), Jobs, History.
 8. **Push notifications** (needs device).
 

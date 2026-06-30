@@ -240,6 +240,26 @@ export function testNotify() {
   return request<{ ok: boolean }>('/api/v1/settings/test-notify', { method: 'POST' });
 }
 
+// ---- Payment cards (Settings → cards CRUD) ----
+export type Card = {
+  id: string; name: string; last4: string; bank: string;
+  kind: 'credit' | 'debit'; type: 'mastercard' | 'visa' | 'amex' | 'maestro' | 'other';
+  color: string; creditLimit: number; notes: string; active: boolean;
+};
+export type CardInput = Partial<Omit<Card, 'id'>> & { name?: string };
+export async function getCards(): Promise<Card[]> {
+  return (await request<{ cards: Card[] }>('/api/v1/cards')).cards ?? [];
+}
+export function createCard(data: CardInput) {
+  return request<{ card: Card }>('/api/v1/cards', { method: 'POST', body: JSON.stringify(data) });
+}
+export function updateCard(id: string, data: CardInput) {
+  return request<{ ok: boolean }>(`/api/v1/cards/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+export function deleteCard(id: string) {
+  return request<{ ok: boolean }>(`/api/v1/cards/${id}`, { method: 'DELETE' });
+}
+
 // ---- Reports ----
 export type Reports = {
   currency: string;

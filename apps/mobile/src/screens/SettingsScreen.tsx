@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal } from 'react-native';
 import { C } from '../theme';
 import { money, ErrorText } from '../ui';
 import { PharosMark } from '../PharosMark';
 import { APP_VERSION } from '../config';
-import { currentBase, currentUser, getSettings, updateSettings, testNotify, type AppSettings } from '../api';
+import {
+  currentBase, currentUser, getSettings, updateSettings, testNotify, type AppSettings,
+  getCards, createCard, updateCard, deleteCard, type Card, type CardInput,
+} from '../api';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP'];
+const CARD_KINDS: Card['kind'][] = ['credit', 'debit'];
+const CARD_TYPES: Card['type'][] = ['mastercard', 'visa', 'amex', 'maestro', 'other'];
+const CARD_COLORS = [C.cyan, C.accent, C.gold, C.purple, C.red, '#f5f5f5'];
 
 export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
   const user = currentUser();
@@ -164,6 +170,8 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
         {saving ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>Save settings</Text>}
       </Pressable>
 
+      <CardsSection currency={currency} />
+
       <Text style={s.section}>CONNECTION</Text>
       <View style={s.card}>
         <Row label="Server" value={currentBase()} last />
@@ -178,6 +186,175 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
 
       <Pressable onPress={onSignOut} style={s.signout}><Text style={s.signoutText}>Sign out</Text></Pressable>
     </ScrollView>
+  );
+}
+
+// ---- Payment cards CRUD (self-contained: loads + saves independently) ----
+const EMPTY_CARD: CardInput = { name: '', last4: '', bank: '', kind: 'credit', type: 'other', color: C.cyan, creditLimit: 0, notes: '' };
+
+function CardsSection({ currency }: { currency: string }) {
+  const [cards, setCards] = useState<Card[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Card | 'new' | null>(null);
+
+  async function load() {
+    try { setCards(await getCards()); setErr(null); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function toggle(c: Card) {
+    setCards((p) => p.map((x) => (x.id === c.id ? { ...x, active: !x.active } : x)));
+    try { await updateCard(c.id, { active: !c.active }); } catch (e) { setErr((e as Error).message); load(); }
+  }
+  function remove(c: Card) {
+    Alert.alert('Delete card', `Remove "${c.name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await deleteCard(c.id); setCards((p) => p.filter((x) => x.id !== c.id)); }
+        catch (e) { setErr((e as Error).message); }
+      } },
+    ]);
+  }
+
+  return (
+    <>
+      <Text style={s.section}>PAYMENT CARDS</Text>
+      <View style={s.cardPad}>
+        <ErrorText>{err}</ErrorText>
+        {loading ? (
+          <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />
+        ) : cards.length === 0 ? (
+          <Text style={s.hint}>No cards yet. Add one below.</Text>
+        ) : (
+          cards.map((c) => (
+            <View key={c.id} style={s.cardRow}>
+              <View style={[s.dot, { backgroundColor: c.color }]} />
+              <Pressable style={{ flex: 1 }} onPress={() => setEditing(c)}>
+                <Text style={[s.cardName, !c.active && s.dimText]} numberOfLines={1}>{c.name}</Text>
+                <Text style={s.cardMeta} numberOfLines={1}>
+                  {[c.bank, c.kind, c.last4 ? `••${c.last4}` : ''].filter(Boolean).join(' · ')}
+                </Text>
+              </Pressable>
+              <Pressable onPress={() => toggle(c)} style={[s.activePill, c.active ? s.activeOn : s.activeOff]}>
+                <Text style={[s.activePillText, c.active ? s.activeOnText : s.activeOffText]}>{c.active ? 'ON' : 'OFF'}</Text>
+              </Pressable>
+              <Pressable onPress={() => remove(c)} style={s.rm}><Text style={s.rmText}>✕</Text></Pressable>
+            </View>
+          ))
+        )}
+        <Pressable onPress={() => setEditing('new')} style={s.addCardBtn}>
+          <Text style={s.addCardText}>+ Add card</Text>
+        </Pressable>
+      </View>
+
+      {editing && (
+        <CardEditor
+          card={editing === 'new' ? null : editing}
+          currency={currency}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load(); }}
+        />
+      )}
+    </>
+  );
+}
+
+function CardEditor({ card, currency, onClose, onSaved }: { card: Card | null; currency: string; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState<CardInput>(card ? { ...card } : { ...EMPTY_CARD });
+  const [limit, setLimit] = useState(String(card?.creditLimit ?? ''));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const set = <K extends keyof CardInput>(k: K, v: CardInput[K]) => setForm((p) => ({ ...p, [k]: v }));
+
+  async function save() {
+    if (!form.name?.trim()) { setErr('Name is required.'); return; }
+    setSaving(true); setErr(null);
+    const payload: CardInput = {
+      name: form.name.trim(),
+      last4: (form.last4 || '').replace(/\D/g, '').slice(0, 4),
+      bank: form.bank || '',
+      kind: form.kind,
+      type: form.type,
+      color: form.color,
+      creditLimit: parseFloat(limit.replace(',', '.')) || 0,
+      notes: form.notes || '',
+    };
+    try {
+      if (card) await updateCard(card.id, payload);
+      else await createCard(payload);
+      onSaved();
+    } catch (e) { setErr((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  const curSym = money(0, currency).replace(/0.*/, '');
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={s.modalBackdrop}>
+        <View style={s.modalSheet}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 18, paddingBottom: 30 }}>
+            <Text style={s.modalTitle}>{card ? 'Edit card' : 'New card'}</Text>
+            <ErrorText>{err}</ErrorText>
+
+            <Text style={s.flabel}>NAME</Text>
+            <TextInput value={form.name} onChangeText={(t) => set('name', t)} placeholder="e.g. Mastercard 7791" placeholderTextColor={C.faint} style={s.input} />
+
+            <View style={s.pair}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.flabel}>BANK</Text>
+                <TextInput value={form.bank} onChangeText={(t) => set('bank', t)} placeholder="Bank" placeholderTextColor={C.faint} style={s.input} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.flabel}>LAST 4</Text>
+                <TextInput value={form.last4} onChangeText={(t) => set('last4', t.replace(/\D/g, '').slice(0, 4))} keyboardType="number-pad" maxLength={4} placeholder="7791" placeholderTextColor={C.faint} style={s.input} />
+              </View>
+            </View>
+
+            <Text style={[s.flabel, { marginTop: 12 }]}>KIND</Text>
+            <View style={s.chipsRow}>
+              {CARD_KINDS.map((k) => (
+                <Pressable key={k} onPress={() => set('kind', k)} style={[s.chip, form.kind === k && s.chipOn]}>
+                  <Text style={[s.chipText, form.kind === k && s.chipTextOn]}>{k}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={[s.flabel, { marginTop: 12 }]}>TYPE</Text>
+            <View style={s.chipsRow}>
+              {CARD_TYPES.map((t) => (
+                <Pressable key={t} onPress={() => set('type', t)} style={[s.chip, form.type === t && s.chipOn]}>
+                  <Text style={[s.chipText, form.type === t && s.chipTextOn]}>{t}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={[s.flabel, { marginTop: 12 }]}>COLOR</Text>
+            <View style={s.chipsRow}>
+              {CARD_COLORS.map((col) => (
+                <Pressable key={col} onPress={() => set('color', col)} style={[s.swatch, { backgroundColor: col }, form.color === col && s.swatchOn]} />
+              ))}
+            </View>
+
+            <Text style={[s.flabel, { marginTop: 12 }]}>CREDIT LIMIT ({curSym || currency})</Text>
+            <TextInput value={limit} onChangeText={setLimit} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={C.faint} style={s.input} />
+
+            <Text style={[s.flabel, { marginTop: 12 }]}>NOTES</Text>
+            <TextInput value={form.notes} onChangeText={(t) => set('notes', t)} placeholder="Optional" placeholderTextColor={C.faint} style={[s.input, { height: 64, textAlignVertical: 'top' }]} multiline />
+
+            <View style={s.modalBtns}>
+              <Pressable onPress={onClose} style={s.cancelBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
+              <Pressable onPress={save} disabled={saving} style={[s.saveBtn, { flex: 1, marginTop: 0 }, saving && s.dim]}>
+                {saving ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>{card ? 'Save card' : 'Add card'}</Text>}
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -252,4 +429,26 @@ const s = StyleSheet.create({
   saveText: { color: '#000', fontSize: 15, fontWeight: '800' },
   signout: { marginTop: 26, borderWidth: 1, borderColor: '#ff475740', backgroundColor: '#ff475715', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   signoutText: { color: C.red, fontSize: 15, fontWeight: '700' },
+  // cards
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border },
+  dot: { width: 12, height: 12, borderRadius: 6 },
+  cardName: { color: C.text, fontSize: 14, fontWeight: '600' },
+  dimText: { color: C.dim },
+  cardMeta: { color: C.faint, fontSize: 12, marginTop: 2, textTransform: 'capitalize' },
+  activePill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  activeOn: { borderColor: C.accent, backgroundColor: '#00ff8815' },
+  activeOff: { borderColor: C.border },
+  activePillText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  activeOnText: { color: C.accent },
+  activeOffText: { color: C.faint },
+  addCardBtn: { marginTop: 12, borderWidth: 1, borderColor: C.cyan, borderRadius: 11, paddingVertical: 11, alignItems: 'center' },
+  addCardText: { color: C.cyan, fontSize: 14, fontWeight: '700' },
+  swatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
+  swatchOn: { borderColor: C.text },
+  modalBackdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: C.border, maxHeight: '90%' },
+  modalTitle: { color: C.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },
+  modalBtns: { flexDirection: 'row', gap: 12, marginTop: 22, alignItems: 'stretch' },
+  cancelBtn: { paddingHorizontal: 20, justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: C.border },
+  cancelText: { color: C.dim, fontSize: 15, fontWeight: '600' },
 });
