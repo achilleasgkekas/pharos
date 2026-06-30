@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, ScrollView, StyleSheet, Alert } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { C } from '../theme';
 import { shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, type Voucher } from '../api';
+import { getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, scanVoucherImage, type Voucher, type ParsedVoucherData } from '../api';
 
 type Draft = { title: string; code: string; store: string; discount: string; expiresAt: string; url: string; used: boolean };
 const EMPTY: Draft = { title: '', code: '', store: '', discount: '', expiresAt: '', url: '', used: false };
@@ -32,20 +33,31 @@ export function VouchersScreen() {
   const [showScan, setShowScan] = useState(false);
   const [scanText, setScanText] = useState('');
   const [scanBusy, setScanBusy] = useState(false);
-  async function doScan() {
+  // Open a draft prefilled with everything the AI found, for review before saving.
+  function draftFromParsed(d: ParsedVoucherData) {
+    setForm({
+      title: d.title ?? title.trim(), code: d.code ?? code.trim(), store: d.store ?? '',
+      discount: d.discount ?? '', expiresAt: ymd(d.expiresAt ?? null), url: d.url ?? '', used: false,
+    });
+    setEditing('new');
+    setShowScan(false); setScanText('');
+  }
+  async function doScanText() {
     const txt = scanText.trim();
     if (!txt) return;
     setScanBusy(true); setErr(null);
-    try {
-      const d = await scanVoucherText(txt);
-      // Open a draft prefilled with everything the AI found, for review before saving.
-      setForm({
-        title: d.title ?? title.trim(), code: d.code ?? code.trim(), store: d.store ?? '',
-        discount: d.discount ?? '', expiresAt: ymd(d.expiresAt ?? null), url: d.url ?? '', used: false,
-      });
-      setEditing('new');
-      setShowScan(false); setScanText('');
-    } catch (e) { setErr((e as Error).message); }
+    try { draftFromParsed(await scanVoucherText(txt)); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setScanBusy(false); }
+  }
+  async function doScanPhoto() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Camera needed', 'Allow camera access to scan a voucher.'); return; }
+    const res = await ImagePicker.launchCameraAsync({ quality: 0.6 });
+    if (res.canceled || !res.assets?.[0]) return;
+    setScanBusy(true); setErr(null);
+    try { draftFromParsed(await scanVoucherImage(res.assets[0].uri)); }
+    catch (e) { setErr((e as Error).message); }
     finally { setScanBusy(false); }
   }
 
@@ -160,10 +172,13 @@ export function VouchersScreen() {
         <Pressable style={s.modalWrap} onPress={() => setShowScan(false)}>
           <Pressable style={s.modal} onPress={() => {}}>
             <Text style={s.modalTitle}>✦ Scan a voucher</Text>
-            <Text style={s.mlabel}>PASTE THE COUPON TEXT</Text>
+            <Pressable onPress={doScanPhoto} disabled={scanBusy} style={[s.photoBtn, scanBusy && s.dim]}>
+              <Text style={s.photoText}>📷  Take a photo</Text>
+            </Pressable>
+            <Text style={s.mlabel}>OR PASTE THE COUPON TEXT</Text>
             <TextInput value={scanText} onChangeText={setScanText} multiline placeholder="e.g. 15% off at Skroutz, code SAVE15, until 31/12" placeholderTextColor={C.faint} style={[s.minput, { minHeight: 90, textAlignVertical: 'top' }]} />
             <View style={s.mbtns}>
-              <Pressable onPress={doScan} disabled={!scanText.trim() || scanBusy} style={[s.save, (!scanText.trim() || scanBusy) && s.dim]}>
+              <Pressable onPress={doScanText} disabled={!scanText.trim() || scanBusy} style={[s.save, (!scanText.trim() || scanBusy) && s.dim]}>
                 {scanBusy ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>Fill</Text>}
               </Pressable>
               <Pressable onPress={() => setShowScan(false)} style={s.delBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
@@ -199,6 +214,8 @@ const s = StyleSheet.create({
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   minput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
   rowFields: { flexDirection: 'row', gap: 10 },
+  photoBtn: { marginTop: 16, borderWidth: 1, borderColor: C.cyan, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  photoText: { color: C.cyan, fontSize: 15, fontWeight: '700' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
   tboxOn: { backgroundColor: C.accent, borderColor: C.accent },

@@ -452,6 +452,16 @@ export type ParsedVoucherData = { title?: string; code?: string; store?: string;
 export async function scanVoucherText(text: string): Promise<ParsedVoucherData> {
   return (await request<{ data: ParsedVoucherData }>('/api/v1/scan/voucher', { method: 'POST', body: JSON.stringify({ text }) })).data;
 }
+export async function scanVoucherImage(uri: string): Promise<ParsedVoucherData> {
+  const fd = new FormData();
+  fd.append('file', { uri, name: 'voucher.jpg', type: 'image/jpeg' } as unknown as Blob);
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(base + '/api/v1/scan/voucher', { method: 'POST', headers, body: fd });
+  const json = (await res.json().catch(() => null)) as { data?: ParsedVoucherData; error?: string } | null;
+  if (!res.ok || !json?.data) throw new Error(json?.error || `Scan failed (HTTP ${res.status})`);
+  return json.data;
+}
 export type ImportedItem = { id: string; title: string; price: number; store: string; updated: boolean };
 export async function importItemUrl(url: string, view: 'shopping' | 'inventory' = 'shopping'): Promise<ImportedItem> {
   const r = await request<{ id: string; title: string; price: number; store: string; updated: boolean }>('/api/v1/items/import', { method: 'POST', body: JSON.stringify({ url, view }) });
