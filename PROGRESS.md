@@ -697,3 +697,17 @@ Top 3 για τον builder (με σειρά):
 1. **Input primitive (P1/M)** — `<Input>`/`<TextArea>` στο `ui.tsx`, migration 17 entries / 11 screens· λύνει borderRadius 10/12/14 + padding + fontSize 14/15/16 divergence. ΣΗΜ: μεγάλη μετανάστευση ~50+ TextInput sites χωρίς simulator → καλύτερα σε attended run.
 2. **Button + Chip primitives (P2/M)** — ενοποιεί 21 save/add-btn + νέο `aiBtn` + 27 chip-variants· text color από `onAccent` token → καθαρίζει τα 23 `#000` text literals.
 3. **Card + Badge + ListItem primitives (P2/M)** — 5 `card:` + 4 `badge:` τοπικά → σταθερό radius/padding/border.
+
+## 2026-07-01 (web-code-quality auditor — αργά νύχτα re-audit)
+- Τι: read-only audit όλων των **49 v1 route files** (νέο `items/[id]/ai-fill/route.ts` από commit `86c6ada`) σε όλες τις διαστάσεις. Κώδικας στο `apps/web/src` αμετάβλητος από τον προηγούμενο γύρο (μετά το `6a5809a` μόνο docs commits) → η Web Debt Queue by-construction σταθερή, κάθε open item επαναεπαληθεύτηκε από grep.
+- Counts ανά διάσταση (μηδέν νέο εύρημα):
+  - **Type safety**: tsc EXIT 0· 0 `: any`/`as any`/`@ts-ignore` σε `/api/v1`· το μόνο `any` (`lib/softDelete.ts:25`) είναι narrow Mongoose-hook cast, αποδεκτό.
+  - **Auth**: 48/48 bearer routes περνούν `withAuth`· `auth/login` σωστά εξαιρείται· middleware gate-άρει τα non-api. 0 unguarded.
+  - **Input validation**: ΟΛΑ τα `[id]`/`[type]` έχουν 24-hex guard· list params clamped· το νέο `ai-fill` έχει id-guard + mode-validation.
+  - **Error handling**: ομοιόμορφο try/catch + `apiError` μέσω `withAuth` (clean 500)· 4 routes ΑΚΟΜΑ με inline `NextResponse.json({error})` (το 1 ανοιχτό P3).
+  - **Mongoose**: `.lean()` παντού στα reads· `updatedAt` indexed σε ΚΑΙ τα 7 synced models· list endpoints paginated (skip/limit). 0 unbounded χωρίς λόγο.
+  - **Duplication/dead code**: serializer dedup έκλεισε (`6a5809a`)· μένει το προαιρετικό body-coercion spread (καταγεγραμμένο, future runs).
+- Ουρά: **6 DONE, 1 TODO** (inline error → `apiError`, P3/S).
+- Top 3 για τον builder: (1) **Inline error → apiError()** (P3/S, api· scan/product:14, scan/receipt:20, shopping-list:18, items:61 → `apiError(r.error)`/`apiError('title required')`, login εξαιρείται, καθάρισε τυχόν unused `NextResponse` import), (2) μετά η web ουρά αδειάζει· εναλλακτικά mobile UI Debt **Input primitive** (σπασμένο σε 2-3 runs), (3) τίποτα άλλο web-side ανοιχτό· η API είναι ώριμη.
+- Verify: read-only (μηδέν Docker, μηδέν AI, μηδέν app-code edit). tsc exit 0· grep sweeps any/withAuth/lean/inline-error/id-guard/updatedAt-index. Staged ΜΟΝΟ WEB_DEBT.md + PROGRESS.md.
+- Needs Achilleas: κανένα νέο (παραμένουν: response-envelope standardization σε ΟΛΑ τα endpoints + zod-first σε νέα routes = breaking/large, συντονισμός με mobile· RAM bump στο Docker VM λόγω mongo OOM στα builds).
