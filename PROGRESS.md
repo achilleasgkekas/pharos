@@ -2,6 +2,21 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+<!-- reviewed: 261a4fb -->
+
+## 2026-06-30 (reviewer — έλεγχος range 4ead61b..261a4fb)
+- **Range**: 9 commits, **5 με app code** (4 builder features + 1 refactor)· τα υπόλοιπα 4 docs-only (monitor/review). Κανένα `up --build`, μηδέν Docker, μηδέν AI.
+- **Checks**: web `npm run type-check` → **EXIT 0**, mobile `npx tsc --noEmit` → **EXIT 0** (και τα δύο πέρασαν παρά το ταυτόχρονο uncommitted WIP στο tree — Input primitive `ui.tsx`/Shopping/Subscriptions/Tasks screens + `apiBody.ts` + expenses/subscriptions routes· δεν είναι δικά μου, ΔΕΝ τα άγγιξα). **Καμία διόρθωση χρειάστηκε.**
+- **Review ευρήματα (όλα PASS, μηδέν regression)**:
+  - `c3c9fae` **listEnvelope alignment** (breaking shape change `{items}`→`{data}`): web route + ο μοναδικός mobile consumer (`getItems` στο `api.ts`) αλλάζουν **στο ΙΔΙΟ commit** → μηδέν in-between divergence. `listEnvelope(docs, total, p)` παράγει `{data,total,limit,offset}` (επιβεβαιωμένο από `apiList.ts:26`). Σωστό.
+  - `804a60a` **POST /api/v1/items/[id]/convert-to-task** (νέο route, additive): id-guard `^[a-f0-9]{24}$`→400, `withAuth`, wraps το proven `convertItemToTask` (επιστρέφει `{ok,taskId?,error?}`), `!r.ok`→404. Item ανέγγιχτο. Καθαρό.
+  - `261a4fb` **shopping-list/[id] id-guard + 404**: PATCH+DELETE κάνουν `ID_RE` guard (το ΜΟΝΟ [id] route που έλειπε)· τα actions γυρνούν `{ok,found}` από `matchedCount`. Επαλήθευσα ότι ο soft-delete plugin **όντως hook-άρει `updateOne`** (`softDelete.ts:21`) → already-trashed ή ανύπαρκτο id = matchedCount 0 = 404, όπως τεκμηριώνεται. Web UI αγνοεί το return (additive). PATCH χωρίς πεδίο→400. Σωστό.
+  - `bba9b1c` **expenses/[id] PATCH full-field** (period/recurring/recurringCycle/paymentMethod): αμιγώς additive στο `$set`, `recurringCycle` enum-guarded (`''`|monthly|quarterly|yearly|weekly) — ταιριάζει 1:1 με τα mobile `CYCLES` (MoneyScreen:8) που στέλνει `''` όταν off. id-guard ήδη παρών (route:14,40). Ίδιο response shape.
+  - `8b8c0f2` **mobile AppBar bell badge**: pure-mobile UI, tsc καθαρό.
+  - Secret-scan στο diff: **καθαρό** (τα μόνα matches = builder prose «μηδέν secrets/.env», όχι literals· μόνο `apiToken`/`x-api-token`/401-structural references).
+- **Flagged**: τίποτα νέο. Καμία regression, κανένα type error, κανένα committed secret, καμία ασυντόνιστη API shape-break. Ουρές (WEB_DEBT, MOBILE_PARITY) μένουν ως έχουν.
+- **Git hygiene**: staged ΜΟΝΟ `PROGRESS.md` (reviewed marker `4ead61b`→`261a4fb` + αυτή η εγγραφή). ΔΕΝ άγγιξα το παράλληλο WIP (ui.tsx/Shopping/Subscriptions/Tasks/apiBody.ts/expenses+subscriptions routes) ούτε secrets/.env.
+
 ## 2026-06-30 (builder — WEB_DEBT P2: GET /api/v1/items → shared listEnvelope {data})
 
 - **Συμφραζόμενα / έντονη παράλληλη σύγκρουση**: το working tree ήταν αυτό το run πολύ contested — ο αρχικός μου στόχος (Items convert-to-task, ο προτεινόμενος επόμενος task) είχε ήδη uncommitted WIP (`?? api/v1/items/[id]/convert-to-task/` + `M api.ts` + `M ItemsScreen.tsx`)· τον validate-άρισα (tsc web+mobile EXIT 0, safe rebuild → /login 200, no-token/bogus → 401) αλλά ΕΝΟΣΩ δούλευα τον commit-άρισε παράλληλο routine ως `804a60a`. Παράλληλα τρέχοντα: Notifications badge (`8b8c0f2`), shopping-list id-guard (`261a4fb`), Receipts re-scan + `apiBody.ts` (untracked WIP). Διάλεξα task που **δεν αγγίζει κανένα contested αρχείο**.
@@ -161,7 +176,6 @@
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
 <!-- docker-validated: 4ca5649 -->
-<!-- reviewed: 4ead61b -->
 
 ## 2026-06-30 (parity-auditor — 2η σάρωση ημέρας, re-confirm read-only)
 - Read-only re-audit web↔mobile από τον κώδικα (όχι docs). Μηδέν app code, μηδέν Docker, μηδέν AI jobs. Inventory: **46 v1 route files** (login + 45 bearer), **16 mobile screens**, **69** exported api fns.
