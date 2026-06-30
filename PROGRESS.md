@@ -5,6 +5,13 @@
 <!-- reviewed: 82fbb58 -->
 <!-- docker-validated: 18c18e6 -->
 
+## 2026-07-01 (web code-quality re-audit — νυχτερινός γύρος, serializer P3 έκλεισε)
+- **Σάρωση (read-only):** πλήρης fresh audit όλων των **48 route files** + `serialize.ts` σε ΟΛΕΣ τις διαστάσεις. `npm run type-check` → **exit 0**.
+- **Counts ανά διάσταση:** type-safety **0** (μηδέν `:any`/`as any`/`@ts-ignore` σε `/api/v1`· μόνο 1 narrow Mongoose-hook cast στο `lib/softDelete.ts:25`, αποδεκτό) · auth **0** (48/48 routes περνούν `withAuth`, μόνο `auth/login` εξαιρείται σωστά) · input-validation **0** (ΟΛΑ τα `[id]`/`[type]` με 24-hex guard· list params clamped) · error-handling **0** (uniform try/catch μέσω `withAuth`, 0 swallowed) · db **0** (ΟΛΑ τα sort keys indexed· ΟΛΕΣ οι reads `.lean()`· pagination παντού) · dead-code/dup **0 νέο**.
+- **Ουρά:** ο builder έκλεισε ενδιάμεσα το P3 «Receipt lineItems serializer» (commit `6a5809a` = last app-code commit) → απομένει **1 ενεργό P3** (inline error → `apiError`, 4 routes). Μηδέν νέο P1/P2/P3 — δεν επινόησα item.
+- **Builder next 3:** (1) **Inline error → shared apiError() (4 routes)** — P3/S, το μόνο ανοιχτό· scan/product:14, scan/receipt:20, shopping-list:18, items:61 → `return apiError(r.error)` (αφήνεις `auth/login`). (2/3) καμία άλλη ουρά — η `/api/v1` είναι σε εξαιρετική κατάσταση.
+- **Docs only:** WEB_DEBT.md (νέα σύνοψη) + PROGRESS.md. Μηδέν app-code άγγιγμα.
+
 ## 2026-07-01 (docker-health guard — safe rebuild, stack healthy)
 - **Health (read-only):** mongo `healthy` (Up 2h, RestartCount 43 ιστορικό σωρευτικό αλλά σταθερό, κανένα active loop), web `running` RestartCount 0, searxng up. flaresolverr ήδη `Exited (143)` εδώ και 29h (σβηστό, καμία RAM πίεση). ΣΗΜ: αυτή η Docker έκδοση δεν έχει `.State.RestartCount` στο template map → χρήση top-level `{{.RestartCount}}`.
 - **Disk:** `docker system df` πριν → Images 3.49GB, Build Cache 565.9MB (0B reclaimable, active). `docker builder prune -f` → 3.18MB reclaimed (cache ήταν ήδη fresh/active). VM άνετο, καμία πίεση.
