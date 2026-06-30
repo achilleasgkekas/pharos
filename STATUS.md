@@ -1,24 +1,24 @@
 # Pharos Monitor — STATUS
 
-## 2026-07-01 00:02
+## 2026-07-01 01:02
 
-**Ετυμηγορια: ΟΛΑ ΟΚ.** Και οι 6 ρουτινες χτυπησαν μεσα στην τελευταια ~1 ωρα (23:05–23:53 στις 30/06), ολες εντος του οριου ~7h. Ο υπολογιστης ηταν ξυπνιος και ο κυκλος ετρεξε με σωστη σειρα (audits → builder → reviewer → docker guard). Ο builder εκλεισε το «receipts re-scan» στο mobile (fbda2b3, το mobile μισο του endpoint d24be27)· ο web auditor μαρκαρε ΟΛΗ την αρχικη web ουρα DONE και προσθεσε 2 νεα P3 dedup items (384de6e)· ο reviewer βρηκε το range 261a4fb..fbda2b3 καθαρο (2a13b65)· ο docker guard επικυρωσε με cached rebuild, stack υγιες (ddcc4c8).
+**Ετυμηγορια: ΟΛΑ ΟΚ.** Και οι 6 ρουτινες χτυπησαν μεσα στην τελευταια ~1 ωρα (00:05–00:54 στις 01/07), ολες πολυ εντος του οριου ~7h. Ο υπολογιστης ηταν ξυπνιος και ο κυκλος ετρεξε με σωστη σειρα (audits → builder → reviewer → docker guard). Ο builder εκλεισε το web P3#1 (shared `serializeLineItems`, 6a5809a/82fbb58)· οι 3 auditors ξανα-σαρωσαν (parity 48 routes 1:1, ui 23 #000 literals, web ουρα αμετάβλητη με 2 P3 dedup)· ο reviewer βρηκε το range fbda2b3..82fbb58 καθαρο (18c18e6)· ο docker guard επικυρωσε ασφαλη web rebuild, /login 200, marker 2a13b65→18c18e6 (a93858e).
 
 | routine | τελευταια δραστηριοτητα | OK/STALE | τι εκανε (συντομα) |
 |---|---|---|---|
-| builder (Pharos daily dev) | 2026-06-30 23:36 | OK | Receipts re-scan (text/OCR) στο mobile detail — mobile half (fbda2b3) |
-| parity auditor | 2026-06-30 23:05 | OK | parity re-audit, 48 routes, receipts re-scan endpoint υπαρχει πλεον (mobile half εμενε) (e8a963a) |
-| ui auditor | 2026-06-30 23:17 | OK | mobile UI re-audit, #000 literals 31→23, 6 TODO αμετάβλητα, top TODO = Input primitive (13f0109) |
-| web auditor | 2026-06-30 23:34 | OK | αρχικη web ουρα ΟΛΗ DONE (incl. listEnvelope c3c9fae), +2 P3 dedup items (384de6e) |
-| reviewer | 2026-06-30 23:48 | OK | range 261a4fb..fbda2b3 clean, both tsc green, μηδεν regression/secret (2a13b65) |
-| docker guard | 2026-06-30 23:53 | OK | validate HEAD 2a13b65, health OK, rebuild cached (ddcc4c8) |
+| builder (Pharos daily dev) | 2026-07-01 00:39 | OK | WEB_DEBT P3#1 — shared receipt `serializeLineItems` helper, 3 routes dedup, tsc green (6a5809a) |
+| parity auditor | 2026-07-01 00:05 | OK | re-audit, 48 routes all consumed 1:1, queue 5 DONE/1 TODO (245be25) |
+| ui auditor | 2026-07-01 00:16 | OK | mobile UI re-audit, 23 #000 literals, 6 TODO αμετάβλητα, top = Input primitive (75780b8) |
+| web auditor | 2026-07-01 00:32 | OK | re-audit, 48 routes, queue αμετάβλητη (2 P3 dedup), tsc green (81fe0ed) |
+| reviewer | 2026-07-01 00:47 | OK | range fbda2b3..82fbb58 clean, serializeLineItems shape-preserving, both tsc green (18c18e6) |
+| docker guard | 2026-07-01 00:54 | OK | safe web rebuild, /login 200, marker 2a13b65→18c18e6 (a93858e) |
 
 ## Open queue counts
-- Build Queue (MOBILE_PARITY): **1** TODO (4 DONE)
-- UI Debt Queue (MOBILE_PARITY): **6** TODO (3 DONE)
-- Web Debt Queue (WEB_DEBT): **2** TODO
+- Build Queue (MOBILE_PARITY): **1** TODO
+- UI Debt Queue (MOBILE_PARITY): **6** TODO
+- Web Debt Queue (WEB_DEBT): **1** TODO
 
-Συγκριση με προηγουμενο STATUS (23:02): Build 2→1, UI 6→6, Web 1→2. Ο builder εκλεισε 1 build item (receipts re-scan mobile). Το web 1→2 ΔΕΝ ειναι κανονικο φουσκωμα: ο web auditor μαρκαρε ολη την αρχικη ουρα DONE και προσθεσε 2 νεα P3/S dedup items (receipt lineItems serializer + inline error→apiError) — μηδεν correctness ρισκο. Η UI ουρα σταθερη.
+Συγκριση με προηγουμενο STATUS (00:02): Build 1→1, UI 6→6, Web 2→1. Ο builder κατανάλωσε 1 web item (P3#1 serializer) → η web ουρα συρρικνωθηκε. Καμια ουρα δεν φουσκωσε· Build + UI σταθερες.
 
 ## Προσοχη
 Καμια ρουτινα δεν ειναι STALE. Ολες χτυπησαν εντος της τελευταιας ~1 ωρας, ο κυκλος ολοκληρωθηκε χωρις κενα, κανενα προβλημα προς ελεγχο.
