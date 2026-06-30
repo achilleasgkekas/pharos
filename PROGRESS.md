@@ -4,6 +4,7 @@
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
 <!-- docker-validated: 1d2a9be -->
+<!-- reviewed: 1d2a9be -->
 
 ## Κανόνες (μην τους σπάσεις)
 - Stage ΜΟΝΟ όσα άλλαξες, με explicit `git add <path>`. ΠΟΤΕ `git add -A` / `.` / `commit -a` (το working tree έχει συχνά parallel uncommitted αλλαγές του Αχιλλέα).
@@ -180,3 +181,29 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
   - **Touch targets**: ~6 κάτω από 44pt (checkboxes 24×24, menuBtn 38×36, backBtn 40×36, lineDel 30×30).
 - Top-3 για τον builder: (1) **Theme tokens: spacing+radius+typography+missing colors** (P1/S, foundation), (2) **Alpha-tint helper** (P1/S, σβήνει τα 11 alpha hex), (3) **Input primitive** (P1/M, ενοποιεί 14 duplicate input styles). Το light/dark theme context είναι P3/L, τελευταίο (εξαρτάται από τα primitives).
 - Verify: read-only· μηδέν Docker, μηδέν AI jobs. Staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md`.
+
+## 2026-06-30 (reviewer — έλεγχος των τελευταίων 5 commits)
+- Range: `eaab2e7..1d2a9be` (δεν υπήρχε `reviewed` marker → έλεγξα τα 5 τελευταία). 2 code commits (`eaab2e7` budget this-month, `a70909d` upcoming installments) + 3 docs-only (`6bdedd2`, `516d258`, `1d2a9be`).
+- Checks: web `npm run type-check` → **EXIT 0**, mobile `npx tsc --noEmit` → **EXIT 0**. Read-only, καμία διόρθωση χρειάστηκε.
+- Review ευρήματα (όλα PASS):
+  - `GET /api/v1/reports` budgets[] + upcomingInstallments[] = πιστό port του web `/reports/page.tsx` (thisMonthCat loop με `amt <= 0 continue`, budget filter limit>0, installments `remainingInstallments >= n` × `perAmount`). **Μηδέν drift** με το web computation.
+  - Αλλαγές API αμιγώς **additive** (2 νέα πεδία, κανένα removed/renamed) → δεν σπάει υπάρχοντες mobile consumers.
+  - Το νέο `amt <= 0 continue` στο budget loop **ευθυγραμμίζει** το API με το web /reports (πριν αθροιζόταν αρνητικά/μηδενικά) → parity fix, όχι regression.
+  - mobile `BudgetRow {category,limit,spent}` ταιριάζει με το API shape· `C.purple/gold/red/accent` υπάρχουν στο theme· `money()`/`Bar` reused σωστά.
+  - Docs commits = docs-only (MOBILE_PARITY.md/PROGRESS.md), μηδέν app code, μηδέν secrets (το secret-scan έβγαλε μόνο false positives — color tokens #000/#ffa502).
+- Flagged: τίποτα νέο. Καμία regression, κανένα type error, κανένα committed secret.
+- Git hygiene: staged ΜΟΝΟ `PROGRESS.md` (reviewed marker + αυτή η εγγραφή). Καμία αλλαγή σε app code/secrets/.env.
+
+## 2026-06-30 (web-code-quality auditor — /api/v1 audit, read-only)
+- Audit της Next.js web υλοποίησης (έμφαση στο `/api/v1` που τρώει το mobile), από τον κώδικα. Μηδέν app code, μηδέν Docker, μηδέν AI jobs. `cd apps/web && npm run type-check` → **exit 0** (κανένα type error).
+- **Counts ανά dimension**: Type safety **0** (μηδέν `any`/`@ts-ignore`· tsc καθαρό). Auth **0** (ΟΛΑ τα 45 routes εκτός login περνούν από `withAuth`· `apiToken` indexed). Error handling **0** (uniform try/catch μέσω `withAuth`· κάθε body read `req.json().catch(() => ({}))`· μηδέν swallowed catch). Validation **2** (items POST δεν κάνει whitelist το status ενώ το PATCH ναι· shopping-list/[id] χωρίς id-guard + σιωπηλό no-op). Consistency **2** (GET /items αποκλίνει από το shared `listEnvelope`· repeated body-coercion patterns). DB/perf **1** (το `updatedAt` — incremental-sync cursor + sort key Item/Task — δεν είναι indexed σε κανένα model).
+- **Σύνολο: 0 P1, 3 P2, 2 P3** → γράφτηκαν στο νέο `WEB_DEBT.md` (## Web Debt Queue), μικρότερο+P-υψηλότερο πρώτα.
+- **Top 3 για τον builder**:
+  1. **Index `updatedAt` στα synced models** (P2/S, db) — επηρεάζει κάθε mobile sync (unindexed `$gte` + in-memory sort).
+  2. **POST /api/v1/items — whitelist status/category** (P2/S, api) — mirror του PATCH· σταματά αυθαίρετα status στη DB.
+  3. **GET /api/v1/items → listEnvelope alignment** (P2/S, api) — 6 endpoints γυρνούν `{data}`, μόνο items γυρνά `{items}`· χρειάζεται συντονισμένο update στο `apps/mobile/src/api.ts`.
+- Staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (όχι `-A`). Καμία αλλαγή σε app code/secrets/.env.
+
+## Needs Achilleas
+- **Ευρεία response-envelope standardization**: τα mutation/single endpoints γυρνούν ad-hoc keys (`{item}`/`{expense}`/`{task}`/`{ok,id}`/`{receipt}`/`{cards}`/`{lists}`/`{hits}`…) αντί ενιαίου `{data}`. Η ενοποίηση είναι breaking change που συντονίζεται με το mobile (`apps/mobile/src/api.ts`) → product/API-versioning απόφαση, ΔΕΝ μπήκε στο queue. Πες αν θες να το ανοίξω σταδιακά (ένα resource/run).
+- **Zod σε όλο το `/api/v1`**: μηδέν zod στα routes (manual `as Record<string,unknown>` + coercion, που είναι προσεκτικό αλλά verbose). Το project χρησιμοποιεί zod αλλού. Πλήρες migration = large/sprawling → δεν το πρότεινα· έβαλα μόνο μικρό P3 για shared coercion helpers + απόφαση αν θες zod-first σε νέα routes.
