@@ -2,6 +2,18 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+## 2026-06-30 (reviewer — range 5457339..4ead61b clean, item-status whitelist verified)
+- Εύρος: `5457339..4ead61b` (7 commits· 6 docs/docker/monitor, **1 code**: `4ead61b` web — whitelist item status σε POST /api/v1/items). Read-only review + αμφότερα type-checks.
+- **Type-checks**: `apps/web` `npm run type-check` → **EXIT 0**· `apps/mobile` `npx tsc --noEmit` → **EXIT 0** (το tree περιείχε και το παράλληλο builder WIP — βλ. κάτω — και παρ' όλα αυτά καθαρό). Καμία διόρθωση χρειάστηκε.
+- **Diff review του `4ead61b`** (`models/Item.ts` + `items/route.ts` + `items/[id]/route.ts`): καθαρό refactor, αμιγώς προστατευτικό. Επαλήθευσα:
+  - `ITEM_STATUSES` export = ΑΚΡΙΒΩΣ οι 8 τιμές του παλιού schema enum, ίδια σειρά → μηδέν αλλαγή στο enum validation. `enum: [...ITEM_STATUSES]` = κανένα διπλό literal.
+  - POST whitelist: `b.status` invalid/undefined/'' → fallback `'researching'` (ίδιο αποτέλεσμα με το παλιό για τις νόμιμες περιπτώσεις· μόνο το invalid-verbatim bug διορθώθηκε). Μηδέν regression. `category` σκόπιμα free string (relaxed enum) — σωστό, τεκμηριωμένο.
+  - PATCH: το local `STATUS` literal αντικαταστάθηκε με το import· **εξακολουθεί να χρησιμοποιείται** (line 113 `STATUS.includes(b.status)`) → κανένα dead const, tsc `strict` καθαρό. Το παλιό literal είχε διαφορετική σειρά (sold/broken πριν deferred) αλλά ίδιο σύνολο → `.includes()` αμετάβλητο.
+  - Μηδέν αλλαγή σε response shape (POST επιστρέφει ίδιο `{item}`), μηδέν secrets.
+- **Παράλληλο uncommitted builder WIP** (Expenses/Income full-field edit): `apps/mobile/src/api.ts`, `apps/mobile/src/screens/MoneyScreen.tsx`, `apps/web/src/app/api/v1/expenses/[id]/route.ts`. **ΔΕΝ είναι committed → εκτός review range· ΔΕΝ τα άγγιξα**. Type-checks πέρασαν με αυτά μέσα. Θα τα δει το επόμενο reviewer run όταν committed-αριστούν.
+- **Fixed**: τίποτα (δεν χρειάστηκε). **Flagged**: κανένα νέο εύρημα (regression/secret/shape-break). Ουρές (WEB_DEBT P2#2 → DONE από builder, MOBILE_PARITY 5 GAP) αμετάβλητες πέρα από το ήδη-καταγεγραμμένο progress.
+- Staged ΜΟΝΟ `PROGRESS.md` (explicit path, όχι `-A`). Marker `5457339 → 4ead61b`. Κανένα Docker/AI job/secret.
+
 ## 2026-06-30 (builder — WEB_DEBT P2#2: whitelist item status σε POST /api/v1/items)
 - Τι: χτίστηκε το επόμενο TODO της WEB_DEBT ουράς (P2/S, api). Το `POST /api/v1/items` έγραφε αυθαίρετο `status` verbatim (`String(b.status||'researching')`) ενώ το `PATCH items/[id]` έκανε ήδη `STATUS.includes()` έλεγχο — άρα invalid status περνούσε μέσω POST. Εξήγαγα **`ITEM_STATUSES`** (+ `ItemStatus` type) ως single source of truth στο `models/Item.ts`, που **τροφοδοτεί και το schema enum** (`enum: [...ITEM_STATUSES]`, μηδέν διπλό literal). Τώρα το POST κάνει whitelist (invalid → fallback `'researching'`, ίδιο μοτίβο με `tasks/route.ts`) και το PATCH αντικατέστησε το local `STATUS` array με το import. Το `category` παραμένει **σκόπιμα free string** (relaxed enum, custom categories από Settings → Lists) — προστέθηκε σχόλιο.
 - **Καμία αλλαγή σε response shape / route logic** πέρα από το να μην αποθηκεύεται πλέον invalid status. Μηδέν αλλαγή στο mobile↔web συμβόλαιο (POST επιστρέφει ίδιο `{item}`).
@@ -90,7 +102,7 @@
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
 <!-- docker-validated: 4ca5649 -->
-<!-- reviewed: 5457339 -->
+<!-- reviewed: 4ead61b -->
 
 ## 2026-06-30 (parity-auditor — 2η σάρωση ημέρας, re-confirm read-only)
 - Read-only re-audit web↔mobile από τον κώδικα (όχι docs). Μηδέν app code, μηδέν Docker, μηδέν AI jobs. Inventory: **46 v1 route files** (login + 45 bearer), **16 mobile screens**, **69** exported api fns.
