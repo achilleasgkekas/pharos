@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getExpenses, addExpense, deleteExpense, updateExpense, type Expense } from '../api';
+import { getExpenses, addExpense, deleteExpense, updateExpense, scanExpenseImage, type Expense, type ParsedExpenseData } from '../api';
 
 export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [rows, setRows] = useState<Expense[]>([]);
@@ -15,6 +16,12 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [eVendor, setEVendor] = useState('');
   const [eAmount, setEAmount] = useState('');
   const [eCategory, setECategory] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [draft, setDraft] = useState<ParsedExpenseData | null>(null);
+  const [dVendor, setDVendor] = useState('');
+  const [dAmount, setDAmount] = useState('');
+  const [dCategory, setDCategory] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -29,6 +36,43 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
     if (!v || !Number.isFinite(n)) return;
     setVendor(''); setAmount('');
     try { await addExpense({ vendor: v, amount: n, kind }); await load(); } catch (e) { setErr((e as Error).message); }
+  }
+
+  async function scan() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Camera needed', 'Allow camera access to scan a bill.'); return; }
+    const res = await ImagePicker.launchCameraAsync({ quality: 0.6 });
+    if (res.canceled || !res.assets?.[0]) return;
+    setScanning(true);
+    setErr(null);
+    try {
+      const d = await scanExpenseImage(res.assets[0].uri);
+      setDraft(d);
+      setDVendor(d.vendor);
+      setDAmount(d.amount ? String(d.amount) : '');
+      setDCategory(d.category);
+    } catch (e) { setErr((e as Error).message); }
+    finally { setScanning(false); }
+  }
+  async function saveDraft() {
+    if (!draft) return;
+    const v = dVendor.trim();
+    const n = parseFloat(dAmount.replace(',', '.'));
+    if (!v || !Number.isFinite(n)) { setErr('Vendor and amount are required'); return; }
+    setSaving(true);
+    try {
+      await addExpense({
+        vendor: v, amount: n, kind: draft.kind || kind,
+        category: dCategory.trim() || undefined,
+        date: draft.date || undefined,
+        period: draft.period || undefined,
+        recurringCycle: draft.recurringCycle || undefined,
+        paymentMethod: draft.paymentMethod || undefined,
+      });
+      setDraft(null);
+      await load();
+    } catch (e) { setErr((e as Error).message); }
+    finally { setSaving(false); }
   }
 
   function remove(it: Expense) {
@@ -60,8 +104,12 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
       <View style={s.addRow}>
         <TextInput value={vendor} onChangeText={setVendor} placeholder={label} placeholderTextColor={C.faint} style={[s.input, { flex: 2 }]} />
         <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={C.faint} style={[s.input, { flex: 1 }]} />
+        <Pressable onPress={scan} disabled={scanning} style={[s.scanBtn, scanning && s.dim]}>
+          {scanning ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.scanText}>✦</Text>}
+        </Pressable>
         <Pressable onPress={add} disabled={!vendor.trim() || !amount.trim()} style={[s.add, (!vendor.trim() || !amount.trim()) && s.dim]}><Text style={s.addText}>＋</Text></Pressable>
       </View>
+      <Text style={s.hint}>✦ scan a {kind === 'income' ? 'payslip' : 'bill'} with AI</Text>
       <ErrorText>{err}</ErrorText>
       <FlatList
         data={rows}
@@ -79,6 +127,28 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
           </Pressable>
         )}
       />
+
+      <Modal visible={!!draft} transparent animationType="fade" onRequestClose={() => setDraft(null)}>
+        <Pressable style={s.modalWrap} onPress={() => setDraft(null)}>
+          <Pressable style={s.modal} onPress={() => {}}>
+            <Text style={s.modalTitle}>Scanned {draft?.kind === 'income' ? 'income' : 'bill'}</Text>
+            <Text style={s.scanNote}>Check the fields, then add it.</Text>
+            <Text style={s.mlabel}>{label.toUpperCase()}</Text>
+            <TextInput value={dVendor} onChangeText={setDVendor} style={s.minput} placeholderTextColor={C.faint} />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}><Text style={s.mlabel}>AMOUNT</Text><TextInput value={dAmount} onChangeText={setDAmount} keyboardType="decimal-pad" style={s.minput} placeholderTextColor={C.faint} /></View>
+              <View style={{ flex: 1 }}><Text style={s.mlabel}>CATEGORY</Text><TextInput value={dCategory} onChangeText={setDCategory} style={s.minput} placeholderTextColor={C.faint} /></View>
+            </View>
+            {!!(draft?.date || draft?.recurringCycle) && (
+              <Text style={s.scanMeta}>{[draft?.date ? shortDate(draft.date) : '', draft?.recurringCycle ? `recurring ${draft.recurringCycle}` : ''].filter(Boolean).join('  ·  ')}</Text>
+            )}
+            <View style={s.mbtns}>
+              <Pressable onPress={saveDraft} disabled={saving} style={[s.save, saving && s.dim]}><Text style={s.saveText}>{saving ? 'Adding…' : 'Add'}</Text></Pressable>
+              <Pressable onPress={() => setDraft(null)} style={s.delBtn}><Text style={s.delBtnText}>Discard</Text></Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
         <Pressable style={s.modalWrap} onPress={() => setEditing(null)}>
@@ -110,6 +180,11 @@ const s = StyleSheet.create({
   input: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: C.text, fontSize: 15 },
   add: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   addText: { color: '#000', fontSize: 24, fontWeight: '700' },
+  scanBtn: { width: 46, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
+  scanText: { color: C.cyan, fontSize: 20, fontWeight: '700' },
+  hint: { color: C.faint, fontSize: 11, paddingHorizontal: 16, marginTop: -2, marginBottom: 4 },
+  scanNote: { color: C.dim, fontSize: 12, marginTop: 4 },
+  scanMeta: { color: C.faint, fontSize: 12, marginTop: 10 },
   dim: { opacity: 0.4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   vendor: { color: C.text, fontSize: 15, fontWeight: '600' },

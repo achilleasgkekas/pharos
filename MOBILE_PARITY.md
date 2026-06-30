@@ -37,7 +37,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Expenses & Income (`/expenses`, `/income`)
 | Web | Mobile |
 |-----|--------|
-| **Scan a bill/payslip** (AI), e-shop layout, recurring series + auto-generate, **anomaly badges**, vendor autocomplete | 🟡 list + manual add (vendor+amount) |
+| **Scan a bill/payslip** (AI), e-shop layout, recurring series + auto-generate, **anomaly badges**, vendor autocomplete | 🟡 list + manual add (vendor+amount) + **AI scan-a-bill** (✦ camera → parse → confirm draft → add; carries date/period/recurring/payment) |
 | Detail + **edit** + re-scan | 🟡 long-press delete; no edit, no scan |
 
 ## Statements (`/statements`)

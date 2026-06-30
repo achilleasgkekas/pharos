@@ -147,8 +147,31 @@ export function deleteTask(id: string) { return request<{ ok: boolean }>(`/api/v
 export async function getExpenses(kind: 'expense' | 'income'): Promise<Expense[]> {
   return (await request<{ data: Expense[] }>(`/api/v1/expenses?kind=${kind}&limit=200`)).data ?? [];
 }
-export function addExpense(data: { vendor: string; amount: number; kind: 'expense' | 'income'; category?: string }) {
+export function addExpense(data: {
+  vendor: string; amount: number; kind: 'expense' | 'income';
+  category?: string; date?: string; period?: string; recurringCycle?: string; paymentMethod?: string;
+}) {
   return request<{ expense: Expense }>('/api/v1/expenses', { method: 'POST', body: JSON.stringify(data) });
+}
+
+// AI bill/payslip scan (does NOT persist — prefills the add form)
+export type ParsedExpenseData = {
+  kind: 'expense' | 'income'; vendor: string; category: string; amount: number; currency: string;
+  date: string; period: string; paymentMethod: string; recurringCycle: string;
+};
+export async function scanExpenseImage(uri: string): Promise<ParsedExpenseData> {
+  const fd = new FormData();
+  fd.append('file', { uri, name: 'bill.jpg', type: 'image/jpeg' } as unknown as Blob);
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(base + '/api/v1/scan/expense', { method: 'POST', headers, body: fd });
+  const json = (await res.json().catch(() => null)) as { data?: ParsedExpenseData; error?: string } | null;
+  if (!res.ok || !json?.data) throw new Error(json?.error || `Scan failed (HTTP ${res.status})`);
+  return json.data;
+}
+export async function scanExpenseText(text: string): Promise<ParsedExpenseData> {
+  const json = await request<{ data: ParsedExpenseData }>('/api/v1/scan/expense', { method: 'POST', body: JSON.stringify({ text }) });
+  return json.data;
 }
 
 // ---- Subscriptions ----

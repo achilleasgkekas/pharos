@@ -56,6 +56,45 @@ async function runExpenseParse(bytes: Buffer, ext: string, isPdf: boolean, useOc
   }
 }
 
+type ScanExpenseResult = { ok: true; data: ParsedExpense } | { ok: false; error: string };
+
+function scanError(err: unknown): string {
+  const msg = (err as Error)?.message || String(err);
+  return `AI scan failed: ${msg.slice(0, 140)}`;
+}
+
+/** Parse pasted bill/payslip text into a structured income/expense WITHOUT saving.
+ *  Mirrors scanVoucherText: the mobile/web client uses the result to prefill a form. */
+export async function scanExpenseText(text: string): Promise<ScanExpenseResult> {
+  if (!(await isFeatureEnabled('expenses'))) return { ok: false, error: 'Bill scanning (AI) is turned off.' };
+  if (!text.trim()) return { ok: false, error: 'Paste some bill text first' };
+  try {
+    const r = await parseExpenseText(text);
+    return { ok: true, data: r.parsed };
+  } catch (err) {
+    return { ok: false, error: scanError(err) };
+  }
+}
+
+/** OCR/vision a bill or payslip photo/PDF into a structured income/expense WITHOUT
+ *  saving. Reuses the receipt-grade pipeline (OCR-first, vision fallback). */
+export async function scanExpenseImage(formData: FormData): Promise<ScanExpenseResult> {
+  if (!(await isFeatureEnabled('expenses'))) return { ok: false, error: 'Bill scanning (AI) is turned off.' };
+  const file = formData.get('file');
+  if (!file || !(file instanceof File) || file.size === 0) return { ok: false, error: 'No file' };
+  if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: 'File too large (max 15MB)' };
+  try {
+    const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+    const isPdf = ext === 'pdf' || file.type === 'application/pdf';
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const { parsed, aiError } = await runExpenseParse(bytes, ext, isPdf, false);
+    if (!parsed) return { ok: false, error: aiError || 'AI returned nothing' };
+    return { ok: true, data: parsed };
+  } catch (err) {
+    return { ok: false, error: scanError(err) };
+  }
+}
+
 /** Inherit category / recurring from an existing record of the same vendor (the
  *  "continuity" the user asked for: a new ΔΕΗ bill joins the existing ΔΕΗ series). */
 async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string } | null> {
