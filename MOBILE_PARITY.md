@@ -20,7 +20,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 |-----|--------|
 | Grid/list, e-shop sidebar filters (status/store/category/sort/flags), select-mode + bulk AI fill | 🟡 list + All/Owned/Shopping filter |
 | Add item + **URL import** (fetch + AI parse → preview → approve), dedup | 🟡 add by title **+ URL import** (paste link → ✦ AI fetch+parse → add to Shopping, auto-detected). No preview-before-approve step, no select-mode/bulk-AI |
-| Item detail: specs, **PricePanel** (best price, where-to-buy, price position, log price, search online, full history chart), links, photos, warranty, purchase & payment, **link to installment plan**, AI specs, convert-to-task | 🟡 tap-to-edit (title, status, category, price, target, specs) + **PricePanel** (best-now + verdict, position bar low/target/high, where-to-buy tap→open store, log-a-price, full history, photos strip, links, warranty/purchase) + **link to installment plan** (linked δόσεις with payoff + unlink, collapsible picker of available plans → tap to attach). No AI specs (AI cost) / no convert-to-task |
+| Item detail: specs, **PricePanel** (best price, where-to-buy, price position, log price, search online, full history chart), links, photos, warranty, purchase & payment, **link to installment plan**, AI specs, convert-to-task | 🟡 tap-to-edit (title, status, category, price, target, specs) + **PricePanel** (best-now + verdict, position bar low/target/high, where-to-buy tap→open store, log-a-price, full history, photos strip, links, warranty/purchase) + **link to installment plan** (linked δόσεις with payoff + unlink, collapsible picker of available plans → tap to attach) + **convert-to-task** (button → seeds a Task from the item). No AI specs (AI cost) |
 | Delete | ✅ long-press delete |
 
 ## Shopping list (`/shopping-list`)
@@ -136,12 +136,12 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ### Items — convert to task
 - Priority: P3 | Size: S | no AI
 - Web ref: convertItemToTask (file: apps/web/src/app/items/actions.ts:649)
-- API: POST /api/v1/items/[id]/convert-to-task (exists: no) — δημιουργεί Task από το item (title + links στα notes), επιστρέφει `{ok, taskId}`. Καθαρό port του `convertItemToTask` (μηδέν AI).
-- Mobile files: apps/mobile/src/api.ts (`convertItemToTask(id)`), apps/mobile/src/screens/ItemsScreen.tsx (κουμπί «→ Convert to task» στο item detail· επιβεβαίωση + toast)
+- API: POST /api/v1/items/[id]/convert-to-task (exists: **yes**) — δημιουργεί Task από το item (title + price + links σε HTML content, tag 'shopping'), επιστρέφει `{ok, taskId}`. Καθαρό wrap του `convertItemToTask` (μηδέν AI), 24-hex id-guard, item αμετάβλητο.
+- Mobile files: apps/mobile/src/api.ts (`convertItemToTask(id)`), apps/mobile/src/screens/ItemsScreen.tsx (κουμπί «＋ Convert to task» στο item edit modal + Alert επιβεβαίωση)
 - Acceptance:
   - POST .../convert-to-task no-token → 401· valid → νέο Task ορατό στο TasksScreen
   - tsc καθαρό (web + mobile)
-- Status: TODO
+- Status: **DONE** (2026-06-30 builder — `POST /api/v1/items/[id]/convert-to-task` + mobile button· tsc καθαρό web+mobile· structural 401 verified)
 
 ### Notifications — unread badge στο AppBar
 - Priority: P3 | Size: S | no AI

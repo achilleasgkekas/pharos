@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C } from '../theme';
 import { money, Spinner, ErrorText, Empty } from '../ui';
-import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
+import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
 function verdictMeta(v: Verdict): { label: string; color: string } | null {
   switch (v) {
@@ -293,6 +293,7 @@ export function ItemsScreen() {
   const [eTarget, setETarget] = useState('');
   const [eSpecs, setESpecs] = useState('');
   const [saving, setSaving] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [detail, setDetail] = useState<ItemDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
@@ -332,6 +333,16 @@ export function ItemsScreen() {
       await load();
     } catch (e) { setErr((e as Error).message); }
     finally { setSaving(false); }
+  }
+  async function convertToTask() {
+    if (!editing || converting) return;
+    setConverting(true); setErr(null);
+    try {
+      const r = await convertItemToTask(editing.id);
+      if (r.ok) Alert.alert('Converted to task', `A task was created from "${editing.title}".`);
+      else setErr('Convert failed');
+    } catch (e) { setErr((e as Error).message); }
+    finally { setConverting(false); }
   }
 
   return (
@@ -406,6 +417,9 @@ export function ItemsScreen() {
               </View>
               <Text style={s.mlabel}>SPECS</Text>
               <TextInput value={eSpecs} onChangeText={setESpecs} multiline style={[s.minput, s.specs]} placeholder="notes / specs" placeholderTextColor={C.faint} />
+              <Pressable onPress={convertToTask} disabled={converting} style={[s.convertBtn, converting && s.dim]}>
+                {converting ? <ActivityIndicator color={C.cyan} /> : <Text style={s.convertBtnText}>＋ Convert to task</Text>}
+              </Pressable>
               <View style={s.mbtns}>
                 <Pressable onPress={saveEdit} disabled={saving || !eTitle.trim()} style={[s.save, (saving || !eTitle.trim()) && s.dim]}>
                   {saving ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>Save</Text>}
@@ -456,6 +470,8 @@ const s = StyleSheet.create({
   saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
   delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
   delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
+  convertBtn: { marginTop: 16, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, paddingVertical: 11, alignItems: 'center' },
+  convertBtnText: { color: C.cyan, fontSize: 14, fontWeight: '600' },
 });
 
 const pb = StyleSheet.create({

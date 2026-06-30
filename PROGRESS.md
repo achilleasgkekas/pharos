@@ -2,6 +2,17 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+## 2026-06-30 (builder — MOBILE_PARITY: Items convert-to-task, P3/S no-AI)
+
+- **Τι**: χτίστηκε το επόμενο καθαρό Build Queue item (το suggested-next του προηγ. builder run). Working tree ΚΑΘΑΡΟ στην αρχή (μηδέν παράλληλο WIP) → δεν χρειάστηκε αποφυγή περιοχής.
+- **Web** (νέο `api/v1/items/[id]/convert-to-task/route.ts`): `POST` wrapper του proven `convertItemToTask` (apps/web/src/app/items/actions.ts:649) — 24-hex id-guard, `withAuth` gate, επιστρέφει `{ok, taskId}`· `r.ok===false` → `apiError(..., 404)`. Δημιουργεί Task (title + price + links σε HTML content, tag 'shopping', status 'todo')· το item μένει αμετάβλητο. Ίδιο μοτίβο με το `items/[id]/link-plan` route. Μηδέν AI.
+- **Mobile** (`api.ts`): νέα `convertItemToTask(id)` → `POST /api/v1/items/${id}/convert-to-task`, type `{ok, taskId?}`.
+- **Mobile** (`ItemsScreen.tsx`): κουμπί «＋ Convert to task» (cyan outline) στο item edit modal, κάτω από SPECS· `converting` state + handler → Alert επιβεβαίωση «Converted to task» (ή error). Νέα styles `convertBtn`/`convertBtnText`.
+- **Verify**: `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**. Safe Docker rebuild: `docker compose build web` (cached, built) → mongo `healthy` → `up -d web` → `curl /login` = **200**· web `.State.Status=running` (αυτό το engine δεν εκθέτει `.State.RestartCount` — γνωστό αβλαβές quirk). Structural: `POST /api/v1/items/<24hex>/convert-to-task` no-token → **401**, bogus-token + non-hex id → **401** (auth πριν το id-check → endpoint registered). Logs μόνο τα γνωστά stale-bundle «Failed to find Server Action» (ανοιχτό browser tab), κανένα crash. flaresolverr σβηστό· `docker builder prune -f` (cache-only, ~2GB). ΔΕΝ έτρεξα authed write (token = secret) ούτε AI job.
+- **Staged ΜΟΝΟ**: `apps/web/src/app/api/v1/items/[id]/convert-to-task/route.ts`, `apps/mobile/src/api.ts`, `apps/mobile/src/screens/ItemsScreen.tsx`, `MOBILE_PARITY.md`, `PROGRESS.md` (explicit paths, όχι `-A`). Μηδέν αλλαγή σε secrets/.env.
+- **Επόμενο task**: MOBILE_PARITY queue → απομένουν **3 GAP** (1 P2 + 2 P3). Καθαρότερο no-AI: **Notifications unread badge** (P3/S, pure-mobile — `GET /api/v1/notifications` γυρνά ήδη `unread` count, απλώς badge στο HomeScreen/tab· μηδέν web touch). Τα Receipts re-scan (P2/M) + Items AI specs (P3/M) θέλουν AI → μόνο δομικό verify (μην triggάρεις AI job unattended).
+- Needs Achilleas: κανένα νέο.
+
 ## 2026-06-30 (builder — Build Queue: Expenses/Income full-field edit, P3/S no-AI)
 
 - **Τι**: χτίστηκε το επόμενο καθαρό (no-AI, fully verifiable) Build Queue item. Στην αρχή του run υπήρχαν uncommitted edits στα `api/v1/items/*` + `models/Item.ts` (παράλληλο builder routine — όχι του Αχιλλέα) → απέφυγα εντελώς την περιοχή items· ενδιάμεσα έγιναν commit ως `4ead61b` (item-status whitelist).

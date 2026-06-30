@@ -230,6 +230,9 @@ export function linkItemPlan(id: string, signature: string) {
 export function unlinkItemPlan(id: string, signature: string) {
   return request<{ ok: boolean }>(`/api/v1/items/${id}/link-plan`, { method: 'DELETE', body: JSON.stringify({ signature }) });
 }
+export function convertItemToTask(id: string) {
+  return request<{ ok: boolean; taskId?: string }>(`/api/v1/items/${id}/convert-to-task`, { method: 'POST' });
+}
 
 // ---- Files (bearer-protected). RN <Image> can attach the auth header via source.headers. ----
 export function fileSource(path: string | null): { uri: string; headers?: Record<string, string> } | undefined {
