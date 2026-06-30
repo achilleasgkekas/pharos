@@ -91,29 +91,31 @@ export async function addListItem(data: NewItem): Promise<{ ok: boolean; error?:
   return { ok: true };
 }
 
-export async function updateListItem(id: string, data: Partial<NewItem>): Promise<{ ok: boolean }> {
+// `found` reports whether a live (non-trashed) doc matched — lets the REST layer
+// return 404 instead of a silent success. The web UI ignores the return value.
+export async function updateListItem(id: string, data: Partial<NewItem>): Promise<{ ok: boolean; found: boolean }> {
   await connectDB();
   const set: Record<string, string> = {};
   for (const k of ['name', 'quantity', 'category', 'brand', 'note'] as const) {
     if (data[k] !== undefined) set[k] = String(data[k]).trim();
   }
-  await ShoppingListItem.updateOne({ _id: id }, { $set: set });
+  const r = await ShoppingListItem.updateOne({ _id: id }, { $set: set });
   revalidatePath('/shopping-list');
-  return { ok: true };
+  return { ok: true, found: (r.matchedCount ?? 0) > 0 };
 }
 
-export async function toggleListItem(id: string, checked: boolean): Promise<{ ok: boolean }> {
+export async function toggleListItem(id: string, checked: boolean): Promise<{ ok: boolean; found: boolean }> {
   await connectDB();
-  await ShoppingListItem.updateOne({ _id: id }, { $set: { checked } });
+  const r = await ShoppingListItem.updateOne({ _id: id }, { $set: { checked } });
   revalidatePath('/shopping-list');
-  return { ok: true };
+  return { ok: true, found: (r.matchedCount ?? 0) > 0 };
 }
 
-export async function deleteListItem(id: string): Promise<{ ok: boolean }> {
+export async function deleteListItem(id: string): Promise<{ ok: boolean; found: boolean }> {
   await connectDB();
-  await ShoppingListItem.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+  const r = await ShoppingListItem.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
   revalidatePath('/shopping-list');
-  return { ok: true };
+  return { ok: true, found: (r.matchedCount ?? 0) > 0 };
 }
 
 /** Remove everything already ticked off (soft-delete → recoverable from Trash). */
