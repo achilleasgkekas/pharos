@@ -1,6 +1,11 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
 
+// Single source of truth for item status. Used by the schema enum AND by the
+// /api/v1/items POST + PATCH routes (whitelist validation) so they never drift.
+export const ITEM_STATUSES = ['researching', 'decided', 'ordered', 'received', 'installed', 'deferred', 'sold', 'broken'] as const;
+export type ItemStatus = (typeof ITEM_STATUSES)[number];
+
 const PriceEntrySchema = new Schema(
   {
     price: { type: Number, required: true },
@@ -36,7 +41,7 @@ const ItemSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ['researching', 'decided', 'ordered', 'received', 'installed', 'deferred', 'sold', 'broken'],
+      enum: [...ITEM_STATUSES],
       default: 'researching',
       index: true,
     },

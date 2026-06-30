@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
-import { Item } from '@/models/Item';
+import { Item, ITEM_STATUSES } from '@/models/Item';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const STATUS = ['researching', 'decided', 'ordered', 'received', 'installed', 'sold', 'broken', 'deferred'];
+const STATUS = ITEM_STATUSES as readonly string[];
 
 function linkHost(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
