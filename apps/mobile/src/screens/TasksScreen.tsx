@@ -6,7 +6,20 @@ import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task } f
 
 const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
 const SC: Record<string, string> = { todo: C.faint, 'in-progress': C.cyan, blocked: C.red, done: C.accent };
+const PRIORITIES = ['low', 'normal', 'high'] as const;
+const PC: Record<string, string> = { low: C.faint, normal: C.dim, high: C.gold };
 const slabel = (st: string) => st.replace('-', ' ').toUpperCase();
+
+/** Normalize a free-text tag list ("#net order, build") → ['net','order','build']. */
+function parseTags(input: string): string[] {
+  return Array.from(new Set(input.split(/[\s,]+/).map((t) => t.replace(/^#/, '').trim().toLowerCase()).filter(Boolean)));
+}
+/** Pull #tags out of a quick-add title → { title, tags }. Keeps Greek letters via \p{L}. */
+function splitTitleTags(raw: string): { title: string; tags: string[] } {
+  const tags: string[] = [];
+  const title = raw.replace(/#([\p{L}0-9_-]+)/gu, (_m, t: string) => { tags.push(t.toLowerCase()); return ''; }).replace(/\s+/g, ' ').trim();
+  return { title, tags: Array.from(new Set(tags)) };
+}
 
 export function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -17,6 +30,8 @@ export function TasksScreen() {
   const [editing, setEditing] = useState<Task | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editStatus, setEditStatus] = useState<string>('todo');
+  const [editPriority, setEditPriority] = useState<string>('normal');
+  const [editTags, setEditTags] = useState('');
 
   const load = useCallback(async () => {
     setErr(null);
@@ -26,22 +41,25 @@ export function TasksScreen() {
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   async function add() {
-    const t = title.trim();
-    if (!t) return;
+    const raw = title.trim();
+    if (!raw) return;
     setTitle('');
-    try { await addTask(t); await load(); } catch (e) { setErr((e as Error).message); }
+    const { title: parsed, tags } = splitTitleTags(raw);
+    const useTitle = parsed || raw; // all-tags input → keep raw so title stays non-empty
+    const useTags = parsed ? tags : [];
+    try { await addTask(useTitle, useTags.length ? { tags: useTags } : undefined); await load(); } catch (e) { setErr((e as Error).message); }
   }
   async function toggle(it: Task) {
     const next = it.status === 'done' ? 'todo' : 'done';
     setTasks((p) => p.map((x) => (x.id === it.id ? { ...x, status: next } : x)));
     try { await setTaskStatus(it.id, next); } catch { await load(); }
   }
-  function openEdit(it: Task) { setEditing(it); setEditTitle(it.title); setEditStatus(it.status); }
+  function openEdit(it: Task) { setEditing(it); setEditTitle(it.title); setEditStatus(it.status); setEditPriority(it.priority || 'normal'); setEditTags(it.tags.join(' ')); }
   async function saveEdit() {
     if (!editing || !editTitle.trim()) return;
     const id = editing.id;
     setEditing(null);
-    try { await updateTask(id, { title: editTitle.trim(), status: editStatus }); await load(); } catch (e) { setErr((e as Error).message); }
+    try { await updateTask(id, { title: editTitle.trim(), status: editStatus, priority: editPriority, tags: parseTags(editTags) }); await load(); } catch (e) { setErr((e as Error).message); }
   }
   function removeEditing() {
     if (!editing) return;
@@ -58,7 +76,7 @@ export function TasksScreen() {
   return (
     <View style={s.wrap}>
       <View style={s.addRow}>
-        <TextInput value={title} onChangeText={setTitle} onSubmitEditing={add} placeholder="Add a task…" placeholderTextColor={C.faint} style={s.input} />
+        <TextInput value={title} onChangeText={setTitle} onSubmitEditing={add} placeholder="Add a task…  #tag" placeholderTextColor={C.faint} style={s.input} />
         <Pressable onPress={add} disabled={!title.trim()} style={[s.add, !title.trim() && s.dim]}><Text style={s.addText}>＋</Text></Pressable>
       </View>
       <ErrorText>{err}</ErrorText>
@@ -100,6 +118,16 @@ export function TasksScreen() {
                 </Pressable>
               ))}
             </View>
+            <Text style={s.label}>PRIORITY</Text>
+            <View style={s.statuses}>
+              {PRIORITIES.map((pr) => (
+                <Pressable key={pr} onPress={() => setEditPriority(pr)} style={[s.statusBtn, editPriority === pr && { backgroundColor: PC[pr], borderColor: PC[pr] }]}>
+                  <Text style={[s.statusText, editPriority === pr && { color: '#000' }]}>{pr.toUpperCase()}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={s.label}>TAGS</Text>
+            <TextInput value={editTags} onChangeText={setEditTags} placeholder="network order  (space or comma)" placeholderTextColor={C.faint} autoCapitalize="none" style={s.modalInput} />
             <View style={s.modalBtns}>
               <Pressable onPress={saveEdit} disabled={!editTitle.trim()} style={[s.save, !editTitle.trim() && s.dim]}><Text style={s.saveText}>Save</Text></Pressable>
               <Pressable onPress={removeEditing} style={s.del}><Text style={s.delText}>Delete</Text></Pressable>

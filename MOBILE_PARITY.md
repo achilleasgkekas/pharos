@@ -68,7 +68,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Tasks (`/tasks`)
 | Web | Mobile |
 |-----|--------|
-| **Kanban** (todo/in-progress/blocked/done, drag + ←/→), board/list toggle, #tags, steps/checklist, project progress by tag | 🟡 list + add + toggle done + tap-to-edit (title + **4-status picker** todo/in-progress/blocked/done) + status chips + tag/priority display + delete. No Kanban board, no #tag-parse on add, no steps/checklist, no project-progress-by-tag |
+| **Kanban** (todo/in-progress/blocked/done, drag + ←/→), board/list toggle, #tags, steps/checklist, project progress by tag | 🟡 list + add (**#tag-parse**) + toggle done + tap-to-edit (title + **4-status picker** + **priority picker** low/normal/high + **tags editor**) + status chips + tag/priority display + delete. No Kanban board, no steps/checklist, no project-progress-by-tag |
 
 ## Settings (`/settings`)
 | Web | Mobile |
@@ -116,7 +116,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 >
 > **Re-audit 2026-06-30 (cont.³ — parity-auditor, 5η σάρωση ημέρας):** queue ξαναμετρημένη από τον κώδικα. **48 v1 routes** (ανέβηκαν από 46: προστέθηκαν `items/[id]/convert-to-task` + `receipts/[id]/rescan`), **16 mobile screens**, **70** exported api fns (όχι 78, η παλιά μέτρηση ήταν χαλαρή). Το mobile `api.ts` καταναλώνει **ΟΛΑ** τα 48 routes εκτός **ενός**: `POST /api/v1/receipts/[id]/rescan` (χτίστηκε σήμερα ως web endpoint, `d24be27`, **κανένας mobile consumer ακόμα**) → αυτό ΕΙΝΑΙ ο μοναδικός «endpoint χωρίς mobile half» gap. **ΚΡΙΣΙΜΗ αλλαγή vs προηγ. audit:** το queue item «Receipts re-scan» έλεγε `API exists: no` — πλέον **exists: yes** (το endpoint είναι registered + serving, no-token 401 verified). Άρα το TODO ΔΕΝ είναι πια full-stack· είναι **μόνο το mobile half** (api.ts `rescanReceipt` + ReceiptsScreen buttons). Από τα 6 queue items: **4 DONE** (Statements overview, Items convert-to-task, Notifications badge, Expenses full-field edit), **2 TODO GAP**: (α) Receipts re-scan mobile half (P2/M, web endpoint ΕΤΟΙΜΟ, AI → δομικό verify), (β) Items AI specs (P3/M, web endpoint `items/[id]/ai-fill` **ΔΕΝ υπάρχει** — full-stack, AI). DONE επιβεβαιωμένα από κώδικα: `items/[id]/convert-to-task/route.ts` υπάρχει + `convertItemToTask` στο api.ts· `expenses/[id]/route.ts` PATCH έχει period/recurring/recurringCycle/paymentMethod (γραμμές 23-27)· `statements/plans` + `getInstallmentPlans` παρόντα. mobile `tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). Web commits από `afbccb3`: 4 feature (item-status whitelist, expenses PATCH, convert-to-task, rescan endpoint) + 2 refactor (listEnvelope `{data}`, apiBody helpers) + 1 perf (updatedAt indexes) — όλα ήδη reviewed/clean.
 
-### Tasks — tags + priority στο add/edit (mobile)
+### Tasks — tags + priority στο add/edit (mobile) ✅ DONE (2026-07-01, builder)
 - Priority: P3 | Size: S | no AI, no decision
 - Web ref: createTask + UpdateTask (file: apps/web/src/app/tasks/actions.ts, apps/web/src/app/tasks/TasksClient.tsx) — το web new-task modal καταχωρεί tags + priority· το mobile όχι.
 - API: POST /api/v1/tasks (exists: yes — δέχεται ήδη `tags` [array ή comma-string] + `priority` [low/normal/high], route.ts:52,58) · PATCH /api/v1/tasks/[id] (exists: yes — δέχεται ήδη `tags`/`priority`/`content`/`dueDate`). **Κανένα νέο endpoint· ο builder αγγίζει ΜΟΝΟ mobile.**
@@ -125,7 +125,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - Quick-add «Buy switch #network #order» → δημιουργεί task title «Buy switch» με tags ['network','order'] (ορατά ως #network #order στη λίστα)
   - Edit modal αλλάζει priority + tags· reflect μετά το reload· POST/PATCH no-token → 401· bad id → 400
   - tsc καθαρό (mobile)
-- Status: TODO
+- Status: ✅ DONE (commit pending). `api.ts`: `addTask(title, {tags?,priority?})` + `updateTask` data type += `tags?: string[]`. `TasksScreen.tsx`: `splitTitleTags()` (#word parse με `\p{L}` για ελληνικά tags, strip από title, all-tags input κρατά raw ώστε title≠κενό) στο `add()`· edit modal += PRIORITY picker (low/normal/high, gold high) + TAGS input (space/comma → `parseTags()` dedupe+lowercase)· `updateTask(id,{title,status,priority,tags})`. mobile tsc EXIT 0. Καμία αλλαγή web runtime → χωρίς Docker rebuild.
 
 ### Statements — installment-plan overview στο mobile detail
 - Priority: P1 | Size: M

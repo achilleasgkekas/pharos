@@ -138,9 +138,9 @@ export async function getTasks(status?: string): Promise<Task[]> {
   const q = status ? `?status=${status}&limit=200` : '?limit=200';
   return (await request<{ data: Task[] }>(`/api/v1/tasks${q}`)).data ?? [];
 }
-export function addTask(title: string) { return request<{ task: Task }>('/api/v1/tasks', { method: 'POST', body: JSON.stringify({ title }) }); }
+export function addTask(title: string, data?: { tags?: string[]; priority?: string }) { return request<{ task: Task }>('/api/v1/tasks', { method: 'POST', body: JSON.stringify({ title, ...data }) }); }
 export function setTaskStatus(id: string, status: string) { return request<{ task: Task }>(`/api/v1/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }); }
-export function updateTask(id: string, data: { title?: string; status?: string; priority?: string }) { return request<{ task: Task }>(`/api/v1/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
+export function updateTask(id: string, data: { title?: string; status?: string; priority?: string; tags?: string[] }) { return request<{ task: Task }>(`/api/v1/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
 export function deleteTask(id: string) { return request<{ ok: boolean }>(`/api/v1/tasks/${id}`, { method: 'DELETE' }); }
 
 // ---- Expenses / income ----
