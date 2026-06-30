@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   });
 }
 
-/** PATCH /api/v1/receipts/:id  { store?, date?, total?, subtotal?, vatAmount?, paymentMethod?, notes?, verified?, archived? } */
+/** PATCH /api/v1/receipts/:id  { store?, date?, total?, subtotal?, vatAmount?, paymentMethod?, notes?, verified?, archived?, lineItems? } */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
@@ -51,6 +51,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof b.notes === 'string') set.notes = b.notes;
     if (typeof b.verified === 'boolean') set.verified = b.verified;
     if (typeof b.archived === 'boolean') set.archived = b.archived;
+    if (Array.isArray(b.lineItems)) {
+      // Sanitize edited line items. `price` is the stored unit NET (excl. VAT).
+      // refinedName is cleared so the edited `name` wins (GET returns refinedName||name).
+      type LineIn = { name?: unknown; qty?: unknown; price?: unknown; vatRate?: unknown };
+      const numOr = (v: unknown, d: number, min = 0) => { const n = Number(v); return Number.isFinite(n) && n >= min ? n : d; };
+      set.lineItems = (b.lineItems as LineIn[])
+        .map((l) => ({ name: String(l.name ?? '').trim(), refinedName: '', qty: numOr(l.qty, 1, 0.0001), price: numOr(l.price, 0), vatRate: numOr(l.vatRate, 0) }))
+        .filter((l) => l.name || l.price > 0);
+    }
     if (!Object.keys(set).length) return apiError('no valid fields');
     await connectDB();
     const doc = await Receipt.findByIdAndUpdate(id, { $set: set }, { new: true }).select('-rawAiResponse').lean();

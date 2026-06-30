@@ -5,6 +5,11 @@ import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
 import { getReceipts, getReceipt, scanReceipt, updateReceipt, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
 
+type LineEdit = { name: string; qty: string; price: string; vatRate: string };
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const num = (s: string) => parseFloat(String(s).replace(',', '.')) || 0;
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 export function ReceiptsScreen() {
   const [rows, setRows] = useState<ReceiptSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +20,11 @@ export function ReceiptsScreen() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [eStore, setEStore] = useState('');
   const [eTotal, setETotal] = useState('');
+  const [eDate, setEDate] = useState('');
+  const [ePay, setEPay] = useState('');
+  const [eNotes, setENotes] = useState('');
   const [eVerified, setEVerified] = useState(false);
+  const [eLines, setELines] = useState<LineEdit[]>([]);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -26,7 +35,12 @@ export function ReceiptsScreen() {
 
   // Prefill editable fields whenever a detail opens (tap or after a scan).
   useEffect(() => {
-    if (detail) { setEStore(detail.store); setETotal(String(detail.total ?? 0)); setEVerified(detail.verified); }
+    if (detail) {
+      setEStore(detail.store); setETotal(String(detail.total ?? 0));
+      setEDate(detail.date ? detail.date.slice(0, 10) : ''); setEPay(detail.paymentMethod ?? '');
+      setENotes(detail.notes ?? ''); setEVerified(detail.verified);
+      setELines(detail.lineItems.map((l) => ({ name: l.name, qty: String(l.qty ?? 1), price: String(l.price ?? 0), vatRate: String(l.vatRate ?? 0) })));
+    }
   }, [detail]);
 
   async function open(id: string) {
@@ -34,12 +48,39 @@ export function ReceiptsScreen() {
     try { setDetail(await getReceipt(id)); } catch (e) { setErr((e as Error).message); }
     finally { setDetailLoading(false); }
   }
+
+  const setLine = (i: number, k: keyof LineEdit, v: string) => setELines((p) => p.map((l, j) => (j === i ? { ...l, [k]: v } : l)));
+  const addLine = () => setELines((p) => [...p, { name: '', qty: '1', price: '0', vatRate: '24' }]);
+  const removeLine = (i: number) => setELines((p) => p.filter((_, j) => j !== i));
+  const lineGross = (l: LineEdit) => num(l.price) * (num(l.qty) || 1) * (1 + num(l.vatRate) / 100);
+  // ∑ items → fill the Total field with the gross sum of the lines.
+  function fillTotal() {
+    const gross = eLines.reduce((s, l) => s + lineGross(l), 0);
+    setETotal(gross.toFixed(2));
+  }
+
   async function saveReceipt() {
     if (!detail) return;
     const id = detail.id;
-    const t = parseFloat(eTotal.replace(',', '.'));
+    const t = num(eTotal);
+    let net = 0, vat = 0;
+    const lines = eLines
+      .filter((l) => l.name.trim() || num(l.price) > 0)
+      .map((l) => { const q = num(l.qty) || 1, p = num(l.price), r = num(l.vatRate); net += p * q; vat += p * q * r / 100; return { name: l.name.trim(), qty: q, price: p, vatRate: r }; });
     setDetail(null);
-    try { await updateReceipt(id, { store: eStore.trim(), total: Number.isFinite(t) ? t : undefined, verified: eVerified }); await load(); } catch (e) { setErr((e as Error).message); }
+    try {
+      await updateReceipt(id, {
+        store: eStore.trim(),
+        total: Number.isFinite(t) ? t : undefined,
+        date: DATE_RE.test(eDate.trim()) ? eDate.trim() : undefined,
+        paymentMethod: ePay.trim(),
+        notes: eNotes,
+        verified: eVerified,
+        lineItems: lines,
+        ...(lines.length ? { subtotal: round2(net), vatAmount: round2(vat) } : {}),
+      });
+      await load();
+    } catch (e) { setErr((e as Error).message); }
   }
   async function archiveReceipt() {
     if (!detail) return;
@@ -101,27 +142,55 @@ export function ReceiptsScreen() {
               <Pressable onPress={() => setDetail(null)} hitSlop={10}><Text style={s.close}>✕</Text></Pressable>
             </View>
             {detailLoading && !detail ? <ActivityIndicator color={C.accent} style={{ margin: 30 }} /> : detail ? (
-              <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+              <ScrollView contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
                 {fileSource(detail.file) && <Image source={fileSource(detail.file)} style={s.bigImg} resizeMode="contain" />}
                 <Text style={s.elabel}>STORE</Text>
                 <TextInput value={eStore} onChangeText={setEStore} style={s.einput} placeholderTextColor={C.faint} />
-                <Text style={s.elabel}>TOTAL ({detail.currency})</Text>
-                <TextInput value={eTotal} onChangeText={setETotal} keyboardType="decimal-pad" style={s.einput} placeholderTextColor={C.faint} />
+                <View style={s.rowFields}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.elabel}>DATE (YYYY-MM-DD)</Text>
+                    <TextInput value={eDate} onChangeText={setEDate} placeholder="2026-06-30" autoCapitalize="none" style={s.einput} placeholderTextColor={C.faint} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.elabel}>PAYMENT</Text>
+                    <TextInput value={ePay} onChangeText={setEPay} placeholder="card / cash" style={s.einput} placeholderTextColor={C.faint} />
+                  </View>
+                </View>
+                <View style={s.totalRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.elabel}>TOTAL ({detail.currency})</Text>
+                    <TextInput value={eTotal} onChangeText={setETotal} keyboardType="decimal-pad" style={s.einput} placeholderTextColor={C.faint} />
+                  </View>
+                  <Pressable onPress={fillTotal} disabled={!eLines.length} style={[s.sumBtn, !eLines.length && s.dim]}><Text style={s.sumText}>∑ items</Text></Pressable>
+                </View>
+
+                <View style={s.linesHead}>
+                  <Text style={s.elabel}>LINE ITEMS</Text>
+                  <Pressable onPress={addLine} hitSlop={8}><Text style={s.addLine}>+ add</Text></Pressable>
+                </View>
+                {eLines.map((l, i) => (
+                  <View key={i} style={s.lineEdit}>
+                    <View style={s.lineTop}>
+                      <TextInput value={l.name} onChangeText={(v) => setLine(i, 'name', v)} placeholder="item name" placeholderTextColor={C.faint} style={[s.einput, { flex: 1 }]} />
+                      <Pressable onPress={() => removeLine(i)} hitSlop={8} style={s.lineDel}><Text style={s.lineDelTxt}>✕</Text></Pressable>
+                    </View>
+                    <View style={s.lineSub}>
+                      <View style={s.lineCell}><Text style={s.cellLab}>QTY</Text><TextInput value={l.qty} onChangeText={(v) => setLine(i, 'qty', v)} keyboardType="decimal-pad" style={s.cellInput} placeholderTextColor={C.faint} /></View>
+                      <View style={s.lineCell}><Text style={s.cellLab}>NET {detail.currency}</Text><TextInput value={l.price} onChangeText={(v) => setLine(i, 'price', v)} keyboardType="decimal-pad" style={s.cellInput} placeholderTextColor={C.faint} /></View>
+                      <View style={s.lineCell}><Text style={s.cellLab}>VAT %</Text><TextInput value={l.vatRate} onChangeText={(v) => setLine(i, 'vatRate', v)} keyboardType="decimal-pad" style={s.cellInput} placeholderTextColor={C.faint} /></View>
+                      <Text style={s.lineGross}>{money(lineGross(l), detail.currency)}</Text>
+                    </View>
+                  </View>
+                ))}
+
+                <Text style={s.elabel}>NOTES</Text>
+                <TextInput value={eNotes} onChangeText={setENotes} multiline placeholder="optional" placeholderTextColor={C.faint} style={[s.einput, { minHeight: 56, textAlignVertical: 'top' }]} />
+
                 <Pressable onPress={() => setEVerified((v) => !v)} style={s.toggle}>
                   <View style={[s.tbox, eVerified && s.tboxOn]}>{eVerified && <Text style={s.tmark}>✓</Text>}</View>
                   <Text style={s.tlabel}>Verified</Text>
                 </Pressable>
-                <Text style={s.dim}>{shortDate(detail.date)}{detail.paymentMethod ? `  ·  ${detail.paymentMethod}` : ''}</Text>
-                {detail.lineItems.length > 0 && (
-                  <View style={s.lines}>
-                    {detail.lineItems.map((l, i) => (
-                      <View key={i} style={s.lineRow}>
-                        <Text style={s.lineName} numberOfLines={1}>{l.qty > 1 ? `${l.qty}× ` : ''}{l.name || '—'}</Text>
-                        <Text style={s.linePrice}>{money(l.price * (l.qty || 1), detail.currency)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
+
                 <View style={s.mbtns}>
                   <Pressable onPress={saveReceipt} style={s.save}><Text style={s.saveText}>Save</Text></Pressable>
                   <Pressable onPress={archiveReceipt} style={s.del}><Text style={s.delText}>Not a receipt</Text></Pressable>
@@ -147,22 +216,30 @@ const s = StyleSheet.create({
   meta: { color: C.faint, fontSize: 12, marginTop: 3 },
   total: { color: C.text, fontSize: 16, fontWeight: '700' },
   modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  modal: { backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, maxHeight: '88%', borderWidth: 1, borderColor: C.border },
+  modal: { backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, maxHeight: '92%', borderWidth: 1, borderColor: C.border },
   modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800', flex: 1 },
   close: { color: C.dim, fontSize: 18, paddingHorizontal: 6 },
-  bigImg: { width: '100%', height: 300, borderRadius: 12, backgroundColor: C.surface, marginBottom: 14 },
-  sumRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  sumLabel: { color: C.dim, fontSize: 14 },
-  sumVal: { color: C.text, fontSize: 22, fontWeight: '800' },
-  dim: { color: C.faint, fontSize: 12, marginTop: 2 },
-  lines: { marginTop: 16, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 10 },
-  lineRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 6 },
-  lineName: { color: C.text, fontSize: 14, flex: 1 },
-  linePrice: { color: C.dim, fontSize: 14 },
+  bigImg: { width: '100%', height: 260, borderRadius: 12, backgroundColor: C.surface, marginBottom: 14 },
+  dim: { opacity: 0.4 },
   elabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   einput: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
-  toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+  rowFields: { flexDirection: 'row', gap: 10 },
+  totalRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
+  sumBtn: { borderWidth: 1, borderColor: C.cyan, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 0 },
+  sumText: { color: C.cyan, fontSize: 14, fontWeight: '700' },
+  linesHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  addLine: { color: C.cyan, fontSize: 13, fontWeight: '700', marginTop: 12 },
+  lineEdit: { borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 10, marginTop: 8, backgroundColor: C.surface },
+  lineTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  lineDel: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  lineDelTxt: { color: C.red, fontSize: 16, fontWeight: '700' },
+  lineSub: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 8 },
+  lineCell: { flex: 1 },
+  cellLab: { color: C.faint, fontSize: 9, letterSpacing: 0.8, marginBottom: 4 },
+  cellInput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 8, color: C.text, fontSize: 14 },
+  lineGross: { color: C.dim, fontSize: 13, fontWeight: '600', paddingBottom: 9, minWidth: 56, textAlign: 'right' },
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
   tboxOn: { backgroundColor: C.accent, borderColor: C.accent },
   tmark: { color: '#000', fontSize: 15, fontWeight: '800' },
