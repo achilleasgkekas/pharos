@@ -57,21 +57,38 @@ export async function GET(req: NextRequest) {
     }
     const monthly = months.map((m) => ({ period: m, expense: 0, income: 0 }));
     const byCat: Record<string, number> = {};
+    const thisMonthCat: Record<string, number> = {}; // expense per category, THIS month (for budgets)
     const sum = { mExp: 0, mInc: 0, yExp: 0, yInc: 0 };
 
     for (const d of docs) {
       const ym = ymOf(d);
       const amt = d.amount || 0;
+      if (amt <= 0) continue;
       const inc = d.kind === 'income';
+      const cat = d.category || 'other';
       const bucket = monthly.find((b) => b.period === ym);
       if (bucket) { if (inc) bucket.income += amt; else bucket.expense += amt; }
-      if (ym === thisYM) { if (inc) sum.mInc += amt; else sum.mExp += amt; }
+      if (ym === thisYM) {
+        if (inc) sum.mInc += amt;
+        else { sum.mExp += amt; thisMonthCat[cat] = (thisMonthCat[cat] || 0) + amt; }
+      }
       if (ym.startsWith(thisYear)) {
         if (inc) sum.yInc += amt;
-        else { sum.yExp += amt; byCat[d.category || 'other'] = (byCat[d.category || 'other'] || 0) + amt; }
+        else { sum.yExp += amt; byCat[cat] = (byCat[cat] || 0) + amt; }
       }
     }
     const byCategory = Object.entries(byCat).map(([category, total]) => ({ category, total })).sort((a, b) => b.total - a.total).slice(0, 8);
+
+    // Budget vs actual (this month), per budgeted category. Mirrors web /reports "Budget · this month".
+    const budgetMap = (settings.budgets || {}) as Record<string, number>;
+    const budgets = Object.entries(budgetMap)
+      .filter(([, limit]) => Number(limit) > 0)
+      .map(([category, limit]) => ({
+        category,
+        limit: Number(limit),
+        spent: Math.round((thisMonthCat[category] || 0) * 100) / 100,
+      }))
+      .sort((a, b) => b.limit - a.limit);
 
     return NextResponse.json({
       currency: settings.currency || 'EUR',
@@ -79,6 +96,7 @@ export async function GET(req: NextRequest) {
       thisMonth: { income: sum.mInc, expense: sum.mExp, net: sum.mInc - sum.mExp },
       thisYear: { income: sum.yInc, expense: sum.yExp, net: sum.yInc - sum.yExp },
       byCategory,
+      budgets,
       monthly,
     });
   });

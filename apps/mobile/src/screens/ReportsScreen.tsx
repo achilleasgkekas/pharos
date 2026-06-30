@@ -15,6 +15,22 @@ function Bar({ label, value, max, cur, color }: { label: string; value: number; 
   );
 }
 
+function BudgetBar({ category, spent, limit, cur }: { category: string; spent: number; limit: number; cur: string }) {
+  const ratio = limit > 0 ? spent / limit : 0;
+  const over = ratio > 1;
+  const pct = Math.max(2, Math.min(100, Math.round(ratio * 100)));
+  const color = over ? C.red : ratio >= 0.8 ? C.gold : C.accent;
+  return (
+    <View style={s.budgetRow}>
+      <View style={s.budgetHead}>
+        <Text style={s.budgetCat} numberOfLines={1}>{category}</Text>
+        <Text style={[s.budgetAmt, over && { color: C.red }]}>{money(spent, cur)} / {money(limit, cur)}</Text>
+      </View>
+      <View style={s.track}><View style={[s.fill, { width: `${pct}%`, backgroundColor: color }]} /></View>
+    </View>
+  );
+}
+
 export function ReportsScreen() {
   const [d, setD] = useState<Reports | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -58,6 +74,13 @@ export function ReportsScreen() {
             </View>
           </View>
 
+          {d.budgets.length > 0 && (
+            <>
+              <Text style={s.section}>BUDGET · THIS MONTH</Text>
+              {d.budgets.map((b) => <BudgetBar key={b.category} category={b.category} spent={b.spent} limit={b.limit} cur={cur} />)}
+            </>
+          )}
+
           <Text style={s.section}>SPEND · LAST 6 MONTHS</Text>
           {d.monthly.map((m) => <Bar key={m.period} label={mLabel(m.period)} value={m.expense} max={monthMax} cur={cur} color={C.gold} />)}
 
@@ -88,4 +111,8 @@ const s = StyleSheet.create({
   track: { flex: 1, height: 10, borderRadius: 5, backgroundColor: C.surface2, overflow: 'hidden' },
   fill: { height: 10, borderRadius: 5 },
   barVal: { color: C.text, fontSize: 12, width: 72, textAlign: 'right' },
+  budgetRow: { marginBottom: 12 },
+  budgetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
+  budgetCat: { color: C.dim, fontSize: 12, flex: 1, marginRight: 8 },
+  budgetAmt: { color: C.text, fontSize: 12 },
 });
