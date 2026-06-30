@@ -678,3 +678,22 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
 - **Push notifications end-to-end**: in-app feed ✅, αλλά το remote push pipeline (Expo) είναι αδοκίμαστο — χρειάζεται EAS dev build + APNs key (device + Apple account).
 - **Statements merge/bind installment plans (write-ops)**: το mobile έχει read-only overview· τα web write-ops (link-to-product, merge/bind) θέλουν UX απόφαση πριν portαριστούν.
 - **/setup wizard**: web-only first-run admin· σκόπιμα εκτός mobile (bearer token). Όχι gap, καταγραφή μόνο.
+
+## 2026-07-01 (ui-auditor, αργά νύχτα — 4η σάρωση ημέρας)
+ui-auditor read-only mobile UI consistency re-audit. ΝΕΟΣ mobile commit ενδιάμεσα: `86c6ada` (Items AI specs/info) πρόσθεσε ghost-button `aiBtn` (radius/padding 12/10 magic numbers, χρώματα όμως σωστά από `C.accent` tokens — μηδέν νέο hardcoded hex/`#000`) → ενσωματώθηκε στο edit list του Button+Chip item.
+
+Violations ανά dimension (live, αμετάβλητα από νυχτερινή σάρωση):
+- Tokens (hardcoded hex εκτός theme.ts): **32** `#000` onAccent literals (23 text-style + 8 `ActivityIndicator color="#000"` + 1 `alpha('#000',0.6)` backdrop)· 8-digit alpha hex **0**.
+- Shared theme file: ✅ υπάρχει (`theme.ts` με `SPACE/RADIUS/SIZE/alpha` + `surface3/orange/onAccent`) — foundation DONE.
+- Reusable components: `ui.tsx` εξάγει μόνο `Header/Centered/Spinner/ErrorText/Empty/Check`· λείπουν Input/Button/Chip/Card/Badge → input style entries **17**, chip-variant **27**, card **5**, badge **4**, save/add-btn **21** ad-hoc (νέο `aiBtn` το 28ο button-variant).
+- Theme/dark mode: dark-only, μηδέν light palette/context (web έχει πλήρες light mode).
+- States: ✅ συνεπή μέσω `ui.tsx` (Spinner/Empty/ErrorText).
+- Adaptive: `react-native-safe-area-context` εκτός deps (0 imports) → μηδέν bottom-inset· `maxWidth` **2** (καμία στο content) → edge-to-edge σε tablet/landscape.
+- Touch targets: DONE (shared `<Check>` + hitSlop).
+
+Queue: **3 foundation DONE, 6 TODO**. mobile `tsc --noEmit` EXIT 0.
+
+Top 3 για τον builder (με σειρά):
+1. **Input primitive (P1/M)** — `<Input>`/`<TextArea>` στο `ui.tsx`, migration 17 entries / 11 screens· λύνει borderRadius 10/12/14 + padding + fontSize 14/15/16 divergence. ΣΗΜ: μεγάλη μετανάστευση ~50+ TextInput sites χωρίς simulator → καλύτερα σε attended run.
+2. **Button + Chip primitives (P2/M)** — ενοποιεί 21 save/add-btn + νέο `aiBtn` + 27 chip-variants· text color από `onAccent` token → καθαρίζει τα 23 `#000` text literals.
+3. **Card + Badge + ListItem primitives (P2/M)** — 5 `card:` + 4 `badge:` τοπικά → σταθερό radius/padding/border.
