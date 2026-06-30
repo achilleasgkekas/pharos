@@ -3,9 +3,11 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
-## Σύνοψη audit (2026-06-30· re-audit confirm 2026-06-30 βραδινό· re-confirm 2026-06-30 late, 46 route files)
+## Σύνοψη audit (2026-06-30· re-audit confirm βραδινό· re-confirm late 46 route files· re-confirm #4 2026-06-30 — μηδέν app-code commit ενδιάμεσα)
 
-Re-audit: η ουρά παρακάτω (5 items, 0 P1 / 3 P2 / 2 P3) **επιβεβαιώθηκε αμετάβλητη** — τίποτα δεν χτίστηκε από αυτήν ενδιάμεσα (τα commits από τότε ήταν μόνο docs + το `df8c87a` statements/plans, additive). Σαρώθηκαν ξανά **46 route files** (45 bearer + login), συμπεριλαμβανομένων των πιο πρόσφατων (statements/plans, items/[id]/{plans,link-plan,price}, scan/expense, push/register, history, trash/[type]/[id]): είναι όλα καλο-γραμμένα (withAuth, id 24-hex guard, `req.json().catch(()=>({}))`, .lean(), clean 400/403/404). Μηδέν νέο εύρημα.
+Re-confirm #4: επανέλεγχος ολόκληρης της `/api/v1` (46 route files). `git log af7fdc5..HEAD -- apps/web/src` → **κενό** (κανένα app-code commit από τότε που στήθηκε η ουρά· μόνο docs). Άρα και τα 5 items παραμένουν αυτόλεξη valid + αμετάβλητα. Επαληθεύτηκαν ξανά από τον κώδικα: (α) κανένα model δεν έχει `index({ updatedAt })` → P2#1, (β) `GET /items` γυρνά `{ items }` όχι `listEnvelope {data}` (route.ts:51) → P2#3, (γ) `POST /items` δέχεται αυθαίρετο `status` ενώ το PATCH κάνει `STATUS.includes()` (8 τιμές πλέον: +sold/broken) → P2#2, (δ) `shopping-list/[id]` το μόνο [id] route χωρίς 24-hex guard, σιωπηλό success σε not-found → P3#4. Μηδέν νέο εύρημα.
+
+Re-audit (προηγ.): η ουρά (5 items, 0 P1 / 3 P2 / 2 P3) **επιβεβαιώθηκε αμετάβλητη** — τίποτα δεν χτίστηκε ενδιάμεσα (commits μόνο docs + το `df8c87a` statements/plans, additive, ήδη reviewed). Σαρώθηκαν ξανά **46 route files** (45 bearer + login): όλα καλο-γραμμένα (withAuth, id 24-hex guard, `req.json().catch(()=>({}))`, .lean(), clean 400/403/404). Μηδέν νέο εύρημα.
 
 Η `/api/v1` επιφάνεια είναι σε καλή κατάσταση. Δεν βρέθηκε P1 (correctness/security/data) θέμα:
 
