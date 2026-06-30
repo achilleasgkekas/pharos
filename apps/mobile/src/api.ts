@@ -272,8 +272,11 @@ export function getReports() { return request<Reports>('/api/v1/reports'); }
 
 // ---- Calendar ----
 export type CalEvent = { date: string; kind: 'renewal' | 'voucher' | 'warranty'; label: string; amount?: number };
-export async function getCalendar(): Promise<{ currency: string; events: CalEvent[] }> {
-  return request<{ currency: string; days: number; events: CalEvent[] }>('/api/v1/calendar');
+export type CalEntryKind = 'renewal' | 'installments' | 'bill' | 'income' | 'warranty' | 'voucher';
+export type CalEntry = { date: string; kind: CalEntryKind; label: string; sub: string; amount: number | null; pinned?: boolean };
+export type CalMonth = { key: string; label: string; entries: CalEntry[]; out: number; inc: number };
+export async function getCalendar(): Promise<{ currency: string; dueThisMonth: number; months: CalMonth[]; events: CalEvent[] }> {
+  return request<{ currency: string; dueThisMonth: number; months: CalMonth[]; events: CalEvent[] }>('/api/v1/calendar');
 }
 
 // ---- Global search ----

@@ -58,7 +58,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Calendar (`/calendar`)
 | Web | Mobile |
 |-----|--------|
-| 3-month money agenda: renewals stepped per cycle, **installments aggregated per month**, recurring bills/income projected, warranty + voucher expiries, monthly in/out totals | 🟡 upcoming list (renewals + voucher/warranty expiries); no installment/recurring projection or monthly totals |
+| 3-month money agenda: renewals stepped per cycle, **installments aggregated per month**, recurring bills/income projected, warranty + voucher expiries, monthly in/out totals | ✅ 3-month sectioned agenda: renewals stepped, installments aggregated/month (pinned), recurring bills/income projected, warranty/voucher expiries, per-month in/out totals |
 
 ## Reports (`/reports`)
 | Web | Mobile |
