@@ -3,7 +3,9 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
-## Σύνοψη audit (2026-06-30)
+## Σύνοψη audit (2026-06-30· re-audit confirm 2026-06-30 βραδινό)
+
+Re-audit: η ουρά παρακάτω (5 items, 0 P1 / 3 P2 / 2 P3) **επιβεβαιώθηκε αμετάβλητη** — τίποτα δεν χτίστηκε από αυτήν ενδιάμεσα (τα commits από τότε ήταν μόνο docs). Σαρώθηκαν ξανά και τα 44 route files (40 endpoints), συμπεριλαμβανομένων των πιο πρόσφατων (cards, stores, items/[id]/plans + link-plan + price, scan/expense, items/import): είναι όλα καλο-γραμμένα (id 24-hex guard, input validation, clean 400/404). Μηδέν νέο εύρημα.
 
 Η `/api/v1` επιφάνεια είναι σε καλή κατάσταση. Δεν βρέθηκε P1 (correctness/security/data) θέμα:
 
