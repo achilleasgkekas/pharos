@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 261a4fb -->
+<!-- reviewed: fbda2b3 -->
 <!-- docker-validated: 0b53e82 -->
+
+## 2026-07-01 (reviewer — range 261a4fb..fbda2b3 καθαρό)
+- **Τι εξετάστηκα**: 11 commits από το προηγούμενο marker (`261a4fb`), εκ των οποίων κώδικας: `c3c9fae` (GET items→listEnvelope), `261a4fb` (id-guard shopping-list ήδη reviewed-base), `d24be27`+route (POST receipts rescan), `9b34b44` (shared body-coercion helpers), `76ce160` (mobile `<Check>` primitive), `fbda2b3` (mobile receipts re-scan). Υπόλοιπα = docs/queues.
+- **Checks**: `apps/web npm run type-check` → **EXIT 0**. `apps/mobile npx tsc --noEmit` → **EXIT 0**. Καμία διαρροή secret/.env στο diff.
+- **Review ευρήματα**: (1) `lib/apiBody.ts` (`readBody/strField/numField/enumField/boolField`) + η εφαρμογή του σε expenses/subscriptions POST = **behavior-preserving** (επαλήθευσα 1:1 σημασιολογία: `String(b.x||fb)`, `Number.isFinite`→`!==null`, `allowed.includes`, `!!`). (2) Νέο `POST /api/v1/receipts/[id]/rescan`: επιστρέφει το **ίδιο shape με GET /receipts/:id** (`trimReceipt`+notes+normalized lineItems) → ο mobile prefill effect δουλεύει αμετάβλητος· error mapping 404/500 σωστό· id-guard 24-hex. **Δεν αλλάζει κανένα υπάρχον API shape** → μηδέν ρίσκο για το mobile. (3) `Check` primitive (`ui.tsx`) αντικαθιστά 6 inline checkboxes (Receipts/Settings/Shopping/Subscriptions/Tasks/Vouchers) με ίδια tokens (`C.onAccent`, `SIZE.md`=15 == παλιό 15)· Tasks δίνει σωστά `hitSlop={10}` στο wrapping Pressable.
+- **Fixes**: κανένα (όλα green/clean, δεν χρειάστηκε small-safe fix).
+- **Flagged**: τίποτα νέο. Ελάσσον (ΔΕΝ flagged ως debt — cosmetic): το mobile `rescanReceipt` type δηλώνει `model: string; aiError: string|null` ενώ ο route μπορεί να παραλείψει `model`/`aiError` (RescanResult: optional)· δεν προκαλεί bug (το ReceiptsScreen διαβάζει μόνο `r.receipt` + truthy `r.aiError`).
+- **Marker**: reviewed → `fbda2b3`.
 
 ## 2026-07-01 (builder — MOBILE_PARITY: Receipts re-scan mobile half, P2/M AI → δομικό verify)
 - **Τι**: ολοκληρώθηκε το ενεργό κορυφαίο parity TODO («Receipts re-scan — mobile half»). Το web endpoint `POST /api/v1/receipts/[id]/rescan` υπήρχε ήδη (`d24be27`)· έλειπε μόνο το mobile wiring. Working tree **καθαρό** στην αρχή (μηδέν παράλληλο WIP) → δεν χρειάστηκε αποφυγή ζώνης.
