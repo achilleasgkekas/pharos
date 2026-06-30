@@ -113,7 +113,7 @@ export async function scanProduct(uri: string): Promise<ScannedProduct> {
 
 // ===================== Additional resources =====================
 export type Task = { id: string; title: string; status: string; priority: string; tags: string[]; dueDate: string | null; completedAt: string | null; updatedAt: string | null };
-export type Expense = { id: string; kind: string; vendor: string; category: string; amount: number; currency: string; date: string | null; period: string; recurring: boolean; file: string | null; thumb: string | null; verified: boolean };
+export type Expense = { id: string; kind: string; vendor: string; category: string; amount: number; currency: string; date: string | null; period: string; recurring: boolean; recurringCycle: string; paymentMethod: string; notes: string; file: string | null; thumb: string | null; verified: boolean };
 export type Subscription = { id: string; name: string; provider: string; category: string; amount: number; currency: string; billingCycle: string; nextRenewal: string | null; active: boolean };
 export type ReceiptSummary = { id: string; store: string; date: string | null; total: number; currency: string; itemCount: number; verified: boolean; archived: boolean; file: string | null; thumb: string | null };
 export type ReceiptLine = { name: string; qty: number; price: number; vatRate: number };
@@ -426,7 +426,7 @@ export function unregisterPush(token: string) {
 
 // ---- Edits (PATCH) ----
 const patch = (path: string, data: object) => request<{ ok: boolean }>(path, { method: 'PATCH', body: JSON.stringify(data) });
-export const updateExpense = (id: string, data: { vendor?: string; amount?: number; category?: string; kind?: string; date?: string }) => patch(`/api/v1/expenses/${id}`, data);
+export const updateExpense = (id: string, data: { vendor?: string; amount?: number; category?: string; kind?: string; date?: string; period?: string; recurring?: boolean; recurringCycle?: string; paymentMethod?: string; notes?: string }) => patch(`/api/v1/expenses/${id}`, data);
 export const updateSubscription = (id: string, data: { name?: string; amount?: number; billingCycle?: string; nextRenewal?: string | null; category?: string; active?: boolean }) => patch(`/api/v1/subscriptions/${id}`, data);
 export const updateVoucher = (id: string, data: { title?: string; code?: string; store?: string; discount?: string; expiresAt?: string | null; url?: string; used?: boolean }) => patch(`/api/v1/vouchers/${id}`, data);
 export const updateReceipt = (id: string, data: { store?: string; total?: number; subtotal?: number; vatAmount?: number; date?: string; verified?: boolean; archived?: boolean; paymentMethod?: string; notes?: string; lineItems?: ReceiptLine[] }) => patch(`/api/v1/receipts/${id}`, data);

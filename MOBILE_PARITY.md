@@ -38,7 +38,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 | Web | Mobile |
 |-----|--------|
 | **Scan a bill/payslip** (AI), e-shop layout, recurring series + auto-generate, **anomaly badges**, vendor autocomplete | 🟡 list + manual add (vendor+amount) + **AI scan-a-bill** (✦ camera → parse → confirm draft → add; carries date/period/recurring/payment) |
-| Detail + **edit** (vendor/amount/category/date/period/recurring/payment/notes) + re-scan | 🟡 tap-to-edit **vendor/amount/category** + long-press delete. No edit of date/period/recurring/payment/notes· no re-scan |
+| Detail + **edit** (vendor/amount/category/date/period/recurring/payment/notes) + re-scan | 🟡 tap-to-edit **vendor/amount/category/date/period/recurring+cycle/payment/notes** (full-field) + long-press delete. No re-scan (AI) |
 
 ## Statements (`/statements`)
 | Web | Mobile |
@@ -108,7 +108,8 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 
 ## Build Queue
 > Ranked για τον builder routine· paίρνει το πρώτο TODO. P1+S πρώτα. Ο πυρήνας του parity είναι κλειστός (CRUD/scan/PricePanel/Activity/Calendar/Reports), οπότε ΔΕΝ υπάρχουν P1/S· ό,τι έμεινε είναι secondary. Όσα έχουν AI cost → δομικό verify μόνο (no token-spend).
-> **Re-audit 2026-06-30 (cont.² — parity-auditor, 3η σάρωση ημέρας):** queue **αμετάβλητο** (5 GAP). Επιβεβαιωμένο ξανά από τον κώδικα: **46 v1 routes** (login + 45 bearer), **16 mobile screens**, **78** exported api fns· το mobile `api.ts` καταναλώνει 1:1 ΚΑΘΕ υπάρχον endpoint (grep των paths ταιριάζει με το route list) → κανένα «web endpoint χωρίς mobile consumer» gap. Το μόνο P1 (Statements installment-plan overview) είναι **DONE** (api.ts:274 καλεί `/api/v1/statements/plans`). Ο ενεργός κορυφαίος TODO είναι **Receipts re-scan (P2/M)**. Τα 5 εναπομείναντα items μένουν γνήσια gaps (ξαναελεγμένα από τα directory listings): `receipts/[id]/` έχει μόνο {route.ts, add-to-library} (κανένα rescan), `items/[id]/` έχει μόνο {route.ts, link-plan, plans, price} (κανένα convert-to-task/ai-fill), το `PATCH /api/v1/expenses/[id]` δέχεται μόνο vendor/amount/category/kind/notes/date (route.ts:11-29 επαληθευμένο, PARTIAL — λείπουν period/recurring/recurringCycle/paymentMethod), `GET /api/v1/notifications` υπάρχει+καταναλώνεται και ήδη γυρνά `unread` count (api.ts:412, badge = pure-mobile UI). Από το προηγ. parity audit (`afbccb3`) μόνο 1 code commit άγγιξε web runtime: `5457339` (updatedAt indexes σε 7 synced models = db perf, ΟΧΙ parity feature)· τα υπόλοιπα = docs/docker. mobile `tsc --noEmit` → exit 0 (μηδέν P1 type errors).
+> **Builder 2026-06-30 (βραδινό):** Expenses/Income full-field edit **DONE** (PATCH επεκτάθηκε + MoneyScreen edit modal full-field) → queue **5 → 4 GAP** (1 P2 + 3 P3). Επόμενο TODO: Items convert-to-task (P3/S, no AI) ή Receipts re-scan (P2/M, AI → δομικό verify).
+> **Re-audit 2026-06-30 (cont.² — parity-auditor, 3η σάρωση ημέρας):** queue (πριν το builder) **αμετάβλητο** (5 GAP). Επιβεβαιωμένο ξανά από τον κώδικα: **46 v1 routes** (login + 45 bearer), **16 mobile screens**, **78** exported api fns· το mobile `api.ts` καταναλώνει 1:1 ΚΑΘΕ υπάρχον endpoint (grep των paths ταιριάζει με το route list) → κανένα «web endpoint χωρίς mobile consumer» gap. Το μόνο P1 (Statements installment-plan overview) είναι **DONE** (api.ts:274 καλεί `/api/v1/statements/plans`). Ο ενεργός κορυφαίος TODO είναι **Receipts re-scan (P2/M)**. Τα 5 εναπομείναντα items μένουν γνήσια gaps (ξαναελεγμένα από τα directory listings): `receipts/[id]/` έχει μόνο {route.ts, add-to-library} (κανένα rescan), `items/[id]/` έχει μόνο {route.ts, link-plan, plans, price} (κανένα convert-to-task/ai-fill), το `PATCH /api/v1/expenses/[id]` δέχεται μόνο vendor/amount/category/kind/notes/date (route.ts:11-29 επαληθευμένο, PARTIAL — λείπουν period/recurring/recurringCycle/paymentMethod), `GET /api/v1/notifications` υπάρχει+καταναλώνεται και ήδη γυρνά `unread` count (api.ts:412, badge = pure-mobile UI). Από το προηγ. parity audit (`afbccb3`) μόνο 1 code commit άγγιξε web runtime: `5457339` (updatedAt indexes σε 7 synced models = db perf, ΟΧΙ parity feature)· τα υπόλοιπα = docs/docker. mobile `tsc --noEmit` → exit 0 (μηδέν P1 type errors).
 
 ### Statements — installment-plan overview στο mobile detail
 - Priority: P1 | Size: M
@@ -161,7 +162,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - PATCH /api/v1/expenses/[id] δέχεται πλέον period/recurring/recurringCycle/paymentMethod (enum-guarded cycle)· no-token → 401· bad id → 400
   - Edit modal αποθηκεύει date/period/recurring/cycle/payment/notes· reflect μετά το reload
   - tsc καθαρό (web + mobile)
-- Status: TODO
+- Status: DONE (2026-06-30) — PATCH επεκτάθηκε με period/recurring/recurringCycle (enum-guard ίδιος με POST)/paymentMethod· MoneyScreen edit modal πλέον date/period/payment/recurring toggle+cycle picker/notes (ScrollView, maxHeight 88%)· mobile `Expense` type + `updateExpense` signature += τα 4+notes πεδία. Structural verify: safe rebuild → /login 200, web restarts 0, PATCH no-token/bogus-token → 401· web+mobile tsc EXIT 0.
 
 ### Items — AI specs / AI-fill info
 - Priority: P3 | Size: M | ⚠ AI cost → δομικό verify μόνο

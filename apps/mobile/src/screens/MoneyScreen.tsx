@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
 import { getExpenses, addExpense, deleteExpense, updateExpense, scanExpenseImage, type Expense, type ParsedExpenseData } from '../api';
+
+const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
 
 export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [rows, setRows] = useState<Expense[]>([]);
@@ -16,6 +18,12 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [eVendor, setEVendor] = useState('');
   const [eAmount, setEAmount] = useState('');
   const [eCategory, setECategory] = useState('');
+  const [eDate, setEDate] = useState('');
+  const [ePeriod, setEPeriod] = useState('');
+  const [eRecurring, setERecurring] = useState(false);
+  const [eCycle, setECycle] = useState('');
+  const [ePayment, setEPayment] = useState('');
+  const [eNotes, setENotes] = useState('');
   const [scanning, setScanning] = useState(false);
   const [draft, setDraft] = useState<ParsedExpenseData | null>(null);
   const [dVendor, setDVendor] = useState('');
@@ -81,13 +89,32 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
       { text: 'Delete', style: 'destructive', onPress: async () => { setRows((p) => p.filter((x) => x.id !== it.id)); try { await deleteExpense(it.id); } catch { await load(); } } },
     ]);
   }
-  function openEdit(it: Expense) { setEditing(it); setEVendor(it.vendor); setEAmount(String(it.amount)); setECategory(it.category); }
+  function openEdit(it: Expense) {
+    setEditing(it);
+    setEVendor(it.vendor); setEAmount(String(it.amount)); setECategory(it.category);
+    setEDate(it.date ? it.date.slice(0, 10) : ''); setEPeriod(it.period || '');
+    setERecurring(!!it.recurring); setECycle(it.recurringCycle || '');
+    setEPayment(it.paymentMethod || ''); setENotes(it.notes || '');
+  }
   async function saveEdit() {
     if (!editing) return;
     const a = parseFloat(eAmount.replace(',', '.'));
     const id = editing.id;
     setEditing(null);
-    try { await updateExpense(id, { vendor: eVendor.trim(), amount: Number.isFinite(a) ? a : undefined, category: eCategory.trim() }); await load(); } catch (e) { setErr((e as Error).message); }
+    try {
+      await updateExpense(id, {
+        vendor: eVendor.trim(),
+        amount: Number.isFinite(a) ? a : undefined,
+        category: eCategory.trim(),
+        date: eDate.trim() || undefined,
+        period: ePeriod.trim(),
+        recurring: eRecurring,
+        recurringCycle: eRecurring ? eCycle : '',
+        paymentMethod: ePayment.trim(),
+        notes: eNotes.trim(),
+      });
+      await load();
+    } catch (e) { setErr((e as Error).message); }
   }
 
   if (loading) return <Spinner />;
@@ -154,12 +181,37 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         <Pressable style={s.modalWrap} onPress={() => setEditing(null)}>
           <Pressable style={s.modal} onPress={() => {}}>
             <Text style={s.modalTitle}>Edit</Text>
-            <Text style={s.mlabel}>{label.toUpperCase()}</Text>
-            <TextInput value={eVendor} onChangeText={setEVendor} style={s.minput} placeholderTextColor={C.faint} />
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}><Text style={s.mlabel}>AMOUNT</Text><TextInput value={eAmount} onChangeText={setEAmount} keyboardType="decimal-pad" style={s.minput} placeholderTextColor={C.faint} /></View>
-              <View style={{ flex: 1 }}><Text style={s.mlabel}>CATEGORY</Text><TextInput value={eCategory} onChangeText={setECategory} style={s.minput} placeholderTextColor={C.faint} /></View>
-            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <Text style={s.mlabel}>{label.toUpperCase()}</Text>
+              <TextInput value={eVendor} onChangeText={setEVendor} style={s.minput} placeholderTextColor={C.faint} />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}><Text style={s.mlabel}>AMOUNT</Text><TextInput value={eAmount} onChangeText={setEAmount} keyboardType="decimal-pad" style={s.minput} placeholderTextColor={C.faint} /></View>
+                <View style={{ flex: 1 }}><Text style={s.mlabel}>CATEGORY</Text><TextInput value={eCategory} onChangeText={setECategory} style={s.minput} placeholderTextColor={C.faint} /></View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}><Text style={s.mlabel}>DATE</Text><TextInput value={eDate} onChangeText={setEDate} placeholder="YYYY-MM-DD" autoCapitalize="none" style={s.minput} placeholderTextColor={C.faint} /></View>
+                <View style={{ flex: 1 }}><Text style={s.mlabel}>PERIOD</Text><TextInput value={ePeriod} onChangeText={setEPeriod} placeholder="YYYY-MM" autoCapitalize="none" style={s.minput} placeholderTextColor={C.faint} /></View>
+              </View>
+              <Text style={s.mlabel}>PAYMENT</Text>
+              <TextInput value={ePayment} onChangeText={setEPayment} placeholder="card, cash…" style={s.minput} placeholderTextColor={C.faint} />
+              <View style={s.recRow}>
+                <Text style={s.recLabel}>Recurring</Text>
+                <Pressable onPress={() => setERecurring((v) => !v)} style={[s.toggle, eRecurring && s.toggleOn]}>
+                  <Text style={[s.toggleText, eRecurring && s.toggleTextOn]}>{eRecurring ? 'ON' : 'OFF'}</Text>
+                </Pressable>
+              </View>
+              {eRecurring && (
+                <View style={s.cycleRow}>
+                  {CYCLES.map((c) => (
+                    <Pressable key={c} onPress={() => setECycle(c)} style={[s.cycle, eCycle === c && s.cycleOn]}>
+                      <Text style={[s.cycleText, eCycle === c && s.cycleTextOn]}>{c}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+              <Text style={s.mlabel}>NOTES</Text>
+              <TextInput value={eNotes} onChangeText={setENotes} multiline style={[s.minput, { minHeight: 60, textAlignVertical: 'top' }]} placeholderTextColor={C.faint} />
+            </ScrollView>
             <View style={s.mbtns}>
               <Pressable onPress={saveEdit} style={s.save}><Text style={s.saveText}>Save</Text></Pressable>
               <Pressable onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
@@ -191,10 +243,21 @@ const s = StyleSheet.create({
   meta: { color: C.faint, fontSize: 12, marginTop: 3 },
   amount: { fontSize: 16, fontWeight: '700' },
   modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
-  modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
+  modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20, maxHeight: '88%' },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   minput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
+  recRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
+  recLabel: { color: C.text, fontSize: 14, fontWeight: '600' },
+  toggle: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 12, backgroundColor: C.surface2 },
+  toggleOn: { borderColor: C.accent, backgroundColor: C.accent },
+  toggleText: { color: C.dim, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  toggleTextOn: { color: '#000' },
+  cycleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  cycle: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: C.surface2 },
+  cycleOn: { borderColor: C.cyan, backgroundColor: C.surface3 },
+  cycleText: { color: C.dim, fontSize: 12, fontWeight: '600' },
+  cycleTextOn: { color: C.cyan },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
   save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
   saveText: { color: '#000', fontSize: 15, fontWeight: '700' },

@@ -2,6 +2,17 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+## 2026-06-30 (builder — Build Queue: Expenses/Income full-field edit, P3/S no-AI)
+
+- **Τι**: χτίστηκε το επόμενο καθαρό (no-AI, fully verifiable) Build Queue item. Στην αρχή του run υπήρχαν uncommitted edits στα `api/v1/items/*` + `models/Item.ts` (παράλληλο builder routine — όχι του Αχιλλέα) → απέφυγα εντελώς την περιοχή items· ενδιάμεσα έγιναν commit ως `4ead61b` (item-status whitelist).
+- **Web** (`api/v1/expenses/[id]/route.ts`): το `PATCH` δέχεται πλέον `period` (string), `recurring` (boolean), `recurringCycle` (ίδιος enum-guard με το POST: monthly/quarterly/yearly/weekly ή '' για clear), `paymentMethod` (string), επιπλέον των vendor/amount/category/kind/notes/date. Αμιγώς additive στο `set` object — μηδέν αλλαγή σε response shape (`{ok,id}`).
+- **Mobile** (`api.ts`): `Expense` type += `recurringCycle`/`paymentMethod`/`notes` (τα γυρνά ήδη το list endpoint `trim()`, απλώς δεν ήταν typed)· `updateExpense` signature += `period`/`recurring`/`recurringCycle`/`paymentMethod`/`notes`.
+- **Mobile** (`MoneyScreen.tsx`): το edit modal (πριν μόνο vendor/amount/category) → full-field: DATE (YYYY-MM-DD), PERIOD (YYYY-MM), PAYMENT, **Recurring toggle ON/OFF** + **cycle picker** (ορατός μόνο όταν recurring=ON), NOTES (multiline). `openEdit` prefill + `saveEdit` (cycle='' όταν recurring off). Wrapped σε `ScrollView` (+ `maxHeight:'88%'`). Νέα styles + `CYCLES` const.
+- **Verify**: `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**. Safe Docker rebuild: `docker compose build web` (cached) → mongo `healthy` → `up -d web` → `curl /login` = **200 σε 1s** → `homepage-web .RestartCount` = **0**. Structural: `PATCH /api/v1/expenses/<24hex>` no-token → **401**, bogus-token + non-hex id → **401** (auth πριν το id-check). flaresolverr σβηστό· `docker builder prune -f` (cache-only). ΔΕΝ έτρεξα authed round-trip (real token/secret) ούτε AI job.
+- **Staged ΜΟΝΟ**: `apps/web/src/app/api/v1/expenses/[id]/route.ts`, `apps/mobile/src/api.ts`, `apps/mobile/src/screens/MoneyScreen.tsx`, `MOBILE_PARITY.md`, `PROGRESS.md` (explicit paths, όχι `-A`). Μηδέν αλλαγή σε items/secrets/.env.
+- **Επόμενο task**: Build Queue → **Items convert-to-task** (P3/S, no AI — νέο `POST /api/v1/items/[id]/convert-to-task` port του `convertItemToTask` + mobile button). Αν τα items routes έχουν uncommitted edits εκείνη τη στιγμή, προτίμησε **Notifications unread badge** (P3/S, pure-mobile, μηδέν web touch).
+- Needs Achilleas: κανένα νέο.
+
 ## 2026-06-30 (reviewer — range 5457339..4ead61b clean, item-status whitelist verified)
 - Εύρος: `5457339..4ead61b` (7 commits· 6 docs/docker/monitor, **1 code**: `4ead61b` web — whitelist item status σε POST /api/v1/items). Read-only review + αμφότερα type-checks.
 - **Type-checks**: `apps/web` `npm run type-check` → **EXIT 0**· `apps/mobile` `npx tsc --noEmit` → **EXIT 0** (το tree περιείχε και το παράλληλο builder WIP — βλ. κάτω — και παρ' όλα αυτά καθαρό). Καμία διόρθωση χρειάστηκε.
