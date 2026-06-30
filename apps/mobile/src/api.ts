@@ -202,7 +202,7 @@ export async function scanReceipt(uri: string): Promise<ReceiptDetail & { aiUsed
 
 // ---- Items / inventory ----
 export async function getItems(status: 'shopping' | 'inventory' | 'all' = 'all'): Promise<Item[]> {
-  return (await request<{ items: Item[] }>(`/api/v1/items?status=${status}&limit=300`)).items ?? [];
+  return (await request<{ data: Item[] }>(`/api/v1/items?status=${status}&limit=300`)).data ?? [];
 }
 export function createItem(data: { title: string; status?: string; category?: string; currentPrice?: number }) {
   return request<{ item: Item }>('/api/v1/items', { method: 'POST', body: JSON.stringify(data) });

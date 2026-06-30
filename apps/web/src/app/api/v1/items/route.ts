@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/apiAuth';
-import { listParams, withSince, iso } from '@/lib/apiList';
+import { listParams, withSince, iso, listEnvelope } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
 import { Item, ITEM_STATUSES } from '@/models/Item';
 
@@ -36,7 +36,7 @@ function trim(i: ItemLean) {
 const SHOPPING = ['researching', 'decided', 'ordered'];
 const OWNED = ['received', 'installed'];
 
-/** GET /api/v1/items?status=shopping|inventory|all&limit&offset&updatedSince → { items, total, limit, offset } */
+/** GET /api/v1/items?status=shopping|inventory|all&limit&offset&updatedSince → { data, total, limit, offset } */
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
@@ -48,7 +48,8 @@ export async function GET(req: NextRequest) {
     const count = Item.countDocuments(filter);
     if (p.updatedSince) { find.setOptions({ withDeleted: true }); count.setOptions({ withDeleted: true }); }
     const [docs, total] = await Promise.all([find.lean() as Promise<ItemLean[]>, count]);
-    return NextResponse.json({ items: docs.map(trim), total, limit: p.limit, offset: p.offset });
+    // Use the shared list envelope ({ data, ... }) like every other v1 list endpoint.
+    return NextResponse.json(listEnvelope(docs.map(trim), total, p));
   });
 }
 
