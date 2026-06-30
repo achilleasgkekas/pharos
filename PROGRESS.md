@@ -2,8 +2,15 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: fbda2b3 -->
+<!-- reviewed: 82fbb58 -->
 <!-- docker-validated: 2a13b65 -->
+
+## 2026-07-01 (reviewer — range fbda2b3..82fbb58, καθαρό)
+- **Εύρος:** 8 commits μετά το τελευταίο review marker (fbda2b3). 7 docs/progress (audits/monitor/parity), **1 code** (`6a5809a` refactor: shared `serializeLineItems` helper).
+- **Έλεγχοι (read-only):** `apps/web` `npm run type-check` EXIT 0· `apps/mobile` `npx tsc --noEmit` EXIT 0.
+- **Diff review του 6a5809a:** behavior-preserving extraction. Νέα `serializeLineItems(lines: unknown): ReceiptLine[]` στο `receipts/serialize.ts`· τα 3 routes (receipts/[id] GET, receipts/[id]/rescan, scan/receipt) σβήνουν τα local `LineLean` + inline `.map` και καλούν το helper. Output shape ΑΚΡΙΒΩΣ ίδιο (name/qty/price/vatRate, ίδιες fallbacks). Το PATCH inbound mapping δεν αγγίχτηκε. **API contract σταθερό:** το mobile `ReceiptLine = { name; qty; price; vatRate }` (api.ts:119) ταιριάζει 1:1 με το νέο helper output → μηδέν risk για το mobile app.
+- **Secret scan:** καμία διαρροή στο range diff.
+- **Fixes:** κανένα (όλα πράσινα). **Flags:** κανένα. Δέντρο αμετάβλητο πέραν του review marker + αυτής της εγγραφής.
 
 ## 2026-07-01 (ui-auditor — mobile UI consistency re-audit, απόγευμα· κατάσταση αμετάβλητη)
 - **Σάρωση κατά διάσταση (read-only):** Tokens → **23** hardcoded hex, ΟΛΑ `#000` (text-on-accent literals) σε 10 screens (Items 5, Subscriptions/Money/Tasks 3, Assistant/Shopping/Vouchers 2, Settings/Login/Receipts 1)· **0** non-`#000` 6-digit literal, **0** 8-digit alpha hex (`alpha()` helper καθάρισε τα παλιά 12). Reusable components → `ui.tsx` εξάγει μόνο `Header/Centered/Spinner/ErrorText/Empty/Check`· μηδέν Input/Button/Chip/Card/Badge primitive → **15** input style entries, **6** `card:`, **54** chip-variant entries ξαναγραμμένα per-screen. Adaptive → `react-native-safe-area-context` **0** imports + εκτός `package.json` (bottom-sheets κάτω από home indicator)· μόνο 2 `maxWidth`, καμία στο content. Theme → dark-only, μηδέν light palette/context. States → ΗΔΗ συνεπή (Spinner/Empty/ErrorText μέσω `ui.tsx`). Touch targets → DONE (`<Check>` + hitSlop).
