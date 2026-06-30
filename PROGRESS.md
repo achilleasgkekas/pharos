@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 82fbb58 -->
+<!-- reviewed: 86c6ada -->
 <!-- docker-validated: 18c18e6 -->
+
+## 2026-07-01 (reviewer — range 82fbb58..86c6ada clean, parity ai-fill commit verified)
+- Εύρος: `82fbb58..86c6ada` (7 commits). Μόνο **ΕΝΑ** app-code commit: `86c6ada` (feat parity Items AI specs/info)· τα υπόλοιπα 6 docs/chore (web-debt/ui-audit/parity re-audits + docker health-guard + review marker). App-code diff = 3 αρχεία, +75/-1.
+- Checks: web `npm run type-check` → **exit 0**· mobile `npx tsc --noEmit` → **exit 0**.
+- Review `86c6ada` (όλα confirmed clean): **νέο route** `POST /api/v1/items/[id]/ai-fill` — `withAuth` ✓, 24-hex id-guard ✓, body `req.json()` σε try/catch με default `mode:'specs'` ✓, wraps τις proven `aiFillSpecs`/`aiFillInfo` (AI-feature gated `itemsImport` μέσα στις actions, friendly error όταν off) ✓. **Shape match επαληθεύτηκε από τον κώδικα:** `aiFillSpecs` επιστρέφει `{ok,specs?,error?}` → route `{ok,mode,specs}`· `aiFillInfo` επιστρέφει `{ok,filled,error?}` → route `{ok,mode,filled}`· mobile `aiFillItem` type ταιριάζει 1:1. Server-action-from-route = ήδη established pattern (ίδιο με sibling `convert-to-task`). **Mobile** `runAiFill` — guards (`!editing||aiFilling`), `setESpecs(r.specs)` σε specs-mode + `loadDetail`+`load` refresh, Alert με filled list σε info-mode, σωστό try/catch/finally· `loadDetail` σετάρει το `detail` state, ΟΧΙ το `eSpecs` → μηδέν clobber. Νέα styles χρησιμοποιούν `C.accent` (μηδέν νέο `#000`).
+- Fixes: **κανένα** — το diff είναι correct, type-safe, shape-consistent, χωρίς secrets/regressions· και τα δύο tsc πράσινα. Δεν χρειάστηκε safe-fix.
+- Flagged: **κανένα νέο**. (aiBtn paddingVertical 10 ≈ <44pt touch target, αλλά consistent με υπάρχον `convertBtn` και ήδη καλυμμένο από το tracked UI Debt· όχι regression.) Οι ουρές μένουν: WEB_DEBT 1×P3 (inline error → apiError), MOBILE_PARITY UI Debt (Input/Button primitives κ.λπ.).
+- Git: staged ΜΟΝΟ PROGRESS.md (reviewed marker 82fbb58→86c6ada + αυτή η εγγραφή). Μηδέν Docker, μηδέν AI, μηδέν app-code edit.
 
 ## 2026-07-01 (builder — MOBILE_PARITY: Items AI specs / ai-fill, full-stack· parity queue 6/6 DONE)
 - **Τι**: ολοκληρώθηκε το ΜΟΝΟ ενεργό parity TODO («Items AI specs / ai-fill», P3/M full-stack). Working tree **καθαρό** στην αρχή (μηδέν παράλληλο WIP) → δεν χρειάστηκε αποφυγή ζώνης. Με αυτό η parity Build Queue κλείνει **6/6 DONE**.
