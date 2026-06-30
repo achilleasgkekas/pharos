@@ -3,6 +3,8 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
+<!-- docker-validated: 516d25855c4587d89599f2f9ba09c56e06f8770e -->
+
 ## Κανόνες (μην τους σπάσεις)
 - Stage ΜΟΝΟ όσα άλλαξες, με explicit `git add <path>`. ΠΟΤΕ `git add -A` / `.` / `commit -a` (το working tree έχει συχνά parallel uncommitted αλλαγές του Αχιλλέα).
 - Docker rebuild: `docker compose build web` ΠΡΩΤΑ, περίμενε mongo `healthy`, μετά `docker compose up -d web`. ΠΟΤΕ `up --build` (πνίγει τη mongo σε CPU, γίνεται unhealthy, και το web δεν σηκώνεται). **Μετά το build τρέξε `docker builder prune -f`** (ΜΟΝΟ cache, ασφαλές) — αλλιώς ο δίσκος γεμίζει.
@@ -159,3 +161,16 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
 - **Mobile Settings — AI engine / prompts / storage / OneDrive / CSV / backup-restore**: desktop/admin-oriented· πιθανώς ΔΕΝ τα θες σε κινητό. Δεν τα έβαλα στο queue· πες αν θες κάποιο.
 - **Docker VM RAM**: η mongo ξανα-OOM-σκοτώθηκε στιγμιαία κατά το web build (recovered healthy, αλλά το `docker exec mongosh` flake-άρει μετά λόγω memory pressure → δυσκολεύει το authenticated verify). Σκέψου Docker Desktop → Resources → **RAM σε 4GB**. (Επαναλαμβανόμενο σε πολλά runs.)
 - **Remote push (#8 γ)**: λείπει EAS dev build + Apple APNs key — βλ. 2026-06-29 cont.⁷.
+
+## 2026-06-30 (ui-auditor — mobile UI consistency audit)
+- Τι: read-only audit του mobile UI vs web design system. Μηδέν app-code άλλαξε· γράφτηκε νέο **`## UI Debt Queue`** στο `MOBILE_PARITY.md` (9 build-ready items, ranked, μικρά+P1 πρώτα).
+- Ευρήματα ανά dimension:
+  - **Tokens**: 49 hardcoded hex εκτός `theme.ts` (κυρίως `#000` text-on-accent + 11 alpha-tinted theme colors π.χ. `#00ff8814`, `#00d4ff44`, `#ff475740`). Το `theme.ts` έχει ΜΟΝΟ χρώματα — μηδέν spacing/radius/typography scale (radius 10/12/14 + padding 12/14 + fontSize 13/14/15/16/19 σκόρπια). Λείπουν `surface3`/`orange` που έχει το web.
+  - **Shared theme**: υπάρχει (`theme.ts` `C`) αλλά incomplete· δεν είναι foundation από το μηδέν, χρειάζεται επέκταση (P1).
+  - **Reusable components**: μηδέν Button/Card/Input/Badge/Chip primitives. `input` style ξαναγράφεται 14×, `saveText` 7×, `addBtn`/`chip`/`card`/`badge` πολλαπλά. `ui.tsx` έχει μόνο Header/Spinner/Empty/Error.
+  - **Theme/dark mode**: μηδέν light theme, μηδέν theme context (`C` const-imported σε 19 αρχεία). Web έχει πλήρες light mode.
+  - **States**: σχετικά συνεπή (Spinner/Empty/ErrorText shared, 13 screens τα χρησιμοποιούν)· 3 screens roll own (Assistant/Login/Shopping) — low priority.
+  - **Adaptive**: `SafeAreaView` χωρίς insets (μηδέν bottom-inset, bottom-sheets κάτω από home indicator)· μόνο 2 maxWidth usages, καμία στο content → τέντωμα σε tablet/landscape.
+  - **Touch targets**: ~6 κάτω από 44pt (checkboxes 24×24, menuBtn 38×36, backBtn 40×36, lineDel 30×30).
+- Top-3 για τον builder: (1) **Theme tokens: spacing+radius+typography+missing colors** (P1/S, foundation), (2) **Alpha-tint helper** (P1/S, σβήνει τα 11 alpha hex), (3) **Input primitive** (P1/M, ενοποιεί 14 duplicate input styles). Το light/dark theme context είναι P3/L, τελευταίο (εξαρτάται από τα primitives).
+- Verify: read-only· μηδέν Docker, μηδέν AI jobs. Staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md`.

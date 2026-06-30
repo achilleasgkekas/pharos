@@ -170,3 +170,109 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - POST .../ai-fill no-token → 401· bad id → 400
   - Δομικό verify μόνο (μην τρέξεις πραγματικό AI)· tsc καθαρό
 - Status: TODO
+
+---
+
+## UI Debt Queue
+> Mobile UI consistency audit (2026-06-30, ui-auditor). Πόσο «universal» είναι το mobile UI σε σχέση με το web design system. Ranked: μικρά + P1 πρώτα. Το shared-theme item είναι foundation, άλλα εξαρτώνται από αυτό. Ο builder παίρνει το πρώτο TODO. Read-only audit, μηδέν app-code άλλαξε.
+>
+> Σύνοψη ευρημάτων: 49 hardcoded hex εκτός `theme.ts` (κυρίως `#000` text-on-accent + 11 alpha-tinted theme colors), το `theme.ts` έχει ΜΟΝΟ χρώματα (μηδέν spacing/radius/typography scale) + λείπουν `surface3`/`orange` που έχει το web, μηδέν reusable Button/Card/Input/Badge/Chip primitives (το `input` style ξαναγράφεται 14 φορές, `saveText` 7, `addBtn`/`chip`/`card` πολλαπλά), μηδέν light theme / theme context (web έχει πλήρες light mode), `SafeAreaView` χωρίς insets (μηδέν bottom-inset, bottom-sheets κάτω από το home indicator), μηδέν max content width για tablet/landscape, ~6 touch targets κάτω από 44pt.
+
+### Theme tokens: spacing + radius + typography scale + missing colors
+- Priority: P1
+- Size: S
+- Web ref: `@theme` tokens (font-display/body/mono, surface-3, orange) (file: apps/web/src/app/globals.css:3-23)
+- Mobile files: apps/mobile/src/theme.ts (επέκταση του `C` + νέα exports `SPACE`, `RADIUS`, `FONT`/`SIZE`)
+- Depends on: none
+- Acceptance:
+  - Το `theme.ts` εξάγει `surface3` (#242424) + `orange` (#ffa502) ώστε να καλύπτει όλα τα web color tokens (globals.css:8-22)
+  - Νέα scale exports: spacing (π.χ. 4/8/12/16/24), radius (10/12/14 — τα 3 που ήδη χρησιμοποιούνται ασυνεπώς), font sizes (13/14/15/16/19) με σταθερά ονόματα
+  - Νέο `onAccent` token (#000, το χρώμα κειμένου πάνω σε accent/cyan buttons) ώστε να μη γράφεται `'#000'` inline
+- Status: TODO
+
+### Alpha-tint helper για theme-derived backgrounds/borders
+- Priority: P1
+- Size: S
+- Web ref: `color-mix(in srgb, var(--color-accent) 16%, transparent)` glow helpers (file: apps/web/src/app/globals.css:87-89)
+- Mobile files: apps/mobile/src/theme.ts (νέο `alpha(hex, n)` helper), μετά αντικατάσταση των hardcoded alpha hex
+- Depends on: Theme tokens: spacing + radius + typography scale + missing colors
+- Acceptance:
+  - Νέο `alpha()` (ή σταθερά tinted tokens) αντικαθιστά τα 11 hardcoded alpha hex: ActivityScreen.tsx:293,302,311,322 και SettingsScreen.tsx:644,653,664
+  - Μηδέν `'#00ff88XX'` / `'#00d4ffXX'` / `'#ff4757XX'` / `'#ffd93dXX'` literals στα screens (grep καθαρό)
+- Status: TODO
+
+### Input primitive (centralize 14 duplicate input styles)
+- Priority: P1
+- Size: M
+- Web ref: shared input στυλ μέσω Tailwind tokens (file: apps/web/src/app/globals.css:8-22)
+- Mobile files: apps/mobile/src/ui.tsx (νέο `<Input>` + `<TextArea>`), edits σε AssistantScreen.tsx:77, MoneyScreen.tsx:180,197, SubscriptionsScreen.tsx:147,163, TasksScreen.tsx:117, ItemsScreen.tsx:426,446, ShoppingScreen.tsx:156, VouchersScreen.tsx:196,215, SettingsScreen.tsx:615, ReceiptsScreen.tsx:241, SearchScreen.tsx:85, LoginScreen.tsx:82
+- Depends on: Theme tokens: spacing + radius + typography scale + missing colors
+- Acceptance:
+  - Ένα `Input` component εξάγεται από `ui.tsx`· τα παραπάνω screens το χρησιμοποιούν αντί για local `input`/`minput`/`einput` StyleSheet entry
+  - Καμία απόκλιση borderRadius (τώρα 10 vs 12) ή padding (τώρα 12 vs 14) μεταξύ screens — όλα από το ένα primitive
+- Status: TODO
+
+### Button + Chip primitives (add/save buttons + filter/status chips)
+- Priority: P2
+- Size: M
+- Web ref: pill buttons + filter pills (file: apps/web/src/app/globals.css:120-132, design-system pills)
+- Mobile files: apps/mobile/src/ui.tsx (νέα `<Button>`, `<Chip>`), edits σε ItemsScreen.tsx:429,436,453,456, SubscriptionsScreen.tsx:149,168, MoneyScreen.tsx:182,200, TasksScreen.tsx:99,119,142, VouchersScreen.tsx:198,222,226, ShoppingScreen.tsx:158,179, ReceiptsScreen.tsx:260,266, SettingsScreen.tsx:621,643, AssistantScreen.tsx:79, LoginScreen.tsx:89
+- Depends on: Theme tokens: spacing + radius + typography scale + missing colors
+- Acceptance:
+  - Ένα `Button` (variant accent/cyan/ghost) με text χρώμα από `onAccent` token· μηδέν inline `color: '#000'` σε button text styles
+  - Ένα `Chip` με on/off state αντικαθιστά τα per-screen `chip`/`chipOn`/`cChip`/`sChip` patterns
+- Status: TODO
+
+### Card + Badge + ListItem primitives
+- Priority: P2
+- Size: M
+- Web ref: card (border-radius 14, hover lift) + status badges (file: apps/web/src/app/globals.css, CLAUDE.md design-system)
+- Mobile files: apps/mobile/src/ui.tsx (νέα `<Card>`, `<Badge>`, `<ListItem>`), edits στα screens που ορίζουν local `card`/`badge`/`row` (ItemsScreen, MoneyScreen, ReceiptsScreen, SettingsScreen, ActivityScreen, StatementsScreen κ.ά.)
+- Depends on: Theme tokens: spacing + radius + typography scale + missing colors
+- Acceptance:
+  - `Card`/`Badge`/`ListItem` εξάγονται από `ui.tsx`· τα 5+ local `card:` και 2+ `badge:` StyleSheet entries αντικαθίστανται
+  - Σταθερό border-radius/padding/border σε όλα τα cards (τώρα ποικίλλει ανά screen)
+- Status: TODO
+
+### Touch targets ≥44pt
+- Priority: P2
+- Size: S
+- Web ref: mobile-first / FAB conventions (file: CLAUDE.md UI conventions)
+- Mobile files: checkbox toggles 24×24 σε SubscriptionsScreen.tsx:170, TasksScreen.tsx:122, SettingsScreen.tsx:625, ShoppingScreen.tsx:165, VouchersScreen.tsx:220, ReceiptsScreen.tsx:258· menuBtn nav.tsx:65 (38×36)· backBtn ui.tsx:35 (40×36)· lineDel ReceiptsScreen.tsx:250 (30×30)
+- Depends on: none
+- Acceptance:
+  - Όλα τα tap targets έχουν effective hit area ≥44×44 (μέσω μεγαλύτερου style ή `hitSlop`)
+  - Τα 24×24 checkboxes ταυτίζονται σε ένα κοινό `Checkbox`/`Toggle` με σωστό hit area
+- Status: TODO
+
+### Safe-area insets (bottom + notch) via react-native-safe-area-context
+- Priority: P2
+- Size: M
+- Web ref: iOS-safe ambient/layout handling (file: apps/web/src/app/globals.css:69-84 comment)
+- Mobile files: apps/mobile/App.tsx:74 (αντικατάσταση του plain `SafeAreaView`), apps/mobile/src/nav.tsx (Drawer paddingTop:60 magic number), bottom-sheet modals (π.χ. SettingsScreen.tsx:681 `modalBackdrop` flex-end)
+- Depends on: none
+- Acceptance:
+  - `SafeAreaProvider` + `useSafeAreaInsets` αντί για το RN `SafeAreaView` (που δίνει μόνο top, μηδέν bottom, και Android-manual paddingTop)
+  - Bottom-sheet content + κάτω κουμπιά δεν κάθονται κάτω από το home indicator (bottom inset εφαρμοσμένο)
+- Status: TODO
+
+### Max content width για tablet / landscape
+- Priority: P3
+- Size: S
+- Web ref: centered max-width layouts (file: apps/web/src/app/settings, max-w 1080)
+- Mobile files: apps/mobile/src/ui.tsx (νέο `<Screen>`/content wrapper με maxWidth + center), εφαρμογή στα list screens
+- Depends on: none
+- Acceptance:
+  - Το main content έχει maxWidth (π.χ. 640) και κεντράρεται σε wide viewport· δεν τεντώνεται edge-to-edge σε tablet/landscape (τώρα μόνο 2 maxWidth usages σε όλο το app, καμία στο content)
+- Status: TODO
+
+### Light / dark theme via theme context
+- Priority: P3
+- Size: L
+- Web ref: light theme overrides + `data-theme` toggle (file: apps/web/src/app/globals.css:32-51)
+- Mobile files: apps/mobile/src/theme.ts (light palette + `ThemeProvider`/`useTheme`), refactor ΟΛΩΝ των screens (το `C` είναι const-imported σε 19 αρχεία) + SettingsScreen theme toggle
+- Depends on: Theme tokens: spacing + radius + typography scale + missing colors, Input primitive (centralize 14 duplicate input styles), Button + Chip primitives (add/save buttons + filter/status chips), Card + Badge + ListItem primitives
+- Acceptance:
+  - `useTheme()` hook δίνει το active palette· μηδέν direct `import { C }` σε screen styles
+  - Settings toggle εναλλάσσει light/dark, persisted· όλα τα screens ακολουθούν (τώρα dark-only, μηδέν `useColorScheme`/context)
+- Status: TODO
