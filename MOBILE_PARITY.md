@@ -63,7 +63,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Reports (`/reports`)
 | Web | Mobile |
 |-----|--------|
-| Net-position banner, monthly-spend chart, upcoming-installments, spend-by-store, inventory-value pie, subs-by-category, warranties expiring, biggest purchases, **budgets**, income-vs-expense, date-range | 🟡 net month/year, by-category, last-6-months bars |
+| Net-position banner, monthly-spend chart, upcoming-installments, spend-by-store, inventory-value pie, subs-by-category, warranties expiring, biggest purchases, **budgets**, income-vs-expense, date-range | 🟡 **net-position banner** (inventory − installments owed), net month/year, by-category, last-6-months bars |
 
 ## Tasks (`/tasks`)
 | Web | Mobile |

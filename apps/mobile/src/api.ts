@@ -322,6 +322,7 @@ export function deleteCard(id: string) {
 // ---- Reports ----
 export type Reports = {
   currency: string;
+  netPosition: { inventoryValue: number; installmentsOwed: number; activePlans: number; net: number };
   thisMonth: { income: number; expense: number; net: number };
   thisYear: { income: number; expense: number; net: number };
   byCategory: { category: string; total: number }[];

@@ -39,6 +39,12 @@ export function ReportsScreen() {
       <ErrorText>{err}</ErrorText>
       {d && (
         <>
+          <View style={s.netCard}>
+            <Text style={s.cardLabel}>NET POSITION</Text>
+            <Text style={[s.netVal, { color: d.netPosition.net >= 0 ? C.accent : C.red }]}>{money(d.netPosition.net, cur)}</Text>
+            <Text style={s.cardSub}>{money(d.netPosition.inventoryValue, cur)} owned − {money(d.netPosition.installmentsOwed, cur)} owed{d.netPosition.activePlans > 0 ? ` · ${d.netPosition.activePlans} plan${d.netPosition.activePlans === 1 ? '' : 's'}` : ''}</Text>
+          </View>
+
           <View style={s.cards}>
             <View style={s.card}>
               <Text style={s.cardLabel}>THIS MONTH · NET</Text>
@@ -69,6 +75,8 @@ export function ReportsScreen() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
+  netCard: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.borderLight, borderRadius: 16, padding: 16, marginBottom: 12 },
+  netVal: { fontSize: 28, fontWeight: '800', marginTop: 4 },
   cards: { flexDirection: 'row', gap: 12 },
   card: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 14 },
   cardLabel: { color: C.faint, fontSize: 9, letterSpacing: 1 },
