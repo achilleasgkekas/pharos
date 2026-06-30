@@ -5,6 +5,15 @@
 <!-- reviewed: fbda2b3 -->
 <!-- docker-validated: 2a13b65 -->
 
+## 2026-07-01 (parity-auditor — mobile parity re-audit, queue confirmed αμετάβλητη)
+- **Inventory από κώδικα (όχι docs):** **48** v1 API routes (login + 47 bearer), **16** mobile screens, **80** exported api fns στο `apps/mobile/src/api.ts`. Το mobile `api.ts` καναλώνει **ΚΑΘΕ** ένα από τα 48 routes 1:1 (το grep των κληθέντων paths == το route listing) → **κανένα «web endpoint χωρίς mobile consumer» gap**.
+- **Diff:** ο πυρήνας του parity είναι κλειστός (CRUD/scan/PricePanel/Activity/Calendar/Reports/Statements overview). Επιβεβαιωμένο από κώδικα ότι ο **Receipts re-scan mobile half είναι DONE** (`fbda2b3`): `rescanReceipt(id, ocr)` στο `api.ts:207` + «Re-scan text/OCR» bar στο `ReceiptsScreen.tsx:171-178` (spinner ανά κουμπί, `setDetail(r.receipt)` → in-place re-prefill). Convert-to-task DONE (endpoint + `ItemsScreen.tsx:341`).
+- **Counts:** **DONE 5 / GAP 1 / NEEDS DECISION 0 νέα.** Build Queue: από τα 6 items, **5 DONE**, **1 TODO** = **Items AI specs / ai-fill** (P3/M, full-stack: το `items/[id]/ai-fill` route **ΔΕΝ υπάρχει** — `items/[id]/` έχει μόνο {route.ts, convert-to-task, link-plan, plans, price}· AI cost → δομικό verify μόνο).
+- **Δεν προέκυψε νέο web feature:** `git log e8a963a..HEAD -- apps/web/src/app` **κενό** → καμία νέα web δυνατότητα προς port από το προηγ. full audit.
+- **Read-only check:** mobile `npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors).
+- **Top-3 για τον builder (με σειρά):** (1) **Items AI specs / ai-fill** (P3/M) — το μόνο ενεργό TODO, χτίζει νέο `POST /api/v1/items/[id]/ai-fill` (body `{mode:'specs'|'info'}`, port των `aiFillSpecs`/`aiFillInfo`) + `aiFillItem(id,mode)` στο `api.ts` + «✦ AI specs» στο ItemsScreen· **δομικό verify μόνο, μην τρέξεις πραγματικό AI**. (2)/(3) Δεν υπάρχουν άλλα GAP items στην ουρά parity· ο builder μπορεί εναλλακτικά να πάρει το κορυφαίο UI Debt TODO (**Input primitive**, P1/M) αν το AI item θεωρηθεί out-of-scope για unattended run.
+- **Needs Achilleas:** κανένα νέο. (Παραμένουν, NEEDS DECISION, εκτός builder: theme toggle + language switcher + AI engine settings + storage/OneDrive στο mobile Settings· remote push pipeline αδοκίμαστο, θέλει EAS dev build + APNs key· light/dark theme context = L, εξαρτάται από τα primitives.)
+
 ## 2026-06-30 (docker-guard — rebuild + health OK)
 - **Health**: mongo `healthy` (RestartCount 43 σωρευτικό, up ~1h, όχι loop), web RestartCount **0** (running). flaresolverr σταματημένο (καμία επιπλέον πίεση μνήμης). searxng up (part of default stack).
 - **Disk**: `docker system df` — Images 3.49GB, Build Cache 565.9MB (reclaimable 0B, όλο in-use). `builder prune -f` ανέκτησε **3.2MB** (μηδέν dangling).
