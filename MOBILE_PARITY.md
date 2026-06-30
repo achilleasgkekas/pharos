@@ -73,7 +73,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Settings (`/settings`)
 | Web | Mobile |
 |-----|--------|
-| 7 tabs: appearance/defaults, budgets/cards, **AI engine/features/prompts**, storage/backup/CSV/trash/OneDrive, stores/lists, **ntfy notifications** | 🟡 account + **editable preferences** (currency, VAT, warranty months/alert, auto-add stores) + **editable budgets** + **payment cards CRUD** (add/edit/delete/toggle, color/kind/type/last4/limit) + **ntfy URL/enable/test** + server/version. No theme/language, AI engine, storage, stores/lists |
+| 7 tabs: appearance/defaults, budgets/cards, **AI engine/features/prompts**, storage/backup/CSV/trash/OneDrive, stores/lists, **ntfy notifications** | 🟡 account + **editable preferences** (currency, VAT, warranty months/alert, auto-add stores) + **editable budgets** + **payment cards CRUD** + **stores CRUD** (search/add/edit/delete, name/url/aliases, needs-review badge) + **dropdown lists editor** (3 category taxonomies, add/remove chips, reset-to-default) + **ntfy URL/enable/test** + server/version. No theme/language, AI engine, storage |
 
 ## Activity
 | Web | Mobile |

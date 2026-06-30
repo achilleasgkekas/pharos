@@ -7,6 +7,8 @@ import { APP_VERSION } from '../config';
 import {
   currentBase, currentUser, getSettings, updateSettings, testNotify, type AppSettings,
   getCards, createCard, updateCard, deleteCard, type Card, type CardInput,
+  getStores, createStore, updateStore, deleteStore, type StoreRow, type StoreInput,
+  getLists, saveList, type ListEntry,
 } from '../api';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP'];
@@ -171,6 +173,8 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
       </Pressable>
 
       <CardsSection currency={currency} />
+      <StoresSection />
+      <ListsSection />
 
       <Text style={s.section}>CONNECTION</Text>
       <View style={s.card}>
@@ -358,6 +362,216 @@ function CardEditor({ card, currency, onClose, onSaved }: { card: Card | null; c
   );
 }
 
+// ---- Store list management (search + CRUD, self-contained) ----
+function StoresSection() {
+  const [stores, setStores] = useState<StoreRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [editing, setEditing] = useState<StoreRow | 'new' | null>(null);
+
+  async function load() {
+    try { setStores(await getStores()); setErr(null); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  function remove(st: StoreRow) {
+    Alert.alert('Delete store', `Remove "${st.name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await deleteStore(st.id); setStores((p) => p.filter((x) => x.id !== st.id)); }
+        catch (e) { setErr((e as Error).message); }
+      } },
+    ]);
+  }
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? stores.filter((st) => st.name.toLowerCase().includes(q) || st.aliases.some((a) => a.includes(q)))
+    : stores;
+  const CAP = 12;
+  const shown = q ? filtered : filtered.slice(0, CAP);
+  const hidden = q ? 0 : Math.max(0, filtered.length - CAP);
+
+  return (
+    <>
+      <Text style={s.section}>STORES ({stores.length})</Text>
+      <View style={s.cardPad}>
+        <ErrorText>{err}</ErrorText>
+        <TextInput value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} placeholder="Search stores…" placeholderTextColor={C.faint} style={[s.input, { marginBottom: 8 }]} />
+        {loading ? (
+          <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />
+        ) : shown.length === 0 ? (
+          <Text style={s.hint}>{q ? 'No matches.' : 'No stores yet.'}</Text>
+        ) : (
+          shown.map((st) => (
+            <View key={st.id} style={s.cardRow}>
+              <Pressable style={{ flex: 1 }} onPress={() => setEditing(st)}>
+                <View style={s.storeNameRow}>
+                  <Text style={s.cardName} numberOfLines={1}>{st.name}</Text>
+                  {st.auto && <Text style={s.autoBadge}>review</Text>}
+                </View>
+                {!!st.aliases.length && <Text style={s.cardMeta} numberOfLines={1}>{st.aliases.join(', ')}</Text>}
+              </Pressable>
+              <Pressable onPress={() => remove(st)} style={s.rm}><Text style={s.rmText}>✕</Text></Pressable>
+            </View>
+          ))
+        )}
+        {hidden > 0 && <Text style={s.hint}>+{hidden} more — search to filter</Text>}
+        <Pressable onPress={() => setEditing('new')} style={s.addCardBtn}>
+          <Text style={s.addCardText}>+ Add store</Text>
+        </Pressable>
+      </View>
+
+      {editing && (
+        <StoreEditor
+          store={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load(); }}
+        />
+      )}
+    </>
+  );
+}
+
+function StoreEditor({ store, onClose, onSaved }: { store: StoreRow | null; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(store?.name ?? '');
+  const [url, setUrl] = useState(store?.url ?? '');
+  const [aliases, setAliases] = useState((store?.aliases ?? []).join(', '));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function save() {
+    if (!name.trim()) { setErr('Name is required.'); return; }
+    setSaving(true); setErr(null);
+    const payload: StoreInput = {
+      name: name.trim(),
+      url: url.trim(),
+      aliases: aliases.split(',').map((a) => a.trim()).filter(Boolean),
+    };
+    try {
+      if (store) await updateStore(store.id, payload);
+      else await createStore(payload);
+      onSaved();
+    } catch (e) { setErr((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={s.modalBackdrop}>
+        <View style={s.modalSheet}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 18, paddingBottom: 30 }}>
+            <Text style={s.modalTitle}>{store ? 'Edit store' : 'New store'}</Text>
+            <ErrorText>{err}</ErrorText>
+
+            <Text style={s.flabel}>NAME</Text>
+            <TextInput value={name} onChangeText={setName} placeholder="e.g. Skroutz" placeholderTextColor={C.faint} style={s.input} />
+
+            <Text style={[s.flabel, { marginTop: 12 }]}>URL</Text>
+            <TextInput value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://skroutz.gr" placeholderTextColor={C.faint} style={s.input} />
+
+            <Text style={[s.flabel, { marginTop: 12 }]}>ALIASES (comma-separated)</Text>
+            <TextInput value={aliases} onChangeText={setAliases} autoCapitalize="none" autoCorrect={false} placeholder="skroutz, skroutz.gr" placeholderTextColor={C.faint} style={s.input} />
+            <Text style={s.hint}>Match terms the AI uses to recognise this shop on receipts.</Text>
+
+            <View style={s.modalBtns}>
+              <Pressable onPress={onClose} style={s.cancelBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
+              <Pressable onPress={save} disabled={saving} style={[s.saveBtn, { flex: 1, marginTop: 0 }, saving && s.dim]}>
+                {saving ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>{store ? 'Save store' : 'Add store'}</Text>}
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ---- Editable dropdown lists / category taxonomies ----
+function ListsSection() {
+  const [lists, setLists] = useState<ListEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [rev, setRev] = useState(0); // bump to remount editors with fresh data after a save
+
+  async function load() {
+    try { setLists(await getLists()); setErr(null); setRev((r) => r + 1); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  return (
+    <>
+      <Text style={s.section}>DROPDOWN LISTS</Text>
+      <View style={s.cardPad}>
+        <ErrorText>{err}</ErrorText>
+        {loading ? (
+          <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />
+        ) : (
+          lists.map((l, i) => <ListEditor key={`${l.key}-${rev}`} entry={l} last={i === lists.length - 1} onSaved={load} />)
+        )}
+      </View>
+    </>
+  );
+}
+
+function ListEditor({ entry, last, onSaved }: { entry: ListEntry; last: boolean; onSaved: () => void }) {
+  const [values, setValues] = useState<string[]>(entry.values);
+  const [add, setAdd] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const dirty = values.length !== entry.values.length || values.some((v, i) => v !== entry.values[i]);
+  const isDefault = values.length === entry.default.length && values.every((v, i) => v === entry.default[i]);
+
+  function addVal() {
+    const v = add.trim().toLowerCase();
+    if (!v || values.includes(v)) { setAdd(''); return; }
+    setValues((p) => [...p, v]); setAdd('');
+  }
+
+  async function save(next?: string[]) {
+    const payload = next ?? values;
+    setSaving(true); setErr(null);
+    try { await saveList(entry.key, payload); onSaved(); }
+    catch (e) { setErr((e as Error).message); setSaving(false); }
+  }
+
+  return (
+    <View style={[s.listBlock, !last && s.listBlockBorder]}>
+      <Text style={s.listLabel}>{entry.label}</Text>
+      <Text style={s.listWhere}>{entry.where}</Text>
+      <ErrorText>{err}</ErrorText>
+      <View style={s.chipsRow}>
+        {values.map((v) => (
+          <Pressable key={v} onPress={() => setValues((p) => p.filter((x) => x !== v))} style={s.valChip}>
+            <Text style={s.valChipText}>{v}</Text>
+            <Text style={s.valChipX}> ✕</Text>
+          </Pressable>
+        ))}
+      </View>
+      <View style={s.listAddRow}>
+        <TextInput value={add} onChangeText={setAdd} onSubmitEditing={addVal} returnKeyType="done" autoCapitalize="none" autoCorrect={false} placeholder="add category…" placeholderTextColor={C.faint} style={[s.input, { flex: 1 }]} />
+        <Pressable onPress={addVal} style={s.listAddBtn}><Text style={s.listAddText}>+</Text></Pressable>
+      </View>
+      <View style={s.listBtns}>
+        <Pressable onPress={() => save()} disabled={saving || !dirty} style={[s.listSaveBtn, (saving || !dirty) && s.dim]}>
+          {saving ? <ActivityIndicator color="#000" size="small" /> : <Text style={s.listSaveText}>Save</Text>}
+        </Pressable>
+        {!isDefault && (
+          <Pressable onPress={() => save(entry.default)} disabled={saving} style={s.listResetBtn}>
+            <Text style={s.listResetText}>Reset to default</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
 function Row({ label, value, last }: { label: string; value: string; last?: boolean }) {
   return (
     <View style={[s.row, last && s.noBorder]}>
@@ -445,6 +659,25 @@ const s = StyleSheet.create({
   addCardText: { color: C.cyan, fontSize: 14, fontWeight: '700' },
   swatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
   swatchOn: { borderColor: C.text },
+  // stores
+  storeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  autoBadge: { color: C.gold, fontSize: 9, fontWeight: '800', letterSpacing: 0.8, borderWidth: 1, borderColor: '#ffd93d50', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, textTransform: 'uppercase' },
+  // dropdown lists
+  listBlock: { paddingVertical: 12 },
+  listBlockBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border },
+  listLabel: { color: C.text, fontSize: 14, fontWeight: '700' },
+  listWhere: { color: C.faint, fontSize: 11, marginTop: 1, marginBottom: 8 },
+  valChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 9, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
+  valChipText: { color: C.text, fontSize: 12, fontWeight: '600' },
+  valChipX: { color: C.faint, fontSize: 11, fontWeight: '700' },
+  listAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  listAddBtn: { width: 44, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: C.cyan },
+  listAddText: { color: '#000', fontSize: 20, fontWeight: '800' },
+  listBtns: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
+  listSaveBtn: { backgroundColor: C.accent, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 22, alignItems: 'center' },
+  listSaveText: { color: '#000', fontSize: 13, fontWeight: '800' },
+  listResetBtn: { paddingVertical: 9, paddingHorizontal: 6 },
+  listResetText: { color: C.dim, fontSize: 12, fontWeight: '600' },
   modalBackdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: C.border, maxHeight: '90%' },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },

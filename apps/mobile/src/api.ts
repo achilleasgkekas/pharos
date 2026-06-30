@@ -356,6 +356,31 @@ export const updateVoucher = (id: string, data: { title?: string; code?: string;
 export const updateReceipt = (id: string, data: { store?: string; total?: number; date?: string; verified?: boolean; archived?: boolean; paymentMethod?: string }) => patch(`/api/v1/receipts/${id}`, data);
 export const updateItem = (id: string, data: { title?: string; status?: string; category?: string; currentPrice?: number; targetPrice?: number | null; specs?: string }) => patch(`/api/v1/items/${id}`, data);
 
+// ---- Stores (Settings → store list management) ----
+export type StoreRow = { id: string; name: string; url: string; aliases: string[]; auto: boolean };
+export type StoreInput = { name?: string; url?: string; aliases?: string[] };
+export async function getStores(): Promise<StoreRow[]> {
+  return (await request<{ stores: StoreRow[] }>('/api/v1/stores')).stores ?? [];
+}
+export function createStore(data: StoreInput) {
+  return request<{ store: StoreRow }>('/api/v1/stores', { method: 'POST', body: JSON.stringify(data) });
+}
+export function updateStore(id: string, data: StoreInput) {
+  return request<{ ok: boolean }>(`/api/v1/stores/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+export function deleteStore(id: string) {
+  return request<{ ok: boolean }>(`/api/v1/stores/${id}`, { method: 'DELETE' });
+}
+
+// ---- Dropdown lists / category taxonomies (Settings → lists editor) ----
+export type ListEntry = { key: string; label: string; where: string; values: string[]; default: string[] };
+export async function getLists(): Promise<ListEntry[]> {
+  return (await request<{ lists: ListEntry[] }>('/api/v1/lists')).lists ?? [];
+}
+export function saveList(key: string, values: string[]) {
+  return request<{ ok: boolean }>('/api/v1/lists', { method: 'PATCH', body: JSON.stringify({ key, values }) });
+}
+
 // ---- AI fill ----
 export type ParsedSub = { provider?: string; amount?: number; billingCycle?: string; category?: string; currency?: string; notes?: string; url?: string };
 export async function suggestSub(name: string): Promise<ParsedSub> {
