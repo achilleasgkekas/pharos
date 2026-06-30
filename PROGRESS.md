@@ -5,6 +5,17 @@
 <!-- reviewed: 261a4fb -->
 <!-- docker-validated: 0b53e82 -->
 
+## 2026-06-30 (parity-auditor — 5η σάρωση ημέρας, queue ξαναμετρημένη από κώδικα)
+- **Inventory (από κώδικα, όχι docs)**: **48 v1 routes** (από 46 — προστέθηκαν `items/[id]/convert-to-task` + `receipts/[id]/rescan`), **16 mobile screens**, **70** exported api fns (η παλιά «78» ήταν χαλαρή μέτρηση). Το mobile `api.ts` καταναλώνει **47/48** routes· το μοναδικό χωρίς mobile consumer = `POST /api/v1/receipts/[id]/rescan`.
+- **DONE / GAP / NEEDS DECISION**: από τα 6 Build Queue items → **4 DONE** (Statements installment-plan overview, Items convert-to-task, Notifications unread badge, Expenses/Income full-field edit — όλα επιβεβαιωμένα στον κώδικα, όχι μόνο στα docs), **2 GAP/TODO**, **0 νέα NEEDS DECISION** (τα γνωστά μένουν, βλ. παρακάτω).
+- **ΚΡΙΣΙΜΗ διόρθωση doc (stale)**: το queue item «Receipts re-scan» έλεγε `API exists: no`. Το web endpoint **χτίστηκε σήμερα** (`d24be27`) και είναι registered + serving (no-token → 401). Διόρθωσα σε `exists: yes` + ξανα-έγραψα το item ώστε να λέει ρητά ότι **απομένει ΜΟΝΟ το mobile half** (api.ts `rescanReceipt` + ReceiptsScreen buttons), να μην ξαναχτίσει ο builder το endpoint.
+- **Top 3 για τον builder (με σειρά)**:
+  1. **Receipts re-scan — mobile half** (P2/M, AI → δομικό verify μόνο): το web endpoint ΕΤΟΙΜΟ· λείπει `rescanReceipt(id,ocr)` στο api.ts + «Re-scan OCR/text» buttons στο ReceiptsScreen detail (re-prefill in-place από το response, ίδιο shape με `getReceipt`). ΜΗΝ τρέξεις πραγματικό AI scan.
+  2. **Items AI specs** (P3/M, AI, full-stack): το `POST /api/v1/items/[id]/ai-fill` **ΔΕΝ υπάρχει** ακόμα → πρώτα νέο web endpoint (port των `aiFillSpecs`/`aiFillInfo`), μετά mobile button. Δομικό verify μόνο.
+  3. **UI Debt → Input primitive** (P1/M, pure-mobile, no AI): centralize ~15 διπλά input styles σε `<Input>`/`<TextArea>` στο `ui.tsx`. Top της UI Debt ουράς.
+- **Read-only checks**: mobile `npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). ΔΕΝ έτρεξα Docker, ΔΕΝ trigger-αρα AI job, ΔΕΝ άγγιξα app code (μόνο τα 2 docs).
+- **Needs Achilleas**: τίποτα νέο. Παραμένουν τα γνωστά (απαιτούν απόφαση/device, ΔΕΝ πάνε στον builder): theme toggle + 8-language switcher στο mobile (product decision + L migration), AI engine / prompts settings στο mobile, Storage/OneDrive settings, Statements PDF import (mobile δεν κάνει upload PDF), remote push pipeline (χτίστηκε αλλά αδοκίμαστο — χρειάζεται EAS dev build + APNs key). Μηδέν committed secrets βρέθηκαν.
+
 ## 2026-06-30 (docker-health — safe rebuild σε νέο web code, stack healthy)
 - **Health**: mongo `healthy`, web RestartCount **0**, mongo RestartCount 43 (σωρευτικό 2 εβδομάδων, αυτή τη στιγμή healthy/up, όχι loop). flaresolverr **Exited** εδώ και 27h (καμία ενέργεια χρειάστηκε, μένει σβηστό).
 - **Disk**: `docker system df` → Images 3.49GB, Build Cache 565.9MB πριν. Άνετα μέσα στο ~31GB VM.
