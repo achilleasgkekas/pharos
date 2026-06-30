@@ -32,7 +32,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 | Web | Mobile |
 |-----|--------|
 | Dropzone upload + AI parse, e-shop layout, **email import**, find-duplicates + merge | 🟡 list + camera scan→save |
-| Detail: image/PDF, **editable line items (net/VAT/gross)**, store select, ∑-items, **re-scan OCR/text**, **verify**, **archive (not a receipt)**, add items to library | ✅ detail = image + **editable** store/date/payment/total/notes + **editable line items** (name/qty/net/VAT%, gross shown, add/remove) + **∑-items** + **verify** + **archive (not a receipt)**. No re-scan (AI), no add-to-library |
+| Detail: image/PDF, **editable line items (net/VAT/gross)**, store select, ∑-items, **re-scan OCR/text**, **verify**, **archive (not a receipt)**, add items to library | ✅ detail = image + **editable** store/date/payment/total/notes + **editable line items** (name/qty/net/VAT%, gross shown, add/remove) + **∑-items** + **verify** + **archive (not a receipt)** + **add items to inventory**. No re-scan (AI) |
 
 ## Expenses & Income (`/expenses`, `/income`)
 | Web | Mobile |

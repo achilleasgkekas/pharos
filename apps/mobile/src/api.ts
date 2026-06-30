@@ -416,6 +416,10 @@ export const updateExpense = (id: string, data: { vendor?: string; amount?: numb
 export const updateSubscription = (id: string, data: { name?: string; amount?: number; billingCycle?: string; nextRenewal?: string | null; category?: string; active?: boolean }) => patch(`/api/v1/subscriptions/${id}`, data);
 export const updateVoucher = (id: string, data: { title?: string; code?: string; store?: string; discount?: string; expiresAt?: string | null; url?: string; used?: boolean }) => patch(`/api/v1/vouchers/${id}`, data);
 export const updateReceipt = (id: string, data: { store?: string; total?: number; subtotal?: number; vatAmount?: number; date?: string; verified?: boolean; archived?: boolean; paymentMethod?: string; notes?: string; lineItems?: ReceiptLine[] }) => patch(`/api/v1/receipts/${id}`, data);
+export async function addReceiptToLibrary(id: string): Promise<{ created: number; linked: number }> {
+  const r = await request<{ created: number; linked: number }>(`/api/v1/receipts/${id}/add-to-library`, { method: 'POST' });
+  return { created: r.created, linked: r.linked };
+}
 export const updateItem = (id: string, data: { title?: string; status?: string; category?: string; currentPrice?: number; targetPrice?: number | null; specs?: string }) => patch(`/api/v1/items/${id}`, data);
 
 // ---- Stores (Settings → store list management) ----

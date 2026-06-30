@@ -3,7 +3,7 @@ import { View, Text, TextInput, Image, Pressable, FlatList, RefreshControl, Acti
 import * as ImagePicker from 'expo-image-picker';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getReceipts, getReceipt, scanReceipt, updateReceipt, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
+import { getReceipts, getReceipt, scanReceipt, updateReceipt, addReceiptToLibrary, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
 
 type LineEdit = { name: string; qty: string; price: string; vatRate: string };
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -87,6 +87,16 @@ export function ReceiptsScreen() {
     const id = detail.id;
     setDetail(null);
     try { await updateReceipt(id, { archived: true }); await load(); } catch (e) { setErr((e as Error).message); }
+  }
+  const [addingLib, setAddingLib] = useState(false);
+  async function addToLibrary() {
+    if (!detail) return;
+    setAddingLib(true);
+    try {
+      const r = await addReceiptToLibrary(detail.id);
+      Alert.alert('Added to inventory', `${r.created} created, ${r.linked} already existed.`);
+    } catch (e) { Alert.alert('Failed', (e as Error).message); }
+    finally { setAddingLib(false); }
   }
 
   async function scan() {
@@ -191,6 +201,11 @@ export function ReceiptsScreen() {
                   <Text style={s.tlabel}>Verified</Text>
                 </Pressable>
 
+                {detail.lineItems.length > 0 && (
+                  <Pressable onPress={addToLibrary} disabled={addingLib} style={[s.libBtn, addingLib && s.dim]}>
+                    {addingLib ? <ActivityIndicator color={C.accent} size="small" /> : <Text style={s.libText}>＋ Add items to inventory</Text>}
+                  </Pressable>
+                )}
                 <View style={s.mbtns}>
                   <Pressable onPress={saveReceipt} style={s.save}><Text style={s.saveText}>Save</Text></Pressable>
                   <Pressable onPress={archiveReceipt} style={s.del}><Text style={s.delText}>Not a receipt</Text></Pressable>
@@ -244,7 +259,9 @@ const s = StyleSheet.create({
   tboxOn: { backgroundColor: C.accent, borderColor: C.accent },
   tmark: { color: '#000', fontSize: 15, fontWeight: '800' },
   tlabel: { color: C.text, fontSize: 15 },
-  mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
+  libBtn: { marginTop: 18, borderWidth: 1, borderColor: C.accent, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  libText: { color: C.accent, fontSize: 15, fontWeight: '700' },
+  mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
   save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
   saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
   del: { paddingVertical: 12, paddingHorizontal: 12 },
