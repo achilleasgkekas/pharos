@@ -2,6 +2,13 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+## 2026-06-30 (docker-health — health OK, χωρίς rebuild)
+- Health (read-only): mongo **healthy**, web **running** (`/login` → **200**), και τα δύο Up 2 ώρες. searxng up (default stack). **flaresolverr ΣΒΗΣΤΟ** (όχι στο ps) → καμία ενέργεια. ΣΗΜ: αυτό το Docker engine δεν εκθέτει `.State.RestartCount` (template parsing error «map has no entry» → αβλαβές quirk έκδοσης)· χρησιμοποίησα `.State.Status=running` ως proxy, κανένα restart-loop σύμπτωμα.
+- Disk: `docker system df` → Images 3.49GB, Build Cache **565.7MB με 0B reclaimable**, Volumes 502MB. VM άνετο → **κανένα prune** (τίποτα να ανακτηθεί + κανένα build).
+- Rebuild decision: `git diff --name-only 01230bd..HEAD -- apps/web` → **κενό** (τα ενδιάμεσα commits docs/mobile-only) → **SKIP rebuild** ανά βήμα 4. Δεν έτρεξα κανένα build/AI.
+- Marker: `01230bd` → **`4ca5649`** (current HEAD). Staged ΜΟΝΟ PROGRESS.md.
+- Needs Achilleas: κανένα νέο. (Παραμένει εκκρεμές από monitor runs: RAM bump στο μικρό Docker VM ~1.9GB λόγω επαναλαμβανόμενου mongo OOM σε βαριά builds.)
+
 ## 2026-06-30 (parity-auditor — 3η σάρωση ημέρας, re-confirm read-only)
 - Read-only re-audit web↔mobile από τον κώδικα (όχι docs). Μηδέν app code, μηδέν Docker, μηδέν AI jobs. Inventory: **46 v1 route files** (login + 45 bearer), **16 mobile screens**, **78** exported api fns.
 - mobile `npx tsc --noEmit` → **EXIT 0** (καθαρό → κανένα P1 type-gap).
@@ -74,7 +81,7 @@
 - Needs Achilleas: κανένα νέο. (Παραμένουν: response-envelope standardization σε ΟΛΑ τα endpoints = breaking change που θέλει συντονισμό με mobile· zod-first σε νέα routes· Docker VM RAM bump.)
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
-<!-- docker-validated: 01230bd -->
+<!-- docker-validated: 4ca5649 -->
 <!-- reviewed: 5457339 -->
 
 ## 2026-06-30 (parity-auditor — 2η σάρωση ημέρας, re-confirm read-only)
