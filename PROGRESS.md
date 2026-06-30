@@ -6,6 +6,24 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
 <!-- docker-validated: 62dc4bf -->
 <!-- reviewed: af7fdc5 -->
 
+## 2026-06-30 (parity-auditor — re-audit Build Queue από τον κώδικα, read-only)
+- Read-only audit web↔mobile από τον κώδικα (όχι docs). Μηδέν app code, μηδέν Docker, μηδέν AI jobs. Inventory: **45 v1 routes** (login + 44 bearer), **16 mobile screens**, **78** exported api fns.
+- mobile `npx tsc --noEmit` → **EXIT 0** (καθαρό· κανένα type error → κανένα P1 type-gap).
+- **Endpoint coverage**: το mobile `api.ts` καταναλώνει **κάθε** υπάρχον v1 endpoint (grep των paths ταιριάζει 1:1 με το route list). Άρα κανένα «web endpoint χωρίς mobile consumer» gap· ό,τι λείπει χρειάζεται **νέο** endpoint ή επέκταση υπάρχοντος.
+- **Επαλήθευσα από τον κώδικα και τα 5 εναπομείναντα Build-Queue gaps ως γνήσια**:
+  - Receipts re-scan (P2/M): `api/v1/receipts/[id]/` έχει μόνο `{route.ts, add-to-library}` → κανένα `rescan` → valid TODO (AI cost → δομικό verify).
+  - Items convert-to-task (P3/S): `api/v1/items/[id]/` έχει μόνο `{route.ts, link-plan, plans, price}` → κανένα `convert-to-task` → valid TODO (no AI).
+  - Expenses/Income full-field edit (P3/S): `PATCH /api/v1/expenses/[id]` (route.ts:11-29) δέχεται ΜΟΝΟ vendor/amount/category/kind/notes/date → ΛΕΙΠΟΥΝ period/recurring/recurringCycle/paymentMethod → spec «PARTIAL» ισχύει (builder επεκτείνει ΠΡΩΤΑ το PATCH).
+  - Items AI specs (P3/M): κανένα `items/[id]/ai-fill` → valid TODO (AI cost).
+  - Notifications unread badge (P3/S): pure-mobile UI· `GET /api/v1/notifications` υπάρχει + καταναλώνεται ήδη → valid TODO.
+- **Status του πρώην P1**: Statements installment-plan overview = **DONE** (commit df8c87a, επιβεβαιωμένο: route `statements/plans` υπάρχει, mobile το καλεί). Ανανέωσα το Build-Queue header note ώστε ο builder να βλέπει ως ενεργό top-TODO το Receipts re-scan.
+- **Σύνολο: πυρήνας parity κλειστός (μηδέν P1/S), 5 GAP στο queue (1 P2 + 4 P3), 0 νέα NEEDS DECISION.**
+- **Top 3 για τον builder:** (1) Receipts re-scan OCR/text [P2/M, AI → δομικό verify], (2) Items convert-to-task [P3/S, no AI], (3) Expenses/Income full-field edit [P3/S, no AI — επέκταση PATCH πρώτα].
+- Staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (όχι `-A`). Καμία αλλαγή σε app code/secrets/.env.
+
+## Needs Achilleas
+- (Αμετάβλητα από προηγούμενα) theme toggle / 8-language i18n / AI-engine + storage(OneDrive) settings στο mobile, remote push creds (EAS dev build + APNs key), Docker VM RAM bump (mongo OOM στα builds), response-envelope standardization σε όλο το `/api/v1` (breaking, χρειάζεται συντονισμό με mobile). Κανένα νέο.
+
 ## 2026-06-30 (docker-health guard — rebuild + validate 62dc4bf)
 - Υγεία πριν: mongo **healthy** (Up 11min, RestartCount 34 = ιστορικό OOM από παλιά builds, όχι τρέχον loop), web **running** RestartCount 0, flaresolverr **exited** (το άφησα σταματημένο), searxng running. Κανένα restart-loop, κανένα OOM τώρα.
 - Disk: `docker system df` → Images 3.49GB, Build Cache 565MB (μικρό). Καμία πίεση.

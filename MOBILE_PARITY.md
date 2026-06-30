@@ -108,6 +108,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 
 ## Build Queue
 > Ranked για τον builder routine· paίρνει το πρώτο TODO. P1+S πρώτα. Ο πυρήνας του parity είναι κλειστός (CRUD/scan/PricePanel/Activity/Calendar/Reports), οπότε ΔΕΝ υπάρχουν P1/S· ό,τι έμεινε είναι secondary. Όσα έχουν AI cost → δομικό verify μόνο (no token-spend).
+> **Re-audit 2026-06-30 (parity-auditor):** το μόνο P1 (Statements installment-plan overview) είναι **DONE**· ο ενεργός κορυφαίος TODO είναι **Receipts re-scan (P2/M)**. Επαλήθευσα από τον κώδικα ότι και τα 5 εναπομείναντα items μένουν γνήσια gaps: `receipts/[id]/` έχει μόνο {route.ts, add-to-library} (κανένα rescan), `items/[id]/` έχει μόνο {route.ts, link-plan, plans, price} (κανένα convert-to-task/ai-fill), το `PATCH /api/v1/expenses/[id]` δέχεται μόνο vendor/amount/category/kind/notes/date (PARTIAL). Το mobile καταναλώνει ήδη ΚΑΘΕ υπάρχον endpoint → κανένα νέο gap. mobile `tsc --noEmit` → exit 0 (μηδέν P1 type errors).
 
 ### Statements — installment-plan overview στο mobile detail
 - Priority: P1 | Size: M
