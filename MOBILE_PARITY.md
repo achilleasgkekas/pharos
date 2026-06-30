@@ -32,7 +32,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 | Web | Mobile |
 |-----|--------|
 | Dropzone upload + AI parse, e-shop layout, **email import**, find-duplicates + merge | 🟡 list + camera scan→save |
-| Detail: image/PDF, **editable line items (net/VAT/gross)**, store select, ∑-items, **re-scan OCR/text**, **verify**, **archive (not a receipt)**, add items to library | ✅ detail = image + **editable** store/date/payment/total/notes + **editable line items** (name/qty/net/VAT%, gross shown, add/remove) + **∑-items** + **verify** + **archive (not a receipt)** + **add items to inventory**. No re-scan (AI) |
+| Detail: image/PDF, **editable line items (net/VAT/gross)**, store select, ∑-items, **re-scan OCR/text**, **verify**, **archive (not a receipt)**, add items to library | ✅ detail = image + **editable** store/date/payment/total/notes + **editable line items** (name/qty/net/VAT%, gross shown, add/remove) + **∑-items** + **verify** + **archive (not a receipt)** + **add items to inventory** + **re-scan text/OCR** (re-prefill in-place) |
 
 ## Expenses & Income (`/expenses`, `/income`)
 | Web | Mobile |
@@ -95,7 +95,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Roadmap (priority order)
 1. ✅ **Edit existing records** — tap-to-edit modals for Tasks, Expenses, Income, Subscriptions, Vouchers, **Items** (PATCH endpoints + forms).
 2. ✅ **Tasks statuses** — todo/in-progress/blocked/done picker + status chips.
-3. ✅ **Receipt verify/edit** — edit fields + line items + ∑-items + verify + archive + add-to-library. *Remaining: re-scan (AI).*
+3. ✅ **Receipt verify/edit** — edit fields + line items + ∑-items + verify + archive + add-to-library + **re-scan text/OCR** (2026-07-01).
 4. ✅ **AI fill** — subscription-from-name, voucher scan (paste+image), item URL import, expenses scan-a-bill.
 5. ✅ **Statement transactions** — per-statement detail με transactions + per-charge installment badges + **aggregated installment-plan overview** (cross-statement payoff, active-first). *Remaining: link plans to products / merge/bind (web overview write-ops).*
 6. 🟡 **Settings** — editable preferences (currency/VAT/warranty/auto-add), editable budgets, payment cards CRUD, stores CRUD, dropdown-lists editor, ntfy URL/enable/test ✅. *Remaining: theme toggle, language, AI engine, storage/OneDrive (βλ. Needs Achilleas).*
@@ -132,7 +132,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Acceptance:
   - `rescanReceipt` καλεί το υπάρχον endpoint· response έχει ίδιο shape με `getReceipt` → re-prefill in-place (χωρίς reopen)
   - Δομικό verify μόνο (το endpoint είναι ήδη registered + no-token 401 verified· tsc καθαρό web+mobile)· **ΜΗΝ τρέξεις πραγματικό AI scan** (κόστος)
-- Status: TODO — **ΕΝΕΡΓΟ ΚΟΡΥΦΑΙΟ: μόνο το mobile wiring λείπει**
+- Status: DONE (2026-07-01) — `rescanReceipt(id, ocr)` στο `api.ts` (POST `/api/v1/receipts/${id}/rescan`, response = `{receipt:ReceiptDetail, aiUsed, model, aiError}`) + «Re-scan text/OCR» bar στο ReceiptsScreen detail modal (κάτω από το image, πάνω από STORE): spinner ανά κουμπί, `setDetail(r.receipt)` → ο υπάρχων prefill effect ξανα-γεμίζει store/date/total/lineItems/notes in-place + `load()` refresh της λίστας, `aiError`→Alert. Δομικό verify μόνο (tsc mobile EXIT 0)· **κανένα πραγματικό AI scan** δεν τρέχτηκε (κόστος).
 
 ### Items — convert to task
 - Priority: P3 | Size: S | no AI

@@ -3,7 +3,7 @@ import { View, Text, TextInput, Image, Pressable, FlatList, RefreshControl, Acti
 import * as ImagePicker from 'expo-image-picker';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Check } from '../ui';
-import { getReceipts, getReceipt, scanReceipt, updateReceipt, addReceiptToLibrary, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
+import { getReceipts, getReceipt, scanReceipt, rescanReceipt, updateReceipt, addReceiptToLibrary, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
 
 type LineEdit = { name: string; qty: string; price: string; vatRate: string };
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -88,6 +88,20 @@ export function ReceiptsScreen() {
     setDetail(null);
     try { await updateReceipt(id, { archived: true }); await load(); } catch (e) { setErr((e as Error).message); }
   }
+  // Re-scan the stored file: ocr=true forces OCR, false uses embedded text / vision.
+  const [rescanning, setRescanning] = useState<null | 'ocr' | 'text'>(null);
+  async function rescan(ocr: boolean) {
+    if (!detail || rescanning) return;
+    setRescanning(ocr ? 'ocr' : 'text');
+    try {
+      const r = await rescanReceipt(detail.id, ocr);
+      setDetail(r.receipt); // triggers the prefill effect → store/date/total/lines refresh in place
+      await load();
+      if (r.aiError) Alert.alert('Re-scan note', r.aiError);
+    } catch (e) { Alert.alert('Re-scan failed', (e as Error).message); }
+    finally { setRescanning(null); }
+  }
+
   const [addingLib, setAddingLib] = useState(false);
   async function addToLibrary() {
     if (!detail) return;
@@ -154,6 +168,15 @@ export function ReceiptsScreen() {
             {detailLoading && !detail ? <ActivityIndicator color={C.accent} style={{ margin: 30 }} /> : detail ? (
               <ScrollView contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
                 {fileSource(detail.file) && <Image source={fileSource(detail.file)} style={s.bigImg} resizeMode="contain" />}
+                <View style={s.rescanBar}>
+                  <Text style={s.rescanLabel}>Re-scan</Text>
+                  <Pressable onPress={() => rescan(false)} disabled={!!rescanning} style={[s.rescanBtn, !!rescanning && s.dim]}>
+                    {rescanning === 'text' ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.rescanText}>text</Text>}
+                  </Pressable>
+                  <Pressable onPress={() => rescan(true)} disabled={!!rescanning} style={[s.rescanBtn, !!rescanning && s.dim]}>
+                    {rescanning === 'ocr' ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.rescanText}>OCR</Text>}
+                  </Pressable>
+                </View>
                 <Text style={s.elabel}>STORE</Text>
                 <TextInput value={eStore} onChangeText={setEStore} style={s.einput} placeholderTextColor={C.faint} />
                 <View style={s.rowFields}>
@@ -236,6 +259,10 @@ const s = StyleSheet.create({
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800', flex: 1 },
   close: { color: C.dim, fontSize: 18, paddingHorizontal: 6 },
   bigImg: { width: '100%', height: 260, borderRadius: 12, backgroundColor: C.surface, marginBottom: 14 },
+  rescanBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.border },
+  rescanLabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, flex: 1 },
+  rescanBtn: { borderWidth: 1, borderColor: C.cyan, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16, minWidth: 56, alignItems: 'center' },
+  rescanText: { color: C.cyan, fontSize: 13, fontWeight: '700' },
   dim: { opacity: 0.4 },
   elabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   einput: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },

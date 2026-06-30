@@ -199,6 +199,17 @@ export async function scanReceipt(uri: string): Promise<ReceiptDetail & { aiUsed
   if (!res.ok || !json?.receipt) throw new Error(json?.error || `Scan failed (HTTP ${res.status})`);
   return json.receipt;
 }
+/**
+ * Re-run the AI parse on a receipt's stored file. `ocr:true` forces the OCR path,
+ * otherwise embedded PDF text / vision. Returns the same `receipt` shape as
+ * getReceipt() so the detail screen can re-prefill in place.
+ */
+export async function rescanReceipt(id: string, ocr: boolean): Promise<{ receipt: ReceiptDetail; aiUsed: boolean; model: string; aiError: string | null }> {
+  return request<{ receipt: ReceiptDetail; aiUsed: boolean; model: string; aiError: string | null }>(
+    `/api/v1/receipts/${id}/rescan`,
+    { method: 'POST', body: JSON.stringify({ ocr }) },
+  );
+}
 
 // ---- Items / inventory ----
 export async function getItems(status: 'shopping' | 'inventory' | 'all' = 'all'): Promise<Item[]> {
