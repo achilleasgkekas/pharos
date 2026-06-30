@@ -33,7 +33,7 @@ Re-audit (προηγ.): η ουρά (5 items, 0 P1 / 3 P2 / 2 P3) **επιβεβ
   - Προτίμησε explicit `Schema.index({ updatedAt: -1 })` (τα Mongoose timestamps ΔΕΝ auto-index-άρουν το updatedAt).
   - Μηδέν αλλαγή σε route logic / response shape.
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (2026-06-30) — explicit `Schema.index({ updatedAt: -1 })` σε Item/Task/Receipt/Expense/Subscription/Statement/Voucher (σχόλιο ότι στα Item/Task είναι ΚΑΙ sort key). tsc EXIT 0· safe rebuild → /login 200, mongo healthy, web up χωρίς loop.
 
 ### POST /api/v1/items — whitelist status & category
 - Priority: P2

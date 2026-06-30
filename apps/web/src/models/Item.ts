@@ -67,6 +67,8 @@ const ItemSchema = new Schema(
 );
 
 ItemSchema.index({ title: 'text', specs: 'text', notes: 'text' });
+// Incremental-sync cursor (lib/apiList withSince → updatedAt $gte) AND sort key for GET /api/v1/items.
+ItemSchema.index({ updatedAt: -1 });
 
 ItemSchema.plugin(softDeletePlugin);
 

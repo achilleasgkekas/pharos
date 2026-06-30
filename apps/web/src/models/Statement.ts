@@ -46,6 +46,8 @@ const StatementSchema = new Schema(
 );
 
 StatementSchema.index({ card: 1, period: 1 }, { unique: true });
+// Incremental-sync cursor (lib/apiList withSince → updatedAt $gte) for GET /api/v1/statements.
+StatementSchema.index({ updatedAt: -1 });
 
 export type StatementDoc = InferSchemaType<typeof StatementSchema> & { _id: string };
 

@@ -40,6 +40,8 @@ const ExpenseSchema = new Schema(
 );
 
 ExpenseSchema.index({ kind: 1, vendorKey: 1, date: -1 }); // series timeline per vendor
+// Incremental-sync cursor (lib/apiList withSince → updatedAt $gte) for GET /api/v1/expenses.
+ExpenseSchema.index({ updatedAt: -1 });
 
 ExpenseSchema.plugin(softDeletePlugin);
 

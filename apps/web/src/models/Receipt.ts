@@ -48,6 +48,9 @@ const ReceiptSchema = new Schema(
   { timestamps: true }
 );
 
+// Incremental-sync cursor (lib/apiList withSince → updatedAt $gte) for GET /api/v1/receipts.
+ReceiptSchema.index({ updatedAt: -1 });
+
 ReceiptSchema.plugin(softDeletePlugin);
 
 export type ReceiptDoc = InferSchemaType<typeof ReceiptSchema> & { _id: string };

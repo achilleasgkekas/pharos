@@ -15,6 +15,9 @@ const VoucherSchema = new Schema(
   { timestamps: true }
 );
 
+// Incremental-sync cursor (lib/apiList withSince → updatedAt $gte) for GET /api/v1/vouchers.
+VoucherSchema.index({ updatedAt: -1 });
+
 VoucherSchema.plugin(softDeletePlugin);
 
 export type VoucherDoc = InferSchemaType<typeof VoucherSchema> & { _id: string };

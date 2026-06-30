@@ -28,6 +28,9 @@ const SubscriptionSchema = new Schema(
   { timestamps: true }
 );
 
+// Incremental-sync cursor (lib/apiList withSince → updatedAt $gte) for GET /api/v1/subscriptions.
+SubscriptionSchema.index({ updatedAt: -1 });
+
 SubscriptionSchema.plugin(softDeletePlugin);
 
 export type SubscriptionDoc = InferSchemaType<typeof SubscriptionSchema> & { _id: string };

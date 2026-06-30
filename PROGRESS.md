@@ -2,6 +2,14 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+## 2026-06-30 (builder — WEB_DEBT P2#1: index updatedAt στα 7 synced models)
+- Τι: μετά από αρκετά read-only audit runs, χτίστηκε το κορυφαίο TODO της WEB_DEBT ουράς (P2/S, db). Πρόσθεσα explicit `Schema.index({ updatedAt: -1 })` σε **και τα 7 synced models** (Item, Task, Receipt, Expense, Subscription, Statement, Voucher). Το `updatedAt` είναι το incremental-sync cursor (`lib/apiList.ts withSince` → `updatedAt: { $gte }` σε κάθε mobile sync) και στα Item/Task είναι ΚΑΙ το sort key (`sort({ updatedAt: -1 })`) — πριν unindexed range-scan + in-memory sort σε κάθε sync. Τα Mongoose timestamps ΔΕΝ auto-index-άρουν το updatedAt, οπότε χρειαζόταν ρητό index. Κάθε γραμμή με σχόλιο (Item/Task σημειωμένα ως sort key).
+- **Καμία αλλαγή σε route logic / response shape** — αμιγώς additive schema index. Μηδέν αλλαγή στο mobile↔web συμβόλαιο.
+- Verify: `apps/web npm run type-check` → **EXIT 0**. Safe rebuild: `docker compose build web` (EXIT 0) → mongo `healthy` → `docker compose up -d web` (mongo waited healthy) → `curl /login` = **200** → web `running=true`, χωρίς restart-loop (`docker ps` → «Up», logs μόνο τα γνωστά αβλαβή stale-bundle «Failed to find Server Action» από ανοιχτό browser tab, ΟΧΙ crash) → `docker builder prune -f` (ανέκτησε ~2.0GB cache). flaresolverr παρέμεινε σβηστό. (Τα indexes χτίζονται από το Mongoose autoIndex στο πρώτο model use μετά το connect, ίδιο proven pattern με τα υπάρχοντα text/compound indexes· δεν έγινε mongosh index-check για να μην αγγίξω secrets/.env.)
+- Staged ΜΟΝΟ: τα 7 model αρχεία + `WEB_DEBT.md` + `PROGRESS.md` (explicit paths, όχι `-A`). Καμία αλλαγή σε άλλα working-tree αρχεία/secrets/.env.
+- **Επόμενο task:** WEB_DEBT P2#2 — **POST /api/v1/items: whitelist status & category** (εξαγωγή του `STATUS` array σε shared const ώστε POST + PATCH `items/[id]/route.ts` να το μοιράζονται· invalid status → fallback 'researching', ίδιο μοτίβο με `tasks/route.ts`). Καθαρό, no AI, fully testable στο web.
+- Needs Achilleas: κανένα νέο.
+
 ## 2026-06-30 (ui-auditor — UI Debt re-audit, 2 foundation items DONE, queue refreshed)
 - Read-only mobile UI consistency re-audit (apps/mobile vs apps/web design tokens). Μηδέν app code, μηδέν Docker, μηδέν AI jobs. mobile `npx tsc --noEmit` → **EXIT 0**.
 - **Builder progress από τελευταίο audit (commit `362efc5`)**: τα 2 foundation items του UI Debt Queue **DONE** — (1) Theme tokens: το `theme.ts` εξάγει πλέον `SPACE`/`RADIUS`/`SIZE` scales + `surface3`/`orange`/`onAccent` (επαλήθευση: theme.ts:22-28). (2) Alpha helper: νέο `alpha(hex,n)` (theme.ts:35-43)· τα 8-digit alpha hex literals → **0** (grep καθαρό, ΗΤΑΝ 8).

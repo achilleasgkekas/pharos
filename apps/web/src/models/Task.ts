@@ -35,6 +35,9 @@ const TaskSchema = new Schema(
   { timestamps: true }
 );
 
+// Incremental-sync cursor (lib/apiList withSince → updatedAt $gte) AND sort key for GET /api/v1/tasks.
+TaskSchema.index({ updatedAt: -1 });
+
 TaskSchema.plugin(softDeletePlugin);
 
 export type TaskDoc = InferSchemaType<typeof TaskSchema> & { _id: string };
