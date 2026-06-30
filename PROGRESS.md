@@ -3,7 +3,7 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 86c6ada -->
-<!-- docker-validated: 18c18e6 -->
+<!-- docker-validated: 4c1e1ac -->
 
 ## 2026-07-01 (reviewer — range 82fbb58..86c6ada clean, parity ai-fill commit verified)
 - Εύρος: `82fbb58..86c6ada` (7 commits). Μόνο **ΕΝΑ** app-code commit: `86c6ada` (feat parity Items AI specs/info)· τα υπόλοιπα 6 docs/chore (web-debt/ui-audit/parity re-audits + docker health-guard + review marker). App-code diff = 3 αρχεία, +75/-1.
@@ -654,6 +654,13 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
 - Output: πρόσθεσα re-audit note + διόρθωσα τους counts στο MOBILE_PARITY.md (23→32 με ανάλυση, input 15→17, refreshed line refs του Input primitive item: MoneyScreen:232/249, SettingsScreen:633, ItemsScreen:460/500). Τα 6 per-item TODO specs μένουν έγκυρα + σωστά ranked.
 - Verify: read-only μόνο (μηδέν Docker, μηδέν AI, μηδέν app-code edit). grep counts + tsc exit 0. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
 - Top 3 για τον builder (σειρά εξάρτησης, foundation ικανοποιημένη): (1) **Input primitive** (P1/M — ένα `<Input>` στο `ui.tsx` αντικαθιστά τα 17 duplicate input styles με RADIUS/SIZE/SPACE tokens· καλύτερα σπασμένο σε 2-3 runs ώστε reviewable unattended), (2) **Button + Chip primitives** (P2/M — `<Button>` με `C.onAccent` text εξαλείφει και τα 32 `#000` incl. τα 8 spinner-props + `<Chip>` με on/off state), (3) **Card + Badge + ListItem primitives** (P2/M — ενοποιεί 5 local `card`/5 `badge`/22 chip). Μετά: safe-area insets (add dep) → max-width → light theme (L, τελευταίο).
+
+## 2026-07-01 (docker-health-guard — safe rebuild, web ai-fill endpoint validated)
+- **Υγεία**: mongo `healthy` (up 3h· RestartCount=43 σωρευτικό, όχι loop), web `running` restarts=0, searxng up. flaresolverr ήδη `exited` (σωστά σταματημένο, δεν το άγγιξα).
+- **Δίσκος**: images 3.49GB, build cache 566MB (0B reclaimable, ενεργά layers). `docker builder prune -f` → reclaimed ~3.19MB.
+- **Rebuild**: ΝΑΙ. Το diff `18c18e6..HEAD` σε `apps/web` άγγιζε runtime code (`apps/web/src/app/api/v1/items/[id]/ai-fill/route.ts`). Ασφαλές dance: `docker compose build web` (CACHED, OK) → mongo healthy → `docker compose up -d web` → `/login` επέστρεψε **200** στην 1η προσπάθεια → web restarts παρέμειναν 0.
+- **Marker**: docker-validated `18c18e6` → **`4c1e1ac`** (HEAD).
+- Τίποτα νέο στο ## Needs Achilleas.
 
 ## Needs Achilleas
 - **Theme toggle + 8-language i18n στο mobile** (web έχει light theme + cookie i18n)· χρειάζεται ThemeProvider/useTheme refactor 19 αρχείων + locale strategy → product decision, μεγάλο (L).
