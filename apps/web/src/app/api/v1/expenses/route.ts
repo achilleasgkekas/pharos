@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
+import { readBody, strField, numField, enumField, boolField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
 import { vendorKey } from '@/app/expenses/lib';
@@ -54,26 +55,26 @@ export async function GET(req: NextRequest) {
 /** POST /api/v1/expenses  { kind?, vendor, amount, date?, category?, period?, recurring?, recurringCycle?, notes? } */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
-    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const vendor = String(b.vendor || '').trim();
-    const amount = typeof b.amount === 'number' ? b.amount : parseFloat(String(b.amount));
+    const b = await readBody(req);
+    const vendor = strField(b, 'vendor', '', true);
+    const amount = numField(b, 'amount');
     if (!vendor) return apiError('vendor required');
-    if (!Number.isFinite(amount)) return apiError('amount must be a number');
+    if (amount === null) return apiError('amount must be a number');
     const date = b.date ? new Date(String(b.date)) : new Date();
     if (Number.isNaN(date.getTime())) return apiError('invalid date');
     await connectDB();
     const doc = await Expense.create({
-      kind: b.kind === 'income' ? 'income' : 'expense',
+      kind: enumField(b, 'kind', ['income', 'expense'], 'expense'),
       vendor,
       vendorKey: vendorKey(vendor),
-      category: String(b.category || 'other'),
+      category: strField(b, 'category', 'other'),
       amount,
       date,
-      period: String(b.period || ''),
-      recurring: !!b.recurring,
-      recurringCycle: ['monthly', 'quarterly', 'yearly', 'weekly'].includes(String(b.recurringCycle)) ? String(b.recurringCycle) : '',
-      paymentMethod: String(b.paymentMethod || ''),
-      notes: String(b.notes || ''),
+      period: strField(b, 'period'),
+      recurring: boolField(b, 'recurring'),
+      recurringCycle: enumField(b, 'recurringCycle', ['monthly', 'quarterly', 'yearly', 'weekly'], ''),
+      paymentMethod: strField(b, 'paymentMethod'),
+      notes: strField(b, 'notes'),
       verified: true, // manually entered → trusted
     });
     return NextResponse.json({ expense: trim(doc.toObject() as ExpenseLean) }, { status: 201 });

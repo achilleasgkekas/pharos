@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
+import { readBody, strField, numField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Subscription } from '@/models/Subscription';
 
@@ -54,25 +55,25 @@ export async function GET(req: NextRequest) {
 /** POST /api/v1/subscriptions  { name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url? } */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
-    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const name = String(b.name || '').trim();
-    const amount = typeof b.amount === 'number' ? b.amount : parseFloat(String(b.amount));
+    const b = await readBody(req);
+    const name = strField(b, 'name', '', true);
+    const amount = numField(b, 'amount');
     if (!name) return apiError('name required');
-    if (!Number.isFinite(amount)) return apiError('amount must be a number');
+    if (amount === null) return apiError('amount must be a number');
     const startDate = b.startDate ? new Date(String(b.startDate)) : new Date();
     if (Number.isNaN(startDate.getTime())) return apiError('invalid startDate');
     await connectDB();
     const doc = await Subscription.create({
       name,
-      provider: String(b.provider || ''),
-      category: String(b.category || 'other'),
+      provider: strField(b, 'provider'),
+      category: strField(b, 'category', 'other'),
       amount,
-      billingCycle: CYCLES.includes(String(b.billingCycle)) ? String(b.billingCycle) : 'monthly',
+      billingCycle: enumField(b, 'billingCycle', CYCLES, 'monthly'),
       startDate,
       nextRenewal: b.nextRenewal ? new Date(String(b.nextRenewal)) : startDate,
-      paymentMethod: String(b.paymentMethod || ''),
-      url: String(b.url || ''),
-      notes: String(b.notes || ''),
+      paymentMethod: strField(b, 'paymentMethod'),
+      url: strField(b, 'url'),
+      notes: strField(b, 'notes'),
     });
     return NextResponse.json({ subscription: trim(doc.toObject() as SubLean) }, { status: 201 });
   });
