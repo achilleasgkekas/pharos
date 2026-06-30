@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 2223203 -->
-<!-- docker-validated: 4c1e1ac -->
+<!-- docker-validated: c47ce35 -->
+
+## 2026-07-01 (docker-health-guard — health πράσινη, χωρίς rebuild)
+- **Health**: mongo `healthy` (RestartCount 43 ιστορικό από παλιά OOM, όχι τρέχον loop)· web `running` RestartCount **0**· searxng up. flaresolverr ήδη `Exited` 31h (το άφησα σταματημένο, μηδέν επιπλέον μνήμη).
+- **Disk**: Images 3.49GB, Containers 80MB, Volumes 504MB, Build Cache 566MB (reclaimable 0B — referenced από το current image). `docker builder prune -f` → **0B** ανακτήθηκαν (αναμενόμενο). VM άνετα.
+- **Rebuild απόφαση**: `git diff 4c1e1ac..HEAD -- apps/web` = **κενό**· οι αλλαγές αγγίζουν μόνο `apps/mobile` (api.ts + TasksScreen.tsx) + docs (PROGRESS/STATUS/MOBILE_PARITY/WEB_DEBT). Καμία αλλαγή σε web runtime → **SKIP rebuild** ανά κανόνα βήμα 4.
+- **Serving check** (read-only): `curl localhost:3000/login` → **200**.
+- **Marker**: docker-validated `4c1e1ac` → **`c47ce35`** (HEAD).
 
 ## 2026-07-01 (reviewer — range 86c6ada..2223203, καθαρό)
 - Εύρος: 7 commits μετά τον marker `86c6ada`· 6 είναι docs (PROGRESS/MOBILE_PARITY/WEB_DEBT/STATUS audits)· **ΕΝΑ** μόνο app-code commit: `2223203` feat(mobile) Tasks tags + priority στο add/edit (`apps/mobile/src/api.ts` + `TasksScreen.tsx`).
