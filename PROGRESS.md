@@ -3,6 +3,15 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 261a4fb -->
+<!-- docker-validated: 0b53e82 -->
+
+## 2026-06-30 (docker-health — safe rebuild σε νέο web code, stack healthy)
+- **Health**: mongo `healthy`, web RestartCount **0**, mongo RestartCount 43 (σωρευτικό 2 εβδομάδων, αυτή τη στιγμή healthy/up, όχι loop). flaresolverr **Exited** εδώ και 27h (καμία ενέργεια χρειάστηκε, μένει σβηστό).
+- **Disk**: `docker system df` → Images 3.49GB, Build Cache 565.9MB πριν. Άνετα μέσα στο ~31GB VM.
+- **Rebuild απόφαση**: marker ήταν `4ca5649`· `git diff 4ca5649..HEAD -- apps/web` αγγίζει web runtime (`api/v1/{items,items/[id],items/[id]/convert-to-task,expenses/[id],receipts/[id]/rescan,shopping-list/[id]}/route.ts`, `shopping-list/actions.ts`, `models/Item.ts`) → rebuild δικαιολογημένο.
+- **Safe rebuild**: `docker compose build web` → **fully cached** (η εικόνα ήταν ήδη χτισμένη σε HEAD, web container 3min old) → mongo `healthy` → `up -d web` → poll `curl /login` → **200** στη 2η προσπάθεια → web RestartCount παρέμεινε **0**. Μετά `docker builder prune -f` → reclaimed ~3.2MB (το υπόλοιπο cache active/in-use).
+- **Needs Achilleas**: κανένα. Stack υγιές, κανένα regression.
+- Marker → `0b53e82` (HEAD).
 
 ## 2026-06-30 (builder — WEB_DEBT P3#5: shared body-coercion helpers, web-only no-AI)
 - **Τι**: χτίστηκε το WEB_DEBT «Shared body-coercion helpers» (P3/S). Στην αρχή του run το tree είχε βαρύ παράλληλο WIP άλλων routines: `apps/mobile/src/api.ts`, `items/route.ts` (commit ως listEnvelope alignment), `shopping-list/*` (commit ως P3#4 DONE), untracked `receipts/[id]/rescan/route.ts` (παράλληλος builder). **Απέφυγα όλες αυτές τις ζώνες** → καθαρά web-only task χωρίς κανένα WIP αρχείο.
