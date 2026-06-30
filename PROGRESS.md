@@ -4,7 +4,7 @@
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
 <!-- docker-validated: 1d2a9be -->
-<!-- reviewed: 1d2a9be -->
+<!-- reviewed: af7fdc5 -->
 
 ## Κανόνες (μην τους σπάσεις)
 - Stage ΜΟΝΟ όσα άλλαξες, με explicit `git add <path>`. ΠΟΤΕ `git add -A` / `.` / `commit -a` (το working tree έχει συχνά parallel uncommitted αλλαγές του Αχιλλέα).
@@ -239,3 +239,16 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
 - Verify: read-only μόνο (μηδέν Docker, μηδέν AI, μηδέν app-code edit). `npm run type-check` → exit 0. grep sweeps για any/ts-ignore/withAuth/id-guard/updatedAt-index. Staged ΜΟΝΟ WEB_DEBT.md + PROGRESS.md.
 - Top 3 για τον builder (αμετάβλητα, P2 πρώτα): (1) **Index updatedAt στα 7 synced models** (P2/S, db — explicit `Schema.index({updatedAt:-1})`· επιταχύνει κάθε mobile incremental sync, ειδικά Item/Task που sort-άρουν κιόλας σε αυτό), (2) **POST /api/v1/items — whitelist status & category** (P2/S, api — ίδια STATUS whitelist με το PATCH, εξαγωγή σε shared const), (3) **GET /api/v1/items → listEnvelope alignment** (P2/S, api+ui — `{items}`→`{data}` + ενημέρωση mobile consumer, ή τεκμηρίωση της απόκλισης αν το breaking δεν είναι ΟΚ τώρα).
 - Needs Achilleas: κανένα νέο. (Παραμένει από προηγούμενα: RAM bump στο Docker VM λόγω επαναλαμβανόμενου mongo OOM στα builds· response-envelope standardization σε ΟΛΑ τα endpoints = breaking change που θέλει συντονισμό με το mobile.)
+
+## 2026-06-30 (reviewer — έλεγχος range 1d2a9be..af7fdc5)
+- Range: 8 commits, μόνο **1 με app code** (`df8c87a` statements installment-plan overview)· τα υπόλοιπα 7 docs-only (audits monitor/web/mobile/parity + το `af7fdc5` progress note). Κανένα `up --build`, μηδέν Docker, μηδέν AI.
+- Checks: web `npm run type-check` → **EXIT 0**, mobile `npx tsc --noEmit` → **EXIT 0**. Καμία διόρθωση χρειάστηκε.
+- Review ευρήματα (όλα PASS, μηδέν regression):
+  - Νέο `GET /api/v1/statements/plans` (route.ts): περνά `withAuth`, `.lean()`, `force-dynamic`· field mapping **ταιριάζει 1:1** με το `InstallmentPlan` type του `lib/installments.ts` (signature/label/card/perAmount/total+paid+remainingInstallments/remainingAmount/totalAmount/projectedEndDate/done + `itemCount=itemIds.length`). Πιστό port του web InstallmentOverview.
+  - Static `/plans` έναντι sibling `/[id]` → στο Next App Router το static segment **έχει προτεραιότητα** (δεν το πιάνει το `[id]`). Σωστό.
+  - Re-sort στο route (`a.done===b.done?0:a.done?1:-1`) είναι **redundant** (το `computeInstallmentPlans` ήδη sort-άρει done-last → soonest-payoff)· ακίνδυνο γιατί το JS Array.sort είναι stable (ES2019+) → διατηρεί τη σειρά πληρωμής. Όχι bug.
+  - API αλλαγή αμιγώς **additive** (1 νέο route, κανένα removed/renamed) → δεν σπάει υπάρχοντες mobile consumers.
+  - Mobile: `InstallmentPlan` type + `getInstallmentPlans()` ταιριάζουν με το API shape· το `load()` κάνει `Promise.all([getStatements, getInstallmentPlans])` σε try/catch (αν αποτύχει το plans, βλέπεις τον ίδιο error state — αποδεκτό). Header section reuse `money()/C.*` σωστά· `payoff()` guard-άρει `isNaN`.
+  - Secret-scan στο diff: καθαρό (μόνο `apiToken` references, όχι literals).
+- Flagged: τίποτα νέο. Καμία regression, κανένα type error, κανένα committed secret. Οι ουρές (WEB_DEBT 5, MOBILE_PARITY) μένουν ως έχουν.
+- Git hygiene: staged ΜΟΝΟ `PROGRESS.md` (reviewed marker `1d2a9be`→`af7fdc5` + αυτή η εγγραφή). Καμία αλλαγή σε app code/secrets/.env.
