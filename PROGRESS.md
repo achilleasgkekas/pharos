@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: fbda2b3 -->
-<!-- docker-validated: 0b53e82 -->
+<!-- docker-validated: 2a13b65 -->
+
+## 2026-06-30 (docker-guard — rebuild + health OK)
+- **Health**: mongo `healthy` (RestartCount 43 σωρευτικό, up ~1h, όχι loop), web RestartCount **0** (running). flaresolverr σταματημένο (καμία επιπλέον πίεση μνήμης). searxng up (part of default stack).
+- **Disk**: `docker system df` — Images 3.49GB, Build Cache 565.9MB (reclaimable 0B, όλο in-use). `builder prune -f` ανέκτησε **3.2MB** (μηδέν dangling).
+- **Rebuild**: ο diff `0b53e82..HEAD` άγγιζε web runtime (`api/v1/expenses/route.ts`, `api/v1/subscriptions/route.ts`, νέο `lib/apiBody.ts`) → δικαιολογημένο rebuild. `docker compose build web` βγήκε **πλήρως cached** (το image είχε ήδη χτιστεί από προηγούμενο run· `npm run build` CACHED). `up -d web` → mongo Healthy gate → web Started· `/login` → **200** (2η προσπάθεια)· RestartCount δεν ανέβηκε (0).
+- **Marker**: docker-validated `0b53e82` → **`2a13b65`** (HEAD).
+- **Needs Achilleas**: κανένα.
 
 ## 2026-07-01 (reviewer — range 261a4fb..fbda2b3 καθαρό)
 - **Τι εξετάστηκα**: 11 commits από το προηγούμενο marker (`261a4fb`), εκ των οποίων κώδικας: `c3c9fae` (GET items→listEnvelope), `261a4fb` (id-guard shopping-list ήδη reviewed-base), `d24be27`+route (POST receipts rescan), `9b34b44` (shared body-coercion helpers), `76ce160` (mobile `<Check>` primitive), `fbda2b3` (mobile receipts re-scan). Υπόλοιπα = docs/queues.
