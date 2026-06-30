@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, StyleSheet, Alert } from 'react-native';
-import { C } from '../theme';
+import { C, alpha } from '../theme';
 import { shortDate, Spinner, ErrorText, Empty } from '../ui';
 import {
   getTrash, restoreTrash, purgeTrash, currentUser,
@@ -290,7 +290,7 @@ const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
-  tabOn: { borderColor: C.accent, backgroundColor: '#00ff8814' },
+  tabOn: { borderColor: C.accent, backgroundColor: alpha(C.accent, 0.08) },
   tabText: { color: C.dim, fontSize: 13, fontWeight: '600' },
   tabTextOn: { color: C.accent, fontWeight: '700' },
   intro: { color: C.faint, fontSize: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, lineHeight: 17 },
@@ -299,7 +299,7 @@ const s = StyleSheet.create({
   markAllText: { color: C.accent, fontSize: 12, fontWeight: '700' },
   list: { padding: 16, paddingTop: 4 },
   card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
-  unreadCard: { borderColor: '#00d4ff44', backgroundColor: '#00d4ff0a' },
+  unreadCard: { borderColor: alpha(C.cyan, 0.27), backgroundColor: alpha(C.cyan, 0.04) },
   dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.cyan, marginTop: 4 },
   head: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   icon: { fontSize: 20, marginTop: 1 },
@@ -308,7 +308,7 @@ const s = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 10, marginTop: 12 },
   restore: { borderWidth: 1, borderColor: C.accent, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
   restoreText: { color: C.accent, fontSize: 14, fontWeight: '700' },
-  purge: { borderWidth: 1, borderColor: '#ff475740', backgroundColor: '#ff475712', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
+  purge: { borderWidth: 1, borderColor: alpha(C.red, 0.25), backgroundColor: alpha(C.red, 0.07), borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
   purgeText: { color: C.red, fontSize: 14, fontWeight: '600' },
   jobHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   badge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 'auto' },
@@ -319,7 +319,7 @@ const s = StyleSheet.create({
   thread: { marginTop: 10, gap: 8 },
   msg: { borderRadius: 10, padding: 10 },
   msgUser: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
-  msgBot: { backgroundColor: '#00d4ff0f', borderWidth: 1, borderColor: '#00d4ff33' },
+  msgBot: { backgroundColor: alpha(C.cyan, 0.06), borderWidth: 1, borderColor: alpha(C.cyan, 0.2) },
   role: { color: C.faint, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 3, textTransform: 'uppercase' },
   msgText: { color: C.text, fontSize: 13, lineHeight: 19 },
   action: { color: C.accent, fontSize: 12, marginTop: 4 },

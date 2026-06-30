@@ -190,7 +190,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - Το `theme.ts` εξάγει `surface3` (#242424) + `orange` (#ffa502) ώστε να καλύπτει όλα τα web color tokens (globals.css:8-22)
   - Νέα scale exports: spacing (π.χ. 4/8/12/16/24), radius (10/12/14 — τα 3 που ήδη χρησιμοποιούνται ασυνεπώς), font sizes (13/14/15/16/19) με σταθερά ονόματα
   - Νέο `onAccent` token (#000, το χρώμα κειμένου πάνω σε accent/cyan buttons) ώστε να μη γράφεται `'#000'` inline
-- Status: TODO
+- Status: DONE (2026-06-30) — `theme.ts` εξάγει `surface3`/`orange`/`onAccent` + `SPACE`/`RADIUS`/`SIZE` scales· τα 5 `#000` onAccent literals του SettingsScreen → `C.onAccent` + το `#f5f5f5` re-def → `C.text`. ΣΗΜ: τα υπόλοιπα ~26 inline `#000` onAccent σε άλλα screens μένουν (μετανάστευση σε `C.onAccent` ανά screen, low-priority follow-up).
 
 ### Alpha-tint helper για theme-derived backgrounds/borders
 - Priority: P1
@@ -201,7 +201,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Acceptance:
   - Νέο `alpha()` (ή σταθερά tinted tokens) αντικαθιστά τα 11 hardcoded alpha hex: ActivityScreen.tsx:293,302,311,322 και SettingsScreen.tsx:644,653,664
   - Μηδέν `'#00ff88XX'` / `'#00d4ffXX'` / `'#ff4757XX'` / `'#ffd93dXX'` literals στα screens (grep καθαρό)
-- Status: TODO
+- Status: DONE (2026-06-30) — νέο `alpha(hex, n)` (0..1 → rgba) στο `theme.ts`· αντικατέστησε και τα 12 alpha-tinted literals (ActivityScreen ×7 + SettingsScreen ×5, incl. `#000000aa` backdrop). grep για 8-digit hex σε `src/**.tsx` → **NONE**.
 
 ### Input primitive (centralize 14 duplicate input styles)
 - Priority: P1

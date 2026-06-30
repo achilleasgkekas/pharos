@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal } from 'react-native';
-import { C } from '../theme';
+import { C, alpha } from '../theme';
 import { money, ErrorText } from '../ui';
 import { PharosMark } from '../PharosMark';
 import { APP_VERSION } from '../config';
@@ -14,7 +14,7 @@ import {
 const CURRENCIES = ['EUR', 'USD', 'GBP'];
 const CARD_KINDS: Card['kind'][] = ['credit', 'debit'];
 const CARD_TYPES: Card['type'][] = ['mastercard', 'visa', 'amex', 'maestro', 'other'];
-const CARD_COLORS = [C.cyan, C.accent, C.gold, C.purple, C.red, '#f5f5f5'];
+const CARD_COLORS = [C.cyan, C.accent, C.gold, C.purple, C.red, C.text];
 
 export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
   const user = currentUser();
@@ -618,13 +618,13 @@ const s = StyleSheet.create({
   chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
   chipOn: { backgroundColor: C.accent, borderColor: C.accent },
   chipText: { color: C.dim, fontSize: 13, fontWeight: '600' },
-  chipTextOn: { color: '#000' },
+  chipTextOn: { color: C.onAccent },
   addChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9, borderWidth: 1, borderColor: C.cyan },
   addChipText: { color: C.cyan, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
   tbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
   tboxOn: { backgroundColor: C.accent, borderColor: C.accent },
-  tmark: { color: '#000', fontSize: 15, fontWeight: '800' },
+  tmark: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
   tlabel: { color: C.text, fontSize: 14 },
   budget: { marginBottom: 12 },
   budgetTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
@@ -640,8 +640,8 @@ const s = StyleSheet.create({
   testText: { color: C.cyan, fontSize: 14, fontWeight: '700' },
   dim: { opacity: 0.45 },
   saveBtn: { marginTop: 20, backgroundColor: C.accent, borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
-  saveText: { color: '#000', fontSize: 15, fontWeight: '800' },
-  signout: { marginTop: 26, borderWidth: 1, borderColor: '#ff475740', backgroundColor: '#ff475715', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  saveText: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
+  signout: { marginTop: 26, borderWidth: 1, borderColor: alpha(C.red, 0.25), backgroundColor: alpha(C.red, 0.08), borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   signoutText: { color: C.red, fontSize: 15, fontWeight: '700' },
   // cards
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border },
@@ -650,7 +650,7 @@ const s = StyleSheet.create({
   dimText: { color: C.dim },
   cardMeta: { color: C.faint, fontSize: 12, marginTop: 2, textTransform: 'capitalize' },
   activePill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
-  activeOn: { borderColor: C.accent, backgroundColor: '#00ff8815' },
+  activeOn: { borderColor: C.accent, backgroundColor: alpha(C.accent, 0.08) },
   activeOff: { borderColor: C.border },
   activePillText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
   activeOnText: { color: C.accent },
@@ -661,7 +661,7 @@ const s = StyleSheet.create({
   swatchOn: { borderColor: C.text },
   // stores
   storeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  autoBadge: { color: C.gold, fontSize: 9, fontWeight: '800', letterSpacing: 0.8, borderWidth: 1, borderColor: '#ffd93d50', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, textTransform: 'uppercase' },
+  autoBadge: { color: C.gold, fontSize: 9, fontWeight: '800', letterSpacing: 0.8, borderWidth: 1, borderColor: alpha(C.gold, 0.31), borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, textTransform: 'uppercase' },
   // dropdown lists
   listBlock: { paddingVertical: 12 },
   listBlockBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border },
@@ -672,13 +672,13 @@ const s = StyleSheet.create({
   valChipX: { color: C.faint, fontSize: 11, fontWeight: '700' },
   listAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   listAddBtn: { width: 44, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: C.cyan },
-  listAddText: { color: '#000', fontSize: 20, fontWeight: '800' },
+  listAddText: { color: C.onAccent, fontSize: 20, fontWeight: '800' },
   listBtns: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
   listSaveBtn: { backgroundColor: C.accent, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 22, alignItems: 'center' },
-  listSaveText: { color: '#000', fontSize: 13, fontWeight: '800' },
+  listSaveText: { color: C.onAccent, fontSize: 13, fontWeight: '800' },
   listResetBtn: { paddingVertical: 9, paddingHorizontal: 6 },
   listResetText: { color: C.dim, fontSize: 12, fontWeight: '600' },
-  modalBackdrop: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'flex-end' },
+  modalBackdrop: { flex: 1, backgroundColor: alpha('#000', 0.67), justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: C.border, maxHeight: '90%' },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },
   modalBtns: { flexDirection: 'row', gap: 12, marginTop: 22, alignItems: 'stretch' },
