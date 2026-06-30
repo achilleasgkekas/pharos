@@ -8,6 +8,25 @@ export type ReceiptLean = {
   lineItems?: unknown[]; filePath?: string; thumbPath?: string; updatedAt?: Date; deletedAt?: Date | null;
 };
 
+// Stored line-item shape (as persisted on the Receipt) and the normalized API shape.
+type LineLean = { name?: string; refinedName?: string; qty?: number; price?: number; vatRate?: number };
+export type ReceiptLine = { name: string; qty: number; price: number; vatRate: number };
+
+/**
+ * Normalize stored receipt line items into the API shape. `refinedName` (AI-cleaned)
+ * wins over the raw `name`; `price` is the stored unit NET. Shared by the receipt
+ * detail GET, the rescan POST, and the scan/receipt POST so all three return an
+ * identical lineItems shape.
+ */
+export function serializeLineItems(lines: unknown): ReceiptLine[] {
+  return ((lines ?? []) as LineLean[]).map((l) => ({
+    name: l.refinedName || l.name || '',
+    qty: l.qty ?? 1,
+    price: l.price ?? 0,
+    vatRate: l.vatRate ?? 0,
+  }));
+}
+
 export function trimReceipt(r: ReceiptLean) {
   return {
     id: String(r._id),

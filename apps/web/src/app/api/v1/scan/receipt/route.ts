@@ -3,7 +3,7 @@ import { withAuth } from '@/lib/apiAuth';
 import { connectDB } from '@/lib/db';
 import { Receipt } from '@/models/Receipt';
 import { uploadReceipt } from '@/app/receipts/actions';
-import { trimReceipt, type ReceiptLean } from '../../receipts/serialize';
+import { trimReceipt, serializeLineItems, type ReceiptLean } from '../../receipts/serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,12 +22,11 @@ export async function POST(req: NextRequest) {
     const doc = await Receipt.findById(r.id).select('-rawAiResponse').lean();
     if (!doc) return NextResponse.json({ receipt: { id: r.id, aiUsed: r.aiUsed } }, { status: 201 });
     const d = doc as ReceiptLean;
-    const lines = (d.lineItems ?? []) as { name?: string; refinedName?: string; qty?: number; price?: number; vatRate?: number }[];
     return NextResponse.json(
       {
         receipt: {
           ...trimReceipt(d),
-          lineItems: lines.map((l) => ({ name: l.refinedName || l.name || '', qty: l.qty ?? 1, price: l.price ?? 0, vatRate: l.vatRate ?? 0 })),
+          lineItems: serializeLineItems(d.lineItems),
           aiUsed: r.aiUsed,
           aiError: r.aiError ?? null,
         },
