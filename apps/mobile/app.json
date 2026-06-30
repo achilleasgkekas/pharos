@@ -30,7 +30,8 @@
     },
     "plugins": [
       "expo-secure-store",
-      ["expo-image-picker", { "cameraPermission": "Pharos uses the camera to scan products for your shopping list." }]
+      ["expo-image-picker", { "cameraPermission": "Pharos uses the camera to scan products for your shopping list." }],
+      ["expo-notifications", { "color": "#00ff88" }]
     ]
   }
 }
