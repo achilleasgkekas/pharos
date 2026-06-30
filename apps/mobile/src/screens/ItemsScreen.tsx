@@ -1,8 +1,156 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C } from '../theme';
 import { money, Spinner, ErrorText, Empty } from '../ui';
-import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, type Item } from '../api';
+import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, fileSource, type Item, type ItemDetail, type Verdict } from '../api';
+
+function verdictMeta(v: Verdict): { label: string; color: string } | null {
+  switch (v) {
+    case 'deal': return { label: 'Deal · at/below target', color: C.accent };
+    case 'dropping': return { label: '↓ Dropping', color: C.accent };
+    case 'rising': return { label: '↑ Rising · maybe wait', color: C.gold };
+    case 'good': return { label: 'Good price', color: C.cyan };
+    case 'high': return { label: 'Above usual', color: C.gold };
+    default: return null;
+  }
+}
+const clampPct = (n: number): DimensionValue => `${Math.max(0, Math.min(100, n))}%` as DimensionValue;
+
+/** Read-only price picture mirroring the web PricePanel: best-now + verdict, position bar,
+ *  where-to-buy (tap → open store), log-a-price, full history, photos, warranty, links. */
+function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () => void }) {
+  const p = detail.price;
+  const [logging, setLogging] = useState(false);
+  const [lprice, setLprice] = useState('');
+  const [lstore, setLstore] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [showHist, setShowHist] = useState(false);
+  const vm = verdictMeta(p.verdict);
+  const hasRange = p.lo != null && p.hi != null && p.hi > p.lo && p.bestNow != null;
+  const toGo = p.target != null && p.bestNow ? p.bestNow.price - p.target : null;
+  const open = (url: string) => Linking.openURL(url).catch(() => {});
+
+  async function submit() {
+    const v = parseFloat(lprice.replace(',', '.'));
+    if (!(v > 0)) return;
+    setBusy(true);
+    try { const r = await logItemPrice(detail.id, v, lstore.trim()); if (r.ok) { setLprice(''); setLstore(''); setLogging(false); onChanged(); } }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <View style={pb.wrap}>
+      {/* Hero best-now + verdict */}
+      <View style={pb.heroRow}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+          <Text style={pb.hero}>{p.bestNow ? money(p.bestNow.price) : '—'}</Text>
+          {!!p.bestNow?.store && <Text style={pb.heroAt}>at {p.bestNow.store}</Text>}
+        </View>
+        {p.trend !== 0 && (
+          <Text style={[pb.trend, { color: p.trend < 0 ? C.accent : C.gold }]}>
+            {p.trend < 0 ? '↓' : '↑'} {money(Math.abs(p.trend))}
+          </Text>
+        )}
+      </View>
+      {vm && <Text style={[pb.verdict, { color: vm.color }]}>{vm.label}</Text>}
+
+      {/* Position bar */}
+      {hasRange && (
+        <View style={{ marginTop: 12 }}>
+          <View style={pb.track}>
+            {p.target != null && p.target >= p.lo! && p.target <= p.hi! && (
+              <View style={[pb.tick, { left: clampPct(((p.target - p.lo!) / (p.hi! - p.lo!)) * 100) }]} />
+            )}
+            <View style={[pb.dot, { left: clampPct(((p.bestNow!.price - p.lo!) / (p.hi! - p.lo!)) * 100) }]} />
+          </View>
+          <View style={pb.scaleRow}>
+            <Text style={[pb.scale, { color: C.accent }]}>low {money(p.lo!)}</Text>
+            {p.target != null && <Text style={[pb.scale, { color: C.cyan }]}>target {money(p.target)}</Text>}
+            <Text style={pb.scale}>high {money(p.hi!)}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Where to buy */}
+      {p.stores.length > 0 && (
+        <View style={{ marginTop: 14 }}>
+          <Text style={pb.section}>WHERE TO BUY</Text>
+          {p.stores.slice(0, 5).map((st, i) => (
+            <Pressable key={i} onPress={() => open(st.url)} style={pb.storeRow}>
+              <View style={[pb.storeDot, { backgroundColor: i === 0 ? C.accent : C.faint }]} />
+              <Text style={pb.storeName} numberOfLines={1}>{st.store}</Text>
+              {i === 0 && p.stores.length > 1 && <Text style={pb.cheapest}>CHEAPEST</Text>}
+              <Text style={pb.storePrice}>{money(st.price)}</Text>
+              <Text style={pb.openIcon}>↗</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {/* Target + Log a price */}
+      <View style={pb.actionRow}>
+        {p.target != null ? (
+          <Text style={pb.targetTxt}>🎯 {money(p.target)}{toGo != null && (toGo <= 0 ? ' · reached' : ` · ${money(toGo)} to go`)}</Text>
+        ) : <View />}
+        {!logging && <Pressable onPress={() => setLogging(true)}><Text style={pb.logBtn}>＋ Log a price</Text></Pressable>}
+      </View>
+      {logging && (
+        <View style={pb.logRow}>
+          <TextInput value={lprice} onChangeText={setLprice} keyboardType="decimal-pad" placeholder="price" placeholderTextColor={C.faint} style={[pb.logInput, { width: 80 }]} />
+          <TextInput value={lstore} onChangeText={setLstore} placeholder="store" placeholderTextColor={C.faint} style={[pb.logInput, { flex: 1 }]} />
+          <Pressable onPress={submit} disabled={busy || !(parseFloat(lprice.replace(',', '.')) > 0)} style={[pb.logSave, (busy || !(parseFloat(lprice.replace(',', '.')) > 0)) && { opacity: 0.4 }]}>
+            {busy ? <ActivityIndicator color="#000" /> : <Text style={pb.logSaveText}>Save</Text>}
+          </Pressable>
+        </View>
+      )}
+
+      {/* Full history */}
+      {detail.priceHistory.length > 0 && (
+        <View style={{ marginTop: 12 }}>
+          <Pressable onPress={() => setShowHist((h) => !h)}><Text style={pb.histToggle}>{showHist ? '▾' : '▸'} Full history · {detail.priceHistory.length}</Text></Pressable>
+          {showHist && detail.priceHistory.slice(0, 30).map((e, i) => (
+            <View key={i} style={pb.histRow}>
+              <Text style={pb.histPrice}>{money(e.price)}</Text>
+              <Text style={pb.histStore} numberOfLines={1}>{e.store}</Text>
+              <Text style={pb.histDate}>{new Date(e.date).toLocaleDateString('en-GB')}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Photos */}
+      {detail.photos.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 14 }}>
+          {detail.photos.slice(0, 8).map((ph, i) => (
+            <Image key={i} source={fileSource(ph)} style={pb.photo} />
+          ))}
+        </ScrollView>
+      )}
+
+      {/* Links (non-priced too) */}
+      {detail.links.length > 0 && (
+        <View style={{ marginTop: 14 }}>
+          <Text style={pb.section}>LINKS</Text>
+          {detail.links.slice(0, 8).map((l, i) => (
+            <Pressable key={i} onPress={() => open(l.url)} style={pb.linkRow}>
+              <Text style={pb.linkLabel} numberOfLines={1}>{l.label || l.url}</Text>
+              <Text style={pb.openIcon}>↗</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {/* Warranty / purchase */}
+      {(detail.warrantyUntil || detail.purchasedFrom || detail.location) && (
+        <View style={{ marginTop: 14, gap: 4 }}>
+          {!!detail.warrantyUntil && <Text style={pb.meta}>🛡 Warranty until {new Date(detail.warrantyUntil).toLocaleDateString('en-GB')}</Text>}
+          {!!detail.purchasedFrom && <Text style={pb.meta}>🧾 Bought from {detail.purchasedFrom}</Text>}
+          {!!detail.location && <Text style={pb.meta}>📍 {detail.location}</Text>}
+        </View>
+      )}
+    </View>
+  );
+}
 
 const FILTERS: { key: 'all' | 'inventory' | 'shopping'; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -63,6 +211,14 @@ export function ItemsScreen() {
   const [eTarget, setETarget] = useState('');
   const [eSpecs, setESpecs] = useState('');
   const [saving, setSaving] = useState(false);
+  const [detail, setDetail] = useState<ItemDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const loadDetail = useCallback(async (id: string) => {
+    setDetailLoading(true);
+    try { setDetail(await getItem(id)); } catch { setDetail(null); }
+    finally { setDetailLoading(false); }
+  }, []);
 
   function openEdit(it: Item) {
     setEditing(it);
@@ -72,6 +228,8 @@ export function ItemsScreen() {
     setEPrice(it.currentPrice ? String(it.currentPrice) : '');
     setETarget(it.targetPrice != null ? String(it.targetPrice) : '');
     setESpecs(it.specs || '');
+    setDetail(null);
+    loadDetail(it.id);
   }
   async function saveEdit() {
     if (!editing) return;
@@ -139,6 +297,8 @@ export function ItemsScreen() {
           <Pressable style={s.modal} onPress={() => {}}>
             <ScrollView keyboardShouldPersistTaps="handled">
               <Text style={s.modalTitle}>Edit item</Text>
+              {detailLoading && <ActivityIndicator color={C.accent} style={{ marginVertical: 14 }} />}
+              {detail && <PriceBlock detail={detail} onChanged={async () => { if (editing) await loadDetail(editing.id); await load(); }} />}
               <Text style={s.mlabel}>TITLE</Text>
               <TextInput value={eTitle} onChangeText={setETitle} style={s.minput} placeholderTextColor={C.faint} />
               <Text style={s.mlabel}>STATUS</Text>
@@ -213,4 +373,41 @@ const s = StyleSheet.create({
   saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
   delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
   delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
+});
+
+const pb = StyleSheet.create({
+  wrap: { marginTop: 14, padding: 14, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 14 },
+  heroRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  hero: { color: C.text, fontSize: 30, fontWeight: '800' },
+  heroAt: { color: C.dim, fontSize: 12, marginBottom: 4 },
+  trend: { fontSize: 13, fontWeight: '700' },
+  verdict: { fontSize: 12, fontWeight: '700', marginTop: 4 },
+  track: { height: 6, borderRadius: 3, backgroundColor: C.borderLight, position: 'relative', justifyContent: 'center' },
+  dot: { position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: C.text, borderWidth: 2, borderColor: C.surface, marginLeft: -6 },
+  tick: { position: 'absolute', width: 2, height: 12, backgroundColor: C.cyan, marginLeft: -1 },
+  scaleRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  scale: { color: C.faint, fontSize: 10 },
+  section: { color: C.faint, fontSize: 10, letterSpacing: 1, marginBottom: 7 },
+  storeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.surface, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 9, marginBottom: 6 },
+  storeDot: { width: 6, height: 6, borderRadius: 3 },
+  storeName: { flex: 1, color: C.dim, fontSize: 13 },
+  cheapest: { color: C.accent, fontSize: 9, fontWeight: '800' },
+  storePrice: { color: C.text, fontSize: 13, fontWeight: '700' },
+  openIcon: { color: C.cyan, fontSize: 13 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, flexWrap: 'wrap', gap: 8 },
+  targetTxt: { color: C.dim, fontSize: 12 },
+  logBtn: { color: C.accent, fontSize: 13, fontWeight: '600' },
+  logRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  logInput: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 14 },
+  logSave: { backgroundColor: C.accent, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9, alignItems: 'center', justifyContent: 'center' },
+  logSaveText: { color: '#000', fontSize: 13, fontWeight: '700' },
+  histToggle: { color: C.dim, fontSize: 12, fontWeight: '600' },
+  histRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.surface, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginTop: 6 },
+  histPrice: { color: C.text, fontSize: 13, fontWeight: '700' },
+  histStore: { flex: 1, color: C.dim, fontSize: 12 },
+  histDate: { color: C.faint, fontSize: 11 },
+  photo: { width: 72, height: 72, borderRadius: 10, marginRight: 8, backgroundColor: C.surface },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
+  linkLabel: { flex: 1, color: C.cyan, fontSize: 13 },
+  meta: { color: C.dim, fontSize: 12 },
 });

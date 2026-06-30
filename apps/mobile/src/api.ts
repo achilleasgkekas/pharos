@@ -119,6 +119,19 @@ export type ReceiptSummary = { id: string; store: string; date: string | null; t
 export type ReceiptLine = { name: string; qty: number; price: number; vatRate: number };
 export type ReceiptDetail = ReceiptSummary & { subtotal: number; vatAmount: number; paymentMethod: string; warrantyMonths: number; notes: string; lineItems: ReceiptLine[] };
 export type Item = { id: string; num: string; title: string; status: string; category: string; currentPrice: number; purchasedPrice: number | null; targetPrice: number | null; specs: string; warrantyUntil: string | null; tags: string[]; photo: string | null };
+export type ItemLink = { label: string; url: string; price: number | null };
+export type PriceEntry = { price: number; store: string; date: string };
+export type PriceStore = { store: string; url: string; price: number };
+export type Verdict = 'deal' | 'dropping' | 'rising' | 'good' | 'high' | 'none';
+export type PriceStatus = {
+  bestNow: { price: number; store: string; url: string | null } | null;
+  lo: number | null; hi: number | null; target: number | null; trend: number;
+  verdict: Verdict; stores: PriceStore[];
+};
+export type ItemDetail = Item & {
+  notes: string; purchasedFrom: string; purchasedAt: string | null; location: string; serialNumber: string;
+  links: ItemLink[]; priceHistory: PriceEntry[]; photos: string[]; price: PriceStatus;
+};
 
 // ---- Tasks ----
 export async function getTasks(status?: string): Promise<Task[]> {
@@ -170,6 +183,12 @@ export async function getItems(status: 'shopping' | 'inventory' | 'all' = 'all')
 }
 export function createItem(data: { title: string; status?: string; category?: string; currentPrice?: number }) {
   return request<{ item: Item }>('/api/v1/items', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function getItem(id: string): Promise<ItemDetail> {
+  return (await request<{ item: ItemDetail }>(`/api/v1/items/${id}`)).item;
+}
+export function logItemPrice(id: string, price: number, store: string) {
+  return request<{ ok: boolean; error?: string }>(`/api/v1/items/${id}/price`, { method: 'POST', body: JSON.stringify({ price, store }) });
 }
 
 // ---- Files (bearer-protected). RN <Image> can attach the auth header via source.headers. ----
