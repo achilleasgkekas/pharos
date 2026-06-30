@@ -3,8 +3,16 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
-<!-- docker-validated: 1d2a9be -->
+<!-- docker-validated: 62dc4bf -->
 <!-- reviewed: af7fdc5 -->
+
+## 2026-06-30 (docker-health guard — rebuild + validate 62dc4bf)
+- Υγεία πριν: mongo **healthy** (Up 11min, RestartCount 34 = ιστορικό OOM από παλιά builds, όχι τρέχον loop), web **running** RestartCount 0, flaresolverr **exited** (το άφησα σταματημένο), searxng running. Κανένα restart-loop, κανένα OOM τώρα.
+- Disk: `docker system df` → Images 3.49GB, Build Cache 565MB (μικρό). Καμία πίεση.
+- Απόφαση rebuild: το diff `1d2a9be..HEAD` άγγιζε web runtime κώδικα (`apps/web/src/app/api/v1/statements/plans/route.ts`, ο builder είχε ενσωματώσει το νέο installment-plans route μετά το τελευταίο validated marker) → rebuild δικαιολογημένο.
+- Ασφαλές rebuild: `docker compose build web` (image μόνο, layers CACHED → γρήγορο) → επιβεβαίωσα mongo healthy → `docker compose up -d web` (recreated, mongo waited healthy πρώτα) → `curl /login` = **200** στην 1η προσπάθεια → web RestartCount παρέμεινε **0** (δεν ανέβηκε) → `docker builder prune -f` (3.15MB reclaimed, σχεδόν όλα cached).
+- Αποτέλεσμα: stack υγιές, /login 200, marker `1d2a9be → 62dc4bf`.
+- Needs Achilleas: κανένα νέο. (Παραμένει: bump RAM στο Docker VM — το mongo RestartCount 34 αντανακλά επαναλαμβανόμενα OOM σε παρελθόντα builds, αν και αυτό το build πέρασε καθαρά λόγω cache.)
 
 ## Κανόνες (μην τους σπάσεις)
 - Stage ΜΟΝΟ όσα άλλαξες, με explicit `git add <path>`. ΠΟΤΕ `git add -A` / `.` / `commit -a` (το working tree έχει συχνά parallel uncommitted αλλαγές του Αχιλλέα).
