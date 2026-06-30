@@ -2,6 +2,12 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+## 2026-06-30 (docker-health guard — υγιές, χωρίς rebuild)
+- **Health**: mongo `healthy` (RestartCount 34 cumulative αλλά up ~2h σταθερό, μηδέν loop), web RestartCount **0** (up ~2h), `/login` → **200**. flaresolverr **σταματημένο** (καλό, μηδέν memory pressure). searxng up (κανονικό μέρος του default stack).
+- **Disk**: `docker system df` → Images 3.49GB, Build Cache 565.7MB (0 active/όλα reclaimable), Containers 78.8MB reclaimable. `docker builder prune -f` → ανέκτησε **0B** (το cache ήταν in-use layers του running image, τίποτα ορφανό).
+- **Rebuild απόφαση**: `git diff --name-only 62dc4bf..HEAD -- apps/web` → **0 αρχεία**. Το gap (`62dc4bf..d897698`) είναι μόνο mobile (`ActivityScreen`/`SettingsScreen`/`theme.ts`) + docs (PROGRESS/STATUS/WEB_DEBT/MOBILE_PARITY). **Δεν χρειάστηκε rebuild** — μόνο επιβεβαίωση υγείας.
+- Marker `62dc4bf → d897698`. Staged ΜΟΝΟ `PROGRESS.md`. Μηδέν Docker mutation πέρα από safe cache prune, μηδέν AI job, μηδέν secret. **Needs Achilleas: κανένα.**
+
 ## 2026-06-30 (reviewer — range af7fdc5..362efc5 clean, theme-token refactor verified)
 - Εύρος: `af7fdc5..362efc5` (8 commits· 7 docs/monitor/docker, **1 code**: `362efc5` mobile theme tokens). Read-only review + αμφότερα type-checks.
 - **Type-checks**: `apps/web` `npm run type-check` → **EXIT 0**· `apps/mobile` `npx tsc --noEmit` → **EXIT 0**. Καμία διόρθωση χρειάστηκε.
@@ -21,7 +27,7 @@
 - Needs Achilleas: κανένα νέο. (Παραμένουν: response-envelope standardization σε ΟΛΑ τα endpoints = breaking change που θέλει συντονισμό με mobile· zod-first σε νέα routes· Docker VM RAM bump.)
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
-<!-- docker-validated: 62dc4bf -->
+<!-- docker-validated: d897698 -->
 <!-- reviewed: 362efc5 -->
 
 ## 2026-06-30 (parity-auditor — re-audit Build Queue από τον κώδικα, read-only)
