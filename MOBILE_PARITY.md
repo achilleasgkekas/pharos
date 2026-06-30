@@ -154,11 +154,12 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ### Expenses/Income — full-field edit
 - Priority: P3 | Size: S | no AI
 - Web ref: updateExpense full fields (file: apps/web/src/app/expenses/actions.ts)
-- API: PATCH /api/v1/expenses/[id] (exists: yes) — δέχεται ήδη date/period/recurring/recurringCycle/paymentMethod/notes
-- Mobile files: apps/mobile/src/screens/MoneyScreen.tsx (το edit modal να καλύπτει date, period, recurring toggle + cycle, payment, notes — όχι μόνο vendor/amount/category)
+- API: PATCH /api/v1/expenses/[id] (exists: PARTIAL) — δέχεται ΜΟΝΟ vendor/amount/category/kind/notes/date (apps/web/src/app/api/v1/expenses/[id]/route.ts:17-22). ⚠ ΛΕΙΠΟΥΝ period/recurring/recurringCycle/paymentMethod → ο builder πρέπει ΠΡΩΤΑ να επεκτείνει το PATCH (mirror του web `updateExpense`: `set.period`, `set.recurring`=bool, `set.recurringCycle` enum-guarded, `set.paymentMethod`) πριν τα δείξει στο mobile.
+- Mobile files: apps/mobile/src/api.ts (`updateExpense` signature += period/recurring/recurringCycle/paymentMethod), apps/mobile/src/screens/MoneyScreen.tsx (το `openEdit`/`saveEdit` καλύπτουν μόνο vendor/amount/category → πρόσθεσε date, period, recurring toggle + cycle picker, payment, notes)
 - Acceptance:
+  - PATCH /api/v1/expenses/[id] δέχεται πλέον period/recurring/recurringCycle/paymentMethod (enum-guarded cycle)· no-token → 401· bad id → 400
   - Edit modal αποθηκεύει date/period/recurring/cycle/payment/notes· reflect μετά το reload
-  - tsc καθαρό (mobile)
+  - tsc καθαρό (web + mobile)
 - Status: TODO
 
 ### Items — AI specs / AI-fill info

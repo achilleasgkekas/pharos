@@ -204,6 +204,19 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
   3. **GET /api/v1/items → listEnvelope alignment** (P2/S, api) — 6 endpoints γυρνούν `{data}`, μόνο items γυρνά `{items}`· χρειάζεται συντονισμένο update στο `apps/mobile/src/api.ts`.
 - Staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (όχι `-A`). Καμία αλλαγή σε app code/secrets/.env.
 
+## 2026-06-30 (parity-auditor — επανέλεγχος Build Queue από τον κώδικα)
+- Read-only audit web↔mobile. Μηδέν app code, μηδέν Docker, μηδέν AI. mobile `npx tsc --noEmit` → **EXIT 0** (καθαρό· κανένα type error προς flag ως P1).
+- Inventory: **44 v1 routes** (login + 43 bearer), **16 mobile screens**. Επαλήθευσα από τον κώδικα ότι και τα **6 items του Build Queue παραμένουν γνήσια gaps** (η προηγούμενη audit cont.¹² ήταν ίδιας μέρας + thorough, οπότε το queue ήταν ήδη σωστά ranked):
+  - `GET /api/v1/statements/plans` → ΔΕΝ υπάρχει (μόνο `statements/route.ts` + `statements/[id]/route.ts`) → **P1/M valid TODO**.
+  - `POST /api/v1/receipts/[id]/rescan` → ΔΕΝ υπάρχει → **P2/M valid TODO** (AI cost).
+  - `POST /api/v1/items/[id]/convert-to-task` → ΔΕΝ υπάρχει· η web action `convertItemToTask` υπάρχει (`items/actions.ts:649`) → **P3/S valid TODO**.
+  - Notifications badge: `nav.tsx` δεν έχει bell/badge· `GET /api/v1/notifications` υπάρχει + το mobile `api.ts` το καλεί ήδη (`getNotifications`/`markNotificationRead`) → **P3/S valid TODO**.
+  - `POST /api/v1/items/[id]/ai-fill` → ΔΕΝ υπάρχει → **P3/M valid TODO** (AI cost).
+- **Διόρθωσα ΕΝΑ stale spec** στο Build Queue: το «Expenses/Income full-field edit» έλεγε «API exists: yes — δέχεται ήδη period/recurring/recurringCycle/paymentMethod». Λάθος: το `PATCH /api/v1/expenses/[id]` (route.ts:17-22) δέχεται **ΜΟΝΟ** vendor/amount/category/kind/notes/date. Ενημέρωσα σε «exists: PARTIAL» + ο builder πρέπει ΠΡΩΤΑ να επεκτείνει το PATCH (period/recurring/recurringCycle/paymentMethod) πριν τα δείξει. Το mobile `openEdit` ούτως ή άλλως καλύπτει μόνο vendor/amount/category (MoneyScreen.tsx:84).
+- **Σύνολο: πυρήνας parity κλειστός (μηδέν P1/S), 6 GAP στο queue, 0 νέα NEEDS DECISION** (τα υπάρχοντα Needs-Achilleas — theme/i18n/AI-engine settings/push creds/Docker RAM — μένουν ως έχουν).
+- **Top 3 για τον builder (αμετάβλητα):** (1) Statements installment-plan overview [P1/M, no AI], (2) Receipts re-scan OCR/text [P2/M, AI cost → δομικό verify], (3) Items convert-to-task [P3/S, no AI].
+- Staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (όχι `-A`). Καμία αλλαγή σε app code/secrets/.env.
+
 ## Needs Achilleas
 - **Ευρεία response-envelope standardization**: τα mutation/single endpoints γυρνούν ad-hoc keys (`{item}`/`{expense}`/`{task}`/`{ok,id}`/`{receipt}`/`{cards}`/`{lists}`/`{hits}`…) αντί ενιαίου `{data}`. Η ενοποίηση είναι breaking change που συντονίζεται με το mobile (`apps/mobile/src/api.ts`) → product/API-versioning απόφαση, ΔΕΝ μπήκε στο queue. Πες αν θες να το ανοίξω σταδιακά (ένα resource/run).
 - **Zod σε όλο το `/api/v1`**: μηδέν zod στα routes (manual `as Record<string,unknown>` + coercion, που είναι προσεκτικό αλλά verbose). Το project χρησιμοποιεί zod αλλού. Πλήρες migration = large/sprawling → δεν το πρότεινα· έβαλα μόνο μικρό P3 για shared coercion helpers + απόφαση αν θες zod-first σε νέα routes.
