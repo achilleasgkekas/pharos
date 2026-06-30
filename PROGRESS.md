@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 82fbb58 -->
-<!-- docker-validated: 2a13b65 -->
+<!-- docker-validated: 18c18e6 -->
+
+## 2026-07-01 (docker-health guard — safe rebuild, stack healthy)
+- **Health (read-only):** mongo `healthy` (Up 2h, RestartCount 43 ιστορικό σωρευτικό αλλά σταθερό, κανένα active loop), web `running` RestartCount 0, searxng up. flaresolverr ήδη `Exited (143)` εδώ και 29h (σβηστό, καμία RAM πίεση). ΣΗΜ: αυτή η Docker έκδοση δεν έχει `.State.RestartCount` στο template map → χρήση top-level `{{.RestartCount}}`.
+- **Disk:** `docker system df` πριν → Images 3.49GB, Build Cache 565.9MB (0B reclaimable, active). `docker builder prune -f` → 3.18MB reclaimed (cache ήταν ήδη fresh/active). VM άνετο, καμία πίεση.
+- **Rebuild:** marker `2a13b65` → diff `2a13b65..HEAD` σε `apps/web` άγγιξε runtime code (4 route files, το `serializeLineItems` refactor `6a5809a`) → δικαιολογημένο safe rebuild. Δικός dance: `docker compose build web` (όλα CACHED, image built) → επιβεβαίωση mongo `healthy` → `docker compose up -d web` (recreated) → `/login` **200** → web RestartCount **0** (δεν ανέβηκε) → `docker builder prune -f`. Κανένα `up --build`, κανένα destructive.
+- **Marker:** docker-validated `2a13b65` → **`18c18e6`** (HEAD). Τα ενδιάμεσα commits (82fbb58/81fe0ed/75780b8 docs + 6a5809a code) πλέον validated.
+- **Needs Achilleas:** κανένα. Stack υγιές, build πράσινο, serving 200.
 
 ## 2026-07-01 (reviewer — range fbda2b3..82fbb58, καθαρό)
 - **Εύρος:** 8 commits μετά το τελευταίο review marker (fbda2b3). 7 docs/progress (audits/monitor/parity), **1 code** (`6a5809a` refactor: shared `serializeLineItems` helper).
