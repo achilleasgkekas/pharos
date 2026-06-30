@@ -4,6 +4,8 @@ import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
 import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription } from '../api';
 
+const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
+
 export function SubscriptionsScreen() {
   const [rows, setRows] = useState<Subscription[]>([]);
   const [name, setName] = useState('');
@@ -14,6 +16,8 @@ export function SubscriptionsScreen() {
   const [editing, setEditing] = useState<Subscription | null>(null);
   const [eName, setEName] = useState('');
   const [eAmount, setEAmount] = useState('');
+  const [eCycle, setECycle] = useState('monthly');
+  const [eRenewal, setERenewal] = useState('');
   const [eActive, setEActive] = useState(true);
 
   const load = useCallback(async () => {
@@ -46,13 +50,30 @@ export function SubscriptionsScreen() {
       { text: 'Delete', style: 'destructive', onPress: async () => { setRows((p) => p.filter((x) => x.id !== it.id)); try { await deleteSubscription(it.id); } catch { await load(); } } },
     ]);
   }
-  function openEdit(it: Subscription) { setEditing(it); setEName(it.name); setEAmount(String(it.amount)); setEActive(it.active); }
+  function openEdit(it: Subscription) {
+    setEditing(it); setEName(it.name); setEAmount(String(it.amount));
+    setECycle(it.billingCycle || 'monthly');
+    setERenewal(it.nextRenewal ? it.nextRenewal.slice(0, 10) : '');
+    setEActive(it.active);
+  }
   async function saveEdit() {
     if (!editing) return;
     const a = parseFloat(eAmount.replace(',', '.'));
     const id = editing.id;
+    // nextRenewal: valid YYYY-MM-DD → send; blank/malformed → omit (the API ignores falsy values)
+    const r = eRenewal.trim();
+    const renewal = /^\d{4}-\d{2}-\d{2}$/.test(r) && !Number.isNaN(new Date(r).getTime()) ? r : undefined;
     setEditing(null);
-    try { await updateSubscription(id, { name: eName.trim(), amount: Number.isFinite(a) ? a : undefined, active: eActive }); await load(); } catch (e) { setErr((e as Error).message); }
+    try {
+      await updateSubscription(id, {
+        name: eName.trim(),
+        amount: Number.isFinite(a) ? a : undefined,
+        billingCycle: eCycle,
+        nextRenewal: renewal,
+        active: eActive,
+      });
+      await load();
+    } catch (e) { setErr((e as Error).message); }
   }
 
   if (loading) return <Spinner />;
@@ -95,6 +116,16 @@ export function SubscriptionsScreen() {
             <TextInput value={eName} onChangeText={setEName} style={s.minput} placeholderTextColor={C.faint} />
             <Text style={s.mlabel}>AMOUNT</Text>
             <TextInput value={eAmount} onChangeText={setEAmount} keyboardType="decimal-pad" style={s.minput} placeholderTextColor={C.faint} />
+            <Text style={s.mlabel}>BILLING CYCLE</Text>
+            <View style={s.chipRow}>
+              {CYCLES.map((cy) => (
+                <Pressable key={cy} onPress={() => setECycle(cy)} style={[s.cChip, eCycle === cy && s.cChipOn]}>
+                  <Text style={[s.cChipText, eCycle === cy && s.cChipTextOn]}>{cy}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={s.mlabel}>NEXT RENEWAL</Text>
+            <TextInput value={eRenewal} onChangeText={setERenewal} autoCapitalize="none" autoCorrect={false} placeholder="YYYY-MM-DD" style={s.minput} placeholderTextColor={C.faint} />
             <Pressable onPress={() => setEActive((v) => !v)} style={s.toggle}>
               <View style={[s.tbox, eActive && s.tboxOn]}>{eActive && <Text style={s.tmark}>✓</Text>}</View>
               <Text style={s.tlabel}>Active</Text>
@@ -130,6 +161,11 @@ const s = StyleSheet.create({
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   minput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  cChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 9, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
+  cChipOn: { backgroundColor: C.accent, borderColor: C.accent },
+  cChipText: { color: C.dim, fontSize: 12, fontWeight: '600' },
+  cChipTextOn: { color: '#000' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
   tboxOn: { backgroundColor: C.accent, borderColor: C.accent },

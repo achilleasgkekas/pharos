@@ -48,7 +48,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Subscriptions (`/subscriptions`)
 | Web | Mobile |
 |-----|--------|
-| e-shop layout, **AI fill from name**, add/edit, cycle, next renewal | 🟡 list + add (name+amount, monthly) + delete; no edit, no AI fill |
+| e-shop layout, **AI fill from name**, add/edit, cycle, next renewal | ✅ list + add (name+amount, ✦ AI fill) + tap-to-edit (name, amount, **billing cycle picker**, **next renewal date**, active) + delete |
 
 ## Vouchers (`/vouchers`)
 | Web | Mobile |
