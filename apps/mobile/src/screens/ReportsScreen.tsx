@@ -48,6 +48,7 @@ export function ReportsScreen() {
   const cur = d?.currency || 'EUR';
   const monthMax = d ? Math.max(...d.monthly.map((m) => m.expense), 1) : 1;
   const catMax = d ? Math.max(...d.byCategory.map((c) => c.total), 1) : 1;
+  const instMax = d ? Math.max(...d.upcomingInstallments.map((u) => u.amount), 1) : 1;
   const mLabel = (p: string) => { const [, m] = p.split('-'); return ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][parseInt(m, 10)] || p; };
 
   return (
@@ -78,6 +79,13 @@ export function ReportsScreen() {
             <>
               <Text style={s.section}>BUDGET · THIS MONTH</Text>
               {d.budgets.map((b) => <BudgetBar key={b.category} category={b.category} spent={b.spent} limit={b.limit} cur={cur} />)}
+            </>
+          )}
+
+          {d.upcomingInstallments.some((u) => u.amount > 0) && (
+            <>
+              <Text style={s.section}>UPCOMING INSTALLMENTS · NEXT 6 MONTHS</Text>
+              {d.upcomingInstallments.map((u) => <Bar key={u.period} label={mLabel(u.period)} value={u.amount} max={instMax} cur={cur} color={C.purple} />)}
             </>
           )}
 

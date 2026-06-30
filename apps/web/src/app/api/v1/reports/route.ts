@@ -47,6 +47,18 @@ export async function GET(req: NextRequest) {
       net: Math.round(inventoryValue - installmentsOwed),
     };
     const now = new Date();
+
+    // ── Upcoming installment obligations (next 6 months). Mirrors web /reports. ──
+    const upcomingInstallments = [1, 2, 3, 4, 5, 6].map((n) => {
+      const d = new Date(now.getFullYear(), now.getMonth() + n, 1);
+      const amount = active
+        .filter((p) => p.remainingInstallments >= n)
+        .reduce((s, p) => s + p.perAmount, 0);
+      return {
+        period: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        amount: Math.round(amount),
+      };
+    });
     const thisYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const thisYear = String(now.getFullYear());
 
@@ -98,6 +110,7 @@ export async function GET(req: NextRequest) {
       byCategory,
       budgets,
       monthly,
+      upcomingInstallments,
     });
   });
 }

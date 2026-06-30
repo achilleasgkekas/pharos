@@ -328,6 +328,7 @@ export type Reports = {
   byCategory: { category: string; total: number }[];
   budgets: BudgetRow[];
   monthly: { period: string; expense: number; income: number }[];
+  upcomingInstallments: { period: string; amount: number }[];
 };
 export function getReports() { return request<Reports>('/api/v1/reports'); }
 
