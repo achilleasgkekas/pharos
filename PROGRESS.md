@@ -2,6 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+## 2026-06-30 (reviewer — range af7fdc5..362efc5 clean, theme-token refactor verified)
+- Εύρος: `af7fdc5..362efc5` (8 commits· 7 docs/monitor/docker, **1 code**: `362efc5` mobile theme tokens). Read-only review + αμφότερα type-checks.
+- **Type-checks**: `apps/web` `npm run type-check` → **EXIT 0**· `apps/mobile` `npx tsc --noEmit` → **EXIT 0**. Καμία διόρθωση χρειάστηκε.
+- **Diff review του `362efc5`** (`theme.ts` + `ActivityScreen.tsx` + `SettingsScreen.tsx`): καθαρό token refactor, μηδέν αλλαγή συμπεριφοράς/λογικής, μηδέν αλλαγή API shape (δεν αγγίζει το mobile↔web συμβόλαιο), μηδέν secrets.
+  - Επαλήθευσα την `alpha(hex, n)` helper αριθμητικά: σωστή 3→6-digit expansion, `parseInt(h,16)` + bitwise mask, επιστρέφει `rgba()` (έγκυρο σε RN StyleSheet).
+  - Επαλήθευσα **κάθε** μετατροπή 8-digit hex → `alpha()` ότι διατηρεί το χρώμα: `#00ff8814`=20/255≈.078→.08, `#00d4ff44`=68/255≈.267→.27, `#00d4ff0a`→.04, `#ff475740`=64/255≈.251→.25, `#ff475712`→.07, `#00d4ff0f`→.06, `#00d4ff33`=51/255=.2→.2, `#00ff8815`→.08, `#ffd93d50`=80/255≈.314→.31, `#ff475715`→.08, `#000000aa`=170/255≈.667→.67. Όλες ακριβείς (≤0.003 απόκλιση, μη ορατή).
+  - `#000`→`C.onAccent`, `#f5f5f5`→`C.text` swaps σωστά (ίδιες τιμές). `grep` επιβεβαίωσε: **κανένα 8-digit hex literal** δεν μένει στο `apps/mobile/src` (το commit claim ισχύει).
+- **Fixed**: τίποτα (δεν χρειάστηκε). **Flagged**: κανένα νέο εύρημα (regression/secret/shape-break). Οι υπάρχουσες ουρές (WEB_DEBT 0P1/3P2/2P3, MOBILE_PARITY 5 GAP) αμετάβλητες — οι docs commits του εύρους τις επιβεβαίωσαν read-only.
+- Staged ΜΟΝΟ `PROGRESS.md` (explicit path, όχι `-A`). Marker `af7fdc5 → 362efc5`. Κανένα Docker/AI job/secret.
+
 ## 2026-06-30 (web-code-quality auditor — re-confirm, 46 route files, read-only)
 - Re-audit ολόκληρης της `/api/v1` επιφάνειας (πλέον **46 route files**, +2 από το προηγ. run· τα νέα = additive όπως statements/plans) από τον κώδικα. Μηδέν app code, μηδέν Docker, μηδέν AI jobs. `npm run type-check` → **EXIT 0**.
 - **Counts ανά dimension**: Type safety **0** (grep για `any`/`as any`/`@ts-ignore`/`@ts-expect-error` στα v1 routes → NONE· tsc καθαρό). Auth **0** (μόνο `auth/login` εκτός `withAuth`, σωστά). Error handling **0** (uniform try/catch μέσω `withAuth`· κάθε body read `req.json().catch(()=>({}))`· μηδέν swallowed catch). Reads **0** (όλα τα list endpoints `.lean()` + pagination 1..200). Validation **2** (items POST line 64 `String(b.status||'researching')` χωρίς whitelist ενώ PATCH κάνει· shopping-list/[id] το ΜΟΝΟ [id] route χωρίς 24-hex guard + σιωπηλό `{ok:true}` σε not-found). Consistency **2** (GET /items μόνο του γυρνά `{items}` αντί `listEnvelope {data}`· repeated body-coercion). DB **1** (κανένα από τα synced models δεν έχει explicit `updatedAt` index — grep επιβεβαίωσε· είναι ο `withSince` sync cursor + sort key στα Item/Task).
@@ -12,7 +22,7 @@
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
 <!-- docker-validated: 62dc4bf -->
-<!-- reviewed: af7fdc5 -->
+<!-- reviewed: 362efc5 -->
 
 ## 2026-06-30 (parity-auditor — re-audit Build Queue από τον κώδικα, read-only)
 - Read-only audit web↔mobile από τον κώδικα (όχι docs). Μηδέν app code, μηδέν Docker, μηδέν AI jobs. Inventory: **45 v1 routes** (login + 44 bearer), **16 mobile screens**, **78** exported api fns.
