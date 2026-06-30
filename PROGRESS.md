@@ -30,6 +30,21 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
 <!-- docker-validated: d897698 -->
 <!-- reviewed: 362efc5 -->
 
+## 2026-06-30 (parity-auditor — 2η σάρωση ημέρας, re-confirm read-only)
+- Read-only re-audit web↔mobile από τον κώδικα (όχι docs). Μηδέν app code, μηδέν Docker, μηδέν AI jobs. Inventory: **46 v1 route files** (login + 45 bearer), **16 mobile screens**, **69** exported api fns.
+- mobile `npx tsc --noEmit` → **EXIT 0** (καθαρό → κανένα P1 type-gap).
+- **Endpoint coverage 1:1**: το mobile `api.ts` καταναλώνει ΚΑΘΕ υπάρχον v1 path (grep των paths ταιριάζει με το route list). Κανένα «web endpoint χωρίς mobile consumer» gap· ό,τι λείπει χρειάζεται **νέο/επεκταμένο** endpoint.
+- **Επαλήθευσα ξανά από directory listings + κώδικα και τα 5 GAP ως γνήσια:**
+  - Receipts re-scan (P2/M): `api/v1/receipts/[id]/` = {route.ts, add-to-library} → κανένα rescan → valid TODO (AI cost → δομικό verify).
+  - Items convert-to-task (P3/S): `api/v1/items/[id]/` = {route.ts, link-plan, plans, price} → κανένα convert-to-task → valid (no AI).
+  - Items AI specs (P3/M): ίδιο listing → κανένα ai-fill → valid (AI cost).
+  - Expenses/Income full-field edit (P3/S): `PATCH /api/v1/expenses/[id]` (route.ts:11-29) δέχεται ΜΟΝΟ vendor/amount/category/kind/notes/date → ΛΕΙΠΟΥΝ period/recurring/recurringCycle/paymentMethod → «PARTIAL» ισχύει (builder επεκτείνει ΠΡΩΤΑ το PATCH).
+  - Notifications unread badge (P3/S): pure-mobile UI· `GET /api/v1/notifications` υπάρχει+καταναλώνεται → valid.
+- **Από το προηγ. parity audit μόνο 1 code commit**: `362efc5` (mobile theme tokens) = UI-Debt item, ΟΧΙ parity → queue σωστά αμετάβλητο. Πυρήνας parity κλειστός (μηδέν P1/S· πρώην P1 statements overview = DONE).
+- **Σύνολο: 0 DONE-corrections, 5 GAP (1 P2 + 4 P3), 0 νέα NEEDS DECISION.**
+- **Top 3 για τον builder:** (1) Receipts re-scan OCR/text [P2/M, AI → δομικό verify], (2) Items convert-to-task [P3/S, no AI], (3) Expenses/Income full-field edit [P3/S, no AI — επέκταση PATCH πρώτα].
+- Staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (όχι `-A`). Καμία αλλαγή σε app code/secrets/.env.
+
 ## 2026-06-30 (parity-auditor — re-audit Build Queue από τον κώδικα, read-only)
 - Read-only audit web↔mobile από τον κώδικα (όχι docs). Μηδέν app code, μηδέν Docker, μηδέν AI jobs. Inventory: **45 v1 routes** (login + 44 bearer), **16 mobile screens**, **78** exported api fns.
 - mobile `npx tsc --noEmit` → **EXIT 0** (καθαρό· κανένα type error → κανένα P1 type-gap).
