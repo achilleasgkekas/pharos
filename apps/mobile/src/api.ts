@@ -263,6 +263,17 @@ export async function getStatementTxns(id: string): Promise<StatementTxn[]> {
   return (await request<{ transactions: StatementTxn[] }>(`/api/v1/statements/${id}`)).transactions ?? [];
 }
 
+// Installment-plan overview across all statements (one plan per purchase, cross-statement).
+export type InstallmentPlan = {
+  signature: string; label: string; card: string;
+  perAmount: number; totalInstallments: number; paidInstallments: number;
+  remainingInstallments: number; remainingAmount: number; totalAmount: number;
+  projectedEndDate: string; done: boolean; itemCount: number;
+};
+export async function getInstallmentPlans(): Promise<{ currency: string; plans: InstallmentPlan[] }> {
+  return request<{ currency: string; plans: InstallmentPlan[] }>('/api/v1/statements/plans');
+}
+
 // ---- App settings (preferences + this-month budgets) ----
 export type BudgetRow = { category: string; limit: number; spent: number };
 export type AppSettings = {

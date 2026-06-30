@@ -43,7 +43,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Statements (`/statements`)
 | Web | Mobile |
 |-----|--------|
-| PDF import, transactions, **installment plans** (compute, link to products, merge/bind, payoff), per-card outstanding, re-scan | 🟡 list + **detail με transactions** (sorted, amount, date, **per-charge installment badge** current/total) + totals (total/min/paid). No aggregated **installment-plan overview** (payoff/remaining/linked products), no merge/bind, no re-scan, no PDF import |
+| PDF import, transactions, **installment plans** (compute, link to products, merge/bind, payoff), per-card outstanding, re-scan | 🟡 list + **installment-plan overview** (cross-statement, active-first: label, card, €/mo, paid/total, €left, payoff month; done plans dimmed) + **detail με transactions** (sorted, amount, date, **per-charge installment badge** current/total) + totals (total/min/paid). No merge/bind, no re-scan, no PDF import |
 
 ## Subscriptions (`/subscriptions`)
 | Web | Mobile |
@@ -97,7 +97,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 2. ✅ **Tasks statuses** — todo/in-progress/blocked/done picker + status chips.
 3. ✅ **Receipt verify/edit** — edit fields + line items + ∑-items + verify + archive + add-to-library. *Remaining: re-scan (AI).*
 4. ✅ **AI fill** — subscription-from-name, voucher scan (paste+image), item URL import, expenses scan-a-bill.
-5. 🟡 **Statement transactions** — per-statement detail με transactions + per-charge installment badges ✅. *Remaining: aggregated installment-plan overview (payoff/linked products).*
+5. ✅ **Statement transactions** — per-statement detail με transactions + per-charge installment badges + **aggregated installment-plan overview** (cross-statement payoff, active-first). *Remaining: link plans to products / merge/bind (web overview write-ops).*
 6. 🟡 **Settings** — editable preferences (currency/VAT/warranty/auto-add), editable budgets, payment cards CRUD, stores CRUD, dropdown-lists editor, ntfy URL/enable/test ✅. *Remaining: theme toggle, language, AI engine, storage/OneDrive (βλ. Needs Achilleas).*
 7. ✅ **Activity** — Alerts (notification feed) + Trash (restore/purge) + Jobs + History.
 8. 🟡 **Push notifications** — in-app feed ✅· remote push pipeline buildable αλλά αδοκίμαστο (needs device + APNs).
@@ -118,7 +118,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - GET /api/v1/statements/plans no-token → 401· με token → `{currency, plans:[…]}` ομαδοποιημένα cross-statement (ίδια signature → ένα plan)
   - StatementsScreen δείχνει active plans πρώτα με remaining amount + projected payoff· done plans μετά (ή κρυμμένα)
   - Ποσά μέσω `money()` + το σωστό currency· tsc καθαρό (web + mobile)
-- Status: TODO
+- Status: DONE (2026-06-30) — `GET /api/v1/statements/plans` + StatementsScreen ListHeader «INSTALLMENT PLANS». Authed round-trip: 9 plans, 5 active-first, real data, read-only.
 
 ### Receipts — re-scan stored file (OCR/text) στο detail
 - Priority: P2 | Size: M | ⚠ AI cost → δομικό verify μόνο

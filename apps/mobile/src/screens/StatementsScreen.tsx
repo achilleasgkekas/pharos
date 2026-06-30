@@ -2,10 +2,18 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, Modal, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
-import { getStatements, getStatementTxns, type Statement, type StatementTxn } from '../api';
+import { getStatements, getStatementTxns, getInstallmentPlans, type Statement, type StatementTxn, type InstallmentPlan } from '../api';
+
+// "2028-10-01" → "Oct 2028" for payoff dates.
+const payoff = (iso: string) => {
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+};
 
 export function StatementsScreen() {
   const [rows, setRows] = useState<Statement[]>([]);
+  const [plans, setPlans] = useState<InstallmentPlan[]>([]);
+  const [planCur, setPlanCur] = useState('EUR');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -17,7 +25,12 @@ export function StatementsScreen() {
 
   const load = useCallback(async () => {
     setErr(null);
-    try { setRows(await getStatements()); } catch (e) { setErr((e as Error).message); }
+    try {
+      const [st, pl] = await Promise.all([getStatements(), getInstallmentPlans()]);
+      setRows(st);
+      setPlans(pl.plans);
+      setPlanCur(pl.currency);
+    } catch (e) { setErr((e as Error).message); }
   }, []);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
@@ -38,6 +51,29 @@ export function StatementsScreen() {
         keyExtractor={(r) => r.id}
         contentContainerStyle={{ padding: 16 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+        ListHeaderComponent={plans.length ? (
+          <View style={s.plansBox}>
+            <Text style={s.plansHead}>INSTALLMENT PLANS · {plans.filter((p) => !p.done).length} active</Text>
+            {plans.map((p) => (
+              <View key={p.signature} style={[s.plan, p.done && s.planDone]}>
+                <View style={s.planTop}>
+                  <Text style={s.planLabel} numberOfLines={1}>{p.label}{p.itemCount > 1 ? ` · ${p.itemCount} items` : ''}</Text>
+                  <Text style={[s.planAmt, p.done && s.planAmtDone]}>
+                    {p.done ? 'paid off' : `${money(p.remainingAmount, planCur)} left`}
+                  </Text>
+                </View>
+                <Text style={s.planMeta}>
+                  {[
+                    p.card,
+                    `${money(p.perAmount, planCur)}/mo`,
+                    `${p.paidInstallments}/${p.totalInstallments}`,
+                    p.done ? `${money(p.totalAmount, planCur)} total` : `ends ${payoff(p.projectedEndDate)}`,
+                  ].filter(Boolean).join('  ·  ')}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         ListEmptyComponent={<Empty>No statements.</Empty>}
         renderItem={({ item }) => (
           <Pressable onPress={() => openDetail(item)} style={s.card}>
@@ -100,6 +136,15 @@ export function StatementsScreen() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
+  plansBox: { marginBottom: 16 },
+  plansHead: { color: C.faint, fontSize: 10, letterSpacing: 1.4, fontWeight: '700', marginBottom: 8 },
+  plan: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 12, marginBottom: 8 },
+  planDone: { opacity: 0.6 },
+  planTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  planLabel: { color: C.text, fontSize: 14, fontWeight: '700', flex: 1 },
+  planAmt: { color: C.purple, fontSize: 14, fontWeight: '800' },
+  planAmtDone: { color: C.faint, fontWeight: '700' },
+  planMeta: { color: C.faint, fontSize: 12, marginTop: 5 },
   card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   card_: { color: C.text, fontSize: 15, fontWeight: '700' },
