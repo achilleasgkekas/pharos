@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C } from '../theme';
 import { money, Spinner, ErrorText, Empty } from '../ui';
-import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, fileSource, type Item, type ItemDetail, type Verdict } from '../api';
+import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
 function verdictMeta(v: Verdict): { label: string; color: string } | null {
   switch (v) {
@@ -146,6 +146,88 @@ function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () =
           {!!detail.warrantyUntil && <Text style={pb.meta}>🛡 Warranty until {new Date(detail.warrantyUntil).toLocaleDateString('en-GB')}</Text>}
           {!!detail.purchasedFrom && <Text style={pb.meta}>🧾 Bought from {detail.purchasedFrom}</Text>}
           {!!detail.location && <Text style={pb.meta}>📍 {detail.location}</Text>}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function monthLabel(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+}
+
+/** Link this item to a credit-card installment plan (δόσεις). A purchase paid monthly
+ *  shows up as one plan; attaching it surfaces payoff on the product. Mirror of the web
+ *  "Link a δόσεις plan" picker. Loads lazily on first expand. */
+function PlansBlock({ itemId }: { itemId: string }) {
+  const [open, setOpen] = useState(false);
+  const [plans, setPlans] = useState<InstallmentPlanRow[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try { const r = await getItemPlans(itemId); setPlans(r.plans); } catch { setPlans([]); }
+    finally { setLoading(false); }
+  }, [itemId]);
+
+  async function toggleOpen() {
+    const next = !open;
+    setOpen(next);
+    if (next && plans == null) await reload();
+  }
+  async function link(sig: string) {
+    setBusy(sig);
+    try { await linkItemPlan(itemId, sig); await reload(); } finally { setBusy(null); }
+  }
+  async function unlink(sig: string) {
+    setBusy(sig);
+    try { await unlinkItemPlan(itemId, sig); await reload(); } finally { setBusy(null); }
+  }
+
+  const linked = plans?.filter((p) => p.linked) ?? [];
+  const available = plans?.filter((p) => !p.linked) ?? [];
+
+  return (
+    <View style={pl.wrap}>
+      {/* Always show linked plans, even before the picker opens */}
+      {linked.map((p) => (
+        <View key={p.signature} style={pl.linkedRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={pl.linkedLabel} numberOfLines={1}>💳 {p.label}</Text>
+            <Text style={pl.linkedMeta}>
+              {money(p.perAmount)}/mo · {p.paidInstallments}/{p.totalInstallments}
+              {p.done ? ' · paid off' : ` · ${money(p.remainingAmount)} left`}
+            </Text>
+          </View>
+          <Pressable onPress={() => unlink(p.signature)} disabled={busy === p.signature} hitSlop={8}>
+            {busy === p.signature ? <ActivityIndicator color={C.red} size="small" /> : <Text style={pl.unlink}>✕</Text>}
+          </Pressable>
+        </View>
+      ))}
+
+      <Pressable onPress={toggleOpen}>
+        <Text style={pl.toggle}>{open ? '▾' : '▸'} Link an installment plan{plans ? ` · ${available.length} available` : ''}</Text>
+      </Pressable>
+
+      {open && (
+        <View style={{ marginTop: 8 }}>
+          {loading && <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />}
+          {!loading && available.length === 0 && <Text style={pl.empty}>No unlinked plans. Import a statement first.</Text>}
+          {available.map((p) => (
+            <Pressable key={p.signature} onPress={() => link(p.signature)} disabled={busy === p.signature} style={pl.availRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={pl.availLabel} numberOfLines={1}>{p.label}</Text>
+                <Text style={pl.availMeta}>
+                  {p.card} · {money(p.perAmount)}/mo · {p.paidInstallments}/{p.totalInstallments}
+                  {p.done ? ' · done' : ` · ends ${monthLabel(p.projectedEndDate)}`}
+                  {p.itemCount > 0 ? ` · ${p.itemCount} linked` : ''}
+                </Text>
+              </View>
+              {busy === p.signature ? <ActivityIndicator color={C.accent} size="small" /> : <Text style={pl.plus}>＋</Text>}
+            </Pressable>
+          ))}
         </View>
       )}
     </View>
@@ -299,6 +381,7 @@ export function ItemsScreen() {
               <Text style={s.modalTitle}>Edit item</Text>
               {detailLoading && <ActivityIndicator color={C.accent} style={{ marginVertical: 14 }} />}
               {detail && <PriceBlock detail={detail} onChanged={async () => { if (editing) await loadDetail(editing.id); await load(); }} />}
+              {editing && <PlansBlock itemId={editing.id} />}
               <Text style={s.mlabel}>TITLE</Text>
               <TextInput value={eTitle} onChangeText={setETitle} style={s.minput} placeholderTextColor={C.faint} />
               <Text style={s.mlabel}>STATUS</Text>
@@ -410,4 +493,18 @@ const pb = StyleSheet.create({
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
   linkLabel: { flex: 1, color: C.cyan, fontSize: 13 },
   meta: { color: C.dim, fontSize: 12 },
+});
+
+const pl = StyleSheet.create({
+  wrap: { marginTop: 12, padding: 14, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 14 },
+  toggle: { color: C.accent, fontSize: 13, fontWeight: '600' },
+  empty: { color: C.faint, fontSize: 12, fontStyle: 'italic', marginVertical: 6 },
+  linkedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.surface, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 9, marginBottom: 8 },
+  linkedLabel: { color: C.text, fontSize: 13, fontWeight: '600' },
+  linkedMeta: { color: C.faint, fontSize: 11, marginTop: 2 },
+  unlink: { color: C.red, fontSize: 15, fontWeight: '700', paddingHorizontal: 4 },
+  availRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: C.border, marginBottom: 6 },
+  availLabel: { color: C.dim, fontSize: 13, fontWeight: '600' },
+  availMeta: { color: C.faint, fontSize: 11, marginTop: 2 },
+  plus: { color: C.accent, fontSize: 18, fontWeight: '800', paddingHorizontal: 4 },
 });

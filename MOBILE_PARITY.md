@@ -20,7 +20,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 |-----|--------|
 | Grid/list, e-shop sidebar filters (status/store/category/sort/flags), select-mode + bulk AI fill | 🟡 list + All/Owned/Shopping filter |
 | Add item + **URL import** (fetch + AI parse → preview → approve), dedup | 🟡 add by title only (no URL import / AI) |
-| Item detail: specs, **PricePanel** (best price, where-to-buy, price position, log price, search online, full history chart), links, photos, warranty, purchase & payment, **link to installment plan**, AI specs, convert-to-task | 🟡 tap-to-edit (title, status, category, price, target, specs) + **PricePanel** (best-now + verdict, position bar low/target/high, where-to-buy tap→open store, log-a-price, full history, photos strip, links, warranty/purchase). No installment-plan link / AI specs / convert-to-task |
+| Item detail: specs, **PricePanel** (best price, where-to-buy, price position, log price, search online, full history chart), links, photos, warranty, purchase & payment, **link to installment plan**, AI specs, convert-to-task | 🟡 tap-to-edit (title, status, category, price, target, specs) + **PricePanel** (best-now + verdict, position bar low/target/high, where-to-buy tap→open store, log-a-price, full history, photos strip, links, warranty/purchase) + **link to installment plan** (linked δόσεις with payoff + unlink, collapsible picker of available plans → tap to attach). No AI specs / convert-to-task |
 | Delete | ✅ long-press delete |
 
 ## Shopping list (`/shopping-list`)

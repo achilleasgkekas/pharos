@@ -214,6 +214,23 @@ export function logItemPrice(id: string, price: number, store: string) {
   return request<{ ok: boolean; error?: string }>(`/api/v1/items/${id}/price`, { method: 'POST', body: JSON.stringify({ price, store }) });
 }
 
+// Installment (δόσεις) plans an item can be linked to.
+export type InstallmentPlanRow = {
+  signature: string; label: string; card: string;
+  perAmount: number; totalInstallments: number; paidInstallments: number;
+  remainingInstallments: number; remainingAmount: number; totalAmount: number;
+  projectedEndDate: string; done: boolean; itemCount: number; linked: boolean;
+};
+export async function getItemPlans(id: string): Promise<{ currency: string; plans: InstallmentPlanRow[] }> {
+  return request<{ currency: string; plans: InstallmentPlanRow[] }>(`/api/v1/items/${id}/plans`);
+}
+export function linkItemPlan(id: string, signature: string) {
+  return request<{ ok: boolean; linked: number }>(`/api/v1/items/${id}/link-plan`, { method: 'POST', body: JSON.stringify({ signature }) });
+}
+export function unlinkItemPlan(id: string, signature: string) {
+  return request<{ ok: boolean }>(`/api/v1/items/${id}/link-plan`, { method: 'DELETE', body: JSON.stringify({ signature }) });
+}
+
 // ---- Files (bearer-protected). RN <Image> can attach the auth header via source.headers. ----
 export function fileSource(path: string | null): { uri: string; headers?: Record<string, string> } | undefined {
   if (!path) return undefined;
