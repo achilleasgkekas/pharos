@@ -3,7 +3,7 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
-<!-- docker-validated: 516d25855c4587d89599f2f9ba09c56e06f8770e -->
+<!-- docker-validated: 1d2a9be -->
 
 ## Κανόνες (μην τους σπάσεις)
 - Stage ΜΟΝΟ όσα άλλαξες, με explicit `git add <path>`. ΠΟΤΕ `git add -A` / `.` / `commit -a` (το working tree έχει συχνά parallel uncommitted αλλαγές του Αχιλλέα).
@@ -154,6 +154,12 @@ Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` 
   3. **Items convert-to-task** (P3/S, no AI) — `convertItemToTask` υπάρχει ως web action (`apps/web/src/app/items/actions.ts:649`), λείπει endpoint + κουμπί.
   - Υπόλοιπα queue: notification unread-badge στο AppBar (P3/S), Expenses/Income full-field edit (P3/S), Items AI-specs (P3/M, AI cost).
 - Staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (όχι `-A`). Καμία αλλαγή σε app code/secrets/.env.
+
+## 2026-06-30 (docker-health guard)
+- Health (read-only): mongo **healthy** (RestartCount 32 = cumulative ιστορικό από παλιές OOMs, αλλά σταθερά up, ΟΧΙ restart-loop)· web **Up, RestartCount 0**, login HTTP **200**· flaresolverr ήδη Exited (σβηστό, καμία ενέργεια)· searxng up (κανονικό default stack).
+- Disk: build cache 2.58GB → **`docker builder prune -f`** (cache only) → 566MB, **~2.0GB reclaimed** (29→15 entries).
+- Rebuild: **ΟΧΙ**. Το concurrent dev-task είχε ήδη κάνει build+up το web runtime change (`a70909d` Reports upcoming-installments)· `git diff a70909d..HEAD -- apps/web/src` = κενό (τα επόμενα commits docs-only) → το τρέχον HEAD σερβίρεται ήδη validated (login 200, restarts 0). Marker set στο HEAD.
+- Race note: το dev-task έτρεχε παράλληλα όλο το run (HEAD eaab2e7 → a70909d → 6bdedd2 → 516d258 → 1d2a9be)· περίμενα να σταθεροποιηθεί το working tree πριν αγγίξω git. Staged ΜΟΝΟ PROGRESS.md.
 
 ## Needs Achilleas
 - **Mobile theme toggle (light/dark)**: το web έχει light theme· το mobile είναι dark-only με static `apps/mobile/src/theme.ts` (`C`). Buildable αλλά θέλει theme-context refactor σε όλες τις οθόνες (M-L) ΚΑΙ απόφαση αν θες καν light theme στο κινητό. Δεν μπήκε στο Build Queue (product decision).
