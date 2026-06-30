@@ -6,7 +6,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Navigation & shell
 | Web | Mobile |
 |-----|--------|
-| Top nav: grouped menus (Stuff/Money/Plan/Activity), central AI/Search bar, AI-online dot, theme toggle, language switcher, notification bell, settings, user menu | 🟡 Drawer menu (Stuff/Money/Plan + Activity + Search/AI/Settings/Sign out), AppBar (☰ + 🔍 + logo). No theme toggle, no language switcher, no notification-bell badge στο AppBar (το feed ζει στο Activity → Alerts) |
+| Top nav: grouped menus (Stuff/Money/Plan/Activity), central AI/Search bar, AI-online dot, theme toggle, language switcher, notification bell, settings, user menu | 🟡 Drawer menu (Stuff/Money/Plan + Activity + Search/AI/Settings/Sign out), AppBar (☰ + 🔍 + 🔔-με-badge + logo). No theme toggle, no language switcher. Notification-bell badge ✅ (unread count, tap → Activity → Alerts) |
 | Dark/light theme + 8-language i18n | ❌ dark only, English only |
 | Lighthouse logo / favicon / PWA | ✅ logo in-app + app icon + splash |
 
@@ -88,7 +88,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Notifications
 | Web | Mobile |
 |-----|--------|
-| In-app notification center (bell), ntfy push | 🟡 in-app feed ✅ (Activity → Alerts, με unread state). No bell-with-badge στο AppBar· remote push pipeline buildable αλλά αδοκίμαστο (χρειάζεται EAS dev build + APNs key) |
+| In-app notification center (bell), ntfy push | 🟡 in-app feed ✅ (Activity → Alerts, με unread state) + **bell-with-badge στο AppBar** (🔔 + κόκκινο unread count, tap → Activity/Alerts). Remote push pipeline buildable αλλά αδοκίμαστο (χρειάζεται EAS dev build + APNs key) |
 
 ---
 
@@ -151,7 +151,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Acceptance:
   - Badge δείχνει τον αριθμό unread· μηδέν unread → χωρίς badge
   - Tap → ανοίγει Activity (Alerts tab)· tsc καθαρό
-- Status: TODO
+- Status: DONE (2026-06-30) — AppBar 🔔 με κόκκινο badge (unread count, 99+ cap)· tap → `setScreen('activity')` (ActivityScreen default tab = alerts). App.tsx: `unread` state, `getNotifications().unread` poll κάθε 60s + refresh σε κάθε screen change (πιάνει το mark-read στο Activity). Καμία αλλαγή σε api.ts (`getNotifications` γυρνά ήδη `unread`). mobile tsc EXIT 0.
 
 ### Expenses/Income — full-field edit
 - Priority: P3 | Size: S | no AI

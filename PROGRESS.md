@@ -2,6 +2,15 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+## 2026-06-30 (builder — MOBILE_PARITY: Notifications unread badge στο AppBar, P3/S pure-mobile)
+- **Τι**: χτίστηκε το «Notifications — unread badge στο AppBar» (Build Queue P3/S, no AI, pure-mobile). Στην αρχή του run υπήρχαν παράλληλα uncommitted edits στην περιοχή items (`convert-to-task/route.ts` untracked + `api.ts` + `ItemsScreen.tsx` modified — όχι δικά μου, παράλληλο builder routine). Ο προηγούμενος builder είχε ρητά γράψει «αν τα items routes έχουν uncommitted edits, προτίμησε Notifications unread badge (pure-mobile, μηδέν web touch)» → ακριβώς αυτό επέλεξα ώστε να μην ακουμπήσω τη ζώνη conflict. (Ενδιάμεσα τα items edits έγιναν commit αλλού· στο τέλος του run το ενεργό παράλληλο WIP ήταν `shopping-list` — επίσης δεν το άγγιξα.)
+- **Mobile** (`src/nav.tsx`): το `AppBar` δέχεται πλέον `onBell?`/`unread?` props → νέο 🔔 Pressable (πριν το `PharosMark`) με κόκκινο badge (`C.red`, white-on-red `C.text`) που δείχνει τον unread count (cap `99+`)· κρύβεται όταν `unread===0`. Νέα styles `bellIcon`/`badge`/`badgeText` (absolute-positioned badge top-right του κουμπιού).
+- **Mobile** (`App.tsx`): νέο `unread` state· `refreshUnread` (useCallback) καλεί το υπάρχον `getNotifications()` (γυρνά ήδη `{items, unread}`, **καμία αλλαγή σε api.ts**) και θέτει το count· poll κάθε 60s όσο `authed` + refresh σε ΚΑΘΕ screen change (ώστε μετά το mark-read στο Activity→Alerts το badge να ενημερώνεται). `onBell={() => setScreen('activity')}` → η ActivityScreen ανοίγει default στο tab `alerts`. Reset σε 0 όταν unauthed.
+- **Verify**: `apps/mobile npx tsc --noEmit` → **EXIT 0** (με το παράλληλο WIP μέσα, καθαρό). Καμία αλλαγή σε web runtime → **κανένα Docker rebuild** (σωστά ανά βήμα 4: web diff κενό). Καμία κλήση AI/token. Mobile UI δεν auto-testable unattended (χωρίς simulator) → βασίστηκα σε tsc + code review (το `getNotifications` συμβόλαιο + ActivityScreen default tab επαληθεύτηκαν από τον κώδικα).
+- **Staged ΜΟΝΟ**: `apps/mobile/App.tsx`, `apps/mobile/src/nav.tsx`, `MOBILE_PARITY.md`, `PROGRESS.md` (explicit paths, όχι `-A`). ΔΕΝ άγγιξα τα παράλληλα `shopping-list/*` / items edits / secrets / `.env`.
+- **Επόμενο task**: Build Queue → **Receipts re-scan OCR/text** (P2/M, AI → δομικό verify μόνο: `POST /api/v1/receipts/[id]/rescan` port του `rescanReceipt` + ReceiptsScreen buttons· endpoint registered + no-token 401, ΧΩΡΙΣ πραγματικό AI scan). Εναλλακτικά, αν τα items routes είναι ελεύθερα, **Items convert-to-task** (αν δεν έχει ήδη γίνει commit από το παράλληλο routine).
+- Needs Achilleas: κανένα νέο.
+
 ## 2026-06-30 (builder — MOBILE_PARITY: Items convert-to-task, P3/S no-AI)
 
 - **Τι**: χτίστηκε το επόμενο καθαρό Build Queue item (το suggested-next του προηγ. builder run). Working tree ΚΑΘΑΡΟ στην αρχή (μηδέν παράλληλο WIP) → δεν χρειάστηκε αποφυγή περιοχής.

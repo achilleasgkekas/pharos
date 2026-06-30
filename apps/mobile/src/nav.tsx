@@ -9,12 +9,26 @@ const GROUPS: { title: string; items: { key: ScreenKey; label: string }[] }[] = 
   { title: 'Plan', items: [{ key: 'tasks', label: 'Tasks' }, { key: 'calendar', label: 'Calendar' }, { key: 'reports', label: 'Reports' }] },
 ];
 
-export function AppBar({ title, onMenu, onSearch }: { title: string; onMenu: () => void; onSearch?: () => void }) {
+export function AppBar({
+  title, onMenu, onSearch, onBell, unread = 0,
+}: {
+  title: string; onMenu: () => void; onSearch?: () => void; onBell?: () => void; unread?: number;
+}) {
   return (
     <View style={s.bar}>
       <Pressable onPress={onMenu} hitSlop={12} style={s.menuBtn}><Text style={s.menu}>☰</Text></Pressable>
       <Text style={s.title} numberOfLines={1}>{title}</Text>
       {onSearch && <Pressable onPress={onSearch} hitSlop={12} style={s.menuBtn}><Text style={s.searchIcon}>🔍</Text></Pressable>}
+      {onBell && (
+        <Pressable onPress={onBell} hitSlop={12} style={s.menuBtn}>
+          <Text style={s.bellIcon}>🔔</Text>
+          {unread > 0 && (
+            <View style={s.badge}>
+              <Text style={s.badgeText}>{unread > 99 ? '99+' : unread}</Text>
+            </View>
+          )}
+        </Pressable>
+      )}
       <PharosMark size={20} />
     </View>
   );
@@ -65,6 +79,9 @@ const s = StyleSheet.create({
   menuBtn: { width: 38, height: 36, alignItems: 'center', justifyContent: 'center' },
   menu: { color: C.text, fontSize: 22, lineHeight: 24 },
   searchIcon: { fontSize: 16 },
+  bellIcon: { fontSize: 16 },
+  badge: { position: 'absolute', top: 2, right: 0, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: C.red, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  badgeText: { color: C.text, fontSize: 10, fontWeight: '800', lineHeight: 12 },
   title: { flex: 1, color: C.text, fontSize: 19, fontWeight: '800' },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', flexDirection: 'row' },
   panel: { width: 270, maxWidth: '82%', backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border, paddingTop: 60, paddingHorizontal: 12, paddingBottom: 24 },

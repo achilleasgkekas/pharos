@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { View, ActivityIndicator, SafeAreaView, Platform, StatusBar as RNStatusBar, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { C } from './src/theme';
-import { loadSession, logout } from './src/api';
+import { loadSession, logout, getNotifications } from './src/api';
 import { registerForPush, unregisterForPush } from './src/push';
 import { AppBar, Drawer } from './src/nav';
 import { LoginScreen } from './src/screens/LoginScreen';
@@ -34,10 +34,24 @@ export default function App() {
   const [authed, setAuthed] = useState(false);
   const [screen, setScreen] = useState<ScreenKey>('home');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => { (async () => { setAuthed(await loadSession()); setReady(true); })(); }, []);
   // Register this device for push once authenticated (no-op in Expo Go / without EAS creds).
   useEffect(() => { if (authed) void registerForPush(); }, [authed]);
+
+  // Unread notification count for the AppBar bell badge.
+  const refreshUnread = useCallback(() => {
+    getNotifications().then((r) => setUnread(r.unread || 0)).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!authed) { setUnread(0); return; }
+    refreshUnread();
+    const t = setInterval(refreshUnread, 60000);
+    return () => clearInterval(t);
+  }, [authed, refreshUnread]);
+  // Re-check on screen change too (e.g. after marking alerts read in Activity).
+  useEffect(() => { if (authed) refreshUnread(); }, [screen, authed, refreshUnread]);
 
   if (!ready) {
     return <View style={s.splash}><StatusBar style="light" /><ActivityIndicator color={C.accent} /></View>;
@@ -73,7 +87,13 @@ export default function App() {
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="light" />
-      <AppBar title={TITLES[screen]} onMenu={() => setDrawerOpen(true)} onSearch={() => setScreen('search')} />
+      <AppBar
+        title={TITLES[screen]}
+        onMenu={() => setDrawerOpen(true)}
+        onSearch={() => setScreen('search')}
+        onBell={() => setScreen('activity')}
+        unread={unread}
+      />
       <View style={{ flex: 1 }}>{body()}</View>
       <Drawer
         open={drawerOpen}
