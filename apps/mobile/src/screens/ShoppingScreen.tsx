@@ -7,6 +7,7 @@ import { C } from '../theme';
 import {
   getShoppingList, addListItem, toggleListItem, deleteListItem, scanProduct, type ListItem, type ScannedProduct,
 } from '../api';
+import { Check } from '../ui';
 
 export function ShoppingScreen() {
   const [items, setItems] = useState<ListItem[]>([]);
@@ -99,7 +100,7 @@ export function ShoppingScreen() {
         ListEmptyComponent={<Text style={s.empty}>Your list is empty — add an item or scan a product.</Text>}
         renderItem={({ item }) => (
           <Pressable onPress={() => toggle(item)} onLongPress={() => remove(item)} style={s.row}>
-            <View style={[s.check, item.checked && s.checkOn]}>{item.checked && <Text style={s.checkMark}>✓</Text>}</View>
+            <Check checked={!!item.checked} />
             <View style={{ flex: 1 }}>
               {!!item.category && <Text style={s.eyebrow}>{item.category.toUpperCase()}</Text>}
               <Text style={[s.name, item.checked && s.struck]}>{item.name}{item.brand ? `  ·  ${item.brand}` : ''}</Text>
@@ -162,9 +163,6 @@ const s = StyleSheet.create({
   error: { color: C.red, fontSize: 13, marginTop: 10 },
   empty: { color: C.faint, fontSize: 14, textAlign: 'center', marginTop: 50 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginTop: 10 },
-  check: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
-  checkOn: { backgroundColor: C.accent, borderColor: C.accent },
-  checkMark: { color: '#000', fontSize: 15, fontWeight: '800' },
   eyebrow: { color: C.faint, fontSize: 10, letterSpacing: 1 },
   name: { color: C.text, fontSize: 15, fontWeight: '600' },
   struck: { textDecorationLine: 'line-through', color: C.dim },

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C } from '../theme';
-import { shortDate, Spinner, ErrorText, Empty } from '../ui';
+import { shortDate, Spinner, ErrorText, Empty, Check } from '../ui';
 import { getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, scanVoucherImage, type Voucher, type ParsedVoucherData } from '../api';
 
 type Draft = { title: string; code: string; store: string; discount: string; expiresAt: string; url: string; used: boolean };
@@ -151,7 +151,7 @@ export function VouchersScreen() {
               <TextInput value={form.url} onChangeText={(v) => setF('url', v)} autoCapitalize="none" keyboardType="url" placeholderTextColor={C.faint} style={s.minput} />
               {!isNew && (
                 <Pressable onPress={() => setF('used', !form.used)} style={s.toggle}>
-                  <View style={[s.tbox, form.used && s.tboxOn]}>{form.used && <Text style={s.tmark}>✓</Text>}</View>
+                  <Check checked={!!form.used} />
                   <Text style={s.tlabel}>Used</Text>
                 </Pressable>
               )}
@@ -217,9 +217,6 @@ const s = StyleSheet.create({
   photoBtn: { marginTop: 16, borderWidth: 1, borderColor: C.cyan, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   photoText: { color: C.cyan, fontSize: 15, fontWeight: '700' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
-  tbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
-  tboxOn: { backgroundColor: C.accent, borderColor: C.accent },
-  tmark: { color: '#000', fontSize: 15, fontWeight: '800' },
   tlabel: { color: C.text, fontSize: 15 },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
   save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },

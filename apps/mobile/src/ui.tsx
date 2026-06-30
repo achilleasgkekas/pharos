@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
-import { C } from './theme';
+import { C, SIZE } from './theme';
 
 export const CUR: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' };
 export const money = (n: number | undefined, cur = 'EUR') => `${CUR[cur] || cur + ' '}${(n ?? 0).toLocaleString()}`;
@@ -30,6 +30,19 @@ export function Empty({ children }: { children: React.ReactNode }) {
   return <Text style={s.empty}>{children}</Text>;
 }
 
+/**
+ * Shared checkbox visual (24×24 box + ✓ when checked). Display-only — wrap it
+ * in a Pressable for tap handling. When it IS the tap target, give the wrapping
+ * Pressable `hitSlop={10}` so the effective hit area is ≥44pt.
+ */
+export function Check({ checked }: { checked: boolean }) {
+  return (
+    <View style={[s.checkbox, checked && s.checkboxOn]}>
+      {checked ? <Text style={s.checkboxMark}>✓</Text> : null}
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, gap: 4 },
   backBtn: { width: 40, height: 36, alignItems: 'center', justifyContent: 'center' },
@@ -39,4 +52,7 @@ const s = StyleSheet.create({
   center: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   error: { color: C.red, fontSize: 13, marginVertical: 10, paddingHorizontal: 16 },
   empty: { color: C.faint, fontSize: 14, textAlign: 'center', marginTop: 50 },
+  checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
+  checkboxOn: { backgroundColor: C.accent, borderColor: C.accent },
+  checkboxMark: { color: C.onAccent, fontSize: SIZE.md, fontWeight: '800' },
 });

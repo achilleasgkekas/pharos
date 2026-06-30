@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal } from 'react-native';
 import { C, alpha } from '../theme';
-import { money, ErrorText } from '../ui';
+import { money, ErrorText, Check } from '../ui';
 import { PharosMark } from '../PharosMark';
 import { APP_VERSION } from '../config';
 import {
@@ -593,7 +593,7 @@ function Field({ label, value, onChange, keyboard }: { label: string; value: str
 function Toggle({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
   return (
     <Pressable onPress={onToggle} style={s.toggle}>
-      <View style={[s.tbox, on && s.tboxOn]}>{on && <Text style={s.tmark}>✓</Text>}</View>
+      <Check checked={!!on} />
       <Text style={s.tlabel}>{label}</Text>
     </Pressable>
   );
@@ -622,9 +622,6 @@ const s = StyleSheet.create({
   addChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9, borderWidth: 1, borderColor: C.cyan },
   addChipText: { color: C.cyan, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
-  tbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
-  tboxOn: { backgroundColor: C.accent, borderColor: C.accent },
-  tmark: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
   tlabel: { color: C.text, fontSize: 14 },
   budget: { marginBottom: 12 },
   budgetTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },

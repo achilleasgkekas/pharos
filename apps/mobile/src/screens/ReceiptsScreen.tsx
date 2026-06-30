@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, Image, Pressable, FlatList, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Check } from '../ui';
 import { getReceipts, getReceipt, scanReceipt, updateReceipt, addReceiptToLibrary, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
 
 type LineEdit = { name: string; qty: string; price: string; vatRate: string };
@@ -197,7 +197,7 @@ export function ReceiptsScreen() {
                 <TextInput value={eNotes} onChangeText={setENotes} multiline placeholder="optional" placeholderTextColor={C.faint} style={[s.einput, { minHeight: 56, textAlignVertical: 'top' }]} />
 
                 <Pressable onPress={() => setEVerified((v) => !v)} style={s.toggle}>
-                  <View style={[s.tbox, eVerified && s.tboxOn]}>{eVerified && <Text style={s.tmark}>✓</Text>}</View>
+                  <Check checked={!!eVerified} />
                   <Text style={s.tlabel}>Verified</Text>
                 </Pressable>
 
@@ -255,9 +255,6 @@ const s = StyleSheet.create({
   cellInput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 8, color: C.text, fontSize: 14 },
   lineGross: { color: C.dim, fontSize: 13, fontWeight: '600', paddingBottom: 9, minWidth: 56, textAlign: 'right' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
-  tbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
-  tboxOn: { backgroundColor: C.accent, borderColor: C.accent },
-  tmark: { color: '#000', fontSize: 15, fontWeight: '800' },
   tlabel: { color: C.text, fontSize: 15 },
   libBtn: { marginTop: 18, borderWidth: 1, borderColor: C.accent, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   libText: { color: C.accent, fontSize: 15, fontWeight: '700' },

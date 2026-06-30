@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
-import { Spinner, ErrorText, Empty } from '../ui';
+import { Spinner, ErrorText, Empty, Check } from '../ui';
 import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task } from '../api';
 
 const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
@@ -72,7 +72,7 @@ export function TasksScreen() {
           const done = item.status === 'done';
           return (
             <View style={s.row}>
-              <Pressable onPress={() => toggle(item)} hitSlop={8} style={[s.check, done && s.checkOn]}>{done && <Text style={s.mark}>✓</Text>}</Pressable>
+              <Pressable onPress={() => toggle(item)} hitSlop={10}><Check checked={!!done} /></Pressable>
               <Pressable onPress={() => openEdit(item)} style={{ flex: 1 }}>
                 <Text style={[s.title, done && s.struck]}>{item.title}</Text>
                 <View style={s.metaRow}>
@@ -119,9 +119,6 @@ const s = StyleSheet.create({
   addText: { color: '#000', fontSize: 24, fontWeight: '700' },
   dim: { opacity: 0.4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
-  check: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
-  checkOn: { backgroundColor: C.accent, borderColor: C.accent },
-  mark: { color: '#000', fontSize: 15, fontWeight: '800' },
   title: { color: C.text, fontSize: 15, fontWeight: '600' },
   struck: { textDecorationLine: 'line-through', color: C.dim },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 },
