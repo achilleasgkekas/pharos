@@ -1,8 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, ScrollView, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { shortDate, Spinner, ErrorText, Empty } from '../ui';
 import { getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, type Voucher } from '../api';
+
+type Draft = { title: string; code: string; store: string; discount: string; expiresAt: string; url: string; used: boolean };
+const EMPTY: Draft = { title: '', code: '', store: '', discount: '', expiresAt: '', url: '', used: false };
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ymd = (iso: string | null) => (iso ? iso.slice(0, 10) : '');
 
 export function VouchersScreen() {
   const [rows, setRows] = useState<Voucher[]>([]);
@@ -11,10 +16,11 @@ export function VouchersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [editing, setEditing] = useState<Voucher | null>(null);
-  const [eTitle, setETitle] = useState('');
-  const [eCode, setECode] = useState('');
-  const [eUsed, setEUsed] = useState(false);
+
+  // 'new' = creating a draft (no Used toggle, no Delete); a Voucher = editing.
+  const [editing, setEditing] = useState<Voucher | 'new' | null>(null);
+  const [form, setForm] = useState<Draft>(EMPTY);
+  const setF = (k: keyof Draft, v: string | boolean) => setForm((p) => ({ ...p, [k]: v }));
 
   const load = useCallback(async () => {
     setErr(null);
@@ -32,14 +38,19 @@ export function VouchersScreen() {
     setScanBusy(true); setErr(null);
     try {
       const d = await scanVoucherText(txt);
-      if (d.title) setTitle(d.title);
-      if (d.code) setCode(d.code);
+      // Open a draft prefilled with everything the AI found, for review before saving.
+      setForm({
+        title: d.title ?? title.trim(), code: d.code ?? code.trim(), store: d.store ?? '',
+        discount: d.discount ?? '', expiresAt: ymd(d.expiresAt ?? null), url: d.url ?? '', used: false,
+      });
+      setEditing('new');
       setShowScan(false); setScanText('');
     } catch (e) { setErr((e as Error).message); }
     finally { setScanBusy(false); }
   }
 
-  async function add() {
+  // Inline quick-add: title (+code) only.
+  async function quickAdd() {
     const t = title.trim();
     if (!t) return;
     setTitle(''); setCode('');
@@ -52,15 +63,29 @@ export function VouchersScreen() {
       { text: 'Delete', style: 'destructive', onPress: async () => { setRows((p) => p.filter((x) => x.id !== it.id)); try { await deleteVoucher(it.id); } catch { await load(); } } },
     ]);
   }
-  function openEdit(it: Voucher) { setEditing(it); setETitle(it.title); setECode(it.code); setEUsed(it.used); }
-  async function saveEdit() {
-    if (!editing || !eTitle.trim()) return;
-    const id = editing.id;
+
+  function openEdit(it: Voucher) {
+    setForm({ title: it.title, code: it.code, store: it.store, discount: it.discount, expiresAt: ymd(it.expiresAt), url: it.url, used: it.used });
+    setEditing(it);
+  }
+
+  async function saveForm() {
+    if (!editing || !form.title.trim()) return;
+    const exp = DATE_RE.test(form.expiresAt.trim()) ? form.expiresAt.trim() : null;
+    const target = editing;
     setEditing(null);
-    try { await updateVoucher(id, { title: eTitle.trim(), code: eCode.trim(), used: eUsed }); await load(); } catch (e) { setErr((e as Error).message); }
+    try {
+      if (target === 'new') {
+        await addVoucher({ title: form.title.trim(), code: form.code.trim(), store: form.store.trim(), discount: form.discount.trim(), expiresAt: exp, url: form.url.trim() });
+      } else {
+        await updateVoucher(target.id, { title: form.title.trim(), code: form.code.trim(), store: form.store.trim(), discount: form.discount.trim(), expiresAt: exp, url: form.url.trim(), used: form.used });
+      }
+      await load();
+    } catch (e) { setErr((e as Error).message); }
   }
 
   if (loading) return <Spinner />;
+  const isNew = editing === 'new';
 
   return (
     <View style={s.wrap}>
@@ -68,7 +93,7 @@ export function VouchersScreen() {
         <TextInput value={title} onChangeText={setTitle} placeholder="title" placeholderTextColor={C.faint} style={[s.input, { flex: 2 }]} />
         <TextInput value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="code" placeholderTextColor={C.faint} style={[s.input, { flex: 1 }]} />
         <Pressable onPress={() => setShowScan(true)} style={s.aiBtn}><Text style={s.aiText}>✦</Text></Pressable>
-        <Pressable onPress={add} disabled={!title.trim()} style={[s.addBtn, !title.trim() && s.dim]}><Text style={s.addBtnText}>＋</Text></Pressable>
+        <Pressable onPress={quickAdd} disabled={!title.trim()} style={[s.addBtn, !title.trim() && s.dim]}><Text style={s.addBtnText}>＋</Text></Pressable>
       </View>
       <ErrorText>{err}</ErrorText>
       <FlatList
@@ -92,18 +117,40 @@ export function VouchersScreen() {
       <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
         <Pressable style={s.modalWrap} onPress={() => setEditing(null)}>
           <Pressable style={s.modal} onPress={() => {}}>
-            <Text style={s.modalTitle}>Edit voucher</Text>
-            <Text style={s.mlabel}>TITLE</Text>
-            <TextInput value={eTitle} onChangeText={setETitle} style={s.minput} placeholderTextColor={C.faint} />
-            <Text style={s.mlabel}>CODE</Text>
-            <TextInput value={eCode} onChangeText={setECode} autoCapitalize="characters" style={s.minput} placeholderTextColor={C.faint} />
-            <Pressable onPress={() => setEUsed((v) => !v)} style={s.toggle}>
-              <View style={[s.tbox, eUsed && s.tboxOn]}>{eUsed && <Text style={s.tmark}>✓</Text>}</View>
-              <Text style={s.tlabel}>Used</Text>
-            </Pressable>
+            <Text style={s.modalTitle}>{isNew ? '✦ New voucher' : 'Edit voucher'}</Text>
+            <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
+              <Text style={s.mlabel}>TITLE</Text>
+              <TextInput value={form.title} onChangeText={(v) => setF('title', v)} style={s.minput} placeholderTextColor={C.faint} />
+              <Text style={s.mlabel}>CODE</Text>
+              <TextInput value={form.code} onChangeText={(v) => setF('code', v)} autoCapitalize="characters" style={s.minput} placeholderTextColor={C.faint} />
+              <Text style={s.mlabel}>STORE</Text>
+              <TextInput value={form.store} onChangeText={(v) => setF('store', v)} style={s.minput} placeholderTextColor={C.faint} />
+              <View style={s.rowFields}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.mlabel}>DISCOUNT</Text>
+                  <TextInput value={form.discount} onChangeText={(v) => setF('discount', v)} placeholder="e.g. 15%" placeholderTextColor={C.faint} style={s.minput} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.mlabel}>EXPIRES (YYYY-MM-DD)</Text>
+                  <TextInput value={form.expiresAt} onChangeText={(v) => setF('expiresAt', v)} placeholder="2026-12-31" placeholderTextColor={C.faint} autoCapitalize="none" style={s.minput} />
+                </View>
+              </View>
+              <Text style={s.mlabel}>URL</Text>
+              <TextInput value={form.url} onChangeText={(v) => setF('url', v)} autoCapitalize="none" keyboardType="url" placeholderTextColor={C.faint} style={s.minput} />
+              {!isNew && (
+                <Pressable onPress={() => setF('used', !form.used)} style={s.toggle}>
+                  <View style={[s.tbox, form.used && s.tboxOn]}>{form.used && <Text style={s.tmark}>✓</Text>}</View>
+                  <Text style={s.tlabel}>Used</Text>
+                </Pressable>
+              )}
+            </ScrollView>
             <View style={s.mbtns}>
-              <Pressable onPress={saveEdit} disabled={!eTitle.trim()} style={[s.save, !eTitle.trim() && s.dim]}><Text style={s.saveText}>Save</Text></Pressable>
-              <Pressable onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
+              <Pressable onPress={saveForm} disabled={!form.title.trim()} style={[s.save, !form.title.trim() && s.dim]}>
+                <Text style={s.saveText}>{isNew ? 'Add' : 'Save'}</Text>
+              </Pressable>
+              {!isNew && editing && (
+                <Pressable onPress={() => { const e = editing; setEditing(null); if (e && typeof e !== 'string') remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
+              )}
             </View>
           </Pressable>
         </Pressable>
@@ -151,6 +198,7 @@ const s = StyleSheet.create({
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   minput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
+  rowFields: { flexDirection: 'row', gap: 10 },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
   tboxOn: { backgroundColor: C.accent, borderColor: C.accent },

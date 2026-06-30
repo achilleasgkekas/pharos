@@ -249,7 +249,7 @@ export type Voucher = { id: string; title: string; code: string; store: string; 
 export async function getVouchers(): Promise<Voucher[]> {
   return (await request<{ data: Voucher[] }>('/api/v1/vouchers?limit=200')).data ?? [];
 }
-export function addVoucher(data: { title: string; code?: string; store?: string }) {
+export function addVoucher(data: { title: string; code?: string; store?: string; discount?: string; expiresAt?: string | null; url?: string }) {
   return request<{ voucher: Voucher }>('/api/v1/vouchers', { method: 'POST', body: JSON.stringify(data) });
 }
 
@@ -414,7 +414,7 @@ export function unregisterPush(token: string) {
 const patch = (path: string, data: object) => request<{ ok: boolean }>(path, { method: 'PATCH', body: JSON.stringify(data) });
 export const updateExpense = (id: string, data: { vendor?: string; amount?: number; category?: string; kind?: string; date?: string }) => patch(`/api/v1/expenses/${id}`, data);
 export const updateSubscription = (id: string, data: { name?: string; amount?: number; billingCycle?: string; nextRenewal?: string | null; category?: string; active?: boolean }) => patch(`/api/v1/subscriptions/${id}`, data);
-export const updateVoucher = (id: string, data: { title?: string; code?: string; store?: string; used?: boolean }) => patch(`/api/v1/vouchers/${id}`, data);
+export const updateVoucher = (id: string, data: { title?: string; code?: string; store?: string; discount?: string; expiresAt?: string | null; url?: string; used?: boolean }) => patch(`/api/v1/vouchers/${id}`, data);
 export const updateReceipt = (id: string, data: { store?: string; total?: number; date?: string; verified?: boolean; archived?: boolean; paymentMethod?: string }) => patch(`/api/v1/receipts/${id}`, data);
 export const updateItem = (id: string, data: { title?: string; status?: string; category?: string; currentPrice?: number; targetPrice?: number | null; specs?: string }) => patch(`/api/v1/items/${id}`, data);
 

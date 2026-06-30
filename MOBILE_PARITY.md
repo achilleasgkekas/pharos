@@ -53,7 +53,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Vouchers (`/vouchers`)
 | Web | Mobile |
 |-----|--------|
-| e-shop layout, **AI scan (paste/image)**, add/edit | 🟡 list + add (title+code) + delete; no AI scan, no edit |
+| e-shop layout, **AI scan (paste/image)**, add/edit | ✅ list + quick-add (title+code) + **AI scan (paste → full draft)** + tap-to-edit full fields (title, code, store, discount, expiry, url, used) + delete |
 
 ## Calendar (`/calendar`)
 | Web | Mobile |
