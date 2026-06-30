@@ -2,6 +2,15 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
+## 2026-06-30 (reviewer — range 362efc5..5457339 clean, updatedAt indexes verified)
+- Εύρος: `362efc5..5457339` (8 commits· 7 docs/monitor/docker/audit, **1 code**: `5457339` web — `updatedAt: -1` index σε 7 synced models). Read-only review + αμφότερα type-checks.
+- **Type-checks**: `apps/web` `npm run type-check` → **EXIT 0**· `apps/mobile` `npx tsc --noEmit` → **EXIT 0**. Καμία διόρθωση χρειάστηκε.
+- **Diff review του `5457339`** (Item/Task/Receipt/Expense/Subscription/Statement/Voucher): αμιγώς additive `Schema.index({ updatedAt: -1 })`, ένα ανά model, με σχόλιο. Μηδέν αλλαγή σε route logic / response shape / mobile↔web συμβόλαιο. Μηδέν secrets.
+  - Επαλήθευσα το claim ότι το `updatedAt` είναι ο sync cursor: `lib/apiList.ts:22` → `withSince` βάζει `updatedAt: { $gte: p.updatedSince }` όταν υπάρχει `updatedSince` param. Ο index ταιριάζει ακριβώς με το query pattern. Στα Item/Task είναι ΚΑΙ sort key (σχόλιο σωστό).
+  - Count: 7 models edited (Item, Task, Receipt, Expense, Subscription, Statement, Voucher) = το commit claim «7 synced models» ισχύει. Κανένα pre-existing updatedAt index → μηδέν redundancy.
+- **Fixed**: τίποτα (δεν χρειάστηκε). **Flagged**: κανένα νέο εύρημα (regression/secret/shape-break). Οι ουρές (WEB_DEBT 0P1/3P2/2P3 → P2#1 χτίστηκε, MOBILE_PARITY 5 GAP) αμετάβλητες πέρα από το ήδη-καταγεγραμμένο builder progress.
+- Staged ΜΟΝΟ `PROGRESS.md` (explicit path, όχι `-A`). Marker `362efc5 → 5457339`. Κανένα Docker/AI job/secret.
+
 ## 2026-06-30 (builder — WEB_DEBT P2#1: index updatedAt στα 7 synced models)
 - Τι: μετά από αρκετά read-only audit runs, χτίστηκε το κορυφαίο TODO της WEB_DEBT ουράς (P2/S, db). Πρόσθεσα explicit `Schema.index({ updatedAt: -1 })` σε **και τα 7 synced models** (Item, Task, Receipt, Expense, Subscription, Statement, Voucher). Το `updatedAt` είναι το incremental-sync cursor (`lib/apiList.ts withSince` → `updatedAt: { $gte }` σε κάθε mobile sync) και στα Item/Task είναι ΚΑΙ το sort key (`sort({ updatedAt: -1 })`) — πριν unindexed range-scan + in-memory sort σε κάθε sync. Τα Mongoose timestamps ΔΕΝ auto-index-άρουν το updatedAt, οπότε χρειαζόταν ρητό index. Κάθε γραμμή με σχόλιο (Item/Task σημειωμένα ως sort key).
 - **Καμία αλλαγή σε route logic / response shape** — αμιγώς additive schema index. Μηδέν αλλαγή στο mobile↔web συμβόλαιο.
@@ -44,7 +53,7 @@
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
 <!-- docker-validated: d897698 -->
-<!-- reviewed: 362efc5 -->
+<!-- reviewed: 5457339 -->
 
 ## 2026-06-30 (parity-auditor — 2η σάρωση ημέρας, re-confirm read-only)
 - Read-only re-audit web↔mobile από τον κώδικα (όχι docs). Μηδέν app code, μηδέν Docker, μηδέν AI jobs. Inventory: **46 v1 route files** (login + 45 bearer), **16 mobile screens**, **69** exported api fns.
