@@ -1,6 +1,14 @@
 # PROGRESS — Pharos autonomous dev log
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
+
+## 2026-06-30 (web-code-quality auditor — re-confirm, 46 route files, read-only)
+- Re-audit ολόκληρης της `/api/v1` επιφάνειας (πλέον **46 route files**, +2 από το προηγ. run· τα νέα = additive όπως statements/plans) από τον κώδικα. Μηδέν app code, μηδέν Docker, μηδέν AI jobs. `npm run type-check` → **EXIT 0**.
+- **Counts ανά dimension**: Type safety **0** (grep για `any`/`as any`/`@ts-ignore`/`@ts-expect-error` στα v1 routes → NONE· tsc καθαρό). Auth **0** (μόνο `auth/login` εκτός `withAuth`, σωστά). Error handling **0** (uniform try/catch μέσω `withAuth`· κάθε body read `req.json().catch(()=>({}))`· μηδέν swallowed catch). Reads **0** (όλα τα list endpoints `.lean()` + pagination 1..200). Validation **2** (items POST line 64 `String(b.status||'researching')` χωρίς whitelist ενώ PATCH κάνει· shopping-list/[id] το ΜΟΝΟ [id] route χωρίς 24-hex guard + σιωπηλό `{ok:true}` σε not-found). Consistency **2** (GET /items μόνο του γυρνά `{items}` αντί `listEnvelope {data}`· repeated body-coercion). DB **1** (κανένα από τα synced models δεν έχει explicit `updatedAt` index — grep επιβεβαίωσε· είναι ο `withSince` sync cursor + sort key στα Item/Task).
+- **Σύνολο: 0 P1, 3 P2, 2 P3** — η ουρά WEB_DEBT **αμετάβλητη** (κανένα item δεν χτίστηκε ενδιάμεσα· από τότε μόνο docs + το additive `df8c87a`). Επιβεβαίωσα ότι όλα τα πρόσφατα routes (statements/plans, items/[id]/{plans,link-plan,price}, scan/expense, push/register, history, trash/[type]/[id]) είναι σωστά guarded (withAuth, 24-hex id, 400/403/404). Μηδέν νέο εύρημα.
+- **Top 3 για τον builder (αμετάβλητα, P2 πρώτα):** (1) **Index updatedAt στα 7 synced models** (P2/S, db — explicit `Schema.index({updatedAt:-1})`· κάθε mobile incremental sync κάνει unindexed `$gte` + in-memory sort στα Item/Task). (2) **POST /api/v1/items — whitelist status & category** (P2/S, api — ίδια STATUS whitelist με το PATCH, εξαγωγή σε shared const). (3) **GET /api/v1/items → listEnvelope alignment** (P2/S, api+ui — `{items}`→`{data}` + ενημέρωση `apps/mobile/src/api.ts`, ή τεκμηρίωση της απόκλισης αν το breaking δεν είναι ΟΚ τώρα).
+- Verify: read-only μόνο. grep sweeps (any/ts-ignore/withAuth/id-guard/updatedAt-index/lean) + `npm run type-check` exit 0. Staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (όχι `-A`). Καμία αλλαγή σε app code/secrets/.env.
+- Needs Achilleas: κανένα νέο. (Παραμένουν: response-envelope standardization σε ΟΛΑ τα endpoints = breaking change που θέλει συντονισμό με mobile· zod-first σε νέα routes· Docker VM RAM bump.)
 Context: δες `CLAUDE.md` (πλήρες ιστορικό), `MOBILE_PARITY.md` (roadmap), `BACKLOG.md` / `TODO.md`.
 
 <!-- docker-validated: 62dc4bf -->
