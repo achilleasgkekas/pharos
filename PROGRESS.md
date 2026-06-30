@@ -2,8 +2,20 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 86c6ada -->
+<!-- reviewed: 2223203 -->
 <!-- docker-validated: 4c1e1ac -->
+
+## 2026-07-01 (reviewer — range 86c6ada..2223203, καθαρό)
+- Εύρος: 7 commits μετά τον marker `86c6ada`· 6 είναι docs (PROGRESS/MOBILE_PARITY/WEB_DEBT/STATUS audits)· **ΕΝΑ** μόνο app-code commit: `2223203` feat(mobile) Tasks tags + priority στο add/edit (`apps/mobile/src/api.ts` + `TasksScreen.tsx`).
+- Checks: `apps/web` type-check **EXIT 0**, `apps/mobile` `npx tsc --noEmit` **EXIT 0**.
+- Review του diff: **καθαρό, μηδέν διόρθωση.** Επαληθεύσεις από κώδικα:
+  - **API contract συνεπές + additive**: `addTask(title, data?)` 2ο arg προαιρετικό (backward-compatible· μοναδικός caller TasksScreen:50 ενημερωμένος)· `updateTask` data type += `tags?`. Web POST `/api/v1/tasks` δέχεται ήδη `tags` (array/comma-string) + `priority` με allowlist-validation `['low','normal','high']` (route.ts:52,58)· PATCH δέχεται `tags`/`priority` ([id]/route.ts:25).
+  - **Runtime-safe**: το `openEdit` καλεί `it.tags.join(' ')` — και οι δύο web serializers επιστρέφουν πάντα `tags: t.tags ?? []` (route.ts:22, [id]/route.ts:34) → ποτέ undefined, καμία `.join` crash. `Task.tags` typed `string[]`.
+  - **Error handling**: `add()`/`saveEdit()` σε try/catch με `setErr`· no-token → 401 + bad id → 400 μέσω `withAuth`+id-guard (ήδη ελεγμένα στο web-debt audit).
+  - **Στυλ**: τα νέα `s.label`/`s.modalInput` υπάρχουν στο StyleSheet (TasksScreen:160-161).
+  - **Secrets**: μηδέν στο diff.
+- Μικρή σημείωση (ΟΧΙ regression, ΗΔΗ tracked): ο νέος PRIORITY picker προσθέτει 1 ακόμα `color:'#000'` literal — καλύπτεται από το υπάρχον MOBILE_PARITY UI-Debt item «Button + Chip primitives» (`onAccent` migration). Δεν δημιούργησα διπλό TODO.
+- Git: μηδέν app-code edit από εμένα· staged ΜΟΝΟ PROGRESS.md (marker → `2223203` + αυτή η εγγραφή).
 
 ## 2026-07-01 (builder — MOBILE_PARITY: Tasks tags + priority στο add/edit, mobile-only no-AI)
 - **Τι**: υλοποιήθηκε το μόνο ενεργό parity TODO («Tasks — tags + priority στο add/edit», P3/S, no AI, no decision) που εντόπισε ο parity-auditor (νυχτερινό run #2). Το web API δέχεται ήδη `tags`+`priority` σε POST `/api/v1/tasks` (route.ts:52,58) ΚΑΙ PATCH `/api/v1/tasks/[id]` (set-builder ελέγχει `Array.isArray(b.tags)` + priority whitelist)· έλειπε μόνο το mobile wiring. Working tree στην αρχή: μόνο `WEB_DEBT.md` (παράλληλο WIP άλλης routine) → το άφησα ανέγγιχτο, δούλεψα σε ξένη ζώνη (mobile Tasks).
