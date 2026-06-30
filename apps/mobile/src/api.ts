@@ -244,6 +244,15 @@ export function unlinkItemPlan(id: string, signature: string) {
 export function convertItemToTask(id: string) {
   return request<{ ok: boolean; taskId?: string }>(`/api/v1/items/${id}/convert-to-task`, { method: 'POST' });
 }
+/** AI-fill an item's specs ('specs') or specs+category+tags ('info', additive).
+ *  Server reads the item's links or top web-search hits. Returns the AI result;
+ *  the caller re-fetches getItem(id) to refresh the detail. */
+export function aiFillItem(id: string, mode: 'specs' | 'info' = 'specs') {
+  return request<{ ok: boolean; mode: 'specs' | 'info'; specs?: string; filled?: string[]; error?: string }>(
+    `/api/v1/items/${id}/ai-fill`,
+    { method: 'POST', body: JSON.stringify({ mode }) }
+  );
+}
 
 // ---- Files (bearer-protected). RN <Image> can attach the auth header via source.headers. ----
 export function fileSource(path: string | null): { uri: string; headers?: Record<string, string> } | undefined {

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C } from '../theme';
 import { money, Spinner, ErrorText, Empty } from '../ui';
-import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
+import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
 function verdictMeta(v: Verdict): { label: string; color: string } | null {
   switch (v) {
@@ -294,6 +294,7 @@ export function ItemsScreen() {
   const [eSpecs, setESpecs] = useState('');
   const [saving, setSaving] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [aiFilling, setAiFilling] = useState<null | 'specs' | 'info'>(null);
   const [detail, setDetail] = useState<ItemDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
@@ -343,6 +344,22 @@ export function ItemsScreen() {
       else setErr('Convert failed');
     } catch (e) { setErr((e as Error).message); }
     finally { setConverting(false); }
+  }
+  async function runAiFill(mode: 'specs' | 'info') {
+    if (!editing || aiFilling) return;
+    setAiFilling(mode); setErr(null);
+    try {
+      const r = await aiFillItem(editing.id, mode);
+      if (!r.ok) { setErr(r.error || 'AI fill failed'); return; }
+      if (mode === 'specs' && r.specs) setESpecs(r.specs);
+      await loadDetail(editing.id);
+      await load();
+      if (mode === 'info') {
+        const filled = r.filled ?? [];
+        Alert.alert('AI fill', filled.length ? `Filled: ${filled.join(', ')}.` : 'Nothing new to fill.');
+      }
+    } catch (e) { setErr((e as Error).message); }
+    finally { setAiFilling(null); }
   }
 
   return (
@@ -417,6 +434,14 @@ export function ItemsScreen() {
               </View>
               <Text style={s.mlabel}>SPECS</Text>
               <TextInput value={eSpecs} onChangeText={setESpecs} multiline style={[s.minput, s.specs]} placeholder="notes / specs" placeholderTextColor={C.faint} />
+              <View style={s.aiBar}>
+                <Pressable onPress={() => runAiFill('specs')} disabled={!!aiFilling} style={[s.aiBtn, !!aiFilling && s.dim]}>
+                  {aiFilling === 'specs' ? <ActivityIndicator color={C.accent} /> : <Text style={s.aiBtnText}>✦ AI specs</Text>}
+                </Pressable>
+                <Pressable onPress={() => runAiFill('info')} disabled={!!aiFilling} style={[s.aiBtn, !!aiFilling && s.dim]}>
+                  {aiFilling === 'info' ? <ActivityIndicator color={C.accent} /> : <Text style={s.aiBtnText}>✦ AI info</Text>}
+                </Pressable>
+              </View>
               <Pressable onPress={convertToTask} disabled={converting} style={[s.convertBtn, converting && s.dim]}>
                 {converting ? <ActivityIndicator color={C.cyan} /> : <Text style={s.convertBtnText}>＋ Convert to task</Text>}
               </Pressable>
@@ -470,6 +495,9 @@ const s = StyleSheet.create({
   saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
   delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
   delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
+  aiBar: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  aiBtn: { flex: 1, borderRadius: 12, borderWidth: 1, borderColor: C.accent, paddingVertical: 10, alignItems: 'center' },
+  aiBtnText: { color: C.accent, fontSize: 14, fontWeight: '600' },
   convertBtn: { marginTop: 16, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, paddingVertical: 11, alignItems: 'center' },
   convertBtnText: { color: C.cyan, fontSize: 14, fontWeight: '600' },
 });

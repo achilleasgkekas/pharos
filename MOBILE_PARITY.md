@@ -170,12 +170,12 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ### Items — AI specs / AI-fill info
 - Priority: P3 | Size: M | ⚠ AI cost → δομικό verify μόνο
 - Web ref: aiFillSpecs / aiFillInfo (file: apps/web/src/app/items/actions.ts:533,571)
-- API: POST /api/v1/items/[id]/ai-fill (exists: no) — body `{mode:'specs'|'info'}`· port των web actions, επιστρέφει updated item
-- Mobile files: apps/mobile/src/api.ts (`aiFillItem(id, mode)`), apps/mobile/src/screens/ItemsScreen.tsx (κουμπί «✦ AI specs» στο item detail)
+- API: POST /api/v1/items/[id]/ai-fill (exists: yes, 2026-07-01) — body `{mode:'specs'|'info'}`· wraps τα web actions· returns `{ok, mode, specs?, filled?, error?}` (όχι item — ο client ξανακαλεί GET /items/:id)
+- Mobile files: apps/mobile/src/api.ts (`aiFillItem(id, mode)`), apps/mobile/src/screens/ItemsScreen.tsx (κουμπιά «✦ AI specs» / «✦ AI info» στο item detail)
 - Acceptance:
-  - POST .../ai-fill no-token → 401· bad id → 400
-  - Δομικό verify μόνο (μην τρέξεις πραγματικό AI)· tsc καθαρό
-- Status: TODO
+  - POST .../ai-fill no-token → 401· bad id → 400 ✓
+  - Δομικό verify μόνο (δεν τρέχτηκε πραγματικό AI)· web+mobile tsc EXIT 0 ✓
+- Status: DONE (2026-07-01) — νέο route `items/[id]/ai-fill` (id-guard 24-hex, withAuth, mode default 'specs', AI-feature-gated μέσω των actions)· mobile `aiFillItem(id, mode)` + AI bar (specs/info) στο edit modal· on-success → re-fetch detail + list refresh, 'specs' γεμίζει το textarea, 'info' → Alert με τα filled πεδία. Structural verify: safe rebuild → /login 200, web restarts 0, ai-fill no-token → 401. **Parity queue: 6/6 DONE.**
 
 ---
 
