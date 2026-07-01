@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, StyleSheet, Alert } from 'react-native';
 import { C, alpha } from '../theme';
-import { shortDate, Spinner, ErrorText, Empty } from '../ui';
+import { shortDate, Spinner, ErrorText, Empty, Card } from '../ui';
 import {
   getTrash, restoreTrash, purgeTrash, currentUser,
   getJobs, getHistory, getNotifications, markNotificationRead,
@@ -93,7 +93,7 @@ function AlertsTab() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={<Empty>No alerts.</Empty>}
         renderItem={({ item }) => (
-          <Pressable onPress={() => readOne(item)} style={[s.card, !item.read && s.unreadCard]}>
+          <Card onPress={() => readOne(item)} style={!item.read && s.unreadCard}>
             <View style={s.head}>
               <Text style={s.icon}>{NOTIF_ICON[item.kind]}</Text>
               <View style={{ flex: 1 }}>
@@ -103,7 +103,7 @@ function AlertsTab() {
               </View>
               {!item.read && <View style={s.dot} />}
             </View>
-          </Pressable>
+          </Card>
         )}
       />
     </>
@@ -151,7 +151,7 @@ function TrashTab() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={<Empty>Trash is empty.</Empty>}
         renderItem={({ item }) => (
-          <View style={s.card}>
+          <Card>
             <View style={s.head}>
               <Text style={s.icon}>{TRASH_ICON[item.type]}</Text>
               <View style={{ flex: 1 }}>
@@ -163,7 +163,7 @@ function TrashTab() {
               <Pressable onPress={() => restore(item)} style={s.restore}><Text style={s.restoreText}>Restore</Text></Pressable>
               {isAdmin && <Pressable onPress={() => purge(item)} style={s.purge}><Text style={s.purgeText}>Delete forever</Text></Pressable>}
             </View>
-          </View>
+          </Card>
         )}
       />
     </>
@@ -214,7 +214,7 @@ function JobsTab() {
             : item.status === 'error' && item.error ? item.error
             : item.lastDetail || item.lastLabel || '';
           return (
-            <View style={s.card}>
+            <Card>
               <View style={s.jobHead}>
                 <Text style={s.title} numberOfLines={1}>{item.title}</Text>
                 <View style={[s.badge, { borderColor: st.color }]}><Text style={[s.badgeText, { color: st.color }]}>{st.label}</Text></View>
@@ -224,7 +224,7 @@ function JobsTab() {
                 <View style={s.track}><View style={[s.fill, { width: `${pct}%`, backgroundColor: st.color }]} /></View>
               )}
               {!!sub && <Text style={[s.meta, item.status === 'error' && { color: C.red }]} numberOfLines={2}>{sub}</Text>}
-            </View>
+            </Card>
           );
         }}
       />
@@ -261,7 +261,7 @@ function HistoryTab() {
         renderItem={({ item }) => {
           const expanded = open === item.id;
           return (
-            <Pressable style={s.card} onPress={() => setOpen(expanded ? null : item.id)}>
+            <Card onPress={() => setOpen(expanded ? null : item.id)}>
               <Text style={s.title} numberOfLines={expanded ? undefined : 1}>{item.title}</Text>
               <Text style={s.meta}>{`${item.turns} turn${item.turns === 1 ? '' : 's'} · ${relTime(item.updatedAt)}`}</Text>
               {!expanded && !!item.preview && <Text style={s.preview} numberOfLines={2}>{item.preview}</Text>}
@@ -278,7 +278,7 @@ function HistoryTab() {
                   ))}
                 </View>
               )}
-            </Pressable>
+            </Card>
           );
         }}
       />
@@ -298,7 +298,6 @@ const s = StyleSheet.create({
   markAll: { borderWidth: 1, borderColor: C.accent, borderRadius: 9, paddingVertical: 6, paddingHorizontal: 11 },
   markAllText: { color: C.accent, fontSize: 12, fontWeight: '700' },
   list: { padding: 16, paddingTop: 4 },
-  card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   unreadCard: { borderColor: alpha(C.cyan, 0.27), backgroundColor: alpha(C.cyan, 0.04) },
   dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.cyan, marginTop: 4 },
   head: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },

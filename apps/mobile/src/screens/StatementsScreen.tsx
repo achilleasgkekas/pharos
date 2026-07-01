@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, Modal, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Card } from '../ui';
 import { getStatements, getStatementTxns, getInstallmentPlans, type Statement, type StatementTxn, type InstallmentPlan } from '../api';
 
 // "2028-10-01" → "Oct 2028" for payoff dates.
@@ -76,13 +76,13 @@ export function StatementsScreen() {
         ) : null}
         ListEmptyComponent={<Empty>No statements.</Empty>}
         renderItem={({ item }) => (
-          <Pressable onPress={() => openDetail(item)} style={s.card}>
+          <Card onPress={() => openDetail(item)}>
             <View style={s.top}>
               <Text style={s.card_}>{item.card}{item.last4 ? ` ··${item.last4}` : ''}</Text>
               <Text style={s.total}>{money(item.totalAmount, item.currency)}</Text>
             </View>
             <Text style={s.meta}>{[item.period, item.dueDate ? `due ${shortDate(item.dueDate)}` : '', `${item.txnCount} txn`].filter(Boolean).join('  ·  ')}</Text>
-          </Pressable>
+          </Card>
         )}
       />
 
@@ -145,7 +145,6 @@ const s = StyleSheet.create({
   planAmt: { color: C.purple, fontSize: 14, fontWeight: '800' },
   planAmtDone: { color: C.faint, fontWeight: '700' },
   planMeta: { color: C.faint, fontSize: 12, marginTop: 5 },
-  card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   card_: { color: C.text, fontSize: 15, fontWeight: '700' },
   total: { color: C.text, fontSize: 16, fontWeight: '800' },

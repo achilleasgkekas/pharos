@@ -5,6 +5,19 @@
 <!-- reviewed: 83cc537 -->
 <!-- docker-validated: 20e1826 -->
 
+## 2026-07-01 (builder — mobile `Card` primitive· UI Debt Card+Badge+ListItem item προχώρησε)
+- **Τι**: με το parity queue 7/7 DONE και το προηγούμενο UI Debt top item (`IconButton`) κλεισμένο, πήρα το επόμενο unattended-safe UI Debt item — το **`Card` κομμάτι** του `### Card + Badge + ListItem primitives` (P2/M, tsc-verifiable αν byte-identical). Το ίδιο `card:` StyleSheet entry (`surface`/border/radius14/padding14/marginBottom10) ήταν byte-identical duplicated σε **3 screens** (Activity/Statements/Vouchers)· τα άλλα 2 (Reports `flex:1`/radius16, Settings `paddingHorizontal:14`-only) είναι token-outliers (οπτική διαφορά → attended-preferred, όπως έγινε με τα input/save outliers).
+- **Αλλαγές** (μόνο mobile, μηδέν API/web):
+  - `ui.tsx`: νέο **`Card({children,onPress,onLongPress,style})`** — surface card container· renders `Pressable` όταν δοθεί `onPress`/`onLongPress` (τα tap/long-press cards κρατούν τη συμπεριφορά τους), αλλιώς `View`· `style` passthrough (merge πάνω στο base). Νέο shared style `card` (== το byte-identical triplet, `RADIUS.lg`=14).
+  - 3 screens migrated σε `<Card>` + διαγραφή των τοπικών `card:` styles: **ActivityScreen** (4 sites: alerts Pressable με `unreadCard` passthrough, trash View, jobs View, history Pressable), **StatementsScreen** (1 Pressable), **VouchersScreen** (1 Pressable με `faded` passthrough).
+  - **Byte-identical επαλήθευση**: base tokens ίδια με τα παλιά (`surface`/border/14/14/10)· το `style` passthrough αναπαράγει ακριβώς τα παλιά composite `[s.card, cond && s.x]` arrays· View-vs-Pressable επιλέγεται από την παρουσία handler → κάθε site κρατά το ίδιο rendered element. Zero dangling `s.card` refs (grep καθαρό)· `Pressable`/`View` παραμένουν used παντού.
+- **Verify**: `apps/mobile` `npx tsc --noEmit` → **EXIT 0** (mismatched JSX close tags θα έσπαγαν εδώ → πράσινο = σωστά ζευγαρωμένα). **Καμία αλλαγή web runtime** (δικά μου diff = μόνο `apps/mobile`) → **δεν** έγινε Docker rebuild. Μηδέν AI/token call. Το mobile δεν auto-testable σε simulator unattended → structural + tsc verify.
+- **Git hygiene**: ⚠ παράλληλος builder έτρεχε ταυτόχρονα (commit-άρισε `99e737f`+`75889e3` apiBody readBody σε expenses/subscriptions [id] PATCH· άφησε staged 2 web `[id]/route.ts` [tasks+vouchers]). Έκανα commit ΜΟΝΟ με explicit pathspec τα δικά μου (3 screens + `ui.tsx` + `MOBILE_PARITY.md` + `PROGRESS.md`)· ΟΧΙ `-A`, ΟΧΙ plain `git commit` (θα έπιανε τα staged web routes του)· δεν άγγιξα τίποτα δικό του. Κανένα secret/`.env`.
+- **Επόμενο task**: UI Debt Queue συνέχεια — **`<ListItem>`** primitive (row layouts, tsc-verifiable αν byte-identical) ή **`<Badge>`** (⚠ token-divergent: Activity container+text vs Statements inline text-badge → attended-preferred). lucide-icons (P2/M) + language-switcher (P3/L) attended-preferred. Εναλλακτικά: fresh web-debt σάρωση.
+
+### Needs Achilleas
+- Κανένα νέο. (Παραμένουν οι παλιές: login brute-force rate-limit, error-message leak στα action responses· mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports extra charts, Tasks Kanban board, Statements merge/bind + PDF import, remote push αδοκίμαστο.)
+
 ## 2026-07-01 (builder — apiBody `readBody` adoption σε expenses/[id] + subscriptions/[id] PATCH· Web Debt Queue → 0)
 - **Τι**: πήρα το μοναδικό ενεργό Web Debt item (`### apiBody helpers — readBody adoption σε expenses/[id] + subscriptions/[id] PATCH`, P3/S) που άνοιξε η 16η σάρωση (`078ee2c`). Το parity queue είναι 7/7 DONE και το mobile UI Debt (Chip/Card primitives) είναι attended-preferred (οπτικό verify), οπότε αυτό ήταν το κορυφαίο unattended-safe TODO με πλήρη spec. Συνέχεια του apiBody adoption, τώρα στα **[id] PATCH** handlers (adopters 6 POST → +2 PATCH = 8).
 - **Αλλαγές** (2 route files μόνο):

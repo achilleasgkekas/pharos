@@ -128,8 +128,35 @@ export function IconButton({ glyph, onPress, disabled, busy, busyColor = C.onAcc
   );
 }
 
+type CardProps = {
+  children: React.ReactNode;
+  onPress?: () => void;
+  onLongPress?: () => void;
+  style?: StyleProp<ViewStyle>;
+};
+
+/**
+ * Surface card container — border + 14 radius + 14 padding + 10 bottom margin.
+ * Unifies the byte-identical `card` StyleSheet entry that was duplicated across
+ * the Activity / Statements / Vouchers screens. Renders a `Pressable` when an
+ * `onPress`/`onLongPress` handler is given (so tap / long-press cards keep their
+ * behaviour), otherwise a plain `View`. Pass `style` for per-card modifiers
+ * (e.g. unread / used / faded states); it merges on top of the base.
+ */
+export function Card({ children, onPress, onLongPress, style }: CardProps) {
+  if (onPress || onLongPress) {
+    return (
+      <Pressable onPress={onPress} onLongPress={onLongPress} style={[s.card, style]}>
+        {children}
+      </Pressable>
+    );
+  }
+  return <View style={[s.card, style]}>{children}</View>;
+}
+
 const s = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, gap: 4 },
+  card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg, padding: 14, marginBottom: 10 },
   iconBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   iconBtnText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   backBtn: { width: 40, height: 36, alignItems: 'center', justifyContent: 'center' },

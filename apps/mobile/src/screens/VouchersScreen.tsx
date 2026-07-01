@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
-import { shortDate, Spinner, ErrorText, Empty, Check, Input, TextArea, Button, IconButton } from '../ui';
+import { shortDate, Spinner, ErrorText, Empty, Check, Input, TextArea, Button, IconButton, Card } from '../ui';
 import { getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, scanVoucherImage, type Voucher, type ParsedVoucherData } from '../api';
 
 type Draft = { title: string; code: string; store: string; discount: string; expiresAt: string; url: string; used: boolean };
@@ -115,14 +115,14 @@ export function VouchersScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={<Empty>No vouchers.</Empty>}
         renderItem={({ item }) => (
-          <Pressable onPress={() => openEdit(item)} onLongPress={() => remove(item)} style={[s.card, item.used && s.faded]}>
+          <Card onPress={() => openEdit(item)} onLongPress={() => remove(item)} style={item.used && s.faded}>
             <View style={s.top}>
               <Text style={s.title} numberOfLines={2}>{item.title}</Text>
               {!!item.discount && <Text style={s.discount}>{item.discount}</Text>}
             </View>
             <Text style={s.meta}>{[item.store, item.expiresAt ? `exp ${shortDate(item.expiresAt)}` : '', item.used ? 'used' : ''].filter(Boolean).join('  ·  ')}</Text>
             {!!item.code && <View style={s.codeBox}><Text style={s.code}>{item.code}</Text></View>}
-          </Pressable>
+          </Card>
         )}
       />
 
@@ -193,7 +193,6 @@ const s = StyleSheet.create({
   aiText: { color: C.cyan, fontSize: 18, fontWeight: '700' },
   cancelText: { color: C.dim, fontSize: 15 },
   dim: { opacity: 0.4 },
-  card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   faded: { opacity: 0.55 },
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   title: { color: C.text, fontSize: 15, fontWeight: '600', flex: 1 },

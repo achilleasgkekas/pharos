@@ -346,7 +346,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Acceptance:
   - `Card`/`Badge`/`ListItem` εξάγονται από `ui.tsx`· τα 5+ local `card:` και 2+ `badge:` StyleSheet entries αντικαθίστανται
   - Σταθερό border-radius/padding/border σε όλα τα cards (τώρα ποικίλλει ανά screen)
-- Status: TODO
+- Status: 🟡 IN PROGRESS (**Card DONE**, 2026-07-01 builder) — νέο `<Card>` στο `ui.tsx` (`children`/`onPress`/`onLongPress`/`style`· renders `Pressable` όταν υπάρχει handler, αλλιώς `View`· base `surface`/border/`RADIUS.lg`/padding14/marginBottom10 == το byte-identical `card:` triplet). Μετανάστευσα **3 screens / 6 sites**: **ActivityScreen** (4: alerts Pressable + trash View + jobs View + history Pressable, `style` passthrough για `unreadCard`), **StatementsScreen** (1 Pressable), **VouchersScreen** (1 Pressable + `faded` passthrough)· έσβησα τα τοπικά `card:` StyleSheet entries. Έμειναν σκόπιμα raw οι 2 outliers (**οπτική** διαφορά, attended-preferred): **ReportsScreen** (`flex:1`/`borderRadius:16`, καμία marginBottom) + **SettingsScreen** (μόνο `paddingHorizontal:14`, section container). mobile `tsc --noEmit` **EXIT 0**. **Απομένουν:** `<Badge>` (ActivityScreen `badge`+`badgeText` container vs StatementsScreen inline text-badge = token-divergent → attended-preferred) + `<ListItem>`.
 
 ### Touch targets ≥44pt
 - Priority: P2
