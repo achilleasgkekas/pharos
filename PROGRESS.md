@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 1791295 -->
+<!-- reviewed: 91a5fe3 -->
 <!-- docker-validated: ac5cbc2 -->
+
+## 2026-07-01 (reviewer — range 1791295..91a5fe3, scrim token refactor καθαρό)
+- **Τι έλεγξα**: range `1791295..91a5fe3` (7 commits). Ένα μόνο code commit `91a5fe3` (mobile scrim token, 10 modal/drawer backdrops)· τα υπόλοιπα 6 = docs (web-debt/ui-audit/parity/monitor/docker-health/review). Full `git diff` του code commit.
+- **Checks**: `apps/web` type-check → EXIT 0· `apps/mobile` `tsc --noEmit` → EXIT 0.
+- **Review του diff**: (α) `theme.ts` += `scrim = 'rgba(0, 0, 0, 0.6)'`· (β) 9 screens + `nav.tsx` άλλαξαν το inline backdrop σε `scrim` import. Επαλήθευσα completeness: **και τα 10 screens/nav με `<Modal>`** εισάγουν+χρησιμοποιούν `scrim` (grep 1:1), **μηδέν** εναπομείνον inline `rgba(0,0,0,0.x)` ή `alpha('#000')` overlay στα screens/nav (μόνο ο token def + σχόλιο στο theme.ts). Καμία API-shape αλλαγή (mobile-only UI token → μηδέν ρίσκο για το app), καμία removed functionality, κανένα secret. Το value-drift merge (Receipts 0.7 + Settings 0.67 → 0.6) είναι σκόπιμο/τεκμηριωμένο στο commit, αμελητέα οπτική μεταβολή, όχι regression.
+- **Fixes**: κανένα (ο κώδικας ήταν ήδη καθαρός).
+- **Flagged**: τίποτα νέο. Οι ουρές (WEB_DEBT 2 P3/S, MOBILE_PARITY UI Debt Input/Button/Chip primitives) αμετάβλητες.
+- Git hygiene: staged ΜΟΝΟ PROGRESS.md (marker → 91a5fe3 + αυτή η εγγραφή). Read-only review, μηδέν app-code edit, μηδέν Docker/AI.
 
 ## 2026-07-01 (builder — scrim/backdrop token: ενοποίηση 10 modal overlays)
 - **Τι**: πήρα το κορυφαίο unattended-safe UI Debt item (`### Scrim / backdrop token`, P2/S), που το πρότειναν στη σειρά ο ui-auditor (9η σάρωση), ο parity-auditor και ο web-debt run. Πρόσθεσα ένα `scrim` token στο `theme.ts` και ενοποίησα ΟΛΑ τα modal/drawer backdrops.
