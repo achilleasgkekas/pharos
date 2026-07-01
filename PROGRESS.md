@@ -3,7 +3,18 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: fe12502 -->
-<!-- docker-validated: 99a9385 -->
+<!-- docker-validated: 258afd5 -->
+
+## 2026-07-01 (docker-health — rebuild λόγω νέου SaaS-auth + tenancy κώδικα, stack υγιής)
+- **Health (πριν):** homepage-mongo `healthy`, homepage-web `running` (RestartCount **0**), homepage-flaresolverr **σταματημένο** (καμία μνημονική πίεση). Ο RestartCount του mongo = **49** είναι σωρευτικός για όλη τη ζωή του container (VM restarts/OOM recoveries στο χρόνο), ΟΧΙ τρέχον loop, αφού το Health δείχνει `healthy` τώρα. Καμία ανάγκη recovery.
+- **Disk (πριν):** Images 4.065GB, Build Cache 666MB (0 active), Containers 78.81MB reclaimable. `docker builder prune -f` (pre-build) → 0B (inline cache referenced).
+- **Απόφαση rebuild:** `git diff 99a9385..HEAD -- apps/web` ακούμπησε web runtime κώδικα (νέα `api/saas/auth/*` routes: signup/login/logout/session, `lib/tenancy/*`, `scan/expense`+`scan/voucher` readBody). Άρα δικαιολογημένο rebuild.
+- **Safe rebuild dance:** `docker compose build web` (image only) → **Built** ✓. Mongo επιβεβαιώθηκε `healthy` πριν το `docker compose up -d web`. Poll `http://localhost:3000/login` → **200** (1η προσπάθεια). WEB RestartCount παρέμεινε **0** (δεν ανέβηκε). Καμία `up --build`.
+- **Disk (μετά):** `docker builder prune -f` (post-build) → **2.08GB reclaimed** (intermediate build cache). Τελικό: Images 4.066GB, Build Cache 666MB (0 active/inline). VM άνετος.
+- **Marker:** docker-validated `99a9385` → **`258afd5`** (HEAD). Staged ΜΟΝΟ PROGRESS.md· το `.claude/launch.json` (WIP εργαλείου του Αχιλλέα) ΔΕΝ αγγίχτηκε.
+
+### Needs Achilleas
+- (κανένα νέο) Το stack χτίζει και σερβίρει υγιώς. Καμία destructive ενέργεια, μηδέν AI job, μηδέν secret access.
 
 ## 2026-07-01 (web-code-quality — 26η σάρωση: ουρά 1→0, ανοίγω το ΤΕΛΕΥΤΑΙΟ raw route· ελέγχθηκε ΝΕΟΣ SaaS auth κώδικας)
 - **Counts ανά dimension (live grep, όχι docs):** Type safety **0** (tsc EXIT 0· zero `any`/`ts-ignore` σε ΟΛΟ το v1 **και** στον νέο SaaS κώδικα)· Auth **0 unguarded** στο v1 (νέος SaaS surface gated σωστά με `saasAuthGate()` → 404/500 fail-closed)· Input validation **0 v1 gaps**· Error handling **0**· DB **0** (v1 `.lean()`+limits· SaaS `accountTenants` bounded `.lean()`· control-plane unique indexes σωστά)· Consistency debt **1 ανοιχτό** (shopping-list POST = το τελευταίο raw-body route).
