@@ -2043,3 +2043,12 @@ Read-only audit των 49 v1 route files + `apiAuth`/`apiBody`/`apiList` helpers
 
 ### Needs Achilleas
 - (αμετάβλητο) Product-decision items, ΟΧΙ auto-buildable: **safe-area insets** (χρειάζεται `react-native-safe-area-context` native dep — προτείνω `npx expo install` από τον Αχιλλέα + έλεγχο σε simulator), **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme/language/AI-engine/storage/OneDrive** (light theme = L refactor· credentials/OAuth boundary — σύσταση: μείνε web-only).
+
+## 2026-07-01 (ui-auditor, 25η σάρωση — `<ListItem>` υπό υιοθέτηση [uncommitted WIP])
+Read-only mobile UI consistency audit, inventory ξαναχτισμένο από τον κώδικα. **16 mobile screens**, 8 primitives στο `ui.tsx` (Input/TextArea/Check/Button/IconButton/Card/ListItem/Badge).
+
+**Ευρήματα ανά διάσταση:** hardcoded-hex **0** (grep 6/8-digit hex στα `screens/` καθαρό, όλα `C.*`) · missing-token **0** (11/11 web color tokens mirror-αρισμένα + SPACE/RADIUS/SIZE/scrim/alpha) · duplicate-primitive **1** (ListItem, in-tree αλλά uncommitted → κλείνει με το commit) · touch-target **0** (Check + hitSlop DONE) · safe-area **1** (TODO, ακόμα plain SafeAreaView) · adaptive/max-width **1** (P3) · theme/dark-mode **1** (P3/L).
+
+**Κύριο νέο:** το top build item της 24ης, το `<ListItem>` primitive, **έχει χτιστεί + υιοθετηθεί στο working tree αλλά ΔΕΝ έχει γίνει commit** — ενεργό WIP του Αχιλλέα (M σε Calendar/Items/Money/Subscriptions/Tasks + ui.tsx). `export function ListItem` @ ui.tsx:166, χρήση σε 6 screens, τα 5 byte-identical `row:` entries σβήστηκαν. **Δεν άγγιξα αυτά τα αρχεία** (git-hygiene). mobile `tsc --noEmit` **EXIT 0** ΜΕ το WIP.
+
+**Top-3 για τον builder:** (1) **ΜΗΝ ξανακάνεις ListItem** — περίμενε το commit του Αχιλλέα. (2) Safe-area insets (μόνο αν εγκριθεί `react-native-safe-area-context` dep-add· βλ. Needs Achilleas). (3) `<Chip>` primitive ή Input-outliers (5 screens) όταν υπάρχει simulator για οπτικό verify (token-drift = attended-preferred).
