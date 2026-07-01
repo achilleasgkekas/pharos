@@ -5,6 +5,17 @@
 <!-- reviewed: fe12502 -->
 <!-- docker-validated: 99a9385 -->
 
+## 2026-07-01 (builder — readBody() adoption σε scan/expense + scan/voucher· κλείνει 2/3 raw routes)
+- **Τι**: πήρα το top web-debt item της ουράς (το web-code-quality run της ημέρας το είχε #1). Αντικατέστησα το inline `String(((await req.json().catch(()=>({}))) as { text?: unknown }).text || '')` με τον shared `readBody(req)` (`lib/apiBody`) στα δύο εναπομείναντα raw-body scan routes: `api/v1/scan/expense/route.ts` + `api/v1/scan/voucher/route.ts` (POST).
+- **Byte-identical εγγύηση**: το `readBody` κάνει ακριβώς `(await req.json().catch(() => ({}))) as Body` → ίδιο never-throw parse· το `String((await readBody(req)).text || '')` δίνει ίδια coercion με πριν (`text` είναι `unknown` → `String(...||'')`). Άλλαξε ΜΟΝΟ ο JSON-text κλάδος· ο multipart κλάδος (`scanExpenseImage`/`scanVoucherImage(await req.formData())`) ανέγγιχτος. Response shapes αμετάβλητα → mobile app ασφαλές.
+- **Απομένει 1 raw route**: `shopping-list` POST (`Record<string,string>` cast, downstream string-values → χρειάζεται προσοχή, ΟΧΙ byte-identical· ξεχωριστό item).
+- **Verify**: `apps/web npm run type-check` → **EXIT 0**. Safe Docker rebuild: mongo `healthy` (πριν+μετά), flaresolverr NOT running· `docker compose build web` (EXIT 0) → `docker compose up -d web` → `/login` **200** (2η poll)· web `Running:true`, `RestartCount 0`, `OOMKilled:false`. Auth boundary intact: no-token `POST /api/v1/scan/expense` & `/scan/voucher` → **401**. `docker builder prune -f` μετά (~4.1GB cache-only reclaimed). Μηδέν AI/token call, μηδέν destructive op.
+- **Git hygiene**: staged ΜΟΝΟ τα 2 route files (explicit paths, ΟΧΙ `-A`). ΔΕΝ άγγιξα το `.claude/launch.json` (foreign/tooling change στο working tree). Commit `4503640`. Κανένα secret/`.env`.
+- **Επόμενο task**: web-debt — `shopping-list` POST readBody adoption (needs care: `Record<string,string>` cast → coercion `String(b.name ?? '')`, έλεγξε downstream string-usage πριν το swap· θα κλείσει το τελευταίο raw-body route). Εναλλακτικά mobile UI Debt: Safe-area insets (χρειάζεται `npx expo install react-native-safe-area-context`, attended-preferred) ή Max content width `<Screen>` wrapper. **ΠΑΝΤΑ** fresh `git status` στην αρχή· αν foreign staged/churn → στάσου.
+
+### Needs Achilleas
+- Κανένα νέο. (Standing: login brute-force rate-limit· error-message leak στο `withAuth` 500· tasks `steps`/shopping-list χωρίς cap. Mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports extra charts, Tasks Kanban, Statements merge/bind + PDF import, remote push αδοκίμαστο. Concurrency: πολλαπλοί builders στο ίδιο `main`.)
+
 ## 2026-07-01 (reviewer — range 2784fc1..fe12502, 15 commits, καθαρό· 1 flag)
 - **Τι εξέτασα:** 15 commits από το τελευταίο marker. Code (μη-docs): `1e5dc4c` SaaS tenant resolver (`host.ts` pure parser + `context.ts` resolver + `host.test.ts`)· `1a7d16e` SaaS per-tenant connection layer (`connection.ts` useDb)· `b4d2eb1` landing waitlist section (`Waitlist.tsx` + page + css)· `0f69116` mobile `<ListItem>` primitive refactor (5 screens + ui.tsx)· `71fd79d` storagePath test suite. Τα υπόλοιπα 10 = docs (parity/ui-audit/backlog/api/progress).
 - **Checks:** `apps/web npm run type-check` **EXIT 0**· `apps/mobile npx tsc --noEmit` **EXIT 0**· `apps/web npx vitest run` **33/33 green** (money 10 + host 8 + storagePath 15).
