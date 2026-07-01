@@ -2122,3 +2122,26 @@ Read-only mobile UI consistency audit, inventory ξαναχτισμένο από
 
 ### Needs Achilleas
 - (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας· μηδέν committed secret (μόνο `.env.example` template). Standing product-decision items (ΟΧΙ auto-buildable queue): **native dep approvals** (`react-native-safe-area-context` για safe-area, προτεινόμενο `npx expo install` + simulator verify), **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor 19 αρχεία), **Settings language switcher** (i18n string-extraction 16 screens + persist dep), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: μείνε web-only), **SaaS multi-tenancy** (`SAAS_MODE` server-only infra = architecture decision, όχι mobile parity).
+
+## 2026-07-01 (ui-auditor, 26η σάρωση — «Card + Badge + ListItem» set ΕΚΛΕΙΣΕ [ListItem committed], tokens 0 violations)
+Read-only mobile UI consistency audit· inventory ξαναχτισμένο από τον κώδικα (όχι docs). **16 mobile screens**, 9 primitives στο `ui.tsx` (Input/TextArea/Check/Button/IconButton/Card/ListItem/Badge + Header/Empty helpers).
+
+**Ευρήματα ανά διάσταση (live grep):**
+- **hardcoded-hex: 0** — grep 3/6-digit hex στα `src/screens/` + `nav.tsx` καθαρό (όλα `C.*`).
+- **rgba(0,0,0) literals: 0** — scrim token πλήρως υιοθετημένο.
+- **missing-token: 0** — 11/11 web color tokens mirror-αρισμένα στο `theme.ts` (+ orange, +onAccent) + SPACE/RADIUS/SIZE/scrim/alpha helper.
+- **duplicate-primitive: 2** — (α) **`<Chip>`** ΔΕΝ υπάρχει ακόμα: `chip`/`chipOn` σε ItemsScreen:465 + SettingsScreen:617 (padding-drift 14/7 vs 16/8), `cChip` SubscriptionsScreen:160, `sChip` ItemsScreen:480. (β) **`<Input>` adoption 6/13 screens**: 21 raw `<TextInput>` σε 7 screens απομένουν — Receipts 9, Shopping 4, Login 3, Items 2, Settings 1, Search 1, Assistant 1 (όλα token-drift outliers, attended-preferred).
+- **touch-target: 0** — Check (24×24) + hitSlop DONE.
+- **safe-area: 1 (TODO)** — `react-native-safe-area-context` ΑΠΟΝ από deps· ακόμα plain RN `SafeAreaView` (μηδέν bottom inset). Native dep-add → attended-only.
+- **adaptive/max-width: 1 (P3)** — μόνο 2 `maxWidth` usages σε όλο το `src/`, καμία στο main content· τεντώνεται edge-to-edge σε tablet/landscape.
+- **theme/dark-mode: 1 (P3/L)** — dark-only, `C` const-imported σε 19 αρχεία· light palette + `useTheme()` = μεγάλο refactor.
+
+**Κύριο νέο από την 25η:** το `<ListItem>` primitive (top build item, ήταν uncommitted WIP στην 25η) **έγινε commit `0f69116`** → κλείνει ολόκληρο το tracked «Card + Badge + ListItem» set (Card `ee9d413`-era + Badge + ListItem, όλα committed). Working tree mobile καθαρό. mobile `tsc --noEmit` **EXIT 0**.
+
+**Top-3 για τον builder (σειρά, unattended-safe πρώτο):**
+1. **Max content width** (P3/S) — καθαρά auto-buildable, μηδέν dep, structural-verifiable: νέο `<Screen>`/content wrapper με `maxWidth`+center, εφαρμογή στα list screens.
+2. **`<Chip>` primitive** (P2/M) — ενοποίηση των 4 filter/status chip clusters· **προσοχή**: token-drift (padding 14/7 vs 16/8) = ελεγχόμενη οπτική αλλαγή, κράτα ΕΝΑ canonical set και σημείωσέ το (attended-preferred για οπτικό verify).
+3. **Input outliers** (P1/M, υπόλοιπο) — 21 raw `<TextInput>` → `<Input>/<TextArea>`· token-drift ανά screen, attended-preferred (no-simulator).
+
+### Needs Achilleas
+- (αμετάβλητο) Μηδέν committed secret (μόνο `.env.example` template). Standing product-decision items (ΟΧΙ auto-buildable): **native dep approvals** (`react-native-safe-area-context` για safe-area — προτεινόμενο `npx expo install` + simulator verify), **Reports extra charts** (endpoint + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor 19 αρχεία), **Settings language switcher** (i18n string-extraction + persist dep), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: web-only).
