@@ -202,6 +202,17 @@ const SHOWCASE_MODS: { icon: string; color: string; title: string; count: string
   { icon: 'wifi', color: 'var(--gold)', title: 'Network', count: '31 clients' },
 ];
 
+const COMPARE: { label: string; self: string; hosted: string }[] = [
+  { label: 'Where it runs', self: 'Your own hardware', hosted: 'Our managed servers' },
+  { label: 'Your data', self: 'Stays on your disk', hosted: 'Isolated per tenant' },
+  { label: 'Setup', self: 'One docker compose up', hosted: 'Nothing to install' },
+  { label: 'Updates & backups', self: 'You run them', hosted: 'Automatic, nightly' },
+  { label: 'AI parsing', self: 'Bring your own key or Ollama', hosted: 'Included, ready to go' },
+  { label: 'Offline use', self: 'Full, no internet needed', hosted: 'Needs a connection' },
+  { label: 'Cost', self: 'Free, AGPL-3.0', hosted: 'Monthly plan' },
+  { label: 'Support', self: 'Community & docs', hosted: 'Priority email' },
+];
+
 const FAQS: { q: string; a: string }[] = [
   {
     q: 'Is self-hosting really free?',
@@ -524,6 +535,43 @@ export default function Home() {
 
           <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 36 }}>
             Final hosted pricing is being worked out. Self-hosting stays free under AGPL-3.0.
+          </p>
+        </div>
+      </section>
+
+      {/* ── Compare (self-host vs hosted) ─────────────────── */}
+      <section id="compare" style={{ padding: '32px 0 72px' }}>
+        <div className="container" style={{ maxWidth: 860 }}>
+          <div style={{ textAlign: 'center', marginBottom: 40 }}>
+            <p className="mono" style={{ marginBottom: 12 }}>Side by side</p>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 700 }}>
+              Self-hosted vs hosted
+            </h2>
+          </div>
+
+          <div className="compare-wrap">
+            <table className="compare">
+              <thead>
+                <tr>
+                  <th scope="col"><span className="sr-only">Feature</span></th>
+                  <th scope="col">Self-hosted</th>
+                  <th scope="col" className="hl">Hosted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARE.map((r) => (
+                  <tr key={r.label}>
+                    <th scope="row">{r.label}</th>
+                    <td data-col="Self-hosted">{r.self}</td>
+                    <td data-col="Hosted" className="hl">{r.hosted}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 28 }}>
+            Same app either way. Export to JSON and switch whenever you like.
           </p>
         </div>
       </section>

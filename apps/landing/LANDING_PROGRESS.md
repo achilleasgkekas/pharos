@@ -209,3 +209,24 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain.
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02 (cont.²)
+
+Task: (e) Polish, μερος 8 — comparison table self-host vs hosted (νεα `<section id="compare">` αναμεσα σε Pricing και FAQ· το landing ειχε pricing cards αλλα καμια συγκεντρωτικη side-by-side συγκριση των δυο tracks, που ειναι η βασικη αποφαση του επισκεπτη).
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεο `COMPARE` array (8 dimensions: Where it runs / Your data / Setup / Updates & backups / AI parsing / Offline use / Cost / Support) + semantic `<table class="compare">` (thead 3-col, tbody με `<th scope="row">` + 2 `<td>`, το Hosted column με `.hl` accent). Wrapper `.compare-wrap` (rounded, border, overflow hidden). Κατω footnote «Same app either way. Export to JSON and switch whenever you like.». `.sr-only` για το κενο header cell. Reuse του υπαρχοντος container/section idiom. Μηδεν νεο dependency, μηδεν JS — pure markup/CSS.
+- `app/globals.css`: νεα `.sr-only` utility· `.compare-wrap` + `.compare` table styles (border-collapse, thead mono uppercase σε surface-2, `th[scope=row]` 34% bold, `.hl` accent χρωμα + πρασινο tint background στο Hosted column, row hover). Mobile stacking @560px: thead hidden, rows -> blocks, καθε `td::before { content: attr(data-col) }` δειχνει «Self-hosted: / Hosted: » label (proper responsive table, οχι horizontal scroll). `#compare` μπηκε στο 480px vertical-rhythm rule (24/48 padding).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 103 kB First Load JS, αμεταβλητο — pure HTML/CSS, μηδεν νεο JS).
+- Preview (landing-dev, port 3100): DOM eval @1280px επιβεβαιωσε 8 rows, headers [Feature/Self-hosted/Hosted], Hosted column computed color rgb(0,255,136) accent, first row «Where it runs -> Your own hardware / Our managed servers», last «Support -> Community & docs / Priority email». @380px: thead display:none, tr display:block, `td.hl::before` = "Hosted: ", scrollWidth==innerWidth==380 (μηδεν horizontal scroll), μηδεν console errors. Σταματησα τον server. Docker/web/mobile αθικτα. Το `.claude/launch.json` (local landing-dev config, shared root) ΔΕΝ commit (collision guard).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση του CSS mockup (#preview) με πραγματικα app screenshots οταν υπαρξουν assets, η secondary CTA band πριν το footer, η μικρες micro-copy βελτιωσεις.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain.
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.

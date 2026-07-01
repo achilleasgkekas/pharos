@@ -546,6 +546,74 @@ h1, h2, h3 {
   max-width: 620px;
 }
 
+/* Compare table (self-host vs hosted) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.compare-wrap {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.compare th,
+.compare td {
+  padding: 14px 18px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.compare tbody tr:last-child th,
+.compare tbody tr:last-child td {
+  border-bottom: none;
+}
+.compare thead th {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  background: var(--surface-2);
+}
+.compare thead th.hl,
+.compare td.hl {
+  color: var(--accent);
+}
+.compare thead th.hl {
+  background: rgba(0, 255, 136, 0.06);
+}
+.compare tbody th[scope='row'] {
+  font-weight: 600;
+  color: var(--text);
+  width: 34%;
+}
+.compare tbody td {
+  color: var(--text-dim);
+}
+.compare tbody td.hl {
+  color: var(--text);
+  background: rgba(0, 255, 136, 0.04);
+}
+.compare tbody tr:hover td,
+.compare tbody tr:hover th[scope='row'] {
+  background: var(--surface-2);
+}
+.compare tbody tr:hover td.hl {
+  background: rgba(0, 255, 136, 0.08);
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
@@ -570,11 +638,40 @@ h1, h2, h3 {
   .win-body { padding: 20px 18px 22px; }
   .win-addr { max-width: 180px; }
   .container { padding: 0 18px; }
+
+  /* Compare: stack each row as a labelled block */
+  .compare thead { display: none; }
+  .compare, .compare tbody, .compare tr, .compare th, .compare td { display: block; }
+  .compare tbody tr {
+    border-bottom: 1px solid var(--border);
+    padding: 6px 0;
+  }
+  .compare tbody tr:last-child { border-bottom: none; }
+  .compare tbody th[scope='row'] {
+    width: auto;
+    padding: 12px 18px 4px;
+    border-bottom: none;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .compare tbody td {
+    border-bottom: none;
+    padding: 4px 18px;
+  }
+  .compare tbody td::before {
+    content: attr(data-col) ': ';
+    color: var(--text-faint);
+  }
+  .compare tbody td.hl, .compare tbody tr:hover td.hl { background: none; }
 }
 @media (max-width: 480px) {
   /* Tighten vertical rhythm so sections do not feel stretched on phones */
   #top { padding: 72px 0 60px !important; }
   #features, #self-host, #faq, #trust { padding: 40px 0 !important; }
+  #compare { padding: 24px 0 48px !important; }
   #pricing { padding: 44px 0 64px !important; }
   #preview { padding: 8px 0 44px !important; }
   .btn { width: 100%; }
