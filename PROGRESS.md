@@ -5,6 +5,19 @@
 <!-- reviewed: f17f279 -->
 <!-- docker-validated: 83639d8 -->
 
+## 2026-07-01 (parity-auditor — 20η σάρωση ημέρας: ουρά αμετάβλητη, 0 GAP)
+- **Inventory από κώδικα** (όχι docs): **49 v1 routes** (`find api/v1 -name route.ts` = 49· login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`** (home + 18· income + setup ξεχωριστά), **81 exported api fns** στο `apps/mobile/src/api.ts`.
+- **Route↔consumer diff (μηχανικό `comm`)**: εξήγαγα και τα 49 route paths και τα consumed v1 paths από το mobile `api.ts` (normalized `${...}`→`[id]`). 45/49 άμεσο match· τα 4 «no consumer» (`receipts`, `search`, `statements`, `trash/[type]/[id]`) ήταν **artifacts** query-string/`[type]` — grep επιβεβαίωσε ότι καταναλώνονται όλα (`receipts?limit=100` :188, `search?q=` :383, `statements?limit=100` :283, `trash/${type}/${id}` PATCH :400 + DELETE :403) → **1:1, μηδέν «endpoint χωρίς mobile consumer» gap**. Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only first-run wizard· N/A).
+- **App-code diff από `43d3b3c` (προηγ. parity marker = 19η σάρωση)**: μόλις **2** app-src commits, **καμία νέα portable web δυνατότητα**: `f17f279` (`refactor(api)` isObjectId dedup 4η/τελική παρτίδα, 7 deep sub-route files, `--stat` 7/+15 −8, byte-identical guard, response shapes αμετάβλητα = **Web Debt cleanup**) + `ee9d413` (`refactor(mobile)` shared `Badge` primitive, `--stat` 4/+37 −14 = **UI Debt**, byte-identical με overrides). Τα ενδιάμεσα = docs + docker-health + marker. Working tree **καθαρό** στην αρχή (μηδέν WIP του Αχιλλέα).
+- **«Partial» rows ξανα-επιβεβαιωμένα ως Needs Decision** (όχι κρυμμένο auto-buildable GAP): `reports/route.ts` **GET-only**, `statements/plans/route.ts` **GET-only** → extra charts / merge-bind / PDF-import θέλουν νέα endpoints + RN charting lib.
+- **Counts: DONE 7 (parity queue 6/6 + theme foundation) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.** Ενεργό parity TODO κανένα.
+- **mobile `tsc --noEmit` → EXIT 0** (μηδέν P1 type errors).
+- **Top-3 για τον builder** (όλα UI Debt, ο parity core είναι κλειστός): (1) **Safe-area insets** [P2/M, `SafeAreaProvider`+`useSafeAreaInsets`, additive, no token-drift, unattended-safe]· (2) **`<ListItem>` primitive** [τελευταίο κομμάτι Card+Badge+ListItem group]· (3) fresh web-debt σάρωση ή **readBody adoption** στα ~13 raw-body routes. Τα `<Chip>`/lucide-icons/language-switcher = attended-preferred για οπτικό verify.
+- **Read-only run**: μηδέν app-code edit, μηδέν Docker build, μηδέν AI/token. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+### Needs Achilleas
+- Κανένα νέο. Standing (product/credentials boundary): theme toggle, language switcher, AI-engine/storage/OneDrive settings στο mobile· Reports extra charts (RN charting lib)· Tasks Kanban board· Statements merge/bind + PDF import (νέα write/upload endpoints)· remote push pipeline αδοκίμαστο (χρειάζεται EAS dev build + APNs key). Web-side: login brute-force rate-limit, error-message leak στο `withAuth` 500, tasks `steps` χωρίς cap.
+
 ## 2026-07-01 (builder — mobile `Badge` primitive· UI Debt «Card+Badge+ListItem» → Badge ΕΚΛΕΙΣΕ)
 - **Context (concurrency)**: το run ξεκίνησε ενώ ένας **concurrent builder** δούλευε ζωντανά στο ίδιο branch (HEAD προχώρησε κάτω από τα πόδια μου, staged files τρίτου, ενεργό churn στο `ui.tsx`/PROGRESS). Στάθηκα μέχρι να **σταθεροποιηθεί** το tree (καθαρό, όλα pushed, HEAD `bf78783`), ΜΕΤΑ πήρα το επόμενο unattended-safe κομμάτι. Μηδέν git write όσο υπήρχε ξένο staged content.
 - **Τι**: ο concurrent builder είχε κλείσει το `<Card>` μισό του UI Debt item «Card + Badge + ListItem» και άφησε το `<Badge>` σημειωμένο ως «attended-preferred (token-divergent)». Το πήρα ως **byte-identical** dedup (μηδέν οπτική αλλαγή → tsc-verifiable χωρίς simulator), λύνοντας ακριβώς εκείνη την ανησυχία.
