@@ -2,8 +2,18 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: e47f150 -->
+<!-- reviewed: 21c4792 -->
 <!-- docker-validated: 454e96e -->
+
+## 2026-07-02 (reviewer — range e47f150..21c4792 clean, 0 fixes)
+- **Έλεγξα:** 7 commits από τον τελευταίο marker (`e47f150`). Κώδικας ουσίας: (α) `918f49c` **SaaS AI/storage quota ENFORCEMENT gate** — νέα `lib/billing/enforce.ts` (+83, `enforceAiQuota`/`enforceStorageQuota` async gates + PURE `quotaExceededBody`/`quotaExceededResponse` 402 builders) + νέο read endpoint `api/saas/usage/route.ts` (+55, GET current-period usage+quota status ανά workspace) + `enforce.test.ts` (+52). (β) `21c4792` + `8e174f1` pure-lib test suites (expenses/lib 14, taxonomies 22, itemStatus 10). (γ) `e4306fa` landing responsive CSS. (δ) docs/monitor + docs/mobile.md guide (+201) + STATUS/progress logs.
+- **Checks:** `apps/web` type-check **EXIT 0**· `apps/mobile` `tsc --noEmit` **EXIT 0**· vitest **201/201 passed** (13 files, incl. νέα `enforce.test.ts` 4 + expenses/lib 14 + taxonomies 22 + itemStatus 10).
+- **Ποιότητα enforce.ts + usage route:** καθαρά, exemplary docs. **OSS parity διατηρημένη:** τα gates είναι pure pass-throughs για τον implicit self-hosted DEFAULT_TENANT / SAAS_MODE off (το υποκείμενο `checkAiQuota`/`checkStorageQuota` επιστρέφει UNLIMITED+allowed χωρίς DB access) → self-hosted app ποτέ blocked, ποτέ ledger hit. Το usage endpoint υπάρχει ΜΟΝΟ σε SaaS mode (`saasAuthGate` → 404 όταν off) + session/membership/tenant-context guards (401/403/404). **Καμία σύνδεση σε feature route ακόμα** (reusable primitive + read surface μόνο) → μηδέν regression risk σε OSS/self-hosted.
+- **Mobile-facing API shapes:** το μοναδικό API route που αγγίχτηκε είναι το ΝΕΟ `api/saas/usage` (SaaS-only, δεν το καταναλώνει το mobile app)· κανένα υπάρχον endpoint δεν άλλαξε shape → mobile ασφαλές (tsc EXIT 0 επιβεβαιώνει).
+- **Landing (`e4306fa`):** static responsive CSS (media queries 900/720/560/480px) + `nav` inline flex-styles → `className="site-nav"`. Επιβεβαίωσα ότι το base `.site-nav` rule (display:flex; align-items:center; gap:28px) υπάρχει στο globals.css → η αντικατάσταση των inline styles ΔΕΝ σπάει το desktop nav layout. Μηδέν runtime logic, μηδέν secret.
+- **Fixes:** καμία (όλα πράσινα, δεν χρειάστηκε καμία μικρή/ασφαλής διόρθωση).
+- **Flagged:** τίποτα νέο — commits σωστά labeled (feat(saas)/test/feat(landing)/docs), μηδέν committed secret, μηδέν broken/removed functionality, μηδέν queue item «DONE» που δεν πληρούται.
+- **Git hygiene:** staged ΜΟΝΟ PROGRESS.md (explicit path, ΟΧΙ `-A`). Το `.claude/launch.json` (foreign tooling WIP του Αχιλλέα) ΔΕΝ αγγίχτηκε. Μηδέν Docker/AI/token-spend, read-only πλην του marker+entry.
 
 ## 2026-07-02 (pharos-daily-dev — vitest suites για `lib/taxonomies.ts` + `lib/itemStatus.ts`, 32 tests)
 - **Τι έγινε:** Δύο νέα pure-lib test files — `apps/web/src/lib/taxonomies.test.ts` (22 tests) + `apps/web/src/lib/itemStatus.test.ts` (10 tests) — που καλύπτουν πλήρως τα δύο εναπομείναντα untested pure modules. **taxonomies.ts:** `normalizeList` (trim, lowercase, space-run→single-dash, case-insensitive dedupe, slug-collision dedupe, drop empties, slice(30), «other»-append χωρίς διπλασιασμό/χωρίς force-last αν υπάρχει mid-list, empty→['other'], non-string junk coercion) + `resolveTaxonomy` (array-override, fallback σε absent/undefined/empty-array/non-array, String-coercion μελών, key-isolation) + defaults/`TAXONOMY_META` invariants (κάθε default λήγει σε «other», idempotent κάτω από normalizeList, meta καλύπτει ακριβώς τα 3 keys με σωστά wired defaults). **itemStatus.ts:** `statusesFor` (inventory→OWNED, shopping→SHOPPING, disjoint vocabularies) + `VIEW_CONFIG` (entry ανά view, defaultStatus ⊂ vocabulary, copy/emoji, κάθε statusFilters ξεκινά με «All»/empty-value, non-«All» values 1:1 με το vocabulary, unique values).
