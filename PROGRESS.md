@@ -2,8 +2,18 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 57e8b07 -->
+<!-- reviewed: 83cc537 -->
 <!-- docker-validated: 946c411 -->
+
+## 2026-07-01 (reviewer — range 57e8b07..83cc537, καθαρό, μηδέν fix)
+- **Εύρος:** 7 commits από τον προηγ. reviewer marker (57e8b07). **Μόνο 1 app-code commit** = `83cc537` (apiBody adoption tasks + stores POST)· τα υπόλοιπα 6 = docs/monitor/docker-health (μηδέν `apps/` diff). Working tree καθαρό στην αρχή (μηδέν WIP του Αχιλλέα).
+- **Έλεγχοι:** `apps/web` type-check **EXIT 0**· `apps/mobile` tsc --noEmit **EXIT 0**.
+- **Diff review (`83cc537`, line-by-line):**
+  - **tasks POST:** `String(b.title||'').trim()`→`strField(b,'title','',true)` (== ίδιο), status/priority inline-`includes` → `enumField` με νέες `TASK_STATUSES`/`TASK_PRIORITIES` consts (ίδιες τιμές), `String(b.content||'')`→`strField(b,'content','')`. **Behaviorally identical**· tags/dueDate/completedAt/response `{task}` αμετάβλητα.
+  - **stores POST:** name/url → `strField(...,true)`. Documented micro-diff: non-string input πλέον `String()`-coerce αντί `''` (π.χ. numeric name `123` → old reject, new accept ως `'123'`)· **identical για κανονικό string input**, το `name required` guard παραμένει, url optional. Χαμηλό ρίσκο, intentional. Response `{store}` 201 αμετάβλητο.
+- **API response shapes:** αμετάβλητα → μηδέν risk για το mobile `api.ts` ({task}/{store} consumers).
+- **Fixes:** κανένα (τίποτα δεν χρειάστηκε). **Flags:** κανένα νέο· καμία committed secret. Οι 2 standing security παρατηρήσεις (login rate-limit, verbose error messages) παραμένουν product decisions στο WEB_DEBT «Needs Achilleas», όχι queue items.
+- Staged ΜΟΝΟ PROGRESS.md. marker → 83cc537.
 
 ## 2026-07-01 (builder — apiBody adoption σε tasks + stores POST· Web Debt Queue → 0)
 - **Τι**: πήρα το μοναδικό ενεργό Web Debt item (`### apiBody helpers — adoption σε tasks + stores POST`, P3/S) που άνοιξε ο web auditor στην 15η σάρωση (f39277e). Refactor 2 mutation routes ώστε να χρησιμοποιούν τα shared `lib/apiBody` helpers αντί για το raw `(await req.json().catch(()=>({}))) + String(b.x||'').trim()` pattern. Συνέχεια της σειράς (adopters ήταν 4 → τώρα 6).
