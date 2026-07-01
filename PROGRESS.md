@@ -1572,3 +1572,14 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 
 ### Needs Achilleas
 - (αμετάβλητο) 3 standing παρατηρήσεις, product decisions ΟΧΙ queue items: (1) `auth/login` χωρίς rate-limit/brute-force guard (self-hosted, WireGuard-only → χαμηλό ρίσκο)· (2) κάποια error messages επιστρέφουν λεπτομέρεια (π.χ. «A store with that name already exists») — αποδεκτό για single-user, review αν γίνει multi-tenant· (3) `PATCH /api/v1/tasks/[id]` δέχεται `steps` full-array χωρίς άνω όριο πλήθους/μήκους — βάλε cap (≤100 steps, text ≤500 chars) αν βγει multi-tenant/public.
+
+## 2026-07-01 (parity-auditor — 15η σάρωση, ουρά αμετάβλητη, μηδέν νέο portable feature)
+- **Inventory από κώδικα (όχι docs):** 49 v1 routes (login + 48 bearer), 16 mobile screens, 19 web `page.tsx` (home + 18· income + setup ξεχωριστά), 72 exported api fns. Το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes (τα `tasks[id]`/`trash/[id]/[id]` = grep artifacts) → **μηδέν «endpoint χωρίς mobile consumer» gap**. Κάθε web page έχει mobile equivalent εκτός `/setup` (web-only first-run wizard, N/A).
+- **App-code diff από `d235eff` (προηγ. parity marker):** 10 commits, **καμία νέα portable web δυνατότητα**. 7 `refactor(api)` = apiBody helpers + `cardFields.ts` dedup (behaviorally identical, Web Debt)· το μόνο νέο vs 14η σάρωση = `0c866eb` (readBody notifications + lists PATCH). Τα `e0f7a97` (Tasks steps) + `47a9574` (Tasks ←/→) + `929ca4d`/`9d226cf` (IconButton/Card primitives) = ήδη DONE.
+- **«Partial» rows ξανα-επιβεβαιωμένα ως Needs Decision:** Reports `route.ts` GET-only (line 24)· Statements `plans/route.ts` GET-only (line 16) → extra charts / merge-bind / PDF-import θέλουν νέα endpoints + lib. ΟΧΙ κρυμμένο auto-buildable GAP.
+- **Counts:** DONE 7 (parity queue) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα. mobile `tsc --noEmit` → **EXIT 0**.
+- **Top 3 για τον builder (κανένα ενεργό parity TODO → UI Debt Queue):** (1) Button-family finish (P2/S, unattended-safe: ShoppingScreen `addBtnWide` + ItemsScreen `save` outlier → `<Button>`)· (2) Safe-area insets (P2/M, unattended-safe: `SafeAreaProvider`+`useSafeAreaInsets`)· (3) `<Chip>`/`<Badge>`/`<ListItem>` primitive (P2/M, attended-preferred λόγω token-drift).
+- Working tree: μόνο `STATUS.md` = WIP του Αχιλλέα (δεν το άγγιξα). Read-only run: μηδέν app-code edit, μηδέν Docker, μηδέν AI. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+### Needs Achilleas
+- (αμετάβλητο) Product-decision items, ΟΧΙ auto-buildable: **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: μείνε web-only).
