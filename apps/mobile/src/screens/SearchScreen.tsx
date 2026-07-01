@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import { C } from '../theme';
-import { Empty } from '../ui';
+import { Empty, Badge } from '../ui';
 import { search, type SearchHit } from '../api';
 import type { ScreenKey } from './HomeScreen';
 
@@ -64,9 +64,11 @@ export function SearchScreen({ onOpen }: { onOpen: (k: ScreenKey) => void }) {
           const dest = TO_SCREEN[item.type];
           return (
             <Pressable onPress={() => dest && onOpen(dest)} style={s.row}>
-              <View style={[s.chip, { borderColor: COLOR[item.type] || C.border }]}>
-                <Text style={[s.chipText, { color: COLOR[item.type] || C.dim }]}>{item.type.toUpperCase()}</Text>
-              </View>
+              <Badge
+                label={item.type.toUpperCase()}
+                color={COLOR[item.type] || C.dim}
+                style={{ borderColor: COLOR[item.type] || C.border, paddingVertical: 3 }}
+              />
               <View style={{ flex: 1 }}>
                 <Text style={s.title} numberOfLines={1}>{item.title}</Text>
                 {!!item.subtitle && <Text style={s.sub} numberOfLines={1}>{item.subtitle}</Text>}
@@ -85,8 +87,6 @@ const s = StyleSheet.create({
   input: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: C.text, fontSize: 16 },
   err: { color: C.red, fontSize: 13, paddingHorizontal: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 12, marginBottom: 8 },
-  chip: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
-  chipText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   title: { color: C.text, fontSize: 15, fontWeight: '600' },
   sub: { color: C.faint, fontSize: 12, marginTop: 2 },
 });

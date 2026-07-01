@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, StyleSheet, Alert } from 'react-native';
 import { C, alpha } from '../theme';
-import { shortDate, Spinner, ErrorText, Empty, Card } from '../ui';
+import { shortDate, Spinner, ErrorText, Empty, Card, Badge } from '../ui';
 import {
   getTrash, restoreTrash, purgeTrash, currentUser,
   getJobs, getHistory, getNotifications, markNotificationRead,
@@ -217,7 +217,7 @@ function JobsTab() {
             <Card>
               <View style={s.jobHead}>
                 <Text style={s.title} numberOfLines={1}>{item.title}</Text>
-                <View style={[s.badge, { borderColor: st.color }]}><Text style={[s.badgeText, { color: st.color }]}>{st.label}</Text></View>
+                <Badge label={st.label} color={st.color} style={{ paddingHorizontal: 7, marginLeft: 'auto' }} textStyle={{ fontSize: 10 }} />
               </View>
               <Text style={s.meta}>{`${item.done}/${item.total} · ${item.ok} ok · ${relTime(item.finishedAt || item.createdAt)}`}</Text>
               {item.total > 0 && (
@@ -310,8 +310,6 @@ const s = StyleSheet.create({
   purge: { borderWidth: 1, borderColor: alpha(C.red, 0.25), backgroundColor: alpha(C.red, 0.07), borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
   purgeText: { color: C.red, fontSize: 14, fontWeight: '600' },
   jobHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  badge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 'auto' },
-  badgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   track: { height: 6, borderRadius: 3, backgroundColor: C.surface2, marginTop: 8, overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3 },
   preview: { color: C.dim, fontSize: 13, marginTop: 8, lineHeight: 18 },

@@ -5,6 +5,21 @@
 <!-- reviewed: f17f279 -->
 <!-- docker-validated: 83639d8 -->
 
+## 2026-07-01 (builder — mobile `Badge` primitive· UI Debt «Card+Badge+ListItem» → Badge ΕΚΛΕΙΣΕ)
+- **Context (concurrency)**: το run ξεκίνησε ενώ ένας **concurrent builder** δούλευε ζωντανά στο ίδιο branch (HEAD προχώρησε κάτω από τα πόδια μου, staged files τρίτου, ενεργό churn στο `ui.tsx`/PROGRESS). Στάθηκα μέχρι να **σταθεροποιηθεί** το tree (καθαρό, όλα pushed, HEAD `bf78783`), ΜΕΤΑ πήρα το επόμενο unattended-safe κομμάτι. Μηδέν git write όσο υπήρχε ξένο staged content.
+- **Τι**: ο concurrent builder είχε κλείσει το `<Card>` μισό του UI Debt item «Card + Badge + ListItem» και άφησε το `<Badge>` σημειωμένο ως «attended-preferred (token-divergent)». Το πήρα ως **byte-identical** dedup (μηδέν οπτική αλλαγή → tsc-verifiable χωρίς simulator), λύνοντας ακριβώς εκείνη την ανησυχία.
+- **Αλλαγές** (μόνο mobile, μηδέν API/web):
+  - `ui.tsx`: νέο **`Badge({label,color,style?,textStyle?})`** — coloured 1px-border pill + matching-colour text· `color` οδηγεί border+text· `style`/`textStyle` passthrough για per-screen tweaks. Νέα shared styles `badge` (== TasksScreen `chip`: `borderRadius:6`/padH6/padV2) + `badgeText` (fs9/w700/ls0.5).
+  - 3 screens migrated + διαγραφή των τοπικών `chip`/`badge` + text pairs: **TasksScreen** (status chip, base ακριβώς), **SearchScreen** (type chip, `style` override `paddingVertical:3` + separate border-fallback `C.border` ενώ text-fallback `C.dim` μέσω `color`), **ActivityScreen** (job-status badge, `style` `paddingHorizontal:7`+`marginLeft:'auto'`, `textStyle` `fontSize:10`).
+  - **Byte-identical επαλήθευση**: base == Tasks tokens· τα Search/Activity quirks διατηρήθηκαν μέσω overrides (later-in-array wins → borderColor/padding/fontSize ακριβώς τα παλιά). **Δεν** αγγίχτηκε το StatementsScreen inline installment badge (text-only cyan count, διαφορετικό pattern). grep καθαρό: μηδέν dangling `s.chip`/`s.badge`.
+- **Verify**: `apps/mobile` `npx tsc --noEmit` → **EXIT 0**. **Καμία αλλαγή web runtime** → **κανένα** Docker rebuild (ούτε χρειάζεται). Μηδέν AI/token call.
+- **Git hygiene**: staged ΜΟΝΟ explicit paths (`ui.tsx` + 3 screens + `MOBILE_PARITY.md` + `PROGRESS.md`)· ΟΧΙ `-A`. Πριν το commit ξανα-έλεγξα `git diff --cached` = μόνο δικά μου (μηδέν ξένο staged). Κανένα secret/`.env`.
+- **Επόμενο task**: κλείσε το UI Debt item με το **`<ListItem>` primitive** (P2/M· τα `row:` list-item StyleSheet entries σε ~αρκετά screens → shared, byte-identical αν προσεκτικό). Εναλλακτικά τα Input outliers (Shopping/Receipts/Search/Assistant/Login → `<Input>`, attended-preferred για οπτικό verify) ή δομικά Safe-area insets (TODO). **ΠΑΝΤΑ** fresh `git status` + `git diff --cached` στην αρχή· αν υπάρχει ξένο staged/churn → στάσου μέχρι να σταθεροποιηθεί (όπως εδώ).
+
+### Needs Achilleas
+- **Concurrency**: επιβεβαιωμένο ότι τρέχουν πολλαπλοί builders ταυτόχρονα στο ίδιο `main` (staged files + advancing HEAD mid-run). Λειτούργησε εντάξει εδώ με το «wait-until-stable», αλλά ένα single-flight lock (ή ξεχωριστά worktrees/branches ανά role) θα απέτρεπε wasted stand-down runs και πιθανές collisions.
+- (Παραμένουν οι παλιές: login brute-force rate-limit, error-message leak· mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports extra charts, Statements merge/bind + PDF import, remote push αδοκίμαστο· lucide-icons + swipe-gesture + language-switcher = attended-preferred.)
+
 ## 2026-07-01 (docker-health — rebuild μετά isObjectId 4η/τελική παρτίδα, marker → 83639d8)
 - **Health/disk (read-only):** mongo `healthy`, web `running` (Up 16 λεπτά, καθαρή εκκίνηση)· web RestartCount **0**· mongo RestartCount 47 = σωρευτικό ιστορικό, health healthy → ΟΧΙ ενεργό OOM. flaresolverr σταματημένο (μηδέν επιπλέον μνήμη). `docker system df`: Images 3.49GB (0B reclaimable), Build Cache 566MB in-use, Containers 78.81MB reclaimable (stopped flaresolverr).
 - **Απόφαση rebuild:** `git diff --name-only b1b2b43..HEAD -- apps/web` = **7 API v1 [id] deep sub-routes** (isObjectId dedup 4η/τελική παρτίδα, commit f17f279) → web runtime code άλλαξε → rebuild δικαιολογημένο.

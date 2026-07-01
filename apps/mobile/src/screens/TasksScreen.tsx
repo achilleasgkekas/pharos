@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
-import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton } from '../ui';
+import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Badge } from '../ui';
 import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task, type TaskStep } from '../api';
 
 const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
@@ -122,7 +122,7 @@ export function TasksScreen() {
               <Pressable onPress={() => openEdit(item)} style={{ flex: 1 }}>
                 <Text style={[s.title, done && s.struck]}>{item.title}</Text>
                 <View style={s.metaRow}>
-                  <View style={[s.chip, { borderColor: SC[item.status] }]}><Text style={[s.chipText, { color: SC[item.status] }]}>{slabel(item.status)}</Text></View>
+                  <Badge label={slabel(item.status)} color={SC[item.status]} />
                   {steps.length > 0 && <Text style={[s.steps, doneSteps === steps.length && { color: C.accent }]}>{`☑ ${doneSteps}/${steps.length}`}</Text>}
                   {item.priority !== 'normal' && <Text style={s.pri}>{item.priority}</Text>}
                   {item.tags.length > 0 && <Text style={s.tags} numberOfLines={1}>#{item.tags.join(' #')}</Text>}
@@ -192,8 +192,6 @@ const s = StyleSheet.create({
   title: { color: C.text, fontSize: 15, fontWeight: '600' },
   struck: { textDecorationLine: 'line-through', color: C.dim },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 },
-  chip: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  chipText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   steps: { color: C.dim, fontSize: 11, fontWeight: '600' },
   pri: { color: C.gold, fontSize: 11 },
   tags: { color: C.faint, fontSize: 11, flex: 1 },

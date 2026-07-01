@@ -154,9 +154,36 @@ export function Card({ children, onPress, onLongPress, style }: CardProps) {
   return <View style={[s.card, style]}>{children}</View>;
 }
 
+type BadgeProps = {
+  /** Short label, usually uppercase (a status or record type). */
+  label: string;
+  /** Border + text colour (typically a status/type colour). */
+  color: string;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+};
+
+/**
+ * Small outlined status/type badge — a coloured 1px-border pill with matching
+ * coloured uppercase text. Display-only. Unifies the byte-identical
+ * `badge`+`badgeText` / `chip`+`chipText` pairs that were duplicated across the
+ * Tasks, Search and Activity screens. `color` drives both the border and the
+ * text; pass `style`/`textStyle` for per-screen tweaks (e.g. Activity's
+ * `marginLeft:'auto'` + larger font, or Search's separate border fallback).
+ */
+export function Badge({ label, color, style, textStyle }: BadgeProps) {
+  return (
+    <View style={[s.badge, { borderColor: color }, style]}>
+      <Text style={[s.badgeText, { color }, textStyle]}>{label}</Text>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, gap: 4 },
   card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg, padding: 14, marginBottom: 10 },
+  badge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  badgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   iconBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   iconBtnText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   backBtn: { width: 40, height: 36, alignItems: 'center', justifyContent: 'center' },
