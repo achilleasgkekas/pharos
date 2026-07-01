@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
-import { isObjectId } from '@/lib/apiBody';
+import { isObjectId, readBody } from '@/lib/apiBody';
 import { logItemPrice } from '@/app/items/actions';
 
 export const runtime = 'nodejs';
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return withAuth(req, async () => {
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
-    const b = (await req.json().catch(() => ({}))) as { price?: unknown; store?: unknown };
+    const b = await readBody(req);
     const price = Number(b.price);
     if (!(price > 0)) return apiError('price must be greater than 0');
     const store = typeof b.store === 'string' ? b.store : '';

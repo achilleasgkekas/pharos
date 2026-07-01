@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { readBody } from '@/lib/apiBody';
 import { importItemFromUrl } from '@/app/items/actions';
 
 export const runtime = 'nodejs';
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic';
  *  → { ok, id, title, price, store, updated }. Needs the 'itemsImport' AI feature. */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
-    const b = (await req.json().catch(() => ({}))) as { url?: unknown; view?: unknown };
+    const b = await readBody(req);
     const url = String(b.url || '').trim();
     if (!/^https?:\/\//i.test(url)) return apiError('valid http(s) url required');
     const view = b.view === 'inventory' ? 'inventory' : 'shopping';

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
 import { AppConfig } from '@/models/AppConfig';
@@ -69,7 +70,7 @@ export async function GET(req: NextRequest) {
  *  Mirrors the (non-admin-gated) web saveDefaults / saveNtfy / saveBudgets actions. */
 export async function PATCH(req: NextRequest) {
   return withAuth(req, async () => {
-    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const b = await readBody(req);
     const set: Record<string, unknown> = {};
 
     if (typeof b.currency === 'string' && b.currency.trim()) set.currency = b.currency.trim().toUpperCase().slice(0, 4);

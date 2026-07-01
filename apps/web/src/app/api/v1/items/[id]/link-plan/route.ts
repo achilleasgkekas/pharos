@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
-import { isObjectId } from '@/lib/apiBody';
+import { isObjectId, readBody } from '@/lib/apiBody';
 import { linkPlanToItem, removeItemFromPlanByKey } from '@/app/statements/actions';
 
 export const runtime = 'nodejs';
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return withAuth(req, async () => {
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
-    const b = (await req.json().catch(() => ({}))) as { signature?: unknown };
+    const b = await readBody(req);
     const signature = typeof b.signature === 'string' ? b.signature.trim() : '';
     if (!signature) return apiError('signature required');
     const r = await linkPlanToItem(signature, id);
@@ -27,7 +27,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   return withAuth(req, async () => {
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
-    const b = (await req.json().catch(() => ({}))) as { signature?: unknown };
+    const b = await readBody(req);
     const signature = typeof b.signature === 'string' ? b.signature.trim() : '';
     if (!signature) return apiError('signature required');
     const r = await removeItemFromPlanByKey(signature, id);

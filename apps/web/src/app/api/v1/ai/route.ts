@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { readBody } from '@/lib/apiBody';
 import { runAiCommand, type ChatTurn } from '@/app/aiCommandActions';
 
 export const runtime = 'nodejs';
@@ -17,7 +18,7 @@ const MAX_CONTENT = 8000;
  *  Needs the Anthropic provider + the 'commandBar' AI feature enabled. */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
-    const b = (await req.json().catch(() => ({}))) as { messages?: unknown };
+    const b = await readBody(req);
     const raw = Array.isArray(b.messages) ? b.messages.slice(-MAX_TURNS) : [];
     const messages: ChatTurn[] = [];
     for (const m of raw) {

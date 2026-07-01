@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
-import { isObjectId } from '@/lib/apiBody';
+import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Store } from '@/models/Store';
 import { invalidateStoreCache } from '@/lib/storeService';
@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return withAuth(req, async () => {
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
-    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const b = await readBody(req);
     const set: Record<string, unknown> = { auto: false };
     if (typeof b.name === 'string') {
       const name = b.name.trim();
