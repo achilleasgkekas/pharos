@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
-import { readBody } from '@/lib/apiBody';
+import { isObjectId, readBody } from '@/lib/apiBody';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '@/app/notifications/actions';
 
 export const runtime = 'nodejs';
@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest) {
   return withAuth(req, async () => {
     const b = await readBody(req);
     if (typeof b.id === 'string' && b.id) {
-      if (!/^[a-f0-9]{24}$/i.test(b.id)) return apiError('bad id');
+      if (!isObjectId(b.id)) return apiError('bad id');
       await markNotificationRead(b.id);
     } else {
       await markAllNotificationsRead();

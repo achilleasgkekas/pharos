@@ -262,7 +262,7 @@
   - Επαλήθευση: `grep -rl '\[a-f0-9\]{24}' apps/web/src/app/api/v1` δεν περιλαμβάνει πλέον κανένα από τα 5 files· `isObjectId` adopters 7 → 12.
   - Απομένουν ~7 route files με inline regex (items/[id]/ai-fill+convert-to-task+link-plan+plans+price, receipts/[id]/add-to-library+rescan) για 4η παρτίδα σε μελλοντικά runs.
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (2026-07-01, commit pending· 5 files migrated, `isObjectId` adopters 7→12· grep `\[a-f0-9\]{24}` πλέον μόνο 7 deep sub-routes· tsc EXIT 0· Docker /login 200, RestartCount 0, cards/trash no-token 401)
 
 ### Dedup ObjectId-validation regex — 2η παρτίδα (5 route files)
 - Priority: P3

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { isObjectId } from '@/lib/apiBody';
 import { restoreFromTrash, purgeTrashEntry, type TrashType } from '@/app/settings/actions';
 
 export const runtime = 'nodejs';
@@ -13,7 +14,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ty
   return withAuth(req, async () => {
     const { type, id } = await params;
     if (!isType(type)) return apiError('bad type');
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     const r = await restoreFromTrash(type, id);
     return NextResponse.json({ ok: r.ok, type, id });
   });
@@ -25,7 +26,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ t
     if (user.role !== 'admin') return apiError('Admin access required', 403);
     const { type, id } = await params;
     if (!isType(type)) return apiError('bad type');
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     const r = await purgeTrashEntry(type, id);
     return NextResponse.json({ ok: r.ok, type, id });
   });

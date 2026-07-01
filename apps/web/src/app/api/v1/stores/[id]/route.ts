@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { isObjectId } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Store } from '@/models/Store';
 import { invalidateStoreCache } from '@/lib/storeService';
@@ -20,7 +21,7 @@ function cleanAliases(raw: unknown): string[] {
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const set: Record<string, unknown> = { auto: false };
     if (typeof b.name === 'string') {
@@ -46,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const doc = await Store.findByIdAndDelete(id).lean();
     if (!doc) return apiError('not found', 404);
