@@ -3,7 +3,17 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: f17f279 -->
-<!-- docker-validated: b1b2b43 -->
+<!-- docker-validated: 83639d8 -->
+
+## 2026-07-01 (docker-health — rebuild μετά isObjectId 4η/τελική παρτίδα, marker → 83639d8)
+- **Health/disk (read-only):** mongo `healthy`, web `running` (Up 16 λεπτά, καθαρή εκκίνηση)· web RestartCount **0**· mongo RestartCount 47 = σωρευτικό ιστορικό, health healthy → ΟΧΙ ενεργό OOM. flaresolverr σταματημένο (μηδέν επιπλέον μνήμη). `docker system df`: Images 3.49GB (0B reclaimable), Build Cache 566MB in-use, Containers 78.81MB reclaimable (stopped flaresolverr).
+- **Απόφαση rebuild:** `git diff --name-only b1b2b43..HEAD -- apps/web` = **7 API v1 [id] deep sub-routes** (isObjectId dedup 4η/τελική παρτίδα, commit f17f279) → web runtime code άλλαξε → rebuild δικαιολογημένο.
+- **Ασφαλές build:** `docker compose build web` (μόνο image, ΟΧΙ `up --build`) → όλα CACHED, image built OK. Επιβεβαίωσα mongo healthy → `docker compose up -d web` → `curl /login` **200** (2η poll) → web RestartCount παρέμεινε **0**, Running true, OOMKilled false.
+- **Disk hygiene:** `docker builder prune -f` μετά το build → ανακτήθηκαν ~3.19MB (fresh layer, cache-only). Καμία καταστροφική ενέργεια.
+- **Marker:** docker-validated `b1b2b43` → **`83639d8`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
+
+### Needs Achilleas
+- Κανένα. Το stack χτίζει και σερβίρει υγιώς.
 
 ## 2026-07-01 (reviewer — range c5cec57..f17f279: isObjectId 4η/ΤΕΛΙΚΗ παρτίδα clean)
 - **Τι review:** 7 commits από τον marker `c5cec57`. Ένα ΜΟΝΟ app-code commit: **`f17f279`** (`refactor(api)` isObjectId dedup 4η/τελική παρτίδα, 7 deep sub-route files). Τα υπόλοιπα 6 = docs (web-debt/ui-auditor/parity/monitor/review) + `26b496a` chore(docker-health). Working tree καθαρό στην αρχή.
