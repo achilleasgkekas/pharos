@@ -5,6 +5,16 @@
 <!-- reviewed: 6809a8c -->
 <!-- docker-validated: 46f35ed -->
 
+## 2026-07-01 (web-code-quality — 21η σάρωση, builder έκλεισε isObjectId 2η παρτίδα, ουρά 0→1, read-only)
+Fresh read-only σάρωση **52 v1 route files** + `apiAuth`/`apiBody`/`apiList` helpers + synced models, όλα από live grep (όχι docs). Από την 20ή σάρωση ο builder κατανάλωσε το commit **`f1413c3`** (isObjectId 2η παρτίδα, 5 [id] routes) → το μοναδικό ενεργό P3/S της 20ής = **DONE** (`isObjectId` adopters live **7**: items, shopping-list + receipts/expenses/subscriptions/tasks/vouchers). Ουρά **0 ενεργά** στην αρχή· άνοιξα 1.
+- **Ευρήματα ανά διάσταση:** Type safety **0** (`npm run type-check` EXIT 0· 0 any/ts-ignore σε όλο το `src`)· Auth **0 unguarded** (τα 3 non-CRUD hits = `auth/login` boundary, `api/mcp` δικό του bearer `authed()`, `api/files` file-server· μηδέν v1 CRUD route χωρίς bearer)· Input validation **0 gaps** (13 raw-body routes validate· list clamped 1..200· ai cap ενεργό)· Error handling **0** (ομοιόμορφο `withAuth` `{error}`)· DB **0** (synced models `updatedAt` index· list reads `.lean()`+`.limit()`)· Duplication **2 ongoing** (raw `req.json().catch` **13 routes**/16 adopters· ObjectId regex inline **12 route files**, `isObjectId` adopters **7**).
+- **Counts: P1=0, P2=0, P3=1** (νέο: isObjectId dedup 3η παρτίδα, 5 route files cards/[id]+stores/[id]+statements/[id]+notifications+trash/[type]/[id], S). Δεν εφευρίσκω debt· άνοιξα ΜΟΝΟ 1 μη-sprawling item.
+- **Top-3 για τον builder:** (1) **isObjectId dedup 3η παρτίδα** (P3/S, το νέο item· cards/[id]+notifications έχουν ήδη apiBody import, τα άλλα 3 θέλουν νέο)· (2) **readBody adoption** στα 13 εναπομείναντα raw-body routes (P3/S ανά 2-3)· (3) **isObjectId 4η παρτίδα** (~7 route files ακόμα: items/[id]/ai-fill+convert-to-task+link-plan+plans+price, receipts/[id]/add-to-library+rescan). Όλα additive, unattended-safe, behaviorally identical.
+- Read-only: μηδέν Docker build, μηδέν AI/token call, μηδέν app-code edit. Staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (explicit paths).
+
+### Needs Achilleas
+- Κανένα νέο. Standing (product/security decisions, ΟΧΙ queue items): login brute-force rate-limit στο `auth/login`, πιθανό error-message leak στο `withAuth` 500 (γενικό vs raw), tasks `steps` array χωρίς άνω όριο πλήθους/μήκους (αποδεκτό για WireGuard-only single-user).
+
 ## 2026-07-01 (ui-auditor — 21η σάρωση, CONFIRMATION: μηδέν νέο mobile-src, ουρά αμετάβλητη)
 - **Read-only mobile UI consistency audit.** `git log 3a272c1..HEAD -- apps/mobile/src` **κενό** + working tree apps/mobile καθαρό → κατάσταση **byte-identical με 19η σάρωση**. Οι ενδιάμεσες commits (isObjectId/readBody dedup + docs) αφορούν ΜΟΝΟ web-api, μηδέν mobile UI impact. Τελευταίος mobile-src commit ΑΚΟΜΑ `3a272c1` (Button-family finish).
 - **Violations ανά διάσταση (fresh live grep):** Tokens **0** (6-digit hex εκτός theme.ts 0· short #fff/#000 0· inline rgba 0· 8-digit alpha 0), States **0** (Spinner 14 / Empty 14 / ErrorText 22 μέσω `ui.tsx`), Touch **0**, Reusable-components **~4 ανοιχτά** (Chip + Badge + ListItem primitives λείπουν + ghost-buttons `aiBtn`/`scanBtn`/`rescanBtn`/`importBtn` μη-ενοποιημένα + 5 Input outlier screens), Adaptive **2** (safe-area 0 imports + εκτός package.json· maxWidth 2 καμία στο content), Theme **1** (dark-only, μηδέν light context).
