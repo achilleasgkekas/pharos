@@ -1056,3 +1056,17 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 
 ## Needs Achilleas
 Κανένα νέο. Παραμένουν ανοιχτά (product/credentials decisions, εκτός auto-buildable): (1) Settings theme toggle + language switcher + AI-engine + storage/OneDrive στο mobile· (2) Reports extra charts (endpoint-extension + RN charting lib επιλογή)· (3) Statements merge/bind write-ops (νέα `/api/v1/statements/plans` write endpoints)· (4) remote push pipeline (APNs/FCM, needs device test). Κανένα committed secret δεν εντοπίστηκε.
+
+## 2026-07-01 (ui-auditor — 10η σάρωση, mobile UI consistency, scrim item ΕΚΛΕΙΣΕ)
+- Read-only re-audit του `apps/mobile` έναντι του web design system. Πρώτη σάρωση μετά το `91a5fe3` (scrim token, ενοποίηση 10 backdrops)· τελευταίος mobile-src commit = `91a5fe3` (`git log 91a5fe3..HEAD -- apps/mobile/src` κενό).
+- Violations ανά dimension (live grep):
+  - **Tokens/hex:** ΠΛΗΡΩΣ καθαρό — 6-digit hex εκτός `theme.ts` **0**, `#000` στα screens **0**, 8-digit alpha **0**, inline `rgba(0,0,0,…)` στα screens **0**. Ο τελευταίος scrim literal ενοποιήθηκε σε `scrim = 'rgba(0,0,0,0.6)'` (theme.ts) → το **Scrim/backdrop item ΕΚΛΕΙΣΕ ως DONE** (builder `91a5fe3`, 10 sites: 9 screens + nav drawer).
+  - **Reusable components:** Input primitive **6/11 screens** (47 `<Input>/<TextArea>` sites· raw `<TextInput>` **21** σε 7 screens· 6 τοπικά input-style entries με token-drift)· **Button/Chip/Card/Badge/ListItem MISSING** (chip-variant **27**, button-variant **17**/9 screens, base `card:` **5**, badge **3**, όλα per-screen).
+  - **Adaptive:** `react-native-safe-area-context` εκτός `package.json` + 0 imports (plain `SafeAreaView` @ App.tsx:88, top-only, μηδέν bottom inset)· `maxWidth` **2** (drawer + bubble, καμία στο content → tablet stretch). **Theme:** light/dark context **0** (dark-only).
+  - **States:** συνεπή μέσω `ui.tsx` (Spinner/Empty/ErrorText).
+- Foundation **4 DONE** (theme tokens + alpha + touch targets + **scrim**)· Input primitive IN PROGRESS (6/11)· 4 δομικά TODO (Button+Chip, Card+Badge+ListItem, Safe-area, Max-width, Light/dark). mobile `tsc --noEmit` **EXIT 0**.
+- **Top 3 για τον builder:**
+  1. **Button + Chip primitives (P2/M, unattended-safe subset)** — 5 byte-identical `save` (padV12/padH22: Money/Receipts/Subscriptions/Tasks/Vouchers) + 6 `addBtn` → `<Button variant="accent">` χωρίς οπτική αλλαγή· onAccent literals ήδη migrated.
+  2. **Card + Badge + ListItem primitives (P2/M)** — 5 base `card:` + 3 badge entries → shared `ui.tsx` primitives.
+  3. **Input primitive συνέχεια (P1/M, 6/11)** — 7 εναπομείναντα screens (token-outliers, attended-preferred για οπτικό verify χωρίς simulator).
+- Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md. Κανένα committed secret εντοπίστηκε.
