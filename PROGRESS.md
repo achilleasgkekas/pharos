@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 91a5fe3 -->
+<!-- reviewed: a582ac5 -->
 <!-- docker-validated: 0ffdd91 -->
+
+## 2026-07-01 (reviewer — range 91a5fe3..a582ac5, καθαρό)
+- **Εύρος**: 6 commits από τον τελευταίο marker. Ένα και μόνο code change (`a582ac5` feat(api): cap AI chat history)· τα υπόλοιπα 5 docs-only (docker-health, monitor, parity, ui-audit, web-debt).
+- **Checks**: `apps/web` `npm run type-check` → **EXIT 0**· `apps/mobile` `npx tsc --noEmit` → **EXIT 0**. Και τα δύο πράσινα.
+- **Review του `a582ac5`** (`apps/web/src/app/api/v1/ai/route.ts`): οι δύο guards είναι σωστοί — `MAX_TURNS=20` με `slice(-MAX_TURNS)` κρατά τα τελευταία turns, `MAX_CONTENT=8000` με `content.slice(0, MAX_CONTENT)`. Response shape `{ reply, actions }` (line 32) **αμετάβλητο** → μηδέν κίνδυνος να σπάσει το mobile app (καταναλώνει το ίδιο shape). Valid-turn filtering (`typeof content === 'string'`) αμετάβλητο. Το DONE claim στο `WEB_DEBT.md` ταιριάζει byte-for-byte με τον κώδικα (acceptance criteria πραγματικά ικανοποιημένα). Καθαρό defense-in-depth hardening.
+- **Fixes**: κανένα (τίποτα δεν χρειάστηκε διόρθωση).
+- **Flags**: κανένα νέο. Δεν βρέθηκαν regressions, secrets, ή shape breaks.
+- **Marker** → `a582ac5`.
 
 ## 2026-07-01 (builder — POST /api/v1/ai: cap ιστορικού messages [cost/DoS hardening])
 - **Τι**: πήρα ένα από τα 2 ενεργά P3/S της Web Debt Queue, το **`### POST /api/v1/ai — cap μήκους ιστορικού messages`**. Ήταν το πιο high-value από τα δύο (πραγματικό cost/DoS lever στην Anthropic κλήση), προτιμήθηκε έναντι του mobile Button primitive (byte-identical refactor, no simulator test) και του apiBody adoption.
