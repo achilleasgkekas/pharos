@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
 import { Spinner, ErrorText, Empty, Check, Input, Button } from '../ui';
-import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task } from '../api';
+import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task, type TaskStep } from '../api';
 
 const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
 const SC: Record<string, string> = { todo: C.faint, 'in-progress': C.cyan, blocked: C.red, done: C.accent };
@@ -32,6 +32,8 @@ export function TasksScreen() {
   const [editStatus, setEditStatus] = useState<string>('todo');
   const [editPriority, setEditPriority] = useState<string>('normal');
   const [editTags, setEditTags] = useState('');
+  const [editSteps, setEditSteps] = useState<TaskStep[]>([]);
+  const [stepInput, setStepInput] = useState('');
 
   const load = useCallback(async () => {
     setErr(null);
@@ -54,7 +56,19 @@ export function TasksScreen() {
     setTasks((p) => p.map((x) => (x.id === it.id ? { ...x, status: next } : x)));
     try { await setTaskStatus(it.id, next); } catch { await load(); }
   }
-  function openEdit(it: Task) { setEditing(it); setEditTitle(it.title); setEditStatus(it.status); setEditPriority(it.priority || 'normal'); setEditTags(it.tags.join(' ')); }
+  function openEdit(it: Task) { setEditing(it); setEditTitle(it.title); setEditStatus(it.status); setEditPriority(it.priority || 'normal'); setEditTags(it.tags.join(' ')); setEditSteps(it.steps ?? []); setStepInput(''); }
+  // Steps persist immediately (add/toggle/remove all send the full updated array), independent of the Save button.
+  async function persistSteps(next: TaskStep[]) {
+    if (!editing) return;
+    const id = editing.id;
+    setEditSteps(next);
+    setEditing((p) => (p ? { ...p, steps: next } : p));
+    setTasks((p) => p.map((x) => (x.id === id ? { ...x, steps: next } : x)));
+    try { await updateTask(id, { steps: next }); } catch { await load(); }
+  }
+  function addStep() { const text = stepInput.trim(); if (!text) return; setStepInput(''); persistSteps([...editSteps, { text, done: false }]); }
+  function toggleStep(idx: number) { persistSteps(editSteps.map((st, i) => (i === idx ? { ...st, done: !st.done } : st))); }
+  function removeStep(idx: number) { persistSteps(editSteps.filter((_, i) => i !== idx)); }
   async function saveEdit() {
     if (!editing || !editTitle.trim()) return;
     const id = editing.id;
@@ -88,6 +102,8 @@ export function TasksScreen() {
         ListEmptyComponent={<Empty>No tasks. Add one above.</Empty>}
         renderItem={({ item }) => {
           const done = item.status === 'done';
+          const steps = item.steps ?? [];
+          const doneSteps = steps.filter((st) => st.done).length;
           return (
             <View style={s.row}>
               <Pressable onPress={() => toggle(item)} hitSlop={10}><Check checked={!!done} /></Pressable>
@@ -95,6 +111,7 @@ export function TasksScreen() {
                 <Text style={[s.title, done && s.struck]}>{item.title}</Text>
                 <View style={s.metaRow}>
                   <View style={[s.chip, { borderColor: SC[item.status] }]}><Text style={[s.chipText, { color: SC[item.status] }]}>{slabel(item.status)}</Text></View>
+                  {steps.length > 0 && <Text style={[s.steps, doneSteps === steps.length && { color: C.accent }]}>{`☑ ${doneSteps}/${steps.length}`}</Text>}
                   {item.priority !== 'normal' && <Text style={s.pri}>{item.priority}</Text>}
                   {item.tags.length > 0 && <Text style={s.tags} numberOfLines={1}>#{item.tags.join(' #')}</Text>}
                 </View>
@@ -128,6 +145,18 @@ export function TasksScreen() {
             </View>
             <Text style={s.label}>TAGS</Text>
             <Input variant="modal" value={editTags} onChangeText={setEditTags} placeholder="network order  (space or comma)" autoCapitalize="none" />
+            <Text style={s.label}>STEPS</Text>
+            {editSteps.map((st, i) => (
+              <View key={i} style={s.stepRow}>
+                <Pressable onPress={() => toggleStep(i)} hitSlop={8}><Check checked={st.done} /></Pressable>
+                <Text style={[s.stepText, st.done && s.struck]} numberOfLines={2}>{st.text}</Text>
+                <Pressable onPress={() => removeStep(i)} hitSlop={8}><Text style={s.stepDel}>×</Text></Pressable>
+              </View>
+            ))}
+            <View style={s.stepAddRow}>
+              <Input variant="modal" value={stepInput} onChangeText={setStepInput} onSubmitEditing={addStep} placeholder="Add a step…" style={{ flex: 1 }} />
+              <Pressable onPress={addStep} disabled={!stepInput.trim()} style={[s.stepAdd, !stepInput.trim() && s.dim]}><Text style={s.addText}>＋</Text></Pressable>
+            </View>
             <View style={s.modalBtns}>
               <Button label="Save" onPress={saveEdit} disabled={!editTitle.trim()} />
               <Pressable onPress={removeEditing} style={s.del}><Text style={s.delText}>Delete</Text></Pressable>
@@ -151,8 +180,14 @@ const s = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 },
   chip: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   chipText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  steps: { color: C.dim, fontSize: 11, fontWeight: '600' },
   pri: { color: C.gold, fontSize: 11 },
   tags: { color: C.faint, fontSize: 11, flex: 1 },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  stepText: { color: C.text, fontSize: 14, flex: 1 },
+  stepDel: { color: C.faint, fontSize: 20, paddingHorizontal: 4 },
+  stepAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  stepAdd: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
   modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 24 },
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },

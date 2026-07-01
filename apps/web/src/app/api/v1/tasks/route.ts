@@ -11,9 +11,10 @@ const TASK_PRIORITIES = ['low', 'normal', 'high'] as const;
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+type StepLean = { _id?: unknown; text?: string; done?: boolean };
 type TaskLean = {
   _id: unknown; title: string; status?: string; priority?: string; tags?: string[];
-  content?: string; dueDate?: Date | null; completedAt?: Date | null; num?: string;
+  content?: string; steps?: StepLean[]; dueDate?: Date | null; completedAt?: Date | null; num?: string;
   updatedAt?: Date; deletedAt?: Date | null;
 };
 
@@ -25,6 +26,7 @@ function trim(t: TaskLean) {
     priority: t.priority ?? 'normal',
     tags: t.tags ?? [],
     content: t.content ?? '',
+    steps: (t.steps ?? []).map((s) => ({ id: String(s._id), text: s.text ?? '', done: !!s.done })),
     dueDate: iso(t.dueDate),
     completedAt: iso(t.completedAt),
     updatedAt: iso(t.updatedAt),

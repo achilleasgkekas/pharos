@@ -112,7 +112,8 @@ export async function scanProduct(uri: string): Promise<ScannedProduct> {
 }
 
 // ===================== Additional resources =====================
-export type Task = { id: string; title: string; status: string; priority: string; tags: string[]; dueDate: string | null; completedAt: string | null; updatedAt: string | null };
+export type TaskStep = { id?: string; text: string; done: boolean };
+export type Task = { id: string; title: string; status: string; priority: string; tags: string[]; steps?: TaskStep[]; dueDate: string | null; completedAt: string | null; updatedAt: string | null };
 export type Expense = { id: string; kind: string; vendor: string; category: string; amount: number; currency: string; date: string | null; period: string; recurring: boolean; recurringCycle: string; paymentMethod: string; notes: string; file: string | null; thumb: string | null; verified: boolean };
 export type Subscription = { id: string; name: string; provider: string; category: string; amount: number; currency: string; billingCycle: string; nextRenewal: string | null; active: boolean };
 export type ReceiptSummary = { id: string; store: string; date: string | null; total: number; currency: string; itemCount: number; verified: boolean; archived: boolean; file: string | null; thumb: string | null };
@@ -140,7 +141,7 @@ export async function getTasks(status?: string): Promise<Task[]> {
 }
 export function addTask(title: string, data?: { tags?: string[]; priority?: string }) { return request<{ task: Task }>('/api/v1/tasks', { method: 'POST', body: JSON.stringify({ title, ...data }) }); }
 export function setTaskStatus(id: string, status: string) { return request<{ task: Task }>(`/api/v1/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }); }
-export function updateTask(id: string, data: { title?: string; status?: string; priority?: string; tags?: string[] }) { return request<{ task: Task }>(`/api/v1/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
+export function updateTask(id: string, data: { title?: string; status?: string; priority?: string; tags?: string[]; steps?: TaskStep[] }) { return request<{ task: Task }>(`/api/v1/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }); }
 export function deleteTask(id: string) { return request<{ ok: boolean }>(`/api/v1/tasks/${id}`, { method: 'DELETE' }); }
 
 // ---- Expenses / income ----

@@ -68,7 +68,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Tasks (`/tasks`)
 | Web | Mobile |
 |-----|--------|
-| **Kanban** (todo/in-progress/blocked/done, drag + ←/→), board/list toggle, #tags, steps/checklist, project progress by tag | 🟡 list + add (**#tag-parse**) + toggle done + tap-to-edit (title + **4-status picker** + **priority picker** low/normal/high + **tags editor**) + status chips + tag/priority display + delete. No Kanban board, no steps/checklist, no project-progress-by-tag |
+| **Kanban** (todo/in-progress/blocked/done, drag + ←/→), board/list toggle, #tags, steps/checklist, project progress by tag | 🟡 list + add (**#tag-parse**) + toggle done + tap-to-edit (title + **4-status picker** + **priority picker** low/normal/high + **tags editor** + **steps/checklist** [add/toggle/remove, optimistic] + card badge `☑ done/total`) + status chips + tag/priority display + delete. No Kanban board, no project-progress-by-tag |
 
 ## Settings (`/settings`)
 | Web | Mobile |
@@ -134,7 +134,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - GET tasks + PATCH επιστρέφουν `steps[]`· PATCH με `steps` array → replace· no-token → 401· bad id → 400
   - Edit modal: add/toggle/remove step → reflect μετά reload· card badge δείχνει `2/5`
   - tsc καθαρό (web + mobile)· safe rebuild → /login 200, web restarts 0
-- Status: TODO
+- Status: ✅ DONE (2026-07-01 builder). Web half: `steps[]` στο `trim()` (list GET) + PATCH response + PATCH δέχεται `steps` ως full-array replacement (idempotent, filter empty). Mobile: `TaskStep` type + `updateTask` δέχεται `steps` + edit-modal STEPS section (Check-toggle / × remove / input+＋ add, κάθε mutation → optimistic `updateTask(id,{steps})`) + card badge `☑ done/total` (accent όταν full). Verified: both tsc 0, safe rebuild /login 200 web restarts 0, POST tasks no-token → 401.
 
 ### Mobile — αντικατάσταση όλων των emoji/glyph icons με lucide (icon set)
 - Priority: P2 | Size: M | no AI, decision ΕΓΙΝΕ (Αχιλλέας 2026-07-01: «δεν θέλω χαζά εικονίδια») · ⚠ attended-preferred (οπτικό verify)
