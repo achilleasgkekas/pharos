@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal } from 'react-native';
 import { C, alpha } from '../theme';
-import { money, ErrorText, Check } from '../ui';
+import { money, ErrorText, Check, Input, TextArea } from '../ui';
 import { PharosMark } from '../PharosMark';
 import { APP_VERSION } from '../config';
 import {
@@ -161,7 +161,7 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
       <Text style={s.section}>NOTIFICATIONS (ntfy)</Text>
       <View style={s.cardPad}>
         <Text style={s.flabel}>NTFY URL</Text>
-        <TextInput value={ntfyUrl} onChangeText={setNtfyUrl} autoCapitalize="none" autoCorrect={false} placeholder="https://ntfy.sh/your-topic" placeholderTextColor={C.faint} style={s.input} />
+        <Input variant="modal" value={ntfyUrl} onChangeText={setNtfyUrl} autoCapitalize="none" autoCorrect={false} placeholder="https://ntfy.sh/your-topic" />
         <Toggle label="Enable alerts" on={ntfyOn} onToggle={() => setNtfyOn((v) => !v)} />
         <Pressable onPress={test} disabled={testing || !ntfyUrl.trim()} style={[s.testBtn, (testing || !ntfyUrl.trim()) && s.dim]}>
           {testing ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.testText}>Send test notification</Text>}
@@ -305,16 +305,16 @@ function CardEditor({ card, currency, onClose, onSaved }: { card: Card | null; c
             <ErrorText>{err}</ErrorText>
 
             <Text style={s.flabel}>NAME</Text>
-            <TextInput value={form.name} onChangeText={(t) => set('name', t)} placeholder="e.g. Mastercard 7791" placeholderTextColor={C.faint} style={s.input} />
+            <Input variant="modal" value={form.name} onChangeText={(t) => set('name', t)} placeholder="e.g. Mastercard 7791" />
 
             <View style={s.pair}>
               <View style={{ flex: 1 }}>
                 <Text style={s.flabel}>BANK</Text>
-                <TextInput value={form.bank} onChangeText={(t) => set('bank', t)} placeholder="Bank" placeholderTextColor={C.faint} style={s.input} />
+                <Input variant="modal" value={form.bank} onChangeText={(t) => set('bank', t)} placeholder="Bank" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.flabel}>LAST 4</Text>
-                <TextInput value={form.last4} onChangeText={(t) => set('last4', t.replace(/\D/g, '').slice(0, 4))} keyboardType="number-pad" maxLength={4} placeholder="7791" placeholderTextColor={C.faint} style={s.input} />
+                <Input variant="modal" value={form.last4} onChangeText={(t) => set('last4', t.replace(/\D/g, '').slice(0, 4))} keyboardType="number-pad" maxLength={4} placeholder="7791" />
               </View>
             </View>
 
@@ -344,10 +344,10 @@ function CardEditor({ card, currency, onClose, onSaved }: { card: Card | null; c
             </View>
 
             <Text style={[s.flabel, { marginTop: 12 }]}>CREDIT LIMIT ({curSym || currency})</Text>
-            <TextInput value={limit} onChangeText={setLimit} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={C.faint} style={s.input} />
+            <Input variant="modal" value={limit} onChangeText={setLimit} keyboardType="decimal-pad" placeholder="0" />
 
             <Text style={[s.flabel, { marginTop: 12 }]}>NOTES</Text>
-            <TextInput value={form.notes} onChangeText={(t) => set('notes', t)} placeholder="Optional" placeholderTextColor={C.faint} style={[s.input, { height: 64, textAlignVertical: 'top' }]} multiline />
+            <TextArea variant="modal" value={form.notes} onChangeText={(t) => set('notes', t)} placeholder="Optional" style={{ height: 64 }} />
 
             <View style={s.modalBtns}>
               <Pressable onPress={onClose} style={s.cancelBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
@@ -400,7 +400,7 @@ function StoresSection() {
       <Text style={s.section}>STORES ({stores.length})</Text>
       <View style={s.cardPad}>
         <ErrorText>{err}</ErrorText>
-        <TextInput value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} placeholder="Search stores…" placeholderTextColor={C.faint} style={[s.input, { marginBottom: 8 }]} />
+        <Input variant="modal" value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} placeholder="Search stores…" style={{ marginBottom: 8 }} />
         {loading ? (
           <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />
         ) : shown.length === 0 ? (
@@ -468,13 +468,13 @@ function StoreEditor({ store, onClose, onSaved }: { store: StoreRow | null; onCl
             <ErrorText>{err}</ErrorText>
 
             <Text style={s.flabel}>NAME</Text>
-            <TextInput value={name} onChangeText={setName} placeholder="e.g. Skroutz" placeholderTextColor={C.faint} style={s.input} />
+            <Input variant="modal" value={name} onChangeText={setName} placeholder="e.g. Skroutz" />
 
             <Text style={[s.flabel, { marginTop: 12 }]}>URL</Text>
-            <TextInput value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://skroutz.gr" placeholderTextColor={C.faint} style={s.input} />
+            <Input variant="modal" value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://skroutz.gr" />
 
             <Text style={[s.flabel, { marginTop: 12 }]}>ALIASES (comma-separated)</Text>
-            <TextInput value={aliases} onChangeText={setAliases} autoCapitalize="none" autoCorrect={false} placeholder="skroutz, skroutz.gr" placeholderTextColor={C.faint} style={s.input} />
+            <Input variant="modal" value={aliases} onChangeText={setAliases} autoCapitalize="none" autoCorrect={false} placeholder="skroutz, skroutz.gr" />
             <Text style={s.hint}>Match terms the AI uses to recognise this shop on receipts.</Text>
 
             <View style={s.modalBtns}>
@@ -555,7 +555,7 @@ function ListEditor({ entry, last, onSaved }: { entry: ListEntry; last: boolean;
         ))}
       </View>
       <View style={s.listAddRow}>
-        <TextInput value={add} onChangeText={setAdd} onSubmitEditing={addVal} returnKeyType="done" autoCapitalize="none" autoCorrect={false} placeholder="add category…" placeholderTextColor={C.faint} style={[s.input, { flex: 1 }]} />
+        <Input variant="modal" value={add} onChangeText={setAdd} onSubmitEditing={addVal} returnKeyType="done" autoCapitalize="none" autoCorrect={false} placeholder="add category…" style={{ flex: 1 }} />
         <Pressable onPress={addVal} style={s.listAddBtn}><Text style={s.listAddText}>+</Text></Pressable>
       </View>
       <View style={s.listBtns}>
@@ -585,7 +585,7 @@ function Field({ label, value, onChange, keyboard }: { label: string; value: str
   return (
     <View style={{ flex: 1 }}>
       <Text style={s.flabel}>{label}</Text>
-      <TextInput value={value} onChangeText={onChange} keyboardType={keyboard} style={s.input} placeholderTextColor={C.faint} />
+      <Input variant="modal" value={value} onChangeText={onChange} keyboardType={keyboard} />
     </View>
   );
 }
@@ -612,7 +612,6 @@ const s = StyleSheet.create({
   rowValue: { color: C.text, fontSize: 14, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
   hint: { color: C.faint, fontSize: 12, paddingVertical: 8 },
   flabel: { color: C.faint, fontSize: 10, letterSpacing: 1.1, marginBottom: 6 },
-  input: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
   pair: { flexDirection: 'row', gap: 12, marginTop: 12 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C } from '../theme';
-import { money, Spinner, ErrorText, Empty } from '../ui';
+import { money, Spinner, ErrorText, Empty, Input, TextArea } from '../ui';
 import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
 function verdictMeta(v: Verdict): { label: string; color: string } | null {
@@ -372,7 +372,7 @@ export function ItemsScreen() {
         ))}
       </View>
       <View style={s.addRow}>
-        <TextInput value={title} onChangeText={setTitle} onSubmitEditing={add} autoCapitalize="none" autoCorrect={false} placeholder="Add an item or paste a link…" placeholderTextColor={C.faint} style={s.input} />
+        <Input value={title} onChangeText={setTitle} onSubmitEditing={add} autoCapitalize="none" autoCorrect={false} placeholder="Add an item or paste a link…" style={{ flex: 1 }} />
         <Pressable onPress={add} disabled={!title.trim() || importing} style={[s.addBtn, isUrl && s.importBtn, (!title.trim() || importing) && s.dim]}>
           {importing ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.addBtnText}>{isUrl ? '✦' : '＋'}</Text>}
         </Pressable>
@@ -411,7 +411,7 @@ export function ItemsScreen() {
               {detail && <PriceBlock detail={detail} onChanged={async () => { if (editing) await loadDetail(editing.id); await load(); }} />}
               {editing && <PlansBlock itemId={editing.id} />}
               <Text style={s.mlabel}>TITLE</Text>
-              <TextInput value={eTitle} onChangeText={setETitle} style={s.minput} placeholderTextColor={C.faint} />
+              <Input variant="modal" value={eTitle} onChangeText={setETitle} />
               <Text style={s.mlabel}>STATUS</Text>
               <View style={s.statusWrap}>
                 {STATUSES.map((st) => (
@@ -421,19 +421,19 @@ export function ItemsScreen() {
                 ))}
               </View>
               <Text style={s.mlabel}>CATEGORY</Text>
-              <TextInput value={eCategory} onChangeText={setECategory} autoCapitalize="none" style={s.minput} placeholder="e.g. networking" placeholderTextColor={C.faint} />
+              <Input variant="modal" value={eCategory} onChangeText={setECategory} autoCapitalize="none" placeholder="e.g. networking" />
               <View style={s.priceRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.mlabel}>PRICE</Text>
-                  <TextInput value={ePrice} onChangeText={setEPrice} keyboardType="decimal-pad" style={s.minput} placeholder="0" placeholderTextColor={C.faint} />
+                  <Input variant="modal" value={ePrice} onChangeText={setEPrice} keyboardType="decimal-pad" placeholder="0" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.mlabel}>TARGET</Text>
-                  <TextInput value={eTarget} onChangeText={setETarget} keyboardType="decimal-pad" style={s.minput} placeholder="—" placeholderTextColor={C.faint} />
+                  <Input variant="modal" value={eTarget} onChangeText={setETarget} keyboardType="decimal-pad" placeholder="—" />
                 </View>
               </View>
               <Text style={s.mlabel}>SPECS</Text>
-              <TextInput value={eSpecs} onChangeText={setESpecs} multiline style={[s.minput, s.specs]} placeholder="notes / specs" placeholderTextColor={C.faint} />
+              <TextArea variant="modal" value={eSpecs} onChangeText={setESpecs} style={s.specs} placeholder="notes / specs" />
               <View style={s.aiBar}>
                 <Pressable onPress={() => runAiFill('specs')} disabled={!!aiFilling} style={[s.aiBtn, !!aiFilling && s.dim]}>
                   {aiFilling === 'specs' ? <ActivityIndicator color={C.accent} /> : <Text style={s.aiBtnText}>✦ AI specs</Text>}
@@ -462,7 +462,6 @@ export function ItemsScreen() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   addRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
-  input: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: C.text, fontSize: 15 },
   addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   importBtn: { backgroundColor: C.cyan },
   addBtnText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
@@ -482,7 +481,6 @@ const s = StyleSheet.create({
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20, maxHeight: '88%' },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
-  minput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
   specs: { minHeight: 64, textAlignVertical: 'top' },
   priceRow: { flexDirection: 'row', gap: 12 },
   statusWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
