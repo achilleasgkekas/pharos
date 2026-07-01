@@ -2,8 +2,14 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 21c4792 -->
+<!-- reviewed: 9ac9db1 -->
 <!-- docker-validated: f63cc4b -->
+
+## 2026-07-02 (reviewer — range 21c4792..9ac9db1, 8 commits, ΟΛΑ CLEAN, μηδέν fix)
+- **Τι ελέγχθηκε:** Οι 8 commits από τον προηγούμενο marker (`21c4792`): SaaS storage-sampling (`lib/billing/dbStats.ts` + `POST /api/saas/usage/sample`), 3 pure-lib test suites (stores 22, ssrf 36, dbStats 4), landing trust/principles strip (`page.tsx` + `Icon.tsx` 6 νέα paths + `globals.css` `.trust-*`), docs + docker-health.
+- **Checks:** `apps/web` type-check **EXIT 0**, `apps/mobile` `tsc --noEmit` **EXIT 0**, vitest **263/263 passed** (16 files).
+- **Review ευρήματα:** `dbStats.ts` σωστά gated — `isSampleable` = `saasMode() && !isDefault && tenantId`, no-op για default tenant / SAAS off (μηδέν db.stats(), μηδέν Usage write στο self-hosted)· `billedBytes` floored στο 0, αγνοεί `dataSize`· per-tenant failure isolated στο `sampleAllTenants` (counted, όχι fatal). Το route: SaaS-only (404 όταν off), fail-closed 500 αν CRON_SECRET unset, 401 σε mismatch, read-only στο data plane. Landing CSS καθαρά additive + scoped (`#trust`/`.trust-*`), μηδέν base rule clobbered, responsive 5→3→1 cols. **Καμία αλλαγή σε API response shape** που να σπάει το mobile (νέο SaaS-only endpoint). Κανένα committed secret (CRON_SECRET από env). 
+- **Fixes:** 0. **Flags:** 0. Ένα low-severity nit σημειωμένο (μη-constant-time `token !== secret` σύγκριση bearer· high-entropy random secret → αμελητέο network timing risk, κάτω από το threshold για WEB_DEBT). Marker → `9ac9db1`.
 
 ## 2026-07-02 (ui-auditor — 28η σάρωση UI Debt, ουρά αμετάβλητη)
 - **Τι έγινε:** Read-only re-audit του mobile UI έναντι του web design system. Inventory ξαναχτισμένο από τον κώδικα: **16 mobile screens**, `ui.tsx` εξάγει ΟΛΑ τα primitives (Input/TextArea/Check/Button/IconButton/Card/ListItem/Badge). `git log -- apps/mobile/src` τελευταίο **ΑΚΟΜΑ `0f69116`** (ListItem) → **μηδέν νέο mobile-src commit από την 27η σάρωση**, ουρά **αμετάβλητη**. Οι ενδιάμεσες commits (`b5cde6d` stores.test, `46240ba` docker-health, `7791adf` SaaS storage-sampling, `f63cc4b`/`3ee00f7` docs+ssrf.test) = web-only tests + SaaS server-scaffold + docs → μηδέν design-token / mobile UI impact.
