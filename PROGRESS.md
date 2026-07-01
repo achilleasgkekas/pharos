@@ -2029,3 +2029,17 @@ Read-only audit των 49 v1 route files + `apiAuth`/`apiBody`/`apiList` helpers
 - **Vitest DONE-claim επαλήθευση**: έτρεξα `npx vitest run` → **10/10 passed** (`money.test.ts`). Το DONE ισχύει.
 - **Secret scan** σε όλο το range: καθαρό.
 - **Fixes**: κανένα (τίποτα δεν χρειάστηκε· δεν άγγιξα κώδικα). **Flags**: κανένα νέο. Marker → `2784fc1`.
+
+## 2026-07-01 (pharos-daily-dev — mobile `<ListItem>` primitive ΕΚΛΕΙΣΕ το "Card + Badge + ListItem" set)
+- **Τι έγινε:** Εξήγαγα το shared `<ListItem>` primitive στο `apps/mobile/src/ui.tsx` (commit `0f69116`). Ενοποιεί το byte-identical `row` StyleSheet entry (`flexDirection:'row', alignItems:'center', gap:12` + Card base: surface bg, 1px border, `RADIUS.lg`=14, padding 14, marginBottom 10) που ήταν διπλασιασμένο σε **5 screens**: Calendar / Money / Items / Subscriptions / Tasks.
+- **Γιατί:** Ήταν το top auto-buildable UI-debt item (ο ui-auditor το σημείωνε ως «top build item = <ListItem> (5 byte-identical rows)», commit b1910fb). Pure-TS refactor, μηδέν νέο native dependency (σε αντίθεση με το safe-area που χρειάζεται `react-native-safe-area-context` — ABSENT από node_modules, non-verifiable χωρίς simulator), άρα το ασφαλέστερο unattended-safe. Κλείνει το tracked «Card + Badge + ListItem» component set (Card DONE, Badge DONE `ee9d413`, τώρα ListItem DONE).
+- **Design:** Το `<ListItem>` καθρεφτίζει ακριβώς το `<Card>` (renders `Pressable` όταν δοθεί `onPress`/`onLongPress`, αλλιώς plain `View`· `style` merge-άρει πάνω στη βάση). Οι μεταναστεύσεις **byte-identical** (ίδια tokens) → μηδέν οπτική αλλαγή:
+  - Calendar/Tasks: plain `<View style={s.row}>` → `<ListItem>` (Calendar κρατά το `item.pinned && s.pinned` override μέσω `style`).
+  - Money/Items: `<Pressable onPress onLongPress style={s.row}>` → `<ListItem onPress onLongPress>`.
+  - Subscriptions: `<Pressable ... style={[s.row, !item.active && s.faded]}>` → `<ListItem ... style={!item.active && s.faded}>`.
+  - Έσβησα και τα 5 local `row:` StyleSheet entries (κάθε screen τα χρησιμοποιούσε ακριβώς 1×).
+- **Verify:** `cd apps/mobile && npx tsc --noEmit` → **EXIT 0**. Μηδέν orphan `s.row` (grep καθαρός· η μοναδική «row:» εμφάνιση = substring μέσα στο `eyebrow:`). Diffstat 6 files / +36 −20. Μηδέν Docker (mobile-only). Μηδέν AI. Μηδέν secret. Staged ΜΟΝΟ τα 6 δικά μου files· άφησα ανέγγιχτο το `.claude/launch.json` (WIP εργαλείου του Αχιλλέα).
+- **Επόμενο (single suggested next task):** `<Chip>` primitive (P2/M) — ενοποίηση των filter/pill chips σε Subscriptions/Items/Settings (`chip`/`chipOn`/`cChip`/`sChip`). ΣΗΜ: έχει token-drift (padding 14/7 vs 16/8, radius9) = πραγματική οπτική αλλαγή χωρίς simulator → attended-preferred· αν ο builder το πάρει unattended, να κρατήσει ΕΝΑ canonical token set και να το σημειώσει ως ελεγχόμενη οπτική ενοποίηση. Εναλλακτικά (unattended-safe, χωρίς native dep) η υπόλοιπη Input adoption (21 raw `<TextInput>` σε 7 screens → `<Input>/<TextArea>`).
+
+### Needs Achilleas
+- (αμετάβλητο) Product-decision items, ΟΧΙ auto-buildable: **safe-area insets** (χρειάζεται `react-native-safe-area-context` native dep — προτείνω `npx expo install` από τον Αχιλλέα + έλεγχο σε simulator), **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme/language/AI-engine/storage/OneDrive** (light theme = L refactor· credentials/OAuth boundary — σύσταση: μείνε web-only).
