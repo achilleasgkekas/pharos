@@ -1511,3 +1511,20 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 ### Needs Achilleas
 - (νέο, χαμηλής προτεραιότητας) `PATCH /api/v1/tasks/[id]` δέχεται `steps` full-array χωρίς άνω όριο πλήθους ή μήκους κειμένου ανά step. Single-user/WireGuard-only → χαμηλό ρίσκο· αν βγει multi-tenant/public, βάλε cap (π.χ. ≤100 steps, text ≤500 chars).
 - (αμετάβλητο) 2 standing security παρατηρήσεις, product decisions ΟΧΙ queue items: (1) `auth/login` χωρίς rate-limit/brute-force guard (self-hosted, WireGuard-only → χαμηλό ρίσκο)· (2) κάποια error messages επιστρέφουν λεπτομέρεια (π.χ. «A store with that name already exists») — αποδεκτό για single-user, review αν γίνει multi-tenant.
+
+## 2026-07-01 (ui-auditor — 16η σάρωση, ΠΡΟΟΔΟΣ: IconButton + Card ΕΚΛΕΙΣΑΝ)
+- **Νέα κατάσταση:** `git log effd90d..HEAD -- apps/mobile/src` → **2 νέα foundation commits** από την 15η σάρωση: `929ca4d` (**IconButton** primitive + 7 adopters: add ×5 + addStep + Items `✦`/import cyan-variant) + `9d226cf` (**Card** primitive + 6 sites). Δηλαδή ο builder κατανάλωσε τα δύο κορυφαία unattended-safe items της 15ης. Foundation **5 → 7 DONE** (theme tokens, alpha, touch, scrim, Button, **IconButton**, **Card**).
+- **Violations ανά διάσταση (live grep, όχι docs):**
+  - **Tokens: 0** (6-digit hex εκτός `theme.ts` 0· `#fff/#000` στα screens 0· inline `rgba(` 0) — πλήρως καθαρό.
+  - **States: 0** (συνεπή μέσω `ui.tsx`)· **Touch targets: 0** (Check + hitSlop DONE).
+  - **Reusable components ~5 ανοιχτά:** `<Chip>` MISSING (14 `chip*:` entries, 2 clusters: filter-chip Items+Settings [padding drift 14/7 vs 16/8] + tag-chip Search+Tasks [radius6/fs9])· `<Badge>` MISSING (3)· `<ListItem>` MISSING· ghost buttons ~6 (aiBtn/scanBtn/rescanBtn cyan-border)· Input 🟡 6/11 (48 Input/TextArea sites, 21 raw `<TextInput>` σε 7 screens)· ShoppingScreen `addBtnWide` (text button leftover).
+  - **Adaptive: 2** — `safe-area-context` 0 imports (TODO P2/M)· maxWidth στο content 0 (TODO P3/S).
+  - **Theme: 1** — dark-only, 0 `useColorScheme`/context (Light theme TODO P3/L).
+- **Top 3 για τον builder:**
+  1. **Button-family finish (P2/S, unattended-safe)** — ShoppingScreen `addBtnWide`/`addBtnText2` (near-`<Button>`, μόνο padH18 vs 22) + ItemsScreen `save` outlier (padH26/minWidth96) + SettingsScreen `saveText` weight800 → `<Button style={...}>`. Byte-identical-ish, tsc-verifiable, κλείνει το Button-half.
+  2. **Safe-area insets (P2/M, unattended-safe)** — `SafeAreaProvider` + `useSafeAreaInsets` αντί plain `SafeAreaView`· additive, no token-drift, real UX (bottom-sheets κάτω από home indicator).
+  3. **`<ListItem>` primitive (P2/M)** ή **`<Chip>`** (attended-preferred λόγω token-drift = οπτική αλλαγή).
+- mobile `tsc --noEmit` **EXIT 0**. Κανένα committed secret (μηδέν tracked `.env`). Read-only run: μηδέν app-code edit, μηδέν Docker, μηδέν AI. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+### Needs Achilleas
+- (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας. Ανοιχτά product-decision items (θέλουν απόφαση, ΟΧΙ auto-buildable): Reports extra charts (endpoint-extension + RN charting lib), Statements merge/bind + PDF-import (write/upload endpoints), Settings theme toggle (light theme = L refactor 19 files), Settings AI-engine/storage/OneDrive (credentials/OAuth boundary — σύσταση: μείνε web-only).
