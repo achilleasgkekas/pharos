@@ -2,8 +2,18 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: fe12502 -->
+<!-- reviewed: b6a6cda -->
 <!-- docker-validated: 6fd1075 -->
+
+## 2026-07-01 (reviewer — range fe12502..b6a6cda, καθαρό· 0 fixes, 0 νέα flags)
+- **Τι εξέτασα:** το range από το προηγούμενο marker (`fe12502`) έως HEAD (`b6a6cda`). Κώδικας (μη-docs): `6fd1075` readBody adoption στο `shopping-list` POST· `2b803cc` **SaaS account auth** (signup/login/logout/session + `lib/tenancy/{accountSession,provision,saasApi}`)· `4503640` readBody σε scan/expense + scan/voucher· `58b250d` `dates.test.ts` (16 tests)· `415bdb1` landing OG image (isolated `apps/landing`). Τα υπόλοιπα = docs (progress/web-debt/ui-audit/docker-health).
+- **Checks:** `apps/web npm run type-check` **EXIT 0**· `apps/mobile npx tsc --noEmit` **EXIT 0**· `apps/web npx vitest run` **49/49 green** (money 10 + host 8 + dates 16 + storagePath 15).
+- **SaaS auth (νέος committed surface, καθαρός):** κάθε route ξεκινά με `saasAuthGate()` → **fail-closed** (`SAAS_MODE` off → 404· `AUTH_SECRET` unset/<16χαρ → 500). Ξεχωριστό cookie `pharos_account` (jose HS256, δικό του `SAAS_SESSION_IDLE_HOURS`) → **δεν εμπλέκεται** με το self-hosted `pharos_session` → single-user app byte-for-byte ανεπηρέαστο. `verifyAccountSession` never-throws, session route επιβεβαιώνει ότι ο Account υπάρχει ακόμα, logout idempotent, scrypt reuse από `lib/auth`, `.lean()` reads, unique-index 11000 catch στο signup. Μηδέν type/auth/DB regression.
+- **readBody swaps:** `shopping-list` POST → `strField(b,'name')` κ.λπ. (4-arg `strField` signature έγκυρη: `(b,key,fallback='',trim=false)`). **Όχι απλώς byte-identical — hardening:** ο παλιός `as Record<string,string>` cast «έλεγε ψέματα»· με μη-string value (π.χ. `quantity: 5`) το downstream `(5||'').trim()` θα έσκαγε `TypeError`· τώρα `String(5||'')='5'` πρώτα → ίδιο για strings + πιο ασφαλές. scan routes = pure JSON-text branch swap, multipart ανέγγιχτο, response shapes αμετάβλητα → **mobile ασφαλές**.
+- **Regression sweep:** κανένα existing API route / `lib/db.ts` / mobile `api.ts` δεν άλλαξε → μηδέν response-shape change. SaaS = additive + flag-guarded + 0 importers. Landing OG = isolated build-time asset (`ImageResponse`, no new deps).
+- **Secret scan** σε όλο το range: **καθαρό** (μόνο Greek prose «token/secret» σε docs, `hello@ph-aros.com` = intended public contact).
+- **Fixes:** **κανένα** (δεν χρειάστηκε — tsc/tests πράσινα, μηδέν προφανές bug· δεν άγγιξα κώδικα).
+- **Flags:** **κανένα νέο.** Τα SaaS-auth robustness items (login timing enumeration, provisionTenant μη-ατομικό + uncaught 11000, χωρίς rate-limit) είναι **ήδη** στο `## Needs Achilleas` από προηγούμενες σαρώσεις (τώρα committed αντί WIP — παραμένουν security/product decisions, ΟΧΙ auto-fix). Marker → `b6a6cda`.
 
 ## 2026-07-01 (pharos-daily-dev — readBody adoption shopping-list POST: ΕΚΛΕΙΣΕ η raw-body ουρά)
 - **Τι έγινε:** Το `shopping-list/route.ts` POST ήταν το **τελευταίο** v1 route που parse-άρει το body inline (`(await req.json().catch(() => ({}))) as Record<string,string>`). Το μετέτρεψα σε `readBody(req)` + `strField()` (commit `6fd1075`), ευθυγραμμισμένο με τα άλλα 28 v1 routes → **ουρά consistency-debt 1→0, μηδέν raw-body route απομένει** (`grep '.json().catch' src/app/api/v1` = NONE).
