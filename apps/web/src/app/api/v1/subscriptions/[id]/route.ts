@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Subscription } from '@/models/Subscription';
 
@@ -13,7 +14,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return withAuth(req, async () => {
     const { id } = await params;
     if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
-    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const b = await readBody(req);
     const set: Record<string, unknown> = {};
     if (typeof b.name === 'string' && b.name.trim()) set.name = b.name.trim();
     if (b.amount != null && Number.isFinite(Number(b.amount))) set.amount = Number(b.amount);
