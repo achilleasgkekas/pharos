@@ -3,7 +3,7 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 6809a8c -->
-<!-- docker-validated: 95edf16 -->
+<!-- docker-validated: 46f35ed -->
 
 ## 2026-07-01 (reviewer — range 114e727..6809a8c, isObjectId 2η παρτίδα clean, marker → 6809a8c)
 - **Εύρος**: 7 commits από τον προηγ. review marker. Μόνο **1** app-src commit (`f1413c3`, isObjectId dedup 2η παρτίδα, 5 [id] routes)· τα υπόλοιπα = docs (progress/web-debt/ui-auditor/parity/monitor) + docker-health. STATUS.md ήταν ήδη committed στο εύρος (WIP Αχιλλέα), δεν το άγγιξα.
@@ -1756,3 +1756,13 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 
 ### Needs Achilleas
 - (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας. Ανοιχτά product-decision items (θέλουν απόφαση, ΟΧΙ auto-buildable): **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor 19 files), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: μείνε web-only).
+
+## 2026-07-01 (docker-health — rebuild μετά isObjectId 2η παρτίδα, marker → 46f35ed)
+- **Health/disk (read-only):** mongo `healthy`, web `running`· web RestartCount **0** (καμία επανεκκίνηση σε βρόχο)· mongo RestartCount 47 = σωρευτικό ιστορικό, health healthy τώρα → ΟΧΙ ενεργό OOM. flaresolverr σταματημένο (μηδέν επιπλέον μνήμη). `docker system df`: Images 3.49GB, Build Cache 566MB in-use (0B reclaimable).
+- **Απόφαση rebuild:** `git diff --name-only 95edf16..HEAD -- apps/web/src` = **5 API v1 [id] routes** (isObjectId dedup 2η παρτίδα: expenses/receipts/subscriptions/tasks/vouchers) → web runtime code άλλαξε → rebuild δικαιολογημένο.
+- **Ασφαλές build:** `docker compose build web` (μόνο image, ΟΧΙ `up --build`) → μεγάλο μέρος CACHED, image built OK. Επιβεβαίωσα mongo healthy → `docker compose up -d web` → `curl /login` **200 σε ~1s** → web RestartCount παρέμεινε **0**.
+- **Disk hygiene:** `docker builder prune -f` μετά το build → ανακτήθηκαν ~3.19MB (fresh layer). Καμία καταστροφική ενέργεια.
+- **Marker:** docker-validated `95edf16` → **`46f35ed`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
+
+### Needs Achilleas
+- Κανένα. Το stack χτίζει και σερβίρει υγιώς.
