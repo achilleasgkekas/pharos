@@ -340,3 +340,46 @@ runtime wiring, `SAAS_MODE` off = zero effect, κανένα Docker rebuild. Κα
 (`lib/billing/dbStats.ts` ή `api/saas` cron route) που τρέχει `db.stats()` στη data db κάθε
 tenant (μέσω `tenantDb(ctx)`) → `setStorageBytes(ctx, bytes)`, ώστε το storage quota να έχει
 πραγματικά νούμερα να ελέγξει. Read-only στο data plane, γράφει μόνο στο control-plane Usage.
+
+---
+
+## 2026-07-02 (increment 8 — storage sampling: db.stats() → Usage ledger)
+**Built:** το storage-metering feed που δίνει στο storage quota πραγματικά νούμερα, ΟΛΟ σε
+νέα αρχεία, μηδέν wiring σε feature routes:
+- `lib/billing/dbStats.ts` — μετράει το Mongo footprint κάθε tenant μέσω native
+  `db.stats()` και το γράφει στο control-plane Usage ledger (`setStorageBytes`). Χωρισμένο σε
+  **PURE** + DB-touching:
+  - PURE: `billedBytes(stats)` → **physical on-disk** footprint = `storageSize + indexSize`
+    (compressed, ό,τι πραγματικά καταναλώνει το storage allowance· ΟΧΙ το uncompressed
+    `dataSize`). Missing→0, floored at 0.
+  - DB: `readDbStats(ctx)` (read-only `conn.db.stats()` πάνω στο `tenantDb(ctx)`),
+    `sampleTenantStorage(ctx)` (measure → `setStorageBytes`), `sampleAllTenants()` (iterate
+    trialing/active tenants από το registry, per-tenant try/catch isolation → ένα κακό db δεν
+    ρίχνει όλο το run). OSS parity: `isSampleable` gate = `saasMode() && !isDefault &&
+    tenantId` → DEFAULT_TENANT / SAAS_MODE off = NO-OP, ΠΟΤΕ db.stats(), ΠΟΤΕ Usage write.
+    Read-only στο data plane· η ΜΟΝΗ write είναι στο control-plane Usage.
+- `app/api/saas/usage/sample/route.ts` — `POST /api/saas/usage/sample` (nodejs, force-
+  dynamic). SaaS-gated (404 όταν off) + **CRON_SECRET bearer** (fail-closed 500 αν unset,
+  401 σε λάθος token) — scheduler-callable, όχι account session. Τρέχει `sampleAllTenants`.
+- `lib/billing/dbStats.test.ts` — 4 PURE tests (billedBytes: storageSize+indexSize, αγνοεί
+  dataSize, missing→0, negative→floor 0).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **241/241 green** (237
+προϋπάρχοντα + 4 νέα). Importers των `billing/dbStats` από υπάρχον feature code → **κανένας**·
+το νέο route SAAS-gated (404 όταν off) ⇒ zero runtime wiring, `SAAS_MODE` off = zero effect,
+κανένα Docker rebuild. Καθαρά additive — δεν άγγιξα κανένα υπάρχον αρχείο.
+
+**## Needs Achilleas:**
+- **CRON_SECRET** env για το sample route (production scheduler auth) + ένα cron entry που το
+  χτυπάει (π.χ. ωριαία/ημερήσια) όταν ανοίξει το SaaS.
+- **File bytes ΔΕΝ μετρώνται ακόμα**: το `db.stats()` πιάνει ΜΟΝΟ το Mongo metadata footprint.
+  Τα binary αρχεία (receipt PDFs, item photos) ζουν σε disk/remote backend, ΟΧΙ στη Mongo, άρα
+  το storage quota υπολογίζει προς το παρόν μόνο το db footprint. Χρειάζεται μελλοντικό
+  increment που αθροίζει on-disk/remote file bytes ανά tenant στο `setStorageBytes`.
+- Enforcement go-live (από increment 7): wiring του `enforceAiQuota`/`recordAiCall` σε ΕΝΑ AI
+  route (`api/v1/*`) ως pilot — απαιτεί edit εκτός SAAS territory (ρητή άδεια ή feature-builder).
+
+**Next task:** increment 9 — file-byte storage accounting: ένα in-territory helper που
+αθροίζει τα on-disk/remote bytes των tenant αρχείων (μέσω του storage abstraction) → προστίθεται
+στο `setStorageBytes` δίπλα στο db footprint, ώστε το storage quota να αντικατοπτρίζει το
+πραγματικό footprint. Εναλλακτικά, το enforcement wiring αν δοθεί άδεια για `api/v1/*`.
