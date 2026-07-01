@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button } from '../ui';
+import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button, ListItem } from '../ui';
 import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
 function verdictMeta(v: Verdict): { label: string; color: string } | null {
@@ -387,14 +387,14 @@ export function ItemsScreen() {
           renderItem={({ item }) => {
             const price = item.purchasedPrice ?? item.currentPrice;
             return (
-              <Pressable onPress={() => openEdit(item)} onLongPress={() => remove(item)} style={s.row}>
+              <ListItem onPress={() => openEdit(item)} onLongPress={() => remove(item)}>
                 <View style={{ flex: 1 }}>
                   {!!item.category && <Text style={s.eyebrow}>{item.category.toUpperCase()}</Text>}
                   <Text style={s.title}>{item.title}</Text>
                   <Text style={s.meta}>{item.status}</Text>
                 </View>
                 {price > 0 && <Text style={s.price}>{money(price)}</Text>}
-              </Pressable>
+              </ListItem>
             );
           }}
         />
@@ -466,7 +466,6 @@ const s = StyleSheet.create({
   chipOn: { backgroundColor: C.accent, borderColor: C.accent },
   chipText: { color: C.dim, fontSize: 13, fontWeight: '600' },
   chipTextOn: { color: C.onAccent },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   eyebrow: { color: C.faint, fontSize: 10, letterSpacing: 1 },
   title: { color: C.text, fontSize: 15, fontWeight: '600', marginTop: 2 },
   meta: { color: C.faint, fontSize: 12, marginTop: 2 },

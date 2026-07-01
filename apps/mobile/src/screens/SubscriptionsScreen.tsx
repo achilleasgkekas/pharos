@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, ListItem } from '../ui';
 import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription } from '../api';
 
 const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
@@ -98,13 +98,13 @@ export function SubscriptionsScreen() {
         ListHeaderComponent={rows.length ? <Text style={s.head}>{active.length} active</Text> : null}
         ListEmptyComponent={<Empty>No subscriptions.</Empty>}
         renderItem={({ item }) => (
-          <Pressable onPress={() => openEdit(item)} onLongPress={() => remove(item)} style={[s.row, !item.active && s.faded]}>
+          <ListItem onPress={() => openEdit(item)} onLongPress={() => remove(item)} style={!item.active && s.faded}>
             <View style={{ flex: 1 }}>
               <Text style={s.name}>{item.name}</Text>
               <Text style={s.meta}>{[item.billingCycle, item.nextRenewal ? `renews ${shortDate(item.nextRenewal)}` : '', !item.active ? 'cancelled' : ''].filter(Boolean).join('  ·  ')}</Text>
             </View>
             <Text style={s.amount}>{money(item.amount, item.currency)}</Text>
-          </Pressable>
+          </ListItem>
         )}
       />
 
@@ -148,7 +148,6 @@ const s = StyleSheet.create({
   aiText: { color: C.cyan, fontSize: 18, fontWeight: '700' },
   dim: { opacity: 0.4 },
   head: { color: C.faint, fontSize: 11, letterSpacing: 1, marginBottom: 10 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   faded: { opacity: 0.55 },
   name: { color: C.text, fontSize: 15, fontWeight: '600' },
   meta: { color: C.faint, fontSize: 12, marginTop: 3 },

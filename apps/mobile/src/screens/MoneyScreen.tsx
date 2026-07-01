@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem } from '../ui';
 import { getExpenses, addExpense, deleteExpense, updateExpense, scanExpenseImage, type Expense, type ParsedExpenseData } from '../api';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
@@ -145,13 +145,13 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={<Empty>Nothing here yet.</Empty>}
         renderItem={({ item }) => (
-          <Pressable onPress={() => openEdit(item)} onLongPress={() => remove(item)} style={s.row}>
+          <ListItem onPress={() => openEdit(item)} onLongPress={() => remove(item)}>
             <View style={{ flex: 1 }}>
               <Text style={s.vendor}>{item.vendor || '—'}</Text>
               <Text style={s.meta}>{[item.category, shortDate(item.date), item.recurring ? 'recurring' : ''].filter(Boolean).join('  ·  ')}</Text>
             </View>
             <Text style={[s.amount, { color: kind === 'income' ? C.accent : C.text }]}>{money(item.amount, item.currency)}</Text>
-          </Pressable>
+          </ListItem>
         )}
       />
 
@@ -235,7 +235,6 @@ const s = StyleSheet.create({
   scanNote: { color: C.dim, fontSize: 12, marginTop: 4 },
   scanMeta: { color: C.faint, fontSize: 12, marginTop: 10 },
   dim: { opacity: 0.4 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   vendor: { color: C.text, fontSize: 15, fontWeight: '600' },
   meta: { color: C.faint, fontSize: 12, marginTop: 3 },
   amount: { fontSize: 16, fontWeight: '700' },

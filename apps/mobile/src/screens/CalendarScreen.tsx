@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, SectionList, RefreshControl, StyleSheet } from 'react-native';
 import { C } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, ListItem } from '../ui';
 import { getCalendar, type CalMonth, type CalEntry, type CalEntryKind } from '../api';
 
 const KIND: Record<CalEntryKind, { label: string; color: string }> = {
@@ -58,7 +58,7 @@ export function CalendarScreen() {
           if (section.data.length === 0) return null;
           const k = KIND[item.kind];
           return (
-            <View style={[s.row, item.pinned && s.pinned]}>
+            <ListItem style={item.pinned && s.pinned}>
               <View style={[s.dot, { backgroundColor: k.color }]} />
               <View style={{ flex: 1 }}>
                 <Text style={[s.kind, { color: k.color }]}>{k.label}</Text>
@@ -73,7 +73,7 @@ export function CalendarScreen() {
                   </Text>
                 )}
               </View>
-            </View>
+            </ListItem>
           );
         }}
         renderSectionFooter={({ section }) =>
@@ -90,7 +90,6 @@ const s = StyleSheet.create({
   month: { color: C.text, fontSize: 16, fontWeight: '800' },
   totals: { flexDirection: 'row', gap: 10 },
   tot: { fontSize: 13, fontWeight: '700' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   pinned: { backgroundColor: C.surface2 ?? C.surface, borderColor: C.purple },
   dot: { width: 8, height: 8, borderRadius: 4 },
   kind: { fontSize: 9, letterSpacing: 1, fontWeight: '700' },

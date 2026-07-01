@@ -154,6 +154,26 @@ export function Card({ children, onPress, onLongPress, style }: CardProps) {
   return <View style={[s.card, style]}>{children}</View>;
 }
 
+/**
+ * Horizontal list row — a `Card` laid out as a flex row (`flexDirection:'row'`,
+ * `alignItems:'center'`, `gap:12`). Unifies the byte-identical `row` StyleSheet
+ * entry that was duplicated across the Calendar / Money / Items / Subscriptions /
+ * Tasks screens. Like `Card`, renders a `Pressable` when an `onPress`/`onLongPress`
+ * handler is given (tap-to-edit / long-press-to-delete rows) and a plain `View`
+ * otherwise. Pass `style` for per-row modifiers (e.g. faded / pinned states); it
+ * merges on top of the base.
+ */
+export function ListItem({ children, onPress, onLongPress, style }: CardProps) {
+  if (onPress || onLongPress) {
+    return (
+      <Pressable onPress={onPress} onLongPress={onLongPress} style={[s.listItem, style]}>
+        {children}
+      </Pressable>
+    );
+  }
+  return <View style={[s.listItem, style]}>{children}</View>;
+}
+
 type BadgeProps = {
   /** Short label, usually uppercase (a status or record type). */
   label: string;
@@ -182,6 +202,7 @@ export function Badge({ label, color, style, textStyle }: BadgeProps) {
 const s = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, gap: 4 },
   card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg, padding: 14, marginBottom: 10 },
+  listItem: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg, padding: 14, marginBottom: 10 },
   badge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   badgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   iconBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },

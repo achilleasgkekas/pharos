@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
-import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Badge } from '../ui';
+import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Badge, ListItem } from '../ui';
 import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task, type TaskStep } from '../api';
 
 const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
@@ -117,7 +117,7 @@ export function TasksScreen() {
           const hasPrev = idx > 0;
           const hasNext = idx >= 0 && idx < STATUSES.length - 1;
           return (
-            <View style={s.row}>
+            <ListItem>
               <Pressable onPress={() => toggle(item)} hitSlop={10}><Check checked={!!done} /></Pressable>
               <Pressable onPress={() => openEdit(item)} style={{ flex: 1 }}>
                 <Text style={[s.title, done && s.struck]}>{item.title}</Text>
@@ -132,7 +132,7 @@ export function TasksScreen() {
                 <Pressable onPress={() => move(item, -1)} disabled={!hasPrev} hitSlop={8} style={[s.moveBtn, !hasPrev && s.moveDim]}><Text style={s.moveText}>←</Text></Pressable>
                 <Pressable onPress={() => move(item, 1)} disabled={!hasNext} hitSlop={8} style={[s.moveBtn, !hasNext && s.moveDim]}><Text style={s.moveText}>→</Text></Pressable>
               </View>
-            </View>
+            </ListItem>
           );
         }}
       />
@@ -188,7 +188,6 @@ const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
   dim: { opacity: 0.4 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   title: { color: C.text, fontSize: 15, fontWeight: '600' },
   struck: { textDecorationLine: 'line-through', color: C.dim },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 },
