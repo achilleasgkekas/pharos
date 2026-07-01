@@ -23,12 +23,9 @@ GitHub today and can feed a docs site later.
 - **[Configuration](configuration.md)** — AI providers, storage backends
   (local/SMB/FTP/OneDrive), notifications (ntfy/Discord/Slack/Telegram/webhook),
   and language (i18n).
-
-## Planned guides
-
-These are being written incrementally (see [DOCS_PROGRESS.md](DOCS_PROGRESS.md)):
-
-- **Mobile app** — Expo companion app setup and pointing it at a server.
+- **[Mobile app](mobile.md)** — the Expo iOS/Android companion: install, point it
+  at your Pharos server, sign in for a bearer token, camera AI scans, push, and
+  building installable binaries with EAS.
 
 ## Reference (repo root)
 

@@ -149,3 +149,46 @@ unstaged (.claude/launch.json) — δεν το αγγιξα.
 
 Επόμενο doc: `docs/mobile.md` (Expo companion app — install, point at a Pharos
 server, bearer token, npx expo start). Θα διαβασω apps/mobile για ακριβεια.
+
+## 2026-07-02
+
+Έγραψα το `docs/mobile.md` — Expo companion app, Αγγλικά, public audience. Ο
+πινακας των Planned guides στο README εκλεισε τελειως (Mobile → live guide).
+
+Περιεχομενο: τι κανει η εφαρμογη (πινακας area→screen, ολα τα modules που
+mirror-αρουν το web), requirements (reachable server + Pharos account + Node/Expo
+Go, οχι localhost απο κινητο), run it (npm install + npx expo start + login server/
+username/password, session persist σε SecureStore, DEFAULT_API_BASE tip), how the
+token works (κανενα ξεχωριστο step — login επιστρεφει bearer `phk_` token, ιδιο με
+API/MCP, regenerate απο Settings → Mobile/MCP· bearer-protected files μεσω
+/api/files), camera/AI scans (product/receipt/expense/voucher, χρειαζονται AI on),
+push notifications (guarded no-op σε Expo Go, EAS dev build + APNs για real, βλ.
+PUSH_SETUP.md), building με EAS (development/preview/production profiles, bundle
+com.achilleas.pharos), project layout, troubleshooting.
+
+Πηγες (διαβασα κωδικα, οχι εικασιες): `apps/mobile/src/config.ts`
+(DEFAULT_API_BASE + STORE_KEYS), `App.tsx` (session gate + app bar + drawer +
+ScreenKey map), `src/api.ts` (ολος ο fetch client, login flow, ολα τα endpoints,
+fileSource bearer header), `src/push.ts` (guarded registerForPush + expo
+projectId), `PUSH_SETUP.md`, `app.json` (name/plugins/permissions/bundle id),
+`eas.json` (build profiles), `package.json` (Expo SDK 54, scripts),
+`apps/mobile/README.md`. Token shape επαληθευτηκε απο
+`api/v1/auth/login/route.ts` (`phk_${randomBytes(24).base64url}`, created on first
+login).
+
+README TOC: το «Mobile app» μεταφερθηκε απο Planned → live guide. Το section
+«Planned guides» αφαιρεθηκε (ολα τα guides ειναι πλεον live: self-hosting,
+features, api, configuration, mobile).
+
+Validation: markdown only, κανενα build/Docker/AI call. Code fences: 8 (4 κλειστα
+blocks, ζυγο). Internal links: script check README.md+mobile.md → 10 targets, ολα
+OK, 0 MISSING.
+
+Collision guard: ελεγχος `git status --short` + `git diff --cached` πριν το commit·
+stage ΜΟΝΟ docs/mobile.md + docs/README.md + docs/DOCS_PROGRESS.md. Foreign
+unstaged (.claude/launch.json) — δεν το αγγιξα.
+
+Επομενο doc: ολα τα core guides γραφτηκαν. Επομενο run → improvement pass: sync
+`docs/api.md` με τυχον νεα endpoints (diff vs `api/v1`), εμπλουτισμος
+`docs/features.md` ανα module, η ενα `docs/troubleshooting.md` που μαζευει τα
+troubleshooting sections. Πρωτα finish-in-progress κανενα (ολα done).
