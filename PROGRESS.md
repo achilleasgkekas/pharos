@@ -911,5 +911,16 @@ Read-only mobile parity re-audit, inventory χτισμένο από τον κώ�
 
 Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
 
+## 2026-07-01 (ui-auditor — 8η σάρωση ημέρας, mobile UI consistency, onAccent chronic ΕΚΛΕΙΣΕ)
+- Read-only re-audit του `apps/mobile` έναντι του web design system. Πρώτη σάρωση μετά το `3bc8a3d` (onAccent `#000` → `C.onAccent`, 32 sites/10 screens)· τελευταίος mobile commit = `3bc8a3d` (`git log 3bc8a3d..HEAD -- apps/mobile/src` κενό).
+- Violations ανά dimension (live grep):
+  - **Tokens/hex:** `#000` στα screens **33 → 1** (ΚΑΘΟΡΙΣΤΙΚΟ drift) — απομένει ΜΟΝΟ το `alpha('#000', 0.67)` modal backdrop scrim @ SettingsScreen:678 (black overlay, ΟΧΙ onAccent → θέλει `scrim`/`backdrop` token = μικρό P3/S follow-up). Το `#000` @ theme.ts:18 = ο `onAccent` token def (όχι violation). non-`#000` 6-digit hex **0**· 8-digit alpha hex **0**.
+  - **Primitives:** `ui.tsx` εξάγει Header/Centered/Spinner/ErrorText/Empty/Check + Input/TextArea· λείπουν **Button/Chip/Card/Badge/ListItem**. chip-variant **27**, card-variant **6**/5 screens, badge-variant **3** (per-screen, μη ενοποιημένα).
+  - **Input primitive:** 🟡 **4/11 screens** (29 `<Input>/<TextArea>`)· raw `<TextInput>` **39**/7 screens (Assistant/Items/Login/Receipts/Search/Settings/Shopping)· **10** τοπικά input-style entries με αποκλίνοντα tokens (radius 10/12/14, padH 10/12/14, padV 8/9/10/11, fs 14/15/16).
+  - **Safe-area:** `react-native-safe-area-context` εκτός `package.json` + 0 imports. **Adaptive:** `maxWidth` **2** (drawer + bubble, καμία στο content → edge-to-edge σε tablet). **Theme:** light/dark context **0** (dark-only· web έχει πλήρες light mode).
+- Foundation 3 DONE (theme tokens + alpha + touch targets)· Input primitive IN PROGRESS· **Button+Chip onAccent-prereq DONE** (component extraction ακόμα TODO). mobile `tsc --noEmit` **EXIT 0**.
+- Top 3 για τον builder: (1) **συνέχεια Input migration** στα 7 εναπομείναντα screens (P1/M, attended-preferred λόγω οπτικού verify χωρίς simulator)· (2) **Button + Chip primitives** (P2/M, unattended-safe· onAccent prereq κλειστό, μένει το `<Button>`/`<Chip>` component)· (3) **Card + Badge + ListItem primitives** (P2/M· ενοποιεί 6 card + 3 badge entries). Μικρό bonus: `scrim` token για το τελευταίο `#000` @ SettingsScreen:678.
+- Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md. Κανένα committed secret εντοπίστηκε.
+
 ## Needs Achilleas
 Κανένα νέο. Παραμένουν ανοιχτά (product/credentials decisions, εκτός auto-buildable): (1) Settings theme toggle + language switcher + AI-engine + storage/OneDrive στο mobile· (2) Reports extra charts (endpoint-extension + RN charting lib επιλογή)· (3) Statements merge/bind write-ops (νέα `/api/v1/statements/plans` write endpoints)· (4) remote push pipeline (APNs/FCM, needs device test). Κανένα committed secret δεν εντοπίστηκε.
