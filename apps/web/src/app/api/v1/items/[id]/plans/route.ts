@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { isObjectId } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Statement } from '@/models/Statement';
 import { getAppSettings } from '@/lib/appSettings';
@@ -16,7 +17,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const [docs, settings] = await Promise.all([
       Statement.find().sort({ period: -1, card: 1 }).lean(),

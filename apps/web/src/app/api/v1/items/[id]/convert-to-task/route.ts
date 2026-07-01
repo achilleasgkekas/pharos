@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { isObjectId } from '@/lib/apiBody';
 import { convertItemToTask } from '@/app/items/actions';
 
 export const runtime = 'nodejs';
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     const r = await convertItemToTask(id);
     if (!r.ok) return apiError(r.error || 'convert failed', 404);
     return NextResponse.json({ ok: true, taskId: r.taskId });

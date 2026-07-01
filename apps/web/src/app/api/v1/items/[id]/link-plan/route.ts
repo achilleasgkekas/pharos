@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { isObjectId } from '@/lib/apiBody';
 import { linkPlanToItem, removeItemFromPlanByKey } from '@/app/statements/actions';
 
 export const runtime = 'nodejs';
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     const b = (await req.json().catch(() => ({}))) as { signature?: unknown };
     const signature = typeof b.signature === 'string' ? b.signature.trim() : '';
     if (!signature) return apiError('signature required');
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     const b = (await req.json().catch(() => ({}))) as { signature?: unknown };
     const signature = typeof b.signature === 'string' ? b.signature.trim() : '';
     if (!signature) return apiError('signature required');
