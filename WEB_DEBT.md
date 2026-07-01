@@ -249,7 +249,7 @@
   - Καμία αλλαγή σε validation behaviour / response shape (`{item}` / `{ok:true}` αμετάβλητα) → μηδέν κίνδυνος για τον mobile consumer.
   - Απομένουν ~13 raw routes με το ίδιο pattern (ai, ai/subscription, items/[id]/link-plan, items/[id]/price, items/import, push/register, receipts/[id], receipts/[id]/rescan, scan/expense, scan/voucher, settings, stores/[id], shopping-list POST) για μελλοντικά runs (1-2/run).
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (2026-07-01) — items/[id] PATCH + shopping-list/[id] PATCH: η γραμμή body-parse `const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;` → `const b = await readBody(req);` (import `{ isObjectId, readBody }` από `@/lib/apiBody`, inline cast αφαιρέθηκε). Τα partial-update guards (`typeof b.x === 'string'`, `Array.isArray(b.tags)`, `'targetPrice' in b`, `typeof b.checked === 'boolean'`) αμετάβλητα· response `{item}`/`{ok:true}` ίδια. tsc EXIT 0· safe rebuild → /login 200, web restarts 0, PATCH items/[id]+shopping-list/[id] no-token → 401. Adopters `readBody` **16**.
 
 ### Dedup ObjectId-validation regex σε shared guard
 - Priority: P3
@@ -263,7 +263,7 @@
   - Behavior-identical (ίδιο regex, ίδιο case-insensitive flag)· καμία αλλαγή σε response/validation. Καθαρά dedup.
   - Μην αλλάξεις το auth flow· η μετακίνηση αφορά ΜΟΝΟ το id-shape guard. Split σε πολλαπλά S runs αν χρειαστεί (μην αγγίξεις 19 files σε ένα commit).
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (2026-07-01) — πρόσθεσα `OBJECT_ID_RE` const + `export function isObjectId(id: string): boolean` στο `lib/apiBody.ts` (byte-identical `/^[a-f0-9]{24}$/i.test(id)`· param `string` αντί type-guard `id is string` αφού όλοι οι consumers περνάνε ήδη string από τα route params). 1η παρτίδα migrated: **items/[id]** (3 guards: GET/PATCH/DELETE) + **shopping-list/[id]** (2 guards + διαγράφηκε το local `ID_RE` const). Μήνυμα `apiError('bad id')` + status 400 αμετάβλητα. tsc EXIT 0· safe rebuild → /login 200, web restarts 0. Απομένουν ~17 route files με inline regex (items/[id]/price+link-plan+ai-fill+convert-to-task, receipts/[id]+rescan, expenses/[id], subscriptions/[id], tasks/[id], vouchers/[id], stores/[id], notifications, trash/[id], κ.λπ.) για 3-5/run συνέχεια.
 
 ### apiBody helpers — readBody adoption σε expenses/[id] + subscriptions/[id] PATCH
 - Priority: P3

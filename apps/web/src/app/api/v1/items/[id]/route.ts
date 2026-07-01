@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { isObjectId, readBody } from '@/lib/apiBody';
 import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
 import { Item, ITEM_STATUSES } from '@/models/Item';
@@ -64,7 +65,7 @@ type ItemDetailLean = {
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const doc = (await Item.findById(id).lean()) as ItemDetailLean | null;
     if (!doc) return apiError('not found', 404);
@@ -106,8 +107,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
-    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!isObjectId(id)) return apiError('bad id');
+    const b = await readBody(req);
     const set: Record<string, unknown> = {};
     if (typeof b.title === 'string' && b.title.trim()) set.title = b.title.trim();
     if (typeof b.status === 'string' && STATUS.includes(b.status)) set.status = b.status;
@@ -131,7 +132,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const doc = await Item.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);

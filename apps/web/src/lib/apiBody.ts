@@ -14,6 +14,13 @@ import type { NextRequest } from 'next/server';
 
 export type Body = Record<string, unknown>;
 
+/** True for a 24-hex Mongo ObjectId string. Centralizes the `/^[a-f0-9]{24}$/i.test(id)`
+ *  guard repeated inline across the dynamic `[id]` routes (identical semantics). */
+const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
+export function isObjectId(id: string): boolean {
+  return OBJECT_ID_RE.test(id);
+}
+
 /** Parse a request JSON body to a plain object; never throws (bad/empty JSON → {}). */
 export async function readBody(req: NextRequest): Promise<Body> {
   return (await req.json().catch(() => ({}))) as Body;
