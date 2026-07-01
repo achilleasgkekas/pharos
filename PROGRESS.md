@@ -5,6 +5,21 @@
 <!-- reviewed: 2784fc1 -->
 <!-- docker-validated: 99a9385 -->
 
+## 2026-07-01 (parity-auditor — 21η σάρωση ημέρας: ουρά αμετάβλητη, 0 GAP)
+- **Inventory από κώδικα** (όχι docs): **49 v1 routes** (`find api/v1 -name route.ts` = 49· login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`** (home + 18· income + setup ξεχωριστά), **130 exported symbols** στο `apps/mobile/src/api.ts`.
+- **Route↔consumer diff**: το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes· grep-count όλων των deep sub-routes ≥1 consumer (`ai-fill` 1, `convert-to-task` 1, `link-plan` 2, `plans` 2, `price` 11, `add-to-library` 1, `rescan` 2, `test-notify` 1, `items/import` 1) → **μηδέν «endpoint χωρίς mobile consumer» gap**. Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only wizard· N/A).
+- **App-code diff από `43d3b3c` (τελευταίο parity baseline)**: 23 files / +272 −36, **καμία νέα portable web δυνατότητα**: (α) API refactors readBody/isObjectId (Web Debt, byte-identical, response shapes αμετάβλητα)· (β) `ee9d413` mobile `Badge` primitive (UI Debt, ήδη DONE)· (γ) `ca2d79f` Vitest + `money.test.ts` (test infra)· (δ) **`ceb65c6` SaaS control-plane models `Tenant`/`Account`/`Membership` + `SAAS_MODE` flag = server-only infra, μηδέν route/page, gated behind flag → ΟΧΙ mobile parity item** (πολυ-tenancy = architecture decision, βλ. Needs Achilleas).
+- **Working tree στην αρχή**: μόνο `.claude/launch.json` (foreign tooling change, δεν το αγγίζω)· μηδέν WIP src του Αχιλλέα.
+- **«Partial» rows ξανα-επιβεβαιωμένα ως Needs Decision**: `reports/route.ts` **GET-only**, `statements/plans/route.ts` **GET-only** → extra charts / merge-bind / PDF-import θέλουν νέα endpoints + RN charting lib· Tasks Kanban, Settings theme/language/AI-engine/storage/OneDrive → decision/credentials boundary.
+- **Counts: DONE 7 (parity queue) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.** Ενεργό parity TODO κανένα.
+- **mobile `tsc --noEmit` → EXIT 0** (μηδέν P1 type errors).
+- **Top-3 για τον builder** (όλα secondary, ο parity core κλειστός): (1) **Safe-area insets** [P2/M, `SafeAreaProvider`+`useSafeAreaInsets`, additive, no token-drift, unattended-safe]· (2) **`<ListItem>` primitive** [τελευταίο κομμάτι Card+Badge+ListItem group]· (3) fresh web-debt σάρωση — readBody adoption στους εναπομείναντες raw-body routes (`scan/expense`, `scan/voucher`, `shopping-list`, `auth/login`, `items/[id]/ai-fill`). Τα `<Chip>`/lucide-icons/language-switcher = attended-preferred για οπτικό verify.
+- **Read-only run**: μηδέν app-code edit, μηδέν Docker build, μηδέν AI/token. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+### Needs Achilleas
+- **Νέο (χαμηλή προτεραιότητα, όχι επείγον)**: μπήκαν SaaS control-plane models (`Tenant`/`Account`/`Membership`) + `SAAS_MODE` flag (`ceb65c6`). Όταν/αν ενεργοποιηθεί το SaaS mode, το mobile θα χρειαστεί απόφαση για tenant-scoping (πώς επιλέγει tenant ο χρήστης, per-tenant bearer token). Προς το παρόν gated behind flag, μηδέν επίδραση στο single-tenant mobile → κανένα build action τώρα.
+- Standing (product/credentials boundary): theme toggle, language switcher, AI-engine/storage/OneDrive settings στο mobile· Reports extra charts (RN charting lib)· Tasks Kanban board· Statements merge/bind + PDF import (νέα write/upload endpoints)· remote push pipeline αδοκίμαστο (χρειάζεται EAS dev build + APNs key). Web-side: login brute-force rate-limit, error-message leak στο `withAuth` 500, tasks `steps` χωρίς cap.
+
 ## 2026-07-01 (docker-health — health OK, μηδέν rebuild, marker 18b611f → 99a9385)
 - **Health**: mongo `healthy` (Up 6h· τα 47 RestartCount είναι cumulative lifetime, όχι τρέχον loop), web `running` RestartCount **0**, curl `/login` → **200**. Καθαρό.
 - **Rebuild**: ΚΑΝΕΝΑ. `git diff --name-only 18b611f..HEAD -- apps/web` = κενό (τα 2 commits ενδιάμεσα, `2784fc1`+`99a9385`, είναι docs/PROGRESS μόνο). Δεν άλλαξε runtime web code → skip build ανά κανόνα.
