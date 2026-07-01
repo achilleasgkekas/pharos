@@ -68,7 +68,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Tasks (`/tasks`)
 | Web | Mobile |
 |-----|--------|
-| **Kanban** (todo/in-progress/blocked/done, drag + ←/→), board/list toggle, #tags, steps/checklist, project progress by tag | 🟡 list + add (**#tag-parse**) + toggle done + tap-to-edit (title + **4-status picker** + **priority picker** low/normal/high + **tags editor** + **steps/checklist** [add/toggle/remove, optimistic] + card badge `☑ done/total`) + status chips + tag/priority display + delete. No Kanban board, no project-progress-by-tag |
+| **Kanban** (todo/in-progress/blocked/done, drag + ←/→), board/list toggle, #tags, steps/checklist, project progress by tag | 🟡 list + add (**#tag-parse**) + toggle done + **inline ←/→ quick-move** (κύκλος status κατά μήκος todo→in-progress→blocked→done, mirror του web Kanban ←/→) + tap-to-edit (title + **4-status picker** + **priority picker** low/normal/high + **tags editor** + **steps/checklist** [add/toggle/remove, optimistic] + card badge `☑ done/total`) + status chips + tag/priority display + delete. No Kanban board, no project-progress-by-tag |
 
 ## Settings (`/settings`)
 | Web | Mobile |
@@ -157,7 +157,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Acceptance:
   - Swipe (ή ←/→) αλλάζει status· reflect + persist· sort ξαναφέρνει done κάτω
   - tsc καθαρό· gesture verify σε device/simulator (attended) ή structural μόνο για το no-dep variant
-- Status: TODO
+- Status: ✅ DONE (no-dep ←/→ variant, 2026-07-01 builder). TasksScreen κάρτα: inline ←/→ κουμπιά (δεξιά, δίπλα στο title) που κινούν το status κατά μήκος του `STATUSES` flow (todo→in-progress→blocked→done, mirror του web `COLUMNS` order)· disabled+dimmed στα άκρα (idx 0 → no ←, idx last → no →)· `move(it, dir)` optimistic + `setTaskStatus` persist, catch → `load()`. Κανένα νέο dep/endpoint (χωρίς `react-native-gesture-handler`)· η swipe-gesture εκδοχή μένει attended-preferred (οπτικό verify). mobile tsc EXIT 0. **Το checkbox (toggle done↔todo) παραμένει** ως ξεχωριστό affordance.
 
 ### Settings — language switcher στο mobile
 - Priority: P3 | Size: L | no AI, decision ΕΓΙΝΕ (Αχιλλέας 2026-07-01) · ⚠ string-extraction heavy — 16 screens

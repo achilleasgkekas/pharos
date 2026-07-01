@@ -56,6 +56,15 @@ export function TasksScreen() {
     setTasks((p) => p.map((x) => (x.id === it.id ? { ...x, status: next } : x)));
     try { await setTaskStatus(it.id, next); } catch { await load(); }
   }
+  // Quick-move along the STATUSES flow (mirror of the web Kanban ←/→ quick-move).
+  async function move(it: Task, dir: -1 | 1) {
+    const idx = STATUSES.indexOf(it.status as (typeof STATUSES)[number]);
+    const ni = idx + dir;
+    if (idx < 0 || ni < 0 || ni >= STATUSES.length) return;
+    const next = STATUSES[ni];
+    setTasks((p) => p.map((x) => (x.id === it.id ? { ...x, status: next } : x)));
+    try { await setTaskStatus(it.id, next); } catch { await load(); }
+  }
   function openEdit(it: Task) { setEditing(it); setEditTitle(it.title); setEditStatus(it.status); setEditPriority(it.priority || 'normal'); setEditTags(it.tags.join(' ')); setEditSteps(it.steps ?? []); setStepInput(''); }
   // Steps persist immediately (add/toggle/remove all send the full updated array), independent of the Save button.
   async function persistSteps(next: TaskStep[]) {
@@ -104,6 +113,9 @@ export function TasksScreen() {
           const done = item.status === 'done';
           const steps = item.steps ?? [];
           const doneSteps = steps.filter((st) => st.done).length;
+          const idx = STATUSES.indexOf(item.status as (typeof STATUSES)[number]);
+          const hasPrev = idx > 0;
+          const hasNext = idx >= 0 && idx < STATUSES.length - 1;
           return (
             <View style={s.row}>
               <Pressable onPress={() => toggle(item)} hitSlop={10}><Check checked={!!done} /></Pressable>
@@ -116,6 +128,10 @@ export function TasksScreen() {
                   {item.tags.length > 0 && <Text style={s.tags} numberOfLines={1}>#{item.tags.join(' #')}</Text>}
                 </View>
               </Pressable>
+              <View style={s.moveBtns}>
+                <Pressable onPress={() => move(item, -1)} disabled={!hasPrev} hitSlop={8} style={[s.moveBtn, !hasPrev && s.moveDim]}><Text style={s.moveText}>←</Text></Pressable>
+                <Pressable onPress={() => move(item, 1)} disabled={!hasNext} hitSlop={8} style={[s.moveBtn, !hasNext && s.moveDim]}><Text style={s.moveText}>→</Text></Pressable>
+              </View>
             </View>
           );
         }}
@@ -183,6 +199,10 @@ const s = StyleSheet.create({
   steps: { color: C.dim, fontSize: 11, fontWeight: '600' },
   pri: { color: C.gold, fontSize: 11 },
   tags: { color: C.faint, fontSize: 11, flex: 1 },
+  moveBtns: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  moveBtn: { paddingHorizontal: 6, paddingVertical: 6 },
+  moveDim: { opacity: 0.2 },
+  moveText: { color: C.dim, fontSize: 18, fontWeight: '700' },
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
   stepText: { color: C.text, fontSize: 14, flex: 1 },
   stepDel: { color: C.faint, fontSize: 20, paddingHorizontal: 4 },

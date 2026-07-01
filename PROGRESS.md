@@ -5,6 +5,19 @@
 <!-- reviewed: 83cc537 -->
 <!-- docker-validated: 20e1826 -->
 
+## 2026-07-01 (builder — Tasks inline ←/→ quick-move στο mobile· swipe Build-Queue item [no-dep variant] ΕΚΛΕΙΣΕ)
+- **Τι**: πήρα το επόμενο ενεργό unattended-safe Build-Queue item, το **no-dep variant** του `### Tasks — swipe-to-change-status (αντί Kanban)` (P3/M, no AI, κανένα decision). Το swipe-gesture variant είναι attended-preferred (dep `react-native-gesture-handler` + οπτικό verify)· ο inline ←/→ variant (mirror του web Kanban ←/→ quick-move) είναι pure-mobile, μηδέν νέο dep/endpoint, δομικά verifiable χωρίς simulator. Το lucide-icons item (P2/M) + το language switcher (P3/L) μένουν attended-preferred, οπότε αυτό ήταν το κορυφαίο auto-buildable.
+- **Αλλαγές** (μόνο mobile, 1 screen file):
+  - `TasksScreen.tsx`: νέα `move(it, dir: -1|1)` — υπολογίζει `idx = STATUSES.indexOf(status)`, πάει στο γειτονικό status (guard στα άκρα + σε unknown status), optimistic `setTasks` + `setTaskStatus` persist (catch → `load()`). Στην κάρτα, δεξιά δίπλα στο title Pressable, δύο μικρά κουμπιά **← →** που καλούν `move(item,-1)` / `move(item,1)`· `disabled`+dimmed (opacity 0.2) όταν `!hasPrev` / `!hasNext` (idx 0 → no ←, idx last → no →). Το `STATUSES = ['todo','in-progress','blocked','done']` ταιριάζει ήδη 1:1 με το web `COLUMNS` order → ίδιο flow.
+  - **Το checkbox παραμένει** ξεχωριστό affordance (toggle done↔todo)· το ←/→ είναι για βηματική μετακίνηση.
+  - Κανένα νέο dep, κανένα νέο/αλλαγμένο endpoint· το `setTaskStatus(id,status)` (PATCH `/api/v1/tasks/[id]`) υπάρχει ήδη.
+- **Verify**: `apps/mobile` `npx tsc --noEmit` → **EXIT 0**. **Καμία αλλαγή web runtime** (μηδέν `apps/web` diff) → **δεν** έγινε Docker rebuild (ούτε χρειάζεται). Μηδέν AI/token call.
+- **Git hygiene**: staged ΜΟΝΟ explicit paths (`apps/mobile/src/screens/TasksScreen.tsx` + `MOBILE_PARITY.md` + `PROGRESS.md`)· working tree στην αρχή είχε μόνο τα δικά μου edits (μηδέν WIP του Αχιλλέα). Κανένα secret/`.env`.
+- **Επόμενο task**: τα εναπομείναντα auto-buildable Build-Queue items είναι πλέον attended-preferred (**lucide-react-native icon set** P2/M — «δεν θέλω χαζά εικονίδια», θέλει οπτικό verify· **language switcher** P3/L — string-extraction σε 16 screens + μετάφραση verify). Unattended-safe εναλλακτική: **mobile UI Debt Queue** — IconButton/`addBtn` variant στο `ui.tsx` (τα `＋` accent buttons σε Tasks/Shopping/κ.ά. + ίσως τα νέα ←/→ move buttons → shared primitive, tsc-verifiable αν byte-identical), ή Chip/Badge primitive (status chips σε 7 screens). Ή νέα fresh web-debt σάρωση.
+
+### Needs Achilleas
+- Κανένα νέο. (Παραμένουν οι παλιές: login brute-force rate-limit, error-message leak στα action responses· mobile NEEDS DECISION: theme toggle, AI-engine/storage/OneDrive settings, Reports extra charts, Tasks Kanban board [το ←/→ quick-move DONE], Statements merge/bind + PDF import, remote push αδοκίμαστο· lucide-icons + swipe-gesture + language-switcher = attended-preferred για οπτικό verify.)
+
 ## 2026-07-01 (builder — Tasks steps/checklist στο mobile, full-stack· Build Queue item ΕΚΛΕΙΣΕ)
 - **Τι**: πήρα το κορυφαίο ενεργό Build-Queue item (`### Tasks — steps / checklist στο mobile detail`, P2/M, no AI, decision ΕΓΙΝΕ από Αχιλλέα). Το parity queue ήταν 7/7 DONE και το Web Debt Queue 0, οπότε αυτό ήταν το πρώτο unattended-safe TODO με πλήρη spec (τα lucide-icons + swipe items είναι attended-preferred λόγω οπτικού verify).
 - **Web half** (2 route files):
