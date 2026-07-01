@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 2784fc1 -->
-<!-- docker-validated: 18b611f -->
+<!-- docker-validated: 99a9385 -->
+
+## 2026-07-01 (docker-health — health OK, μηδέν rebuild, marker 18b611f → 99a9385)
+- **Health**: mongo `healthy` (Up 6h· τα 47 RestartCount είναι cumulative lifetime, όχι τρέχον loop), web `running` RestartCount **0**, curl `/login` → **200**. Καθαρό.
+- **Rebuild**: ΚΑΝΕΝΑ. `git diff --name-only 18b611f..HEAD -- apps/web` = κενό (τα 2 commits ενδιάμεσα, `2784fc1`+`99a9385`, είναι docs/PROGRESS μόνο). Δεν άλλαξε runtime web code → skip build ανά κανόνα.
+- **Disk**: overlay 18% χρήση, **24.5G free** από 31.4G. Images 3.49GB, Containers 80MB, Build Cache **566MB με 0B reclaimable** (prune θα ήταν no-op) → δεν έγινε prune. flaresolverr ήδη `Exited` (μηδέν memory pressure), αφέθηκε σταματημένο.
+- **Marker**: docker-validated `18b611f` → **`99a9385`** (HEAD). Read-only run πλην marker: μηδέν rebuild, μηδέν app-code edit, μηδέν AI. Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-01 (builder — readBody() adoption σε 10 raw-body v1 routes· Web Debt)
 - **Τι**: πήρα το επόμενο web-debt task από την ουρά (parity core κλειστός → UI/Web Debt). Αντικατέστησα το επαναλαμβανόμενο `(await req.json().catch(() => ({}))) as ...` με τον shared `readBody(req)` (`lib/apiBody`) σε **10 route files**: `ai`, `ai/subscription`, `items/[id]/link-plan` (×2 POST+DELETE), `items/[id]/price`, `items/import`, `push/register` (×2 POST+DELETE), `receipts/[id]/rescan`, `receipts/[id]`, `settings`, `stores/[id]`.
