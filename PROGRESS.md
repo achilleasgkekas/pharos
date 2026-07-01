@@ -23,6 +23,27 @@
 - **Επόμενο task**: **Button primitive** (UI Debt, P2/M) — το unattended-safe subset είναι τα **5 byte-identical `save`** (`padV12/padH22 + C.accent + radius12`: Money/Receipts/Subscriptions/Tasks/Vouchers) + 6 `addBtn` → `<Button variant="accent">` στο `ui.tsx`, tsc-verifiable με μηδέν οπτική αλλαγή. Μετά (attended-preferred, οπτικό verify): τα 5 input-outlier screens (Shopping/Receipts/Assistant/Search/Login) στο `<Input>` + Chip/Badge extraction.
 - **Needs Achilleas**: κανένα νέο. (Παραμένουν NEEDS DECISION, εκτός builder: mobile theme toggle + language switcher + AI-engine/storage/OneDrive settings· Reports extra charts [endpoint-extension + RN charting lib]· Tasks Kanban/steps-checklist· Statements merge/bind + PDF import + re-scan write endpoints· remote push αδοκίμαστο [EAS dev build + APNs]· mongo RestartCount OOM → προαιρετικό RAM bump.)
 
+## 2026-07-01 (web-code-quality — όψιμο re-audit· ουρά αμετάβλητη, 2 P3/S ΑΝΟΙΧΤΑ)
+
+Fresh read-only σάρωση όλης της `/api/v1` (**49 route files**) + 7 synced models. `npm run type-check` → **exit 0**. Τελευταίος app-code commit στο `apps/web/src` = **`c540322`** (apiError refactor), ίδιος με τους 2 προηγούμενους γύρους· clean tree, κανένας builder δεν κατανάλωσε item ενδιάμεσα (μετέπειτα commits = docs + mobile scrim/Input primitive, 0 `apps/web/src` diff) → η Web Debt Queue σταθερή by-construction.
+
+**Ευρήματα ανά διάσταση (0 νέα):**
+- Type safety: `: any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε `/api/v1` → **0**.
+- Auth: sweep 49 routes → μόνο `auth/login` χωρίς `withAuth`/`bearerUser` (σωστά, auth boundary). 0 unguarded.
+- Input validation: sweep όλων των `[id]`/`[type]` → **0 NOGUARD** (24-hex guard παντού, π.χ. `items/[id]:67`)· list params clamped 1..200.
+- Error handling: inline `NextResponse.json({ error })` εκτός `auth/login` → **0**· ομοιόμορφο try/catch + `apiError` μέσω `withAuth`.
+- DB: 7/7 synced models με explicit `index({ updatedAt: -1 })`· reads `.lean()` + `.limit()`.
+- Duplication/dead code: κανένα νέο. UX states: N/A (auditor εστιάζει API).
+
+**Ουρά (αμετάβλητη): 2 ενεργά P3/S, όλα τα άλλα DONE.** Re-verified: `readBody` grep → 2 routes το χρησιμοποιούν, 27 ακόμα raw· `ai/route.ts` messages (γρ. 15-23) χωρίς cap· `vouchers/route.ts` 7× `String(b.)`.
+
+**Top-3 για τον builder:**
+1. apiBody helpers adoption σε vouchers + items POST (P3/S) — 27 routes ακόμα με raw body pattern.
+2. POST /api/v1/ai — cap μήκους ιστορικού messages (P3/S) — μόνο array-input χωρίς άνω όριο (cost exposure).
+3. (Ουρά αλλιώς καθαρή) builder πέφτει στο mobile UI Debt Queue (Button primitive, 5 byte-identical `save`) αν εξαντλήσει τα web items.
+
+Κανένα νέο item δεν ανοίχτηκε (no debt to invent). Καμία νέα καταχώρηση στο `## Needs Achilleas` (οι 2 παλιές security παρατηρήσεις — login brute-force, error-message leak — παραμένουν product decisions).
+
 ## 2026-07-01 (web-code-quality — αργά βραδινό re-audit· ουρά αμετάβλητη, 2 P3/S ΑΝΟΙΧΤΑ)
 
 Fresh read-only σάρωση όλης της `/api/v1` (**49 route files**) + 7 synced models + `apiAuth`/`apiList`/`apiBody`/`serialize`. `npm run type-check` → **exit 0**. Τελευταίος app-code commit στο `apps/web/src` = **`c540322`** (apiError refactor), ίδιος με τον προηγούμενο γύρο· clean tree, κανένας builder δεν κατανάλωσε item → η Web Debt Queue σταθερή by-construction.
