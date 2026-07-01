@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: c5cec57 -->
-<!-- docker-validated: 46f35ed -->
+<!-- docker-validated: b1b2b43 -->
+
+## 2026-07-01 (docker-health — safe rebuild μετά isObjectId 3η παρτίδα, marker → b1b2b43)
+- **Health/disk (read-only)**: mongo `healthy` (Up 4h· ιστορικό RestartCount 47 από παλιά OOM, ΟΧΙ τρέχον loop)· web RestartCount 0· flaresolverr `Exited` 46h (ήδη σταματημένο, μηδέν memory pressure)· searxng up (κανονικό default service). `docker system df`: Images 3.49GB, Build Cache 566MB.
+- **Rebuild decision**: `git diff 46f35ed..HEAD -- apps/web` = 5 API route files (isObjectId dedup 3η παρτίδα, web runtime) → rebuild warranted.
+- **Safe rebuild dance**: `docker compose build web` (image only, κυρίως CACHED, EXIT 0) → mongo `healthy` (πριν το up) → `docker compose up -d web` (Recreated) → poll `/login` **200** (1η προσπάθεια) → web RestartCount **0**, status running. `docker builder prune -f` μετά (free cache reclaimed· 566MB που έμεινε = in-use layers του τρέχοντος image, όχι garbage). Μηδέν AI/token call, μηδέν destructive op.
+- Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-01 (reviewer — range 6809a8c..c5cec57, isObjectId 3η παρτίδα clean, marker → c5cec57)
 - **Εύρος**: 7 commits από τον προηγ. review marker. Μόνο **1** app-src commit (`c5cec57`, isObjectId dedup 3η παρτίδα, 5 route files)· τα υπόλοιπα = docs (web-debt/ui-auditor/parity/monitor/docker-health) + το προηγ. review commit. Working tree καθαρό στην αρχή.
