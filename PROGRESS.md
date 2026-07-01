@@ -5,6 +5,22 @@
 <!-- reviewed: effd90d -->
 <!-- docker-validated: d235eff -->
 
+## 2026-07-01 (web-code-quality — νυχτερινό re-audit· ουρά σταθερή, μηδέν νέο εύρημα)
+- **Σάρωση**: 49 route files + 7 synced models + `apiAuth`/`apiList`/`apiBody`/`serialize`. Τελευταίος app-code commit στο `apps/web/src` = **`a582ac5`** (ai chat-history cap), ίδιος με τον προηγούμενο γύρο· clean tree, κανένας builder δεν κατανάλωσε web item ενδιάμεσα (τα μετέπειτα commits = docs + `effd90d` mobile Button primitive, μηδέν `apps/web/src` diff).
+- **Ευρήματα ανά διάσταση (όλα 0 P1/P2):**
+  - Type safety: `npm run type-check` → **EXIT 0**. `: any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το `/api/v1` → **0**.
+  - Auth: `grep -L` sweep 49 routes → μόνο `auth/login` χωρίς `withAuth` (σωστά, auth boundary). 0 unguarded.
+  - Input validation: 0 NOGUARD στα `[id]`/`[type]` routes· list params clamped 1..200· `ai` cap (MAX_TURNS=20/MAX_CONTENT=8000) live στον κώδικα.
+  - Error handling: 0 inline `NextResponse.json({ error })` εκτός `auth/login`· ομοιόμορφο `apiError` μέσω `withAuth`.
+  - DB: 7/7 models με `index({ updatedAt: -1 })`· και τα 8 list endpoints `.limit()` + `.lean()`· τα 6 no-limit `.find()` = non-list aggregations/window-filtered (false positives).
+  - Duplication/dead code, UX states: μηδέν νέο (τα προηγούμενα dedup items ΕΚΛΕΙΣΑΝ).
+- **Ουρά**: **1 ενεργό P3/S** (apiBody adoption σε vouchers + items POST)· επαναεπαληθεύτηκε (27 raw-body routes, 2 adopters, vouchers 7× `String(b.)`). Δεν ανοίχτηκε νέο item (no debt to invent).
+- **Top-3 για τον builder**: (1) **apiBody adoption** — vouchers POST (7× `String(b.)`) + items POST → `readBody`/`strField`/`numField`/`enumField`. (2) Αν εξαντληθεί, mobile UI Debt: **Chip/Badge primitive** (status chips σε 7 screens). (3) Input outliers (5 input screens, attended-preferred).
+- **Git hygiene**: staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (explicit paths). Read-only πλην docs, μηδέν Docker/AI/app-code edit. Κανένα secret.
+
+### Needs Achilleas
+Κανένα νέο. (Παραμένουν οι 2 παλιές security παρατηρήσεις ως product decisions: login brute-force rate-limit, error-message leak στα action responses.)
+
 ## 2026-07-01 (docker-health — υγεία πράσινη, χωρίς rebuild)
 - **Health**: homepage-mongo `healthy` (Up 5 ώρες), homepage-web running 57 λεπτά (Running:true, OOMKilled:false, ExitCode:0, RestartCount:0). homepage-mongo RestartCount 44 = ιστορικό σωρευτικό, ΟΧΙ ενεργό loop (τρέχει 5 ώρες healthy). homepage-flaresolverr εκτός `ps` (ήδη σταματημένο, καμία ενέργεια). homepage-searxng running (default stack).
 - **Disk**: system df καθαρό, Images 3.49GB, Build Cache 566MB αλλά **reclaimable 0B** (κανένα prune δεν έτρεξε, δεν άξιζε), Containers 78MB reclaimable (stopped flaresolverr). Καμία πίεση στη μικρή VM.
