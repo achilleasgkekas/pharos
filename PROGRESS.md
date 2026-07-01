@@ -5,6 +5,16 @@
 <!-- reviewed: 114e727 -->
 <!-- docker-validated: 95edf16 -->
 
+## 2026-07-01 (web-code-quality — 20ή σάρωση, builder έκλεισε 2 items, ουρά 0→1, read-only)
+Fresh σάρωση **49 v1 route files** + `apiAuth`/`apiBody`/`apiList` helpers + 7 synced models, όλα από τον κώδικα (live grep, όχι docs). Από την 19η σάρωση ο builder κατανάλωσε το commit `d259a55` (shared `isObjectId()` + `readBody` σε items/[id] & shopping-list/[id] PATCH) → τα 2 P3/S items της 19ης = **DONE** (επαλήθευση: αμφότερα κάνουν `import { isObjectId, readBody }`, μηδέν raw `req.json().catch`). Ουρά έφτασε **0 ενεργά**· άνοιξα 1.
+- **Ευρήματα ανά διάσταση:** Type safety **0** (`npm run type-check` EXIT 0· 0 any/ts-ignore σε /api/v1)· Auth **0 unguarded** (μόνο `auth/login` χωρίς `withAuth`, σωστά)· Input validation **0 gaps** (raw-body routes validate· list clamped 1..200· ai cap 20/8000)· Error handling **0** (ομοιόμορφο `withAuth` try/catch + `{error}`)· DB **0** (7/7 models `index({updatedAt:-1})`· 0 «limit χωρίς lean»· list reads `.lean()`+`.limit()`)· Duplication **2 ongoing** (raw-body `req.json().catch` **13 routes**/16 adopters· ObjectId regex inline **17 route files**, `isObjectId` adopters **2**).
+- **Counts: P1=0, P2=0, P3=1** (νέο item: isObjectId dedup 2η παρτίδα, 5 route files receipts/expenses/subscriptions/tasks/vouchers [id], S). Δεν εφευρίσκω debt· άνοιξα ΜΟΝΟ 1 μη-sprawling item ώστε ο builder να έχει ουρά.
+- **Top-3 για τον builder:** (1) **isObjectId dedup 2η παρτίδα** (P3/S, το νέο item)· (2) **readBody adoption** στα εναπομείναντα 13 raw-body routes (P3/S ανά 2-3)· (3) **isObjectId 3η παρτίδα** (~12 route files ακόμα). Όλα additive, unattended-safe, behaviorally identical.
+- Read-only: μηδέν Docker build, μηδέν AI/token call, μηδέν app-code edit. Staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (explicit paths).
+
+### Needs Achilleas
+- Κανένα νέο. Standing (product/security decisions, ΟΧΙ queue items): login brute-force rate-limit στο `auth/login`, πιθανό error-message leak στο `withAuth` 500 (γενικό μήνυμα vs raw), tasks `steps` array χωρίς άνω όριο πλήθους/μήκους (αποδεκτό για WireGuard-only single-user).
+
 ## 2026-07-01 (parity-auditor — 17η σάρωση ημέρας, ουρά αμετάβλητη, read-only)
 Fresh inventory ξαναχτισμένο **από τον κώδικα** (όχι docs). **49 v1 routes** (login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`** (home + 18· income + setup ξεχωριστά), **81 exported api fns** στο mobile `api.ts`.
 - **Diff web↔mobile:** το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes· grep-count στα deep sub-routes επιβεβαίωσε consumers: `items/[id]/ai-fill` 1, `convert-to-task` 1, `link-plan` 2, `plans` 2, `price` 1, `receipts/[id]/add-to-library` 1, `rescan` 2, `settings/test-notify` 1, `items/import` 4 → **μηδέν «endpoint χωρίς mobile consumer» gap**. Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (first-run admin wizard, web-only by design· N/A).

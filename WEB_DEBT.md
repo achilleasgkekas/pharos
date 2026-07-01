@@ -3,6 +3,20 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-01 20ή σάρωση· builder έκλεισε items/[id]+shopping-list/[id] apiBody + 1η isObjectId παρτίδα, ουρά 0→ανοίγω 1 P3/S)
+
+**2026-07-01 (20ή σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 route files** + `apiAuth`/`apiBody`/`apiList` helpers + 7 synced models. Από την 19η σάρωση ο builder κατανάλωσε το commit **`d259a55`** (shared `isObjectId()` guard στο `lib/apiBody.ts` + `readBody` σε items/[id] & shopping-list/[id] PATCH) → τα 2 ενεργά P3/S items της 19ης είναι πλέον **DONE** (επαλήθευση live: αμφότερα κάνουν πλέον `import { isObjectId, readBody } from '@/lib/apiBody'`, μηδέν raw `req.json().catch`). Άρα η Web Debt Queue έφτασε **0 ενεργά** στην αρχή αυτού του γύρου.
+- **Ευρήματα ανά διάσταση (live grep, όχι docs):**
+  - **Type safety: 0** — `npm run type-check` EXIT 0· `:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το `/api/v1` = **0**.
+  - **Auth: 0 unguarded** — `grep -rL withAuth|bearerUser` σε 49 routes → μόνο `auth/login` (auth boundary, σωστά). Κεντρικό bearer-check + try/catch + καθαρό 500 μέσω `withAuth`.
+  - **Input validation: 0 gaps** — τα εναπομείναντα raw-body routes ΟΛΑ validate τα inputs τους· το `readBody`/`isObjectId` adoption είναι style/consistency, ΟΧΙ validation gap. list params clamped 1..200· `ai` cap (MAX_TURNS=20/MAX_CONTENT=8000) ενεργό.
+  - **Error handling: 0** — ομοιόμορφο try/catch + `{ error }` shape μέσω `withAuth`· inline `NextResponse.json({ error })` μόνο στο `auth/login` (σκόπιμα).
+  - **DB: 0** — 7/7 synced models `index({ updatedAt: -1 })`· heuristic sweep «limit χωρίς lean» = **0 hits**· τα list endpoints `.lean()`+`.limit()`· τα no-limit finds είναι bounded-domain aggregations, όλα `.lean()`.
+  - **Duplication: 2 ongoing** — (1) raw-body `req.json().catch` σε **13 routes** (από 15· ο builder έκλεισε 2), **16 adopters**· (2) ObjectId regex `/^[a-f0-9]{24}$/i` inline σε **17 route files** ακόμα (από 19· 2 migrated στο `d259a55`), `isObjectId` adopters **2**.
+- **Counts ανά dimension: P1=0, P2=0, P3=1** (νέο: isObjectId dedup 2η παρτίδα, 5 route files, S). Άνοιξα ΜΟΝΟ 1 μη-sprawling item ώστε ο builder να έχει ουρά· δεν εφευρίσκω debt. Δες `## Needs Achilleas` στο PROGRESS για standing product decisions (login brute-force rate-limit, error-message leak στο `withAuth` 500, tasks `steps` χωρίς cap).
+
+---
+
 ## Σύνοψη audit (2026-07-01 19η σάρωση· ουρά αμετάβλητη, 2 P3/S ΑΝΟΙΧΤΑ, μηδέν app-code diff)
 
 **2026-07-01 (19η σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 route files** + `apiAuth`/`apiBody`/serialize helpers + 10 models. `git log --oneline -- apps/web/src` → τελευταίος app-code commit **`0c866eb`** (notifications+lists PATCH `readBody`), ΙΔΙΟΣ με την 18η σάρωση· clean working tree, κανένας builder δεν κατανάλωσε web item ενδιάμεσα (τα ενδιάμεσα commits = mobile Button-family `3a272c1` + docs review/parity/ui-auditor/monitor/docker-health, μηδέν `apps/web/src` diff) → η ουρά είναι by-construction σταθερή: **2 ενεργά P3/S** (readBody items/[id]+shopping-list/[id]· ObjectId-regex dedup), όλα τα άλλα DONE. Επαναεπαλήθευσα και τα 2 ανοιχτά items live από κώδικα: `items/[id]:110` + `shopping-list/[id]:15` έχουν ακόμα το raw `const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;`.
@@ -219,6 +233,21 @@
 ---
 
 ## Web Debt Queue
+
+### Dedup ObjectId-validation regex — 2η παρτίδα (5 route files)
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/v1/receipts/[id]/route.ts, apps/web/src/app/api/v1/expenses/[id]/route.ts, apps/web/src/app/api/v1/subscriptions/[id]/route.ts, apps/web/src/app/api/v1/tasks/[id]/route.ts, apps/web/src/app/api/v1/vouchers/[id]/route.ts
+- Depends on: none
+- Acceptance:
+  - Συνέχεια του ήδη-DONE `isObjectId()` dedup (1η παρτίδα: items/[id] + shopping-list/[id]). Το shared `export function isObjectId(id: string): boolean` ζει ΗΔΗ στο `lib/apiBody.ts` (byte-identical `/^[a-f0-9]{24}$/i.test(id)`).
+  - Σε καθένα από τα 5 route files: αντικατέστησε τον inline έλεγχο `/^[a-f0-9]{24}$/i.test(id)` (ή τυχόν local `ID_RE`/`OBJECT_ID_RE` const) με `isObjectId(id)`, προσθέτοντας το `isObjectId` στο υπάρχον import από `@/lib/apiBody` (ή νέο import αν δεν υπάρχει). Σβήσε το local regex const αν μένει αχρησιμοποίητο.
+  - Το μήνυμα σφάλματος (`apiError('bad id')`) + status 400 + η σειρά auth-πριν-id ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. Καμία αλλαγή σε behaviour / response shape.
+  - Επαλήθευση: `grep -rl '/\^\[a-f0-9\]{24}\$/i' apps/web/src/app/api/v1` δεν περιλαμβάνει πλέον κανένα από τα 5 files· `isObjectId` adopters 2 → 7.
+  - Απομένουν ~12 route files με inline regex (cards/[id], stores/[id], statements/[id], trash/[type]/[id], notifications, receipts/[id]/rescan+add-to-library, items/[id]/link-plan+plans+convert-to-task+ai-fill+price) για 3η-4η παρτίδα σε μελλοντικά runs.
+  - npm run type-check exits 0
+- Status: TODO
 
 ### apiBody helpers — readBody adoption σε notifications + lists PATCH
 - Priority: P3
