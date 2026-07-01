@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 2223203 -->
+<!-- reviewed: 6a9dc33 -->
 <!-- docker-validated: c47ce35 -->
+
+## 2026-07-01 (reviewer — range 2223203..6a9dc33 καθαρό, mobile Input/TextArea refactor verified)
+- **Τι εξετάστηκα**: 1 code commit (`6a9dc33`, mobile Input/TextArea primitives + migration 4 record-form screens)· τα υπόλοιπα του range (`0f5be40`/`54c575e`/`eec8a8a`/`d95c8aa`/`4d1e074`/`c47ce35`) = docs/queues/marker από άλλα routines.
+- **Checks**: `apps/web` `npm run type-check` → **EXIT 0**· `apps/mobile` `npx tsc --noEmit` → **EXIT 0**.
+- **Επαλήθευση refactor**: το token mapping είναι **byte-identical** με τα παλιά styles — `inputSurface` = RADIUS.md(12)/SPACE.md(12)/padV11/SIZE.md(15) == παλιό `input`· `inputModal` = RADIUS.sm(10)/SPACE.md(12)/padV10/SIZE.md(15) == παλιό `minput`/`modalInput`· `TextArea` προσθέτει `textAlignVertical:'top'` == παλιό inline. `Input` βάζει `placeholderTextColor={C.faint}` πριν το `{...rest}` (override-able) + `style` merge-άρει τελευταίο (flex/minHeight σωστά πάνω στο base). Μόνη ορατή απόκλιση = TasksScreen add-input padH 14→12 (~2px, disclosed). **Grep**: μηδέν dangling `s.input`/`s.minput`/`s.modalInput` και στα 4 screens (το tsc θα τα έπιανε ως missing-property ούτως ή άλλως), μηδέν leftover `TextInput` import. Vouchers scanText TextArea (minHeight 90) + Money notes TextArea (minHeight 60) σωστά.
+- **Ρίσκο shape/regression**: μηδέν — mobile-only, καμία αλλαγή σε web route ή API response shape (δεν σπάει το mobile consumer). Καμία hardcoded τιμή που θα έπρεπε να είναι token (το αντίθετο: κεντροποιεί hardcoded σε tokens). Μηδέν secret στο diff. Ο builder δεν μαρκάρισε το UI-Debt item DONE (σωστά «starts», 4/~11 screens) → κανένα false-DONE.
+- **Fixes**: κανένα (τίποτα small-unsafe να διορθωθεί). **Flags**: κανένα νέο (το εναπομείναν Input-migration σε outlier screens είναι ήδη στην ουρά ως attended-preferred).
+- **Git**: staged ΜΟΝΟ `PROGRESS.md` (marker 2223203→6a9dc33 + αυτή η εγγραφή). Μηδέν Docker, μηδέν AI, μηδέν app-code edit.
 
 ## 2026-07-01 (builder — UI Debt: Input/TextArea primitives + migration 4 record-form screens)
 - **Τι**: ξεκίνησα το κορυφαίο UI Debt item («Input primitive», P1/M) που όλοι οι ui-auditors έδειχναν εδώ και μέρες αλλά ανέβαλλαν ως «ideally attended» (no simulator). Working tree **καθαρό** στην αρχή (μηδέν παράλληλο WIP του Αχιλλέα). Επειδή η πλήρης μετανάστευση (~60 TextInput sites / 11 screens με flex/multiline/token-outliers) είναι όντως «sprawling» + οπτικά ριψοκίνδυνη unattended, την **έκοψα σε ασφαλές, συνεκτικό κομμάτι**: primitives + τα 4 standard record-form screens όπου τα styles είναι byte-identical με το primitive base → **zero-visual-change** (μόνο centralization), tsc-verifiable.
