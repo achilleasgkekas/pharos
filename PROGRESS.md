@@ -5,6 +5,17 @@
 <!-- reviewed: 3e3d8ef -->
 <!-- docker-validated: 7f18222 -->
 
+## 2026-07-01 (web-code-quality — 18η σάρωση, ουρά 0→2 P3/S, read-only)
+Fresh read-only audit **49 route files** + `apiAuth`/`apiBody`/serialize + 10 models. `npm run type-check` **EXIT 0** (μηδέν P1). Καμία Docker build, μηδέν AI/token call.
+- **Ευρήματα ανά διάσταση:** Type safety **0** (0 any/ts-ignore, tsc 0)· Auth **0** (48/49 `withAuth`, μόνο login εξαιρείται — σωστά· κεντρικό bearer+try/catch+500)· Input validation **0 gaps** (τα raw-body routes ΟΛΑ validate· readBody adoption = style, όχι gap)· Error handling **0** (ομοιόμορφο `{error}` μέσω `withAuth`)· DB **0** (7/7 models `updatedAt` index, όλα τα reads `.lean()`, big list endpoints `.limit()`· η reports:81 «find» = `Array.find`, false positive)· Duplication **2**.
+- **Το stale top item έκλεισε:** το `### apiBody — readBody adoption σε notifications + lists PATCH` ήταν TODO ενώ ο builder το είχε ήδη υλοποιήσει (commit `0c866eb`)· επαλήθευσα ότι αμφότερα τα files κάνουν import `readBody` → το μάρκαρα DONE. adopters `readBody` **14**, raw `req.json().catch` **15**.
+- **Άνοιξα 2 P3/S (μη-sprawling):** (1) apiBody `readBody` σε `items/[id]` + `shopping-list/[id]` PATCH (συνέχεια, 1 γραμμή/route)· (2) **ΝΕΟ** dedup του ObjectId regex `/^[a-f0-9]{24}$/i` (inline σε **19 route files / 30 occurrences**) σε shared `isObjectId()` guard στο `lib/apiBody.ts`, migrate 3-5 routes/run.
+- **Top-3 για τον builder:** (1) readBody σε items/[id]+shopping-list/[id] PATCH (P3/S)· (2) shared `isObjectId()` helper + migrate shopping-list/[id]+items/[id]+price+link-plan (P3/S)· (3) fresh web-debt σάρωση ή επόμενη apiBody παρτίδα (~13 raw routes απομένουν).
+- Staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (explicit paths). Καμία destructive ενέργεια, μηδέν secret.
+
+### Needs Achilleas
+- Κανένα νέο. (Standing product decisions: login brute-force rate-limit· error-message leak στο `withAuth` 500 [`apiError((e as Error).message?.slice(0,200))` επιστρέφει raw error στον client — σκόπιμο για mobile debug ή hardening;]· tasks `steps` χωρίς cap. Mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports charts, Tasks Kanban, Statements merge/bind + PDF import, remote push αδοκίμαστο.)
+
 ## 2026-07-01 (ui-auditor — 17η σάρωση, CONFIRMATION, μηδέν νέο mobile-src)
 Read-only mobile UI consistency audit. `git log 2b0422d..HEAD -- apps/mobile/src` **κενό** → καμία αλλαγή στον mobile κώδικα από την 16η σάρωση (τελευταίος mobile-src commit = `9d226cf` Card primitive· ενδιάμεσα μόνο web-debt `0c866eb` readBody notifications+lists, behaviorally identical, μηδέν mobile UI impact). Fresh grep re-verify ανά διάσταση, όλα ξανα-μετρημένα live.
 
