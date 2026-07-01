@@ -143,3 +143,37 @@ JSON parse, missing/empty body, invalid content, όποιο validation επισ�
 Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — serialize helpers.
 Δες `apps/web/src/**/lib.ts` (π.χ. `expenses/lib.ts` `vendorKey`/`serializeExpense`,
 ή `receipts` serialize) — pure, χωρίς DB, καλά για deterministic tests. Ένα module ανά run.
+
+---
+
+## 2026-07-02
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/app/expenses/lib.test.ts` για τα serialize helpers του `expenses/lib.ts`.**
+
+Τι έγινε:
+- Νέο `apps/web/src/app/expenses/lib.test.ts` (14 tests) που καλύπτει και τα δύο
+  pure exports: `vendorKey` (Greek→latin transliteration «ΔΕΗ/δεη/ΔεΗ → dei»,
+  combining-diacritic strip «Café == Cafe», legal-suffix strip whole-word
+  «Foo AE/A.E./Ltd/GmbH/Inc → foo», **embedded-suffix guard «Visa» ΔΕΝ χάνει το
+  «sa»**, non-alnum/separator strip «PPC / ΔΕΗ → ppcdei», «Store 24 → store24»,
+  whitespace trim, lowercase, 40-char cap, empty/whitespace/stopword «the»→''
+  + nullish guard undefined/null→'') και `serializeExpense` (full field-for-field
+  mapping, safe fallbacks σε near-empty doc, kind default = expense εκτός exactly
+  'income', boolean coercion recurring/verified, _id stringify μέσω JSON round-trip).
+- **Εύρημα που pin-αρίστηκε στα expectations (δεν άλλαξα κώδικα)**: το σχόλιο στο
+  lib.ts ισχυρίζεται «PPC / ΔΕΗ → dei», αλλά η ΠΡΑΓΜΑΤΙΚΗ έξοδος είναι «ppcdei»
+  (το «ppc» δεν είναι legal-suffix, μένει). Επιβεβαιώθηκε live με tsx πριν το test·
+  το test κλειδώνει την πραγματική συμπεριφορά. Το σχόλιο είναι aspirational, όχι bug.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/expenses/lib.test.ts` → 14/14 passed.
+- `npx vitest run` (όλο το suite) → 10 files, 165/165 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json`
+  (foreign, ΔΕΝ το άγγιξα/staged) + το νέο lib.test.ts· `git diff --cached` κενό·
+  στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — δες άλλα deterministic
+serialize/normalize helpers χωρίς DB, π.χ. `lib/taxonomies.ts` (`normalizeList`/
+`resolveTaxonomy`) ή `lib/prompts.ts` (`getPromptOverride` fallback logic, αν καθαρό
+από I/O). Ένα module ανά run.
