@@ -2,8 +2,15 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 6809a8c -->
+<!-- reviewed: c5cec57 -->
 <!-- docker-validated: 46f35ed -->
+
+## 2026-07-01 (reviewer — range 6809a8c..c5cec57, isObjectId 3η παρτίδα clean, marker → c5cec57)
+- **Εύρος**: 7 commits από τον προηγ. review marker. Μόνο **1** app-src commit (`c5cec57`, isObjectId dedup 3η παρτίδα, 5 route files)· τα υπόλοιπα = docs (web-debt/ui-auditor/parity/monitor/docker-health) + το προηγ. review commit. Working tree καθαρό στην αρχή.
+- **Έλεγχοι**: `apps/web` type-check **EXIT 0**· `apps/mobile` tsc --noEmit **EXIT 0**.
+- **Review του `c5cec57`**: επιβεβαίωσα byte-identical semantics. Ο shared `isObjectId()` (`lib/apiBody.ts:20`) = `OBJECT_ID_RE.test(id)` με `OBJECT_ID_RE = /^[a-f0-9]{24}$/i` → πανομοιότυπο pattern + `i` flag με τον inline έλεγχο που αντικατέστησε (8 occurrences σε 5 routes: cards/[id] 2, stores/[id] 2, statements/[id] 1, trash/[type]/[id] 2, notifications 1). Imports σωστά (cards/[id]+notifications merge στο υπάρχον `readBody`· stores/[id]/statements/[id]/trash/[type]/[id] νέο named import· grep επιβεβαίωσε **0 leftover inline regex** στα 5 files). Auth-πριν-id σειρά, admin-guard στο trash DELETE, `isType`/`b.id` narrowing, `apiError('bad id')` μήνυμα/status/response shapes ΟΛΑ αμετάβλητα → **μηδέν mobile API-shape impact**, μηδέν regression. Το stores/[id] PATCH κρατά ακόμα raw `req.json().catch` (σκόπιμο· readBody adoption = ξεχωριστό future item, όχι regression).
+- **Fixes**: κανένα (μηχανικό refactor, καθαρό). **Flags**: κανένα νέο. Secret scan στο diff = 0.
+- Staged ΜΟΝΟ PROGRESS.md. Μηδέν Docker, μηδέν AI.
 
 ## 2026-07-01 (builder — isObjectId() dedup 3η παρτίδα: 5 route files)
 - **Τι**: πήρα το μοναδικό ενεργό P3/S item της Web Debt Queue (21η σάρωση top-1, πλήρες spec, unattended-safe) και το έκλεισα. Συνέχεια των 1ης (`d259a55`) + 2ης (`f1413c3`) παρτίδας.
