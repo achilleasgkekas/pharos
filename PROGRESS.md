@@ -5,6 +5,18 @@
 <!-- reviewed: c5cec57 -->
 <!-- docker-validated: b1b2b43 -->
 
+## 2026-07-01 (parity-auditor — 19η σάρωση ημέρας: ουρά αμετάβλητη, 0 GAP)
+- **Inventory από κώδικα** (όχι docs): **49 v1 routes** (`find api/v1 -name route.ts` = 49· login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`** (home + 18), **72 exported api fns** στο mobile `api.ts`.
+- **Diff web↔mobile:** το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes. Επιβεβαίωσα τα deep sub-routes με ακριβές interpolated-path grep (τα προηγ. substring-greps ήταν artifacts): `items/[id]/plans` :237, `link-plan` :240/:243, `convert-to-task` :246, `ai-fill` :253, `price` :226, `items/import` :509, `receipts/[id]/rescan` :210, `add-to-library` :458, `statements/plans` :298, `settings/test-notify` :334, `scan/{product,expense,receipt,voucher}` :108/:168/:198/:502 → **μηδέν «endpoint χωρίς mobile consumer» gap**. Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only first-run wizard· N/A).
+- **App-code diff από `0fa3365` (προηγ. parity marker = 18η σάρωση):** **1 μόνο** app-src commit — `c5cec57` (`refactor(api)` isObjectId dedup 3η παρτίδα, 5 route files, `--stat` 5 files/+13−10, byte-identical guard, response shapes αμετάβλητα = **Web Debt cleanup, ΟΧΙ feature**). Μηδέν mobile-src commit. Τα υπόλοιπα = docs + docker-health. Working tree καθαρό στην αρχή.
+- **Counts: DONE 7 (parity queue 6/6 + theme foundation) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.** Ενεργό parity TODO κανένα.
+- **mobile `tsc --noEmit` → EXIT 0** (μηδέν P1 type errors).
+- **Top-3 για τον builder** (όλα UI Debt, ο parity core είναι κλειστός): (1) **Safe-area insets** [P2/M, `SafeAreaProvider`+`useSafeAreaInsets`, additive, no token-drift, unattended-safe]· (2) **`<ListItem>` primitive** [ολοκλήρωση Card+Badge+ListItem group]· (3) fresh web-debt σάρωση ή **isObjectId 4η παρτίδα** (items/[id]/{ai-fill,convert-to-task,link-plan,plans,price} + receipts/[id]/{add-to-library,rescan}). Τα `<Chip>`/`<Badge>`/lucide-icons/language-switcher = attended-preferred για οπτικό verify.
+- **Read-only run:** μηδέν app-code edit, μηδέν Docker build, μηδέν AI/token. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+### Needs Achilleas
+- Κανένα νέο. Standing (product/credentials boundary): theme toggle, language switcher, AI-engine/storage/OneDrive settings στο mobile· Reports extra charts (RN charting lib)· Tasks Kanban board· Statements merge/bind + PDF import (νέα write/upload endpoints)· remote push pipeline αδοκίμαστο (χρειάζεται EAS dev build + APNs key). Web-side: login brute-force rate-limit, error-message leak στο `withAuth` 500, tasks `steps` χωρίς cap.
+
 ## 2026-07-01 (docker-health — safe rebuild μετά isObjectId 3η παρτίδα, marker → b1b2b43)
 - **Health/disk (read-only)**: mongo `healthy` (Up 4h· ιστορικό RestartCount 47 από παλιά OOM, ΟΧΙ τρέχον loop)· web RestartCount 0· flaresolverr `Exited` 46h (ήδη σταματημένο, μηδέν memory pressure)· searxng up (κανονικό default service). `docker system df`: Images 3.49GB, Build Cache 566MB.
 - **Rebuild decision**: `git diff 46f35ed..HEAD -- apps/web` = 5 API route files (isObjectId dedup 3η παρτίδα, web runtime) → rebuild warranted.
