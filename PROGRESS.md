@@ -788,3 +788,20 @@ Top 3 για τον builder (με σειρά):
 - Verify: read-only μόνο (μηδέν Docker, μηδέν AI, μηδέν app-code edit). `npm run type-check` → exit 0. grep sweeps: any/withAuth/inline-error/id-guard/updatedAt-index/find-lean. Staged ΜΟΝΟ WEB_DEBT.md + PROGRESS.md.
 - Top 3 για τον builder: (1) **Inline error → apiError()** (P3/S, api· 4 routes σε shared helper, login εξαιρείται, καθάρισε τυχόν unused `NextResponse` import) — αδειάζει την web ουρά, (2) μετά η API είναι ώριμη· εναλλακτικά mobile UI Debt **Input primitive** (σπασμένο σε 2-3 runs ώστε reviewable) ή **Items ai-fill** parity (δομικό verify μόνο, AI cost), (3) τίποτα άλλο web-side ανοιχτό.
 - Needs Achilleas: κανένα νέο (παραμένουν: response-envelope standardization σε ΟΛΑ τα endpoints + zod-first σε νέα routes = breaking/large, συντονισμός με mobile· RAM bump στο Docker VM λόγω mongo OOM στα builds).
+
+## 2026-07-01 (parity-auditor — μεσημεριανό run)
+Read-only mobile parity re-audit, inventory χτισμένο από τον κώδικα (όχι από docs).
+- **49 v1 routes** (login + 48 bearer), **16 mobile screens**, **81** exported api fns. Το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes → μηδέν «endpoint χωρίς mobile consumer» gap.
+- **18** web `page.tsx` (home + 17), ΟΛΕΣ με mobile equivalent εκτός `/setup` (web-only first-run admin wizard· N/A, όχι gap).
+- App-code diff από `eec8a8a` (προηγ. parity marker): **1 commit** `6a9dc33` = mobile Input/TextArea primitives refactor (UI Debt, ΟΧΙ parity feature)· τα `3ae313f`/`f11ce26` = docs/docker. **Καμία νέα web δυνατότητα προς port.**
+- «Partial» rows ξανα-ελεγμένες live: Reports (trimmed endpoint + charting lib), Statements merge/bind (`statements/plans` GET-only), Tasks Kanban/steps, Settings theme/language/AI-engine/storage → ΟΛΑ **Needs Decision**, όχι clean auto-buildable gaps.
+- mobile `tsc --noEmit` → **EXIT 0**.
+
+**Counts: DONE 7 / GAP 0 (auto-buildable) / NEEDS DECISION 0 νέα.**
+
+**Top 3 για τον builder (δεν υπάρχει ενεργό parity TODO → πέφτει στο UI Debt Queue):**
+1. **Input primitive (P1/M, IN PROGRESS)** — 4/11 record-form screens migrated (`6a9dc33`)· απομένουν Items/Receipts/Settings/Shopping/Search/Assistant/Login (token-outlier / flex-heavy composers, καλύτερα σε attended run).
+2. **Button + Chip primitives (P2/M)** — ενοποίηση ~28 ad-hoc button-variants + chip patterns, μηδέν inline `#000` (→ `C.onAccent`).
+3. **Card + Badge + ListItem primitives (P2/M)** — 5+ local `card:` + 2+ `badge:` StyleSheet entries → shared primitives.
+
+Καμία αλλαγή στο ## Needs Achilleas (αμετάβλητο). Read-only run: μηδέν app-code άλλαξε, μόνο docs.
