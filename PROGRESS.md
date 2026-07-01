@@ -3,7 +3,21 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: effd90d -->
-<!-- docker-validated: d235eff -->
+<!-- docker-validated: 37fca25 -->
+
+## 2026-07-01 (builder — apiBody adoption σε vouchers + items POST· Web Debt Queue → 0)
+- **Τι**: πήρα το **τελευταίο ενεργό Web Debt item** (`### apiBody helpers — adoption σε vouchers + items POST`, P3/S), το μοναδικό που είχε μείνει στην ουρά μετά το ai-cap. Refactor 2 mutation routes ώστε να χρησιμοποιούν τα shared `lib/apiBody` helpers αντί για το raw `(await req.json().catch(()=>({}))) + String(b.x||'').trim()` pattern.
+- **Αλλαγές** (2 route files μόνο):
+  - **vouchers POST**: `readBody(req)` + 6× `strField(b, key, '', true)` (title/code/store/discount/url/notes). Το `expiresAt` έμεινε ως έχει (δεν υπάρχει date helper). Ίδια trimmed/required/fallback semantics 1:1.
+  - **items POST**: `strField(b,'title','',true)` + `enumField(b,'status',ITEM_STATUSES,'researching')` (αντικαθιστά το χειροκίνητο whitelist include-check, ταυτόσημη λογική) + `strField(b,'category','other')` + `numField(b,'currentPrice') ?? 0`. Το `status` πλέον typed ως `ItemStatus` union αντί `string` (tsc-clean, το model δέχεται).
+- **Μία αμελητέα διαφορά semantics** (τεκμηριωμένη, σκόπιμη — έτσι το προδιέγραφε το item): το items `currentPrice` πλέον parse-άρει και numeric string (π.χ. `"5"` → 5), ενώ πριν δεχόταν μόνο `typeof === 'number'` αλλιώς 0. Ευθυγραμμίζεται με το `amount` σε subscriptions/expenses (ίδιο `numField`). Response shape αμετάβλητο.
+- **Verify**: `apps/web` `npm run type-check` → **EXIT 0**. Safe Docker rebuild (mongo healthy πριν+μετά, flaresolverr stopped, build cache reclaimable→0 μετά prune 2.02GB): `docker compose build web` → mongo healthy → `up -d web` → `/login` **200**, web **RestartCount 0**· `POST /api/v1/vouchers` & `POST /api/v1/items` no-token → **401** (auth boundary intact, guards live στο built image). `docker builder prune -f` μετά (cache-only).
+- **Git hygiene**: staged ΜΟΝΟ (explicit paths, ΟΧΙ `-A`): τα 2 route files + `WEB_DEBT.md` (item → DONE) + `PROGRESS.md`. Working tree στην αρχή καθαρό (μηδέν WIP του Αχιλλέα). Κανένα secret/`.env`, μηδέν AI/token call.
+- **Adopters πλέον 4** (expenses/subscriptions/vouchers/items). Απομένουν ~25 routes με το ίδιο raw pattern για μελλοντικά runs, αλλά **η επίσημη ουρά Web Debt είναι πλέον 0 ενεργά items — όλα DONE**.
+- **Επόμενο task**: με τη Web Debt Queue άδεια, ο builder πέφτει στο **mobile UI Debt Queue**. Κορυφή = **Chip/Badge primitive** (P2/M) — status chips επαναλαμβάνονται σε 7 screens, unattended-safe (tsc-verifiable, μηδέν οπτική αλλαγή αν κρατηθεί byte-identical). Εναλλακτικά: τα 5 input-outlier screens (Shopping/Receipts/Assistant/Search/Login) στο `<Input>` primitive (attended-preferred, θέλει οπτικό verify). Ή, αν δεν υπάρχει mobile item, νέα fresh σάρωση για web debt (χωρίς να εφευρεθεί).
+
+### Needs Achilleas
+- Κανένα νέο. (Παραμένουν οι 2 παλιές security παρατηρήσεις ως product decisions: login brute-force rate-limit, error-message leak στα action responses· + τα mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports extra charts, Tasks Kanban/steps, Statements merge/bind + PDF import, remote push αδοκίμαστο.)
 
 ## 2026-07-01 (web-code-quality — νυχτερινό re-audit· ουρά σταθερή, μηδέν νέο εύρημα)
 - **Σάρωση**: 49 route files + 7 synced models + `apiAuth`/`apiList`/`apiBody`/`serialize`. Τελευταίος app-code commit στο `apps/web/src` = **`a582ac5`** (ai chat-history cap), ίδιος με τον προηγούμενο γύρο· clean tree, κανένας builder δεν κατανάλωσε web item ενδιάμεσα (τα μετέπειτα commits = docs + `effd90d` mobile Button primitive, μηδέν `apps/web/src` diff).
