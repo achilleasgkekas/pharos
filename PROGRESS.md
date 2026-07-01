@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: c540322 -->
-<!-- docker-validated: 3ae313f -->
+<!-- docker-validated: d532e68 -->
+
+## 2026-07-01 (docker-health — rebuild μετά apiError refactor, health πράσινη)
+- **Health (read-only πρώτα)**: mongo `healthy`, web running (up ~15min πριν το rebuild), flaresolverr `Exited` (σωστά stopped, δεν το ξαναξεκίνησα). Restarts: web 0, mongo 44 (σωρευτικό ιστορικό OOM· κανένα ενεργό loop, αμετάβλητο μετά το build).
+- **Disk**: build cache 566MB πριν, images 3.49GB / 0B reclaimable. Καμία επιθετική εκκαθάριση χρειάστηκε· `docker builder prune -f` μετά το build reclaim 3.19MB (το build ήταν σχεδόν ολόκληρο CACHED).
+- **Rebuild ΝΑΙ**: diff `3ae313f..HEAD -- apps/web/src` άγγιξε 4 v1 routes (items, scan/product, scan/receipt, shopping-list = commit `c540322` inline-error→apiError). Ασφαλές dance: `docker compose build web` (image only, όλα CACHED) → mongo healthy check → `docker compose up -d web` → poll `/login` → **200 στην 1η προσπάθεια**. web restarts παρέμειναν 0, mongo restarts παρέμειναν 44 (κανένα νέο OOM στο build).
+- **Marker**: docker-validated `3ae313f` → **`d532e68`** (HEAD).
+- Needs Achilleas: κανένα νέο (παραμένει: RAM bump στο Docker VM λόγω mongo OOM ιστορικού στα builds· τώρα σταθερό γιατί flaresolverr stopped + build ήταν cached).
 
 ## 2026-07-01 (reviewer — range 6a9dc33..c540322 καθαρό· apiError refactor behaviorally identical)
 - **Review range**: `6a9dc33..c540322` (5 commits: 1 code + 4 docs). Ένα code commit, το `c540322` (refactor: inline error → shared `apiError()` στα 4 v1 routes)· τα υπόλοιπα docs (parity/ui-audit/web-debt/progress).
