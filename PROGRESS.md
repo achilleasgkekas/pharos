@@ -5,6 +5,14 @@
 <!-- reviewed: 6809a8c -->
 <!-- docker-validated: 46f35ed -->
 
+## 2026-07-01 (parity-auditor — 18η σάρωση ημέρας: ουρά αμετάβλητη, 0 GAP)
+- **Inventory από κώδικα** (όχι docs): **49 v1 routes** (`find api/v1 -name route.ts` = 49· login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`**. Το mobile `api.ts` έχει **50 distinct route-strings** ≥ 49 routes → κάθε route (incl. deep sub-routes `ai-fill`/`convert-to-task`/`link-plan`/`plans`/`price`/`add-to-library`/`rescan`/`test-notify`/`items/import`) ≥1 consumer· μηδέν «endpoint χωρίς mobile consumer».
+- **Diff από 17η σάρωση (`ed352c4`)**: `git log ed352c4..HEAD` = 7 commits, μόνο **1** app-src: `f1413c3` (`refactor(api)` isObjectId dedup 2η παρτίδα, 5 `[id]` routes· `--stat` = 5 files / +15 −14). Επιβεβαίωσα ότι είναι καθαρό Web Debt refactor (guard μετακόμισε στο `@/lib/apiBody`, response shapes αμετάβλητα) → **καμία νέα portable web δυνατότητα**. Τα υπόλοιπα = docs + docker-health. Working tree καθαρό στην αρχή.
+- **Counts: DONE 7 (parity queue 6/6 + theme foundation) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.** Ενεργό parity TODO κανένα.
+- **mobile `tsc --noEmit` → EXIT 0** (μηδέν P1 type-error gaps).
+- **Top-3 για τον builder** (όλα UI Debt, ο parity core είναι κλειστός): (1) **Safe-area insets** [P2/M, `SafeAreaProvider`+`useSafeAreaInsets`, additive, no token-drift, unattended-safe]· (2) **`<ListItem>` primitive** [ολοκλήρωση Card+Badge+ListItem group]· (3) **Input primitive** ολοκλήρωση 5 outlier screens [attended-preferred, οπτικό verify]. Τα `<Chip>`/`<Badge>`/lucide-icons/language-switcher = attended-preferred.
+- **Read-only run**: μηδέν app-code edit, μηδέν Docker, μηδέν AI/token. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
 ## 2026-07-01 (reviewer — range 114e727..6809a8c, isObjectId 2η παρτίδα clean, marker → 6809a8c)
 - **Εύρος**: 7 commits από τον προηγ. review marker. Μόνο **1** app-src commit (`f1413c3`, isObjectId dedup 2η παρτίδα, 5 [id] routes)· τα υπόλοιπα = docs (progress/web-debt/ui-auditor/parity/monitor) + docker-health. STATUS.md ήταν ήδη committed στο εύρος (WIP Αχιλλέα), δεν το άγγιξα.
 - **Έλεγχοι**: `apps/web` type-check EXIT 0· `apps/mobile` tsc --noEmit EXIT 0. Working tree καθαρό στην αρχή.
