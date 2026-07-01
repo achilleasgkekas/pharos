@@ -5,6 +5,16 @@
 <!-- reviewed: 83cc537 -->
 <!-- docker-validated: 20e1826 -->
 
+## 2026-07-01 (builder — apiBody `readBody` adoption σε tasks/[id] + vouchers/[id] PATCH· commit `4c6856f`)
+- **Τι**: συνέχεια της apiBody `readBody` adoption στα `[id]` PATCH handlers. **Concurrency**: ένας παράλληλος builder-routine έτρεχε ταυτόχρονα, πήρε το ίδιο WEB_DEBT item (expenses/[id] + subscriptions/[id]) και είχε ήδη εφαρμόσει τα edits του στο working tree (uncommitted WIP) όταν διάβασα τα αρχεία → τα είδα ήδη migrated. Τα κατέθεσε ως `99e737f` + `75889e3`. Αντί να διπλο-δουλέψω τα ίδια, πήρα τα **επόμενα δύο** raw `[id]` PATCH routes (`tasks/[id]`, `vouchers/[id]`) — γνήσια, μη-επικαλυπτόμενη επέκταση (adopters 8 → 10).
+- **Αλλαγές** (2 route files, panομοιότυπη ελάχιστη αλλαγή): `import { readBody } from '@/lib/apiBody'` + η **μόνη** γραμμή body-parse `const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;` → `const b = await readBody(req);`. Το `readBody` επιστρέφει `Body` (= `Record<string, unknown>`), ίδιος τύπος με το παλιό cast → cast αφαιρέθηκε, μηδέν αλλαγή τύπου. **ΟΛΑ τα partial-update guards αμετάβλητα** (tasks: title/status/priority/tags/steps/dueDate· vouchers: title/code/store/discount/url/used/expiresAt). Response shapes `{task}` / `{ok:true,id}` αμετάβλητα → μηδέν κίνδυνος για το mobile `api.ts`.
+- **Verify**: `apps/web` `npm run type-check` → **EXIT 0**. Safe Docker rebuild: mongo **healthy** (πριν+μετά), flaresolverr stopped· `build web` → `up -d web` → `/login` **200** (1η προσπάθεια), web **RestartCount 0**, PATCH `tasks/[id]` & `vouchers/[id]` no-token → **401** (auth boundary intact). `docker builder prune -f` (0B, cache in-use). Μηδέν AI/token call.
+- **Git hygiene**: commit `4c6856f` — staged ΜΟΝΟ τα 2 route files (explicit paths, ΟΧΙ `-A`). **ΔΕΝ** άγγιξα ό,τι έγραφε ο παράλληλος routine (WEB_DEBT.md, MOBILE_PARITY.md, mobile Card/Chip WIP). Κανένα secret/`.env`.
+- **Επόμενο task**: απομένουν **5** `[id]` PATCH routes με το raw pattern (`cards`/`items`/`receipts`/`shopping-list`/`stores`) για μελλοντική apiBody συνέχεια (2/run, μη-sprawling). Ή fresh web-debt σάρωση.
+
+### Needs Achilleas
+- Κανένα νέο. ⚠ **Concurrency**: πολλαπλά autonomous routines έτρεξαν ταυτόχρονα σήμερα (builder ×2 + mobile primitive builder), όλα push-άροντας στο `main` γρήγορα. Δούλεψε (μη-επικαλυπτόμενα αρχεία + rebase), αλλά αυξάνει το push-race ρίσκο· αν επαναλαμβάνεται, ίσως χρειάζεται serialization των routines.
+
 ## 2026-07-01 (builder — mobile `Card` primitive· UI Debt Card+Badge+ListItem item προχώρησε)
 - **Τι**: με το parity queue 7/7 DONE και το προηγούμενο UI Debt top item (`IconButton`) κλεισμένο, πήρα το επόμενο unattended-safe UI Debt item — το **`Card` κομμάτι** του `### Card + Badge + ListItem primitives` (P2/M, tsc-verifiable αν byte-identical). Το ίδιο `card:` StyleSheet entry (`surface`/border/radius14/padding14/marginBottom10) ήταν byte-identical duplicated σε **3 screens** (Activity/Statements/Vouchers)· τα άλλα 2 (Reports `flex:1`/radius16, Settings `paddingHorizontal:14`-only) είναι token-outliers (οπτική διαφορά → attended-preferred, όπως έγινε με τα input/save outliers).
 - **Αλλαγές** (μόνο mobile, μηδέν API/web):
