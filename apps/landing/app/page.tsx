@@ -152,6 +152,23 @@ const TIERS: Tier[] = [
   },
 ];
 
+const SHOWCASE_STATS: { lbl: string; val: string; color: string }[] = [
+  { lbl: 'Net position', val: '€12,708', color: 'var(--accent)' },
+  { lbl: 'Owed · installments', val: '€1,149', color: 'var(--gold)' },
+  { lbl: 'This month', val: '−€221', color: 'var(--cyan)' },
+];
+
+const SHOWCASE_MODS: { icon: string; color: string; title: string; count: string }[] = [
+  { icon: 'package', color: 'var(--accent)', title: 'Inventory', count: '66 items' },
+  { icon: 'receipt', color: 'var(--cyan)', title: 'Receipts', count: '240 scanned' },
+  { icon: 'card', color: 'var(--purple)', title: 'Installments', count: '5 active plans' },
+  { icon: 'calendar', color: 'var(--gold)', title: 'Subscriptions', count: 'next in 4d' },
+  { icon: 'wallet', color: 'var(--red)', title: 'Expenses', count: '3 recurring' },
+  { icon: 'ticket', color: 'var(--accent)', title: 'Vouchers', count: '2 expiring' },
+  { icon: 'chart', color: 'var(--cyan)', title: 'Reports', count: '12-mo trend' },
+  { icon: 'wifi', color: 'var(--gold)', title: 'Network', count: '31 clients' },
+];
+
 const FAQS: { q: string; a: string }[] = [
   {
     q: 'Is self-hosting really free?',
@@ -275,6 +292,49 @@ export default function Home() {
             <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
               Self-host it free
             </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Product showcase ──────────────────────────────── */}
+      <section id="preview" style={{ padding: '16px 0 64px' }}>
+        <div className="container">
+          <div className="showcase" aria-label="PHAROS dashboard preview">
+            <div className="win-bar">
+              <div className="win-dots"><span /><span /><span /></div>
+              <div className="win-addr">pharos.local / dashboard</div>
+              <span className="win-online">AI online</span>
+            </div>
+            <div className="win-body">
+              <div className="win-head">
+                <h4>Good evening, Achilleas</h4>
+                <span>Tue · 01 Jul</span>
+              </div>
+
+              <div className="stat-row">
+                {SHOWCASE_STATS.map((s) => (
+                  <div key={s.lbl} className="stat-tile">
+                    <span className="lbl">{s.lbl}</span>
+                    <span className="val" style={{ color: s.color }}>{s.val}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mod-grid">
+                {SHOWCASE_MODS.map((m) => (
+                  <div key={m.title} className="mod-tile">
+                    <span className="mod-ico" style={{ color: m.color }}>
+                      <span className="g" style={{ background: m.color }} />
+                      <Icon name={m.icon} size={17} />
+                    </span>
+                    <span>
+                      <span className="t" style={{ display: 'block' }}>{m.title}</span>
+                      <span className="c">{m.count}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>

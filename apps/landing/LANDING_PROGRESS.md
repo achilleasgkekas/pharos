@@ -145,3 +145,24 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain.
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-01 (cont.⁶)
+
+Task: (e) Polish, μερος 5 — product showcase / «see it in action» section (πριν το landing ηταν all-text: hero -> features, χωρις καμια οπτικη του προϊοντος. Ελλειψη screenshot assets -> εφτιαξα CSS-drawn app-window mockup αντι για πραγματικες εικονες).
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεο `<section id="preview">` αναμεσα σε Hero και Features. Faux app-window (browser chrome: 3 traffic-light dots + mono address chip «pharos.local / dashboard» + «AI online» pulse-dot) με ενα mini dashboard mockup: header «Good evening, Achilleas» + mono date, 3 stat tiles (Net position €12,708 accent / Owed €1,149 gold / This month −€221 cyan), + 8 module tiles (Inventory/Receipts/Installments/Subscriptions/Expenses/Vouchers/Reports/Network) με icon-dot glow + count. Δυο νεα data arrays (`SHOWCASE_STATS`, `SHOWCASE_MODS`), reuse του υπαρχοντος `Icon` (ολα τα 8 names υπαρχουν ηδη). Μηδεν νεο dependency, μηδεν JS — pure markup/CSS.
+- `app/globals.css`: `.showcase` (rounded window, border-light, drop-shadow, accent+purple corner glows via ::before), `.win-bar`/`.win-dots`/`.win-addr`/`.win-online` (chrome), `.win-body`/`.win-head`, `.stat-row`+`.stat-tile` (3-col grid), `.mod-grid`+`.mod-tile`+`.mod-ico` (4-col, icon glow). Responsive: mod-grid 4->2 @900px, stat-row+mod-grid ->1col @560px + tighter win padding + narrower addr.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 103 kB First Load JS, αμεταβλητο — pure HTML/CSS).
+- Preview (port 3100, landing-dev): DOM eval επιβεβαιωσε showcase renders (addr, 3 stat values €12,708/€1,149/−€221, ολα τα 8 module titles), inspect στο `.stat-tile .val` -> color rgb(0,255,136) accent + Outfit 800 24px (CSS applied), μηδεν console errors. Σταματησα τον server. Docker/web/mobile αθικτα. Το `.claude/launch.json` (local landing-dev config) ΔΕΝ commit (shared root file, collision guard).
+
+Επομενο increment: (e) συνεχεια — mobile QA pass ολων των sections σε ~380px (hero/showcase/features/pricing/waitlist/faq), ισως testimonials/social-proof placeholder, η αντικατασταση του CSS mockup με πραγματικα app screenshots οταν υπαρξουν assets.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain.
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.
