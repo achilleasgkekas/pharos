@@ -1640,3 +1640,14 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 
 ### Needs Achilleas
 - (αμετάβλητο) Product-decision items, ΟΧΙ auto-buildable: **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: μείνε web-only).
+
+## 2026-07-01 (parity-auditor — 16η σάρωση, ουρά αμετάβλητη, μηδέν νέο portable feature)
+- **Inventory από κώδικα (όχι docs):** 49 v1 routes (login + 48 bearer), 16 mobile screens, 19 web `page.tsx` (home + 18· income + setup ξεχωριστά), 81 exported api fns. Το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes· ΟΛΑ τα deep sub-routes (`items/[id]/{ai-fill,convert-to-task,link-plan,plans,price}`, `receipts/[id]/{add-to-library,rescan}`, `settings/test-notify`, `push/register`, `items/import`) ≥1 consumer → **μηδέν «endpoint χωρίς mobile consumer» gap**. Κάθε web page έχει mobile equivalent εκτός `/setup` (web-only first-run wizard, N/A).
+- **App-code diff από `bead394` (προηγ. parity marker):** **1 μόνο** app-src commit — `3a272c1` (mobile Button-family finish: ShoppingScreen `addBtnWide` + ItemsScreen `save` outlier → `<Button>` = **UI Debt**, byte-identical-ish). `git diff bead394..HEAD -- apps/web/src` = **ΚΕΝΟ** → **καμία νέα portable web δυνατότητα προς port**. Τα ενδιάμεσα commits = docs (web-debt/ui-auditor/monitor) + docker-health.
+- **«Partial» rows ξανα-επιβεβαιωμένα ως Needs Decision:** Reports `route.ts` GET-only (line 24)· Statements `plans/route.ts` GET-only (line 16) → extra charts / merge-bind / PDF-import θέλουν νέα endpoints + RN charting lib. ΟΧΙ κρυμμένο auto-buildable GAP.
+- **Counts:** DONE 7 (parity queue) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα. mobile `tsc --noEmit` → **EXIT 0**.
+- **Top 3 για τον builder (κανένα ενεργό parity TODO → UI Debt Queue):** (1) Safe-area insets (P2/M, unattended-safe: `SafeAreaProvider`+`useSafeAreaInsets`, additive, no token-drift)· (2) `<Chip>` primitive (P2/M, attended-preferred λόγω padding token-drift 14/7 vs 16/8)· (3) lucide-icons migration ή `<Badge>`/`<ListItem>` (attended-preferred για οπτικό verify).
+- Working tree καθαρό στην αρχή (μηδέν WIP του Αχιλλέα). Read-only run: μηδέν app-code edit, μηδέν Docker, μηδέν AI. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+### Needs Achilleas
+- (αμετάβλητο) Product-decision items, ΟΧΙ auto-buildable: **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: μείνε web-only).
