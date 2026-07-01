@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 4c6856f -->
+<!-- reviewed: 3e3d8ef -->
 <!-- docker-validated: 0c866eb -->
+
+## 2026-07-01 (reviewer — range `4c6856f..3e3d8ef`· καθαρό, καμία διόρθωση)
+- **Τι αναθεώρησα**: 2 code commits (`196834b` cards field-dedup + readBody, `0c866eb` notifications+lists readBody) + 8 docs/monitor commits. Οι docs δεν αγγίζουν κώδικα.
+- **Checks**: `apps/web` type-check exit 0· `apps/mobile` tsc --noEmit exit 0. Και τα δύο πράσινα.
+- **Εύρημα cards (`196834b`)**: το `cardFieldsFromBody` (νέο `lib/cardFields.ts`) αναπαράγει byte-identical τους guards και των δύο inline αντιγράφων (POST create με `name` required → null· PATCH partial). Το `cardFieldsFromBody(b, true) ?? {}` στο PATCH είναι αβλαβώς defensive (partial=true ποτέ δεν επιστρέφει null). Response shapes `{card}`/`{ok}` αμετάβλητα.
+- **Εύρημα notifications+lists (`0c866eb`)**: το `readBody(req)` = `(await req.json().catch(() => ({}))) as Body`, ακριβώς το παλιό inline. Οι guards (`typeof b.id/b.key === 'string'` + 24-hex, `Array.isArray(b.values)`) και τα `{ ok: true }` αμετάβλητα. Zero behaviour change — δεν σπάει το mobile app (ίδια σχήματα απόκρισης).
+- **Διορθώσεις**: καμία (όλα safe refactors). **Flags**: κανένα. **Secrets**: κανένα committed.
+- Marker → `3e3d8ef`.
 
 ## 2026-07-01 (builder — apiBody `readBody` adoption σε notifications + lists PATCH· commit `0c866eb`)
 - **Τι**: πήρα το μοναδικό ενεργό Web Debt item (`### apiBody helpers — readBody adoption σε notifications + lists PATCH`, P3/S), που άνοιξε η **17η web-debt σάρωση** (`375b1f7`, committed πριν το run μου). Parity queue 7/7 DONE, mobile UI Debt (ListItem/Chip) attended-preferred για οπτικό verify → αυτό ήταν το κορυφαίο unattended-safe TODO με πλήρη spec. Συνέχεια του apiBody adoption (adopters `readBody` **12 → 14**).
