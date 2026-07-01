@@ -177,3 +177,57 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — 
 serialize/normalize helpers χωρίς DB, π.χ. `lib/taxonomies.ts` (`normalizeList`/
 `resolveTaxonomy`) ή `lib/prompts.ts` (`getPromptOverride` fallback logic, αν καθαρό
 από I/O). Ένα module ανά run.
+
+---
+
+## 2026-07-02 (cont. — ssrf.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/ssrf.test.ts` για τον SSRF guard `assertPublicUrl` του `lib/ssrf.ts`.**
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/ssrf.test.ts` (36 tests). Καλύπτει ντετερμινιστικά όλα τα
+  no-DNS μονοπάτια: malformed URL → 'Invalid URL', non-http(s) schemes (ftp/file/gopher/
+  javascript) → 'Only http(s)', bare internal names (localhost, *.localhost, *.local,
+  host.docker.internal) → 'Internal host', literal IPv4 private/reserved (loopback,
+  10/8, 192.168, 172.16-31, 169.254 metadata, 100.64 CGNAT, 198.18 benchmark, multicast,
+  0.0.0.0) → reject + public literals (8.8.8.8, 1.1.1.1, 172.15/172.32 όρια) → pass,
+  literal IPv6 private (::1, ::, fe80, fc00, fd00) → reject + public (2606:/2001:) → pass.
+  Το hostname branch (DNS) μοκάρεται μέσω `vi.mock('node:dns/promises')`: public-resolve
+  pass, **DNS-rebinding** (public name → 127.0.0.1) reject, mixed answers reject, empty/
+  ENOTFOUND reject. Assert-άρω επίσης ότι τα no-DNS cases ΔΕΝ καλούν `lookup`.
+
+- **ΕΥΡΗΜΑ ΑΣΦΑΛΕΙΑΣ (SSRF bypass, δες "## Needs Achilleas" πιο κάτω)**: τα IPv4-mapped
+  IPv6 (`[::ffff:127.0.0.1]`, `[::ffff:10.0.0.1]`) **ΠΕΡΝΑΝΕ ως public** αντί να
+  απορρίπτονται. Root cause: το WHATWG `URL` κανονικοποιεί το `::ffff:127.0.0.1` σε
+  `::ffff:7f00:1` (hex compression) πριν φτάσει στον guard, αλλά το `ip6IsPrivate`
+  ανιχνεύει mapped addresses ΜΟΝΟ με dotted-decimal regex (`/^::ffff:(\d+\.\d+\.\d+\.\d+)$/`)
+  → δεν ματσάρει → επιστρέφει false → «public». Επιβεβαιώθηκε live με node. ΔΕΝ πείραξα
+  τον `ssrf.ts` (εκτός territory — μόνο tests). Τα 2 σχετικά tests **κλειδώνουν την
+  τρέχουσα (μη-ασφαλή) συμπεριφορά** με ρητό `KNOWN GAP` σχόλιο + comment στο test, ώστε
+  μια μελλοντική διόρθωση στο ssrf.ts να τα γυρίσει ορατά από resolve→reject.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/ssrf.test.ts` → 36/36 passed.
+- `npx vitest run` (όλο το suite) → 14 files, 237/237 passed (ήταν 201).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json`
+  (foreign, ΔΕΝ το άγγιξα/staged) + το νέο ssrf.test.ts· `git diff --cached` κενό·
+  στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — δες `lib/cardFields.ts`
+(pure field-derivation helpers) ή `lib/aiModels.ts` (model metadata/list logic, αν
+καθαρό από I/O). Ένα module ανά run. Και δες το "## Needs Achilleas" — το SSRF IPv4-mapped
+gap θέλει one-liner fix στο `ip6IsPrivate` (normalize το ::ffff:HEX:HEX σε dotted πριν
+τον έλεγχο) από τον Αχιλλέα, εκτός test territory.
+
+## Needs Achilleas
+
+- **[SSRF, 2026-07-02] IPv4-mapped IPv6 bypass στο `apps/web/src/lib/ssrf.ts`
+  (`ip6IsPrivate`)**: `assertPublicUrl('http://[::ffff:127.0.0.1]/')` ΔΕΝ απορρίπτεται
+  (περνά ως public), γιατί το WHATWG `URL` κάνει `::ffff:127.0.0.1` → `::ffff:7f00:1`
+  (hex), και ο έλεγχος mapped βασίζεται σε dotted-decimal regex. Ένας επιτιθέμενος μπορεί
+  να φτάσει loopback/private μέσω `http://[::ffff:7f00:1]/`. Fix (εκτός test territory):
+  στο `ip6IsPrivate`, αποσυμπίεσε το IPv4-mapped hex (τα τελευταία 32 bits) σε dotted και
+  τρέξε `ip4IsPrivate`, ή απόρριψε ρητά κάθε `::ffff:*`. Τα tests στο `ssrf.test.ts`
+  (block "KNOWN GAP") κλειδώνουν την τωρινή συμπεριφορά· μόλις διορθωθεί, γύρνα τα από
+  `.resolves.toBeUndefined()` σε `.rejects.toThrow('Private address not allowed')`.
