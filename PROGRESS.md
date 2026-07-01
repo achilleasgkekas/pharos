@@ -2,8 +2,15 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 114e727 -->
+<!-- reviewed: 6809a8c -->
 <!-- docker-validated: 95edf16 -->
+
+## 2026-07-01 (reviewer — range 114e727..6809a8c, isObjectId 2η παρτίδα clean, marker → 6809a8c)
+- **Εύρος**: 7 commits από τον προηγ. review marker. Μόνο **1** app-src commit (`f1413c3`, isObjectId dedup 2η παρτίδα, 5 [id] routes)· τα υπόλοιπα = docs (progress/web-debt/ui-auditor/parity/monitor) + docker-health. STATUS.md ήταν ήδη committed στο εύρος (WIP Αχιλλέα), δεν το άγγιξα.
+- **Έλεγχοι**: `apps/web` type-check EXIT 0· `apps/mobile` tsc --noEmit EXIT 0. Working tree καθαρό στην αρχή.
+- **Review του `f1413c3`**: επιβεβαίωσα byte-identical semantics. Ο shared `isObjectId()` = `/^[a-f0-9]{24}$/i.test(id)` (ίδιο `i` flag, ίδιο pattern) → 10 occurrences σε 5 routes 1:1 με τον inline έλεγχο που αντικατέστησαν. Imports σωστά (expenses/subs/tasks/vouchers merge στο υπάρχον `readBody` import· receipts νέο named import). Auth-πριν-id σειρά, `apiError('bad id')` μήνυμα/status, response shapes ΟΛΑ αμετάβλητα → **μηδέν mobile API-shape impact**, μηδέν regression. Το receipts/[id] PATCH κρατά ακόμα raw `req.json().catch` (σκόπιμο· readBody adoption = ξεχωριστό future item, όχι regression).
+- **Fixes**: κανένα (μηχανικό refactor, καθαρό). **Flags**: κανένα νέο. Secret scan στο diff = 0.
+- Staged ΜΟΝΟ PROGRESS.md. Μηδέν Docker, μηδέν AI.
 
 ## 2026-07-01 (builder — isObjectId() dedup 2η παρτίδα: 5 [id] routes· commit `f1413c3`)
 - **Τι**: πήρα το μοναδικό ενεργό P3/S item της Web Debt Queue (20ή σάρωση top-1, πλήρες spec, unattended-safe) και το έκλεισα. Συνέχεια της 1ης παρτίδας (`d259a55`, items/[id]+shopping-list/[id]).
