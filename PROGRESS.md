@@ -3,7 +3,18 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: fe12502 -->
-<!-- docker-validated: 258afd5 -->
+<!-- docker-validated: 6fd1075 -->
+
+## 2026-07-01 (pharos-daily-dev — readBody adoption shopping-list POST: ΕΚΛΕΙΣΕ η raw-body ουρά)
+- **Τι έγινε:** Το `shopping-list/route.ts` POST ήταν το **τελευταίο** v1 route που parse-άρει το body inline (`(await req.json().catch(() => ({}))) as Record<string,string>`). Το μετέτρεψα σε `readBody(req)` + `strField()` (commit `6fd1075`), ευθυγραμμισμένο με τα άλλα 28 v1 routes → **ουρά consistency-debt 1→0, μηδέν raw-body route απομένει** (`grep '.json().catch' src/app/api/v1` = NONE).
+- **Γιατί:** Ήταν το μοναδικό ανοιχτό auto-buildable queue item (η 26η web-debt σάρωση το σημείωσε ρητά ως «το τελευταίο raw route»). Μικρό, focused, unattended-safe, tsc+Docker-verifiable — ιδανικό για unattended run αντί για attended-preferred UI-drift tasks (mobile Chip/Input adoption έχουν token-drift → οπτική αλλαγή χωρίς simulator).
+- **Byte-identical επαλήθευση:** το `addListItem` coerce-άρει **κάθε** πεδίο με `(x || '').trim()` (name/quantity/category/brand/note). Άρα το `strField(b,'name')` που επιστρέφει `''` για missing key συμπεριφέρεται ΑΚΡΙΒΩΣ όπως το παλιό `b.name` (undefined pass-through → `(undefined||'').trim()` = `('' ||'').trim()` = `''`). Μηδέν συμπεριφορική αλλαγή, ίδιο 201 shape + response → **mobile ανεπηρέαστο**.
+- **Verify:** `cd apps/web && npm run type-check` → **EXIT 0**. Safe Docker dance: `docker compose build web` → Built· mongo `healthy` πριν το up· `docker compose up -d web`· poll `/login` → **200** (1η προσπάθεια)· WEB RestartCount **0**· unauth `POST /api/v1/shopping-list` → **401** (auth guard ανέπαφο, ΟΧΙ 500). `docker builder prune -f` → **2.08GB reclaimed**. Καμία `up --build`, μηδέν AI, μηδέν secret.
+- **Git hygiene:** staged ΜΟΝΟ το `route.ts` (+ PROGRESS.md). Το `.claude/launch.json` (WIP εργαλείου του Αχιλλέα) ΔΕΝ αγγίχτηκε. Marker docker-validated → `6fd1075`.
+- **Επόμενο (single suggested next task):** Η raw-body ουρά εξαντλήθηκε· ο web κώδικας είναι σε ώριμο consistency state. Στρέψε στο **mobile UI-debt αλλά ΜΟΝΟ attended** (Chip/Input primitives = token-drift, χρειάζονται simulator) ή στο **unattended-safe mobile «Max content width» wrapper** (`<Screen>` maxWidth+center, P3/S, μηδέν dep, structural — no-op σε phone, μόνο tablet centering). Εναλλακτικά, νέο web feature από το `PRODUCT_BACKLOG.md` (5 candidate features awaiting Achilleas-approval — βλ. Needs Achilleas· ΜΗΝ ξεκινήσεις χωρίς έγκριση).
+
+### Needs Achilleas
+- (αμετάβλητο) Κανένα νέο ζήτημα ασφαλείας, μηδέν committed secret. Standing product-decisions (ΟΧΙ auto-buildable): `PRODUCT_BACKLOG.md` 5 candidate features (χρειάζονται έγκριση πριν build), login brute-force rate-limit, mobile native-dep approvals (`react-native-safe-area-context`), Settings theme/language/AI-engine/storage/OneDrive (light-theme refactor + credentials/OAuth boundary → σύσταση: web-only), Statements merge/bind + PDF-import (write/upload endpoints), SaaS multi-tenancy rollout (`SAAS_MODE` architecture decision).
 
 ## 2026-07-01 (docker-health — rebuild λόγω νέου SaaS-auth + tenancy κώδικα, stack υγιής)
 - **Health (πριν):** homepage-mongo `healthy`, homepage-web `running` (RestartCount **0**), homepage-flaresolverr **σταματημένο** (καμία μνημονική πίεση). Ο RestartCount του mongo = **49** είναι σωρευτικός για όλη τη ζωή του container (VM restarts/OOM recoveries στο χρόνο), ΟΧΙ τρέχον loop, αφού το Health δείχνει `healthy` τώρα. Καμία ανάγκη recovery.
