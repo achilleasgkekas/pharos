@@ -1361,3 +1361,9 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 
 ### Needs Achilleas
 - Απέμειναν (δεν προωθήθηκαν, θέλουν ακόμα απόφαση): **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor 19 files), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: μείνε web-only).
+
+## 2026-07-01 (parity-auditor — +1 item: mobile icon set [lucide], αίτημα Αχιλλέα)
+- **Αίτημα Αχιλλέα:** «δεν θέλω χαζά εικονίδια» → νέο Build Queue item **Mobile icon set (lucide)**, P2/M, attended-preferred.
+- **Facts:** το mobile χρησιμοποιεί **58 emoji/glyph icon sites / 12 αρχεία** (`＋ ✦ 🔔 📷 🔍 🗂 🛡 ↑↗↘ ∑ ⚡ 🎯 💳` ως `<Text>` glyphs) ενώ το web έχει `lucide-react` παντού. Λύση = **`lucide-react-native`** (peer `react-native-svg` **ήδη dep** 15.12.1 → μηδέν νέα native dep) + νέο `icons.tsx` re-export + mapping emoji→lucide (γραμμένο στο queue item, mirror των web NavCard icons). Κανένα endpoint.
+- **Ranking (4 ενεργά Build Queue TODO):** (1) Tasks steps-checklist (P2/M, functional, tsc-verifiable)· (2) **Mobile icon set** (P2/M, visual, attended)· (3) Tasks swipe-status (P3/M)· (4) Language switcher (P3/L).
+- Read-only run (μηδέν app-code edit, μηδέν Docker/AI). Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.

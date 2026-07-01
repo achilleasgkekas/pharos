@@ -136,6 +136,19 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - tsc καθαρό (web + mobile)· safe rebuild → /login 200, web restarts 0
 - Status: TODO
 
+### Mobile — αντικατάσταση όλων των emoji/glyph icons με lucide (icon set)
+- Priority: P2 | Size: M | no AI, decision ΕΓΙΝΕ (Αχιλλέας 2026-07-01: «δεν θέλω χαζά εικονίδια») · ⚠ attended-preferred (οπτικό verify)
+- Web ref: `lucide-react` παντού (file: apps/web/package.json + apps/web/src/components/SiteNav*, nav cards με `Package/Cart/Receipt/CreditCard/CalendarClock/ListChecks/BarChart3` κλπ) — το mobile χρησιμοποιεί emoji/unicode glyphs αντί για icon set.
+- API: **κανένα** — pure mobile UI.
+- Πρόβλημα: **58 emoji/glyph icon sites / 12 αρχεία** (nav.tsx + 11 screens): `＋ ✦ 🔔 📷 🔍 🗂 🗄 🛡 ↑ ↗ ↘ ← → ∑ ⚡ 🎯 💳` κ.ά. ως `<Text>` glyphs. Ασυνεπή, «χαζά», δεν ταιριάζουν με το web design system.
+- Λύση: **`lucide-react-native`** (`npx expo install lucide-react-native` — peer `react-native-svg` **ΕΙΝΑΙ ήδη dep** [15.12.1], μηδέν νέα native dep) → ίδιο icon vocabulary με το web. Νέο `apps/mobile/src/icons.tsx` (thin re-export των icons που χρειάζονται, default size/`color={C.text}`), μετά αντικατάσταση των glyphs. **Mapping** (mirror web): `＋`→`Plus`, `✦/AI`→`Sparkles`, `🔔`→`Bell`, `📷`→`Camera`, `🔍`→`Search`, `🗂/🗄`→`Archive`, `🛡`→`ShieldCheck`, `↑`→`TrendingUp`, `↘`→`TrendingDown`, `←/→`→`ChevronLeft/Right`, `∑`→`Sigma`, `⚡`→`Zap`, `🎯`→`Target`, `💳`→`CreditCard`· nav tiles → τα ίδια lucide με τα web NavCards (`Package/ShoppingCart/Receipt/CalendarClock/ListChecks/BarChart3/Ticket/Wallet`). ΣΗΜ: το `••${last4}` της κάρτας **δεν** είναι icon → μένει text· το `✓` έχει ήδη `<Check>` primitive.
+- Mobile files: apps/mobile/package.json (+`lucide-react-native`), νέο apps/mobile/src/icons.tsx, apps/mobile/src/nav.tsx + 11 screens (nav/Activity/Assistant/Items/Money/Receipts/Shopping/Statements/Subscriptions/Tasks/Vouchers)
+- Acceptance:
+  - Μηδέν emoji/glyph icon σε `<Text>` για UI affordances (grep καθαρό στα 12 αρχεία)· όλα μέσω lucide components με χρώμα από `theme.ts`
+  - Icon sizes/colors συνεπή (default μέσω `icons.tsx`)· nav tiles + AppBar (🔔/🔍) + κάθε κουμπί ταιριάζουν οπτικά με το web
+  - tsc καθαρό (mobile)· οπτικό verify σε device/simulator (attended)
+- Status: TODO
+
 ### Tasks — swipe-to-change-status (αντί Kanban)
 - Priority: P3 | Size: M | no AI · ⚠ dep-add + attended-preferred (gesture + οπτικό verify)
 - Web ref: Kanban ←/→ quick-move (file: apps/web/src/app/tasks/TasksClient.tsx) — mobile-friendly εκδοχή = swipe, ΟΧΙ board (columns δεν χωράνε σε phone)
