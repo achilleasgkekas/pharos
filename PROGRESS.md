@@ -2,8 +2,18 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: a582ac5 -->
+<!-- reviewed: effd90d -->
 <!-- docker-validated: 0c5a087 -->
+
+## 2026-07-01 (reviewer — range a582ac5..effd90d, Button primitive καθαρό, μηδέν fix)
+- **Range:** από marker `a582ac5` έως HEAD `effd90d`. Ένα μόνο app-code commit (`effd90d`, Button primitive)· τα υπόλοιπα 6 = docs (web-debt/ui-audit/parity/monitor/docker-health/review). Working tree καθαρό στην αρχή (μηδέν WIP του Αχιλλέα).
+- **Checks:** `apps/web` `npm run type-check` → **EXIT 0**· `apps/mobile` `npx tsc --noEmit` → **EXIT 0**.
+- **Diff review — `effd90d` (νέο `<Button>` στο `ui.tsx` + 5 screens / 7 sites):**
+  - **«Byte-identical» επαληθεύτηκε token-by-token:** νέο `btn` = `{accent, RADIUS.md, padV SPACE.md, padH22}` και `theme.ts` δίνει `RADIUS.md=12`, `SPACE.md=12`, `SIZE.md=15` → ταυτόσημο με το παλιό `save {12,12,22}`/`saveText {15,700}`. Το παλιό per-screen `dim` ήταν `opacity 0.4` και στα 5 screens → ταυτόσημο με το νέο `btnDim`.
+  - **Faithfulness των conditional variants:** VouchersScreen `doScanText` — παλιό `disabled={!trim||scanBusy}` = νέο `disabled={!trim} busy={scanBusy}` (μέσα στο Button `off=disabled||busy` → ίδια συνθήκη + ίδιο dim + spinner)· MoneyScreen `saveDraft` κρατά dimmed-text «Adding…» (label-swap, όχι spinner) → οπτικά ίδιο.
+  - **Καθαρότητα:** μηδέν dangling `s.save`/`s.saveText` στα 5 screens· αφαιρέθηκε το πλέον-αχρησιμοποίητο `ActivityIndicator` import στο Vouchers· κανένα API response-shape δεν άλλαξε (mobile-only refactor) → μηδέν κίνδυνος για το backend/mobile contract.
+- **Fixes:** κανένα (τίποτα μικρό/επισφαλές δεν βρέθηκε). **Flags:** κανένα νέο· η ουρά μένει ως έχει (Web: 1 P3/S apiBody adoption· Mobile: Button+Chip συνέχεια, Card/Badge/ListItem, Input 6/11). Κανένα committed secret.
+- Read-only πλην marker+entry. Staged ΜΟΝΟ `PROGRESS.md`. Μηδέν Docker/AI.
 
 ## 2026-07-01 (parity-auditor — όψιμο απογευματινό run· ουρά καθαρή, 1 doc-fix)
 - **Inventory από κώδικα (όχι docs):** **49** v1 API routes (login + 48 bearer), **16** mobile screens, **19** web `page.tsx` (home + 18· income ξεχωριστή σελίδα). Το mobile `api.ts` (81 exported fns) καταναλώνει **ΚΑΘΕ** ένα από τα 49 routes 1:1 (grep normalized consumed-paths == route list· τα `receiptsX_rescan`/`tasks:id`/`trash/:id/:id` είναι grep artifacts, όχι routes). **Μηδέν «endpoint χωρίς mobile consumer» gap.** Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (first-run admin wizard, web-only by design· N/A).
