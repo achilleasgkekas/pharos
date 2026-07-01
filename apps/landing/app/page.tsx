@@ -232,11 +232,11 @@ export default function Home() {
               PHAROS
             </span>
           </a>
-          <nav style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-            <a href="#features" className="navlink">Features</a>
-            <a href="#self-host" className="navlink">Self-host</a>
+          <nav className="site-nav">
+            <a href="#features" className="navlink nav-anchor">Features</a>
+            <a href="#self-host" className="navlink nav-anchor">Self-host</a>
             <a href="#pricing" className="navlink">Pricing</a>
-            <a href="#faq" className="navlink">FAQ</a>
+            <a href="#faq" className="navlink nav-anchor">FAQ</a>
             <a
               href={GITHUB_URL}
               target="_blank"

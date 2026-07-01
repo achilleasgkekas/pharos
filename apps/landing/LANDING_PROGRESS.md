@@ -166,3 +166,24 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain.
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02
+
+Task: (e) Polish, μερος 6 — mobile QA pass ~380px (το nav δεν ειχε ΚΑΜΙΑ responsive συμπεριφορα· logo + 5 text links @28px gap στριμωχνοντουσαν/ξεχειλιζαν σε στενη οθονη).
+
+Τι εφτιαξα:
+- `app/page.tsx`: το `<nav>` πηρε class `site-nav` (αντι για inline flex style)· τα in-page anchors Features/Self-host/FAQ πηραν class `nav-anchor` (secondary), ενω Pricing + GitHub μενουν παντα ορατα (primary CTA target + repo).
+- `app/globals.css`: νεο `.site-nav` base (flex, gap 28). Νεα breakpoints: `@media (max-width:720px)` -> `.nav-anchor { display:none }` + gap 20 (nav μενει logo + Pricing + GitHub, χωρις hamburger/JS). `@media (max-width:560px)` += `.container { padding 0 18px }`. Νεο `@media (max-width:480px)` -> σφιχτοτερο vertical rhythm ανα section (#top 72/60, #features/#self-host/#faq 44, #pricing 44/64, #preview 8/44) + `.btn { width:100% }` (τα hero CTA κουμπια γινονται full-width stacked στο κινητο).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 103 kB First Load JS, αμεταβλητο — pure CSS/markup, μηδεν νεο JS).
+- Preview (landing-dev, port 3100) σε viewport 380×800: nav δειχνει μονο «Pricing» + «GitHub» (τα 3 nav-anchor hidden, offsetParent null), header 65px καθαρο, ΜΗΔΕΝ horizontal scroll (scrollWidth == innerWidth == 380). Screenshot hero -> full-width stacked «Get started»/«Self-host it free», lighthouse mark + gradient headline OK. Grids ολα 1-col στα 380 (feature/pricing/stat/mod), μηδεν console errors. Σταματησα τον server. Docker/web/mobile αθικτα. Το `.claude/launch.json` (local landing-dev config, shared root) ΔΕΝ commit.
+
+Επομενο increment: (e) συνεχεια — testimonials/social-proof strip (π.χ. «open-source / privacy-first / zero-telemetry» badges αντι για fake quotes), η αντικατασταση του CSS mockup με πραγματικα app screenshots οταν υπαρξουν assets.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain.
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.

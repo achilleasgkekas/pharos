@@ -93,6 +93,11 @@ h1, h2, h3 {
   color: var(--text-faint);
 }
 
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
 .navlink {
   font-size: 0.92rem;
   color: var(--text-dim);
@@ -514,6 +519,11 @@ h1, h2, h3 {
 @media (max-width: 900px) {
   .mod-grid { grid-template-columns: repeat(2, 1fr); }
 }
+@media (max-width: 720px) {
+  /* Nav: drop secondary in-page anchors, keep Pricing + GitHub reachable */
+  .site-nav { gap: 20px; }
+  .nav-anchor { display: none; }
+}
 @media (max-width: 560px) {
   .feature-grid { grid-template-columns: 1fr; }
   .pricing-grid { grid-template-columns: 1fr; }
@@ -521,6 +531,15 @@ h1, h2, h3 {
   .mod-grid { grid-template-columns: 1fr; }
   .win-body { padding: 20px 18px 22px; }
   .win-addr { max-width: 180px; }
+  .container { padding: 0 18px; }
+}
+@media (max-width: 480px) {
+  /* Tighten vertical rhythm so sections do not feel stretched on phones */
+  #top { padding: 72px 0 60px !important; }
+  #features, #self-host, #faq { padding: 44px 0 !important; }
+  #pricing { padding: 44px 0 64px !important; }
+  #preview { padding: 8px 0 44px !important; }
+  .btn { width: 100%; }
 }
 
 /* Pulsing beacon on the lighthouse mark */
