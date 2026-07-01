@@ -167,3 +167,41 @@ per-db cache· off (ή `dbName:''`) ⇒ η σημερινή default σύνδεσ
 (reuse `lib/auth.ts` format) + `jose` httpOnly cookie session (reuse `lib/session.ts`),
 flag-guarded, ξεχωριστό `Account` login από το per-tenant `User` path. Το bearer-token path
 (`lib/apiAuth.ts`) μένει ανέπαφο.
+
+---
+
+## 2026-07-01 (increment 4 — SaaS account auth: signup/login/logout/session)
+**Built:** το πλήρες `api/saas/auth` για το **global Account login** (SaaS mode), ΟΛΟ σε
+νέα αρχεία, με ρητό split από το self-hosted `User`/bearer path:
+- `apps/web/src/lib/tenancy/accountSession.ts` — Account session cookie **`pharos_account`**
+  (ΞΕΧΩΡΙΣΤΟ από το `pharos_session` του per-tenant User → τα δύο auth paths συνυπάρχουν στον
+  ίδιο browser χωρίς clobber). `jose` HS256 (edge-safe sign/verify) + node cookie helpers
+  (`next/headers`). Reuse του υπάρχοντος `AUTH_SECRET` (μηδέν νέο config)· fail-closed χωρίς
+  secret. Δικό του idle knob `SAAS_SESSION_IDLE_HOURS` (default 12h).
+- `apps/web/src/lib/tenancy/provision.ts` — `slugify` (DNS-safe label) + `uniqueTenantSlug`
+  (reserved-check via `RESERVED_SLUGS` + collision `-2/-3…`, bounded retry) + `dbNameForSlug`
+  (`tenant_<slug>`) + `provisionTenant({accountId, workspaceName})` → δημιουργεί Tenant
+  (plan=free, status=trialing) + owner Membership. Η data db φτιάχνεται lazily από τη Mongo.
+- `apps/web/src/lib/tenancy/saasApi.ts` — `saasAuthGate()` (SAAS_MODE off → 404· AUTH_SECRET
+  unset → 500) + `accountTenants(accountId)` (active memberships → tenant slug/plan/status +
+  role) για τα login/session responses.
+- Routes (`runtime=nodejs`, `dynamic=force-dynamic`, όλα `saasAuthGate()` πρώτα):
+  - `POST api/saas/auth/signup` `{email,password,name?,workspace?}` → Account (scrypt hash,
+    reuse `hashPassword`) + `provisionTenant` + set cookie → 201 `{account, tenants}`. Email
+    regex + min-8 password + 409 σε duplicate (pre-check + 11000 race fallback).
+  - `POST api/saas/auth/login` `{email,password}` → `verifyPassword` → set cookie → `{account,
+    tenants}`. Ίδιο 401 για wrong email/password (no enumeration)· `lastLoginAt` update.
+  - `POST api/saas/auth/logout` → clear cookie (idempotent).
+  - `GET  api/saas/auth/session` → `{account, tenants}` ή `{account:null}` (deleted account με
+    live cookie → logged-out).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **49/49 green** (καμία
+regression). Οι routes είναι νέες + gated: `SAAS_MODE` off ⇒ 404 σε όλες ⇒ **zero effect**
+στο self-hosted app· κανένα υπάρχον αρχείο δεν άλλαξε (καθαρά additive) ⇒ κανένα Docker
+rebuild (δεν άλλαξε runtime wiring υπαρχόντων routes). Bearer-token path αμετάβλητο.
+
+**Next task:** increment 5 — billing scaffold: `lib/billing/stripe.ts` (plans/prices config,
+checkout-session + customer-portal stubs, env keys) + `api/saas/billing/webhook`
+(signature-verified skeleton) + `lib/billing/entitlements.ts` (plan → allowed features,
+mirror OSS-vs-paid split). Καμία πραγματική χρέωση· Stripe keys μέσω env (deferred κατ'
+απόφαση Achilleas).
