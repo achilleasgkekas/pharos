@@ -3,7 +3,7 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 91a5fe3 -->
-<!-- docker-validated: ac5cbc2 -->
+<!-- docker-validated: 0ffdd91 -->
 
 ## 2026-07-01 (reviewer — range 1791295..91a5fe3, scrim token refactor καθαρό)
 - **Τι έλεγξα**: range `1791295..91a5fe3` (7 commits). Ένα μόνο code commit `91a5fe3` (mobile scrim token, 10 modal/drawer backdrops)· τα υπόλοιπα 6 = docs (web-debt/ui-audit/parity/monitor/docker-health/review). Full `git diff` του code commit.
@@ -1038,6 +1038,12 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 - Foundation 3 DONE (theme tokens + alpha + touch targets)· Input primitive IN PROGRESS· **Button+Chip onAccent-prereq DONE** (component extraction ακόμα TODO). mobile `tsc --noEmit` **EXIT 0**.
 - Top 3 για τον builder: (1) **συνέχεια Input migration** στα 7 εναπομείναντα screens (P1/M, attended-preferred λόγω οπτικού verify χωρίς simulator)· (2) **Button + Chip primitives** (P2/M, unattended-safe· onAccent prereq κλειστό, μένει το `<Button>`/`<Chip>` component)· (3) **Card + Badge + ListItem primitives** (P2/M· ενοποιεί 6 card + 3 badge entries). Μικρό bonus: `scrim` token για το τελευταίο `#000` @ SettingsScreen:678.
 - Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md. Κανένα committed secret εντοπίστηκε.
+
+## 2026-07-01 (docker-health — υγεία πράσινη, χωρίς rebuild)
+- **Health**: homepage-mongo `healthy`, homepage-web running 3 ώρες (Running:true, OOMKilled:false, ExitCode:0, μηδέν restart). homepage-flaresolverr `Exited (143)` εδώ και 36 ώρες (ήδη σταματημένο, καμία ενέργεια).
+- **Disk**: system df καθαρό, Images 3.49GB, Build Cache 566MB (reclaimable 0B, δεν άξιζε prune), Containers 78MB reclaimable (stopped flaresolverr). Καμία πίεση στη μικρή VM, κανένα prune δεν έτρεξε.
+- **Rebuild**: ΟΧΙ. `git diff --name-only ac5cbc2..HEAD -- apps/web` = κενό. Τα ενδιάμεσα commits από τον marker (0ffdd91/91a5fe3/e47c48a/08afea0/e2197a7) είναι docs + `refactor(mobile)` scrim token, μηδέν web runtime αλλαγή.
+- **Marker**: docker-validated `ac5cbc2` → **`0ffdd91`** (HEAD).
 
 ## Needs Achilleas
 Κανένα νέο. Παραμένουν ανοιχτά (product/credentials decisions, εκτός auto-buildable): (1) Settings theme toggle + language switcher + AI-engine + storage/OneDrive στο mobile· (2) Reports extra charts (endpoint-extension + RN charting lib επιλογή)· (3) Statements merge/bind write-ops (νέα `/api/v1/statements/plans` write endpoints)· (4) remote push pipeline (APNs/FCM, needs device test). Κανένα committed secret δεν εντοπίστηκε.
