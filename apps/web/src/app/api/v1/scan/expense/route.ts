@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { readBody } from '@/lib/apiBody';
 import { scanExpenseText, scanExpenseImage } from '@/app/expenses/actions';
 
 export const runtime = 'nodejs';
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
     const ct = req.headers.get('content-type') || '';
     const r = ct.includes('multipart/form-data')
       ? await scanExpenseImage(await req.formData())
-      : await scanExpenseText(String(((await req.json().catch(() => ({}))) as { text?: unknown }).text || ''));
+      : await scanExpenseText(String((await readBody(req)).text || ''));
     if (!r.ok) return apiError(r.error, 400);
     return NextResponse.json({ data: r.data });
   });
