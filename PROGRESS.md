@@ -1409,3 +1409,24 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
   2. **Card + Badge + ListItem primitives** (P2/M) — 5 base `card:` + 3 `badge*:` entries per-screen προς ενοποίηση.
   3. **Input συνέχεια + `<Chip>`** (P1/M, attended-preferred) — 5 outlier screens token-drift + on/off chip.
 - mobile `tsc --noEmit` **EXIT 0**. Κανένα committed secret (μηδέν tracked `.env`). Read-only run: μηδέν app-code edit, μηδέν Docker, μηδέν AI. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+## 2026-07-01 (web-code-quality — 16η σάρωση, νέος tasks-steps κώδικας, ουρά 0→1)
+- **Fresh audit 41 v1 routes + 7 synced models.** Τελευταίος `apps/web/src` app-code commit = `e0f7a97` (feat mobile+api: Tasks steps/checklist), ΝΕΟΤΕΡΟΣ από την 15η σάρωση (baseline `83cc537` apiBody tasks+stores POST = προηγ. ενεργό item, τώρα DONE). Άρα η Web Debt Queue ήταν **0 ενεργά** στην αρχή· ο builder κατανάλωσε το apiBody tasks+stores.
+- **Νέος κώδικας ελεγμένος (tasks steps):** GET/POST `tasks/route.ts` + PATCH `tasks/[id]/route.ts` εκθέτουν πλέον `steps: [{id,text,done}]`. **Καθαρό:** POST χρησιμοποιεί ήδη apiBody helpers· PATCH κάνει full-array replacement με validation (`String(s?.text ?? '').trim()` + `.filter(s => s.text)` → drop empty). Response shapes συνεπή. Μοναδική παρατήρηση (χαμηλή, single-user): το `steps` array χωρίς άνω όριο πλήθους/μήκους — αποδεκτό για WireGuard-only self-host, ΔΕΝ άνοιξα item (δες Needs Achilleas).
+- **Ευρήματα ανά διάσταση (live grep):**
+  - **Type safety: 0** — `npm run type-check` EXIT 0· `:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το `/api/v1` = 0.
+  - **Auth: 0 unguarded** — `grep -rL withAuth|bearerUser` → μόνο `auth/login` (auth boundary).
+  - **Input validation: 0 NOGUARD** — όλα τα `[id]` routes με 24-hex guard· list params clamped 1..200· `ai` cap ενεργό.
+  - **Error handling: 0** inline `NextResponse.json({ error })` εκτός `auth/login`.
+  - **DB: 0** — 7/7 synced models `index({ updatedAt: -1 })`· 7/7 list endpoints `.limit()`+`.lean()`.
+  - **Duplication: 1 ongoing** — raw-body `req.json().catch` σε **23 routes** (από 25· 2 έκλεισαν με `83cc537`), 6 adopters. Νόμιμο consistency debt.
+- **Counts ανά dimension: P1=0, P2=0, P3=1** (νέο apiBody [id]-PATCH continuation, S).
+- **Top 3 για τον builder:**
+  1. **apiBody readBody adoption expenses/[id] + subscriptions/[id] PATCH (P3/S, api)** — μόνο η γραμμή body-parse (`req.json().catch` → `readBody(req)`, cast αφαιρείται)· τα partial-update field guards αμετάβλητα, 1:1-verified, tsc-checkable.
+  2. **(μελλοντικό) apiBody batch** — επόμενα ~21 routes με raw pattern (cards/[id], receipts/[id] PATCH, vouchers/[id], shopping-list/[id], κλπ· ένα-δύο ανά run).
+  3. Ουρά αλλιώς καθαρή — αν ο builder δεν έχει web item, πέφτει στο mobile UI Debt Queue (IconButton/Card primitives).
+- Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ WEB_DEBT.md + PROGRESS.md.
+
+### Needs Achilleas
+- (νέο, χαμηλής προτεραιότητας) `PATCH /api/v1/tasks/[id]` δέχεται `steps` full-array χωρίς άνω όριο πλήθους ή μήκους κειμένου ανά step. Single-user/WireGuard-only → χαμηλό ρίσκο· αν βγει multi-tenant/public, βάλε cap (π.χ. ≤100 steps, text ≤500 chars).
+- (αμετάβλητο) 2 standing security παρατηρήσεις, product decisions ΟΧΙ queue items: (1) `auth/login` χωρίς rate-limit/brute-force guard (self-hosted, WireGuard-only → χαμηλό ρίσκο)· (2) κάποια error messages επιστρέφουν λεπτομέρεια (π.χ. «A store with that name already exists») — αποδεκτό για single-user, review αν γίνει multi-tenant.
