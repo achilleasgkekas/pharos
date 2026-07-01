@@ -1,26 +1,26 @@
 # Pharos Monitor — STATUS
 
-## 2026-07-01 22:00
+## 2026-07-02 01:02
 
-**Ετυμηγορια: ΟΛΑ ΟΚ.** Και οι 6 ρουτινες εχουν προσφατη δραστηριοτητα, ολες εντος του οριου ~7h. Ο υπολογιστης ηταν ξυπνιος. Στον τελευταιο κυκλο (~21:xx) χτυπησαν parity (21:36, 22η σαρωση), ui auditor (21:18, 25η σαρωση), builder (εως 21:58, landing OG/waitlist + saas connection layer + ListItem) και reviewer (21:52, range 2784fc1..fe12502 clean, marker → fe12502). Ο web auditor (τελ. 19:37) και ο docker guard (τελ. 19:55) δεν χτυπησαν σε αυτον τον κυκλο αλλα ειναι ~2h πισω, ανετα εντος οριου. Κανενα προβλημα.
+**Ετυμηγορια: ΟΛΑ ΟΚ.** Και οι 6 ρουτινες χτυπησαν στον ιδιο, προσφατο κυκλο (00:24 εως 00:54, τωρα 01:02), ολες μεσα στην τελευταια ~1h. Ο υπολογιστης ηταν ξυπνιος και ο παλμος πυκνος. Ο builder εβγαλε landing (product showcase ae2760b, mobile nav e4306fa) + Expo companion guide (2d06cf8) + SaaS billing scaffold (3c6bcc4) + 3 νεες test suites (apiBody 9ebeea2, installments 0b136b1, cards 9550465). Οι τρεις auditors εκαναν φρεσκια σαρωση (ui 27η, web 27η, parity 1η της 2026-07-02), ο reviewer καθαρισε δυο ranges (marker → e47f150), ο docker guard εκανε rebuild μετα το SaaS billing scaffold (marker → 454e96e). Κανενα προβλημα.
 
 | routine | τελευταια δραστηριοτητα | OK/STALE | τι εκανε (συντομα) |
 |---|---|---|---|
-| builder (Pharos daily dev) | 2026-07-01 21:58 | OK | landing OG/Twitter card (415bdb1) + waitlist section (b4d2eb1) + per-tenant connection layer useDb (1a7d16e) + mobile `<ListItem>` (0f69116) + PRODUCT_BACKLOG seed (a489475) |
-| parity auditor | 2026-07-01 21:36 | OK | 22η σαρωση, 49 routes 1:1, 0 GAP, ListItem committed, dep-facts refresh (fe12502) |
-| ui auditor | 2026-07-01 21:18 | OK | 25η σαρωση, `<ListItem>` υπο υιοθετηση, tokens 0 violations, tsc EXIT 0 (a2ed44b) |
-| web auditor | 2026-07-01 19:37 | OK | 24η σαρωση, isObjectId effort ΕΚΛΕΙΣΕ (f17f279), ουρα 2→1 ενεργο + readBody receipts/[id] (d7efd80) |
-| reviewer | 2026-07-01 21:52 | OK | range 2784fc1..fe12502 clean, tsc web+mobile EXIT 0, vitest 33/33, SaaS additive+flag-guarded, marker → fe12502 (cc53ff5) |
-| docker guard | 2026-07-01 19:55 | OK | health OK, no rebuild, marker → 99a9385 (9974fa2) |
+| builder (Pharos daily dev) | 2026-07-02 00:54 | OK | Expo companion guide (2d06cf8) + landing mobile nav/380px QA (e4306fa) + product showcase (ae2760b) + SaaS billing scaffold (3c6bcc4) + test suites apiBody/installments/cards |
+| parity auditor | 2026-07-02 00:28 | OK | 1η σαρωση 2026-07-02, ουρα αμεταβλητη, 0 auto-buildable GAP (be64194) |
+| ui auditor | 2026-07-02 00:47 | OK | 27η σαρωση, ουρα αμεταβλητη, μηδεν νεο mobile-src απο 26η, tokens 0 violations, tsc EXIT 0 (e47f150) |
+| web auditor | 2026-07-02 00:24 | OK | 27η σαρωση, readBody adoption 100% ΕΚΛΕΙΣΕ (shopping-list DONE), +1 P3/S isObjectId στο νεο SaaS billing webhook (454e96e) |
+| reviewer | 2026-07-02 00:51 | OK | range 0b136b1..e47f150 clean, tsc web+mobile EXIT 0, vitest 151/151, 0 fixes, 1 git-hygiene flag, marker → e47f150 (de7bfef) |
+| docker guard | 2026-07-02 00:33 | OK | rebuild μετα SaaS billing scaffold, stack healthy, marker → 454e96e (ca0e10f) |
 
 ## Open queue counts
-- Build Queue (MOBILE_PARITY): **2** TODO (lucide icon set [attended-preferred] + i18n language switcher)
+- Build Queue (MOBILE_PARITY): **2** TODO
 - UI Debt Queue (MOBILE_PARITY): **3** TODO (Chip primitive + Safe-area/Max-width + Light theme)
-- Web Debt Queue (WEB_DEBT): **2** TODO (isObjectId 4η/τελ. παρτιδα 7 routes + connection-guard P3 flagged από reviewer)
+- Web Debt Queue (WEB_DEBT): **2** TODO (isObjectId στο billing webhook [νεο P3/S] + connection-guard P3 flagged απο reviewer)
 
-Συγκριση με προηγουμενο STATUS (20:03): Build 2→2, UI 3→3, Web 2→2. Καμια αυξηση σε καμια ουρα. Ο παλμος υγιης: το mobile `<ListItem>` primitive εγινε commit (0f69116) και κλεισε το set «Card + Badge + ListItem» (foundation ολοκληρωμενη). Η νεα OSS+SaaS κατευθυνση προχωραει (landing app + per-tenant connection layer useDb, flag-guarded), ο reviewer τα επιβεβαιωσε additive/isolated. Vitest 10→33 tests (money + storagePath suites).
+Συγκριση με προηγουμενο STATUS (2026-07-01 22:00): Build 2→2, UI 3→3, Web 2→2. Καμια αυξηση σε καμια ουρα. Ο web auditor εκλεισε το readBody adoption (100%, shopping-list DONE) και ανοιξε ενα νεο P3/S στο SaaS billing webhook, οποτε η ουρα εμεινε στα 2. Vitest ανεβηκε 33→151 tests (apiBody + installments + cards suites). Η OSS+SaaS κατευθυνση προχωραει (landing app σχεδον ολοκληρωμενο, SaaS billing scaffold + auth + tenancy, ολα flag-guarded), ο reviewer τα επιβεβαιωσε additive/isolated.
 
 ## Προσοχη
-Καμια ρουτινα δεν ειναι STALE, κανενα κενο προς ελεγχο. Ολες εντος ~7h.
+Καμια ρουτινα δεν ειναι STALE, κανενα κενο προς ελεγχο. Και οι 6 χτυπησαν μεσα στην τελευταια ~40 λεπτα, ο πιο υγιης κυκλος εδω και μερες (σε αντιθεση με τον προηγουμενο, οπου web/docker ηταν ~2h πισω· τωρα ολοι ευθυγραμμισμενοι).
 
-Σημειωσεις (οχι alarm): (1) web auditor (19:37) και docker guard (19:55) ειναι οι δυο πιο παλιες, ~2h πισω· δεν χτυπησαν στον τελευταιο κυκλο ~21:xx (ενω builder/parity/ui/reviewer χτυπησαν). Ανετα εντος οριου, αλλα αν στον επομενο κυκλο μεινουν παλι πισω και ξεπερασουν τις ~7h, αξιζει ελεγχος οτι τρεχουν κανονικα. (2) Τα Build 2 + UI 3 που μενουν ειναι ειτε attended-preferred (lucide icons, Chip token-drift χρειαζεται simulator για οπτικο verify) ειτε product decisions (Light theme = L refactor, Safe-area = native dep-add `react-native-safe-area-context` ΑΠΟΝ)· δεν προχωρανε unattended, δεν ειναι κολλημα. (3) Standing security product-decisions (ΟΧΙ queue): auth χωρις brute-force rate-limit, πιθανο error-leak στο withAuth 500, PATCH tasks/[id] steps χωρις άνω οριο, + νεο P3 flag reviewer (per-tenant connection guard, commit 1a7d16e)· ολα χαμηλο ρισκο σε single-user/WireGuard-only setup.
+Σημειωσεις (οχι alarm): (1) Ο reviewer ανεφερε **1 git-hygiene flag** (commit be64194 mislabel) — cosmetic, οχι κωδικας. (2) Τα Build 2 + UI 3 που μενουν ειναι attended-preferred (Chip token-drift χρειαζεται simulator για οπτικο verify, lucide icons) η product decisions (Light theme = L refactor 19 αρχειων, Safe-area = native dep-add `react-native-safe-area-context` ΑΠΟΝ)· δεν προχωρανε unattended, δεν ειναι κολλημα. (3) Standing security product-decisions (ΟΧΙ queue): login χωρις brute-force rate-limit, πιθανο error-leak στο withAuth 500, `tenancy/connection.ts` reuse-semantic (dead-until-SaaS, θελει σκοπιμη αποφαση), Stripe key provisioning (env boundary, server-only)· ολα χαμηλο ρισκο σε single-user/WireGuard-only setup.
