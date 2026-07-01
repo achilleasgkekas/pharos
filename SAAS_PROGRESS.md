@@ -56,12 +56,17 @@ Entitlements map plan → allowed features (mirror του OSS-vs-paid split). Κ
 
 ---
 
-## Needs Achilleas
+## Decisions (Achilleas, 2026-07-01)
+- **SaaS domain = `ph-aros.com`** → tenant subdomains `<slug>.ph-aros.com`, wildcard
+  `*.ph-aros.com` + on-demand certs για custom domains (dedicated tier).
+- **Stripe = αργότερα** (scaffold με env placeholders μέχρι τότε, καμία πραγματική χρέωση).
+- **Plan pricing = αργότερα** (free/shared/dedicated τιμές + quotas θα οριστούν αργότερα·
+  τα plan keys υπάρχουν ήδη στο `Tenant.plan`).
+
+## Needs Achilleas (ανοιχτά)
 - **Stripe account + keys** (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, price ids) όταν
-  φτάσουμε στο billing scaffold. Μέχρι τότε placeholders από env.
-- **Ακριβές plan pricing** (free/shared/dedicated τιμές + quotas GB/AI). Θα μπουν σαν
-  config όταν αποφασιστεί.
-- **SaaS domain** (`*.pharos.app` ή άλλο) για subdomain routing.
+  φτάσουμε στο billing scaffold (deferred κατ' απόφαση).
+- **Ακριβές plan pricing** (free/shared/dedicated τιμές + quotas GB/AI) — deferred.
 
 ---
 

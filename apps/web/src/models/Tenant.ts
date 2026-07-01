@@ -13,7 +13,7 @@ import { Schema, model, models, type Model, type InferSchemaType } from 'mongoos
  */
 const TenantSchema = new Schema(
   {
-    // Subdomain label + primary routing key: <slug>.pharos.app. Lowercase DNS label.
+    // Subdomain label + primary routing key: <slug>.ph-aros.com. Lowercase DNS label.
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, required: true }, // display name
     // Name of this tenant's isolated data database, e.g. "tenant_<slug>". Set at
