@@ -574,6 +574,19 @@
   - npm run type-check exits 0
 - Status: DONE (2026-06-30) — νέο `lib/apiBody.ts` (`readBody`/`strField`/`numField`/`enumField`/`boolField`, behaviour-identical helpers). Refactor-αρίστηκαν **expenses + subscriptions** POST (αντί items: το `items/route.ts` ήταν active parallel WIP → απέφυγα conflict, ίδιο pattern). Μηδέν αλλαγή σε validation/response shape (vendor/name trimmed+required, amount→null guard, enum-guard cycle/kind/billingCycle, bool recurring). tsc EXIT 0· safe rebuild → /login 200, web running· POST/GET no-token → 401. Απομένουν ~23 routes με το ίδιο pattern για μελλοντικά runs (incl. items, όταν ελεύθερο).
 
+### getTenantConnection cache-reuse guard δέχεται disconnected connection
+- Priority: P3
+- Size: S
+- Area: shared
+- Files: apps/web/src/lib/tenancy/connection.ts
+- Depends on: none
+- Acceptance:
+  - Ο guard επαναχρησιμοποίησης (`connection.ts:~60`) ελέγχει `existing.readyState !== 99` (uninitialized) και επιστρέφει το cached `useDb` connection. Όμως το inline σχόλιο λέει «reuse only while the underlying connection is still open· a dropped socket would make a stale entry unusable, so fall through and rebuild it» — και το `!== 99` επιστρέφει και connections σε readyState **0 (disconnected)** / **3 (disconnecting)**, δηλαδή ΟΧΙ «open». Είτε ο κώδικας είτε το σχόλιο πρέπει να ευθυγραμμιστεί.
+  - Πρόταση (αν επιβεβαιωθεί ως πρόθεση): reuse μόνο όταν `readyState === 1` (connected) ή `2` (connecting), αλλιώς rebuild· ή, αν το intent είναι «rebuild μόνο σε torn-down object», διόρθωσε το σχόλιο ώστε να μη λέει «still open».
+  - **ΣΗΜ (γιατί flag, όχι fix):** dead-until-SaaS κώδικας — **0 importers**, gated πίσω από `SAAS_MODE` (off). Μηδέν επίδραση στο single-user app σήμερα· ambiguous το «σωστό» rebuild-semantic (το `defaultConn.useDb()` μοιράζεται το ίδιο base client, οπότε ένα rebuild δεν «ξαναφτιάχνει» dropped socket από μόνο του — μπορεί να μη χρειάζεται καθόλου rebuild). Θέλει σκόπιμη απόφαση, όχι μηχανικό swap.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-01 reviewer, commit `1a7d16e`)
+
 ---
 
 ## Δεν είναι debt (επιβεβαιωμένο, μην ανοίξεις item)

@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 2784fc1 -->
+<!-- reviewed: fe12502 -->
 <!-- docker-validated: 99a9385 -->
+
+## 2026-07-01 (reviewer — range 2784fc1..fe12502, 15 commits, καθαρό· 1 flag)
+- **Τι εξέτασα:** 15 commits από το τελευταίο marker. Code (μη-docs): `1e5dc4c` SaaS tenant resolver (`host.ts` pure parser + `context.ts` resolver + `host.test.ts`)· `1a7d16e` SaaS per-tenant connection layer (`connection.ts` useDb)· `b4d2eb1` landing waitlist section (`Waitlist.tsx` + page + css)· `0f69116` mobile `<ListItem>` primitive refactor (5 screens + ui.tsx)· `71fd79d` storagePath test suite. Τα υπόλοιπα 10 = docs (parity/ui-audit/backlog/api/progress).
+- **Checks:** `apps/web npm run type-check` **EXIT 0**· `apps/mobile npx tsc --noEmit` **EXIT 0**· `apps/web npx vitest run` **33/33 green** (money 10 + host 8 + storagePath 15).
+- **Regression sweep:** ΚΑΝΕΝΑ existing API route / `lib/db.ts` / mobile `api.ts` δεν άλλαξε → **μηδέν response-shape change → mobile app ασφαλές**. Ο SaaS κώδικας είναι additive + flag-guarded (`SAAS_MODE` off → `getTenantContext` επιστρέφει `DEFAULT_TENANT` χωρίς DB hit· `getTenantConnection('')` → default connection unchanged) + **0 importers** → μηδέν επίδραση στο single-user app. Landing = απομονωμένο app (isolated). Mobile `<ListItem>` **byte-identical** refactor: το νέο `listItem` style χρησιμοποιεί `RADIUS.lg` (= **14**, επιβεβαιωμένο στο `theme.ts`) ίδιο με τα 5 σβησμένα literal-`14` `row:` entries· onPress/onLongPress/style overrides διατηρήθηκαν σωστά (Calendar `pinned`, Subscriptions `faded`)· μηδέν orphan `s.row` στα 5 migrated screens (tsc EXIT 0 το επιβεβαιώνει· τα `s.row` σε Shopping/Search/Settings/Receipts είναι local, ξεχωριστά, ανέγγιχτα).
+- **Secret scan** σε όλο το range: **καθαρό** (μόνο Greek prose «token/secret» στο PROGRESS/docs, μηδέν πραγματικά credentials· `hello@ph-aros.com` σε landing = intended public contact).
+- **Fixes:** **κανένα** (μηδέν type error, μηδέν προφανές bug· δεν άγγιξα κώδικα).
+- **Flags:** **1** νέο P3/S στο `WEB_DEBT.md` — `getTenantConnection` cache-reuse guard (`connection.ts`): το `readyState !== 99` επιστρέφει και disconnected (0) / disconnecting (3) cached connection, ενώ το inline σχόλιο λέει «reuse only while still open». Dead-until-SaaS (0 importers, flag off), ambiguous το σωστό rebuild-semantic → flagged αντί fix. Marker → `fe12502`.
 
 ## 2026-07-01 (web-code-quality — 25η σάρωση: ουρά 2→0, builder κατανάλωσε ΚΑΙ τα 2 + επιπλέον, ανοίγω 1 P3/S)
 - **Counts ανά dimension (live grep, όχι docs):** Type safety **0** (tsc EXIT 0· zero `any`/`ts-ignore` σε όλο το `/api/v1`)· Auth **0 unguarded** (μόνο `auth/login` exempt, σωστά)· Input validation **0 gaps**· Error handling **0** (uniform `withAuth` try/catch + `{ error }`)· DB **0** (όλα `.lean()`, lists limited)· Consistency debt **1 ανοιχτό** (3 raw-body routes απομένουν).
