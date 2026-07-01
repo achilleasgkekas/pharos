@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: effd90d -->
-<!-- docker-validated: 0c5a087 -->
+<!-- docker-validated: d235eff -->
+
+## 2026-07-01 (docker-health — υγεία πράσινη, χωρίς rebuild)
+- **Health**: homepage-mongo `healthy` (Up 5 ώρες), homepage-web running 57 λεπτά (Running:true, OOMKilled:false, ExitCode:0, RestartCount:0). homepage-mongo RestartCount 44 = ιστορικό σωρευτικό, ΟΧΙ ενεργό loop (τρέχει 5 ώρες healthy). homepage-flaresolverr εκτός `ps` (ήδη σταματημένο, καμία ενέργεια). homepage-searxng running (default stack).
+- **Disk**: system df καθαρό, Images 3.49GB, Build Cache 566MB αλλά **reclaimable 0B** (κανένα prune δεν έτρεξε, δεν άξιζε), Containers 78MB reclaimable (stopped flaresolverr). Καμία πίεση στη μικρή VM.
+- **Rebuild**: ΟΧΙ. `git diff --name-only 0c5a087..HEAD -- apps/web` = **κενό**. Τα 7 ενδιάμεσα commits από τον marker είναι docs (review/web-debt/ui-audit/parity/monitor/docker-health) + `refactor(mobile)` (effd90d Button primitive) → μηδέν web runtime αλλαγή.
+- **Marker**: docker-validated `0c5a087` → **`d235eff`** (HEAD).
 
 ## 2026-07-01 (reviewer — range a582ac5..effd90d, Button primitive καθαρό, μηδέν fix)
 - **Range:** από marker `a582ac5` έως HEAD `effd90d`. Ένα μόνο app-code commit (`effd90d`, Button primitive)· τα υπόλοιπα 6 = docs (web-debt/ui-audit/parity/monitor/docker-health/review). Working tree καθαρό στην αρχή (μηδέν WIP του Αχιλλέα).
