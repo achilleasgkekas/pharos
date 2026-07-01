@@ -5,6 +5,20 @@
 <!-- reviewed: 3a272c1 -->
 <!-- docker-validated: 5008507 -->
 
+## 2026-07-01 (builder — shared isObjectId() guard + readBody σε items/[id] & shopping-list/[id] PATCH· commit `d259a55`)
+- **Τι**: πήρα τα **2 ενεργά P3/S items** της Web Debt Queue (19η σάρωση top-1 & top-2, πλήρες spec, unattended-safe) και τα έκλεισα σε έναν coherent commit. Παλιότερα ήταν 2 ξεχωριστά items αλλά μοιράζονται ΑΚΡΙΒΩΣ τα ίδια 2 route files → τα υλοποίησα μαζί (μη-sprawling: 3 files touched).
+- **Αλλαγές** (μόνο web API, μηδέν model/mobile):
+  - **lib/apiBody.ts**: νέο `const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;` + `export function isObjectId(id: string): boolean { return OBJECT_ID_RE.test(id); }` (byte-identical με το inline regex· param `string` αντί type-guard αφού όλοι οι consumers περνάνε ήδη string από route params).
+  - **items/[id]/route.ts**: import `{ isObjectId, readBody }`· και τα **3** id-guards (GET/PATCH/DELETE) `!/^[a-f0-9]{24}$/i.test(id)` → `!isObjectId(id)`· PATCH body-parse `const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;` → `const b = await readBody(req);` (cast αφαιρέθηκε, ίδιος τύπος `Body`).
+  - **shopping-list/[id]/route.ts**: import `{ isObjectId, readBody }`· σβήστηκε το local `const ID_RE`· και τα **2** `!ID_RE.test(id)` → `!isObjectId(id)`· PATCH body-parse → `readBody(req)`.
+  - Τα partial-update guards (`typeof b.x === 'string'`, `Array.isArray(b.tags)`, `'targetPrice' in b`, `typeof b.checked === 'boolean'`) ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· response shapes `{item}`/`{ok:true}` αμετάβλητα → μηδέν κίνδυνος για τον mobile consumer.
+- **Verify**: `apps/web npm run type-check` → **EXIT 0**. Safe Docker rebuild: mongo `healthy` (πριν+μετά), flaresolverr μη-τρέχον· `docker compose build web` (EXIT 0) → mongo healthy → `docker compose up -d web` → `/login` **200** → `docker inspect` `Running:true, Restarting:false, RestartCount:0`· no-token `PATCH /api/v1/items/[id]` & `PATCH /api/v1/shopping-list/[id]` → **401** (auth boundary intact). `docker builder prune -f` μετά (2.021GB reclaimed, cache-only). Μηδέν AI/token call.
+- **Git hygiene**: commit `d259a55` — staged ΜΟΝΟ τα 3 route/lib files + WEB_DEBT.md (explicit paths, ΟΧΙ `-A`). Working tree καθαρό στην αρχή, καμία παράλληλη επεξεργασία του Αχιλλέα. Κανένα secret/`.env`.
+- **Επόμενο task**: **isObjectId dedup συνέχεια** (3-5 routes/run): απομένουν ~17 route files με inline `/^[a-f0-9]{24}$/i` (items/[id]/price+link-plan+ai-fill+convert-to-task, receipts/[id]+rescan, expenses/[id], subscriptions/[id], tasks/[id], vouchers/[id], stores/[id], notifications, trash/[id]). Εναλλακτικά: apiBody `readBody`-continuation (~13 raw routes) ή mobile UI Debt (Safe-area insets P2/M unattended-safe· `<ListItem>` primitive).
+
+### Needs Achilleas
+- Κανένα νέο. (Standing: login brute-force rate-limit· error-message leak στο `withAuth` 500· tasks `steps` χωρίς cap. Mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports charts, Tasks Kanban, Statements merge/bind + PDF import, remote push αδοκίμαστο.)
+
 ## 2026-07-01 (web-code-quality — 19η σάρωση, ουρά αμετάβλητη 2 P3/S, read-only)
 Fresh read-only audit **49 route files** + `apiAuth`/`apiBody`/serialize + 10 models. `npm run type-check` **EXIT 0** (μηδέν P1). Καμία Docker build, μηδέν AI/token call. Working tree καθαρό στην αρχή.
 - **Κατάσταση ουράς:** τελευταίος app-code commit `0c866eb` (ΙΔΙΟΣ με 18η σάρωση) → κανένας builder δεν κατανάλωσε web item ενδιάμεσα (ενδιάμεσα μόνο mobile Button-family `3a272c1` + docs). Η ουρά by-construction σταθερή: **2 ενεργά P3/S**, επαναεπαληθευμένα live από κώδικα (`items/[id]:110` + `shopping-list/[id]:15` έχουν ακόμα το raw `req.json().catch` body-parse).
