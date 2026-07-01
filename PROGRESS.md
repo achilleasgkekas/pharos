@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 0b136b1 -->
+<!-- reviewed: e47f150 -->
 <!-- docker-validated: 454e96e -->
+
+## 2026-07-02 (reviewer — range 0b136b1..e47f150 clean, 0 fixes)
+- **Έλεγξα:** 6 commits από τον τελευταίο marker (`0b136b1`): `ae2760b` landing product-showcase (static CSS/HTML), `454e96e`+`be64194`+`e47f150` docs/queues, `ca0e10f` docker-health, `9550465` cards.ts tests. Κώδικας ουσίας: το ΝΕΟ SaaS billing usage-metering (`lib/billing/usage.ts` +156, `models/Usage.ts` +40, `usage.test.ts` +77) που μπήκε **μέσα** στο `be64194`.
+- **Checks:** `apps/web` type-check **EXIT 0**· `apps/mobile` `tsc --noEmit` **EXIT 0**· vitest **151/151 passed** (9 files, incl. νέα `usage.test.ts` 9 + `cards.test.ts` 23).
+- **Ποιότητα usage.ts:** exemplary. Καθαρός διαχωρισμός PURE helpers (`periodOf`/`quotaFor`/`aiQuotaStatus`/`storageQuotaStatus`, unit-tested χωρίς DB) από DB-touching (`currentUsage`/`recordAiCall`/`setStorageBytes`/`checkAiQuota`/`checkStorageQuota`). **Fail-safe SaaS gating:** `isMetered` = `saasMode() && !ctx.isDefault && !!ctx.tenantId` → self-hosted/DEFAULT_TENANT = no-op + UNLIMITED, μηδέν Usage doc, μηδέν DB access. Atomic `$inc` upsert (concurrent-safe), `setDefaultsOnInsert`, `.lean()` reads, `Math.max(0, ...)` guards, unique `{tenant,period}` index. **Καμία σύνδεση σε AI call sites ακόμα** (ledger + helpers μόνο) → μηδέν regression risk σε OSS/self-hosted ή σε mobile API shapes.
+- **Fixes:** καμία (όλα πράσινα, δεν χρειάστηκε καμία μικρή/ασφαλής διόρθωση).
+- **Flagged (git hygiene, ΟΧΙ safely fixable):** το `be64194` έχει subject `docs(mobile-parity)` αλλά περιέχει και **νέο source** (billing usage-metering + model + tests) — mislabel· δεν διορθώνεται χωρίς history-rewrite/force-push (forbidden), σημειώνεται μόνο ως παρατήρηση για μελλοντικά commits του builder (χώρισε source από docs).
+- **Working tree:** αμετάβλητο από εμένα — `.claude/launch.json` (foreign tooling WIP) + `apps/landing/{globals.css,page.tsx}` (WIP άλλου routine) αφέθηκαν ανέγγιχτα. Staged ΜΟΝΟ PROGRESS.md. Μηδέν committed secret. Μηδέν Docker/AI/token-spend.
 
 ## 2026-07-02 (ui-auditor — 27η σάρωση UI Debt, ουρά αμετάβλητη)
 - **Τι έγινε:** Re-audit του mobile UI έναντι του web design system, read-only. Inventory ξαναχτισμένο από τον κώδικα: **16 mobile screens**, `ui.tsx` εξάγει ΟΛΑ τα primitives (Input/TextArea/Check/Button/IconButton/Card/ListItem/Badge). `git log b6a6cda..HEAD -- apps/mobile/src` = **ΚΕΝΟ** → μηδέν νέο mobile-src commit από την 26η σάρωση, ουρά **αμετάβλητη**. Οι ενδιάμεσες commits = web pure-lib tests + SaaS billing scaffold (server-only, μηδέν design-token) + landing + docs → μηδέν mobile UI impact.
