@@ -3,7 +3,18 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: f17f279 -->
-<!-- docker-validated: 83639d8 -->
+<!-- docker-validated: 18b611f -->
+
+## 2026-07-01 (builder — readBody() adoption σε 10 raw-body v1 routes· Web Debt)
+- **Τι**: πήρα το επόμενο web-debt task από την ουρά (parity core κλειστός → UI/Web Debt). Αντικατέστησα το επαναλαμβανόμενο `(await req.json().catch(() => ({}))) as ...` με τον shared `readBody(req)` (`lib/apiBody`) σε **10 route files**: `ai`, `ai/subscription`, `items/[id]/link-plan` (×2 POST+DELETE), `items/[id]/price`, `items/import`, `push/register` (×2 POST+DELETE), `receipts/[id]/rescan`, `receipts/[id]`, `settings`, `stores/[id]`.
+- **Byte-identical εγγύηση**: `readBody` επιστρέφει `Body = Record<string, unknown>`. Οι 4 routes με cast `Record<string, unknown>` είναι ακριβώς ισοδύναμοι· οι narrowed casts (`{ messages?: unknown }`, `{ name?: unknown }`, `{ signature?: unknown }`, `{ price?: unknown; store?: unknown }`, `{ url?: unknown; view?: unknown }`, `{ token?: unknown }`) είχαν ΟΛΑ πεδία `?: unknown` → downstream access (`b.messages`, `Number(b.price)`, `const { token }`) παραμένει `unknown`, μηδέν type/behaviour change. Όλοι χρησιμοποιούσαν ήδη `.catch(() => ({}))` → μηδέν throw-semantics change.
+- **Σκόπιμα εκτός** (για αποφυγή drift): `auth/login` + `items/[id]/ai-fill` (χρησιμοποιούν `req.json()` ΧΩΡΙΣ catch → throw-on-bad-JSON· η αλλαγή θα άλλαζε συμπεριφορά)· `shopping-list` (`Record<string, string>` cast, διαφορετικός τύπος, downstream string-values)· `scan/expense`+`scan/voucher` (awkward inline one-liners). Αυτά τα 5 μένουν στην ουρά.
+- **Verify**: `apps/web npm run type-check` → **EXIT 0**. Safe Docker rebuild: mongo `healthy` (πριν+μετά), flaresolverr `Exited`· `docker compose build web` (EXIT 0) → mongo healthy → `docker compose up -d web` → `/login` **200** (2η poll)· web `RestartCount 0`, `Running:true`, `OOMKilled:false`. Auth boundary intact: no-token `PATCH /api/v1/settings` & `POST /api/v1/items/import` → **401**. `docker builder prune -f` μετά (~2.08GB cache-only reclaimed). Μηδέν AI/token call, μηδέν destructive op.
+- **Git hygiene**: staged ΜΟΝΟ τα 10 route files (explicit paths, ΟΧΙ `-A`). ΔΕΝ άγγιξα το `.claude/launch.json` (foreign/tooling change στο working tree). Commit `18b611f`. Κανένα secret/`.env`.
+- **Επόμενο task**: web-debt — 2 δρόμοι. (α) Ολοκλήρωσε το readBody adoption στους εναπομείναντες: `scan/expense`+`scan/voucher` (restructure του inline one-liner σε `const b = await readBody(req)` + `String(b.text || '')`, byte-identical, εύκολο) και `shopping-list` (χρειάζεται προσοχή στον `Record<string,string>` τύπο — έλεγξε downstream string-usage πριν το swap). (β) Εναλλακτικά mobile UI Debt: **`<ListItem>` primitive** (P2/M, κλείνει το Card+Badge+ListItem group) ή **Safe-area insets** (χρειάζεται `npx expo install react-native-safe-area-context` = νέο native dep, attended-preferred γιατί δεν επαληθεύεται σε simulator unattended). **ΠΑΝΤΑ** fresh `git status` στην αρχή· αν foreign staged/churn → στάσου.
+
+### Needs Achilleas
+- Κανένα νέο. (Standing web-side: login brute-force rate-limit· error-message leak στο `withAuth` 500· tasks `steps` χωρίς cap. Mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports extra charts, Tasks Kanban, Statements merge/bind + PDF import, remote push αδοκίμαστο. Concurrency: πολλαπλοί builders στο ίδιο `main` — single-flight lock ή per-role worktrees θα απέτρεπε collisions.)
 
 ## 2026-07-01 (parity-auditor — 20η σάρωση ημέρας: ουρά αμετάβλητη, 0 GAP)
 - **Inventory από κώδικα** (όχι docs): **49 v1 routes** (`find api/v1 -name route.ts` = 49· login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`** (home + 18· income + setup ξεχωριστά), **81 exported api fns** στο `apps/mobile/src/api.ts`.
