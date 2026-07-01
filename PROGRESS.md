@@ -5,6 +5,24 @@
 <!-- reviewed: 3e3d8ef -->
 <!-- docker-validated: 7f18222 -->
 
+## 2026-07-01 (ui-auditor — 17η σάρωση, CONFIRMATION, μηδέν νέο mobile-src)
+Read-only mobile UI consistency audit. `git log 2b0422d..HEAD -- apps/mobile/src` **κενό** → καμία αλλαγή στον mobile κώδικα από την 16η σάρωση (τελευταίος mobile-src commit = `9d226cf` Card primitive· ενδιάμεσα μόνο web-debt `0c866eb` readBody notifications+lists, behaviorally identical, μηδέν mobile UI impact). Fresh grep re-verify ανά διάσταση, όλα ξανα-μετρημένα live.
+
+Violations ανά διάσταση (17η):
+- **Tokens: 0** — 6-digit hex εκτός `theme.ts` 0, short `#fff/#000` στα screens 0, inline `rgba(` στα screens 0 (ΠΛΗΡΩΣ καθαρό).
+- **States: 0** — συνεπή μέσω `ui.tsx` (Spinner/Empty/ErrorText).
+- **Touch targets: 0** — `<Check>` primitive + hitSlop, DONE.
+- **Reusable components: ~5 ανοιχτά** — `<IconButton>` 15 refs DONE, `<Card>` 11 refs DONE, `<Button>` 7 sites· απομένουν: Chip (chip keys σε 5 screens), Badge (5), ListItem, ghost-buttons ~6, Input outliers 5, ShoppingScreen `addBtnWide`. `<Input>/<TextArea>` 48 sites (6/11 screens), raw `<TextInput>` 23 σε 7 screens.
+- **Adaptive: 2** — safe-area-context 0 imports, maxWidth 2 (drawer+bubble, καμία στο content).
+- **Theme: 1** — light/dark context 0 (dark-only).
+
+Foundation **7 DONE** (theme tokens + alpha + touch targets + scrim + Button + IconButton + Card). mobile `tsc --noEmit` **EXIT 0**. Κανένα committed secret (μηδέν tracked `.env`). Μηδέν Docker, μηδέν AI.
+
+Top-3 για τον builder:
+1. **Button-family finish** (P2/S, unattended-safe): ShoppingScreen `addBtnWide` → `<Button label="Add to list" style={{paddingHorizontal:18}}>` (byte-identical: bg accent/radius12/padV12/onAccent/fs15/w700) + ItemsScreen `save` outlier + SettingsScreen `saveText`.
+2. **Safe-area insets** (P2/M, unattended-safe additive): `SafeAreaProvider`+`useSafeAreaInsets` αντί plain RN `SafeAreaView`, bottom inset στα bottom-sheets.
+3. **`<ListItem>` primitive** (P2/M) ή **`<Chip>`** (attended-preferred, token-drift ανά cluster).
+
 ## 2026-07-01 (docker-health guard — υγιές, χωρίς rebuild)
 - **Υγεία**: mongo `healthy`, web RestartCount **0**, mongo RestartCount 47 (ιστορικό OOM· ΟΧΙ ενεργό loop — up 17', healthy). flaresolverr δεν τρέχει (καμία μνημονική πίεση). Running: web, mongo, searxng.
 - **Rebuild**: ΟΧΙ. `git diff --name-only 0c866eb..HEAD -- apps/web` = κενό (μόνο PROGRESS.md άλλαξε από τον marker· τα ενδιάμεσα `3e3d8ef`/`7f18222` = docs-only). Το build ισχύει για το HEAD.
