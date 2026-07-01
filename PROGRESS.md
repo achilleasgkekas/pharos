@@ -1940,3 +1940,25 @@ Read-only audit των 52 v1 route files + apiAuth/apiBody/apiList helpers, όλ
 
 ### Needs Achilleas
 - (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας. Ανοιχτά product-decision items (θέλουν απόφαση, ΟΧΙ auto-buildable): **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor 19 files), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: μείνε web-only).
+
+## 2026-07-01 (web-code-quality — 24η σάρωση, isObjectId effort ΕΚΛΕΙΣΕ, ουρά 2→1 ενεργό + 1 νέο readBody)
+
+Read-only audit των 49 v1 route files + `apiAuth`/`apiBody`/`apiList` helpers, όλα από live grep. Από την 22η/23η σάρωση ο builder κατανάλωσε το `f17f279` (isObjectId 4η/τελική παρτίδα, 7 deep sub-routes) → το `isObjectId()` dedup effort **ΕΚΛΕΙΣΕ πλήρως**. `npm run type-check` **EXIT 0**.
+
+**Ευρήματα ανά διάσταση (μηδέν νέο P1/P2):**
+- Type safety: **0** (`:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το v1 = 0).
+- Auth: **0 unguarded** — μοναδικό v1 route χωρίς withAuth = `auth/login` (auth boundary). 48/49 CRUD routes μέσω withAuth.
+- Input validation: **0 gaps** — τα 13 raw-body routes validate τα inputs τους.
+- Error handling: **0** — ομοιόμορφο `{ error }` shape μέσω withAuth.
+- DB: **0** — ΟΛΑ τα reads `.lean()` (live-verified receipts/items/expenses/subscriptions/statements/vouchers/tasks list builders + settings/calendar find-chains· reports:81 = JS Array.find, false positive)· list endpoints `.limit()`+`.skip()`.
+- Duplication (consistency): **isObjectId ΕΚΛΕΙΣΕ** (`grep -rln '[a-f0-9]{24}' src/app/api/v1` = NONE, adopters 19)· readBody raw `req.json().catch` απομένει σε **13 routes**, adopters **16**.
+
+**Queue ενέργειες:** μάρκαρα DONE το stale «isObjectId 4η παρτίδα» (ήταν TODO ενώ committed `f17f279`)· κράτησα ανοιχτό το «readBody settings + stores/[id]» (live: settings:72 + stores/[id]:25 ακόμα raw)· άνοιξα 1 νέο P3/S «readBody receipts/[id]+rescan» για runway (μη-sprawling, 2 files, byte-identical refactor).
+
+**Top 3 για τον builder (με σειρά):**
+1. **readBody adoption settings + stores/[id] PATCH** — αντικατάσταση `as Record<string,unknown>` cast με `await readBody(req)`, guards αμετάβλητα (settings χρειάζεται νέο import, stores/[id] επεκτείνει το `{ isObjectId }`).
+2. **readBody adoption receipts/[id] + receipts/[id]/rescan PATCH** — ίδιο refactor, αμφότερα έχουν ήδη `{ isObjectId }` import.
+3. (κενό — ουρά εξαντλείται· επόμενα runs συνεχίζουν readBody adoption 1-2/run στα ~9 raw routes που απομένουν: scan/expense, scan/voucher, push/register, shopping-list POST, ai, ai/subscription, items/[id]/link-plan+price, items/import).
+
+### Needs Achilleas
+- (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας. Standing product-decisions (ΟΧΙ auto-buildable queue items): login brute-force rate-limit, error-message leak στο `withAuth` 500, tasks `steps` array χωρίς άνω όριο πλήθους (αποδεκτό για WireGuard-only self-host).
