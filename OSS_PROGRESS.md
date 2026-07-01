@@ -39,3 +39,36 @@ Suggested next task: (f συνέχεια) Γράψε το επόμενο pure-li
 `apps/web/src/lib/storagePath.test.ts` για το `renderStoragePath` / sanitizeSegment:
 default templates, path-injection prevention (store `a/b:c*?` → single segment),
 empty-token collapse, extension handling. Ένα module ανά run.
+
+---
+
+## 2026-07-01 (cont.)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/storagePath.test.ts` για το `renderStoragePath`.**
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/storagePath.test.ts` (15 tests) που καλύπτει:
+  default templates + empty-string fallback, **path-injection prevention** (store
+  `a/b:c*?` → ένα segment `a_b_c`, traversal `../../etc` → flat `_.._etc` χωρίς `/../`,
+  slash-in-name → single segment), empty-token collapse (empty `{total}` → collapse των
+  διπλών separators + filter κενών folder segments + name fallback στο id), date handling
+  (YYYY-MM-DD → year/month/day, non-ISO → κενά parts), extension (leading-dot strip +
+  lowercase, empty ext → χωρίς κατάληξη), token defaults (files/unknown, total 5.00), και
+  TEMPLATE_TOKENS metadata (μηδέν διπλά, κάλυψη όλων).
+- **Εύρημα που διορθώθηκε στα expectations**: το `sanitizeSegment` regex είναι
+  `[\\/:*?"<>|\x00-\x1F]` (illegal path chars + control-char range 0x00–0x1F), ΟΧΙ
+  space/hyphen όπως φαινόταν στο Read (τα control bytes render-άρονταν ως κενά). Άρα
+  διατηρεί τα hyphens: το `{date}` βγάζει `2026-06-04` (όχι `2026_06_04`). Τα tests
+  pin-άρουν την πραγματική συμπεριφορά.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/storagePath.test.ts` → 15/15 passed.
+- `npx vitest run` (όλο το suite) → 2 files, 25/25 passed (money 10 + storagePath 15).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json`
+  (foreign, ΔΕΝ το άγγιξα, ΔΕΝ staged)· κανένα foreign αρχείο staged.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file —
+`apps/web/src/lib/dates.test.ts` για το `safeDate` (ISO, European DD/MM/YYYY,
+DD-MM-YYYY, DD.MM.YYYY, day-first >12 disambiguation, invalid → null/fallback).
+Ένα module ανά run.
