@@ -2251,3 +2251,27 @@ Read-only audit των 49 v1 route files + `apiAuth`/`apiBody`/`apiList` helpers
 
 ### Needs Achilleas
 - (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας· μηδέν committed secret (μόνο `.env.example` + env-only Stripe keys, deferred). Standing product-decisions (ΟΧΙ auto-buildable queue): login brute-force rate-limit, error-message leak στο `withAuth` 500, `tenancy/connection.ts` reuse-semantic (rebuild μόνο σε `readyState===1|2`; ή διόρθωση σχολίου — dead-until-SaaS, θέλει σκόπιμη απόφαση), SaaS multi-tenancy architecture, Stripe key provisioning (env boundary — μείνε server-only).
+
+## 2026-07-02 (web-code-quality — 28η σάρωση· ουρά 1 P3/S αμετάβλητη [isObjectId billing webhook ΑΚΟΜΑ TODO], ελέγχθηκε ΝΕΟ quota-enforce gate + usage endpoint)
+
+Read-only audit των **57 API route files** (49 v1 + 6 saas + λοιπά) + `apiAuth`/`apiBody`/`apiList` helpers + του ΝΕΟΥ SaaS metering-enforcement κώδικα (`lib/billing/enforce.ts` + `GET /api/saas/usage`, commit `918f49c`), όλα από live grep. Από την 27η σάρωση ο builder **ΔΕΝ** κατανάλωσε το top item → `grep '\[a-f0-9\]{24}' src/app/api/saas` = ακόμα 1 hit (`webhook/route.ts:81`) → μένει TODO στην κορυφή. `npm run type-check` **EXIT 0**.
+
+**Ευρήματα ανά διάσταση (counts):**
+- Type safety: **0** (`:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε saas+billing+tenancy = 0· `enforce.ts` πλήρως τυπωμένο, `usage/route.ts` χωρίς cast).
+- Auth: **0 unguarded** (usage route: `saasAuthGate()` → `getCurrentAccount()` 401 → membership-check 404/403, fail-closed σωστή σειρά).
+- Input validation: **0 gaps** (μόνο input το `?tenant=` query param → `.trim().toLowerCase()` + validate κατά memberships → 403 μη-μέλος· enforce.ts pure, δεν διαβάζει request).
+- Error handling: **0** (ομοιόμορφο `{ error }` shape· `quotaExceededBody` σταθερό machine-readable 402 `{ error, code:'quota_exceeded', kind, plan, used, limit, remaining, upgrade }`).
+- DB: **0** (`Usage.findOne({tenant,period}).lean()` πάνω σε unique compound index `{tenant:1,period:1}` = single-doc point-read· `accountTenants` bounded `.lean()`· upserts key στο ίδιο pair· μηδέν N+1/unbounded).
+- Duplication (consistency): **0 νέο** (saas surface ομοιόμορφα bare domain objects· `{ data }` = v1-mobile convention, usage δεν αποκλίνει εντός saas).
+
+**Ποιότητα νέου metering-enforcement κώδικα:** exemplary. OSS-parity ρητά σχολιασμένο (default tenant / SAAS off → pure pass-through, μηδέν DB, ποτέ blocked)· `quotaExceededBody` pure body-builder unit-tested· gate primitives dependency-free· wiring-ready αλλά **όχι ακόμα** καλωδιωμένο σε feature route (σκόπιμο forward-work, ΟΧΙ dead code) — δεν άνοιξα item.
+
+**Counts συνολικά: P1=0, P2=0, P3=1** (μόνο το προϋπάρχον isObjectId στο billing webhook· η ουρά δεν μεγάλωσε). 28 σαρώσεις χωρίς P1/P2 στο v1, ο κώδικας ώριμος· δεν εφευρίσκω debt.
+
+**Top 3 για τον builder (με σειρά):**
+1. **isObjectId στο SaaS billing webhook** (P3/S, μοναδικό ενεργό) — νέο `import { isObjectId } from '@/lib/apiBody';` + `resolveTenant:81` `/^[a-f0-9]{24}$/i.test(tenantId)` → `isObjectId(tenantId)`. Byte-identical, κλείνει ξανά την inline-regex εξάλειψη σε ΟΛΟ το api + tenancy + billing.
+2. (κενό — v1 raw-body + isObjectId v1 ουρές εξαντλημένες· επόμενα runs παρακολουθούν νέο SaaS/landing κώδικα για consistency drift).
+3. (κενό.)
+
+### Needs Achilleas
+- (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας· μηδέν committed secret (μόνο `.env.example` + env-only Stripe/AUTH keys, deferred). Standing product-decisions (ΟΧΙ auto-buildable queue): login brute-force rate-limit, error-message leak στο `withAuth` 500, `tenancy/connection.ts` reuse-semantic (dead-until-SaaS, θέλει σκόπιμη απόφαση), SaaS multi-tenancy architecture, Stripe key provisioning (env boundary — μείνε server-only), wiring του quota-enforce gate σε πραγματικά AI/upload routes (φέρνει 402-on-over-quota συμπεριφορά — product decision πότε/πού ενεργοποιείται).
