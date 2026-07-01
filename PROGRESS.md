@@ -5,6 +5,22 @@
 <!-- reviewed: 1791295 -->
 <!-- docker-validated: ac5cbc2 -->
 
+## 2026-07-01 (ui-auditor — 9η σάρωση· scrim-drift formalized ως P2/S item)
+- **Foundation (read-only re-verify):** `theme.ts` mirror-άρει 1:1 το `globals.css:8-22` (13 χρώματα + `onAccent`) + `SPACE/RADIUS/SIZE/alpha`· `ui.tsx` εξάγει `Header/Centered/Spinner/ErrorText/Empty/Check/Input/TextArea`. Το shared-theme P1 foundation παραμένει DONE (δεν λείπει).
+- **Ευρήματα ανά διάσταση:**
+  - **Tokens:** hardcoded hex εκτός `theme.ts` = **1** (`#000` @ SettingsScreen:677 modal backdrop). **ΝΕΟ:** modal backdrop scrim ξαναγράφεται **inline σε 9 screens με 3-way drift** — `rgba(0,0,0,0.6)` ×7, `rgba(0,0,0,0.7)` ×1 (Receipts), `alpha('#000',0.67)` ×1 (Settings). Ένα `scrim` token τα ενοποιεί + σβήνει τον τελευταίο hex.
+  - **Reusable components:** Input primitive **6/11** (5 outliers: Shopping/Receipts/Search/Assistant/Login, token-drift). **Button MISSING** — save/add/scan ξαναγράφεται σε 9 screens, με **5 byte-identical `save`** (unattended-safe subset). **Chip/Badge MISSING** (7 screens).
+  - **Adaptive:** `react-native-safe-area-context` εκτός `package.json` (plain RN `SafeAreaView`, μηδέν bottom inset)· **0** `maxWidth` στο content (tablet/landscape stretch). Και τα δύο ήδη TODO στην ουρά.
+  - **States:** συνεπή μέσω `ui.tsx` primitives (Spinner/Empty/ErrorText)· input-driven screens (Assistant/Shopping/Login) σκόπιμα minimal, όχι violation.
+  - **Touch targets / dark-mode:** touch targets DONE (`<Check>` + hitSlop)· dark-only by design (μηδέν `useColorScheme`/context) → light theme = γνωστό P3/L TODO.
+- **Δράση (docs μόνο):** πρόσθεσα formal `### Scrim / backdrop token` (P2/S, unattended-safe, top active) + refresh Input status → **6/11** + σημείωσα το byte-identical `save`/`addBtn` subset στο Button+Chip item.
+- **Read-only:** mobile `npx tsc --noEmit` → **EXIT 0**. Μηδέν Docker, μηδέν AI, μηδέν app-code edit. Κανένα committed secret.
+- **Top-3 για τον builder (σειρά):** (1) **scrim token** στο `theme.ts` → 9 backdrops + σβήσιμο τελευταίου `#000` (P2/S, unattended-safe). (2) **Button primitive** — `<Button variant="accent">` για τα 5 byte-identical `save` + 6 `addBtn` (unattended-safe subset). (3) **Input outliers** — τα 5 εναπομείναντα screens (attended-preferred, οπτικό verify).
+
+### Needs Achilleas
+- Κανένα νέο. (NEEDS DECISION, εκτός builder: mobile theme toggle + language switcher + AI-engine/storage settings· safe-area-context + max-width adaptive [device verify]· remote push [EAS dev build + APNs].)
+- Γνωστό infra: `homepage-mongo` RestartCount υψηλό λόγω σωρευτικού OOM· προαιρετικό RAM bump στο Docker Desktop.
+
 ## 2026-07-01 (parity-auditor — όψιμο νυχτερινό run· ουρά πλήρως καθαρή, 0 auto-buildable GAP)
 - **Inventory από κώδικα (όχι docs):** **49** v1 API routes (login + 48 bearer), **16** mobile screens, **18** web `page.tsx` (home + 17). Το mobile `api.ts` (81 exported fns) καταναλώνει **ΚΑΘΕ** ένα από τα 49 routes 1:1 (grep consumed-paths == route list). Επιβεβαίωσα ρητά και τα deep sub-routes: `items/[id]/{ai-fill, convert-to-task, link-plan, plans, price}`, `receipts/[id]/{add-to-library, rescan}`, `settings/test-notify`, `push/register` → όλα ≥1 consumer. **Μηδέν «endpoint χωρίς mobile consumer» gap.** Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (first-run admin wizard, web-only by design· N/A).
 - **App-code diff vs `b6a3a36` (προηγ. parity marker):** **1 μόνο** commit — `1791295` (mobile Input primitive migration Items+Settings = **UI Debt**, byte-identical, ήδη reviewed στο `ac5cbc2`). `git diff b6a3a36..HEAD -- apps/web/src` = **κενό** → **καμία νέα web δυνατότητα προς port**. Working tree καθαρό στην αρχή (μηδέν WIP του Αχιλλέα).
