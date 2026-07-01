@@ -75,6 +75,39 @@ const STEPS: { title: string; desc: string }[] = [
   },
 ];
 
+const TRUST: { icon: string; color: string; title: string; desc: string }[] = [
+  {
+    icon: 'code',
+    color: 'var(--accent)',
+    title: 'Open source',
+    desc: 'Every line is AGPL-3.0 on GitHub. Read it, fork it, audit it, run it forever.',
+  },
+  {
+    icon: 'shield',
+    color: 'var(--cyan)',
+    title: 'Privacy-first',
+    desc: 'Receipts and finances stay on your disk. Nothing is sold, shared, or mined.',
+  },
+  {
+    icon: 'eyeOff',
+    color: 'var(--purple)',
+    title: 'Zero telemetry',
+    desc: 'No trackers, no analytics beacons, no phone-home. The self-host build talks to nobody.',
+  },
+  {
+    icon: 'server',
+    color: 'var(--gold)',
+    title: 'Local-first',
+    desc: 'Files are served straight from your machine. Works fully offline, no cloud dependency.',
+  },
+  {
+    icon: 'unlock',
+    color: 'var(--red)',
+    title: 'No lock-in',
+    desc: 'One-click JSON export and import. Move between self-hosted and hosted whenever you like.',
+  },
+];
+
 type Tier = {
   name: string;
   price: string;
@@ -361,6 +394,33 @@ export default function Home() {
               </article>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Trust / principles strip ──────────────────────── */}
+      <section id="trust" style={{ padding: '48px 0 64px' }}>
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: 40 }}>
+            <p className="mono" style={{ marginBottom: 12 }}>Built on principles, not promises</p>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 700 }}>
+              Your data, your rules
+            </h2>
+          </div>
+
+          <ul className="trust-grid">
+            {TRUST.map((t) => (
+              <li key={t.title} className="card trust-card">
+                <span className="trust-icon" style={{ color: t.color }}>
+                  <span className="trust-glow" style={{ background: t.color }} />
+                  <Icon name={t.icon} size={20} />
+                </span>
+                <h3 style={{ fontSize: '1rem', margin: '14px 0 6px' }}>{t.title}</h3>
+                <p style={{ color: 'var(--text-dim)', fontSize: '0.88rem', lineHeight: 1.5 }}>
+                  {t.desc}
+                </p>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

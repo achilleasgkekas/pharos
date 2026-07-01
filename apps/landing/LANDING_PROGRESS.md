@@ -187,3 +187,25 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain.
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02 (cont.)
+
+Task: (e) Polish, μερος 7 — trust / principles strip (social-proof χωρις fake quotes· το landing πηγαινε features -> self-host χωρις καμια δηλωση αξιων, ενω το ολο pitch ειναι privacy/open-source· εβαλα honest badges αντι για ψευτικα testimonials).
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεο `TRUST` array (5 principles) + νεα `<section id="trust">` αναμεσα σε Features και Self-host. Καρτες: Open source (AGPL-3.0, accent), Privacy-first (cyan), Zero telemetry (purple), Local-first (gold), No lock-in (red). Reuse του υπαρχοντος `Icon` + `card` idiom (icon-dot + blurred glow, ιδιο pattern με feature-card). Semantic `<ul>/<li>` (list of principles). Μηδεν νεο dependency, μηδεν JS — pure markup/CSS.
+- `app/components/Icon.tsx`: 5 νεα lucide-style paths (`shield`, `eyeOff`, `code`, `server`, `unlock`).
+- `app/globals.css`: `.trust-grid` (5-col grid, list-reset), `.trust-card` (hover lift), `.trust-icon`/`.trust-glow` (40px dot + blur-16 glow @0.26). Responsive: trust-grid 5->3 @900px -> 1 @560px· #trust μπηκε στο 480px vertical-rhythm rule (40px padding).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 103 kB First Load JS, αμεταβλητο — pure HTML/CSS, μηδεν νεο JS).
+- Preview (landing-dev, port 3100): DOM eval επιβεβαιωσε 5 trust-cards render με σωστα brand χρωματα (accent/cyan/purple/gold/red), ολα με SVG icon. Στα 1280px το `.trust-grid` = 5 columns (201px το καθενα), glow opacity 0.26 + blur 16px applied. Hero screenshot OK, μηδεν console errors. Σταματησα τον server. Docker/web/mobile αθικτα. Το `.claude/launch.json` (local landing-dev config, shared root) ΔΕΝ commit (collision guard).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση του CSS mockup (#preview) με πραγματικα app screenshots οταν υπαρξουν assets, η secondary CTA band πριν το footer, η comparison table self-host vs hosted.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain.
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.
