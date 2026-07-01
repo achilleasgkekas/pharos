@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 3bc8a3d -->
-<!-- docker-validated: d532e68 -->
+<!-- docker-validated: fd3c2f1 -->
+
+## 2026-07-01 (docker-health guard — υγεία πράσινη, χωρίς rebuild)
+- Health: **mongo healthy** (RestartCount 44 ιστορικό OOM, αλλά τώρα σταθερό, up ~1h), **web running restarts=0** (up ~1h, μηδέν OOM/restart-loop). flaresolverr ήδη **Exited** (34h), δεν χρειάστηκε stop. searxng up.
+- Rebuild: **ΟΧΙ**. `git diff --name-only d532e68..HEAD -- apps/web` = **κενό** (τα 7 ενδιάμεσα commits = mobile `#000`→`C.onAccent` refactor `3bc8a3d` + docs)· μηδέν web runtime αλλαγή → το τρέχον image αντιστοιχεί σε validated code. Marker προχώρησε `d532e68` → **`fd3c2f1`** (HEAD).
+- Disk: `docker system df` → Images 3.49GB, Volumes 505MB, Build Cache 566MB (0 active αλλά **in-use**, δεμένο στο web image). `docker builder prune -f` → **0B reclaimed** (τίποτα stale). VM ~31GB → άφθονο περιθώριο, μηδέν πίεση.
+- Needs Achilleas: κανένα νέο. (Παραμένει γνωστό: mongo RestartCount υψηλό λόγω OOM στα builds σε μικρό VM RAM ~1.9GB· προαιρετικό RAM bump στο Docker Desktop.)
 
 ## 2026-07-01 (reviewer — range c540322..3bc8a3d, mobile onAccent refactor καθαρό)
 - Εύρος: 1 app-code commit `3bc8a3d` (mobile `#000` → `C.onAccent`, 32 sites / 10 screens)· τα υπόλοιπα 6 = docs + chore(docker), μηδέν src diff.
