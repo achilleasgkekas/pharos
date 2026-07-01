@@ -2,8 +2,17 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: b6a6cda -->
+<!-- reviewed: 0b136b1 -->
 <!-- docker-validated: 6fd1075 -->
+
+## 2026-07-01 (reviewer — range b6a6cda..0b136b1, καθαρό· 0 fixes, 0 νέα flags)
+- **Τι εξέτασα:** το range από το προηγούμενο marker (`b6a6cda`) έως HEAD (`0b136b1`). Κώδικας (μη-docs/μη-test): `3c6bcc4` **SaaS billing scaffold** (`api/saas/billing/webhook/route.ts` + `lib/billing/{plans,entitlements,stripe}.ts`)· `e5e6ff7` landing FAQ (isolated `apps/landing`)· `vitest.config.ts` `@/*` alias. Tests: `0b136b1` `installments.test.ts` (35), `9ebeea2` `apiBody.test.ts`, `3c6bcc4` `billing.test.ts`. Υπόλοιπα = docs (PROGRESS/OSS/SAAS/LANDING).
+- **Checks:** `apps/web npm run type-check` **EXIT 0**· `apps/mobile npx tsc --noEmit` **EXIT 0**· `apps/web npx vitest run` **119/119 green** (49 προϋπάρχοντα + 70 νέα: installments 35 + apiBody/billing 35).
+- **Billing scaffold (νέος committed surface, καθαρός):** τα `plans.ts`/`entitlements.ts`/`stripe.ts` είναι **pure/additive** — ο μόνος live importer είναι το webhook route, πλήρως SaaS-gated (`saasMode()` off → 404, `webhookSecret()` unset → 503, bad sig → 400, DB error → 500 ώστε να retry-άρει το Stripe). `verifyStripeSignature` = SDK-free HMAC-SHA256 με `timingSafeEqual` + 5min replay window (χωρίς npm dep). `stripe.ts` keys ΜΟΝΟ από env, κάθε outbound call πίσω από `stripeConfigured()`, never-throws tagged results → **μηδέν charge path**. `entitlements.ts` κάνει import το **client-safe** `@/lib/aiFeatures` (όχι το node `.server`) → κανένα `node:fs` leak. **Tenant model** ορίζει ΟΛΑ τα πεδία που γράφει το webhook (`billingCustomerId`/`billingSubscriptionId`/`plan`/`status`) → κανένα σιωπηλό strict-mode drop· τα enum values ταιριάζουν με τα `PlanKey`/status writes.
+- **Regression sweep:** κανένα existing v1 route / `lib/db.ts` / mobile `api.ts` δεν άλλαξε → μηδέν response-shape change → **mobile ασφαλές**. Billing = additive + `SAAS_MODE`-guarded + 0 importers στο single-user path. Landing = isolated build. `vitest.config.ts` alias = test-only.
+- **Secret scan** σε όλο το range: **καθαρό** (μόνο `whsec_test` = fake constant στο `billing.test.ts`).
+- **Fixes:** **κανένα** (tsc/tests πράσινα, μηδέν προφανές bug· δεν άγγιξα κώδικα).
+- **Flags:** **κανένα νέο.** Τα Stripe live-config items (real price IDs / webhook secret / SDK adoption) είναι deferred-by-Achilleas by design (env boundary) — παραμένουν στο standing `## Needs Achilleas`. Marker → `0b136b1`.
 
 ## 2026-07-01 (pharos-daily-dev — vitest suite για `lib/installments.ts`, 35 tests)
 - **Τι έγινε:** Νέο `apps/web/src/lib/installments.test.ts` (35 tests) που καλύπτει ΟΛΟ το pure-logic surface του `installments.ts` — του πυρήνα των δόσεων (grouping per-statement «ΔΟΣΗ N/M» lines σε ένα plan + payoff projection). Καλύπτει: `normalizeInstallmentDesc` (strip counters δοση/installment/NN-MM, punctuation, Greek preservation incl. final sigma), `installmentOrigin` (purchase-month math + year-rollback across Jan + malformed guards), `installmentSignature`/`installmentKey`/`installmentGroupKey` (merchant|total|origin, planKey override, empty-merchant → null/''), `computeInstallmentPlans` (cross-statement merge, origin-separation, planKey manual merge, done flag, unknown-total guard, itemIds union, non-installment skip, active-before-done sort, empty input), `plansForItem`, `shortMonth`.
