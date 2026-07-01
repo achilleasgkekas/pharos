@@ -258,3 +258,41 @@ effect. Δεν άλλαξα υπάρχον runtime wiring routes ⇒ κανέν�
 period/aiCalls/storageBytes) + `lib/billing/usage.ts` (`recordAiCall`/`currentUsage`/enforce
 μέσω `withinAiQuota`+`withinStorage`), όλα flag-guarded, χωρίς να αγγίξω τα AI call sites ακόμα
 (μόνο το ledger + helpers· το wiring στα υπάρχοντα routes = μετέπειτα, προσεκτικό increment).
+
+---
+
+## 2026-07-02 (increment 6 — usage metering ledger + quota helpers)
+**Built:** το per-tenant usage metering layer, ΟΛΟ σε νέα αρχεία, μηδέν wiring στα AI call
+sites (μόνο ledger + helpers — το enforcement wiring μένει για προσεκτικό increment):
+- `models/Usage.ts` — **control-plane** ledger (registry db). Ένα doc ανά `(tenant, period)`
+  όπου `period="YYYY-MM"`: `aiCalls` (monotonic volume ανά μήνα), `storageBytes` (gauge
+  snapshot, όχι sum), `storageMeasuredAt`. Compound unique index `{tenant, period}` (upsert
+  key). Deliberately μικρό (ledger, όχι event log)· per-call token/cost lines σε ξεχωριστό
+  append-only collection αργότερα (TODO §11) χωρίς αλλαγή εδώ.
+- `lib/billing/usage.ts` — metering helpers, χωρισμένα σε **PURE** (unit-tested, no DB) +
+  DB-touching:
+  - PURE: `periodOf(date)` (UTC "YYYY-MM"), `aiQuotaStatus(plan, used)` /
+    `storageQuotaStatus(plan, usedBytes)` → `QuotaStatus {used, limit, remaining, allowed,
+    ratio}` (ratio για «X of Y used» UIs· unlimited plan → limit null/ratio 0/allowed true).
+    Χτισμένα πάνω στα υπάρχοντα `entitlementsFor`/`withinAiQuota`/`withinStorage`.
+  - DB: `isMetered(ctx)` gate = `saasMode() && !ctx.isDefault && !!ctx.tenantId` → **ΟΛΑ**
+    τα DB functions είναι NO-OP + unlimited για τον DEFAULT_TENANT / SAAS_MODE off (OSS
+    parity: το self-hosted app ΠΟΤΕ δεν γράφει Usage doc, ΠΟΤΕ δεν μπλοκάρεται, μηδέν DB hit).
+    `currentUsage` (zeroed `metered:false` snapshot όταν off), `recordAiCall(ctx,n=1)` (atomic
+    `$inc` upsert → running total), `setStorageBytes` (gauge overwrite, για #10 dbStats),
+    `checkAiQuota`/`checkStorageQuota(+additionalBytes)` (gates «μία ακόμα;» πριν AI/upload op).
+- `lib/billing/usage.test.ts` — 9 PURE tests (periodOf UTC/boundaries, free 50/shared 1000/
+  dedicated unlimited AI caps + block-at-cap, unknown→free fallback, negative floor, storage
+  5GB/500GB edges με `<=` at-cap).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **128/128 green** (119
+προϋπάρχοντα + 9 νέα). Importers των `billing/usage`/`models/Usage`/metering helpers από
+υπάρχον feature code → **κανένας** ⇒ zero runtime wiring, `SAAS_MODE` off = zero effect,
+κανένα Docker rebuild (δεν άλλαξα runtime wiring υπαρχόντων routes). Δεν άγγιξα κανένα υπάρχον
+αρχείο — καθαρά additive.
+
+**Next task:** increment 7 — enforcement wiring (προσεκτικό): ένας thin gate helper
+(`enforceAiQuota(ctx)` → 402/«upgrade» όταν `!allowed`) που θα μπει σε ΕΝΑ AI route ως pilot,
+flag-guarded (off ⇒ pass-through), + `recordAiCall` μετά το επιτυχές AI op. Πρώτα σε ένα
+route μόνο, με tests, πριν rollout. Εναλλακτικά #10 dbStats sampling (`setStorageBytes` feed)
+αν προτιμηθεί το storage metering πρώτο.
