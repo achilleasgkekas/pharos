@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: c540322 -->
+<!-- reviewed: 3bc8a3d -->
 <!-- docker-validated: d532e68 -->
+
+## 2026-07-01 (reviewer — range c540322..3bc8a3d, mobile onAccent refactor καθαρό)
+- Εύρος: 1 app-code commit `3bc8a3d` (mobile `#000` → `C.onAccent`, 32 sites / 10 screens)· τα υπόλοιπα 6 = docs + chore(docker), μηδέν src diff.
+- Review diff (10 screens): καθαρό mechanical swap. `C.onAccent` ορίζεται `theme.ts:18` = `'#000'` → **behaviorally identical**, μηδέν visual regression. Scope σωστό: αγγίζει ΜΟΝΟ onAccent contexts (text πάνω σε accent/cyan fills, `ActivityIndicator` μέσα σε accent buttons, selected chip/toggle/status text). Το μοναδικό εναπομείναν `#000` (`SettingsScreen.tsx:678` `alpha('#000',0.67)` modal backdrop) **σωστά αφέθηκε literal** (backdrop ≠ onAccent). Ο τελευταίος `#000` onAccent literal καθαρίστηκε → σβήνει το top-item του mobile UI Debt (Button/Chip onAccent).
+- Regressions/error-handling/secrets/API-shape: κανένα. Mobile-only styling, μηδέν αλλαγή σε api.ts ή response shapes → δεν επηρεάζει web/parity. Όλες οι 10 οθόνες κάνουν ήδη `import { C } from '../theme'`.
+- Checks: web `npm run type-check` EXIT 0· mobile `npx tsc --noEmit` EXIT 0.
+- Fixes: κανένα (τίποτα small/unsafe να διορθωθεί). Flags: κανένα νέο (WEB_DEBT ουρά ΑΔΕΙΑ· MOBILE_PARITY UI Debt ανοιχτό, unchanged). Needs Achilleas: κανένα νέο.
+- Git: staged ΜΟΝΟ PROGRESS.md (reviewed marker → 3bc8a3d + entry). Read-only αλλιώς.
 
 ## 2026-07-01 (builder — UI Debt: onAccent `#000` literal migration → `C.onAccent`, 32 sites/10 screens)
 - **Τι**: το κορυφαίο **unattended-safe** UI Debt item που όλοι οι ui-auditors (5η–7η σάρωση) + οι parity-auditors σημείωναν ως το εναπομείναν byte-identical pick — η μετανάστευση των onAccent `#000` literals σε `C.onAccent`. Το επέλεξα αντί για τη συνέχεια του Input primitive migration γιατί εκείνο έχει token-outliers (padH14→12, fs16→15, radius14) = **οπτική αλλαγή** που απαιτεί attended verify (no simulator), ενώ αυτό είναι **byte-identical** (`C.onAccent === '#000'`, theme.ts:18) → μηδέν οπτικό ρίσκο, tsc-verifiable, μηδέν AI, μηδέν web change. Working tree **καθαρό** στην αρχή (μηδέν παράλληλο WIP του Αχιλλέα).
