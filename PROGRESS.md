@@ -5,6 +5,21 @@
 <!-- reviewed: 83cc537 -->
 <!-- docker-validated: 20e1826 -->
 
+## 2026-07-01 (builder — Tasks steps/checklist στο mobile, full-stack· Build Queue item ΕΚΛΕΙΣΕ)
+- **Τι**: πήρα το κορυφαίο ενεργό Build-Queue item (`### Tasks — steps / checklist στο mobile detail`, P2/M, no AI, decision ΕΓΙΝΕ από Αχιλλέα). Το parity queue ήταν 7/7 DONE και το Web Debt Queue 0, οπότε αυτό ήταν το πρώτο unattended-safe TODO με πλήρη spec (τα lucide-icons + swipe items είναι attended-preferred λόγω οπτικού verify).
+- **Web half** (2 route files):
+  - `api/v1/tasks/route.ts`: πρόσθεσα `StepLean` type + `steps` στο `TaskLean` + `steps: (t.steps??[]).map(s=>({id:String(s._id), text:s.text??'', done:!!s.done}))` στο `trim()` → το GET list επιστρέφει πλέον `steps[]`.
+  - `api/v1/tasks/[id]/route.ts` PATCH: δέχεται `steps` ως **full-array replacement** — `set.steps = b.steps.map(s=>({text:String(s?.text??'').trim(), done:!!s?.done})).filter(s=>s.text)` (idempotent, το mobile στέλνει όλο το updated array· κανένα νέο route/sub-route)· το PATCH response τυλίγει και αυτό `steps[]` όπως το list.
+- **Mobile half**:
+  - `api.ts`: νέο `TaskStep` type (`{id?,text,done}`), `Task` += `steps?`, `updateTask` data type += `steps?`.
+  - `TasksScreen.tsx`: edit modal → section **STEPS** (λίστα με `<Check>` toggle + κείμενο + × remove· input+`＋` add). Κάθε mutation (add/toggle/remove) υπολογίζει το `next` array και **persist-άρει optimistic** μέσω `updateTask(id,{steps:next})` (ανεξάρτητα από το Save button, ενημερώνει και editing + tasks list state). Στην κάρτα: badge `☑ done/total` όταν total>0 (accent χρώμα όταν πλήρες, mirror του web `ListChecks`).
+- **Verify**: `apps/web` type-check **EXIT 0**, `apps/mobile` tsc --noEmit **EXIT 0**. Safe Docker rebuild (mongo healthy πριν+μετά, flaresolverr stopped [Exited], build cache 566MB μικρό): `docker compose build web` → mongo healthy → `up -d web` → `/login` **200** (1η προσπάθεια), web **RestartCount 0**· `POST /api/v1/tasks` no-token → **401** (auth boundary intact στο built image). `docker builder prune -f` μετά (cache-only, 2.02GB reclaimed).
+- **Git hygiene**: staged ΜΟΝΟ explicit paths (τα 4 app files + `MOBILE_PARITY.md`)· working tree στην αρχή είχε μόνο τα δικά μου edits (μηδέν WIP του Αχιλλέα). Κανένα secret/`.env`, μηδέν AI/token call. Commit `e0f7a97`, pushed.
+- **Επόμενο task**: το επόμενο auto-buildable Build-Queue item είναι το **Tasks swipe-to-change-status** (P3/M) — αλλά το gesture variant είναι attended-preferred (dep `react-native-gesture-handler` + οπτικό verify)· ο **no-dep inline ←/→ variant** (κύκλος status, mirror του web Kanban quick-move) είναι unattended-safe και δεν χρειάζεται simulator. Εναλλακτικά: mobile UI Debt (IconButton/`addBtn` variant στο `ui.tsx` — τα `＋` accent buttons σε Tasks/Shopping/κ.ά. → shared `<Button>` variant, tsc-verifiable). Το lucide-icons item (P2/M) μένει attended (οπτικό verify, «δεν θέλω χαζά εικονίδια»).
+
+### Needs Achilleas
+- Κανένα νέο. (Παραμένουν οι παλιές: login brute-force rate-limit, error-message leak στα action responses· mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports extra charts, Tasks Kanban, Statements merge/bind + PDF import, remote push αδοκίμαστο· lucide-icons + swipe-gesture = attended-preferred για οπτικό verify.)
+
 ## 2026-07-01 (docker-health — υγιές, safe rebuild μετά apiBody refactor, marker → 20e1826)
 - **Υγεία (pre)**: `homepage-mongo` **healthy** (up 7h), `homepage-web` up 14min **RestartCount 0**, `/login` → **200**. `homepage-mongo` RestartCount 44 = σωρευτικό ιστορικό (παλιά OOM), όχι τρέχον loop (σταθερό 7h healthy). `homepage-flaresolverr` ήδη **Exited (143)** πριν 40h (καμία ενέργεια). `homepage-searxng` up.
 - **Δίσκος** (`docker system df`): Images 3.49GB, Build Cache **566MB** (μικρό, 0B reclaimable = active layers), Containers 80MB. Υγιές, καμία πίεση.
