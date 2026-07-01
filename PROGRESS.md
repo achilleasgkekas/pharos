@@ -5,6 +5,15 @@
 <!-- reviewed: 91a5fe3 -->
 <!-- docker-validated: 0ffdd91 -->
 
+## 2026-07-01 (builder — POST /api/v1/ai: cap ιστορικού messages [cost/DoS hardening])
+- **Τι**: πήρα ένα από τα 2 ενεργά P3/S της Web Debt Queue, το **`### POST /api/v1/ai — cap μήκους ιστορικού messages`**. Ήταν το πιο high-value από τα δύο (πραγματικό cost/DoS lever στην Anthropic κλήση), προτιμήθηκε έναντι του mobile Button primitive (byte-identical refactor, no simulator test) και του apiBody adoption.
+- **Root cause**: το `POST /api/v1/ai` δεχόταν `messages: ChatTurn[]` **χωρίς άνω όριο** — ένας authenticated χρήστης (ή app bug που δεν trim-άρει το local chat) μπορούσε να στείλει τεράστιο history που ταξιδεύει ΟΛΟΚΛΗΡΟ σε κάθε Anthropic turn (κόστος tokens). Κάθε άλλο list input στο API είναι bounded (limit 1..200)· μόνο αυτό όχι.
+- **Αλλαγή** (`apps/web/src/app/api/v1/ai/route.ts`, μόνο αυτό το αρχείο κώδικα): δύο documented σταθερές — `MAX_TURNS = 20` (`b.messages.slice(-MAX_TURNS)` πριν το φιλτράρισμα → μόνο τα τελευταία 20 turns· ο conversational agent χρειάζεται πρόσφατο context, όχι όλο το ιστορικό) + `MAX_CONTENT = 8000` (κάθε `content.slice(0, MAX_CONTENT)` καθώς μπαίνει στο array → ένα μεμονωμένο blob δεν φουσκώνει τα tokens). **Μηδέν** αλλαγή σε response shape (`{ reply, actions }`) ή σε valid-turn filtering· ταυτόσημη συμπεριφορά για κανονικά σύντομα conversations.
+- **Verify**: `apps/web` `npm run type-check` → **EXIT 0**. Safe Docker rebuild (mongo healthy πριν+μετά, flaresolverr stopped, disk OK): `docker compose build web` → `up -d web` → `/login` **200**, web **RestartCount 0**, `POST /api/v1/ai` no-token → **401** (auth boundary intact, ο guard ζει στο built image). `docker builder prune -f` μετά (cache-only, 2.02GB reclaimed).
+- **Git hygiene**: staged ΜΟΝΟ (explicit paths, ΟΧΙ `-A`): `apps/web/src/app/api/v1/ai/route.ts`, `WEB_DEBT.md` (item → DONE), `PROGRESS.md`. Working tree στην αρχή είχε μόνο αυτά (μηδέν WIP του Αχιλλέα). Κανένα secret/`.env`, μηδέν AI/token call.
+- **Επόμενο task**: **apiBody adoption** (P3/S, το τελευταίο ενεργό Web Debt item) — refactor `vouchers` POST (7× `String(b.)`) + `items` POST στα shared `readBody`/`strField`/`numField`/`enumField`/`boolField` helpers (`lib/apiBody.ts`), behaviour-identical, tsc-verifiable. Αν εξαντληθεί: mobile **Button primitive** (5 byte-identical `save` + 6 `addBtn` → `<Button variant="accent">` στο `ui.tsx`).
+- **Needs Achilleas**: κανένα νέο. (Παραμένουν οι 2 παλιές security παρατηρήσεις — login brute-force, error-message leak — ως product decisions, + τα mobile NEEDS DECISION items.)
+
 ## 2026-07-01 (reviewer — range 1791295..91a5fe3, scrim token refactor καθαρό)
 - **Τι έλεγξα**: range `1791295..91a5fe3` (7 commits). Ένα μόνο code commit `91a5fe3` (mobile scrim token, 10 modal/drawer backdrops)· τα υπόλοιπα 6 = docs (web-debt/ui-audit/parity/monitor/docker-health/review). Full `git diff` του code commit.
 - **Checks**: `apps/web` type-check → EXIT 0· `apps/mobile` `tsc --noEmit` → EXIT 0.
