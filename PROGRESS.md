@@ -1349,3 +1349,15 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 
 ### Needs Achilleas
 - (αμετάβλητο) 2 standing security παρατηρήσεις, product decisions ΟΧΙ queue items: (1) `auth/login` χωρίς rate-limit/brute-force guard (self-hosted, WireGuard-only πρόσβαση → χαμηλό ρίσκο, αλλά αν βγει public χρειάζεται throttle)· (2) κάποια error messages επιστρέφουν λεπτομέρεια (π.χ. «A store with that name already exists») — αποδεκτό για single-user, review αν γίνει multi-tenant.
+
+## 2026-07-01 (parity-auditor — promote 3 items από Needs Achilleas → Build Queue)
+- **Απόφαση Αχιλλέα:** promote στο auto-buildable Build Queue τα: **Tasks steps-checklist**, **Language switcher**, **Tasks swipe-status**. Γράφτηκαν build-ready (exact format) στο `MOBILE_PARITY.md`, ranked P2/M → P3/M → P3/L.
+- **Facts μαζεμένα από τον κώδικα (ώστε ο builder να μην ξανα-ανακαλύψει):**
+  1. **Tasks steps-checklist (P2/M):** το `Task` model **έχει ήδη** `steps: [{text,done,_id}]` (models/Task.ts:4-10) + web actions addStep/toggleStep/deleteStep. Αλλά το REST **ΔΕΝ τα εκθέτει** (`trim()` σε GET list + PATCH `/tasks/[id]` χωρίς `steps`). Builder web half = πρόσθεσε `steps` στο `trim()` (2 routes) + δέξου `steps` full-array replacement στο PATCH· κανένα νέο route file. Mobile = edit-modal STEPS section + card badge `done/total`.
+  2. **Tasks swipe-status (P3/M):** **κανένα νέο endpoint** (`setTaskStatus`/PATCH υπάρχει). Θέλει `react-native-gesture-handler` (εκτός deps, μόνο `react-native-svg` υπάρχει) + `GestureHandlerRootView` wrap. No-dep variant = inline ←/→ status-cycle (unattended-safe). Attended-preferred (gesture verify).
+  3. **Language switcher (P3/L):** το mobile έχει **μηδέν** i18n (hardcoded English σε 16 screens)· web έχει πλήρες cookie-based i18n (lib/i18n/server.ts, 8 locales). Client-side, **κανένα endpoint** (persist σε AsyncStorage). **L λόγω string-extraction** σε 16 screens → incremental passes (infra + el/en + core screens πρώτα).
+- **Ranking builder:** (1) Tasks steps-checklist (P2/M, μεγαλύτερη αξία, full-stack αλλά μικρό web half)· (2) Tasks swipe-status (P3/M)· (3) Language switcher (P3/L, string-heavy).
+- Read-only run (μηδέν app-code edit, μηδέν Docker/AI). Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+### Needs Achilleas
+- Απέμειναν (δεν προωθήθηκαν, θέλουν ακόμα απόφαση): **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor 19 files), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: μείνε web-only).

@@ -125,6 +125,39 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 >
 > **Re-audit 2026-06-30 (cont.³ — parity-auditor, 5η σάρωση ημέρας):** queue ξαναμετρημένη από τον κώδικα. **48 v1 routes** (ανέβηκαν από 46: προστέθηκαν `items/[id]/convert-to-task` + `receipts/[id]/rescan`), **16 mobile screens**, **70** exported api fns (όχι 78, η παλιά μέτρηση ήταν χαλαρή). Το mobile `api.ts` καταναλώνει **ΟΛΑ** τα 48 routes εκτός **ενός**: `POST /api/v1/receipts/[id]/rescan` (χτίστηκε σήμερα ως web endpoint, `d24be27`, **κανένας mobile consumer ακόμα**) → αυτό ΕΙΝΑΙ ο μοναδικός «endpoint χωρίς mobile half» gap. **ΚΡΙΣΙΜΗ αλλαγή vs προηγ. audit:** το queue item «Receipts re-scan» έλεγε `API exists: no` — πλέον **exists: yes** (το endpoint είναι registered + serving, no-token 401 verified). Άρα το TODO ΔΕΝ είναι πια full-stack· είναι **μόνο το mobile half** (api.ts `rescanReceipt` + ReceiptsScreen buttons). Από τα 6 queue items: **4 DONE** (Statements overview, Items convert-to-task, Notifications badge, Expenses full-field edit), **2 TODO GAP**: (α) Receipts re-scan mobile half (P2/M, web endpoint ΕΤΟΙΜΟ, AI → δομικό verify), (β) Items AI specs (P3/M, web endpoint `items/[id]/ai-fill` **ΔΕΝ υπάρχει** — full-stack, AI). DONE επιβεβαιωμένα από κώδικα: `items/[id]/convert-to-task/route.ts` υπάρχει + `convertItemToTask` στο api.ts· `expenses/[id]/route.ts` PATCH έχει period/recurring/recurringCycle/paymentMethod (γραμμές 23-27)· `statements/plans` + `getInstallmentPlans` παρόντα. mobile `tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). Web commits από `afbccb3`: 4 feature (item-status whitelist, expenses PATCH, convert-to-task, rescan endpoint) + 2 refactor (listEnvelope `{data}`, apiBody helpers) + 1 perf (updatedAt indexes) — όλα ήδη reviewed/clean.
 
+### Tasks — steps / checklist στο mobile detail
+- Priority: P2 | Size: M | no AI, decision ΕΓΙΝΕ (Αχιλλέας 2026-07-01: promote από Needs Achilleas)
+- Web ref: addStep/toggleStep/deleteStep + Steps section στο modal (file: apps/web/src/app/tasks/actions.ts:81-96, apps/web/src/app/tasks/TasksClient.tsx:660-688)
+- API: το `Task` model **έχει ήδη** `steps: [{ text, done, _id }]` (models/Task.ts:4-10) αλλά το REST **ΔΕΝ τα εκθέτει**: το `trim()` σε GET `/api/v1/tasks` (route.ts) + το PATCH `/api/v1/tasks/[id]` δεν περιλαμβάνουν `steps`. **Ο builder πρέπει ΠΡΩΤΑ (web half):** (α) πρόσθεσε `steps: (t.steps??[]).map(s=>({id:String(s._id), text:s.text, done:!!s.done}))` στο `trim()` **και** στα δύο routes (list + [id] PATCH response)· (β) στο PATCH `/api/v1/tasks/[id]` δέξου `steps` ως **full-array replacement** — `if (Array.isArray(b.steps)) set.steps = b.steps.map(s=>({text:String(s.text||'').trim(), done:!!s.done})).filter(s=>s.text)` (idempotent, mobile στέλνει όλο το updated array· απλούστερο από sub-routes). **Κανένα νέο route file.**
+- Mobile files: apps/mobile/src/api.ts (`Task` type += `steps?:{id?:string;text:string;done:boolean}[]`· `updateTask` data type += `steps?`), apps/mobile/src/screens/TasksScreen.tsx (edit modal: section «STEPS» με λίστα `<Check>`+text ανά step [tap toggle], × remove, input+＋ add· κάθε mutation → `updateTask(id,{steps:next})` optimistic· στη λίστα/card: badge `doneCount/total` όταν total>0, mirror του web `ListChecks doneSteps/steps.length`)
+- Acceptance:
+  - GET tasks + PATCH επιστρέφουν `steps[]`· PATCH με `steps` array → replace· no-token → 401· bad id → 400
+  - Edit modal: add/toggle/remove step → reflect μετά reload· card badge δείχνει `2/5`
+  - tsc καθαρό (web + mobile)· safe rebuild → /login 200, web restarts 0
+- Status: TODO
+
+### Tasks — swipe-to-change-status (αντί Kanban)
+- Priority: P3 | Size: M | no AI · ⚠ dep-add + attended-preferred (gesture + οπτικό verify)
+- Web ref: Kanban ←/→ quick-move (file: apps/web/src/app/tasks/TasksClient.tsx) — mobile-friendly εκδοχή = swipe, ΟΧΙ board (columns δεν χωράνε σε phone)
+- API: **κανένα νέο** — το `setTaskStatus(id,status)` υπάρχει ήδη (api.ts, PATCH `/api/v1/tasks/[id]`, TasksScreen:53 toggle το χρησιμοποιεί)
+- Mobile files: apps/mobile/package.json (+`react-native-gesture-handler`, Expo-compatible· `npx expo install`), apps/mobile/App.tsx (wrap σε `GestureHandlerRootView`), apps/mobile/src/screens/TasksScreen.tsx (κάθε task row → `Swipeable`: swipe-right → επόμενο status στον κύκλο todo→in-progress→done, swipe-left → blocked/πίσω· `setTaskStatus` optimistic). **Εναλλακτικά (no-dep, unattended-safe):** inline ←/→ κουμπιά που κυκλώνουν status (mirror του web) αν ο builder τρέχει unattended χωρίς simulator.
+- Acceptance:
+  - Swipe (ή ←/→) αλλάζει status· reflect + persist· sort ξαναφέρνει done κάτω
+  - tsc καθαρό· gesture verify σε device/simulator (attended) ή structural μόνο για το no-dep variant
+- Status: TODO
+
+### Settings — language switcher στο mobile
+- Priority: P3 | Size: L | no AI, decision ΕΓΙΝΕ (Αχιλλέας 2026-07-01) · ⚠ string-extraction heavy — 16 screens
+- Web ref: cookie-based i18n (file: apps/web/src/lib/i18n/server.ts + config.ts + dictionaries· 8 locales, `LOCALE_COOKIE`)
+- API: **κανένα** — client-side i18n (persist locale σε `AsyncStorage`, όχι server). Το mobile έχει **μηδέν** i18n σήμερα (hardcoded English σε 16 screens).
+- Mobile files: νέο apps/mobile/src/i18n.ts (mirror του web `config.ts`: LOCALES + `t(key)` + `LocaleProvider`/`useT` context, persist `AsyncStorage('pharosLocale')`), port των web dictionaries → mobile dict (ξεκίνα από el+en, τα υπόλοιπα incremental), apps/mobile/src/screens/SettingsScreen.tsx (language picker κάτω από preferences), **σταδιακή** αντικατάσταση hardcoded strings → `t('key')` σε ΟΛΑ τα 16 screens
+- Acceptance:
+  - Language picker αλλάζει locale· persisted μεταξύ launches· τα migrated screens ακολουθούν άμεσα
+  - Ξεκίνα incremental: infra + el/en dict + 2-3 core screens (Home/Settings/Tasks) σε πρώτο pass· τα υπόλοιπα screens ως follow-up (μη-block)
+  - tsc καθαρό (mobile)
+- Status: TODO
+- ΣΗΜ builder: **L λόγω string-extraction** (κάθε αγγλικό literal σε 16 screens). Σπάσε σε passes· μην περιμένεις one-shot. Attended-preferred για οπτικό verify των μεταφράσεων.
+
 ### Tasks — tags + priority στο add/edit (mobile) ✅ DONE (2026-07-01, builder)
 - Priority: P3 | Size: S | no AI, no decision
 - Web ref: createTask + UpdateTask (file: apps/web/src/app/tasks/actions.ts, apps/web/src/app/tasks/TasksClient.tsx) — το web new-task modal καταχωρεί tags + priority· το mobile όχι.
