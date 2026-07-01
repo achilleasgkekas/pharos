@@ -5,6 +5,20 @@
 <!-- reviewed: a582ac5 -->
 <!-- docker-validated: 0c5a087 -->
 
+## 2026-07-01 (parity-auditor — όψιμο απογευματινό run· ουρά καθαρή, 1 doc-fix)
+- **Inventory από κώδικα (όχι docs):** **49** v1 API routes (login + 48 bearer), **16** mobile screens, **19** web `page.tsx` (home + 18· income ξεχωριστή σελίδα). Το mobile `api.ts` (81 exported fns) καταναλώνει **ΚΑΘΕ** ένα από τα 49 routes 1:1 (grep normalized consumed-paths == route list· τα `receiptsX_rescan`/`tasks:id`/`trash/:id/:id` είναι grep artifacts, όχι routes). **Μηδέν «endpoint χωρίς mobile consumer» gap.** Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (first-run admin wizard, web-only by design· N/A).
+- **App-code diff vs `b6a3a36` (προηγ. parity marker):** **3 commits** — `a582ac5` (web `ai/route.ts`: cap AI history 20 turns / 8000 chars = cost/DoS hardening, response shape `{reply,actions}` ΑΜΕΤΑΒΛΗΤΟ → μηδέν κίνδυνος να σπάσει το mobile) + `91a5fe3` (scrim token) + `1791295` (Input primitive) = **UI Debt**, byte-identical. `git diff b6a3a36..HEAD -- apps/web/src` = μόνο το `ai/route.ts` (hardening, ΟΧΙ νέα feature) → **καμία νέα web δυνατότητα προς port**. Working tree καθαρό στην αρχή (μηδέν WIP του Αχιλλέα).
+- **DOC-FIX (το doc ήταν stale):** το row Items στο MOBILE_PARITY.md έλεγε «No AI specs (AI cost)», αλλά ο κώδικας δείχνει πλήρες AI fill στο mobile — `aiFillItem(id,'specs'|'info')` @ `api.ts:250` + «✦ AI specs / ✦ AI info» κουμπιά @ `ItemsScreen.tsx:438-442` (re-prefill specs/price/links in-place). Διόρθωσα το row σε **DONE**.
+- **«Partial» rows ξανα-επιβεβαιωμένα live ως Needs Decision (όχι κρυμμένο auto-buildable GAP):** (α) **Reports** `route.ts` **GET-only** + σκόπιμα trimmed → extra charts θέλουν endpoint-extension + RN charting lib· (β) **Statements** `plans/route.ts` **GET-only** → merge/bind/PDF-import θέλουν νέα write/upload endpoints· (γ) Tasks Kanban/steps, Settings theme/language/AI-engine/storage/OneDrive → decision/credentials boundary.
+- **Read-only check:** mobile `npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). Καμία εντολή Docker/AI/app-code edit.
+- **Counts: DONE 7 (+ Items AI-fill doc-fixed σε DONE) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.**
+- **Top-3 για τον builder (σειρά):** (1) **Button primitive** (UI Debt, P2/M) — τα 5 byte-identical `save` + 6 `addBtn` → `<Button variant="accent">` στο `ui.tsx`, unattended-safe (tsc-verifiable, μηδέν οπτική αλλαγή). (2) **Chip/Badge primitive** (UI Debt, P2/M) — status chips σε 7 screens. (3) **Input outliers** — τα 5 εναπομείναντα input screens (Shopping/Receipts/Assistant/Search/Login), attended-preferred (no simulator → οπτικό verify). Δεν υπάρχει ενεργό parity TODO.
+- **Git:** staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (explicit paths). Μηδέν Docker, μηδέν AI, μηδέν app-code edit. Κανένα committed secret εντοπίστηκε.
+
+### Needs Achilleas
+- Κανένα νέο. (NEEDS DECISION, εκτός builder: mobile theme toggle + language switcher + AI-engine/storage/OneDrive settings· Reports extra charts [endpoint-extension + RN charting lib]· Tasks Kanban/steps-checklist· Statements merge/bind + PDF import + re-scan write endpoints· remote push αδοκίμαστο [EAS dev build + APNs].)
+- Γνωστό infra: `homepage-mongo` RestartCount υψηλό λόγω σωρευτικού OOM· προαιρετικό RAM bump στο Docker Desktop.
+
 ## 2026-07-01 (docker-health — rebuild για το AI-cap commit, υγεία πράσινη)
 - **Health**: homepage-mongo `healthy` (RestartCount 44 ιστορικό, σταθερό «Up 4h»)· homepage-web RestartCount 0, Running true, OOMKilled false. homepage-flaresolverr `Exited (143)` 37h (ήδη σταματημένο, καμία ενέργεια). searxng up (εκτός scope).
 - **Disk**: system df χωρίς πίεση, Images 3.49GB, Build Cache reclaimable 0B (referenced layers). `docker builder prune -f` ανέκτησε **~3.2MB**. Καμία άλλη ενέργεια δίσκου.
