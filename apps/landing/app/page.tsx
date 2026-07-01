@@ -1,5 +1,6 @@
 import { PharosMark } from './components/PharosMark';
 import { Icon } from './components/Icon';
+import { Waitlist } from './components/Waitlist';
 
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 
@@ -373,9 +374,33 @@ export default function Home() {
             ))}
           </div>
 
-          <p id="waitlist" style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 36 }}>
+          <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 36 }}>
             Final hosted pricing is being worked out. Self-hosting stays free under AGPL-3.0.
           </p>
+        </div>
+      </section>
+
+      {/* ── Waitlist ──────────────────────────────────────── */}
+      <section id="waitlist" style={{ padding: '48px 0 96px' }}>
+        <div className="container" style={{ maxWidth: 640 }}>
+          <div className="card" style={{ textAlign: 'center', padding: '40px 28px', overflow: 'hidden' }}>
+            <p className="mono" style={{ marginBottom: 12 }}>Hosted beta</p>
+            <h2 style={{ fontSize: 'clamp(1.6rem, 4vw, 2.2rem)', fontWeight: 700, marginBottom: 12 }}>
+              Be first on the managed version
+            </h2>
+            <p style={{ color: 'var(--text-dim)', maxWidth: 460, margin: '0 auto 28px' }}>
+              Prefer not to run your own server? Leave your email and we&apos;ll
+              tell you when hosted PHAROS opens up. No spam, just the launch.
+            </p>
+            <Waitlist />
+            <p style={{ color: 'var(--text-faint)', fontSize: '0.82rem', marginTop: 20 }}>
+              Rather self-host?{' '}
+              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+                It stays free under AGPL-3.0
+              </a>
+              .
+            </p>
+          </div>
         </div>
       </section>
 

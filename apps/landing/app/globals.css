@@ -254,6 +254,43 @@ h1, h2, h3 {
 .code-block .tok-cmd { color: var(--accent); }
 .code-block .tok-comment { color: var(--text-faint); }
 
+/* Waitlist */
+.waitlist-form {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.waitlist-input {
+  flex: 1 1 240px;
+  max-width: 320px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 13px 16px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  transition: border-color 0.15s ease;
+}
+.waitlist-input::placeholder { color: var(--text-faint); }
+.waitlist-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.waitlist-form .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.waitlist-note {
+  flex-basis: 100%;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-top: 6px;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
