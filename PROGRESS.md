@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 0b136b1 -->
-<!-- docker-validated: 6fd1075 -->
+<!-- docker-validated: 454e96e -->
+
+## 2026-07-02 (docker-health — rebuild μετά το SaaS billing scaffold, stack healthy)
+- **Health (read-only):** homepage-mongo **healthy** (Up 2 ώρες), homepage-web RestartCount **0** (Up 2 ώρες), homepage-flaresolverr **Exited εδώ και 2 μέρες** (ήδη σταματημένο, μηδέν memory pressure). Το mongo RestartCount είναι **58** cumulative (ιστορικά OOM restarts στο μικρό VM), αλλά **κανένα active loop** — σταθερό 2 ώρες healthy, οπότε δεν αποτελεί failure mode τώρα.
+- **Disk:** Images 4.066GB, Build Cache 666MB (μη-ανακτήσιμο, shared layers). Ο πρώτος `builder prune -f` έδωσε 0B, ο post-build **ανέκτησε 2.085GB**.
+- **Rebuild:** το diff `6fd1075..HEAD (454e96e)` αγγίζει web runtime (`api/saas/billing/webhook/route.ts` + `lib/billing/{entitlements,plans,stripe}.ts`), άρα rebuild δικαιολογημένο. Ασφαλές dance: `builder prune` → `docker compose build web` (image-only, **Built** OK) → επιβεβαίωση mongo healthy → `up -d web` → poll `/login` → **200 στην 1η προσπάθεια** → RestartCount έμεινε **0** → post `builder prune -f` (−2.085GB). Μηδέν `up --build`, μηδέν AI job, μηδέν destructive op.
+- **Marker:** docker-validated `6fd1075` → **`454e96e`** (HEAD). Staged ΜΟΝΟ PROGRESS.md. Το `.claude/launch.json` + `apps/web/src/models/Usage.ts` (untracked WIP εργαλείου/builder του Αχιλλέα) ΔΕΝ αγγίχτηκαν.
 
 ## 2026-07-02 (parity-auditor — 1η σάρωση ημέρας: ουρά αμετάβλητη, 0 auto-buildable GAP)
 - **Inventory από κώδικα (όχι docs):** **49 v1 routes** (`find api/v1 -name route.ts` = 49· login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`** (home + 18· income + setup ξεχωριστά). Route↔consumer επαλήθευση με live grep στο `apps/mobile/src/api.ts`: κάθε route ≥1 consumer (deep sub-routes: `ai-fill` 1, `convert-to-task` 1, `link-plan` 2, `plans` 5, `price` 11, `add-to-library` 1, `rescan` 2· `push/register` = registerPush/unregisterPush POST+DELETE· `scan/{product,expense,receipt,voucher}` όλα consumed) → **μηδέν «endpoint χωρίς mobile consumer» gap, 1:1**. Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only wizard· N/A).
