@@ -5,6 +5,19 @@
 <!-- reviewed: 1791295 -->
 <!-- docker-validated: ac5cbc2 -->
 
+## 2026-07-01 (parity-auditor — όψιμο νυχτερινό run· ουρά πλήρως καθαρή, 0 auto-buildable GAP)
+- **Inventory από κώδικα (όχι docs):** **49** v1 API routes (login + 48 bearer), **16** mobile screens, **18** web `page.tsx` (home + 17). Το mobile `api.ts` (81 exported fns) καταναλώνει **ΚΑΘΕ** ένα από τα 49 routes 1:1 (grep consumed-paths == route list). Επιβεβαίωσα ρητά και τα deep sub-routes: `items/[id]/{ai-fill, convert-to-task, link-plan, plans, price}`, `receipts/[id]/{add-to-library, rescan}`, `settings/test-notify`, `push/register` → όλα ≥1 consumer. **Μηδέν «endpoint χωρίς mobile consumer» gap.** Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (first-run admin wizard, web-only by design· N/A).
+- **App-code diff vs `b6a3a36` (προηγ. parity marker):** **1 μόνο** commit — `1791295` (mobile Input primitive migration Items+Settings = **UI Debt**, byte-identical, ήδη reviewed στο `ac5cbc2`). `git diff b6a3a36..HEAD -- apps/web/src` = **κενό** → **καμία νέα web δυνατότητα προς port**. Working tree καθαρό στην αρχή (μηδέν WIP του Αχιλλέα).
+- **«Partial» rows ξανα-επιβεβαιωμένα live ως Needs Decision (όχι κρυμμένο auto-buildable GAP):** (α) **Reports** endpoint σκόπιμα trimmed → extra charts θέλουν endpoint-extension + RN charting lib· (β) **Statements** `plans` GET-only → merge/bind/PDF-import θέλουν νέα write/upload endpoints· (γ) Tasks Kanban/steps-checklist, Settings theme/language/AI-engine/storage/OneDrive → decision/credentials boundary.
+- **Read-only check:** mobile `npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). Καμία εντολή Docker/AI/app-code edit.
+- **Counts: DONE 7 (parity queue) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.**
+- **Top-3 για τον builder (σειρά):** (1) **Input primitive συνέχεια** (UI Debt, P1/M) — τα 5 εναπομείναντα input-outlier screens (Shopping/Receipts/Assistant/Search/Login) στο `<Input>`/`<TextArea>`, ενοποιεί token-outliers (padH14→12, fs16→15, radius14)· attended-preferred (no simulator → οπτικό verify). (2) **`scrim`/`backdrop` token** στο `theme.ts` για το εναπομείναν `alpha('#000',0.67)` modal backdrop @ SettingsScreen (P3/S, byte-identical, unattended-safe, σβήνει τον τελευταίο inline `#000`). (3) **Button + Chip primitives** (UI Debt, P2/M). Δεν υπάρχει ενεργό parity TODO.
+- **Git:** staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (explicit paths). Μηδέν Docker, μηδέν AI, μηδέν app-code edit. Κανένα committed secret εντοπίστηκε.
+
+### Needs Achilleas
+- Κανένα νέο. (Παραμένουν NEEDS DECISION, εκτός builder: mobile theme toggle + language switcher + AI-engine/storage/OneDrive settings [credentials/provider]· Reports extra charts [endpoint-extension + RN charting lib]· Tasks Kanban board + steps/checklist [model το έχει, δεν εκτίθεται στο v1 API]· Statements merge/bind + PDF import + re-scan write endpoints· remote push αδοκίμαστο [χρειάζεται EAS dev build + APNs key].)
+- Γνωστό infra (όχι δικό μου scope): `homepage-mongo` RestartCount υψηλό λόγω σωρευτικού OOM στα builds σε μικρό VM RAM· προαιρετικό RAM bump στο Docker Desktop.
+
 ## 2026-07-01 (docker-health guard — υγεία πράσινη, χωρίς rebuild)
 - **Health**: `homepage-mongo` healthy (up 2h), `homepage-web` RestartCount 0 (up 2h), `/login` → 200. `homepage-mongo` RestartCount 44 (σωρευτικό ιστορικό OOM, ΟΧΙ ενεργό loop· τώρα σταθερό 2h) → βλ. Needs Achilleas (RAM bump). `homepage-flaresolverr` ήδη Exited (143), το άφησα stopped. `searxng` up (default stack).
 - **Rebuild απόφαση**: `git diff fd3c2f1..HEAD -- apps/web` = **0 αρχεία** (τα ενδιάμεσα commits = mobile Input primitive `1791295` + docs). Κανένα web runtime code δεν άλλαξε → **SKIP rebuild**, μόνο επιβεβαίωση υγείας.
