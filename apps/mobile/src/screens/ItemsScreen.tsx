@@ -99,7 +99,7 @@ function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () =
           <TextInput value={lprice} onChangeText={setLprice} keyboardType="decimal-pad" placeholder="price" placeholderTextColor={C.faint} style={[pb.logInput, { width: 80 }]} />
           <TextInput value={lstore} onChangeText={setLstore} placeholder="store" placeholderTextColor={C.faint} style={[pb.logInput, { flex: 1 }]} />
           <Pressable onPress={submit} disabled={busy || !(parseFloat(lprice.replace(',', '.')) > 0)} style={[pb.logSave, (busy || !(parseFloat(lprice.replace(',', '.')) > 0)) && { opacity: 0.4 }]}>
-            {busy ? <ActivityIndicator color="#000" /> : <Text style={pb.logSaveText}>Save</Text>}
+            {busy ? <ActivityIndicator color={C.onAccent} /> : <Text style={pb.logSaveText}>Save</Text>}
           </Pressable>
         </View>
       )}
@@ -374,7 +374,7 @@ export function ItemsScreen() {
       <View style={s.addRow}>
         <TextInput value={title} onChangeText={setTitle} onSubmitEditing={add} autoCapitalize="none" autoCorrect={false} placeholder="Add an item or paste a link…" placeholderTextColor={C.faint} style={s.input} />
         <Pressable onPress={add} disabled={!title.trim() || importing} style={[s.addBtn, isUrl && s.importBtn, (!title.trim() || importing) && s.dim]}>
-          {importing ? <ActivityIndicator color="#000" /> : <Text style={s.addBtnText}>{isUrl ? '✦' : '＋'}</Text>}
+          {importing ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.addBtnText}>{isUrl ? '✦' : '＋'}</Text>}
         </Pressable>
       </View>
       {isUrl && <Text style={s.hint}>✦ AI will fetch this link and add it to Shopping</Text>}
@@ -447,7 +447,7 @@ export function ItemsScreen() {
               </Pressable>
               <View style={s.mbtns}>
                 <Pressable onPress={saveEdit} disabled={saving || !eTitle.trim()} style={[s.save, (saving || !eTitle.trim()) && s.dim]}>
-                  {saving ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>Save</Text>}
+                  {saving ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.saveText}>Save</Text>}
                 </Pressable>
                 <Pressable onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
               </View>
@@ -465,14 +465,14 @@ const s = StyleSheet.create({
   input: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: C.text, fontSize: 15 },
   addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   importBtn: { backgroundColor: C.cyan },
-  addBtnText: { color: '#000', fontSize: 24, fontWeight: '700' },
+  addBtnText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   hint: { color: C.cyan, fontSize: 11, paddingHorizontal: 16, paddingBottom: 8, marginTop: -2 },
   dim: { opacity: 0.4 },
   filters: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
   chipOn: { backgroundColor: C.accent, borderColor: C.accent },
   chipText: { color: C.dim, fontSize: 13, fontWeight: '600' },
-  chipTextOn: { color: '#000' },
+  chipTextOn: { color: C.onAccent },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   eyebrow: { color: C.faint, fontSize: 10, letterSpacing: 1 },
   title: { color: C.text, fontSize: 15, fontWeight: '600', marginTop: 2 },
@@ -489,10 +489,10 @@ const s = StyleSheet.create({
   sChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 9, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
   sChipOn: { backgroundColor: C.accent, borderColor: C.accent },
   sChipText: { color: C.dim, fontSize: 12, fontWeight: '600' },
-  sChipTextOn: { color: '#000' },
+  sChipTextOn: { color: C.onAccent },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22 },
   save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 26, minWidth: 96, alignItems: 'center' },
-  saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
+  saveText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
   delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
   delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
   aiBar: { flexDirection: 'row', gap: 10, marginTop: 12 },
@@ -527,7 +527,7 @@ const pb = StyleSheet.create({
   logRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   logInput: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 14 },
   logSave: { backgroundColor: C.accent, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9, alignItems: 'center', justifyContent: 'center' },
-  logSaveText: { color: '#000', fontSize: 13, fontWeight: '700' },
+  logSaveText: { color: C.onAccent, fontSize: 13, fontWeight: '700' },
   histToggle: { color: C.dim, fontSize: 12, fontWeight: '600' },
   histRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.surface, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginTop: 6 },
   histPrice: { color: C.text, fontSize: 13, fontWeight: '700' },

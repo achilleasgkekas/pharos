@@ -179,7 +179,7 @@ export function VouchersScreen() {
             <TextArea variant="modal" value={scanText} onChangeText={setScanText} placeholder="e.g. 15% off at Skroutz, code SAVE15, until 31/12" style={{ minHeight: 90 }} />
             <View style={s.mbtns}>
               <Pressable onPress={doScanText} disabled={!scanText.trim() || scanBusy} style={[s.save, (!scanText.trim() || scanBusy) && s.dim]}>
-                {scanBusy ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>Fill</Text>}
+                {scanBusy ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.saveText}>Fill</Text>}
               </Pressable>
               <Pressable onPress={() => setShowScan(false)} style={s.delBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
             </View>
@@ -194,7 +194,7 @@ const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
   addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
-  addBtnText: { color: '#000', fontSize: 24, fontWeight: '700' },
+  addBtnText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   aiBtn: { width: 40, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
   aiText: { color: C.cyan, fontSize: 18, fontWeight: '700' },
   cancelText: { color: C.dim, fontSize: 15 },
@@ -218,7 +218,7 @@ const s = StyleSheet.create({
   tlabel: { color: C.text, fontSize: 15 },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
   save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
-  saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
+  saveText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
   delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
   delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });

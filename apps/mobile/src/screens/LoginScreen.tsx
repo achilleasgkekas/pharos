@@ -66,7 +66,7 @@ export function LoginScreen({ onLogin }: { onLogin: (u: SessionUser) => void }) 
         {error && <Text style={s.error}>{error}</Text>}
 
         <Pressable onPress={submit} disabled={busy || !username.trim() || !password} style={[s.btn, (busy || !username.trim() || !password) && s.btnDisabled]}>
-          {busy ? <ActivityIndicator color="#000" /> : <Text style={s.btnText}>Sign in</Text>}
+          {busy ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.btnText}>Sign in</Text>}
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -86,5 +86,5 @@ const s = StyleSheet.create({
   error: { color: C.red, fontSize: 13, marginTop: 14 },
   btn: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
   btnDisabled: { opacity: 0.4 },
-  btnText: { color: '#000', fontSize: 15, fontWeight: '700' },
+  btnText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
 });

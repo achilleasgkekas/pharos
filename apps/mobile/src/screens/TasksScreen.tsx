@@ -114,7 +114,7 @@ export function TasksScreen() {
             <View style={s.statuses}>
               {STATUSES.map((st) => (
                 <Pressable key={st} onPress={() => setEditStatus(st)} style={[s.statusBtn, editStatus === st && { backgroundColor: SC[st], borderColor: SC[st] }]}>
-                  <Text style={[s.statusText, editStatus === st && { color: '#000' }]}>{slabel(st)}</Text>
+                  <Text style={[s.statusText, editStatus === st && { color: C.onAccent }]}>{slabel(st)}</Text>
                 </Pressable>
               ))}
             </View>
@@ -122,7 +122,7 @@ export function TasksScreen() {
             <View style={s.statuses}>
               {PRIORITIES.map((pr) => (
                 <Pressable key={pr} onPress={() => setEditPriority(pr)} style={[s.statusBtn, editPriority === pr && { backgroundColor: PC[pr], borderColor: PC[pr] }]}>
-                  <Text style={[s.statusText, editPriority === pr && { color: '#000' }]}>{pr.toUpperCase()}</Text>
+                  <Text style={[s.statusText, editPriority === pr && { color: C.onAccent }]}>{pr.toUpperCase()}</Text>
                 </Pressable>
               ))}
             </View>
@@ -143,7 +143,7 @@ const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
   add: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
-  addText: { color: '#000', fontSize: 24, fontWeight: '700' },
+  addText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   dim: { opacity: 0.4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   title: { color: C.text, fontSize: 15, fontWeight: '600' },
@@ -162,7 +162,7 @@ const s = StyleSheet.create({
   statusText: { color: C.dim, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   modalBtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
   save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
-  saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
+  saveText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
   del: { paddingVertical: 12, paddingHorizontal: 12 },
   delText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });

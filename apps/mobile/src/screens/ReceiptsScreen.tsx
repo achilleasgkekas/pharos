@@ -287,7 +287,7 @@ const s = StyleSheet.create({
   libText: { color: C.accent, fontSize: 15, fontWeight: '700' },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
   save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
-  saveText: { color: '#000', fontSize: 15, fontWeight: '700' },
+  saveText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
   del: { paddingVertical: 12, paddingHorizontal: 12 },
   delText: { color: C.gold, fontSize: 15, fontWeight: '600' },
 });

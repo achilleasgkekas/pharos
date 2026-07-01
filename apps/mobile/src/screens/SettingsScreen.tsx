@@ -169,7 +169,7 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
       </View>
 
       <Pressable onPress={save} disabled={saving} style={[s.saveBtn, saving && s.dim]}>
-        {saving ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>Save settings</Text>}
+        {saving ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.saveText}>Save settings</Text>}
       </Pressable>
 
       <CardsSection currency={currency} />
@@ -352,7 +352,7 @@ function CardEditor({ card, currency, onClose, onSaved }: { card: Card | null; c
             <View style={s.modalBtns}>
               <Pressable onPress={onClose} style={s.cancelBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
               <Pressable onPress={save} disabled={saving} style={[s.saveBtn, { flex: 1, marginTop: 0 }, saving && s.dim]}>
-                {saving ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>{card ? 'Save card' : 'Add card'}</Text>}
+                {saving ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.saveText}>{card ? 'Save card' : 'Add card'}</Text>}
               </Pressable>
             </View>
           </ScrollView>
@@ -480,7 +480,7 @@ function StoreEditor({ store, onClose, onSaved }: { store: StoreRow | null; onCl
             <View style={s.modalBtns}>
               <Pressable onPress={onClose} style={s.cancelBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
               <Pressable onPress={save} disabled={saving} style={[s.saveBtn, { flex: 1, marginTop: 0 }, saving && s.dim]}>
-                {saving ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>{store ? 'Save store' : 'Add store'}</Text>}
+                {saving ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.saveText}>{store ? 'Save store' : 'Add store'}</Text>}
               </Pressable>
             </View>
           </ScrollView>
@@ -560,7 +560,7 @@ function ListEditor({ entry, last, onSaved }: { entry: ListEntry; last: boolean;
       </View>
       <View style={s.listBtns}>
         <Pressable onPress={() => save()} disabled={saving || !dirty} style={[s.listSaveBtn, (saving || !dirty) && s.dim]}>
-          {saving ? <ActivityIndicator color="#000" size="small" /> : <Text style={s.listSaveText}>Save</Text>}
+          {saving ? <ActivityIndicator color={C.onAccent} size="small" /> : <Text style={s.listSaveText}>Save</Text>}
         </Pressable>
         {!isDefault && (
           <Pressable onPress={() => save(entry.default)} disabled={saving} style={s.listResetBtn}>
