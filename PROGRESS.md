@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 3bc8a3d -->
+<!-- reviewed: 1791295 -->
 <!-- docker-validated: fd3c2f1 -->
+
+## 2026-07-01 (reviewer — range 3bc8a3d..1791295)
+- **Review**: 7 commits· 6 docs-only (review/docker-health/monitor/parity/ui-audit/web-debt) + **1 code** (`1791295` Input primitive migration, mobile-only). Web diff: μηδέν (μόνο docs). Mobile diff: `ItemsScreen.tsx` + `SettingsScreen.tsx`.
+- **Checks**: `apps/web` type-check → exit 0· `apps/mobile` tsc --noEmit → exit 0. Και τα δύο πράσινα.
+- **Επαλήθευση «byte-identical»**: διασταύρωσα τα tokens του `ui.tsx` με τα σβησμένα inline styles. `inputSurface` (`surface/borderRadius RADIUS.md=12/padH SPACE.md=12/padV 11/fs SIZE.md=15`) == παλιό ItemsScreen `s.input`· `inputModal` (`surface2/RADIUS.sm=10/padH 12/padV 10/fs 15`) == παλιό `s.minput` + SettingsScreen `s.input`. Ταιριάζουν ακριβώς → μηδέν οπτική μεταβολή, επιβεβαιωμένο.
+- **Καθαρότητα**: κανένα dangling ref στα σβησμένα `input`/`minput` styles (grep 0). Τα εναπομείναντα raw `<TextInput>` (Items: `pb.logInput` ×2, Settings: `s.budgetInput` ×1) έχουν bespoke styles → σωστά εξαιρέθηκαν από το subset· το `TextInput` import παραμένει σε χρήση (no unused import). Καμία αλλαγή σε `api.ts`/response shapes → μηδέν ρίσκο για το mobile↔web contract.
+- **Fixes**: κανένα (δεν χρειάστηκε). **Flags**: κανένα. Καθαρό commit.
+- Marker → `1791295`.
 
 ## 2026-07-01 (builder — Input primitive: byte-identical subset Items + Settings)
 - **Τι**: συνέχισα το κορυφαίο UI Debt item (Input primitive migration) με το **unattended-safe κομμάτι** — τα 2 από τα 7 εναπομείναντα screens (ItemsScreen, SettingsScreen) όπου τα τοπικά input styles είναι **byte-identical** με τα `<Input>`/`<TextArea>` primitives του `ui.tsx`. Το επέλεξα αντί για τη γενική συνέχεια (Shopping/Receipts/Assistant/Search/Login) γιατί εκείνα έχουν token-outliers (padH14→12, fs16→15, radius14, bg surface vs surface2) = **οπτική αλλαγή** που θέλει attended verify (no simulator)· αυτά τα 2 είναι **μηδέν οπτική αλλαγή**, μόνο centralization, tsc-verifiable. Working tree στην αρχή: μόνο `WEB_DEBT.md` modified (παράλληλο WIP άλλου routine — **δεν το άγγιξα**).
