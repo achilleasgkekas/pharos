@@ -1921,3 +1921,22 @@ Read-only audit των 52 v1 route files + apiAuth/apiBody/apiList helpers, όλ
 3. (κενό — ουρά εξαντλείται· επόμενα runs συνεχίζουν readBody adoption 1-2/run στα ~11 raw routes που απομένουν).
 
 **Needs Achilleas:** κανένα. Ο κώδικας παραμένει ώριμος/καθαρός (20+ σαρώσεις)· απομένει μόνο style/consistency debt (P3/S).
+
+## 2026-07-01 (ui-auditor — 23η σάρωση, ΠΡΟΟΔΟΣ: `<Badge>` primitive ΕΚΛΕΙΣΕ)
+- **Νέο mobile-src:** `git log 3a272c1..HEAD -- apps/mobile/src` δείχνει **1 νέο commit** από την 22η σάρωση: `ee9d413` (**shared `<Badge>` primitive** για status/type chips· 4 files/+37 −14). Τελευταίος mobile-src commit πλέον `ee9d413` (ήταν `3a272c1`). Εξήγαγε `<Badge label color style? textStyle?>` στο `ui.tsx` (coloured 1px-border pill, `color`→border+text, base == παλιό TasksScreen `chip`) + μετανάστευσε **byte-identical** τα 3 display-only badges (TasksScreen status, SearchScreen type με padV3/border-fallback override, ActivityScreen job-status με padH7/marginLeft:auto/fs10 override)· έσβησε τα 3 local `chip/badge`+text StyleSheet pairs. Οι ενδιάμεσες μη-mobile commits (`f17f279` isObjectId 4η/τελική + docs/marker) = μηδέν επιπλέον UI impact. Working tree apps/mobile **καθαρό**.
+- **→ Item «Card + Badge + ListItem»: Card DONE + Badge DONE· απομένει μόνο `<ListItem>`.**
+- **Violations ανά διάσταση (fresh live grep, όχι docs):**
+  - **Tokens: 0** — 6-digit hex εκτός `theme.ts` **0**, short `#fff/#000` **0**, inline `rgba(` **0**, 8-digit alpha hex **0**. Πλήρως καθαρό.
+  - **States: 0** (συνεπή μέσω `ui.tsx`)· **Touch targets: 0** (Check + hitSlop DONE).
+  - **Reusable-components ~3 ανοιχτά** (Badge πλέον DONE): `<Chip>` MISSING (`chip`/`chipOn`/`sChip`/`cChip` style-keys σε **3** screens Subscriptions/Items/Settings· 2 clusters: filter-chip Items+Settings padding-drift 14/7 vs 16/8 + pill radius9)· `<ListItem>` MISSING· ghost cyan/accent-border buttons **~7** sites (`aiBtn`/`scanBtn`/`rescanBtn`/`importBtn`)· Input 🟡 6/11 (48 `<Input>/<TextArea>` sites, **21** raw `<TextInput>` σε **7** screens Assistant/Items/Settings/Shopping/Search/Login/Receipts)· base `card:` **2** outliers (Reports flex1/radius16 + Settings section-container). `<Badge>` **3** sites (Tasks/Search/Activity, DONE).
+  - **Adaptive: 2** — `safe-area-context` **0** imports + εκτός `package.json` (TODO P2/M)· `maxWidth` στο content **0** (μόνο 2 σε drawer+bubble· TODO P3/S).
+  - **Theme: 1** — dark-only, **0** `useColorScheme`/context (Light theme TODO P3/L· web έχει πλήρες light palette globals.css:37-50).
+- **Foundation 9 DONE** (theme tokens + alpha + touch targets + scrim + Button + IconButton + Card + Button-family finish + **Badge**). Input 🟡 6/11. Chip / ListItem / Safe-area / Max-width / Light = TODO.
+- **Top 3 για τον builder (unattended-safe πρώτο):**
+  1. **Safe-area insets (P2/M, unattended-safe)** — `SafeAreaProvider` + `useSafeAreaInsets` αντί plain RN `SafeAreaView`· additive, no token-drift, tsc-verifiable, real UX (bottom-sheet κουμπιά κάτω από home indicator). Κορυφαίο auto-buildable.
+  2. **`<ListItem>` primitive (P2/M)** — extract κοινό row pattern· μειώνει duplication χωρίς οπτική αλλαγή αν κρατηθούν byte-identical tokens. Κλείνει το «Card + Badge + ListItem».
+  3. **`<Chip>` (P2/M)** — attended-preferred (token-drift 14/7 vs 16/8 = οπτική αλλαγή χωρίς simulator).
+- mobile `tsc --noEmit` **EXIT 0**. Κανένα committed secret (μόνο `.env.example` template, μηδέν πραγματικό `.env` tracked). Read-only run: μηδέν app-code edit, μηδέν Docker, μηδέν AI. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+### Needs Achilleas
+- (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας. Ανοιχτά product-decision items (θέλουν απόφαση, ΟΧΙ auto-buildable): **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor 19 files), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: μείνε web-only).
