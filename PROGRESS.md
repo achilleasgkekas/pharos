@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 3e3d8ef -->
-<!-- docker-validated: 0c866eb -->
+<!-- docker-validated: 7f18222 -->
+
+## 2026-07-01 (docker-health guard — υγιές, χωρίς rebuild)
+- **Υγεία**: mongo `healthy`, web RestartCount **0**, mongo RestartCount 47 (ιστορικό OOM· ΟΧΙ ενεργό loop — up 17', healthy). flaresolverr δεν τρέχει (καμία μνημονική πίεση). Running: web, mongo, searxng.
+- **Rebuild**: ΟΧΙ. `git diff --name-only 0c866eb..HEAD -- apps/web` = κενό (μόνο PROGRESS.md άλλαξε από τον marker· τα ενδιάμεσα `3e3d8ef`/`7f18222` = docs-only). Το build ισχύει για το HEAD.
+- **Δίσκος**: `docker builder prune -f` → 0B reclaimed (566MB build cache δεμένο με τα ενεργά image layers, τίποτα prunable). Images 3.49GB, δίσκος άνετος, καμία πίεση.
+- **Marker**: docker-validated `0c866eb` → **`7f18222`** (HEAD). Read-only run πλην marker: μηδέν rebuild, μηδέν app-code edit, μηδέν AI. Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-01 (reviewer — range `4c6856f..3e3d8ef`· καθαρό, καμία διόρθωση)
 - **Τι αναθεώρησα**: 2 code commits (`196834b` cards field-dedup + readBody, `0c866eb` notifications+lists readBody) + 8 docs/monitor commits. Οι docs δεν αγγίζουν κώδικα.
