@@ -5,6 +5,13 @@
 <!-- reviewed: 6809a8c -->
 <!-- docker-validated: 46f35ed -->
 
+## 2026-07-01 (ui-auditor — 21η σάρωση, CONFIRMATION: μηδέν νέο mobile-src, ουρά αμετάβλητη)
+- **Read-only mobile UI consistency audit.** `git log 3a272c1..HEAD -- apps/mobile/src` **κενό** + working tree apps/mobile καθαρό → κατάσταση **byte-identical με 19η σάρωση**. Οι ενδιάμεσες commits (isObjectId/readBody dedup + docs) αφορούν ΜΟΝΟ web-api, μηδέν mobile UI impact. Τελευταίος mobile-src commit ΑΚΟΜΑ `3a272c1` (Button-family finish).
+- **Violations ανά διάσταση (fresh live grep):** Tokens **0** (6-digit hex εκτός theme.ts 0· short #fff/#000 0· inline rgba 0· 8-digit alpha 0), States **0** (Spinner 14 / Empty 14 / ErrorText 22 μέσω `ui.tsx`), Touch **0**, Reusable-components **~4 ανοιχτά** (Chip + Badge + ListItem primitives λείπουν + ghost-buttons `aiBtn`/`scanBtn`/`rescanBtn`/`importBtn` μη-ενοποιημένα + 5 Input outlier screens), Adaptive **2** (safe-area 0 imports + εκτός package.json· maxWidth 2 καμία στο content), Theme **1** (dark-only, μηδέν light context).
+- **Reusable state:** `<Button>` 9 · `<IconButton>` 7 · `<Card>` 11 · `<Input>/<TextArea>` 48 (6/11 screens) · raw `<TextInput>` 21 σε 7 screens. Foundation 8 DONE · Input 🟡 6/11.
+- **Top-3 builder next:** (1) **Safe-area insets** (P2/M, unattended-safe: `SafeAreaProvider`+`useSafeAreaInsets`, additive, no token-drift, real UX)· (2) **`<ListItem>` primitive** (P2/M, extract κοινό row)· (3) **`<Chip>`/`<Badge>`** (attended-preferred, token-drift = οπτική αλλαγή χωρίς simulator).
+- mobile `tsc --noEmit` **EXIT 0**. Κανένα committed secret (μόνο `.env.example`). Μηδέν app-code edit, μηδέν Docker, μηδέν AI. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
 ## 2026-07-01 (parity-auditor — 18η σάρωση ημέρας: ουρά αμετάβλητη, 0 GAP)
 - **Inventory από κώδικα** (όχι docs): **49 v1 routes** (`find api/v1 -name route.ts` = 49· login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`**. Το mobile `api.ts` έχει **50 distinct route-strings** ≥ 49 routes → κάθε route (incl. deep sub-routes `ai-fill`/`convert-to-task`/`link-plan`/`plans`/`price`/`add-to-library`/`rescan`/`test-notify`/`items/import`) ≥1 consumer· μηδέν «endpoint χωρίς mobile consumer».
 - **Diff από 17η σάρωση (`ed352c4`)**: `git log ed352c4..HEAD` = 7 commits, μόνο **1** app-src: `f1413c3` (`refactor(api)` isObjectId dedup 2η παρτίδα, 5 `[id]` routes· `--stat` = 5 files / +15 −14). Επιβεβαίωσα ότι είναι καθαρό Web Debt refactor (guard μετακόμισε στο `@/lib/apiBody`, response shapes αμετάβλητα) → **καμία νέα portable web δυνατότητα**. Τα υπόλοιπα = docs + docker-health. Working tree καθαρό στην αρχή.
