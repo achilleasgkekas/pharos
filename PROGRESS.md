@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 21c4792 -->
-<!-- docker-validated: 454e96e -->
+<!-- docker-validated: f63cc4b -->
+
+## 2026-07-02 (docker-health — rebuild μετά το SaaS usage/enforce gate, stack healthy)
+- **Health (read-only):** homepage-mongo **healthy** (Up 2 ώρες πριν το rebuild), homepage-web RestartCount **0**, homepage-searxng **Up** (κανονικό default-stack μέλος), homepage-flaresolverr **Exited (143) εδώ και 2 μέρες** (ήδη σταματημένο, μηδέν memory pressure). Το mongo RestartCount **68** cumulative = ιστορικά OOM restarts στο μικρό VM, αλλά **κανένα active loop** (σταθερό 2 ώρες healthy) → όχι failure mode τώρα.
+- **Disk:** Images 4.066GB, Build Cache 666.7MB (shared non-reclaimable layers, 0B reclaimable). Ο πρώτος `builder prune -f` έδωσε 0B, ο post-build **ανέκτησε 2.086GB**.
+- **Rebuild:** το diff `454e96e..HEAD (f63cc4b)` αγγίζει web runtime στο `apps/web/src` — νέο `api/saas/usage/route.ts` + `lib/billing/{enforce,usage}.ts` + `models/Usage.ts` (SaaS-only, gated πίσω από `SAAS_MODE`, server-only· τα υπόλοιπα diffs = `.test.ts` vitest-only). Παρότι gated, ο νέος route/source πρέπει να χτίζεται καθαρά στο standalone image → rebuild δικαιολογημένο. Ασφαλές dance: `builder prune` → `docker compose build web` (image-only, **Built** OK) → επιβεβαίωση mongo healthy → `up -d web` → poll `/login` → **200 στην 1η προσπάθεια** → RestartCount έμεινε **0** → post `builder prune -f` (−2.086GB). Μηδέν `up --build`, μηδέν AI job, μηδέν destructive op.
+- **Marker:** docker-validated `454e96e` → **`f63cc4b`** (HEAD). Staged ΜΟΝΟ PROGRESS.md. Το `.claude/launch.json` (WIP εργαλείου του Αχιλλέα) ΔΕΝ αγγίχτηκε.
 
 ## 2026-07-02 (reviewer — range e47f150..21c4792 clean, 0 fixes)
 - **Έλεγξα:** 7 commits από τον τελευταίο marker (`e47f150`). Κώδικας ουσίας: (α) `918f49c` **SaaS AI/storage quota ENFORCEMENT gate** — νέα `lib/billing/enforce.ts` (+83, `enforceAiQuota`/`enforceStorageQuota` async gates + PURE `quotaExceededBody`/`quotaExceededResponse` 402 builders) + νέο read endpoint `api/saas/usage/route.ts` (+55, GET current-period usage+quota status ανά workspace) + `enforce.test.ts` (+52). (β) `21c4792` + `8e174f1` pure-lib test suites (expenses/lib 14, taxonomies 22, itemStatus 10). (γ) `e4306fa` landing responsive CSS. (δ) docs/monitor + docs/mobile.md guide (+201) + STATUS/progress logs.
