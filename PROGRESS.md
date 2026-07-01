@@ -2,8 +2,17 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 6a9dc33 -->
+<!-- reviewed: c540322 -->
 <!-- docker-validated: 3ae313f -->
+
+## 2026-07-01 (reviewer — range 6a9dc33..c540322 καθαρό· apiError refactor behaviorally identical)
+- **Review range**: `6a9dc33..c540322` (5 commits: 1 code + 4 docs). Ένα code commit, το `c540322` (refactor: inline error → shared `apiError()` στα 4 v1 routes)· τα υπόλοιπα docs (parity/ui-audit/web-debt/progress).
+- **Checks**: `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**. Και τα δύο πράσινα.
+- **Diff review**: επιβεβαίωσα ότι το `apiError(message, status=400)` (`lib/apiAuth.ts:21`) επιστρέφει ακριβώς `NextResponse.json({ error: message }, { status })` → **ίδιο shape + ίδιο status 400** με τα παλιά inline returns· καμία αλλαγή σχήματος API response (το mobile app δεν επηρεάζεται). Το fallback `|| 'Bad request'` είναι μόνο βελτίωση έναντι πιθανού `{ error: undefined }`, ποτέ regression. `NextResponse` παραμένει σε χρήση και στα 4 files (κανένα dangling import — επιβεβαιωμένο από tsc). `auth/login` αμετάβλητο.
+- **Secrets**: κανένα committed secret στο range (μόνο 4 route files + .md docs).
+- **Fixes**: κανένα (τίποτα προς διόρθωση — clean refactor).
+- **Flagged**: κανένα νέο item. Οι auto-buildable ουρές παραμένουν κενές (Web Debt 0 ενεργά· parity 7/7 DONE). Το mobile UI Input-primitive migration μένει attended-preferred (οπτικό verify).
+- **Marker**: reviewed → `c540322`.
 
 ## 2026-07-01 (builder — WEB_DEBT: inline error → shared apiError() στα 4 routes· Web Debt queue ΚΕΝΗ)
 - **Τι**: έκλεισα το μόνο ενεργό Web Debt item (P3/S, το τελευταίο σε όλες τις ουρές μαζί με το attended-preferred Input migration). Διάλεξα αυτό αντί για τη συνέχεια του mobile Input primitive γιατί η μετανάστευση των εναπομείναντων screens έχει token-outliers (padH14→12, fs16→15, radius14) = **οπτική αλλαγή** που όλοι οι ui-auditors ζητούν attended verify (no simulator), ενώ αυτό είναι καθαρό web refactor, tsc-verifiable, μηδέν οπτικό ρίσκο, μηδέν AI. Working tree **καθαρό** στην αρχή (μηδέν παράλληλο WIP του Αχιλλέα).
