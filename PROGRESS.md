@@ -1295,3 +1295,22 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
   2. **Card + Badge + ListItem primitives (P2/M)** — 5 base `card:` + 3 badge → shared `ui.tsx`.
   3. **Input-outlier screens + Chip primitive (P1/M, attended-preferred)** — 5 screens token-drift + on/off chip.
 - mobile `tsc --noEmit` → **EXIT 0**. Read-only: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md. Κανένα committed secret εντοπίστηκε.
+
+## 2026-07-01 (web-code-quality — 15η σάρωση, ουρά 0→1, ανοίγω apiBody continuation)
+- **Fresh audit 49 v1 routes + 7 synced models.** Τελευταίος `apps/web/src` app-code commit = `37fca25` (apiBody adoption vouchers+items POST) = το προηγ. ενεργό item, τώρα DONE → η Web Debt Queue ήταν **0 ενεργά** στην αρχή. Ενδιάμεσοι commits (parity/ui-audit/monitor/docker-health docs) = μηδέν `apps/web/src` diff. Working tree καθαρό στην αρχή.
+- **Ευρήματα ανά διάσταση (live grep, όχι docs):**
+  - **Type safety: 0** — `npm run type-check` EXIT 0· `:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το `/api/v1` = 0.
+  - **Auth: 0 unguarded** — `grep -L withAuth|bearerUser` → μόνο `auth/login` (auth boundary, σωστά).
+  - **Input validation: 0 NOGUARD** — όλα τα `[id]`/`[type]` routes με hex/`ID_RE`/`isValidObjectId` guard· list params clamped 1..200· `ai` cap ενεργό.
+  - **Error handling: 0** inline `NextResponse.json({ error })` εκτός `auth/login`· ομοιόμορφο `apiError` μέσω `withAuth`.
+  - **DB: 0** — 7/7 synced models `index({ updatedAt: -1 })`· 7/7 list endpoints `.limit()`+`.lean()`.
+  - **Duplication: 1 ongoing** — raw-body pattern `req.json().catch` σε **25 routes** (από 27· 2 έκλεισαν με `37fca25`), 4 adopters. Νόμιμο consistency debt.
+- **Counts ανά dimension: P1=0, P2=0, P3=1** (νέο apiBody continuation, S). Άνοιξα ΜΟΝΟ 1 item (μη-sprawling, 2 routes) ώστε ο builder να έχει ουρά· δεν εφευρίσκω debt.
+- **Top 3 για τον builder:**
+  1. **apiBody adoption tasks + stores POST (P3/S, api)** — tasks (5× `String(b.)` → strField/enumField) + stores (name/url trims → strField), 1:1-verified, tsc-checkable.
+  2. **(μελλοντικό) apiBody batch 3** — επόμενα ~23 routes με raw pattern (π.χ. `expenses/[id]`, `subscriptions/[id]`, `tasks/[id]`, `receipts/[id]` PATCH· ένα-δύο ανά run).
+  3. Ουρά αλλιώς καθαρή — αν ο builder δεν έχει web item, πέφτει στο mobile UI Debt Queue (IconButton/Card primitives).
+- Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ WEB_DEBT.md + PROGRESS.md. Κανένα committed secret.
+
+### Needs Achilleas
+- (αμετάβλητο) 2 standing security παρατηρήσεις, product decisions ΟΧΙ queue items: (1) `auth/login` χωρίς rate-limit/brute-force guard (self-hosted, WireGuard-only πρόσβαση → χαμηλό ρίσκο, αλλά αν βγει public χρειάζεται throttle)· (2) κάποια error messages επιστρέφουν λεπτομέρεια (π.χ. «A store with that name already exists») — αποδεκτό για single-user, review αν γίνει multi-tenant.
