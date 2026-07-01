@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/apiAuth';
+import { withAuth, apiError } from '@/lib/apiAuth';
 import { scanProductPhoto } from '@/app/shopping-list/actions';
 
 export const runtime = 'nodejs';
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const form = await req.formData();
     const r = await scanProductPhoto(form);
-    if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+    if (!r.ok) return apiError(r.error || 'Bad request');
     return NextResponse.json({ data: r.data });
   });
 }

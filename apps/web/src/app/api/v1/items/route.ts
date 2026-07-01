@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/apiAuth';
+import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, iso, listEnvelope } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
 import { Item, ITEM_STATUSES } from '@/models/Item';
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const title = String(b.title || '').trim();
-    if (!title) return NextResponse.json({ error: 'title required' }, { status: 400 });
+    if (!title) return apiError('title required');
     // Validate status against the shared whitelist (same list the PATCH route uses);
     // an unknown value falls back to 'researching' rather than being stored verbatim.
     const status = (ITEM_STATUSES as readonly string[]).includes(String(b.status)) ? String(b.status) : 'researching';

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/apiAuth';
+import { withAuth, apiError } from '@/lib/apiAuth';
 import { getListItems, addListItem } from '@/app/shopping-list/actions';
 
 export const runtime = 'nodejs';
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const b = (await req.json().catch(() => ({}))) as Record<string, string>;
     const r = await addListItem({ name: b.name, quantity: b.quantity, category: b.category, brand: b.brand, note: b.note });
-    if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+    if (!r.ok) return apiError(r.error || 'Bad request');
     return NextResponse.json({ ok: true, items: await getListItems() }, { status: 201 });
   });
 }

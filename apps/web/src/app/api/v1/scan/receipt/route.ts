@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuth } from '@/lib/apiAuth';
+import { withAuth, apiError } from '@/lib/apiAuth';
 import { connectDB } from '@/lib/db';
 import { Receipt } from '@/models/Receipt';
 import { uploadReceipt } from '@/app/receipts/actions';
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const form = await req.formData();
     const r = await uploadReceipt(form);
-    if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
+    if (!r.ok) return apiError(r.error || 'Bad request');
     await connectDB();
     const doc = await Receipt.findById(r.id).select('-rawAiResponse').lean();
     if (!doc) return NextResponse.json({ receipt: { id: r.id, aiUsed: r.aiUsed } }, { status: 201 });
