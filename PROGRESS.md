@@ -1528,3 +1528,22 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 
 ### Needs Achilleas
 - (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας. Ανοιχτά product-decision items (θέλουν απόφαση, ΟΧΙ auto-buildable): Reports extra charts (endpoint-extension + RN charting lib), Statements merge/bind + PDF-import (write/upload endpoints), Settings theme toggle (light theme = L refactor 19 files), Settings AI-engine/storage/OneDrive (credentials/OAuth boundary — σύσταση: μείνε web-only).
+
+## 2026-07-01 (web-code-quality — 17η σάρωση, builder κατανάλωσε 6 apiBody routes, ουρά 0→1)
+- **Fresh audit 49 v1 routes + 7 synced models.** Από την 16η σάρωση ο builder έκλεισε **6 apiBody items** (git log: `99e737f` expenses/[id]+subscriptions/[id] PATCH, `4c6856f` tasks/[id]+vouchers/[id] PATCH, `196834b` cards field-dedup) → `readBody` adopters **6 → 12**, raw `req.json().catch` routes **23 → 17**. Ουρά **0 ενεργά** στην αρχή → άνοιξα 1 μη-sprawling continuation.
+- **Ευρήματα ανά διάσταση (live grep, όχι docs):**
+  - **Type safety: 0** — `npm run type-check` EXIT 0· `:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το `/api/v1` = 0.
+  - **Auth: 0 unguarded** — `grep -rL withAuth|bearerUser` (49 routes) → μόνο `auth/login` (auth boundary).
+  - **Input validation: 0 NOGUARD** — regex-aware sweep ΚΑΙ των 18 `[id]`/`[type]` routes → όλα με 24-hex guard· list params clamped 1..200· `ai` cap ενεργό.
+  - **Error handling: 0** inline `NextResponse.json({ error })` εκτός `auth/login` (3 hits σκόπιμα).
+  - **DB: 0** — 7/7 models `index({ updatedAt: -1 })`· list endpoints `.limit()`+`.lean()`· no-lean heuristic sweep = 0.
+  - **Duplication: 1 ongoing** — raw-body pattern σε **17 routes**, 12 adopters. Νόμιμο consistency debt.
+- **Counts ανά dimension: P1=0, P2=0, P3=1** (νέο apiBody continuation, S).
+- **Top 3 για τον builder:**
+  1. **apiBody readBody adoption notifications + lists PATCH (P3/S, api)** — μόνο η γραμμή body-parse (`req.json().catch` → `readBody(req)`, cast αφαιρείται)· τα `typeof`/`Array.isArray` field guards αμετάβλητα, 1:1-verified, tsc-checkable.
+  2. **(μελλοντικό) apiBody batch** — επόμενα ~15 raw routes (ai, items/[id]+link-plan+price, receipts/[id]+rescan, scan/expense+voucher, settings, shopping-list+[id], stores/[id], push/register), ένα-δύο ανά run.
+  3. Αν ο builder δεν έχει web item → πέφτει στο mobile UI Debt Queue (Chip/Badge/ListItem primitives).
+- Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ WEB_DEBT.md + PROGRESS.md.
+
+### Needs Achilleas
+- (αμετάβλητο) 3 standing παρατηρήσεις, product decisions ΟΧΙ queue items: (1) `auth/login` χωρίς rate-limit/brute-force guard (self-hosted, WireGuard-only → χαμηλό ρίσκο)· (2) κάποια error messages επιστρέφουν λεπτομέρεια (π.χ. «A store with that name already exists») — αποδεκτό για single-user, review αν γίνει multi-tenant· (3) `PATCH /api/v1/tasks/[id]` δέχεται `steps` full-array χωρίς άνω όριο πλήθους/μήκους — βάλε cap (≤100 steps, text ≤500 chars) αν βγει multi-tenant/public.
