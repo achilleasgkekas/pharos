@@ -79,3 +79,38 @@ fetch+rebase+push. Κανενα force-push.
 Επόμενο doc: `docs/api.md` (REST v1 reference — auth bearer token + καθε endpoint
 κατω απο api/v1, διαβάζοντας τα route files). Μετά: `docs/configuration.md`,
 `docs/mobile.md`.
+
+## 2026-07-01 (3ο run)
+
+Έγραψα το `docs/api.md` — πλήρες REST API v1 reference, Αγγλικά, public audience.
+Δομη: overview/base URL, Authentication (POST /auth/login → bearer `phk_` token,
+role admin/member), Conventions (list envelope `{data,total,limit,offset}`,
+pagination limit 1..200/offset, `updatedSince` incremental sync που επιστρεφει και
+soft-deleted flagged `deleted:true`, soft-delete vs permanent, ObjectId 400,
+`{error}` shapes, AI-gated endpoints), και ολα τα 49 endpoints ομαδοποιημενα
+(Dashboard/reports, Items, Shopping list, Receipts, Scan, Expenses, Statements,
+Subscriptions, Vouchers, Tasks, Cards, Stores, AI command bar, Notifications/jobs/
+push, Settings/lists, Trash) + quick-start curl.
+
+Πηγες για ακριβεια (διάβασα κώδικα, οχι εικασιες): `lib/apiAuth.ts` (bearerUser +
+withAuth + apiError → το ακριβες 401 message), `lib/apiList.ts` (listParams/
+withSince/listEnvelope → το envelope + updatedSince semantics + soft-deleted-on-
+sync), `lib/apiBody.ts` (isObjectId 400 guard), `auth/login/route.ts` (token
+shape `phk_`), + JSDoc απο ολα τα 49 route.ts (method/path/params/response). Ολα
+τα endpoints/shapes απο τα actual routes, οχι μνημη.
+
+README TOC: το «API reference» μεταφερθηκε απο Planned → live guide (link σε
+api.md). Εμεινε στα Planned: Configuration, Mobile.
+
+Validation: markdown only, κανενα build/Docker/AI call. Code fences: 12 (6 κλειστα
+blocks, ζυγο). Internal links: script check README.md+api.md → 10 targets, ολα OK,
+0 MISSING. Απεφυγα broken link προς ανυπαρκτο mobile.md (το ανεφερα ως plain text,
+οχι link, μεχρι να γραφτει).
+
+Collision guard: `git diff --cached --name-only` κενο πριν το stage (κανενα
+concurrent routine mid-commit). Foreign unstaged (.claude/launch.json, WEB_DEBT.md)
+— δεν τα αγγιξα. Stage ΜΟΝΟ docs/api.md + docs/README.md + docs/DOCS_PROGRESS.md.
+
+Επόμενο doc: `docs/configuration.md` (AI providers, storage backends local/SMB/FTP/
+OneDrive, notifications ntfy/Discord/Slack/Telegram/webhook, i18n). Μετα:
+`docs/mobile.md`.

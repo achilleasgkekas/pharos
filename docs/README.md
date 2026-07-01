@@ -17,6 +17,9 @@ GitHub today and can feed a docs site later.
   Items/Shopping, Shopping list, Receipts + AI parsing, Expenses/Income,
   Statements/installments, Subscriptions, Vouchers, Calendar, Reports, Tasks,
   Network/UniFi, AI command bar, Search, Notifications, Trash, Settings.
+- **[API reference](api.md)** — the REST API v1 under `/api/v1`: bearer-token
+  auth, list envelope & incremental sync, and every endpoint (method, path,
+  request/response shape), read from the route files.
 
 ## Planned guides
 
@@ -24,7 +27,6 @@ These are being written incrementally (see [DOCS_PROGRESS.md](DOCS_PROGRESS.md))
 
 - **Configuration** — AI providers, storage backends (local/SMB/FTP/OneDrive),
   notifications (ntfy/Discord/Slack/Telegram/webhook), i18n.
-- **API reference** — the REST API v1 under `/api/v1` (auth, endpoints, shapes).
 - **Mobile app** — Expo companion app setup and pointing it at a server.
 
 ## Reference (repo root)

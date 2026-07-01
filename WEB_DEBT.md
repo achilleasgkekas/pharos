@@ -3,6 +3,21 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-01 25η σάρωση· builder κατανάλωσε ΚΑΙ τα 2 ανοιχτά items + επιπλέον, ουρά 2→0 → ανοίγω 1 P3/S readBody twins)
+
+**2026-07-01 (25η σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 route files** + `apiAuth`/`apiBody`/`apiList` helpers + νέος SaaS tenancy κώδικας (`lib/tenancy/*`), όλα από live grep. Από την 24η σάρωση ο builder προχώρησε πολύ: κατανάλωσε **και τα 2 ανοιχτά P3/S** (readBody σε settings + stores/[id], και σε receipts/[id] + receipts/[id]/rescan) **και επιπλέον** raw-body routes → `req.json().catch` απομένει πλέον **μόνο σε 3 routes** (scan/expense, scan/voucher, shopping-list POST), `readBody` adopters **26**. Τα 2 stale-marked TODO ήταν ήδη DONE → τα μάρκαρα DONE (live-verified). Η ουρά έφτασε **0 ενεργά** στην αρχή.
+- **Ευρήματα ανά διάσταση (live grep, όχι docs):**
+  - **Type safety: 0** — `npm run type-check` **EXIT 0**· `:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το `/api/v1` = **0**. Ο νέος SaaS κώδικας (`lib/tenancy/context.ts`, `saasMode.ts`) καθαρός: μηδέν `any`.
+  - **Auth: 0 unguarded** — μοναδικό v1 route χωρίς `withAuth`/`bearerUser` = `auth/login` (auth boundary, σωστά). 48/49 routes μέσω `withAuth`.
+  - **Input validation: 0 gaps** — τα 3 εναπομείναντα raw-body routes validate τα inputs τους· `readBody` adoption = style/consistency, ΟΧΙ validation gap.
+  - **Error handling: 0** — ομοιόμορφο try/catch + `{ error }` shape μέσω `withAuth`.
+  - **DB: 0** — ΟΛΑ τα read paths `.lean()` (settings:16 + calendar:48 = multi-line builder chains με `.lean()` παρακάτω, false positives)· list endpoints `.limit()`+`.skip()`. Νέο `getTenantContext` κάνει `Tenant.findOne(...).lean()` × 2, gated πίσω από `SAAS_MODE` (μηδέν DB access όταν off) → καθαρό.
+  - **SaaS tenancy (νέο, ceb65c6/1e5dc4c): 0 debt** — server-only, gated behind `SAAS_MODE`, `.lean()`, pure host-parser έχει tests (`host.test.ts`). Δεν εισάγει route/parity/type debt.
+  - **Consistency debt (ανοιχτό): ανοίγω 1 P3/S** (readBody scan/expense + scan/voucher — twin one-liner swap, byte-behavior-identical). shopping-list POST μένει «needs care» (cast `Record<string,string>` → coercion, βλ. item σημείωση).
+- **Counts ανά dimension: P1=0, P2=0, P3=1** (νέο, S). Δεν εφευρίσκω debt· 25 σαρώσεις χωρίς P1/P2, ο κώδικας παραμένει ώριμος.
+
+---
+
 ## Σύνοψη audit (2026-07-01 24η σάρωση· builder έκλεισε isObjectId 4η/τελική παρτίδα, ουρά 2→1 ενεργό + ανοίγω 1 P3/S readBody continuation)
 
 **2026-07-01 (24η σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 route files** + `apiAuth`/`apiBody`/`apiList` helpers, όλα από live grep. Από την 22η/23η σάρωση ο builder κατανάλωσε το commit **`f17f279`** (isObjectId 4η/τελική παρτίδα — 7 deep sub-routes) → το `isObjectId()` dedup effort **ΕΚΛΕΙΣΕ πλήρως**: `grep -rln '\[a-f0-9\]{24}' src/app/api/v1` = **NONE**, `isObjectId` adopters = **19**. Το πρώτο queue item ήταν stale-marked TODO ενώ ήταν ήδη DONE → το μάρκαρα DONE. Το δεύτερο (readBody settings + stores/[id]) παραμένει **ΑΝΟΙΧΤΟ** (live: settings/route.ts:72 + stores/[id]/route.ts:25 ακόμα με raw `req.json().catch`).
@@ -273,6 +288,24 @@
 
 ## Web Debt Queue
 
+### apiBody helpers — readBody adoption σε scan/expense + scan/voucher POST
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/v1/scan/expense/route.ts, apps/web/src/app/api/v1/scan/voucher/route.ts
+- Depends on: none
+- Acceptance:
+  - Συνέχεια (και σχεδόν κλείσιμο) του apiBody adoption. Απομένουν μόλις **3** raw-body routes με `req.json().catch` (scan/expense, scan/voucher, shopping-list POST)· `readBody` adopters = **26**. Το shared `readBody` ζει στο `lib/apiBody.ts` (επιστρέφει `Body` = `Record<string, unknown>`, δεν πετάει· bad/empty JSON → `{}`).
+  - Και τα δύο routes έχουν **πανομοιότυπο** inline pattern μέσα σε ternary (JSON branch):
+    `String(((await req.json().catch(() => ({}))) as { text?: unknown }).text || '')`
+    → `String((await readBody(req)).text || '')`. Το `readBody(req)` επιστρέφει ήδη `Record<string, unknown>` → `.text` είναι `unknown` → `String(unknown || '')` δουλεύει· byte-behavior-identical (το `readBody` τυλίγει το ίδιο `req.json().catch(() => ({}))`, ίδιο no-throw semantics).
+  - Imports: κανένα από τα 2 files δεν έχει ήδη `@/lib/apiBody` import → σε καθένα νέο `import { readBody } from '@/lib/apiBody';` (δίπλα στο `import { withAuth, apiError } from '@/lib/apiAuth';`). Το multipart branch (`scanExpenseImage`/`scanVoucherImage(await req.formData())`) ΜΕΝΕΙ ΑΚΡΙΒΩΣ ως έχει — μόνο το JSON-text branch αλλάζει.
+  - Το `apiError(r.error, 400)` + το `{ data }` response shape + η σειρά content-type ternary ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. Καμία αλλαγή σε behaviour → μηδέν κίνδυνος για τον mobile consumer.
+  - **Εκτός scope (needs care, όχι εδώ):** `shopping-list/route.ts` POST κάνει `as Record<string, string>` και περνά `b.name`/`b.quantity`/... κατευθείαν ως strings στο `addListItem` (`NewItem = { name: string; ... }`). Το `readBody` επιστρέφει `unknown` values → θα χρειαστεί coercion (`String(b.name ?? '')` κ.λπ.), ΟΧΙ byte-identical → ξεχωριστό item σε επόμενο run.
+  - Επαλήθευση: `grep -rln 'req.json().catch' apps/web/src/app/api/v1` επιστρέφει πλέον μόνο `shopping-list/route.ts`· `readBody` adopters 26 → 28.
+  - npm run type-check exits 0
+- Status: TODO
+
 ### Dedup ObjectId-validation regex — 4η (τελευταία) παρτίδα (7 route files)
 - Priority: P3
 - Size: S
@@ -301,7 +334,7 @@
   - Μόνο η γραμμή body-parse αλλάζει (το inline `as Record<string, unknown>` cast αφαιρείται, ίδιος τύπος `Body`)· καμία αλλαγή σε validation behaviour / response shape.
   - Απομένουν ~11 raw routes με το ίδιο pattern (receipts/[id], receipts/[id]/rescan, scan/expense, scan/voucher, push/register, shopping-list POST, ai, ai/subscription, items/[id]/link-plan, items/[id]/price, items/import) για μελλοντικά runs (1-2/run).
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (2026-07-01, 25η σάρωση) — live-verified: `settings/route.ts:73` + `stores/[id]/route.ts:25` κάνουν πλέον `const b = await readBody(req);` (imports `{ readBody }` / `{ isObjectId, readBody }`). Ο builder το κατανάλωσε μαζί με πολλά άλλα readBody swaps· `req.json().catch` απομένει μόνο σε 3 routes.
 
 ### apiBody helpers — readBody adoption σε receipts/[id] + receipts/[id]/rescan PATCH
 - Priority: P3
@@ -316,7 +349,7 @@
   - Μόνο η γραμμή body-parse αλλάζει (το inline `as Record<string, unknown>` cast αφαιρείται, ίδιος τύπος `Body`)· ΟΛΑ τα partial-update field guards + response shapes ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· καμία αλλαγή σε behaviour → μηδέν κίνδυνος για τον mobile consumer.
   - Απομένουν ~9 raw routes με το ίδιο pattern (scan/expense, scan/voucher, push/register, shopping-list POST, ai, ai/subscription, items/[id]/link-plan, items/[id]/price, items/import) για μελλοντικά runs (1-2/run).
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (2026-07-01, 25η σάρωση) — live-verified: `receipts/[id]/route.ts:36` + `receipts/[id]/rescan/route.ts:23` κάνουν πλέον `const b = await readBody(req);` (imports `{ isObjectId, readBody }`). Adopters `readBody` = **26**· `req.json().catch` απομένει μόνο σε 3 routes (scan/expense, scan/voucher, shopping-list POST).
 
 ### Dedup ObjectId-validation regex — 3η παρτίδα (5 route files)
 - Priority: P3

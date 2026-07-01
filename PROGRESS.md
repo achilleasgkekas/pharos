@@ -5,6 +5,17 @@
 <!-- reviewed: 2784fc1 -->
 <!-- docker-validated: 99a9385 -->
 
+## 2026-07-01 (web-code-quality — 25η σάρωση: ουρά 2→0, builder κατανάλωσε ΚΑΙ τα 2 + επιπλέον, ανοίγω 1 P3/S)
+- **Counts ανά dimension (live grep, όχι docs):** Type safety **0** (tsc EXIT 0· zero `any`/`ts-ignore` σε όλο το `/api/v1`)· Auth **0 unguarded** (μόνο `auth/login` exempt, σωστά)· Input validation **0 gaps**· Error handling **0** (uniform `withAuth` try/catch + `{ error }`)· DB **0** (όλα `.lean()`, lists limited)· Consistency debt **1 ανοιχτό** (3 raw-body routes απομένουν).
+- **Ουρά κίνηση**: από την 24η σάρωση ο builder κατανάλωσε **και τα 2 ανοιχτά P3/S** (readBody σε settings + stores/[id], και σε receipts/[id] + receipts/[id]/rescan) **και επιπλέον** — `req.json().catch` απομένει πλέον **μόνο σε 3 routes** (scan/expense, scan/voucher, shopping-list POST), `readBody` adopters **26**. Τα 2 stale-marked TODO ήταν ήδη DONE → τα μάρκαρα DONE (live-verified: και τα 4 files κάνουν `const b = await readBody(req);`).
+- **Νέος SaaS κώδικας ελεγμένος (καθαρός):** `lib/tenancy/context.ts` (`getTenantContext`/`dbNameFor`/`scoped`/`DEFAULT_TENANT`) + `saasMode.ts` — server-only, gated πίσω από `SAAS_MODE` (μηδέν DB access όταν off), `Tenant.findOne(...).lean()`, μηδέν `any`, pure host-parser με tests (`host.test.ts`). Δεν εισάγει route/type/DB debt.
+- **Άνοιξα 1 P3/S** (μη-sprawling): **readBody adoption σε scan/expense + scan/voucher POST** — twin one-liner swap `String(((await req.json().catch(()=>({}))) as {text?:unknown}).text || '')` → `String((await readBody(req)).text || '')`, byte-behavior-identical (μόνο το JSON-text branch· multipart branch αμετάβλητο). Δεν ανοίγω νέο πέρα από αυτό (no debt to invent).
+- **Top-3 για τον builder:** (1) **readBody scan/expense + scan/voucher** [P3/S, το νέο item, κλείνει 2/3 raw routes]· (2) **readBody shopping-list POST** [P3/S, needs care — `Record<string,string>` cast → coercion `String(b.name ?? '')`, ΟΧΙ byte-identical· ξεχωριστό item όταν το πάρει ο builder]· (3) mobile UI Debt `<ListItem>` primitive (5 byte-identical sites) αν η web ουρά αδειάσει.
+- **mobile δεν αγγίχτηκε** (web-focused run). **Read-only**: μηδέν app-code edit, μηδέν Docker, μηδέν AI/token. Staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (ρητά paths, ΟΧΙ `-A`). ΔΕΝ άγγιξα το `.claude/launch.json` (foreign tooling change στο working tree).
+
+### Needs Achilleas
+- Κανένα νέο. Standing web-side (product/security decisions, ΟΧΙ queue items): login brute-force rate-limit· error-message leak στο `withAuth` 500· tasks `steps`/shopping-list χωρίς άνω όριο πλήθους (αποδεκτό για WireGuard-only single-user). Νέο SaaS: όταν/αν ενεργοποιηθεί `SAAS_MODE`, το mobile θα χρειαστεί απόφαση tenant-scoping (per-tenant bearer). Concurrency: πολλαπλοί builders στο ίδιο `main` — single-flight lock ή per-role worktrees θα απέτρεπε collisions.
+
 ## 2026-07-01 (ui-auditor — 24η σάρωση: CONFIRMATION, foundation καθαρό, επόμενο = `<ListItem>`)
 - **Mobile-src διαφορά από το τελευταίο marker** (`git log 3a272c1..HEAD -- apps/mobile/src`): **μόνο** το `ee9d413` (shared `<Badge>` primitive, ήδη καταγεγραμμένο 23η) → **μηδέν νέο mobile-src commit**, UI Debt Queue **αμετάβλητη**. Working tree apps/mobile **καθαρό** (μόνο `.claude/launch.json` foreign tooling, δεν το αγγίζω).
 - **Ευρήματα ανά dimension (fresh grep από κώδικα, όχι docs):**
