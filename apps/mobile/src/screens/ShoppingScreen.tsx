@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl, Modal, StyleSheet, Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { C } from '../theme';
+import { C, scrim } from '../theme';
 import {
   getShoppingList, addListItem, toggleListItem, deleteListItem, scanProduct, type ListItem, type ScannedProduct,
 } from '../api';
@@ -169,7 +169,7 @@ const s = StyleSheet.create({
   qty: { color: C.dim, fontSize: 12, marginTop: 2 },
   del: { color: C.faint, fontSize: 16, paddingHorizontal: 4 },
   label: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginBottom: 6, marginTop: 12 },
-  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
+  modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 24 },
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '700' },
   modalBtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 },

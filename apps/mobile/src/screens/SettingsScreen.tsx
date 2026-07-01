@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal } from 'react-native';
-import { C, alpha } from '../theme';
+import { C, alpha, scrim } from '../theme';
 import { money, ErrorText, Check, Input, TextArea } from '../ui';
 import { PharosMark } from '../PharosMark';
 import { APP_VERSION } from '../config';
@@ -674,7 +674,7 @@ const s = StyleSheet.create({
   listSaveText: { color: C.onAccent, fontSize: 13, fontWeight: '800' },
   listResetBtn: { paddingVertical: 9, paddingHorizontal: 6 },
   listResetText: { color: C.dim, fontSize: 12, fontWeight: '600' },
-  modalBackdrop: { flex: 1, backgroundColor: alpha('#000', 0.67), justifyContent: 'flex-end' },
+  modalBackdrop: { flex: 1, backgroundColor: scrim, justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: C.border, maxHeight: '90%' },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },
   modalBtns: { flexDirection: 'row', gap: 12, marginTop: 22, alignItems: 'stretch' },

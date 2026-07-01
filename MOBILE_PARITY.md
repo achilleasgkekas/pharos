@@ -265,7 +265,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - Νέο `scrim` (ή `C.scrim`) token στο `theme.ts`· τα 9 modal backdrops το χρησιμοποιούν αντί για inline `rgba(0,0,0,0.6)` / `rgba(0,0,0,0.7)` / `alpha('#000',0.67)`
   - Μηδέν `rgba(0, 0, 0, …)` ή `#000` literal στα screens (grep καθαρό — σβήνει και τον τελευταίο hardcoded hex @ SettingsScreen:677)
   - Ενιαία διαφάνεια σε όλα τα modals (τώρα 0.6 vs 0.67 vs 0.7 drift)· tsc καθαρό (mobile)
-- Status: TODO
+- Status: DONE (2026-07-01) — `scrim = 'rgba(0, 0, 0, 0.6)'` προστέθηκε στο `theme.ts`· και τα **10** backdrop sites (9 screens + `nav.tsx:86` drawer scrim, που είχε ξεφύγει από την αρχική λίστα) το χρησιμοποιούν πλέον. Grep καθαρό: μηδέν `rgba(0,0,0,…)` / `alpha('#000',…)` inline στα screens (μόνο σχόλιο στο `theme.ts`). Receipts (0.7→0.6) + Settings (0.67→0.6) ενοποιήθηκαν στο 0.6 (dominant, 7/9)· αμελητέα οπτική μεταβολή. mobile `tsc --noEmit` EXIT 0.
 
 ### Button + Chip primitives (add/save buttons + filter/status chips)
 - Priority: P2

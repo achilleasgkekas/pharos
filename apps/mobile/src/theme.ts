@@ -24,6 +24,10 @@ export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 } as const;
 // Corner radii — the 3 values used inconsistently across screens.
 export const RADIUS = { sm: 10, md: 12, lg: 14 } as const;
 
+// Modal / drawer backdrop scrim — one dim overlay for every sheet & centered modal.
+// (Was drifting inline across screens: rgba(0,0,0,0.6) ×7, 0.7 ×1, alpha('#000',0.67) ×1.)
+export const scrim = 'rgba(0, 0, 0, 0.6)';
+
 // Font sizes — the recurring scale across screens.
 export const SIZE = { xs: 11, sm: 13, base: 14, md: 15, lg: 16, xl: 19 } as const;
 

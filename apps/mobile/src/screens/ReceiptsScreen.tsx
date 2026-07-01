@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, Image, Pressable, FlatList, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { C } from '../theme';
+import { C, scrim } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Check } from '../ui';
 import { getReceipts, getReceipt, scanReceipt, rescanReceipt, updateReceipt, addReceiptToLibrary, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
 
@@ -253,7 +253,7 @@ const s = StyleSheet.create({
   store: { color: C.text, fontSize: 15, fontWeight: '600' },
   meta: { color: C.faint, fontSize: 12, marginTop: 3 },
   total: { color: C.text, fontSize: 16, fontWeight: '700' },
-  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'flex-end' },
   modal: { backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, maxHeight: '92%', borderWidth: 1, borderColor: C.border },
   modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800', flex: 1 },

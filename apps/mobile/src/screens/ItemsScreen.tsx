@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
-import { C } from '../theme';
+import { C, scrim } from '../theme';
 import { money, Spinner, ErrorText, Empty, Input, TextArea } from '../ui';
 import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
@@ -477,7 +477,7 @@ const s = StyleSheet.create({
   title: { color: C.text, fontSize: 15, fontWeight: '600', marginTop: 2 },
   meta: { color: C.faint, fontSize: 12, marginTop: 2 },
   price: { color: C.accent, fontSize: 16, fontWeight: '700' },
-  modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 },
+  modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 20 },
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20, maxHeight: '88%' },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },

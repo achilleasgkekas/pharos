@@ -1,5 +1,5 @@
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { C } from './theme';
+import { C, scrim } from './theme';
 import { PharosMark } from './PharosMark';
 import type { ScreenKey } from './screens/HomeScreen';
 
@@ -83,7 +83,7 @@ const s = StyleSheet.create({
   badge: { position: 'absolute', top: 2, right: 0, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: C.red, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   badgeText: { color: C.text, fontSize: 10, fontWeight: '800', lineHeight: 12 },
   title: { flex: 1, color: C.text, fontSize: 19, fontWeight: '800' },
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', flexDirection: 'row' },
+  scrim: { flex: 1, backgroundColor: scrim, flexDirection: 'row' },
   panel: { width: 270, maxWidth: '82%', backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border, paddingTop: 60, paddingHorizontal: 12, paddingBottom: 24 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, marginBottom: 16 },
   brand: { color: C.text, fontSize: 20, fontWeight: '800', letterSpacing: 3 },

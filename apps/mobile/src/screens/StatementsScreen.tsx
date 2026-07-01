@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, Modal, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
-import { C } from '../theme';
+import { C, scrim } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
 import { getStatements, getStatementTxns, getInstallmentPlans, type Statement, type StatementTxn, type InstallmentPlan } from '../api';
 
@@ -150,7 +150,7 @@ const s = StyleSheet.create({
   card_: { color: C.text, fontSize: 15, fontWeight: '700' },
   total: { color: C.text, fontSize: 16, fontWeight: '800' },
   meta: { color: C.faint, fontSize: 12, marginTop: 4 },
-  sheetWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  sheetWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'flex-end' },
   sheet: { backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: C.border, padding: 18, maxHeight: '88%' },
   sheetHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   sheetTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
