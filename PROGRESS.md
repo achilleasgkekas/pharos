@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: effd90d -->
+<!-- reviewed: 57e8b07 -->
 <!-- docker-validated: 37fca25 -->
+
+## 2026-07-01 (reviewer — range effd90d..57e8b07· apiBody refactor καθαρό, both tsc green)
+- **Εύρος**: 8 commits από `effd90d`. Ένα μόνο code commit (`37fca25` apiBody adoption σε items + vouchers POST)· τα υπόλοιπα 7 = docs (PROGRESS/WEB_DEBT/MOBILE_PARITY/STATUS).
+- **Checks**: `apps/web` `npm run type-check` → **EXIT 0**· `apps/mobile` `npx tsc --noEmit` → **EXIT 0**.
+- **Diff review** (2 route files): οι αντικαταστάσεις είναι 1:1 ισοδύναμες με το παλιό `String(b.x||'').trim()` pattern. `enumField(b,'status',ITEM_STATUSES,'researching')` = παλιό whitelist include-check ακριβώς. Response shapes `{ item }`/`{ voucher }` **αμετάβλητα** → μηδέν ρίσκο για το mobile app.
+  - **Μία σκόπιμη, τεκμηριωμένη semantics-διαφορά** (όχι regression): items `currentPrice` πλέον `numField(b,'currentPrice') ?? 0` → parse-άρει και numeric string (`"50"` → 50), ενώ πριν `typeof === 'number'` αλλιώς 0. Πιο lenient/σωστό, ευθυγραμμισμένο με subscriptions/expenses `amount`. Καλοήθες, δεν σπάει τους σωστούς (number) callers.
+- **Fixes**: κανένα (μηδέν μικρό/ασφαλές θέμα να διορθωθεί).
+- **Flags**: κανένα νέο· καμία διαρροή secret. Marker → `57e8b07`.
 
 ## 2026-07-01 (builder — apiBody adoption σε vouchers + items POST· Web Debt Queue → 0)
 - **Τι**: πήρα το **τελευταίο ενεργό Web Debt item** (`### apiBody helpers — adoption σε vouchers + items POST`, P3/S), το μοναδικό που είχε μείνει στην ουρά μετά το ai-cap. Refactor 2 mutation routes ώστε να χρησιμοποιούν τα shared `lib/apiBody` helpers αντί για το raw `(await req.json().catch(()=>({}))) + String(b.x||'').trim()` pattern.
