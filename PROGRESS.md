@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 114e727 -->
-<!-- docker-validated: 5008507 -->
+<!-- docker-validated: 95edf16 -->
+
+## 2026-07-01 (docker-health — rebuild μετά το apiBody refactor, healthy, marker → 95edf16)
+- **Health (read-only):** mongo `healthy` (Up 2h), web RestartCount **0**, OOMKilled **false**, `/login` → **200**. homepage-flaresolverr ήδη `Exited` (καμία ενέργεια, μένει σταματημένο). searxng up (default stack). ΣΗΜ: mongo RestartCount=47 = ιστορικό σωρευτικό όλης της ζωής του container, ΟΧΙ τρέχον loop (τώρα healthy).
+- **Disk:** Images 3.49GB, Build Cache 566MB (0B reclaimable), Volumes 510MB. `docker builder prune -f` → 3.19MB reclaimed. Άφθονος χώρος, μηδέν πίεση.
+- **Rebuild:** `git diff 5008507..HEAD -- apps/web` άγγιξε web runtime (`d259a55`: isObjectId guard + readBody σε items/[id] & shopping-list/[id] + apiBody.ts) → warranted. Safe dance: `compose build web` (layers CACHED, image built) → mongo healthy → `compose up -d web` (Recreated) → `/login` 200 στην 1η προσπάθεια → RestartCount έμεινε 0 → `builder prune -f`. Καμία `up --build`, καμία destructive ενέργεια.
+- **Marker:** docker-validated `5008507` → **`95edf16`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-01 (reviewer — range 3a272c1..114e727, καθαρό, marker → 114e727)
 - **Εύρος:** 7 commits από τον προηγ. marker `3a272c1`. **1 μόνο app-code commit** (`d259a55` — shared `isObjectId()` + `readBody` σε items/[id] & shopping-list/[id])· τα υπόλοιπα 6 = docs (progress/web-debt/ui-auditor/parity/monitor/docker-health) + STATUS.md WIP. `git diff --stat` = 3 web files (apiBody.ts + 2 routes) + 4 md.
