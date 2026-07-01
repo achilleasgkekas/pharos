@@ -247,7 +247,7 @@
   - Επαλήθευση: `grep -rl '/\^\[a-f0-9\]{24}\$/i' apps/web/src/app/api/v1` δεν περιλαμβάνει πλέον κανένα από τα 5 files· `isObjectId` adopters 2 → 7.
   - Απομένουν ~12 route files με inline regex (cards/[id], stores/[id], statements/[id], trash/[type]/[id], notifications, receipts/[id]/rescan+add-to-library, items/[id]/link-plan+plans+convert-to-task+ai-fill+price) για 3η-4η παρτίδα σε μελλοντικά runs.
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (2026-07-01) — και τα 5 route files migrated: `!/^[a-f0-9]{24}$/i.test(id)` → `!isObjectId(id)` (10 occurrences, 2/file). expenses/subscriptions/tasks/vouchers είχαν ήδη `import { readBody }` → έγινε `import { isObjectId, readBody }`· receipts πήρε νέο `import { isObjectId } from '@/lib/apiBody'`. Μήνυμα `apiError('bad id')` + auth-πριν-id αμετάβλητα. tsc EXIT 0· safe rebuild → /login 200, web RestartCount 0, OOM false, GET receipts/[id] + PATCH vouchers/[id] no-token → 401. `isObjectId` adopters 2 → 7· απομένουν ~12 route files για 3η παρτίδα.
 
 ### apiBody helpers — readBody adoption σε notifications + lists PATCH
 - Priority: P3

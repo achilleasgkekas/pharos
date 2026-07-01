@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { isObjectId } from '@/lib/apiBody';
 import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
 import { Receipt } from '@/models/Receipt';
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const doc = await Receipt.findById(id).select('-rawAiResponse').lean();
     if (!doc) return apiError('not found', 404);
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const set: Record<string, unknown> = {};
     if (typeof b.store === 'string' && b.store.trim()) set.store = b.store.trim();

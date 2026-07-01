@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
-import { readBody } from '@/lib/apiBody';
+import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Voucher } from '@/models/Voucher';
 
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     const b = await readBody(req);
     const set: Record<string, unknown> = {};
     if (typeof b.title === 'string' && b.title.trim()) set.title = b.title.trim();
@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
-    if (!/^[a-f0-9]{24}$/i.test(id)) return apiError('bad id');
+    if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
     const doc = await Voucher.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
