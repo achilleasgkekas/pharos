@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
+import { readBody, strField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Voucher } from '@/models/Voucher';
 
@@ -38,18 +39,18 @@ export async function GET(req: NextRequest) {
 /** POST /api/v1/vouchers  { title, code?, store?, discount?, expiresAt?, url?, notes? } */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
-    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const title = String(b.title || '').trim();
+    const b = await readBody(req);
+    const title = strField(b, 'title', '', true);
     if (!title) return apiError('title required');
     await connectDB();
     const doc = await Voucher.create({
       title,
-      code: String(b.code || '').trim(),
-      store: String(b.store || '').trim(),
-      discount: String(b.discount || '').trim(),
+      code: strField(b, 'code', '', true),
+      store: strField(b, 'store', '', true),
+      discount: strField(b, 'discount', '', true),
       expiresAt: b.expiresAt ? new Date(String(b.expiresAt)) : null,
-      url: String(b.url || '').trim(),
-      notes: String(b.notes || '').trim(),
+      url: strField(b, 'url', '', true),
+      notes: strField(b, 'notes', '', true),
     });
     return NextResponse.json({ voucher: trim(doc.toObject() as VoucherLean) }, { status: 201 });
   });

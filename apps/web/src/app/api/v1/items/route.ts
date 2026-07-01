@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, iso, listEnvelope } from '@/lib/apiList';
+import { readBody, strField, numField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Item, ITEM_STATUSES } from '@/models/Item';
 
@@ -56,19 +57,19 @@ export async function GET(req: NextRequest) {
 /** POST /api/v1/items  { title, status?, category?, currentPrice? } → { item } */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
-    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const title = String(b.title || '').trim();
+    const b = await readBody(req);
+    const title = strField(b, 'title', '', true);
     if (!title) return apiError('title required');
     // Validate status against the shared whitelist (same list the PATCH route uses);
     // an unknown value falls back to 'researching' rather than being stored verbatim.
-    const status = (ITEM_STATUSES as readonly string[]).includes(String(b.status)) ? String(b.status) : 'researching';
+    const status = enumField(b, 'status', ITEM_STATUSES, 'researching');
     await connectDB();
     const doc = await Item.create({
       title,
       status,
       // category stays a free string by design (relaxed enum → custom categories from Settings → Lists).
-      category: String(b.category || 'other'),
-      currentPrice: typeof b.currentPrice === 'number' ? b.currentPrice : 0,
+      category: strField(b, 'category', 'other'),
+      currentPrice: numField(b, 'currentPrice') ?? 0,
     });
     return NextResponse.json({ item: trim(doc.toObject() as ItemLean) }, { status: 201 });
   });
