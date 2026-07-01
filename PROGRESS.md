@@ -5,6 +5,27 @@
 <!-- reviewed: 1791295 -->
 <!-- docker-validated: ac5cbc2 -->
 
+## 2026-07-01 (web-code-quality — αργά βραδινό re-audit· ουρά αμετάβλητη, 2 P3/S ΑΝΟΙΧΤΑ)
+
+Fresh read-only σάρωση όλης της `/api/v1` (**49 route files**) + 7 synced models + `apiAuth`/`apiList`/`apiBody`/`serialize`. `npm run type-check` → **exit 0**. Τελευταίος app-code commit στο `apps/web/src` = **`c540322`** (apiError refactor), ίδιος με τον προηγούμενο γύρο· clean tree, κανένας builder δεν κατανάλωσε item → η Web Debt Queue σταθερή by-construction.
+
+**Ευρήματα ανά διάσταση (0 νέα):**
+- Type safety: `: any`/`as any`/`@ts-ignore` σε `/api/v1` → **0** (μόνο 1 αναγκαίο Mongoose cast σε `lib/softDelete.ts:25`, εκτός api).
+- Auth: 48/49 routes περνούν `withAuth`· μόνο `auth/login` MISSING (σωστά, auth boundary). 0 unguarded.
+- Input validation: όλα τα `[id]`/`[type]` με 24-hex/`ID_RE` guard· list params clamped 1..200.
+- Error handling: inline `NextResponse.json({ error })` → **3 hits, όλα στο `auth/login`** (σκόπιμα)· 0 αλλού.
+- DB: 7/7 synced models με explicit `index({ updatedAt: -1 })`· reads `.lean()` + pagination (9 «no-lean» hits = non-list endpoints, false positives).
+- Duplication/dead code: κανένα νέο. UX states: N/A (auditor εστιάζει API).
+
+**Ουρά (αμετάβλητη): 2 ενεργά P3/S, όλα τα άλλα DONE.**
+
+**Top-3 για τον builder:**
+1. apiBody helpers adoption σε vouchers + items POST (P3/S) — grep επιβεβαίωσε 27 routes ακόμα με raw body pattern.
+2. POST /api/v1/ai — cap μήκους ιστορικού messages (P3/S) — μόνο array-input χωρίς άνω όριο (cost exposure).
+3. (Ουρά αλλιώς καθαρή) builder πέφτει στο mobile UI Debt Queue αν εξαντλήσει τα web items.
+
+Κανένα νέο item δεν ανοίχτηκε (no debt to invent). Καμία νέα καταχώρηση στο `## Needs Achilleas` (οι 2 παλιές security παρατηρήσεις — login brute-force, error-message leak — παραμένουν product decisions).
+
 ## 2026-07-01 (ui-auditor — 9η σάρωση· scrim-drift formalized ως P2/S item)
 - **Foundation (read-only re-verify):** `theme.ts` mirror-άρει 1:1 το `globals.css:8-22` (13 χρώματα + `onAccent`) + `SPACE/RADIUS/SIZE/alpha`· `ui.tsx` εξάγει `Header/Centered/Spinner/ErrorText/Empty/Check/Input/TextArea`. Το shared-theme P1 foundation παραμένει DONE (δεν λείπει).
 - **Ευρήματα ανά διάσταση:**
