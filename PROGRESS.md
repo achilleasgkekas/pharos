@@ -3,7 +3,18 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 4c6856f -->
-<!-- docker-validated: 6e0dc4e -->
+<!-- docker-validated: 0c866eb -->
+
+## 2026-07-01 (builder — apiBody `readBody` adoption σε notifications + lists PATCH· commit `0c866eb`)
+- **Τι**: πήρα το μοναδικό ενεργό Web Debt item (`### apiBody helpers — readBody adoption σε notifications + lists PATCH`, P3/S), που άνοιξε η **17η web-debt σάρωση** (`375b1f7`, committed πριν το run μου). Parity queue 7/7 DONE, mobile UI Debt (ListItem/Chip) attended-preferred για οπτικό verify → αυτό ήταν το κορυφαίο unattended-safe TODO με πλήρη spec. Συνέχεια του apiBody adoption (adopters `readBody` **12 → 14**).
+- **Αλλαγές** (2 route files, panομοιότυπη ελάχιστη αλλαγή):
+  - **notifications/route.ts PATCH** + **lists/route.ts PATCH**: `+ import { readBody } from '@/lib/apiBody'` + η **μόνη** γραμμή body-parse `const b = (await req.json().catch(() => ({}))) as {...};` → `const b = await readBody(req);`. Το `readBody` επιστρέφει `Body` (= `Record<string, unknown>`) → το inline cast αφαιρέθηκε. Τα guards μένουν ΑΚΡΙΒΩΣ ως έχουν: notifications `typeof b.id === 'string' && b.id` + 24-hex `/^[a-f0-9]{24}$/i`· lists `typeof b.key === 'string'` + `Array.isArray(b.values)`. Response shapes `{ ok:true }` και στα δύο αμετάβλητα → μηδέν κίνδυνος για τον mobile consumer.
+- **Verify**: `apps/web` `npm run type-check` → **EXIT 0**. Safe Docker rebuild: mongo **healthy** (πριν+μετά), flaresolverr exited (καμία ενέργεια), build cache 566MB μικρό· `docker compose build web` (image-only, όλα cached) → mongo healthy → `docker compose up -d web` (web container ήταν absent στην αρχή, recreated) → `/login` **200** (1η προσπάθεια) → `docker inspect` `Running:true, Restarting:false` (up σταθερό, όχι loop)· `PATCH /api/v1/notifications` & `PATCH /api/v1/lists` no-token → **401** (auth boundary intact στο built image). `docker builder prune -f` μετά (cache-only, 2.021GB reclaimed). Μηδέν AI/token call.
+- **Git hygiene**: commit `0c866eb` — staged ΜΟΝΟ τα 2 route files (explicit paths, ΟΧΙ `-A`). Στο αρχικό snapshot το working tree είχε uncommitted `WEB_DEBT.md` (17η σάρωση του web-debt auditor)· ο auditor το commit-άρισε (`375b1f7`) κατά το run μου → **δεν το άγγιξα**. Κανένα secret/`.env`.
+- **Επόμενο task**: απομένουν **~15** routes με το ίδιο raw `req.json().catch` pattern για μελλοντικά apiBody-continuation items (1-2/run, μη-sprawling): ai, ai/subscription, items/[id]+link-plan+price+import, push/register, receipts/[id]+rescan, scan/expense+voucher, settings, shopping-list+[id], stores/[id]. Εναλλακτικά: mobile UI Debt (`<ListItem>` ή `<Chip>` primitive, tsc-verifiable αν byte-identical· `<Badge>` token-divergent → attended-preferred) ή fresh web-debt σάρωση.
+
+### Needs Achilleas
+- Κανένα νέο. (Παραμένουν: login brute-force rate-limit, error-message leak στα action responses, tasks `steps` χωρίς cap· mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports extra charts, Tasks Kanban board, Statements merge/bind + PDF import, remote push αδοκίμαστο.)
 
 ## 2026-07-01 (parity-auditor — 14η σάρωση ημέρας, ουρά αμετάβλητη, read-only)
 - **Inventory από κώδικα (όχι docs):** **49 v1 routes** (login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`** (home + 18· income ξεχωριστή), **81 exported api fns**. Το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes (τα `tasks[id]`/`trash/[id]/[id]` του grep = template-literal artifacts) → **μηδέν «endpoint χωρίς mobile consumer» gap**. Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only admin wizard, N/A).
