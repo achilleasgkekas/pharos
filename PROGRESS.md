@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: c5cec57 -->
+<!-- reviewed: f17f279 -->
 <!-- docker-validated: b1b2b43 -->
+
+## 2026-07-01 (reviewer — range c5cec57..f17f279: isObjectId 4η/ΤΕΛΙΚΗ παρτίδα clean)
+- **Τι review:** 7 commits από τον marker `c5cec57`. Ένα ΜΟΝΟ app-code commit: **`f17f279`** (`refactor(api)` isObjectId dedup 4η/τελική παρτίδα, 7 deep sub-route files). Τα υπόλοιπα 6 = docs (web-debt/ui-auditor/parity/monitor/review) + `26b496a` chore(docker-health). Working tree καθαρό στην αρχή.
+- **Diff review:** μηχανικό dedup, byte-identical. Επιβεβαίωσα ότι ο shared `isObjectId()` (`lib/apiBody.ts:20`) = `/^[a-f0-9]{24}$/i.test(id)` μέσω `OBJECT_ID_RE` → ΑΚΡΙΒΩΣ ίδιο pattern+flag με τον inline regex που αντικαταστάθηκε. Κάθε αρχείο πρόσθεσε μόνο `import { isObjectId } from '@/lib/apiBody'`. `apiError('bad id')` μήνυμα/status/σειρά auth-πριν-id/response shapes αμετάβλητα → **μηδέν ρίσκο mobile consumer** (καμία αλλαγή response shape).
+- **DONE acceptance verified:** `grep 'a-f0-9]{24}' api/v1` → **0** (η δήλωση «μηδέν inline ObjectId regex σε api/v1» ισχύει)· `isObjectId` adopters = **19** (=12+7, ταιριάζει).
+- **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**. Μηδέν regression, μηδέν missing error-handling, μηδέν secret, μηδέν shape change.
+- **Fixes/flags:** κανένα fix χρειάστηκε (καθαρό). Κανένα νέο flag· τα standing items (login rate-limit, `withAuth` 500 leak, tasks `steps` cap) παραμένουν στην ουρά, ανέγγιχτα.
+- **Git hygiene:** staged ΜΟΝΟ PROGRESS.md (explicit path). Marker → `f17f279`.
 
 ## 2026-07-01 (builder — isObjectId() dedup 4η/ΤΕΛΙΚΗ παρτίδα: 7 deep sub-routes)
 - **Τι**: έκλεισα το τελευταίο εκκρεμές P3/S της Web Debt Queue (builder next-task από την 3η παρτίδα, πλήρες spec, unattended-safe). Ολοκληρώνει το isObjectId dedup — **μηδέν inline ObjectId regex πλέον σε όλο το `api/v1`**.
