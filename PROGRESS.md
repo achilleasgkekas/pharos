@@ -1191,3 +1191,17 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 - **Verify:** `cd apps/mobile && npx tsc --noEmit` → **EXIT 0**. Grep επιβεβαίωσε μηδέν dangling `s.save`/`s.saveText` στα 5 screens. Καμία Docker/AI ενέργεια (mobile-only). Δεν μπορεί να δοκιμαστεί σε simulator unattended → βασίστηκα σε tsc + zero-visual-change by construction.
 - **Staged (explicit):** `apps/mobile/src/ui.tsx` + 5 screens (Money/Receipts/Subscriptions/Tasks/Vouchers) + `MOBILE_PARITY.md` + `PROGRESS.md`. ΟΧΙ `git add -A`.
 - **Επόμενο task (πρόταση):** συνέχεια του Button+Chip item — (1) `addBtn` (46-wide icon `＋`, 6 screens Subscriptions/Items/Shopping/Vouchers) → νέο `IconButton` variant (fontSize 24, + cyan `importBtn` variant στο Items)· ή (2) ItemsScreen `save` outlier (padH26/minWidth96) μέσω `<Button style={...}>`. Το `<Chip>` component + ghost `aiBtn` variants παραμένουν attended-preferred (οπτικό verify).
+
+## 2026-07-01 (parity-auditor — 12η σάρωση, ουρά αμετάβλητη 7/7 DONE)
+- **Σάρωση από τον κώδικα (όχι docs):** **49 v1 routes** (login + 48 bearer), **16 mobile screens**, **81** exported api fns. Το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes (grep normalized consumed-paths == route list· `tasks[id]`/`trash/[id]/[id]`/double-slash = grep artifacts) → **μηδέν «endpoint χωρίς mobile consumer» gap**. Όλα τα web `page.tsx` έχουν mobile equivalent εκτός `/setup` (first-run admin wizard, web-only by design· N/A).
+- **App-code diff από `d235eff` (προηγ. parity marker) = ΚΕΝΟ:** `git diff d235eff..HEAD -- apps/web/src apps/mobile/src` δεν επιστρέφει τίποτα· ο μόνος ενδιάμεσος commit `5ebf9c2` = docker-health docs → **καμία νέα δυνατότητα προς port**. Working tree καθαρό στην αρχή (μηδέν WIP του Αχιλλέα).
+- **«Partial» rows ξανα-επιβεβαιωμένα live ως Needs Decision** (όχι κρυμμένο auto-buildable GAP): Reports `route.ts` GET-only + trimmed (extra charts → endpoint-extension + RN charting lib)· Statements `plans/route.ts` GET-only (merge/bind/PDF-import → νέα write/upload endpoints)· Tasks Kanban/steps + Settings theme/language/AI-engine/storage/OneDrive → decision/credentials boundary.
+- **Counts: DONE 7 / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.** mobile `tsc --noEmit` → **EXIT 0**.
+- **Top 3 για τον builder (κανένα ενεργό parity TODO → UI Debt Queue):**
+  1. **IconButton / `addBtn` variant (P2/M, unattended-safe)** — 6 screens icon `＋` (46-wide) → κοινό variant, byte-identical, verifiable με tsc.
+  2. **Card + Badge + ListItem primitives (P2/M)** — 6 base `card:` + 3 badge entries → shared `ui.tsx`.
+  3. **Input-outlier screens + Chip primitive (P1/M, attended-preferred)** — 5 screens token-drift, οπτικό verify χωρίς simulator.
+- Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+### Needs Achilleas
+- (αμετάβλητο) Κανένα νέο. Παραμένουν product decisions, ΟΧΙ queue items: Reports extra charts (endpoint-extension + RN charting lib), Statements merge/bind/PDF-import (write/upload endpoints + UX), Tasks Kanban/steps, Settings theme/language/AI-engine/storage/OneDrive (credentials boundary).
