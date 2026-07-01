@@ -47,8 +47,8 @@ Entitlements map plan → allowed features (mirror του OSS-vs-paid split). Κ
 
 ### Build order (increments)
 1. ✅ Architecture note + control-plane models (Tenant/Account/Membership). — *αυτό το run*
-2. ⬜ `lib/tenancy/context.ts` — tenant resolver (session/subdomain/header) + `scoped()`
-   helper· off = fixed default tenant.
+2. ✅ `lib/tenancy/context.ts` — tenant resolver (session/subdomain/host → Tenant) +
+   `scoped()`/`dbNameFor()` helpers· off = `DEFAULT_TENANT`. Pure host parser σε `host.ts`.
 3. ⬜ Per-tenant connection layer (`useDb`) πάνω στο `lib/db.ts`, flag-guarded.
 4. ⬜ `api/saas/auth` signup/login/logout/session (scrypt + jose, httpOnly cookie).
 5. ⬜ Billing scaffold: `lib/billing/stripe.ts` + `api/saas/billing/webhook` +
@@ -98,3 +98,45 @@ tree δεν έχει foreign uncommitted files· εδώ υπάρχουν → **s
 `lib/tenancy/context.ts`: tenant resolver (session/subdomain/header → Tenant, off → fixed
 default tenant) + `scoped(model, tenantId)` query helper. Δεν wire-άρεται σε feature routes
 ακόμα.
+
+---
+
+## 2026-07-01 (increment 2 — tenant resolver)
+Το εκκρεμές increment 1 (`564f26e`) έχει ΗΔΗ landαρίσει στο main ως `ceb65c6`
+(control-plane models + `SAAS_MODE` flag) — ο collision guard του προηγ. run έκανε τη
+δουλειά του, ένα επόμενο run merge-άρισε καθαρά. Δεν έμεινε τίποτα να push-άρω από εκεί.
+
+**Built (increment 2):** ο tenant resolver, ΟΛΑ σε νέα αρχεία, τίποτα wired (0 importers):
+- `apps/web/src/lib/tenancy/host.ts` — **PURE** host→slug parsing, **μηδέν imports**
+  (ούτε saasMode) → edge/middleware-safe + unit-testable χωρίς path alias/DB.
+  `parseTenantSlug(host, base?)` (apex/reserved/nested/custom-domain → null),
+  `baseDomain()` (`SAAS_BASE_DOMAIN` env, default `ph-aros.com`), `normalizeHost()`.
+- `apps/web/src/lib/tenancy/context.ts` — **NODE-only** resolver (αγγίζει Mongoose):
+  - `TenantContext` type + `DEFAULT_TENANT` (frozen· ο implicit self-hosted tenant:
+    `dbName:''` = default connection, `plan:'dedicated'`, always active).
+  - `getTenantContext({host, slug})` → **off ⇒ `DEFAULT_TENANT` χωρίς DB hit**· on ⇒
+    lookup Tenant by explicit slug → subdomain slug → full host ως customDomain·
+    unknown ⇒ `null` (ο caller αποφασίζει 404/marketing/signup). Throws μόνο σε
+    πραγματικό DB error, όχι σε not-found.
+  - `dbNameFor(ctx)` → data-db name (`''` για default ⇒ «default connection as-is»)· το
+    consume-άρει το increment 3 (`useDb`). Η routing rule ζει δίπλα στον resolver.
+  - `scoped(filter, ctx)` → **control-plane** query scope helper. ΣΗΜ: το data plane
+    είναι database-per-tenant, άρα τα feature queries ΔΕΝ φιλτράρονται με tenantId
+    (isolation στο connection level)· το `scoped` merge-άρει `{tenant: id}` μόνο για τις
+    shared control-plane collections (Membership/Usage). Default tenant → filter as-is.
+- `apps/web/src/lib/tenancy/host.test.ts` — 8 pure tests για `parseTenantSlug`
+  (flat slug, case/port/dot norm, apex, reserved, nested, custom domain, empty, custom base).
+
+Απόκλιση από το task brief: το generic `scoped(model, tenantId)` δεν ταιριάζει στο
+DB-per-tenant μοντέλο (εκεί το «scope» = επιλογή db μέσω `useDb`, όχι per-query φίλτρο) →
+το υλοποίησα ως (α) `dbNameFor(ctx)` για το data plane + (β) `scoped(filter, ctx)` για το
+control plane, που είναι το honest ισοδύναμο.
+
+**Verified:** `npm run type-check` → EXIT 0. `npm test` → **33/33 green** (8 νέα + 25
+προϋπάρχοντα). `grep` για importers των νέων αρχείων → **κανένας** ⇒ zero runtime wiring,
+κανένα Docker rebuild, `SAAS_MODE` off = zero effect (αμετάβλητο single-user app).
+
+**Next task:** increment 3 — per-tenant connection layer πάνω στο `lib/db.ts`:
+flag-guarded `getTenantConnection(dbName)` / `tenantDb(ctx)` με `conn.useDb(dbName)` +
+per-db cache· off (ή `dbName:''`) ⇒ η σημερινή default σύνδεση αυτούσια. Additive-only,
+δεν αλλάζει το υπάρχον `connectDB()`.
