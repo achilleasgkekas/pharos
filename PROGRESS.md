@@ -893,3 +893,23 @@ Read-only mobile parity re-audit, inventory χτισμένο από τον κώ�
 - Verify: read-only μόνο (μηδέν Docker, μηδέν AI, μηδέν app-code edit). `npm run type-check` → exit 0. grep sweeps: any/withAuth/inline-error/id-guard/updatedAt-index/find-lean. Staged ΜΟΝΟ WEB_DEBT.md + PROGRESS.md.
 - Top 3 για τον builder (δεν υπάρχει ενεργό web item → πέφτει στο mobile UI Debt Queue): (1) **Input primitive** migration στα 7 εναπομείναντα record-form screens (P1/M, IN PROGRESS 4/11· ιδανικά attended run λόγω οπτικού verify), (2) **Button + Chip primitives** (P2/M, unattended-safe· σβήνει τα 33 `#000` onAccent → `C.onAccent`), (3) **Card + Badge + ListItem primitives** (P2/M· ενοποιεί 5 card + 3 badge entries). Καμία νέα web εργασία δεν είναι διαθέσιμη — η API είναι ώριμη.
 - Needs Achilleas: κανένα νέο (παραμένουν: response-envelope standardization σε ΟΛΑ τα endpoints + zod-first σε νέα routes = breaking/large, συντονισμός με mobile· RAM bump στο Docker VM λόγω mongo OOM στα builds).
+
+## 2026-07-01 (parity-auditor — βραδινό run)
+Read-only mobile parity re-audit, inventory χτισμένο από τον κώδικα (όχι από docs).
+- **49 v1 routes** (login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`**, **81** exported api fns. Το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes (grep consumed-paths == route list, κάθε route ≥1 consumer) → μηδέν «endpoint χωρίς mobile consumer» gap.
+- Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only first-run admin wizard, N/A). Το `shopping-list` καλύπτεται από ShoppingScreen.
+- App-code diff από `eec8a8a` (προηγ. parity marker): ΜΙΑ web αλλαγή `c540322` (inline error → `apiError()`, Web Debt refactor, behaviorally identical)· τα υπόλοιπα mobile UI Debt (`6a9dc33`, `3bc8a3d`) + docker/docs → **καμία νέα web feature προς port**.
+- «Partial» rows ξανα-ελεγμένες live ως **Needs Decision** (όχι κρυμμένο auto-buildable GAP): Reports trimmed endpoint (+charting lib), Statements `plans` GET-only (merge/bind = νέα write endpoints), Tasks Kanban/steps, Settings theme/language/AI-engine/storage.
+- mobile `tsc --noEmit` → **EXIT 0** (μηδέν type-error gaps).
+
+**Counts: DONE 7 / GAP 0 (auto-buildable) / NEEDS DECISION 0 νέα.**
+
+**Top 3 για τον builder (δεν υπάρχει ενεργό parity TODO → πέφτει στο UI Debt Queue):**
+1. **Input primitive (P1/M, IN PROGRESS 4/11)** — απομένουν Items/Receipts/Settings/Shopping/Search/Assistant/Login (token-outlier / flex-heavy composers, attended-preferred λόγω οπτικού verify χωρίς simulator).
+2. **Button + Chip primitives (P2/M)** — onAccent literals ήδη migrated (`3bc8a3d`)· απομένει το actual `<Button>`/`<Chip>` component extraction (~28 ad-hoc button-variants + 27 chip patterns).
+3. **Card + Badge + ListItem primitives (P2/M)** — 5 τοπικά `card:` + 3 `badge:` StyleSheet entries → shared primitives.
+
+Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+## Needs Achilleas
+Κανένα νέο. Παραμένουν ανοιχτά (product/credentials decisions, εκτός auto-buildable): (1) Settings theme toggle + language switcher + AI-engine + storage/OneDrive στο mobile· (2) Reports extra charts (endpoint-extension + RN charting lib επιλογή)· (3) Statements merge/bind write-ops (νέα `/api/v1/statements/plans` write endpoints)· (4) remote push pipeline (APNs/FCM, needs device test). Κανένα committed secret δεν εντοπίστηκε.
