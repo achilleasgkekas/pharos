@@ -3,7 +3,17 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: a582ac5 -->
-<!-- docker-validated: 0ffdd91 -->
+<!-- docker-validated: 0c5a087 -->
+
+## 2026-07-01 (docker-health — rebuild για το AI-cap commit, υγεία πράσινη)
+- **Health**: homepage-mongo `healthy` (RestartCount 44 ιστορικό, σταθερό «Up 4h»)· homepage-web RestartCount 0, Running true, OOMKilled false. homepage-flaresolverr `Exited (143)` 37h (ήδη σταματημένο, καμία ενέργεια). searxng up (εκτός scope).
+- **Disk**: system df χωρίς πίεση, Images 3.49GB, Build Cache reclaimable 0B (referenced layers). `docker builder prune -f` ανέκτησε **~3.2MB**. Καμία άλλη ενέργεια δίσκου.
+- **Rebuild decision**: ΝΑΙ. Diff από validated `0ffdd91`..HEAD στο `apps/web` = **1 runtime αρχείο** (`api/v1/ai/route.ts`, commit `a582ac5` cap AI history). Το τρέχον web image είχε χτιστεί **05:35:13Z**, ενώ το commit `a582ac5` έγινε **05:36:48Z** (~1.5' αργότερα) → runtime αλλαγή δυνητικά εκτός image, οπότε ασφαλές rebuild.
+- **Rebuild dance**: `docker compose build web` (το `npm run build` βγήκε CACHED = η πηγή στο δίσκο ήταν ήδη ταυτόσημη με HEAD στο build των 05:35)· mongo healthy· `docker compose up -d web` (recreated)· `curl /login` → **200** (2η προσπάθεια)· web RestartCount έμεινε **0**, OOMKilled false· `builder prune -f`. Κανένα AI job, καμία destructive ενέργεια.
+- **Marker**: docker-validated `0ffdd91` → **`0c5a087`** (HEAD).
+
+## Needs Achilleas
+Κανένα νέο από αυτό το run.
 
 ## 2026-07-01 (reviewer — range 91a5fe3..a582ac5, καθαρό)
 - **Εύρος**: 6 commits από τον τελευταίο marker. Ένα και μόνο code change (`a582ac5` feat(api): cap AI chat history)· τα υπόλοιπα 5 docs-only (docker-health, monitor, parity, ui-audit, web-debt).
