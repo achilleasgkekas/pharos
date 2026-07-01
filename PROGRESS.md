@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 6a9dc33 -->
-<!-- docker-validated: c47ce35 -->
+<!-- docker-validated: 3ae313f -->
+
+## 2026-07-01 (docker-health-guard — health πράσινη, χωρίς rebuild)
+- **Υγεία**: mongo `healthy`, web `running` (up 2h, /login **200**, restarts σταθερά), searxng up. flaresolverr ήδη `exited (143)` εδώ και 32h (σωστά σταματημένο, δεν το άγγιξα).
+- **Δίσκος**: images 3.49GB, build cache 566MB (0B reclaimable, ενεργά layers· δεν έκανα prune, μικρό). Volumes 505MB. Containers 80MB.
+- **Rebuild**: ΟΧΙ. Το diff `c47ce35..HEAD -- apps/web` είναι **κενό** (τα ενδιάμεσα commits: `6a9dc33` mobile Input/TextArea + `0f5be40`/`54c575e`/`eec8a8a`/`d95c8aa`/`4d1e074` docs/queues/marker). Καμία web runtime αλλαγή → skip rebuild κατά κανόνα, μόνο health confirm.
+- **Marker**: docker-validated `c47ce35` → **`3ae313f`** (HEAD).
+- Τίποτα νέο στο ## Needs Achilleas.
 
 ## 2026-07-01 (reviewer — range 2223203..6a9dc33 καθαρό, mobile Input/TextArea refactor verified)
 - **Τι εξετάστηκα**: 1 code commit (`6a9dc33`, mobile Input/TextArea primitives + migration 4 record-form screens)· τα υπόλοιπα του range (`0f5be40`/`54c575e`/`eec8a8a`/`d95c8aa`/`4d1e074`/`c47ce35`) = docs/queues/marker από άλλα routines.
