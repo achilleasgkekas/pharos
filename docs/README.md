@@ -13,14 +13,15 @@ GitHub today and can feed a docs site later.
 - **[Self-hosting](self-hosting.md)** — from an empty host to a running instance:
   prerequisites, Docker Compose, required env vars, first-run admin setup,
   storage & backups, updating, HTTPS, and troubleshooting.
+- **[Features](features.md)** — what each module does from a user's perspective:
+  Items/Shopping, Shopping list, Receipts + AI parsing, Expenses/Income,
+  Statements/installments, Subscriptions, Vouchers, Calendar, Reports, Tasks,
+  Network/UniFi, AI command bar, Search, Notifications, Trash, Settings.
 
 ## Planned guides
 
 These are being written incrementally (see [DOCS_PROGRESS.md](DOCS_PROGRESS.md)):
 
-- **Features** — what each module does from a user's perspective (Items/Shopping,
-  Receipts + AI parsing, Expenses/Income, Statements/installments, Subscriptions,
-  Vouchers, Calendar, Reports, Tasks, Network/UniFi, Settings).
 - **Configuration** — AI providers, storage backends (local/SMB/FTP/OneDrive),
   notifications (ntfy/Discord/Slack/Telegram/webhook), i18n.
 - **API reference** — the REST API v1 under `/api/v1` (auth, endpoints, shapes).
