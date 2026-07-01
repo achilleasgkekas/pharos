@@ -82,6 +82,14 @@ env keys). Νέα αρχεία, τίποτα wired:
 **Verified:** `npm run type-check` → EXIT 0. Δεν άλλαξε runtime wiring (τα models δεν
 γίνονται import από πουθενά ακόμα) → κανένα Docker rebuild. `SAAS_MODE` off = zero effect.
 
-**Next task:** increment 2 — `lib/tenancy/context.ts`: tenant resolver
-(session/subdomain/header → Tenant, off → fixed default tenant) + `scoped(model, tenantId)`
-query helper. Δεν wire-άρεται σε feature routes ακόμα.
+**Push:** committed locally (`564f26e`) αλλά **ΔΕΝ pushed** — collision guard: την ώρα
+του push, concurrent routine έγραψε untracked `apps/landing/**` (το incoming
+`44bc648 feat(landing)` προσθέτει ακριβώς αυτά τα αρχεία). Hard rule: rebase μόνο όταν το
+tree δεν έχει foreign uncommitted files· εδώ υπάρχουν → **stopped**, δεν διέγραψα ξένα
+αρχεία, δεν force-push. Το commit είναι ασφαλές local (1 ahead / 1 behind). Το επόμενο run
+θα κάνει καθαρό `fetch` + `rebase origin/main` + push μόλις το tree είναι clean.
+
+**Next task:** (α) push το εκκρεμές `564f26e` μόλις το tree καθαρίσει· (β) increment 2 —
+`lib/tenancy/context.ts`: tenant resolver (session/subdomain/header → Tenant, off → fixed
+default tenant) + `scoped(model, tenantId)` query helper. Δεν wire-άρεται σε feature routes
+ακόμα.
