@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
-import { Spinner, ErrorText, Empty, Check, Input } from '../ui';
+import { Spinner, ErrorText, Empty, Check, Input, Button } from '../ui';
 import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task } from '../api';
 
 const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
@@ -129,7 +129,7 @@ export function TasksScreen() {
             <Text style={s.label}>TAGS</Text>
             <Input variant="modal" value={editTags} onChangeText={setEditTags} placeholder="network order  (space or comma)" autoCapitalize="none" />
             <View style={s.modalBtns}>
-              <Pressable onPress={saveEdit} disabled={!editTitle.trim()} style={[s.save, !editTitle.trim() && s.dim]}><Text style={s.saveText}>Save</Text></Pressable>
+              <Button label="Save" onPress={saveEdit} disabled={!editTitle.trim()} />
               <Pressable onPress={removeEditing} style={s.del}><Text style={s.delText}>Delete</Text></Pressable>
             </View>
           </Pressable>
@@ -161,8 +161,6 @@ const s = StyleSheet.create({
   statusBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
   statusText: { color: C.dim, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   modalBtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
-  save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
-  saveText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
   del: { paddingVertical: 12, paddingHorizontal: 12 },
   delText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });

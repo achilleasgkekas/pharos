@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check, Input } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button } from '../ui';
 import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription } from '../api';
 
 const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
@@ -131,7 +131,7 @@ export function SubscriptionsScreen() {
               <Text style={s.tlabel}>Active</Text>
             </Pressable>
             <View style={s.mbtns}>
-              <Pressable onPress={saveEdit} style={s.save}><Text style={s.saveText}>Save</Text></Pressable>
+              <Button label="Save" onPress={saveEdit} />
               <Pressable onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
             </View>
           </Pressable>
@@ -167,8 +167,6 @@ const s = StyleSheet.create({
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tlabel: { color: C.text, fontSize: 15 },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
-  save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
-  saveText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
   delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
   delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });

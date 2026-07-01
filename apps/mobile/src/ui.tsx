@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet, TextInput, type TextInputProps } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, StyleSheet, TextInput, type TextInputProps, type StyleProp, type ViewStyle, type TextStyle } from 'react-native';
 import { C, SIZE, RADIUS, SPACE } from './theme';
 
 export const CUR: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' };
@@ -73,6 +73,31 @@ export function Check({ checked }: { checked: boolean }) {
   );
 }
 
+type ButtonProps = {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  /** Show a spinner in place of the label (also blocks the press). */
+  busy?: boolean;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+};
+
+/**
+ * Primary accent action pill (the "Save"/"Add" button). Unifies the byte-identical
+ * `save` + `saveText` + `dim` styles that were duplicated across screens. `disabled`
+ * or `busy` dims it to 0.4 and blocks taps; `busy` swaps the label for a spinner.
+ * Pass `style` to override layout (e.g. wider padding / minWidth on Items).
+ */
+export function Button({ label, onPress, disabled, busy, style, textStyle }: ButtonProps) {
+  const off = !!(disabled || busy);
+  return (
+    <Pressable onPress={onPress} disabled={off} style={[s.btn, off && s.btnDim, style]}>
+      {busy ? <ActivityIndicator color={C.onAccent} /> : <Text style={[s.btnText, textStyle]}>{label}</Text>}
+    </Pressable>
+  );
+}
+
 const s = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, gap: 4 },
   backBtn: { width: 40, height: 36, alignItems: 'center', justifyContent: 'center' },
@@ -85,6 +110,9 @@ const s = StyleSheet.create({
   checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
   checkboxOn: { backgroundColor: C.accent, borderColor: C.accent },
   checkboxMark: { color: C.onAccent, fontSize: SIZE.md, fontWeight: '800' },
+  btn: { backgroundColor: C.accent, borderRadius: RADIUS.md, paddingVertical: SPACE.md, paddingHorizontal: 22 },
+  btnText: { color: C.onAccent, fontSize: SIZE.md, fontWeight: '700' },
+  btnDim: { opacity: 0.4 },
   inputSurface: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.md, paddingHorizontal: SPACE.md, paddingVertical: 11, color: C.text, fontSize: SIZE.md },
   inputModal: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.sm, paddingHorizontal: SPACE.md, paddingVertical: 10, color: C.text, fontSize: SIZE.md },
   textArea: { textAlignVertical: 'top' },

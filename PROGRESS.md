@@ -1165,3 +1165,13 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 
 ### Needs Achilleas
 - (αμετάβλητο) Δύο security παρατηρήσεις παραμένουν product decisions, ΟΧΙ queue items: (1) το `auth/login` δεν έχει brute-force rate-limit· (2) πιθανό error-message leak σε λεπτομερή μηνύματα. Και τα δύο θέλουν απόφαση σχεδιασμού πριν υλοποιηθούν.
+
+## 2026-07-01 (builder — Button primitive DONE, 5 screens migrated)
+- **Task:** UI Debt Queue top-1 (unattended-safe) — extract το `<Button>` primitive στο mobile `apps/mobile/src/ui.tsx` και μετανάστευση του byte-identical `save` κουμπιού. Επιλέχθηκε γιατί ήταν η επανειλημμένη κορυφαία σύσταση, unattended-safe (μηδέν οπτική αλλαγή by construction), και πλήρως verifiable με `tsc` χωρίς simulator.
+- **Τι έγινε:**
+  - Νέο `Button` component στο `ui.tsx`: props `label`/`onPress`/`disabled`/`busy`/`style`/`textStyle`. `disabled||busy` → 0.4 dim + block tap· `busy` → `ActivityIndicator` αντί για label. Styles `btn`/`btnText`/`btnDim` με tokens (`RADIUS.md`=12, `SPACE.md`=12, padH22, `SIZE.md`=15, weight700, `C.onAccent`) → **byte-identical** με το παλιό `save`+`saveText`+`dim`.
+  - Migrated **5 screens / 7 sites**: SubscriptionsScreen (saveEdit), MoneyScreen (saveDraft «Adding…»/«Add» + saveEdit), TasksScreen (saveEdit + disabled), VouchersScreen (saveForm «Add»/«Save» + doScanText Fill με busy spinner), ReceiptsScreen (saveReceipt). Αφαιρέθηκαν τα per-screen `save:`/`saveText:` StyleSheet entries (το κοινό `dim:` έμεινε — το χρησιμοποιούν κι άλλα κουμπιά). Καθαρίστηκε το πλέον-αχρησιμοποίητο `ActivityIndicator` import στο Vouchers.
+  - Faithfulness σημειώσεις: MoneyScreen saveDraft κρατά dimmed-text «Adding…» (όχι spinner) μέσω `label={saving?'Adding…':'Add'} disabled={saving}` για να μείνει οπτικά ίδιο· VouchersScreen doScanText κρατά spinner μέσω `busy={scanBusy}`.
+- **Verify:** `cd apps/mobile && npx tsc --noEmit` → **EXIT 0**. Grep επιβεβαίωσε μηδέν dangling `s.save`/`s.saveText` στα 5 screens. Καμία Docker/AI ενέργεια (mobile-only). Δεν μπορεί να δοκιμαστεί σε simulator unattended → βασίστηκα σε tsc + zero-visual-change by construction.
+- **Staged (explicit):** `apps/mobile/src/ui.tsx` + 5 screens (Money/Receipts/Subscriptions/Tasks/Vouchers) + `MOBILE_PARITY.md` + `PROGRESS.md`. ΟΧΙ `git add -A`.
+- **Επόμενο task (πρόταση):** συνέχεια του Button+Chip item — (1) `addBtn` (46-wide icon `＋`, 6 screens Subscriptions/Items/Shopping/Vouchers) → νέο `IconButton` variant (fontSize 24, + cyan `importBtn` variant στο Items)· ή (2) ItemsScreen `save` outlier (padH26/minWidth96) μέσω `<Button style={...}>`. Το `<Chip>` component + ghost `aiBtn` variants παραμένουν attended-preferred (οπτικό verify).

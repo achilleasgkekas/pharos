@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, Image, Pressable, FlatList, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Button } from '../ui';
 import { getReceipts, getReceipt, scanReceipt, rescanReceipt, updateReceipt, addReceiptToLibrary, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
 
 type LineEdit = { name: string; qty: string; price: string; vatRate: string };
@@ -230,7 +230,7 @@ export function ReceiptsScreen() {
                   </Pressable>
                 )}
                 <View style={s.mbtns}>
-                  <Pressable onPress={saveReceipt} style={s.save}><Text style={s.saveText}>Save</Text></Pressable>
+                  <Button label="Save" onPress={saveReceipt} />
                   <Pressable onPress={archiveReceipt} style={s.del}><Text style={s.delText}>Not a receipt</Text></Pressable>
                 </View>
               </ScrollView>
@@ -286,8 +286,6 @@ const s = StyleSheet.create({
   libBtn: { marginTop: 18, borderWidth: 1, borderColor: C.accent, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   libText: { color: C.accent, fontSize: 15, fontWeight: '700' },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
-  save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
-  saveText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
   del: { paddingVertical: 12, paddingHorizontal: 12 },
   delText: { color: C.gold, fontSize: 15, fontWeight: '600' },
 });

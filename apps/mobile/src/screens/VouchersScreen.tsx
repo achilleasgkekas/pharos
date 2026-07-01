@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
-import { shortDate, Spinner, ErrorText, Empty, Check, Input, TextArea } from '../ui';
+import { shortDate, Spinner, ErrorText, Empty, Check, Input, TextArea, Button } from '../ui';
 import { getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, scanVoucherImage, type Voucher, type ParsedVoucherData } from '../api';
 
 type Draft = { title: string; code: string; store: string; discount: string; expiresAt: string; url: string; used: boolean };
@@ -157,9 +157,7 @@ export function VouchersScreen() {
               )}
             </ScrollView>
             <View style={s.mbtns}>
-              <Pressable onPress={saveForm} disabled={!form.title.trim()} style={[s.save, !form.title.trim() && s.dim]}>
-                <Text style={s.saveText}>{isNew ? 'Add' : 'Save'}</Text>
-              </Pressable>
+              <Button label={isNew ? 'Add' : 'Save'} onPress={saveForm} disabled={!form.title.trim()} />
               {!isNew && editing && (
                 <Pressable onPress={() => { const e = editing; setEditing(null); if (e && typeof e !== 'string') remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
               )}
@@ -178,9 +176,7 @@ export function VouchersScreen() {
             <Text style={s.mlabel}>OR PASTE THE COUPON TEXT</Text>
             <TextArea variant="modal" value={scanText} onChangeText={setScanText} placeholder="e.g. 15% off at Skroutz, code SAVE15, until 31/12" style={{ minHeight: 90 }} />
             <View style={s.mbtns}>
-              <Pressable onPress={doScanText} disabled={!scanText.trim() || scanBusy} style={[s.save, (!scanText.trim() || scanBusy) && s.dim]}>
-                {scanBusy ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.saveText}>Fill</Text>}
-              </Pressable>
+              <Button label="Fill" onPress={doScanText} disabled={!scanText.trim()} busy={scanBusy} />
               <Pressable onPress={() => setShowScan(false)} style={s.delBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
             </View>
           </Pressable>
@@ -217,8 +213,6 @@ const s = StyleSheet.create({
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tlabel: { color: C.text, fontSize: 15 },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
-  save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
-  saveText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
   delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
   delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });

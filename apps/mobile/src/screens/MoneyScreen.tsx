@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button } from '../ui';
 import { getExpenses, addExpense, deleteExpense, updateExpense, scanExpenseImage, type Expense, type ParsedExpenseData } from '../api';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
@@ -170,7 +170,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
               <Text style={s.scanMeta}>{[draft?.date ? shortDate(draft.date) : '', draft?.recurringCycle ? `recurring ${draft.recurringCycle}` : ''].filter(Boolean).join('  ·  ')}</Text>
             )}
             <View style={s.mbtns}>
-              <Pressable onPress={saveDraft} disabled={saving} style={[s.save, saving && s.dim]}><Text style={s.saveText}>{saving ? 'Adding…' : 'Add'}</Text></Pressable>
+              <Button label={saving ? 'Adding…' : 'Add'} onPress={saveDraft} disabled={saving} />
               <Pressable onPress={() => setDraft(null)} style={s.delBtn}><Text style={s.delBtnText}>Discard</Text></Pressable>
             </View>
           </Pressable>
@@ -213,7 +213,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
               <TextArea variant="modal" value={eNotes} onChangeText={setENotes} style={{ minHeight: 60 }} />
             </ScrollView>
             <View style={s.mbtns}>
-              <Pressable onPress={saveEdit} style={s.save}><Text style={s.saveText}>Save</Text></Pressable>
+              <Button label="Save" onPress={saveEdit} />
               <Pressable onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
             </View>
           </Pressable>
@@ -257,8 +257,6 @@ const s = StyleSheet.create({
   cycleText: { color: C.dim, fontSize: 12, fontWeight: '600' },
   cycleTextOn: { color: C.cyan },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
-  save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 22 },
-  saveText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
   delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
   delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });

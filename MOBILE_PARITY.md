@@ -280,7 +280,10 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Acceptance:
   - Ένα `Button` (variant accent/cyan/ghost) με text χρώμα από `onAccent` token· μηδέν inline `color: '#000'` σε button text styles
   - Ένα `Chip` με on/off state αντικαθιστά τα per-screen `chip`/`chipOn`/`cChip`/`sChip` patterns
-- Status: TODO (partial: onAccent `#000` literal migration → `C.onAccent` DONE 2026-07-01, 32 sites/10 screens· απομένει το actual `<Button>`/`<Chip>` component extraction). **Unattended-safe subset (9η σάρωση):** ο `save` button είναι **byte-identical σε 5 screens** (`{backgroundColor:C.accent, borderRadius:12, paddingVertical:12, paddingHorizontal:22}`: Money:260/Receipts:289/Subscriptions:170/Tasks:164/Vouchers:220) + το `addBtn` (`width:46, borderRadius:12, backgroundColor:C.accent, center`) σε 6 screens → αυτά μπορούν να πάνε σε `<Button variant="accent">` χωρίς οπτική αλλαγή· τα outliers (ItemsScreen `save` padH26/minWidth96, ghost `aiBtn`, scanBtn cyan-border) = attended-preferred (οπτικό verify)
+- Status: IN PROGRESS 🟡 (2026-07-01):
+  - onAccent `#000` literal migration → `C.onAccent` DONE (32 sites/10 screens)
+  - **`<Button>` primitive DONE** (builder, 2026-07-01): νέο `Button` στο `ui.tsx` (`label`/`onPress`/`disabled`/`busy`/`style`/`textStyle`, accent pill· `disabled||busy` → 0.4 dim + block, `busy` → spinner) ενοποιεί το byte-identical `save`+`saveText`+`dim` triplet. Migrated **5 screens** (Money ×2, Receipts, Subscriptions, Tasks, Vouchers ×2) → **7 save/scan sites**· τα per-screen `save:`/`saveText:` StyleSheet entries αφαιρέθηκαν (byte-identical output: `RADIUS.md`=12, `SPACE.md`=12, padH22, `SIZE.md`=15, weight700, `onAccent`). mobile `tsc --noEmit` EXIT 0.
+  - **Απομένει:** (α) `addBtn` (46-wide icon `＋`) σε 6 screens → `<Button>` variant ή νέο `IconButton` (fontSize 24 icon, cyan `importBtn` variant στο Items)· (β) ItemsScreen `save` outlier (padH26/minWidth96) → `<Button style={...}>`· (γ) ghost `aiBtn`/`scanBtn` cyan-border variants· (δ) το `<Chip>` component (chip/chipOn/cChip/sChip per-screen). Τα icon/ghost/chip variants = attended-preferred (οπτικό verify χωρίς simulator).
 
 ### Card + Badge + ListItem primitives
 - Priority: P2
