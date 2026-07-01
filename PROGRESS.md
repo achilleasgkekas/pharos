@@ -5,6 +5,20 @@
 <!-- reviewed: 2784fc1 -->
 <!-- docker-validated: 99a9385 -->
 
+## 2026-07-01 (ui-auditor — 24η σάρωση: CONFIRMATION, foundation καθαρό, επόμενο = `<ListItem>`)
+- **Mobile-src διαφορά από το τελευταίο marker** (`git log 3a272c1..HEAD -- apps/mobile/src`): **μόνο** το `ee9d413` (shared `<Badge>` primitive, ήδη καταγεγραμμένο 23η) → **μηδέν νέο mobile-src commit**, UI Debt Queue **αμετάβλητη**. Working tree apps/mobile **καθαρό** (μόνο `.claude/launch.json` foreign tooling, δεν το αγγίζω).
+- **Ευρήματα ανά dimension (fresh grep από κώδικα, όχι docs):**
+  - **Tokens: 0 violations** — 8-digit alpha hex στα screens **0**, inline `rgba(0,0,0,…)` scrim **0**, `'#000'` onAccent literals **0**, άλλα 6-digit hex εκτός `theme.ts` **0**. Foundation (colors/spacing/radius/typography/alpha/scrim/onAccent) πλήρως ενοποιημένο.
+  - **Shared theme file: υπάρχει** (`theme.ts` = `C`/`SPACE`/`RADIUS`/`SIZE`/`scrim`/`alpha`, mirror του `globals.css:3-23`). P1 foundation ΚΛΕΙΣΤΟ.
+  - **Reusable components: 6 DONE** (`Input` 6/11, `Button`, `IconButton`, `Card`, `Badge`, `Check`). **Απομένουν 2 primitives**: `<ListItem>` (unattended-safe) + `<Chip>` (attended, token-drift).
+  - **ListItem duplicates: 5 BYTE-IDENTICAL** `row:` entries → Subscriptions:151, Calendar:93, Money:238, Tasks:191, Items:469 (καθαρό dedup, μηδέν οπτική αλλαγή).
+  - **Chip duplicates: 4** (Items chip/chipOn padH14/7, Settings chip/chipOn padH16/8, Subscriptions cChip, Items sChip) — token-drift → attended.
+  - **Adaptive: safe-area 1 violation** (App.tsx:88 plain RN `SafeAreaView`, `react-native-safe-area-context` ΔΕΝ στο package.json) + **max-content-width 1** (μόνο 2 `maxWidth` usages, καμία στο content).
+  - **Touch targets: 0 νέα** (`<Check>` primitive + hitSlop έκλεισαν το item).
+- **mobile `tsc --noEmit` → EXIT 0.**
+- **Top-3 για τον builder:** (1) **`<ListItem>` primitive** [P2/M, 5 byte-identical sites, unattended-safe, μηδέν visual change]· (2) **Safe-area insets** [P2/M, χρειάζεται `npx expo install react-native-safe-area-context` — additive αλλά νέο dependency]· (3) **Max content width** [P3/S, `<Screen>` wrapper maxWidth ~640 στα list screens]. `<Chip>`/ghost-Button-variants/Input-outliers/light-dark-theme = attended-preferred (οπτικό verify).
+- **Read-only run**: μηδέν app-code edit, μηδέν Docker, μηδέν AI/token. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
 ## 2026-07-01 (parity-auditor — 21η σάρωση ημέρας: ουρά αμετάβλητη, 0 GAP)
 - **Inventory από κώδικα** (όχι docs): **49 v1 routes** (`find api/v1 -name route.ts` = 49· login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`** (home + 18· income + setup ξεχωριστά), **130 exported symbols** στο `apps/mobile/src/api.ts`.
 - **Route↔consumer diff**: το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes· grep-count όλων των deep sub-routes ≥1 consumer (`ai-fill` 1, `convert-to-task` 1, `link-plan` 2, `plans` 2, `price` 11, `add-to-library` 1, `rescan` 2, `test-notify` 1, `items/import` 1) → **μηδέν «endpoint χωρίς mobile consumer» gap**. Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only wizard· N/A).
