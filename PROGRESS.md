@@ -3,7 +3,17 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 83cc537 -->
-<!-- docker-validated: 946c411 -->
+<!-- docker-validated: 20e1826 -->
+
+## 2026-07-01 (docker-health — υγιές, safe rebuild μετά apiBody refactor, marker → 20e1826)
+- **Υγεία (pre)**: `homepage-mongo` **healthy** (up 7h), `homepage-web` up 14min **RestartCount 0**, `/login` → **200**. `homepage-mongo` RestartCount 44 = σωρευτικό ιστορικό (παλιά OOM), όχι τρέχον loop (σταθερό 7h healthy). `homepage-flaresolverr` ήδη **Exited (143)** πριν 40h (καμία ενέργεια). `homepage-searxng` up.
+- **Δίσκος** (`docker system df`): Images 3.49GB, Build Cache **566MB** (μικρό, 0B reclaimable = active layers), Containers 80MB. Υγιές, καμία πίεση.
+- **Rebuild**: **ΕΓΙΝΕ** (safe dance). `git diff --name-only 946c411..HEAD -- apps/web` = 2 runtime files (`api/v1/stores/route.ts` + `api/v1/tasks/route.ts`, το apiBody refactor `83cc537`) → δικαιολογεί rebuild. Ροή: `docker compose build web` (image-only, CACHED κυρίως) → mongo healthy → `docker compose up -d web` (recreated) → `/login` **200** (2η προσπάθεια, ~2s) → web **RestartCount 0** (δεν ανέβηκε). `docker builder prune -f` μετά (cache-only, 3.2MB reclaimed· το cache ήταν σχεδόν όλο in-use).
+- **Marker**: docker-validated `946c411` → **`20e1826`** (HEAD).
+- **ΣΗΜ template quirk** (αμετάβλητο): `--format '{{.State.RestartCount}}'` βγάζει parsing error σε αυτή την έκδοση Docker Desktop· διαβάστηκε ως `{{.RestartCount}}` (top-level).
+
+### Needs Achilleas
+- Κανένα νέο από το docker-health run. Το stack χτίζει και σερβίρει υγιώς.
 
 ## 2026-07-01 (reviewer — range 57e8b07..83cc537, καθαρό, μηδέν fix)
 - **Εύρος:** 7 commits από τον προηγ. reviewer marker (57e8b07). **Μόνο 1 app-code commit** = `83cc537` (apiBody adoption tasks + stores POST)· τα υπόλοιπα 6 = docs/monitor/docker-health (μηδέν `apps/` diff). Working tree καθαρό στην αρχή (μηδέν WIP του Αχιλλέα).
