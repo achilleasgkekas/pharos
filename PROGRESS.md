@@ -5,6 +5,19 @@
 <!-- reviewed: 114e727 -->
 <!-- docker-validated: 95edf16 -->
 
+## 2026-07-01 (parity-auditor — 17η σάρωση ημέρας, ουρά αμετάβλητη, read-only)
+Fresh inventory ξαναχτισμένο **από τον κώδικα** (όχι docs). **49 v1 routes** (login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`** (home + 18· income + setup ξεχωριστά), **81 exported api fns** στο mobile `api.ts`.
+- **Diff web↔mobile:** το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes· grep-count στα deep sub-routes επιβεβαίωσε consumers: `items/[id]/ai-fill` 1, `convert-to-task` 1, `link-plan` 2, `plans` 2, `price` 1, `receipts/[id]/add-to-library` 1, `rescan` 2, `settings/test-notify` 1, `items/import` 4 → **μηδέν «endpoint χωρίς mobile consumer» gap**. Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (first-run admin wizard, web-only by design· N/A).
+- **App-code diff από τον προηγ. parity marker `bead394`:** 3 web files + 2 mobile files — `d259a55` (shared `isObjectId()` + `readBody` σε items/[id] & shopping-list/[id] PATCH = **Web Debt**, behaviorally identical) + `3a272c1` (mobile Button-family finish = **UI Debt**). `git diff bead394..HEAD -- apps/web/src` = μόνο refactor → **καμία νέα portable web δυνατότητα προς port**. Working tree καθαρό στην αρχή (μηδέν WIP του Αχιλλέα).
+- **«Partial» rows ξανα-επιβεβαιωμένα ως Needs Decision** (όχι κρυμμένο auto-buildable GAP): Reports/Statements plans `route.ts` GET-only (extra charts / merge-bind / PDF-import θέλουν νέα endpoints + RN charting lib), Tasks Kanban board, Settings theme/language/AI-engine/storage/OneDrive → decision/credentials boundary.
+- **Checks:** mobile `npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). Read-only run: μηδέν Docker build, μηδέν AI/token call, μηδέν app-code edit. Κανένα committed secret.
+- **Counts: DONE 7 / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.**
+- **Top-3 για τον builder** (κανένα ενεργό parity TODO → UI Debt Queue): (1) **Safe-area insets** (P2/M, unattended-safe, additive)· (2) **`<ListItem>` primitive** (P2/M)· (3) fresh web-debt σάρωση ή apiBody `isObjectId` dedup συνέχεια (~17 routes με inline regex). `<Chip>`/`<Badge>`/lucide-icons/language-switcher = attended-preferred.
+- Staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (explicit paths).
+
+### Needs Achilleas
+- Κανένα νέο. Standing (product/credentials boundary): theme toggle, language switcher, AI-engine/storage/OneDrive settings στο mobile· Reports extra charts (RN charting lib)· Tasks Kanban board· Statements merge/bind + PDF import (νέα write/upload endpoints)· remote push pipeline αδοκίμαστο (χρειάζεται EAS dev build + APNs key). Web-side standing: login brute-force rate-limit, error-message leak στο `withAuth` 500, tasks `steps` χωρίς cap.
+
 ## 2026-07-01 (docker-health — rebuild μετά το apiBody refactor, healthy, marker → 95edf16)
 - **Health (read-only):** mongo `healthy` (Up 2h), web RestartCount **0**, OOMKilled **false**, `/login` → **200**. homepage-flaresolverr ήδη `Exited` (καμία ενέργεια, μένει σταματημένο). searxng up (default stack). ΣΗΜ: mongo RestartCount=47 = ιστορικό σωρευτικό όλης της ζωής του container, ΟΧΙ τρέχον loop (τώρα healthy).
 - **Disk:** Images 3.49GB, Build Cache 566MB (0B reclaimable), Volumes 510MB. `docker builder prune -f` → 3.19MB reclaimed. Άφθονος χώρος, μηδέν πίεση.
