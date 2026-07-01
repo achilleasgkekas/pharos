@@ -1367,3 +1367,17 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 - **Facts:** το mobile χρησιμοποιεί **58 emoji/glyph icon sites / 12 αρχεία** (`＋ ✦ 🔔 📷 🔍 🗂 🛡 ↑↗↘ ∑ ⚡ 🎯 💳` ως `<Text>` glyphs) ενώ το web έχει `lucide-react` παντού. Λύση = **`lucide-react-native`** (peer `react-native-svg` **ήδη dep** 15.12.1 → μηδέν νέα native dep) + νέο `icons.tsx` re-export + mapping emoji→lucide (γραμμένο στο queue item, mirror των web NavCard icons). Κανένα endpoint.
 - **Ranking (4 ενεργά Build Queue TODO):** (1) Tasks steps-checklist (P2/M, functional, tsc-verifiable)· (2) **Mobile icon set** (P2/M, visual, attended)· (3) Tasks swipe-status (P3/M)· (4) Language switcher (P3/L).
 - Read-only run (μηδέν app-code edit, μηδέν Docker/AI). Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+## 2026-07-01 (ui-auditor — 15η σάρωση, CONFIRMATION μηδέν νέο mobile-src)
+- **Κατάσταση:** `git log ff588b7..HEAD -- apps/mobile/src` **κενό** → μηδέν αλλαγή στον mobile κώδικα από την 14η σάρωση (builder inactive· τελευταίος mobile-src commit = `effd90d` Button primitive). Μόνη ενδιάμεση app-code αλλαγή = `83cc537` (web apiBody helpers σε tasks+stores POST = Web Debt, behaviorally identical, μηδέν UI impact). Κατάσταση **byte-identical με 12η/14η σάρωση**.
+- **Violations ανά διάσταση (live grep):**
+  - **Tokens: 0** — 6-digit hex εκτός `theme.ts` 0, short `#fff/#000` στα screens 0, inline `rgba(` στα screens 0. ΠΛΗΡΩΣ καθαρό.
+  - **Reusable components (ανοιχτά):** `<Input>/<TextArea>` 47 sites (6/11 screens)· raw `<TextInput>` 21 σε 7 screens· `<Button>` 7 sites· `addBtn` 18 refs σε 4 screens· ghost/scan/import buttons σε 6 screens· `chip*:` 14, base `card:` 5 (grep 6, −1 false-positive), `badge*:` 3 → **IconButton/Chip/Card/Badge/ListItem MISSING**.
+  - **Adaptive/theme (δομικά TODO):** `safe-area-context` 0 (εκτός package.json)· `maxWidth` 2 (καμία στο content)· light/dark context 0 (dark-only).
+  - **States: 0** — συνεπή μέσω `ui.tsx`.
+- **Foundation: 5 DONE** (theme tokens + alpha + touch targets + scrim + Button) **· Input 🟡 6/11 · 5 TODO** (IconButton+Chip, Card+Badge+ListItem, Safe-area, Max-width, Light).
+- **Top 3 για τον builder (αμετάβλητο):**
+  1. **IconButton / `addBtn` variant** (P2/M, unattended-safe) — byte-identical 46-wide `＋` accent ×4 screens + Items cyan `importBtn`.
+  2. **Card + Badge + ListItem primitives** (P2/M) — 5 base `card:` + 3 `badge*:` entries per-screen προς ενοποίηση.
+  3. **Input συνέχεια + `<Chip>`** (P1/M, attended-preferred) — 5 outlier screens token-drift + on/off chip.
+- mobile `tsc --noEmit` **EXIT 0**. Κανένα committed secret (μηδέν tracked `.env`). Read-only run: μηδέν app-code edit, μηδέν Docker, μηδέν AI. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
