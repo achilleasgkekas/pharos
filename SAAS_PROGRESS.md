@@ -49,7 +49,8 @@ Entitlements map plan → allowed features (mirror του OSS-vs-paid split). Κ
 1. ✅ Architecture note + control-plane models (Tenant/Account/Membership). — *αυτό το run*
 2. ✅ `lib/tenancy/context.ts` — tenant resolver (session/subdomain/host → Tenant) +
    `scoped()`/`dbNameFor()` helpers· off = `DEFAULT_TENANT`. Pure host parser σε `host.ts`.
-3. ⬜ Per-tenant connection layer (`useDb`) πάνω στο `lib/db.ts`, flag-guarded.
+3. ✅ Per-tenant connection layer — `lib/tenancy/connection.ts` (`useDb` + per-db cache),
+   flag-guarded. Δεν αγγίζει το `connectDB()`.
 4. ⬜ `api/saas/auth` signup/login/logout/session (scrypt + jose, httpOnly cookie).
 5. ⬜ Billing scaffold: `lib/billing/stripe.ts` + `api/saas/billing/webhook` +
    `lib/billing/entitlements.ts`.
@@ -140,3 +141,29 @@ control plane, που είναι το honest ισοδύναμο.
 flag-guarded `getTenantConnection(dbName)` / `tenantDb(ctx)` με `conn.useDb(dbName)` +
 per-db cache· off (ή `dbName:''`) ⇒ η σημερινή default σύνδεση αυτούσια. Additive-only,
 δεν αλλάζει το υπάρχον `connectDB()`.
+
+---
+
+## 2026-07-01 (increment 3 — per-tenant connection layer)
+**Built:** `apps/web/src/lib/tenancy/connection.ts` — database-per-tenant data plane πάνω
+από ΕΝΑ MongoDB client/pool, ΟΛΟ σε νέο αρχείο, μηδέν importers:
+- `getTenantConnection(dbName)` → κενό `dbName` (default tenant / SAAS_MODE off) επιστρέφει
+  τη **default σύνδεση αυτούσια** (κανένα `useDb`, κανένα extra pool = byte-for-byte το
+  σημερινό self-hosted behaviour)· non-empty → cached `defaultConn.useDb(dbName, {useCache})`
+  που μοιράζεται το socket pool. Καλεί `connectDB()` πρώτα, οπότε ο caller δεν sequence-άρει.
+- `tenantDb(ctx)` → resolve μέσω `dbNameFor(ctx)` (default tenant → κενό → default conn).
+- `tenantModel(conn, model)` → bind υπάρχοντος model στο tenant connection
+  (`conn.model(name, schema)`, per-connection cached), ώστε το ΙΔΙΟ feature schema να τρέχει
+  στη βάση του tenant χωρίς να αλλάξει κανένα model. Default conn → επιστρέφει το ίδιο model.
+- HMR-safe per-db cache (`global.__pharosTenantConns`, ίδιο pattern με `lib/db.ts`),
+  stale-guard σε readystate.
+
+**Verified:** `npm run type-check` → EXIT 0. `npm test` → **33/33 green** (καμία regression).
+`grep` για importers (`getTenantConnection`/`tenantDb`/`tenantModel`/`tenancy/connection`)
+→ **κανένας** ⇒ zero runtime wiring, κανένα Docker rebuild, `SAAS_MODE` off = zero effect.
+Δεν άγγιξα το `connectDB()` — καθαρά additive.
+
+**Next task:** increment 4 — `api/saas/auth` (signup/login/logout/session): scrypt hashing
+(reuse `lib/auth.ts` format) + `jose` httpOnly cookie session (reuse `lib/session.ts`),
+flag-guarded, ξεχωριστό `Account` login από το per-tenant `User` path. Το bearer-token path
+(`lib/apiAuth.ts`) μένει ανέπαφο.
