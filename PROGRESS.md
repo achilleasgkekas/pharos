@@ -3,7 +3,16 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 3a272c1 -->
-<!-- docker-validated: 7f18222 -->
+<!-- docker-validated: 5008507 -->
+
+## 2026-07-01 (docker-health — υγιές, χωρίς rebuild, marker → 5008507)
+- **Υγεία:** mongo `healthy`, web running (RestartCount 0). Mongo RestartCount 47 (ιστορικό OOM saga, τώρα σταθερό, μηδέν restart-loop τώρα). Flaresolverr ΔΕΝ τρέχει (καμία ενέργεια).
+- **Δίσκος:** `docker system df` → Images 3.49GB (0B reclaimable), Containers 80MB, Volumes 510MB, Build Cache 566MB (0B reclaimable, 0 active). Σε VM ~31GB → άφθονος χώρος. **Δεν έγινε prune** (0B reclaimable → no-op).
+- **Rebuild decision:** `git diff --name-only 7f18222..HEAD -- apps/web` = **κενό**. Τα 6 commits από τον marker = μόνο mobile screens (ItemsScreen/ShoppingScreen Button-family) + docs (PROGRESS/STATUS/WEB_DEBT/MOBILE_PARITY). Μηδέν web runtime diff → **SKIP rebuild**, ο υπάρχων web image ισχύει για το HEAD.
+- **Marker:** docker-validated `7f18222` → **`5008507`** (HEAD). Read-only run πλην marker: μηδέν rebuild, μηδέν app-code edit, μηδέν AI. Staged ΜΟΝΟ PROGRESS.md.
+
+### Needs Achilleas
+- (αμετάβλητο) Κανένα νέο ζήτημα. Mongo RestartCount στα 47 παραμένει το ιστορικό αποτύπωμα του OOM saga· παρακολουθείται αλλά τώρα σταθερό.
 
 ## 2026-07-01 (reviewer — range 3e3d8ef..3a272c1, καθαρό, marker → 3a272c1)
 - **Εύρος:** 7 commits από τον προηγ. marker `3e3d8ef`. Μόνο **1 app-code commit** (`3a272c1` mobile Button-family finish)· τα υπόλοιπα 6 = docs (web-debt/ui-auditor/parity/monitor/docker-health/review) + `STATUS.md` WIP. `git diff --stat` = 2 mobile screens + 4 md.
