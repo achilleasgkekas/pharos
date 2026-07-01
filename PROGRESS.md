@@ -5,6 +5,17 @@
 <!-- reviewed: 4c6856f -->
 <!-- docker-validated: 6e0dc4e -->
 
+## 2026-07-01 (parity-auditor — 14η σάρωση ημέρας, ουρά αμετάβλητη, read-only)
+- **Inventory από κώδικα (όχι docs):** **49 v1 routes** (login + 48 bearer), **16 mobile screens**, **19 web `page.tsx`** (home + 18· income ξεχωριστή), **81 exported api fns**. Το mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** ένα από τα 49 routes (τα `tasks[id]`/`trash/[id]/[id]` του grep = template-literal artifacts) → **μηδέν «endpoint χωρίς mobile consumer» gap**. Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only admin wizard, N/A).
+- **App-code diff από `d235eff` (προηγ. parity marker):** 9 app commits, **καμία νέα portable web δυνατότητα**. 8 `refactor(api)` = apiBody `readBody`/`strField`/`enumField` adoption + νέο `lib/cardFields.ts` dedup (cards/expenses/subscriptions/tasks/vouchers/stores/items) — behaviorally identical (Web Debt cleanup). Τα υπόλοιπα (`e0f7a97` Tasks steps, `47a9574` ←/→ quick-move, `929ca4d` IconButton, `9d226cf` Card) = **ήδη DONE** στην ουρά.
+- **Read-only checks:** `apps/mobile npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). Καμία Docker build, μηδέν AI/token call. Working tree καθαρό στην αρχή.
+- **Counts:** DONE 7 (parity queue) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα. Ενεργό parity TODO κανένα.
+- **Top-3 για τον builder μετά (όλα auto-buildable UI Debt, unattended-safe):** (1) `<ListItem>` primitive (row layouts, tsc-verifiable αν byte-identical)· (2) `<Chip>` primitive (status chips ~7 screens, προσοχή στα per-status χρώματα)· (3) fresh web-debt σάρωση (~21 routes ακόμα με raw `req.json().catch` pattern για apiBody-continuation, 1-2/run). ⚠ `<Badge>`/lucide-icons/language-switcher/swipe-gesture = attended-preferred (οπτικό verify).
+- Staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (explicit paths). Καμία destructive ενέργεια.
+
+### Needs Achilleas
+- Κανένα νέο. (Παραμένουν: login brute-force rate-limit, error-message leak στα action responses· mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports extra charts, Tasks Kanban board, Statements merge/bind + PDF import, remote push αδοκίμαστο.)
+
 ## 2026-07-01 (docker-health — safe rebuild μετά cards apiBody/cardFields refactor, /login 200, marker → `6e0dc4e`)
 - **Υγεία (read-only):** mongo `healthy`, web RestartCount 0, mongo RestartCount 46 (ιστορικό OOM, τώρα σταθερό/healthy up 3′), flaresolverr ΔΕΝ τρέχει (καμία ενέργεια), searxng up (default stack). `/login` → 200.
 - **Δίσκος:** images 3.49GB, build cache 566MB (0B reclaimable), volumes 508MB — άνετα εντός ~31GB. `docker builder prune -f` → 3.19MB reclaimed.
