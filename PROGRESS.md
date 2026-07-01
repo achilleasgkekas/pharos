@@ -5,6 +5,18 @@
 <!-- reviewed: 83cc537 -->
 <!-- docker-validated: 20e1826 -->
 
+## 2026-07-01 (builder — apiBody `readBody` adoption σε expenses/[id] + subscriptions/[id] PATCH· Web Debt Queue → 0)
+- **Τι**: πήρα το μοναδικό ενεργό Web Debt item (`### apiBody helpers — readBody adoption σε expenses/[id] + subscriptions/[id] PATCH`, P3/S) που άνοιξε η 16η σάρωση (`078ee2c`). Το parity queue είναι 7/7 DONE και το mobile UI Debt (Chip/Card primitives) είναι attended-preferred (οπτικό verify), οπότε αυτό ήταν το κορυφαίο unattended-safe TODO με πλήρη spec. Συνέχεια του apiBody adoption, τώρα στα **[id] PATCH** handlers (adopters 6 POST → +2 PATCH = 8).
+- **Αλλαγές** (2 route files μόνο):
+  - **expenses/[id] PATCH** + **subscriptions/[id] PATCH**: η γραμμή `const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;` → `const b = await readBody(req);` (+ import `{ readBody }` από `@/lib/apiBody`). Ο τύπος επιστροφής του `readBody` είναι `Body` = `Record<string, unknown>` → το inline `as` cast αφαιρέθηκε, μηδέν αλλαγή στον τύπο του `b`.
+  - **Τα partial-update field guards ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν** (vendor/amount/category/kind/notes/date/period/recurring/recurringCycle/paymentMethod σε expenses· name/amount/billingCycle/category/active/nextRenewal σε subscriptions). Το item αφορούσε ΜΟΝΟ την γραμμή body-parse — τα `if (typeof b.x === 'string')` guards πρέπει να ξεχωρίζουν «πεδίο απόν» από «κενό», οπότε τα `strField`/`enumField` (με fallback) ΔΕΝ ταιριάζουν εδώ, σκόπιμα δεν εφαρμόστηκαν. Response shape `{ ok:true, id }` αμετάβλητο.
+- **Verify**: `apps/web` `npm run type-check` → **EXIT 0**. Safe Docker rebuild (mongo healthy πριν+μετά, flaresolverr exited, build cache 566MB μικρό): `docker compose build web` → mongo healthy → `up -d web` → `/login` **200** (1η προσπάθεια), web **RestartCount 0**· `PATCH /api/v1/expenses/…` & `PATCH /api/v1/subscriptions/…` no-token → **401** (auth boundary intact στο built image). `docker builder prune -f` μετά (cache-only, 1.378GB reclaimed). Μηδέν AI/token call.
+- **Git hygiene**: staged ΜΟΝΟ explicit paths (τα 2 route files + `WEB_DEBT.md`)· ΟΧΙ `-A`. Το working tree είχε **παράλληλα WIP edits του Αχιλλέα** (mobile ActivityScreen/StatementsScreen/VouchersScreen/ui.tsx + web tasks/[id]/vouchers/[id] routes) — **δεν τα άγγιξα**. Κανένα secret/`.env`. Commit `99e737f`.
+- **Επόμενο task**: **Web Debt Queue = 0 ενεργά** (όλα DONE). Απομένουν ~21 routes με το ίδιο raw `req.json().catch` pattern για μελλοντικά apiBody-continuation items (μη-sprawling, 1-2 routes ανά run). Εναλλακτικά: νέα fresh web-debt σάρωση (χωρίς να εφευρεθεί debt), ή mobile UI Debt (Chip/Badge ή Card+ListItem primitive — attended-preferred λόγω οπτικού verify), ή νέα parity σάρωση.
+
+### Needs Achilleas
+- Κανένα νέο. (Παραμένουν οι παλιές: login brute-force rate-limit, error-message leak στα action responses· mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports extra charts, Tasks Kanban board, Statements merge/bind + PDF import, remote push αδοκίμαστο· lucide-icons + swipe-gesture + language-switcher = attended-preferred για οπτικό verify.)
+
 ## 2026-07-01 (builder — mobile `IconButton` primitive· UI Debt top item ΕΚΛΕΙΣΕ)
 - **Τι**: με το parity queue 7/7 DONE, το Web Debt Queue 0, και τα εναπομείναντα Build-Queue items (lucide-icons, language-switcher) attended-preferred, πήρα το **κορυφαίο unattended-safe UI Debt item**: το `IconButton`/`addBtn` variant (σημειωμένο σε STATUS/PROGRESS ως το επόμενο βήμα). Το 46-wide square `＋`/`✦` accent glyph button ήταν byte-identical duplicated σε **6 screens** (`addBtn`+`addBtnText` / `add`+`addText` / `stepAdd`), μαζί με το glyph `<Text>` και τα `dim`-blocked press states.
 - **Αλλαγές** (μόνο mobile, μηδέν API/web):
