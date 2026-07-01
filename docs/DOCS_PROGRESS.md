@@ -114,3 +114,38 @@ concurrent routine mid-commit). Foreign unstaged (.claude/launch.json, WEB_DEBT.
 Επόμενο doc: `docs/configuration.md` (AI providers, storage backends local/SMB/FTP/
 OneDrive, notifications ntfy/Discord/Slack/Telegram/webhook, i18n). Μετα:
 `docs/mobile.md`.
+
+## 2026-07-01 (4ο run)
+
+Έγραψα το `docs/configuration.md` — Αγγλικά, public audience. Καλύπτει τις 4
+περιοχες που ζηταει το task file: (1) AI providers (ollama/anthropic/openai/
+gemini/openrouter/custom, master switch + per-feature toggles, text vs vision
+Ollama slots, cost guard aiConfirmBulk, editable prompts, ξεχωριστο scraper AI,
+half-config fallback σε ollama), (2) Storage backends (local always-working-copy +
+mirror· smb=smbclient CLI SMB3, ftp/ftps, onedrive zero-config device-code OAuth
+→ /Apps/Pharos, consumers tenant· folder/file templates + tokens), (3)
+Notifications (notifiers array: ntfy/discord/slack/telegram/webhook + fields ανα
+type + legacy ntfyUrl migration + scraper NTFY_URL/TOPIC/PRICE_DROP_ALERT_PCT),
+(4) Language i18n (8 locales, pharos_locale cookie, en fallback· + currency/VAT
+σημειωση).
+
+Πηγες (διαβασα κωδικα, οχι εικασιες): `models/AppConfig.ts` (ολα τα πεδια +
+defaults + enums), `lib/aiConfig.ts` (AiProvider union + env fallbacks + isAiReady
+half-config→ollama), `lib/notifiers.ts` (sendOne switch ανα channel type + fields),
+`lib/i18n/config.ts` (LOCALES + DEFAULT_LOCALE + LOCALE_COOKIE), `lib/onedrive.ts`
+(DEFAULT_CLIENT_ID zero-config, TENANT=consumers, /Apps/Pharos upload path),
+`apps/web/.env.example` (OLLAMA_*/NTFY_*/PRICE_DROP env vars).
+
+README TOC: το «Configuration» μεταφερθηκε απο Planned → live guide (link σε
+configuration.md). Εμεινε στα Planned μονο: Mobile app.
+
+Validation: markdown only, κανενα build/Docker/AI call. Code fences: 0 (καθαρη
+προζα + tables). Internal links: script check README.md+configuration.md → 10
+targets, ολα OK, 0 MISSING.
+
+Collision guard: ελεγχος `git status --short` + `git diff --cached` πριν το commit·
+stage ΜΟΝΟ docs/configuration.md + docs/README.md + docs/DOCS_PROGRESS.md. Foreign
+unstaged (.claude/launch.json) — δεν το αγγιξα.
+
+Επόμενο doc: `docs/mobile.md` (Expo companion app — install, point at a Pharos
+server, bearer token, npx expo start). Θα διαβασω apps/mobile για ακριβεια.
