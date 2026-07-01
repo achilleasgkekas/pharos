@@ -2,7 +2,7 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: f17f279 -->
+<!-- reviewed: 2784fc1 -->
 <!-- docker-validated: 18b611f -->
 
 ## 2026-07-01 (builder — readBody() adoption σε 10 raw-body v1 routes· Web Debt)
@@ -1973,3 +1973,13 @@ Read-only audit των 49 v1 route files + `apiAuth`/`apiBody`/`apiList` helpers
 
 ### Needs Achilleas
 - (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας. Standing product-decisions (ΟΧΙ auto-buildable queue items): login brute-force rate-limit, error-message leak στο `withAuth` 500, tasks `steps` array χωρίς άνω όριο πλήθους (αποδεκτό για WireGuard-only self-host).
+
+## 2026-07-01 (reviewer — range f17f279..2784fc1, 17 commits, ΟΛΑ CLEAN, μηδέν fix)
+- **Έλεγξα**: 17 commits από το τελευταίο reviewed marker (`f17f279`) έως HEAD (`2784fc1`). Ουσιαστικά code commits: `18b611f` (readBody × 10 routes), `ca2d79f` (Vitest + money.ts suite), `ceb65c6` (SaaS control-plane models), `44bc648`/`a16c8c9`/`9e6f40c` (landing app scaffold + sections). Τα υπόλοιπα docs-only.
+- **Type-checks**: `apps/web` type-check exit 0 ✓, `apps/mobile` `tsc --noEmit` exit 0 ✓.
+- **readBody refactor (18b611f) — επαλήθευσα byte-identical**: διάβασα το `lib/apiBody.ts` → `readBody(req)` είναι ακριβώς `(await req.json().catch(() => ({}))) as Body` (`Body = Record<string, unknown>`). Έλεγξα και τα 10 route diffs (link-plan ×2, push/register ×2, price, settings, stores/[id], receipts/[id], κλπ): κάθε downstream access ήταν ήδη type-guarded σε `unknown` → μηδέν συμπεριφορική/type αλλαγή, μηδέν throw-semantics change. Καμία API response shape δεν άλλαξε → **mobile ανεπηρέαστο**.
+- **SaaS models (ceb65c6)**: additive + flag-guarded. Επιβεβαίωσα ότι `models/Tenant|Account|Membership` + `tenancy/saasMode` **δεν γίνονται import από πουθενά** στο runtime (μόνο σε σχόλια). `SAAS_MODE` off = zero effect. OK.
+- **Landing app (44bc648…)**: απομονωμένο Next.js app· 12 tracked files, μηδέν secrets, `node_modules`/`tsbuildinfo` σωστά gitignored (μόνο `package-lock.json` tracked). Το `http://localhost:3000` είναι μέσα σε docker quick-start code-block (intended). OK.
+- **Vitest DONE-claim επαλήθευση**: έτρεξα `npx vitest run` → **10/10 passed** (`money.test.ts`). Το DONE ισχύει.
+- **Secret scan** σε όλο το range: καθαρό.
+- **Fixes**: κανένα (τίποτα δεν χρειάστηκε· δεν άγγιξα κώδικα). **Flags**: κανένα νέο. Marker → `2784fc1`.
