@@ -3,6 +3,20 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-01 26η σάρωση· builder έκλεισε scan/expense+voucher, ουρά 1→0 → ανοίγω το ΤΕΛΕΥΤΑΙΟ raw route [shopping-list POST]· ελέγχθηκε ΝΕΟΣ SaaS auth κώδικας)
+
+**2026-07-01 (26η σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 v1 route files** + `apiAuth`/`apiBody`/`apiList` helpers + **ΝΕΟ SaaS auth surface** (`api/saas/auth/{signup,login,session,logout}` + `lib/tenancy/{saasApi,accountSession,provision}` — uncommitted WIP του Αχιλλέα στο working tree). Από την 25η σάρωση ο builder κατανάλωσε το top item (readBody σε scan/expense + scan/voucher, commits `4503640`+`875264b`) → η v1 ουρά έφτασε **0 ενεργά** στην αρχή.
+- **Ευρήματα ανά διάσταση (live grep, όχι docs):**
+  - **Type safety: 0** — `npm run type-check` **EXIT 0**· `:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το `/api/v1` **και** στον νέο SaaS κώδικα = **0**.
+  - **Auth: 0 unguarded** στο v1 (μόνο `auth/login` exempt). Ο νέος SaaS surface έχει σωστό gate pattern: κάθε route `const gate = saasAuthGate(); if (gate) return gate;` → 404 όταν `SAAS_MODE` off + 500 όταν `AUTH_SECRET` unset (fail-closed). Session cookie httpOnly + jose HS256 + `verifyAccountSession` never-throws.
+  - **Input validation: 0 gaps στο v1.** Ο SaaS signup validate email regex + MIN_PASSWORD 8· login same-401 (χωρίς enumeration μήνυμα). **ΟΜΩΣ 3 παρατηρήσεις στον SaaS WIP → Needs Achilleas** (ΟΧΙ queue items, γιατί είναι uncommitted WIP + product/security decisions· δες PROGRESS).
+  - **Error handling: 0** — ομοιόμορφο try/catch + `{ error }` shape.
+  - **DB: 0** — v1 reads `.lean()`+limits· SaaS `accountTenants` κάνει `Membership.find(...).lean()` + `Tenant.find({_id:{$in}}).lean()` (bounded ανά account, ΟΚ)· control-plane models έχουν σωστά unique indexes (Account.email, Tenant.slug/dbName, Membership {account,tenant}).
+  - **Consistency debt (ανοιχτό): 1 P3/S** — readBody adoption σε **shopping-list POST** (το ΤΕΛΕΥΤΑΙΟ v1 route με raw `req.json().catch`· ΟΧΙ byte-identical — χρειάζεται `strField` coercion, κλείνει και latent non-string crash).
+- **Counts ανά dimension: P1=0, P2=0, P3=1** (shopping-list readBody, S). Δεν εφευρίσκω debt· 26 σαρώσεις χωρίς P1/P2 στο v1, ο κώδικας ώριμος. Ο νέος SaaS κώδικας είναι καθαρός type/auth/DB-wise· οι 3 παρατηρήσεις είναι security/robustness σε WIP → Needs Achilleas.
+
+---
+
 ## Σύνοψη audit (2026-07-01 25η σάρωση· builder κατανάλωσε ΚΑΙ τα 2 ανοιχτά items + επιπλέον, ουρά 2→0 → ανοίγω 1 P3/S readBody twins)
 
 **2026-07-01 (25η σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 route files** + `apiAuth`/`apiBody`/`apiList` helpers + νέος SaaS tenancy κώδικας (`lib/tenancy/*`), όλα από live grep. Από την 24η σάρωση ο builder προχώρησε πολύ: κατανάλωσε **και τα 2 ανοιχτά P3/S** (readBody σε settings + stores/[id], και σε receipts/[id] + receipts/[id]/rescan) **και επιπλέον** raw-body routes → `req.json().catch` απομένει πλέον **μόνο σε 3 routes** (scan/expense, scan/voucher, shopping-list POST), `readBody` adopters **26**. Τα 2 stale-marked TODO ήταν ήδη DONE → τα μάρκαρα DONE (live-verified). Η ουρά έφτασε **0 ενεργά** στην αρχή.
@@ -288,6 +302,21 @@
 
 ## Web Debt Queue
 
+### apiBody helpers — readBody adoption σε shopping-list POST (τελευταίο raw-body route)
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/v1/shopping-list/route.ts
+- Depends on: none
+- Acceptance:
+  - **Κλείνει** το apiBody adoption effort: το `shopping-list/route.ts` POST είναι το **ΜΟΝΟ** εναπομείναν v1 route με raw `req.json().catch` (live-verified: `grep -rln 'req.json().catch' apps/web/src/app/api/v1` = μόνο αυτό το file). `readBody` adopters = **28**.
+  - **ΟΧΙ byte-identical, χρειάζεται coercion** (γι' αυτό ξεχωριστό item): σήμερα η γραμμή είναι `const b = (await req.json().catch(() => ({}))) as Record<string, string>;` και περνά `b.name`/`b.quantity`/`b.category`/`b.brand`/`b.note` **κατευθείαν** στο `addListItem({ name: b.name, ... })`. Το `NewItem` έχει string πεδία, οπότε ο τρέχων cast «λέει ψέματα» (runtime τα values μπορεί να είναι number/object).
+  - Swap: `const b = await readBody(req);` (import `{ readBody, strField }` από `@/lib/apiBody`) + πέρασε `{ name: strField(b, 'name'), quantity: strField(b, 'quantity'), category: strField(b, 'category'), brand: strField(b, 'brand'), note: strField(b, 'note') }`. Το `strField(b, k)` = `String(b[k] || '')` → downstream το `addListItem` ήδη κάνει `(data.x || '').trim()` → **ίδιο αποτέλεσμα για strings**, και ΕΠΙΠΛΕΟΝ αποτρέπει latent crash: με μη-string value (π.χ. `quantity: 5`) ο παλιός κώδικας θα έφτανε στο `(5 || '').trim()` → `TypeError: .trim is not a function`· το `strField` το κάνει `'5'` πρώτα.
+  - `readBody` επιστρέφει `Body = Record<string, unknown>` → τα `strField(...)` δίνουν `string` → ταιριάζουν με `NewItem` (τέλος ο ψευδής `Record<string,string>` cast). Το `withAuth` wrapper, ο `if (!r.ok) return apiError(...)` κλάδος, το `{ ok: true, items }` + status 201 response shape ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν → μηδέν κίνδυνος για τον mobile consumer.
+  - Επαλήθευση: `grep -rln 'req.json().catch' apps/web/src/app/api/v1` επιστρέφει **μηδέν** αρχεία (πλήρες κλείσιμο του readBody adoption).
+  - npm run type-check exits 0
+- Status: TODO
+
 ### apiBody helpers — readBody adoption σε scan/expense + scan/voucher POST
 - Priority: P3
 - Size: S
@@ -304,7 +333,7 @@
   - **Εκτός scope (needs care, όχι εδώ):** `shopping-list/route.ts` POST κάνει `as Record<string, string>` και περνά `b.name`/`b.quantity`/... κατευθείαν ως strings στο `addListItem` (`NewItem = { name: string; ... }`). Το `readBody` επιστρέφει `unknown` values → θα χρειαστεί coercion (`String(b.name ?? '')` κ.λπ.), ΟΧΙ byte-identical → ξεχωριστό item σε επόμενο run.
   - Επαλήθευση: `grep -rln 'req.json().catch' apps/web/src/app/api/v1` επιστρέφει πλέον μόνο `shopping-list/route.ts`· `readBody` adopters 26 → 28.
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (2026-07-01, commits `4503640` + `875264b`) — live-verified 26η σάρωση: `scan/expense/route.ts:20` + `scan/voucher/route.ts:18` κάνουν πλέον `String((await readBody(req)).text || '')` (import `{ readBody }`). Απομένει **μόνο** το `shopping-list` POST με raw `req.json().catch` (νέο top item παραπάνω). tsc EXIT 0.
 
 ### Dedup ObjectId-validation regex — 4η (τελευταία) παρτίδα (7 route files)
 - Priority: P3
