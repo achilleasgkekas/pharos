@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { readBody } from '@/lib/apiBody';
 import { getListsForEditor, saveList } from '@/app/settings/actions';
 
 export const runtime = 'nodejs';
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
 /** PATCH /api/v1/lists  { key, values[] } → overwrite one taxonomy. Empty/identical-to-default clears the override. */
 export async function PATCH(req: NextRequest) {
   return withAuth(req, async () => {
-    const b = (await req.json().catch(() => ({}))) as { key?: unknown; values?: unknown };
+    const b = await readBody(req);
     const key = typeof b.key === 'string' ? b.key : '';
     if (!key) return apiError('key required');
     const values = Array.isArray(b.values) ? b.values.map(String) : [];
