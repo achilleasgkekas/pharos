@@ -5,6 +5,30 @@
 <!-- reviewed: 3bc8a3d -->
 <!-- docker-validated: fd3c2f1 -->
 
+## 2026-07-01 (web-code-quality auditor — βραδινό re-audit· 2 νέα P3/S items στην ουρά)
+
+Fresh read-only σάρωση 50 v1 route files + 7 synced models + shared helpers (`apiAuth`/`apiList`/`apiBody`/`serialize`). `npm run type-check` → **exit 0**. Η ουρά ήταν καθαρή (8/8 DONE, ο builder είχε κλείσει το apiError P3 στο `c540322`)· fresh audit βρήκε **μηδέν P1/P2** (correctness/security/data) και **2 P3/S** consistency-hardening items.
+
+**Ευρήματα ανά διάσταση:**
+- **Type safety**: 0 issues. `: any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε `/api/v1` → 0 (μόνο 1 αναγκαίο `as any` στο `lib/softDelete.ts:25`, Mongoose hook cast).
+- **Auth**: 0 unguarded routes· 49/50 περνούν `withAuth`, μόνο `auth/login` εξαιρείται (σωστά).
+- **Input validation**: 0 gaps· όλα τα `[id]`/`[type]` έχουν 24-hex guard, τα ειδικά routes (push/import/scan/ai) validate το payload τους.
+- **Error handling**: 0 deviations· ομοιόμορφο `withAuth` try/catch + `apiError`, `auth/login` δικό του. 0 routes χωρίς `connectDB`.
+- **Mongoose**: 0 issues· 7/7 `index({ updatedAt: -1 })`, όλα τα list reads `.lean()`+`.limit()`, non-list reads window-filtered ή σκόπιμα full-aggregation.
+- **Duplication**: apiBody helpers υπάρχουν αλλά 2/29 mutation routes τα υιοθέτησαν → 1 P3 continuation (vouchers+items POST).
+- **Νέο P3**: `POST /api/v1/ai` = το μόνο array-input χωρίς άνω όριο μήκους (cost exposure) → cap στα τελευταία N turns.
+
+**Top-3 για τον builder (με σειρά):**
+1. apiBody helpers — adoption σε vouchers + items POST (P3/S, dedup continuation).
+2. POST /api/v1/ai — cap μήκους ιστορικού messages (P3/S, cost-hardening).
+3. (fallback) Receipt lineItems serializer — dedup σε 3 routes (P3/S, ήδη στην ουρά).
+
+### Needs Achilleas
+- **Login brute-force**: το `POST /api/v1/auth/login` δεν έχει rate-limit/backoff. Το threat model είναι VPN-only (WireGuard, no public access) → χαμηλό ρίσκο, αλλά αν το mobile API εκτεθεί ποτέ έξω από το VPN, χρειάζεται attempt-throttle (product/security decision, όχι auto-buildable — απαιτεί σχεδιασμό store/policy).
+- **Error-message leak**: το `withAuth` catch επιστρέφει `(e as Error).message.slice(0,200)` ως 500 body → μπορεί να διαρρεύσει internal error text στον client. Αποδεκτό για internal app, αλλά αν θες αυστηρό boundary → generic «Server error» + server-side log. Product call.
+
+---
+
 ## 2026-07-01 (docker-health guard — υγεία πράσινη, χωρίς rebuild)
 - Health: **mongo healthy** (RestartCount 44 ιστορικό OOM, αλλά τώρα σταθερό, up ~1h), **web running restarts=0** (up ~1h, μηδέν OOM/restart-loop). flaresolverr ήδη **Exited** (34h), δεν χρειάστηκε stop. searxng up.
 - Rebuild: **ΟΧΙ**. `git diff --name-only d532e68..HEAD -- apps/web` = **κενό** (τα 7 ενδιάμεσα commits = mobile `#000`→`C.onAccent` refactor `3bc8a3d` + docs)· μηδέν web runtime αλλαγή → το τρέχον image αντιστοιχεί σε validated code. Marker προχώρησε `d532e68` → **`fd3c2f1`** (HEAD).
