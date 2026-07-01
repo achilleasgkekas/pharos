@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
+import { readBody, strField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Store } from '@/models/Store';
 import { getStores, invalidateStoreCache } from '@/lib/storeService';
@@ -30,10 +31,10 @@ export async function GET(req: NextRequest) {
 /** POST /api/v1/stores  { name, url?, aliases? } → create a store. Mirrors web saveStore. */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
-    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const name = typeof b.name === 'string' ? b.name.trim() : '';
+    const b = await readBody(req);
+    const name = strField(b, 'name', '', true);
     if (!name) return apiError('name required');
-    const url = typeof b.url === 'string' ? b.url.trim() : '';
+    const url = strField(b, 'url', '', true);
     const aliases = cleanAliases(b.aliases);
     await connectDB();
     try {

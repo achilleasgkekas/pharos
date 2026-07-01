@@ -5,6 +5,21 @@
 <!-- reviewed: 57e8b07 -->
 <!-- docker-validated: 946c411 -->
 
+## 2026-07-01 (builder — apiBody adoption σε tasks + stores POST· Web Debt Queue → 0)
+- **Τι**: πήρα το μοναδικό ενεργό Web Debt item (`### apiBody helpers — adoption σε tasks + stores POST`, P3/S) που άνοιξε ο web auditor στην 15η σάρωση (f39277e). Refactor 2 mutation routes ώστε να χρησιμοποιούν τα shared `lib/apiBody` helpers αντί για το raw `(await req.json().catch(()=>({}))) + String(b.x||'').trim()` pattern. Συνέχεια της σειράς (adopters ήταν 4 → τώρα 6).
+- **Αλλαγές** (2 route files μόνο):
+  - **tasks POST** (`api/v1/tasks/route.ts`): `readBody(req)` + `strField(b,'title','',true)` + `enumField(b,'status',TASK_STATUSES,'todo')` + `enumField(b,'priority',TASK_PRIORITIES,'normal')` + `strField(b,'content','')`. Νέες module-const `TASK_STATUSES = ['todo','in-progress','done','blocked']` + `TASK_PRIORITIES = ['low','normal','high']` (ίδιες τιμές με τα παλιά inline arrays). Το `status` κρατιέται σε var ώστε το `completedAt: status==='done' ? new Date() : null` να δουλεύει όπως πριν. `tags` (array/csv split) + `dueDate` (Date) αμετάβλητα (δεν υπάρχει helper για arrays/dates).
+  - **stores POST** (`api/v1/stores/route.ts`): `readBody(req)` + `strField(b,'name','',true)` + `strField(b,'url','',true)`. Το `aliases`/`cleanAliases` + το duplicate-name try/catch αμετάβλητα.
+- **Σκόπιμη απόκλιση από την περιγραφή (πιο faithful)**: η περιγραφή πρότεινε `url → strField(b,'url','')` (no-trim), αλλά ο παλιός κώδικας έκανε `b.url.trim()` → χρησιμοποίησα `strField(b,'url','',true)` για να διατηρηθεί ΑΚΡΙΒΩΣ το trimming.
+- **Αμελητέα διαφορά semantics** (ίδια με vouchers/items/expenses adopters, τεκμηριωμένη): `name`/`url` πλέον coerce-άρουν non-string input via `String()` αντί να το ρίχνουν σε `''` (πριν: `typeof b.x === 'string' ? .trim() : ''`). Για κανονικό string input **ταυτόσημη** συμπεριφορά· non-string παραμένει καλοήθες edge case. Response shapes `{task}`/`{store}` 201 **αμετάβλητα** → μηδέν κίνδυνος για το mobile app.
+- **Verify**: `apps/web` `npm run type-check` → **EXIT 0**. Safe Docker rebuild (mongo healthy πριν+μετά, flaresolverr stopped, disk OK): `docker compose build web` → mongo healthy → `up -d web` → `/login` **200** (1η προσπάθεια), web **RestartCount 0**· `POST /api/v1/tasks` & `POST /api/v1/stores` no-token → **401** (auth boundary intact, guards live στο built image). `docker builder prune -f` μετά (cache-only, 2.02GB reclaimed).
+- **Git hygiene**: staged ΜΟΝΟ (explicit paths, ΟΧΙ `-A`): τα 2 route files + `WEB_DEBT.md` (item → DONE) + `PROGRESS.md`. Working tree στην αρχή καθαρό (μηδέν WIP του Αχιλλέα). Κανένα secret/`.env`, μηδέν AI/token call.
+- **Adopters πλέον 6** (expenses/subscriptions/vouchers/items/tasks/stores). Απομένουν ~21 routes με το ίδιο raw pattern για μελλοντικά runs, αλλά **η επίσημη Web Debt Queue είναι πλέον 0 ενεργά items — όλα DONE**.
+- **Επόμενο task**: με τη Web Debt Queue άδεια, ο builder πέφτει στο **mobile UI Debt Queue** (βλ. ui-audit). Κορυφή unattended-safe = **IconButton/`addBtn` variant** (4 byte-identical 46-wide `＋` accent buttons + Items cyan `importBtn` → `<Button>` variant στο `ui.tsx`, tsc-verifiable, μηδέν οπτική αλλαγή αν byte-identical), ή **Chip/Badge primitive** (status chips σε 7 screens). Εναλλακτικά: νέα fresh web-debt σάρωση (χωρίς να εφευρεθεί debt).
+
+### Needs Achilleas
+- Κανένα νέο. (Παραμένουν οι 2 παλιές security παρατηρήσεις ως product decisions: login brute-force rate-limit, error-message leak στα action responses· + τα mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports extra charts, Tasks Kanban/steps, Statements merge/bind + PDF import, remote push αδοκίμαστο.)
+
 ## 2026-07-01 (docker-health — υγιές, χωρίς rebuild, δίσκος καθαρός)
 - **Υγεία**: `homepage-mongo` **healthy** (up 6h), `homepage-web` up 14min **RestartCount 0**, `/login` → **200**. `homepage-mongo` RestartCount 44 = ιστορικό (παλιά OOM επεισόδια), όχι τρέχον loop (σταθερό 6 ώρες healthy). `homepage-flaresolverr` ήδη **Exited** (καμία ενέργεια). `homepage-searxng` up.
 - **Web logs**: μόνο `Failed to find Server Action` (γνωστό benign από ανοιχτά stale tabs), κανένα crash.

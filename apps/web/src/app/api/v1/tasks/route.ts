@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
+import { readBody, strField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Task } from '@/models/Task';
+
+const TASK_STATUSES = ['todo', 'in-progress', 'done', 'blocked'] as const;
+const TASK_PRIORITIES = ['low', 'normal', 'high'] as const;
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,18 +50,18 @@ export async function GET(req: NextRequest) {
 /** POST /api/v1/tasks  { title, status?, priority?, tags?, content?, dueDate? } */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
-    const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-    const title = String(b.title || '').trim();
+    const b = await readBody(req);
+    const title = strField(b, 'title', '', true);
     if (!title) return apiError('title required');
     const tags = Array.isArray(b.tags) ? b.tags.map(String) : typeof b.tags === 'string' ? b.tags.split(',').map((s) => s.trim()).filter(Boolean) : [];
-    const status = ['todo', 'in-progress', 'done', 'blocked'].includes(String(b.status)) ? String(b.status) : 'todo';
+    const status = enumField(b, 'status', TASK_STATUSES, 'todo');
     await connectDB();
     const doc = await Task.create({
       title,
       status,
-      priority: ['low', 'normal', 'high'].includes(String(b.priority)) ? String(b.priority) : 'normal',
+      priority: enumField(b, 'priority', TASK_PRIORITIES, 'normal'),
       tags,
-      content: String(b.content || ''),
+      content: strField(b, 'content', ''),
       dueDate: b.dueDate ? new Date(String(b.dueDate)) : null,
       completedAt: status === 'done' ? new Date() : null,
     });
