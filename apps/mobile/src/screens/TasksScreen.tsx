@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
-import { Spinner, ErrorText, Empty, Check, Input, Button } from '../ui';
+import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton } from '../ui';
 import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task, type TaskStep } from '../api';
 
 const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
@@ -100,7 +100,7 @@ export function TasksScreen() {
     <View style={s.wrap}>
       <View style={s.addRow}>
         <Input value={title} onChangeText={setTitle} onSubmitEditing={add} placeholder="Add a task…  #tag" style={{ flex: 1 }} />
-        <Pressable onPress={add} disabled={!title.trim()} style={[s.add, !title.trim() && s.dim]}><Text style={s.addText}>＋</Text></Pressable>
+        <IconButton glyph="＋" onPress={add} disabled={!title.trim()} />
       </View>
       <ErrorText>{err}</ErrorText>
       <FlatList
@@ -171,7 +171,7 @@ export function TasksScreen() {
             ))}
             <View style={s.stepAddRow}>
               <Input variant="modal" value={stepInput} onChangeText={setStepInput} onSubmitEditing={addStep} placeholder="Add a step…" style={{ flex: 1 }} />
-              <Pressable onPress={addStep} disabled={!stepInput.trim()} style={[s.stepAdd, !stepInput.trim() && s.dim]}><Text style={s.addText}>＋</Text></Pressable>
+              <IconButton glyph="＋" onPress={addStep} disabled={!stepInput.trim()} style={{ paddingVertical: 10 }} />
             </View>
             <View style={s.modalBtns}>
               <Button label="Save" onPress={saveEdit} disabled={!editTitle.trim()} />
@@ -187,8 +187,6 @@ export function TasksScreen() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
-  add: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
-  addText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   dim: { opacity: 0.4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginBottom: 10 },
   title: { color: C.text, fontSize: 15, fontWeight: '600' },
@@ -207,7 +205,6 @@ const s = StyleSheet.create({
   stepText: { color: C.text, fontSize: 14, flex: 1 },
   stepDel: { color: C.faint, fontSize: 20, paddingHorizontal: 4 },
   stepAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  stepAdd: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
   modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 24 },
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },

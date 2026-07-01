@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton } from '../ui';
 import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription } from '../api';
 
 const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
@@ -87,7 +87,7 @@ export function SubscriptionsScreen() {
         <Pressable onPress={aiFill} disabled={!name.trim() || aiBusy} style={[s.aiBtn, (!name.trim() || aiBusy) && s.dim]}>
           {aiBusy ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.aiText}>✦</Text>}
         </Pressable>
-        <Pressable onPress={add} disabled={!name.trim() || !amount.trim()} style={[s.addBtn, (!name.trim() || !amount.trim()) && s.dim]}><Text style={s.addBtnText}>＋</Text></Pressable>
+        <IconButton glyph="＋" onPress={add} disabled={!name.trim() || !amount.trim()} />
       </View>
       <ErrorText>{err}</ErrorText>
       <FlatList
@@ -144,8 +144,6 @@ export function SubscriptionsScreen() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
-  addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
-  addBtnText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   aiBtn: { width: 40, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
   aiText: { color: C.cyan, fontSize: 18, fontWeight: '700' },
   dim: { opacity: 0.4 },

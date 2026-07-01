@@ -98,8 +98,40 @@ export function Button({ label, onPress, disabled, busy, style, textStyle }: But
   );
 }
 
+type IconButtonProps = {
+  /** Single glyph shown centered (e.g. "＋" or "✦"). */
+  glyph: string;
+  onPress: () => void;
+  disabled?: boolean;
+  /** Show a spinner in place of the glyph (also blocks the press). */
+  busy?: boolean;
+  /** Spinner tint when `busy` (defaults to onAccent). */
+  busyColor?: string;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+};
+
+/**
+ * Square 46-wide accent glyph button — the "＋"/"✦" pill that sits next to an
+ * input in an add-row. Height stretches to the sibling input in a flex row.
+ * Unifies the byte-identical `addBtn`+`addBtnText` / `add`+`addText` pairs that
+ * were duplicated across six screens. `disabled`/`busy` dim to 0.4 and block
+ * taps; `busy` swaps the glyph for a spinner. Pass `style` for a colour override
+ * (e.g. Items' cyan import variant) or `textStyle` for a glyph tweak.
+ */
+export function IconButton({ glyph, onPress, disabled, busy, busyColor = C.onAccent, style, textStyle }: IconButtonProps) {
+  const off = !!(disabled || busy);
+  return (
+    <Pressable onPress={onPress} disabled={off} style={[s.iconBtn, off && s.btnDim, style]}>
+      {busy ? <ActivityIndicator color={busyColor} /> : <Text style={[s.iconBtnText, textStyle]}>{glyph}</Text>}
+    </Pressable>
+  );
+}
+
 const s = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, gap: 4 },
+  iconBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  iconBtnText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   backBtn: { width: 40, height: 36, alignItems: 'center', justifyContent: 'center' },
   back: { color: C.accent, fontSize: 30, lineHeight: 32, marginTop: -3 },
   title: { flex: 1, color: C.text, fontSize: 19, fontWeight: '800' },

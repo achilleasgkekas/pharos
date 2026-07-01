@@ -7,7 +7,7 @@ import { C, scrim } from '../theme';
 import {
   getShoppingList, addListItem, toggleListItem, deleteListItem, scanProduct, type ListItem, type ScannedProduct,
 } from '../api';
-import { Check } from '../ui';
+import { Check, IconButton } from '../ui';
 
 export function ShoppingScreen() {
   const [items, setItems] = useState<ListItem[]>([]);
@@ -81,9 +81,7 @@ export function ShoppingScreen() {
           placeholderTextColor={C.faint}
           style={s.input}
         />
-        <Pressable onPress={() => add(name)} disabled={!name.trim()} style={[s.addBtn, !name.trim() && s.dim]}>
-          <Text style={s.addBtnText}>＋</Text>
-        </Pressable>
+        <IconButton glyph="＋" onPress={() => add(name)} disabled={!name.trim()} textStyle={{ lineHeight: 26 }} />
       </View>
 
       <Pressable onPress={scan} disabled={scanning} style={s.scanBtn}>
@@ -155,8 +153,6 @@ const s = StyleSheet.create({
   h1: { color: C.text, fontSize: 26, fontWeight: '800', marginBottom: 14 },
   addRow: { flexDirection: 'row', gap: 8 },
   input: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: C.text, fontSize: 15 },
-  addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
-  addBtnText: { color: C.onAccent, fontSize: 24, fontWeight: '700', lineHeight: 26 },
   dim: { opacity: 0.4 },
   scanBtn: { marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface2, paddingVertical: 12, alignItems: 'center' },
   scanText: { color: C.cyan, fontSize: 15, fontWeight: '600' },

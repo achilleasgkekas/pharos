@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
-import { shortDate, Spinner, ErrorText, Empty, Check, Input, TextArea, Button } from '../ui';
+import { shortDate, Spinner, ErrorText, Empty, Check, Input, TextArea, Button, IconButton } from '../ui';
 import { getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, scanVoucherImage, type Voucher, type ParsedVoucherData } from '../api';
 
 type Draft = { title: string; code: string; store: string; discount: string; expiresAt: string; url: string; used: boolean };
@@ -105,7 +105,7 @@ export function VouchersScreen() {
         <Input value={title} onChangeText={setTitle} placeholder="title" style={{ flex: 2 }} />
         <Input value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="code" style={{ flex: 1 }} />
         <Pressable onPress={() => setShowScan(true)} style={s.aiBtn}><Text style={s.aiText}>✦</Text></Pressable>
-        <Pressable onPress={quickAdd} disabled={!title.trim()} style={[s.addBtn, !title.trim() && s.dim]}><Text style={s.addBtnText}>＋</Text></Pressable>
+        <IconButton glyph="＋" onPress={quickAdd} disabled={!title.trim()} />
       </View>
       <ErrorText>{err}</ErrorText>
       <FlatList
@@ -189,8 +189,6 @@ export function VouchersScreen() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
-  addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
-  addBtnText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   aiBtn: { width: 40, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
   aiText: { color: C.cyan, fontSize: 18, fontWeight: '700' },
   cancelText: { color: C.dim, fontSize: 15 },

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton } from '../ui';
 import { getExpenses, addExpense, deleteExpense, updateExpense, scanExpenseImage, type Expense, type ParsedExpenseData } from '../api';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
@@ -134,7 +134,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         <Pressable onPress={scan} disabled={scanning} style={[s.scanBtn, scanning && s.dim]}>
           {scanning ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.scanText}>✦</Text>}
         </Pressable>
-        <Pressable onPress={add} disabled={!vendor.trim() || !amount.trim()} style={[s.add, (!vendor.trim() || !amount.trim()) && s.dim]}><Text style={s.addText}>＋</Text></Pressable>
+        <IconButton glyph="＋" onPress={add} disabled={!vendor.trim() || !amount.trim()} />
       </View>
       <Text style={s.hint}>✦ scan a {kind === 'income' ? 'payslip' : 'bill'} with AI</Text>
       <ErrorText>{err}</ErrorText>
@@ -229,8 +229,6 @@ const s = StyleSheet.create({
   totalLabel: { color: C.faint, fontSize: 11, letterSpacing: 1 },
   total: { fontSize: 22, fontWeight: '800' },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
-  add: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
-  addText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   scanBtn: { width: 46, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
   scanText: { color: C.cyan, fontSize: 20, fontWeight: '700' },
   hint: { color: C.faint, fontSize: 11, paddingHorizontal: 16, marginTop: -2, marginBottom: 4 },

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, Spinner, ErrorText, Empty, Input, TextArea } from '../ui';
+import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton } from '../ui';
 import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
 function verdictMeta(v: Verdict): { label: string; color: string } | null {
@@ -373,9 +373,7 @@ export function ItemsScreen() {
       </View>
       <View style={s.addRow}>
         <Input value={title} onChangeText={setTitle} onSubmitEditing={add} autoCapitalize="none" autoCorrect={false} placeholder="Add an item or paste a link…" style={{ flex: 1 }} />
-        <Pressable onPress={add} disabled={!title.trim() || importing} style={[s.addBtn, isUrl && s.importBtn, (!title.trim() || importing) && s.dim]}>
-          {importing ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.addBtnText}>{isUrl ? '✦' : '＋'}</Text>}
-        </Pressable>
+        <IconButton glyph={isUrl ? '✦' : '＋'} onPress={add} disabled={!title.trim()} busy={importing} style={isUrl ? s.importBtn : undefined} />
       </View>
       {isUrl && <Text style={s.hint}>✦ AI will fetch this link and add it to Shopping</Text>}
       <ErrorText>{err}</ErrorText>
@@ -462,9 +460,7 @@ export function ItemsScreen() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   addRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
-  addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   importBtn: { backgroundColor: C.cyan },
-  addBtnText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   hint: { color: C.cyan, fontSize: 11, paddingHorizontal: 16, paddingBottom: 8, marginTop: -2 },
   dim: { opacity: 0.4 },
   filters: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
