@@ -7,7 +7,7 @@ import { C, scrim } from '../theme';
 import {
   getShoppingList, addListItem, toggleListItem, deleteListItem, scanProduct, type ListItem, type ScannedProduct,
 } from '../api';
-import { Check, IconButton } from '../ui';
+import { Button, Check, IconButton } from '../ui';
 
 export function ShoppingScreen() {
   const [items, setItems] = useState<ListItem[]>([]);
@@ -129,13 +129,12 @@ export function ShoppingScreen() {
                   </View>
                 </View>
                 <View style={s.modalBtns}>
-                  <Pressable
+                  <Button
+                    label="Add to list"
                     onPress={() => { const d = draft; setDraft(null); add(d.name, d); }}
                     disabled={!draft.name.trim()}
-                    style={[s.addBtnWide, !draft.name.trim() && s.dim]}
-                  >
-                    <Text style={s.addBtnText2}>Add to list</Text>
-                  </Pressable>
+                    style={{ paddingHorizontal: 18 }}
+                  />
                   <Pressable onPress={() => setDraft(null)} style={s.cancelBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
                 </View>
               </>
@@ -153,7 +152,6 @@ const s = StyleSheet.create({
   h1: { color: C.text, fontSize: 26, fontWeight: '800', marginBottom: 14 },
   addRow: { flexDirection: 'row', gap: 8 },
   input: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: C.text, fontSize: 15 },
-  dim: { opacity: 0.4 },
   scanBtn: { marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface2, paddingVertical: 12, alignItems: 'center' },
   scanText: { color: C.cyan, fontSize: 15, fontWeight: '600' },
   error: { color: C.red, fontSize: 13, marginTop: 10 },
@@ -169,8 +167,6 @@ const s = StyleSheet.create({
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '700' },
   modalBtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 },
-  addBtnWide: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 18 },
-  addBtnText2: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
   cancelBtn: { paddingVertical: 12, paddingHorizontal: 8 },
   cancelText: { color: C.dim, fontSize: 15 },
 });

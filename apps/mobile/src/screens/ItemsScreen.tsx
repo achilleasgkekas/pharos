@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton } from '../ui';
+import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button } from '../ui';
 import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
 function verdictMeta(v: Verdict): { label: string; color: string } | null {
@@ -444,9 +444,7 @@ export function ItemsScreen() {
                 {converting ? <ActivityIndicator color={C.cyan} /> : <Text style={s.convertBtnText}>＋ Convert to task</Text>}
               </Pressable>
               <View style={s.mbtns}>
-                <Pressable onPress={saveEdit} disabled={saving || !eTitle.trim()} style={[s.save, (saving || !eTitle.trim()) && s.dim]}>
-                  {saving ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.saveText}>Save</Text>}
-                </Pressable>
+                <Button label="Save" onPress={saveEdit} disabled={!eTitle.trim()} busy={saving} style={{ paddingHorizontal: 26, minWidth: 96, alignItems: 'center' }} />
                 <Pressable onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
               </View>
             </ScrollView>
@@ -485,8 +483,6 @@ const s = StyleSheet.create({
   sChipText: { color: C.dim, fontSize: 12, fontWeight: '600' },
   sChipTextOn: { color: C.onAccent },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22 },
-  save: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 26, minWidth: 96, alignItems: 'center' },
-  saveText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
   delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
   delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
   aiBar: { flexDirection: 'row', gap: 10, marginTop: 12 },
