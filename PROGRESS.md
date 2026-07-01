@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 4c6856f -->
-<!-- docker-validated: 20e1826 -->
+<!-- docker-validated: 6e0dc4e -->
+
+## 2026-07-01 (docker-health — safe rebuild μετά cards apiBody/cardFields refactor, /login 200, marker → `6e0dc4e`)
+- **Υγεία (read-only):** mongo `healthy`, web RestartCount 0, mongo RestartCount 46 (ιστορικό OOM, τώρα σταθερό/healthy up 3′), flaresolverr ΔΕΝ τρέχει (καμία ενέργεια), searxng up (default stack). `/login` → 200.
+- **Δίσκος:** images 3.49GB, build cache 566MB (0B reclaimable), volumes 508MB — άνετα εντός ~31GB. `docker builder prune -f` → 3.19MB reclaimed.
+- **Rebuild (δικαιολογημένο):** web runtime diff `20e1826..HEAD` = 8 αρχεία (cards/[id]+cards routes, expenses/subscriptions/tasks/vouchers [id] PATCH readBody, νέο `lib/cardFields.ts`) → `docker compose build web` (image-only, όλα CACHED) · mongo healthy · `docker compose up -d web` · `/login` 200 στο 1ο try · RestartCount έμεινε 0.
+- **Marker:** docker-validated `20e1826` → **`6e0dc4e`** (HEAD). Το `6e0dc4e` είναι docs-only (μηδέν web runtime diff από το built `196834b`), άρα το build ισχύει για το HEAD. Ο builder commit-άρισε ζωντανά κατά το run (b9b2725→196834b→6e0dc4e)· working tree καθαρό.
+- Staged ΜΟΝΟ PROGRESS.md. Καμία destructive ενέργεια, μηδέν AI job.
 
 ## 2026-07-01 (builder — `cards` POST+PATCH: apiBody `readBody` + dedup validation σε `lib/cardFields.ts`· commit `196834b`)
 - **Τι**: συνέχεια της apiBody adoption στα raw-body routes. Προηγ. entry σημείωσε τα `cards/items/receipts/shopping-list/stores` ως εναπομείναντα `[id]` PATCH routes· πήρα το **`cards` ζεύγος** (POST `cards/route.ts` + PATCH `cards/[id]/route.ts`), μη-επικαλυπτόμενο με τα άλλα ταυτόχρονα routines (expenses/subscriptions, tasks/vouchers `4c6856f`, mobile Card WIP στο working tree — **δεν το άγγιξα**).
