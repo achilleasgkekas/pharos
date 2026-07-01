@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 1791295 -->
-<!-- docker-validated: fd3c2f1 -->
+<!-- docker-validated: ac5cbc2 -->
+
+## 2026-07-01 (docker-health guard — υγεία πράσινη, χωρίς rebuild)
+- **Health**: `homepage-mongo` healthy (up 2h), `homepage-web` RestartCount 0 (up 2h), `/login` → 200. `homepage-mongo` RestartCount 44 (σωρευτικό ιστορικό OOM, ΟΧΙ ενεργό loop· τώρα σταθερό 2h) → βλ. Needs Achilleas (RAM bump). `homepage-flaresolverr` ήδη Exited (143), το άφησα stopped. `searxng` up (default stack).
+- **Rebuild απόφαση**: `git diff fd3c2f1..HEAD -- apps/web` = **0 αρχεία** (τα ενδιάμεσα commits = mobile Input primitive `1791295` + docs). Κανένα web runtime code δεν άλλαξε → **SKIP rebuild**, μόνο επιβεβαίωση υγείας.
+- **Disk**: `docker builder prune -f` → 0B reclaimed (566MB cache all in-use, δεν καθαρίζεται χωρίς `--all` = forbidden). Images 3.49GB, VM χωρίς πίεση. Καμία destructive ενέργεια.
+- **Marker** → `ac5cbc2` (HEAD· ταυτόσημο build με fd3c2f1, μηδέν web diff).
 
 ## 2026-07-01 (reviewer — range 3bc8a3d..1791295)
 - **Review**: 7 commits· 6 docs-only (review/docker-health/monitor/parity/ui-audit/web-debt) + **1 code** (`1791295` Input primitive migration, mobile-only). Web diff: μηδέν (μόνο docs). Mobile diff: `ItemsScreen.tsx` + `SettingsScreen.tsx`.
