@@ -1279,3 +1279,19 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 
 ### Needs Achilleas
 - (αμετάβλητο) Κανένα νέο. Παραμένουν product decisions, ΟΧΙ queue items: Reports extra charts (endpoint-extension + RN charting lib), Statements merge/bind/PDF-import (write/upload endpoints + UX), Tasks Kanban/steps, Settings theme/language/AI-engine/storage/OneDrive (credentials boundary).
+
+## 2026-07-01 (ui-auditor — 14η σάρωση, CONFIRMATION, μηδέν νέο mobile-src)
+- **Diff `e41fdff..HEAD -- apps/mobile/src/` κενό** → καμία αλλαγή στον mobile κώδικα από την 12η σάρωση· ο builder ήταν αδρανής εδώ. Ξανα-μέτρησα ΚΑΘΕ διάσταση live (grep, όχι docs), όχι απλή αντιγραφή.
+- **Violations ανά διάσταση (αμετάβλητα):**
+  - **Tokens: 0** παραβάσεις — 6-digit hex εκτός `theme.ts` 0, short `#fff/#000` στα screens 0, inline `rgba(` στα screens 0. Πλήρως καθαρό (foundation DONE).
+  - **Reusable components: ~10 ανοιχτά** — raw `<TextInput>` **22** σε 7 screens (Input primitive 6/11 done, 5 outlier + micro inputs μένουν)· `addBtn` **18** refs σε **4** screens (IconButton MISSING)· ghost/scan/import buttons σε 6 screens· `chip*:` **14** (Chip MISSING)· base `card:` **5** (Card MISSING)· `badge*:` **3** (Badge MISSING)· ListItem MISSING.
+  - **Theme/dark mode: 0** hardcoded-light screens (dark-only design· light context MISSING = P3/L).
+  - **States: 0** ασυνέπειες (loading/empty/error μέσω `ui.tsx` Spinner/Empty/ErrorText/Centered).
+  - **Adaptive: 3** — `safe-area-context` εκτός `package.json` + 0 imports (P2/M)· `maxWidth` μόνο 1 στα screens, καμία στο content (P3/S)· light context 0.
+  - **Touch targets: 0** κάτω από 44pt (foundation DONE, `<Check>` + hitSlop).
+- **Foundation 5/8 DONE** (theme tokens, alpha, scrim, touch targets, Button primitive). Input 🟡 6/11. Ουρά αμετάβλητη από 12η σάρωση.
+- **Top 3 για τον builder (αμετάβλητο):**
+  1. **IconButton / `addBtn` variant (P2/M, unattended-safe)** — 4 byte-identical 46-wide `＋` accent + Items cyan `importBtn` → κοινό variant, tsc-verifiable.
+  2. **Card + Badge + ListItem primitives (P2/M)** — 5 base `card:` + 3 badge → shared `ui.tsx`.
+  3. **Input-outlier screens + Chip primitive (P1/M, attended-preferred)** — 5 screens token-drift + on/off chip.
+- mobile `tsc --noEmit` → **EXIT 0**. Read-only: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md. Κανένα committed secret εντοπίστηκε.
