@@ -108,3 +108,38 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file —
 διαβάζει/parse-άρει το body των REST v1 routes — deterministic, χωρίς DB/Mongo:
 JSON parse, missing/empty body, invalid content, όποιο validation επιστρέφει).
 Ένα module ανά run.
+
+---
+
+## 2026-07-01 (cont.³)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/apiBody.test.ts` για το `lib/apiBody.ts`.**
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/apiBody.test.ts` (26 tests) που καλύπτει και τα 6 exports:
+  `isObjectId` (24-hex accept, case-insensitivity, wrong length 23/25, non-hex,
+  empty/whitespace reject), `readBody` (valid JSON, async body, **reject → {}**),
+  `strField` (present value, non-string coercion, falsy→fallback incl. 0/empty,
+  default empty fallback, trim toggle + trimmed fallback), `numField` (numeric as-is,
+  parse string, non-numeric→null, missing→null, **NaN/Infinity→null**, empty→null,
+  zero accepted), `enumField` (allowed value, disallowed→fallback, missing→fallback),
+  `boolField` (truthy/falsy/missing). `readBody` mocked με minimal NextRequest fake
+  (μόνο `.json()`), χωρίς Next runtime.
+- **Εύρημα που pin-αρίστηκε στα expectations**: το `readBody` κάνει `req.json().catch(...)`,
+  άρα πιάνει ΜΟΝΟ async rejections — αν το `json()` πετάξει synchronously ή γυρίσει
+  non-Promise, ΔΕΝ το πιάνει. Ο πραγματικός `NextRequest.json()` γυρίζει ΠΑΝΤΑ Promise,
+  οπότε το fake γυρίζει Promise· αφαίρεσα το μη-ρεαλιστικό synchronous-throw case (2
+  αρχικά failures που αποκάλυψαν αυτή τη συμπεριφορά → διορθώθηκαν στα tests, όχι στον κώδικα).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/apiBody.test.ts` → 26/26 passed.
+- `npx vitest run` (όλο το suite) → 5 files, 75/75 passed (money 10 + storagePath 15
+  + host 8 + dates 16 + apiBody 26).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json`
+  (foreign, ΔΕΝ το άγγιξα/staged) + το νέο apiBody.test.ts· `git diff --cached` κενό·
+  στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — serialize helpers.
+Δες `apps/web/src/**/lib.ts` (π.χ. `expenses/lib.ts` `vendorKey`/`serializeExpense`,
+ή `receipts` serialize) — pure, χωρίς DB, καλά για deterministic tests. Ένα module ανά run.
