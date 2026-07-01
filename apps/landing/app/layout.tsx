@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
-const SITE_URL = 'https://pharos.app';
+const SITE_URL = 'https://ph-aros.com';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
