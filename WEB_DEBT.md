@@ -3,6 +3,17 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-01 22η σάρωση· builder έκλεισε isObjectId 3η παρτίδα, ουρά 0→ανοίγω 2 P3/S: isObjectId 4η [τελ.] παρτίδα + readBody settings/stores)
+
+**2026-07-01 (22η σάρωση, αυτόνομος γύρος):** fresh σάρωση **52 route files** + `apiAuth`/`apiBody`/`apiList` helpers, όλα από live grep. Από την 21η σάρωση ο builder κατανάλωσε το commit **`c5cec57`** (isObjectId 3η παρτίδα — cards/[id]+stores/[id]+statements/[id]+notifications+trash/[type]/[id]) → επαλήθευση live: `isObjectId` adopters **12**· inline `[a-f0-9]{24}` regex απομένει μόνο σε **7 deep sub-routes**. Η ουρά έφτασε **0 ενεργά** στην αρχή αυτού του γύρου.
+- **Ευρήματα ανά διάσταση (live grep):**
+  - **Type safety: 0** — `npm run type-check` **EXIT 0**· `:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το `/api/v1` = **0** (μόνο 1 legit `hook as any` σε `lib/softDelete.ts` pre-hook cast, όχι v1).
+  - **Auth: 0 unguarded** — μοναδικό v1 route χωρίς `withAuth` = `auth/login` (auth boundary, σωστά). Τα 51 v1 CRUD routes ΟΛΑ μέσω `withAuth` (bearer + try/catch + clean 500).
+  - **Input validation: 0 gaps** — τα 13 raw-body routes validate τα inputs τους· `readBody`/`isObjectId` adoption = style/consistency, ΟΧΙ validation gap.
+  - **Error handling: 0** — ομοιόμορφο try/catch + `{ error }` shape μέσω `withAuth`.
+  - **DB: 0** — ΟΛΑ τα read routes `.lean()` (reports γρ.81 `.find()` = JS `Array.find`, όχι Mongoose)· list endpoints `.limit()` via `listParams`· no-limit finds (cards/statements/plans/calendar/overview/items/[id]/plans) = bounded aggregations, `.lean()`.
+  - **Consistency debt (ανοιχτό): 2 P3/S** — isObjectId 4η (τελ.) παρτίδα (7 files, 8 occ.· κλείνει το effort) + readBody adoption (settings+stores/[id]).
+
 ## Σύνοψη audit (2026-07-01 21η σάρωση· builder έκλεισε isObjectId 2η παρτίδα, ουρά 0→ανοίγω 1 P3/S 3η παρτίδα)
 
 **2026-07-01 (21η σάρωση, αυτόνομος γύρος):** fresh σάρωση **52 route files** (`find api/v1 -name route.ts`) + `apiAuth`/`apiBody`/`apiList` helpers + synced models, όλα από live grep (όχι docs). Από την 20ή σάρωση ο builder κατανάλωσε το commit **`f1413c3`** (isObjectId 2η παρτίδα — receipts/expenses/subscriptions/tasks/vouchers [id]) → το μοναδικό ενεργό P3/S της 20ής είναι πλέον **DONE** (επαλήθευση live: `isObjectId` adopters **7** = items, shopping-list + τα 5 της 2ης παρτίδας). Άρα η Web Debt Queue έφτασε **0 ενεργά** στην αρχή αυτού του γύρου.
@@ -247,6 +258,36 @@
 ---
 
 ## Web Debt Queue
+
+### Dedup ObjectId-validation regex — 4η (τελευταία) παρτίδα (7 route files)
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/v1/receipts/[id]/rescan/route.ts, apps/web/src/app/api/v1/receipts/[id]/add-to-library/route.ts, apps/web/src/app/api/v1/items/[id]/link-plan/route.ts, apps/web/src/app/api/v1/items/[id]/plans/route.ts, apps/web/src/app/api/v1/items/[id]/convert-to-task/route.ts, apps/web/src/app/api/v1/items/[id]/ai-fill/route.ts, apps/web/src/app/api/v1/items/[id]/price/route.ts
+- Depends on: none
+- Acceptance:
+  - **Κλείνει** το `isObjectId()` dedup effort (1η παρτίδα items/[id]+shopping-list/[id]· 2η receipts/expenses/subscriptions/tasks/vouchers [id]· 3η cards/[id]+stores/[id]+statements/[id]+notifications+trash/[type]/[id]). Το shared `export function isObjectId(id: string): boolean` ζει ΗΔΗ στο `lib/apiBody.ts` (byte-identical `/^[a-f0-9]{24}$/i.test(id)`).
+  - Σε καθένα από τα 7 route files: αντικατέστησε τον inline `!/^[a-f0-9]{24}$/i.test(id)` με `!isObjectId(id)`. Occurrences (8 συνολικά, όλα `apiError('bad id')` + status 400): receipts/[id]/rescan **1** (γρ.21), receipts/[id]/add-to-library **1** (γρ.15), items/[id]/link-plan **2** (γρ.14,28), items/[id]/plans **1** (γρ.19), items/[id]/convert-to-task **1** (γρ.14), items/[id]/ai-fill **1** (γρ.18), items/[id]/price **1** (γρ.13).
+  - Imports: **κανένα** από τα 7 files δεν έχει ήδη `@/lib/apiBody` import → σε καθένα νέο `import { isObjectId } from '@/lib/apiBody';` (δίπλα στα υπόλοιπα lib imports).
+  - Το μήνυμα σφάλματος, ο status 400, και η σειρά auth-πριν-id ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. Καμία αλλαγή σε behaviour / response shape → μηδέν κίνδυνος για τον mobile consumer.
+  - Επαλήθευση: `grep -rl '\[a-f0-9\]{24}' apps/web/src/app/api/v1` επιστρέφει **μηδέν** αρχεία (πλήρης εξάλειψη του inline regex από όλο το v1)· `isObjectId` adopters 12 → 19.
+  - npm run type-check exits 0
+- Status: TODO
+
+### apiBody helpers — readBody adoption σε settings + stores/[id] PATCH
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/v1/settings/route.ts, apps/web/src/app/api/v1/stores/[id]/route.ts
+- Depends on: none
+- Acceptance:
+  - Συνέχεια του apiBody adoption (16 routes ήδη adopters `readBody`). Το shared `readBody` ζει στο `lib/apiBody.ts`, επιστρέφει `Body` = `Record<string, unknown>` (δεν πετάει· bad/empty JSON → `{}`).
+  - **settings PATCH** (γρ.72): `const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;` → `const b = await readBody(req);`. Το settings δεν έχει ακόμα apiBody import → νέο `import { readBody } from '@/lib/apiBody';`. ΟΛΑ τα typeof-based guards (currency/defaultVatRate/defaultItemView/warranty/ntfy/budgets κ.λπ.) ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν.
+  - **stores/[id] PATCH** (γρ.25): ίδια αλλαγή στη γραμμή body-parse. Το stores/[id] έχει ΗΔΗ `import { isObjectId } from '@/lib/apiBody'` → γίνεται `import { isObjectId, readBody } from '@/lib/apiBody'`. Τα partial-update guards (name/aliases/... ) αμετάβλητα.
+  - Μόνο η γραμμή body-parse αλλάζει (το inline `as Record<string, unknown>` cast αφαιρείται, ίδιος τύπος `Body`)· καμία αλλαγή σε validation behaviour / response shape.
+  - Απομένουν ~11 raw routes με το ίδιο pattern (receipts/[id], receipts/[id]/rescan, scan/expense, scan/voucher, push/register, shopping-list POST, ai, ai/subscription, items/[id]/link-plan, items/[id]/price, items/import) για μελλοντικά runs (1-2/run).
+  - npm run type-check exits 0
+- Status: TODO
 
 ### Dedup ObjectId-validation regex — 3η παρτίδα (5 route files)
 - Priority: P3

@@ -1845,3 +1845,22 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 
 ### Needs Achilleas
 - (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας. Ανοιχτά product-decision items (θέλουν απόφαση, ΟΧΙ auto-buildable): **Reports extra charts** (endpoint-extension + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor 19 files), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: μείνε web-only).
+
+## 2026-07-01 (web-code-quality — 22η σάρωση, ουρά 0→2 P3/S: isObjectId 4η [τελ.] παρτίδα + readBody settings/stores)
+
+Read-only audit των 52 v1 route files + apiAuth/apiBody/apiList helpers, όλα από live grep. Από την 21η σάρωση ο builder κατανάλωσε το `c5cec57` (isObjectId 3η παρτίδα, 5 files) → η ουρά έφτασε 0 ενεργά. `npm run type-check` **EXIT 0**.
+
+**Ευρήματα ανά διάσταση (μηδέν νέο P1/P2):**
+- Type safety: **0** (μόνο 1 legit `hook as any` σε lib/softDelete.ts pre-hook cast, εκτός v1).
+- Auth: **0 unguarded** — μοναδικό v1 route χωρίς withAuth = auth/login (auth boundary). 51/51 CRUD routes μέσω withAuth (bearer + try/catch + clean 500).
+- Input validation: **0 gaps** — τα raw-body routes validate τα inputs τους.
+- Error handling: **0** — ομοιόμορφο { error } shape μέσω withAuth.
+- DB: **0** — ΟΛΑ τα reads .lean() (reports γρ.81 = JS Array.find, όχι Mongoose)· list endpoints .limit() via listParams· no-limit finds = bounded aggregations.
+- Duplication (consistency): **2 P3/S** ανοιχτά (κάτω).
+
+**Top 3 για τον builder (με σειρά):**
+1. **isObjectId 4η (τελευταία) παρτίδα** — 7 deep sub-routes (receipts/[id]/rescan+add-to-library, items/[id]/link-plan+plans+convert-to-task+ai-fill+price), 8 occurrences. Κλείνει το effort: μετά `grep -rl '[a-f0-9]{24}' api/v1` = μηδέν, adopters 12→19.
+2. **readBody adoption settings + stores/[id] PATCH** — αντικατάσταση `as Record<string,unknown>` cast με `await readBody(req)`, guards αμετάβλητα.
+3. (κενό — ουρά εξαντλείται· επόμενα runs συνεχίζουν readBody adoption 1-2/run στα ~11 raw routes που απομένουν).
+
+**Needs Achilleas:** κανένα. Ο κώδικας παραμένει ώριμος/καθαρός (20+ σαρώσεις)· απομένει μόνο style/consistency debt (P3/S).
