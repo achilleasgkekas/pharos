@@ -1045,5 +1045,14 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 - **Rebuild**: ΟΧΙ. `git diff --name-only ac5cbc2..HEAD -- apps/web` = κενό. Τα ενδιάμεσα commits από τον marker (0ffdd91/91a5fe3/e47c48a/08afea0/e2197a7) είναι docs + `refactor(mobile)` scrim token, μηδέν web runtime αλλαγή.
 - **Marker**: docker-validated `ac5cbc2` → **`0ffdd91`** (HEAD).
 
+## 2026-07-01 (parity-auditor — 10η σάρωση ημέρας, inventory από κώδικα)
+- **Inventory (από κώδικα, όχι docs):** **49 v1 routes** (login + 48 bearer), **16 mobile screens** (+ App.tsx/nav), **18 web `page.tsx`** (home + 17). Normalized grep των consumed paths στο `apps/mobile/src/api.ts` == route list, **ακριβές 1:1 match** (κάθε route ≥1 mobile consumer· `tasks:id`/`trash/:id/:id` = grep artifacts) → **μηδέν «endpoint χωρίς mobile consumer» gap**.
+- **Web page coverage:** όλα τα web pages έχουν mobile equivalent εκτός `/setup` (first-run admin wizard, web-only by design· N/A).
+- **App-code diff:** `git diff b6a3a36..HEAD -- apps/web/src` = **ΚΕΝΟ**. Τα commits από τον marker = docs + `refactor(mobile)` (`1791295` Input primitive, `91a5fe3` scrim token = UI Debt, byte-identical) → **καμία νέα web feature προς port**. Working tree καθαρό στην αρχή.
+- **«Partial» rows επιβεβαιωμένα ως Needs Decision (όχι κρυμμένο GAP):** Reports `route.ts` GET-only + trimmed· Statements `plans/route.ts` GET-only (μόνο `export async function GET`) → merge/bind/PDF-import θέλουν νέα write/upload endpoints· Tasks Kanban/steps + Settings theme/language/AI-engine/storage → decision/credentials boundary.
+- **Checks (read-only):** mobile `tsc --noEmit` → **EXIT 0** (μηδέν type errors, κανένα νέο P1). Καμία Docker build, κανένα AI job.
+- **Counts: DONE 7 (parity queue) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.**
+- **Top-3 για τον builder:** ενεργό parity TODO **κανένα** → πέφτει στο **UI Debt Queue**: (1) Button+Chip token/primitive (unattended-safe)· (2) Input-primitive συνέχεια (6/11 screens, attended-preferred για οπτικό verify)· (3) Card/Badge/ListItem primitives.
+
 ## Needs Achilleas
 Κανένα νέο. Παραμένουν ανοιχτά (product/credentials decisions, εκτός auto-buildable): (1) Settings theme toggle + language switcher + AI-engine + storage/OneDrive στο mobile· (2) Reports extra charts (endpoint-extension + RN charting lib επιλογή)· (3) Statements merge/bind write-ops (νέα `/api/v1/statements/plans` write endpoints)· (4) remote push pipeline (APNs/FCM, needs device test). Κανένα committed secret δεν εντοπίστηκε.
