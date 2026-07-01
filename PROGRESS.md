@@ -1146,3 +1146,22 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
   2. **Card + Badge + ListItem primitives (P2/M)** — 6 base `card:` + 3 badge entries → shared `ui.tsx` primitives.
   3. **Input primitive συνέχεια (P1/M, 6/11)** — 5 outlier screens (token-drift, attended-preferred, no-simulator verify).
 - Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
+
+## 2026-07-01 (web-code-quality — βραδινό re-audit, ai-cap ΕΚΛΕΙΣΕ, 1 P3/S μένει)
+
+- **Σάρωση:** 49 route files + 7 synced models, read-only. `git log -- apps/web/src` → τελευταίος app-code commit `a582ac5` (ai chat-history cap). Ο builder έκλεισε ενδιάμεσα το item «ai messages cap» (MAX_TURNS=20 + MAX_CONTENT=8000) → Web Debt Queue: **1 ενεργό P3/S** (apiBody adoption), όλα τα άλλα DONE.
+- **Ευρήματα ανά διάσταση (μηδέν νέο):**
+  - **Type safety:** `npm run type-check` → **exit 0**. `any`/`ts-ignore`/`ts-expect-error` σε `/api/v1` → **0**.
+  - **Auth:** 48/49 routes με `withAuth`· μόνο `auth/login` εξαιρείται (σωστά). **0** unguarded. (ΣΗΜ: το `grep -Lq` δίνει ψευδή NOGUARD· χρήση σκέτου `grep -L`.)
+  - **Input validation:** ΟΛΑ τα `[id]`/`[type]` routes με `ID_RE` 24-hex guard → **0 NOGUARD**. list params clamp 1..200.
+  - **Error handling:** inline `NextResponse.json({ error })` εκτός `auth/login` → **0**. Ομοιόμορφο `apiError` μέσω `withAuth`.
+  - **DB:** 7/7 models με `index({ updatedAt: -1 })`. 2 «no-lean» hits (settings:15, calendar:48) = multi-line chains με `.lean()` επόμενη γραμμή (false positives). list reads `.lean()`+`.limit()`.
+  - **Duplication/dead code:** μηδέν νέο (Receipt lineItems serializer + inline-error dedup ήδη έκλεισαν).
+- **Top 3 για τον builder:**
+  1. **apiBody adoption — vouchers + items POST (P3/S)** — 27 mutation routes ακόμα με raw `req.json().catch`, μόνο 2 adopters· vouchers έχει 7× `String(b.)`.
+  2. (Web ουρά αλλιώς άδεια) → πέφτει στο mobile UI Debt Queue: Button + Chip primitives (P2/M).
+  3. Card + Badge + ListItem primitives (P2/M, mobile).
+- Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ WEB_DEBT.md + PROGRESS.md.
+
+### Needs Achilleas
+- (αμετάβλητο) Δύο security παρατηρήσεις παραμένουν product decisions, ΟΧΙ queue items: (1) το `auth/login` δεν έχει brute-force rate-limit· (2) πιθανό error-message leak σε λεπτομερή μηνύματα. Και τα δύο θέλουν απόφαση σχεδιασμού πριν υλοποιηθούν.
