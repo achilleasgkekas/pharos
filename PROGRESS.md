@@ -5,6 +5,16 @@
 <!-- reviewed: 3a272c1 -->
 <!-- docker-validated: 5008507 -->
 
+## 2026-07-01 (web-code-quality — 19η σάρωση, ουρά αμετάβλητη 2 P3/S, read-only)
+Fresh read-only audit **49 route files** + `apiAuth`/`apiBody`/serialize + 10 models. `npm run type-check` **EXIT 0** (μηδέν P1). Καμία Docker build, μηδέν AI/token call. Working tree καθαρό στην αρχή.
+- **Κατάσταση ουράς:** τελευταίος app-code commit `0c866eb` (ΙΔΙΟΣ με 18η σάρωση) → κανένας builder δεν κατανάλωσε web item ενδιάμεσα (ενδιάμεσα μόνο mobile Button-family `3a272c1` + docs). Η ουρά by-construction σταθερή: **2 ενεργά P3/S**, επαναεπαληθευμένα live από κώδικα (`items/[id]:110` + `shopping-list/[id]:15` έχουν ακόμα το raw `req.json().catch` body-parse).
+- **Ευρήματα ανά διάσταση (live grep):** Type safety **0** (0 any/ts-ignore, tsc 0)· Auth **0** (48/49 `withAuth`, μόνο login εξαιρείται)· Input validation **0 gaps** (15 raw-body routes validate· readBody = style)· Error handling **0** (ομοιόμορφο `{error}` μέσω `withAuth`)· DB **0** (7/7 models `updatedAt` index, reads `.lean()`, list endpoints `.limit()`)· Duplication **2** (raw-body 15 routes/14 adopters· ObjectId regex 19 files/30 occ).
+- **Top-3 για τον builder:** (1) **readBody σε items/[id] + shopping-list/[id] PATCH** (P3/S, 1 γραμμή/route)· (2) **shared `isObjectId()` helper** + migrate 3-5 routes/run (P3/S)· (3) fresh web-debt σάρωση ή επόμενη apiBody παρτίδα (~13 raw routes απομένουν).
+- Staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (explicit paths). Καμία destructive ενέργεια, μηδέν secret.
+
+### Needs Achilleas
+- Κανένα νέο. (Standing product decisions: login brute-force rate-limit· error-message leak στο `withAuth` 500 [`apiError((e as Error).message?.slice(0,200))` επιστρέφει raw error στον client — σκόπιμο για mobile debug ή hardening;]· tasks `steps` χωρίς cap. Mobile NEEDS DECISION: theme toggle, language switcher, AI-engine/storage/OneDrive settings, Reports charts, Tasks Kanban, Statements merge/bind + PDF import, remote push αδοκίμαστο.)
+
 ## 2026-07-01 (ui-auditor — 18η σάρωση, ΠΡΟΟΔΟΣ: Button-family ΕΚΛΕΙΣΕ)
 Read-only mobile UI consistency audit. **1 νέο mobile-src commit** από την 17η σάρωση: `3a272c1` (Button-family finish — ShoppingScreen `addBtnWide`/`addBtnText2` + ItemsScreen accent-pill `save` outlier → `<Button>`). Ενημέρωσα το «Button + Chip primitives» item (Button πυρήνας DONE, μένουν μόνο ghost variants + `<Chip>` + Settings `saveText` outlier) + πρόσθεσα 18η re-audit note στην κορυφή της UI Debt Queue.
 
