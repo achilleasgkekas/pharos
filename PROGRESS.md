@@ -2,8 +2,17 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 3e3d8ef -->
+<!-- reviewed: 3a272c1 -->
 <!-- docker-validated: 7f18222 -->
+
+## 2026-07-01 (reviewer — range 3e3d8ef..3a272c1, καθαρό, marker → 3a272c1)
+- **Εύρος:** 7 commits από τον προηγ. marker `3e3d8ef`. Μόνο **1 app-code commit** (`3a272c1` mobile Button-family finish)· τα υπόλοιπα 6 = docs (web-debt/ui-auditor/parity/monitor/docker-health/review) + `STATUS.md` WIP. `git diff --stat` = 2 mobile screens + 4 md.
+- **Review του `3a272c1` (ShoppingScreen + ItemsScreen accent pills → `<Button>`):**
+  - **Συμπεριφορά διατηρημένη ✓.** Το `<Button>` (ui.tsx:92) κάνει `off = !!(disabled || busy)` → `disabled={off}` στο Pressable, οπότε το νέο ItemsScreen `disabled={!eTitle.trim()} busy={saving}` αναπαράγει ΑΚΡΙΒΩΣ το παλιό `disabled={saving || !eTitle.trim()}`· το `busy` δείχνει spinner (`C.onAccent`, ίδιο χρώμα). Το removed `dim` (opacity 0.4) αντικαθίσταται από το `btnDim` του primitive (ui.tsx:174).
+  - **Styling 1:1 ✓.** Base `btn` = accent/RADIUS.md/SPACE.md/padH22· ItemsScreen override `{padH26, minWidth96, alignItems center}` = παλιό `save`· ShoppingScreen override `{padH18}` = παλιό `addBtnWide`. Τα orphan styles (`save`/`saveText`/`addBtnWide`/`addBtnText2`/`dim`) σβήστηκαν σωστά, μηδέν dangling ref.
+  - **Χωρίς API/web αλλαγή** → μηδέν ρίσκο για response-shape που θα έσπαγε το mobile. SettingsScreen σκόπιμα ανέγγιχτο (fontWeight 800 ≠ 700 primitive).
+- **Checks:** web `npm run type-check` **EXIT 0**· mobile `npx tsc --noEmit` **EXIT 0**. Κανένα committed secret (μηδέν tracked `.env`, ο diff = 2 .tsx + 4 .md). Μηδέν regression, μηδέν hardcoded token drift.
+- **Fixes:** κανένα χρειάστηκε (καθαρό). **Flags:** κανένα νέο (οι ουρές WEB_DEBT/MOBILE_PARITY ήδη ενημερωμένες από builder/auditors). Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-01 (builder — mobile Button-family finish: ShoppingScreen `addBtnWide` + ItemsScreen `save` → `<Button>`)
 - **Τι**: το κορυφαίο unattended-safe UI Debt item (top-1 σύσταση της 17ης ui-auditor σάρωσης). Το `<Button>` primitive (`ui.tsx:92`) υπήρχε ήδη (accent/radius12/padV12/padH22/onAccent/15/700, dim 0.4 σε off, `busy`→spinner), αλλά **2 screens ανα-υλοποιούσαν byte-identical accent action pills** με τοπικά styles. Τα μετέτρεψα σε `<Button style={...}>` (μόνο τα padding/minWidth outliers ως override) — γνήσιο dedup, μηδέν οπτική αλλαγή.
