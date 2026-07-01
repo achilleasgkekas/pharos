@@ -296,3 +296,47 @@ sites (μόνο ledger + helpers — το enforcement wiring μένει για �
 flag-guarded (off ⇒ pass-through), + `recordAiCall` μετά το επιτυχές AI op. Πρώτα σε ένα
 route μόνο, με tests, πριν rollout. Εναλλακτικά #10 dbStats sampling (`setStorageBytes` feed)
 αν προτιμηθεί το storage metering πρώτο.
+
+---
+
+## 2026-07-02 (increment 7 — AI/storage quota enforcement primitive + usage read surface)
+**Built:** το enforcement gate + το πρώτο SaaS read surface που κλείνει το metering loop
+(ledger → quota math → HTTP απόφαση), ΟΛΟ σε νέα αρχεία, μηδέν wiring σε feature routes:
+- `lib/billing/enforce.ts` — η **thin drop-in gate** που ένα AI route θα βάλει σε δύο
+  γραμμές: `enforceAiQuota(ctx)` / `enforceStorageQuota(ctx, +bytes)` → `{allowed, status}`
+  (wrappάρουν τα `checkAiQuota`/`checkStorageQuota`) + **PURE** `quotaExceededBody(kind,
+  status, plan)` (stable machine-readable `{error, code:'quota_exceeded', kind, plan, used,
+  limit, remaining, upgrade:true}`) + `quotaExceededResponse(...)` → **402** Payment Required.
+  OSS parity: για DEFAULT_TENANT / SAAS_MODE off τα gates είναι pure pass-through (unlimited,
+  allowed, μηδέν DB) → self-hosted ΠΟΤΕ δεν μπλοκάρεται.
+- `app/api/saas/usage/route.ts` — `GET /api/saas/usage[?tenant=<slug>]` (nodejs, force-
+  dynamic, `saasAuthGate()` πρώτα). Account session → `accountTenants` (membership authz,
+  διαλέγει workspace by slug ή το πρώτο· 403 αν όχι μέλος) → `getTenantContext({slug})` →
+  `currentUsage` + `aiQuotaStatus`/`storageQuotaStatus`. Επιστρέφει period + used/limit/
+  remaining/ratio ανά AI+storage → το read surface που τρέφει ένα usage/billing dashboard.
+  Πρώτο endpoint που ασκεί end-to-end όλο το metering stack.
+- `lib/billing/enforce.test.ts` — 4 DB-free tests (default-tenant AI+storage pass-through =
+  unlimited/allowed· PURE body builder AI over-quota shape + storage over-quota + missing
+  plan → null).
+
+**Απόκλιση από το «Next task» (wiring σε ΕΝΑ AI route ως pilot):** το territory του routine
+απαγορεύει ρητά edits σε `api/v1/*` feature routes. Άρα έχτισα το enforcement PRIMITIVE
+(έτοιμο για drop-in σε δύο γραμμές) + ένα in-territory SaaS read surface που το ασκεί, αντί
+να αγγίξω feature route. Το πραγματικό wiring στα AI call sites (enforce πριν + recordAiCall
+μετά) μένει για increment που έχει άδεια να πειράξει `api/v1/*` (ή για το feature-builder
+routine που το owns) — δες Needs-Achilleas.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **169/169 green** (165
+προϋπάρχοντα + 4 νέα). Importers των `billing/enforce`/`enforceAiQuota`/`quotaExceeded*` από
+υπάρχον feature code → **κανένας**· το νέο route είναι SAAS-gated (404 όταν off) ⇒ zero
+runtime wiring, `SAAS_MODE` off = zero effect, κανένα Docker rebuild. Καθαρά additive.
+
+**## Needs Achilleas** (enforcement go-live):
+- Έγκριση για wiring του `enforceAiQuota`/`recordAiCall` σε ΕΝΑ AI route (`api/v1/*`) ως
+  pilot — απαιτεί edit εκτός SAAS territory. Flag-guarded (off ⇒ pass-through), αλλά αγγίζει
+  feature route → θέλει ρητή άδεια ή ανάθεση στο feature-builder routine.
+
+**Next task:** increment 8 — #10 dbStats storage sampling: ένα in-territory helper
+(`lib/billing/dbStats.ts` ή `api/saas` cron route) που τρέχει `db.stats()` στη data db κάθε
+tenant (μέσω `tenantDb(ctx)`) → `setStorageBytes(ctx, bytes)`, ώστε το storage quota να έχει
+πραγματικά νούμερα να ελέγξει. Read-only στο data plane, γράφει μόνο στο control-plane Usage.
