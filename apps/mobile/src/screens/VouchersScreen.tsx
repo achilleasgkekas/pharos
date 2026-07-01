@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C } from '../theme';
-import { shortDate, Spinner, ErrorText, Empty, Check } from '../ui';
+import { shortDate, Spinner, ErrorText, Empty, Check, Input, TextArea } from '../ui';
 import { getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, scanVoucherImage, type Voucher, type ParsedVoucherData } from '../api';
 
 type Draft = { title: string; code: string; store: string; discount: string; expiresAt: string; url: string; used: boolean };
@@ -102,8 +102,8 @@ export function VouchersScreen() {
   return (
     <View style={s.wrap}>
       <View style={s.addRow}>
-        <TextInput value={title} onChangeText={setTitle} placeholder="title" placeholderTextColor={C.faint} style={[s.input, { flex: 2 }]} />
-        <TextInput value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="code" placeholderTextColor={C.faint} style={[s.input, { flex: 1 }]} />
+        <Input value={title} onChangeText={setTitle} placeholder="title" style={{ flex: 2 }} />
+        <Input value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="code" style={{ flex: 1 }} />
         <Pressable onPress={() => setShowScan(true)} style={s.aiBtn}><Text style={s.aiText}>✦</Text></Pressable>
         <Pressable onPress={quickAdd} disabled={!title.trim()} style={[s.addBtn, !title.trim() && s.dim]}><Text style={s.addBtnText}>＋</Text></Pressable>
       </View>
@@ -132,23 +132,23 @@ export function VouchersScreen() {
             <Text style={s.modalTitle}>{isNew ? '✦ New voucher' : 'Edit voucher'}</Text>
             <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
               <Text style={s.mlabel}>TITLE</Text>
-              <TextInput value={form.title} onChangeText={(v) => setF('title', v)} style={s.minput} placeholderTextColor={C.faint} />
+              <Input variant="modal" value={form.title} onChangeText={(v) => setF('title', v)} />
               <Text style={s.mlabel}>CODE</Text>
-              <TextInput value={form.code} onChangeText={(v) => setF('code', v)} autoCapitalize="characters" style={s.minput} placeholderTextColor={C.faint} />
+              <Input variant="modal" value={form.code} onChangeText={(v) => setF('code', v)} autoCapitalize="characters" />
               <Text style={s.mlabel}>STORE</Text>
-              <TextInput value={form.store} onChangeText={(v) => setF('store', v)} style={s.minput} placeholderTextColor={C.faint} />
+              <Input variant="modal" value={form.store} onChangeText={(v) => setF('store', v)} />
               <View style={s.rowFields}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.mlabel}>DISCOUNT</Text>
-                  <TextInput value={form.discount} onChangeText={(v) => setF('discount', v)} placeholder="e.g. 15%" placeholderTextColor={C.faint} style={s.minput} />
+                  <Input variant="modal" value={form.discount} onChangeText={(v) => setF('discount', v)} placeholder="e.g. 15%" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.mlabel}>EXPIRES (YYYY-MM-DD)</Text>
-                  <TextInput value={form.expiresAt} onChangeText={(v) => setF('expiresAt', v)} placeholder="2026-12-31" placeholderTextColor={C.faint} autoCapitalize="none" style={s.minput} />
+                  <Input variant="modal" value={form.expiresAt} onChangeText={(v) => setF('expiresAt', v)} placeholder="2026-12-31" autoCapitalize="none" />
                 </View>
               </View>
               <Text style={s.mlabel}>URL</Text>
-              <TextInput value={form.url} onChangeText={(v) => setF('url', v)} autoCapitalize="none" keyboardType="url" placeholderTextColor={C.faint} style={s.minput} />
+              <Input variant="modal" value={form.url} onChangeText={(v) => setF('url', v)} autoCapitalize="none" keyboardType="url" />
               {!isNew && (
                 <Pressable onPress={() => setF('used', !form.used)} style={s.toggle}>
                   <Check checked={!!form.used} />
@@ -176,7 +176,7 @@ export function VouchersScreen() {
               <Text style={s.photoText}>📷  Take a photo</Text>
             </Pressable>
             <Text style={s.mlabel}>OR PASTE THE COUPON TEXT</Text>
-            <TextInput value={scanText} onChangeText={setScanText} multiline placeholder="e.g. 15% off at Skroutz, code SAVE15, until 31/12" placeholderTextColor={C.faint} style={[s.minput, { minHeight: 90, textAlignVertical: 'top' }]} />
+            <TextArea variant="modal" value={scanText} onChangeText={setScanText} placeholder="e.g. 15% off at Skroutz, code SAVE15, until 31/12" style={{ minHeight: 90 }} />
             <View style={s.mbtns}>
               <Pressable onPress={doScanText} disabled={!scanText.trim() || scanBusy} style={[s.save, (!scanText.trim() || scanBusy) && s.dim]}>
                 {scanBusy ? <ActivityIndicator color="#000" /> : <Text style={s.saveText}>Fill</Text>}
@@ -193,7 +193,6 @@ export function VouchersScreen() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
-  input: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: C.text, fontSize: 15 },
   addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   addBtnText: { color: '#000', fontSize: 24, fontWeight: '700' },
   aiBtn: { width: 40, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
@@ -212,7 +211,6 @@ const s = StyleSheet.create({
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
-  minput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
   rowFields: { flexDirection: 'row', gap: 10 },
   photoBtn: { marginTop: 16, borderWidth: 1, borderColor: C.cyan, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   photoText: { color: C.cyan, fontSize: 15, fontWeight: '700' },

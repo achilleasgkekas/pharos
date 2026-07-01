@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Input } from '../ui';
 import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription } from '../api';
 
 const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
@@ -82,8 +82,8 @@ export function SubscriptionsScreen() {
   return (
     <View style={s.wrap}>
       <View style={s.addRow}>
-        <TextInput value={name} onChangeText={setName} placeholder="name" placeholderTextColor={C.faint} style={[s.input, { flex: 2 }]} />
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="€/mo" placeholderTextColor={C.faint} style={[s.input, { flex: 1 }]} />
+        <Input value={name} onChangeText={setName} placeholder="name" style={{ flex: 2 }} />
+        <Input value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="€/mo" style={{ flex: 1 }} />
         <Pressable onPress={aiFill} disabled={!name.trim() || aiBusy} style={[s.aiBtn, (!name.trim() || aiBusy) && s.dim]}>
           {aiBusy ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.aiText}>✦</Text>}
         </Pressable>
@@ -113,9 +113,9 @@ export function SubscriptionsScreen() {
           <Pressable style={s.modal} onPress={() => {}}>
             <Text style={s.modalTitle}>Edit subscription</Text>
             <Text style={s.mlabel}>NAME</Text>
-            <TextInput value={eName} onChangeText={setEName} style={s.minput} placeholderTextColor={C.faint} />
+            <Input variant="modal" value={eName} onChangeText={setEName} />
             <Text style={s.mlabel}>AMOUNT</Text>
-            <TextInput value={eAmount} onChangeText={setEAmount} keyboardType="decimal-pad" style={s.minput} placeholderTextColor={C.faint} />
+            <Input variant="modal" value={eAmount} onChangeText={setEAmount} keyboardType="decimal-pad" />
             <Text style={s.mlabel}>BILLING CYCLE</Text>
             <View style={s.chipRow}>
               {CYCLES.map((cy) => (
@@ -125,7 +125,7 @@ export function SubscriptionsScreen() {
               ))}
             </View>
             <Text style={s.mlabel}>NEXT RENEWAL</Text>
-            <TextInput value={eRenewal} onChangeText={setERenewal} autoCapitalize="none" autoCorrect={false} placeholder="YYYY-MM-DD" style={s.minput} placeholderTextColor={C.faint} />
+            <Input variant="modal" value={eRenewal} onChangeText={setERenewal} autoCapitalize="none" autoCorrect={false} placeholder="YYYY-MM-DD" />
             <Pressable onPress={() => setEActive((v) => !v)} style={s.toggle}>
               <Check checked={!!eActive} />
               <Text style={s.tlabel}>Active</Text>
@@ -144,7 +144,6 @@ export function SubscriptionsScreen() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
-  input: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: C.text, fontSize: 15 },
   addBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   addBtnText: { color: '#000', fontSize: 24, fontWeight: '700' },
   aiBtn: { width: 40, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
@@ -160,7 +159,6 @@ const s = StyleSheet.create({
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
-  minput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   cChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 9, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
   cChipOn: { backgroundColor: C.accent, borderColor: C.accent },

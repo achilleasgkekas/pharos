@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
-import { Spinner, ErrorText, Empty, Check } from '../ui';
+import { Spinner, ErrorText, Empty, Check, Input } from '../ui';
 import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task } from '../api';
 
 const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
@@ -76,7 +76,7 @@ export function TasksScreen() {
   return (
     <View style={s.wrap}>
       <View style={s.addRow}>
-        <TextInput value={title} onChangeText={setTitle} onSubmitEditing={add} placeholder="Add a task…  #tag" placeholderTextColor={C.faint} style={s.input} />
+        <Input value={title} onChangeText={setTitle} onSubmitEditing={add} placeholder="Add a task…  #tag" style={{ flex: 1 }} />
         <Pressable onPress={add} disabled={!title.trim()} style={[s.add, !title.trim() && s.dim]}><Text style={s.addText}>＋</Text></Pressable>
       </View>
       <ErrorText>{err}</ErrorText>
@@ -109,7 +109,7 @@ export function TasksScreen() {
           <Pressable style={s.modal} onPress={() => {}}>
             <Text style={s.modalTitle}>Edit task</Text>
             <Text style={s.label}>TITLE</Text>
-            <TextInput value={editTitle} onChangeText={setEditTitle} style={s.modalInput} placeholderTextColor={C.faint} />
+            <Input variant="modal" value={editTitle} onChangeText={setEditTitle} />
             <Text style={s.label}>STATUS</Text>
             <View style={s.statuses}>
               {STATUSES.map((st) => (
@@ -127,7 +127,7 @@ export function TasksScreen() {
               ))}
             </View>
             <Text style={s.label}>TAGS</Text>
-            <TextInput value={editTags} onChangeText={setEditTags} placeholder="network order  (space or comma)" placeholderTextColor={C.faint} autoCapitalize="none" style={s.modalInput} />
+            <Input variant="modal" value={editTags} onChangeText={setEditTags} placeholder="network order  (space or comma)" autoCapitalize="none" />
             <View style={s.modalBtns}>
               <Pressable onPress={saveEdit} disabled={!editTitle.trim()} style={[s.save, !editTitle.trim() && s.dim]}><Text style={s.saveText}>Save</Text></Pressable>
               <Pressable onPress={removeEditing} style={s.del}><Text style={s.delText}>Delete</Text></Pressable>
@@ -142,7 +142,6 @@ export function TasksScreen() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
-  input: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: C.text, fontSize: 15 },
   add: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   addText: { color: '#000', fontSize: 24, fontWeight: '700' },
   dim: { opacity: 0.4 },
@@ -158,7 +157,6 @@ const s = StyleSheet.create({
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   label: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 14, marginBottom: 6 },
-  modalInput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
   statuses: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statusBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
   statusText: { color: C.dim, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },

@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
-import { C, SIZE } from './theme';
+import { View, Text, Pressable, ActivityIndicator, StyleSheet, TextInput, type TextInputProps } from 'react-native';
+import { C, SIZE, RADIUS, SPACE } from './theme';
 
 export const CUR: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' };
 export const money = (n: number | undefined, cur = 'EUR') => `${CUR[cur] || cur + ' '}${(n ?? 0).toLocaleString()}`;
@@ -30,6 +30,36 @@ export function Empty({ children }: { children: React.ReactNode }) {
   return <Text style={s.empty}>{children}</Text>;
 }
 
+type InputProps = TextInputProps & { variant?: 'surface' | 'modal' };
+
+/**
+ * Single-line text field. `surface` (default) sits on the page background;
+ * `modal` sits on surface-2 inside a bottom-sheet/modal. Unifies the borderRadius/
+ * padding/fontSize tokens that used to diverge per screen. Pass `style` to add
+ * layout props (e.g. `{ flex: 1 }`); it merges on top of the base.
+ */
+export function Input({ variant = 'surface', style, ...rest }: InputProps) {
+  return (
+    <TextInput
+      placeholderTextColor={C.faint}
+      {...rest}
+      style={[variant === 'modal' ? s.inputModal : s.inputSurface, style]}
+    />
+  );
+}
+
+/** Multi-line variant (top-aligned). Pass `minHeight` via `style`. */
+export function TextArea({ variant = 'surface', style, ...rest }: InputProps) {
+  return (
+    <TextInput
+      placeholderTextColor={C.faint}
+      multiline
+      {...rest}
+      style={[variant === 'modal' ? s.inputModal : s.inputSurface, s.textArea, style]}
+    />
+  );
+}
+
 /**
  * Shared checkbox visual (24×24 box + ✓ when checked). Display-only — wrap it
  * in a Pressable for tap handling. When it IS the tap target, give the wrapping
@@ -55,4 +85,7 @@ const s = StyleSheet.create({
   checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1, borderColor: C.borderLight, alignItems: 'center', justifyContent: 'center' },
   checkboxOn: { backgroundColor: C.accent, borderColor: C.accent },
   checkboxMark: { color: C.onAccent, fontSize: SIZE.md, fontWeight: '800' },
+  inputSurface: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.md, paddingHorizontal: SPACE.md, paddingVertical: 11, color: C.text, fontSize: SIZE.md },
+  inputModal: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.sm, paddingHorizontal: SPACE.md, paddingVertical: 10, color: C.text, fontSize: SIZE.md },
+  textArea: { textAlignVertical: 'top' },
 });

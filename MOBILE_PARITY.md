@@ -241,7 +241,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Acceptance:
   - Ένα `Input` component εξάγεται από `ui.tsx`· τα παραπάνω screens το χρησιμοποιούν αντί για local `input`/`minput`/`einput` StyleSheet entry
   - Καμία απόκλιση borderRadius (τώρα 10 vs 12) ή padding (τώρα 12 vs 14) μεταξύ screens — όλα από το ένα primitive
-- Status: TODO
+- Status: 🟡 IN PROGRESS (2026-07-01, builder) — **primitives χτίστηκαν** στο `ui.tsx`: `<Input variant="surface"|"modal">` + `<TextArea>` (base tokens `RADIUS.md/sm` + `SPACE.md` + `SIZE.md`, default `placeholderTextColor`, `style` passthrough για flex/minHeight). Μετανάστευσα τα **4 standard record-form screens** — **MoneyScreen** (2 surface + 9 modal + 1 TextArea notes), **SubscriptionsScreen** (2 surface + 3 modal), **VouchersScreen** (2 surface + 6 modal + 1 TextArea scan), **TasksScreen** (1 surface + 2 modal) — και έσβησα τα τοπικά `input`/`minput`/`modalInput` StyleSheet entries (byte-identical με το primitive base· μόνη ορατή μεταβολή: TasksScreen add-input padH 14→12, ~2px σε full-width field, ασήμαντο). mobile `tsc --noEmit` **EXIT 0**. **Απομένουν** (token-outlier / flex-heavy composers → καλύτερα σε attended run λόγω no-simulator οπτικού verify): **ItemsScreen** (input flex + `logInput` micro padH10/padV8/fs14 + `specs` multiline addon), **ReceiptsScreen** (`einput` + line-item flex + notes multiline), **SettingsScreen** (`input` surface2 + `budgetInput` padV9 + notes/store multilines + marginBottom variant), **ShoppingScreen** (input padH14), **SearchScreen** (input padH14/fs16), **AssistantScreen** (chat composer radius14/maxHeight120), **LoginScreen** (distinct block).
 
 ### Button + Chip primitives (add/save buttons + filter/status chips)
 - Priority: P2

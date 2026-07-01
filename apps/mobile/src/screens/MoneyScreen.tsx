@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea } from '../ui';
 import { getExpenses, addExpense, deleteExpense, updateExpense, scanExpenseImage, type Expense, type ParsedExpenseData } from '../api';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
@@ -129,8 +129,8 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         <Text style={[s.total, { color: kind === 'income' ? C.accent : C.text }]}>{money(total, cur)}</Text>
       </View>
       <View style={s.addRow}>
-        <TextInput value={vendor} onChangeText={setVendor} placeholder={label} placeholderTextColor={C.faint} style={[s.input, { flex: 2 }]} />
-        <TextInput value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={C.faint} style={[s.input, { flex: 1 }]} />
+        <Input value={vendor} onChangeText={setVendor} placeholder={label} style={{ flex: 2 }} />
+        <Input value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" style={{ flex: 1 }} />
         <Pressable onPress={scan} disabled={scanning} style={[s.scanBtn, scanning && s.dim]}>
           {scanning ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.scanText}>✦</Text>}
         </Pressable>
@@ -161,10 +161,10 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
             <Text style={s.modalTitle}>Scanned {draft?.kind === 'income' ? 'income' : 'bill'}</Text>
             <Text style={s.scanNote}>Check the fields, then add it.</Text>
             <Text style={s.mlabel}>{label.toUpperCase()}</Text>
-            <TextInput value={dVendor} onChangeText={setDVendor} style={s.minput} placeholderTextColor={C.faint} />
+            <Input variant="modal" value={dVendor} onChangeText={setDVendor} />
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}><Text style={s.mlabel}>AMOUNT</Text><TextInput value={dAmount} onChangeText={setDAmount} keyboardType="decimal-pad" style={s.minput} placeholderTextColor={C.faint} /></View>
-              <View style={{ flex: 1 }}><Text style={s.mlabel}>CATEGORY</Text><TextInput value={dCategory} onChangeText={setDCategory} style={s.minput} placeholderTextColor={C.faint} /></View>
+              <View style={{ flex: 1 }}><Text style={s.mlabel}>AMOUNT</Text><Input variant="modal" value={dAmount} onChangeText={setDAmount} keyboardType="decimal-pad" /></View>
+              <View style={{ flex: 1 }}><Text style={s.mlabel}>CATEGORY</Text><Input variant="modal" value={dCategory} onChangeText={setDCategory} /></View>
             </View>
             {!!(draft?.date || draft?.recurringCycle) && (
               <Text style={s.scanMeta}>{[draft?.date ? shortDate(draft.date) : '', draft?.recurringCycle ? `recurring ${draft.recurringCycle}` : ''].filter(Boolean).join('  ·  ')}</Text>
@@ -183,17 +183,17 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
             <Text style={s.modalTitle}>Edit</Text>
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <Text style={s.mlabel}>{label.toUpperCase()}</Text>
-              <TextInput value={eVendor} onChangeText={setEVendor} style={s.minput} placeholderTextColor={C.faint} />
+              <Input variant="modal" value={eVendor} onChangeText={setEVendor} />
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}><Text style={s.mlabel}>AMOUNT</Text><TextInput value={eAmount} onChangeText={setEAmount} keyboardType="decimal-pad" style={s.minput} placeholderTextColor={C.faint} /></View>
-                <View style={{ flex: 1 }}><Text style={s.mlabel}>CATEGORY</Text><TextInput value={eCategory} onChangeText={setECategory} style={s.minput} placeholderTextColor={C.faint} /></View>
+                <View style={{ flex: 1 }}><Text style={s.mlabel}>AMOUNT</Text><Input variant="modal" value={eAmount} onChangeText={setEAmount} keyboardType="decimal-pad" /></View>
+                <View style={{ flex: 1 }}><Text style={s.mlabel}>CATEGORY</Text><Input variant="modal" value={eCategory} onChangeText={setECategory} /></View>
               </View>
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}><Text style={s.mlabel}>DATE</Text><TextInput value={eDate} onChangeText={setEDate} placeholder="YYYY-MM-DD" autoCapitalize="none" style={s.minput} placeholderTextColor={C.faint} /></View>
-                <View style={{ flex: 1 }}><Text style={s.mlabel}>PERIOD</Text><TextInput value={ePeriod} onChangeText={setEPeriod} placeholder="YYYY-MM" autoCapitalize="none" style={s.minput} placeholderTextColor={C.faint} /></View>
+                <View style={{ flex: 1 }}><Text style={s.mlabel}>DATE</Text><Input variant="modal" value={eDate} onChangeText={setEDate} placeholder="YYYY-MM-DD" autoCapitalize="none" /></View>
+                <View style={{ flex: 1 }}><Text style={s.mlabel}>PERIOD</Text><Input variant="modal" value={ePeriod} onChangeText={setEPeriod} placeholder="YYYY-MM" autoCapitalize="none" /></View>
               </View>
               <Text style={s.mlabel}>PAYMENT</Text>
-              <TextInput value={ePayment} onChangeText={setEPayment} placeholder="card, cash…" style={s.minput} placeholderTextColor={C.faint} />
+              <Input variant="modal" value={ePayment} onChangeText={setEPayment} placeholder="card, cash…" />
               <View style={s.recRow}>
                 <Text style={s.recLabel}>Recurring</Text>
                 <Pressable onPress={() => setERecurring((v) => !v)} style={[s.toggle, eRecurring && s.toggleOn]}>
@@ -210,7 +210,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
                 </View>
               )}
               <Text style={s.mlabel}>NOTES</Text>
-              <TextInput value={eNotes} onChangeText={setENotes} multiline style={[s.minput, { minHeight: 60, textAlignVertical: 'top' }]} placeholderTextColor={C.faint} />
+              <TextArea variant="modal" value={eNotes} onChangeText={setENotes} style={{ minHeight: 60 }} />
             </ScrollView>
             <View style={s.mbtns}>
               <Pressable onPress={saveEdit} style={s.save}><Text style={s.saveText}>Save</Text></Pressable>
@@ -229,7 +229,6 @@ const s = StyleSheet.create({
   totalLabel: { color: C.faint, fontSize: 11, letterSpacing: 1 },
   total: { fontSize: 22, fontWeight: '800' },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
-  input: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: C.text, fontSize: 15 },
   add: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   addText: { color: '#000', fontSize: 24, fontWeight: '700' },
   scanBtn: { width: 46, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
@@ -246,7 +245,6 @@ const s = StyleSheet.create({
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20, maxHeight: '88%' },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
-  minput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
   recRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
   recLabel: { color: C.text, fontSize: 14, fontWeight: '600' },
   toggle: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 12, backgroundColor: C.surface2 },
