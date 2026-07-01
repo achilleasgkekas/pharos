@@ -2,8 +2,15 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 83cc537 -->
+<!-- reviewed: 4c6856f -->
 <!-- docker-validated: 20e1826 -->
+
+## 2026-07-01 (reviewer — range `83cc537..4c6856f`, 15 commits· marker → `4c6856f`)
+- **Τι ελέγχθηκε**: 6 code commits (οι υπόλοιποι 9 docs-only). readBody adoption ×4 (`tasks/[id]`, `vouchers/[id]`, `expenses/[id]`, `subscriptions/[id]` PATCH), Tasks steps/checklist (mobile+api `e0f7a97`), mobile Tasks inline ←/→ quick-move (`47a9574`), shared mobile primitives Card (`9d226cf`) + IconButton (`929ca4d`).
+- **Checks**: `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**. Read-only, καμία Docker build.
+- **Εύρημα-by-εύρημα**: (1) Τα 4 `readBody` refactors panομοιότυπα — `readBody` επιστρέφει `Record<string, unknown>`, ίδιος τύπος με το παλιό `req.json().catch(()=>({}))` cast· μηδέν αλλαγή συμπεριφοράς, guards/response shapes αμετάβλητα. (2) Tasks-steps API: η προσθήκη `steps` στο GET-list `trim()` + στο PATCH response είναι **additive** (δεν σπάει υπάρχοντες consumers)· το PATCH `steps` full-array replacement γράφει σε πεδίο που **υπάρχει** στο `Task` model (`StepSchema`, `_id:true`) → `String(s._id)` έγκυρο, όχι silent-drop. (3) mobile quick-move: `STATUSES=['todo','in-progress','blocked','done']` ταιριάζει με το web Kanban· bounds guards σωστά (`hasPrev`/`hasNext`, optimistic + `setTaskStatus`, revert σε load στο catch). (4) Card/IconButton: καθαρά extractions, behavior preserved (busy/disabled dim + block, Pressable-when-handler, style passthrough).
+- **Regressions**: καμία. **Secrets**: κανένα. **Fixes εφαρμοσμένα**: κανένα (τίποτα small-and-safe δεν χρειάστηκε). **Flags**: κανένα νέο TODO — και οι δύο ουρές παρέμειναν ως έχουν.
+- **ΣΗΜ**: το working tree έχει uncommitted WIP άλλου routine (`cards/[id]/route.ts`, `cards/route.ts`, νέο `lib/cardFields.ts`) — **ΔΕΝ** το άγγιξα, εκτός review range. Staged ΜΟΝΟ `PROGRESS.md`.
 
 ## 2026-07-01 (builder — apiBody `readBody` adoption σε tasks/[id] + vouchers/[id] PATCH· commit `4c6856f`)
 - **Τι**: συνέχεια της apiBody `readBody` adoption στα `[id]` PATCH handlers. **Concurrency**: ένας παράλληλος builder-routine έτρεχε ταυτόχρονα, πήρε το ίδιο WEB_DEBT item (expenses/[id] + subscriptions/[id]) και είχε ήδη εφαρμόσει τα edits του στο working tree (uncommitted WIP) όταν διάβασα τα αρχεία → τα είδα ήδη migrated. Τα κατέθεσε ως `99e737f` + `75889e3`. Αντί να διπλο-δουλέψω τα ίδια, πήρα τα **επόμενα δύο** raw `[id]` PATCH routes (`tasks/[id]`, `vouchers/[id]`) — γνήσια, μη-επικαλυπτόμενη επέκταση (adopters 8 → 10).
