@@ -152,6 +152,33 @@ const TIERS: Tier[] = [
   },
 ];
 
+const FAQS: { q: string; a: string }[] = [
+  {
+    q: 'Is self-hosting really free?',
+    a: 'Yes. The self-hosted edition is open source under AGPL-3.0 with every module and no seat limits. Run it on your own hardware for as long as you like. The only paid option is the managed hosting, where we run and maintain it for you.',
+  },
+  {
+    q: 'What data leaves my machine?',
+    a: 'Nothing by default. PHAROS stores everything locally and has zero telemetry. The one exception is AI: if you point it at a cloud provider, the document being parsed is sent to that provider. Run a local Ollama instead and it stays fully offline.',
+  },
+  {
+    q: 'Do I need an AI API key?',
+    a: 'No. AI is optional and can be toggled off per feature. Bring your own key (Anthropic, OpenAI, Gemini, OpenRouter) or run a local model with Ollama. The manual entry, tracking, and reporting work without any AI at all.',
+  },
+  {
+    q: 'What do I need to run it?',
+    a: 'Docker and a machine that stays on: a Mac mini, a NAS, a Proxmox LXC, or a spare mini PC all work. One docker compose up brings up the web app, MongoDB, and search. Reach it over your LAN or your own VPN.',
+  },
+  {
+    q: 'How is hosted different from self-hosted?',
+    a: 'It is the same app. With hosted we handle the server, updates, and nightly backups, and AI parsing is included so there is nothing to configure. Self-hosted gives you full control and keeps every byte on your own hardware.',
+  },
+  {
+    q: 'Can I move between self-hosted and hosted?',
+    a: 'Yes. PHAROS exports your whole dataset to JSON and imports it back by merging on record id, so you can start self-hosted and move to hosted later, or the other way round, without losing anything.',
+  },
+];
+
 export default function Home() {
   return (
     <main>
@@ -192,6 +219,7 @@ export default function Home() {
             <a href="#features" className="navlink">Features</a>
             <a href="#self-host" className="navlink">Self-host</a>
             <a href="#pricing" className="navlink">Pricing</a>
+            <a href="#faq" className="navlink">FAQ</a>
             <a
               href={GITHUB_URL}
               target="_blank"
@@ -377,6 +405,32 @@ export default function Home() {
           <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 36 }}>
             Final hosted pricing is being worked out. Self-hosting stays free under AGPL-3.0.
           </p>
+        </div>
+      </section>
+
+      {/* ── FAQ ───────────────────────────────────────────── */}
+      <section id="faq" style={{ padding: '64px 0' }}>
+        <div className="container" style={{ maxWidth: 760 }}>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <p className="mono" style={{ marginBottom: 12 }}>Questions</p>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 700 }}>
+              Answers before you ask
+            </h2>
+          </div>
+
+          <div className="faq-list">
+            {FAQS.map((f) => (
+              <details key={f.q} className="faq-item">
+                <summary className="faq-q">
+                  <span>{f.q}</span>
+                  <span className="faq-chevron" aria-hidden="true">
+                    <Icon name="chevron" size={18} />
+                  </span>
+                </summary>
+                <p className="faq-a">{f.a}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </section>
 

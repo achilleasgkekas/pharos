@@ -122,3 +122,26 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain.
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-01 (cont.⁵)
+
+Task: (e) Polish, μερος 4 — FAQ section (πριν δεν υπηρχε· τα conversion questions «ειναι οντως free;», «τι δεδομενα φευγουν;», «θελω AI key;» δεν απαντιονταν πουθενα).
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεο `FAQS` array (6 Q&A) + dedicated `<section id="faq">` αναμεσα σε Pricing και Waitlist. Native `<details>/<summary>` accordion (μηδεν JS, static, accessible, keyboard-friendly) — καθε item: ερωτηση + rotating chevron, expand δειχνει την απαντηση. Ερωτησεις: self-host free (AGPL-3.0, no seat limits), τι δεδομενα φευγουν (τιποτα by default, zero telemetry, AI = μονο αν το στειλεις σε cloud provider, local Ollama = offline), AI key (optional, per-feature toggle, bring-your-own η Ollama), τι χρειαζεται (Docker + always-on machine: Mac mini/NAS/Proxmox LXC), hosted vs self-hosted, migrate μεταξυ τους (JSON export/import, merge-by-id).
+- Nav: link «FAQ» (#faq) αναμεσα σε Pricing και GitHub.
+- `app/components/Icon.tsx`: νεο `chevron` path (`m6 9 6 6 6-6`).
+- `app/globals.css`: `.faq-list` (flex column), `.faq-item` (card, border-light στο [open]), `.faq-q` (summary, no default marker, display font), `.faq-chevron` (rotate 180° + accent στο [open]), `.faq-a` (text-dim). Κρυβω τον default disclosure marker (list-style none + ::-webkit-details-marker).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 103 kB First Load JS, αμεταβλητο — pure HTML/CSS, μηδεν νεο JS).
+- Δεν σηκωσα preview server (static markup, native details, low-risk). Docker/web/mobile αθικτα. Το `.claude/launch.json` (local landing-dev config) ΔΕΝ commit (shared root file, collision guard).
+
+Επομενο increment: (e) συνεχεια — app screenshots / product-shots section (real UI, χρειαζεται assets), mobile QA pass στα sections (~380px), ισως testimonials/social-proof placeholder.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain.
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.

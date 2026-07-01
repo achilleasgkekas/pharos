@@ -16,6 +16,7 @@ const PATHS: Record<string, string> = {
   wifi:
     'M12 20h.01 M2 8.82a15 15 0 0 1 20 0 M5 12.859a10 10 0 0 1 14 0 M8.5 16.429a5 5 0 0 1 7 0',
   check: 'M20 6 9 17l-5-5',
+  chevron: 'm6 9 6 6 6-6',
 };
 
 export function Icon({
