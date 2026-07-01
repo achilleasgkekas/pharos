@@ -205,3 +205,56 @@ checkout-session + customer-portal stubs, env keys) + `api/saas/billing/webhook`
 (signature-verified skeleton) + `lib/billing/entitlements.ts` (plan → allowed features,
 mirror OSS-vs-paid split). Καμία πραγματική χρέωση· Stripe keys μέσω env (deferred κατ'
 απόφαση Achilleas).
+
+---
+
+## 2026-07-01 (increment 5 — billing scaffold: plans + entitlements + Stripe + webhook)
+**Built:** το billing layer, ΟΛΟ σε νέα αρχεία, μηδέν wiring στο υπάρχον app:
+- `lib/billing/plans.ts` — **PURE** plan ladder (μηδέν imports): `PlanKey` free/shared/
+  dedicated, `PLANS` table (name/tier/priceMonthlyEUR/storageGB/aiCallsPerMonth/customDomain/
+  stripePriceEnv), `planDef(key)` (unknown→free), `stripePriceId(key)` (διαβάζει το Stripe
+  Price ID από env **at call time**, ποτέ hardcoded), `planForPriceId(id)` (reverse για το
+  webhook). Free 5GB/50 AI · Pro €9 50GB/1000 AI · Dedicated €29 500GB/unlimited+custom domain.
+- `lib/billing/entitlements.ts` — plan → entitlements. **OSS parity** ρητά τεκμηριωμένο: το
+  self-hosted τρέχει ως implicit `dedicated` (DEFAULT_TENANT) → πλήρες set· ΟΛΑ τα core +
+  AI features σε ΚΑΘΕ plan, differentiation ΜΟΝΟ σε quotas (storage+AI volume)+custom domain+
+  tier (όχι feature paywalls). `entitlementsFor`/`canUseAiFeature`/`withinStorage`/
+  `withinAiQuota` (unlimited plan → πάντα true). Consume-άρεται από #10 dbStats + #11 metering.
+- `lib/billing/stripe.ts` — **NODE-only, DEPENDENCY-FREE** (κανένα `stripe` npm): REST μέσω
+  `fetch` + webhook signature μέσω `node:crypto`. `stripeConfigured()` (gate σε ΚΑΘΕ outbound
+  call), `createCheckoutSession`/`createPortalSession` (stub-safe: `{ok:false,reason:'not-
+  configured'}` όταν λείπουν keys → **καμία χρέωση δυνατή**), `verifyStripeSignature(raw,header,
+  secret,tolerance)` (documented `t=…,v1=…` scheme, HMAC-SHA256, constant-time compare,
+  5min replay window).
+- `api/saas/billing/webhook/route.ts` — skeleton receiver (nodejs, force-dynamic). Gates:
+  SAAS_MODE off→404, webhook secret unset→503, bad sig→400. Raw body via `req.text()` (πριν
+  το parse), verify, dispatch: checkout.session.completed / customer.subscription.created+
+  updated / deleted → reflect σε `Tenant.status/plan/billingCustomerId/billingSubscriptionId`
+  (resolve tenant via metadata.tenantId → billingCustomerId). Ποτέ δεν χρεώνει· μόνο
+  καθρεφτίζει το Stripe state στο control plane. 200 ack σε unhandled events.
+- `lib/billing/billing.test.ts` — 9 pure tests (plan fallback, env price id, OSS-parity
+  entitlements, storage/AI quota edges, signature accept/tamper/wrong-secret/stale/no-secret).
+- `vitest.config.ts` — additive `resolve.alias` `@`→`./src` (mirror του tsconfig path) ώστε
+  τα tests να importάρουν `@/lib/…` όπως το production code. Test-only infra, zero runtime effect.
+
+**Απόφαση (billing provider):** το task λέει Stripe· κράτησα Stripe αλλά **dependency-free**
+(fetch+crypto) → μηδέν npm dep, type-checks/builds με ή χωρίς keys. Το TODO #12 αναφέρει και
+Paddle (merchant-of-record για EU VAT) ως εναλλακτική — καταγράφεται στο Needs-Achilleas.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **84/84 green** (75 προϋπάρχοντα
++ 9 νέα). Importers των billing modules από υπάρχον feature code → **κανένας** (μόνο το δικό
+μου webhook route + ένα comment στο Tenant.ts) ⇒ zero runtime wiring, `SAAS_MODE` off = zero
+effect. Δεν άλλαξα υπάρχον runtime wiring routes ⇒ κανένα Docker rebuild (το webhook είναι νέο
++ SAAS-gated· 404 στο self-hosted).
+
+**## Needs Achilleas** (billing go-live):
+- Stripe (ή Paddle) account + keys: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+  `STRIPE_PRICE_SHARED`, `STRIPE_PRICE_DEDICATED` (μέσω env, ποτέ commit).
+- Οριστικό pricing (τα €9/€29 + quotas είναι placeholders).
+- Paddle-vs-Stripe απόφαση (EU VAT / MoR). Αν Paddle → ο stripe.ts client αντικαθίσταται,
+  τα plans/entitlements μένουν ίδια.
+
+**Next task:** increment 6 — wire το metering: `models/Usage.ts` (per-tenant ledger:
+period/aiCalls/storageBytes) + `lib/billing/usage.ts` (`recordAiCall`/`currentUsage`/enforce
+μέσω `withinAiQuota`+`withinStorage`), όλα flag-guarded, χωρίς να αγγίξω τα AI call sites ακόμα
+(μόνο το ledger + helpers· το wiring στα υπάρχοντα routes = μετέπειτα, προσεκτικό increment).
