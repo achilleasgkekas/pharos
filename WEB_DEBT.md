@@ -3,6 +3,20 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-02 27η σάρωση· builder έκλεισε shopping-list POST [readBody adoption 100%], ουρά 1→0 → ανοίγω 1 P3/S [isObjectId στο νέο SaaS billing webhook]· ελέγχθηκε ΝΕΟΣ SaaS billing scaffold + Stripe webhook)
+
+**2026-07-02 (27η σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 v1 route files** + `apiAuth`/`apiBody`/`apiList` helpers + **ΝΕΟΣ SaaS billing surface** (`api/saas/billing/webhook` + `lib/billing/{stripe,plans}`, commit `3c6bcc4`). Από την 26η σάρωση ο builder κατανάλωσε το top item (readBody σε shopping-list POST, commit `6fd1075`) → η v1 raw-body ουρά έφτασε **0** και το apiBody/readBody adoption **ΕΚΛΕΙΣΕ πλήρως** (`grep -rn 'req.json().catch' src/app/api` = μηδέν σε ΟΛΟ το api).
+- **Ευρήματα ανά διάσταση (live grep, όχι docs):**
+  - **Type safety: 0** — `npm run type-check` **EXIT 0**· `:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το `/api` (v1 + saas) = **0**. Ο billing webhook + `stripe.ts` δουλεύουν πλήρως τυπωμένα με `Record<string, unknown>` + guards, μηδέν `any`.
+  - **Auth: 0 unguarded** στο v1 (μόνο `auth/login` exempt). Ο SaaS billing webhook είναι σωστά gated: `saasMode()` off → 404, webhook secret unset → 503, bad/missing signature → 400 (fail-closed). Signature-verify με constant-time `timingSafeEqual` + replay window (±300s) + σωστό HMAC-SHA256 scheme, dependency-free — **exemplary**.
+  - **Input validation: 0 gaps** — τα 2 εναπομείναντα raw `req.json()` (auth/login boundary, items/[id]/ai-fill) είναι σωστά try/catch-wrapped + safe-cast σε `unknown`/typed guard· webhook διαβάζει raw body ΠΡΙΝ verify (σωστό) + `JSON.parse` σε try/catch.
+  - **Error handling: 0** — ομοιόμορφο try/catch + `{ error }` shape· webhook επιστρέφει 500 σε DB failure (Stripe retry) αντί να καταπίνει.
+  - **DB: 0** — ΟΛΑ τα v1 reads `.lean()` (live-verified: receipts/items/expenses/subscriptions/statements/vouchers/tasks list builders + settings/calendar chains· reports:81 = JS `Array.find`, false positive)· list endpoints `.limit()`+`.skip()`. `auth/login` findOne σκόπιμα ΟΧΙ lean (κάνει `user.save()` για apiToken). Webhook: `Tenant.findById`/`findOne` μη-lean γιατί κάνει mutation (`.save()`), σωστό.
+  - **Consistency debt (νέο): 1 P3/S** — ο νέος SaaS billing webhook (`resolveTenant`, γρ.81) ξανα-εισήγαγε inline `/^[a-f0-9]{24}$/i.test(...)` αντί για το shared `isObjectId` — το ίδιο debt που είχε κλείσει για όλο το v1. Byte-identical swap → queue item.
+- **Counts ανά dimension: P1=0, P2=0, P3=1** (isObjectId στο billing webhook, S). Δεν εφευρίσκω debt· 27 σαρώσεις χωρίς P1/P2 στο v1, ο κώδικας ώριμος. Ο νέος billing scaffold είναι υψηλής ποιότητας (constant-time sig, fail-closed gating, dependency-free)· η μόνη παρατήρηση είναι η inline-regex consistency.
+
+---
+
 ## Σύνοψη audit (2026-07-01 26η σάρωση· builder έκλεισε scan/expense+voucher, ουρά 1→0 → ανοίγω το ΤΕΛΕΥΤΑΙΟ raw route [shopping-list POST]· ελέγχθηκε ΝΕΟΣ SaaS auth κώδικας)
 
 **2026-07-01 (26η σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 v1 route files** + `apiAuth`/`apiBody`/`apiList` helpers + **ΝΕΟ SaaS auth surface** (`api/saas/auth/{signup,login,session,logout}` + `lib/tenancy/{saasApi,accountSession,provision}` — uncommitted WIP του Αχιλλέα στο working tree). Από την 25η σάρωση ο builder κατανάλωσε το top item (readBody σε scan/expense + scan/voucher, commits `4503640`+`875264b`) → η v1 ουρά έφτασε **0 ενεργά** στην αρχή.
@@ -302,6 +316,20 @@
 
 ## Web Debt Queue
 
+### Dedup ObjectId-validation regex — SaaS billing webhook (isObjectId re-introduced inline)
+- Priority: P3
+- Size: S
+- Area: shared
+- Files: apps/web/src/app/api/saas/billing/webhook/route.ts
+- Depends on: none
+- Acceptance:
+  - Ο νέος SaaS billing webhook (commit `3c6bcc4`) **ξανα-εισήγαγε** inline ObjectId regex — το ακριβές debt που είχε κλείσει για ολόκληρο το v1 (isObjectId dedup, 4 παρτίδες). Live: `grep -rn '\[a-f0-9\]{24}' src/app/api/saas src/lib/tenancy src/lib/billing` = **1 hit** → `webhook/route.ts:81`, μέσα στο `resolveTenant`: `if (tenantId && /^[a-f0-9]{24}$/i.test(tenantId)) {`.
+  - Swap **byte-identical**: το shared `isObjectId(id)` στο `@/lib/apiBody` είναι ακριβώς `/^[a-f0-9]{24}$/i.test(id)` (pure string helper, μηδέν server-only import· ήδη importable σε route files, π.χ. `items/[id]/ai-fill/route.ts` το κάνει import). Αλλαγή: νέο `import { isObjectId } from '@/lib/apiBody';` (δίπλα στα υπάρχοντα imports) + η γραμμή γίνεται `if (tenantId && isObjectId(tenantId)) {`. Μηδέν αλλαγή συμπεριφοράς.
+  - Το route μένει node runtime + SaaS-gated· `Tenant.findById` / `Tenant.findOne({ billingCustomerId })` fallback, signature-verify, event-switch, response shapes ΟΛΑ αμετάβλητα. Δεν αγγίζει τον v1 mobile surface (SaaS-only endpoint).
+  - Επαλήθευση: `grep -rn '\[a-f0-9\]{24}' src/app/api src/lib/tenancy src/lib/billing` επιστρέφει **μηδέν** (πλήρης εξάλειψη inline ObjectId regex σε ΟΛΟ το api + tenancy + billing).
+  - npm run type-check exits 0
+- Status: TODO
+
 ### apiBody helpers — readBody adoption σε shopping-list POST (τελευταίο raw-body route)
 - Priority: P3
 - Size: S
@@ -315,7 +343,7 @@
   - `readBody` επιστρέφει `Body = Record<string, unknown>` → τα `strField(...)` δίνουν `string` → ταιριάζουν με `NewItem` (τέλος ο ψευδής `Record<string,string>` cast). Το `withAuth` wrapper, ο `if (!r.ok) return apiError(...)` κλάδος, το `{ ok: true, items }` + status 201 response shape ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν → μηδέν κίνδυνος για τον mobile consumer.
   - Επαλήθευση: `grep -rln 'req.json().catch' apps/web/src/app/api/v1` επιστρέφει **μηδέν** αρχεία (πλήρες κλείσιμο του readBody adoption).
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (2026-07-02, commit `6fd1075`) — live-verified 27η σάρωση: `shopping-list/route.ts:17-18` κάνει πλέον `const b = await readBody(req);` + `strField(b, 'name'|'quantity'|'category'|'brand'|'note')` (import `{ readBody, strField }`). `grep -rn 'req.json().catch' src/app/api` = **μηδέν** σε ΟΛΟ το api· `readBody` adopters v1 = **29**. Το apiBody/readBody adoption effort **ΕΚΛΕΙΣΕ πλήρως**. Τα 2 εναπομείναντα raw `req.json()` (auth/login boundary, items/[id]/ai-fill) είναι σωστά try/catch-wrapped + safe-cast → όχι debt. tsc EXIT 0.
 
 ### apiBody helpers — readBody adoption σε scan/expense + scan/voucher POST
 - Priority: P3

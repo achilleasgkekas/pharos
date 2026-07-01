@@ -2172,3 +2172,27 @@ Read-only mobile UI consistency audit· inventory ξαναχτισμένο απ�
 
 ### Needs Achilleas
 - (αμετάβλητο) Μηδέν committed secret (μόνο `.env.example` template). Standing product-decision items (ΟΧΙ auto-buildable): **native dep approvals** (`react-native-safe-area-context` για safe-area — προτεινόμενο `npx expo install` + simulator verify), **Reports extra charts** (endpoint + RN charting lib), **Statements merge/bind + PDF-import** (write/upload endpoints), **Settings theme toggle** (light theme = L refactor 19 αρχεία), **Settings language switcher** (i18n string-extraction + persist dep), **Settings AI-engine/storage/OneDrive** (credentials/OAuth boundary — σύσταση: web-only).
+
+## 2026-07-02 (web-code-quality — 27η σάρωση, readBody adoption 100% ΕΚΛΕΙΣΕ, +1 P3/S στο νέο SaaS billing webhook)
+
+Read-only audit των 49 v1 route files + `apiAuth`/`apiBody`/`apiList` helpers + του ΝΕΟΥ SaaS billing scaffold (`api/saas/billing/webhook` + `lib/billing/{stripe,plans}`, commit `3c6bcc4`), όλα από live grep. Από την 26η σάρωση ο builder κατανάλωσε το top item (readBody σε shopping-list POST, commit `6fd1075`) → το apiBody/readBody adoption **ΕΚΛΕΙΣΕ πλήρως**: `grep -rn 'req.json().catch' src/app/api` = μηδέν σε ΟΛΟ το api. `npm run type-check` **EXIT 0**.
+
+**Ευρήματα ανά διάσταση (counts):**
+- Type safety: **0** (`:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε v1 + saas = 0).
+- Auth: **0 unguarded** (v1: μόνο `auth/login` exempt· billing webhook σωστά gated 404/503/400 fail-closed).
+- Input validation: **0 gaps** (τα 2 raw `req.json()` — auth/login, items/[id]/ai-fill — try/catch + safe-cast· webhook raw-body-before-verify + JSON.parse σε try/catch).
+- Error handling: **0** (ομοιόμορφο `{ error }` shape· webhook 500-on-DB-fail για Stripe retry).
+- DB: **0** (όλα τα v1 reads `.lean()`· auth/login + webhook μη-lean γιατί κάνουν `.save()`, σωστό).
+- Duplication (consistency): **1 P3/S νέο** — ο billing webhook `resolveTenant` (γρ.81) ξανα-εισήγαγε inline `/^[a-f0-9]{24}$/i.test(...)` αντί για shared `isObjectId`.
+
+**Ποιότητα νέου billing scaffold:** exemplary. `verifyStripeSignature` = constant-time `timingSafeEqual` + replay window (±300s) + σωστό HMAC-SHA256 scheme, **dependency-free** (μηδέν npm dep). Fail-closed gating (SAAS off→404, secret unset→503, bad sig→400). Οι `createCheckoutSession`/`createPortalSession` είναι stub-safe scaffold (unused-until-wired, σκόπιμο forward-work· ΟΧΙ accidental dead code) — δεν άνοιξα item.
+
+**Queue ενέργειες:** μάρκαρα DONE το stale top item «shopping-list readBody» (ήταν TODO ενώ committed `6fd1075`)· άνοιξα 1 νέο P3/S «isObjectId στο billing webhook» (byte-identical swap, non-sprawling). Το «tenancy/connection.ts guard» παραμένει TODO (dead-until-SaaS reviewer flag).
+
+**Top 3 για τον builder (με σειρά):**
+1. **isObjectId στο SaaS billing webhook** — νέο `import { isObjectId } from '@/lib/apiBody';` + `resolveTenant:81` `/^[a-f0-9]{24}$/i.test(tenantId)` → `isObjectId(tenantId)`. Byte-identical, κλείνει ξανά την inline-regex εξάλειψη σε ΟΛΟ το api + tenancy + billing.
+2. **tenancy/connection.ts reuse-guard** — align κώδικα/σχόλιο (readyState `!== 99` επιστρέφει και disconnected/disconnecting· βλ. Needs Achilleas — θέλει intent confirmation).
+3. (κενό — v1 raw-body ουρά εξαντλήθηκε· επόμενα runs παρακολουθούν νέο SaaS/landing κώδικα για consistency drift).
+
+### Needs Achilleas
+- (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας· μηδέν committed secret (μόνο `.env.example` + env-only Stripe keys, deferred). Standing product-decisions (ΟΧΙ auto-buildable queue): login brute-force rate-limit, error-message leak στο `withAuth` 500, `tenancy/connection.ts` reuse-semantic (rebuild μόνο σε `readyState===1|2`; ή διόρθωση σχολίου — dead-until-SaaS, θέλει σκόπιμη απόφαση), SaaS multi-tenancy architecture, Stripe key provisioning (env boundary — μείνε server-only).
