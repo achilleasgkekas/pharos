@@ -3,7 +3,15 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 57e8b07 -->
-<!-- docker-validated: 37fca25 -->
+<!-- docker-validated: 946c411 -->
+
+## 2026-07-01 (docker-health — υγιές, χωρίς rebuild, δίσκος καθαρός)
+- **Υγεία**: `homepage-mongo` **healthy** (up 6h), `homepage-web` up 14min **RestartCount 0**, `/login` → **200**. `homepage-mongo` RestartCount 44 = ιστορικό (παλιά OOM επεισόδια), όχι τρέχον loop (σταθερό 6 ώρες healthy). `homepage-flaresolverr` ήδη **Exited** (καμία ενέργεια). `homepage-searxng` up.
+- **Web logs**: μόνο `Failed to find Server Action` (γνωστό benign από ανοιχτά stale tabs), κανένα crash.
+- **Δίσκος** (`docker system df`): Images 3.49GB, Build Cache **566MB** (μικρό), Containers 80MB. Υγιές, **δεν** έγινε prune (κρατήθηκε warm cache· δίσκος άνετος).
+- **Rebuild**: **ΠΑΡΑΛΕΙΦΘΗΚΕ**. `git diff --name-only 37fca25..HEAD -- apps/web` = κενό· τα ενδιάμεσα commits (946c411, 57e8b07) είναι docs-only (μόνο PROGRESS.md). Καμία αλλαγή web runtime.
+- **Marker**: docker-validated `37fca25` → **`946c411`** (HEAD).
+- **ΣΗΜ template quirk**: `--format '{{.State.RestartCount}}'` βγάζει parsing error σε αυτή την έκδοση Docker Desktop· το RestartCount διαβάστηκε από raw `docker inspect | grep`.
 
 ## 2026-07-01 (reviewer — range effd90d..57e8b07· apiBody refactor καθαρό, both tsc green)
 - **Εύρος**: 8 commits από `effd90d`. Ένα μόνο code commit (`37fca25` apiBody adoption σε items + vouchers POST)· τα υπόλοιπα 7 = docs (PROGRESS/WEB_DEBT/MOBILE_PARITY/STATUS).
