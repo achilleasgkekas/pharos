@@ -59,6 +59,21 @@ const FEATURES: {
   },
 ];
 
+const STEPS: { title: string; desc: string }[] = [
+  {
+    title: 'Clone & configure',
+    desc: 'Grab the repo, copy the env template, and set your secrets. Bring your own AI key or point it at a local Ollama.',
+  },
+  {
+    title: 'docker compose up',
+    desc: 'One command starts the web app, MongoDB, and SearXNG. No external services, no telemetry, nothing phones home.',
+  },
+  {
+    title: 'Open the dashboard',
+    desc: 'Reach it on your LAN or over your own VPN. Add receipts, items, and statements, and let the AI do the parsing.',
+  },
+];
+
 type Tier = {
   name: string;
   price: string;
@@ -174,6 +189,7 @@ export default function Home() {
           </a>
           <nav style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
             <a href="#features" className="navlink">Features</a>
+            <a href="#self-host" className="navlink">Self-host</a>
             <a href="#pricing" className="navlink">Pricing</a>
             <a
               href={GITHUB_URL}
@@ -256,6 +272,42 @@ export default function Home() {
               </article>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── How it works (self-host) ──────────────────────── */}
+      <section id="self-host" style={{ padding: '64px 0' }}>
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <p className="mono" style={{ marginBottom: 12 }}>Self-host</p>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 700, marginBottom: 14 }}>
+              Up and running in three steps
+            </h2>
+            <p style={{ color: 'var(--text-dim)', maxWidth: 560, margin: '0 auto' }}>
+              One Docker Compose file brings up the app, MongoDB, and search.
+              Your data never leaves your machine.
+            </p>
+          </div>
+
+          <div className="steps-grid">
+            {STEPS.map((s, i) => (
+              <article key={s.title} className="card step-card">
+                <span className="step-num">{i + 1}</span>
+                <h3 style={{ fontSize: '1.08rem', marginBottom: 8 }}>{s.title}</h3>
+                <p style={{ color: 'var(--text-dim)', fontSize: '0.92rem' }}>{s.desc}</p>
+              </article>
+            ))}
+          </div>
+
+          <pre className="code-block" aria-label="Docker quick start">
+            <span className="tok-comment"># Pull and start the stack</span>{'\n'}
+            <span className="tok-cmd">git clone</span> {GITHUB_URL}.git{'\n'}
+            <span className="tok-cmd">cd</span> pharos{'\n'}
+            <span className="tok-cmd">cp</span> .env.example .env   <span className="tok-comment"># set your secrets</span>{'\n'}
+            <span className="tok-cmd">docker compose up</span> -d{'\n'}
+            {'\n'}
+            <span className="tok-comment"># Open http://localhost:3000</span>
+          </pre>
         </div>
       </section>
 

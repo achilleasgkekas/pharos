@@ -212,10 +212,53 @@ h1, h2, h3 {
   color: #041b0f;
 }
 
+/* How it works / self-host steps */
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.step-card {
+  transition: border-color 0.2s ease;
+}
+.step-card:hover {
+  border-color: var(--border-light);
+}
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.95rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-light);
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+.code-block {
+  background: #0d0d0d;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+  margin-top: 20px;
+}
+.code-block .tok-cmd { color: var(--accent); }
+.code-block .tok-comment { color: var(--text-faint); }
+
 /* Responsive */
 @media (max-width: 900px) {
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
   .pricing-grid { grid-template-columns: repeat(2, 1fr); }
+  .steps-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
   .feature-grid { grid-template-columns: 1fr; }
