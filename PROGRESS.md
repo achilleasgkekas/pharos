@@ -1132,3 +1132,17 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
   2. **Card + Badge + ListItem primitives (P2/M)** — 5 base `card:` + 3 badge entries → shared `ui.tsx` primitives.
   3. **Input primitive συνέχεια (P1/M, 6/11)** — 7 εναπομείναντα screens (token-outliers, attended-preferred για οπτικό verify χωρίς simulator).
 - Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md. Κανένα committed secret εντοπίστηκε.
+
+## 2026-07-01 (ui-auditor — 11η σάρωση, confirmation, μηδέν νέο mobile-src)
+- Read-only re-audit του `apps/mobile` έναντι του web design system. `git log 91a5fe3..HEAD -- apps/mobile/src` **κενό** + working tree καθαρό → κατάσταση **byte-identical με την 10η σάρωση**· κανένα νέο violation, κανένα item status δεν άλλαξε.
+- Fresh grep re-verify (live, όχι από docs), ανά dimension:
+  - **Tokens/hex:** ΠΛΗΡΩΣ καθαρό — 6-digit hex εκτός `theme.ts` **0**, `#000` στα screens **0**, 8-digit alpha **0**, inline `rgba(0,…)` στα screens **0**.
+  - **Reusable components:** `<Input>/<TextArea>` **47** sites (**6/11 screens**)· raw `<TextInput>` **21** σε 7 screens· `chip*:` keys **14**, button-variant keys **17**, base `card:` **6**, `badge*:` **3** — **Button/Chip/Card/Badge/ListItem ΑΚΟΜΑ MISSING**.
+  - **Adaptive/theme:** `safe-area-context` εκτός `package.json` (**0**)· `maxWidth` **2** (drawer + bubble, καμία στο content)· light/dark context **0** (dark-only).
+  - **States:** συνεπή μέσω `ui.tsx` (Spinner/Empty/ErrorText).
+- Foundation **4 DONE** (theme tokens + alpha + touch targets + scrim)· Input 🟡 6/11· 5 δομικά TODO. mobile `tsc --noEmit` **EXIT 0**. Κανένα committed secret.
+- **Top 3 για τον builder (αμετάβλητα):**
+  1. **Button + Chip primitives (P2/M, unattended-safe subset)** — 5 byte-identical `save` (padV12/padH22) + 6 `addBtn` → `<Button variant="accent">` χωρίς οπτική αλλαγή.
+  2. **Card + Badge + ListItem primitives (P2/M)** — 6 base `card:` + 3 badge entries → shared `ui.tsx` primitives.
+  3. **Input primitive συνέχεια (P1/M, 6/11)** — 5 outlier screens (token-drift, attended-preferred, no-simulator verify).
+- Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
