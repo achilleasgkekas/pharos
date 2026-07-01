@@ -1205,3 +1205,17 @@ Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Stage
 
 ### Needs Achilleas
 - (αμετάβλητο) Κανένα νέο. Παραμένουν product decisions, ΟΧΙ queue items: Reports extra charts (endpoint-extension + RN charting lib), Statements merge/bind/PDF-import (write/upload endpoints + UX), Tasks Kanban/steps, Settings theme/language/AI-engine/storage/OneDrive (credentials boundary).
+
+## 2026-07-01 (ui-auditor — 12η σάρωση, `Button` primitive ΕΚΛΕΙΣΕ, foundation 5 DONE)
+- Πρώτο ui-audit μετά τον builder commit `effd90d` (extract `<Button>` στο `apps/mobile/src/ui.tsx` + 7 sites). Read-only re-audit ολόκληρου του `apps/mobile/src` έναντι του web design system· working tree καθαρό στην αρχή.
+- **Ευρήματα ανά διάσταση (live grep, όχι από docs):**
+  - **Tokens/hex:** ΠΛΗΡΩΣ καθαρό — 6-digit hex εκτός `theme.ts` **0**, short `#fff/#000` στα screens **0**, 8-digit alpha **0**, inline `rgba(` στα screens **0**.
+  - **Reusable components:** `<Button>` primitive πλέον στο `ui.tsx`, **7 sites migrated** (Money ×2, Receipts, Subscriptions, Tasks, Vouchers ×2). `<Input>/<TextArea>` **47** sites / **6 screens**· raw `<TextInput>` **21** σε 7 screens. Ανοιχτά: `addBtn` (46-wide `＋` accent) ×4 screens + `scanBtn` ×2 + ghost `aiBtn` ×3 + `importBtn` cyan (Items) + Items `save` outlier + Settings leftover `saveText` → **IconButton/Chip/ghost MISSING**· `chip*:` **14**, `card:` **5**, `badge*:` **3** → **Chip/Card/Badge/ListItem MISSING**.
+  - **Adaptive/theme:** `safe-area-context` εκτός `package.json` (**0**)· `maxWidth` **2** (drawer + bubble, καμία στο content)· light/dark context **0** (dark-only).
+  - **States:** συνεπή μέσω `ui.tsx` (Spinner/Empty/ErrorText).
+- **Counts:** Foundation **5 DONE** (theme tokens + alpha + touch targets + scrim + Button)· Input 🟡 6/11· 5 δομικά TODO (IconButton+Chip, Card+Badge+ListItem, Safe-area, Max-width, Light). mobile `tsc --noEmit` **EXIT 0**. Κανένα committed secret.
+- **Top 3 για τον builder:**
+  1. **IconButton / `addBtn` variant (P2/M, unattended-safe)** — 4 byte-identical 46-wide `＋` accent (Subscriptions/Items/Vouchers/Shopping) + Items cyan `importBtn` → κοινό variant, verifiable με tsc.
+  2. **Card + Badge + ListItem primitives (P2/M)** — 5 base `card:` + 3 badge entries → shared `ui.tsx`.
+  3. **Input συνέχεια + `<Chip>` (P1/M, attended-preferred)** — 5 outlier screens token-drift + on/off chip, οπτικό verify χωρίς simulator.
+- Read-only run: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ MOBILE_PARITY.md + PROGRESS.md.
