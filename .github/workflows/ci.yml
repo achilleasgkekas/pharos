@@ -21,6 +21,7 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npm run type-check
+      - run: npm test
       - run: npm run build
         env:
           # Placeholders so the build never reads a real secret; these are only

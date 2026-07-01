@@ -87,6 +87,8 @@ Pin a version with `PHAROS_IMAGE=ghcr.io/achilleasgkekas/pharos:1.2.3` in `.env`
 Update later with `pull && up -d`. The image is published to GHCR by the
 **Release image** workflow on every `v*.*.*` tag (`git tag v1.2.3 && git push --tags`).
 
+📚 Full documentation lives in [docs/](docs/README.md) (start with the [self-hosting guide](docs/self-hosting.md)).
+
 Local dev (outside Docker):
 
 ```bash
