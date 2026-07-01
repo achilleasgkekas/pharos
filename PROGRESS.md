@@ -5,6 +5,13 @@
 <!-- reviewed: 3a272c1 -->
 <!-- docker-validated: 5008507 -->
 
+## 2026-07-01 (ui-auditor — 18η σάρωση, ΠΡΟΟΔΟΣ: Button-family ΕΚΛΕΙΣΕ)
+Read-only mobile UI consistency audit. **1 νέο mobile-src commit** από την 17η σάρωση: `3a272c1` (Button-family finish — ShoppingScreen `addBtnWide`/`addBtnText2` + ItemsScreen accent-pill `save` outlier → `<Button>`). Ενημέρωσα το «Button + Chip primitives» item (Button πυρήνας DONE, μένουν μόνο ghost variants + `<Chip>` + Settings `saveText` outlier) + πρόσθεσα 18η re-audit note στην κορυφή της UI Debt Queue.
+
+Violations ανά διάσταση (live grep, ξανα-μετρημένα): **Tokens 0** (6-digit hex εκτός `theme.ts` 0, `#fff/#000` 0, inline `rgba(` 0)· **States 0** (μέσω `ui.tsx`)· **Touch 0** (DONE)· **Reusable-components ~4 ανοιχτά** (Chip 4 screens + `sChip`, Badge 2 screens, ListItem missing, ghost-buttons 7 sites, Input outliers 5/11 screens)· **Adaptive 2** (safe-area 0 imports, max-width 2 μη-content)· **Theme 1** (light/dark context 0, dark-only). Foundation **8 DONE** (theme tokens + alpha + touch + scrim + Button + IconButton + Card + Button-family finish). mobile `tsc --noEmit` **EXIT 0**. Κανένα committed secret.
+
+**Top-3 για builder:** (1) **Safe-area insets** (P2/M, unattended-safe: `SafeAreaProvider`+`useSafeAreaInsets`, additive, no token-drift — τώρα η κορυφαία unattended-safe αφού το Button έκλεισε)· (2) **`<ListItem>` primitive** (P2/M)· (3) **`<Chip>`/`<Badge>`** (attended-preferred, token-drift = οπτική αλλαγή χωρίς simulator).
+
 ## 2026-07-01 (docker-health — υγιές, χωρίς rebuild, marker → 5008507)
 - **Υγεία:** mongo `healthy`, web running (RestartCount 0). Mongo RestartCount 47 (ιστορικό OOM saga, τώρα σταθερό, μηδέν restart-loop τώρα). Flaresolverr ΔΕΝ τρέχει (καμία ενέργεια).
 - **Δίσκος:** `docker system df` → Images 3.49GB (0B reclaimable), Containers 80MB, Volumes 510MB, Build Cache 566MB (0B reclaimable, 0 active). Σε VM ~31GB → άφθονος χώρος. **Δεν έγινε prune** (0B reclaimable → no-op).
