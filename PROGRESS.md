@@ -2,8 +2,17 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 3a272c1 -->
+<!-- reviewed: 114e727 -->
 <!-- docker-validated: 5008507 -->
+
+## 2026-07-01 (reviewer — range 3a272c1..114e727, καθαρό, marker → 114e727)
+- **Εύρος:** 7 commits από τον προηγ. marker `3a272c1`. **1 μόνο app-code commit** (`d259a55` — shared `isObjectId()` + `readBody` σε items/[id] & shopping-list/[id])· τα υπόλοιπα 6 = docs (progress/web-debt/ui-auditor/parity/monitor/docker-health) + STATUS.md WIP. `git diff --stat` = 3 web files (apiBody.ts + 2 routes) + 4 md.
+- **Review του `d259a55`:**
+  - **Συμπεριφορά διατηρημένη ✓.** `readBody(req)` επιστρέφει `Body = Record<string, unknown>` — ΑΚΡΙΒΩΣ ο τύπος του παλιού inline `(await req.json().catch(() => ({}))) as Record<string, unknown>`· όλοι οι consumers (`b.title`, `b.status`, `b[k]`, `'targetPrice' in b`, `b.checked`) δουλεύουν αναλλοίωτα. `isObjectId()` = byte-identical `/^[a-f0-9]{24}$/i.test(id)`.
+  - **Καθαρό dedup ✓.** Και τα 3 id-guards (GET/PATCH/DELETE) στο items + 2 (PATCH/DELETE) στο shopping-list migrated· το local `const ID_RE` σβήστηκε, **μηδέν dangling ref** (grep καθαρό). `isObjectId`/`readBody` σωστά exported από `apiBody.ts`.
+  - **Response shapes `{item}`/`{ok:true}` αμετάβλητα** → μηδέν ρίσκο για τον mobile consumer. Partial-update guards ανέγγιχτα.
+- **Checks:** web `npm run type-check` **EXIT 0**· mobile `npx tsc --noEmit` **EXIT 0**. Κανένα committed secret (μηδέν tracked `.env` πλην `.env.example` template· τα grep-hits «secret»/«AUTH_SECRET» = doc prose). Μηδέν regression, μηδέν hardcoded token drift.
+- **Fixes:** κανένα χρειάστηκε (καθαρό). **Flags:** κανένα νέο (οι ουρές WEB_DEBT/MOBILE_PARITY ήδη ενημερωμένες). Read-only run πλην marker/entry: μηδέν Docker, μηδέν AI, μηδέν app-code edit. Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-01 (builder — shared isObjectId() guard + readBody σε items/[id] & shopping-list/[id] PATCH· commit `d259a55`)
 - **Τι**: πήρα τα **2 ενεργά P3/S items** της Web Debt Queue (19η σάρωση top-1 & top-2, πλήρες spec, unattended-safe) και τα έκλεισα σε έναν coherent commit. Παλιότερα ήταν 2 ξεχωριστά items αλλά μοιράζονται ΑΚΡΙΒΩΣ τα ίδια 2 route files → τα υλοποίησα μαζί (μη-sprawling: 3 files touched).
