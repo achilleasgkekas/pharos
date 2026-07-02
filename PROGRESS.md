@@ -5,6 +5,22 @@
 <!-- reviewed: 148fb06 -->
 <!-- docker-validated: 4a240aa -->
 
+## 2026-07-03 (pharos-daily-dev — mobile `<Input>` primitive migration, 3 screens)
+- **Τι έκανα:** προχώρησα το **top unattended-safe UI Debt item** (Input primitive migration finish, P1/S) που πρότεινε η 40ή σάρωση του parity-auditor. Ο πυρήνας του functional parity είναι κλειστός (0 auto-buildable GAP), οπότε ο builder πέφτει στην UI Debt Queue. Το `<Input>` primitive υπάρχει ήδη στο `ui.tsx` αλλά 5 screens κρατούσαν raw `<TextInput style={s.input}>`. Μετέτρεψα τα **3 καθαρότερα** (LoginScreen 3 fields, SearchScreen 1, AssistantScreen 1), αφήνοντας εκτός τα 2 με σύγκρουση/μεγαλύτερο ρίσκο.
+- **Αλλαγές (3 mobile αρχεία):**
+  - **`LoginScreen.tsx`** — server/username/password `<TextInput>` → `<Input>`· drop `placeholderTextColor={C.faint}` + `style={s.input}` (η primitive τα ορίζει)· διαγραφή του dead `input:` StyleSheet block· αφαίρεση `TextInput` από το react-native import + νέο `import { Input } from '../ui'`. Spacing αμετάβλητο (προερχόταν από `label` marginTop, το input δεν είχε margin).
+  - **`SearchScreen.tsx`** — search field → `<Input style={{ flex: 1 }}>`· ίδιο cleanup· `Input` προστέθηκε στο υπάρχον `../ui` import.
+  - **`AssistantScreen.tsx`** — chat field → `<Input style={{ flex: 1, maxHeight: 120, borderRadius: 14 }}>` (layout-affecting props διατηρήθηκαν ρητά)· ίδιο cleanup + νέο `../ui` import.
+- **Token normalization (σκόπιμο — ο ρητός σκοπός της primitive per το docstring «unifies tokens that used to diverge per screen»):** paddingHorizontal 14→12 (SPACE.md) και στα 3· Search fontSize 16→15 (SIZE.md)· Login paddingVertical 12→11· borderRadius/bg/border ήδη ίδια (RADIUS.md=12)· Assistant borderRadius 14 διατηρήθηκε. Δηλαδή 1-2px normalization, τεκμηριωμένο εδώ ώστε ο reviewer να ξέρει ακριβώς τι μετακινήθηκε.
+- **Τι ΔΕΝ άγγιξα (σκόπιμα):** **ReceiptsScreen** (έχει uncommitted WIP του Αχιλλέα) + **ItemsScreen** (compact paired price/store `logInput`: borderRadius 10 / pad 10-8 / fontSize 14 → μεγαλύτερο visual delta, attended-preferred). Migration πλέον **9/11 screens**.
+- **Verify:** `apps/mobile npx tsc --noEmit` → **EXIT 0**. Grep επιβεβαίωσε μηδέν leftover `s.input` refs στα 3 screens. Καθαρά mobile-only (μηδέν web runtime code) → **καμία Docker rebuild** (per task rule) + **κανένα AI call**. Mobile δεν auto-testable unattended → tsc + code-review του primitive contract (`Input` spread-order: `placeholderTextColor` πρώτο, `{...rest}`, `style={[base, style]}` τελευταίο → το passed style κάνει merge πάνω στα base tokens· επιβεβαιωμένο στο `ui.tsx:49-57`).
+- **Docs:** `MOBILE_PARITY.md` Build Queue — νέο builder note 2026-07-03 (6/11 → 9/11, ποια screens, token deltas, τι έμεινε).
+- **Git hygiene:** stage ΜΟΝΟ ρητά paths (3 screens + `MOBILE_PARITY.md` + `PROGRESS.md`), ΟΧΙ `-A`. Δεν αγγίχτηκαν: `.claude/launch.json`, ReceiptsScreen, SettingsScreen, ShoppingScreen (όλα WIP του Αχιλλέα).
+- **Προτεινόμενο επόμενο task:** **Button ghost-variant finish** [P2/S, ~7 holdout sites κατά τον builder note `681098f`· structural, unattended-safe, tsc-verify]. Εναλλακτικά unattended-safe: ολοκλήρωση Input migration σε ItemsScreen `logInput` (attended-preferred λόγω visual delta — προτίμησέ το μόνο αν ο Αχιλλέας δεν έχει WIP εκεί). Attended-preferred (ΜΗΝ ξεκινήσεις χωρίς έγκριση): mobile lucide icons [P2/M], language switcher [P3/L], safe-area insets [P2/M native dep].
+
+### Needs Achilleas (pharos-daily-dev 2026-07-03 Input migration)
+- Τίποτα νέο ασφαλείας· μηδέν committed secret. Εκκρεμείς αποφάσεις (αμετάβλητες): SMTP/email provider για production· Stripe keys· native mobile deps (safe-area / charting / persist)· theme toggle + language switcher· AI-engine / storage / OneDrive στα mobile Settings· Tasks Kanban board (full drag)· remote push (EAS dev build + APNs key)· statements merge/bind + PDF-import.
+
 ## 2026-07-03 (docker-health guard — safe rebuild, stack υγιές)
 - **Health (read-only):** homepage-mongo `healthy` (Up 2h), homepage-web RestartCount **0**, homepage-flaresolverr όχι running (καμία ενέργεια). Mongo cumulative RestartCount 172 = ιστορικό OOM, όχι τρέχον restart-loop (τώρα σταθερό).
 - **Disk:** Images 4.41GB, Build Cache 1.068GB, Containers 80MB. Μετά το build, `docker builder prune -f` ελευθέρωσε **~2.1GB** unused cache. VM άνετο.

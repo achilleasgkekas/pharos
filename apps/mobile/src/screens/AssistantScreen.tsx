@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { C } from '../theme';
+import { Input } from '../ui';
 import { aiCommand, type AiTurn } from '../api';
 
 type Msg = AiTurn & { actions?: { name: string; summary: string }[] };
@@ -51,7 +52,7 @@ export function AssistantScreen() {
         {err && <Text style={s.err}>{err}</Text>}
       </ScrollView>
       <View style={s.inputRow}>
-        <TextInput value={input} onChangeText={setInput} onSubmitEditing={() => send()} placeholder="Ask or command…" placeholderTextColor={C.faint} style={s.input} editable={!busy} returnKeyType="send" />
+        <Input value={input} onChangeText={setInput} onSubmitEditing={() => send()} placeholder="Ask or command…" style={{ flex: 1, maxHeight: 120, borderRadius: 14 }} editable={!busy} returnKeyType="send" />
         <Pressable onPress={() => send()} disabled={busy || !input.trim()} style={[s.send, (busy || !input.trim()) && s.dim]}><Text style={s.sendText}>↑</Text></Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -74,7 +75,6 @@ const s = StyleSheet.create({
   action: { color: C.accent, fontSize: 12, marginTop: 6, fontWeight: '600' },
   err: { color: C.red, fontSize: 13, marginTop: 10 },
   inputRow: { flexDirection: 'row', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: C.border, alignItems: 'flex-end' },
-  input: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, color: C.text, fontSize: 15, maxHeight: 120 },
   send: { width: 46, height: 44, borderRadius: 14, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   sendText: { color: C.onAccent, fontSize: 20, fontWeight: '800' },
   dim: { opacity: 0.4 },

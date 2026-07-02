@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Pressable, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import { C } from '../theme';
-import { Empty, Badge, contentWidth } from '../ui';
+import { Empty, Badge, Input, contentWidth } from '../ui';
 import { search, type SearchHit } from '../api';
 import type { ScreenKey } from './HomeScreen';
 
@@ -41,15 +41,14 @@ export function SearchScreen({ onOpen }: { onOpen: (k: ScreenKey) => void }) {
   return (
     <View style={s.wrap}>
       <View style={s.bar}>
-        <TextInput
+        <Input
           value={q}
           onChangeText={setQ}
           autoFocus
           autoCapitalize="none"
           autoCorrect={false}
           placeholder="Search everything…"
-          placeholderTextColor={C.faint}
-          style={s.input}
+          style={{ flex: 1 }}
         />
         {busy && <ActivityIndicator color={C.accent} style={{ marginRight: 6 }} />}
       </View>
@@ -84,7 +83,6 @@ export function SearchScreen({ onOpen }: { onOpen: (k: ScreenKey) => void }) {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   bar: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingBottom: 8 },
-  input: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: C.text, fontSize: 16 },
   err: { color: C.red, fontSize: 13, paddingHorizontal: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 12, marginBottom: 8 },
   title: { color: C.text, fontSize: 15, fontWeight: '600' },

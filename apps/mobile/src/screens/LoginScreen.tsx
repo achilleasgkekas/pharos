@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { C } from '../theme';
+import { Input } from '../ui';
 import { DEFAULT_API_BASE } from '../config';
 import { login, type SessionUser } from '../api';
 import { PharosMark } from '../PharosMark';
@@ -34,33 +35,27 @@ export function LoginScreen({ onLogin }: { onLogin: (u: SessionUser) => void }) 
         <Text style={s.tagline}>One light over everything you run.</Text>
 
         <Text style={s.label}>SERVER</Text>
-        <TextInput
+        <Input
           value={server}
           onChangeText={setServer}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
           placeholder="http://192.168.x.x:3000"
-          placeholderTextColor={C.faint}
-          style={s.input}
         />
         <Text style={s.label}>USERNAME</Text>
-        <TextInput
+        <Input
           value={username}
           onChangeText={setUsername}
           autoCapitalize="none"
           autoCorrect={false}
-          placeholderTextColor={C.faint}
-          style={s.input}
         />
         <Text style={s.label}>PASSWORD</Text>
-        <TextInput
+        <Input
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           onSubmitEditing={submit}
-          placeholderTextColor={C.faint}
-          style={s.input}
         />
 
         {error && <Text style={s.error}>{error}</Text>}
@@ -79,10 +74,6 @@ const s = StyleSheet.create({
   brand: { color: C.text, fontSize: 34, fontWeight: '800', letterSpacing: 4, textAlign: 'center' },
   tagline: { color: C.dim, fontSize: 13, textAlign: 'center', marginTop: 6, marginBottom: 32 },
   label: { color: C.faint, fontSize: 10, letterSpacing: 1.4, marginBottom: 6, marginTop: 14 },
-  input: {
-    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 12, color: C.text, fontSize: 15,
-  },
   error: { color: C.red, fontSize: 13, marginTop: 14 },
   btn: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
   btnDisabled: { opacity: 0.4 },
