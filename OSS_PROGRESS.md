@@ -552,3 +552,43 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — 
 οπότε ίσως χρειαστεί `vi.mock('./db')` + `vi.mock('@/models/AppConfig')` για καθαρό import),
 ή άλλο ακάλυπτο pure heuristic. Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν
 παράλληλα). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — aiConfig.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/aiConfig.test.ts` για τον vision-model classifier `isVisionModel(name)` του `lib/aiConfig.ts`.**
+
+Επιλογή: το suggested target από το προηγούμενο entry. Η ανησυχία «το module φορτώνει mongoose
+στο import» ελέγχθηκε με smoke import μέσα στο vitest → **δεν χρειάζεται mock**: το `connectDB`
+καλείται lazily ΜΟΝΟ μέσα στο `getAiConfig`, ενώ το `import { isVisionModel }` απλώς ορίζει το
+regex + registers το AppConfig mongoose schema (καμία σύνδεση). Οπότε καθαρό pure test, μηδέν
+`vi.mock`.
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/aiConfig.test.ts` (8 tests, μηδέν DB/fs/δίκτυο/clock). Κανόνας υπό έλεγχο:
+  case-insensitive **SUBSTRING** regex `/vl|vision|llava|minicpm-v|moondream|bakllava|
+  llama3.2-vision/i`. Καλύπτει: πραγματικά vision tags (qwen2.5vl, qwen2-vl, llava, minicpm-v,
+  moondream, bakllava, llama3.2-vision), το γενικό «vision» hint ανεξαρτήτως vendor (gpt-4-vision),
+  case-insensitivity (VL/LLaVA/MINICPM-V/MoonDream), text-only → false (qwen2.5:14b, llama3.1,
+  mistral, gemma2, phi3, deepseek-r1), empty → false, bare «vl» → true, mid-string hint με registry
+  path, και **τεκμηριωμένο το substring/no-word-boundary trade-off** (vllm/vlan → true false-positive·
+  novel/swivel/gpt-4o → false γιατί δεν έχουν το token «vl»/«vision»).
+- **Σημείο που κλειδώθηκε**: το over-include (false positive σε ό,τι περιέχει «vl») είναι
+  σκόπιμο — ένα extra vision candidate ποτέ δεν σπάει image parse, ενώ ένα false negative θα το
+  έσπαγε· αν κάποιος σφίξει το regex με word boundaries, το test θα το κάνει ορατή απόφαση.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/aiConfig.test.ts` → 8/8 passed.
+- `npx vitest run` (όλο το suite) → 41 files, 614/614 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json` (foreign,
+  ΔΕΝ το άγγιξα/staged) + το νέο aiConfig.test.ts· `git diff --cached` κενό· στάγιαρα μόνο τα
+  δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file. Ακάλυπτα καθαρά targets:
+`lib/aiProviders.ts` (τα internal helpers `mediaTypeOf`/`stripFences` ΔΕΝ είναι exported →
+θα χρειαζόταν export ή testing μέσω των public JSON helpers με fetch mock· καλύτερα skip),
+`lib/clientImage.ts` (δες αν έχει pure resize/format helpers χωρίς canvas/DOM), ή serialize
+helpers σε app routes. Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν
+παράλληλα). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
