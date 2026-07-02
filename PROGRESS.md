@@ -3319,3 +3319,34 @@ Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `a
 
 ### Needs Achilleas
 - Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) + «language switcher» (P3/L) παραμένουν σκόπιμες decisions (μεγάλα refactors). Safe-area + Input full-adoption = επόμενα semi-attended/attended.
+
+## 2026-07-03 (web-code-quality — 36η σάρωση· CONFIRMATION run, μηδέν νέο P1/P2· ουρά αμετάβλητη)
+
+Read-only web code-quality audit (grep + `apps/web && npm run type-check`, όχι docs) σε **50 v1 route files** + **21 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/tenancy/*` + `models/*`. **type-check → EXIT 0** (0 TS errors).
+
+**Νέος κώδικας από τον marker της 35ης (`9d7bbab`/`7cc406f`):** commits `7de30bc` (test looksLikeUsableOcr), `c9367e2` (landing 404), `148fb06` (mobile vendor-autocomplete), `4ec7af4` (saas MAIL_WEBHOOK_URL) — κανένας δεν άγγιξε την ουσία των v1/saas API handlers (tests / landing / mobile / mailer-provider). Επιθεωρήθηκαν όλα τα surface.
+
+**Ευρήματα ανά διάσταση (live grep):**
+- **Type safety:** 0 (`: any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε api εκτός tests = μηδέν). type-check EXIT 0.
+- **Input validation:** 0 gaps. `req.json()` χωρίς readBody = 3 σκόπιμα (auth/login boundary try/catch, items/[id]/ai-fill safe-cast, mcp protocol). readBody adoption 100% σε όλα τα άλλα.
+- **Auth:** 0 unguarded — κάθε v1 route έχει `withAuth`/`apiAuth` εκτός του σωστά exempt `v1/auth/login`.
+- **Error handling:** αμετάβλητο· το μόνο κενό παραμένει το `saas/invites/route.ts` GET+DELETE (χωρίς `saasGuard`) = ήδη στην ουρά (item P3/S).
+- **Mongoose:** exemplary — και τα 7 list routes (receipts/items/expenses/statements/subscriptions/tasks/vouchers) κάνουν `.lean()` + `.skip(offset).limit(limit)` + `listEnvelope` + `updatedSince→withDeleted`. N+1 (`.map(async`/`.forEach(async`) = **0** σε api. Invites GET κάνει batched `$in` actor-lookup (ΟΧΙ N+1). Indexes: Invite (`tenant+email+status`, `tenant`, `tokenHash`), AuditEvent (`tenant+createdAt`, `tenant+action+createdAt`), Account (`email` unique). **Λείπει** μόνο sparse index στα `verifyTokenHash`/`resetTokenHash` (queried by `findOne` σε verify/reset confirm) = ήδη στην ουρά (item P3/S).
+- **UX states:** εκτός scope (API-only surface).
+
+**Επαλήθευση ενεργών items (και τα 4 ΠΑΡΑΜΕΝΟΥΝ VALID, μηδέν stale):**
+1. invites `saasGuard` (P3/S) — live `grep saasGuard\|try {` invites/route.ts = **0**· GET@43 + DELETE@102 unwrapped. VALID.
+2. Account token-hash sparse index (P3/S) — `verify/confirm:30` + `reset/confirm:36` κάνουν `Account.findOne({ verifyTokenHash })` / `{ resetTokenHash }`· τα fields **χωρίς index** (μόνο `default:null`). VALID.
+3. connection cache-reuse `readyState` guard (P3, decision) — `connection.ts:54` `existing.readyState !== 99` επιστρέφει και disconnected(0)/disconnecting(3)· σχόλιο λέει «reuse only while open». VALID (dead-until-SaaS, 0 importers → decision).
+4. reset-request timing (P3, decision) — `reset/request:53` `await sendEmail` πριν το response· registered vs non-registered latency-delta αποδυναμώνει το `{ ok:true }` anti-enumeration. VALID (delivery-semantics tradeoff → decision).
+
+**Counts:** P1=0, P2=0, P3=4 (2 auto-buildable + 2 decision). Μηδέν item έκλεισε, μηδέν νέο item άνοιξε — 36η συνεχόμενη σάρωση χωρίς P1. Διόρθωσα stale queue-header note («2 νέα ενεργά» → ακριβές 4-item state).
+
+**Top 3 items να πάρει ο builder μετά (unattended-safe διάταξη):**
+1. **invites/route.ts saasGuard (P3/S)** — τύλιξε GET+DELETE σε `saasGuard` (ίδιο pattern με members). Ολοκληρώνει το try/catch item· κάθε write saas route → `{ error }` 500 αντί framework 500. Unattended-safe (tsc-verifiable).
+2. **Account token-hash sparse index (P3/S)** — `Schema.index({ verifyTokenHash:1 }, { sparse:true })` + ίδιο για `resetTokenHash` στο `models/Account.ts`. Μηδέν runtime αλλαγή· επιταχύνει τα verify/reset confirm lookups.
+3. (κανένα άλλο auto-buildable· τα 2 εναπομείναντα είναι decision-flavored, δες Needs Achilleas)
+
+### Needs Achilleas
+- **connection cache-reuse guard (P3, decision):** `connection.ts:54` το `readyState !== 99` δεν ταιριάζει με το σχόλιο («reuse only while open»)· είτε reuse μόνο σε readyState 1/2, είτε διόρθωση σχολίου. Dead-until-SaaS (0 importers), ambiguous το «σωστό» rebuild-semantic (`useDb` μοιράζεται base client) → σκόπιμη απόφαση, όχι μηχανικό swap.
+- **reset-request timing (P3, decision):** fire-and-forget `void sendEmail` ευθυγραμμίζει το anti-enumeration ΑΛΛΑ ρισκάρει κομμένο send σε serverless. Delivery-semantics tradeoff.

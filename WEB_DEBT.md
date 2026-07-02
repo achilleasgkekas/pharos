@@ -423,7 +423,7 @@
 - **Error handling**: ομοιόμορφο try/catch μέσω `withAuth` → καθαρό 500· κάθε body read κάνει `req.json().catch(() => ({}))` (δεν σκάει σε κακό JSON)· μηδέν swallowed catches. Καθαρό.
 - **Reads**: όλα τα list endpoints κάνουν `.lean()` + `skip/limit` pagination (1..200). Καλό.
 
-Τα 2 νέα ενεργά items παρακάτω είναι P3 (polish, dedup). Η ευρεία standardization του response envelope σε ΟΛΑ τα endpoints (breaking change που συντονίζεται με το mobile) παραμένει στο `## Needs Achilleas` του PROGRESS, ΟΧΙ εδώ.
+Ενεργά items (επιβεβαιωμένα live στην 36η σάρωση, 2026-07-03): **2 auto-buildable P3/S** (invites `saasGuard` + Account token-hash sparse index) + **2 decision-flavored P3** (connection cache-reuse `readyState` guard, reset-request timing). Ολα P3· μηδέν P1/P2 ανοιχτό, type-check EXIT 0. Η ευρεία standardization του response envelope σε ΟΛΑ τα endpoints (breaking change που συντονίζεται με το mobile) παραμένει στο `## Needs Achilleas` του PROGRESS, ΟΧΙ εδώ.
 
 ---
 
