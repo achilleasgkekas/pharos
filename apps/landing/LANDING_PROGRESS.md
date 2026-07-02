@@ -271,3 +271,24 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL στο JSON-LD το χρησιμοποιει).
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02 (cont.⁵)
+
+Task: (e) Polish, μερος 11 — sitemap.ts + robots.ts (SEO crawl surface). Το JSON-LD (cont.⁴) εδωσε rich results· ελειπαν ομως τα δυο βασικα crawl-directive αρχεια που καθε crawler ψαχνει πρωτα. Ηταν η προαιρετικη συνεχεια που ειχα σημειωσει στο cont.⁴, self-contained, μηδεν assets/decisions.
+
+Τι εφτιαξα:
+- `app/robots.ts`: Next App-Router MetadataRoute.Robots — `userAgent: '*'`, `allow: '/'`, `host` + `sitemap` δειχνουν στο `https://ph-aros.com`. Παραγει `/robots.txt` ως static route.
+- `app/sitemap.ts`: MetadataRoute.Sitemap — ενα entry (root URL, single-page landing), `lastModified` σταθερη ημερομηνια (2026-07-02, οχι `new Date()` ωστε το output να μενει deterministic μεταξυ builds), `changeFrequency: weekly`, `priority: 1`. Παραγει `/sitemap.xml`. Το SITE_URL const ιδιο με layout/page JSON-LD. Μηδεν νεο dependency, μηδεν client JS.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· δυο νεα static routes `/robots.txt` + `/sitemap.xml` στο route table, `/` αμεταβλητο 761 B / 103 kB.
+- Prerendered output: `.next/server/app/robots.txt.body` = σωστο `User-Agent: * / Allow: / / Host + Sitemap`· `.next/server/app/sitemap.xml.body` = εγκυρο `<urlset>` με το root `<loc>`. Non-visual metadata routes -> επιβεβαιωθηκαν στο static output (οπως το JSON-LD), δεν χρειαστηκε preview server. Docker/web/mobile αθικτα. Το `.claude/launch.json` (shared local config) ΔΕΝ commit (collision guard — μονο app/robots.ts + app/sitemap.ts).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση του CSS mockup (#preview) με πραγματικα screenshots οταν υπαρξουν assets, secondary CTA band πριν το footer, η micro-copy βελτιωσεις. (Προαιρετικα: Organization/BreadcrumbList JSON-LD.)
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap το χρησιμοποιει).
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.
