@@ -474,3 +474,58 @@ additive — δεν άγγιξα κανένα υπάρχον αρχείο.
 επέκταση του `/api/saas/usage`) που ενώνει plan/status/priceMonthlyEUR/subscription-id +
 `billingConfigured` flag, ώστε ένα settings/billing UI να ξέρει τι να δείξει (Subscribe vs
 Manage). Εναλλακτικά, το enforcement/saveFile wiring αν δοθεί άδεια.
+
+---
+
+## 2026-07-02 (increment 12 — workspace member management)
+**Σημείωση για increment 11:** το «billing summary» read surface (`GET /api/saas/billing`)
+έχει ΗΔΗ landαρίσει στο main (`9ecb86c feat(saas): billing summary read surface`) μαζί με
+`lib/billing/billingSummary.ts` + tests — ένα προηγούμενο run το έχτισε/commit-άρισε αλλά το
+log entry του χάθηκε (μάλλον σε collision). Καμία επανάληψη· περνάω στο επόμενο κενό.
+
+**Το κενό:** το `Membership` model έχει ήδη `role` (owner/admin/member), `status`
+(invited/active/removed) και `invitedBy` — σχεδιασμένο για team, αλλά **τίποτα δεν γράφει
+memberships εκτός του signup** (ο implicit owner). Δεν υπήρχε τρόπος να δει/διαχειριστεί
+κανείς την ομάδα ενός workspace, παρόλο που ο owner/admin ρόλος ήδη gate-άρει το billing.
+
+**Built** (ΟΛΟ σε νέα αρχεία, control-plane μόνο):
+- `lib/tenancy/members.ts` — **PURE** guard helpers (μηδέν imports/DB/env): `parseRole`,
+  `canManageMembers` (owner/admin), `canAssignRole` (μόνο owner μπορεί να δώσει owner ρόλο —
+  anti-escalation), `activeOwners`, `wouldOrphanOwners` (ένα workspace πρέπει πάντα να έχει
+  ≥1 active owner), `normalizeEmail`/`looksLikeEmail`.
+- `lib/tenancy/workspaceSession.ts` — NODE-only `resolveWorkspaceSession(slug, requireManage)`:
+  γενικεύει το flow του billingSession (gate→account session→membership authz→ctx+Tenant doc)
+  με switch `requireManage` (read=οποιοδήποτε active member· mutate=owner/admin). Καθρεφτίζει
+  (δεν importάρει) το billingSession ώστε τα δύο concerns να μένουν decoupled.
+- `app/api/saas/members/route.ts` (nodejs, force-dynamic) — 4 methods, όλα SaaS-gated:
+  - `GET  ?tenant=<slug>` → λίστα members (email/name/role/status/invitedBy) join Account.
+    Any active member (read).
+  - `POST {email, role?, tenant?}` → προσθέτει ΥΠΑΡΧΟΝ account ως member (reactivate αν ήταν
+    removed). Owner/admin· admin ΔΕΝ φτιάχνει owner (403). Email που δεν έχει account →
+    404 `account_not_found` (invite-by-email σε νέο user θέλει email delivery — deferred).
+    409 σε duplicate. 201 στην επιτυχία.
+  - `PATCH {accountId, role, tenant?}` → αλλαγή ρόλου. Owner/admin· last-owner guard (409
+    `last_owner` σε demote του μοναδικού owner).
+  - `DELETE {accountId, tenant?}` → soft-remove (status→'removed', κρατά το unique row για
+    reactivation). Owner/admin· last-owner guard.
+- `lib/tenancy/members.test.ts` — 14 PURE tests (parseRole valid/invalid, canManageMembers,
+  canAssignRole owner-only-owner + admin admin/member + member-none, activeOwners αγνοεί
+  removed, wouldOrphanOwners sole/two/non-owner/removed-target, normalize/looks email).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **412/412 green** (398
+προϋπάρχοντα + 14 νέα). External importers των `members`/`workspaceSession` από feature code
+→ **κανένας** (μόνο το δικό μου route)· το route SAAS-gated (404 όταν off) ⇒ zero runtime
+wiring, `SAAS_MODE` off = zero effect, κανένα Docker rebuild. Καθαρά additive — δεν άγγιξα
+κανένα υπάρχον αρχείο.
+
+**## Needs Achilleas** (member management go-live):
+- **Invite-by-email σε νέο (μη εγγεγραμμένο) user** θέλει email delivery (transactional email
+  provider + token flow). Το `Membership.status:'invited'` + `Account.verifyTokenHash` fields
+  υπάρχουν ήδη· λείπει ο mailer. Μέχρι τότε: μόνο ΥΠΑΡΧΟΝΤΑ accounts προστίθενται (404 αλλιώς).
+- Seat limits ανά plan (πόσα members επιτρέπει το free/shared/dedicated) — δεν επιβάλλονται
+  ακόμα· θα μπουν στα entitlements όταν οριστεί το pricing.
+
+**Next task:** increment 13 — account self-service (`api/saas/account`): change password
+(reuse `verifyPassword`+`hashPassword`) + change name/email, όλα gated + πάνω στο υπάρχον
+Account session. Εναλλακτικά, password-reset request/confirm scaffold (τα `resetTokenHash`/
+`resetTokenExpires` fields υπάρχουν ήδη· λείπει ο mailer → scaffold με token return σε dev).
