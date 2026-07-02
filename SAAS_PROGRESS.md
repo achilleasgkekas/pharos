@@ -1137,3 +1137,44 @@ webhook καλύπτει τους self-hosters χωρίς εξάρτηση· μ�
 user-facing workspace-settings UI panels που consume-άρουν τα έτοιμα read APIs (Activity/Invitations/
 Members/Billing — UI-only)· είτε (γ) resend-webhook delivery retry/backoff στο sendEmail (best-effort
 σήμερα: ένα transient 5xx = undelivered χωρίς retry).
+
+## 2026-07-03 (increment 28 — workspace self-service: read + rename)
+**Built:** το workspace-level read/rename surface — ώσπου τώρα υπήρχαν read APIs για members/
+invites/billing/usage/audit αλλά **κανένα για το ίδιο το workspace** (δεν μπορούσες να δεις τα
+στοιχεία του ή να το μετονομάσεις). Κλείνει το «General» tab ενός workspace-settings panel. ΟΛΟ
+SAAS-gated, additive, νέα αρχεία μόνο (κανένα existing file δεν αγγίχτηκε):
+- `lib/tenancy/workspace.ts` (νέο) — **PURE** helpers (μηδέν imports/DB/env): `MAX_WORKSPACE_NAME`
+  (80), `sanitizeWorkspaceName` (trim + collapse internal whitespace + cap· non-string→''),
+  `workspaceNameError` (empty→required, αλλιώς null), **`workspaceView(tenant, role, memberCount)`**
+  client-safe projection (tenantId/slug/name/plan/status/tier/customDomain/role/memberCount/
+  createdAt). **By construction ΠΟΤΕ billingCustomerId/SubscriptionId** — μόνο whitelisted πεδία·
+  null-safe createdAt (Date ή ISO-string), member count clamped ≥0.
+- `app/api/saas/workspace/route.ts` (νέο, nodejs + force-dynamic): **GET** `[?tenant]` → workspace
+  details + active member count (any active member, `resolveWorkspaceSession(slug,false)`). **PATCH**
+  `{name, tenant?}` → rename display name (owner/admin, `resolveWorkspaceSession(slug,true)`)·
+  sanitize + validate· **no-op όταν name αμετάβλητο** (κανένα audit row)· αλλιώς `Tenant.updateOne`
+  + `recordAudit('workspace.updated', meta {field,from,to})` (το action υπήρχε ήδη στο
+  AUDIT_ACTIONS). **Slug/dbName immutable** (routing keys — rename θα έσπαγε subdomain routing +
+  orphan-άριζε τη data db)· customDomain/plan/status managed από τα δικά τους flows.
+- `lib/tenancy/workspace.test.ts` (νέο) — 13 PURE tests (sanitize trim/collapse/empty/non-string/
+  cap-80, nameError empty-vs-nonempty, workspaceView exact-key-set + **no billing-id leak** +
+  ISO-string/null/garbage createdAt + missing-field fallbacks + member-count clamp).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run workspace.test.ts` → **13/13
+green**· full suite `npx vitest run` → **759/759 green** (καμία regression). Το route SAAS-gated
+(404 όταν SAAS_MODE off) + οι helpers pure/additive + κανένας external importer από feature code
+⇒ `SAAS_MODE` off = **zero effect** στο self-hosted app· κανένας Docker rebuild (route 404 στο
+running container με SAAS_MODE off — ο νέος κώδικας δεν εκτελείται· type-check καλύπτει το compile)·
+καμία νέα εξάρτηση· κανένα feature route/data-db/User-path αγγίχτηκε. Άγγιξα μόνο δικά μου νέα SAAS
+αρχεία (foreign `.claude/launch.json`/`MOBILE_PARITY.md`/`PROGRESS.md` άθικτα).
+
+**## Needs Achilleas** (workspace settings UI):
+- Χρειάζεται user-facing workspace-settings «General» section που καλεί `GET /api/saas/workspace`
+  → δείχνει name/plan/status/tier/member-count + rename input (PATCH). UI-only· το read+write API
+  είναι έτοιμο. Slug/custom-domain αλλαγές = ξεχωριστά flows (routing/DNS), όχι εδώ.
+
+**Next task:** increment 29 — είτε (α) user-facing workspace-settings UI panels που consume-άρουν τα
+έτοιμα read APIs (General/Members/Invitations/Activity/Billing — UI-only, όλα τα APIs έτοιμα), είτε
+(β) `sendViaSmtp` via nodemailer (μετά provider decision Achilleas), είτε (γ) workspace delete
+scaffold (soft `status:'canceled'`· η πραγματική drop της tenant db = destructive → Needs-Achilleas,
+όχι από routine).
