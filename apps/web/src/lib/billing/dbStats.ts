@@ -12,11 +12,13 @@
 // never writes a Usage doc. Read-only on the data plane; the only WRITE is to the
 // control-plane Usage collection (via setStorageBytes).
 //
-// SCOPE LIMITATION (documented, see SAAS_PROGRESS.md → Needs Achilleas): db.stats() only
-// measures the tenant's Mongo footprint (documents + indexes). Binary files (receipt PDFs,
-// item photos) live on disk / a remote backend, NOT in Mongo, so they are NOT counted here
-// yet. A future increment must add on-disk/remote file-byte accounting to setStorageBytes
-// for the storage quota to reflect the true footprint.
+// FOOTPRINT = db + files (increment 9): db.stats() only measures the tenant's Mongo
+// footprint (documents + indexes). The binary files (receipt PDFs, item photos) live on the
+// storage volume, NOT in Mongo. As of increment 9, sampleTenantStorage also sums the
+// tenant's on-disk file bytes (fileStorage.tenantFileBytes) and writes db + files to the
+// Usage ledger, so the storage quota reflects the true footprint. NOTE: the shared storage
+// layer is not tenant-aware yet, so file bytes read 0 until saveFile namespaces per tenant
+// (see fileStorage.ts + SAAS_PROGRESS.md → Needs Achilleas).
 //
 // This module is NODE-ONLY (Mongoose + native driver). Never import from the edge runtime.
 import { connectDB } from '@/lib/db';
@@ -25,6 +27,7 @@ import { tenantDb } from '@/lib/tenancy/connection';
 import { saasMode } from '@/lib/tenancy/saasMode';
 import type { TenantContext, TenantPlan, TenantStatus } from '@/lib/tenancy/context';
 import { setStorageBytes } from './usage';
+import { tenantFileBytes } from './fileStorage';
 
 // ---------------------------------------------------------------------------------------
 // PURE helper (no DB, unit-tested)
@@ -59,8 +62,12 @@ function isSampleable(ctx: TenantContext): boolean {
 
 export type StorageSample = {
   slug: string;
-  /** Billed bytes written to the Usage ledger (storageSize + indexSize). */
+  /** Total billed bytes written to the Usage ledger (dbBytes + fileBytes). */
   bytes: number;
+  /** MongoDB footprint (storageSize + indexSize). */
+  dbBytes: number;
+  /** On-disk file footprint (tenant storage subtree). */
+  fileBytes: number;
   dataSize: number;
   objects: number;
 };
@@ -95,9 +102,18 @@ export async function sampleTenantStorage(
   if (!isSampleable(ctx)) return null;
   const stats = await readDbStats(ctx);
   if (!stats) return null;
-  const bytes = billedBytes(stats);
+  const dbBytes = billedBytes(stats);
+  const fileBytes = await tenantFileBytes(ctx);
+  const bytes = dbBytes + fileBytes;
   await setStorageBytes(ctx, bytes, at);
-  return { slug: ctx.slug, bytes, dataSize: stats.dataSize ?? 0, objects: stats.objects ?? 0 };
+  return {
+    slug: ctx.slug,
+    bytes,
+    dbBytes,
+    fileBytes,
+    dataSize: stats.dataSize ?? 0,
+    objects: stats.objects ?? 0,
+  };
 }
 
 /** Build a minimal TenantContext straight from a registry doc (avoids a re-lookup). */

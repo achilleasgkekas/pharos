@@ -383,3 +383,45 @@ tenant (μέσω `tenantDb(ctx)`) → `setStorageBytes(ctx, bytes)`, ώστε τ
 αθροίζει τα on-disk/remote bytes των tenant αρχείων (μέσω του storage abstraction) → προστίθεται
 στο `setStorageBytes` δίπλα στο db footprint, ώστε το storage quota να αντικατοπτρίζει το
 πραγματικό footprint. Εναλλακτικά, το enforcement wiring αν δοθεί άδεια για `api/v1/*`.
+
+---
+
+## 2026-07-02 (increment 9 — file-byte storage accounting)
+**Built:** το file-byte skέλος του storage footprint (db + files), ΟΛΟ σε νέο αρχείο +
+additive-only edit στο δικό μου `dbStats.ts`:
+- `lib/billing/fileStorage.ts` — αθροίζει τα on-disk bytes ενός tenant. Χωρισμένο σε **PURE**
+  (unit-tested) + FS-touching:
+  - PURE: `sumBytes(sizes[])` (floor-each-at-0 sum), `tenantStorageRoot(ctx)` → η per-tenant
+    υποδιαδρομή `STORAGE_ROOT/<dbName>` (fallback `tenant_<slug>`)· **null** για τον default
+    tenant + traversal-guard (crafted `../../etc` dbName → null, μένει μέσα στο STORAGE_ROOT).
+  - FS: `measureDir(dir)` (recursive file-size sum· missing dir → 0· symlinks όχι followed·
+    per-entry try/catch ώστε ένα unreadable file να μη ρίχνει το walk), `tenantFileBytes(ctx)`
+    (**NO-OP → 0** για default tenant / SAAS_MODE off, μηδέν fs access· αλλιώς `measureDir`
+    στο tenant root).
+- `lib/billing/dbStats.ts` (δικό μου, additive): το `sampleTenantStorage` γράφει πλέον
+  **`dbBytes + fileBytes`** στο Usage ledger (πριν μόνο dbBytes). `StorageSample` += `dbBytes`/
+  `fileBytes` breakdown (κανένας external consumer της shape — μόνο το SAAS route spread-άρει
+  το `SampleAllResult`).
+- `lib/billing/fileStorage.test.ts` — 8 tests (sumBytes floor/NaN, tenantStorageRoot
+  default→null / dbName / slug-fallback / traversal-guard, measureDir recursive-sum +
+  missing-dir→0 σε πραγματικό temp dir).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **296/296 green** (288
+προϋπάρχοντα + 8 νέα). Importers του `fileStorage` από feature code → **κανένας** (μόνο το
+δικό μου `dbStats.ts`)· το `dbStats` το χρησιμοποιεί ΜΟΝΟ το SAAS-gated sample route (404 όταν
+off) ⇒ zero runtime wiring, `SAAS_MODE` off = zero effect, κανένα Docker rebuild. Άγγιξα μόνο
+δικά μου SAAS αρχεία.
+
+**## Needs Achilleas** (file metering go-live):
+- **Το `saveFile` (lib/storage.ts) ΔΕΝ είναι tenant-aware ακόμα**: γράφει σε
+  `STORAGE_ROOT/<bucket>` όχι σε `STORAGE_ROOT/<dbName>/<bucket>`. Άρα ένας live tenant's
+  subtree είναι κενός → `tenantFileBytes` μετράει 0 μέχρι να γίνει το saveFile per-tenant.
+  Αυτό αγγίζει shared storage plumbing (feature territory) → θέλει ρητή άδεια ή feature-builder.
+  Backward-compatible design: ο default tenant / self-hosted δεν κουνάει κανένα αρχείο.
+- Remote backends (SMB/FTP/OneDrive mirror) μετρώνται ξεχωριστά αργότερα — το increment αυτό
+  καλύπτει το local STORAGE_ROOT volume.
+
+**Next task:** increment 10 — tenant-aware `saveFile` (αν δοθεί άδεια για shared storage
+plumbing): namespace τα SaaS uploads σε `STORAGE_ROOT/<dbName>/<bucket>` (flag-guarded, default
+tenant αμετάβλητος) ώστε το `tenantFileBytes` να μετράει πραγματικά νούμερα. Εναλλακτικά, το
+enforcement wiring σε ΕΝΑ AI route αν δοθεί άδεια για `api/v1/*`.
