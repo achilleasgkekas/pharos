@@ -632,3 +632,24 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-02 (cont.²¹)
+
+Task: (e) Polish, μερος 27 — branded 404 page (`app/not-found.tsx`). Το app δεν ειχε custom not-found -> καθε λαθος URL εδειχνε το γενικο default Next 404, off-brand. Ηταν φρεσκο self-contained increment: μηδεν assets, μηδεν pricing decision, brand-consistent (reuse του hero idiom + υπαρχουσων CSS classes, μηδεν globals.css αλλαγη -> ελαχιστο collision surface, ενα νεο αρχειο).
+
+Τι εφτιαξα:
+- `app/not-found.tsx` (νεο, server component): centered full-height layout με PharosMark 64px + mono eyebrow «Error 404 · off the map» + clamp() gradient headline «No light this way.» (ιδια accent→cyan→purple βαφη με το hero) + subcopy («let the beacon guide you back») + 2 CTA κουμπια «Back to home» (-> /) + «Self-host it free» (-> GITHUB_URL). Reuse υπαρχουσων `.container`/`.btn`/`.btn-primary`/`.btn-ghost`/`.mono` classes + inline styles (ιδιο pattern με το hero), οποτε ΜΗΔΕΝ globals.css αλλαγη. Metadata: title «Page not found · PHAROS» + `robots: { index:false, follow:false }` (τα 404 δεν indexαρονται).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· το `/_not-found` route τωρα ○ (Static) prerendered 138 B (πριν = default Next 404)· / αμεταβλητο 2.18 kB / 105 kB.
+- Prerendered HTML (`.next/server/app/_not-found.html`): «No light», «Error 404», «off the map», «Back to home», «beacon guide» ολα FOUND. Route static -> prerendered HTML = ακριβως το served (build + HTML check = ισοδυναμη επαληθευση για pure-static content με reuse CSS idioms· δεν σηκωσα preview server). Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status -> foreign `.claude/launch.json` (modified, ασταγο, αλλης ρουτινας) ΔΕΝ commit — μονο app/not-found.tsx + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως custom error boundary (app/error.tsx) η prefers-reduced-motion σεβασμος στο ScrollSpy.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
