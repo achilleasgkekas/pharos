@@ -107,6 +107,84 @@ h1, h2, h3 {
   color: var(--text);
 }
 
+/* Mobile hamburger + slide-in drawer (hidden on desktop) */
+.nav-burger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.nav-burger:hover {
+  border-color: var(--border-light);
+  background: var(--surface-2);
+}
+.mobile-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+.drawer-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  animation: drawer-fade 0.2s ease;
+}
+.drawer-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(80vw, 320px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.5);
+  animation: drawer-slide 0.22s ease;
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.drawer-link {
+  padding: 13px 12px;
+  border-radius: 10px;
+  font-size: 1.02rem;
+  color: var(--text-dim);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.drawer-link:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+@keyframes drawer-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes drawer-slide {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -1127,9 +1205,9 @@ h1, h2, h3 {
   .mobile-highlights { width: 100%; }
 }
 @media (max-width: 720px) {
-  /* Nav: drop secondary in-page anchors, keep Pricing + GitHub reachable */
-  .site-nav { gap: 20px; }
-  .nav-anchor { display: none; }
+  /* Nav: hide the desktop links, expose the hamburger drawer instead */
+  .site-nav { display: none; }
+  .nav-burger { display: inline-flex; }
   /* AI flow: stack input over output, point the arrow down */
   .ai-flow { grid-template-columns: 1fr; gap: 14px; }
   .ai-arrow { transform: rotate(0deg); justify-self: center; }

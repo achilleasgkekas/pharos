@@ -1,6 +1,7 @@
 import { PharosMark } from './components/PharosMark';
 import { Icon } from './components/Icon';
 import { Waitlist } from './components/Waitlist';
+import { MobileNav } from './components/MobileNav';
 
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const SITE_URL = 'https://ph-aros.com';
@@ -484,6 +485,7 @@ export default function Home() {
               GitHub
             </a>
           </nav>
+          <MobileNav githubUrl={GITHUB_URL} />
         </div>
       </header>
 

@@ -534,3 +534,28 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-02 (cont.¹⁷)
+
+Task: (e) Polish, μερος 23 — mobile hamburger drawer. Ηταν το ρητο «επομενο increment» του προηγουμενου log (τα αλλα δυο, real screenshots + per-plan Offer JSON-LD, μενουν blocked σε assets/τιμες). Προβλημα: <720px το top nav εκρυβε ΟΛΑ τα `.nav-anchor` (Features/AI/Mobile/Who/Self-host/Compare/FAQ), αφηνοντας μονο Pricing + GitHub -> τα 7 sections αναζητησιμα μονο με χειροκινητο scroll σε κινητο. Τωρα ενα drawer τα επαναφερει ολα.
+
+Τι εφτιαξα:
+- `app/components/MobileNav.tsx` (νεο, client component, ιδιο idiom με Waitlist): hamburger button (aria-label/aria-expanded/aria-controls) + slide-in drawer απο δεξια. `ITEMS` array κρατιεται σε sync με το desktop <nav> (8 anchors) + GitHub link. useEffect: body scroll-lock + Escape-to-close οσο ειναι open. Close σε: scrim click, close button (X), καθε link click. Hamburger + X icons ζωγραφισμενα inline SVG (το Icon.tsx δεν εχει menu/close glyph).
+- `app/page.tsx`: import + `<MobileNav githubUrl={GITHUB_URL} />` μεσα στο header, διπλα στο desktop <nav>.
+- `app/globals.css`: `.nav-burger` (default display:none -> desktop hidden· hover border/bg), `.mobile-drawer` (fixed inset, z-index 60), `.drawer-scrim` (rgba scrim + blur, fade-in keyframe), `.drawer-panel` (right slide-in min(80vw,320px), slide keyframe, left border + shadow), `.drawer-head`, `.drawer-link` (13px touch targets, hover bg). Reduced-motion ηδη καλυπτεται απο το global `@media (prefers-reduced-motion)` block (animation: none). Reuse υπαρχουσας παλετας.
+- Media <720px: αλλαξε απο «`.nav-anchor { display:none }`» σε «`.site-nav { display:none }` + `.nav-burger { display:inline-flex }`» -> desktop links φευγουν εντελως, εμφανιζεται το hamburger. (Το `.nav-anchor` class μενει στα anchors αλλα αχρησιμοποιητο CSS-wise· αβλαβες.)
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success. Route / = 1.41 kB / 104 kB First Load JS (ηταν 761 B / 103 kB· +~650 B γιατι το MobileNav ειναι client component -> μικρο hydration bundle. Ολα ακομα ○ Static/prerendered).
+- Prerendered HTML (.next/server/app/index.html): nav-burger / mobile-drawer / drawer-panel / «Open menu» / drawer-link ολα FOUND (client component renders initial state στο SSR: burger + hidden drawer markup).
+- Dev smoke: `npm run dev` -> «Ready» καθαρο, 0 errors, στο :3001 (το :3000 το κραταει το Docker homepage-web· δεν το πειραξα). Server σταματημενος (pkill next), δεν αφησα κανενα να τρεχει. Docker/web/mobile αθικτα.
+- Collision guard: git status -> κανενα staged απο αλλο routine· foreign `.claude/launch.json` (modified) ΔΕΝ commit — μονο MobileNav.tsx + page.tsx + globals.css + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως active-section highlight στο drawer (scroll-spy) ή focus-trap μεσα στο drawer για πληρη a11y.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
