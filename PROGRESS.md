@@ -2,8 +2,14 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: e6ad795 -->
+<!-- reviewed: 12b80a1 -->
 <!-- docker-validated: 35953c6 -->
+
+## 2026-07-02 (reviewer — range e6ad795..12b80a1 καθαρό, 0 fixes, marker → 12b80a1)
+- **Έλεγχος:** commits `e6ad795..HEAD` (5d97826 SaaS API hardening, b4ec753 refactor, 35953c6 password-reset scaffold, 4dfac8d landing JSON-LD, d6b1ef9 format tests + docs). Κώδικας που άλλαξε: password-reset (lib + request/confirm routes), billing/members/usage routes, landing page.tsx.
+- **Type-checks:** `apps/web` tsc **EXIT 0**, `apps/mobile` tsc **EXIT 0**. Νέα test suites `passwordReset.test.ts` + `format.test.ts` → **25/25 PASS**.
+- **Ευρήματα:** κανένα. Το password-reset scaffold είναι σωστό (SHA-256 hashed single-use tokens, anti-enumeration πάντα-ok στο request, dev-only `devToken` echo μόνο εκτός production ΚΑΙ χωρίς mailer). Το SaaS hardening (readBody/strField/isObjectId shared helpers + constant-time `tokenMatches` στο usage/sample) είναι no-behavior-change refactor. Landing JSON-LD Organization/WebSite nodes έγκυρα, το `logo: /favicon.svg` υπάρχει στο `apps/landing/public/`. Καμία αλλαγή σχήματος API που να αγγίζει το mobile (νέες SaaS control-plane routes, δεν καταναλώνονται από το self-hosted app).
+- **Fixes:** 0 (τίποτα small/unsafe). **Flags:** 0. Δεν βρέθηκαν secrets. Marker reviewed `e6ad795` → **`12b80a1`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-02 (docker-health — safe rebuild @35953c6, stack healthy, 2.1GB reclaimed)
 - **Health (read-only):** `homepage-mongo` = **healthy**, `homepage-web` RestartCount **0** (running). Mongo RestartCount 86 = ιστορικό OOM σωρευτικό, ΟΧΙ ενεργό loop (health=healthy, web σταθερό). `homepage-flaresolverr` **δεν έτρεχε** (καμία ενέργεια). `docker system df` πριν: Images 4.07GB, Build Cache 667MB.
