@@ -153,7 +153,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - `GET /api/v1/expenses` επιστρέφει `anomaly` σε records που αποκλίνουν >30% από το vendor median· additive → no-auth ακόμα 401, όχι 500· υπόλοιπο shape byte-stable
   - mobile Expense/Income row + detail δείχνει gold `⚠ +N%`/`⚠ -N%` badge όταν anomaly· κρύβεται αλλιώς
   - tsc καθαρό (web + mobile)· safe rebuild → /login 200, web restarts 0
-- Status: TODO
+- Status: ✅ DONE 2026-07-02 (επιβεβαιωμένο στον κώδικα, 39η σάρωση: `computeAnomalies`+`trimExpense(…, anomaly)` @ serialize.ts, list route καλεί μόνο όταν όχι `updatedSince`, mobile `Expense.anomaly?` + gold badge @ MoneyScreen:170,273· stale `Status: TODO` διορθώθηκε)
 
 ### Expenses/Income — vendor autocomplete στο add-form (mobile)
 - Priority: P3 | Size: S | no AI, no decision, no endpoint, no native dep

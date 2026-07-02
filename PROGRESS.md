@@ -3258,3 +3258,29 @@ Read-only web code-quality audit (grep, όχι docs) σε **49 v1 route files** 
 
 ### Needs Achilleas
 - **reset-request timing (P3/S, decision-flag):** `saas/account/reset/request/route.ts:52` `await sendEmail(...)` → registered/non-registered response-time delta αποδυναμώνει το anti-enumeration `{ ok:true }`. Fire-and-forget `void sendEmail` το ευθυγραμμίζει με το members route ΑΛΛΑ ρισκάρει κομμένο send σε serverless. Delivery-semantics tradeoff, όχι unattended fix.
+
+## 2026-07-02 (ui-auditor — 39η σάρωση mobile UI consistency· CONFIRMATION, ουρά αμετάβλητη· 1 stale-doc διόρθωση)
+
+Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `apps/web/src/app/globals.css`). Inventory ξαναχτίστηκε από τον κώδικα: **16 screens**, `theme.ts` (`C`/`SPACE`/`RADIUS`/`SIZE`/`scrim`/`onAccent`/`alpha`) + `ui.tsx` primitives (`Input`/`TextArea`/`Check`/`Button`/`IconButton`/`Card`/`ListItem`/`Badge`/`Chip` + `Header`/`Centered`/`Spinner`/`ErrorText`/`Empty` + `contentWidth`) ΟΛΑ παρόντα. mobile `npx tsc --noEmit` → **EXIT 0**.
+
+**Νέος κώδικας από την 37η/38η (marker `2201932`):** **ΚΑΝΕΝΑΣ** στο `apps/mobile/src` (`git log 2201932..HEAD -- apps/mobile/src` = ΚΕΝΟ· τελευταίο mobile-src commit παραμένει `2201932`). Στο `api/v1` μόνο **ένα** commit, `7cc406f` (`test(api): cover trimExpense v1 serializer shape`), **web-only test** (καμία νέα portable mobile δυνατότητα, καμία αλλαγή shape). Οι υπόλοιποι commits (`ec2c195`/`abbb7d6` + docs/landing/health) είναι web/SaaS/infra-only.
+
+**Ευρήματα ανά διάσταση (fresh grep):**
+- Tokens (hardcoded hex στα `screens/`+`nav.tsx`+`App.tsx`, εκτός `theme.ts`): **0** (όλα `C.*`).
+- Shared theme file: **ΥΠΑΡΧΕΙ** (`theme.ts`) → κανένα P1 foundation item ανοιχτό.
+- Reusable components: εναπομένον holdout **ΜΟΝΟ** το ghost `<Button variant>` (~19-20 bordered *Btn sites / 8 screens: cyan Subscriptions `aiBtn`, Money `scanBtn`+`rescanBtn`, Items `convertBtn`, Settings `testBtn`+`addCardBtn`, Receipts `rescanBtn`+`sumBtn`, Vouchers `aiBtn`+`photoBtn`· accent Items `aiBtn`, Receipts `libBtn`· neutral Tasks `statusBtn`, Shopping `scanBtn`, Settings `cancelBtn`· fill outlier Items `importBtn`). Drift: radius 8/10/11/12, padV 7-13, border cyan/accent/border.
+- Theme/dark mode: **0** `useColorScheme`/`ThemeProvider`/`useTheme` (dark-only, P3/L decision).
+- States: complete trio (Spinner/ErrorText/Empty)· in-button `ActivityIndicator` επικαλύπτεται με ghost-button holdout.
+- Adaptive: safe-area **ανοιχτό** (plain `SafeAreaView` @ App.tsx:88, `react-native-safe-area-context` εκτός package.json [grep 0], μηδέν bottom inset· `nav.tsx:87` `paddingTop:60` magic)· max-content-width DONE (`contentWidth`, 14 screens).
+- Touch targets: DONE (`<Check>` 24×24 + hitSlop).
+- Input primitive: raw `<TextInput>` **21 JSX sites / 7 screens** (Receipts 9 / Shopping 4 / Login 3 / Items 2 / Assistant 1 / Search 1 / Settings 1) — attended-preferred token-drift.
+
+**Ουρά:** **αμετάβλητη** — μηδέν νέο item, μηδέν item έκλεισε (καμία νέα mobile-src αλλαγή). **1 doc-fix:** το «Expenses/Income anomaly badge» (P2/S) είχε header `✅ DONE` + πλήρες DONE block ΑΛΛΑ stale `Status: TODO`· επιβεβαιώθηκε στον κώδικα (`computeAnomalies`+`trimExpense(…, anomaly)` @ `serialize.ts`, list route καλεί εκτός `updatedSince`, `Expense.anomaly?` + gold badge @ `MoneyScreen:170,273`) → διορθώθηκε σε `Status: ✅ DONE`. Ουρά violations ανά διάσταση: tokens 0, reusable-holdout 1 (ghost button ~19-20 sites), safe-area 1, input-drift 21/7-screens, dark-theme 1 (decision).
+
+**Top 3 items να πάρει ο builder μετά (unattended-safe διάταξη):**
+1. **Ghost `<Button variant>` (P2/M)** — τελευταίο reusable-component holdout· `variant?: 'primary'|'ghost'` (+ optional tint cyan/accent) στο υπάρχον `Button`, ενοποιεί τον πυρήνα ~7 AI/scan/rescan cyan-ghosts. Unattended-safe (tsc-verifiable, style-override idiom)· ΠΡΟΣΟΧΗ στο drift (cyan vs accent vs neutral border, surface vs surface2 bg, padding 7-13) → per-site override για pixel-identical.
+2. **Expenses/Income vendor autocomplete (P3/S)** — αμιγώς client-side (distinct vendors από τα ήδη-φορτωμένα `items`), μηδέν endpoint/dep, μικρός σε έκταση· suggestion chips κάτω από το vendor `Input` στο MoneyScreen add-form. Unattended-safe (tsc-verifiable).
+3. **Safe-area insets (P2/M)** — μοναδικό πραγματικό adaptive gap· `react-native-safe-area-context` + `SafeAreaProvider`/`useSafeAreaInsets` (bottom inset για sheet buttons). Package-add + simulator verify → semi-attended.
+
+### Needs Achilleas
+- Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) + «language switcher» (P3/L) παραμένουν σκόπιμες decisions (μεγάλα refactors). Safe-area + Input full-adoption = επόμενα semi-attended/attended.
