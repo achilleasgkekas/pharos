@@ -103,3 +103,40 @@ mint-άρει invites, κανένας external importer των αλλαγών), 
 Achilleas· ξεκλειδώνει reset/verify/invite delivery σε production), είτε (β) dedicated resend
 endpoint (re-mint + email σε ένα βήμα), είτε (γ) `invitedBy` projection στο inviteView (ποιος
 έστειλε το invite — συμπληρώνει το acceptedBy του §21 για πλήρες audit trail).
+
+## 2026-07-02 (increment 23 — dedicated invite-resend endpoint)
+**Built:** το §19-20-21-22 έκλεισαν το invite lifecycle (mint → list → audit), αλλά το
+«resend» ήταν έμμεσο (ξανα-POST στο `/api/saas/members` για το ίδιο email, που supersede-άρει
+τον παλιό token). Πρόσθεσα ξεχωριστό endpoint που re-mint + re-send σε ΕΝΑ βήμα, χωρίς να
+ξέρεις/ξαναγράφεις το email. ΟΛΟ SaaS-gated, additive, σε νέο αρχείο — κανένα υπάρχον αρχείο
+δεν άλλαξε:
+- `app/api/saas/invites/resend/route.ts` (νέο): **POST** `{ inviteId, tenant? }`, owner/admin
+  only (`resolveWorkspaceSession(slug, true)`). Re-mint (`mintInviteToken`) → `findOneAndUpdate`
+  με `{_id, tenant, status:'pending'}` filter → `$set {tokenHash, expires}` (ίδιο row: κρατά
+  invitedBy/createdAt/email/role· ΝΕΟΣ hash **retire-άρει τον παλιό link** — «newest link
+  wins», ίδια αρχή με το members supersede). matchedCount 0 (accepted/revoked/wrong-tenant) →
+  404. **Δεν καταναλώνει νέα θέση** (το pending invite είχε ήδη κρατήσει seat στο mint) → κανένα
+  seat re-check. Email re-send μέσω `inviteEmail`/`inviteLinkUrl`/`sendEmail` όταν
+  `mailerCanDeliver()`· SCAFFOLD dev-token echo (mirror members: non-prod + no mailer →
+  `devToken`, prod drops silently). Token hash ΠΟΤΕ στο response. Runtime nodejs + force-dynamic.
+
+Γιατί re-mint αντί resend του ίδιου token: ο token δεν αποθηκεύεται ποτέ (μόνο το hash), άρα
+δεν γίνεται να ξαναδιαβαστεί για re-send· το re-mint είναι και η μόνη δυνατή διαδρομή και η
+ασφαλής (invalidate του παλιού). Το target είναι τυπικά expired-but-pending invite (ο link
+έληξε πριν κλικαριστεί) — status μένει `pending`, νέο future expiry το ξαναζωντανεύει.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run` → **652/652 green** (καμία
+regression· ο συνολικός ανέβηκε από concurrent routines). Το route SaaS-gated (404 όταν off)
++ καθαρά νέο αρχείο (μηδέν edit σε υπάρχον, μηδέν external importer) ⇒ `SAAS_MODE` off = zero
+effect, κανένα Docker rebuild, καμία νέα εξάρτηση.
+
+**## Needs Achilleas:**
+- **SMTP/email provider decision** (Resend key ή wired SMTP) για production delivery· μέχρι τότε
+  ο resend επιστρέφει `devToken` ΜΟΝΟ σε non-production (ίδιο με reset/verify/invite).
+- Χρειάζεται invites-UI (§19) που εκθέτει resend button → POST εδώ (το `expired` flag του
+  inviteView ήδη σηματοδοτεί ποια invites θέλουν resend).
+
+**Next task:** increment 24 — είτε (α) `sendViaSmtp` via nodemailer (μετά από provider decision
+Achilleas· ξεκλειδώνει ΟΛΑ τα reset/verify/invite/resend emails σε production), είτε (β) invites
+UI section (owner/admin) που καταναλώνει `GET /api/saas/invites` + resend/revoke controls (ζει σε
+δικό μου SaaS territory), είτε (γ) billing/usage widget (increment 12 από την ουρά).
