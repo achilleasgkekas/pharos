@@ -834,3 +834,24 @@ Sharp concern + resolution: το `ocr.ts` κάνει top-level `import sharp` (n
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` (ΔΕΝ το άγγιξα/staged) + το νέο ocr.test.ts. Στάγιαρα μόνο τα δικά μου paths.
 
 Suggested next task: (f συνέχεια) Επόμενο pure test file. Τα καθαρά exported helpers έχουν πλέον σχεδόν όλα test. Απομένοντα: (α) `components/ui/cn.ts` (thin, μόνο αν θέλουμε lock στο tailwind-merge conflict-resolution)· (β) API-shape/validation helpers σε app/api/v1 route.ts που δεν θέλουν live Mongo (mock ή inline parsers)· (γ) additive-export ενός `aiProviders.ts` internal helper (`stripFences`/`mediaTypeOf`) ΑΝ εγκριθεί source edit (εκτός territory τώρα). Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα) + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-03 (cont. — prompts.test.ts, AI-prompts registry)
+
+**Task: (f συνέχεια) Pure test file `apps/web/src/lib/prompts.test.ts` για το `PROMPT_META` registry + το `DEFAULT_SCRAPER_PRICE_PROMPT` του `lib/prompts.ts`.**
+
+Επιλογή target: σάρωσα τα lib modules χωρίς test (`find src/lib -maxdepth 1`). Το `notifiers.shared` (NOTIFIER_TYPES) ήταν ήδη καλυμμένο από το notifiers.test.ts· τα περισσότερα υπόλοιπα (db/jobRunner/mirror/ollama/onedrive/remoteStorage/scrape/search/softDelete/storage) είναι side-effectful χωρίς pure exports. Διάλεξα το `prompts.ts` γιατί εκθέτει δύο καθαρά static exports: το `PROMPT_META` (single source of truth για το Settings → AI Prompts editor· κάθε row = ένας overridable prompt) και το `DEFAULT_SCRAPER_PRICE_PROMPT` (default κείμενο που το Settings δείχνει/reset-άρει, KEEP-IN-SYNC με τον scraper). Ένα key στο PromptKey union που λείπει από το PROMPT_META = σιωπηλά μη-editable prompt· διπλό/stray key = σπασμένο editor row. Οι DB helpers (getPromptOverride/getAllPromptOverrides) θέλουν live Mongo → εκτός scope.
+
+Import concern + probe: το module κάνει top-level `import { connectDB } from './db'` + `import { AppConfig }` (mongoose). Probe (`_probe.test.ts`, δοκιμαστικό, διαγράφηκε) έδειξε ότι φορτώνει καθαρά στο vitest — το server-only alias (από προηγούμενο run) + το db import resolve-άρουν χωρίς να εκτελούν DB (μηδέν connection στο import). Καμία mock δεν χρειάστηκε.
+
+Τι έγινε:
+- Νέο `prompts.test.ts` (10 tests). PROMPT_META: non-empty array· **exact canonical PromptKey set** (10 keys, mirror — add/remove prompt must update union + list + META)· unique keys· non-empty label+where ανά prompt· distinct labels (no ambiguous rows)· κάθε canonical key βρίσκεται via find. DEFAULT_SCRAPER_PRICE_PROMPT: non-empty· περιέχει `"price"`/`"currency"`/`"inStock"` + «JSON only/Return ONLY JSON» (ο scraper κάνει JSON.parse το reply → το shape πρέπει να είναι pinned)· «dot decimal» instruction (EU comma vs US dot)· η scraperPrice row υπάρχει στο META.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/prompts.test.ts` → 10/10 passed.
+- `npx vitest run` (όλο το suite) → 52 files, 772/772 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + το νέο prompts.test.ts. Στάγιαρα μόνο το δικό μου path. Commit 320102d, pushed.
+
+Suggested next task: (f συνέχεια) Επόμενο pure test file. Τα single-file lib pure helpers έχουν πλέον σχεδόν όλα test. Απομένοντα καθαρά targets: (α) `components/ui/cn.ts` (thin wrapper πάνω σε clsx+tailwind-merge — μόνο αν θέλουμε lock στο conflict-resolution, χαμηλή αξία)· (β) `lib/storageConfig.ts` type/registry invariants (StorageBackend union) ή `lib/i18n` υπο-modules αν μένουν ακάλυπτα· (γ) API-shape/validation helpers σε app/api/v1 route.ts που δεν θέλουν live Mongo (mock ή inline parsers). Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα) + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
