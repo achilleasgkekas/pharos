@@ -292,3 +292,34 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — 
 (query/sort/pagination helpers, αν καθαρό από I/O) ή `lib/dates.ts` `safeDate`
 (European DD/MM parsing, deterministic). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF
 IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — billing/plans.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/billing/plans.test.ts` για τον SaaS plan-ladder module `lib/billing/plans.ts` (`planDef`, `stripePriceId`, `planForPriceId` + το PLANS/PLAN_KEYS table).**
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/billing/plans.test.ts` (16 tests, μηδέν DB/Stripe SDK). Καλύπτει:
+  table invariants (τα 3 keys σε ladder order, κάθε def self-consistent `def.key===mapKey`,
+  free = μόνο zero-price + no Stripe binding + AI 50, paid tiers με σωστό `stripePriceEnv`,
+  μόνο dedicated = dedicated-isolation + customDomain + unlimited AI [null], storage
+  monotonic free<shared<dedicated). `planDef` exact-match + fallback σε free για
+  unknown/legacy/empty/null/undefined + case-sensitive ('FREE'→free). `stripePriceId`
+  free→πάντα null, reads plan-bound env var, unset→null, trim + blank-only→null (τα δύο
+  Stripe Price-ID env vars save/restore μέσω afterEach ώστε ντετερμινιστικό). `planForPriceId`
+  reverse-map configured id→key, empty-id→null, unknown→null, no-config→null (guard κατά
+  spurious unset==unset match).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/billing/plans.test.ts` → 16/16 passed.
+- `npx vitest run` (όλο το suite) → 25 files, 398/398 passed (ήταν 382).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json`
+  (foreign, ΔΕΝ το άγγιξα/staged) + το νέο plans.test.ts· `git diff --cached` κενό·
+  στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — δες `lib/billing/entitlements.ts`
+(pure plan→entitlement mapping, OSS parity note) ή `lib/i18n/format.ts` `relTime` (deterministic
+με fake timers/fixed `Date.now`). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix
+στο "## Needs Achilleas".
