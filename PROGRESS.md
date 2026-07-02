@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 12c47ba -->
-<!-- docker-validated: d170d93 -->
+<!-- docker-validated: 1b6744a -->
+
+## 2026-07-02 (docker-guard — safe rebuild HEAD 1b6744a)
+- **Health:** homepage-mongo **healthy** (Up ~50min, RestartCount 104 σωρευτικό αλλά σταθερό τώρα, δεν loop-άρει)· homepage-web RestartCount **0**· homepage-flaresolverr ήδη **exited** (καμία ενέργεια).
+- **Disk:** πριν → Images 4.07GB, Build Cache 667MB (0 reclaimable in-use), Containers 79MB reclaimable. Μετά το `builder prune -f`: ανακτήθηκαν **~2.1GB** από το intermediate cache του νέου build.
+- **Rebuild:** ΝΑΙ. Το diff `d170d93..HEAD -- apps/web` άγγιζε web runtime code (`api/saas/members/route.ts`, `api/v1/reports/route.ts`, `lib/billing/entitlements.ts`, `lib/billing/plans.ts` + 3 test files). Ασφαλής ακολουθία: `compose build web` → mongo healthy → `compose up -d web` → `/login` **200** (1η προσπάθεια) → web RestartCount παρέμεινε 0 → `builder prune -f`.
+- **Marker:** docker-validated `d170d93` → **`1b6744a`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
+- **Needs Achilleas:** κανένα.
 
 ## 2026-07-02 (parity-auditor — inventory από κώδικα· 1 νέο auto-buildable GAP στην κορυφή)
 - **Inventory από κώδικα (όχι docs):** **49 v1 routes** (`find api/v1 -name route.ts` = 49), **16 mobile screens**, **19 web `page.tsx`**. **Route↔consumer:** grep normalized paths στο `apps/mobile/src/api.ts` → και τα 49 έχουν ≥1 mobile consumer (1:1, **μηδέν orphan endpoint**). Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only first-run wizard, N/A).
