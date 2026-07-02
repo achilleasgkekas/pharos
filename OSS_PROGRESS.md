@@ -3,6 +3,43 @@
 Ημερολόγιο της OSS-release + test routine (τρέχει ωριαία, unattended). Κάθε εγγραφή:
 τι έγινε, τι επαληθεύτηκε, και το επόμενο προτεινόμενο βήμα.
 
+## 2026-07-02 (cont. — apiAuth.test.ts / apiError)
+
+**Task: (f συνέχεια, μετάβαση σε validation-helper tests) Test file `apps/web/src/lib/apiAuth.test.ts`
+για τον shared error-response builder `apiError` του `lib/apiAuth.ts`.**
+
+Επιλογή target: το suggested step («API-shape tests που δεν θέλουν live Mongo, test the validation
+helpers»). Τα καθαρά pure-lib targets έχουν εξαντληθεί (όλα τα exported pure helpers έχουν test· τα
+απομένοντα untested lib files είναι network/DB/fs: `ollama`/`onedrive`/`remoteStorage`/`scrape`/
+`search`/`storeService`/`appSettings`/`storage`/`notify`, ή θέλουν DOM όπως `clientImage`). Τα
+inline `trim()`/`addCycle()` helpers στα `app/api/v1/*/route.ts` ΔΕΝ είναι exported → δεν testable
+χωρίς source edit (εκτός territory). Το `apiError` είναι exported, pure (φτιάχνει `NextResponse.json`,
+μηδέν DB call), και ουσιαστικό: είναι το error-response contract που parse-άρει το mobile app σε κάθε
+αποτυχία `/api/v1`. Probe επιβεβαίωσε ότι το module import-άρεται καθαρά σε node vitest (το
+`connectDB`/`User` που εισάγει είναι side-effect-free στο import· κανένα connection).
+
+Τι έγινε:
+- Νέο `apiAuth.test.ts` (9 tests). Καλύπτει: default status 400· body shape ακριβώς `{ error: msg }`·
+  explicit status (401/403/404/500)· body↔status independence· `content-type: application/json`·
+  empty-string message (χωρίς coercion σε default)· non-ASCII/ελληνικά verbatim· **καμία extra key**
+  πέρα από `error`· fresh response object ανά call.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/apiAuth.test.ts` → 9/9 passed.
+- `npx vitest run` (όλο το suite) → 45 files, 676/676 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό· `git status --short` foreign = μόνο
+  `.claude/launch.json` (ΔΕΝ το άγγιξα/staged). Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (validation-helper tests συνέχεια) Επόμενο target = ένα από τα άλλα shared
+API helpers χωρίς DB. Υποψήφια: (α) `withAuth` του ίδιου `apiAuth.ts` με mocked `bearerUser`
+(401-χωρίς-token / 500-on-throw paths, χρειάζεται vi.mock) — καλύπτει το auth gate κάθε route·
+(β) `stores/route.ts cleanAliases` ΑΝ γίνει exported (θέλει source edit, εκτός territory τώρα).
+Το `withAuth` είναι το πιο αξιόλογο. Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines
+γράφουν παράλληλα). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
 ## 2026-07-02 (cont. — .env.example completeness [task c])
 
 **Task: (c) Ολοκλήρωση του `.env.example` — κάθε env var που διαβάζει ο web app να υπάρχει με ασφαλές placeholder + one-line σχόλιο.**
