@@ -355,3 +355,25 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02 (cont.⁹)
+
+Task: (e) Polish, μερος 15 — «Who it's for» personas section. Ηταν το προαιρετικο επομενο που ειχα σημειωσει (self-contained, μηδεν assets, μηδεν decisions, δεν επικαλυπτει υπαρχον section: τα features λενε ΤΙ κανει, τα personas λενε ΓΙΑ ΠΟΙΟΝ ειναι). Τα screenshots του #preview mockup μενουν blocked χωρις πραγματικα app images, οποτε προχωρησα με copy-only increment.
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεα σταθερα `PERSONAS` (3 rich cards) + νεο `#who` section αναμεσα σε Features και Trust. eyebrow «Who it's for» + h2 «Built for people who own their stack». Τα 3 personas: (1) Homelabbers (server icon, accent) — Proxmox/NAS/UniFi κοινο· (2) Receipt & money trackers (receipt icon, cyan) — receipts/installments/subscriptions· (3) Privacy-first owners (shield icon, purple) — self-host/offline/zero-telemetry. Ολα icons απο το υπαρχον Icon set (server/receipt/shield). Reuse του `.feature-icon`/`.feature-glow` treatment. Μηδεν client JS, semantic `<article class="card">`.
+- `app/globals.css`: νεα `.persona-grid` (repeat(3,1fr), gap 18) + `.persona-card` (hover translateY(-3px) + border-light, ιδιο idiom με feature/trust cards) + responsive: 1fr στο <=900px (matches το steps stacking).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 761 B / 103 kB First Load JS, αμεταβλητο — pure static markup+CSS, μηδεν bundle impact).
+- Prerendered HTML (`.next/server/app/index.html`): «Who it's for», «Built for people who own their stack», «Homelabbers», «Privacy-first owners», `persona-card` ολα present.
+- Preview (landing-dev, port 3100): DOM eval -> section present, h2 σωστο, count=3, titles [Homelabbers, Receipt & money trackers, Privacy-first owners], και τα 3 icons rendered (feature-icon svg present)· console errors: none. Σταματησα τον server. Docker/web/mobile αθικτα. Το `.claude/launch.json` (shared local config) ΔΕΝ commit (collision guard — μονο app/page.tsx + app/globals.css + LANDING_PROGRESS.md).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση του CSS mockup (#preview) με πραγματικα app screenshots οταν υπαρξουν assets, secondary CTA band (κατω απο compare/faq), η per-plan Offer JSON-LD nodes οταν κλεισουν οι τιμες. Προαιρετικα: «who» link στο nav αν χρειαστει (τωρα reachable μονο με scroll).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.

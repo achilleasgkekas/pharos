@@ -118,6 +118,27 @@ const TRUST: { icon: string; color: string; title: string; desc: string }[] = [
   },
 ];
 
+const PERSONAS: { icon: string; color: string; title: string; desc: string }[] = [
+  {
+    icon: 'server',
+    color: 'var(--accent)',
+    title: 'Homelabbers',
+    desc: 'You already run Proxmox, a NAS, and a UniFi rack. Pharos is the one dashboard that ties your gear, your spend, and your network together, sitting self-hosted right beside everything else you own.',
+  },
+  {
+    icon: 'receipt',
+    color: 'var(--cyan)',
+    title: 'Receipt & money trackers',
+    desc: 'Shoeboxes of receipts, installments spread across cards, subscriptions you forgot you had. Drop it all in and let AI read, sort, and total it, so you always know exactly what you owe.',
+  },
+  {
+    icon: 'shield',
+    color: 'var(--purple)',
+    title: 'Privacy-first owners',
+    desc: 'Your financial life does not belong in someone else’s cloud. Run Pharos on your own hardware, fully offline, with zero telemetry, answering to nobody but you.',
+  },
+];
+
 type Tier = {
   name: string;
   price: string;
@@ -468,6 +489,33 @@ export default function Home() {
                 </span>
                 <h3 style={{ fontSize: '1.12rem', margin: '16px 0 8px' }}>{f.title}</h3>
                 <p style={{ color: 'var(--text-dim)', fontSize: '0.95rem' }}>{f.desc}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Who it's for (personas) ───────────────────────── */}
+      <section id="who" style={{ padding: '48px 0' }}>
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <p className="mono" style={{ marginBottom: 12 }}>Who it&apos;s for</p>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 700 }}>
+              Built for people who own their stack
+            </h2>
+          </div>
+
+          <div className="persona-grid">
+            {PERSONAS.map((p) => (
+              <article key={p.title} className="card persona-card">
+                <span className="feature-icon" style={{ color: p.color }}>
+                  <span className="feature-glow" style={{ background: p.color }} />
+                  <Icon name={p.icon} size={22} />
+                </span>
+                <h3 style={{ fontSize: '1.12rem', margin: '16px 0 8px' }}>{p.title}</h3>
+                <p style={{ color: 'var(--text-dim)', fontSize: '0.95rem', lineHeight: 1.55 }}>
+                  {p.desc}
+                </p>
               </article>
             ))}
           </div>

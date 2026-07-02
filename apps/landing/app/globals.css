@@ -218,6 +218,20 @@ h1, h2, h3 {
   z-index: -1;
 }
 
+/* Who it's for / personas */
+.persona-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.persona-card {
+  transition: transform 0.15s ease, border-color 0.2s ease;
+}
+.persona-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-light);
+}
+
 /* Pricing */
 .pricing-grid {
   display: grid;
@@ -683,6 +697,7 @@ h1, h2, h3 {
 /* Responsive */
 @media (max-width: 900px) {
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
+  .persona-grid { grid-template-columns: 1fr; }
   .pricing-grid { grid-template-columns: repeat(2, 1fr); }
   .steps-grid { grid-template-columns: 1fr; }
   .trust-grid { grid-template-columns: repeat(3, 1fr); }
