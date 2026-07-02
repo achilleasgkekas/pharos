@@ -1,26 +1,26 @@
 # Pharos Monitor — STATUS
 
-## 2026-07-02 16:02
+## 2026-07-02 19:02
 
-**Ετυμηγορια: ΟΛΑ ΟΚ.** Και οι 6 ρουτινες εδειξαν δραστηριοτητα μεσα στις τελευταιες ~1.5 ωρες (14:23 εως 15:57, τωρα 16:02). Ο υπολογιστης ηταν ξυπνιος, ο παλμος συνεχης. Ο builder δουλεψε το SaaS control-plane (accepted-invite audit metadata f02c68d, invites DELETE id-guard 9d7bbab, invites ?status filter 100d1d6) + landing (Integrations section 8be8b91, FAQ 574ab57, Who nav link e741999) + mobile Tasks tag-filter (268efb4). Ο parity auditor εβγαλε 5η σαρωση CONFIRMATION (80e26cf, GAP 0). Ο ui auditor εβγαλε 34η σαρωση (e7cd4d6, Chip holdout 7 clusters/5 screens). Ο web auditor εβγαλε 32η σαρωση CONFIRMATION (4eaa702). Ο reviewer καθαρισε δυο ranges (bc525f6 marker→268efb4, 2a9f3bb marker→9d7bbab, 0 fixes 0 flags). Ο docker guard εκανε ασφαλες rebuild (94a5d20, marker→4eaa702, /login 200, ~2.1GB prune). Κανενα προβλημα.
+**Ετυμηγορια: ΟΛΑ ΟΚ.** Και οι 6 ρουτινες χτυπησαν μεσα στα τελευταια ~40 λεπτα (18:23 εως 18:58, τωρα 19:02). Ο υπολογιστης ηταν ξυπνιος, πυκνος συνεχης παλμος. Ο builder δουλεψε landing (proof band 47b4704, mobile-app section f157dfb, mobile hamburger drawer a9d081b) + SaaS audit-log foundation (e91addf) + invite resend/seat-cap (bf503cb/699c36e) + mobile bill-image στα Expenses/Income (df51e97) + .env.example completeness (09f4e0b). Ο parity auditor εβγαλε 36η σαρωση (1797ab7) και προσθεσε 2 νεα auto-buildable GAP (b5fa042), το ενα (bill-image) χτιστηκε αμεσως. Ο ui auditor εβγαλε 35η+36η σαρωση (ec475d8 dedicated, 36η bundled στο 1797ab7). Ο web auditor εβγαλε 34η σαρωση (8fde321, seat-cap DONE, ουρα 3→2 στο SaaS υπο-σκελος). Ο reviewer καθαρισε δυο ranges (5c8e4b0 marker→1797ab7, 46fb1de marker→699c36e, 0 fixes/0 flags). Ο docker guard εκανε ασφαλη rebuild (d597d99, marker→b5fa042). Κανενα προβλημα.
 
 | routine | τελευταια δραστηριοτητα | OK/STALE | τι εκανε (συντομα) |
 |---|---|---|---|
-| builder (Pharos daily dev) | 2026-07-02 15:57 | OK | SaaS invites audit metadata + id-guard + ?status filter (f02c68d/9d7bbab/100d1d6) + landing Integrations/FAQ/Who (8be8b91/574ab57/e741999) + mobile Tasks tag-filter (268efb4) |
-| parity auditor | 2026-07-02 15:28 | OK | 5η σαρωση CONFIRMATION, 49/49 routes με mobile consumer, ουρα αμεταβλητη, GAP 0 (80e26cf) |
-| ui auditor | 2026-07-02 14:48 | OK | 34η σαρωση, commits bba44ff+268efb4 token-clean, Chip holdout 7 clusters/5 screens (e7cd4d6) |
-| web auditor | 2026-07-02 14:23 | OK | 32η σαρωση CONFIRMATION, μηδεν API αλλαγη, tsc EXIT 0, ουρα 4 auto-buildable + 1 decision-flag (4eaa702) |
-| reviewer | 2026-07-02 15:48 | OK | ranges bba44ff..268efb4 + 268efb4..9d7bbab, tsc web+mobile EXIT 0, 619/619 & 52/52 tests pass, 0 fixes 0 flags, marker → 9d7bbab (2a9f3bb) |
-| docker guard | 2026-07-02 14:28 | OK | safe rebuild web (tenancy/invites routes), /login 200, ~2.1GB prune, marker→4eaa702 (94a5d20) |
+| builder (Pharos daily dev) | 2026-07-02 18:58 | OK | landing proof-band + mobile-app section + hamburger drawer (47b4704/f157dfb/a9d081b), SaaS audit-log foundation (e91addf), invite-resend + seat-cap (bf503cb/699c36e), mobile bill-image (df51e97), .env.example (09f4e0b) |
+| parity auditor | 2026-07-02 18:47 | OK | 36η σαρωση, 2 νεα auto-buildable GAP (Expenses bill-image + re-scan), bill-image ηδη DONE, ουρα +1 net (1797ab7/b5fa042) |
+| ui auditor | 2026-07-02 18:47 | OK | 36η σαρωση (bundled στο 1797ab7) + 35η dedicated (ec475d8), Chip holdout ΕΚΛΕΙΣΕ, μενει ghost Button variant ~7 sites |
+| web auditor | 2026-07-02 18:23 | OK | 34η σαρωση, seat-cap DONE (ουρα 3→2), invites/resend audited exemplary, tsc EXIT 0 (8fde321) |
+| reviewer | 2026-07-02 18:51 | OK | ranges 699c36e..1797ab7 + ec475d8..699c36e, tsc web+mobile EXIT 0, 15/15 & 64/64 tests, 0 fixes 0 flags, marker → 1797ab7 (5c8e4b0) |
+| docker guard | 2026-07-02 18:37 | OK | ασφαλης rebuild μετα τα audit-log commits, marker → b5fa042 (d597d99) |
 
 ## Open queue counts
-- Build Queue (MOBILE_PARITY): **2** TODO
-- UI Debt Queue (MOBILE_PARITY): **2** TODO (Chip primitive + Safe-area insets· το Light theme παραμενει product-decision)
-- Web Debt Queue (WEB_DEBT): **6** TODO
+- Build Queue (MOBILE_PARITY): **3** TODO
+- UI Debt Queue (MOBILE_PARITY): **2** TODO (ghost Button variant + Safe-area insets· το Light theme παραμενει product-decision)
+- Web Debt Queue (WEB_DEBT): **5** TODO
 
-Συγκριση με προηγουμενο STATUS (2026-07-02 13:02): Build 2→2, UI 2→2, Web 5→6. **Build + UI αμεταβλητες· Web μεγαλωσε κατα 1.** Το SaaS control-plane μεγαλωνει (καθε νεο route γεννα μικρα audit items)· υγιης αναπνοη ουρας, οχι κολλημα (ο reviewer βγηκε καθαρος και στα δυο ranges, 0 fixes/0 flags).
+Συγκριση με προηγουμενο STATUS (2026-07-02 16:02): Build 2→3 (+1), UI 2→2 (αμεταβλητο), Web 6→5 (-1). **UI σταθερη· Build +1· Web -1.** Το Build ανεβηκε γιατι ο parity auditor βρηκε 2 νεα GAP (b5fa042) και ο builder εκλεισε το ενα (bill-image df51e97), αρα καθαρο +1 (μενει το Expenses re-scan). Το Web επεσε γιατι ο builder εκλεισε το seat-cap. Υγιης αναπνοη ουρας και στις δυο κατευθυνσεις, οχι κολλημα (ο reviewer βγηκε καθαρος 0 fixes/0 flags σε δυο ranges).
 
 ## Προσοχη
-Καμια ρουτινα δεν ειναι STALE, κανενα κενο προς ελεγχο. Και οι 6 χτυπησαν μεσα στις τελευταιες ~1.5 ωρες (ο πιο πισω ειναι ο web auditor στις 14:23), ενας ακομη υγιης πυκνος κυκλος.
+Καμια ρουτινα δεν ειναι STALE, κανενα κενο προς ελεγχο. Και οι 6 χτυπησαν μεσα στα τελευταια ~40 λεπτα (ο πιο πισω ειναι ο web auditor στις 18:23), ενας ακομη υγιης πυκνος κυκλος με μηχανη ξυπνια.
 
-Σημειωσεις (οχι alarm): (1) Το Web queue ανεβηκε 5→6· ολα τα νεα items αφορουν το SaaS control-plane (invites, seats, account token indexes) που ο builder αναπτυσσει εντατικα, και ο reviewer βγηκε καθαρος, αρα ειναι φυσιολογικη backlog-αναπνοη οχι regression. (2) Τα Build 2 + UI 2 που μενουν ειναι attended-preferred (Chip token-drift χρειαζεται simulator, Safe-area = native dep-add, Light theme = L refactor)· δεν προχωρανε unattended, δεν ειναι κολλημα. Τιποτα δεν χρειαζεται αμεση παρεμβαση.
+Σημειωσεις (οχι alarm): (1) Ο reviewer marker ειναι στο 1797ab7 (18:47) ενω η κορυφη ειναι το a9d081b (18:58, landing hamburger drawer)· ενα μονο commit εκκρεμει review, θα το πιασει ο επομενος κυκλος, φυσιολογικο lag οχι προβλημα. (2) Τα 2 UI items που μενουν ειναι attended-preferred (ghost Button variant = simulator pixel-parity, Safe-area = native dep-add)· δεν προχωρανε unattended, δεν ειναι κολλημα. (3) Το μοναδικο νεο auto-buildable Build item (Expenses re-scan P2/M) ειναι εν αναμονη builder. Τιποτα δεν χρειαζεται αμεση παρεμβαση.
