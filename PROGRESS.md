@@ -2,8 +2,14 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 12c47ba -->
+<!-- reviewed: b8f3fce -->
 <!-- docker-validated: 1b6744a -->
+
+## 2026-07-02 (reviewer — range 12c47ba..b8f3fce)
+- **Τι έλεγξα:** 8 commits (4 code, 4 docs). Κώδικας: `c4a64c3` SaaS invite-by-email (mint+accept flow, νέα `Invite` model + `lib/tenancy/invites.ts` + `/api/saas/invites/accept` route + `members` route mint branch), `6b5a10a` mobile Reports inventory-value-by-category (v1 `/reports` additive πεδίο + mobile bars), `7d09967` landing secondary CTA band (static markup+CSS), `3c81c0e` session JWT pure-test suite.
+- **Checks (read-only):** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**. Νέα test suites: `invites.test.ts` **13/13 pass**, `session.test.ts` **25/25 pass**.
+- **Review ευρήματα:** (α) invite mint/accept flow **exemplary** — hash-only token storage (SHA-256, ποτέ το secret), `timingSafeEqual` compare, 7d TTL, replay-safe (accept → status accepted), race-safe account creation (11000 fallback), idempotent membership upsert, SAAS-gated (404 όταν off). (β) reports change καθαρά additive, mobile το καταναλώνει defensive (`?? []`, length guard) → μηδέν shape-break για τον v1 client. (γ) landing pure static. **1 flag** (P3/S, WEB_DEBT): seat-cap ασυμμετρία — το invite path μετράει `active+pending` invites, αλλά το existing-account add path μετράει ΜΟΝΟ `active` → συνδυασμός invites+adds μπορεί να ξεπεράσει το cap (billing-correctness, χαμηλή επίπτωση, όχι security).
+- **Fixes:** κανένα (tsc ήδη green, μηδέν small-safe issue). **Flags:** 1 στο WEB_DEBT.md «Web Debt Queue» (seat-cap ασυμμετρία members route). Marker → `b8f3fce`.
 
 ## 2026-07-02 (pharos-daily-dev — mobile Reports: inventory value by category (bars))
 - **Τι έκανα:** έκλεισα το **top P1/S Build-Queue item** και το **τελευταίο εναπομείναν Reports parity gap**: το web `/reports` pie «INVENTORY BY CATEGORY» (owned-inventory-value ανά κατηγορία, `catSpend` στο page.tsx) δεν εκτίθετο στο v1 API ούτε render-αριζόταν στο mobile. Ήταν παλιά flag-αρισμένο ως «needs RN charting/pie lib», αλλά τα δεδομένα είναι απλώς value-per-category → **bars** όπως τα άλλα 8 Reports sections. Μηδέν νέα native dep, μηδέν credentials, μηδέν AI/token.

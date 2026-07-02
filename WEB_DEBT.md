@@ -365,6 +365,21 @@
 
 ## Web Debt Queue
 
+### Seat-cap ασυμμετρία — το existing-account add path ΔΕΝ μετράει τα pending invites
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/saas/members/route.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα (εισήχθη με το commit `c4a64c3` invite-by-email):** το ΝΕΟ invite path (`inviteUnregistered`, `members/route.ts`) μετράει σωστά το seat cap ως `activeCount + pendingCount` (active memberships ΣΥΝ outstanding pending invites) — ένα pending invite δεσμεύει μελλοντικό seat. Ομως το προϋπάρχον existing-account add path (POST, ίδιο αρχείο, ~γρ.219) μετράει ΜΟΝΟ `activeCount` (`Membership.countDocuments({ tenant, status:'active' })`) — αγνοεί τελείως τα pending invites. Ασυμμετρία: με cap=2, 1 active member + 1 pending invite, το να προσθέσεις έναν ΥΠΑΡΧΟΝΤΑ account περνάει (`withinSeatLimit(plan, 1)` → true) → κατάληξη 2 active + 1 pending = 3 δεσμευμένα seats, πάνω από το cap. Ενας owner μπορεί να ξεπεράσει το plan allowance συνδυάζοντας invites + existing-account adds.
+  - **ΣΗΜ χαμηλής επίπτωσης:** ο owner πληρώνει, το accept-time ΔΕΝ ξανα-ελέγχει cap (ο invite μετρήθηκε στο mint), και το overshoot είναι bounded από το πλήθος outstanding invites. Καθαρά billing-correctness inconsistency, όχι security. Flag για συνέπεια — μόλις υπάρχει η έννοια «pending invite δεσμεύει seat», ΚΑΘΕ seat-check πρέπει να την τιμά.
+  - **Fix:** στο existing-account branch, πρόσθεσε το pending-invite count στο seat check ώστε να ταιριάζει με το invite path: `const pendingCount = await Invite.countDocuments({ tenant: tenantId, status: 'pending' }); if (!withinSeatLimit(plan, activeCount + pendingCount)) { ... }`. (Το `Invite` model είναι ήδη imported στο route.) Reactivation ενός removed member μετράει επίσης seat, οπότε το ίδιο branch τα καλύπτει και τα δύο.
+  - Response shapes (409 `{ error, code:'seat_limit', maxMembers }`, 201 `{ member }`) + η σειρά των guards + το `withinSeatLimit`/`entitlementsFor` API ΜΕΝΟΥΝ ως έχουν· αλλάζει ΜΟΝΟ το count που περνά στο `withinSeatLimit`. SaaS-only, μηδέν επίδραση στον self-hosted ή v1 mobile surface (`SAAS_MODE` off → κανένα invite ποτέ).
+  - Επαλήθευση: το existing-account seat check διαβάζει `activeCount + pendingCount` (ίδιο με το `inviteUnregistered`)· `grep -n 'pendingCount' src/app/api/saas/members/route.ts` δείχνει 2 hits (invite path + existing path).
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-02 reviewer)
+
 ### SaaS route handlers χωρίς try/catch → ασυνεπές 500 error-shape vs v1 `withAuth`
 - Priority: P2
 - Size: M
