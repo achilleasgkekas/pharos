@@ -2491,3 +2491,27 @@ Fresh read-only mobile UI consistency audit, inventory ξαναχτισμένο 
 
 ### Needs Achilleas
 - (αμετάβλητο) Κανένα committed secret στο apps/mobile (μόνο `.env.example` tracked). Standing decisions (θέλουν simulator/attended verify, ΟΧΙ unattended-safe): οι 5 Input outliers + 2 micro, το `<Chip>` + ghost-button variants (οπτική token-drift), το Light/dark theme (L, αγγίζει ~19 αρχεία). Το safe-area (P2/M) προσθέτει native dep → non-verifiable χωρίς simulator, αλλά additive/token-drift-free, οπότε ο builder μπορεί να το πάρει με προσοχή.
+
+## 2026-07-02 (web-code-quality — 31η σάρωση· CONFIRMATION, ουρά αμετάβλητη, ελέγχθηκε ΝΕΟΣ account self-service surface)
+
+Fresh read-only web code-quality audit: **49 v1 route files** + **13 saas route files** + apiAuth/apiBody/apiList helpers + lib/billing/* + lib/tenancy/*. `npm run type-check` **EXIT 0**.
+
+**Ευρήματα ανά διάσταση (counts, live grep):**
+- Type safety: **0** (`: any`/`as any`/`@ts-ignore`/`@ts-expect-error` = 0 σε ΟΛΟ το api + billing + tenancy).
+- Input validation: **0 gaps** (νέος account PATCH: hasOwnProperty guards + email regex + uniqueness pre-check + 11000 race fallback· password POST: policy gate + same-401 no-leak).
+- Error handling: **0 P-level** (ομοιόμορφο `{ error }`· παρατήρηση: οι saas routes χωρίς εξωτερικό try/catch, saas-consistent, χαμηλό ρίσκο, ΟΧΙ item).
+- Auth: **0 unguarded** (account surface fail-closed: saasAuthGate → getCurrentAccount 401 → findById caller-only).
+- DB: **0** (account reads `.lean()`/point-read στο unique `_id`/`email`· μηδέν scan/N+1).
+- Duplication/consistency: **0 νέο** (account adopter readBody+strField από την αρχή).
+- UI states: εκτός scope αυτού του run (api-focused)· δες ui-auditor.
+
+**Builder progress:** από την 30ή σάρωση **μηδέν** κατανάλωση — και τα 5 ενεργά P3/S items live-verified ακόμα ανοιχτά. Νέο code = SaaS account self-service (commit `a082819`), exemplary, μηδέν νέο debt.
+
+**Top 3 items να πάρει ο builder μετά (όλα P3/S, byte-safe):**
+1. **Constant-time CRON_SECRET compare** (saas/usage/sample/route.ts:30) — inline `timingSafeEqual`+length-guard, ίδιο pattern με stripe.ts:142 / auth.ts:43· saas-only, μηδέν v1 mobile risk.
+2. **isObjectId στο billing webhook** (saas/billing/webhook/route.ts:81) — byte-identical swap σε `isObjectId` από `@/lib/apiBody`· κλείνει πλήρως την εξάλειψη inline ObjectId regex σε ΟΛΟ το api+tenancy+billing.
+3. **readBody adoption σε saas billing checkout+portal** (+ members) — τα ΜΟΝΑ 3 saas routes με raw `req.json().catch`· `readBody`+`strField` coercion, κλείνει το adoption effort σε ΟΛΟ το api.
+
+### Needs Achilleas
+- (αμετάβλητο) getTenantConnection cache-reuse guard (`lib/tenancy/connection.ts:54`): `readyState !== 99` επιστρέφει και disconnected (0) / disconnecting (3) connections ενώ το σχόλιο λέει «still open» — dead-until-SaaS, ambiguous το σωστό rebuild-semantic → θέλει σκόπιμη απόφαση, όχι μηχανικό swap.
+- (αμετάβλητο) Standing product/security decisions (ΟΧΙ auto-buildable): login brute-force rate-limit, error-message leak στο `withAuth` 500, wiring του quota-enforce gate σε πραγματικά AI/upload routes, tenant-aware `saveFile` (live SaaS tenant μετράει 0 file-bytes μέχρι το storage namespace-άρει per tenant), Stripe/CRON/AUTH key provisioning (env boundary, server-only).
