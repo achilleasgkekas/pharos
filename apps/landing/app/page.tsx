@@ -269,6 +269,18 @@ const FAQS: { q: string; a: string }[] = [
     q: 'Can I move between self-hosted and hosted?',
     a: 'Yes. PHAROS exports your whole dataset to JSON and imports it back by merging on record id, so you can start self-hosted and move to hosted later, or the other way round, without losing anything.',
   },
+  {
+    q: 'Can it read receipts and statements I already have?',
+    a: 'Yes. Drag in a PDF or a photo and PHAROS parses the store, date, total, and line items automatically. Card statements are read the same way, including installment plans split across months. You can also bulk-import receipts straight from a Gmail export.',
+  },
+  {
+    q: 'How do backups work?',
+    a: 'Self-hosted ships with a nightly backup you can point at a NAS, plus one-click JSON and CSV exports any time. You can also mirror your files to SMB, FTP, or OneDrive for a proper 3-2-1 setup. On hosted, nightly backups are handled for you.',
+  },
+  {
+    q: 'Is my financial data secure?',
+    a: 'PHAROS is built for private access, not the open internet: reach it over your LAN or your own VPN, behind a login. There is no public sign-up and no telemetry, so your receipts, statements, and balances stay yours.',
+  },
 ];
 
 const JSON_LD = {
@@ -367,6 +379,7 @@ export default function Home() {
             <a href="#features" className="navlink nav-anchor">Features</a>
             <a href="#self-host" className="navlink nav-anchor">Self-host</a>
             <a href="#pricing" className="navlink">Pricing</a>
+            <a href="#compare" className="navlink nav-anchor">Compare</a>
             <a href="#faq" className="navlink nav-anchor">FAQ</a>
             <a
               href={GITHUB_URL}

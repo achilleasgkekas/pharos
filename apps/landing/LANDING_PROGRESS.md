@@ -399,3 +399,28 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02 (cont.¹¹)
+
+Task: (e) Polish, μερος 17 — FAQ expansion (3 νεες ερωτησεις) + Compare link στο top nav. Καθαρα self-contained content increment: μηδεν assets, μηδεν pricing decisions, brand-consistent. Οι 3 ερωτησεις καλυπτουν πραγματικα buyer gaps που δεν απαντιουνται αλλου στη σελιδα, και το Compare nav link κλεινει το navigation gap που ειχα σημειωσει (το #compare section ηταν reachable μονο με scroll).
+
+Τι εφτιαξα:
+- `app/page.tsx` FAQS: +3 entries (6 -> 9), ολα ακριβη per CLAUDE.md:
+  1. «Can it read receipts and statements I already have?» — drag-drop PDF/photo AI parse + card statements + installments split across months + Gmail export bulk-import.
+  2. «How do backups work?» — self-host nightly backup -> NAS + one-click JSON/CSV export + SMB/FTP/OneDrive mirror (3-2-1)· hosted = managed nightly.
+  3. «Is my financial data secure?» — LAN/VPN access behind login, no public sign-up, zero telemetry.
+  Το FAQ JSON-LD (mainEntity) mapαρει το FAQS array -> πηρε αυτοματα και τις 3 νεες (structured data μενει consistent).
+- `app/page.tsx` top nav: νεο Compare link (href="#compare", nav-anchor) αναμεσα σε Pricing και FAQ. Reuse του υπαρχοντος nav-anchor idiom (smooth scroll ηδη υπαρχει). Μηδεν CSS αλλαγη.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 761 B / 103 kB First Load JS, αμεταβλητο — pure static markup, μηδεν bundle impact).
+- Prerendered HTML (.next/server/app/index.html): και οι 3 νεες ερωτησεις FOUND· href="#compare" count=2 (top nav + footer). Το route ειναι static, οποτε το prerendered HTML ειναι ακριβως αυτο που σερβιρεται (build + HTML check = ισοδυναμη επαληθευση για pure-static content). Docker/web/mobile αθικτα. Το .claude/launch.json (shared local config) ΔΕΝ commit (collision guard — μονο app/page.tsx + LANDING_PROGRESS.md).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση του CSS mockup (#preview) με πραγματικα app screenshots οταν υπαρξουν assets· per-plan Offer JSON-LD nodes οταν κλεισουν οι τιμες· η «who» link στο top nav (τωρα reachable μονο με scroll).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
