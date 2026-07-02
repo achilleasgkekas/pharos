@@ -2350,3 +2350,26 @@ Fresh σάρωση 49 v1 + 7 saas route files + apiAuth/apiBody/apiList helpers 
 
 ### Needs Achilleas
 - (αμετάβλητο) Μηδέν committed secret (μόνο `.env.example` + env-only Stripe/AUTH/CRON keys, deferred). Standing product-decisions (ΟΧΙ auto-buildable queue): login brute-force rate-limit, error-message leak στο `withAuth` 500, wiring του quota-enforce gate σε πραγματικά AI/upload routes, SaaS multi-tenancy architecture, Stripe/CRON key provisioning (env boundary — μείνε server-only). **ΝΕΟ observation (ΟΧΙ queue item):** ο shared storage layer (`lib/storage.ts saveFile`) ΔΕΝ είναι tenant-aware ακόμα → ένας live SaaS tenant μετράει 0 file-bytes μέχρι το `saveFile` να namespace-άρει per tenant (feature-builder territory, σκόπιμο forward-work, τεκμηριωμένο στο `fileStorage.ts` + `SAAS_PROGRESS.md`).
+
+## 2026-07-02 (ui-auditor — 29η σάρωση· CONFIRMATION, ουρά αμετάβλητη, μηδέν νέο mobile-src από `0f69116`)
+
+Fresh read-only mobile UI consistency audit, inventory ξαναχτισμένο από τον κώδικα (16 screens + `ui.tsx` primitives + `theme.ts` tokens). **Τελευταίος `apps/mobile/src` commit ΑΚΟΜΑ `0f69116` (ListItem)** — μηδέν νέο mobile-src από την 26η. Οι ενδιάμεσες commits έως HEAD `7836f43` (SaaS billing routes `4819f97`, docker-health `9db3f05`, web-debt docs, web pure-lib tests) = web-only + SaaS server-scaffold + docs → **μηδέν mobile UI impact**. mobile `tsc --noEmit` **EXIT 0**.
+
+**Ευρήματα ανά διάσταση (counts):**
+- Hardcoded hex (screens+nav): **0** (fresh grep 6/8-digit → όλα από `C.*`).
+- Missing shared token: **0** (`SPACE`/`RADIUS`/`SIZE`/`scrim`/`alpha()` + `surface3`/`orange`/`onAccent` παρόντα στο `theme.ts`).
+- Duplicate primitive (auto-buildable byte-identical): **0** — το «Card+Badge+ListItem» + Button/IconButton/Check/Input-core set έχει κλείσει· απομένοντα διπλότυπα = **token-drift** (`<Chip>` MISSING, 5 Input outliers), οπτική αλλαγή → attended-preferred, ΟΧΙ byte-identical.
+- Touch targets: **0** (shared `<Check>` 24×24 + hitSlop· menuBtn/backBtn/lineDel effective ≥44).
+- Safe-area: **1 TODO** — `react-native-safe-area-context` εκτός `package.json`, plain `SafeAreaView` @ App.tsx:88, μηδέν bottom inset.
+- Adaptive/max-width: **1 P3 TODO** — content `maxWidth` 0 (μόνο nav drawer + Assistant bubble).
+- Theme/dark-mode: **1 P3 TODO** — μηδέν `useColorScheme`/context· dark-only, web light palette χωρίς mobile αντίστοιχο.
+
+**Κατάσταση queue:** αμετάβλητη. Auto-buildable byte-identical debt = **εξαντλημένο** (όλα τα primitives extracted+committed). Τα εναπομείναντα ενεργά items είναι είτε additive-dep (safe-area, max-width) είτε token-drift που θέλει οπτικό verify σε simulator (Chip, Input outliers) → attended-preferred.
+
+**Top 3 για τον builder (με σειρά):**
+1. **Safe-area insets** (P2/M) — top unattended-safe· `npx expo install react-native-safe-area-context` (additive dep, μηδέν token-drift) + `SafeAreaProvider`/`useSafeAreaInsets` αντί για plain `SafeAreaView`, bottom inset σε bottom-sheet modals + κάτω κουμπιά.
+2. **Max content width** (P3/S) — additive `<Screen>` wrapper (maxWidth ~640 + center), no-op σε phone, καθαρίζει tablet/landscape stretch.
+3. **`<Chip>` primitive ή Input outliers** (P2/P1) — token-drift (padding/radius unify) → χρειάζεται simulator για οπτικό verify· κράτα attended-preferred μέχρι ο Αχιλλέας να μπορεί να το δει.
+
+### Needs Achilleas
+- (αμετάβλητο) Κανένα committed secret στο apps/mobile (μόνο `.env.example` tracked). Standing decisions (θέλουν simulator/attended verify, ΟΧΙ unattended-safe): οι 5 Input outliers + το `<Chip>` (οπτική token-drift), το Light/dark theme (L, αγγίζει 19 αρχεία). Το safe-area (P2/M) προσθέτει native dep → non-verifiable χωρίς simulator, αλλά είναι additive/token-drift-free, οπότε ο builder μπορεί να το πάρει με προσοχή.
