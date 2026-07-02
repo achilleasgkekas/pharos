@@ -627,24 +627,57 @@ export default function Home() {
       </section>
 
       {/* ── Footer ────────────────────────────────────────── */}
-      <footer style={{ borderTop: '1px solid var(--border)', padding: '32px 0' }}>
-        <div
-          className="container"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: 16,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <PharosMark size={22} />
-            <span className="mono" style={{ color: 'var(--text-dim)' }}>PHAROS · AGPL-3.0</span>
+      <footer style={{ borderTop: '1px solid var(--border)', padding: '56px 0 32px' }}>
+        <div className="container">
+          <div className="footer-grid">
+            {/* Brand column */}
+            <div className="footer-brand">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <PharosMark size={24} />
+                <span
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 800,
+                    letterSpacing: '0.14em',
+                    fontSize: '1rem',
+                  }}
+                >
+                  PHAROS
+                </span>
+              </div>
+              <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', maxWidth: 280, marginBottom: 14 }}>
+                One light over everything you run. Personal Hub · Asset &amp; Resource Oversight System.
+              </p>
+              <p className="mono" style={{ color: 'var(--text-faint)' }}>// achilleas</p>
+            </div>
+
+            {/* Link columns */}
+            <div className="footer-col">
+              <p className="footer-heading mono">Product</p>
+              <a href="#features" className="navlink">Features</a>
+              <a href="#pricing" className="navlink">Pricing</a>
+              <a href="#self-host" className="navlink">Self-host</a>
+              <a href="#compare" className="navlink">Compare</a>
+            </div>
+
+            <div className="footer-col">
+              <p className="footer-heading mono">Resources</p>
+              <a href={GITHUB_URL} className="navlink" target="_blank" rel="noopener noreferrer">GitHub</a>
+              <a href={`${GITHUB_URL}/blob/main/README.md`} className="navlink" target="_blank" rel="noopener noreferrer">Docs</a>
+              <a href={`${GITHUB_URL}/issues`} className="navlink" target="_blank" rel="noopener noreferrer">Report an issue</a>
+              <a href="#waitlist" className="navlink">Hosted beta</a>
+            </div>
+
+            <div className="footer-col">
+              <p className="footer-heading mono">Legal</p>
+              <a href={`${GITHUB_URL}/blob/main/LICENSE`} className="navlink" target="_blank" rel="noopener noreferrer">License (AGPL-3.0)</a>
+              <a href="#faq" className="navlink">FAQ</a>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 24 }}>
-            <a href={GITHUB_URL} className="navlink" target="_blank" rel="noopener noreferrer">GitHub</a>
-            <a href={`${GITHUB_URL}/blob/main/LICENSE`} className="navlink" target="_blank" rel="noopener noreferrer">License</a>
+
+          <div className="footer-bar">
+            <span className="mono" style={{ color: 'var(--text-faint)' }}>© 2026 PHAROS · AGPL-3.0</span>
+            <span className="mono" style={{ color: 'var(--text-faint)' }}>Open source · self-hostable · no telemetry</span>
           </div>
         </div>
       </footer>

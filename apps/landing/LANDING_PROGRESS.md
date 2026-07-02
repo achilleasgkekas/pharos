@@ -230,3 +230,24 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain.
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02 (cont.³)
+
+Task: (e) Polish, μερος 9 — richer multi-column footer (το footer ηταν ενα single-row στριπ με μονο logo + GitHub + License· ενα proper marketing footer βοηθαει navigation, SEO, και δινει ισορροπια στο κατω μερος της σελιδας).
+
+Τι εφτιαξα:
+- `app/page.tsx`: αντικατεστησα το single-row footer με `.footer-grid` (4 στηλες): brand column (PharosMark + PHAROS wordmark + tagline «One light over everything you run. Personal Hub · Asset & Resource Oversight System.» + `// achilleas` mono note) + 3 link columns — Product (Features/Pricing/Self-host/Compare, in-page anchors), Resources (GitHub, Docs=README, Report an issue=/issues, Hosted beta=#waitlist), Legal (License AGPL-3.0, FAQ). Κατω `.footer-bar` (border-top) με «© 2026 PHAROS · AGPL-3.0» + «Open source · self-hostable · no telemetry». Ολα τα links honest (in-page anchors η πραγματικα GitHub URLs, μηδεν dead pages). Reuse του υπαρχοντος `.navlink`/`.mono`/`.container`/`PharosMark` idiom. Μηδεν νεο dependency, μηδεν JS.
+- `app/globals.css`: νεα `.footer-grid` (grid 2fr/1fr/1fr/1fr, gap 40), `.footer-col` (flex column, gap 12, align-start), `.footer-heading`, `.footer-bar` (space-between, border-top, padding-top 28). Responsive: @900px -> 2 columns με το brand column `grid-column: 1/-1` full-width· @560px -> 1 column stack + footer-bar align flex-start. Footer padding 32px -> 56px 0 32px.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 103 kB First Load JS, αμεταβλητο — pure HTML/CSS, μηδεν νεο JS).
+- Preview (landing-dev, port 3100): DOM eval επιβεβαιωσε footer render — 3 headings [Product/Resources/Legal], 10 links (Features…FAQ), 2 footer-bar spans, hScroll false (μηδεν horizontal overflow). Hero screenshot OK, μηδεν console errors (error level: none). Σταματησα τον server. Docker/web/mobile αθικτα. Το `.claude/launch.json` (local landing-dev config, shared root) ΔΕΝ commit (collision guard).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση του CSS mockup (#preview) με πραγματικα app screenshots οταν υπαρξουν assets, secondary CTA band, η micro-copy βελτιωσεις.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain.
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.

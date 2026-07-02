@@ -614,12 +614,41 @@ h1, h2, h3 {
   background: rgba(0, 255, 136, 0.08);
 }
 
+/* Footer */
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 40px;
+  padding-bottom: 40px;
+}
+.footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+.footer-heading {
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+.footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
   .pricing-grid { grid-template-columns: repeat(2, 1fr); }
   .steps-grid { grid-template-columns: 1fr; }
   .trust-grid { grid-template-columns: repeat(3, 1fr); }
+  .footer-grid { grid-template-columns: 1fr 1fr; row-gap: 32px; }
+  .footer-brand { grid-column: 1 / -1; }
 }
 @media (max-width: 900px) {
   .mod-grid { grid-template-columns: repeat(2, 1fr); }
@@ -666,6 +695,10 @@ h1, h2, h3 {
     color: var(--text-faint);
   }
   .compare tbody td.hl, .compare tbody tr:hover td.hl { background: none; }
+
+  /* Footer: single column stack */
+  .footer-grid { grid-template-columns: 1fr; row-gap: 28px; }
+  .footer-bar { justify-content: flex-start; }
 }
 @media (max-width: 480px) {
   /* Tighten vertical rhythm so sections do not feel stretched on phones */
