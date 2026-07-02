@@ -298,6 +298,9 @@ curl -s "$BASE/items?updatedSince=2026-07-01T00:00:00Z&limit=200" \
 
 ---
 
-See also: [Self-hosting](self-hosting.md) · [Features](features.md) · [Docs index](README.md).
-A dedicated mobile-app guide (`mobile.md`) is coming; for now, point the Expo app
-at your server's base URL and log in with your username/password to get a token.
+See also: [Docs index](README.md) · [Self-hosting](self-hosting.md) ·
+[Features](features.md) · [Configuration](configuration.md) · [Mobile app](mobile.md).
+
+The [mobile guide](mobile.md) covers pointing the Expo app at your server and
+logging in to obtain a token; the same `phk_` bearer token also works for the
+MCP integration and any script you write against this API.

@@ -192,3 +192,40 @@ unstaged (.claude/launch.json) — δεν το αγγιξα.
 `docs/api.md` με τυχον νεα endpoints (diff vs `api/v1`), εμπλουτισμος
 `docs/features.md` ανα module, η ενα `docs/troubleshooting.md` που μαζευει τα
 troubleshooting sections. Πρωτα finish-in-progress κανενα (ολα done).
+
+## 2026-07-02 (cont.)
+
+Improvement pass στο `docs/api.md` — audit + sync με τα πραγματικα routes, οχι νεο doc
+(ολα τα core guides ειναι ηδη live).
+
+Audit: εκανα enumerate ολο το δεντρο `apps/web/src/app/api/v1/**/route.ts` (24 resource
+folders) και το αντιστοιχισα με τον πινακα endpoints του api.md. Ολα τα routes ειναι ηδη
+documented — 0 λειπον, 0 undocumented. Επιβεβαιωθηκαν και τα nested: items/[id]/{ai-fill,
+convert-to-task,link-plan,plans,price}, receipts/[id]/{rescan,add-to-library}, scan/
+{receipt,product,expense,voucher}, statements/{[id],plans}, ai/subscription, push/register,
+settings/test-notify, trash/[type]/[id]. Δεν προστεθηκε νεο endpoint στον κωδικα απο το
+τελευταιο api.md (τα προσφατα commits ειναι SaaS usage-accounting/landing/tests, οχι νεα
+v1 routes).
+
+Accuracy spot-check (διαβασα κωδικα, οχι εικασιες): `auth/login/route.ts` → token
+`phk_${randomBytes(24).base64url}`, created on first login, `{ token, user{id,name,
+username,role} }` — ταιριαζει ακριβως με το doc. `items/route.ts` POST → body `{ title,
+status?, category?, currentPrice? }`, 201 `{ item }`, status validated vs ITEM_STATUSES,
+category free string — ταιριαζει.
+
+Fix: αφαιρεσα το stale trailer του api.md που ελεγε οτι το `mobile.md` «is coming» — το
+mobile.md γραφτηκε ηδη νωριτερα σημερα. Το αντικατεστησα με σωστο «See also» (Docs index,
+Self-hosting, Features, Configuration, Mobile app) + μια προταση οτι το ιδιο `phk_` bearer
+token δουλευει για mobile/MCP/scripts.
+
+Validation: markdown only, κανενα build/Docker/AI call. Internal links του api.md → README.md,
+self-hosting.md, features.md, configuration.md, mobile.md, ολα υπαρχουν στο docs/. Code
+fences αθικτα (δεν αγγιξα κανενα block).
+
+Collision guard: `git status --short` + `git diff --cached` πριν το commit· staged κενο (κανενα
+concurrent routine mid-commit). Stage ΜΟΝΟ docs/api.md + docs/DOCS_PROGRESS.md. Foreign
+unstaged (.claude/launch.json) — δεν το αγγιξα.
+
+Επομενο run: ενα `docs/troubleshooting.md` που συγκεντρωνει τα διασπαρτα troubleshooting
+sections (self-hosting/mobile/configuration) σε ενα σημειο· η εμπλουτισμος του features.md
+ανα module με screenshots-placeholders. Πρωτα finish-in-progress κανενα (ολα done).
