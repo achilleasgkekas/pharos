@@ -3212,3 +3212,27 @@ Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `a
 
 ### Needs Achilleas
 - Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) παραμένει σκόπιμη απόφαση (μεγάλο refactor). Safe-area + Input full-adoption = επόμενα semi-attended/attended.
+
+## 2026-07-02 (web-code-quality — 35η σάρωση· builder έκλεισε το P2/M SaaS try/catch· +1 P3/S invites saasGuard gap)
+
+Read-only web code-quality audit (grep, όχι docs) σε **49 v1 route files** + **21 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/tenancy/*` + `lib/billing/*` + `models/*`. `apps/web && npm run type-check` → **EXIT 0** (0 TS errors).
+
+**Νέος κώδικας από τον marker `9d7bbab`:** saasGuard try/catch slices (`6f5199c` account/*, `a2e1811` remaining write routes), audit-event recording (`3bb57f0`) + audit read API με actor-name/email resolution (`6e82811`/`77836a1`), expenses/[id]/rescan v1 route. Επιθεωρήθηκαν όλα.
+
+**Ευρήματα ανά διάσταση (live grep):**
+- **Type safety:** 0 (`: any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε api εκτός tests = 0). type-check EXIT 0.
+- **Input validation:** 0 gaps (`req.json().catch` = μηδέν, readBody adoption 100% v1+saas). audit route: limit clamp 1..200, action allowlist, bad `before` cursor αγνοείται (δεν 400άρει read).
+- **Auth:** 0 unguarded (μόνο `auth/login` exempt στο v1). audit route gated μέσω `resolveWorkspaceSession(slug, true)` πριν το collection.
+- **Error handling:** το P2/M try/catch item **ΕΚΛΕΙΣΕ** — 12/21 saas routes σε `saasGuard` (όλα τα write). Εναπομείναντα 7 = 6 σκόπιμα read-only + **1 gap: `invites/route.ts` DELETE** (write revoke, missed από slice 2/2).
+- **DB/consistency:** 0 νέο. inline ObjectId regex = 0 (1 hit = σχόλιο). audit read: bounded limit, keyset pagination, batched actor `$in` (ΟΧΙ N+1), whitelisted projection.
+- **UX states:** εκτός scope αυτού του surface (API-only run).
+
+**Counts:** P1=0, P2=0, P3=1 νέο (invites saasGuard). Στην ουρά: 2 ενεργά auto-buildable P3/S + 1 decision-flag. Διορθώθηκε stale «TODO» → DONE στο invites DELETE id-guard (isObjectId live @ γρ.82).
+
+**Top 3 items να πάρει ο builder μετά:**
+1. **invites/route.ts saasGuard (P3/S)** — τύλιξε GET+DELETE σε `saasGuard` (ίδιο pattern με members). Ολοκληρώνει το try/catch item· κάθε write saas route → `{ error }` 500 αντί framework 500. Unattended-safe (tsc-verifiable).
+2. **Account token-hash sparse index (P3/S)** — `Schema.index({ verifyTokenHash:1 }, { sparse:true })` + ίδιο για `resetTokenHash` στο `models/Account.ts`. Μηδέν runtime αλλαγή.
+3. (κανένα άλλο auto-buildable· ο κώδικας ώριμος, 35 σαρώσεις χωρίς P1)
+
+### Needs Achilleas
+- **reset-request timing (P3/S, decision-flag):** `saas/account/reset/request/route.ts:52` `await sendEmail(...)` → registered/non-registered response-time delta αποδυναμώνει το anti-enumeration `{ ok:true }`. Fire-and-forget `void sendEmail` το ευθυγραμμίζει με το members route ΑΛΛΑ ρισκάρει κομμένο send σε serverless. Delivery-semantics tradeoff, όχι unattended fix.

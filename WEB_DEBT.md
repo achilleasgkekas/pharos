@@ -3,6 +3,23 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-02 35η σάρωση· builder ΕΚΛΕΙΣΕ το P2/M SaaS try/catch [slice 2/2, `a2e1811`]· ουρά 2→2 [−1 try/catch DONE, +1 P3/S invites saasGuard gap] + 1 P3/S sparse-index + 1 decision-flag· νέος audit read-surface [`3bb57f0`/`6e82811`] audited → exemplary)
+
+**2026-07-02 (35η σάρωση, αυτόνομος γύρος):** fresh live σάρωση (grep, όχι docs) σε **49 v1 route files** + **21 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/tenancy/*` + `lib/billing/*` + `models/*`. `git diff --name-only 9d7bbab..HEAD` = νέα SaaS surface (audit-event recording + read API, saasGuard slices, expenses rescan v1). `npm run type-check` **EXIT 0** (0 TS errors).
+- **Ευρήματα ανά διάσταση (live grep):**
+  - **Type safety: 0** — `grep -rnE ': any|as any|@ts-ignore|@ts-expect-error' src/app/api` (εκτός `.test.ts`) = **0**. Ο νέος audit route (`saas/audit/route.ts`) πλήρως τυπωμένος (μόνο νόμιμοι `.lean() as ...` projection casts).
+  - **Input validation: 0 gaps** — `grep -rln 'req.json().catch' src/app/api` = **μηδέν** (readBody adoption 100%, v1 + saas). audit route: `parseLimit` (1..200 clamp), `parseAuditAction` allowlist, `before` bad-cursor → ignore (δεν 400άρει read).
+  - **Auth: 0 unguarded** — κάθε v1 route matches `withAuth`/`apiAuth` (μόνο `auth/login` exempt). audit route gated μέσω `resolveWorkspaceSession(slug, true)` (SAAS-off 404 / unauth 401 / non-owner-admin 403) ΠΡΙΝ αγγίξει το AuditEvent collection.
+  - **Error handling / try-catch: P2/M ΕΚΛΕΙΣΕ.** live loop σε 21 saas routes → **12** wrapped σε `saasGuard` (όλα τα write: members×4, account×5, billing checkout/portal, invites/resend, auth login/signup). Εναπομείναντα 7 χωρίς wrap = 6 σκόπιμα read-only (usage/audit/billing GET, session, logout, usage/sample cron) **+ 1 gap: `invites/route.ts` DELETE** (write revoke, missed από το slice 2/2) → νέο P3/S item.
+  - **DB/consistency: 0 νέο** — inline ObjectId regex σε api+tenancy+billing (εκτός test/comment) = **μηδέν** (1 hit = σχόλιο στο `invites/route.ts:81`). audit read: bounded limit (MAX 200), keyset `?before` pagination, batched actor lookup (`$in`, ΟΧΙ N+1), whitelisted projection. Καμία νέα unbounded query.
+- **Ουρά (live re-verify):**
+  - **SaaS try/catch (P2/M):** ~~16/16 write routes χωρίς try/catch~~ → **DONE 2026-07-02** (slices `6f5199c`+`a2e1811`, `saasGuard` helper στο `saasApi.ts`, 12 routes wrapped). Confirmed live.
+  - **invites/route.ts saasGuard gap (P3/S):** ΝΕΟ — DELETE (write) + GET δεν τυλίχθηκαν, thrown DB error → framework 500 αντί `{ error }` → **TODO** (top auto-buildable, ολοκληρώνει το try/catch item).
+  - **Sparse index Account token-hash (P3/S):** live `models/Account.ts:24,26` `verifyTokenHash`/`resetTokenHash` = `{ type:String, default:null }`, μηδέν `.index()` → collection-scan σε verify/reset confirm → **TODO** (low-urgency).
+  - **reset-request timing (P3/S, decision-flag):** ακόμα `await sendEmail(...)` → registered/non-registered response-time delta → **Needs Achilleas** (delivery-semantics tradeoff).
+  - **invites DELETE id-guard (P3/S):** ~~stale TODO~~ → επιβεβαιώθηκε **DONE** (isObjectId `invites/route.ts:82`), status διορθώθηκε.
+- **Counts ανά dimension: P1=0, P2=0, P3=1 νέο (invites saasGuard).** Δεν εφευρίσκω debt· 35 σαρώσεις χωρίς P1, ο κώδικας ώριμος. Ο builder ΕΚΛΕΙΣΕ το μεγαλύτερο εκκρεμές (P2/M try/catch). Ο νέος audit read-surface είναι **exemplary** (gate ladder, bounded page, keyset pagination, batched no-N+1 actor resolve, whitelisted projection). Top-2 για builder: (1) **invites saasGuard** [P3/S, ολοκληρώνει το try/catch]· (2) **Account token-hash sparse index** [P3/S].
+
 ## Σύνοψη audit (2026-07-02 34η σάρωση· CONFIRMATION· builder έκλεισε το seat-cap [DONE], ουρά 3→2 ενεργά auto-buildable [1 P2/M + 1 P3/S] + 1 P3/S decision-flag· νέος invites/resend surface audited → exemplary, μηδέν νέο debt· SaaS try/catch count 15→16)
 
 **2026-07-02 (34η σάρωση, αυτόνομος γύρος):** fresh live σάρωση (grep, όχι docs) σε **49 v1 route files** + **20 saas route files** + `apiAuth`/`apiBody`/`apiList` helpers + `lib/billing/*` + `lib/tenancy/*` + `models/*`. `git diff --name-only 9d7bbab..HEAD -- apps/web/src/app/api apps/web/src/lib apps/web/src/models` = **6 αρχεία** — `saas/invites/resend/route.ts` (ΝΕΟ), `saas/invites/route.ts` (+`invitedBy` στο GET projection, additive), `saas/members/route.ts` (seat-cap fix, ήδη audited+DONE), `lib/tenancy/invites.ts` (+`invitedBy` στο `InviteView`, additive), + 2 test files (`serialize.test.ts`, `invites.test.ts`). Από τον τελευταίο marker καμία αλλαγή σε type/validation/auth/DB surface. `npm run type-check` **EXIT 0**.
@@ -412,6 +429,20 @@
 
 ## Web Debt Queue
 
+### saasGuard adoption σε invites/route.ts (DELETE write-route + GET) — missed από το try/catch slice 2/2
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/saas/invites/route.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα (κενό μετά το κλείσιμο του P2/M try/catch item):** το slice 2/2 (commit `a2e1811`) τύλιξε σε `saasGuard` ΟΛΑ τα write saas routes (members×4, invites/resend, billing checkout/portal, auth login/signup), και η DONE-note (row 459) απαρίθμησε ρητά τα read-only routes που αφέθηκαν σκόπιμα (`usage`/`session`/`logout`/`audit`/`billing GET`/`invites GET`/`invites/accept`/`webhook`). Ομως το **`invites/route.ts` DELETE** (revoke invite: `Invite.findOneAndUpdate({ _id, tenant, status:'pending' }, { status:'revoked' })`, γρ.89) είναι **write route** που ΔΕΝ μπήκε ΟΥΤΕ στη wrapped λίστα ΟΥΤΕ στη deliberately-left read-only λίστα → live: `grep -q 'saasGuard\|try {' invites/route.ts` = **μηδέν**. Ενα thrown `findOneAndUpdate()` / `connectDB()` βγαίνει ως framework-default 500 (HTML/κενό), ΟΧΙ `{ error }` — ασύμμετρο με το sibling `members` DELETE (wrapped). Το GET (`Invite.find(...)`, γρ.~46) έχει το ίδιο κενό (read, χαμηλότερη πιθανότητα throw).
+  - **ΣΗΜ χαμηλής επίπτωσης:** owner/admin-gated + `SAAS_MODE`-only (dead-until-SaaS)· καθαρά error-shape consistency, ΟΧΙ security/data-integrity (τα `resolveWorkspaceSession` gate, `isObjectId` guard, `{_id,tenant,status:'pending'}` scope μένουν σωστά). Ολοκληρώνει το try/catch item — μετά από αυτό ΚΑΘΕ write saas route περνά από `saasGuard`.
+  - **Fix:** `import { saasGuard } from '@/lib/tenancy/saasApi';` + τύλιξε τα σώματα GET και DELETE σε `return saasGuard(async () => { ...υπάρχον σώμα... });` (ίδιο pattern με members/route.ts). Το `resolveWorkspaceSession` gate (επιστρέφει early χωρίς throw), το `isObjectId` guard, τα response shapes (400/404/200 `{ revoked }`, GET `{ workspace, invites }`), το `recordAudit` — ΟΛΑ αμετάβλητα· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500.
+  - Επαλήθευση: `grep -c 'saasGuard' src/app/api/saas/invites/route.ts` ≥ 2 (import + ≥1 wrap)· κανένα write saas route δεν μένει χωρίς `saasGuard`.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-02 auditor, 35η σάρωση)
+
 ### DELETE /api/saas/invites — λείπει id-format guard στο inviteId (CastError → 500) — DONE 2026-07-02
 - Status: DONE (commit αυτού του run). Fix = `import { isObjectId }` από `apiBody` + `if (!isObjectId(inviteId)) return 400 'invalid inviteId'` μετά το `!inviteId` check, πριν το `Invite.updateOne`. Reuse του υπάρχοντος shared helper (όχι νέο inline regex). type-check EXIT 0, apiBody+invites suites 52/52 pass, web serve /login 200.
 - Priority: P3
@@ -425,7 +456,7 @@
   - **Fix:** πρόσθεσε `const ID_RE = /^[a-f0-9]{24}$/i;` (ή reuse τυχόν shared guard) και μετά το `inviteId` trim: `if (!ID_RE.test(inviteId)) return NextResponse.json({ error: 'bad id' }, { status: 400 });` — πριν το `Invite.updateOne`. Καμία αλλαγή στα υπόλοιπα response shapes (400 `inviteId is required`, 404 `no pending invite`, 200 `{ revoked }`) ούτε στη σειρά των guards (το resolveWorkspaceSession μένει πρώτο).
   - Επαλήθευση: malformed inviteId → 400 αντί 500· `grep -n 'test(inviteId)' src/app/api/saas/invites/route.ts` δείχνει 1 hit.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-02 reviewer)
+- Status: DONE 2026-07-02 (verified 35η σάρωση). Live: `invites/route.ts:4` κάνει `import { readBody, isObjectId } from '@/lib/apiBody';` + γρ.82 `if (!isObjectId(inviteId)) return 400 'invalid inviteId'` πριν το `findOneAndUpdate`. Το malformed id → 400 αντί CastError-500. (Το προηγ. trailing «TODO» ήταν stale· ο header ήδη έγραφε DONE.)
 
 ### Seat-cap ασυμμετρία — το existing-account add path ΔΕΝ μετράει τα pending invites
 - Priority: P3
