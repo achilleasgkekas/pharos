@@ -793,3 +793,23 @@ Semantically σωστό για node test env (ταιριάζει με το no-op
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` (ΔΕΝ το άγγιξα/staged) + τα δικά μου. Στάγιαρα μόνο `aiTools.test.ts`, `src/test/stubs/server-only.ts`, `vitest.config.ts`.
 
 Suggested next task: (f συνέχεια) Με το server-only shim στη θέση του, ξεκλειδώθηκαν pure-export tests σε server modules που πριν δεν φόρτωναν. Καθαρά targets: (α) pure exports σε `lib/` modules που πριν έσκαγαν στο `server-only` (π.χ. helper functions που ζουν δίπλα σε server code)· (β) το `SYSTEM` prompt string του `aiTools.ts` (μπορεί να ελεγχθεί για invariants αν χρειαστεί, χαμηλή αξία)· (γ) άλλα `app/**/lib.ts` ή shape-helpers. Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα) + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — auth.test.ts, password hashing)
+
+**Task: (f συνέχεια) Pure test file `apps/web/src/lib/auth.test.ts` για τους scrypt password helpers `hashPassword` / `verifyPassword` του `lib/auth.ts`.**
+
+Επιλογή target: το `lib/auth.ts` ήταν ακάλυπτο και οι δύο pure exports είναι credential-critical — το `verifyPassword` είναι το gate κάθε login. Ελέγχθηκε ότι το import φορτώνει καθαρά σε node vitest (probe): παρότι το module εισάγει `next/headers`/`next/navigation` στην κορυφή, αυτά είναι μόνο function imports (καμία εκτέλεση στο import), άρα μηδέν mock χρειάστηκε. Το scrypt τρέχει μέσω `node:crypto` (διαθέσιμο στο test env), οπότε ντετερμινιστικό roundtrip χωρίς DB/cookies. Οι async accessors (`getCurrentUser`/`requireUser`/`requireAdmin`/`setSessionCookie`) αγγίζουν cookies+session → εκτός scope.
+
+Τι έγινε:
+- Νέο `auth.test.ts` (11 tests). Καλύπτει: `hashPassword` shape (`scrypt$N$r$p$salt$hash`, 6 parts, prefix, default cost N=16384/r=8/p=1, salt 16 bytes + hash 64 bytes base64), **fresh random salt ανά call** (ίδιο password → διαφορετικά strings αλλά και τα δύο verify). `verifyPassword`: roundtrip, wrong-password (case-sensitive, missing char, empty), empty+unicode password roundtrip (accent-sensitive), **reads cost params από το stored string** (χειροποίητο hash σε N=1024 verify-άρει → αποδεικνύει ότι δεν αγνοεί το stored N), never-throws σε malformed stored (empty, plaintext, too-few/too-many parts, wrong algo tag), reject σε non-numeric/zero N/r/p, empty hash segment, **tampered hash σωστού μήκους** (byte flip → false, κλειδώνει τον timingSafeEqual έλεγχο), και non-string stored input (undefined/null/number → false, όχι throw).
+- **Σημείο ασφαλείας που κλειδώθηκε**: το `verifyPassword` fail-closed (κάθε malformed/tampered/wrong input → false, ποτέ throw ή σιωπηλό true) + η ανάγνωση των stored cost params· ένα ακούσιο loosening θα έπεφτε ορατό.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/auth.test.ts` → 11/11 passed.
+- `npx vitest run` (όλο το suite) → 49 files, 735/735 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` (ΔΕΝ το άγγιξα/staged) + το νέο auth.test.ts. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure test file. Απομένοντα καθαρά targets λίγα — τα περισσότερα exported pure helpers έχουν test. Πιθανά: (α) `lib/session.ts` έχει ήδη test· δες αν το `auth.ts` async layer αξίζει με mocked `next/headers`+`session` (role-guard branches του `requireAdmin`)· (β) `models/` pure statics/virtuals αν υπάρχουν· (γ) additive-export ενός `aiProviders.ts` internal helper (`stripFences`/`mediaTypeOf`) ΑΝ εγκριθεί source edit (εκτός territory τώρα). Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα) + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
