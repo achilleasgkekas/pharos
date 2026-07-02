@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 9ac9db1 -->
+<!-- reviewed: f8aaea4 -->
 <!-- docker-validated: f63cc4b -->
+
+## 2026-07-02 (reviewer — range 9ac9db1..f8aaea4 clean, 0 fixes, 0 flags)
+- **Range:** 4 commits πάνω από τον προηγούμενο marker (`9ac9db1`): `a615c15` (feat/landing compare table), `3d7e50f` (test/web cardFields), `138488c` (docs/mobile-parity), `f8aaea4` (feat/saas file-byte storage accounting). Docs commits παραλείφθηκαν από code review.
+- **Checks (read-only):** web `npm run type-check` → **EXIT 0**, mobile `npx tsc --noEmit` → **EXIT 0**, full web vitest → **296/296 passed** (18 files· περιλαμβάνει τα νέα `fileStorage.test.ts` 8 + `cardFields.test.ts` 25).
+- **SaaS file-byte accounting (`f8aaea4`, το μόνο ουσιαστικό runtime diff):** νέο `lib/billing/fileStorage.ts` (`tenantFileBytes`/`measureDir`/`tenantStorageRoot`/`sumBytes`) + wiring στο `dbStats.sampleTenantStorage` (bytes = dbBytes + fileBytes). Έλεγξα: (α) **OSS-safe** — no-op returning 0 όταν `!saasMode() || ctx.isDefault || !ctx.tenantId`, μηδέν fs access για self-hosted· (β) **path-traversal guard** στο `tenantStorageRoot` σωστό (rel==''/`..`/absolute → null)· (γ) symlinks δεν ακολουθούνται, per-entry errors skip → ένα unreadable file δεν ρίχνει το walk· (δ) `STORAGE_ROOT` mirror **ταιριάζει byte-for-byte** με `lib/storage.ts` (`process.env.STORAGE_ROOT ?? path.join(process.cwd(),'storage')`)· (ε) το `StorageSample` απέκτησε `dbBytes`/`fileBytes` — **additive**, μηδέν external consumer (grep → μόνο σχόλιο σε test). Currently no-op σε πράξη (saveFile δεν είναι tenant-aware ακόμα) αλλά documented + ήδη flagged στο SAAS_PROGRESS → Needs Achilleas. Καμία αλλαγή API shape που να επηρεάζει το mobile.
+- **Landing compare table (`a615c15`):** pure markup + CSS, additive. Accessible (`.sr-only`, `scope="col/row"`, `data-col` mobile fallback), responsive (stack σε ≤900px). Καθαρό.
+- **Secrets scan στο range:** μηδέν (μόνο code/CSS/docs, κανένα `.env`).
+- **Αποτέλεσμα: 0 fixes, 0 flags.** Δεν χρειάστηκε αλλαγή σε καμία ουρά· marker → `f8aaea4`.
 
 ## 2026-07-02 (parity-auditor — 2η σάρωση ημέρας: ουρά αμετάβλητη, 0 auto-buildable GAP)
 - **Inventory από κώδικα (όχι docs):** **49 v1 routes** (`find api/v1 -name route.ts` = 49), **16 mobile screens** (`apps/mobile/src/screens/`), **19 web `page.tsx`**. Route↔consumer: `grep` στο `apps/mobile/src/api.ts` βρήκε **50 distinct `/api/v1/*` paths** (49 routes + `auth/login`) → κάθε endpoint έχει ≥1 mobile consumer, **1:1, μηδέν orphan**. Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only first-run wizard· N/A).
