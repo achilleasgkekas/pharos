@@ -4,6 +4,7 @@ import {
   canCancelWorkspace,
   sanitizeWorkspaceName,
   workspaceNameError,
+  workspaceStatusError,
   workspaceView,
 } from './workspace';
 
@@ -130,5 +131,28 @@ describe('workspaceView', () => {
   it('clamps a negative / non-finite member count to 0', () => {
     expect(workspaceView(base, 'owner', -5).memberCount).toBe(0);
     expect(workspaceView(base, 'owner', NaN).memberCount).toBe(0);
+  });
+});
+
+describe('workspaceStatusError', () => {
+  it('allows active / trialing (any case)', () => {
+    expect(workspaceStatusError('active')).toBeNull();
+    expect(workspaceStatusError('trialing')).toBeNull();
+    expect(workspaceStatusError('ACTIVE')).toBeNull();
+    expect(workspaceStatusError('  Trialing ')).toBeNull();
+  });
+
+  it('blocks pending / suspended / canceled with a specific message', () => {
+    expect(workspaceStatusError('pending')).toMatch(/being set up/);
+    expect(workspaceStatusError('suspended')).toMatch(/suspended/);
+    expect(workspaceStatusError('canceled')).toMatch(/canceled/);
+  });
+
+  it('fails closed on unknown / empty / non-string status', () => {
+    expect(workspaceStatusError('')).toBe('workspace is not active');
+    expect(workspaceStatusError('bogus')).toBe('workspace is not active');
+    expect(workspaceStatusError(undefined)).toBe('workspace is not active');
+    expect(workspaceStatusError(null)).toBe('workspace is not active');
+    expect(workspaceStatusError(42)).toBe('workspace is not active');
   });
 });

@@ -39,7 +39,9 @@ async function activeMemberCount(tenantId: string): Promise<number> {
 export async function GET(req: NextRequest) {
   return saasGuard(async () => {
     const slug = new URL(req.url).searchParams.get('tenant');
-    const resolved = await resolveWorkspaceSession(slug, false);
+    // allowInactive: an owner must still be able to view a suspended/canceled workspace (to
+    // see its status and, later, reactivate it). Management routes stay status-enforced.
+    const resolved = await resolveWorkspaceSession(slug, false, true);
     if ('response' in resolved) return resolved.response;
     const { session } = resolved;
 
@@ -104,8 +106,9 @@ export async function DELETE(req: NextRequest) {
   return saasGuard(async () => {
     const slug = new URL(req.url).searchParams.get('tenant');
     // Resolve as any active member first, then enforce the stricter owner-only gate below
-    // (resolveWorkspaceSession's requireManage flag only reaches owner/admin).
-    const resolved = await resolveWorkspaceSession(slug, false);
+    // (resolveWorkspaceSession's requireManage flag only reaches owner/admin). allowInactive
+    // so cancel stays idempotent on an already-canceled workspace (returns current view).
+    const resolved = await resolveWorkspaceSession(slug, false, true);
     if ('response' in resolved) return resolved.response;
     const { session } = resolved;
 

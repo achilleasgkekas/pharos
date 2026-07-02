@@ -14,6 +14,7 @@ import { getCurrentAccount, type AccountClaims } from '@/lib/tenancy/accountSess
 import { getTenantContext, type TenantContext } from '@/lib/tenancy/context';
 import { Tenant, type TenantDoc } from '@/models/Tenant';
 import { canManageMembers } from './members';
+import { workspaceStatusError } from './workspace';
 
 export type WorkspaceSession = {
   account: AccountClaims;
@@ -30,10 +31,15 @@ export type WorkspaceSession = {
  *                        account's first workspace when omitted.
  * @param requireManage   when true, the caller must be an owner/admin (else 403). When
  *                        false (default), any active membership suffices (read access).
+ * @param allowInactive   when false (default), a suspended/canceled/pending tenant is denied
+ *                        with 403 (lifecycle enforcement). Read/lifecycle routes that must
+ *                        still operate on an inactive workspace (view details, idempotent
+ *                        cancel, future reactivate) pass true to opt out of the status gate.
  */
 export async function resolveWorkspaceSession(
   wantSlug: string | null,
-  requireManage = false
+  requireManage = false,
+  allowInactive = false
 ): Promise<{ response: NextResponse } | { session: WorkspaceSession }> {
   const gate = saasAuthGate();
   if (gate) return { response: gate };
@@ -72,6 +78,13 @@ export async function resolveWorkspaceSession(
   const tenant = (await Tenant.findById(ctx.tenantId)) as TenantDoc | null;
   if (!tenant) {
     return { response: NextResponse.json({ error: 'workspace not found' }, { status: 404 }) };
+  }
+
+  if (!allowInactive) {
+    const statusErr = workspaceStatusError(tenant.status);
+    if (statusErr) {
+      return { response: NextResponse.json({ error: statusErr }, { status: 403 }) };
+    }
   }
 
   return { session: { account, workspace, ctx, tenant } };

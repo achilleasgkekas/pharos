@@ -35,6 +35,35 @@ export function canCancelWorkspace(role: string): boolean {
   return role === 'owner';
 }
 
+/**
+ * Tenant lifecycle statuses that permit normal workspace access. Per the Tenant model,
+ * `trialing`/`active` use the app; `pending` (provisioned, not ready), `suspended` (dunning/
+ * manual hold) and `canceled` (soft-deleted) all block access. Fail-closed: any unknown value
+ * is treated as blocked.
+ */
+export const ACTIVE_WORKSPACE_STATUSES = ['active', 'trialing'] as const;
+
+/**
+ * Access gate on a workspace's lifecycle status. Returns a human-readable error when the
+ * status blocks access, or null when the workspace is usable. Used by resolveWorkspaceSession
+ * to deny workspace-scoped routes for suspended/canceled/pending tenants. Read/lifecycle
+ * routes (view details, reactivate, idempotent cancel) opt out via `allowInactive`.
+ */
+export function workspaceStatusError(status: unknown): string | null {
+  const s = typeof status === 'string' ? status.trim().toLowerCase() : '';
+  if ((ACTIVE_WORKSPACE_STATUSES as readonly string[]).includes(s)) return null;
+  switch (s) {
+    case 'pending':
+      return 'workspace is still being set up';
+    case 'suspended':
+      return 'workspace is suspended';
+    case 'canceled':
+      return 'workspace has been canceled';
+    default:
+      return 'workspace is not active';
+  }
+}
+
 /** Client-safe projection of a workspace for the read/rename responses. */
 export type WorkspaceView = {
   tenantId: string;

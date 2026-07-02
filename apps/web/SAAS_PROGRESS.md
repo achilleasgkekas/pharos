@@ -140,3 +140,47 @@ effect, κανένα Docker rebuild, καμία νέα εξάρτηση.
 Achilleas· ξεκλειδώνει ΟΛΑ τα reset/verify/invite/resend emails σε production), είτε (β) invites
 UI section (owner/admin) που καταναλώνει `GET /api/saas/invites` + resend/revoke controls (ζει σε
 δικό μου SaaS territory), είτε (γ) billing/usage widget (increment 12 από την ουρά).
+
+## 2026-07-03 (increment 30 — tenant-status access enforcement)
+**Built:** επέλεξα το (β) — έκλεισα το P2 gap που είχε flag-αριστεί (ο soft-cancel του increment 29
+ήταν άδοντος: το `resolveWorkspaceSession` δεν κοίταζε ποτέ το `tenant.status`, οπότε ένας
+`canceled`/`suspended` workspace παρέμενε πλήρως προσβάσιμος). Additive, ΟΛΟ σε δικά μου SAAS-gated
+αρχεία:
+- `lib/tenancy/workspace.ts` — νέος **PURE** guard `workspaceStatusError(status)` (+ export
+  `ACTIVE_WORKSPACE_STATUSES = ['active','trialing']`). Επιστρέφει null όταν active/trialing (case/
+  whitespace-insensitive), αλλιώς ειδικό μήνυμα ανά status (`pending`→being-set-up, `suspended`,
+  `canceled`) και **fail-closed** για unknown/empty/non-string → «workspace is not active».
+- `lib/tenancy/workspaceSession.ts` — νέα 3η παράμετρος **`allowInactive=false`** στο
+  `resolveWorkspaceSession`. Με το default (false), μετά το resolve του Tenant doc ελέγχεται
+  `workspaceStatusError(tenant.status)` → **403** αν blocked. Έτσι ΟΛΑ τα workspace-scoped routes
+  (members/audit/invites/resend + workspace PATCH) αποκτούν enforcement **χωρίς edit** (default
+  false = enforce).
+- `app/api/saas/workspace/route.ts` — **GET** και **DELETE** περνούν `allowInactive:true`: ο owner
+  πρέπει να **βλέπει** έναν canceled/suspended workspace (status + μελλοντικό reactivate), και ο
+  soft-cancel μένει **idempotent** πάνω σε ήδη-canceled tenant. Η **PATCH (rename)** μένει enforced
+  (2 args → allowInactive false): δεν μετονομάζεις νεκρό workspace.
+  ΣΗΜ: τα billing routes (portal/checkout) χρησιμοποιούν ξεχωριστό `billingSession` — **σκόπιμα
+  ΔΕΝ** μπαίνει status-gate εκεί (ένας suspended/dunning tenant πρέπει να μπορεί να πληρώσει για να
+  ξε-suspend-αριστεί).
+- `lib/tenancy/workspace.test.ts` — +3 PURE tests για `workspaceStatusError` (active/trialing allow
+  με case/space, pending/suspended/canceled specific messages, fail-closed unknown/empty/null/number).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run workspace.test.ts` → **19/19 green**
+(16+3)· full suite `npx vitest run` → **775/775 green** (καμία regression). Το enforcement είναι
+SAAS-only (τα routes 404 όταν SAAS_MODE off) + ο guard pure· ο default path παραμένει αμετάβλητος
+(non-active tenants υπάρχουν μόνο σε SAAS mode). **Zero effect** στο self-hosted app. Κανένας Docker
+rebuild (route 404 στο running container με SAAS_MODE off — ο νέος κώδικας δεν εκτελείται· type-check
++tests καλύπτουν compile+logic)· καμία νέα εξάρτηση· κανένα feature route/data-db/User-path αγγίχτηκε.
+Άγγιξα μόνο δικά μου SAAS αρχεία (foreign `.claude/launch.json` + apps/mobile edits άθικτα).
+
+**## Needs Achilleas** (workspace lifecycle):
+- **Reactivation path**: canceled/suspended → active χρειάζεται μικρό owner-only route· τώρα που το
+  enforcement μπλοκάρει τα management routes, ο μόνος τρόπος «επαναφοράς» ενός workspace θα είναι
+  αυτό (θα περνά `allowInactive:true` για να δει/αλλάξει τον inactive tenant). Εύκολο επόμενο increment.
+- **Suspend flow**: ποιος/τι θέτει `status:'suspended'` (Stripe dunning webhook) — billing-side, όταν
+  υπάρχει live Stripe.
+
+**Next task:** increment 31 — είτε (α) reactivate route (owner-only, canceled/suspended→active,
+`allowInactive:true`), είτε (β) Stripe webhook → suspend/reactivate on payment failure/recovery
+(θέλει live Stripe keys → Needs-Achilleas για το τελικό wiring), είτε (γ) user-facing
+workspace-settings UI panels (όλα τα read/write APIs έτοιμα).
