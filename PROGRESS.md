@@ -2,8 +2,18 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 1c14515 -->
+<!-- reviewed: 12c47ba -->
 <!-- docker-validated: d170d93 -->
+
+## 2026-07-02 (reviewer — range 1c14515..12c47ba καθαρό)
+- **Τι έλεγξα:** 3 feat commits + 2 test suites απ' το τελευταίο marker (1c14515): `12c47ba` mobile Reports cash-flow, `e08f2ed` SaaS per-plan seat limits, `2380a59` landing personas, `80918f9`/`e08f2ed` tests (saasMode + seatLimits).
+- **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· `vitest run seatLimits + saasMode` → **17/17 pass**.
+- **Ευρήματα (κανένα regression):**
+  - *Seat limits* (`entitlements.ts`/`plans.ts`/`members/route.ts`): live count `Membership.countDocuments({status:'active'})` πριν το invite/reactivate branch, σωστά· `withinSeatLimit` clamp-άρει negative activeCount σε 0· unlimited (maxMembers null → dedicated/self-hosted) short-circuit· 409 + `code:'seat_limit'`. Ορθό.
+  - *Reports 12μ cash-flow* (`api/v1/reports/route.ts`): το underlying query είναι **`Expense.find({})` (unbounded)** → ο 12-μηνος `ie` πίνακας γεμίζει πλήρως (όχι κομμένος από 6-μηνο window). Το mobile guard-άρει `incomeExpense ?? []` → κανένα crash σε παλιό server. Additive-only πεδίο, μηδέν shape break για το mobile API.
+  - *Landing personas* (`page.tsx`/`globals.css`): icons `server`/`receipt`/`shield` υπάρχουν όλα στο `components/Icon.tsx`· responsive `.persona-grid` → 1 στήλη <900px. ΟΚ.
+- **Fixes:** κανένα (μηδέν small-safe issue).
+- **Flags:** κανένα νέο (το placeholder `maxMembers` pricing είναι ήδη σημειωμένο από τον builder στο SAAS_PROGRESS «Needs Achilleas»· δεν διπλασιάζω). Δεν βρέθηκαν secrets. Marker → `12c47ba`.
 
 ## 2026-07-02 (pharos-daily-dev — mobile Reports: cash-flow income-vs-expense · 12 months)
 - **Τι έκανα:** έκλεισα ένα από τα δύο εναπομείναντα Reports parity gaps, το **income-vs-expense (12 μήνες)** = το web «Cash flow · income vs expense · last 12 months». Ήταν flag-αρισμένο ως «χρειάζεται RN charting lib», αλλά το web είναι grouped bar chart → το render-άρω με το ήδη-καθιερωμένο manual-bar pattern (όπως spend-by-store/subs-by-category/upcoming-installments), **μηδέν charting lib, μηδέν νέα native dep**. Το income ανά μήνα ήδη υπολογιζόταν αλλά ΔΕΝ εμφανιζόταν. Προτιμήθηκε αντί των Needs-Decision items (inventory-pie native dep, theme/language) και του attended-preferred icons→lucide.
