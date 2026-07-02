@@ -312,3 +312,24 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02 (cont.⁷)
+
+Task: (e) Polish, μερος 13 — accessibility pass (prefers-reduced-motion + keyboard focus ring). Δυο πραγματικα a11y κενα που ειχε η σελιδα: (1) ο pulsing beacon + τα hover-lift transforms + το `scroll-behavior: smooth` ετρεχαν παντα, αγνοωντας το OS «reduce motion» setting· (2) δεν υπηρχε global keyboard focus ring — μονο το `.waitlist-input:focus` ειχε styling, οποτε keyboard-only χρηστες δεν εβλεπαν που βρισκονται σε links/buttons/nav.
+
+Τι εφτιαξα (μονο `app/globals.css`):
+- `:focus-visible` ring για a/button/.btn/.navlink/.waitlist-input — 2px solid `var(--accent)` (brand green) + outline-offset 3px + radius 6. Μονο keyboard (`:focus-visible`, οχι `:focus`), ωστε mouse clicks να μη δειχνουν ring.
+- `@media (prefers-reduced-motion: reduce)`: `scroll-behavior: auto` στο html, `.beacon { animation: none; opacity: 1 }` (σταθερο, οχι σβηστο), universal `*` clamp σε animation/transition-duration 0.01ms + iteration-count 1, και ρητο `transform: none` στα btn hover ωστε τιποτα να μη πηδαει. Μηδεν νεο dependency, μηδεν JS, μηδεν layout impact.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 761 B / 103 kB First Load JS, αμεταβλητο — pure CSS, μηδεν bundle impact).
+- Preview (landing-dev, port 3100): DOM eval μεσω document.styleSheets επιβεβαιωσε reducedMotionRulePresent=true + focusVisibleRulePresent=true· beacon animationName='beacon' σε normal motion (οκ)· console errors: none· hero screenshot καθαρο (brand palette/beacon/gradient wordmark/2 CTAs). Σταματησα τον server. (ΣΗΜ: το preview eval εδωσε winW=0/hScroll=true — headless viewport quirk αυτης της harness, οχι πραγματικο overflow· CSS outline/animation δεν επηρεαζει scrollWidth.) Docker/web/mobile αθικτα. Το `.claude/launch.json` (shared local config) ΔΕΝ commit (collision guard — μονο app/globals.css + LANDING_PROGRESS.md).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση του CSS mockup (#preview) με πραγματικα app screenshots οταν υπαρξουν assets, secondary CTA band, η micro-copy βελτιωσεις. (Προαιρετικα: per-plan Offer JSON-LD nodes οταν κλεισουν οι τιμες, prefers-color-scheme fallback αν ποτε μπει light mode.)
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.

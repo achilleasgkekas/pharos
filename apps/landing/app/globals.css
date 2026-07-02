@@ -720,3 +720,37 @@ h1, h2, h3 {
   transform-origin: center;
   animation: beacon 2.4s ease-in-out infinite;
 }
+
+/* Keyboard focus ring — visible only for keyboard users, brand accent */
+a:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+.navlink:focus-visible,
+.waitlist-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* Respect users who ask the OS to reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .beacon {
+    animation: none;
+    opacity: 1;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* Neutralise hover-lift so nothing jumps for reduced-motion users */
+  .btn-primary:hover,
+  .btn-ghost:hover {
+    transform: none;
+  }
+}
