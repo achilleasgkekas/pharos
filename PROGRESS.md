@@ -2,8 +2,19 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 699c36e -->
+<!-- reviewed: 1797ab7 -->
 <!-- docker-validated: b5fa042 -->
+
+## 2026-07-02 (reviewer — range 699c36e..1797ab7, 10 commits)
+- **Έλεγχοι:** `apps/web` type-check **EXIT 0**, `apps/mobile` `tsc --noEmit` **EXIT 0**. `vitest run audit.test.ts` → **15/15 green**.
+- **Review εύρους (κώδικας):** 3 code commits — `e91addf` audit-log foundation (νέα SAAS αρχεία: `models/AuditEvent.ts`, `lib/tenancy/audit.ts`, `app/api/saas/audit/route.ts` + test), `df51e97` mobile bill-image στο MoneyScreen, `47b4704` landing proof-band. Υπόλοιπα = docs/env/docker-health.
+  - **audit-log:** exemplary — pure/node-only split, `redactMeta` (sensitive-key strip + depth-bound + scalar-only), `auditView` whitelist projection + re-redact, `recordAudit` never-throws + no-op για default tenant, read route owner/admin-gated + keyset pagination + serializer ⇒ κανένα secret leak. Additive, SAAS-gated, κανένα existing file δεν αγγίχτηκε.
+  - **mobile bill-image:** `fileSource(editing.file)` — και τα δύο (`fileSource` api.ts:259, `Expense.file` api.ts:117) υπάρχουν· additive `Image` στο edit modal, μηδέν shape change στο v1 API.
+  - **landing proof-band:** additive section· ΟΛΕΣ οι CSS classes (`numbers-band`/`number-tile`/`num-glow`/`num`/`lbl`) ορισμένες στο globals.css + responsive breakpoints. `apps/landing` εκτός των 2 required type-checks (ξεχωριστό app).
+  - **secrets:** `.env.example` additions = μόνο placeholders (scan για real-looking values = μηδέν).
+- **Fixes:** καμία (όλα green, μηδέν regression, μηδέν shape break που να σπάει το mobile).
+- **Flags:** καμία νέα. Παρατήρηση (ΟΧΙ queue item): το `recordAudit` έχει **μηδέν call sites** εκτός του module του → η `GET /api/saas/audit` επιστρέφει άδειο trail μέχρι να καλωδιωθεί στα mutations. Ο builder το έχει ΗΔΗ τεκμηριωμένο ρητά ως «κανένα runtime wiring» + queued ως «increment 23 — wire recordAudit» (SAAS_PROGRESS increment 22). Ειλικρινές forward-work, ήδη tracked → δεν διπλασιάζω WEB_DEBT item.
+- **Marker:** reviewed `699c36e` → **`1797ab7`** (HEAD). Staged ΜΟΝΟ PROGRESS.md (το foreign `.claude/launch.json` άθικτο).
 
 ## 2026-07-02 (docker-health guard — rebuild μετά audit-log commits)
 - **Health:** homepage-mongo **healthy** (up 51 min), web RestartCount **0**, mongo RestartCount 133 (ιστορικό OOM, όχι τρέχον loop — currently up & healthy). homepage-flaresolverr **Exited** (143, εδώ και 2 μέρες) → μένει stopped, καμία ενέργεια.
