@@ -11,6 +11,7 @@ import {
   type MemberLite,
   type OrgRole,
 } from '@/lib/tenancy/members';
+import { readBody, strField } from '@/lib/apiBody';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -87,13 +88,9 @@ export async function GET(req: NextRequest) {
  * for now the target account must already exist (404 otherwise).
  */
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => ({}))) as {
-    email?: string;
-    role?: string;
-    tenant?: string;
-  };
+  const body = await readBody(req);
 
-  const resolved = await resolveWorkspaceSession(body.tenant ?? null, true);
+  const resolved = await resolveWorkspaceSession(strField(body, 'tenant').trim() || null, true);
   if ('response' in resolved) return resolved.response;
   const { session } = resolved;
 
@@ -168,13 +165,9 @@ export async function POST(req: NextRequest) {
  * Body: `{ accountId, role, tenant? }`. Owner/admin only. Cannot demote the last owner.
  */
 export async function PATCH(req: NextRequest) {
-  const body = (await req.json().catch(() => ({}))) as {
-    accountId?: string;
-    role?: string;
-    tenant?: string;
-  };
+  const body = await readBody(req);
 
-  const resolved = await resolveWorkspaceSession(body.tenant ?? null, true);
+  const resolved = await resolveWorkspaceSession(strField(body, 'tenant').trim() || null, true);
   if ('response' in resolved) return resolved.response;
   const { session } = resolved;
 
@@ -214,9 +207,9 @@ export async function PATCH(req: NextRequest) {
  * Body: `{ accountId, tenant? }`. Owner/admin only. Cannot remove the last owner.
  */
 export async function DELETE(req: NextRequest) {
-  const body = (await req.json().catch(() => ({}))) as { accountId?: string; tenant?: string };
+  const body = await readBody(req);
 
-  const resolved = await resolveWorkspaceSession(body.tenant ?? null, true);
+  const resolved = await resolveWorkspaceSession(strField(body, 'tenant').trim() || null, true);
   if ('response' in resolved) return resolved.response;
   const { session } = resolved;
 

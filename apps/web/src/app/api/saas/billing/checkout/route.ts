@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveBillingSession } from '@/lib/billing/billingSession';
 import { createCheckoutSession } from '@/lib/billing/stripe';
 import { checkoutablePlan, pickBaseUrl, checkoutUrls } from '@/lib/billing/billingRoutes';
+import { readBody, strField } from '@/lib/apiBody';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,13 +24,13 @@ export const dynamic = 'force-dynamic';
  * charges here; Stripe collects payment and the webhook reflects the result.
  */
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => ({}))) as { plan?: string; tenant?: string };
+  const body = await readBody(req);
 
-  const resolved = await resolveBillingSession(body.tenant ?? null);
+  const resolved = await resolveBillingSession(strField(body, 'tenant').trim() || null);
   if ('response' in resolved) return resolved.response;
   const { session } = resolved;
 
-  const plan = checkoutablePlan(body.plan);
+  const plan = checkoutablePlan(strField(body, 'plan'));
   if (!plan) {
     return NextResponse.json(
       { error: 'plan must be a paid plan (shared or dedicated)' },

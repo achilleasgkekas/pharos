@@ -4,6 +4,7 @@ import { Tenant } from '@/models/Tenant';
 import { saasMode } from '@/lib/tenancy/saasMode';
 import { verifyStripeSignature, webhookSecret } from '@/lib/billing/stripe';
 import { planForPriceId } from '@/lib/billing/plans';
+import { isObjectId } from '@/lib/apiBody';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
 async function resolveTenant(obj: Record<string, unknown>) {
   const meta = (obj.metadata || {}) as Record<string, unknown>;
   const tenantId = typeof meta.tenantId === 'string' ? meta.tenantId : '';
-  if (tenantId && /^[a-f0-9]{24}$/i.test(tenantId)) {
+  if (tenantId && isObjectId(tenantId)) {
     const t = await Tenant.findById(tenantId);
     if (t) return t;
   }

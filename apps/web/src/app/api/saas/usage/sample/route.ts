@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'node:crypto';
 import { saasMode } from '@/lib/tenancy/saasMode';
 import { sampleAllTenants } from '@/lib/billing/dbStats';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+/** Constant-time bearer-token compare. Length-guarded because timingSafeEqual throws on
+ *  differing buffer lengths (same shape as stripe.ts / auth.ts). */
+function tokenMatches(token: string, secret: string): boolean {
+  const a = Buffer.from(token, 'utf8');
+  const b = Buffer.from(secret, 'utf8');
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 /**
  * POST /api/saas/usage/sample
@@ -27,7 +36,7 @@ export async function POST(req: Request) {
   }
   const auth = req.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  if (!token || token !== secret) {
+  if (!token || !tokenMatches(token, secret)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 

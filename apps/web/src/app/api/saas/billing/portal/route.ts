@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveBillingSession } from '@/lib/billing/billingSession';
 import { createPortalSession } from '@/lib/billing/stripe';
 import { pickBaseUrl, portalReturnUrl } from '@/lib/billing/billingRoutes';
+import { readBody, strField } from '@/lib/apiBody';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,9 +25,9 @@ export const dynamic = 'force-dynamic';
  * On success: `{ url }` — the portal URL to redirect the browser to.
  */
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => ({}))) as { tenant?: string };
+  const body = await readBody(req);
 
-  const resolved = await resolveBillingSession(body.tenant ?? null);
+  const resolved = await resolveBillingSession(strField(body, 'tenant').trim() || null);
   if ('response' in resolved) return resolved.response;
   const { session } = resolved;
 
