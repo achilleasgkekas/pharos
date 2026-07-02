@@ -364,6 +364,9 @@ export type Reports = {
   budgets: BudgetRow[];
   monthly: { period: string; expense: number; income: number }[];
   upcomingInstallments: { period: string; amount: number }[];
+  spendByStore: { name: string; total: number; count: number }[];
+  biggestPurchases: { store: string; total: number; date: string }[];
+  warrantiesExpiring: { title: string; until: string; days: number }[];
 };
 export function getReports() { return request<Reports>('/api/v1/reports'); }
 

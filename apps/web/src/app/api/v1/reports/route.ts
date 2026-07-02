@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/apiAuth';
 import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
 import { Item } from '@/models/Item';
+import { Receipt } from '@/models/Receipt';
 import { Statement } from '@/models/Statement';
 import { getAppSettings } from '@/lib/appSettings';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -13,7 +14,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type Lean = { kind?: string; amount?: number; category?: string; date?: Date; period?: string };
-type ItemLean = { status?: string; purchasedPrice?: number; currentPrice?: number };
+type ItemLean = { status?: string; purchasedPrice?: number; currentPrice?: number; warrantyUntil?: string | Date; title?: string };
+type ReceiptLean = { store?: string; date?: Date; total?: number };
 const ymOf = (d: Lean): string => {
   if (d.period && /^\d{4}-\d{2}/.test(d.period)) return d.period.slice(0, 7);
   const dt = d.date ? new Date(d.date) : null;
@@ -24,10 +26,11 @@ const ymOf = (d: Lean): string => {
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
-    const [docs, items, statementsRaw, settings] = await Promise.all([
+    const [docs, items, statementsRaw, receipts, settings] = await Promise.all([
       Expense.find({}).select('kind amount category date period').lean() as Promise<Lean[]>,
-      Item.find().select('status purchasedPrice currentPrice').lean() as Promise<ItemLean[]>,
+      Item.find().select('status purchasedPrice currentPrice warrantyUntil title').lean() as Promise<ItemLean[]>,
       Statement.find().lean(),
+      Receipt.find().select('store date total').lean() as Promise<ReceiptLean[]>,
       getAppSettings(),
     ]);
 
@@ -102,6 +105,38 @@ export async function GET(req: NextRequest) {
       }))
       .sort((a, b) => b.limit - a.limit);
 
+    // ── Spend by store (top 8). Mirrors web /reports. ──
+    const storeMap = new Map<string, { total: number; count: number }>();
+    for (const r of receipts) {
+      const k = r.store || '—';
+      const e = storeMap.get(k) ?? { total: 0, count: 0 };
+      e.total += r.total || 0;
+      e.count += 1;
+      storeMap.set(k, e);
+    }
+    const spendByStore = [...storeMap.entries()]
+      .map(([name, v]) => ({ name, total: Math.round(v.total), count: v.count }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8);
+
+    // ── Biggest single purchases (top receipts). Mirrors web /reports. ──
+    const biggestPurchases = receipts
+      .filter((r) => (r.total || 0) > 0)
+      .sort((a, b) => (b.total || 0) - (a.total || 0))
+      .slice(0, 8)
+      .map((r) => ({ store: r.store || '—', total: Math.round(r.total || 0), date: r.date ? String(r.date) : '' }));
+
+    // ── Warranties expiring (next 150 days). Mirrors web /reports. ──
+    const warrantiesExpiring = items
+      .filter((i) => i.warrantyUntil)
+      .map((i) => {
+        const t = new Date(i.warrantyUntil as string).getTime();
+        return { title: i.title || '—', until: String(i.warrantyUntil), days: Math.ceil((t - now.getTime()) / 86400000) };
+      })
+      .filter((w) => !isNaN(w.days) && w.days >= 0 && w.days <= 150)
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 10);
+
     return NextResponse.json({
       currency: settings.currency || 'EUR',
       netPosition,
@@ -111,6 +146,9 @@ export async function GET(req: NextRequest) {
       budgets,
       monthly,
       upcomingInstallments,
+      spendByStore,
+      biggestPurchases,
+      warrantiesExpiring,
     });
   });
 }
