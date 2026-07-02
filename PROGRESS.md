@@ -2439,3 +2439,26 @@ Fresh read-only mobile UI consistency audit, inventory ξαναχτισμένο 
 - **Marker**: docker-validated `c619123` → **`7c92fe2`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 ### Needs Achilleas
 - Κανένα. Το stack είναι υγιές και σερβίρει.
+
+## 2026-07-02 (ui-auditor — 30ή σάρωση· ΝΕΟ mobile-src commit `28c943c` → «Max content width» item ΕΚΛΕΙΣΕ [DONE + committed])
+
+Fresh read-only mobile UI consistency audit, inventory ξαναχτισμένο από τον κώδικα (16 screens + `ui.tsx` primitives + `theme.ts` tokens). **Τελευταίος `apps/mobile/src` commit πλέον `28c943c` (feat: shared max-content-width for list/scroll containers)** — το ΠΡΩΤΟ νέο mobile-src commit από την 26η σάρωση (`0f69116` ListItem). Επιθεώρησα το diff: νέο `export const contentWidth` const (`{ width:'100%', maxWidth:640, alignSelf:'center' }`) εφαρμοσμένο σε **14 screens** (main scroll/list content-container), μηδέν hardcoded number εκτός του single 640 token, no-op σε phone. → **Το «Max content width για tablet / landscape» (P3/S) ΕΚΛΕΙΣΕ** (ήταν το #2 top-3 της 29ης). mobile `tsc --noEmit` **EXIT 0**. Read-only γύρος· άγγιξα μόνο docs.
+
+**Ευρήματα ανά διάσταση (counts):**
+- Hardcoded hex (screens+nav, fresh grep 6/8-digit): **0** (όλα από `C.*`).
+- Missing shared token: **0** (`SPACE`/`RADIUS`/`SIZE`/`scrim`/`alpha()` + `surface3`/`orange`/`onAccent` + `contentWidth` παρόντα στο `theme.ts`/`ui.tsx`).
+- Duplicate primitive (auto-buildable byte-identical): **0** — Card+Badge+ListItem + Button/IconButton/Check/Input-core set κλειστό· απομένοντα διπλότυπα = token-drift (`<Chip>` MISSING [6 entries Subscriptions/Items/Settings], 5 Input outliers + 2 micro, ghost-button variants), οπτική αλλαγή → attended-preferred, ΟΧΙ byte-identical.
+- Touch targets <44pt: **0** (shared `<Check>` 24×24 + hitSlop· menuBtn/backBtn/lineDel effective ≥44).
+- Safe-area: **1 TODO** — `react-native-safe-area-context` εκτός `package.json`, plain `SafeAreaView` @ App.tsx:88, μηδέν bottom inset.
+- Adaptive/max-width: **0** (ΕΚΛΕΙΣΕ με `28c943c`).
+- Theme/dark-mode: **1 P3 TODO** — μηδέν `useColorScheme`/context· dark-only, web light palette (globals.css) χωρίς mobile αντίστοιχο.
+
+**Κατάσταση queue:** ένα item έκλεισε (max-width), τα υπόλοιπα αμετάβλητα. Auto-buildable byte-identical debt = **εξαντλημένο**. Τα εναπομείναντα ενεργά items είναι είτε additive-dep (safe-area) είτε token-drift (Chip/Input/ghost) που θέλει οπτικό verify σε simulator → attended-preferred.
+
+**Top 3 για τον builder (με σειρά):**
+1. **Safe-area insets** (P2/M) — top unattended-safe· `npx expo install react-native-safe-area-context` (additive dep, μηδέν token-drift) + `SafeAreaProvider`/`useSafeAreaInsets` αντί για plain `SafeAreaView`, bottom inset σε bottom-sheet modals + κάτω κουμπιά.
+2. **`<Chip>` primitive** (P2) — 6 StyleSheet entries (Subscriptions `cChip`, Items `chip`/`sChip`, Settings chip) με padding/radius drift → ενοποίηση σε ένα `<Chip>`· token-drift (οπτική αλλαγή) → χρειάζεται simulator, attended-preferred.
+3. **Input outliers / ghost-button variants** (attended-preferred) — 5 raw inputs (Shopping/Receipts/Search/Assistant/Login) + 2 micro + ~7 ghost cyan/accent-border buttons· οπτική αλλαγή, κράτα attended μέχρι ο Αχιλλέας να το δει σε simulator.
+
+### Needs Achilleas
+- (αμετάβλητο) Κανένα committed secret στο apps/mobile (μόνο `.env.example` tracked). Standing decisions (θέλουν simulator/attended verify, ΟΧΙ unattended-safe): οι 5 Input outliers + 2 micro, το `<Chip>` + ghost-button variants (οπτική token-drift), το Light/dark theme (L, αγγίζει ~19 αρχεία). Το safe-area (P2/M) προσθέτει native dep → non-verifiable χωρίς simulator, αλλά additive/token-drift-free, οπότε ο builder μπορεί να το πάρει με προσοχή.
