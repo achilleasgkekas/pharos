@@ -2,8 +2,17 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 268efb4 -->
+<!-- reviewed: 9d7bbab -->
 <!-- docker-validated: 4eaa702 -->
+
+## 2026-07-02 (REVIEWER — range 268efb4..9d7bbab)
+- **Τι review-άρισα:** 6 commits (2 code, 1 landing, 3 docs): `9d7bbab` fix invites DELETE inviteId format-guard, `f02c68d` accepted-invite audit metadata (acceptedBy/acceptedAt) στο inviteView, `e741999` landing «Who» nav link, + `80e26cf`/`e7cd4d6`/`bc525f6` docs (mobile-parity/ui-audit/review). Καθαρή αλλαγή: 3 web αρχεία (`models/Invite.ts`, `lib/tenancy/invites.ts`, `api/saas/invites/route.ts` + `accept/route.ts`) + 1 test + 1 landing γραμμή.
+- **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· `npx vitest run invites.test.ts apiBody.test.ts` → **52/52 pass** (νέα acceptance-audit assertions: projects acceptedBy/acceptedAt σε accepted invite, null σε pending/thin doc).
+- **Review diff:** (α) `acceptedAt` = νέο model field (`default: null`, distinct από `updatedAt` που bump-άρει και σε revoke)· accept route βάζει `acceptedAt: new Date()` δίπλα στο ήδη-υπάρχον `acceptedBy`· GET `.select()` + inviteView projection **καθαρά additive** (`String(acceptedBy)` για ObjectId, `toIso(acceptedAt)`, null-safe και στα δύο). Μηδέν secret leak (ο token hash μένει εκτός projection). (β) DELETE `isObjectId(inviteId)` guard = reuse του ήδη unit-tested helper, additive 400 πριν το Mongoose CastError → 500· backward-compatible, guards order αμετάβλητη (session gate πρώτο). (γ) landing: `#who` nav-anchor → επιβεβαίωσα ότι υπάρχει `<section id="who">` (page.tsx:602) = **όχι dangling anchor**.
+- **API-shape για mobile:** invites = SaaS control-plane, ΔΕΝ το καταναλώνει το app (49 v1 routes only)· τα extra fields είναι additive → **μηδέν mobile regression**.
+- **Secret scan:** μηδέν committed secret στο range.
+- **Fixes:** **0** (το δέντρο ήταν καθαρό, τίποτα small-safe δεν χρειάστηκε). **Flags:** **0** νέα (τα εκκρεμή Needs-Achilleas αμετάβλητα από προηγ. εγγραφές).
+- **Marker → 9d7bbab.** Staged ΜΟΝΟ PROGRESS.md (ρητό path, ΟΧΙ `-A`)· `.claude/launch.json` + `apps/web/SAAS_PROGRESS.md` (WIP εργαλείου/άλλης routine) ΔΕΝ αγγίχτηκαν.
 
 ## 2026-07-02 (pharos-daily-dev — SaaS invites DELETE id-format guard)
 - **Τι έκανα:** έκλεισα το **top web-debt auto-buildable item** (flagged από reviewer `9744a68` + auditor 32η σάρωση + WEB_DEBT top-3): το `DELETE /api/saas/invites` περνούσε το `body.inviteId` (trimmed string) κατευθείαν στο `Invite.updateOne({ _id: inviteId, ... })` **χωρίς** format guard → malformed id (π.χ. `"abc"`) = Mongoose CastError → uncaught → framework 500 αντί για καθαρό 400. Παραβίαζε την τεκμηριωμένη σύμβαση `^[a-f0-9]{24}$` που τηρούν όλα τα άλλα id-taking routes. Προτιμήθηκε ως το μικρότερο, καθαρότερο, πλήρως-finishable item (μηδέν credentials, μηδέν AI/token, μηδέν native dep).
