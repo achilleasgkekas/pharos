@@ -29,6 +29,10 @@ GitHub today and can feed a docs site later.
 - **[Troubleshooting](troubleshooting.md)** — the most common problems in one
   place, grouped by area (startup, login, database, AI, storage, notifications,
   import, mobile, performance), each linking back to the guide that covers it.
+- **[Managed SaaS mode](saas.md)** — the optional multi-tenant control plane
+  (`SAAS_MODE`): accounts, workspaces, memberships & roles, the plan/quota
+  ladder, the `/api/saas` control-plane API, Stripe billing, and its env vars.
+  Does not apply to the self-hosted app.
 
 ## Reference (repo root)
 

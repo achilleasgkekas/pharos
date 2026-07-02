@@ -258,3 +258,45 @@ Stage ΜΟΝΟ docs/troubleshooting.md + docs/README.md + docs/DOCS_PROGRESS.md.
 Επομενο run: εμπλουτισμος `docs/features.md` ανα module (screenshot placeholders), η ενα
 `docs/saas.md`/`docs/faq.md` (τα προσφατα commits ειναι SaaS billing/members — μηδεν doc
 ακομα για SaaS onboarding). Πρωτα finish-in-progress κανενα (ολα done).
+
+## 2026-07-02 (cont.³)
+
+Νεο doc: `docs/saas.md` — το πρωτο documentation για το managed SaaS layer, οπως ειχε
+προγραμματιστει (τα προσφατα commits ειναι SaaS billing/members/invites/seat-limits,
+μηδεν doc μεχρι τωρα). Καλυπτει: dual-shape (self-hosted AGPL vs managed SaaS),
+enabling μεσω `SAAS_MODE`, tenancy model (Account/Tenant/Membership + subdomain/custom-
+domain resolution), roles (owner/admin/member + last-owner guard), plan ladder
+(Free/Pro/Dedicated με storage/AI/seats/custom-domain), quota enforcement, ολοκληρο το
+`/api/saas/**` control-plane API (auth/account/members/invites/billing/usage) σε πινακες
+method/path/body/result, και τα SaaS-only env vars.
+
+Accuracy (διαβασα κωδικα, οχι εικασιες): `lib/tenancy/saasMode.ts` (flag values on/1/true/
+yes), `context.ts` (DEFAULT_TENANT frozen, db-per-tenant, scoped()), `host.ts` (RESERVED_
+SLUGS, parseTenantSlug), `billing/plans.ts` (Free 5GB/50/1 seat, Pro shared €9/50GB/1000/5,
+Dedicated €29/500GB/unlimited/unlimited+custom-domain, stripePriceEnv bindings), `billing/
+entitlements.ts` (OSS parity: dedicated=full, no feature locks, withinSeatLimit/withinAiQuota/
+withinStorage), `tenancy/members.ts` (OrgRole, canAssignRole, wouldOrphanOwners), και τα
+route.ts για signup/login/logout/session/account/members/invites-accept/billing/usage
+(status codes 201/401/403/409/410/502, request/response shapes ακριβως απο τον κωδικα). Τα
+env var ονοματα μαζευτηκαν με grep στο lib/tenancy + lib/billing: SAAS_MODE, SAAS_BASE_
+DOMAIN, SAAS_SESSION_IDLE_HOURS, AUTH_SECRET, AUTH_COOKIE_SECURE, STRIPE_SECRET_KEY/WEBHOOK_
+SECRET/PRICE_SHARED/PRICE_DEDICATED, RESEND_API_KEY, SMTP_URL, MAIL_FROM.
+
+TODO που σημειωθηκε μεσα στο doc: τα SaaS env vars δεν ειναι ακομα στο `.env.example`
+(self-hosted only) — αξιζει ενα documented SaaS block εκει (δεν το αγγιξα, εκτος territory
+απο κωδικα· καθαρο docs/ scope εδω).
+
+Προσθεσα link στο `docs/README.md` index (νεα εγγραφη «Managed SaaS mode» μετα το
+Troubleshooting).
+
+Validation: markdown only, κανενα build/Docker/AI call. Internal links του saas.md →
+README.md, self-hosting.md, configuration.md, api.md — ολα υπαρχουν στο docs/. Code fences:
+μονο inline `code` + πινακες, κανενα fenced block. Χρησιμοποιησα placeholders για ολα τα
+secrets (καμια πραγματικη τιμη).
+
+Collision guard: `git status --short` + `git diff --cached` πριν το commit· staged κενο.
+Stage ΜΟΝΟ docs/saas.md + docs/README.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: εμπλουτισμος `docs/features.md` ανα module (screenshot placeholders), η ενα
+`docs/faq.md` για κοινες ερωτησεις (self-host vs SaaS, privacy, AI optionality). Πρωτα
+finish-in-progress κανενα (ολα done).
