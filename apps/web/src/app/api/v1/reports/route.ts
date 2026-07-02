@@ -29,6 +29,14 @@ const ymOf = (d: Lean): string => {
 /** GET /api/v1/reports → money summary (net position, this month / year, by-category, last-6-months). */
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
+    // Date-range selector (mirrors web /reports ?months=). When a valid value is
+    // given, BOTH windowed series (monthly spend + 12-month cash-flow) use it.
+    // No/invalid param keeps the legacy defaults (spend=6, flow=12) so an
+    // un-updated mobile client sees exactly the same windows as before.
+    const rawMonths = Number(req.nextUrl.searchParams.get('months'));
+    const selMonths = [6, 12, 24].includes(rawMonths) ? rawMonths : null;
+    const spendWindow = selMonths ?? 6;
+    const flowWindow = selMonths ?? 12;
     await connectDB();
     const [docs, items, statementsRaw, receipts, subs, settings] = await Promise.all([
       Expense.find({}).select('kind amount category date period').lean() as Promise<Lean[]>,
@@ -83,15 +91,15 @@ export async function GET(req: NextRequest) {
     const thisYear = String(now.getFullYear());
 
     const months: string[] = [];
-    for (let i = 5; i >= 0; i--) {
+    for (let i = spendWindow - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
     }
     const monthly = months.map((m) => ({ period: m, expense: 0, income: 0 }));
 
-    // ── Income vs expense (last 12 months). Mirrors web /reports "Cash flow". ──
+    // ── Income vs expense (windowed months). Mirrors web /reports "Cash flow". ──
     const ie: Array<{ period: string; income: number; expense: number }> = [];
-    for (let i = 11; i >= 0; i--) {
+    for (let i = flowWindow - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       ie.push({ period: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, income: 0, expense: 0 });
     }
@@ -176,6 +184,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       currency: settings.currency || 'EUR',
+      // Effective trend window the client should highlight (6/12/24). Legacy
+      // (no param) reports 12 but keeps the asymmetric 6/12 arrays for old clients.
+      months: selMonths ?? 12,
       netPosition,
       thisMonth: { income: sum.mInc, expense: sum.mExp, net: sum.mInc - sum.mExp },
       thisYear: { income: sum.yInc, expense: sum.yExp, net: sum.yInc - sum.yExp },

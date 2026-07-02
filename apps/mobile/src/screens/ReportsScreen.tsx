@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, StyleSheet, Pressable } from 'react-native';
 import { C } from '../theme';
 import { money, Spinner, ErrorText, contentWidth } from '../ui';
 import { getReports, type Reports } from '../api';
@@ -52,17 +52,20 @@ function FlowRow({ label, income, expense, max, cur }: { label: string; income: 
   );
 }
 
+const RANGES = [6, 12, 24] as const;
+
 export function ReportsScreen() {
   const [d, setD] = useState<Reports | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [months, setMonths] = useState<number>(12); // trend window (spend + cash-flow)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (m: number) => {
     setErr(null);
-    try { setD(await getReports()); } catch (e) { setErr((e as Error).message); }
+    try { setD(await getReports(m)); } catch (e) { setErr((e as Error).message); }
   }, []);
-  useEffect(() => { load(); }, [load]);
-  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+  useEffect(() => { load(months); }, [months, load]);
+  const onRefresh = useCallback(async () => { setRefreshing(true); await load(months); setRefreshing(false); }, [load, months]);
 
   if (!d && !err) return <Spinner />;
 
@@ -115,13 +118,24 @@ export function ReportsScreen() {
             </>
           )}
 
-          <Text style={s.section}>SPEND · LAST 6 MONTHS</Text>
+          <View style={s.rangeHead}>
+            <Text style={[s.section, { marginBottom: 0 }]}>TRENDS</Text>
+            <View style={s.rangeRow}>
+              {RANGES.map((r) => (
+                <Pressable key={r} onPress={() => setMonths(r)} style={[s.rangeChip, months === r && s.rangeChipOn]}>
+                  <Text style={[s.rangeText, months === r && s.rangeTextOn]}>{r}m</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <Text style={s.section}>SPEND · LAST {d.monthly.length} MONTHS</Text>
           {d.monthly.map((m) => <Bar key={m.period} label={mLabel(m.period)} value={m.expense} max={monthMax} cur={cur} color={C.gold} />)}
 
           {(d.incomeExpense ?? []).some((m) => m.income > 0 || m.expense > 0) && (
             <>
               <View style={s.flowHead}>
-                <Text style={s.section}>CASH FLOW · 12 MONTHS</Text>
+                <Text style={s.section}>CASH FLOW · {(d.incomeExpense ?? []).length} MONTHS</Text>
                 <View style={s.legend}>
                   <View style={[s.dot, { backgroundColor: C.accent }]} /><Text style={s.legendText}>in</Text>
                   <View style={[s.dot, { backgroundColor: C.red, marginLeft: 10 }]} /><Text style={s.legendText}>out</Text>
@@ -201,6 +215,12 @@ const s = StyleSheet.create({
   cardVal: { fontSize: 22, fontWeight: '800', marginTop: 4 },
   cardSub: { color: C.dim, fontSize: 11, marginTop: 2 },
   section: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 24, marginBottom: 10 },
+  rangeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24 },
+  rangeRow: { flexDirection: 'row', gap: 6 },
+  rangeChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 9, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
+  rangeChipOn: { backgroundColor: C.accent, borderColor: C.accent },
+  rangeText: { color: C.dim, fontSize: 12, fontWeight: '600' },
+  rangeTextOn: { color: C.onAccent },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   barLabel: { color: C.dim, fontSize: 12, width: 64 },
   track: { flex: 1, height: 10, borderRadius: 5, backgroundColor: C.surface2, overflow: 'hidden' },

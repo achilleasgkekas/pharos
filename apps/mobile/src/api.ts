@@ -357,6 +357,7 @@ export function deleteCard(id: string) {
 // ---- Reports ----
 export type Reports = {
   currency: string;
+  months?: number; // effective trend window (6/12/24); absent on older servers
   netPosition: { inventoryValue: number; installmentsOwed: number; activePlans: number; net: number };
   thisMonth: { income: number; expense: number; net: number };
   thisYear: { income: number; expense: number; net: number };
@@ -371,7 +372,9 @@ export type Reports = {
   biggestPurchases: { store: string; total: number; date: string }[];
   warrantiesExpiring: { title: string; until: string; days: number }[];
 };
-export function getReports() { return request<Reports>('/api/v1/reports'); }
+export function getReports(months?: number) {
+  return request<Reports>(months ? `/api/v1/reports?months=${months}` : '/api/v1/reports');
+}
 
 // ---- Calendar ----
 export type CalEvent = { date: string; kind: 'renewal' | 'voucher' | 'warranty'; label: string; amount?: number };
