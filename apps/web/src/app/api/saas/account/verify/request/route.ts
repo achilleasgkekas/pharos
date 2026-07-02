@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import { Account } from '@/models/Account';
-import { saasAuthGate } from '@/lib/tenancy/saasApi';
+import { saasAuthGate, saasGuard } from '@/lib/tenancy/saasApi';
 import { getCurrentAccount } from '@/lib/tenancy/accountSession';
 import { mintVerifyToken } from '@/lib/tenancy/emailVerify';
 import { mailerCanDeliver, sendEmail, verifyEmail, verifyLinkUrl } from '@/lib/tenancy/mailer';
@@ -25,30 +25,32 @@ export const dynamic = 'force-dynamic';
  * silently (fail closed).
  */
 export async function POST(req: NextRequest) {
-  const gate = saasAuthGate();
-  if (gate) return gate;
+  return saasGuard(async () => {
+    const gate = saasAuthGate();
+    if (gate) return gate;
 
-  const claims = await getCurrentAccount();
-  if (!claims) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    const claims = await getCurrentAccount();
+    if (!claims) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-  await connectDB();
-  const account = await Account.findById(claims.sub).select('_id email emailVerified');
-  if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 });
+    await connectDB();
+    const account = await Account.findById(claims.sub).select('_id email emailVerified');
+    if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 });
 
-  if (account.emailVerified) return NextResponse.json({ ok: true, alreadyVerified: true });
+    if (account.emailVerified) return NextResponse.json({ ok: true, alreadyVerified: true });
 
-  const { token, tokenHash, expires } = mintVerifyToken();
-  account.set({ verifyTokenHash: tokenHash, verifyTokenExpires: expires });
-  await account.save();
+    const { token, tokenHash, expires } = mintVerifyToken();
+    account.set({ verifyTokenHash: tokenHash, verifyTokenExpires: expires });
+    await account.save();
 
-  // Email the verification link through the configured provider (best-effort; never throws).
-  if (mailerCanDeliver()) {
-    const base = pickBaseUrl(process.env.SAAS_PUBLIC_URL || process.env.APP_URL, new URL(req.url).origin);
-    const { subject, html } = verifyEmail(verifyLinkUrl(base, token));
-    await sendEmail({ to: account.email, subject, html });
-  }
+    // Email the verification link through the configured provider (best-effort; never throws).
+    if (mailerCanDeliver()) {
+      const base = pickBaseUrl(process.env.SAAS_PUBLIC_URL || process.env.APP_URL, new URL(req.url).origin);
+      const { subject, html } = verifyEmail(verifyLinkUrl(base, token));
+      await sendEmail({ to: account.email, subject, html });
+    }
 
-  // SCAFFOLD: echo the token only when nothing was delivered AND we are not in production.
-  const canEcho = !mailerCanDeliver() && process.env.NODE_ENV !== 'production';
-  return NextResponse.json(canEcho ? { ok: true, devToken: token } : { ok: true });
+    // SCAFFOLD: echo the token only when nothing was delivered AND we are not in production.
+    const canEcho = !mailerCanDeliver() && process.env.NODE_ENV !== 'production';
+    return NextResponse.json(canEcho ? { ok: true, devToken: token } : { ok: true });
+  });
 }

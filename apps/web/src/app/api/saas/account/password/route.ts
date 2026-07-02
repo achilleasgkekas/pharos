@@ -3,7 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Account } from '@/models/Account';
 import { hashPassword, verifyPassword } from '@/lib/auth';
 import { readBody, strField } from '@/lib/apiBody';
-import { saasAuthGate } from '@/lib/tenancy/saasApi';
+import { saasAuthGate, saasGuard } from '@/lib/tenancy/saasApi';
 import { getCurrentAccount } from '@/lib/tenancy/accountSession';
 import { passwordChangeError } from '@/lib/tenancy/accountProfile';
 
@@ -18,29 +18,31 @@ export const dynamic = 'force-dynamic';
  * new hash verifies on the next login; existing sessions are not force-expired here.
  */
 export async function POST(req: NextRequest) {
-  const gate = saasAuthGate();
-  if (gate) return gate;
+  return saasGuard(async () => {
+    const gate = saasAuthGate();
+    if (gate) return gate;
 
-  const claims = await getCurrentAccount();
-  if (!claims) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    const claims = await getCurrentAccount();
+    if (!claims) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-  const b = await readBody(req);
-  const current = strField(b, 'currentPassword');
-  const next = strField(b, 'newPassword');
-  if (!current || !next) {
-    return NextResponse.json({ error: 'currentPassword and newPassword are required' }, { status: 400 });
-  }
-  const policyError = passwordChangeError(current, next);
-  if (policyError) return NextResponse.json({ error: policyError }, { status: 400 });
+    const b = await readBody(req);
+    const current = strField(b, 'currentPassword');
+    const next = strField(b, 'newPassword');
+    if (!current || !next) {
+      return NextResponse.json({ error: 'currentPassword and newPassword are required' }, { status: 400 });
+    }
+    const policyError = passwordChangeError(current, next);
+    if (policyError) return NextResponse.json({ error: policyError }, { status: 400 });
 
-  await connectDB();
-  const account = await Account.findById(claims.sub).select('_id passwordHash');
-  if (!account || !verifyPassword(current, account.passwordHash)) {
-    return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
-  }
+    await connectDB();
+    const account = await Account.findById(claims.sub).select('_id passwordHash');
+    if (!account || !verifyPassword(current, account.passwordHash)) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
 
-  account.passwordHash = hashPassword(next);
-  await account.save();
+    account.passwordHash = hashPassword(next);
+    await account.save();
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  });
 }

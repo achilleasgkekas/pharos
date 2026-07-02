@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import { Account } from '@/models/Account';
 import { readBody, strField } from '@/lib/apiBody';
-import { saasAuthGate } from '@/lib/tenancy/saasApi';
+import { saasAuthGate, saasGuard } from '@/lib/tenancy/saasApi';
 import { normalizeEmail, looksLikeEmail } from '@/lib/tenancy/members';
 import { mintResetToken, resetDeliveryConfigured } from '@/lib/tenancy/passwordReset';
 import { sendEmail, resetEmail, resetLinkUrl } from '@/lib/tenancy/mailer';
@@ -26,34 +26,36 @@ export const dynamic = 'force-dynamic';
  * happens — an unwired mailer there just drops the token silently (fail closed, no leak).
  */
 export async function POST(req: NextRequest) {
-  const gate = saasAuthGate();
-  if (gate) return gate;
+  return saasGuard(async () => {
+    const gate = saasAuthGate();
+    if (gate) return gate;
 
-  const b = await readBody(req);
-  const email = normalizeEmail(strField(b, 'email', '', true));
-  if (!looksLikeEmail(email)) {
-    return NextResponse.json({ error: 'A valid email is required' }, { status: 400 });
-  }
+    const b = await readBody(req);
+    const email = normalizeEmail(strField(b, 'email', '', true));
+    if (!looksLikeEmail(email)) {
+      return NextResponse.json({ error: 'A valid email is required' }, { status: 400 });
+    }
 
-  await connectDB();
-  const account = await Account.findOne({ email }).select('_id');
+    await connectDB();
+    const account = await Account.findOne({ email }).select('_id');
 
-  // No account → still return ok (no enumeration). No token minted.
-  if (!account) return NextResponse.json({ ok: true });
+    // No account → still return ok (no enumeration). No token minted.
+    if (!account) return NextResponse.json({ ok: true });
 
-  const { token, tokenHash, expires } = mintResetToken();
-  account.set({ resetTokenHash: tokenHash, resetTokenExpires: expires });
-  await account.save();
+    const { token, tokenHash, expires } = mintResetToken();
+    account.set({ resetTokenHash: tokenHash, resetTokenExpires: expires });
+    await account.save();
 
-  // Email the reset link through the configured provider (best-effort; never throws).
-  if (resetDeliveryConfigured()) {
-    const base = pickBaseUrl(process.env.SAAS_PUBLIC_URL || process.env.APP_URL, new URL(req.url).origin);
-    const { subject, html } = resetEmail(resetLinkUrl(base, token));
-    await sendEmail({ to: email, subject, html });
-  }
+    // Email the reset link through the configured provider (best-effort; never throws).
+    if (resetDeliveryConfigured()) {
+      const base = pickBaseUrl(process.env.SAAS_PUBLIC_URL || process.env.APP_URL, new URL(req.url).origin);
+      const { subject, html } = resetEmail(resetLinkUrl(base, token));
+      await sendEmail({ to: email, subject, html });
+    }
 
-  // SCAFFOLD: when no delivery channel is wired AND we are not in production, echo the token
-  // so the flow is testable locally. In production an unwired mailer drops it silently.
-  const canEcho = !resetDeliveryConfigured() && process.env.NODE_ENV !== 'production';
-  return NextResponse.json(canEcho ? { ok: true, devToken: token } : { ok: true });
+    // SCAFFOLD: when no delivery channel is wired AND we are not in production, echo the token
+    // so the flow is testable locally. In production an unwired mailer drops it silently.
+    const canEcho = !resetDeliveryConfigured() && process.env.NODE_ENV !== 'production';
+    return NextResponse.json(canEcho ? { ok: true, devToken: token } : { ok: true });
+  });
 }

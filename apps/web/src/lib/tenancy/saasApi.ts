@@ -24,6 +24,24 @@ export function saasAuthGate(): NextResponse | null {
   return null;
 }
 
+/**
+ * Wrap a SaaS route handler body so an unexpected thrown error becomes a clean `{ error }`
+ * 500 (JSON) instead of Next's default HTML 500 page. Mirrors the catch in the v1 `withAuth`
+ * wrapper (`lib/apiAuth.ts`). Gate checks, validation, and all deliberate short-circuits
+ * still return their own responses — this only catches the unforeseen throw (e.g. a DB
+ * failure mid-handler) so the client always sees the uniform `{ error }` shape.
+ *
+ * Usage: `export async function GET() { return saasGuard(async () => { ... }); }`
+ */
+export async function saasGuard(fn: () => Promise<NextResponse>): Promise<NextResponse> {
+  try {
+    return await fn();
+  } catch (e) {
+    const message = (e as Error).message?.slice(0, 200) || 'Server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 export type AccountTenant = {
   tenantId: string;
   slug: string;

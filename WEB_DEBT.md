@@ -455,7 +455,7 @@
   - ΣΗΜ scope: αν φανεί μεγάλο, split — S πρώτα (helper + account/* 5 routes), μετά S (members + billing 3 routes).
   - Επαλήθευση: κάθε write route της λίστας έχει το thrown-path να περνά από τον helper· `grep -rn 'saasRoute\|try {' src/app/api/saas/account` δείχνει coverage στα 5 account routes.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-02 auditor)
+- Status: DOING — **slice 1/2 DONE 2026-07-02 (pharos-daily-dev)**. Νέος helper `saasGuard(fn)` στο `lib/tenancy/saasApi.ts` (mirror του `withAuth` catch: `try { return await fn(); } catch (e) { return NextResponse.json({ error: (e as Error).message?.slice(0,200) || 'Server error' }, { status: 500 }); }`) + adopted στα **6 account/* files (7 handlers)**: `account/route.ts` (GET+PATCH), `account/password`, `account/reset/{request,confirm}`, `account/verify/{request,confirm}`. Gate ladders + validation + όλες οι deliberate short-circuits αμετάβλητες· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500. Νέο `saasGuard.test.ts` (6 tests: happy pass-through, gate-404 pass-through, throw→500{error}, 200-char slice, empty→'Server error', no-extra-keys). type-check EXIT 0, 23/23 tests green, safe Docker rebuild `/login` 200 + `GET/POST /api/saas/account*` no-auth → **401 (gated, όχι 500)**, RestartCount 0. **slice 2/2 TODO** = members + invites/resend + billing×3 + auth/{login,signup} (adopt `saasGuard` στο ίδιο pattern).
 
 ### Sparse index στα Account token-hash fields (verifyTokenHash / resetTokenHash)
 - Priority: P3
