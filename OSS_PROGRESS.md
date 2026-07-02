@@ -750,3 +750,22 @@ source edit (τώρα εκτός territory)· (β) API-shape tests που δεν
 helpers σε api routes, π.χ. body-parsers)· (γ) pure branches σε `models/` αν προστεθούν helpers.
 Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα). Ένα module ανά run.
 Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — expenses/serialize.test.ts)
+
+**Task: (f συνέχεια) Pure API-shape test file `apps/web/src/app/api/v1/expenses/serialize.test.ts` για το `trimExpense` του `app/api/v1/expenses/serialize.ts`.**
+
+Επιλογή target: το `receipts/serialize.ts` είχε ήδη test· το αδελφό `expenses/serialize.ts` (το άλλο v1 serializer) ήταν ακάλυπτο. Καθαρός στόχος: το `trimExpense` είναι deterministic (μηδέν clock/fs/network/DB· το `iso` είναι pure Date→ISO wrapper, το apiList import μόνο type), και είναι το single source of truth για το v1 Expense JSON shape που μοιράζονται το GET /api/v1/expenses (list) + το rescan POST, οπότε το τεστ κλειδώνει το contract που καταναλώνει το mobile detail.
+
+Τι έγινε:
+- Νέο `expenses/serialize.test.ts` (12 tests). Καλύπτει: _id→String coercion (number + toString object)· όλα τα defaults από bare _id (kind='expense', category='other', amount=0, currency='EUR', date=null, period='', recurring=false, recurringCycle='', paymentMethod='', notes='', file=null, thumb=null, verified=false, updatedAt=null, deleted=false)· passthrough populated scalars (incl. ελληνικά notes)· **amount 0 / αρνητικό διατηρείται** (δεν το πατάει το default)· booleanize recurring/verified· date+updatedAt → ISO μέσω iso()· null date όταν λείπει· empty-string filePath/thumbPath → null· non-empty paths passthrough· deleted true μόνο με deletedAt set (null/absent → false)· **exact key-set guard** (extra lean fields όπως __v δεν διαρρέουν στο output).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/expenses/serialize.test.ts` → 12/12 passed.
+- `npx vitest run` (όλο το suite) → 47 files, 702/702 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` (ΔΕΝ το άγγιξα/staged) + το νέο serialize.test.ts. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure test file. Με τα δύο v1 serializers καλυμμένα, απομένοντα καθαρά targets: (α) API-shape/validation helpers σε api routes που δεν θέλουν live Mongo (π.χ. body-parsers/query-parsers σε app/api/v1/*)· (β) additive-export ενός `aiProviders.ts` internal helper (`stripFences`/`mediaTypeOf`) ΑΝ εγκριθεί source edit (τώρα εκτός territory). Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
