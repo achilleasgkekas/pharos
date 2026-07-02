@@ -386,6 +386,31 @@ h1, h2, h3 {
 }
 
 /* Product showcase (CSS-drawn app window, no screenshot assets) */
+/* Secondary CTA band */
+.cta-band {
+  position: relative;
+  border: 1px solid var(--border-light);
+  border-radius: 18px;
+  background: var(--surface);
+  overflow: hidden;
+  text-align: center;
+}
+.cta-band::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(520px circle at 10% 0%, rgba(0, 255, 136, 0.1), transparent 60%),
+    radial-gradient(520px circle at 90% 100%, rgba(165, 94, 234, 0.1), transparent 60%);
+  pointer-events: none;
+}
+.cta-band-inner {
+  position: relative;
+  z-index: 1;
+  padding: 52px 28px;
+}
+
 .showcase {
   position: relative;
   max-width: 940px;

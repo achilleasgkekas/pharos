@@ -702,6 +702,30 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Secondary CTA band ────────────────────────────── */}
+      <section id="cta" style={{ padding: '8px 0 40px' }}>
+        <div className="container" style={{ maxWidth: 900 }}>
+          <div className="cta-band">
+            <div className="cta-band-inner">
+              <p className="mono" style={{ marginBottom: 14 }}>Two paths, one app</p>
+              <h2 style={{ fontSize: 'clamp(1.7rem, 4vw, 2.6rem)', fontWeight: 700, marginBottom: 14 }}>
+                Ready to see everything in one place?
+              </h2>
+              <p style={{ color: 'var(--text-dim)', maxWidth: 520, margin: '0 auto 30px' }}>
+                Run it yourself for free, forever, or let us host it for you.
+                Your data, your call, and you can switch either way.
+              </p>
+              <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <a href="#pricing" className="btn btn-primary">Get started</a>
+                <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
+                  Self-host it free
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── FAQ ───────────────────────────────────────────── */}
       <section id="faq" style={{ padding: '64px 0' }}>
         <div className="container" style={{ maxWidth: 760 }}>

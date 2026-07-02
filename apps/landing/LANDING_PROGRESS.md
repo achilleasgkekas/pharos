@@ -377,3 +377,25 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02 (cont.¹⁰)
+
+Task: (e) Polish, μερος 16 — secondary CTA band αναμεσα σε Compare και FAQ. Ηταν το explicit «επομενο increment» που ειχα σημειωσει (self-contained, μηδεν assets, high-conversion). Το τοποθετησα ΜΕΤΑ το compare table (φυσικο conversion σημειο: «ειδες τη διαφορα, τωρα διαλεξε») και ΠΡΙΝ το FAQ, ωστε να μην επικαλυπτεται με το waitlist card στο τελος (που ειναι email-capture μονο). Το band προσφερει ΚΑΙ τα δυο paths (self-host free / hosted) — ταιριαζει με το dual-model positioning.
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεο `#cta` section με `.cta-band` -> `.cta-band-inner`: mono eyebrow «Two paths, one app» + h2 «Ready to see everything in one place?» + subtext (run it free forever ή hosted, switch either way) + 2 buttons (Get started -> #pricing, Self-host it free -> GITHUB_URL, ιδια btn-primary/btn-ghost με το hero). Semantic, μηδεν client JS.
+- `app/globals.css`: νεες `.cta-band` (border-light, radius 18, surface bg, overflow hidden) + `.cta-band::before` (dual radial-gradient glow accent 10%/purple 10%, ιδιο idiom με `.showcase::before`) + `.cta-band-inner` (z-index 1, padding 52px 28px). Reuse υπαρχουσας παλετας/glow pattern.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 761 B / 103 kB First Load JS, αμεταβλητο — pure static markup+CSS, μηδεν bundle impact).
+- Prerendered HTML (`.next/server/app/index.html`): «Ready to see everything in one place?» + «Two paths, one app» + `cta-band` ολα present.
+- Preview (landing-dev, port 3100): DOM eval -> band present, heading σωστο, 2 buttons με σωστα hrefs (#pricing, github), borderRadius 18px, inner padding 52px 28px· console errors: none· hero screenshot καθαρο (brand palette intact). Σταματησα τον server. (ΣΗΜ: το preview_screenshot πιανει παντα το top — γνωστο headless viewport quirk, οχι bug· επαληθευση μεσω DOM eval + static output.) Docker/web/mobile αθικτα. Το `.claude/launch.json` (shared local config) ΔΕΝ commit (collision guard — μονο app/page.tsx + app/globals.css + LANDING_PROGRESS.md).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση του CSS mockup (#preview) με πραγματικα app screenshots οταν υπαρξουν assets· η per-plan Offer JSON-LD nodes οταν κλεισουν οι τιμες· η «who»/«compare» links στο top nav (τωρα reachable μονο με scroll).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.
