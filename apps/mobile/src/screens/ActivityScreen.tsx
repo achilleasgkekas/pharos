@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, StyleSheet, Alert } from 'react-native';
 import { C, alpha } from '../theme';
-import { shortDate, Spinner, ErrorText, Empty, Card, Badge } from '../ui';
+import { shortDate, Spinner, ErrorText, Empty, Card, Badge, contentWidth } from '../ui';
 import {
   getTrash, restoreTrash, purgeTrash, currentUser,
   getJobs, getHistory, getNotifications, markNotificationRead,
@@ -297,7 +297,7 @@ const s = StyleSheet.create({
   alertHead: { flexDirection: 'row', alignItems: 'center', paddingRight: 16 },
   markAll: { borderWidth: 1, borderColor: C.accent, borderRadius: 9, paddingVertical: 6, paddingHorizontal: 11 },
   markAllText: { color: C.accent, fontSize: 12, fontWeight: '700' },
-  list: { padding: 16, paddingTop: 4 },
+  list: { padding: 16, paddingTop: 4, ...contentWidth },
   unreadCard: { borderColor: alpha(C.cyan, 0.27), backgroundColor: alpha(C.cyan, 0.04) },
   dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.cyan, marginTop: 4 },
   head: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
-import { shortDate, Spinner, ErrorText, Empty, Check, Input, TextArea, Button, IconButton, Card } from '../ui';
+import { shortDate, Spinner, ErrorText, Empty, Check, Input, TextArea, Button, IconButton, Card, contentWidth } from '../ui';
 import { getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, scanVoucherImage, type Voucher, type ParsedVoucherData } from '../api';
 
 type Draft = { title: string; code: string; store: string; discount: string; expiresAt: string; url: string; used: boolean };
@@ -111,7 +111,7 @@ export function VouchersScreen() {
       <FlatList
         data={rows}
         keyExtractor={(v) => v.id}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={[{ padding: 16 }, contentWidth]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={<Empty>No vouchers.</Empty>}
         renderItem={({ item }) => (

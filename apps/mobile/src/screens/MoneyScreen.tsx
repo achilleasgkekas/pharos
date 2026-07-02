@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem, contentWidth } from '../ui';
 import { getExpenses, addExpense, deleteExpense, updateExpense, scanExpenseImage, type Expense, type ParsedExpenseData } from '../api';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
@@ -141,7 +141,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
       <FlatList
         data={rows}
         keyExtractor={(r) => r.id}
-        contentContainerStyle={{ padding: 16, paddingTop: 4 }}
+        contentContainerStyle={[{ padding: 16, paddingTop: 4 }, contentWidth]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={<Empty>Nothing here yet.</Empty>}
         renderItem={({ item }) => (

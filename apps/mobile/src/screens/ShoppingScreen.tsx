@@ -7,7 +7,7 @@ import { C, scrim } from '../theme';
 import {
   getShoppingList, addListItem, toggleListItem, deleteListItem, scanProduct, type ListItem, type ScannedProduct,
 } from '../api';
-import { Button, Check, IconButton } from '../ui';
+import { Button, Check, IconButton, contentWidth } from '../ui';
 
 export function ShoppingScreen() {
   const [items, setItems] = useState<ListItem[]>([]);
@@ -93,7 +93,7 @@ export function ShoppingScreen() {
       <FlatList
         data={sorted}
         keyExtractor={(i) => i._id}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={[{ paddingBottom: 40 }, contentWidth]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={<Text style={s.empty}>Your list is empty — add an item or scan a product.</Text>}
         renderItem={({ item }) => (

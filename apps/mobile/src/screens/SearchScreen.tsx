@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import { C } from '../theme';
-import { Empty, Badge } from '../ui';
+import { Empty, Badge, contentWidth } from '../ui';
 import { search, type SearchHit } from '../api';
 import type { ScreenKey } from './HomeScreen';
 
@@ -58,7 +58,7 @@ export function SearchScreen({ onOpen }: { onOpen: (k: ScreenKey) => void }) {
         data={hits}
         keyExtractor={(h) => `${h.type}-${h.id}`}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: 16, paddingTop: 4 }}
+        contentContainerStyle={[{ padding: 16, paddingTop: 4 }, contentWidth]}
         ListEmptyComponent={q.trim().length >= 2 && !busy ? <Empty>No matches.</Empty> : null}
         renderItem={({ item }) => {
           const dest = TO_SCREEN[item.type];

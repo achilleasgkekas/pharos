@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, SectionList, RefreshControl, StyleSheet } from 'react-native';
 import { C } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, ListItem } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, ListItem, contentWidth } from '../ui';
 import { getCalendar, type CalMonth, type CalEntry, type CalEntryKind } from '../api';
 
 const KIND: Record<CalEntryKind, { label: string; color: string }> = {
@@ -40,7 +40,7 @@ export function CalendarScreen() {
       <SectionList
         sections={sections}
         keyExtractor={(_, i) => String(i)}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={[{ padding: 16 }, contentWidth]}
         stickySectionHeadersEnabled={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={!hasAny ? <Empty>Nothing coming up.</Empty> : null}

@@ -403,7 +403,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Depends on: none
 - Acceptance:
   - Το main content έχει maxWidth (π.χ. 640) και κεντράρεται σε wide viewport· δεν τεντώνεται edge-to-edge σε tablet/landscape (τώρα μόνο 2 maxWidth usages σε όλο το app, καμία στο content)
-- Status: TODO
+- Status: ✅ DONE (2026-07-03 pharos-daily-dev) — νέο `contentWidth: ViewStyle` const στο `ui.tsx` (`{ width:'100%', maxWidth:640, alignSelf:'center' }`, JSDoc): `width:'100%'` γεμίζει το phone, `maxWidth` καπάρει το tablet, `alignSelf:'center'` κεντράρει το capped column → **no-op σε phone** (ήδη κάτω από 640), centering μόνο σε tablet/landscape. Εφαρμόστηκε στο main scroll/list content-container **14 screens**: named-style spread (ActivityScreen `s.list` [τα 4 tab FlatLists], HomeScreen `s.content`) + inline array `[{…}, contentWidth]` (Reports/Settings root ScrollView + Calendar/Items/Money/Receipts/Search/Shopping/Statements/Subscriptions/Tasks/Vouchers κύριο FlatList). Modals/inner-scrolls + Assistant(chat)/Login(centered form) αφέθηκαν σκόπιμα. mobile `tsc --noEmit` **EXIT 0**. ΣΗΜ: μη-verifiable χωρίς tablet simulator, αλλά byte-safe σε phone (min(100%,640)).
 
 ### Light / dark theme via theme context
 - Priority: P3

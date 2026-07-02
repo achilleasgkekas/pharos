@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { C } from '../theme';
-import { money, Spinner, ErrorText } from '../ui';
+import { money, Spinner, ErrorText, contentWidth } from '../ui';
 import { getReports, type Reports } from '../api';
 
 function Bar({ label, value, max, cur, color }: { label: string; value: number; max: number; cur: string; color: string }) {
@@ -52,7 +52,7 @@ export function ReportsScreen() {
   const mLabel = (p: string) => { const [, m] = p.split('-'); return ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][parseInt(m, 10)] || p; };
 
   return (
-    <ScrollView style={s.wrap} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}>
+    <ScrollView style={s.wrap} contentContainerStyle={[{ padding: 16, paddingBottom: 40 }, contentWidth]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}>
       <ErrorText>{err}</ErrorText>
       {d && (
         <>

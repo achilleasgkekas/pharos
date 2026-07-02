@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, StyleSheet } from 'react-native';
 import { C } from '../theme';
-import { money, Spinner, ErrorText } from '../ui';
+import { money, Spinner, ErrorText, contentWidth } from '../ui';
 import { getOverview, type Overview } from '../api';
 
 export type ScreenKey = 'home' | 'shopping' | 'receipts' | 'tasks' | 'expenses' | 'income' | 'subscriptions' | 'items' | 'assistant' | 'vouchers' | 'statements' | 'calendar' | 'reports' | 'settings' | 'search' | 'activity';
@@ -64,7 +64,7 @@ export function HomeScreen({ onOpen }: { onOpen: (k: ScreenKey) => void }) {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
-  content: { padding: 16, paddingBottom: 40 },
+  content: { padding: 16, paddingBottom: 40, ...contentWidth },
   head: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },
   brand: { color: C.text, fontSize: 24, fontWeight: '800', letterSpacing: 3 },
   sub: { color: C.dim, fontSize: 12, marginTop: 2 },

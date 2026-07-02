@@ -2,6 +2,14 @@ import React from 'react';
 import { View, Text, Pressable, ActivityIndicator, StyleSheet, TextInput, type TextInputProps, type StyleProp, type ViewStyle, type TextStyle } from 'react-native';
 import { C, SIZE, RADIUS, SPACE } from './theme';
 
+/**
+ * Max readable content-column width for the main list/scroll containers. Spread into a
+ * `contentContainerStyle` array to cap and center the column on tablet/landscape; it is
+ * a no-op on phones (already narrower than the cap). `width:'100%'` fills a phone,
+ * `maxWidth` caps a tablet, `alignSelf:'center'` centers the capped column.
+ */
+export const contentWidth: ViewStyle = { width: '100%', maxWidth: 640, alignSelf: 'center' };
+
 export const CUR: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' };
 export const money = (n: number | undefined, cur = 'EUR') => `${CUR[cur] || cur + ' '}${(n ?? 0).toLocaleString()}`;
 export const shortDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString() : '');

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
-import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Badge, ListItem } from '../ui';
+import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Badge, ListItem, contentWidth } from '../ui';
 import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task, type TaskStep } from '../api';
 
 const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
@@ -106,7 +106,7 @@ export function TasksScreen() {
       <FlatList
         data={sorted}
         keyExtractor={(t) => t.id}
-        contentContainerStyle={{ padding: 16, paddingTop: 4 }}
+        contentContainerStyle={[{ padding: 16, paddingTop: 4 }, contentWidth]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={<Empty>No tasks. Add one above.</Empty>}
         renderItem={({ item }) => {

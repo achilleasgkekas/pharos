@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button, ListItem } from '../ui';
+import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button, ListItem, contentWidth } from '../ui';
 import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
 function verdictMeta(v: Verdict): { label: string; color: string } | null {
@@ -381,7 +381,7 @@ export function ItemsScreen() {
         <FlatList
           data={rows}
           keyExtractor={(i) => i.id}
-          contentContainerStyle={{ padding: 16, paddingTop: 4 }}
+          contentContainerStyle={[{ padding: 16, paddingTop: 4 }, contentWidth]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
           ListEmptyComponent={<Empty>No items.</Empty>}
           renderItem={({ item }) => {

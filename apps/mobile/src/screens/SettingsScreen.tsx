@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal } from 'react-native';
 import { C, alpha, scrim } from '../theme';
-import { money, ErrorText, Check, Input, TextArea } from '../ui';
+import { money, ErrorText, Check, Input, TextArea, contentWidth } from '../ui';
 import { PharosMark } from '../PharosMark';
 import { APP_VERSION } from '../config';
 import {
@@ -91,7 +91,7 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
   if (loading) return <View style={s.loadWrap}><ActivityIndicator color={C.accent} /></View>;
 
   return (
-    <ScrollView style={s.wrap} contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScrollView style={s.wrap} contentContainerStyle={[{ padding: 16, paddingBottom: 40 }, contentWidth]} keyboardShouldPersistTaps="handled">
       <View style={s.logo}><PharosMark size={40} /></View>
       <ErrorText>{err}</ErrorText>
 

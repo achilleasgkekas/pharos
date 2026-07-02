@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, ListItem } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, ListItem, contentWidth } from '../ui';
 import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription } from '../api';
 
 const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
@@ -93,7 +93,7 @@ export function SubscriptionsScreen() {
       <FlatList
         data={rows}
         keyExtractor={(r) => r.id}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={[{ padding: 16 }, contentWidth]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListHeaderComponent={rows.length ? <Text style={s.head}>{active.length} active</Text> : null}
         ListEmptyComponent={<Empty>No subscriptions.</Empty>}

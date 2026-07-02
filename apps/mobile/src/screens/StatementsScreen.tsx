@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, Modal, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Card } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Card, contentWidth } from '../ui';
 import { getStatements, getStatementTxns, getInstallmentPlans, type Statement, type StatementTxn, type InstallmentPlan } from '../api';
 
 // "2028-10-01" → "Oct 2028" for payoff dates.
@@ -49,7 +49,7 @@ export function StatementsScreen() {
       <FlatList
         data={rows}
         keyExtractor={(r) => r.id}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={[{ padding: 16 }, contentWidth]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListHeaderComponent={plans.length ? (
           <View style={s.plansBox}>
