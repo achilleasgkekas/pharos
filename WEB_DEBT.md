@@ -365,6 +365,35 @@
 
 ## Web Debt Queue
 
+### SaaS route handlers χωρίς try/catch → ασυνεπές 500 error-shape vs v1 `withAuth`
+- Priority: P2
+- Size: M
+- Area: shared
+- Files: apps/web/src/lib/apiAuth.ts (ή νέο `lib/tenancy/saasApi.ts` helper), apps/web/src/app/api/saas/account/verify/request/route.ts, apps/web/src/app/api/saas/account/verify/confirm/route.ts, apps/web/src/app/api/saas/account/reset/request/route.ts, apps/web/src/app/api/saas/account/reset/confirm/route.ts, apps/web/src/app/api/saas/account/password/route.ts, apps/web/src/app/api/saas/members/route.ts, apps/web/src/app/api/saas/billing/checkout/route.ts, apps/web/src/app/api/saas/billing/portal/route.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα:** κάθε v1 route περνά από `withAuth` (`lib/apiAuth.ts:27`) που τυλίγει τον handler σε `try/catch` → σε thrown error γυρίζει καθαρό `apiError(msg, 500)` = `{ error }`. Τα SaaS routes ΔΕΝ έχουν αντίστοιχο wrapper: **14/17** δεν έχουν `try {` (live: `for f in $(find src/app/api/saas -name route.ts); do grep -q 'try {' "$f" || echo "$f"; done`). Στα write paths (account/verify+reset+password, members, billing) ένα thrown `account.save()` / `connectDB()` / Stripe error βγαίνει ως framework-default 500 (κενό ή HTML body), ΟΧΙ ως το `{ error }` shape που περιμένει ο SaaS client — inconsistency με ολόκληρο τον v1 surface.
+  - **Fix:** πρόσθεσε shared helper (mirror του `withAuth` catch, χωρίς το auth κομμάτι), π.χ. `export async function saasRoute(fn: () => Promise<NextResponse>): Promise<NextResponse>` σε `lib/apiAuth.ts` ή `lib/tenancy/saasApi.ts`: `try { return await fn(); } catch (e) { return apiError((e as Error).message?.slice(0,200) || 'Server error', 500); }`. Adoption ΜΟΝΟ στα DB-write routes της λίστας (τα read-only `usage`/`session`/`logout` σπάνια throw → μπορούν να μείνουν)· ο κάθε handler τυλίγει το body του μετά το `saasAuthGate()`/session gate (τα οποία επιστρέφουν early χωρίς throw, μένουν έξω).
+  - Response shapes (validation 400/401/403/404/409, success `{ ok }`/`{ url,id }`/`{ workspace, members }`) + η σειρά των gate-ladders ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· αλλάζει ΜΟΝΟ η συμπεριφορά σε **unexpected throw** (τώρα → καθαρό `{ error }` 500). SaaS-only, μηδέν επίδραση στον v1 mobile surface.
+  - ΣΗΜ scope: αν φανεί μεγάλο, split — S πρώτα (helper + account/* 5 routes), μετά S (members + billing 3 routes).
+  - Επαλήθευση: κάθε write route της λίστας έχει το thrown-path να περνά από τον helper· `grep -rn 'saasRoute\|try {' src/app/api/saas/account` δείχνει coverage στα 5 account routes.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-02 auditor)
+
+### Sparse index στα Account token-hash fields (verifyTokenHash / resetTokenHash)
+- Priority: P3
+- Size: S
+- Area: db
+- Files: apps/web/src/models/Account.ts
+- Depends on: none
+- Acceptance:
+  - Τα confirm routes κάνουν `Account.findOne({ verifyTokenHash: ... })` (`verify/confirm/route.ts:29`) και `Account.findOne({ resetTokenHash: ... })` (`reset/confirm/route.ts:35`) σε **unindexed** πεδία (`Account.ts:24,26` — απλά `{ type: String, default: null }`, μόνο το `email` έχει `unique` index). Collection-scan σε κάθε verify/reset confirm.
+  - **ΣΗΜ low-urgency:** το Account collection είναι μία εγγραφή ανά SaaS owner (μικρό) + οι confirm ops είναι σπάνιες → ελάχιστο πρακτικό κόστος σήμερα. Το flag είναι για consistency (κάθε queried field θέλει index) + future scale.
+  - **Fix:** `Schema.index({ verifyTokenHash: 1 }, { sparse: true })` + `Schema.index({ resetTokenHash: 1 }, { sparse: true })` (sparse γιατί default `null` → δεν indexάρει τα κενά, ο lookup είναι πάντα με non-null hash). Μηδέν αλλαγή runtime λογικής.
+  - Επαλήθευση: `grep -n 'index(' src/models/Account.ts` δείχνει τα 2 νέα sparse indexes.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-02 auditor)
+
 ### Constant-time CRON_SECRET compare — saas/usage/sample route (timing side-channel)
 - Priority: P3
 - Size: S
@@ -378,7 +407,7 @@
   - Η σειρά gate (`saasMode()` 404 → `CRON_SECRET` unset 500 → token 401) + το `{ ok: true, ...result }` success shape + το `sampleAllTenants()` call ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. Είναι saas-only endpoint (δεν αγγίζει τον v1 mobile surface).
   - Επαλήθευση: `grep -n 'timingSafeEqual' src/app/api/saas/usage/sample/route.ts` επιστρέφει hit· `grep -n 'token !== secret' src/app/api/saas` επιστρέφει μηδέν.
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (verified 2026-07-02 auditor) — live: `usage/sample/route.ts:2` κάνει `import { timingSafeEqual } from 'node:crypto';` + local `constEq(a,b)` (γρ.14) = `a.length === b.length && timingSafeEqual(a, b)` που χρησιμοποιείται στο bearer compare. `grep 'token !== secret' src/app/api/saas` = **μηδέν**. Ο builder το έκλεισε· stale-marked TODO.
 
 ### Reset-request route — timing side-channel αποδυναμώνει το anti-enumeration
 - Priority: P3
@@ -405,7 +434,7 @@
   - Το route μένει node runtime + SaaS-gated· `Tenant.findById` / `Tenant.findOne({ billingCustomerId })` fallback, signature-verify, event-switch, response shapes ΟΛΑ αμετάβλητα. Δεν αγγίζει τον v1 mobile surface (SaaS-only endpoint).
   - Επαλήθευση: `grep -rn '\[a-f0-9\]{24}' src/app/api src/lib/tenancy src/lib/billing` επιστρέφει **μηδέν** (πλήρης εξάλειψη inline ObjectId regex σε ΟΛΟ το api + tenancy + billing).
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (verified 2026-07-02 auditor) — live: `webhook/route.ts:7` κάνει `import { isObjectId } from '@/lib/apiBody';` + γρ.82 `if (tenantId && isObjectId(tenantId)) {`. `grep -rn '\[a-f0-9\]{24}' src/app/api src/lib/tenancy src/lib/billing` = **μηδέν**. Stale-marked TODO, ο builder το έκλεισε.
 
 ### apiBody helpers — readBody adoption σε saas billing checkout + portal POST
 - Priority: P3
@@ -422,7 +451,7 @@
   - `readBody` επιστρέφει `Body = Record<string, unknown>` → τα `strField(...)` δίνουν `string` → τέλος ο ψευδής cast. Το `resolveBillingSession` gate-ladder, το `pickBaseUrl`, το `StripeResult` branch (503/502), τα success shapes (`{ url, id }`) ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. SaaS-only routes → μηδέν επίδραση στον v1 mobile surface.
   - Επαλήθευση: `grep -rln 'req.json().catch' apps/web/src/app/api` επιστρέφει **μηδέν** αρχεία (πλήρες κλείσιμο readBody adoption σε ΟΛΟ το api, v1 + saas).
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (verified 2026-07-02 auditor) — live: `checkout/route.ts:5` + `portal/route.ts:5` κάνουν `import { readBody, strField } from '@/lib/apiBody';`· checkout γρ.27-33 `const body = await readBody(req);` + `strField(body,'tenant')` + `checkoutablePlan(strField(body,'plan'))`· portal γρ.28-30 ίδιο pattern. Stale-marked TODO, ο builder το έκλεισε.
 
 ### apiBody helpers — readBody adoption σε saas/members POST + PATCH + DELETE
 - Priority: P3
@@ -436,7 +465,7 @@
   - Τα gate-ladders (`resolveWorkspaceSession` 404/401/403), οι έλεγχοι `looksLikeEmail`/`canAssignRole`/`wouldOrphanOwners`, τα status codes (400/403/404/409/201) και τα success shapes ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. SaaS-only route → μηδέν επίδραση στον v1 mobile surface.
   - Επαλήθευση: `grep -rln 'req.json().catch' apps/web/src/app/api/saas/members` επιστρέφει **μηδέν**.
   - npm run type-check exits 0
-- Status: TODO
+- Status: DONE (verified 2026-07-02 auditor) — live: `members/route.ts:14` κάνει `import { readBody, strField } from '@/lib/apiBody';`· και τα 3 methods (POST γρ.93, PATCH γρ.192, DELETE γρ.234) `const body = await readBody(req);` + `strField(body,'tenant'|'email'|'accountId'|'role')`. `grep 'req.json().catch' members` = **μηδέν**. Stale-marked TODO, ο builder το έκλεισε.
 
 ### apiBody helpers — readBody adoption σε shopping-list POST (τελευταίο raw-body route)
 - Priority: P3

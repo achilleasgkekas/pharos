@@ -2683,3 +2683,28 @@ Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `a
 
 ### Needs Achilleas
 - Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) παραμένει σκόπιμη απόφαση (μεγάλο refactor, εξαρτάται από ολοκλήρωση reusable set), όχι unattended.
+
+## 2026-07-02 (web-code-quality auditor — API/db/error-handling σάρωση)
+
+Read-only audit του Next.js web surface (49 v1 routes + 17 saas routes), inventory ξαναχτισμένο από τον κώδικα. `npm run type-check` (apps/web) → **EXIT 0** (μηδέν P1 type error). Working tree στην αρχή: μόνο `.claude/launch.json` (foreign tooling, δεν το άγγιξα). Καμία Docker build, κανένα AI job.
+
+**Ευρήματα ανά διάσταση:**
+- **Type safety: 0.** `grep ': any|as any|@ts-ignore|@ts-nocheck|@ts-expect-error' src/app/api` = μηδέν· type-check καθαρό.
+- **Input validation: 0 νέα.** Ολόκληρος ο v1+saas surface χρησιμοποιεί `readBody`/`strField`/`isObjectId` ή safe try-wrapped casts. Μόνα raw `req.json()`: auth/login (boundary), items/[id]/ai-fill (try-wrapped), mcp/route (try-wrapped) — όλα σωστά.
+- **Auth: 0.** Μόνο το `auth/login` δεν έχει gate (by design)· όλα τα υπόλοιπα v1 μέσω `withAuth` (bearer), saas μέσω `saasAuthGate()` + session.
+- **Error handling: 1 νέο (P2/M).** 14/17 saas routes χωρίς `try/catch` → σε thrown DB/Stripe error γυρίζουν framework-default 500 (κενό/HTML body) αντί για το `{ error }` shape που δίνει το `withAuth` σε ΟΛΟ τον v1. Ασυνέπεια στα write paths (account/verify+reset+password, members, billing).
+- **Mongoose: 1 νέο (P3/S).** `Account.verifyTokenHash`/`resetTokenHash` queried με `findOne` αλλά unindexed (low-urgency, single-row-per-owner collection). Οι list routes είναι ΟΛΟΙ καθαροί: `.lean()` + `.select()` + `.skip/.limit` pagination + `listEnvelope`. Τα reports/calendar full-collection reads είναι analytics (χρειάζονται όλες τις γραμμές) με `.select()`+`.lean()` → ΟΧΙ debt.
+- **Duplication/dead code: 0 υλικό νέο.** apiBody/isObjectId dedup efforts κλειστά.
+- **Web UX states:** τα loading.tsx αφαιρέθηκαν σκόπιμα (nav-flash decision, CLAUDE.md) → ΟΧΙ debt.
+
+**Queue hygiene:** μαρκάρισα **4 stale TODO → DONE** (ο builder τα είχε ήδη κλείσει χωρίς update του marker): CRON_SECRET constant-time compare (usage/sample χρησιμοποιεί `timingSafeEqual`), ObjectId dedup webhook (χρησιμοποιεί `isObjectId`), readBody adoption checkout+portal, readBody adoption members (και τα 3 methods). **Πρόσθεσα 2 νέα** (P2/M try-catch wrapper, P3/S sparse index). **Ενεργά TODO πλέον: 4** (2 προϋπάρχοντα valid + 2 νέα).
+
+**Top 3 items να πάρει ο builder μετά:**
+1. **Account sparse token-hash indexes (P3/S)** — μικρότερο, byte-safe, μηδέν runtime αλλαγή, καθαρό `Schema.index({...},{sparse:true})` ×2. Unattended-safe.
+2. **SaaS try/catch → clean 500 wrapper (P2/M)** — shared `saasRoute()` helper (mirror του `withAuth` catch) + adoption στα account/* write routes πρώτα (S split), μετά members+billing. Consistency με τον v1 surface.
+3. **getTenantConnection cache-reuse guard (P2/S, valid TODO)** — το `existing.readyState !== 99` δέχεται και disconnected (readyState 0) connection· ambiguous rebuild-semantic → semi-attended.
+
+### Needs Achilleas
+- (αμετάβλητο) Standing product/security decisions μη-auto-buildable: login brute-force rate-limit, error-message leak στο `withAuth`/`saasRoute` 500 (bearer-authed, low-risk), quota-enforce gate wiring σε πραγματικά AI/upload routes, tenant-aware `saveFile`, Stripe/CRON/AUTH key provisioning (env boundary).
+- **Reset-request timing side-channel** (valid TODO, P3): μείωση του registered/non-registered latency gap θέλει σκόπιμη delivery-semantics απόφαση (`await sendEmail` vs fire-and-forget `void`), όχι unattended fix. Dead-until-SaaS.
+- Μηδέν committed secret εντοπίστηκε στο web source.
