@@ -5,6 +5,24 @@
 <!-- reviewed: 699c36e -->
 <!-- docker-validated: bf503cb -->
 
+## 2026-07-02 (web-code-quality auditor — 34η σάρωση, CONFIRMATION)
+- **Τι έκανα:** read-only fresh live σάρωση (grep, όχι docs) όλου του web API surface: **49 v1 route files** + **20 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/billing/*` + `lib/tenancy/*` + `models/*`. Καμία Docker build, κανένα AI job, μηδέν app-code edit.
+- **Κρίσιμο εύρημα (scope):** `git diff --name-only 9d7bbab..HEAD -- apps/web/src/app/api apps/web/src/lib apps/web/src/models` = **6 αρχεία**: `saas/invites/resend/route.ts` (ΝΕΟ, commit `bf503cb`), `saas/invites/route.ts` (+`invitedBy` GET projection, additive), `saas/members/route.ts` (seat-cap fix `699c36e`, ήδη audited+DONE), `lib/tenancy/invites.ts` (+`invitedBy` στο `InviteView`, additive), + 2 test files. Runtime type/validation/auth/DB surface byte-stable από τον marker εκτός του νέου resend route.
+- **Counts ανά dimension (P1=0, P2=0, P3=0 νέο):**
+  - Type safety: **0** (`: any|as any|@ts-ignore|@ts-expect-error` σε `app/api` εκτός test = 0· type-check EXIT 0). Το νέο resend route πλήρως τυπωμένο.
+  - Input validation: **0** (`req.json().catch` = μηδέν· readBody adoption 100%· resend adopter readBody + isObjectId guard).
+  - Auth: **0 unguarded** (κάθε v1 route `withAuth`/`apiAuth`· resend gated `resolveWorkspaceSession(slug,true)` = 404/401/403 ladder πριν το Invite collection· scoped `{_id,tenant,status:'pending'}`· token hash ΠΟΤΕ leaked).
+  - DB/consistency: **0 νέο** (inline ObjectId regex = μηδέν· resend = single `findOneAndUpdate` στο unique `_id`, no scan).
+  - Error handling: SaaS try/catch count **15→16** (το νέο resend route εντάχθηκε στο ίδιο pattern· ενημέρωσα το υπάρχον P2/M item με το route + count).
+- **Ουρά (2 ενεργά auto-buildable + 1 decision-flag):** ο builder έκλεισε το **seat-cap ασυμμετρία** [P3/S, DONE `699c36e`] αυτόν τον κύκλο (ουρά 3→2). Εναπομείναντα: **SaaS try/catch helper** [P2/M, 16 routes, split S+S] + **Account token-hash sparse index** [P3/S]. Decision-flag: **reset-request timing** [P3/S, Needs Achilleas].
+- **Verify:** `apps/web npm run type-check` → **EXIT 0**.
+- **Top-2 για τον builder:** (1) **SaaS try/catch helper** [P2/M, split S+S — mirror του `withAuth` catch· ξεκίνα με helper + account/* 5 routes]· (2) **Account token-hash sparse index** [P3/S — 2 sparse `.index()` στο `models/Account.ts`].
+- **Παρατήρηση (χαμηλής αξίας, ΔΕΝ queue item):** το `invites/resend/route.ts` δεν έχει dedicated route test (mirror του well-tested mint path· suite μένει green). Ενα pure gating/shape test (SAAS-off 404, non-owner 403, malformed id 400, pending-only 404) είναι μικρό+safe αν ο builder θέλει.
+- **Git hygiene:** staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (ρητά paths, ΟΧΙ `-A`). Το `.claude/launch.json` (WIP εργαλείου του Αχιλλέα) ΔΕΝ αγγίχτηκε.
+
+### Needs Achilleas (web-auditor 2026-07-02, 34η)
+- Μηδέν committed secret στο range. Εκκρεμείς αποφάσεις (αμετάβλητες): reset-request timing side-channel [P3/S, delivery-semantics tradeoff — registered/non-registered response-time delta λόγω `await sendEmail` στο happy-path]· SMTP/email provider για production delivery (reset/verify/invite/resend)· Stripe keys· native mobile deps.
+
 ## 2026-07-02 (REVIEWER — range ec475d8..699c36e)
 - **Τι review-άρισα:** 5 commits (2 web code, 1 web test, 1 landing, 1 docs): `699c36e` seat-cap fix (existing-account path μετράει πλέον `activeCount + pendingCount`), `bf503cb` dedicated invite-resend endpoint (νέο route, re-mint + re-send), `bbdd835` pure guard suite για `isExpoPushToken` (12 tests), `f157dfb` landing Mobile app section, `0cb4884` docs (προηγ. reviewer marker). Καθαρή code-αλλαγή: 3 web αρχεία (`members/route.ts`, νέο `invites/resend/route.ts`, νέο `expoPush.test.ts`) + landing (`page.tsx`, `globals.css`, `Icon.tsx`).
 - **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· `npx vitest run seatLimits.test.ts members.test.ts invites.test.ts expoPush.test.ts` → **64/64 pass** (10 seatLimits + 14 members + 28 invites + 12 expoPush).
