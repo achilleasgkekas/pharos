@@ -11,6 +11,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // `server-only` is a build-time-only empty module (it errors if bundled client-side and
+      // has no runtime). Vitest can't resolve the real package, so server modules that import it
+      // (e.g. lib/mirror.ts) fail to load. Point it at an empty stub to test their pure exports.
+      'server-only': fileURLToPath(new URL('./src/test/stubs/server-only.ts', import.meta.url)),
     },
   },
   test: {

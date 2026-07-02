@@ -769,3 +769,27 @@ helpers σε api routes, π.χ. body-parsers)· (γ) pure branches σε `models/
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` (ΔΕΝ το άγγιξα/staged) + το νέο serialize.test.ts. Στάγιαρα μόνο τα δικά μου paths.
 
 Suggested next task: (f συνέχεια) Επόμενο pure test file. Με τα δύο v1 serializers καλυμμένα, απομένοντα καθαρά targets: (α) API-shape/validation helpers σε api routes που δεν θέλουν live Mongo (π.χ. body-parsers/query-parsers σε app/api/v1/*)· (β) additive-export ενός `aiProviders.ts` internal helper (`stripFences`/`mediaTypeOf`) ΑΝ εγκριθεί source edit (τώρα εκτός territory). Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — aiTools.test.ts + server-only vitest shim)
+
+**Task: (f συνέχεια) Pure test file `apps/web/src/app/aiTools.test.ts` για το `TOOLS` registry + τον `today()` helper του `app/aiTools.ts`, μαζί με μικρή test-infra προσθήκη (server-only shim).**
+
+Επιλογή target: με τα δύο v1 serializers ήδη καλυμμένα, διάλεξα το `TOOLS` array του `aiTools.ts` — είναι το single source of truth των AI tool schemas που καταναλώνουν ΚΑΙ το chat command bar (runAiCommand) ΚΑΙ το MCP route, και πάνω σε αυτά κάνει validate το Anthropic tool-calling τα tool_use blocks. Ένα σπασμένο schema (required key χωρίς matching property, διπλό tool name, κενό enum) ΔΕΝ σκάει build· σπάει σιωπηλά το tool-calling στο runtime. Καθαρός στόχος (deterministic, μηδέν DB): το registry είναι static, ο `today()` είναι pure Date→ISO slice. Το `execute()` dispatcher θέλει live DB → εκτός scope.
+
+Εμπόδιο + λύση (test infra): το import chain του `aiTools` (μέσω items/expenses actions → `lib/mirror.ts`) κάνει `import 'server-only'`, που το vitest (σκέτο node, χωρίς Next bundler) δεν resolve-άρει → «Failed to load url server-only». Το `server-only` στο production είναι **build-time-only empty module** (μοναδικός σκοπός: build error αν μπει σε client bundle· μηδέν runtime). Πρόσθεσα:
+- `apps/web/src/test/stubs/server-only.ts` (κενό `export {}`)·
+- alias `'server-only' → stub` στο `vitest.config.ts` (μέσα στο υπάρχον resolve.alias, δίπλα στο `@`).
+Semantically σωστό για node test env (ταιριάζει με το no-op runtime) και ξεκλειδώνει testing των pure exports server modules γενικότερα σε μελλοντικά runs.
+
+Τι έγινε:
+- Νέο `aiTools.test.ts` (11 tests). Καλύπτει: non-empty registry· **exact canonical tool-name set** (11 tools, mirror — add/remove tool must update the test)· unique names· non-empty name+description ανά tool· κάθε `input_schema` = JSON-schema object με properties· **`required` keys υπάρχουν όλα στα `properties`** (το κύριο invariant)· κάθε enum = non-empty array of strings· mutation tools (update_record/delete_record) `type` enum == ['item','task','subscription'] + required type+id (sync με modelFor dispatcher)· add_expense required == [amount, vendor]. Plus `today()`: ISO YYYY-MM-DD shape + == `new Date().toISOString().slice(0,10)`.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/aiTools.test.ts` → 11/11 passed.
+- `npx vitest run` (όλο το suite) → 48 files, 714/714 passed (server-only alias δεν έσπασε κανένα υπάρχον test).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` (ΔΕΝ το άγγιξα/staged) + τα δικά μου. Στάγιαρα μόνο `aiTools.test.ts`, `src/test/stubs/server-only.ts`, `vitest.config.ts`.
+
+Suggested next task: (f συνέχεια) Με το server-only shim στη θέση του, ξεκλειδώθηκαν pure-export tests σε server modules που πριν δεν φόρτωναν. Καθαρά targets: (α) pure exports σε `lib/` modules που πριν έσκαγαν στο `server-only` (π.χ. helper functions που ζουν δίπλα σε server code)· (β) το `SYSTEM` prompt string του `aiTools.ts` (μπορεί να ελεγχθεί για invariants αν χρειαστεί, χαμηλή αξία)· (γ) άλλα `app/**/lib.ts` ή shape-helpers. Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα) + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
