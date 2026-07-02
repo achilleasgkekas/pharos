@@ -904,3 +904,45 @@ mint-άρει invites, κανένας external importer των αλλαγών), 
 Achilleas· ξεκλειδώνει reset/verify/invite delivery σε production), είτε (β) dedicated resend
 endpoint (re-mint + email σε ένα βήμα), είτε (γ) `invitedBy` projection στο inviteView (ποιος
 έστειλε το invite — συμπληρώνει το acceptedBy του §21 για πλήρες audit trail).
+
+## 2026-07-02 (increment 22 — audit-log foundation)
+**Built:** append-only per-tenant **audit trail** για security/billing events — η βάση για
+ένα workspace-settings «Activity» panel (και μελλοντικό compliance export των §14/§15). Κλείνει
+το «ποιος έκανε τι»: member added/removed, role changed, invite sent/resent/accepted/revoked,
+plan changed. ΟΛΟ SAAS-gated, additive, νέα αρχεία μόνο (κανένα existing file δεν αγγίχτηκε):
+- `models/AuditEvent.ts` (νέο): control-plane model (tenant/actor/action/target/meta,
+  `createdAt`-only timestamps = immutable by convention). `action` free String (όχι enum →
+  zero migration για νέο verb· validation στον recorder). Indexes `{tenant,createdAt:-1}` +
+  `{tenant,action,createdAt:-1}`. **Secret-free zone** by design.
+- `lib/tenancy/audit.ts` (νέο): PURE helpers + node-only recorder. `AUDIT_ACTIONS` closed
+  list + `isAuditAction`/`parseAuditAction` (trim+lowercase, unknown→null). **`redactMeta`** —
+  strip sensitive keys (token/password/secret/hash/cookie/authorization/apikey, case-insensitive
+  substring) + drop non-scalar/non-plain values + depth-bound (≤4) + scalar-only arrays →
+  display-safe copy ή null. **`auditView`** client-safe serializer (whitelist projection,
+  re-redacts meta defence-in-depth, stringified ids, null-safe). **`recordAudit(ctx, input)`**
+  node-only: no-op για default/self-hosted tenant + missing tenantId + unknown action· **never
+  throws** (audit failure ≠ load-bearing)· lazy model import. Μηδέν side-effect imports στα pure.
+- `app/api/saas/audit/route.ts` (νέο): **GET** `[?tenant][?action][?limit=1..200][?before=<iso>]`
+  → workspace activity newest-first, owner/admin only (`resolveWorkspaceSession(slug, true)`).
+  Keyset pagination cursor (`before`, bad cursor ignored όχι 400)· optional action filter
+  (unknown→all)· serializer projection ⇒ κανένα secret leak. Runtime nodejs + force-dynamic.
+- `lib/tenancy/audit.test.ts` — 15 PURE tests (action validation, redactMeta: scalars/sensitive-
+  strip/null-drop/scalar-arrays/nested-recurse/all-stripped→null/depth-bound, auditView: exact
+  key set + no-token-leak + null-safe + re-redact + ISO/garbage createdAt).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run audit.test.ts` → **15/15 green**.
+Route SAAS-gated (404 off) + model/lib pure/additive + κανένας external importer των νέων modules
+από feature code ⇒ `SAAS_MODE` off = zero effect, κανένα Docker rebuild, κανένα runtime wiring,
+καμία νέα εξάρτηση. Άγγιξα μόνο δικά μου νέα SAAS αρχεία (git add explicit 4 paths· foreign
+`.claude/launch.json`+`MOBILE_PARITY.md` άθικτα). Push: `e91addf`.
+
+**## Needs Achilleas** (audit go-live):
+- Χρειάζεται user-facing workspace-settings «Activity» section (owner/admin) που καλεί
+  `GET /api/saas/audit` → λίστα events με action/actor/target/time + action-filter + «load more»
+  (before cursor). UI-only· το read API είναι έτοιμο.
+
+**Next task:** increment 23 — **wire `recordAudit` into the mutating SaaS routes** (τα δικά μου,
+εντός territory): members POST/PATCH/DELETE (member.added/role_changed/removed), invites
+POST-mint/resend/accept/revoke (invite.sent/resent/accepted/revoked), billing webhook
+(plan.changed). Additive fire-and-forget calls (never-throw recorder ⇒ zero risk στο user action),
+SAAS-gated routes ⇒ off = never runs. Μετά: audit `?action` filter αποκτά πραγματικά δεδομένα.
