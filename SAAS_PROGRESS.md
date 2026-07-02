@@ -809,3 +809,42 @@ Docker rebuild, κανένα runtime wiring. External importers των νέων 
 είτε (β) `sendViaSmtp` via nodemailer (μετά από provider decision Achilleas), είτε (γ)
 storage-quota enforcement wiring (`withinStorage` + `dbStats`) — αλλά αυτό αγγίζει feature
 upload path (εκτός territory), οπότε θα ήθελε flag-guarded shim.
+
+## 2026-07-02 (increment 19 — invites list/revoke route)
+**Built:** lifecycle management των outstanding invites — ο owner/admin βλέπει και ακυρώνει
+τα pending invitations που μίντησε το `/api/saas/members` (increment 18). Κλείνει τον κύκλο
+mint → send → **list/revoke** → accept. ΟΛΟ SAAS-gated, additive, σε δικά μου αρχεία:
+- `lib/tenancy/invites.ts` (additive): νέος PURE serializer **`inviteView`** + `InviteView`
+  type — client-safe projection (id/email/role/status/expires/expired/createdAt). **By
+  construction δεν φέρει ΠΟΤΕ το tokenHash** (μόνο whitelisted πεδία). `expired` derived μέσω
+  `isInviteValid` ώστε το UI να ξεχωρίζει live links από stale pending rows past-TTL. Δέχεται
+  Date ή ISO-string, null-safe. `toIso` helper (NaN-guard). Μηδέν νέα imports.
+- `app/api/saas/invites/route.ts` (νέο): **GET** `[?tenant]` → pending invites, newest-first,
+  owner/admin only (`resolveWorkspaceSession(slug, true)`). **DELETE** `{inviteId, tenant?}` →
+  revoke (status→revoked) μόνο αν `_id + tenant + status:'pending'` ταιριάζουν
+  (workspace-scoped· ένας tenant δεν αγγίζει invites άλλου· matchedCount 0 → 404). Runtime
+  nodejs + force-dynamic. Μόνο control-plane Invite collection· κανένα feature route/per-tenant
+  db/self-hosted session.
+- `lib/tenancy/invites.test.ts` — +7 PURE tests για inviteView (field projection + id-stringify,
+  **no tokenHash leak + exact key set**, expired-flag pending-past-TTL true/future false,
+  non-pending never expired, ISO-string + null expiry [null→expired true], defaults για missing
+  optional fields).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **606/606 green** (599 προϋπάρχοντα
++ 7 νέα· ο συνολικός ανέβηκε από concurrent routines). Το invites route SAAS-gated (404 όταν off)
++ ο serializer pure/additive ⇒ `SAAS_MODE` off = zero effect, κανένα Docker rebuild, κανένα
+runtime wiring. External importers των νέων/edited modules από feature code → κανένας. Άγγιξα
+μόνο δικά μου SAAS αρχεία.
+
+**## Needs Achilleas** (invites UI):
+- Χρειάζεται user-facing workspace-settings section (owner/admin) που καλεί `GET
+  /api/saas/invites` → λίστα με resend/revoke controls· το revoke καλεί `DELETE`. Το
+  `expired` flag ήδη σηματοδοτεί ποια links θέλουν re-mint (νέο POST στο members route).
+- Resend = re-mint (νέος token) μέσω του υπάρχοντος members POST· δεν υπάρχει ξεχωριστό
+  resend endpoint (ο παλιός token supersede-άρεται ήδη στο mint). Αν θες dedicated resend →
+  increment.
+
+**Next task:** increment 20 — είτε (α) `sendViaSmtp` via nodemailer (μετά από provider decision
+Achilleas· ξεκλειδώνει reset/verify/invite delivery σε production), είτε (β) accepted/revoked
+invites στη λίστα με ?status filter (audit view), είτε (γ) dedicated resend endpoint (re-mint +
+email σε ένα βήμα).

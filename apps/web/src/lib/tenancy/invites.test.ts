@@ -6,6 +6,7 @@ import {
   hashInviteToken,
   mintInviteToken,
   inviteHashMatches,
+  inviteView,
 } from './invites';
 
 // The pure + crypto helpers are unit-tested. The mint (members POST) and accept route
@@ -82,5 +83,61 @@ describe('inviteHashMatches', () => {
     expect(inviteHashMatches('abc', 'abcd')).toBe(false);
     expect(inviteHashMatches(null, 'abc')).toBe(false);
     expect(inviteHashMatches('abc', undefined)).toBe(false);
+  });
+});
+
+describe('inviteView', () => {
+  const now = 10_000_000;
+  const future = new Date(now + INVITE_TTL_MS);
+  const past = new Date(now - 1000);
+
+  it('projects the manager-facing fields and stringifies the id', () => {
+    const v = inviteView(
+      { _id: 42, email: 'a@b.com', role: 'admin', status: 'pending', expires: future, createdAt: new Date(now) },
+      now
+    );
+    expect(v.id).toBe('42');
+    expect(v.email).toBe('a@b.com');
+    expect(v.role).toBe('admin');
+    expect(v.status).toBe('pending');
+    expect(v.expires).toBe(future.toISOString());
+    expect(v.createdAt).toBe(new Date(now).toISOString());
+  });
+
+  it('never leaks the token hash or unknown fields', () => {
+    const v = inviteView(
+      { _id: 'x', email: 'a@b.com', role: 'member', status: 'pending', expires: future, tokenHash: 'SECRET' } as never,
+      now
+    );
+    expect(JSON.stringify(v)).not.toContain('SECRET');
+    expect(Object.keys(v).sort()).toEqual(
+      ['createdAt', 'email', 'expired', 'expires', 'id', 'role', 'status'].sort()
+    );
+  });
+
+  it('flags a pending invite past its TTL as expired', () => {
+    expect(inviteView({ _id: 1, status: 'pending', expires: past }, now).expired).toBe(true);
+    expect(inviteView({ _id: 1, status: 'pending', expires: future }, now).expired).toBe(false);
+  });
+
+  it('a non-pending invite is never marked expired', () => {
+    expect(inviteView({ _id: 1, status: 'accepted', expires: past }, now).expired).toBe(false);
+    expect(inviteView({ _id: 1, status: 'revoked', expires: past }, now).expired).toBe(false);
+  });
+
+  it('accepts ISO-string dates and null expiry safely', () => {
+    const v = inviteView({ _id: 1, status: 'pending', expires: future.toISOString() }, now);
+    expect(v.expires).toBe(future.toISOString());
+    const n = inviteView({ _id: 1, status: 'pending', expires: null }, now);
+    expect(n.expires).toBeNull();
+    expect(n.expired).toBe(true); // no expiry → not redeemable
+  });
+
+  it('fills sensible defaults for missing optional fields', () => {
+    const v = inviteView({ _id: 7 }, now);
+    expect(v.email).toBe('');
+    expect(v.role).toBe('member');
+    expect(v.status).toBe('pending');
+    expect(v.createdAt).toBeNull();
   });
 });

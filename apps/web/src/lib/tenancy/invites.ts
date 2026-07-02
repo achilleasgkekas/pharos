@@ -66,3 +66,50 @@ export function inviteHashMatches(a: string | null | undefined, b: string | null
   if (!a || !b || a.length !== b.length) return false;
   return timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
+
+/**
+ * Client-safe projection of an invite row for list responses. By construction it never
+ * carries the token hash (or any secret) — only the fields a workspace manager needs to
+ * see (who was invited, as what, and whether the link is still redeemable). `expired` is
+ * derived so the caller doesn't re-implement the TTL check.
+ */
+export type InviteView = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  expires: string | null;
+  expired: boolean;
+  createdAt: string | null;
+};
+
+function toIso(d: Date | string | null | undefined): string | null {
+  if (!d) return null;
+  const t = d instanceof Date ? d : new Date(d);
+  return Number.isNaN(t.getTime()) ? null : t.toISOString();
+}
+
+export function inviteView(
+  inv: {
+    _id: unknown;
+    email?: string | null;
+    role?: string | null;
+    status?: string | null;
+    expires?: Date | string | null;
+    createdAt?: Date | string | null;
+  },
+  nowMs: number = Date.now()
+): InviteView {
+  const status = inv.status ?? 'pending';
+  return {
+    id: String(inv._id),
+    email: inv.email ?? '',
+    role: inv.role ?? 'member',
+    status,
+    expires: toIso(inv.expires),
+    // A pending invite past its TTL is effectively dead even though the row still says
+    // "pending"; surface that so the UI can distinguish live links from stale ones.
+    expired: status === 'pending' && !isInviteValid(status, inv.expires, nowMs),
+    createdAt: toIso(inv.createdAt),
+  };
+}
