@@ -673,3 +673,23 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-03 (cont.)
+
+Task: (e) Polish, μερος 29 — root-level error boundary (`app/global-error.tsx`). Ηταν ρητη προταση απο το προηγουμενο log (global-error.tsx για σφαλματα στο ιδιο το root layout). Φυσικος συντροφος του error.tsx (cont.²⁸) + not-found.tsx (cont.²¹): μηδεν assets, μηδεν pricing decision, ενα νεο αρχειο. Το app ειχε μονο segment-level error boundary (error.tsx)· αν πεταξει το ιδιο το root layout, το error.tsx ΔΕΝ πιανεται (ειναι μεσα στο layout) -> εδειχνε το γενικο default Next global error, off-brand και χωρις recovery.
+
+Τι εφτιαξα:
+- `app/global-error.tsx` (νεο, client component οπως απαιτει το App Router· δεχεται `error`+`digest` + `reset`). ΚΡΙΣΙΜΗ διαφορα απο το error.tsx: το global-error ΑΝΤΙΚΑΘΙΣΤΑ ολοκληρο το root layout -> το `globals.css` ΔΕΝ φορτωνεται και πρεπει να renderαρει δικο του `<html>/<body>`. Οποτε ολα ειναι fully self-contained inline styles με hardcoded brand values (#0a0a0a bg, #f5f5f5 text, #00ff88 accent, accent→cyan→purple gradient headline, #999/#666 dims) — καμια εξαρτηση απο CSS variables/`.btn`/`.mono` classes που δεν υπαρχουν εδω. Reuse του PharosMark (64px): επειδη χρησιμοποιει `var(--accent)`/`var(--bg)`, set τα δυο vars inline ΜΟΝΟ στο `<body>` ωστε να resolvαρουν. Font stack με Manrope/IBM Plex Mono + system fallbacks (τα @font imports ζουν στο globals.css που δεν φορτωνεται). 3 CTA: **«Try again»** (button -> `reset()`, recovery) + «Back to home» (/) + «Self-host it free» (GitHub). `useEffect` -> `console.error` ωστε να μη χανεται σιωπηλα.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success. Το global-error.tsx ειναι boundary (οπως το error.tsx), ΟΧΙ route -> δεν εμφανιζεται νεο route entry (bundle-αρεται στο client boundary chunk)· / αμεταβλητο 2.18 kB / 105 kB First Load JS, ολα 8 routes ○ Static. Verification = type-check + build (ιδιο pattern με ολα τα προηγουμενα increments)· το boundary πυροδοτειται μονο σε runtime root-layout exception, μη παρατηρησιμο σε στατικο preview -> δεν σηκωσα dev server (ουτε αγγιξα το Docker :3000). Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged (καμια αλλη ρουτινα mid-commit)· foreign `.claude/launch.json` + `MOBILE_PARITY.md` + `apps/mobile/src/screens/*` (modified, ασταγα, αλλων ρουτινων) ΔΕΝ commit — staged μονο app/global-error.tsx + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως prefers-reduced-motion σεβασμος στο ScrollSpy ή lazy-load των mockup blocks. Το error-handling triad (not-found + error + global-error) ειναι πλεον πληρες.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
