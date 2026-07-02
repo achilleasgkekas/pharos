@@ -3,7 +3,18 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
-## Σύνοψη audit (2026-07-02 35η σάρωση· builder ΕΚΛΕΙΣΕ το P2/M SaaS try/catch [slice 2/2, `a2e1811`]· ουρά 2→2 [−1 try/catch DONE, +1 P3/S invites saasGuard gap] + 1 P3/S sparse-index + 1 decision-flag· νέος audit read-surface [`3bb57f0`/`6e82811`] audited → exemplary)
+## Σύνοψη audit (2026-07-03 37η σάρωση· type-check EXIT 0· μηδέν νέο P1/P2· ουρά 5 TODO αμετάβλητη — και τα 5 επιβεβαιωμένα ανοιχτά στον κώδικα· νέα surface [`saas/workspace` DELETE soft-cancel + `lib/tenancy/workspace.ts` + `audit.ts`] audited → exemplary)
+
+**2026-07-03 (37η σάρωση, αυτόνομος γύρος):** fresh live σάρωση (grep, όχι docs) σε **50 v1 route files** + **22 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/tenancy/*` + `lib/billing/*` + `models/*`. `git diff --name-only 4a240aa..HEAD` = νέα SaaS surface (`workspace` route soft-cancel DELETE + rename PATCH + read GET, `lib/tenancy/workspace.ts` pure helpers, `audit.ts` batched-lookup). `npm run type-check` **EXIT 0** (0 TS errors).
+- **Ευρήματα ανά διάσταση (live grep):**
+  - **Type safety: 0** — `grep -rnE ': any|as any|@ts-ignore|@ts-expect-error' src/app/api src/lib/tenancy src/lib/billing` (εκτός `.test.ts`) = **1 hit, false positive** (σχόλιο «any active member» στο `workspace/route.ts:106`, όχι τύπος). `workspace.ts`/`workspaceView` πλήρως τυπωμένα (whitelisted projection, μηδέν leak billing ids).
+  - **Input validation: 0 gaps** — `grep -rln 'req.json().catch' src/app/api` = **μηδέν** (readBody adoption 100%). `workspace` PATCH/DELETE: `readBody`+`strField` body, `sanitizeWorkspaceName`+`workspaceNameError` (empty→400), idempotent no-op guards (rename ίδιο όνομα / ήδη canceled → view χωρίς audit row).
+  - **Auth: 0 unguarded** — κάθε v1 route matches `withAuth`/`apiAuth`/`requireAuth` (μόνο `auth/login` exempt)· κάθε saas route gated (`resolveWorkspaceSession`/`resolveBillingSession`/`saasAuthGate`/CRON/webhook). `workspace` DELETE: owner-only (`canCancelWorkspace`) πάνω από το session gate.
+  - **Error handling: 0 νέα** — `workspace` GET/PATCH/DELETE όλα wrapped σε `saasGuard` (καθαρό `{ error }` 500)· `audit.ts recordAudit` = μοναδικό DB touch, batched actor lookup (μηδέν N+1).
+  - **Mongoose: 0 νέα** — τα `no-limit .find()` (settings/calendar/cards/reports/overview/plans) είναι single-tenant/single-user bounded aggregations (prior-accepted, όχι list-pagination surface)· list routes (receipts/items/…) μέσω `apiList`. Μηδέν `.map(async`/N+1.
+- **Ουρά αμετάβλητη (5 TODO, όλα code-verified ανοιχτά):** (1) P2/M tenant `status:'canceled'/'suspended'` δεν επιβάλλεται — ο νέος soft-cancel DELETE ΤΟ ΕΝΙΣΧΥΕΙ (θέτει flag που κανείς δεν διαβάζει· `grep tenant.status src/lib/tenancy src/lib/apiAuth.ts` = μόνο 2 projection hits, μηδέν gate). (2) P3/S `invites/route.ts` GET+DELETE χωρίς `saasGuard` (throw→ασυνεπές 500). (3) P3/S sparse index `Account.verifyTokenHash/resetTokenHash` (fields χωρίς index). (4) P3/S `reset/request` timing side-channel (no-account fast-path `return {ok:true}` vs mint+store+mail → enumeration). (5) P3/S `getTenantConnection` cache guard δέχεται readyState 0 (disconnected, όχι μόνο 99). **Μηδέν auto-buildable P1/P2· 4 P3/S auto-buildable + 1 P2/M decision (SaaS access-control).**
+
+
 
 **2026-07-02 (35η σάρωση, αυτόνομος γύρος):** fresh live σάρωση (grep, όχι docs) σε **49 v1 route files** + **21 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/tenancy/*` + `lib/billing/*` + `models/*`. `git diff --name-only 9d7bbab..HEAD` = νέα SaaS surface (audit-event recording + read API, saasGuard slices, expenses rescan v1). `npm run type-check` **EXIT 0** (0 TS errors).
 - **Ευρήματα ανά διάσταση (live grep):**
@@ -442,7 +453,7 @@
   - **ΣΗΜ:** μην dropάρεις data· ΜΟΝΟ gate. Το drop της isolated data-db μένει manual (per το route docstring). Αν το scope είναι ασαφές (ποια ακριβώς routes gate + reactivate UX) → κόψε ένα «Needs Achilleas» sub-decision αντί να μαντέψεις.
   - Επαλήθευση: canceled tenant → v1 feature call → 403 (όχι 200)· reactivate path παραμένει προσβάσιμος· `grep -rn "status === 'canceled'\|status === 'suspended'" src/lib/tenancy` δείχνει ≥1 enforcement hit (όχι μόνο comment/audit/set).
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-03 reviewer, range 148fb06..53b861a)
+- Status: TODO (flagged 2026-07-03 reviewer, range 148fb06..53b861a· 37η σάρωση επιβεβαίωσε ανοιχτό: `grep tenant.status src/lib/tenancy src/lib/apiAuth.ts` = μόνο projection hits, μηδέν gate· ο νέος `workspace` DELETE θέτει `status:'canceled'` που κανείς δεν επιβάλλει)
 
 ### saasGuard adoption σε invites/route.ts (DELETE write-route + GET) — missed από το try/catch slice 2/2
 - Priority: P3
@@ -456,7 +467,7 @@
   - **Fix:** `import { saasGuard } from '@/lib/tenancy/saasApi';` + τύλιξε τα σώματα GET και DELETE σε `return saasGuard(async () => { ...υπάρχον σώμα... });` (ίδιο pattern με members/route.ts). Το `resolveWorkspaceSession` gate (επιστρέφει early χωρίς throw), το `isObjectId` guard, τα response shapes (400/404/200 `{ revoked }`, GET `{ workspace, invites }`), το `recordAudit` — ΟΛΑ αμετάβλητα· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500.
   - Επαλήθευση: `grep -c 'saasGuard' src/app/api/saas/invites/route.ts` ≥ 2 (import + ≥1 wrap)· κανένα write saas route δεν μένει χωρίς `saasGuard`.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-02 auditor, 35η σάρωση)
+- Status: TODO (flagged 2026-07-02 auditor, 35η σάρωση· 37η σάρωση επιβεβαίωσε ανοιχτό: `invites/route.ts` GET(43)+DELETE(102) δεν wrap-άρουν `saasGuard`, κάνουν direct `Invite.find`/`updateOne` → uncaught throw = ασυνεπές 500)
 
 ### DELETE /api/saas/invites — λείπει id-format guard στο inviteId (CastError → 500) — DONE 2026-07-02
 - Status: DONE (commit αυτού του run). Fix = `import { isObjectId }` από `apiBody` + `if (!isObjectId(inviteId)) return 400 'invalid inviteId'` μετά το `!inviteId` check, πριν το `Invite.updateOne`. Reuse του υπάρχοντος shared helper (όχι νέο inline regex). type-check EXIT 0, apiBody+invites suites 52/52 pass, web serve /login 200.
@@ -516,7 +527,7 @@
   - **Fix:** `Schema.index({ verifyTokenHash: 1 }, { sparse: true })` + `Schema.index({ resetTokenHash: 1 }, { sparse: true })` (sparse γιατί default `null` → δεν indexάρει τα κενά, ο lookup είναι πάντα με non-null hash). Μηδέν αλλαγή runtime λογικής.
   - Επαλήθευση: `grep -n 'index(' src/models/Account.ts` δείχνει τα 2 νέα sparse indexes.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-02 auditor)
+- Status: TODO (flagged 2026-07-02 auditor· 37η σάρωση επιβεβαίωσε ανοιχτό: `Account.ts:24/26` `verifyTokenHash`/`resetTokenHash` fields χωρίς index/sparse)
 
 ### Constant-time CRON_SECRET compare — saas/usage/sample route (timing side-channel)
 - Priority: P3
@@ -544,7 +555,7 @@
   - **ΣΗΜ (γιατί flag, όχι fix):** dead-until-SaaS (gated πίσω από `saasAuthGate()`, `SAAS_MODE` off = μηδέν επίδραση στο single-user app). Η μείωση του gap είναι tradeoff, όχι μηχανικό swap: το members route κάνει ήδη fire-and-forget `void sendEmail(...)`, οπότε το reset route θα μπορούσε να το ίδιο (αφαιρεί το network-time delta + ευθυγραμμίζεται) — ΑΛΛΑ το `await` υπάρχει σκόπιμα ώστε να εξασφαλίζεται η αποστολή πριν το response· `void` σε πιθανό serverless deploy ρισκάρει να κοπεί το send. Το DB-write delta παραμένει ούτως ή άλλως. Θέλει σκόπιμη απόφαση delivery-semantics, όχι unattended fix.
   - Πιθανή κατεύθυνση (αν εγκριθεί): fire-and-forget `void sendEmail(...)` όπως το members route (ίδιο best-effort pattern), ή/και ενοποίηση των δύο branch-times ώστε registered/non-registered να έχουν παρόμοιο κόστος.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-02 reviewer, range 12b80a1..7a0af2b)
+- Status: TODO (flagged 2026-07-02 reviewer, range 12b80a1..7a0af2b· 37η σάρωση επιβεβαίωσε ανοιχτό: `reset/request/route.ts:43` no-account fast-path `return {ok:true}` πριν το mint+store+mail → μετρήσιμη timing διαφορά που αποδυναμώνει το anti-enumeration)
 
 ### Dedup ObjectId-validation regex — SaaS billing webhook (isObjectId re-introduced inline)
 - Priority: P3
@@ -903,7 +914,7 @@
   - Πρόταση (αν επιβεβαιωθεί ως πρόθεση): reuse μόνο όταν `readyState === 1` (connected) ή `2` (connecting), αλλιώς rebuild· ή, αν το intent είναι «rebuild μόνο σε torn-down object», διόρθωσε το σχόλιο ώστε να μη λέει «still open».
   - **ΣΗΜ (γιατί flag, όχι fix):** dead-until-SaaS κώδικας — **0 importers**, gated πίσω από `SAAS_MODE` (off). Μηδέν επίδραση στο single-user app σήμερα· ambiguous το «σωστό» rebuild-semantic (το `defaultConn.useDb()` μοιράζεται το ίδιο base client, οπότε ένα rebuild δεν «ξαναφτιάχνει» dropped socket από μόνο του — μπορεί να μη χρειάζεται καθόλου rebuild). Θέλει σκόπιμη απόφαση, όχι μηχανικό swap.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-01 reviewer, commit `1a7d16e`)
+- Status: TODO (flagged 2026-07-01 reviewer, commit `1a7d16e`· 37η σάρωση επιβεβαίωσε ανοιχτό: `connection.ts:54` guard επιστρέφει cached conn εκτός αν `readyState === 99` (uninitialized)· readyState 0 (disconnected) περνά ακόμα)
 
 ---
 

@@ -3397,3 +3397,36 @@ Read-only web code-quality audit (grep + `apps/web && npm run type-check`, όχ�
 ### Needs Achilleas
 - **connection cache-reuse guard (P3, decision):** `connection.ts:54` το `readyState !== 99` δεν ταιριάζει με το σχόλιο («reuse only while open»)· είτε reuse μόνο σε readyState 1/2, είτε διόρθωση σχολίου. Dead-until-SaaS (0 importers), ambiguous το «σωστό» rebuild-semantic (`useDb` μοιράζεται base client) → σκόπιμη απόφαση, όχι μηχανικό swap.
 - **reset-request timing (P3, decision):** fire-and-forget `void sendEmail` ευθυγραμμίζει το anti-enumeration ΑΛΛΑ ρισκάρει κομμένο send σε serverless. Delivery-semantics tradeoff.
+
+## 2026-07-03 (web-code-quality — 37η σάρωση· CONFIRMATION run, μηδέν νέο P1/P2· νέα `workspace` surface exemplary)
+
+Read-only web code-quality audit (grep + `apps/web && npm run type-check`, όχι docs) σε **50 v1 route files** + **22 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/tenancy/*` + `lib/billing/*` + `models/*`. **type-check → EXIT 0** (0 TS errors).
+
+**Νέος κώδικας από τον marker της 36ης (`4a240aa..HEAD`):** `a24707a`+`681a647` (saas `workspace` read GET + rename PATCH + soft-cancel DELETE), `lib/tenancy/workspace.ts` (pure helpers), `audit.ts` (batched actor lookup). Επιθεωρήθηκαν όλα — καθαρά.
+
+**Ευρήματα ανά διάσταση (live grep):**
+- **Type safety:** 0. `grep : any|as any|@ts-ignore|@ts-expect-error` σε api+tenancy+billing (εκτός tests) = 1 false positive (σχόλιο «any active member» στο `workspace/route.ts:106`). `workspaceView` = whitelisted projection (μηδέν leak billing ids/control columns).
+- **Input validation:** 0 gaps. `req.json().catch` = μηδέν (readBody 100%). `workspace` PATCH/DELETE: `readBody`+`strField`+`sanitizeWorkspaceName`+`workspaceNameError` (empty→400)· idempotent no-op guards (rename ίδιο / already-canceled → view χωρίς audit row).
+- **Auth:** 0 unguarded — κάθε v1 route έχει `withAuth`/`apiAuth`/`requireAuth` εκτός του exempt `v1/auth/login`· κάθε saas route gated. `workspace` DELETE = owner-only (`canCancelWorkspace`) πάνω από το session gate.
+- **Error handling:** `workspace` GET/PATCH/DELETE όλα σε `saasGuard` (καθαρό `{ error }` 500). Το μόνο κενό παραμένει `saas/invites/route.ts` GET+DELETE (ήδη στην ουρά).
+- **Mongoose:** exemplary — list routes `.lean()`+`.skip().limit()`+`listEnvelope`. `audit.ts recordAudit` = batched actor lookup (μηδέν N+1). Τα `no-limit .find()` (settings/calendar/cards/reports/overview/plans) = single-tenant/single-user bounded aggregations (prior-accepted). `.map(async`/N+1 = 0.
+- **UX states:** εκτός scope (API-only surface).
+
+**Επαλήθευση ενεργών items (και τα 5 ΠΑΡΑΜΕΝΟΥΝ VALID, μηδέν stale):**
+1. tenant `status:'canceled'/'suspended'` enforcement (P2/M) — `grep tenant.status src/lib/tenancy src/lib/apiAuth.ts` = μόνο 2 projection hits (`workspace.ts:80`, `provision.ts:98`), μηδέν gate path. Ο νέος `workspace` DELETE θέτει `status:'canceled'` που ΚΑΝΕΝΑΣ auth path δεν επιβάλλει → soft-cancel/dunning κοσμητικά. VALID (ΕΝΙΣΧΥΘΗΚΕ από `681a647`).
+2. invites `saasGuard` (P3/S) — `invites/route.ts` GET@43 + DELETE@102 unwrapped (direct `Invite.find`/`updateOne`). VALID.
+3. Account token-hash sparse index (P3/S) — `Account.ts:24/26` `verifyTokenHash`/`resetTokenHash` fields χωρίς index. VALID.
+4. reset-request timing (P3, decision) — `reset/request/route.ts:43` no-account fast-path `return {ok:true}` πριν το mint+store+mail → enumeration delta. VALID.
+5. connection cache-reuse `readyState` guard (P3, decision) — `connection.ts:54` `existing.readyState !== 99` περνά και disconnected(0). VALID (dead-until-SaaS).
+
+**Counts:** P1=0, P2=1 (decision), P3=4 (2 auto-buildable + 2 decision). Μηδέν item έκλεισε, μηδέν νέο άνοιξε — 37η συνεχόμενη σάρωση χωρίς P1.
+
+**Top 3 items να πάρει ο builder μετά (unattended-safe διάταξη):**
+1. **invites/route.ts saasGuard (P3/S)** — τύλιξε GET+DELETE σε `saasGuard` (ίδιο pattern με members). Ολοκληρώνει το try/catch item· tsc-verifiable, unattended-safe.
+2. **Account token-hash sparse index (P3/S)** — `Schema.index({ verifyTokenHash:1 }, { sparse:true })` + `resetTokenHash` στο `models/Account.ts`. Μηδέν runtime αλλαγή· επιταχύνει verify/reset confirm lookups.
+3. (κανένα άλλο auto-buildable· τα υπόλοιπα είναι decision, δες Needs Achilleas)
+
+### Needs Achilleas
+- **tenant status enforcement (P2/M, decision):** ο soft-cancel/dunning θέτει `Tenant.status='canceled'/'suspended'` αλλά κανένα auth path (`resolveWorkspaceSession`/`accountTenants`/v1 gate) δεν το ελέγχει → canceled workspace παραμένει πλήρως προσβάσιμο. SAAS-only (dead-until-SaaS), αλλά billing/access-control correctness όταν ανοίξει. Χρειάζεται απόφαση: πού μπαίνει το gate (session resolver = ένα σημείο; ή feature-route ladder;) + ποιο error (402/403) + reactivate flow.
+- **connection cache-reuse guard (P3, decision):** `connection.ts:54` `readyState !== 99` δεν ταιριάζει με το σχόλιο («reuse only while open»)· reuse μόνο σε 1/2 ή διόρθωση σχολίου. Dead-until-SaaS, ambiguous rebuild-semantic (`useDb` μοιράζεται base client).
+- **reset-request timing (P3, decision):** fire-and-forget `void sendEmail` ευθυγραμμίζει το anti-enumeration ΑΛΛΑ ρισκάρει κομμένο send σε serverless. Delivery-semantics tradeoff.
