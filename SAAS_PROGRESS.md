@@ -566,3 +566,48 @@ runtime wiring, `SAAS_MODE` off = zero effect, κανένα Docker rebuild. Κα
 mint token, hash+store, expiry) + confirm (token → verify → set new password). Χωρίς mailer →
 scaffold που επιστρέφει το token μόνο σε dev/όταν λείπει ο mailer (documented Needs-Achilleas).
 Εναλλακτικά, seat-limits ανά plan στα entitlements όταν οριστεί το pricing.
+
+---
+
+## 2026-07-02 (increment 14 — password-reset request/confirm scaffold)
+**Built:** το forgot-password flow (unauthenticated by design — ο χρήστης ΞΕΧΑΣΕ το
+password), ΟΛΟ σε νέα αρχεία, πάνω στα υπάρχοντα `resetTokenHash`/`resetTokenExpires` fields
+του Account, μηδέν wiring σε feature code:
+- `lib/tenancy/passwordReset.ts` — PURE helpers (`RESET_TTL_MS`=1h, `resetTokenExpiry`,
+  `isResetTokenValid` με injectable now, `resetPasswordError` = length-only, αφού δεν υπάρχει
+  «current» password να διαφέρει) + node:crypto helpers (`hashResetToken` = sha256 hex,
+  `mintResetToken` = 32 random bytes base64url → {token, tokenHash, expires},
+  `resetHashMatches` constant-time, `resetDeliveryConfigured` = ελέγχει SMTP_URL/RESEND_API_KEY).
+  Pattern «store the hash, never the secret» — leaked DB row ΔΕΝ replay-άρεται ως live token.
+- `app/api/saas/account/reset/request/route.ts` (nodejs, force-dynamic, saasAuthGate) —
+  `POST {email}` → mint token, store hash+expiry. **Anti-enumeration:** ΠΑΝΤΑ `{ok:true}`
+  ανεξαρτήτως αν υπάρχει account. **Scaffold echo:** όταν λείπει mailer ΚΑΙ NODE_ENV≠production
+  → επιστρέφει `devToken` για local testing· σε production ένα unwired mailer ρίχνει το token
+  σιωπηλά (fail closed, no leak).
+- `app/api/saas/account/reset/confirm/route.ts` — `POST {token, newPassword}` → lookup by
+  `hashResetToken(token)` → `isResetTokenValid` → set νέο `passwordHash` + clear reset fields
+  (single-use). Generic 400 σε missing/invalid/expired (τίποτα να leak-άρει). Policy μέσω
+  `resetPasswordError` ΠΡΙΝ το DB hit. Sessions ΔΕΝ force-expire-άρονται (consistent με το
+  password-change route· το νέο hash ισχύει στο επόμενο login).
+- `lib/tenancy/passwordReset.test.ts` — 15 PURE tests (expiry TTL, valid/expired/exact-instant/
+  null/unparseable, password policy, sha256 determinism+length+distinctness, mint↔hash coherence
+  + distinct tokens, constant-time match incl. length-mismatch no-throw).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **462/462 green** (447 προϋπάρχοντα
++ 15 νέα· ο συνολικός ανέβηκε από concurrent routines). External importers των νέων modules/routes
+από feature code → **κανένας**· τα routes SAAS-gated (404 όταν off) ⇒ zero runtime wiring,
+`SAAS_MODE` off = zero effect, κανένα Docker rebuild. Καθαρά additive — δεν άγγιξα κανένα υπάρχον
+αρχείο.
+
+**## Needs Achilleas** (reset go-live):
+- **Mailer** (transactional email provider — SMTP ή Resend/Postmark): το request route έχει
+  `TODO(Needs-Achilleas)` στο σημείο του send. Μέχρι να μπει, το token επιστρέφεται ως `devToken`
+  ΜΟΝΟ σε non-production. Όταν οριστεί ο provider → `resetDeliveryConfigured()` γίνεται true (env
+  SMTP_URL ή RESEND_API_KEY) και το echo σβήνει αυτόματα.
+- Ίδιος mailer ξεκλειδώνει και το invite-by-email (increment 12) + email verification (verifyTokenHash).
+
+**Next task:** increment 15 — mailer abstraction (`lib/tenancy/mailer.ts`): thin interface
+`sendEmail({to, subject, html})` με provider dispatch (SMTP via nodemailer ή Resend HTTP) +
+no-op/console fallback όταν unconfigured. Wire το reset-request + το members invite να το καλούν
+(behind resetDeliveryConfigured). Χρειάζεται provider decision από Achilleas (βλ. Needs-Achilleas).
+Εναλλακτικά, seat-limits ανά plan στα entitlements όταν οριστεί το pricing.
