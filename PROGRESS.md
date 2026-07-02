@@ -5,6 +5,19 @@
 <!-- reviewed: 268efb4 -->
 <!-- docker-validated: 4eaa702 -->
 
+## 2026-07-02 (MOBILE PARITY AUDITOR — 5η σάρωση ημέρας, CONFIRMATION)
+- **Τι έκανα:** read-only re-audit, inventory ξαναχτισμένο από τον κώδικα (όχι docs). **49 v1 routes** (`find api/v1 -name route.ts`), **16 mobile screens**. Καμία Docker build, κανένα AI job, μηδέν app-code edit.
+- **Route↔consumer:** grep στο `apps/mobile/src/api.ts` → και τα 49 route paths έχουν ≥1 mobile consumer (deep sub-routes ai-fill/convert-to-task/link-plan/plans/price/add-to-library/rescan όλα ≥1) = **1:1, μηδέν orphan endpoint**.
+- **Δέλτα portable-surface:** `git log 268efb4..HEAD -- apps/mobile/src apps/web/src/app/api/v1` = **ΚΕΝΟ**. Τελευταία mobile/src αλλαγή = `268efb4` (Tasks tag-filter, ήδη audited)· api/v1 = `bba44ff` (reports date-range). Οι μετέπειτα commits (landing `e741999`/`5544822`, SaaS invites `100d1d6`, test `2e5e7da`, docs/health `94a5d20`/`4eaa702`/`e7cd4d6`/`bc525f6`) όλοι **web-only** (landing / SaaS control-plane / tests / docs) → **καμία νέα portable mobile δυνατότητα**.
+- **Spot-check DONE claims (κώδικας, όχι doc):** ItemsScreen (PricePanel/link-plan/convert-to-task/ai-fill/log-price) ✓, ReceiptsScreen (rescan/verify/add-to-library/line-items) ✓, StatementsScreen (plans overview + per-charge installment) ✓, TasksScreen (tag-filter/progress/steps/status) ✓ → doc rows ακριβή, **μηδέν doc-fix**. `statements/route.ts` + `statements/plans/route.ts` + `reports/route.ts` = **GET-only** → merge/bind + PDF-import + extra charts θέλουν νέα endpoints.
+- **Counts: DONE 7 (parity queue 6/6 + Activity) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.** Ενεργό functional parity TODO **κανένα** → ο builder πέφτει στο UI Debt Queue.
+- **Verify:** `apps/mobile npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). Deps (live): `react-native-svg@15.12.1` ΥΠΑΡΧΕΙ· safe-area-context/async-storage/gesture/reanimated/charting-lib ΑΠΟΝ.
+- **Top-3 για τον builder (unattended-safe πρώτο):** (1) **Max content width** `<Screen>` wrapper [P3/S· να επιβεβαιωθεί αν ΗΔΗ DONE από `28c943c` πριν ξαναχτιστεί]· (2) fresh pure-lib **vitest coverage** σε untested helper (`lib/cards.ts` / `lib/taxonomies.ts normalizeList` / `lib/itemStatus.ts`) [P3/S]· (3) **`<Chip>` primitive** [P2/M, attended-preferred].
+- **Git hygiene:** staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (ρητά paths, ΟΧΙ `-A`). Το `.claude/launch.json` (WIP εργαλείου του Αχιλλέα) ΔΕΝ αγγίχτηκε.
+
+### Needs Achilleas (parity-auditor 2026-07-02, 5η)
+- Μηδέν committed secret στο range. Εκκρεμείς αποφάσεις (αμετάβλητες): native dep `react-native-safe-area-context` (safe-area insets)· persist dep (`async-storage`) για language-switcher + theme toggle· RN charting lib για extra reports charts (inventory-pie/subs-by-cat pie)· AI-engine / storage / OneDrive στα mobile Settings (credentials/architecture)· full Kanban board (drag)· statements merge/bind + PDF-import (νέα write/upload endpoints)· remote push (EAS dev build + APNs key).
+
 ## 2026-07-02 (REVIEWER — range bba44ff..268efb4)
 - **Τι review-άρισα:** 5 commits (2 code, 1 landing, 1 test, 1 docs): `268efb4` mobile Tasks tag-filter + project-progress-by-tag, `100d1d6` invites list `?status` audit filter, `2e5e7da` isVisionModel test suite, `5544822` landing «AI in action» spotlight, `94a5d20`/`4eaa702` docs.
 - **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· `apps/web npm test` → **619/619 pass** (41 files), περιλαμβάνει τα νέα `aiConfig.test.ts` (8) + `invites.test.ts` (νέες status-filter assertions).
