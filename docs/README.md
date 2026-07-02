@@ -26,6 +26,9 @@ GitHub today and can feed a docs site later.
 - **[Mobile app](mobile.md)** — the Expo iOS/Android companion: install, point it
   at your Pharos server, sign in for a bearer token, camera AI scans, push, and
   building installable binaries with EAS.
+- **[Troubleshooting](troubleshooting.md)** — the most common problems in one
+  place, grouped by area (startup, login, database, AI, storage, notifications,
+  import, mobile, performance), each linking back to the guide that covers it.
 
 ## Reference (repo root)
 

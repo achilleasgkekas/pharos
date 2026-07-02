@@ -229,3 +229,32 @@ unstaged (.claude/launch.json) — δεν το αγγιξα.
 Επομενο run: ενα `docs/troubleshooting.md` που συγκεντρωνει τα διασπαρτα troubleshooting
 sections (self-hosting/mobile/configuration) σε ενα σημειο· η εμπλουτισμος του features.md
 ανα module με screenshots-placeholders. Πρωτα finish-in-progress κανενα (ολα done).
+
+## 2026-07-02 (cont.²)
+
+Νεο doc: `docs/troubleshooting.md` — συγκεντρωτικο troubleshooting σε ενα σημειο,
+οπως ειχε προγραμματιστει στο προηγουμενο run. Ομαδοποιησα τα διασπαρτα sections
+(self-hosting §10, mobile Troubleshooting, configuration notes) σε 9 areas: Install &
+startup, Login & authentication, Database (Mongo), AI parsing & scans, Storage & backups,
+Notifications, Import & price scraping, Mobile app, Performance. Καθε item linkαρει πισω
+στον αναλυτικο guide (η troubleshooting.md ειναι fast index, οι guides authoritative).
+
+Accuracy (διαβασα κωδικα/config, οχι εικασιες): επιβεβαιωσα ονοματα env vars απο
+`.env.example` (AUTH_SECRET, NEXT_SERVER_ACTIONS_ENCRYPTION_KEY, AUTH_COOKIE_SECURE,
+MONGO_USER/PASS, SOLVER_URL, OLLAMA_NUM_CTX) + service names απο `docker-compose.yml`
+(web, mongo, mongo-express, flaresolverr, searxng, scraper· volume mongo-data) + το
+host-gateway wiring (`host.docker.internal:host-gateway`, OLLAMA_HOST) + το SOLVER_URL
+default (`http://flaresolverr:8191`). Ολα ταιριαζουν με τον κωδικα.
+
+Προσθεσα link στο `docs/README.md` index (νεα εγγραφη Troubleshooting μετα το Mobile app).
+
+Validation: markdown only, κανενα build/Docker/AI call. Internal links του troubleshooting.md
+→ README.md, self-hosting.md, configuration.md, features.md, api.md, mobile.md — ολα υπαρχουν
+στο docs/. Code fences (inline `code` μονο, κανενα fenced block) αθικτα.
+
+Collision guard: `git status --short` + `git diff --cached` πριν το commit· staged κενο.
+Stage ΜΟΝΟ docs/troubleshooting.md + docs/README.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: εμπλουτισμος `docs/features.md` ανα module (screenshot placeholders), η ενα
+`docs/saas.md`/`docs/faq.md` (τα προσφατα commits ειναι SaaS billing/members — μηδεν doc
+ακομα για SaaS onboarding). Πρωτα finish-in-progress κανενα (ολα done).
