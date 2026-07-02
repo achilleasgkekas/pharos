@@ -424,3 +424,26 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-02 (cont.¹²)
+
+Task: (e) Polish, μερος 18 — νεο flagship spotlight section «AI in action» (#ai) αναμεσα σε Features και Who. Το AI receipt/statement parsing ειναι το κυριο differentiator του app αλλα ζουσε μονο ως ενα feature card· του εδωσα δικη του visual στιγμη (input -> parsed output), ολα CSS-drawn (μηδεν screenshot assets, ιδιο idiom με το υπαρχον #preview mockup). Self-contained, brand-consistent, μηδεν pricing/asset dependency.
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεα data arrays (AI_FIELDS store/date/VAT/total, AI_LINES 2 line items, AI_NOTES 3 chips) + νεο `#ai` section: eyebrow «AI that reads your paperwork» + h2 «Drop a receipt. Get structured data.» + subtext + `.ai-flow` (input panel με faux-receipt fuzzy lines + file chip «receipt_plaisio.pdf» -> `.ai-arrow` -> output panel με 4 parsed fields [Πλαίσιο Computers / 22 Nov 2023 / VAT / €149.50 accent] + 2 line items με check icons) + 3 note chips (any language / line items+VAT split / quick-verify queue). Semantic, μηδεν client JS. Values ακριβη per CLAUDE.md (το πραγματικο Πλαίσιο €149.50 22/11/2023 example απο το OCR-rotation finding).
+- `app/page.tsx` top nav: νεο «AI» link (href="#ai", nav-anchor) αναμεσα σε Features και Self-host. Το `.nav-anchor` κρυβεται <720px, οποτε μηδεν mobile crowding.
+- `app/globals.css`: νεες `.ai-flow` (3-col grid 1fr/auto/1fr) + `.ai-panel`/`.ai-panel-out` (accent radial glow, ιδιο pattern με showcase/cta-band) + `.ai-receipt`/`.ai-rline` (dashed faux-receipt με width utility classes w-30..w-80) + `.ai-file` + `.ai-arrow` (round accent badge, rotate -90 desktop) + `.ai-fields`/`.ai-field` + `.ai-lines`/`.ai-lineitem` + `.ai-notes`/`.ai-note` chips. Reuse υπαρχουσας παλετας/glow idiom. Responsive: <720px το `.ai-flow` γινεται single-col + arrow rotate 0 (points down)· #ai padding 40px στο 480px block.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 761 B / 103 kB First Load JS, αμεταβλητο — pure static markup+CSS, μηδεν bundle impact).
+- Prerendered HTML (.next/server/app/index.html): «Drop a receipt. Get structured data.», «AI that reads your paperwork», id="ai", receipt_plaisio.pdf, «Line items, VAT», «Πλαίσιο Computers» ολα FOUND· href="#ai" nav count=1.
+- Preview (landing-dev, port 3100): DOM eval -> #ai present, h2 σωστο, 2 panels / 4 fields / 2 line items / 3 notes, nav AI link present· console errors: none. Σταματησα τον server. (ΣΗΜ: το headless viewport εχει innerWidth=0 -> εφαρμοζεται το <720px stacking rule, γνωστο quirk· το desktop 3-col rule ειναι εγκυρο CSS, επιβεβαιωμενο απο build + DOM structure.) Docker/web/mobile αθικτα. Το `.claude/launch.json` (shared local config) ΔΕΝ commit (collision guard — μονο app/page.tsx + app/globals.css + LANDING_PROGRESS.md).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση των CSS mockups (#preview, #ai) με πραγματικα app screenshots οταν υπαρξουν assets· per-plan Offer JSON-LD nodes οταν κλεισουν οι τιμες· «who» link στο top nav (τωρα reachable μονο με scroll).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.

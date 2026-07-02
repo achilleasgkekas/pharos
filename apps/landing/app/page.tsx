@@ -233,6 +233,25 @@ const SHOWCASE_MODS: { icon: string; color: string; title: string; count: string
   { icon: 'wifi', color: 'var(--gold)', title: 'Network', count: '31 clients' },
 ];
 
+// Parsed output for the "AI in action" spotlight (CSS-drawn, no assets)
+const AI_FIELDS: { k: string; v: string; color?: string }[] = [
+  { k: 'Store', v: 'Πλαίσιο Computers' },
+  { k: 'Date', v: '22 Nov 2023' },
+  { k: 'VAT (24%)', v: '€28.94' },
+  { k: 'Total', v: '€149.50', color: 'var(--accent)' },
+];
+
+const AI_LINES: { name: string; price: string }[] = [
+  { name: 'Lenovo Tab M9 3GB', price: '€119.50' },
+  { name: 'USB-C 65W charger', price: '€30.00' },
+];
+
+const AI_NOTES: { icon: string; label: string }[] = [
+  { icon: 'receipt', label: 'Any language, any layout' },
+  { icon: 'check', label: 'Line items, VAT & totals split out' },
+  { icon: 'chart', label: 'Quick-verify queue clears the backlog' },
+];
+
 const COMPARE: { label: string; self: string; hosted: string }[] = [
   { label: 'Where it runs', self: 'Your own hardware', hosted: 'Our managed servers' },
   { label: 'Your data', self: 'Stays on your disk', hosted: 'Isolated per tenant' },
@@ -377,6 +396,7 @@ export default function Home() {
           </a>
           <nav className="site-nav">
             <a href="#features" className="navlink nav-anchor">Features</a>
+            <a href="#ai" className="navlink nav-anchor">AI</a>
             <a href="#self-host" className="navlink nav-anchor">Self-host</a>
             <a href="#pricing" className="navlink">Pricing</a>
             <a href="#compare" className="navlink nav-anchor">Compare</a>
@@ -505,6 +525,75 @@ export default function Home() {
               </article>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── AI in action (flagship spotlight) ─────────────── */}
+      <section id="ai" style={{ padding: '56px 0' }}>
+        <div className="container" style={{ maxWidth: 960 }}>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <p className="mono" style={{ marginBottom: 12 }}>AI that reads your paperwork</p>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 700, marginBottom: 14 }}>
+              Drop a receipt. Get structured data.
+            </h2>
+            <p style={{ color: 'var(--text-dim)', maxWidth: 560, margin: '0 auto' }}>
+              Photos, PDFs, or forwarded emails go in. Store, date, totals, VAT,
+              and every line item come out, ready to file. Bring your own model
+              or run it fully local.
+            </p>
+          </div>
+
+          <div className="ai-flow">
+            <div className="ai-panel">
+              <span className="ai-panel-label">Drop in</span>
+              <div className="ai-receipt" aria-hidden="true">
+                <span className="ai-rline w-60" />
+                <span className="ai-rline w-40" />
+                <span className="ai-rline w-80" />
+                <span className="ai-rline w-50" />
+                <span className="ai-rline w-70" />
+                <span className="ai-rline w-30" />
+              </div>
+              <span className="ai-file">
+                <Icon name="receipt" size={15} />
+                receipt_plaisio.pdf
+              </span>
+            </div>
+
+            <span className="ai-arrow" aria-hidden="true">
+              <Icon name="chevron" size={22} />
+            </span>
+
+            <div className="ai-panel ai-panel-out">
+              <span className="ai-panel-label">Parsed out</span>
+              <ul className="ai-fields">
+                {AI_FIELDS.map((f) => (
+                  <li key={f.k} className="ai-field">
+                    <span className="k">{f.k}</span>
+                    <span className="v" style={f.color ? { color: f.color } : undefined}>{f.v}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="ai-lines">
+                {AI_LINES.map((l) => (
+                  <div key={l.name} className="ai-lineitem">
+                    <span className="chk"><Icon name="check" size={13} /></span>
+                    <span className="nm">{l.name}</span>
+                    <span className="pr">{l.price}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <ul className="ai-notes">
+            {AI_NOTES.map((n) => (
+              <li key={n.label} className="ai-note">
+                <span className="ai-note-ico"><Icon name={n.icon} size={15} /></span>
+                {n.label}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
