@@ -429,6 +429,21 @@
 
 ## Web Debt Queue
 
+### Tenant `status:'canceled'`/`'suspended'` δεν επιβάλλεται πουθενά → soft-cancel/dunning ΔΕΝ μπλοκάρει πρόσβαση
+- Priority: P2
+- Size: M
+- Area: shared
+- Files: apps/web/src/lib/tenancy/workspaceSession.ts (ή νέος shared status gate), apps/web/src/lib/tenancy/saasApi.ts, apps/web/src/app/api/saas/workspace/route.ts, apps/web/src/app/api/saas/billing/webhook/route.ts, apps/web/src/models/Tenant.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα (επιφανειοποιήθηκε από το commit `681a647` workspace soft-cancel + προϋπάρχει από το billing webhook):** δύο flows θέτουν `Tenant.status = 'canceled'` — το νέο owner-only DELETE `/api/saas/workspace` (soft-cancel) και το `billing/webhook/route.ts:138` (dunning/subscription cancel). Το `Tenant.ts:27` σχόλιο + το commit message («blocks access, reversible») δηλώνουν ρητά ότι `suspended`/`canceled` **μπλοκάρουν πρόσβαση**. Ομως live grep σε ΟΛΟ το `src/` (`grep -rn "canceled\|suspended" src --include=*.ts`) δείχνει **μηδέν enforcement point**: ούτε το `resolveWorkspaceSession`, ούτε το `accountTenants`/`saasApi`, ούτε κανένα v1 feature-route auth path ελέγχει `tenant.status`. Το `accountTenants` φιλτράρει ΜΟΝΟ `Membership.status:'active'`, ΠΟΤΕ `Tenant.status`. Αποτέλεσμα: ένα canceled/suspended workspace παραμένει **πλήρως προσβάσιμο** — ο soft-cancel και το dunning είναι κοσμητικά (θέτουν flag + audit row που κανείς δεν διαβάζει). Η acceptance του `681a647` («blocks access») ΔΕΝ ικανοποιείται.
+  - **ΣΗΜ επίπτωσης:** `SAAS_MODE`-only (dead-until-SaaS· μηδέν επίδραση self-hosted ή v1 mobile). Ομως όταν ανοίξει το SaaS, είναι billing/access-control correctness: ένας μη-πληρώνων (past_due→canceled) tenant συνεχίζει να χρησιμοποιεί την app. P2 γιατί είναι το enforcement που κάνει cancel/suspend/dunning να έχουν νόημα.
+  - **Fix (μία απόφαση: πού μπαίνει το gate):** πρόσθεσε έναν κεντρικό έλεγχο `if (tenant.status === 'canceled' || tenant.status === 'suspended') → 403 { error, code:'workspace_inactive' }` στο **σημείο όπου resolve-άρεται το tenant context για write feature-routes + control-plane** (πιθανότερα στο `resolveWorkspaceSession` και/ή στο tenant-context resolution του v1 auth path). Απόφαση scope: (α) μπλοκάρεις read+write ή μόνο write (ώστε ο owner να μπορεί να δει/reactivate); (β) εξαιρείς το reactivate flow + το ίδιο το GET `/api/saas/workspace` ώστε ο owner να ξαναανοίξει. Πρότεινε: block feature-routes (v1) πλήρως, άφησε control-plane read (workspace GET, billing) ώστε reactivate/upgrade να δουλεύει.
+  - **ΣΗΜ:** μην dropάρεις data· ΜΟΝΟ gate. Το drop της isolated data-db μένει manual (per το route docstring). Αν το scope είναι ασαφές (ποια ακριβώς routes gate + reactivate UX) → κόψε ένα «Needs Achilleas» sub-decision αντί να μαντέψεις.
+  - Επαλήθευση: canceled tenant → v1 feature call → 403 (όχι 200)· reactivate path παραμένει προσβάσιμος· `grep -rn "status === 'canceled'\|status === 'suspended'" src/lib/tenancy` δείχνει ≥1 enforcement hit (όχι μόνο comment/audit/set).
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-03 reviewer, range 148fb06..53b861a)
+
 ### saasGuard adoption σε invites/route.ts (DELETE write-route + GET) — missed από το try/catch slice 2/2
 - Priority: P3
 - Size: S

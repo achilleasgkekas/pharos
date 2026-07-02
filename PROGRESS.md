@@ -2,8 +2,19 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 148fb06 -->
+<!-- reviewed: 53b861a -->
 <!-- docker-validated: 4a240aa -->
+
+## 2026-07-03 (reviewer — range 148fb06..53b861a· tsc web+mobile EXIT 0· 1 P2 flag)
+- **Τι review-άρισα:** 9 commits από τον τελευταίο marker `148fb06` → HEAD `53b861a`. Code commits: `53b861a` (mobile Input migration 3 screens), `681a647` (workspace soft-cancel DELETE), `a24707a` (workspace read/rename route + lib), `c9367e2` (landing 404), `7de30bc` (test(ocr))· υπόλοιπα docs.
+- **Checks (read-only):** `apps/web npm run type-check` **EXIT 0**· `apps/mobile npx tsc --noEmit` **EXIT 0**· `vitest run ocr.test.ts workspace.test.ts` → **24/24 pass** (8 ocr + 16 workspace).
+- **Ανά commit:**
+  - `53b861a` mobile Input migration — καθαρό. `TextInput→Input` σε Login/Search/Assistant, dead `s.input` StyleSheet blocks διαγράφηκαν, layout-affecting props (`flex`/`maxHeight`/`borderRadius`) διατηρήθηκαν μέσω `style` override. Μηδέν leftover `s.input` ref, μηδέν web runtime. Safe.
+  - `a24707a`/`681a647` SaaS workspace route (GET/PATCH/DELETE) + `workspace.ts` pure helpers — κώδικας solid: `saasGuard` wrap, owner-only gate για DELETE, idempotent no-op, whitelisted `workspaceView` (μηδέν secret leak), `recordAudit`. Tests pass.
+  - `c9367e2` landing 404 + `7de30bc` ocr test — additive, καθαρά, pass.
+- **Τι διόρθωσα:** τίποτα. Ολα green, μηδέν small-safe-fix candidate (καθόλου typo/bad-import/missing-await/unused-import στο diff).
+- **Τι flag-αρα (WEB_DEBT.md, νέο P2/M στην κορυφή της Queue):** το `Tenant.status:'canceled'`/`'suspended'` **δεν επιβάλλεται πουθενά**. Το soft-cancel DELETE (`681a647`) + το billing webhook (`billing/webhook/route.ts:138`) θέτουν `status:'canceled'` και το `Tenant.ts` σχόλιο + το commit msg λένε «blocks access», αλλά live grep σε ΟΛΟ το `src/` δείχνει μηδέν enforcement point (ούτε `resolveWorkspaceSession`, ούτε `accountTenants`, ούτε v1 auth path ελέγχουν `tenant.status`). Δηλαδή ένα canceled workspace μένει πλήρως προσβάσιμο → η acceptance («blocks access») ΔΕΝ ικανοποιείται. `SAAS_MODE`-only (μηδέν self-hosted/mobile επίπτωση), γι' αυτό P2 όχι P1· enforcement-scope έχει ένα sub-decision (block read+write ή μόνο write· reactivate UX) που σημειώθηκε στο acceptance. ΔΕΝ το διόρθωσα εγώ — design-level, spans workspaceSession + v1 auth path, όχι small-safe.
+- **Git hygiene:** stage ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (ρητά paths). ΔΕΝ αγγίχτηκαν τα WIP του Αχιλλέα (`.claude/launch.json`, ReceiptsScreen, SettingsScreen, ShoppingScreen).
 
 ## 2026-07-03 (pharos-daily-dev — mobile `<Input>` primitive migration, 3 screens)
 - **Τι έκανα:** προχώρησα το **top unattended-safe UI Debt item** (Input primitive migration finish, P1/S) που πρότεινε η 40ή σάρωση του parity-auditor. Ο πυρήνας του functional parity είναι κλειστός (0 auto-buildable GAP), οπότε ο builder πέφτει στην UI Debt Queue. Το `<Input>` primitive υπάρχει ήδη στο `ui.tsx` αλλά 5 screens κρατούσαν raw `<TextInput style={s.input}>`. Μετέτρεψα τα **3 καθαρότερα** (LoginScreen 3 fields, SearchScreen 1, AssistantScreen 1), αφήνοντας εκτός τα 2 με σύγκρουση/μεγαλύτερο ρίσκο.
