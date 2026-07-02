@@ -435,3 +435,38 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — 
 insensitive· env save/restore μέσω afterEach) ή `lib/i18n/config.ts` (`isLocale` guard +
 LOCALES table invariants). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο
 "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — tenancy/saasMode.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/tenancy/saasMode.test.ts` για τον SaaS feature-flag reader `saasMode()` του `lib/tenancy/saasMode.ts`.**
+
+ΣΗΜ: το `lib/i18n/config.ts` (η άλλη προτεινόμενη επιλογή) είχε ΗΔΗ test file
+(`config.test.ts`, commit 7a0af2b από παράλληλο routine) → το προσπέρασα, διάλεξα το
+`saasMode.ts` που δεν είχε κάλυψη.
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/tenancy/saasMode.test.ts` (7 tests, μηδέν DB/δίκτυο/clock). Το
+  `SAAS_MODE` είναι process-global env var → save/restore μέσω `afterEach` ώστε ντετερμινιστικό
+  και χωρίς cross-test leakage. Καλύπτει: **default OFF** όταν unset (self-hosted single-user
+  shape), empty/whitespace-only → OFF, τα 4 accepted truthy tokens (on/1/true/yes) → ON,
+  case-insensitivity (ON/True/YES), whitespace trim πριν το match («  on  », «\ttrue\n»),
+  explicit falsy/non-matching (off/0/false/no/enabled/2/onn) → OFF, και **partial-match guard**
+  (whole-token μόνο: «on off», «turn on», «is-true», «10» → OFF).
+- **Σημείο που κλειδώθηκε**: το gate είναι exact-token-after-trim-and-lowercase, ΟΧΙ substring
+  match· το test το πιν-άρει ρητά ώστε μια ακούσια χαλάρωση σε `includes` να πέσει. Το default
+  (undefined) === off είναι το invariant που κρατά το OSS self-hosted app να δουλεύει χωρίς config.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/tenancy/saasMode.test.ts` → 7/7 passed.
+- `npx vitest run` (όλο το suite) → 36 files, 538/538 passed (ήταν 531).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json`
+  (foreign, ΔΕΝ το άγγιξα/staged) + το νέο saasMode.test.ts· `git diff --cached` κενό·
+  στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — δες `lib/tenancy/saasApi.ts`
+(αν pure request/response helpers χωρίς DB) ή edge cases σε ακάλυπτα modules. Έλεγξε πρώτα με
+`find src -name '*.test.ts'` ποια έμειναν χωρίς κάλυψη (πολλά routines γράφουν παράλληλα).
+Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
