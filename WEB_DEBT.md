@@ -3,6 +3,10 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Reviewer note (2026-07-03· range 53b861a..2f31c5d· P2/M tenant-status ΜΕΡΙΚΩΣ έκλεισε)
+- **Item #1 (P2/M tenant `status:'canceled'/'suspended'` δεν επιβάλλεται) → DOING, μερική κάλυψη.** Το `b911882` πρόσθεσε fail-closed `workspaceStatusError` guard στο `resolveWorkspaceSession` (`lib/tenancy/workspace.ts` + `workspaceSession.ts`), tested (15 refs στο `workspace.test.ts`, 19/19 green). **Καλύπτει ΜΟΝΟ τα workspace-management routes** (members/audit/invites/rename → 403 σε suspended/canceled/pending· GET+DELETE opt-out με `allowInactive` για view + idempotent cancel). Το commit msg είναι ειλικρινές για το scope.
+- **Παραμένει ανοιχτό:** το v1 app-data path (`getTenantContext`, `lib/tenancy/context.ts:63` διαβάζει `status` αλλά ΔΕΝ κάνει gate) → ένα canceled/suspended workspace κρατά πλήρη πρόσβαση στα δικά του δεδομένα (receipts/items/expenses/…). Επίσης εκκρεμεί το reactivate UX. **Design decision (block read+write στο v1 path ή μόνο write· reactivate flow)** → μένει P2/M, ΟΧΙ small-safe. Ο builder ας ΜΗΝ ξανα-υλοποιήσει το management-route κομμάτι (έγινε).
+
 ## Σύνοψη audit (2026-07-03 37η σάρωση· type-check EXIT 0· μηδέν νέο P1/P2· ουρά 5 TODO αμετάβλητη — και τα 5 επιβεβαιωμένα ανοιχτά στον κώδικα· νέα surface [`saas/workspace` DELETE soft-cancel + `lib/tenancy/workspace.ts` + `audit.ts`] audited → exemplary)
 
 **2026-07-03 (37η σάρωση, αυτόνομος γύρος):** fresh live σάρωση (grep, όχι docs) σε **50 v1 route files** + **22 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/tenancy/*` + `lib/billing/*` + `models/*`. `git diff --name-only 4a240aa..HEAD` = νέα SaaS surface (`workspace` route soft-cancel DELETE + rename PATCH + read GET, `lib/tenancy/workspace.ts` pure helpers, `audit.ts` batched-lookup). `npm run type-check` **EXIT 0** (0 TS errors).
