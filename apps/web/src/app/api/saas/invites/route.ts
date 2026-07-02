@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveWorkspaceSession } from '@/lib/tenancy/workspaceSession';
 import { Invite, type InviteDoc } from '@/models/Invite';
-import { readBody } from '@/lib/apiBody';
+import { readBody, isObjectId } from '@/lib/apiBody';
 import { inviteView, parseInviteStatusFilter, inviteStatusQuery } from '@/lib/tenancy/invites';
 
 export const runtime = 'nodejs';
@@ -74,6 +74,12 @@ export async function DELETE(req: NextRequest) {
   const inviteId = typeof body.inviteId === 'string' ? body.inviteId.trim() : '';
   if (!inviteId) {
     return NextResponse.json({ error: 'inviteId is required' }, { status: 400 });
+  }
+  // Format-guard before hitting Mongoose: a malformed id would otherwise throw a
+  // CastError inside updateOne and surface as an uncaught 500. Mirrors the
+  // `^[a-f0-9]{24}$` convention used across the dynamic `[id]` routes.
+  if (!isObjectId(inviteId)) {
+    return NextResponse.json({ error: 'invalid inviteId' }, { status: 400 });
   }
 
   // Revoke only within this workspace and only if still pending — a fresh mint or an
