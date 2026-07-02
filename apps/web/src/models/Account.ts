@@ -22,6 +22,7 @@ const AccountSchema = new Schema(
     // Short-lived tokens for email verification / password reset. Hashed value + expiry;
     // cleared on use. Null when none outstanding.
     verifyTokenHash: { type: String, default: null },
+    verifyTokenExpires: { type: Date, default: null },
     resetTokenHash: { type: String, default: null },
     resetTokenExpires: { type: Date, default: null },
     lastLoginAt: { type: Date, default: null },

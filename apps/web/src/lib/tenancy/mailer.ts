@@ -80,6 +80,24 @@ export function resetEmail(link: string): { subject: string; html: string } {
   };
 }
 
+/** The user-facing verification link a request email points at (a future /verify page reads
+ *  the token and posts it to /api/saas/account/verify/confirm). `base` should be normalized. */
+export function verifyLinkUrl(base: string, token: string): string {
+  const b = (base || '').replace(/\/+$/, '');
+  return `${b}/verify?token=${encodeURIComponent(token)}`;
+}
+
+/** Build the email-verification email body. Pure — no send. */
+export function verifyEmail(link: string): { subject: string; html: string } {
+  return {
+    subject: 'Verify your Pharos email',
+    html:
+      `<p>Confirm this email address for your Pharos account.</p>` +
+      `<p><a href="${link}">Verify your email</a></p>` +
+      `<p>This link expires in 24 hours. If you did not create this account, you can ignore this email.</p>`,
+  };
+}
+
 /** Build the "you were added to a workspace" notification body. Pure — no send. */
 export function invitedEmail(workspaceName: string): { subject: string; html: string } {
   const name = (workspaceName || 'a Pharos workspace').trim() || 'a Pharos workspace';

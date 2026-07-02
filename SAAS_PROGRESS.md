@@ -663,3 +663,52 @@ effect, κανένα Docker rebuild. Το mailer module δεν το κάνει i
 από provider decision), είτε (β) email verification flow (`verifyTokenHash`/`verifyTokenExpires`
 υπάρχουν ήδη στο Account) request/confirm scaffold πάνω στον νέο mailer, είτε (γ) seat-limits
 ανά plan στα entitlements όταν οριστεί το pricing.
+
+---
+
+## 2026-07-02 (increment 16 — email verification: request/confirm scaffold)
+**Built:** το email-verification flow πάνω στον mailer (increment 15), καθρέφτης του
+password-reset (increment 14). Ένας logged-in Account επιβεβαιώνει το email του· το confirm
+γίνεται με token κλικαρισμένο από το inbox (unauthenticated). ΟΛΟ σε νέα αρχεία + additive-only
+edits στα δικά μου SAAS αρχεία:
+- `models/Account.ts` (δικό μου, additive): πρόσθεσα το field `verifyTokenExpires` (default
+  null) δίπλα στο ήδη υπάρχον `verifyTokenHash` — το schema comment μιλούσε ήδη για «Hashed
+  value + expiry», απλά έλειπε το expiry field για verification (μόνο το reset το είχε).
+  Backward-compatible: default null, ο DEFAULT_TENANT / self-hosted δεν το αγγίζει ποτέ.
+- `lib/tenancy/emailVerify.ts` — PURE + crypto helpers, mirror του passwordReset.ts:
+  `VERIFY_TTL_MS` (24h — πιο γενναιόδωρο από το reset 1h, γιατί verification links
+  κλικάρονται αργά), `verifyTokenExpiry`, `isVerifyTokenValid` (injectable now),
+  `hashVerifyToken` (sha256 hex), `mintVerifyToken` (32 random bytes base64url →
+  {token, tokenHash, expires}), `verifyHashMatches` (constant-time). «Store the hash, never
+  the secret» — leaked DB row ΔΕΝ replay-άρεται.
+- `lib/tenancy/mailer.ts` (δικό μου, additive): `verifyLinkUrl(base, token)` (→ `/verify?token=`,
+  url-encoded) + `verifyEmail(link)` message builder (24h notice). Pure, μηδέν send.
+- `app/api/saas/account/verify/request/route.ts` — `POST` **AUTHENTICATED** (getCurrentAccount).
+  Στοχεύει το email του ΙΔΙΟΥ του caller → μηδέν enumeration surface. Already-verified →
+  short-circuit `{ok:true, alreadyVerified:true}`, κανένα token. Αλλιώς mint + store hash+expiry
+  + (αν `mailerCanDeliver`) `sendEmail`. Scaffold echo: `devToken` ΜΟΝΟ όταν δεν υπάρχει mailer
+  ΚΑΙ NODE_ENV≠production.
+- `app/api/saas/account/verify/confirm/route.ts` — `POST {token}` **UNAUTHENTICATED** (proof
+  via token). Lookup by `hashVerifyToken` → `isVerifyTokenValid` → `emailVerified:true` + clear
+  verify fields (single-use). Generic 400 σε missing/invalid/expired (τίποτα να leak-άρει).
+- `lib/tenancy/emailVerify.test.ts` — 13 PURE tests (TTL 24h, valid/expired/exact-instant/null/
+  unparseable, sha256 determinism+length+distinctness, mint↔hash coherence + distinct tokens,
+  constant-time match incl. length-mismatch no-throw).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **531/531 green** (518 προϋπάρχοντα
++ 13 νέα). External importers των νέων modules/routes από feature code → **κανένας**· τα routes
+SAAS-gated (404 όταν off) ⇒ zero runtime wiring, `SAAS_MODE` off = zero effect, κανένα Docker
+rebuild. Άγγιξα μόνο δικά μου SAAS αρχεία (Account model + mailer· additive).
+
+**## Needs Achilleas** (verification go-live):
+- **Mailer** (ίδιος με reset/invite): μέχρι να μπει Resend (`RESEND_API_KEY`) ή wired SMTP, το
+  verify-request επιστρέφει `devToken` ΜΟΝΟ σε non-production. Μόλις μπει provider →
+  `mailerCanDeliver()` true, στέλνεται link, το echo σβήνει.
+- Χρειάζεται user-facing `/verify` σελίδα (διαβάζει `?token=` → POST στο confirm route)· το
+  `verifyLinkUrl` δείχνει ήδη εκεί. Ίδιο pattern με το `/reset`.
+
+**Next task:** increment 17 — είτε (α) `sendViaSmtp` via nodemailer (μετά από provider decision
+Achilleas), είτε (β) seat-limits ανά plan στα entitlements όταν οριστεί το pricing (πόσα members
+επιτρέπει free/shared/dedicated· τα guards ζουν ήδη στο members.ts), είτε (γ) invite-by-email
+νέων (μη εγγεγραμμένων) users — τώρα που υπάρχει mailer + token pattern, μπορεί να στείλει
+signup link σε email που δεν έχει account.
