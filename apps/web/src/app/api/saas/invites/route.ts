@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveWorkspaceSession } from '@/lib/tenancy/workspaceSession';
 import { Invite, type InviteDoc } from '@/models/Invite';
+import { Account } from '@/models/Account';
 import { readBody, isObjectId } from '@/lib/apiBody';
-import { inviteView, parseInviteStatusFilter, inviteStatusQuery } from '@/lib/tenancy/invites';
+import {
+  inviteView,
+  parseInviteStatusFilter,
+  inviteStatusQuery,
+  collectInviteAccountIds,
+} from '@/lib/tenancy/invites';
 import { recordAudit } from '@/lib/tenancy/audit';
 
 export const runtime = 'nodejs';
@@ -50,10 +56,39 @@ export async function GET(req: NextRequest) {
     .sort({ createdAt: -1 })
     .lean()) as unknown as (InviteDoc & { createdAt?: Date })[];
 
+  // Resolve every referenced account's email + display name in ONE batched lookup (never
+  // N+1), across both invitedBy (minter) and acceptedBy (redeemer), so an "Invitations" panel
+  // can render human identities without its own account API. Deleted accounts / legacy rows
+  // simply have no entry → inviteView gets null. A blank name (Account default '') is treated
+  // as absent so the UI falls back to the email. Mirrors the audit route's actor resolution.
+  const accountIds = collectInviteAccountIds(invites);
+  const emailById = new Map<string, string>();
+  const nameById = new Map<string, string>();
+  if (accountIds.length) {
+    const accounts = (await Account.find({ _id: { $in: accountIds } })
+      .select('email name')
+      .lean()) as unknown as { _id: unknown; email?: string | null; name?: string | null }[];
+    for (const a of accounts) {
+      const id = String(a._id);
+      if (a.email) emailById.set(id, a.email);
+      const name = a.name?.trim();
+      if (name) nameById.set(id, name);
+    }
+  }
+
   return NextResponse.json({
     workspace: session.workspace.slug,
     status: filter,
-    invites: invites.map((inv) => inviteView(inv)),
+    invites: invites.map((inv) => {
+      const inviter = inv.invitedBy != null ? String(inv.invitedBy) : null;
+      const accepter = inv.acceptedBy != null ? String(inv.acceptedBy) : null;
+      return inviteView(inv, undefined, {
+        inviterEmail: inviter ? emailById.get(inviter) ?? null : null,
+        inviterName: inviter ? nameById.get(inviter) ?? null : null,
+        accepterEmail: accepter ? emailById.get(accepter) ?? null : null,
+        accepterName: accepter ? nameById.get(accepter) ?? null : null,
+      });
+    }),
   });
 }
 

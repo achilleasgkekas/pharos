@@ -1057,3 +1057,46 @@ consume-άρει το `GET /api/saas/audit` (το read API επιστρέφει 
 render-able· UI-only), είτε (β) `sendViaSmtp` via nodemailer (μετά provider decision Achilleas·
 ξεκλειδώνει reset/verify/invite delivery), είτε (γ) `invitedBy` projection στο inviteView (ποιος
 έστειλε το invite — συμπληρώνει το acceptedBy/acceptedAt του §21 για πλήρες invite audit trail).
+
+## 2026-07-02 (increment 26 — resolve inviter/accepter emails+names in the invites list)
+**Built:** το option (γ) του §25 (`invitedBy` projection) είχε ΗΔΗ landαρίσει (ο `inviteView`
+έβγαζε ήδη `invitedBy`/`acceptedBy` ids). Το πραγματικό κενό: το `GET /api/saas/invites`
+επέστρεφε **γυμνά Account ObjectIds** για inviter/accepter — ένα «Invitations» panel δεν
+μπορεί να δείξει ανθρώπινο όνομα χωρίς N+1 lookup. Πρόσθεσα batched email+name resolution,
+ΑΚΡΙΒΩΣ ο ίδιος μηχανισμός με το audit read API (§24-25). ΟΛΟ SAAS-gated, additive,
+backward-compatible, σε δικά μου SAAS αρχεία:
+- `lib/tenancy/invites.ts` (additive): (α) ο `InviteView` απέκτησε **`inviterEmail`/`inviterName`/
+  `accepterEmail`/`accepterName`** (display-only, ΠΟΤΕ secret· null σε legacy rows/deleted
+  accounts/blank name)· (β) νέος type `InviteIdentities` + ο `inviteView` δέχεται **optional 3ο
+  param `ids: InviteIdentities = {}`** (μετά το `nowMs`· όλοι οι υπάρχοντες 1-arg/2-arg callers
+  αμετάβλητοι — default null → pure serializer δουλεύει χωρίς DB)· (γ) νέος PURE helper
+  **`collectInviteAccountIds(invites)`** → distinct stringified non-null ids **και** από τα δύο
+  πεδία (invitedBy + acceptedBy) ώστε ο route να κάνει **ΕΝΑ** `_id:{$in}` query αντί N+1.
+- `app/api/saas/invites/route.ts` (additive): μετά το fetch, `collectInviteAccountIds` →
+  `Account.find({_id:{$in}}).select('email name')` → `emailById`/`nameById` maps → `inviteView(inv,
+  undefined, {inviter/accepter email+name})`. Skip lookup όταν κανένα account. Blank name (Account
+  default `''`) → trim → absent ⇒ null (UI falls back στο email). Gate/scope/status-filter/sort
+  αμετάβλητα.
+- `lib/tenancy/invites.test.ts` — updated exact-key-set assertion (+4 identity keys) + 2 νέα
+  it-blocks (default-null identities· projection από 3ο arg) + νέο `collectInviteAccountIds`
+  describe (distinct+dedup cross-field· null/undefined-drop + empty batch).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run invites.test.ts` → **32/32 green**
+(26 προϋπάρχοντα + 6 νέα)· full suite `npx vitest run` → **718/718 green** (καμία regression). Το
+route SAAS-gated (404 όταν SAAS_MODE off) + serializer/helper pure/additive + κανένας external
+importer των αλλαγών από feature code ⇒ `SAAS_MODE` off = **zero effect** στο self-hosted app·
+κανένας Docker rebuild (route 404 στο running container με SAAS_MODE off — ο νέος κώδικας δεν
+εκτελείται· type-check καλύπτει το compile)· καμία νέα εξάρτηση· κανένα feature route/data-db/
+User-path αγγίχτηκε. Άγγιξα μόνο δικά μου SAAS αρχεία (foreign `.claude/launch.json` άθικτο).
+
+**## Needs Achilleas** (invitations UI):
+- Χρειάζεται user-facing workspace-settings «Invitations» section (owner/admin) που καλεί
+  `GET /api/saas/invites` → λίστα με inviter/accepter names + resend/revoke controls· το read API
+  επιστρέφει πλέον inviterEmail/inviterName + accepterEmail/accepterName → πλήρως render-able.
+
+**Next task:** increment 27 — είτε (α) user-facing workspace-settings UI panels που consume-άρουν
+τα έτοιμα read APIs (`/api/saas/audit` + `/api/saas/invites` + `/api/saas/members` + `/api/saas/
+usage` + `/api/saas/billing`) — Activity/Invitations/Members/Billing tabs (UI-only, όλα τα APIs
+έτοιμα), είτε (β) `sendViaSmtp` via nodemailer (μετά provider decision Achilleas· ξεκλειδώνει
+reset/verify/invite delivery σε production), είτε (γ) dedicated invite-resend endpoint (re-mint +
+email σε ένα βήμα, αντί POST στο members route).

@@ -9,6 +9,7 @@ import {
   inviteView,
   parseInviteStatusFilter,
   inviteStatusQuery,
+  collectInviteAccountIds,
 } from './invites';
 
 // The pure + crypto helpers are unit-tested. The mint (members POST) and accept route
@@ -113,8 +114,48 @@ describe('inviteView', () => {
     );
     expect(JSON.stringify(v)).not.toContain('SECRET');
     expect(Object.keys(v).sort()).toEqual(
-      ['acceptedAt', 'acceptedBy', 'createdAt', 'email', 'expired', 'expires', 'id', 'invitedBy', 'role', 'status'].sort()
+      [
+        'acceptedAt',
+        'acceptedBy',
+        'accepterEmail',
+        'accepterName',
+        'createdAt',
+        'email',
+        'expired',
+        'expires',
+        'id',
+        'invitedBy',
+        'inviterEmail',
+        'inviterName',
+        'role',
+        'status',
+      ].sort()
     );
+  });
+
+  it('defaults resolved identities to null when the route passes none', () => {
+    const v = inviteView({ _id: 1, status: 'pending', expires: future, invitedBy: 7 }, now);
+    expect(v.inviterEmail).toBeNull();
+    expect(v.inviterName).toBeNull();
+    expect(v.accepterEmail).toBeNull();
+    expect(v.accepterName).toBeNull();
+  });
+
+  it('projects resolved inviter/accepter identities from the 3rd arg', () => {
+    const v = inviteView(
+      { _id: 1, status: 'accepted', expires: future, invitedBy: 7, acceptedBy: 99, acceptedAt: new Date(now) },
+      now,
+      {
+        inviterEmail: 'owner@b.com',
+        inviterName: 'Owner',
+        accepterEmail: 'joiner@b.com',
+        accepterName: 'Joiner',
+      }
+    );
+    expect(v.inviterEmail).toBe('owner@b.com');
+    expect(v.inviterName).toBe('Owner');
+    expect(v.accepterEmail).toBe('joiner@b.com');
+    expect(v.accepterName).toBe('Joiner');
   });
 
   it('projects acceptance audit fields on an accepted invite', () => {
@@ -170,6 +211,22 @@ describe('inviteView', () => {
     expect(v.invitedBy).toBeNull();
     expect(v.acceptedBy).toBeNull();
     expect(v.acceptedAt).toBeNull();
+  });
+});
+
+describe('collectInviteAccountIds', () => {
+  it('collects distinct stringified ids across invitedBy and acceptedBy', () => {
+    const ids = collectInviteAccountIds([
+      { invitedBy: 7, acceptedBy: 99 },
+      { invitedBy: 7 }, // duplicate inviter → deduped
+      { acceptedBy: 42 },
+    ]);
+    expect(ids.sort()).toEqual(['42', '7', '99'].sort());
+  });
+
+  it('drops null/undefined fields and returns empty for legacy/empty rows', () => {
+    expect(collectInviteAccountIds([{ invitedBy: null, acceptedBy: undefined }, {}])).toEqual([]);
+    expect(collectInviteAccountIds([])).toEqual([]);
   });
 });
 

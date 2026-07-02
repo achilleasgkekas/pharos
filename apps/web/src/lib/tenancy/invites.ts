@@ -113,7 +113,43 @@ export type InviteView = {
   // never carries the token hash or any secret.
   acceptedBy: string | null;
   acceptedAt: string | null;
+  // Human-readable identities for invitedBy/acceptedBy, resolved by the read route from a
+  // batched Account lookup (mirrors the audit trail's actorEmail/actorName). Null for legacy
+  // rows, deleted accounts, or (for *Name) accounts that never set a display name. Purely for
+  // display; never a secret.
+  inviterEmail: string | null;
+  inviterName: string | null;
+  accepterEmail: string | null;
+  accepterName: string | null;
 };
+
+/**
+ * Resolved display identities the read route hands to `inviteView` after a batched Account
+ * lookup. All optional so the pure serializer stays usable with zero DB access (defaults null).
+ */
+export type InviteIdentities = {
+  inviterEmail?: string | null;
+  inviterName?: string | null;
+  accepterEmail?: string | null;
+  accepterName?: string | null;
+};
+
+/**
+ * Distinct, stringified, non-null Account ids referenced by a batch of invites — across BOTH
+ * `invitedBy` (minter) and `acceptedBy` (redeemer). Pure so the read route can resolve every
+ * identity in ONE `_id: { $in }` query instead of N+1. Legacy rows (null fields) contribute
+ * nothing.
+ */
+export function collectInviteAccountIds(
+  invites: readonly { invitedBy?: unknown; acceptedBy?: unknown }[]
+): string[] {
+  const seen = new Set<string>();
+  for (const inv of invites) {
+    if (inv.invitedBy != null) seen.add(String(inv.invitedBy));
+    if (inv.acceptedBy != null) seen.add(String(inv.acceptedBy));
+  }
+  return [...seen];
+}
 
 function toIso(d: Date | string | null | undefined): string | null {
   if (!d) return null;
@@ -133,7 +169,8 @@ export function inviteView(
     acceptedBy?: unknown;
     acceptedAt?: Date | string | null;
   },
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  ids: InviteIdentities = {}
 ): InviteView {
   const status = inv.status ?? 'pending';
   return {
@@ -151,5 +188,10 @@ export function inviteView(
     // null on pending/revoked rows; set only when an invite was actually accepted.
     acceptedBy: inv.acceptedBy != null ? String(inv.acceptedBy) : null,
     acceptedAt: toIso(inv.acceptedAt),
+    // Resolved display identities (route passes them from a batched lookup; default null).
+    inviterEmail: ids.inviterEmail ?? null,
+    inviterName: ids.inviterName ?? null,
+    accepterEmail: ids.accepterEmail ?? null,
+    accepterName: ids.accepterName ?? null,
   };
 }
