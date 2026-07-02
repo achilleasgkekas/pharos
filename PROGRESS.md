@@ -2,8 +2,18 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 2201932 -->
+<!-- reviewed: 6f5199c -->
 <!-- docker-validated: 577364e -->
+
+## 2026-07-02 (reviewer — range 2201932..6f5199c, 2 code commits)
+- **Έλεγχοι:** `apps/web` type-check **EXIT 0**, `apps/mobile` `tsc --noEmit` **EXIT 0**. `vitest run saasGuard.test.ts apiAuth.test.ts audit.test.ts` → **38/38 green** (6 + 9 + 23).
+- **Review εύρους (κώδικας):** 2 code commits (τα υπόλοιπα = docs/progress).
+  - **audit actor-email (`77836a1`):** additive + ασφαλές. Νέα pure `collectActorIds(events)` (distinct, stringified, non-null· system events null actor → τίποτα). Η read route ανακτά κάθε distinct actor σε **ΕΝΑ** batched `Account.find({ _id: { $in } }).select('email')` (μηδέν N+1), χτίζει id→email map, `auditView(ev, email)`. `auditView` πήρε προαιρετικό `actorEmail` param (default null → backward-compatible)· η `AuditView` πήρε `actorEmail: string | null` (display-only, ποτέ secret). Deleted accounts + system events → null. **Tenant-scoping OK:** τα events είναι scoped σε `{ tenant: session.ctx.tenantId }` + η route είναι owner/admin-gated· τα actorIds προέρχονται μόνο από τα events αυτού του tenant → μηδέν cross-tenant email leak. Το batched lookup skip-άρεται όταν δεν υπάρχουν actors.
+  - **saasGuard (`6f5199c`):** νέος `saasGuard(fn)` helper στο `saasApi.ts` = byte-mirror του `withAuth` catch (try/return await fn / catch → `{ error: msg.slice(0,200) || 'Server error' }` 500). Και τα 6 account/* route files wrapped **1:1** (7 handlers, grep επιβεβαίωσε 1 wrap ανά handler): route.ts GET+PATCH, password, reset/{request,confirm}, verify/{request,confirm}. Το diff είναι καθαρή indentation γύρω από `return saasGuard(async () => {...})`· gate ladders (`saasAuthGate`/401), validation (400/409), anti-enumeration paths, ΚΑΙ το internal 11000 try/catch του PATCH — ΟΛΑ αμετάβλητα. Αλλάζει ΜΟΝΟ ο unforeseen throw → uniform `{ error }` 500.
+  - **secrets:** μηδέν committed secret στο εύρος.
+- **Fixes:** καμία (όλα green, additive/byte-stable, μηδέν v1 shape break που να σπάει το mobile).
+- **Flags:** καμία νέα.
+- **Marker:** reviewed `2201932` → **`6f5199c`** (HEAD). Staged ΜΟΝΟ PROGRESS.md (τα foreign `.claude/launch.json` + `MOBILE_PARITY.md` άθικτα).
 
 ## 2026-07-02 (pharos-daily-dev — SaaS try/catch helper `saasGuard` + account/* slice)
 - **Τι έκανα:** έκλεισα το **slice 1/2 του top auto-buildable web-debt item** (WEB_DEBT «SaaS route handlers χωρίς try/catch», P2/M, auditor top-2· η προτεινόμενη S+S διάσπαση = helper + account/* πρώτα). Τα SaaS routes, σε αντίθεση με κάθε v1 route (που περνά από το `withAuth` catch), δεν είχαν wrapper → ένα thrown `account.save()`/`connectDB()`/DB error βγαίνει ως framework-default 500 (κενό/HTML body) αντί για το `{ error }` shape που περιμένει ο SaaS client. Επιλέχθηκε ως το μικρότερο πλήρως-finishable, μηδέν credentials / AI / native dep / new endpoint.
