@@ -279,6 +279,42 @@ const INTEGRATIONS: { group: string; icon: string; color: string; items: string[
   },
 ];
 
+const MOBILE_HIGHLIGHTS: { icon: string; color: string; title: string; desc: string }[] = [
+  {
+    icon: 'camera',
+    color: 'var(--accent)',
+    title: 'Scan on the spot',
+    desc: 'Point the camera at a product or receipt and AI files it before you even leave the shop.',
+  },
+  {
+    icon: 'bell',
+    color: 'var(--cyan)',
+    title: 'Push notifications',
+    desc: 'Price drops, renewals, and warranty expiries arrive as native alerts, no need to open the app.',
+  },
+  {
+    icon: 'server',
+    color: 'var(--purple)',
+    title: 'Talks to your server',
+    desc: 'Point it at your own Pharos host over the LAN or your VPN. The session token lives in the secure enclave.',
+  },
+  {
+    icon: 'package',
+    color: 'var(--gold)',
+    title: 'The whole hub',
+    desc: 'Dashboard, shopping, receipts, money, subscriptions, reports, and the AI assistant, all in your pocket.',
+  },
+];
+
+const MOBILE_NAV: { icon: string; color: string }[] = [
+  { icon: 'package', color: 'var(--accent)' },
+  { icon: 'receipt', color: 'var(--cyan)' },
+  { icon: 'wallet', color: 'var(--gold)' },
+  { icon: 'calendar', color: 'var(--purple)' },
+  { icon: 'chart', color: 'var(--cyan)' },
+  { icon: 'ticket', color: 'var(--red)' },
+];
+
 const COMPARE: { label: string; self: string; hosted: string }[] = [
   { label: 'Where it runs', self: 'Your own hardware', hosted: 'Our managed servers' },
   { label: 'Your data', self: 'Stays on your disk', hosted: 'Isolated per tenant' },
@@ -424,6 +460,7 @@ export default function Home() {
           <nav className="site-nav">
             <a href="#features" className="navlink nav-anchor">Features</a>
             <a href="#ai" className="navlink nav-anchor">AI</a>
+            <a href="#mobile" className="navlink nav-anchor">Mobile</a>
             <a href="#who" className="navlink nav-anchor">Who</a>
             <a href="#self-host" className="navlink nav-anchor">Self-host</a>
             <a href="#pricing" className="navlink">Pricing</a>
@@ -660,6 +697,77 @@ export default function Home() {
               </li>
             ))}
           </ul>
+        </div>
+      </section>
+
+      {/* ── Mobile app ────────────────────────────────────── */}
+      <section id="mobile" style={{ padding: '56px 0' }}>
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <p className="mono" style={{ marginBottom: 12 }}>Take it with you</p>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 700, marginBottom: 14 }}>
+              The hub, in your pocket
+            </h2>
+            <p style={{ color: 'var(--text-dim)', maxWidth: 560, margin: '0 auto' }}>
+              A native iOS and Android app, built with Expo, that signs in to your
+              own server. Scan on the go, get push alerts, and reach every module
+              from the phone.
+            </p>
+          </div>
+
+          <div className="mobile-flow">
+            <div className="phone" aria-hidden="true">
+              <span className="phone-notch" />
+              <div className="phone-screen">
+                <div className="phone-status">
+                  <span>9:41</span>
+                  <span className="phone-online">Pharos</span>
+                </div>
+                <div className="phone-greet">
+                  <strong>Good evening</strong>
+                  <span>3 alerts</span>
+                </div>
+                <div className="phone-stats">
+                  <div className="phone-tile">
+                    <span className="k">Owed</span>
+                    <span className="v" style={{ color: 'var(--gold)' }}>€1,149</span>
+                  </div>
+                  <div className="phone-tile">
+                    <span className="k">This month</span>
+                    <span className="v" style={{ color: 'var(--accent)' }}>€612</span>
+                  </div>
+                </div>
+                <div className="phone-nav">
+                  {MOBILE_NAV.map((n, i) => (
+                    <span key={i} className="phone-nav-ico" style={{ color: n.color }}>
+                      <Icon name={n.icon} size={16} />
+                    </span>
+                  ))}
+                </div>
+                <div className="phone-cta">
+                  <Icon name="camera" size={15} />
+                  Scan a product
+                </div>
+              </div>
+            </div>
+
+            <ul className="mobile-highlights">
+              {MOBILE_HIGHLIGHTS.map((m) => (
+                <li key={m.title} className="card mobile-highlight">
+                  <span className="feature-icon" style={{ color: m.color }}>
+                    <span className="feature-glow" style={{ background: m.color }} />
+                    <Icon name={m.icon} size={20} />
+                  </span>
+                  <div>
+                    <h3 style={{ fontSize: '1.05rem', margin: '0 0 6px' }}>{m.title}</h3>
+                    <p style={{ color: 'var(--text-dim)', fontSize: '0.92rem', lineHeight: 1.5 }}>
+                      {m.desc}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </section>
 

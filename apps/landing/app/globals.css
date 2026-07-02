@@ -941,6 +941,125 @@ h1, h2, h3 {
 }
 .ai-note-ico { display: inline-flex; color: var(--accent); }
 
+/* Mobile app section (CSS-drawn phone, no screenshot assets) */
+.mobile-flow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 48px;
+}
+.phone {
+  position: relative;
+  justify-self: center;
+  width: 232px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 34px;
+  background: var(--surface);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 44px rgba(0, 255, 136, 0.08);
+}
+.phone-notch {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 92px;
+  height: 20px;
+  border-radius: 0 0 12px 12px;
+  background: var(--bg);
+  z-index: 2;
+}
+.phone-screen {
+  border-radius: 24px;
+  background: var(--bg);
+  padding: 32px 16px 16px;
+  overflow: hidden;
+}
+.phone-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-faint);
+  margin-bottom: 16px;
+}
+.phone-online {
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.phone-greet {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.phone-greet strong { font-size: 0.98rem; font-weight: 700; }
+.phone-greet span { font-size: 0.72rem; color: var(--cyan); }
+.phone-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.phone-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.phone-tile .k {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.phone-tile .v { font-size: 1.02rem; font-weight: 700; }
+.phone-nav {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.phone-nav-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.phone-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 11px;
+  padding: 11px;
+}
+.mobile-highlights {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.mobile-highlight {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
@@ -953,6 +1072,9 @@ h1, h2, h3 {
 }
 @media (max-width: 900px) {
   .mod-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Mobile section: phone on top, highlights below */
+  .mobile-flow { grid-template-columns: 1fr; gap: 32px; justify-items: center; }
+  .mobile-highlights { width: 100%; }
 }
 @media (max-width: 720px) {
   /* Nav: drop secondary in-page anchors, keep Pricing + GitHub reachable */
@@ -971,6 +1093,7 @@ h1, h2, h3 {
   .win-body { padding: 20px 18px 22px; }
   .win-addr { max-width: 180px; }
   .container { padding: 0 18px; }
+  .mobile-highlights { grid-template-columns: 1fr; }
 
   /* Compare: stack each row as a labelled block */
   .compare thead { display: none; }

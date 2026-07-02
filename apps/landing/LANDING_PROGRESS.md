@@ -489,3 +489,26 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-02 (cont.¹⁵)
+
+Task: (c/e) Polish, μερος 21 — νεο section «Mobile app» (#mobile) αναμεσα σε Integrations και Who. Το apps/mobile (Expo, native iOS/Android) ειναι πραγματικο και βαρια αναπτυγμενο (15+ screens: home/shopping/receipts/tasks/money/subscriptions/items/assistant/vouchers/statements/calendar/reports/settings/search/activity, camera product scan, push notifications, expo-secure-store token, login στον δικο σου server) αλλα ΔΕΝ αναφερονταν πουθενα στο landing (grep mobile=0). Δυνατο, factual differentiator· του εδωσα δικη του ενοτητα με CSS-drawn phone mockup (ιδιο idiom με #preview/#ai, μηδεν screenshot assets).
+
+Τι εφτιαξα:
+- `app/components/Icon.tsx`: 3 νεα stroke icons (phone, camera, bell) στο PATHS map. Ακολουθουν το ' M'-split idiom (καθε subpath ξεκιναει με M).
+- `app/page.tsx`: νεα data arrays `MOBILE_HIGHLIGHTS` (4: Scan on the spot/camera, Push notifications/bell, Talks to your server/server [secure enclave, LAN/VPN], The whole hub/package) + `MOBILE_NAV` (6 module icons για το mockup). Νεο `#mobile` section: eyebrow «Take it with you» + h2 «The hub, in your pocket» + subtext (native iOS+Android, Expo, signs in to your own server) + `.mobile-flow` (phone mockup + 2×2 highlights grid). Το phone: notch + status bar (9:41 / «Pharos» accent) + greeting (Good evening / 3 alerts) + 2 stat tiles (Owed €1,149 gold / This month €612 accent) + 6-icon nav row + accent «Scan a product» CTA με camera icon. Ολα ακριβη per CLAUDE.md/apps-mobile README.
+- `app/page.tsx` top nav: νεο «Mobile» link (href="#mobile", nav-anchor) αναμεσα σε AI και Who (reading order: Features -> AI -> Mobile -> Who -> Self-host -> Pricing -> Compare -> FAQ). Nav-anchor κρυβεται <720px -> μηδεν mobile crowding.
+- `app/globals.css`: νεες `.mobile-flow` (2-col auto/1fr, στοιβαζει <900px) + `.phone`/`.phone-notch`/`.phone-screen` (accent glow shadow, ιδιο pattern με showcase) + `.phone-status`/`.phone-greet`/`.phone-stats`/`.phone-tile`/`.phone-nav`/`.phone-nav-ico`/`.phone-cta` + `.mobile-highlights` (2-col -> 1-col <560px)/`.mobile-highlight` (reuse feature-icon/feature-glow). Reuse υπαρχουσας παλετας/glow idiom.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 761 B / 103 kB First Load JS, αμεταβλητο — pure static markup+CSS, μηδεν bundle impact).
+- Prerendered HTML (.next/server/app/index.html): id="mobile"=1, «The hub, in your pocket», «Take it with you», «Scan on the spot», «Talks to your server», «Scan a product» ολα FOUND· href="#mobile" nav count=1. Route static -> prerendered HTML = ακριβως το served (build + HTML check = ισοδυναμη επαληθευση για pure-static content). Δεν σηκωσα preview server (μονο νεο section με reuse CSS idioms). Docker/web/mobile αθικτα. Το `.claude/launch.json` (shared local config) ΔΕΝ commit (collision guard — μονο Icon.tsx + page.tsx + globals.css + LANDING_PROGRESS.md).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση των CSS mockups (#preview, #ai, #mobile phone) με πραγματικα app screenshots οταν υπαρξουν assets· per-plan Offer JSON-LD nodes οταν κλεισουν οι τιμες.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
