@@ -3,6 +3,18 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-02 30ή σάρωση· ουρά 3→4 P3/S· ελέγχθηκε ΝΕΟΣ SaaS billing checkout+portal read surface [commits `4819f97`/`9ecb86c`]· +1 νέο P3/S [readBody adoption στα 2 billing routes που κρατούν raw `req.json().catch` + lying cast])
+
+**2026-07-02 (30ή σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 v1 route files** + **10 saas route files** (auth×4, billing/{checkout,portal,webhook,route}, usage, usage/sample) + `apiAuth`/`apiBody`/`apiList` helpers + `lib/billing/*` + `lib/tenancy/*`. Από την 29η σάρωση ο builder **ΔΕΝ** κατανάλωσε κανένα από τα 3 top TODO items (live-verified όλα ακόμα ανοιχτά, βλ. παρακάτω) → μένουν TODO. `npm run type-check` **EXIT 0**.
+- **Ευρήματα ανά διάσταση (live grep, όχι docs):**
+  - **Type safety: 0** — `: any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το `/api` (v1 + saas) + `lib/billing` + `lib/tenancy` = **0**. Ο νέος billing read surface (`billingSession.ts`, `billingSummary.ts`, route handlers) πλήρως τυπωμένος (`StripeResult<T>`, `PlanKey`, `BillingSession`)· μόνο ο νόμιμος `as TenantDoc | null` lean-cast, ΟΧΙ `any`.
+  - **Auth: 0 unguarded** — v1: μόνο `auth/login` exempt (auth boundary). saas: όλα τα billing routes (`checkout`/`portal`/`route`) περνούν από `resolveBillingSession()` (SaaS-gate 404 → 401 no-session → 403 not-owner/admin → 404 no-workspace) πριν αγγίξουν Stripe· `usage`/`usage/sample`/`webhook` gated σωστά (`saasAuthGate`/`CRON_SECRET`/`timingSafeEqual` sig-verify).
+  - **Input validation: 0 gaps** — τα billing routes διαβάζουν μόνο `body.plan`/`body.tenant`· το `plan` περνά από `checkoutablePlan()` (whitelist PlanKey ή null), το `tenant` validate-άρεται κατά της λίστας memberships (μη-μέλος → 403). Καμία un-validated χρήση. (Το raw-body cast είναι consistency debt, ΟΧΙ validation gap — δες παρακάτω.)
+  - **Error handling: 0 P-level** — ομοιόμορφο `{ error }` shape σε ΟΛΑ τα saas routes· graceful degradation (Stripe not-configured → 503, upstream → 502) μέσω `StripeResult`. Παρατήρηση (ΟΧΙ queue): `checkout`/`portal` δεν έχουν εξωτερικό try/catch (0 try-blocks)· ο κύριος throw-path (`resolveBillingSession` → `Tenant.findById` DB error) θα γύριζε default 500 αντί `{ error }`. Χαμηλού ρίσκου (τα Stripe calls είναι ήδη `StripeResult`-wrapped, όχι throw)· δεν το ανεβάζω σε item — δες `## Needs Achilleas`/observations στο PROGRESS.
+  - **DB: 0** — v1 reads `.lean()`+limits· billing: `accountTenants` = bounded `Membership.find().lean()` + `Tenant.find({_id:{$in}}).lean()`· `resolveBillingSession` κάνει `Tenant.findById(ctx.tenantId)` **μη-lean** (read-only path· μικρό single-doc point-read, marginal .lean() nit, ΟΧΙ queue — ίδιο pattern με τα ήδη-«δεν είναι debt» webhook mutation reads). `dbStats.sampleAllTenants` = intentional full-scan των live tenants.
+  - **Consistency debt (νέο): 1 P3/S** — τα `saas/billing/checkout/route.ts:26` + `saas/billing/portal/route.ts:27` κρατούν raw `(await req.json().catch(() => ({}))) as { plan?; tenant? }` — το ΙΔΙΟ debt που έκλεισε πλήρως για το v1 (readBody adoption) **και** για τα saas auth routes (`signup`/`login` ήδη adopters). Ο `as {...}` cast «λέει ψέματα» (runtime τα values μπορεί να μην είναι string). Byte-behavior swap με `readBody` + `strField` coercion → queue item.
+- **Counts ανά dimension: P1=0, P2=0, P3=1 νέο** (η ουρά πάει 3→4 P3/S: CRON_SECRET timing [προϋπάρχον] + isObjectId webhook [προϋπάρχον] + getTenantConnection guard [προϋπάρχον] + billing readBody [νέο]). Ο νέος billing read surface είναι **exemplary** (κεντρικό authz, pure helpers `billingSummary`/`checkoutablePlan`, graceful degradation, ΠΟΤΕ charge)· η μόνη νέα παρατήρηση είναι το raw-body cast σε 2 routes. Δεν εφευρίσκω debt· 30 σαρώσεις χωρίς P1/P2.
+
 ## Σύνοψη audit (2026-07-02 29η σάρωση· ουρά 1→2 P3/S· ελέγχθηκε ΝΕΟΣ SaaS file-byte storage κώδικας [commit `f8aaea4`]· +1 νέο P3/S [non-constant-time CRON_SECRET compare στο usage/sample route])
 
 **2026-07-02 (29η σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 v1 route files** + **7 saas route files** (auth×4, billing/webhook, usage, usage/sample) + `apiAuth`/`apiBody`/`apiList` helpers + **ΝΕΟΣ SaaS file-byte storage-accounting κώδικας** (`lib/billing/fileStorage.ts` + integration στο `lib/billing/dbStats.ts`, commit `f8aaea4`). Από την 28η σάρωση ο builder **ΔΕΝ** κατανάλωσε το top item (`grep '\[a-f0-9\]{24}' src/app/api` = ακόμα 1 hit στο `saas/billing/webhook/route.ts:81`) → μένει TODO. `npm run type-check` **EXIT 0**.
@@ -367,6 +379,23 @@
   - Swap **byte-identical**: το shared `isObjectId(id)` στο `@/lib/apiBody` είναι ακριβώς `/^[a-f0-9]{24}$/i.test(id)` (pure string helper, μηδέν server-only import· ήδη importable σε route files, π.χ. `items/[id]/ai-fill/route.ts` το κάνει import). Αλλαγή: νέο `import { isObjectId } from '@/lib/apiBody';` (δίπλα στα υπάρχοντα imports) + η γραμμή γίνεται `if (tenantId && isObjectId(tenantId)) {`. Μηδέν αλλαγή συμπεριφοράς.
   - Το route μένει node runtime + SaaS-gated· `Tenant.findById` / `Tenant.findOne({ billingCustomerId })` fallback, signature-verify, event-switch, response shapes ΟΛΑ αμετάβλητα. Δεν αγγίζει τον v1 mobile surface (SaaS-only endpoint).
   - Επαλήθευση: `grep -rn '\[a-f0-9\]{24}' src/app/api src/lib/tenancy src/lib/billing` επιστρέφει **μηδέν** (πλήρης εξάλειψη inline ObjectId regex σε ΟΛΟ το api + tenancy + billing).
+  - npm run type-check exits 0
+- Status: TODO
+
+### apiBody helpers — readBody adoption σε saas billing checkout + portal POST
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/saas/billing/checkout/route.ts, apps/web/src/app/api/saas/billing/portal/route.ts
+- Depends on: none
+- Acceptance:
+  - Επεκτείνει το ήδη-κλεισμένο readBody adoption effort στον saas surface. Τα saas auth routes (`signup`/`login`) είναι ΗΔΗ adopters του `readBody`· τα 2 billing routes είναι τα ΜΟΝΑ saas routes που κρατούν raw `req.json().catch` (live-verified: `grep -rln 'req.json().catch' src/app/api` = μόνο `saas/billing/checkout` + `saas/billing/portal`).
+  - **ΟΧΙ byte-identical, χρειάζεται coercion** (γι' αυτό ξεχωριστό item): σήμερα `checkout/route.ts:26` = `const body = (await req.json().catch(() => ({}))) as { plan?: string; tenant?: string };` και `portal/route.ts:27` = `const body = (await req.json().catch(() => ({}))) as { tenant?: string };`. Ο `as {...}` cast «λέει ψέματα» (runtime τα values μπορεί να είναι number/object). Downstream: `resolveBillingSession(wantSlug: string | null)` (`billingSession.ts:30`) + `checkoutablePlan(plan: string | null | undefined)` (`billingRoutes.ts:23`).
+  - Swap (import `{ readBody, strField }` από `@/lib/apiBody` σε καθένα· κανένα από τα 2 files δεν έχει ήδη apiBody import):
+    - **checkout:** `const b = await readBody(req);` → `const resolved = await resolveBillingSession(strField(b, 'tenant') || null);` + `const plan = checkoutablePlan(strField(b, 'plan') || null);`. Το `strField(b, k)` = `String(b[k] || '')` → για string value ίδιο αποτέλεσμα, για absent → `''` → `|| null` = `null` (ίδιο με το παλιό `body.tenant ?? null` / `body.plan` undefined). `checkoutablePlan` δέχεται `string | null` → ΟΚ.
+    - **portal:** `const b = await readBody(req);` → `const resolved = await resolveBillingSession(strField(b, 'tenant') || null);`.
+  - `readBody` επιστρέφει `Body = Record<string, unknown>` → τα `strField(...)` δίνουν `string` → τέλος ο ψευδής cast. Το `resolveBillingSession` gate-ladder, το `pickBaseUrl`, το `StripeResult` branch (503/502), τα success shapes (`{ url, id }`) ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. SaaS-only routes → μηδέν επίδραση στον v1 mobile surface.
+  - Επαλήθευση: `grep -rln 'req.json().catch' apps/web/src/app/api` επιστρέφει **μηδέν** αρχεία (πλήρες κλείσιμο readBody adoption σε ΟΛΟ το api, v1 + saas).
   - npm run type-check exits 0
 - Status: TODO
 
