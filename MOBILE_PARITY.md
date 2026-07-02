@@ -63,7 +63,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Reports (`/reports`)
 | Web | Mobile |
 |-----|--------|
-| Net-position banner, monthly-spend chart, upcoming-installments, spend-by-store, inventory-value pie, subs-by-category, warranties expiring, biggest purchases, **budgets**, income-vs-expense, date-range | 🟡 **net-position banner** (inventory − installments owed), net month/year, by-category, **budget · this month** (per-category progress bars, gold ≥80%, red over), **upcoming-installments · next 6 months** (purple bars), last-6-months bars, **spend-by-store · top 8** (accent bars), **biggest purchases** (list: store/date/total), **warranties expiring · next 150 days** (list: title + Nd-left, red ≤30d / gold ≤90d). No inventory-pie / subs-by-cat / income-vs-expense-12mo (χρειάζονται RN charting lib) |
+| Net-position banner, monthly-spend chart, upcoming-installments, spend-by-store, inventory-value pie, subs-by-category, warranties expiring, biggest purchases, **budgets**, income-vs-expense, date-range | 🟡 **net-position banner** (inventory − installments owed), net month/year, by-category, **budget · this month** (per-category progress bars, gold ≥80%, red over), **upcoming-installments · next 6 months** (purple bars), last-6-months bars, **spend-by-store · top 8** (accent bars), **biggest purchases** (list: store/date/total), **warranties expiring · next 150 days** (list: title + Nd-left, red ≤30d / gold ≤90d), **subscriptions · monthly by category** (purple bars, monthly-equivalent). No inventory-pie / income-vs-expense-12mo (χρειάζονται RN charting lib) |
 
 ## Tasks (`/tasks`)
 | Web | Mobile |

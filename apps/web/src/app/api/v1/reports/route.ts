@@ -5,6 +5,7 @@ import { Expense } from '@/models/Expense';
 import { Item } from '@/models/Item';
 import { Receipt } from '@/models/Receipt';
 import { Statement } from '@/models/Statement';
+import { Subscription } from '@/models/Subscription';
 import { getAppSettings } from '@/lib/appSettings';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
@@ -16,6 +17,9 @@ export const dynamic = 'force-dynamic';
 type Lean = { kind?: string; amount?: number; category?: string; date?: Date; period?: string };
 type ItemLean = { status?: string; purchasedPrice?: number; currentPrice?: number; warrantyUntil?: string | Date; title?: string };
 type ReceiptLean = { store?: string; date?: Date; total?: number };
+type SubLean = { amount?: number; billingCycle?: string; category?: string };
+// Monthly-equivalent multiplier per billing cycle. Mirrors web /reports CYCLE_PER_MONTH.
+const CYCLE_PER_MONTH: Record<string, number> = { weekly: 52 / 12, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12, lifetime: 0 };
 const ymOf = (d: Lean): string => {
   if (d.period && /^\d{4}-\d{2}/.test(d.period)) return d.period.slice(0, 7);
   const dt = d.date ? new Date(d.date) : null;
@@ -26,11 +30,12 @@ const ymOf = (d: Lean): string => {
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
-    const [docs, items, statementsRaw, receipts, settings] = await Promise.all([
+    const [docs, items, statementsRaw, receipts, subs, settings] = await Promise.all([
       Expense.find({}).select('kind amount category date period').lean() as Promise<Lean[]>,
       Item.find().select('status purchasedPrice currentPrice warrantyUntil title').lean() as Promise<ItemLean[]>,
       Statement.find().lean(),
       Receipt.find().select('store date total').lean() as Promise<ReceiptLean[]>,
+      Subscription.find({ active: true }).select('amount billingCycle category').lean() as Promise<SubLean[]>,
       getAppSettings(),
     ]);
 
@@ -137,6 +142,17 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => a.days - b.days)
       .slice(0, 10);
 
+    // ── Active subscriptions by category (monthly-equivalent). Mirrors web /reports. ──
+    const subsByCat = new Map<string, number>();
+    for (const sub of subs) {
+      const m = (sub.amount || 0) * (CYCLE_PER_MONTH[sub.billingCycle || 'monthly'] ?? 1);
+      const k = sub.category || 'other';
+      subsByCat.set(k, (subsByCat.get(k) ?? 0) + m);
+    }
+    const subsByCategory = [...subsByCat.entries()]
+      .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
+      .sort((a, b) => b.value - a.value);
+
     return NextResponse.json({
       currency: settings.currency || 'EUR',
       netPosition,
@@ -147,6 +163,7 @@ export async function GET(req: NextRequest) {
       monthly,
       upcomingInstallments,
       spendByStore,
+      subsByCategory,
       biggestPurchases,
       warrantiesExpiring,
     });

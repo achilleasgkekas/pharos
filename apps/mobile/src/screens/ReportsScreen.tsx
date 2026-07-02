@@ -50,6 +50,7 @@ export function ReportsScreen() {
   const catMax = d ? Math.max(...d.byCategory.map((c) => c.total), 1) : 1;
   const instMax = d ? Math.max(...d.upcomingInstallments.map((u) => u.amount), 1) : 1;
   const storeMax = d ? Math.max(...(d.spendByStore ?? []).map((st) => st.total), 1) : 1;
+  const subsMax = d ? Math.max(...(d.subsByCategory ?? []).map((sc) => sc.value), 1) : 1;
   const mLabel = (p: string) => { const [, m] = p.split('-'); return ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][parseInt(m, 10)] || p; };
   const fmtDate = (v: string) => { const dt = new Date(v); return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); };
 
@@ -105,6 +106,13 @@ export function ReportsScreen() {
             <>
               <Text style={s.section}>SPEND BY STORE · TOP 8</Text>
               {d.spendByStore.map((st) => <Bar key={st.name} label={st.name} value={st.total} max={storeMax} cur={cur} color={C.accent} />)}
+            </>
+          )}
+
+          {(d.subsByCategory?.length ?? 0) > 0 && (
+            <>
+              <Text style={s.section}>SUBSCRIPTIONS · MONTHLY BY CATEGORY</Text>
+              {d.subsByCategory.map((sc) => <Bar key={sc.name} label={sc.name} value={sc.value} max={subsMax} cur={cur} color={C.purple} />)}
             </>
           )}
 
