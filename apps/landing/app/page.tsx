@@ -3,6 +3,7 @@ import { Icon } from './components/Icon';
 import { Waitlist } from './components/Waitlist';
 
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
+const SITE_URL = 'https://ph-aros.com';
 
 const FEATURES: {
   icon: string;
@@ -240,9 +241,45 @@ const FAQS: { q: string; a: string }[] = [
   },
 ];
 
+const JSON_LD = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'SoftwareApplication',
+      name: 'PHAROS',
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Docker, Linux, macOS',
+      description:
+        'A self-hosted personal hub: inventory, receipts read by AI, expenses, credit-card installments, subscriptions, vouchers, reports, and your network, in one private dashboard you control.',
+      url: SITE_URL,
+      author: { '@type': 'Person', name: 'Achilleas' },
+      license: 'https://www.gnu.org/licenses/agpl-3.0.html',
+      softwareHelp: `${GITHUB_URL}/blob/main/README.md`,
+      offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'EUR',
+        description: 'Self-hosted edition, open source under AGPL-3.0',
+      },
+    },
+    {
+      '@type': 'FAQPage',
+      mainEntity: FAQS.map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    },
+  ],
+};
+
 export default function Home() {
   return (
     <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+      />
       {/* ── Nav ───────────────────────────────────────────── */}
       <header
         style={{

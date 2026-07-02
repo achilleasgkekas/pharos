@@ -251,3 +251,23 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain.
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02 (cont.⁴)
+
+Task: (e) Polish, μερος 10 — JSON-LD structured data (SEO). Το layout ειχε ηδη πληρη metadata + OG/Twitter, αλλα ελειπε schema.org markup που δινει rich results στο Google (ιδιως FAQ rich snippets). Ηταν το πιο ουσιαστικο εναπομειναν SEO κομματι.
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεα σταθερα `SITE_URL = 'https://ph-aros.com'` + `JSON_LD` object (schema.org `@graph` με δυο types): (1) `SoftwareApplication` — name PHAROS, applicationCategory BusinessApplication, operatingSystem Docker/Linux/macOS, url, author, license (AGPL-3.0 URL), softwareHelp (README), `offers` price 0 EUR «Self-hosted edition, open source under AGPL-3.0» (ΟΧΙ fabricated hosted price — TBD). (2) `FAQPage` — `mainEntity` **χτισμενο απο το υπαρχον `FAQS` array** (map -> Question/acceptedAnswer), ωστε το structured data να μενει παντα in-sync με τα rendered FAQs. Render μεσα στο `<main>` ως `<script type="application/ld+json" dangerouslySetInnerHTML={...}>` (το standard Next App-Router pattern· static/controlled data, μηδεν user input -> ασφαλες). Μηδεν νεο dependency, μηδεν client JS.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 761 B / 103 kB First Load JS, αμεταβλητο — inline HTML script, μηδεν bundle impact).
+- Prerendered HTML check (`.next/server/app/index.html`): `application/ld+json` + `FAQPage` + `SoftwareApplication` και τα τρια present. Δεν χρειαστηκε preview server (JSON-LD ειναι non-visual head/body metadata· επιβεβαιωθηκε στο static output). Docker/web/mobile αθικτα.
+
+Επομενο increment: (e) συνεχεια — αντικατασταση του CSS mockup (#preview) με πραγματικα app screenshots οταν υπαρξουν assets, secondary CTA band, η micro-copy βελτιωσεις. (Προαιρετικα: BreadcrumbList/Organization JSON-LD, sitemap.ts + robots.ts.)
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD) — το SoftwareApplication offer δηλωνει μονο το free self-host, οχι hosted price.
+- GitHub repo public (η mirror) — CTA/self-host/footer links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL στο JSON-LD το χρησιμοποιει).
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.
