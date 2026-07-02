@@ -83,10 +83,27 @@ export type AuditView = {
   id: string;
   action: string;
   actor: string | null;
+  // Human-readable actor identity (the Account's email), resolved by the read route from a
+  // batched lookup. Null for system-originated events (no actor) or when the account is no
+  // longer resolvable (e.g. deleted). Purely for display; never a secret.
+  actorEmail: string | null;
   target: string | null;
   meta: Record<string, unknown> | null;
   createdAt: string | null;
 };
+
+/**
+ * Distinct, stringified, non-null actor ids across a batch of events. Pure so the read
+ * route can resolve every actor's email in ONE `_id: { $in }` query instead of N+1 lookups.
+ * System events (null actor) contribute nothing.
+ */
+export function collectActorIds(events: readonly { actor?: unknown }[]): string[] {
+  const seen = new Set<string>();
+  for (const ev of events) {
+    if (ev.actor != null) seen.add(String(ev.actor));
+  }
+  return [...seen];
+}
 
 function toIso(d: Date | string | null | undefined): string | null {
   if (!d) return null;
@@ -97,20 +114,25 @@ function toIso(d: Date | string | null | undefined): string | null {
 /**
  * Client-safe projection of an AuditEvent row. By construction it only exposes whitelisted
  * fields, so a tokenHash or other stray secret column could never leak through it. `actor`
- * is a stringified Account id (null for system events).
+ * is a stringified Account id (null for system events). `actorEmail` is the resolved display
+ * identity when the read route passes it (from a batched Account lookup), else null.
  */
-export function auditView(ev: {
-  _id: unknown;
-  action?: string | null;
-  actor?: unknown;
-  target?: string | null;
-  meta?: unknown;
-  createdAt?: Date | string | null;
-}): AuditView {
+export function auditView(
+  ev: {
+    _id: unknown;
+    action?: string | null;
+    actor?: unknown;
+    target?: string | null;
+    meta?: unknown;
+    createdAt?: Date | string | null;
+  },
+  actorEmail: string | null = null
+): AuditView {
   return {
     id: String(ev._id),
     action: ev.action ?? '',
     actor: ev.actor != null ? String(ev.actor) : null,
+    actorEmail: actorEmail ?? null,
     target: ev.target ?? null,
     // Re-redact on the way out as a defence-in-depth belt: even a legacy row written before
     // the recorder redacted is scrubbed before it reaches a client.

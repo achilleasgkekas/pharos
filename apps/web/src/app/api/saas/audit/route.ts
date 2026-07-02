@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveWorkspaceSession } from '@/lib/tenancy/workspaceSession';
 import { AuditEvent, type AuditEventDoc } from '@/models/AuditEvent';
-import { auditView, parseAuditAction } from '@/lib/tenancy/audit';
+import { Account } from '@/models/Account';
+import { auditView, collectActorIds, parseAuditAction } from '@/lib/tenancy/audit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,11 +67,27 @@ export async function GET(req: NextRequest) {
     .limit(limit)
     .lean()) as unknown as (AuditEventDoc & { createdAt?: Date })[];
 
+  // Resolve every actor's email in ONE batched lookup (never N+1), so the Activity panel can
+  // render a human name without its own account API. System events (null actor) and deleted
+  // accounts simply have no entry → auditView gets null.
+  const actorIds = collectActorIds(events);
+  const emailById = new Map<string, string>();
+  if (actorIds.length) {
+    const accounts = (await Account.find({ _id: { $in: actorIds } })
+      .select('email')
+      .lean()) as unknown as { _id: unknown; email?: string | null }[];
+    for (const a of accounts) {
+      if (a.email) emailById.set(String(a._id), a.email);
+    }
+  }
+
   return NextResponse.json({
     workspace: session.workspace.slug,
     action: action ?? 'all',
     limit,
     count: events.length,
-    events: events.map((ev) => auditView(ev)),
+    events: events.map((ev) =>
+      auditView(ev, ev.actor != null ? emailById.get(String(ev.actor)) ?? null : null)
+    ),
   });
 }

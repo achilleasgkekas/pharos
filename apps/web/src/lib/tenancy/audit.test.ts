@@ -6,6 +6,7 @@ import {
   redactMeta,
   auditView,
   auditCtx,
+  collectActorIds,
 } from './audit';
 
 // The pure helpers (validation, redaction, serialization) are unit-tested here. The
@@ -106,19 +107,35 @@ describe('auditView', () => {
       id: 'evt1',
       action: 'member.removed',
       actor: 'acc9',
+      actorEmail: null,
       target: 'someone@example.com',
       meta: { role: 'member' },
       createdAt: iso,
     });
     // Exact key set — no stray columns can pass through.
     expect(Object.keys(view).sort()).toEqual(
-      ['action', 'actor', 'createdAt', 'id', 'meta', 'target'].sort()
+      ['action', 'actor', 'actorEmail', 'createdAt', 'id', 'meta', 'target'].sort()
     );
+  });
+
+  it('projects the resolved actorEmail when the route passes it', () => {
+    const view = auditView(
+      { _id: 'e1b', action: 'member.removed', actor: 'acc9' },
+      'admin@example.com'
+    );
+    expect(view.actor).toBe('acc9');
+    expect(view.actorEmail).toBe('admin@example.com');
+  });
+
+  it('actorEmail defaults to null (omitted, or explicit null for a system/deleted actor)', () => {
+    expect(auditView({ _id: 'e1c', action: 'plan.changed' }).actorEmail).toBeNull();
+    expect(auditView({ _id: 'e1d', action: 'plan.changed' }, null).actorEmail).toBeNull();
   });
 
   it('null-safes actor/target/meta/createdAt (system event, legacy row)', () => {
     const view = auditView({ _id: 'e2', action: 'plan.changed' });
     expect(view.actor).toBeNull();
+    expect(view.actorEmail).toBeNull();
     expect(view.target).toBeNull();
     expect(view.meta).toBeNull();
     expect(view.createdAt).toBeNull();
@@ -161,5 +178,24 @@ describe('auditCtx', () => {
     expect(auditCtx(undefined).tenantId).toBeNull();
     expect(auditCtx('').tenantId).toBeNull();
     expect(auditCtx(null).isDefault).toBe(false);
+  });
+});
+
+describe('collectActorIds', () => {
+  it('returns distinct stringified non-null actor ids', () => {
+    const ids = collectActorIds([
+      { actor: 'a1' },
+      { actor: { toString: () => 'a2' } },
+      { actor: 'a1' }, // duplicate collapses
+    ]);
+    expect(ids.sort()).toEqual(['a1', 'a2']);
+  });
+
+  it('drops null/undefined actors (system events contribute nothing)', () => {
+    expect(collectActorIds([{ actor: null }, { actor: undefined }, {}])).toEqual([]);
+  });
+
+  it('handles an empty batch', () => {
+    expect(collectActorIds([])).toEqual([]);
   });
 });
