@@ -2592,3 +2592,18 @@ Read-only mobile-parity audit (apps/mobile Expo ⇄ apps/web `api/v1`). Inventor
 - **Safe-area insets** (P2/M): χρειάζεται native dep `react-native-safe-area-context` (ΑΠΟΝ στο package.json) + simulator verify → semi-attended, όχι unattended-safe.
 - «Partial» rows παραμένουν decision/credentials boundary: extra Reports charts (inventory-pie / subs-by-cat / income-vs-expense-12mo → RN charting lib + endpoint-extension)· Statements merge-bind / PDF-import (νέα write/upload endpoints)· Settings theme/language/AI-engine/storage/OneDrive.
 - Μηδέν committed secret εντοπίστηκε.
+
+## 2026-07-02 (builder — pure-lib vitest suite για i18n/config.ts + locale-dictionary integrity)
+
+Το προηγούμενο run άφησε ρητά ως suggested next: **pure-lib vitest suite** (byte-safe auto-buildable web debt εξαντλημένο, mobile #6/#8 = needs-decision/simulator). Έλεγξα ποια lib αρχεία μένουν untested (`find src/lib -name '*.ts' ! -name '*.test.ts'` cross-ref) και διάλεξα το **`src/lib/i18n/config.ts`** (isLocale type guard + LOCALES table) που ήταν untested, plus έναν integrity έλεγχο των 8 locale λεξικών, γιατί το i18n είναι κεντρικό (cookie validation + fallback) και ο guard προστατεύει untrusted cookie input.
+
+**Τι έγινε (2 νέα test files, μηδέν runtime κώδικας):**
+1. **`src/lib/i18n/config.test.ts`** (10 tests) — `isLocale` (αποδοχή όλων των codes, απόρριψη `EN`/`en-US`/`gr`/`' el'`/κενό/null/undefined, type-narrowing proof) + config invariants (LOCALE_CODES 1:1 με LOCALES, μηδέν duplicates, κάθε locale έχει 2-γραμμα code + non-empty name, DEFAULT_LOCALE υπάρχει στον πίνακα, cookie name = `pharos_locale` pinned).
+2. **`src/lib/i18n/locales.test.ts`** (18 tests, `describe.each` πάνω στα 7 non-English dicts) — (α) καμία locale δεν κρατά **stale/renamed key** εκτός `en.ts` (το πιάνει runtime, ο τύπος `Partial<Dict>` το αφήνει να περάσει σε rename)· (β) καμία τιμή κενή/whitespace (θα render-άριζε blank αντί για en fallback)· (γ) en source μηδέν κενά + floor >100 keys· (δ) registration: κάθε code του πίνακα resolve-άρει σε πλήρες dict, translated set == LOCALE_CODES minus `en`. **Σκόπιμα ΔΕΝ** ελέγχω full coverage (τα partial translations είναι by-design, το en γεμίζει τα κενά).
+
+**Verify:** `npm run test` → **518/518 pass** (34 files, από 490/32 πριν, +28 νέα). `npm run type-check` → **EXIT 0** (πρώτο πέρασμα είχε TS2322 από `Partial<typeof en>` literal types → διορθώθηκε σε `Partial<Dict>`). Καθαρά test-only αρχεία → κανένα Docker rebuild (δεν άλλαξε runtime κώδικας). Staged ΜΟΝΟ τα 2 test files (το `.claude/launch.json` του Αχιλλέα αφέθηκε unstaged).
+
+**Suggested next task:** Συνέχεια pure-lib coverage — υπόλοιπα untested καθαρά helpers χωρίς I/O είναι λίγα (τα περισσότερα untested = db/ollama/storage/network I/O-bound). Καλός επόμενος στόχος: `lib/notifiers.shared.ts` NOTIFIER_TYPES metadata structural test (needs-array-ανά-type consistency) ή ένας νέος read-only audit γύρος (web/ui/parity) για fresh queue αφού τα προηγούμενα ήταν confirmation runs. Τα mobile #6 (Settings theme/budgets/notifications) + #8 (push) παραμένουν needs-decision/simulator.
+
+### Needs Achilleas
+- (αμετάβλητο) Standing product/security decisions μη-auto-buildable: login brute-force rate-limit, error-message leak στο `withAuth` 500, quota-enforce gate wiring σε πραγματικά AI/upload routes, tenant-aware `saveFile`, `getTenantConnection` cache-reuse guard (ambiguous rebuild-semantic), Stripe/CRON/AUTH key provisioning (env boundary). Mobile #6/#8 θέλουν simulator/APNs/theme-refactor απόφαση.
