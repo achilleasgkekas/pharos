@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 9d7bbab -->
-<!-- docker-validated: 4eaa702 -->
+<!-- docker-validated: 62c3c5b -->
+
+## 2026-07-02 (docker-health guard — rebuild + validate)
+- **Health:** homepage-mongo `healthy`, web RestartCount 0, mongo RestartCount 122 (ιστορικό, σταθερό τώρα). Flaresolverr όχι running (μηδέν memory pressure). Running stack: web + mongo + searxng.
+- **Rebuild:** ΝΑΙ. `git diff 4eaa702..HEAD -- apps/web/src` άγγιξε runtime code (invites/accept + invites route.ts, `lib/tenancy/invites.ts`, `models/Invite.ts` + 2 tests + SAAS_PROGRESS.md). Safe dance: `docker compose build web` (OK) → mongo healthy → `docker compose up -d web` → `/login` επέστρεψε **200** στην 1η προσπάθεια, web RestartCount έμεινε 0.
+- **Disk:** `docker builder prune -f` → reclaimed **~2.1GB**. Μετά: Images 4.41GB, Build Cache 1.07GB (active, reclaimable 0B).
+- **Marker:** docker-validated `4eaa702` → **`62c3c5b`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
+- **Needs Achilleas:** κανένα.
 
 ## 2026-07-02 (web-code-quality auditor — 33η σάρωση, CONFIRMATION)
 - **Τι έκανα:** read-only fresh live σάρωση (grep, όχι docs) όλου του web API surface: **49 v1 route files** + **19 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/billing/*` + `lib/tenancy/*` + `models/*`. Καμία Docker build, κανένα AI job, μηδέν app-code edit.
