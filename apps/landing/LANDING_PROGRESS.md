@@ -653,3 +653,23 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-03
+
+Task: (e) Polish, μερος 28 — branded error boundary (`app/error.tsx`). Ηταν ρητη προταση απο το προηγουμενο log (custom error boundary η prefers-reduced-motion)· το διαλεξα γιατι ειναι φυσικος συντροφος του `not-found.tsx` (cont.²¹): μηδεν assets, μηδεν pricing decision, brand-consistent, ενα νεο αρχειο (ελαχιστο collision surface, καμια globals.css αλλαγη). Το app δεν ειχε κανενα error boundary -> καθε runtime exception εδειχνε το γενικο default Next error, off-brand και χωρις recovery.
+
+Τι εφτιαξα:
+- `app/error.tsx` (νεο, client component οπως απαιτει το App Router· δεχεται `error` + `reset`): centered layout (min-height 70vh ωστε να μενει το layout header/footer ορατο) με PharosMark 64px + mono eyebrow «Error · the beacon flickered» + clamp() gradient headline «Something went dark.» (ιδια accent→cyan→purple βαφη με hero/404) + subcopy + optional `error.digest` reference line (μονο αν υπαρχει) + 3 CTA: **«Try again»** (button -> `reset()`, το recovery που το στατικο 404 δεν εχει) + «Back to home» (/) + «Self-host it free» (GitHub). `useEffect` -> `console.error` ωστε να μη χανεται σιωπηλα το σφαλμα. Reuse υπαρχουσων `.container`/`.btn`/`.btn-primary`/`.btn-ghost`/`.mono` classes -> ΜΗΔΕΝ globals.css αλλαγη. Επιβεβαιωσα οτι το `.btn` base κανει σωστο reset σε `<button>` (explicit background απο btn-primary, border/cursor/font-family/focus-visible ολα καλυμμενα στο globals.css:198-227,1293).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success. Το error.tsx ειναι boundary, ΟΧΙ route -> δεν εμφανιζεται νεο route entry (bundle-αρεται στο client boundary)· / αμεταβλητο 2.18 kB / 105 kB First Load JS, ολα ○ Static. Verification = type-check + build (ιδιο pattern με ολα τα προηγουμενα increments)· το boundary πυροδοτειται μονο σε runtime exception, μη παρατηρησιμο σε στατικο preview -> δεν σηκωσα dev server (ουτε αγγιξα το Docker :3000). Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged· foreign `.claude/launch.json` + `apps/mobile/src/screens/*` (modified, ασταγα, αλλων ρουτινων) ΔΕΝ commit — staged μονο app/error.tsx + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως prefers-reduced-motion σεβασμος στο ScrollSpy (IntersectionObserver δεν κανει scroll animation, οποτε low priority) ή global-error.tsx για σφαλματα στο ιδιο το root layout.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
