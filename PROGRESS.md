@@ -2951,3 +2951,29 @@ Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `a
 
 ### Needs Achilleas
 - Κανένα νέο· μηδέν committed secret. Safe-area insets + light/dark theme παραμένουν semi-attended/decision (device/refactor).
+
+## 2026-07-02 (ui-auditor — 35η σάρωση mobile UI consistency· `<Chip>` holdout ΕΚΛΕΙΣΕ)
+
+Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `apps/web/src/app/globals.css`). Inventory ξαναχτίστηκε από τον κώδικα: **16 screens**, `theme.ts` (`C`/`SPACE`/`RADIUS`/`SIZE`/`scrim`/`onAccent`/`alpha`) + `ui.tsx` primitives ΟΛΑ παρόντα, **τώρα και `<Chip>` (ui.tsx:229)**. mobile `npx tsc --noEmit` → **EXIT 0**.
+
+**Νέος κώδικας από την 34η (marker `268efb4`):** ένα mobile-src commit, **`681098f`** (`refactor(mobile): extract <Chip> toggle-pill primitive`). Επιθεώρησα το diff: νέο `<Chip label on onPress style? textStyle?>` (base padH12/padV6/radius10/fs12, surface2→accent-fill) + υιοθέτηση σε 5 screens (Items/Subscriptions/Settings ×3/Reports/Tasks)· τα 6 byte-identical toggle-chip clusters σβήστηκαν, pixel-identical μέσω minimal override. Token-clean, μηδέν hex.
+
+**Ευρήματα ανά διάσταση (fresh grep):**
+- Tokens (hardcoded hex): **0** στα `screens/`+`nav.tsx`+`App.tsx` (μόνο σχόλια στο `theme.ts`/`ui.tsx`).
+- Shared theme file: **ΥΠΑΡΧΕΙ** (`theme.ts`) → κανένα P1 foundation item ανοιχτό.
+- Reusable components: **`<Chip>` ΕΚΛΕΙΣΕ** — built + adopted σε 5 screens· εναπομείναντα Settings `addChip` (cyan ghost) + `valChip` (removable ✕) είναι σκόπιμα non-toggle → όχι chip debt. **Απομένει ΜΟΝΟ** το ghost `<Button variant>` (7 sites: `aiBtn`/`scanBtn`/`rescanBtn`/`importBtn`, με drift cyan/accent/border) = τελευταίο button-family holdout.
+- Theme/dark mode: **0** `useColorScheme`/`ThemeProvider`/`useTheme` (dark-only, P3/L decision).
+- States: complete trio (Spinner/ErrorText/Empty)· in-button `ActivityIndicator` επικαλύπτεται με ghost-button holdout.
+- Adaptive: safe-area **ανοιχτό** (plain `SafeAreaView` @ App.tsx:88, `react-native-safe-area-context` εκτός package.json [grep count 0], μηδέν bottom inset· `nav.tsx` `paddingTop:60`)· max-content-width DONE (`contentWidth`, `28c943c`).
+- Touch targets: DONE (`<Check>` 24×24 + hitSlop).
+- Input primitive: raw `<TextInput>` **21 sites / 7 screens** (Assistant/Items/Search/Settings/Shopping/Login/Receipts) — attended-preferred token-drift, `<Input>`/`<TextArea>` υπάρχουν αλλά όχι πλήρως υιοθετημένα.
+
+**Ουρά:** **ένα item έκλεισε** (το `<Chip>` sub-item του «Button + Chip primitives»)· κανένα νέο άνοιξε. Το «Button + Chip primitives» item παραμένει IN PROGRESS 🟡 μόνο για το ghost-variant μέρος (β).
+
+**Top 3 items να πάρει ο builder μετά (unattended-safe διάταξη):**
+1. **Ghost `<Button variant>` (P2/M)** — τελευταίο reusable-component holdout· `variant?: 'primary' | 'ghost'` (+ optional tint cyan/accent) στο υπάρχον `Button`, ενοποιεί 7 sites. Unattended-safe (tsc-verifiable, style-override idiom)· ΠΡΟΣΟΧΗ στο drift (borderColor cyan vs accent, padding 8-12) → κράτα per-site override για pixel-identical.
+2. **Safe-area insets (P2/M)** — μοναδικό πραγματικό adaptive gap· `react-native-safe-area-context` + `SafeAreaProvider`/`useSafeAreaInsets` (bottom inset για sheet buttons κάτω από home indicator). Package-add + simulator verify → semi-attended.
+3. **Input primitive πλήρης υιοθέτηση (P2/M)** — 21 raw `<TextInput>` σε 7 screens να περάσουν στο υπάρχον `<Input>`/`<TextArea>`. Token-drift → attended-preferred.
+
+### Needs Achilleas
+- Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) παραμένει σκόπιμη απόφαση (μεγάλο refactor). Safe-area + Input full-adoption = επόμενα semi-attended/attended.
