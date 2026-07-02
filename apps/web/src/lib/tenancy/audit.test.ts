@@ -5,6 +5,7 @@ import {
   parseAuditAction,
   redactMeta,
   auditView,
+  auditCtx,
 } from './audit';
 
 // The pure helpers (validation, redaction, serialization) are unit-tested here. The
@@ -136,5 +137,29 @@ describe('auditView', () => {
   it('accepts an ISO string createdAt, null on garbage', () => {
     expect(auditView({ _id: 'e4', createdAt: iso }).createdAt).toBe(iso);
     expect(auditView({ _id: 'e5', createdAt: 'not-a-date' }).createdAt).toBeNull();
+  });
+});
+
+describe('auditCtx', () => {
+  it('builds a non-default context from a tenant id', () => {
+    expect(auditCtx('507f1f77bcf86cd799439011')).toEqual({
+      isDefault: false,
+      tenantId: '507f1f77bcf86cd799439011',
+    });
+  });
+
+  it('stringifies a non-string id', () => {
+    expect(auditCtx({ toString: () => 'abc' } as unknown as string)).toEqual({
+      isDefault: false,
+      tenantId: 'abc',
+    });
+  });
+
+  it('maps null/undefined/empty id to a no-op context (null tenantId)', () => {
+    // recordAudit treats tenantId === null as a no-op, so these never write a row.
+    expect(auditCtx(null).tenantId).toBeNull();
+    expect(auditCtx(undefined).tenantId).toBeNull();
+    expect(auditCtx('').tenantId).toBeNull();
+    expect(auditCtx(null).isDefault).toBe(false);
   });
 });

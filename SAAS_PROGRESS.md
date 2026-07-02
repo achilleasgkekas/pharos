@@ -946,3 +946,46 @@ Route SAAS-gated (404 off) + model/lib pure/additive + κανένας external i
 POST-mint/resend/accept/revoke (invite.sent/resent/accepted/revoked), billing webhook
 (plan.changed). Additive fire-and-forget calls (never-throw recorder ⇒ zero risk στο user action),
 SAAS-gated routes ⇒ off = never runs. Μετά: audit `?action` filter αποκτά πραγματικά δεδομένα.
+
+## 2026-07-02 (increment 23 — wire recordAudit into mutating SaaS routes)
+**Built:** το audit-log foundation του §22 είχε recorder + read API αλλά **κανέναν writer** — η
+`?action` λίστα ήταν πάντα άδεια. Τώρα τα mutating SaaS routes (εντός territory) καταγράφουν
+πραγματικά events. ΟΛΟ SAAS-gated, additive, backward-compatible, σε δικά μου SAAS αρχεία:
+- `lib/tenancy/audit.ts` (additive): (α) το `recordAudit` δέχεται πλέον `AuditCtx =
+  Pick<TenantContext,'isDefault'|'tenantId'>` αντί για ολόκληρο `TenantContext` — **widening**
+  (μόνο αυτά τα 2 πεδία διαβάζει), οπότε και το `session.ctx` ΚΑΙ ένα minimal ctx ταιριάζουν·
+  (β) νέος PURE helper **`auditCtx(tenantId)`** για paths χωρίς workspace session (invite-accept
+  unauthenticated + system Stripe webhook) → `{isDefault:false, tenantId}`· null/empty id →
+  `tenantId:null` = no-op recorder.
+- `app/api/saas/members/route.ts`: `member.added` (POST, existing account· meta reactivated
+  flag), `invite.sent` (POST → inviteUnregistered mint), `member.role_changed` (PATCH· meta
+  from→to), `member.removed` (DELETE). Το PATCH/DELETE destructure πλέον και `views` για
+  email ως audit target (πριν μόνο `lite`).
+- `app/api/saas/invites/route.ts`: `invite.revoked` (DELETE). Το revoke updateOne→
+  **findOneAndUpdate** ώστε να ανακτηθεί email/role για το audit target πριν revoke-αριστεί.
+- `app/api/saas/invites/resend/route.ts`: `invite.resent` (POST re-mint).
+- `app/api/saas/invites/accept/route.ts`: `invite.accepted` (POST redeem· actor = ο invitee
+  που δέχεται, ctx = `auditCtx(invite.tenant)` αφού δεν υπάρχει session ακόμα).
+- `app/api/saas/billing/webhook/route.ts`: `plan.changed` (system actor, actor:null, target=
+  tenant.slug, meta from→to) μέσω νέου `auditPlanChange(tenant, prevPlan)` — **no-op όταν το
+  plan δεν άλλαξε** (subscription updated χωρίς price change ⇒ κανένα row)· καλείται σε
+  onSubscriptionActive + onSubscriptionCanceled.
+- `lib/tenancy/audit.test.ts` — +3 PURE tests για `auditCtx` (id→non-default ctx, non-string
+  stringify, null/undefined/empty→null tenantId no-op).
+
+Design: όλα τα recordAudit calls **awaited** (όχι fire-and-forget) — ο recorder never-throws,
+οπότε το await εγγυάται durability του audit row χωρίς ρίσκο στο user action· η μία insert
+είναι αμελητέα. Redaction (§22 `redactMeta`) τρέχει σε κάθε meta ⇒ κανένα secret στο trail.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run audit.test.ts invites.test.ts`
+→ **46/46 green** (43 προϋπάρχοντα + 3 νέα). ΟΛΕΣ οι edited routes είναι SAAS-gated
+(`saasAuthGate`/`resolveWorkspaceSession`/`saasMode` → 404 όταν off) + `recordAudit` no-op για
+default tenant ⇒ `SAAS_MODE` off = **zero effect** στο self-hosted app· κανένα feature route/
+data-db/User-path αγγίχτηκε. Κανένας Docker rebuild (οι routes 404 στο running container με
+SAAS_MODE off — δεν εκτελείται ο νέος κώδικας· type-check καλύπτει το compile). Καμία νέα
+εξάρτηση. Άγγιξα μόνο δικά μου SAAS αρχεία (foreign `.claude/launch.json` άθικτο).
+
+**Next task:** increment 24 — είτε (α) user-facing workspace-settings «Activity» panel που
+consume-άρει το `GET /api/saas/audit` (UI-only, το read+write API είναι πλέον πλήρες), είτε (β)
+`sendViaSmtp` via nodemailer (μετά provider decision Achilleas), είτε (γ) `invitedBy` projection
+στο inviteView για πλήρες invite audit trail.

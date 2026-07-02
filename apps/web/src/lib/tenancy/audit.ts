@@ -119,6 +119,23 @@ export function auditView(ev: {
   };
 }
 
+/**
+ * The slice of a TenantContext the recorder actually reads. Widening the param to this
+ * (rather than the full `TenantContext`) lets both a real `session.ctx` AND a minimal
+ * `{ isDefault, tenantId }` — built by `auditCtx` for the unauthenticated invite-accept and
+ * the system-originated Stripe webhook, neither of which has a workspace session — satisfy it.
+ */
+export type AuditCtx = Pick<TenantContext, 'isDefault' | 'tenantId'>;
+
+/**
+ * Build an audit context from a bare tenant id, for code paths that have a resolved tenant
+ * but no workspace session (invite accept, billing webhook). A resolved tenant is by
+ * definition never the implicit default; a null/empty id makes `recordAudit` a no-op.
+ */
+export function auditCtx(tenantId: string | null | undefined): AuditCtx {
+  return { isDefault: false, tenantId: tenantId ? String(tenantId) : null };
+}
+
 export type RecordAuditInput = {
   action: AuditAction;
   /** Account id of the human actor; omit/null for system-originated events. */
@@ -138,7 +155,7 @@ export type RecordAuditInput = {
  *     user action it records.
  * Returns true if a row was written, false otherwise.
  */
-export async function recordAudit(ctx: TenantContext, input: RecordAuditInput): Promise<boolean> {
+export async function recordAudit(ctx: AuditCtx, input: RecordAuditInput): Promise<boolean> {
   if (ctx.isDefault || !ctx.tenantId) return false;
   if (!isAuditAction(input.action)) return false;
   try {

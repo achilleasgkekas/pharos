@@ -8,6 +8,7 @@ import { readBody, strField } from '@/lib/apiBody';
 import { saasAuthGate, accountTenants } from '@/lib/tenancy/saasApi';
 import { setAccountCookie } from '@/lib/tenancy/accountSession';
 import { hashInviteToken, isInviteValid } from '@/lib/tenancy/invites';
+import { recordAudit, auditCtx } from '@/lib/tenancy/audit';
 import type { OrgRole } from '@/lib/tenancy/members';
 
 export const runtime = 'nodejs';
@@ -103,6 +104,15 @@ export async function POST(req: NextRequest) {
     { _id: invite._id },
     { $set: { status: 'accepted', acceptedBy: accountId, acceptedAt: new Date() } }
   );
+
+  // The invitee is the actor of their own acceptance. No workspace session yet, so build a
+  // bare audit context from the invite's tenant.
+  await recordAudit(auditCtx(String(tenantId)), {
+    action: 'invite.accepted',
+    actor: accountId,
+    target: email,
+    meta: { role },
+  });
 
   await setAccountCookie({ sub: accountId, email });
 

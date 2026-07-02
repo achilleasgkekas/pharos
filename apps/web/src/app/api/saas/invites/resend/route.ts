@@ -10,6 +10,7 @@ import {
   mailerCanDeliver,
 } from '@/lib/tenancy/mailer';
 import { pickBaseUrl } from '@/lib/billing/billingRoutes';
+import { recordAudit } from '@/lib/tenancy/audit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -85,6 +86,13 @@ export async function POST(req: NextRequest) {
       { status: 404 }
     );
   }
+
+  await recordAudit(session.ctx, {
+    action: 'invite.resent',
+    actor: session.account.sub,
+    target: String(invite.email),
+    meta: { role: String(invite.role) },
+  });
 
   const canDeliver = mailerCanDeliver();
   if (canDeliver) {

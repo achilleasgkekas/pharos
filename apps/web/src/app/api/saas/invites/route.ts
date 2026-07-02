@@ -3,6 +3,7 @@ import { resolveWorkspaceSession } from '@/lib/tenancy/workspaceSession';
 import { Invite, type InviteDoc } from '@/models/Invite';
 import { readBody, isObjectId } from '@/lib/apiBody';
 import { inviteView, parseInviteStatusFilter, inviteStatusQuery } from '@/lib/tenancy/invites';
+import { recordAudit } from '@/lib/tenancy/audit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -83,18 +84,28 @@ export async function DELETE(req: NextRequest) {
   }
 
   // Revoke only within this workspace and only if still pending — a fresh mint or an
-  // accepted/revoked row is left untouched.
-  const res = await Invite.updateOne(
+  // accepted/revoked row is left untouched. findOneAndUpdate (not updateOne) so we recover
+  // the invite's email/role for the audit trail before it is revoked.
+  const revoked = (await Invite.findOneAndUpdate(
     { _id: inviteId, tenant: session.ctx.tenantId!, status: 'pending' },
     { $set: { status: 'revoked' } }
-  );
+  )
+    .select('email role')
+    .lean()) as Pick<InviteDoc, 'email' | 'role'> | null;
 
-  if (res.matchedCount === 0) {
+  if (!revoked) {
     return NextResponse.json(
       { error: 'no pending invite with that id in this workspace' },
       { status: 404 }
     );
   }
+
+  await recordAudit(session.ctx, {
+    action: 'invite.revoked',
+    actor: session.account.sub,
+    target: String(revoked.email),
+    meta: { role: String(revoked.role) },
+  });
 
   return NextResponse.json({ revoked: inviteId });
 }

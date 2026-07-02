@@ -23,6 +23,7 @@ import { withinSeatLimit, entitlementsFor } from '@/lib/billing/entitlements';
 import { Invite } from '@/models/Invite';
 import { mintInviteToken } from '@/lib/tenancy/invites';
 import { pickBaseUrl } from '@/lib/billing/billingRoutes';
+import { recordAudit } from '@/lib/tenancy/audit';
 import type { WorkspaceSession } from '@/lib/tenancy/workspaceSession';
 
 export const runtime = 'nodejs';
@@ -133,6 +134,13 @@ async function inviteUnregistered(
     tokenHash,
     expires,
     invitedBy: session.account.sub,
+  });
+
+  await recordAudit(session.ctx, {
+    action: 'invite.sent',
+    actor: session.account.sub,
+    target: email,
+    meta: { role },
   });
 
   const canDeliver = mailerCanDeliver();
@@ -251,6 +259,13 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  await recordAudit(session.ctx, {
+    action: 'member.added',
+    actor: session.account.sub,
+    target: account.email,
+    meta: { role, reactivated: Boolean(existing) },
+  });
+
   // Best-effort notification that they now have workspace access (no-op unless a mailer is
   // configured). Fire-and-forget so it never delays or fails the response; sendEmail never throws.
   const { subject, html } = invitedEmail(session.workspace.slug);
@@ -294,7 +309,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const tenantId = session.ctx.tenantId!;
-  const { lite } = await loadMembers(tenantId);
+  const { lite, views } = await loadMembers(tenantId);
   const target = lite.find((m) => m.accountId === accountId && m.status !== 'removed');
   if (!target) {
     return NextResponse.json({ error: 'member not found' }, { status: 404 });
@@ -309,6 +324,14 @@ export async function PATCH(req: NextRequest) {
   }
 
   await Membership.updateOne({ account: accountId, tenant: tenantId }, { $set: { role } });
+
+  await recordAudit(session.ctx, {
+    action: 'member.role_changed',
+    actor: session.account.sub,
+    target: views.find((v) => v.accountId === accountId)?.email || accountId,
+    meta: { from: target.role, to: role, accountId },
+  });
+
   return NextResponse.json({ member: { accountId, role } });
 }
 
@@ -329,7 +352,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   const tenantId = session.ctx.tenantId!;
-  const { lite } = await loadMembers(tenantId);
+  const { lite, views } = await loadMembers(tenantId);
   const target = lite.find((m) => m.accountId === accountId && m.status !== 'removed');
   if (!target) {
     return NextResponse.json({ error: 'member not found' }, { status: 404 });
@@ -343,5 +366,13 @@ export async function DELETE(req: NextRequest) {
   }
 
   await Membership.updateOne({ account: accountId, tenant: tenantId }, { $set: { status: 'removed' } });
+
+  await recordAudit(session.ctx, {
+    action: 'member.removed',
+    actor: session.account.sub,
+    target: views.find((v) => v.accountId === accountId)?.email || accountId,
+    meta: { role: target.role, accountId },
+  });
+
   return NextResponse.json({ removed: accountId });
 }
