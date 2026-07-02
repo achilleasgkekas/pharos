@@ -2,8 +2,37 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 53b861a -->
+<!-- reviewed: 2f31c5d -->
 <!-- docker-validated: b911882 -->
+
+## 2026-07-03 (reviewer — range 53b861a..2f31c5d· tsc web+mobile EXIT 0· 29 tests green· 0 fixes· 1 P2 partial-close note + 1 Needs-Achilleas)
+- **Τι review-άρισα:** 7 commits από τον marker `53b861a` → HEAD `2f31c5d`. Code: `b911882` (SaaS tenant-status enforcement), `96150c5` (mobile Button danger/ghost variants + 4 screens), `67ac112` (landing branded error boundary), `320102d` (prompts.test.ts)· υπόλοιπα docs/docker-health.
+- **Checks (read-only):** `apps/web npm run type-check` **EXIT 0**· `apps/mobile npx tsc --noEmit` **EXIT 0**· `vitest run prompts.test.ts workspace.test.ts` → **29/29 pass** (10 prompts + 19 workspace).
+- **Ανά commit:**
+  - `b911882` tenant-status — καθαρός, fail-closed `workspaceStatusError` (unknown→blocked), `allowInactive` opt-out σε GET/DELETE σωστά τεκμηριωμένο, tested (15 refs). **ΑΛΛΑ μερική κάλυψη:** επιβάλλεται μόνο στα workspace-management routes· το v1 app-data path (`context.ts` getTenantContext) δεν κάνει gate σε status → canceled workspace κρατά πρόσβαση στα δεδομένα του. Commit msg ειλικρινές για το scope. Flag → WEB_DEBT reviewer note (item #1 DOING/partial, ΟΧΙ small-safe — design decision).
+  - `96150c5` mobile Button variants — καθαρό· default `primary` path byte-identical (`s.btn`/`s.btnText`/`C.onAccent`), variant ternaries σωστά, dead `delBtn`/`delBtnText`/`cancelText` διαγράφηκαν, tsc green. Safe.
+  - `67ac112` landing error boundary — additive client component, reuses `.btn`/`PharosMark`/gradient idiom, μηδέν globals change, console.error surface. Safe.
+  - `320102d` prompts.test.ts — additive pure test (PROMPT_META registry invariants + DEFAULT_SCRAPER_PRICE_PROMPT shape), 10/10 pass.
+- **Τι διόρθωσα:** τίποτα. Ολα green· μηδέν typo/bad-import/missing-await/unused-import στο diff.
+- **Τι flag-αρα:** (1) WEB_DEBT reviewer note — P2/M tenant-status μερικώς έκλεισε (management routes DONE+tested· v1 data-path + reactivate UX μένουν, design decision). (2) Needs Achilleas — GitHub URL spelling mismatch στο landing content: 5× `github.com/achilleasgkekas/pharos` vs 1× `github.com/AchilleasGekas/pharos` (pre-existing, εκτός range logic· το νέο `error.tsx` ακολουθεί το majority spelling). Ένα από τα δύο link είναι σπασμένο — μόνο ο Αχιλλέας ξέρει το σωστό handle.
+- **Git hygiene:** stage ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (ρητά paths). ΔΕΝ αγγίχτηκαν τα WIP του Αχιλλέα (`.claude/launch.json`, ReceiptsScreen, SettingsScreen, ShoppingScreen).
+
+### Needs Achilleas (reviewer 2026-07-03)
+- **Landing GitHub URL:** διάλεξε ένα σωστό handle και ενοποίησε — `achilleasgkekas` (5 usages, ταιριάζει με το email `gkekas57`) vs `AchilleasGekas` (1 usage, ό,τι λέει το CLAUDE.md για το repo που δημιουργήθηκε). Το ένα δίνει σπασμένο «View source» link. Grep: `grep -rni "github.com/[a-z]*/pharos" apps/landing`.
+- Τίποτα νέο ασφαλείας· μηδέν committed secret.
+
+## 2026-07-03 (ui-auditor — 38η σάρωση mobile UI· 2 items προχώρησαν· 1 νέο touch-target finding)
+- **Read-only audit** (grep από κώδικα, μηδέν Docker, μηδέν AI, μηδέν app-code edit). mobile `npx tsc --noEmit` → **EXIT 0**. Working tree: `.claude/launch.json` + ReceiptsScreen/SettingsScreen/ShoppingScreen = WIP του Αχιλλέα (δεν αγγίχτηκαν).
+- **Ευρήματα ανά διάσταση:**
+  - **Tokens:** hardcoded hex εκτός `theme.ts` = **0**, rgba/rgb literals εκτός `theme.ts` = **0**. Token layer πλήρως καθαρό (foundation DONE εδώ και καιρό).
+  - **Shared theme:** υπάρχει (`theme.ts` + `ui.tsx` με 14 primitives). Μηδέν P1 foundation gap.
+  - **Reusable components (leftover duplicates):** Input **9/11** (commit `53b861a` έκλεισε Login/Search/Assistant· απομένουν ItemsScreen `logInput` non-WIP + ReceiptsScreen `einput`/`cellInput` WIP). Button danger/ghost variants + 4 screens migrated (`96150c5`)· απομένουν Shopping/Settings cancel-buttons + Settings `saveText` (WIP-blocked). Μικρό debt: SearchScreen `row`→ListItem, Statements `badge`→Badge.
+  - **Theme/dark:** dark-only, μηδέν light context (P3/L, needs decision).
+  - **Adaptive:** `contentWidth` DONE· safe-area ΑΚΟΜΑ plain `SafeAreaView`, dep ΑΠΟΝ (needs Achilleas).
+  - **Touch targets (ΝΕΟ):** SettingsScreen `rm` ✕ (36×36 ×3) + `swatch` (32×32) χωρίς hitSlop → <44pt. Νέο queue item (P2/S, WIP-blocked). Τα υπόλοιπα small targets έχουν hitSlop → OK.
+- **Top-3 για τον builder (unattended-safe, non-WIP):** (1) Input finish σε ItemsScreen `logInput` [P2/S]· (2) SearchScreen `row`→`<ListItem>` [P3/S]· (3) StatementsScreen `badge`→`<Badge>` [P3/S]. Ό,τι άλλο απομένει είναι WIP-blocked (Receipts/Settings/Shopping) ή needs-decision.
+- **Docs:** `MOBILE_PARITY.md` — νέο 38η-σάρωση note στην κορυφή του UI Debt Queue + Input status → 9/11 + νέο item «Touch targets — Settings `rm`/`swatch` missing hitSlop». Git hygiene: staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md`.
+- **Needs Achilleas:** τα 3 WIP screens (Receipts/Settings/Shopping) κρατούν το μεγαλύτερο εναπομείναν UI debt (Input/Button/hitSlop)· ένα commit ή revert θα τα ξεμπλόκαρε. Μηδέν committed secret.
 
 ## 2026-07-03 (docker-health — rebuild b911882· mongo healthy· 2.1GB reclaimed)
 - **Health (read-only):** mongo `healthy`, web RestartCount `0`, mongo RestartCount `177` (σωρευτικό ιστορικό από παλιά OOM· τώρα σταθερό, μηδέν loop). flaresolverr ήδη σταματημένο. Docker df: Images 4.41GB, Build Cache ~1GB.
