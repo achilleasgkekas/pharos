@@ -252,6 +252,33 @@ const AI_NOTES: { icon: string; label: string }[] = [
   { icon: 'chart', label: 'Quick-verify queue clears the backlog' },
 ];
 
+const INTEGRATIONS: { group: string; icon: string; color: string; items: string[] }[] = [
+  {
+    group: 'Storage & backup',
+    icon: 'server',
+    color: 'var(--accent)',
+    items: ['Local disk', 'SMB / SMB3', 'FTP / FTPS', 'OneDrive', 'Nightly archive'],
+  },
+  {
+    group: 'Bring your own AI',
+    icon: 'code',
+    color: 'var(--cyan)',
+    items: ['Ollama (local)', 'Anthropic', 'OpenAI', 'Gemini', 'OpenRouter'],
+  },
+  {
+    group: 'Import & export',
+    icon: 'receipt',
+    color: 'var(--purple)',
+    items: ['Gmail export', 'PDF & image OCR', 'CSV export', 'JSON backup'],
+  },
+  {
+    group: 'Network & alerts',
+    icon: 'wifi',
+    color: 'var(--gold)',
+    items: ['UniFi monitoring', 'Speedtest', 'ntfy push', 'Price-drop alerts'],
+  },
+];
+
 const COMPARE: { label: string; self: string; hosted: string }[] = [
   { label: 'Where it runs', self: 'Your own hardware', hosted: 'Our managed servers' },
   { label: 'Your data', self: 'Stays on your disk', hosted: 'Isolated per tenant' },
@@ -592,6 +619,44 @@ export default function Home() {
               <li key={n.label} className="ai-note">
                 <span className="ai-note-ico"><Icon name={n.icon} size={15} /></span>
                 {n.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* ── Integrations (works with your stack) ──────────── */}
+      <section id="integrations" style={{ padding: '48px 0' }}>
+        <div className="container" style={{ maxWidth: 960 }}>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <p className="mono" style={{ marginBottom: 12 }}>Works with your stack</p>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 700, marginBottom: 14 }}>
+              Plugs into what you already run
+            </h2>
+            <p style={{ color: 'var(--text-dim)', maxWidth: 560, margin: '0 auto' }}>
+              Keep your files where you want them, point it at any AI model, and
+              wire up the alerts you care about. No lock-in, no forced cloud.
+            </p>
+          </div>
+
+          <ul className="integ-grid">
+            {INTEGRATIONS.map((g) => (
+              <li key={g.group} className="card integ-group">
+                <div className="integ-head">
+                  <span className="integ-icon" style={{ color: g.color }}>
+                    <span className="integ-glow" style={{ background: g.color }} />
+                    <Icon name={g.icon} size={18} />
+                  </span>
+                  <h3 style={{ fontSize: '0.98rem', fontWeight: 600 }}>{g.group}</h3>
+                </div>
+                <ul className="integ-pills">
+                  {g.items.map((item) => (
+                    <li key={item} className="integ-pill">
+                      <span className="integ-dot" style={{ background: g.color }} aria-hidden="true" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ul>

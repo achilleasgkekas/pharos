@@ -467,3 +467,25 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-02 (cont.¹⁴)
+
+Task: (c/e) Polish, μερος 20 — νεο section «Integrations / Works with your stack» (#integrations) αναμεσα σε AI και Who. Οι integrations (OneDrive/SMB/FTP local storage, multi-provider AI, Gmail import, UniFi/ntfy alerts) ειναι απο τα δυνατοτερα differentiators του app (βαρια στο CLAUDE.md) αλλα δεν εμφανιζονταν πουθενα ως δικη τους ενοτητα — μονο σκορπια σε feature cards. Self-contained content increment: μηδεν assets, μηδεν pricing decision, brand-consistent (ιδιο glow/pill idiom με deploy-strip + feature cards).
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεο `INTEGRATIONS` array (4 groups × icon+color): Storage & backup (Local disk/SMB·SMB3/FTP·FTPS/OneDrive/Nightly archive), Bring your own AI (Ollama local/Anthropic/OpenAI/Gemini/OpenRouter), Import & export (Gmail export/PDF·image OCR/CSV/JSON backup), Network & alerts (UniFi monitoring/Speedtest/ntfy/Price-drop alerts). Ολα ακριβη per CLAUDE.md (lib/aiProviders, lib/onedrive, lib/unifi, lib/notify, Gmail takeout pipeline). Νεο `#integrations` section: eyebrow «Works with your stack» + h2 «Plugs into what you already run» + subtext + `.integ-grid` (2-col cards, ενα ανα group, με icon badge + pill ανα integration).
+- `app/globals.css`: νεες `.integ-grid` (2-col, single-col <640px) + `.integ-group` card + `.integ-head`/`.integ-icon`/`.integ-glow` (ιδιο radial glow pattern με feature-icon) + `.integ-pills`/`.integ-pill`/`.integ-dot` (per-group color dot, reuse deploy-pill styling). Reuse υπαρχουσας παλετας.
+- ΔΕΝ προσθεσα nav link (το top nav ειναι ηδη πληρες με 7 anchors· #integrations reachable με scroll οπως τα #trust/#preview που επισης δεν εχουν nav link — αποφυγη overcrowding).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 761 B / 103 kB First Load JS, αμεταβλητο — pure static markup+CSS, μηδεν bundle impact).
+- Prerendered HTML (.next/server/app/index.html): «Plugs into what you already run», «Works with your stack», id="integrations", «Ollama (local)», «UniFi monitoring», «OneDrive» ολα FOUND. Route static -> prerendered HTML = ακριβως το served (build + HTML check = ισοδυναμη επαληθευση για pure-static content). Docker/web/mobile αθικτα. Το `.claude/launch.json` + `apps/web/SAAS_PROGRESS.md` (foreign, modified απο αλλα routines) ΔΕΝ commit (collision guard — μονο app/page.tsx + app/globals.css + LANDING_PROGRESS.md).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση των CSS mockups (#preview, #ai) με πραγματικα app screenshots οταν υπαρξουν assets· per-plan Offer JSON-LD nodes οταν κλεισουν οι τιμες.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
