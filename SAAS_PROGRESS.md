@@ -529,3 +529,40 @@ wiring, `SAAS_MODE` off = zero effect, κανένα Docker rebuild. Καθαρά
 (reuse `verifyPassword`+`hashPassword`) + change name/email, όλα gated + πάνω στο υπάρχον
 Account session. Εναλλακτικά, password-reset request/confirm scaffold (τα `resetTokenHash`/
 `resetTokenExpires` fields υπάρχουν ήδη· λείπει ο mailer → scaffold με token return σε dev).
+
+---
+
+## 2026-07-02 (increment 13 — account self-service: profile + password change)
+**Built:** το account self-service surface — ένας logged-in Account μπορεί να δει/αλλάξει το
+δικό του προφίλ + password, ΟΛΟ σε νέα αρχεία, πάνω στο υπάρχον Account session, μηδέν wiring
+σε feature code:
+- `lib/tenancy/accountProfile.ts` — **PURE** helpers (μηδέν imports/DB/env): `MIN_PASSWORD`
+  (8, mirror του signup), `sanitizeName(x)` (trim + cap 120 chars, non-string→''),
+  `passwordChangeError(current, next)` → error string ή null (length rule ΠΡΩΤΑ, μετά
+  must-differ-from-current· ΔΕΝ κάνει verify το current — αυτό το κάνει το route με
+  `verifyPassword`).
+- `app/api/saas/account/route.ts` (nodejs, force-dynamic, `saasAuthGate()` πρώτα):
+  - `GET` → το προφίλ του caller (id/email/name/emailVerified/lastLoginAt/createdAt). 401 αν
+    όχι authenticated, 404 αν το account διαγράφηκε με live cookie.
+  - `PATCH {name?, email?}` → update name ή/και email. Email: `normalizeEmail`+`looksLikeEmail`
+    (reuse από members.ts) + 409 σε duplicate (pre-check + 11000 race fallback) + `emailVerified→false`
+    + **refresh του session cookie** (το `email` claim μένει accurate). «Nothing to update» → 400.
+    Επιστρέφει account + tenants (ίδια shape με login/session).
+- `app/api/saas/account/password/route.ts` — `POST {currentPassword, newPassword}` →
+  `verifyPassword(current)` → `hashPassword(next)` save. Ίδιο 401 για missing account / wrong
+  current password (no leak). Policy μέσω `passwordChangeError`. Session cookie μένει intact
+  (το νέο hash verify-άρεται στο επόμενο login· δεν force-expire-άρω υπάρχοντα sessions εδώ).
+- `lib/tenancy/accountProfile.test.ts` — 8 PURE tests (sanitizeName trim/empty/non-string/cap-120,
+  passwordChangeError too-short/same/valid/length-before-differ).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **437/437 green** (429 προϋπάρχοντα
++ 8 νέα· ο συνολικός αριθμός ανέβηκε από concurrent routines). External importers των νέων
+modules/routes από feature code → **κανένας**· τα routes SAAS-gated (404 όταν off) ⇒ zero
+runtime wiring, `SAAS_MODE` off = zero effect, κανένα Docker rebuild. Καθαρά additive — δεν
+άγγιξα κανένα υπάρχον αρχείο.
+
+**Next task:** increment 14 — password-reset request/confirm scaffold (`api/saas/account/reset`):
+τα `resetTokenHash`/`resetTokenExpires` fields υπάρχουν ήδη στο Account· χτίσε request (email →
+mint token, hash+store, expiry) + confirm (token → verify → set new password). Χωρίς mailer →
+scaffold που επιστρέφει το token μόνο σε dev/όταν λείπει ο mailer (documented Needs-Achilleas).
+Εναλλακτικά, seat-limits ανά plan στα entitlements όταν οριστεί το pricing.
