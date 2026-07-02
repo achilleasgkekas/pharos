@@ -363,6 +363,7 @@ export type Reports = {
   byCategory: { category: string; total: number }[];
   budgets: BudgetRow[];
   monthly: { period: string; expense: number; income: number }[];
+  incomeExpense: { period: string; income: number; expense: number }[];
   upcomingInstallments: { period: string; amount: number }[];
   spendByStore: { name: string; total: number; count: number }[];
   subsByCategory: { name: string; value: number }[];

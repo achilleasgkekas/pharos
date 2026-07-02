@@ -31,6 +31,27 @@ function BudgetBar({ category, spent, limit, cur }: { category: string; spent: n
   );
 }
 
+/** One month of the cash-flow chart: two stacked mini-bars (income green, expense red). */
+function FlowRow({ label, income, expense, max, cur }: { label: string; income: number; expense: number; max: number; cur: string }) {
+  const ipct = max > 0 ? Math.max(income > 0 ? 2 : 0, Math.round((income / max) * 100)) : 0;
+  const epct = max > 0 ? Math.max(expense > 0 ? 2 : 0, Math.round((expense / max) * 100)) : 0;
+  return (
+    <View style={s.flowRow}>
+      <Text style={s.flowLabel} numberOfLines={1}>{label}</Text>
+      <View style={s.flowBars}>
+        <View style={s.flowLine}>
+          <View style={s.track}><View style={[s.fill, { width: `${ipct}%`, backgroundColor: C.accent }]} /></View>
+          <Text style={s.flowVal}>{money(income, cur)}</Text>
+        </View>
+        <View style={s.flowLine}>
+          <View style={s.track}><View style={[s.fill, { width: `${epct}%`, backgroundColor: C.red }]} /></View>
+          <Text style={s.flowVal}>{money(expense, cur)}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export function ReportsScreen() {
   const [d, setD] = useState<Reports | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -51,6 +72,7 @@ export function ReportsScreen() {
   const instMax = d ? Math.max(...d.upcomingInstallments.map((u) => u.amount), 1) : 1;
   const storeMax = d ? Math.max(...(d.spendByStore ?? []).map((st) => st.total), 1) : 1;
   const subsMax = d ? Math.max(...(d.subsByCategory ?? []).map((sc) => sc.value), 1) : 1;
+  const ieMax = d ? Math.max(...(d.incomeExpense ?? []).flatMap((m) => [m.income, m.expense]), 1) : 1;
   const mLabel = (p: string) => { const [, m] = p.split('-'); return ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][parseInt(m, 10)] || p; };
   const fmtDate = (v: string) => { const dt = new Date(v); return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); };
 
@@ -94,6 +116,19 @@ export function ReportsScreen() {
 
           <Text style={s.section}>SPEND · LAST 6 MONTHS</Text>
           {d.monthly.map((m) => <Bar key={m.period} label={mLabel(m.period)} value={m.expense} max={monthMax} cur={cur} color={C.gold} />)}
+
+          {(d.incomeExpense ?? []).some((m) => m.income > 0 || m.expense > 0) && (
+            <>
+              <View style={s.flowHead}>
+                <Text style={s.section}>CASH FLOW · 12 MONTHS</Text>
+                <View style={s.legend}>
+                  <View style={[s.dot, { backgroundColor: C.accent }]} /><Text style={s.legendText}>in</Text>
+                  <View style={[s.dot, { backgroundColor: C.red, marginLeft: 10 }]} /><Text style={s.legendText}>out</Text>
+                </View>
+              </View>
+              {d.incomeExpense.map((m) => <FlowRow key={m.period} label={mLabel(m.period)} income={m.income} expense={m.expense} max={ieMax} cur={cur} />)}
+            </>
+          )}
 
           {d.byCategory.length > 0 && (
             <>
@@ -163,6 +198,15 @@ const s = StyleSheet.create({
   track: { flex: 1, height: 10, borderRadius: 5, backgroundColor: C.surface2, overflow: 'hidden' },
   fill: { height: 10, borderRadius: 5 },
   barVal: { color: C.text, fontSize: 12, width: 72, textAlign: 'right' },
+  flowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  legend: { flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 10 },
+  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 4 },
+  legendText: { color: C.dim, fontSize: 11 },
+  flowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  flowLabel: { color: C.dim, fontSize: 12, width: 40 },
+  flowBars: { flex: 1, gap: 4 },
+  flowLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  flowVal: { color: C.text, fontSize: 11, width: 72, textAlign: 'right' },
   budgetRow: { marginBottom: 12 },
   budgetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
   budgetCat: { color: C.dim, fontSize: 12, flex: 1, marginRight: 8 },

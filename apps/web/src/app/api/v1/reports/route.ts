@@ -76,6 +76,13 @@ export async function GET(req: NextRequest) {
       months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
     }
     const monthly = months.map((m) => ({ period: m, expense: 0, income: 0 }));
+
+    // ── Income vs expense (last 12 months). Mirrors web /reports "Cash flow". ──
+    const ie: Array<{ period: string; income: number; expense: number }> = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      ie.push({ period: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, income: 0, expense: 0 });
+    }
     const byCat: Record<string, number> = {};
     const thisMonthCat: Record<string, number> = {}; // expense per category, THIS month (for budgets)
     const sum = { mExp: 0, mInc: 0, yExp: 0, yInc: 0 };
@@ -88,6 +95,8 @@ export async function GET(req: NextRequest) {
       const cat = d.category || 'other';
       const bucket = monthly.find((b) => b.period === ym);
       if (bucket) { if (inc) bucket.income += amt; else bucket.expense += amt; }
+      const ieBucket = ie.find((b) => b.period === ym);
+      if (ieBucket) { if (inc) ieBucket.income += amt; else ieBucket.expense += amt; }
       if (ym === thisYM) {
         if (inc) sum.mInc += amt;
         else { sum.mExp += amt; thisMonthCat[cat] = (thisMonthCat[cat] || 0) + amt; }
@@ -161,6 +170,7 @@ export async function GET(req: NextRequest) {
       byCategory,
       budgets,
       monthly,
+      incomeExpense: ie.map((m) => ({ period: m.period, income: Math.round(m.income), expense: Math.round(m.expense) })),
       upcomingInstallments,
       spendByStore,
       subsByCategory,
