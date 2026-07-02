@@ -712,3 +712,43 @@ Achilleas), είτε (β) seat-limits ανά plan στα entitlements όταν �
 επιτρέπει free/shared/dedicated· τα guards ζουν ήδη στο members.ts), είτε (γ) invite-by-email
 νέων (μη εγγεγραμμένων) users — τώρα που υπάρχει mailer + token pattern, μπορεί να στείλει
 signup link σε email που δεν έχει account.
+
+---
+
+## 2026-07-02 (increment 17 — per-plan seat limits)
+**Built:** enforcement ορίου θέσεων (active members) ανά plan, additive + SAAS-gated. Ένα
+workspace σε free tier δεν προσθέτει 2ο member· shared → έως 5· dedicated (και self-hosted) →
+απεριόριστα. ΟΛΟ σε νέα/δικά μου SAAS-billing αρχεία:
+- `lib/billing/plans.ts` (δικό μου, additive): νέο field `maxMembers: number | null` στο PlanDef
+  + τιμές — free **1** (single-seat owner), shared **5** (household/team), dedicated **null**
+  (unlimited). Placeholder counts μέχρι το τελικό pricing (Needs Achilleas). PURE module, μηδέν
+  imports· self-hosted δεν το διαβάζει ποτέ (τρέχει ως implicit dedicated).
+- `lib/billing/entitlements.ts` (δικό μου, additive): `maxMembers` στο `Entitlements` type +
+  resolve στο `entitlementsFor` + νέο pure guard **`withinSeatLimit(plan, activeCount)`** →
+  `cap===null ? true : max(0,activeCount) < cap`. Το clamp στο 0 εμποδίζει negative input να
+  «φτιάξει» χώρο πάνω από το cap.
+- `app/api/saas/members/route.ts` (δικό μου, additive): στο POST, ΜΕΤΑ το already-member 409 και
+  ΠΡΙΝ το create/reactivate → `Membership.countDocuments({tenant, status:'active'})` +
+  `withinSeatLimit(session.tenant.plan, activeCount)`. Full → **409 `code:'seat_limit'`** με
+  `maxMembers` στο body. Πιάνει και reactivate removed member (καταναλώνει seat). Live count →
+  ΟΧΙ stale snapshot· dedicated/self-hosted short-circuit (cap null).
+- `lib/billing/seatLimits.test.ts` — 10 PURE tests (plan table: κάθε plan έχει έγκυρο maxMembers,
+  free1/shared5/dedicated-null, non-decreasing ladder, entitlementsFor surfaces it, unknown→free·
+  withinSeatLimit: free boundary 0→true/1→false, shared 4→true/5→false, dedicated always, unknown
+  →free, negative clamp).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **548/548 green** (538 προϋπάρχοντα
++ 10 νέα· ο συνολικός ανέβηκε από concurrent routines). Το members route είναι SAAS-gated (404
+όταν off) + οι αλλαγές additive/flag-guarded σε pure modules ⇒ `SAAS_MODE` off = zero effect,
+κανένα Docker rebuild. External importers των billing helpers από feature code → κανένας νέος.
+
+**## Needs Achilleas** (seat pricing):
+- **Τελικά seat counts ανά plan.** Σήμερα placeholder: free 1, shared 5, dedicated ∞. Άλλαξέ τα
+  σε ΕΝΑ σημείο (`PLANS[*].maxMembers` στο plans.ts)· το guard + το route ακολουθούν αυτόματα.
+- Όταν οριστεί per-seat billing (αντί flat plan), θα χρειαστεί Stripe quantity-based subscription
+  + sync του seat count → increment μελλοντικό (τώρα το enforcement είναι hard cap, όχι metered).
+
+**Next task:** increment 18 — είτε (α) `sendViaSmtp` via nodemailer (μετά από provider decision
+Achilleas), είτε (β) invite-by-email νέων (μη εγγεγραμμένων) users πάνω στον mailer + token
+pattern (στέλνει signup link), είτε (γ) storage-quota enforcement wiring (`withinStorage` +
+`dbStats`) στο upload path, SAAS-gated.

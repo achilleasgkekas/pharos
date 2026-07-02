@@ -20,6 +20,7 @@ export type Entitlements = {
   storageBytes: number; // storageGB expressed in bytes (quota checks)
   aiCallsPerMonth: number | null; // null = unlimited
   customDomain: boolean;
+  maxMembers: number | null; // max active seats; null = unlimited
   tier: 'shared' | 'dedicated';
   // AI features the plan may use. Every plan gets the full set — AI access is metered by
   // VOLUME (aiCallsPerMonth), not by locking individual features. Kept as an explicit
@@ -38,6 +39,7 @@ export function entitlementsFor(plan: string | null | undefined): Entitlements {
     storageBytes: def.storageGB * GB,
     aiCallsPerMonth: def.aiCallsPerMonth,
     customDomain: def.customDomain,
+    maxMembers: def.maxMembers,
     tier: def.tier,
     // No per-feature lock today: all plans get every AI feature; the cap is call volume.
     aiFeatures: [...AI_FEATURE_KEYS],
@@ -61,4 +63,15 @@ export function withinStorage(plan: string | null | undefined, usedBytes: number
 export function withinAiQuota(plan: string | null | undefined, usedCalls: number): boolean {
   const cap = entitlementsFor(plan).aiCallsPerMonth;
   return cap === null || usedCalls < cap;
+}
+
+/** Seat check: could a workspace on `plan` with `activeCount` active members admit ONE
+ *  more? True when adding a seat stays within the plan's allowance. Unlimited plans
+ *  (maxMembers === null) always return true. Enforced by the members route (SaaS only);
+ *  the self-hosted single-owner app never calls this. `activeCount` is clamped at 0 so a
+ *  bad negative input can't fabricate headroom. */
+export function withinSeatLimit(plan: string | null | undefined, activeCount: number): boolean {
+  const cap = entitlementsFor(plan).maxMembers;
+  if (cap === null) return true;
+  return Math.max(0, activeCount) < cap;
 }

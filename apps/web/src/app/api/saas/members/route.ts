@@ -13,6 +13,7 @@ import {
 } from '@/lib/tenancy/members';
 import { readBody, strField } from '@/lib/apiBody';
 import { sendEmail, invitedEmail } from '@/lib/tenancy/mailer';
+import { withinSeatLimit, entitlementsFor } from '@/lib/billing/entitlements';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -129,6 +130,23 @@ export async function POST(req: NextRequest) {
 
   if (existing && existing.status !== 'removed') {
     return NextResponse.json({ error: 'already a member of this workspace' }, { status: 409 });
+  }
+
+  // Seat limit: adding a new member OR reactivating a removed one consumes an active seat.
+  // Reject when the plan's allowance is already full (unlimited plans always pass). Counting
+  // live avoids a stale snapshot; `dedicated`/self-hosted (maxMembers null) short-circuits.
+  const plan = String(session.tenant.plan);
+  const activeCount = await Membership.countDocuments({ tenant: tenantId, status: 'active' });
+  if (!withinSeatLimit(plan, activeCount)) {
+    const cap = entitlementsFor(plan).maxMembers;
+    return NextResponse.json(
+      {
+        error: `seat limit reached for the ${plan} plan (max ${cap})`,
+        code: 'seat_limit',
+        maxMembers: cap,
+      },
+      { status: 409 }
+    );
   }
 
   if (existing) {

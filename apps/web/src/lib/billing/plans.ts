@@ -25,6 +25,11 @@ export type PlanDef = {
   aiCallsPerMonth: number | null;
   // Custom domain allowed (dedicated/top tier only).
   customDomain: boolean;
+  // Max ACTIVE members (seats) a workspace on this plan may hold. null = unlimited.
+  // Enforced additively by the members route when SAAS_MODE is on (self-hosted is a
+  // single implicit owner and never reads this). Placeholder counts pending Achilleas'
+  // final pricing — see SAAS_PROGRESS "Needs Achilleas".
+  maxMembers: number | null;
   // Name of the env var holding this plan's Stripe Price ID. null for free (no charge).
   stripePriceEnv: string | null;
 };
@@ -38,6 +43,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     storageGB: 5,
     aiCallsPerMonth: 50,
     customDomain: false,
+    maxMembers: 1, // single-seat: the owner only (personal free tier)
     stripePriceEnv: null,
   },
   shared: {
@@ -48,6 +54,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     storageGB: 50,
     aiCallsPerMonth: 1000,
     customDomain: false,
+    maxMembers: 5, // small household/team on the shared Pro tier
     stripePriceEnv: 'STRIPE_PRICE_SHARED',
   },
   dedicated: {
@@ -58,6 +65,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     storageGB: 500,
     aiCallsPerMonth: null, // unlimited / BYO-key
     customDomain: true,
+    maxMembers: null, // unlimited seats on the dedicated tier
     stripePriceEnv: 'STRIPE_PRICE_DEDICATED',
   },
 };
