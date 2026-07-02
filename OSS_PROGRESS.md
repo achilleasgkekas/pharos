@@ -514,3 +514,41 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file. Α�
 `lib/aiConfig.ts` → `isVisionModel(name)` (pure regex classifier). Τρέξε πρώτα
 `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα). Ένα module ανά run.
 Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — pdf.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/pdf.test.ts` για τον scanned-PDF heuristic `looksLikeScannedPdf(text)` του `lib/pdf.ts`.**
+
+Επιλογή: από τα δύο suggested targets διάλεξα το `pdf.ts` γιατί είναι import-side-effect-free
+(η μόνη εξωτερική εξάρτηση, pdfjs-dist, είναι dynamic `import()` ΜΕΣΑ στο `extractPdfText` που
+τα tests δεν καλούν). Το `aiConfig.ts` (το άλλο target) φορτώνει `./db` + mongoose στο module load,
+οπότε δεν είναι εξίσου καθαρό pure target· το προσπέρασα. Κανένα από τα δύο δεν είχε test file.
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/pdf.test.ts` (14 tests, μηδέν DB/fs/δίκτυο/clock). Κανόνας υπό έλεγχο:
+  strip ΟΛΟ το whitespace, μετά `nonWhitespaceLength < 40`. Καλύπτει: empty/whitespace-only →
+  scanned (spaces, μεικτό ASCII ws tab/newline/CR/FF/VT, και Unicode ws που πιάνει το `\s` —
+  NBSP/ideographic/line-sep/BOM), το **ακριβές 40-char boundary** (39 → true, ακριβώς 40 →
+  false [exclusive], 41 → false), **whitespace δεν μετράει** (40 γράμματα σκορπισμένα σε βαρύ ws
+  → not scanned· 39 θαμμένα σε ws → scanned· σελίδα με 500 blank lines → scanned), και
+  real-world shapes (sparse OCR-failure snippet → scanned, γνήσια statement γραμμή → not scanned,
+  **Greek/non-ASCII glyphs μετράνε ως extractable text**, σύντομο ελληνικό store name → scanned).
+- **Σημείο parser που κλειδώθηκε στα σχόλια**: το Unicode-whitespace case γράφτηκε με `\u` escapes
+  (`' 　 ﻿'`), ΟΧΙ literal invisible glyphs — το U+2028/U+2029 είναι source
+  line terminator και σπάει το esbuild parse αν μπει literally (το έμαθα από 1 αρχικό transform
+  failure· διορθώθηκε στο test, όχι στον κώδικα).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/pdf.test.ts` → 14/14 passed.
+- `npx vitest run` (όλο το suite) → 40 files, 600/600 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json` (foreign,
+  ΔΕΝ το άγγιξα/staged) + το νέο pdf.test.ts· `git diff --cached` κενό· στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — δες `lib/aiConfig.ts`
+→ `isVisionModel(name)` (pure regex classifier· ΣΗΜ: το module φορτώνει mongoose στο import,
+οπότε ίσως χρειαστεί `vi.mock('./db')` + `vi.mock('@/models/AppConfig')` για καθαρό import),
+ή άλλο ακάλυπτο pure heuristic. Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν
+παράλληλα). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
