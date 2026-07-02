@@ -323,3 +323,38 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — 
 (pure plan→entitlement mapping, OSS parity note) ή `lib/i18n/format.ts` `relTime` (deterministic
 με fake timers/fixed `Date.now`). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix
 στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — billing/entitlements.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/billing/entitlements.test.ts` για τον plan→entitlement resolver `lib/billing/entitlements.ts` (`entitlementsFor`, `canUseAiFeature`, `withinStorage`, `withinAiQuota`).**
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/billing/entitlements.test.ts` (17 tests, μηδέν DB/Stripe/clock/fs).
+  Καλύπτει: `entitlementsFor` και για τα 3 plans (free 5GB/50, shared 50GB/1000,
+  dedicated 500GB/null-unlimited/customDomain/dedicated-tier) + fallback σε free για
+  unknown/legacy/empty/'FREE'/null/undefined, το **OSS-parity invariant** (κάθε plan παίρνει
+  ΟΛΟ το AI_FEATURE_KEYS set — μηδέν per-feature lock), fresh-array guard (η aiFeatures ΔΕΝ
+  είναι shared reference στο registry), `storageBytes === storageGB*GB` invariant.
+  `canUseAiFeature` = true για κάθε feature σε κάθε plan (+ unknown→free→true).
+  `withinStorage` = **boundary inclusive** (usedBytes <= cap → allowed, cap+1 → false,
+  scales με plan, unknown→free cap). `withinAiQuota` = **exclusive upper bound**
+  (usedCalls < cap → allowed, == cap → blocked, unlimited/null → πάντα true, unknown→free cap).
+- **Σημείο που pin-αρίστηκε**: storage είναι `<=` (at-cap allowed) ενώ AI quota είναι
+  `<` (at-cap blocked) — δύο διαφορετικά boundary semantics στο ίδιο module· τα tests τα
+  κλειδώνουν ρητά ώστε ένα ακούσιο flip σε off-by-one να πέσει.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/billing/entitlements.test.ts` → 17/17 passed.
+- `npx vitest run` (όλο το suite) → 27 files, 429/429 passed (είχαν προστεθεί εν τω μεταξύ
+  fileStorage+dbStats από άλλα routines· 412→429 με τα δικά μου 17).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json`
+  (foreign, ΔΕΝ το άγγιξα/staged) + το νέο entitlements.test.ts· `git diff --cached` κενό·
+  στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — `lib/i18n/format.ts` `relTime`
+(deterministic με fake timers / fixed `Date.now`: justNow/minutes/hours/yesterday/days
+buckets + clamp αρνητικού διαστήματος στο 0) ή `lib/billing/usage.ts` αν pure. Ένα module ανά
+run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
