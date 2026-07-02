@@ -367,6 +367,7 @@ export type Reports = {
   upcomingInstallments: { period: string; amount: number }[];
   spendByStore: { name: string; total: number; count: number }[];
   subsByCategory: { name: string; value: number }[];
+  inventoryByCategory: { name: string; value: number }[];
   biggestPurchases: { store: string; total: number; date: string }[];
   warrantiesExpiring: { title: string; until: string; days: number }[];
 };

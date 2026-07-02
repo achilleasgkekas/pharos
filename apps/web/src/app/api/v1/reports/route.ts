@@ -15,7 +15,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type Lean = { kind?: string; amount?: number; category?: string; date?: Date; period?: string };
-type ItemLean = { status?: string; purchasedPrice?: number; currentPrice?: number; warrantyUntil?: string | Date; title?: string };
+type ItemLean = { status?: string; purchasedPrice?: number; currentPrice?: number; warrantyUntil?: string | Date; title?: string; category?: string };
 type ReceiptLean = { store?: string; date?: Date; total?: number };
 type SubLean = { amount?: number; billingCycle?: string; category?: string };
 // Monthly-equivalent multiplier per billing cycle. Mirrors web /reports CYCLE_PER_MONTH.
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     await connectDB();
     const [docs, items, statementsRaw, receipts, subs, settings] = await Promise.all([
       Expense.find({}).select('kind amount category date period').lean() as Promise<Lean[]>,
-      Item.find().select('status purchasedPrice currentPrice warrantyUntil title').lean() as Promise<ItemLean[]>,
+      Item.find().select('status purchasedPrice currentPrice warrantyUntil title category').lean() as Promise<ItemLean[]>,
       Statement.find().lean(),
       Receipt.find().select('store date total').lean() as Promise<ReceiptLean[]>,
       Subscription.find({ active: true }).select('amount billingCycle category').lean() as Promise<SubLean[]>,
@@ -42,9 +42,21 @@ export async function GET(req: NextRequest) {
     // ── Net position: owned inventory value − installments still owed ──
     const ownedSet = new Set<string>(OWNED_STATUSES as readonly string[]);
     let inventoryValue = 0;
+    // Inventory value by category (owned items, value>0). Mirrors web /reports catSpend.
+    const invByCat = new Map<string, number>();
     for (const i of items) {
-      if (ownedSet.has(i.status || '')) inventoryValue += i.purchasedPrice ?? i.currentPrice ?? 0;
+      if (ownedSet.has(i.status || '')) {
+        const v = i.purchasedPrice ?? i.currentPrice ?? 0;
+        inventoryValue += v;
+        if (v > 0) {
+          const c = i.category || 'other';
+          invByCat.set(c, (invByCat.get(c) ?? 0) + v);
+        }
+      }
     }
+    const inventoryByCategory = [...invByCat.entries()]
+      .map(([name, value]) => ({ name, value: Math.round(value) }))
+      .sort((a, b) => b.value - a.value);
     const plans = computeInstallmentPlans(JSON.parse(JSON.stringify(statementsRaw)) as SerializedStatement[]);
     const active = plans.filter((p) => !p.done);
     const installmentsOwed = active.reduce((s, p) => s + p.remainingAmount, 0);
@@ -174,6 +186,7 @@ export async function GET(req: NextRequest) {
       upcomingInstallments,
       spendByStore,
       subsByCategory,
+      inventoryByCategory,
       biggestPurchases,
       warrantiesExpiring,
     });

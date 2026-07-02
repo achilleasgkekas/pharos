@@ -72,6 +72,7 @@ export function ReportsScreen() {
   const instMax = d ? Math.max(...d.upcomingInstallments.map((u) => u.amount), 1) : 1;
   const storeMax = d ? Math.max(...(d.spendByStore ?? []).map((st) => st.total), 1) : 1;
   const subsMax = d ? Math.max(...(d.subsByCategory ?? []).map((sc) => sc.value), 1) : 1;
+  const invMax = d ? Math.max(...(d.inventoryByCategory ?? []).map((ic) => ic.value), 1) : 1;
   const ieMax = d ? Math.max(...(d.incomeExpense ?? []).flatMap((m) => [m.income, m.expense]), 1) : 1;
   const mLabel = (p: string) => { const [, m] = p.split('-'); return ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][parseInt(m, 10)] || p; };
   const fmtDate = (v: string) => { const dt = new Date(v); return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); };
@@ -148,6 +149,13 @@ export function ReportsScreen() {
             <>
               <Text style={s.section}>SUBSCRIPTIONS · MONTHLY BY CATEGORY</Text>
               {d.subsByCategory.map((sc) => <Bar key={sc.name} label={sc.name} value={sc.value} max={subsMax} cur={cur} color={C.purple} />)}
+            </>
+          )}
+
+          {(d.inventoryByCategory?.length ?? 0) > 0 && (
+            <>
+              <Text style={s.section}>INVENTORY VALUE · BY CATEGORY</Text>
+              {d.inventoryByCategory.map((ic) => <Bar key={ic.name} label={ic.name} value={ic.value} max={invMax} cur={cur} color={C.cyan} />)}
             </>
           )}
 

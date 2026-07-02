@@ -63,7 +63,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Reports (`/reports`)
 | Web | Mobile |
 |-----|--------|
-| Net-position banner, monthly-spend chart, upcoming-installments, spend-by-store, inventory-value pie, subs-by-category, warranties expiring, biggest purchases, **budgets**, income-vs-expense, date-range | 🟡 **net-position banner** (inventory − installments owed), net month/year, by-category, **budget · this month** (per-category progress bars, gold ≥80%, red over), **upcoming-installments · next 6 months** (purple bars), last-6-months bars, **spend-by-store · top 8** (accent bars), **biggest purchases** (list: store/date/total), **warranties expiring · next 150 days** (list: title + Nd-left, red ≤30d / gold ≤90d), **subscriptions · monthly by category** (purple bars, monthly-equivalent), **cash flow · 12 months** (grouped income-green / expense-red stacked mini-bars per month, με legend). Λείπει ΜΟΝΟ το **inventory-value-by-category** (το web το δείχνει ως pie, αλλά τα δεδομένα = owned-value ανά κατηγορία → **γίνεται bars** χωρίς RN charting lib· queued P1/S στο Build Queue) |
+| Net-position banner, monthly-spend chart, upcoming-installments, spend-by-store, inventory-value pie, subs-by-category, warranties expiring, biggest purchases, **budgets**, income-vs-expense, date-range | 🟡 **net-position banner** (inventory − installments owed), net month/year, by-category, **budget · this month** (per-category progress bars, gold ≥80%, red over), **upcoming-installments · next 6 months** (purple bars), last-6-months bars, **spend-by-store · top 8** (accent bars), **biggest purchases** (list: store/date/total), **warranties expiring · next 150 days** (list: title + Nd-left, red ≤30d / gold ≤90d), **subscriptions · monthly by category** (purple bars, monthly-equivalent), **cash flow · 12 months** (grouped income-green / expense-red stacked mini-bars per month, με legend), **inventory value · by category** (cyan bars, owned-value ανά κατηγορία — το web pie, στο mobile bars χωρίς RN charting lib). **Reports parity ΚΛΕΙΣΤΟ** (όλα τα web charts καλυμμένα)· λείπει μόνο **date-range selector** (6/12/24μ, secondary) |
 
 ## Tasks (`/tasks`)
 | Web | Mobile |
@@ -148,7 +148,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - mobile Reports δείχνει νέα section με bars ανά κατηγορία (values = inventory value)· κρύβεται όταν κενό
   - tsc καθαρό (web + mobile)· safe rebuild → /login 200, web restarts 0
   - ΚΛΕΙΝΕΙ το τελευταίο εναπομείναν Reports parity gap (το «inventory-pie» που ήταν flag-αρισμένο ως needs-lib· γίνεται bars αντί pie, όπως τα υπόλοιπα 8 Reports sections)
-- Status: TODO
+- Status: **DONE** (2026-07-02, pharos-daily-dev — endpoint `inventoryByCategory` additive + mobile «INVENTORY VALUE · BY CATEGORY» cyan bars· web+mobile tsc EXIT 0· safe rebuild /login 200, reports no-auth 401, web restarts 0)
 
 ### Tasks — steps / checklist στο mobile detail
 - Priority: P2 | Size: M | no AI, decision ΕΓΙΝΕ (Αχιλλέας 2026-07-01: promote από Needs Achilleas)
