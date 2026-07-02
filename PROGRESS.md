@@ -5,6 +5,20 @@
 <!-- reviewed: 148fb06 -->
 <!-- docker-validated: 7192c8e -->
 
+## 2026-07-03 (mobile-parity-auditor — 40ή σάρωση, CONFIRMATION· 0 νέο functional GAP)
+- **Inventory από κώδικα (όχι docs):** 50 v1 routes (`find api/v1 -name route.ts`· login + 49 bearer· +1 vs προηγ. «49» = `expenses/[id]/rescan`, ήδη consumed), 16 mobile screens. Route↔consumer loop → κάθε route base έχει ≥1 mobile consumer, μηδέν orphan. mobile `npx tsc --noEmit` → **EXIT 0**.
+- **Δέλτα:** τα 2 gaps της 38η/39η σάρωσης (anomaly badge ±% + vendor autocomplete) **ΕΚΛΕΙΣΑΝ** (`7670bf9`, `148fb06`)· ήδη αποτυπωμένα στο parity table (γρ.40-41) → **μηδέν doc-fix**. Post-`148fb06` commits (`c9367e2` landing 404, `7de30bc` test(ocr), `2fe2483`/`4a240aa` docs) είναι **web-only** → καμία νέα portable mobile δυνατότητα.
+- **Counts: DONE 7 / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.** Ενεργό functional parity TODO κανένα → ο builder πέφτει στο UI Debt Queue.
+- **Top-3 για τον builder (unattended-safe πρώτο):** (1) **Input primitive migration finish** (P1/S· `<Input>` σε `ui.tsx`, 6/11 screens → 5 απομένουν· structural, tsc-verify)· (2) **Button ghost-variant finish** (P2/S· ~7 holdout sites)· (3) **icons→lucide** (P2/M· `react-native-svg` ήδη dep, αλλά attended-preferred). Εναλλακτικά unattended-safe: fresh pure-lib vitest coverage (`lib/cards.ts` / `lib/taxonomies.ts` / `lib/itemStatus.ts`).
+- **Git hygiene:** working tree είχε μόνο `.claude/launch.json` (foreign tooling, δεν το άγγιξα)· staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md`.
+
+### Needs Achilleas
+- **Safe-area insets** (P2/M): χρειάζεται native dep `react-native-safe-area-context` (ΑΠΟΝ). Έγκριση `npx expo install`;
+- **Language switcher στο mobile** (P3/L): persist dep (`@react-native-async-storage/async-storage` ΑΠΟΝ ή reuse `expo-secure-store`) + string-extraction σε 16 screens. Απόφαση scope/incremental.
+- **Light/dark theme context** (P3): theme-provider refactor· attended για οπτικό verify.
+- **Statements merge-bind / link-plan-to-product write-ops + PDF import**, **extra reports charts** (inventory-pie/subs-by-cat ήδη ως bars, τα υπόλοιπα θέλουν RN charting lib), **AI-engine/storage/OneDrive settings**: νέα endpoints / charting lib / credentials / product decisions.
+- **SaaS control-plane** (`api/saas/*`, gated πίσω από `SAAS_MODE`): multi-tenancy + billing = product/architecture, ΟΧΙ mobile parity item.
+
 ## 2026-07-02 (reviewer — range 7670bf9..148fb06, καθαρή επιθεώρηση, μηδέν fix)
 - **Τι επιθεώρησα:** 4 commits από τον marker `7670bf9`. Code commits: `4ec7af4` (SaaS generic `MAIL_WEBHOOK_URL` email provider), `148fb06` (mobile Expense/Income vendor autocomplete chips), `637f672` (landing scroll-margin offset). Ένα test-only (`eec3b7e`, scrypt hashPassword/verifyPassword).
 - **Checks (read-only):** `apps/web` type-check → **EXIT 0**. `apps/mobile` tsc → **EXIT 0**. Affected tests (`auth.test.ts` + `mailer.test.ts`) → **27/27 green** (16 mailer + 11 auth).
