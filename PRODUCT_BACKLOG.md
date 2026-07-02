@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-01 (1η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-02 (2η σάρωση planner· +4 candidates P6-P9).
 
 ---
 
@@ -53,6 +53,41 @@ Ranked by value/effort (πρώτο = καλύτερη σχέση αξίας πρ
   Καταναλώνει το `/api/v1` (§5 TODO) → καλός λόγος να επισπευστεί το REST seed.
 - **Module:** Items / Shopping (+ REST API).
 - **Απόφαση που χρειάζεται:** εξαρτάται από το `/api/v1` (§5)· MV3 extension ή απλό bookmarklet για πρώτη έκδοση;
+
+### P6. iCal (.ics) subscription feed για Calendar — S — both
+- **Αξία:** το `/calendar` ήδη ενοποιεί renewals / installments / recurring bills / warranty
+  & voucher expiries, αλλά ζει μόνο μέσα στο app. Ένα read-only `.ics` feed URL (token-scoped)
+  αφήνει τον χρήστη να κάνει subscribe από Google/Apple/Outlook Calendar → όλα τα οικονομικά
+  deadlines εμφανίζονται δίπλα στο κανονικό ημερολόγιό του. Πολύ ψηλή σχέση αξίας/κόπου: ο
+  υπολογισμός των events υπάρχει ήδη, μένει μόνο VCALENDAR serialization + authenticated route.
+- **Module:** Calendar (+ auth token, reuse `User.apiToken` scope).
+- **Απόφαση που χρειάζεται:** ένα ενιαίο feed ή ξεχωριστά ανά τύπο (installments/warranties/…) ώστε ο χρήστης να διαλέγει; expiries ως all-day events;
+
+### P7. Auto-discovery επαναλαμβανόμενων χρεώσεων (untracked subscriptions/bills) — S/M — both
+- **Αξία:** σαρώνει expenses + statement transactions ανά `vendorKey` και εντοπίζει σειρές που
+  «μοιάζουν» με συνδρομή/λογαριασμό (σταθερό ποσό, κανονικό διάστημα) αλλά ΔΕΝ υπάρχει ακόμα
+  Subscription/recurring flag → προτείνει «Βρήκα 3 πιθανές συνδρομές που δεν παρακολουθείς:
+  Netflix €15/μήνα, …» με one-click «track». Αντιμετωπίζει το subscription-creep (κλασικό
+  personal-finance win) και επαναχρησιμοποιεί τη λογική vendorKey-series + anomaly detection.
+- **Module:** Subscriptions + Expenses/Statements.
+- **Απόφαση που χρειάζεται:** heuristic-only (μηδέν AI, δωρεάν παντού) ή AI-assisted confidence (metered στο SaaS); κατώφλι «κανονικότητας» (π.χ. ≥3 εμφανίσεις, ±5 μέρες);
+
+### P8. Tax / deductible tagging + year-end export bundle — M — both (SaaS = premium)
+- **Αξία:** flag «tax-deductible» (+ optional tax category) σε expenses/receipts → στο τέλος
+  χρονιάς ένα «Tax export» παράγει σύνοψη ανά κατηγορία + ZIP με τα συνημμένα PDF/εικόνες
+  αποδείξεων. Μετατρέπει το Pharos από «tracker» σε εργαλείο που γλιτώνει πραγματικό χρόνο/χρήμα
+  σε ελεύθερους επαγγελματίες — δυνατό paid-tier differentiator, ενώ το βασικό tagging μένει OSS.
+- **Module:** Expenses/Receipts (+ Reports/Settings για το export).
+- **Απόφαση που χρειάζεται:** ελληνικές φορολογικές κατηγορίες preset ή free-form tags; το ZIP-με-αρχεία μόνο σε paid ή παντού;
+
+### P9. Multi-currency (per-transaction currency + FX conversion) — L — both
+- **Αξία:** σήμερα το deployment είναι single-currency (αλλάζει μόνο το σύμβολο, δεν converts —
+  σκόπιμο για single-user). Για χρήστες που ταξιδεύουν/αγοράζουν από εξωτερικό ή για SaaS
+  διεθνές κοινό, ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency
+  είναι πραγματικό κενό (καταγεγραμμένο στο CLAUDE.md). Μεγάλο γιατί αγγίζει schema
+  (amount+currency+rate), aggregations, imports και όλα τα money views.
+- **Module:** cross-cutting (Expenses/Receipts/Statements/Reports + `lib/money.ts`).
+- **Απόφαση που χρειάζεται:** πηγή FX (manual entry, δωρεάν API, ή on-import capture); να ξεκινήσει opt-in ανά deployment ώστε να μη βαρύνει τους single-currency χρήστες;
 
 ---
 
