@@ -3,7 +3,7 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 561b92a -->
-<!-- docker-validated: c619123 -->
+<!-- docker-validated: 7c92fe2 -->
 
 ## 2026-07-02 (parity-auditor — 3η σάρωση ημέρας: ουρά αμετάβλητη, 0 auto-buildable GAP, +1 doc-fix)
 - **Inventory από κώδικα (όχι docs):** **49 v1 routes** (`find api/v1 -name route.ts` = 49), **16 mobile screens** (`apps/mobile/src/screens/`), **19 web `page.tsx`**. Route↔consumer: grep στο `apps/mobile/src/api.ts` → κάθε endpoint έχει ≥1 mobile consumer (1:1, μηδέν orphan).
@@ -2420,3 +2420,11 @@ Fresh read-only mobile UI consistency audit, inventory ξαναχτισμένο 
 
 ### Needs Achilleas
 - (αμετάβλητο) Κανένα committed secret στο apps/mobile (μόνο `.env.example` tracked). Standing decisions (θέλουν simulator/attended verify, ΟΧΙ unattended-safe): οι 5 Input outliers + το `<Chip>` (οπτική token-drift), το Light/dark theme (L, αγγίζει 19 αρχεία). Το safe-area (P2/M) προσθέτει native dep → non-verifiable χωρίς simulator, αλλά είναι additive/token-drift-free, οπότε ο builder μπορεί να το πάρει με προσοχή.
+
+## 2026-07-02 (docker-health — υγεία OK, ΕΓΙΝΕ rebuild λόγω SaaS billing runtime changes)
+- **Υγεία**: mongo `healthy`, web running restarts=0, mongo cumulative restarts=78 (ιστορικά OOM στη μικρή VM, ΟΧΙ ενεργό loop· up ~2h σταθερά). flaresolverr `exited` (καμία μνημονική πίεση).
+- **Disk πριν**: Images 4.07GB, Build Cache 667MB. Μετά το prune ανακτήθηκαν **~2.09GB** cache (νέα build layers), τελικό Build Cache 667MB.
+- **Rebuild**: ΝΑΙ. `git diff c619123..HEAD -- apps/web` άγγιξε runtime κώδικα (SaaS billing routes `api/saas/billing/{checkout,portal,route}` + `lib/billing/*`). Ασφαλές dance: `docker compose build web` → mongo healthy → `docker compose up -d web` → `/login` 200 σε ~3s → web restarts παρέμεινε 0 → `docker builder prune -f`.
+- **Marker**: docker-validated `c619123` → **`7c92fe2`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
+### Needs Achilleas
+- Κανένα. Το stack είναι υγιές και σερβίρει.
