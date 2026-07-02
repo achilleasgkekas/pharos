@@ -2570,3 +2570,25 @@ Fresh read-only mobile UI audit (apps/mobile, Expo). Reference = web design toke
 
 ### Needs Achilleas
 - Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) εξαρτάται από την ολοκλήρωση του reusable set + είναι μεγάλο refactor 19 αρχείων → θέλει σκόπιμη απόφαση, όχι unattended.
+
+## 2026-07-02 (parity-auditor — 4η σάρωση ημέρας· mobile parity· CONFIRMATION run)
+
+Read-only mobile-parity audit (apps/mobile Expo ⇄ apps/web `api/v1`). Inventory ξαναχτίστηκε από τον κώδικα, όχι από docs.
+
+**Inventory:** **49 v1 routes** (`find apps/web/src/app/api/v1 -name route.ts` = 49· login + 48 bearer), **16 mobile screens** (`apps/mobile/src/screens/*`), **19 web `page.tsx`**. **Route↔consumer (μηχανικό `comm`):** εξήγαγα τα 49 normalized route paths και τα consumed `/api/v1/*` paths από το `apps/mobile/src/api.ts`· `comm -23 routes consumed` = **ΚΕΝΟ** → και τα 49 έχουν ≥1 mobile consumer (`tasksID` = grep artifact template-literal concat). Μηδέν «endpoint χωρίς mobile consumer». Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only first-run wizard· N/A).
+
+**Δέλτα portable-surface:** το τελευταίο commit που άγγιξε είτε `apps/mobile/src` είτε `apps/web/src/app/api/v1` είναι **`e6ad795`** (feat(mobile) Reports parity: spend-by-store + biggest-purchases + warranties-expiring). `git log e6ad795..HEAD -- apps/mobile/src apps/web/src/app/api/v1` = **ΚΕΝΟ**. Οι μετέπειτα commits (`a082819` SaaS account, `35953c6`/`b4ec753` SaaS password-reset+harden, `4dfac8d`/`c253bab` landing, `d6b1ef9`/`34045b9` i18n vitest, review/docs) είναι όλοι web-only (SaaS control-plane / landing / tests / docs) → **καμία νέα portable mobile δυνατότητα**. Οι 15 `api/saas/*` routes (account/auth/billing/members/usage) είναι control-plane gated πίσω από `SAAS_MODE`, εκτός `v1` → ΟΧΙ mobile parity items (multi-tenancy + billing = product decision). Το e6ad795 έχει ΗΔΗ αποτυπωθεί στο row Reports (γραμμή 66) → κανένα doc-fix αυτόν τον γύρο.
+
+**Read-only checks:** mobile `npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). Working tree στην αρχή: μόνο `.claude/launch.json` (foreign tooling, δεν το άγγιξα). Δεν έτρεξα Docker builds ούτε AI jobs.
+
+**Counts: DONE 7 (parity queue 6/6 + Activity) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.** Ενεργό functional parity TODO κανένα → ο builder πέφτει στο **UI Debt Queue**.
+
+**Top 3 να πάρει ο builder μετά (unattended-safe πρώτο):**
+1. **Max content width `<Screen>` wrapper** (P3/S) — ΣΗΜ: πιθανώς ΗΔΗ DONE από `28c943c` (shared max-content-width)· ο builder να το επιβεβαιώσει πριν το ξαναχτίσει. Αλλιώς unattended-safe pure-lib test coverage (`lib/cards.ts` / `lib/taxonomies.ts` / `lib/itemStatus.ts`, pure+untested+vitest-verifiable).
+2. **`<Chip>` primitive** (P2/M) — τελευταίο reusable-component holdout (`chip`/`chipOn`/`cChip`/`sChip` σε 3 screens)· token-drift → attended-preferred για οπτικό verify.
+3. **icons→lucide** (P2/M) — μηδέν native dep (`react-native-svg@15.12.1` ΥΠΑΡΧΕΙ) αλλά attended-preferred.
+
+### Needs Achilleas
+- **Safe-area insets** (P2/M): χρειάζεται native dep `react-native-safe-area-context` (ΑΠΟΝ στο package.json) + simulator verify → semi-attended, όχι unattended-safe.
+- «Partial» rows παραμένουν decision/credentials boundary: extra Reports charts (inventory-pie / subs-by-cat / income-vs-expense-12mo → RN charting lib + endpoint-extension)· Statements merge-bind / PDF-import (νέα write/upload endpoints)· Settings theme/language/AI-engine/storage/OneDrive.
+- Μηδέν committed secret εντοπίστηκε.
