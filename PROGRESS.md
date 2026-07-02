@@ -2,8 +2,19 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 1797ab7 -->
+<!-- reviewed: 2201932 -->
 <!-- docker-validated: b5fa042 -->
+
+## 2026-07-02 (reviewer — range 1797ab7..2201932, 6 commits)
+- **Έλεγχοι:** `apps/web` type-check **EXIT 0**, `apps/mobile` `tsc --noEmit` **EXIT 0**. `vitest run apiAuth.test.ts audit.test.ts` → **27/27 green** (9 + 18).
+- **Review εύρους (κώδικας):** 3 code commits — `3bb57f0` SAAS audit wiring, `8fe9281`/`apiAuth.test.ts` shared error-builder coverage, `a9d081b` landing mobile hamburger· + `2201932` mobile Expenses/Income re-scan. Υπόλοιπα = docs/glossary/monitor.
+  - **audit wiring (`3bb57f0`):** exemplary. Και τα 8 actions (member.added/role_changed/removed, invite.sent/resent/accepted/revoked, plan.changed) υπάρχουν στο `AUDIT_ACTIONS` allowlist. Νέο `AuditCtx = Pick<TenantContext,'isDefault'|'tenantId'>` + `auditCtx(tenantId)` επιτρέπει session-less paths (invite-accept, Stripe webhook) να καλέσουν το `recordAudit` χωρίς full session. Invite DELETE `updateOne`→`findOneAndUpdate().select('email role').lean()` για να ανακτηθεί email/role πριν το revoke· `!revoked` guard → σωστό 404. `member.role_changed`/`removed` target = `views.find(...)?.email || accountId` (ασφαλές fallback). `recordAudit` never-throws + no-op σε default tenant → μηδέν regression risk.
+  - **expenses rescan (`2201932`):** νέο `serialize.ts` (single source of truth `trimExpense`+`ExpenseLean`) — το route.ts refactor είναι byte-stable (ίδιο JSON shape). Νέο `[id]/rescan/route.ts` = mirror του receipts rescan· `rescanExpense` return `{ok,error}` επιβεβαιωμένο· error-map `no file|not found|missing`→404 αλλιώς 500 σωστό· re-read με `.select('-rawAiResponse')` = ίδιο shape με GET. Mobile `rescanExpense` + rescanBar mirror του ReceiptsScreen, tsc-clean.
+  - **landing MobileNav (`a9d081b`):** accessible (aria-expanded/controls, Escape, body-scroll-lock). Και τα 8 drawer anchors (#features/#ai/#mobile/#who/#self-host/#pricing/#compare/#faq) αντιστοιχούν σε υπαρκτά section ids. Όλες οι CSS classes (nav-burger/mobile-drawer/drawer-scrim/panel/head/link) ορισμένες. Responsive σωστό: `.nav-burger` default `display:none` → `inline-flex` <720px, `.site-nav` → `display:none` <720px (μηδέν double-nav). `apps/landing` εκτός των 2 required type-checks (ξεχωριστό app).
+  - **secrets:** μηδέν committed secret στο εύρος.
+- **Fixes:** καμία (όλα green, μηδέν regression, μηδέν v1 shape break που να σπάει το mobile).
+- **Flags:** καμία νέα.
+- **Marker:** reviewed `1797ab7` → **`2201932`** (HEAD). Staged ΜΟΝΟ PROGRESS.md (το foreign `.claude/launch.json` άθικτο).
 
 ## 2026-07-02 (pharos-daily-dev — mobile Expenses/Income AI re-scan text/OCR)
 - **Τι έκανα:** έκλεισα το **suggested-next-task της προηγ. εγγραφής** + top auto-buildable mobile-parity item [P2/M]: Expenses & Income δεν είχαν re-scan στο mobile ενώ το web `rescanExpense(id, useOcr)` (`expenses/actions.ts:348`) υπάρχει· έλειπε όμως το v1 endpoint. Τώρα που η scanned-bill εικόνα φαίνεται στο detail (χθεσινό commit), το re-scan κλείνει τον κύκλο «δες το bill → ξανα-parse-άρησέ το».
