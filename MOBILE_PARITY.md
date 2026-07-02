@@ -68,7 +68,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Tasks (`/tasks`)
 | Web | Mobile |
 |-----|--------|
-| **Kanban** (todo/in-progress/blocked/done, drag + ←/→), board/list toggle, #tags, steps/checklist, project progress by tag | 🟡 list + add (**#tag-parse**) + toggle done + **inline ←/→ quick-move** (κύκλος status κατά μήκος todo→in-progress→blocked→done, mirror του web Kanban ←/→) + tap-to-edit (title + **4-status picker** + **priority picker** low/normal/high + **tags editor** + **steps/checklist** [add/toggle/remove, optimistic] + card badge `☑ done/total`) + status chips + tag/priority display + delete. No Kanban board, no project-progress-by-tag |
+| **Kanban** (todo/in-progress/blocked/done, drag + ←/→), board/list toggle, #tags, steps/checklist, project progress by tag | 🟡 list + add (**#tag-parse**) + toggle done + **inline ←/→ quick-move** (κύκλος status κατά μήκος todo→in-progress→blocked→done, mirror του web Kanban ←/→) + tap-to-edit (title + **4-status picker** + **priority picker** low/normal/high + **tags editor** + **steps/checklist** [add/toggle/remove, optimistic] + card badge `☑ done/total`) + status chips + tag/priority display + **tag filter row** (horizontal chips από όλα τα task tags, tap→φιλτράρει τη λίστα, tap ξανά→καθαρίζει) + **project-progress-by-tag** (όταν επιλεγεί tag: bar done/total + % — ο επιλεγμένος tag λειτουργεί ως project/phase, mirror του web) + delete. No Kanban board |
 
 ## Settings (`/settings`)
 | Web | Mobile |

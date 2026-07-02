@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, Modal, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
 import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Badge, ListItem, contentWidth } from '../ui';
 import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task, type TaskStep } from '../api';
@@ -34,6 +34,8 @@ export function TasksScreen() {
   const [editTags, setEditTags] = useState('');
   const [editSteps, setEditSteps] = useState<TaskStep[]>([]);
   const [stepInput, setStepInput] = useState('');
+  // A selected tag behaves like a project/phase (mirror of the web Tasks project-progress).
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -94,7 +96,13 @@ export function TasksScreen() {
   }
 
   if (loading) return <Spinner />;
-  const sorted = [...tasks].sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0));
+  const allTags = Array.from(new Set(tasks.flatMap((t) => t.tags))).sort();
+  // Drop a stale filter (e.g. the last task with that tag was deleted/edited) so nothing shows empty.
+  const activeTag = tagFilter && allTags.includes(tagFilter) ? tagFilter : null;
+  const shown = activeTag ? tasks.filter((t) => t.tags.includes(activeTag)) : tasks;
+  const sorted = [...shown].sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0));
+  const projDone = activeTag ? shown.filter((t) => t.status === 'done').length : 0;
+  const projPct = activeTag && shown.length ? Math.round((projDone / shown.length) * 100) : 0;
 
   return (
     <View style={s.wrap}>
@@ -103,6 +111,24 @@ export function TasksScreen() {
         <IconButton glyph="＋" onPress={add} disabled={!title.trim()} />
       </View>
       <ErrorText>{err}</ErrorText>
+      {allTags.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tagRow}>
+          {allTags.map((tag) => (
+            <Pressable key={tag} onPress={() => setTagFilter((cur) => (cur === tag ? null : tag))} style={[s.tagChip, activeTag === tag && s.tagChipOn]}>
+              <Text style={[s.tagChipText, activeTag === tag && s.tagChipTextOn]}>#{tag}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+      {activeTag && shown.length > 0 && (
+        <View style={[s.progWrap, contentWidth]}>
+          <View style={s.progHead}>
+            <Text style={s.progLabel}>#{activeTag} · PROJECT PROGRESS</Text>
+            <Text style={s.progPct}>{`${projDone}/${shown.length} · ${projPct}%`}</Text>
+          </View>
+          <View style={s.progTrack}><View style={[s.progFill, { width: `${projPct}%` }]} /></View>
+        </View>
+      )}
       <FlatList
         data={sorted}
         keyExtractor={(t) => t.id}
@@ -194,6 +220,17 @@ const s = StyleSheet.create({
   steps: { color: C.dim, fontSize: 11, fontWeight: '600' },
   pri: { color: C.gold, fontSize: 11 },
   tags: { color: C.faint, fontSize: 11, flex: 1 },
+  tagRow: { gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
+  tagChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
+  tagChipOn: { backgroundColor: C.accent, borderColor: C.accent },
+  tagChipText: { color: C.dim, fontSize: 12, fontWeight: '600' },
+  tagChipTextOn: { color: C.onAccent },
+  progWrap: { paddingHorizontal: 16, paddingBottom: 10 },
+  progHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
+  progLabel: { color: C.dim, fontSize: 10, letterSpacing: 1 },
+  progPct: { color: C.accent, fontSize: 11, fontWeight: '700' },
+  progTrack: { height: 6, borderRadius: 3, backgroundColor: C.surface2, overflow: 'hidden' },
+  progFill: { height: '100%', borderRadius: 3, backgroundColor: C.accent },
   moveBtns: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   moveBtn: { paddingHorizontal: 6, paddingVertical: 6 },
   moveDim: { opacity: 0.2 },
