@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: a2e1811 -->
-<!-- docker-validated: 577364e -->
+<!-- docker-validated: 7192c8e -->
+
+## 2026-07-02 (docker-health guard)
+- **Health:** homepage-mongo `healthy`, homepage-web `running` (RestartCount 0). Mongo cumulative RestartCount 147 (ιστορικό OOM, ΟΧΙ ενεργό loop τώρα· web σταθερό, mongo healthy). flaresolverr ΔΕΝ έτρεχε (μηδέν επιπλέον μνήμη).
+- **Rebuild:** ΝΑΙ. Ο marker ήταν `577364e`· το `git diff --name-only 577364e..HEAD -- apps/web` άγγιξε runtime κώδικα (SaaS API routes, `lib/tenancy/audit.ts` + `saasApi.ts`, 21 αρχεία). Safe dance: `docker compose build web` (image only, OK) → mongo healthy → `docker compose up -d web` → `/login` επέστρεψε **200** στην 1η προσπάθεια → RestartCount έμεινε 0.
+- **Disk:** `docker builder prune -f` μετά το build → ανακτήθηκαν **2.104GB** build cache. Images 4.41GB, volumes 844MB αμετάβλητα (δεν αγγίχτηκαν).
+- **Marker:** docker-validated `577364e` → **`7192c8e`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-02 (reviewer — range 6f5199c..a2e1811· 0 fixes, 0 νέα flags)
 - **Τι επιθεώρησα:** 5 commits μετά τον marker `6f5199c` — `e25df16` (landing focus-trap + focus return στο mobile drawer), `7cc406f` (12 tests για `trimExpense` v1 serializer shape), `6e82811` (audit read API: resolve actor **name** δίπλα στο email), `a2e1811` (saasGuard try/catch slice 2/2 στα υπόλοιπα write routes), + docs `acef29d`.
