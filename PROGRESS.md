@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 53b861a -->
-<!-- docker-validated: 4a240aa -->
+<!-- docker-validated: b911882 -->
+
+## 2026-07-03 (docker-health — rebuild b911882· mongo healthy· 2.1GB reclaimed)
+- **Health (read-only):** mongo `healthy`, web RestartCount `0`, mongo RestartCount `177` (σωρευτικό ιστορικό από παλιά OOM· τώρα σταθερό, μηδέν loop). flaresolverr ήδη σταματημένο. Docker df: Images 4.41GB, Build Cache ~1GB.
+- **Rebuild:** ναι. Ο validated marker ήταν `4a240aa`· `git diff 4a240aa..HEAD -- apps/web` έδειξε web runtime αλλαγές (workspace route, tenancy audit/workspace). Ασφαλές dance: `docker compose build web` → mongo healthy check → `up -d web` → `/login` επέστρεψε **200 στην 1η προσπάθεια**, web restarts παρέμειναν 0.
+- **Race με concurrent autonomous runs:** ενώ έχτιζα, το HEAD προχώρησε δύο φορές (`5764f5f` → `b911882` SaaS tenant enforcement, web runtime → `96150c5` mobile Button variants). Ξαναέχτισα πάνω στο `b911882` (web-relevant, /login 200 ξανά)· το `96150c5` είναι **mobile-only, μηδέν apps/web αλλαγή**, οπότε το web image καλύπτει πλήρως το web runtime του HEAD. Marker = `b911882` (ό,τι πράγματι έχτισα+deploy-άρισα).
+- **Disk:** `docker builder prune -f` μετά το build → **~2.1GB reclaimed**. Τελικό build cache ~1GB (in-use).
+- **Needs Achilleas:** κανένα. Το stack σερβίρει healthy.
 
 ## 2026-07-03 (pharos-daily-dev — mobile `<Button variant>` ghost/danger, 4 screens)
 - **Τι έκανα:** έκλεισα το **suggested-next-task της τελευταίας builder εγγραφής** (Button ghost-variant finish, P2/S, unattended-safe) — το reusable holdout που είχε επισημάνει ο Chip note `681098f`. Ο functional parity πυρήνας είναι κλειστός (0 auto-buildable GAP), οπότε ο builder δουλεύει στην UI Debt Queue. Το `<Button>` primitive είχε ΜΟΝΟ την primary accent pill· τα secondary text-buttons (Delete/Discard/Cancel σε modal footers) ήταν raw `<Pressable style={s.delBtn}><Text style={s.delBtnText}>…` duplicated ανά screen.
