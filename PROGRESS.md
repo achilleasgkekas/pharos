@@ -2,8 +2,25 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: b8f3fce -->
+<!-- reviewed: bba44ff -->
 <!-- docker-validated: 1b6744a -->
+
+## 2026-07-02 (reviewer — range b8f3fce..bba44ff)
+
+Review των 7 commits από τον τελευταίο marker (`0e6f8ee` landing FAQ, `76daffe` docs-review, `c95de0c`/`b07a9bc` docs, `fd372c6` pdf tests, `f4bdd8e` saas invites list/revoke, `bba44ff` mobile Reports date-range). Working tree στην αρχή: μόνο `.claude/launch.json` (foreign tooling, δεν το άγγιξα). Καμία Docker build, κανένα AI job.
+
+**Checks:** `apps/web` type-check **EXIT 0**· `apps/mobile` tsc --noEmit **EXIT 0**. Τα 2 νέα test suites έτρεξαν καθαρά: `pdf.test.ts` 14/14 + `invites.test.ts` 19/19 = **33/33 pass** (και τα δύο importάρουν τα πραγματικά modules, όχι reimplemented copies).
+
+**Diff review ανά αλλαγή:**
+- **Reports date-range (web `api/v1/reports` + mobile `api.ts`/`ReportsScreen`):** backward-compatible. Το `?months=` param whitelist-άρεται (`[6,12,24].includes`)· χωρίς/invalid param κρατά τα legacy windows (spend=6, flow=12) → un-updated mobile client βλέπει ΑΚΡΙΒΩΣ τα ίδια arrays. Το νέο response field `months?` είναι additive optional (mobile type το έχει optional με σχόλιο «absent on older servers»). Ο mobile label χρησιμοποιεί `d.monthly.length`/`incomeExpense.length` (self-consistent με το επιλεγμένο window), όχι το `d.months`. **Μηδέν API-shape regression, μηδέν mobile break.**
+- **SaaS invites list/revoke (`api/saas/invites/route.ts` + `lib/tenancy/invites.ts inviteView`):** σωστό gating ladder (SAAS off→404 / no session→401 / non-owner-admin→403 μέσω `resolveWorkspaceSession`)· tenant-scoped queries· `inviteView` δεν επιστρέφει ποτέ token hash (by construction)· DELETE idempotent-ish (already-non-pending→404), `readBody`-based. **1 flag** (βλ. κάτω).
+- **Landing (`app/page.tsx`):** FAQ +3 (receipts/backups/security) + «Compare» nav link → επιβεβαίωσα ότι το `#compare` section υπάρχει (page.tsx:682) → κανένα dead anchor.
+
+**Fixes:** κανένα. Δεν υπήρξε εύρημα στην small-safe κατηγορία (type error / missing await / unused import / wrong path / typo). Το μοναδικό εύρημα είναι behavioral validation → flag, όχι fix (conservative mandate).
+
+**Flag (WEB_DEBT.md, P3/S):** `DELETE /api/saas/invites` περνά το `body.inviteId` κατευθείαν στο `Invite.updateOne({ _id })` χωρίς id-format guard· malformed id → Mongoose CastError → uncaught → 500 αντί καθαρό 400. Παραβιάζει την τεκμηριωμένη σύμβαση `^[a-f0-9]{24}$` (βλ. shopping-list/[id] DONE). Χαμηλή επίπτωση (owner/admin-gated, SAAS-only, dead-until-SaaS), καθαρά robustness/consistency.
+
+**Secrets:** μηδέν committed secret στο range (grep sk-/api-key/password/PEM/AKIA → 0 πραγματικά hits). Marker → `bba44ff`.
 
 ## 2026-07-02 (pharos-daily-dev — mobile Reports date-range selector 6/12/24μ)
 - **Τι έκανα:** έκλεισα το **τελευταίο εναπομείναν Reports parity item** (το ρητό top suggested-next-task, option α): **date-range selector** (6/12/24 μήνες) στο mobile Reports, mirror του web `/reports ?months=`. Στο web ο selector οδηγεί ΚΑΙ το monthly-spend chart ΚΑΙ το cash-flow (income-vs-expense) chart (μοιράζονται τον ίδιο `months` πίνακα). Το mobile έκανε ήδη render και τα δύο (SPEND · LAST 6 MONTHS + CASH FLOW · 12 MONTHS) αλλά με **σταθερά** windows. Πραγματικό functional parity, μηδέν νέα native dep, μηδέν credentials, μηδέν AI/token. Προτιμήθηκε αντί των attended-preferred (icons→lucide) και των Needs-Decision items (theme/language/safe-area native dep).

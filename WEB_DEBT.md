@@ -365,6 +365,20 @@
 
 ## Web Debt Queue
 
+### DELETE /api/saas/invites — λείπει id-format guard στο inviteId (CastError → 500)
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/saas/invites/route.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα (εισήχθη με το commit `f4bdd8e` invites list/revoke):** το DELETE διαβάζει `body.inviteId` (trimmed string) και το περνά κατευθείαν στο `Invite.updateOne({ _id: inviteId, tenant, status:'pending' }, ...)` χωρίς έλεγχο μορφής. Ενα malformed inviteId (π.χ. `"abc"`) προκαλεί Mongoose CastError στο `_id` cast → uncaught (η route δεν έχει try/catch) → framework-default 500 αντί για καθαρό 400. Ο codebase έχει τεκμηριωμένη σύμβαση (βλ. `shopping-list/[id]` DONE 2026-06-30) ότι ΟΛΑ τα id-taking routes κάνουν validate `^[a-f0-9]{24}$` πριν φτάσει το id στη query. Αυτό είναι το ΜΟΝΟ id-taking route (μαζί με τα ήδη flagged saas billing) χωρίς guard.
+  - **ΣΗΜ χαμηλής επίπτωσης:** owner/admin-gated + SAAS_MODE-only (dead-until-SaaS)· ένα malformed id απλώς δίνει 500 αντί 400/404 σε authed manager. Καθαρά consistency/robustness, όχι security ούτε data-integrity (το `status:'pending'` + `tenant` scope μένουν σωστά).
+  - **Fix:** πρόσθεσε `const ID_RE = /^[a-f0-9]{24}$/i;` (ή reuse τυχόν shared guard) και μετά το `inviteId` trim: `if (!ID_RE.test(inviteId)) return NextResponse.json({ error: 'bad id' }, { status: 400 });` — πριν το `Invite.updateOne`. Καμία αλλαγή στα υπόλοιπα response shapes (400 `inviteId is required`, 404 `no pending invite`, 200 `{ revoked }`) ούτε στη σειρά των guards (το resolveWorkspaceSession μένει πρώτο).
+  - Επαλήθευση: malformed inviteId → 400 αντί 500· `grep -n 'test(inviteId)' src/app/api/saas/invites/route.ts` δείχνει 1 hit.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-02 reviewer)
+
 ### Seat-cap ασυμμετρία — το existing-account add path ΔΕΝ μετράει τα pending invites
 - Priority: P3
 - Size: S
