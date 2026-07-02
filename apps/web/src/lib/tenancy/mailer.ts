@@ -3,11 +3,17 @@
 //
 // One entry point, `sendEmail({ to, subject, html })`, dispatches to whichever provider is
 // configured via env:
-//   RESEND_API_KEY → Resend HTTP API (dependency-free, uses fetch)  [WIRED]
-//   SMTP_URL       → SMTP via nodemailer                            [NOT wired yet — needs
-//                    the nodemailer dependency + a provider decision; see Needs-Achilleas]
-//   neither        → no-op that logs to the console in non-production so local flows are
-//                    still observable, and reports delivered:false.
+//   RESEND_API_KEY   → Resend HTTP API (dependency-free, uses fetch)      [WIRED]
+//   MAIL_WEBHOOK_URL → generic email webhook (Zapier / n8n / self-hosted  [WIRED]
+//                      relay): POST the message as JSON and let the endpoint
+//                      relay it. Dependency-free, no managed-provider lock-in,
+//                      the self-hoster's escape hatch. Optional bearer via
+//                      MAIL_WEBHOOK_TOKEN.
+//   SMTP_URL         → SMTP via nodemailer  [NOT wired yet: needs the nodemailer
+//                      dependency + a provider decision (see Needs-Achilleas).
+//                      Prefer MAIL_WEBHOOK_URL until then, it needs no new dependency.]
+//   none             → no-op that logs to the console in non-production so local flows are
+//                      still observable, and reports delivered:false.
 //
 // The pure helpers (provider resolution, from-address, html→text, message builders) carry
 // no imports and are unit-tested. Only `sendEmail` reaches the network. Nothing here is
@@ -15,29 +21,44 @@
 
 export type EmailMessage = { to: string; subject: string; html: string; text?: string };
 export type SendResult = { delivered: boolean; provider: MailProvider; id?: string; error?: string };
-export type MailProvider = 'resend' | 'smtp' | 'none';
+export type MailProvider = 'resend' | 'webhook' | 'smtp' | 'none';
 
 type Env = Record<string, string | undefined>;
 
 /**
- * Which provider the environment selects. Resend takes precedence (it is the wired one);
- * SMTP is recognised as intent but not yet deliverable (see mailerCanDeliver). Pure: env
- * is injectable for tests.
+ * Which provider the environment selects. Resend takes precedence (managed, wired), then the
+ * generic MAIL_WEBHOOK_URL (also wired, dependency-free), then SMTP (recognised as intent but
+ * not yet deliverable, see mailerCanDeliver). Pure: env is injectable for tests.
  */
 export function resolveProvider(env: Env = process.env): MailProvider {
   if (env.RESEND_API_KEY) return 'resend';
+  if (env.MAIL_WEBHOOK_URL) return 'webhook';
   if (env.SMTP_URL) return 'smtp';
   return 'none';
 }
 
 /**
- * Whether a working delivery channel actually exists. Only Resend is wired today, so an
- * SMTP_URL alone counts as "configured intent" but NOT deliverable — which is exactly what
- * lets the reset-request route keep echoing the dev token until SMTP is wired. This is the
- * single source of truth behind resetDeliveryConfigured().
+ * Whether a working delivery channel actually exists. Resend and the generic webhook are
+ * both wired; an SMTP_URL alone counts as "configured intent" but NOT deliverable, which is
+ * exactly what lets the reset-request route keep echoing the dev token until SMTP is wired.
+ * This is the single source of truth behind resetDeliveryConfigured().
  */
 export function mailerCanDeliver(env: Env = process.env): boolean {
-  return resolveProvider(env) === 'resend';
+  const p = resolveProvider(env);
+  return p === 'resend' || p === 'webhook';
+}
+
+/** The generic outbound-email webhook endpoint (Zapier / n8n / self-hosted relay). Empty
+ *  when unset. Dependency-free delivery for self-hosters who don't want a managed provider:
+ *  we POST the message as JSON and the endpoint relays it wherever it likes. */
+export function mailWebhookUrl(env: Env = process.env): string {
+  return (env.MAIL_WEBHOOK_URL || '').trim();
+}
+
+/** Optional bearer token sent as `Authorization: Bearer …` on the webhook POST so the relay
+ *  can authenticate the caller. Empty when unset (no auth header is added). */
+export function mailWebhookToken(env: Env = process.env): string {
+  return (env.MAIL_WEBHOOK_TOKEN || '').trim();
 }
 
 /** The From address for outbound mail. Configurable; sensible branded default. */
@@ -153,6 +174,34 @@ async function sendViaResend(msg: EmailMessage, apiKey: string): Promise<SendRes
   }
 }
 
+/** POST a message as JSON to the generic email webhook. Network-touching; caller guarantees
+ *  the url exists. Any 2xx response counts as delivered; the relay owns actual delivery. */
+async function sendViaWebhook(msg: EmailMessage, url: string, token: string): Promise<SendResult> {
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        from: fromAddress(),
+        to: msg.to,
+        subject: msg.subject,
+        html: msg.html,
+        text: msg.text ?? htmlToText(msg.html),
+      }),
+    });
+    if (!res.ok) {
+      return { delivered: false, provider: 'webhook', error: `webhook_${res.status}` };
+    }
+    const data = (await res.json().catch(() => ({}))) as { id?: string };
+    const id = typeof data?.id === 'string' ? data.id : undefined;
+    return { delivered: true, provider: 'webhook', id };
+  } catch (err) {
+    return { delivered: false, provider: 'webhook', error: err instanceof Error ? err.message : 'send_failed' };
+  }
+}
+
 /**
  * Send a transactional email through the configured provider. Never throws — returns a
  * SendResult so callers can decide (e.g. the reset route echoes a dev token when nothing
@@ -163,6 +212,10 @@ export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
 
   if (provider === 'resend') {
     return sendViaResend(msg, process.env.RESEND_API_KEY as string);
+  }
+
+  if (provider === 'webhook') {
+    return sendViaWebhook(msg, mailWebhookUrl(), mailWebhookToken());
   }
 
   if (provider === 'smtp') {

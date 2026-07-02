@@ -1100,3 +1100,40 @@ usage` + `/api/saas/billing`) — Activity/Invitations/Members/Billing tabs (UI-
 έτοιμα), είτε (β) `sendViaSmtp` via nodemailer (μετά provider decision Achilleas· ξεκλειδώνει
 reset/verify/invite delivery σε production), είτε (γ) dedicated invite-resend endpoint (re-mint +
 email σε ένα βήμα, αντί POST στο members route).
+
+## 2026-07-02 (increment 27 — generic MAIL_WEBHOOK_URL email provider, dependency-free)
+**Built:** ξεκλείδωσα πραγματικό email delivery χωρίς νέα εξάρτηση. Ο mailer είχε μόνο ΕΝΑ
+wired channel (Resend) + έναν SMTP stub που θέλει nodemailer (Needs-Achilleas, deferred). Οι
+reset/verify/invite flows επομένως δεν παρέδιδαν σε self-hosters που δεν θέλουν managed provider
+— έμεναν στο dev-token echo. Πρόσθεσα generic **`MAIL_WEBHOOK_URL`** provider: POST του μηνύματος
+ως JSON σε endpoint (Zapier/n8n/self-hosted relay), ακριβώς ό,τι πρότεινε το TODO §3 («email μέσω
+generic webhook»). Dependency-free (fetch, σαν το Resend path), no vendor lock-in, ταιριάζει με το
+self-hosted ethos. ΟΛΟ additive, σε δικό μου SAAS αρχείο (`lib/tenancy/mailer.ts`):
+- `MailProvider` union += `'webhook'` (θέση: resend > webhook > smtp > none).
+- `resolveProvider` += `MAIL_WEBHOOK_URL` branch (precedence: resend πρώτο, μετά webhook, μετά
+  smtp-intent, μετά none). Pure, env-injectable.
+- `mailerCanDeliver` → true πλέον και για webhook (όχι μόνο resend) → single source of truth: οι
+  reset/verify/invite routes **σταματούν** το dev-token echo όταν υπάρχει webhook (σωστό: υπάρχει
+  πραγματικό channel).
+- Νέοι PURE helpers `mailWebhookUrl(env)` / `mailWebhookToken(env)` (trim, empty όταν unset).
+- `sendViaWebhook(msg,url,token)` — network-touching, never-throws, 2xx = delivered, optional
+  `Authorization: Bearer <MAIL_WEBHOOK_TOKEN>`· body `{from,to,subject,html,text}` (text fallback
+  = htmlToText). `sendEmail` απέκτησε το webhook branch (μετά resend, πριν smtp).
+- Header doc comment ενημερώθηκε (webhook = WIRED· «prefer MAIL_WEBHOOK_URL until SMTP wired»).
+- `mailer.test.ts` — resolveProvider precedence (resend>webhook>smtp), mailerCanDeliver webhook=true,
+  + νέο describe για mailWebhookUrl/Token (trim + empty). Δεν testάρω network (ίδιο pattern με το
+  υπάρχον: sendViaResend δεν έχει network test· μόνο pure helpers).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run mailer.test.ts` → **16/16 green**
+(10 προϋπάρχοντα + 6 νέα)· full suite `npx vitest run` → **738/738 green** (καμία regression).
+Καμία νέα εξάρτηση (μηδέν package.json/lock αλλαγή). Ο mailer καλείται ΜΟΝΟ από SAAS routes (404
+όταν SAAS_MODE off) → `SAAS_MODE` off = **zero effect** στο self-hosted app· default env (χωρίς
+MAIL_WEBHOOK_URL) → `resolveProvider` επιστρέφει ό,τι και πριν → byte-for-byte ίδια συμπεριφορά.
+Κανένας Docker rebuild (καμία runtime αλλαγή στο default config path· type-check καλύπτει το
+compile). Άγγιξα μόνο δικά μου SAAS αρχεία (foreign `.claude/launch.json` άθικτο).
+
+**Next task:** increment 28 — είτε (α) `sendViaSmtp` via nodemailer (τώρα λιγότερο επείγον: το
+webhook καλύπτει τους self-hosters χωρίς εξάρτηση· μένει για όποιον θέλει άμεσο SMTP)· είτε (β)
+user-facing workspace-settings UI panels που consume-άρουν τα έτοιμα read APIs (Activity/Invitations/
+Members/Billing — UI-only)· είτε (γ) resend-webhook delivery retry/backoff στο sendEmail (best-effort
+σήμερα: ένα transient 5xx = undelivered χωρίς retry).

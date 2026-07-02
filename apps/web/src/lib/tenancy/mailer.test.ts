@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveProvider,
   mailerCanDeliver,
+  mailWebhookUrl,
+  mailWebhookToken,
   fromAddress,
   htmlToText,
   resetLinkUrl,
@@ -10,24 +12,41 @@ import {
 } from './mailer';
 
 describe('resolveProvider', () => {
-  it('picks resend when the key is present (precedence over smtp)', () => {
-    expect(resolveProvider({ RESEND_API_KEY: 'x', SMTP_URL: 'smtp://h' })).toBe('resend');
+  it('picks resend when the key is present (precedence over webhook and smtp)', () => {
+    expect(
+      resolveProvider({ RESEND_API_KEY: 'x', MAIL_WEBHOOK_URL: 'https://h/e', SMTP_URL: 'smtp://h' })
+    ).toBe('resend');
+  });
+  it('picks webhook over smtp when no resend key is set', () => {
+    expect(resolveProvider({ MAIL_WEBHOOK_URL: 'https://h/e', SMTP_URL: 'smtp://h' })).toBe('webhook');
   });
   it('falls back to smtp when only SMTP_URL is set', () => {
     expect(resolveProvider({ SMTP_URL: 'smtp://h' })).toBe('smtp');
   });
-  it('is none when neither is configured', () => {
+  it('is none when nothing is configured', () => {
     expect(resolveProvider({})).toBe('none');
   });
 });
 
 describe('mailerCanDeliver', () => {
-  it('is true only for the wired provider (resend)', () => {
+  it('is true for the wired providers (resend and webhook)', () => {
     expect(mailerCanDeliver({ RESEND_API_KEY: 'x' })).toBe(true);
+    expect(mailerCanDeliver({ MAIL_WEBHOOK_URL: 'https://h/e' })).toBe(true);
   });
   it('is false for smtp-only (recognised but not wired) and for none', () => {
     expect(mailerCanDeliver({ SMTP_URL: 'smtp://h' })).toBe(false);
     expect(mailerCanDeliver({})).toBe(false);
+  });
+});
+
+describe('mailWebhookUrl / mailWebhookToken', () => {
+  it('reads and trims the webhook url; empty when unset', () => {
+    expect(mailWebhookUrl({ MAIL_WEBHOOK_URL: '  https://h/e  ' })).toBe('https://h/e');
+    expect(mailWebhookUrl({})).toBe('');
+  });
+  it('reads and trims the optional bearer token; empty when unset', () => {
+    expect(mailWebhookToken({ MAIL_WEBHOOK_TOKEN: '  tok  ' })).toBe('tok');
+    expect(mailWebhookToken({})).toBe('');
   });
 });
 
