@@ -447,3 +447,23 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-02 (cont.¹³)
+
+Task: (e) Polish, μερος 19 — «Who» link στο top nav. Το #who section («Who it's for», personas) ηταν reachable μονο με scroll· ηταν το τελευταιο navigation gap που ειχα σημειωσει επαναληπτικα στα προηγουμενα entries. Καθαρο one-line increment, μηδεν assets, μηδεν pricing decision.
+
+Τι εφτιαξα:
+- `app/page.tsx` top nav: νεο «Who» link (href="#who", nav-anchor) αναμεσα σε AI και Self-host, ωστε η σειρα του nav να ακολουθει τη σειρα αναγνωσης της σελιδας (Features -> AI -> Who -> Self-host -> Pricing -> Compare -> FAQ). Reuse του υπαρχοντος nav-anchor idiom (smooth scroll + hide <720px, οποτε μηδεν mobile crowding). Μηδεν CSS αλλαγη.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ First Load JS 102 kB shared, αμεταβλητο — pure static markup, μηδεν bundle impact).
+- Prerendered HTML (.next/server/app/index.html): href="#who" count=1 (νεο nav link). Το route ειναι static, οποτε το prerendered HTML ειναι ακριβως αυτο που σερβιρεται (build + HTML check = ισοδυναμη επαληθευση για pure-static content — δεν χρειαστηκε preview server για ενα nav anchor). Docker/web/mobile αθικτα. Το `.claude/launch.json` (shared local config) ΔΕΝ commit (collision guard — μονο app/page.tsx + LANDING_PROGRESS.md).
+
+Επομενο increment: (e) συνεχεια — το top nav ειναι πλεον πληρες (ολα τα major sections reachable)· αντικατασταση των CSS mockups (#preview, #ai) με πραγματικα app screenshots οταν υπαρξουν assets· per-plan Offer JSON-LD nodes οταν κλεισουν οι τιμες.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.

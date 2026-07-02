@@ -397,6 +397,7 @@ export default function Home() {
           <nav className="site-nav">
             <a href="#features" className="navlink nav-anchor">Features</a>
             <a href="#ai" className="navlink nav-anchor">AI</a>
+            <a href="#who" className="navlink nav-anchor">Who</a>
             <a href="#self-host" className="navlink nav-anchor">Self-host</a>
             <a href="#pricing" className="navlink">Pricing</a>
             <a href="#compare" className="navlink nav-anchor">Compare</a>
