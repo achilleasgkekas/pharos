@@ -24,6 +24,7 @@ import { Invite } from '@/models/Invite';
 import { mintInviteToken } from '@/lib/tenancy/invites';
 import { pickBaseUrl } from '@/lib/billing/billingRoutes';
 import { recordAudit } from '@/lib/tenancy/audit';
+import { saasGuard } from '@/lib/tenancy/saasApi';
 import type { WorkspaceSession } from '@/lib/tenancy/workspaceSession';
 
 export const runtime = 'nodejs';
@@ -166,13 +167,15 @@ async function inviteUnregistered(
 
 /** GET /api/saas/members[?tenant=<slug>] — list members. Any active member may read. */
 export async function GET(req: NextRequest) {
-  const slug = new URL(req.url).searchParams.get('tenant');
-  const resolved = await resolveWorkspaceSession(slug, false);
-  if ('response' in resolved) return resolved.response;
-  const { session } = resolved;
+  return saasGuard(async () => {
+    const slug = new URL(req.url).searchParams.get('tenant');
+    const resolved = await resolveWorkspaceSession(slug, false);
+    if ('response' in resolved) return resolved.response;
+    const { session } = resolved;
 
-  const { views } = await loadMembers(session.ctx.tenantId!);
-  return NextResponse.json({ workspace: session.workspace.slug, members: views });
+    const { views } = await loadMembers(session.ctx.tenantId!);
+    return NextResponse.json({ workspace: session.workspace.slug, members: views });
+  });
 }
 
 /**
@@ -182,107 +185,109 @@ export async function GET(req: NextRequest) {
  * for now the target account must already exist (404 otherwise).
  */
 export async function POST(req: NextRequest) {
-  const body = await readBody(req);
+  return saasGuard(async () => {
+    const body = await readBody(req);
 
-  const resolved = await resolveWorkspaceSession(strField(body, 'tenant').trim() || null, true);
-  if ('response' in resolved) return resolved.response;
-  const { session } = resolved;
+    const resolved = await resolveWorkspaceSession(strField(body, 'tenant').trim() || null, true);
+    if ('response' in resolved) return resolved.response;
+    const { session } = resolved;
 
-  const email = normalizeEmail(body.email);
-  if (!looksLikeEmail(email)) {
-    return NextResponse.json({ error: 'a valid email is required' }, { status: 400 });
-  }
-  const role = body.role == null ? 'member' : parseRole(body.role);
-  if (!role) {
-    return NextResponse.json({ error: 'role must be owner, admin, or member' }, { status: 400 });
-  }
-  if (!canAssignRole(session.workspace.role, role)) {
-    return NextResponse.json({ error: 'only an owner may assign the owner role' }, { status: 403 });
-  }
+    const email = normalizeEmail(body.email);
+    if (!looksLikeEmail(email)) {
+      return NextResponse.json({ error: 'a valid email is required' }, { status: 400 });
+    }
+    const role = body.role == null ? 'member' : parseRole(body.role);
+    if (!role) {
+      return NextResponse.json({ error: 'role must be owner, admin, or member' }, { status: 400 });
+    }
+    if (!canAssignRole(session.workspace.role, role)) {
+      return NextResponse.json({ error: 'only an owner may assign the owner role' }, { status: 403 });
+    }
 
-  const account = (await Account.findOne({ email }).select('_id email name').lean()) as
-    | AccountDoc
-    | null;
-  if (!account) {
-    // No account for this email yet → mint an email invitation (signup link) rather than
-    // 404. The invitee creates their account by redeeming the token at /invites/accept.
-    return inviteUnregistered(req, session, email, role);
-  }
+    const account = (await Account.findOne({ email }).select('_id email name').lean()) as
+      | AccountDoc
+      | null;
+    if (!account) {
+      // No account for this email yet → mint an email invitation (signup link) rather than
+      // 404. The invitee creates their account by redeeming the token at /invites/accept.
+      return inviteUnregistered(req, session, email, role);
+    }
 
-  const tenantId = session.ctx.tenantId!;
-  const existing = (await Membership.findOne({
-    account: account._id,
-    tenant: tenantId,
-  })
-    .select('status')
-    .lean()) as Pick<MembershipDoc, 'status'> | null;
-
-  if (existing && existing.status !== 'removed') {
-    return NextResponse.json({ error: 'already a member of this workspace' }, { status: 409 });
-  }
-
-  // Seat limit: adding a new member OR reactivating a removed one consumes an active seat.
-  // Reject when the plan's allowance is already full (unlimited plans always pass). Counting
-  // live avoids a stale snapshot; `dedicated`/self-hosted (maxMembers null) short-circuits.
-  // Mirror the invite path (inviteUnregistered): a pending invite reserves a future seat, so
-  // the occupancy the cap is checked against is active members PLUS outstanding pending invites.
-  // Without counting pending, an add could push active+pending past the cap once those invites
-  // are redeemed.
-  const plan = String(session.tenant.plan);
-  const activeCount = await Membership.countDocuments({ tenant: tenantId, status: 'active' });
-  const pendingCount = await Invite.countDocuments({ tenant: tenantId, status: 'pending' });
-  if (!withinSeatLimit(plan, activeCount + pendingCount)) {
-    const cap = entitlementsFor(plan).maxMembers;
-    return NextResponse.json(
-      {
-        error: `seat limit reached for the ${plan} plan (max ${cap})`,
-        code: 'seat_limit',
-        maxMembers: cap,
-      },
-      { status: 409 }
-    );
-  }
-
-  if (existing) {
-    // Reactivate a previously removed member with the requested role.
-    await Membership.updateOne(
-      { account: account._id, tenant: tenantId },
-      { $set: { status: 'active', role, invitedBy: session.account.sub } }
-    );
-  } else {
-    await Membership.create({
+    const tenantId = session.ctx.tenantId!;
+    const existing = (await Membership.findOne({
       account: account._id,
       tenant: tenantId,
-      role,
-      status: 'active',
-      invitedBy: session.account.sub,
-    });
-  }
+    })
+      .select('status')
+      .lean()) as Pick<MembershipDoc, 'status'> | null;
 
-  await recordAudit(session.ctx, {
-    action: 'member.added',
-    actor: session.account.sub,
-    target: account.email,
-    meta: { role, reactivated: Boolean(existing) },
-  });
+    if (existing && existing.status !== 'removed') {
+      return NextResponse.json({ error: 'already a member of this workspace' }, { status: 409 });
+    }
 
-  // Best-effort notification that they now have workspace access (no-op unless a mailer is
-  // configured). Fire-and-forget so it never delays or fails the response; sendEmail never throws.
-  const { subject, html } = invitedEmail(session.workspace.slug);
-  void sendEmail({ to: account.email, subject, html });
+    // Seat limit: adding a new member OR reactivating a removed one consumes an active seat.
+    // Reject when the plan's allowance is already full (unlimited plans always pass). Counting
+    // live avoids a stale snapshot; `dedicated`/self-hosted (maxMembers null) short-circuits.
+    // Mirror the invite path (inviteUnregistered): a pending invite reserves a future seat, so
+    // the occupancy the cap is checked against is active members PLUS outstanding pending invites.
+    // Without counting pending, an add could push active+pending past the cap once those invites
+    // are redeemed.
+    const plan = String(session.tenant.plan);
+    const activeCount = await Membership.countDocuments({ tenant: tenantId, status: 'active' });
+    const pendingCount = await Invite.countDocuments({ tenant: tenantId, status: 'pending' });
+    if (!withinSeatLimit(plan, activeCount + pendingCount)) {
+      const cap = entitlementsFor(plan).maxMembers;
+      return NextResponse.json(
+        {
+          error: `seat limit reached for the ${plan} plan (max ${cap})`,
+          code: 'seat_limit',
+          maxMembers: cap,
+        },
+        { status: 409 }
+      );
+    }
 
-  return NextResponse.json(
-    {
-      member: {
-        accountId: String(account._id),
-        email: account.email,
-        name: account.name ?? '',
+    if (existing) {
+      // Reactivate a previously removed member with the requested role.
+      await Membership.updateOne(
+        { account: account._id, tenant: tenantId },
+        { $set: { status: 'active', role, invitedBy: session.account.sub } }
+      );
+    } else {
+      await Membership.create({
+        account: account._id,
+        tenant: tenantId,
         role,
         status: 'active',
+        invitedBy: session.account.sub,
+      });
+    }
+
+    await recordAudit(session.ctx, {
+      action: 'member.added',
+      actor: session.account.sub,
+      target: account.email,
+      meta: { role, reactivated: Boolean(existing) },
+    });
+
+    // Best-effort notification that they now have workspace access (no-op unless a mailer is
+    // configured). Fire-and-forget so it never delays or fails the response; sendEmail never throws.
+    const { subject, html } = invitedEmail(session.workspace.slug);
+    void sendEmail({ to: account.email, subject, html });
+
+    return NextResponse.json(
+      {
+        member: {
+          accountId: String(account._id),
+          email: account.email,
+          name: account.name ?? '',
+          role,
+          status: 'active',
+        },
       },
-    },
-    { status: 201 }
-  );
+      { status: 201 }
+    );
+  });
 }
 
 /**
@@ -290,49 +295,51 @@ export async function POST(req: NextRequest) {
  * Body: `{ accountId, role, tenant? }`. Owner/admin only. Cannot demote the last owner.
  */
 export async function PATCH(req: NextRequest) {
-  const body = await readBody(req);
+  return saasGuard(async () => {
+    const body = await readBody(req);
 
-  const resolved = await resolveWorkspaceSession(strField(body, 'tenant').trim() || null, true);
-  if ('response' in resolved) return resolved.response;
-  const { session } = resolved;
+    const resolved = await resolveWorkspaceSession(strField(body, 'tenant').trim() || null, true);
+    if ('response' in resolved) return resolved.response;
+    const { session } = resolved;
 
-  const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
-  if (!accountId) {
-    return NextResponse.json({ error: 'accountId is required' }, { status: 400 });
-  }
-  const role = parseRole(body.role);
-  if (!role) {
-    return NextResponse.json({ error: 'role must be owner, admin, or member' }, { status: 400 });
-  }
-  if (!canAssignRole(session.workspace.role, role)) {
-    return NextResponse.json({ error: 'only an owner may assign the owner role' }, { status: 403 });
-  }
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!accountId) {
+      return NextResponse.json({ error: 'accountId is required' }, { status: 400 });
+    }
+    const role = parseRole(body.role);
+    if (!role) {
+      return NextResponse.json({ error: 'role must be owner, admin, or member' }, { status: 400 });
+    }
+    if (!canAssignRole(session.workspace.role, role)) {
+      return NextResponse.json({ error: 'only an owner may assign the owner role' }, { status: 403 });
+    }
 
-  const tenantId = session.ctx.tenantId!;
-  const { lite, views } = await loadMembers(tenantId);
-  const target = lite.find((m) => m.accountId === accountId && m.status !== 'removed');
-  if (!target) {
-    return NextResponse.json({ error: 'member not found' }, { status: 404 });
-  }
+    const tenantId = session.ctx.tenantId!;
+    const { lite, views } = await loadMembers(tenantId);
+    const target = lite.find((m) => m.accountId === accountId && m.status !== 'removed');
+    if (!target) {
+      return NextResponse.json({ error: 'member not found' }, { status: 404 });
+    }
 
-  // Demoting the sole owner would leave the workspace ownerless.
-  if (target.role === 'owner' && role !== 'owner' && wouldOrphanOwners(lite, accountId)) {
-    return NextResponse.json(
-      { error: 'cannot demote the last owner; promote another owner first', code: 'last_owner' },
-      { status: 409 }
-    );
-  }
+    // Demoting the sole owner would leave the workspace ownerless.
+    if (target.role === 'owner' && role !== 'owner' && wouldOrphanOwners(lite, accountId)) {
+      return NextResponse.json(
+        { error: 'cannot demote the last owner; promote another owner first', code: 'last_owner' },
+        { status: 409 }
+      );
+    }
 
-  await Membership.updateOne({ account: accountId, tenant: tenantId }, { $set: { role } });
+    await Membership.updateOne({ account: accountId, tenant: tenantId }, { $set: { role } });
 
-  await recordAudit(session.ctx, {
-    action: 'member.role_changed',
-    actor: session.account.sub,
-    target: views.find((v) => v.accountId === accountId)?.email || accountId,
-    meta: { from: target.role, to: role, accountId },
+    await recordAudit(session.ctx, {
+      action: 'member.role_changed',
+      actor: session.account.sub,
+      target: views.find((v) => v.accountId === accountId)?.email || accountId,
+      meta: { from: target.role, to: role, accountId },
+    });
+
+    return NextResponse.json({ member: { accountId, role } });
   });
-
-  return NextResponse.json({ member: { accountId, role } });
 }
 
 /**
@@ -340,39 +347,41 @@ export async function PATCH(req: NextRequest) {
  * Body: `{ accountId, tenant? }`. Owner/admin only. Cannot remove the last owner.
  */
 export async function DELETE(req: NextRequest) {
-  const body = await readBody(req);
+  return saasGuard(async () => {
+    const body = await readBody(req);
 
-  const resolved = await resolveWorkspaceSession(strField(body, 'tenant').trim() || null, true);
-  if ('response' in resolved) return resolved.response;
-  const { session } = resolved;
+    const resolved = await resolveWorkspaceSession(strField(body, 'tenant').trim() || null, true);
+    if ('response' in resolved) return resolved.response;
+    const { session } = resolved;
 
-  const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
-  if (!accountId) {
-    return NextResponse.json({ error: 'accountId is required' }, { status: 400 });
-  }
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!accountId) {
+      return NextResponse.json({ error: 'accountId is required' }, { status: 400 });
+    }
 
-  const tenantId = session.ctx.tenantId!;
-  const { lite, views } = await loadMembers(tenantId);
-  const target = lite.find((m) => m.accountId === accountId && m.status !== 'removed');
-  if (!target) {
-    return NextResponse.json({ error: 'member not found' }, { status: 404 });
-  }
+    const tenantId = session.ctx.tenantId!;
+    const { lite, views } = await loadMembers(tenantId);
+    const target = lite.find((m) => m.accountId === accountId && m.status !== 'removed');
+    if (!target) {
+      return NextResponse.json({ error: 'member not found' }, { status: 404 });
+    }
 
-  if (wouldOrphanOwners(lite, accountId)) {
-    return NextResponse.json(
-      { error: 'cannot remove the last owner; promote another owner first', code: 'last_owner' },
-      { status: 409 }
-    );
-  }
+    if (wouldOrphanOwners(lite, accountId)) {
+      return NextResponse.json(
+        { error: 'cannot remove the last owner; promote another owner first', code: 'last_owner' },
+        { status: 409 }
+      );
+    }
 
-  await Membership.updateOne({ account: accountId, tenant: tenantId }, { $set: { status: 'removed' } });
+    await Membership.updateOne({ account: accountId, tenant: tenantId }, { $set: { status: 'removed' } });
 
-  await recordAudit(session.ctx, {
-    action: 'member.removed',
-    actor: session.account.sub,
-    target: views.find((v) => v.accountId === accountId)?.email || accountId,
-    meta: { role: target.role, accountId },
+    await recordAudit(session.ctx, {
+      action: 'member.removed',
+      actor: session.account.sub,
+      target: views.find((v) => v.accountId === accountId)?.email || accountId,
+      meta: { role: target.role, accountId },
+    });
+
+    return NextResponse.json({ removed: accountId });
   });
-
-  return NextResponse.json({ removed: accountId });
 }

@@ -3,7 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Account } from '@/models/Account';
 import { hashPassword } from '@/lib/auth';
 import { readBody, strField } from '@/lib/apiBody';
-import { saasAuthGate, accountTenants } from '@/lib/tenancy/saasApi';
+import { saasAuthGate, saasGuard, accountTenants } from '@/lib/tenancy/saasApi';
 import { setAccountCookie } from '@/lib/tenancy/accountSession';
 import { provisionTenant } from '@/lib/tenancy/provision';
 
@@ -21,50 +21,52 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * SaaS-mode only (404 when SAAS_MODE off). Does not touch the self-hosted User/bearer path.
  */
 export async function POST(req: NextRequest) {
-  const gate = saasAuthGate();
-  if (gate) return gate;
+  return saasGuard(async () => {
+    const gate = saasAuthGate();
+    if (gate) return gate;
 
-  const b = await readBody(req);
-  const email = strField(b, 'email', '', true).toLowerCase();
-  const password = strField(b, 'password');
-  const name = strField(b, 'name', '', true);
-  const workspace = strField(b, 'workspace', '', true);
+    const b = await readBody(req);
+    const email = strField(b, 'email', '', true).toLowerCase();
+    const password = strField(b, 'password');
+    const name = strField(b, 'name', '', true);
+    const workspace = strField(b, 'workspace', '', true);
 
-  if (!EMAIL_RE.test(email)) return NextResponse.json({ error: 'A valid email is required' }, { status: 400 });
-  if (password.length < MIN_PASSWORD) {
-    return NextResponse.json({ error: `Password must be at least ${MIN_PASSWORD} characters` }, { status: 400 });
-  }
+    if (!EMAIL_RE.test(email)) return NextResponse.json({ error: 'A valid email is required' }, { status: 400 });
+    if (password.length < MIN_PASSWORD) {
+      return NextResponse.json({ error: `Password must be at least ${MIN_PASSWORD} characters` }, { status: 400 });
+    }
 
-  await connectDB();
+    await connectDB();
 
-  // Uniqueness pre-check + a race-safe fallback on the unique index (11000).
-  if (await Account.exists({ email })) {
-    return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 });
-  }
-
-  let account;
-  try {
-    account = await Account.create({ email, name, passwordHash: hashPassword(password) });
-  } catch (e) {
-    if ((e as { code?: number }).code === 11000) {
+    // Uniqueness pre-check + a race-safe fallback on the unique index (11000).
+    if (await Account.exists({ email })) {
       return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 });
     }
-    throw e;
-  }
 
-  const accountId = String(account._id);
-  await provisionTenant({
-    accountId,
-    workspaceName: workspace || name || email.split('@')[0],
+    let account;
+    try {
+      account = await Account.create({ email, name, passwordHash: hashPassword(password) });
+    } catch (e) {
+      if ((e as { code?: number }).code === 11000) {
+        return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 });
+      }
+      throw e;
+    }
+
+    const accountId = String(account._id);
+    await provisionTenant({
+      accountId,
+      workspaceName: workspace || name || email.split('@')[0],
+    });
+
+    await setAccountCookie({ sub: accountId, email });
+
+    return NextResponse.json(
+      {
+        account: { id: accountId, email, name: account.name || '' },
+        tenants: await accountTenants(accountId),
+      },
+      { status: 201 }
+    );
   });
-
-  await setAccountCookie({ sub: accountId, email });
-
-  return NextResponse.json(
-    {
-      account: { id: accountId, email, name: account.name || '' },
-      tenants: await accountTenants(accountId),
-    },
-    { status: 201 }
-  );
 }

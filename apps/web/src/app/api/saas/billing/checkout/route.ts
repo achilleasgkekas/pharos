@@ -3,6 +3,7 @@ import { resolveBillingSession } from '@/lib/billing/billingSession';
 import { createCheckoutSession } from '@/lib/billing/stripe';
 import { checkoutablePlan, pickBaseUrl, checkoutUrls } from '@/lib/billing/billingRoutes';
 import { readBody, strField } from '@/lib/apiBody';
+import { saasGuard } from '@/lib/tenancy/saasApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,36 +25,38 @@ export const dynamic = 'force-dynamic';
  * charges here; Stripe collects payment and the webhook reflects the result.
  */
 export async function POST(req: NextRequest) {
-  const body = await readBody(req);
+  return saasGuard(async () => {
+    const body = await readBody(req);
 
-  const resolved = await resolveBillingSession(strField(body, 'tenant').trim() || null);
-  if ('response' in resolved) return resolved.response;
-  const { session } = resolved;
+    const resolved = await resolveBillingSession(strField(body, 'tenant').trim() || null);
+    if ('response' in resolved) return resolved.response;
+    const { session } = resolved;
 
-  const plan = checkoutablePlan(strField(body, 'plan'));
-  if (!plan) {
-    return NextResponse.json(
-      { error: 'plan must be a paid plan (shared or dedicated)' },
-      { status: 400 }
-    );
-  }
+    const plan = checkoutablePlan(strField(body, 'plan'));
+    if (!plan) {
+      return NextResponse.json(
+        { error: 'plan must be a paid plan (shared or dedicated)' },
+        { status: 400 }
+      );
+    }
 
-  const base = pickBaseUrl(process.env.SAAS_PUBLIC_URL || process.env.APP_URL, new URL(req.url).origin);
-  const { successUrl, cancelUrl } = checkoutUrls(base);
+    const base = pickBaseUrl(process.env.SAAS_PUBLIC_URL || process.env.APP_URL, new URL(req.url).origin);
+    const { successUrl, cancelUrl } = checkoutUrls(base);
 
-  const result = await createCheckoutSession({
-    plan,
-    tenantId: session.ctx.tenantId!,
-    customerId: session.tenant.billingCustomerId,
-    customerEmail: session.account.email,
-    successUrl,
-    cancelUrl,
+    const result = await createCheckoutSession({
+      plan,
+      tenantId: session.ctx.tenantId!,
+      customerId: session.tenant.billingCustomerId,
+      customerEmail: session.account.email,
+      successUrl,
+      cancelUrl,
+    });
+
+    if (!result.ok) {
+      const status = result.reason === 'not-configured' ? 503 : 502;
+      return NextResponse.json({ error: `checkout unavailable: ${result.reason}` }, { status });
+    }
+
+    return NextResponse.json({ url: result.data.url, id: result.data.id });
   });
-
-  if (!result.ok) {
-    const status = result.reason === 'not-configured' ? 503 : 502;
-    return NextResponse.json({ error: `checkout unavailable: ${result.reason}` }, { status });
-  }
-
-  return NextResponse.json({ url: result.data.url, id: result.data.id });
 }
