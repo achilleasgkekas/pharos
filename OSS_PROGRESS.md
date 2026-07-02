@@ -3,6 +3,45 @@
 Ημερολόγιο της OSS-release + test routine (τρέχει ωριαία, unattended). Κάθε εγγραφή:
 τι έγινε, τι επαληθεύτηκε, και το επόμενο προτεινόμενο βήμα.
 
+## 2026-07-02 (cont. — .env.example completeness [task c])
+
+**Task: (c) Ολοκλήρωση του `.env.example` — κάθε env var που διαβάζει ο web app να υπάρχει με ασφαλές placeholder + one-line σχόλιο.**
+
+Επιλογή: παρά το ότι οι προηγούμενες εγγραφές εστίαζαν σε test files (f), έλεγξα ξανά την προτεραιότητα
+a→f. Τα a/d/e είναι done (LICENSE AGPL-3.0 661 γρ., README, .github τα 5 αρχεία, CONTRIBUTING/SECURITY/
+COC υπάρχουν). Αλλά το (c) ΔΕΝ ήταν done: diff `process.env.*` (apps/web/src) vs `.env.example` έδειξε
+**20 undocumented vars** (Stripe ×4, SaaS ×5, cloud AI keys ×3, MONGO_URI, STORAGE_ROOT, OLLAMA_HOST/
+VISION_MODEL/KEEP_ALIVE, SEARXNG_URL, CRON_SECRET, APP_URL). Το (c) είναι υψηλότερης προτεραιότητας από
+άλλο test file, οπότε το διάλεξα.
+
+Τι έγινε (`.env.example`):
+- MONGO_URI (με native-dev σημείωση στο apps/web/.env.local) κάτω από το MongoDB section.
+- Επέκταση του App-level section: STORAGE_ROOT, OLLAMA_HOST, OLLAMA_VISION_MODEL, OLLAMA_KEEP_ALIVE,
+  SEARXNG_URL (compose vs native-dev defaults σε κάθε ένα).
+- Νέο «Cloud AI providers (OPTIONAL)»: ANTHROPIC/OPENAI/GEMINI keys, κενά, με σαφήνεια ότι όλα είναι
+  local by default και το key είναι μόνο fallback του DB setting.
+- Νέο «SaaS / multi-tenant mode (OPTIONAL)»: SAAS_MODE, SAAS_BASE_DOMAIN, SAAS_PUBLIC_URL, APP_URL,
+  SAAS_SESSION_IDLE_HOURS, CRON_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_SHARED,
+  STRIPE_PRICE_DEDICATED, RESEND_API_KEY. Όλα κενά, με ρητή σημείωση «self-host αφήνει όλο το section κενό».
+- Τα σχόλια βασίστηκαν σε πραγματικό grep του κάθε usage (defaults/fallbacks), όχι σε μαντεψιά.
+
+Τι επαληθεύτηκε:
+- `comm -23` (used vs documented) → απομένει ΜΟΝΟ `NODE_ENV` (framework-managed, σωστά παραλείπεται).
+- Secret scan (`git grep` για sk-/sk_live_/AKIA/ghp_/private keys/creds-in-URI, εκτός .env.example+tests)
+  → μόνο placeholder connection strings (`${MONGO_USER:-admin}`, `admin:changeme`) σε compose/scraper.
+  ΚΑΝΕΝΑ πραγματικό secret. `.env`/`.env.local`/`apps/web/.env` επιβεβαιωμένα gitignored.
+- Meta-only αλλαγή → κανένα build (σύμφωνα με τους κανόνες).
+- Collision guard: `git diff --cached` κενό πριν το stage· foreign `.claude/launch.json` modified αλλά ΔΕΝ
+  το άγγιξα/staged. Στάγιαρα μόνο `.env.example`. Commit `09f4e0b`, pushed καθαρά.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib/pure-shape test file. Τα a–e είναι πλέον όλα done. Το (b)
+secret-scan έτρεξε clean αυτό το run. Οπότε μένει το (f): τρέξε πρώτα `find apps/web/src -name '*.test.ts'`
+(πολλά routines γράφουν παράλληλα), βρες ένα ακάλυπτο pure target (π.χ. άλλο `app/api/v1/*/serialize.ts`
+ή pure helper σε `lib/billing/plans.ts` an έχει exported pure functions). Ένα module ανά run. Εκκρεμεί ακόμα
+το SSRF IPv4-mapped fix στο «## Needs Achilleas».
+
+---
+
 Κατάσταση baseline (πρώτη εγγραφή, 2026-07-01):
 - (a) LICENSE — DONE, πλήρες κείμενο AGPL-3.0 (34KB).
 - (b) Secrets scan — εκκρεμεί ρητός έλεγχος (`.env*` σωστά gitignored).
