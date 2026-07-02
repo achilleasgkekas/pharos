@@ -3054,3 +3054,29 @@ Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `a
 
 ### Needs Achilleas
 - Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) παραμένει σκόπιμη απόφαση (μεγάλο refactor). Safe-area + Input full-adoption = επόμενα semi-attended/attended.
+
+## 2026-07-02 (ui-auditor — 36η σάρωση mobile UI consistency· CONFIRMATION, ουρά αμετάβλητη)
+
+Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `apps/web/src/app/globals.css`). Inventory ξαναχτίστηκε από τον κώδικα: **16 screens**, `theme.ts` (`C`/`SPACE`/`RADIUS`/`SIZE`/`scrim`/`onAccent`/`alpha`) + `ui.tsx` primitives (`Input`/`TextArea`/`Check`/`Button`/`IconButton`/`Card`/`ListItem`/`Badge`/`Chip` + `Header`/`Centered`/`Spinner`/`ErrorText`/`Empty` + `contentWidth`) ΟΛΑ παρόντα. mobile `npx tsc --noEmit` → **EXIT 0**.
+
+**Νέος κώδικας από την 35η (marker `681098f`):** ένα mobile-src commit, **`df51e97`** (`feat(mobile): show scanned bill image in Expenses/Income detail`). Επιθεώρησα το diff: υλοποιεί το queue item «Expenses/Income scanned-bill image» (P2/S, ΗΔΗ DONE 2026-07-02) — `Image` (react-native) + `fileSource` στο MoneyScreen detail modal, νέο style `bigImg`, guard για manual entries (`file:null`). Token-clean, μηδέν hardcoded hex.
+
+**Ευρήματα ανά διάσταση (fresh grep):**
+- Tokens (hardcoded hex): **0** στα `screens/`+`nav.tsx`+`App.tsx` (όλα `C.*`, incl. ο νέος κώδικας).
+- Shared theme file: **ΥΠΑΡΧΕΙ** (`theme.ts`) → κανένα P1 foundation item ανοιχτό.
+- Reusable components: εναπομένον holdout **ΜΟΝΟ** το ghost `<Button variant>` (~7 drift sites: Subscriptions/Vouchers `aiBtn` cyan-border, Money `scanBtn` cyan+surface, Shopping `scanBtn` neutral+surface2, Items `aiBtn` accent-border + `importBtn` cyan-fill, Receipts `rescanBtn` cyan radius10) = τελευταίο button-family holdout.
+- Theme/dark mode: **0** `useColorScheme`/`ThemeProvider`/`useTheme` (dark-only, P3/L decision).
+- States: complete trio (Spinner/ErrorText/Empty)· in-button `ActivityIndicator` επικαλύπτεται με ghost-button holdout.
+- Adaptive: safe-area **ανοιχτό** (plain `SafeAreaView` @ App.tsx:88, `react-native-safe-area-context` εκτός package.json [grep 0], μηδέν bottom inset· `nav.tsx:87` `paddingTop:60` magic)· max-content-width DONE (`contentWidth`).
+- Touch targets: DONE (`<Check>` 24×24 + hitSlop).
+- Input primitive: raw `<TextInput>` **21 sites / 7 screens** (Receipts 9 / Shopping 4 / Login 3 / Items 2 / Assistant 1 / Settings 1 / Search 1) — attended-preferred token-drift.
+
+**Ουρά:** **αμετάβλητη** — μηδέν νέο item, μηδέν item έκλεισε (το `df51e97` υλοποίησε προϋπάρχον DONE item). Ουρά violations ανά διάσταση: tokens 0, reusable-holdout 1 (ghost button ~7 sites), safe-area 1, input-drift 21/7-screens, dark-theme 1 (decision).
+
+**Top 3 items να πάρει ο builder μετά (unattended-safe διάταξη):**
+1. **Ghost `<Button variant>` (P2/M)** — τελευταίο reusable-component holdout· `variant?: 'primary'|'ghost'` (+ optional tint cyan/accent) στο υπάρχον `Button`, ενοποιεί ~7 sites. Unattended-safe (tsc-verifiable, style-override idiom)· ΠΡΟΣΟΧΗ στο drift (cyan vs accent vs neutral border, surface vs surface2 bg, padding 8-12) → per-site override για pixel-identical.
+2. **Safe-area insets (P2/M)** — μοναδικό πραγματικό adaptive gap· `react-native-safe-area-context` + `SafeAreaProvider`/`useSafeAreaInsets` (bottom inset για sheet buttons). Package-add + simulator verify → semi-attended.
+3. **Input primitive πλήρης υιοθέτηση (P2/M)** — 21 raw `<TextInput>` σε 7 screens να περάσουν στα υπάρχοντα `<Input>`/`<TextArea>`. Token-drift → attended-preferred.
+
+### Needs Achilleas
+- Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) παραμένει σκόπιμη απόφαση (μεγάλο refactor). Safe-area + Input full-adoption = επόμενα semi-attended/attended.
