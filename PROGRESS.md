@@ -2319,3 +2319,20 @@ Read-only audit των **57 API route files** (49 v1 + 6 saas + λοιπά) + `a
 
 ### Needs Achilleas
 - (αμετάβλητο) Χωρίς νέα ζητήματα ασφαλείας· μηδέν committed secret (μόνο `.env.example` + env-only Stripe/AUTH keys, deferred). Standing product-decisions (ΟΧΙ auto-buildable queue): login brute-force rate-limit, error-message leak στο `withAuth` 500, `tenancy/connection.ts` reuse-semantic (dead-until-SaaS, θέλει σκόπιμη απόφαση), SaaS multi-tenancy architecture, Stripe key provisioning (env boundary — μείνε server-only), wiring του quota-enforce gate σε πραγματικά AI/upload routes (φέρνει 402-on-over-quota συμπεριφορά — product decision πότε/πού ενεργοποιείται).
+
+## 2026-07-02 (web-code-quality — 29η σάρωση· ουρά 1→2 P3/S, ελέγχθηκε ΝΕΟΣ SaaS file-byte storage κώδικας [f8aaea4], +1 νέο P3/S [timing-safe CRON compare])
+
+Fresh σάρωση 49 v1 + 7 saas route files + apiAuth/apiBody/apiList helpers + ΝΕΟΣ file-byte storage-accounting κώδικας (`lib/billing/fileStorage.ts` + integration στο `dbStats.ts`, commit `f8aaea4`). `npm run type-check` EXIT 0. Read-only γύρος (μηδέν app-code diff)· άγγιξα μόνο docs.
+
+**Counts ανά dimension:** Type safety **0**, Auth **0 unguarded**, Input validation **0 gaps**, Error handling **0**, DB **0**, OSS parity **exemplary**. Consistency debt: **+1 P3/S νέο**.
+- Ο νέος storage-accounting κώδικας (increment 9) είναι υποδειγματικός: OSS-parity no-op (μηδέν fs/db access όταν SAAS off / default tenant), path-escape guard στο `tenantStorageRoot` (`path.relative` + `..`/absolute check), symlinks δεν ακολουθούνται (no traversal amplification), per-entry try/catch στο `measureDir`, per-tenant error isolation στο `sampleAllTenants`, pure helpers unit-tested (`fileStorage.test.ts`). Πλήρως τυπωμένος, μηδέν `any`.
+- **Νέο εύρημα (P3/S):** το ΝΕΟ cron `usage/sample/route.ts:31` κάνει `token !== secret` (non-constant-time), ενώ το ίδιο billing subsystem (`stripe.ts:142`) + `auth.ts:43` έχουν ήδη `timingSafeEqual`. Timing side-channel στο CRON_SECRET (μικρού ρίσκου· υπάρχει καθιερωμένο shared pattern). → queue item.
+- Το top item (isObjectId στο billing webhook, commit `3c6bcc4`) παραμένει **TODO** — ο builder δεν το κατανάλωσε από την 27η/28η σάρωση (`grep '\[a-f0-9\]{24}' src/app/api` = 1 hit, webhook:81).
+
+**Top-3 για τον builder (σειρά):**
+1. **Constant-time CRON_SECRET compare** (P3/S, saas/usage/sample) — inline `timingSafeEqual`+length-guard, ίδιο pattern με stripe.ts/auth.ts, saas-only (μηδέν v1 mobile risk).
+2. **isObjectId στο billing webhook** (P3/S, saas) — byte-identical swap σε `isObjectId` από `@/lib/apiBody`, κλείνει την πλήρη εξάλειψη inline ObjectId regex σε ΟΛΟ το api.
+3. (ουρά κενή μετά· ο κώδικας ώριμος — αν κλείσουν, ο builder πέφτει στο mobile UI Debt Queue.)
+
+### Needs Achilleas
+- (αμετάβλητο) Μηδέν committed secret (μόνο `.env.example` + env-only Stripe/AUTH/CRON keys, deferred). Standing product-decisions (ΟΧΙ auto-buildable queue): login brute-force rate-limit, error-message leak στο `withAuth` 500, wiring του quota-enforce gate σε πραγματικά AI/upload routes, SaaS multi-tenancy architecture, Stripe/CRON key provisioning (env boundary — μείνε server-only). **ΝΕΟ observation (ΟΧΙ queue item):** ο shared storage layer (`lib/storage.ts saveFile`) ΔΕΝ είναι tenant-aware ακόμα → ένας live SaaS tenant μετράει 0 file-bytes μέχρι το `saveFile` να namespace-άρει per tenant (feature-builder territory, σκόπιμο forward-work, τεκμηριωμένο στο `fileStorage.ts` + `SAAS_PROGRESS.md`).

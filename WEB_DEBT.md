@@ -3,6 +3,19 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-02 29η σάρωση· ουρά 1→2 P3/S· ελέγχθηκε ΝΕΟΣ SaaS file-byte storage κώδικας [commit `f8aaea4`]· +1 νέο P3/S [non-constant-time CRON_SECRET compare στο usage/sample route])
+
+**2026-07-02 (29η σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 v1 route files** + **7 saas route files** (auth×4, billing/webhook, usage, usage/sample) + `apiAuth`/`apiBody`/`apiList` helpers + **ΝΕΟΣ SaaS file-byte storage-accounting κώδικας** (`lib/billing/fileStorage.ts` + integration στο `lib/billing/dbStats.ts`, commit `f8aaea4`). Από την 28η σάρωση ο builder **ΔΕΝ** κατανάλωσε το top item (`grep '\[a-f0-9\]{24}' src/app/api` = ακόμα 1 hit στο `saas/billing/webhook/route.ts:81`) → μένει TODO. `npm run type-check` **EXIT 0**.
+- **Ευρήματα ανά διάσταση (live grep, όχι docs):**
+  - **Type safety: 0** — `:any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ΟΛΟ το `/api` (v1 + saas) + `lib/billing` + `lib/tenancy` = **0**. Ο νέος `fileStorage.ts` πλήρως τυπωμένος (`import('node:fs').Dirent[]`, `TenantContext`)· ο `dbStats.ts` `StorageSample` επεκτάθηκε καθαρά με `dbBytes`/`fileBytes` (μόνο ο νόμιμος `as unknown as TenantDoc[]` lean-cast, ΟΧΙ `any`).
+  - **Auth: 0 unguarded** — v1: μόνο `auth/login` exempt (auth boundary). saas: `usage` + `auth/session` κάνουν `saasAuthGate()` + `getCurrentAccount()` (fail-closed)· `billing/webhook` σωστά signature-gated (`timingSafeEqual` + replay window)· **ΝΕΟ** `usage/sample` (cron endpoint) gated με `saasMode()` 404 + `CRON_SECRET` bearer (500 αν unset, 401 σε bad token) — σωστό pattern για scheduler.
+  - **Input validation: 0 gaps** — ο `fileStorage.ts` δεν διαβάζει request (server-side sampling)· ο `tenantStorageRoot` έχει **path-escape guard** (`path.relative` + `..`/absolute check → null) ώστε DNS-safe dbName/slug να μη μπορεί να ξεφύγει από το STORAGE_ROOT· symlinks ΔΕΝ ακολουθούνται (`Dirent.isFile` false) → no traversal amplification.
+  - **Error handling: 0** — `measureDir` κάνει per-entry try/catch (ένα unreadable file δεν σπάει το walk)· missing dir → 0· `sampleAllTenants` isolate-άρει per-tenant failures (counted, όχι fatal). Ομοιόμορφο `{ error }` shape σε όλα τα saas routes.
+  - **DB: 0** — `Tenant.find({status:{$in}}).select().lean()` (fleet-sample, bounded-by-design· MUST iterate all live tenants — intentional full scan, όχι N+1)· `readDbStats` κάνει native `db.stats()` (read-only)· `setStorageBytes` upsert στο unique `{tenant,period}` index. `accountTenants` = `Membership.find().lean()` + `Tenant.find({_id:{$in}}).lean()` (bounded ανά account).
+  - **OSS parity: exemplary** — `tenantFileBytes`/`sampleTenantStorage` no-op returning 0 με **μηδέν fs/db access** όταν `!saasMode()` ή `ctx.isDefault` ή `!tenantId`· self-hosted app ποτέ file-metered. Pure helpers (`sumBytes`, `tenantStorageRoot`, `billedBytes`) unit-tested (`fileStorage.test.ts` 79 γρ.).
+  - **Consistency debt (νέο): 1 P3/S** — το ΝΕΟ cron `usage/sample/route.ts:31` συγκρίνει `token !== secret` με **plain string equality** (non-constant-time), ενώ το **ίδιο billing subsystem** (`lib/billing/stripe.ts:142`) ΚΑΙ το `lib/auth.ts:43` έχουν ήδη καθιερώσει `timingSafeEqual` για secret compare. Timing side-channel στο CRON_SECRET (μικρού ρίσκου, αλλά υπάρχει καθιερωμένο shared pattern να επαναχρησιμοποιηθεί). → queue item.
+- **Counts ανά dimension: P1=0, P2=0, P3=1 νέο** (η ουρά πάει 1→2 P3/S: isObjectId webhook [προϋπάρχον TODO] + timing-safe CRON compare [νέο]). Ο νέος storage-accounting κώδικας είναι **exemplary** (OSS-parity, path-guard, symlink-safe walk, per-entry error isolation, unit-tested pure helpers)· η μόνη παρατήρηση είναι το non-constant-time secret compare σε ένα ΝΕΟ route. Δεν εφευρίσκω debt· 29 σαρώσεις χωρίς P1/P2.
+
 ## Σύνοψη audit (2026-07-02 28η σάρωση· ουρά αμετάβλητη 1 P3/S [isObjectId billing webhook, ΑΚΟΜΑ TODO — ο builder δεν το κατανάλωσε]· ελέγχθηκε ΝΕΟ SaaS quota-enforce gate + usage read endpoint [commit `918f49c`])
 
 **2026-07-02 (28η σάρωση, αυτόνομος γύρος):** fresh σάρωση **57 API route files** (49 v1 + 6 saas [auth×4, billing/webhook, usage] + λοιπά) + `apiAuth`/`apiBody`/`apiList` helpers + **ΝΕΟΣ SaaS metering-enforcement κώδικας** (`lib/billing/enforce.ts` + `GET /api/saas/usage`, commit `918f49c`). Από την 27η σάρωση ο builder **ΔΕΝ** κατανάλωσε το top item (`grep '\[a-f0-9\]{24}' src/app/api/saas` = ακόμα 1 hit στο `webhook/route.ts:81`) → μένει TODO στην κορυφή της ουράς. `npm run type-check` **EXIT 0**.
@@ -327,6 +340,21 @@
 ---
 
 ## Web Debt Queue
+
+### Constant-time CRON_SECRET compare — saas/usage/sample route (timing side-channel)
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/saas/usage/sample/route.ts
+- Depends on: none
+- Acceptance:
+  - Το ΝΕΟ cron endpoint (commit `f8aaea4`) συγκρίνει το bearer token με **plain string equality**: live `src/app/api/saas/usage/sample/route.ts:31` → `if (!token || token !== secret) { return ... 401 }`. Αυτό είναι non-constant-time → timing side-channel στο `CRON_SECRET` (byte-by-byte early-exit διαρρέει μήκος/prefix).
+  - Το ίδιο billing subsystem έχει ΗΔΗ καθιερωμένο το σωστό pattern: `lib/billing/stripe.ts:142` → `sigBuf.length === expBuf.length && timingSafeEqual(sigBuf, expBuf)`, και `lib/auth.ts:43` → `actual.length === expected.length && timingSafeEqual(actual, expected)`. ΔΕΝ υπάρχει exported shared helper· και τα δύο κάνουν inline το length-guard + `timingSafeEqual(Buffer, Buffer)` — ακολούθησε το ΙΔΙΟ inline pattern (μηδέν νέο helper).
+  - Swap: πρόσθεσε `import { timingSafeEqual } from 'node:crypto';` (top του route)· η γραμμή 401-check γίνεται: πρώτα `if (!token) return 401`, μετά compare με buffers ίσου μήκους — π.χ. `const a = Buffer.from(token); const b = Buffer.from(secret); if (a.length !== b.length || !timingSafeEqual(a, b)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });`. Το length-guard είναι απαραίτητο (`timingSafeEqual` throws σε άνισα μήκη).
+  - Η σειρά gate (`saasMode()` 404 → `CRON_SECRET` unset 500 → token 401) + το `{ ok: true, ...result }` success shape + το `sampleAllTenants()` call ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. Είναι saas-only endpoint (δεν αγγίζει τον v1 mobile surface).
+  - Επαλήθευση: `grep -n 'timingSafeEqual' src/app/api/saas/usage/sample/route.ts` επιστρέφει hit· `grep -n 'token !== secret' src/app/api/saas` επιστρέφει μηδέν.
+  - npm run type-check exits 0
+- Status: TODO
 
 ### Dedup ObjectId-validation regex — SaaS billing webhook (isObjectId re-introduced inline)
 - Priority: P3
