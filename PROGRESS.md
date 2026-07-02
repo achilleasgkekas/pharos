@@ -2,8 +2,18 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: a2e1811 -->
+<!-- reviewed: 7670bf9 -->
 <!-- docker-validated: 7192c8e -->
+
+## 2026-07-02 (reviewer — range a2e1811..7670bf9, καθαρή επιθεώρηση, μηδέν fix)
+- **Τι επιθεώρησα:** 9 commits από τον marker `a2e1811`. Code commits: `7670bf9` (mobile Expense anomaly badge + web serializer), `ec2c195` (SaaS invites inviter/accepter name resolution), `0b1f56b` (test AI TOOLS registry), `4f047f6` (landing scroll-spy). Τα υπόλοιπα 5 (`abbb7d6`/`7192c8e`/`7422a62`/`0e77b26`/`1f8531c`) docs-only.
+- **Checks (read-only):** `apps/web` type-check → **EXIT 0**. `apps/mobile` tsc → **EXIT 0**. Extra sanity (έπεσε landing commit): `apps/landing` tsc → **EXIT 0**. Τρία affected test files (`aiTools` + expenses `serialize` + tenancy `invites`) → **61/61 green**.
+- **Ανά commit:**
+  - `7670bf9` — mobile diff token-clean (`C.gold`/`C.surface2`, μηδέν hex). Web `computeAnomalies` pure, byte-mirror του `page.tsx`. Επιβεβαίωσα ότι το `route.ts` `Expense.find()` **δεν** έχει `.select()` → το `vendorKey` όντως επιστρέφεται (stored field, `models/Expense.ts:14`), οπότε το anomaly όντως υπολογίζεται. Shape change additive (`anomaly?` optional) → μη-σπάσιμο για mobile.
+  - `ec2c195` — SaaS-gated, additive (`inviteView` +4 identity keys με default null, backward-compatible 1/2-arg callers), batched `_id:{$in}` lookup (όχι N+1). Το mobile δεν καταναλώνει `/api/saas/invites`. Καθαρό.
+  - `0b1f56b`/`4f047f6` — additive tests + isolated landing client component, μηδέν επίδραση σε web/mobile runtime.
+- **Fixes:** κανένα. Και οι δύο υποχρεωτικοί type-checks EXIT 0, τα diffs additive/tested, δεν βρέθηκε regression ή small-safe defect.
+- **Flagged:** κανένα νέο queue item. Μικρή watch-note (ΟΧΙ bug, ΟΧΙ actionable): το mobile anomaly υπολογίζεται πάνω στο paginated slice (limit=200/offset=0), οπότε σε vendor με >200 entries το median μπορεί να διαφέρει ελαφρώς από το web (που το υπολογίζει σε όλο το dataset). Σκόπιμο tradeoff, τεκμηριωμένο στο commit. Καμία ανάγκη Αχιλλέα, μηδέν committed secret.
 
 ## 2026-07-02 (pharos-daily-dev — mobile Expense anomaly badge [ΚΛΕΙΝΕΙ το item])
 - **Τι έκανα:** έκλεισα το **top auto-buildable suggested-next-task** (mobile Expense anomaly badge, P2/S, auditor top-3 #1 της 38ης σάρωσης). Το web `/expenses` δείχνει gold `AnomalyBadge` (±% απόκλιση από το vendor median) αλλά ο v1 serializer δεν εξέθετε το πεδίο → το mobile δεν μπορούσε να το δείξει. Pure stats, μηδέν AI / credentials / native dep / new endpoint → ιδανικό unattended.
