@@ -2,8 +2,14 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 7a0af2b -->
+<!-- reviewed: 1c14515 -->
 <!-- docker-validated: d170d93 -->
+
+## 2026-07-02 (reviewer — range 7a0af2b..1c14515 καθαρό)
+- **Τι επιθεώρησα:** 5 commits από τον τελευταίο marker (`7a0af2b`): `0a07bae` landing deploy-targets strip, `30e9d0d` SaaS email-verify scaffold, `c6ab1ae` docker-health chore (μη-κώδικας), `d170d93` mobile Reports subs-by-category bars, `1c14515` progress doc.
+- **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· `npx vitest run` → **531/531 pass** (35 files), εκ των οποίων 13 νέα `emailVerify.test.ts` (mint/hash/expiry/constant-time compare).
+- **Ευρήματα:** μηδέν regression, μηδέν fix. (1) Mobile subs-by-category: το νέο `subsByCategory` JSON πεδίο στο `/api/v1/reports` είναι additive, ο mobile consumer το guard-άρει με `?? []` → μηδέν breaking change· επιβεβαίωσα το `CYCLE_PER_MONTH` (weekly 52/12, monthly 1, quarterly 1/3, yearly 1/12, lifetime 0) είναι byte-identical με το web `/reports` page.tsx και ότι το `Subscription` model έχει `active`/`amount`/`billingCycle`/`category`. Ο desc-sort είναι σκόπιμος (καταγραμμένος από τον builder). (2) SaaS email-verify: `emailVerify.ts` καθρεφτίζει το proven `passwordReset` pattern (store-the-hash, 24h TTL, constant-time compare, single-use clear)· τα routes είναι σωστά gated (`saasAuthGate`), request authenticated + fail-closed dev-token echo (μόνο εκτός production ΚΑΙ χωρίς wired mailer), confirm token-based/unauthenticated με generic 400. Όλα τα imports (`pickBaseUrl`/`saasAuthGate`/`getCurrentAccount`/`readBody`/`strField`/`mailerCanDeliver`) resolve. (3) Landing: static additive strip + matching CSS, μηδέν λογική. **Κανένα committed secret** (μόνο env-var names).
+- **Fixes:** 0. **Flags:** 0. Δεν πείραξα τα προϋπάρχοντα uncommitted edits (`.claude/launch.json`, `MOBILE_PARITY.md`). Marker → `1c14515`.
 
 ## 2026-07-02 (pharos-daily-dev — mobile Reports subs-by-category bars)
 - **Τι έκανα:** έκλεισα το ρητό top suggested-next-task του προηγούμενου builder entry (2026-07-03): **subscriptions monthly-by-category** ως bars, χωρίς RN charting lib (list/bar style, mirror του ήδη-γινομένου spend-by-store). Πραγματικό functional parity, μηδέν νέα dependency, μηδέν credentials, μηδέν AI/token.
