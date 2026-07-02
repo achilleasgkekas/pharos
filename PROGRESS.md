@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: f8aaea4 -->
-<!-- docker-validated: f63cc4b -->
+<!-- docker-validated: c619123 -->
+
+## 2026-07-02 (docker-health — safe rebuild, stack healthy)
+- **Υγεία:** `homepage-mongo` healthy, `homepage-web` RestartCount 0 (δεν ανέβηκε μετά το deploy), `homepage-mongo` RestartCount 74 (σωρευτικό, όχι loop· up 2h healthy). `homepage-flaresolverr` δεν έτρεχε (καμία ενέργεια). `homepage-searxng` up.
+- **Rebuild:** ΝΑΙ. Το `git diff f63cc4b..HEAD -- apps/web` άγγιζε web runtime κώδικα (`app/api/saas/usage/sample/route.ts`, `lib/billing/dbStats.ts`, `lib/billing/fileStorage.ts`· υπόλοιπα test files). Ασφαλές dance: `docker compose build web` (image μόνο) → mongo healthy check → `docker compose up -d web` → `/login` επέστρεψε **200** στην 1η προσπάθεια → RestartCount έμεινε 0.
+- **Disk:** `docker builder prune -f` → reclaimed **2.087GB** build cache. Images 4.07GB, volumes 836MB αμετάβλητα (δεν αγγίχτηκαν). VM άνετα.
+- **Needs Achilleas:** τίποτα.
+- **Marker:** docker-validated `f63cc4b` → **`c619123`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-02 (reviewer — range 9ac9db1..f8aaea4 clean, 0 fixes, 0 flags)
 - **Range:** 4 commits πάνω από τον προηγούμενο marker (`9ac9db1`): `a615c15` (feat/landing compare table), `3d7e50f` (test/web cardFields), `138488c` (docs/mobile-parity), `f8aaea4` (feat/saas file-byte storage accounting). Docs commits παραλείφθηκαν από code review.
