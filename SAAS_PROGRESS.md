@@ -425,3 +425,52 @@ off) ⇒ zero runtime wiring, `SAAS_MODE` off = zero effect, κανένα Docker
 plumbing): namespace τα SaaS uploads σε `STORAGE_ROOT/<dbName>/<bucket>` (flag-guarded, default
 tenant αμετάβλητος) ώστε το `tenantFileBytes` να μετράει πραγματικά νούμερα. Εναλλακτικά, το
 enforcement wiring σε ΕΝΑ AI route αν δοθεί άδεια για `api/v1/*`.
+
+---
+
+## 2026-07-02 (increment 10 — billing checkout + portal routes)
+**Απόκλιση από το «Next task»:** και οι δύο προτεινόμενες επιλογές (tenant-aware `saveFile` /
+enforcement wiring σε `api/v1/*`) απαιτούν edit ΕΚΤΟΣ SAAS territory (shared storage plumbing /
+feature routes) → θέλουν ρητή άδεια. Γύρισα σε καθαρά in-territory increment: εξέθεσα τα ήδη
+χτισμένα stripe stubs (`createCheckoutSession`/`createPortalSession`) που μέχρι τώρα ΔΕΝ είχαν
+route (μόνο ο webhook υπήρχε).
+
+**Built** (όλο σε νέα αρχεία κάτω από `lib/billing/**` + `api/saas/billing/**`):
+- `lib/billing/billingRoutes.ts` — PURE helpers (μηδέν imports πλην PlanKey, μηδέν DB/env-at-load):
+  `canManageBilling(role)` (owner/admin only), `checkoutablePlan(plan)` (μόνο paid shared/
+  dedicated· free/unknown→null), `normalizeBase`, `pickBaseUrl(envBase, reqOrigin)` (προτιμά
+  configured public URL, αλλιώς request origin), `checkoutUrls(base)` (success/cancel, κρατά το
+  Stripe `{CHECKOUT_SESSION_ID}` template token literal), `portalReturnUrl(base)`.
+- `lib/billing/billingSession.ts` — NODE-ONLY `resolveBillingSession(wantSlug)`: centralises
+  gate→account session→membership authz→tenant ctx+Tenant doc. Tagged result (short-circuit
+  NextResponse ή {session}). Owner/admin required (403 αλλιώς). Δεν αγγίζει feature route ούτε
+  το per-tenant User session — μόνο control-plane.
+- `app/api/saas/billing/checkout/route.ts` — `POST` `{plan, tenant?}` → Checkout Session.
+  Gating: SAAS off 404 / not-auth 401 / not owner-admin 403 / bad-free plan 400 / Stripe
+  unconfigured 503 / upstream 502. Επιστρέφει `{url, id}`. ΠΟΤΕ δεν χρεώνει — ο webhook
+  αντικατοπτρίζει το αποτέλεσμα.
+- `app/api/saas/billing/portal/route.ts` — `POST` `{tenant?}` → Billing Portal Session
+  (manage/cancel). Απαιτεί υπάρχον `billingCustomerId` (409 αλλιώς, «checkout first»). Ίδιο
+  gating ladder. Επιστρέφει `{url, id}`.
+- `lib/billing/billingRoutes.test.ts` — 9 PURE tests (canManageBilling owner/admin vs member/
+  unknown, checkoutablePlan paid vs free/unknown, normalizeBase trailing-slash, pickBaseUrl
+  env-vs-origin fallback, checkoutUrls template-token literal, portalReturnUrl).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **320/320 green** (9 νέα).
+External importers των νέων modules από feature code → **κανένας**· τα routes SAAS-gated (404
+όταν off) ⇒ zero runtime wiring, `SAAS_MODE` off = zero effect, κανένα Docker rebuild. Καθαρά
+additive — δεν άγγιξα κανένα υπάρχον αρχείο.
+
+**## Needs Achilleas** (billing go-live):
+- **Stripe keys** (`STRIPE_SECRET_KEY`, `STRIPE_PRICE_SHARED`, `STRIPE_PRICE_DEDICATED`,
+  `STRIPE_WEBHOOK_SECRET`) + optional `SAAS_PUBLIC_URL`/`APP_URL` για τα redirect URLs.
+  Χωρίς αυτά τα routes γυρίζουν 503 (graceful).
+- Ο webhook σετάρει το `billingCustomerId` στο checkout.completed → το portal route δουλεύει
+  μόνο ΜΕΤΑ από ένα ολοκληρωμένο checkout (409 πριν).
+- Ανοιχτά από πριν: tenant-aware `saveFile` (shared storage) + enforcement wiring σε `api/v1/*`
+  (feature territory) — και τα δύο θέλουν ρητή άδεια ή feature-builder routine.
+
+**Next task:** increment 11 — ένα «billing summary» read surface (`GET /api/saas/billing` ή
+επέκταση του `/api/saas/usage`) που ενώνει plan/status/priceMonthlyEUR/subscription-id +
+`billingConfigured` flag, ώστε ένα settings/billing UI να ξέρει τι να δείξει (Subscribe vs
+Manage). Εναλλακτικά, το enforcement/saveFile wiring αν δοθεί άδεια.
