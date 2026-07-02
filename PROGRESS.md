@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 7a0af2b -->
-<!-- docker-validated: 35953c6 -->
+<!-- docker-validated: 0a07bae -->
+
+## 2026-07-02 (docker-health — safe rebuild @0a07bae, stack healthy, 2.1GB reclaimed)
+- **Health (read-only):** `homepage-mongo` = **healthy**, `homepage-web` RestartCount **0** (running, OOMKilled=false, Up ~2h). Mongo RestartCount **87** = σωρευτικό ιστορικό OOM, ΟΧΙ ενεργό loop (health=healthy, web σταθερό). `homepage-flaresolverr` **δεν έτρεχε** (Exited πριν 2 μέρες, καμία ενέργεια). ΣΗΜ: το `.State.RestartCount` template του skill αποτυγχάνει σε αυτή την έκδοση Docker (το πεδίο είναι top-level `.RestartCount`) — χρησιμοποιήθηκε το σωστό path. Το `docker system df` πριν: Images 4.07GB, Build Cache 667MB.
+- **Rebuild:** warranted — ο canonical marker ήταν `35953c6`, ο diff `35953c6..HEAD` αγγίζει **web runtime files** (`lib/tenancy/mailer.ts` νέο, `passwordReset.ts`, 5 SaaS API routes billing/members/usage/reset). Ασφαλής χορός: `docker compose build web` (image-only) → mongo healthy → `docker compose up -d web` → `/login` **200** (1η προσπάθεια) → web RestartCount παρέμεινε **0**, OOMKilled=false.
+- **Disk hygiene:** `docker builder prune -f` μετά το build → **2.098GB reclaimed** (build cache μόνο). Καμία destructive ενέργεια (μηδέν volume/system/`--all` prune). ΣΗΜ: υπάρχουν σταματημένα `bakecore-*` containers (άλλο project, Exited) — ΔΕΝ αγγίχτηκαν.
+- **Marker:** docker-validated `35953c6` → **`0a07bae`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
+- **Needs Achilleas:** κανένα νέο. (Παραμένει προϋπάρχον: Docker VM RAM bump ~1.9GB → μειώνει τα OOM-driven mongo restarts, τώρα στα 87.)
 
 ## 2026-07-02 (reviewer — range 12b80a1..7a0af2b καθαρό, 0 fixes, 1 P3 flag, marker → 7a0af2b)
 - **Έλεγχος:** commits `12b80a1..HEAD` (6: c253bab landing a11y, 34045b9 i18n index tests, 4fd7033 mobile-parity doc, 10d9656 SaaS mailer + wire emails, 7a0af2b i18n config/locales tests, ee3f49a προηγούμενο reviewer doc). Ουσιαστικός runtime κώδικας: `lib/tenancy/mailer.ts` (νέο), `passwordReset.ts`, `saas/account/reset/request/route.ts`, `saas/members/route.ts`, `apps/landing/app/globals.css`.
