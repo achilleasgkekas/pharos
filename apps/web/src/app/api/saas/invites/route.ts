@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
     tenant: session.ctx.tenantId!,
     ...inviteStatusQuery(filter),
   })
-    .select('email role status expires createdAt acceptedBy acceptedAt')
+    .select('email role status expires createdAt invitedBy acceptedBy acceptedAt')
     .sort({ createdAt: -1 })
     .lean()) as unknown as (InviteDoc & { createdAt?: Date })[];
 

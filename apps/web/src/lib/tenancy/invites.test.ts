@@ -113,7 +113,7 @@ describe('inviteView', () => {
     );
     expect(JSON.stringify(v)).not.toContain('SECRET');
     expect(Object.keys(v).sort()).toEqual(
-      ['acceptedAt', 'acceptedBy', 'createdAt', 'email', 'expired', 'expires', 'id', 'role', 'status'].sort()
+      ['acceptedAt', 'acceptedBy', 'createdAt', 'email', 'expired', 'expires', 'id', 'invitedBy', 'role', 'status'].sort()
     );
   });
 
@@ -131,6 +131,16 @@ describe('inviteView', () => {
     const v = inviteView({ _id: 1, status: 'pending', expires: future }, now);
     expect(v.acceptedBy).toBeNull();
     expect(v.acceptedAt).toBeNull();
+  });
+
+  it('projects invitedBy (the minter) as a stringified id', () => {
+    const v = inviteView({ _id: 1, status: 'pending', expires: future, invitedBy: 7 }, now);
+    expect(v.invitedBy).toBe('7');
+  });
+
+  it('leaves invitedBy null on a legacy row minted before the field existed', () => {
+    const v = inviteView({ _id: 1, status: 'pending', expires: future }, now);
+    expect(v.invitedBy).toBeNull();
   });
 
   it('flags a pending invite past its TTL as expired', () => {
@@ -157,6 +167,7 @@ describe('inviteView', () => {
     expect(v.role).toBe('member');
     expect(v.status).toBe('pending');
     expect(v.createdAt).toBeNull();
+    expect(v.invitedBy).toBeNull();
     expect(v.acceptedBy).toBeNull();
     expect(v.acceptedAt).toBeNull();
   });

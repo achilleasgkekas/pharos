@@ -1,6 +1,41 @@
 
 ---
 
+## 2026-07-02 (increment 22 — invitedBy projection στο inviteView, κλείνει το audit loop)
+**Built:** το §21 πρόσθεσε acceptedBy/acceptedAt (ποιος δέχτηκε), αλλά έλειπε το «ποιος
+έστειλε». Το `invitedBy` υπήρχε ΗΔΗ στο `Invite` model + set-άρεται στο mint
+(`members/route.ts:135` → `invitedBy: session.account.sub`), απλώς **δεν προβαλλόταν**. Το
+πρόσθεσα ΟΛΟ additive, SaaS-gated, σε δικά μου αρχεία:
+- `lib/tenancy/invites.ts` (additive): ο `InviteView` type += **`invitedBy: string|null`** +
+  ο `inviteView` serializer το projects (stringified ObjectId· null σε legacy rows minted πριν
+  υπάρξει το field). By construction ΠΟΤΕ tokenHash — μόνο whitelisted πεδία.
+- `app/api/saas/invites/route.ts` (additive): το GET `.select()` += `invitedBy` ώστε να φτάνει
+  στον serializer. Gate/scope/sort/status-filter αμετάβλητα.
+- `lib/tenancy/invites.test.ts`: ενημέρωσα το exact-key-set assertion (+invitedBy) + το
+  defaults test + 2 νέα it-blocks (invitedBy → '7'· legacy row → null).
+
+Έτσι το audit view (`?status=accepted|all`) δίνει πλήρες trail: **invitedBy → acceptedBy/
+acceptedAt** (ποιος κάλεσε ποιον, ποιος τελικά μπήκε, πότε).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run invites.test.ts` → **28/28
+green** (26 προϋπάρχοντα + 2 νέα). Pure serializer + `.select()` προσθήκη σε SaaS-gated route
+(404 όταν off) ⇒ `SAAS_MODE` off = zero effect, κανένα Docker rebuild, καμία νέα εξάρτηση,
+κανένας external importer των αλλαγών. Άγγιξα μόνο δικά μου SAAS αρχεία.
+
+**Next task:** increment 23 — είτε (α) `invitedBy` projection και στο MEMBER list
+(`members/route.ts` έχει ήδη το field στο `.select()` + serializer· έλεγξε αν χρειάζεται
+consistency με invites), είτε (β) `sendViaSmtp` via nodemailer (μετά από provider decision
+Achilleas — ξεκλειδώνει reset/verify/invite delivery σε production), είτε (γ) dedicated resend
+endpoint (re-mint + email σε ένα βήμα).
+
+**## Needs Achilleas:**
+- **Stripe keys** για `billingConfigured:true` (αλλιώς summary σωστά `false` + action buttons
+  503 graceful).
+- **SMTP/email provider decision** για production delivery των reset/verify/invite emails
+  (τώρα echo σε non-prod, no-op σε prod χωρίς config).
+- Ανοιχτά: tenant-aware `saveFile` (shared storage) + enforcement wiring σε `api/v1/*`
+  (feature territory) — θέλουν ρητή άδεια ή feature-builder routine.
+
 ## 2026-07-02 (increment 11 — billing summary read surface)
 **Built** (όλο σε νέα αρχεία· μηδέν edit σε υπάρχον):
 - `lib/billing/billingSummary.ts` — PURE builder (imports μόνο το plan table + το δικό μου
@@ -38,3 +73,33 @@ bars + Subscribe/Manage button (POST στα checkout/portal routes). Θα ζει
 component/page under δικό μου territory (π.χ. `app/(saas)/billing` ή component gated από
 `saasMode()`), ώστε να μην αγγίξει τα υπάρχοντα settings pages. Εναλλακτικά, το enforcement/
 saveFile wiring αν δοθεί άδεια για shared plumbing.
+
+## 2026-07-02 (increment 21 — accepted-invite audit metadata στο inviteView)
+**Built:** το audit view του §20 (`?status=accepted|all`) έδειχνε accepted invites αλλά **χωρίς
+who/when** — ποιος τα δέχτηκε και πότε. Πρόσθεσα explicit acceptance trail. ΟΛΟ SAAS-gated,
+additive, backward-compatible, σε δικά μου αρχεία:
+- `models/Invite.ts` (additive): νέο πεδίο **`acceptedAt: { type: Date, default: null }`**.
+  Ξεχωριστό από το `updatedAt` (που bump-άρει και στο revoke) → null μέχρι το redeem και
+  αμετάβλητο μετά, οπότε το «ποιος/πότε» είναι μονοσήμαντο. Το `acceptedBy` προϋπήρχε.
+- `app/api/saas/invites/accept/route.ts` (additive): το consume-step βάζει πλέον
+  `acceptedAt: new Date()` μαζί με `status:'accepted', acceptedBy` στο ίδιο `$set`.
+- `lib/tenancy/invites.ts` (additive): ο `InviteView` type + ο `inviteView` serializer
+  προβάλλουν **`acceptedBy: string|null`** (stringified ObjectId, null σε pending/revoked) +
+  **`acceptedAt: string|null`** (ISO μέσω του υπάρχοντος null-safe `toIso`). By construction
+  ΠΟΤΕ tokenHash — μόνο whitelisted πεδία.
+- `app/api/saas/invites/route.ts` (additive): το GET `.select()` += `acceptedBy acceptedAt`
+  ώστε να φτάνουν στον serializer. Gate/scope/sort αμετάβλητα.
+- `lib/tenancy/invites.test.ts` — ενημέρωσα το exact-key-set assertion (+acceptedAt/acceptedBy)
+  + 2 νέα it-blocks (accepted invite → projects '99'/ISO· pending → null/null) + 2 assertions
+  στο defaults test.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run invites.test.ts` → **26/26
+green** (24 προϋπάρχοντα + 2 νέα). Additive model field με default + routes SaaS-gated (404 off)
++ serializer pure ⇒ `SAAS_MODE` off = zero effect, κανένα Docker rebuild (self-hosted path δεν
+mint-άρει invites, κανένας external importer των αλλαγών), καμία νέα εξάρτηση. Άγγιξα μόνο δικά
+μου SAAS αρχεία.
+
+**Next task:** increment 22 — είτε (α) `sendViaSmtp` via nodemailer (μετά από provider decision
+Achilleas· ξεκλειδώνει reset/verify/invite delivery σε production), είτε (β) dedicated resend
+endpoint (re-mint + email σε ένα βήμα), είτε (γ) `invitedBy` projection στο inviteView (ποιος
+έστειλε το invite — συμπληρώνει το acceptedBy του §21 για πλήρες audit trail).

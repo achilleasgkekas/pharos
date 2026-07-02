@@ -104,6 +104,10 @@ export type InviteView = {
   expires: string | null;
   expired: boolean;
   createdAt: string | null;
+  // Who minted the invite (the owner/admin who sent it), stringified Account id or null on
+  // legacy rows minted before the field existed. Together with acceptedBy this closes the
+  // audit loop: who invited whom, and who ultimately joined. Still never a secret.
+  invitedBy: string | null;
   // Acceptance audit trail — populated only once an invite is redeemed, null otherwise. Lets
   // the audit list (?status=accepted|all) show who joined via which invite, and when. Still
   // never carries the token hash or any secret.
@@ -125,6 +129,7 @@ export function inviteView(
     status?: string | null;
     expires?: Date | string | null;
     createdAt?: Date | string | null;
+    invitedBy?: unknown;
     acceptedBy?: unknown;
     acceptedAt?: Date | string | null;
   },
@@ -141,6 +146,8 @@ export function inviteView(
     // "pending"; surface that so the UI can distinguish live links from stale ones.
     expired: status === 'pending' && !isInviteValid(status, inv.expires, nowMs),
     createdAt: toIso(inv.createdAt),
+    // Set at mint (owner/admin id); null only on legacy rows minted before the field.
+    invitedBy: inv.invitedBy != null ? String(inv.invitedBy) : null,
     // null on pending/revoked rows; set only when an invite was actually accepted.
     acceptedBy: inv.acceptedBy != null ? String(inv.acceptedBy) : null,
     acceptedAt: toIso(inv.acceptedAt),
