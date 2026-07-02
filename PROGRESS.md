@@ -2630,3 +2630,29 @@ Read-only mobile-parity audit (apps/mobile Expo ⇄ apps/web `api/v1`). Inventor
 
 ### Needs Achilleas
 - (αμετάβλητο) Standing product/security decisions μη-auto-buildable: login brute-force rate-limit, error-message leak στο `withAuth` 500, quota-enforce gate wiring σε πραγματικά AI/upload routes, tenant-aware `saveFile`, `getTenantConnection` cache-reuse guard (ambiguous rebuild-semantic), Stripe/CRON/AUTH key provisioning (env boundary). Mobile #6/#8 θέλουν simulator/APNs/theme-refactor απόφαση.
+
+## 2026-07-02 (ui-auditor — 32η σάρωση mobile UI consistency· CONFIRMATION run)
+
+Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `apps/web/src/app/globals.css`). Inventory ξαναχτίστηκε από τον κώδικα: **16 screens**, `theme.ts` (`C`/`SPACE`/`RADIUS`/`SIZE`/`scrim`/`alpha`) + `ui.tsx` primitives (`Input/TextArea/Check/Button/IconButton/Card/ListItem/Badge` + `Header/Centered/Spinner/ErrorText/Empty` + `contentWidth`) ΟΛΑ παρόντα. mobile `npx tsc --noEmit` → **EXIT 0**.
+
+**Νέος κώδικας από την 31η:** ένα mobile-src commit, `d170d93` (feat(mobile): Reports subs-by-category bars, monthly-equivalent). Diff = +9 γραμμές (`api.ts` +1, `ReportsScreen.tsx` +8): ξαναχρησιμοποιεί το υπάρχον `<Bar>` component με `color={C.purple}` + `s.section` style, μηδέν νέο StyleSheet entry, μηδέν hex → **0 νέο UI debt.**
+
+**Ευρήματα ανά διάσταση (fresh grep):**
+- Tokens (hardcoded hex): **0** στα `screens/`+`nav.tsx`+`App.tsx` (πλήρως καθαρό, incl. ο νέος Reports κώδικας).
+- Shared theme file: **ΥΠΑΡΧΕΙ** (`theme.ts`) → κανένα P1 foundation item ανοιχτό.
+- Reusable components: **`<Chip>` MISSING** (`chip`/`chipOn`/`chipText` Items:465 + Settings:617· `cChip` Subscriptions:160· `sChip` Items:480) + ghost cyan/accent-border button variant ~7 sites (`aiBtn` Subscriptions:147/Vouchers:192/Items:488· `scanBtn` Money:232/Shopping:155· `rescanBtn` Receipts:264· `importBtn` Items:461).
+- Theme/dark mode: **0** `useColorScheme`/`ThemeProvider`/`useTheme` (dark-only· web light palette χωρίς mobile αντίστοιχο).
+- States: complete trio στα περισσότερα screens· inline `ActivityIndicator` = in-button busy spinners (επικαλύπτονται με ghost-button holdout), ΟΧΙ νέο debt.
+- Adaptive: safe-area **ανοιχτό** (plain `SafeAreaView` @ App.tsx:88, `react-native-safe-area-context` εκτός package.json, μηδέν bottom inset· `nav.tsx:87` `paddingTop:60`)· max-content-width DONE (`contentWidth`).
+- Touch targets: DONE.
+- Input primitive: raw `<TextInput>` 21 sites σε 7 screens (attended-preferred token-drift).
+
+**Ουρά:** αμετάβλητη από την 31η, μηδέν item έκλεισε ή άνοιξε. Καθαρό confirmation run.
+
+**Top 3 items να πάρει ο builder μετά (unattended-safe διάταξη):**
+1. **Safe-area insets (P2/M)** — μοναδικό πραγματικό adaptive gap· `react-native-safe-area-context` + `SafeAreaProvider`/`useSafeAreaInsets` (bottom inset για sheet buttons κάτω από home indicator). Θέλει package-add + simulator verify → semi-attended.
+2. **`<Chip>` primitive (P2/M)** — τελευταίο reusable-component holdout· ενοποιεί `chip`/`chipOn`/`cChip`/`sChip` σε 3 screens. Attended-preferred για οπτικό verify.
+3. **Ghost `<Button variant>` (P2)** — κλείνει το button family (~7 sites)· μέρος του Button+Chip item.
+
+### Needs Achilleas
+- Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) παραμένει σκόπιμη απόφαση (μεγάλο refactor, εξαρτάται από ολοκλήρωση reusable set), όχι unattended.
