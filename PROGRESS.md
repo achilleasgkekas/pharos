@@ -2,8 +2,18 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 7670bf9 -->
+<!-- reviewed: 148fb06 -->
 <!-- docker-validated: 7192c8e -->
+
+## 2026-07-02 (reviewer — range 7670bf9..148fb06, καθαρή επιθεώρηση, μηδέν fix)
+- **Τι επιθεώρησα:** 4 commits από τον marker `7670bf9`. Code commits: `4ec7af4` (SaaS generic `MAIL_WEBHOOK_URL` email provider), `148fb06` (mobile Expense/Income vendor autocomplete chips), `637f672` (landing scroll-margin offset). Ένα test-only (`eec3b7e`, scrypt hashPassword/verifyPassword).
+- **Checks (read-only):** `apps/web` type-check → **EXIT 0**. `apps/mobile` tsc → **EXIT 0**. Affected tests (`auth.test.ts` + `mailer.test.ts`) → **27/27 green** (16 mailer + 11 auth).
+- **Ανά commit:**
+  - `4ec7af4` — νέος `webhook` provider στο `mailer.ts`, καθαρός: `resolveProvider` precedence RESEND > MAIL_WEBHOOK_URL > SMTP_URL > none· `mailerCanDeliver` true για resend/webhook· `sendViaWebhook` POST JSON, optional `Bearer` (MAIL_WEBHOOK_TOKEN), 2xx=delivered, **try/catch never-throws**. Server-only, μηδέν API shape change → δεν αγγίζει mobile. Το webhook path καλύπτεται από 9 test refs.
+  - `148fb06` — mobile-only. `vendorList` useMemo (case-insensitive dedup, keeps first casing, localeCompare), `vendorSuggestions` substring-match cap 6 εξαιρώντας exact. Render horizontal `ScrollView` με `Chip` (επιβεβαίωσα signature `{label,onPress}` στο `ui.tsx:229`), `keyboardShouldPersistTaps="handled"` σωστό RN idiom. Token-clean styles.
+  - `637f672` — landing-only `section[id] { scroll-margin-top: 80px }`. Το comment λέει 64px header, το margin 80px = εσκεμμένο breathing room, όχι bug.
+- **Secret scan:** added lines έναντι `sk-…/AKIA/BEGIN/xox./ghp_/re_…` → **μηδέν match**. MAIL_WEBHOOK_URL/TOKEN διαβάζονται από env, ΟΧΙ hardcoded.
+- **Fixes:** κανένα. Και οι δύο υποχρεωτικοί type-checks EXIT 0, τα diffs additive/tested, δεν βρέθηκε regression ή small-safe defect. Ουρές (WEB_DEBT/MOBILE_PARITY) αμετάβλητες.
 
 ## 2026-07-02 (pharos-daily-dev — mobile Expense vendor autocomplete [ΚΛΕΙΝΕΙ το item])
 - **Τι έκανα:** έκλεισα το **suggested-next-task της προηγ. pharos-daily-dev εγγραφής** (mobile Expense vendor autocomplete, P3/S, Build Queue). Το web add-expense form έχει vendor autocomplete (`SearchableSelect` allowCustom πάνω σε distinct vendors), αλλά το mobile MoneyScreen add-row είχε plain `Input` χωρίς suggestions. Επιλέχθηκε ως το top auto-buildable: pure client-side, μηδέν endpoint / AI / credentials / native dep → ιδανικό unattended.
