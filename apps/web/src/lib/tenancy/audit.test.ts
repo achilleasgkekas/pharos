@@ -108,13 +108,14 @@ describe('auditView', () => {
       action: 'member.removed',
       actor: 'acc9',
       actorEmail: null,
+      actorName: null,
       target: 'someone@example.com',
       meta: { role: 'member' },
       createdAt: iso,
     });
     // Exact key set — no stray columns can pass through.
     expect(Object.keys(view).sort()).toEqual(
-      ['action', 'actor', 'actorEmail', 'createdAt', 'id', 'meta', 'target'].sort()
+      ['action', 'actor', 'actorEmail', 'actorName', 'createdAt', 'id', 'meta', 'target'].sort()
     );
   });
 
@@ -127,15 +128,32 @@ describe('auditView', () => {
     expect(view.actorEmail).toBe('admin@example.com');
   });
 
-  it('actorEmail defaults to null (omitted, or explicit null for a system/deleted actor)', () => {
-    expect(auditView({ _id: 'e1c', action: 'plan.changed' }).actorEmail).toBeNull();
-    expect(auditView({ _id: 'e1d', action: 'plan.changed' }, null).actorEmail).toBeNull();
+  it('projects the resolved actorName when the route passes it (3rd arg)', () => {
+    const view = auditView(
+      { _id: 'e1e', action: 'member.removed', actor: 'acc9' },
+      'admin@example.com',
+      'Achilleas'
+    );
+    expect(view.actorEmail).toBe('admin@example.com');
+    expect(view.actorName).toBe('Achilleas');
+  });
+
+  it('actorEmail/actorName default to null (omitted, or explicit null for a system/deleted actor)', () => {
+    const omitted = auditView({ _id: 'e1c', action: 'plan.changed' });
+    expect(omitted.actorEmail).toBeNull();
+    expect(omitted.actorName).toBeNull();
+    const explicit = auditView({ _id: 'e1d', action: 'plan.changed' }, null, null);
+    expect(explicit.actorEmail).toBeNull();
+    expect(explicit.actorName).toBeNull();
+    // Email resolved but name absent (blank display name) → email set, name null.
+    expect(auditView({ _id: 'e1f', action: 'plan.changed' }, 'x@y.z').actorName).toBeNull();
   });
 
   it('null-safes actor/target/meta/createdAt (system event, legacy row)', () => {
     const view = auditView({ _id: 'e2', action: 'plan.changed' });
     expect(view.actor).toBeNull();
     expect(view.actorEmail).toBeNull();
+    expect(view.actorName).toBeNull();
     expect(view.target).toBeNull();
     expect(view.meta).toBeNull();
     expect(view.createdAt).toBeNull();

@@ -83,10 +83,12 @@ export type AuditView = {
   id: string;
   action: string;
   actor: string | null;
-  // Human-readable actor identity (the Account's email), resolved by the read route from a
-  // batched lookup. Null for system-originated events (no actor) or when the account is no
-  // longer resolvable (e.g. deleted). Purely for display; never a secret.
+  // Human-readable actor identity, resolved by the read route from a batched lookup. Both are
+  // null for system-originated events (no actor) or when the account is no longer resolvable
+  // (e.g. deleted); `actorName` is also null when the account never set a display name. Purely
+  // for display; never a secret.
   actorEmail: string | null;
+  actorName: string | null;
   target: string | null;
   meta: Record<string, unknown> | null;
   createdAt: string | null;
@@ -114,8 +116,9 @@ function toIso(d: Date | string | null | undefined): string | null {
 /**
  * Client-safe projection of an AuditEvent row. By construction it only exposes whitelisted
  * fields, so a tokenHash or other stray secret column could never leak through it. `actor`
- * is a stringified Account id (null for system events). `actorEmail` is the resolved display
- * identity when the read route passes it (from a batched Account lookup), else null.
+ * is a stringified Account id (null for system events). `actorEmail`/`actorName` are the
+ * resolved display identity when the read route passes them (from a batched Account lookup),
+ * else null. Both are positional + optional so every existing caller stays unchanged.
  */
 export function auditView(
   ev: {
@@ -126,13 +129,15 @@ export function auditView(
     meta?: unknown;
     createdAt?: Date | string | null;
   },
-  actorEmail: string | null = null
+  actorEmail: string | null = null,
+  actorName: string | null = null
 ): AuditView {
   return {
     id: String(ev._id),
     action: ev.action ?? '',
     actor: ev.actor != null ? String(ev.actor) : null,
     actorEmail: actorEmail ?? null,
+    actorName: actorName ?? null,
     target: ev.target ?? null,
     // Re-redact on the way out as a defence-in-depth belt: even a legacy row written before
     // the recorder redacted is scrubbed before it reaches a client.

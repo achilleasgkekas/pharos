@@ -67,17 +67,22 @@ export async function GET(req: NextRequest) {
     .limit(limit)
     .lean()) as unknown as (AuditEventDoc & { createdAt?: Date })[];
 
-  // Resolve every actor's email in ONE batched lookup (never N+1), so the Activity panel can
-  // render a human name without its own account API. System events (null actor) and deleted
-  // accounts simply have no entry → auditView gets null.
+  // Resolve every actor's email + display name in ONE batched lookup (never N+1), so the
+  // Activity panel can render a human identity without its own account API. System events
+  // (null actor) and deleted accounts simply have no entry → auditView gets null. A blank
+  // name (Account default '') is treated as absent so the UI falls back to the email.
   const actorIds = collectActorIds(events);
   const emailById = new Map<string, string>();
+  const nameById = new Map<string, string>();
   if (actorIds.length) {
     const accounts = (await Account.find({ _id: { $in: actorIds } })
-      .select('email')
-      .lean()) as unknown as { _id: unknown; email?: string | null }[];
+      .select('email name')
+      .lean()) as unknown as { _id: unknown; email?: string | null; name?: string | null }[];
     for (const a of accounts) {
-      if (a.email) emailById.set(String(a._id), a.email);
+      const id = String(a._id);
+      if (a.email) emailById.set(id, a.email);
+      const name = a.name?.trim();
+      if (name) nameById.set(id, name);
     }
   }
 
@@ -86,8 +91,13 @@ export async function GET(req: NextRequest) {
     action: action ?? 'all',
     limit,
     count: events.length,
-    events: events.map((ev) =>
-      auditView(ev, ev.actor != null ? emailById.get(String(ev.actor)) ?? null : null)
-    ),
+    events: events.map((ev) => {
+      const id = ev.actor != null ? String(ev.actor) : null;
+      return auditView(
+        ev,
+        id ? emailById.get(id) ?? null : null,
+        id ? nameById.get(id) ?? null : null
+      );
+    }),
   });
 }

@@ -1023,3 +1023,37 @@ UI-only), είτε (β) `sendViaSmtp` via nodemailer (μετά provider decision
 reset/verify/invite delivery), είτε (γ) `target`-email enrichment για invite/member events (το
 target είναι ήδη email/slug string, οπότε ίσως δεν χρειάζεται) ή actor-name προσθήκη αν το Account
 αποκτήσει displayName πεδίο.
+
+## 2026-07-02 (increment 25 — resolve actor names in the audit read API)
+**Built:** το `GET /api/saas/audit` (§24) επέστρεφε `actorEmail` αλλά όχι ανθρώπινο όνομα. Το
+`Account` έχει **ήδη** πεδίο `name` (default `''`) — δεν χρειάστηκε νέο `displayName` όπως έλεγε
+το §24 option (γ). Πρόσθεσα batched actor-**name** resolution δίπλα στο email, ώστε ένα «Activity»
+panel να δείχνει «Achilleas» αντί για σκέτο email. ΟΛΟ SAAS-gated, additive, backward-compatible,
+σε δικά μου SAAS αρχεία:
+- `lib/tenancy/audit.ts` (additive): (α) ο `AuditView` απέκτησε **`actorName: string|null`**
+  (display-only, ΠΟΤΕ secret· null σε system events/deleted accounts/blank name)· (β) ο
+  `auditView` δέχεται **optional 3ο param `actorName = null`** (positional, μετά το `actorEmail`
+  του §24 → όλοι οι υπάρχοντες 1-arg/2-arg callers αμετάβλητοι). `collectActorIds` (§24)
+  ξαναχρησιμοποιείται ως έχει (ίδιο batched id set για email+name).
+- `app/api/saas/audit/route.ts` (additive): το `.select('email')` → **`.select('email name')`**·
+  χτίζει και `nameById` map δίπλα στο `emailById` (μία διαδρομή, ο ίδιος `_id:{$in}` lookup — ΟΧΙ
+  δεύτερο query). **Blank name (Account default `''`) → trim → treated as absent** ⇒ nameById δεν
+  έχει entry ⇒ `actorName:null`, το UI πέφτει πίσω στο email. System/deleted → null. Το map-build
+  refactor-άρισε το event mapping σε ένα resolved `id` (μηδέν διπλό `String(ev.actor)`).
+- `lib/tenancy/audit.test.ts` — updated exact-key-set assertion (+actorName) + null-safe
+  assertions + 1 νέο it-block («projects actorName from 3rd arg») + επέκταση του email-default test
+  (email set αλλά name null όταν blank).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run audit.test.ts` → **24/24 green**·
+full suite `npx vitest run` → **703/703 green** (καμία regression). Route SAAS-gated (404 όταν
+SAAS_MODE off) + serializer pure/additive + κανένας external importer των αλλαγών από feature code
+⇒ `SAAS_MODE` off = **zero effect** στο self-hosted app· κανένας Docker rebuild (route 404 στο
+running container με SAAS_MODE off — ο νέος κώδικας δεν εκτελείται· type-check καλύπτει το compile)·
+καμία νέα εξάρτηση· κανένα feature route/data-db/User-path αγγίχτηκε. Άγγιξα μόνο δικά μου SAAS
+αρχεία (foreign `.claude/launch.json` άθικτο).
+
+**Next task:** increment 26 — είτε (α) user-facing workspace-settings «Activity» panel που
+consume-άρει το `GET /api/saas/audit` (το read API επιστρέφει πλέον actorEmail+actorName → πλήρως
+render-able· UI-only), είτε (β) `sendViaSmtp` via nodemailer (μετά provider decision Achilleas·
+ξεκλειδώνει reset/verify/invite delivery), είτε (γ) `invitedBy` projection στο inviteView (ποιος
+έστειλε το invite — συμπληρώνει το acceptedBy/acceptedAt του §21 για πλήρες invite audit trail).
