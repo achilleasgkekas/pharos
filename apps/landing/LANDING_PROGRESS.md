@@ -610,3 +610,25 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-02 (cont.²⁰)
+
+Task: (e) Polish, μερος 26 — scroll-margin-top offset για το sticky header. Ηταν το ρητο «επομενο increment» του προηγουμενου log (real screenshots + per-plan Offer JSON-LD μενουν blocked σε assets/τιμες). Προβλημα: το header ειναι `position: sticky; top:0; height:64px`. Καθε κλικ σε nav anchor (#features, #ai, #pricing, ...) εκανε jump με το section top στο top:0 -> το sticky header σκεπαζε τους πρωτους ~64px καθε section (ο τιτλος του section κρυβοταν απο κατω). Ιδιο και για το ScrollSpy landing απο external #hash. Τωρα ο anchor στοχος προσγειωνεται καθαρα κατω απο το header.
+
+Τι εφτιαξα (μονο `app/globals.css`, μια regla):
+- `section[id] { scroll-margin-top: 80px }` διπλα στο υπαρχον `html { scroll-behavior: smooth }` block. Ολα τα scroll targets ειναι `<section id="...">` (top/preview/features/ai/mobile/who/self-host/pricing/compare/faq/waitlist) -> ενας attribute selector τα καλυπτει ολα χωρις να αγγιξω τα inline styles καθε section. 80px = 64px header + 16px breathing room. Δουλευει και με smooth-scroll και με reduced-motion (το scroll-margin ειναι ανεξαρτητο απ' το scroll-behavior:auto override στο :1298).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success. Route / = 2.18 kB / 105 kB First Load JS (αμεταβλητο· pure CSS, μηδεν JS delta).
+- Compiled CSS (.next/static/css/*.css): `scroll-margin-top:80px` FOUND.
+- Δεν αφησα κανενα dev server. Το :3000 το κραταει το Docker homepage-web· δεν το πειραξα. Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status -> foreign `.claude/launch.json` + `PROGRESS.md` (modified, αλλα ΑΣΤΑΓΑ, αλλης ρουτινας) ΔΕΝ commit — μονο globals.css + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως prefers-reduced-motion σεβασμος στο ScrollSpy ή lazy-load των mockup blocks.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.

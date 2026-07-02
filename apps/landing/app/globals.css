@@ -35,6 +35,11 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Offset anchor jumps so section tops clear the 64px sticky header. */
+section[id] {
+  scroll-margin-top: 80px;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
