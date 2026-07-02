@@ -611,3 +611,55 @@ password), ΟΛΟ σε νέα αρχεία, πάνω στα υπάρχοντα `
 no-op/console fallback όταν unconfigured. Wire το reset-request + το members invite να το καλούν
 (behind resetDeliveryConfigured). Χρειάζεται provider decision από Achilleas (βλ. Needs-Achilleas).
 Εναλλακτικά, seat-limits ανά plan στα entitlements όταν οριστεί το pricing.
+
+---
+
+## 2026-07-02 (increment 15 — mailer abstraction + reset/invite wiring)
+**Built:** το transactional-email layer που ξεκλειδώνει το reset go-live (increment 14) +
+το members notification, με **μηδέν νέα εξάρτηση** (Resend μέσω `fetch`, όχι nodemailer):
+- `lib/tenancy/mailer.ts` — ένα entry point `sendEmail({to,subject,html})` με provider
+  dispatch από env. Χωρισμένο σε **PURE** (unit-tested) + network-touching:
+  - PURE: `resolveProvider(env)` (RESEND_API_KEY → `resend`, αλλιώς SMTP_URL → `smtp`,
+    αλλιώς `none`· resend precedence), `mailerCanDeliver(env)` (**true ΜΟΝΟ** για wired
+    provider = resend· SMTP_URL = intent αλλά όχι deliverable ακόμα), `fromAddress(env)`
+    (`MAIL_FROM` ή branded default), `htmlToText(html)` (tag-strip + entity-decode για το
+    text/* alternative), `resetLinkUrl(base,token)` (url-encoded token → `/reset?token=`),
+    `resetEmail(link)` / `invitedEmail(workspace)` (message builders).
+  - NETWORK: `sendEmail(msg)` → `sendViaResend` (POST api.resend.com/emails, **never
+    throws**, returns `SendResult`)· `smtp` → warn + `smtp_not_wired` (nodemailer deferred)·
+    `none` → dev console log + `delivered:false`. Best-effort by design.
+- `lib/tenancy/passwordReset.ts` (δικό μου, additive): το `resetDeliveryConfigured()`
+  **delegate-άρει τώρα στο `mailerCanDeliver()`** — μία source of truth. Άλλαξε σημασιολογία:
+  SMTP_URL μόνο ΔΕΝ θεωρείται deliverable πλέον (σωστά — δεν είναι wired), οπότε το
+  dev-token echo συνεχίζει σε non-prod μέχρι να μπει Resend/SMTP.
+- `app/api/saas/account/reset/request/route.ts` (δικό μου, additive): όταν
+  `resetDeliveryConfigured()` → χτίζει base URL (`pickBaseUrl(SAAS_PUBLIC_URL||APP_URL,
+  origin)`) + `resetLinkUrl` + `await sendEmail(resetEmail(...))`. Το anti-enumeration
+  `{ok:true}` + το dev-token echo (όταν όχι deliverable) μένουν ανέπαφα.
+- `app/api/saas/members/route.ts` (δικό μου, additive): μετά το add existing account →
+  best-effort `void sendEmail(invitedEmail(workspace))` (fire-and-forget, δεν καθυστερεί/
+  ρίχνει το 201· no-op χωρίς mailer). Full invite-by-email νέων χρηστών μένει deferred.
+- `lib/tenancy/mailer.test.ts` — 13 PURE tests (resolveProvider precedence/fallback/none,
+  mailerCanDeliver resend-only, fromAddress default/override, htmlToText strip+decode+empty,
+  resetLinkUrl encode+trailing-slash, resetEmail link-embed, invitedEmail name+fallback).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **490/490 green** (477
+προϋπάρχοντα + 13 νέα· ο συνολικός ανέβηκε από concurrent routines). Οι δύο edited routes
+είναι SAAS-gated (404 όταν off) + οι αλλαγές additive/flag-guarded ⇒ `SAAS_MODE` off = zero
+effect, κανένα Docker rebuild. Το mailer module δεν το κάνει import feature code.
+
+**## Needs Achilleas** (mailer go-live):
+- **Email provider decision + keys.** Wired σήμερα: **Resend** (`RESEND_API_KEY` + optional
+  `MAIL_FROM`) — μηδέν dependency, δουλεύει μόλις μπει το key. Αν προτιμηθεί **SMTP** →
+  χρειάζεται το `nodemailer` dependency (νέο `npm install`) + wiring στο `sendViaSmtp` (το
+  σημείο έχει `TODO(Needs-Achilleas)`). Μόλις μπει provider → `mailerCanDeliver()` γίνεται
+  true, το reset στέλνει link, το members στέλνει notification, το dev-token echo σβήνει.
+- Ο ίδιος mailer ξεκλειδώνει και το invite-by-email νέων χρηστών (increment 12 μελλοντικό) +
+  email verification (`verifyTokenHash` στο Account).
+- Χρειάζεται μια user-facing `/reset` σελίδα (διαβάζει `?token=` → POST στο confirm route)·
+  το `resetLinkUrl` δείχνει ήδη εκεί.
+
+**Next task:** increment 16 — είτε (α) `sendViaSmtp` via nodemailer αν επιλεγεί SMTP (μετά
+από provider decision), είτε (β) email verification flow (`verifyTokenHash`/`verifyTokenExpires`
+υπάρχουν ήδη στο Account) request/confirm scaffold πάνω στον νέο mailer, είτε (γ) seat-limits
+ανά plan στα entitlements όταν οριστεί το pricing.

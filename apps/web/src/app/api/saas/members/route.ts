@@ -12,6 +12,7 @@ import {
   type OrgRole,
 } from '@/lib/tenancy/members';
 import { readBody, strField } from '@/lib/apiBody';
+import { sendEmail, invitedEmail } from '@/lib/tenancy/mailer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -145,6 +146,11 @@ export async function POST(req: NextRequest) {
       invitedBy: session.account.sub,
     });
   }
+
+  // Best-effort notification that they now have workspace access (no-op unless a mailer is
+  // configured). Fire-and-forget so it never delays or fails the response; sendEmail never throws.
+  const { subject, html } = invitedEmail(session.workspace.slug);
+  void sendEmail({ to: account.email, subject, html });
 
   return NextResponse.json(
     {

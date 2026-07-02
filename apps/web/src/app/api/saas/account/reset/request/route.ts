@@ -5,6 +5,8 @@ import { readBody, strField } from '@/lib/apiBody';
 import { saasAuthGate } from '@/lib/tenancy/saasApi';
 import { normalizeEmail, looksLikeEmail } from '@/lib/tenancy/members';
 import { mintResetToken, resetDeliveryConfigured } from '@/lib/tenancy/passwordReset';
+import { sendEmail, resetEmail, resetLinkUrl } from '@/lib/tenancy/mailer';
+import { pickBaseUrl } from '@/lib/billing/billingRoutes';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,7 +45,15 @@ export async function POST(req: NextRequest) {
   account.set({ resetTokenHash: tokenHash, resetTokenExpires: expires });
   await account.save();
 
-  // TODO(Needs-Achilleas): send the reset link by email once a mailer is configured.
+  // Email the reset link through the configured provider (best-effort; never throws).
+  if (resetDeliveryConfigured()) {
+    const base = pickBaseUrl(process.env.SAAS_PUBLIC_URL || process.env.APP_URL, new URL(req.url).origin);
+    const { subject, html } = resetEmail(resetLinkUrl(base, token));
+    await sendEmail({ to: email, subject, html });
+  }
+
+  // SCAFFOLD: when no delivery channel is wired AND we are not in production, echo the token
+  // so the flow is testable locally. In production an unwired mailer drops it silently.
   const canEcho = !resetDeliveryConfigured() && process.env.NODE_ENV !== 'production';
   return NextResponse.json(canEcho ? { ok: true, devToken: token } : { ok: true });
 }

@@ -12,6 +12,7 @@
 // reachable from the (node-runtime) reset routes.
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { MIN_PASSWORD } from './accountProfile';
+import { mailerCanDeliver } from './mailer';
 
 /** How long a freshly minted reset token stays valid. Short by design (1 hour). */
 export const RESET_TTL_MS = 60 * 60 * 1000;
@@ -65,10 +66,11 @@ export function resetHashMatches(a: string | null | undefined, b: string | null 
 }
 
 /**
- * Whether a real email delivery channel is wired up. No mailer exists yet, so this stays
- * false until an SMTP URL / provider key is configured — which is exactly what tells the
- * request route it may safely echo the token back in NON-production for local testing.
+ * Whether a working email delivery channel exists — delegated to the mailer so there is one
+ * source of truth. Only a WIRED provider counts (today: Resend); an SMTP_URL alone is intent
+ * but not yet deliverable. When this is false the request route may safely echo the token
+ * back in NON-production for local testing.
  */
 export function resetDeliveryConfigured(): boolean {
-  return Boolean(process.env.SMTP_URL || process.env.RESEND_API_KEY);
+  return mailerCanDeliver();
 }
