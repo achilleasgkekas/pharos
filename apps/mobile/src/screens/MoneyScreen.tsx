@@ -3,7 +3,7 @@ import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, Sty
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem, contentWidth } from '../ui';
-import { getExpenses, addExpense, deleteExpense, updateExpense, scanExpenseImage, fileSource, type Expense, type ParsedExpenseData } from '../api';
+import { getExpenses, addExpense, deleteExpense, updateExpense, rescanExpense, scanExpenseImage, fileSource, type Expense, type ParsedExpenseData } from '../api';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
 
@@ -89,12 +89,27 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
       { text: 'Delete', style: 'destructive', onPress: async () => { setRows((p) => p.filter((x) => x.id !== it.id)); try { await deleteExpense(it.id); } catch { await load(); } } },
     ]);
   }
-  function openEdit(it: Expense) {
-    setEditing(it);
+  // Fill the edit-form fields from an Expense (shared by open + re-scan re-prefill).
+  function prefill(it: Expense) {
     setEVendor(it.vendor); setEAmount(String(it.amount)); setECategory(it.category);
     setEDate(it.date ? it.date.slice(0, 10) : ''); setEPeriod(it.period || '');
     setERecurring(!!it.recurring); setECycle(it.recurringCycle || '');
     setEPayment(it.paymentMethod || ''); setENotes(it.notes || '');
+  }
+  function openEdit(it: Expense) { setEditing(it); prefill(it); }
+
+  // Re-run the AI on the stored bill: ocr=true forces OCR, false uses embedded text / vision.
+  const [rescanning, setRescanning] = useState<null | 'ocr' | 'text'>(null);
+  async function rescan(ocr: boolean) {
+    if (!editing || rescanning) return;
+    setRescanning(ocr ? 'ocr' : 'text');
+    try {
+      const updated = await rescanExpense(editing.id, ocr);
+      setEditing(updated);
+      prefill(updated); // store/amount/date/category/etc refresh in place
+      await load();
+    } catch (e) { Alert.alert('Re-scan failed', (e as Error).message); }
+    finally { setRescanning(null); }
   }
   async function saveEdit() {
     if (!editing) return;
@@ -183,6 +198,17 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
             <Text style={s.modalTitle}>Edit</Text>
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               {editing && fileSource(editing.file) && <Image source={fileSource(editing.file)} style={s.bigImg} resizeMode="contain" />}
+              {editing?.file && (
+                <View style={s.rescanBar}>
+                  <Text style={s.rescanLabel}>Re-scan</Text>
+                  <Pressable onPress={() => rescan(false)} disabled={!!rescanning} style={[s.rescanBtn, !!rescanning && s.dim]}>
+                    {rescanning === 'text' ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.rescanText}>text</Text>}
+                  </Pressable>
+                  <Pressable onPress={() => rescan(true)} disabled={!!rescanning} style={[s.rescanBtn, !!rescanning && s.dim]}>
+                    {rescanning === 'ocr' ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.rescanText}>OCR</Text>}
+                  </Pressable>
+                </View>
+              )}
               <Text style={s.mlabel}>{label.toUpperCase()}</Text>
               <Input variant="modal" value={eVendor} onChangeText={setEVendor} />
               <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -242,6 +268,10 @@ const s = StyleSheet.create({
   modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 24 },
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20, maxHeight: '88%' },
   bigImg: { width: '100%', height: 220, borderRadius: 12, backgroundColor: C.surface2, marginTop: 12 },
+  rescanBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.border },
+  rescanLabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, flex: 1 },
+  rescanBtn: { borderWidth: 1, borderColor: C.cyan, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16, minWidth: 56, alignItems: 'center' },
+  rescanText: { color: C.cyan, fontSize: 13, fontWeight: '700' },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   recRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },

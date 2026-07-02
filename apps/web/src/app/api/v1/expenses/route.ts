@@ -1,41 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
-import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
+import { listParams, withSince, listEnvelope } from '@/lib/apiList';
 import { readBody, strField, numField, enumField, boolField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
 import { vendorKey } from '@/app/expenses/lib';
+import { trimExpense, type ExpenseLean } from './serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-type ExpenseLean = {
-  _id: unknown; kind?: string; vendor?: string; category?: string; amount?: number; currency?: string;
-  date?: Date; period?: string; recurring?: boolean; recurringCycle?: string; paymentMethod?: string;
-  notes?: string; filePath?: string; thumbPath?: string; verified?: boolean; updatedAt?: Date; deletedAt?: Date | null;
-};
-
-function trim(e: ExpenseLean) {
-  return {
-    id: String(e._id),
-    kind: e.kind ?? 'expense',
-    vendor: e.vendor ?? '',
-    category: e.category ?? 'other',
-    amount: e.amount ?? 0,
-    currency: e.currency ?? 'EUR',
-    date: iso(e.date),
-    period: e.period ?? '',
-    recurring: !!e.recurring,
-    recurringCycle: e.recurringCycle ?? '',
-    paymentMethod: e.paymentMethod ?? '',
-    notes: e.notes ?? '',
-    file: e.filePath || null,
-    thumb: e.thumbPath || null,
-    verified: !!e.verified,
-    updatedAt: iso(e.updatedAt),
-    deleted: !!e.deletedAt,
-  };
-}
 
 /** GET /api/v1/expenses?kind=income|expense&limit&offset&updatedSince */
 export async function GET(req: NextRequest) {
@@ -48,7 +21,7 @@ export async function GET(req: NextRequest) {
     const count = Expense.countDocuments(filter);
     if (p.updatedSince) { find.setOptions({ withDeleted: true }); count.setOptions({ withDeleted: true }); }
     const [docs, total] = await Promise.all([find.lean() as Promise<ExpenseLean[]>, count]);
-    return NextResponse.json(listEnvelope(docs.map(trim), total, p));
+    return NextResponse.json(listEnvelope(docs.map(trimExpense), total, p));
   });
 }
 
@@ -77,6 +50,6 @@ export async function POST(req: NextRequest) {
       notes: strField(b, 'notes'),
       verified: true, // manually entered → trusted
     });
-    return NextResponse.json({ expense: trim(doc.toObject() as ExpenseLean) }, { status: 201 });
+    return NextResponse.json({ expense: trimExpense(doc.toObject() as ExpenseLean) }, { status: 201 });
   });
 }

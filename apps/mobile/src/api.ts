@@ -154,6 +154,13 @@ export function addExpense(data: {
 }) {
   return request<{ expense: Expense }>('/api/v1/expenses', { method: 'POST', body: JSON.stringify(data) });
 }
+// Re-run the AI on the stored bill (text or forced OCR). Returns the same Expense
+// shape as getExpenses so the detail can re-prefill in place. Leaves it unverified.
+export async function rescanExpense(id: string, ocr: boolean): Promise<Expense> {
+  return (await request<{ expense: Expense }>(`/api/v1/expenses/${id}/rescan`, {
+    method: 'POST', body: JSON.stringify({ ocr }),
+  })).expense;
+}
 
 // AI bill/payslip scan (does NOT persist — prefills the add form)
 export type ParsedExpenseData = {
