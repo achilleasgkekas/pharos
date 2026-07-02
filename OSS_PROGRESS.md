@@ -633,3 +633,44 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file. Α�
 -name serialize.ts`) ή pure helpers σε `models/`. Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά
 routines γράφουν παράλληλα). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο
 "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — expoPush.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/expoPush.test.ts` για το type-guard `isExpoPushToken` του `lib/expoPush.ts`.**
+
+Επιλογή target: το suggested «επόμενο pure-lib test file». Έλεγξα τους υποψηφίους:
+`aiProviders.ts` (τα pure helpers `mediaTypeOf`/`stripFences` ΔΕΝ είναι exported → skip χωρίς
+source edit, εκτός territory)· `notify.ts` (ο ascii-sanitizer είναι inline, όχι exported·
+network)· `prompts.ts`/`storageConfig.ts` (DB)· `revalidate.ts` (next/cache wrapper)· `models/*`
+(μηδέν pure exports). Διάλεξα το `isExpoPushToken` γιατί είναι καθαρό pure guard (regex πάνω σε
+string, μηδέν clock/fs/network/DB στο ίδιο το function) ΚΑΙ έχει πραγματική αξία: είναι το
+validation gate που αποφασίζει ποια strings αποθηκεύονται ως push tokens σε user + fan-out στο
+Expo. Το module κάνει `import` το `db`/`User`, αλλά αυτό είναι μόνο mongoose schema registration
+στο import (καμία σύνδεση), οπότε το load σε node vitest είναι side-effect-free· τα tests δεν
+αγγίζουν DB.
+
+Τι έγινε:
+- Νέο `expoPush.test.ts` (12 tests). Καλύπτει: αποδοχή και των δύο shapes (ExponentPushToken[…]
+  / ExpoPushToken[…])· any non-`]` char μέσα στα brackets· trim leading/trailing whitespace·
+  απόρριψη κενών brackets (`[^\]]+` απαιτεί ≥1 char)· missing/malformed bracket· leading/trailing
+  content γύρω από το token· case-sensitivity στο prefix· nested-but-wrong prefix (ExponentToken /
+  PushToken)· κενό + whitespace-only string· non-string values (null/undefined/number/bool/array/
+  object)· type-narrowing στο true branch.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/expoPush.test.ts` → 12/12 passed.
+- `npx vitest run` (όλο το suite) → 43 files, 652/652 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)·
+  `git status --short` = foreign `.claude/launch.json` (ΔΕΝ το άγγιξα/staged) + το νέο
+  expoPush.test.ts. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file. Απομένοντα καθαρά targets είναι
+πλέον λίγα: τα περισσότερα exported pure helpers έχουν test. Πιθανά: (α) additive-export ενός
+από τα `aiProviders.ts` internal helpers (`stripFences`/`mediaTypeOf`) ΑΝ ο χρήστης εγκρίνει
+source edit (τώρα εκτός territory)· (β) API-shape tests που δεν θέλουν live Mongo (validation
+helpers σε api routes, π.χ. body-parsers)· (γ) pure branches σε `models/` αν προστεθούν helpers.
+Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα). Ένα module ανά run.
+Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
