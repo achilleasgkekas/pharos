@@ -130,7 +130,7 @@ export function SubscriptionsScreen() {
             </Pressable>
             <View style={s.mbtns}>
               <Button label="Save" onPress={saveEdit} />
-              <Pressable onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
+              <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} variant="danger" />
             </View>
           </Pressable>
         </Pressable>
@@ -159,6 +159,4 @@ const s = StyleSheet.create({
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tlabel: { color: C.text, fontSize: 15 },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
-  delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
-  delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });

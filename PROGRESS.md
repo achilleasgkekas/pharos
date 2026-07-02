@@ -5,6 +5,24 @@
 <!-- reviewed: 53b861a -->
 <!-- docker-validated: 4a240aa -->
 
+## 2026-07-03 (pharos-daily-dev — mobile `<Button variant>` ghost/danger, 4 screens)
+- **Τι έκανα:** έκλεισα το **suggested-next-task της τελευταίας builder εγγραφής** (Button ghost-variant finish, P2/S, unattended-safe) — το reusable holdout που είχε επισημάνει ο Chip note `681098f`. Ο functional parity πυρήνας είναι κλειστός (0 auto-buildable GAP), οπότε ο builder δουλεύει στην UI Debt Queue. Το `<Button>` primitive είχε ΜΟΝΟ την primary accent pill· τα secondary text-buttons (Delete/Discard/Cancel σε modal footers) ήταν raw `<Pressable style={s.delBtn}><Text style={s.delBtnText}>…` duplicated ανά screen.
+- **Αλλαγές (`ui.tsx` + 4 screens):**
+  - **`apps/mobile/src/ui.tsx`** — `Button` πήρε `variant?: 'primary' | 'danger' | 'ghost'` (default `primary`, byte-identical με πριν). `danger` = red text-button (`s.btnGhost` container padV/padH `SPACE.md` + `s.btnDangerText` C.red/`SIZE.md`/600)· `ghost` = dim "Cancel" (ίδιο container + `s.btnGhostText` C.dim/`SIZE.md`). Spinner tint ανά variant (red/dim/onAccent). 3 νέα StyleSheet entries. Docstring ενημερώθηκε.
+  - **MoneyScreen** — "Discard" + "Delete" → `variant="danger"`· διαγράφηκαν `delBtn`/`delBtnText`.
+  - **SubscriptionsScreen** — "Delete" → `variant="danger"`· διαγράφηκαν `delBtn`/`delBtnText`.
+  - **ItemsScreen** — "Delete" → `variant="danger"`· διαγράφηκαν `delBtn`/`delBtnText` (το wide `style` override στο Save Button αμετάβλητο).
+  - **VouchersScreen** — "Delete" → `variant="danger"` + "Cancel" (scan modal) → `variant="ghost"`· διαγράφηκαν `delBtn`/`delBtnText`/`cancelText`.
+- **Pixel-identical:** `SPACE.md=12`, `SIZE.md=15` (theme.ts) → 1:1 με τα literals που έφευγαν (padV12/padH12, C.red 15/600, C.dim 15). Μηδέν visual delta· ο default primary path αμετάβλητος (`s.btn`/`s.btnText`).
+- **Τι ΔΕΝ άγγιξα (σκόπιμα):** **Receipts/Settings/Shopping** έχουν uncommitted WIP του Αχιλλέα → τα δικά τους cancel/del buttons + το Settings bordered `cancelBtn` (border variant) μένουν για attended follow-up. 6 sites migrated, τα υπόλοιπα ζουν στα 3 WIP screens.
+- **Verify:** `apps/mobile npx tsc --noEmit` → **EXIT 0**. Grep επιβεβαίωσε μηδέν leftover `delBtn`/`delBtnText`/`cancelText` refs στα 4 migrated screens. Καθαρά mobile-only (μηδέν web runtime) → **καμία Docker rebuild** (per task rule) + **κανένα AI call**. Mobile δεν auto-testable unattended → tsc + code-review του variant contract (`btnStyle`/`txtStyle`/`spinner` ternaries· default `primary` → αμετάβλητος path).
+- **Docs:** `MOBILE_PARITY.md` — νέος builder note 2026-07-03 (Button variant DONE, ποια sites, token mapping, τι έμεινε στα WIP screens).
+- **Git hygiene:** stage ΜΟΝΟ ρητά paths (`ui.tsx` + 4 screens + `MOBILE_PARITY.md` + `PROGRESS.md`), ΟΧΙ `-A`. Δεν αγγίχτηκαν: `.claude/launch.json`, ReceiptsScreen, SettingsScreen, ShoppingScreen (WIP του Αχιλλέα).
+- **Προτεινόμενο επόμενο task:** **Input migration σε ItemsScreen `logInput`** [P2/S — compact paired price/store inputs, attended-preferred λόγω visual delta (borderRadius:10/pad 10-8/fontSize:14)· προτίμησέ το μόνο αν ο Αχιλλέας δεν έχει WIP εκεί]. Εναλλακτικά unattended-safe: fresh pure-lib **vitest coverage** (`lib/cards.ts` statement-title / `lib/taxonomies.ts normalizeList` / `lib/itemStatus.ts`). Attended-preferred (ΜΗΝ ξεκινήσεις χωρίς έγκριση): mobile lucide icons [P2/M], language switcher [P3/L], safe-area insets [P2/M native dep], Button border-variant + Receipts/Settings/Shopping cancel-button migration (μετά το merge των WIP αλλαγών του Αχιλλέα).
+
+### Needs Achilleas (pharos-daily-dev 2026-07-03 Button variant)
+- Τίποτα νέο ασφαλείας· μηδέν committed secret. Εκκρεμείς αποφάσεις (αμετάβλητες): SMTP/email provider για production· Stripe keys· native mobile deps (safe-area / charting / persist)· theme toggle + language switcher· AI-engine / storage / OneDrive στα mobile Settings· Tasks Kanban board (full drag)· remote push (EAS dev build + APNs key)· statements merge/bind + PDF-import. Επίσης: τα Receipts/Settings/Shopping mobile screens έχουν μακροχρόνιο uncommitted WIP στο working tree — αν εγκαταλείφθηκε, ένα commit/revert θα ξεμπλόκαρε το Input/Button migration finish σε αυτά.
+
 ## 2026-07-03 (reviewer — range 148fb06..53b861a· tsc web+mobile EXIT 0· 1 P2 flag)
 - **Τι review-άρισα:** 9 commits από τον τελευταίο marker `148fb06` → HEAD `53b861a`. Code commits: `53b861a` (mobile Input migration 3 screens), `681a647` (workspace soft-cancel DELETE), `a24707a` (workspace read/rename route + lib), `c9367e2` (landing 404), `7de30bc` (test(ocr))· υπόλοιπα docs.
 - **Checks (read-only):** `apps/web npm run type-check` **EXIT 0**· `apps/mobile npx tsc --noEmit` **EXIT 0**· `vitest run ocr.test.ts workspace.test.ts` → **24/24 pass** (8 ocr + 16 workspace).

@@ -81,27 +81,39 @@ export function Check({ checked }: { checked: boolean }) {
   );
 }
 
+/** `primary` = accent pill · `danger` = red text-button · `ghost` = dim text-button. */
+type ButtonVariant = 'primary' | 'danger' | 'ghost';
+
 type ButtonProps = {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   /** Show a spinner in place of the label (also blocks the press). */
   busy?: boolean;
+  /** Visual style (defaults to `primary`). */
+  variant?: ButtonVariant;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
 };
 
 /**
- * Primary accent action pill (the "Save"/"Add" button). Unifies the byte-identical
- * `save` + `saveText` + `dim` styles that were duplicated across screens. `disabled`
- * or `busy` dims it to 0.4 and blocks taps; `busy` swaps the label for a spinner.
- * Pass `style` to override layout (e.g. wider padding / minWidth on Items).
+ * Action button. `primary` (default) is the accent "Save"/"Add" pill (unifies the
+ * byte-identical `save`+`saveText`+`dim` styles). `danger` and `ghost` are the
+ * fill-less text-buttons that sat next to the primary action in modal footers:
+ * `danger` = red "Delete"/"Discard" (the byte-identical `delBtn`+`delBtnText` pair
+ * duplicated across Money/Subscriptions/Items/Vouchers), `ghost` = dim "Cancel".
+ * Both share the padH12/padV12 tap target. `disabled`/`busy` dim to 0.4 and block
+ * taps; `busy` swaps the label for a spinner. Pass `style`/`textStyle` for layout
+ * overrides (e.g. wider padding / minWidth on Items).
  */
-export function Button({ label, onPress, disabled, busy, style, textStyle }: ButtonProps) {
+export function Button({ label, onPress, disabled, busy, variant = 'primary', style, textStyle }: ButtonProps) {
   const off = !!(disabled || busy);
+  const btnStyle = variant === 'primary' ? s.btn : s.btnGhost;
+  const txtStyle = variant === 'danger' ? s.btnDangerText : variant === 'ghost' ? s.btnGhostText : s.btnText;
+  const spinner = variant === 'danger' ? C.red : variant === 'ghost' ? C.dim : C.onAccent;
   return (
-    <Pressable onPress={onPress} disabled={off} style={[s.btn, off && s.btnDim, style]}>
-      {busy ? <ActivityIndicator color={C.onAccent} /> : <Text style={[s.btnText, textStyle]}>{label}</Text>}
+    <Pressable onPress={onPress} disabled={off} style={[btnStyle, off && s.btnDim, style]}>
+      {busy ? <ActivityIndicator color={spinner} /> : <Text style={[txtStyle, textStyle]}>{label}</Text>}
     </Pressable>
   );
 }
@@ -258,6 +270,9 @@ const s = StyleSheet.create({
   checkboxMark: { color: C.onAccent, fontSize: SIZE.md, fontWeight: '800' },
   btn: { backgroundColor: C.accent, borderRadius: RADIUS.md, paddingVertical: SPACE.md, paddingHorizontal: 22 },
   btnText: { color: C.onAccent, fontSize: SIZE.md, fontWeight: '700' },
+  btnGhost: { paddingVertical: SPACE.md, paddingHorizontal: SPACE.md },
+  btnDangerText: { color: C.red, fontSize: SIZE.md, fontWeight: '600' },
+  btnGhostText: { color: C.dim, fontSize: SIZE.md },
   btnDim: { opacity: 0.4 },
   inputSurface: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.md, paddingHorizontal: SPACE.md, paddingVertical: 11, color: C.text, fontSize: SIZE.md },
   inputModal: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.sm, paddingHorizontal: SPACE.md, paddingVertical: 10, color: C.text, fontSize: SIZE.md },

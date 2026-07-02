@@ -159,7 +159,7 @@ export function VouchersScreen() {
             <View style={s.mbtns}>
               <Button label={isNew ? 'Add' : 'Save'} onPress={saveForm} disabled={!form.title.trim()} />
               {!isNew && editing && (
-                <Pressable onPress={() => { const e = editing; setEditing(null); if (e && typeof e !== 'string') remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
+                <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e && typeof e !== 'string') remove(e); }} variant="danger" />
               )}
             </View>
           </Pressable>
@@ -177,7 +177,7 @@ export function VouchersScreen() {
             <TextArea variant="modal" value={scanText} onChangeText={setScanText} placeholder="e.g. 15% off at Skroutz, code SAVE15, until 31/12" style={{ minHeight: 90 }} />
             <View style={s.mbtns}>
               <Button label="Fill" onPress={doScanText} disabled={!scanText.trim()} busy={scanBusy} />
-              <Pressable onPress={() => setShowScan(false)} style={s.delBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
+              <Button label="Cancel" onPress={() => setShowScan(false)} variant="ghost" />
             </View>
           </Pressable>
         </Pressable>
@@ -191,7 +191,6 @@ const s = StyleSheet.create({
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
   aiBtn: { width: 40, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
   aiText: { color: C.cyan, fontSize: 18, fontWeight: '700' },
-  cancelText: { color: C.dim, fontSize: 15 },
   dim: { opacity: 0.4 },
   faded: { opacity: 0.55 },
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
@@ -210,6 +209,4 @@ const s = StyleSheet.create({
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tlabel: { color: C.text, fontSize: 15 },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
-  delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
-  delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });

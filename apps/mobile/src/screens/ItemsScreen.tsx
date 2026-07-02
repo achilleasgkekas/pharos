@@ -441,7 +441,7 @@ export function ItemsScreen() {
               </Pressable>
               <View style={s.mbtns}>
                 <Button label="Save" onPress={saveEdit} disabled={!eTitle.trim()} busy={saving} style={{ paddingHorizontal: 26, minWidth: 96, alignItems: 'center' }} />
-                <Pressable onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
+                <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} variant="danger" />
               </View>
             </ScrollView>
           </Pressable>
@@ -473,8 +473,6 @@ const s = StyleSheet.create({
   statusWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   statusChip: { paddingHorizontal: 11, borderRadius: 9 },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22 },
-  delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
-  delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
   aiBar: { flexDirection: 'row', gap: 10, marginTop: 12 },
   aiBtn: { flex: 1, borderRadius: 12, borderWidth: 1, borderColor: C.accent, paddingVertical: 10, alignItems: 'center' },
   aiBtnText: { color: C.accent, fontSize: 14, fontWeight: '600' },

@@ -209,7 +209,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
             )}
             <View style={s.mbtns}>
               <Button label={saving ? 'Adding…' : 'Add'} onPress={saveDraft} disabled={saving} />
-              <Pressable onPress={() => setDraft(null)} style={s.delBtn}><Text style={s.delBtnText}>Discard</Text></Pressable>
+              <Button label="Discard" onPress={() => setDraft(null)} variant="danger" />
             </View>
           </Pressable>
         </Pressable>
@@ -264,7 +264,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
             </ScrollView>
             <View style={s.mbtns}>
               <Button label="Save" onPress={saveEdit} />
-              <Pressable onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} style={s.delBtn}><Text style={s.delBtnText}>Delete</Text></Pressable>
+              <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} variant="danger" />
             </View>
           </Pressable>
         </Pressable>
@@ -311,6 +311,4 @@ const s = StyleSheet.create({
   cycleText: { color: C.dim, fontSize: 12, fontWeight: '600' },
   cycleTextOn: { color: C.cyan },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
-  delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
-  delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },
 });
