@@ -10,6 +10,9 @@ GitHub today and can feed a docs site later.
 
 ## Guides
 
+- **[Architecture](architecture.md)** — how the pieces fit: the Docker services and
+  profiles, the two auth surfaces (session cookie vs bearer token), the data layer,
+  optional AI/scraper/searxng companions, and the managed-SaaS overlay.
 - **[Self-hosting](self-hosting.md)** — from an empty host to a running instance:
   prerequisites, Docker Compose, required env vars, first-run admin setup,
   storage & backups, updating, HTTPS, and troubleshooting.

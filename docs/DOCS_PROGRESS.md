@@ -364,3 +364,41 @@ Collision guard: `git status --short` δειχνει προϋπαρχον .claud
 Επομενο run: εμπλουτισμος `docs/features.md` με screenshot placeholders ανα module, η ενα
 `docs/contributing-docs.md` (πως να προσθεσεις/διορθωσεις doc). Πρωτα finish-in-progress κανενα
 (ολα done).
+
+## 2026-07-02 (cont.⁶)
+
+Νεο doc: `docs/architecture.md` — το πρωτο architecture overview (πραγματικο κενο· ολα τα
+guides a-f της SKILL ηδη υπηρχαν, αλλα κανενα δεν εξηγουσε πως ταιριαζουν τα κομματια). Κοινο
+για ΚΑΙ self-hosters (τι τρεχει στο κουτι τους) ΚΑΙ contributors (χαρτης codebase). Περιεχει:
+short version, deployment topology (ascii diagram host→web/mongo + companions + host Ollama),
+services & profiles table (web/mongo/searxng default· scraper/flaresolverr profile scraper·
+mongo-express profile tools), two auth surfaces (session cookie UI vs bearer token API, split
+στο middleware.ts edge), request flows (RSC+Server Actions UI, /api/v1 REST mobile, /api/files,
+/api/mcp, /api/saas), data layer (Mongoose models list, files-on-disk local-first, soft-delete),
+storage backends+mirror push-only, AI on-the-side (6 providers, host Ollama via host.docker.
+internal, aiFeatures client/server split, Job queue), optional companions, SaaS overlay (tenancy/
+billing SAAS_MODE), mobile client, «where things live» quick map.
+
+Accuracy (διαβασα κωδικα, οχι εικασιες): `docker-compose.yml` (services/profiles/ports/env/
+loopback bindings ολα verbatim), `middleware.ts` (session verify edge + /api bearer 401 + first-
+run /setup redirect + sliding idle SESSION_IDLE_HOURS), `lib/apiAuth.ts` (Bearer <token> →
+User.apiToken lookup, withAuth 401), `ls models/` (23 models, ολα ονομαστικα), `ls app/api/`
+(v1/files/mcp/saas), `grep SAAS_MODE` → lib/tenancy + lib/billing. Container names kept-as-is
+σημειωμενο (predate rename). Καμια νεα τιμη/env εφευρεθηκε.
+
+Προσθεσα link στο `docs/README.md` index (νεα εγγραφη «Architecture» στην ΚΟΡΥΦΗ των Guides,
+πριν το Self-hosting — λογικη σειρα: καταλαβε το συστημα → μετα τρεξε το).
+
+Validation: markdown only, κανενα build/Docker/AI call. Internal links του architecture.md →
+api/configuration/glossary/mobile/saas/self-hosting/troubleshooting.md ολα OK· 12 relative repo
+paths (../apps/web/**, ../apps/mobile, ../services δεν χρησιμοποιηθηκε ως link — μονο στον πινακα
+ως plaintext) ολα υπαρχουν (verified με test -e). Code fences: 4 fence-lines = 2 balanced blocks
+(topology diagram + start commands). Καμια secret τιμη — τα env αναφερονται μονο ονομαστικα.
+
+Collision guard: `git status --short` δειχνει προϋπαρχον .claude/launch.json (αλλης ρουτινας,
+ΔΕΝ το αγγιξα)· staged κενο πριν το add. Stage ΜΟΝΟ docs/architecture.md + docs/README.md +
+docs/DOCS_PROGRESS.md.
+
+Επομενο run: `docs/contributing-docs.md` (πως να προσθεσεις/διορθωσεις doc — style, link-check,
+markdown-first) η enrich `docs/features.md` με screenshot placeholders ανα module. Πρωτα finish-
+in-progress κανενα (ολα done).
