@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 9d7bbab -->
+<!-- reviewed: ec475d8 -->
 <!-- docker-validated: 62c3c5b -->
+
+## 2026-07-02 (REVIEWER — range 9d7bbab..ec475d8)
+- **Τι review-άρισα:** 11 commits (2 web code+test, 1 mobile refactor, 1 landing, υπόλοιπα docs/health): `62c3c5b` project `invitedBy` στο inviteView, `777304f` pure-shape suite για receipts serializers (17 tests), `681098f` extract `<Chip>` mobile primitive (5 screens), `8be8b91` landing Integrations section, + docs (`ec475d8`/`532de80`/`af0e878`/`574ab57`/`16e5b3e`/`2a9f3bb`) + `02aac47` docker-health. Καθαρή code-αλλαγή: 10 αρχεία σε apps/web/src + apps/mobile/src (+landing).
+- **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· `npx vitest run invites.test.ts serialize.test.ts` → **45/45 pass** (28 invites + 17 serialize).
+- **Review diff:** (α) **invitedBy** — καθαρά additive στο `InviteView` type + `inviteView()` projection (`String(invitedBy)` null-safe) + GET `.select('... invitedBy ...')`. Το field αποθηκεύεται ΗΔΗ στο mint (`members/route.ts:135`, `Invite.create({..., invitedBy: session.account.sub})`), οπότε το commit απλώς το εκθέτει· model default null → legacy rows → null. Μηδέν secret leak (ο token hash μένει εκτός projection). SaaS control-plane, ΔΕΝ το καταναλώνει το mobile app (49 v1 routes only) → **μηδέν mobile regression**. Νέα test coverage επιβεβαιώνει το shape (id-stringify + legacy-null). (β) **`<Chip>` primitive** — ενοποιεί τα byte-identical `chip/chipOn/chipText/chipTextOn` clusters σε 6 call-sites (Items filter+status, Subscriptions cycle, Settings currency/kind/type, Tasks tag, Reports range). **Έλεγξα pixel-parity ένα-προς-ένα**: base padH12/padV6/radius10/12px + per-screen `style`/`textStyle` overrides αναπαράγουν ΑΚΡΙΒΩΣ τα παλιά μεγέθη (Items filter padH14/padV7/13px, status padH11/radius9· Subs cycle padH11/radius9· Reports range padV5/radius9· Settings opt padH16/padV8/13px· Tasks tag = base). Μηδέν dangling `s.chip*` ref στα 5 screens (grep). (γ) **landing Integrations** = self-contained additive `<section id="integrations">`· και τα 5 icon keys (server/code/receipt/wifi/chart) υπάρχουν στο `Icon.tsx` → όχι blank icons. (δ) **serialize.test** = ουσιαστικό pure-shape suite (null/undefined→[], refinedName>name, empty-string fallback), μηδέν side effects.
+- **Secret scan:** μηδέν committed secret στο range.
+- **Fixes:** **0** (το δέντρο ήταν καθαρό, τίποτα small-safe δεν χρειάστηκε). **Flags:** **0** νέα (τα εκκρεμή Needs-Achilleas αμετάβλητα από προηγ. εγγραφές).
+- **Marker → ec475d8.** Staged ΜΟΝΟ PROGRESS.md (ρητό path, ΟΧΙ `-A`)· το `.claude/launch.json` (WIP εργαλείου) ΔΕΝ αγγίχτηκε.
 
 ## 2026-07-02 (docker-health guard — rebuild + validate)
 - **Health:** homepage-mongo `healthy`, web RestartCount 0, mongo RestartCount 122 (ιστορικό, σταθερό τώρα). Flaresolverr όχι running (μηδέν memory pressure). Running stack: web + mongo + searxng.
