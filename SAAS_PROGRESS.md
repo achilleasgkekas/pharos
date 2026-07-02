@@ -848,3 +848,29 @@ runtime wiring. External importers των νέων/edited modules από feature
 Achilleas· ξεκλειδώνει reset/verify/invite delivery σε production), είτε (β) accepted/revoked
 invites στη λίστα με ?status filter (audit view), είτε (γ) dedicated resend endpoint (re-mint +
 email σε ένα βήμα).
+
+## 2026-07-02 (increment 20 — invites list ?status audit filter)
+**Built:** το `GET /api/saas/invites` δεχόταν μόνο τα `pending`· τώρα δέχεται optional
+`?status=pending|accepted|revoked|all` ώστε ο owner/admin να βλέπει και **accepted/revoked
+history** (audit view), όχι μόνο τα outstanding. ΟΛΟ SAAS-gated, additive, backward-compatible,
+σε δικά μου αρχεία:
+- `lib/tenancy/invites.ts` (additive): δύο PURE helpers — **`parseInviteStatusFilter(raw)`**
+  (case-insensitive + trim· unknown/missing/empty → `'pending'` ώστε κάθε υπάρχων caller που
+  παραλείπει το param να παίρνει ΑΚΡΙΒΩΣ το ίδιο αποτέλεσμα· δέχεται τα 3 concrete statuses +
+  `'all'`) + **`inviteStatusQuery(filter)`** (`'all'` → `{}` no-constraint· concrete →
+  `{ status }`). Νέος type `InviteStatusFilter = InviteStatus | 'all'`. Μηδέν νέα imports.
+- `app/api/saas/invites/route.ts` (additive): το GET διαβάζει πλέον `?status`, φιλτράρει με
+  `{ tenant, ...inviteStatusQuery(filter) }`, και επιστρέφει το resolved `status` στο body
+  (additive πεδίο). Owner/admin gate + workspace scope αμετάβλητα.
+- `lib/tenancy/invites.test.ts` — +5 PURE tests (default/empty/unknown→pending, τα 4 valid
+  values, case+trim· inviteStatusQuery all→{} και concrete→{status}).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run invites.test.ts` → **24/24
+green** (19 προϋπάρχοντα + 5 νέα). Το route SAAS-gated (404 όταν off) + οι helpers pure/additive
++ default = παλιά συμπεριφορά ⇒ `SAAS_MODE` off = zero effect, κανένα Docker rebuild, κανένα
+runtime wiring, καμία νέα εξάρτηση. Άγγιξα μόνο δικά μου SAAS αρχεία.
+
+**Next task:** increment 21 — είτε (α) `sendViaSmtp` via nodemailer (μετά από provider decision
+Achilleas· ξεκλειδώνει reset/verify/invite delivery σε production), είτε (β) dedicated resend
+endpoint (re-mint + email σε ένα βήμα, αντί POST στο members route), είτε (γ) accepted-invite
+audit metadata στο inviteView (acceptedBy/acceptedAt projection για την audit λίστα του §20).

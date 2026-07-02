@@ -16,6 +16,29 @@ import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 /** Invite lifecycle status stored on the Invite row. */
 export type InviteStatus = 'pending' | 'accepted' | 'revoked';
 
+/** Query filter for listing invites: a concrete status, or 'all' (no status constraint). */
+export type InviteStatusFilter = InviteStatus | 'all';
+
+/**
+ * Parse the `?status=` list-filter param. Unknown/missing → 'pending' so the default listing
+ * (and every existing caller that omits the param) keeps returning only outstanding invites —
+ * the filter is purely additive. Accepts the three concrete statuses plus 'all' for an audit
+ * view spanning accepted + revoked history.
+ */
+export function parseInviteStatusFilter(raw: string | null | undefined): InviteStatusFilter {
+  const v = (raw ?? '').trim().toLowerCase();
+  if (v === 'all' || v === 'accepted' || v === 'revoked' || v === 'pending') return v;
+  return 'pending';
+}
+
+/**
+ * Mongo `status` query fragment for a filter. 'all' → `{}` (no constraint, every lifecycle
+ * row); a concrete status → `{ status }`. Kept pure so the route needn't branch inline.
+ */
+export function inviteStatusQuery(filter: InviteStatusFilter): { status?: InviteStatus } {
+  return filter === 'all' ? {} : { status: filter };
+}
+
 /** How long a freshly minted invite token stays valid (7 days). Longer than reset/verify:
  *  invites get forwarded and sat on. */
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;

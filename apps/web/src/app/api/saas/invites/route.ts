@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveWorkspaceSession } from '@/lib/tenancy/workspaceSession';
 import { Invite, type InviteDoc } from '@/models/Invite';
 import { readBody } from '@/lib/apiBody';
-import { inviteView } from '@/lib/tenancy/invites';
+import { inviteView, parseInviteStatusFilter, inviteStatusQuery } from '@/lib/tenancy/invites';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,24 +24,34 @@ export const dynamic = 'force-dynamic';
  */
 
 /**
- * GET /api/saas/invites[?tenant=<slug>]
- *   → list the workspace's pending invitations (email/role/expiry/expired-flag), newest
- *     first. Owner/admin only. `expired` distinguishes still-redeemable links from stale
- *     pending rows past their TTL.
+ * GET /api/saas/invites[?tenant=<slug>][?status=pending|accepted|revoked|all]
+ *   → list the workspace's invitations (email/role/expiry/expired-flag), newest first.
+ *     Owner/admin only. `expired` distinguishes still-redeemable links from stale pending
+ *     rows past their TTL.
+ *
+ *     `?status` defaults to 'pending' (unchanged behaviour for callers that omit it); an
+ *     unknown value falls back to 'pending'. 'accepted'/'revoked' give an audit view of the
+ *     lifecycle, and 'all' spans every status.
  */
 export async function GET(req: NextRequest) {
-  const slug = new URL(req.url).searchParams.get('tenant');
+  const url = new URL(req.url);
+  const slug = url.searchParams.get('tenant');
+  const filter = parseInviteStatusFilter(url.searchParams.get('status'));
   const resolved = await resolveWorkspaceSession(slug, true);
   if ('response' in resolved) return resolved.response;
   const { session } = resolved;
 
-  const invites = (await Invite.find({ tenant: session.ctx.tenantId!, status: 'pending' })
+  const invites = (await Invite.find({
+    tenant: session.ctx.tenantId!,
+    ...inviteStatusQuery(filter),
+  })
     .select('email role status expires createdAt')
     .sort({ createdAt: -1 })
     .lean()) as unknown as (InviteDoc & { createdAt?: Date })[];
 
   return NextResponse.json({
     workspace: session.workspace.slug,
+    status: filter,
     invites: invites.map((inv) => inviteView(inv)),
   });
 }

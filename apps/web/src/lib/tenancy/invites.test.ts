@@ -7,6 +7,8 @@ import {
   mintInviteToken,
   inviteHashMatches,
   inviteView,
+  parseInviteStatusFilter,
+  inviteStatusQuery,
 } from './invites';
 
 // The pure + crypto helpers are unit-tested. The mint (members POST) and accept route
@@ -139,5 +141,40 @@ describe('inviteView', () => {
     expect(v.role).toBe('member');
     expect(v.status).toBe('pending');
     expect(v.createdAt).toBeNull();
+  });
+});
+
+describe('parseInviteStatusFilter', () => {
+  it('defaults to pending for missing/empty/unknown input (backward compatible)', () => {
+    expect(parseInviteStatusFilter(null)).toBe('pending');
+    expect(parseInviteStatusFilter(undefined)).toBe('pending');
+    expect(parseInviteStatusFilter('')).toBe('pending');
+    expect(parseInviteStatusFilter('   ')).toBe('pending');
+    expect(parseInviteStatusFilter('bogus')).toBe('pending');
+  });
+
+  it('accepts the three concrete statuses plus all', () => {
+    expect(parseInviteStatusFilter('pending')).toBe('pending');
+    expect(parseInviteStatusFilter('accepted')).toBe('accepted');
+    expect(parseInviteStatusFilter('revoked')).toBe('revoked');
+    expect(parseInviteStatusFilter('all')).toBe('all');
+  });
+
+  it('is case-insensitive and trims surrounding whitespace', () => {
+    expect(parseInviteStatusFilter(' ALL ')).toBe('all');
+    expect(parseInviteStatusFilter('Accepted')).toBe('accepted');
+    expect(parseInviteStatusFilter('REVOKED')).toBe('revoked');
+  });
+});
+
+describe('inviteStatusQuery', () => {
+  it('all → no status constraint', () => {
+    expect(inviteStatusQuery('all')).toEqual({});
+  });
+
+  it('a concrete status → that status constraint', () => {
+    expect(inviteStatusQuery('pending')).toEqual({ status: 'pending' });
+    expect(inviteStatusQuery('accepted')).toEqual({ status: 'accepted' });
+    expect(inviteStatusQuery('revoked')).toEqual({ status: 'revoked' });
   });
 });
