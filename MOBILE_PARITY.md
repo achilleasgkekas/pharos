@@ -37,7 +37,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Expenses & Income (`/expenses`, `/income`)
 | Web | Mobile |
 |-----|--------|
-| **Scan a bill/payslip** (AI), e-shop layout, recurring series + auto-generate, **anomaly badges**, vendor autocomplete | 🟡 list + manual add (vendor+amount) + **AI scan-a-bill** (✦ camera → parse → confirm draft → add; carries date/period/recurring/payment). **Anomaly badges ✅** (2026-07-02: v1 list route εκθέτει additive `anomaly?` ±% μέσω `computeAnomalies` στο `serialize.ts`, mirror του web `page.tsx` median-deviation· gold `⚠ ±N%` badge δίπλα στο amount στο MoneyScreen· skip σε incremental sync). ❌ **vendor autocomplete** στο add-form (Build Queue P3/S) |
+| **Scan a bill/payslip** (AI), e-shop layout, recurring series + auto-generate, **anomaly badges**, vendor autocomplete | 🟡 list + manual add (vendor+amount) + **AI scan-a-bill** (✦ camera → parse → confirm draft → add; carries date/period/recurring/payment). **Anomaly badges ✅** (2026-07-02: v1 list route εκθέτει additive `anomaly?` ±% μέσω `computeAnomalies` στο `serialize.ts`, mirror του web `page.tsx` median-deviation· gold `⚠ ±N%` badge δίπλα στο amount στο MoneyScreen· skip σε incremental sync). **vendor autocomplete ✅** (2026-07-02: distinct-vendor suggestion chips από την ήδη-φορτωμένη λίστα, substring-match, tap→fill, μηδέν endpoint). |
 | Detail + **edit** (vendor/amount/category/date/period/recurring/payment/notes) + re-scan | 🟡 tap-to-edit **vendor/amount/category/date/period/recurring+cycle/payment/notes** (full-field) + long-press delete. Scanned-bill image στο detail ✅ (2026-07-02, `fileSource(editing.file)` → `<Image>`). **Re-scan (AI) text/OCR ✅** (2026-07-02, νέο `POST /api/v1/expenses/[id]/rescan` byte-mirror του receipts rescan → `rescanExpense(id, ocr)` σε api.ts → «Re-scan text/OCR» bar στο edit modal όταν `editing.file`, re-prefill in-place, μένει unverified) |
 
 ## Statements (`/statements`)
@@ -163,7 +163,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Acceptance:
   - Typing στο vendor field δείχνει matching υπάρχοντες vendors· tap συμπληρώνει το field· κενό input → καμία λίστα
   - Μηδέν νέο endpoint/dep· tsc καθαρό (mobile)
-- Status: TODO
+- Status: ✅ DONE 2026-07-02 (pharos-daily-dev). `useMemo` `vendorList` = case-insensitive dedup των `rows.vendor` (κρατά first casing, sorted). `vendorSuggestions` = substring-match στο typed `vendor.trim()`, εξαιρεί exact match, cap 6. Render = horizontal `ScrollView` με `<Chip>` (keyboardShouldPersistTaps="handled" ώστε το tap να μη χάνεται) κάτω από το add-row· tap → `setVendor(v)`. Κενό input → καμία λίστα. Μηδέν endpoint/dep. mobile tsc EXIT 0. (apps/mobile/src/screens/MoneyScreen.tsx)
 
 ### Expenses/Income — δείξε το scanned bill image στο mobile detail
 - Priority: P2 | Size: S | no AI, no decision, no native dep

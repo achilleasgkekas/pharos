@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem, contentWidth } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem, Chip, contentWidth } from '../ui';
 import { getExpenses, addExpense, deleteExpense, updateExpense, rescanExpense, scanExpenseImage, fileSource, type Expense, type ParsedExpenseData } from '../api';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
@@ -37,6 +37,17 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   }, [kind]);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+
+  // Distinct vendors already seen (case-insensitive dedup, keeps first casing), for add-form autocomplete.
+  const vendorList = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of rows) if (r.vendor) m.set(r.vendor.toLowerCase(), r.vendor);
+    return [...m.values()].sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+  const vq = vendor.trim().toLowerCase();
+  const vendorSuggestions = vq
+    ? vendorList.filter((v) => v.toLowerCase().includes(vq) && v.toLowerCase() !== vq).slice(0, 6)
+    : [];
 
   async function add() {
     const v = vendor.trim();
@@ -151,6 +162,13 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         </Pressable>
         <IconButton glyph="＋" onPress={add} disabled={!vendor.trim() || !amount.trim()} />
       </View>
+      {vendorSuggestions.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={s.suggestRow}>
+          {vendorSuggestions.map((v) => (
+            <Chip key={v} label={v} onPress={() => setVendor(v)} />
+          ))}
+        </ScrollView>
+      )}
       <Text style={s.hint}>✦ scan a {kind === 'income' ? 'payslip' : 'bill'} with AI</Text>
       <ErrorText>{err}</ErrorText>
       <FlatList
@@ -263,6 +281,7 @@ const s = StyleSheet.create({
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
   scanBtn: { width: 46, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
   scanText: { color: C.cyan, fontSize: 20, fontWeight: '700' },
+  suggestRow: { gap: 6, paddingHorizontal: 16, paddingBottom: 6 },
   hint: { color: C.faint, fontSize: 11, paddingHorizontal: 16, marginTop: -2, marginBottom: 4 },
   scanNote: { color: C.dim, fontSize: 12, marginTop: 4 },
   scanMeta: { color: C.faint, fontSize: 12, marginTop: 10 },

@@ -5,6 +5,21 @@
 <!-- reviewed: 7670bf9 -->
 <!-- docker-validated: 7192c8e -->
 
+## 2026-07-02 (pharos-daily-dev — mobile Expense vendor autocomplete [ΚΛΕΙΝΕΙ το item])
+- **Τι έκανα:** έκλεισα το **suggested-next-task της προηγ. pharos-daily-dev εγγραφής** (mobile Expense vendor autocomplete, P3/S, Build Queue). Το web add-expense form έχει vendor autocomplete (`SearchableSelect` allowCustom πάνω σε distinct vendors), αλλά το mobile MoneyScreen add-row είχε plain `Input` χωρίς suggestions. Επιλέχθηκε ως το top auto-buildable: pure client-side, μηδέν endpoint / AI / credentials / native dep → ιδανικό unattended.
+- **Αλλαγές (1 mobile αρχείο, `apps/mobile/src/screens/MoneyScreen.tsx`):**
+  - `useMemo` `vendorList` = case-insensitive dedup των `rows.vendor` (κρατά το πρώτο casing μέσω `Map<lower,orig>`, guard σε άδειο vendor, sorted με `localeCompare`).
+  - `vendorSuggestions` = substring-match στο typed `vendor.trim().toLowerCase()`, εξαιρεί exact match, cap **6**· κενό input → κενή λίστα.
+  - Render: horizontal `ScrollView` με reusable `<Chip>` (ήδη στο `ui.tsx`) κάτω από το add-row, **μόνο** όταν υπάρχουν suggestions· `keyboardShouldPersistTaps="handled"` ώστε το tap να μη χάνεται από dismiss-keyboard· tap → `setVendor(v)`. Νέο style `suggestRow`.
+  - Imports: `useMemo` (από react), `Chip` (από ../ui). `ScrollView` ήταν ήδη imported.
+- **Verify:** `apps/mobile npx tsc --noEmit` → **EXIT 0**. Καθαρά mobile-only (μηδέν web runtime code) → **καμία Docker rebuild** (per task rule: rebuild μόνο σε web runtime αλλαγή). Mobile δεν auto-testable unattended → tsc + code-review του chip idiom (mirror του υπάρχοντος `<Chip>` toggle-pill pattern· `keyboardShouldPersistTaps` επιβεβαιωμένο ως το σωστό RN idiom για tappable list πάνω από keyboard). **ΚΑΝΕΝΑ AI call.**
+- **Docs:** `MOBILE_PARITY.md` — vendor-autocomplete detail Status TODO→**DONE** + table row `❌`→`✅`.
+- **Git hygiene:** stage ΜΟΝΟ ρητά paths (`MoneyScreen.tsx` + `MOBILE_PARITY.md` + `PROGRESS.md`), ΟΧΙ `-A`. Το `.claude/launch.json` (WIP εργαλείου του Αχιλλέα) ΔΕΝ αγγίχτηκε.
+- **Προτεινόμενο επόμενο task:** το εναπομείναν top auto-buildable web-side = **Account token-hash sparse index** [P3/S — 2 sparse `.index()` στο `models/Account.ts` για τα reset/verify token hashes· μηδέν AI/dep, tsc + safe rebuild verify]. Attended-preferred (χρειάζονται decision/dep, ΜΗΝ ξεκινήσεις χωρίς έγκριση): mobile lucide icons [P2/M], language switcher [P3/L], safe-area insets [P2/M native dep], Tasks Kanban full-drag, remote push (EAS + APNs).
+
+### Needs Achilleas (pharos-daily-dev 2026-07-02 vendor autocomplete)
+- Τίποτα νέο ασφαλείας· μηδέν committed secret. Εκκρεμείς αποφάσεις (αμετάβλητες): SMTP/email provider για production· Stripe keys· native mobile deps (safe-area / charting / persist)· theme toggle + language switcher· AI-engine / storage / OneDrive στα mobile Settings· Tasks Kanban board (full drag)· remote push (EAS dev build + APNs key)· statements merge/bind + PDF-import.
+
 ## 2026-07-02 (reviewer — range a2e1811..7670bf9, καθαρή επιθεώρηση, μηδέν fix)
 - **Τι επιθεώρησα:** 9 commits από τον marker `a2e1811`. Code commits: `7670bf9` (mobile Expense anomaly badge + web serializer), `ec2c195` (SaaS invites inviter/accepter name resolution), `0b1f56b` (test AI TOOLS registry), `4f047f6` (landing scroll-spy). Τα υπόλοιπα 5 (`abbb7d6`/`7192c8e`/`7422a62`/`0e77b26`/`1f8531c`) docs-only.
 - **Checks (read-only):** `apps/web` type-check → **EXIT 0**. `apps/mobile` tsc → **EXIT 0**. Extra sanity (έπεσε landing commit): `apps/landing` tsc → **EXIT 0**. Τρία affected test files (`aiTools` + expenses `serialize` + tenancy `invites`) → **61/61 green**.
