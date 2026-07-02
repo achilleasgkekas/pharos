@@ -2522,3 +2522,19 @@ Fresh read-only web code-quality audit: **49 v1 route files** + **13 saas route 
 ### Needs Achilleas
 - (αμετάβλητο) getTenantConnection cache-reuse guard (`lib/tenancy/connection.ts:54`): `readyState !== 99` επιστρέφει και disconnected (0) / disconnecting (3) connections ενώ το σχόλιο λέει «still open» — dead-until-SaaS, ambiguous το σωστό rebuild-semantic → θέλει σκόπιμη απόφαση, όχι μηχανικό swap.
 - (αμετάβλητο) Standing product/security decisions (ΟΧΙ auto-buildable): login brute-force rate-limit, error-message leak στο `withAuth` 500, wiring του quota-enforce gate σε πραγματικά AI/upload routes, tenant-aware `saveFile` (live SaaS tenant μετράει 0 file-bytes μέχρι το storage namespace-άρει per tenant), Stripe/CRON/AUTH key provisioning (env boundary, server-only).
+
+## 2026-07-02 (builder — SaaS API hardening/consistency, τα 3 top-3 items της 31ης σάρωσης [DONE + committed `b4ec753`])
+
+Πήρα τα 3 byte-safe P3/S items που πρότεινε το τελευταίο web-code-quality audit (μηδέν εξ αυτών κατανάλωση μέχρι τώρα· τα mobile roadmap items #6/#8 θέλουν simulator ή απόφαση Αχιλλέα → μη-unattended). Όλα SaaS-mode-only routes (404 στο self-hosted stack), οπότε runtime-inert εκεί, αλλά καθαρίζουν το SaaS control plane.
+
+**Τι έγινε:**
+1. **Constant-time CRON_SECRET compare** (`api/saas/usage/sample/route.ts`) — το plain `token !== secret` (timing-leaky σε bearer secret) → νέο local `tokenMatches()` με `timingSafeEqual` + length-guard (`node:crypto`), ίδιο pattern με `stripe.ts:142` / `auth.ts:43`.
+2. **isObjectId στο billing webhook** (`api/saas/billing/webhook/route.ts`) — inline `/^[a-f0-9]{24}$/i.test(tenantId)` → shared `isObjectId` από `@/lib/apiBody`. Έκλεισε πλήρως η εξάλειψη inline ObjectId regex σε ΟΛΟ το api + tenancy + billing.
+3. **readBody adoption** στα 3 (5 handlers) εναπομείναντα saas routes με raw `req.json().catch(() => ({}))`: `billing/checkout`, `billing/portal`, `members` (POST/PATCH/DELETE) → shared `readBody` + `strField` coercion. Identical semantics: οι member helpers (`parseRole`/`normalizeEmail`) δέχονται ήδη `unknown`, το tenant → `strField(body,'tenant').trim() || null` (preserve το `?? null`), accountId narrowing αμετάβλητο. Έκλεισε το readBody adoption σε ΟΛΟ το api surface.
+
+**Verify:** `npm run type-check` **EXIT 0**. Safe Docker rebuild dance (build web → mongo `healthy` → up -d web → `/login` **200** σε ~3s → web running/not-restarting) → `docker builder prune -f` ανέκτησε **2.096GB** cache. Staged ΜΟΝΟ τα 5 route files (το `.claude/launch.json` του Αχιλλέα αφέθηκε unstaged). Commit `b4ec753`, pushed.
+
+**Suggested next task:** Οι mobile roadmap items #6 (theme/language/AI-engine/storage) και #8 (remote push) είναι Needs-Achilleas / needs-simulator. Στο web, byte-safe auto-buildable debt = εξαντλημένο (το audit της 31ης δεν άφησε P-level items εκτός των standing decisions). Επόμενο υψηλής-αξίας unattended-safe: **pure-lib vitest suite** για `lib/billing/billingRoutes.ts` (`checkoutablePlan`/`pickBaseUrl`/`normalizeBase`/`checkoutUrls`/`portalReturnUrl` — καθαρές συναρτήσεις, μηδέν I/O, εύκολο coverage) ή για `lib/tenancy/members.ts` (`parseRole`/`canAssignRole`/`wouldOrphanOwners`/`normalizeEmail`/`looksLikeEmail`). Αλλιώς, ένας νέος read-only audit γύρος (ui/web/planner) για fresh queue.
+
+### Needs Achilleas
+- (αμετάβλητο) Standing product/security decisions που δεν είναι auto-buildable: login brute-force rate-limit, error-message leak στο `withAuth` 500, wiring του quota-enforce gate σε πραγματικά AI/upload routes, tenant-aware `saveFile`, Stripe/CRON/AUTH key provisioning (env boundary). Επίσης το `getTenantConnection` cache-reuse guard (`lib/tenancy/connection.ts:54`, ambiguous rebuild-semantic). Τα mobile #6/#8 θέλουν simulator/APNs/theme-refactor απόφαση.
