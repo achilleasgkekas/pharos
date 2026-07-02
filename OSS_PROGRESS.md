@@ -261,3 +261,34 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — 
 (`priceForModel` longest-substring-match + `looksVisionModel` heuristic, τελείως καθαρό
 από I/O) ή `lib/apiList.ts` (αν pure query/sort helpers). Ένα module ανά run. Εκκρεμεί
 ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — aiModels.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/aiModels.test.ts` για τα δύο καθαρά helpers του `lib/aiModels.ts` (`priceForModel`, `looksVisionModel`) + τα recommendation tables.**
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/aiModels.test.ts` (15 tests, μηδέν DB/clock/fs). Καλύπτει:
+  `priceForModel` longest-substring-match tie-break (gpt-4o-mini > gpt-4o,
+  claude-3-5-haiku > claude-3-haiku, gpt-4.1-mini/nano > gpt-4.1), case-insensitivity,
+  και τις 3 provider families (Anthropic/OpenAI-reasoning/Gemini) με τα ακριβή in/out
+  ποσά του πίνακα, + null για unknown ids (llama/qwen/mistral/κενό). `looksVisionModel`
+  negative-first guard (text-/embed/whisper/tts/davinci/moderation/instruct → false ακόμα
+  κι όταν περιέχουν gpt-4o), positive cloud + local vision markers (vl/llava/minicpm-v/
+  pixtral/llama-3.2/gemini), text-only local → false. Table invariants: κάθε
+  PROVIDER_RECOMMEND έχει model+reason + περνά looksVisionModel· SCRAPER_RECOMMEND.anthropic
+  είναι haiku + priced ({in:0.8,out:4}).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/aiModels.test.ts` → 15/15 passed.
+- `npx vitest run` (όλο το suite) → 19 files, 311/311 passed (ήταν 288).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json`
+  (foreign, ΔΕΝ το άγγιξα/staged) + το νέο aiModels.test.ts· `git diff --cached` κενό·
+  στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — δες `lib/apiList.ts`
+(query/sort/pagination helpers, αν καθαρό από I/O) ή `lib/dates.ts` `safeDate`
+(European DD/MM parsing, deterministic). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF
+IPv4-mapped fix στο "## Needs Achilleas".
