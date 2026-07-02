@@ -5,6 +5,19 @@
 <!-- reviewed: 12c47ba -->
 <!-- docker-validated: d170d93 -->
 
+## 2026-07-02 (parity-auditor — inventory από κώδικα· 1 νέο auto-buildable GAP στην κορυφή)
+- **Inventory από κώδικα (όχι docs):** **49 v1 routes** (`find api/v1 -name route.ts` = 49), **16 mobile screens**, **19 web `page.tsx`**. **Route↔consumer:** grep normalized paths στο `apps/mobile/src/api.ts` → και τα 49 έχουν ≥1 mobile consumer (1:1, **μηδέν orphan endpoint**). Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only first-run wizard, N/A).
+- **Δέλτα από την προηγ. σάρωση (marker `9283367`):** `git log 9283367..HEAD -- apps/mobile/src apps/web/src/app/api/v1` = μόνο 4 commits, **όλοι Reports parity** (`e6ad795` spend-by-store/biggest/warranties, `d170d93` subs-by-category, `12c47ba` cash-flow, `28c943c` content-width). Οι ενδιάμεσοι είναι web-only (SaaS control-plane / landing / tests). Καμία άλλη νέα portable δυνατότητα.
+- **Read-only checks:** `cd apps/mobile && npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). Μηδέν Docker build, μηδέν AI/token, μηδέν app-code edit.
+- **ΝΕΟ εύρημα (auto-buildable GAP, μπήκε στην κορυφή του Build Queue ως P1/S):** το web `/reports` pie «INVENTORY BY CATEGORY» (`ReportsClient.tsx:260 <Pie data={data.spendByCategory}>`) φαίνεται «spend» από το όνομα var, αλλά τα δεδομένα (`page.tsx:163-184 catSpend`) είναι **owned-inventory-value ανά κατηγορία** (sum `purchasedPrice ?? currentPrice` μόνο owned items). Το v1 route **ΔΕΝ** εκθέτει αυτό (το `byCategory` του route είναι EXPENSE-based, route.ts:106) και το mobile ΔΕΝ το renders. Είναι το **τελευταίο εναπομείναν Reports parity gap** — flag-αρισμένο παλιότερα ως «χρειάζεται RN charting lib / pie», αλλά **γίνεται bars** όπως τα άλλα 8 Reports sections → **μηδέν native dep, αυτο-χτίσιμο** (endpoint additive field + mobile bar section). Το route έχει ήδη το `Item.find()` query, άρα μηδέν νέο DB read. Πλήρες acceptance στο Build Queue.
+- **Doc-fix:** το `MOBILE_PARITY.md` row Reports (γραμμή 66) έλεγε «No inventory-pie (χρειάζεται RN charting lib / pie)» — παραπλανητικό (τα δεδομένα δεν χρειάζονται pie/lib). Διορθώθηκε σε «γίνεται bars, queued P1/S».
+- **Counts: DONE 7 (parity queue 6/6 + Activity) / auto-buildable GAP 1 (νέο: inventory-value-by-category bars) / NEEDS DECISION 0 νέα.** Λοιπά TODO στην ουρά (icons→lucide P2/M attended, language/theme/safe-area) αμετάβλητα (native/persist dep → Needs Achilleas).
+- **Top-3 για τον builder:** (1) **Reports inventory-value by category (bars)** [P1/S, νέο, top TODO, unattended-safe]· (2) icons→lucide [P2/M, `react-native-svg` υπάρχει → μηδέν native dep, αλλά attended-preferred για οπτικό verify]· (3) finish Input/Button+Chip UI primitives (outliers αφημένα attended-preferred, βλ. UI Debt Queue).
+- **Git hygiene:** staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (ρητά paths, ΟΧΙ `-A`). Τα `.claude/launch.json` + `WEB_DEBT.md` (uncommitted WIP άλλων routines/του Αχιλλέα) ΔΕΝ αγγίχτηκαν.
+
+### Needs Achilleas (parity-auditor 2026-07-02)
+- Τίποτα νέο ασφαλείας· μηδέν committed secret εντοπίστηκε. Εκκρεμείς αποφάσεις (αμετάβλητες): native dep `react-native-safe-area-context` (safe-area insets)· persist dep (`@react-native-async-storage/async-storage` ή reuse `expo-secure-store`) για language-switcher + theme toggle· AI-engine / storage / OneDrive στα mobile Settings· Tasks Kanban board (full drag)· remote push (EAS dev build + APNs key)· statements merge/bind + PDF-import (νέα endpoints).
+
 ## 2026-07-02 (reviewer — range 1c14515..12c47ba καθαρό)
 - **Τι έλεγξα:** 3 feat commits + 2 test suites απ' το τελευταίο marker (1c14515): `12c47ba` mobile Reports cash-flow, `e08f2ed` SaaS per-plan seat limits, `2380a59` landing personas, `80918f9`/`e08f2ed` tests (saasMode + seatLimits).
 - **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· `vitest run seatLimits + saasMode` → **17/17 pass**.
