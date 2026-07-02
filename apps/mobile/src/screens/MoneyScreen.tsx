@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem, contentWidth } from '../ui';
-import { getExpenses, addExpense, deleteExpense, updateExpense, scanExpenseImage, type Expense, type ParsedExpenseData } from '../api';
+import { getExpenses, addExpense, deleteExpense, updateExpense, scanExpenseImage, fileSource, type Expense, type ParsedExpenseData } from '../api';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
 
@@ -182,6 +182,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
           <Pressable style={s.modal} onPress={() => {}}>
             <Text style={s.modalTitle}>Edit</Text>
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              {editing && fileSource(editing.file) && <Image source={fileSource(editing.file)} style={s.bigImg} resizeMode="contain" />}
               <Text style={s.mlabel}>{label.toUpperCase()}</Text>
               <Input variant="modal" value={eVendor} onChangeText={setEVendor} />
               <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -240,6 +241,7 @@ const s = StyleSheet.create({
   amount: { fontSize: 16, fontWeight: '700' },
   modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 24 },
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20, maxHeight: '88%' },
+  bigImg: { width: '100%', height: 220, borderRadius: 12, backgroundColor: C.surface2, marginTop: 12 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   recRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },

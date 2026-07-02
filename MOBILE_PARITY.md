@@ -38,7 +38,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 | Web | Mobile |
 |-----|--------|
 | **Scan a bill/payslip** (AI), e-shop layout, recurring series + auto-generate, **anomaly badges**, vendor autocomplete | 🟡 list + manual add (vendor+amount) + **AI scan-a-bill** (✦ camera → parse → confirm draft → add; carries date/period/recurring/payment) |
-| Detail + **edit** (vendor/amount/category/date/period/recurring/payment/notes) + re-scan | 🟡 tap-to-edit **vendor/amount/category/date/period/recurring+cycle/payment/notes** (full-field) + long-press delete. **No scanned-bill image στο detail** (`file`/`thumb` εκτίθενται από το API αλλά δεν renderάρονται → Build Queue P2/S). **No re-scan (AI)** (χρειάζεται νέο `/api/v1/expenses/[id]/rescan` → Build Queue P2/M) |
+| Detail + **edit** (vendor/amount/category/date/period/recurring/payment/notes) + re-scan | 🟡 tap-to-edit **vendor/amount/category/date/period/recurring+cycle/payment/notes** (full-field) + long-press delete. Scanned-bill image στο detail ✅ (2026-07-02, `fileSource(editing.file)` → `<Image>`). **No re-scan (AI)** (χρειάζεται νέο `/api/v1/expenses/[id]/rescan` → Build Queue P2/M) |
 
 ## Statements (`/statements`)
 | Web | Mobile |
@@ -151,7 +151,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - Expense/Income με αποθηκευμένο αρχείο δείχνει το bill image στο detail (και προαιρετικά thumbnail στη λίστα)· manual entries (κενό `file`) δεν σπάνε (guard)
   - Χρήση του υπάρχοντος `fileSource()` helper (authed uri + headers)· μηδέν νέο endpoint, μηδέν νέα dep
   - tsc καθαρό (mobile)
-- Status: TODO
+- Status: **DONE 2026-07-02** — `MoneyScreen.tsx`: import `Image` (react-native) + `fileSource` (../api)· στο edit/detail modal, πρώτο child του ScrollView `{editing && fileSource(editing.file) && <Image source={fileSource(editing.file)} style={s.bigImg} resizeMode="contain" />}`· νέο style `bigImg` (width 100%, height 220, radius 12, marginTop 12). Manual entries (`file:null`) → guard short-circuit, καμία εικόνα. Μηδέν νέο endpoint/dep. `npx tsc --noEmit` → EXIT 0. (Λίστα thumbnail παραλείφθηκε σκόπιμα — το detail image καλύπτει το gap· η λίστα μένει καθαρή text-first, όπως το web ExpenseRow.)
 
 ### Expenses/Income — re-scan stored file (OCR/text) στο mobile detail
 - Priority: P2 | Size: M | ⚠ AI cost → δομικό verify μόνο
