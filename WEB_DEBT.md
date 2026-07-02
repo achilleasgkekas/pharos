@@ -399,6 +399,20 @@
   - npm run type-check exits 0
 - Status: TODO
 
+### apiBody helpers — readBody adoption σε saas/members POST + PATCH + DELETE
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/saas/members/route.ts
+- Depends on: none
+- Acceptance:
+  - Ο ΝΕΟΣ workspace-members route (commit `090cd41`) ξανα-εισήγαγε raw `(await req.json().catch(() => ({}))) as {...}` σε **3** methods: `POST` (`{ email?; role?; tenant? }`, γρ.90), `PATCH` (`{ accountId?; role?; tenant? }`, γρ.171), `DELETE` (`{ accountId?; tenant? }`, γρ.217). Ίδιο consistency debt με το ήδη ανοιχτό checkout+portal item — ο `as {...}` cast «λέει ψέματα» (runtime τα values μπορεί να μην είναι string).
+  - Swap (import `{ readBody, strField }` από `@/lib/apiBody` — το file δεν έχει ήδη apiBody import): σε καθεμία method `const b = await readBody(req);` και μετά διάβασε τα πεδία με `strField(b, 'email')` / `strField(b, 'accountId')` / `strField(b, 'tenant')` / `strField(b, 'role')`. Το `strField(b,k)` = `String(b[k] || '')` → για string ίδιο, για absent → `''`. Πρόσεξε τα downstream: `resolveWorkspaceSession(wantSlug: string | null)` θέλει `strField(b,'tenant') || null`· `parseRole(x: unknown)` δέχεται ήδη `unknown` άρα μπορείς να του δώσεις `strField(b,'role')` (ή `b.role`)· το `role == null ? 'member' : parseRole(...)` του POST πρέπει να διατηρήσει το «absent → default member» (π.χ. `const rawRole = strField(b,'role'); const role = rawRole === '' ? 'member' : parseRole(rawRole);`).
+  - Τα gate-ladders (`resolveWorkspaceSession` 404/401/403), οι έλεγχοι `looksLikeEmail`/`canAssignRole`/`wouldOrphanOwners`, τα status codes (400/403/404/409/201) και τα success shapes ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. SaaS-only route → μηδέν επίδραση στον v1 mobile surface.
+  - Επαλήθευση: `grep -rln 'req.json().catch' apps/web/src/app/api/saas/members` επιστρέφει **μηδέν**.
+  - npm run type-check exits 0
+- Status: TODO
+
 ### apiBody helpers — readBody adoption σε shopping-list POST (τελευταίο raw-body route)
 - Priority: P3
 - Size: S

@@ -2,8 +2,22 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 561b92a -->
+<!-- reviewed: 28c943c -->
 <!-- docker-validated: 7c92fe2 -->
+
+## 2026-07-03 (reviewer — range `561b92a..28c943c`, καθαρό· 0 fixes, +1 WEB_DEBT TODO, +1 Needs Achilleas)
+- **Τι ελέγχθηκα:** 7 commits από τον marker `561b92a` έως HEAD `28c943c`. Ουσιαστικά code: `090cd41` (SaaS workspace member-management route + `members.ts`/`workspaceSession.ts` helpers + tests), `28c943c` (mobile `contentWidth` σε 14 screens), `56bb22d` (landing JSON-LD), `063192a` (billing/plans vitest). Υπόλοιπα docs/queues.
+- **Checks:** `apps/web` `npm run type-check` → **EXIT 0**· `apps/mobile` `npx tsc --noEmit` → **EXIT 0**· `apps/web` vitest → **412/412 pass** (26 files). Καμία regression, κανένα type error.
+- **Review ευρήματα:**
+  - **SaaS members route (`090cd41`) — solid:** gate-ladder μέσω `resolveWorkspaceSession` (SAAS off 404 → no-session 401 → non-member 403 → non-manager 403 → no-workspace 404), pure helpers (`parseRole`/`canAssignRole`/`wouldOrphanOwners`) unit-tested, last-owner guard σε PATCH+DELETE, soft-remove, reactivation. Επιβεβαίωσα ότι `accountTenants` φιλτράρει `status:'active'` → removed member ΔΕΝ αποκτά πρόσβαση (καμία authz διαρροή). Είναι SaaS-only surface (`/api/saas/*`), ο mobile καταναλώνει `/api/v1/*` → **μηδέν κίνδυνος αλλαγής shape για το mobile app**.
+  - **mobile `contentWidth` (`28c943c`):** additive const, `min(100%,640)` → no-op σε phone, centering μόνο σε tablet. Καμία λειτουργική αλλαγή.
+  - **landing JSON-LD (`56bb22d`):** `dangerouslySetInnerHTML` πάνω σε **στατικά constants** (FEATURES/FAQS, μηδέν user input) → XSS-safe. Κανένα secret.
+- **Fixes:** κανένα (όλα green, δεν χρειάστηκε small-safe fix).
+- **Flags:** (1) **WEB_DEBT +1 P3/S** — ο νέος members route κρατά raw `req.json().catch` σε POST/PATCH/DELETE αντί για `readBody`/`strField` (ίδια οικογένεια με το ανοιχτό checkout+portal item)· πρόσθεσα queue TODO με πλήρες acceptance. (2) **Needs Achilleas** (authz policy, βλ. παρακάτω).
+- **Git hygiene:** staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (ρητά paths, ΟΧΙ `-A`). Μηδέν app-code edit, μηδέν Docker, μηδέν AI/token, μηδέν secret. Το `.claude/launch.json` (WIP του Αχιλλέα) ΔΕΝ αγγίχτηκε.
+
+### Needs Achilleas (reviewer 2026-07-03)
+- **Authz policy — μπορεί ένας `admin` να ενεργεί πάνω σε `owner`;** Στο `apps/web/src/app/api/saas/members/route.ts` (PATCH+DELETE) οι guards (`canAssignRole`/`canManageMembers`) μπλοκάρουν ΜΟΝΟ το να *αναθέσει* κανείς τον ρόλο `owner`, ΟΧΙ το να ενεργήσει πάνω σε υπάρχοντα owner. Αποτέλεσμα: ένας admin μπορεί να **υποβιβάσει** (owner→member/admin) ή να **αφαιρέσει** (soft-remove) έναν owner, όσο μένει ≥1 active owner (ο `wouldOrphanOwners` κρατά μόνο το «να μη μείνει το workspace χωρίς owner»). Σε πολλά RBAC designs ένας admin ΔΕΝ πρέπει να μπορεί να πειράξει owner. **Δεν είναι live κίνδυνος σήμερα** (SAAS_MODE off → 404 σε όλα αυτά τα routes), γι' αυτό ΔΕΝ το έβαλα στο builder queue (θέλει δική σου απόφαση πολιτικής, όχι auto-fix). Αν θες αυστηρότερο boundary: conservative fix = νέο guard `canActOnMember(actorRole, targetRole)` (μόνο owner ενεργεί πάνω σε owner) στο `lib/tenancy/members.ts`, κλήση πριν τα `Membership.updateOne` σε PATCH+DELETE. Μηδέν committed secret εντοπίστηκε.
 
 ## 2026-07-03 (pharos-daily-dev — mobile UI Debt: `contentWidth` max-content-width σε 14 screens)
 - **Τι έκανα:** υλοποίησα το top **unattended-safe** UI-Debt item («Max content width για tablet / landscape», P3/S) που οι parity/ui auditors flag-άρουν επανειλημμένα. Λειτουργικό parity queue = 6/6 DONE + Activity· τα εναπομείναντα functional gaps είναι Needs-Decision (endpoints/credentials/native-dep). Τα SaaS route nits ανήκουν σε άλλο routine (saas-core territory) — έμεινα στο mobile.
