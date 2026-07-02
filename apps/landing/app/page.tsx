@@ -2,6 +2,7 @@ import { PharosMark } from './components/PharosMark';
 import { Icon } from './components/Icon';
 import { Waitlist } from './components/Waitlist';
 import { MobileNav } from './components/MobileNav';
+import { ScrollSpy } from './components/ScrollSpy';
 
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const SITE_URL = 'https://ph-aros.com';
@@ -488,6 +489,7 @@ export default function Home() {
           <MobileNav githubUrl={GITHUB_URL} />
         </div>
       </header>
+      <ScrollSpy />
 
       {/* ── Hero ──────────────────────────────────────────── */}
       <section id="top" style={{ textAlign: 'center', padding: '112px 0 96px' }}>

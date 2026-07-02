@@ -586,3 +586,27 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (ή mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-02 (cont.¹⁹)
+
+Task: (e) Polish, μερος 25 — scroll-spy active-section highlight στο nav. Ηταν το ρητο «επομενο increment» του προηγουμενου log (real screenshots + per-plan Offer JSON-LD μενουν blocked σε assets/τιμες). Προβλημα: το top nav (desktop + drawer) δεν εδειχνε πουθενα «που βρισκεσαι» καθως ο αναγνωστης scroll-αρει τα 8 sections· τωρα ο ενεργος συνδεσμος φωτιζεται accent.
+
+Τι εφτιαξα:
+- `app/components/ScrollSpy.tsx` (νεο, client component, renders null): useEffect μαζευει ολα τα `a.navlink[href^="#"]` + `a.drawer-link[href^="#"]`, τα χαρτογραφει ανα section id (ενα section μπορει να εχει anchor και στο desktop nav και στο drawer), και ενα IntersectionObserver με `rootMargin: -48% 0 -48% 0` (λεπτη ζωνη στο κεντρο του viewport) toggle-αρει `.nav-active` + `aria-current="true"` στους matching anchors. Οταν πανω απο ενα section ειναι στη ζωνη, διαλεγει αυτο που το top edge ειναι πλησιεστερα στο κεντρο. Graceful no-op αν λειπουν anchors/sections. SECTIONS array κρατιεται σε sync με το <nav> (page.tsx) + drawer ITEMS (MobileNav.tsx).
+- `app/page.tsx`: import + `<ScrollSpy />` αμεσως μετα το </header>.
+- `app/globals.css`: `.navlink.nav-active, .drawer-link.nav-active { color: var(--accent) }` διπλα στους navlink κανονες.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success. Route / = 2.18 kB / 105 kB First Load JS (ηταν 1.7 kB / 104 kB· +~480 B για το client ScrollSpy chunk· ολα ○ Static/prerendered).
+- Prerendered HTML (.next/server/app/index.html): site-nav + drawer-panel FOUND, «nav-active» ΑΠΩΝ στο SSR (σωστο — εφαρμοζεται μονο runtime στο scroll, καμια αλλαγη στο initial markup).
+- Δεν αφησα κανενα dev server (pgrep «next dev» -> none). Το :3000 το κραταει το Docker homepage-web· δεν το πειραξα. Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status πριν το commit -> μονο τα δικα μου paths· foreign `.claude/launch.json` (modified) ΔΕΝ commit.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως smooth-scroll offset για το sticky header ή prefers-reduced-motion guard στο scroll behavior.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
