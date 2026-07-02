@@ -2,10 +2,15 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 12b80a1 -->
+<!-- reviewed: 7a0af2b -->
 <!-- docker-validated: 35953c6 -->
 
-## 2026-07-02 (reviewer — range e6ad795..12b80a1 καθαρό, 0 fixes, marker → 12b80a1)
+## 2026-07-02 (reviewer — range 12b80a1..7a0af2b καθαρό, 0 fixes, 1 P3 flag, marker → 7a0af2b)
+- **Έλεγχος:** commits `12b80a1..HEAD` (6: c253bab landing a11y, 34045b9 i18n index tests, 4fd7033 mobile-parity doc, 10d9656 SaaS mailer + wire emails, 7a0af2b i18n config/locales tests, ee3f49a προηγούμενο reviewer doc). Ουσιαστικός runtime κώδικας: `lib/tenancy/mailer.ts` (νέο), `passwordReset.ts`, `saas/account/reset/request/route.ts`, `saas/members/route.ts`, `apps/landing/app/globals.css`.
+- **Type-checks:** `apps/web` tsc **EXIT 0**, `apps/mobile` tsc **EXIT 0**. Πλήρες vitest → **518/518 PASS** (34 files· +28 από 490).
+- **Ευρήματα:** μηδέν regression. Ο mailer είναι exemplary (dependency-free Resend-via-fetch, SMTP recognised-but-deferred, `sendEmail` ΠΟΤΕ throws, no-op dev-log fallback· `mailerCanDeliver` single source of truth πίσω από `resetDeliveryConfigured`). Reset-request route διατηρεί anti-enumeration (`{ ok: true }`) + dev-token echo μόνο εκτός production ΚΑΙ χωρίς wired mailer. Members POST fire-and-forget `void sendEmail(...)`. API response shapes αμετάβλητα → μηδέν επίδραση στο mobile v1 surface (όλα SaaS-gated control-plane). Landing a11y (`prefers-reduced-motion` + `:focus-visible`) standard/safe. Δεν βρέθηκαν secrets (keys όλα από env).
+- **Fixes:** 0 (τίποτα small-and-safe προς διόρθωση· όλα πράσινα). **Flags:** 1 νέο P3/S στο WEB_DEBT.md → reset-request route timing side-channel (registered email αργεί λόγω `save()` + `await sendEmail` δικτύου έναντι non-registered· αποδυναμώνει εν μέρει το anti-enumeration· dead-until-SaaS, delivery-semantics tradeoff → flag όχι fix).
+- Marker reviewed `12b80a1` → **`7a0af2b`** (HEAD). Staged ΜΟΝΟ PROGRESS.md + WEB_DEBT.md (το `.claude/launch.json` του Αχιλλέα αφέθηκε unstaged).
 - **Έλεγχος:** commits `e6ad795..HEAD` (5d97826 SaaS API hardening, b4ec753 refactor, 35953c6 password-reset scaffold, 4dfac8d landing JSON-LD, d6b1ef9 format tests + docs). Κώδικας που άλλαξε: password-reset (lib + request/confirm routes), billing/members/usage routes, landing page.tsx.
 - **Type-checks:** `apps/web` tsc **EXIT 0**, `apps/mobile` tsc **EXIT 0**. Νέα test suites `passwordReset.test.ts` + `format.test.ts` → **25/25 PASS**.
 - **Ευρήματα:** κανένα. Το password-reset scaffold είναι σωστό (SHA-256 hashed single-use tokens, anti-enumeration πάντα-ok στο request, dev-only `devToken` echo μόνο εκτός production ΚΑΙ χωρίς mailer). Το SaaS hardening (readBody/strField/isObjectId shared helpers + constant-time `tokenMatches` στο usage/sample) είναι no-behavior-change refactor. Landing JSON-LD Organization/WebSite nodes έγκυρα, το `logo: /favicon.svg` υπάρχει στο `apps/landing/public/`. Καμία αλλαγή σχήματος API που να αγγίζει το mobile (νέες SaaS control-plane routes, δεν καταναλώνονται από το self-hosted app).

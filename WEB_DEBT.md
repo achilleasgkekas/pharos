@@ -380,6 +380,19 @@
   - npm run type-check exits 0
 - Status: TODO
 
+### Reset-request route — timing side-channel αποδυναμώνει το anti-enumeration
+- Priority: P3
+- Size: S
+- Area: shared
+- Files: apps/web/src/app/api/saas/account/reset/request/route.ts
+- Depends on: none
+- Acceptance:
+  - Το route (commit `10d9656`) γυρίζει ΠΑΝΤΑ `{ ok: true }` για να μη διαρρέει ποιο email είναι registered (anti-enumeration, σωστό). Όμως το **response-time delta** το προδίδει: registered email → `findOne` + `account.save()` (DB write) + (όταν `resetDeliveryConfigured()`) **await `sendEmail()`** (Resend network round-trip)· non-registered → `findOne` και άμεσο return. Ο attacker διακρίνει registered emails μετρώντας latency, ακυρώνοντας εν μέρει το `{ ok: true }` design. Το νέο `await sendEmail` (network) διευρύνει αισθητά το gap που πριν ήταν μόνο DB-write.
+  - **ΣΗΜ (γιατί flag, όχι fix):** dead-until-SaaS (gated πίσω από `saasAuthGate()`, `SAAS_MODE` off = μηδέν επίδραση στο single-user app). Η μείωση του gap είναι tradeoff, όχι μηχανικό swap: το members route κάνει ήδη fire-and-forget `void sendEmail(...)`, οπότε το reset route θα μπορούσε να το ίδιο (αφαιρεί το network-time delta + ευθυγραμμίζεται) — ΑΛΛΑ το `await` υπάρχει σκόπιμα ώστε να εξασφαλίζεται η αποστολή πριν το response· `void` σε πιθανό serverless deploy ρισκάρει να κοπεί το send. Το DB-write delta παραμένει ούτως ή άλλως. Θέλει σκόπιμη απόφαση delivery-semantics, όχι unattended fix.
+  - Πιθανή κατεύθυνση (αν εγκριθεί): fire-and-forget `void sendEmail(...)` όπως το members route (ίδιο best-effort pattern), ή/και ενοποίηση των δύο branch-times ώστε registered/non-registered να έχουν παρόμοιο κόστος.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-02 reviewer, range 12b80a1..7a0af2b)
+
 ### Dedup ObjectId-validation regex — SaaS billing webhook (isObjectId re-introduced inline)
 - Priority: P3
 - Size: S
