@@ -470,3 +470,47 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — 
 (αν pure request/response helpers χωρίς DB) ή edge cases σε ακάλυπτα modules. Έλεγξε πρώτα με
 `find src -name '*.test.ts'` ποια έμειναν χωρίς κάλυψη (πολλά routines γράφουν παράλληλα).
 Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — session.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/session.test.ts` για τους edge-safe
+session helpers του `lib/session.ts` (JWT sign/verify με jose, cookie options, refresh logic).**
+
+Επιλογή: έτρεξα `find src -name '*.test.ts'` — 37 test files υπήρχαν ήδη· το `session.ts`
+(auth-critical, jose-only, μηδέν DB/network) ήταν ακάλυπτο και pure → ιδανικό. Το `apiAuth.ts`
+(η άλλη σκέψη) χτυπά DB στο `bearerUser` → δεν είναι clean pure target.
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/session.test.ts` (25 tests, μηδέν DB/δίκτυο). Τα AUTH_SECRET /
+  AUTH_COOKIE_SECURE διαβάζονται at call-time (όχι module-load) → save/restore μέσω
+  beforeEach/afterEach, ντετερμινιστικά χωρίς cross-test leakage. Το SESSION_MAX_AGE /
+  IDLE_HOURS είναι frozen at module-load → κάνω assert πάνω στο **exported SESSION_MAX_AGE
+  constant** (όχι hardcoded 43200) ώστε να μη σπάει αν το CI ορίσει SESSION_IDLE_HOURS.
+- Κάλυψη: **constants** (SESSION_COOKIE='pharos_session', MAX_AGE positive int)·
+  **sessionCookieOptions** (httpOnly/sameSite=lax/path='/'/maxAge· secure ΜΟΝΟ όταν
+  AUTH_COOKIE_SECURE==='true' exact, όχι 'yes'/'1')· **authConfigured** (fail-closed: unset
+  ή <16 chars → false, ≥16 → true)· **signSession** (throw χωρίς secret, compact JWT 3
+  segments)· **sign→verify roundtrip** (sub/role/name/exp ανακτώνται, exp ≈ MAX_AGE ahead)·
+  **verifySession** security edges: null σε empty/no-secret/garbage/**wrong-secret**/**expired**/
+  **no-sub**, **role defaults σε member** (unknown 'superuser' ΔΕΝ γίνεται σιωπηλά admin),
+  missing name → '' · **shouldRefresh** (undefined→false, fresh→false, past-half→true,
+  expired→true, long-lived-outliving-window→true/shrink-on-sight).
+- **Σημείο ασφαλείας που κλειδώθηκε**: το role-clamp (μόνο 'admin' literal → admin, αλλιώς
+  member) + το fail-closed χωρίς secret· ένα ακούσιο loosening θα έπεφτε ορατό.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/session.test.ts` → 25/25 passed.
+- `npx vitest run` (όλο το suite) → 38 files, 573/573 passed (ήταν 538· +25 δικά μου, τα
+  υπόλοιπα από παράλληλα routines).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json` (foreign,
+  ΔΕΝ το άγγιξα/staged) + το νέο session.test.ts· `git diff --cached` κενό· στάγιαρα μόνο τα
+  δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file. Ακάλυπτα καθαρά targets:
+`lib/pdf.ts` → `looksLikeScannedPdf(text)` (pure heuristic, ντετερμινιστικό) και/ή
+`lib/aiConfig.ts` → `isVisionModel(name)` (pure regex classifier). Τρέξε πρώτα
+`find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα). Ένα module ανά run.
+Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
