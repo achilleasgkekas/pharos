@@ -2,8 +2,15 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 28c943c -->
+<!-- reviewed: e6ad795 -->
 <!-- docker-validated: 7c92fe2 -->
+
+## 2026-07-02 (reviewer — range 28c943c..e6ad795 clean, καμία διόρθωση)
+- **Εύρος:** 8 commits από τον προηγούμενο marker (`28c943c`) έως HEAD (`e6ad795`). Κώδικας: 3 code commits (mobile Reports parity `e6ad795`, SaaS account self-service `a082819`, entitlements test `a24362c`) + landing robots/sitemap `48e2f9d` + docs/monitor.
+- **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· `apps/web npx vitest run` → **437/437 (28 files)**, incl. τα νέα `entitlements.test.ts` (17) + `accountProfile.test.ts` (8).
+- **Review ευρήματα (όλα καθαρά):** (1) **SaaS account routes** (`api/saas/account/route.ts` GET/PATCH + `password/route.ts` POST): σωστά διπλο-φυλαγμένα — `saasAuthGate()` → 404 όταν SAAS_MODE off, `getCurrentAccount()` → 401 χωρίς session. Password change: ίδιο 401 σε missing-account και wrong-password (μηδέν info-leak), policy μέσω pure `passwordChangeError` (min 8 + must-differ). Email change: race-safe uniqueness (pre-check + 11000 index fallback), `emailVerified→false`, refresh του session cookie. (2) **Reports parity** (`api/v1/reports`): τα `spendByStore`/`biggestPurchases`/`warrantiesExpiring` καθρεφτίζουν **byte-for-byte** τα thresholds του web `/reports/page.tsx` (top-8 / top-8 / 150d·top-10)· additive JSON πεδία = μηδέν breaking change· mobile consumer με defensive `?? []` guards για server/client version skew. (3) **landing robots/sitemap**: static metadata routes, μηδέν input.
+- **Διορθώσεις:** καμία (τίποτα μικρό/ασφαλές δεν χρειάστηκε). **Flagged:** τίποτα νέο (η ουρά WEB_DEBT + το προϋπάρχον «admin-acts-on-owner» Needs-Achilleas παραμένουν από τον προηγούμενο γύρο). Κανένα committed secret (μόνο `.env.example` tracked).
+- **Git hygiene:** stage ΜΟΝΟ `PROGRESS.md` (ρητό path). Το `.claude/launch.json` (WIP εργαλείου) ΔΕΝ αγγίχτηκε. Marker → `e6ad795`.
 
 ## 2026-07-03 (pharos-daily-dev — mobile Reports parity: spend-by-store + biggest-purchases + warranties-expiring)
 - **Τι έκανα:** έκλεισα 3 από τα εναπομείναντα Reports parity gaps που **δεν** χρειάζονται RN charting lib (είναι list/bar style): **spend-by-store · top 8**, **biggest purchases**, **warranties expiring · next 150 days**. Επιλέχθηκε αντί των attended-preferred (icons→lucide, χρειάζεται οπτικό verify) και των Needs-Decision items (safe-area native dep, theme/language). Πραγματικό functional parity, μηδέν νέα dependency, μηδέν credentials.
