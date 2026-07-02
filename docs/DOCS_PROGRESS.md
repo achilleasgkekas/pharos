@@ -330,3 +330,37 @@ docs/faq.md + docs/README.md + docs/DOCS_PROGRESS.md.
 Επομενο run: εμπλουτισμος `docs/features.md` με screenshot placeholders ανα module, η
 ενα `docs/glossary.md` (ορολογια: installment plan/signature, vendorKey series, mirror,
 tenant/membership). Πρωτα finish-in-progress κανενα (ολα done).
+
+## 2026-07-02 (cont.⁵)
+
+Νεο doc: `docs/glossary.md` — το πρωτο glossary, οπως ειχε σημειωθει ως επομενο (features.md
++ saas.md + faq.md ηδη πληρη). Αλφαβητικο, με ορισμους σε απλη γλωσσα + link στο αναλυτικο doc
+αντι επαναληψης. Καλυπτει τους Pharos-specific ορους: AI command bar, anomaly badge, receipt
+status (verified/parsed/failed/archived), installment signature/origin/merge-bind/
+installmentGroupKey, vendorKey series, mirror, local-first, price panel/verdict/target,
+quick verify, bill image, budget, bulk-AI cost guard, period, store resolution, soft-delete/
+Trash, SaaS tenant/membership/role, currency-symbol single-currency.
+
+Accuracy (διαβασα κωδικα, οχι εικασιες): `lib/installments.ts` (signature = merchant|total|
+origin, origin = period − currentInstallment [installmentOrigin], installmentGroupKey =
+planKey override || signature, merged flag οταν bound), `app/expenses/lib.ts` (vendorKey
+normalise). Οι υπολοιποι οροι απο CLAUDE.md (source of truth) + τα υπαρχοντα docs. Καμια νεα
+τιμη/limit εφευρεθηκε.
+
+Bonus accuracy check: επιβεβαιωσα οτι το `docs/api.md` ειναι in-sync — 47 route.ts κατω απο
+`app/api/v1/` vs api.md, ολα τα 26 distinct paths τεκμηριωμενα (find + grep). Δεν χρειαστηκε
+edit στο api.md.
+
+Προσθεσα link στο `docs/README.md` index (νεα εγγραφη «Glossary» μετα το FAQ).
+
+Validation: markdown only, κανενα build/Docker/AI call. Internal links του glossary.md →
+features.md (+ anchors ai-command-bar--history, expenses--income, receipts, calendar,
+inventory--shopping-items, statements--installments, trash-soft-delete), api.md, saas.md,
+configuration.md — ολα υπαρχουν. Code fences: 0 (μονο inline `code`). Καμια secret τιμη.
+
+Collision guard: `git status --short` δειχνει προϋπαρχον .claude/launch.json (αλλης ρουτινας,
+ΔΕΝ το αγγιξα)· staged κενο. Stage ΜΟΝΟ docs/glossary.md + docs/README.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: εμπλουτισμος `docs/features.md` με screenshot placeholders ανα module, η ενα
+`docs/contributing-docs.md` (πως να προσθεσεις/διορθωσεις doc). Πρωτα finish-in-progress κανενα
+(ολα done).

@@ -36,6 +36,9 @@ GitHub today and can feed a docs site later.
 - **[FAQ](faq.md)** — common questions grouped by topic: self-hosting vs managed
   SaaS, privacy & data ownership, AI, storage & backups, mobile, cost &
   licensing, and where to start when something breaks.
+- **[Glossary](glossary.md)** — Pharos-specific terms in plain language: receipt
+  status, installment signature/merge, vendorKey series, mirror, local-first,
+  tenant/membership, price verdict, and more.
 
 ## Reference (repo root)
 
