@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 148fb06 -->
-<!-- docker-validated: 7192c8e -->
+<!-- docker-validated: 4a240aa -->
+
+## 2026-07-03 (docker-health guard — safe rebuild, stack υγιές)
+- **Health (read-only):** homepage-mongo `healthy` (Up 2h), homepage-web RestartCount **0**, homepage-flaresolverr όχι running (καμία ενέργεια). Mongo cumulative RestartCount 172 = ιστορικό OOM, όχι τρέχον restart-loop (τώρα σταθερό).
+- **Disk:** Images 4.41GB, Build Cache 1.068GB, Containers 80MB. Μετά το build, `docker builder prune -f` ελευθέρωσε **~2.1GB** unused cache. VM άνετο.
+- **Rebuild:** marker `7192c8e → HEAD 4a240aa` diff άγγιξε web runtime (`api/saas/*`, `api/v1/expenses`, `tenancy/{invites,mailer,workspace}`, serialize) → δικαιολογημένο. `docker compose build web` (image μόνο) OK → confirm mongo healthy → `docker compose up -d web` → `curl /login` **200** (1η προσπάθεια) → web RestartCount παρέμεινε **0** → prune. Καμία `up --build`, καμία destructive ενέργεια.
+- **Marker:** docker-validated `7192c8e` → **`4a240aa`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-03 (mobile-parity-auditor — 40ή σάρωση, CONFIRMATION· 0 νέο functional GAP)
 - **Inventory από κώδικα (όχι docs):** 50 v1 routes (`find api/v1 -name route.ts`· login + 49 bearer· +1 vs προηγ. «49» = `expenses/[id]/rescan`, ήδη consumed), 16 mobile screens. Route↔consumer loop → κάθε route base έχει ≥1 mobile consumer, μηδέν orphan. mobile `npx tsc --noEmit` → **EXIT 0**.
