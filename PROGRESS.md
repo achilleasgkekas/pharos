@@ -2842,3 +2842,30 @@ Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `a
 
 ### Needs Achilleas
 - Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) παραμένει σκόπιμη απόφαση (μεγάλο refactor, εξαρτάται από ολοκλήρωση reusable set), όχι unattended. Safe-area + Chip = επόμενα semi-attended/attended.
+
+## 2026-07-02 (ui-auditor — 34η σάρωση mobile UI consistency· ΔΥΟ νέα commits, Chip holdout μεγάλωσε)
+
+Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `apps/web/src/app/globals.css`). Inventory ξαναχτίστηκε από τον κώδικα: **16 screens**, `theme.ts` (`C`/`SPACE`/`RADIUS`/`SIZE`/`scrim`/`alpha`) + `ui.tsx` primitives (`Input/TextArea/Check/Button/IconButton/Card/ListItem/Badge` + `Header/Centered/Spinner/ErrorText/Empty` + `contentWidth`) ΟΛΑ παρόντα, μηδέν `<Chip>` export. mobile `npx tsc --noEmit` → **EXIT 0**.
+
+**Νέος κώδικας από την 33η (marker `6b5a10a`):** ΔΥΟ mobile-src commits, `bba44ff` (Reports date-range selector 6/12/24m) + `268efb4` (Tasks tag-filter + project-progress-by-tag). Επιθεώρησα και τα δύο diffs:
+- `bba44ff` ReportsScreen: +range-selector chips → νέο inline cluster `rangeChip`/`rangeChipOn`/`rangeText`/`rangeTextOn` (padH12/padV5/radius9· ΟΛΑ `C.surface2`/`C.border`/`C.accent`/`C.onAccent`). Λογική = pure client (`getReports(m)` παραμετρικό window). Μηδέν hex.
+- `268efb4` TasksScreen: +horizontal tag-chip row + progress bar → νέο inline cluster `tagChip`/`tagChipOn`/`tagChipText`/`tagChipTextOn` (padH12/padV6/radius10· ΟΛΑ `C.*`) + `progTrack`/`progFill` (token-clean, μιμείται το υπάρχον `<Bar>` track). Pure client aggregation, μηδέν endpoint.
+
+**Ευρήματα ανά διάσταση (fresh grep):**
+- Tokens (hardcoded hex): **0** στα `screens/`+`nav.tsx`+`App.tsx` (πλήρως καθαρό, incl. ο νέος Reports+Tasks κώδικας).
+- Shared theme file: **ΥΠΑΡΧΕΙ** (`theme.ts`) → κανένα P1 foundation item ανοιχτό.
+- Reusable components: **`<Chip>` MISSING και ΜΕΓΑΛΩΣΕ** — το chip footprint πλέον **7 StyleSheet clusters σε 5 screens** (από 5 clusters/4 screens στην 33η): Items `chip`+`sChip`, Settings `chip`+`addChip`+`valChip`, Subscriptions `cChip`, **Reports `rangeChip` [ΝΕΟ]**, **Tasks `tagChip` [ΝΕΟ]**. Κοινή βάση (surface2/1px border/accent-on/onAccent-text) σε όλα· κάθε νέα οθόνη με chips προσθέτει άλλο ένα cluster → το πιο πολλαπλασιαζόμενο holdout. Ghost cyan/accent-border button variant ~7 sites επίσης ανοιχτό.
+- Theme/dark mode: **0** `useColorScheme`/`ThemeProvider`/`useTheme` (dark-only).
+- States: complete trio· in-button `ActivityIndicator` επικαλύπτεται με ghost-button holdout, ΟΧΙ νέο debt.
+- Adaptive: safe-area **ανοιχτό** (plain `SafeAreaView` @ App.tsx:88, `react-native-safe-area-context` εκτός package.json, μηδέν bottom inset· `nav.tsx:87` `paddingTop:60`)· max-content-width DONE (`contentWidth`, `28c943c`).
+- Touch targets: DONE.
+
+**Ουρά:** μηδέν item έκλεισε ή άνοιξε ως ξεχωριστό, ΑΛΛΑ αναβάθμισα το scope του «Button + Chip primitives» item (μέρος γ `<Chip>`) στην MOBILE_PARITY.md ώστε ο builder να δει και τα 2 νέα clusters (Reports `rangeChip`, Tasks `tagChip`) + πρόταση για default-size `<Chip label on onPress size?>`.
+
+**Top 3 items να πάρει ο builder μετά (unattended-safe διάταξη):**
+1. **Safe-area insets (P2/M)** — μοναδικό πραγματικό adaptive gap· `react-native-safe-area-context` + `SafeAreaProvider`/`useSafeAreaInsets` (bottom inset για sheet buttons). Package-add + simulator verify → semi-attended.
+2. **`<Chip>` primitive (P2/M)** — 7 clusters/5 screens, το πιο πολλαπλασιαζόμενο reusable holdout· ένα `<Chip on={}>` κλείνει τα 5 core filter/range/tag clusters. Attended-preferred για οπτικό verify.
+3. **Ghost `<Button variant>` (P2)** — κλείνει το button family (~7 sites)· μέρος του Button+Chip item.
+
+### Needs Achilleas
+- Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) παραμένει σκόπιμη απόφαση (μεγάλο refactor, εξαρτάται από ολοκλήρωση reusable set), όχι unattended.
