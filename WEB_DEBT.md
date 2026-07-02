@@ -12,7 +12,7 @@
   - **Auth: 0 unguarded** — κάθε v1 route matches `withAuth`/`apiAuth` (μόνο `auth/login` σκόπιμα exempt = auth boundary)· saas routes gated (`saasAuthGate`/`resolveBillingSession`/`CRON_SECRET`/webhook-sig).
   - **DB/consistency: 0 νέο** — `grep -rn '\[a-f0-9\]{24}' app/api lib/tenancy lib/billing` (εκτός test) = **μηδέν** (inline ObjectId regex πλήρως εξαλειμμένο). Καμία νέα unbounded query (μηδέν νέο route).
 - **Ουρά (live re-verify, ΟΛΑ ακόμα ανοιχτά):**
-  - **Seat-cap ασυμμετρία (P3/S):** live `members/route.ts:220-221` existing-account seat check = `withinSeatLimit(plan, activeCount)` **μόνο**· το invite path γρ.107-109 = `withinSeatLimit(plan, activeCount + pendingCount)` (`Invite` model ήδη imported) → **TODO** (η ασυμμετρία παραμένει, invites+adds μπορούν να ξεπεράσουν το cap).
+  - **Seat-cap ασυμμετρία (P3/S):** ~~existing-account seat check μετράει μόνο `activeCount`~~ → **DONE 2026-07-02** (pharos-daily-dev): το POST branch μετράει πλέον `activeCount + pendingCount`, symmetric με το invite path (2 `pendingCount` hits στο route).
   - **SaaS try/catch (P2/M):** live loop σε `find app/api/saas -name route.ts` → **15** routes χωρίς `try {` (usage, members, invites, billing×3, auth×3, account×5, usage/sample) → thrown DB/Stripe error βγαίνει ως framework-default 500 αντί `{ error }` → **TODO**.
   - **Sparse index Account token-hash (P3/S):** live `models/Account.ts:24,26` `verifyTokenHash`/`resetTokenHash` = `{ type:String, default:null }`, μηδέν `.index()` → collection-scan σε verify/reset confirm → **TODO** (low-urgency, μικρό collection).
   - **reset-request timing (P3/S, decision-flag):** ακόμα `await sendEmail(...)` στο happy-path → registered/non-registered response-time delta → **Needs Achilleas** (delivery-semantics tradeoff, όχι unattended fix).
@@ -424,7 +424,7 @@
   - Response shapes (409 `{ error, code:'seat_limit', maxMembers }`, 201 `{ member }`) + η σειρά των guards + το `withinSeatLimit`/`entitlementsFor` API ΜΕΝΟΥΝ ως έχουν· αλλάζει ΜΟΝΟ το count που περνά στο `withinSeatLimit`. SaaS-only, μηδέν επίδραση στον self-hosted ή v1 mobile surface (`SAAS_MODE` off → κανένα invite ποτέ).
   - Επαλήθευση: το existing-account seat check διαβάζει `activeCount + pendingCount` (ίδιο με το `inviteUnregistered`)· `grep -n 'pendingCount' src/app/api/saas/members/route.ts` δείχνει 2 hits (invite path + existing path).
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-02 reviewer)
+- Status: DONE 2026-07-02 (pharos-daily-dev). Το existing-account POST branch μετράει πλέον `activeCount + pendingCount` (`Invite.countDocuments({ tenant, status:'pending' })`) όπως το invite path· `grep -n 'pendingCount' src/app/api/saas/members/route.ts` = 2 hits. Response shapes/guards/API αμετάβλητα. type-check EXIT 0, seatLimits+members tests pass, safe Docker rebuild `/login` 200 + `POST /api/saas/members` no-auth → 401 (gated, όχι 500).
 
 ### SaaS route handlers χωρίς try/catch → ασυνεπές 500 error-shape vs v1 `withAuth`
 - Priority: P2

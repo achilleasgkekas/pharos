@@ -216,9 +216,14 @@ export async function POST(req: NextRequest) {
   // Seat limit: adding a new member OR reactivating a removed one consumes an active seat.
   // Reject when the plan's allowance is already full (unlimited plans always pass). Counting
   // live avoids a stale snapshot; `dedicated`/self-hosted (maxMembers null) short-circuits.
+  // Mirror the invite path (inviteUnregistered): a pending invite reserves a future seat, so
+  // the occupancy the cap is checked against is active members PLUS outstanding pending invites.
+  // Without counting pending, an add could push active+pending past the cap once those invites
+  // are redeemed.
   const plan = String(session.tenant.plan);
   const activeCount = await Membership.countDocuments({ tenant: tenantId, status: 'active' });
-  if (!withinSeatLimit(plan, activeCount)) {
+  const pendingCount = await Invite.countDocuments({ tenant: tenantId, status: 'pending' });
+  if (!withinSeatLimit(plan, activeCount + pendingCount)) {
     const cap = entitlementsFor(plan).maxMembers;
     return NextResponse.json(
       {
