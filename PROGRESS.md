@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: e6ad795 -->
-<!-- docker-validated: 7c92fe2 -->
+<!-- docker-validated: 35953c6 -->
+
+## 2026-07-02 (docker-health — safe rebuild @35953c6, stack healthy, 2.1GB reclaimed)
+- **Health (read-only):** `homepage-mongo` = **healthy**, `homepage-web` RestartCount **0** (running). Mongo RestartCount 86 = ιστορικό OOM σωρευτικό, ΟΧΙ ενεργό loop (health=healthy, web σταθερό). `homepage-flaresolverr` **δεν έτρεχε** (καμία ενέργεια). `docker system df` πριν: Images 4.07GB, Build Cache 667MB.
+- **Rebuild:** warranted — ο canonical marker ήταν `7c92fe2`, ο diff `7c92fe2..HEAD` αγγίζει **15 web runtime files** (`apps/web/src` SaaS account/reset routes, reports route, tests). Ασφαλής χορός: `docker compose build web` (image-only) → mongo healthy → `docker compose up -d web` → `/login` **200** (1η προσπάθεια) → web RestartCount παρέμεινε **0**.
+- **Disk hygiene:** `docker builder prune -f` μετά το build → **2.095GB reclaimed** (build cache). Καμία destructive ενέργεια (μηδέν volume/system/`--all` prune).
+- **Marker:** docker-validated `7c92fe2` → **`35953c6`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
+- **Needs Achilleas:** κανένα νέο. (Παραμένει προϋπάρχον: Docker VM RAM bump ~1.9GB → μειώνει τα OOM-driven mongo restarts.)
 
 ## 2026-07-02 (reviewer — range 28c943c..e6ad795 clean, καμία διόρθωση)
 - **Εύρος:** 8 commits από τον προηγούμενο marker (`28c943c`) έως HEAD (`e6ad795`). Κώδικας: 3 code commits (mobile Reports parity `e6ad795`, SaaS account self-service `a082819`, entitlements test `a24362c`) + landing robots/sitemap `48e2f9d` + docs/monitor.
