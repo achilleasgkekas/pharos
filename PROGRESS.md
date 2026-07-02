@@ -5,6 +5,27 @@
 <!-- reviewed: 9d7bbab -->
 <!-- docker-validated: 4eaa702 -->
 
+## 2026-07-02 (web-code-quality auditor — 33η σάρωση, CONFIRMATION)
+- **Τι έκανα:** read-only fresh live σάρωση (grep, όχι docs) όλου του web API surface: **49 v1 route files** + **19 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/billing/*` + `lib/tenancy/*` + `models/*`. Καμία Docker build, κανένα AI job, μηδέν app-code edit.
+- **Κρίσιμο εύρημα (scope):** `git diff --name-only 9d7bbab..HEAD -- apps/web/src` = **μόνο `api/v1/receipts/serialize.test.ts`** (test-only, commit `777304f`). Από τον τελευταίο code marker το runtime API/model/billing/tenancy surface είναι **byte-identical**. Το invites surface που άλλαξε από `bba44ff` (invites/accept routes + invites.ts + Invite.ts) ήταν ήδη audited+DONE (invites DELETE id-guard, 32η σάρωση). Άρα καθαρή confirmation σάρωση.
+- **Counts ανά dimension (P1=0, P2=0, P3=0 νέο):**
+  - Type safety: **0** (`: any|as any|@ts-ignore|@ts-expect-error` σε `app/api` εκτός test = 0· type-check EXIT 0).
+  - Input validation: **0** (`req.json().catch` σε `app/api` = μηδέν· readBody adoption 100%).
+  - Auth: **0 unguarded** (κάθε v1 route matches `withAuth`/`apiAuth`· μόνο `auth/login` σκόπιμα exempt· saas routes gated).
+  - DB/consistency: **0 νέο** (inline ObjectId regex `[a-f0-9]{24}` σε api+tenancy+billing εκτός test = μηδέν).
+  - Error handling: **0 νέο** (το μοναδικό open item είναι το προϋπάρχον P2/M SaaS try/catch).
+- **Ουρά αμετάβλητη — 3 ενεργά auto-buildable items + 1 decision-flag, ΟΛΑ live-verified ακόμα ανοιχτά** (ο builder δεν κατανάλωσε κανένα αυτόν τον κύκλο):
+  - seat-cap ασυμμετρία [P3/S] — `members/route.ts:220-221` μετράει μόνο `activeCount` (invite path γρ.109 = `activeCount + pendingCount`).
+  - SaaS try/catch helper [P2/M] — **15** saas routes χωρίς `try {`.
+  - Account token-hash sparse index [P3/S] — `models/Account.ts:24,26` μηδέν `.index()`.
+  - reset-request timing [P3/S, Needs Achilleas] — delivery-semantics tradeoff.
+- **Verify:** `apps/web npm run type-check` → **EXIT 0**.
+- **Top-3 για τον builder:** (1) **seat-cap ασυμμετρία** [P3/S, μικρότερο — πρόσθεσε `pendingCount` στο existing-account seat check, `members/route.ts:220`]· (2) **SaaS try/catch helper** [P2/M, split S+S — mirror του `withAuth` catch για τα 15 saas write routes]· (3) **Account token-hash sparse index** [P3/S].
+- **Git hygiene:** staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (ρητά paths, ΟΧΙ `-A`). Το `.claude/launch.json` + `apps/web/SAAS_PROGRESS.md` (WIP εργαλείου/άλλης routine) ΔΕΝ αγγίχτηκαν.
+
+### Needs Achilleas (web-auditor 2026-07-02, 33η)
+- Μηδέν committed secret στο range. Εκκρεμείς αποφάσεις (αμετάβλητες): reset-request timing side-channel [P3/S, delivery-semantics tradeoff — registered/non-registered response-time delta λόγω `await sendEmail` στο happy-path· fix θα άλλαζε delivery semantics (fire-and-forget ή σταθερό delay), όχι unattended].
+
 ## 2026-07-02 (REVIEWER — range 268efb4..9d7bbab)
 - **Τι review-άρισα:** 6 commits (2 code, 1 landing, 3 docs): `9d7bbab` fix invites DELETE inviteId format-guard, `f02c68d` accepted-invite audit metadata (acceptedBy/acceptedAt) στο inviteView, `e741999` landing «Who» nav link, + `80e26cf`/`e7cd4d6`/`bc525f6` docs (mobile-parity/ui-audit/review). Καθαρή αλλαγή: 3 web αρχεία (`models/Invite.ts`, `lib/tenancy/invites.ts`, `api/saas/invites/route.ts` + `accept/route.ts`) + 1 test + 1 landing γραμμή.
 - **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· `npx vitest run invites.test.ts apiBody.test.ts` → **52/52 pass** (νέα acceptance-audit assertions: projects acceptedBy/acceptedAt σε accepted invite, null σε pending/thin doc).

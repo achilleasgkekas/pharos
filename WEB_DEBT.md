@@ -3,6 +3,21 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-02 33η σάρωση· CONFIRMATION· ΜΗΔΕΝ API αλλαγή από τον προηγ. marker `9d7bbab`· ουρά αμετάβλητη — 3 ενεργά auto-buildable [1 P2/M + 2 P3/S] + 1 P3/S decision-flag)
+
+**2026-07-02 (33η σάρωση, αυτόνομος γύρος):** fresh live σάρωση (grep, όχι docs) σε **49 v1 route files** + **19 saas route files** + `apiAuth`/`apiBody`/`apiList` helpers + `lib/billing/*` + `lib/tenancy/*` + `models/*`. `git diff --name-only 9d7bbab..HEAD -- apps/web/src` = **μόνο `api/v1/receipts/serialize.test.ts`** (test-only, commit `777304f`). Από τον τελευταίο code marker ΚΑΜΙΑ αλλαγή σε runtime API/model/billing/tenancy. Το invites surface (accept/route.ts, invites/route.ts, invites.ts, Invite.ts) που άλλαξε από `bba44ff` ήταν ήδη audited+DONE (invites DELETE id-guard). `npm run type-check` **EXIT 0**.
+- **Ευρήματα ανά διάσταση (live grep):**
+  - **Type safety: 0** — `grep -rnE ': any|as any|@ts-ignore|@ts-expect-error' app/api` (εκτός `.test.ts`) = **0**. type-check EXIT 0.
+  - **Input validation: 0 gaps** — `grep -rln 'req.json().catch' app/api` = **μηδέν** (readBody adoption 100%, v1 + saas).
+  - **Auth: 0 unguarded** — κάθε v1 route matches `withAuth`/`apiAuth` (μόνο `auth/login` σκόπιμα exempt = auth boundary)· saas routes gated (`saasAuthGate`/`resolveBillingSession`/`CRON_SECRET`/webhook-sig).
+  - **DB/consistency: 0 νέο** — `grep -rn '\[a-f0-9\]{24}' app/api lib/tenancy lib/billing` (εκτός test) = **μηδέν** (inline ObjectId regex πλήρως εξαλειμμένο). Καμία νέα unbounded query (μηδέν νέο route).
+- **Ουρά (live re-verify, ΟΛΑ ακόμα ανοιχτά):**
+  - **Seat-cap ασυμμετρία (P3/S):** live `members/route.ts:220-221` existing-account seat check = `withinSeatLimit(plan, activeCount)` **μόνο**· το invite path γρ.107-109 = `withinSeatLimit(plan, activeCount + pendingCount)` (`Invite` model ήδη imported) → **TODO** (η ασυμμετρία παραμένει, invites+adds μπορούν να ξεπεράσουν το cap).
+  - **SaaS try/catch (P2/M):** live loop σε `find app/api/saas -name route.ts` → **15** routes χωρίς `try {` (usage, members, invites, billing×3, auth×3, account×5, usage/sample) → thrown DB/Stripe error βγαίνει ως framework-default 500 αντί `{ error }` → **TODO**.
+  - **Sparse index Account token-hash (P3/S):** live `models/Account.ts:24,26` `verifyTokenHash`/`resetTokenHash` = `{ type:String, default:null }`, μηδέν `.index()` → collection-scan σε verify/reset confirm → **TODO** (low-urgency, μικρό collection).
+  - **reset-request timing (P3/S, decision-flag):** ακόμα `await sendEmail(...)` στο happy-path → registered/non-registered response-time delta → **Needs Achilleas** (delivery-semantics tradeoff, όχι unattended fix).
+- **Counts ανά dimension: P1=0, P2=0, P3=0 νέο.** Δεν εφευρίσκω debt· 33 σαρώσεις χωρίς P1, ο κώδικας ώριμος. Ο builder ΔΕΝ κατανάλωσε κανένα από τα 3 auto-buildable items αυτόν τον κύκλο (όλα live-verified TODO). Top-3 για builder: (1) seat-cap asymmetry [P3/S, single seat-check add — μικρότερο]· (2) SaaS try/catch helper [P2/M, split S+S]· (3) Account token-hash sparse index [P3/S].
+
 ## Σύνοψη audit (2026-07-02 32η σάρωση· CONFIRMATION· ΜΗΔΕΝ API αλλαγή από τον προηγ. marker `bba44ff`· ουρά αμετάβλητη — 4 ενεργά auto-buildable [1 P2/M + 3 P3/S] + 1 P3/S decision-flag)
 
 **2026-07-02 (32η σάρωση, αυτόνομος γύρος):** fresh live σάρωση (grep, όχι docs) σε **49 v1 route files** + **21 saas route files** + `apiAuth`/`apiBody`/`apiList` helpers + `lib/billing/*` + `lib/tenancy/*` + `models/*`. `git diff --name-only bba44ff..HEAD -- src/app/api src/lib/billing src/lib/tenancy src/models` = **μηδέν αρχεία** → από τον τελευταίο audited marker ΚΑΜΙΑ αλλαγή στο API/model/billing/tenancy surface (οι μόνες αλλαγές: `apps/landing/*` marketing site + `apps/web/src/lib/aiConfig.test.ts` test-only). Το API είναι byte-identical με ό,τι κάλυψαν οι 31 προηγ. σαρώσεις. `npm run type-check` **EXIT 0**.
