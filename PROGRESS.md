@@ -2,8 +2,19 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 6f5199c -->
+<!-- reviewed: a2e1811 -->
 <!-- docker-validated: 577364e -->
+
+## 2026-07-02 (reviewer — range 6f5199c..a2e1811· 0 fixes, 0 νέα flags)
+- **Τι επιθεώρησα:** 5 commits μετά τον marker `6f5199c` — `e25df16` (landing focus-trap + focus return στο mobile drawer), `7cc406f` (12 tests για `trimExpense` v1 serializer shape), `6e82811` (audit read API: resolve actor **name** δίπλα στο email), `a2e1811` (saasGuard try/catch slice 2/2 στα υπόλοιπα write routes), + docs `acef29d`.
+- **Checks:** web `npm run type-check` **EXIT 0**· mobile `npx tsc --noEmit` **EXIT 0**· landing `npx tsc --noEmit` **EXIT 0** (άλλαξε ο κώδικάς του, το επιβεβαίωσα κι ας μην είναι στο υποχρεωτικό σετ)· web vitest **703/703 passed (47 files)**.
+- **Review ευρήματα:**
+  - **audit actorName (`6e82811`):** additive + backward-compatible. Το batched `Account.find({_id:{$in}})` πρόσθεσε `name` στο `.select`, blank name (Account default `''`) → treated ως absent ώστε το UI να πέφτει στο email. `auditView` πήρε 3ο **positional optional** `actorName` (default null) → κάθε υπάρχων caller αμετάβλητος· η `AuditView` πήρε `actorName: string | null` (display-only, ποτέ secret). Tenant-scoping παραμένει (actorIds μόνο από events του tenant). Μηδέν mobile consumer του shape (grep 0) → μηδέν risk σπασίματος parity.
+  - **saasGuard slice 2/2 (`a2e1811`):** καθαρό **1:1 wrap** σε `saasGuard(async () => {...})` στα members GET/POST/PATCH/DELETE + login/signup/checkout/portal/invites-resend. Έλεγξα τα diffs: gate ladders (`saasAuthGate`/401/500), validation (400/403/409), seat-limit + last-owner guards, anti-enumeration, recordAudit + fire-and-forget email — ΟΛΑ αμετάβλητα, μόνο indentation. Αλλάζει μόνο ο unforeseen throw → uniform `{ error }` 500.
+  - **focus-trap (`e25df16`):** σωστή υλοποίηση — Tab/Shift-Tab wrap μέσα στο `panelRef`, `requestAnimationFrame` focus στο close button όταν ανοίγει, focus return στο burger στο cleanup (registered μόνο όταν `open===true` → πυροδοτείται μόνο σε πραγματικό open→close). tsc OK.
+  - **serialize.test.ts (`7cc406f`):** 12 pure tests, μηδέν side effect (import μόνο τύπου), καλύπτουν coercion/defaults/0-value/booleanize/iso/null-date/empty-path-collapse/deleted-flag/exact-key-set. Ευθυγραμμισμένα με τον κώδικα, όλα πράσινα.
+  - **secrets:** μηδέν committed secret στο εύρος (τα grep hits ήταν display-only prose + legit password validation).
+- **Fixes:** κανένα (η δουλειά ήταν καθαρή, tsc πράσινο και στα 3 apps, tests πράσινα). **Νέα flags:** καμία. Marker → `a2e1811`.
 
 ## 2026-07-02 (pharos-daily-dev — SaaS try/catch slice 2/2 [ΚΛΕΙΝΕΙ το item])
 - **Τι έκανα:** ολοκλήρωσα το **suggested-next-task της προηγ. pharos-daily-dev εγγραφής** (SaaS try/catch slice 2/2, top auto-buildable WEB_DEBT item P2/M). Το slice 1/2 (`6f5199c`) είχε καλύψει τα 6 account/* routes· αυτό το slice καλύπτει τα **6 εναπομείναντα write routes**. Επιλέχθηκε ως το πληρέστερα-finishable, μηδέν credentials / AI / native dep / new endpoint — απλή υιοθέτηση υπάρχοντος helper.
