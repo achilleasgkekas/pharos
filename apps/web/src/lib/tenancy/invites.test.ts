@@ -113,8 +113,24 @@ describe('inviteView', () => {
     );
     expect(JSON.stringify(v)).not.toContain('SECRET');
     expect(Object.keys(v).sort()).toEqual(
-      ['createdAt', 'email', 'expired', 'expires', 'id', 'role', 'status'].sort()
+      ['acceptedAt', 'acceptedBy', 'createdAt', 'email', 'expired', 'expires', 'id', 'role', 'status'].sort()
     );
+  });
+
+  it('projects acceptance audit fields on an accepted invite', () => {
+    const acceptedAt = new Date(now + 5000);
+    const v = inviteView(
+      { _id: 1, status: 'accepted', expires: future, acceptedBy: 99, acceptedAt },
+      now
+    );
+    expect(v.acceptedBy).toBe('99');
+    expect(v.acceptedAt).toBe(acceptedAt.toISOString());
+  });
+
+  it('leaves acceptance fields null on a not-yet-accepted invite', () => {
+    const v = inviteView({ _id: 1, status: 'pending', expires: future }, now);
+    expect(v.acceptedBy).toBeNull();
+    expect(v.acceptedAt).toBeNull();
   });
 
   it('flags a pending invite past its TTL as expired', () => {
@@ -141,6 +157,8 @@ describe('inviteView', () => {
     expect(v.role).toBe('member');
     expect(v.status).toBe('pending');
     expect(v.createdAt).toBeNull();
+    expect(v.acceptedBy).toBeNull();
+    expect(v.acceptedAt).toBeNull();
   });
 });
 

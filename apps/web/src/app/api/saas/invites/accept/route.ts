@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
   // Consume the invite so the token cannot be replayed.
   await Invite.updateOne(
     { _id: invite._id },
-    { $set: { status: 'accepted', acceptedBy: accountId } }
+    { $set: { status: 'accepted', acceptedBy: accountId, acceptedAt: new Date() } }
   );
 
   await setAccountCookie({ sub: accountId, email });

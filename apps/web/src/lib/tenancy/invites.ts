@@ -104,6 +104,11 @@ export type InviteView = {
   expires: string | null;
   expired: boolean;
   createdAt: string | null;
+  // Acceptance audit trail — populated only once an invite is redeemed, null otherwise. Lets
+  // the audit list (?status=accepted|all) show who joined via which invite, and when. Still
+  // never carries the token hash or any secret.
+  acceptedBy: string | null;
+  acceptedAt: string | null;
 };
 
 function toIso(d: Date | string | null | undefined): string | null {
@@ -120,6 +125,8 @@ export function inviteView(
     status?: string | null;
     expires?: Date | string | null;
     createdAt?: Date | string | null;
+    acceptedBy?: unknown;
+    acceptedAt?: Date | string | null;
   },
   nowMs: number = Date.now()
 ): InviteView {
@@ -134,5 +141,8 @@ export function inviteView(
     // "pending"; surface that so the UI can distinguish live links from stale ones.
     expired: status === 'pending' && !isInviteValid(status, inv.expires, nowMs),
     createdAt: toIso(inv.createdAt),
+    // null on pending/revoked rows; set only when an invite was actually accepted.
+    acceptedBy: inv.acceptedBy != null ? String(inv.acceptedBy) : null,
+    acceptedAt: toIso(inv.acceptedAt),
   };
 }

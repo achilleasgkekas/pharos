@@ -24,6 +24,10 @@ const InviteSchema = new Schema(
     expires: { type: Date, required: true },
     invitedBy: { type: Schema.Types.ObjectId, ref: 'Account', default: null },
     acceptedBy: { type: Schema.Types.ObjectId, ref: 'Account', default: null },
+    // Explicit acceptance timestamp for the audit view. Distinct from `updatedAt`, which
+    // also bumps on revoke; this is null until the invite is redeemed and never changes
+    // afterward, so "who accepted, and when" is unambiguous.
+    acceptedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

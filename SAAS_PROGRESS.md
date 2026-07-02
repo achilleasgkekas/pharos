@@ -874,3 +874,33 @@ runtime wiring, καμία νέα εξάρτηση. Άγγιξα μόνο δικ
 Achilleas· ξεκλειδώνει reset/verify/invite delivery σε production), είτε (β) dedicated resend
 endpoint (re-mint + email σε ένα βήμα, αντί POST στο members route), είτε (γ) accepted-invite
 audit metadata στο inviteView (acceptedBy/acceptedAt projection για την audit λίστα του §20).
+
+## 2026-07-02 (increment 21 — accepted-invite audit metadata στο inviteView)
+**Built:** το audit view του §20 (`?status=accepted|all`) έδειχνε accepted invites αλλά **χωρίς
+who/when** — ποιος τα δέχτηκε και πότε. Πρόσθεσα explicit acceptance trail. ΟΛΟ SAAS-gated,
+additive, backward-compatible, σε δικά μου αρχεία:
+- `models/Invite.ts` (additive): νέο πεδίο **`acceptedAt: { type: Date, default: null }`**.
+  Ξεχωριστό από το `updatedAt` (που bump-άρει και στο revoke) → null μέχρι το redeem και
+  αμετάβλητο μετά, οπότε το «ποιος/πότε» είναι μονοσήμαντο. Το `acceptedBy` προϋπήρχε.
+- `app/api/saas/invites/accept/route.ts` (additive): το consume-step βάζει πλέον
+  `acceptedAt: new Date()` μαζί με `status:'accepted', acceptedBy` στο ίδιο `$set`.
+- `lib/tenancy/invites.ts` (additive): ο `InviteView` type + ο `inviteView` serializer
+  προβάλλουν **`acceptedBy: string|null`** (stringified ObjectId, null σε pending/revoked) +
+  **`acceptedAt: string|null`** (ISO μέσω του υπάρχοντος null-safe `toIso`). By construction
+  ΠΟΤΕ tokenHash — μόνο whitelisted πεδία.
+- `app/api/saas/invites/route.ts` (additive): το GET `.select()` += `acceptedBy acceptedAt`
+  ώστε να φτάνουν στον serializer. Gate/scope/sort αμετάβλητα.
+- `lib/tenancy/invites.test.ts` — ενημέρωσα το exact-key-set assertion (+acceptedAt/acceptedBy)
+  + 2 νέα it-blocks (accepted invite → projects '99'/ISO· pending → null/null) + 2 assertions
+  στο defaults test.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run invites.test.ts` → **26/26
+green** (24 προϋπάρχοντα + 2 νέα). Additive model field με default + routes SaaS-gated (404 off)
++ serializer pure ⇒ `SAAS_MODE` off = zero effect, κανένα Docker rebuild (self-hosted path δεν
+mint-άρει invites, κανένας external importer των αλλαγών), καμία νέα εξάρτηση. Άγγιξα μόνο δικά
+μου SAAS αρχεία.
+
+**Next task:** increment 22 — είτε (α) `sendViaSmtp` via nodemailer (μετά από provider decision
+Achilleas· ξεκλειδώνει reset/verify/invite delivery σε production), είτε (β) dedicated resend
+endpoint (re-mint + email σε ένα βήμα), είτε (γ) `invitedBy` projection στο inviteView (ποιος
+έστειλε το invite — συμπληρώνει το acceptedBy του §21 για πλήρες audit trail).
