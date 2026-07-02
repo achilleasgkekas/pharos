@@ -358,3 +358,41 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — 
 (deterministic με fake timers / fixed `Date.now`: justNow/minutes/hours/yesterday/days
 buckets + clamp αρνητικού διαστήματος στο 0) ή `lib/billing/usage.ts` αν pure. Ένα module ανά
 run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — i18n/format.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/i18n/format.test.ts` για το `relTime`
+του `lib/i18n/format.ts` (localized "x ago" relative-time bucketing).**
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/i18n/format.test.ts` (10 tests, μηδέν DB/fs/δίκτυο). Deterministic
+  μέσω `vi.useFakeTimers()` + `vi.setSystemTime(NOW)` (NOW pin-αρισμένο στο
+  2026-07-02T12:00:00Z), οπότε το `Date.now()` μέσα στο relTime είναι σταθερό· κάθε iso
+  παράγεται με helper `ago(secondsAgo)`. Δύο μέτωπα ελέγχου:
+  (α) **spy `t`** που καταγράφει το ΑΚΡΙΒΕΣ key + vars που διάλεξε το relTime, ανεξάρτητα
+  από dictionary wording, ώστε να κλειδώσουν τα boundaries: justNow < 60s, minutes στα
+  ακριβώς 60s (floor: 119s→1m, 3599s→59m), hours στα ακριβώς 3600s (floor: 7199s→1h,
+  86399s→23h), **yesterday** (no vars) στο ακριβώς 1 ημέρα (και 2*86400-1 ακόμα day-1),
+  days με floored count από 2 ημέρες κι επάνω· επίσης **future/edge clamp** — μελλοντικό iso
+  (ago(-120)) και το ακριβές NOW → `Math.max(0,…)` → justNow.
+  (β) **real English dict** (`makeT(resolveDict('en'))`) end-to-end: '1m ago'/'45m ago'/
+  '1h ago'/'5h ago'/'yesterday'/'3d ago' — επιβεβαιώνει το {n} interpolation.
+- **Σημείο που pin-αρίστηκε**: το yesterday branch ΔΕΝ περνά vars (`t('time.yesterday')`),
+  σε αντίθεση με minutes/hours/days· το test το κλειδώνει ρητά (`vars: undefined`) ώστε
+  ακούσια προσθήκη `{n}` να πέσει. Επίσης τα boundaries είναι `<` (exclusive upper) σε κάθε
+  bucket — ελέγχονται και οι δύο πλευρές (59/60, 3599/3600, 86399/86400).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/i18n/format.test.ts` → 10/10 passed.
+- `npx vitest run` (όλο το suite) → 29 files, 447/447 passed (ήταν 437).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json`
+  (foreign, ΔΕΝ το άγγιξα/staged) + το νέο format.test.ts· `git diff --cached` κενό·
+  στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — δες `lib/apiList.ts`
+(query/sort/pagination helpers, αν καθαρό από I/O) ή `lib/dates.ts` `safeDate` (European
+DD/MM/YYYY, DD.MM, ISO parsing — deterministic). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF
+IPv4-mapped fix στο "## Needs Achilleas".
