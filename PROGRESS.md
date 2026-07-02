@@ -2931,3 +2931,23 @@ Read-only mobile UI consistency audit (apps/mobile Expo ⇄ web design tokens `a
 
 ### Needs Achilleas
 - Κανένα νέο· μηδέν committed secret εντοπίστηκε στο mobile source. Το «Light / dark theme via theme context» (P3/L) παραμένει σκόπιμη απόφαση (μεγάλο refactor, εξαρτάται από ολοκλήρωση reusable set), όχι unattended.
+
+## 2026-07-02 (builder — <Chip> toggle-pill primitive, mobile UI consolidation)
+
+Πήρα το πιο επαναλαμβανόμενο unattended-safe item της ουράς (ui-auditor 33η/34η σάρωση): το **`<Chip>` primitive**. Το functional parity queue είναι κλειστό (6/6 + Activity), οπότε το επόμενο value ήταν το reusable-component holdout που **μεγάλωνε** σε κάθε νέα οθόνη με chips (7 StyleSheet clusters / 5 screens).
+
+**Τι έγινε:** νέο **`<Chip label on onPress style? textStyle?>`** στο `apps/mobile/src/ui.tsx` (base padH12/padV6/radius10/12px, surface2/1px-border → accent-fill/onAccent-text όταν `on`), ίδιο style/textStyle-override idiom με τα υπάρχοντα `Button`/`IconButton`/`Badge`. Αντικατέστησε **6 byte-identical toggle-chip clusters** (24 StyleSheet entries) σε 5 screens:
+- **ItemsScreen** `chip` (filter) → `filterChip`/`filterChipText` (padH14/padV7/fs13)· `sChip` (status) → `statusChip` (padH11/radius9).
+- **SubscriptionsScreen** `cChip` (billing cycle) → `cycleChip` (padH11/radius9).
+- **SettingsScreen** `chip` (currency + card kind + type, 3 call sites) → `optChip`/`optChipText` (padH16/padV8/fs13). Άφησα ανέγγιχτα τα `addChip` (cyan ghost) + `valChip` (removable ✕) — διαφορετική semantics, ΟΧΙ toggle chips.
+- **TasksScreen** `tagChip` → **μηδέν override** (ταιριάζει ακριβώς το base).
+- **ReportsScreen** `rangeChip` → `rangeChip` (padV5/radius9).
+
+Η base fontSize διαλέχτηκε 12 (matches 4/6 sites) ώστε μόνο 2 sites να χρειάζονται `textStyle` (τα δύο μεγαλύτερα chips, fs13). Κάθε call site κρατά **pixel-identical** rendering μέσω minimal override (επαλήθευσα ένα-ένα ότι τα resolved padding/radius/fontSize == τα original).
+
+**Verify:** `cd apps/mobile && npx tsc --noEmit` → **EXIT 0**. Καθάρισα το πλέον-unused `Pressable` import από το ReportsScreen. Diffstat: 6 files, +52/−54 (net −2 γραμμές, −24 duplicated style entries). ΟΧΙ Docker build (mobile-only change, ο web surface αμετάβλητος). ΟΧΙ AI job. Working tree `.claude/launch.json` (foreign) ΔΕΝ αγγίχτηκε· staged μόνο τα 6 δικά μου αρχεία. Commit `681098f`, pushed. Simulator visual-verify **ΕΚΚΡΕΜΕΙ** (unattended, no device) — αλλά byte-identical by construction.
+
+**Suggested next task:** το επόμενο reusable holdout είναι το **ghost `<Button variant>`** (cyan/accent-border, no-fill· ~7 sites: `aiBtn`/`scanBtn`/`rescanBtn`/`importBtn` + Settings `addChip` που τώρα ξεχωρίζει). Επεκτείνει το υπάρχον `Button` με `variant?: 'primary' | 'ghost'` (+ optional tint), unattended-safe (tsc-verifiable, style-override idiom). Εναλλακτικά, semi-attended: **safe-area insets** (package-add `react-native-safe-area-context` + `useSafeAreaInsets`, θέλει simulator verify).
+
+### Needs Achilleas
+- Κανένα νέο· μηδέν committed secret. Safe-area insets + light/dark theme παραμένουν semi-attended/decision (device/refactor).
