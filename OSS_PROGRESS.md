@@ -231,3 +231,33 @@ gap θέλει one-liner fix στο `ip6IsPrivate` (normalize το ::ffff:HEX:HE
   τρέξε `ip4IsPrivate`, ή απόρριψε ρητά κάθε `::ffff:*`. Τα tests στο `ssrf.test.ts`
   (block "KNOWN GAP") κλειδώνουν την τωρινή συμπεριφορά· μόλις διορθωθεί, γύρνα τα από
   `.resolves.toBeUndefined()` σε `.rejects.toThrow('Private address not allowed')`.
+
+---
+
+## 2026-07-02 (cont. — cardFields.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/cardFields.test.ts` για τον API card-validator `cardFieldsFromBody` του `lib/cardFields.ts`.**
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/cardFields.test.ts` (25 tests). Καλύπτει ντετερμινιστικά όλο
+  τον validator (μηδέν DB/clock/fs): name required-on-create vs optional-on-update
+  (blank/whitespace/non-string → null στο create, `{}` στο update), last4 strip-non-
+  digits + cap 4 (empty-string όταν no digits), enums kind/type (accept valid, drop
+  unknown), bank/color/notes trim (color θέλει non-empty guard, bank/notes γράφουν
+  και κενό string), creditLimit numeric-string coerce + clamp>=0 + accept 0 + drop
+  NaN/null/undefined, active boolean-only, + 2 integration cases (πλήρες valid body,
+  και «drop invalid keep valid»). Κλειδώνει τη byte-identical συμπεριφορά που μοιράζονται
+  POST + PATCH /api/v1/cards.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/cardFields.test.ts` → 25/25 passed.
+- `npx vitest run` (όλο το suite) → 17 files, 288/288 passed (ήταν 263).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json`
+  (foreign, ΔΕΝ το άγγιξα/staged) + το νέο cardFields.test.ts· `git diff --cached` κενό·
+  στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — `lib/aiModels.ts`
+(`priceForModel` longest-substring-match + `looksVisionModel` heuristic, τελείως καθαρό
+από I/O) ή `lib/apiList.ts` (αν pure query/sort helpers). Ένα module ανά run. Εκκρεμεί
+ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
