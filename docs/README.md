@@ -33,6 +33,9 @@ GitHub today and can feed a docs site later.
   (`SAAS_MODE`): accounts, workspaces, memberships & roles, the plan/quota
   ladder, the `/api/saas` control-plane API, Stripe billing, and its env vars.
   Does not apply to the self-hosted app.
+- **[FAQ](faq.md)** — common questions grouped by topic: self-hosting vs managed
+  SaaS, privacy & data ownership, AI, storage & backups, mobile, cost &
+  licensing, and where to start when something breaks.
 
 ## Reference (repo root)
 

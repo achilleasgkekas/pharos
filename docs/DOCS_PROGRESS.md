@@ -300,3 +300,33 @@ Stage ΜΟΝΟ docs/saas.md + docs/README.md + docs/DOCS_PROGRESS.md.
 Επομενο run: εμπλουτισμος `docs/features.md` ανα module (screenshot placeholders), η ενα
 `docs/faq.md` για κοινες ερωτησεις (self-host vs SaaS, privacy, AI optionality). Πρωτα
 finish-in-progress κανενα (ολα done).
+
+## 2026-07-02 (cont.⁴)
+
+Νεο doc: `docs/faq.md` — το πρωτο FAQ, οπως ειχε σημειωθει ως επομενο (features.md
+ηδη πληρες, saas.md γραφτηκε στο προηγουμενο run). Ομαδοποιημενο σε 8 θεματα: General,
+Self-hosting vs managed SaaS, Privacy & data ownership, AI, Storage & backups, Mobile
+app, Cost & licensing, Troubleshooting. Καθε απαντηση συντομη, με link στο αναλυτικο doc
+(features/self-hosting/saas/configuration/mobile/troubleshooting) αντι να επαναλαμβανει.
+
+Accuracy (απο υπαρχοντα docs + CLAUDE.md, οχι εικασιες): dual shape AGPL vs SAAS_MODE,
+AI optional/per-feature + οι 6 providers (Ollama/Anthropic/OpenAI/Gemini/OpenRouter/
+custom), local-first storage με SMB/FTP/OneDrive push-only mirror, soft-delete/Trash
+αναστρεψιμα, JSON+CSV export, bulk-AI cost guard, stale-bundle hard-refresh, provider-
+aware AI status fallback σε Ollama. Καμια νεα τιμη/limit εφευρεθηκε — τα SaaS plan limits
+παραπεμπουν στο saas.md.
+
+Προσθεσα link στο `docs/README.md` index (νεα εγγραφη «FAQ» μετα το Managed SaaS mode).
+
+Validation: markdown only, κανενα build/Docker/AI call. Internal links του faq.md →
+README.md, features.md, self-hosting.md, saas.md, configuration.md, mobile.md,
+troubleshooting.md, ../LICENSE — ολα υπαρχουν. Code fences: μονο inline `code`, κανενα
+fenced block. Καμια secret τιμη.
+
+Collision guard: `git status --short` δειχνει προϋπαρχοντα .claude/launch.json +
+apps/web/SAAS_PROGRESS.md (αλλης ρουτινας, ΔΕΝ τα αγγιξα)· staged κενο. Stage ΜΟΝΟ
+docs/faq.md + docs/README.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: εμπλουτισμος `docs/features.md` με screenshot placeholders ανα module, η
+ενα `docs/glossary.md` (ορολογια: installment plan/signature, vendorKey series, mirror,
+tenant/membership). Πρωτα finish-in-progress κανενα (ολα done).
