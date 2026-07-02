@@ -512,3 +512,25 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-02 (cont.¹⁶)
+
+Task: (c/e) Polish, μερος 22 — νεο slim «By the numbers» proof band (#numbers) αναμεσα σε #preview και #features. Και τα δυο next-increment items του προηγουμενου log ηταν blocked (πραγματικα app screenshots = χρειαζονται assets· per-plan Offer JSON-LD = χρειαζονται τελικες τιμες), οποτε διαλεξα φρεσκο (e) increment: μια συμπαγη μπαρα με 5 factual figures που ενισχυει τα differentiators αμεσως μετα το dashboard preview (marketing flow: dashboard -> app σε νουμερα -> feature-by-feature). Ολα τα νουμερα αληθινα/derivable απο το app: 8 modules (=FEATURES), 6 AI providers (Ollama/Anthropic/OpenAI/Gemini/OpenRouter/Custom per CLAUDE.md), 4 storage backends (Local/SMB/FTP/OneDrive), 0 telemetry, ∞ Yours to keep · AGPL-3.0. Self-contained, μηδεν assets, μηδεν pricing decision.
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεο `STATS` array (5 × num+lbl+color) + νεο `#numbers` section (`.numbers-band` με 5 `.number-tile`, καθε ενα με radial `.num-glow` στο brand color + big display num + label). Τοποθετηθηκε αναμεσα στο product showcase και τα features.
+- `app/globals.css`: νεες `.numbers-band` (5-col grid -> 3-col <900px -> 2-col <560px), `.number-tile` (surface card, hover lift + border-light, ιδιο idiom με stat-tile/deploy-pill), `.number-tile .num` (display 800, brand color), `.lbl` (dim), `.num-glow` (radial blur, reuse feature-glow pattern). Reuse υπαρχουσας παλετας.
+- ΔΕΝ προσθεσα nav link (slim band, reachable με scroll οπως τα #trust/#preview/#integrations που επισης δεν εχουν nav link· το top nav ειναι ηδη πληρες με 8 anchors, αποφυγη overcrowding).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 761 B / 103 kB First Load JS, αμεταβλητο — pure static markup+CSS, μηδεν bundle impact).
+- Prerendered HTML (.next/server/app/index.html): id="numbers"=1, «Modules in one hub», «AI providers, your pick», «Storage backends», «Trackers or telemetry», «Yours to keep» ολα FOUND. Route static -> prerendered HTML = ακριβως το served (build + HTML check = ισοδυναμη επαληθευση για pure-static content· δεν σηκωσα preview server για slim static band με reuse CSS idioms). Docker/web/mobile αθικτα. Το `.claude/launch.json` (shared local config, modified) ΔΕΝ commit (collision guard — μονο page.tsx + globals.css + LANDING_PROGRESS.md).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση των CSS mockups (#preview, #ai, #mobile phone) με πραγματικα app screenshots οταν υπαρξουν assets· per-plan Offer JSON-LD nodes οταν κλεισουν οι τιμες· mobile hamburger menu (το top nav κρυβει τα secondary anchors <720px, δουλευει αλλα ενα drawer θα εδινε πληρη mobile nav).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.

@@ -348,6 +348,54 @@ h1, h2, h3 {
   flex-shrink: 0;
 }
 
+/* By-the-numbers proof band */
+.numbers-band {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+.number-tile {
+  position: relative;
+  overflow: hidden;
+  padding: 24px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: center;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.number-tile:hover {
+  border-color: var(--border-light);
+  transform: translateY(-2px);
+}
+.number-tile .num {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2.3rem;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+.number-tile .lbl {
+  display: block;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.number-tile .num-glow {
+  position: absolute;
+  top: -30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  filter: blur(38px);
+  opacity: 0.16;
+  pointer-events: none;
+}
+
 /* Integrations */
 .integ-grid {
   list-style: none;
@@ -1072,6 +1120,8 @@ h1, h2, h3 {
 }
 @media (max-width: 900px) {
   .mod-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Numbers band: 5-across becomes a tidy grid */
+  .numbers-band { grid-template-columns: repeat(3, 1fr); }
   /* Mobile section: phone on top, highlights below */
   .mobile-flow { grid-template-columns: 1fr; gap: 32px; justify-items: center; }
   .mobile-highlights { width: 100%; }
@@ -1090,6 +1140,7 @@ h1, h2, h3 {
   .trust-grid { grid-template-columns: 1fr; }
   .stat-row { grid-template-columns: 1fr; }
   .mod-grid { grid-template-columns: 1fr; }
+  .numbers-band { grid-template-columns: repeat(2, 1fr); }
   .win-body { padding: 20px 18px 22px; }
   .win-addr { max-width: 180px; }
   .container { padding: 0 18px; }

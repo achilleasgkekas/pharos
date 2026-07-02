@@ -233,6 +233,15 @@ const SHOWCASE_MODS: { icon: string; color: string; title: string; count: string
   { icon: 'wifi', color: 'var(--gold)', title: 'Network', count: '31 clients' },
 ];
 
+// By-the-numbers proof band, every figure is factual and derivable from the app
+const STATS: { num: string; lbl: string; color: string }[] = [
+  { num: '8', lbl: 'Modules in one hub', color: 'var(--accent)' },
+  { num: '6', lbl: 'AI providers, your pick', color: 'var(--cyan)' },
+  { num: '4', lbl: 'Storage backends', color: 'var(--purple)' },
+  { num: '0', lbl: 'Trackers or telemetry', color: 'var(--gold)' },
+  { num: '∞', lbl: 'Yours to keep · AGPL-3.0', color: 'var(--red)' },
+];
+
 // Parsed output for the "AI in action" spotlight (CSS-drawn, no assets)
 const AI_FIELDS: { k: string; v: string; color?: string }[] = [
   { k: 'Store', v: 'Πλαίσιο Computers' },
@@ -565,6 +574,21 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── By the numbers ────────────────────────────────── */}
+      <section id="numbers" style={{ padding: '8px 0 40px' }}>
+        <div className="container">
+          <ul className="numbers-band">
+            {STATS.map((s) => (
+              <li key={s.lbl} className="number-tile">
+                <span className="num-glow" style={{ background: s.color }} aria-hidden="true" />
+                <span className="num" style={{ color: s.color }}>{s.num}</span>
+                <span className="lbl">{s.lbl}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
