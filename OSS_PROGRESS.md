@@ -813,3 +813,24 @@ Suggested next task: (f συνέχεια) Με το server-only shim στη θέ
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` (ΔΕΝ το άγγιξα/staged) + το νέο auth.test.ts. Στάγιαρα μόνο τα δικά μου paths.
 
 Suggested next task: (f συνέχεια) Επόμενο pure test file. Απομένοντα καθαρά targets λίγα — τα περισσότερα exported pure helpers έχουν test. Πιθανά: (α) `lib/session.ts` έχει ήδη test· δες αν το `auth.ts` async layer αξίζει με mocked `next/headers`+`session` (role-guard branches του `requireAdmin`)· (β) `models/` pure statics/virtuals αν υπάρχουν· (γ) additive-export ενός `aiProviders.ts` internal helper (`stripFences`/`mediaTypeOf`) ΑΝ εγκριθεί source edit (εκτός territory τώρα). Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα) + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-03 (cont. — ocr.test.ts, looksLikeUsableOcr gate)
+
+**Task: (f συνέχεια) Pure test file `apps/web/src/lib/ocr.test.ts` για το `looksLikeUsableOcr` gate του `lib/ocr.ts`.**
+
+Επιλογή target: σάρωσα τα ακάλυπτα pure exports (`find src -name '*.test.ts'` = 49 files πριν). Τα δύο v1 serializers, `computeAnomalies` (7 refs στο expenses/serialize.test.ts), auth, aiTools, expoPush κ.λπ. είναι ήδη καλυμμένα. Απόρριψα το `components/ui/cn.ts` (thin wrapper πάνω σε clsx+tailwind-merge, τεστάρει third-party, χαμηλή αξία). Διάλεξα το `looksLikeUsableOcr` γιατί είναι δικό μας business gate: μετά το Tesseract, αποφασίζει αν το OCR text έχει αρκετούς πραγματικούς χαρακτήρες για το text model ή αν πρέπει fallback σε vision parse. Το threshold έχει σημασία (πολύ χαμηλό → garbage στο model σε άδειες/€0 αποδείξεις· πολύ ψηλό → άσκοπο vision call σε καλό text). Ντετερμινιστικό (strip whitespace, length ≥40), μηδέν clock/DB.
+
+Sharp concern + resolution: το `ocr.ts` κάνει top-level `import sharp` (native lib). Έλεγξα ότι το CI (`.github/workflows/ci.yml`) τρέχει ήδη `npm ci` + `npm run build` σε ubuntu-latest → το sharp-linux binary εγκαθίσταται/χρησιμοποιείται ήδη· άρα import του ocr.ts σε vitest ΔΕΝ είναι νέο CI ρίσκο. Probe: `import('./src/lib/ocr.ts')` φόρτωσε καθαρά (sharp-darwin-arm64 present τοπικά), το `looksLikeUsableOcr` export ok. Το import είναι side-effect-free (καμία εικόνα δεν επεξεργάζεται στο load).
+
+Τι έγινε:
+- Νέο `ocr.test.ts` (8 tests). Καλύπτει: empty → false· whitespace-only (spaces/tabs/newlines/CR) → false· 39 non-ws chars → false (boundary)· 40 non-ws chars → true (boundary)· πολύ πάνω από threshold → true· surrounding whitespace ΔΕΝ μετράει (39 wrapped → false, 40 wrapped → true)· interspersed whitespace ΔΕΝ μετράει (`'a '.repeat(40)` → true, `.repeat(39)` → false)· Greek/non-ASCII BMP chars μετρώνται 1:1 (39 → false, 40 → true) + ρεαλιστικό κοντό ελληνικό fragment → false.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/ocr.test.ts` → 8/8 passed (sharp φόρτωσε κανονικά).
+- `npx vitest run` (όλο το suite) → 50 files, 746/746 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` (ΔΕΝ το άγγιξα/staged) + το νέο ocr.test.ts. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure test file. Τα καθαρά exported helpers έχουν πλέον σχεδόν όλα test. Απομένοντα: (α) `components/ui/cn.ts` (thin, μόνο αν θέλουμε lock στο tailwind-merge conflict-resolution)· (β) API-shape/validation helpers σε app/api/v1 route.ts που δεν θέλουν live Mongo (mock ή inline parsers)· (γ) additive-export ενός `aiProviders.ts` internal helper (`stripFences`/`mediaTypeOf`) ΑΝ εγκριθεί source edit (εκτός territory τώρα). Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα) + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
