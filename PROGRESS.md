@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 2201932 -->
-<!-- docker-validated: b5fa042 -->
+<!-- docker-validated: 577364e -->
+
+## 2026-07-02 (docker-health — safe rebuild μετά τα SaaS audit + expenses-rescan commits)
+- **Health (read-only):** `homepage-mongo` **healthy**, `homepage-web` **0 restarts** (up ~49min πριν το rebuild). Το mongo RestartCount=145 είναι σωρευτικό του container lifetime, ΟΧΙ ενεργό loop (τώρα healthy). `homepage-flaresolverr` δεν έτρεχε (μηδέν memory pressure).
+- **Disk:** Images 4.41GB, Build Cache 1.068GB πριν. Μετά το build+prune, `docker builder prune -f` ανέκτησε **~2.1GB** intermediate cache (το εναπομείναν 1.068GB = in-use base layers, reclaimable 0B).
+- **Rebuild:** δικαιολογημένο. `git diff b5fa042..HEAD -- apps/web` άγγιζε runtime code (SaaS audit routes, `lib/tenancy/audit.ts`, v1 expenses `serialize.ts`+routes). Ασφαλής χορός: `docker compose build web` (image only, mongo healthy πριν) → `docker compose up -d web` → poll `/login` → **200 στην 1η προσπάθεια** → web restarts παρέμειναν **0**, up & healthy. NEVER `up --build`.
+- **Marker:** docker-validated `b5fa042` → **`577364e`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
+- **## Needs Achilleas:** τίποτα.
 
 ## 2026-07-02 (reviewer — range 1797ab7..2201932, 6 commits)
 - **Έλεγχοι:** `apps/web` type-check **EXIT 0**, `apps/mobile` `tsc --noEmit` **EXIT 0**. `vitest run apiAuth.test.ts audit.test.ts` → **27/27 green** (9 + 18).
