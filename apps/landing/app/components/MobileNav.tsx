@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type NavItem = { href: string; label: string; external?: boolean };
 
@@ -18,25 +18,60 @@ const ITEMS: NavItem[] = [
 
 export function MobileNav({ githubUrl }: { githubUrl: string }) {
   const [open, setOpen] = useState(false);
+  const burgerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
-  // Lock body scroll + close on Escape while the drawer is open.
+  // Lock body scroll, close on Escape, and trap focus inside the drawer while open.
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
+
+    function focusable(): HTMLElement[] {
+      const panel = panelRef.current;
+      if (!panel) return [];
+      return Array.from(
+        panel.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
+      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
     }
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = focusable();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (active === first || !panelRef.current?.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    // Move focus into the drawer once it is rendered.
+    const raf = requestAnimationFrame(() => closeRef.current?.focus());
     window.addEventListener('keydown', onKey);
     return () => {
+      cancelAnimationFrame(raf);
       document.body.style.overflow = prev;
       window.removeEventListener('keydown', onKey);
+      // Return focus to the trigger when the drawer closes.
+      burgerRef.current?.focus();
     };
   }, [open]);
 
   return (
     <>
       <button
+        ref={burgerRef}
         type="button"
         className="nav-burger"
         aria-label="Open menu"
@@ -70,10 +105,11 @@ export function MobileNav({ githubUrl }: { githubUrl: string }) {
           tabIndex={-1}
           onClick={() => setOpen(false)}
         />
-        <nav className="drawer-panel" aria-label="Mobile">
+        <nav className="drawer-panel" aria-label="Mobile" ref={panelRef}>
           <div className="drawer-head">
             <span className="mono">Menu</span>
             <button
+              ref={closeRef}
               type="button"
               className="nav-burger"
               aria-label="Close menu"

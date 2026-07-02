@@ -559,3 +559,30 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-02 (cont.¹⁸)
+
+Task: (e) Polish, μερος 24 — focus-trap + focus management στο mobile drawer. Ηταν το ρητο «επομενο increment» του προηγουμενου log (τα αλλα δυο, real screenshots + per-plan Offer JSON-LD, μενουν blocked σε assets/τιμες). Προβλημα a11y: το drawer ανοιγε αλλα το keyboard focus εμενε πισω στη σελιδα (Tab ξεφευγε κατω απ' το scrim, keyboard/screen-reader users χανονταν) και μετα το κλεισιμο το focus δεν επεστρεφε στο hamburger. Τωρα το drawer ειναι πληρως keyboard-navigable.
+
+Τι εφτιαξα (μονο `app/components/MobileNav.tsx`):
+- 3 refs: `burgerRef` (trigger), `panelRef` (drawer nav), `closeRef` (X button).
+- On open: `requestAnimationFrame` -> focus στο close button (focus μπαινει μεσα στο drawer).
+- Focus-trap στο `onKey` (Tab/Shift+Tab): `focusable()` μαζευει τα ορατα a[href]/button μεσα στο panel· Tab στο last -> wrap στο first, Shift+Tab στο first (ή focus εκτος panel) -> wrap στο last. Escape κλεινει (ηδη υπηρχε).
+- On close (cleanup): `burgerRef.current?.focus()` -> return focus στο trigger (WCAG 2.4.3 focus order).
+- Το scrim button (tabIndex=-1, εκτος panelRef) σωστα εξαιρειται απο το trap.
+- Μηδεν CSS/markup αλλαγη πλην των ref attachments· καμια αλλη component/αρχειο δεν αγγιχτηκε.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success. Route / = 1.7 kB / 104 kB First Load JS (ηταν 1.41 kB· +~290 B για refs+trap logic στο client component· ολα ○ Static/prerendered).
+- Prerendered HTML: mobile-drawer / drawer-panel / «Open menu» ολα FOUND (SSR initial state αμεταβλητο).
+- Dev smoke: `PORT=3007 npm run dev` -> HTTP 200, 0 errors στο log· server σταματημενος (pkill), δεν αφησα κανενα να τρεχει (το :3000 το κραταει το Docker homepage-web). Docker/web/mobile αθικτα.
+- Collision guard: git status -> κανενα foreign staged· foreign `.claude/launch.json` (modified) ΔΕΝ commit — μονο MobileNav.tsx + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως scroll-spy active-section highlight στο drawer/desktop nav.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (ή mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
