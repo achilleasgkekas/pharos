@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 699c36e -->
-<!-- docker-validated: bf503cb -->
+<!-- docker-validated: b5fa042 -->
+
+## 2026-07-02 (docker-health guard — rebuild μετά audit-log commits)
+- **Health:** homepage-mongo **healthy** (up 51 min), web RestartCount **0**, mongo RestartCount 133 (ιστορικό OOM, όχι τρέχον loop — currently up & healthy). homepage-flaresolverr **Exited** (143, εδώ και 2 μέρες) → μένει stopped, καμία ενέργεια.
+- **Disk:** πριν Build Cache 1.068GB / Images 4.41GB. `docker builder prune -f` reclaimed **2.104GB** (cache only, ποτέ --all). Volumes/mongo δεν αγγίχτηκαν.
+- **Rebuild:** ΝΑΙ. `git diff bf503cb..HEAD -- apps/web` άγγιξε web runtime code (saas/audit route, saas/members route, `lib/tenancy/audit.ts`, `models/AuditEvent.ts`) → warranted. Ασφαλές dance: `docker compose build web` (image μόνο, OK) → mongo healthy confirm → `docker compose up -d web` → poll `/login` → **200 στην 1η προσπάθεια** → web RestartCount έμεινε **0** → builder prune. Καμία `up --build`.
+- **Marker:** docker-validated `bf503cb` → **`b5fa042`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-02 (pharos-daily-dev — mobile Expenses/Income bill image στο detail)
 - **Τι έκανα:** έκλεισα το **top auto-buildable mobile-parity item** (top-3 #1 της προηγ. εγγραφής + MOBILE_PARITY Build Queue P2/S): το mobile MoneyScreen (Expenses + Income) δεν έδειχνε καθόλου το scanned bill image στο detail, παρόλο που ο GET serializer εκθέτει ήδη `file`/`thumb` (`api/v1/expenses/route.ts:32-33`) και ο mobile `Expense` type τα φέρει. Προτιμήθηκε ως το μικρότερο, πλήρως-finishable, μηδέν endpoint / dep / AI / credentials / native dep, mirror αποδεδειγμένου pattern (ReceiptsScreen).
