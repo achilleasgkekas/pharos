@@ -5,6 +5,17 @@
 <!-- reviewed: 9ac9db1 -->
 <!-- docker-validated: f63cc4b -->
 
+## 2026-07-02 (parity-auditor — 2η σάρωση ημέρας: ουρά αμετάβλητη, 0 auto-buildable GAP)
+- **Inventory από κώδικα (όχι docs):** **49 v1 routes** (`find api/v1 -name route.ts` = 49), **16 mobile screens** (`apps/mobile/src/screens/`), **19 web `page.tsx`**. Route↔consumer: `grep` στο `apps/mobile/src/api.ts` βρήκε **50 distinct `/api/v1/*` paths** (49 routes + `auth/login`) → κάθε endpoint έχει ≥1 mobile consumer, **1:1, μηδέν orphan**. Όλα τα web pages έχουν mobile equivalent εκτός `/setup` (web-only first-run wizard· N/A).
+- **Δέλτα από την 1η σάρωση (σήμερα το πρωί):** μόνο **2 νέα commits**, αμφότερα web-only — `3d7e50f` (`test(web)` pure-lib suite για `cardFields.ts`, 25 tests, μηδέν runtime code) + `a615c15` (`feat(landing)` self-host vs hosted comparison table, `apps/landing` isolated build). **`git log -- apps/mobile/src` τελευταίο ΑΚΟΜΑ `0f69116`** (ListItem primitive)· **`git log -- apps/web/src/app/api/v1` τελευταίο ΑΚΟΜΑ `6fd1075`** (readBody refactor, byte-identical response shapes). → **Μηδέν νέα portable web δυνατότητα, μηδέν νέο mobile-src, μηδέν API shape change** που να επηρεάζει το mobile.
+- **Checks (read-only, όπως ορίζει το task):** mobile `npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). Μηδέν Docker build, μηδέν AI/token, μηδέν app-code edit.
+- **Counts: DONE 7 (parity queue 6/6 + Activity) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.** Ενεργό functional parity TODO **κανένα** → ο builder πέφτει στο UI Debt Queue.
+- **Top-3 για τον builder (unattended-safe πρώτο):** (1) **Max content width** `<Screen>` wrapper [P3/S, μηδέν dep, structural, no-op σε phone]· (2) **icons→lucide** [P2/M, μηδέν native dep γιατί `react-native-svg@15.12.1` ΥΠΑΡΧΕΙ, αλλά attended-preferred για οπτικό verify]· (3) **Safe-area insets** [P2/M, ΜΟΝΟ αν εγκριθεί native dep `react-native-safe-area-context`]. Εναλλακτικά: fresh pure-lib test coverage (τα εναπομείναντα pure surfaces είναι ελάχιστα· βλ. pharos-daily-dev entries).
+- **Git hygiene:** staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (ρητά paths, ΟΧΙ `-A`). Το `.claude/launch.json` (WIP εργαλείου του Αχιλλέα) ΔΕΝ αγγίχτηκε.
+
+### Needs Achilleas
+- (αμετάβλητο, κανένα νέο ζήτημα ασφαλείας· μηδέν committed secret) Standing product/decision items: **SaaS multi-tenancy + billing rollout** (`SAAS_MODE` + Stripe live-config: price IDs / webhook secret / SDK — env boundary)· mobile native-dep approvals (`react-native-safe-area-context`, `@react-native-async-storage/async-storage`)· Settings theme/language/AI-engine/storage/OneDrive (light-theme refactor + credentials/OAuth → σύσταση web-only)· Reports extra charts + Statements merge/bind + PDF-import (νέα write/upload endpoints)· login brute-force rate-limit· remote push αδοκίμαστο (χρειάζεται EAS dev build + APNs key). Concurrency: πολλαπλοί routines στο ίδιο `main`.
+
 ## 2026-07-02 (reviewer — range 21c4792..9ac9db1, 8 commits, ΟΛΑ CLEAN, μηδέν fix)
 - **Τι ελέγχθηκε:** Οι 8 commits από τον προηγούμενο marker (`21c4792`): SaaS storage-sampling (`lib/billing/dbStats.ts` + `POST /api/saas/usage/sample`), 3 pure-lib test suites (stores 22, ssrf 36, dbStats 4), landing trust/principles strip (`page.tsx` + `Icon.tsx` 6 νέα paths + `globals.css` `.trust-*`), docs + docker-health.
 - **Checks:** `apps/web` type-check **EXIT 0**, `apps/mobile` `tsc --noEmit` **EXIT 0**, vitest **263/263 passed** (16 files).
