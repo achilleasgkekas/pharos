@@ -396,3 +396,42 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — 
 (query/sort/pagination helpers, αν καθαρό από I/O) ή `lib/dates.ts` `safeDate` (European
 DD/MM/YYYY, DD.MM, ISO parsing — deterministic). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF
 IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — i18n/index.test.ts)
+
+**Task: (f συνέχεια) Pure-lib test file `apps/web/src/lib/i18n/index.test.ts` για τα `resolveDict` / `makeT` του `lib/i18n/index.ts`.**
+
+ΣΗΜ: το `lib/apiList.ts` (προηγ. suggested task) είχε ΗΔΗ test file (`src/lib/apiList.test.ts`,
+γραμμένο 04:35 από παράλληλο routine, εκτός δικού μου log) → το προσπέρασα για να μη γίνει overwrite,
+και διάλεξα το επόμενο καθαρό module.
+
+Τι έγινε:
+- Νέο `apps/web/src/lib/i18n/index.test.ts` (15 tests, μηδέν DB/DOM/fs/δίκτυο). Καλύπτει:
+  `resolveDict` — English base intact για 'en', el-overlay πάνω από en (nav.inventory
+  'Inventory'→'Αποθήκη', time.minutes '{n}m ago'→'πριν {n}λ'), **fallback completeness**
+  (κάθε locale από LOCALE_CODES εκθέτει ΟΛΑ τα en keys → καμία lookup undefined), κάθε
+  locale resolve-άρει χωρίς throw + key count >= en, και **fresh-object guard** (mutation του
+  resolved dict ΔΕΝ μολύνει το en base). `makeT` — known-key lookup, translated value μέσω
+  resolved el, **δι-επίπεδο fallback** (partial dict → en[key], μετά → String(key) για entirely
+  unknown), και {var} interpolation: no-vars passthrough, single/multi substitution, numeric
+  coercion (0 και 42), **repeated placeholder** («{x}-{x}-{x}» → «a-a-a» μέσω split/join),
+  unknown placeholder μένει άθικτο, extra vars αγνοούνται.
+- **Robustness επιλογή**: interpolation/fallback edge cases σε μικρά synthetic dicts (casts),
+  ώστε translation-wording edits να μη σπάνε τα tests· μόνο λίγες real-value assertions
+  (nav.inventory/time.minutes σε en+el) κλειδώνουν το layering σε σταθερά keys.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/i18n/index.test.ts` → 15/15 passed.
+- `npx vitest run` (όλο το suite) → 31 files, 477/477 passed (ήταν 462, +15 δικά μου·
+  παράλληλα routines είχαν φτάσει το baseline στα 462).
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git status --short` = μόνο `.claude/launch.json`
+  (foreign, ΔΕΝ το άγγιξα/staged)· `git diff --cached` κενό· στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file — `lib/tenancy/saasMode.ts`
+(`saasMode` env-flag reader: on/1/true/yes → true, off/unset/άλλο → false, case/whitespace
+insensitive· env save/restore μέσω afterEach) ή `lib/i18n/config.ts` (`isLocale` guard +
+LOCALES table invariants). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο
+"## Needs Achilleas".
