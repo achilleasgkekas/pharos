@@ -12,8 +12,18 @@ import {
   type OrgRole,
 } from '@/lib/tenancy/members';
 import { readBody, strField } from '@/lib/apiBody';
-import { sendEmail, invitedEmail } from '@/lib/tenancy/mailer';
+import {
+  sendEmail,
+  invitedEmail,
+  inviteEmail,
+  inviteLinkUrl,
+  mailerCanDeliver,
+} from '@/lib/tenancy/mailer';
 import { withinSeatLimit, entitlementsFor } from '@/lib/billing/entitlements';
+import { Invite } from '@/models/Invite';
+import { mintInviteToken } from '@/lib/tenancy/invites';
+import { pickBaseUrl } from '@/lib/billing/billingRoutes';
+import type { WorkspaceSession } from '@/lib/tenancy/workspaceSession';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -72,6 +82,80 @@ async function loadMembers(tenantId: string): Promise<{ views: MemberView[]; lit
   return { views, lite };
 }
 
+/**
+ * Mint an email invitation for an address that has NO account yet, instead of 404ing.
+ * A high-entropy token (hash stored on the Invite row) is emailed as a signup link; the
+ * invitee redeems it at /api/saas/invites/accept, which creates their Account + Membership.
+ *
+ * Seats: a pending invite reserves a future seat, so the cap counts active members PLUS
+ * outstanding pending invites — you cannot invite past the plan allowance. Any existing
+ * pending invite for the same (tenant, email) is superseded (revoked) so the newest link wins.
+ *
+ * SCAFFOLD (mirrors reset/request): when no mailer can deliver AND we are not in production,
+ * the plaintext token is echoed as `devToken` so the flow is testable locally; in production
+ * an unwired mailer drops it silently (no leak).
+ */
+async function inviteUnregistered(
+  req: NextRequest,
+  session: WorkspaceSession,
+  email: string,
+  role: OrgRole
+): Promise<NextResponse> {
+  const tenantId = session.ctx.tenantId!;
+  const plan = String(session.tenant.plan);
+
+  const activeCount = await Membership.countDocuments({ tenant: tenantId, status: 'active' });
+  const pendingCount = await Invite.countDocuments({ tenant: tenantId, status: 'pending' });
+  if (!withinSeatLimit(plan, activeCount + pendingCount)) {
+    const cap = entitlementsFor(plan).maxMembers;
+    return NextResponse.json(
+      {
+        error: `seat limit reached for the ${plan} plan (max ${cap})`,
+        code: 'seat_limit',
+        maxMembers: cap,
+      },
+      { status: 409 }
+    );
+  }
+
+  // Supersede any prior outstanding invite for this address so only the newest token is live.
+  await Invite.updateMany(
+    { tenant: tenantId, email, status: 'pending' },
+    { $set: { status: 'revoked' } }
+  );
+
+  const { token, tokenHash, expires } = mintInviteToken();
+  await Invite.create({
+    tenant: tenantId,
+    email,
+    role,
+    status: 'pending',
+    tokenHash,
+    expires,
+    invitedBy: session.account.sub,
+  });
+
+  const canDeliver = mailerCanDeliver();
+  if (canDeliver) {
+    const base = pickBaseUrl(
+      process.env.SAAS_PUBLIC_URL || process.env.APP_URL,
+      new URL(req.url).origin
+    );
+    const { subject, html } = inviteEmail(inviteLinkUrl(base, token), session.workspace.slug);
+    void sendEmail({ to: email, subject, html });
+  }
+
+  const canEcho = !canDeliver && process.env.NODE_ENV !== 'production';
+  return NextResponse.json(
+    {
+      invite: { email, role, status: 'pending', expires },
+      inviteByEmail: true,
+      ...(canEcho ? { devToken: token } : {}),
+    },
+    { status: 201 }
+  );
+}
+
 /** GET /api/saas/members[?tenant=<slug>] — list members. Any active member may read. */
 export async function GET(req: NextRequest) {
   const slug = new URL(req.url).searchParams.get('tenant');
@@ -112,12 +196,9 @@ export async function POST(req: NextRequest) {
     | AccountDoc
     | null;
   if (!account) {
-    // No account for this email yet. Inviting a brand-new user needs email delivery,
-    // which is deferred (see SAAS_PROGRESS "Needs Achilleas"). Report it explicitly.
-    return NextResponse.json(
-      { error: 'no account exists for that email', code: 'account_not_found', inviteByEmail: false },
-      { status: 404 }
-    );
+    // No account for this email yet → mint an email invitation (signup link) rather than
+    // 404. The invitee creates their account by redeeming the token at /invites/accept.
+    return inviteUnregistered(req, session, email, role);
   }
 
   const tenantId = session.ctx.tenantId!;

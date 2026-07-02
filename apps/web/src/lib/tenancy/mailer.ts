@@ -109,6 +109,26 @@ export function invitedEmail(workspaceName: string): { subject: string; html: st
   };
 }
 
+/** The user-facing invite link a new-user invitation points at (a /signup page reads the
+ *  token and posts it to /api/saas/invites/accept). `base` should be normalized. */
+export function inviteLinkUrl(base: string, token: string): string {
+  const b = (base || '').replace(/\/+$/, '');
+  return `${b}/signup?invite=${encodeURIComponent(token)}`;
+}
+
+/** Build the "you're invited to a workspace" email body for a NOT-yet-registered address.
+ *  Unlike invitedEmail (existing account added), this carries a signup link. Pure — no send. */
+export function inviteEmail(link: string, workspaceName: string): { subject: string; html: string } {
+  const name = (workspaceName || 'a Pharos workspace').trim() || 'a Pharos workspace';
+  return {
+    subject: `You're invited to ${name} on Pharos`,
+    html:
+      `<p>You've been invited to join the <strong>${name}</strong> workspace on Pharos.</p>` +
+      `<p><a href="${link}">Accept the invitation</a> and create your account.</p>` +
+      `<p>This link expires in 7 days. If you weren't expecting this, you can ignore this email.</p>`,
+  };
+}
+
 /** POST a message to the Resend API. Network-touching; caller guarantees the key exists. */
 async function sendViaResend(msg: EmailMessage, apiKey: string): Promise<SendResult> {
   try {

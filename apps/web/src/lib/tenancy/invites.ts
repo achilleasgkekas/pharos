@@ -1,0 +1,68 @@
+// SaaS CONTROL-PLANE — workspace-invite token helpers. Only meaningful when SAAS_MODE is
+// on; the self-hosted single-user app never mints invites.
+//
+// The flow mirrors password-reset / email-verify (passwordReset.ts, emailVerify.ts): a
+// high-entropy random token is handed to the invitee over email; the Invite row stores
+// ONLY its SHA-256 hash + an expiry, so a leaked row cannot be replayed as a live invite.
+// Accepting re-hashes the presented token and looks it up by hash ("store the hash, never
+// the secret").
+//
+// Unlike a reset link (1h) or verification (24h), an invite is long-lived — people forward
+// them, sit on them, accept days later — so the default TTL is 7 days. The pure helpers
+// carry no imports beyond node:crypto and are unit-tested; the crypto helpers are only
+// reachable from the (node-runtime) invite routes.
+import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
+
+/** Invite lifecycle status stored on the Invite row. */
+export type InviteStatus = 'pending' | 'accepted' | 'revoked';
+
+/** How long a freshly minted invite token stays valid (7 days). Longer than reset/verify:
+ *  invites get forwarded and sat on. */
+export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Expiry Date for an invite minted at `nowMs` (defaults to now). */
+export function inviteTokenExpiry(nowMs: number = Date.now()): Date {
+  return new Date(nowMs + INVITE_TTL_MS);
+}
+
+/**
+ * True when an invite is still redeemable: status is exactly 'pending' AND its expiry is
+ * present and in the future. An accepted/revoked invite, or a past/missing expiry, is not.
+ * `nowMs` is injectable for tests.
+ */
+export function isInviteValid(
+  status: string | null | undefined,
+  expires: Date | string | null | undefined,
+  nowMs: number = Date.now()
+): boolean {
+  if (status !== 'pending') return false;
+  if (!expires) return false;
+  const t = expires instanceof Date ? expires.getTime() : new Date(expires).getTime();
+  if (Number.isNaN(t)) return false;
+  return t > nowMs;
+}
+
+/** SHA-256 hex of an invite token — what gets stored / looked up. */
+export function hashInviteToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * Mint a fresh invite token: the plaintext `token` goes to the invitee (in the link), the
+ * `tokenHash` + `expires` go to the Invite row. 32 random bytes → base64url (URL-safe, no
+ * padding).
+ */
+export function mintInviteToken(nowMs: number = Date.now()): {
+  token: string;
+  tokenHash: string;
+  expires: Date;
+} {
+  const token = randomBytes(32).toString('base64url');
+  return { token, tokenHash: hashInviteToken(token), expires: inviteTokenExpiry(nowMs) };
+}
+
+/** Constant-time compare of two stored hashes (hex strings of equal length). */
+export function inviteHashMatches(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b || a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}

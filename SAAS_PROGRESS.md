@@ -752,3 +752,60 @@ workspace σε free tier δεν προσθέτει 2ο member· shared → έω�
 Achilleas), είτε (β) invite-by-email νέων (μη εγγεγραμμένων) users πάνω στον mailer + token
 pattern (στέλνει signup link), είτε (γ) storage-quota enforcement wiring (`withinStorage` +
 `dbStats`) στο upload path, SAAS-gated.
+
+---
+
+## 2026-07-02 (increment 18 — invite-by-email νέων/μη-εγγεγραμμένων users)
+**Built:** end-to-end invite flow ώστε ένας owner/admin να προσθέτει member με email που **δεν
+έχει account ακόμα** (πριν: 404 `account_not_found`). Χτισμένο πάνω στον υπάρχοντα mailer +
+token pattern (reset/verify). ΟΛΟ SAAS-gated, additive, σε δικά μου αρχεία:
+- `lib/tenancy/invites.ts` (νέο, καθρέφτης του emailVerify/passwordReset): `INVITE_TTL_MS`
+  **7 μέρες** (τα invites προωθούνται/κάθονται — μεγαλύτερο από reset 1h/verify 24h),
+  `inviteTokenExpiry`, `isInviteValid(status, expires, now)` (μόνο `pending` + future),
+  `hashInviteToken` (sha256 hex), `mintInviteToken` (32 bytes base64url → token + hash +
+  expires), `inviteHashMatches` (constant-time, length-safe). node:crypto + pure, μηδέν άλλα
+  imports. **«store the hash, never the secret»**.
+- `models/Invite.ts` (νέο control-plane model): tenant/email/role/status(pending·accepted·
+  revoked)/tokenHash/expires/invitedBy/acceptedBy + timestamps. Index {tokenHash} (lookup) +
+  {tenant,email,status} (non-unique — επιτρέπει re-invite μετά από revoke/expire). Distinct
+  από Membership (invite = μόνο για τη not-yet-registered περίπτωση).
+- `lib/tenancy/mailer.ts` (δικό μου, additive): `inviteLinkUrl(base, token)` → `/signup?
+  invite=<token>` + `inviteEmail(link, workspaceName)` message builder (signup-link variant,
+  ξεχωριστός από τον υπάρχοντα `invitedEmail` που ειδοποιεί existing account). Pure.
+- `app/api/saas/members/route.ts` (δικό μου, additive): το POST 404-branch → νέα helper
+  **`inviteUnregistered(req, session, email, role)`**: (α) **seat check counts active members
+  + pending invites** (ένα pending invite δεσμεύει μελλοντική θέση → δεν invite-άρεις πάνω
+  από το cap· dedicated/self-hosted null → πάντα περνά), (β) supersede (revoke) τυχόν
+  προηγούμενο pending invite για το ίδιο (tenant,email) ώστε μόνο ο νεότερος token να ζει,
+  (γ) mint + Invite.create, (δ) email signup-link όταν `mailerCanDeliver()`, (ε) **SCAFFOLD
+  dev-token echo** (mirror reset/request: non-prod + no mailer → `devToken` στο body· prod
+  drops silently). Response 201 `{ invite, inviteByEmail:true }`.
+- `app/api/saas/invites/accept/route.ts` (νέο): POST `{ token, password?, name? }`,
+  UNAUTHENTICATED (ο invitee δεν έχει session). Lookup by `hashInviteToken` → `isInviteValid`
+  guard (αλλιώς 410). Reuse account αν υπάρχει ήδη (signed up meanwhile) αλλιώς create
+  (password ≥8 required, 11000-race fallback). Create/reactivate active Membership με το
+  invited role (**idempotent**). Mark invite accepted (`acceptedBy`) → token δεν replay-άρεται.
+  setAccountCookie → auto-login. Return account + tenants (όπως signup). SaaS-gated (404 off).
+- `lib/tenancy/invites.test.ts` — 13 PURE tests (TTL=7d, expiry math, isInviteValid: pending+
+  future only / past / non-pending / null / ISO string / unparseable, hash determinism+64hex+
+  distinct, mint↔hash coherence + right expiry + base64url + distinct tokens, constant-time
+  match incl. length-mismatch no-throw).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npm test` → **586/586 green** (573 προϋπάρχοντα
++ 13 νέα· ο συνολικός ανέβηκε από concurrent routines). Τα invite routes SAAS-gated (404 όταν
+off)· members route additive· mailer/invites/model pure ⇒ `SAAS_MODE` off = zero effect, κανένα
+Docker rebuild, κανένα runtime wiring. External importers των νέων modules από feature code →
+κανένας. Άγγιξα μόνο δικά μου SAAS αρχεία.
+
+**## Needs Achilleas** (invite go-live):
+- **Mailer** (ίδιο με reset/verify): μέχρι να μπει Resend (`RESEND_API_KEY`), το invite-mint
+  επιστρέφει `devToken` ΜΟΝΟ σε non-production. Μόλις μπει provider → `mailerCanDeliver()` true,
+  στέλνεται το signup-link, το echo σβήνει.
+- Χρειάζεται user-facing `/signup` handling του `?invite=` param → prefill email (read-only) +
+  POST token+password στο `/api/saas/invites/accept`. Το `inviteLinkUrl` δείχνει ήδη εκεί.
+
+**Next task:** increment 19 — είτε (α) **invites list/revoke route** (`GET`/`DELETE
+/api/saas/invites` — owner/admin βλέπει/ακυρώνει outstanding pending invites· lifecycle mgmt),
+είτε (β) `sendViaSmtp` via nodemailer (μετά από provider decision Achilleas), είτε (γ)
+storage-quota enforcement wiring (`withinStorage` + `dbStats`) — αλλά αυτό αγγίζει feature
+upload path (εκτός territory), οπότε θα ήθελε flag-guarded shim.
