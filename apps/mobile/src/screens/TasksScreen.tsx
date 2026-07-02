@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
-import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Badge, ListItem, contentWidth } from '../ui';
+import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Badge, Chip, ListItem, contentWidth } from '../ui';
 import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task, type TaskStep } from '../api';
 
 const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
@@ -114,9 +114,7 @@ export function TasksScreen() {
       {allTags.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tagRow}>
           {allTags.map((tag) => (
-            <Pressable key={tag} onPress={() => setTagFilter((cur) => (cur === tag ? null : tag))} style={[s.tagChip, activeTag === tag && s.tagChipOn]}>
-              <Text style={[s.tagChipText, activeTag === tag && s.tagChipTextOn]}>#{tag}</Text>
-            </Pressable>
+            <Chip key={tag} label={`#${tag}`} on={activeTag === tag} onPress={() => setTagFilter((cur) => (cur === tag ? null : tag))} />
           ))}
         </ScrollView>
       )}
@@ -221,10 +219,6 @@ const s = StyleSheet.create({
   pri: { color: C.gold, fontSize: 11 },
   tags: { color: C.faint, fontSize: 11, flex: 1 },
   tagRow: { gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
-  tagChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
-  tagChipOn: { backgroundColor: C.accent, borderColor: C.accent },
-  tagChipText: { color: C.dim, fontSize: 12, fontWeight: '600' },
-  tagChipTextOn: { color: C.onAccent },
   progWrap: { paddingHorizontal: 16, paddingBottom: 10 },
   progHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
   progLabel: { color: C.dim, fontSize: 10, letterSpacing: 1 },

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, ListItem, contentWidth } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Chip, ListItem, contentWidth } from '../ui';
 import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription } from '../api';
 
 const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
@@ -119,9 +119,7 @@ export function SubscriptionsScreen() {
             <Text style={s.mlabel}>BILLING CYCLE</Text>
             <View style={s.chipRow}>
               {CYCLES.map((cy) => (
-                <Pressable key={cy} onPress={() => setECycle(cy)} style={[s.cChip, eCycle === cy && s.cChipOn]}>
-                  <Text style={[s.cChipText, eCycle === cy && s.cChipTextOn]}>{cy}</Text>
-                </Pressable>
+                <Chip key={cy} label={cy} on={eCycle === cy} onPress={() => setECycle(cy)} style={s.cycleChip} />
               ))}
             </View>
             <Text style={s.mlabel}>NEXT RENEWAL</Text>
@@ -157,10 +155,7 @@ const s = StyleSheet.create({
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  cChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 9, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
-  cChipOn: { backgroundColor: C.accent, borderColor: C.accent },
-  cChipText: { color: C.dim, fontSize: 12, fontWeight: '600' },
-  cChipTextOn: { color: C.onAccent },
+  cycleChip: { paddingHorizontal: 11, borderRadius: 9 },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tlabel: { color: C.text, fontSize: 15 },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },

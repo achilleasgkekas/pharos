@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, StyleSheet, Pressable } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { C } from '../theme';
-import { money, Spinner, ErrorText, contentWidth } from '../ui';
+import { money, Spinner, ErrorText, Chip, contentWidth } from '../ui';
 import { getReports, type Reports } from '../api';
 
 function Bar({ label, value, max, cur, color }: { label: string; value: number; max: number; cur: string; color: string }) {
@@ -122,9 +122,7 @@ export function ReportsScreen() {
             <Text style={[s.section, { marginBottom: 0 }]}>TRENDS</Text>
             <View style={s.rangeRow}>
               {RANGES.map((r) => (
-                <Pressable key={r} onPress={() => setMonths(r)} style={[s.rangeChip, months === r && s.rangeChipOn]}>
-                  <Text style={[s.rangeText, months === r && s.rangeTextOn]}>{r}m</Text>
-                </Pressable>
+                <Chip key={r} label={`${r}m`} on={months === r} onPress={() => setMonths(r)} style={s.rangeChip} />
               ))}
             </View>
           </View>
@@ -217,10 +215,7 @@ const s = StyleSheet.create({
   section: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 24, marginBottom: 10 },
   rangeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24 },
   rangeRow: { flexDirection: 'row', gap: 6 },
-  rangeChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 9, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
-  rangeChipOn: { backgroundColor: C.accent, borderColor: C.accent },
-  rangeText: { color: C.dim, fontSize: 12, fontWeight: '600' },
-  rangeTextOn: { color: C.onAccent },
+  rangeChip: { paddingVertical: 5, borderRadius: 9 },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   barLabel: { color: C.dim, fontSize: 12, width: 64 },
   track: { flex: 1, height: 10, borderRadius: 5, backgroundColor: C.surface2, overflow: 'hidden' },

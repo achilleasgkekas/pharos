@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal } from 'react-native';
 import { C, alpha, scrim } from '../theme';
-import { money, ErrorText, Check, Input, TextArea, contentWidth } from '../ui';
+import { money, ErrorText, Check, Input, TextArea, Chip, contentWidth } from '../ui';
 import { PharosMark } from '../PharosMark';
 import { APP_VERSION } from '../config';
 import {
@@ -107,9 +107,7 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
         <Text style={s.flabel}>CURRENCY</Text>
         <View style={s.chipsRow}>
           {CURRENCIES.map((c) => (
-            <Pressable key={c} onPress={() => setCurrency(c)} style={[s.chip, currency === c && s.chipOn]}>
-              <Text style={[s.chipText, currency === c && s.chipTextOn]}>{c}</Text>
-            </Pressable>
+            <Chip key={c} label={c} on={currency === c} onPress={() => setCurrency(c)} style={s.optChip} textStyle={s.optChipText} />
           ))}
         </View>
         <View style={s.pair}>
@@ -321,18 +319,14 @@ function CardEditor({ card, currency, onClose, onSaved }: { card: Card | null; c
             <Text style={[s.flabel, { marginTop: 12 }]}>KIND</Text>
             <View style={s.chipsRow}>
               {CARD_KINDS.map((k) => (
-                <Pressable key={k} onPress={() => set('kind', k)} style={[s.chip, form.kind === k && s.chipOn]}>
-                  <Text style={[s.chipText, form.kind === k && s.chipTextOn]}>{k}</Text>
-                </Pressable>
+                <Chip key={k} label={k} on={form.kind === k} onPress={() => set('kind', k)} style={s.optChip} textStyle={s.optChipText} />
               ))}
             </View>
 
             <Text style={[s.flabel, { marginTop: 12 }]}>TYPE</Text>
             <View style={s.chipsRow}>
               {CARD_TYPES.map((t) => (
-                <Pressable key={t} onPress={() => set('type', t)} style={[s.chip, form.type === t && s.chipOn]}>
-                  <Text style={[s.chipText, form.type === t && s.chipTextOn]}>{t}</Text>
-                </Pressable>
+                <Chip key={t} label={t} on={form.type === t} onPress={() => set('type', t)} style={s.optChip} textStyle={s.optChipText} />
               ))}
             </View>
 
@@ -614,10 +608,8 @@ const s = StyleSheet.create({
   flabel: { color: C.faint, fontSize: 10, letterSpacing: 1.1, marginBottom: 6 },
   pair: { flexDirection: 'row', gap: 12, marginTop: 12 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
-  chipOn: { backgroundColor: C.accent, borderColor: C.accent },
-  chipText: { color: C.dim, fontSize: 13, fontWeight: '600' },
-  chipTextOn: { color: C.onAccent },
+  optChip: { paddingHorizontal: 16, paddingVertical: 8 },
+  optChipText: { fontSize: 13 },
   addChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9, borderWidth: 1, borderColor: C.cyan },
   addChipText: { color: C.cyan, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },

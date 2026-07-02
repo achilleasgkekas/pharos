@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button, ListItem, contentWidth } from '../ui';
+import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button, Chip, ListItem, contentWidth } from '../ui';
 import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
 function verdictMeta(v: Verdict): { label: string; color: string } | null {
@@ -366,9 +366,7 @@ export function ItemsScreen() {
     <View style={s.wrap}>
       <View style={s.filters}>
         {FILTERS.map((f) => (
-          <Pressable key={f.key} onPress={() => setFilter(f.key)} style={[s.chip, filter === f.key && s.chipOn]}>
-            <Text style={[s.chipText, filter === f.key && s.chipTextOn]}>{f.label}</Text>
-          </Pressable>
+          <Chip key={f.key} label={f.label} on={filter === f.key} onPress={() => setFilter(f.key)} style={s.filterChip} textStyle={s.filterChipText} />
         ))}
       </View>
       <View style={s.addRow}>
@@ -413,9 +411,7 @@ export function ItemsScreen() {
               <Text style={s.mlabel}>STATUS</Text>
               <View style={s.statusWrap}>
                 {STATUSES.map((st) => (
-                  <Pressable key={st} onPress={() => setEStatus(st)} style={[s.sChip, eStatus === st && s.sChipOn]}>
-                    <Text style={[s.sChipText, eStatus === st && s.sChipTextOn]}>{st}</Text>
-                  </Pressable>
+                  <Chip key={st} label={st} on={eStatus === st} onPress={() => setEStatus(st)} style={s.statusChip} />
                 ))}
               </View>
               <Text style={s.mlabel}>CATEGORY</Text>
@@ -462,10 +458,8 @@ const s = StyleSheet.create({
   hint: { color: C.cyan, fontSize: 11, paddingHorizontal: 16, paddingBottom: 8, marginTop: -2 },
   dim: { opacity: 0.4 },
   filters: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
-  chipOn: { backgroundColor: C.accent, borderColor: C.accent },
-  chipText: { color: C.dim, fontSize: 13, fontWeight: '600' },
-  chipTextOn: { color: C.onAccent },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 7 },
+  filterChipText: { fontSize: 13 },
   eyebrow: { color: C.faint, fontSize: 10, letterSpacing: 1 },
   title: { color: C.text, fontSize: 15, fontWeight: '600', marginTop: 2 },
   meta: { color: C.faint, fontSize: 12, marginTop: 2 },
@@ -477,10 +471,7 @@ const s = StyleSheet.create({
   specs: { minHeight: 64, textAlignVertical: 'top' },
   priceRow: { flexDirection: 'row', gap: 12 },
   statusWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  sChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 9, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
-  sChipOn: { backgroundColor: C.accent, borderColor: C.accent },
-  sChipText: { color: C.dim, fontSize: 12, fontWeight: '600' },
-  sChipTextOn: { color: C.onAccent },
+  statusChip: { paddingHorizontal: 11, borderRadius: 9 },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22 },
   delBtn: { paddingVertical: 12, paddingHorizontal: 12 },
   delBtnText: { color: C.red, fontSize: 15, fontWeight: '600' },

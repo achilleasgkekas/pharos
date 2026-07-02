@@ -207,8 +207,39 @@ export function Badge({ label, color, style, textStyle }: BadgeProps) {
   );
 }
 
+type ChipProps = {
+  /** Chip text (already formatted, e.g. `#network` or `EUR`). */
+  label: string;
+  /** Selected state — fills the chip with accent and flips the text to onAccent. */
+  on?: boolean;
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+};
+
+/**
+ * Toggle/filter pill — surface-2 fill + 1px border, flips to an accent fill with
+ * onAccent text when `on`. Unifies the byte-identical 4-entry `chip`/`chipOn`/
+ * `chipText`/`chipTextOn` StyleSheet clusters that were duplicated across the
+ * Items (filter + status), Subscriptions (cycle), Settings (currency/card kind+
+ * type), Tasks (tag) and Reports (range) screens. The base is padH12/padV6/
+ * radius10/12px; pass `style`/`textStyle` for the small per-screen size tweaks
+ * (like the other primitives) so each call site stays pixel-identical.
+ */
+export function Chip({ label, on, onPress, style, textStyle }: ChipProps) {
+  return (
+    <Pressable onPress={onPress} style={[s.chip, on && s.chipOn, style]}>
+      <Text style={[s.chipText, on && s.chipTextOn, textStyle]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const s = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, gap: 4 },
+  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
+  chipOn: { backgroundColor: C.accent, borderColor: C.accent },
+  chipText: { color: C.dim, fontSize: 12, fontWeight: '600' },
+  chipTextOn: { color: C.onAccent },
   card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg, padding: 14, marginBottom: 10 },
   listItem: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg, padding: 14, marginBottom: 10 },
   badge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
