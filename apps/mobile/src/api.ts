@@ -114,7 +114,7 @@ export async function scanProduct(uri: string): Promise<ScannedProduct> {
 // ===================== Additional resources =====================
 export type TaskStep = { id?: string; text: string; done: boolean };
 export type Task = { id: string; title: string; status: string; priority: string; tags: string[]; steps?: TaskStep[]; dueDate: string | null; completedAt: string | null; updatedAt: string | null };
-export type Expense = { id: string; kind: string; vendor: string; category: string; amount: number; currency: string; date: string | null; period: string; recurring: boolean; recurringCycle: string; paymentMethod: string; notes: string; file: string | null; thumb: string | null; verified: boolean };
+export type Expense = { id: string; kind: string; vendor: string; category: string; amount: number; currency: string; date: string | null; period: string; recurring: boolean; recurringCycle: string; paymentMethod: string; notes: string; file: string | null; thumb: string | null; verified: boolean; anomaly?: number };
 export type Subscription = { id: string; name: string; provider: string; category: string; amount: number; currency: string; billingCycle: string; nextRenewal: string | null; active: boolean };
 export type ReceiptSummary = { id: string; store: string; date: string | null; total: number; currency: string; itemCount: number; verified: boolean; archived: boolean; file: string | null; thumb: string | null };
 export type ReceiptLine = { name: string; qty: number; price: number; vatRate: number };

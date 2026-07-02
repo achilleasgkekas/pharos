@@ -2,7 +2,7 @@ import { iso } from '@/lib/apiList';
 
 /** Lean Expense doc shape as read from Mongo (fields the v1 surface exposes). */
 export type ExpenseLean = {
-  _id: unknown; kind?: string; vendor?: string; category?: string; amount?: number; currency?: string;
+  _id: unknown; kind?: string; vendor?: string; vendorKey?: string; category?: string; amount?: number; currency?: string;
   date?: Date; period?: string; recurring?: boolean; recurringCycle?: string; paymentMethod?: string;
   notes?: string; filePath?: string; thumbPath?: string; verified?: boolean; updatedAt?: Date; deletedAt?: Date | null;
 };
@@ -11,8 +11,10 @@ export type ExpenseLean = {
  * Single source of truth for the v1 Expense JSON shape.
  * Shared by GET /api/v1/expenses (list) and POST /api/v1/expenses/:id/rescan
  * so the mobile detail can re-prefill in place from either.
+ * `anomaly` (optional ±%) is a cross-doc stat computed by the list route only;
+ * single-doc callers (rescan) omit it and it recomputes on the next list load.
  */
-export function trimExpense(e: ExpenseLean) {
+export function trimExpense(e: ExpenseLean, anomaly?: number) {
   return {
     id: String(e._id),
     kind: e.kind ?? 'expense',
@@ -31,5 +33,35 @@ export function trimExpense(e: ExpenseLean) {
     verified: !!e.verified,
     updatedAt: iso(e.updatedAt),
     deleted: !!e.deletedAt,
+    ...(anomaly !== undefined ? { anomaly } : {}),
   };
+}
+
+/**
+ * Anomaly flags, mirroring the web /expenses view (page.tsx). Within each vendor
+ * series (≥3 priced entries) mark entries deviating >30% from the series median,
+ * as ±% (rounded). Catches a double bill or a wrong AI parse at a glance. Pure
+ * stats, no AI cost. Returns an array aligned to `docs` (undefined where none).
+ */
+export function computeAnomalies(docs: ExpenseLean[]): (number | undefined)[] {
+  const byVendor = new Map<string, number[]>();
+  for (const e of docs) {
+    if (!e.vendorKey || !(e.amount && e.amount > 0)) continue;
+    const arr = byVendor.get(e.vendorKey) ?? [];
+    arr.push(e.amount);
+    byVendor.set(e.vendorKey, arr);
+  }
+  const medians = new Map<string, number>();
+  for (const [k, arr] of byVendor) {
+    if (arr.length < 3) continue;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    medians.set(k, sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2);
+  }
+  return docs.map((e) => {
+    const med = e.vendorKey ? medians.get(e.vendorKey) : undefined;
+    if (!med || !(e.amount && e.amount > 0)) return undefined;
+    const dev = (e.amount - med) / med;
+    return Math.abs(dev) > 0.3 ? Math.round(dev * 100) : undefined;
+  });
 }

@@ -5,7 +5,7 @@ import { readBody, strField, numField, enumField, boolField } from '@/lib/apiBod
 import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
 import { vendorKey } from '@/app/expenses/lib';
-import { trimExpense, type ExpenseLean } from './serialize';
+import { trimExpense, computeAnomalies, type ExpenseLean } from './serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,7 +21,11 @@ export async function GET(req: NextRequest) {
     const count = Expense.countDocuments(filter);
     if (p.updatedSince) { find.setOptions({ withDeleted: true }); count.setOptions({ withDeleted: true }); }
     const [docs, total] = await Promise.all([find.lean() as Promise<ExpenseLean[]>, count]);
-    return NextResponse.json(listEnvelope(docs.map(trimExpense), total, p));
+    // Anomaly ±% needs the vendor series; only meaningful on a full-list read
+    // (the mobile client fetches limit=200/offset=0). Skip on incremental sync
+    // (updatedSince returns a partial slice → medians would be wrong).
+    const anomalies = p.updatedSince ? [] : computeAnomalies(docs);
+    return NextResponse.json(listEnvelope(docs.map((d, i) => trimExpense(d, anomalies[i])), total, p));
   });
 }
 

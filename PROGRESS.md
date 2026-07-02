@@ -5,6 +5,22 @@
 <!-- reviewed: a2e1811 -->
 <!-- docker-validated: 7192c8e -->
 
+## 2026-07-02 (pharos-daily-dev — mobile Expense anomaly badge [ΚΛΕΙΝΕΙ το item])
+- **Τι έκανα:** έκλεισα το **top auto-buildable suggested-next-task** (mobile Expense anomaly badge, P2/S, auditor top-3 #1 της 38ης σάρωσης). Το web `/expenses` δείχνει gold `AnomalyBadge` (±% απόκλιση από το vendor median) αλλά ο v1 serializer δεν εξέθετε το πεδίο → το mobile δεν μπορούσε να το δείξει. Pure stats, μηδέν AI / credentials / native dep / new endpoint → ιδανικό unattended.
+- **Αλλαγές (3 web + 2 mobile αρχεία):**
+  - **`apps/web/.../expenses/serialize.ts`** — νέα exported pure `computeAnomalies(docs)`: byte-mirror του web `page.tsx:28-46` (group amounts ανά `vendorKey`, median ανά series με ≥3 priced entries, flag |dev|>0.3 ως rounded ±%), επιστρέφει array aligned στα docs. `trimExpense` πήρε optional 2ο param `anomaly?` → μπαίνει στο output **μόνο όταν defined** (το single-doc `rescan` το παραλείπει, όπως και το web υπολογίζει anomaly μόνο σε list context). `ExpenseLean` += `vendorKey?`.
+  - **`apps/web/.../expenses/route.ts`** — το GET list καλεί `computeAnomalies(docs)` μετά το `.lean()` και το περνά per-index στο `trimExpense`. **Skip όταν `updatedSince`** (incremental sync = partial slice → λάθος medians· το mobile φορτώνει limit=200/offset=0 → πλήρης series). POST/shape αμετάβλητα.
+  - **`apps/mobile/src/api.ts`** — `Expense` type += `anomaly?: number`.
+  - **`apps/mobile/src/screens/MoneyScreen.tsx`** — gold `⚠ ±N%` badge (tint `C.gold`, surface2 bg + gold border) δίπλα στο amount σε κάθε Expense/Income row όταν `anomaly != null`.
+  - **`serialize.test.ts`** — +4 `computeAnomalies` tests (below-3-entries → undefined, high/low outlier ±%, ignore no-vendorKey/0-amount, vendor-series independence) + 1 anomaly-key test για `trimExpense`.
+- **Verify:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· `npx vitest run serialize.test.ts` → **18/18 green**. Safe Docker rebuild (web runtime άλλαξε): mongo **healthy** πριν+μετά· `docker compose build web` (image-only) → mongo healthy → `up -d web` → `/login` **200 (2η προσπάθεια)** → web running, OOMKilled false· `GET /api/v1/expenses?kind=expense&limit=200` + `...&updatedSince=2026-01-01` no-auth → **401 (gated, όχι 500)**. `docker builder prune -f` → **2.104GB** reclaimed (cache-only, ποτέ --all). flaresolverr έμεινε stopped. **ΚΑΝΕΝΑ AI call** — δομικό verify μόνο. Mobile δεν auto-testable unattended → tsc + code-review του badge idiom.
+- **Docs:** `MOBILE_PARITY.md` — Expenses row + Build Queue anomaly item → **DONE** με λεπτομέρεια.
+- **Git hygiene:** stage ΜΟΝΟ ρητά paths (3 web code + 2 mobile + `serialize.test.ts` + `MOBILE_PARITY.md` + `PROGRESS.md`), ΟΧΙ `-A`. Το `.claude/launch.json` (WIP εργαλείου του Αχιλλέα) ΔΕΝ αγγίχτηκε.
+- **Προτεινόμενο επόμενο task:** το επόμενο auto-buildable = **Expense vendor autocomplete** [P3/S — client-side distinct vendors από την ήδη-φορτωμένη λίστα στο MoneyScreen add-form, μηδέν endpoint, μηδέν dep]. Εναλλακτικά web-side: **Account token-hash sparse index** [P3/S, 2 sparse `.index()` στο `models/Account.ts`]. Attended-preferred (χρειάζονται decision/dep): mobile lucide icons [P2/M], language switcher [P3/L], safe-area insets [P2/M native dep]. ΜΗΝ ξεκινήσεις native dep χωρίς έγκριση.
+
+### Needs Achilleas (pharos-daily-dev 2026-07-02 anomaly badge)
+- Τίποτα νέο ασφαλείας· μηδέν committed secret. Εκκρεμείς αποφάσεις (αμετάβλητες): SMTP/email provider για production· Stripe keys· native mobile deps (safe-area / charting / persist)· theme toggle + language switcher· AI-engine / storage / OneDrive στα mobile Settings· Tasks Kanban board (full drag)· remote push (EAS dev build + APNs key)· statements merge/bind + PDF-import.
+
 ## 2026-07-02 (docker-health guard)
 - **Health:** homepage-mongo `healthy`, homepage-web `running` (RestartCount 0). Mongo cumulative RestartCount 147 (ιστορικό OOM, ΟΧΙ ενεργό loop τώρα· web σταθερό, mongo healthy). flaresolverr ΔΕΝ έτρεχε (μηδέν επιπλέον μνήμη).
 - **Rebuild:** ΝΑΙ. Ο marker ήταν `577364e`· το `git diff --name-only 577364e..HEAD -- apps/web` άγγιξε runtime κώδικα (SaaS API routes, `lib/tenancy/audit.ts` + `saasApi.ts`, 21 αρχεία). Safe dance: `docker compose build web` (image only, OK) → mongo healthy → `docker compose up -d web` → `/login` επέστρεψε **200** στην 1η προσπάθεια → RestartCount έμεινε 0.

@@ -165,7 +165,12 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
               <Text style={s.vendor}>{item.vendor || '—'}</Text>
               <Text style={s.meta}>{[item.category, shortDate(item.date), item.recurring ? 'recurring' : ''].filter(Boolean).join('  ·  ')}</Text>
             </View>
-            <Text style={[s.amount, { color: kind === 'income' ? C.accent : C.text }]}>{money(item.amount, item.currency)}</Text>
+            <View style={{ alignItems: 'flex-end', gap: 4 }}>
+              <Text style={[s.amount, { color: kind === 'income' ? C.accent : C.text }]}>{money(item.amount, item.currency)}</Text>
+              {item.anomaly != null && (
+                <Text style={s.anomaly}>⚠ {item.anomaly > 0 ? '+' : ''}{item.anomaly}%</Text>
+              )}
+            </View>
           </ListItem>
         )}
       />
@@ -265,6 +270,7 @@ const s = StyleSheet.create({
   vendor: { color: C.text, fontSize: 15, fontWeight: '600' },
   meta: { color: C.faint, fontSize: 12, marginTop: 3 },
   amount: { fontSize: 16, fontWeight: '700' },
+  anomaly: { color: C.gold, fontSize: 10, fontWeight: '700', backgroundColor: C.surface2, borderWidth: 1, borderColor: C.gold, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
   modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 24 },
   modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20, maxHeight: '88%' },
   bigImg: { width: '100%', height: 220, borderRadius: 12, backgroundColor: C.surface2, marginTop: 12 },

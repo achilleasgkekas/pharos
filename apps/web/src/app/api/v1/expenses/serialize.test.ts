@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { trimExpense, type ExpenseLean } from './serialize';
+import { trimExpense, computeAnomalies, type ExpenseLean } from './serialize';
 
 // Pure API-shape contract for the mobile expenses endpoints (list GET, rescan POST
 // both share trimExpense so the detail can re-prefill in place from either). No
@@ -116,6 +116,13 @@ describe('trimExpense', () => {
     expect(trimExpense({ _id: 'a' }).deleted).toBe(false);
   });
 
+  it('adds anomaly only when the ±% argument is provided', () => {
+    expect(trimExpense({ _id: 'a' })).not.toHaveProperty('anomaly');
+    expect(trimExpense({ _id: 'a' }, undefined)).not.toHaveProperty('anomaly');
+    expect(trimExpense({ _id: 'a' }, -50).anomaly).toBe(-50);
+    expect(trimExpense({ _id: 'a' }, 0).anomaly).toBe(0); // 0 is a real ±% value
+  });
+
   it('exposes exactly the documented key set (no extra fields leak from the lean doc)', () => {
     const extra = { _id: 'a', vendor: 'X', __v: 7, secretInternal: 'nope' } as ExpenseLean & {
       __v: number;
@@ -142,5 +149,44 @@ describe('trimExpense', () => {
         'id',
       ].sort(),
     );
+  });
+});
+
+describe('computeAnomalies', () => {
+  const doc = (vendorKey: string, amount: number): ExpenseLean => ({ _id: vendorKey + amount, vendorKey, amount });
+
+  it('returns an array aligned to the docs, all undefined below 3 priced entries', () => {
+    const out = computeAnomalies([doc('ote', 60), doc('ote', 62)]);
+    expect(out).toEqual([undefined, undefined]);
+  });
+
+  it('flags an entry deviating >30% from the vendor median as rounded ±%', () => {
+    // median of [60,60,62,64,120] = 62; 120 → +94%, the rest within 30%
+    const docs = [doc('ote', 60), doc('ote', 60), doc('ote', 62), doc('ote', 64), doc('ote', 120)];
+    const out = computeAnomalies(docs);
+    expect(out.slice(0, 4)).toEqual([undefined, undefined, undefined, undefined]);
+    expect(out[4]).toBe(94);
+  });
+
+  it('flags a low outlier as a negative ±%', () => {
+    // median of [100,100,100] = 100; 40 → -60%
+    const out = computeAnomalies([doc('x', 100), doc('x', 100), doc('x', 100), doc('x', 40)]);
+    expect(out[3]).toBe(-60);
+  });
+
+  it('ignores entries with no vendorKey or non-positive amount', () => {
+    const docs: ExpenseLean[] = [
+      { _id: '1', amount: 999 }, // no vendorKey
+      { _id: '2', vendorKey: 'x', amount: 0 }, // not priced
+      doc('x', 100), doc('x', 100), doc('x', 100),
+    ];
+    const out = computeAnomalies(docs);
+    expect(out[0]).toBeUndefined();
+    expect(out[1]).toBeUndefined();
+  });
+
+  it('keeps vendor series independent (one vendor never skews another)', () => {
+    const docs = [doc('a', 10), doc('a', 10), doc('a', 10), doc('b', 1000), doc('b', 1000), doc('b', 1000)];
+    expect(computeAnomalies(docs).every((v) => v === undefined)).toBe(true);
   });
 });
