@@ -3,7 +3,12 @@ import { resolveWorkspaceSession } from '@/lib/tenancy/workspaceSession';
 import { Membership } from '@/models/Membership';
 import { Tenant } from '@/models/Tenant';
 import { readBody, strField } from '@/lib/apiBody';
-import { sanitizeWorkspaceName, workspaceNameError, workspaceView } from '@/lib/tenancy/workspace';
+import {
+  canCancelWorkspace,
+  sanitizeWorkspaceName,
+  workspaceNameError,
+  workspaceView,
+} from '@/lib/tenancy/workspace';
 import { recordAudit } from '@/lib/tenancy/audit';
 import { saasGuard } from '@/lib/tenancy/saasApi';
 
@@ -16,10 +21,13 @@ export const dynamic = 'force-dynamic';
  * workspace-settings page has a "General" tab.
  *
  * Gating (via resolveWorkspaceSession): SAAS_MODE off → 404, not signed in → 401,
- * not a member → 403 (GET) / not owner-admin → 403 (PATCH). Only reads/writes control-plane
- * collections (Tenant/Membership); never touches a feature route, the per-tenant data
- * database, or the self-hosted User session. Slug/dbName are immutable routing keys and are
- * NOT changeable here.
+ * not a member → 403 (GET) / not owner-admin → 403 (PATCH) / not owner → 403 (DELETE).
+ * Only reads/writes control-plane collections (Tenant/Membership); never touches a feature
+ * route, the per-tenant data database, or the self-hosted User session. Slug/dbName are
+ * immutable routing keys and are NOT changeable here.
+ *
+ * DELETE is a SOFT cancel (`status:'canceled'`) only — the destructive drop of the tenant's
+ * isolated data database is a separate manual flow, never performed by an automated routine.
  */
 
 /** Count a workspace's active members for the view. */
@@ -77,6 +85,54 @@ export async function PATCH(req: NextRequest) {
       actor: session.account.sub,
       target: session.workspace.slug,
       meta: { field: 'name', from: previous, to: name },
+    });
+
+    const memberCount = await activeMemberCount(session.ctx.tenantId!);
+    return NextResponse.json({
+      workspace: workspaceView(session.tenant, session.workspace.role, memberCount),
+    });
+  });
+}
+
+/**
+ * DELETE /api/saas/workspace[?tenant=<slug>] — soft-cancel the workspace.
+ * Owner only. Sets `status:'canceled'` (blocks access; reversible via a separate reactivate
+ * flow). Does NOT drop the tenant's data database — that destructive step is a manual op.
+ * Idempotent: an already-canceled workspace returns its current view with no new audit row.
+ */
+export async function DELETE(req: NextRequest) {
+  return saasGuard(async () => {
+    const slug = new URL(req.url).searchParams.get('tenant');
+    // Resolve as any active member first, then enforce the stricter owner-only gate below
+    // (resolveWorkspaceSession's requireManage flag only reaches owner/admin).
+    const resolved = await resolveWorkspaceSession(slug, false);
+    if ('response' in resolved) return resolved.response;
+    const { session } = resolved;
+
+    if (!canCancelWorkspace(session.workspace.role)) {
+      return NextResponse.json(
+        { error: 'only the workspace owner can cancel it' },
+        { status: 403 }
+      );
+    }
+
+    const previous = String(session.tenant.status ?? '');
+    if (previous === 'canceled') {
+      // Already canceled — no-op, no audit row.
+      const memberCount = await activeMemberCount(session.ctx.tenantId!);
+      return NextResponse.json({
+        workspace: workspaceView(session.tenant, session.workspace.role, memberCount),
+      });
+    }
+
+    await Tenant.updateOne({ _id: session.ctx.tenantId }, { $set: { status: 'canceled' } });
+    session.tenant.status = 'canceled';
+
+    await recordAudit(session.ctx, {
+      action: 'workspace.canceled',
+      actor: session.account.sub,
+      target: session.workspace.slug,
+      meta: { field: 'status', from: previous, to: 'canceled' },
     });
 
     const memberCount = await activeMemberCount(session.ctx.tenantId!);

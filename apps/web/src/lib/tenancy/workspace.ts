@@ -25,6 +25,16 @@ export function workspaceNameError(name: string): string | null {
   return null;
 }
 
+/**
+ * Only the workspace owner may cancel it (soft-delete → `status:'canceled'`). Cancelling
+ * blocks access for everyone and is a billing-adjacent, destructive-in-intent action, so it
+ * is stricter than the owner/admin rename gate. Admins/members are rejected. The actual drop
+ * of the tenant's data database is a separate, manual flow (never done by a routine).
+ */
+export function canCancelWorkspace(role: string): boolean {
+  return role === 'owner';
+}
+
 /** Client-safe projection of a workspace for the read/rename responses. */
 export type WorkspaceView = {
   tenantId: string;

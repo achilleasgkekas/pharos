@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   MAX_WORKSPACE_NAME,
+  canCancelWorkspace,
   sanitizeWorkspaceName,
   workspaceNameError,
   workspaceView,
@@ -39,6 +40,20 @@ describe('workspaceNameError', () => {
   });
   it('accepts a non-empty name', () => {
     expect(workspaceNameError('Acme')).toBeNull();
+  });
+});
+
+describe('canCancelWorkspace', () => {
+  it('allows the owner to cancel', () => {
+    expect(canCancelWorkspace('owner')).toBe(true);
+  });
+  it('rejects admins and members', () => {
+    expect(canCancelWorkspace('admin')).toBe(false);
+    expect(canCancelWorkspace('member')).toBe(false);
+  });
+  it('rejects unknown / empty roles', () => {
+    expect(canCancelWorkspace('')).toBe(false);
+    expect(canCancelWorkspace('viewer')).toBe(false);
   });
 });
 

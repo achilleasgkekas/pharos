@@ -1178,3 +1178,46 @@ running container με SAAS_MODE off — ο νέος κώδικας δεν εκ�
 (β) `sendViaSmtp` via nodemailer (μετά provider decision Achilleas), είτε (γ) workspace delete
 scaffold (soft `status:'canceled'`· η πραγματική drop της tenant db = destructive → Needs-Achilleas,
 όχι από routine).
+
+---
+
+## 2026-07-03 (increment 29 — workspace soft-cancel: owner-only DELETE)
+**Built:** επέλεξα το (γ) — soft-cancel του workspace, το φυσικό συμπλήρωμα του read/rename του
+increment 28 (κλείνει το «danger zone» ενός workspace-settings panel). Backend-only, additive, ΟΛΟ
+σε δικά μου SAAS-gated αρχεία· καμία UI, καμία destructive DB πράξη:
+- `lib/tenancy/audit.ts` — +1 auditable action `workspace.canceled` στο `AUDIT_ACTIONS` (μόνη
+  αλλαγή· redaction/recorder αμετάβλητα).
+- `lib/tenancy/workspace.ts` — νέος **PURE** guard `canCancelWorkspace(role)` = **owner-only**
+  (αυστηρότερο από το owner/admin του rename: το cancel μπλοκάρει πρόσβαση για όλους + είναι
+  billing-adjacent). Admin/member/unknown/empty → false.
+- `app/api/saas/workspace/route.ts` — νέος **DELETE** `[?tenant=<slug>]` handler:
+  `resolveWorkspaceSession(slug,false)` (any active member) → **owner-only** gate μέσω
+  `canCancelWorkspace` (403 αλλιώς· ο `requireManage` flag του resolver φτάνει μόνο owner/admin,
+  γι' αυτό resolve-άρω χαλαρά + gate-άρω owner εδώ). **Idempotent**: ήδη `canceled` → current view,
+  κανένα audit row. Αλλιώς `Tenant.updateOne {$set:{status:'canceled'}}` +
+  `recordAudit('workspace.canceled', meta {field:'status', from, to:'canceled'})`. **Slug/dbName/data-db
+  ΑΘΙΚΤΑ** — το status:'canceled' μπλοκάρει πρόσβαση (per Tenant model) + είναι reversible· η
+  πραγματική drop της tenant db = ξεχωριστό manual flow (Needs-Achilleas), ΠΟΤΕ από routine.
+- `lib/tenancy/workspace.test.ts` — +3 PURE tests για `canCancelWorkspace` (owner-yes,
+  admin/member-no, unknown/empty-no).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run workspace.test.ts` → **16/16 green**
+(13 + 3 νέα)· full suite `npx vitest run` → **762/762 green** (759 + 3, καμία regression). Ο DELETE
+είναι SAAS-gated (404 όταν SAAS_MODE off) + `canCancelWorkspace` pure· κανένας external importer από
+feature code ⇒ `SAAS_MODE` off = **zero effect** στο self-hosted app. Κανένας Docker rebuild (route
+404 στο running container με SAAS_MODE off — ο νέος κώδικας δεν εκτελείται· type-check+tests καλύπτουν
+compile+logic)· καμία νέα εξάρτηση· κανένα feature route/data-db/User-path αγγίχτηκε. Άγγιξα μόνο δικά
+μου SAAS αρχεία (foreign `.claude/launch.json` + apps/mobile edits άθικτα).
+
+**## Needs Achilleas** (workspace lifecycle):
+- **Hard-delete / GDPR drop**: το πραγματικό drop της tenant data db (μετά cancel) είναι destructive
+  → πρέπει να το κάνει ο Achilleas χειροκίνητα ή ξεχωριστό flow με ρητό confirm, όχι routine.
+- **Reactivation path**: αν ένας canceled workspace πρέπει να ξαναανοίξει (`status:'active'`) — μικρό
+  owner-only PATCH/POST, εύκολο να προστεθεί όταν ζητηθεί.
+- **Access enforcement**: επιβεβαίωσε ότι το `status:'canceled'`/`'suspended'` όντως μπλοκάρει τα
+  workspace/feature routes (σήμερα το `resolveWorkspaceSession`/`accountTenants` δεν φιλτράρει tenant
+  status — enforcement layer = επόμενο increment υποψήφιο).
+
+**Next task:** increment 30 — είτε (α) reactivate route (owner-only, `canceled`→`active`), είτε (β)
+tenant-status access enforcement (canceled/suspended → block στο `resolveWorkspaceSession`), είτε (γ)
+user-facing workspace-settings UI panels (όλα τα read/write APIs έτοιμα).

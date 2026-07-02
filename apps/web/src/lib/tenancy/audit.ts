@@ -24,6 +24,7 @@ export const AUDIT_ACTIONS = [
   'billing.checkout_started',
   'workspace.created',
   'workspace.updated',
+  'workspace.canceled',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
