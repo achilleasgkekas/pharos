@@ -333,3 +333,25 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02 (cont.⁸)
+
+Task: (e) Polish, μερος 14 — «Runs anywhere you do» deploy-targets strip μεσα στο self-host section. Το self-host section ειχε τα 3 βηματα + το docker quick-start code block, αλλα δεν ελεγε ΠΟΥ τρεχει· για το homelab κοινο (το core self-host audience) η βεβαιοτητα «δουλευει στο δικο μου setup» ειναι πραγματικο conversion σημειο. Ηταν το πιο ουσιαστικο εναπομειναν κομματι που δεν χρειαζεται assets (τα screenshots μενουν blocked χωρις πραγματικα app images) και δεν επικαλυπτει υπαρχον section (το trust ειναι principles, οχι deploy targets).
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεα σταθερα `DEPLOY_TARGETS` (6 strings: Docker Compose, Proxmox LXC, Any Linux VM, Raspberry Pi (ARM64), Synology / NAS, Bare metal — ολα αληθινα per CLAUDE.md: Proxmox LXC ειναι ο τελικος προορισμος, DS923+ NAS, Docker stack) + νεο `.deploy-strip` block μεσα στο `#self-host`, ΜΕΤΑ το code block: `.mono` label «Runs anywhere you do» + `<ul>` απο pills (καθε pill = accent dot + κειμενο). Semantic list, μηδεν client JS, μηδεν icons (καθαρες text pills).
+- `app/globals.css`: νεα CSS `.deploy-strip`/`.deploy-label`/`.deploy-pills` (flex-wrap center) / `.deploy-pill` (rounded 999px, surface bg, border, hover -> border-light + text brighten) / `.deploy-dot` (6px accent κουκιδα). Ταιριαζει το υπαρχον pill/card idiom (ιδια border/surface vars, ιδιο hover pattern με step-card).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 761 B / 103 kB First Load JS, αμεταβλητο — pure static markup+CSS, μηδεν bundle impact).
+- Prerendered HTML (`.next/server/app/index.html`): «Runs anywhere you do» + «Proxmox LXC» + `deploy-pill` present.
+- Preview (landing-dev, port 3100): DOM eval επιβεβαιωσε strip present, label σωστο, και τα 6 pills renderαρουν (count=6)· `preview_inspect .deploy-pill` -> border-radius applied, border rgb(42,42,42)=var(--border), color rgb(153,153,153)=var(--text-dim) (σωστη brand παλετα)· console errors: none. Σταματησα τον server. (ΣΗΜ: το preview_screenshot πιανει παντα το top του page — γνωστο headless viewport quirk αυτης της harness, οχι bug· η επαληθευση εγινε μεσω DOM eval + inspect + static output.) Docker/web/mobile αθικτα. Το `.claude/launch.json` (shared local config) ΔΕΝ commit (collision guard — μονο app/page.tsx + app/globals.css + LANDING_PROGRESS.md).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση του CSS mockup (#preview) με πραγματικα app screenshots οταν υπαρξουν assets, secondary CTA band, η micro-copy βελτιωσεις. (Προαιρετικα: per-plan Offer JSON-LD nodes οταν κλεισουν οι τιμες, «who it's for» personas section.)
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.

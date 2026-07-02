@@ -295,6 +295,45 @@ h1, h2, h3 {
 .code-block .tok-cmd { color: var(--accent); }
 .code-block .tok-comment { color: var(--text-faint); }
 
+/* Deploy-targets strip (self-host) */
+.deploy-strip {
+  margin-top: 28px;
+  text-align: center;
+}
+.deploy-label {
+  margin-bottom: 16px;
+}
+.deploy-pills {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+.deploy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.deploy-pill:hover {
+  border-color: var(--border-light);
+  color: var(--text);
+}
+.deploy-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
 /* Waitlist */
 .waitlist-form {
   display: flex;

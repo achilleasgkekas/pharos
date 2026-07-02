@@ -61,6 +61,15 @@ const FEATURES: {
   },
 ];
 
+const DEPLOY_TARGETS: string[] = [
+  'Docker Compose',
+  'Proxmox LXC',
+  'Any Linux VM',
+  'Raspberry Pi (ARM64)',
+  'Synology / NAS',
+  'Bare metal',
+];
+
 const STEPS: { title: string; desc: string }[] = [
   {
     title: 'Clone & configure',
@@ -525,6 +534,18 @@ export default function Home() {
             {'\n'}
             <span className="tok-comment"># Open http://localhost:3000</span>
           </pre>
+
+          <div className="deploy-strip">
+            <p className="mono deploy-label">Runs anywhere you do</p>
+            <ul className="deploy-pills">
+              {DEPLOY_TARGETS.map((target) => (
+                <li key={target} className="deploy-pill">
+                  <span className="deploy-dot" aria-hidden="true" />
+                  {target}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </section>
 
