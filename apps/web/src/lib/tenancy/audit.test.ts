@@ -1,0 +1,140 @@
+import { describe, it, expect } from 'vitest';
+import {
+  AUDIT_ACTIONS,
+  isAuditAction,
+  parseAuditAction,
+  redactMeta,
+  auditView,
+} from './audit';
+
+// The pure helpers (validation, redaction, serialization) are unit-tested here. The
+// recorder (recordAudit) and the GET /api/saas/audit route are SaaS-gated node paths; their
+// no-secret / whitelist guarantees rest on redactMeta + auditView, which are asserted below.
+
+describe('isAuditAction / parseAuditAction', () => {
+  it('accepts every declared action', () => {
+    for (const a of AUDIT_ACTIONS) expect(isAuditAction(a)).toBe(true);
+  });
+
+  it('rejects unknown / non-string input', () => {
+    expect(isAuditAction('member.exploded')).toBe(false);
+    expect(isAuditAction('')).toBe(false);
+    expect(isAuditAction(null)).toBe(false);
+    expect(isAuditAction(42)).toBe(false);
+  });
+
+  it('parseAuditAction trims + lowercases, returns null on unknown', () => {
+    expect(parseAuditAction('  MEMBER.REMOVED  ')).toBe('member.removed');
+    expect(parseAuditAction('Invite.Sent')).toBe('invite.sent');
+    expect(parseAuditAction('nope')).toBeNull();
+    expect(parseAuditAction(undefined)).toBeNull();
+    expect(parseAuditAction(123)).toBeNull();
+  });
+});
+
+describe('redactMeta', () => {
+  it('returns null for non-plain-object input', () => {
+    expect(redactMeta(null)).toBeNull();
+    expect(redactMeta(undefined)).toBeNull();
+    expect(redactMeta('x')).toBeNull();
+    expect(redactMeta(5)).toBeNull();
+    expect(redactMeta([1, 2, 3])).toBeNull();
+  });
+
+  it('keeps scalar fields', () => {
+    expect(redactMeta({ role: 'admin', count: 3, active: true })).toEqual({
+      role: 'admin',
+      count: 3,
+      active: true,
+    });
+  });
+
+  it('strips sensitive keys (case-insensitive, substring)', () => {
+    const out = redactMeta({
+      role: 'admin',
+      token: 'abc',
+      resetToken: 'x',
+      passwordHash: 'y',
+      apiKey: 'z',
+      Authorization: 'Bearer q',
+      cookieJar: 'c',
+    });
+    expect(out).toEqual({ role: 'admin' });
+  });
+
+  it('drops null/undefined and non-serializable values', () => {
+    const out = redactMeta({ a: 'keep', b: null, c: undefined, d: () => 1, e: Symbol('s') });
+    expect(out).toEqual({ a: 'keep' });
+  });
+
+  it('keeps scalar arrays, drops nested-structure arrays', () => {
+    const out = redactMeta({ tags: ['a', 'b', 3], objs: [{ x: 1 }, { y: 2 }] });
+    expect(out).toEqual({ tags: ['a', 'b', 3] });
+  });
+
+  it('recurses into nested plain objects and redacts within', () => {
+    const out = redactMeta({ change: { from: 'member', to: 'admin', secret: 'nope' } });
+    expect(out).toEqual({ change: { from: 'member', to: 'admin' } });
+  });
+
+  it('returns null when everything is stripped', () => {
+    expect(redactMeta({ token: 'a', password: 'b' })).toBeNull();
+    expect(redactMeta({})).toBeNull();
+  });
+
+  it('bounds recursion depth (deeply nested collapses to null)', () => {
+    const deep = { l1: { l2: { l3: { l4: { l5: { v: 'x' } } } } } };
+    // l5 is at depth 5 (> 4) so it returns null and prunes upward.
+    expect(redactMeta(deep)).toBeNull();
+  });
+});
+
+describe('auditView', () => {
+  const iso = '2026-07-02T10:00:00.000Z';
+
+  it('projects only whitelisted fields with stringified ids', () => {
+    const view = auditView({
+      _id: { toString: () => 'evt1' },
+      action: 'member.removed',
+      actor: { toString: () => 'acc9' },
+      target: 'someone@example.com',
+      meta: { role: 'member' },
+      createdAt: new Date(iso),
+    });
+    expect(view).toEqual({
+      id: 'evt1',
+      action: 'member.removed',
+      actor: 'acc9',
+      target: 'someone@example.com',
+      meta: { role: 'member' },
+      createdAt: iso,
+    });
+    // Exact key set — no stray columns can pass through.
+    expect(Object.keys(view).sort()).toEqual(
+      ['action', 'actor', 'createdAt', 'id', 'meta', 'target'].sort()
+    );
+  });
+
+  it('null-safes actor/target/meta/createdAt (system event, legacy row)', () => {
+    const view = auditView({ _id: 'e2', action: 'plan.changed' });
+    expect(view.actor).toBeNull();
+    expect(view.target).toBeNull();
+    expect(view.meta).toBeNull();
+    expect(view.createdAt).toBeNull();
+    expect(view.action).toBe('plan.changed');
+  });
+
+  it('re-redacts meta on the way out (defence in depth)', () => {
+    const view = auditView({
+      _id: 'e3',
+      action: 'invite.sent',
+      meta: { email: 'x@y.z', token: 'leaked-hash' },
+    });
+    expect(view.meta).toEqual({ email: 'x@y.z' });
+  });
+
+  it('accepts an ISO string createdAt, null on garbage', () => {
+    expect(auditView({ _id: 'e4', createdAt: iso }).createdAt).toBe(iso);
+    expect(auditView({ _id: 'e5', createdAt: 'not-a-date' }).createdAt).toBeNull();
+  });
+});
