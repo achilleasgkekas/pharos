@@ -989,3 +989,37 @@ SAAS_MODE off — δεν εκτελείται ο νέος κώδικας· type-
 consume-άρει το `GET /api/saas/audit` (UI-only, το read+write API είναι πλέον πλήρες), είτε (β)
 `sendViaSmtp` via nodemailer (μετά provider decision Achilleas), είτε (γ) `invitedBy` projection
 στο inviteView για πλήρες invite audit trail.
+
+## 2026-07-02 (increment 24 — resolve actor emails in the audit read API)
+**Built:** το `GET /api/saas/audit` του §22-23 επέστρεφε `actor` ως γυμνό Account ObjectId — ένα
+μελλοντικό workspace-settings «Activity» panel δεν μπορεί να δείξει human name χωρίς N+1 lookup
+που δεν έχει API. Πρόσθεσα batched actor-email resolution. ΟΛΟ SAAS-gated, additive,
+backward-compatible, σε δικά μου SAAS αρχεία:
+- `lib/tenancy/audit.ts` (additive): (α) ο `AuditView` απέκτησε **`actorEmail: string|null`**
+  (display-only, ΠΟΤΕ secret· null σε system events/deleted accounts)· (β) ο `auditView` δέχεται
+  **optional 2ο param `actorEmail = null`** (default → backward-compatible, όλοι οι υπάρχοντες
+  1-arg callers αμετάβλητοι)· (γ) νέος PURE helper **`collectActorIds(events)`** → distinct,
+  stringified, non-null actor ids (Set-dedup· system events με null actor δεν συνεισφέρουν) ώστε
+  ο route να κάνει **ΕΝΑ** `_id:{$in}` query αντί N+1.
+- `app/api/saas/audit/route.ts` (additive): μετά το fetch, `collectActorIds(events)` →
+  `Account.find({_id:{$in}}).select('email').lean()` → `Map<id,email>` → `auditView(ev, email)`.
+  Skip εντελώς όταν κανένας actor. System/deleted → null (το map δεν έχει entry). Gate/scope/
+  cursor/action-filter αμετάβλητα.
+- `lib/tenancy/audit.test.ts` — +5 PURE tests: actorEmail projection (route-passed vs default
+  vs explicit-null), updated exact-key-set assertion (+actorEmail), `collectActorIds`
+  (distinct+dedup / null-undefined-drop / empty batch).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run audit.test.ts` → **23/23 green**
+(18 προϋπάρχοντα + 5 νέα). Route SAAS-gated (404 όταν SAAS_MODE off) + serializer pure/additive
++ κανένας external importer των αλλαγών από feature code ⇒ `SAAS_MODE` off = **zero effect** στο
+self-hosted app· κανένας Docker rebuild (route 404 στο running container με SAAS_MODE off — ο νέος
+κώδικας δεν εκτελείται· type-check καλύπτει το compile)· καμία νέα εξάρτηση· κανένα feature route/
+data-db/User-path αγγίχτηκε. Άγγιξα μόνο δικά μου SAAS αρχεία (foreign `.claude/launch.json` άθικτο).
+Push: `77836a1`.
+
+**Next task:** increment 25 — είτε (α) user-facing workspace-settings «Activity» panel που
+consume-άρει το `GET /api/saas/audit` (τώρα το read API επιστρέφει actorEmail → πλήρως render-able·
+UI-only), είτε (β) `sendViaSmtp` via nodemailer (μετά provider decision Achilleas· ξεκλειδώνει
+reset/verify/invite delivery), είτε (γ) `target`-email enrichment για invite/member events (το
+target είναι ήδη email/slug string, οπότε ίσως δεν χρειάζεται) ή actor-name προσθήκη αν το Account
+αποκτήσει displayName πεδίο.
