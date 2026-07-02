@@ -245,6 +245,25 @@ const JSON_LD = {
   '@context': 'https://schema.org',
   '@graph': [
     {
+      '@type': 'Organization',
+      '@id': `${SITE_URL}/#organization`,
+      name: 'PHAROS',
+      alternateName: 'Personal Hub · Asset & Resource Oversight System',
+      url: SITE_URL,
+      logo: `${SITE_URL}/favicon.svg`,
+      description:
+        'PHAROS is a self-hosted personal hub for overseeing everything you own, from a single private dashboard you control.',
+      sameAs: [GITHUB_URL],
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${SITE_URL}/#website`,
+      name: 'PHAROS',
+      url: SITE_URL,
+      inLanguage: 'en',
+      publisher: { '@id': `${SITE_URL}/#organization` },
+    },
+    {
       '@type': 'SoftwareApplication',
       name: 'PHAROS',
       applicationCategory: 'BusinessApplication',
@@ -253,6 +272,7 @@ const JSON_LD = {
         'A self-hosted personal hub: inventory, receipts read by AI, expenses, credit-card installments, subscriptions, vouchers, reports, and your network, in one private dashboard you control.',
       url: SITE_URL,
       author: { '@type': 'Person', name: 'Achilleas' },
+      publisher: { '@id': `${SITE_URL}/#organization` },
       license: 'https://www.gnu.org/licenses/agpl-3.0.html',
       softwareHelp: `${GITHUB_URL}/blob/main/README.md`,
       offers: {

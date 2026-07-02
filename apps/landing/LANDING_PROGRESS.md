@@ -292,3 +292,23 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer links αλλιως 404.
 - Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap το χρησιμοποιει).
 - Contact inbox `hello@ph-aros.com` για τα waitlist emails.
+
+## 2026-07-02 (cont.⁶)
+
+Task: (e) Polish, μερος 12 — Organization + WebSite JSON-LD nodes. Το cont.⁴ εδωσε SoftwareApplication + FAQPage· ελειπαν τα δυο entity-level nodes που βοηθουν το Google να καταλαβει το brand ως οντοτητα (knowledge-graph eligibility). Ηταν το προαιρετικο επομενο που ειχα σημειωσει, self-contained, μηδεν assets/decisions.
+
+Τι εφτιαξα:
+- `app/page.tsx` (`JSON_LD` `@graph`): προσθεσα δυο nodes ΠΡΙΝ το SoftwareApplication. (1) `Organization` με `@id` `${SITE_URL}/#organization` — name PHAROS, alternateName ο backronym («Personal Hub · Asset & Resource Oversight System»), url, logo (`/favicon.svg` absolute), description, `sameAs: [GITHUB_URL]`. (2) `WebSite` με `@id` `${SITE_URL}/#website` — name/url/inLanguage «en» + `publisher` reference στο `#organization`. Προσθεσα και `publisher: {'@id': …#organization}` στο υπαρχον SoftwareApplication ωστε τα nodes να δενουν σωστα με cross-references (οχι διπλα inline objects). Ολα deterministic (υπαρχοντα consts SITE_URL/GITHUB_URL), μηδεν νεο dependency, μηδεν client JS.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ 761 B / 103 kB First Load JS, αμεταβλητο — inline HTML script, μηδεν bundle impact).
+- Prerendered HTML (`.next/server/app/index.html`): και τα 8 `@type` present (Organization, WebSite, SoftwareApplication, FAQPage, Offer, Person, Question, Answer)· το `#organization` id εμφανιζεται 6× (definition + publisher refs), αρα τα cross-references resolve. Non-visual head/body metadata -> επιβεβαιωθηκε στο static output (οπως JSON-LD/robots/sitemap), δεν χρειαστηκε preview server. Docker/web/mobile αθικτα. Το `.claude/launch.json` (shared local config) ΔΕΝ commit (collision guard — μονο app/page.tsx).
+
+Επομενο increment: (e) συνεχεια — αντικατασταση του CSS mockup (#preview) με πραγματικα app screenshots οταν υπαρξουν assets, secondary CTA band, η micro-copy βελτιωσεις. (Προαιρετικα: BreadcrumbList JSON-LD, η per-plan Offer nodes οταν κλεισουν οι τιμες.)
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs links αλλιως 404.
+- Επιβεβαιωση `ph-aros.com` ως domain (το SITE_URL σε layout/page/robots/sitemap/JSON-LD το χρησιμοποιει).
+- Contact inbox `hello@ph-aros.com` για τα waitlist emails.
