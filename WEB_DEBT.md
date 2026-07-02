@@ -3,6 +3,22 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-02 32η σάρωση· CONFIRMATION· ΜΗΔΕΝ API αλλαγή από τον προηγ. marker `bba44ff`· ουρά αμετάβλητη — 4 ενεργά auto-buildable [1 P2/M + 3 P3/S] + 1 P3/S decision-flag)
+
+**2026-07-02 (32η σάρωση, αυτόνομος γύρος):** fresh live σάρωση (grep, όχι docs) σε **49 v1 route files** + **21 saas route files** + `apiAuth`/`apiBody`/`apiList` helpers + `lib/billing/*` + `lib/tenancy/*` + `models/*`. `git diff --name-only bba44ff..HEAD -- src/app/api src/lib/billing src/lib/tenancy src/models` = **μηδέν αρχεία** → από τον τελευταίο audited marker ΚΑΜΙΑ αλλαγή στο API/model/billing/tenancy surface (οι μόνες αλλαγές: `apps/landing/*` marketing site + `apps/web/src/lib/aiConfig.test.ts` test-only). Το API είναι byte-identical με ό,τι κάλυψαν οι 31 προηγ. σαρώσεις. `npm run type-check` **EXIT 0**.
+- **Ευρήματα ανά διάσταση (live grep):**
+  - **Type safety: 0** — `grep -rnE ': any|as any|@ts-ignore|@ts-expect-error' src/app/api` = **0**. type-check EXIT 0.
+  - **Input validation: 0 gaps** — `grep -rln 'req.json().catch' src/app/api` = **μηδέν** (readBody adoption 100%, v1 + saas). Κανένα raw-body route.
+  - **Auth: 0 unguarded** — loop σε ΟΛΑ τα `src/app/api/v1/*/route.ts`: κάθε file matches `withAuth`/`apiAuth` (μόνο το `auth/login` είναι σκόπιμα exempt = auth boundary). Μηδέν `NO-AUTH` hit.
+  - **DB/consistency: 0 νέο** — `grep -rn '\[a-f0-9\]{24}' src/app/api src/lib/tenancy src/lib/billing` = **μηδέν** (inline ObjectId regex πλήρως εξαλειμμένο). Καμία νέα unbounded query (μηδέν νέο route).
+- **Ουρά (live re-verify, ΟΛΑ ακόμα ανοιχτά):**
+  - **invites DELETE id-guard (P3/S):** `invites/route.ts:72` περνά `_id: inviteId` (trimmed string, γρ.64) στο `Invite.updateOne` **χωρίς** `^[a-f0-9]{24}$` guard· `grep 'test(inviteId)\|isObjectId(inviteId)'` = **μηδέν** → **TODO** (malformed id → CastError → 500 αντί 400).
+  - **Seat-cap ασυμμετρία (P3/S):** `members/route.ts:220-221` existing-account seat check = `withinSeatLimit(plan, activeCount)` **μόνο** (χωρίς `pendingCount`), ενώ το invite path γρ.107-109 = `activeCount + pendingCount` → **TODO** (η ασυμμετρία παραμένει).
+  - **SaaS try/catch (P2/M):** `for f in saas/**/route.ts; do grep -q 'try {' || echo` = **15** saas routes χωρίς try/catch → thrown DB/Stripe error βγαίνει ως framework-default 500 αντί `{ error }` → **TODO**.
+  - **Sparse index Account token-hash (P3/S):** `models/Account.ts:24,26` `verifyTokenHash`/`resetTokenHash` = απλά `{ type:String, default:null }`, μηδέν `index()` → collection-scan σε verify/reset confirm → **TODO** (low-urgency, μικρό collection).
+  - **reset-request timing (P3/S, decision-flag):** `reset/request/route.ts:52` ακόμα `await sendEmail(...)` → registered/non-registered response-time delta → **Needs Achilleas** (delivery-semantics tradeoff, όχι unattended fix).
+- **Counts ανά dimension: P1=0, P2=0, P3=0 νέο.** Δεν εφευρίσκω debt· 32 σαρώσεις χωρίς P1, ο κώδικας ώριμος. Ο builder ΔΕΝ κατανάλωσε κανένα από τα 4 auto-buildable items αυτόν τον κύκλο (όλα live-verified ακόμα TODO). Top-3 για builder: (1) invites DELETE id-guard [P3/S, μικρότερο, single-line guard]· (2) seat-cap asymmetry [P3/S, single seat-check add]· (3) SaaS try/catch helper [P2/M, split S+S].
+
 ## Σύνοψη audit (2026-07-02 31η σάρωση· CONFIRMATION· ουρά αμετάβλητη 5 ενεργά P3/S· ελέγχθηκε ΝΕΟΣ SaaS account self-service surface [commit `a082819`: profile GET/PATCH + password POST] → exemplary, μηδέν νέο debt)
 
 **2026-07-02 (31η σάρωση, αυτόνομος γύρος):** fresh σάρωση **49 v1 route files** + **13 saas route files** (auth×4, billing×4, usage, usage/sample, members, account, account/password) + `apiAuth`/`apiBody`/`apiList` helpers + `lib/billing/*` + `lib/tenancy/*`. Από την 30ή σάρωση ο builder **ΔΕΝ** κατανάλωσε κανένα από τα 5 ενεργά P3/S items (live-verified όλα ακόμα ανοιχτά) → μένουν TODO. Νέο code από τότε = ο SaaS account self-service surface (`saas/account/route.ts` GET+PATCH, `saas/account/password/route.ts` POST, commit `a082819`). `npm run type-check` **EXIT 0**.

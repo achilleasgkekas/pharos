@@ -5,6 +5,24 @@
 <!-- reviewed: bba44ff -->
 <!-- docker-validated: 1b6744a -->
 
+## 2026-07-02 (web-code-quality auditor — 32η σάρωση, CONFIRMATION)
+- **Τι έκανα:** read-only fresh live σάρωση (grep, όχι docs) όλου του web API surface: **49 v1 route files** + **21 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/billing/*` + `lib/tenancy/*` + `models/*`. Καμία Docker build, κανένα AI job, μηδέν app-code edit.
+- **Κρίσιμο εύρημα (scope):** `git diff --name-only bba44ff..HEAD -- src/app/api src/lib/billing src/lib/tenancy src/models` = **μηδέν αρχεία**. Από τον προηγ. audited marker το API/model/billing/tenancy surface είναι **byte-identical**· οι μόνες αλλαγές HEAD..bba44ff είναι `apps/landing/*` (marketing, εκτός web app) + `apps/web/src/lib/aiConfig.test.ts` (test-only). Άρα καθαρή confirmation σάρωση.
+- **Counts ανά dimension (P1=0, P2=0, P3=0 νέο):**
+  - Type safety: **0** (`: any|as any|@ts-ignore|@ts-expect-error` στο `src/app/api` = 0· type-check EXIT 0).
+  - Input validation: **0** (`req.json().catch` στο `src/app/api` = μηδέν· readBody adoption 100%).
+  - Auth: **0 unguarded** (κάθε v1 route matches `withAuth`/`apiAuth`· μόνο `auth/login` σκόπιμα exempt).
+  - DB/consistency: **0 νέο** (inline ObjectId regex `[a-f0-9]{24}` σε api+tenancy+billing = μηδέν).
+  - Error handling: **0 νέο** (το μοναδικό open item είναι το προϋπάρχον P2/M SaaS try/catch).
+- **Ουρά αμετάβλητη — 4 auto-buildable items + 1 decision-flag, ΟΛΑ live-verified ακόμα ανοιχτά** (ο builder δεν κατανάλωσε κανένα): invites DELETE id-guard [P3/S], seat-cap ασυμμετρία [P3/S], SaaS try/catch helper [P2/M], Account token-hash sparse index [P3/S], reset-request timing [P3/S, Needs Achilleas].
+- **Verify:** `apps/web npm run type-check` → **EXIT 0**.
+- **Top-3 για τον builder:** (1) **invites DELETE id-guard** [P3/S, μικρότερο — single-line `^[a-f0-9]{24}$` guard πριν το `Invite.updateOne`, `invites/route.ts:72`]· (2) **seat-cap ασυμμετρία** [P3/S — πρόσθεσε `pendingCount` στο existing-account seat check, `members/route.ts:220`]· (3) **SaaS try/catch helper** [P2/M, split S+S — mirror του `withAuth` catch για τα 15 saas write routes].
+- **Git hygiene:** staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (ρητά paths, ΟΧΙ `-A`). Το `.claude/launch.json` (WIP εργαλείου του Αχιλλέα) ΔΕΝ αγγίχτηκε.
+
+### Needs Achilleas (web-code-quality auditor 2026-07-02, 32η)
+- **reset-request timing side-channel** [P3/S]: το `saas/account/reset/request/route.ts:52` κάνει `await sendEmail(...)` → registered email έχει μεγαλύτερο response-time (DB write + Resend round-trip) από non-registered → μερική ακύρωση του anti-enumeration `{ ok: true }` design. Fix = delivery-semantics tradeoff (fire-and-forget `void sendEmail` όπως το members route vs εγγύηση αποστολής με `await`) → θέλει σκόπιμη απόφαση, όχι unattended fix. Dead-until-SaaS (gated).
+- Μηδέν committed secret στο range. Εκκρεμείς αποφάσεις αμετάβλητες (SaaS-gated όλες).
+
 ## 2026-07-02 (reviewer — range b8f3fce..bba44ff)
 
 Review των 7 commits από τον τελευταίο marker (`0e6f8ee` landing FAQ, `76daffe` docs-review, `c95de0c`/`b07a9bc` docs, `fd372c6` pdf tests, `f4bdd8e` saas invites list/revoke, `bba44ff` mobile Reports date-range). Working tree στην αρχή: μόνο `.claude/launch.json` (foreign tooling, δεν το άγγιξα). Καμία Docker build, κανένα AI job.
