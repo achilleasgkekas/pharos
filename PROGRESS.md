@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: bba44ff -->
+<!-- reviewed: 268efb4 -->
 <!-- docker-validated: 4eaa702 -->
+
+## 2026-07-02 (REVIEWER — range bba44ff..268efb4)
+- **Τι review-άρισα:** 5 commits (2 code, 1 landing, 1 test, 1 docs): `268efb4` mobile Tasks tag-filter + project-progress-by-tag, `100d1d6` invites list `?status` audit filter, `2e5e7da` isVisionModel test suite, `5544822` landing «AI in action» spotlight, `94a5d20`/`4eaa702` docs.
+- **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· `apps/web npm test` → **619/619 pass** (41 files), περιλαμβάνει τα νέα `aiConfig.test.ts` (8) + `invites.test.ts` (νέες status-filter assertions).
+- **Review diff:** (α) invites route `?status` = **καθαρά additive** — default 'pending', unknown→'pending' (`parseInviteStatusFilter`), 'all'→`{}` query fragment· backward-compatible για callers που παραλείπουν το param· pure helpers, unit-tested. (β) mobile `TasksScreen` tag-filter: **stale-filter guard** (activeTag drop όταν σβηστεί το tag), **div-by-zero guard** (`shown.length ?`), θεματικά tokens (`C.accent`/`C.surface2`/`C.onAccent`), `t.tags` εγγυημένα `string[]` από το Task type — μηδέν crash risk. (γ) landing: static marketing, τα 4 icons (`receipt`/`chart`/`check`/`chevron`) υπάρχουν στο `Icon.tsx`, αριθμοί consistent (€119.50+€30.00=€149.50, VAT 24%=€28.94). Μηδέν API-shape regression για το mobile (invites = SaaS control-plane, δεν το καταναλώνει το app).
+- **Secret scan:** μηδέν committed secret στο range.
+- **Fixes:** **0** (τίποτα small-safe δεν χρειάστηκε — ο builder άφησε το δέντρο καθαρό). **Flags:** **0** νέα.
+- **Marker → 268efb4.**
 
 ## 2026-07-02 (pharos-daily-dev — mobile Tasks: tag filter + project-progress-by-tag)
 - **Τι έκανα:** έκλεισα το **top suggested-next-task** (option α της προηγ. εγγραφής): **project-progress-by-tag** στο mobile Tasks, mirror του web. Στο web (`apps/web/src/app/tasks/TasksClient.tsx:210`) ένα επιλεγμένο tag λειτουργεί ως project/phase (η παλιά `/phases`): φιλτράρει τα tasks + δείχνει bar done/total + %. Το mobile είχε ήδη #tag-parse + tags editor + tag display, αλλά **κανένα tag filter ούτε progress**. Μηδέν νέα native dep, μηδέν endpoint αλλαγή (pure client aggregation πάνω στα ήδη-fetched `tags`+`status`), μηδέν credentials, μηδέν AI/token. Προτιμήθηκε αντί των attended-preferred (icons→lucide) και των Needs-Decision (theme/language/native dep).
