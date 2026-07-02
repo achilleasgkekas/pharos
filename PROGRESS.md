@@ -2,8 +2,15 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: f8aaea4 -->
+<!-- reviewed: 9283367 -->
 <!-- docker-validated: c619123 -->
+
+## 2026-07-02 (reviewer — range f8aaea4..9283367 clean)
+- **Τι ελέγχθηκα:** 8 commits (SaaS billing checkout+portal routes `4819f97`, billing lib `billingRoutes.ts`/`billingSession.ts`, test suites `apiList.test.ts` 33 + `aiModels.test.ts` 15 + `billingRoutes.test.ts`, docs/status/queue updates, docker-health + ui-audit docs). `git diff f8aaea4..HEAD` + full read των 4 νέων route/lib αρχείων.
+- **Checks:** web `npm run type-check` **EXIT 0** · mobile `npx tsc --noEmit` **EXIT 0** · web `npx vitest run` **353/353 green** (21 files). Επαλήθευσα ότι τα route handlers ταιριάζουν με το lib surface: `createCheckoutSession`/`createPortalSession` (`stripe.ts`) με `StripeResult<T>` shape (`ok`/`reason`), `Tenant.billingCustomerId` υπάρχει (index, default null). Secret-scan στο diff (`sk_live|sk_test|whsec_|AKIA|BEGIN`) → καθαρό. `docs/api.md` diff = additive (mobile guide link). Καμία αλλαγή σε υπάρχον v1 route shape → μηδέν ρίσκο για το mobile app.
+- **Ποιότητα billing κώδικα:** exemplary — pure/testable helpers (`billingRoutes.ts`, μηδέν env-at-load), κεντρικό authz (`resolveBillingSession`: SaaS-gate 404 → 401 → owner/admin 403 → 404), graceful degradation (Stripe not-configured→503, upstream→502), ΠΟΤΕ charge στο route. OSS self-hosted path μένει inert (saasAuthGate 404).
+- **Fixes:** 0 (τίποτα small/unsafe δεν χρειάστηκε). **Flags:** 0 νέα — το μόνο εκκρεμές (non-constant-time `CRON_SECRET` compare στο `usage/sample/route.ts:31`) είναι **ήδη queued** στο `WEB_DEBT.md:344` από τον builder (commit `c619123`), δεν το διπλασιάζω.
+- **Marker → 9283367.**
 
 ## 2026-07-02 (pharos-daily-dev — vitest suite για `lib/apiList.ts`, 33 tests)
 - **Τι έγινε:** Νέο `apps/web/src/lib/apiList.test.ts` (33 tests) που καλύπτει ΟΛΟ το pure surface του `apiList.ts` — του **shared list/pagination contract κάθε `/api/v1` read endpoint** (receipts/tasks/expenses/subscriptions/statements κλπ) που κάνει poll το mobile app για incremental sync. Καλύπτει: **listParams** (defaults 50/0/null· `sp` = URLSearchParams με endpoint-specific filters· limit clamp 1..200 [in-range, >200→200, =200, negative→1, `0`→50 λόγω `||50` falsy-guard, non-numeric→50, empty→50, fractional parseInt-truncate]· offset clamp >=0 [in-range, negative→0, `0`→0, non-numeric→0, empty→0, fractional-truncate]· **updatedSince cursor** [valid ISO→Date, date-only→midnight-Z, unparseable→null, absent→null, empty→null]· combined all-fields), **withSince** (no-cursor → base αμετάβλητο, cursor → `updatedAt:{$gte}` merge, **δεν mutate-άρει το base**, empty base, cursor overrides existing base `updatedAt`), **listEnvelope** (`{data,total,limit,offset}` με το page-window του params, data pass-by-reference, empty page), **iso** (Date→ISO, date-string→full ISO, null/undefined/''→null).
