@@ -592,3 +592,44 @@ Suggested next task: (f συνέχεια) Επόμενο pure-lib test file. Α�
 `lib/clientImage.ts` (δες αν έχει pure resize/format helpers χωρίς canvas/DOM), ή serialize
 helpers σε app routes. Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν
 παράλληλα). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-02 (cont. — receipts/serialize.test.ts)
+
+**Task: (f συνέχεια) Pure-shape test file `apps/web/src/app/api/v1/receipts/serialize.test.ts` για τους δύο serializers (`serializeLineItems`, `trimReceipt`) του mobile receipts API (`app/api/v1/receipts/serialize.ts`).**
+
+Επιλογή: το suggested target («serialize helpers σε app routes») από το προηγούμενο entry. Απο τα δύο
+untested app-route pure helpers (`expenses/lib.ts` έχει ήδη test), διάλεξα το receipts `serialize.ts`
+γιατί είναι καθαρό pure target: η μόνη dependency είναι το `iso` του `lib/apiList.ts`, που είναι pure
+one-liner (`d ? new Date(d).toISOString() : null`), και το `apiList.ts` κάνει μόνο `import type
+{ NextRequest }` (type-only, erased at compile) → μηδέν side effect / DB / fs / δίκτυο / clock στο import.
+
+Τι έγινε:
+- Νέο `serialize.test.ts` (17 tests). Καλύπτει τη shared API-shape που επιστρέφουν και τα 3 receipt
+  endpoints (detail GET, rescan POST, scan POST):
+  - `serializeLineItems`: null/undefined/[] → []· **refinedName (AI-cleaned) κερδίζει το raw name**·
+    fallback σε name όταν refinedName λείπει Ή είναι κενό string (falsy `||`)· κενό-string name όταν
+    λείπουν και τα δύο· defaults qty=1/price=0/vatRate=0· **explicit zeros επιβιώνουν το `??`** (qty:0
+    δεν γίνεται 1)· σειρά διατηρείται σε multiple items.
+  - `trimReceipt`: `String(_id)` (και για ObjectId-like με toString)· date/updatedAt μέσω `iso`
+    (Date→ISO, absent→null)· money defaults →0 + preserve provided· currency default EUR·
+    paymentMethod default ''· itemCount = lineItems.length ?? 0· **booleanize** verified/archived/
+    deleted (deleted από `!!deletedAt`, με deletedAt:null → false)· file/thumb από paths, `|| null`
+    (κενό string collapses σε null).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/receipts/serialize.test.ts` → 17/17 passed.
+- `npx vitest run` (όλο το suite) → 42 files, 638/638 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)·
+  `git status --short` = foreign `.claude/launch.json` + `apps/web/SAAS_PROGRESS.md` (ΔΕΝ τα άγγιξα/
+  staged) + το νέο serialize.test.ts. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Επόμενο pure-lib test file. Ακάλυπτα καθαρά targets που απομένουν:
+`lib/notifiers.shared.ts` NOTIFIER_TYPES **έχει ήδη test** (notifiers.test.ts)· `lib/clientImage.ts`
+θέλει DOM/canvas (skip σε node vitest)· `scrape.ts`/`search.ts`/`storeService.ts`/`appSettings.ts`
+είναι network/DB (skip pure). Πιθανά: άλλα `app/api/v1/*/serialize.ts` (τρέξε `find src/app/api/v1
+-name serialize.ts`) ή pure helpers σε `models/`. Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά
+routines γράφουν παράλληλα). Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο
+"## Needs Achilleas".
