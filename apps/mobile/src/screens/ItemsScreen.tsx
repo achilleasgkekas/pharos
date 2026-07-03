@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
+import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C, scrim } from '../theme';
 import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button, Chip, ListItem, contentWidth } from '../ui';
 import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
@@ -96,8 +96,8 @@ function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () =
       </View>
       {logging && (
         <View style={pb.logRow}>
-          <TextInput value={lprice} onChangeText={setLprice} keyboardType="decimal-pad" placeholder="price" placeholderTextColor={C.faint} style={[pb.logInput, { width: 80 }]} />
-          <TextInput value={lstore} onChangeText={setLstore} placeholder="store" placeholderTextColor={C.faint} style={[pb.logInput, { flex: 1 }]} />
+          <Input value={lprice} onChangeText={setLprice} keyboardType="decimal-pad" placeholder="price" style={{ width: 80 }} />
+          <Input value={lstore} onChangeText={setLstore} placeholder="store" style={{ flex: 1 }} />
           <Pressable onPress={submit} disabled={busy || !(parseFloat(lprice.replace(',', '.')) > 0)} style={[pb.logSave, (busy || !(parseFloat(lprice.replace(',', '.')) > 0)) && { opacity: 0.4 }]}>
             {busy ? <ActivityIndicator color={C.onAccent} /> : <Text style={pb.logSaveText}>Save</Text>}
           </Pressable>
@@ -503,7 +503,6 @@ const pb = StyleSheet.create({
   targetTxt: { color: C.dim, fontSize: 12 },
   logBtn: { color: C.accent, fontSize: 13, fontWeight: '600' },
   logRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  logInput: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, color: C.text, fontSize: 14 },
   logSave: { backgroundColor: C.accent, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9, alignItems: 'center', justifyContent: 'center' },
   logSaveText: { color: C.onAccent, fontSize: 13, fontWeight: '700' },
   histToggle: { color: C.dim, fontSize: 12, fontWeight: '600' },
