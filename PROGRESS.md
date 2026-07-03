@@ -2,8 +2,14 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: acba60a -->
+<!-- reviewed: 2fa5c29 -->
 <!-- docker-validated: dc8a83f -->
+
+## 2026-07-03 (reviewer — range acba60a..2fa5c29· tsc web+mobile EXIT 0, μηδέν regression)
+- **Εύρος:** 5 code commits (τα υπόλοιπα docs/chore): `7f4e99e` landing copy-button, `2fc4893` notifiers dispatch test, `2bdf29d`+portalAudit billing.portal_opened audit, `7151d47` mobile StatementsScreen badge → shared `<Badge>`, `2fa5c29` docs.
+- **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0** (με τα uncommitted WIP του Achilleas στα Receipts/Settings/Shopping παρόντα, καθαρό). Νέα committed tests: `portalAudit.test.ts` (6) + `notifiers.dispatch.test.ts` (16) → **22/22 pass**· το dispatch test κάνει import τον πραγματικό `testNotifier` (όχι hollow).
+- **Review ευρήματα:** μηδέν regression. `portalAuditMeta` = pure/secret-free (whitelist plan+portalId, drop blanks, ΠΟΤΕ URL/customer/key)· το audit log-άρεται ΜΕΤΑ το success (σωστό — 502/503/409 δεν αφήνουν misleading trail)· `recordAudit` best-effort/no-op για default tenant, δεν επηρεάζει το response. `billing.portal_opened` προστέθηκε στο `AUDIT_ACTIONS`. StatementsScreen badge swap = ασφαλές (ίδιο cyan token, σβήστηκε το dead `s.badge` style). CopyButton = progressive enhancement (mount μόνο με Clipboard API, cleanup timer, fail-quiet). Καμία αλλαγή σε API response shape → μηδέν ρίσκο για το mobile.
+- **Fixes:** κανένα (τίποτα small/unsafe προς διόρθωση). **Flags:** κανένα νέο P1/P2. Μικρό documented debt: `QUICKSTART_COMMANDS` στο landing κρατιέται manually σε sync με το `<pre>` markup (acknowledged σε comment, όχι bug) — δεν flag-άρεται.
 
 ## 2026-07-03 (ui-auditor — 40η σάρωση mobile UI· confirmation, μηδέν νέο finding)
 - **Fresh read-only grep audit** (όχι docs read-back): **17 mobile source files** (16 screens + `ui.tsx`). Foundation `theme.ts` + `ui.tsx` primitives ΟΛΑ παρόντα (`Header`/`Centered`/`Spinner`/`Empty`/`ErrorText`/`Input`/`TextArea`/`Check`/`Button`/`IconButton`/`Card`/`ListItem`/`Badge`/`Chip`/`contentWidth`). mobile `npx tsc --noEmit` → **EXIT 0**.
