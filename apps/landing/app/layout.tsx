@@ -19,6 +19,7 @@ export const metadata: Metadata = {
     'privacy',
   ],
   authors: [{ name: 'Achilleas' }],
+  manifest: '/manifest.webmanifest',
   alternates: { canonical: '/' },
   openGraph: {
     type: 'website',

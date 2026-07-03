@@ -808,3 +808,26 @@ Needs-Achilleas (open, αμεταβλητα):
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
 - Roadmap «Building/Exploring» περιεχομενο = grounded σε BACKLOG/memory· αν αλλαξουν οι προτεραιοτητες, edit το ROADMAP const.
+
+## 2026-07-03 (cont.⁷)
+
+Task: (e) Polish, μερος 34 — PWA web manifest (`app/manifest.ts`). Self-contained SEO/mobile-quality increment: μηδεν assets (reuse του υπαρχοντος `/favicon.svg`), μηδεν pricing decision, ενα νεο metadata route + μια γραμμη στο layout. Το site ειχε πληρη openGraph/twitter/canonical/JSON-LD/themeColor αλλα ΚΑΝΕΝΑ web manifest -> «Add to Home Screen» σε κινητο εδινε γενικο ονομα/χωρις brand χρωματα. Το κινητο ειναι primary use case (CLAUDE.md: «mobile-first, χρησιμοποιειται συχνα απο κινητο μεσω VPN») -> λογικο polish.
+
+Τι εφτιαξα:
+- `app/manifest.ts` (νεο, Next `MetadataRoute.Manifest` route): name «PHAROS · Personal Hub», short_name «PHAROS», description (ιδια φωνη με το layout), id/start_url/scope `/`, `display: 'standalone'`, background_color + theme_color `#0a0a0a` (ιδιο με το υπαρχον viewport.themeColor), categories [productivity, finance, utilities], lang en / dir ltr, icons -> το υπαρχον `/favicon.svg` (type image/svg+xml, sizes any, purpose any). Σερβιρεται στο `/manifest.webmanifest`.
+- `app/layout.tsx`: `manifest: '/manifest.webmanifest'` στο metadata (μετα το authors, πριν το alternates) -> Next εκπεμπει αυτοματα `<link rel="manifest">` στο <head>.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· τωρα 9 route entries ολα ○ Static, νεο `/manifest.webmanifest` (140 B)· / αμεταβλητο 2.79 kB / 105 kB First Load JS (manifest = ξεχωριστο route, μηδεν JS στη σελιδα).
+- Manifest body (`.next/server/app/manifest.webmanifest.body`): εγκυρο JSON με ολα τα πεδια (name/short_name/theme_color #0a0a0a/icons favicon.svg) FOUND.
+- Prerendered HTML (`.next/server/app/index.html`): `rel="manifest" href="/manifest.webmanifest"` FOUND στο <head>. Route static -> prerendered = ακριβως το served (build + grep = ισοδυναμη επαληθευση για metadata route)· δεν σηκωσα dev server, δεν αγγιξα το Docker :3000. Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged (καμια αλλη ρουτινα mid-commit)· foreign `.claude/launch.json` + `apps/mobile/src/screens/*` (modified, ασταγα, αλλων ρουτινων) ΔΕΝ commit — staged μονο manifest.ts + layout.tsx + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως apple-touch-icon PNG (το SVG δεν το τιμα το iOS) + maskable PNG icons για πληρη PWA installability (χρειαζεται asset generation, χαμηλη προτεραιοτητα). SEO/metadata surface (canonical + OG + twitter + JSON-LD graph + manifest) πλεον πληρες.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/roadmap GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD/manifest scope).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
