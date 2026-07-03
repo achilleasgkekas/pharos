@@ -44,7 +44,12 @@ export async function getStoreNames(): Promise<string[]> {
   return (await getStores()).map((s) => s.name);
 }
 
-function matchIn(raw: string, stores: StoreLite[]): string | null {
+/**
+ * Match a raw store name against a list of known stores (exact name/alias, or
+ * substring in either direction for meaningful lengths). Exported for testing —
+ * `resolveStore` calls it with the DB-backed store list.
+ */
+export function matchIn(raw: string, stores: StoreLite[]): string | null {
   const q = (raw || '').toLowerCase().trim();
   if (!q) return null;
   for (const s of stores) {
