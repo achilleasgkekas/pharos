@@ -942,3 +942,25 @@ Import concern + probe: το `notifiers.ts` κάνει top-level `import { conne
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + τα δικά μου notifiers.dispatch.test.ts + OSS_PROGRESS.md. Στάγιαρα μόνο τα δικά μου paths.
 
 Suggested next task: (f συνέχεια) Η καθαρή pure-lib ουρά έχει σχεδόν στερέψει. Πιο αξιόλογα εναπομείναντα: (α) το `coerce`/`getNotifiers` legacy-ntfy migration στο ίδιο `notifiers.ts` (θέλει mock του AppConfig.findOne — mockable, καλύπτει το «empty notifiers[] + legacy ntfyUrl → single channel» invariant)· (β) API-shape/validation tests σε `app/api/v1/*/route.ts` με mocked withAuth+connectDB+model (καλύπτει το mobile REST contract — υψηλή αξία αλλά heavier mocking)· (γ) `components/ui/cn.ts` (thin, χαμηλή αξία). Τρέξε πρώτα `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-03 (cont. — notifiers.migration.test.ts, legacy-ntfy migration + coerce invariants)
+
+**Task: (f συνέχεια) Test file `apps/web/src/lib/notifiers.migration.test.ts` για το `getNotifiers`/`coerce` του `lib/notifiers.ts` (η DB-read πλευρά, συμπληρωματική στο dispatch transport).**
+
+Επιλογή target: ακολούθησα το suggested next task του προηγ. entry (α) — το `getNotifiers`/`coerce` legacy-ntfy migration. Το `notifiers.dispatch.test.ts` κάλυψε ήδη το wire contract (private `sendOne` μέσω `testNotifier`, μηδέν DB). Το `getNotifiers` είναι η άλλη μισή, DB-side λειτουργία: διαβάζει `AppConfig.notifiers[]`, τα normalize-άρει με το (μη-exported) `coerce`, και όταν το array είναι κενό **migrate-άρει** τα legacy `ntfyUrl`/`ntfyEnabled` σε ένα single ntfy channel ώστε setups που προϋπάρχουν του pluggable-array να συνεχίζουν να ειδοποιούν μέχρι ο χρήστης να ξανα-σώσει. Regression εδώ (πτώση του legacy fallback ή coerce που μαγκώνει stored channel) θα απενεργοποιούσε **σιωπηλά** τα alerts ενός χρήστη χωρίς error.
+
+Mocking pattern (νέο για το suite — κανένα προηγ. test δεν mock-άρει το DB layer): έστησα `vi.hoisted()` για το findOne/select/lean chain (`AppConfig.findOne({...}).select('...').lean()`) + `state.doc` που κάθε test θέτει μέσω `setDoc()`, mock του `./db` (connectDB → no-op) + `@/models/AppConfig` (findOne) + `./notify` (sendNtfyTo, module-load import που το getNotifiers δεν καλεί). Μηδέν live Mongo, ντετερμινιστικό.
+
+Τι έγινε:
+- Νέο `notifiers.migration.test.ts` (16 tests). **DB plumbing** (2): connectDB κληθέν 1×· findOne με `{key:'singleton'}`· select με τα 3 πεδία· null doc → []. **Coercion** (8): full valid channel verbatim· order-preserving map· `enabled` default true / false-only-when-exactly-false / `0 !== false → true`· missing label/url/token/target → ''· unknown type dropped· null/string/number entries dropped χωρίς throw· **id fallback = RAW array index** (junk entry advance-άρει τον counter → valid 2ο χωρίς id → `n1` όχι `n0`)· non-array notifiers → treated as empty. **Legacy migration** (6): κενό array + ntfyUrl → single `ntfy-legacy` enabled channel· ntfyEnabled falsy → disabled· missing ntfyEnabled → disabled· ΔΕΝ migrate όταν array έχει ήδη channels· ΔΕΝ migrate όταν κενό array χωρίς ntfyUrl → []· migrate όταν όλα τα stored channels coerce-άρουν σε τίποτα (junk-only array + legacy ntfyUrl → fallback ενεργοποιείται).
+- **Σημείο που κλειδώθηκε**: το migration on/off contract (empty-coerced-channels ∧ legacy ntfyUrl → 1 channel· non-empty → κανένα legacy) + το coerce id-index-over-raw-array invariant (ένα reorder του filter πριν το map θα άλλαζε σιωπηλά τα auto ids).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/notifiers.migration.test.ts` → 16/16 passed.
+- `npx vitest run` (όλο το suite) → 62 files, 918/918 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + το δικό μου notifiers.migration.test.ts + OSS_PROGRESS.md. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Η καθαρή pure-lib ουρά έχει πλέον ουσιαστικά στερέψει (notifiers και τα δύο μισά καλυμμένα, storage/revalidate/ssrf/money/dates/storagePath κλπ done). Πιο αξιόλογη επόμενη κίνηση = (β) **API-shape/validation tests σε `app/api/v1/*/route.ts`** με το ίδιο DB-mock pattern που μόλις έστησα (`vi.hoisted` + mock `withAuth`/`connectDB`/model) — καλύπτει το mobile REST contract (π.χ. ένα route που validate-άρει body/params πριν το DB write, ή σειριοποιεί την απάντηση). Χαμηλότερης αξίας fallback: `components/ui/cn.ts` (thin clsx+tailwind-merge). Τρέξε πρώτα `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
