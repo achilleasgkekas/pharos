@@ -5,6 +5,18 @@
 <!-- reviewed: 0ac3041 -->
 <!-- docker-validated: 1b6e18c -->
 
+## 2026-07-03 (ui-auditor — 39η σάρωση mobile UI· confirmation, μηδέν νέο finding)
+Read-only grep audit (17 source files, όχι docs). mobile `npx tsc --noEmit` → EXIT 0.
+Ευρήματα ανά διάσταση:
+- Tokens: hardcoded hex εκτός `theme.ts` = 0, rgba/rgb εκτός `theme.ts` = 0 (token layer καθαρό).
+- Reusable: raw `<TextInput>` = 13 (ItemsScreen `logInput` ×2 non-WIP buildable· ReceiptsScreen `einput` ×7 + `cellInput` ×3 + notes TextArea, WIP-blocked). Όλα τα primitives (`Input`/`Button`/`IconButton`/`Card`/`ListItem`/`Badge`/`Chip`/`Check`/`TextArea`) παρόντα + adopted.
+- Theme/dark-mode: dark-only, μηδέν light palette/context (parity gap, P3/L).
+- Adaptive: `contentWidth` DONE (committed `28c943c`)· safe-area = plain RN `SafeAreaView` `App.tsx:88` (top-only), `react-native-safe-area-context` ΑΠΟΝ → bottom home-indicator + landscape notch ακάλυπτα (P2/M).
+- States: loading/empty/error μέσω shared `Spinner`/`Empty`/`ErrorText` — συνεπή.
+- Touch: 11 hitSlop sites OK· Settings `rm`/`swatch` χωρίς → WIP-blocked.
+Git WIP block αμετάβλητο (Receipts/Settings/Shopping uncommitted edits Αχιλλέα). Μηδέν νέο ### item.
+Top-3 για builder: (1) ItemsScreen `logInput` → `<Input>` (P2/S, unblocked), (2) safe-area-context adoption (P2/M, foundation), (3) light/dark theme context (P3/L).
+
 ## 2026-07-03 (docker-health guard — safe rebuild + cache prune)
 - **Health:** homepage-mongo `healthy` (restarts 192 ιστορικά, up 2h, όχι loop), homepage-web restarts 0 `running`. Τρέχουν web/mongo/searxng· κανένα flaresolverr (μηδέν επιπλέον πίεση μνήμης).
 - **Rebuild:** ΝΑΙ. Ο diff `b911882..HEAD -- apps/web` άγγιζε web runtime code (Stripe webhook route, workspace reactivate route, `billing/statusAudit.ts`, `tenancy/audit.ts`, `tenancy/workspace.ts` + tests). Safe dance: prune → `docker compose build web` (image only) → mongo healthy check → `docker compose up -d web` → `/login` → **200 στην 1η προσπάθεια** → web restarts παρέμειναν 0.
