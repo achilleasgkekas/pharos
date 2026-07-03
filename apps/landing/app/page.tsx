@@ -431,6 +431,7 @@ const JSON_LD = {
 export default function Home() {
   return (
     <main>
+      <a href="#top" className="skip-link">Skip to content</a>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
@@ -492,7 +493,7 @@ export default function Home() {
       <ScrollSpy />
 
       {/* ── Hero ──────────────────────────────────────────── */}
-      <section id="top" style={{ textAlign: 'center', padding: '112px 0 96px' }}>
+      <section id="top" tabIndex={-1} style={{ textAlign: 'center', padding: '112px 0 96px', outline: 'none' }}>
         <div className="container" style={{ maxWidth: 820 }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
             <PharosMark size={72} />

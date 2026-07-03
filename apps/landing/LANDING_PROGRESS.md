@@ -693,3 +693,25 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-03 (cont.²)
+
+Task: (e) Polish, μερος 30 — skip-to-content link (a11y). Το app ειχε `<main>` landmark + focus-visible rings + reduced-motion + sr-only, αλλα ΟΧΙ skip link -> keyboard/screen-reader χρηστες αναγκαζονταν να κανουν tab μεσα απο ολο το nav (8 links + GitHub + MobileNav) πριν φτασουν στο περιεχομενο. Φρεσκο, self-contained increment: μηδεν assets, μηδεν pricing decision, brand-consistent, καμια νεα εξαρτηση.
+
+Τι εφτιαξα:
+- `app/page.tsx`: skip link `<a href="#top" className="skip-link">Skip to content</a>` ως ΠΡΩΤΟ παιδι του `<main>` (πριν το JSON-LD script -> πρωτο focusable στοιχειο στο tab order). Το hero `<section id="top">` πηρε `tabIndex={-1}` + `outline:'none'` ωστε το focus να προσγειωνεται εκει προγραμματικα οταν πατηθει ο skip link (τα section elements δεν ειναι focusable by default -> χωρις αυτο ο screen reader δεν θα μετεφερε το focus, μονο θα scrollαρε).
+- `app/globals.css`: νεα `.skip-link` class (position:fixed, top:-80px off-screen· :focus -> top:16px slide-in, accent bg #00ff88 + dark text #05130b για contrast, mono font, box-shadow, brand-consistent). Τοποθετηθηκε στο a11y block διπλα στο focus-visible ring (μηδεν αλλαγη σε υπαρχοντες selectors). Το reduced-motion global transition-override ηδη ουδετεροποιει το slide για οσους το ζητουν.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· ολα 8 routes ○ Static· / αμεταβλητο 2.18 kB / 105 kB First Load JS (καθαρα markup/CSS, μηδεν JS).
+- Prerendered HTML (`.next/server/app/index.html`): `skip-link">Skip to content` FOUND + `id="top" tabindex="-1"` FOUND. Route static -> prerendered HTML = ακριβως το served (build + HTML grep = ισοδυναμη επαληθευση για pure-static markup/CSS)· δεν σηκωσα dev server, δεν αγγιξα το Docker :3000. Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged (καμια αλλη ρουτινα mid-commit)· foreign `.claude/launch.json` + `apps/mobile/src/screens/*` (modified, ασταγα, αλλων ρουτινων) ΔΕΝ commit — staged μονο app/page.tsx + app/globals.css + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως «back to top» button η lazy-load των mockup blocks. Το a11y triad (skip-link + focus-visible + reduced-motion) πληρες.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
