@@ -23,8 +23,22 @@ export type AppSettings = {
   budgets: Record<string, number>; // monthly budget per expense category (€)
 };
 
+/** Raw AppConfig singleton fields relevant to app settings (all optional). */
+export type RawAppConfigDoc = {
+  defaultItemView?: string;
+  defaultWarrantyMonths?: number;
+  warrantyAlertDays?: number;
+  autoAddStores?: boolean;
+  ntfyUrl?: string;
+  ntfyEnabled?: boolean;
+  currency?: string;
+  defaultVatRate?: number;
+  lists?: Record<string, unknown>;
+  budgets?: Record<string, unknown>;
+};
+
 /** Coerce a Mixed map to { key: positiveNumber }. */
-function numMap(raw: unknown): Record<string, number> {
+export function numMap(raw: unknown): Record<string, number> {
   const out: Record<string, number> = {};
   if (raw && typeof raw === 'object') {
     for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
@@ -53,32 +67,9 @@ const DEFAULTS: AppSettings = {
 let cache: { v: AppSettings; t: number } | null = null;
 const TTL = 5000;
 
-/** Effective defaults/alerts/notification settings (DB singleton over hard defaults). */
-export async function getAppSettings(): Promise<AppSettings> {
-  if (cache && Date.now() - cache.t < TTL) return cache.v;
-  let doc:
-    | {
-        defaultItemView?: string;
-        defaultWarrantyMonths?: number;
-        warrantyAlertDays?: number;
-        autoAddStores?: boolean;
-        ntfyUrl?: string;
-        ntfyEnabled?: boolean;
-        currency?: string;
-        defaultVatRate?: number;
-        lists?: Record<string, unknown>;
-        budgets?: Record<string, unknown>;
-      }
-    | null = null;
-  try {
-    await connectDB();
-    doc = await AppConfig.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate lists budgets')
-      .lean();
-  } catch {
-    /* DB down → hard defaults */
-  }
-  const v: AppSettings = {
+/** Pure coercion of a raw AppConfig doc into effective AppSettings (DB-free, testable). */
+export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppSettings {
+  return {
     defaultItemView: doc?.defaultItemView === 'list' ? 'list' : 'grid',
     defaultWarrantyMonths: typeof doc?.defaultWarrantyMonths === 'number' ? doc.defaultWarrantyMonths : DEFAULTS.defaultWarrantyMonths,
     warrantyAlertDays: typeof doc?.warrantyAlertDays === 'number' ? doc.warrantyAlertDays : DEFAULTS.warrantyAlertDays,
@@ -92,6 +83,21 @@ export async function getAppSettings(): Promise<AppSettings> {
     subscriptionCategories: resolveTaxonomy('subscriptionCategories', doc?.lists, DEFAULT_SUBSCRIPTION_CATEGORIES),
     budgets: numMap(doc?.budgets),
   };
+}
+
+/** Effective defaults/alerts/notification settings (DB singleton over hard defaults). */
+export async function getAppSettings(): Promise<AppSettings> {
+  if (cache && Date.now() - cache.t < TTL) return cache.v;
+  let doc: RawAppConfigDoc | null = null;
+  try {
+    await connectDB();
+    doc = await AppConfig.findOne({ key: 'singleton' })
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate lists budgets')
+      .lean();
+  } catch {
+    /* DB down → hard defaults */
+  }
+  const v = normalizeSettings(doc);
   // Keep the server-side currency symbol in sync for any server code that calls cur().
   setCurrencySymbol(currencySymbol(v.currency));
   cache = { v, t: Date.now() };
