@@ -1393,3 +1393,39 @@ User-path/bearer-path αγγίχτηκε. Άγγιξα μόνο δικά μου 
 **Next task:** increment 37 — είτε (α) surface tokens/cost στο billing summary (`billingSummary.ts`)
 + ένα «cost this month» read helper, είτε (β) BYO-key resolver+storage scaffold μόλις οριστεί crypto
 (Needs-Achilleas), είτε (γ) user-facing workspace-settings UI panels (όλα τα APIs έτοιμα, UI-only).
+
+## 2026-07-03 (increment 37 — cost-this-month read helper + usage route cost block, TODO §11)
+**Built:** επέλεξα το (α) — το increment 36 πρόσθεσε token+cost accounting στο ledger (micros),
+αλλά το read surface έβγαζε μόνο raw `aiCostMicros` (integer micros, ακατάλληλο για UI). Πρόσθεσα
+PURE presentation layer + το wiring στο usage route, ΟΛΟ additive + backward-compatible, σε δικά
+μου SAAS αρχεία:
+- `lib/billing/costSummary.ts` (νέο, **PURE** — μηδέν imports/DB/env/Stripe): `microsToUnits(micros)`
+  (micros → whole currency units, garbage/negative → 0), `formatMicros(micros, symbol='€')`
+  (2-decimal label «€1.23»· internal dashboard label, ΟΧΙ locale-aware money· garbage → «€0.00»),
+  `buildCostSummary(input, symbol?)` → **«cost this month» roll-up** (period + aiCalls +
+  input/output/**totalTokens** + costMicros + **costUnits** + **costFormatted**). Κάθε numeric πεδίο
+  coerced σε non-negative integer (local `nonNegInt`) → partial/garbage snapshot ΠΟΤΕ δεν παράγει
+  NaN/negative στο read surface.
+- `app/api/saas/usage/route.ts` (additive, δικό μου SAAS route) — το response απέκτησε **`cost`
+  block** (`buildCostSummary` πάνω στο ήδη-φερμένο `currentUsage` snapshot) δίπλα στα υπάρχοντα
+  `usage`/`quotas`. Το route είναι SAAS-gated (404 όταν off)· gate/session/membership/tenant-scope
+  αμετάβλητα.
+- `lib/billing/costSummary.test.ts` (νέο) — 8 PURE tests (microsToUnits convert/zero/garbage·
+  formatMicros default-€/custom-symbol/clamp· buildCostSummary roll-up/period-passthrough+custom
+  symbol/garbage-coerce).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run costSummary.test.ts` → **8/8
+green**· full suite `npx vitest run` → **1022/1022 green** (καμία regression, +8 νέα). Ο cost
+summary είναι PURE presentation πάνω από το ledger· καταναλώνεται μόνο από το SAAS-gated usage route
+(404 όταν off)· κανένας external importer από feature code. ⇒ `SAAS_MODE` off / default tenant =
+**zero effect** (το usage snapshot είναι ήδη zeroed off-path· η format math απλώς παρουσιάζει
+μηδενικά). Κανένας Docker rebuild (νέο PURE module + additive JSON field σε gated route·
+type-check+tests καλύπτουν compile+logic)· καμία νέα εξάρτηση· κανένα feature route/data-db/
+User-path/bearer-path αγγίχτηκε. Άγγιξα μόνο δικά μου SAAS αρχεία (foreign `.claude/launch.json` +
+apps/mobile edits άθικτα).
+
+**Next task:** increment 38 — είτε (α) BYO-key resolver+storage scaffold μόλις οριστεί η crypto
+προσέγγιση (Needs-Achilleas· §14), είτε (β) real AI pricing wiring στο `DEFAULT_AI_RATE`
+(Needs-Achilleas· provider+model lock), είτε (γ) user-facing workspace-settings UI panels που
+consume-άρουν τα έτοιμα read/write APIs (General/Members/Invitations/Activity/Billing/Usage — όλα
+έτοιμα, UI-only· το usage route δίνει τώρα έτοιμο `cost` block για ένα «AI spend this month» card).

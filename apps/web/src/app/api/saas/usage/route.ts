@@ -4,6 +4,7 @@ import { saasAuthGate, accountTenants } from '@/lib/tenancy/saasApi';
 import { getCurrentAccount } from '@/lib/tenancy/accountSession';
 import { getTenantContext } from '@/lib/tenancy/context';
 import { currentUsage, aiQuotaStatus, storageQuotaStatus } from '@/lib/billing/usage';
+import { buildCostSummary } from '@/lib/billing/costSummary';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,5 +59,12 @@ export async function GET(req: Request) {
       ai: aiQuotaStatus(ctx.plan, usage.aiCalls),
       storage: storageQuotaStatus(ctx.plan, usage.storageBytes),
     },
+    cost: buildCostSummary({
+      period: usage.period,
+      aiCalls: usage.aiCalls,
+      aiInputTokens: usage.aiInputTokens,
+      aiOutputTokens: usage.aiOutputTokens,
+      aiCostMicros: usage.aiCostMicros,
+    }),
   });
 }
