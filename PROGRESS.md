@@ -3728,3 +3728,24 @@ Read-only audit της web υλοποίησης (v1 API + saas control plane). `
 - **v1 data-path tenant-status enforcement (P2/M, decision):** το control-plane μισό έκλεισε (`b911882`). Ενας canceled/suspended tenant μπορεί ακόμα να χτυπά v1 feature routes γιατί ο v1 auth path δεν είναι tenant-scoped (`bearerUser` = User-by-token, μηδέν tenant). Χρειάζεται πρώτα (α) το v1 να γίνει tenant-scoped + (β) read-vs-write decision (πλήρες lockout ή read-only grace· 402 billing vs 403). SAAS-only, dead-until-SaaS.
 - **connection cache-reuse guard (P3, decision):** `connection.ts` `readyState !== 99` δεν ταιριάζει με το σχόλιο («reuse only while open»)· reuse μόνο σε 1/2 ή διόρθωση σχολίου. Dead-until-SaaS.
 - **reset-request timing (P3, decision):** fire-and-forget `void sendEmail` ευθυγραμμίζει anti-enumeration ΑΛΛΑ ρισκάρει κομμένο send σε serverless. Delivery-semantics tradeoff.
+
+## 2026-07-03 (ui-auditor, 41η σάρωση)
+Fresh read-only UI-consistency audit του `apps/mobile` vs web design system. mobile `npx tsc --noEmit` → **EXIT 0**.
+
+**Ευρήματα ανά διάσταση:**
+- **Tokens:** 0 hardcoded hex + 0 rgba/rgb εκτός `theme.ts` (token layer πλήρως καθαρό).
+- **Shared theme file:** ΥΠΑΡΧΕΙ (`theme.ts` + `ui.tsx` 18 primitives incl. `<Chip>`) → κανένα P1 foundation item ανοιχτό.
+- **Reusable components:** raw `<TextInput>` = 11 (ItemsScreen `logInput` ×2 non-WIP + ReceiptsScreen ×9 WIP-blocked)· ghost/tint border-buttons ακόμα raw = 9 sites, `<Button variant="ghost">` adopted μόλις 1 → ghost-variant holdout ανοιχτό.
+- **Theme/dark mode:** dark-only, μηδέν light palette/context (web έχει πλήρες light `:root`) → P3/L, needs decision.
+- **States:** Spinner/Empty/ErrorText centralized → consistent.
+- **Adaptive:** `contentWidth` DONE· safe-area ΑΚΟΜΑ plain RN `SafeAreaView` (top-only), `react-native-safe-area-context` ΑΠΟΝ από package.json → bottom/landscape ακάλυπτα (P2/M).
+- **Touch targets:** Settings `rm` 36×36 + `swatch` 32×32 χωρίς hitSlop → WIP-blocked.
+
+**Δέλτα:** ΕΝΑ leftover-migration έκλεισε — commit `7151d47` μετανάστευσε το StatementsScreen installment badge → shared `<Badge>` (τελευταίος display-badge outlier). Το «Card + Badge + ListItem primitives» item κλείνει πλήρως. Μηδέν νέο `###` item, μηδέν νέο functional finding.
+
+**Git WIP:** ReceiptsScreen/SettingsScreen/ShoppingScreen uncommitted edits του Αχιλλέα (δεν αγγίχτηκαν).
+
+**Top-3 για τον builder (unattended-safe, non-WIP):**
+1. ItemsScreen `logInput` ×2 → `<Input variant="surface">` (P2/S· κλείνει το τελευταίο non-WIP Input holdout).
+2. safe-area-context adoption (P2/M foundation· package.json + App.tsx, ΟΧΙ screen-WIP).
+3. `<Button variant="ghost" tint?>` για τα ~7 core cyan-ghost sites σε non-WIP screens (P2/M).
