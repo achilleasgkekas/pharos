@@ -4,6 +4,7 @@ import { Tenant } from '@/models/Tenant';
 import { saasMode } from '@/lib/tenancy/saasMode';
 import { verifyStripeSignature, webhookSecret } from '@/lib/billing/stripe';
 import { planForPriceId } from '@/lib/billing/plans';
+import { statusAuditAction } from '@/lib/billing/statusAudit';
 import { isObjectId } from '@/lib/apiBody';
 import { recordAudit, auditCtx } from '@/lib/tenancy/audit';
 import type { TenantDoc } from '@/models/Tenant';
@@ -17,6 +18,20 @@ async function auditPlanChange(tenant: TenantDoc, prevPlan: string) {
     actor: null,
     target: tenant.slug,
     meta: { from: prevPlan, to: nextPlan },
+  });
+}
+
+/** Record a billing-driven lifecycle status change (suspend/cancel/reactivate). No-op when
+ *  the status is unchanged or the transition isn't one we audit. */
+async function auditStatusChange(tenant: TenantDoc, prevStatus: string) {
+  const nextStatus = String(tenant.status);
+  const action = statusAuditAction(prevStatus, nextStatus);
+  if (!action) return;
+  await recordAudit(auditCtx(String(tenant._id)), {
+    action,
+    actor: null,
+    target: tenant.slug,
+    meta: { field: 'status', from: prevStatus, to: nextStatus },
   });
 }
 
@@ -105,16 +120,19 @@ async function resolveTenant(obj: Record<string, unknown>) {
 async function onCheckoutCompleted(obj: Record<string, unknown>) {
   const tenant = await resolveTenant(obj);
   if (!tenant) return;
+  const prevStatus = String(tenant.status);
   if (typeof obj.customer === 'string') tenant.billingCustomerId = obj.customer;
   if (typeof obj.subscription === 'string') tenant.billingSubscriptionId = obj.subscription;
   tenant.status = 'active';
   await tenant.save();
+  await auditStatusChange(tenant, prevStatus);
 }
 
 async function onSubscriptionActive(obj: Record<string, unknown>) {
   const tenant = await resolveTenant(obj);
   if (!tenant) return;
   const prevPlan = String(tenant.plan);
+  const prevStatus = String(tenant.status);
   if (typeof obj.id === 'string') tenant.billingSubscriptionId = obj.id;
 
   // Map the subscription's price back to one of our plans, if configured.
@@ -129,16 +147,19 @@ async function onSubscriptionActive(obj: Record<string, unknown>) {
   else if (stripeStatus === 'past_due' || stripeStatus === 'unpaid') tenant.status = 'suspended';
   await tenant.save();
   await auditPlanChange(tenant, prevPlan);
+  await auditStatusChange(tenant, prevStatus);
 }
 
 async function onSubscriptionCanceled(obj: Record<string, unknown>) {
   const tenant = await resolveTenant(obj);
   if (!tenant) return;
   const prevPlan = String(tenant.plan);
+  const prevStatus = String(tenant.status);
   tenant.status = 'canceled';
   tenant.plan = 'free';
   await tenant.save();
   await auditPlanChange(tenant, prevPlan);
+  await auditStatusChange(tenant, prevStatus);
 }
 
 /** Pull the first line-item price id out of a Stripe subscription object (best-effort). */

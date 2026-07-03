@@ -218,3 +218,43 @@ SAAS_MODE off — ο νέος κώδικας δεν εκτελείται· type-
 consume-άρει programmatically), είτε (β) user-facing workspace-settings UI panels (General/Members/
 Invitations/Activity/Billing + cancel/reactivate controls — όλα τα read/write APIs έτοιμα), είτε (γ)
 `sendViaSmtp` via nodemailer (μετά provider decision Achilleas).
+
+## 2026-07-03 (increment 32 — audit billing-driven status changes στο Stripe webhook)
+**Built:** επέλεξα το (α), το κομμάτι που έλειπε: το webhook άλλαζε ήδη `Tenant.status`
+(suspend σε past_due/unpaid, canceled σε subscription.deleted, active σε recovery/checkout)
+αλλά **δεν το κατέγραφε** — μόνο το `plan.changed` γινόταν audit. Έτσι το «Activity» panel δεν
+θα έδειχνε ποτέ ότι ο Stripe suspend-άρισε ένα workspace για μη-πληρωμή ή το reactivate-άρισε
+στην ανάκαμψη. Κλείνει το billing-lifecycle audit trail. ΟΛΟ SAAS-gated, additive, σε δικά μου
+SAAS αρχεία:
+- `lib/tenancy/audit.ts` — +1 auditable action `workspace.suspended` στο `AUDIT_ACTIONS` (μόνη
+  αλλαγή· redaction/recorder/serializer αμετάβλητα· το `parseAuditAction` του read route το
+  δέχεται αυτόματα ως `?action=` φίλτρο).
+- `lib/billing/statusAudit.ts` (νέο) — **PURE** `statusAuditAction(prev, next)` → `AuditAction |
+  null`. Χαρτογραφεί ΜΟΝΟ τις billing transitions που μετράνε: → suspended ⇒ `workspace.suspended`·
+  → canceled ⇒ `workspace.canceled`· suspended|canceled → active|trialing ⇒ `workspace.reactivated`
+  (recovery). No-op change (prev===next), initial go-live (pending|trialing→active, ήδη captured
+  από plan.changed) και benign trialing↔active flips → null. Case/space-insensitive, **fail-closed**
+  σε unknown/blank/non-string. Μηδέν imports πλην του `AuditAction` type.
+- `app/api/saas/billing/webhook/route.ts` — νέος helper `auditStatusChange(tenant, prevStatus)`
+  (mirror του `auditPlanChange`, system actor, meta {field:'status',from,to}). Κάθε handler
+  (`onCheckoutCompleted`/`onSubscriptionActive`/`onSubscriptionCanceled`) πιάνει `prevStatus`
+  ΠΡΙΝ τη mutation και καλεί `auditStatusChange` μετά το save (best-effort, never-throws όπως το
+  υπάρχον plan audit). Καμία αλλαγή στη status logic — μόνο audit πάνω από αυτήν.
+- `lib/billing/statusAudit.test.ts` (νέο) — 8 PURE tests (suspend/cancel/reactivate mapping,
+  no-audit για go-live + trialing↔active, no-op prev===next, case/space-insensitivity και στις 2
+  πλευρές, fail-closed unknown/blank/null/number).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run statusAudit.test.ts audit.test.ts`
+→ **32/32 green**· full suite `npx vitest run` → **828/828 green** (καμία regression, +8 νέα). Το
+webhook route είναι SAAS-gated (404 όταν SAAS_MODE off· επιπλέον 503 χωρίς webhook secret) + ο
+mapper pure + κανένας external importer από feature code ⇒ `SAAS_MODE` off = **zero effect** στο
+self-hosted app· κανένας Docker rebuild (ο νέος κώδικας δεν εκτελείται στο default path — μόνο
+audit πάνω από existing status logic· type-check+tests καλύπτουν compile+logic)· καμία νέα
+εξάρτηση· κανένα feature route/data-db/User-path αγγίχτηκε. Άγγιξα μόνο δικά μου SAAS αρχεία
+(foreign `.claude/launch.json` + apps/mobile edits άθικτα).
+
+**Next task:** increment 33 — είτε (α) user-facing workspace-settings UI panels που consume-άρουν
+τα έτοιμα read/write APIs (General/Members/Invitations/Activity/Billing + cancel/reactivate — όλα
+έτοιμα, UI-only), είτε (β) `sendViaSmtp` via nodemailer (μετά provider decision Achilleas· το
+webhook mailer καλύπτει ήδη dependency-free delivery), είτε (γ) `billing.checkout_started` /
+πλήρες billing-event audit coverage (checkout route → audit πριν το Stripe redirect).

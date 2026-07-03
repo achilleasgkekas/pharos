@@ -25,6 +25,7 @@ export const AUDIT_ACTIONS = [
   'workspace.created',
   'workspace.updated',
   'workspace.canceled',
+  'workspace.suspended',
   'workspace.reactivated',
 ] as const;
 
