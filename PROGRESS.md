@@ -3833,3 +3833,27 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 - **extra reports charts** — θέλουν RN charting lib.
 - **remote push** — buildable αλλά αδοκίμαστο (EAS dev build + APNs key).
 - **Tasks Kanban board** — mobile έχει list + ←/→ quick-move· το board αφέθηκε product decision.
+
+## 2026-07-04 (mobile-parity-auditor, 44η σάρωση)
+Read-only parity audit web↔mobile, inventory ξαναχτισμένο από τον κώδικα (docs τελευταία). **50 v1 routes** (50 μοναδικά base paths), **16 mobile screens**. mobile `tsc --noEmit` → **EXIT 0**. Μηχανικός route↔consumer loop (50 bases vs `apps/mobile/src/api.ts`): και τα 50 έχουν ≥1 consumer → **μηδέν orphan endpoint**.
+
+**Counts: DONE 7 (parity queue 6/6 + Activity) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.** 44η συνεχόμενη σάρωση με πλήρη functional parity· καμία νέα portable δυνατότητα δεν εμφανίστηκε.
+
+**Δέλτα από 43η (`git log eecf89c..HEAD -- apps/mobile/src apps/web/src/app/api/v1`):** **1 μόνο** commit → **`ad226a7`** (`refactor(mobile): ItemsScreen price-log inputs → shared <Input> primitive`) που **ΕΚΛΕΙΣΕ το top-2 item της 43ης** (ItemsScreen `logInput`→`<Input>`). Οι υπόλοιποι 8 commits από την 43η (`ec1bf52`/`388246d`/`ac35ca3` SaaS, `0c010e0`/`7873cba` tests, `66c7903` landing app-icons, `c914f1d`/`ba1a725` docs) = **όλοι web-only** → μηδέν v1 shape change, καμία νέα portable mobile δυνατότητα.
+
+**DOC-FIX:** ενημέρωσα το UI-Debt «Input primitive» Status στο MOBILE_PARITY.md (10/11 screens· `ad226a7` έκλεισε το ItemsScreen `logInput`· απομένει ΜΟΝΟ ReceiptsScreen). Live raw-`<TextInput>` grep: μόνο **ReceiptsScreen 9** (WIP-blocked)· ItemsScreen/SettingsScreen/ShoppingScreen = 0 raw.
+
+**Top 3 για τον builder (unattended-safe, non-WIP):**
+1. fresh pure-lib **vitest coverage** — `lib/cards.ts` / `lib/taxonomies.ts normalizeList` / `lib/itemStatus.ts` (καθαρά pure, μηδέν rebuild).
+2. **`<Chip>`/`<Badge>` holdout σάρωση** για τυχόν εναπομείναντα non-WIP raw clusters (P3/S, tsc-verifiable).
+3. (κανένα άλλο mobile-only unattended-safe· ReceiptsScreen Input-debt = WIP-blocked, lucide icons + language switcher = attended/needs-decision).
+
+### Needs Achilleas
+- **safe-area insets** (`react-native-safe-area-context` ΑΠΟΝ από package.json· bottom/notch/landscape ακάλυπτα) — P2/M, θέλει dep-add απόφαση.
+- **theme toggle + light/dark context + language switcher** (dark-only, English-only· web έχει πλήρες light `:root` + 8-lang i18n).
+- **Settings: AI engine / storage / OneDrive** panels — δεν υπάρχουν στο mobile.
+- **Statements merge-bind + PDF-import** — θέλουν write/upload endpoints που δεν υπάρχουν στο v1.
+- **extra reports charts** — θέλουν RN charting lib.
+- **remote push** — buildable αλλά αδοκίμαστο (EAS dev build + APNs key).
+- **Tasks Kanban board** — mobile έχει list + ←/→ quick-move· το board αφέθηκε product decision.
+- **ReceiptsScreen Input-debt** (9 raw `<TextInput>`) — WIP του Αχιλλέα κρατά το screen· commit/revert του θα ξεμπλόκαρε το τελευταίο mobile Input primitive migration.
