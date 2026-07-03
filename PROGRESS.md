@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 0ac3041 -->
+<!-- reviewed: 3b29203 -->
 <!-- docker-validated: 1b6e18c -->
+
+## 2026-07-03 (reviewer — range 0ac3041..3b29203· καθαρό, μηδέν regression)
+- **Τι έλεγξα:** 10 commits (2 feat, 1 chore, 3 test, 4 docs). Ουσιαστικός κώδικας: (α) `feat(saas)` billing-driven status audit στο Stripe webhook (`lib/billing/statusAudit.ts` + webhook route + νέο `workspace.suspended` audit action)· (β) `feat(landing)` skip-to-content link.
+- **Checks:** `apps/web` type-check EXIT 0, `apps/mobile` `tsc --noEmit` EXIT 0. Vitest στα 3 νέα test files (`statusAudit` 8, `ollama.schemas` 30, `revalidate` 8) → **46/46 πράσινα**.
+- **Review ευρήματα:** `statusAudit.ts` είναι pure/fail-closed (normalize lowercase+trim, null σε unchanged/unknown, reactivation μόνο από suspended|canceled), σωστά καλυμμένο από tests· το νέο audit action προστέθηκε σωστά στο `AUDIT_ACTIONS` enum → μηδέν tsc break στα call-sites. Webhook: `prevStatus` capture ΠΡΙΝ το mutation σε 3 handlers, audit ΜΕΤΑ το `save()` — σωστή σειρά. Καμία αλλαγή σχήματος API που να σπάει το mobile (SaaS billing path, το mobile δεν τον αγγίζει). Landing skip-link `href="#top"` δείχνει σε υπαρκτό `<section id="top">` που πήρε `tabIndex={-1}` → σωστό a11y focus target.
+- **Secrets:** grep όλου του range diff → μόνο `changeme` placeholder σε docs example, κανένα πραγματικό secret.
+- **Fixes:** κανένα (τίποτα small-unsafe δεν βρέθηκε). **Flags:** κανένα. **Needs Achilleas:** κανένα.
+- **Marker:** reviewed `0ac3041` → **`3b29203`** (HEAD). Staged ΜΟΝΟ PROGRESS.md· τα uncommitted mobile screens + launch.json του Αχιλλέα αμετάβλητα.
 
 ## 2026-07-03 (ui-auditor — 39η σάρωση mobile UI· confirmation, μηδέν νέο finding)
 Read-only grep audit (17 source files, όχι docs). mobile `npx tsc --noEmit` → EXIT 0.
