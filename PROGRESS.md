@@ -5,6 +5,21 @@
 <!-- reviewed: 0ac3041 -->
 <!-- docker-validated: b911882 -->
 
+## 2026-07-03 (pharos-daily-dev — vitest coverage για τα 7 AI-parse Zod schemas του `lib/ollama.ts`· 30 tests green)
+- **Τι έκανα:** έγραψα το **`apps/web/src/lib/ollama.schemas.test.ts`** (νέο), συνεχίζοντας το suggested-next-task της τελευταίας builder εγγραφής (pure-lib vitest coverage στα εναπομείναντα untested modules· ρητά αναφερόταν το `lib/ollama.ts`). Ο functional parity πυρήνας είναι κλειστός (0 auto-buildable GAP)· τα top-3 UI Debt items είναι WIP-blocked (Receipts/Settings/Shopping screens του Αχιλλέα) ή attended-preferred (ItemsScreen `logInput`, visual delta), οπότε ο ασφαλέστερος unattended δρόμος είναι test coverage.
+- **Γιατί αυτά τα schemas:** είναι το **trust boundary για untrusted AI JSON** — κάθε receipt/statement/product/card/subscription/expense/voucher που γυρνά το μοντέλο περνά `.parse()` μέσα από αυτά πριν αγγίξει τη DB. Το `ollama.ts` ήταν untested module (κανένα `.test.ts`) και τα schemas είναι fully-verifiable **χωρίς network/Ollama** (μόνο `.parse()` πάνω σε literals) → μηδέν Docker, μηδέν AI cost, μηδέν WIP σύγκρουση. Import-probe επιβεβαίωσε ότι το module φορτώνει καθαρά σε vitest (το `new Ollama()` στο load δεν κάνει connect).
+- **Coverage (30 tests, καθαρά in-memory `.parse()`):**
+  - **`ParsedReceiptSchema`** (8): full receipt· string→number coercion (`'287.28'`→287.28)· defaults (subtotal/vat/warranty 0, currency EUR, paymentMethod '', lineItems [])· per-line-item defaults (qty 1/price 0/vatRate 24/refinedName '')· line-item numeric-string coercion· throw σε missing required (store/date/total)· throw σε comma-decimal `'12,50'` (πρέπει να dot-normalize-άρει upstream).
+  - **`ParsedStatementSchema`** (5): all-default empty obj· totals + per-tx amount coercion· installment counters coerced όταν present / undefined όταν absent· negative amount (payments)· throw σε missing tx required field.
+  - **`ParsedProductSchema`** (6): all-default· `category` valid-keep + invalid→`'other'` (`.catch`)· `tags` preprocess — array passthrough, comma/semicolon split, non-string/non-array→`[]`· price coercion.
+  - **`ParsedCardSchema`** (2): all-default· type/kind `.catch` fallbacks (invalid→other/credit).
+  - **`ParsedSubscriptionSchema`** (3): all-default· category/billingCycle `.catch`· amount coercion.
+  - **`ParsedExpenseSchema`** (5): all-default· kind `.catch` (invalid→expense)· category `.catch`→other· recurringCycle empty-string tolerated + invalid `.catch`→''· amount coercion.
+  - **`ParsedVoucherSchema`** (2): all fields default ''· full voucher passthrough.
+- **Verify:** `npx vitest run src/lib/ollama.schemas.test.ts` → **30/30 pass** (6ms). `npm run type-check` → **EXIT 0**. Test-only, μηδέν web runtime code αγγίχτηκε → **καμία Docker rebuild** (per task rule) + **κανένα AI call**.
+- **Git hygiene:** stage ΜΟΝΟ ρητά paths (`ollama.schemas.test.ts` + `PROGRESS.md`), ΟΧΙ `-A`. Δεν αγγίχτηκαν τα WIP του Αχιλλέα (`.claude/launch.json`, ReceiptsScreen, SettingsScreen, ShoppingScreen).
+- **Προτεινόμενο επόμενο task:** συνέχεια pure-lib coverage στα εναπομείναντα untested modules — **`lib/scrape.ts`** (internal `parsePriceNum`/`extractPrimaryPrice`/`decodeEntities`/`isBotChallenge` — καθαρή HTML/price-parse λογική, θέλει minimal export ή re-export για να δοκιμαστεί) ή **`lib/storeService.ts` `resolveStore` normalization** (greek→latin / alias / domain-strip — αλλά αγγίζει DB, θέλει mock). Εναλλακτικά UI Debt (αν merge-αριστούν τα 3 WIP screens): SearchScreen `row`→`<ListItem>` [P3/S] ή ItemsScreen `logInput` Input finish [attended-preferred, visual delta].
+
 ## 2026-07-03 (reviewer — range 2f31c5d..0ac3041· tsc web+mobile EXIT 0, 56 νέα tests green, μηδέν regression)
 - **Τι έλεγξα:** 7 commits (12c46e8, cfaddd8, 88e44c6, 061b3fa, 04105ca, bbb09d1, 0ac3041). Functional: (α) `feat(landing)` root global-error boundary, (β) `feat(saas)` workspace reactivate route + `lib/tenancy/workspace.ts` helpers + `audit.ts` enum. Υπόλοιπα = tests + docs.
 - **Checks:** `apps/web` type-check EXIT 0, `apps/mobile` tsc EXIT 0. Έτρεξα και τα 3 νέα test files (`aiProviders.test.ts`, `notify.test.ts`, `workspace.test.ts`) → **56/56 pass**.
