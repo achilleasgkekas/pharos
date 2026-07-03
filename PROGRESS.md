@@ -3765,3 +3765,26 @@ Fresh read-only UI-consistency audit του `apps/mobile` vs web design system. 
 1. ItemsScreen `logInput` ×2 → `<Input variant="surface">` (P2/S· κλείνει το τελευταίο non-WIP Input holdout).
 2. safe-area-context adoption (P2/M foundation· package.json + App.tsx, ΟΧΙ screen-WIP).
 3. `<Button variant="ghost" tint?>` για τα ~7 core cyan-ghost sites σε non-WIP screens (P2/M).
+
+## 2026-07-03 (mobile-parity-auditor, 43η σάρωση)
+Read-only parity audit web↔mobile, inventory ξαναχτισμένο από τον κώδικα (docs τελευταία). **50 v1 routes** (39 μοναδικά base paths), **16 mobile screens**. mobile `tsc --noEmit` → **EXIT 0**. Μηχανικός route↔consumer loop (39 bases vs `apps/mobile/src/api.ts`): και τα 39 έχουν ≥1 consumer → **μηδέν orphan endpoint**.
+
+**Counts: DONE 7 (parity queue 6/6 + Activity) / auto-buildable GAP 0 / NEEDS DECISION 0 νέα.** 43η συνεχόμενη σάρωση με πλήρη functional parity· καμία νέα portable δυνατότητα δεν εμφανίστηκε.
+
+**Δέλτα από 42η (`git log acba60a..HEAD -- apps/mobile/src apps/web/src/app/api/v1`):** 3 commits, όλα ήδη γνωστά/ακίνδυνα. `7151d47` (StatementsScreen badge → shared `<Badge>`) ΕΚΛΕΙΣΕ το top-3 item #1 της 42ης (live: `grep -c '<Badge' StatementsScreen.tsx`=1). `3d7e3e3`+`4f3ea11` = `test(api)` tasks coverage (test-only, μηδέν shape change). Μετέπειτα `bf49975`/`7eeb319` = web-only (PWA manifest / store test). Μηδέν v1 shape change.
+
+**Εναπομείναντα `Status: TODO` (2, κανένα auto-buildable):** lucide icon set (P2/M, μεγάλο cosmetic swap → attended/οπτικό verify)· Settings language switcher (P3/L, needs i18n decision).
+
+**Top 3 για τον builder (unattended-safe, non-WIP):**
+1. fresh pure-lib **vitest coverage** — `lib/cards.ts` / `lib/taxonomies.ts normalizeList` / `lib/itemStatus.ts` (καθαρά pure, μηδέν rebuild) ή `lib/scrape.ts` internals με minimal export.
+2. **ItemsScreen `logInput` ×2 → `<Input>`** (P2/S, τελευταίο non-WIP raw-`<TextInput>` site· visual delta → attended-preferred).
+3. (κανένα άλλο mobile-only unattended-safe· τα υπόλοιπα WIP-blocked ή needs-decision).
+
+### Needs Achilleas
+- **safe-area insets** (`react-native-safe-area-context` ΑΠΟΝ από package.json· bottom/notch/landscape ακάλυπτα) — P2/M, θέλει dep-add απόφαση.
+- **theme toggle + light/dark context + language switcher** (dark-only, English-only· web έχει πλήρες light `:root` + 8-lang i18n).
+- **Settings: AI engine / storage / OneDrive** panels — δεν υπάρχουν στο mobile.
+- **Statements merge-bind + PDF-import** — θέλουν write/upload endpoints που δεν υπάρχουν στο v1.
+- **extra reports charts** — θέλουν RN charting lib.
+- **remote push** — buildable αλλά αδοκίμαστο (EAS dev build + APNs key).
+- **Tasks Kanban board** — mobile έχει list + ←/→ quick-move· το board αφέθηκε product decision.
