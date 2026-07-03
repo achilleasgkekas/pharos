@@ -855,3 +855,25 @@ Import concern + probe: το module κάνει top-level `import { connectDB } f
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + το νέο prompts.test.ts. Στάγιαρα μόνο το δικό μου path. Commit 320102d, pushed.
 
 Suggested next task: (f συνέχεια) Επόμενο pure test file. Τα single-file lib pure helpers έχουν πλέον σχεδόν όλα test. Απομένοντα καθαρά targets: (α) `components/ui/cn.ts` (thin wrapper πάνω σε clsx+tailwind-merge — μόνο αν θέλουμε lock στο conflict-resolution, χαμηλή αξία)· (β) `lib/storageConfig.ts` type/registry invariants (StorageBackend union) ή `lib/i18n` υπο-modules αν μένουν ακάλυπτα· (γ) API-shape/validation helpers σε app/api/v1 route.ts που δεν θέλουν live Mongo (mock ή inline parsers). Τρέξε πρώτα `find src -name '*.test.ts'` (πολλά routines γράφουν παράλληλα) + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-03 (cont. — notify.test.ts, ntfy ASCII-Title constraint)
+
+**Task: (f συνέχεια) Test file `apps/web/src/lib/notify.test.ts` για τον low-level ntfy sender `sendNtfyTo` του `lib/notify.ts`.**
+
+Επιλογή target: σάρωσα τα lib modules χωρίς test (`for f in src/lib/*.ts`). Τα περισσότερα εναπομείναντα είναι side-effectful χωρίς pure exports (db/jobRunner/mirror/ollama/onedrive/remoteStorage/scrape/search/softDelete/storage/appSettings/anthropic/aiProviders). Το `clientImage.shrinkImage` είναι browser-only (canvas/DOM, δεν τρέχει σε node). Διάλεξα το `sendNtfyTo` γιατί εκθέτει έναν πραγματικό business invariant: το ntfy απορρίπτει non-ASCII τιμές στο Title header, οπότε ένας ελληνικός τίτλος θα έσπαγε **σιωπηλά** το notification. Ο κώδικας κάνει strip το Title σε ASCII (κρατώντας τα ελληνικά στο body) και είναι fail-closed (empty URL ή network error → false, ποτέ throw). Ντετερμινιστικό με mocked global fetch, μηδέν DB/δίκτυο.
+
+Import concern + probe: το module κάνει top-level `import { getAppSettings }` (→ appSettings → db). Probe (`_probe_notify.test.ts`, δοκιμαστικό, διαγράφηκε) φόρτωσε καθαρά — το import είναι side-effect-free και το `sendNtfyTo` παίρνει explicit URL, δεν αγγίζει settings. Καμία mock του getAppSettings δεν χρειάστηκε.
+
+Τι έγινε:
+- Νέο `notify.test.ts` (13 tests) με `vi.stubGlobal('fetch', ...)` + helper που διαβάζει τα headers από το `RequestInit` του fetch call. Καλύπτει: empty URL → false ΧΩΡΙΣ fetch call· επιτυχές POST (body = message, method POST, url verbatim) → true· non-ok response (500) → false· plain ASCII title verbatim στο Title header· **fully-Greek title → Title header omitted** (stripped κενό) ενώ το ελληνικό body περνά αναλλοίωτο· mixed-script title («Alert Ειδοποίηση now») → κρατά μόνο το ASCII κομμάτι· trim surrounding whitespace στο Title· empty title → no Title header· Priority header ως string όταν δοθεί· **Priority omitted όταν falsy (0)**· Tags joined με comma· Tags omitted όταν empty array· **fetch reject → false (never throws)**.
+- **Σημείο που κλειδώθηκε**: η ASCII-only συμπεριφορά του Title (ένα ακούσιο loosening θα έστελνε non-ASCII header → ntfy 400 → χαμένη ειδοποίηση) + το fail-closed contract (empty URL/network error → false).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/notify.test.ts` → 13/13 passed.
+- `npx vitest run` (όλο το suite) → 53 files, 788/788 passed (πριν προσθέσω το notify: 787· τώρα 801 — βλ. σημ.). ΣΗΜ: το πλήρες suite μετά την προσθήκη = 53 files. Το type-check ανέδειξε `init possibly undefined` σε destructured fetch-call arg → fix με explicit `as RequestInit` cast (όχι destructuring).
+- `npm run type-check` → exit 0, 0 errors (μετά το cast fix).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + το νέο notify.test.ts. Στάγιαρα μόνο το δικό μου path.
+
+Suggested next task: (f συνέχεια) Επόμενο test file. Τα single-file lib pure helpers έχουν πλέον σχεδόν όλα test. Απομένοντα targets: (α) `lib/storageConfig.ts` — μόνο το `invalidateStorageConfig()` + η `StorageBackend` union είναι pure (το `getStorageConfig` θέλει DB)· χαμηλή αξία μόνο του· (β) `lib/storage.ts` `StorageBucket` union / path-building αν υπάρχει pure κομμάτι· (γ) API-shape/validation helpers σε app/api/v1 route.ts με mocked req (χωρίς live Mongo) — πιο υψηλή αξία, καλύπτει το mobile-app contract· (δ) `components/ui/cn.ts` (thin, χαμηλή αξία). Τρέξε πρώτα `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
