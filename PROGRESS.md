@@ -3691,3 +3691,34 @@ Read-only audit της web υλοποίησης (v1 API + saas control plane). `
 - **v1 data-path tenant-status enforcement (residual του κλεισμένου P2, decision):** το control-plane μισό έκλεισε (`b911882`). Ομως ένας canceled/suspended tenant μπορεί ακόμα να χτυπά v1 feature routes (receipts/items/expenses…) γιατί ο v1 auth path δεν είναι tenant-scoped (`bearerUser` = User-by-token, μηδέν tenant). Για να μπει gate εκεί χρειάζεται πρώτα (α) το v1 να γίνει tenant-scoped (μεγαλύτερο SaaS-data-isolation κομμάτι, δεν υπάρχει) + (β) read-vs-write decision (πλήρες lockout ή read-only grace· 402 billing vs 403). SAAS-only, dead-until-SaaS.
 - **connection cache-reuse guard (P3, decision):** `connection.ts:54` `readyState !== 99` δεν ταιριάζει με το σχόλιο («reuse only while open»)· reuse μόνο σε 1/2 ή διόρθωση σχολίου. Dead-until-SaaS.
 - **reset-request timing (P3, decision):** fire-and-forget `void sendEmail` ευθυγραμμίζει anti-enumeration ΑΛΛΑ ρισκάρει κομμένο send σε serverless. Delivery-semantics tradeoff.
+
+## 2026-07-03 (web-code-quality auditor, 40η σάρωση, αυτόνομος γύρος)
+
+Read-only audit της web υλοποίησης (v1 API + saas control plane). `cd apps/web && npm run type-check` **EXIT 0** (0 TS errors). Νέα surface από την 39η: `7a533b4` (BYO-key AI policy — `lib/billing/aiKeyPolicy.ts` + `Tenant.aiByoKey` flag + `context.ts`/`usage.ts` wiring), billing-audit helpers (`2bdf29d`/`a4c1fd3` checkout/portal audit recording), test-only files.
+
+**Counts ανά dimension (live grep, όχι docs):**
+- Type safety: **0** νέα. 1 grep hit = `softDelete.ts:25` `schema.pre(hook as any, …)` = canonical Mongoose pre-hook union-overload workaround (eslint-disabled, pre-existing infra, `this` σωστά τυπωμένο). Μηδέν type-hole.
+- Input validation: **0** gaps. 3 raw `req.json()` = σκόπιμα (auth/login boundary, items/[id]/ai-fill safe-cast, mcp protocol)· μηδέν `req.json().catch` (readBody adoption 100%).
+- Auth: **0** unguarded v1 route εκτός του σωστά exempt `v1/auth/login`. saas χωρίς `saasGuard` = 9, όλα documented deliberate exemptions εκτός του `invites/route.ts` (active P3/S item).
+- Error handling: **0** νέα. Billing-audit = pure helpers μέσα σε ήδη-wrapped routes. invites GET/DELETE gap αμετάβλητο.
+- Mongoose: **0** νέα. N+1 σε api = 0. Ολα τα list routes `.limit(p.limit)`+`.lean()`. `calendar Statement.find()` unbounded ΑΛΛΑ ΟΧΙ debt (χρειάζεται ΟΛΑ τα statements για installment-aggregation· low-cardinality· `.lean()`). BYO-key = flag-read μόνο.
+- Duplication/dead code: **0** νέα.
+
+**Νέος κώδικας = exemplary.** `aiKeyPolicy.ts` = pure module (type-only import, μηδέν DB/Stripe/secret handling), `isByoKey`/`aiKeyMode`/`meterAiUsage`/`unmeteredAiQuota` fail-closed (μη-true → metered), OSS-parity-aware (self-hosted default ποτέ metered), unit-tested (928/928 green). `Tenant.aiByoKey` default false, additive + flag-guarded (SAAS-off/default tenant ποτέ δεν χτυπά το BYO branch). Μηδέν secret leak, μηδέν νέο debt.
+
+**Επαλήθευση ενεργών items (και τα 3 ΠΑΡΑΜΕΝΟΥΝ VALID):**
+1. invites `saasGuard` (P3/S) — `grep -c saasGuard invites/route.ts` = **0**· GET@43 + DELETE@102 unwrapped. VALID.
+2. Account token-hash sparse index (P3/S) — `Account.ts:24,26` `verifyTokenHash`/`resetTokenHash` = `{ type:String, default:null }`, μηδέν `.index()`. VALID.
+3. reset-request timing (P3, decision) — `reset/request/route.ts` no-account fast-path `return {ok:true}` πριν το mint+store+mail. VALID.
+
+**Counts:** P1=0, P2=0 (residual v1 data-path enforcement → Needs Achilleas, decision), P3=3 ενεργά (2 auto-buildable + 1 decision). 40η συνεχόμενη σάρωση χωρίς P1· μηδέν νέο item, μηδέν status change.
+
+**Top 3 items να πάρει ο builder μετά (unattended-safe διάταξη):**
+1. **invites/route.ts saasGuard (P3/S)** — τύλιξε GET+DELETE σε `saasGuard` (ίδιο pattern με members). Ολοκληρώνει το try/catch effort· tsc-verifiable.
+2. **Account token-hash sparse index (P3/S)** — `Schema.index({ verifyTokenHash:1 }, { sparse:true })` + `resetTokenHash` στο `models/Account.ts`. Μηδέν runtime αλλαγή· επιταχύνει verify/reset confirm lookups.
+3. (κανένα άλλο auto-buildable· τα υπόλοιπα είναι decision, δες Needs Achilleas)
+
+### Needs Achilleas
+- **v1 data-path tenant-status enforcement (P2/M, decision):** το control-plane μισό έκλεισε (`b911882`). Ενας canceled/suspended tenant μπορεί ακόμα να χτυπά v1 feature routes γιατί ο v1 auth path δεν είναι tenant-scoped (`bearerUser` = User-by-token, μηδέν tenant). Χρειάζεται πρώτα (α) το v1 να γίνει tenant-scoped + (β) read-vs-write decision (πλήρες lockout ή read-only grace· 402 billing vs 403). SAAS-only, dead-until-SaaS.
+- **connection cache-reuse guard (P3, decision):** `connection.ts` `readyState !== 99` δεν ταιριάζει με το σχόλιο («reuse only while open»)· reuse μόνο σε 1/2 ή διόρθωση σχολίου. Dead-until-SaaS.
+- **reset-request timing (P3, decision):** fire-and-forget `void sendEmail` ευθυγραμμίζει anti-enumeration ΑΛΛΑ ρισκάρει κομμένο send σε serverless. Delivery-semantics tradeoff.
