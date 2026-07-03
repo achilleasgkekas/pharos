@@ -783,3 +783,28 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-03 (cont.⁶)
+
+Task: (c/e) νεο content section — Roadmap. Το site ειχε ολα τα modules/pricing/compare/faq αλλα καμια εικονα momentum (τι εχει βγει, τι φτιαχνεται, τι ερχεται) — κενο για dual OSS/SaaS οπου το «ζωντανο project» ειναι σημα εμπιστοσυνης. Self-contained: μηδεν assets, μηδεν pricing decision, ενα const + ενα section + nav wiring + μια grid class. Το περιεχομενο ειναι grounded στην πραγματικη κατασταση (CLAUDE.md features + memory in-progress + BACKLOG P10-P13), οχι marketing φαντασια.
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεο `ROADMAP` const (3 φασεις: **Shipped** var(--accent) = inventory/receipts-AI/statements/subs/reports/network/mobile/backups· **Building** var(--cyan) = managed multi-tenant hosted + 8-lang i18n + BYO-key AI billing· **Exploring** var(--purple) = return-window reminders / IMAP email-in / savings goals & insurance export, απο το BACKLOG). Νεο `<section id="roadmap">` αναμεσα σε #compare και #cta: 3 cards (dot χρωματιστο ανα φαση + note + check-list items reuse του `<Icon name="check">`) + footer line «open an issue on GitHub». Header navlink «Roadmap» (μετα το Compare).
+- `app/components/MobileNav.tsx`: `#roadmap` entry στο ITEMS (μετα το Compare) — drawer link.
+- `app/components/ScrollSpy.tsx`: 'roadmap' στο SECTIONS array (μετα 'compare') — active-highlight το νεο section.
+- `app/globals.css`: `.roadmap-grid` (repeat(3,1fr), align-items:start) + `.roadmap-col` hover-lift (ιδιο idiom με .persona-card) + `.roadmap-head`/`.roadmap-dot` (10px χρωματιστη κουκιδα). Responsive collapse σε 1fr στο <=900px breakpoint (διπλα στα αλλα grids). Reuse υπαρχουσων vars· μηδεν αλλαγη σε υπαρχοντες selectors. Το reduced-motion global transition-override ηδη κανει το hover-lift instant (οπως persona/step cards).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· ολα 8 routes ○ Static· / = 2.79 kB (πριν 2.77) / 105 kB First Load JS (η μικρη αυξηση = το markup του section, μηδεν νεο JS — pure server markup).
+- Prerendered HTML (`.next/server/app/index.html`): `id="roadmap"` FOUND + `Where PHAROS is headed` FOUND + `href="#roadmap"` ×2 (header + drawer) + `roadmap-col` cards + «Return-window reminders for recent buys» (backlog item) FOUND. Route static -> prerendered HTML = ακριβως το served· δεν σηκωσα dev server, δεν αγγιξα το Docker :3000. Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged (καμια αλλη ρουτινα mid-commit)· foreign `.claude/launch.json` + `apps/mobile/src/screens/*` (modified, ασταγα, αλλων ρουτινων) ΔΕΝ commit — staged μονο page.tsx + MobileNav.tsx + ScrollSpy.tsx + globals.css + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως roadmap-dot σε aria-hidden verify η lazy-load των mockup blocks. Content sections (features/AI/mobile/who/trust/self-host/pricing/compare/roadmap/faq) πλεον πληρη για single-page marketing site.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/roadmap GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
+- Roadmap «Building/Exploring» περιεχομενο = grounded σε BACKLOG/memory· αν αλλαξουν οι προτεραιοτητες, edit το ROADMAP const.

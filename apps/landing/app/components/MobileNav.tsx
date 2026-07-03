@@ -13,6 +13,7 @@ const ITEMS: NavItem[] = [
   { href: '#self-host', label: 'Self-host' },
   { href: '#pricing', label: 'Pricing' },
   { href: '#compare', label: 'Compare' },
+  { href: '#roadmap', label: 'Roadmap' },
   { href: '#faq', label: 'FAQ' },
 ];
 

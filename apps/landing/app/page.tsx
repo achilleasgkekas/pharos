@@ -351,6 +351,46 @@ const COMPARE: { label: string; self: string; hosted: string }[] = [
   { label: 'Support', self: 'Community & docs', hosted: 'Priority email' },
 ];
 
+const ROADMAP: {
+  phase: string;
+  color: string;
+  note: string;
+  items: string[];
+}[] = [
+  {
+    phase: 'Shipped',
+    color: 'var(--accent)',
+    note: 'Live in the self-hosted app today',
+    items: [
+      'Inventory, shopping & multi-store price tracking',
+      'AI receipt, expense & voucher scanning',
+      'Card statements with installment plans',
+      'Subscriptions, reports & UniFi network dashboard',
+      'Mobile app plus SMB, FTP & OneDrive backups',
+    ],
+  },
+  {
+    phase: 'Building',
+    color: 'var(--cyan)',
+    note: 'In active development now',
+    items: [
+      'Managed multi-tenant hosted edition',
+      'Eight-language interface localisation',
+      'Bring-your-own-key AI billing policy',
+    ],
+  },
+  {
+    phase: 'Exploring',
+    color: 'var(--purple)',
+    note: 'On the backlog, not yet scheduled',
+    items: [
+      'Return-window reminders for recent buys',
+      'IMAP email-in for hands-off receipt capture',
+      'Savings goals & insurance export',
+    ],
+  },
+];
+
 const FAQS: { q: string; a: string }[] = [
   {
     q: 'Is self-hosting really free?',
@@ -510,6 +550,7 @@ export default function Home() {
             <a href="#self-host" className="navlink nav-anchor">Self-host</a>
             <a href="#pricing" className="navlink">Pricing</a>
             <a href="#compare" className="navlink nav-anchor">Compare</a>
+            <a href="#roadmap" className="navlink nav-anchor">Roadmap</a>
             <a href="#faq" className="navlink nav-anchor">FAQ</a>
             <a
               href={GITHUB_URL}
@@ -1040,6 +1081,54 @@ export default function Home() {
 
           <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 28 }}>
             Same app either way. Export to JSON and switch whenever you like.
+          </p>
+        </div>
+      </section>
+
+      {/* ── Roadmap ───────────────────────────────────────── */}
+      <section id="roadmap" style={{ padding: '48px 0 72px' }}>
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <p className="mono" style={{ marginBottom: 12 }}>Roadmap</p>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 700, marginBottom: 14 }}>
+              Where PHAROS is headed
+            </h2>
+            <p style={{ color: 'var(--text-dim)', maxWidth: 560, margin: '0 auto' }}>
+              Most of the app already ships. Here is what is live, what we are
+              building, and what is next.
+            </p>
+          </div>
+
+          <div className="roadmap-grid">
+            {ROADMAP.map((col) => (
+              <article key={col.phase} className="card roadmap-col">
+                <div className="roadmap-head">
+                  <span className="roadmap-dot" style={{ background: col.color }} aria-hidden="true" />
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>{col.phase}</h3>
+                </div>
+                <p style={{ color: 'var(--text-faint)', fontSize: '0.82rem', marginBottom: 18 }}>
+                  {col.note}
+                </p>
+                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 11 }}>
+                  {col.items.map((it) => (
+                    <li key={it} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: '0.9rem' }}>
+                      <span style={{ color: col.color, flexShrink: 0, marginTop: 2 }}>
+                        <Icon name="check" size={15} />
+                      </span>
+                      <span style={{ color: 'var(--text-dim)' }}>{it}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+
+          <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 32 }}>
+            Priorities can shift. Open an issue on{' '}
+            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+              GitHub
+            </a>{' '}
+            to weigh in.
           </p>
         </div>
       </section>

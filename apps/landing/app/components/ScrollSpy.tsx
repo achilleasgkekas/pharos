@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 
 // Section ids that have a matching nav anchor, in document order. Kept in sync
 // with the <nav> in page.tsx and the drawer ITEMS in MobileNav.tsx.
-const SECTIONS = ['features', 'ai', 'mobile', 'who', 'self-host', 'pricing', 'compare', 'faq'];
+const SECTIONS = ['features', 'ai', 'mobile', 'who', 'self-host', 'pricing', 'compare', 'roadmap', 'faq'];
 
 /**
  * Highlights the nav link (desktop nav + mobile drawer) for the section the

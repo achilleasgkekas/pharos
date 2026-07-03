@@ -355,6 +355,33 @@ h1, h2, h3 {
   color: #041b0f;
 }
 
+/* Roadmap */
+.roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.roadmap-col {
+  transition: transform 0.15s ease, border-color 0.2s ease;
+}
+.roadmap-col:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-light);
+}
+.roadmap-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.roadmap-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* How it works / self-host steps */
 .steps-grid {
   display: grid;
@@ -1231,6 +1258,7 @@ h1, h2, h3 {
   .feature-grid { grid-template-columns: repeat(2, 1fr); }
   .persona-grid { grid-template-columns: 1fr; }
   .pricing-grid { grid-template-columns: repeat(2, 1fr); }
+  .roadmap-grid { grid-template-columns: 1fr; }
   .steps-grid { grid-template-columns: 1fr; }
   .trust-grid { grid-template-columns: repeat(3, 1fr); }
   .footer-grid { grid-template-columns: 1fr 1fr; row-gap: 32px; }
