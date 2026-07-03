@@ -38,6 +38,13 @@ export type TenantContext = {
   status: TenantStatus;
   /** True for the implicit single-user tenant (SAAS_MODE off). */
   isDefault: boolean;
+  /**
+   * True when the tenant brings its OWN AI provider key (BYO-key): their AI calls run on
+   * that key, so they are not metered against the plan's AI volume (see
+   * lib/billing/aiKeyPolicy.ts). Optional so legacy/synthetic contexts (and callers that
+   * only need routing) can omit it — absent ⇒ platform key + normal metering.
+   */
+  byoKey?: boolean;
 };
 
 /**
@@ -52,6 +59,7 @@ export const DEFAULT_TENANT: TenantContext = Object.freeze({
   plan: 'dedicated', // self-hosted = every feature; entitlements resolve this to "all".
   status: 'active',
   isDefault: true,
+  byoKey: false, // self-hosted uses its own AI config; metering is off for it anyway.
 });
 
 function toContext(t: TenantDoc): TenantContext {
@@ -62,6 +70,7 @@ function toContext(t: TenantDoc): TenantContext {
     plan: (t.plan as TenantPlan) ?? 'free',
     status: (t.status as TenantStatus) ?? 'trialing',
     isDefault: false,
+    byoKey: Boolean(t.aiByoKey),
   };
 }
 

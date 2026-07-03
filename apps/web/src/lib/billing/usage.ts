@@ -12,6 +12,7 @@
 import { connectDB } from '@/lib/db';
 import { Usage, type UsageDoc } from '@/models/Usage';
 import { entitlementsFor, withinAiQuota, withinStorage } from './entitlements';
+import { isByoKey, meterAiUsage, unmeteredAiQuota } from './aiKeyPolicy';
 import { saasMode } from '@/lib/tenancy/saasMode';
 import type { TenantContext } from '@/lib/tenancy/context';
 
@@ -104,7 +105,8 @@ export async function currentUsage(ctx: TenantContext, at: Date = new Date()): P
  * so concurrent calls don't lose increments.
  */
 export async function recordAiCall(ctx: TenantContext, n: number = 1, at: Date = new Date()): Promise<number> {
-  if (!isMetered(ctx) || n === 0) return 0;
+  // BYO-key tenants run on their own AI key → zero platform cost → not metered.
+  if (!isMetered(ctx) || !meterAiUsage(ctx.byoKey) || n === 0) return 0;
   const period = periodOf(at);
   await connectDB();
   const doc = await Usage.findOneAndUpdate(
@@ -136,7 +138,9 @@ export async function setStorageBytes(ctx: TenantContext, bytes: number, at: Dat
  * cap. The enforcement wiring (block + "upgrade") calls this before an AI op later.
  */
 export async function checkAiQuota(ctx: TenantContext, at: Date = new Date()): Promise<QuotaStatus> {
-  if (!isMetered(ctx)) return { used: 0, limit: null, remaining: null, allowed: true, ratio: 0 };
+  if (!isMetered(ctx)) return unmeteredAiQuota();
+  // BYO-key tenants bring their own key → unlimited AI, never blocked (no ledger read).
+  if (isByoKey(ctx.byoKey)) return unmeteredAiQuota();
   const { aiCalls } = await currentUsage(ctx, at);
   return aiQuotaStatus(ctx.plan, aiCalls);
 }

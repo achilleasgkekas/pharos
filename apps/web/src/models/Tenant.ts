@@ -37,6 +37,13 @@ const TenantSchema = new Schema(
     // Billing provider linkage (Stripe). Stored here so a webhook can resolve tenant.
     billingCustomerId: { type: String, default: null, index: true },
     billingSubscriptionId: { type: String, default: null, index: true },
+    // BYO-key (TODO §11): this tenant supplies its OWN AI provider key, so their AI calls
+    // cost the platform nothing → they are NOT metered against the plan's AI volume and are
+    // never blocked on AI quota (effectively unlimited AI). See lib/billing/aiKeyPolicy.ts.
+    // This is only the FLAG; the encrypted key itself is stored/managed separately (TODO
+    // §14 encryption at rest — Needs Achilleas). Default false = use the platform's shared
+    // AI key + normal per-plan metering.
+    aiByoKey: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

@@ -1294,3 +1294,56 @@ reactivate — όλα τα APIs έτοιμα, UI-only), είτε (β) `sendViaSm
 decision Achilleas· το webhook mailer καλύπτει ήδη dependency-free delivery), είτε (γ) tenant-status
 access enforcement (canceled/suspended → block στο `resolveWorkspaceSession`/`accountTenants`, ώστε
 canceled workspaces να μη σερβίρονται).
+
+## 2026-07-03 (increment 35 — BYO-key AI policy: unmetered own-key tenants)
+**Built:** το TODO §11 «BYO-key option» (tenant βάζει δικό του Anthropic key = μηδέν AI
+κόστος για μας). Ώσπου τώρα το BYO-key ήταν μόνο σχόλιο (`plans.ts`: `aiCallsPerMonth:null
+// unlimited / BYO-key`) χωρίς μηχανισμό: τίποτα δεν σήμαινε «αυτός ο tenant φέρνει δικό του
+key» ούτε επηρέαζε το metering. Πρόσθεσα το **policy layer** (τον flag + τον κανόνα «BYO ⇒
+δεν metrούμε ⇒ unlimited AI»), ΧΩΡΙΣ αποθήκευση του ίδιου του secret (encrypted key storage
+= ξεχωριστό, TODO §14 / Needs-Achilleas). ΟΛΟ additive, backward-compatible, σε δικά μου
+SAAS αρχεία:
+- `models/Tenant.ts` (additive field) — **`aiByoKey: Boolean, default false`** (control-plane
+  FLAG, ΟΧΙ το secret). Default false → μηδέν επίδραση σε υπάρχοντες tenants· ο self-hosted
+  default ΠΟΤΕ δεν φτιάχνει Tenant docs → zero effect.
+- `lib/tenancy/context.ts` (additive) — `TenantContext` απέκτησε **optional `byoKey?: boolean`**
+  (optional ώστε legacy/synthetic ctxs + routing-only callers + τα υπάρχοντα test literals να
+  μη σπάσουν — absent ⇒ platform key + normal metering). `toContext` το σετάρει από
+  `Boolean(t.aiByoKey)`· `DEFAULT_TENANT.byoKey=false` (self-hosted metering off ούτως ή άλλως).
+- `lib/billing/aiKeyPolicy.ts` (νέο, **PURE** — μόνο ένα `import type QuotaStatus`, erased at
+  runtime· μηδέν DB/Stripe/secret): `AiKeyMode='platform'|'byo'`, `isByoKey(flag)` (strict
+  `===true`, undefined/null/truthy-non-true → false), `aiKeyMode(flag)`, **`meterAiUsage(flag)`**
+  (BYO → false = δεν metrούμε· zero platform cost), `unmeteredAiQuota(used?)` (canonical
+  unlimited+allowed status, ίδιο shape με τα non-metered branches του usage.ts).
+- `lib/billing/usage.ts` (additive edit, δικό μου αρχείο) — το BYO gate μπήκε **ΜΟΝΟ στο AI
+  path** (το storage μένει metered για BYO — φέρνουν key, όχι δίσκο): `checkAiQuota` →
+  `isByoKey(ctx.byoKey)` πριν το ledger read ⇒ `unmeteredAiQuota()`· `recordAiCall` →
+  `!meterAiUsage(ctx.byoKey)` ⇒ no-op return 0. Το non-metered inline literal του `checkAiQuota`
+  αντικαταστάθηκε με `unmeteredAiQuota()` (DRY, byte-identical). **Backward-compatible**: για
+  υπάρχοντες metered tenants `byoKey` undefined → `meterAiUsage`=true → αμετάβλητο· default
+  tenant / SAAS off → `isMetered` false → αμετάβλητο.
+- `lib/billing/aiKeyPolicy.test.ts` (νέο) — 10 PURE tests (isByoKey strict-true/false/null/
+  undefined + truthy-non-true fail-safe· aiKeyMode· meterAiUsage BYO-vs-platform· unmeteredAiQuota
+  shape + used-clamp + no-cap-regardless-of-used).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run aiKeyPolicy.test.ts
+usage.test.ts` → **19/19 green**· full suite `npx vitest run` → **928/928 green** (καμία
+regression). Η policy consume-άρεται μόνο από το metering path (usage.ts), που δεν είναι ακόμα
+wired σε κανένα feature/AI route → **zero runtime effect**· `SAAS_MODE` off / default tenant →
+το byoKey branch ΠΟΤΕ δεν τρέχει (isDefault short-circuit + default false). Κανένας Docker
+rebuild (unwired scaffold· type-check+tests καλύπτουν compile+logic)· καμία νέα εξάρτηση· κανένα
+feature route/data-db/User-path/bearer-path αγγίχτηκε. Άγγιξα μόνο δικά μου SAAS αρχεία (foreign
+`.claude/launch.json` + apps/mobile edits άθικτα).
+
+**## Needs Achilleas** (BYO-key):
+- **Encrypted key storage + entry point**: το `aiByoKey` είναι μόνο ο flag. Χρειάζεται (α)
+  encrypted-at-rest αποθήκευση του πραγματικού tenant AI key (TODO §14· per-tenant document key
+  ή KMS — απόφαση Achilleas), (β) resolver «ποιο key για αυτό το AI call» (tenant key αν BYO,
+  αλλιώς platform), (γ) settings UI + route για να το βάλει/rotate/clear ο owner, (δ) validation
+  του key πριν set `aiByoKey:true`. Καμία από αυτές δεν χειρίζεται secret χωρίς την crypto απόφαση.
+
+**Next task:** increment 36 — είτε (α) BYO-key resolver+storage scaffold μόλις οριστεί η crypto
+προσέγγιση (Needs-Achilleas), είτε (β) usage ledger tokens+cost (TODO §11: το Usage μετρά μόνο
+`aiCalls` count· λείπουν tokens/estimated-cost πεδία — additive Usage fields + record signature),
+είτε (γ) user-facing workspace-settings UI panels που consume-άρουν τα έτοιμα read/write APIs
+(General/Members/Invitations/Activity/Billing — όλα έτοιμα, UI-only).
