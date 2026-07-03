@@ -2,8 +2,19 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 3b29203 -->
+<!-- reviewed: acba60a -->
 <!-- docker-validated: 1b6e18c -->
+
+## 2026-07-03 (reviewer — range 3b29203..acba60a· καθαρό, μηδέν regression)
+- **Έλεγξα:** 4 code commits πάνω από το προηγ. marker (df5f376 landing back-to-top, 10c26d3 storage tests, a4c1fd3 checkout audit, acba60a mobile SearchScreen→ListItem) + τα docs commits.
+- **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· full vitest **59 files / 880 tests PASS** (τα 22 νέα των checkoutAudit+storage πράσινα).
+- **Review ευρήματα:**
+  - `checkoutAudit.ts` + route: pure helper, whitelist μόνο plan+checkoutId, ρητά ΧΩΡΙΣ URL/email/secret. Το `recordAudit` καλείται best-effort ΜΕΤΑ το success (σωστά, ώστε 502/503 attempts να μη γράφουν misleading trail)· signatures (`recordAudit`/`auditCtx`) ταιριάζουν. Response shape `{url,id}` **αμετάβλητο** → μηδέν risk για mobile.
+  - `storage.test.ts`: mock μόνο `node:fs`, το path-traversal guard («Path escapes storage root») δοκιμάζεται στον ΠΡΑΓΜΑΤΙΚΟ storage module (readFile/deleteFile reject σε `../` escape / absolute / empty· saveFile bucket/year/month shape + unique hash). Acceptance πληρείται.
+  - `BackToTop.tsx`: progressive enhancement, rAF-throttled scroll, honours prefers-reduced-motion, aria-hidden+tabIndex toggle, focus target `#top` υπάρχει στο hero. Καθαρό.
+  - `SearchScreen`→`<ListItem>`: το shared primitive render-άρει `Pressable` όταν δοθεί `onPress` (ταιριάζει με το πρότερο behaviour)· `s.listItem` byte-equivalent layout (row/gap12/surface/border), μικρό εσκεμμένο spacing delta (radius/padding/marginBottom) — ίδιο με προηγ. parity work.
+- **Fixes:** κανένα (τίποτα small-unsafe δεν βρέθηκε). **Flags:** κανένα. Μηδέν secret, μηδέν API-shape change, μηδέν broken functionality.
+- **Git hygiene:** stage ΜΟΝΟ `PROGRESS.md`. Δεν αγγίχτηκαν τα WIP του Αχιλλέα (`.claude/launch.json`, ReceiptsScreen, SettingsScreen, ShoppingScreen).
 
 ## 2026-07-03 (pharos-daily-dev — mobile SearchScreen `row` → shared `<ListItem>`)
 - **Τι έκανα:** έκλεισα το top-3 non-WIP UI-debt item που οι parity/ui auditors flag-άρουν επανειλημμένα (SearchScreen `row`→`<ListItem>`, P3/S). Ο functional parity πυρήνας είναι κλειστός (0 auto-buildable GAP)· τα μεγαλύτερα UI-debt items (Input/Button/hitSlop σε Receipts/Settings/Shopping) παραμένουν **WIP-blocked** από τα uncommitted edits του Αχιλλέα, οπότε αυτό ήταν το ασφαλέστερο πραγματικό debt που κλείνει unattended (SearchScreen δεν είναι στο working-tree WIP).
