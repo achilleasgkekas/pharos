@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, Modal, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Card, contentWidth } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Card, Badge, contentWidth } from '../ui';
 import { getStatements, getStatementTxns, getInstallmentPlans, type Statement, type StatementTxn, type InstallmentPlan } from '../api';
 
 // "2028-10-01" → "Oct 2028" for payoff dates.
@@ -119,7 +119,7 @@ export function StatementsScreen() {
                       <Text style={s.txDesc} numberOfLines={2}>{item.description || '—'}</Text>
                       <View style={s.txMetaRow}>
                         {!!item.date && <Text style={s.txMeta}>{shortDate(item.date)}</Text>}
-                        {!!item.installment && <Text style={s.badge}>{item.installment.current}/{item.installment.total}</Text>}
+                        {!!item.installment && <Badge label={`${item.installment.current}/${item.installment.total}`} color={C.cyan} />}
                       </View>
                     </View>
                     <Text style={[s.txAmount, item.amount < 0 && s.credit]}>{money(item.amount, detail?.currency)}</Text>
@@ -164,7 +164,6 @@ const s = StyleSheet.create({
   txDesc: { color: C.text, fontSize: 14, fontWeight: '500' },
   txMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   txMeta: { color: C.faint, fontSize: 12 },
-  badge: { color: C.cyan, fontSize: 11, fontWeight: '700', borderWidth: 1, borderColor: C.cyan, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, overflow: 'hidden' },
   txAmount: { color: C.text, fontSize: 15, fontWeight: '700' },
   credit: { color: C.accent },
 });
