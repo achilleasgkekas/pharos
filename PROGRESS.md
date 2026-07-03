@@ -5,6 +5,18 @@
 <!-- reviewed: 2f31c5d -->
 <!-- docker-validated: b911882 -->
 
+## 2026-07-03 (parity-auditor — 41η σάρωση· CONFIRMATION· DONE 7 / GAP 0 / NEEDS DECISION 0 νέα)
+- **Read-only audit** (inventory από κώδικα, όχι docs· μηδέν Docker, μηδέν AI, μηδέν app-code edit).
+- **Inventory:** **50 v1 routes** (`find api/v1 -name route.ts`· login + 49 bearer), **16 mobile screens**. Route↔consumer: μηχανικό loop route-base-paths vs `apps/mobile/src/api.ts` → **κάθε route base έχει ≥1 mobile consumer, μηδέν orphan** (incl. `push/register`)· deep-route spot-check `ai-fill/convert-to-task/link-plan/add-to-library/rescan/expenses[id]rescan/price` όλα ≥1 ref.
+- **Δέλτα:** τελευταίο mobile-src commit `96150c5` (Button variants, audited)· τελευταίο api/v1 `7670bf9` (anomaly, audited). Μετέπειτα (`061b3fa` test, `88e44c6`/`cfaddd8` docs, `12c46e8` landing) = **όλοι web-only** → μηδέν νέα portable δυνατότητα, μηδέν doc-fix.
+- **Checks:** mobile `npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type error).
+- **Counts:** DONE 7 (parity queue 6/6 + Activity) / auto-buildable functional GAP **0** / NEEDS DECISION **0** νέα. Functional parity πυρήνας κλειστός → ο builder δουλεύει UI Debt Queue.
+- **Top-3 για τον builder (unattended-safe, non-WIP):** (1) Input finish σε ItemsScreen `logInput` [P2/S]· (2) SearchScreen `row`→`<ListItem>` [P3/S]· (3) StatementsScreen `badge`→`<Badge>` [P3/S]. Εναλλακτικά: pure-lib vitest coverage (`lib/cards.ts` / `lib/taxonomies.ts` / `lib/itemStatus.ts`).
+- **Docs:** `MOBILE_PARITY.md` — νέο 41η-σάρωση note στην κορυφή του Build Queue. Git hygiene: staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (ρητά paths). ΔΕΝ αγγίχτηκαν τα WIP του Αχιλλέα (`.claude/launch.json`, Receipts/Settings/Shopping screens).
+
+### Needs Achilleas (parity-auditor 2026-07-03 41η)
+- Τίποτα νέο ασφαλείας· μηδέν committed secret. Εκκρεμείς αποφάσεις (αμετάβλητες): native mobile deps (safe-area / charting / persist)· theme toggle + language switcher· AI-engine / storage / OneDrive στα mobile Settings· statements merge-bind + PDF-import (θέλουν write/upload endpoints)· remote push (EAS dev build + APNs)· Tasks Kanban board. Επίσης: Receipts/Settings/Shopping mobile screens έχουν μακροχρόνιο uncommitted WIP στο working tree — commit ή revert θα ξεμπλόκαρε το εναπομείναν Input/Button/hitSlop UI-debt finish.
+
 ## 2026-07-03 (reviewer — range 53b861a..2f31c5d· tsc web+mobile EXIT 0· 29 tests green· 0 fixes· 1 P2 partial-close note + 1 Needs-Achilleas)
 - **Τι review-άρισα:** 7 commits από τον marker `53b861a` → HEAD `2f31c5d`. Code: `b911882` (SaaS tenant-status enforcement), `96150c5` (mobile Button danger/ghost variants + 4 screens), `67ac112` (landing branded error boundary), `320102d` (prompts.test.ts)· υπόλοιπα docs/docker-health.
 - **Checks (read-only):** `apps/web npm run type-check` **EXIT 0**· `apps/mobile npx tsc --noEmit` **EXIT 0**· `vitest run prompts.test.ts workspace.test.ts` → **29/29 pass** (10 prompts + 19 workspace).
