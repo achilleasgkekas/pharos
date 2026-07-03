@@ -19,6 +19,7 @@ export const metadata: Metadata = {
     'privacy',
   ],
   authors: [{ name: 'Achilleas' }],
+  alternates: { canonical: '/' },
   openGraph: {
     type: 'website',
     url: SITE_URL,

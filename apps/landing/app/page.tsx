@@ -439,6 +439,25 @@ const JSON_LD = {
         acceptedAnswer: { '@type': 'Answer', text: f.a },
       })),
     },
+    {
+      '@type': 'HowTo',
+      '@id': `${SITE_URL}/#self-host`,
+      name: 'Self-host PHAROS with Docker',
+      description:
+        'Bring up the PHAROS personal hub, MongoDB, and search with a single Docker Compose file. Your data never leaves your machine.',
+      inLanguage: 'en',
+      tool: [
+        { '@type': 'HowToTool', name: 'Docker' },
+        { '@type': 'HowToTool', name: 'Docker Compose' },
+      ],
+      step: STEPS.map((s, i) => ({
+        '@type': 'HowToStep',
+        position: i + 1,
+        name: s.title,
+        text: s.desc,
+        url: `${SITE_URL}/#self-host`,
+      })),
+    },
   ],
 };
 

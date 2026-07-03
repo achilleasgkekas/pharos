@@ -761,3 +761,25 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-03 (cont.⁵)
+
+Task: (e) Polish, μερος 33 — canonical URL + HowTo structured data (SEO). Καθαρο, self-contained increment (μηδεν assets, μηδεν pricing decision): δυο pure SEO προσθηκες. (α) Το layout metadata ειχε πληρη openGraph/twitter/themeColor/icons αλλα ΟΧΙ canonical -> standard best-practice που ελειπε. (β) Το JSON-LD @graph ειχε Organization/WebSite/SoftwareApplication/FAQPage αλλα οχι HowTo για το self-host quickstart -> rich-results ευκαιρια για το OSS κοινο.
+
+Τι εφτιαξα:
+- `app/layout.tsx`: `alternates: { canonical: '/' }` στο metadata. Με το `metadataBase = https://ph-aros.com` ηδη set, το '/' resolvαρει σε canonical `https://ph-aros.com` -> ενα καθαρο canonical στο <head>, αποφευγει duplicate-URL θεματα (www/trailing-slash/query params).
+- `app/page.tsx`: νεο `HowTo` node στο `JSON_LD['@graph']` (`@id` = `${SITE_URL}/#self-host`) με name «Self-host PHAROS with Docker», description, inLanguage, tool [Docker, Docker Compose], και `step` array παραγομενο απο το υπαρχον `STEPS` const (map -> HowToStep με position/name/text/url) -> ΜΗΔΕΝ διχασμος του step content (single source of truth, τα 3 βηματα μενουν σε sync με το self-host section). Καμια νεα εξαρτηση, καμια globals.css αλλαγη.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· ολα 6 route entries ○ Static· / αμεταβλητο 2.77 kB / 105 kB First Load JS (καθαρο <head>/JSON-LD markup, μηδεν JS).
+- Prerendered HTML (`.next/server/app/index.html`): `rel="canonical" href="https://ph-aros.com"` FOUND + `"@type":"HowTo",...,"name":"Self-host PHAROS with Docker"` FOUND + 3× `"HowToStep"` (= τα 3 STEPS). Route static -> prerendered HTML = ακριβως το served (build + HTML grep = ισοδυναμη επαληθευση για <head>/structured-data markup)· δεν σηκωσα dev server, δεν αγγιξα το Docker :3000. Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged (καμια αλλη ρουτινα mid-commit)· foreign `.claude/launch.json` + `apps/mobile/src/screens/*` (modified, ασταγα, αλλων ρουτινων) ΔΕΝ commit — staged μονο app/layout.tsx + app/page.tsx + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως BreadcrumbList αν προστεθει δευτερη σελιδα, η lazy-load των mockup blocks. Structured-data graph (Organization + WebSite + SoftwareApplication + FAQPage + HowTo) πλεον πληρες για single-page marketing site.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
