@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: acba60a -->
-<!-- docker-validated: 1b6e18c -->
+<!-- docker-validated: dc8a83f -->
+
+## 2026-07-03 (docker-health guard — safe rebuild + cache prune)
+- **Health:** homepage-mongo `healthy` (StartedAt 01:36 σήμερα, σταθερό· RestartCount 198 σωρευτικό ιστορικά OOM, ΟΧΙ ενεργό loop), homepage-web restarts 0 `running`, /login 200 πριν το rebuild. Τρέχουν web/mongo/searxng· κανένα homepage-flaresolverr (μηδέν επιπλέον πίεση μνήμης).
+- **Rebuild:** ΝΑΙ. Ο diff `1b6e18c..dc8a83f -- apps/web` άγγιζε web runtime code (`api/saas/billing/checkout/route.ts` + `lib/billing/checkoutAudit.ts` + test files). Safe dance: `docker compose build web` (image only, ~12min στη μικρή VM, EXIT 0) → mongo healthy check → `docker compose up -d web` (recreated) → poll `/login` → **200** → web RestartCount παρέμεινε **0**, state running.
+- **Disk:** `docker builder prune -f` μετά το build → **2.107GB** ανακτημένα (build cache). Images 4.41GB, volumes 847MB αμετάβλητα (SAFE, μόνο cache). Σύνολο δίσκου άνετο στη VM.
+- **Needs Achilleas:** κανένα από τον guard. (Σημ: το working tree έχει uncommitted WIP του Αχιλλέα — `.claude/launch.json`, ReceiptsScreen/SettingsScreen/ShoppingScreen, billing portal/audit files· το build τα συμπεριέλαβε στο context και πέρασε καθαρά, δεν αγγίχτηκαν από τον guard.)
+- **Marker:** docker-validated `1b6e18c` → **`dc8a83f`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-03 (pharos-daily-dev — mobile StatementsScreen installment `badge` → shared `<Badge>`)
 - **Τι έκανα:** έκλεισα το ranked-#1 non-WIP UI-debt item που flag-άρουν επανειλημμένα οι parity/ui auditors (StatementsScreen `badge`→`<Badge>`, P3/S· το επόμενο shared-primitive debt μετά το SearchScreen `row`→`<ListItem>` του `acba60a`). Ο functional parity πυρήνας είναι κλειστός (0 auto-buildable GAP)· τα μεγαλύτερα UI-debt items (Receipts/Settings/Shopping Input/hitSlop) παραμένουν **WIP-blocked** από τα uncommitted edits του Αχιλλέα, οπότε αυτό ήταν το ασφαλέστερο πραγματικό debt που κλείνει unattended (StatementsScreen δεν είναι στο working-tree WIP).
