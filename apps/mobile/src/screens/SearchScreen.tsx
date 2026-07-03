@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, Pressable, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import { C } from '../theme';
-import { Empty, Badge, Input, contentWidth } from '../ui';
+import { Empty, Badge, Input, ListItem, contentWidth } from '../ui';
 import { search, type SearchHit } from '../api';
 import type { ScreenKey } from './HomeScreen';
 
@@ -62,7 +62,7 @@ export function SearchScreen({ onOpen }: { onOpen: (k: ScreenKey) => void }) {
         renderItem={({ item }) => {
           const dest = TO_SCREEN[item.type];
           return (
-            <Pressable onPress={() => dest && onOpen(dest)} style={s.row}>
+            <ListItem onPress={() => dest && onOpen(dest)}>
               <Badge
                 label={item.type.toUpperCase()}
                 color={COLOR[item.type] || C.dim}
@@ -72,7 +72,7 @@ export function SearchScreen({ onOpen }: { onOpen: (k: ScreenKey) => void }) {
                 <Text style={s.title} numberOfLines={1}>{item.title}</Text>
                 {!!item.subtitle && <Text style={s.sub} numberOfLines={1}>{item.subtitle}</Text>}
               </View>
-            </Pressable>
+            </ListItem>
           );
         }}
       />
@@ -84,7 +84,6 @@ const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   bar: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingBottom: 8 },
   err: { color: C.red, fontSize: 13, paddingHorizontal: 16 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 12, marginBottom: 8 },
   title: { color: C.text, fontSize: 15, fontWeight: '600' },
   sub: { color: C.faint, fontSize: 12, marginTop: 2 },
 });
