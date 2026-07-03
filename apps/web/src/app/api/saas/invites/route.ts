@@ -10,6 +10,7 @@ import {
   collectInviteAccountIds,
 } from '@/lib/tenancy/invites';
 import { recordAudit } from '@/lib/tenancy/audit';
+import { saasGuard } from '@/lib/tenancy/saasApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,54 +42,56 @@ export const dynamic = 'force-dynamic';
  *     lifecycle, and 'all' spans every status.
  */
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const slug = url.searchParams.get('tenant');
-  const filter = parseInviteStatusFilter(url.searchParams.get('status'));
-  const resolved = await resolveWorkspaceSession(slug, true);
-  if ('response' in resolved) return resolved.response;
-  const { session } = resolved;
+  return saasGuard(async () => {
+    const url = new URL(req.url);
+    const slug = url.searchParams.get('tenant');
+    const filter = parseInviteStatusFilter(url.searchParams.get('status'));
+    const resolved = await resolveWorkspaceSession(slug, true);
+    if ('response' in resolved) return resolved.response;
+    const { session } = resolved;
 
-  const invites = (await Invite.find({
-    tenant: session.ctx.tenantId!,
-    ...inviteStatusQuery(filter),
-  })
-    .select('email role status expires createdAt invitedBy acceptedBy acceptedAt')
-    .sort({ createdAt: -1 })
-    .lean()) as unknown as (InviteDoc & { createdAt?: Date })[];
+    const invites = (await Invite.find({
+      tenant: session.ctx.tenantId!,
+      ...inviteStatusQuery(filter),
+    })
+      .select('email role status expires createdAt invitedBy acceptedBy acceptedAt')
+      .sort({ createdAt: -1 })
+      .lean()) as unknown as (InviteDoc & { createdAt?: Date })[];
 
-  // Resolve every referenced account's email + display name in ONE batched lookup (never
-  // N+1), across both invitedBy (minter) and acceptedBy (redeemer), so an "Invitations" panel
-  // can render human identities without its own account API. Deleted accounts / legacy rows
-  // simply have no entry → inviteView gets null. A blank name (Account default '') is treated
-  // as absent so the UI falls back to the email. Mirrors the audit route's actor resolution.
-  const accountIds = collectInviteAccountIds(invites);
-  const emailById = new Map<string, string>();
-  const nameById = new Map<string, string>();
-  if (accountIds.length) {
-    const accounts = (await Account.find({ _id: { $in: accountIds } })
-      .select('email name')
-      .lean()) as unknown as { _id: unknown; email?: string | null; name?: string | null }[];
-    for (const a of accounts) {
-      const id = String(a._id);
-      if (a.email) emailById.set(id, a.email);
-      const name = a.name?.trim();
-      if (name) nameById.set(id, name);
+    // Resolve every referenced account's email + display name in ONE batched lookup (never
+    // N+1), across both invitedBy (minter) and acceptedBy (redeemer), so an "Invitations" panel
+    // can render human identities without its own account API. Deleted accounts / legacy rows
+    // simply have no entry → inviteView gets null. A blank name (Account default '') is treated
+    // as absent so the UI falls back to the email. Mirrors the audit route's actor resolution.
+    const accountIds = collectInviteAccountIds(invites);
+    const emailById = new Map<string, string>();
+    const nameById = new Map<string, string>();
+    if (accountIds.length) {
+      const accounts = (await Account.find({ _id: { $in: accountIds } })
+        .select('email name')
+        .lean()) as unknown as { _id: unknown; email?: string | null; name?: string | null }[];
+      for (const a of accounts) {
+        const id = String(a._id);
+        if (a.email) emailById.set(id, a.email);
+        const name = a.name?.trim();
+        if (name) nameById.set(id, name);
+      }
     }
-  }
 
-  return NextResponse.json({
-    workspace: session.workspace.slug,
-    status: filter,
-    invites: invites.map((inv) => {
-      const inviter = inv.invitedBy != null ? String(inv.invitedBy) : null;
-      const accepter = inv.acceptedBy != null ? String(inv.acceptedBy) : null;
-      return inviteView(inv, undefined, {
-        inviterEmail: inviter ? emailById.get(inviter) ?? null : null,
-        inviterName: inviter ? nameById.get(inviter) ?? null : null,
-        accepterEmail: accepter ? emailById.get(accepter) ?? null : null,
-        accepterName: accepter ? nameById.get(accepter) ?? null : null,
-      });
-    }),
+    return NextResponse.json({
+      workspace: session.workspace.slug,
+      status: filter,
+      invites: invites.map((inv) => {
+        const inviter = inv.invitedBy != null ? String(inv.invitedBy) : null;
+        const accepter = inv.acceptedBy != null ? String(inv.acceptedBy) : null;
+        return inviteView(inv, undefined, {
+          inviterEmail: inviter ? emailById.get(inviter) ?? null : null,
+          inviterName: inviter ? nameById.get(inviter) ?? null : null,
+          accepterEmail: accepter ? emailById.get(accepter) ?? null : null,
+          accepterName: accepter ? nameById.get(accepter) ?? null : null,
+        });
+      }),
+    });
   });
 }
 
@@ -100,47 +103,49 @@ export async function GET(req: NextRequest) {
  *     touch another's invites.
  */
 export async function DELETE(req: NextRequest) {
-  const body = await readBody(req);
+  return saasGuard(async () => {
+    const body = await readBody(req);
 
-  const tenantSlug = typeof body.tenant === 'string' ? body.tenant.trim() || null : null;
-  const resolved = await resolveWorkspaceSession(tenantSlug, true);
-  if ('response' in resolved) return resolved.response;
-  const { session } = resolved;
+    const tenantSlug = typeof body.tenant === 'string' ? body.tenant.trim() || null : null;
+    const resolved = await resolveWorkspaceSession(tenantSlug, true);
+    if ('response' in resolved) return resolved.response;
+    const { session } = resolved;
 
-  const inviteId = typeof body.inviteId === 'string' ? body.inviteId.trim() : '';
-  if (!inviteId) {
-    return NextResponse.json({ error: 'inviteId is required' }, { status: 400 });
-  }
-  // Format-guard before hitting Mongoose: a malformed id would otherwise throw a
-  // CastError inside updateOne and surface as an uncaught 500. Mirrors the
-  // `^[a-f0-9]{24}$` convention used across the dynamic `[id]` routes.
-  if (!isObjectId(inviteId)) {
-    return NextResponse.json({ error: 'invalid inviteId' }, { status: 400 });
-  }
+    const inviteId = typeof body.inviteId === 'string' ? body.inviteId.trim() : '';
+    if (!inviteId) {
+      return NextResponse.json({ error: 'inviteId is required' }, { status: 400 });
+    }
+    // Format-guard before hitting Mongoose: a malformed id would otherwise throw a
+    // CastError inside updateOne and surface as an uncaught 500. Mirrors the
+    // `^[a-f0-9]{24}$` convention used across the dynamic `[id]` routes.
+    if (!isObjectId(inviteId)) {
+      return NextResponse.json({ error: 'invalid inviteId' }, { status: 400 });
+    }
 
-  // Revoke only within this workspace and only if still pending — a fresh mint or an
-  // accepted/revoked row is left untouched. findOneAndUpdate (not updateOne) so we recover
-  // the invite's email/role for the audit trail before it is revoked.
-  const revoked = (await Invite.findOneAndUpdate(
-    { _id: inviteId, tenant: session.ctx.tenantId!, status: 'pending' },
-    { $set: { status: 'revoked' } }
-  )
-    .select('email role')
-    .lean()) as Pick<InviteDoc, 'email' | 'role'> | null;
+    // Revoke only within this workspace and only if still pending — a fresh mint or an
+    // accepted/revoked row is left untouched. findOneAndUpdate (not updateOne) so we recover
+    // the invite's email/role for the audit trail before it is revoked.
+    const revoked = (await Invite.findOneAndUpdate(
+      { _id: inviteId, tenant: session.ctx.tenantId!, status: 'pending' },
+      { $set: { status: 'revoked' } }
+    )
+      .select('email role')
+      .lean()) as Pick<InviteDoc, 'email' | 'role'> | null;
 
-  if (!revoked) {
-    return NextResponse.json(
-      { error: 'no pending invite with that id in this workspace' },
-      { status: 404 }
-    );
-  }
+    if (!revoked) {
+      return NextResponse.json(
+        { error: 'no pending invite with that id in this workspace' },
+        { status: 404 }
+      );
+    }
 
-  await recordAudit(session.ctx, {
-    action: 'invite.revoked',
-    actor: session.account.sub,
-    target: String(revoked.email),
-    meta: { role: String(revoked.role) },
+    await recordAudit(session.ctx, {
+      action: 'invite.revoked',
+      actor: session.account.sub,
+      target: String(revoked.email),
+      meta: { role: String(revoked.role) },
+    });
+
+    return NextResponse.json({ revoked: inviteId });
   });
-
-  return NextResponse.json({ revoked: inviteId });
 }
