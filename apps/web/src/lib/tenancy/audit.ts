@@ -25,6 +25,7 @@ export const AUDIT_ACTIONS = [
   'workspace.created',
   'workspace.updated',
   'workspace.canceled',
+  'workspace.reactivated',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

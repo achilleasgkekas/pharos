@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   MAX_WORKSPACE_NAME,
   canCancelWorkspace,
+  canReactivateWorkspace,
+  reactivateStatusError,
   sanitizeWorkspaceName,
   workspaceNameError,
   workspaceStatusError,
@@ -154,5 +156,42 @@ describe('workspaceStatusError', () => {
     expect(workspaceStatusError(undefined)).toBe('workspace is not active');
     expect(workspaceStatusError(null)).toBe('workspace is not active');
     expect(workspaceStatusError(42)).toBe('workspace is not active');
+  });
+});
+
+describe('canReactivateWorkspace', () => {
+  it('allows only the owner', () => {
+    expect(canReactivateWorkspace('owner')).toBe(true);
+  });
+  it('rejects admin / member', () => {
+    expect(canReactivateWorkspace('admin')).toBe(false);
+    expect(canReactivateWorkspace('member')).toBe(false);
+  });
+  it('rejects unknown / empty', () => {
+    expect(canReactivateWorkspace('')).toBe(false);
+    expect(canReactivateWorkspace('viewer')).toBe(false);
+  });
+});
+
+describe('reactivateStatusError', () => {
+  it('allows a canceled workspace (any case)', () => {
+    expect(reactivateStatusError('canceled')).toBeNull();
+    expect(reactivateStatusError('CANCELED')).toBeNull();
+    expect(reactivateStatusError('  Canceled ')).toBeNull();
+  });
+  it('rejects already-active / trialing', () => {
+    expect(reactivateStatusError('active')).toMatch(/already active/);
+    expect(reactivateStatusError('trialing')).toMatch(/already active/);
+  });
+  it('rejects suspended (billing) and pending with specific messages', () => {
+    expect(reactivateStatusError('suspended')).toMatch(/billing/);
+    expect(reactivateStatusError('pending')).toMatch(/being set up/);
+  });
+  it('fails closed on unknown / empty / non-string status', () => {
+    expect(reactivateStatusError('')).toBe('workspace cannot be reactivated');
+    expect(reactivateStatusError('bogus')).toBe('workspace cannot be reactivated');
+    expect(reactivateStatusError(undefined)).toBe('workspace cannot be reactivated');
+    expect(reactivateStatusError(null)).toBe('workspace cannot be reactivated');
+    expect(reactivateStatusError(42)).toBe('workspace cannot be reactivated');
   });
 });

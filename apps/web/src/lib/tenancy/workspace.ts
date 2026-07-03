@@ -64,6 +64,44 @@ export function workspaceStatusError(status: unknown): string | null {
   }
 }
 
+/**
+ * Only the owner may reactivate a canceled workspace back to `active`. Mirrors the
+ * owner-only cancel gate: reactivation re-opens access for everyone and is billing-adjacent,
+ * so admins/members are rejected.
+ */
+export function canReactivateWorkspace(role: string): boolean {
+  return role === 'owner';
+}
+
+/**
+ * Statuses an owner may manually reactivate to `active`. Only a soft-`canceled` workspace
+ * qualifies — the cancel it reverses was owner-initiated, so it is owner-reversible. A
+ * `suspended` workspace is a billing hold that must be cleared by paying (not a manual flip),
+ * and active/trialing/pending are not canceled.
+ */
+export const REACTIVATABLE_STATUSES = ['canceled'] as const;
+
+/**
+ * Guard for the reactivate route. Returns a human-readable error when the current status
+ * cannot be reactivated, or null when it can (currently only `canceled`). Fail-closed: any
+ * unknown value is rejected.
+ */
+export function reactivateStatusError(status: unknown): string | null {
+  const s = typeof status === 'string' ? status.trim().toLowerCase() : '';
+  if ((REACTIVATABLE_STATUSES as readonly string[]).includes(s)) return null;
+  switch (s) {
+    case 'active':
+    case 'trialing':
+      return 'workspace is already active';
+    case 'suspended':
+      return 'a suspended workspace is reactivated by resolving billing, not manually';
+    case 'pending':
+      return 'workspace is still being set up';
+    default:
+      return 'workspace cannot be reactivated';
+  }
+}
+
 /** Client-safe projection of a workspace for the read/rename responses. */
 export type WorkspaceView = {
   tenantId: string;

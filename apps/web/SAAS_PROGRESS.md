@@ -184,3 +184,37 @@ rebuild (route 404 στο running container με SAAS_MODE off — ο νέος �
 `allowInactive:true`), είτε (β) Stripe webhook → suspend/reactivate on payment failure/recovery
 (θέλει live Stripe keys → Needs-Achilleas για το τελικό wiring), είτε (γ) user-facing
 workspace-settings UI panels (όλα τα read/write APIs έτοιμα).
+
+## 2026-07-03 (increment 31 — workspace reactivate: owner-only canceled→active)
+**Built:** επέλεξα το (α) — reactivate route, το φυσικό συμπλήρωμα του soft-cancel (increment 29) +
+status-enforcement (increment 30). Αφού το cancel μπλοκάρει πρόσβαση για όλους, ο owner χρειάζεται
+δρόμο επιστροφής. Backend-only, additive, ΟΛΟ σε δικά μου SAAS-gated αρχεία:
+- `lib/tenancy/workspace.ts` — 2 νέοι **PURE** guards: `canReactivateWorkspace(role)` (**owner-only**,
+  mirror του cancel — re-opens access + billing-adjacent) + `reactivateStatusError(status)`
+  (+ export `REACTIVATABLE_STATUSES=['canceled']`). Επιτρέπει ΜΟΝΟ `canceled`→active (case/space-
+  insensitive)· `active/trialing`→«already active», `suspended`→«resolved by billing, not manually»
+  (billing hold, όχι manual flip), `pending`→being-set-up· **fail-closed** για unknown/empty/non-string.
+- `lib/tenancy/audit.ts` — +1 auditable action `workspace.reactivated` στο `AUDIT_ACTIONS`.
+- `app/api/saas/workspace/reactivate/route.ts` (νέο, nodejs + force-dynamic): **POST** `{tenant?}` →
+  `resolveWorkspaceSession(slug,false,true)` (allowInactive:true ώστε ο canceled tenant να είναι
+  reachable — αλλιώς το status-gate του increment 30 θα τον 403-άριζε) → **owner-only** gate
+  (`canReactivateWorkspace`, 403 αλλιώς) → `reactivateStatusError` (409 αν όχι canceled) →
+  `Tenant.updateOne {$set:{status:'active'}}` + `recordAudit('workspace.reactivated', from→'active')`.
+  Επιστρέφει `workspaceView` (ίδιο shape με cancel/rename). Slug/dbName/data-db ΑΘΙΚΤΑ.
+- `lib/tenancy/workspace.test.ts` — +7 PURE tests (canReactivateWorkspace owner-yes/admin-member-no/
+  unknown-no· reactivateStatusError canceled-allow-case-space, already-active, suspended-billing/
+  pending, fail-closed unknown/empty/null/number).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run workspace.test.ts` → **26/26 green**
+(19+7)· full suite `npx vitest run` → **795/795 green** (καμία regression). Το route SAAS-gated (404
+όταν SAAS_MODE off) + οι guards pure· κανένας external importer από feature code ⇒ `SAAS_MODE` off =
+**zero effect** στο self-hosted app. Κανένας Docker rebuild (route 404 στο running container με
+SAAS_MODE off — ο νέος κώδικας δεν εκτελείται· type-check+tests καλύπτουν compile+logic)· καμία νέα
+εξάρτηση· κανένα feature route/data-db/User-path αγγίχτηκε. Άγγιξα μόνο δικά μου SAAS αρχεία (foreign
+`.claude/launch.json` + apps/mobile edits άθικτα).
+
+**Next task:** increment 32 — είτε (α) Stripe webhook → suspend/reactivate on payment failure/recovery
+(θέλει live Stripe keys → Needs-Achilleas για το τελικό wiring· ο reactivate guard είναι έτοιμος να το
+consume-άρει programmatically), είτε (β) user-facing workspace-settings UI panels (General/Members/
+Invitations/Activity/Billing + cancel/reactivate controls — όλα τα read/write APIs έτοιμα), είτε (γ)
+`sendViaSmtp` via nodemailer (μετά provider decision Achilleas).
