@@ -35,7 +35,14 @@ export const metadata: Metadata = {
     description: 'One light over everything you run. Self-hosted personal hub.',
   },
   icons: {
-    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    // SVG favicon for modern browser tabs; generated PNG for platforms that
+    // can't render SVG icons; apple-touch-icon for iOS home screens (iOS
+    // ignores SVG favicons). /icon and /apple-icon are next/og routes.
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icon', type: 'image/png', sizes: '512x512' },
+    ],
+    apple: [{ url: '/apple-icon', type: 'image/png', sizes: '180x180' }],
   },
 };
 
