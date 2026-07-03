@@ -3602,3 +3602,37 @@ Read-only audit της web υλοποίησης (v1 API + saas control plane). `
 ### Needs Achilleas
 - **tenant status enforcement (P2/M, decision):** τώρα που υπάρχει reactivate flow, το gating ενός canceled/suspended workspace στο v1 data path (`getTenantContext`) είναι ασφαλές να μπει. Απομένει η απόφαση: block **read+write** (πλήρες lockout, ο owner το ξεκλειδώνει με reactivate/πληρωμή) ή μόνο **write** (read-only grace)· + ποιο error (402 billing vs 403). SAAS-only (dead-until-SaaS).
 - **reset-request timing (P3, decision):** no-account fast-path vs mint+store+mail timing delta· delivery-semantics tradeoff (fire-and-forget ρισκάρει κομμένο send σε serverless). Αμετάβλητο.
+
+## 2026-07-03 (web-code-quality auditor, 39η σάρωση, αυτόνομος γύρος)
+
+Read-only audit της web υλοποίησης (v1 API + saas control plane). `cd apps/web && npm run type-check` **EXIT 0** (0 TS errors). Νέα surface από την 38η (`git diff HEAD~12..HEAD -- api lib models`): billing-audit helpers (`checkoutAudit.ts`+`statusAudit.ts` + tests), `b911882` tenant-status enforcement, `bbb09d1` reactivate, test-only files.
+
+**Counts ανά dimension (live grep, όχι docs):**
+- Type safety: **0** (2 grep hits = η λέξη «any» σε doc-comments στο `workspace.ts:41,86`, μηδέν type).
+- Input validation: **0** gaps. `req.json()` χωρίς readBody = 3 σκόπιμα (auth/login boundary, items/[id]/ai-fill safe-cast, mcp protocol) — αμετάβλητα.
+- Auth: **0** unguarded v1 route εκτός του σωστά exempt `v1/auth/login`.
+- Error handling: **0** νέα. Νέο billing-audit code = pure helpers (καλούνται μέσα σε ήδη-wrapped routes). invites GET/DELETE gap αμετάβλητο (existing P3 item).
+- Mongoose: **0** νέα. N+1 (`.map(async`/`.forEach(async`) σε api = **0**.
+- Duplication/dead code: **0** νέα.
+
+**Νέος κώδικας = exemplary.** `checkoutAuditMeta` (whitelist plan+checkoutId, ΠΟΤΕ hosted URL/email/key· drop blank id) + `statusAuditAction` (pure prev→next map, fail-closed σε unknown/blank, μόνο billing-lifecycle transitions) = καθαροί, unit-tested (`checkoutAudit.test.ts` 41 γρ., `statusAudit.test.ts` 52 γρ.), μηδέν secret leak. Μηδέν νέο debt.
+
+**ΣΗΜΑΝΤΙΚΟ — το top P2/M item έκλεισε (control-plane μισό):** το commit `b911882` πρόσθεσε το `workspaceStatusError` pure guard (`workspace.ts:52`) που καλείται στο `resolveWorkspaceSession` (`workspaceSession.ts:84`) → 403 για suspended/canceled/pending στα workspace-scoped control-plane routes (members/audit/invites/rename), με `allowInactive` opt-out στο GET/DELETE ώστε ο owner να δει + soft-cancel + reactivate. Η acceptance («≥1 enforcement hit στο `src/lib/tenancy`») ΙΚΑΝΟΠΟΙΕΙΤΑΙ. Το residual (v1 feature data-path enforcement) **δεν είναι actionable**: ο v1 auth path (`withAuth`→`bearerUser`, `apiAuth.ts:9`) resolve-άρει User by `apiToken`, ΜΗΔΕΝ tenant/getTenantContext — το v1 δεν είναι ακόμα tenant-scoped, άρα δεν υπάρχει σημείο να μπει `tenant.status` gate. Μεταφέρθηκε σε Needs Achilleas (εξαρτάται από v1 tenant-scoping + read-vs-write decision). Το item βγήκε από την ενεργή ουρά.
+
+**Επαλήθευση εναπομείναντων ενεργών items (και τα 4 ΠΑΡΑΜΕΝΟΥΝ VALID):**
+1. invites `saasGuard` (P3/S) — `grep -c saasGuard invites/route.ts` = **0**· GET@43 + DELETE@102 unwrapped. VALID.
+2. Account token-hash sparse index (P3/S) — `Account.ts:24,26` `verifyTokenHash`/`resetTokenHash` = `{ type:String, default:null }`, μηδέν `.index()`. VALID.
+3. connection cache-reuse `readyState` guard (P3, decision) — `connection.ts:54` `existing.readyState !== 99` περνά και disconnected(0)/disconnecting(3). VALID (dead-until-SaaS).
+4. reset-request timing (P3, decision) — αμετάβλητο. VALID.
+
+**Counts:** P1=0, P2=0 (το μοναδικό P2 έκλεισε control-plane· residual → decision), P3=4 (2 auto-buildable + 2 decision). 39η συνεχόμενη σάρωση χωρίς P1· ένα P2 item έκλεισε, μηδέν νέο άνοιξε.
+
+**Top 3 items να πάρει ο builder μετά (unattended-safe διάταξη):**
+1. **invites/route.ts saasGuard (P3/S)** — τύλιξε GET+DELETE σε `saasGuard` (ίδιο pattern με members). Ολοκληρώνει το try/catch effort· tsc-verifiable.
+2. **Account token-hash sparse index (P3/S)** — `Schema.index({ verifyTokenHash:1 }, { sparse:true })` + `resetTokenHash` στο `models/Account.ts`. Μηδέν runtime αλλαγή· επιταχύνει verify/reset confirm lookups.
+3. (κανένα άλλο auto-buildable· τα υπόλοιπα είναι decision, δες Needs Achilleas)
+
+### Needs Achilleas
+- **v1 data-path tenant-status enforcement (residual του κλεισμένου P2, decision):** το control-plane μισό έκλεισε (`b911882`). Ομως ένας canceled/suspended tenant μπορεί ακόμα να χτυπά v1 feature routes (receipts/items/expenses…) γιατί ο v1 auth path δεν είναι tenant-scoped (`bearerUser` = User-by-token, μηδέν tenant). Για να μπει gate εκεί χρειάζεται πρώτα (α) το v1 να γίνει tenant-scoped (μεγαλύτερο SaaS-data-isolation κομμάτι, δεν υπάρχει) + (β) read-vs-write decision (πλήρες lockout ή read-only grace· 402 billing vs 403). SAAS-only, dead-until-SaaS.
+- **connection cache-reuse guard (P3, decision):** `connection.ts:54` `readyState !== 99` δεν ταιριάζει με το σχόλιο («reuse only while open»)· reuse μόνο σε 1/2 ή διόρθωση σχολίου. Dead-until-SaaS.
+- **reset-request timing (P3, decision):** fire-and-forget `void sendEmail` ευθυγραμμίζει anti-enumeration ΑΛΛΑ ρισκάρει κομμένο send σε serverless. Delivery-semantics tradeoff.
