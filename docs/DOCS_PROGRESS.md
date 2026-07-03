@@ -402,3 +402,41 @@ docs/DOCS_PROGRESS.md.
 Επομενο run: `docs/contributing-docs.md` (πως να προσθεσεις/διορθωσεις doc — style, link-check,
 markdown-first) η enrich `docs/features.md` με screenshot placeholders ανα module. Πρωτα finish-
 in-progress κανενα (ολα done).
+
+## 2026-07-03
+
+Νεο doc: `docs/backup-and-restore.md` — πραγματικο κενο (backups ηταν διασκορπισμενα: μια
+συντομη ενοτητα στο self-hosting.md §7 + JSON export/import + storage mirror + Trash, το καθενα
+αλλου). Ενοποιημενος operational οδηγος, το #1 μελημα καθε self-hoster. Περιεχει: (1) πληρες
+offline backup = ΚΑΙ database ΚΑΙ files (γιατι το DB κραταει μονο paths), (2) automation nightly
+dump (cron Linux + macOS/launchd TCC caveat για ~/Desktop), (3) restore με scripts/restore.sh
+(destructive --drop, typed yes), (4) in-app JSON export/import (portable subset), (5) CSV export
+(3 kinds), (6) remote storage mirror (push-only), (7) Trash / soft-delete (30d auto-purge), (8)
+«what to keep and where» 3-2-1 routine.
+
+Accuracy (διαβασα κωδικα, οχι εικασιες): `scripts/backup.sh` (env defaults MONGO_USER/PASS/DB/
+CONTAINER=homepage-mongo, BACKUP_DIR, RETENTION_DAYS=14, archive homepage-<ts>.archive.gz, fail-
+loud σε empty/no-container), `scripts/restore.sh` (mongorestore --drop --nsInclude, prompt yes),
+`docker-compose.yml` (STORAGE_ROOT=/storage bind απο ./data/storage, mongo-data named volume /data/db,
+container_name homepage-mongo), `app/settings/actions.ts` (exportData → {app:'homepage',version:1,
+collections} με BACKUP_MODELS = items/receipts/statements/subscriptions/vouchers/cards/tasks/stores
+— ΣΗΜΑΝΤΙΚΟ: expenses ΔΕΝ ειναι μεσα, ουτε settings/files· importData upsert by _id, isSafeStoredPath
+guard· exportCSV kinds receipts/expenses/items + toCSV injection-guard + BOM), `SettingsClient.tsx`
+(download filenames pharos-backup-YYYY-MM-DD.json, pharos-<kind>-YYYY-MM-DD.csv). Trash/30d απο
+CLAUDE.md (source of truth) + softDelete plugin· statements hard-delete caveat απο CLAUDE.md.
+Καμια νεα τιμη/env εφευρεθηκε· τα secrets μονο ως placeholder (changeme = το υπαρχον default του
+script, οχι πραγματικο).
+
+Προσθεσα link στο `docs/README.md` index (νεα εγγραφη «Backup & restore» μετα το Configuration) +
+ενα pointer-line στο self-hosting.md §7 (μεσα στο docs/ territory) προς τον νεο οδηγο.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence-lines = 8 (4 balanced blocks). Internal
+links → self-hosting/configuration/features/troubleshooting.md ολα υπαρχουν (test -e). Καμια secret.
+
+Collision guard: `git status --short` δειχνει προϋπαρχοντα .claude/launch.json + apps/mobile/src/screens
+edits (αλλων ρουτινων, ΔΕΝ τα αγγιξα)· staged κενο πριν το add. Stage ΜΟΝΟ docs/backup-and-restore.md +
+docs/README.md + docs/self-hosting.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: η enrich `docs/features.md` με screenshot placeholders ανα module, η `docs/updating.md`
+(dedicated upgrade/migration guide — τωρα ειναι μονο μεσα στο self-hosting.md). Πρωτα finish-in-progress
+κανενα (ολα done).

@@ -26,6 +26,9 @@ GitHub today and can feed a docs site later.
 - **[Configuration](configuration.md)** — AI providers, storage backends
   (local/SMB/FTP/OneDrive), notifications (ntfy/Discord/Slack/Telegram/webhook),
   and language (i18n).
+- **[Backup & restore](backup-and-restore.md)** — the complete offline dump
+  (database + files), automating the nightly `mongodump`, restoring, the in-app
+  JSON/CSV exports, the remote storage mirror, and the Trash safety net.
 - **[Mobile app](mobile.md)** — the Expo iOS/Android companion: install, point it
   at your Pharos server, sign in for a bearer token, camera AI scans, push, and
   building installable binaries with EAS.

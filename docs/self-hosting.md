@@ -206,6 +206,10 @@ recovery, JSON data export/import from Settings, and optional SMB/FTP/OneDrive
 mirroring of the storage bucket to a NAS or cloud drive. These complement, not
 replace, the offline dump above (3-2-1 backups).
 
+For the full picture — automating the nightly dump, restoring, the JSON/CSV
+exports, the storage mirror, and Trash — see the dedicated
+[Backup & restore](backup-and-restore.md) guide.
+
 ---
 
 ## 8. Updating
