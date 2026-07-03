@@ -4,6 +4,8 @@ import { createCheckoutSession } from '@/lib/billing/stripe';
 import { checkoutablePlan, pickBaseUrl, checkoutUrls } from '@/lib/billing/billingRoutes';
 import { readBody, strField } from '@/lib/apiBody';
 import { saasGuard } from '@/lib/tenancy/saasApi';
+import { recordAudit, auditCtx } from '@/lib/tenancy/audit';
+import { checkoutAuditMeta } from '@/lib/billing/checkoutAudit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -56,6 +58,17 @@ export async function POST(req: NextRequest) {
       const status = result.reason === 'not-configured' ? 503 : 502;
       return NextResponse.json({ error: `checkout unavailable: ${result.reason}` }, { status });
     }
+
+    // Best-effort audit: a real Stripe checkout was created and the owner/admin is being sent
+    // to it. recordAudit swallows its own errors and no-ops for the default tenant, so this
+    // never affects the response. Logged AFTER success so failed/unconfigured attempts (502/503)
+    // don't produce a misleading "checkout started" trail.
+    await recordAudit(auditCtx(session.ctx.tenantId), {
+      action: 'billing.checkout_started',
+      actor: session.account.sub,
+      target: session.tenant.slug,
+      meta: checkoutAuditMeta(plan, result.data.id),
+    });
 
     return NextResponse.json({ url: result.data.url, id: result.data.id });
   });

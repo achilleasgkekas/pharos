@@ -1221,3 +1221,37 @@ compile+logic)· καμία νέα εξάρτηση· κανένα feature route
 **Next task:** increment 30 — είτε (α) reactivate route (owner-only, `canceled`→`active`), είτε (β)
 tenant-status access enforcement (canceled/suspended → block στο `resolveWorkspaceSession`), είτε (γ)
 user-facing workspace-settings UI panels (όλα τα read/write APIs έτοιμα).
+
+## 2026-07-03 (increment 33 — record billing.checkout_started στο checkout route)
+**Built:** επέλεξα το (γ) — έκλεισα το τελευταίο κενό στο billing-event audit trail. Το verb
+`billing.checkout_started` υπήρχε ΗΔΗ στο `AUDIT_ACTIONS` (placeholder) αλλά **κανένα route δεν
+το έγραφε**: το increment 32 κατέγραψε τις billing-driven status αλλαγές στο webhook (η «άλλη
+άκρη»), όμως η **έναρξη** ενός checkout δεν αφηνόταν πουθενά. Έτσι ένα «Activity» panel δεν θα
+έδειχνε ποτέ ότι ένας owner/admin ξεκίνησε αναβάθμιση, ούτε θα μπορούσε να correlate-άρει το
+started-checkout με το επακόλουθο webhook event. ΟΛΟ SAAS-gated, additive, σε δικά μου SAAS αρχεία:
+- `lib/billing/checkoutAudit.ts` (νέο) — **PURE** `checkoutAuditMeta(plan, checkoutId?)` (μηδέν
+  imports/DB/env): whitelist ΜΟΝΟ `plan` + (optional) `checkoutId` (Stripe `cs_...` correlation
+  handle, όχι credential). **ΠΟΤΕ** το hosted checkout URL / customer email / Stripe key. Trim του
+  id· blank/whitespace/non-string id → dropped (κανένα `checkoutId:""`).
+- `app/api/saas/billing/checkout/route.ts` (additive edit): μετά το `result.ok`, `recordAudit(
+  auditCtx(session.ctx.tenantId), {action:'billing.checkout_started', actor: session.account.sub,
+  target: session.tenant.slug, meta: checkoutAuditMeta(plan, result.data.id)})`. Best-effort
+  (recordAudit swallows-errors + no-op για default tenant → ΠΟΤΕ δεν επηρεάζει το response).
+  Καταγράφεται **ΜΕΤΑ** το success ώστε failed/unconfigured attempts (502/503) να μη γεννούν
+  παραπλανητικό «checkout started» row.
+- `lib/billing/checkoutAudit.test.ts` (νέο) — 6 PURE tests (plan-only χωρίς/με null/undefined id,
+  real id, trim, blank/whitespace-drop, non-string fail-safe, exact-key-set = κανένα leak).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run checkoutAudit.test.ts` → **6/6
+green**· full suite `npx vitest run` → **880/880 green** (καμία regression). Το checkout route
+είναι SAAS-gated (404 όταν SAAS_MODE off) + ο mapper pure + κανένας external importer από feature
+code ⇒ `SAAS_MODE` off = **zero effect** στο self-hosted app· κανένας Docker rebuild (ο νέος
+κώδικας δεν εκτελείται στο default path — μόνο audit πάνω από το υπάρχον success path· type-check+
+tests καλύπτουν compile+logic)· καμία νέα εξάρτηση· κανένα feature route/data-db/User-path
+αγγίχτηκε. Άγγιξα μόνο δικά μου SAAS αρχεία (foreign `.claude/launch.json` + apps/mobile edits άθικτα).
+
+**Next task:** increment 34 — είτε (α) user-facing workspace-settings UI panels που consume-άρουν τα
+έτοιμα read/write APIs (General/Members/Invitations/Activity/Billing + cancel/reactivate — όλα
+έτοιμα, UI-only), είτε (β) `sendViaSmtp` via nodemailer (μετά provider decision Achilleas· το webhook
+mailer καλύπτει ήδη dependency-free delivery), είτε (γ) `billing.portal_opened` audit στο portal
+route (συμπληρώνει το checkout_started για πλήρες self-service billing audit).
