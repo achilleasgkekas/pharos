@@ -1313,6 +1313,41 @@ h1, h2, h3 {
   outline-offset: 2px;
 }
 
+/* Floating "back to top" button — hidden until scrolled past the hero, then
+   fades in bottom-right. JS toggles `.back-to-top-on`. */
+.back-to-top {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--border-light);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease, background 0.2s ease;
+}
+.back-to-top-on {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.back-to-top:hover {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 8px 30px rgba(0, 255, 136, 0.28);
+}
+
 /* Keyboard focus ring — visible only for keyboard users, brand accent */
 a:focus-visible,
 button:focus-visible,

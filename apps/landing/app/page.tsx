@@ -3,6 +3,7 @@ import { Icon } from './components/Icon';
 import { Waitlist } from './components/Waitlist';
 import { MobileNav } from './components/MobileNav';
 import { ScrollSpy } from './components/ScrollSpy';
+import { BackToTop } from './components/BackToTop';
 
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const SITE_URL = 'https://ph-aros.com';
@@ -491,6 +492,7 @@ export default function Home() {
         </div>
       </header>
       <ScrollSpy />
+      <BackToTop />
 
       {/* ── Hero ──────────────────────────────────────────── */}
       <section id="top" tabIndex={-1} style={{ textAlign: 'center', padding: '112px 0 96px', outline: 'none' }}>

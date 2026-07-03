@@ -715,3 +715,26 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-03 (cont.³)
+
+Task: (e) Polish, μερος 31 — floating «back to top» button (`app/components/BackToTop.tsx`). Ηταν ρητη προταση απο το προηγουμενο log («back to top» button η lazy-load). Το διαλεξα γιατι ειναι φυσικος συντροφος του ScrollSpy + skip-link (a11y/navigation triad): μηδεν assets, μηδεν pricing decision, brand-consistent, ενα νεο component + μια CSS class. Το site εχει 16 sections (~long scroll) αλλα καμια γρηγορη επιστροφη στην κορυφη — ο χρηστης αναγκαζοταν να scrollαρει χειροκινητα.
+
+Τι εφτιαξα:
+- `app/components/BackToTop.tsx` (νεο, client component): fixed κουμπι κατω-δεξια με inline up-chevron SVG (ιδιο stroke idiom με το Icon.tsx, strokeWidth 1.8). Κρυφο μεχρι `window.scrollY > 800` (περιπου μετα το hero), μετα fade-in. Scroll listener με `requestAnimationFrame` throttle + `{passive:true}` (μηδεν jank). Click -> `window.scrollTo({top:0})` με `behavior` που σεβεται το `prefers-reduced-motion` (matchMedia -> 'auto' αλλιως 'smooth') + μεταφερει focus στο `#top` (`focus({preventScroll:true})`) ωστε ο screen reader να ανακοινωσει το jump (reuse του `tabIndex={-1}` που εβαλε το skip-link cont.²). a11y: `aria-label="Back to top"`, `aria-hidden` + `tabIndex` toggle οταν κρυφο (ΔΕΝ ειναι tab-target οσο αορατο). Progressive enhancement: no-op σε SSR, degrade αν λειπει το #top.
+- `app/globals.css`: νεα `.back-to-top` class (46px circle, surface-2 bg + border-light, box-shadow) + `.back-to-top-on` (opacity/translateY reveal, pointer-events auto) + hover (accent bg + dark chevron + accent glow, ιδιο idiom με τα `.btn-primary`). Reuse υπαρχουσων vars (--surface-2/--border-light/--text-dim/--accent/--bg). Τοποθετηθηκε στο a11y block πριν το focus-visible ring (μηδεν αλλαγη σε υπαρχοντες selectors). Το reduced-motion global transition-override ηδη ουδετεροποιει το fade/slide.
+- `app/page.tsx`: import + mount `<BackToTop />` διπλα στο `<ScrollSpy />` (μετα το header).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· ολα 8 routes ○ Static· / = 2.43 kB (πριν 2.18) / 105 kB First Load JS (η μικρη αυξηση = το νεο client component chunk· ολα τα υπολοιπα routes αμεταβλητα).
+- Prerendered HTML (`.next/server/app/index.html`): `back-to-top" aria-label="Back to top"` FOUND στο σωστο baseline hidden state (χωρις `-on` class -> κρυφο μεχρι scroll, οπως αναμενεται). Το interactive reveal/scroll τρεχει μονο client-side· verification = type-check + build + HTML grep (ιδιο pattern με το ScrollSpy client component)· δεν σηκωσα dev server, δεν αγγιξα το Docker :3000. Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged (καμια αλλη ρουτινα mid-commit)· foreign `.claude/launch.json` + `apps/mobile/src/screens/*` (modified, ασταγα, αλλων ρουτινων) ΔΕΝ commit — staged μονο BackToTop.tsx + globals.css + page.tsx + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως lazy-load των mockup blocks η prefers-reduced-motion σεβασμος στο ScrollSpy (χαμηλη προτεραιοτητα, IntersectionObserver δεν κανει animation). Navigation/a11y triad (skip-link + ScrollSpy + back-to-top) πληρες.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.
