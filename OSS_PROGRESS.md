@@ -877,3 +877,25 @@ Import concern + probe: το module κάνει top-level `import { getAppSetting
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + το νέο notify.test.ts. Στάγιαρα μόνο το δικό μου path.
 
 Suggested next task: (f συνέχεια) Επόμενο test file. Τα single-file lib pure helpers έχουν πλέον σχεδόν όλα test. Απομένοντα targets: (α) `lib/storageConfig.ts` — μόνο το `invalidateStorageConfig()` + η `StorageBackend` union είναι pure (το `getStorageConfig` θέλει DB)· χαμηλή αξία μόνο του· (β) `lib/storage.ts` `StorageBucket` union / path-building αν υπάρχει pure κομμάτι· (γ) API-shape/validation helpers σε app/api/v1 route.ts με mocked req (χωρίς live Mongo) — πιο υψηλή αξία, καλύπτει το mobile-app contract· (δ) `components/ui/cn.ts` (thin, χαμηλή αξία). Τρέξε πρώτα `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-03 (cont. — revalidate.test.ts, safeRevalidate fail-safe contract)
+
+**Task: (f συνέχεια) Pure test file `apps/web/src/lib/revalidate.test.ts` για το `safeRevalidate` του `lib/revalidate.ts`.**
+
+Επιβεβαίωση προτεραιοτήτων πρώτα: πριν διαλέξω ξανά (f), επαλήθευσα ότι τα a-e είναι όντως κλειστά (όχι assumption). (a) LICENSE = πλήρες AGPL-3.0 (34KB). (c) `.env.example`: grep `process.env.*` σε όλο το apps/web/src → **κάθε** var που διαβάζεται υπάρχει στο .env.example (τα extras ME_USER/NTFY_TOPIC/SCRAPER_CRON/PRICE_DROP_ALERT_PCT είναι για compose/scraper). (d) README = 190 γραμμές, public-ready. (e) `.github/` = ISSUE_TEMPLATE (bug+feature), PULL_REQUEST_TEMPLATE, ci.yml (τρέχει type-check + npm test + build σε ubuntu, με CI placeholder secrets), release.yml. Άρα η σωστή επιλογή = (f).
+
+Επιλογή target: `find src/lib -maxdepth 1` untested → τα περισσότερα side-effectful (scrape/ollama/appSettings/search/remoteStorage/anthropic/storage/jobRunner/onedrive/softDelete/db/mirror/pdfThumb/storeService/storageConfig). Οι api/v1 routes (items/statements/history) δεν εκθέτουν pure exported helpers (grep = κενό) → extraction θα ήταν source edit εκτός territory. Διάλεξα το `safeRevalidate` γιατί κλειδώνει έναν πραγματικό fail-safe: το `revalidatePath()` του Next **πετάει** όταν καλείται εκτός request scope, και ο background job worker (`lib/jobRunner`) τρέχει detached από request. Ένα uncaught throw θα σκότωνε τον worker στη μέση ενός job. Το wrapper πρέπει να swallow-άρει την εξαίρεση (το skipped revalidate δεν είναι correctness θέμα — pages είναι force-dynamic + polling). Ντετερμινιστικό με `vi.mock('next/cache')`, μηδέν request context/DB.
+
+Τι έγινε:
+- Νέο `revalidate.test.ts` (8 tests) με hoisted `vi.mock('next/cache')` + mock ref reconfigured per test. Καλύπτει: happy path forwards path verbatim → `revalidatePath('/receipts')`· returns undefined on success· empty path pass-through (no normalization)· **δεν πετάει όταν το revalidatePath πετάει** (out-of-request scope)· returns undefined ακόμα κι όταν throws· **επιχειρεί την κλήση ΠΡΙΝ swallow-άρει** (path έφτασε στο wrapped fn)· swallow και non-Error throws (thrown string)· μία κλήση ανά invocation (no retry-on-success).
+- **Σημείο που κλειδώθηκε**: το fail-safe contract (throwing revalidatePath → absorbed silently, ο worker επιβιώνει) + το «attempt-then-swallow» ordering (ένα ακούσιο reorder που swallow-άρει πριν την κλήση θα περνούσε τα άλλα tests αλλά θα έσπαγε το cache-invalidation entirely).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/revalidate.test.ts` → 8/8 passed.
+- `npx vitest run` (όλο το suite) → 55 files, 820/820 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + το νέο revalidate.test.ts. Στάγιαρα μόνο το δικό μου path.
+
+Suggested next task: (f συνέχεια) Επόμενο pure test file, αλλά η ουρά καθαρών targets στένεψε πολύ. Απομένοντα: (α) `components/ui/cn.ts` (thin clsx+tailwind-merge wrapper — χαμηλή αξία, τεστάρει third-party conflict-resolution)· (β) API-shape/validation με mocked req σε app/api/v1 route.ts — πιο υψηλή αξία (καλύπτει το mobile contract) αλλά θέλει mock του DB layer/session, όχι πλέον pure· (γ) `lib/storageConfig.ts` `invalidateStorageConfig` + StorageBackend union invariant (thin). Εναλλακτικά, αν εξαντληθούν τα καθαρά, σκέψου μετακίνηση στην προτεραιότητα coverage των υπαρχόντων (edge cases σε ήδη-tested modules). Τρέξε πρώτα `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
