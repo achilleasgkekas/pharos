@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 44eff1a -->
-<!-- docker-validated: dc8a83f -->
+<!-- docker-validated: db18c72 -->
+
+## 2026-07-03 (docker-health guard — rebuild OK, stack healthy, 965MB build cache reclaimed)
+- **Health (πριν):** homepage-mongo **healthy** (48min uptime, ιστορικά 223 restarts από παλιά OOM, όχι τωρινό loop), homepage-web restarts **0**, searxng up. flaresolverr ήδη Exited (143) εδώ και 3 μέρες, καμία memory pressure. Disk: images 4.41GB, build cache 1.069GB, volumes 848MB — VM άνετα.
+- **Rebuild:** το diff `dc8a83f..HEAD` (db18c72) άγγιζε web runtime code (billing/aiCost+aiKeyPolicy+portalAudit+usage, tenancy/audit+context, models Tenant+Usage, scrape, api/saas+v1 routes) → δικαιολογημένο rebuild. Ασφαλής χορός: `docker compose build web` (image μόνο, OK) → mongo healthy check → `docker compose up -d web` → poll `/login` → **HTTP 200** (μετά ~28s) → web restarts παρέμειναν **0**, status running.
+- **Disk hygiene:** `docker builder prune -f` → reclaimed **965.2MB**. Μετά το build τα images ανέβηκαν 4.41→5.98GB (νέα layers, αναμενόμενο), VM παραμένει άνετο (~31GB).
+- **Marker:** docker-validated `dc8a83f` → **`db18c72`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-03 (reviewer — range 2fa5c29..44eff1a· tsc web+mobile EXIT 0, 56 νέα tests green, μηδέν regression)
 - **Εύρος:** 3 code commits (τα υπόλοιπα docs): `cb2d136` landing canonical+HowTo JSON-LD, `7a533b4` BYO-key AI policy (usage/context/Tenant + νέο `aiKeyPolicy.ts`), `44eff1a` scrape helpers export+tests. Επίσης test-only: `a69ca22` notifiers legacy-ntfy migration test.
