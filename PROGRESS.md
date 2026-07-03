@@ -5,6 +5,19 @@
 <!-- reviewed: acba60a -->
 <!-- docker-validated: 1b6e18c -->
 
+## 2026-07-03 (parity-auditor — 42η σάρωση· CONFIRMATION· DONE 7 / GAP 0 / NEEDS DECISION 0 νέα)
+- **Read-only audit** (inventory από κώδικα, όχι docs· μηδέν Docker, μηδέν AI, μηδέν app-code edit).
+- **Inventory:** **50 v1 routes** (`find api/v1 -name route.ts`· login + 49 bearer), **16 mobile screens**. Route↔consumer: μηχανικός loop route-base-paths vs `apps/mobile/src/api.ts` → **κάθε route base έχει ≥1 mobile consumer, μηδέν orphan** (incl. push/register, expenses/[id]/rescan, όλα τα deep items/[id]/* + receipts/[id]/* + scan/* + trash/[type]/[id]).
+- **Δέλτα:** τελευταίο mobile-src commit `acba60a` (SearchScreen row→ListItem, UI-debt ήδη committed+reviewed)· τελευταίο api/v1 `7670bf9` (anomaly, audited). Μετέπειτα (`2fc4893` test(notifiers), `7f4e99e`/`df5f376` landing, `eab4ac9`/`28e0575` docs) = **όλοι web-only** → μηδέν νέα portable δυνατότητα, μηδέν doc-fix στα parity rows.
+- **Checks:** mobile `npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type error).
+- **Doc-accuracy note:** raw-`<TextInput>` live grep → SettingsScreen + ShoppingScreen πλέον **0 raw inputs** (όλα `<Input>`)· το εναπομείναν non-WIP Input-debt είναι ΜΟΝΟ τα 2 ItemsScreen `logInput` (visual delta). Ενημέρωσα το Build Queue note ανάλογα.
+- **Counts:** DONE 7 (parity queue 6/6 + Activity) / auto-buildable functional GAP **0** / NEEDS DECISION **0** νέα. Functional parity πυρήνας κλειστός → builder δουλεύει UI Debt Queue.
+- **Top-3 για τον builder (unattended-safe, non-WIP):** (1) StatementsScreen `badge`→`<Badge>` [P3/S]· (2) fresh pure-lib vitest coverage (`lib/scrape.ts` price-parse helpers με minimal export → safe rebuild, ή `lib/cards.ts`/`lib/taxonomies.ts`/`lib/itemStatus.ts` καθαρά pure χωρίς rebuild)· (3) ItemsScreen `logInput`→`<Input>` [P2/S, attended-preferred λόγω visual delta].
+- **Docs:** `MOBILE_PARITY.md` — νέο 42η-σάρωση note στην κορυφή του Build Queue. Git hygiene: staged ΜΟΝΟ `MOBILE_PARITY.md` + `PROGRESS.md` (ρητά paths). ΔΕΝ αγγίχτηκαν τα WIP του Αχιλλέα (`.claude/launch.json`, Receipts/Settings/Shopping screens).
+
+### Needs Achilleas (parity-auditor 2026-07-03 42η)
+- Τίποτα νέο ασφαλείας· μηδέν committed secret. Εκκρεμείς αποφάσεις (αμετάβλητες): native mobile deps (safe-area / charting / persist)· theme toggle + language switcher· AI-engine / storage / OneDrive στα mobile Settings· statements merge-bind + PDF-import (θέλουν write/upload endpoints)· remote push (EAS dev build + APNs)· Tasks Kanban board. Επίσης: Receipts/Settings/Shopping mobile screens έχουν μακροχρόνιο uncommitted WIP στο working tree — commit ή revert θα ξεμπλόκαρε το εναπομείναν Receipts Input/hitSlop UI-debt.
+
 ## 2026-07-03 (reviewer — range 3b29203..acba60a· καθαρό, μηδέν regression)
 - **Έλεγξα:** 4 code commits πάνω από το προηγ. marker (df5f376 landing back-to-top, 10c26d3 storage tests, a4c1fd3 checkout audit, acba60a mobile SearchScreen→ListItem) + τα docs commits.
 - **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· full vitest **59 files / 880 tests PASS** (τα 22 νέα των checkoutAudit+storage πράσινα).
