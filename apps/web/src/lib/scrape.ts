@@ -16,7 +16,7 @@ export type ScrapedPage = {
  *  page. Detect them so we fail with a clear message instead of handing the LLM a
  *  challenge page (which yields a garbage "product"). */
 const CHALLENGE_PLATFORM = /\/cdn-cgi\/challenge-platform\//i;
-function isBotChallenge(status: number, html: string, server: string | null): boolean {
+export function isBotChallenge(status: number, html: string, server: string | null): boolean {
   // The cdn-cgi/challenge-platform script also ships on normally-served Cloudflare pages,
   // so it only signals a challenge when the body is tiny (the interstitial is ~6KB).
   if (CHALLENGE_PLATFORM.test(html) && html.length < 20000) return true;
@@ -58,7 +58,7 @@ async function fetchViaSolver(url: string): Promise<{ html: string; status: numb
   return { html: data.solution.response ?? '', status: data.solution.status ?? 200 };
 }
 
-function decodeEntities(s: string): string {
+export function decodeEntities(s: string): string {
   return s
     .replace(/&nbsp;/gi, ' ')
     .replace(/&euro;/gi, '€')
@@ -68,7 +68,7 @@ function decodeEntities(s: string): string {
 }
 
 /** Greek "1.234,56" / "576.10" / "625,00" → number. */
-function parsePriceNum(s: string): number {
+export function parsePriceNum(s: string): number {
   let t = (s.match(/\d[\d.,]*/) || [''])[0];
   if (/,\d{1,2}$/.test(t)) t = t.replace(/\./g, '').replace(',', '.'); // EU decimal comma
   else t = t.replace(/,/g, ''); // thousands separators only
@@ -81,7 +81,7 @@ function parsePriceNum(s: string): number {
  *  visible-text crop, behind related-product prices — so the LLM can't reliably pick it
  *  from text. Take the first such element (the main product); if a VAT-excluded twin
  *  follows (×1.06/1.13/1.24) keep the gross. Returns '' when there is no price markup. */
-function extractPrimaryPrice(html: string): string {
+export function extractPrimaryPrice(html: string): string {
   const cands: { v: number; t: string }[] = [];
   const push = (raw: string) => {
     const t = decodeEntities(raw);
