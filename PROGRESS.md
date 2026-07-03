@@ -2,8 +2,15 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 44eff1a -->
+<!-- reviewed: 8b3d477 -->
 <!-- docker-validated: db18c72 -->
+
+## 2026-07-03 (reviewer — range 44eff1a..8b3d477· tsc web+mobile EXIT 0, 25 νέα tests green, μηδέν regression)
+- **Εύρος:** 8 commits· 3 code (τα υπόλοιπα docs/chore): `3d7e3e3` test-only /api/v1/tasks GET+POST shape, `6b4b9bf` landing roadmap section, `db18c72` usage ledger AI token + estimated-cost accounting (TODO §11). Docs/chore: `194c135` backlog, `80dc00d`+`8b3d477` σαρώσεις, `e4d293b` docker-validate.
+- **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` (absolute path) → **EXIT 0** (με τα uncommitted WIP του Αχιλλέα Receipts/Settings/Shopping + `storeService.ts`/`storeService.test.ts` + `.claude/launch.json` παρόντα, καθαρό). Νέα tests: `aiCost.test.ts` (10) + `api/v1/tasks/route.test.ts` (15) → **25/25 pass** (0.3s).
+- **Review ευρήματα:** μηδέν regression. **Usage ledger** (`db18c72`) = additive + SAAS-gated: νέο pure `aiCost.ts` (normalizeAiUsage clamps NaN/negative/float → non-neg int, integer micros → μηδέν float-drift στα running totals)· `recordAiUsage` atomic `$inc` upsert, το legacy `recordAiCall(ctx,n)` έγινε thin wrapper με διατηρημένο το `n===0` no-op (calls=0∧tokens=0∧cost=0 → skip write)· BYO-key/default-tenant/SAAS-off short-circuit αμετάβλητα. **API shape:** `/api/saas/usage` πρόσθεσε ΜΟΝΟ πεδία (aiInputTokens/aiOutputTokens/aiCostMicros) → **καθαρά additive, μηδέν ρίσκο για το mobile app**. Landing roadmap = isolated marketing site (`apps/landing`), nav wiring πλήρως συνεπές: `#roadmap` section id (page.tsx:1089) ↔ desktop nav (553) ↔ MobileNav ITEMS ↔ ScrollSpy SECTIONS όλα ταιριάζουν.
+- **Fixes:** κανένα (τίποτα small/unsafe προς διόρθωση, όλα πράσινα). **Flags:** κανένα νέο P1/P2. Documented future-work (όχι bug, ήδη flagged στο commit body): το `DEFAULT_AI_RATE` είναι placeholder pricing (Needs Achilleas) + `recordAiUsage` δεν έχει external importers ακόμα (plumbing, θα καλωδιωθεί στα AI call sites). Δεν flag-άρεται εδώ.
+- **Marker:** reviewed `44eff1a` → **`8b3d477`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-03 (docker-health guard — rebuild OK, stack healthy, 965MB build cache reclaimed)
 - **Health (πριν):** homepage-mongo **healthy** (48min uptime, ιστορικά 223 restarts από παλιά OOM, όχι τωρινό loop), homepage-web restarts **0**, searxng up. flaresolverr ήδη Exited (143) εδώ και 3 μέρες, καμία memory pressure. Disk: images 4.41GB, build cache 1.069GB, volumes 848MB — VM άνετα.
