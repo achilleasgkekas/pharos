@@ -738,3 +738,26 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-03 (cont.⁴)
+
+Task: (e) Polish, μερος 32 — copy-to-clipboard κουμπι στο self-host Docker quickstart (`app/components/CopyButton.tsx`). Ρητη προταση απο προηγουμενα logs για interaction polish. Το διαλεξα γιατι ειναι το φυσικο επομενο για το OSS κοινο: το #self-host section δειχνει το `docker compose` quickstart σε `<pre>` χωρις καμια affordance για αντιγραφη -> ο χρηστης επρεπε να το επιλεξει χειροκινητα. Μηδεν assets, μηδεν pricing decision, brand-consistent, ενα νεο client component + μια CSS class.
+
+Τι εφτιαξα:
+- `app/components/CopyButton.tsx` (νεο, client component): δεχεται `text` prop (τα raw commands, ξεχωριστα απο το colour-tokenised markup του `<pre>`), copy μεσω `navigator.clipboard.writeText`, flip σε «Copied» confirmation (check icon) για 1.8s με cleanup του timer στο unmount. **Progressive enhancement**: mount-αρει (returns null) μονο οταν υπαρχει Clipboard API -> no-JS/SSR readers βλεπουν το code κανονικα, απλα χωρις το κουμπι. try/catch γυρω απο το write (μπορει να απορριφθει σε insecure context/permissions) -> fail quietly, το code μενει ορατο για manual selection. Copy/check SVG icons με το ιδιο stroke idiom (strokeWidth 1.8) οπως BackToTop/Icon. a11y: dynamic `aria-label` (copy vs copied).
+- `app/page.tsx`: νεα `QUICKSTART_COMMANDS` const (τα raw commands, kept-in-sync με το `<pre>`, χτισμενη απο το `GITHUB_URL` ωστε να μη διχαζεται το URL) + wrap του `<pre>` σε `.code-wrap` (position:relative) με `<CopyButton>` pinned top-right + import.
+- `app/globals.css`: `.code-wrap` (relative) + `.copy-btn` (absolute top-right, surface-2 bg + border-light, mono 0.72rem, hover -> accent border + text) + `.copy-btn-done` (accent). Reuse υπαρχουσων vars, τοποθετηθηκε αμεσως μετα τα `.code-block` rules (μηδεν αλλαγη σε υπαρχοντες selectors). Το reduced-motion global transition-override ηδη ουδετεροποιει τα transitions.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· ολα 8 routes ○ Static· / = 2.77 kB (πριν 2.43) / 105 kB First Load JS (η αυξηση = το νεο client component chunk· ολα τα υπολοιπα routes αμεταβλητα).
+- Prerendered HTML (`.next/server/app/index.html`): `code-wrap` + `Docker quick start` + `git clone ...pharos.git` FOUND (το wrapper + το code block prerendered). Το CopyButton returns null σε SSR (mounts client-side μετα το clipboard-support check) -> σωστα ΔΕΝ εμφανιζεται στο static HTML· ιδιο progressive-enhancement pattern με τα προηγουμενα client components. Verification = type-check + build + HTML grep· δεν σηκωσα dev server, δεν αγγιξα το Docker :3000. Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged (καμια αλλη ρουτινα mid-commit)· foreign `.claude/launch.json` + `apps/mobile/src/screens/*` (modified, ασταγα, αλλων ρουτινων) ΔΕΝ commit — staged μονο CopyButton.tsx + page.tsx + globals.css + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως lazy-load των mockup blocks. Interaction/a11y triad (skip-link + ScrollSpy + back-to-top + copy-btn) πληρες.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/drawer GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD).
+- Contact inbox hello@ph-aros.com για τα waitlist emails.

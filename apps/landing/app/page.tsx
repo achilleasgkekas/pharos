@@ -4,9 +4,22 @@ import { Waitlist } from './components/Waitlist';
 import { MobileNav } from './components/MobileNav';
 import { ScrollSpy } from './components/ScrollSpy';
 import { BackToTop } from './components/BackToTop';
+import { CopyButton } from './components/CopyButton';
 
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const SITE_URL = 'https://ph-aros.com';
+
+// Raw quickstart commands, kept in sync with the colour-tokenised <pre> below.
+// Used by the copy-to-clipboard button so the copied text has no markup.
+const QUICKSTART_COMMANDS = [
+  '# Pull and start the stack',
+  `git clone ${GITHUB_URL}.git`,
+  'cd pharos',
+  'cp .env.example .env   # set your secrets',
+  'docker compose up -d',
+  '',
+  '# Open http://localhost:3000',
+].join('\n');
 
 const FEATURES: {
   icon: string;
@@ -880,15 +893,18 @@ export default function Home() {
             ))}
           </div>
 
-          <pre className="code-block" aria-label="Docker quick start">
-            <span className="tok-comment"># Pull and start the stack</span>{'\n'}
-            <span className="tok-cmd">git clone</span> {GITHUB_URL}.git{'\n'}
-            <span className="tok-cmd">cd</span> pharos{'\n'}
-            <span className="tok-cmd">cp</span> .env.example .env   <span className="tok-comment"># set your secrets</span>{'\n'}
-            <span className="tok-cmd">docker compose up</span> -d{'\n'}
-            {'\n'}
-            <span className="tok-comment"># Open http://localhost:3000</span>
-          </pre>
+          <div className="code-wrap">
+            <CopyButton text={QUICKSTART_COMMANDS} />
+            <pre className="code-block" aria-label="Docker quick start">
+              <span className="tok-comment"># Pull and start the stack</span>{'\n'}
+              <span className="tok-cmd">git clone</span> {GITHUB_URL}.git{'\n'}
+              <span className="tok-cmd">cd</span> pharos{'\n'}
+              <span className="tok-cmd">cp</span> .env.example .env   <span className="tok-comment"># set your secrets</span>{'\n'}
+              <span className="tok-cmd">docker compose up</span> -d{'\n'}
+              {'\n'}
+              <span className="tok-comment"># Open http://localhost:3000</span>
+            </pre>
+          </div>
 
           <div className="deploy-strip">
             <p className="mono deploy-label">Runs anywhere you do</p>
