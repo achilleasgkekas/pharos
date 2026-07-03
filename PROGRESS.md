@@ -2,8 +2,15 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 8b3d477 -->
+<!-- reviewed: 0c010e0 -->
 <!-- docker-validated: db18c72 -->
+
+## 2026-07-03 (REVIEWER — range 8b3d477..0c010e0, 7 commits, καθαρό)
+- **Τι επιθεώρησα:** τα 7 commits από τον προηγ. reviewed marker (`8b3d477`) ως HEAD (`0c010e0`): 4 test/docs commits, 2 feat (saas cost-summary block, landing PWA manifest), 1 test (tasks PATCH/DELETE route). Diff = 15 αρχεία, +828/−29, κυρίως tests + docs· κώδικας που άλλαξε: `lib/appSettings.ts` (extract `normalizeSettings`/export `numMap`), `lib/storeService.ts` (export `matchIn`), `api/saas/usage/route.ts` (+`cost` block), νέο `lib/billing/costSummary.ts`, νέο `apps/landing/app/manifest.ts` + `layout.tsx` (+`manifest` metadata).
+- **Checks (read-only):** `apps/web` tsc **EXIT 0**· `apps/mobile` `tsc --noEmit` **EXIT 0**. Έτρεξα και τα 4 νέα test files (`appSettings` 18, `costSummary` 8, `storeService` 15, `tasks/[id]` 16) → **57/57 green**.
+- **Review findings:** μηδέν regression. (α) Το `usage/route.ts` `cost` block είναι **additive** (νέο top-level field, δεν αλλάζει υπάρχον shape) → ασφαλές για το mobile API. Τα πεδία που καταναλώνει (`aiInputTokens`/`aiOutputTokens`/`aiCostMicros`) υπάρχουν όντως στο `UsageSnapshot` (`lib/billing/usage.ts:82-84`). (β) `costSummary.ts` = pure, όλα τα numeric inputs περνούν από `nonNegInt` → κανένα NaN/negative στο read surface. (γ) `normalizeSettings` extraction = behavior-preserving (ίδια fields/σειρά, currency side-effect + cache μένουν στο async wrapper). (δ) landing manifest icon `/favicon.svg` → resolves μέσω `apps/landing/public/favicon.svg` (υπάρχει), consistent με το προϋπάρχον `layout.tsx` icon ref. Μηδέν secret, μηδέν hardcoded value, μηδέν acceptance-gap.
+- **Fixes:** κανένα χρειάστηκε (tree ήδη πράσινο).
+- **Flagged:** τίποτα. Ουρές (WEB_DEBT/MOBILE_PARITY) αμετάβλητες. ΣΗΜ: υπάρχουν uncommitted edits του Αχιλλέα (`apps/mobile` Receipts/Settings/Shopping screens + `.claude/launch.json`) — δεν τα άγγιξα, δεν σπάνε το tsc.
 
 ## 2026-07-03 (pharos-daily-dev — vitest coverage για το `lib/appSettings.ts` normalization· 18 tests green)
 - **Τι έκανα:** έκλεισα το ρητά suggested-next-task της προηγ. builder εγγραφής («pure-lib coverage — `lib/appSettings.ts` `getAppSettings` normalization/coercion: `numMap` positive-number filter, defaultItemView list/grid guard, `autoAddStores !== false`, taxonomy resolution»). Ο functional parity πυρήνας παραμένει κλειστός (0 auto-buildable GAP)· τα εναπομείναντα UI-debt items είναι WIP-blocked (Receipts/Settings/Shopping screens του Αχιλλέα, uncommitted) ή attended-preferred (ItemsScreen `logInput`, visual delta), οπότε pure-lib coverage ήταν ξανά ο ασφαλέστερος υψηλής-αξίας unattended δρόμος. Από τους candidate modules μόνο `appSettings.ts` + `storageConfig.ts` έμεναν untested· διάλεξα το `appSettings.ts` (μεγαλύτερη, μη-τετριμμένη coercion λογική + ρητά ζητημένο).
