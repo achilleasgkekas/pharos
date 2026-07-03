@@ -237,6 +237,9 @@ docker compose up -d --build
 > across restarts, but changed code can still invalidate old bundles in a stale
 > tab.
 
+For version pinning, database migrations, post-upgrade checks, and rolling back,
+see the dedicated [Updating](updating.md) guide.
+
 ---
 
 ## 9. Running behind HTTPS / a reverse proxy

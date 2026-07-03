@@ -29,6 +29,9 @@ GitHub today and can feed a docs site later.
 - **[Backup & restore](backup-and-restore.md)** — the complete offline dump
   (database + files), automating the nightly `mongodump`, restoring, the in-app
   JSON/CSV exports, the remote storage mirror, and the Trash safety net.
+- **[Updating](updating.md)** — moving an existing instance to a newer version:
+  what persists, image tags & version pinning, whether migrations are needed,
+  post-upgrade checks, and rolling back.
 - **[Mobile app](mobile.md)** — the Expo iOS/Android companion: install, point it
   at your Pharos server, sign in for a bearer token, camera AI scans, push, and
   building installable binaries with EAS.

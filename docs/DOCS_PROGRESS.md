@@ -440,3 +440,40 @@ docs/README.md + docs/self-hosting.md + docs/DOCS_PROGRESS.md.
 Επομενο run: η enrich `docs/features.md` με screenshot placeholders ανα module, η `docs/updating.md`
 (dedicated upgrade/migration guide — τωρα ειναι μονο μεσα στο self-hosting.md). Πρωτα finish-in-progress
 κανενα (ολα done).
+
+## 2026-07-03 (updating guide)
+
+Νεο doc: `docs/updating.md` — dedicated upgrade/migration/rollback οδηγος. Ηταν το προτεινομενο
+επομενο βημα του προηγ. run· η αναβαθμιση ζουσε μονο ως συντομη §8 στο self-hosting.md (pull/up +
+hard-refresh note), χωρις version pinning, migrations, rollback, MongoDB upgrade. Περιεχει: (1)
+τι επιβιωνει σε upgrade (πινακας: mongo-data volume, ./data/storage bind, .env — μονο το web image
+αλλαζει), (2) before-you-upgrade (full backup DB+files, note current image, skim ROADMAP), (3)
+prebuilt image pull/up + verify, (4) from-source git pull + build, (5) image tags & PHAROS_IMAGE
+pinning, (6) database migrations = ΚΑΝΕΝΑ separate step (Mongoose backward-compat· το migrate.ts
+ειναι μονο το legacy-tracker import, οχι upgrade migration· TODO για CHANGELOG), (7) after-upgrade
+(hard refresh, logs, sanity check), (8) rollback = pin previous tag + pull/up, (9) MongoDB pinned
+mongo:7 δεν αλλαζει σε app upgrade.
+
+Accuracy (διαβασα κωδικα/config, οχι εικασιες): `docker-compose.prod.yml` (image
+${PHAROS_IMAGE:-ghcr.io/achilleasgkekas/pharos:latest}, header comments με τα ακριβη pull/up
+commands + pin example 1.2.3, required .env AUTH_SECRET/NEXT_SERVER_ACTIONS_ENCRYPTION_KEY/MONGO_*,
+volumes ./data/storage:/storage + mongo-data:/data/db, container_name homepage-web/homepage-mongo),
+`.github/workflows/release.yml` (v*.*.* tag → :X.Y.Z/:X.Y/:X/:latest· workflow_dispatch → :edge·
+multi-arch amd64+arm64· GHCR GITHUB_TOKEN), `ls scripts/` (migrate.ts = tracker→Mongo one-off,
+ΟΧΙ upgrade migration· επιβεβαιωσα zero startup-migration hook σε compose/Dockerfile + zero
+runMigration/schemaVersion στο src), `apps/web/package.json` version 0.1.0. Καμια νεα τιμη/env/tag
+εφευρεθηκε· secrets μονο ως placeholder (PHAROS_IMAGE tag = παραδειγμα).
+
+Προσθεσα link στο `docs/README.md` index (νεα «Updating» μετα το Backup & restore) + pointer-line
+στο self-hosting.md §8 προς τον νεο οδηγο.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence-lines = 14 (7 balanced blocks). Internal
+links → self-hosting/backup-and-restore/configuration/troubleshooting.md + ../ROADMAP.md ολα υπαρχουν
+(test -e). Καμια secret.
+
+Collision guard: `git status --short` δειχνει προϋπαρχοντα .claude/launch.json + apps/mobile/src/screens
+edits (αλλων ρουτινων, ΔΕΝ τα αγγιξα)· staged κενο πριν το add. Stage ΜΟΝΟ docs/updating.md +
+docs/README.md + docs/self-hosting.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: enrich `docs/features.md` με screenshot placeholders ανα module, η `docs/contributing-docs.md`
+(docs style + link-check + markdown-first convention). Πρωτα finish-in-progress κανενα (ολα done).
