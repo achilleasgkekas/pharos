@@ -2,8 +2,19 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 2f31c5d -->
+<!-- reviewed: 0ac3041 -->
 <!-- docker-validated: b911882 -->
+
+## 2026-07-03 (reviewer — range 2f31c5d..0ac3041· tsc web+mobile EXIT 0, 56 νέα tests green, μηδέν regression)
+- **Τι έλεγξα:** 7 commits (12c46e8, cfaddd8, 88e44c6, 061b3fa, 04105ca, bbb09d1, 0ac3041). Functional: (α) `feat(landing)` root global-error boundary, (β) `feat(saas)` workspace reactivate route + `lib/tenancy/workspace.ts` helpers + `audit.ts` enum. Υπόλοιπα = tests + docs.
+- **Checks:** `apps/web` type-check EXIT 0, `apps/mobile` tsc EXIT 0. Έτρεξα και τα 3 νέα test files (`aiProviders.test.ts`, `notify.test.ts`, `workspace.test.ts`) → **56/56 pass**.
+- **Review findings:**
+  - **`workspace/reactivate/route.ts`** — πιστό mirror του DELETE cancel route: SAAS-gated (`saasGuard`), `allowInactive:true` ώστε το canceled tenant να είναι reachable, owner-only gate (`canReactivateWorkspace`), `reactivateStatusError` fail-closed (409 σε already-active/suspended/pending/unknown, μόνο `canceled`→`active`), audit `workspace.reactivated`, `workspaceView` whitelist projection. Response shape `{ workspace: WorkspaceView }` = ίδιο με cancel → μηδέν mobile break. Acceptance «owner-only canceled→active» ✅ met.
+  - **`audit.ts`** — μόνο νέο enum value `workspace.reactivated`, additive.
+  - **`workspace.ts`** — μόνο νέες pure helpers (reactivate gate/status), μηδέν αλλαγή σε υπάρχουσα λογική.
+  - **`landing/global-error.tsx`** — σωστά self-contained (renders δικό του `<html>/<body>` αφού αντικαθιστά το root layout· inline styles, hardcoded brand). Named import `{ PharosMark }` verified ότι resolve-άρει (named export υπάρχει).
+  - **Secrets:** μηδέν committed secret στο diff.
+- **Fixes:** κανένα (δεν χρειάστηκε). **Flags:** κανένα νέο.
 
 ## 2026-07-03 (pharos-daily-dev — vitest coverage για `lib/aiProviders.ts`· 17 tests green)
 - **Τι έκανα:** έγραψα το **`apps/web/src/lib/aiProviders.test.ts`** (νέο), το unattended-safe εναλλακτικό task που πρότειναν οι τελευταίες builder εγγραφές (fresh pure-lib vitest coverage). Ο functional parity πυρήνας είναι κλειστός· τα top-3 UI Debt items ήταν είτε **attended-preferred** (ItemsScreen `logInput` — visual delta) είτε mobile-only με visual delta (SearchScreen row→ListItem, Statements badge→Badge, μη auto-testable unattended). Το `aiProviders.ts` ήταν **untested** (module χωρίς `.test.ts`) και είναι fully-verifiable με mocked `fetch` → μηδέν Docker, μηδέν AI cost, μηδέν WIP σύγκρουση, μηδέν visual regression risk.
