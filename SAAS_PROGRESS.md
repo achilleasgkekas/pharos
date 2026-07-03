@@ -1255,3 +1255,42 @@ tests καλύπτουν compile+logic)· καμία νέα εξάρτηση· �
 έτοιμα, UI-only), είτε (β) `sendViaSmtp` via nodemailer (μετά provider decision Achilleas· το webhook
 mailer καλύπτει ήδη dependency-free delivery), είτε (γ) `billing.portal_opened` audit στο portal
 route (συμπληρώνει το checkout_started για πλήρες self-service billing audit).
+
+## 2026-07-03 (increment 34 — record billing.portal_opened στο portal route)
+**Built:** επέλεξα το (γ) — έκλεισα το τελευταίο κενό στο self-service billing audit trail. Το
+increment 33 κατέγραψε το `billing.checkout_started` (έναρξη αναβάθμισης)· έλειπε το άλλο
+self-service billing entry point, το **billing portal** (όπου owner/admin διαχειρίζεται/ακυρώνει
+συνδρομή + payment details). Χωρίς αυτό, ένα «Activity» panel δεν θα έδειχνε ποτέ ότι κάποιος
+άνοιξε το portal, ούτε θα μπορούσε να correlate-άρει το portal-open με το επακόλουθο
+subscription-change webhook. ΟΛΟ SAAS-gated, additive, σε δικά μου SAAS αρχεία:
+- `lib/tenancy/audit.ts` — +1 auditable verb `billing.portal_opened` στο `AUDIT_ACTIONS` (μόνη
+  αλλαγή· redaction/recorder αμετάβλητα), grouped δίπλα στο `billing.checkout_started`.
+- `lib/billing/portalAudit.ts` (νέο) — **PURE** `portalAuditMeta(plan?, portalId?)` (μηδέν
+  imports/DB/env): whitelist ΜΟΝΟ το current `plan` (context: ποιος άνοιξε το portal, σε ποιο
+  plan) + (optional) `portalId` (Stripe `bps_...` correlation handle, όχι credential). **ΠΟΤΕ** το
+  portal URL / Stripe customer id / key. Trim + drop blank/whitespace/non-string και στα δύο
+  πεδία (κανένα `plan:""`/`portalId:""`).
+- `app/api/saas/billing/portal/route.ts` (additive edit): μετά το `result.ok`, `recordAudit(
+  auditCtx(session.ctx.tenantId), {action:'billing.portal_opened', actor: session.account.sub,
+  target: session.tenant.slug, meta: portalAuditMeta(session.tenant.plan, result.data.id)})`.
+  Best-effort (recordAudit swallows-errors + no-op για default tenant → ΠΟΤΕ επηρεάζει το
+  response). Καταγράφεται **ΜΕΤΑ** το success ώστε failed/unconfigured/no-customer attempts
+  (502/503/409) να μη γεννούν παραπλανητικό «portal opened» row.
+- `lib/billing/portalAudit.test.ts` (νέο) — 6 PURE tests (plan-only χωρίς/με null/undefined id,
+  real id, trim plan+id, blank/whitespace-drop και στα δύο, non-string fail-safe, exact-key-set =
+  κανένα leak).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run portalAudit.test.ts` → **6/6
+green**· full suite `npx vitest run` → **902/902 green** (καμία regression). Το portal route είναι
+SAAS-gated (404 όταν SAAS_MODE off) + ο mapper pure + κανένας external importer από feature code ⇒
+`SAAS_MODE` off = **zero effect** στο self-hosted app· κανένας Docker rebuild (ο νέος κώδικας δεν
+εκτελείται στο default path — μόνο audit πάνω από το υπάρχον success path· type-check+tests
+καλύπτουν compile+logic)· καμία νέα εξάρτηση· κανένα feature route/data-db/User-path αγγίχτηκε.
+Άγγιξα μόνο δικά μου SAAS αρχεία (foreign `.claude/launch.json` + apps/mobile edits άθικτα).
+
+**Next task:** increment 35 — είτε (α) user-facing workspace-settings UI panels που consume-άρουν τα
+έτοιμα read/write APIs (General/Members/Invitations/Activity/Billing + checkout/portal/cancel/
+reactivate — όλα τα APIs έτοιμα, UI-only), είτε (β) `sendViaSmtp` via nodemailer (μετά provider
+decision Achilleas· το webhook mailer καλύπτει ήδη dependency-free delivery), είτε (γ) tenant-status
+access enforcement (canceled/suspended → block στο `resolveWorkspaceSession`/`accountTenants`, ώστε
+canceled workspaces να μη σερβίρονται).

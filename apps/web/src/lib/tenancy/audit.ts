@@ -22,6 +22,7 @@ export const AUDIT_ACTIONS = [
   'invite.revoked',
   'plan.changed',
   'billing.checkout_started',
+  'billing.portal_opened',
   'workspace.created',
   'workspace.updated',
   'workspace.canceled',

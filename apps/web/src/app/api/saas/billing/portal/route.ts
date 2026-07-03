@@ -4,6 +4,8 @@ import { createPortalSession } from '@/lib/billing/stripe';
 import { pickBaseUrl, portalReturnUrl } from '@/lib/billing/billingRoutes';
 import { readBody, strField } from '@/lib/apiBody';
 import { saasGuard } from '@/lib/tenancy/saasApi';
+import { recordAudit, auditCtx } from '@/lib/tenancy/audit';
+import { portalAuditMeta } from '@/lib/billing/portalAudit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,6 +50,17 @@ export async function POST(req: NextRequest) {
       const status = result.reason === 'not-configured' ? 503 : 502;
       return NextResponse.json({ error: `billing portal unavailable: ${result.reason}` }, { status });
     }
+
+    // Best-effort audit: a real Stripe billing-portal session was created and the owner/admin
+    // is being sent to it. recordAudit swallows its own errors and no-ops for the default
+    // tenant, so this never affects the response. Logged AFTER success so failed/unconfigured
+    // attempts (502/503/409) don't produce a misleading "portal opened" trail.
+    await recordAudit(auditCtx(session.ctx.tenantId), {
+      action: 'billing.portal_opened',
+      actor: session.account.sub,
+      target: session.tenant.slug,
+      meta: portalAuditMeta(session.tenant.plan, result.data.id),
+    });
 
     return NextResponse.json({ url: result.data.url, id: result.data.id });
   });
