@@ -2,8 +2,14 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 2fa5c29 -->
+<!-- reviewed: 44eff1a -->
 <!-- docker-validated: dc8a83f -->
+
+## 2026-07-03 (reviewer — range 2fa5c29..44eff1a· tsc web+mobile EXIT 0, 56 νέα tests green, μηδέν regression)
+- **Εύρος:** 3 code commits (τα υπόλοιπα docs): `cb2d136` landing canonical+HowTo JSON-LD, `7a533b4` BYO-key AI policy (usage/context/Tenant + νέο `aiKeyPolicy.ts`), `44eff1a` scrape helpers export+tests. Επίσης test-only: `a69ca22` notifiers legacy-ntfy migration test.
+- **Checks:** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` (από το apps/mobile) → **EXIT 0** (με τα uncommitted WIP του Αχιλλέα Receipts/Settings/Shopping + `.claude/launch.json` παρόντα, καθαρό). Νέα tests: `scrape.test.ts` (30) + `aiKeyPolicy.test.ts` (10) + `notifiers.migration.test.ts` (16) → **56/56 pass** (0.3s).
+- **Review ευρήματα:** μηδέν regression. **BYO-key** (`7a533b4`) = additive + flag-guarded: `Tenant.aiByoKey` default false· ο DEFAULT_TENANT (self-hosted/OSS) short-circuit-άρει ήδη στο `isMetered` (SAAS_MODE off), οπότε το νέο branch μόνο managed multi-tenant επηρεάζει· `aiKeyPolicy.ts` pure (type-only import, μηδέν DB/Stripe/secret — το κλειδί μένει αλλού, TODO §14)· `checkAiQuota`/`recordAiCall` αγγίζουν ΜΟΝΟ το AI path, το storage metering μένει· υπάρχοντα metered tenants (byoKey undefined→false) αμετάβλητα. `scrape.ts` = μόνο 4 `export` keywords σε προϋπάρχουσες pure helpers, το `fetchPageText` τις καλεί ίδια εσωτερικά (behavior-preserving). Landing JSON-LD/canonical = pure SEO, τα HowTo steps derive από το single-source `STEPS` const. **Καμία αλλαγή σε API response shape → μηδέν ρίσκο για το mobile app.**
+- **Fixes:** κανένα (τίποτα small/unsafe προς διόρθωση). **Flags:** κανένα νέο P1/P2. Documented future-work (όχι bug, ήδη flagged στα commit bodies): BYO-key encrypted-key storage/rotation (TODO §14, Needs Achilleas) + το enforcement wiring που μπλοκάρει το AI op στο quota-hit είναι ακόμα ξεχωριστό βήμα. Δεν flag-άρεται εδώ.
 
 ## 2026-07-03 (pharos-daily-dev — vitest coverage για τα price-parse helpers του `lib/scrape.ts`· 30 tests green)
 - **Τι έκανα:** έγραψα το **`apps/web/src/lib/scrape.test.ts`** (νέο), υλοποιώντας το ρητά suggested-next-task που επαναλαμβάνουν οι τελευταίες builder/parity/reviewer εγγραφές («pure-lib vitest coverage — `lib/scrape.ts` internal price-parse helpers, θέλουν minimal `export`»). Ο functional parity πυρήνας είναι κλειστός (0 auto-buildable GAP)· τα εναπομείναντα UI-debt items είναι είτε **WIP-blocked** (Receipts/Settings/Shopping screens του Αχιλλέα, uncommitted) είτε **attended-preferred** (ItemsScreen `logInput`, visual delta), οπότε test coverage ενός untested runtime module ήταν ο ασφαλέστερος υψηλής-αξίας unattended δρόμος.
