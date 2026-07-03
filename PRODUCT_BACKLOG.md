@@ -6,13 +6,16 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-02 (2η σάρωση planner· +4 candidates P6-P9).
+> Τελευταία ενημέρωση: 2026-07-03 (3η σάρωση planner· +4 candidates P10-P13). Κανένα από τα
+> P1-P9 δεν χτίστηκε ακόμα (τα πρόσφατα commits ήταν SaaS/billing/docs/mobile-parity) → όλα ισχύουν.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
-Ranked by value/effort (πρώτο = καλύτερη σχέση αξίας προς κόπο).
+Ranked by value/effort (πρώτο = καλύτερη σχέση αξίας προς κόπο). ΣΗΜ: η αρίθμηση P# είναι
+απλό id (σειρά προσθήκης), όχι σειρά προτεραιότητας — το value/effort standing γράφεται σε κάθε item.
+Από τα νέα, τα **P10 και P11 είναι από τα υψηλότερα value/effort όλης της λίστας**.
 
 ### P1. Demo / sample-data mode σε fresh install — S — OSS (κυρίως), both
 - **Αξία:** πρώτη εντύπωση σε νέο self-host = άδειο dashboard. Ένα «Load sample data»
@@ -88,6 +91,50 @@ Ranked by value/effort (πρώτο = καλύτερη σχέση αξίας πρ
   (amount+currency+rate), aggregations, imports και όλα τα money views.
 - **Module:** cross-cutting (Expenses/Receipts/Statements/Reports + `lib/money.ts`).
 - **Απόφαση που χρειάζεται:** πηγή FX (manual entry, δωρεάν API, ή on-import capture); να ξεκινήσει opt-in ανά deployment ώστε να μη βαρύνει τους single-currency χρήστες;
+
+### P10. Return-window & warranty-claim tracker — S — both (πολύ ψηλό value/effort)
+- **Αξία:** το app ήδη κρατά warranty expiry + notification framework, αλλά αγνοεί το **παράθυρο
+  επιστροφής**. Στην ΕΕ ισχύει 14ήμερο δικαίωμα υπαναχώρησης (κι άλλα καταστήματα δίνουν 30/100
+  μέρες). Ένα computed «return by» πεδίο ανά απόδειξη/είδος (default 14 μέρες από purchase date,
+  override ανά κατάστημα) + alert 2-3 μέρες πριν λήξει → ο χρήστης δεν χάνει ποτέ το δικαίωμα
+  επιστροφής/αλλαγής. Ελάχιστος κόπος (μια παραγόμενη ημερομηνία + reuse του υπάρχοντος
+  `runAlertChecks`/notifiers), άμεσα χειροπιαστό όφελος, ταιριάζει στο ελληνικό/EU κοινό.
+- **Module:** Receipts / Items (+ Notifications, Calendar feed αν γίνει το P6).
+- **Απόφαση που χρειάζεται:** default return-window (14 μέρες EU) global ή per-store editable; να
+  εμφανίζεται και ως badge «5 μέρες για επιστροφή» στην κάρτα απόδειξης;
+
+### P11. Email-in auto-import — self-hosted IMAP receipt inbox — M — both (ψηλό value/effort)
+- **Αξία:** το μεγαλύτερο long-term value σε ένα receipt hub είναι η **συνεχής** αυτόματη σύλληψη,
+  όχι το one-off Gmail Takeout που έγινε ήδη. Ο χρήστης βάζει IMAP creds (ή ένα dedicated
+  forwarding address) → background poller τραβά νέα emails με συνημμένα/receipt bodies → περνά από
+  το ΥΠΑΡΧΟΝ pipeline (attachment/html→text→AI parse→dedupe→draft receipt). Μετατρέπει το Pharos
+  από «μια φορά σκάναρα το αρχείο μου» σε «κάθε νέα απόδειξη μπαίνει μόνη της». Καθαρό OSS win για
+  self-host· στο SaaS γίνεται managed inbox (συμπληρώνει, ΔΕΝ διπλασιάζει το TODO §13 που είναι
+  chat-bot/webhook ingest με per-message metering — εδώ είναι mailbox polling).
+- **Module:** Receipts (+ νέος `lib/imap.ts` poller / cron, reuse email-inbox import που υπάρχει).
+- **Απόφαση που χρειάζεται:** IMAP polling (κρατά creds) ή μόνο forward-to-address (πιο ασφαλές, χωρίς
+  credentials); πόσο συχνά poll; στο SaaS metered ανά AI-parse ή free ingest + metered parse;
+
+### P12. Savings / financial goals (στόχοι, όχι όρια) — S/M — both
+- **Αξία:** τα budgets είναι **όρια δαπάνης** ανά κατηγορία/μήνα· λείπει η θετική πλευρά — **στόχοι**
+  («μάζεψε €2.000 για το sailing trip μέχρι Σεπ», «€500 για νέο GPU»). Ένα `Goal` model (target
+  ποσό + προθεσμία + optional linked category/manual contributions) + progress ring + «είσαι στον
+  ρυθμό / χρειάζεσαι €X/μήνα». Κλασικό sticky personal-finance feature που δίνει λόγο να μπαίνεις
+  τακτικά. Reuse του reports aggregation + calendar deadline pattern.
+- **Module:** Reports (νέα «Goals» ενότητα) + Homepage card.
+- **Απόφαση που χρειάζεται:** τα goals τρέφονται αυτόματα από κατηγορία/income series ή μόνο manual
+  contributions; ένα ή πολλά ταυτόχρονα goals;
+
+### P13. Home-inventory insurance export bundle — M — both (OSS differentiator)
+- **Αξία:** το inventory (τι κατέχεις) + οι αποδείξεις + οι φωτο + οι εγγυήσεις είναι ήδη εκεί.
+  Ένα «Insurance / proof-of-ownership export» παράγει PDF/ZIP με λίστα assets (κατηγορία, αξία,
+  serial, ημ. αγοράς) + συνημμένες αποδείξεις/φωτο + σύνολο ασφαλιστέας αξίας. Χρήσιμο για
+  ασφάλιση κατοικίας ή δήλωση απώλειας/κλοπής — δίνει στο «personal hub» έναν λόγο ύπαρξης πέρα
+  από finance tracking. **Διακριτό από το P8** (P8 = tax-deductible έξοδα· εδώ = τεκμηρίωση
+  περιουσιακών στοιχείων). Reuse του CSV/backup export machinery + PDF gen.
+- **Module:** Items/Inventory (+ Reports/Settings για το export).
+- **Απόφαση που χρειάζεται:** αξία = purchasedPrice ή currentPrice (αγοραστική vs τρέχουσα); PDF, ZIP
+  με αρχεία, ή και τα δύο; να μπει behind paid tier στο SaaS ή παντού;
 
 ---
 
