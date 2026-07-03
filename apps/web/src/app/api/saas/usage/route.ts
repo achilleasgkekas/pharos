@@ -46,7 +46,14 @@ export async function GET(req: Request) {
   return NextResponse.json({
     tenant: { slug: chosen.slug, name: chosen.name, plan: ctx.plan, status: ctx.status, role: chosen.role },
     period: usage.period,
-    usage: { aiCalls: usage.aiCalls, storageBytes: usage.storageBytes, metered: usage.metered },
+    usage: {
+      aiCalls: usage.aiCalls,
+      aiInputTokens: usage.aiInputTokens,
+      aiOutputTokens: usage.aiOutputTokens,
+      aiCostMicros: usage.aiCostMicros,
+      storageBytes: usage.storageBytes,
+      metered: usage.metered,
+    },
     quotas: {
       ai: aiQuotaStatus(ctx.plan, usage.aiCalls),
       storage: storageQuotaStatus(ctx.plan, usage.storageBytes),

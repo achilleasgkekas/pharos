@@ -1347,3 +1347,49 @@ feature route/data-db/User-path/bearer-path αγγίχτηκε. Άγγιξα μ�
 `aiCalls` count· λείπουν tokens/estimated-cost πεδία — additive Usage fields + record signature),
 είτε (γ) user-facing workspace-settings UI panels που consume-άρουν τα έτοιμα read/write APIs
 (General/Members/Invitations/Activity/Billing — όλα έτοιμα, UI-only).
+
+## 2026-07-03 (increment 36 — usage ledger tokens + estimated cost, TODO §11)
+**Built:** επέλεξα το (β) — το Usage ledger μετρούσε ΜΟΝΟ `aiCalls` count (plan quotas ανά
+VOLUME), αλλά το πραγματικό platform spend το οδηγούν τα **tokens**. Πρόσθεσα token + estimated-
+cost accounting στο ledger, ΟΛΟ additive + backward-compatible, σε δικά μου SAAS αρχεία:
+- `models/Usage.ts` (additive fields) — **`aiInputTokens` / `aiOutputTokens`** (running token
+  totals ανά μήνα, monotonic όπως το aiCalls) + **`aiCostMicros`** (running estimated AI spend
+  σε currency **micros** = εκατομμυριοστά μιας νομισματικής μονάδας, integer → μηδέν float drift).
+  Όλα `default 0` → υπάρχοντα Usage docs αμετάβλητα (Mongoose default fill on read/write).
+- `lib/billing/aiCost.ts` (νέο, **PURE** — μηδέν imports/DB/env): `AiUsageDetail` (όλα optional
+  ώστε ο απλός caller να περνά `{}` = ένα call, no token data), `normalizeAiUsage(detail)` (κάθε
+  πεδίο → non-negative integer, `calls` default 1 αλλά explicit `0` μένει 0· NaN/negative/float/
+  garbage → safe), `AiRate` (micros ανά 1M tokens), `DEFAULT_AI_RATE` (**PLACEHOLDER** ~€3/1M in,
+  ~€15/1M out — Needs-Achilleas για πραγματικό pricing), `estimateCostMicros(in,out,rate?)`
+  (floored integer, clamps garbage → 0).
+- `lib/billing/usage.ts` (additive edit, δικό μου) — νέο **`recordAiUsage(ctx, detail, at)`** που
+  `$inc` atomic ΚΑΙ τα τέσσερα (calls+in+out+cost) upsert· `recordAiCall(ctx, n, at)` έγινε **thin
+  wrapper** πάνω του (`{calls:n}`) → ίδιο return (new aiCalls total), ίδιο gate (BYO-key / default
+  tenant / SAAS off = no-op 0), ίδια «n===0 = true no-op» συμπεριφορά (empty-detail skip). Το
+  `UsageSnapshot` + `currentUsage` επεκτάθηκαν με τα 3 νέα πεδία (zeroed helper για off-path).
+- `app/api/saas/usage/route.ts` (additive, δικό μου SAAS route) — το read surface εκθέτει πλέον
+  `aiInputTokens/aiOutputTokens/aiCostMicros` δίπλα στο `aiCalls`.
+- `lib/billing/aiCost.test.ts` (νέο) — 10 PURE tests (normalize defaults/passthrough/explicit-0/
+  floor+clamp/NaN-fail-safe· estimate zero/rate-math/default-rate/floor/garbage-clamp).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run aiCost.test.ts usage.test.ts` →
+**19/19 green**· full suite `npx vitest run` → **983/983 green** (καμία regression, +10 νέα).
+External importers των `billing/usage`/`recordAiUsage`/`billing/aiCost` από feature code →
+**κανένας** (grep) — το metering path δεν είναι wired σε κανένα AI/feature route ακόμα· το usage
+route SAAS-gated (404 όταν off). ⇒ `SAAS_MODE` off / default tenant = **zero effect** (isMetered
+false short-circuit· τα νέα fields default 0). Κανένας Docker rebuild (unwired scaffold·
+type-check+tests καλύπτουν compile+logic)· καμία νέα εξάρτηση· κανένα feature route/data-db/
+User-path/bearer-path αγγίχτηκε. Άγγιξα μόνο δικά μου SAAS αρχεία (foreign `.claude/launch.json`
++ apps/mobile edits άθικτα).
+
+**## Needs Achilleas** (token/cost metering):
+- **Πραγματικό AI pricing**: το `DEFAULT_AI_RATE` (~€3/1M in, ~€15/1M out) είναι placeholder. Όταν
+  κλειδώσει το provider + το model, όρισε τον σωστό `AiRate` (ιδανικά per-model, από env/config).
+- **Token wiring στα AI call sites**: το `recordAiUsage(ctx, {inputTokens, outputTokens, costMicros})`
+  θέλει να καλείται μετά από κάθε AI op με τα πραγματικά token counts (τα Anthropic responses έχουν
+  `usage.input_tokens/output_tokens`). Αγγίζει `api/v1/*` / AI call sites (feature territory) → ρητή
+  άδεια ή feature-builder routine (ίδιο ανοιχτό με το enforcement wiring).
+
+**Next task:** increment 37 — είτε (α) surface tokens/cost στο billing summary (`billingSummary.ts`)
++ ένα «cost this month» read helper, είτε (β) BYO-key resolver+storage scaffold μόλις οριστεί crypto
+(Needs-Achilleas), είτε (γ) user-facing workspace-settings UI panels (όλα τα APIs έτοιμα, UI-only).

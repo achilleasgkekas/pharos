@@ -8,12 +8,18 @@ import { Schema, model, models, type Model, type InferSchemaType } from 'mongoos
  *
  * One document per (tenant, period) where `period` is the billing month "YYYY-MM". It
  * accumulates the metered quantities the plan caps:
- *   - aiCalls:      number of AI operations this month (metered by VOLUME, per plan).
- *   - storageBytes: latest snapshot of the tenant's data-db + files footprint (a gauge,
- *                   overwritten by #10 dbStats metering — NOT a running sum).
+ *   - aiCalls:       number of AI operations this month (metered by VOLUME, per plan).
+ *   - aiInputTokens / aiOutputTokens: running token totals this month (TODO §11 — the
+ *                    cost basis: plan caps by call VOLUME, but tokens/cost drive the real
+ *                    platform spend and any future token-based plan tiers).
+ *   - aiCostMicros:  running estimated AI spend this month in currency micros (millionths
+ *                    of one unit, integer → no float drift). A best-effort estimate from
+ *                    token totals × a rate; the source of truth for real billing stays Stripe.
+ *   - storageBytes:  latest snapshot of the tenant's data-db + files footprint (a gauge,
+ *                    overwritten by #10 dbStats metering — NOT a running sum).
  *
- * Kept deliberately small (a ledger, not an event log). Per-call detail/token/cost lines
- * can land in a separate append-only collection later (TODO §11) without touching this.
+ * Kept deliberately small (a ledger, not an event log). Per-call detail lines can land in a
+ * separate append-only collection later without touching this rollup.
  */
 const UsageSchema = new Schema(
   {
@@ -23,6 +29,11 @@ const UsageSchema = new Schema(
     // Monotonic within a month: number of AI calls consumed. Reset happens implicitly by
     // moving to a new period document, so history stays queryable.
     aiCalls: { type: Number, default: 0 },
+    // Running token totals this month (monotonic, like aiCalls). Cost basis for TODO §11.
+    aiInputTokens: { type: Number, default: 0 },
+    aiOutputTokens: { type: Number, default: 0 },
+    // Running estimated AI spend this month, in currency micros (integer, no float drift).
+    aiCostMicros: { type: Number, default: 0 },
     // Latest storage footprint snapshot in bytes (gauge, not additive).
     storageBytes: { type: Number, default: 0 },
     // When storageBytes was last refreshed (dbStats sampling).

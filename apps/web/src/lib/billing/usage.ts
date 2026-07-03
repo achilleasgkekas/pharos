@@ -13,6 +13,7 @@ import { connectDB } from '@/lib/db';
 import { Usage, type UsageDoc } from '@/models/Usage';
 import { entitlementsFor, withinAiQuota, withinStorage } from './entitlements';
 import { isByoKey, meterAiUsage, unmeteredAiQuota } from './aiKeyPolicy';
+import { normalizeAiUsage, type AiUsageDetail } from './aiCost';
 import { saasMode } from '@/lib/tenancy/saasMode';
 import type { TenantContext } from '@/lib/tenancy/context';
 
@@ -78,9 +79,17 @@ function isMetered(ctx: TenantContext): boolean {
 export type UsageSnapshot = {
   period: string;
   aiCalls: number;
+  aiInputTokens: number;
+  aiOutputTokens: number;
+  aiCostMicros: number;
   storageBytes: number;
   metered: boolean;
 };
+
+/** A zeroed snapshot (default tenant / SAAS_MODE off) — no DB access. */
+function zeroSnapshot(period: string): UsageSnapshot {
+  return { period, aiCalls: 0, aiInputTokens: 0, aiOutputTokens: 0, aiCostMicros: 0, storageBytes: 0, metered: false };
+}
 
 /**
  * Current-period usage for a tenant. The default/self-hosted tenant (or SAAS_MODE off)
@@ -88,33 +97,54 @@ export type UsageSnapshot = {
  */
 export async function currentUsage(ctx: TenantContext, at: Date = new Date()): Promise<UsageSnapshot> {
   const period = periodOf(at);
-  if (!isMetered(ctx)) return { period, aiCalls: 0, storageBytes: 0, metered: false };
+  if (!isMetered(ctx)) return zeroSnapshot(period);
   await connectDB();
   const doc = (await Usage.findOne({ tenant: ctx.tenantId, period }).lean()) as UsageDoc | null;
   return {
     period,
     aiCalls: doc?.aiCalls ?? 0,
+    aiInputTokens: doc?.aiInputTokens ?? 0,
+    aiOutputTokens: doc?.aiOutputTokens ?? 0,
+    aiCostMicros: doc?.aiCostMicros ?? 0,
     storageBytes: doc?.storageBytes ?? 0,
     metered: true,
   };
 }
 
 /**
- * Record `n` AI calls (default 1) against the tenant's current period, returning the new
- * running total. No-op returning 0 for the default tenant / SAAS_MODE off. Atomic upsert
- * so concurrent calls don't lose increments.
+ * Record one AI operation's full usage (calls + input/output tokens + estimated cost micros)
+ * against the tenant's current period. Returns the new running aiCalls total (0 = not
+ * recorded). No-op for the default tenant / SAAS_MODE off / BYO-key tenants. Atomic `$inc`
+ * upsert so concurrent calls don't lose increments. `detail.calls` defaults to 1.
  */
-export async function recordAiCall(ctx: TenantContext, n: number = 1, at: Date = new Date()): Promise<number> {
+export async function recordAiUsage(
+  ctx: TenantContext,
+  detail: AiUsageDetail = {},
+  at: Date = new Date()
+): Promise<number> {
   // BYO-key tenants run on their own AI key → zero platform cost → not metered.
-  if (!isMetered(ctx) || !meterAiUsage(ctx.byoKey) || n === 0) return 0;
+  if (!isMetered(ctx) || !meterAiUsage(ctx.byoKey)) return 0;
+  const { calls, inputTokens, outputTokens, costMicros } = normalizeAiUsage(detail);
+  // Nothing to record → skip the write entirely (keeps "n === 0" callers a true no-op).
+  if (calls === 0 && inputTokens === 0 && outputTokens === 0 && costMicros === 0) return 0;
   const period = periodOf(at);
   await connectDB();
   const doc = await Usage.findOneAndUpdate(
     { tenant: ctx.tenantId, period },
-    { $inc: { aiCalls: n } },
+    { $inc: { aiCalls: calls, aiInputTokens: inputTokens, aiOutputTokens: outputTokens, aiCostMicros: costMicros } },
     { new: true, upsert: true, setDefaultsOnInsert: true }
   ).lean();
   return (doc as UsageDoc | null)?.aiCalls ?? 0;
+}
+
+/**
+ * Record `n` AI calls (default 1) against the tenant's current period, returning the new
+ * running total. Thin wrapper over `recordAiUsage` (no token/cost detail) — preserved for
+ * callers that only count call volume. No-op returning 0 for the default tenant / SAAS_MODE
+ * off / BYO-key tenants.
+ */
+export async function recordAiCall(ctx: TenantContext, n: number = 1, at: Date = new Date()): Promise<number> {
+  return recordAiUsage(ctx, { calls: n }, at);
 }
 
 /**
