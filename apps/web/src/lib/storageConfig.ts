@@ -15,18 +15,31 @@ export type StorageConfig = {
   hasPass: boolean;
 };
 
-let cache: { v: StorageConfig; t: number } | null = null;
-const TTL = 5000;
+/** Shape of the persisted AppConfig singleton fields consumed here (all optional). */
+export type RawStorageConfigDoc = {
+  storageBackend?: string;
+  storageMirror?: boolean;
+  folderTemplate?: string;
+  fileNameTemplate?: string;
+  remoteHost?: string;
+  remotePort?: number;
+  remoteUser?: string;
+  remotePass?: string;
+  remoteShare?: string;
+  remoteBasePath?: string;
+  remoteSecure?: boolean;
+} | null | undefined;
 
-export async function getStorageConfig(): Promise<StorageConfig> {
-  if (cache && Date.now() - cache.t < TTL) return cache.v;
-  await connectDB();
-  const doc = await AppConfig.findOne({ key: 'singleton' }).lean();
+/**
+ * Pure, DB-free coercion of a persisted AppConfig doc into a StorageConfig.
+ * Extracted from getStorageConfig so it is unit-testable without a DB mock.
+ */
+export function normalizeStorageConfig(doc: RawStorageConfigDoc): StorageConfig {
   const backend: StorageBackend =
     doc?.storageBackend === 'ftp' || doc?.storageBackend === 'smb' || doc?.storageBackend === 'onedrive'
       ? doc.storageBackend
       : 'local';
-  const v: StorageConfig = {
+  return {
     backend,
     mirror: !!doc?.storageMirror,
     folderTemplate: doc?.folderTemplate || DEFAULT_FOLDER_TEMPLATE,
@@ -43,6 +56,16 @@ export async function getStorageConfig(): Promise<StorageConfig> {
     },
     hasPass: !!doc?.remotePass,
   };
+}
+
+let cache: { v: StorageConfig; t: number } | null = null;
+const TTL = 5000;
+
+export async function getStorageConfig(): Promise<StorageConfig> {
+  if (cache && Date.now() - cache.t < TTL) return cache.v;
+  await connectDB();
+  const doc = await AppConfig.findOne({ key: 'singleton' }).lean();
+  const v = normalizeStorageConfig(doc as RawStorageConfigDoc);
   cache = { v, t: Date.now() };
   return v;
 }
