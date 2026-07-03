@@ -899,3 +899,24 @@ Suggested next task: (f συνέχεια) Επόμενο test file. Τα single-
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + το νέο revalidate.test.ts. Στάγιαρα μόνο το δικό μου path.
 
 Suggested next task: (f συνέχεια) Επόμενο pure test file, αλλά η ουρά καθαρών targets στένεψε πολύ. Απομένοντα: (α) `components/ui/cn.ts` (thin clsx+tailwind-merge wrapper — χαμηλή αξία, τεστάρει third-party conflict-resolution)· (β) API-shape/validation με mocked req σε app/api/v1 route.ts — πιο υψηλή αξία (καλύπτει το mobile contract) αλλά θέλει mock του DB layer/session, όχι πλέον pure· (γ) `lib/storageConfig.ts` `invalidateStorageConfig` + StorageBackend union invariant (thin). Εναλλακτικά, αν εξαντληθούν τα καθαρά, σκέψου μετακίνηση στην προτεραιότητα coverage των υπαρχόντων (edge cases σε ήδη-tested modules). Τρέξε πρώτα `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-03 (cont. — storage.test.ts, path-traversal guard + saveFile shape)
+
+**Task: (f συνέχεια) Test file `apps/web/src/lib/storage.test.ts` για τα `saveFile`/`readFile`/`deleteFile` + τον (μη-exported) traversal guard `resolveWithinStorage` του `lib/storage.ts`.**
+
+Επιλογή target: σάρωσα ξανά τα untested lib modules (`find src/lib -maxdepth 2`). Τα περισσότερα εναπομείναντα είναι side-effectful network/DB (scrape/ollama/appSettings/search/remoteStorage/anthropic/onedrive/jobRunner/mirror/pdfThumb/storeService/db/softDelete) ή browser-only (clientImage). Επιθεώρησα τα exports: `storageConfig.getStorageConfig` θέλει DB, `onedrive.*` είναι όλα Graph HTTP calls. Το `storage.ts` ξεχώρισε γιατί (α) εκθέτει έναν πραγματικό **security contract** (`resolveWithinStorage` — path.relative-based guard κατά `..` traversal + absolute paths που φτάνουν readFile/deleteFile από route params ή tampered DB filePath), και (β) το `saveFile` παράγει το relativePath που αποθηκεύεται στη Mongo + σερβίρεται από `/api/files`. Μοναδικά deps = `node:fs`/`node:path`/`node:crypto` → πλήρως mockable, μηδέν DB, ντετερμινιστικό.
+
+Import/env concern + resolution: το `STORAGE_ROOT` διαβάζεται μία φορά στο module-eval. Το έθεσα σε fixed `/srv/pharos-storage` **πριν** το dynamic import (μέσα σε `beforeAll`), ώστε τα path assertions να μην εξαρτώνται από cwd/δίσκο. Το `node:fs` (`{ promises as fs }`) mock-άρεται με hoisted `vi.mock` (self-contained factory, μηδέν πραγματικό I/O). Ο clock πιν-άρεται σε UTC-noon (`2026-06-04T12:00:00Z`) ώστε το year/month να είναι TZ-stable σε κάθε CI timezone (assert `receipts/2026/06/…` μόνο· η ημέρα μένει regex).
+
+Τι έγινε:
+- Νέο `storage.test.ts` (16 tests). **saveFile** (7): bucket/year/month/dated-16hex-filename shape· `filePath === path.join(ROOT, relativePath)` + μέσα στο root· extension normalization (bare `pdf` → `.pdf`, dotted `.png` δεν διπλασιάζεται σε `..png`)· bucket = πρώτο segment· `mkdir {recursive:true}` + `writeFile(buffer)` κλήσεις· **unique filename ανά call** (random hash). **readFile traversal guard** (6): legit relative → `fs.readFile(path.resolve(ROOT,rel))`· `../` που normalize-άρει ΠΙΣΩ μέσα (`receipts/../statements/x.pdf`) επιτρέπεται· `../../etc/passwd` → throw 'Path escapes storage root' χωρίς fs κλήση· absolute `/etc/passwd` → throw· empty '' (resolves στο root) → throw· nested climb-out → throw. **deleteFile guard** (3): legit unlink· traversal + absolute → throw + ποτέ unlink.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/storage.test.ts` → 16/16 passed.
+- `npx vitest run` (όλο το suite) → 58 files, 874/874 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + τα δικά μου storage.test.ts + OSS_PROGRESS.md. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Η ουρά καθαρών pure-lib targets έχει σχεδόν εξαντληθεί. Πιο αξιόλογη επόμενη κίνηση = (β) API-shape/validation tests σε `app/api/v1/*/route.ts` με mocked DB layer/session (καλύπτει το mobile-app REST contract — π.χ. ένα route που κάνει validation πριν το DB write· mock `connectDB` + το model). Χαμηλότερης αξίας fallbacks: (α) `components/ui/cn.ts` (thin clsx+tailwind-merge)· (γ) edge-case coverage σε ήδη-tested modules. Τρέξε πρώτα `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
