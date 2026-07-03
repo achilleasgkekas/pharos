@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 0ac3041 -->
-<!-- docker-validated: b911882 -->
+<!-- docker-validated: 1b6e18c -->
+
+## 2026-07-03 (docker-health guard — safe rebuild + cache prune)
+- **Health:** homepage-mongo `healthy` (restarts 192 ιστορικά, up 2h, όχι loop), homepage-web restarts 0 `running`. Τρέχουν web/mongo/searxng· κανένα flaresolverr (μηδέν επιπλέον πίεση μνήμης).
+- **Rebuild:** ΝΑΙ. Ο diff `b911882..HEAD -- apps/web` άγγιζε web runtime code (Stripe webhook route, workspace reactivate route, `billing/statusAudit.ts`, `tenancy/audit.ts`, `tenancy/workspace.ts` + tests). Safe dance: prune → `docker compose build web` (image only) → mongo healthy check → `docker compose up -d web` → `/login` → **200 στην 1η προσπάθεια** → web restarts παρέμειναν 0.
+- **Disk:** `docker builder prune -f` πριν (2.105GB) + μετά (2.106GB) το build → ~4.2GB build cache ανακτημένα συνολικά. Images 6.48GB, volumes 846MB αμετάβλητα (SAFE, μόνο cache).
+- **Marker:** docker-validated `b911882` → **`1b6e18c`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
+- **Needs Achilleas:** κανένα.
 
 ## 2026-07-03 (pharos-daily-dev — vitest coverage για τα 7 AI-parse Zod schemas του `lib/ollama.ts`· 30 tests green)
 - **Τι έκανα:** έγραψα το **`apps/web/src/lib/ollama.schemas.test.ts`** (νέο), συνεχίζοντας το suggested-next-task της τελευταίας builder εγγραφής (pure-lib vitest coverage στα εναπομείναντα untested modules· ρητά αναφερόταν το `lib/ollama.ts`). Ο functional parity πυρήνας είναι κλειστός (0 auto-buildable GAP)· τα top-3 UI Debt items είναι WIP-blocked (Receipts/Settings/Shopping screens του Αχιλλέα) ή attended-preferred (ItemsScreen `logInput`, visual delta), οπότε ο ασφαλέστερος unattended δρόμος είναι test coverage.
