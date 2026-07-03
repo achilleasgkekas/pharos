@@ -3517,3 +3517,28 @@ Read-only web code-quality audit (grep + `apps/web && npm run type-check`, όχ�
 - **tenant status enforcement (P2/M, decision):** ο soft-cancel/dunning θέτει `Tenant.status='canceled'/'suspended'` αλλά κανένα auth path (`resolveWorkspaceSession`/`accountTenants`/v1 gate) δεν το ελέγχει → canceled workspace παραμένει πλήρως προσβάσιμο. SAAS-only (dead-until-SaaS), αλλά billing/access-control correctness όταν ανοίξει. Χρειάζεται απόφαση: πού μπαίνει το gate (session resolver = ένα σημείο; ή feature-route ladder;) + ποιο error (402/403) + reactivate flow.
 - **connection cache-reuse guard (P3, decision):** `connection.ts:54` `readyState !== 99` δεν ταιριάζει με το σχόλιο («reuse only while open»)· reuse μόνο σε 1/2 ή διόρθωση σχολίου. Dead-until-SaaS, ambiguous rebuild-semantic (`useDb` μοιράζεται base client).
 - **reset-request timing (P3, decision):** fire-and-forget `void sendEmail` ευθυγραμμίζει το anti-enumeration ΑΛΛΑ ρισκάρει κομμένο send σε serverless. Delivery-semantics tradeoff.
+
+## 2026-07-03 (web-code-quality auditor, 38η σάρωση, αυτόνομος γύρος)
+
+Read-only audit της web υλοποίησης (v1 API + saas control plane). `npm run type-check` **EXIT 0**. Νέα surface από την 37η (`git diff 2f31c5d..HEAD`): 1 νέο route (`saas/workspace/reactivate/route.ts`) + additive helpers (`lib/tenancy/workspace.ts` reactivate helpers, `audit.ts` batched actor lookup) + test files.
+
+**Counts ανά dimension (live grep, όχι docs):**
+- Type safety: **0** (4 grep hits όλα false positives — η λέξη «any» σε σχόλια, μηδέν type).
+- Input validation: **0** gaps (readBody adoption 100%, μηδέν `req.json().catch`).
+- Auth: **0** unguarded (reactivate gated: SAAS 404 / unauth 401 / owner-only 403 / status 409).
+- Error handling: **0** νέα (reactivate wrapped σε `saasGuard`· invites GET/DELETE gap αμετάβλητο, existing P3 item).
+- Mongoose: **0** νέα (audit `collectActorIds` = ΕΝΑ `$in` batched, μηδέν N+1· reactivate = single point-write).
+- Duplication/dead code: **0** νέα.
+
+**Νέα surface = exemplary.** Το reactivate route ακολουθεί το canonical gate ladder, saasGuard wrap, allowInactive resolve (ώστε ο canceled tenant να φτάνεται), `reactivateStatusError` 409 (μόνο canceled→active, ΟΧΙ suspended), audit `workspace.reactivated`. Μηδέν νέο debt.
+
+**Ουρά αμετάβλητη: 5 TODO, όλα code-verified ανοιχτά.** Το reactivate route έλυσε τον reactivate-UX blocker του P2/M item #1 (soft-cancel↔reactivate lifecycle πλήρες στο control plane), άρα το gating του v1 data path είναι πλέον ασφαλές να υλοποιηθεί· απομένει μόνο read-vs-write product decision. Priority αμετάβλητο.
+
+**Top 3 για τον builder:**
+1. **invites saasGuard** (P3/S, api) — `invites/route.ts` GET(43)+DELETE(102) χωρίς `saasGuard` wrap → uncaught throw = ασυνεπές 500· ολοκληρώνει το try/catch effort.
+2. **Account token-hash sparse index** (P3/S, db) — `Account.ts:24,26` `verifyTokenHash`/`resetTokenHash` χωρίς `.index()` → collection-scan σε verify/reset confirm.
+3. **connection cache-reuse guard** (P3/S, shared) — `connection.ts:54` `readyState !== 99` επιτρέπει readyState 0 (disconnected)/3 (disconnecting) να επιστραφούν ως live· reuse μόνο σε readyState 1/2 ή διόρθωση σχολίου.
+
+### Needs Achilleas
+- **tenant status enforcement (P2/M, decision):** τώρα που υπάρχει reactivate flow, το gating ενός canceled/suspended workspace στο v1 data path (`getTenantContext`) είναι ασφαλές να μπει. Απομένει η απόφαση: block **read+write** (πλήρες lockout, ο owner το ξεκλειδώνει με reactivate/πληρωμή) ή μόνο **write** (read-only grace)· + ποιο error (402 billing vs 403). SAAS-only (dead-until-SaaS).
+- **reset-request timing (P3, decision):** no-account fast-path vs mint+store+mail timing delta· delivery-semantics tradeoff (fire-and-forget ρισκάρει κομμένο send σε serverless). Αμετάβλητο.
