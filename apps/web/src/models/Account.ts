@@ -30,6 +30,13 @@ const AccountSchema = new Schema(
   { timestamps: true }
 );
 
+// The verify/reset confirm routes look an account up by its hashed token
+// (`findOne({ verifyTokenHash })` / `{ resetTokenHash }`). Without an index those are
+// full-collection scans. Sparse so accounts with no outstanding token stay out of the
+// index footprint. Not unique: multiple accounts legitimately share the null default.
+AccountSchema.index({ verifyTokenHash: 1 }, { sparse: true });
+AccountSchema.index({ resetTokenHash: 1 }, { sparse: true });
+
 export type AccountDoc = InferSchemaType<typeof AccountSchema> & { _id: string };
 
 export const Account: Model<AccountDoc> =
