@@ -5,6 +5,12 @@
 <!-- reviewed: acba60a -->
 <!-- docker-validated: dc8a83f -->
 
+## 2026-07-03 (ui-auditor — 40η σάρωση mobile UI· confirmation, μηδέν νέο finding)
+- **Fresh read-only grep audit** (όχι docs read-back): **17 mobile source files** (16 screens + `ui.tsx`). Foundation `theme.ts` + `ui.tsx` primitives ΟΛΑ παρόντα (`Header`/`Centered`/`Spinner`/`Empty`/`ErrorText`/`Input`/`TextArea`/`Check`/`Button`/`IconButton`/`Card`/`ListItem`/`Badge`/`Chip`/`contentWidth`). mobile `npx tsc --noEmit` → **EXIT 0**.
+- **Violations ανά διάσταση:** (Tokens) hardcoded hex εκτός `theme.ts` = **0**, rgba/rgb εκτός `theme.ts` = **0** (token layer πλήρως καθαρό). (Reusable) raw `<TextInput>` = **11** (Items `logInput` ×2 buildable + Receipts ×9 WIP-blocked)· ghost/tint border-buttons ακόμα raw ~**17 sites** (`<Button variant="ghost">` holdout). (Theme) dark-only vs web light `:root` = **1** ανοιχτή διαφορά (P3/L, η μεγαλύτερη web-parity). (States) centralized → 0. (Adaptive) `contentWidth` DONE· **safe-area-context ΑΠΟΝ** = **1** foundation gap (P2/M). (Touch) Settings `rm`/`swatch` χωρίς `hitSlop` = **1** (WIP-blocked).
+- **Σύνολο:** αμετάβλητο από 39η. Κανένα νέο ### item (τα υπάρχοντα καλύπτουν τα ευρήματα). Git WIP block (Receipts/Settings/Shopping uncommitted) αμετάβλητο.
+- **Top-3 για builder:** (1) ItemsScreen `logInput` ×2 → `<Input variant="surface">` (P2/S, κλείνει το Input holdout, non-WIP)· (2) `react-native-safe-area-context` adoption (P2/M, foundation, non-screen-WIP)· (3) `<Button variant="ghost" tint?>` για τα core cyan-ghost sites σε non-WIP screens (P2/M).
+
 ## 2026-07-03 (docker-health guard — safe rebuild + cache prune)
 - **Health:** homepage-mongo `healthy` (StartedAt 01:36 σήμερα, σταθερό· RestartCount 198 σωρευτικό ιστορικά OOM, ΟΧΙ ενεργό loop), homepage-web restarts 0 `running`, /login 200 πριν το rebuild. Τρέχουν web/mongo/searxng· κανένα homepage-flaresolverr (μηδέν επιπλέον πίεση μνήμης).
 - **Rebuild:** ΝΑΙ. Ο diff `1b6e18c..dc8a83f -- apps/web` άγγιζε web runtime code (`api/saas/billing/checkout/route.ts` + `lib/billing/checkoutAudit.ts` + test files). Safe dance: `docker compose build web` (image only, ~12min στη μικρή VM, EXIT 0) → mongo healthy check → `docker compose up -d web` (recreated) → poll `/login` → **200** → web RestartCount παρέμεινε **0**, state running.
