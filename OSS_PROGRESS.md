@@ -920,3 +920,25 @@ Import/env concern + resolution: το `STORAGE_ROOT` διαβάζεται μία
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + τα δικά μου storage.test.ts + OSS_PROGRESS.md. Στάγιαρα μόνο τα δικά μου paths.
 
 Suggested next task: (f συνέχεια) Η ουρά καθαρών pure-lib targets έχει σχεδόν εξαντληθεί. Πιο αξιόλογη επόμενη κίνηση = (β) API-shape/validation tests σε `app/api/v1/*/route.ts` με mocked DB layer/session (καλύπτει το mobile-app REST contract — π.χ. ένα route που κάνει validation πριν το DB write· mock `connectDB` + το model). Χαμηλότερης αξίας fallbacks: (α) `components/ui/cn.ts` (thin clsx+tailwind-merge)· (γ) edge-case coverage σε ήδη-tested modules. Τρέξε πρώτα `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-03 (cont. — notifiers.dispatch.test.ts, per-channel wire contract + fail-closed)
+
+**Task: (f συνέχεια) Test file `apps/web/src/lib/notifiers.dispatch.test.ts` για το `testNotifier`/`sendOne` του `lib/notifiers.ts` (pluggable outbound alert channels).**
+
+Επιλογή target: η ουρά καθαρών pure-lib targets έχει σχεδόν εξαντληθεί (βλ. προηγ. entries). Επιθεώρησα ξανά τα untested modules· τα περισσότερα είναι network/DB side-effectful (scrape/ollama/appSettings/search/remoteStorage/anthropic/onedrive/jobRunner/mirror/storeService/db/softDelete/storageConfig) ή browser-only (clientImage). Το `notifiers.ts` ξεχώρισε: το `sendOne` (μέσω του exported `testNotifier(c)`) χτίζει **διαφορετικό payload ανά κανάλι** (Discord `{content}`, Slack `{text}`, Telegram `{chat_id,text}` στο bot-scoped URL, generic webhook `{title,message,ts}`, ntfy → `sendNtfyTo`) και είναι πλήρως ντετερμινιστικό με stubbed `fetch` + mocked `./notify`. Δεν αγγίζει DB (το `getNotifiers`/`dispatchAlert` κάνουν το `connectDB`, όχι το `testNotifier`). Το υπάρχον `notifiers.test.ts` καλύπτει ΜΟΝΟ το client-safe `NOTIFIER_TYPES` metadata — αυτό είναι το transport, συμπληρωματικό· νέο ξεχωριστό filename για να μην το πατήσω.
+
+Import concern + probe: το `notifiers.ts` κάνει top-level `import { connectDB }` + `AppConfig`. Probe (`_probe_notifiers.test.ts`, δοκιμαστικό, διαγράφηκε) φόρτωσε καθαρά με μόνο το `./notify` mocked — τα mongoose imports είναι side-effect-free (model registration), όπως και στο notify.test.ts. Καμία mock του db δεν χρειάστηκε.
+
+Τι έγινε:
+- Νέο `notifiers.dispatch.test.ts` (16 tests) με `vi.mock('./notify')` (sendNtfyTo → deterministic) + `vi.stubGlobal('fetch', ...)` + helper που διαβάζει url/init/JSON-body από το τελευταίο fetch call. Καλύπτει ανά κανάλι: **ntfy** delegation (url + ASCII title 'Pharos test' + `tags:['bell']`, ΚΑΝΕΝΑ fetch), propagate false, no-url → false χωρίς sendNtfyTo· **discord** `{content:'**title**\nmsg'}` POST JSON, ≤1900 char cap, no-url → no fetch + false, non-ok response → false· **slack** `{text:'*title*\nmsg'}` (και όχι `content`), no-url guard· **telegram** `{chat_id,text}` στο `https://api.telegram.org/bot<token>/sendMessage`, missing token → false/no-fetch, missing target → false/no-fetch· **webhook** `{title,message,ts}` με valid ISO ts, no-url guard· **fail-closed**: fetch reject → false (never throws), unknown channel type → false χωρίς fetch.
+- **Σημείο που κλειδώθηκε**: το ακριβές wire contract κάθε καναλιού (ένα field-rename Discord content→text ή Telegram chat_id→chatId θα έσπαγε σιωπηλά το notification) + τα per-channel missing-credential guards (discord/slack/webhook → url, telegram → token+target, ntfy → url) + το fail-closed (bad creds / non-ok / network error → false, ποτέ throw).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/lib/notifiers.dispatch.test.ts` → 16/16 passed.
+- `npx vitest run` (όλο το suite) → 60 files, 896/896 passed.
+- `npm run type-check` → exit 0 (2 αρχικά errors από untyped vi.fn spread + tuple cast → fix με `(..._args: unknown[])` rest param + `as unknown as` cast· καθαρό μετά).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + τα δικά μου notifiers.dispatch.test.ts + OSS_PROGRESS.md. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (f συνέχεια) Η καθαρή pure-lib ουρά έχει σχεδόν στερέψει. Πιο αξιόλογα εναπομείναντα: (α) το `coerce`/`getNotifiers` legacy-ntfy migration στο ίδιο `notifiers.ts` (θέλει mock του AppConfig.findOne — mockable, καλύπτει το «empty notifiers[] + legacy ntfyUrl → single channel» invariant)· (β) API-shape/validation tests σε `app/api/v1/*/route.ts` με mocked withAuth+connectDB+model (καλύπτει το mobile REST contract — υψηλή αξία αλλά heavier mocking)· (γ) `components/ui/cn.ts` (thin, χαμηλή αξία). Τρέξε πρώτα `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
