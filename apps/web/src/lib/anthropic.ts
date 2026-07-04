@@ -3,8 +3,8 @@
 
 type ImageMedia = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
 
-/** Sniff the media type from the first bytes of a base64 payload. */
-function mediaTypeOf(b64: string): ImageMedia {
+/** Sniff the media type from the first bytes of a base64 payload. Exported for tests. */
+export function mediaTypeOf(b64: string): ImageMedia {
   if (b64.startsWith('/9j/')) return 'image/jpeg';
   if (b64.startsWith('iVBOR')) return 'image/png';
   if (b64.startsWith('UklGR')) return 'image/webp';
@@ -12,14 +12,15 @@ function mediaTypeOf(b64: string): ImageMedia {
   return 'image/jpeg';
 }
 
-function stripFences(raw: string): string {
+/** Strip markdown code fences from a model's JSON reply. Exported for tests. */
+export function stripFences(raw: string): string {
   return raw.replace(/```json\s*|```\s*$/gi, '').replace(/```\s*$/g, '').trim();
 }
 
 /** Scrub the API key (and any sk-ant-… token) out of an error string before it
  *  bubbles up to a UI message or log. Defense in depth: the API doesn't echo the
- *  key, but error bodies/strings shouldn't be able to carry it either. */
-function redactKey(s: string, apiKey: string): string {
+ *  key, but error bodies/strings shouldn't be able to carry it either. Exported for tests. */
+export function redactKey(s: string, apiKey: string): string {
   let out = s;
   if (apiKey && apiKey.length > 8) out = out.split(apiKey).join('[redacted]');
   return out.replace(/sk-ant-[A-Za-z0-9_-]+/g, '[redacted]');
