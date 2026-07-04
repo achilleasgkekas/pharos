@@ -6,8 +6,9 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-03 (3η σάρωση planner· +4 candidates P10-P13). Κανένα από τα
-> P1-P9 δεν χτίστηκε ακόμα (τα πρόσφατα commits ήταν SaaS/billing/docs/mobile-parity) → όλα ισχύουν.
+> Τελευταία ενημέρωση: 2026-07-04 (4η σάρωση planner· +4 candidates P14-P17). Κανένα από τα
+> P1-P13 δεν χτίστηκε ακόμα (τα commits από 2026-07-01 ήταν αποκλειστικά SaaS/billing/landing/
+> mobile-parity/docs από τις builder routines, μηδέν νέο product feature) → όλα ισχύουν.
 
 ---
 
@@ -135,6 +136,46 @@ Ranked by value/effort (πρώτο = καλύτερη σχέση αξίας πρ
 - **Module:** Items/Inventory (+ Reports/Settings για το export).
 - **Απόφαση που χρειάζεται:** αξία = purchasedPrice ή currentPrice (αγοραστική vs τρέχουσα); PDF, ZIP
   με αρχεία, ή και τα δύο; να μπει behind paid tier στο SaaS ή παντού;
+
+### P14. Subscription / bill price-hike watch (ανατιμήσεις επαναλαμβανόμενων) — S — both (πολύ ψηλό value/effort)
+- **Αξία:** όταν μια συνδρομή ή επαναλαμβανόμενος λογαριασμός **ανεβαίνει** σε σχέση με το δικό του
+  ιστορικό (Netflix €13→€15, ΔΕΗ +18%, cloud plan +€3), ένα alert «η X ανέβηκε €Y (+Z%) από τον
+  προηγούμενο κύκλο» πιάνει τις σιωπηλές ανατιμήσεις που κανείς δεν προσέχει. Reuse σχεδόν ολόκληρο:
+  vendorKey-series + anomaly logic + `runAlertChecks`/`dispatchAlert` (§3 done). Μικρότερος κόπος από
+  τα P3/P7, πιο στοχευμένο. **Διακριτό:** P7 βρίσκει *untracked* σειρές, P3 είναι πλήρες digest — εδώ
+  είναι ένα και μόνο event («ανέβηκε») πάνω σε ήδη tracked recurring.
+- **Module:** Subscriptions + Expenses/Statements (+ Notifications).
+- **Απόφαση που χρειάζεται:** κατώφλι alert (π.χ. ≥5% ή ≥€1); να πιάνει και *μειώσεις* («έπεσε, ίσως λάθος χρέωση»);
+
+### P15. Vendor→category auto-rules (ντετερμινιστικοί κανόνες κατηγοριοποίησης) — S/M — both (πολύ ψηλό value/effort)
+- **Αξία:** η #1 τριβή μετά το data-entry είναι το χειροκίνητο categorisation. Ένας απλός rules engine
+  «αν vendor/description περιέχει X → category Y (+ optional tax flag / recurring)» εφαρμόζεται αυτόματα
+  σε κάθε νέο έξοδο/απόδειξη/transaction. **Ντετερμινιστικό, μηδέν AI κόστος** (δουλεύει και offline, και
+  δωρεάν σε όλα τα SaaS tiers), σε αντίθεση με το AI auto-categorise του P2. «Learn from this» κουμπί:
+  όταν ο χρήστης αλλάζει κατηγορία χειροκίνητα → προτείνει να φτιάξει κανόνα για τον vendor. Reuse
+  vendorKey normalization.
+- **Module:** Expenses/Receipts/Statements (+ Settings για τη διαχείριση κανόνων).
+- **Απόφαση που χρειάζεται:** matching σε vendorKey (κανονικοποιημένο) ή raw text/regex; οι κανόνες να
+  τρέχουν και αναδρομικά σε υπάρχοντα uncategorised ή μόνο forward;
+
+### P16. Migration importers από άλλα finance/self-host apps (Firefly III / YNAB / Grocy) — M — OSS (adoption lever)
+- **Αξία:** ο πιο άμεσος τρόπος να αποκτήσει χρήστες ένα OSS finance/inventory app είναι να **δεχτεί το
+  export ενός ανταγωνιστή**. Ένας importer για Firefly III (JSON/CSV export), YNAB (CSV) και προαιρετικά
+  Grocy (inventory) χαρτογραφεί accounts/transactions/categories → Pharos expenses/income + items. Μειώνει
+  δραστικά το switching cost. **Διακριτό από το P2** (P2 = γενικό bank CSV· εδώ = structured app-specific
+  migration με mapping presets). Reuse του CSV parse machinery + upsert-by dedupe.
+- **Module:** Settings → Data (νέο «Import from another app») + Expenses/Items.
+- **Απόφαση που χρειάζεται:** ποιες πηγές πρώτα (πρόταση: Firefly III + YNAB, τα πιο διαδεδομένα self-host/
+  budgeting); να φέρνει και ιστορικά balances ή μόνο transactions;
+
+### P17. Mobile barcode/QR scan → γρήγορη προσθήκη στο inventory — M — both (mobile-native)
+- **Αξία:** το mobile app σκανάρει σήμερα αποδείξεις (φωτο). Ένα barcode/QR scan (EAN/UPC) της
+  συσκευασίας ενός προϊόντος → lookup (open product DB ή AI) → prefill τίτλου/κατηγορίας/specs → one-tap
+  add στο inventory ή στο shopping. Κάνει την καταγραφή περιουσίας/λίστας αγορών στιγμιαία σε κινητό,
+  εκεί που πραγματικά χρησιμοποιείται το app (σπίτι/κατάστημα). Native mobile win, όχι απλό parity με το web.
+- **Module:** Mobile (νέα camera-scan ροή) + Items/Inventory (+ REST `/api/v1` §5, product-lookup helper).
+- **Απόφαση που χρειάζεται:** πηγή lookup (δωρεάν Open Food Facts / UPC DB, ή AI-only χωρίς εξωτερικό API);
+  εξαρτάται από το mobile MVP (§6 TODO) — companion feature, όχι blocker;
 
 ---
 
