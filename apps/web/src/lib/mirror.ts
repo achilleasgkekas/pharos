@@ -15,21 +15,24 @@ export type MirrorMeta = {
   id?: unknown; // Mongo _id
 };
 
-function shortId(id: unknown): string {
+/** Last 8 chars of a Mongo _id — the short, filename-safe token used in path templates. */
+export function shortId(id: unknown): string {
   return String(id ?? '').slice(-8);
 }
-function extOf(p: string): string {
+/** Lower-cased file extension without the dot; 'bin' when the path has none. */
+export function extOf(p: string): string {
   const m = /\.([a-z0-9]+)$/i.exec(p);
   return m ? m[1].toLowerCase() : 'bin';
 }
-function baseNoExt(p: string): string {
+/** The filename (last path segment) with its extension stripped. */
+export function baseNoExt(p: string): string {
   const base = p.split('/').pop() || p;
   return base.replace(/\.[a-z0-9]+$/i, '');
 }
 
 /** The remote path a local file mirrors to — the same folder/filename template the
  *  push path uses, so download/share resolve to exactly where the upload landed. */
-function remoteRelPath(
+export function remoteRelPath(
   s: { folderTemplate: string; fileNameTemplate: string },
   meta: MirrorMeta,
   filePath: string
