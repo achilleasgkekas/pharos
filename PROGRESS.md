@@ -3939,3 +3939,28 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 - **remote push** — buildable αλλά αδοκίμαστο (EAS dev build + APNs key).
 - **Tasks Kanban board** — mobile έχει list + ←/→ quick-move· το board αφέθηκε product decision.
 - **ReceiptsScreen Input-debt** (9 raw `<TextInput>`) — WIP του Αχιλλέα κρατά το screen· commit/revert του θα ξεμπλόκαρε το τελευταίο mobile Input primitive migration.
+
+## 2026-07-05 (mobile-parity-auditor, 45η σάρωση)
+Read-only parity audit web↔mobile, inventory ξαναχτισμένο από τον κώδικα (docs τελευταία). **50 route.ts κάτω από `api/v1`** (login + 49 bearer), **39 μοναδικά base paths**, **16 mobile screens**. mobile `tsc --noEmit` → **EXIT 0**. Μηχανικός route↔consumer loop (39 bases vs `apps/mobile/src/api.ts`): και τα 39 έχουν ≥1 consumer → **μηδέν orphan endpoint**.
+
+**Counts: DONE 7 (parity queue 6/6 + Activity) / auto-buildable functional GAP 0 / NEEDS DECISION 0 νέα.** 45η συνεχόμενη σάρωση με πλήρη functional parity· καμία νέα portable δυνατότητα δεν εμφανίστηκε.
+
+**Δέλτα από 44η (`git log --since=2026-07-04 -- apps/mobile/src apps/web/src/app/api/v1`):** 2 relevant commits. **`ad226a7`** (`refactor(mobile): ItemsScreen price-log inputs → shared <Input>`) ΕΚΛΕΙΣΕ το top-2 recommendation των 43η/44η· live επιβεβαίωση: ItemsScreen raw `<TextInput>` = 0. **`8d4ab98`** (`feat(api): config-gated rate limiting`) = **off by default**, additive· fixed-window in-memory limiter που μετρά ανά API token (withAuth) + ανά IP (login), 429 + Retry-After/X-RateLimit-* μόνο όταν ενεργό μέσω `API_RATE_LIMIT`/`API_RATE_WINDOW_MS` env· **καμία v1 shape change, καμία νέα portable mobile δυνατότητα**. Υπόλοιποι commits (landing PWA manifest, api tests) = web-only marketing/test.
+
+**Raw-`<TextInput>` audit (live grep):** μόνο **ReceiptsScreen 9** (WIP-blocked)· ItemsScreen/SettingsScreen/ShoppingScreen = 0 raw → το εναπομείναν Input primitive migration είναι εξ ολοκλήρου WIP-blocked (ReceiptsScreen στο working tree = uncommitted edits του Αχιλλέα). Working tree στην αρχή: `.claude/launch.json` + 2 deleted `.github/workflows` + Receipts/Settings/Shopping screens = WIP (δεν αγγίχτηκαν).
+
+**Top 3 για τον builder (unattended-safe, non-WIP):**
+1. fresh pure-lib **vitest coverage** — `lib/cards.ts` / `lib/taxonomies.ts normalizeList` / `lib/itemStatus.ts` (καθαρά pure, μηδέν rebuild).
+2. **`<Chip>`/`<Badge>`/`<ListItem>` holdout σάρωση** για τυχόν εναπομείναντα non-WIP raw clusters (P3/S, tsc-verifiable).
+3. (κανένα άλλο mobile-only unattended-safe· ReceiptsScreen Input-debt = WIP-blocked, lucide icons + language switcher = attended/needs-decision).
+
+### Needs Achilleas
+- **NEO — rate-limit 429 handling στο mobile**: το config-gated rate limiting (`8d4ab98`) όταν ενεργοποιηθεί (SaaS) επιστρέφει 429 + Retry-After· το mobile `api.ts` δεν έχει 429 retry/backoff handling. Off by default τώρα (μηδέν impact), αλλά αν ανάψει σε παραγωγή SaaS χρειάζεται decision για client-side backoff/UX. P3/S, decision-gated.
+- **safe-area insets** (`react-native-safe-area-context` ΑΠΟΝ από package.json· bottom/notch/landscape ακάλυπτα) — P2/M, θέλει dep-add απόφαση.
+- **theme toggle + light/dark context + language switcher** (dark-only, English-only· web έχει πλήρες light `:root` + 8-lang i18n).
+- **Settings: AI engine / storage / OneDrive** panels — δεν υπάρχουν στο mobile.
+- **Statements merge-bind + PDF-import** — θέλουν write/upload endpoints που δεν υπάρχουν στο v1.
+- **extra reports charts** — θέλουν RN charting lib.
+- **remote push** — buildable αλλά αδοκίμαστο (EAS dev build + APNs key).
+- **Tasks Kanban board** — mobile έχει list + ←/→ quick-move· το board αφέθηκε product decision.
+- **ReceiptsScreen Input-debt** (9 raw `<TextInput>`) — WIP του Αχιλλέα κρατά το screen· commit/revert του θα ξεμπλόκαρε το τελευταίο mobile Input primitive migration.
