@@ -3,6 +3,14 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-04 46η σάρωση· type-check EXIT 0· builder έκλεισε 2 items → ουρά 4→2· ΚΑΙ ΤΑ 2 εναπομείναντα είναι decision-flag [Achilleas], ΜΗΔΕΝ auto-buildable αριστερά)
+
+- **type-check:** `npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
+- **Builder έκλεισε 2 items** από τον προηγ. marker: (α) **saasGuard invites GET+DELETE** (commit `388246d` — live-verified: import γρ.13, GET(45)+DELETE(106) wrapped· κάθε write saas route πλέον `saasGuard`)· (β) **Account sparse index** verify/reset token-hash (commit `ac35ca3` — live-verified: `AccountSchema.index(...sparse)` γρ.37/38). Και τα δύο → **DONE**.
+- **Ουρά τώρα:** 2 TODO, **και τα δύο decision-flag** (θέλουν σκόπιμη απόφαση Achilleas, ΟΧΙ μηχανικό unattended fix): (1) reset/request timing side-channel [P3/S — delivery-semantics tradeoff: `void sendEmail` vs `await`]· (2) getTenantConnection readyState guard [P3/S — ambiguous rebuild-semantic, 0 importers]. **Και τα δύο code-verified ανοιχτά** (`reset/request/route.ts:43` fast-path return· `connection.ts:54` `readyState !== 99`).
+- **Νέα surface audited → exemplary, μηδέν νέο debt:** `lib/billing/costSummary.ts` (pure micros→currency roll-up, defensive `nonNegInt` coercion, tested) + `saas/usage/route.ts` cost block (`buildCostSummary` imported+used, καθαρό `{ error }` shapes, saasGuard-gate). v1 API sweep: κάθε route εκτός `auth/login` περνά από `withAuth` (try/catch + consistent `apiError`)· login έχει own try/catch + validation· μηδέν `any`/`@ts-ignore` σε v1· `readBody`/`apiBody` validators υιοθετημένα καθολικά.
+- **ΣΗΜ builder-feed:** η ουρά έμεινε ΧΩΡΙΣ auto-buildable item. Δες `## Needs Achilleas` στο PROGRESS.md — τα 2 εναπομείναντα θέλουν έγκριση κατεύθυνσης πριν καταναλωθούν.
+
 ## Σύνοψη audit (2026-07-03 40η σάρωση· CONFIRMATION· type-check EXIT 0· μηδέν νέο P1/P2/P3· ουρά 3 ενεργά TODO αμετάβλητη — και τα 3 code-verified ανοιχτά· νέα surface [`lib/billing/aiKeyPolicy.ts` BYO-key policy + `Tenant.aiByoKey` flag + billing-audit helpers] audited → exemplary, μηδέν νέο debt)
 
 **2026-07-03 (40η σάρωση, αυτόνομος γύρος):** fresh live σάρωση (grep, όχι docs) σε **50 v1 route files** + **23 saas route files** + `apiAuth`/`apiBody`/`apiList` + `lib/tenancy/*` + `lib/billing/*` + `models/*`. Νέα surface από την 39η: `7a533b4` (BYO-key AI policy), billing-audit helpers (`2bdf29d`/`a4c1fd3` checkout/portal audit recording), test-only files. `cd apps/web && npm run type-check` **EXIT 0** (0 TS errors).
@@ -496,7 +504,7 @@
   - **Fix:** `import { saasGuard } from '@/lib/tenancy/saasApi';` + τύλιξε τα σώματα GET και DELETE σε `return saasGuard(async () => { ...υπάρχον σώμα... });` (ίδιο pattern με members/route.ts). Το `resolveWorkspaceSession` gate (επιστρέφει early χωρίς throw), το `isObjectId` guard, τα response shapes (400/404/200 `{ revoked }`, GET `{ workspace, invites }`), το `recordAudit` — ΟΛΑ αμετάβλητα· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500.
   - Επαλήθευση: `grep -c 'saasGuard' src/app/api/saas/invites/route.ts` ≥ 2 (import + ≥1 wrap)· κανένα write saas route δεν μένει χωρίς `saasGuard`.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-02 auditor, 35η σάρωση· 37η σάρωση επιβεβαίωσε ανοιχτό: `invites/route.ts` GET(43)+DELETE(102) δεν wrap-άρουν `saasGuard`, κάνουν direct `Invite.find`/`updateOne` → uncaught throw = ασυνεπές 500)
+- Status: DONE (2026-07-04 46η σάρωση επιβεβαίωσε κλείσιμο· builder commit `388246d` «fix(saas): wrap invites route GET+DELETE in saasGuard»· live: `saasGuard` import γρ.13 + GET(45) + DELETE(106) και τα δύο `return saasGuard(async () => {...})`· κάθε write saas route περνά πλέον από `saasGuard`)
 
 ### DELETE /api/saas/invites — λείπει id-format guard στο inviteId (CastError → 500) — DONE 2026-07-02
 - Status: DONE (commit αυτού του run). Fix = `import { isObjectId }` από `apiBody` + `if (!isObjectId(inviteId)) return 400 'invalid inviteId'` μετά το `!inviteId` check, πριν το `Invite.updateOne`. Reuse του υπάρχοντος shared helper (όχι νέο inline regex). type-check EXIT 0, apiBody+invites suites 52/52 pass, web serve /login 200.
@@ -556,7 +564,7 @@
   - **Fix:** `Schema.index({ verifyTokenHash: 1 }, { sparse: true })` + `Schema.index({ resetTokenHash: 1 }, { sparse: true })` (sparse γιατί default `null` → δεν indexάρει τα κενά, ο lookup είναι πάντα με non-null hash). Μηδέν αλλαγή runtime λογικής.
   - Επαλήθευση: `grep -n 'index(' src/models/Account.ts` δείχνει τα 2 νέα sparse indexes.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-02 auditor· 37η σάρωση επιβεβαίωσε ανοιχτό: `Account.ts:24/26` `verifyTokenHash`/`resetTokenHash` fields χωρίς index/sparse)
+- Status: DONE (2026-07-04 46η σάρωση επιβεβαίωσε κλείσιμο· builder commit `ac35ca3` «perf(saas): sparse index Account verify/reset token hashes»· live: `AccountSchema.index({ verifyTokenHash: 1 }, { sparse: true })` γρ.37 + `resetTokenHash` sparse index γρ.38· τα confirm lookups δεν κάνουν πια collection-scan)
 
 ### Constant-time CRON_SECRET compare — saas/usage/sample route (timing side-channel)
 - Priority: P3

@@ -5,6 +5,19 @@
 <!-- reviewed: 0c010e0 -->
 <!-- docker-validated: 63249e6 -->
 
+## 2026-07-04 (web-code-quality — 46η σάρωση· builder έκλεισε 2 items, ουρά 4→2 decision-flag)
+- **type-check:** `cd apps/web && npm run type-check` → **EXIT 0**. Read-only run (καμία app-code αλλαγή, μηδέν Docker build, μηδέν AI job).
+- **Issue counts ανά dimension:** type-safety **0** (μηδέν `any`/`@ts-ignore` σε v1)· input-validation **0** (`readBody`/`apiBody` καθολικά)· error-handling **0** (κάθε v1 route εκτός login μέσω `withAuth` try/catch → consistent `apiError`· login own try/catch)· auth **0** (κάθε v1 route εκτός `auth/login` verify-άρει bearer via `withAuth`→`bearerUser`)· mongoose **0 νέα** (τα προϋπάρχοντα `Statement.find` no-limit παραμένουν low-risk «όχι debt»)· duplication/dead-code **0**· ui-states **0 νέα**.
+- **Builder έκλεισε 2 queue items** (marked DONE στο WEB_DEBT.md): (α) **saasGuard invites GET+DELETE** — commit `388246d`, live-verified import γρ.13 + GET(45)+DELETE(106) wrapped· (β) **Account sparse index** verify/reset token-hash — commit `ac35ca3`, live-verified `AccountSchema.index(...sparse)` γρ.37/38.
+- **Νέα surface → exemplary:** `lib/billing/costSummary.ts` (pure micros→currency, defensive coercion, tested) + `saas/usage/route.ts` cost block (`buildCostSummary` imported+used, καθαρά shapes). Μηδέν νέο debt.
+- **Top 3 για builder:** (κανένα auto-buildable) — τα 2 εναπομείναντα (reset/request timing side-channel· getTenantConnection readyState guard) είναι **decision-flag**, θέλουν έγκριση Achilleas πριν καταναλωθούν. Δες παρακάτω.
+- **Marker:** reviewed δεν άλλαξε (δεν είμαι reviewer). Staged ΜΟΝΟ WEB_DEBT.md + PROGRESS.md.
+
+### Needs Achilleas (web-code-quality 2026-07-04 46η)
+- **Η Web Debt Queue έμεινε ΧΩΡΙΣ auto-buildable item.** Και τα 2 εναπομείναντα TODO είναι decision-flag (dead-until-SaaS, gated πίσω από `SAAS_MODE` off — μηδέν επίδραση single-user/mobile σήμερα):
+  1. **reset/request timing side-channel** (`api/saas/account/reset/request/route.ts:43`, P3/S): registered email → `save()`+`await sendEmail()`· non-registered → άμεσο `return {ok:true}`. Το latency delta προδίδει registered emails, αποδυναμώνοντας το anti-enumeration. Fix θέλει delivery-semantics απόφαση: fire-and-forget `void sendEmail(...)` (όπως το members route· αφαιρεί το network-time gap ΑΛΛΑ ρισκάρει κομμένο send σε serverless) vs κράτημα `await`. **Ενέκρινε κατεύθυνση** για να μπει στην ουρά.
+  2. **getTenantConnection readyState guard** (`lib/tenancy/connection.ts:54`, P3/S): reuse guard επιστρέφει cached conn εκτός αν `readyState === 99`· readyState 0 (disconnected)/3 (disconnecting) περνούν ακόμα, ενώ το σχόλιο λέει «reuse only while still open». Είτε ο κώδικας (`=== 1||2`) είτε το σχόλιο πρέπει να ευθυγραμμιστεί. 0 importers· ambiguous το «σωστό» rebuild-semantic (`useDb()` μοιράζεται base client). **Επιβεβαίωσε την πρόθεση** (rebuild-on-drop vs σχόλιο-fix).
+
 ## 2026-07-04 (docker-health guard — rebuild + health OK)
 - **Υγεία:** homepage-mongo `healthy`, homepage-web `running` (up 3h, OOMKilled=false, exit=0). Flaresolverr ήδη σταματημένο (Exited 4 μέρες), καμία ενέργεια. Οι bakecore-* containers exited (άλλο project, δεν άγγιξα). ΣΗΜ: το `.State.RestartCount` λείπει ως key σε αυτή την έκδοση Docker (template error), όχι θέμα υγείας.
 - **Disk:** Images 4.41GB, Build Cache 1.069GB (όλο ενεργό, reclaimable 0B). `docker builder prune -f` πριν το build = 0B, μετά το build = 4.27MB reclaimed. VM άνετο.
