@@ -100,8 +100,11 @@ export async function pollDeviceToken(
   }
 }
 
-/** Pull the email/name out of the id_token JWT (middle segment is base64url JSON). */
-function accountFromIdToken(idToken: string): string {
+/** Pull the email/name out of the id_token JWT (middle segment is base64url JSON).
+ *  Claim precedence: preferred_username → email → name → '' (never throws; a
+ *  malformed/missing token yields '' so onedriveAccount just stays blank). Exported
+ *  for unit testing — the runtime call site is pollDeviceToken. */
+export function accountFromIdToken(idToken: string): string {
   try {
     const payload = idToken.split('.')[1];
     if (!payload) return '';
