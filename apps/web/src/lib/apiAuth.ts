@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import { User } from '@/models/User';
+import { rateHit, rateLimitConfig, rateStore } from '@/lib/apiRateLimit';
 
 export type ApiUser = { id: string; name: string; username: string; role: 'admin' | 'member' };
+
+/** Apply the (optional, env-gated) rate limit for `key`. Returns a 429 response when
+ *  the limit is tripped (with `Retry-After` + `X-RateLimit-*` headers), else null. */
+export function rateLimit(key: string): NextResponse | null {
+  const cfg = rateLimitConfig();
+  if (!cfg.enabled) return null;
+  const res = rateHit(rateStore, key, Date.now(), cfg.limit, cfg.windowMs);
+  const reset = Math.ceil(res.resetAt / 1000);
+  if (res.allowed) return null;
+  const r = apiError('Rate limit exceeded — slow down and retry later', 429);
+  r.headers.set('Retry-After', String(res.retryAfterSec));
+  r.headers.set('X-RateLimit-Limit', String(res.limit));
+  r.headers.set('X-RateLimit-Remaining', '0');
+  r.headers.set('X-RateLimit-Reset', String(reset));
+  return r;
+}
 
 /** Resolve the Bearer-token user, or null. Shared by every /api/v1 route. The token
  *  is the per-user `apiToken` (generated at first login or in Settings → Mobile/MCP). */
@@ -30,6 +47,8 @@ export async function withAuth(
 ): Promise<NextResponse> {
   const user = await bearerUser(req);
   if (!user) return apiError('Unauthorized — send Authorization: Bearer <token>', 401);
+  const limited = rateLimit(`u:${user.id}`);
+  if (limited) return limited;
   try {
     return await fn(user);
   } catch (e) {

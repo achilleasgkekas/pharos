@@ -3,14 +3,25 @@ import { randomBytes } from 'node:crypto';
 import { connectDB } from '@/lib/db';
 import { User } from '@/models/User';
 import { verifyPassword } from '@/lib/auth';
+import { rateLimit } from '@/lib/apiAuth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+/** Best-effort client IP for keying the login rate limit (proxy headers → 'unknown'). */
+function clientIp(req: NextRequest): string {
+  const fwd = req.headers.get('x-forwarded-for');
+  if (fwd) return fwd.split(',')[0].trim();
+  return req.headers.get('x-real-ip') || 'unknown';
+}
 
 /** POST /api/v1/auth/login  { username, password } → { token, user }
  *  The token is the user's bearer apiToken (created on first login); send it as
  *  `Authorization: Bearer <token>` on every other /api/v1 request. */
 export async function POST(req: NextRequest) {
+  const limited = rateLimit(`login:${clientIp(req)}`);
+  if (limited) return limited;
+
   let body: { username?: string; password?: string };
   try {
     body = await req.json();

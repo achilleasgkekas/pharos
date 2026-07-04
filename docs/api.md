@@ -70,6 +70,37 @@ you get:
 with status `401`. A thrown server error returns `500` with the same
 `{ "error": "..." }` shape.
 
+### Rate limiting
+
+Rate limiting is **off by default** (a self-hosted single user never needs it).
+Enable it for a shared or public deployment with two environment variables:
+
+| Env var              | Default | Meaning                                                     |
+|----------------------|---------|-------------------------------------------------------------|
+| `API_RATE_LIMIT`     | (unset) | Max requests per window per caller. Unset or `<= 0` = off.  |
+| `API_RATE_WINDOW_MS` | `60000` | Window length in milliseconds.                              |
+
+When enabled, authenticated requests are counted **per API token** and the login
+endpoint is counted **per client IP** (to blunt brute-force attempts). Over the
+limit you get:
+
+```json
+{ "error": "Rate limit exceeded — slow down and retry later" }
+```
+
+with status `429` and these headers:
+
+```
+Retry-After: 42
+X-RateLimit-Limit: 120
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1751673600
+```
+
+`Retry-After` is seconds until the window resets; `X-RateLimit-Reset` is the reset
+time as a Unix epoch (seconds). The counter is per-process and in-memory, so it
+resets on restart.
+
 ---
 
 ## Conventions

@@ -44,7 +44,7 @@
 ### 5. `/api/v1` REST API ⬜
 - Resources: `receipts`, `items`, `expenses`, `statements`, `subscriptions`, `vouchers`, `tasks` (CRUD + list/pagination).
 - Auth: reuse `User.apiToken` (Bearer), επέκταση με scopes.
-- Errors, pagination, rate-limit, **OpenAPI spec** — ✅ `docs/openapi.yaml` (OpenAPI 3.1, 50 paths / 74 ops, 1:1 με τα route files, validated· 2026-07-04). Rate-limit ακόμα ⬜.
+- Errors, pagination, rate-limit, **OpenAPI spec** — ✅ `docs/openapi.yaml` (OpenAPI 3.1, 50 paths / 74 ops, 1:1 με τα route files, validated· 2026-07-04). ✅ Rate-limit (`lib/apiRateLimit.ts` fixed-window, env-gated `API_RATE_LIMIT`/`API_RATE_WINDOW_MS`, 429 + `Retry-After`/`X-RateLimit-*`· per-token στο `withAuth`, per-IP στο login· off by default· 2026-07-05).
 - Reuse server actions / `aiTools.ts` `execute()` όπου ταιριάζει.
 - Middleware exception (όπως το `/api/mcp`).
 
