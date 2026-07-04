@@ -5,6 +5,28 @@
 <!-- reviewed: 16afcbf -->
 <!-- docker-validated: 63249e6 -->
 
+## 2026-07-05 (ui-auditor, 46η σάρωση mobile UI consistency)
+Read-only UI consistency audit web↔mobile. mobile `npx tsc --noEmit` → **EXIT 0**. **Δέλτα από 45η:** `git log --since=2026-07-04 -- apps/mobile/src` = μηδέν commit → βάση αμετάβλητη· confirmation scan.
+
+**Violations ανά διάσταση (live counts):**
+- Tokens: hardcoded hex εκτός `theme.ts` = **0**, rgba/rgb literals εκτός `theme.ts` = **0** (και στα 3 WIP screens = 0 νέο). Token layer πλήρως καθαρός.
+- Shared theme file: υπάρχει (`theme.ts`: C/SPACE/RADIUS/SIZE/scrim/alpha). DONE.
+- Reusable components: Card/Badge/ListItem/Input/TextArea/Button/IconButton/Chip/Check/Header centralized. Εναπομείνον consolidation: **`<ModalSheet>`** (6× `modal:` `borderRadius:18` magic literal, 5 non-WIP buildable).
+- Theme/dark mode: dark-only, μηδέν light context (needs-decision).
+- States: αμετάβλητα.
+- Adaptive: `contentWidth` DONE· safe-area insets ΑΠΩΝ (`react-native-safe-area-context` όχι σε package.json, needs dep-add decision).
+- Touch targets: Settings `rm` 36×36 + `swatch` 32×32 χωρίς `hitSlop` (WIP-blocked, attended-preferred).
+
+**Top 3 για τον builder (unattended-safe, non-WIP):**
+1. **`<ModalSheet>` + `RADIUS.xl=18`** [P2/M] — top buildable· ενοποιεί 5 non-WIP modal StyleSheet (Subscriptions/Money/Tasks/Items/Vouchers), byte-identical, tsc-verifiable.
+2. **`<Chip>`/`<Badge>`/`<ListItem>` holdout σάρωση** [P3/S] για non-WIP raw clusters.
+3. κανένα άλλο mobile-only unattended-safe (ReceiptsScreen Input-debt + Settings touch-targets = WIP-blocked· safe-area/theme-toggle/language-switcher = needs-decision).
+
+### Needs Achilleas
+- **safe-area insets** — `react-native-safe-area-context` ΑΠΟΝ από package.json· bottom/notch/landscape ακάλυπτα (P2/M, dep-add decision).
+- **theme toggle + light/dark context + language switcher** — dark-only, English-only.
+- **ReceiptsScreen/SettingsScreen/ShoppingScreen WIP** — uncommitted edits του Αχιλλέα κρατούν το τελευταίο Input primitive migration + Settings touch-target fix· commit/revert θα τα ξεμπλόκαρε.
+
 ## 2026-07-05 (pharos-daily-dev — rate-limiting για το `/api/v1`· έκλεισε το τελευταίο sub-item του TODO #5)
 - **Τι έκανα:** υλοποίησα το ρητά suggested-next-task της προηγ. εγγραφής (2026-07-04 OpenAPI): **per-caller rate-limiting για το `/api/v1`**, το τελευταίο εναπομείναν sub-item του TODO #5 («Errors, pagination, rate-limit»). Νέο **`lib/apiRateLimit.ts`** (pure fixed-window counter) + wiring σε 2 σημεία: (α) το shared `withAuth` (`lib/apiAuth.ts`) μετράει **per API token** (`u:<id>`), (β) το unauthenticated login route μετράει **per client IP** (`login:<ip>`) για anti-brute-force. Νέο **`lib/apiRateLimit.test.ts`** (12 tests). Docs + `.env.example` + TODO.md ενημερώθηκαν.
 - **Γιατί:** ήταν το μόνο μη-αόριστο, ρητά-ζητημένο, high-value deliverable που κλείνει ένα TODO tier item. Ο mobile-parity πυρήνας παραμένει saturated (0 auto-buildable GAP)· τα mobile items #6/#7/#8 είναι WIP-blocked (SettingsScreen του Αχιλλέα uncommitted) ή needs device+APNs (#8). Το rate-limit είναι χρήσιμο για shared/SaaS deployment (blunt runaway clients + login brute-force) και **off by default** (single-user self-host δεν το ακουμπά).
