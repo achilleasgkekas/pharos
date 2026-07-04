@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 0c010e0 -->
-<!-- docker-validated: db18c72 -->
+<!-- docker-validated: 63249e6 -->
+
+## 2026-07-04 (docker-health guard — rebuild + health OK)
+- **Υγεία:** homepage-mongo `healthy`, homepage-web `running` (up 3h, OOMKilled=false, exit=0). Flaresolverr ήδη σταματημένο (Exited 4 μέρες), καμία ενέργεια. Οι bakecore-* containers exited (άλλο project, δεν άγγιξα). ΣΗΜ: το `.State.RestartCount` λείπει ως key σε αυτή την έκδοση Docker (template error), όχι θέμα υγείας.
+- **Disk:** Images 4.41GB, Build Cache 1.069GB (όλο ενεργό, reclaimable 0B). `docker builder prune -f` πριν το build = 0B, μετά το build = 4.27MB reclaimed. VM άνετο.
+- **Rebuild:** ΝΑΙ. Marker `db18c72` → HEAD `63249e6`· το diff `db18c72..HEAD -- apps/web` άγγιξε runtime κώδικα (appSettings.ts, storageConfig.ts, storeService.ts, models/Account.ts, billing/costSummary.ts, api/saas/invites+usage routes). `docker compose build web` (image only, mostly CACHED) → mongo healthy → `docker compose up -d web` → `/login` επέστρεψε **200 στο 1ο try** → web state running, OOM=false. Μετά υποχρεωτικό `builder prune -f`.
+- **Marker:** docker-validated `db18c72` → **`63249e6`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-04 (ui-auditor — 45η σάρωση mobile UI consistency· ΕΝΑ νέο item)
 - **Τι έκανα:** read-only mobile UI consistency audit (16 screens + `ui.tsx` + `theme.ts`), reference = web design tokens (`apps/web/src/app/globals.css:3-51`). mobile `npx tsc --noEmit` → **EXIT 0**. Δεν άγγιξα app code· έγραψα μόνο MOBILE_PARITY.md + PROGRESS.md.
