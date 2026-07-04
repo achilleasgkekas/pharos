@@ -2,8 +2,21 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 0c010e0 -->
+<!-- reviewed: 16afcbf -->
 <!-- docker-validated: 63249e6 -->
+
+## 2026-07-04 (REVIEWER — range 0c010e0..16afcbf, μηδέν regression)
+- **Εύρος:** 11 commits από το προηγούμενο marker (0c010e0). Ουσιαστικά code commits: `388246d` (saasGuard invites), `ac35ca3` (Account sparse index), `ad226a7` (mobile Input refactor), `66c7903` (landing PNG icons), `7873cba` (storageConfig test)· τα υπόλοιπα docs/validate.
+- **Type-checks:** `apps/web` type-check **EXIT 0**· `apps/mobile npx tsc --noEmit` **EXIT 0**.
+- **Tests:** `apps/web` vitest → **1049 passed (71 files)**, μηδέν αποτυχία (περιλαμβάνεται το νέο `storageConfig.test.ts`).
+- **Έλεγχος diff:**
+  - `388246d` invites GET+DELETE: καθαρό wrapping σε `saasGuard(async () => …)`· όλα τα inner returns παραμένουν `NextResponse`· gate checks/validation/short-circuits αμετάβλητα· **καμία αλλαγή σε response shape** (η mobile app δεν επηρεάζεται). Επιβεβαιώθηκε το contract του `saasGuard` (fn→Promise<NextResponse>).
+  - `ac35ca3` Account: sparse μη-unique indexes σε `verifyTokenHash`/`resetTokenHash` — σωστό (πολλαπλά accounts μοιράζονται null default). Ασφαλές.
+  - `ad226a7` mobile: raw `<TextInput>` → shared `<Input>` + διαγραφή unused `TextInput` import + dead `logInput` StyleSheet. Behavior-preserving.
+  - `7873cba` storageConfig: extraction pure `normalizeStorageConfig(doc)` — ίδια πεδία/σειρά, cache+TTL στο async wrapper. Behavior-preserving, καλυμμένο με tests.
+  - `66c7903` landing: `app/icon.tsx`+`app/apple-icon.tsx` (next/og) + manifest any/maskable + layout metadata. Σωστό Next file-based routing (`/icon`, `/apple-icon`).
+- **Secret scan** στο diff range: καθαρό (μόνο tokenHash field names, μηδέν committed credential).
+- **Fixes:** καμία — όλα τα commits μικρά, ασφαλή, τεκμηριωμένα. **Flags:** κανένα.
 
 ## 2026-07-04 (web-code-quality — 46η σάρωση· builder έκλεισε 2 items, ουρά 4→2 decision-flag)
 - **type-check:** `cd apps/web && npm run type-check` → **EXIT 0**. Read-only run (καμία app-code αλλαγή, μηδέν Docker build, μηδέν AI job).
