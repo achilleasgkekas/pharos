@@ -178,6 +178,7 @@ These are flagged **(AI)** below with the feature name.
 | GET    | `/expenses?kind=income\|expense`    | List (+ `limit`/`offset`/`updatedSince`). |
 | POST   | `/expenses`                         | Create `{ kind?, vendor, amount, date?, category?, period?, recurring?, recurringCycle?, notes? }`. |
 | PATCH  | `/expenses/:id`                     | Update `{ vendor?, amount?, category?, kind?, notes?, date?, period?, recurring?, recurringCycle?, paymentMethod? }`. |
+| POST   | `/expenses/:id/rescan`              | **(AI: expenses)** Re-run the parse on the stored bill/payslip. Body `{ ocr?: boolean }` (`true` forces OCR). Returns `{ expense }` (same shape as the list) so the client can re-prefill in place; the record is left unverified. |
 | DELETE | `/expenses/:id`                     | Soft-delete. |
 
 ### Statements & installment plans

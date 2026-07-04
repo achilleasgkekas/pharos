@@ -477,3 +477,27 @@ docs/README.md + docs/self-hosting.md + docs/DOCS_PROGRESS.md.
 
 Επομενο run: enrich `docs/features.md` με screenshot placeholders ανα module, η `docs/contributing-docs.md`
 (docs style + link-check + markdown-first convention). Πρωτα finish-in-progress κανενα (ολα done).
+
+## 2026-07-04 (api.md sync — expenses rescan)
+
+Sync-check του `docs/api.md` (source of truth για το mobile) εναντια στα ΠΡΑΓΜΑΤΙΚΑ route files.
+`find apps/web/src/app/api/v1 -name route.ts` → 50 routes· εξαγωγη ολων + diff με το api.md.
+Ενα GAP: **`POST /api/v1/expenses/:id/rescan`** υπηρχε στον κωδικα (`expenses/[id]/rescan/route.ts`)
+αλλα ΕΛΕΙΠΕ απο τον πινακα «Expenses & income». Διαβασα το route (mirror του receipts rescan:
+body `{ ocr?: boolean }`, καλει `rescanExpense(id, useOcr)`, γυρναει `{ expense }` με τον GET
+serializer, αφηνει το record unverified) και προσθεσα τη σειρα με το σωστο **(AI: expenses)** flag.
+
+Επιβεβαιωσα οτι τα statements ειναι σωστα GET-only στο doc (grep: μονο GET σε statements/route.ts
++ statements/[id]/route.ts· το PDF import ειναι web-action, οχι api/v1) οποτε δεν χρειαστηκε αλλαγη.
+Ολα τα υπολοιπα 49 routes ηδη documented (1-προς-1 match). Καμια νεα τιμη/shape εφευρεθηκε — μονο
+οτι λεει ο κωδικας.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence-lines api.md = 12 (6 balanced blocks).
+Internal links (README/self-hosting/features/configuration/mobile.md) ολα υπαρχουν (test -e). Καμια secret.
+
+Collision guard: `git status --short` δειχνει προϋπαρχοντα .claude/launch.json + apps/mobile/src/screens
+edits (αλλων ρουτινων, ΔΕΝ τα αγγιξα)· staged κενο πριν το add. Stage ΜΟΝΟ docs/api.md +
+docs/DOCS_PROGRESS.md.
+
+Επομενο run: enrich `docs/features.md` με screenshot placeholders ανα module, η `docs/contributing-docs.md`
+(docs style + markdown-first convention + link-check). Πρωτα finish-in-progress κανενα (ολα done).
