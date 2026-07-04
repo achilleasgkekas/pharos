@@ -1,0 +1,8 @@
+# Security policy for PHAROS (ph-aros.com)
+# PHAROS is a self-hosted personal hub, open source under AGPL-3.0.
+# If you find a vulnerability, please report it privately first.
+
+Contact: mailto:hello@ph-aros.com
+Expires: 2027-07-04T00:00:00.000Z
+Preferred-Languages: en, el
+Canonical: https://ph-aros.com/.well-known/security.txt

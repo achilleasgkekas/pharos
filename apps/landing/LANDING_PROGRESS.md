@@ -857,3 +857,25 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/roadmap GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD/manifest scope).
 - Contact inbox hello@ph-aros.com για τα waitlist emails.
+
+## 2026-07-04
+
+Task: (e) Polish, μερος 36 — RFC 9116 `security.txt` + user-facing em-dash cleanup. Self-contained (μηδεν assets, μηδεν pricing decision). Το site ειχε πληρη SEO/PWA/a11y/404/error surface αλλα (α) καμια security-contact declaration — για privacy/security-first OSS προϊον με hosted σκελος, το `/.well-known/security.txt` ειναι standard σημα ωριμοτητας ωστε researchers να αναφερουν vulns ιδιωτικα· (β) το OG/Twitter `image:alt` περιειχε em-dash («PHAROS — one light…»), που παραβιαζει τη ρητη προτιμηση του Achilleas (NO em-dashes) και ηταν user-facing metadata (social-share alt).
+
+Τι εφτιαξα:
+- `public/.well-known/security.txt` (νεο, RFC 9116): Contact mailto:hello@ph-aros.com, Expires 2027-07-04 (~1 ετος μπροστα, οπως απαιτει το RFC), Preferred-Languages en, el (ο Achilleas ειναι Ελληνας), Canonical https://ph-aros.com/.well-known/security.txt + comment οτι ειναι AGPL-3.0 self-hosted, report privately first. Σερβιρεται στο `/.well-known/security.txt` (Next static public/).
+- `app/opengraph-image.tsx`: το `export const alt` «PHAROS — one light over everything you run» -> «PHAROS: one light over everything you run» (em-dash -> colon). Το twitter-image.tsx κανει re-export -> και τα δυο image:alt meta διορθωθηκαν με μια αλλαγη.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· ολα 11 routes ○ Static, / αμεταβλητο 2.79 kB / 105 kB First Load JS (static file + alt string, μηδεν JS/bundle impact).
+- Served output: `public/.well-known/security.txt` present (Next σερβιρει public/ ως-εχει)· prerendered `<head>` (`.next/server/app/index.html`) -> `og:image:alt` + `twitter:image:alt` = «PHAROS: one light over everything you run», grep '—' στο index.html = **0** (μηδεν em-dash στο served head). Static/metadata increment -> επιβεβαιωθηκε στο static output (οπως robots/sitemap/manifest/icons)· δεν σηκωσα dev server, δεν αγγιξα το Docker :3000. Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged (καμια αλλη ρουτινα mid-commit)· foreign `.claude/launch.json` + `apps/mobile/src/screens/*` (modified, ασταγα, αλλων ρουτινων) ΔΕΝ commit — staged μονο public/.well-known/security.txt + app/opengraph-image.tsx + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες· ισως SECURITY.md στο repo (GitHub territory, οχι landing) η humans.txt. SEO/security/metadata surface πλεον πληρες.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/roadmap GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD/manifest/security.txt).
+- Contact inbox hello@ph-aros.com για waitlist + security reports (το security.txt το δηλωνει· αν θες dedicated security@ πες μου).

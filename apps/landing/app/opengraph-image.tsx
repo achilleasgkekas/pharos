@@ -3,7 +3,7 @@ import { ImageResponse } from 'next/og';
 // Branded Open Graph card, generated at build time (next/og).
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
-export const alt = 'PHAROS — one light over everything you run';
+export const alt = 'PHAROS: one light over everything you run';
 
 const BG = '#0a0a0a';
 const SURFACE = '#141414';
