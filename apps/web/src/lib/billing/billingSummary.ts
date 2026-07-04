@@ -9,6 +9,7 @@
 
 import { planDef, type PlanKey } from './plans';
 import { canManageBilling } from './billingRoutes';
+import { evaluateTrial, type TrialState } from './trial';
 
 /** What the billing UI should offer the current viewer. */
 export type BillingAction = 'subscribe' | 'manage' | 'view';
@@ -25,6 +26,8 @@ export type BillingSummary = {
   };
   status: string;
   trialEndsAt: string | null;
+  /** Derived trial window state (onTrial / expired / daysLeft), from status + trialEndsAt. */
+  trial: TrialState;
   subscription: {
     customerId: string | null;
     subscriptionId: string | null;
@@ -59,6 +62,8 @@ export type BillingSummaryInput = {
   trialEndsAt: Date | string | null | undefined;
   /** Result of stripeConfigured() — passed in to keep this module pure. */
   billingConfigured: boolean;
+  /** Evaluation instant for the trial window. Defaults to now; passed in tests for determinism. */
+  now?: Date;
 };
 
 /** ISO string for a Date/string/nullish, or null. Tolerant of already-serialized values. */
@@ -88,6 +93,7 @@ export function buildBillingSummary(input: BillingSummaryInput): BillingSummary 
     },
     status: input.status || 'trialing',
     trialEndsAt: toIso(input.trialEndsAt),
+    trial: evaluateTrial({ status: input.status, trialEndsAt: input.trialEndsAt }, input.now),
     subscription: {
       customerId,
       subscriptionId,

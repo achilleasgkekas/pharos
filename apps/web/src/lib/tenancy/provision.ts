@@ -7,6 +7,7 @@ import { connectDB } from '@/lib/db';
 import { Tenant } from '@/models/Tenant';
 import { Membership } from '@/models/Membership';
 import { RESERVED_SLUGS } from './host';
+import { trialEndFrom } from '@/lib/billing/trial';
 
 /**
  * Normalise arbitrary text into a valid subdomain label: lowercase, ASCII a-z0-9 and single
@@ -80,6 +81,8 @@ export async function provisionTenant(opts: {
     plan: 'free',
     status: 'trialing',
     tier: 'shared',
+    // Stamp a bounded trial end so the trial actually lapses (lib/billing/trial.ts).
+    trialEndsAt: trialEndFrom(new Date()),
   });
 
   await Membership.create({

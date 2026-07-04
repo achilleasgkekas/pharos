@@ -88,6 +88,27 @@ describe('buildBillingSummary', () => {
     expect(buildBillingSummary({ ...base, trialEndsAt: null }).trialEndsAt).toBeNull();
   });
 
+  it('derives the trial window from status + trialEndsAt against a fixed now', () => {
+    const now = new Date('2026-07-04T00:00:00.000Z');
+    const future = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const past = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    // active tenant → not on trial
+    expect(buildBillingSummary({ ...base, now }).trial).toEqual({
+      onTrial: false,
+      expired: false,
+      daysLeft: null,
+    });
+    // trialing with a future end → onTrial + countdown
+    expect(
+      buildBillingSummary({ ...base, status: 'trialing', trialEndsAt: future, now }).trial
+    ).toEqual({ onTrial: true, expired: false, daysLeft: 3 });
+    // trialing with a past end → expired
+    expect(
+      buildBillingSummary({ ...base, status: 'trialing', trialEndsAt: past, now }).trial
+    ).toEqual({ onTrial: false, expired: true, daysLeft: 0 });
+  });
+
   it('trims empty Stripe ids to null and reflects an unconfigured backend', () => {
     const s = buildBillingSummary({
       ...base,

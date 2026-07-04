@@ -1429,3 +1429,51 @@ apps/mobile edits άθικτα).
 (Needs-Achilleas· provider+model lock), είτε (γ) user-facing workspace-settings UI panels που
 consume-άρουν τα έτοιμα read/write APIs (General/Members/Invitations/Activity/Billing/Usage — όλα
 έτοιμα, UI-only· το usage route δίνει τώρα έτοιμο `cost` block για ένα «AI spend this month» card).
+
+## 2026-07-04 (increment 38 — trial window: bounded end + evaluation, SaaS lifecycle)
+**Built:** επέλεξα ένα καθαρό gap που δεν χρειάζεται Achilleas. Το `provision.ts` έφτιαχνε
+tenants με `status:'trialing'` αλλά **ΠΟΤΕ** δεν σετάρε `trialEndsAt` → οι δοκιμές ήταν
+ουσιαστικά ατέρμονες και κανένα read surface δεν μπορούσε να πει στο UI «N μέρες μένουν» ή
+«η δοκιμή έληξε». Πρόσθεσα και τα δύο κομμάτια, ΟΛΟ PURE / additive / backward-compatible, σε
+δικά μου SAAS αρχεία:
+- `lib/billing/trial.ts` (νέο, **PURE** — μηδέν imports/DB/env/Stripe): `DEFAULT_TRIAL_DAYS=14`
+  (**PLACEHOLDER** — trial length = product decision, Needs-Achilleas), `trialEndFrom(start,
+  days?, now?)` → Date (compute trial end· garbage start → now, garbage/negative/NaN days →
+  default, floor fractional), `evaluateTrial({status, trialEndsAt}, now?)` → **`TrialState`**
+  (`onTrial` / `expired` / `daysLeft`): non-trialing → no trial· trialing χωρίς end → open-ended
+  (onTrial, daysLeft null)· trialing με future end → onTrial + ceil daysLeft· trialing με
+  reached/past end → expired (daysLeft 0). Tolerant σε Date/string/number/null.
+- `lib/tenancy/provision.ts` (additive edit, δικό μου SAAS-only αρχείο) — το `Tenant.create`
+  σετάρει πλέον **`trialEndsAt: trialEndFrom(new Date())`** ώστε η δοκιμή να λήγει όντως. Τρέχει
+  ΜΟΝΟ σε SAAS provisioning (self-hosted app δεν φτιάχνει Tenant docs) → zero effect off-path.
+- `lib/billing/billingSummary.ts` (additive edit, δικό μου) — το `BillingSummary` απέκτησε
+  **`trial: TrialState`** (derived από status+trialEndsAt μέσω `evaluateTrial`)· `BillingSummaryInput`
+  +optional `now?: Date` (default now· tests περνάνε fixed για determinism). Η υπόλοιπη λογική
+  αμετάβλητη· το SAAS-gated billing route (404 όταν off) το εκθέτει αυτόματα (spread) — καμία
+  αλλαγή στο route.
+- `lib/billing/trial.test.ts` (νέο) — 10 PURE tests (trialEndFrom default/explicit/string+number
+  start/garbage fallbacks/floor· evaluateTrial non-trialing/open-ended/future-ceil/expired-
+  boundary/serialized-end).
+- `lib/billing/billingSummary.test.ts` (+1 test) — trial block derivation (active→no-trial,
+  future→countdown, past→expired) σε fixed `now`.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run trial.test.ts
+billingSummary.test.ts` → **21/21 green**· full suite `npx vitest run` → **1099/1099 green**
+(καμία regression). Ο trial evaluator είναι PURE· καταναλώνεται μόνο από το SAAS-gated billing
+summary (404 όταν off) + το SAAS-only provision path. ⇒ `SAAS_MODE` off / default tenant =
+**zero effect** (κανένα Tenant doc, το billing route δεν mount-άρει). Κανένας Docker rebuild
+(νέο PURE module + additive gated field + SAAS-only provision stamp· type-check+tests καλύπτουν
+compile+logic)· καμία νέα εξάρτηση· κανένα feature route/data-db/User-path/bearer-path αγγίχτηκε.
+Άγγιξα μόνο δικά μου SAAS αρχεία (foreign `.claude/launch.json` + apps/mobile edits άθικτα).
+
+**## Needs Achilleas** (trial):
+- **Πραγματικό trial length**: το `DEFAULT_TRIAL_DAYS=14` είναι placeholder. Όρισε το τελικό
+  (π.χ. 7/14/30) — ιδανικά per-plan ή από env/config.
+- **Trial-lapse enforcement**: το `evaluateTrial` λέει ΑΝ έληξε αλλά κανείς δεν το επιβάλλει
+  ακόμα. Μελλοντικό increment/cron: όταν `expired` → flip status σε `suspended` (dunning) ή block
+  access· ήδη υπάρχει το `workspaceStatusError` gate που θα μπλόκαρε suspended workspaces.
+
+**Next task:** increment 39 — είτε (α) trial-lapse job/helper που flip-άρει expired trials σε
+suspended (κλείνει τον βρόχο με το status enforcement), είτε (β) BYO-key resolver+storage scaffold
+μόλις οριστεί crypto (Needs-Achilleas), είτε (γ) user-facing workspace-settings UI panels (όλα τα
+read/write APIs έτοιμα — General/Members/Invitations/Activity/Billing[+trial]/Usage — UI-only).
