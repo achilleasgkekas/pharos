@@ -22,7 +22,9 @@ GitHub today and can feed a docs site later.
   Network/UniFi, AI command bar, Search, Notifications, Trash, Settings.
 - **[API reference](api.md)** — the REST API v1 under `/api/v1`: bearer-token
   auth, list envelope & incremental sync, and every endpoint (method, path,
-  request/response shape), read from the route files.
+  request/response shape), read from the route files. A machine-readable
+  **[OpenAPI 3.1 spec](openapi.yaml)** mirrors the same 50 endpoints for
+  Swagger UI, Postman, and client code generation.
 - **[Configuration](configuration.md)** — AI providers, storage backends
   (local/SMB/FTP/OneDrive), notifications (ntfy/Discord/Slack/Telegram/webhook),
   and language (i18n).

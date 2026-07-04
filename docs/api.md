@@ -16,6 +16,11 @@ in the web UI (and vice versa).
 > `apps/web/src/app/api/v1/`. It is the source of truth for the mobile client; if
 > a shape here disagrees with the code, the code wins, so please open an issue.
 
+> **Machine-readable spec:** the same endpoints are described in
+> [`openapi.yaml`](openapi.yaml) (OpenAPI 3.1). Load it into Swagger UI, Postman,
+> Insomnia, or an OpenAPI client generator to get a typed SDK for free. It is kept
+> in step with this document; the route files remain the ultimate source of truth.
+
 ---
 
 ## Authentication

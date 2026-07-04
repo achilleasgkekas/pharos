@@ -1,0 +1,1937 @@
+openapi: 3.1.0
+info:
+  title: Pharos REST API
+  version: 1.0.0
+  summary: Token-authenticated JSON API for the Pharos personal hub.
+  description: |
+    Pharos exposes a versioned REST API under `/api/v1`. It is the same API the
+    Expo mobile app consumes, and it is stable enough to build your own clients
+    or scripts against. Every route runs on the Node.js runtime and talks to the
+    same MongoDB as the web app, so anything you change through the API shows up
+    in the web UI (and vice versa).
+
+    This document is a machine-readable mirror of `docs/api.md`. Both are derived
+    from the route files under `apps/web/src/app/api/v1/`. If a shape here
+    disagrees with the code, **the code wins** — please open an issue.
+
+    ## Auth
+    Every route requires a bearer token (`Authorization: Bearer phk_…`) except
+    `POST /auth/login`, which mints it. The token is the user's `apiToken` and is
+    shared with the MCP connector.
+
+    ## List envelope & incremental sync
+    Every list (`GET`) endpoint returns `{ data, total, limit, offset }` and
+    accepts `limit` (1..200, default 50), `offset` (default 0) and `updatedSince`
+    (ISO date). When `updatedSince` is set, soft-deleted records are ALSO
+    returned, each flagged `deleted: true`, so a client can sync both changes and
+    deletions in one poll. (`/shopping-list` is the one exception: it returns
+    `{ items }` without pagination.)
+
+    ## Soft delete
+    `DELETE` on Items, Receipts, Expenses/Income, Subscriptions, Vouchers and
+    Tasks is a soft delete (recoverable via the Trash endpoints). Cards and Stores
+    are removed permanently.
+
+    ## AI-backed endpoints
+    Endpoints tagged **(AI)** call the configured AI provider and are gated behind
+    a per-feature toggle in Settings. If the feature is off or the provider is
+    misconfigured they return a friendly `{ error }` instead of acting.
+  license:
+    name: AGPL-3.0-only
+    url: https://www.gnu.org/licenses/agpl-3.0.en.html
+externalDocs:
+  description: Human-readable API reference
+  url: https://github.com/AchilleasGekas/pharos/blob/main/docs/api.md
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local LAN / dev
+  - url: https://{host}/api/v1
+    description: Reverse-proxied HTTPS host
+    variables:
+      host:
+        default: pharos.example.com
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+    description: Obtain a bearer token.
+  - name: Dashboard
+    description: Overview, reports, calendar and global search.
+  - name: Items
+    description: Inventory and shopping items, price tracking, installment links.
+  - name: Shopping list
+    description: Lightweight household shopping list.
+  - name: Receipts
+    description: Parsed receipts and their line items.
+  - name: Scan
+    description: AI capture of receipts, products, bills and vouchers.
+  - name: Expenses
+    description: Expenses and income.
+  - name: Statements
+    description: Credit-card statements and installment plans.
+  - name: Subscriptions
+    description: Recurring subscriptions.
+  - name: Vouchers
+    description: Discount vouchers and coupons.
+  - name: Tasks
+    description: Planner tasks.
+  - name: Cards
+    description: Payment cards.
+  - name: Stores
+    description: Known stores / vendors.
+  - name: AI
+    description: Natural-language command bar and history.
+  - name: Notifications
+    description: In-app notifications, background jobs and push tokens.
+  - name: Settings
+    description: App preferences and editable taxonomies.
+  - name: Trash
+    description: Soft-deleted records — list, restore, purge.
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in and mint a bearer token
+      description: The only unauthenticated endpoint. Returns the user's stable `phk_` API token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: Token and user profile.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /overview:
+    get:
+      tags: [Dashboard]
+      summary: Headline dashboard counts
+      description: Counts (items, shopping list, receipts, expenses, subscriptions, open tasks) plus installments owed, active plan count and currency. For a mobile dashboard.
+      responses:
+        '200':
+          description: Overview object.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /reports:
+    get:
+      tags: [Dashboard]
+      summary: Money summary
+      description: Net position, this month/year, by-category and the last 6 months.
+      responses:
+        '200':
+          description: Reports object.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /calendar:
+    get:
+      tags: [Dashboard]
+      summary: 3-month money agenda
+      description: Subscription renewals (stepped per cycle), card installments aggregated per month, projected recurring bills/income, warranty + voucher expiries, per-month in/out totals, plus a flat `events` array for backward compatibility.
+      responses:
+        '200':
+          description: Calendar agenda.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /search:
+    get:
+      tags: [Dashboard]
+      summary: Global search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+          description: Search query.
+      responses:
+        '200':
+          description: Search hits.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hits:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type: { type: string }
+                        id: { type: string }
+                        title: { type: string }
+                        subtitle: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /items:
+    get:
+      tags: [Items]
+      summary: List items
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [shopping, inventory, all] }
+          description: Filter by lifecycle bucket.
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/UpdatedSince'
+      responses:
+        '200':
+          description: Paginated items.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Item' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Items]
+      summary: Create an item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                status: { type: string }
+                category: { type: string }
+                currentPrice: { type: number }
+      responses:
+        '201':
+          description: Created item.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  item: { $ref: '#/components/schemas/Item' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /items/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Items]
+      summary: Item detail
+      description: Full detail (links, price history, photos, warranty, purchase) plus a computed `price` block (best-now, lowest/highest, trend, verdict, where-to-buy) for the mobile price panel.
+      responses:
+        '200':
+          description: Item detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Items]
+      summary: Update an item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                status: { type: string }
+                category: { type: string }
+                currentPrice: { type: number }
+                targetPrice: { type: number }
+                specs: { type: string }
+                tags:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Updated item.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  item: { $ref: '#/components/schemas/Item' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Items]
+      summary: Soft-delete an item
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /items/import:
+    post:
+      tags: [Items]
+      summary: Import an item from a URL (AI)
+      description: '**(AI: itemsImport)** Fetch a product page, AI-parse it, then add or merge into the library.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, format: uri }
+                view: { type: string, enum: [shopping, inventory], default: shopping }
+      responses:
+        '200':
+          description: Imported or merged.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  id: { type: string }
+                  title: { type: string }
+                  price: { type: number }
+                  store: { type: string }
+                  updated: { type: boolean }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /items/{id}/ai-fill:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Items]
+      summary: AI-fill item specs/info
+      description: '**(AI: itemsImport)** Fill specs/category/tags from the item''s links or a web search.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode: { type: string, enum: [specs, info], default: specs }
+      responses:
+        '200':
+          description: Fill result.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /items/{id}/price:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Items]
+      summary: Log an observed price
+      description: Appends to the item's price history and updates `currentPrice`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [price]
+              properties:
+                price: { type: number }
+                store: { type: string }
+      responses:
+        '200':
+          description: Updated item.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /items/{id}/convert-to-task:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Items]
+      summary: Convert an item into a task
+      description: Creates a Task seeded from this item (title, price, links, tag `shopping`). The item is left untouched.
+      responses:
+        '200':
+          description: Created task.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /items/{id}/plans:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Items]
+      summary: Installment plans for an item
+      description: Installment plans across all statements, each flagged `linked` for this item. Linked first, then active, then by soonest payoff.
+      responses:
+        '200':
+          description: Plans list.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /items/{id}/link-plan:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Items]
+      summary: Link an item to an installment plan
+      description: Attaches this item to a plan (additive).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signature]
+              properties:
+                signature: { type: string }
+      responses:
+        '200':
+          description: Link result.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Items]
+      summary: Unlink an item from a plan
+      description: Detaches this item from a plan, keeping other linked products.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signature]
+              properties:
+                signature: { type: string }
+      responses:
+        '200':
+          description: Unlink result.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /shopping-list:
+    get:
+      tags: [Shopping list]
+      summary: List shopping-list items
+      responses:
+        '200':
+          description: Shopping list items (not paginated).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ShoppingListItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Shopping list]
+      summary: Add a shopping-list item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                quantity: { type: number }
+                category: { type: string }
+                brand: { type: string }
+                note: { type: string }
+      responses:
+        '201':
+          description: Updated list.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ShoppingListItem' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /shopping-list/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Shopping list]
+      summary: Update a shopping-list item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                checked: { type: boolean }
+                name: { type: string }
+                quantity: { type: number }
+                category: { type: string }
+                brand: { type: string }
+                note: { type: string }
+      responses:
+        '200':
+          description: Updated list.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Shopping list]
+      summary: Remove a shopping-list item
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /receipts:
+    get:
+      tags: [Receipts]
+      summary: List receipts
+      parameters:
+        - name: store
+          in: query
+          schema: { type: string }
+        - name: archived
+          in: query
+          schema: { type: string, enum: ['0', '1'] }
+          description: '`1` returns archived receipts.'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/UpdatedSince'
+      responses:
+        '200':
+          description: Paginated receipts.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Receipt' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /receipts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Receipts]
+      summary: Receipt detail
+      description: Receipt plus its line items.
+      responses:
+        '200':
+          description: Receipt with line items.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Receipts]
+      summary: Update a receipt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                store: { type: string }
+                date: { type: string }
+                total: { type: number }
+                subtotal: { type: number }
+                vatAmount: { type: number }
+                paymentMethod: { type: string }
+                notes: { type: string }
+                verified: { type: boolean }
+                archived: { type: boolean }
+                lineItems:
+                  type: array
+                  items: { $ref: '#/components/schemas/LineItem' }
+      responses:
+        '200':
+          description: Updated receipt.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /receipts/{id}/rescan:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Receipts]
+      summary: Re-scan a stored receipt (AI)
+      description: '**(AI)** Re-run the parse on the stored file. Returns the same shape as `GET /receipts/{id}` plus `aiUsed`/`model`/`aiError`.'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ocr: { type: boolean, description: Force OCR. }
+      responses:
+        '200':
+          description: Re-parsed receipt.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /receipts/{id}/add-to-library:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Receipts]
+      summary: Add receipt line items to inventory
+      description: Turns line items into inventory Items (find-or-create by title, link the receipt).
+      responses:
+        '200':
+          description: Add result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  created: { type: integer }
+                  linked: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /scan/receipt:
+    post:
+      tags: [Scan]
+      summary: Scan and persist a receipt (AI)
+      description: '**(AI)** Saves the uploaded file, parses it and creates the receipt. This endpoint **persists**.'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: Image or PDF. }
+      responses:
+        '201':
+          description: Created receipt.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  receipt: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /scan/product:
+    post:
+      tags: [Scan]
+      summary: Scan a product image (AI)
+      description: '**(AI)** Parse a product image. No save.'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: Parsed product.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      name: { type: string }
+                      brand: { type: string }
+                      category: { type: string }
+                      quantity: { type: number }
+                      notes: { type: string }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /scan/expense:
+    post:
+      tags: [Scan]
+      summary: Scan a bill/payslip (AI)
+      description: '**(AI: expenses)** Provide JSON `{ text }` or a multipart `file`. No save.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string }
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: Parsed expense.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: true
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /scan/voucher:
+    post:
+      tags: [Scan]
+      summary: Scan a voucher (AI)
+      description: '**(AI: vouchers)** Provide JSON `{ text }` or a multipart `file`. No save.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string }
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          description: Parsed voucher.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: true
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /expenses:
+    get:
+      tags: [Expenses]
+      summary: List expenses/income
+      parameters:
+        - name: kind
+          in: query
+          schema: { type: string, enum: [income, expense] }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/UpdatedSince'
+      responses:
+        '200':
+          description: Paginated expenses.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Expense' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Expenses]
+      summary: Create an expense/income
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vendor, amount]
+              properties:
+                kind: { type: string, enum: [income, expense] }
+                vendor: { type: string }
+                amount: { type: number }
+                date: { type: string }
+                category: { type: string }
+                period: { type: string }
+                recurring: { type: boolean }
+                recurringCycle: { type: string }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Created expense.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  expense: { $ref: '#/components/schemas/Expense' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /expenses/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Expenses]
+      summary: Update an expense/income
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vendor: { type: string }
+                amount: { type: number }
+                category: { type: string }
+                kind: { type: string, enum: [income, expense] }
+                notes: { type: string }
+                date: { type: string }
+                period: { type: string }
+                recurring: { type: boolean }
+                recurringCycle: { type: string }
+                paymentMethod: { type: string }
+      responses:
+        '200':
+          description: Updated expense.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  expense: { $ref: '#/components/schemas/Expense' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Expenses]
+      summary: Soft-delete an expense/income
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /expenses/{id}/rescan:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Expenses]
+      summary: Re-scan a stored bill/payslip (AI)
+      description: '**(AI: expenses)** Re-run the parse on the stored file. Returns `{ expense }` (same shape as the list) so the client can re-prefill in place; the record is left unverified.'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ocr: { type: boolean }
+      responses:
+        '200':
+          description: Re-parsed expense.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  expense: { $ref: '#/components/schemas/Expense' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /statements:
+    get:
+      tags: [Statements]
+      summary: List statements
+      description: Newest period first.
+      parameters:
+        - name: card
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/UpdatedSince'
+      responses:
+        '200':
+          description: Paginated statements.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Statement' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /statements/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Statements]
+      summary: Statement detail
+      description: One statement with its transactions (plus per-charge installment info).
+      responses:
+        '200':
+          description: Statement with transactions.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /statements/plans:
+    get:
+      tags: [Statements]
+      summary: All installment plans
+      description: Plans grouped cross-statement (same signature → one plan). Active first (by soonest payoff), then done.
+      responses:
+        '200':
+          description: Plans list.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /subscriptions:
+    get:
+      tags: [Subscriptions]
+      summary: List subscriptions
+      parameters:
+        - name: active
+          in: query
+          schema: { type: string, enum: ['0', '1'] }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/UpdatedSince'
+      responses:
+        '200':
+          description: Paginated subscriptions.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Subscription' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Subscriptions]
+      summary: Create a subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, amount]
+              properties:
+                name: { type: string }
+                amount: { type: number }
+                billingCycle: { type: string }
+                startDate: { type: string }
+                nextRenewal: { type: string }
+                category: { type: string }
+                provider: { type: string }
+                url: { type: string }
+      responses:
+        '201':
+          description: Created subscription.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscription: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /subscriptions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Subscriptions]
+      summary: Update a subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                amount: { type: number }
+                billingCycle: { type: string }
+                nextRenewal: { type: string }
+                category: { type: string }
+                active: { type: boolean }
+      responses:
+        '200':
+          description: Updated subscription.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscription: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Subscriptions]
+      summary: Soft-delete a subscription
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /ai/subscription:
+    post:
+      tags: [Subscriptions]
+      summary: AI-fill subscription details (AI)
+      description: '**(AI: subscriptions)** AI-fill details from a name.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        '200':
+          description: Suggested subscription fields.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: true
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /vouchers:
+    get:
+      tags: [Vouchers]
+      summary: List vouchers
+      parameters:
+        - name: used
+          in: query
+          schema: { type: string, enum: ['0', '1'] }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/UpdatedSince'
+      responses:
+        '200':
+          description: Paginated vouchers.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Voucher' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Vouchers]
+      summary: Create a voucher
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                code: { type: string }
+                store: { type: string }
+                discount: { type: string }
+                expiresAt: { type: string }
+                url: { type: string }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Created voucher.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  voucher: { $ref: '#/components/schemas/Voucher' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /vouchers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Vouchers]
+      summary: Update a voucher
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                code: { type: string }
+                store: { type: string }
+                discount: { type: string }
+                url: { type: string }
+                expiresAt: { type: string }
+                used: { type: boolean }
+      responses:
+        '200':
+          description: Updated voucher.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  voucher: { $ref: '#/components/schemas/Voucher' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Vouchers]
+      summary: Soft-delete a voucher
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: List tasks
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [todo, in-progress, done, blocked] }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/UpdatedSince'
+      responses:
+        '200':
+          description: Paginated tasks.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Task' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Tasks]
+      summary: Create a task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                status: { type: string, enum: [todo, in-progress, done, blocked] }
+                priority: { type: string }
+                tags:
+                  type: array
+                  items: { type: string }
+                content: { type: string }
+                dueDate: { type: string }
+      responses:
+        '201':
+          description: Created task.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task: { $ref: '#/components/schemas/Task' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /tasks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Tasks]
+      summary: Update a task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                status: { type: string, enum: [todo, in-progress, done, blocked] }
+                priority: { type: string }
+                tags:
+                  type: array
+                  items: { type: string }
+                content: { type: string }
+                dueDate: { type: string }
+      responses:
+        '200':
+          description: Updated task.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task: { $ref: '#/components/schemas/Task' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Tasks]
+      summary: Soft-delete a task
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /cards:
+    get:
+      tags: [Cards]
+      summary: List payment cards
+      description: Active first, then by name.
+      responses:
+        '200':
+          description: Cards.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Cards]
+      summary: Create a payment card
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                last4: { type: string }
+                bank: { type: string }
+                kind: { type: string }
+                type: { type: string }
+                color: { type: string }
+                creditLimit: { type: number }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Created card.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /cards/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Cards]
+      summary: Update a payment card
+      description: Update any create field plus `active` (send just `{ active }` to toggle).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                last4: { type: string }
+                bank: { type: string }
+                kind: { type: string }
+                type: { type: string }
+                color: { type: string }
+                creditLimit: { type: number }
+                notes: { type: string }
+                active: { type: boolean }
+      responses:
+        '200':
+          description: Updated card.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Cards]
+      summary: Delete a payment card (permanent)
+      description: Cards are not soft-deleted.
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /stores:
+    get:
+      tags: [Stores]
+      summary: List stores
+      description: Seeded on first use, sorted by name.
+      responses:
+        '200':
+          description: Stores.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Stores]
+      summary: Create a store
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                url: { type: string }
+                aliases:
+                  description: Array of aliases or a comma-separated string.
+                  oneOf:
+                    - type: array
+                      items: { type: string }
+                    - type: string
+      responses:
+        '201':
+          description: Created store.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /stores/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Stores]
+      summary: Update a store
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                url: { type: string }
+                aliases:
+                  oneOf:
+                    - type: array
+                      items: { type: string }
+                    - type: string
+      responses:
+        '200':
+          description: Updated store.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Stores]
+      summary: Delete a store (permanent)
+      description: Stores are not soft-deleted.
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /ai:
+    post:
+      tags: [AI]
+      summary: Natural-language command bar (AI)
+      description: '**(AI: commandBar)** Command agent (add expenses/items/tasks, search, overview…). Needs the Anthropic provider. Older turns are trimmed and each message is size-capped.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role: { type: string, enum: [user, assistant] }
+                      content: { type: string }
+      responses:
+        '200':
+          description: Agent reply and actions taken.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reply: { type: string }
+                  actions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        summary: { type: string }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /history:
+    get:
+      tags: [AI]
+      summary: AI command-bar history
+      description: Saved conversations, newest first. Read-only.
+      responses:
+        '200':
+          description: History.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      description: Newest-unread first (deals / installments / warranties / system).
+      responses:
+        '200':
+          description: Notifications and unread count.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Notification' }
+                  unread: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Notifications]
+      summary: Mark notifications read
+      description: 'Body `{ id }` marks one; omit `id` to mark all read.'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+      responses:
+        '200':
+          description: Mark result.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /jobs:
+    get:
+      tags: [Notifications]
+      summary: List background jobs
+      description: Recent background AI jobs (running first, then newest). Read-only.
+      responses:
+        '200':
+          description: Jobs.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /push/register:
+    post:
+      tags: [Notifications]
+      summary: Register an Expo push token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: Registered.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Notifications]
+      summary: Remove an Expo push token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: Removed.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /settings:
+    get:
+      tags: [Settings]
+      summary: Get app settings
+      description: App preferences plus this-month budget usage.
+      responses:
+        '200':
+          description: Settings.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Settings]
+      summary: Update app settings
+      description: Update preferences/defaults, ntfy config and/or budgets.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: Updated settings.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /settings/test-notify:
+    post:
+      tags: [Settings]
+      summary: Send a test notification
+      description: Send a one-off test to the configured ntfy topic.
+      responses:
+        '200':
+          description: Sent.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /lists:
+    get:
+      tags: [Settings]
+      summary: Get editable taxonomies
+      description: Category taxonomies (current values + defaults).
+      responses:
+        '200':
+          description: Taxonomies.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Settings]
+      summary: Overwrite one taxonomy
+      description: Empty or identical-to-default clears the override.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, values]
+              properties:
+                key: { type: string }
+                values:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Updated taxonomy.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /trash:
+    get:
+      tags: [Trash]
+      summary: List soft-deleted records
+      description: Most-recently-deleted first (item/receipt/expense/subscription/voucher/task). Auto-purges entries older than 30 days as a side effect.
+      responses:
+        '200':
+          description: Trash entries.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /trash/{type}/{id}:
+    parameters:
+      - name: type
+        in: path
+        required: true
+        schema: { type: string, enum: [item, receipt, expense, subscription, voucher, task] }
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Trash]
+      summary: Restore a soft-deleted record
+      description: Clears `deletedAt`.
+      responses:
+        '200':
+          description: Restored.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Trash]
+      summary: Permanently purge a record (admin)
+      description: Removes the doc, its files and cross-refs. **Admin only.**
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: phk_ token
+      description: The user's personal API token (`apiToken`), shared with the MCP connector.
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: 24-character hex Mongo ObjectId.
+      schema:
+        type: string
+        pattern: '^[a-fA-F0-9]{24}$'
+    Limit:
+      name: limit
+      in: query
+      description: Page size, clamped to 1..200.
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    Offset:
+      name: offset
+      in: query
+      description: Records to skip.
+      schema: { type: integer, minimum: 0, default: 0 }
+    UpdatedSince:
+      name: updatedSince
+      in: query
+      description: ISO date. Returns only records with `updatedAt >= it`; soft-deleted records are also returned, flagged `deleted:true`.
+      schema: { type: string, format: date-time }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: 'Unauthorized — send Authorization: Bearer <token>' }
+    Forbidden:
+      description: Authenticated but not permitted (admin-only endpoint).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Record not found.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadInput:
+      description: Malformed body or ID.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    OkDeleted:
+      description: Deleted.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok: { type: boolean, const: true }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+      required: [error]
+    ListMeta:
+      type: object
+      description: Common pagination envelope fields (data array is added per resource).
+      properties:
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+      required: [total, limit, offset]
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        username: { type: string }
+        role: { type: string, enum: [admin, member] }
+    LoginResponse:
+      type: object
+      properties:
+        token: { type: string, description: 'Bearer token beginning with phk_.' }
+        user: { $ref: '#/components/schemas/User' }
+      required: [token, user]
+    Item:
+      type: object
+      description: Item summary. The detail endpoint returns additional fields (links, price history, photos, warranty, purchase, computed price block).
+      additionalProperties: true
+      properties:
+        _id: { type: string }
+        title: { type: string }
+        status: { type: string }
+        category: { type: string }
+        currentPrice: { type: number }
+        targetPrice: { type: number }
+        tags:
+          type: array
+          items: { type: string }
+        updatedAt: { type: string, format: date-time }
+        deleted: { type: boolean, description: Present and true only in an updatedSince sync when the record was soft-deleted. }
+    ShoppingListItem:
+      type: object
+      additionalProperties: true
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        quantity: { type: number }
+        category: { type: string }
+        brand: { type: string }
+        note: { type: string }
+        checked: { type: boolean }
+    LineItem:
+      type: object
+      additionalProperties: true
+      properties:
+        name: { type: string }
+        price: { type: number }
+        quantity: { type: number }
+        vatRate: { type: number }
+    Receipt:
+      type: object
+      additionalProperties: true
+      properties:
+        _id: { type: string }
+        store: { type: string }
+        date: { type: string }
+        total: { type: number }
+        subtotal: { type: number }
+        vatAmount: { type: number }
+        paymentMethod: { type: string }
+        verified: { type: boolean }
+        archived: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+        deleted: { type: boolean }
+    Expense:
+      type: object
+      additionalProperties: true
+      properties:
+        _id: { type: string }
+        kind: { type: string, enum: [income, expense] }
+        vendor: { type: string }
+        amount: { type: number }
+        category: { type: string }
+        date: { type: string }
+        period: { type: string }
+        recurring: { type: boolean }
+        recurringCycle: { type: string }
+        paymentMethod: { type: string }
+        notes: { type: string }
+        updatedAt: { type: string, format: date-time }
+        deleted: { type: boolean }
+    Statement:
+      type: object
+      additionalProperties: true
+      properties:
+        _id: { type: string }
+        card: { type: string }
+        period: { type: string }
+        total: { type: number }
+        updatedAt: { type: string, format: date-time }
+        deleted: { type: boolean }
+    Subscription:
+      type: object
+      additionalProperties: true
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        amount: { type: number }
+        billingCycle: { type: string }
+        nextRenewal: { type: string }
+        category: { type: string }
+        provider: { type: string }
+        url: { type: string }
+        active: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+        deleted: { type: boolean }
+    Voucher:
+      type: object
+      additionalProperties: true
+      properties:
+        _id: { type: string }
+        title: { type: string }
+        code: { type: string }
+        store: { type: string }
+        discount: { type: string }
+        expiresAt: { type: string }
+        url: { type: string }
+        used: { type: boolean }
+        notes: { type: string }
+        updatedAt: { type: string, format: date-time }
+        deleted: { type: boolean }
+    Task:
+      type: object
+      additionalProperties: true
+      properties:
+        _id: { type: string }
+        title: { type: string }
+        status: { type: string, enum: [todo, in-progress, done, blocked] }
+        priority: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        content: { type: string }
+        dueDate: { type: string }
+        updatedAt: { type: string, format: date-time }
+        deleted: { type: boolean }
+    Notification:
+      type: object
+      additionalProperties: true
+      properties:
+        _id: { type: string }
+        kind: { type: string }
+        title: { type: string }
+        body: { type: string }
+        href: { type: string }
+        read: { type: boolean }
+        createdAt: { type: string, format: date-time }
