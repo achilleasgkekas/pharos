@@ -1,26 +1,27 @@
 # Pharos Monitor — STATUS
 
-## 2026-07-03 06:59
+## 2026-07-04 06:14
 
-**Ετυμηγορια: ΟΛΑ ΟΚ.** Και οι 6 ρουτινες εχουν φρεσκο αποτυπωμα μεσα στην τελευταια ~ωρα (πυκνος συνεχης παλμος 06:23 εως 06:58) με μηχανη ξυπνια. Ο builder οργωσε docs (upgrade/pinning/rollback guide c97383d), landing SEO (canonical + HowTo JSON-LD cb2d136), mobile (StatementsScreen installment badge → shared Badge 7151d47) και SaaS (billing.portal_opened audit 2bdf29d). Ο parity auditor εβγαλε 42η σαρωση (dc8a83f, GAP 0, 50/50 routes consumed, tsc EXIT 0). Ο ui auditor εβγαλε 40η σαρωση (2fa5c29, confirmation, 0 token violations, μηδεν νεο finding). Ο web auditor εβγαλε 39η σαρωση (eab4ac9, type-check EXIT 0, το P2 tenant-status εκλεισε μισο control-plane με b911882, μηδεν νεο P1/P2). Ο reviewer καθαρισε range acba60a..2fa5c29 (8f8d6ed, tsc web+mobile EXIT 0, 22 νεα tests green, μηδεν regression). Ο docker guard εκανε ασφαλη rebuild web + prune 2.1GB (110d3c9, marker → dc8a83f). Κανενα προβλημα.
+**Ετυμηγορια: 1 πιθανο προβλημα.** Πεντε απο τις εξι ρουτινες εχουν φρεσκο αποτυπωμα μεσα στον τελευταιο υγιη νυχτερινο κυκλο (συνεχης παλμος 00:12 εως 05:17 με μηχανη ξυπνια). Ο builder εβγαλε pure-lib mirror test coverage (e6c5dfe), ο parity auditor 45η σαρωση (63249e6, νεο ModalSheet item), ο web auditor 46η σαρωση (16afcbf, ουρα 4→2), ο reviewer καθαρισε range 0c010e0..16afcbf (c40e194), ο docker guard validate 63249e6 (f379349, /login 200, mongo healthy). **ΜΟΝΟ ο ui auditor ειναι STALE**: το τελευταιο του `docs(mobile-ui)` ειναι στις 2026-07-03 08:46 (8b3d477, 41η σαρωση), ~21.5 ωρες πισω, και προσπερασε ολοκληρο τον νυχτερινο κυκλο οπου ετρεξαν ολοι οι αλλοι. Δεν ειναι θεμα σβηστης μηχανης (η μηχανη οργωνε ασταματητα 00:12-05:17).
 
 | routine | τελευταια δραστηριοτητα | OK/STALE | τι εκανε (συντομα) |
 |---|---|---|---|
-| builder (Pharos daily dev) | 2026-07-03 06:58 | OK | upgrade/pinning/rollback guide (c97383d), landing canonical+HowTo JSON-LD (cb2d136), mobile StatementsScreen badge→shared Badge (7151d47), saas billing.portal_opened audit (2bdf29d) |
-| parity auditor | 2026-07-03 06:26 | OK | 42η σαρωση mobile-parity, GAP 0, 50/50 routes consumed, tsc EXIT 0 (dc8a83f) |
-| ui auditor | 2026-07-03 06:48 | OK | 40η σαρωση mobile-ui, confirmation, tsc EXIT 0, 0 token violations, μηδεν νεο finding (2fa5c29) |
-| web auditor | 2026-07-03 06:23 | OK | 39η σαρωση web-debt, type-check EXIT 0, P2 tenant-status μισο εκλεισε (b911882), μηδεν νεο P1/P2 (eab4ac9) |
-| reviewer | 2026-07-03 06:51 | OK | range acba60a..2fa5c29, tsc web+mobile EXIT 0, 22 tests green, μηδεν regression (8f8d6ed) |
-| docker guard | 2026-07-03 06:45 | OK | safe rebuild web + prune 2.1GB, marker → dc8a83f (110d3c9) |
+| builder (Pharos daily dev) | 2026-07-04 05:17 | OK | pure-lib mirror path-helper test coverage (e6c5dfe), νωριτερα perf saas sparse index (ac35ca3), fix saasGuard invites (388246d) |
+| parity auditor | 2026-07-04 02:48 | OK | 45η σαρωση mobile-parity, νεο ModalSheet item (6 modal dupes + RADIUS.xl), tsc EXIT 0 (63249e6) |
+| ui auditor | 2026-07-03 08:46 | **STALE** | 41η σαρωση mobile-ui, StatementsScreen badge→Badge confirm, tsc EXIT 0 (8b3d477) — καμια εκτοτε |
+| web auditor | 2026-07-04 04:03 | OK | 46η σαρωση web-debt, builder εκλεισε saasGuard-invites + Account sparse-index, ουρα 4→2, tsc EXIT 0 (16afcbf) |
+| reviewer | 2026-07-04 04:33 | OK | range 0c010e0..16afcbf, tsc web+mobile EXIT 0, 1049 tests green, μηδεν regression (c40e194, marker → 16afcbf) |
+| docker guard | 2026-07-04 03:22 | OK | validate 63249e6, rebuild web, /login 200, mongo healthy (f379349, marker → 63249e6) |
 
 ## Open queue counts
-- Build Queue (MOBILE_PARITY): **3** TODO
-- UI Debt Queue (MOBILE_PARITY): **3** TODO
-- Web Debt Queue (WEB_DEBT): **4** TODO
+- Build Queue (MOBILE_PARITY): **4** TODO
+- UI Debt Queue (MOBILE_PARITY): **4** TODO
+- Web Debt Queue (WEB_DEBT): **2** TODO
 
-Συγκριση με προηγουμενο STATUS (2026-07-03 04:02): Build 3→3 (=), UI 3→3 (=), Web 5→4 (-1). Ο web auditor εκλεισε ενα Web item (το P2 tenant-status μεταφερθηκε σε Needs Achilleas μετα το control-plane enforcement b911882, βγηκε απο την ενεργη ουρα) ενω build/ui σταθερα. Υγιης ουρα, οχι κολλημα, οχι φουσκωμα.
+Συγκριση με προηγουμενο STATUS (2026-07-03 06:59: Build 3 / UI 3 / Web 4): **Build 3→4 (+1)**, **UI 3→4 (+1)**, **Web 4→2 (-2)**. Ο parity auditor προσθεσε το ModalSheet item (φουσκωμα κατα 1 σε build/ui, φυσιολογικο), ενω ο builder εκλεισε 2 web items (saasGuard-invites + Account sparse-index). Οι ουρες κινουνται, οχι κολλημενες. Σημ: η UI ουρα μεγαλωσε ενω ο ui auditor ειναι stale, οποτε τα νεα UI items τα γραφει προς το παρον ο parity auditor, οχι ο ui auditor.
 
 ## Προσοχη
-Καμια ρουτινα δεν ειναι STALE, κανενα κενο προς ελεγχο. Και οι 6 χτυπησαν μεσα στα τελευταια ~36 λεπτα (ο πιο πισω ειναι ο web auditor στις 06:23, ανετα εντος του ~7ωρου παραθυρου· οι υπολοιποι 5 μετα τις 06:26). Ενας ακομη υγιης πυκνος πρωινος κυκλος με μηχανη ξυπνια.
 
-Σημειωσεις (οχι alarm): (1) Το κλεισιμο του P2 tenant-status (Web 5→4) ειναι φυσιολογικο: ο builder το υλοποιησε στον προηγουμενο κυκλο (b911882 + reactivate bbb09d1) και η 39η web σαρωση το επιβεβαιωσε ως control-plane-complete, μετακινωντας το residual (v1 data-path tenant-scoping) σε Needs Achilleas. (2) Ο reviewer marker καλυπτει μεχρι 2fa5c29 (06:48) ενω η κορυφη ειναι c97383d (06:58)· 2 commits (landing SEO cb2d136, upgrade docs c97383d) εκκρεμουν review, θα τα πιασει ο επομενος κυκλος, φυσιολογικο lag. Τιποτα δεν χρειαζεται αμεση παρεμβαση.
+- **ui auditor (STALE, ~21.5 ωρες)**: το τελευταιο footprint `docs(mobile-ui)` ειναι 2026-07-03 08:46 και ελειψε τελειως απο τον νυχτερινο κυκλο 00:12-05:17 οπου χτυπησαν και οι υπολοιποι πεντε. **ΔΕΝ ειναι σβηστη μηχανη** (οι αλλοι 5 ετρεξαν κανονικα). Τι να ελεγξεις: (1) οτι το scheduled task «Ui auditor» ειναι ενεργο και δεν εχει disable/error στο cron· (2) αν κρασαρε σιωπηλα (πχ tsc timeout ή write conflict στο MOBILE_PARITY.md UI Debt Queue)· (3) οτι δεν μπλοκαρεται απο uncommitted WIP στο tree. Δεν επειγει functional (η UI ουρα δεν εχει P1), αλλα αν μεινει stale κι αλλον κυκλο, θελει χειροκινητο τρεξιμο.
+
+Οι υπολοιπες πεντε ρουτινες υγιεις, καμια αλλη προσοχη. Ο reviewer marker (16afcbf) και ο docker marker (63249e6) καλυπτουν σχεδον την κορυφη· ελαχιστο φυσιολογικο lag (e6c5dfe 05:17 εκκρεμει review/validate, θα το πιασει ο επομενος κυκλος).
