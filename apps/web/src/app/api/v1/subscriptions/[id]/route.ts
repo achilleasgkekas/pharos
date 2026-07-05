@@ -3,6 +3,7 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Subscription } from '@/models/Subscription';
+import { trim, type SubLean } from '../route';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await connectDB();
     const doc = await Subscription.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
-    return NextResponse.json({ ok: true, id });
+    // Spec: PATCH returns { subscription: Subscription } (the updated doc), same trim as the list route.
+    return NextResponse.json({ subscription: trim(doc as SubLean) });
   });
 }
 

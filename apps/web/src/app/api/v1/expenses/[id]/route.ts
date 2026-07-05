@@ -4,6 +4,7 @@ import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
 import { vendorKey } from '@/app/expenses/lib';
+import { trimExpense, type ExpenseLean } from '../serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await connectDB();
     const doc = await Expense.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
-    return NextResponse.json({ ok: true, id });
+    // Spec: PATCH returns { expense: Expense } (the updated doc), same shape as the list/rescan trim.
+    return NextResponse.json({ expense: trimExpense(doc as ExpenseLean) });
   });
 }
 

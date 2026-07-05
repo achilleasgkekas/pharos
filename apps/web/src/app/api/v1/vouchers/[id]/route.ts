@@ -3,6 +3,7 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Voucher } from '@/models/Voucher';
+import { trim, type VoucherLean } from '../route';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await connectDB();
     const doc = await Voucher.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
-    return NextResponse.json({ ok: true, id });
+    // Spec: PATCH returns { voucher: Voucher } (the updated doc), same trim as the list route.
+    return NextResponse.json({ voucher: trim(doc as VoucherLean) });
   });
 }
 

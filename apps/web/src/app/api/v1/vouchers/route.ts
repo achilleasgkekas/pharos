@@ -8,11 +8,12 @@ import { Voucher } from '@/models/Voucher';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type VoucherLean = {
+export type VoucherLean = {
   _id: unknown; title: string; code?: string; store?: string; discount?: string;
   expiresAt?: Date | null; used?: boolean; url?: string; notes?: string; updatedAt?: Date; deletedAt?: Date | null;
 };
-function trim(v: VoucherLean) {
+/** Single source of truth for the v1 Voucher JSON shape (list, POST, PATCH). */
+export function trim(v: VoucherLean) {
   return {
     id: String(v._id), title: v.title, code: v.code ?? '', store: v.store ?? '', discount: v.discount ?? '',
     expiresAt: iso(v.expiresAt), used: !!v.used, url: v.url ?? '', notes: v.notes ?? '',

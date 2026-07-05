@@ -10,13 +10,14 @@ export const dynamic = 'force-dynamic';
 
 const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
 
-type SubLean = {
+export type SubLean = {
   _id: unknown; name: string; provider?: string; category?: string; amount?: number; currency?: string;
   billingCycle?: string; startDate?: Date; nextRenewal?: Date | null; active?: boolean; paymentMethod?: string;
   url?: string; notes?: string; updatedAt?: Date; deletedAt?: Date | null;
 };
 
-function trim(s: SubLean) {
+/** Single source of truth for the v1 Subscription JSON shape (list, POST, PATCH). */
+export function trim(s: SubLean) {
   return {
     id: String(s._id),
     name: s.name,
