@@ -49,6 +49,18 @@ export function Waitlist() {
           .
         </p>
       )}
+      <noscript>
+        <p className="waitlist-note">
+          Email{' '}
+          <a
+            href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('PHAROS hosted waitlist')}`}
+            style={{ color: 'var(--accent)' }}
+          >
+            {CONTACT_EMAIL}
+          </a>{' '}
+          to join the hosted waitlist.
+        </p>
+      </noscript>
     </form>
   );
 }

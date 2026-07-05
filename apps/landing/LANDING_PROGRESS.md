@@ -1007,3 +1007,41 @@ Needs-Achilleas (open):
 - Annual billing: αν θελει ετησια πληρωμη, να ορισει το discount (π.χ. 2 μηνες δωρεαν) πριν φτιαξω toggle.
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι λειτουργει πριν launch.
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-05 (cont.⁴) — (e) polish: waitlist `<noscript>` fallback (JS-off resilience)
+
+Task: (e) polish. Το site ειναι ωριμο (17 sections). Απο τα εκκρεμη next-increment options: real
+screenshots (χωρις assets, skip)· annual-billing toggle (δεσμευει ετησιες τιμες, μενει Needs-Achilleas,
+ΔΕΝ το αγγιξα). Εντοπισα πραγματικο resilience gap: το `Waitlist.tsx` ειναι client component με
+`mailto:`-based submit· το κουμπι ειναι `disabled={!valid}` και το `valid` ξεκιναει false -> με JS
+απενεργοποιημενο (ή αν πεσει το bundle) ο επισκεπτης βλεπει disabled button + νεκρη φορμα, ΧΩΡΙΣ τροπο
+να μπει στη waitlist (= το κυριο conversion του site). Διαλεξα να το κλεισω· self-contained, μηδεν
+commitment, μηδεν asset, μηδεν Achilleas.
+
+Τι εφτιαξα:
+- `app/components/Waitlist.tsx`: προσθηκη `<noscript>` block μεσα στη φορμα (μετα το sent-note) με ενα
+  απλο `.waitlist-note` paragraph + direct `mailto:hello@ph-aros.com?subject=PHAROS hosted waitlist`
+  link («Email hello@ph-aros.com to join the hosted waitlist.»). Reuse του υπαρχοντος `.waitlist-note`
+  style (μηδεν νεο CSS). Οταν JS τρεχει, το `<noscript>` δεν εμφανιζεται· οταν οχι, ο επισκεπτης εχει
+  λειτουργικο mailto path. Μηδεν αλλη αλλαγη (state/validation/submit αμεταβλητα).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· 9+2 routes ○ Static, / = 2.83 kB / 105 kB First Load JS (ηταν 2.79 kB·
+  +0.04 kB απο το static noscript markup, μηδεν JS impact — το `<noscript>` ειναι static HTML).
+- Prerendered `.next/server/app/index.html`: `noscript` present· «to join the hosted waitlist» present.
+- grep '—' (em-dash) στο Waitlist.tsx = 0.
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev server στον φακελο· τα preview tools δεν το φτανουν
+  και δεν σηκωνω ανταγωνιστικο)· δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged απο αλλη ρουτινα. Foreign
+  `apps/web/SAAS_PROGRESS.md` (modified, ασταγο, αλλης ρουτινας) ΔΕΝ commit. Staged μονο τα δικα μου:
+  apps/landing/app/components/Waitlist.tsx + apps/landing/LANDING_PROGRESS.md.
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots στα CSS mockups οταν υπαρξουν assets·
+annual-billing toggle ΜΟΝΟ αφου ο Achilleas κλεισει ετησιες τιμες.
+
+Needs-Achilleas (open):
+- Annual billing: αν θελει ετησια πληρωμη, να ορισει το discount (π.χ. 2 μηνες δωρεαν) πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι λειτουργει πριν launch (το noscript fallback +
+  ολα τα waitlist paths δειχνουν εκει).
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
