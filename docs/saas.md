@@ -86,6 +86,77 @@ Quota enforcement:
 - **Features** — every plan gets the full AI feature set; the value ladder is
   volume + capacity + isolation, not feature locks.
 
+## Workspace lifecycle
+
+A tenant carries a lifecycle `status` that gates access independently of its
+plan. The five states are:
+
+| Status | Meaning | Access |
+| --- | --- | --- |
+| `pending` | Provisioned but not yet activated. | Blocked. |
+| `trialing` | In its free trial window (the default at signup). | Full. |
+| `active` | Paid subscription in good standing. | Full. |
+| `suspended` | A recoverable dunning hold (trial lapsed, or billing failed). | Blocked; an owner clears it by resolving billing. |
+| `canceled` | Owner-initiated soft delete. | Blocked. |
+
+New workspaces start as `trialing` with a bounded end instant
+(`trialEndsAt = createdAt + trial days`; the default trial length is a
+placeholder of **14 days** in `lib/billing/trial.ts`). A read surface can tell
+the UI "N days left" or "trial expired" from that end.
+
+### Trial dunning and lapse sweep
+
+An expired trial does not silently keep full access. A scheduler-driven sweep
+(`runTrialLapseSweep`, also reachable via the endpoint below) runs two ordered
+passes:
+
+1. **Warn** — trialing tenants whose bounded trial ends within
+   `WARN_BEFORE_DAYS` (**3**) receive exactly one idempotent dunning email. The
+   send is stamped (`trialWarnEmailedAt`) so a tenant is never warned twice, and
+   the pass is skipped entirely when no mail channel is configured.
+2. **Suspend** — trialing tenants whose `trialEndsAt` has already passed
+   transition to `suspended` (a recoverable hold, not `canceled`). The owner
+   reactivates by adding billing.
+
+The warn window and the lapse instant are mutually exclusive, so a tenant is
+never warned and suspended in the same run. Open-ended trials (a legacy tenant
+with no `trialEndsAt`) are treated as still-active and never auto-suspended.
+
+An in-process 6-hourly cron calls the same runner; the route below is the
+on-demand / external trigger.
+
+| Method | Path | Auth | Result |
+| --- | --- | --- | --- |
+| `POST` | `/api/saas/trials/sweep` | `Bearer <CRON_SECRET>` | Runs the warn + suspend sweep. `{ ok, warned, warnFailed, ... }`. `404` when SaaS off, `500` if `CRON_SECRET` unset, `401` on a bad token. Writes only the control-plane `Tenant`/`AuditEvent` collections; the data plane is untouched. |
+
+## Bring-your-own-key AI (secret-at-rest)
+
+On the Dedicated tier a workspace can supply **its own** AI provider key (BYO-key)
+instead of drawing on the platform's metered AI quota. Because that key is a
+third-party secret, it is encrypted at rest rather than stored in plaintext.
+
+- **Cipher** — AES-256-GCM (authenticated, so tampering is detected). Stored as a
+  self-describing `gcm1$<iv>$<tag>$<ciphertext>` envelope (all parts base64) with
+  a fresh random 12-byte IV per encryption, so encrypting the same key twice
+  yields different ciphertexts (`lib/tenancy/secretCrypto.ts`).
+- **Key derivation** — the 32-byte encryption key is derived from the existing
+  `AUTH_SECRET` via scrypt with a fixed domain-separation salt (no new dependency,
+  no new secret to manage). Rotating `AUTH_SECRET` re-derives the key and makes
+  existing ciphertexts undecryptable, so treat it as stable.
+- **Fail-closed** — without a real `AUTH_SECRET` (min 16 chars) the codec refuses
+  to encrypt or decrypt. Decryption returns `null` on any failure (malformed
+  envelope, wrong secret, tampered ciphertext) rather than throwing; the caller
+  treats `null` as "no usable key".
+- **Supported providers** — `anthropic`, `openai`, `gemini`, `openrouter`,
+  `custom` (`lib/billing/byoKey.ts`). The stored record is
+  `{ provider, keyEnc }`; it is decrypted on-demand in memory at the AI call site
+  and never logged. Settings UIs read a masked preview (`••••<last 4>`), never the
+  plaintext.
+
+> **OSS parity.** Only the SaaS BYO-key path uses this. The self-hosted app keeps
+> its single-owner provider key in `AppConfig` (unencrypted, one trusted box), so
+> the crypto layer is never on its path.
+
 ## Control-plane API (`/api/saas/**`)
 
 All routes below exist **only** when `SAAS_MODE` is on (404 otherwise) and are
@@ -160,10 +231,11 @@ secrets. They are not part of the self-hosted `.env.example` yet
 | `SAAS_MODE` | Master switch (see above). |
 | `SAAS_BASE_DOMAIN` | Base domain for tenant subdomains (`<slug>.<domain>`). Defaults to `ph-aros.com`; override for localhost/staging. |
 | `SAAS_SESSION_IDLE_HOURS` | Idle lifetime for the account session cookie. |
-| `AUTH_SECRET` | Shared secret used to sign session cookies (also required by the self-hosted app). |
+| `AUTH_SECRET` | Shared secret used to sign session cookies (also required by the self-hosted app) and to derive the AES-256-GCM key that encrypts BYO-key AI secrets at rest. Rotating it invalidates existing encrypted keys, so keep it stable. |
 | `AUTH_COOKIE_SECURE` | Force the `Secure` flag on cookies (behind HTTPS). |
 | `STRIPE_SECRET_KEY` | Stripe secret key. When unset, billing reports "not configured" and checkout/portal are unavailable. |
 | `STRIPE_WEBHOOK_SECRET` | Verifies incoming Stripe webhook signatures. |
+| `CRON_SECRET` | Bearer token guarding scheduler-driven routes (e.g. the trial-lapse sweep). Required for those endpoints; when unset they fail closed with `500`. |
 | `STRIPE_PRICE_SHARED` | Stripe Price ID for the Pro (`shared`) plan. |
 | `STRIPE_PRICE_DEDICATED` | Stripe Price ID for the Dedicated plan. |
 | `RESEND_API_KEY` | Enables transactional email (invites, verification, reset) via Resend. |

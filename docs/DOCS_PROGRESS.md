@@ -626,3 +626,40 @@ Collision guard: `git status --short` πριν το add → μονο `M docs/REA
 Επομενο run: stale-forward-ref sweep ολου του set με grep «(planned)»/«coming soon» (τωρα clean, να
 μεινει clean καθως το app εξελισσεται), η screenshot placeholders οταν υπαρξουν πραγματικες εικονες.
 Ολα τα content docs done + accurate.
+
+## 2026-07-05 (saas.md: lifecycle + trial dunning + BYO-key crypto)
+
+Το content set ηταν ολο accurate, αλλα το `docs/saas.md` δεν κατεγραφε δυο προσφατα SaaS
+increments που ειδα στο git log: D4 (trial-lapse sweep / dunning, `8155ba4`) και D5 (BYO-key
+secret-at-rest crypto, `2612b5a`). Τα προσθεσα, διαβαζοντας τον πραγματικο κωδικα (οχι εικασιες).
+
+Τι εγραψα στο saas.md:
+1. **Νεα «## Workspace lifecycle»** section — πινακας των 5 status (pending/trialing/active/
+   suspended/canceled) + access ανα state. Επιβεβαιωσα το enum απο `models/Tenant.ts:31`
+   (`['pending','trialing','active','suspended','canceled']`, default `trialing`). Trial length
+   placeholder = 14 μερες (`lib/billing/trial.ts` DEFAULT_TRIAL_DAYS).
+2. **«### Trial dunning and lapse sweep»** — 2-pass sweep (WARN εντος 3 ημερων = WARN_BEFORE_DAYS,
+   ενα idempotent email με trialWarnEmailedAt stamp· SUSPEND οταν trialEndsAt περασε → `suspended`
+   οχι `canceled`). Open-ended trials δεν lapse-αρουν. Πηγη: `lib/billing/trialLapse.ts` +
+   `trialSweep.ts`. + νεο endpoint row **`POST /api/saas/trials/sweep`** (Bearer CRON_SECRET,
+   404 SaaS-off / 500 no-secret / 401 bad-token) απο το `app/api/saas/trials/sweep/route.ts`.
+3. **Νεα «## Bring-your-own-key AI (secret-at-rest)»** section — AES-256-GCM, `gcm1$iv$tag$ct`
+   envelope, key derived απο AUTH_SECRET via scrypt (zero new dep), fail-closed, providers
+   (anthropic/openai/gemini/openrouter/custom), masked preview. Πηγη: `lib/tenancy/secretCrypto.ts`
+   + `lib/billing/byoKey.ts`. + OSS-parity blockquote (self-hosted κραταει unencrypted AppConfig key).
+4. Env vars table: προσθεσα **`CRON_SECRET`** row + ενημερωσα το `AUTH_SECRET` row (τωρα και για
+   το BYO-key KDF· rotation invalidates ciphertexts).
+
+Accuracy: καμια τιμη/env/endpoint εφευρεθηκε — ολα cross-checked με τα source files. Status enum,
+WARN_BEFORE_DAYS=3, DEFAULT_TRIAL_DAYS=14, cipher format, provider set, sweep response keys
+(warned/warnFailed), auth guards ολα διαβασμενα απο κωδικα.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 0 (balanced, ο tables-
+only doc δεν εχει fenced blocks). Internal links → OK README.md/api.md/configuration.md/self-hosting.md.
+Secret scan (sk_live/sk_test/AUTH_SECRET=/CRON_SECRET=) → κανενα literal secret (μονο placeholders).
+
+Collision guard: πριν το add ελεγχος `git status --short` + `git diff --cached` (βλ. commit βημα).
+Stage ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: sync check του features.md/configuration.md με τα ιδια D4/D5 (αν χρειαζεται mention),
+η stale-forward-ref sweep. Content set παραμενει accurate.
