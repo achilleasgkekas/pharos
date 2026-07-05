@@ -9,6 +9,12 @@ import { CopyButton } from './components/CopyButton';
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const SITE_URL = 'https://ph-aros.com';
 
+// The repository is private during the waitlist phase and goes public right
+// before launch. While false, self-host CTAs carry a "coming soon" signal so
+// visitors are not surprised by a 404. Flip to true the moment the repo is
+// public and every badge/note below disappears automatically.
+const REPO_PUBLIC = false;
+
 // Raw quickstart commands, kept in sync with the colour-tokenised <pre> below.
 // Used by the copy-to-clipboard button so the copied text has no markup.
 const QUICKSTART_COMMANDS = [
@@ -641,6 +647,7 @@ export default function Home() {
             <a href="#pricing" className="btn btn-primary">Get started</a>
             <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
               Self-host it free
+              {!REPO_PUBLIC && <span className="soon-badge">soon</span>}
             </a>
           </div>
         </div>
@@ -985,6 +992,15 @@ export default function Home() {
             ))}
           </div>
 
+          {!REPO_PUBLIC && (
+            <p className="repo-soon">
+              <span className="repo-soon-dot" aria-hidden="true" />
+              The public repo opens right before launch.{' '}
+              <a href="#waitlist">Join the waitlist</a> and we&apos;ll send the
+              clone link the moment it goes live.
+            </p>
+          )}
+
           <div className="code-wrap">
             <CopyButton text={QUICKSTART_COMMANDS} />
             <pre className="code-block" aria-label="Docker quick start">
@@ -1086,6 +1102,9 @@ export default function Home() {
                   style={{ width: '100%', marginBottom: 22 }}
                 >
                   {t.cta}
+                  {!REPO_PUBLIC && t.ctaHref === GITHUB_URL && (
+                    <span className="soon-badge">soon</span>
+                  )}
                 </a>
 
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1210,6 +1229,7 @@ export default function Home() {
                 <a href="#pricing" className="btn btn-primary">Get started</a>
                 <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
                   Self-host it free
+                  {!REPO_PUBLIC && <span className="soon-badge">soon</span>}
                 </a>
               </div>
             </div>

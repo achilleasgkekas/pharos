@@ -952,3 +952,23 @@ Verify:
 Needs-Achilleas (open):
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι το mailbox λειτουργει πριν launch (waitlist + security reports).
 - GitHub repo public ΠΡΙΝ launch (D2: μενει private τωρα, links = «coming soon», αποδεκτο στη waitlist φαση).
+
+## 2026-07-05 (cont.²) — D2 υλοποιηθηκε: self-host CTAs = «coming soon» (repo private στη waitlist φαση)
+
+Task: (D2) το repo μενει private τωρα (αποφαση Achilleas), αλλα ολα τα self-host/GitHub CTAs ανοιγαν σε private repo -> 404 για εξω επισκεπτες, χωρις καμια προειδοποιηση. Το D2 ζητησε τα links να μενουν (self-host/AGPL/«audit it» αφηγηση = πυρηνας του site) αλλα να διαβαζονται ως «coming soon». Υλοποιηθηκε ως presentation-only signal, χωρις να πειραξω κανενα URL (οπως ρητα ζητησε το D2).
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεα σταθερα `REPO_PUBLIC = false` (documented flag). Οταν false: (α) οι δυο «Self-host it free» ghost CTAs (hero + secondary CTA band) + το self-host pricing-tier CTA (ctaHref === GITHUB_URL) παιρνουν ενα διακριτικο inline `<span class="soon-badge">soon</span>`· (β) νεο `.repo-soon` note bar μεσα στο #self-host, ακριβως ΠΑΝΩ απο το `git clone` code block: gold dot + «The public repo opens right before launch. Join the waitlist and we'll send the clone link the moment it goes live.» με link στο #waitlist. ΟΛΑ gated στο `!REPO_PUBLIC` -> οταν ο Achilleas κανει το repo public + flip σε true, καθε badge/note εξαφανιζεται αυτοματα, μηδεν further edit. Τα GITHUB_URL links αμεταβλητα (D2: «κραταμε το GITHUB_URL οπως ειναι»).
+- `app/globals.css`: νεες `.repo-soon` (centered flex note, wrap), `.repo-soon-dot` (7px gold), `.soon-badge` (mono uppercase pill, gold, border-light/surface-2, 0.62rem). Reuse brand vars (gold/accent/surface-2/border-light). Μηδεν νεο JS.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· 11 routes ○ Static, / αμεταβλητο 2.79 kB / 105 kB First Load JS (static markup + CSS, μηδεν JS impact).
+- Prerendered `.next/server/app/index.html`: `soon-badge` present (6× = 3 CTAs, rendered HTML ×2 απο RSC flight-data serialization — φυσιολογικο, οπως στα προηγουμενα entries)· `repo-soon` 4× (banner + dot ×2)· «opens right before launch» 2×· «Join the waitlist» 9×· grep '—' (em-dash) = **0**. Static/markup increment -> επιβεβαιωθηκε στο static output (οπως ολα τα προηγουμενα)· δεν σηκωσα dev server, δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged (καμια αλλη ρουτινα mid-commit)· foreign `apps/web/src/*` (modified, ασταγα, αλλων ρουτινων) ΔΕΝ commit — staged μονο apps/landing/app/page.tsx + apps/landing/app/globals.css + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) polish — real app screenshots στα CSS mockups οταν υπαρξουν assets· annual-billing toggle αν το θελησει ο Achilleas· humans.txt. ΟΤΑΝ γινει το repo public: flip `REPO_PUBLIC` σε true (μια γραμμη) -> ολα τα «coming soon» σβηνουν.
+
+Needs-Achilleas (open):
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι το mailbox λειτουργει πριν launch.
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge εκκρεμει)· μετα flip `REPO_PUBLIC=true` στο landing (D2).

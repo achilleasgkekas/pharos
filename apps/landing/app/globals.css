@@ -493,6 +493,43 @@ h1, h2, h3 {
   flex-shrink: 0;
 }
 
+/* Waitlist-phase "public repo coming soon" note + inline CTA badge */
+.repo-soon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 auto 20px;
+  max-width: 560px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+.repo-soon a {
+  color: var(--accent);
+}
+.repo-soon-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  flex-shrink: 0;
+}
+.soon-badge {
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-light);
+  background: var(--surface-2);
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+}
+
 /* By-the-numbers proof band */
 .numbers-band {
   list-style: none;
