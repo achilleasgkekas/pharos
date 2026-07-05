@@ -15,7 +15,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type Lean = { kind?: string; amount?: number; category?: string; date?: Date; period?: string };
-type ItemLean = { status?: string; purchasedPrice?: number; currentPrice?: number; warrantyUntil?: string | Date; title?: string; category?: string };
+type ItemLean = { _id?: unknown; status?: string; purchasedPrice?: number; currentPrice?: number; warrantyUntil?: string | Date; title?: string; category?: string };
 type ReceiptLean = { store?: string; date?: Date; total?: number };
 type SubLean = { amount?: number; billingCycle?: string; category?: string };
 // Monthly-equivalent multiplier per billing cycle. Mirrors web /reports CYCLE_PER_MONTH.
@@ -182,6 +182,22 @@ export async function GET(req: NextRequest) {
       .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
       .sort((a, b) => b.value - a.value);
 
+    // ── Installment payoff (all plans, active + done). Mirrors web /reports
+    //    "Installment payoff" card. Linked plans resolve item titles as label. ──
+    const titleById = new Map(items.map((i) => [String(i._id), i.title || '']));
+    const installmentPayoff = plans.map((p) => ({
+      key: p.key,
+      label: p.itemIds.length
+        ? p.itemIds.map((id) => titleById.get(id)).filter(Boolean).join(' + ') || p.label
+        : p.label,
+      linked: p.itemIds.length > 0,
+      paidInstallments: p.paidInstallments,
+      totalInstallments: p.totalInstallments,
+      perAmount: Math.round(p.perAmount * 100) / 100,
+      remainingAmount: Math.round(p.remainingAmount * 100) / 100,
+      done: p.done,
+    }));
+
     return NextResponse.json({
       currency: settings.currency || 'EUR',
       // Effective trend window the client should highlight (6/12/24). Legacy
@@ -200,6 +216,7 @@ export async function GET(req: NextRequest) {
       inventoryByCategory,
       biggestPurchases,
       warrantiesExpiring,
+      installmentPayoff,
     });
   });
 }

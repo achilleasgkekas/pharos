@@ -52,6 +52,27 @@ function FlowRow({ label, income, expense, max, cur }: { label: string; income: 
   );
 }
 
+/** One installment plan: label + paid/total counter, progress bar, per-month + remaining. Mirrors web /reports payoff card. */
+function PayoffRow({ p, cur }: { p: NonNullable<Reports['installmentPayoff']>[number]; cur: string }) {
+  const pct = p.totalInstallments > 0 ? Math.max(2, Math.min(100, Math.round((p.paidInstallments / p.totalInstallments) * 100))) : 0;
+  return (
+    <View style={s.payoffRow}>
+      <View style={s.payoffHead}>
+        <View style={s.payoffLabelWrap}>
+          {p.linked && <View style={s.payoffDot} />}
+          <Text style={s.payoffLabel} numberOfLines={1}>{p.label}</Text>
+        </View>
+        <Text style={s.payoffCount}>{p.paidInstallments}/{p.totalInstallments}</Text>
+      </View>
+      <View style={s.track}><View style={[s.fill, { width: `${pct}%`, backgroundColor: p.done ? C.accent : C.purple }]} /></View>
+      <View style={s.payoffFoot}>
+        <Text style={s.payoffFootText}>{money(p.perAmount, cur)}/mo</Text>
+        <Text style={s.payoffFootText}>{p.done ? 'paid off ✓' : `${money(p.remainingAmount, cur)} left`}</Text>
+      </View>
+    </View>
+  );
+}
+
 const RANGES = [6, 12, 24] as const;
 
 export function ReportsScreen() {
@@ -197,6 +218,13 @@ export function ReportsScreen() {
               ))}
             </>
           )}
+
+          {(d.installmentPayoff?.length ?? 0) > 0 && (
+            <>
+              <Text style={s.section}>INSTALLMENT PAYOFF</Text>
+              {d.installmentPayoff!.map((p) => <PayoffRow key={p.key} p={p} cur={cur} />)}
+            </>
+          )}
         </>
       )}
     </ScrollView>
@@ -239,4 +267,12 @@ const s = StyleSheet.create({
   listTitle: { color: C.text, fontSize: 13 },
   listSub: { color: C.faint, fontSize: 11, marginTop: 2 },
   listAmt: { color: C.text, fontSize: 13, fontWeight: '600' },
+  payoffRow: { marginBottom: 14 },
+  payoffHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
+  payoffLabelWrap: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 },
+  payoffDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.accent, marginRight: 6 },
+  payoffLabel: { color: C.text, fontSize: 12, fontWeight: '500', flexShrink: 1 },
+  payoffCount: { color: C.faint, fontSize: 11 },
+  payoffFoot: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 3 },
+  payoffFootText: { color: C.faint, fontSize: 10 },
 });

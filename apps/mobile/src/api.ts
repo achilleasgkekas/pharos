@@ -378,6 +378,8 @@ export type Reports = {
   inventoryByCategory: { name: string; value: number }[];
   biggestPurchases: { store: string; total: number; date: string }[];
   warrantiesExpiring: { title: string; until: string; days: number }[];
+  // Installment payoff progress (active + done plans). Absent on older servers.
+  installmentPayoff?: { key: string; label: string; linked: boolean; paidInstallments: number; totalInstallments: number; perAmount: number; remainingAmount: number; done: boolean }[];
 };
 export function getReports(months?: number) {
   return request<Reports>(months ? `/api/v1/reports?months=${months}` : '/api/v1/reports');
