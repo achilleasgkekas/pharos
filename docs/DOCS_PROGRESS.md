@@ -561,3 +561,35 @@ Collision guard: `git status --short` πριν το add δειχνει μονο 
 Επομενο run: `docs/contributing-docs.md` (docs style + markdown-first convention + link-check helper),
 η pass για stale forward-refs στα υπολοιπα docs (grep «(planned)»/«coming soon» σε ολο το set). Πρωτα
 finish-in-progress κανενα (ολα done).
+
+## 2026-07-05 (accuracy: api.md write-response convention)
+
+Ολο το doc-set ειναι writ-ten. Αντι για screenshot placeholders (χαμηλη αξια χωρις πραγματικες
+εικονες) εκανα accuracy pass στο `docs/api.md` (source of truth). Κενο: το doc τεκμηριωνε το
+list envelope (`{ data, total, limit, offset }`) αλλα ΟΧΙ τα write-response shapes· τα PATCH/POST
+rows ηταν ασυνεπη (καποια «→ { item }», αλλα ΤΙΠΟΤΑ). Το προσφατο commit «fix(api/v1): PATCH
+expenses/subscriptions/vouchers return { <resource> }» ευθυγραμμισε τον κωδικα σε ενα consistent
+pattern που δεν φαινοταν στα docs.
+
+Προσθεσα νεο `### Write responses` subsection (μετα το List envelope, πριν το Incremental sync)
+με πινακα: POST create → `201 { <resource> }` (singular key)· PATCH update → `200 { <resource> }`
+(ιδια trimmed fields με τη λιστα)· DELETE → `200 { ok, id }`· + exceptions (shopping-list =
+`{ items }`/`{ ok }`, AI/scan = `{ data }`).
+
+Accuracy (διαβασα κωδικα, οχι εικασιες): επιβεβαιωσα return shapes σε κωδικα —
+`items/[id]`, `expenses/[id]`, `subscriptions/[id]`, `vouchers/[id]`, `tasks/[id]` route.ts
+(PATCH → `{ <resource> }`, DELETE → `{ ok, id }`) + POST create σε items/tasks/expenses/
+subscriptions/vouchers/cards/stores route.ts (ολα `NextResponse.json({ <resource> }, {status:201})`).
+Επιβεβαιωσα shopping-list = `{ items }` + `{ ok:true }`. Καμια νεα τιμη/endpoint εφευρεθηκε.
+
+Route-coverage check (παραπλευρα): σαρωσα ολα τα 50 route.ts κατω απο api/v1 και τα paths του
+api.md — 100% coverage, κανενα undocumented endpoint (συμπ. `/auth/login`).
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence balance api.md = 16 (even, balanced).
+Καμια νεα .md link (μονο inline code + πινακας). Καμια secret.
+
+Collision guard: `git status --short` πριν το add δειχνει `M apps/landing/app/page.tsx` (foreign,
+αλλης ρουτινας, ΔΕΝ το αγγιξα, unstaged)· staged κενο. Stage ΜΟΝΟ docs/api.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: `docs/contributing-docs.md` (docs style + markdown-first convention + link-check helper),
+η pass για write-response shapes ανα-row (προαιρετικο· η convention τα καλυπτει ηδη ενιαια). Ολα done.

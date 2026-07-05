@@ -121,6 +121,20 @@ Query params supported by list endpoints:
 | `offset`       | `0`     | Number of records to skip.                                     |
 | `updatedSince` | —       | ISO date; returns only records with `updatedAt >= it`.         |
 
+### Write responses
+
+Create, update, and delete endpoints follow a consistent shape:
+
+| Action           | Status | Body                                                          |
+|------------------|--------|---------------------------------------------------------------|
+| `POST` (create)  | `201`  | The new record wrapped under its singular key: `{ item }`, `{ task }`, `{ expense }`, `{ subscription }`, `{ voucher }`, `{ card }`, `{ store }`. |
+| `PATCH` (update) | `200`  | The updated record, same singular-key wrapper and same trimmed fields as the list: `{ item }`, `{ expense }`, `{ subscription }`, `{ voucher }`, `{ task }`, `{ receipt }`. |
+| `DELETE`         | `200`  | `{ "ok": true, "id": "<id>" }`.                               |
+
+Exceptions: the lightweight **shopping list** returns the whole list (`{ items }`)
+on create/update and `{ "ok": true }` on delete. AI and scan endpoints return a
+`{ data: … }` payload (see their rows below).
+
 ### Incremental sync
 
 When `updatedSince` is set, list endpoints **also** include soft-deleted
