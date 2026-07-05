@@ -6,6 +6,7 @@ import { getAiConfig } from './aiConfig';
 import { anthropicJSON } from './anthropic';
 import { openaiCompatJSON, geminiJSON } from './aiProviders';
 import { getPromptOverride } from './prompts';
+import { assertAiQuota, meterAiResult } from './billing/aiMeter';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? 'qwen2.5vl:7b';
@@ -68,8 +69,14 @@ export async function runVisionJSON(
   // Master switch off → never hit a provider. Call sites gate per-feature first and
   // give friendly messages; this is the last-resort guard so nothing slips through.
   if (!cfg.aiEnabled) throw new Error('AI is turned off');
+  // SaaS metering: block an over-quota tenant before any provider cost is incurred.
+  // No-op for the self-hosted default tenant / SAAS_MODE off / BYO-key tenants.
+  await assertAiQuota();
   const cloud = await cloudJSON(cfg, systemPrompt, userPrompt, imagesBase64);
-  if (cloud) return cloud;
+  if (cloud) {
+    await meterAiResult();
+    return cloud;
+  }
   // Vision tasks must run on a vision-capable model, not the active text model.
   const visionModel = cfg.ollamaVisionModel;
   const response = await clientFor(cfg.ollamaHost).chat({
@@ -83,7 +90,9 @@ export async function runVisionJSON(
     ],
   });
   const raw = response.message.content;
-  return { json: JSON.parse(stripFences(raw)), raw, model: visionModel };
+  const result = { json: JSON.parse(stripFences(raw)), raw, model: visionModel };
+  await meterAiResult();
+  return result;
 }
 
 /** Run a text-only prompt and return parsed JSON. `numCtx` lets long inputs (e.g.
@@ -96,8 +105,14 @@ export async function runTextJSON(
 ): Promise<{ json: unknown; raw: string; model: string }> {
   const cfg = await getAiConfig();
   if (!cfg.aiEnabled) throw new Error('AI is turned off');
+  // SaaS metering: block an over-quota tenant before any provider cost is incurred.
+  // No-op for the self-hosted default tenant / SAAS_MODE off / BYO-key tenants.
+  await assertAiQuota();
   const cloud = await cloudJSON(cfg, systemPrompt, userPrompt);
-  if (cloud) return cloud;
+  if (cloud) {
+    await meterAiResult();
+    return cloud;
+  }
   const response = await clientFor(cfg.ollamaHost).chat({
     model: cfg.ollamaModel,
     keep_alive: KEEP_ALIVE,
@@ -109,7 +124,9 @@ export async function runTextJSON(
     ],
   });
   const raw = response.message.content;
-  return { json: JSON.parse(stripFences(raw)), raw, model: cfg.ollamaModel };
+  const result = { json: JSON.parse(stripFences(raw)), raw, model: cfg.ollamaModel };
+  await meterAiResult();
+  return result;
 }
 
 // ─── Receipt parsing ────────────────────────────────────────────────────────
