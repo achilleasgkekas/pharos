@@ -1078,3 +1078,25 @@ Mock pattern: ίδιο DB-seam pattern με τα προηγ. route tests (`vi.ho
 - Collision guard: `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign mods (auth/login/route.ts, billing/enforce.ts, ollama.ts, docs, aiMeter.ts, tenancy/current.ts+test) που ΔΕΝ άγγιξα· στάγιαρα μόνο τα δικά μου cards/[id]/route.test.ts + OSS_PROGRESS.md.
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας επόμενα: ένα route με `boolField` end-to-end (`subscriptions/[id]` active toggle) ή ουσιαστικά διαφορετικό partial-update (`items/[id]` με price/priceHistory, `receipts/[id]` με line-items, `stores/[id]`, `shopping-list/[id]`). Ιδανικά ένα route με πλουσιότερη array/nested coercion. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-05 (cont. — items/[id]/route.test.ts, GET priceStatus verdicts + PATCH targetPrice key-presence)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/items/[id]/route.test.ts` για το GET/PATCH/DELETE του `/api/v1/items/:id` (το πλουσιότερο single-record endpoint του Expo mobile app).**
+
+Επιλογή target: ακολούθησα το suggested next task του προηγ. entry (πρώτη επιλογή στα «ουσιαστικά διαφορετικό partial-update» = `items/[id]` με price/priceHistory, ακόμα untested· `subscriptions/[id]` boolplan ήταν ήδη καλυμμένο). Δύο κομμάτια λογικής ζουν ΜΟΝΟ σε αυτό το route και ένα drift σιωπηλά διαφθείρει το mobile contract χωρίς άλλο test να το πιάσει:
+- **GET `priceStatus()`** — server-side mirror του `components/PricePanel.tsx`: best-now (φθηνότερο priced link, αλλιώς currentPrice), lowest/highest seen, trend (last vs previous history point), where-to-buy sorted cheapest-first, και ένα verdict (deal/dropping/rising/good/high/none). Τα verdict thresholds (target hit → deal· pos≤0.15 → good· pos≥0.7 → high) είναι ακριβώς οι τιμές που διαβάζει το mobile badge.
+- **PATCH partial coercion** με δύο σκόπιμα αποκλίνοντα πεδία: το `currentPrice` γράφεται ΜΟΝΟ όταν είναι πραγματικός `number` (numeric string αγνοείται), ενώ το `targetPrice` είναι key-presence driven (`'targetPrice' in b`) — `null` το ΚΑΘΑΡΙΖΕΙ, `0` κρατιέται (falsy-but-not-null), numeric string περνά από `Number()`. Ένα regression που θα τα ευθυγράμμιζε (π.χ. `if (b.targetPrice)`) θα έχανε σιωπηλά ένα target clear ή ένα target 0. DELETE = **soft** ($set deletedAt), σε αντίθεση με το hard-delete των cards.
+
+Mock pattern: ίδιο DB-seam pattern με τα προηγ. route tests (`vi.hoisted` + mock `@/lib/db` connectDB + `@/models/User` bearerUser chain + `@/models/Item` findById [GET] + findByIdAndUpdate [PATCH+DELETE, και τα δύο soft-update]). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody/apiList helpers. Mock και το `ITEM_STATUSES` export (enum guard). `itemDoc()` helper για minimal detail docs.
+
+Τι έγινε: Νέο `[id]/route.test.ts` (26 tests). **auth gate** (2: GET no-token→401, PATCH unknown-token→401, καμία query/write). **id guard** (3: GET/PATCH/DELETE malformed id → 400 'bad id' χωρίς DB touch). **GET serialization** (3: 404 όταν missing· defaults + link mapping [label ''/price null] + `photo`=photos[0]· priceHistory newest-first + ISO). **GET priceStatus** (8: where-to-buy priced-only cheapest-first + bestNow=cheapest link· currentPrice fallback bestNow· verdict deal [≤target]· dropping [trend<0]· rising [trend>0]· good [flat, pos≤0.15]· high [flat, pos≥0.7]· none [μηδέν price signal]). **PATCH** (8: empty→400· all-invalid→400· whitelisted $set [title trim/status enum/category/specs/numeric price/tags stringify] + {new:true} + response shape· currentPrice string αγνοείται· targetPrice null clear [lone write]· targetPrice 0 kept· targetPrice numeric-string→Number· 404). **DELETE** (2: soft-delete $set deletedAt Date + {ok,id}· 404).
+
+Τι επαληθεύτηκε:
+- `npx vitest run 'src/app/api/v1/items/[id]/route.test.ts'` → 26/26 passed.
+- `npx vitest run` (όλο το suite) → 91 files, 1293/1293 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = ΜΟΝΟ το δικό μου items/[id]/route.test.ts (τα προηγουμένως uncommitted ollama.ts/ollama.test.ts τα committ-άρισε concurrent routine στο μεταξύ, σωστά δεν τα άγγιξα). Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας επόμενα ακόμα untested: `receipts/[id]/route.ts` (line-items nested coercion, το πιο πλούσιο array partial-update), `stores/[id]/route.ts`, `shopping-list/[id]/route.ts`, `vouchers/route.ts` (GET/POST, μόνο το [id] καλύφθηκε), `expenses/route.ts` (GET/POST, μόνο το [id]), ή ένα `statements/[id]`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
