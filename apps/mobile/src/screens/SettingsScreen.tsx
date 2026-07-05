@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal } from 'react-native';
 import { C, alpha, scrim } from '../theme';
 import { money, ErrorText, Check, Input, TextArea, Chip, contentWidth } from '../ui';
 import { PharosMark } from '../PharosMark';
@@ -136,7 +136,7 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
               </View>
               <View style={s.budgetEdit}>
                 <Text style={s.curSym}>{money(0, currency).replace(/0.*/, '')}</Text>
-                <TextInput value={val} onChangeText={(t) => setBudgets((p) => ({ ...p, [cat]: t }))} keyboardType="decimal-pad" placeholder="limit" placeholderTextColor={C.faint} style={s.budgetInput} />
+                <Input variant="modal" value={val} onChangeText={(t) => setBudgets((p) => ({ ...p, [cat]: t }))} keyboardType="decimal-pad" placeholder="limit" style={{ flex: 1, paddingVertical: 9 }} />
                 <Pressable onPress={() => setBudgets((p) => { const n = { ...p }; delete n[cat]; return n; })} style={s.rm}><Text style={s.rmText}>✕</Text></Pressable>
               </View>
             </View>
@@ -621,7 +621,6 @@ const s = StyleSheet.create({
   over: { color: C.red },
   budgetEdit: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   curSym: { color: C.dim, fontSize: 15 },
-  budgetInput: { flex: 1, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, color: C.text, fontSize: 15 },
   rm: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: C.border },
   rmText: { color: C.red, fontSize: 14, fontWeight: '700' },
   testBtn: { marginTop: 14, borderWidth: 1, borderColor: C.cyan, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },

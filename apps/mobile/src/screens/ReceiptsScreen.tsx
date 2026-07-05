@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, Image, Pressable, FlatList, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check, Button, contentWidth } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Button, Input, TextArea, contentWidth } from '../ui';
 import { getReceipts, getReceipt, scanReceipt, rescanReceipt, updateReceipt, addReceiptToLibrary, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
 
 type LineEdit = { name: string; qty: string; price: string; vatRate: string };

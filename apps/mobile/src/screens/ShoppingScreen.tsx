@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl, Modal, StyleSheet, Alert,
+  View, Text, Pressable, FlatList, ActivityIndicator, RefreshControl, Modal, StyleSheet, Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim } from '../theme';
 import {
   getShoppingList, addListItem, toggleListItem, deleteListItem, scanProduct, type ListItem, type ScannedProduct,
 } from '../api';
-import { Button, Check, IconButton, contentWidth } from '../ui';
+import { Button, Check, IconButton, Input, contentWidth } from '../ui';
 
 export function ShoppingScreen() {
   const [items, setItems] = useState<ListItem[]>([]);
@@ -73,13 +73,12 @@ export function ShoppingScreen() {
   return (
     <View style={s.wrap}>
       <View style={s.addRow}>
-        <TextInput
+        <Input
           value={name}
           onChangeText={setName}
           onSubmitEditing={() => add(name)}
           placeholder="Add an item…"
-          placeholderTextColor={C.faint}
-          style={s.input}
+          style={{ flex: 1, paddingHorizontal: 14 }}
         />
         <IconButton glyph="＋" onPress={() => add(name)} disabled={!name.trim()} textStyle={{ lineHeight: 26 }} />
       </View>
@@ -117,15 +116,15 @@ export function ShoppingScreen() {
             {draft && (
               <>
                 <Text style={s.label}>NAME</Text>
-                <TextInput value={draft.name} onChangeText={(v) => setDraft({ ...draft, name: v })} style={s.input} placeholderTextColor={C.faint} />
+                <Input value={draft.name} onChangeText={(v) => setDraft({ ...draft, name: v })} style={{ flex: 1, paddingHorizontal: 14 }} />
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={s.label}>QTY</Text>
-                    <TextInput value={draft.quantity} onChangeText={(v) => setDraft({ ...draft, quantity: v })} style={s.input} placeholderTextColor={C.faint} />
+                    <Input value={draft.quantity} onChangeText={(v) => setDraft({ ...draft, quantity: v })} style={{ flex: 1, paddingHorizontal: 14 }} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.label}>CATEGORY</Text>
-                    <TextInput value={draft.category} onChangeText={(v) => setDraft({ ...draft, category: v })} style={s.input} placeholderTextColor={C.faint} />
+                    <Input value={draft.category} onChangeText={(v) => setDraft({ ...draft, category: v })} style={{ flex: 1, paddingHorizontal: 14 }} />
                   </View>
                 </View>
                 <View style={s.modalBtns}>
@@ -151,7 +150,6 @@ const s = StyleSheet.create({
   center: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   h1: { color: C.text, fontSize: 26, fontWeight: '800', marginBottom: 14 },
   addRow: { flexDirection: 'row', gap: 8 },
-  input: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: C.text, fontSize: 15 },
   scanBtn: { marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface2, paddingVertical: 12, alignItems: 'center' },
   scanText: { color: C.cyan, fontSize: 15, fontWeight: '600' },
   error: { color: C.red, fontSize: 13, marginTop: 10 },
