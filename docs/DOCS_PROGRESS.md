@@ -534,3 +534,30 @@ Stage ΜΟΝΟ docs/security.md + docs/README.md + docs/DOCS_PROGRESS.md.
 
 Επομενο run: enrich `docs/features.md` με screenshot placeholders ανα module, η `docs/contributing-docs.md`
 (docs style + markdown-first convention + link-check). Πρωτα finish-in-progress κανενα (ολα done).
+
+## 2026-07-05 (accuracy fix: features.md stale cross-refs)
+
+Ολο το set ειναι πλεον writ-ten (README, api, architecture, backup-and-restore, configuration,
+faq, features, glossary, mobile, saas, security, self-hosting, troubleshooting, updating +
+openapi.yaml). Αντι για screenshot placeholders (χαμηλη αξια χωρις πραγματικες εικονες) διαλεξα
+accuracy pass στο `docs/features.md`, που ειχε STALE forward-refs: 3× «configuration guide (planned)»
+και «an API reference is being written (see DOCS_PROGRESS.md)» — αλλα και τα δυο docs υπαρχουν πλεον.
+
+Fixes (4 σημεια): (1) intro «configuration guide (planned)» → [Configuration guide](configuration.md)·
+(2) intro «API reference is being written (DOCS_PROGRESS.md)» → [API reference](api.md)· (3) AI command
+bar «(see configuration)» → [Configuration → AI providers](configuration.md#ai-providers)· (4)
+Notifications «(see configuration)» → [Configuration → Notifications](configuration.md#notifications)·
+(5) Settings footer «configuration guide (planned)» → [Configuration guide](configuration.md).
+Anchors verified: configuration.md εχει «## AI providers» (#ai-providers) + «## Notifications»
+(#notifications). Καμια αλλαγη περιεχομενου, μονο τα links· καμια νεα τιμη εφευρεθηκε.
+
+Validation: markdown only, κανενα build/Docker/AI call. grep → 0 εναπομειναντα «(planned)»/«being
+written»/«DOCS_PROGRESS» στο features.md. test -e → self-hosting/configuration/api.md resolve. Fence
+count features.md = 0 (prose, balanced). Καμια secret.
+
+Collision guard: `git status --short` πριν το add δειχνει μονο `?? apps/web/src/lib/tenancy/current.ts`
+(untracked, αλλης ρουτινας, ΔΕΝ το αγγιξα)· staged κενο. Stage ΜΟΝΟ docs/features.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: `docs/contributing-docs.md` (docs style + markdown-first convention + link-check helper),
+η pass για stale forward-refs στα υπολοιπα docs (grep «(planned)»/«coming soon» σε ολο το set). Πρωτα
+finish-in-progress κανενα (ολα done).

@@ -7,11 +7,11 @@ your documents so you do not have to type them in by hand.
 
 This page describes each module from a user's point of view. For how to install
 it, see [Self-hosting](self-hosting.md). For how to wire up AI providers,
-storage, and notifications, see the configuration guide (planned).
+storage, and notifications, see the [Configuration guide](configuration.md).
 
 Everything below is available both in the web app and, for most modules, through
-the REST API (`/api/v1`) that the mobile companion app uses; an API reference is
-being written (see [DOCS_PROGRESS.md](DOCS_PROGRESS.md)).
+the REST API (`/api/v1`) that the mobile companion app uses; see the
+[API reference](api.md).
 
 ## Contents
 
@@ -204,7 +204,7 @@ short follow-up before acting. Past conversations are kept under **AI history**
 
 The command bar has a **Search / AI toggle**: in Search mode it is the global
 search below; in AI mode it is the assistant. The AI command bar requires an
-Anthropic-capable provider (see configuration).
+Anthropic-capable provider (see [Configuration → AI providers](configuration.md#ai-providers)).
 
 ## Search
 
@@ -217,7 +217,8 @@ example `/items?open=<id>`).
 Alert checks scan for deals (target price hit), installments due this month,
 warranties expiring within your lead time, and network issues, then send a
 summary through your configured channel (ntfy and other providers, see
-configuration). You can trigger a check on demand or send a test message from
+[Configuration → Notifications](configuration.md#notifications)). You can trigger
+a check on demand or send a test message from
 Settings. The mobile app can also register for push notifications.
 
 ## Trash (soft delete)
@@ -245,5 +246,5 @@ Configuration is grouped into tabs:
   editable dropdown taxonomies (item / expense / subscription categories).
 - **Notifications** — ntfy and other channels, with test and check-now buttons.
 
-See the configuration guide (planned) for the details of AI providers, storage
-backends, notifications, and internationalisation.
+See the [Configuration guide](configuration.md) for the details of AI providers,
+storage backends, notifications, and internationalisation.
