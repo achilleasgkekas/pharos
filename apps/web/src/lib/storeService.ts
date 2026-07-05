@@ -2,27 +2,42 @@ import { connectDB } from './db';
 import { Store } from '@/models/Store';
 import { KNOWN_STORES } from './stores';
 import { getAppSettings } from './appSettings';
+import { currentModel } from './tenancy/connection';
+import { currentTenant } from './tenancy/current';
 
 export type StoreLite = { _id?: string; name: string; aliases: string[]; url?: string; auto?: boolean };
 
-let cache: { v: StoreLite[]; t: number } | null = null;
+// Cache keyed by tenant. Default/self-hosted tenant uses the '' key → identical behaviour
+// and TTL to the old single-slot cache; SaaS tenants each get their own slot so one tenant's
+// store list never leaks into another's.
+const cache = new Map<string, { v: StoreLite[]; t: number }>();
 const TTL = 10000;
+
+/** Stable cache key for the current tenant ('' = default/self-hosted). */
+function tenantKey(): string {
+  const ctx = currentTenant();
+  return ctx.isDefault || !ctx.tenantId ? '' : ctx.tenantId;
+}
 
 /** All stores. Seeds the collection from the curated list on first use. */
 export async function getStores(): Promise<StoreLite[]> {
-  if (cache && Date.now() - cache.t < TTL) return cache.v;
+  const key = tenantKey();
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.t < TTL) return hit.v;
   await connectDB();
-  let docs = await Store.find().sort({ name: 1 }).lean();
+  // Route to the current tenant's database (default tenant → the Store model untouched).
+  const StoreModel = await currentModel(Store);
+  let docs = await StoreModel.find().sort({ name: 1 }).lean();
   if (docs.length === 0) {
     try {
-      await Store.insertMany(
+      await StoreModel.insertMany(
         KNOWN_STORES.map((s) => ({ name: s.name, aliases: s.aliases, url: s.url ?? '', auto: false })),
         { ordered: false }
       );
     } catch {
       /* race / duplicate on concurrent seed */
     }
-    docs = await Store.find().sort({ name: 1 }).lean();
+    docs = await StoreModel.find().sort({ name: 1 }).lean();
   }
   const v: StoreLite[] = docs.map((d) => ({
     _id: String(d._id),
@@ -31,12 +46,14 @@ export async function getStores(): Promise<StoreLite[]> {
     url: d.url ?? '',
     auto: d.auto ?? false,
   }));
-  cache = { v, t: Date.now() };
+  cache.set(key, { v, t: Date.now() });
   return v;
 }
 
-export function invalidateStoreCache(): void {
-  cache = null;
+/** Clear the store cache. No arg → only the CURRENT tenant; `all` → every tenant. */
+export function invalidateStoreCache(all = false): void {
+  if (all) cache.clear();
+  else cache.delete(tenantKey());
 }
 
 /** Names only — for AI prompt hints and dropdowns. */
@@ -82,7 +99,8 @@ export async function resolveStore(raw: string): Promise<string> {
   if (autoAddStores) {
     try {
       await connectDB();
-      await Store.create({ name, aliases: [name.toLowerCase()], auto: true });
+      const StoreModel = await currentModel(Store);
+      await StoreModel.create({ name, aliases: [name.toLowerCase()], auto: true });
       invalidateStoreCache();
     } catch {
       /* duplicate-name race — fine, it exists now */

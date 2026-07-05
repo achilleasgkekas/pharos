@@ -1,6 +1,12 @@
 import { connectDB } from './db';
 import { AppConfig } from '@/models/AppConfig';
+import { currentModel } from './tenancy/connection';
+import { currentTenant } from './tenancy/current';
 import { setCurrencySymbol, currencySymbol } from './money';
+// Side-effect import: registers the tenant-aware currency-symbol resolver into money.ts.
+// getAppSettings is server-only and runs on every request before render, so importing it
+// here guarantees the resolver is bound server-side without money.ts needing a node import.
+import './tenancy/currencyBinding';
 import {
   resolveTaxonomy,
   DEFAULT_EXPENSE_CATEGORIES,
@@ -64,8 +70,17 @@ const DEFAULTS: AppSettings = {
   budgets: {},
 };
 
-let cache: { v: AppSettings; t: number } | null = null;
+// Cache keyed by tenant. Default/self-hosted tenant uses the '' key so its behaviour and
+// TTL are byte-for-byte identical to the old single-slot cache; SaaS tenants each get their
+// own slot so one tenant's settings never bleed into another's.
+const cache = new Map<string, { v: AppSettings; t: number }>();
 const TTL = 5000;
+
+/** Stable cache key for the current tenant ('' = default/self-hosted). */
+function tenantKey(): string {
+  const ctx = currentTenant();
+  return ctx.isDefault || !ctx.tenantId ? '' : ctx.tenantId;
+}
 
 /** Pure coercion of a raw AppConfig doc into effective AppSettings (DB-free, testable). */
 export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppSettings {
@@ -87,23 +102,30 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
 
 /** Effective defaults/alerts/notification settings (DB singleton over hard defaults). */
 export async function getAppSettings(): Promise<AppSettings> {
-  if (cache && Date.now() - cache.t < TTL) return cache.v;
+  const key = tenantKey();
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.t < TTL) return hit.v;
   let doc: RawAppConfigDoc | null = null;
   try {
     await connectDB();
-    doc = await AppConfig.findOne({ key: 'singleton' })
+    // Route to the current tenant's database (default tenant → the AppConfig model
+    // untouched, same query as before).
+    const Config = await currentModel(AppConfig);
+    doc = await Config.findOne({ key: 'singleton' })
       .select('defaultItemView defaultWarrantyMonths warrantyAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate lists budgets')
       .lean();
   } catch {
     /* DB down → hard defaults */
   }
   const v = normalizeSettings(doc);
-  // Keep the server-side currency symbol in sync for any server code that calls cur().
+  // Keep the (tenant-scoped) currency symbol in sync for any server code that calls cur().
   setCurrencySymbol(currencySymbol(v.currency));
-  cache = { v, t: Date.now() };
+  cache.set(key, { v, t: Date.now() });
   return v;
 }
 
-export function invalidateAppSettings(): void {
-  cache = null;
+/** Clear the settings cache. No arg → only the CURRENT tenant; `all` → every tenant. */
+export function invalidateAppSettings(all = false): void {
+  if (all) cache.clear();
+  else cache.delete(tenantKey());
 }
