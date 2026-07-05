@@ -1521,3 +1521,42 @@ User-path/bearer-path αγγίχτηκε. Άγγιξα μόνο δικά μου 
 BYO-key resolver+storage scaffold μόλις οριστεί crypto (Needs-Achilleas), είτε (γ) user-facing
 workspace-settings UI panels (όλα τα read/write APIs έτοιμα — General/Members/Invitations/Activity/
 Billing[+trial]/Usage — UI-only).
+
+---
+
+## 2026-07-05 — DECISIONS FROM ACHILLEAS (interactive session)
+
+Ο Achilleas απάντησε τα ανοιχτά SaaS Needs-Achilleas. Υλοποιήστε τα ως εξής (flag-guarded,
+backward-compatible, SAAS_MODE off = zero effect όπως πάντα):
+
+**D4 — Trial-lapse scheduler (RESOLVED).** node-cron **in-process**, sweep **κάθε 6h**:
+`Tenant.find(lapsedTrialFilter())` → `evaluateTrialLapse` → `$set status:'suspended'` +
+`recordAudit('workspace.suspended')`. ΕΠΙΠΛΕΟΝ: **1 dunning email 3 μέρες πριν** το suspend
+(warning «το trial σου λήγει σε 3 μέρες»), idempotent (μην ξαναστείλεις στο ίδιο tenant). Το
+in-process επιλέχθηκε γιατί single-deployment (δεν τρέχουμε replicas)· external cron μόνο αν
+αργότερα χρειαστεί HA. Χρησιμοποιήστε injected `now` για tests.
+
+**D5 — BYO-key crypto (RESOLVED).** **AES-256-GCM**, encryption key **derived από το `AUTH_SECRET`**
+μέσω **scrypt** (node `crypto`, μηδέν νέα dependency). User AI keys → encrypted-at-rest στη Mongo,
+decrypt μόνο on-demand στη μνήμη στο AI call. GCM = authenticated (tamper-evident). Ξεμπλοκάρει τον
+BYO-key resolver+storage scaffold. (ΣΗΜ: αν αργότερα θέλει key-rotation ανεξάρτητη του AUTH_SECRET,
+μετακίνηση σε ξεχωριστό `ENCRYPTION_KEY` env — για τώρα AUTH_SECRET-derived.)
+
+**D6 — reset-request timing side-channel (RESOLVED, spec).** Απόφαση: **constant-time απάντηση** —
+το route να μη διαρρέει αν υπάρχει account μέσω timing. Ο τρέχων κώδικας (`reset/request/route.ts:43`)
+κάνει early-return `{ ok:true }` ΠΡΙΝ το mint+save+email όταν δεν υπάρχει account → μετρήσιμη διαφορά.
+Spec υλοποίησης (χρειάζεται δικά σας timing tests, γι' αυτό δεν το έκανα εγώ ad-hoc):
+(α) πάντα `mintResetToken()` (κόστος crypto και στα δύο μονοπάτια)·
+(β) όταν ΔΕΝ υπάρχει account, εκτελέστε **comparable dummy work** αντί για fast-return (π.χ. dummy
+scrypt/verify comparable με το save cost) ώστε ο συνολικός χρόνος να συγκλίνει· ΜΗΝ στείλετε email σε
+μη-εγγεγραμμένη διεύθυνση (self-leak/spam)·
+(γ) εναλλακτικά/επιπλέον: **fixed floor delay** σε ΟΛΑ τα responses (target constant, `await sleep(target−elapsed)`)
+για να καλυφθεί DB/email variance — απλούστερο, robust, με μικρό latency cost·
+(δ) response shape μένει ΑΜΕΤΑΒΛΗΤΟ (πάντα `{ ok:true }`, devToken echo μόνο non-prod).
+Dead-until-SaaS (SAAS_MODE off), οπότε χαμηλή προτεραιότητα αλλά κλείστε το πριν το launch.
+
+**D7 — Tenant data-isolation (DEFERRED).** getTenantConnection cache guard (`connection.ts:54`
+δέχεται disconnected connection) + v1 data-path tenant-scoping (`withAuth`→`bearerUser` δεν είναι
+tenant-scoped) → **αφήνονται για ξεχωριστό design session**. Είναι ολόκληρο το multi-tenancy
+data-isolation μοντέλο (per-tenant DB vs shared-DB-with-tenantId + read-vs-write product decision),
+όχι mechanical. Μη τα ξεκινήσετε unattended· καταγράψτε open questions και προχωρήστε.

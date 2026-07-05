@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { connectDB } from '@/lib/db';
 import { User } from '@/models/User';
 import { verifyPassword } from '@/lib/auth';
-import { rateLimit } from '@/lib/apiAuth';
+import { rateLimit, apiError } from '@/lib/apiAuth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,16 +26,16 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return apiError('Invalid JSON body');
   }
   const username = (body.username || '').trim().toLowerCase();
   const password = body.password || '';
-  if (!username || !password) return NextResponse.json({ error: 'username and password required' }, { status: 400 });
+  if (!username || !password) return apiError('username and password required');
 
   await connectDB();
   const user = await User.findOne({ username }).select('_id name username role passwordHash apiToken');
   if (!user || !verifyPassword(password, user.passwordHash)) {
-    return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    return apiError('Invalid credentials', 401);
   }
 
   let token = user.apiToken;

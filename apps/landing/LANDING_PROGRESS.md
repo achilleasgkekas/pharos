@@ -902,3 +902,31 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/roadmap GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD/manifest/security.txt).
 - Contact inbox hello@ph-aros.com για waitlist + security reports.
+
+---
+
+## 2026-07-05 — DECISIONS FROM ACHILLEAS (interactive session)
+
+Ο Achilleas απαντησε τα ανοιχτα Needs-Achilleas. Υλοποιηστε τα ως εξης:
+
+**D1 — Τιμες hosted tiers (RESOLVED).** Τεσσερα tiers:
+- **Free** — self-host, παντα δωρεαν (AGPL-3.0).
+- **Solo — €4/mo** — 1 χρηστης, ολα τα modules.
+- **Family — €8/mo** — εως 5 members, shared workspace.
+- **Pro — €15/mo** — API access + priority support.
+Ενημερωστε το pricing/compare section με αυτα τα νουμερα + προσθεστε per-plan Offer JSON-LD (currency EUR,
+billing monthly). Το Free να δειχνει καθαρα «self-host, δωρεαν για παντα».
+
+**D2 — GitHub repo (RESOLVED: μενει PRIVATE τωρα).** Ο Achilleas ΔΕΝ κανει το repo public ακομα.
+ΟΜΩΣ η self-host/AGPL/«clone it, audit it» αφηγηση ειναι ο πυρηνας του site (primary persona =
+Homelabbers), ΑΡΑ ΜΗΝ αφαιρεσετε τα GitHub links. Αποφαση: τα GitHub links μενουν ως **«coming soon»** —
+δεσμευση οτι το repo θα γινει public **ΠΡΙΝ** το site παει live (τωρα ειμαστε σε waitlist φαση, δεν
+βιαζεται). Πρακτικα: κραταμε το `GITHUB_URL` οπως ειναι· ΟΤΑΝ ερθει το launch, ο Achilleas (α) τρεχει
+`git push --force origin main` (mbox purge, εκκρεμει) και (β) κανει το repo public. Μεχρι τοτε τα links
+δειχνουν σε private repo (404 για εξω) — αποδεκτο στη waitlist φαση. **ΜΗΝ pivot-αρετε σε SaaS-only.**
+
+**D3 — Domain (RESOLVED).** `ph-aros.com` κατοχυρωμενο απο τον Achilleas. Το SITE_URL μενει ως εχει
+σε ολα τα αρχεια (layout/page/robots/sitemap/JSON-LD/manifest/security.txt). Κανενα change needed.
+
+Απομενει ανοιχτο: Contact inbox `hello@ph-aros.com` (waitlist + security reports) — να επιβεβαιωθει
+οτι το mailbox υπαρχει/λειτουργει πριν το launch.
