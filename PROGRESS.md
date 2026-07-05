@@ -2,8 +2,22 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 16afcbf -->
+<!-- reviewed: 5667e5b -->
 <!-- docker-validated: 07250fe -->
+
+## 2026-07-05 (reviewer — range 16afcbf..5667e5b)
+Read-only safety-net review 18 commit (κυρίως tests + docs + config-gated features). **tsc web EXIT 0, mobile EXIT 0. Vitest web: 77 files, 1142 tests πράσινα.** Μηδέν regression, μηδέν fix χρειάστηκε (ο κώδικας ήταν καθαρός).
+
+**Τι ελέγχθηκε στον diff:**
+- `apiRateLimit.ts` (νέο) + `apiAuth.rateLimit` + login route: fixed-window in-memory limiter, **config-gated, off by default** (`API_RATE_LIMIT` κενό → disabled). Keyed per API-token (`withAuth`) + per client-IP (login). Pure `rateHit` (injected store+now), bounded με `MAX_KEYS`. Καλυμμένο από tests. Ασφαλές.
+- `billing/trial.ts` (νέο, pure, zero-imports) + `provisionTenant` stamp `trialEndsAt` + `billingSummary` νέο πεδίο `trial`. SaaS-only path (self-hosted δεν φτιάχνει Tenant docs). Το νέο πεδίο στο response είναι **additive** → δεν σπάει mobile (το mobile δεν καταναλώνει καθόλου `billingSummary`, grep = 0 hits).
+- `mirror.ts`/`onedrive.ts`/`anthropic.ts`: μόνο `function`→`export function` για testability (μηδέν behavior change).
+- landing: `security.txt` (Expires 2027 έγκυρο, μηδέν secret) + OG alt em-dash→colon fix.
+- `.env.example`: τεκμηρίωση των 2 νέων rate-limit env vars. Μηδέν committed secret.
+
+**Route auth coverage:** μόνο το login route παρακάμπτει `withAuth` (σωστό — unauthenticated, έχει δικό του IP-keyed limit)· όλα τα υπόλοιπα `/api/v1` περνούν από `withAuth` → rate-limited όταν enabled.
+
+**Fixes:** κανένα. **Flags:** κανένα (καμία εκκρεμότητα για builder ή Αχιλλέα). Staged ΜΟΝΟ PROGRESS.md. Marker `16afcbf` → `5667e5b`.
 
 ## 2026-07-05 (docker-health guard — rebuild μετά από web runtime αλλαγές)
 Unattended health/build guard. **Health πριν:** homepage-mongo `healthy`, homepage-web `Up 3 hours` (OOMKilled=false, όχι restart loop), flaresolverr σταματημένο (καμία μνημονική πίεση). **Disk:** Images 4.412GB, Build Cache 1.069GB (RECLAIMABLE 0B, in-use), Containers reclaimable 79MB.
