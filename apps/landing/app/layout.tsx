@@ -18,7 +18,9 @@ export const metadata: Metadata = {
     'homelab',
     'privacy',
   ],
-  authors: [{ name: 'Achilleas' }],
+  // url points at /humans.txt so Next emits the conventional
+  // <link rel="author" href="/humans.txt"> alongside <meta name="author">.
+  authors: [{ name: 'Achilleas', url: '/humans.txt' }],
   manifest: '/manifest.webmanifest',
   alternates: { canonical: '/' },
   openGraph: {

@@ -972,3 +972,38 @@ Verify:
 Needs-Achilleas (open):
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι το mailbox λειτουργει πριν launch.
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge εκκρεμει)· μετα flip `REPO_PUBLIC=true` στο landing (D2).
+
+## 2026-07-05 (cont.³) — (e) polish: humans.txt credits + rel=author link
+
+Task: (e) polish. Το site ειναι ωριμο (11 sections, full JSON-LD graph, 9-question FAQ, per-plan Offers).
+Απο τα εκκρεμη next-increment options: (i) real app screenshots — ΔΕΝ υπαρχουν assets, skip· (ii)
+annual-billing toggle — δεσμευει σε συγκεκριμενες ετησιες τιμες (π.χ. «2 μηνες δωρεαν»), αρα ΧΡΕΙΑΖΕΤΑΙ
+confirmation του Achilleas, μενει Needs-Achilleas, ΔΕΝ το εφτιαξα· (iii) humans.txt — self-contained,
+standard web convention, μηδεν pricing commitment. Διαλεξα το (iii).
+
+Τι εφτιαξα:
+- `public/humans.txt`: καθιερωμενο humans.txt (TEAM/THANKS/SITE sections) στο brand voice — creator
+  Achilleas, site/repo/license (AGPL-3.0 «free forever»), open-source thanks (Next.js/React/MongoDB/
+  Mongoose/Tailwind/Zod/Recharts/Ollama/Tesseract/SearXNG), stack/fonts/palette/privacy note, μικρο
+  ASCII lighthouse. English copy, μηδεν em-dashes. Σερβιρεται στο `/humans.txt` (public/ root).
+- `app/layout.tsx`: το `authors: [{ name: 'Achilleas' }]` εγινε `authors: [{ name: 'Achilleas',
+  url: '/humans.txt' }]` -> ο Next εκπεμπει το conventional `<link rel="author" href="/humans.txt">`
+  διπλα στο `<meta name="author">`. Μηδεν αλλη αλλαγη.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· 11 routes ○ Static, / αμεταβλητο 2.79 kB / 105 kB First Load JS.
+- Prerendered `.next/server/app/index.html`: `<link rel="author" href="/humans.txt"/>` present.
+- `public/humans.txt` (1228 bytes) υπαρχει, θα σερβιρεται στο /humans.txt· grep '—' (em-dash) = 0.
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev server στον φακελο· τα preview tools δεν το φτανουν),
+  δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged απο αλλη ρουτινα. Staged μονο τα δικα μου:
+  apps/landing/public/humans.txt + apps/landing/app/layout.tsx + apps/landing/LANDING_PROGRESS.md.
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots στα CSS mockups οταν υπαρξουν assets·
+annual-billing toggle ΜΟΝΟ αφου ο Achilleas κλεισει ετησιες τιμες· ισως `/.well-known/` housekeeping.
+
+Needs-Achilleas (open):
+- Annual billing: αν θελει ετησια πληρωμη, να ορισει το discount (π.χ. 2 μηνες δωρεαν) πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι λειτουργει πριν launch.
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
