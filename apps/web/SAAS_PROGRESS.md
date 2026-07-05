@@ -258,3 +258,103 @@ audit πάνω από existing status logic· type-check+tests καλύπτου�
 έτοιμα, UI-only), είτε (β) `sendViaSmtp` via nodemailer (μετά provider decision Achilleas· το
 webhook mailer καλύπτει ήδη dependency-free delivery), είτε (γ) `billing.checkout_started` /
 πλήρες billing-event audit coverage (checkout route → audit πριν το Stripe redirect).
+
+## 2026-07-05 (increment 42 — BYO-key crypto scaffold: AES-256-GCM at rest, closes D5)
+**Built:** επέλεξα το (β) — υλοποίησα το D5 (RESOLVED: AES-256-GCM, key derived από `AUTH_SECRET`
+μέσω scrypt, μηδέν νέα dependency). Το `aiByoKey` **flag** υπήρχε στο `Tenant` + το `aiKeyPolicy.ts`
+το διάβαζε, αλλά ο ίδιος ο κλειδί δεν είχε πουθενά encrypted-at-rest storage/crypto («encryption at
+rest — Needs Achilleas» έλεγε το ίδιο το aiKeyPolicy header). Το έκλεισα. ΟΛΟ additive /
+backward-compatible / NODE-only, σε δικά μου SAAS αρχεία, μηδέν wiring:
+- `lib/tenancy/secretCrypto.ts` (νέο, NODE-only `node:crypto`): ο crypto πυρήνας. `encryptSecret
+  (plaintext)` → self-describing envelope **`gcm1$<iv>$<tag>$<ct>`** (base64, random 12-byte IV
+  ανά call → ίδιο plaintext → διαφορετικά ciphertexts)· `decryptSecret(stored)` → plaintext ή
+  **`null`** σε ΚΑΘΕ αποτυχία (malformed / λάθος AUTH_SECRET / tampered — GCM auth tag fail),
+  never throws· `secretCryptoReady()` (mirror του `authConfigured`, fail-closed χωρίς AUTH_SECRET
+  ≥16 chars)· `isEncryptedSecret()` (envelope shape check, no decrypt). Key = **scrypt(AUTH_SECRET,
+  fixed KDF_SALT `pharos:byo-key:aes256gcm:v1`, 32)**, ίδιο cost profile με `lib/auth.ts` (N=16384),
+  cached ανά secret value (rotate/test-swap → re-derive). Deterministic derivation ⇒ decryptable
+  later· fixed salt = domain separation από τον JWT signer (όχι secret).
+- `lib/billing/byoKey.ts` (νέο, **PURE codec** πάνω από το secretCrypto, no DB/Stripe): ο
+  provider-aware storage codec. `BYO_PROVIDERS` (anthropic/openai/gemini/openrouter/custom) +
+  `isByoProvider`· `encodeAiKey(provider, rawKey)` → `{ provider, keyEnc }` (validate + trim +
+  encrypt· null σε bad provider/empty key/no-crypto)· `decodeAiKey(stored)` → `{ provider, key }`
+  on-demand decrypt (null σε malformed/tampered/rotated)· `maskAiKey(stored)` → `{ provider,
+  ••••tail }` για settings UI (ποτέ plaintext)· `byoKeyReady()`. Το plaintext ΠΟΤΕ δεν αποθηκεύεται/
+  logάρεται — μόνο in-memory στο decode.
+- `lib/tenancy/secretCrypto.test.ts` (νέο) — 11 tests (ready flag· round-trip incl. unicode/empty·
+  envelope shape· fresh-IV uniqueness· null σε malformed/tampered-ct/rotated-secret· throw-on-encrypt
+  χωρίς secret· isEncryptedSecret).
+- `lib/billing/byoKey.test.ts` (νέο) — 10 tests (provider guard· ready· encode→decode round-trip ανά
+  provider + trim· reject bad provider/empty/non-string/no-secret· decode reject malformed/tampered/
+  rotated· maskAiKey last-4-only).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run secretCrypto.test.ts byoKey.test.ts`
+→ **21/21 green**· full suite `npx vitest run` → **1385/1385 green** (99 files, καμία regression).
+Grep για external importers (`secretCrypto`/`billing/byoKey`/`encryptSecret`/`decodeAiKey`/`encodeAiKey`)
+από feature code → **ZERO** ⇒ zero runtime wiring. ⇒ `SAAS_MODE` off / default tenant = **zero
+effect** (self-hosted app κρατά το unencrypted single-owner key στο AppConfig, δεν καλεί τίποτα από
+εδώ). Κανένας Docker rebuild (νέα NODE modules, unwired· type-check+tests καλύπτουν compile+logic)·
+**καμία νέα εξάρτηση** (node:crypto)· κανένα feature route/data-db/User-path/bearer-path αγγίχτηκε.
+Άγγιξα μόνο δικά μου SAAS αρχεία (foreign edits άθικτα).
+
+**## Needs Achilleas** (BYO-key go-live):
+- **Persist wiring**: ο codec είναι έτοιμος, αλλά κανείς δεν γράφει/διαβάζει `{provider, keyEnc}`
+  ακόμα. Μελλοντικό increment: additive optional `aiKeyEnc` field στο `Tenant` + write path (settings
+  API `encodeAiKey` → `$set`) + read στο AI dispatch site (`decodeAiKey` → provider client). Αγγίζει
+  AI entrypoint → προσεκτικό increment/άδεια.
+- **AUTH_SECRET-scoped rotation**: αν αργότερα θέλει key-rotation ανεξάρτητη του AUTH_SECRET,
+  μετακίνηση σε ξεχωριστό `ENCRYPTION_KEY` env (D5 note) — για τώρα AUTH_SECRET-derived· αλλαγή του
+  AUTH_SECRET κάνει τα υπάρχοντα ciphertexts undecryptable (decode → null, ο tenant ξανα-εισάγει key).
+
+**Next task:** increment 43 — είτε (α) BYO-key persist wiring (Tenant `aiKeyEnc` field + settings
+write API + read στο AI dispatch· αγγίζει AI entrypoint → άδεια/προσοχή), είτε (β) in-process 6h cron
+registration για το trial-lapse sweep (bootstrap hook, shared runtime → άδεια), είτε (γ) reset-request
+timing side-channel fix (D6 spec: constant-time response), είτε (δ) user-facing workspace-settings UI
+panels (read/write APIs έτοιμα).
+
+## 2026-07-06 (increment 43 — reset-request constant-time response, closes D6)
+**Built:** επέλεξα το (γ) — έκλεισα το D6 timing side-channel στο μοναδικό UNAUTHENTICATED
+control-plane route (`POST /api/saas/account/reset/request`). Το body ήταν ήδη anti-enumeration
+(πάντα `{ok:true}` άσχετα αν υπάρχει ο λογαριασμός), αλλά ο **χρόνος** διέρρεε: ένα registered
+email έκανε επιπλέον `mintResetToken` + `account.save()` (DB write) + `await sendEmail` (network),
+οπότε απαντούσε μετρήσιμα πιο αργά από ένα άγνωστο → ένας attacker που χρονομετρά μπορούσε να
+enumerate-άρει ποια emails έχουν λογαριασμό. Το `verify/request` route ΔΕΝ έχει το πρόβλημα (είναι
+authenticated, στοχεύει τον ΙΔΙΟ λογαριασμό του caller — μηδέν enumeration surface), οπότε το άφησα.
+ΟΛΟ additive / SAAS-gated, σε δικά μου αρχεία:
+- `lib/tenancy/resetTiming.ts` (νέο): **PURE** `resetResponseDelayMs(elapsedMs, floorMs?)` →
+  υπόλοιπο μέχρι ένα σταθερό floor, clamped σε `[0, floor]`· non-finite/negative elapsed → **full
+  floor** (fail-safe προς ΠΕΡΙΣΣΟΤΕΡΟ masking, ποτέ λιγότερο)· non-positive/non-finite floor →
+  disable (0). `RESET_MIN_RESPONSE_MS = 500`. `settleMinResponseTime(startedAtMs, nowMs?)` κοιμάται
+  το υπόλοιπο (nowMs injectable για tests, resolves αμέσως χωρίς timer όταν το floor έχει ήδη
+  καλυφθεί → ποτέ hang).
+- `app/api/saas/account/reset/request/route.ts` (edit, δικό μου): (1) `startedAt = Date.now()` ΠΡΙΝ
+  κάθε account-dependent work· (2) η αποστολή email έγινε **fire-and-forget** (`void sendEmail(...)
+  .catch(()=>{})` — το sendEmail ποτέ δεν throws) ώστε το network latency να ΜΗΝ μπαίνει στο timed
+  path· (3) `await settleMinResponseTime(startedAt)` πριν το return ώστε το existence-dependent DB
+  write να καλύπτεται από το floor. Και οι δύο κλάδοι (found/not-found) settle-άρουν στο ίδιο floor.
+  Το malformed-email **400** μένει fast (εξαρτάται μόνο από το input string, μηδέν account leak). Το
+  devToken scaffold (non-prod, no-mailer echo) διατηρεί ΑΚΡΙΒΩΣ την ίδια σημασιολογία (mint μόνο όταν
+  υπάρχει account· echo μόνο non-prod & !configured).
+- `lib/tenancy/resetTiming.test.ts` (νέο) — 10 PURE tests (full-floor at 0, below-floor remaining,
+  exactly-at-floor→0, past-floor→0, fail-safe negative/NaN/±Infinity→full floor, custom floor,
+  disabled floor, [0,floor] invariant sweep, settle resolves-immediately-when-met + waits-small-delay).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run` → **1425/1425 green** (102 files,
++10 νέα, καμία regression). Το route SAAS-gated (404 όταν `SAAS_MODE` off) + το νέο module import-άρεται
+ΜΟΝΟ από αυτό το route (μηδέν external importer από feature code) ⇒ `SAAS_MODE` off = **zero effect**
+στο self-hosted app. Κανένας Docker rebuild (route 404 στο running container με SAAS_MODE off — ο νέος
+κώδικας δεν εκτελείται· type-check+tests καλύπτουν compile+logic)· **καμία νέα εξάρτηση**· κανένα
+feature route/data-db/User-path/bearer-path αγγίχτηκε. Άγγιξα μόνο δικά μου SAAS αρχεία.
+
+**## Needs Achilleas:**
+- Ίδιο με πριν: **SMTP/email provider decision** (Resend key / MAIL_WEBHOOK_URL / wired SMTP) για
+  production delivery· μέχρι τότε ο reset επιστρέφει `devToken` ΜΟΝΟ σε non-production.
+- **Fire-and-forget email σε serverless**: σε persistent Node container (τρέχον Docker deploy) το
+  detached `sendEmail` ολοκληρώνεται κανονικά· αν ποτέ γίνει deploy σε serverless/edge όπου το process
+  παγώνει μετά το response, θα χρειαστεί `waitUntil`/queue ώστε να μη χάνεται το email.
+
+**Next task:** increment 44 — είτε (α) BYO-key persist wiring (Tenant `aiKeyEnc` field + settings write
+API + read στο AI dispatch· αγγίζει AI entrypoint → άδεια/προσοχή), είτε (β) in-process 6h cron
+registration για το trial-lapse sweep (bootstrap hook, shared runtime → άδεια), είτε (γ) user-facing
+workspace-settings UI panels (read/write APIs έτοιμα), είτε (δ) reset-request rate-limit (throttle
+ανά IP/email — συμπληρώνει το D6 anti-enumeration με anti-brute-force).
