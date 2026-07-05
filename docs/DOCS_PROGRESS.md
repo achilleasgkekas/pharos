@@ -737,3 +737,38 @@ Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/sa
 Επομενο run: το control-plane API section ειναι πλεον πληρες (ολα τα 24 saas routes καλυμμενα).
 Επομενο = sync check features.md/configuration.md με το BYO-key settings UI (αν εκτεθει στον χρηστη),
 η stale-forward-ref sweep ολου του set.
+
+## 2026-07-06 (saas.md: GDPR account data-export endpoint)
+
+Το πιο προσφατο commit `401b2fc` (feat(saas): GDPR account data-export endpoint,
+Art. 15/20) προσθεσε νεο SaaS-gated route που **δεν** ηταν τεκμηριωμενο πουθενα
+(grep "export" σε saas.md + api.md = 0 hits). Διαβασα τα πραγματικα αρχεια
+(`app/api/saas/account/export/route.ts` + ο pure assembler `lib/tenancy/accountExport.ts`)
+και προσθεσα νεα subsection **### Data export (GDPR)** στο saas.md, τοποθετημενη μετα
+το "Email verification & password" και πριν το "Members and invitations".
+
+Τι εγραψα:
+- Πινακας μιας γραμμης: `GET /api/saas/account/export`, authenticated, streams JSON
+  attachment (`Content-Disposition: attachment; filename="pharos-account-<id>.json"`,
+  `Cache-Control: no-store`). Status codes: 401 signed-out, 404 account-gone / SaaS-off.
+- Επεξηγηση: **control-plane data only** (account profile + memberships), οχι tenant
+  data-DB, οχι self-hosted User/bearer path. Workspace content εξαιρειται (ανα-workspace
+  export ξεχωριστα). Secrets (passwordHash, verify/reset tokens) ποτε δεν διαβαζονται,
+  ο assembler κανει project μονο whitelisted πεδια.
+- Πληρες JSON payload sample (format/version/generatedAt/notice/account/memberships)
+  αντιγραμμενο απο το `AccountExport` type. Ολα τα memberships regardless of status,
+  unresolvable tenant → skipped (οχι blank rows).
+
+Accuracy: καμια τιμη/header/endpoint εφευρεθηκε, ολα cross-checked με τον κωδικα
+(response headers, status codes, payload keys, gating). Placeholders μονο στο sample.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 2 markers
+(1 balanced block). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=)
+→ clean. Κανενα route-count claim στο published doc προς διορθωση (το "24 routes" ζουσε
+μονο στο DOCS_PROGRESS). Πραγματικος saas route count = 26.
+
+Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: sync check αν το data-export εκτιθεται στο account-settings UI (features.md
+mention) οταν χτιστει· αλλιως stale-forward-ref sweep ολου του set. Τα 26 saas routes
+πλεον ολα τεκμηριωμενα.

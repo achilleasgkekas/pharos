@@ -206,6 +206,55 @@ sessions; the new hash takes effect on the next login.
 > closed), so nothing leaks. See [SaaS environment variables](#saas-environment-variables)
 > for `RESEND_API_KEY` / `SMTP_URL` and the mailer setup.
 
+### Data export (GDPR)
+
+A signed-in account can download a machine-readable copy of the personal data the
+platform holds about it (GDPR Art. 15 right of access + Art. 20 data portability).
+
+| Method | Path | Body | Result |
+| --- | --- | --- | --- |
+| `GET` | `/api/saas/account/export` | — | **Authenticated.** Streams the caller's own personal data as a JSON attachment (`Content-Disposition: attachment; filename="pharos-account-<id>.json"`, `Cache-Control: no-store`). `401` when signed out, `404` when the account no longer exists (or when SaaS mode is off). |
+
+The export reads **control-plane data only** — the account profile plus its
+workspace memberships — and never touches a tenant's data database or the
+self-hosted `User`/bearer path. Workspace **content** (Items, Receipts, …) is not
+included here; it lives in each workspace's own isolated database and is exported
+separately per workspace. Secrets (password hash, verify/reset tokens) are never
+read: a pure assembler projects only a fixed whitelist of fields, so no secret
+column can leak into the file. The payload shape:
+
+```json
+{
+  "format": "pharos.account-export",
+  "version": 1,
+  "generatedAt": "2026-07-06T00:00:00.000Z",
+  "notice": "This is a copy of the personal data associated with your Pharos account …",
+  "account": {
+    "id": "…",
+    "email": "you@example.com",
+    "name": "You",
+    "emailVerified": true,
+    "lastLoginAt": "2026-07-05T…",
+    "createdAt": "2026-06-01T…",
+    "updatedAt": "2026-07-05T…"
+  },
+  "memberships": [
+    {
+      "tenantSlug": "acme",
+      "tenantName": "Acme",
+      "plan": "pro",
+      "role": "owner",
+      "status": "active",
+      "joinedAt": "2026-06-01T…"
+    }
+  ]
+}
+```
+
+All memberships are included regardless of status (a complete record of what the
+platform knows about the identity); a membership whose tenant was deleted
+mid-export is skipped rather than emitted as a blank row.
+
 ### Members and invitations
 
 `/api/saas/members` manages a workspace's roster. Gating: 404 when SaaS off, 401
