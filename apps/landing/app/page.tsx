@@ -171,6 +171,8 @@ type Tier = {
   name: string;
   price: string;
   cadence?: string;
+  // Numeric EUR amount for per-plan Offer JSON-LD ('0' = free). Omit for non-priced rows.
+  amount?: string;
   tagline: string;
   cta: string;
   ctaHref: string;
@@ -183,6 +185,8 @@ const TIERS: Tier[] = [
   {
     name: 'Self-hosted',
     price: 'Free',
+    amount: '0',
+    cadence: 'forever',
     tagline: 'Run it on your own hardware, forever. Open source, AGPL-3.0.',
     cta: 'Get the Docker image',
     ctaHref: GITHUB_URL,
@@ -196,50 +200,53 @@ const TIERS: Tier[] = [
     ],
   },
   {
-    name: 'Hosted · Free',
-    price: 'TBD',
-    cadence: 'free tier',
-    tagline: 'Managed for you. Kick the tyres with the essentials.',
+    name: 'Solo',
+    price: '€4',
+    cadence: 'per month',
+    amount: '4',
+    tagline: 'Managed for you. The whole hub, one user, nothing to install.',
     cta: 'Join the waitlist',
     ctaHref: '#waitlist',
     features: [
       '1 user',
-      'Inventory, shopping & receipts',
-      'Limited AI receipt scans / month',
+      'Every module, no limits',
+      'AI receipt & document parsing included',
       'Automatic nightly backups',
       'We handle updates & hosting',
     ],
   },
   {
-    name: 'Hosted · Pro',
-    price: 'TBD',
+    name: 'Family',
+    price: '€8',
     cadence: 'per month',
-    tagline: 'The full hub, managed, with AI included.',
+    amount: '8',
+    tagline: 'Share one hub across the household, up to 5 members.',
     cta: 'Join the waitlist',
     ctaHref: '#waitlist',
     highlight: true,
     badge: 'Most popular',
     features: [
-      'All modules (expenses, statements, subscriptions, vouchers, reports)',
-      'AI receipt & document parsing included',
-      'Network monitoring & alerts (ntfy)',
-      'Price tracking & deal notifications',
+      'Everything in Solo',
+      'Up to 5 members',
+      'Shared household workspace',
+      'Higher AI limits',
       'Priority email support',
     ],
   },
   {
-    name: 'Hosted · Team',
-    price: 'TBD',
-    cadence: 'per seat',
-    tagline: 'Share a hub across a household or small team.',
-    cta: 'Talk to us',
+    name: 'Pro',
+    price: '€15',
+    cadence: 'per month',
+    amount: '15',
+    tagline: 'For power users who want to build on top of their hub.',
+    cta: 'Join the waitlist',
     ctaHref: '#waitlist',
     features: [
-      'Everything in Pro',
-      'Multiple users & shared workspace',
-      'Roles & permissions',
-      'Higher AI limits',
-      'Audit trail',
+      'Everything in Family',
+      'REST API access',
+      'Priority support',
+      'Highest AI limits',
+      'Early access to new modules',
     ],
   },
 ];
@@ -359,7 +366,7 @@ const COMPARE: { label: string; self: string; hosted: string }[] = [
   { label: 'Updates & backups', self: 'You run them', hosted: 'Automatic, nightly' },
   { label: 'AI parsing', self: 'Bring your own key or Ollama', hosted: 'Included, ready to go' },
   { label: 'Offline use', self: 'Full, no internet needed', hosted: 'Needs a connection' },
-  { label: 'Cost', self: 'Free, AGPL-3.0', hosted: 'Monthly plan' },
+  { label: 'Cost', self: 'Free, AGPL-3.0', hosted: 'From €4/mo' },
   { label: 'Support', self: 'Community & docs', hosted: 'Priority email' },
 ];
 
@@ -476,12 +483,25 @@ const JSON_LD = {
       publisher: { '@id': `${SITE_URL}/#organization` },
       license: 'https://www.gnu.org/licenses/agpl-3.0.html',
       softwareHelp: `${GITHUB_URL}/blob/main/README.md`,
-      offers: {
+      // Per-plan Offers, one per priced tier (Free self-host + Solo/Family/Pro hosted)
+      offers: TIERS.filter((t) => t.amount !== undefined).map((t) => ({
         '@type': 'Offer',
-        price: '0',
+        name: `PHAROS ${t.name}`,
+        price: t.amount,
         priceCurrency: 'EUR',
-        description: 'Self-hosted edition, open source under AGPL-3.0',
-      },
+        description: t.tagline,
+        availability: 'https://schema.org/InStock',
+        ...(t.amount !== '0' && {
+          priceSpecification: {
+            '@type': 'UnitPriceSpecification',
+            price: t.amount,
+            priceCurrency: 'EUR',
+            unitText: 'MONTH',
+            billingDuration: 1,
+            billingIncrement: 1,
+          },
+        }),
+      })),
     },
     {
       '@type': 'FAQPage',
@@ -1030,7 +1050,7 @@ export default function Home() {
             </h2>
             <p style={{ color: 'var(--text-dim)', maxWidth: 560, margin: '0 auto' }}>
               Self-host the whole thing for free under AGPL-3.0, or pick a managed
-              plan and skip the setup. Hosted prices are indicative while we finalise them.
+              plan and skip the setup. Every hosted plan includes AI parsing and nightly backups.
             </p>
           </div>
 
@@ -1083,7 +1103,7 @@ export default function Home() {
           </div>
 
           <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 36 }}>
-            Final hosted pricing is being worked out. Self-hosting stays free under AGPL-3.0.
+            Prices in EUR, billed monthly, cancel anytime. Self-hosting stays free forever under AGPL-3.0.
           </p>
         </div>
       </section>

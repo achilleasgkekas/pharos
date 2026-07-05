@@ -930,3 +930,25 @@ Homelabbers), ΑΡΑ ΜΗΝ αφαιρεσετε τα GitHub links. Αποφασ
 
 Απομενει ανοιχτο: Contact inbox `hello@ph-aros.com` (waitlist + security reports) — να επιβεβαιωθει
 οτι το mailbox υπαρχει/λειτουργει πριν το launch.
+
+## 2026-07-05 (cont.) — D1 υλοποιηθηκε: τελικες τιμες + per-plan Offer JSON-LD
+
+Task: (d/D1) το pricing section εδειχνε ακομα `price: 'TBD'` σε 3 hosted tiers («Hosted · Free/Pro/Team») + copy «indicative»/«being worked out». Ο Achilleas κλεισε τις τιμες (D1 στο προηγουμενο entry). Υλοποιηθηκε.
+
+Τι εφτιαξα (μονο `app/page.tsx`):
+- `TIERS`: τα 3 placeholder hosted tiers αντικατασταθηκαν με τα 3 confirmed: **Solo €4/mo** (1 χρηστης, ολα τα modules, AI parsing included), **Family €8/mo** (εως 5 members, shared workspace, higher AI limits — highlighted «Most popular»), **Pro €15/mo** (REST API access + priority support + highest AI limits + early access). Το self-host tier μενει «Free» με νεο cadence «forever» -> «Free forever». Το παλιο hosted-Free tier αφαιρεθηκε (ο Achilleas δεν οριζει hosted free tier — το Free ειναι το self-host).
+- `Tier` type: νεο optional `amount?: string` (numeric EUR για JSON-LD· '0'/'4'/'8'/'15').
+- JSON-LD: το μονολιθικο single `offers` object εγινε **per-plan Offers array** derived απο `TIERS.filter(amount!==undefined)` — 4 Offers (PHAROS Self-hosted/Solo/Family/Pro), currency EUR, `availability: InStock`, + `UnitPriceSpecification` (billingDuration 1, unitText MONTH) στα 3 paid. Το Free κραταει price '0' χωρις priceSpecification.
+- Copy: pricing intro «indicative while we finalise» -> «Every hosted plan includes AI parsing and nightly backups»· footnote «being worked out» -> «Prices in EUR, billed monthly, cancel anytime. Self-hosting stays free forever under AGPL-3.0.»· COMPARE Cost row hosted «Monthly plan» -> «From €4/mo».
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· 11 routes ○ Static, / = 2.79 kB / 105 kB First Load JS (μηδεν JS impact, static markup + JSON-LD).
+- Prerendered `.next/server/app/index.html`: €4/€8/€15 + Solo/Family/Pro + «Free forever» present· 4 named Offers («PHAROS Solo/Family/Pro/Self-hosted») + UnitPriceSpecification στα paid· grep 'TBD'/'indicative'/'being worked out' = **0**· grep '—' (em-dash) = **0**. (Τα διπλα counts στο grep = RSC flight-data serialization, rendered HTML ×2 — φυσιολογικο.) Δεν σηκωσα dev server, δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged, μονο `apps/landing/app/page.tsx` modified. Staged μονο page.tsx + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) polish — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· ισως annual-billing toggle (2 μηνες δωρεαν) αν το θελησει ο Achilleas· humans.txt.
+
+Needs-Achilleas (open):
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι το mailbox λειτουργει πριν launch (waitlist + security reports).
+- GitHub repo public ΠΡΙΝ launch (D2: μενει private τωρα, links = «coming soon», αποδεκτο στη waitlist φαση).
