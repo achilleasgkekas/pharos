@@ -97,7 +97,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 2. ✅ **Tasks statuses** — todo/in-progress/blocked/done picker + status chips.
 3. ✅ **Receipt verify/edit** — edit fields + line items + ∑-items + verify + archive + add-to-library + **re-scan text/OCR** (2026-07-01).
 4. ✅ **AI fill** — subscription-from-name, voucher scan (paste+image), item URL import, expenses scan-a-bill.
-5. ✅ **Statement transactions** — per-statement detail με transactions + per-charge installment badges + **aggregated installment-plan overview** (cross-statement payoff, active-first). *Remaining: link plans to products / merge/bind (web overview write-ops).*
+5. ✅ **Statement transactions** — per-statement detail με transactions + per-charge installment badges + **aggregated installment-plan overview** (cross-statement payoff, active-first) + **link plans to products** (item PlansBlock) + **merge/bind plans** (overview «⑂ Merge into…» picker + «Unmerge», 2026-07-05). *Complete — closes the last #5 write-op gap.*
 6. 🟡 **Settings** — editable preferences (currency/VAT/warranty/auto-add), editable budgets, payment cards CRUD, stores CRUD, dropdown-lists editor, ntfy URL/enable/test ✅. *Remaining: theme toggle, language, AI engine, storage/OneDrive (βλ. Needs Achilleas).*
 7. ✅ **Activity** — Alerts (notification feed) + Trash (restore/purge) + Jobs + History.
 8. 🟡 **Push notifications** — in-app feed ✅· remote push pipeline buildable αλλά αδοκίμαστο (needs device + APNs).

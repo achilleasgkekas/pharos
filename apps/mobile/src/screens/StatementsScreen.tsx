@@ -1,14 +1,87 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, Pressable, Modal, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
 import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Card, Badge, contentWidth } from '../ui';
-import { getStatements, getStatementTxns, getInstallmentPlans, type Statement, type StatementTxn, type InstallmentPlan } from '../api';
+import { money, shortDate, Spinner, ErrorText, Empty, Card, Badge, Input, contentWidth } from '../ui';
+import { getStatements, getStatementTxns, getInstallmentPlans, mergePlans, unmergePlan, type Statement, type StatementTxn, type InstallmentPlan } from '../api';
 
 // "2028-10-01" → "Oct 2028" for payoff dates.
 const payoff = (iso: string) => {
   const d = new Date(iso);
   return isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 };
+
+/** One installment plan in the overview, with a merge/unmerge control. Merging binds
+ *  a differently-worded plan ("QUEST ONLINE" vs "QUEST ONLINE KALLITHEA") into this one
+ *  so their payoff collapses. Mirror of the web PlanMergeControl. */
+function PlanRow({ plan, allPlans, cur, onChanged }: {
+  plan: InstallmentPlan; allPlans: InstallmentPlan[]; cur: string; onChanged: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const targets = useMemo(() => {
+    const others = allPlans.filter((p) => p.key !== plan.key);
+    const query = q.trim().toLowerCase();
+    return (query ? others.filter((p) => p.label.toLowerCase().includes(query)) : others).slice(0, 8);
+  }, [allPlans, plan.key, q]);
+
+  async function merge(targetKey: string) {
+    setBusy(true);
+    try { await mergePlans(plan.key, targetKey); setOpen(false); setQ(''); await onChanged(); }
+    finally { setBusy(false); }
+  }
+  async function unmerge() {
+    setBusy(true);
+    try { await unmergePlan(plan.key); await onChanged(); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <View style={[s.plan, plan.done && s.planDone]}>
+      <View style={s.planTop}>
+        <Text style={s.planLabel} numberOfLines={1}>{plan.label}{plan.itemCount > 1 ? ` · ${plan.itemCount} items` : ''}</Text>
+        <Text style={[s.planAmt, plan.done && s.planAmtDone]}>
+          {plan.done ? 'paid off' : `${money(plan.remainingAmount, cur)} left`}
+        </Text>
+      </View>
+      <Text style={s.planMeta}>
+        {[
+          plan.card,
+          `${money(plan.perAmount, cur)}/mo`,
+          `${plan.paidInstallments}/${plan.totalInstallments}`,
+          plan.done ? `${money(plan.totalAmount, cur)} total` : `ends ${payoff(plan.projectedEndDate)}`,
+        ].filter(Boolean).join('  ·  ')}
+      </Text>
+
+      {open ? (
+        <View style={s.mergeBox}>
+          <Text style={s.mergeHint}>MERGE INTO ANOTHER PLAN</Text>
+          <Input variant="modal" value={q} onChangeText={setQ} placeholder="Search plans…" autoFocus style={s.mergeSearch} />
+          {targets.map((t) => (
+            <Pressable key={t.key} onPress={() => merge(t.key)} disabled={busy} style={s.mergeItem}>
+              <Text style={s.mergeItemLabel} numberOfLines={1}>{t.label}</Text>
+              <Text style={s.mergeItemMeta}>{money(t.perAmount, cur)} · {t.paidInstallments}/{t.totalInstallments}</Text>
+            </Pressable>
+          ))}
+          {targets.length === 0 && <Text style={s.mergeEmpty}>No other plans</Text>}
+          <Pressable onPress={() => { setOpen(false); setQ(''); }} hitSlop={8}><Text style={s.mergeCancel}>Cancel</Text></Pressable>
+        </View>
+      ) : (
+        <View style={s.mergeActions}>
+          <Pressable onPress={() => setOpen(true)} disabled={busy || allPlans.length < 2} hitSlop={8}>
+            <Text style={[s.mergeBtn, allPlans.length < 2 && s.mergeBtnDisabled]}>⑂ Merge into…</Text>
+          </Pressable>
+          {plan.merged && (
+            <Pressable onPress={unmerge} disabled={busy} hitSlop={8}>
+              <Text style={s.unmergeBtn}>Unmerge</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
 
 export function StatementsScreen() {
   const [rows, setRows] = useState<Statement[]>([]);
@@ -55,22 +128,7 @@ export function StatementsScreen() {
           <View style={s.plansBox}>
             <Text style={s.plansHead}>INSTALLMENT PLANS · {plans.filter((p) => !p.done).length} active</Text>
             {plans.map((p) => (
-              <View key={p.signature} style={[s.plan, p.done && s.planDone]}>
-                <View style={s.planTop}>
-                  <Text style={s.planLabel} numberOfLines={1}>{p.label}{p.itemCount > 1 ? ` · ${p.itemCount} items` : ''}</Text>
-                  <Text style={[s.planAmt, p.done && s.planAmtDone]}>
-                    {p.done ? 'paid off' : `${money(p.remainingAmount, planCur)} left`}
-                  </Text>
-                </View>
-                <Text style={s.planMeta}>
-                  {[
-                    p.card,
-                    `${money(p.perAmount, planCur)}/mo`,
-                    `${p.paidInstallments}/${p.totalInstallments}`,
-                    p.done ? `${money(p.totalAmount, planCur)} total` : `ends ${payoff(p.projectedEndDate)}`,
-                  ].filter(Boolean).join('  ·  ')}
-                </Text>
-              </View>
+              <PlanRow key={p.key} plan={p} allPlans={plans} cur={planCur} onChanged={load} />
             ))}
           </View>
         ) : null}
@@ -145,6 +203,18 @@ const s = StyleSheet.create({
   planAmt: { color: C.purple, fontSize: 14, fontWeight: '800' },
   planAmtDone: { color: C.faint, fontWeight: '700' },
   planMeta: { color: C.faint, fontSize: 12, marginTop: 5 },
+  mergeActions: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 9 },
+  mergeBtn: { color: C.dim, fontSize: 12, fontWeight: '600' },
+  mergeBtnDisabled: { opacity: 0.4 },
+  unmergeBtn: { color: C.red, fontSize: 12, fontWeight: '600' },
+  mergeBox: { backgroundColor: C.surface2, borderRadius: 10, padding: 8, marginTop: 9, gap: 6 },
+  mergeHint: { color: C.faint, fontSize: 9, letterSpacing: 1.2, fontWeight: '700' },
+  mergeSearch: { marginBottom: 2 },
+  mergeItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 8, backgroundColor: C.surface },
+  mergeItemLabel: { color: C.text, fontSize: 13, fontWeight: '500', flex: 1 },
+  mergeItemMeta: { color: C.faint, fontSize: 11 },
+  mergeEmpty: { color: C.faint, fontSize: 12, fontStyle: 'italic', paddingVertical: 4 },
+  mergeCancel: { color: C.dim, fontSize: 12, paddingVertical: 2 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   card_: { color: C.text, fontSize: 15, fontWeight: '700' },
   total: { color: C.text, fontSize: 16, fontWeight: '800' },

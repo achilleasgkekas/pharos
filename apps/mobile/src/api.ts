@@ -296,13 +296,27 @@ export async function getStatementTxns(id: string): Promise<StatementTxn[]> {
 
 // Installment-plan overview across all statements (one plan per purchase, cross-statement).
 export type InstallmentPlan = {
-  signature: string; label: string; card: string;
+  // `key` is the stable grouping key the merge/unmerge write-ops key on.
+  key: string; signature: string; label: string; card: string;
   perAmount: number; totalInstallments: number; paidInstallments: number;
   remainingInstallments: number; remainingAmount: number; totalAmount: number;
-  projectedEndDate: string; done: boolean; itemCount: number;
+  projectedEndDate: string; done: boolean; itemCount: number; merged: boolean;
 };
 export async function getInstallmentPlans(): Promise<{ currency: string; plans: InstallmentPlan[] }> {
   return request<{ currency: string; plans: InstallmentPlan[] }>('/api/v1/statements/plans');
+}
+/** Bind every charge of one plan into another (merge two differently-worded plans into
+ *  one payoff). Keys are `InstallmentPlan.key`. Mirror of the web "merge into" control. */
+export function mergePlans(sourceKey: string, targetKey: string) {
+  return request<{ ok: boolean; moved: number }>('/api/v1/statements/plans/merge', {
+    method: 'POST', body: JSON.stringify({ sourceKey, targetKey }),
+  });
+}
+/** Undo a merge: split the bound charges back into their own auto plans. */
+export function unmergePlan(key: string) {
+  return request<{ ok: boolean; moved: number }>('/api/v1/statements/plans/merge', {
+    method: 'DELETE', body: JSON.stringify({ key }),
+  });
 }
 
 // ---- App settings (preferences + this-month budgets) ----

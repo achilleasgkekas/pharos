@@ -22,6 +22,9 @@ export async function GET(req: NextRequest) {
     ]);
     const statements = JSON.parse(JSON.stringify(docs)) as SerializedStatement[];
     const plans = computeInstallmentPlans(statements).map((p) => ({
+      // `key` is the stable grouping key (planKey || signature); it is what the
+      // merge/unmerge write-ops key on. `signature` is kept for back-compat.
+      key: p.key,
       signature: p.signature,
       label: p.label,
       card: p.card,
@@ -34,6 +37,8 @@ export async function GET(req: NextRequest) {
       projectedEndDate: p.projectedEndDate,
       done: p.done,
       itemCount: p.itemIds.length,
+      // true when a charge was manually bound into this plan → mobile shows "unmerge".
+      merged: p.merged,
     }));
     // Active before done; computeInstallmentPlans already sorts active by soonest payoff.
     plans.sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
