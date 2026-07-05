@@ -1708,3 +1708,45 @@ bearer-path αγγίχτηκε.
 AI call site μέσω `currentTenant()`, αγγίζει shared runtime → άδεια/προσοχή), είτε (β) in-process
 6h cron registration για τον trial-lapse sweep (bootstrap hook, shared runtime → άδεια), είτε (γ)
 user-facing workspace-settings UI panels (όλα τα read/write APIs έτοιμα, incl. τώρα το ai-key).
+
+## 2026-07-06 (increment 43 — GDPR account data-export, opens §15 compliance)
+**Το κενό:** ο SaaS layer είχε read/write control-plane APIs (account profile, memberships,
+billing, ai-key) αλλά **καμία GDPR data-access/portability έξοδο** — §15 (Legal & compliance)
+είναι `blocking για SaaS`, και το §8 ζητά ρητά «Per-tenant … export». Έκλεισα το πρώτο,
+ασφαλέστερο κομμάτι: το **account-level** export (Art. 15 access + Art. 20 portability), που
+διαβάζει ΜΟΝΟ control-plane δεδομένα (Account profile + Memberships→Tenants), χωρίς per-tenant
+DB scoping και χωρίς shared runtime. ΟΛΟ additive + SaaS-gated:
+- `lib/tenancy/accountExport.ts` (νέο). **PURE** assembler `buildAccountExport(account,
+  memberships, generatedAt)` → σταθερό envelope `{format:'pharos.account-export', version:1,
+  generatedAt, notice(GDPR), account{id,email,name,emailVerified,lastLoginAt,createdAt,updatedAt},
+  memberships[]}`. Διαβάζει ΜΟΝΟ whitelisted πεδία → **by construction κανένα secret** (password
+  Hash/tokens) δεν διαρρέει έστω κι αν μπει κατά λάθος στο input. Memberships χωρίς resolvable
+  tenant → skip· dates→ISO ή null· tenantName fallback σε slug. + `accountExportFilename` (safe
+  charset, ποτέ κενό stem).
+- `app/api/saas/account/export/route.ts` (νέο). GET only, `saasGuard` + `saasAuthGate` (404 off,
+  500 χωρίς AUTH_SECRET) + `getCurrentAccount` (401 logged-out). Φορτώνει account +ΟΛΑ τα
+  memberships (any status = πλήρες record) + batched Tenant lookup → `buildAccountExport` →
+  `Content-Disposition: attachment` JSON, `Cache-Control: no-store`. Δεν αγγίζει τον
+  self-hosted User/bearer path ούτε tenant data-db.
+- `lib/tenancy/accountExport.test.ts` (νέο) — 8 PURE tests: envelope shape/ISO, no-secret-leak
+  (tainted input), membership join, unresolvable-tenant skip, name→slug fallback + missing
+  optionals, invalid/blank date→null, filename safety (hex + path-traversal strip).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run accountExport.test.ts` → **8/8
+green**· full suite `npx vitest run` → **1503/1503 green** (108 files, +8 νέα, καμία regression).
+Το route SAAS-gated (404 off)· ο assembler είναι pure + import-free ⇒ `SAAS_MODE` off / default
+tenant = **zero effect**. Κανένας Docker rebuild (additive gated route + PURE module, μηδέν shared
+runtime wiring — type-check+tests καλύπτουν)· καμία νέα εξάρτηση· κανένα feature route/data-db/
+User-path/bearer-path αγγίχτηκε. Collision guard: staging καθαρό, μόνο τα 3 δικά μου paths.
+
+**## Needs Achilleas** (GDPR export πληρότητα):
+- **Per-tenant CONTENT export** (§8): το account export καλύπτει την login identity· το ΠΕΡΙΕΧΟΜΕΝΟ
+  ενός workspace (Items/Receipts/…) ζει στην isolated tenant DB και θέλει ξεχωριστό per-workspace
+  export endpoint που αγγίζει την per-tenant connection (`useDb(dbName)`) → χωριστό increment.
+- **Right-to-erasure** (Art. 17): delete/offboarding lifecycle (soft-delete + grace + db-drop)
+  είναι το destructive αντίστοιχο — scaffold-only όταν γίνει, το πραγματικό drop = Needs-Achilleas.
+
+**Next task:** increment 44 — είτε (α) per-tenant content-export scaffold (αγγίζει per-tenant
+connection → προσοχή), είτε (β) account/workspace erasure-request lifecycle (soft, reversible
+grace· destructive purge deferred), είτε (γ) BYO-key AI-dispatch consumption / in-process 6h cron
+(και τα δύο αγγίζουν shared runtime → άδεια), είτε (δ) user-facing workspace-settings UI panels.
