@@ -4,6 +4,43 @@
 (συν μία γραμμή link στο README αν λείπει). Γλώσσα των docs: Αγγλικά (public
 audience). Σημειώσεις εδώ: Ελληνικά, χωρίς παύλες.
 
+## 2026-07-06 (saas.md: πληρες account/verify/reset/password reference + D6 constant-time)
+
+Το git log εδειξε δυο SaaS commits που δεν καλυπτονταν στα docs: `e75cd74` (D6, constant-time
+reset-request response) και το ευρυτερο account/verify/reset/password set, που στο `docs/saas.md`
+υπηρχε μονο ως μια αοριστη προταση («Additional account routes exist for...»), χωρις method/path/
+body/response. Το αντικατεστησα με πληρη τεκμηριωση, διαβαζοντας ολα τα route files (οχι εικασιες).
+
+Τι εγραψα στο saas.md, νεα «### Email verification & password»:
+1. Πινακας 5 endpoints με ακριβη gating/body/response:
+   - `POST /account/verify/request` (AUTH, 24h token, alreadyVerified short-circuit)
+   - `POST /account/verify/confirm` (unauth, single-use, generic 400)
+   - `POST /account/reset/request` (unauth, ALWAYS {ok:true}, **constant-time** D6:
+     RESET_MIN_RESPONSE_MS=500 floor + fire-and-forget email, fast 400 σε malformed)
+   - `POST /account/reset/confirm` (unauth, newPassword ≥ 8, single-use)
+   - `POST /account/password` (AUTH, re-verify current, ιδιο 401 για missing/wrong)
+2. Intro παραγραφος: token = SHA-256 hash only, single-use, invalid/expired → ιδιο generic 400.
+3. Σημειωση οτι reset-confirm + password-change ΔΕΝ force-expire-αρουν sessions (νεο hash ισχυει
+   στο επομενο login) — απο τα route comments.
+4. Dev-scaffold blockquote (devToken μονο εκτος production, fail-closed σε production) + link στο
+   in-doc «SaaS environment variables» section για RESEND_API_KEY/SMTP_URL.
+
+Accuracy: ολες οι τιμες cross-checked με source — MIN_PASSWORD=8 (accountProfile.ts), RESET_TTL_MS=1h
++ VERIFY_TTL_MS=24h (passwordReset.ts/emailVerify.ts), RESET_MIN_RESPONSE_MS=500 (resetTiming.ts,
+hard constant ΟΧΙ env var → καμια αλλαγη στον env πινακα). Καμια εφευρεμενη τιμη.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 0 (balanced, tables-
+only). Internal links (README.md/api.md/configuration.md/self-hosting.md) → 4/4 OK. Διορθωσα ενα
+forward-ref: αρχικα εδειξα configuration.md για RESEND_API_KEY, αλλα το configuration.md ΔΕΝ το
+καλυπτει (grep=0)· το αλλαξα σε in-doc anchor #saas-environment-variables (οπου οντως ζει, γρ.244+262).
+Secret scan (sk_live/sk_test/AUTH_SECRET=/re_) → κανενα literal secret.
+
+Collision guard: `git status --short` πριν το add → μονο `M docs/saas.md` (δικο μου)· staged κενο.
+Stage ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: sync check αν το mobile.md/api.md χρειαζονται mention των reset/verify (μαλλον οχι, ειναι
+SaaS control-plane οχι bearer-API), η stale-forward-ref sweep. Content set παραμενει accurate.
+
 ## 2026-07-01
 
 Πρώτο run της DOCS routine. Το `docs/` είχε μόνο banner assets (banner.png/svg),

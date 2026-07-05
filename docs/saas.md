@@ -180,10 +180,31 @@ signup/login, not a bearer token.
 | `GET` | `/api/saas/account` | — | The caller's own profile: `{ account: { id, email, name, emailVerified, lastLoginAt, createdAt } }`. |
 | `PATCH` | `/api/saas/account` | `{ name?, email? }` | Update display name and/or email. `409` if the new email is taken. |
 
-Additional account routes exist for email verification
-(`/api/saas/account/verify/request`, `/verify/confirm`), password reset
-(`/api/saas/account/reset/request`, `/reset/confirm`), and password change
-(`/api/saas/account/password`).
+### Email verification & password
+
+All of these live under `/api/saas/account/**`. The confirm and reset-request
+routes are **unauthenticated** (the user proves ownership with a one-time token
+from their inbox, or has forgotten their password); the verify-request and
+password-change routes act on the **logged-in** account. Tokens are stored only
+as SHA-256 hashes, are single-use, and an invalid or expired token always returns
+the same generic `400` (no "unknown vs expired" distinction to leak).
+
+| Method | Path | Body | Result |
+| --- | --- | --- | --- |
+| `POST` | `/api/saas/account/verify/request` | — | **Authenticated.** Mints a 24-hour email-verification token for the caller's own account and emails the link. Already-verified accounts short-circuit `200 { ok: true, alreadyVerified: true }` and mint nothing. |
+| `POST` | `/api/saas/account/verify/confirm` | `{ token }` | Unauthenticated. Marks the email verified and clears the token. `200 { ok: true }`, or `400` for a missing/invalid/expired token. |
+| `POST` | `/api/saas/account/reset/request` | `{ email }` | Unauthenticated. Mints a 1-hour reset token and emails the link **only** if the email is registered, but **always** responds `200 { ok: true }`. Anti-enumeration is enforced by body and by time: the response is padded to a fixed floor (`RESET_MIN_RESPONSE_MS`, 500 ms) and the outbound email is fired without awaiting, so a registered email is indistinguishable from an unknown one. A malformed email is a fast `400`. |
+| `POST` | `/api/saas/account/reset/confirm` | `{ token, newPassword }` | Unauthenticated. Sets a fresh password hash (`newPassword` ≥ 8 chars) and clears the token. `200 { ok: true }`, or `400` for a bad password or a missing/invalid/expired token. |
+| `POST` | `/api/saas/account/password` | `{ currentPassword, newPassword }` | **Authenticated.** Re-verifies the current password, then stores a fresh hash (`newPassword` ≥ 8 chars). A missing account and a wrong current password both return the same `401`. |
+
+Neither the reset-confirm nor the password-change route force-expires existing
+sessions; the new hash takes effect on the next login.
+
+> **Dev scaffold:** until a mailer is wired up, the verify- and reset-request
+> routes echo the freshly minted token back as `devToken` **only** outside
+> production. In production an unwired mailer drops the token silently (fail
+> closed), so nothing leaks. See [SaaS environment variables](#saas-environment-variables)
+> for `RESEND_API_KEY` / `SMTP_URL` and the mailer setup.
 
 ### Members and invitations
 
