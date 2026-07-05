@@ -1477,3 +1477,47 @@ compile+logic)· καμία νέα εξάρτηση· κανένα feature route
 suspended (κλείνει τον βρόχο με το status enforcement), είτε (β) BYO-key resolver+storage scaffold
 μόλις οριστεί crypto (Needs-Achilleas), είτε (γ) user-facing workspace-settings UI panels (όλα τα
 read/write APIs έτοιμα — General/Members/Invitations/Activity/Billing[+trial]/Usage — UI-only).
+
+## 2026-07-05 (increment 39 — trial-lapse decision layer: expired trial → suspended, SaaS lifecycle)
+**Built:** επέλεξα το (α) — έκλεισα τον βρόχο του increment 38. Το `evaluateTrial` έλεγε ΑΝ έληξε
+μια δοκιμή, αλλά κανείς δεν αποφάσιζε τι γίνεται: ένας trialing tenant με περασμένο `trialEndsAt`
+έμενε `trialing` για πάντα με πλήρη πρόσβαση. Πρόσθεσα το **decision core** που λέει «αυτή η δοκιμή
+έληξε → πήγαινε σε `suspended`», μια μετάβαση που το υπόλοιπο stack ήδη καταλαβαίνει
+(`workspaceStatusError` μπλοκάρει `suspended`, `statusAuditAction` το logάρει ως
+`workspace.suspended`, owner το ξεκλειδώνει με billing). ΟΛΟ PURE / additive / backward-compatible,
+σε δικά μου SAAS αρχεία:
+- `lib/billing/trialLapse.ts` (νέο, **PURE** — μόνο import το PURE `evaluateTrial`, μηδέν DB/env/
+  Stripe): `LAPSED_TRIAL_STATUS='suspended'` (σκόπιμα `suspended` όχι `canceled` — recoverable
+  dunning hold, ο owner το reactivate-άρει με billing)· `evaluateTrialLapse(input, now?)` →
+  **`TrialLapseDecision`** (`shouldLapse`/`nextStatus`/`reason`): non-trialing → ποτέ (already
+  converted/suspended/…)· trialing+future/open-ended → όχι (open-ended = active by `evaluateTrial`,
+  δεν force-expire-άρεται)· trialing+reached/past → lapse ⇒ `suspended`· `planTrialLapses(rows, now?)`
+  → PURE batch planner που επιστρέφει τα ids προς suspend (skip blank id, tolerant σε garbage input),
+  για future sweep job· `lapsedTrialFilter(now?)` → Mongo filter (`{status:'trialing',
+  trialEndsAt:{$lte:now}}`) ώστε το job να μη φορτώνει ΟΛΟΥΣ τους tenants (open-ended με null end δεν
+  ματσάρει `$lte`-a-Date → συμφωνεί με «open-ended ποτέ δεν lapse»).
+- `lib/billing/trialLapse.test.ts` (νέο) — 10 PURE tests (evaluate: past→suspend/boundary-at-now/
+  future/open-ended/all-non-trialing-statuses/serialized-end· plan: ids-only-filter/skip-blank-id/
+  empty+garbage-input· filter shape).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run trialLapse.test.ts` → **10/10
+green**· full suite `npx vitest run` → **1172/1172 green** (καμία regression, +10 νέα). Το decision
+core είναι PURE· **κανένας external importer** από feature code (η πραγματική μετάβαση = future impure
+cron/job που θα φορτώνει candidates μέσω `lapsedTrialFilter` + θα κάνει `$set status` + audit· αυτό
+είναι μόνο ο decision πυρήνας του). ⇒ `SAAS_MODE` off / default tenant = **zero effect** (κανένα
+Tenant doc, τίποτα καλεί το module). Κανένας Docker rebuild (νέο PURE module, unwired·
+type-check+tests καλύπτουν compile+logic)· καμία νέα εξάρτηση· κανένα feature route/data-db/
+User-path/bearer-path αγγίχτηκε. Άγγιξα μόνο δικά μου SAAS αρχεία (foreign `.claude/launch.json` +
+`.github/workflows` + apps/mobile edits άθικτα).
+
+**## Needs Achilleas** (trial-lapse):
+- **Sweep scheduling**: το decision core είναι έτοιμο αλλά κανένας δεν το τρέχει ακόμα. Μελλοντικό
+  increment: cron/job που κάθε X ώρες κάνει `Tenant.find(lapsedTrialFilter())` → `evaluateTrialLapse`
+  → `$set status:'suspended'` + `recordAudit('workspace.suspended')`. Χρειάζεται απόφαση για τον
+  scheduler (node-cron in-process vs external) + αν θα υπάρχει grace/dunning email πριν το suspend.
+
+**Next task:** increment 40 — είτε (α) ο πραγματικός trial-lapse sweep helper (impure: query via
+`lapsedTrialFilter` + `$set` + audit, flag-guarded, με fixed-`now` injection για test), είτε (β)
+BYO-key resolver+storage scaffold μόλις οριστεί crypto (Needs-Achilleas), είτε (γ) user-facing
+workspace-settings UI panels (όλα τα read/write APIs έτοιμα — General/Members/Invitations/Activity/
+Billing[+trial]/Usage — UI-only).
