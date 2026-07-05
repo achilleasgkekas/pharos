@@ -3,7 +3,16 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 16afcbf -->
-<!-- docker-validated: 63249e6 -->
+<!-- docker-validated: 07250fe -->
+
+## 2026-07-05 (docker-health guard — rebuild μετά από web runtime αλλαγές)
+Unattended health/build guard. **Health πριν:** homepage-mongo `healthy`, homepage-web `Up 3 hours` (OOMKilled=false, όχι restart loop), flaresolverr σταματημένο (καμία μνημονική πίεση). **Disk:** Images 4.412GB, Build Cache 1.069GB (RECLAIMABLE 0B, in-use), Containers reclaimable 79MB.
+
+**Rebuild:** ΝΑΙ. `git diff 63249e6..HEAD -- apps/web` άγγιξε web runtime code (api/v1 auth+subscriptions, lib/anthropic, apiAuth, apiRateLimit, billing/{billingSummary,trial}, mirror, onedrive, tenancy/provision). Ασφαλής χορογραφία: `docker compose build web` (image only, όχι `up --build`) → mongo confirmed healthy → `docker compose up -d web` (recreated, mongo Waiting→Healthy, web Started) → `/login` επέστρεψε **200** στην 1η προσπάθεια → web σταθερό (up, OOMKilled=false, όχι restarting).
+
+**Disk reclaimed:** `docker builder prune -f` → **4.329MB** (μόνο το νέο layer cache· το υπόλοιπο 1GB είναι active/in-use).
+
+**Marker:** docker-validated `63249e6` → **`07250fe`** (HEAD). Staged ΜΟΝΟ PROGRESS.md. Καμία εκκρεμότητα για τον Αχιλλέα από αυτό το run.
 
 ## 2026-07-05 (ui-auditor, 46η σάρωση mobile UI consistency)
 Read-only UI consistency audit web↔mobile. mobile `npx tsc --noEmit` → **EXIT 0**. **Δέλτα από 45η:** `git log --since=2026-07-04 -- apps/mobile/src` = μηδέν commit → βάση αμετάβλητη· confirmation scan.
