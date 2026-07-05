@@ -13,6 +13,12 @@ export async function middleware(req: NextRequest) {
   // signs you in mid-flow — getCurrentUser() alone can't tell those pages apart.
   const headers = new Headers(req.headers);
   headers.set('x-pathname', pathname);
+  // Forward the request host to Server Components / Server Actions so the node-side tenant
+  // resolver (lib/tenancy/request.ts) can derive the tenant from the subdomain / custom
+  // domain. Edge-safe (pure header copy, no Mongo). Harmless when SAAS_MODE is off — nothing
+  // reads it in the self-hosted app.
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host');
+  if (host) headers.set('x-tenant-host', host);
   const pass = () => NextResponse.next({ request: { headers } });
 
   if (claims) {

@@ -16,6 +16,7 @@
 import type { Connection, Model } from 'mongoose';
 import { connectDB } from '@/lib/db';
 import { dbNameFor, type TenantContext } from './context';
+import { currentTenant } from './current';
 
 // Per-database Connection cache, HMR-safe (survives Next.js dev hot reloads) the same way
 // lib/db.ts caches the base connection on globalThis.
@@ -84,4 +85,25 @@ export function tenantModel<T>(conn: Connection, model: Model<T>): Model<T> {
   const existing = conn.models[model.modelName] as Model<T> | undefined;
   if (existing) return existing;
   return conn.model<T>(model.modelName, model.schema);
+}
+
+/**
+ * The tenant-bound version of a feature model for the CURRENT request. This is the single
+ * accessor feature actions use in place of importing a model directly:
+ *
+ *   const R = await currentModel(Receipt);
+ *   await R.find(...); // runs in the current tenant's database
+ *
+ * It reads the ambient tenant from `currentTenant()` (established by `withRequestTenant`),
+ * resolves that tenant's connection, and rebinds the model to it.
+ *
+ * OSS PARITY (critical): for the self-hosted DEFAULT_TENANT — which is what `currentTenant()`
+ * returns whenever no `withTenant` is active (the entire self-hosted app) — `dbNameFor` is
+ * the empty string, `tenantDb` yields the DEFAULT connection, and `tenantModel` returns the
+ * original model UNTOUCHED. So a self-hosted `await currentModel(Receipt)` is `Receipt` with
+ * one cheap `connectDB()` (already required before any query) and nothing else changes.
+ */
+export async function currentModel<T>(model: Model<T>): Promise<Model<T>> {
+  const conn = await tenantDb(currentTenant());
+  return tenantModel(conn, model);
 }
