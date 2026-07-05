@@ -101,6 +101,18 @@ const STEPS: { title: string; desc: string }[] = [
   },
 ];
 
+// Honest tech stack for the audit-minded self-host audience. No mystery box.
+const STACK: { name: string; detail: string; color: string }[] = [
+  { name: 'Next.js 15', detail: 'App Router, React Server Components, server actions, TypeScript strict.', color: 'var(--accent)' },
+  { name: 'MongoDB 7', detail: 'Mongoose 8 ODM, soft-delete trash, time-series price history.', color: 'var(--cyan)' },
+  { name: 'Docker Compose', detail: 'Web, database, and search in one command. Nothing external required.', color: 'var(--purple)' },
+  { name: 'Tailwind CSS v4', detail: 'Dark-first design system, mobile-first, tuned for use over VPN.', color: 'var(--gold)' },
+  { name: 'Zod', detail: 'One schema validates the same data on the server and the client.', color: 'var(--red)' },
+  { name: 'SearXNG', detail: 'A self-hosted metasearch node powers price and product enrichment.', color: 'var(--accent)' },
+  { name: 'Your AI, your call', detail: 'Local Ollama for full privacy, or Anthropic, OpenAI, Gemini, OpenRouter.', color: 'var(--cyan)' },
+  { name: 'No public auth', detail: 'Login-gated, reached over your LAN or VPN. No sign-up, no telemetry.', color: 'var(--purple)' },
+];
+
 const TRUST: { icon: string; color: string; title: string; desc: string }[] = [
   {
     icon: 'code',
@@ -977,6 +989,34 @@ export default function Home() {
               ))}
             </ul>
           </div>
+        </div>
+      </section>
+
+      {/* ── Under the hood (tech stack) ───────────────────── */}
+      <section id="stack" style={{ padding: '48px 0 64px' }}>
+        <div className="container" style={{ maxWidth: 960 }}>
+          <div style={{ textAlign: 'center', marginBottom: 44 }}>
+            <p className="mono" style={{ marginBottom: 12 }}>Under the hood</p>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 700, marginBottom: 14 }}>
+              No mystery box
+            </h2>
+            <p style={{ color: 'var(--text-dim)', maxWidth: 560, margin: '0 auto' }}>
+              Every part of the stack is open and self-contained. Read the code,
+              audit the dependencies, and run the whole thing on your own hardware.
+            </p>
+          </div>
+
+          <ul className="stack-grid">
+            {STACK.map((s) => (
+              <li key={s.name} className="card stack-tile">
+                <span className="stack-name">
+                  <span className="stack-dot" style={{ background: s.color }} aria-hidden="true" />
+                  {s.name}
+                </span>
+                <span className="stack-detail">{s.detail}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

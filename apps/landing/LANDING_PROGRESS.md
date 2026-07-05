@@ -879,3 +879,26 @@ Needs-Achilleas (open, αμεταβλητα):
 - GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/roadmap GitHub links αλλιως 404.
 - Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD/manifest/security.txt).
 - Contact inbox hello@ph-aros.com για waitlist + security reports (το security.txt το δηλωνει· αν θες dedicated security@ πες μου).
+
+## 2026-07-05
+
+Task: (c/e) νεα ενοτητα «Under the hood» (tech stack) — το site ειχε ολα τα sections (hero/preview/features/ai/integrations/mobile/who/trust/self-host/pricing/compare/roadmap/cta/faq/waitlist) + πληρες SEO/PWA/a11y surface, αλλα ΚΑΜΙΑ αναφορα στο stack. Το primary persona ειναι «Homelabbers» (CLAUDE.md): οι self-hosters ελεγχουν το stack ΠΡΙΝ commit-αρουν. Self-contained (μηδεν assets, μηδεν pricing decision, ολα τα facts απο CLAUDE.md tech-stack).
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεο `STACK` constant (8 tiles, ταιριαζει με το «8 modules» motif) + νεα `<section id="stack">` αναμεσα σε #self-host και #pricing (συνεχιζει το technical/audit narrative ακριβως πριν ζητησει λεφτα). Tiles: Next.js 15 (App Router/RSC/server actions/TS strict), MongoDB 7 (Mongoose 8/soft-delete/time-series prices), Docker Compose (web+db+search, ενα command), Tailwind v4, Zod (shared server/client), SearXNG (self-hosted metasearch), «Your AI, your call» (Ollama local η Anthropic/OpenAI/Gemini/OpenRouter), «No public auth» (login-gated LAN/VPN, zero telemetry). Heading «No mystery box».
+- `app/globals.css`: νεες classes `.stack-grid` (4-col -> 2-col <900px -> 1-col <480px) + `.stack-tile`/`.stack-name`/`.stack-dot`/`.stack-detail`, reusing το `.card` base + brand color dots (accent/cyan/purple/gold/red). Μηδεν νεο JS.
+- ScrollSpy/MobileNav ΑΘΙΚΤΑ: το #stack δεν εχει nav anchor (οπως #preview/#numbers/#integrations/#trust/#cta/#waitlist) -> το self-host μενει highlighted καθως το διασχιζεις, graceful, μηδεν breakage.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· ολα 11 routes ○ Static, / αμεταβλητο 2.79 kB / 105 kB First Load JS (CSS + static markup, μηδεν JS impact).
+- Prerendered `.next/server/app/index.html`: FOUND `id="stack"` + «Under the hood» + «No mystery box» + «Next.js 15» + «SearXNG» + «No public auth»· grep '—' στο index.html = **0** (μηδεν em-dash στο served output). Static/markup increment -> επιβεβαιωθηκε στο static output· δεν σηκωσα dev server, δεν αγγιξα το Docker :3000. Docker/web/mobile αθικτα, μηδεν AI call.
+- Collision guard: git status πριν το commit -> foreign `.claude/launch.json` + `apps/mobile/src/screens/*` (modified, ασταγα, αλλων ρουτινων) ΔΕΝ commit — staged μονο page.tsx + globals.css + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) συνεχεια — real app screenshots στα CSS mockups (#preview/#ai/#mobile) οταν υπαρξουν assets· per-plan Offer JSON-LD οταν κλεισουν οι τιμες.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Τελικες τιμες hosted tiers (TBD).
+- GitHub repo public (η mirror) — CTA/self-host/footer/sameAs/roadmap GitHub links αλλιως 404.
+- Επιβεβαιωση ph-aros.com ως domain (SITE_URL σε layout/page/robots/sitemap/JSON-LD/manifest/security.txt).
+- Contact inbox hello@ph-aros.com για waitlist + security reports.
