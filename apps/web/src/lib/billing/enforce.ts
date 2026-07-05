@@ -81,3 +81,34 @@ export function quotaExceededBody(kind: QuotaKind, status: QuotaStatus, plan?: s
 export function quotaExceededResponse(kind: QuotaKind, status: QuotaStatus, plan?: string | null): NextResponse {
   return NextResponse.json(quotaExceededBody(kind, status, plan), { status: 402 });
 }
+
+/**
+ * Translate a thrown `AiQuotaExceededError` (from the AI dispatch's up-front `assertAiQuota`)
+ * into the canonical 402 `quota_exceeded` response — WITHOUT importing the AI-meter module
+ * here (which would pull in the whole tenancy/usage graph). We duck-type on the error's
+ * shape (`code === 'quota_exceeded'` + the quota fields it carries) so a route can do:
+ *
+ *   try { ...runVisionJSON()... } catch (e) {
+ *     const q = aiQuotaResponse(e); if (q) return q; throw e;
+ *   }
+ *
+ * Returns null for any other error so the caller re-throws / handles it normally.
+ */
+export function aiQuotaResponse(err: unknown): NextResponse | null {
+  if (
+    err &&
+    typeof err === 'object' &&
+    (err as { code?: unknown }).code === 'quota_exceeded'
+  ) {
+    const e = err as { plan?: string | null; used?: number; limit?: number | null; remaining?: number | null };
+    const status: QuotaStatus = {
+      used: e.used ?? 0,
+      limit: e.limit ?? null,
+      remaining: e.remaining ?? null,
+      allowed: false,
+      ratio: e.limit && e.limit > 0 ? Math.min(1, (e.used ?? 0) / e.limit) : 1,
+    };
+    return quotaExceededResponse('ai', status, e.plan ?? null);
+  }
+  return null;
+}
