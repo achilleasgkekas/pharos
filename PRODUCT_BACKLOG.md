@@ -6,9 +6,9 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-04 (4η σάρωση planner· +4 candidates P14-P17). Κανένα από τα
-> P1-P13 δεν χτίστηκε ακόμα (τα commits από 2026-07-01 ήταν αποκλειστικά SaaS/billing/landing/
-> mobile-parity/docs από τις builder routines, μηδέν νέο product feature) → όλα ισχύουν.
+> Τελευταία ενημέρωση: 2026-07-05 (5η σάρωση planner· +4 candidates P18-P21). Κανένα από τα
+> P1-P17 δεν χτίστηκε ακόμα (τα commits έως 2026-07-05 ήταν αποκλειστικά SaaS/billing/trial-lapse/
+> landing/mobile-parity/docs/API/tests από τις builder routines, μηδέν νέο product feature) → όλα ισχύουν.
 
 ---
 
@@ -176,6 +176,51 @@ Ranked by value/effort (πρώτο = καλύτερη σχέση αξίας πρ
 - **Module:** Mobile (νέα camera-scan ροή) + Items/Inventory (+ REST `/api/v1` §5, product-lookup helper).
 - **Απόφαση που χρειάζεται:** πηγή lookup (δωρεάν Open Food Facts / UPC DB, ή AI-only χωρίς εξωτερικό API);
   εξαρτάται από το mobile MVP (§6 TODO) — companion feature, όχι blocker;
+
+### P18. Receipt ↔ statement transaction reconciliation (auto-match) — S/M — both (πολύ ψηλό value/effort)
+- **Αξία:** το app έχει ΚΑΙ τις αποδείξεις ΚΑΙ τις χρεώσεις καρτών, αλλά ζουν χωριστά. Ένα auto-match
+  (κατάστημα/ποσό/ημερομηνία ±μέρες) που συνδέει μια απόδειξη με τη συναλλαγή του statement κλείνει τον
+  κύκλο: «αυτή η €287 χρέωση ΚΩΤΣΟΒΟΛΟΣ = αυτή η απόδειξη» + flag «χρεώσεις χωρίς απόδειξη» και
+  «αποδείξεις που δεν βρέθηκαν σε statement». Πιάνει διπλοχρεώσεις/λάθος χρεώσεις και δίνει πλήρη
+  εικόνα ανά αγορά. Reuse σχεδόν όλο: το statement έχει ήδη signature/description-normalization + το
+  υπάρχον link-to-item machinery· εδώ γίνεται link-to-receipt. **Διακριτό** από το installment↔item
+  linking (εκεί συνδέεις προϊόν, εδώ την ίδια την απόδειξη-πηγή).
+- **Module:** Statements + Receipts (νέο `matchedReceiptId` + reconciliation view).
+- **Απόφαση που χρειάζεται:** auto-suggest με confirm (πρόταση) ή auto-link πάνω από confidence threshold;
+  ανοχή ημερομηνίας (χρέωση συχνά 1-3 μέρες μετά την αγορά);
+
+### P19. «Safe-to-spend» forward cashflow (τι μένει, όχι τι ξόδεψες) — S/M — both (ψηλό value/effort)
+- **Αξία:** όλα τα σημερινά money views κοιτούν **πίσω** (Reports) ή λιστάρουν events (Calendar). Λείπει
+  το μπροστινό: «αυτόν τον μήνα έχεις €X income − €Y γνωστές μελλοντικές χρεώσεις (δόσεις + recurring
+  bills + subscriptions) = €Z διαθέσιμα». Ένα single «safe-to-spend» νούμερο + mini προβολή επόμενων
+  30/60/90 ημερών. Ο υπολογισμός των μελλοντικών events **υπάρχει ήδη** στο `/calendar` (projected
+  recurring + installments/renewals) — εδώ αθροίζεται σε ένα actionable αριθμό στο homepage/reports.
+  Κλασικό «γιατί μπαίνω κάθε μέρα» feature. **Διακριτό** από P4 (net-worth = στοκ περιουσίας) και P12
+  (goals = αποταμίευση) — εδώ είναι ρευστότητα/discretionary του τρέχοντος κύκλου.
+- **Module:** Reports + Homepage card (reuse calendar projection).
+- **Απόφαση που χρειάζεται:** «income» = μόνο tracked recurring income ή και manual «expected income»;
+  να αφαιρεί και το μέσο μεταβλητό ξόδεμα (median κατηγοριών) ή μόνο τις σταθερές γνωστές χρεώσεις;
+
+### P20. Loyalty / membership card wallet (barcode display στο checkout) — S/M — both (mobile-native)
+- **Αξία:** φυσικό συμπλήρωμα των Vouchers: αποθήκευση καρτών μέλους/επιβράβευσης (super market, καύσιμα,
+  φαρμακείο) με αριθμό + barcode/QR. Στο κινητό, ένα tap δείχνει το barcode fullscreen (max brightness)
+  να το σκανάρει το ταμείο — τέλος το φυσικό πορτοφόλι γεμάτο κάρτες. **Διακριτό από τα Vouchers** (=
+  εκπτωτικά coupons/codes με λήξη) και από το P17 (= scan-to-add-inventory). Καθαρά χρήσιμο, μικρό
+  schema, δίνει στο «hub» έναν λόγο να το ανοίγεις έξω από το σπίτι.
+- **Module:** νέο μικρό module «Cards/Wallet» (ή επέκταση Vouchers) + Mobile barcode render.
+- **Απόφαση που χρειάζεται:** ξεχωριστό module ή tab μέσα στα Vouchers; client-side barcode render
+  (μηδέν εξωτερικό API, μικρή lib) — αποδεκτό στο OSS bundle;
+
+### P21. Document / manual vault στα inventory items — S/M — OSS (κυρίως) (personal-hub differentiator)
+- **Αξία:** το inventory κρατά «τι κατέχω» + αποδείξεις (proof of purchase), αλλά όχι τα **έγγραφα** που
+  συνοδεύουν ένα asset: εγχειρίδια χρήσης (PDF), πιστοποιητικά εγγύησης, φωτο του serial/σειριακού,
+  τιμολόγια service. Ένα attachments slot ανά item (reuse του υπάρχοντος storage/upload/thumbnail
+  pipeline) μετατρέπει το «personal hub» σε πραγματικό αρχείο περιουσίας — βρίσκεις το manual του
+  φούρνου ή την εγγύηση του laptop σε δευτερόλεπτα. **Διακριτό** από P13 (= export bundle για ασφάλιση,
+  παράγει αρχείο) — εδώ είναι το ίδιο το ongoing αποθετήριο εγγράφων ανά είδος.
+- **Module:** Items/Inventory (νέο `attachments[]` στο Item, reuse storage backends + `/api/files`).
+- **Απόφαση που χρειάζεται:** πόσα/τι μέγεθος ανά item (quota, ειδικά για SaaS storage metering);
+  να τραβά αυτόματα το manual μέσω AI/web-search ή μόνο manual upload;
 
 ---
 
