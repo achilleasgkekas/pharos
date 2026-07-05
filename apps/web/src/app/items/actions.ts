@@ -1,10 +1,12 @@
 'use server';
 import { cur } from "@/lib/money";
 import { connectDB } from '@/lib/db';
-import { Item } from '@/models/Item';
-import { Receipt } from '@/models/Receipt';
-import { Statement } from '@/models/Statement';
-import { Task } from '@/models/Task';
+import { Item as ItemModel } from '@/models/Item';
+import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { Statement as StatementModel } from '@/models/Statement';
+import { Task as TaskModel } from '@/models/Task';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { fetchPageText } from '@/lib/scrape';
 import { parseProductFromPage } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
@@ -69,9 +71,11 @@ function parseLinks(raw: string): { label: string; url: string; price: number | 
 }
 
 export async function createItem(formData: FormData) {
+  return withRequestTenant(async () => {
   const raw = Object.fromEntries(formData);
   const { links, tags, ...rest } = ItemFormSchema.parse(raw);
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const parsedLinks = parseLinks(links);
   // When store links carry prices, the headline price is DERIVED (cheapest link) —
   // the manual price field is only a fallback for link-less items.
@@ -83,12 +87,15 @@ export async function createItem(formData: FormData) {
     links: parsedLinks,
   });
   revalidatePath('/items');
+  });
 }
 
 export async function updateItem(id: string, formData: FormData) {
+  return withRequestTenant(async () => {
   const raw = Object.fromEntries(formData);
   const { links, tags, ...rest } = ItemFormSchema.parse(raw);
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const parsedLinks = parseLinks(links);
   const cl = lowestKnownPrice({ links: parsedLinks });
   await Item.findByIdAndUpdate(id, {
@@ -98,10 +105,13 @@ export async function updateItem(id: string, formData: FormData) {
     links: parsedLinks,
   });
   revalidatePath('/items');
+  });
 }
 
 export async function deleteItem(id: string) {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
   // Soft delete → Trash (Settings → Storage & data). Receipt/statement links stay
   // intact so a restore is lossless; purging from the Trash clears them for real.
   await Item.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
@@ -110,6 +120,7 @@ export async function deleteItem(id: string) {
   revalidatePath('/shopping');
   revalidatePath('/receipts');
   revalidatePath('/statements');
+  });
 }
 
 // ─── Product photos ──────────────────────────────────────────────────────
@@ -121,10 +132,12 @@ export async function uploadItemPhotos(
   itemId: string,
   formData: FormData
 ): Promise<{ ok: boolean; added: number; photos: string[]; error?: string }> {
+  return withRequestTenant(async () => {
   const files = formData.getAll('files').filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) return { ok: false, added: 0, photos: [], error: 'No image found' };
 
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, added: 0, photos: [], error: 'Item not found' };
 
@@ -142,11 +155,14 @@ export async function uploadItemPhotos(
   revalidatePath('/items');
   revalidatePath('/shopping');
   return { ok: added > 0, added, photos: [...item.photos], error: added === 0 ? 'Unsupported image type' : undefined };
+  });
 }
 
 /** Remove a product photo (and delete the underlying file). */
 export async function deleteItemPhoto(itemId: string, relativePath: string): Promise<{ ok: boolean; photos: string[] }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, photos: [] };
   item.photos = item.photos.filter((p) => p !== relativePath);
@@ -159,11 +175,14 @@ export async function deleteItemPhoto(itemId: string, relativePath: string): Pro
   revalidatePath('/items');
   revalidatePath('/shopping');
   return { ok: true, photos: [...item.photos] };
+  });
 }
 
 /** Make a photo the cover (move it to the front of the gallery). */
 export async function setItemCover(itemId: string, relativePath: string): Promise<{ ok: boolean; photos: string[] }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, photos: [] };
   item.photos = [relativePath, ...item.photos.filter((p) => p !== relativePath)];
@@ -171,6 +190,7 @@ export async function setItemCover(itemId: string, relativePath: string): Promis
   revalidatePath('/items');
   revalidatePath('/shopping');
   return { ok: true, photos: [...item.photos] };
+  });
 }
 
 const UA =
@@ -318,7 +338,9 @@ async function fillPhotos(item: WithPhotos & { title: string }, targetUrls: stri
 export async function fetchItemPhotos(
   itemId: string
 ): Promise<{ ok: boolean; added: number; photos: string[]; error?: string }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, added: 0, photos: [], error: 'Item not found' };
 
@@ -330,6 +352,7 @@ export async function fetchItemPhotos(
   revalidatePath('/items');
   revalidatePath('/shopping');
   return { ok: added > 0, added, photos: [...item.photos], error: added === 0 ? 'Could not find/download images' : undefined };
+  });
 }
 
 /**
@@ -372,8 +395,10 @@ export async function aiFillItem(itemId: string): Promise<{
   item?: SerializedItem;
   error?: string;
 }> {
+  return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, checked: 0, filled: [], lowest: null, error: 'Product AI-fill is turned off.' };
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, checked: 0, filled: [], lowest: null, error: 'Item not found' };
 
@@ -501,6 +526,7 @@ export async function aiFillItem(itemId: string): Promise<{
         ? 'Web search found nothing usable for this title.'
         : 'Could not read any of the links (bot-protection or offline).',
   };
+  });
 }
 
 /**
@@ -512,6 +538,7 @@ export async function aiFillItem(itemId: string): Promise<{
 export async function aiFillItemsBulk(
   itemIds: string[]
 ): Promise<{ ok: boolean; results: { id: string; ok: boolean; filled: string[]; error?: string }[] }> {
+  return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, results: [] };
   const ids = itemIds.slice(0, 5); // bound wall-time per call (~5 × up-to-30s)
   const results: { id: string; ok: boolean; filled: string[]; error?: string }[] = [];
@@ -524,6 +551,7 @@ export async function aiFillItemsBulk(
     }
   }
   return { ok: true, results };
+  });
 }
 
 /**
@@ -533,8 +561,10 @@ export async function aiFillItemsBulk(
 export async function aiFillSpecs(
   itemId: string
 ): Promise<{ ok: boolean; specs?: string; item?: SerializedItem; error?: string }> {
+  return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, error: 'AI specs is turned off.' };
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, error: 'Item not found' };
 
@@ -560,6 +590,7 @@ export async function aiFillSpecs(
   revalidatePath('/shopping');
   const fresh = await Item.findById(itemId).lean();
   return { ok: true, specs: parsed.specs, item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined };
+  });
 }
 
 /**
@@ -571,8 +602,10 @@ export async function aiFillSpecs(
 export async function aiFillInfo(
   itemId: string
 ): Promise<{ ok: boolean; filled: string[]; item?: SerializedItem; error?: string }> {
+  return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, filled: [], error: 'Product AI is turned off.' };
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, filled: [], error: 'Item not found' };
 
@@ -636,6 +669,7 @@ export async function aiFillInfo(
     item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined,
     error: okCount > 0 ? undefined : webDiscovered ? 'Web search found nothing usable for this title.' : 'Could not read any of the links.',
   };
+  });
 }
 
 function escapeHtml(s: string): string {
@@ -647,7 +681,10 @@ function escapeHtml(s: string): string {
  * into the task's notes — no link back to the item, no mutation of the item.
  */
 export async function convertItemToTask(itemId: string): Promise<{ ok: boolean; taskId?: string; error?: string }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
+  const Task = await currentModel(TaskModel);
   const item = await Item.findById(itemId).lean();
   if (!item) return { ok: false, error: 'Item not found' };
 
@@ -673,6 +710,7 @@ export async function convertItemToTask(itemId: string): Promise<{ ok: boolean; 
   });
   revalidatePath('/tasks');
   return { ok: true, taskId: String(task._id) };
+  });
 }
 
 export type ImportItemResult =
@@ -732,6 +770,7 @@ function lowestKnownPrice(item: { links?: { price?: number | null }[] }): number
  * record the price instead of creating a duplicate.
  */
 export async function importItemFromUrl(url: string, view: ItemView): Promise<ImportItemResult> {
+  return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, error: 'Product import (AI) is turned off.' };
   let page;
   try {
@@ -757,6 +796,7 @@ export async function importItemFromUrl(url: string, view: ItemView): Promise<Im
 
   try {
     await connectDB();
+  const Item = await currentModel(ItemModel);
 
     // Look for an existing item: first by a matching link URL, then by title.
     const targetUrl = normUrl(url);
@@ -812,6 +852,7 @@ export async function importItemFromUrl(url: string, view: ItemView): Promise<Im
   } catch (err) {
     return { ok: false, error: `DB error: ${(err as Error).message}` };
   }
+  });
 }
 
 // ─── Preview-then-approve import ─────────────────────────────────────────────
@@ -832,6 +873,7 @@ export type ItemPreview =
 
 /** Fetch + AI-parse a product URL WITHOUT saving (the preview step). */
 export async function previewItemFromUrl(url: string): Promise<ItemPreview> {
+  return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, error: 'Product import (AI) is turned off.' };
   let page;
   try {
@@ -861,6 +903,7 @@ export async function previewItemFromUrl(url: string): Promise<ItemPreview> {
     })();
 
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const targetUrl = normUrl(url);
   const targetTitle = normTitle(title);
   const all = await Item.find();
@@ -880,6 +923,7 @@ export async function previewItemFromUrl(url: string): Promise<ItemPreview> {
     category: parsed.category || 'other',
     existing: match ? { id: String(match._id), title: match.title } : null,
   };
+  });
 }
 
 /** Save a previewed product (no AI re-parse). Mirrors importItemFromUrl's save path. */
@@ -887,8 +931,10 @@ export async function confirmImportItem(
   data: { url: string; title: string; price: number; store: string; specs: string; category: string },
   view: ItemView
 ): Promise<ImportItemResult> {
+  return withRequestTenant(async () => {
   try {
     await connectDB();
+  const Item = await currentModel(ItemModel);
     const url = data.url;
     const title = (data.title || url).slice(0, 200);
     const store = data.store || 'Source';
@@ -945,27 +991,34 @@ export async function confirmImportItem(
   } catch (err) {
     return { ok: false, error: `DB error: ${(err as Error).message}` };
   }
+  });
 }
 
 export async function addPriceEntry(
   id: string,
   entry: { price: number; store: string; url?: string }
 ) {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
   await Item.findByIdAndUpdate(id, {
     $push: { priceHistory: { ...entry, date: new Date() } },
     $set: { currentPrice: entry.price },
   });
   revalidatePath('/items');
+  });
 }
 
 /** Set (or clear) the target price from the price panel, without opening the form. */
 export async function setItemTarget(id: string, target: number | null): Promise<{ ok: boolean }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
   await Item.findByIdAndUpdate(id, { $set: { targetPrice: target && target > 0 ? target : null } });
   revalidatePath('/items');
   revalidatePath('/shopping');
   return { ok: true };
+  });
 }
 
 /** Log an observed price for an item (manual "I saw it at €X" — also used by the AI
@@ -975,8 +1028,10 @@ export async function logItemPrice(
   price: number,
   store: string
 ): Promise<{ ok: boolean; error?: string }> {
+  return withRequestTenant(async () => {
   if (!(price > 0)) return { ok: false, error: 'Price must be greater than 0' };
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const r = await Item.findByIdAndUpdate(id, {
     $push: { priceHistory: { price, store: store.trim() || 'manual', date: new Date() } },
     $set: { currentPrice: price },
@@ -985,6 +1040,7 @@ export async function logItemPrice(
   revalidatePath('/items');
   revalidatePath('/shopping');
   return { ok: true };
+  });
 }
 
 // ─── Merge duplicate products ────────────────────────────────────────────────
@@ -1013,7 +1069,9 @@ const STATUS_RANK: Record<string, number> = {
  * different titles won't cluster here — the select-mode "Merge" covers those.)
  */
 export async function findDuplicateItems(): Promise<ItemDupGroup[]> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const items = await Item.find({ deletedAt: null })
     .select('title num status currentPrice links photos receiptIds')
     .lean();
@@ -1053,6 +1111,7 @@ export async function findDuplicateItems(): Promise<ItemDupGroup[]> {
   }
   out.sort((a, b) => b.items.length - a.items.length);
   return out;
+  });
 }
 
 /**
@@ -1066,7 +1125,11 @@ export async function mergeItems(
   keepId: string,
   dropIds: string[]
 ): Promise<{ ok: boolean; merged: number; error?: string }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
+  const Receipt = await currentModel(ReceiptModel);
+  const Statement = await currentModel(StatementModel);
   const keep = await Item.findById(keepId);
   if (!keep) return { ok: false, merged: 0, error: 'Item to keep not found' };
   const targets = dropIds.filter((id) => id && id !== keepId);
@@ -1166,6 +1229,7 @@ export async function mergeItems(
   revalidatePath('/receipts');
   revalidatePath('/statements');
   return { ok: true, merged: drops.length };
+  });
 }
 
 // ─── Interactive online price search (pick a shop to track) ──────────────────
@@ -1191,8 +1255,10 @@ export async function searchItemPriceCandidates(
   itemId: string,
   queryOverride?: string
 ): Promise<{ ok: boolean; candidates: PriceCandidate[]; error?: string }> {
+  return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, candidates: [], error: 'Product AI is turned off.' };
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId).lean();
   if (!item) return { ok: false, candidates: [], error: 'Item not found' };
 
@@ -1242,6 +1308,7 @@ export async function searchItemPriceCandidates(
     }
   }
   return { ok: true, candidates };
+  });
 }
 
 /**
@@ -1253,7 +1320,9 @@ export async function addPriceLinks(
   itemId: string,
   picks: { store: string; url: string; price: number; currency?: string }[]
 ): Promise<{ ok: boolean; item?: SerializedItem; added: number; error?: string }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, added: 0, error: 'Item not found' };
 
@@ -1284,6 +1353,7 @@ export async function addPriceLinks(
   revalidatePath('/shopping');
   const fresh = await Item.findById(itemId).lean();
   return { ok: true, added, item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined };
+  });
 }
 
 // ─── Refresh the prices of an item's ALREADY-tracked store links ─────────────
@@ -1305,8 +1375,10 @@ export type PriceRefresh = {
 export async function refreshItemPrices(
   itemId: string
 ): Promise<{ ok: boolean; results: PriceRefresh[]; error?: string }> {
+  return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, results: [], error: 'Product AI is turned off.' };
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, results: [], error: 'Item not found' };
 
@@ -1364,6 +1436,7 @@ export async function refreshItemPrices(
   revalidatePath('/items');
   revalidatePath('/shopping');
   return { ok: true, results };
+  });
 }
 
 /**
@@ -1372,7 +1445,9 @@ export async function refreshItemPrices(
  * store behind it) so the big number always reflects real, tracked prices.
  */
 export async function recomputeAllItemPrices(): Promise<{ ok: boolean; updated: number }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
   const items = await Item.find();
   let updated = 0;
   for (const it of items) {
@@ -1386,4 +1461,5 @@ export async function recomputeAllItemPrices(): Promise<{ ok: boolean; updated: 
   revalidatePath('/items');
   revalidatePath('/shopping');
   return { ok: true, updated };
+  });
 }

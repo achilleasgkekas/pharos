@@ -1,8 +1,10 @@
 import { connectDB } from '@/lib/db';
-import { Receipt } from '@/models/Receipt';
-import { Card } from '@/models/Card';
+import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { Card as CardModel } from '@/models/Card';
 import { isAiReady } from '@/lib/ollama';
 import { getStoreNames } from '@/lib/storeService';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { ReceiptsClient } from './ReceiptsClient';
 import { backfillReceiptThumbs, getEmailInboxCount } from './actions';
 import type { SerializedReceipt, SerializedCard } from '@/types';
@@ -10,7 +12,10 @@ import type { SerializedReceipt, SerializedCard } from '@/types';
 export const dynamic = 'force-dynamic';
 
 async function getData(): Promise<{ receipts: SerializedReceipt[]; cards: SerializedCard[]; ollamaUp: boolean; storeNames: string[]; emailInboxCount: number }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
+  const Card = await currentModel(CardModel);
   // Self-heal thumbnails in the background — never block the page render on it.
   // New uploads generate their thumb at upload time, so this only matters for
   // old/failed ones and can safely catch up on a later load.
@@ -31,6 +36,7 @@ async function getData(): Promise<{ receipts: SerializedReceipt[]; cards: Serial
     storeNames,
     emailInboxCount,
   };
+  });
 }
 
 export default async function ReceiptsPage() {

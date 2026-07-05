@@ -1,8 +1,10 @@
 import { connectDB } from '@/lib/db';
-import { Expense } from '@/models/Expense';
-import { Card } from '@/models/Card';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { Card as CardModel } from '@/models/Card';
 import { isAiReady } from '@/lib/ollama';
 import { getAppSettings } from '@/lib/appSettings';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { serializeExpense } from './lib';
 import { generateDueRecurring } from './actions';
 import { ExpensesClient } from './ExpensesClient';
@@ -11,7 +13,10 @@ import type { SerializedCard } from '@/types';
 export const dynamic = 'force-dynamic';
 
 export async function getExpenseData(kind: 'income' | 'expense') {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Expense = await currentModel(ExpenseModel);
+  const Card = await currentModel(CardModel);
   // Auto-post any due recurring bills/income before reading (idempotent).
   await generateDueRecurring().catch(() => {});
   const [docs, cards, ollamaUp, settings] = await Promise.all([
@@ -54,6 +59,7 @@ export async function getExpenseData(kind: 'income' | 'expense') {
     ollamaUp,
     categories: settings.expenseCategories,
   };
+  });
 }
 
 export default async function ExpensesPage() {

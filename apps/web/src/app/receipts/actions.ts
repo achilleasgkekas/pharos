@@ -1,7 +1,9 @@
 'use server';
 import { connectDB } from '@/lib/db';
-import { Receipt } from '@/models/Receipt';
-import { Item } from '@/models/Item';
+import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { Item as ItemModel } from '@/models/Item';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { saveFile, deleteFile, readFile } from '@/lib/storage';
 import { parseReceipt, parseReceiptText } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
@@ -162,6 +164,7 @@ async function runReceiptParse(bytes: Buffer, ext: string, isPdf: boolean, mode:
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 
 export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
+  return withRequestTenant(async () => {
   const file = formData.get('file');
   if (!file || !(file instanceof File) || file.size === 0) {
     return { ok: false, error: 'No file found' };
@@ -203,6 +206,7 @@ export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
 
   try {
     await connectDB();
+    const Receipt = await currentModel(ReceiptModel);
     const receipt = await Receipt.create({
       store: parsed?.store || 'Unknown store',
       date: safeDate(parsed?.date),
@@ -228,6 +232,7 @@ export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
   } catch (err) {
     return { ok: false, error: `DB error: ${(err as Error).message}` };
   }
+  });
 }
 
 export async function updateReceipt(
@@ -235,7 +240,9 @@ export async function updateReceipt(
   data: z.input<typeof UpdateReceiptSchema>
 ) {
   const parsed = UpdateReceiptSchema.parse(data);
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
   const doc = await Receipt.findByIdAndUpdate(
     id,
     { ...parsed, date: safeDate(parsed.date) },
@@ -247,6 +254,7 @@ export async function updateReceipt(
     void mirrorFileToRemote({ kind: 'receipts', store: doc.store, date: doc.date, total: doc.total, id: doc._id }, doc.filePath);
   }
   revalidatePath('/receipts');
+  });
 }
 
 /** Confirm a receipt fast from Quick-verify: updates only the headline fields
@@ -255,7 +263,9 @@ export async function quickVerifyReceipt(
   id: string,
   fields: { store: string; date: string; total: number; subtotal?: number; vatAmount?: number }
 ): Promise<{ ok: boolean }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
   const doc = await Receipt.findByIdAndUpdate(
     id,
     {
@@ -275,6 +285,7 @@ export async function quickVerifyReceipt(
   }
   revalidatePath('/receipts');
   return { ok: true };
+  });
 }
 
 export type RescanResult = {
@@ -293,7 +304,14 @@ export type RescanResult = {
  * user re-checks the fresh result. Used from the receipt detail + bulk re-scan.
  */
 export async function rescanReceipt(id: string, useOcr: boolean): Promise<RescanResult> {
+  return withRequestTenant(() => rescanReceiptOne(id, useOcr));
+}
+
+/** Internal: assumes the tenant context is already established (called inside a
+ *  `withRequestTenant` by both `rescanReceipt` and `rescanReceiptsBulk`). */
+async function rescanReceiptOne(id: string, useOcr: boolean): Promise<RescanResult> {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
   const receipt = await Receipt.findById(id);
   if (!receipt?.filePath) return { ok: false, aiUsed: false, error: 'Receipt or file not found' };
 
@@ -344,12 +362,14 @@ export async function rescanReceiptsBulk(
   ids: string[],
   useOcr = true
 ): Promise<{ ok: boolean; recovered: number; processed: number }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
   const batch = ids.slice(0, 6); // bound wall-time per call (~6 × up-to-45s)
   let recovered = 0;
   for (const id of batch) {
     try {
-      const r = await rescanReceipt(id, useOcr);
+      const r = await rescanReceiptOne(id, useOcr);
       if (r.ok && r.receipt && (r.receipt.total > 0 || (r.receipt.lineItems?.length ?? 0) > 0)) recovered++;
     } catch {
       // One bad receipt must not abort the batch.
@@ -358,6 +378,7 @@ export async function rescanReceiptsBulk(
   }
   revalidatePath('/receipts');
   return { ok: true, recovered, processed: batch.length };
+  });
 }
 
 /**
@@ -369,7 +390,10 @@ export async function rescanReceiptsBulk(
 export async function addReceiptItemsToLibrary(
   receiptId: string
 ): Promise<{ ok: boolean; created: number; linked: number; error?: string }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
+  const Item = await currentModel(ItemModel);
   const receipt = await Receipt.findById(receiptId);
   if (!receipt) return { ok: false, created: 0, linked: 0, error: 'Receipt not found' };
 
@@ -431,11 +455,14 @@ export async function addReceiptItemsToLibrary(
   revalidatePath('/receipts');
   revalidatePath('/items');
   return { ok: true, created, linked };
+  });
 }
 
 /** Generate missing 1st-page thumbnails for PDF receipts (self-heals old ones). */
 export async function backfillReceiptThumbs(limit = 12): Promise<number> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
   const pending = await Receipt.find({
     fileType: /pdf/i,
     $or: [{ thumbPath: { $exists: false } }, { thumbPath: '' }],
@@ -456,25 +483,32 @@ export async function backfillReceiptThumbs(limit = 12): Promise<number> {
     }
   }
   return done;
+  });
 }
 
 export async function deleteReceipt(id: string) {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
   // Soft delete → Trash (Settings → Storage & data). Files and item links stay
   // intact so a restore brings everything back; purging from the Trash deletes
   // the files and drops the references for real.
   await Receipt.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
   revalidatePath('/receipts');
   revalidatePath('/items');
+  });
 }
 
 /** Mark a receipt as "not a real receipt" (or restore it). Archived ones are
  *  hidden from the list and never counted as failed / re-scan candidates. */
 export async function archiveReceipt(id: string, value: boolean): Promise<{ ok: boolean }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
   await Receipt.updateOne({ _id: id }, { $set: { archived: value } });
   revalidatePath('/receipts');
   return { ok: true };
+  });
 }
 
 // ─── Duplicate detection + merge ─────────────────────────────────────────────
@@ -515,7 +549,9 @@ function dupKey(store: string, date: string | Date | null, total: number): strin
  * so the UI can default to keeping it.
  */
 export async function findDuplicateReceipts(): Promise<DupGroup[]> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
   const receipts = await Receipt.find({ total: { $gt: 0 } })
     .select('store date total verified lineItems itemIds filePath thumbPath fileType aiModel')
     .lean();
@@ -557,6 +593,7 @@ export async function findDuplicateReceipts(): Promise<DupGroup[]> {
   // Biggest/most-valuable clusters first
   out.sort((a, b) => b.receipts.length - a.receipts.length || (b.receipts[0]?.total ?? 0) - (a.receipts[0]?.total ?? 0));
   return out;
+  });
 }
 
 /**
@@ -568,7 +605,10 @@ export async function mergeReceipts(
   keepId: string,
   dropIds: string[]
 ): Promise<{ ok: boolean; merged: number; error?: string }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
+  const Item = await currentModel(ItemModel);
   const keep = await Receipt.findById(keepId);
   if (!keep) return { ok: false, merged: 0, error: 'Receipt to keep not found' };
 
@@ -621,6 +661,7 @@ export async function mergeReceipts(
   revalidatePath('/receipts');
   revalidatePath('/items');
   return { ok: true, merged: drops.length };
+  });
 }
 
 // ─── Email receipt import ────────────────────────────────────────────────────
@@ -651,7 +692,9 @@ export async function getEmailInboxCount(): Promise<number> {
 
 /** Ingest every staged email attachment as a draft receipt, then move it to done/. */
 export async function importEmailInbox(): Promise<{ ok: boolean; imported: number; skipped: number; error?: string }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
   let files: string[];
   try {
     files = (await fs.readdir(EMAIL_INBOX)).filter((f) => INBOX_EXT.test(f));
@@ -715,4 +758,5 @@ export async function importEmailInbox(): Promise<{ ok: boolean; imported: numbe
   }
   revalidatePath('/receipts');
   return { ok: true, imported, skipped };
+  });
 }

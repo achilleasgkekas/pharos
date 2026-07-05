@@ -1,6 +1,8 @@
 'use server';
 import { connectDB } from '@/lib/db';
-import { Expense } from '@/models/Expense';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { saveFile, deleteFile } from '@/lib/storage';
 import { parseExpenseText, parseExpenseImage } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
@@ -99,6 +101,7 @@ export async function scanExpenseImage(formData: FormData): Promise<ScanExpenseR
  *  "continuity" the user asked for: a new ΔΕΗ bill joins the existing ΔΕΗ series). */
 async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string } | null> {
   if (!vKey) return null;
+  const Expense = await currentModel(ExpenseModel);
   const prev = await Expense.findOne({ kind, vendorKey: vKey }).sort({ date: -1 }).lean();
   if (!prev) return null;
   return { category: prev.category, recurring: prev.recurring, recurringCycle: prev.recurringCycle };
@@ -126,7 +129,9 @@ function addCycle(d: Date, cycle: string): Date {
  * latest, so it never duplicates. Called (awaited) on the expenses/income page load.
  */
 export async function generateDueRecurring(): Promise<{ created: number }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Expense = await currentModel(ExpenseModel);
   const recurring = await Expense.find({
     recurring: true,
     recurringCycle: { $nin: ['', null] },
@@ -177,6 +182,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
     revalidatePath('/income');
   }
   return { created };
+  });
 }
 
 export type UploadExpenseResult = { ok: true; id: string; aiUsed: boolean; aiError?: string } | { ok: false; error: string };
@@ -186,6 +192,7 @@ export type UploadExpenseResult = { ok: true; id: string; aiUsed: boolean; aiErr
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 
 export async function uploadExpense(formData: FormData): Promise<UploadExpenseResult> {
+  return withRequestTenant(async () => {
   const file = formData.get('file');
   const kind = asKind(formData.get('kind'));
   if (!file || !(file instanceof File) || file.size === 0) return { ok: false, error: 'No file found' };
@@ -214,6 +221,7 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
 
   try {
     await connectDB();
+    const Expense = await currentModel(ExpenseModel);
     const date = safeDate(parsed?.date);
     const vendor = parsed?.vendor || '';
     const vKey = vendorKey(vendor);
@@ -247,6 +255,7 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
   } catch (err) {
     return { ok: false, error: `Could not save: ${(err as Error).message}` };
   }
+  });
 }
 
 const UpdateSchema = z.object({
@@ -268,8 +277,10 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
   const p = UpdateSchema.safeParse(data);
   if (!p.success) return { ok: false, error: 'Invalid data' };
   const d = p.data;
+  return withRequestTenant(async () => {
   try {
     await connectDB();
+    const Expense = await currentModel(ExpenseModel);
     const date = safeDate(d.date);
     await Expense.updateOne(
       { _id: id },
@@ -297,6 +308,7 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }
+  });
 }
 
 /** Manual entry (no file) — e.g. type in a salary or a cash expense. */
@@ -304,8 +316,10 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
   const p = UpdateSchema.safeParse(data);
   if (!p.success) return { ok: false, error: 'Invalid data' };
   const d = p.data;
+  return withRequestTenant(async () => {
   try {
     await connectDB();
+    const Expense = await currentModel(ExpenseModel);
     const date = safeDate(d.date);
     const inherited = await inheritFromSeries(d.kind, vendorKey(d.vendor));
     const exp = await Expense.create({
@@ -329,11 +343,14 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }
+  });
 }
 
 export async function deleteExpense(id: string): Promise<{ ok: boolean }> {
+  return withRequestTenant(async () => {
   try {
     await connectDB();
+    const Expense = await currentModel(ExpenseModel);
     // Soft delete → Trash (Settings → Storage & data). Files stay until purge.
     await Expense.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
     revalidatePath('/expenses');
@@ -342,12 +359,15 @@ export async function deleteExpense(id: string): Promise<{ ok: boolean }> {
   } catch {
     return { ok: false };
   }
+  });
 }
 
 /** Re-run the AI on the stored file (text or forced OCR). Returns the updated record. */
 export async function rescanExpense(id: string, useOcr: boolean): Promise<{ ok: boolean; expense?: SerializedExpense; error?: string }> {
+  return withRequestTenant(async () => {
   try {
     await connectDB();
+    const Expense = await currentModel(ExpenseModel);
     const exp = await Expense.findById(id);
     if (!exp || !exp.filePath) return { ok: false, error: 'No file to scan' };
     const { readFile } = await import('@/lib/storage');
@@ -378,4 +398,5 @@ export async function rescanExpense(id: string, useOcr: boolean): Promise<{ ok: 
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }
+  });
 }
