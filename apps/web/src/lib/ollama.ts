@@ -29,7 +29,14 @@ export function getOllamaModel() {
 
 // ─── Generic helpers (reused by receipts, statements, categorization) ───────
 
-function stripFences(raw: string): string {
+/**
+ * Strip markdown code fences before `JSON.parse`. Removes any `` ```json `` opener
+ * (anywhere, not just at the start) and a trailing `` ``` `` at end-of-string, then
+ * trims. NOTE: unlike anthropic/aiProviders `stripFences`, this does NOT remove a
+ * bare leading `` ``` `` (one without the `json` tag) — only the `json`-tagged form.
+ * Exported for tests.
+ */
+export function stripFences(raw: string): string {
   return raw.replace(/```json\s*|```\s*$/g, '').trim();
 }
 
