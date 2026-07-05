@@ -1,27 +1,25 @@
 # Pharos Monitor — STATUS
 
-## 2026-07-04 06:14
+## 2026-07-05 06:14
 
-**Ετυμηγορια: 1 πιθανο προβλημα.** Πεντε απο τις εξι ρουτινες εχουν φρεσκο αποτυπωμα μεσα στον τελευταιο υγιη νυχτερινο κυκλο (συνεχης παλμος 00:12 εως 05:17 με μηχανη ξυπνια). Ο builder εβγαλε pure-lib mirror test coverage (e6c5dfe), ο parity auditor 45η σαρωση (63249e6, νεο ModalSheet item), ο web auditor 46η σαρωση (16afcbf, ουρα 4→2), ο reviewer καθαρισε range 0c010e0..16afcbf (c40e194), ο docker guard validate 63249e6 (f379349, /login 200, mongo healthy). **ΜΟΝΟ ο ui auditor ειναι STALE**: το τελευταιο του `docs(mobile-ui)` ειναι στις 2026-07-03 08:46 (8b3d477, 41η σαρωση), ~21.5 ωρες πισω, και προσπερασε ολοκληρο τον νυχτερινο κυκλο οπου ετρεξαν ολοι οι αλλοι. Δεν ειναι θεμα σβηστης μηχανης (η μηχανη οργωνε ασταματητα 00:12-05:17).
+**Ετυμηγορια: ΟΛΑ ΟΚ.** Και οι εξι ρουτινες εχουν φρεσκο αποτυπωμα μεσα στον τρεχοντα νυχτερινο κυκλο (συνεχης παλμος 00:09 εως 05:12, μηχανη ξυπνια). **Ο ui auditor ανακαμψε**: το προηγουμενο STATUS τον ειχε STALE (~21.5 ωρες), τωρα εχει τρεξει κανονικα (46η σαρωση, 07250fe, 2026-07-05 02:47). Ο builder εβγαλε soft-delete test coverage (a3ee778), ο parity auditor 45η σαρωση full-parity (6ba848d), ο web auditor 47η σαρωση (5667e5b, +1 login→apiError item), ο reviewer καθαρισε range 16afcbf..5667e5b (660b8ea, marker → 5667e5b), ο docker guard rebuild web /login 200 (f79b710, marker → 07250fe).
 
 | routine | τελευταια δραστηριοτητα | OK/STALE | τι εκανε (συντομα) |
 |---|---|---|---|
-| builder (Pharos daily dev) | 2026-07-04 05:17 | OK | pure-lib mirror path-helper test coverage (e6c5dfe), νωριτερα perf saas sparse index (ac35ca3), fix saasGuard invites (388246d) |
-| parity auditor | 2026-07-04 02:48 | OK | 45η σαρωση mobile-parity, νεο ModalSheet item (6 modal dupes + RADIUS.xl), tsc EXIT 0 (63249e6) |
-| ui auditor | 2026-07-03 08:46 | **STALE** | 41η σαρωση mobile-ui, StatementsScreen badge→Badge confirm, tsc EXIT 0 (8b3d477) — καμια εκτοτε |
-| web auditor | 2026-07-04 04:03 | OK | 46η σαρωση web-debt, builder εκλεισε saasGuard-invites + Account sparse-index, ουρα 4→2, tsc EXIT 0 (16afcbf) |
-| reviewer | 2026-07-04 04:33 | OK | range 0c010e0..16afcbf, tsc web+mobile EXIT 0, 1049 tests green, μηδεν regression (c40e194, marker → 16afcbf) |
-| docker guard | 2026-07-04 03:22 | OK | validate 63249e6, rebuild web, /login 200, mongo healthy (f379349, marker → 63249e6) |
+| builder (Pharos daily dev) | 2026-07-05 05:12 | OK | soft-delete hideDeleted hook + plugin wiring test coverage 8 tests (a3ee778), νωριτερα rate-limit /api/v1 (8d4ab98), bounded trial window (382ae86) |
+| parity auditor | 2026-07-05 01:16 | OK | 45η σαρωση mobile-parity, full parity confirmed, μηδεν auto-buildable GAP (6ba848d) |
+| ui auditor | 2026-07-05 02:47 | OK | 46η σαρωση mobile-ui, confirmation + token layer καθαρος, ModalSheet top buildable (07250fe) — ΑΝΑΚΑΜΨΕ απο STALE |
+| web auditor | 2026-07-05 04:04 | OK | 47η σαρωση web-debt, v1 πληρως καθαρη tsc EXIT 0, +1 P3/S item (login→apiError) (5667e5b) |
+| reviewer | 2026-07-05 04:33 | OK | range 16afcbf..5667e5b, tsc web+mobile EXIT 0, 1142 tests green, μηδεν regression (660b8ea, marker → 5667e5b) |
+| docker guard | 2026-07-05 03:21 | OK | rebuild web μετα api/billing/mirror, /login 200, mongo healthy (f79b710, marker → 07250fe) |
 
 ## Open queue counts
-- Build Queue (MOBILE_PARITY): **4** TODO
+- Build Queue (MOBILE_PARITY): **5** TODO
 - UI Debt Queue (MOBILE_PARITY): **4** TODO
-- Web Debt Queue (WEB_DEBT): **2** TODO
+- Web Debt Queue (WEB_DEBT): **3** TODO
 
-Συγκριση με προηγουμενο STATUS (2026-07-03 06:59: Build 3 / UI 3 / Web 4): **Build 3→4 (+1)**, **UI 3→4 (+1)**, **Web 4→2 (-2)**. Ο parity auditor προσθεσε το ModalSheet item (φουσκωμα κατα 1 σε build/ui, φυσιολογικο), ενω ο builder εκλεισε 2 web items (saasGuard-invites + Account sparse-index). Οι ουρες κινουνται, οχι κολλημενες. Σημ: η UI ουρα μεγαλωσε ενω ο ui auditor ειναι stale, οποτε τα νεα UI items τα γραφει προς το παρον ο parity auditor, οχι ο ui auditor.
+Συγκριση με προηγουμενο STATUS (2026-07-04 06:14: Build 4 / UI 4 / Web 2): **Build 4→5 (+1)**, **UI 4→4 (0)**, **Web 2→3 (+1)**. Ο web auditor προσθεσε το login→apiError item (φυσιολογικο audit output), το Build μεγαλωσε κατα 1, το UI σταθερο. Οι ουρες κινουνται, οχι κολλημενες. Το φουσκωμα ειναι μικρο και αναμενομενο (οι auditors γραφουν, ο builder κλεινει), μηδεν συσσωρευση.
 
 ## Προσοχη
 
-- **ui auditor (STALE, ~21.5 ωρες)**: το τελευταιο footprint `docs(mobile-ui)` ειναι 2026-07-03 08:46 και ελειψε τελειως απο τον νυχτερινο κυκλο 00:12-05:17 οπου χτυπησαν και οι υπολοιποι πεντε. **ΔΕΝ ειναι σβηστη μηχανη** (οι αλλοι 5 ετρεξαν κανονικα). Τι να ελεγξεις: (1) οτι το scheduled task «Ui auditor» ειναι ενεργο και δεν εχει disable/error στο cron· (2) αν κρασαρε σιωπηλα (πχ tsc timeout ή write conflict στο MOBILE_PARITY.md UI Debt Queue)· (3) οτι δεν μπλοκαρεται απο uncommitted WIP στο tree. Δεν επειγει functional (η UI ουρα δεν εχει P1), αλλα αν μεινει stale κι αλλον κυκλο, θελει χειροκινητο τρεξιμο.
-
-Οι υπολοιπες πεντε ρουτινες υγιεις, καμια αλλη προσοχη. Ο reviewer marker (16afcbf) και ο docker marker (63249e6) καλυπτουν σχεδον την κορυφη· ελαχιστο φυσιολογικο lag (e6c5dfe 05:17 εκκρεμει review/validate, θα το πιασει ο επομενος κυκλος).
+Καμια. Και οι εξι ρουτινες υγιεις με αποτυπωμα στον τελευταιο κυκλο. Ο ui auditor που ηταν STALE στο προηγουμενο run εχει ξανατρεξει κανονικα, οποτε το προηγουμενο ζητημα εκλεισε μονο του (ητανε πιθανοτατα ενας χαμενος κυκλος, οχι μονιμο θεμα). Ο reviewer marker (5667e5b) και ο docker marker (07250fe) καλυπτουν σχεδον την κορυφη· ελαχιστο φυσιολογικο lag (a3ee778 05:12 εκκρεμει review/validate, θα το πιασει ο επομενος κυκλος).
