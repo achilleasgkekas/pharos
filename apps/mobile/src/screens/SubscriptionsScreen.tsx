@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, Modal, ActivityIndicator, StyleSheet, Alert } from 'react-native';
-import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Chip, ListItem, contentWidth } from '../ui';
+import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { C } from '../theme';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Chip, ListItem, ModalSheet, contentWidth } from '../ui';
 import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription } from '../api';
 
 const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
@@ -108,9 +108,7 @@ export function SubscriptionsScreen() {
         )}
       />
 
-      <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
-        <Pressable style={s.modalWrap} onPress={() => setEditing(null)}>
-          <Pressable style={s.modal} onPress={() => {}}>
+      <ModalSheet visible={!!editing} onClose={() => setEditing(null)}>
             <Text style={s.modalTitle}>Edit subscription</Text>
             <Text style={s.mlabel}>NAME</Text>
             <Input variant="modal" value={eName} onChangeText={setEName} />
@@ -132,9 +130,7 @@ export function SubscriptionsScreen() {
               <Button label="Save" onPress={saveEdit} />
               <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} variant="danger" />
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </ModalSheet>
     </View>
   );
 }
@@ -150,8 +146,6 @@ const s = StyleSheet.create({
   name: { color: C.text, fontSize: 15, fontWeight: '600' },
   meta: { color: C.faint, fontSize: 12, marginTop: 3 },
   amount: { color: C.text, fontSize: 16, fontWeight: '700' },
-  modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 24 },
-  modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

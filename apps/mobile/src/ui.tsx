@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet, TextInput, type TextInputProps, type StyleProp, type ViewStyle, type TextStyle } from 'react-native';
-import { C, SIZE, RADIUS, SPACE } from './theme';
+import { View, Text, Pressable, ActivityIndicator, StyleSheet, TextInput, Modal, type TextInputProps, type StyleProp, type ViewStyle, type TextStyle } from 'react-native';
+import { C, SIZE, RADIUS, SPACE, scrim } from './theme';
 
 /**
  * Max readable content-column width for the main list/scroll containers. Spread into a
@@ -36,6 +36,34 @@ export function ErrorText({ children }: { children: React.ReactNode }) {
 }
 export function Empty({ children }: { children: React.ReactNode }) {
   return <Text style={s.empty}>{children}</Text>;
+}
+
+type ModalSheetProps = {
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  /** Extra style for the backdrop wrapper (e.g. tighter `padding`). */
+  wrapStyle?: StyleProp<ViewStyle>;
+  /** Extra style for the card (e.g. `maxHeight` for a scrollable body). */
+  cardStyle?: StyleProp<ViewStyle>;
+};
+
+/**
+ * Centered modal card over a dimmed scrim. Tap the backdrop to close; taps on the
+ * card itself are swallowed (inner `Pressable` no-op) so touches don't bubble out.
+ * Unifies the identical `<Modal><Pressable modalWrap><Pressable modal>` scaffold that
+ * was copy-pasted across Subscriptions/Money/Tasks/Items/Vouchers screens.
+ */
+export function ModalSheet({ visible, onClose, children, wrapStyle, cardStyle }: ModalSheetProps) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={[s.modalWrap, wrapStyle]} onPress={onClose}>
+        <Pressable style={[s.modalCard, cardStyle]} onPress={() => {}}>
+          {children}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 }
 
 type InputProps = TextInputProps & { variant?: 'surface' | 'modal' };
@@ -277,4 +305,6 @@ const s = StyleSheet.create({
   inputSurface: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.md, paddingHorizontal: SPACE.md, paddingVertical: 11, color: C.text, fontSize: SIZE.md },
   inputModal: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.sm, paddingHorizontal: SPACE.md, paddingVertical: 10, color: C.text, fontSize: SIZE.md },
   textArea: { textAlignVertical: 'top' },
+  modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: SPACE.xl },
+  modalCard: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.xl, padding: 20 },
 });

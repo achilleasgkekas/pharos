@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { C, scrim } from '../theme';
-import { shortDate, Spinner, ErrorText, Empty, Check, Input, TextArea, Button, IconButton, Card, contentWidth } from '../ui';
+import { C } from '../theme';
+import { shortDate, Spinner, ErrorText, Empty, Check, Input, TextArea, Button, IconButton, Card, ModalSheet, contentWidth } from '../ui';
 import { getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, scanVoucherImage, type Voucher, type ParsedVoucherData } from '../api';
 
 type Draft = { title: string; code: string; store: string; discount: string; expiresAt: string; url: string; used: boolean };
@@ -126,9 +126,7 @@ export function VouchersScreen() {
         )}
       />
 
-      <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
-        <Pressable style={s.modalWrap} onPress={() => setEditing(null)}>
-          <Pressable style={s.modal} onPress={() => {}}>
+      <ModalSheet visible={!!editing} onClose={() => setEditing(null)}>
             <Text style={s.modalTitle}>{isNew ? '✦ New voucher' : 'Edit voucher'}</Text>
             <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
               <Text style={s.mlabel}>TITLE</Text>
@@ -162,13 +160,9 @@ export function VouchersScreen() {
                 <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e && typeof e !== 'string') remove(e); }} variant="danger" />
               )}
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </ModalSheet>
 
-      <Modal visible={showScan} transparent animationType="fade" onRequestClose={() => setShowScan(false)}>
-        <Pressable style={s.modalWrap} onPress={() => setShowScan(false)}>
-          <Pressable style={s.modal} onPress={() => {}}>
+      <ModalSheet visible={showScan} onClose={() => setShowScan(false)}>
             <Text style={s.modalTitle}>✦ Scan a voucher</Text>
             <Pressable onPress={doScanPhoto} disabled={scanBusy} style={[s.photoBtn, scanBusy && s.dim]}>
               <Text style={s.photoText}>📷  Take a photo</Text>
@@ -179,9 +173,7 @@ export function VouchersScreen() {
               <Button label="Fill" onPress={doScanText} disabled={!scanText.trim()} busy={scanBusy} />
               <Button label="Cancel" onPress={() => setShowScan(false)} variant="ghost" />
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </ModalSheet>
     </View>
   );
 }
@@ -199,8 +191,6 @@ const s = StyleSheet.create({
   meta: { color: C.faint, fontSize: 12, marginTop: 4 },
   codeBox: { marginTop: 10, alignSelf: 'flex-start', borderWidth: 1, borderColor: C.borderLight, borderStyle: 'dashed', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   code: { color: C.cyan, fontSize: 15, letterSpacing: 1.5, fontWeight: '700' },
-  modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 24 },
-  modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   rowFields: { flexDirection: 'row', gap: 10 },

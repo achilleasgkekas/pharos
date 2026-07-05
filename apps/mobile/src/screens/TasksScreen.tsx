@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
-import { C, scrim } from '../theme';
-import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Badge, Chip, ListItem, contentWidth } from '../ui';
+import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet, Alert } from 'react-native';
+import { C } from '../theme';
+import { Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Badge, Chip, ListItem, ModalSheet, contentWidth } from '../ui';
 import { getTasks, addTask, setTaskStatus, updateTask, deleteTask, type Task, type TaskStep } from '../api';
 
 const STATUSES = ['todo', 'in-progress', 'blocked', 'done'] as const;
@@ -161,9 +161,7 @@ export function TasksScreen() {
         }}
       />
 
-      <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
-        <Pressable style={s.modalWrap} onPress={() => setEditing(null)}>
-          <Pressable style={s.modal} onPress={() => {}}>
+      <ModalSheet visible={!!editing} onClose={() => setEditing(null)}>
             <Text style={s.modalTitle}>Edit task</Text>
             <Text style={s.label}>TITLE</Text>
             <Input variant="modal" value={editTitle} onChangeText={setEditTitle} />
@@ -201,9 +199,7 @@ export function TasksScreen() {
               <Button label="Save" onPress={saveEdit} disabled={!editTitle.trim()} />
               <Pressable onPress={removeEditing} style={s.del}><Text style={s.delText}>Delete</Text></Pressable>
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </ModalSheet>
     </View>
   );
 }
@@ -233,8 +229,6 @@ const s = StyleSheet.create({
   stepText: { color: C.text, fontSize: 14, flex: 1 },
   stepDel: { color: C.faint, fontSize: 20, paddingHorizontal: 4 },
   stepAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 24 },
-  modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   label: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 14, marginBottom: 6 },
   statuses: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { C, scrim } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem, Chip, contentWidth } from '../ui';
+import { C } from '../theme';
+import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem, Chip, ModalSheet, contentWidth } from '../ui';
 import { getExpenses, addExpense, deleteExpense, updateExpense, rescanExpense, scanExpenseImage, fileSource, type Expense, type ParsedExpenseData } from '../api';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
@@ -193,9 +193,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         )}
       />
 
-      <Modal visible={!!draft} transparent animationType="fade" onRequestClose={() => setDraft(null)}>
-        <Pressable style={s.modalWrap} onPress={() => setDraft(null)}>
-          <Pressable style={s.modal} onPress={() => {}}>
+      <ModalSheet visible={!!draft} onClose={() => setDraft(null)} cardStyle={s.modalMax}>
             <Text style={s.modalTitle}>Scanned {draft?.kind === 'income' ? 'income' : 'bill'}</Text>
             <Text style={s.scanNote}>Check the fields, then add it.</Text>
             <Text style={s.mlabel}>{label.toUpperCase()}</Text>
@@ -211,13 +209,9 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
               <Button label={saving ? 'Adding…' : 'Add'} onPress={saveDraft} disabled={saving} />
               <Button label="Discard" onPress={() => setDraft(null)} variant="danger" />
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </ModalSheet>
 
-      <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
-        <Pressable style={s.modalWrap} onPress={() => setEditing(null)}>
-          <Pressable style={s.modal} onPress={() => {}}>
+      <ModalSheet visible={!!editing} onClose={() => setEditing(null)} cardStyle={s.modalMax}>
             <Text style={s.modalTitle}>Edit</Text>
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               {editing && fileSource(editing.file) && <Image source={fileSource(editing.file)} style={s.bigImg} resizeMode="contain" />}
@@ -266,9 +260,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
               <Button label="Save" onPress={saveEdit} />
               <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} variant="danger" />
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </ModalSheet>
     </View>
   );
 }
@@ -290,8 +282,7 @@ const s = StyleSheet.create({
   meta: { color: C.faint, fontSize: 12, marginTop: 3 },
   amount: { fontSize: 16, fontWeight: '700' },
   anomaly: { color: C.gold, fontSize: 10, fontWeight: '700', backgroundColor: C.surface2, borderWidth: 1, borderColor: C.gold, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
-  modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 24 },
-  modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20, maxHeight: '88%' },
+  modalMax: { maxHeight: '88%' },
   bigImg: { width: '100%', height: 220, borderRadius: 12, backgroundColor: C.surface2, marginTop: 12 },
   rescanBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.border },
   rescanLabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, flex: 1 },

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
-import { C, scrim } from '../theme';
-import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button, Chip, ListItem, contentWidth } from '../ui';
+import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
+import { C } from '../theme';
+import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button, Chip, ListItem, ModalSheet, contentWidth } from '../ui';
 import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
 function verdictMeta(v: Verdict): { label: string; color: string } | null {
@@ -398,9 +398,7 @@ export function ItemsScreen() {
         />
       )}
 
-      <Modal visible={!!editing} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
-        <Pressable style={s.modalWrap} onPress={() => setEditing(null)}>
-          <Pressable style={s.modal} onPress={() => {}}>
+      <ModalSheet visible={!!editing} onClose={() => setEditing(null)} wrapStyle={s.modalPad} cardStyle={s.modalMax}>
             <ScrollView keyboardShouldPersistTaps="handled">
               <Text style={s.modalTitle}>Edit item</Text>
               {detailLoading && <ActivityIndicator color={C.accent} style={{ marginVertical: 14 }} />}
@@ -444,9 +442,7 @@ export function ItemsScreen() {
                 <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} variant="danger" />
               </View>
             </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </ModalSheet>
     </View>
   );
 }
@@ -464,8 +460,8 @@ const s = StyleSheet.create({
   title: { color: C.text, fontSize: 15, fontWeight: '600', marginTop: 2 },
   meta: { color: C.faint, fontSize: 12, marginTop: 2 },
   price: { color: C.accent, fontSize: 16, fontWeight: '700' },
-  modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 20 },
-  modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20, maxHeight: '88%' },
+  modalPad: { padding: 20 },
+  modalMax: { maxHeight: '88%' },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   specs: { minHeight: 64, textAlignVertical: 'top' },
