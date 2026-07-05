@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev", "--prefix", "apps/web"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "landing-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "apps/landing"],
+      "port": 3100,
+      "autoPort": true
     }
   ]
 }
