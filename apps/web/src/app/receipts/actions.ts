@@ -14,6 +14,7 @@ import { safeDate } from '@/lib/dates';
 import { safeRevalidate } from '@/lib/revalidate';
 import { getAppSettings } from '@/lib/appSettings';
 import { mirrorFileToRemote } from '@/lib/mirror';
+import { htmlReceiptToText } from '@/lib/htmlReceipt';
 import { revalidatePath } from 'next/cache';
 import { Types } from 'mongoose';
 import { z } from 'zod';
@@ -75,36 +76,11 @@ type ParseOut = { parsed: Awaited<ReturnType<typeof parseReceipt>>['parsed'] | n
  * - Image           → OCR-first → TEXT model, vision fallback.
  * mode: 'auto' (smart default) · 'ocr' (force OCR) · 'no-ocr' (embedded text / vision).
  */
-/** Strip an HTML email body down to readable text for the TEXT model. */
-function htmlToText(html: string): string {
-  // The store name is often ONLY in the logo's alt text (e.g. <img alt="Plaisio">),
-  // never in the visible body — keep it so the model doesn't hallucinate the store.
-  const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
-  return (title ? `[${title}]\n` : '')
-    .concat(html)
-    .replace(/<(script|style|head)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|tr|li|h[1-6]|td|table)>/gi, '\n')
-    .replace(/<img\b[^>]*\balt=["']([^"']+)["'][^>]*>/gi, ' [logo: $1] ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&euro;/gi, '€')
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n[ \t]*\n+/g, '\n')
-    .trim()
-    .slice(0, 16000); // keep within the text model's context
-}
-
 async function runReceiptParse(bytes: Buffer, ext: string, isPdf: boolean, mode: ParseMode): Promise<ParseOut> {
   try {
     // Email order-confirmation body (.html) → strip to text → TEXT model.
     if (ext === 'html' || ext === 'htm') {
-      const r = await parseReceiptText(htmlToText(bytes.toString('utf8')));
+      const r = await parseReceiptText(htmlReceiptToText(bytes.toString('utf8')));
       return { parsed: r.parsed, raw: r.raw, model: `email-body+${r.model}` };
     }
     if (isPdf) {
