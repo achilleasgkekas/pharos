@@ -1031,3 +1031,25 @@ Mock pattern: ίδιο DB-seam pattern με τα tasks/route + tasks/[id]/route 
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 3 mobile screens (ΔΕΝ τα άγγιξα/staged) + το δικό μου subscriptions/route.test.ts + OSS_PROGRESS.md. Στάγιαρα μόνο τα δικά μου paths.
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας επόμενα: `cards/route.ts` (POST card — limit/last4/kind coercion, ακόμα untested) ή ένα `[id]` route με ουσιαστικά διαφορετικό partial-update (π.χ. `subscriptions/[id]` PATCH, ή `items/[id]` με price/priceHistory, ή `receipts/[id]` με line-items). Ιδανικά κάλυψε ένα route με `boolField` end-to-end (π.χ. active toggle σε subscriptions/[id]). Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-05 (cont. — cards/route.test.ts, POST wiring + trim() serialization defaults)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/cards/route.test.ts` για το GET/POST του `/api/v1/cards` (ένα ακόμα από τα ~50 endpoints του Expo mobile app).**
+
+Επιλογή target: ακολούθησα ρητά το suggested next task του προηγ. entry (πρώτη επιλογή = `cards/route.ts`, POST card, ακόμα untested). Η body coercion ζει στο `cardFieldsFromBody` (ήδη unit-tested μεμονωμένα στο `cardFields.test.ts`), οπότε δεν την ξανα-καλύπτω· αυτό που ζει ΜΟΝΟ στο route (και ένα drift σιωπηλά σπάει το mobile contract) = το wiring: (α) το bearer-auth gate, (β) POST: null `$set` (name missing on create) → `apiError('name required')`· valid body → `Card.create({ ...set, active: true })` + 201 + `trim(doc.toObject())`· κρίσιμο invariant = το route **spread-άρει `active: true` ΜΕΤΑ** το set, οπότε ακόμα κι όταν το body λέει `active:false` το νέο card μπαίνει ενεργό, (γ) GET: το `sort({ active: -1, name: 1 })` order + οι `trim()` serialization DEFAULTS (last4 ''/bank ''/kind 'credit'/type 'other'/color '#00d4ff'/creditLimit 0/notes ''/`active !== false`). ΣΗΜ: το route ΔΕΝ έχει pagination envelope (επιστρέφει `{ cards }`, όχι apiList), απλούστερη GET chain από subscriptions/tasks.
+
+Mock pattern: ίδιο DB-seam pattern με τα προηγ. route tests (`vi.hoisted` + mock `@/lib/db` connectDB + `@/models/User` bearerUser chain + `@/models/Card` find/create). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody helpers. GET chain = self-returning `sort` + `lean` (χωρίς skip/limit/setOptions, αφού δεν paginate)· `Card.create` επιστρέφει doc με `.toObject()`.
+
+Τι έγινε:
+- Νέο `route.test.ts` (12 tests). **auth gate** (2): GET no-token → 401 + no find· POST unknown-token → 401 + no create. **POST** (6): missing name → 400 'name required' + no create· whitespace-only name → ίδιο· valid body → create με `active:true` forced + 201· body `active:false` → ακόμα `active:true` (spread-after invariant)· name-only body → trimmed card με ΟΛΑ τα defaults (exact `toEqual`)· coerced fields passthrough (last4 keeps digits capped-4 'ab12cd34ef'→'1234', creditLimit '3500'→3500). **GET** (4): `{ cards }` envelope με κάθε card trimmed (2 cards, full + defaults, exact `toEqual`)· missing active → true (`active !== false`)· sort `{ active:-1, name:1 }`· empty list → `{ cards: [] }` χωρίς error.
+- **Σημείο που κλειδώθηκε**: το `active: true` force-on-create invariant (ένα reorder σε `{ active:true, ...set }` θα άφηνε το body να απενεργοποιήσει νέα κάρτα) + οι trim() defaults (ένα drift στο `#00d4ff`/`credit`/`other` fallback σπάει το mobile display).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/cards/route.test.ts` → 12/12 passed.
+- `npx vitest run` (όλο το suite) → 79 files, 1162/1162 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 2 deleted `.github/workflows/*.yml` (concurrent routine, ΔΕΝ τα άγγιξα/staged/revert) + 3 mobile screens + το δικό μου cards/route.test.ts + OSS_PROGRESS.md. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας επόμενα: το `cards/[id]/route.ts` PATCH/DELETE (κλείνει το cards ζεύγος, `cardFieldsFromBody(_, true)` partial-mode + soft-delete DELETE) ή ένα route με `boolField` end-to-end (`subscriptions/[id]` active toggle) ή ουσιαστικά διαφορετικό partial-update (`items/[id]` με price/priceHistory, `receipts/[id]` με line-items). Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
