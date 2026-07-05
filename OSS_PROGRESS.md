@@ -1053,3 +1053,28 @@ Mock pattern: ίδιο DB-seam pattern με τα προηγ. route tests (`vi.ho
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `.claude/launch.json` + 2 deleted `.github/workflows/*.yml` (concurrent routine, ΔΕΝ τα άγγιξα/staged/revert) + 3 mobile screens + το δικό μου cards/route.test.ts + OSS_PROGRESS.md. Στάγιαρα μόνο τα δικά μου paths.
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας επόμενα: το `cards/[id]/route.ts` PATCH/DELETE (κλείνει το cards ζεύγος, `cardFieldsFromBody(_, true)` partial-mode + soft-delete DELETE) ή ένα route με `boolField` end-to-end (`subscriptions/[id]` active toggle) ή ουσιαστικά διαφορετικό partial-update (`items/[id]` με price/priceHistory, `receipts/[id]` με line-items). Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-05 (cont. — cards/[id]/route.test.ts, PATCH partial-mode + hard-DELETE, κλείνει το cards ζεύγος)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/cards/[id]/route.test.ts` για το PATCH/DELETE του `/api/v1/cards/:id`.**
+
+Επιλογή target: ακολούθησα ρητά το suggested next task του προηγ. entry (πρώτη επιλογή = `cards/[id]/route.ts`, κλείνει το cards ζεύγος μετά το POST/GET του προηγ. run). Η body coercion ζει στο `cardFieldsFromBody` (ήδη unit-tested στο `cardFields.test.ts`), οπότε δεν την ξανα-καλύπτω· αυτό που ζει ΜΟΝΟ στο route = το wiring: (α) bearer-auth gate, (β) `isObjectId` id guard (malformed → 400 'bad id' χωρίς write), (γ) PATCH partial-mode (`cardFieldsFromBody(b, true)` → το name ΔΕΝ είναι required, σε αντίθεση με POST) + empty `$set` → 400 'no valid fields' + valid → `findByIdAndUpdate(id, {$set}, {new:true})` + bare `{ok:true,id}` + 404 όταν null, (δ) DELETE = **hard** removal (`findByIdAndDelete`, ΟΧΙ soft-delete, καθρεφτίζει το web `deleteCard`).
+
+Κρίσιμα invariants που κλειδώθηκαν:
+- **active toggle divergence**: στο PATCH το `{active:false}` είναι νόμιμο partial write (το partial mode το κρατά), ενώ το POST force-spread-άρει `active:true`. Ένα regression που θα το ευθυγράμμιζε με το POST θα έκανε αδύνατη την απενεργοποίηση κάρτας από το mobile.
+- **hard-delete guard**: το DELETE καλεί `findByIdAndDelete` (όχι `$set deletedAt`). Ένα drift σε soft-delete (όπως στα tasks/[id]) θα άλλαζε σιωπηλά το contract· το test κλειδώνει ρητά το `cardDelete` call + ότι `cardUpdate` ΔΕΝ καλείται.
+- **empty-changeset 400**: all-invalid body (out-of-enum kind, non-boolean active) → κενό set → 400 χωρίς DB touch.
+
+Mock pattern: ίδιο DB-seam pattern με τα προηγ. route tests (`vi.hoisted` + mock `@/lib/db` connectDB + `@/models/User` bearerUser chain + `@/models/Card` findByIdAndUpdate/findByIdAndDelete). Το dynamic route δέχεται `{ params: Promise<{id}> }` → helper `ctx(id)`. findByIdAndUpdate captures (id,update,opts) → `updateState.calls`, επιστρέφει `{ lean: async () => updateState.doc }`· ίδια δομή για το delete.
+
+Τι έγινε: Νέο `[id]/route.test.ts` (13 tests). **auth gate** (2), **id guard** (2), **PATCH** (7: empty→400, all-invalid→400, last4-only valid [name-not-required], full `$set`+trim+{new:true}+{ok,id}, active:false toggle, active:true toggle, 404), **DELETE** (2: hard-remove+{ok,id}, 404).
+
+Τι επαληθεύτηκε:
+- `npx vitest run 'src/app/api/v1/cards/[id]/route.test.ts'` → 13/13 passed.
+- `npx vitest run` (όλο το suite) → 85 files, 1228/1228 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign mods (auth/login/route.ts, billing/enforce.ts, ollama.ts, docs, aiMeter.ts, tenancy/current.ts+test) που ΔΕΝ άγγιξα· στάγιαρα μόνο τα δικά μου cards/[id]/route.test.ts + OSS_PROGRESS.md.
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας επόμενα: ένα route με `boolField` end-to-end (`subscriptions/[id]` active toggle) ή ουσιαστικά διαφορετικό partial-update (`items/[id]` με price/priceHistory, `receipts/[id]` με line-items, `stores/[id]`, `shopping-list/[id]`). Ιδανικά ένα route με πλουσιότερη array/nested coercion. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
