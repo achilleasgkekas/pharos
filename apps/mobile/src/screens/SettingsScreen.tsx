@@ -137,7 +137,7 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
               <View style={s.budgetEdit}>
                 <Text style={s.curSym}>{money(0, currency).replace(/0.*/, '')}</Text>
                 <Input variant="modal" value={val} onChangeText={(t) => setBudgets((p) => ({ ...p, [cat]: t }))} keyboardType="decimal-pad" placeholder="limit" style={{ flex: 1, paddingVertical: 9 }} />
-                <Pressable onPress={() => setBudgets((p) => { const n = { ...p }; delete n[cat]; return n; })} style={s.rm}><Text style={s.rmText}>✕</Text></Pressable>
+                <Pressable onPress={() => setBudgets((p) => { const n = { ...p }; delete n[cat]; return n; })} hitSlop={8} style={s.rm}><Text style={s.rmText}>✕</Text></Pressable>
               </View>
             </View>
           );
@@ -243,7 +243,7 @@ function CardsSection({ currency }: { currency: string }) {
               <Pressable onPress={() => toggle(c)} style={[s.activePill, c.active ? s.activeOn : s.activeOff]}>
                 <Text style={[s.activePillText, c.active ? s.activeOnText : s.activeOffText]}>{c.active ? 'ON' : 'OFF'}</Text>
               </Pressable>
-              <Pressable onPress={() => remove(c)} style={s.rm}><Text style={s.rmText}>✕</Text></Pressable>
+              <Pressable onPress={() => remove(c)} hitSlop={8} style={s.rm}><Text style={s.rmText}>✕</Text></Pressable>
             </View>
           ))
         )}
@@ -333,7 +333,7 @@ function CardEditor({ card, currency, onClose, onSaved }: { card: Card | null; c
             <Text style={[s.flabel, { marginTop: 12 }]}>COLOR</Text>
             <View style={s.chipsRow}>
               {CARD_COLORS.map((col) => (
-                <Pressable key={col} onPress={() => set('color', col)} style={[s.swatch, { backgroundColor: col }, form.color === col && s.swatchOn]} />
+                <Pressable key={col} onPress={() => set('color', col)} hitSlop={6} style={[s.swatch, { backgroundColor: col }, form.color === col && s.swatchOn]} />
               ))}
             </View>
 
@@ -409,7 +409,7 @@ function StoresSection() {
                 </View>
                 {!!st.aliases.length && <Text style={s.cardMeta} numberOfLines={1}>{st.aliases.join(', ')}</Text>}
               </Pressable>
-              <Pressable onPress={() => remove(st)} style={s.rm}><Text style={s.rmText}>✕</Text></Pressable>
+              <Pressable onPress={() => remove(st)} hitSlop={8} style={s.rm}><Text style={s.rmText}>✕</Text></Pressable>
             </View>
           ))
         )}

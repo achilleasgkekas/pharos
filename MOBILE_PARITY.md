@@ -485,7 +485,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - Τα 3 `rm` (✕ remove budget/list/store) Pressables παίρνουν `hitSlop={10}` (ή μεγαλύτερο container) → effective ≥44×44 (τώρα 36×36 raw, χωρίς hitSlop)
   - Το color `swatch` (card-color picker) παίρνει `hitSlop` ή μεγαλύτερο tap area → ≥44×44 (τώρα 32×32)
   - grep: κανένα 36×36/32×32 Pressable στο SettingsScreen χωρίς hitSlop
-- Status: TODO — ΣΗΜ: SettingsScreen έχει uncommitted WIP του Αχιλλέα· attended-preferred μέχρι να γίνει merge/revert. Το «Touch targets ≥44pt» DONE item κάλυψε μόνο τα checkboxes, όχι αυτά τα ✕/swatch buttons.
+- Status: DONE (2026-07-06, pharos-daily-dev) — τα WIP screens του Αχιλλέα έγιναν commit (`6835e6a`), ξεμπλόκαρε. Τα 3 `rm` ✕ Pressables (36×36, γρ.140/246/412) πήραν `hitSlop={8}` → 52×52 effective· το `swatch` (32×32, γρ.336) πήρε `hitSlop={6}` → 44×44 (μικρό hitSlop ώστε να μη γίνεται overlap στο tight `chipsRow` gap:8· benign overlap σε color-picker αποδεκτό). grep: μηδέν 36×36/32×32 tap χωρίς hitSlop. mobile tsc EXIT 0.
 
 ### Modal container primitive (`<ModalSheet>`) + `RADIUS.xl` token
 - Priority: P2
@@ -497,7 +497,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - Νέο `RADIUS.xl = 18` στο `theme.ts`· κανένα `borderRadius: 18` magic literal στα 5 non-WIP modal screens (χρησιμοποιούν `RADIUS.xl` ή το primitive).
   - Νέο `<ModalSheet>` στο `ui.tsx` που ενσωματώνει το byte-identical panel (`surface`/border/`RADIUS.xl`/padding20· optional `maxHeight` prop για Money/Items `'88%'`)· τα 5 τοπικά `modal:` StyleSheet entries σβήνονται.
   - Μηδέν οπτική αλλαγή (byte-identical output στα 5 screens)· mobile `npx tsc --noEmit` EXIT 0.
-- Status: TODO
+- Status: DONE (commit `c9fef1b`, 2026-07-06) — `<ModalSheet>` primitive + `RADIUS.xl=18` εξήχθησαν, 7 modals σε 5 screens μεταναστεύτηκαν.
 
 ### Safe-area insets (bottom + notch) via react-native-safe-area-context
 - Priority: P2
