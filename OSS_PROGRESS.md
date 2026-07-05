@@ -1168,3 +1168,25 @@ Mock pattern: ίδιο DB-seam pattern με το vouchers/route.test.ts (`vi.hoi
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = ΜΟΝΟ το δικό μου expenses/route.test.ts. Στάγιαρα μόνο τα δικά μου paths (route.test.ts + OSS_PROGRESS.md).
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας ακόμα untested collection routes: `stores/route.ts` (alias cleaning), `shopping-list/route.ts`, `receipts/route.ts`. Untested [id] routes: `stores/[id]/route.ts`, `shopping-list/[id]/route.ts`, `statements/[id]/route.ts`, `cards` ήδη καλυμμένα. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-06 (cont.³ — stores/route.test.ts, GET/POST collection route, alias cleaning)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/stores/route.test.ts` για το GET/POST του `/api/v1/stores`.**
+
+Επιλογή target: ακολούθησα ρητά το suggested next task του προηγ. entry (το `stores/route.ts` ήταν πρώτο στη λίστα «untested collection routes», με σημείωση για alias cleaning). Route-only logic που ζει αποκλειστικά εδώ και τροφοδοτεί τον mobile store picker + το receipt store field:
+- **GET**: επιστρέφει `{ stores: [...] }` wrapper (ΟΧΙ το standard list envelope apiList — μηδέν data/total/limit), mapped απευθείας από το `getStores()`, με per-store defaults `url ?? ''` / `aliases ?? []` / `auto ?? false`. Το id είναι το raw `s._id` (ΟΧΙ String()-ed όπως στο POST).
+- **POST**: `name` required (`strField(b,'name','',true)` → blank/whitespace trim → '' → 400 'name required' πριν από κάθε DB touch)· `url` trimmed· `cleanAliases` (δέχεται array Ή comma-string → map String → trim + toLowerCase + filter Boolean)· aliases fallback σε `[name.toLowerCase()]` όταν η καθαρισμένη λίστα είναι κενή· `auto:false`· SPEC `{ store }` wrapper στο 201 (String(_id))· `invalidateStoreCache()` firing ΜΟΝΟ σε successful create (μέσα στο try, μετά το create)· duplicate-name catch → 400 'A store with that name already exists' (χωρίς invalidate, αφού το create throw το προσπερνά).
+
+Mock pattern: ίδιο DB-seam pattern με τα προηγ. route tests, αλλά το GET δεν αγγίζει Store model — περνά από `getStores()`, οπότε mock το `@/lib/storeService` (getStores + invalidateStoreCache) αντί για find/count chain. Επίσης mock `@/lib/db` connectDB + `@/models/User` bearerUser chain + `@/models/Store` create (με flag για throw στο duplicate test). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody helpers (withAuth + strField) + την ΠΡΑΓΜΑΤΙΚΗ cleanAliases (module-local, μέσω του route).
+
+Τι έγινε: Νέο `route.test.ts` (11 tests). **auth gate** (2: GET no-token→401 + getStores untouched, POST unknown-token→401 + no create). **GET listing** (2: `{stores}` wrapper [όχι data/total] + full doc + bare-doc defaults [url '', aliases [], auto false]· empty DB → `{stores:[]}`). **POST validation** (2: missing name→400 'name required' + no create· whitespace name→ίδιο). **POST create** (5: name-only → aliases fallback `[name.toLowerCase()]` + url '' + auto false + `{store}` 201 [no ok/data] + invalidate ×1· url trim + array aliases cleaned [trim/lowercase/drop empties]· comma-string aliases split+cleaned· all-empty aliases input → name fallback· duplicate create throw → 400 'A store with that name already exists' + invalidate NOT called).
+
+Τι επαληθεύτηκε:
+- `npx vitest run 'src/app/api/v1/stores/route.test.ts'` → 11/11 passed.
+- `npx vitest run` (όλο το suite) → 107 files, 1495/1495 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `src/app/receipts/actions.ts` (M) + `src/lib/htmlReceipt.ts`/`htmlReceipt.test.ts` (?? — pre-existing WIP άλλου routine, ΔΕΝ τα άγγιξα/staged) + το δικό μου stores/route.test.ts. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας ακόμα untested collection routes: `shopping-list/route.ts`, `receipts/route.ts`. Untested [id] routes: `stores/[id]/route.ts`, `shopping-list/[id]/route.ts`, `statements/[id]/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
