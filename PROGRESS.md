@@ -4157,3 +4157,27 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 - **Tasks Kanban board** — mobile έχει list + ←/→ quick-move· το board αφέθηκε product decision.
 - **rate-limit 429 backoff στο mobile `api.ts`** — config-gated (`8d4ab98`), off by default· αν ανάψει σε SaaS χρειάζεται client-side backoff/UX decision (P3/S).
 - **ReceiptsScreen compact `cellInput` migration** (qty/net/vat tight grid) — visual delta, attended-preferred (no-simulator verify).
+
+## 2026-07-06 (ui-auditor, 47η σάρωση mobile UI consistency)
+Read-only mobile UI-consistency audit web↔mobile (design tokens / shared theme / reusable components / states / adaptive / touch targets), inventory ξαναχτισμένο από τον κώδικα (live grep, όχι docs read-back). **17 mobile source files** (16 screens + `ui.tsx`), mobile `npx tsc --noEmit` → **EXIT 0**. Working tree στην αρχή **καθαρό** (μόνο τα 2 doc files αγγίχτηκαν).
+
+**Violations ανά διάσταση:**
+- **Tokens:** hardcoded hex εκτός `theme.ts` = **0**, inline rgba/rgb εκτός `theme.ts` = **0**. Μοναδικό magic literal: **1** (`ShoppingScreen.tsx:165` `borderRadius: 18`, ενώ `RADIUS.xl=18` υπάρχει πλέον στο `theme.ts:26`).
+- **Shared theme:** foundation `theme.ts` υπάρχει (C/SPACE/RADIUS/SIZE/scrim/alpha) → **0 gap** (DONE).
+- **Reusable components:** όλα centralized στο `ui.tsx`· εναπομείναν consolidation holdout = **1** (`ShoppingScreen.tsx:112` raw `<Modal fade>` = χειροκίνητο αντίγραφο του `<ModalSheet>`).
+- **Raw `<TextInput>`:** **9**, όλα ReceiptsScreen (6 top-level `einput` + 3 compact `cellInput`).
+- **Touch targets:** **0 violations** (Settings rm/swatch + Receipts lineDel όλα ≥44 με hitSlop μετά το `0ac7a37`).
+- **States (loading/empty/error):** **0** (Spinner/Empty/ErrorText centralized, consistent).
+- **Adaptive/safe-area:** `contentWidth` cap DONE· **1 foundation gap** = `react-native-safe-area-context` ΑΠΟΝ από `package.json` → bottom home-indicator + landscape side-notch ακάλυπτα.
+- **Theme/dark mode:** dark-only, μηδέν light context/toggle (web έχει πλήρες light `:root` + toggle) = **1 needs-decision gap**.
+
+**Δέλτα από 46η:** μηδέν νέο mobile-src commit (τελευταίο = `08ced6d`), αλλά **working tree έγινε καθαρό** → τα πρώην WIP-blocked Receipts/Settings/Shopping έγιναν commit (`6835e6a`/`0ac7a37`), οπότε **ξεμπλόκαραν 2 attended-preferred items**. Επίσης επιβεβαιώθηκε ότι το `RADIUS.xl=18` υπάρχει πλέον (46η το ανέφερε ΑΠΟΝ) και τα Settings rm/swatch touch-targets έκλεισαν.
+
+**Top 3 για τον builder (unattended-safe, non-WIP):**
+1. **ShoppingScreen → `<ModalSheet>` + `RADIUS.xl`** [P3/S]: κλείνει το τελευταίο ModalSheet holdout ΚΑΙ το μοναδικό `borderRadius:18` magic literal, tsc-verifiable, μηδέν rebuild.
+2. **ReceiptsScreen 6× `einput` → `<Input variant="surface">`** [P3/S]: τα 3 compact `cellInput` μένουν attended-preferred (visual delta).
+3. καμία άλλη auto-buildable UI debt· safe-area-context adoption + light/dark theme context = needs-decision (βλ. Needs Achilleas).
+
+### Needs Achilleas
+- **safe-area insets** (`react-native-safe-area-context` ΑΠΟΝ από `package.json`· bottom/notch/landscape ακάλυπτα): P2/M, θέλει dep-add απόφαση.
+- **theme toggle + light/dark context + language switcher** (dark-only, English-only· web έχει πλήρες light `:root` + 8-lang i18n): P3/L.
