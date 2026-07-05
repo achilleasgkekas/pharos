@@ -4117,3 +4117,34 @@ Read-only audit της Next.js web υλοποίησης (έμφαση στο `/a
 ### Needs Achilleas
 - **Reset-request timing** + **getTenantConnection guard**: αμφότερα dead-until-SaaS (`SAAS_MODE` off = μηδέν impact σήμερα)· θέλουν σκόπιμη απόφαση (delivery semantics / rebuild semantics), όχι μηχανικό fix.
 - **v1 data-path tenant-scoping**: το feature data path (`withAuth`→`bearerUser` by `apiToken`) ΔΕΝ είναι tenant-scoped, άρα δεν υπάρχει σημείο να μπει `tenant.status` gate στο v1· εξαρτάται από μεγαλύτερο SaaS data-isolation κομμάτι + read-vs-write product decision.
+
+## 2026-07-06 (mobile-parity-auditor, 46η σάρωση)
+Read-only parity audit web↔mobile, inventory ξαναχτισμένο από τον κώδικα (docs τελευταία). **51 route.ts κάτω από `api/v1`** (login + 50 bearer· **+1 vs 45η**), **51 μοναδικά base paths**, **16 mobile screens**. mobile `tsc --noEmit` → **EXIT 0**. Μηχανικός route↔consumer loop (51 bases vs `apps/mobile/src/api.ts`): και τα 51 έχουν ≥1 consumer → **μηδέν orphan endpoint**.
+
+**Counts: DONE 8 (parity queue 6/6 + Activity + πλέον merge/bind) / auto-buildable functional GAP 0 / NEEDS DECISION 0 νέα.** 46η συνεχόμενη σάρωση με πλήρη functional parity.
+
+**Το +1 route** = `statements/plans/merge` (POST+DELETE), προστέθηκε με το `08ced6d` και **το mobile το καταναλώνει** (`api.ts` `statements/plans/merge` ×2 → `mergePlans`/`unmergePlan`).
+
+**Δέλτα από 45η (`git log --since=2026-07-05 -- apps/mobile/src apps/web/src/app/api/v1`):** 1 feat commit → **`08ced6d`** (`feat(mobile): installment plan merge/bind (last #5 parity gap)`) που **ΕΚΛΕΙΣΕ ΤΟ ΤΕΛΕΥΤΑΙΟ #5 write-op parity gap** (statements merge/bind· ήταν «Needs Achilleas» μέχρι τώρα). Roadmap #5 = 100% ✅. Οι υπόλοιποι commits (`test(api/v1)` receipts/statements/vouchers/merge coverage) = test-only → μηδέν v1 shape change, μηδέν νέο portable feature.
+
+**2 state changes vs 45η:** (α) **working tree ΚΑΘΑΡΟ** — τα πρώην WIP Receipts/Settings/Shopping έγιναν commit (`6835e6a` `<Input>` primitive + `0ac7a37` Settings rm/swatch hitSlop), άρα το προηγούμενο «WIP-blocked» debt ξεμπλόκαρε· (β) «statements merge-bind = Needs Achilleas» ΔΕΝ ισχύει πια (χτίστηκε).
+
+**Raw-`<TextInput>` audit (live grep):** μόνο **ReceiptsScreen 9** (`einput` ×6 + compact `cellInput` ×3) — **τώρα committed/non-WIP** (όχι πια WIP-blocked)· ItemsScreen/SettingsScreen/ShoppingScreen = 0 raw. Working tree στην αρχή: **καθαρό** (μηδέν uncommitted· δεν αγγίχτηκε τίποτα πλην των 2 doc files).
+
+**Ενημερώσεις doc:** νέα re-audit note (46η) στην κορυφή του Build Queue· ενημερώθηκε το UI-Debt «Input primitive» Status (ReceiptsScreen committed → non-WIP, διαθέσιμο)· τεκμηριώθηκε το +1 route.
+
+**Top 3 για τον builder (unattended-safe, non-WIP):**
+1. **ReceiptsScreen `einput`→`<Input>`** — τα 5-6 top-level fields (store/date/pay/total/notes) [P3/S, tsc-verifiable, mobile-only, μηδέν rebuild· άνοιξε τώρα που έγινε commit]. Τα 3 compact `cellInput` (qty/net/vat tight grid) = attended-preferred visual delta.
+2. fresh pure-lib **vitest coverage** — `lib/cards.ts` / `lib/taxonomies.ts normalizeList` / `lib/itemStatus.ts` (καθαρά pure, μηδέν rebuild).
+3. `<Chip>`/`<Badge>`/`<ListItem>` holdout σάρωση για τυχόν εναπομείναντα non-WIP raw clusters (P3/S, tsc-verifiable).
+
+### Needs Achilleas
+- **safe-area insets** (`react-native-safe-area-context` ΑΠΟΝ από package.json· bottom/notch/landscape ακάλυπτα) — P2/M, θέλει dep-add απόφαση.
+- **theme toggle + light/dark context + language switcher** (dark-only, English-only· web έχει πλήρες light `:root` + 8-lang i18n).
+- **Settings: AI engine / storage / OneDrive** panels — δεν υπάρχουν στο mobile (credentials/OAuth boundary).
+- **Statements PDF-import** — θέλει upload endpoint που δεν υπάρχει στο v1 (το merge/bind πλέον ΧΤΙΣΤΗΚΕ, αφαιρέθηκε από τη λίστα).
+- **extra reports charts** — θέλουν RN charting lib.
+- **remote push** — buildable αλλά αδοκίμαστο (EAS dev build + APNs key).
+- **Tasks Kanban board** — mobile έχει list + ←/→ quick-move· το board αφέθηκε product decision.
+- **rate-limit 429 backoff στο mobile `api.ts`** — config-gated (`8d4ab98`), off by default· αν ανάψει σε SaaS χρειάζεται client-side backoff/UX decision (P3/S).
+- **ReceiptsScreen compact `cellInput` migration** (qty/net/vat tight grid) — visual delta, attended-preferred (no-simulator verify).
