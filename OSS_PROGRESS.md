@@ -1124,3 +1124,25 @@ Mock pattern: ίδιο DB-seam pattern με τα προηγ. route tests (`vi.ho
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = ΜΟΝΟ το δικό μου receipts/[id]/route.test.ts. Στάγιαρα μόνο το δικό μου path· commit `2234ab1` pushed καθαρά (fast-forward, no rebase).
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας ακόμα untested [id] routes: `stores/[id]/route.ts`, `shopping-list/[id]/route.ts`, `statements/[id]/route.ts`. Untested collection routes (GET/POST, μόνο το [id] καλύφθηκε): `vouchers/route.ts`, `expenses/route.ts`, `receipts/route.ts`, `stores/route.ts`, `shopping-list/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-06 (cont. — vouchers/route.test.ts, GET/POST collection route, κλείνει το vouchers ζεύγος)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/vouchers/route.test.ts` για το GET/POST του `/api/v1/vouchers`.**
+
+Επιλογή target: ακολούθησα ρητά το suggested next task του προηγ. entry (το `vouchers/route.ts` ήταν πρώτο στη λίστα «untested collection routes, μόνο το [id] καλύφθηκε»). Κλείνει το vouchers ζεύγος μετά το ήδη-καλυμμένο `vouchers/[id]`. Route-only logic που ζει αποκλειστικά εδώ και ένα drift σιωπηλά διαφθείρει το mobile contract:
+- **POST**: `title` required μέσω `strField(b,'title','',true)` (blank/whitespace → trim → '' → 400 'title required' πριν από κάθε DB touch), κάθε άλλο string field trimmed, `expiresAt` **truthiness-gated** (`b.expiresAt ? new Date(...) : null` — falsy/empty/omitted → null, ΟΧΙ key-presence όπως στο PATCH), και το response είναι το SPEC `{ voucher }` wrapper στο 201 (ΟΧΙ list envelope, ΟΧΙ bare `{ok}`). Ένα regression που θα άλλαζε το wrapper ή το title-gate σπάει το mobile create+prefill.
+- **GET**: `used=0` → filter `{ used: { $ne: true } }` (και στα δύο find+count), ο `updatedSince` cursor ανάβει `withDeleted` και στα δύο queries (incremental sync πρέπει να βλέπει soft-deletes), sort `{ expiresAt: 1 }`, list envelope `{ data, total, limit, offset }`, και οι trim() defaults (code/store/discount/url/notes '', used false, deleted from deletedAt).
+
+Mock pattern: ίδιο DB-seam pattern με το subscriptions/route.test.ts (`vi.hoisted` + mock `@/lib/db` connectDB + `@/models/User` bearerUser chain + `@/models/Voucher` find/countDocuments/create). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody/apiList helpers ώστε coercion + serialization αληθινά. find = self-returning chain (sort/skip/limit/setOptions→self, lean→docs), count = thenable με self-returning setOptions, create = doc με `.toObject()` (ο route trims `doc.toObject()`).
+
+Τι έγινε: Νέο `route.test.ts` (14 tests). **auth gate** (2: GET no-token→401 + no find, POST unknown-token→401 + no create). **POST** (6: missing title→400 'title required' + no create· whitespace title→ίδιο· title-only → all-'' defaults + expiresAt null + 201 `{voucher}` [exact toEqual create arg + no ok/data keys]· full body → όλα trimmed + expiresAt Date με σωστό ISO round-trip· empty-string expiresAt → null [truthiness, όχι key-presence]). **GET** (6: list envelope + trim mapping full+bare doc [exact toEqual defaults]· used=0 → `{used:{$ne:true}}` σε find+count· no used → `{}`· sort `{expiresAt:1}`· updatedSince → `$gte` + withDeleted και στα δύο queries· χωρίς cursor → κανένα setOptions· soft-deleted doc → deleted:true).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/vouchers/route.test.ts` → 14/14 passed.
+- `npx vitest run` (όλο το suite) → 101 files, 1415/1415 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `apps/web/SAAS_PROGRESS.md` (concurrent routine, ΔΕΝ το άγγιξα/staged) + το δικό μου vouchers/route.test.ts + OSS_PROGRESS.md. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας ακόμα untested collection routes: `expenses/route.ts` (GET/POST — kind/amount/date coercion), `stores/route.ts` (alias cleaning), `shopping-list/route.ts`, `receipts/route.ts`. Untested [id] routes: `stores/[id]/route.ts`, `shopping-list/[id]/route.ts`, `statements/[id]/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
