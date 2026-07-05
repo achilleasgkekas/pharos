@@ -501,3 +501,36 @@ docs/DOCS_PROGRESS.md.
 
 Επομενο run: enrich `docs/features.md` με screenshot placeholders ανα module, η `docs/contributing-docs.md`
 (docs style + markdown-first convention + link-check). Πρωτα finish-in-progress κανενα (ολα done).
+
+## 2026-07-05 (νεο doc: security.md)
+
+Νεο public-facing `docs/security.md` — security *οδηγος* για operators. Ηταν το κενο του set:
+υπηρχε root `SECURITY.md` (hardening changelog + reporting) + μια συντομη §HTTPS στο self-hosting.md,
+αλλα ΚΑΝΕΝΑ security guide στα docs. Το νεο doc πλαισιωνεται διαφορετικα (δεν διπλωνει το root):
+default threat model, τα δυο auth surfaces, rate limiting, built-in hardening, secrets, network
+exposure, + checklist «πριν το βγαλεις στο internet». Cross-link στο root SECURITY.md για reporting.
+
+Accuracy (διαβασα κωδικα, οχι εικασιες): `lib/apiAuth.ts` (bearerUser → `Authorization: Bearer`,
+`User.findOne({apiToken})`, withAuth 401/500 wrap + rateLimit `u:<id>`), `api/v1/auth/login/route.ts`
+(POST {username,password} → {token,user}, apiToken format `phk_<base64url>` randomBytes(24) on first
+login, login rate-key `login:<ip>`), `lib/apiRateLimit.ts` (config-gated OFF by default, env
+API_RATE_LIMIT + API_RATE_WINDOW_MS default 60000, fixed-window per-process Map, 429 + Retry-After +
+X-RateLimit-*), `.env.example` (AUTH_SECRET/AUTH_COOKIE_SECURE/NEXT_SERVER_ACTIONS_ENCRYPTION_KEY/
+MONGO_PASS/API_RATE_LIMIT). Session layer (middleware JWT/scrypt/jose/AUTH_SECRET) + path-traversal/
+SSRF/upload-cap/CSP/CSV-injection/secret-redaction αντληθηκαν απο το root SECURITY.md (verified against
+its text). Καμια νεα τιμη/env/token εφευρεθηκε· secrets μονο ως placeholder (openssl rand παραδειγμα).
+
+Προσθεσα link στο `docs/README.md` index (νεα «Security» μετα το Configuration).
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence-blocks = 0 (πινακες + inline code μονο,
+balanced). Ολα τα internal .md links resolve (test -e: api/architecture/backup-and-restore/configuration/
+glossary/mobile/self-hosting/updating.md). Anchor-check: διορθωσα `self-hosting.md#environment` →
+`#3-configure-env` (πραγματικο heading «3. Configure .env») + `../SECURITY.md#manual-apply` → drop
+fragment (το πραγματικο slug εχει trailing clause, fragile). `configuration.md#ai-providers` σωστο.
+
+Collision guard: `git status --short` δειχνει προϋπαρχοντα .claude/launch.json + .github/workflows
+(deleted) + apps/mobile/src/screens edits (αλλων ρουτινων, ΔΕΝ τα αγγιξα)· staged κενο πριν το add.
+Stage ΜΟΝΟ docs/security.md + docs/README.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: enrich `docs/features.md` με screenshot placeholders ανα module, η `docs/contributing-docs.md`
+(docs style + markdown-first convention + link-check). Πρωτα finish-in-progress κανενα (ολα done).

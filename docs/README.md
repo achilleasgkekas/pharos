@@ -28,6 +28,9 @@ GitHub today and can feed a docs site later.
 - **[Configuration](configuration.md)** — AI providers, storage backends
   (local/SMB/FTP/OneDrive), notifications (ntfy/Discord/Slack/Telegram/webhook),
   and language (i18n).
+- **[Security](security.md)** — the default threat model, the two auth surfaces
+  (session cookie vs bearer token), rate limiting, built-in hardening, secrets,
+  and the checklist to follow before exposing an instance to the internet.
 - **[Backup & restore](backup-and-restore.md)** — the complete offline dump
   (database + files), automating the nightly `mongodump`, restoring, the in-app
   JSON/CSV exports, the remote storage mirror, and the Trash safety net.
