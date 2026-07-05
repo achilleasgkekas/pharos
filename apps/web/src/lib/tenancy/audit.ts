@@ -28,6 +28,8 @@ export const AUDIT_ACTIONS = [
   'workspace.canceled',
   'workspace.suspended',
   'workspace.reactivated',
+  'ai_key.set',
+  'ai_key.cleared',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

@@ -44,10 +44,22 @@ const TenantSchema = new Schema(
     // BYO-key (TODO §11): this tenant supplies its OWN AI provider key, so their AI calls
     // cost the platform nothing → they are NOT metered against the plan's AI volume and are
     // never blocked on AI quota (effectively unlimited AI). See lib/billing/aiKeyPolicy.ts.
-    // This is only the FLAG; the encrypted key itself is stored/managed separately (TODO
-    // §14 encryption at rest — Needs Achilleas). Default false = use the platform's shared
-    // AI key + normal per-plan metering.
+    // This is only the FLAG; the encrypted key envelope itself lives in `aiKey` below.
+    // Default false = use the platform's shared AI key + normal per-plan metering.
     aiByoKey: { type: Boolean, default: false },
+    // Encrypted-at-rest BYO AI key (D5, TODO §14): the `{ provider, keyEnc }` envelope built
+    // by lib/billing/byoKey (keyEnc is a lib/tenancy/secretCrypto AES-256-GCM ciphertext).
+    // Written ONLY by lib/billing/byoKeyStore, which keeps `aiByoKey` above in lockstep (true
+    // when a key is set, false when cleared). Null = no tenant key → platform key + normal
+    // metering. The plaintext is never stored or logged; decryption happens on-demand in
+    // memory at the AI dispatch site. Optional + null-default ⇒ fully backward-compatible.
+    aiKey: {
+      type: new Schema(
+        { provider: { type: String }, keyEnc: { type: String } },
+        { _id: false }
+      ),
+      default: null,
+    },
   },
   { timestamps: true }
 );

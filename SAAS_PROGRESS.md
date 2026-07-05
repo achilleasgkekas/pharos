@@ -1659,3 +1659,52 @@ commit, οπότε το tree έμεινε καθαρό για staging μόνο �
 shared runtime → άδεια/προσοχή), είτε (β) BYO-key AES-256-GCM resolver+storage scaffold (D5
 RESOLVED: AUTH_SECRET-derived scrypt key· ξεμπλόκαρε), είτε (γ) reset-request timing side-channel
 fix (D6 spec: constant-time response), είτε (δ) user-facing workspace-settings UI panels.
+
+## 2026-07-06 (increment 42 — BYO-key STORAGE + management route, closes D5 wiring)
+**Το κενό:** ο D5 codec (`lib/billing/byoKey.ts`, encode/decode/mask πάνω από AES-256-GCM
+`secretCrypto`) υπήρχε αλλά είχε **μηδέν importers** — τίποτα δεν persist-άρε το encrypted
+`{provider,keyEnc}` envelope, και το `Tenant.aiByoKey` (το flag που διαβάζει το `aiKeyPolicy`
+για metering) γραφόταν «ξεχωριστά» (σχόλιο στο model). Ένας tenant δεν είχε τρόπο να βάλει
+δικό του AI key. Έκλεισα το storage/management loop, ΟΛΟ additive + SaaS-gated:
+- `models/Tenant.ts` (additive edit, control-plane μου) — νέο **`aiKey: {provider, keyEnc}`**
+  subdoc (`_id:false`), default `null`. Γράφεται ΜΟΝΟ από τον store, που κρατά το `aiByoKey`
+  σε lockstep (true όταν υπάρχει key, false όταν clear). Optional + null-default ⇒ πλήρως
+  backward-compatible· self-hosted δεν φτιάχνει Tenant docs → zero effect.
+- `lib/tenancy/audit.ts` (additive edit, δικό μου) — 2 νέες audit actions `ai_key.set` /
+  `ai_key.cleared` (το audit.test «accepts every declared action» τα καλύπτει auto, καμία
+  length assertion → μηδέν breakage).
+- `lib/billing/byoKeyStore.ts` (νέο). **PURE** planners (unit-tested): `planAiKeyUpdate(provider,
+  rawKey)` → `{$set:{aiKey, aiByoKey:true}}` ή null (bad provider/empty key/no-crypto μέσω
+  `encodeAiKey`), `planAiKeyClear()` → `{$set:{aiKey:null, aiByoKey:false}}` — η flag-consistency
+  ζει εδώ. **Impure** thin wrappers (SaaS-gated node paths, ο audit-recorder convention):
+  `setTenantAiKey` (byoKeyReady guard → 503, `updateOne` → not_found, masked result), 
+  `clearTenantAiKey`, `describeTenantAiKey` (masked last-4, ποτέ plaintext), `resolveTenantAiKey`
+  (on-demand decrypt για το AI dispatch site — το επόμενο risky increment το consume-άρει).
+- `app/api/saas/workspace/ai-key/route.ts` (νέο) — GET (masked status + cryptoReady + providers)
+  / PUT `{provider,key}` / DELETE, ΟΛΑ `saasGuard` + `resolveWorkspaceSession(slug, requireManage=
+  true)` (owner/admin only, lifecycle-gated) + audit (provider μόνο στο meta, ποτέ το key).
+  503 όταν AUTH_SECRET unset, 400 invalid, 404 not-found.
+- `lib/billing/byoKeyStore.test.ts` (νέο) — 7 PURE tests: lockstep flag on/off, encrypt-not-
+  plaintext, round-trip decode (trim), όλοι οι 5 providers, invalid provider/empty-key/non-
+  string → null, no-crypto → null.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run` → **1464/1464 green** (105
+files, +7 νέα, καμία regression). External importers του `byoKeyStore` από feature code →
+**κανένας** (μόνο το δικό μου SaaS route)· το route SAAS-gated (404 off). ⇒ `SAAS_MODE` off /
+default tenant = **zero effect** (κανένα Tenant doc, το route δεν mount-άρει, `aiKey` default
+null). Κανένας Docker rebuild (additive gated route + optional model field + PURE module·
+type-check+tests καλύπτουν)· καμία νέα εξάρτηση· κανένα feature route/data-db/User-path/
+bearer-path αγγίχτηκε.
+
+**## Needs Achilleas** (BYO-key go-live):
+- **AI dispatch consumption**: ο `resolveTenantAiKey` είναι έτοιμος αλλά κανείς δεν τον καλεί
+  ακόμα στο AI call site (`lib/ollama.ts` / `aiProviders.ts`). Το wiring αγγίζει shared AI
+  runtime → χωριστό προσεκτικό increment/άδεια (ίδιο caveat με το metering wire `9cb635e`).
+  Μπορεί να διαβάζει tenant από `currentTenant()` (increment 40) → decode → override provider key.
+- **AUTH_SECRET**: χωρίς αυτό η BYO-key storage κάνει 503 (μηδέν crypto)· self-hoster χωρίς mail
+  δεν επηρεάζεται (self-hosted δεν χρησιμοποιεί BYO-key path καθόλου).
+
+**Next task:** increment 43 — είτε (α) BYO-key AI-dispatch consumption (`resolveTenantAiKey` στο
+AI call site μέσω `currentTenant()`, αγγίζει shared runtime → άδεια/προσοχή), είτε (β) in-process
+6h cron registration για τον trial-lapse sweep (bootstrap hook, shared runtime → άδεια), είτε (γ)
+user-facing workspace-settings UI panels (όλα τα read/write APIs έτοιμα, incl. τώρα το ai-key).
