@@ -593,3 +593,36 @@ Collision guard: `git status --short` πριν το add δειχνει `M apps/l
 
 Επομενο run: `docs/contributing-docs.md` (docs style + markdown-first convention + link-check helper),
 η pass για write-response shapes ανα-row (προαιρετικο· η convention τα καλυπτει ηδη ενιαια). Ολα done.
+
+## 2026-07-05 (νεο doc: contributing-docs.md)
+
+Ολο το content set ηταν ηδη writ-ten + accurate (link-check clean, 0 broken .md links, καμια
+stale forward-ref στα content docs — τα 2 grep hits ηταν false positives: Kanban column name
+«In-Progress» στο features.md + query-param `?status=in-progress` στο api.md). Εγραψα λοιπον το
+εναπομειναν suggested doc: **`docs/contributing-docs.md`** — οδηγος συγγραφης της τεκμηριωσης
+(οχι του κωδικα· το root CONTRIBUTING.md καλυπτει code, μολις 2 αναφορες σε docs, μηδεν overlap).
+
+Περιεχομενο: (1) markdown-first / no-build convention (γιατι plain GFM, relative `.md` links,
+anchors)· (2) file-layout table + καν το README index εντρυ οταν προσθετεις guide· (3) style rules
+(English, no em-dashes, accuracy-over-completeness, placeholders-only για secrets, balanced fences)·
+(4) **api.md ↔ routes sync rule** (route files = source of truth· 4-step process + `find` drift-check
+one-liner)· (5) validation helpers copy-paste (link-check loop, fence-parity loop, staged-secret grep)·
+(6) commit discipline (stage-only-own-files, collision guard, no force-push). + README.md index εντρυ.
+
+Accuracy: επιβεβαιωσα (α) root CONTRIBUTING.md δεν καλυπτει docs (grep → μονο 2 casual αναφορες)·
+(β) api.md λεει ηδη «source of truth = route files» (lines 15-22) → το sync-rule ευθυγραμμιζεται·
+(γ) write-response convention (201 `{ <resource> }` / 200 `{ <resource> }` / `{ ok, id }`) ταιριαζει
+με το προηγουμενο api.md accuracy pass. Καμια νεα τιμη/env/endpoint εφευρεθηκε.
+
+Validation: markdown only, κανενα build/Docker/AI call. Link-check ολου του set → 0 BROKEN (νεα
+contributing-docs.md links [configuration#ai-providers, api.md, ../CONTRIBUTING.md] resolve· README
+νεο link → contributing-docs.md resolve). Fence parity contributing-docs.md = 8 (even). Καμια secret
+(τα secret-παραδειγματα ειναι placeholders `<your-secret>`).
+
+Collision guard: `git status --short` πριν το add → μονο `M docs/README.md` + `?? docs/contributing-docs.md`
+(τα δικα μου)· staged κενο, κανενα foreign αρχειο. Stage ΜΟΝΟ docs/contributing-docs.md + docs/README.md
++ docs/DOCS_PROGRESS.md.
+
+Επομενο run: stale-forward-ref sweep ολου του set με grep «(planned)»/«coming soon» (τωρα clean, να
+μεινει clean καθως το app εξελισσεται), η screenshot placeholders οταν υπαρξουν πραγματικες εικονες.
+Ολα τα content docs done + accurate.

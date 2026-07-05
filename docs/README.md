@@ -53,6 +53,9 @@ GitHub today and can feed a docs site later.
 - **[Glossary](glossary.md)** — Pharos-specific terms in plain language: receipt
   status, installment signature/merge, vendorKey series, mirror, local-first,
   tenant/membership, price verdict, and more.
+- **[Contributing to the docs](contributing-docs.md)** — the markdown-first
+  convention, style rules, keeping `api.md` in sync with the route files, the
+  link-check and fence-balance helpers, and the commit discipline.
 
 ## Reference (repo root)
 
