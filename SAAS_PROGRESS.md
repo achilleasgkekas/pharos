@@ -1560,3 +1560,43 @@ Dead-until-SaaS (SAAS_MODE off), οπότε χαμηλή προτεραιότη�
 tenant-scoped) → **αφήνονται για ξεχωριστό design session**. Είναι ολόκληρο το multi-tenancy
 data-isolation μοντέλο (per-tenant DB vs shared-DB-with-tenantId + read-vs-write product decision),
 όχι mechanical. Μη τα ξεκινήσετε unattended· καταγράψτε open questions και προχωρήστε.
+
+## 2026-07-05 (increment 40 — adopt request-scoped tenant store `current.ts` + tests)
+**Το κενό:** untracked `lib/tenancy/current.ts` στο tree — WIP προηγούμενου run που έμεινε
+αδέσποτο (μηδέν importers, μηδέν test, ποτέ commit). Ένα αδέσποτο untracked αρχείο στο δικό μου
+territory μπερδεύει το collision guard **κάθε** επόμενου run, οπότε το προτεραιοποίησα: adopt +
+τεκμηρίωση + tests αντί να κρέμεται. Είναι κι ένα genuinely χρήσιμο primitive — ο **request-scoped
+current-tenant store** (AsyncLocalStorage) που λείπει για να ξέρει deeply-nested κώδικας (AI
+dispatch στο `lib/ollama.ts`, storage writes) σε ποιον tenant τρέχει **χωρίς** threading
+`TenantContext` σε κάθε signature — ακριβώς το prerequisite των «token wiring στα AI call sites»
+Needs-Achilleas items (και το `9cb635e` metering wire μπορεί αργότερα να διαβάζει tenant από εδώ).
+
+**Built:**
+- `lib/tenancy/current.ts` (adopt, NODE-only — `node:async_hooks`): `withTenant(ctx, fn)` (ambient
+  tenant για όλο το async subtree), `currentTenant()` (ambient ή **`DEFAULT_TENANT`** όταν κανείς
+  δεν έκανε `withTenant` → **ΟΛΟ** το self-hosted app· never throws/undefined), `hasTenantContext()`.
+  OSS parity: μόνο SaaS entrypoints καλούν `withTenant`, άρα self-hosted → πάντα `DEFAULT_TENANT`
+  (unmetered/unlimited/zero-DB), byte-for-byte αμετάβλητο, ποτέ δεν αγγίζει το write path.
+- `lib/tenancy/current.test.ts` (νέο) — 9 tests: default-όταν-κανένα-context (OSS path), identity
+  μέσα στο `withTenant`, restore μετά, return passthrough, nesting (inner override → outer restore),
+  carry across async boundaries (await/setTimeout hops), concurrent isolation (overlapping subtrees
+  δεν διαρρέουν), error-unwind (throw → store restored, μηδέν leak).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run current.test.ts` → **9/9 green**·
+full suite → **1237/1237 green** (86 files, καμία regression). Grep για importers του
+`current`/`withTenant`/`currentTenant` από feature code → **κανένας** ⇒ zero runtime wiring,
+`SAAS_MODE` off / default tenant = **zero effect**, κανένας Docker rebuild· καμία νέα εξάρτηση·
+κανένα feature route/data-db/User-path/bearer-path αγγίχτηκε.
+
+**Collision note:** στο `git add`, concurrent OSS routine έκανε ταυτόχρονο `git add`+commit — τα
+`current.ts`+`current.test.ts` παρασύρθηκαν στο commit **`872dd14`** (`test(api): cover cards/[id]…`)
+πριν προλάβω `restore --staged`. Το περιεχόμενο είναι σωστό + **ήδη pushed στο origin/main**· η
+attribution έπεσε στο OSS commit αντί για δικό μου SAAS commit, αλλά ο κώδικας είναι ασφαλής στο
+main. Αυτό το entry το τεκμηριώνει. (Παράλληλα landαρισαν `9cb635e` AI-metering wire + `550f351`
+aiMeter tests + `7273bd8` decisions/login refactor — άλλων routines, δεν αγγίχτηκαν.)
+
+**Next task:** increment 41 — είτε (α) trial-lapse sweep helper (impure: `lapsedTrialFilter` +
+`$set status:'suspended'` + audit, flag-guarded, fixed-`now` injection), είτε (β) SaaS entrypoint
+που κάνει `withTenant(ctx)` ώστε το `9cb635e` metering να διαβάζει τον tenant από `currentTenant()`
+αντί για threading (κλείνει τον βρόχο· αγγίζει AI entrypoint = θέλει προσοχή/άδεια), είτε (γ)
+user-facing workspace-settings UI panels (read/write APIs έτοιμα).
