@@ -1045,3 +1045,46 @@ Needs-Achilleas (open):
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι λειτουργει πριν launch (το noscript fallback +
   ολα τα waitlist paths δειχνουν εκει).
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-06 — (e) polish: surface well-known files in footer + build-stamped sitemap
+
+Task: (e) polish. Το site ειναι ωριμο (17 sections, 11 static routes, JSON-LD Organization/WebSite/
+SoftwareApplication+Offers/FAQPage/HowTo, OG images, manifest, security.txt, humans.txt, reduced-motion,
+noscript waitlist). Εψαξα για πραγματικα self-contained κενα (μηδεν commitment, μηδεν asset, μηδεν
+Achilleas). Βρηκα δυο:
+- Τα standard well-known αρχεια (`/.well-known/security.txt` + `/humans.txt`) υπηρχαν αλλα ΔΕΝ ηταν
+  linked πουθενα -> μη ανακαλυψιμα. Το security contact ειδικα πρεπει να ειναι εμφανες πριν το repo
+  γινει public.
+- Το `app/sitemap.ts` ειχε hardcoded `lastModified = new Date('2026-07-02')` -> stale (σημερα 07-06),
+  και θα εμενε παγωμενο σε καθε μελλοντικο build.
+
+Τι εφτιαξα:
+- `app/page.tsx` (footer Legal column): προσθηκη δυο navlinks — «Security» -> `/.well-known/security.txt`
+  και «Credits» -> `/humans.txt` (target=_blank rel=noopener noreferrer, ιδιο pattern με τα αλλα
+  external footer links· εγκαταλειπουν το SPA). Balance-αρει και τη Legal στηλη (2 -> 4 items, οπως οι
+  αλλες). Μηδεν αλλη αλλαγη στο page.
+- `app/sitemap.ts`: `new Date('2026-07-02')` -> `new Date()` (build-time stamp) + σχολιο. Το sitemap
+  γραφεται στο build, οποτε παντα αντικατοπτριζει το τελευταιο build αντι για stale literal.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· 9+2 routes ○ Static, / = 2.83 kB / 105 kB First Load JS (αμεταβλητο —
+  static markup only).
+- Prerendered `.next/server/app/index.html`: `href="/.well-known/security.txt"` + `href="/humans.txt"`
+  present.
+- `.next/server/app/sitemap.xml.body`: `<lastmod>` πλεον build-stamped ISO timestamp (οχι το 2026-07-02).
+- grep '—' (em-dash) σε page.tsx + sitemap.ts = 0.
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev server στον φακελο· τα preview tools δεν το φτανουν
+  και δεν σηκωνω ανταγωνιστικο)· δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged απο αλλη ρουτινα, μηδεν foreign
+  uncommitted files. Staged μονο τα δικα μου: apps/landing/app/page.tsx + apps/landing/app/sitemap.ts +
+  apps/landing/LANDING_PROGRESS.md.
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots στα CSS mockups οταν υπαρξουν assets·
+annual-billing toggle ΜΟΝΟ αφου ο Achilleas κλεισει ετησιες τιμες.
+
+Needs-Achilleas (open):
+- Annual billing: αν θελει ετησια πληρωμη, να ορισει το discount (π.χ. 2 μηνες δωρεαν) πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι λειτουργει πριν launch (waitlist + noscript +
+  security.txt + νεο footer «Security» link δειχνουν εκει).
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.

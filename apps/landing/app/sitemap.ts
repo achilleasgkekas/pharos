@@ -3,7 +3,8 @@ import type { MetadataRoute } from 'next';
 const SITE_URL = 'https://ph-aros.com';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date('2026-07-02');
+  // Stamped at build time so the sitemap never advertises a stale date.
+  const lastModified = new Date();
   return [
     {
       url: SITE_URL,
