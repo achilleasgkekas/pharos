@@ -241,6 +241,40 @@ Redeeming an invite:
 
 There is also a metering sample endpoint at `/api/saas/usage/sample`.
 
+### Workspace settings
+
+`/api/saas/workspace` is the "General" tab of workspace settings. Gating: 404 when
+SaaS off, 401 when signed out, 403 for the wrong role per method. The `slug` and
+internal `dbName` are immutable routing keys and cannot be changed here.
+
+| Method | Path | Body | Result |
+| --- | --- | --- | --- |
+| `GET` | `/api/saas/workspace` | `?tenant=<slug>` | Workspace details for the settings view. Any active member may read. |
+| `PATCH` | `/api/saas/workspace` | `{ name, tenant? }` | Rename the workspace display name. Owner/admin only. |
+| `DELETE` | `/api/saas/workspace` | `{ tenant? }` | **Soft** cancel only: sets `status:'canceled'`. Owner only. The destructive drop of the tenant's isolated data database is a separate manual flow, never automated. |
+| `POST` | `/api/saas/workspace/reactivate` | `{ tenant? }` | Reverse an owner-initiated soft-cancel (`canceled` → `active`). Owner only. `409` if the workspace is not in the `canceled` state (a `suspended` tenant is a billing hold cleared by paying, not a manual flip). |
+
+### Bring-your-own-key management
+
+`/api/saas/workspace/ai-key` stores a workspace's own encrypted AI provider key so
+its AI calls run on that key (unmetered) instead of the platform's shared key. See
+[Bring-your-own-key AI](#bring-your-own-key-ai-secret-at-rest) for the crypto. All
+three methods are owner/admin only; the plaintext key is never returned, only a
+masked `••••<last 4>` preview. Set/clear operations are written to the audit trail
+(`ai_key.set` / `ai_key.cleared`), recording the provider only, never the key.
+
+| Method | Path | Body | Result |
+| --- | --- | --- | --- |
+| `GET` | `/api/saas/workspace/ai-key` | `?tenant=<slug>` | `{ workspace, configured, key: { provider, masked } \| null, cryptoReady, providers }`. `cryptoReady` is false when `AUTH_SECRET` is unset (secrets cannot be stored); `providers` lists the accepted values. |
+| `PUT` | `/api/saas/workspace/ai-key` | `{ provider, key, tenant? }` | Store or overwrite the key. `200 { configured: true, key: { provider, masked } }`. `400` if the provider is not one of `anthropic`/`openai`/`gemini`/`openrouter`/`custom` or the key is empty; `503 { code: 'crypto_unavailable' }` when `AUTH_SECRET` is unset. |
+| `DELETE` | `/api/saas/workspace/ai-key` | `{ tenant? }` | Remove the key and revert to the platform key. `200 { configured: false }`. |
+
+### Activity (audit)
+
+| Method | Path | Query | Result |
+| --- | --- | --- | --- |
+| `GET` | `/api/saas/audit` | `?tenant=<slug>&action=<verb>&limit=<n>&before=<iso>` | Append-only activity trail for the workspace, newest first (members added/removed, role changes, invites, plan changes, `ai_key` events). Owner/admin only. `limit` is 1..200 (default 50); `before` is an ISO timestamp cursor returning events strictly older than it, for pagination; an unknown `action` applies no filter. The serializer projects whitelisted fields only, so no secret leaks. |
+
 ## SaaS environment variables
 
 These are needed **only** in SaaS mode. Use placeholders; never commit real

@@ -700,3 +700,40 @@ Stage ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
 
 Επομενο run: sync check του features.md/configuration.md με τα ιδια D4/D5 (αν χρειαζεται mention),
 η stale-forward-ref sweep. Content set παραμενει accurate.
+
+## 2026-07-06 (saas.md: workspace + BYO-key management + audit endpoints)
+
+Το προηγουμενο run κατεγραψε το D5 BYO-key **crypto** (secret-at-rest) αλλα οχι το
+**management endpoint** που προστεθηκε στο πιο προσφατο commit `97ca9e7` (BYO-key storage +
+management route). Ελεγξα το control-plane API section: τα workspace routes (`/api/saas/workspace`,
+`.../reactivate`, `.../ai-key`) και το `/api/saas/audit` **δεν** ηταν τεκμηριωμενα σε πινακες.
+Τα προσθεσα, διαβαζοντας τα πραγματικα route files (οχι εικασιες).
+
+Τι εγραψα στο saas.md (3 νεες subsections πριν το env-vars section):
+1. **### Workspace settings** — GET (any member) / PATCH rename (owner-admin) / DELETE soft-cancel
+   `status:'canceled'` (owner only, data-DB drop = ξεχωριστο manual flow) / POST reactivate
+   (owner only, `409` αν οχι σε `canceled`). Πηγη: `app/api/saas/workspace/route.ts` +
+   `workspace/reactivate/route.ts` (slug/dbName immutable, gating απο resolveWorkspaceSession).
+2. **### Bring-your-own-key management** — GET masked status (`configured`/`key`/`cryptoReady`/
+   `providers`), PUT store/overwrite (`400` invalid provider ή empty key, `503 crypto_unavailable`
+   οταν AUTH_SECRET unset), DELETE revert-to-platform-key. Ολα owner/admin, masked-only response,
+   audited (`ai_key.set`/`ai_key.cleared`, provider-only). Link στο υπαρχον BYO-key crypto section.
+   Πηγη: `app/api/saas/workspace/ai-key/route.ts`.
+3. **### Activity (audit)** — GET activity trail, newest-first, owner/admin, `limit` 1..200 def 50,
+   `before` ISO cursor pagination, unknown `action` = no filter, whitelisted serializer. Πηγη:
+   `app/api/saas/audit/route.ts`.
+
+Accuracy: καμια τιμη/env/endpoint εφευρεθηκε. Status codes (400/404/409/503), provider set
+(anthropic/openai/gemini/openrouter/custom), response keys, gating roles, limit bounds ολα
+cross-checked με τον κωδικα. Το BYO-key anchor `#bring-your-own-key-ai-secret-at-rest` ταιριαζει
+με το υπαρχον heading.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 0 (balanced).
+Anchor target present (1). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=)
+→ clean, μονο placeholders. Pipe-escaped `\|` στο union-type cell.
+
+Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: το control-plane API section ειναι πλεον πληρες (ολα τα 24 saas routes καλυμμενα).
+Επομενο = sync check features.md/configuration.md με το BYO-key settings UI (αν εκτεθει στον χρηστη),
+η stale-forward-ref sweep ολου του set.
