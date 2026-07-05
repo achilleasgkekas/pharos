@@ -111,6 +111,16 @@ h1, h2, h3 {
 .navlink:hover {
   color: var(--text);
 }
+/* In-flow text links inside prose (e.g. the Privacy page) */
+.inline-link {
+  color: var(--cyan);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+.inline-link:hover {
+  color: var(--accent);
+}
 /* Scroll-spy: the nav link for the section currently in view (ScrollSpy.tsx) */
 .navlink.nav-active,
 .drawer-link.nav-active {

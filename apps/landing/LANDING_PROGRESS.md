@@ -1088,3 +1088,52 @@ Needs-Achilleas (open):
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι λειτουργει πριν launch (waitlist + noscript +
   security.txt + νεο footer «Security» link δειχνουν εκει).
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-06 — (e) polish: /privacy legal page + footer link
+
+Task: (e) polish. Το site ειναι ωριμο (17 sections, JSON-LD, OG, well-known files). Εψαξα για
+self-contained κενο με πραγματικη αξια (μηδεν asset, μηδεν commitment) και βρηκα ενα ουσιαστικο:
+η Legal στηλη στο footer ειχε License / Security / Credits / FAQ αλλα ΚΑΜΙΑ Privacy Policy. Για paid
+SaaS που μαζευει waitlist emails σε EU (Ελλαδα, GDPR), η δηλωση απορρητου ειναι πραγματικη αναγκη προ
+launch, οχι busywork.
+
+Τι εφτιαξα:
+- `app/privacy/page.tsx` (νεο static route): πληρης Privacy Policy σε plain English, δομημενη γυρω απο
+  το DUAL model — Section 1 «Self-hosted (open source)» ξεκαθαριζει οτι στο self-host ΤΙΠΟΤΑ δεν φτανει
+  σε εμας (no telemetry, local Ollama option, δικα σου backups)· Section 2 «Hosted SaaS» (τι μαζευουμε:
+  account/content/logs/payment via processor, πως δουλευει το AI parsing + BYO-key)· 3 waitlist email,
+  4 GDPR rights, 5 retention/trash, 6 security (link στο security.txt), 7 changes, 8 contact
+  (`hello@ph-aros.com`). Minimal header (PharosMark + back-home), gradient H1, brand palette/vars, `.card`
+  για draft banner. **Draft banner (gold) + `robots:{index:false}`**: το page ειναι honest draft «not yet
+  legal advice, reviewed before hosted launch» και ΔΕΝ μπαινει στο index μεχρι review (safe — draft policy
+  indexed = liability). follow:true ωστε τα links να ακολουθουνται.
+- `app/page.tsx` (footer Legal): προσθηκη `<a href="/privacy">Privacy</a>` αναμεσα σε License και Security
+  (internal SPA link, οχι external). Legal στηλη 4 -> 5 items.
+- `app/globals.css`: νεα `.inline-link` class (cyan underline, hover accent) για in-flow prose links μεσα
+  στο privacy doc — προστεθηκε διπλα στο `.navlink`, μηδεν impact σε υπαρχοντα markup.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· τωρα 10+2 routes ○ Static (νεο `/privacy` 147 B, 103 kB First Load).
+  `/` αμεταβλητο 2.83 kB / 105 kB (μονο ενα footer link).
+- Prerendered `.next/server/app/privacy.html`: «Privacy Policy» + self-host/GDPR + inline-link present.
+- `.next/server/app/index.html`: `href="/privacy"` present στο footer.
+- em-dash check: 0 στα δικα μου (globals.css εχει 3 σε ΠΡΟΫΠΑΡΧΟΝΤΑ comments εκτος edit region).
+  Διορθωσα το ενα em-dash που ειχα σε δικο μου code comment.
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev server στον φακελο — verify μεσω build output,
+  αρκετο για static page)· δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ΤΙΠΟΤΑ staged απο αλλη ρουτινα. Staged μονο τα δικα μου:
+  app/privacy/page.tsx + app/page.tsx + app/globals.css + LANDING_PROGRESS.md.
+
+Επομενο increment: (e) polish συνεχεια — Terms of Service stub (ιδιο pattern με privacy, draft+noindex)
+οταν ο Achilleas το θελησει· real app screenshots στα CSS mockups οταν υπαρξουν assets· annual-billing
+toggle ΜΟΝΟ αφου κλεισουν ετησιες τιμες.
+
+Needs-Achilleas (open):
+- Privacy Policy: review + finalize (ιδιως AI-provider/payment-processor ονοματα + retention windows)
+  ΠΡΙΝ hosted launch, μετα flip `robots:{index:false}` -> indexable + add στο sitemap.
+- Terms of Service: αν θελει ξεχωριστο ToS page, να το πω (draft pattern ετοιμο).
+- Annual billing: αν θελει ετησια πληρωμη, να ορισει το discount πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι λειτουργει πριν launch (waitlist + noscript +
+  security.txt + footer Security + νεο privacy page δειχνουν εκει).
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
