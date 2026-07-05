@@ -477,6 +477,19 @@
 
 ## Web Debt Queue
 
+### auth/login — inline `NextResponse.json({ error })` αντί για τον shared `apiError()` helper (response-shape consistency)
+- Priority: P3
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/v1/auth/login/route.ts
+- Depends on: none
+- Acceptance:
+  - Το `auth/login/route.ts` είναι το μοναδικό v1 route που χτίζει error responses inline (γρ.29 `Invalid JSON body` 400, γρ.33 `username and password required` 400, γρ.38 `Invalid credentials` 401) ενώ κάθε άλλο route χρησιμοποιεί τον shared `apiError(message, status)` (= `NextResponse.json({ error: message }, { status })`). Το shape είναι byte-identical, οπότε ο swap είναι μηχανικός + behavior-identical.
+  - Πρόσθεσε `apiError` στο υπάρχον import (`import { rateLimit, apiError } from '@/lib/apiAuth';`, γρ.6) και αντικατέστησε τα 3 inline `NextResponse.json({ error }, { status })` με `apiError(msg, status)`. Το `NextResponse` παραμένει σε χρήση για το τελικό success response ({ token, user }), άρα δεν μένει dangling import.
+  - Ο swap ΔΕΝ αγγίζει το auth boundary logic (το login μένει σκόπιμα εκτός `withAuth`, μόνο η error-shape ενοποιείται)· rate-limit gate, JSON-parse guard, credential check, token-mint αμετάβλητα.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-05, 47η σάρωση· live: `auth/login/route.ts` γρ.29/33/38 inline error-json, import γρ.6 δεν φέρνει `apiError`)
+
 ### Tenant `status:'canceled'`/`'suspended'` δεν επιβάλλεται πουθενά → soft-cancel/dunning ΔΕΝ μπλοκάρει πρόσβαση
 - Priority: P2
 - Size: M

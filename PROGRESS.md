@@ -3995,3 +3995,31 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 - **remote push** — buildable αλλά αδοκίμαστο (EAS dev build + APNs key).
 - **Tasks Kanban board** — mobile έχει list + ←/→ quick-move· το board αφέθηκε product decision.
 - **ReceiptsScreen Input-debt** (9 raw `<TextInput>`) — WIP του Αχιλλέα κρατά το screen· commit/revert του θα ξεμπλόκαρε το τελευταίο mobile Input primitive migration.
+
+## 2026-07-05 (web-code-quality-auditor, 47η σάρωση)
+Read-only audit της Next.js web υλοποίησης (έμφαση στο `/api/v1` που καταναλώνει το mobile). `cd apps/web && npm run type-check` → **EXIT 0** (μηδέν TS errors). Working tree στην αρχή: `.claude/launch.json` + 2 deleted `.github/workflows` + Receipts/Settings/Shopping mobile screens = WIP του Αχιλλέα (δεν αγγίχτηκαν).
+
+**Issue counts ανά dimension (56 route files κάτω από `api/v1`):**
+- Type safety: **0** — μηδέν `: any` / `as any` / `@ts-ignore` σε ολόκληρο το `api/v1`· `withAuth`/`bearerUser` typed.
+- Input validation: **0 νέα** — κάθε write route περνά body μέσω των shared `apiBody` helpers (`readBody`/`strField`/`numField`/`enumField`/`isObjectId`)· `req.json().catch` = μηδέν· τα deep `[id]` routes έχουν `isObjectId` guard.
+- Error handling: **0 νέα** — κάθε v1 route μέσα σε `withAuth` (try/catch → clean `{ error }` 500)· κάθε write saas route μέσα σε `saasGuard`· login έχει δικό του JSON-parse guard.
+- Auth: **0** — κάθε bearer route μέσω `withAuth` (401 χωρίς token)· login IP-rate-limited (`8d4ab98`).
+- Mongoose: **0 νέα** — όλα τα list routes `.lean()` + `.limit(p.limit)` (pagination) + shared `listEnvelope`· hot fields indexed (`User.apiToken` index:true· `Receipt.store/date/archived`· `Expense.kind/vendorKey/category/date` + compound· `updatedAt:-1` παντού για incremental sync).
+- Duplication/dead code: **0 νέα** — apiBody/apiError/isObjectId/serializeLineItems adoption effort ΕΚΛΕΙΣΕ σε προηγούμενες σάρωσεις.
+- Web UX states: global `app/error.tsx` υπάρχει· μηδέν `loading.tsx` = σκόπιμο (CLAUDE.md 2026-06-08 cont.²).
+- type-check: **0 errors**.
+
+**Νέο item (1, P3/S):** `auth/login` είναι το μοναδικό v1 route που χτίζει error responses inline (`NextResponse.json({ error }, { status })` ×3) αντί για τον shared `apiError()` helper που χρησιμοποιεί κάθε άλλο route· byte-identical shape → μηχανικός swap. Μπήκε στην κορυφή του Web Debt Queue.
+
+**Επιβεβαιωμένα ανοιχτά (ήδη στην ουρά, decision-gated):**
+- Reset-request timing side-channel (P3/S, saas· `reset/request/route.ts:42` no-account fast-path πριν το mint+mail) — dead-until-SaaS, θέλει delivery-semantics απόφαση.
+- getTenantConnection cache guard δέχεται disconnected connection (P3/S, saas· `connection.ts:54` `readyState !== 99` περνά και το 0/3) — 0 importers, dead-until-SaaS.
+
+**Top 3 για τον builder (unattended-safe):**
+1. **auth/login → apiError()** (P3/S, api· καθαρός mechanical swap, tsc-verifiable, μηδέν rebuild).
+2. (τα άλλα 2 ανοιχτά είναι SaaS decision-gated → όχι unattended-safe· βλ. Needs Achilleas).
+3. (καμία νέα auto-buildable functional debt· η v1 επιφάνεια είναι πλήρως καθαρή μετά από 47 σάρωσεις).
+
+### Needs Achilleas
+- **Reset-request timing** + **getTenantConnection guard**: αμφότερα dead-until-SaaS (`SAAS_MODE` off = μηδέν impact σήμερα)· θέλουν σκόπιμη απόφαση (delivery semantics / rebuild semantics), όχι μηχανικό fix.
+- **v1 data-path tenant-scoping**: το feature data path (`withAuth`→`bearerUser` by `apiToken`) ΔΕΝ είναι tenant-scoped, άρα δεν υπάρχει σημείο να μπει `tenant.status` gate στο v1· εξαρτάται από μεγαλύτερο SaaS data-isolation κομμάτι + read-vs-write product decision.
