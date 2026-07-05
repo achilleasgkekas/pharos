@@ -1100,3 +1100,27 @@ Mock pattern: ίδιο DB-seam pattern με τα προηγ. route tests (`vi.ho
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = ΜΟΝΟ το δικό μου items/[id]/route.test.ts (τα προηγουμένως uncommitted ollama.ts/ollama.test.ts τα committ-άρισε concurrent routine στο μεταξύ, σωστά δεν τα άγγιξα). Στάγιαρα μόνο τα δικά μου paths.
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας επόμενα ακόμα untested: `receipts/[id]/route.ts` (line-items nested coercion, το πιο πλούσιο array partial-update), `stores/[id]/route.ts`, `shopping-list/[id]/route.ts`, `vouchers/route.ts` (GET/POST, μόνο το [id] καλύφθηκε), `expenses/route.ts` (GET/POST, μόνο το [id]), ή ένα `statements/[id]`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-05 (cont. — receipts/[id]/route.test.ts, GET line-serialization + PATCH lineItems sanitizer)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/receipts/[id]/route.test.ts` για το GET/PATCH του `/api/v1/receipts/:id` (το πλουσιότερο ARRAY partial-update του mobile surface).**
+
+Επιλογή target: ακολούθησα ρητά το πρώτο suggested next task του προηγ. entry (`receipts/[id]/route.ts`, line-items nested coercion). Το route έχει ΜΟΝΟ GET + PATCH (κανένα DELETE). Δύο κομμάτια λογικής ζουν αποκλειστικά εδώ και ένα drift διαφθείρει σιωπηλά το mobile contract:
+- **GET serialization**: `trimReceipt` + notes fallback ('') + `serializeLineItems`, όπου το AI-cleaned `refinedName` ΝΙΚΑΕΙ το raw `name` (η edit φόρμα δείχνει refinedName||name). Το `itemCount` = stored `lineItems.length`, όχι το serialized count. Επίσης `.select('-rawAiResponse')` (ποτέ το debug blob στον client) — pinned μέσω select-capture.
+- **PATCH lineItems sanitizer** (το μοναδικό κομμάτι): κάθε edited line ξαναχτίζεται μέσω `numOr(v, default, min)` = `Number(v)` + min-clamp → default. qty default 1 clamped `>=0.0001` (qty 0/negative → 1)· price/vatRate default 0 clamped `>=0` (negative → 0)· το `refinedName` FORCE-άρεται σε '' ώστε το edited name να νικά στο επόμενο GET· και μια γραμμή επιβιώνει ΜΟΝΟ αν `name || price>0` (empty-name zero-price row → dropped). + scalar coercion: store non-empty trimmed· unparseable date αγνοείται· total/subtotal/vatAmount `Number()` μόνο όταν `!=null && finite`· verified/archived δέχονται ΜΟΝΟ πραγματικά booleans· empty changeset → 400 'no valid fields'.
+
+Σημείο που κλειδώθηκε ρητά: το all-dropped lineItems array (π.χ. `[{name:'',price:0}]`) → `set.lineItems=[]` (empty array = non-empty key) → το route ΠΡΟΧΩΡΑ (200) και **καθαρίζει** τα items, ΔΕΝ επιστρέφει 400. Pinned ως contract ώστε ένα μελλοντικό regression που θα το γύριζε σε 400 να σκάσει.
+
+Mock pattern: ίδιο DB-seam pattern με τα προηγ. route tests (`vi.hoisted` + mock `@/lib/db` connectDB + `@/models/User` bearerUser chain + `@/models/Receipt` findById [GET, με select-capture] + findByIdAndUpdate [PATCH]). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody/apiList helpers + τους ΠΡΑΓΜΑΤΙΚΟΥΣ trimReceipt/serializeLineItems από το `../serialize`.
+
+Τι έγινε: Νέο `[id]/route.test.ts` (21 tests). **GET auth+id guard** (4: no-token→401, unknown-token→401, malformed id→400 'bad id', missing→404 + select capture). **GET serialization** (4: full trimReceipt+notes fallback+itemCount-from-stored-length· bare-doc defaults· refinedName-wins line mapping με qty/price/vatRate defaults· soft-deleted→deleted:true). **PATCH auth+id guard** (2). **PATCH scalar** (6: all-invalid→400· full trim/date/Number/bool $set+{new:true}· unparseable date + null/Infinity totals dropped· empty-string paymentMethod/notes kept [typeof-string, όχι truthiness]· non-boolean verified/archived dropped· 404). **PATCH lineItems** (5: remap+refinedName-reset+defaults· qty0/neg→1 & neg price/vat→0 clamp· drop empty-name-zero-price/keep empty-name-with-price· all-dropped→[]· non-array αγνοείται).
+
+Τι επαληθεύτηκε:
+- `npx vitest run 'src/app/api/v1/receipts/[id]/route.test.ts'` → 21/21 passed.
+- `npx vitest run` (όλο το suite) → 97 files, 1364/1364 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = ΜΟΝΟ το δικό μου receipts/[id]/route.test.ts. Στάγιαρα μόνο το δικό μου path· commit `2234ab1` pushed καθαρά (fast-forward, no rebase).
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας ακόμα untested [id] routes: `stores/[id]/route.ts`, `shopping-list/[id]/route.ts`, `statements/[id]/route.ts`. Untested collection routes (GET/POST, μόνο το [id] καλύφθηκε): `vouchers/route.ts`, `expenses/route.ts`, `receipts/route.ts`, `stores/route.ts`, `shopping-list/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
