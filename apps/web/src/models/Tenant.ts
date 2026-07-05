@@ -34,6 +34,10 @@ const TenantSchema = new Schema(
     // Isolation tier: 'shared' = own db on the shared cluster; 'dedicated' = own instance.
     tier: { type: String, enum: ['shared', 'dedicated'], default: 'shared' },
     trialEndsAt: { type: Date, default: null },
+    // Idempotency stamp for the pre-suspend dunning email (D4): set when the "your trial
+    // ends in N days" warning was successfully delivered, so the 6-hourly sweep never
+    // re-warns a tenant. Null = not warned yet. Only written by the trial-lapse sweep.
+    trialWarnEmailedAt: { type: Date, default: null },
     // Billing provider linkage (Stripe). Stored here so a webhook can resolve tenant.
     billingCustomerId: { type: String, default: null, index: true },
     billingSubscriptionId: { type: String, default: null, index: true },

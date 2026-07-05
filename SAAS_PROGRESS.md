@@ -1600,3 +1600,62 @@ aiMeter tests + `7273bd8` decisions/login refactor — άλλων routines, δε
 που κάνει `withTenant(ctx)` ώστε το `9cb635e` metering να διαβάζει τον tenant από `currentTenant()`
 αντί για threading (κλείνει τον βρόχο· αγγίζει AI entrypoint = θέλει προσοχή/άδεια), είτε (γ)
 user-facing workspace-settings UI panels (read/write APIs έτοιμα).
+
+## 2026-07-05 (increment 41 — trial-lapse SWEEP: warn + suspend, closes D4)
+**Built:** το increment 39/40 έδωσε τον PURE decision πυρήνα (`evaluateTrialLapse`,
+`planTrialLapses`, `lapsedTrialFilter`)· κανείς όμως δεν τον έτρεχε — ένας trialing tenant με
+περασμένο `trialEndsAt` έμενε trialing για πάντα. Υλοποίησα το **actual sweep** που ο Achilleas
+υπέγραψε στο **D4** (node-cron in-process/6h, `$set status:'suspended'` + audit + 1 dunning email
+3 μέρες πριν, idempotent, injected `now`). ΟΛΟ additive / backward-compatible, σε δικά μου SAAS
+αρχεία:
+- `models/Tenant.ts` (additive edit, control-plane μου) — νέο **`trialWarnEmailedAt: Date|null`**
+  = idempotency stamp της dunning warning (default null). Optional + null-default ⇒ πλήρως
+  backward-compatible, γράφεται ΜΟΝΟ από το sweep.
+- `lib/billing/trialSweep.ts` (νέο). **PURE** (unit-tested): `WARN_BEFORE_DAYS=3`,
+  `shouldWarnTrial(input, now)` (trialing + bounded end + όχι expired + `daysLeft<=3`· open-ended/
+  non-trialing/expired → false, δηλ. warn-window ⊥ lapse-instant, ποτέ warn+suspend στο ίδιο run),
+  `planTrialWarnings(rows, now)` (ids-only batch planner, skip blank id), `trialWarningFilter(now)`
+  (Mongo: `{status:'trialing', trialWarnEmailedAt:null, trialEndsAt:{$gt:now,$lte:now+3d}}` →
+  idempotent + narrows scan· open-ended null-end δεν ματσάρει το range), `dunningEmail(name,
+  daysLeft)` (body builder, «tomorrow»/«in N days», clamps garbage στο [1,3]). **Impure**
+  `runTrialLapseSweep(now?)`: SAAS-gated (off → `swept:false`), (1) WARN μόνο αν `mailerCanDeliver()`
+  (self-hoster χωρίς mail → skip· stamp ΜΟΝΟ σε delivered → retry transient failures, ποτέ
+  re-warn), owner emails μέσω Membership(owner,active)→Account· (2) LAPSE `lapsedTrialFilter` →
+  `updateOne({_id,status:'trialing'},{$set status:suspended})` (race-safe guard) + `recordAudit
+  ('workspace.suspended', meta.reason)`. Per-tenant try/catch isolation (μοτίβο `sampleAllTenants`).
+- `app/api/saas/trials/sweep/route.ts` (νέο) — `POST` SAAS-gated (404 off) + **CRON_SECRET bearer**
+  (fail-closed 500 unset, constant-time compare· ίδιο μοτίβο με `usage/sample`) → `runTrialLapseSweep`.
+  On-demand/external trigger· ο in-process 6h cron καλεί τον ίδιο runner.
+- `lib/billing/trialSweep.test.ts` (νέο) — 12 PURE tests (shouldWarnTrial window/edge-at-3d/
+  beyond/expired/open-ended/non-trialing· planTrialWarnings ids+skip-blank+garbage· filter shape·
+  dunningEmail tomorrow/in-N/clamp/blank-name).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run trialSweep.test.ts` → **12/12
+green**· full suite `npx vitest run` → **1322/1322 green** (95 files, καμία regression, +12 νέα).
+External importers του `runTrialLapseSweep`/`trialSweep` από feature code → **κανένας** (μόνο το
+δικό μου CRON route)· το route SAAS-gated (404 off). ⇒ `SAAS_MODE` off / default tenant = **zero
+effect** (κανένα Tenant doc, το route δεν mount-άρει, το `trialWarnEmailedAt` απλώς default null).
+Κανένας Docker rebuild (νέο PURE module + additive gated route + optional model field·
+type-check+tests καλύπτουν compile+logic)· καμία νέα εξάρτηση· κανένα feature route/data-db/
+User-path/bearer-path αγγίχτηκε.
+
+**Collision note:** στην αρχή του run το tree είχε foreign uncommitted WIP (per-tenant currency:
+`lib/tenancy/currencyBinding.ts` + edits σε `money.ts`/`appSettings.ts`/`storeService.ts` — άλλη
+routine). ΔΕΝ τα άγγιξα· landαρισαν καθαρά (committed από την concurrent routine) πριν το δικό μου
+commit, οπότε το tree έμεινε καθαρό για staging μόνο των δικών μου αρχείων.
+
+**## Needs Achilleas** (trial-lapse sweep go-live):
+- **In-process 6h cron registration**: ο runner + το CRON route είναι έτοιμα, αλλά ο **in-process
+  node-cron scheduler** (D4) δεν έχει registration ακόμα — αυτό απαιτεί ένα server bootstrap hook
+  (π.χ. `instrumentation.ts`) που αγγίζει shared runtime wiring (rebuild) → χωριστό προσεκτικό
+  increment/άδεια. Μέχρι τότε: το sweep τρέχει on-demand μέσω `POST /api/saas/trials/sweep` +
+  `CRON_SECRET` (external scheduler).
+- **Mail provider** (`RESEND_API_KEY` ή `MAIL_WEBHOOK_URL`): χωρίς αυτό η WARN φάση κάνει skip
+  (mailerCanDeliver=false)· τα trials suspend-άρονται κανονικά αλλά ΧΩΡΙΣ προειδοποιητικό email.
+- **Trial length** `DEFAULT_TRIAL_DAYS=14` + **WARN_BEFORE_DAYS=3** = placeholders μέχρι final
+  product decision.
+
+**Next task:** increment 42 — είτε (α) το in-process 6h cron registration (bootstrap hook, αγγίζει
+shared runtime → άδεια/προσοχή), είτε (β) BYO-key AES-256-GCM resolver+storage scaffold (D5
+RESOLVED: AUTH_SECRET-derived scrypt key· ξεμπλόκαρε), είτε (γ) reset-request timing side-channel
+fix (D6 spec: constant-time response), είτε (δ) user-facing workspace-settings UI panels.
