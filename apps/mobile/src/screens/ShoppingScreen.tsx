@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, Pressable, FlatList, ActivityIndicator, RefreshControl, Modal, StyleSheet, Alert,
+  View, Text, Pressable, FlatList, ActivityIndicator, RefreshControl, StyleSheet, Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { C, scrim } from '../theme';
+import { C } from '../theme';
 import {
   getShoppingList, addListItem, toggleListItem, deleteListItem, scanProduct, type ListItem, type ScannedProduct,
 } from '../api';
-import { Button, Check, IconButton, Input, contentWidth } from '../ui';
+import { Button, Check, IconButton, Input, ModalSheet, contentWidth } from '../ui';
 
 export function ShoppingScreen() {
   const [items, setItems] = useState<ListItem[]>([]);
@@ -109,38 +109,34 @@ export function ShoppingScreen() {
       />
 
       {/* Confirm a scanned product before adding */}
-      <Modal visible={!!draft} transparent animationType="fade" onRequestClose={() => setDraft(null)}>
-        <View style={s.modalWrap}>
-          <View style={s.modal}>
-            <Text style={s.modalTitle}>Add scanned product</Text>
-            {draft && (
-              <>
-                <Text style={s.label}>NAME</Text>
-                <Input value={draft.name} onChangeText={(v) => setDraft({ ...draft, name: v })} style={{ flex: 1, paddingHorizontal: 14 }} />
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.label}>QTY</Text>
-                    <Input value={draft.quantity} onChangeText={(v) => setDraft({ ...draft, quantity: v })} style={{ flex: 1, paddingHorizontal: 14 }} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.label}>CATEGORY</Text>
-                    <Input value={draft.category} onChangeText={(v) => setDraft({ ...draft, category: v })} style={{ flex: 1, paddingHorizontal: 14 }} />
-                  </View>
-                </View>
-                <View style={s.modalBtns}>
-                  <Button
-                    label="Add to list"
-                    onPress={() => { const d = draft; setDraft(null); add(d.name, d); }}
-                    disabled={!draft.name.trim()}
-                    style={{ paddingHorizontal: 18 }}
-                  />
-                  <Pressable onPress={() => setDraft(null)} style={s.cancelBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
+      <ModalSheet visible={!!draft} onClose={() => setDraft(null)}>
+        <Text style={s.modalTitle}>Add scanned product</Text>
+        {draft && (
+          <>
+            <Text style={s.label}>NAME</Text>
+            <Input value={draft.name} onChangeText={(v) => setDraft({ ...draft, name: v })} style={{ flex: 1, paddingHorizontal: 14 }} />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.label}>QTY</Text>
+                <Input value={draft.quantity} onChangeText={(v) => setDraft({ ...draft, quantity: v })} style={{ flex: 1, paddingHorizontal: 14 }} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.label}>CATEGORY</Text>
+                <Input value={draft.category} onChangeText={(v) => setDraft({ ...draft, category: v })} style={{ flex: 1, paddingHorizontal: 14 }} />
+              </View>
+            </View>
+            <View style={s.modalBtns}>
+              <Button
+                label="Add to list"
+                onPress={() => { const d = draft; setDraft(null); add(d.name, d); }}
+                disabled={!draft.name.trim()}
+                style={{ paddingHorizontal: 18 }}
+              />
+              <Pressable onPress={() => setDraft(null)} style={s.cancelBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
+            </View>
+          </>
+        )}
+      </ModalSheet>
     </View>
   );
 }
@@ -161,8 +157,6 @@ const s = StyleSheet.create({
   qty: { color: C.dim, fontSize: 12, marginTop: 2 },
   del: { color: C.faint, fontSize: 16, paddingHorizontal: 4 },
   label: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginBottom: 6, marginTop: 12 },
-  modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: 24 },
-  modal: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 18, padding: 20 },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '700' },
   modalBtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 },
   cancelBtn: { paddingVertical: 12, paddingHorizontal: 8 },
