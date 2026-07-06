@@ -1256,3 +1256,27 @@ Mock pattern: ίδιο DB-seam pattern με το cards/[id]/route.test.ts. Mock 
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `src/app/api/saas/*` (5× M — pre-existing WIP άλλου routine, ΔΕΝ τα άγγιξα/staged) + το δικό μου stores/[id]/route.test.ts (??). Στάγιαρα μόνο τα δικά μου paths.
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Untested [id] routes ακόμα (υψηλή αξία — found→404 pattern): `shopping-list/[id]/route.ts` (PATCH/DELETE), `statements/[id]/route.ts`. Untested collection routes: `lists/route.ts`, `notifications/route.ts`, `history/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-06 (cont.⁷ — shopping-list/[id]/route.test.ts, PATCH/DELETE [id] route, no-valid-fields + found→404)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/shopping-list/[id]/route.test.ts` για το PATCH/DELETE του `/api/v1/shopping-list/:id`.**
+
+Επιλογή target: ακολούθησα ρητά το suggested next task του προηγ. entry (`shopping-list/[id]/route.ts` ήταν πρώτο στη λίστα untested [id] routes). Κλείνει το shopping-list ζεύγος μετά το ήδη-καλυμμένο collection GET/POST. Route-only logic που ζει αποκλειστικά εδώ και τροφοδοτεί τα mobile edit/tick/remove flows της λίστας για ψώνια:
+- **Auth gate + id guard**: withAuth → 401 χωρίς token (κανένα action)· `isObjectId` → 400 'bad id' σε malformed id πριν από κάθε action touch (το withAuth/bearerUser έχει ήδη αγγίξει connectDB, οπότε το meaningful guard είναι «καμία action δεν κλήθηκε»).
+- **PATCH field selection**: ΜΟΝΟ τα πέντε string πεδία (name/quantity/category/brand/note) περνούν μέσω `typeof b[k]==='string'` (non-strings + άγνωστα keys σιωπηλά dropped)· το `checked` περνά ΜΟΝΟ όταν `typeof==='boolean'` (`checked:false` έγκυρο, `checked:'yes'` string → αγνοείται). `!hasChecked && !hasFields` → **400 'no valid fields'** χωρίς καμία action call.
+- **PATCH ops divergence**: toggle+update τρέχουν **ανεξάρτητα** (το ένα δεν μπλοκάρει το άλλο) — και τα δύο attempted όταν το flag τους είναι set· ΟΠΟΙΟΔΗΠΟΤΕ report `found:false` → **404 'not found'** (ακόμα κι αν το άλλο πέτυχε). Success → bare `{ ok:true }` (ΟΧΙ list envelope, ΟΧΙ id echo).
+- **DELETE**: soft-delete μέσω `deleteListItem` (`$set deletedAt`, recoverable από Trash — regression guard vs hard-delete)· `found:false` → 404.
+
+Mock pattern: action-seam (όπως το collection shopping-list/route.test.ts) — το route delegate σε toggleListItem/updateListItem/deleteListItem, οπότε mock το `@/app/shopping-list/actions` (found flags ανά action) + auth seam (`@/lib/db` connectDB + `@/models/User` bearerUser chain). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody helpers (withAuth + isObjectId + readBody).
+
+Τι έγινε: Νέο `route.test.ts` (14 tests). **auth gate** (2: PATCH no-token→401 + no toggle/update, DELETE unknown-token→401 + no delete). **id guard** (2: PATCH/DELETE malformed id→400 'bad id' + no action). **PATCH validation** (2: empty body→400 'no valid fields'· non-string field + non-boolean checked→ίδιο, no action). **PATCH ops** (6: checked-only→toggle [id,true] + no update + 200 `{ok}`· `checked:false` έγκυρο→toggle false· fields-only→update με ΜΟΝΟ τα 5 whitelisted [drop extra/price/number]· both→toggle+update μαζί· toggle found:false→404 [και τα δύο ops attempted]· update found:false→404). **DELETE** (2: soft-delete→200 `{ok}` + lastDelete id· found:false→404 [delete attempted]).
+
+Τι επαληθεύτηκε:
+- `npx vitest run 'src/app/api/v1/shopping-list/[id]/route.test.ts'` → 14/14 passed.
+- `npx vitest run` (όλο το suite) → 116 files, 1592/1592 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `apps/web/src/app/search-actions.ts` (M — pre-existing WIP άλλου routine, ΔΕΝ το άγγιξα/staged) + το δικό μου shopping-list/[id]/route.test.ts (??). Στάγιαρα μόνο τα δικά μου paths (route.test.ts + OSS_PROGRESS.md).
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Untested [id] routes ακόμα (υψηλή αξία — found→404 pattern): `statements/[id]/route.ts` (GET/DELETE ή PATCH — δες πρώτα το route), `subscriptions/[id]` ήδη καλυμμένο, `tasks/[id]` ήδη καλυμμένο. Untested collection routes: `lists/route.ts`, `notifications/route.ts`, `history/route.ts`, `calendar/route.ts`, `overview/route.ts`, `reports/route.ts`, `search/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
