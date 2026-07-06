@@ -18,6 +18,17 @@ export type SearchHit = {
   href: string;
 };
 
+// Lean projection shapes — one per query below, each mirroring its `.select(...)`
+// (plus the implicit `_id`). Replaces the old `as any[]` casts so the field
+// access in the hit-builders is type-checked against what was actually selected.
+type ItemLean = { _id: unknown; title: string; status: string; currentPrice?: number | null; purchasedPrice?: number | null };
+type ReceiptLean = { _id: unknown; store: string; date: string | Date; total?: number };
+type StatementLean = { _id: unknown; card: string; period: string; totalAmount?: number };
+type TaskLean = { _id: unknown; title: string; status: string };
+type SubscriptionLean = { _id: unknown; name: string; amount?: number; billingCycle?: string };
+type ExpenseLean = { _id: unknown; vendor?: string; kind?: string; amount?: number | null; date?: string | Date; category?: string };
+type VoucherLean = { _id: unknown; title: string; store?: string; discount?: string; used?: boolean };
+
 function rx(query: string): RegExp {
   return new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 }
@@ -33,39 +44,39 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
     Item.find({ $or: [{ title: r }, { specs: r }, { notes: r }, { tags: r }, { serialNumber: r }] })
       .limit(8)
       .select('title status currentPrice purchasedPrice')
-      .lean(),
+      .lean<ItemLean[]>(),
     Receipt.find({
       $or: [{ store: r }, { 'lineItems.name': r }, { 'lineItems.refinedName': r }, { paymentMethod: r }],
     })
       .limit(8)
       .select('store date total')
-      .lean(),
+      .lean<ReceiptLean[]>(),
     Statement.find({ $or: [{ card: r }, { period: r }, { 'transactions.description': r }] })
       .limit(6)
       .select('card period totalAmount')
-      .lean(),
+      .lean<StatementLean[]>(),
     Task.find({ $or: [{ title: r }, { tags: r }, { description: r }] })
       .limit(6)
       .select('title status')
-      .lean(),
+      .lean<TaskLean[]>(),
     Subscription.find({ $or: [{ name: r }, { provider: r }] })
       .limit(6)
       .select('name amount billingCycle')
-      .lean(),
+      .lean<SubscriptionLean[]>(),
     Expense.find({ $or: [{ vendor: r }, { notes: r }, { category: r }] })
       .limit(6)
       .select('vendor kind amount date category')
-      .lean(),
+      .lean<ExpenseLean[]>(),
     Voucher.find({ $or: [{ title: r }, { code: r }, { store: r }] })
       .limit(6)
       .select('title store discount used')
-      .lean(),
+      .lean<VoucherLean[]>(),
   ]);
 
   const hits: SearchHit[] = [];
 
-  for (const it of items as any[]) {
-    const owned = OWNED_STATUSES.includes(it.status);
+  for (const it of items) {
+    const owned = (OWNED_STATUSES as readonly string[]).includes(it.status);
     const id = String(it._id);
     hits.push({
       type: 'item',
@@ -75,7 +86,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
       href: `${owned ? '/items' : '/shopping'}?open=${id}`,
     });
   }
-  for (const rc of receipts as any[]) {
+  for (const rc of receipts) {
     const id = String(rc._id);
     hits.push({
       type: 'receipt',
@@ -85,7 +96,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
       href: `/receipts?open=${id}`,
     });
   }
-  for (const st of statements as any[]) {
+  for (const st of statements) {
     const id = String(st._id);
     hits.push({
       type: 'statement',
@@ -95,7 +106,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
       href: `/statements?open=${id}`,
     });
   }
-  for (const tk of tasks as any[]) {
+  for (const tk of tasks) {
     const id = String(tk._id);
     hits.push({
       type: 'task',
@@ -105,7 +116,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
       href: `/tasks?open=${id}`,
     });
   }
-  for (const sb of subs as any[]) {
+  for (const sb of subs) {
     const id = String(sb._id);
     hits.push({
       type: 'subscription',
@@ -115,7 +126,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
       href: `/subscriptions?open=${id}`,
     });
   }
-  for (const ex of expenses as any[]) {
+  for (const ex of expenses) {
     const id = String(ex._id);
     const income = ex.kind === 'income';
     hits.push({
@@ -126,7 +137,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
       href: `${income ? '/income' : '/expenses'}?open=${id}`,
     });
   }
-  for (const v of vouchers as any[]) {
+  for (const v of vouchers) {
     const id = String(v._id);
     hits.push({
       type: 'voucher',
