@@ -772,3 +772,40 @@ Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/sa
 Επομενο run: sync check αν το data-export εκτιθεται στο account-settings UI (features.md
 mention) οταν χτιστει· αλλιως stale-forward-ref sweep ολου του set. Τα 26 saas routes
 πλεον ολα τεκμηριωμενα.
+
+## 2026-07-06 (saas.md: workspace erasure-request lifecycle, GDPR Art. 17)
+
+Το πιο προσφατο commit `a6d0746` (feat(saas): workspace erasure-request lifecycle,
+Art. 17) προσθεσε νεο SaaS-gated route `/api/saas/workspace/erasure` που **δεν** ηταν
+τεκμηριωμενο (grep "erasure" σε saas.md = 0 hits). Διαβασα τα πραγματικα αρχεια
+(`app/api/saas/workspace/erasure/route.ts` + ο pure helper `lib/tenancy/erasure.ts`)
+και προσθεσα νεα subsection **### Workspace erasure (GDPR)** στο saas.md, τοποθετημενη
+μετα το "Data export (GDPR)" και πριν το "Members and invitations".
+
+Τι εγραψα:
+- Πινακας 3 γραμμων: `GET` (any active member, current state), `POST` (owner only,
+  schedule, idempotent, `403`/`400`), `DELETE` (owner only, cancel, idempotent, `403`).
+- Gating: `404` SaaS off, `401` signed out, `403` not member (GET) / not owner (POST/DELETE).
+  Session resolves ακομα για inactive workspace (allowInactive=true) → owner mid-erasure
+  μπορει read/cancel. Ολα διαβαζουν/γραφουν ΜΟΝΟ το control-plane Tenant doc.
+- Reversible marker· destructive drop = ξεχωριστο manual/gated flow, ΠΟΤΕ automated routine.
+- Orthogonal to `status` (δεν suspend-αρει, owner κραταει access στο grace window).
+- Audit actions: `workspace.erasure_requested` / `workspace.erasure_canceled`.
+- Response shape sample (`workspace`/`graceDays`/`erasure` ErasureView: requested/requestedAt/
+  scheduledAt/requestedBy/graceDaysLeft/due). graceDaysLeft = whole days up-rounded clamp 0,
+  due flips οταν scheduledAt περασει.
+- Callout: το graceDays=30 ειναι **placeholder** (GitHub/Google-style), final = needs decision.
+
+Accuracy: καμια τιμη/action/status-code εφευρεθηκε — ολα cross-checked με τον κωδικα
+(ERASURE_GRACE_DAYS=30, ErasureView keys, audit action strings, gating roles, 400/403/404/401).
+Placeholders μονο στο JSON sample (`<account-id>`, `acme`).
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 4 markers
+(2 balanced blocks). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=)
+→ clean. Πραγματικος saas route count = 27 (ηταν 26).
+
+Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: sync check αν το erasure/data-export εκτιθεται στο account/workspace-settings UI
+(features.md mention) οταν χτιστει· αλλιως stale-forward-ref sweep ολου του set. Τα 27 saas
+routes πλεον ολα τεκμηριωμενα.

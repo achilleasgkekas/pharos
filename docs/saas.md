@@ -255,6 +255,61 @@ All memberships are included regardless of status (a complete record of what the
 platform knows about the identity); a membership whose tenant was deleted
 mid-export is skipped rather than emitted as a blank row.
 
+### Workspace erasure (GDPR)
+
+The workspace owner can **schedule the permanent deletion** of a workspace and its
+isolated data (GDPR Art. 17 right-to-erasure). The request is a **reversible marker**:
+it stamps the workspace with a request timestamp and a scheduled purge instant a
+grace window in the future, and can be cancelled any time before that instant. The
+actual destructive drop of the tenant's data database is a **separate, manual/gated
+flow** that runs only after the grace window elapses — it is never performed by this
+route or by any automated routine.
+
+Erasure is **orthogonal to the access lifecycle** (`status`): scheduling it does not
+suspend the workspace, so the owner keeps full access during the grace window and can
+change their mind without a status-restoration dance.
+
+| Method | Path | Body | Result |
+| --- | --- | --- | --- |
+| `GET` | `/api/saas/workspace/erasure[?tenant=<slug>]` | — | **Any active member.** Returns the current erasure state. |
+| `POST` | `/api/saas/workspace/erasure` | `{ tenant? }` | **Owner only.** Schedules permanent deletion after the grace window. Idempotent — an already-pending erasure returns its current state with no new audit row. `403` when not the owner; `400` if the request cannot be attributed to an account. |
+| `DELETE` | `/api/saas/workspace/erasure[?tenant=<slug>]` | — | **Owner only.** Cancels a pending erasure. Idempotent — no pending erasure is a no-op with no audit row. `403` when not the owner. |
+
+Gating (shared by all three verbs, via `resolveWorkspaceSession`): `404` when SaaS
+mode is off, `401` when signed out, `403` when not a member (GET) or not the owner
+(POST/DELETE). The session resolves even for an inactive workspace, so an owner mid-
+erasure can still read and cancel it. All three verbs read/write **only the control-
+plane `Tenant` doc** — never a feature route, a tenant's data database, or the self-
+hosted `User`/bearer path. A scheduled request writes a `workspace.erasure_requested`
+audit row (with the scheduled instant and grace days); a cancel writes
+`workspace.erasure_canceled`.
+
+Every response carries the same shape — the workspace slug, the grace window in days,
+and the erasure projection:
+
+```json
+{
+  "workspace": "acme",
+  "graceDays": 30,
+  "erasure": {
+    "requested": true,
+    "requestedAt": "2026-07-06T00:00:00.000Z",
+    "scheduledAt": "2026-08-05T00:00:00.000Z",
+    "requestedBy": "<account-id>",
+    "graceDaysLeft": 30,
+    "due": false
+  }
+}
+```
+
+`graceDaysLeft` counts whole days remaining (rounded up, clamped at 0), and `due`
+flips true once the scheduled instant passes. Before any request is made, `requested`
+is `false` and the timestamp fields are `null`.
+
+> The grace window (`graceDays`) is currently a **30-day placeholder** (mirroring the
+> GitHub/Google-style scheduled-deletion window) held in a single named constant; the
+> final product value is still to be decided.
+
 ### Members and invitations
 
 `/api/saas/members` manages a workspace's roster. Gating: 404 when SaaS off, 401
