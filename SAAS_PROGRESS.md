@@ -1806,3 +1806,48 @@ User-path/bearer-path αγγίχτηκε. Collision guard: staging καθαρό,
 route που reportάρει due tenants ΧΩΡΙΣ drop· ο drop = Needs-Achilleas), είτε (β) per-tenant CONTENT
 export scaffold (§8, αγγίζει per-tenant connection → προσοχή), είτε (γ) BYO-key AI-dispatch consumption
 / in-process 6h cron (shared runtime → άδεια), είτε (δ) user-facing workspace-settings UI panels.
+
+## 2026-07-06 (increment 45 — erasure PURGE scaffold: report-only due-workspace scan)
+**Το κενό:** το increment 44 έδωσε το erasure request/cancel lifecycle + το `erasureDueFilter` που
+βρίσκει workspaces περασμένα το grace window, αλλά **τίποτα δεν consume-άρει το due-filter** — δεν
+υπήρχε τρόπος να δει κανείς ποια workspaces περιμένουν permanent deletion. Έκλεισα το πρώτο,
+ασφαλέστερο κομμάτι του purge: ένας **REPORT-ONLY** scanner που περιγράφει τι ΘΑ διαγραφόταν, ΧΩΡΙΣ
+κανένα destructive action. Ο πραγματικός drop της isolated tenant db μένει manual/gated (Needs
+Achilleas), ΠΟΤΕ από routine. ΟΛΟ σε νέα αρχεία, additive + SaaS-gated:
+- `lib/tenancy/erasurePurge.ts` (νέο). **PURE** planners (unit-tested, μόνο τα pure helpers του
+  `erasure.ts` ως import): `daysOverdue(scheduledAt, now)` (floor whole days PAST το scheduled purge
+  instant, clamp≥0, null όταν όχι-ακόμα-due/invalid — mirror του `graceDaysLeft`), `purgeTarget`
+  (project → `PurgeTarget` ή null· refuse μη-due, blank id, ή **blank dbName** — ένα purge πρέπει να
+  μπορεί να ονομάσει τη db που θα dropάρει, defence-in-depth), `planErasurePurge` (batch → μόνο
+  genuinely-due, safely-named). **Impure** `runErasurePurgeScan(now)`: SaaS-gated (`scanned:false`
+  off), read-only `Tenant.find(erasureDueFilter(now)).select().lean()` → `planErasurePurge` → report
+  με **`dryRun: true` ΠΑΝΤΑ**, μηδέν writes, μηδέν drop.
+- `app/api/saas/workspace/erasure/purge/route.ts` (νέο) — `POST` SAAS-gated (404 off) + **CRON_SECRET
+  bearer** (fail-closed 500 unset, 401 λάθος, constant-time compare· ίδιο μοτίβο με `trials/sweep` +
+  `usage/sample`). Report-only· καλεί `runErasurePurgeScan`. Scheduler-callable για να surface-άρει
+  due workspaces σε human review πριν οποιοδήποτε πραγματικό delete.
+- `lib/tenancy/erasurePurge.test.ts` (νέο) — 13 PURE tests (daysOverdue floor/at-due/future-null/
+  invalid-null/ISO· purgeTarget due-projection/not-due/no-schedule/blank-id/blank-dbName/trim+missing-
+  optionals· planErasurePurge keep-only-due-and-named/empty-and-non-array).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run erasurePurge.test.ts` → **13/13
+green**· full suite `npx vitest run` → **1555/1555 green** (113 files, +13 νέα, καμία regression).
+Το route SAAS-gated (404 off)· οι planners είναι pure + import-light ⇒ `SAAS_MODE` off / default tenant
+= **zero effect** (κανένα Tenant doc, το route δεν mount-άρει). Κανένας Docker rebuild (νέα PURE module
++ additive gated route, μηδέν shared runtime wiring — type-check+tests καλύπτουν)· καμία νέα εξάρτηση·
+κανένα feature route/data-db/User-path/bearer-path αγγίχτηκε. Δεν άγγιξα κανένα υπάρχον αρχείο (ούτε το
+`Tenant.ts` — τα erasure fields υπήρχαν ήδη από #44). Collision guard: staging καθαρό, μόνο τα 3 δικά
+μου paths· push clean (`4a7c975`).
+
+**## Needs Achilleas** (purge go-live):
+- **Actual destructive drop** (deferred, ΠΟΤΕ από routine): ο scan reportάρει τα due targets (id/slug/
+  dbName/daysOverdue)· το πραγματικό `useDb(dbName).dropDatabase()` + delete των Tenant/Membership docs
+  παραμένει χειροκίνητο/gated. Επόμενο βήμα: ένας human-triggered admin action (ή explicit-άδεια CRON)
+  που δρα πάνω στο report — όχι αυτόματο.
+- **Grace length** `ERASURE_GRACE_DAYS=30` (από #44) = placeholder μέχρι final product decision.
+- **CRON_SECRET** env + cron entry (ίδιο caveat με `trials/sweep`/`usage/sample`) για production trigger.
+
+**Next task:** increment 46 — είτε (α) per-tenant CONTENT export scaffold (§8, αγγίζει per-tenant
+connection → προσοχή), είτε (β) user-facing workspace-settings UI panels (όλα τα read/write control-plane
+APIs έτοιμα: profile, members, billing, ai-key, erasure, τώρα και το purge report), είτε (γ) BYO-key
+AI-dispatch consumption / in-process 6h cron (και τα δύο αγγίζουν shared runtime → άδεια).
