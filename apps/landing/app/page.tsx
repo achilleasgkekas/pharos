@@ -5,6 +5,7 @@ import { MobileNav } from './components/MobileNav';
 import { ScrollSpy } from './components/ScrollSpy';
 import { BackToTop } from './components/BackToTop';
 import { CopyButton } from './components/CopyButton';
+import { FaqDeepLink } from './components/FaqDeepLink';
 
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const SITE_URL = 'https://ph-aros.com';
@@ -463,6 +464,15 @@ const FAQS: { q: string; a: string }[] = [
   },
 ];
 
+// Stable, human-readable anchor id for each FAQ item, e.g. "faq-how-do-backups-work".
+// Deterministic from the question so deep links stay valid across builds.
+const faqId = (q: string): string =>
+  'faq-' +
+  q
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
 const JSON_LD = {
   '@context': 'https://schema.org',
   '@graph': [
@@ -522,6 +532,7 @@ const JSON_LD = {
       mainEntity: FAQS.map((f) => ({
         '@type': 'Question',
         name: f.q,
+        url: `${SITE_URL}/#${faqId(f.q)}`,
         acceptedAnswer: { '@type': 'Answer', text: f.a },
       })),
     },
@@ -1268,7 +1279,7 @@ export default function Home() {
 
           <div className="faq-list">
             {FAQS.map((f) => (
-              <details key={f.q} className="faq-item">
+              <details key={f.q} id={faqId(f.q)} className="faq-item">
                 <summary className="faq-q">
                   <span>{f.q}</span>
                   <span className="faq-chevron" aria-hidden="true">
@@ -1279,6 +1290,7 @@ export default function Home() {
               </details>
             ))}
           </div>
+          <FaqDeepLink />
         </div>
       </section>
 

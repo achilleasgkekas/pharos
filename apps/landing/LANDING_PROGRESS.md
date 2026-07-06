@@ -1246,3 +1246,44 @@ Needs-Achilleas (open):
 - Annual billing: discount πριν φτιαξω toggle.
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-06 (cont.⁴) — (e) polish: deep-linkable, shareable FAQ items
+
+Task: (e) polish. Τα δυο μπλοκαρισμενα increments (real app screenshots, annual-billing toggle) μενουν
+blocked (assets / Needs-Achilleas), οποτε διαλεξα ενα φρεσκο self-contained: να γινουν τα FAQ items
+deep-linkable + shareable. Μεχρι τωρα ολα τα `<details>` ηταν ανωνυμα, δεν μπορουσες να στειλεις link σε
+συγκεκριμενη απαντηση, και μια hosted-support απαντηση («δες το FAQ για backups») δεν ειχε που να δειξει.
+Μηδεν asset, μηδεν Achilleas, ακολουθει το υπαρχον pattern μικρων client components (BackToTop/ScrollSpy/
+MobileNav).
+
+Τι εφτιαξα:
+- `app/components/FaqDeepLink.tsx` (νεο, `'use client'`, progressive enhancement, no-op σε SSR/αν λειπει το
+  FAQ): (α) σε load + `hashchange`, αν το URL hash ταιριαζει FAQ item -> ανοιγει το `<details>` +
+  `scrollIntoView` (honours prefers-reduced-motion). (β) οταν ο χρηστης ανοιγει ερωτηση, ενημερωνει το hash
+  μεσω `history.replaceState` (οχι push -> δεν γεμιζει το back button) ωστε το address bar να δειχνει την
+  ανοιχτη απαντηση και να αντιγραφεται/μοιραζεται.
+- `app/page.tsx`: (α) νεο helper `faqId(q)` -> stable slug `faq-<kebab>` απο το question (deterministic, τα
+  deep links μενουν εγκυρα cross-build)· (β) καθε FAQ `<details>` πηρε `id={faqId(f.q)}`· (γ) render
+  `<FaqDeepLink/>` μεσα στο `#faq` section· (δ) στο JSON-LD FAQPage καθε `Question` πηρε `url:
+  ${SITE_URL}/#${faqId(f.q)}` (legit SEO, δειχνει στο anchor της απαντησης). Import του FaqDeepLink.
+- Μηδεν νεο CSS (τα `<details>`/`.faq-item` styles υπαρχουν ηδη).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static· `/` 2.83 -> 3.08 kB (client component + markup, καμια νεα route).
+- Prerendered `.next/server/app/index.html`: 9 `id="faq-..."` anchors present (faq-is-self-hosting-really-
+  free ... faq-is-my-financial-data-secure) + JSON-LD `ph-aros.com/#faq-...` urls present.
+- em-dash check: 0 σε FaqDeepLink.tsx + page.tsx.
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev στον φακελο· verify μεσω build output + prerendered
+  HTML)· δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ελεγχος για foreign staged files.
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets· annual-billing toggle
+ΜΟΝΟ αφου κλεισουν ετησιες τιμες· ισως «copy link» affordance πανω σε καθε ανοιχτο FAQ.
+
+Needs-Achilleas (open):
+- Terms + Privacy: review + finalize (billing terms, governing-law jurisdiction, provider/processor ονοματα)
+  ΠΡΙΝ hosted launch· μετα flip `robots:{index:false}` -> indexable + add στο sitemap.
+- Annual billing: discount πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
