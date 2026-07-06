@@ -1233,3 +1233,26 @@ Mock pattern: ίδιο DB-seam pattern με το expenses/route.test.ts, αλλ�
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = ΜΟΝΟ το δικό μου receipts/route.test.ts. Στάγιαρα μόνο τα δικά μου paths.
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Untested [id] routes (υψηλή αξία — found→404 pattern): `stores/[id]/route.ts`, `shopping-list/[id]/route.ts` (PATCH/DELETE), `statements/[id]/route.ts`. Untested collection routes: `lists/route.ts`, `notifications/route.ts`, `history/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-06 (cont.⁶ — stores/[id]/route.test.ts, PATCH/DELETE [id] route, always-seeded $set)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/stores/[id]/route.test.ts` για το PATCH/DELETE του `/api/v1/stores/:id`.**
+
+Επιλογή target: ακολούθησα ρητά το suggested next task του προηγ. entry (`stores/[id]/route.ts` ήταν πρώτο στη λίστα untested [id] routes). Route-only logic που ζει αποκλειστικά εδώ και τροφοδοτεί τον mobile store picker + το receipt store field (rename/retag/remove καταστήματος):
+- **Auth gate + id guard**: withAuth → 401 χωρίς token (κανένα write)· `isObjectId` → 400 'bad id' σε malformed id πριν από κάθε DB touch.
+- **PATCH divergence από cards**: το `$set` είναι **ΠΑΝΤΑ seeded με `{ auto:false }`** → ΔΕΝ υπάρχει 'no valid fields' rejection (ακόμα και κενό body κάνει update `{$set:{auto:false}}`, αντίθετα με τα cards). Το `name` (όταν string) trim-άρεται και empty trim → **400 'name cannot be empty' ΠΡΙΝ από κάθε DB touch** (connectDB δεν καλείται στο name-fail path — αλλά ΣΗΜ το withAuth/bearerUser έχει ήδη αγγίξει connectDB, οπότε το meaningful guard είναι `storeUpdate not called`). `url` (όταν string) trimmed· non-string url αγνοείται. `aliases` (όταν present) → real module-local `cleanAliases` (array Ή comma-string → trim + lowercase + drop empties). Missing doc → 404 (write attempted, invalidate NOT fired). Duplicate-name write throw → 400 'A store with that name already exists' (unique-name index), χωρίς invalidate. Success → `invalidateStoreCache()` + bare `{ok:true,id}`.
+- **DELETE**: **HARD** removal (`findByIdAndDelete`, ΟΧΙ soft-delete — regression guard, mirrors web deleteStore) → invalidate + `{ok:true,id}`· 404 όταν missing (χωρίς invalidate).
+
+Mock pattern: ίδιο DB-seam pattern με το cards/[id]/route.test.ts. Mock `@/lib/db` connectDB + `@/models/User` bearerUser chain + `@/models/Store` findByIdAndUpdate/findByIdAndDelete + **`@/lib/storeService` invalidateStoreCache** (νέο seam vs cards, ώστε να επιβεβαιωθεί το firing μόνο σε success). Update mock έχει `throws` flag για το duplicate path. Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody helpers (withAuth + isObjectId) + την ΠΡΑΓΜΑΤΙΚΗ module-local cleanAliases (μέσω του route).
+
+Τι έγινε: Νέο `route.test.ts` (13 tests). **auth gate** (2: PATCH no-token→401 + no update + no invalidate, DELETE unknown-token→401 + no delete). **id guard** (2: PATCH/DELETE malformed id→400 'bad id' + no write). **PATCH** (7: empty body → still updates `{$set:{auto:false}}` + `{ok,id}`· whitespace name→400 'name cannot be empty' + no write· trim name/url + array aliases cleaned [trim/lowercase/drop empties] + auto:false + invalidate ×1· comma-string aliases split· non-string url ignored· missing doc→404 [write attempted, no invalidate]· duplicate throw→400 dup message [no invalidate]). **DELETE** (2: hard findByIdAndDelete + invalidate + `{ok,id}` + no storeUpdate· missing→404 no invalidate).
+
+Τι επαληθεύτηκε:
+- `npx vitest run 'src/app/api/v1/stores/[id]/route.test.ts'` → 13/13 passed (μετά από 1 fix: αφαίρεσα λάθος `connectDBMock not called` assertion — το withAuth/bearerUser αγγίζει ήδη connectDB πριν το name-check).
+- `npx vitest run` (όλο το suite) → 114 files, 1568/1568 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `src/app/api/saas/*` (5× M — pre-existing WIP άλλου routine, ΔΕΝ τα άγγιξα/staged) + το δικό μου stores/[id]/route.test.ts (??). Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Untested [id] routes ακόμα (υψηλή αξία — found→404 pattern): `shopping-list/[id]/route.ts` (PATCH/DELETE), `statements/[id]/route.ts`. Untested collection routes: `lists/route.ts`, `notifications/route.ts`, `history/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
