@@ -1333,6 +1333,7 @@ export default function Home() {
               <p className="footer-heading mono">Legal</p>
               <a href={`${GITHUB_URL}/blob/main/LICENSE`} className="navlink" target="_blank" rel="noopener noreferrer">License (AGPL-3.0)</a>
               <a href="/privacy" className="navlink">Privacy</a>
+              <a href="/terms" className="navlink">Terms</a>
               <a href="/.well-known/security.txt" className="navlink" target="_blank" rel="noopener noreferrer">Security</a>
               <a href="/humans.txt" className="navlink" target="_blank" rel="noopener noreferrer">Credits</a>
               <a href="#faq" className="navlink">FAQ</a>

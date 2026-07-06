@@ -1137,3 +1137,43 @@ Needs-Achilleas (open):
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει οτι λειτουργει πριν launch (waitlist + noscript +
   security.txt + footer Security + νεο privacy page δειχνουν εκει).
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-06 (cont.) — (e) polish: /terms Terms of Service page + footer link
+
+Task: (e) polish. Το προηγουμενο increment (2026-07-06) εβαλε /privacy και σημειωσε ως επομενο «Terms of
+Service stub (ιδιο pattern με privacy, draft+noindex)». Self-contained, μηδεν asset, μηδεν commitment, μηδεν
+Achilleas. Για paid SaaS σε EU, οι οροι χρησης ειναι πραγματικη προ-launch αναγκη διπλα στη Privacy Policy.
+
+Τι εφτιαξα:
+- `app/terms/page.tsx` (νεο static route): πληρες Terms of Service σε plain English, γυρω απο το DUAL model.
+  11 sections: 1 Self-hosted (AGPL-3.0 governs, οχι αυτοι οι οροι, as-is), 2 Hosted SaaS (acceptance),
+  3 Account, 4 Acceptable use (list), 5 Your content (ownership + JSON export, link στο /privacy),
+  6 Plans & billing (advance, third-party processor, τιμες not yet published), 7 Availability & changes,
+  8 Disclaimer & liability (GDPR-safe), 9 Termination, 10 Governing law (Greece), 11 Contact. Ιδιο pattern
+  με /privacy: minimal header (PharosMark + back-home), gradient H1, `Section` helper, gold draft banner +
+  `robots:{index:false, follow:true}`, skip-link, brand vars, inline-link. Reuse υπαρχοντων classes, μηδεν
+  νεο CSS, μηδεν client JS.
+- `app/page.tsx` (footer Legal): `<a href="/terms">Terms</a>` αναμεσα σε Privacy και Security. Legal στηλη
+  5 -> 6 items.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success· τωρα 11+2 routes ○ Static (νεο `/terms` 149 B, 103 kB First Load). `/`
+  αμεταβλητο (μονο ενα footer link).
+- Prerendered `.next/server/app/terms.html`: «Terms of», «Governing law», «Draft in review» present·
+  `<meta name="robots" content="noindex, follow">` σωστο. `.next/server/app/index.html`: `href="/terms"`
+  present στο footer.
+- em-dash check: 0 σε terms/page.tsx + page.tsx.
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev server στον φακελο· verify μεσω build output, αρκετο
+  για static page)· δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ελεγχος για foreign staged files.
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets· annual-billing toggle
+ΜΟΝΟ αφου κλεισουν ετησιες τιμες· ισως μικρο legal sub-nav cross-link Privacy <-> Terms.
+
+Needs-Achilleas (open):
+- Terms + Privacy: review + finalize (billing terms, governing-law jurisdiction, provider/processor ονοματα)
+  ΠΡΙΝ hosted launch· μετα flip `robots:{index:false}` -> indexable + add στο sitemap.
+- Annual billing: discount πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
