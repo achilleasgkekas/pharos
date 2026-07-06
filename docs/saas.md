@@ -310,6 +310,54 @@ is `false` and the timestamp fields are `null`.
 > GitHub/Google-style scheduled-deletion window) held in a single named constant; the
 > final product value is still to be decided.
 
+#### Erasure purge scan (report-only)
+
+Once a workspace passes its grace window (`due: true`), it awaits **permanent
+deletion**. A scheduler surfaces those due workspaces with a **report-only** scan so a
+human can review them before anything is dropped. This route **never drops a database**:
+its result is always `dryRun: true`. The actual destructive drop of a tenant's data
+database is a **separate, manual/gated flow** that a person confirms; it is never
+performed by this route or by any automated routine.
+
+| Method | Path | Auth | Result |
+| --- | --- | --- | --- |
+| `POST` | `/api/saas/workspace/erasure/purge` | `Bearer <CRON_SECRET>` | Reports workspaces past their grace window that await deletion. `{ ok, scanned, dryRun, due, targets }`. `404` when SaaS off, `500` if `CRON_SECRET` unset, `401` on a bad token. |
+
+Like the trial-lapse sweep, this is a **scheduler-driven** endpoint (a scheduler, not
+a user, calls it), so it is guarded by the shared `CRON_SECRET` bearer with a constant-
+time compare and fails closed (`500`) when the secret is unset, rather than by an
+account session. It reads **only the control-plane `Tenant` collection** (via the same
+due-workspace filter as the erasure lifecycle) and takes **zero writes** — the data
+plane is never touched.
+
+```json
+{
+  "ok": true,
+  "scanned": true,
+  "dryRun": true,
+  "due": 1,
+  "targets": [
+    {
+      "id": "<tenant-id>",
+      "slug": "acme",
+      "dbName": "tenant_acme",
+      "requestedAt": "2026-07-06T00:00:00.000Z",
+      "scheduledAt": "2026-08-05T00:00:00.000Z",
+      "requestedBy": "<account-id>",
+      "daysOverdue": 3
+    }
+  ]
+}
+```
+
+Each `target` describes what a confirmed drop **would** remove: the workspace, the name
+of the isolated data database that a real purge would drop (`dbName`), the erasure
+markers, and `daysOverdue` (whole days past the scheduled instant, floored, ≥0 — the
+mirror of `graceDaysLeft`). A candidate with a blank id or blank `dbName` is skipped
+defensively so a report never names an un-purgeable (or unsafe-to-name) workspace. When
+SaaS mode is off the scan is a no-op and returns `scanned: false` with an empty
+`targets` array.
+
 ### Members and invitations
 
 `/api/saas/members` manages a workspace's roster. Gating: 404 when SaaS off, 401

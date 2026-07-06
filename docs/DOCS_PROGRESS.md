@@ -809,3 +809,44 @@ Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/sa
 Επομενο run: sync check αν το erasure/data-export εκτιθεται στο account/workspace-settings UI
 (features.md mention) οταν χτιστει· αλλιως stale-forward-ref sweep ολου του set. Τα 27 saas
 routes πλεον ολα τεκμηριωμενα.
+
+## 2026-07-06 (saas.md: erasure purge SCAN, report-only, GDPR Art. 17)
+
+Το πιο προσφατο commit `4a7c975` (feat(saas): erasure purge scaffold, report-only
+due-workspace scan) προσθεσε νεο SaaS-gated + CRON_SECRET route
+`POST /api/saas/workspace/erasure/purge` που **δεν** ηταν τεκμηριωμενο (grep "purge"
+σε saas.md = 0 hits στο published doc). Διαβασα τα πραγματικα αρχεια
+(`app/api/saas/workspace/erasure/purge/route.ts` + ο planner `lib/tenancy/erasurePurge.ts`)
+και προσθεσα νεα subsection **#### Erasure purge scan (report-only)** μεσα στο
+"Workspace erasure (GDPR)", μετα το graceDays placeholder callout και πριν το
+"Members and invitations".
+
+Τι εγραψα:
+- Πινακας 1 γραμμης: `POST` με `Bearer <CRON_SECRET>`. Result shape
+  `{ ok, scanned, dryRun, due, targets }`. Status codes: `404` SaaS off, `500`
+  CRON_SECRET unset (fail-closed), `401` bad token.
+- Εξηγηση οτι ειναι scheduler-driven (οπως το trials/sweep), constant-time bearer
+  compare, ΟΧΙ account session. Reads ΜΟΝΟ control-plane Tenant collection (ιδιο
+  erasureDueFilter), zero writes, data plane ποτε δεν αγγιζεται.
+- **REPORT-ONLY**: `dryRun` παντα true, ΚΑΝΕΝΑ dropDatabase. Ο πραγματικος drop =
+  ξεχωριστο manual/gated flow που το εγκρινει ανθρωπος, ΠΟΤΕ automated routine.
+- JSON sample (targets[]: id/slug/dbName/requestedAt/scheduledAt/requestedBy/daysOverdue).
+  daysOverdue = whole days past scheduled instant (floored, ≥0), mirror του graceDaysLeft.
+- Defensive skip candidates με blank id/dbName (report ποτε δεν ονομαζει un-purgeable
+  ή unsafe-to-name workspace). SaaS off → scanned:false + empty targets.
+
+Accuracy: καμια τιμη/header/status-code εφευρεθηκε — ολα cross-checked με τον κωδικα
+(dryRun always true, scanned false gate, 404/500/401, ErasurePurgeScanResult keys,
+PurgeTarget keys, tokenMatches constant-time compare). **Διορθωση**: αρχικα εγραψα
+dbName sample `pharos_tenant_acme`· grep-αρα τα tenancy tests → πραγματικη συμβαση
+`tenant_<slug>` → το αλλαξα σε `tenant_acme`. Placeholders μονο `<tenant-id>`/`<account-id>`.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 6 markers
+(3 balanced blocks). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/
+CRON_SECRET=<value>) → clean. Πραγματικος saas route count = 28 (ηταν 27).
+
+Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: sync check αν erasure/purge/data-export εκτιθενται στο workspace-settings UI
+(features.md mention) οταν χτιστει· αλλιως stale-forward-ref sweep ολου του set. Τα 28 saas
+routes πλεον ολα τεκμηριωμενα.
