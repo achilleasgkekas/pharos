@@ -60,6 +60,18 @@ const TenantSchema = new Schema(
       ),
       default: null,
     },
+    // GDPR Art. 17 (right-to-erasure) scheduled-deletion markers (D-erasure). An owner requests
+    // erasure → these are stamped; a purge job later drops the tenant's data database once
+    // `erasureScheduledAt` passes (the destructive drop is a separate, manual/gated flow — NEVER
+    // an automated routine). The request is REVERSIBLE any time before `erasureScheduledAt` by
+    // clearing them again. Kept ORTHOGONAL to `status`: erasure is a scheduled purge, not an
+    // access flip, so an owner can keep using the workspace (and change their mind) during the
+    // grace window without a prior-status-restoration dance. Written ONLY by lib/tenancy/erasure.
+    // All null-default ⇒ fully backward-compatible; self-hosted never creates Tenant docs.
+    erasureRequestedAt: { type: Date, default: null },
+    erasureScheduledAt: { type: Date, default: null, index: true },
+    // Account id of the owner who requested erasure (audit-adjacent; display/pointer only).
+    erasureRequestedBy: { type: String, default: null },
   },
   { timestamps: true }
 );

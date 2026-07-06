@@ -28,6 +28,8 @@ export const AUDIT_ACTIONS = [
   'workspace.canceled',
   'workspace.suspended',
   'workspace.reactivated',
+  'workspace.erasure_requested',
+  'workspace.erasure_canceled',
   'ai_key.set',
   'ai_key.cleared',
 ] as const;

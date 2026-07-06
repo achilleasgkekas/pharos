@@ -1750,3 +1750,59 @@ User-path/bearer-path αγγίχτηκε. Collision guard: staging καθαρό,
 connection → προσοχή), είτε (β) account/workspace erasure-request lifecycle (soft, reversible
 grace· destructive purge deferred), είτε (γ) BYO-key AI-dispatch consumption / in-process 6h cron
 (και τα δύο αγγίζουν shared runtime → άδεια), είτε (δ) user-facing workspace-settings UI panels.
+
+## 2026-07-06 (increment 44 — workspace ERASURE lifecycle, opens GDPR Art. 17)
+**Το κενό:** το increment 43 έδωσε GDPR **access/portability** (Art. 15/20 account export)· έλειπε
+το **right-to-erasure** (Art. 17), που το §15 σημειώνει `blocking για SaaS`. Έκλεισα το πρώτο,
+ασφαλέστερο κομμάτι: το **scheduled-deletion lifecycle** (request → grace window → cancel), soft +
+πλήρως reversible· ο πραγματικός destructive drop της tenant db μένει **deferred** (manual/gated,
+ΠΟΤΕ από routine). ΟΛΟ additive + SaaS-gated, σε δικά μου SAAS αρχεία:
+- `models/Tenant.ts` (additive edit, control-plane μου) — 3 νέα markers `erasureRequestedAt`/
+  `erasureScheduledAt`(indexed)/`erasureRequestedBy`, όλα default null. **Orthogonal στο `status`**:
+  η erasure είναι scheduled purge, ΟΧΙ access flip → ο owner κρατά πρόσβαση στο grace window και
+  μπορεί ν' αλλάξει γνώμη, χωρίς prior-status-restoration dance (και χωρίς conflict με το reactivate
+  flow). Null-default ⇒ πλήρως backward-compatible· self-hosted δεν φτιάχνει Tenant docs → zero effect.
+- `lib/tenancy/audit.ts` (additive edit, δικό μου) — 2 νέες actions `workspace.erasure_requested` /
+  `workspace.erasure_canceled` (το audit.test «accepts every declared action» τις καλύπτει auto,
+  καμία length assertion → μηδέν breakage).
+- `lib/tenancy/erasure.ts` (νέο). **PURE** (unit-tested): `ERASURE_GRACE_DAYS=30` (placeholder),
+  `canEraseWorkspace` (owner-only, stricter από owner/admin — mirror του cancel), `erasureScheduledFor`
+  (requestedAt+grace, garbage/negative → default, ποτέ purge στο παρελθόν), `graceDaysLeft` (ceil +
+  clamp≥0, null χωρίς schedule), `isErasureDue`/`isErasureRequested`, `planErasureRequest(accountId,
+  now, graceDays?)` (→ `$set` των 3 markers ή null αν blank id — must be attributable· ΔΕΝ αγγίζει
+  status), `planErasureCancel()` (→ null και στα 3), `erasureDueFilter(now)` (`{erasureScheduledAt:
+  {$ne:null,$lte:now}}` για το deferred purge job), `erasureView` (client-safe projection + computed
+  grace/due). Injected `now`/`graceDays` παντού για deterministic tests.
+- `app/api/saas/workspace/erasure/route.ts` (νέο) — GET (erasure state, any active member) / POST
+  (schedule, **owner-only**, idempotent) / DELETE (cancel μέσα στο grace, owner-only, idempotent),
+  ΟΛΑ `saasGuard` + `resolveWorkspaceSession(slug,false,allowInactive=true)` (ο owner mid-erasure —
+  που ίσως έχει και canceled workspace — διαβάζει/ακυρώνει κανονικά) + `canEraseWorkspace` gate +
+  audit (scheduledAt/graceDays μόνο στο meta). 403 μη-owner, 400 μη-attributable, 404 off.
+- `lib/tenancy/erasure.test.ts` (νέο) — 14 PURE tests (owner-only· scheduledFor default/custom/
+  garbage/0· isErasureRequested· graceDaysLeft ceil/clamp/null· isErasureDue boundary· planRequest
+  markers-not-status/trim/blank-null· planCancel· dueFilter shape· view populated/empty/due).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run erasure.test.ts audit.test.ts` →
+**38/38 green**· full suite `npx vitest run` → **1531/1531 green** (111 files, +14 νέα, καμία
+regression). Το route SAAS-gated (404 off)· τα helpers είναι pure + import-free ⇒ `SAAS_MODE` off /
+default tenant = **zero effect** (κανένα Tenant doc, το route δεν mount-άρει, τα markers default
+null). Κανένας Docker rebuild (additive gated route + PURE module + optional model fields, μηδέν
+shared runtime wiring — type-check+tests καλύπτουν)· καμία νέα εξάρτηση· κανένα feature route/data-db/
+User-path/bearer-path αγγίχτηκε. Collision guard: staging καθαρό, μόνο τα δικά μου paths.
+
+**## Needs Achilleas** (erasure go-live):
+- **Actual purge** (destructive): ο `erasureDueFilter` είναι έτοιμος να βρίσκει due tenants, αλλά
+  το πραγματικό drop της isolated tenant db (`useDb(dbName).dropDatabase()`) + delete των Tenant/
+  Membership docs είναι **destructive** → scaffold-only τώρα· ο drop = Needs-Achilleas (χειροκίνητο/
+  gated, ποτέ από routine). Επόμενο increment: purge-planner (ids-only, pure) + gated CRON route που
+  ΜΟΝΟ σημειώνει/reportάρει, χωρίς πραγματικό drop μέχρι explicit άδεια.
+- **Access-block στο grace window (optional)**: εσκεμμένα η erasure είναι orthogonal στο status
+  (scheduled-deletion μοντέλο GitHub/Google-style, ο owner κρατά πρόσβαση + μπορεί ν' ακυρώσει). Αν
+  θελήσει «immediate restrict on request», θα ήθελε wiring στο `workspaceStatusError`/`resolveWorkspaceSession`
+  (shared plumbing → χωριστό προσεκτικό increment).
+- **Grace length** `ERASURE_GRACE_DAYS=30` = placeholder μέχρι final product decision.
+
+**Next task:** increment 45 — είτε (α) erasure PURGE scaffold (ids-only pure planner + gated CRON
+route που reportάρει due tenants ΧΩΡΙΣ drop· ο drop = Needs-Achilleas), είτε (β) per-tenant CONTENT
+export scaffold (§8, αγγίζει per-tenant connection → προσοχή), είτε (γ) BYO-key AI-dispatch consumption
+/ in-process 6h cron (shared runtime → άδεια), είτε (δ) user-facing workspace-settings UI panels.
