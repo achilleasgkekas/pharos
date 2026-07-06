@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
-import { saasAuthGate, accountTenants } from '@/lib/tenancy/saasApi';
+import { saasAuthGate, saasGuard, accountTenants } from '@/lib/tenancy/saasApi';
 import { getCurrentAccount } from '@/lib/tenancy/accountSession';
 import { getTenantContext } from '@/lib/tenancy/context';
 import { currentUsage, aiQuotaStatus, storageQuotaStatus } from '@/lib/billing/usage';
@@ -25,46 +25,48 @@ export async function GET(req: Request) {
   const gate = saasAuthGate();
   if (gate) return gate;
 
-  const claims = await getCurrentAccount();
-  if (!claims) return NextResponse.json({ error: 'not authenticated' }, { status: 401 });
+  return saasGuard(async () => {
+    const claims = await getCurrentAccount();
+    if (!claims) return NextResponse.json({ error: 'not authenticated' }, { status: 401 });
 
-  await connectDB();
-  const tenants = await accountTenants(claims.sub);
-  if (tenants.length === 0) {
-    return NextResponse.json({ error: 'no workspace for this account' }, { status: 404 });
-  }
+    await connectDB();
+    const tenants = await accountTenants(claims.sub);
+    if (tenants.length === 0) {
+      return NextResponse.json({ error: 'no workspace for this account' }, { status: 404 });
+    }
 
-  const want = new URL(req.url).searchParams.get('tenant')?.trim().toLowerCase() || null;
-  const chosen = want ? tenants.find((t) => t.slug === want) : tenants[0];
-  if (!chosen) {
-    return NextResponse.json({ error: 'not a member of that workspace' }, { status: 403 });
-  }
+    const want = new URL(req.url).searchParams.get('tenant')?.trim().toLowerCase() || null;
+    const chosen = want ? tenants.find((t) => t.slug === want) : tenants[0];
+    if (!chosen) {
+      return NextResponse.json({ error: 'not a member of that workspace' }, { status: 403 });
+    }
 
-  const ctx = await getTenantContext({ slug: chosen.slug });
-  if (!ctx) return NextResponse.json({ error: 'workspace not found' }, { status: 404 });
+    const ctx = await getTenantContext({ slug: chosen.slug });
+    if (!ctx) return NextResponse.json({ error: 'workspace not found' }, { status: 404 });
 
-  const usage = await currentUsage(ctx);
-  return NextResponse.json({
-    tenant: { slug: chosen.slug, name: chosen.name, plan: ctx.plan, status: ctx.status, role: chosen.role },
-    period: usage.period,
-    usage: {
-      aiCalls: usage.aiCalls,
-      aiInputTokens: usage.aiInputTokens,
-      aiOutputTokens: usage.aiOutputTokens,
-      aiCostMicros: usage.aiCostMicros,
-      storageBytes: usage.storageBytes,
-      metered: usage.metered,
-    },
-    quotas: {
-      ai: aiQuotaStatus(ctx.plan, usage.aiCalls),
-      storage: storageQuotaStatus(ctx.plan, usage.storageBytes),
-    },
-    cost: buildCostSummary({
+    const usage = await currentUsage(ctx);
+    return NextResponse.json({
+      tenant: { slug: chosen.slug, name: chosen.name, plan: ctx.plan, status: ctx.status, role: chosen.role },
       period: usage.period,
-      aiCalls: usage.aiCalls,
-      aiInputTokens: usage.aiInputTokens,
-      aiOutputTokens: usage.aiOutputTokens,
-      aiCostMicros: usage.aiCostMicros,
-    }),
+      usage: {
+        aiCalls: usage.aiCalls,
+        aiInputTokens: usage.aiInputTokens,
+        aiOutputTokens: usage.aiOutputTokens,
+        aiCostMicros: usage.aiCostMicros,
+        storageBytes: usage.storageBytes,
+        metered: usage.metered,
+      },
+      quotas: {
+        ai: aiQuotaStatus(ctx.plan, usage.aiCalls),
+        storage: storageQuotaStatus(ctx.plan, usage.storageBytes),
+      },
+      cost: buildCostSummary({
+        period: usage.period,
+        aiCalls: usage.aiCalls,
+        aiInputTokens: usage.aiInputTokens,
+        aiOutputTokens: usage.aiOutputTokens,
+        aiCostMicros: usage.aiCostMicros,
+      }),
+    });
   });
 }

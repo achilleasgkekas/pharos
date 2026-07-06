@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 import { saasMode } from '@/lib/tenancy/saasMode';
+import { saasGuard } from '@/lib/tenancy/saasApi';
 import { runTrialLapseSweep } from '@/lib/billing/trialSweep';
 
 export const runtime = 'nodejs';
@@ -41,6 +42,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  const result = await runTrialLapseSweep();
-  return NextResponse.json({ ok: true, ...result });
+  return saasGuard(async () => {
+    const result = await runTrialLapseSweep();
+    return NextResponse.json({ ok: true, ...result });
+  });
 }

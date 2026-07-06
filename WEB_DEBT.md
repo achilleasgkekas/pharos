@@ -30,7 +30,7 @@
   - ΣΗΜ: αυτό ξαναεξετάζει τη σκόπιμη «read-only exemption» του item 565 (row DONE slice 2/2). Δικαιολογία revisit: και τα 5 κάνουν non-trivial DB work → «rarely throw» δεν σημαίνει «ποτέ». `auth/logout` (μηδέν DB) + `audit`/`invites` GET (ήδη έχουν gate που δεν throw-άρει σε happy path) ΜΠΟΡΟΥΝ να μείνουν εκτός· focus στα 5 DB-touching.
   - Επαλήθευση: `for f in usage billing auth/session usage/sample trials/sweep; do grep -c saasGuard "apps/web/src/app/api/saas/$f/route.ts"; done` → όλα ≥1.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-06, 48η σάρωση· live-verified guardless: `grep -c saasGuard` = 0 και στα 5, `grep -c 'try {'` = 0, dbTouch 2-9)
+- Status: DONE (2026-07-06 builder — και τα 5 routes τυλιγμένα σε `saasGuard` μετά το gate/token ladder· `grep -c saasGuard` = 2 σε καθένα· type-check EXIT 0· 1555 tests green· safe Docker rebuild `/login` 200 + κάθε route JSON 401 [ΟΧΙ HTML]· builder cache −2.12GB)
 
 ### `search-actions.ts` — 7× `as any[]` παρακάμπτουν το type-checking στα lean results
 - Priority: P3
