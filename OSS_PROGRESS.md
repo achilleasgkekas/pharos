@@ -1190,3 +1190,25 @@ Mock pattern: ίδιο DB-seam pattern με τα προηγ. route tests, αλλ
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `src/app/receipts/actions.ts` (M) + `src/lib/htmlReceipt.ts`/`htmlReceipt.test.ts` (?? — pre-existing WIP άλλου routine, ΔΕΝ τα άγγιξα/staged) + το δικό μου stores/route.test.ts. Στάγιαρα μόνο τα δικά μου paths.
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock pattern. Υψηλής αξίας ακόμα untested collection routes: `shopping-list/route.ts`, `receipts/route.ts`. Untested [id] routes: `stores/[id]/route.ts`, `shopping-list/[id]/route.ts`, `statements/[id]/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-06 (cont.⁴ — shopping-list/route.test.ts, GET/POST collection route)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/shopping-list/route.test.ts` για το GET/POST του `/api/v1/shopping-list`.**
+
+Επιλογή target: ακολούθησα ρητά το suggested next task του προηγ. entry (το `shopping-list/route.ts` ήταν πρώτο στη λίστα «untested collection routes»). Το route είναι λεπτό (delegate σε getListItems/addListItem), αλλά το response SHAPE + error mapping ζουν αποκλειστικά εδώ και ένα drift σιωπηλά διαφθείρει το mobile shopping list:
+- **GET**: `{ items }` wrapper (ΟΧΙ το standard apiList envelope — μηδέν data/total/limit), mapped απευθείας από το `getListItems()`.
+- **POST**: τα 5 πεδία περνούν από `strField` **ΧΩΡΙΣ trim flag** (`String(b[k]||'')` coercion — non-strings stringified, missing → '')· το `name` δεν trim-άρεται στο route, το trim + required-check γίνεται μέσα στο `addListItem`. Το failure path: `addListItem {ok:false}` → `apiError(r.error || 'Bad request')` → 400 (με το r.error Ή το 'Bad request' fallback όταν λείπει), και **ΚΑΝΕΝΑ items re-fetch** (το getListItems δεν καλείται στο fail). Το success path: 201 `{ ok:true, items }` με τη φρέσκα re-fetched λίστα.
+
+Mock pattern: το route δεν αγγίζει models απευθείας — delegate σε actions, οπότε mock το `@/app/shopping-list/actions` (getListItems + addListItem) στο seam, μαζί με το auth seam (`@/lib/db` connectDB + `@/models/User` bearerUser chain). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody helpers (withAuth + strField + apiError) ώστε το coercion + auth gate + error wrapping να είναι αληθινά.
+
+Τι έγινε: Νέο `route.test.ts` (8 tests). **auth gate** (2: GET no-token→401 + getListItems untouched, POST unknown-token→401 + no add). **GET listing** (2: `{items}` wrapper [όχι data/total] straight off getListItems· empty → `{items:[]}`). **POST validation** (2: addListItem `{ok:false,error:'Name required'}` → 400 με το error + ΚΑΝΕΝΑ re-fetch· `{ok:false}` χωρίς error → 400 'Bad request' fallback). **POST create** (2: 5 strField πεδία un-trimmed στο addListItem [το ίδιο κάνει το trim μετά] + 201 `{ok,items}` με re-fetched λίστα· non-string quantity 4 → '4' & missing category/brand/note → '').
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/shopping-list/route.test.ts` → 8/8 passed.
+- `npx vitest run` (όλο το suite) → 110 files, 1517/1517 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = ΜΟΝΟ το δικό μου shopping-list/route.test.ts. Στάγιαρα μόνο τα δικά μου paths (route.test.ts + OSS_PROGRESS.md).
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Υψηλής αξίας ακόμα untested collection routes: `receipts/route.ts` (GET/POST). Untested [id] routes: `stores/[id]/route.ts`, `shopping-list/[id]/route.ts` (PATCH/DELETE, found→404 pattern), `statements/[id]/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
