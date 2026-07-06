@@ -1851,3 +1851,55 @@ green**· full suite `npx vitest run` → **1555/1555 green** (113 files, +13 ν
 connection → προσοχή), είτε (β) user-facing workspace-settings UI panels (όλα τα read/write control-plane
 APIs έτοιμα: profile, members, billing, ai-key, erasure, τώρα και το purge report), είτε (γ) BYO-key
 AI-dispatch consumption / in-process 6h cron (και τα δύο αγγίζουν shared runtime → άδεια).
+
+## 2026-07-06 (increment 46 — per-tenant CONTENT export scaffold, closes §8 "Per-tenant export")
+**Το κενό:** το increment 43 έδωσε GDPR **account** export (login identity: profile + memberships).
+Το §8 ζητά ρητά «Per-tenant … export» και το §15 σημειώνει GDPR portability ως blocking — έλειπε
+το **workspace CONTENT** export (Items/Receipts/… που ζουν στην isolated tenant DB). Έκλεισα το
+συμπλήρωμα του account export: ένα **READ-ONLY** workspace-content export (GDPR Art. 20 σε
+workspace level). ΟΛΟ additive + SaaS-gated, σε δικά μου SAAS αρχεία:
+- `lib/tenancy/workspaceExport.ts` (νέο). **PURE** assembler + helpers (unit-tested): `buildWorkspaceExport(meta,collections,generatedAt,maxDocs)` → σταθερό envelope `{format:'pharos.
+  workspace-export', version:1, generatedAt(ISO), notice(GDPR), workspace{slug/name/plan/status},
+  maxDocsPerCollection, collections[]}` (name→slug fallback, invalid date→epoch, ποτέ blank),
+  `isExportableCollection` (skip `system.*` + non-names), `resolveMaxDocs(env, fallback=10000)`
+  (non-numeric/≤0→default, floored), `workspaceExportFilename(slug)` (safe charset + path-traversal
+  strip + non-empty fallback). **Impure** `collectWorkspaceData(ctx, maxDocs)`: ο ΜΟΝΟΣ node reader —
+  **model-agnostic raw-driver collection dump** μέσω `tenantDb(ctx)` (μηδέν feature-model import →
+  πλήρως decoupled από το feature territory), reads `maxDocs+1` για truncation-flag χωρίς extra
+  count, **READ-ONLY** (ποτέ write), stable sort. OSS parity: refuse του `isDefault`/no-tenantId
+  (self-hosted έχει ήδη δικό του JSON backup) → `[]`, μηδέν connection.
+- `app/api/saas/workspace/export/route.ts` (νέο) — `GET [?tenant=<slug>]` → attachment JSON,
+  `no-store`. `saasGuard` + `resolveWorkspaceSession(slug, requireManage=true, allowInactive=true)`:
+  owner/admin only (το export περιέχει ΟΛΩΝ των members τα δεδομένα → data-controller action, όχι
+  self-service)· allowInactive ώστε suspended/canceled workspace να μπορεί ακόμα να πάρει τα δεδομένα
+  του (portability δεν gate-άρεται σε billing status). Audit `workspace.data_exported` (μόνο
+  collections/docs/truncated counts στο meta, ποτέ περιεχόμενο).
+- `lib/tenancy/audit.ts` (additive edit, δικό μου) — νέα action `workspace.data_exported` (το
+  audit.test «accepts every declared action» την καλύπτει auto, καμία length assertion).
+- `lib/tenancy/workspaceExport.test.ts` (νέο) — 10 PURE tests (envelope shape/ISO/notice, workspace
+  projection + name/slug fallback, collection pass-through + truncated, invalid-date→epoch,
+  isExportableCollection system-skip, resolveMaxDocs default/floor, filename safety+traversal).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run` → **1578/1578 green** (115 files,
++10 νέα, καμία regression). External importers του `workspaceExport` από feature code → **κανένας**
+(μόνο το δικό μου SaaS route)· το route SAAS-gated (404 off). ⇒ `SAAS_MODE` off / default tenant =
+**zero effect** (το route δεν mount-άρει, ο reader refuse-άρει τον default tenant → μηδέν DB hit).
+Κανένας Docker rebuild (νέα PURE-heavy module + additive gated route + 1 audit action, μηδέν shared
+runtime wiring — type-check+tests καλύπτουν)· καμία νέα εξάρτηση· κανένα feature route/data-db/
+User-path/bearer-path αγγίχτηκε. Collision guard: staging καθαρό, μόνο τα δικά μου paths.
+
+**## Needs Achilleas** (workspace export πληρότητα):
+- **Πλήρες (μη-capped) export**: ο per-collection cap `WORKSPACE_EXPORT_MAX_DOCS=10000` (env) είναι
+  scaffold guard κατά OOM· collection πάνω από το cap φλαγκάρεται `truncated:true`. Πλήρες streaming
+  export (NDJSON / gzip / per-collection paging) = μελλοντικό increment όταν μεγαλώσουν τα datasets.
+- **File binaries ΔΕΝ περιλαμβάνονται**: το export dump-άρει ΜΟΝΟ τα Mongo collections· τα receipt
+  PDFs / item photos ζουν στο STORAGE_ROOT/remote backend, ΟΧΙ στη Mongo (ίδιο caveat με το
+  storage-metering #9). Χρειάζεται ξεχωριστό increment που πακετάρει τα tenant files (zip/tar) δίπλα.
+- **Right-to-erasure purge** (Art. 17): ο destructive drop της tenant db (από #44/#45 scaffold)
+  παραμένει manual/gated — ΠΟΤΕ από routine.
+
+**Next task:** increment 47 — είτε (α) workspace file-binary export (πακετάρει τα tenant STORAGE_ROOT
+files δίπλα στο content dump· αγγίζει storage abstraction read-only → προσοχή), είτε (β) user-facing
+workspace-settings UI panels (όλα τα read/write control-plane APIs έτοιμα: profile, members, billing,
+ai-key, erasure, purge report, τώρα και content-export), είτε (γ) BYO-key AI-dispatch consumption /
+in-process 6h cron (και τα δύο αγγίζουν shared runtime → άδεια).
