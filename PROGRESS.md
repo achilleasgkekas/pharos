@@ -4205,3 +4205,28 @@ Read-only mobile UI-consistency audit web↔mobile (design tokens / shared theme
 **Verified:** `apps/mobile npx tsc --noEmit` → **EXIT 0**. Working tree στην αρχή είχε `WEB_DEBT.md` (parallel edit άλλης routine) — ΔΕΝ αγγίχτηκε· stage-άρισα ΜΟΝΟ το `ShoppingScreen.tsx`. Δεν έγινε rebuild (mobile-only, no web runtime change).
 
 **Επόμενο suggested task:** **ReceiptsScreen 6× `einput` → `<Input variant="surface">`** (τα 5-6 top-level fields store/date/pay/total/notes· P3/S, tsc-verifiable, mobile-only, committed/non-WIP πλέον). Τα 3 compact `cellInput` (qty/net/vat tight grid) μένουν attended-preferred λόγω visual delta χωρίς simulator.
+
+## 2026-07-06 (web-code-quality auditor, 48η σάρωση)
+Read-only code-quality audit της Next.js web επιφάνειας (fresh grep, όχι docs read-back). `cd apps/web && npm run type-check` → **EXIT 0**. Σαρώθηκαν: 51 v1 route files + 27 saas route files + `apiAuth`/`apiBody`/`apiList` + `lib/tenancy/*` + `lib/billing/*` + `models/*` + `search-actions.ts` + mcp/files routes.
+
+**Ευρήματα ανά διάσταση:**
+- **Type safety:** 1 cluster = `search-actions.ts` 7× `as any[]` στα lean results (γρ.67/78/88/98/108/118/129· μοναδικό μη-infra `as any` στο src· `softDelete.ts:38` + tenancy σχόλια = false positives). type-check EXIT 0 → μηδέν TS error.
+- **Input validation:** 0 gaps — `readBody`/`apiBody` υιοθετημένα καθολικά· μηδέν `req.json().catch` σε v1.
+- **Error handling:** 1 finding = 5 guardless DB-touching SaaS read+cron routes (usage/billing/auth-session/usage-sample/trials-sweep) χωρίς `saasGuard`/`try` → HTML 500 αντί `{ error }` σε DB throw. Τα SaaS write routes ΕΚΛΕΙΣΑΝ (item 565 DONE, slice 2/2 live-verified).
+- **Auth:** 0 unguarded — v1 όλα `withAuth` (εκτός login), saas όλα gated, mcp/files bearer/session.
+- **Mongoose:** 0 νέα — read routes `.limit`+`.lean`· hot-path indexes καλυμμένα (User.apiToken, Notification, Tenant/Account sparse)· τα no-limit aggregations single-tenant bounded (prior-accepted).
+- **Dead code/dup:** 0 νέα.
+
+**Builder έκλεισε 2 items** από τον προηγ. marker (live-verified): v1 `auth/login` apiError swap (→ DONE) + SaaS try/catch slice 2/2 (members+invites/resend+billing×2+auth×2 → item 565 DONE πλήρως).
+
+**Counts: P1=0, P2=1 νέο (saasGuard reads/cron), P3=1 νέο (search-actions typing).** 48η συνεχόμενη σάρωση χωρίς P1.
+
+**Top 3 για τον builder:**
+1. **[P2/S] saasGuard στα 5 guardless DB reads/cron** (usage/billing/auth-session/usage-sample/trials-sweep) — ο helper υπάρχει, μηχανικό wrap, tsc-verifiable.
+2. **[P3/S] `search-actions.ts` 7× `as any[]` → typed lean shapes** — καθαρά type-safety, μηδέν behavior change.
+3. (καμία άλλη auto-buildable· τα 2 decision-flag θέλουν απόφαση, βλ. Needs Achilleas).
+
+### Needs Achilleas
+- **Reset-request timing side-channel** (`saas/account/reset/request/route.ts:43` no-account fast-path πριν mint+mail): delivery-semantics tradeoff (`void sendEmail` vs `await`), θέλει σκόπιμη απόφαση.
+- **getTenantConnection readyState guard** (`connection.ts:54` δέχεται readyState 0 disconnected ως cached-live): ambiguous rebuild-semantic, 0 importers, dead-until-SaaS.
+- **saasGuard read-route revisit:** το νέο P2/S item ξαναεξετάζει τη σκόπιμη «read-only exemption» του item 565. Αν ο Achilleas προτιμά να μείνουν εξαιρεμένα (rarely-throw stance), κλείσε το ως WONTFIX· αλλιώς ο builder μπορεί να το καταναλώσει unattended (μηχανικό, μηδέν product decision).

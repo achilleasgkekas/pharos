@@ -3,6 +3,51 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-06 48η σάρωση· type-check EXIT 0· builder έκλεισε 2 items από τον προηγ. marker [auth/login apiError + SaaS try/catch slice 2/2] → 2 νέα auto-buildable items στην ουρά [1 P2/S + 1 P3/S] + 2 decision-flag [Achilleas])
+
+- **type-check:** `cd apps/web && npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
+- **Builder έκλεισε 2 items** από τον προηγ. marker (live-verified): (α) **v1 `auth/login` apiError swap** (γρ.6 import + γρ.29/33/38 `apiError(...)`· το μοναδικό inline-error v1 route ενοποιήθηκε) → **DONE**· (β) **SaaS try/catch slice 2/2** (members + invites/resend + billing/checkout + billing/portal + auth/login + auth/signup όλα `saasGuard`-wrapped τώρα· `grep -c saasGuard` = 2-5 ανά route, `try {` = 0) → το item 565 κλείνει **DONE πλήρως** (κάθε SaaS **write** route περνά από `saasGuard`).
+- **2 νέα auto-buildable ευρήματα (fresh grep, όχι docs):**
+  - **[P2/S] Guardless DB-touching SaaS read+cron routes** — `usage` (dbTouch 9), `billing` (dbTouch 8), `auth/session` (dbTouch 5), `usage/sample` (cron, dbTouch 2), `trials/sweep` (cron, dbTouch 2) κάνουν `connectDB()`+Mongoose queries (accountTenants/getTenantContext/currentUsage/Tenant.findById/Account.findById/sampleAllTenants/runTrialLapseSweep) **χωρίς `saasGuard` ΚΑΙ χωρίς `try/catch`** → ένα mid-handler DB throw (Mongo failover / net blip) γυρίζει Next HTML 500 αντί για το uniform `{ error }` JSON. Οι προηγ. σαρώσεις (item 565) τα εξαίρεσαν σκόπιμα ως «rarely throw» — αλλά και τα 5 κάνουν non-trivial DB work, οπότε αξίζει η ενοποίηση για πλήρη shape-consistency. Νέο item παρακάτω.
+  - **[P3/S] `search-actions.ts` 7× `as any[]`** — τα 7 `.lean()` results (items/receipts/statements/tasks/subs/expenses/vouchers) γίνονται iterate ως `as any[]` (γρ.67/78/88/98/108/118/129), παρακάμπτοντας το type-checking στα πεδία που διαβάζονται (`_id`, `status`, `store`, `total`, κ.λπ.). Είναι το μοναδικό μη-infra `as any` σε όλο το `src` (τα `softDelete.ts:38` Mongoose pre-hook override + τα tenancy σχόλια είναι false positives). Νέο item παρακάτω.
+- **Ουρά μετά το run:** 2 auto-buildable TODO (P2/S saasGuard reads/cron, P3/S search-actions typing) + 2 decision-flag [Achilleas] (reset-request timing side-channel· getTenantConnection readyState guard· αμφότερα code-verified ανοιχτά).
+- **Καθαρό αλλού (fresh grep):** κάθε v1 read route `.limit(p.limit)`+`.lean()` (τα no-limit calendar/settings/cards/reports/overview είναι single-tenant bounded aggregations, prior-accepted)· hot-path indexes καλυμμένα (`User.apiToken index:true`, `Notification` field-indexes, `Tenant`/`Account` sparse indexes)· mcp + files routes gated (bearer / session-ή-bearer)· κάθε v1 route εκτός `auth/login` περνά από `withAuth`. Card/Store `findOne({name/last4})` χωρίς index = tiny single-user collections, ΟΧΙ debt.
+
+---
+
+## Web Debt Queue — ενεργά items (48η σάρωση 2026-07-06)
+
+### Guardless DB-touching SaaS read + cron routes → ασυνεπές HTML 500 αντί `{ error }`
+- Priority: P2
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/saas/usage/route.ts, apps/web/src/app/api/saas/billing/route.ts, apps/web/src/app/api/saas/auth/session/route.ts, apps/web/src/app/api/saas/usage/sample/route.ts, apps/web/src/app/api/saas/trials/sweep/route.ts
+- Depends on: none (ο helper `saasGuard` υπάρχει ήδη στο `lib/tenancy/saasApi.ts`, χρησιμοποιείται σε ΟΛΑ τα write SaaS routes)
+- Acceptance:
+  - **Το πρόβλημα:** το item 565 έκλεισε το try/catch effort για τα SaaS **write** routes, αλλά τα εναπομείναντα DB-touching routes μένουν χωρίς `saasGuard` ΚΑΙ χωρίς `try/catch`: `usage/route.ts` (accountTenants+getTenantContext+currentUsage), `billing/route.ts` (accountTenants+getTenantContext+Tenant.findById), `auth/session/route.ts` (Account.findById+accountTenants), `usage/sample/route.ts` (sampleAllTenants), `trials/sweep/route.ts` (runTrialLapseSweep). Ένα thrown DB error (Mongo failover, connection drop) βγαίνει ως Next default HTML 500, ΟΧΙ ως το `{ error }` JSON shape που περιμένει κάθε άλλος client-consumer.
+  - **Fix:** τύλιξε το σώμα κάθε handler (μετά το `saasAuthGate()`/token-gate, που επιστρέφουν early χωρίς throw) σε `return saasGuard(async () => { ...υπάρχον σώμα... })`. Ίδιο pattern με τα write routes (`saasGuard` mirror του `withAuth` catch). Import `{ saasGuard }` από `@/lib/tenancy/saasApi` όπου λείπει.
+  - Response shapes (200 payloads, gate 401/404/403 short-circuits, cron `{ ok, ...result }`) + η σειρά των gate ladders ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· αλλάζει ΜΟΝΟ η συμπεριφορά σε **unexpected throw** → καθαρό `{ error }` 500. SaaS-only, μηδέν επίδραση στον v1 mobile surface.
+  - ΣΗΜ: αυτό ξαναεξετάζει τη σκόπιμη «read-only exemption» του item 565 (row DONE slice 2/2). Δικαιολογία revisit: και τα 5 κάνουν non-trivial DB work → «rarely throw» δεν σημαίνει «ποτέ». `auth/logout` (μηδέν DB) + `audit`/`invites` GET (ήδη έχουν gate που δεν throw-άρει σε happy path) ΜΠΟΡΟΥΝ να μείνουν εκτός· focus στα 5 DB-touching.
+  - Επαλήθευση: `for f in usage billing auth/session usage/sample trials/sweep; do grep -c saasGuard "apps/web/src/app/api/saas/$f/route.ts"; done` → όλα ≥1.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-06, 48η σάρωση· live-verified guardless: `grep -c saasGuard` = 0 και στα 5, `grep -c 'try {'` = 0, dbTouch 2-9)
+
+### `search-actions.ts` — 7× `as any[]` παρακάμπτουν το type-checking στα lean results
+- Priority: P3
+- Size: S
+- Area: shared
+- Files: apps/web/src/app/search-actions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα:** το `searchAll` κάνει 7 `.lean().select(...)` queries και μετά iterate κάθε result ως `for (const it of items as any[])` (γρ.67/78/88/98/108/118/129). Το `as any[]` σβήνει το type-checking στα πεδία που διαβάζονται (`it._id`, `it.status`, `it.currentPrice`, `rc.store`, `rc.total`, `st.card`, `st.period`, κ.λπ.) → ένα typo ή schema drift δεν πιάνεται από τον compiler. Είναι το μοναδικό μη-infra `as any` σε όλο το `src`.
+  - **Fix:** δήλωσε ανά query ένα narrow lean type (π.χ. `type ItemHit = { _id: unknown; title?: string; status?: string; currentPrice?: number; purchasedPrice?: number }`) που ταιριάζει με το `.select(...)` projection, και κάνε cast το result του `.lean()` σε `ItemHit[]` (ή annotate το `Promise.all` destructuring). Αντικατέστησε τα 7 `as any[]` με τα typed arrays. Το ίδιο pattern χρησιμοποιείται ήδη στα v1 routes (`.lean() as ItemLean[]`).
+  - Το output (`SearchHit[]` shape: type/id/title/subtitle/href) + η ranking σειρά + τα `cur()`/`OWNED_STATUSES` reads ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· καθαρά type-safety, μηδέν αλλαγή συμπεριφοράς.
+  - Μηδέν `as any` απομένει στο `search-actions.ts` (`grep -c 'as any' apps/web/src/app/search-actions.ts` = 0).
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-06, 48η σάρωση· live: γρ.67/78/88/98/108/118/129 `as any[]`)
+
+---
+
 ## Σύνοψη audit (2026-07-04 46η σάρωση· type-check EXIT 0· builder έκλεισε 2 items → ουρά 4→2· ΚΑΙ ΤΑ 2 εναπομείναντα είναι decision-flag [Achilleas], ΜΗΔΕΝ auto-buildable αριστερά)
 
 - **type-check:** `npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
@@ -488,7 +533,7 @@
   - Πρόσθεσε `apiError` στο υπάρχον import (`import { rateLimit, apiError } from '@/lib/apiAuth';`, γρ.6) και αντικατέστησε τα 3 inline `NextResponse.json({ error }, { status })` με `apiError(msg, status)`. Το `NextResponse` παραμένει σε χρήση για το τελικό success response ({ token, user }), άρα δεν μένει dangling import.
   - Ο swap ΔΕΝ αγγίζει το auth boundary logic (το login μένει σκόπιμα εκτός `withAuth`, μόνο η error-shape ενοποιείται)· rate-limit gate, JSON-parse guard, credential check, token-mint αμετάβλητα.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-05, 47η σάρωση· live: `auth/login/route.ts` γρ.29/33/38 inline error-json, import γρ.6 δεν φέρνει `apiError`)
+- Status: DONE (verified 2026-07-06, 48η σάρωση) — ο builder το κατανάλωσε: `v1/auth/login/route.ts` γρ.6 φέρνει πλέον `import { rateLimit, apiError } from '@/lib/apiAuth';` και τα 3 error paths είναι `apiError('Invalid JSON body')` (γρ.29), `apiError('username and password required')` (γρ.33), `apiError('Invalid credentials', 401)` (γρ.38). Μηδέν inline `NextResponse.json({ error })` απομένει· auth boundary/rate-limit/token-mint αμετάβλητα.
 
 ### Tenant `status:'canceled'`/`'suspended'` δεν επιβάλλεται πουθενά → soft-cancel/dunning ΔΕΝ μπλοκάρει πρόσβαση
 - Priority: P2
