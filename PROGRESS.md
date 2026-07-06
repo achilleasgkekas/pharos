@@ -4196,3 +4196,12 @@ Read-only mobile UI-consistency audit web↔mobile (design tokens / shared theme
 ### Needs Achilleas
 - **safe-area insets** (`react-native-safe-area-context` ΑΠΟΝ από `package.json`· bottom/notch/landscape ακάλυπτα): P2/M, θέλει dep-add απόφαση.
 - **theme toggle + light/dark context + language switcher** (dark-only, English-only· web έχει πλήρες light `:root` + 8-lang i18n): P3/L.
+
+## 2026-07-06 (pharos-daily-dev, ShoppingScreen ModalSheet)
+Υλοποίησα το top-1 recommendation της 47ης ui-auditor σάρωσης: **ShoppingScreen scan-confirm modal → shared `<ModalSheet>`** (commit `f7527e0`). Το scan-confirm popup ήταν το τελευταίο raw `<Modal fade>` holdout στο mobile, χειροκίνητο αντίγραφο του `<ModalSheet>` scaffold (ίδιο scrim wrap + surface card). Αντικαταστάθηκε με το shared component, κλείνοντας ταυτόχρονα και τη μοναδική εναπομείνασα magic-literal `borderRadius:18` (τώρα `RADIUS.xl` μέσα στο ModalSheet). Αφαιρέθηκαν τα πλέον-αχρησιμοποίητα `modalWrap`/`modal` StyleSheet entries + τα `Modal` (react-native) και `scrim` (theme) imports.
+
+**Γιατί ασφαλές/μηδέν-delta:** τα tokens ήταν byte-identical (`ui.tsx` `modalWrap` = `{flex:1, scrim, justifyContent:center, padding:SPACE.xl=24}` ≡ πρώην local· `modalCard` = `{surface, border, RADIUS.xl=18, padding:20}` ≡ πρώην `s.modal`). Μοναδική συμπεριφορική διαφορά: tap στο backdrop πλέον κλείνει το modal (`onClose`), consistent με όλες τις άλλες οθόνες — improvement, όχι regression.
+
+**Verified:** `apps/mobile npx tsc --noEmit` → **EXIT 0**. Working tree στην αρχή είχε `WEB_DEBT.md` (parallel edit άλλης routine) — ΔΕΝ αγγίχτηκε· stage-άρισα ΜΟΝΟ το `ShoppingScreen.tsx`. Δεν έγινε rebuild (mobile-only, no web runtime change).
+
+**Επόμενο suggested task:** **ReceiptsScreen 6× `einput` → `<Input variant="surface">`** (τα 5-6 top-level fields store/date/pay/total/notes· P3/S, tsc-verifiable, mobile-only, committed/non-WIP πλέον). Τα 3 compact `cellInput` (qty/net/vat tight grid) μένουν attended-preferred λόγω visual delta χωρίς simulator.
