@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 5667e5b -->
-<!-- docker-validated: 08ced6d -->
+<!-- docker-validated: 51d43ba -->
+
+## 2026-07-06 (docker-health — safe rebuild στο HEAD 51d43ba, stack healthy)
+- **Health (read-only):** mongo `healthy`, web running (ExitCode 0, OOM false). Web RestartCount `0`. Mongo cumulative RestartCount `337` (ιστορικό OOM· τώρα σταθερό, ΟΧΙ ενεργό loop, δεν χρειάστηκε recovery). flaresolverr **δεν έτρεχε** (μηδέν memory pressure, τίποτα να σταματήσω).
+- **Disk:** Images 4.41GB, Volumes 854MB. Build cache prune πριν το build → 0B (μη-reclaimable τότε). Μετά το build, δεύτερο prune ανέκτησε **2.12GB** νέου build cache.
+- **Rebuild (step 4/5):** ο marker ήταν `08ced6d`· `git diff 08ced6d..HEAD -- apps/web` άγγιξε runtime κώδικα (νέα SaaS routes account/export + reset/request + workspace/ai-key, `receipts/actions.ts`, `lib/billing/byoKey*`, `lib/tenancy/*` accountExport/audit/resetTiming/secretCrypto, `models/Tenant.ts`) → warranted. `docker compose build web` (μόνο image) → success. mongo healthy → `docker compose up -d web` → `/login` **200** στην 1η προσπάθεια. Web RestartCount παρέμεινε `0`, OOM false.
+- **Marker:** docker-validated `08ced6d` → **`51d43ba`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
 
 ## 2026-07-06 (pharos-daily-dev — vitest coverage για τους pass-through guards του `lib/clientImage.ts shrinkImage`· 6 tests green)
 - **Τι έκανα:** υλοποίησα το ρητά suggested-next-task των τελευταίων εγγραφών (candidate «α»: `lib/clientImage.ts shrinkImage` guard branches). Έγραψα το **`apps/web/src/lib/clientImage.test.ts`** (6 tests) που κλειδώνει τα τέσσερα early-exit μονοπάτια του browser image-downscaler. **Κανένα runtime source change** — το `shrinkImage` είναι ήδη `export`, καθαρά test-only addition.
