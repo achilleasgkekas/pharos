@@ -255,6 +255,56 @@ All memberships are included regardless of status (a complete record of what the
 platform knows about the identity); a membership whose tenant was deleted
 mid-export is skipped rather than emitted as a blank row.
 
+#### Workspace content export (GDPR portability)
+
+The account export above covers the **login identity**. Its complement dumps a
+workspace's actual **content** — Items, Receipts, Statements, everything that lives
+in the tenant's own isolated data database (GDPR Art. 20 portability at the workspace
+level).
+
+| Method | Path | Body | Result |
+| --- | --- | --- | --- |
+| `GET` | `/api/saas/workspace/export[?tenant=<slug>]` | — | **Owner/admin only.** Streams the workspace's content database as a JSON attachment (`Content-Disposition: attachment; filename="pharos-workspace-<slug>.json"`, `Cache-Control: no-store`). `404` when SaaS mode is off, `401` when signed out, `403` for non-owner/admin members. |
+
+Because the export contains **every member's data** in the workspace, it is a
+data-controller action gated to owner/admin (`requireManage`), not a self-service
+per-member download. It works even for a suspended or canceled workspace
+(`allowInactive`), because portability must not be gated on billing status.
+
+The reader is **read-only and model-agnostic**: it opens the tenant-scoped connection
+and dumps each collection through the raw Mongo driver, so it exports whatever the
+tenant database holds without importing any feature model. It never writes to the data
+plane; the only write is a control-plane `workspace.data_exported` audit row. Each
+collection is capped at `WORKSPACE_EXPORT_MAX_DOCS` documents (default `10000`); a
+collection that held more is cut to the cap and flagged `truncated` so the export never
+silently claims completeness. Internal `system.*` collections (indexes, etc.) are
+skipped.
+
+**OSS parity:** this is SaaS-only. The reader refuses the implicit default tenant and
+the route is 404 when `SAAS_MODE` is off, so the self-hosted single-user app is
+untouched (it has its own JSON backup/restore under Settings → Storage & data). The
+payload shape:
+
+```json
+{
+  "format": "pharos.workspace-export",
+  "version": 1,
+  "generatedAt": "2026-07-06T00:00:00.000Z",
+  "notice": "This is a machine-readable copy of the content stored in this Pharos workspace …",
+  "workspace": { "slug": "acme", "name": "Acme", "plan": "pro", "status": "active" },
+  "maxDocsPerCollection": 10000,
+  "collections": [
+    { "name": "items", "count": 128, "truncated": false, "docs": [ /* … */ ] },
+    { "name": "receipts", "count": 10000, "truncated": true, "docs": [ /* … */ ] }
+  ]
+}
+```
+
+Collections are sorted by name so successive exports diff cleanly. The collection
+`docs` are passed through verbatim (the user's own data handed back to them); only the
+whitelisted workspace display fields (`slug`/`name`/`plan`/`status`) are projected into
+the envelope, never secrets.
+
 ### Workspace erasure (GDPR)
 
 The workspace owner can **schedule the permanent deletion** of a workspace and its
@@ -448,6 +498,7 @@ secrets. They are not part of the self-hosted `.env.example` yet
 | `RESEND_API_KEY` | Enables transactional email (invites, verification, reset) via Resend. |
 | `SMTP_URL` | Alternative mailer transport when Resend is not set. |
 | `MAIL_FROM` | From address for outbound email. Defaults to `Pharos <no-reply@ph-aros.com>`. |
+| `WORKSPACE_EXPORT_MAX_DOCS` | Per-collection document cap for the workspace content export ([above](#workspace-content-export-gdpr-portability)). Non-numeric/non-positive falls back to `10000`; collections beyond it are flagged `truncated`. |
 
 When neither `RESEND_API_KEY` nor `SMTP_URL` is set, the mailer cannot deliver;
 in non-production it logs the message instead of sending, so invite/reset flows

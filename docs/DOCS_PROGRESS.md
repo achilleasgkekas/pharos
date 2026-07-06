@@ -850,3 +850,44 @@ Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/sa
 Επομενο run: sync check αν erasure/purge/data-export εκτιθενται στο workspace-settings UI
 (features.md mention) οταν χτιστει· αλλιως stale-forward-ref sweep ολου του set. Τα 28 saas
 routes πλεον ολα τεκμηριωμενα.
+
+## 2026-07-06 (saas.md: per-tenant WORKSPACE CONTENT export, GDPR Art. 20)
+
+Το πιο προσφατο commit `ee9d705` (feat(saas): per-tenant content export scaffold) προσθεσε
+νεο SaaS-gated route `GET /api/saas/workspace/export[?tenant=<slug>]` που **δεν** ηταν
+τεκμηριωμενο (grep "workspace/export" σε saas.md = 0 hits· μονο το account/export υπηρχε).
+Διαβασα τα πραγματικα αρχεια (`app/api/saas/workspace/export/route.ts` +
+`lib/tenancy/workspaceExport.ts`) και προσθεσα νεα subsection **#### Workspace content export
+(GDPR portability)** μεσα στο "Data export (GDPR)", μετα το account-export payload και πριν το
+"Workspace erasure (GDPR)".
+
+Τι εγραψα:
+- Πινακας 1 γραμμης: `GET` owner/admin-only (requireManage), attachment JSON
+  `pharos-workspace-<slug>.json`, `Cache-Control: no-store`. Status: `404` SaaS off, `401`
+  signed out, `403` non-owner/admin. Δουλευει και σε suspended/canceled workspace
+  (allowInactive) — portability δεν gate-αρεται σε billing.
+- Read-only + model-agnostic reader (raw Mongo driver collection dumps, κανενα feature model
+  import). Zero writes στο data plane· μονο control-plane `workspace.data_exported` audit row.
+  Per-collection cap `WORKSPACE_EXPORT_MAX_DOCS` (default 10000), truncated flag, skip `system.*`.
+- OSS parity callout: SaaS-only, reader refuses default tenant, 404 οταν SAAS_MODE off·
+  self-hosted εχει το δικο του JSON backup/restore (Settings → Storage & data).
+- JSON sample (format `pharos.workspace-export` v1, workspace slug/name/plan/status whitelist,
+  collections[] name/count/truncated/docs). Collections sorted by name (clean diffs), docs
+  verbatim, μονο whitelisted workspace fields στο envelope (ποτε secrets).
+- Προσθεσα `WORKSPACE_EXPORT_MAX_DOCS` στον SaaS env-vars πινακα (με anchor link στη subsection).
+
+Accuracy: καμια τιμη/header/status-code εφευρεθηκε — cross-checked με τον κωδικα (requireManage
++ allowInactive args στο resolveWorkspaceSession, maxDocs+1 truncation trick, isDefault guard →
+[], format/version/notice/keys, audit action string `workspace.data_exported`, filename
+sanitize). Placeholders μονο `<slug>`/`<account-id>`/`acme`.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 8 markers
+(4 balanced blocks). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/
+CRON_SECRET=<value>) → clean. Anchor `#workspace-content-export-gdpr-portability` ταιριαζει
+το heading. Πραγματικος saas route count = 29 (ηταν 28).
+
+Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: ERASURE_GRACE_DAYS λειπει απο τον env-vars πινακα (gap εντοπισμενο)· η stale-forward-ref
+sweep αν εκτεθουν τα export/erasure στο workspace-settings UI (features.md). Τα 29 saas routes
+πλεον ολα τεκμηριωμενα.
