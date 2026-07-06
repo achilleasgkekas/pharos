@@ -119,6 +119,14 @@ const STACK: { name: string; detail: string; color: string }[] = [
   { name: 'No public auth', detail: 'Login-gated, reached over your LAN or VPN. No sign-up, no telemetry.', color: 'var(--purple)' },
 ];
 
+// Reassurance chips shown directly under the hero CTAs, reinforcing the core
+// differentiators (open source, private, easy self-host) at the highest-attention spot.
+const HERO_TRUST: { icon: string; color: string; label: string }[] = [
+  { icon: 'code', color: 'var(--accent)', label: 'AGPL-3.0 open source' },
+  { icon: 'eyeOff', color: 'var(--cyan)', label: 'No telemetry, ever' },
+  { icon: 'server', color: 'var(--purple)', label: 'Self-host in minutes' },
+];
+
 const TRUST: { icon: string; color: string; title: string; desc: string }[] = [
   {
     icon: 'code',
@@ -650,6 +658,17 @@ export default function Home() {
               {!REPO_PUBLIC && <span className="soon-badge">soon</span>}
             </a>
           </div>
+
+          <ul className="hero-assurance" aria-label="What you get">
+            {HERO_TRUST.map((t) => (
+              <li key={t.label} className="hero-chip">
+                <span className="hero-chip-ico" style={{ color: t.color }}>
+                  <Icon name={t.icon} size={15} />
+                </span>
+                {t.label}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

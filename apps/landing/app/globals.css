@@ -540,6 +540,32 @@ h1, h2, h3 {
   line-height: 1.4;
 }
 
+/* Hero reassurance chips, directly under the primary CTAs */
+.hero-assurance {
+  list-style: none;
+  margin: 30px auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 14px;
+}
+.hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.hero-chip-ico {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
 /* By-the-numbers proof band */
 .numbers-band {
   list-style: none;

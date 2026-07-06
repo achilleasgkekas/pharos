@@ -1210,3 +1210,39 @@ Needs-Achilleas (open):
 - Annual billing: discount πριν φτιαξω toggle.
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-06 (cont.³) — (e) polish: hero reassurance chips κατω απο τα CTAs
+
+Task: (e) polish. Τα δυο επομενα increments που ειχα σημειωσει (real app screenshots, annual-billing
+toggle) ειναι μπλοκαρισμενα (assets / Needs-Achilleas), οποτε διαλεξα ενα φρεσκο, self-contained: μια
+σειρα reassurance chips ακριβως κατω απο τα hero CTAs. Ειναι το σημειο με τη μεγαλυτερη προσοχη, και μεχρι
+τωρα οι core διαφοροποιησεις (open source, private, ευκολο self-host) φαινονταν μονο αφου κατεβεις στο
+#trust. Proven conversion pattern, ειλικρινες για το προϊον, μηδεν asset, μηδεν client JS, μηδεν Achilleas.
+
+Τι εφτιαξα:
+- `app/page.tsx`: νεο const `HERO_TRUST` (3 chips: «AGPL-3.0 open source» / «No telemetry, ever» /
+  «Self-host in minutes», με icons code/eyeOff/server + accent/cyan/purple) + render ως `<ul.hero-assurance>`
+  αμεσως μετα τη γραμμη κουμπιων στο hero (`aria-label="What you get"`, καθε chip με `<Icon>`).
+- `app/globals.css`: νεες classes `.hero-assurance` (flex-wrap, centered, gap) + `.hero-chip` (pill:
+  border/surface/rounded, text-dim, 0.85rem) + `.hero-chip-ico`. Reuse brand vars, μηδεν νεο keyframe/JS.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static· `/` 2.71->2.83 kB (μονο +CSS/markup, καμια νεα route).
+- Prerendered `.next/server/app/index.html`: «AGPL-3.0 open source», «No telemetry, ever»,
+  «Self-host in minutes», class `hero-assurance` ολα present.
+- em-dash check: 0 σε page.tsx· τα 3 hits στο globals.css ειναι προϋπαρχοντα box/em σε αλλα comments
+  (γραμμες 1463/1489/1524), οχι δικα μου, δεν τα αγγιξα.
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev στον φακελο· verify μεσω build output αρκετο για
+  static page)· δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> μονο app/page.tsx + app/globals.css, κανενα foreign staged.
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets· annual-billing toggle
+ΜΟΝΟ αφου κλεισουν ετησιες τιμες.
+
+Needs-Achilleas (open):
+- Terms + Privacy: review + finalize (billing terms, governing-law jurisdiction, provider/processor ονοματα)
+  ΠΡΙΝ hosted launch· μετα flip `robots:{index:false}` -> indexable + add στο sitemap.
+- Annual billing: discount πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
