@@ -1212,3 +1212,24 @@ Mock pattern: το route δεν αγγίζει models απευθείας — del
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = ΜΟΝΟ το δικό μου shopping-list/route.test.ts. Στάγιαρα μόνο τα δικά μου paths (route.test.ts + OSS_PROGRESS.md).
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Υψηλής αξίας ακόμα untested collection routes: `receipts/route.ts` (GET/POST). Untested [id] routes: `stores/[id]/route.ts`, `shopping-list/[id]/route.ts` (PATCH/DELETE, found→404 pattern), `statements/[id]/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-06 (cont.⁵ — receipts/route.test.ts, GET-only collection route, store/archived filters)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/receipts/route.test.ts` για το GET του `/api/v1/receipts`.**
+
+Επιλογή target: ακολούθησα το suggested next task του προηγ. entry (`receipts/route.ts`). **Διόρθωση της σημείωσης**: το route είναι **GET-only** — δεν υπάρχει POST. Οι αποδείξεις δεν δημιουργούνται εδώ (έρχονται από upload/scan flows), οπότε το test καλύπτει μόνο GET. Route-only logic που ζει αποκλειστικά εδώ και τροφοδοτεί το mobile receipts list:
+- **GET**: envelope `listEnvelope` standard (data/total/limit/offset). Filters: `store` (`{ store }` ΜΟΝΟ όταν υπάρχει το param)· **archived default hide** (`archived !== '1'` → `{ archived: { $ne: true } }`· `archived=1` ρίχνει τη clause → `{}` και επιστρέφει τα πάντα). Projection `.select('-rawAiResponse')` (κόβει το heavy debug blob από το wire). Sort `{ date: -1 }` + skip/limit paging. Ο `updatedSince` cursor merge-άρει `$gte` ΚΑΙ ανάβει `withDeleted` και στα δύο queries (find+count). Το `trimReceipt` map-άρει: `itemCount` από `lineItems.length`, `file`/`thumb` → `filePath||null`/`thumbPath||null`, `deleted` από `!!deletedAt`, με per-field `?? defaults` (total/subtotal/vatAmount → 0, currency → 'EUR', warrantyMonths → 0).
+
+Mock pattern: ίδιο DB-seam pattern με το expenses/route.test.ts, αλλά (α) η find chain απέκτησε επιπλέον `select` step (`.select('-rawAiResponse')` πριν το sort), (β) καθόλου create/POST/anomaly. Mock `@/lib/db` connectDB + `@/models/User` bearerUser chain + `@/models/Receipt` find/countDocuments. Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiList helpers + το ΠΡΑΓΜΑΤΙΚΟ `trimReceipt` (`./serialize`).
+
+Τι έγινε: Νέο `route.test.ts` (11 tests). **auth gate** (2: GET no-token→401 + no find/count, unknown-token→401). **GET listing** (9: envelope + trim mapping full-doc [itemCount 3, USD, warranty 24] + bare-doc exact defaults [date null, EUR, 0s, false flags]· select `-rawAiResponse`· archived default `{$ne:true}` σε find+count· `archived=1` → `{}`· store filter + archived default μαζί· sort `{date:-1}` + skip 20/limit 10· updatedSince → `$gte` + withDeleted και στα δύο· χωρίς cursor → κανένα setOptions· soft-deleted → `deleted:true`).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/receipts/route.test.ts` → 11/11 passed.
+- `npx vitest run` (όλο το suite) → 112 files, 1542/1542 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = ΜΟΝΟ το δικό μου receipts/route.test.ts. Στάγιαρα μόνο τα δικά μου paths.
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Untested [id] routes (υψηλή αξία — found→404 pattern): `stores/[id]/route.ts`, `shopping-list/[id]/route.ts` (PATCH/DELETE), `statements/[id]/route.ts`. Untested collection routes: `lists/route.ts`, `notifications/route.ts`, `history/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
