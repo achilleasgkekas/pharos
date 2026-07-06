@@ -1177,3 +1177,36 @@ Needs-Achilleas (open):
 - Annual billing: discount πριν φτιαξω toggle.
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-06 (cont.²) — (e) polish: legal cross-nav Privacy ↔ Terms
+
+Task: (e) polish. Το προηγουμενο increment (/terms) σημειωσε ως επομενο «μικρο legal sub-nav cross-link
+Privacy <-> Terms». Self-contained, μηδεν asset, μηδεν Achilleas, μηδεν νεο CSS/JS. Ενας χρηστης που
+διαβαζει τη Privacy Policy πρεπει να φτανει ευκολα στους Ορους (και αντιστροφα)· μεχρι τωρα καθε legal page
+ειχε μονο «Back to home» + «Self-host it free» χωρις συνδεσμο στην αδελφη σελιδα.
+
+Τι εφτιαξα:
+- `app/terms/page.tsx`: στη γραμμη κουμπιων στο τελος, νεο ghost button `<a href="/privacy">Privacy Policy</a>`
+  αναμεσα σε «Back to home» και «Self-host it free».
+- `app/privacy/page.tsx`: συμμετρικα, νεο ghost button `<a href="/terms">Terms of Service</a>` στην ιδια θεση.
+  Reuse υπαρχουσας `.btn .btn-ghost` class, μηδεν νεο styling.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static, `/privacy` + `/terms` αμεταβλητα 149 B / 103 kB First Load.
+- Prerendered: `.next/server/app/terms.html` -> `href="/privacy" class="btn btn-ghost">Privacy Policy`
+  present· `.next/server/app/privacy.html` -> `href="/terms" class="btn btn-ghost">Terms of Service` present.
+- em-dash check: 0 σε terms/page.tsx + privacy/page.tsx.
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev server στον φακελο· verify μεσω build output, αρκετο
+  για static pages)· δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> ελεγχος για foreign staged files.
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets· annual-billing toggle
+ΜΟΝΟ αφου κλεισουν ετησιες τιμες.
+
+Needs-Achilleas (open):
+- Terms + Privacy: review + finalize (billing terms, governing-law jurisdiction, provider/processor ονοματα)
+  ΠΡΙΝ hosted launch· μετα flip `robots:{index:false}` -> indexable + add στο sitemap.
+- Annual billing: discount πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.

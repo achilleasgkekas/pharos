@@ -215,6 +215,7 @@ export default function TermsOfService() {
 
         <div style={{ marginTop: 56, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
           <a href="/" className="btn btn-primary">Back to home</a>
+          <a href="/privacy" className="btn btn-ghost">Privacy Policy</a>
           <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="btn btn-ghost">
             Self-host it free
           </a>
