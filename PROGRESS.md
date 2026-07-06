@@ -2,8 +2,17 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 5667e5b -->
+<!-- reviewed: 62d0a86 -->
 <!-- docker-validated: 51d43ba -->
+
+## 2026-07-06 (reviewer — range 5667e5b..62d0a86, tsc web+mobile EXIT 0, 1542 tests green, μηδέν regression)
+- **Εύρος:** 68 commits από τον marker `5667e5b` έως HEAD `62d0a86` (κυρίως SaaS control-plane, API v1 tests, landing legal pages, mobile ModalSheet refactors, tenancy fixes). Ο προηγ. marker έδειχνε `5667e5b` ενώ το review commit `660b8ea` του ήταν ήδη στο ιστορικό μετά — ο νέος marker κλείνει το gap.
+- **Gates (read-only):** `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0** (επαληθευμένο με explicit `cd` για αποφυγή cwd-race σε parallel run)· `apps/web npm test` → **112 files / 1542 tests pass**.
+- **Deep review (security-sensitive SaaS):** διάβασα πλήρως `tenancy/secretCrypto.ts` (AES-256-GCM, scrypt-KDF από AUTH_SECRET, random IV/call, fail-closed, decrypt→null on tamper — textbook), `tenancy/resetTiming.ts` (constant-time 500ms floor, pure+clamped), `tenancy/request.ts` (request-scoped tenant establishment· host→tenant, membership→access· OSS parity short-circuit για SAAS off), `tenancy/erasure.ts` (GDPR Art.17 markers, pure, reversible grace window, καμία destructive drop εδώ), `tenancy/currencyBinding.ts` (server-only resolver injection, client path άθικτος), `fix(tenancy) 87c8832` (per-tenant Map cache-keying για appSettings+storeService — γνήσια isolation-leak διόρθωση, σωστό OSS-'' key). Όλα defensive, καλά τεκμηριωμένα, με tests.
+- **API shape change (mobile-risk check):** `055a9c0` PATCH expenses/subscriptions/vouchers → `{ <resource>: doc }` αντί `{ ok, id }` — αυτό είναι **spec-alignment fix** (ταιριάζει tasks/receipts) που ξεμπλοκάρει mobile detail re-prefill, ΟΧΙ regression. Single-source-of-truth trim serializer επαναχρησιμοποιείται.
+- **Secret scan:** `git diff 5667e5b..HEAD` added lines → μόνο test fixtures (`sk-ant-secret-123` κλπ σε `*.test.ts`), κανένα πραγματικό secret, κανένα `.env` άγγιγμα.
+- **Fixes:** **ΚΑΝΕΝΑ** — ο builder's κώδικας σε αυτό το εύρος είναι καθαρός. Δεν χρειάστηκε καμία safe διόρθωση, δεν flag-άρω τίποτα νέο στα queues.
+- **Git hygiene:** stage ΜΟΝΟ `PROGRESS.md` (marker + αυτή η εγγραφή), explicit path, ΟΧΙ `-A`. Working tree ήταν καθαρό στην αρχή.
 
 ## 2026-07-06 (docker-health — safe rebuild στο HEAD 51d43ba, stack healthy)
 - **Health (read-only):** mongo `healthy`, web running (ExitCode 0, OOM false). Web RestartCount `0`. Mongo cumulative RestartCount `337` (ιστορικό OOM· τώρα σταθερό, ΟΧΙ ενεργό loop, δεν χρειάστηκε recovery). flaresolverr **δεν έτρεχε** (μηδέν memory pressure, τίποτα να σταματήσω).
