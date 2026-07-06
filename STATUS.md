@@ -1,25 +1,25 @@
 # Pharos Monitor — STATUS
 
-## 2026-07-05 06:14
+## 2026-07-06 06:14
 
-**Ετυμηγορια: ΟΛΑ ΟΚ.** Και οι εξι ρουτινες εχουν φρεσκο αποτυπωμα μεσα στον τρεχοντα νυχτερινο κυκλο (συνεχης παλμος 00:09 εως 05:12, μηχανη ξυπνια). **Ο ui auditor ανακαμψε**: το προηγουμενο STATUS τον ειχε STALE (~21.5 ωρες), τωρα εχει τρεξει κανονικα (46η σαρωση, 07250fe, 2026-07-05 02:47). Ο builder εβγαλε soft-delete test coverage (a3ee778), ο parity auditor 45η σαρωση full-parity (6ba848d), ο web auditor 47η σαρωση (5667e5b, +1 login→apiError item), ο reviewer καθαρισε range 16afcbf..5667e5b (660b8ea, marker → 5667e5b), ο docker guard rebuild web /login 200 (f79b710, marker → 07250fe).
+**Ετυμηγορια: ΟΛΑ ΟΚ.** Και οι εξι ρουτινες εχουν φρεσκο αποτυπωμα μεσα στον τρεχοντα νυχτερινο κυκλο (συνεχης παλμος 2026-07-05 23:41 εως 2026-07-06 06:02, μηχανη ξυπνια). Καμια STALE. Ο builder δουλεψε αδιακοπα (test/feat/refactor across web+saas+mobile+landing), οι τρεις auditors εγραψαν τις 46η/47η/48η σαρωσεις τους, ο reviewer καθαρισε το range (marker → 62d0a86), ο docker guard επικυρωσε το stack (marker → 51d43ba).
 
 | routine | τελευταια δραστηριοτητα | OK/STALE | τι εκανε (συντομα) |
 |---|---|---|---|
-| builder (Pharos daily dev) | 2026-07-05 05:12 | OK | soft-delete hideDeleted hook + plugin wiring test coverage 8 tests (a3ee778), νωριτερα rate-limit /api/v1 (8d4ab98), bounded trial window (382ae86) |
-| parity auditor | 2026-07-05 01:16 | OK | 45η σαρωση mobile-parity, full parity confirmed, μηδεν auto-buildable GAP (6ba848d) |
-| ui auditor | 2026-07-05 02:47 | OK | 46η σαρωση mobile-ui, confirmation + token layer καθαρος, ModalSheet top buildable (07250fe) — ΑΝΑΚΑΜΨΕ απο STALE |
-| web auditor | 2026-07-05 04:04 | OK | 47η σαρωση web-debt, v1 πληρως καθαρη tsc EXIT 0, +1 P3/S item (login→apiError) (5667e5b) |
-| reviewer | 2026-07-05 04:33 | OK | range 16afcbf..5667e5b, tsc web+mobile EXIT 0, 1142 tests green, μηδεν regression (660b8ea, marker → 5667e5b) |
-| docker guard | 2026-07-05 03:21 | OK | rebuild web μετα api/billing/mirror, /login 200, mongo healthy (f79b710, marker → 07250fe) |
+| builder (Pharos daily dev) | 2026-07-06 06:02 | OK | συνεχης ροη: feat(landing) shareable FAQ (5d89529), feat(saas) per-tenant content export (ee9d705), fix(saas) saasGuard σε 5 read+cron routes (d0c9364), refactor(mobile) ShoppingScreen→ModalSheet (f7527e0), πληθος test(api/v1) coverage |
+| parity auditor | 2026-07-06 01:18 | OK | 46η σαρωση mobile-parity, εκλεισε το τελευταιο #5 gap (merge/bind), route 50→51, ReceiptsScreen non-WIP (541af0b) |
+| ui auditor | 2026-07-06 02:48 | OK | 47η σαρωση mobile-ui, working tree καθαρο, 2 items ξεμπλοκαραν, ShoppingScreen ModalSheet top buildable (875ba83) |
+| web auditor | 2026-07-06 04:07 | OK | 48η σαρωση web-debt, tsc EXIT 0, 2 items εκλεισαν, +2 auto-buildable (saasGuard reads/cron P2, search-actions typing P3) (a986750) |
+| reviewer | 2026-07-06 04:34 | OK | range 5667e5b..62d0a86, tsc web+mobile EXIT 0, 1542 tests green, μηδεν regression (add8079, marker → 62d0a86) |
+| docker guard | 2026-07-06 03:31 | OK | validate stack at 51d43ba, safe web rebuild μετα erasure-lifecycle route (33d6ef9, marker → 51d43ba) |
 
 ## Open queue counts
 - Build Queue (MOBILE_PARITY): **5** TODO
-- UI Debt Queue (MOBILE_PARITY): **4** TODO
+- UI Debt Queue (MOBILE_PARITY): **2** TODO
 - Web Debt Queue (WEB_DEBT): **3** TODO
 
-Συγκριση με προηγουμενο STATUS (2026-07-04 06:14: Build 4 / UI 4 / Web 2): **Build 4→5 (+1)**, **UI 4→4 (0)**, **Web 2→3 (+1)**. Ο web auditor προσθεσε το login→apiError item (φυσιολογικο audit output), το Build μεγαλωσε κατα 1, το UI σταθερο. Οι ουρες κινουνται, οχι κολλημενες. Το φουσκωμα ειναι μικρο και αναμενομενο (οι auditors γραφουν, ο builder κλεινει), μηδεν συσσωρευση.
+Συγκριση με προηγουμενο STATUS (2026-07-05 06:14: Build 5 / UI 4 / Web 3): **Build 5→5 (0)**, **UI 4→2 (-2)**, **Web 3→3 (0)**. Το UI queue μικρυνε κατα 2 (ο builder εκλεισε ModalSheet/touch-target items), τα αλλα δυο σταθερα (auditors προσθεσαν, builder εκλεισε, ισορροπια). Καμια συσσωρευση, οι ουρες κινουνται υγιως.
 
 ## Προσοχη
 
-Καμια. Και οι εξι ρουτινες υγιεις με αποτυπωμα στον τελευταιο κυκλο. Ο ui auditor που ηταν STALE στο προηγουμενο run εχει ξανατρεξει κανονικα, οποτε το προηγουμενο ζητημα εκλεισε μονο του (ητανε πιθανοτατα ενας χαμενος κυκλος, οχι μονιμο θεμα). Ο reviewer marker (5667e5b) και ο docker marker (07250fe) καλυπτουν σχεδον την κορυφη· ελαχιστο φυσιολογικο lag (a3ee778 05:12 εκκρεμει review/validate, θα το πιασει ο επομενος κυκλος).
+Καμια. Και οι εξι ρουτινες υγιεις με φρεσκο αποτυπωμα στον τελευταιο κυκλο, ολες μεσα σε ~5 ωρες η μια απο την αλλη. Ο reviewer marker (62d0a86) και ο docker marker (51d43ba) καλυπτουν σχεδον την κορυφη· μονο φυσιολογικο lag στα τελευταια commits (04:07 εως 06:02 εκκρεμουν review/validate, θα τα πιασει ο επομενος κυκλος). Καμια ρουτινα δεν χρειαζεται ελεγχο.
