@@ -1903,3 +1903,59 @@ files δίπλα στο content dump· αγγίζει storage abstraction read-o
 workspace-settings UI panels (όλα τα read/write control-plane APIs έτοιμα: profile, members, billing,
 ai-key, erasure, purge report, τώρα και content-export), είτε (γ) BYO-key AI-dispatch consumption /
 in-process 6h cron (και τα δύο αγγίζουν shared runtime → άδεια).
+
+## 2026-07-06 (increment 47 — workspace FILE-BINARY manifest scaffold, closes #46 file gap)
+**Το κενό:** το increment 46 έδωσε το per-tenant CONTENT export (τα Mongo collections), αλλά ρητά
+σημείωσε ότι **τα binaries ΔΕΝ περιλαμβάνονται** — τα receipt/statement PDFs (`filePath`/`thumbPath`)
+και τα item photos (`photos[]`) ζουν στο `STORAGE_ROOT` στον δίσκο, όχι στη Mongo. Χωρίς αυτά ένα GDPR
+Art. 20 export είναι μισό. Έκλεισα το πρώτο, ασφαλέστερο κομμάτι: ένα **REPORT-ONLY manifest** που
+λέει ΑΚΡΙΒΩΣ ποια αρχεία ανήκουν σε ένα workspace (derived από τα ΔΙΚΑ του doc references), αν το
+καθένα υπάρχει στον δίσκο, και το συνολικό μέγεθος. Ο πραγματικός tar/zip των binaries (θέλει
+streaming archive dependency) μένει deferred — μοτίβο ίδιο με το erasurePurge dry-run scaffold. ΟΛΟ
+additive + SaaS-gated, σε δικά μου SAAS αρχεία:
+- `lib/tenancy/workspaceFiles.ts` (νέο). **PURE** extractors + envelope (unit-tested):
+  `SINGLE_FILE_FIELDS`(filePath/thumbPath) + `ARRAY_FILE_FIELDS`(photos), `extractFileRefs(doc)`
+  (single+array, skip blank/absolute/traversal), `isStorageRelative` (defence-in-depth mirror του
+  storage.ts resolveWithinStorage: reject blank/abs/`..`), `fileBucket` (first segment),
+  `dedupeFileRefs` (dedupe+stable sort), `buildFileManifest(meta,entries,generatedAt)` → σταθερό
+  envelope `{format:'pharos.workspace-files-manifest', version:1, generatedAt(ISO), notice, workspace,
+  totals{files/present/missing/bytes}, files[{path,bucket,exists,bytes}]}` (totals computed → header
+  ποτέ δεν διαφωνεί με τη λίστα, negative bytes clamped), `workspaceFilesManifestFilename` (safe
+  charset + fallback). **Impure** (2 READ-ONLY readers): `collectWorkspaceFileRefs(ctx)` —
+  model-agnostic **projected** query (μόνο τα file-ref fields, ποτέ full docs) σε κάθε exportable
+  collection της tenant db μέσω `tenantDb(ctx)`· refuse default tenant → `[]`. `statWorkspaceFiles(refs)`
+  — `fs.stat` only (ποτέ content, ποτέ write)· root-escaping/missing ref → `exists:false` χωρίς throw.
+  Ίδια `STORAGE_ROOT` resolution με storage.ts, κρατημένη in-territory (μηδέν edit σε shared file).
+- `app/api/saas/workspace/export/files/route.ts` (νέο) — `GET [?tenant=<slug>]` → attachment JSON,
+  `no-store`. `saasGuard` (404 off) + `resolveWorkspaceSession(slug, requireManage=true,
+  allowInactive=true)`: owner/admin only (περιγράφει ΟΛΩΝ των members τα αρχεία → data-controller
+  action)· allowInactive ώστε suspended/canceled workspace να παίρνει ακόμα το manifest του. Audit
+  `workspace.files_manifested` (μόνο counts/bytes, ποτέ paths-content).
+- `lib/tenancy/audit.ts` (additive edit, δικό μου) — νέα action `workspace.files_manifested` (το
+  audit.test «accepts every declared action» την καλύπτει auto).
+- `lib/tenancy/workspaceFiles.test.ts` (νέο) — 15 tests (isStorageRelative accept/reject/trim·
+  fileBucket· extractFileRefs single+array+skip/non-obj/trim· dedupe· buildFileManifest shape/
+  fallback/epoch/neg-clamp· filename safety· statWorkspaceFiles present/missing/dir + escape-not-stat'd).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run` → **1607/1607 green** (117 files,
++15 νέα, καμία regression). External importers του `workspaceFiles` από feature code → **κανένας**
+(μόνο το δικό μου SaaS route)· το route SAAS-gated (404 off)· ο reader refuse-άρει τον default tenant.
+⇒ `SAAS_MODE` off / self-hosted = **zero effect** (route δεν mount-άρει, μηδέν DB/fs hit). Κανένας
+Docker rebuild (νέα PURE-heavy module + additive gated route + 1 audit action, μηδέν shared runtime
+wiring — type-check+tests καλύπτουν)· καμία νέα εξάρτηση· κανένα feature route/data-db/User-path/
+bearer-path/storage-write αγγίχτηκε. Collision guard: staging καθαρό, μόνο τα δικά μου paths.
+
+**## Needs Achilleas** (file export πληρότητα):
+- **Πραγματικό binary packaging** (tar/zip/gzip streaming) δίπλα στο manifest — θέλει archive
+  dependency + streaming route· deferred. Το manifest είναι το scaffold που το προηγείται.
+- **Per-tenant storage isolation**: σήμερα τα αρχεία ΟΛΩΝ των tenants μοιράζονται το ένα `STORAGE_ROOT`
+  (bucket/year/month, όχι per-tenant dir). Το manifest είναι σωστά scoped **από τα DB refs** του
+  tenant (λίστάρει μόνο ό,τι δείχνει η δική του βάση), αλλά μια πραγματική per-tenant STORAGE_ROOT/
+  prefix θα χρειαστεί όταν προστεθεί το packaging (αλλιώς δύο tenants μπορεί θεωρητικά να δείξουν το
+  ίδιο shared-hash file). Design decision για τον owner.
+
+**Next task:** increment 48 — είτε (α) actual binary packaging (tar/gzip stream του manifest· θέλει
+archive dep + per-tenant storage prefix → άδεια/απόφαση), είτε (β) user-facing workspace-settings UI
+panels (ΟΛΑ τα read/write control-plane APIs έτοιμα: profile, members, billing, ai-key, erasure, purge
+report, content-export, files-manifest), είτε (γ) BYO-key AI-dispatch consumption / in-process 6h cron
+(shared runtime → άδεια).

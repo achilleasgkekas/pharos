@@ -31,6 +31,7 @@ export const AUDIT_ACTIONS = [
   'workspace.erasure_requested',
   'workspace.erasure_canceled',
   'workspace.data_exported',
+  'workspace.files_manifested',
   'ai_key.set',
   'ai_key.cleared',
 ] as const;
