@@ -1,5 +1,6 @@
 import { connectDB } from './db';
 import { AppConfig } from '@/models/AppConfig';
+import { currentModel } from './tenancy/connection';
 import { sendNtfyTo } from './notify';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from './notifiers.shared';
 
@@ -98,7 +99,10 @@ function coerce(raw: unknown, i: number): NotifierConfig | null {
  *  when the array is empty so existing setups keep notifying until they save. */
 export async function getNotifiers(): Promise<NotifierConfig[]> {
   await connectDB();
-  const doc = await AppConfig.findOne({ key: 'singleton' })
+  // Route to the current tenant's database (default tenant → AppConfig untouched), so one
+  // tenant's notifier channels + tokens are never read for another.
+  const Config = await currentModel(AppConfig);
+  const doc = await Config.findOne({ key: 'singleton' })
     .select('notifiers ntfyUrl ntfyEnabled')
     .lean();
   const arr = Array.isArray(doc?.notifiers) ? doc!.notifiers : [];

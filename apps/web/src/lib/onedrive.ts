@@ -1,6 +1,14 @@
 import 'server-only';
 import { connectDB } from './db';
 import { AppConfig } from '@/models/AppConfig';
+import { currentModel } from './tenancy/connection';
+import { currentTenant } from './tenancy/current';
+
+/** Stable cache key for the current tenant ('' = default/self-hosted). */
+function tenantKey(): string {
+  const ctx = currentTenant();
+  return ctx.isDefault || !ctx.tenantId ? '' : ctx.tenantId;
+}
 
 // ─── OneDrive (Microsoft Graph) ──────────────────────────────────────────────
 // Auth uses the OAuth 2.0 DEVICE CODE flow: ideal for a self-hosted app reached
@@ -85,7 +93,9 @@ export async function pollDeviceToken(
       const account = accountFromIdToken(String(j.id_token || '')) || (await accountName(String(j.access_token)));
       await connectDB();
       // Persist the EFFECTIVE client id (default or custom) so refreshes use it.
-      await AppConfig.updateOne(
+      // Route to the current tenant's database (default tenant → AppConfig untouched).
+      const Config = await currentModel(AppConfig);
+      await Config.updateOne(
         { key: 'singleton' },
         { $set: { onedriveClientId: cid, onedriveRefreshToken: String(j.refresh_token), onedriveAccount: account } },
         { upsert: true }
@@ -128,11 +138,15 @@ async function accountName(accessToken: string): Promise<string> {
   }
 }
 
-// Cache the short-lived access token in memory (valid ~1h).
-let tokenCache: { token: string; exp: number } | null = null;
+// Cache the short-lived access token in memory (valid ~1h), keyed by tenant so one
+// tenant's OneDrive OAuth token is never served to another. Default/self-hosted tenant
+// uses the '' key → single-slot behaviour identical to before.
+const tokenCache = new Map<string, { token: string; exp: number }>();
 
 async function accessTokenFor(clientId: string, refreshToken: string): Promise<string> {
-  if (tokenCache && Date.now() < tokenCache.exp - 60_000) return tokenCache.token;
+  const key = tenantKey();
+  const hit = tokenCache.get(key);
+  if (hit && Date.now() < hit.exp - 60_000) return hit.token;
   const res = await fetch(`${AUTH_BASE}/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -144,10 +158,11 @@ async function accessTokenFor(clientId: string, refreshToken: string): Promise<s
   // Microsoft rotates refresh tokens — persist the new one so we don't expire.
   if (j.refresh_token && j.refresh_token !== refreshToken) {
     await connectDB();
-    await AppConfig.updateOne({ key: 'singleton' }, { $set: { onedriveRefreshToken: String(j.refresh_token) } });
+    const Config = await currentModel(AppConfig);
+    await Config.updateOne({ key: 'singleton' }, { $set: { onedriveRefreshToken: String(j.refresh_token) } });
   }
   const token = String(j.access_token);
-  tokenCache = { token, exp: Date.now() + Number(j.expires_in || 3600) * 1000 };
+  tokenCache.set(key, { token, exp: Date.now() + Number(j.expires_in || 3600) * 1000 });
   return token;
 }
 
@@ -155,15 +170,17 @@ export type OnedriveCreds = { clientId: string; refreshToken: string; account: s
 
 export async function getOnedriveCreds(): Promise<OnedriveCreds | null> {
   await connectDB();
-  const doc = await AppConfig.findOne({ key: 'singleton' }).select('onedriveClientId onedriveRefreshToken onedriveAccount').lean();
+  const Config = await currentModel(AppConfig);
+  const doc = await Config.findOne({ key: 'singleton' }).select('onedriveClientId onedriveRefreshToken onedriveAccount').lean();
   if (!doc?.onedriveClientId || !doc?.onedriveRefreshToken) return null;
   return { clientId: doc.onedriveClientId, refreshToken: doc.onedriveRefreshToken, account: doc.onedriveAccount || '' };
 }
 
 export async function disconnectOnedrive(): Promise<void> {
   await connectDB();
-  await AppConfig.updateOne({ key: 'singleton' }, { $unset: { onedriveRefreshToken: '', onedriveAccount: '' } });
-  tokenCache = null;
+  const Config = await currentModel(AppConfig);
+  await Config.updateOne({ key: 'singleton' }, { $unset: { onedriveRefreshToken: '', onedriveAccount: '' } });
+  tokenCache.delete(tenantKey());
 }
 
 /**

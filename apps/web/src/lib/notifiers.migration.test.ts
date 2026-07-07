@@ -20,6 +20,10 @@ const { findOne, select, lean, connectDBMock, state } = vi.hoisted(() => {
 });
 vi.mock('./db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/AppConfig', () => ({ AppConfig: { findOne } }));
+// getNotifiers routes its read through currentModel(AppConfig) so it hits the current
+// tenant's db. For these single-tenant coercion tests, return the mocked AppConfig verbatim
+// (the default-tenant path returns the model untouched in production anyway).
+vi.mock('./tenancy/connection', () => ({ currentModel: async () => ({ findOne }) }));
 // notifiers.ts imports sendNtfyTo at module load; getNotifiers never calls it, but mock it so no
 // node-only ntfy transport is pulled in.
 vi.mock('./notify', () => ({ sendNtfyTo: vi.fn(async () => true) }));
