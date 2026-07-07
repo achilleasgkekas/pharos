@@ -1,6 +1,8 @@
 import 'server-only';
 import { connectDB } from './db';
 import { AppConfig } from '@/models/AppConfig';
+import { currentModel } from './tenancy/connection';
+import { currentTenant } from './tenancy/current';
 import type { RemoteConfig } from './remoteStorage';
 import { DEFAULT_FOLDER_TEMPLATE, DEFAULT_NAME_TEMPLATE } from './storagePath';
 
@@ -58,18 +60,33 @@ export function normalizeStorageConfig(doc: RawStorageConfigDoc): StorageConfig 
   };
 }
 
-let cache: { v: StorageConfig; t: number } | null = null;
+// Keyed by tenant. Default/self-hosted tenant uses the '' key → identical behaviour and
+// TTL to the old single-slot cache; SaaS tenants each get their own slot so one tenant's
+// storage backend + remote credentials never leak into another's.
+const cache = new Map<string, { v: StorageConfig; t: number }>();
 const TTL = 5000;
 
+/** Stable cache key for the current tenant ('' = default/self-hosted). */
+function tenantKey(): string {
+  const ctx = currentTenant();
+  return ctx.isDefault || !ctx.tenantId ? '' : ctx.tenantId;
+}
+
 export async function getStorageConfig(): Promise<StorageConfig> {
-  if (cache && Date.now() - cache.t < TTL) return cache.v;
+  const key = tenantKey();
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.t < TTL) return hit.v;
   await connectDB();
-  const doc = await AppConfig.findOne({ key: 'singleton' }).lean();
+  // Route to the current tenant's database (default tenant → AppConfig untouched).
+  const Config = await currentModel(AppConfig);
+  const doc = await Config.findOne({ key: 'singleton' }).lean();
   const v = normalizeStorageConfig(doc as RawStorageConfigDoc);
-  cache = { v, t: Date.now() };
+  cache.set(key, { v, t: Date.now() });
   return v;
 }
 
-export function invalidateStorageConfig(): void {
-  cache = null;
+/** Clear the storage-config cache. No arg → only the CURRENT tenant; `all` → every tenant. */
+export function invalidateStorageConfig(all = false): void {
+  if (all) cache.clear();
+  else cache.delete(tenantKey());
 }

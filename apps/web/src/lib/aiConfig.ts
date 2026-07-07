@@ -1,5 +1,7 @@
 import { connectDB } from './db';
 import { AppConfig } from '@/models/AppConfig';
+import { currentModel } from './tenancy/connection';
+import { currentTenant } from './tenancy/current';
 
 export type AiProvider = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 
@@ -34,14 +36,25 @@ export function isVisionModel(name: string): boolean {
 }
 
 // Short cache so a burst of parses in one request doesn't hit Mongo each time.
-let cache: { v: AiConfig; t: number } | null = null;
+// Keyed by tenant. Default/self-hosted tenant uses the '' key → identical behaviour and
+// TTL to the old single-slot cache; SaaS tenants each get their own slot so one tenant's
+// AI provider/keys never leak into another's.
+const cache = new Map<string, { v: AiConfig; t: number }>();
 const TTL = 5000;
+
+/** Stable cache key for the current tenant ('' = default/self-hosted). */
+function tenantKey(): string {
+  const ctx = currentTenant();
+  return ctx.isDefault || !ctx.tenantId ? '' : ctx.tenantId;
+}
 
 /** Effective AI config, merging the DB singleton over env defaults. If the chosen
  *  cloud provider has no key (or custom has no URL/model), it transparently falls
  *  back to Ollama so parsing never hard-fails on a half-configured setup. */
 export async function getAiConfig(): Promise<AiConfig> {
-  if (cache && Date.now() - cache.t < TTL) return cache.v;
+  const key = tenantKey();
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.t < TTL) return hit.v;
   let doc: {
     aiProvider?: string;
     ollamaHost?: string;
@@ -64,7 +77,10 @@ export async function getAiConfig(): Promise<AiConfig> {
   } | null = null;
   try {
     await connectDB();
-    doc = await AppConfig.findOne({ key: 'singleton' }).lean();
+    // Route to the current tenant's database (default tenant → the AppConfig model
+    // untouched, same query as before).
+    const Config = await currentModel(AppConfig);
+    doc = await Config.findOne({ key: 'singleton' }).lean();
   } catch {
     /* DB down → use env defaults */
   }
@@ -105,11 +121,13 @@ export async function getAiConfig(): Promise<AiConfig> {
   ) {
     v.provider = 'ollama';
   }
-  cache = { v, t: Date.now() };
+  cache.set(key, { v, t: Date.now() });
   return v;
 }
 
-/** Call after saving settings so the next parse picks up the change immediately. */
-export function invalidateAiConfigCache(): void {
-  cache = null;
+/** Call after saving settings so the next parse picks up the change immediately.
+ *  No arg → only the CURRENT tenant; `all` → every tenant. */
+export function invalidateAiConfigCache(all = false): void {
+  if (all) cache.clear();
+  else cache.delete(tenantKey());
 }

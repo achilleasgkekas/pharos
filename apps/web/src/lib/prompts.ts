@@ -1,5 +1,7 @@
 import { connectDB } from './db';
 import { AppConfig } from '@/models/AppConfig';
+import { currentModel } from './tenancy/connection';
+import { currentTenant } from './tenancy/current';
 
 export type PromptKey = 'receipt' | 'statement' | 'product' | 'card' | 'subscription' | 'category' | 'expense' | 'voucher' | 'productPhoto' | 'scraperPrice';
 
@@ -33,15 +35,28 @@ export const PROMPT_META: { key: PromptKey; label: string; where: string }[] = [
   { key: 'scraperPrice', label: 'Scraper price', where: 'Price scraper service: extract current price' },
 ];
 
-let cache: { v: Record<string, string>; t: number } | null = null;
+// Keyed by tenant. Default/self-hosted tenant uses the '' key → identical behaviour and
+// TTL to the old single-slot cache; SaaS tenants each get their own slot so one tenant's
+// prompt overrides never leak into another's.
+const cache = new Map<string, { v: Record<string, string>; t: number }>();
 const TTL = 5000;
 
+/** Stable cache key for the current tenant ('' = default/self-hosted). */
+function tenantKey(): string {
+  const ctx = currentTenant();
+  return ctx.isDefault || !ctx.tenantId ? '' : ctx.tenantId;
+}
+
 async function getOverrides(): Promise<Record<string, string>> {
-  if (cache && Date.now() - cache.t < TTL) return cache.v;
+  const key = tenantKey();
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.t < TTL) return hit.v;
   const v: Record<string, string> = {};
   try {
     await connectDB();
-    const doc = await AppConfig.findOne({ key: 'singleton' }).select('prompts').lean();
+    // Route to the current tenant's database (default tenant → AppConfig untouched).
+    const Config = await currentModel(AppConfig);
+    const doc = await Config.findOne({ key: 'singleton' }).select('prompts').lean();
     const p = (doc as { prompts?: Record<string, unknown> } | null)?.prompts;
     if (p && typeof p === 'object') {
       for (const [k, val] of Object.entries(p)) if (typeof val === 'string') v[k] = val;
@@ -49,7 +64,7 @@ async function getOverrides(): Promise<Record<string, string>> {
   } catch {
     /* DB unreachable → no overrides, fall back to built-in defaults */
   }
-  cache = { v, t: Date.now() };
+  cache.set(key, { v, t: Date.now() });
   return v;
 }
 
@@ -65,6 +80,8 @@ export async function getAllPromptOverrides(): Promise<Record<string, string>> {
   return { ...(await getOverrides()) };
 }
 
-export function invalidatePromptsCache(): void {
-  cache = null;
+/** Clear the prompt-override cache. No arg → only the CURRENT tenant; `all` → every tenant. */
+export function invalidatePromptsCache(all = false): void {
+  if (all) cache.clear();
+  else cache.delete(tenantKey());
 }
