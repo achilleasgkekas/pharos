@@ -1959,3 +1959,57 @@ archive dep + per-tenant storage prefix → άδεια/απόφαση), είτε
 panels (ΟΛΑ τα read/write control-plane APIs έτοιμα: profile, members, billing, ai-key, erasure, purge
 report, content-export, files-manifest), είτε (γ) BYO-key AI-dispatch consumption / in-process 6h cron
 (shared runtime → άδεια).
+
+## 2026-07-07 (increment 48 — Superadmin console scaffold: read-only cross-tenant listing, §8)
+**Το κενό:** το TODO §8 ζητά ρητά **«Superadmin console»** και μέχρι τώρα ΔΕΝ υπήρχε κανένα
+cross-tenant / platform-operator surface — όλα τα υπάρχοντα SaaS routes είναι per-workspace
+(owner/admin authz μέσω `resolveWorkspaceSession`). Έχτισα το πρώτο, ασφαλέστερο κομμάτι: ένα
+**READ-ONLY** cross-tenant listing του control-plane `Tenant` registry, πίσω από ξεχωριστό
+operator gate. Καμία destructive/write δυνατότητα (superadmin ξεκινά ως observability surface·
+tenant drop/suspend μένουν manual/gated, ΠΟΤΕ από routine). ΟΛΟ additive + SaaS-gated, σε δικά
+μου SAAS αρχεία:
+- `lib/tenancy/superadmin.ts` (νέο) — platform-operator gate, **ξεχωριστό** από το per-workspace
+  authz. Superadmin membership = **ENV allowlist** `SAAS_SUPERADMIN_EMAILS` (comma/semicolon/
+  whitespace-separated), matched κατά του signed account-session email → **δεν υπάρχει in-app path
+  για escalation** (μόνο ο operator του deployment το δίνει· compromised account row δεν μπορεί να
+  γίνει superadmin). PURE helpers (unit-tested): `normalizeEmail`, `parseSuperadminEmails` (dedupe +
+  drop tokens χωρίς `@` ώστε stray word να μη whitelist-άρει τους πάντες), `isSuperadminEmail`,
+  `superadminAllowlist`/`superadminConfigured`. Impure `requireSuperadmin()` gate (mirrors
+  `resolveWorkspaceSession` shape `{response}|{account}`): SAAS off/no AUTH_SECRET → saasAuthGate·
+  empty allowlist → **404** (δεν αποκαλύπτει ότι υπάρχει)· not signed in → 401· not in allowlist →
+  403· deleted account (stale cookie) → 401 (defence-in-depth Account existence check).
+- `lib/tenancy/adminTenants.ts` (νέο) — READ-ONLY registry listing. PURE (unit-tested):
+  `parseAdminTenantQuery` (limit 1..100 clamp+floor def 50, offset floor≥0, status exact-enum-only
+  else null, q trim→null), `buildTenantQueryFilter` (exact status + case-insensitive **regex-escaped**
+  $or slug/name/customDomain search — literal, ποτέ pattern-injection), `summarizeTenant`
+  (display-safe projection: slug/plan/status/tier/customDomain/trial+erasure ISO dates/`billingLinked`
+  bool/`aiByoKey` bool — **ΠΟΤΕ** aiKey ή billing ids verbatim, dates→ISO safe), `buildTenantListing`
+  (σταθερό envelope `pharos.admin-tenant-listing` v1, derived count, clamped total, epoch-safe gen).
+  Impure `listTenantsForAdmin` = ο ΜΟΝΟΣ reader (`Tenant.countDocuments`+`find().sort({createdAt:-1}).
+  skip().limit().lean()`)· αγγίζει ΜΟΝΟ το central registry, ΠΟΤΕ per-tenant data db.
+- `app/api/saas/admin/tenants/route.ts` (νέο) — `GET [?status=&q=&limit=&offset=]`, `runtime=nodejs`,
+  `force-dynamic`, `saasGuard` + `requireSuperadmin` → paginated listing, `no-store`. Read-only.
+- `superadmin.test.ts` (9) + `adminTenants.test.ts` (14) — PURE helper coverage (allowlist parse/
+  match/config, query clamp/status/search, filter escape, summary projection + no-secret-leak +
+  null-safety, envelope shape/epoch/clamp).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run` → **1641/1641 green** (120 files,
++23 νέα, καμία regression). Importers των νέων modules από feature code (εκτός του δικού μου admin
+route) → **κανένας**· το route SAAS-gated (404 off) + operator-gated (404 όταν `SAAS_SUPERADMIN_EMAILS`
+κενό). ⇒ `SAAS_MODE` off / self-hosted = **zero effect** (route δεν mount-άρει, gate inert, μηδέν DB
+hit). Κανένας Docker rebuild (νέα PURE-heavy modules + additive gated route, μηδέν shared runtime
+wiring — type-check+tests καλύπτουν)· καμία νέα εξάρτηση· κανένα feature route/data-db/User-path/
+bearer-path/audit αγγίχτηκε. Collision guard: staging καθαρό (τίποτα pre-staged), μόνο τα δικά μου paths.
+
+**## Needs Achilleas** (superadmin console):
+- **`SAAS_SUPERADMIN_EMAILS` env** (comma/semicolon/whitespace-separated operator emails) όταν
+  θελήσεις να ενεργοποιήσεις το console σε production. Κενό/unset = console disabled (404), zero risk.
+- **Superadmin UI page** (`/admin` ή subdomain-gated) που καταναλώνει αυτό το read API — deferred (UI
+  = χωριστό territory). Το API είναι το scaffold που το προηγείται.
+- **Write/destructive superadmin actions** (suspend/reactivate/force-plan/drop-tenant) = **ΠΟΤΕ από
+  routine**· human-triggered admin actions πάνω σε αυτό το read baseline, gated ρητά.
+
+**Next task:** increment 49 — είτε (α) superadmin **tenant DETAIL** read endpoint (`GET admin/
+tenants/[slug]` → single-tenant control-plane view + usage/dbStats summary, read-only), είτε (β)
+user-facing workspace-settings UI panels (ΟΛΑ τα read/write control-plane APIs έτοιμα), είτε (γ)
+actual binary packaging / BYO-key AI-dispatch (shared runtime / archive dep → άδεια).
