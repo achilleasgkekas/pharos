@@ -1418,3 +1418,46 @@ Needs-Achilleas (open):
 - Annual billing: discount πριν φτιαξω toggle.
 - Contact inbox `hello@ph-aros.com` να επιβεβαιωθει πριν launch.
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-09 — (e) polish: /llms.txt για AI answer engines
+
+Task: (e) polish. Τα δυο blocked increments (real app screenshots -> assets· annual-billing toggle ->
+Needs-Achilleas τιμες) μενουν κλειστα. Το site ειναι ηδη ωριμο (17 sections, JSON-LD graph
+[Organization/WebSite/SoftwareApplication+Offers/FAQPage/HowTo], robots/sitemap, OG images, privacy/terms,
+security.txt, humans.txt, ολα τα referenced assets resolve). Φρεσκο self-contained increment: ενα static
+`/llms.txt` (llmstxt.org convention) ωστε AI answer engines (ChatGPT, Perplexity, Claude κλπ) να
+περιγραφουν το PHAROS σωστα. Ταιριαζει με το AI-forward brand, μηδεν ρισκο (static file).
+
+Τι εφτιαξα:
+- `public/llms.txt` (νεο, 3.8KB): llmstxt.org format, H1 «PHAROS» + blockquote summary (τι ειναι, dual
+  self-host/hosted, tagline, backronym) + design principles paragraph + sections **Modules** (8 module
+  links -> #features/#ai), **Pricing** (4 tiers με τα ΠΡΑΓΜΑΤΙΚΑ ποσα απο TIERS: Self-hosted Free /
+  Solo €4 / Family €8 / Pro €15, με «indicative during beta» disclaimer), **Getting started** (Docker /
+  GitHub / README / waitlist), **More** (FAQ/privacy/terms/security.txt/license). Ολα absolute URLs σε
+  ph-aros.com + github.com/achilleasgkekas/pharos. Copy απο τα υπαρχοντα page constants (μηδεν νεα claims).
+- `app/page.tsx`: νεο footer link «AI (llms.txt)» στη Legal στηλη, διπλα στο «Credits» (/humans.txt),
+  discoverable + target=_blank rel=noopener. Μηδεν αλλη αλλαγη markup.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static· `/` 3.48 kB (μονο ενα footer <a>, καμια νεα route/JS· το
+  llms.txt ειναι public static, δεν μετραει σαν route).
+- `public/llms.txt` served ok (3792 bytes)· prerendered `index.html` περιεχει «AI (llms.txt)» + `href="/llms.txt"`.
+- em-dash check: αρχικα εβαλα em-dashes στα pricing labels («Solo — €4/month»)· τα αντικατεστησα ολα (5)
+  με middot «·» (on-brand, το site το χρησιμοποιει ηδη σε «© 2026 PHAROS · AGPL-3.0»), 0 em-dash πλεον
+  σε llms.txt + page.tsx. Hard-rule compliant.
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev στον φακελο· static txt verify μεσω build output +
+  prerender grep)· δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit, ελεγχος για foreign staged· stage ΜΟΝΟ τα δικα μου
+  (public/llms.txt, page.tsx, LANDING_PROGRESS.md).
+
+Επομενο increment: (e) polish συνεχεια, real app screenshots οταν υπαρξουν assets· annual-billing toggle
+ΜΟΝΟ αφου κλεισουν ετησιες τιμες· ισως BreadcrumbList JSON-LD στα /privacy /terms ή content copy pass.
+
+Needs-Achilleas (open):
+- Terms + Privacy: review + finalize (billing terms, governing-law jurisdiction, provider/processor ονοματα)
+  ΠΡΙΝ hosted launch· μετα flip `robots:{index:false}` -> indexable + add στο sitemap.
+- Annual billing: discount πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` να επιβεβαιωθει πριν launch.
+- Hosted τιμες (€4/€8/€15): confirm ΠΡΙΝ launch, τωρα marked «indicative during beta» και στο llms.txt.
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.

@@ -1,0 +1,42 @@
+# PHAROS
+
+> PHAROS (Greek "Φάρος", lighthouse) is a self-hosted personal hub: one private dashboard for the things you own and pay for. It reads your receipts and statements with AI, tracks inventory, expenses, credit-card installments, subscriptions and vouchers, gives you reports, and can watch your home network. Tagline: "One light over everything you run." Backronym: PH (Personal Hub) + AROS (Asset & Resource Oversight System).
+
+PHAROS ships two ways. Self-hosted is free and open source under AGPL-3.0: run it on your own hardware with Docker, and your data never leaves your machine. A managed hosted service (currently in private beta / waitlist) runs the same hub for you, with automatic backups, updates and included AI parsing.
+
+Design principles: local-first, privacy-first (financial data stays under your control), no telemetry, dark-theme dashboard, mobile-friendly. Bring your own AI provider when self-hosting (Ollama, Anthropic, OpenAI, Gemini, and OpenAI-compatible endpoints).
+
+## Modules
+
+- [Inventory & shopping](https://ph-aros.com/#features): Track what you own and what you plan to buy, with price history across stores and target-price alerts.
+- [Receipts with AI](https://ph-aros.com/#ai): Drop in a photo or PDF; AI reads store, date, total, VAT and line items, in many languages. OCR handles scanned and rotated receipts.
+- [Expenses & income](https://ph-aros.com/#features): Log bills and income, scan documents, auto-detect recurring series and spending anomalies.
+- [Statements & installments](https://ph-aros.com/#features): Import credit-card statement PDFs, reconstruct installment plans, and see what you owe month by month.
+- [Subscriptions](https://ph-aros.com/#features): Track recurring charges with a renewal calendar.
+- [Vouchers](https://ph-aros.com/#features): Store discount codes and gift vouchers with expiry reminders.
+- [Reports](https://ph-aros.com/#features): Net position, cash flow, budgets, spend by category and store.
+- [Network](https://ph-aros.com/#features): Optional UniFi dashboard for devices, clients, WAN health and speed tests.
+
+## Pricing
+
+- [Self-hosted · Free forever](https://ph-aros.com/#pricing): Every module, no limits, AGPL-3.0, community support. Run it yourself with Docker.
+- [Solo · €4/month](https://ph-aros.com/#pricing): Managed hosting for one user, every module, AI parsing included, nightly backups. (Hosted beta, waitlist.)
+- [Family · €8/month](https://ph-aros.com/#pricing): Shared household hub for up to 5 members, higher AI limits, priority email support. (Hosted beta, waitlist.)
+- [Pro · €15/month](https://ph-aros.com/#pricing): Everything in Family plus REST API access and highest AI limits. (Hosted beta, waitlist.)
+
+Hosted prices are indicative during the beta and may change before general availability.
+
+## Getting started
+
+- [Self-host with Docker](https://ph-aros.com/#self-host): Bring up the hub, MongoDB and search with a single Docker Compose file.
+- [GitHub repository](https://github.com/achilleasgkekas/pharos): Source code, README and issues.
+- [Documentation (README)](https://github.com/achilleasgkekas/pharos/blob/main/README.md): Setup and configuration.
+- [Hosted beta waitlist](https://ph-aros.com/#waitlist): Join to be notified when managed hosting opens.
+
+## More
+
+- [FAQ](https://ph-aros.com/#faq): Common questions about self-hosting, data, AI keys, backups and security.
+- [Privacy policy](https://ph-aros.com/privacy): How the site and hosted service handle data.
+- [Terms of service](https://ph-aros.com/terms): Terms for the hosted service.
+- [Security policy](https://ph-aros.com/.well-known/security.txt): How to report a vulnerability.
+- [License · AGPL-3.0](https://github.com/achilleasgkekas/pharos/blob/main/LICENSE): Full license text.

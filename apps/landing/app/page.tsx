@@ -1374,6 +1374,7 @@ export default function Home() {
               <a href="/terms" className="navlink">Terms</a>
               <a href="/.well-known/security.txt" className="navlink" target="_blank" rel="noopener noreferrer">Security</a>
               <a href="/humans.txt" className="navlink" target="_blank" rel="noopener noreferrer">Credits</a>
+              <a href="/llms.txt" className="navlink" target="_blank" rel="noopener noreferrer">AI (llms.txt)</a>
               <a href="#faq" className="navlink">FAQ</a>
             </div>
           </div>
