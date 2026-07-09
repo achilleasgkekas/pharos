@@ -1358,3 +1358,26 @@ Mock pattern: action-seam (όπως το lists/route.test.ts) — το route del
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = ΜΟΝΟ το δικό μου notifications/route.test.ts (??). Στάγιαρα μόνο τα δικά μου paths (route.test.ts + OSS_PROGRESS.md).
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Υψηλής αξίας untested collection routes ακόμα: `history/route.ts`, `calendar/route.ts`, `overview/route.ts`, `reports/route.ts`, `search/route.ts`, `trash/route.ts`, `jobs/route.ts`, `vouchers` ήδη καλυμμένο. Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-09 (cont.¹¹ — search/route.test.ts, GET-only collection route, min-length guard + href-drop projection)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/search/route.test.ts` για το GET του `/api/v1/search`.**
+
+Επιλογή target: από τη λίστα untested collection routes του προηγ. entry (`history/calendar/overview/reports/search/trash/jobs`) διάλεξα το **`search/route.ts`** γιατί έχει τη μεγαλύτερη route-only λογική με καθαρό single-action seam (τα υπόλοιπα είναι είτε trivial verbatim wrappers όπως `history` → `{rows}`, είτε βαριά multi-model DB aggregation όπως `overview`/`calendar` που θέλουν 5-7 model mocks). Route-only logic που ζει αποκλειστικά εδώ και τροφοδοτεί το global search bar του mobile:
+- **Auth gate**: withAuth → 401 χωρίς token (καμία searchAll call).
+- **query prep + min-length guard**: `q = (?q ?? '').trim()`· **μόνο** `q.length >= 2` καλεί `searchAll(q)`, αλλιώς short-circuit σε `[]` **ΧΩΡΙΣ** να αγγίξει το DB seam. Το trim γίνεται ΠΡΙΝ το μέτρημα (`"  a  "` → length 1 → []).
+- **projection**: κάθε `SearchHit` narrow-άρεται σε `{ type, id, title, subtitle }` — το `href` πεδίο **πέφτει** (ώστε ο mobile client να μη βλέπει web route που δεν μπορεί να πλοηγηθεί).
+
+Mock pattern: action-seam (όπως notifications/lists) — mock το `@/app/search-actions` searchAll (καταγράφει το lastQuery που του δόθηκε + returns configurable hits) + auth seam (`@/lib/db` connectDB + `@/models/User` findOne chain). Τρέχω τον ΠΡΑΓΜΑΤΙΚΟ withAuth helper. Το makeReq βάζει το `?q=` στο url (το route διαβάζει `new URL(req.url).searchParams`).
+
+Τι έγινε: Νέο `route.test.ts` (9 tests). **auth gate** (2: no-token→401 + no searchAll, unknown-token→401 + no searchAll). **min-length guard** (5: q missing→`{hits:[]}` + no searchAll· single-char→ίδιο· `"  a  "` trims→length 1→[] + no searchAll· 2-char boundary→searchAll('ab') κληθηκε· `"  skroutz  "`→searchAll('skroutz') [trimmed]). **projection** (2: full hits με href→narrowed σε type/id/title/subtitle, href dropped· κενά results→`{hits:[]}` + searchAll κληθηκε).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/search/route.test.ts` → 9/9 passed.
+- `npx vitest run` (όλο το suite) → 129 files, 1720/1720 passed (ήταν 1686).
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλου routine (return-window feature: `receipts/ReceiptsClient.tsx`+`page.tsx`, `settings/SettingsClient.tsx`+`actions.ts`, `appSettings.ts`+`.test.ts`, `storeService.ts`, `models/AppConfig.ts`+`Store.ts`, `types.ts` [M] + `lib/returnWindow.ts`+`.test.ts` [??]) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα μόνο τα δικά μου paths (search/route.test.ts + OSS_PROGRESS.md).
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Υψηλής αξίας untested collection routes ακόμα: `trash/route.ts` (GET listing των soft-deleted, per-type grouping) + `jobs/route.ts` (background AI jobs feed) — και τα δύο single-action seam σαν το search/notifications. Πιο βαριά (θέλουν multi-model mocks, άφησέ τα για αργότερα ή σπάσε τα): `overview/route.ts` (7 countDocuments + computeInstallmentPlans), `calendar/route.ts` (5 models + date-stepping), `reports/route.ts`, `history/route.ts` (trivial `{rows}` wrapper — χαμηλή αξία). Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
