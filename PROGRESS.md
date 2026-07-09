@@ -2,8 +2,19 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 62d0a86 -->
+<!-- reviewed: 5c2abf3 -->
 <!-- docker-validated: 51d43ba -->
+
+## 2026-07-09 (reviewer — range 62d0a86..5c2abf3, 18 commits)
+- **Τι έλεγξα:** όλα τα commits μετά το τελευταίο review marker (62d0a86). Κύρια θέματα: (α) per-tenant keying των AppConfig caches (`aiConfig`/`prompts`/`storageConfig`/`notifiers`/`onedrive` → `currentModel(AppConfig)` + Map-keyed-by-tenant cache, '' key = default/self-hosted), (β) SaaS §8 scaffolds report-only (superadmin console `admin/tenants`, workspace content export + file-binary manifest [GDPR Art. 20], erasure purge scan [Art. 17]), (γ) `search-actions.ts` typed lean projections (drop 7× `as any[]`), (δ) νέο security fix 5c2abf3: SSRF IPv4-mapped IPv6 bypass στο `assertPublicUrl`.
+- **Checks:** `apps/web` type-check EXIT 0· `apps/mobile` tsc --noEmit EXIT 0· vitest **1659/1659 πράσινα** (123 files)· ξεχωριστό re-run `ssrf.test.ts` 40/40 μετά το security commit.
+- **Review ευρήματα:**
+  - **SSRF fix (5c2abf3) — σωστό.** Το παλιό `ip6IsPrivate` έπιανε μόνο dotted `::ffff:d.d.d.d`, αλλά ο WHATWG URL parser συμπιέζει το IPv4-mapped σε hex (`::ffff:127.0.0.1` → `::ffff:7f00:1`) → το regex αστοχούσε = SSRF bypass προς loopback/private. Το νέο `expandIp6` κάνει πλήρη expansion (handles `::`, trailing dotted IPv4) και decode-άρει τα low 32 bits → reuse `ip4IsPrivate`. Fail-closed (unparseable → reject). Επαλήθευσα με το χέρι `::1`/`::`/`::ffff:7f00:1`/public Cloudflare `2606:4700:...` — όλα σωστά.
+  - **Per-tenant cache keying — backward-compatible.** Όλα τα 15 call sites καλούν `invalidate*Cache()` χωρίς arg → μόνο ο current tenant· default tenant key '' → συμπεριφορά + TTL ίδια με το παλιό single-slot. Καμία regression στο self-hosted path.
+  - **`search-actions.ts` refactor — output shape αμετάβλητο** (`SearchHit` ίδιο)· τα lean types mirror-άρουν τα `.select(...)`. Καθαρή type-safety win.
+  - **SaaS routes — properly guarded, report-only.** `saasGuard` + `requireSuperadmin`/`resolveWorkspaceSession`, `no-store`, μηδέν destructive path (`dryRun` πάντα true στο erasure). `workspaceFiles.ts` έχει path-traversal άμυνα (`isStorageRelative`, απορρίπτει absolute/`..`). Μόνο stat, ποτέ file content.
+- **Τι διόρθωσα:** τίποτα — δεν βρέθηκε small-safe θέμα.
+- **Τι flag-άρισα:** τίποτα — καμία regression, κανένα committed secret (scan καθαρό), καμία αλλαγή σε API shape που να σπάει το mobile. Ο κλάδος είναι καθαρός.
 
 ## 2026-07-06 (pharos-daily-dev — `search-actions.ts` 7× `as any[]` → typed lean projection shapes· type-safe hit builders)
 - **Τι έκανα:** έκλεισα το ρητά suggested-next-task της προηγ. dev εγγραφής (2026-07-06 saasGuard, γρ.14): το τελευταίο auto-buildable web-debt item, **[P3/S] `search-actions.ts` 7× `as any[]`**. Το `searchAll()` (global cross-collection search πίσω από το AI command bar / navbar search) έκανε 7 lean queries και μετά cast-άριζε κάθε result array σε `as any[]` στα hit-builder loops → μηδέν type-checking στο field access (ένα typo σε `it.purchasdPrice` ή drift ανάμεσα στο `.select(...)` και το loop θα περνούσε σιωπηλά). Όρισα **7 lean-projection types** (`ItemLean`/`ReceiptLean`/`StatementLean`/`TaskLean`/`SubscriptionLean`/`ExpenseLean`/`VoucherLean`), το καθένα mirror του αντίστοιχου `.select(...)` (+ implicit `_id`), τα σύνδεσα με `.lean<XLean[]>()` generic ανά query, και αφαίρεσα και τα 7 `as any[]` casts από τα loops.
