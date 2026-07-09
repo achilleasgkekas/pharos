@@ -4376,3 +4376,18 @@ Read-only code-quality audit της Next.js web επιφάνειας (fresh grep
 **Needs Achilleas:** κανένα νέο. Παραμένουν τα προϋπάρχοντα product/decision flags (reset-request timing → OWNER_DECISIONS #4 APPROVED, εκκρεμεί builder· v1 tenant-scoping για SaaS data isolation· getTenantConnection readyState guard).
 
 **Working tree:** το `apps/mobile/src/screens/ReceiptsScreen.tsx` παραμένει uncommitted (ξένη WIP migration) — ΔΕΝ το άγγιξα· stage-άρω μόνο `WEB_DEBT.md` + `PROGRESS.md` με ρητό pathspec.
+
+## 2026-07-09 (pharos-daily-dev, receipts quick-verify στο mobile + υιοθέτηση ορφανού WIP)
+Δύο commits, και τα δύο mobile-only (μηδέν web runtime change, μηδέν rebuild):
+
+1. **`b397bc0` refactor(mobile):** υιοθέτησα το ορφανό uncommitted WIP στο `ReceiptsScreen.tsx` (το suggested task της 2026-07-06 που είχε μείνει μισοτελειωμένο στο working tree): 6× raw `TextInput`+local `einput` style → shared `<Input>`, notes → `<TextArea>`, το αχρησιμοποίητο `einput` StyleSheet entry σβήστηκε. Επιβεβαίωσα πριν το commit ότι τα tokens είναι ισοδύναμα (`inputSurface` = surface/border/RADIUS.md/SIZE.md, μόνο paddingVertical 11 αντί 10). Τα 3 compact `cellInput` έμειναν ως έχουν (attended-preferred κατά την 47η ui-auditor σάρωση).
+
+2. **`00d6f46` feat(mobile): receipts quick-verify rapid queue** — το top Build Queue item της 47ης parity σάρωσης (P1/M). Κουμπί «⚡ Quick verify (N)» κάτω από το scan button (N = `!verified && !archived && (total>0 || itemCount>0)`, κρυφό όταν 0) → bottom-sheet ουρά που περνά μία απόδειξη τη φορά: thumbnail, inline editable store/date/total, progress «i / N · done» + λεπτό progress bar, 4 actions (**Verify & next** = PATCH `{store,date,total,verified:true}`, το partial `$set` του v1 route δεν αγγίζει lineItems· **Skip**· **Edit fully** = κλείνει την ουρά και ανοίγει το υπάρχον detail modal· **🗄 Not a receipt** = PATCH `{archived:true}`). Η ουρά snapshot-άρεται στο άνοιγμα (δεν reshuffle-άρει καθώς verify-άρεις) και η λίστα κάνει `load()` στο κλείσιμο. Κανένα νέο endpoint, καμία αλλαγή στο `api.ts`, μηδέν AI calls. Νέα styles με RADIUS/SIZE tokens. Το MOBILE_PARITY item → ✅ DONE.
+
+**Σημείωση για το προηγούμενο suggested task (OWNER_DECISIONS #4, reset-request timing):** ήδη υλοποιημένο από άλλη routine (commit `e75cd74`, constant-time reset-request D6: fire-and-forget `void sendEmail(...)` + `settleMinResponseTime` floor). Το επιβεβαίωσα διαβάζοντας το route, δεν χρειάστηκε δουλειά· superseded.
+
+**Verified:** `apps/mobile npx tsc --noEmit` → **EXIT 0** και στα δύο commits. Mobile-only αλλαγές, δεν έγινε Docker rebuild (κανένα web runtime αρχείο δεν αγγίχτηκε). Simulator δεν βγαίνει unattended, οπότε λειτουργική επαλήθευση = προσεκτικό code review: sibling Modal (ποτέ ταυτόχρονα ορατά, το Edit fully μηδενίζει το queue πριν το `open`), busy-guards σε όλα τα actions, τελευταίο item → αυτόματο κλείσιμο + reload.
+
+**Working tree:** τα ξένα untracked `apps/web/src/app/api/saas/admin/tenants/[slug]/` + `adminTenantDetail.{ts,test.ts}` (δουλειά άλλης routine σε εξέλιξη) ΔΕΝ αγγίχτηκαν· commits με ρητό pathspec (`git commit --only`).
+
+**Επόμενο suggested task:** το rank-2 του parity auditor: **fresh pure-lib vitest coverage** (`apps/web/src/lib/cards.ts`, `lib/taxonomies.ts normalizeList`, `lib/itemStatus.ts`· μηδέν rebuild, unattended-safe)· εκτός αν νεότερη σάρωση (parity/web-debt) έχει βγάλει κάτι υψηλότερο μέχρι τότε.

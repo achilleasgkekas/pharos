@@ -153,7 +153,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 
 > **Re-audit 2026-07-02 (mobile-parity-auditor, 38η σάρωση):** inventory ξαναχτισμένο από τον κώδικα (όχι docs). **50 v1 routes** (login + 49 bearer, `find api/v1 -name route.ts`), **16 mobile screens**, mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** route → **μηδέν endpoint-level gap** (και τα νέα `expenses/[id]/rescan` + `statements/plans` δεμένα). Mobile `npx tsc --noEmit` → **EXIT 0**. Επιβεβαίωσα στον κώδικα ότι τα 2 GAP της προηγ. σάρωσης έκλεισαν: bill image (`fileSource(editing.file)` στο MoneyScreen) + Expenses/Income re-scan (`rescanExpense` + rescanBar) → **DONE**. **ΝΕΟ εύρημα (2 auto-buildable GAP, τοποθετημένα στην κορυφή):** (α) **Expense anomaly badges** — το web υπολογίζει `anomaly` (±% απόκλιση από το vendor median, `page.tsx:25-46`, pure stats μηδέν AI) και δείχνει `AnomalyBadge`, αλλά ο v1 serializer (`serialize.ts`) ΔΕΝ εκθέτει το πεδίο → το mobile δεν μπορεί να το δείξει· port = additive `anomaly?` στο list route (ήδη import-άρει `vendorKey`) + badge στο MoneyScreen. (β) **Expense vendor autocomplete** — το web add-form έχει vendor autocomplete· το mobile MoneyScreen add-form είναι plain `Input` (line 147), μηδέν suggestions· auto-buildable client-side (derive distinct vendors από την ήδη-φορτωμένη λίστα, μηδέν endpoint). Τα εναπομείναντα παλιά TODO (lucide icons, language switcher) μένουν attended-preferred → κάτω από τα 2 νέα un-attended.
 
-### Receipts — quick-verify rapid queue στο mobile
+### Receipts — quick-verify rapid queue στο mobile — ✅ DONE 2026-07-09 (daily-dev, `00d6f46`)
 - Priority: P1 | Size: M
 - Web ref: rapid review queue (file: apps/web/src/app/receipts/QuickVerify.tsx· κουμπί «⚡ Quick verify (N)» στο ReceiptsClient header, N = parsed-but-unverified)
 - API: GET /api/v1/receipts?limit=… (exists: yes· λίστα με `verified`/`archived`/`total`/`itemCount`/`store`/`date`/`thumb`) + PATCH /api/v1/receipts/[id] (exists: yes· partial `$set`, δέχεται `{store,date,total,verified,archived}` χωρίς να αγγίζει lineItems) — **κανένα νέο endpoint**
@@ -165,7 +165,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - Progress indicator «i / N · done» + κλείσιμο όταν τελειώσει η ουρά· η λίστα κάνει refresh (`load()`) στο τέλος
   - Το queue snapshot-άρεται στο άνοιγμα (δεν reshuffle-άρει καθώς verify-άρεις)
   - mobile `npx tsc --noEmit` EXIT 0· structural verify μόνο (δεν καλεί AI, μηδέν κόστος)
-- Status: TODO
+- Status: ✅ DONE 2026-07-09 (commit `00d6f46`· κουμπί «⚡ Quick verify (N)» κάτω από το scan, snapshot queue bottom-sheet με editable store/date/total + Verify & next / Skip / Edit fully / Not a receipt + progress bar· «Edit fully» κλείνει την ουρά και ανοίγει το detail modal· λίστα reload στο κλείσιμο)
 
 ### Expenses/Income — anomaly badge (±% vs vendor median) στο mobile — ✅ DONE 2026-07-02
 - Priority: P2 | Size: S | no AI (pure stats), no decision, no dep, no native dep
