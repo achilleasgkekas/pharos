@@ -39,6 +39,7 @@ import { readFile, deleteFile } from '@/lib/storage';
 import { Types } from 'mongoose';
 import { getStores, invalidateStoreCache, type StoreLite } from '@/lib/storeService';
 import { effectiveReturnWindow, returnDaysLeft } from '@/lib/returnWindow';
+import { suggestBudgetsFromExpenses, type BudgetExpenseRow } from '@/lib/budgetSuggest';
 import { anthropicTest } from '@/lib/anthropic';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
 import { requireAdmin } from '@/lib/auth';
@@ -991,6 +992,20 @@ export async function saveBudgets(budgets: Record<string, number>): Promise<{ ok
   revalidatePath('/reports');
   revalidatePath('/settings');
   return { ok: true };
+}
+
+/** Suggest a monthly budget per expense category from spending history (P27).
+ *  Deterministic, no AI: median of the last few complete months per category,
+ *  rounded to the nearest €5. The UI pre-fills these into the budget inputs so
+ *  the user can edit before saving (suggest ≠ auto-apply). */
+export async function suggestBudgets(): Promise<{ suggestions: Record<string, number>; months: number }> {
+  await connectDB();
+  const months = 3;
+  const rows = (await Expense.find({ kind: { $ne: 'income' } })
+    .select('kind amount category period date')
+    .lean()) as BudgetExpenseRow[];
+  const suggestions = suggestBudgetsFromExpenses(rows, { windowMonths: months });
+  return { suggestions, months };
 }
 
 /** Save manual asset accounts for net worth (account name → balance). Zero/empty

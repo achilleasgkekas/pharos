@@ -1,12 +1,12 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark } from 'lucide-react';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, saveAssetAccounts, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, suggestBudgets, saveAssetAccounts, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { AI_FEATURES } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, SCRAPER_RECOMMEND, type FetchedModel } from '@/lib/aiModels';
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
@@ -1475,6 +1475,7 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
     Object.fromEntries(settings.expenseCategories.map((c) => [c, settings.budgets[c] != null ? String(settings.budgets[c]) : '']))
   );
   const [msg, setMsg] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
   const total = Object.values(budgets).reduce((s, v) => s + (Number(v) || 0), 0);
 
   function save() {
@@ -1488,6 +1489,31 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
       await saveBudgets(out);
       setMsg(t('common.savedOk'));
     });
+  }
+
+  function suggest() {
+    setMsg(null);
+    setSuggesting(true);
+    (async () => {
+      try {
+        const { suggestions, months } = await suggestBudgets();
+        const n = Object.keys(suggestions).length;
+        if (n === 0) {
+          setMsg(t('set.budgetsNoHistory'));
+          return;
+        }
+        // Pre-fill only categories the history covers; leave the rest untouched
+        // so the user reviews before saving (suggest ≠ auto-apply).
+        setBudgets((p) => {
+          const next = { ...p };
+          for (const [cat, amount] of Object.entries(suggestions)) next[cat] = String(amount);
+          return next;
+        });
+        setMsg(t('set.budgetsSuggested', { n, months }));
+      } finally {
+        setSuggesting(false);
+      }
+    })();
   }
 
   return (
@@ -1510,9 +1536,13 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
           </label>
         ))}
       </div>
-      <div className="flex items-center gap-3 mt-3">
+      <div className="flex items-center gap-3 mt-3 flex-wrap">
         <button onClick={save} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
           {pending ? t('common.saving') : t('set.saveBudgets')}
+        </button>
+        <button onClick={suggest} disabled={suggesting} title={t('set.suggestBudgetsHint')} className="text-xs px-3 py-1.5 rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-border-light)] disabled:opacity-50 inline-flex items-center gap-1.5">
+          {suggesting ? <Loader2 size={13} className="animate-spin" /> : <TrendingUp size={13} />}
+          {t('set.suggestBudgets')}
         </button>
         <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.budgetTotal', { amount: `${cur()}${total.toLocaleString('en-GB')}` })}</span>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
