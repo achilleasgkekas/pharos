@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   Archive,
   Zap,
+  Undo2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -560,9 +561,12 @@ function ReceiptRow({ receipt, onClick }: { receipt: SerializedReceipt; onClick:
         <span className="font-semibold text-sm truncate block" style={{ fontFamily: 'var(--font-display)' }}>
           {receipt.store || t('ex.unknown')}
         </span>
-        <span className="text-[10px] text-[color:var(--color-text-faint)] block mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-          {isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB')} · {receipt.lineItems?.length ?? 0} {t('it.items')}
-          {receipt.fileType === 'pdf' ? ' · pdf' : isHtml ? ' · email' : ''}
+        <span className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className="truncate">
+            {isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB')} · {receipt.lineItems?.length ?? 0} {t('it.items')}
+            {receipt.fileType === 'pdf' ? ' · pdf' : isHtml ? ' · email' : ''}
+          </span>
+          <ReturnBadge days={receipt.returnDaysLeft} />
         </span>
       </div>
       <div className="flex items-center gap-3 shrink-0">
@@ -665,14 +669,39 @@ function ReceiptCard({
           </span>
         </div>
         <div
-          className="text-[10px] text-[color:var(--color-text-faint)] mt-1"
+          className="text-[10px] text-[color:var(--color-text-faint)] mt-1 flex items-center gap-1.5 flex-wrap"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          {new Date(receipt.date).toLocaleDateString('en-GB')}
-          {receipt.lineItems.length > 0 && ` · ${receipt.lineItems.length} ${t('it.items')}`}
+          <span>
+            {new Date(receipt.date).toLocaleDateString('en-GB')}
+            {receipt.lineItems.length > 0 && ` · ${receipt.lineItems.length} ${t('it.items')}`}
+          </span>
+          <ReturnBadge days={receipt.returnDaysLeft} />
         </div>
       </div>
     </button>
+  );
+}
+
+/** "N days to return" chip — shown while a purchase is inside its store's return
+ *  window (PA3). Gold when the window closes within 3 days. */
+function ReturnBadge({ days }: { days?: number | null }) {
+  const t = useT();
+  if (days == null) return null;
+  const closing = days <= 3;
+  return (
+    <span
+      title={t('rc.returnTip', { n: days })}
+      className={cn(
+        'inline-flex items-center gap-0.5 px-1.5 py-px rounded border text-[9px] font-bold shrink-0',
+        closing
+          ? 'text-[color:var(--color-gold)] border-[#ffd93d40] bg-[#ffd93d14]'
+          : 'text-[color:var(--color-cyan)] border-[#00d4ff33] bg-[#00d4ff10]'
+      )}
+      style={{ fontFamily: 'var(--font-mono)' }}
+    >
+      <Undo2 size={9} /> {t('rc.returnBadge', { n: days })}
+    </span>
   );
 }
 

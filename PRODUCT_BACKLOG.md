@@ -42,12 +42,6 @@ _(κενό — όλα εγκρίθηκαν 2026-07-09· ο planner προσθέ�
   **forward-only** (χωρίς backfill). Reuse του υπάρχοντος net-position υπολογισμού.
 - Owner: **pharos-daily-dev**.
 
-### PA3 ← P10. Return-window & warranty-claim tracker — S — both
-- Computed «return by» ανά απόδειξη/είδος (default 14 μέρες EU από purchase date, **per-store
-  editable** override) + alert 2-3 μέρες πριν λήξει (reuse `runAlertChecks`/notifiers) + badge
-  «N μέρες για επιστροφή» στην κάρτα απόδειξης.
-- Owner: **pharos-daily-dev**. Δένει με Calendar feed αν γίνει το P6.
-
 ### P22. Full-text search πάνω σε receipt line-items & parsed text — S/M — both (πολύ ψηλό value/effort)
 - **Αξία:** το global search (`searchAll`) ψάχνει σήμερα δομημένα πεδία (store/vendor/notes/τίτλους),
   αλλά ΟΧΙ το περιεχόμενο των αποδείξεων — τα ονόματα των line items ή το raw parsed κείμενο. Επέκταση
@@ -204,7 +198,12 @@ _(κενό — όλα εγκρίθηκαν 2026-07-09· ο planner προσθέ�
 
 ## Done
 
-_(κενό)_
+### PA3 ← P10. Return-window tracker — ✅ SHIPPED 2026-07-09 (pharos-daily-dev)
+- Computed «return by» ανά απόδειξη (default 14 μέρες EU, ρυθμιζόμενο Settings → Defaults,
+  per-store override Settings → Stores, 0 = χωρίς επιστροφές) + badge «Nd return» σε κάρτα/λίστα
+  αποδείξεων (gold όταν ≤3 μέρες) + γραμμή «↩ return window(s) closing ≤3d» στο `runAlertChecks`.
+- Web slice. Mobile badge = follow-up (το v1 API δεν εκθέτει ακόμα το computed πεδίο).
+- Warranty-claim κομμάτι: καλύπτεται ήδη από warranty tracking/alerts· δεν χρειάστηκε νέο μοντέλο.
 
 ---
 

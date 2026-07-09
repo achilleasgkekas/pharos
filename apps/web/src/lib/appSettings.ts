@@ -23,6 +23,7 @@ export type AppSettings = {
   ntfyEnabled: boolean;
   currency: string;
   defaultVatRate: number;
+  defaultReturnWindowDays: number; // return window (days) unless a store overrides it; 0 = off
   expenseCategories: string[];
   itemCategories: string[];
   subscriptionCategories: string[];
@@ -39,6 +40,7 @@ export type RawAppConfigDoc = {
   ntfyEnabled?: boolean;
   currency?: string;
   defaultVatRate?: number;
+  defaultReturnWindowDays?: number;
   lists?: Record<string, unknown>;
   budgets?: Record<string, unknown>;
 };
@@ -64,6 +66,7 @@ const DEFAULTS: AppSettings = {
   ntfyEnabled: false,
   currency: 'EUR',
   defaultVatRate: 24,
+  defaultReturnWindowDays: 14, // EU distance-selling default
   expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
   itemCategories: DEFAULT_ITEM_CATEGORIES,
   subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,
@@ -93,6 +96,10 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     ntfyEnabled: !!doc?.ntfyEnabled,
     currency: doc?.currency || DEFAULTS.currency,
     defaultVatRate: typeof doc?.defaultVatRate === 'number' ? doc.defaultVatRate : DEFAULTS.defaultVatRate,
+    defaultReturnWindowDays:
+      typeof doc?.defaultReturnWindowDays === 'number' && doc.defaultReturnWindowDays >= 0
+        ? doc.defaultReturnWindowDays
+        : DEFAULTS.defaultReturnWindowDays,
     expenseCategories: resolveTaxonomy('expenseCategories', doc?.lists, DEFAULT_EXPENSE_CATEGORIES),
     itemCategories: resolveTaxonomy('itemCategories', doc?.lists, DEFAULT_ITEM_CATEGORIES),
     subscriptionCategories: resolveTaxonomy('subscriptionCategories', doc?.lists, DEFAULT_SUBSCRIPTION_CATEGORIES),
@@ -112,7 +119,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     // untouched, same query as before).
     const Config = await currentModel(AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate lists budgets')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets')
       .lean();
   } catch {
     /* DB down → hard defaults */

@@ -36,6 +36,7 @@ const AppConfigSchema = new Schema(
     autoAddStores: { type: Boolean, default: true }, // auto-add unknown receipt stores to the list
     currency: { type: String, default: 'EUR' }, // display currency symbol (ISO 4217 code)
     defaultVatRate: { type: Number, default: 24 }, // fallback VAT/sales-tax % when a receipt doesn't show one
+    defaultReturnWindowDays: { type: Number, default: 14 }, // return window (days) unless a store overrides it; 0 = off
     // User-editable dropdown lists (category taxonomies). Map taxonomyKey → string[].
     lists: { type: Schema.Types.Mixed, default: {} },
 

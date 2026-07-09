@@ -1529,6 +1529,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   const [autoAdd, setAutoAdd] = useState(settings.autoAddStores);
   const [currency, setCurrency] = useState(settings.currency);
   const [vatRate, setVatRate] = useState(String(settings.defaultVatRate));
+  const [returnDays, setReturnDays] = useState(String(settings.defaultReturnWindowDays));
   const [msg, setMsg] = useState<string | null>(null);
 
   function save() {
@@ -1539,6 +1540,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     fd.set('autoAddStores', String(autoAdd));
     fd.set('currency', currency);
     fd.set('defaultVatRate', vatRate);
+    fd.set('defaultReturnWindowDays', returnDays);
     setMsg(null);
     startTransition(async () => {
       await saveDefaults(fd);
@@ -1579,6 +1581,10 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.warrantyAlert')}</span>
           <input type="number" min="0" max="730" value={alertDays} onChange={(e) => setAlertDays(e.target.value)} className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.returnWindow')}</span>
+          <input type="number" min="0" max="365" value={returnDays} onChange={(e) => setReturnDays(e.target.value)} className={inputClass} />
         </label>
         <div className="flex items-center justify-between gap-3 self-end pb-1">
           <span className="min-w-0">
@@ -2076,6 +2082,7 @@ function StoreForm({ store, onDone }: { store?: StoreLite; onDone: () => void })
   const [name, setName] = useState(store?.name ?? '');
   const [aliases, setAliases] = useState((store?.aliases ?? []).join(', '));
   const [url, setUrl] = useState(store?.url ?? '');
+  const [returnDays, setReturnDays] = useState(store?.returnWindowDays == null ? '' : String(store.returnWindowDays));
   const [err, setErr] = useState<string | null>(null);
 
   function save() {
@@ -2085,6 +2092,7 @@ function StoreForm({ store, onDone }: { store?: StoreLite; onDone: () => void })
     fd.set('name', name);
     fd.set('aliases', aliases);
     fd.set('url', url);
+    fd.set('returnWindowDays', returnDays);
     startTransition(async () => {
       const r = await saveStore(fd);
       if (r.ok) onDone();
@@ -2103,6 +2111,16 @@ function StoreForm({ store, onDone }: { store?: StoreLite; onDone: () => void })
         style={{ fontFamily: 'var(--font-mono)' }}
       />
       <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t('set.urlPlaceholder')} className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+      <input
+        type="number"
+        min="0"
+        max="365"
+        value={returnDays}
+        onChange={(e) => setReturnDays(e.target.value)}
+        placeholder={t('set.storeReturnWindowPlaceholder')}
+        className={inputClass}
+        style={{ fontFamily: 'var(--font-mono)' }}
+      />
       <div className="flex items-center gap-2">
         <button
           onClick={save}

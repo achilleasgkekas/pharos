@@ -89,6 +89,10 @@ export type SerializedReceipt = {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  // Computed (not stored): days left in the store's return window, set by the
+  // receipts page when the purchase is still returnable. null/absent = window
+  // closed, disabled, or unknown date.
+  returnDaysLeft?: number | null;
 };
 
 export type SerializedExpense = {

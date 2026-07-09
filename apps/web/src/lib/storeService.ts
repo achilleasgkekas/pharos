@@ -5,7 +5,7 @@ import { getAppSettings } from './appSettings';
 import { currentModel } from './tenancy/connection';
 import { currentTenant } from './tenancy/current';
 
-export type StoreLite = { _id?: string; name: string; aliases: string[]; url?: string; auto?: boolean };
+export type StoreLite = { _id?: string; name: string; aliases: string[]; url?: string; auto?: boolean; returnWindowDays?: number | null };
 
 // Cache keyed by tenant. Default/self-hosted tenant uses the '' key → identical behaviour
 // and TTL to the old single-slot cache; SaaS tenants each get their own slot so one tenant's
@@ -45,6 +45,7 @@ export async function getStores(): Promise<StoreLite[]> {
     aliases: d.aliases ?? [],
     url: d.url ?? '',
     auto: d.auto ?? false,
+    returnWindowDays: typeof d.returnWindowDays === 'number' ? d.returnWindowDays : null,
   }));
   cache.set(key, { v, t: Date.now() });
   return v;

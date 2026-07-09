@@ -38,6 +38,7 @@ import { renderStoragePath, DEFAULT_FOLDER_TEMPLATE, DEFAULT_NAME_TEMPLATE } fro
 import { readFile, deleteFile } from '@/lib/storage';
 import { Types } from 'mongoose';
 import { getStores, invalidateStoreCache, type StoreLite } from '@/lib/storeService';
+import { effectiveReturnWindow, returnDaysLeft } from '@/lib/returnWindow';
 import { anthropicTest } from '@/lib/anthropic';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
 import { requireAdmin } from '@/lib/auth';
@@ -265,6 +266,9 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   const autoAdd = formData.get('autoAddStores') === 'true';
   const currency = (String(formData.get('currency') || 'EUR').trim().toUpperCase()) || 'EUR';
   const vatRate = Math.max(0, Math.min(100, Number(formData.get('defaultVatRate')) || 24));
+  // 0 is meaningful here (return tracking off), so parse explicitly instead of `|| 14`.
+  const returnRaw = Number(formData.get('defaultReturnWindowDays'));
+  const returnDays = Number.isFinite(returnRaw) ? Math.max(0, Math.min(365, Math.round(returnRaw))) : 14;
   await AppConfig.updateOne(
     { key: 'singleton' },
     {
@@ -275,6 +279,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
         autoAddStores: autoAdd,
         currency,
         defaultVatRate: vatRate,
+        defaultReturnWindowDays: returnDays,
       },
     },
     { upsert: true }
@@ -367,6 +372,24 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
     .filter((w) => !isNaN(w.days) && w.days >= 0 && w.days <= s.warrantyAlertDays)
     .sort((a, b) => a.days - b.days);
 
+  // Return windows closing within 3 days (PA3): purchase date + per-store window.
+  // Only recent receipts can still be inside a window, so bound the scan.
+  const stores = await getStores();
+  const maxWindow = Math.max(s.defaultReturnWindowDays, ...stores.map((st) => st.returnWindowDays ?? 0));
+  const returnsClosing: { store: string; total: number; days: number }[] = [];
+  if (maxWindow > 0) {
+    const since = new Date(now - (maxWindow + 1) * 86400000);
+    const recent = (await Receipt.find({ archived: { $ne: true }, date: { $gte: since } })
+      .select('store date total')
+      .lean()) as Array<{ store?: string; date?: string | Date; total?: number }>;
+    for (const r of recent) {
+      const win = effectiveReturnWindow(r.store ?? '', stores, s.defaultReturnWindowDays);
+      const days = returnDaysLeft(r.date, win, now);
+      if (days !== null && days <= 3) returnsClosing.push({ store: r.store || 'Unknown', total: r.total ?? 0, days });
+    }
+    returnsClosing.sort((a, b) => a.days - b.days);
+  }
+
   const statements = await Statement.find().lean();
   const plans = computeInstallmentPlans(JSON.parse(JSON.stringify(statements)) as SerializedStatement[]).filter(
     (p) => !p.done && p.remainingInstallments >= 1
@@ -378,6 +401,13 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   if (dueThisMonth > 0) lines.push(`💳 installments this month: ${cur()}${dueThisMonth.toFixed(0)} (${plans.length} plans)`);
   if (expiring.length)
     lines.push(`🛡 ${expiring.length} warranty expiring ≤${s.warrantyAlertDays}d: ${expiring.slice(0, 5).map((w) => `${w.title} (${w.days}d)`).join(', ')}`);
+  if (returnsClosing.length)
+    lines.push(
+      `↩ ${returnsClosing.length} return window(s) closing ≤3d: ${returnsClosing
+        .slice(0, 5)
+        .map((r) => `${r.store}${r.total > 0 ? ` ${cur()}${r.total}` : ''} (${r.days}d)`)
+        .join(', ')}`
+    );
 
   // Also surface these alerts in the in-app notification bell.
   try {
@@ -719,13 +749,18 @@ export async function saveStore(formData: FormData): Promise<{ ok: boolean; erro
     .map((a) => a.trim().toLowerCase())
     .filter(Boolean);
   if (!name) return { ok: false, error: 'Name is required' };
+  // Per-store return-window override: blank = inherit the global default (null),
+  // 0 = no returns at this store.
+  const rwRaw = String(formData.get('returnWindowDays') ?? '').trim();
+  const rwNum = Number(rwRaw);
+  const returnWindowDays = rwRaw === '' || !Number.isFinite(rwNum) ? null : Math.max(0, Math.min(365, Math.round(rwNum)));
 
   await connectDB();
   try {
     if (id) {
-      await Store.findByIdAndUpdate(id, { $set: { name, url, aliases, auto: false } });
+      await Store.findByIdAndUpdate(id, { $set: { name, url, aliases, auto: false, returnWindowDays } });
     } else {
-      await Store.create({ name, url, aliases: aliases.length ? aliases : [name.toLowerCase()], auto: false });
+      await Store.create({ name, url, aliases: aliases.length ? aliases : [name.toLowerCase()], auto: false, returnWindowDays });
     }
   } catch {
     return { ok: false, error: 'A store with that name already exists' };

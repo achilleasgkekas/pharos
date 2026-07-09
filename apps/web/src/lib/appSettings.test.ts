@@ -50,6 +50,7 @@ describe('normalizeSettings', () => {
       ntfyEnabled: false,
       currency: 'EUR',
       defaultVatRate: 24,
+      defaultReturnWindowDays: 14,
       expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
       itemCategories: DEFAULT_ITEM_CATEGORIES,
       subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,
@@ -90,6 +91,13 @@ describe('normalizeSettings', () => {
     expect(v.defaultWarrantyMonths).toBe(12);
     expect(v.warrantyAlertDays).toBe(30);
     expect(v.defaultVatRate).toBe(19);
+  });
+
+  it('defaultReturnWindowDays honours 0 (off) and stored values, rejects negatives', () => {
+    expect(normalizeSettings({ defaultReturnWindowDays: 0 }).defaultReturnWindowDays).toBe(0);
+    expect(normalizeSettings({ defaultReturnWindowDays: 30 }).defaultReturnWindowDays).toBe(30);
+    expect(normalizeSettings({ defaultReturnWindowDays: -5 }).defaultReturnWindowDays).toBe(14);
+    expect(normalizeSettings({}).defaultReturnWindowDays).toBe(14);
   });
 
   it('empty currency string falls back to EUR default', () => {

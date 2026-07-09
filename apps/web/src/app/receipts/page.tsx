@@ -2,7 +2,9 @@ import { connectDB } from '@/lib/db';
 import { Receipt as ReceiptModel } from '@/models/Receipt';
 import { Card as CardModel } from '@/models/Card';
 import { isAiReady } from '@/lib/ollama';
-import { getStoreNames } from '@/lib/storeService';
+import { getStores } from '@/lib/storeService';
+import { getAppSettings } from '@/lib/appSettings';
+import { effectiveReturnWindow, returnDaysLeft } from '@/lib/returnWindow';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
 import { ReceiptsClient } from './ReceiptsClient';
@@ -20,20 +22,31 @@ async function getData(): Promise<{ receipts: SerializedReceipt[]; cards: Serial
   // New uploads generate their thumb at upload time, so this only matters for
   // old/failed ones and can safely catch up on a later load.
   void backfillReceiptThumbs().catch(() => {});
-  const [receipts, cards, ollamaUp, storeNames, emailInboxCount] = await Promise.all([
+  const [receipts, cards, ollamaUp, stores, emailInboxCount, settings] = await Promise.all([
     // -rawAiResponse: debug-only blob (full AI JSON per receipt) — never rendered,
     // and with ~270 receipts it bloats the RSC payload by hundreds of KB.
     Receipt.find().select('-rawAiResponse').sort({ date: -1, createdAt: -1 }).lean(),
     Card.find({ active: true }).sort({ name: 1 }).lean(),
     isAiReady(),
-    getStoreNames(),
+    getStores(),
     getEmailInboxCount(),
+    getAppSettings(),
   ]);
+  // Annotate each non-archived receipt still inside its store's return window with
+  // the computed days left (PA3) — powers the "N days to return" badge client-side.
+  const now = Date.now();
+  const serialized: SerializedReceipt[] = JSON.parse(JSON.stringify(receipts));
+  for (const r of serialized) {
+    if (r.archived) continue;
+    const win = effectiveReturnWindow(r.store, stores, settings.defaultReturnWindowDays);
+    const days = returnDaysLeft(r.date, win, now);
+    if (days !== null) r.returnDaysLeft = days;
+  }
   return {
-    receipts: JSON.parse(JSON.stringify(receipts)),
+    receipts: serialized,
     cards: JSON.parse(JSON.stringify(cards)),
     ollamaUp,
-    storeNames,
+    storeNames: stores.map((s) => s.name),
     emailInboxCount,
   };
   });

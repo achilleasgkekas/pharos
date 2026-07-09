@@ -13,6 +13,9 @@ const StoreSchema = new Schema(
     // true when created automatically from a receipt the AI couldn't match —
     // surfaces "needs review" stores in the management UI.
     auto: { type: Boolean, default: false },
+    // Per-store return-window override in days (PA3). null = inherit the global
+    // default (Settings → Defaults); 0 = this store accepts no returns.
+    returnWindowDays: { type: Number, default: null },
   },
   { timestamps: true }
 );
