@@ -1543,3 +1543,36 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον.
+
+## 2026-07-10 — (e) polish: annual Offers στο homepage JSON-LD
+
+Increment (e) polish, το explicit «επομενο» απο το προηγουμενο run. Το per-plan `Offer` JSON-LD (homepage
+`@graph` -> SoftwareApplication.offers) εξεθετε ΜΟΝΟ monthly τιμη (ενα `UnitPriceSpecification`,
+billingDuration 1), ενω το pricing UI εχει ηδη annual/monthly toggle (annual = monthly×10, 2 μηνες
+δωρεαν). Ασυμφωνια: crawlers + AI answer engines εβλεπαν μονο τη μηνιαια τιμη.
+
+- `app/page.tsx`: το `priceSpecification` καθε hosted Offer εγινε **array** με δυο `UnitPriceSpecification`
+  nodes: (1) Monthly (price=amount, unitText MONTH, billingDuration 1), (2) Annual (price=amount×10,
+  unitText ANN, billingDuration 12, name «Annual»). Το free self-host tier (amount '0') μενει χωρις
+  priceSpecification (οπως πριν). Deterministic, `String(Number(t.amount)*10)` απο το υπαρχον TIERS array
+  (single source of truth, μενει in-sync αν αλλαξουν οι τιμες). Μηδεν νεο dependency, μηδεν client JS.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static, route set + / First Load JS αμεταβλητα (inline HTML script,
+  μηδεν bundle impact).
+- Prerender (`.next/server/app/index.html`): `"billingDuration":12` + `"unitText":"ANN"` present· annual
+  τιμες «40» / «80» / «150» και οι τρεις παρουσες (Solo/Family/Pro × 10). Non-visual JSON-LD -> verified
+  στο static output (ιδιο pattern με προηγουμενα SEO increments), δεν χρειαστηκε preview server.
+- em-dash: 0 στο edited file. Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (page.tsx + αυτο το log) μεσω explicit pathspec commit· τα foreign
+  staged files αλλου routine (PROGRESS.md, apps/web/*) τα αφησα αθικτα (collision guard).
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets (blocked)· ή content
+copy pass· ή annual Offers και στα per-tier Pricing.tsx aria labels αν χρειαστει.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον.

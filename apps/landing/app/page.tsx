@@ -510,7 +510,8 @@ const JSON_LD = {
       publisher: { '@id': `${SITE_URL}/#organization` },
       license: 'https://www.gnu.org/licenses/agpl-3.0.html',
       softwareHelp: `${GITHUB_URL}/blob/main/README.md`,
-      // Per-plan Offers, one per priced tier (Free self-host + Solo/Family/Pro hosted)
+      // Per-plan Offers, one per priced tier (Free self-host + Solo/Family/Pro hosted).
+      // Hosted tiers expose BOTH billing options: monthly, and annual (monthly x10 = 2 months free).
       offers: TIERS.filter((t) => t.amount !== undefined).map((t) => ({
         '@type': 'Offer',
         name: `PHAROS ${t.name}`,
@@ -519,14 +520,27 @@ const JSON_LD = {
         description: t.tagline,
         availability: 'https://schema.org/InStock',
         ...(t.amount !== '0' && {
-          priceSpecification: {
-            '@type': 'UnitPriceSpecification',
-            price: t.amount,
-            priceCurrency: 'EUR',
-            unitText: 'MONTH',
-            billingDuration: 1,
-            billingIncrement: 1,
-          },
+          priceSpecification: [
+            {
+              '@type': 'UnitPriceSpecification',
+              name: 'Monthly',
+              price: t.amount,
+              priceCurrency: 'EUR',
+              unitText: 'MONTH',
+              billingDuration: 1,
+              billingIncrement: 1,
+            },
+            {
+              // Annual = monthly x10 (two months free)
+              '@type': 'UnitPriceSpecification',
+              name: 'Annual',
+              price: String(Number(t.amount) * 10),
+              priceCurrency: 'EUR',
+              unitText: 'ANN',
+              billingDuration: 12,
+              billingIncrement: 1,
+            },
+          ],
         }),
       })),
     },
