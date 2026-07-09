@@ -5,6 +5,14 @@
 <!-- reviewed: 5c2abf3 -->
 <!-- docker-validated: 51d43ba -->
 
+## 2026-07-09 (ui-auditor, 48η σάρωση mobile UI consistency)
+
+Read-only live grep audit (όχι docs read-back). mobile `npx tsc --noEmit` → EXIT 0. Working tree: `ReceiptsScreen.tsx` uncommitted-modified (WIP) → τα 3 cellInput raw `<TextInput>` μένουν WIP-blocked.
+
+**Ευρήματα ανά διάσταση:** (Tokens χρωματικά) hardcoded hex εκτός `theme.ts` = 0, inline `rgba(` = 0 → καθαρό. (Tokens radius) **47 `borderRadius` literals** (10/12/14/18) γραμμένα raw αντί `RADIUS.*` σε 12 screens + ίδιο το `ui.tsx` → drift. (Typography) **μηδέν `fontFamily`** σε όλο το mobile (hierarchy μόνο με `fontWeight` ×134)· web = Outfit/Manrope/IBM Plex Mono → ο μεγαλύτερος untracked gap. (Shared theme) DONE αλλά dark-only. (Reusable) 15 primitives centralized, αλλά 14 inline button styles ακόμη hand-rolled (existing partial). (States) 2 full-screen loaders hand-rolled (Shopping:69/Settings:91). (Touch targets) μηδέν violation (lineDel 30×30 έχει hitSlop 8). (Adaptive) safe-area-context ΔΕΝ installed· max-width DONE. **Δέλτα:** ShoppingScreen ModalSheet holdout ΕΚΛΕΙΣΕ (fade Modal + τελευταίο borderRadius:18 έφυγαν).
+
+**3 νέα items προστέθηκαν** (RADIUS adoption P2/S, Brand typography P2/M, loader consistency P3/S). **Builder next-3:** (1) RADIUS adoption (P2/S, mechanical tsc-verifiable), (2) Brand typography (P2/M), (3) Button+Chip completion (14 inline buttons, existing partial).
+
 ## 2026-07-09 (reviewer — range 62d0a86..5c2abf3, 18 commits)
 - **Τι έλεγξα:** όλα τα commits μετά το τελευταίο review marker (62d0a86). Κύρια θέματα: (α) per-tenant keying των AppConfig caches (`aiConfig`/`prompts`/`storageConfig`/`notifiers`/`onedrive` → `currentModel(AppConfig)` + Map-keyed-by-tenant cache, '' key = default/self-hosted), (β) SaaS §8 scaffolds report-only (superadmin console `admin/tenants`, workspace content export + file-binary manifest [GDPR Art. 20], erasure purge scan [Art. 17]), (γ) `search-actions.ts` typed lean projections (drop 7× `as any[]`), (δ) νέο security fix 5c2abf3: SSRF IPv4-mapped IPv6 bypass στο `assertPublicUrl`.
 - **Checks:** `apps/web` type-check EXIT 0· `apps/mobile` tsc --noEmit EXIT 0· vitest **1659/1659 πράσινα** (123 files)· ξεχωριστό re-run `ssrf.test.ts` 40/40 μετά το security commit.
