@@ -1,8 +1,20 @@
 import type { Metadata } from 'next';
 import { PharosMark } from '../components/PharosMark';
 
+const SITE_URL = 'https://ph-aros.com';
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const CONTACT = 'hello@ph-aros.com';
+
+// BreadcrumbList so crawlers and AI answer engines place this page under the
+// site root (Home > Terms). Harmless while noindex; useful once flipped.
+const BREADCRUMB_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+    { '@type': 'ListItem', position: 2, name: 'Terms of Service', item: `${SITE_URL}/terms` },
+  ],
+};
 
 // Placeholders to confirm before the hosted service launches. The operating
 // entity is the party to these terms; the processor handles card payments.
@@ -44,6 +56,10 @@ export default function TermsOfService() {
   return (
     <main style={{ padding: '48px 0 96px' }}>
       <a href="#top" className="skip-link">Skip to content</a>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(BREADCRUMB_LD) }}
+      />
 
       {/* ── Minimal header ─────────────────────────────────── */}
       <div className="container" id="top" style={{ maxWidth: 820 }}>

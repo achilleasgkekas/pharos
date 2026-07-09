@@ -1512,3 +1512,34 @@ Needs-Achilleas (open):
 - Contact inbox `hello@ph-aros.com` να επιβεβαιωθει.
 - Hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: ο χρηστης το κρατα private προς το παρον (mbox ηδη out of reachable history).
+
+## 2026-07-09 — (e) polish: BreadcrumbList JSON-LD στα /terms + /privacy
+
+Increment (e) polish. Οι δυο legal σελιδες δεν ειχαν κανενα structured data (η homepage εχει πλουσιο
+`@graph`: Organization/WebSite/SoftwareApplication+Offers/FAQPage/HowTo). Προσθεσα `BreadcrumbList`
+JSON-LD (Home > Terms, Home > Privacy) σε καθε μια ωστε crawlers + AI answer engines να τις τοποθετουν
+κατω απο το site root.
+
+- `app/terms/page.tsx`: νεα const `SITE_URL='https://ph-aros.com'` (ελειπε, το privacy το ειχε ηδη) +
+  `BREADCRUMB_LD` (2 ListItems) + `<script type="application/ld+json">` αμεσως μετα το skip-link
+  (ιδιο pattern με την homepage).
+- `app/privacy/page.tsx`: ιδιο `BREADCRUMB_LD` (reuse του υπαρχοντος SITE_URL) + script tag.
+- Harmless οσο robots:{index:false}· χρησιμο μολις γινουν indexable (post legal-review flip).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static, route set αμεταβλητο.
+- Prerender: `grep BreadcrumbList` -> βρεθηκε στα .next/server/app/terms.html + privacy.html (×2 το καθενα:
+  raw script + escaped).
+- em-dash: 0 στα δυο edited files.
+- Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call. Staged ΜΟΝΟ τα δυο δικα μου landing files +
+  αυτο το log (τα foreign uncommitted files αλλων routines τα αφησα ασταγκα).
+
+Επομενο increment: (e) polish συνεχεια — annual Offers στο homepage JSON-LD (τωρα μονο monthly
+UnitPriceSpecification)· ή real app screenshots οταν υπαρξουν assets· ή content copy pass.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον.
