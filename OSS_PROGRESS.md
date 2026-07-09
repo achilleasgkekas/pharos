@@ -1403,3 +1403,25 @@ Mock pattern: action-seam (όπως search/notifications/lists) — mock το `@
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλου routine (expenses CSV import: `expenses/ExpensesClient.tsx`+`actions.ts`, `i18n/locales/el.ts`+`en.ts` [M] + `expenses/CsvImportModal.tsx`, `lib/csvImport.ts`+`.test.ts` [??]) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα μόνο τα δικά μου paths (trash/route.test.ts + OSS_PROGRESS.md).
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο single-action-seam pattern. Πρώτο: `jobs/route.ts` (GET-only verbatim `{ rows }` wrapper σε `getJobs`, ίδιο ακριβώς μοτίβο με το trash — auth gate + verbatim envelope, γρήγορη κάλυψη). Μετά, πιο βαριά (multi-model mocks, σπάσε τα): `overview/route.ts` (7 countDocuments + computeInstallmentPlans), `calendar/route.ts` (5 models + date-stepping), `reports/route.ts`. Χαμηλή αξία (trivial wrapper): `history/route.ts`. Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-09 (cont.¹³ — jobs/route.test.ts, GET-only verbatim `{ rows }` wrapper + auth gate)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/jobs/route.test.ts` για το GET του `/api/v1/jobs`.**
+
+Επιλογή target: ακολούθησα ρητά το suggested next task (`jobs/route.ts` ήταν πρώτο). Διάβασα πρώτα το route + το `getJobs` action: thin verbatim `{ rows }` wrapper με single-action seam, ίδιο ακριβώς μοτίβο με το trash του προηγ. run (μόνο η action αλλάζει: `getTrash` → `getJobs` από `@/app/jobActions`). Route-only logic που ζει αποκλειστικά εδώ και τροφοδοτεί το mobile background-jobs widget + /jobs view (bulk receipt re-scan, item AI-fill, running-first-then-newest):
+- **Auth gate**: withAuth → 401 χωρίς token (καμία getJobs call).
+- **Envelope**: τα rows επιστρέφονται κάτω από bare `{ rows }` key, **verbatim** (ΟΧΙ list envelope data/total, ΟΧΙ projection, ΟΧΙ re-sort, ΟΧΙ filtering) — ακριβώς το `JobRow[]` που γυρνάει το getJobs (already sorted running-first από το action· το route ΔΕΝ ξαναταξινομεί). Το `ensureProcessor()` self-heal side-effect ζει μέσα στο getJobs, δεν το εξετάζω από route level.
+
+Mock pattern: action-seam (όπως trash/search/notifications/lists) — mock το `@/app/jobActions` getJobs (configurable rows + call-count) + auth seam (`@/lib/db` connectDB + `@/models/User` findOne chain). Τρέχω τον ΠΡΑΓΜΑΤΙΚΟ withAuth helper (bearerUser + rateLimit env-gated off).
+
+Τι έγινε: Νέο `route.test.ts` (5 tests). **auth gate** (2: no-token→401 + no getJobs· unknown-token→401 + no getJobs). **listing** (3: multi-row getJobs output [running + done job, όλα τα JobRow πεδία] → verbatim `{ rows }` + getJobs κληθηκε once· empty → `{ rows: [] }`· order-preservation → το route ΔΕΝ ξαναταξινομεί [running-first order του action μένει ως έχει] + κάθε πεδίο pass-through untouched).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/jobs/route.test.ts` → 5/5 passed.
+- `npx vitest run` (όλο το suite) → 136 files, 1781/1781 passed (ήταν 1757).
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλων routines (landing Docker: `apps/landing/next.config.ts` [M] + `.dockerignore`/`Dockerfile` [??]· `search-actions.ts` [M]· `docker-compose.yml` [M]· `lib/receiptSearch.ts`+`.test.ts` [??]) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα μόνο τα δικά μου paths (jobs/route.test.ts + OSS_PROGRESS.md).
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run. Τα εύκολα single-action `{ rows }` wrappers (trash, jobs) ΕΓΙΝΑΝ. Απομένουν τα πιο βαριά (multi-model mocks — σπάσε τα ή δώσε τους ολόκληρο run): `overview/route.ts` (7 countDocuments + computeInstallmentPlans — envelope shape + auth), `calendar/route.ts` (5 models + date-stepping), `reports/route.ts`. Χαμηλή αξία (trivial `{rows}` wrapper): `history/route.ts`. Εναλλακτικά, αν προτιμάς DB-free: κοίτα untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
