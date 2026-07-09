@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, Image, Pressable, FlatList, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { C, scrim } from '../theme';
+import { C, scrim, RADIUS, SIZE } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Check, Button, Input, TextArea, contentWidth } from '../ui';
 import { getReceipts, getReceipt, scanReceipt, rescanReceipt, updateReceipt, addReceiptToLibrary, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
 
@@ -9,6 +9,8 @@ type LineEdit = { name: string; qty: string; price: string; vatRate: string };
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const num = (s: string) => parseFloat(String(s).replace(',', '.')) || 0;
 const round2 = (n: number) => Math.round(n * 100) / 100;
+// Parsed-but-unverified: the quick-verify queue predicate (mirrors web QuickVerify).
+const isPending = (r: ReceiptSummary) => !r.verified && !r.archived && (r.total > 0 || r.itemCount > 0);
 
 export function ReceiptsScreen() {
   const [rows, setRows] = useState<ReceiptSummary[]>([]);
@@ -102,6 +104,67 @@ export function ReceiptsScreen() {
     finally { setRescanning(null); }
   }
 
+  // ---- Quick verify: rapid one-at-a-time review of parsed-but-unverified receipts ----
+  const [qv, setQv] = useState<ReceiptSummary[] | null>(null); // snapshot queue (null = closed)
+  const [qvI, setQvI] = useState(0);
+  const [qvDone, setQvDone] = useState(0);
+  const [qvBusy, setQvBusy] = useState(false);
+  const [qvStore, setQvStore] = useState('');
+  const [qvDate, setQvDate] = useState('');
+  const [qvTotal, setQvTotal] = useState('');
+  const qvCount = rows.filter(isPending).length;
+  const qvCur = qv?.[qvI] ?? null;
+
+  useEffect(() => {
+    if (qvCur) {
+      setQvStore(qvCur.store);
+      setQvDate(qvCur.date ? qvCur.date.slice(0, 10) : '');
+      setQvTotal(String(qvCur.total ?? 0));
+    }
+  }, [qvCur]);
+
+  function openQuickVerify() {
+    // Snapshot the queue at open so verifying does not reshuffle it mid-pass.
+    const queue = rows.filter(isPending);
+    if (!queue.length) return;
+    setQvI(0); setQvDone(0); setQv(queue);
+  }
+  async function closeQuickVerify() { setQv(null); await load(); }
+  function qvNext(counted: boolean) {
+    if (counted) setQvDone((d) => d + 1);
+    if (!qv || qvI + 1 >= qv.length) void closeQuickVerify();
+    else setQvI(qvI + 1);
+  }
+  // Verify & next: $set only the headline fields + verified (lineItems untouched by PATCH).
+  async function qvVerify() {
+    if (!qvCur || qvBusy) return;
+    setQvBusy(true);
+    try {
+      const t = num(qvTotal);
+      await updateReceipt(qvCur.id, {
+        store: qvStore.trim() || qvCur.store,
+        ...(DATE_RE.test(qvDate.trim()) ? { date: qvDate.trim() } : {}),
+        ...(Number.isFinite(t) ? { total: t } : {}),
+        verified: true,
+      });
+      qvNext(true);
+    } catch (e) { Alert.alert('Verify failed', (e as Error).message); }
+    finally { setQvBusy(false); }
+  }
+  async function qvArchive() {
+    if (!qvCur || qvBusy) return;
+    setQvBusy(true);
+    try { await updateReceipt(qvCur.id, { archived: true }); qvNext(true); }
+    catch (e) { Alert.alert('Archive failed', (e as Error).message); }
+    finally { setQvBusy(false); }
+  }
+  function qvEditFully() {
+    if (!qvCur) return;
+    const id = qvCur.id;
+    setQv(null);
+    void open(id);
+  }
+
   const [addingLib, setAddingLib] = useState(false);
   async function addToLibrary() {
     if (!detail) return;
@@ -135,6 +198,11 @@ export function ReceiptsScreen() {
       <Pressable onPress={scan} disabled={scanning} style={s.scan}>
         {scanning ? <ActivityIndicator color={C.cyan} /> : <Text style={s.scanText}>📷  Scan a receipt</Text>}
       </Pressable>
+      {qvCount > 0 && (
+        <Pressable onPress={openQuickVerify} style={s.qvOpen}>
+          <Text style={s.qvOpenText}>⚡ Quick verify ({qvCount})</Text>
+        </Pressable>
+      )}
       <ErrorText>{err}</ErrorText>
 
       <FlatList
@@ -238,6 +306,45 @@ export function ReceiptsScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal visible={!!qvCur} transparent animationType="slide" onRequestClose={() => void closeQuickVerify()}>
+        <View style={s.modalWrap}>
+          <View style={s.modal}>
+            <View style={s.modalHead}>
+              <Text style={s.modalTitle} numberOfLines={1}>⚡ Quick verify</Text>
+              <Pressable onPress={() => void closeQuickVerify()} hitSlop={10}><Text style={s.close}>✕</Text></Pressable>
+            </View>
+            {qvCur && (
+              <ScrollView contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
+                <Text style={s.qvProgress}>{qvI + 1} / {qv?.length ?? 0}{qvDone ? `  ·  ${qvDone} done` : ''}</Text>
+                <View style={s.qvBar}><View style={[s.qvBarFill, { width: `${Math.round((qvI / Math.max(qv?.length ?? 1, 1)) * 100)}%` }]} /></View>
+                {fileSource(qvCur.thumb || qvCur.file) && <Image source={fileSource(qvCur.thumb || qvCur.file)} style={s.qvImg} resizeMode="contain" />}
+                <Text style={s.elabel}>STORE</Text>
+                <Input value={qvStore} onChangeText={setQvStore} />
+                <View style={s.rowFields}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.elabel}>DATE (YYYY-MM-DD)</Text>
+                    <Input value={qvDate} onChangeText={setQvDate} placeholder="2026-06-30" autoCapitalize="none" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.elabel}>TOTAL ({qvCur.currency})</Text>
+                    <Input value={qvTotal} onChangeText={setQvTotal} keyboardType="decimal-pad" />
+                  </View>
+                </View>
+                <Text style={s.qvMeta}>{qvCur.itemCount} line item{qvCur.itemCount === 1 ? '' : 's'} · use “Edit fully” to change them</Text>
+                <View style={s.mbtns}>
+                  <Button label="Verify & next" onPress={qvVerify} busy={qvBusy} style={{ flex: 1 }} />
+                  <Button label="Skip" onPress={() => qvNext(false)} disabled={qvBusy} variant="ghost" />
+                </View>
+                <View style={s.mbtns}>
+                  <Button label="Edit fully" onPress={qvEditFully} disabled={qvBusy} variant="ghost" />
+                  <Pressable onPress={qvArchive} disabled={qvBusy} style={[s.del, qvBusy && s.dim]}><Text style={s.delText}>🗄 Not a receipt</Text></Pressable>
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -287,4 +394,11 @@ const s = StyleSheet.create({
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
   del: { paddingVertical: 12, paddingHorizontal: 12 },
   delText: { color: C.gold, fontSize: 15, fontWeight: '600' },
+  qvOpen: { marginHorizontal: 16, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: C.accent, paddingVertical: 12, alignItems: 'center' },
+  qvOpenText: { color: C.accent, fontSize: SIZE.md, fontWeight: '700' },
+  qvProgress: { color: C.faint, fontSize: SIZE.xs, letterSpacing: 0.5, marginBottom: 6 },
+  qvBar: { height: 3, borderRadius: 2, backgroundColor: C.surface2, overflow: 'hidden', marginBottom: 12 },
+  qvBarFill: { height: 3, backgroundColor: C.accent },
+  qvImg: { width: '100%', height: 200, borderRadius: RADIUS.md, backgroundColor: C.surface },
+  qvMeta: { color: C.faint, fontSize: SIZE.xs, marginTop: 12 },
 });
