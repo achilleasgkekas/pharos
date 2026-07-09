@@ -2060,3 +2060,57 @@ staging καθαρό (τίποτα pre-staged), μόνο τα δικά μου 3 
 plane read-only → προσοχή/άδεια), είτε (β) user-facing workspace-settings UI panels (ΟΛΑ τα read/write
 control-plane APIs έτοιμα), είτε (γ) actual binary packaging / BYO-key AI-dispatch (shared runtime /
 archive dep → άδεια).
+
+## 2026-07-09 (increment 50 — Superadmin tenant DETAIL usage rollup: control-plane ledger read, §8)
+**Το κενό:** το increment 49 έδωσε το superadmin single-tenant DETAIL (registry summary
++ member roster + role/status tally), αλλά ο operator δεν έβλεπε **κατανάλωση** — πόσα AI
+calls/tokens/cost έχει κάψει ένα workspace, ούτε το storage footprint του. Το SAAS_PROGRESS
+είχε σημειώσει «per-tenant db/usage stats στο detail» ως next-task (α) ΜΕ την προειδοποίηση
+ότι θα άγγιζε το data plane (`useDb`/`db.stats()`). Το έκλεισα με τον **ασφαλέστερο** τρόπο:
+διαβάζω ΜΟΝΟ το control-plane **`Usage` ledger** (κεντρική registry βάση), δηλαδή τα ΗΔΗ
+δειγματοληπτημένα νούμερα που γράφουν τα dbStats/aiMeter — **καμία** per-tenant data db δεν
+ανοίγει, κανένα `db.stats()` δεν τρέχει από αυτό το module, μηδέν write. ΟΛΟ additive +
+SaaS-gated + operator-gated, σε δικά μου SAAS αρχεία:
+- `lib/tenancy/adminTenantUsage.ts` (νέο). **PURE** shapers (unit-tested):
+  `summarizeUsagePeriod(doc)` → display-safe ανά μήνα (period/aiCalls/aiInput+OutputTokens/
+  aiCostMicros/storageBytes/storageMeasuredAt ISO· defensive `count()` NaN/±Inf/negative→0
+  floored· invalid date→null), `buildUsageSummary(docs)` → σταθερό rollup {periodCount,
+  totals(SUM των monotonic AI counters), latestPeriod, latestStorageBytes+MeasuredAt, periods
+  most-recent-first}. **ΚΡΙΣΙΜΟ:** το storage είναι **GAUGE** (overwritten, όχι additive) →
+  παίρνω τα bytes από το period με το **νεότερο storageMeasuredAt**, ΟΧΙ sum (αλλιώς θα
+  τετραπλασίαζα το footprint)· ένα νεότερο αμέτρητο period δεν clobber-άρει το gauge. **Impure**
+  `readTenantUsageForAdmin(tenantId, limit=12)` = ο ΜΟΝΟΣ reader: `Usage.find({tenant}).sort(
+  {period:-1}).limit(clamp 1..60).lean()` πάνω στο **central registry** μόνο.
+- `lib/tenancy/adminTenantDetail.ts` (edit, δικό μου #49) — envelope `version 1→2` + νέο top-
+  level `usage: AdminUsageSummary` πεδίο· `buildTenantDetail` παίρνει optional 4ο arg (default
+  = empty summary ώστε pure callers/tests να μη θρεντάρουν ledger)· `getTenantDetailForAdmin`
+  καλεί `readTenantUsageForAdmin(String(tenant._id))` (registry-only).
+- `app/api/saas/admin/tenants/[slug]/route.ts` (edit, δικό μου #49) — docstring: usage rollup +
+  «reads only registry (Tenant/Membership/Account/Usage)». Καμία αλλαγή σε auth/gating/shape πέρα
+  από το richer payload.
+- `adminTenantUsage.test.ts` (νέο, 8) + `adminTenantDetail.test.ts` (+2: usage default + verbatim
+  passthrough, version→2).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run` → **1696/1696 green** (127
+files, +19 net, καμία regression). External importers του νέου usage module από feature code →
+**κανένας** (μόνο το δικό μου detail module). Route SAAS-gated (404 off) + operator-gated (404
+όταν `SAAS_SUPERADMIN_EMAILS` κενό)· ο reader αγγίζει ΜΟΝΟ το registry Usage ledger, ΠΟΤΕ per-
+tenant data db. ⇒ `SAAS_MODE` off / self-hosted = **zero effect** (route δεν mount-άρει, gate
+inert, default tenant δεν γράφει Usage docs → empty summary). Κανένας Docker rebuild (additive
+node-only read module, μηδέν shared runtime wiring — type-check+tests καλύπτουν)· καμία νέα
+εξάρτηση· κανένα feature route/data-db/User-path/bearer-path αγγίχτηκε. Collision guard: staging
+καθαρό (τίποτα pre-staged), μόνο τα δικά μου 5 paths.
+
+**## Needs Achilleas** (superadmin console):
+- **`SAAS_SUPERADMIN_EMAILS` env** (από #48) για ενεργοποίηση σε production. Κενό = disabled (404).
+- **Superadmin UI page** (`/admin`) που καταναλώνει listing (#48) + detail-με-usage (#49/#50) — deferred (UI territory).
+- **LIVE per-tenant `db.stats()` στο detail** (πραγματικός on-demand δειγματοληπτικός reader αντί
+  για το cached ledger): θα άγγιζε το data plane (`tenantDb`/`db.stats()`) → ξεχωριστό προσεκτικό
+  increment με άδεια. Το τρέχον detail δείχνει το ΤΕΛΕΥΤΑΙΟ sampled snapshot (φρέσκο όσο τρέχει το
+  `sampleAllTenants` cron).
+- **Write/destructive superadmin actions** (suspend/reactivate/force-plan/drop-tenant) = **ΠΟΤΕ από routine**.
+
+**Next task:** increment 51 — είτε (α) LIVE on-demand `db.stats()` reader στο superadmin detail
+(data plane read-only → άδεια), είτε (β) user-facing workspace-settings UI panels (ΟΛΑ τα read/
+write control-plane APIs έτοιμα), είτε (γ) actual binary packaging / BYO-key AI-dispatch (shared
+runtime / archive dep → άδεια).
