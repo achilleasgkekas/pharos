@@ -4342,3 +4342,29 @@ Read-only code-quality audit της Next.js web επιφάνειας (fresh grep
 **Σημείωση working tree:** το `apps/mobile/src/screens/ReceiptsScreen.tsx` έχει uncommitted migration 6× `einput`→`<Input>`+`<TextArea>` (το suggested task του 2026-07-06, μισοτελειωμένο από κάποιον/κάτι)· ΔΕΝ το άγγιξα. Όποια routine το πήρε ας το ολοκληρώσει/commit-άρει, αλλιώς επόμενο run να το υιοθετήσει αν παραμένει.
 
 **Επόμενο suggested task:** **OWNER_DECISIONS.md #4 (APPROVED)**: reset-request timing side-channel στο `apps/web/src/app/api/saas/account/reset/request/route.ts`, fire-and-forget `void sendEmail(...)` στο registered path ώστε και τα δύο paths να επιστρέφουν άμεσα (τα παλιά «Needs Achilleas» flags γι αυτό είναι πλέον superseded, η απόφαση ελήφθη).
+
+## 2026-07-09 (web-code-quality auditor, 50η σάρωση)
+
+**type-check:** `cd apps/web && npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
+
+**Μετρήσεις ανά διάσταση (read-only sweep, fresh grep):**
+- Type safety: **0** — μηδέν `any`/`as any`/`@ts-ignore`/`@ts-expect-error` στο `src/app/api/v1` (εκτός test). Το προηγ. `search-actions.ts` 7× `as any[]` έκλεισε (49η, `d9af6d0`).
+- Input validation: **0 νέα** — κάθε v1 body route περνά από `readBody`/`strField`/`isObjectId` (apiBody helpers, adoption effort έκλεισε).
+- Error handling: **3 ανοιχτά** (όλα SaaS control-plane, δεν αγγίζουν v1 mobile surface): `audit/route.ts` + `workspace/erasure/purge` (49η, ακόμα `try {`=0) + **νέο** `invites/accept` (write route, 8 DB touches, μόνο η create-race έχει try/catch). Κάθε v1 route έχει ήδη uniform `{ error }` shape μέσω `withAuth`.
+- Auth: **0** — κάθε `/api/v1` route εκτός `auth/login` (mint endpoint) περνά από `withAuth`→bearer· κάθε SaaS write route από `saasGuard`/session ladder.
+- Mongoose: **0 νέα** — κάθε v1 read `.lean()`-backed + `.limit()` όπου list· `audit/route.ts` κάνει batched actor lookup (μηδέν N+1)· hot-path indexes καλυμμένα· τα no-limit calendar/settings/cards είναι single-tenant bounded aggregations (prior-accepted).
+- Duplication & dead code: **0 νέα** — apiBody/isObjectId/apiError/serializeLineItems dedup efforts όλα κλειστά.
+- Web UX states: **0 νέα** αυτόν τον κύκλο (read-only API focus).
+
+**Top 3 για τον builder (smallest-highest-priority πρώτα, όλα P2/S, api):**
+1. `audit/route.ts` — try/catch wrap του σώματος μετά το gate (2 unguarded DB reads γρ.64+79).
+2. `invites/accept/route.ts` — top-level try/catch wrap (8 DB ops guardless· nested create-race try μένει ως έχει).
+3. `workspace/erasure/purge/route.ts` — try/catch wrap του `runErasurePurgeScan()` (cron holdout, ίδια κλάση με `usage/sample`+`trials/sweep`).
+
+Και τα 3 είναι μηχανικά, dead-until-SaaS (SAAS_MODE off = 404), unattended-safe wraps· μηδέν επίδραση στον v1/mobile.
+
+**Διόρθωση προηγ. σημείωσης:** η γρ.45 του `erasure/purge` item έγραφε «`invites/accept` έχει ήδη δικό του try/catch» — ανακριβές· το inner `try` (γρ.65) καλύπτει ΜΟΝΟ τη `Account.create` 11000 dup-race, όχι τα υπόλοιπα ~7 DB ops. Γι αυτό μπήκε ως ξεχωριστό item.
+
+**Needs Achilleas:** κανένα νέο. Παραμένουν τα προϋπάρχοντα product/decision flags (reset-request timing → OWNER_DECISIONS #4 APPROVED, εκκρεμεί builder· v1 tenant-scoping για SaaS data isolation· getTenantConnection readyState guard).
+
+**Working tree:** το `apps/mobile/src/screens/ReceiptsScreen.tsx` παραμένει uncommitted (ξένη WIP migration) — ΔΕΝ το άγγιξα· stage-άρω μόνο `WEB_DEBT.md` + `PROGRESS.md` με ρητό pathspec.

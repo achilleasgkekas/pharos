@@ -3,8 +3,9 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
-## Σύνοψη audit (2026-07-06 48η σάρωση· type-check EXIT 0· builder έκλεισε 2 items από τον προηγ. marker [auth/login apiError + SaaS try/catch slice 2/2] → 2 νέα auto-buildable items στην ουρά [1 P2/S + 1 P3/S] + 2 decision-flag [Achilleas])
+## Σύνοψη audit (2026-07-09 50η σάρωση· type-check EXIT 0· v1 surface 100% καθαρός· 2 items της 49ης ακόμα ανοιχτά + 1 νέο SaaS error-handling εύρημα [invites/accept])
 
+- **50η σάρωση (2026-07-09):** `cd apps/web && npm run type-check` → **EXIT 0**. v1 API **αμετάβλητος + καθαρός**: μηδέν `any`/`as any`/`@ts-ignore` στο `src/app/api/v1` (εκτός test), κάθε read route `.lean()`-backed (find=lean σε receipts/settings/tasks/calendar/expenses/cards/subscriptions/statements/vouchers), κάθε v1 route εκτός `auth/login` περνά από `withAuth`. Τα 2 items της 49ης (`audit/route.ts`, `workspace/erasure/purge`) **παραμένουν ανοιχτά** (`grep -c 'try {'` = 0 και στα δύο). **1 νέο εύρημα:** `invites/accept` (SaaS write route, 8 DB touches) — το μοναδικό του `try` (γρ.65) καλύπτει ΜΟΝΟ τη create-dup race, ΟΧΙ τα υπόλοιπα ~7 DB ops → guardless (διορθώνει την ανακριβή σημείωση της 45ης γραμμής «invites/accept έχει ήδη δικό του try/catch»). Νέο item κάτω.
 - **type-check:** `cd apps/web && npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
 - **Builder έκλεισε 2 items** από τον προηγ. marker (live-verified): (α) **v1 `auth/login` apiError swap** (γρ.6 import + γρ.29/33/38 `apiError(...)`· το μοναδικό inline-error v1 route ενοποιήθηκε) → **DONE**· (β) **SaaS try/catch slice 2/2** (members + invites/resend + billing/checkout + billing/portal + auth/login + auth/signup όλα `saasGuard`-wrapped τώρα· `grep -c saasGuard` = 2-5 ανά route, `try {` = 0) → το item 565 κλείνει **DONE πλήρως** (κάθε SaaS **write** route περνά από `saasGuard`).
 - **2 νέα auto-buildable ευρήματα (fresh grep, όχι docs):**
@@ -12,6 +13,26 @@
   - **[P3/S] `search-actions.ts` 7× `as any[]`** — τα 7 `.lean()` results (items/receipts/statements/tasks/subs/expenses/vouchers) γίνονται iterate ως `as any[]` (γρ.67/78/88/98/108/118/129), παρακάμπτοντας το type-checking στα πεδία που διαβάζονται (`_id`, `status`, `store`, `total`, κ.λπ.). Είναι το μοναδικό μη-infra `as any` σε όλο το `src` (τα `softDelete.ts:38` Mongoose pre-hook override + τα tenancy σχόλια είναι false positives). Νέο item παρακάτω.
 - **Ουρά μετά το run:** 2 auto-buildable TODO (P2/S saasGuard reads/cron, P3/S search-actions typing) + 2 decision-flag [Achilleas] (reset-request timing side-channel· getTenantConnection readyState guard· αμφότερα code-verified ανοιχτά).
 - **Καθαρό αλλού (fresh grep):** κάθε v1 read route `.limit(p.limit)`+`.lean()` (τα no-limit calendar/settings/cards/reports/overview είναι single-tenant bounded aggregations, prior-accepted)· hot-path indexes καλυμμένα (`User.apiToken index:true`, `Notification` field-indexes, `Tenant`/`Account` sparse indexes)· mcp + files routes gated (bearer / session-ή-bearer)· κάθε v1 route εκτός `auth/login` περνά από `withAuth`. Card/Store `findOne({name/last4})` χωρίς index = tiny single-user collections, ΟΧΙ debt.
+
+---
+
+## Web Debt Queue — ενεργά items (50η σάρωση 2026-07-09)
+
+> Σύνοψη 50ής: v1 surface **100% καθαρός** (type/validation/auth/mongoose/dup = 0· type-check EXIT 0). Τα 2 SaaS error-handling items της 49ης (`audit`, `erasure/purge`) **ακόμα ανοιχτά** (builder δεν τα κατανάλωσε — παραμένουν top). 1 νέο εύρημα ίδιας κλάσης (`invites/accept` guardless write route) — μηχανικό, unattended-safe wrap.
+
+### `invites/accept/route.ts` — write route με 8 DB touches guardless (μόνο η create-race έχει try/catch)
+- Priority: P2
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/saas/invites/accept/route.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα:** το POST (`invites/accept/route.ts:34`) κάνει ~8 DB ops μετά το token gate: `Invite.findOne` (γρ.44), `Account.findOne` (γρ.55), `Membership.findOne` (γρ.84), `Membership.updateOne`/`create` (γρ.88/93), `Invite.updateOne` (γρ.103), `recordAudit` (γρ.110), `setAccountCookie` (γρ.117), `accountTenants` (γρ.122). Το ΜΟΝΟ `try` (γρ.65-71) τυλίγει αποκλειστικά τη `Account.create` dup-race (11000 → re-fetch)· ΟΛΑ τα υπόλοιπα DB ops είναι **αγύριστα**. Ένα mid-handler throw (Mongo failover / net blip) βγαίνει ως Next default HTML 500 αντί για το `{ error }` JSON shape που παίρνει κάθε άλλο SaaS route. Δεν χρησιμοποιεί `saasGuard` (public token-driven path, όχι session ladder), άρα χρειάζεται plain try/catch wrap του σώματος — όχι `saasGuard`.
+  - **Fix:** τύλιξε το σώμα μετά το token/invite validation gate σε `try { ... } catch (e) { return NextResponse.json({ error: (e as Error).message?.slice(0,200) || 'Server error' }, { status: 500 }); }`. Κράτα το υπάρχον inner `try/catch` της create-race ως έχει (nested)· τα early-return validation gates (invalid token 400/401, expired invite, seat-cap 409) ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. Αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500.
+  - SaaS-only (SAAS_MODE off = 404 upstream), μηδέν επίδραση στον v1 mobile surface. Διορθώνει και την ανακριβή σημείωση στη γρ.45 του `erasure/purge` item («invites/accept έχει ήδη δικό του try/catch» — ισχύει μόνο για την create-race).
+  - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/invites/accept/route.ts` → ≥2 (create-race + νέο top-level).
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-09, 50η σάρωση· live: `try {` = 1 [create-race μόνο], 8 unguarded DB ops γρ.44-122)
 
 ---
 
