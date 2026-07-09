@@ -728,6 +728,126 @@ Response envelope (`format: pharos.admin-tenant-detail`, version `2`):
 Members are ordered oldest-first (`createdAt`, then `_id`). Same observability
 contract: no writes, no destructive actions, control plane only.
 
+#### Fleet overview
+
+A single, fleet-wide summary that complements the per-workspace listing and
+detail above: instead of a row per tenant, one aggregate across the **whole**
+SaaS. Same platform-operator gate (`requireSuperadmin`) and the same
+authorization order as the listing.
+
+| Method | Path | Result |
+| --- | --- | --- |
+| `GET` | `/api/saas/admin/overview` | Read-only, cross-tenant aggregate: tenant counts by plan/status/tier (plus billing-linked / BYO-key / custom-domain / erasure-scheduled flags), total accounts, active-member count, and this month's usage totals summed from the `Usage` ledger. `no-store`. |
+
+Like the listing and detail, this reads **only** the central registry
+collections (`Tenant`, `Account`, `Membership`) plus the control-plane `Usage`
+ledger; it never opens a per-tenant data database, never runs `db.stats()`, and
+never writes.
+
+The counts are shaped so a plan/status/tier with no tenants still appears (its
+known keys are pre-seeded to `0`), yet an unexpected stored value is still
+counted under its own key rather than silently dropped. The usage totals are for
+the **current month** only:
+
+- The AI counters (`aiCalls`, `aiInputTokens`, `aiOutputTokens`, `aiCostMicros`)
+  are monotonic per month, so summing across tenants gives the fleet's volume
+  for the month. `aiCostMicros` is estimated spend in currency micros.
+- `storageBytes` is a per-tenant **gauge**; each `Usage` row already holds one
+  tenant's latest snapshot for the period, so summing across tenants is correct
+  (it is not summing a running counter). Tenants with no `Usage` row this month
+  contribute `0` and are excluded from `tenantsReporting`.
+
+All numeric fields are floored at `0`. With SaaS mode off the endpoint is `404`,
+and the self-hosted `DEFAULT_TENANT` has no registry or `Usage` rows, so there is
+nothing to aggregate.
+
+Response envelope (`format: pharos.admin-overview`, version `1`):
+
+```json
+{
+  "format": "pharos.admin-overview",
+  "version": 1,
+  "generatedAt": "2026-07-09T13:00:00.000Z",
+  "period": "2026-07",
+  "tenants": {
+    "total": 128,
+    "byPlan": { "free": 40, "shared": 70, "dedicated": 18 },
+    "byStatus": { "pending": 2, "trialing": 9, "active": 110, "suspended": 5, "canceled": 2 },
+    "byTier": { "shared": 110, "pro": 18 },
+    "billingLinked": 96,
+    "aiByoKey": 12,
+    "customDomain": 7,
+    "erasureScheduled": 1
+  },
+  "accounts": 240,
+  "activeMembers": 205,
+  "usage": {
+    "tenantsReporting": 88,
+    "aiCalls": 41200,
+    "aiInputTokens": 91800000,
+    "aiOutputTokens": 12120000,
+    "aiCostMicros": 345000000,
+    "storageBytes": 82348179456
+  }
+}
+```
+
+Same observability contract: no writes, no destructive actions, control plane
+only.
+
+#### Live storage footprint (on-demand `db.stats()`)
+
+The [detail endpoint](#single-tenant-detail) reports the **last sampled**
+storage figure from the `Usage` ledger; this endpoint takes a fresh, read-only
+`db.stats()` against one tenant's own data database **right now**. Use it to see
+a live footprint on demand (e.g. before an operator decision) without waiting for
+the next metering sample. Same platform-operator gate; an unknown slug is a
+`404`.
+
+| Method | Path | Result |
+| --- | --- | --- |
+| `GET` | `/api/saas/admin/tenants/<slug>/dbstats` | Read-only LIVE footprint: a fresh `db.stats()` against the tenant's data database plus its on-disk file bytes. It **never** records a `Usage` sample, so viewing a footprint has zero side effects. `no-store`. |
+
+The slug is resolved from the central `Tenant` registry; only that tenant's
+data-plane `db.stats()` and file subtree are read. Unlike the detail rollup, this
+does open the per-tenant data database (read-only) to run the live command, but
+it still never writes.
+
+`measured` is `true` when a live `db.stats()` actually ran; it is `false` when
+the connection had no native db handle, in which case the db footprint is all
+zeros while file bytes are still counted. All numeric fields are floored at `0`,
+so a garbage or negative raw value can never surface.
+
+Response envelope (`format: pharos.admin-tenant-dbstats`, version `1`):
+
+```json
+{
+  "format": "pharos.admin-tenant-dbstats",
+  "version": 1,
+  "generatedAt": "2026-07-09T21:40:00.000Z",
+  "slug": "acme",
+  "dbName": "tenant_acme",
+  "measured": true,
+  "live": {
+    "dataSize": 512000000,
+    "storageSize": 268435456,
+    "indexSize": 33554432,
+    "objects": 18420,
+    "dbBytes": 301989888,
+    "fileBytes": 734003200,
+    "totalBytes": 1035993088
+  }
+}
+```
+
+Field meanings: `dataSize` is the uncompressed logical size of all documents;
+`storageSize` and `indexSize` are the physical on-disk (compressed) collection
+and index footprints; `objects` is the document count. `dbBytes` is the **billed**
+MongoDB footprint (`storageSize + indexSize`) — the same definition the metering
+sampler uses — and `totalBytes` = `dbBytes + fileBytes`, the figure a storage
+quota is checked against. `fileBytes` is the tenant's binary-file footprint (`0`
+until the storage layer is tenant-aware). SaaS-only: `404` when SaaS mode is off.
+
 ## SaaS environment variables
 
 These are needed **only** in SaaS mode. Use placeholders; never commit real

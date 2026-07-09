@@ -1111,3 +1111,40 @@ saas-core ρουτινα ηταν mid-commit. ΔΕΝ commit-αρα· poll καθ
 τωρα committed) θελει τεκμηριωση στο saas.md §8 (listing #48, detail #49, usage #50, fleet
 overview #51). Watch νεα admin/* commits για superadmin write actions (suspend/reactivate/
 impersonate) ή UI console page.
+
+## 2026-07-09 (saas.md §8: superadmin fleet overview #51 + live db.stats footprint #52)
+
+Συνεχεια της τεκμηριωσης του superadmin console (§8). Οι δυο πιο προσφατες SaaS commits εισηγαγαν
+δυο νεα gated endpoints που ελειπαν απο το saas.md: `GET /api/saas/admin/overview` (fleet
+aggregate, increment 51, commit 189282e) και `GET /api/saas/admin/tenants/<slug>/dbstats` (live
+on-demand db.stats reader, increment 52, commit c6ac616). Προστεθηκαν δυο νεα #### subsections
+μετα το "Single-tenant detail".
+
+Διαβασα τα πραγματικα αρχεια πριν γραψω:
+- overview/route.ts + adminOverview.ts → envelope pharos.admin-overview v1: tenants tally
+  (byPlan/byStatus/byTier pre-seeded σε 0 + billingLinked/aiByoKey/customDomain/erasureScheduled),
+  accounts, activeMembers, usage (tenantsReporting + AI counters + storageBytes gauge summed).
+  Registry-only (Tenant/Account/Membership/Usage), ΠΟΤΕ db.stats, ΠΟΤΕ writes.
+- tenants/[slug]/dbstats/route.ts + adminTenantDbStats.ts → envelope pharos.admin-tenant-dbstats
+  v1: slug, dbName, measured (true οταν εγινε live db.stats), live {dataSize/storageSize/
+  indexSize/objects/dbBytes=billed storageSize+indexSize/fileBytes/totalBytes}. Ανοιγει το
+  per-tenant data db read-only για fresh reading αλλα ΠΟΤΕ γραφει (κανενα Usage sample).
+
+Accuracy: cross-checked κατα του κωδικα (requireSuperadmin gate + saasGuard, unknown slug→404,
+nonNeg floor, dbBytes=billedBytes({storageSize,indexSize}), dbName convention `tenant_<slug>` απο
+provision.ts:49 → διορθωσα το placeholder απο pharos_t_acme σε tenant_acme). Illustrative sample
+numbers μονο, καμια εφευρεση field. Placeholders μονο `<slug>`/`acme`/`.example`.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md 14→18 markers (9
+balanced blocks, +2 νεα JSON blocks). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/
+STRIPE_SECRET_KEY=/CRON_SECRET=<value>) → clean. Cross-ref #single-tenant-detail resolve-ει
+(υπαρχον heading).
+
+Collision guard: `git status --short` = foreign UNSTAGED files (reports/settings/appSettings/
+AppConfig/i18n/netWorth — daily-dev net-worth WIP) αλλα ΤΙΠΟΤΑ staged. Stage ΜΟΝΟ docs/saas.md +
+docs/DOCS_PROGRESS.md.
+
+Επομενο run: το §8 superadmin console τωρα καλυπτει listing #48, detail #49/#50, fleet overview
+#51, live db.stats #52 — ολα τα read-only endpoints τεκμηριωμενα. Watch νεα admin/* commits για
+τα πρωτα superadmin WRITE actions (suspend/reactivate/impersonate) ή UI console page. Εναλλακτικα:
+stale-forward sweep του features.md αν εκτεθουν export/erasure στο workspace-settings UI.
