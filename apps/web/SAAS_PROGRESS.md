@@ -468,3 +468,33 @@ snapshot είχαν ήδη commit-αριστεί από concurrent routine), μ�
 tenants flag στο fleet overview/detail, read-only πάνω στο υπάρχον `checkStorageQuota` → control
 plane, ασφαλές), είτε (β) user-facing workspace-settings UI panels (control-plane APIs έτοιμα → UI
 territory), είτε (γ) actual binary packaging / BYO-key AI-dispatch (shared runtime / archive dep → άδεια).
+
+## 2026-07-09 — DIRECTION CHANGE (Achilleas, interactive): UI-FIRST απο εδω και περα
+Ο Αχιλλέας (interactive session): «ρύθμισε το να προχωράει UI κτλ και τα υπόλοιπα μετά».
+Το SaaS backend/API είναι σχεδόν πλήρες· το bottleneck πλέον είναι το **UI**. Νέα προτεραιότητα
+της routine (και στο SKILL.md):
+
+- **UI-FIRST**: σε κάθε run, προτίμησε ένα UI page/panel αντί για άλλο backend read-endpoint,
+  όποτε υπάρχει διαθέσιμο. Χτίζουμε (α) το **superadmin console** (`app/admin/**`) που
+  καταναλώνει τα έτοιμα `api/saas/admin/*` (listing #48 / detail+usage #49-50 / fleet #51 /
+  LIVE dbstats #52), και (β) τα **user-facing workspace-settings/auth panels** (`app/(saas)/**`)
+  πάνω στα έτοιμα control-plane read/write APIs (signup/login/session, members/invites, plan,
+  BYO-key).
+- **Territory UI (νέο, αυστηρά δικό μας ώστε να μη συγκρουόμαστε με feature/landing routines)**:
+  `app/admin/**`, `app/(saas)/**`, και ΟΛΑ τα νέα components σε `components/saas/**` (νέος
+  φάκελος). ΜΗΝ αγγίζεις shared components (SiteNav/layout.tsx/globals.css) — κάθε SaaS segment
+  παίρνει δικό του layout.
+- **Self-gating (κρίσιμο για OSS parity)**: κάθε SaaS UI page → `notFound()`/redirect όταν
+  `SAAS_MODE` off (και το `/admin` επιπλέον όταν ο viewer δεν είναι superadmin). Έτσι το
+  self-hosted app μένει byte-for-byte αμετάβλητο.
+- **Deferred (τα «υπόλοιπα μετά»)**: Stripe live wiring, plan pricing/quotas, SMTP delivery,
+  storage-quota enforcement surface — μένουν scaffold + «## Needs Achilleas» μέχρι να δώσει
+  keys/αποφάσεις. ΔΕΝ μπλοκάρουν το UI (τα panels δουλεύουν με placeholders/read APIs).
+
+**Next task:** increment 53 (UI-first) — **superadmin console shell**: `app/admin/layout.tsx`
+(δικό του minimal layout + superadmin-gate server check → notFound όταν off/μη-operator) +
+`app/admin/page.tsx` (fleet overview #51: tenant counts by plan/status/tier + this-period AI/
+storage totals) + `components/saas/**` πρώτα atoms (StatCard/Table). Server components που
+fetch-άρουν απ' τα admin read APIs (ή καλούν κατευθείαν τους registry readers server-side).
+Μετά: tenant list → tenant detail (με usage + LIVE dbstats button). Το quota-enforcement surface
+(πρώην #53 backend option) υποβιβάζεται σε «μετά το UI».
