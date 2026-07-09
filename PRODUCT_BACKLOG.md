@@ -18,6 +18,10 @@ Ranked by value/effort (πρώτο = καλύτερη σχέση αξίας πρ
 απλό id (σειρά προσθήκης), όχι σειρά προτεραιότητας — το value/effort standing γράφεται σε κάθε item.
 Από τα νέα, τα **P10 και P11 είναι από τα υψηλότερα value/effort όλης της λίστας**.
 
+> **ΜΕΤΑΚΙΝΗΘΗΚΑΝ στο `## Approved` (2026-07-07, Αχιλλέας):** **P2** (bank/CSV import), **P4**
+> (net-worth time-series), **P10** (return-window/warranty tracker) → PA1/PA2/PA3. Παραμένουν
+> εδώ οι περιγραφές τους ως αναφορά· ο planner ΔΕΝ τα ξαναπροτείνει, ο builder τα χτίζει από Approved.
+
 ### P1. Demo / sample-data mode σε fresh install — S — OSS (κυρίως), both
 - **Αξία:** πρώτη εντύπωση σε νέο self-host = άδειο dashboard. Ένα «Load sample data»
   (και «Clear sample data») γεμίζει items/receipts/expenses/subscriptions με ρεαλιστικά
@@ -226,7 +230,29 @@ Ranked by value/effort (πρώτο = καλύτερη σχέση αξίας πρ
 
 ## Approved
 
-_(κενό — ο Αχιλλέας μετακινεί εδώ ό,τι εγκρίνει· οι builders τραβάνε από εδώ)_
+> **Εγκρίθηκαν από τον Αχιλλέα 2026-07-07** (βλ. `OWNER_DECISIONS.md` #8). Οι builder/daily-dev
+> routines χτίζουν ΜΟΝΟ από εδώ, ένα item ανά run, verify-pre-build πρώτα. Οι «Απόφαση που
+> χρειάζεται» **λύθηκαν με locked defaults** (χτίσε το MVP)· όπου αγγίζει SaaS metering/storage,
+> ο builder κρατά το free-tier behaviour non-metered.
+
+### PA1 ← P2. Bank / generic CSV import για expenses & income — M — both
+- Column-mapping UI (date/amount/description → vendor/category) + dedupe κατά το import.
+- **Locked default:** AI auto-categorise **ΜΕΤΑ** το import (batch, opt-in), ΟΧΙ inline — ώστε το
+  SaaS AI metering να μη σκάει σε κάθε γραμμή import. Reuse EXPENSE pipeline + upsert-by dedupe.
+- Owner: **pharos-daily-dev**.
+
+### PA2 ← P4. Net-worth time-series (snapshots + trend) — M — both
+- Νέο `Snapshot` model + μηνιαίο cron· assets (inventory value + optional manual accounts) −
+  liabilities (installments owed + card balances)· «Net worth» ενότητα στα Reports + γράφημα.
+- **Locked defaults:** manual asset accounts **επιτρέπονται** (μετρητά/τραπεζικά χωρίς integration)·
+  **forward-only** (χωρίς backfill). Reuse του υπάρχοντος net-position υπολογισμού.
+- Owner: **pharos-daily-dev**.
+
+### PA3 ← P10. Return-window & warranty-claim tracker — S — both
+- Computed «return by» ανά απόδειξη/είδος (default 14 μέρες EU από purchase date, **per-store
+  editable** override) + alert 2-3 μέρες πριν λήξει (reuse `runAlertChecks`/notifiers) + badge
+  «N μέρες για επιστροφή» στην κάρτα απόδειξης.
+- Owner: **pharos-daily-dev**. Δένει με Calendar feed αν γίνει το P6.
 
 ---
 
