@@ -237,7 +237,37 @@ These are flagged **(AI)** below with the feature name.
 |--------|---------------------------|-------------|
 | GET    | `/statements?card=`       | Statements, newest period first (+ `limit`/`offset`/`updatedSince`). |
 | GET    | `/statements/:id`         | One statement with its transactions (+ per-charge installment info). |
-| GET    | `/statements/plans`       | All installment plans grouped cross-statement (same signature → one plan). Active first (by soonest payoff), then done. |
+| GET    | `/statements/plans`       | All installment plans grouped cross-statement. Active first (by soonest payoff), then done. |
+| POST   | `/statements/plans/merge` | Merge two plans into one payoff. Body `{ sourceKey, targetKey }` → `{ ok, moved }`. |
+| DELETE | `/statements/plans/merge` | Undo a merge, splitting charges back into their own plans. Body `{ key }` → `{ ok, moved }`. |
+
+Each plan in the `GET /statements/plans` response is:
+
+```json
+{
+  "currency": "EUR",
+  "plans": [
+    {
+      "key": "quest-online|473.88|2026-04",
+      "signature": "quest-online|473.88|2026-04",
+      "label": "QUEST ONLINE",
+      "card": "Εθνική Mastercard",
+      "perAmount": 39.49,
+      "totalInstallments": 12,
+      "paidInstallments": 3,
+      "remainingInstallments": 9,
+      "remainingAmount": 355.41,
+      "totalAmount": 473.88,
+      "projectedEndDate": "2027-03-01",
+      "done": false,
+      "itemCount": 1,
+      "merged": false
+    }
+  ]
+}
+```
+
+`key` is the stable grouping key (`planKey || signature`); it is what the merge/unmerge write-ops key on (pass it as `targetKey`/`key`). `signature` is kept for back-compat. `merged` is `true` when a differently-worded charge was manually bound into the plan — the mobile app then offers "unmerge" (`DELETE /statements/plans/merge`). Two same-purchase charges that show up with different descriptions across months (for example `QUEST ONLINE` vs `QUEST ONLINE KALLITHEA`) can be collapsed into one plan via `POST /statements/plans/merge`.
 
 ### Subscriptions
 

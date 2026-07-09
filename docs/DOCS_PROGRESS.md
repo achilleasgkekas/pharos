@@ -1073,3 +1073,41 @@ Collision guard: `git status --short` = μονο `M docs/saas.md` (κανενα 
 rollup #50)· watch νεα admin/* commits για superadmin ACTIONS (write surfaces: suspend/reactivate/
 impersonate) ή UI console page. Η stale-forward-ref sweep αν εκτεθουν export/erasure/files/
 superadmin στο workspace-settings UI (features.md).
+
+## 2026-07-09 (api.md: statements/plans/merge POST+DELETE + plan envelope σχημα)
+
+Gap-scan στο api.md εναντι ολων των routes στο apps/web/src/app/api/v1/ (find route.ts, 52 αρχεια).
+Βρεθηκε ενα undocumented endpoint: `/api/v1/statements/plans/merge` (POST + DELETE), το mobile
+surface για merge/unmerge δοσεων με διαφορετικο λεκτικο (QUEST ONLINE vs QUEST ONLINE KALLITHEA).
+Ολα τα αλλα item/receipt/expense sub-routes ηταν ηδη τεκμηριωμενα.
+
+Διαβασα τα πραγματικα αρχεια (statements/plans/merge/route.ts [POST bindInstallmentGroup →
+{ok,moved}· DELETE unbindInstallmentGroup → {ok,moved}], statements/plans/route.ts [envelope
+{currency, plans[]} με key/signature/merged κ.λπ.]) και ενημερωσα το ### Statements & installment
+plans:
+- Δυο νεες σειρες: POST `/statements/plans/merge` {sourceKey,targetKey}→{ok,moved}, DELETE
+  `/statements/plans/merge` {key}→{ok,moved}.
+- Νεο JSON sample του GET /statements/plans plan object (key/signature/label/card/perAmount/
+  totalInstallments/paidInstallments/remainingInstallments/remainingAmount/totalAmount/
+  projectedEndDate/done/itemCount/merged).
+- Επεξηγηση: `key` = planKey||signature (το keys-on για merge/unmerge· περναει ως targetKey/key),
+  `signature` = back-compat, `merged`=true οταν manual bind → mobile "unmerge".
+
+Accuracy: cross-checked κατα του κωδικα (readBody+strField required sourceKey/targetKey/key,
+apiError οταν λειπουν, r.moved ?? 0, computeInstallmentPlans map keys, sort active-before-done).
+Illustrative sample numbers μονο, καμια εφευρεση field. Placeholders μονο store names.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity api.md = 18 markers (9
+balanced blocks, +1 νεο JSON block). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/
+STRIPE_SECRET_KEY=/CRON_SECRET=<value>) → clean.
+
+Collision guard (ΕΝΕΡΓΟΠΟΙΗΘΗΚΕ): mid-run το git diff --cached εδειξε foreign STAGED files
+(apps/web/src/app/api/saas/admin/overview/* + adminOverview.ts/test + SAAS_PROGRESS.md) — η
+saas-core ρουτινα ηταν mid-commit. ΔΕΝ commit-αρα· poll καθε 20s μεχρι index clear· η saas-core
+εκανε land το `189282e feat(saas): superadmin fleet overview (increment 51)`. Μετα εμεινε ΜΟΝΟ
+`M docs/api.md`. Stage ΜΟΝΟ docs/api.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: το νεο `GET /api/saas/admin/overview` (superadmin fleet aggregate, increment 51,
+τωρα committed) θελει τεκμηριωση στο saas.md §8 (listing #48, detail #49, usage #50, fleet
+overview #51). Watch νεα admin/* commits για superadmin write actions (suspend/reactivate/
+impersonate) ή UI console page.
