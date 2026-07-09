@@ -1331,3 +1331,47 @@ Needs-Achilleas (open):
 - Annual billing: discount πριν φτιαξω toggle.
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-09 — (e) polish: reading-progress «lighthouse beam» στην κορυφη
+
+Task: (e) polish. Τα δυο blocked increments (real app screenshots -> assets· annual-billing toggle ->
+Needs-Achilleas τιμες) μενουν κλειστα, οποτε πηρα φρεσκο self-contained: ενα reading-progress indicator
+που ταιριαζει στο brand motif (φαρος = δεσμη φωτος). Μεχρι τωρα ο αναγνωστης δεν ειχε καμια ενδειξη ποσο
+βαθια εχει διαβασει τη μακρια landing (17 sections)· ο ScrollSpy φωτιζει το τρεχον nav section αλλα οχι
+συνολικη προοδο.
+
+Τι εφτιαξα:
+- `app/components/ScrollProgress.tsx` (νεο, `'use client'`, progressive enhancement σαν BackToTop):
+  λεπτη 3px μπαρα καρφωμενη στο πανω-πανω edge (fixed, z-index 60, pointer-events none) που γεμιζει
+  αριστερα-προς-δεξια καθως scroll-αρεις. rAF-throttled scroll+resize listener γραφει `scaleX(0..1)`
+  transform (transform-origin left) -> ποτε layout, μονο compositor. Κρυβεται (opacity 0) οταν η σελιδα
+  ειναι πιο κοντη απο το viewport (τιποτα να scroll-αρεις) ή στο top. aria-hidden (καθαρα διακοσμητικο),
+  no-op σε SSR.
+- `app/page.tsx`: import + mount `<ScrollProgress/>` διπλα στα ScrollSpy/BackToTop.
+- `app/globals.css`: νεα `.scroll-progress` (fixed top strip) + `.scroll-progress-beam` (accent->cyan->
+  purple gradient, subtle glow shadow, transition transform 0.08s linear -> ομαλο fill· το global
+  reduced-motion override το μηδενιζει αυτοματα). Το CSS comment ακολουθει το υπαρχον section-header
+  convention του αρχειου (lines 1490/1539/1574 χρησιμοποιουν ιδιο «— » στυλ).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static· `/` 3.27 -> 3.48 kB (νεο client component, καμια νεα route).
+- Prerendered `.next/server/app/index.html`: `scroll-progress` + `scroll-progress-beam` present (η
+  container μαρκα renderαρει server-side· το scaleX το γραφει το JS client-side σε useEffect) -> zero SSR
+  regression, η σελιδα δουλευει και χωρις JS (η μπαρα απλα μενει στο 0/κρυφη).
+- em-dash check: 0 σε ScrollProgress.tsx + page.tsx (το CSS comment ακολουθει το local file convention).
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev στον φακελο· verify μεσω build output + prerendered
+  HTML)· δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> κανενα foreign staged file· stage ΜΟΝΟ τα δικα μου
+  (page.tsx, globals.css, ScrollProgress.tsx, LANDING_PROGRESS.md)· το foreign modified
+  (apps/mobile ReceiptsScreen) δεν το αγγιξα.
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets· annual-billing toggle
+ΜΟΝΟ αφου κλεισουν ετησιες τιμες· ισως keyboard-focus outline tuning ή print stylesheet.
+
+Needs-Achilleas (open):
+- Terms + Privacy: review + finalize (billing terms, governing-law jurisdiction, provider/processor ονοματα)
+  ΠΡΙΝ hosted launch· μετα flip `robots:{index:false}` -> indexable + add στο sitemap.
+- Annual billing: discount πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.

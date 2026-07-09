@@ -1513,6 +1513,29 @@ h1, h2, h3 {
   outline-offset: 2px;
 }
 
+/* Reading-progress "lighthouse beam" — a thin accent→cyan bar pinned to the
+   very top edge that fills left-to-right as the reader scrolls. JS writes a
+   scaleX(0..1) transform on the beam; purely decorative. */
+.scroll-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  z-index: 60;
+  pointer-events: none;
+  background: transparent;
+}
+.scroll-progress-beam {
+  height: 100%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  opacity: 0;
+  background: linear-gradient(90deg, var(--accent), var(--cyan) 70%, var(--purple));
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.45), 0 0 4px rgba(0, 212, 255, 0.4);
+  transition: transform 0.08s linear, opacity 0.2s ease;
+  will-change: transform;
+}
+
 /* Floating "back to top" button — hidden until scrolled past the hero, then
    fades in bottom-right. JS toggles `.back-to-top-on`. */
 .back-to-top {

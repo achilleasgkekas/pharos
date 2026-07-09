@@ -3,6 +3,7 @@ import { Icon } from './components/Icon';
 import { Waitlist } from './components/Waitlist';
 import { MobileNav } from './components/MobileNav';
 import { ScrollSpy } from './components/ScrollSpy';
+import { ScrollProgress } from './components/ScrollProgress';
 import { BackToTop } from './components/BackToTop';
 import { CopyButton } from './components/CopyButton';
 import { FaqDeepLink } from './components/FaqDeepLink';
@@ -622,6 +623,7 @@ export default function Home() {
           <MobileNav githubUrl={GITHUB_URL} />
         </div>
       </header>
+      <ScrollProgress />
       <ScrollSpy />
       <BackToTop />
 
