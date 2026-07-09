@@ -2114,3 +2114,54 @@ node-only read module, μηδέν shared runtime wiring — type-check+tests κ�
 (data plane read-only → άδεια), είτε (β) user-facing workspace-settings UI panels (ΟΛΑ τα read/
 write control-plane APIs έτοιμα), είτε (γ) actual binary packaging / BYO-key AI-dispatch (shared
 runtime / archive dep → άδεια).
+
+## 2026-07-10 (increment 53 — Superadmin console UI: PRWTH SaaS σελιδα, Fleet Overview, §8 UI-first)
+**Το κενο:** μετα την αλλαγη κατευθυνσης (2026-07-09, UI-first) το backend admin API ηταν
+πληρες (overview #51 / listing #48 / detail+usage #49/#50) αλλα **ΜΗΔΕΝ UI** — καμια σελιδα
+δεν καταναλωνε τιποτα. Δεν υπηρχε `app/admin/**`, `app/(saas)/**`, ουτε `components/saas/**`.
+Εκλεισα το πρωτο, θεμελιωδες κομματι: το **superadmin console shell + Fleet Overview σελιδα**,
+που θεσπιζει το pattern (self-gating segment + own chrome + design-token styling) για ολο το
+μελλοντικο SaaS UI. ΟΛΟ additive, σε νεους φακελους που κατεχω αποκλειστικα:
+- `lib/tenancy/superadminPage.ts` (νεο) — **PAGE-side gate** = ο page-shaped καθρεφτης του
+  `requireSuperadmin()` (API). Ιδια σειρα ελεγχων (saasMode → accountAuthConfigured →
+  allowlist → getCurrentAccount → isSuperadminEmail → Account.findById defence-in-depth), αλλα
+  ΟΛΑ καταληγουν σε ενα `notFound()` (η σελιδα δεν μπορει να επιστρεψει distinct status). Καμια
+  login-redirect εσκεμμενα (θα ελεγε οτι το console υπαρχει). Επιστρεφει AccountClaims στο shell.
+- `components/saas/format.ts` (νεο) — **PURE + client-safe** display helpers (formatInt/
+  formatBytes base-1024/formatCostMicros micros→USD με sub-cent precision/formatWhen ISO→locale),
+  ολα defensive (non-finite/negative → sane zero, ποτε "NaN"/"-1 B" σε operator dashboard).
+- `components/saas/format.test.ts` (νεο, 12 tests) — grouping/scaling/precision/fallback/coercion.
+- `components/saas/StatTile.tsx` (νεο) — presentational StatTile (label/value/sub/accent) +
+  BreakdownList (key→count), styled με τα υπαρχοντα Pharos design tokens (`var(--color-*)`),
+  ΧΩΡΙΣ να αγγιζω shared CSS/globals.
+- `components/saas/AdminNav.tsx` (νεο, client) — active-link nav (usePathname)· σημερα μονο Overview.
+- `app/admin/layout.tsx` (νεο) — **self-gating** segment shell (requireSuperadminPage → 404 για
+  self-hosted/μη-operator), δικο του header/chrome (ΟΧΙ το SiteNav), `robots: noindex`,
+  force-dynamic, operator email στο header.
+- `app/admin/page.tsx` (νεο) — Fleet Overview: gate (defence-in-depth) + `readFleetOverviewForAdmin()`
+  (read-only registry aggregate) → workspaces/accounts/members/billing tiles + this-month usage
+  (AI calls/tokens/cost + storage) + plan/status/tier breakdowns + custom-domain/erasure counts +
+  empty-state. Καλει το lib reader κατευθειαν server-side (idiomatic SSR, ηδη gated), οχι self-fetch.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run format.test.ts` → **12/12
+green**· full suite `npx vitest run` → **1815/1815 green** (139 files, καμια regression). ΚΑΝΕΝΑ
+υπαρχον αρχειο δεν αγγιχτηκε (μονο νεοι φακελοι app/admin, components/saas + ενα νεο lib helper).
+`SAAS_MODE` off / self-hosted = **zero effect** (το /admin segment self-gates σε notFound() πριν
+render-αρει οτιδηποτε· ο reader επιστρεφει empty overview αφου ο DEFAULT_TENANT δεν εχει Tenant/
+Usage rows). Κανενας Docker rebuild (additive gated segment, μηδεν shared runtime wiring — type-
+check+tests καλυπτουν)· καμια νεα εξαρτηση. Collision guard: 3 foreign files (search-actions/
+receiptSearch απο αλλη routine) ηταν pre-staged απο την αρχη του run → **δεν** τα αγγιξα· εκανα
+isolated pathspec commit μονο των δικων μου 7 αρχειων ωστε να μη σαρωθουν στο commit μου.
+
+**## Needs Achilleas** (superadmin console):
+- **`SAAS_SUPERADMIN_EMAILS` env** (operator allowlist) + **`SAAS_MODE=on`** + **`AUTH_SECRET`**
+  για να ενεργοποιηθει το /admin σε production. Κενο/off = console disabled (404), zero risk.
+- **Superadmin sign-in:** το /admin απαιτει ενεργο Account session (`pharos_account` cookie). Η
+  (saas) login σελιδα (UI) δεν εχει χτιστει ακομα → προς το παρον ο operator συνδεεται μεσω του
+  υπαρχοντος `POST api/saas/auth/login`. Επομενο increment: (saas) auth UI.
+- **Write/destructive superadmin actions** (suspend/reactivate/force-plan/drop-tenant) = **ΠΟΤΕ απο routine**.
+
+**Next task:** increment 54 — είτε (α) superadmin **Workspaces** σελιδα (`/admin/tenants`) που
+καταναλωνει το listing (#48) + per-tenant detail drill-down (#49/#50), είτε (β) user-facing
+**(saas) auth UI** (signup/login panels που καταναλωνουν api/saas/auth/*), είτε (γ) user-facing
+**workspace-settings** panels (members/billing/usage, ολα τα read/write control-plane APIs ετοιμα).
