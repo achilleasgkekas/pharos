@@ -114,17 +114,21 @@ describe('assertPublicUrl — literal IPv6 addresses (no DNS)', () => {
     },
   );
 
-  // KNOWN GAP (see OSS_PROGRESS.md "Needs Achilleas" 2026-07-02): ip6IsPrivate()
-  // detects IPv4-mapped addresses via a dotted-decimal regex (/^::ffff:(\d+\.\d+\.\d+\.\d+)$/),
-  // but WHATWG URL normalizes `[::ffff:127.0.0.1]` → `[::ffff:7f00:1]` (hex compression),
-  // so the regex never matches and an IPv4-mapped loopback/private address slips through
-  // as "public". These tests LOCK the current (insecure) behavior so a future fix in
-  // ssrf.ts flips them from resolve→reject visibly. Do NOT read this as "intended".
+  // WHATWG URL normalizes `[::ffff:127.0.0.1]` → `[::ffff:7f00:1]` (hex compression),
+  // so ip6IsPrivate must decode the IPv4-mapped low 32 bits rather than pattern-match
+  // the dotted form (fixed 2026-07-09 per OWNER_DECISIONS.md #3).
   it.each([
-    ['http://[::ffff:127.0.0.1]/', 'IPv4-mapped loopback → normalized to ::ffff:7f00:1'],
-    ['http://[::ffff:10.0.0.1]/', 'IPv4-mapped private → normalized to ::ffff:a00:1'],
-  ])('KNOWN GAP: currently ALLOWS %s (%s)', async (url) => {
-    await expect(assertPublicUrl(url)).resolves.toBeUndefined();
+    ['http://[::ffff:127.0.0.1]/', 'IPv4-mapped loopback, dotted'],
+    ['http://[::ffff:7f00:1]/', 'IPv4-mapped loopback, hex-compressed'],
+    ['http://[::ffff:10.0.0.1]/', 'IPv4-mapped private, dotted'],
+    ['http://[::ffff:a00:1]/', 'IPv4-mapped private, hex-compressed'],
+    ['http://[::ffff:a9fe:a9fe]/', 'IPv4-mapped link-local/metadata (169.254.169.254)'],
+  ])('rejects IPv4-mapped private %s (%s)', async (url) => {
+    await expect(assertPublicUrl(url)).rejects.toThrow('Private address not allowed');
+  });
+
+  it('allows an IPv4-mapped PUBLIC address', async () => {
+    await expect(assertPublicUrl('http://[::ffff:808:808]/')).resolves.toBeUndefined(); // 8.8.8.8
   });
 });
 

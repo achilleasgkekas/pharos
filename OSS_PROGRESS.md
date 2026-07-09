@@ -298,6 +298,10 @@ gap θέλει one-liner fix στο `ip6IsPrivate` (normalize το ::ffff:HEX:HE
 
 ## Needs Achilleas
 
+- **✅ APPROVED 2026-07-07 (Achilleas) — ΦΤΙΑΞΕ ΤΟ** (security, μηχανικό· βλ. `OWNER_DECISIONS.md`).
+  Στο `ip6IsPrivate`: αποσυμπίεσε το IPv4-mapped hex (τελευταία 32 bits) σε dotted → `ip4IsPrivate`,
+  ή απόρριψε ρητά κάθε `::ffff:*`. Μετά, γύρνα τα «KNOWN GAP» tests στο `ssrf.test.ts` από
+  `.resolves.toBeUndefined()` σε `.rejects.toThrow('Private address not allowed')`.
 - **[SSRF, 2026-07-02] IPv4-mapped IPv6 bypass στο `apps/web/src/lib/ssrf.ts`
   (`ip6IsPrivate`)**: `assertPublicUrl('http://[::ffff:127.0.0.1]/')` ΔΕΝ απορρίπτεται
   (περνά ως public), γιατί το WHATWG `URL` κάνει `::ffff:127.0.0.1` → `::ffff:7f00:1`
@@ -1280,3 +1284,29 @@ Mock pattern: action-seam (όπως το collection shopping-list/route.test.ts)
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `apps/web/src/app/search-actions.ts` (M — pre-existing WIP άλλου routine, ΔΕΝ το άγγιξα/staged) + το δικό μου shopping-list/[id]/route.test.ts (??). Στάγιαρα μόνο τα δικά μου paths (route.test.ts + OSS_PROGRESS.md).
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Untested [id] routes ακόμα (υψηλή αξία — found→404 pattern): `statements/[id]/route.ts` (GET/DELETE ή PATCH — δες πρώτα το route), `subscriptions/[id]` ήδη καλυμμένο, `tasks/[id]` ήδη καλυμμένο. Untested collection routes: `lists/route.ts`, `notifications/route.ts`, `history/route.ts`, `calendar/route.ts`, `overview/route.ts`, `reports/route.ts`, `search/route.ts`. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Εκκρεμεί ακόμα το SSRF IPv4-mapped fix στο "## Needs Achilleas".
+
+---
+
+## 2026-07-09 (cont.⁸ — statements/[id]/route.test.ts, GET-only detail route, tx map + installment + abs-amount sort)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/statements/[id]/route.test.ts` για το GET του `/api/v1/statements/:id`.**
+
+Επιλογή target: ακολούθησα ρητά το suggested next task του προηγ. entry (`statements/[id]/route.ts` ήταν πρώτο στη λίστα untested [id] routes). **Διόρθωση της σημείωσης**: το route είναι **GET-only** — δεν υπάρχει PATCH/DELETE (τα statements δημιουργούνται από το PDF-import flow, όχι εδώ), οπότε το test καλύπτει μόνο GET. Route-only logic που ζει αποκλειστικά εδώ και τροφοδοτεί το mobile statement-detail screen (μία κάρτα statement με τις per-charge χρεώσεις + installment info):
+- **Auth gate + id guard**: withAuth → 401 χωρίς token (κανένα query)· `isObjectId` → 400 'bad id' σε malformed id ΠΡΙΝ από κάθε DB touch· missing doc → 404 'not found'.
+- **statement envelope**: per-field `?? default` fallbacks — last4 '', totalAmount/minimumPayment/paidAmount 0, currency 'EUR', statementDate/dueDate μέσω `iso` (Date → ISO ή null).
+- **transactions map**: κάθε χρέωση → `{ id: String(_id), date: iso, description||'', amount||0, category||'uncategorized', installment }`. Το `installment` είναι object ΜΟΝΟ όταν `installmentInfo.totalInstallments` truthy (`current` default 0)· missing installmentInfo Ή `totalInstallments` 0/undefined → **null**.
+- **sort**: transactions ταξινομούνται με **ΦΘΙΝΟΝ absolute amount** (`Math.abs(b.amount) - Math.abs(a.amount)`) → installment plans + οι μεγαλύτερες χρεώσεις (και τα μεγάλα refunds by abs) βγαίνουν στην κορυφή.
+
+Mock pattern: ίδιο DB-seam pattern με το receipts/[id]/route.test.ts, αλλά η find chain είναι απλή `findById(id).lean()` (χωρίς select step, χωρίς PATCH/update seam). Mock `@/lib/db` connectDB + `@/models/User` bearerUser chain + `@/models/Statement` findById. Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody/apiList helpers (withAuth + isObjectId + iso).
+
+Τι έγινε: Νέο `route.test.ts` (11 tests). **auth + id guard** (4: no-token→401 + no findById, unknown-token→401, malformed id→400 'bad id' + no findById, missing doc→404 [findById called με το OID]). **statement envelope** (2: full doc → όλα τα πεδία exact [USD, dates iso]· bare doc → όλα τα defaults [last4 '', 0s, EUR, dates null] + transactions []). **transactions map + installment** (5: full tx με installment object· bare tx defaults [description '', amount 0, category 'uncategorized', date null, installment null]· installment null σε null/no-total/total-0· `current` default 0 όταν μόνο total· **abs-amount sort** big/refund(-300)/mid/small → big,refund,mid,small).
+
+Τι επαληθεύτηκε:
+- `npx vitest run 'src/app/api/v1/statements/[id]/route.test.ts'` → 11/11 passed.
+- `npx vitest run` (όλο το suite) → 118 files, 1618/1618 passed (ήταν 1592).
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `apps/mobile/src/screens/ReceiptsScreen.tsx` (M), `docs/DOCS_PROGRESS.md`+`docs/saas.md` (M), `OWNER_DECISIONS.md` (?? — νέο owner-decision αρχείο) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Το `OSS_PROGRESS.md` έφερε inline owner annotation (η ✅ APPROVED σημείωση του Achilleas στο SSRF item, βλ. κάτω) — το fold-άρω στο commit αφού είναι το δικό μου log αρχείο. Στάγιαρα μόνο τα δικά μου paths (route.test.ts + OSS_PROGRESS.md).
+
+**ΣΗΜ owner decisions (OWNER_DECISIONS.md, 2026-07-07)**: ο Achilleas ενέκρινε το SSRF IPv4-mapped fix (decision #3), αλλά το ανέθεσε ρητά στο **builder** routine (μηχανικό fix στο `lib/ssrf.ts`, εκτός test-territory μου). Το test-flip των «KNOWN GAP» cases στο `ssrf.test.ts` (από `.resolves.toBeUndefined()` σε `.rejects.toThrow('Private address not allowed')`) πρέπει να γίνει ΜΟΝΟ ΑΦΟΥ landάρει το ssrf.ts fix — το suite είναι ακόμα green (1618 passing), άρα το fix ΔΕΝ έχει landάρει ακόμα, οπότε αφήνω τα tests ως έχουν. Μόλις ο builder διορθώσει το ssrf.ts, ένα επόμενο run αυτής της routine flip-άρει τα 2 tests.
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Υψηλής αξίας untested collection routes: `lists/route.ts`, `notifications/route.ts`, `history/route.ts`, `calendar/route.ts`, `overview/route.ts`, `reports/route.ts`, `search/route.ts`. Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. **Δευτερεύον (μόλις landάρει το builder ssrf.ts fix)**: flip τα «KNOWN GAP» tests στο `ssrf.test.ts` σε `.rejects.toThrow('Private address not allowed')`.

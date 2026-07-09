@@ -26,13 +26,39 @@ function ip4IsPrivate(ip: string): boolean {
   return false;
 }
 
+/** Expand an IPv6 literal into its 8 16-bit groups (handles `::` and a trailing dotted IPv4). */
+function expandIp6(v: string): number[] | null {
+  let s = v;
+  const dotted = s.match(/^(.*:)(\d+\.\d+\.\d+\.\d+)$/);
+  if (dotted) {
+    const p = dotted[2].split('.').map(Number);
+    if (p.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+    s = dotted[1] + (((p[0] << 8) | p[1]).toString(16) + ':' + (((p[2] << 8) | p[3]).toString(16)));
+  }
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const fill = halves.length === 2 ? 8 - head.length - tail.length : 0;
+  if (halves.length === 2 ? fill < 1 : head.length !== 8) return null;
+  const groups = [...head, ...Array(fill).fill('0'), ...tail];
+  if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return null;
+  return groups.map((g) => parseInt(g, 16));
+}
+
 function ip6IsPrivate(ip: string): boolean {
   const v = ip.toLowerCase().split('%')[0]; // strip zone id
-  if (v === '::1' || v === '::') return true; // loopback / unspecified
-  if (v.startsWith('fe8') || v.startsWith('fe9') || v.startsWith('fea') || v.startsWith('feb')) return true; // link-local fe80::/10
-  if (v.startsWith('fc') || v.startsWith('fd')) return true; // unique local fc00::/7
-  const mapped = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/); // IPv4-mapped
-  if (mapped) return ip4IsPrivate(mapped[1]);
+  const g = expandIp6(v);
+  if (!g) return true; // unparseable → reject
+  if (g.every((n) => n === 0)) return true; // :: unspecified
+  if (g.slice(0, 7).every((n) => n === 0) && g[7] === 1) return true; // ::1 loopback
+  if ((g[0] & 0xffc0) === 0xfe80) return true; // link-local fe80::/10
+  if ((g[0] & 0xfe00) === 0xfc00) return true; // unique local fc00::/7
+  if (g.slice(0, 5).every((n) => n === 0) && g[5] === 0xffff) {
+    // IPv4-mapped ::ffff:0:0/96 — WHATWG URL compresses the dotted form to hex
+    // (::ffff:127.0.0.1 → ::ffff:7f00:1), so decode the low 32 bits and reuse ip4IsPrivate.
+    return ip4IsPrivate(`${g[6] >> 8}.${g[6] & 0xff}.${g[7] >> 8}.${g[7] & 0xff}`);
+  }
   return false;
 }
 
