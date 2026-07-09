@@ -6,16 +6,57 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-09 (6η σάρωση planner).
-> **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «τα εγκρίνω όλα» → **ΟΛΑ** τα Proposed
-> (P1, P3, P5-P26) μετακινήθηκαν στο «Approved», μαζί με τα ήδη-εγκεκριμένα PA1/PA2/PA3. Το «Proposed»
-> είναι πλέον κενό· ο planner θα προσθέτει νέους candidates σε επόμενα runs.
+> Τελευταία ενημέρωση: 2026-07-09 (7η σάρωση planner).
+> **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «τα εγκρίνω όλα» → **ΟΛΑ** τα προηγούμενα Proposed
+> (P1, P3, P5-P26) μετακινήθηκαν στο «Approved», μαζί με τα ήδη-εγκεκριμένα PA1/PA2/PA3.
+> **7η σάρωση (2026-07-09):** PA1 (bank/CSV import) shipped → «Done»· προστέθηκαν **5 νέοι candidates P27-P31**
+> στο «Proposed» (awaiting έγκριση — κανένα δεν χτίζεται πριν ο Αχιλλέας τα μετακινήσει στο «Approved»).
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
-_(κενό — όλα εγκρίθηκαν 2026-07-09· ο planner προσθέτει νέους candidates σε επόμενες σαρώσεις)_
+> Νέοι candidates 7ης σάρωσης. Ranked value/effort. **Τίποτα δεν χτίζεται μέχρι μετακίνηση στο «Approved».**
+
+### P27. Suggested budgets από ιστορικό δαπανών — S — both (πολύ ψηλό value/effort)
+- **Αξία:** το να στήσεις budgets είναι σήμερα χειροκίνητο (κενό input ανά κατηγορία → οι περισσότεροι δεν το κάνουν
+  ποτέ). «Suggest budgets» υπολογίζει προτεινόμενο όριο ανά κατηγορία από τον μ.ο. των τελευταίων 3-6 μηνών (+ προαιρετικά
+  ελαφρύ padding) → ένα κλικ γεμίζει όλα τα budgets. Μηδέν AI, ντετερμινιστικό, reuse των υπαρχόντων expense aggregations.
+- **Module:** Budgets (Settings → General) + Reports «Budget · this month».
+- **Ανοιχτή απόφαση (builder default):** median 3 μηνών ανά κατηγορία, στρογγυλοποίηση στα €5· ο χρήστης επεξεργάζεται
+  πριν αποθηκεύσει (suggest ≠ auto-apply)· κατηγορίες με <2 μήνες δεδομένων παραλείπονται.
+
+### P28. Bill / payable status tracker (due → paid → overdue) — M — both (ψηλό value/effort)
+- **Αξία:** πραγματικό κενό — σήμερα οι subscriptions είναι *αυτόματες* χρεώσεις και το `/calendar` μόνο **προβάλλει**
+  μελλοντικές, αλλά κανένα module δεν κρατά τον κύκλο ζωής ενός λογαριασμού που **πληρώνεις χειροκίνητα** (ΔΕΗ/ΟΤΕ/κοινόχρηστα):
+  «due, το πλήρωσα;, ξεχάστηκε → overdue». Bill με status (pending/paid/overdue) + «mark paid» (προαιρετικά δημιουργεί expense)
+  + overdue alert. Reuse recurring-series + `runAlertChecks`/`dispatchAlert`. **Διακριτό** από P7 (discover untracked) & P19 (cashflow αριθμός).
+- **Module:** νέο μικρό «Bills» (ή tab στα Expenses) + Notifications + Calendar (paid vs pending χρωματισμός).
+- **Ανοιχτή απόφαση (builder default):** recurring bill templates → auto-generate pending instances ανά κύκλο· «mark paid»
+  δημιουργεί expense (opt-in link)· overdue = due date πέρασε & όχι paid.
+
+### P29. Asset depreciation model για αξία inventory — S/M — both (ενισχύει PA2/P13)
+- **Αξία:** η αξία των owned assets μένει «κολλημένη» στην τιμή αγοράς εκτός αν την ενημερώνεις χειροκίνητα → net-worth
+  (PA2) και insurance export (P13) υπερεκτιμούν. Απλό depreciation curve ανά κατηγορία (π.χ. electronics −X%/έτος,
+  straight-line ή declining) → computed «estimated current value» από ημ. αγοράς. Ντετερμινιστικό, μηδέν AI, reuse purchasedPrice/date.
+- **Module:** Items/Inventory (computed πεδίο, όχι stored) + Reports/PA2 net-worth + P13 export.
+- **Ανοιχτή απόφαση (builder default):** default rates ανά κατηγορία (editable Settings), floor στο ~10% salvage·
+  computed on-read (όπως το expense `anomaly`)· manual override ανά item κερδίζει πάντα.
+
+### P30. Mobile push notifications (Expo) για alerts & reminders — M — both (mobile-native engagement)
+- **Αξία:** το §3 notifier framework στέλνει σε ntfy/Discord/Slack/webhook (HTTP), αλλά **όχι native push** στο κινητό.
+  Expo push tokens + device registration → οι ίδιες ειδοποιήσεις (δόση λήγει, return window κλείνει, budget ξεπεράστηκε,
+  bill overdue) φτάνουν ως native push. Μεγαλώνει το retention του mobile app. **Διακριτό** από §3 (HTTP) & §13 (inbound bots).
+- **Module:** Mobile (Expo Notifications + token registration) + `/api/v1` (register device) + `dispatchAlert` (νέο push channel).
+- **Εξάρτηση:** mobile MVP (§6) + `/api/v1` (§5). **Builder default:** ένα «push» notifier channel που reuse-άρει το event fan-out.
+
+### P31. Household / shared access — multi-user σε ένα self-host instance — M — OSS (adoption) / SaaS seed
+- **Αξία:** σήμερα single-user per deployment· μια οικογένεια/νοικοκυριό θέλει **πολλαπλά logins πάνω στα ίδια δεδομένα**
+  (κοινό inventory/έξοδα) με ρόλους (admin/member/viewer) + «ποιος καταχώρησε τι» attribution. Ισχυρό OSS self-host lever
+  και σπόρος για το SaaS team-plan. **Διακριτό από §8** (multi-tenancy = ξεχωριστές βάσεις) και **§9** (SaaS-grade email verify/MFA/OAuth).
+- **Module:** Auth/Users (ρόλοι + invite εντός instance) + cross-cutting attribution (createdBy).
+- **Απόφαση που χρειάζεται (Αχιλλέας):** θέλει in-instance multi-user για το OSS, ή single-user OSS + βασίσου αποκλειστικά
+  στο §8 multi-tenancy για shared/SaaS; (αλλάζει το scope· default αν εγκριθεί = shared-data + 3 ρόλοι, χωρίς email/MFA στο OSS tier).
 
 ---
 
@@ -28,12 +69,6 @@ _(κενό — όλα εγκρίθηκαν 2026-07-09· ο planner προσθέ�
 > heavy/AI/SaaS-touching κομμάτια **opt-in**· (β) reuse υπάρχοντος pipeline/pattern· (γ) ξεκίνα από το
 > πιο απλό MVP (heuristic/deterministic πριν AI, single πριν multi). Κατέγραψε την επιλογή στο progress log.
 > Εξαρτήσεις: P5/P17/P23 δένουν με `/api/v1` (§5) + mobile MVP (§6)· P6 feed βοηθά το PA3/P20.
-
-### PA1 ← P2. Bank / generic CSV import για expenses & income — M — both
-- Column-mapping UI (date/amount/description → vendor/category) + dedupe κατά το import.
-- **Locked default:** AI auto-categorise **ΜΕΤΑ** το import (batch, opt-in), ΟΧΙ inline — ώστε το
-  SaaS AI metering να μη σκάει σε κάθε γραμμή import. Reuse EXPENSE pipeline + upsert-by dedupe.
-- Owner: **pharos-daily-dev**.
 
 ### PA2 ← P4. Net-worth time-series (snapshots + trend) — M — both
 - Νέο `Snapshot` model + μηνιαίο cron· assets (inventory value + optional manual accounts) −
@@ -197,6 +232,18 @@ _(κενό — όλα εγκρίθηκαν 2026-07-09· ο planner προσθέ�
 ---
 
 ## Done
+
+### PA1 ← P2. Bank / generic CSV import — ✅ SHIPPED 2026-07-09 (pharos-daily-dev)
+- «Import CSV» στο header των /expenses + /income → modal: file picker, RFC-4180 parser
+  (κόμμα/ερωτηματικό/tab auto-detect, quotes, BOM), auto-guess column mapping (en+el headers),
+  mapping UI (date/amount/vendor/category/notes), preview με έγκυρες/άκυρες γραμμές, «split by
+  sign» option (αρνητικά → έξοδα, θετικά → έσοδα) για μικτά bank exports.
+- Server action `importExpensesCsv`: re-validate (zod), dedupe kind+vendorKey+ημέρα+ποσό
+  (έναντι υπαρχόντων ΚΑΙ μέσα στο batch), κληρονομιά category/recurring από υπάρχουσα σειρά
+  vendor (ντετερμινιστικό, μηδέν AI), chunks των 300, cap 500/κλήση, `verified:true`
+  (τραπεζικά δεδομένα, όχι AI guess). Pure lib `lib/csvImport.ts` + 24 vitest tests.
+- Locked default τηρήθηκε: μηδέν inline AI. Το batch AI auto-categorise (opt-in κουμπί σε
+  uncategorised imports) = follow-up· το ίδιο και το mobile UI (το API action είναι κοινό).
 
 ### PA3 ← P10. Return-window tracker — ✅ SHIPPED 2026-07-09 (pharos-daily-dev)
 - Computed «return by» ανά απόδειξη (default 14 μέρες EU, ρυθμιζόμενο Settings → Defaults,
