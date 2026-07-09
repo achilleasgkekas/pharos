@@ -358,3 +358,53 @@ API + read στο AI dispatch· αγγίζει AI entrypoint → άδεια/πρ
 registration για το trial-lapse sweep (bootstrap hook, shared runtime → άδεια), είτε (γ) user-facing
 workspace-settings UI panels (read/write APIs έτοιμα), είτε (δ) reset-request rate-limit (throttle
 ανά IP/email — συμπληρώνει το D6 anti-enumeration με anti-brute-force).
+
+## 2026-07-09 (increment 51 — Superadmin FLEET OVERVIEW: registry-only aggregate, §8)
+**Το κενό:** ο operator είχε το cross-tenant LISTING (#48) + per-tenant DETAIL με usage
+rollup (#49/#50), αλλά κανένα **fleet-wide** summary — «πώς πάει όλο το SaaS τώρα». Οι next-
+task επιλογές του #50 ήταν όλες gated (LIVE `db.stats()` = data plane / UI panels = ξένο
+territory / binary packaging = shared runtime → άδεια). Έκλεισα το ασφαλέστερο, καθαρά δικό
+μου κομμάτι: ένα **READ-ONLY** fleet overview πάνω ΜΟΝΟ στο central registry. ΟΛΟ additive +
+SaaS-gated + operator-gated, σε δικά μου SAAS αρχεία:
+- `lib/tenancy/adminOverview.ts` (νέο). **PURE** shapers (unit-tested), reuse των
+  `summarizeTenant`/`TenantSummary`/`TENANT_STATUSES` (#48) + `summarizeUsagePeriod`/
+  `AdminUsagePeriod` (#50) + `PLAN_KEYS` (plans) + `periodOf` (billing/usage):
+  - `tallyTenants(summaries)` → fleet counts: total, byPlan/byStatus/byTier (γνωστά keys
+    pre-seeded σε 0 για σταθερό shape· άγνωστο value μετριέται στο δικό του key, ποτέ dropped)
+    + flags billingLinked/aiByoKey/customDomain/erasureScheduled.
+  - `sumFleetUsage(docs)` → this-period totals: AI counters (monotonic → sum across tenants =
+    month volume) + storageBytes (per-tenant GAUGE, ένα row/tenant → sum across tenants =
+    fleet footprint, ΟΧΙ running counter)· null rows dropped, negatives/NaN → 0 defensive.
+  - `buildFleetOverview({...})` → σταθερό envelope `{format:'pharos.admin-overview', version:1,
+    generatedAt(ISO safe→epoch), period, tenants, accounts(non-neg int), activeMembers, usage}`.
+  - **Impure** `readFleetOverviewForAdmin(now?)` = ο ΜΟΝΟΣ reader: 4 φθηνά **registry** reads
+    (`Tenant.find` → tally in-memory· `Account.countDocuments`· `Membership.countDocuments(
+    {status:'active'})`· `Usage.find({period})`) → pure rollup. Αγγίζει ΜΟΝΟ το central
+    registry, ΠΟΤΕ per-tenant data db, ΠΟΤΕ `db.stats()`, ΠΟΤΕ write.
+- `app/api/saas/admin/overview/route.ts` (νέο) — `GET`, `runtime=nodejs`, `force-dynamic`,
+  `saasGuard` (404 off) + `requireSuperadmin` (404 console-off / 401 / 403)· `no-store`.
+- `lib/tenancy/adminOverview.test.ts` (νέο) — 8 PURE tests (tally pre-seed/counts/unknown-key·
+  sum empty/across-tenants+gauge/null+garbage· envelope passthrough + invalid-gen→epoch+floor).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run adminOverview.test.ts` →
+**8/8 green**· full suite `npx vitest run` → **1728/1728 green** (130 files, καμία regression).
+External importers του νέου module από feature code → **κανένας** (μόνο το δικό μου route).
+Route SAAS-gated (404 off) + operator-gated (404 όταν `SAAS_SUPERADMIN_EMAILS` κενό)· ο reader
+αγγίζει ΜΟΝΟ το registry (Tenant/Account/Membership/Usage). ⇒ `SAAS_MODE` off / self-hosted =
+**zero effect** (route δεν mount-άρει, gate inert, default tenant δεν έχει Tenant/Usage rows →
+empty overview). Κανένας Docker rebuild (additive node-only read module + gated route, μηδέν
+shared runtime wiring — type-check+tests καλύπτουν)· καμία νέα εξάρτηση· κανένα feature route/
+data-db/User-path/bearer-path αγγίχτηκε. Collision guard: staging καθαρό (τίποτα pre-staged),
+μόνο τα δικά μου 3 paths.
+
+**## Needs Achilleas** (superadmin console):
+- **`SAAS_SUPERADMIN_EMAILS` env** (από #48) για ενεργοποίηση σε production. Κενό = disabled (404).
+- **Superadmin UI page** (`/admin`) που καταναλώνει listing (#48) + detail-με-usage (#49/#50) +
+  αυτό το fleet overview (#51) — deferred (UI territory).
+- **LIVE per-tenant `db.stats()`** (on-demand δειγματοληπτικός reader αντί για το cached ledger):
+  θα άγγιζε το data plane → ξεχωριστό προσεκτικό increment με άδεια.
+- **Write/destructive superadmin actions** (suspend/reactivate/force-plan/drop-tenant) = **ΠΟΤΕ από routine**.
+
+**Next task:** increment 52 — είτε (α) LIVE on-demand `db.stats()` reader (data plane read-only →
+άδεια), είτε (β) user-facing workspace-settings UI panels (control-plane APIs έτοιμα → UI territory),
+είτε (γ) actual binary packaging / BYO-key AI-dispatch (shared runtime / archive dep → άδεια).
