@@ -5,6 +5,24 @@
 <!-- reviewed: 5c2abf3 -->
 <!-- docker-validated: 51d43ba -->
 
+## 2026-07-09 (parity-auditor, 47η σάρωση — ΝΕΟ functional GAP: Receipts quick-verify)
+
+Read-only audit, inventory ξαναχτισμένο από τον κώδικα (όχι docs). **51 route.ts κάτω από `api/v1`**, **19 web pages**, **16 mobile screens**, **84 exported api-functions**. Μηχανικός loop api.ts↔screens: και οι 84 api-functions + τα 51 route bases έχουν ≥1 mobile consumer → μηδέν orphan endpoint, μηδέν unwired wrapper. mobile `npx tsc --noEmit` → EXIT 0 (μηδέν P1 type-error gap).
+
+**Counts: DONE 8 / auto-buildable functional GAP 1 (νέο) / NEEDS DECISION 0 νέα.**
+
+**ΝΕΟ εύρημα (οι προηγ. endpoint-centric σαρώσεις το έχασαν γιατί δεν εκθέτει νέο route):** το web `apps/web/src/app/receipts/QuickVerify.tsx` (rapid review queue: μία unverified απόδειξη τη φορά, editable store/date/total + Verify/Skip/Not-a-receipt + progress) ΔΕΝ έχει mobile αντίστοιχο· το ReceiptsScreen έχει μόνο per-receipt detail-modal με Verified toggle. Αναπαράγεται πλήρως με τα ΥΠΑΡΧΟΝΤΑ endpoints: το mobile PATCH `/api/v1/receipts/[id]` κάνει partial `$set` (δεν αγγίζει lineItems), οπότε `updateReceipt(id,{store,date,total,verified:true})` + `updateReceipt(id,{archived:true})` φτάνουν — μηδέν νέο endpoint, μηδέν AI cost, μηδέν product decision. Μπήκε στην κορυφή του Build Queue (P1/M).
+
+**Top-3 που πρέπει να πάρει ο builder μετά:**
+1. Receipts quick-verify rapid queue (P1/M, νέο, endpoint υπάρχει, structural verify — δεν καλεί AI)
+2. Fresh pure-lib vitest coverage (`lib/cards.ts` / `lib/taxonomies.ts normalizeList` / `lib/itemStatus.ts`, μηδέν rebuild)
+3. ReceiptsScreen `einput`→`<Input>` (P3/S, tsc-verifiable, μηδέν rebuild)
+
+### Needs Achilleas
+- **Duplicate-detection στο mobile** (receipts/stores/items): το web έχει `DuplicatesModal`/`StoreDuplicatesModal`/`ItemDuplicatesModal`, αλλά είναι server-actions (findDuplicate*/merge*) με **κανένα v1 endpoint**. Θέλει (α) σχεδιασμό v1 endpoints (detect + merge) και (β) απόφαση για το mobile UX (irreversible merge σε μικρή οθόνη). Δεν πάει στον builder.
+- **Backup/Restore + CSV export στα Settings**: web server-actions `exportData`/`importData`, **κανένα v1 endpoint**· το file-download/upload UX είναι awkward σε mobile. Θέλει απόφαση αν αξίζει καθόλου στο κινητό.
+- Υπόλοιπα αμετάβλητα (attended/decision): safe-area dep, language switcher + light/dark theme context, AI-engine/storage/OneDrive στα Settings, statements PDF-import (upload endpoint), extra reports charts (charting lib), remote push (EAS + APNs), Tasks Kanban board, lucide icon set.
+
 ## 2026-07-09 (ui-auditor, 48η σάρωση mobile UI consistency)
 
 Read-only live grep audit (όχι docs read-back). mobile `npx tsc --noEmit` → EXIT 0. Working tree: `ReceiptsScreen.tsx` uncommitted-modified (WIP) → τα 3 cellInput raw `<TextInput>` μένουν WIP-blocked.

@@ -153,6 +153,20 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 
 > **Re-audit 2026-07-02 (mobile-parity-auditor, 38η σάρωση):** inventory ξαναχτισμένο από τον κώδικα (όχι docs). **50 v1 routes** (login + 49 bearer, `find api/v1 -name route.ts`), **16 mobile screens**, mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** route → **μηδέν endpoint-level gap** (και τα νέα `expenses/[id]/rescan` + `statements/plans` δεμένα). Mobile `npx tsc --noEmit` → **EXIT 0**. Επιβεβαίωσα στον κώδικα ότι τα 2 GAP της προηγ. σάρωσης έκλεισαν: bill image (`fileSource(editing.file)` στο MoneyScreen) + Expenses/Income re-scan (`rescanExpense` + rescanBar) → **DONE**. **ΝΕΟ εύρημα (2 auto-buildable GAP, τοποθετημένα στην κορυφή):** (α) **Expense anomaly badges** — το web υπολογίζει `anomaly` (±% απόκλιση από το vendor median, `page.tsx:25-46`, pure stats μηδέν AI) και δείχνει `AnomalyBadge`, αλλά ο v1 serializer (`serialize.ts`) ΔΕΝ εκθέτει το πεδίο → το mobile δεν μπορεί να το δείξει· port = additive `anomaly?` στο list route (ήδη import-άρει `vendorKey`) + badge στο MoneyScreen. (β) **Expense vendor autocomplete** — το web add-form έχει vendor autocomplete· το mobile MoneyScreen add-form είναι plain `Input` (line 147), μηδέν suggestions· auto-buildable client-side (derive distinct vendors από την ήδη-φορτωμένη λίστα, μηδέν endpoint). Τα εναπομείναντα παλιά TODO (lucide icons, language switcher) μένουν attended-preferred → κάτω από τα 2 νέα un-attended.
 
+### Receipts — quick-verify rapid queue στο mobile
+- Priority: P1 | Size: M
+- Web ref: rapid review queue (file: apps/web/src/app/receipts/QuickVerify.tsx· κουμπί «⚡ Quick verify (N)» στο ReceiptsClient header, N = parsed-but-unverified)
+- API: GET /api/v1/receipts?limit=… (exists: yes· λίστα με `verified`/`archived`/`total`/`itemCount`/`store`/`date`/`thumb`) + PATCH /api/v1/receipts/[id] (exists: yes· partial `$set`, δέχεται `{store,date,total,verified,archived}` χωρίς να αγγίζει lineItems) — **κανένα νέο endpoint**
+- Mobile files: apps/mobile/src/screens/ReceiptsScreen.tsx (νέο quick-verify modal/queue + «⚡ Quick verify (N)» κουμπί στο header)· καμία αλλαγή σε api.ts (τα `getReceipts` + `updateReceipt` αρκούν)
+- Acceptance:
+  - Header κουμπί «⚡ Quick verify (N)» όπου N = πλήθος parsed-but-unverified (`!verified && !archived && (total>0 || itemCount>0)`)· κρυφό όταν N=0
+  - Focused queue που περνά μία απόδειξη τη φορά: thumbnail/preview + editable store (text ή picker) + date + total inline
+  - Actions: **Verify & next** → `updateReceipt(id,{store,date,total,verified:true})` + προχωρά· **Skip** → επόμενη χωρίς αλλαγή· **Not a receipt** → `updateReceipt(id,{archived:true})` + προχωρά· **Edit fully** → ανοίγει το υπάρχον detail modal
+  - Progress indicator «i / N · done» + κλείσιμο όταν τελειώσει η ουρά· η λίστα κάνει refresh (`load()`) στο τέλος
+  - Το queue snapshot-άρεται στο άνοιγμα (δεν reshuffle-άρει καθώς verify-άρεις)
+  - mobile `npx tsc --noEmit` EXIT 0· structural verify μόνο (δεν καλεί AI, μηδέν κόστος)
+- Status: TODO
+
 ### Expenses/Income — anomaly badge (±% vs vendor median) στο mobile — ✅ DONE 2026-07-02
 - Priority: P2 | Size: S | no AI (pure stats), no decision, no dep, no native dep
 - **DONE (pharos-daily-dev 2026-07-02):** νέα exported pure `computeAnomalies(docs)` στο `serialize.ts` (byte-mirror του web `page.tsx:28-46` median-deviation· returns array aligned στα docs)· `trimExpense` πήρε optional 2ο param `anomaly?` (μπαίνει στο output μόνο όταν defined → το single-doc `rescan` το παραλείπει). Το GET list route καλεί `computeAnomalies(docs)` μετά το `.lean()` και το περνά per-index· **skip όταν `updatedSince`** (incremental sync = partial slice → wrong medians). `ExpenseLean` += `vendorKey?`. Mobile: `Expense` type += `anomaly?`, gold `⚠ ±N%` badge δίπλα στο amount στο MoneyScreen row. +4 `computeAnomalies` tests + 1 anomaly-key test (serialize.test.ts, 18/18 green). Verify: web+mobile tsc EXIT 0· safe rebuild /login 200· GET no-auth (και με `updatedSince`) 401 όχι 500.
