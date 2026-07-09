@@ -8,6 +8,7 @@ import { BackToTop } from './components/BackToTop';
 import { CopyButton } from './components/CopyButton';
 import { FaqDeepLink } from './components/FaqDeepLink';
 import { FaqCopyLink } from './components/FaqCopyLink';
+import { Pricing } from './components/Pricing';
 
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const SITE_URL = 'https://ph-aros.com';
@@ -1104,59 +1105,11 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="pricing-grid">
-            {TIERS.map((t) => (
-              <article
-                key={t.name}
-                className={`card price-card${t.highlight ? ' price-card-hl' : ''}`}
-              >
-                {t.badge && (
-                  <span className={`price-badge${t.highlight ? ' price-badge-hl' : ''}`}>
-                    {t.badge}
-                  </span>
-                )}
-                <h3 style={{ fontSize: '1.15rem', marginBottom: 6 }}>{t.name}</h3>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6 }}>
-                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 800 }}>
-                    {t.price}
-                  </span>
-                  {t.cadence && (
-                    <span style={{ color: 'var(--text-faint)', fontSize: '0.85rem' }}>{t.cadence}</span>
-                  )}
-                </div>
-                <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', minHeight: 44, marginBottom: 18 }}>
-                  {t.tagline}
-                </p>
-
-                <a
-                  href={t.ctaHref}
-                  target={t.ctaHref.startsWith('http') ? '_blank' : undefined}
-                  rel={t.ctaHref.startsWith('http') ? 'noopener noreferrer' : undefined}
-                  className={`btn ${t.highlight ? 'btn-primary' : 'btn-ghost'}`}
-                  style={{ width: '100%', marginBottom: 22 }}
-                >
-                  {t.cta}
-                  {!REPO_PUBLIC && t.ctaHref === GITHUB_URL && (
-                    <span className="soon-badge">soon</span>
-                  )}
-                </a>
-
-                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {t.features.map((feat) => (
-                    <li key={feat} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: '0.9rem' }}>
-                      <span style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 2 }}>
-                        <Icon name="check" size={16} />
-                      </span>
-                      <span style={{ color: 'var(--text-dim)' }}>{feat}</span>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
+          <Pricing tiers={TIERS} repoPublic={REPO_PUBLIC} githubUrl={GITHUB_URL} />
 
           <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 36 }}>
-            Prices in EUR, billed monthly, cancel anytime. Self-hosting stays free forever under AGPL-3.0.
+            Prices in EUR, cancel anytime. Annual plans bill once a year (2 months free).
+            Self-hosting stays free forever under AGPL-3.0.
           </p>
         </div>
       </section>

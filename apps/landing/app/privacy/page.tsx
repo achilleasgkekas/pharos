@@ -5,6 +5,12 @@ const SITE_URL = 'https://ph-aros.com';
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const CONTACT = 'hello@ph-aros.com';
 
+// Placeholders to confirm before the hosted service launches. The operating
+// legal entity is the GDPR data controller for hosted users; the payment
+// processor handles card data. Both are shown as drafts until finalised.
+const ENTITY = '[Operating entity, to confirm]';
+const PROCESSOR = 'Stripe';
+
 // This is a plain-language draft, not final legal counsel output. It is kept
 // out of search indexes until Achilleas has it reviewed (see PROGRESS note).
 export const metadata: Metadata = {
@@ -92,6 +98,8 @@ export default function PrivacyPolicy() {
           <strong style={{ color: 'var(--gold)' }}>Draft in review.</strong>{' '}
           This is a plain-language draft for transparency. The final policy will be
           reviewed before the hosted service launches. It is not yet legal advice.
+          The operating legal entity and payment processor named below are
+          placeholders pending confirmation.
         </div>
 
         {/* ── Sections ─────────────────────────────────────── */}
@@ -150,8 +158,8 @@ export default function PrivacyPolicy() {
             </li>
             <li style={{ marginBottom: 8 }}>
               <strong style={{ color: 'var(--text)' }}>Payment data:</strong> handled by
-              Stripe, our payment processor. Card details go directly to Stripe; we never
-              see or store full card numbers.
+              {' '}{PROCESSOR}, our payment processor. Card details go directly to the
+              processor; we never see or store full card numbers.
             </li>
           </ul>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: '18px 0 8px', color: 'var(--text)' }}>
@@ -173,15 +181,15 @@ export default function PrivacyPolicy() {
           </p>
           <ul style={{ margin: '14px 0 0', paddingLeft: 20 }}>
             <li style={{ marginBottom: 8 }}>
-              <strong style={{ color: 'var(--text)' }}>Stripe</strong> — payments and
+              <strong style={{ color: 'var(--text)' }}>{PROCESSOR}</strong>, payments and
               subscription billing.
             </li>
             <li style={{ marginBottom: 8 }}>
-              <strong style={{ color: 'var(--text)' }}>Resend</strong> — transactional
+              <strong style={{ color: 'var(--text)' }}>Resend</strong>, transactional
               email (verification, password reset, team invites).
             </li>
             <li style={{ marginBottom: 8 }}>
-              <strong style={{ color: 'var(--text)' }}>Anthropic</strong> — AI parsing of
+              <strong style={{ color: 'var(--text)' }}>Anthropic</strong>, AI parsing of
               the documents you scan, unless you bring your own key.
             </li>
             <li style={{ marginBottom: 8 }}>
@@ -206,10 +214,10 @@ export default function PrivacyPolicy() {
 
         <Section id="rights" title="4. Your rights">
           <p>
-            PHAROS is built in the EU (Greece), and we honour the GDPR for hosted
-            users. You can request access to your data, correction, export, or deletion,
-            and you can object to processing or withdraw consent. To exercise any of
-            these, email{' '}
+            The hosted service is operated by {ENTITY}, the data controller, based in
+            the EU (Greece), and we honour the GDPR for hosted users. You can request
+            access to your data, correction, export, or deletion, and you can object to
+            processing or withdraw consent. To exercise any of these, email{' '}
             <a href={`mailto:${CONTACT}`} className="inline-link">{CONTACT}</a>. If you
             self-host, these controls are already in your hands, the data never leaves
             your systems.

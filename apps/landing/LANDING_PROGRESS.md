@@ -1461,3 +1461,54 @@ Needs-Achilleas (open):
 - Contact inbox `hello@ph-aros.com` να επιβεβαιωθει πριν launch.
 - Hosted τιμες (€4/€8/€15): confirm ΠΡΙΝ launch, τωρα marked «indicative during beta» και στο llms.txt.
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-09 — (d)+(e): annual/monthly billing toggle + Terms/Privacy placeholders
+
+Interactive session, ο Αχιλλέας απαντησε στα open Needs-Achilleas: repo ΜΕΝΕΙ private (mbox ηδη out of
+reachable history, local==origin)· annual = **2 μηνες δωρεαν (~17%)**· Terms/Privacy = **γραψε τωρα με
+placeholders**. Δυο increments σε ενα run:
+
+### 1. Annual/monthly billing toggle (pricing)
+- `app/components/Pricing.tsx` (νεο, `'use client'`): segmented pill Monthly|Annual («2 months free»
+  cyan chip) + το pricing grid εγινε client island (χρειαζεται useState). Annual = monthly×10 (2 μηνες
+  δωρεαν): Solo €4->€40, Family €8->€80, Pro €15->€150· cadence «per year» + sub-line «€X.XX/mo, billed
+  annually»· Self-hosted (Free) ΔΕΝ αλλαζει. `isHosted()` guard = amount θετικο + cadence includes month.
+  Ολα τα tiers renderαρουν `.billing-sub` (blank στο free) για vertical alignment.
+- `app/page.tsx`: το inline `.pricing-grid` (~50 lines) αντικατασταθηκε με `<Pricing tiers repoPublic
+  githubUrl />` + import· footer note -> «Annual plans bill once a year (2 months free)». Το soon-badge/
+  REPO_PUBLIC logic περασε ως prop.
+- `app/globals.css`: νεα `.billing-toggle` (segmented pill, surface-2 bg) + `.billing-opt`/`-on` (accent
+  #00ff88 active, dark ink) + `.billing-save` (cyan chip) + `.billing-sub`. Χωρις em-dash στα comments.
+
+### 2. Terms + Privacy: legal-entity placeholder + fixes
+- `app/terms/page.tsx` + `app/privacy/page.tsx`: νεες consts `ENTITY='[Operating entity, to confirm]'` +
+  `PROCESSOR='Stripe'`. Draft banners αναφερουν ρητα οτι entity + processor ειναι placeholders pending
+  confirmation. Privacy §4 rights + §2: «operated by {ENTITY}, the data controller, based in EU (Greece)»
+  (GDPR controller ID, ελειπε). Terms §2 hosted + §10 governing-law: name το {ENTITY}. Terms §6 billing:
+  διορθωθηκαν stale tier names («Free, Pro, and Dedicated» -> «free self-hosted + Solo/Family/Pro») +
+  annual «two months free» (consistent με το νεο toggle) + {PROCESSOR}. Payment-data + sub-processor list
+  -> {PROCESSOR}. Οι 3 sub-processor bullets normalized απο em-dash σε comma (hard-rule).
+
+Verify:
+- `npm run type-check` -> exit 0· `npm run build` -> success, 13/13 static· `/` unchanged route set.
+- **Live preview (landing-dev :3100, δικος μου server, stopped μετα)**: DOM drive -> Monthly = Solo €4/
+  Family €8/ Pro €15 «billed monthly»· click Annual -> Solo €40 (€3.33/mo)/ Family €80 (€6.67/mo)/ Pro
+  €150 (€12.50/mo) «per year», Self-hosted μενει Free/forever. Active «Annual» btn = accent
+  rgb(0,255,136) + dark ink (σωστο brand styling). (Screenshot black λογω 26000px-tall page· DOM+inspect
+  authoritative.)
+- Prerender: `billing-toggle`+«2 months free» στο index.html· «Operating entity, to confirm» στα
+  privacy.html/terms.html. SSR default = monthly (useState false) -> zero regression χωρις JS.
+- em-dash: 0 σε Pricing.tsx/page.tsx/terms/privacy/νεο CSS. (Pre-existing globals.css comment-header
+  em-dashes ΔΕΝ τα αγγιξα.)
+- Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call. Repo ΠΑΡΑΜΕΝΕΙ private (per χρηστη).
+
+Επομενο increment: (e) polish — real app screenshots οταν υπαρξουν assets· ισως BreadcrumbList JSON-LD
+στα /privacy /terms· annual Offers στο JSON-LD (τωρα μονο monthly).
+
+Needs-Achilleas (open):
+- **Legal entity name** (`[Operating entity, to confirm]`) + **payment processor** (τωρα Stripe): confirm
+  ΠΡΙΝ hosted launch -> fill τις consts στα terms/privacy.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip `robots:{index:false}` -> indexable + sitemap.
+- Contact inbox `hello@ph-aros.com` να επιβεβαιωθει.
+- Hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: ο χρηστης το κρατα private προς το παρον (mbox ηδη out of reachable history).

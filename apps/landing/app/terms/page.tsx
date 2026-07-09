@@ -4,6 +4,11 @@ import { PharosMark } from '../components/PharosMark';
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const CONTACT = 'hello@ph-aros.com';
 
+// Placeholders to confirm before the hosted service launches. The operating
+// entity is the party to these terms; the processor handles card payments.
+const ENTITY = '[Operating entity, to confirm]';
+const PROCESSOR = 'Stripe';
+
 // Plain-language draft, not final legal counsel output. Kept out of search
 // indexes until Achilleas has it reviewed (same pattern as /privacy).
 export const metadata: Metadata = {
@@ -91,6 +96,8 @@ export default function TermsOfService() {
           <strong style={{ color: 'var(--gold)' }}>Draft in review.</strong>{' '}
           This is a plain-language draft for transparency. The final terms will be
           reviewed before the hosted service launches. It is not yet legal advice.
+          The operating entity and payment processor named below are placeholders
+          pending confirmation.
         </div>
 
         {/* ── Sections ─────────────────────────────────────── */}
@@ -111,7 +118,7 @@ export default function TermsOfService() {
 
         <Section id="hosted" title="2. Hosted PHAROS (the SaaS)">
           <p>
-            The hosted service is the optional managed version we run for you. By
+            The hosted service is the optional managed version operated by {ENTITY}. By
             creating an account or joining the waitlist you agree to these terms. You
             must be able to form a binding contract and use the service in line with
             applicable law.
@@ -158,12 +165,13 @@ export default function TermsOfService() {
 
         <Section id="billing" title="6. Plans and billing">
           <p>
-            Paid hosted plans are billed in advance through Stripe, our third-party
-            payment processor. Current plans are Free, Pro, and Dedicated; the exact
-            fees, billing cycle, and any trial terms are shown at checkout before you
-            are charged. Annual billing is offered at a discount to paying monthly. You
-            can cancel to stop future renewals; unless stated otherwise, cancellation
-            takes effect at the end of the current billing period and is not prorated.
+            Paid hosted plans are billed in advance through {PROCESSOR}, our third-party
+            payment processor. Plans are the free self-hosted edition and the Solo,
+            Family, and Pro hosted tiers; the exact fees, billing cycle, and any trial
+            terms are shown at checkout before you are charged. Annual billing is offered
+            at a discount to paying monthly (two months free). You can cancel to stop
+            future renewals; unless stated otherwise, cancellation takes effect at the
+            end of the current billing period and is not prorated.
           </p>
         </Section>
 
@@ -198,8 +206,9 @@ export default function TermsOfService() {
 
         <Section id="law" title="10. Governing law">
           <p>
-            These terms are governed by the laws of Greece, where PHAROS is built,
-            without prejudice to mandatory protections in your country of residence.
+            These terms are governed by the laws of Greece, where {ENTITY} operates the
+            service, without prejudice to mandatory protections in your country of
+            residence.
           </p>
         </Section>
 
