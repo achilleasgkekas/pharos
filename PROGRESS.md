@@ -3,7 +3,14 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 5c2abf3 -->
-<!-- docker-validated: 51d43ba -->
+<!-- docker-validated: 6135bd8 -->
+
+## 2026-07-09 (docker-health — safe rebuild ×2, stack healthy, running image = HEAD web runtime)
+- **Health (read-only):** mongo `healthy`, web `running` (OOM false). Web RestartCount `0`, mongo RestartCount `0`. flaresolverr `Exited (143) 9 days ago` (δεν έτρεχε· μηδέν memory pressure, τίποτα να σταματήσω). ΣΗΜ: το `docker inspect --format '{{.State.RestartCount}}'` έβγαζε template error στο τρέχον OrbStack/Docker (το key λείπει από το State map του format)· η τιμή διαβάστηκε αξιόπιστα με `docker inspect ... | grep -i restartcount` → `0` και στα δύο. Παράλληλα τρέχει και το bakecore stack (7 containers Up 2 days), αλλά το homepage stack είναι σταθερό.
+- **Disk:** Images 4.41GB, Volumes 887MB, Build Cache 1.07GB (0B reclaimable πριν το build → pre-prune παραλείφθηκε ως no-op). Ο mandatory post-build `docker builder prune -f` ανέκτησε **2.127GB** (build 1) + **2.128GB** (build 2) νέου build cache (SAFE, μόνο cache).
+- **Rebuild (step 4/5) — έγιναν 2 λόγω concurrent commits:** ο marker ήταν `51d43ba`· `git diff 51d43ba..HEAD -- apps/web` άγγιξε web runtime (SaaS routes usage/billing/auth-session/trials-sweep + workspace erasure/export, `lib/tenancy/*`, `lib/aiConfig`/`notifiers`/`onedrive`/`prompts`/`storageConfig`, `search-actions.ts`, `models/Tenant.ts`) → warranted. **Build 1** στο `b01f579`: `docker compose build web` → Built exit 0 → `up -d web` → `/login` **200**, RestartCount 0. Ενώ έτρεχε, άλλα routines (reviewer/pharos-daily-dev/parity/landing) έκαναν commit+push → HEAD προχώρησε σε `18e849a`→…→`6135bd8`. Ο runtime delta `b01f579..HEAD` περιείχε ΕΝΑ πραγματικό runtime αρχείο ακόμη: `lib/ssrf.ts` (security fix 5c2abf3, SSRF IPv4-mapped-IPv6 bypass στο `assertPublicUrl`)· τα άλλα 2 (`ssrf.test.ts`, `statements/[id]/route.test.ts`) είναι tests. **Build 2** για να μπει το ssrf.ts fix στο running image: `docker compose build web` (working tree = committed ssrf.ts, ΟΧΙ modified) → Built exit 0 → mongo healthy → `up -d web` → `/login` **200**, RestartCount 0, OOM false. Επιβεβαίωση: `git diff b01f579..HEAD -- apps/web/src` = μόνο ssrf.ts + 2 tests → το running image ταιριάζει με το web runtime του HEAD `6135bd8`.
+- **Git hygiene:** stage ΜΟΝΟ `PROGRESS.md` (explicit path, ΟΧΙ `-A`). Working tree είχε WIP άλλων routines (MOBILE_PARITY.md, PRODUCT_BACKLOG.md, WEB_DEBT.md, apps/mobile ReceiptsScreen.tsx, untracked OWNER_DECISIONS.md) → **δεν αγγίχτηκαν**.
+- **Marker:** docker-validated `51d43ba` → **`6135bd8`** (HEAD κατά το build 2· ssrf.ts included). Καμία εκκρεμότητα για τον Αχιλλέα από αυτό το run.
 
 ## 2026-07-09 (parity-auditor, 47η σάρωση — ΝΕΟ functional GAP: Receipts quick-verify)
 
