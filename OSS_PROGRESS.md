@@ -1310,3 +1310,28 @@ Mock pattern: ίδιο DB-seam pattern με το receipts/[id]/route.test.ts, α
 **ΣΗΜ owner decisions (OWNER_DECISIONS.md, 2026-07-07)**: ο Achilleas ενέκρινε το SSRF IPv4-mapped fix (decision #3), αλλά το ανέθεσε ρητά στο **builder** routine (μηχανικό fix στο `lib/ssrf.ts`, εκτός test-territory μου). Το test-flip των «KNOWN GAP» cases στο `ssrf.test.ts` (από `.resolves.toBeUndefined()` σε `.rejects.toThrow('Private address not allowed')`) πρέπει να γίνει ΜΟΝΟ ΑΦΟΥ landάρει το ssrf.ts fix — το suite είναι ακόμα green (1618 passing), άρα το fix ΔΕΝ έχει landάρει ακόμα, οπότε αφήνω τα tests ως έχουν. Μόλις ο builder διορθώσει το ssrf.ts, ένα επόμενο run αυτής της routine flip-άρει τα 2 tests.
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Υψηλής αξίας untested collection routes: `lists/route.ts`, `notifications/route.ts`, `history/route.ts`, `calendar/route.ts`, `overview/route.ts`, `reports/route.ts`, `search/route.ts`. Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. **Δευτερεύον (μόλις landάρει το builder ssrf.ts fix)**: flip τα «KNOWN GAP» tests στο `ssrf.test.ts` σε `.rejects.toThrow('Private address not allowed')`.
+
+---
+
+## 2026-07-09 (cont.⁹ — lists/route.test.ts, GET/PATCH collection route, { lists } wrapper + key-required guard)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/lists/route.test.ts` για το GET/PATCH του `/api/v1/lists`.**
+
+Δευτερεύον check πρώτα: ο builder ΕΧΕΙ ήδη landάρει το SSRF IPv4-mapped fix (`lib/ssrf.ts` `ip6IsPrivate` γραμμές 57-61 αποσυμπιέζουν τα low-32-bits του `::ffff:*` σε dotted και τρέχουν `ip4IsPrivate`), ΚΑΙ το `ssrf.test.ts` έχει ήδη flip-αριστεί (γραμμές 121-127: όλα τα IPv4-mapped loopback/private/metadata cases, dotted + hex-compressed, τώρα `.rejects.toThrow('Private address not allowed')`, με `[::ffff:808:808]` = 8.8.8.8 να μένει public). Το suite είναι green (1671), άρα και τα δύο συμφωνούν. Το "## Needs Achilleas" SSRF item είναι πλέον **CLOSED** (fix + tests landed). Δεν χρειάστηκε καμία ενέργεια από εμένα σε αυτό.
+
+Επιλογή target: ακολούθησα ρητά το suggested next task (`lists/route.ts` ήταν πρώτο στη λίστα untested collection routes). Route-only logic που ζει αποκλειστικά εδώ και τροφοδοτεί τον mobile taxonomy editor (item/expense/subscription category lists):
+- **Auth gate**: withAuth → 401 χωρίς token (καμία action call, ούτε GET ούτε PATCH).
+- **GET**: `{ lists }` wrapper (ΟΧΙ το standard list envelope — μηδέν data/total), mapped απευθείας από το `getListsForEditor()`.
+- **PATCH**: το `key` απαιτείται (`typeof==='string' && non-empty` → αλλιώς **400 'key required' ΠΡΙΝ από κάθε saveList call**· non-string/empty/missing → reject). Τα `values` περνούν από `Array.isArray(b.values) ? b.values.map(String) : []` (non-array Ή missing → `[]` που clear-άρει το override· non-string entries → String-coerced). `saveList {ok:false}` (unknown taxonomy key) → **400 'unknown list key'**· success → `{ ok:true }` στο 200.
+
+Mock pattern: action-seam (όπως το shopping-list/route.test.ts) — το route delegate σε getListsForEditor/saveList, οπότε mock το `@/app/settings/actions` (lists array + saveResult flag) + auth seam (`@/lib/db` connectDB + `@/models/User` bearerUser chain). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody helpers (withAuth + readBody + apiError).
+
+Τι έγινε: Νέο `route.test.ts` (12 tests). **auth gate** (2: GET no-token→401 + no getListsForEditor, PATCH unknown-token→401 + no saveList). **GET listing** (2: `{lists}` wrapper [όχι data/total] straight off getListsForEditor· empty → `{lists:[]}`). **PATCH validation** (4: missing key→400 'key required' + no save· empty-string key→ίδιο· non-string key 123→ίδιο· saveList `{ok:false}`→400 'unknown list key' [με τα σωστά args στο saveList]). **PATCH save** (4: key + String-coerced values → saveList + 200 `{ok:true}`· non-string entries [5/true/null] → '5'/'true'/'null'· non-array values → `[]`· missing values → `[]` + saveList κληθηκε).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/lists/route.test.ts` → 12/12 passed.
+- `npx vitest run` (όλο το suite) → 124 files, 1671/1671 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `apps/mobile/src/screens/ReceiptsScreen.tsx` (M — pre-existing WIP άλλου routine, ΔΕΝ το άγγιξα/staged) + το δικό μου lists/route.test.ts (??). Στάγιαρα μόνο τα δικά μου paths (route.test.ts + OSS_PROGRESS.md).
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Υψηλής αξίας untested collection routes ακόμα: `notifications/route.ts` (GET/PATCH, isObjectId guard + mark-one-vs-mark-all branch), `history/route.ts`, `calendar/route.ts`, `overview/route.ts`, `reports/route.ts`, `search/route.ts`. Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι πλέον CLOSED.
