@@ -2,7 +2,7 @@
 import { cur } from '@/lib/money';
 import { useState, useTransition, useRef, useMemo } from 'react';
 import {
-  Upload, Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, Repeat, Wallet, Search, Plus, X, Camera, Sparkles,
+  Upload, Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Repeat, Wallet, Search, Plus, X, Camera, Sparkles,
   LayoutGrid, List as ListIcon, SlidersHorizontal,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
@@ -17,6 +17,7 @@ import { shrinkImage } from '@/lib/clientImage';
 import { useRouter } from 'next/navigation';
 import type { SerializedExpense, SerializedCard } from '@/types';
 import { uploadExpense, updateExpense, addExpense, deleteExpense, rescanExpense } from './actions';
+import { CsvImportModal } from './CsvImportModal';
 import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
@@ -51,6 +52,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
 
   const [selected, setSelected] = useState<SerializedExpense | null>(null);
   const [creating, setCreating] = useState(false);
+  const [importingCsv, setImportingCsv] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -181,6 +183,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
           </h1>
           <div className="flex items-center gap-4 text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
             <button onClick={() => setCreating(true)} className="flex items-center gap-1 text-[color:var(--color-accent)] hover:opacity-80"><Plus size={13} /> {t('common.add')}</button>
+            <button onClick={() => setImportingCsv(true)} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)]" title={t('csv.title')}><FileSpreadsheet size={13} /> {t('csv.button')}</button>
             <div className="flex bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg p-0.5">
               {([['grid', <LayoutGrid key="g" size={14} />], ['list', <ListIcon key="l" size={14} />]] as const).map(([v, icon]) => (
                 <button key={v} onClick={() => setLayout(v)} className={cn('px-2 py-1 rounded-md transition-colors', layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}>{icon}</button>
@@ -265,6 +268,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
         <ExpenseDetail expense={selected} cards={cards} vendors={vendors} categories={categories} seriesCount={selected.vendorKey ? seriesCount[selected.vendorKey] || 1 : 1} onClose={() => setSelected(null)} onChanged={() => router.refresh()} confirm={confirm} />
       )}
       {creating && <ExpenseCreate kind={kind} cards={cards} vendors={vendors} categories={categories} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); router.refresh(); }} />}
+      {importingCsv && <CsvImportModal kind={kind} onClose={() => setImportingCsv(false)} onImported={() => router.refresh()} />}
     </main>
   );
 }

@@ -17,6 +17,7 @@ import { z } from 'zod';
 import type { SerializedExpense } from '@/types';
 import type { ParsedExpense } from '@/lib/ollama';
 import { vendorKey, serializeExpense } from './lib';
+import { csvDedupeKey } from '@/lib/csvImport';
 
 type Kind = 'income' | 'expense';
 function asKind(v: unknown): Kind {
@@ -359,6 +360,107 @@ export async function deleteExpense(id: string): Promise<{ ok: boolean }> {
   } catch {
     return { ok: false };
   }
+  });
+}
+
+// ── Bank / generic CSV import (PA1) ─────────────────────────────────────────
+// The client parses + column-maps the file (lib/csvImport) and sends clean rows;
+// the server re-validates, dedupes against existing records AND within the batch,
+// inherits category/recurring from each vendor's existing series, and inserts.
+// Deterministic — zero AI calls. AI batch-categorise stays a separate opt-in step.
+
+const CsvRowSchema = z.object({
+  vendor: z.string().min(1).max(200),
+  amount: z.number().finite(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  category: z.string().max(60).default(''),
+  notes: z.string().max(500).default(''),
+});
+
+const MAX_CSV_ROWS_PER_CALL = 500;
+
+export type CsvImportResult =
+  | { ok: true; imported: number; skippedDupes: number }
+  | { ok: false; error: string };
+
+/**
+ * Import mapped CSV rows as expenses/income.
+ * `signSplit`: negative amounts → expense, positive → income (typical bank export);
+ * otherwise every row gets `kind` and the sign is dropped (amounts stored positive).
+ */
+export async function importExpensesCsv(
+  rows: Array<z.input<typeof CsvRowSchema>>,
+  opts: { kind: Kind; signSplit: boolean }
+): Promise<CsvImportResult> {
+  if (!Array.isArray(rows) || rows.length === 0) return { ok: false, error: 'No rows to import' };
+  if (rows.length > MAX_CSV_ROWS_PER_CALL) return { ok: false, error: `Too many rows (max ${MAX_CSV_ROWS_PER_CALL} per batch)` };
+  const parsed = z.array(CsvRowSchema).safeParse(rows);
+  if (!parsed.success) return { ok: false, error: 'Invalid rows' };
+  const kind = asKind(opts.kind);
+
+  return withRequestTenant(async () => {
+    try {
+      await connectDB();
+      const Expense = await currentModel(ExpenseModel);
+
+      const prepared = parsed.data.map((r) => {
+        const rowKind: Kind = opts.signSplit ? (r.amount < 0 ? 'expense' : 'income') : kind;
+        const vKey = vendorKey(r.vendor);
+        return { ...r, kind: rowKind, vKey, amount: Math.abs(r.amount), key: csvDedupeKey(rowKind, vKey, r.date, r.amount) };
+      });
+
+      // Existing-record dedupe: one bounded query over the batch's date range.
+      const dates = prepared.map((r) => new Date(`${r.date}T00:00:00Z`));
+      const min = new Date(Math.min(...dates.map((d) => d.getTime())));
+      const max = new Date(Math.max(...dates.map((d) => d.getTime())));
+      max.setUTCDate(max.getUTCDate() + 1);
+      const existing = await Expense.find({ date: { $gte: min, $lt: max } })
+        .select('kind vendorKey date amount')
+        .lean();
+      const seen = new Set(
+        existing.map((e) =>
+          csvDedupeKey(e.kind === 'income' ? 'income' : 'expense', e.vendorKey || '', new Date(e.date).toISOString(), e.amount || 0)
+        )
+      );
+
+      // Series inheritance (category/recurring) per vendor — one query per unique key.
+      const inheritCache = new Map<string, Awaited<ReturnType<typeof inheritFromSeries>>>();
+      async function inherited(rowKind: Kind, vKey: string) {
+        const k = `${rowKind}|${vKey}`;
+        if (!inheritCache.has(k)) inheritCache.set(k, await inheritFromSeries(rowKind, vKey));
+        return inheritCache.get(k) ?? null;
+      }
+
+      const docs = [];
+      let skippedDupes = 0;
+      for (const r of prepared) {
+        if (seen.has(r.key)) { skippedDupes++; continue; }
+        seen.add(r.key); // intra-batch dedupe too
+        const inh = r.category ? null : await inherited(r.kind, r.vKey);
+        const date = new Date(`${r.date}T00:00:00Z`);
+        docs.push({
+          kind: r.kind,
+          vendor: r.vendor,
+          vendorKey: r.vKey,
+          category: r.category || inh?.category || 'other',
+          amount: r.amount,
+          date,
+          period: periodFrom(date),
+          recurring: inh?.recurring ?? false,
+          recurringCycle: (inh?.recurringCycle || '') as '' | 'monthly' | 'quarterly' | 'yearly' | 'weekly',
+          notes: r.notes,
+          aiModel: 'csv-import',
+          verified: true, // deterministic bank data, not an AI guess — no review queue
+        });
+      }
+
+      if (docs.length) await Expense.insertMany(docs);
+      revalidatePath('/expenses');
+      revalidatePath('/income');
+      return { ok: true, imported: docs.length, skippedDupes };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
   });
 }
 
