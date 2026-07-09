@@ -6,9 +6,10 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-05 (5η σάρωση planner· +4 candidates P18-P21). Κανένα από τα
-> P1-P17 δεν χτίστηκε ακόμα (τα commits έως 2026-07-05 ήταν αποκλειστικά SaaS/billing/trial-lapse/
-> landing/mobile-parity/docs/API/tests από τις builder routines, μηδέν νέο product feature) → όλα ισχύουν.
+> Τελευταία ενημέρωση: 2026-07-09 (6η σάρωση planner· +5 candidates P22-P26). Τα **P2/P4/P10**
+> εγκρίθηκαν (2026-07-07) → μετακινήθηκαν στο «Approved» (PA1/PA2/PA3). Τα υπόλοιπα P1, P3, P5-P21
+> παραμένουν Proposed· κανένα δεν χτίστηκε ακόμα (τα commits ήταν SaaS/billing/landing/mobile-parity/
+> docs/API/tests, μηδέν νέο product feature από την ουρά αυτή) → όλα ισχύουν.
 
 ---
 
@@ -21,6 +22,58 @@ Ranked by value/effort (πρώτο = καλύτερη σχέση αξίας πρ
 > **ΜΕΤΑΚΙΝΗΘΗΚΑΝ στο `## Approved` (2026-07-07, Αχιλλέας):** **P2** (bank/CSV import), **P4**
 > (net-worth time-series), **P10** (return-window/warranty tracker) → PA1/PA2/PA3. Παραμένουν
 > εδώ οι περιγραφές τους ως αναφορά· ο planner ΔΕΝ τα ξαναπροτείνει, ο builder τα χτίζει από Approved.
+
+### P22. Full-text search πάνω σε receipt line-items & parsed text — S/M — both (πολύ ψηλό value/effort)
+- **Αξία:** το global search (`searchAll`) ψάχνει σήμερα δομημένα πεδία (store/vendor/notes/τίτλους),
+  αλλά ΟΧΙ το περιεχόμενο των αποδείξεων — τα ονόματα των line items ή το raw parsed κείμενο. Ο χρήστης
+  δεν μπορεί να βρει «ποια απόδειξη είχε το HDMI καλώδιο / το serial number X». Επέκταση του search index
+  ώστε να καλύπτει line-item names (+ optionally raw AI text) κλείνει το πιο συχνό «πού το αγόρασα αυτό;».
+  Reuse σχεδόν όλο το υπάρχον search machinery· μόνο επέκταση projection + matcher (+ ίσως Mongo text index
+  για performance σε μεγάλα datasets).
+- **Module:** Search (+ Receipts data shape).
+- **Απόφαση που χρειάζεται:** substring match (απλό, δωρεάν) ή Mongo `$text` index (ταχύτερο, θέλει index
+  migration); να μπει και το raw AI-parsed text ή μόνο τα καθαρά line-item names (privacy/noise trade-off);
+
+### P23. Mobile share-sheet quick capture (share-to-Pharos) — M — both (mobile-native, ψηλό value/effort)
+- **Αξία:** το πιο φυσικό mobile-native capture: από ΟΠΟΙΑΔΗΠΟΤΕ app (Photos, Files, browser, email PDF)
+  → «Share → Pharos» → η φωτο/PDF μπαίνει κατευθείαν στο υπάρχον receipt/expense AI pipeline. Μηδενίζει
+  την τριβή («άνοιξε app → camera → …») που είναι ο #1 λόγος εγκατάλειψης των receipt apps. **Διακριτό**
+  από το P5 (browser extension, desktop) και το P17 (barcode scan) — εδώ είναι OS-level share target
+  (iOS Share Extension / Android intent filter). Companion του mobile MVP (§6), όχι blocker.
+- **Module:** Mobile (share extension/intent) + Receipts/Expenses (reuse upload+parse μέσω `/api/v1`).
+- **Απόφαση που χρειάζεται:** το shared αρχείο πάει πάντα σε «receipts» ή picker (receipt/expense/item);
+  εξαρτάται από το mobile MVP (§6) + `/api/v1` upload endpoint — companion, μετά το MVP;
+
+### P24. Outbound event webhooks / automation hooks (Home Assistant / n8n) — M — both (OSS self-host lever)
+- **Αξία:** το §3 notifier framework στέλνει *alert μηνύματα* (ntfy/Discord/…). Λείπει το generic
+  **event webhook**: «όταν συμβεί X (νέα απόδειξη parsed, budget ξεπεράστηκε, δόση λήγει, τιμή έπεσε) →
+  POST structured JSON σε ένα URL». Ξεκλειδώνει automation για το self-host/homelab κοινό (Home Assistant,
+  n8n, Node-RED) που είναι ακριβώς το target audience του OSS track. **Διακριτό** από τους notifiers
+  (= human-readable ειδοποιήσεις) — εδώ machine-readable events για integration. Reuse των event trigger
+  points που ήδη υπάρχουν (`runAlertChecks`/verify/import hooks).
+- **Module:** Settings → Integrations (νέο «Webhooks») + event dispatch points.
+- **Απόφαση που χρειάζεται:** ποια events στην πρώτη έκδοση (πρόταση: receipt.parsed, budget.exceeded,
+  installment.due, price.drop); HMAC signature για verification; στο SaaS metered/rate-limited ή free;
+
+### P25. Budget rollover / envelope mode (μεταφορά αδιάθετου υπολοίπου) — S/M — both
+- **Αξία:** τα budgets είναι σήμερα σκληρά μηνιαία όρια ανά κατηγορία — ό,τι δεν ξοδεύτηκε «χάνεται».
+  Ένα optional **rollover** (envelope method, δημοφιλές από YNAB): το αδιάθετο υπόλοιπο του μήνα προστίθεται
+  στο budget του επόμενου (ή το overspend μειώνει τον επόμενο). Δίνει πιο ρεαλιστική εικόνα για ανομοιόμορφα
+  έξοδα (π.χ. δίμηνοι λογαριασμοί ΟΤΕ/ΔΕΗ). Reuse του υπάρχοντος budgets + reports aggregation· κυρίως
+  λογική carry-forward + ένα flag ανά κατηγορία.
+- **Module:** Budgets (Settings) + Reports «Budget · this month».
+- **Απόφαση που χρειάζεται:** rollover per-category opt-in ή global toggle; να μεταφέρεται και το overspend
+  (negative rollover) ή μόνο θετικά υπόλοιπα;
+
+### P26. In-app onboarding checklist / getting-started guide — S — OSS (adoption lever)
+- **Αξία:** μετά το πρώτο login ένας self-hoster δεν ξέρει από πού να αρχίσει. Ένα dismissable
+  «getting started» card (connect storage backend, add first receipt, set a budget, add payment card,
+  enable notifications) με progress ticks καθοδηγεί στο activation και δείχνει το εύρος του app. **Διακριτό**
+  από το P1 (demo data = γεμίζει με δείγματα) — εδώ καθοδηγεί τον χρήστη να βάλει *τα δικά του* δεδομένα.
+  Χαμηλός κόπος (static checklist + derived «done?» flags από existing state), μεγάλο activation win για OSS.
+- **Module:** Homepage / Dashboard (νέο dismissable card) + Settings state reads.
+- **Απόφαση που χρειάζεται:** πόσα βήματα (πρόταση: 5)· να εξαφανίζεται μόνιμα όταν ολοκληρωθούν όλα ή να
+  μένει collapsible· να δείχνεται και σε SaaS onboarding ή μόνο self-host;
 
 ### P1. Demo / sample-data mode σε fresh install — S — OSS (κυρίως), both
 - **Αξία:** πρώτη εντύπωση σε νέο self-host = άδειο dashboard. Ένα «Load sample data»
