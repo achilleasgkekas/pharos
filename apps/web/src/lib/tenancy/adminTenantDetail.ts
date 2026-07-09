@@ -14,6 +14,11 @@ import { Tenant, type TenantDoc } from '@/models/Tenant';
 import { Membership, type MembershipDoc } from '@/models/Membership';
 import { Account, type AccountDoc } from '@/models/Account';
 import { summarizeTenant, type TenantSummary } from '@/lib/tenancy/adminTenants';
+import {
+  readTenantUsageForAdmin,
+  buildUsageSummary,
+  type AdminUsageSummary,
+} from '@/lib/tenancy/adminTenantUsage';
 
 /** Safe ISO serializer: valid Date/parseable → ISO string, everything else → null. */
 function iso(value: unknown): string | null {
@@ -93,28 +98,39 @@ export function tallyMembers(members: AdminMemberView[]): MemberTally {
 
 export type AdminTenantDetail = {
   format: 'pharos.admin-tenant-detail';
-  version: 1;
+  version: 2;
   generatedAt: string;
   tenant: TenantSummary;
   memberCounts: MemberTally;
   members: AdminMemberView[];
+  /**
+   * Control-plane usage rollup (AI consumption + storage footprint gauge). Sourced from the
+   * central Usage ledger only — NEVER the per-tenant data database. Empty for the default /
+   * self-hosted tenant (which writes no Usage docs).
+   */
+  usage: AdminUsageSummary;
 };
 
-/** Assemble the stable detail envelope. PURE: tally derived from the member list, never trusted. */
+/**
+ * Assemble the stable detail envelope. PURE: tally derived from the member list, never trusted.
+ * `usage` defaults to an empty summary so pure callers/tests need not thread the ledger through.
+ */
 export function buildTenantDetail(
   tenant: TenantSummary,
   members: AdminMemberView[],
-  generatedAt: Date
+  generatedAt: Date,
+  usage: AdminUsageSummary = buildUsageSummary([])
 ): AdminTenantDetail {
   const gen =
     generatedAt instanceof Date && !Number.isNaN(generatedAt.getTime()) ? generatedAt : new Date(0);
   return {
     format: 'pharos.admin-tenant-detail',
-    version: 1,
+    version: 2,
     generatedAt: gen.toISOString(),
     tenant,
     memberCounts: tallyMembers(members),
     members,
+    usage,
   };
 }
 
@@ -146,5 +162,7 @@ export async function getTenantDetailForAdmin(
   const byId = new Map(accounts.map((a) => [String(a._id), a]));
 
   const members = memberships.map((m) => summarizeMember(m, byId.get(String(m.account))));
-  return buildTenantDetail(summarizeTenant(tenant), members, generatedAt);
+  // Control-plane usage rollup (registry Usage ledger only; no per-tenant data db opened).
+  const usage = await readTenantUsageForAdmin(String(tenant._id));
+  return buildTenantDetail(summarizeTenant(tenant), members, generatedAt, usage);
 }

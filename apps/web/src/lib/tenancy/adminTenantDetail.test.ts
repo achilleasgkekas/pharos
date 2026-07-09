@@ -114,12 +114,34 @@ describe('buildTenantDetail', () => {
   it('emits a stable envelope with derived member counts', () => {
     const out = buildTenantDetail(tenant, members, gen);
     expect(out.format).toBe('pharos.admin-tenant-detail');
-    expect(out.version).toBe(1);
+    expect(out.version).toBe(2);
     expect(out.generatedAt).toBe('2026-07-07T10:00:00.000Z');
     expect(out.tenant).toBe(tenant);
     expect(out.members).toHaveLength(1);
     expect(out.memberCounts.total).toBe(1);
     expect(out.memberCounts.owners).toBe(1);
+  });
+
+  it('defaults usage to an empty summary when none is passed', () => {
+    const out = buildTenantDetail(tenant, members, gen);
+    expect(out.usage.periodCount).toBe(0);
+    expect(out.usage.periods).toEqual([]);
+    expect(out.usage.latestPeriod).toBe(null);
+    expect(out.usage.totals.aiCalls).toBe(0);
+  });
+
+  it('carries a supplied usage summary through verbatim', () => {
+    const usage = {
+      periodCount: 1,
+      totals: { aiCalls: 5, aiInputTokens: 0, aiOutputTokens: 0, aiCostMicros: 0 },
+      latestPeriod: '2026-07',
+      latestStorageBytes: 0,
+      latestStorageMeasuredAt: null,
+      periods: [],
+    };
+    const out = buildTenantDetail(tenant, members, gen, usage);
+    expect(out.usage).toBe(usage);
+    expect(out.usage.latestPeriod).toBe('2026-07');
   });
 
   it('coerces an invalid generatedAt to epoch', () => {

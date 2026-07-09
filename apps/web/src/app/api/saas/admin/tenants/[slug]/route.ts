@@ -9,8 +9,9 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/saas/admin/tenants/[slug] → superadmin single-tenant DETAIL (TODO §8 "Superadmin
  * console"). READ-ONLY control-plane view of ONE workspace: the registry summary (plan/status/
- * tier/billing-linked/BYO-key/trial+erasure timestamps) plus its member roster (role/status
- * joined to account email/name) and a role/status tally. Builds on the listing endpoint (#48).
+ * tier/billing-linked/BYO-key/trial+erasure timestamps), its member roster (role/status joined
+ * to account email/name), a role/status tally, and a usage rollup (AI consumption + storage
+ * footprint gauge) read from the central Usage ledger. Builds on the listing endpoint (#48).
  *
  * Authorization is the platform-operator gate (requireSuperadmin), NOT per-workspace authz:
  *   - SAAS_MODE off / AUTH_SECRET unset      → 404 / 500 (endpoint absent for self-hosted)
@@ -19,8 +20,8 @@ export const dynamic = 'force-dynamic';
  *   - signed-in account not in the allowlist → 403
  *   - unknown slug                           → 404
  *
- * Reads only the registry (Tenant/Membership/Account); never opens a per-tenant data database,
- * never writes, never touches a feature route or the self-hosted User/bearer path. `no-store`.
+ * Reads only the registry (Tenant/Membership/Account/Usage); never opens a per-tenant data
+ * database, never writes, never touches a feature route or self-hosted User/bearer path. `no-store`.
  */
 export async function GET(
   _req: Request,
