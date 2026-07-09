@@ -1335,3 +1335,26 @@ Mock pattern: action-seam (όπως το shopping-list/route.test.ts) — το r
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign `apps/mobile/src/screens/ReceiptsScreen.tsx` (M — pre-existing WIP άλλου routine, ΔΕΝ το άγγιξα/staged) + το δικό μου lists/route.test.ts (??). Στάγιαρα μόνο τα δικά μου paths (route.test.ts + OSS_PROGRESS.md).
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Υψηλής αξίας untested collection routes ακόμα: `notifications/route.ts` (GET/PATCH, isObjectId guard + mark-one-vs-mark-all branch), `history/route.ts`, `calendar/route.ts`, `overview/route.ts`, `reports/route.ts`, `search/route.ts`. Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι πλέον CLOSED.
+
+---
+
+## 2026-07-09 (cont.¹⁰ — notifications/route.test.ts, GET/PATCH collection route, mark-one-vs-mark-all branch + isObjectId guard)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/notifications/route.test.ts` για το GET/PATCH του `/api/v1/notifications`.**
+
+Επιλογή target: ακολούθησα ρητά το suggested next task του προηγ. entry (`notifications/route.ts` ήταν πρώτο στη λίστα untested collection routes). Route-only logic που ζει αποκλειστικά εδώ και τροφοδοτεί το mobile notification centre (live alert feed deals/installments/warranties/system + mark-read):
+- **Auth gate**: withAuth → 401 χωρίς token (καμία action call — ούτε GET feed ούτε PATCH mark).
+- **GET**: επιστρέφει `getNotifications()` **verbatim** (`{ items, unread }` — ΟΧΙ list envelope, ΟΧΙ wrapper· μηδέν data/total). Το route δεν κάνει καμία μετατροπή στο shape.
+- **PATCH branch split**: `typeof b.id==='string' && b.id` → **mark-one** μονοπάτι: `isObjectId(b.id)` guard → **400 'bad id'** σε malformed πριν από κάθε mark call, αλλιώς `markNotificationRead(id)`. Οποιοδήποτε άλλο (missing / empty-string '' / non-string number) → **mark-all** μονοπάτι: `markAllNotificationsRead()`. Και τα δύο branches **αγνοούν** το `{ ok }` result των actions και επιστρέφουν πάντα bare `{ ok:true }` στο 200 (δεν υπάρχει found→404 εδώ, σε αντίθεση με τα [id] routes).
+
+Mock pattern: action-seam (όπως το lists/route.test.ts) — το route delegate σε getNotifications/markNotificationRead/markAllNotificationsRead, οπότε mock το `@/app/notifications/actions` (feed + markedOne/markedAllCount state) + auth seam (`@/lib/db` connectDB + `@/models/User` bearerUser chain). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody helpers (withAuth + readBody + isObjectId).
+
+Τι έγινε: Νέο `route.test.ts` (9 tests). **auth gate** (2: GET no-token→401 + no getNotifications, PATCH unknown-token→401 + no mark calls). **GET feed** (2: getNotifications verbatim `{items,unread}` [όχι data/total]· empty → `{items:[],unread:0}`). **PATCH mark-one** (2: valid OID → markNotificationRead(id) + 200 `{ok}` + no markAll· malformed id → 400 'bad id' + καμία mark call). **PATCH mark-all** (3: missing id → markAll + no markOne· empty-string id → markAll [πέφτει έξω από το mark-one guard]· non-string number id → markAll).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/notifications/route.test.ts` → 9/9 passed.
+- `npx vitest run` (όλο το suite) → 126 files, 1686/1686 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = ΜΟΝΟ το δικό μου notifications/route.test.ts (??). Στάγιαρα μόνο τα δικά μου paths (route.test.ts + OSS_PROGRESS.md).
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run, ίδιο DB-mock/action-seam pattern. Υψηλής αξίας untested collection routes ακόμα: `history/route.ts`, `calendar/route.ts`, `overview/route.ts`, `reports/route.ts`, `search/route.ts`, `trash/route.ts`, `jobs/route.ts`, `vouchers` ήδη καλυμμένο. Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
