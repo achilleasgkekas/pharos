@@ -7,6 +7,7 @@ import { Expense } from '@/models/Expense';
 import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
+import { captureAndListSnapshots } from '@/lib/netWorth';
 import type { SerializedStatement } from '@/types';
 import { ReportsClient } from './ReportsClient';
 
@@ -241,7 +242,20 @@ async function getReports(monthsBack = 12) {
   }
   const subsByCategory = [...subsByCat.entries()].map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }));
 
+  // ── Net worth (PA2): assets (inventory + manual accounts) − liabilities ──
+  // Refreshes this month's snapshot on every load (idempotent, forward-only —
+  // past months freeze as they roll over) and returns the series for the trend.
+  const accountsTotal = Object.values(appSettings.assetAccounts).reduce((s, v) => s + v, 0);
+  const netWorthSeries = await captureAndListSnapshots({
+    assetsInventory: ownedValue,
+    assetsAccounts: accountsTotal,
+    accounts: appSettings.assetAccounts,
+    liabInstallments: installmentsRemaining,
+    liabCards: outstanding,
+  });
+
   return {
+    netWorth: { accountsTotal: Math.round(accountsTotal), series: netWorthSeries },
     monthlySpend,
     upcomingInstallments,
     spendByStore,

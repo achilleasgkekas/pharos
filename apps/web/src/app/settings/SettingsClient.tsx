@@ -1,12 +1,12 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star } from 'lucide-react';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, saveAssetAccounts, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { AI_FEATURES } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, SCRAPER_RECOMMEND, type FetchedModel } from '@/lib/aiModels';
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
@@ -217,6 +217,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
           {tab === 'money' && (
             <>
               <BudgetsManager settings={info.settings} />
+              <AssetAccountsManager settings={info.settings} />
               <CardsManager cards={info.cardList} />
             </>
           )}
@@ -1514,6 +1515,75 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
           {pending ? t('common.saving') : t('set.saveBudgets')}
         </button>
         <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.budgetTotal', { amount: `${cur()}${total.toLocaleString('en-GB')}` })}</span>
+        {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
+      </div>
+    </Section>
+  );
+}
+
+/** Manual asset accounts (cash, bank balances) counted into net worth (PA2).
+ *  Free-form name + balance rows — no bank integration, the user updates by hand. */
+function AssetAccountsManager({ settings }: { settings: AppSettings }) {
+  const t = useT();
+  const [pending, startTransition] = useTransition();
+  const [rows, setRows] = useState<Array<{ name: string; balance: string }>>(() => {
+    const existing = Object.entries(settings.assetAccounts).map(([name, balance]) => ({ name, balance: String(balance) }));
+    return existing.length ? existing : [{ name: '', balance: '' }];
+  });
+  const [msg, setMsg] = useState<string | null>(null);
+  const total = rows.reduce((s, r) => s + (Number(r.balance) || 0), 0);
+
+  function save() {
+    setMsg(null);
+    const out: Record<string, number> = {};
+    for (const r of rows) {
+      const n = Number(r.balance);
+      if (r.name.trim() && n > 0) out[r.name.trim()] = n;
+    }
+    startTransition(async () => {
+      await saveAssetAccounts(out);
+      setMsg(t('common.savedOk'));
+    });
+  }
+
+  return (
+    <Section title={t('set.accountsTitle')} icon={<Landmark size={15} />}>
+      <p className="text-xs text-[color:var(--color-text-dim)] mb-3">{t('set.accountsDesc')}</p>
+      <div className="space-y-2">
+        {rows.map((r, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input
+              value={r.name}
+              onChange={(e) => setRows((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+              placeholder={t('set.accountNamePlaceholder')}
+              className="flex-1 min-w-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+            />
+            <label className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
+              <span className="text-[10px] text-[color:var(--color-text-faint)]">{cur()}</span>
+              <input
+                type="number"
+                min="0"
+                inputMode="decimal"
+                value={r.balance}
+                onChange={(e) => setRows((p) => p.map((x, j) => (j === i ? { ...x, balance: e.target.value } : x)))}
+                placeholder="0"
+                className="w-24 bg-transparent text-right text-xs text-[color:var(--color-text)] focus:outline-none"
+              />
+            </label>
+            <button onClick={() => setRows((p) => p.filter((_, j) => j !== i))} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" title={t('common.delete')}>
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3 mt-3">
+        <button onClick={() => setRows((p) => [...p, { name: '', balance: '' }])} className="flex items-center gap-1 text-xs text-[color:var(--color-cyan)] hover:text-[color:var(--color-accent)]">
+          <Plus size={13} /> {t('set.addAccount')}
+        </button>
+        <button onClick={save} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
+          {pending ? t('common.saving') : t('set.saveAccounts')}
+        </button>
+        <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.accountsTotal', { amount: `${cur()}${total.toLocaleString('en-GB')}` })}</span>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
       </div>
     </Section>

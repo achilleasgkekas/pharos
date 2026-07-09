@@ -28,6 +28,7 @@ export type AppSettings = {
   itemCategories: string[];
   subscriptionCategories: string[];
   budgets: Record<string, number>; // monthly budget per expense category (€)
+  assetAccounts: Record<string, number>; // manual asset accounts for net worth (name → balance)
 };
 
 /** Raw AppConfig singleton fields relevant to app settings (all optional). */
@@ -43,6 +44,7 @@ export type RawAppConfigDoc = {
   defaultReturnWindowDays?: number;
   lists?: Record<string, unknown>;
   budgets?: Record<string, unknown>;
+  assetAccounts?: Record<string, unknown>;
 };
 
 /** Coerce a Mixed map to { key: positiveNumber }. */
@@ -71,6 +73,7 @@ const DEFAULTS: AppSettings = {
   itemCategories: DEFAULT_ITEM_CATEGORIES,
   subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,
   budgets: {},
+  assetAccounts: {},
 };
 
 // Cache keyed by tenant. Default/self-hosted tenant uses the '' key so its behaviour and
@@ -104,6 +107,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     itemCategories: resolveTaxonomy('itemCategories', doc?.lists, DEFAULT_ITEM_CATEGORIES),
     subscriptionCategories: resolveTaxonomy('subscriptionCategories', doc?.lists, DEFAULT_SUBSCRIPTION_CATEGORIES),
     budgets: numMap(doc?.budgets),
+    assetAccounts: numMap(doc?.assetAccounts),
   };
 }
 
@@ -119,7 +123,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     // untouched, same query as before).
     const Config = await currentModel(AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets assetAccounts')
       .lean();
   } catch {
     /* DB down → hard defaults */

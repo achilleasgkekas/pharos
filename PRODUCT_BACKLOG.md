@@ -31,13 +31,6 @@ _(κενό — P27-P31 εγκρίθηκαν 2026-07-09· ο planner προσθέ
 > πιο απλό MVP (heuristic/deterministic πριν AI, single πριν multi). Κατέγραψε την επιλογή στο progress log.
 > Εξαρτήσεις: P5/P17/P23 δένουν με `/api/v1` (§5) + mobile MVP (§6)· P6 feed βοηθά το PA3/P20.
 
-### PA2 ← P4. Net-worth time-series (snapshots + trend) — M — both
-- Νέο `Snapshot` model + μηνιαίο cron· assets (inventory value + optional manual accounts) −
-  liabilities (installments owed + card balances)· «Net worth» ενότητα στα Reports + γράφημα.
-- **Locked defaults:** manual asset accounts **επιτρέπονται** (μετρητά/τραπεζικά χωρίς integration)·
-  **forward-only** (χωρίς backfill). Reuse του υπάρχοντος net-position υπολογισμού.
-- Owner: **pharos-daily-dev**.
-
 ### P27. Suggested budgets από ιστορικό δαπανών — S — both (πολύ ψηλό value/effort)
 - **Αξία:** το να στήσεις budgets είναι σήμερα χειροκίνητο (κενό input ανά κατηγορία → οι περισσότεροι δεν το κάνουν
   ποτέ). «Suggest budgets» υπολογίζει προτεινόμενο όριο ανά κατηγορία από τον μ.ο. των τελευταίων 3-6 μηνών (+ προαιρετικά
@@ -233,6 +226,19 @@ _(κενό — P27-P31 εγκρίθηκαν 2026-07-09· ο planner προσθέ
 ---
 
 ## Done
+
+### PA2 ← P4. Net-worth time-series — ✅ SHIPPED 2026-07-09 (pharos-daily-dev)
+- Νέο `NetWorthSnapshot` model (ένα σημείο ανά YYYY-MM, unique period)· το banner των Reports
+  έγινε «Net worth»: assets (owned inventory + manual accounts) − liabilities (υπόλοιπο δόσεων +
+  card balances), breakdown chips + AreaChart trend από τα snapshots (≥2 σημεία, αλλιώς note).
+- **Manual asset accounts**: Settings → Money → «Asset accounts» (όνομα + υπόλοιπο, χειροκίνητη
+  ενημέρωση, ίδιο Mixed-map pattern με τα budgets· `saveAssetAccounts` + `AppSettings.assetAccounts`).
+- **Capture**: idempotent upsert του τρέχοντος μήνα σε κάθε /reports load (pattern
+  `generateDueRecurring`), forward-only χωρίς backfill· οι περασμένοι μήνες παγώνουν στο rollover.
+  Το «μηνιαίο cron» του spec υλοποιήθηκε ως on-load capture: δεν υπάρχει in-app scheduler για
+  tenant data, και το on-load είναι tenant-safe· true cron = follow-up αν στηθεί scheduler.
+- Follow-ups: mobile/v1 expose (όπως PA1/PA3)· τα snapshots (και τα expenses, προϋπάρχον κενό)
+  ΔΕΝ μπαίνουν στο backup export (`BACKUP_MODELS`).
 
 ### PA1 ← P2. Bank / generic CSV import — ✅ SHIPPED 2026-07-09 (pharos-daily-dev)
 - «Import CSV» στο header των /expenses + /income → modal: file picker, RFC-4180 parser

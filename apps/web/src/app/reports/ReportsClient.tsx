@@ -32,7 +32,17 @@ type InstallmentPlanRow = {
   done: boolean;
 };
 
+type NetWorthPoint = {
+  period: string;
+  assetsInventory: number;
+  assetsAccounts: number;
+  liabInstallments: number;
+  liabCards: number;
+  net: number;
+};
+
 type Data = {
+  netWorth: { accountsTotal: number; series: NetWorthPoint[] };
   monthlySpend: { key: string; label: string; total: number; count: number }[];
   upcomingInstallments: { label: string; amount: number }[];
   spendByStore: { name: string; total: number; count: number }[];
@@ -79,6 +89,7 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
   const t = useT();
   const s = data.summary;
   const spend12 = data.monthlySpend.reduce((a, m) => a + m.total, 0);
+  const netWorthNow = s.ownedValue + data.netWorth.accountsTotal - s.installmentsRemaining - s.outstanding;
   const avgMonth = Math.round(spend12 / Math.max(1, data.monthlySpend.filter((m) => m.total > 0).length || 1));
 
   return (
@@ -100,21 +111,44 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         </div>
       </div>
 
-      {/* Net position — inventory value minus installment debt */}
+      {/* Net worth (PA2) — assets (inventory + manual accounts) minus liabilities
+          (remaining installments + card balances), with the monthly snapshot trend */}
       <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-gradient-to-br from-[color:var(--color-surface)] to-[color:var(--color-surface-2)] p-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netPosition')}</p>
-            <p className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: s.ownedValue - s.installmentsRemaining >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
-              {cur()}{(s.ownedValue - s.installmentsRemaining).toLocaleString('en-GB')}
+            <p className="text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorth')}</p>
+            <p className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: netWorthNow >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
+              {cur()}{netWorthNow.toLocaleString('en-GB')}
             </p>
           </div>
-          <div className="flex gap-5 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
+          <div className="flex flex-wrap gap-5 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
             <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.inventoryValue')}</span><span className="text-[color:var(--color-text)] text-sm">{cur()}{s.ownedValue.toLocaleString('en-GB')}</span></div>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.accounts')}</span><span className="text-[color:var(--color-cyan)] text-sm">{cur()}{data.netWorth.accountsTotal.toLocaleString('en-GB')}</span></div>
             <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.owed')}</span><span className="text-[color:var(--color-red)] text-sm">-{cur()}{s.installmentsRemaining.toLocaleString('en-GB')}</span></div>
-            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.cardBalance')}</span><span className="text-[color:var(--color-gold)] text-sm">{cur()}{s.outstanding.toLocaleString('en-GB')}</span></div>
+            <div><span className="text-[color:var(--color-text-faint)] block mb-0.5">{t('reports.cardBalance')}</span><span className="text-[color:var(--color-gold)] text-sm">-{cur()}{s.outstanding.toLocaleString('en-GB')}</span></div>
           </div>
         </div>
+        {data.netWorth.series.length >= 2 ? (
+          <div className="h-32 mt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.netWorth.series} margin={{ left: 0, right: 10, top: 6 }}>
+                <defs>
+                  <linearGradient id="netWorthFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#00ff88" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="#00ff88" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="period" tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--color-text-faint)', fontSize: 10 }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => `${cur()}${v >= 1000 || v <= -1000 ? `${Math.round(v / 1000)}k` : v}`} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${cur()}${Number(v).toLocaleString('en-GB')}`, t('reports.netWorth')]} />
+                <Area type="monotone" dataKey="net" stroke="#00ff88" strokeWidth={2} fill="url(#netWorthFill)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="mt-3 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorthTrendNote')}</p>
+        )}
       </div>
 
       {/* Summary cards */}

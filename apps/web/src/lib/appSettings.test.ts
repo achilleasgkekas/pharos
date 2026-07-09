@@ -55,6 +55,7 @@ describe('normalizeSettings', () => {
       itemCategories: DEFAULT_ITEM_CATEGORIES,
       subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,
       budgets: {},
+      assetAccounts: {},
     };
     expect(normalizeSettings(null)).toEqual(expected);
     expect(normalizeSettings(undefined)).toEqual(expected);

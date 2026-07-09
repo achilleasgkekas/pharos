@@ -54,6 +54,10 @@ const AppConfigSchema = new Schema(
     // Monthly budget per expense category. Map category → € amount.
     budgets: { type: Schema.Types.Mixed, default: {} },
 
+    // Manual asset accounts for net worth (PA2). Map account name → balance
+    // (cash, bank accounts — no integration, the user updates balances by hand).
+    assetAccounts: { type: Schema.Types.Mixed, default: {} },
+
     // ── Notifications ──
     // Legacy single ntfy channel (migrated into `notifiers` on first save).
     ntfyUrl: { type: String, default: '' }, // e.g. https://ntfy.sh/your-topic (or self-hosted)

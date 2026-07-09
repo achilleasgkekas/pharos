@@ -176,6 +176,9 @@ export const en = {
 
   // ── Reports ──────────────────────────────────────────────────────────────
   'reports.netPosition': 'Net position',
+  'reports.netWorth': 'Net worth',
+  'reports.accounts': 'Accounts',
+  'reports.netWorthTrendNote': 'Trend builds month by month — a snapshot is stored each time you visit Reports in a new month.',
   'reports.inventoryValue': 'Inventory value',
   'reports.owed': 'Owed · installments',
   'reports.cardBalance': 'Card balance',
@@ -643,6 +646,12 @@ export const en = {
   'set.saveDefaults': 'Save defaults',
   'set.savedReloading': 'Saved ✓ — reloading…',
   // Money: budgets + cards
+  'set.accountsTitle': 'Asset accounts (net worth)',
+  'set.accountsDesc': 'Cash and bank balances counted into your net worth on Reports. No bank connection — update the balances by hand.',
+  'set.accountNamePlaceholder': 'e.g. Checking account, Cash…',
+  'set.addAccount': 'Add account',
+  'set.saveAccounts': 'Save accounts',
+  'set.accountsTotal': 'Total {amount}',
   'set.budgetsTitle': 'Monthly budgets',
   'set.budgetsDesc': 'A monthly limit per expense category. Tracked against actual spend in Reports.',
   'set.saveBudgets': 'Save budgets',

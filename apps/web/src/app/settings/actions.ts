@@ -993,6 +993,22 @@ export async function saveBudgets(budgets: Record<string, number>): Promise<{ ok
   return { ok: true };
 }
 
+/** Save manual asset accounts for net worth (account name → balance). Zero/empty
+ *  balances are dropped — an account with no balance contributes nothing (PA2). */
+export async function saveAssetAccounts(accounts: Record<string, number>): Promise<{ ok: boolean }> {
+  await connectDB();
+  const clean: Record<string, number> = {};
+  for (const [k, v] of Object.entries(accounts || {})) {
+    const n = Number(v);
+    if (k.trim() && Number.isFinite(n) && n > 0) clean[k.trim().slice(0, 60)] = Math.round(n * 100) / 100;
+  }
+  await AppConfig.updateOne({ key: 'singleton' }, { $set: { assetAccounts: clean } }, { upsert: true });
+  invalidateAppSettings();
+  revalidatePath('/reports');
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
 /** A stored file reference is safe only if it's a contained relative path. A
  *  tampered backup must not be able to point filePath/thumbPath/photos at e.g.
  *  ../../etc/passwd, which would then be served or unlinked by purge. */
