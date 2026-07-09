@@ -3,7 +3,13 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 5c2abf3 -->
-<!-- docker-validated: 6135bd8 -->
+<!-- docker-validated: 163a0ab -->
+
+## 2026-07-09 (docker-health — no-rebuild, health-only pass, stack healthy)
+- **Health (read-only):** mongo `healthy`, web `/login` **200**, RestartCount web `0` / mongo `7` (cumulative lifetime, σταθερό τώρα, Up 9 min). flaresolverr δεν τρέχει (μηδέν memory pressure, τίποτα να σταματήσω). ΣΗΜ: το `docker inspect --format '{{.State.RestartCount}}'` ξαναέβγαλε template error στο τρέχον OrbStack· η τιμή διαβάστηκε αξιόπιστα με `--format '{{json .RestartCount}}'` (top-level) → web 0, mongo 7. Παράλληλα τρέχει και το bakecore stack (7 containers Up 2 days), σταθερό.
+- **Disk:** Images 4.41GB, Volumes 885MB, Build Cache 1.07GB (0B reclaimable — δεμένο με τα layers των τρεχόντων images). `docker builder prune -f` ανέκτησε **0B** (SAFE no-op· τίποτα unused). Δίσκος υγιής σε 31GB VM.
+- **Rebuild (step 4/5):** ΠΑΡΑΛΕΙΦΘΗΚΕ. Marker ήταν `6135bd8`· `git diff 6135bd8..HEAD -- apps/web Dockerfile next.config.*` = **κενό**. Τα 2 commits από τότε (`a6ad58a` chore(docker) validate-log, `163a0ab` docs(backlog) μαζική έγκριση 24 items) είναι μόνο docs. Καμία αλλαγή web runtime → κανένας λόγος rebuild. Το running image ήδη = web runtime του HEAD.
+- **Git hygiene:** stage ΜΟΝΟ `PROGRESS.md` (explicit path). Working tree έχει WIP άλλου routine (`apps/mobile/src/screens/ReceiptsScreen.tsx` modified) → δεν αγγίχτηκε.
 
 ## 2026-07-09 (docker-health — safe rebuild ×2, stack healthy, running image = HEAD web runtime)
 - **Health (read-only):** mongo `healthy`, web `running` (OOM false). Web RestartCount `0`, mongo RestartCount `0`. flaresolverr `Exited (143) 9 days ago` (δεν έτρεχε· μηδέν memory pressure, τίποτα να σταματήσω). ΣΗΜ: το `docker inspect --format '{{.State.RestartCount}}'` έβγαζε template error στο τρέχον OrbStack/Docker (το key λείπει από το State map του format)· η τιμή διαβάστηκε αξιόπιστα με `docker inspect ... | grep -i restartcount` → `0` και στα δύο. Παράλληλα τρέχει και το bakecore stack (7 containers Up 2 days), αλλά το homepage stack είναι σταθερό.
