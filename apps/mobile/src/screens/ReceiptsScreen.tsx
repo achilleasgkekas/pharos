@@ -178,21 +178,21 @@ export function ReceiptsScreen() {
                   </Pressable>
                 </View>
                 <Text style={s.elabel}>STORE</Text>
-                <TextInput value={eStore} onChangeText={setEStore} style={s.einput} placeholderTextColor={C.faint} />
+                <Input value={eStore} onChangeText={setEStore} />
                 <View style={s.rowFields}>
                   <View style={{ flex: 1 }}>
                     <Text style={s.elabel}>DATE (YYYY-MM-DD)</Text>
-                    <TextInput value={eDate} onChangeText={setEDate} placeholder="2026-06-30" autoCapitalize="none" style={s.einput} placeholderTextColor={C.faint} />
+                    <Input value={eDate} onChangeText={setEDate} placeholder="2026-06-30" autoCapitalize="none" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.elabel}>PAYMENT</Text>
-                    <TextInput value={ePay} onChangeText={setEPay} placeholder="card / cash" style={s.einput} placeholderTextColor={C.faint} />
+                    <Input value={ePay} onChangeText={setEPay} placeholder="card / cash" />
                   </View>
                 </View>
                 <View style={s.totalRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={s.elabel}>TOTAL ({detail.currency})</Text>
-                    <TextInput value={eTotal} onChangeText={setETotal} keyboardType="decimal-pad" style={s.einput} placeholderTextColor={C.faint} />
+                    <Input value={eTotal} onChangeText={setETotal} keyboardType="decimal-pad" />
                   </View>
                   <Pressable onPress={fillTotal} disabled={!eLines.length} style={[s.sumBtn, !eLines.length && s.dim]}><Text style={s.sumText}>∑ items</Text></Pressable>
                 </View>
@@ -204,7 +204,7 @@ export function ReceiptsScreen() {
                 {eLines.map((l, i) => (
                   <View key={i} style={s.lineEdit}>
                     <View style={s.lineTop}>
-                      <TextInput value={l.name} onChangeText={(v) => setLine(i, 'name', v)} placeholder="item name" placeholderTextColor={C.faint} style={[s.einput, { flex: 1 }]} />
+                      <Input value={l.name} onChangeText={(v) => setLine(i, 'name', v)} placeholder="item name" style={{ flex: 1 }} />
                       <Pressable onPress={() => removeLine(i)} hitSlop={8} style={s.lineDel}><Text style={s.lineDelTxt}>✕</Text></Pressable>
                     </View>
                     <View style={s.lineSub}>
@@ -217,7 +217,7 @@ export function ReceiptsScreen() {
                 ))}
 
                 <Text style={s.elabel}>NOTES</Text>
-                <TextInput value={eNotes} onChangeText={setENotes} multiline placeholder="optional" placeholderTextColor={C.faint} style={[s.einput, { minHeight: 56, textAlignVertical: 'top' }]} />
+                <TextArea value={eNotes} onChangeText={setENotes} placeholder="optional" style={{ minHeight: 56 }} />
 
                 <Pressable onPress={() => setEVerified((v) => !v)} style={s.toggle}>
                   <Check checked={!!eVerified} />
@@ -265,7 +265,6 @@ const s = StyleSheet.create({
   rescanText: { color: C.cyan, fontSize: 13, fontWeight: '700' },
   dim: { opacity: 0.4 },
   elabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
-  einput: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.text, fontSize: 15 },
   rowFields: { flexDirection: 'row', gap: 10 },
   totalRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
   sumBtn: { borderWidth: 1, borderColor: C.cyan, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 0 },
