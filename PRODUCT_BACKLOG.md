@@ -9,14 +9,34 @@
 > Τελευταία ενημέρωση: 2026-07-09 (7η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «τα εγκρίνω όλα» → **ΟΛΑ** τα προηγούμενα Proposed
 > (P1, P3, P5-P26) μετακινήθηκαν στο «Approved», μαζί με τα ήδη-εγκεκριμένα PA1/PA2/PA3.
-> **7η σάρωση (2026-07-09):** PA1 (bank/CSV import) shipped → «Done»· προστέθηκαν **5 νέοι candidates P27-P31**
-> στο «Proposed» (awaiting έγκριση — κανένα δεν χτίζεται πριν ο Αχιλλέας τα μετακινήσει στο «Approved»).
+> **7η σάρωση (2026-07-09):** PA1 (bank/CSV import) shipped → «Done»· προστέθηκαν 5 νέοι candidates P27-P31.
+> **⚑ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «μετακίνησέ τα εσύ» → **P27-P31 μετακινήθηκαν στο «Approved»**.
+> Το «Proposed» είναι πάλι κενό· ο planner θα προσθέτει νέους candidates σε επόμενα runs.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
-> Νέοι candidates 7ης σάρωσης. Ranked value/effort. **Τίποτα δεν χτίζεται μέχρι μετακίνηση στο «Approved».**
+_(κενό — P27-P31 εγκρίθηκαν 2026-07-09· ο planner προσθέτει νέους candidates σε επόμενες σαρώσεις)_
+
+---
+
+## Approved
+
+> Οι builder/daily-dev routines χτίζουν ΜΟΝΟ από εδώ — **ένα item ανά run**, verify-pre-build πρώτα,
+> με τη σειρά value/effort (τα «πολύ ψηλό value/effort» πρώτα). **Κανόνας ανοιχτών αποφάσεων:** όπου
+> ένα item έχει «Απόφαση που χρειάζεται» και ο Αχιλλέας ΔΕΝ την έλυσε ρητά (μόνο τα PA1/PA2/PA3 έχουν
+> locked defaults), ο builder παίρνει **sensible default**: (α) free-tier behaviour **non-metered**,
+> heavy/AI/SaaS-touching κομμάτια **opt-in**· (β) reuse υπάρχοντος pipeline/pattern· (γ) ξεκίνα από το
+> πιο απλό MVP (heuristic/deterministic πριν AI, single πριν multi). Κατέγραψε την επιλογή στο progress log.
+> Εξαρτήσεις: P5/P17/P23 δένουν με `/api/v1` (§5) + mobile MVP (§6)· P6 feed βοηθά το PA3/P20.
+
+### PA2 ← P4. Net-worth time-series (snapshots + trend) — M — both
+- Νέο `Snapshot` model + μηνιαίο cron· assets (inventory value + optional manual accounts) −
+  liabilities (installments owed + card balances)· «Net worth» ενότητα στα Reports + γράφημα.
+- **Locked defaults:** manual asset accounts **επιτρέπονται** (μετρητά/τραπεζικά χωρίς integration)·
+  **forward-only** (χωρίς backfill). Reuse του υπάρχοντος net-position υπολογισμού.
+- Owner: **pharos-daily-dev**.
 
 ### P27. Suggested budgets από ιστορικό δαπανών — S — both (πολύ ψηλό value/effort)
 - **Αξία:** το να στήσεις budgets είναι σήμερα χειροκίνητο (κενό input ανά κατηγορία → οι περισσότεροι δεν το κάνουν
@@ -55,27 +75,8 @@
   (κοινό inventory/έξοδα) με ρόλους (admin/member/viewer) + «ποιος καταχώρησε τι» attribution. Ισχυρό OSS self-host lever
   και σπόρος για το SaaS team-plan. **Διακριτό από §8** (multi-tenancy = ξεχωριστές βάσεις) και **§9** (SaaS-grade email verify/MFA/OAuth).
 - **Module:** Auth/Users (ρόλοι + invite εντός instance) + cross-cutting attribution (createdBy).
-- **Απόφαση που χρειάζεται (Αχιλλέας):** θέλει in-instance multi-user για το OSS, ή single-user OSS + βασίσου αποκλειστικά
-  στο §8 multi-tenancy για shared/SaaS; (αλλάζει το scope· default αν εγκριθεί = shared-data + 3 ρόλοι, χωρίς email/MFA στο OSS tier).
-
----
-
-## Approved
-
-> Οι builder/daily-dev routines χτίζουν ΜΟΝΟ από εδώ — **ένα item ανά run**, verify-pre-build πρώτα,
-> με τη σειρά value/effort (τα «πολύ ψηλό value/effort» πρώτα). **Κανόνας ανοιχτών αποφάσεων:** όπου
-> ένα item έχει «Απόφαση που χρειάζεται» και ο Αχιλλέας ΔΕΝ την έλυσε ρητά (μόνο τα PA1/PA2/PA3 έχουν
-> locked defaults), ο builder παίρνει **sensible default**: (α) free-tier behaviour **non-metered**,
-> heavy/AI/SaaS-touching κομμάτια **opt-in**· (β) reuse υπάρχοντος pipeline/pattern· (γ) ξεκίνα από το
-> πιο απλό MVP (heuristic/deterministic πριν AI, single πριν multi). Κατέγραψε την επιλογή στο progress log.
-> Εξαρτήσεις: P5/P17/P23 δένουν με `/api/v1` (§5) + mobile MVP (§6)· P6 feed βοηθά το PA3/P20.
-
-### PA2 ← P4. Net-worth time-series (snapshots + trend) — M — both
-- Νέο `Snapshot` model + μηνιαίο cron· assets (inventory value + optional manual accounts) −
-  liabilities (installments owed + card balances)· «Net worth» ενότητα στα Reports + γράφημα.
-- **Locked defaults:** manual asset accounts **επιτρέπονται** (μετρητά/τραπεζικά χωρίς integration)·
-  **forward-only** (χωρίς backfill). Reuse του υπάρχοντος net-position υπολογισμού.
-- Owner: **pharos-daily-dev**.
+- **Απόφαση που χρειάζεται (Αχιλλέας):** in-instance multi-user για το OSS, ή single-user OSS + βασίσου αποκλειστικά στο §8
+  multi-tenancy; **δεν λύθηκε ρητά στην έγκριση** → builder default = shared-data + 3 ρόλοι (admin/member/viewer), χωρίς email/MFA στο OSS tier.
 
 ### P22. Full-text search πάνω σε receipt line-items & parsed text — S/M — both (πολύ ψηλό value/effort)
 - **Αξία:** το global search (`searchAll`) ψάχνει σήμερα δομημένα πεδία (store/vendor/notes/τίτλους),
