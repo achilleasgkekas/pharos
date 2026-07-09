@@ -2,8 +2,16 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 5c2abf3 -->
+<!-- reviewed: c11d296 -->
 <!-- docker-validated: 163a0ab -->
+
+## 2026-07-09 (reviewer — range 5c2abf3..c11d296, tsc web+mobile+landing EXIT 0, μηδέν regression)
+- **Range:** 12 commits από τον προηγ. marker `5c2abf3` έως HEAD `c11d296`. **11 από 12 = docs-only** (.md: MOBILE_PARITY/OWNER_DECISIONS/PRODUCT_BACKLOG/PROGRESS/STATUS/WEB_DEBT/LANDING_PROGRESS/DOCS_PROGRESS/saas.md). **Το μόνο code commit = `8798bea`** (`feat(landing): copy-link affordance on each open FAQ answer`).
+- **Type-checks (read-only):** `apps/web` `npm run type-check` → **EXIT 0**. `apps/mobile` `npx tsc --noEmit` → **EXIT 0**. Επιπλέον `apps/landing` `npm run type-check` → **EXIT 0** (εκεί ζει η μόνη code αλλαγή).
+- **Review του `8798bea`:** νέο `FaqCopyLink.tsx` (client, progressive enhancement — mount μόνο όταν υπάρχει `navigator.clipboard`, cleanup του setTimeout στο unmount, aria-label σε copied/idle state, quiet catch σε clipboard reject). Το wiring είναι συνεπές: `<details id={faqId(f.q)}>` ↔ `<FaqCopyLink id={faqId(f.q)}>` ↔ `FaqDeepLink` ταιριάζει με `el.id === id` — το copied hash `#faq-...` δείχνει σε υπαρκτό anchor. `globals.css`: σωστό refactor `.faq-a` → `.faq-a p` (το answer τυλίγεται πλέον σε `<p>`) + νέα `.faq-copy` styles, μηδέν orphaned rule (μοναδικό `.faq-a` usage). Καμία API-shape αλλαγή → μηδέν επίπτωση στο mobile.
+- **Secret scan:** grep όλου του range diff για key/secret/token/private-key patterns → όλα τα hits είναι **documentation prose** (συζήτηση για «API token», «token-scoped» κλπ), **κανένα committed secret value**.
+- **Fixes:** κανένα (μηδέν tsc error, μηδέν regression). **Flags:** κανένα από αυτό το range — ο κώδικας είναι καθαρός.
+- **Git hygiene:** stage ΜΟΝΟ `PROGRESS.md` (explicit path, ΟΧΙ `-A`). Working tree έχει WIP άλλων routines (`.env.example`, `apps/landing/app/privacy/page.tsx`, `apps/landing/app/terms/page.tsx`, `apps/mobile/src/screens/ReceiptsScreen.tsx` — εμφανίστηκαν concurrent κατά το run) → **δεν αγγίχτηκαν**. Marker reviewed `5c2abf3` → **`c11d296`**.
 
 ## 2026-07-09 (docker-health — no-rebuild, health-only pass, stack healthy)
 - **Health (read-only):** mongo `healthy`, web `/login` **200**, RestartCount web `0` / mongo `7` (cumulative lifetime, σταθερό τώρα, Up 9 min). flaresolverr δεν τρέχει (μηδέν memory pressure, τίποτα να σταματήσω). ΣΗΜ: το `docker inspect --format '{{.State.RestartCount}}'` ξαναέβγαλε template error στο τρέχον OrbStack· η τιμή διαβάστηκε αξιόπιστα με `--format '{{json .RestartCount}}'` (top-level) → web 0, mongo 7. Παράλληλα τρέχει και το bakecore stack (7 containers Up 2 days), σταθερό.
