@@ -149,6 +149,21 @@ services:
       flaresolverr:
         condition: service_started
 
+  # PHAROS marketing + pricing site. Standalone Next.js, no DB, always on.
+  # Independent of the main app: nothing depends on it and it depends on
+  # nothing, so it stays up on its own. Host port 3100 (web is 3000).
+  landing:
+    build:
+      context: ./apps/landing
+      dockerfile: Dockerfile
+    container_name: homepage-landing
+    restart: unless-stopped
+    ports:
+      - "3100:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+
 volumes:
   mongo-data:
     driver: local
