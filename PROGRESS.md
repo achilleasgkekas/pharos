@@ -4391,3 +4391,20 @@ Read-only code-quality audit της Next.js web επιφάνειας (fresh grep
 **Working tree:** τα ξένα untracked `apps/web/src/app/api/saas/admin/tenants/[slug]/` + `adminTenantDetail.{ts,test.ts}` (δουλειά άλλης routine σε εξέλιξη) ΔΕΝ αγγίχτηκαν· commits με ρητό pathspec (`git commit --only`).
 
 **Επόμενο suggested task:** το rank-2 του parity auditor: **fresh pure-lib vitest coverage** (`apps/web/src/lib/cards.ts`, `lib/taxonomies.ts normalizeList`, `lib/itemStatus.ts`· μηδέν rebuild, unattended-safe)· εκτός αν νεότερη σάρωση (parity/web-debt) έχει βγάλει κάτι υψηλότερο μέχρι τότε.
+
+## 2026-07-09 (pharos-daily-dev, PA3 return-window tracker SHIPPED)
+Εκτέλεσα το πρώτο διαθέσιμο Approved item (OWNER_DECISIONS #8 / PRODUCT_BACKLOG PA3, size S): **return-window tracker** στις αποδείξεις (commit `0514499`, 15 αρχεία, +275/−22).
+
+Τι μπήκε:
+- **Pure lib `lib/returnWindow.ts`**: `effectiveReturnWindow(store, stores, default)` (per-store override, αλλιώς global default) + `returnDaysLeft(date, window, now)` (μέρες που απομένουν, null όταν έληξε/off/invalid date· clamp στο μήκος του window για bogus μελλοντικές ημερομηνίες· normalize του -0 του Math.ceil). 14 vitest cases.
+- **Ρυθμίσεις**: `AppConfig.defaultReturnWindowDays` (default 14, EU distance-selling) + πεδίο «Default return window · days» στο Settings → Defaults (0 = τελείως off)· `Store.returnWindowDays` per-store override (κενό = inherit, 0 = no returns) + input στη StoreForm (Settings → Stores). Το saveDefaults κάνει explicit parse (όχι `|| 14`) ώστε το 0 να σώζεται.
+- **Badge**: το receipts page annotate-άρει server-side κάθε μη-archived απόδειξη που είναι ακόμα στο παράθυρό της με computed `returnDaysLeft` (νέο optional πεδίο στο SerializedReceipt, ΔΕΝ αποθηκεύεται, ίδιο pattern με το expense `anomaly`) → chip «Nd return» (Undo2 icon) σε ReceiptCard grid + ReceiptRow list, cyan κανονικά, gold όταν ≤3 μέρες. i18n keys σε en+el (τα άλλα 6 locales κάνουν graceful fallback στα αγγλικά).
+- **Alert**: το `runAlertChecks` σαρώνει πλέον πρόσφατες αποδείξεις (bounded query, `date ≥ now − maxWindow`, indexed) και προσθέτει γραμμή «↩ N return window(s) closing ≤3d: Store €X (Nd)» στο ntfy/notifier summary.
+
+Επιλογές που πήρα (builder defaults, καταγράφονται όπως ζητά το PRODUCT_BACKLOG): per-receipt (όχι per-line-item) MVP· badge σε όλες τις μη-archived (και unverified, αγορά είναι έτσι κι αλλιώς)· alert κατώφλι ≤3 μέρες (spec έλεγε 2-3)· το «warranty-claim» σκέλος του τίτλου καλύπτεται ήδη από το υπάρχον warranty tracking + alerts, δεν χρειάστηκε νέο μοντέλο. Web slice μόνο· το mobile badge είναι follow-up (θέλει το computed πεδίο στο v1 receipts serializer + chip στο ReceiptsScreen).
+
+**Verified**: `npm run type-check` EXIT 0· ΠΛΗΡΕΣ vitest suite **1711/1711 passed** (128 αρχεία, μαζί τα 14 νέα + ενημερωμένο appSettings defaults-shape test)· safe Docker rebuild (build → mongo healthy → up -d → `/login` 200, RestartCount 0) + `docker builder prune -f` (2.1GB). Λειτουργικό browser-check των badges δεν έγινε (η εφαρμογή έχει login, δεν έχω session unattended)· το SSR path καλύπτεται από το ότι το /login σερβίρει και το page compile πέρασε στο build.
+
+**Working tree**: καθαρό από ξένα uncommitted (το commit έγινε με ρητό `--only` pathspec)· στο μεταξύ άλλη routine έκανε το `f853758` (v1 search tests), δεν επηρεάστηκε.
+
+**Επόμενο suggested task**: (α) expose του `returnDaysLeft` στο v1 receipts API + badge στο mobile ReceiptsScreen (ολοκληρώνει το «both» του PA3), ή (β) αν προτιμηθεί νέο Approved item: **PA1 bank/CSV import** (M, θέλει ολόκληρο run) — τα PA2/PA1 είναι πλέον τα μόνα ανοιχτά PA items.
