@@ -991,3 +991,44 @@ Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/sa
 Επομενο run: superadmin console = πιθανον να αποκτησει κι αλλα routes (per-tenant detail, actions)
 καθως το §8 scaffold μεγαλωνει, watch τα νεα admin/* commits· η stale-forward-ref sweep αν εκτεθουν
 export/erasure/files/superadmin στο workspace-settings UI (features.md).
+
+## 2026-07-09 (saas.md: Superadmin tenant DETAIL endpoint §8)
+
+Το commit `6fd3613` (feat(saas): superadmin tenant DETAIL read endpoint, increment 49) προσθεσε
+νεο control-plane route `GET /api/saas/admin/tenants/[slug]` που ηταν ατεκμηριωτο (grep
+"tenants/<slug>" / "admin-tenant-detail" σε saas.md = 0 hits). Ειναι το δευτερο superadmin surface,
+drill-in σε ΕΝΑ workspace απο το listing (#48).
+
+Διαβασα τα πραγματικα αρχεια (`app/api/saas/admin/tenants/[slug]/route.ts`,
+`lib/tenancy/adminTenantDetail.ts`) και προσθεσα νεα υποενοτητα **#### Single-tenant detail** μεσα
+στο §8, αμεσως μετα το OSS-parity note του listing και πριν το "SaaS environment variables".
+
+Τι εγραψα:
+- Route πινακας: `GET /api/saas/admin/tenants/<slug>` → registry summary (ιδια fields με listing row)
+  + full member roster + role/status tally, `no-store`. Ιδιο requireSuperadmin gate + ιδια
+  authorization order με το listing· unknown slug → 404.
+- Slug trim + lowercase πριν το lookup (`/Acme` == `acme`). Reads ΜΟΝΟ central registry
+  (Tenant/Membership/Account), ποτε per-tenant data db, ποτε write· per-tenant usage/stats = separate
+  later increment (data plane).
+- Display-safety: μονο email/name απο το account (ποτε password hash/token)· dangling membership
+  (deleted account row) → empty email/name, οχι throw.
+- Tally rules: status counts (active/invited/removed) ολα τα members· role counts
+  (owners/admins/members) ΜΟΝΟ active → ownerless workspace ευκολα ορατο.
+- JSON sample (format `pharos.admin-tenant-detail` v1: generatedAt/tenant/memberCounts/members[]).
+  Members oldest-first (createdAt, μετα _id).
+
+Accuracy: cross-checked με τον κωδικα (saasGuard+requireSuperadmin ordering, getTenantDetailForAdmin
+slug trim/lower + null→404, summarizeMember email/name-only + dangling handling, tallyMembers
+active-only role counting, buildTenantDetail envelope keys, memberships sort createdAt:1/_id:1).
+Καμια τιμη/field εφευρεθηκε. Placeholders μονο `<slug>`/`acme`/`.example`.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 14 markers (7
+balanced blocks, +1 νεο). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/
+CRON_SECRET=<value>) → clean.
+
+Collision guard: `git status --short` δειχνει foreign unstaged `apps/mobile/.../ReceiptsScreen.tsx`
+(αλλη ρουτινα WIP, ΟΧΙ staged). Stage ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: το superadmin console §8 μεγαλωνει ανα increment (listing #48, detail #49)· watch νεα
+admin/* commits για per-tenant detail actions ή usage/stats view. Η stale-forward-ref sweep αν
+εκτεθουν export/erasure/files/superadmin στο workspace-settings UI (features.md).

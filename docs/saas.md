@@ -614,6 +614,77 @@ never writes. Destructive operations stay manual and out of scope here.
 is no equivalent in the self-hosted single-tenant app (there is nothing to list
 across; the operator owns the one deployment).
 
+#### Single-tenant detail
+
+Drill into **one** workspace from the listing. Same platform-operator gate
+(`requireSuperadmin`) and the same authorization order as the listing above; an
+unknown slug is a `404`.
+
+| Method | Path | Result |
+| --- | --- | --- |
+| `GET` | `/api/saas/admin/tenants/<slug>` | Read-only detail for one workspace: the registry summary (same fields as a listing row) plus its full member roster and a role/status tally. `no-store`. |
+
+The slug is trimmed and lower-cased before lookup, so `/Acme` and `acme` resolve
+to the same workspace. Like the listing, this reads **only** the central
+registry collections (`Tenant`, `Membership`, `Account`); it never opens a
+per-tenant data database and never writes. A per-tenant usage/stats view would
+touch the data plane and is a deliberately separate, later increment.
+
+Each member row is display-safe: only `email` and `name` are read from the
+account (never a password hash or token), and a dangling membership (its account
+row deleted) yields empty `email`/`name` rather than an error. The tally counts
+members by status (`active`/`invited`/`removed`); roles (`owners`/`admins`/
+`members`) are counted for **active** members only, so `owners` reflects the
+actual live owner seats, which makes an ownerless workspace easy to spot.
+
+Response envelope (`format: pharos.admin-tenant-detail`, version `1`):
+
+```json
+{
+  "format": "pharos.admin-tenant-detail",
+  "version": 1,
+  "generatedAt": "2026-07-09T13:00:00.000Z",
+  "tenant": {
+    "id": "665f...",
+    "slug": "acme",
+    "name": "Acme",
+    "plan": "shared",
+    "status": "active",
+    "tier": "pro",
+    "customDomain": null,
+    "trialEndsAt": null,
+    "erasureScheduledAt": null,
+    "billingLinked": true,
+    "aiByoKey": false,
+    "createdAt": "2026-06-01T09:00:00.000Z",
+    "updatedAt": "2026-07-01T09:00:00.000Z"
+  },
+  "memberCounts": {
+    "total": 3,
+    "active": 2,
+    "invited": 1,
+    "removed": 0,
+    "owners": 1,
+    "admins": 1,
+    "members": 0
+  },
+  "members": [
+    {
+      "accountId": "665a...",
+      "email": "owner@acme.example",
+      "name": "Acme Owner",
+      "role": "owner",
+      "status": "active",
+      "invitedBy": null,
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    }
+  ]
+}
+```
+
+Members are ordered oldest-first (`createdAt`, then `_id`). Same observability
+contract: no writes, no destructive actions, control plane only.
+
 ## SaaS environment variables
 
 These are needed **only** in SaaS mode. Use placeholders; never commit real
