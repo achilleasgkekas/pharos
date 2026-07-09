@@ -4425,3 +4425,22 @@ Read-only code-quality audit της Next.js web επιφάνειας (fresh grep
 **Working tree**: commit με ρητό pathspec μόνο των δικών μου αρχείων. Ο planner (7η σάρωση) commit-άρισε παράλληλα το PRODUCT_BACKLOG.md (`5b277d2`) απορροφώντας και τη δική μου μετακίνηση του PA1 στο «Done»· υπάρχει ξένο untracked `apps/landing/app/components/Pricing.tsx` (άλλης routine), δεν το άγγιξα.
 
 **Επόμενο suggested task**: **PA2 net-worth time-series** (το μόνο εναπομείναν PA item με locked defaults: `Snapshot` model, μηνιαίο cron forward-only, manual asset accounts, «Net worth» ενότητα + γράφημα στα Reports). Εναλλακτικά, μικρότερο: το opt-in «AI categorise uncategorised imports» κουμπί (κλείνει πλήρως το locked default του PA1) ή το P22 full-text search σε line items (S/M, πολύ ψηλό value/effort).
+
+## 2026-07-09 (pharos-daily-dev συνέχεια, PA2 net-worth time-series SHIPPED)
+
+**Τι έγινε**: Με εντολή συνέχισης του Αχιλλέα στο ίδιο session, υλοποιήθηκε το **PA2 (net-worth time-series)**, το τελευταίο PA item με locked defaults. Commit `67bffc9`.
+
+- **`models/NetWorthSnapshot.ts`**: ένα σημείο ανά μήνα (unique `period` YYYY-MM) με πλήρες breakdown: assetsInventory, assetsAccounts (+ αντίγραφο των accounts τη στιγμή του capture), liabInstallments, liabCards, net.
+- **`lib/netWorth.ts`**: `captureAndListSnapshots` κάνει idempotent upsert του ΤΡΕΧΟΝΤΟΣ μήνα σε κάθε /reports load και επιστρέφει όλη τη σειρά για το γράφημα. Forward-only by design: οι περασμένοι μήνες παγώνουν όταν αλλάζει ο μήνας, μηδέν backfill. Never-throws (αποτυχία snapshot δεν ρίχνει τη σελίδα). Reuse των τιμών που ήδη υπολογίζει το getReports (ownedValue, installmentsRemaining, outstanding), μηδέν έξτρα queries στα κύρια collections.
+- **Manual asset accounts**: νέο `AppConfig.assetAccounts` (Mixed map όνομα → υπόλοιπο, ίδιο pattern με budgets), `AppSettings.assetAccounts` (numMap coercion), `saveAssetAccounts` action, και **«Asset accounts» manager στο Settings → Money** (rows όνομα + υπόλοιπο, προσθήκη/αφαίρεση/save, σύνολο).
+- **Reports**: το net-position banner έγινε **«Net worth»** = inventory + accounts − υπόλοιπο δόσεων − card balances, με 4 breakdown chips και **AreaChart trend** από τα snapshots (≥2 σημεία· αλλιώς note ότι η τάση χτίζεται μήνα με τον μήνα). Τα κλειδιά `reports.netPosition` κ.λπ. έμειναν (τα χρησιμοποιούν aiTools/v1 API).
+
+**Επιλογές που πήρα**: (α) το «μηνιαίο cron» του spec υλοποιήθηκε ως **on-load capture** (pattern `generateDueRecurring`): δεν υπάρχει in-app scheduler για tenant data, το on-load είναι tenant-safe και ισοδύναμο λειτουργικά (ο μήνας παγώνει στο rollover)· true cron = follow-up αν στηθεί scheduler. (β) Στη headline το card balance ΑΦΑΙΡΕΙΤΑΙ πλέον (το locked spec ορίζει liabilities = δόσεις + card balances· το παλιό banner το έδειχνε χωρίς να το αφαιρεί). (γ) Λογαριασμοί με μηδενικό υπόλοιπο απορρίπτονται στο save (δεν συνεισφέρουν τίποτα, συνεπές με το budgets pattern).
+
+**Verified**: type-check EXIT 0· ΠΛΗΡΕΣ suite **1769/1769 passed** (134 αρχεία)· safe Docker rebuild (build → mongo healthy → up -d → /login 200, /reports 307 auth redirect όπως αναμένεται, RestartCount 0) + `docker builder prune -f` (1.5GB).
+
+**Working tree**: ρητό pathspec staging· ξένη παράλληλη δουλειά (apps/landing Dockerfile/compose, receiptSearch/P22 στο search-actions) έμεινε ανέγγιχτη· έλεγξα με diff ότι τα κοινά αρχεία (i18n, PRODUCT_BACKLOG) είχαν ΜΟΝΟ δικά μου hunks πριν το stage.
+
+**Follow-ups που άφησα**: mobile/v1 expose του net worth (όπως PA1/PA3)· τα NetWorthSnapshot (και τα Expense, προϋπάρχον κενό) λείπουν από το `BACKUP_MODELS` του backup export· opt-in «AI categorise» για uncategorised CSV imports (PA1).
+
+**Επόμενο suggested task**: το Approved queue συνεχίζει με τα «πολύ ψηλό value/effort»: **P27 suggested budgets** (S, ντετερμινιστικό, φαίνεται ιδανικό για ένα run) ή **P22 full-text search** (ΠΡΟΣΟΧΗ: φαίνεται να το δουλεύει ήδη άλλη routine — υπάρχει uncommitted receiptSearch.ts στο tree, κάνε verify-pre-build πρώτα) ή **P14 price-hike watch** (S).
