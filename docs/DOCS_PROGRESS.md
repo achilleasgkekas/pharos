@@ -1032,3 +1032,44 @@ Collision guard: `git status --short` δειχνει foreign unstaged `apps/mobi
 Επομενο run: το superadmin console §8 μεγαλωνει ανα increment (listing #48, detail #49)· watch νεα
 admin/* commits για per-tenant detail actions ή usage/stats view. Η stale-forward-ref sweep αν
 εκτεθουν export/erasure/files/superadmin στο workspace-settings UI (features.md).
+
+## 2026-07-09 (saas.md: Superadmin tenant DETAIL usage rollup, envelope v1 -> v2 §8)
+
+Το commit `b4374d8` (feat(saas): superadmin tenant detail usage rollup, increment 50) προσθεσε
+νεο πεδιο `usage` στο single-tenant DETAIL endpoint (`GET /api/saas/admin/tenants/[slug]`) και
+bumped το envelope απο version 1 σε 2. Ηταν ατεκμηριωτο: το saas.md #### Single-tenant detail
+ελεγε ακομα "A per-tenant usage/stats view WOULD touch the data plane and is a deliberately
+separate, later increment" (forward-looking, τωρα χτισμενο), envelope JSON = version 1, χωρις
+`usage` field.
+
+Διαβασα τα πραγματικα αρχεια (`lib/tenancy/adminTenantUsage.ts` [νεο module: summarizeUsagePeriod/
+buildUsageSummary/readTenantUsageForAdmin], `lib/tenancy/adminTenantDetail.ts` [version 2 +
+usage field wiring], `app/api/saas/admin/tenants/[slug]/route.ts` [updated docblock]) και ενημερωσα
+το #### Single-tenant detail:
+- Table row: προσθηκη "και usage rollup (AI consumption + storage footprint)".
+- Διορθωση της stale forward-ref παραγραφου: το usage δεν "would touch the data plane" — διαβαζει
+  ΜΟΝΟ το control-plane `Usage` ledger (central registry), ποτε per-tenant data db, ποτε write.
+- Νεα παραγραφος usage rollup: `totals` = monotonic AI counters (aiCalls/aiInputTokens/
+  aiOutputTokens/aiCostMicros) summed· storage = GAUGE (latestStorageBytes/latestStorageMeasuredAt
+  απο το newest-measured period, ΟΧΙ summed)· `periods[]` most-recent first· defensive non-negative
+  int coercion· DEFAULT_TENANT/SAAS off → empty summary (periodCount 0).
+- Envelope version 1 → 2 (heading + JSON sample) + προσθηκη `usage` block στο JSON sample.
+
+Accuracy: cross-checked κατα του κωδικα (readTenantUsageForAdmin limit clamp [1,60] default 12,
+period sort desc, aiCostMicros = currency micros, gauge picks newest storageMeasuredAt, count()
+NaN/neg→0 floor, buildTenantDetail version:2 + usage default buildUsageSummary([])). Καμια τιμη
+εφευρεθηκε πλην illustrative sample numbers. Placeholders μονο `<slug>`/`acme`/`.example`.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 14 markers (7
+balanced blocks, ιδιο — μονο edits σε υπαρχον block, μηδεν νεο fence). Listing envelope μενει
+version 1 (σωστα, ξεχωριστο), μονο το detail εγινε 2. Secret scan (sk_live/sk_test/sk-ant-/
+AUTH_SECRET=/STRIPE_SECRET_KEY=/CRON_SECRET=<value>) → clean. Μονο το saas.md αναφερει το
+admin-tenant-detail endpoint (grep) → καμια αλλη σελιδα out-of-sync.
+
+Collision guard: `git status --short` = μονο `M docs/saas.md` (κανενα foreign staged). Stage
+ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: το superadmin console §8 μεγαλωνει ανα increment (listing #48, detail #49, usage
+rollup #50)· watch νεα admin/* commits για superadmin ACTIONS (write surfaces: suspend/reactivate/
+impersonate) ή UI console page. Η stale-forward-ref sweep αν εκτεθουν export/erasure/files/
+superadmin στο workspace-settings UI (features.md).

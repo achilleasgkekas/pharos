@@ -622,13 +622,13 @@ unknown slug is a `404`.
 
 | Method | Path | Result |
 | --- | --- | --- |
-| `GET` | `/api/saas/admin/tenants/<slug>` | Read-only detail for one workspace: the registry summary (same fields as a listing row) plus its full member roster and a role/status tally. `no-store`. |
+| `GET` | `/api/saas/admin/tenants/<slug>` | Read-only detail for one workspace: the registry summary (same fields as a listing row), its full member roster, a role/status tally, and a usage rollup (AI consumption + storage footprint). `no-store`. |
 
 The slug is trimmed and lower-cased before lookup, so `/Acme` and `acme` resolve
 to the same workspace. Like the listing, this reads **only** the central
-registry collections (`Tenant`, `Membership`, `Account`); it never opens a
-per-tenant data database and never writes. A per-tenant usage/stats view would
-touch the data plane and is a deliberately separate, later increment.
+registry collections (`Tenant`, `Membership`, `Account`) plus the control-plane
+`Usage` ledger (below); it never opens a per-tenant data database and never
+writes.
 
 Each member row is display-safe: only `email` and `name` are read from the
 account (never a password hash or token), and a dangling membership (its account
@@ -637,12 +637,32 @@ members by status (`active`/`invited`/`removed`); roles (`owners`/`admins`/
 `members`) are counted for **active** members only, so `owners` reflects the
 actual live owner seats, which makes an ownerless workspace easy to spot.
 
-Response envelope (`format: pharos.admin-tenant-detail`, version `1`):
+The `usage` rollup is sourced **entirely** from the central `Usage` ledger, the
+same control-plane collection the metering endpoints already sample into. The
+operator sees a footprint/AI-consumption view **without** this endpoint ever
+opening a per-tenant data database or running `db.stats()` itself. It reads at
+most the 12 most-recent monthly rows and shapes them into:
+
+- `totals` — the monotonic AI counters (`aiCalls`, `aiInputTokens`,
+  `aiOutputTokens`, `aiCostMicros`) **summed** across the returned months.
+  `aiCostMicros` is estimated spend in currency micros (millionths of one unit).
+- `latestStorageBytes` / `latestStorageMeasuredAt` — storage is a **gauge**, not
+  additive, so it is taken from the period with the newest measurement timestamp
+  rather than summed (summing an overwritten footprint would be wrong).
+- `periods[]` — the per-month rows, most-recent first.
+
+All numeric fields are defensively coerced to non-negative integers, so a
+garbage or negative stored value can never surface. The self-hosted
+`DEFAULT_TENANT` never writes `Usage` docs, so for it (and whenever SaaS mode is
+off) the rollup is an **empty** summary (`periodCount: 0`, zero totals) — no
+effect on the OSS app.
+
+Response envelope (`format: pharos.admin-tenant-detail`, version `2`):
 
 ```json
 {
   "format": "pharos.admin-tenant-detail",
-  "version": 1,
+  "version": 2,
   "generatedAt": "2026-07-09T13:00:00.000Z",
   "tenant": {
     "id": "665f...",
@@ -678,7 +698,30 @@ Response envelope (`format: pharos.admin-tenant-detail`, version `1`):
       "invitedBy": null,
       "createdAt": "2026-06-01T09:00:00.000Z"
     }
-  ]
+  ],
+  "usage": {
+    "periodCount": 2,
+    "totals": {
+      "aiCalls": 412,
+      "aiInputTokens": 918400,
+      "aiOutputTokens": 121200,
+      "aiCostMicros": 3450000
+    },
+    "latestPeriod": "2026-07",
+    "latestStorageBytes": 734003200,
+    "latestStorageMeasuredAt": "2026-07-09T02:00:00.000Z",
+    "periods": [
+      {
+        "period": "2026-07",
+        "aiCalls": 190,
+        "aiInputTokens": 402000,
+        "aiOutputTokens": 55200,
+        "aiCostMicros": 1500000,
+        "storageBytes": 734003200,
+        "storageMeasuredAt": "2026-07-09T02:00:00.000Z"
+      }
+    ]
+  }
 }
 ```
 
