@@ -305,6 +305,65 @@ Collections are sorted by name so successive exports diff cleanly. The collectio
 whitelisted workspace display fields (`slug`/`name`/`plan`/`status`) are projected into
 the envelope, never secrets.
 
+#### Workspace file-binary manifest (GDPR portability)
+
+The content export above hands back the **Mongo collections**, but the binary files a
+workspace references, the receipt and statement PDFs and the item photos, do **not**
+live in Mongo. They live on disk under `STORAGE_ROOT`, referenced by each document's
+`filePath` / `thumbPath` / `photos` fields. Without those binaries an export is
+incomplete. This route closes that gap with a **report-only manifest**.
+
+| Method | Path | Body | Result |
+| --- | --- | --- | --- |
+| `GET` | `/api/saas/workspace/export/files[?tenant=<slug>]` | — | **Owner/admin only.** Streams a JSON manifest of the binary files the workspace references (`Content-Disposition: attachment; filename="pharos-workspace-<slug>-files.json"`, `Cache-Control: no-store`). `404` when SaaS mode is off, `401` when signed out, `403` for non-owner/admin members. |
+
+Same authorization and lifecycle as the content export: because the manifest describes
+**every member's files**, it is a data-controller action gated to owner/admin
+(`requireManage`), and it works for a suspended or canceled workspace (`allowInactive`),
+because portability must not be gated on billing status. The write is a single
+control-plane `workspace.files_manifested` audit row (with the file/present/missing/byte
+totals in `meta`); nothing on the data plane or the filesystem is mutated.
+
+It is **report-only by design** (mirrors the [erasure purge scan](#erasure-purge-scan-report-only)):
+it never reads any file's **content** and produces **no archive**. Building the actual
+tar/zip needs a streaming-archive dependency and is deferred ("Needs Achilleas"). Two
+strictly read-only passes feed it:
+
+- **DB pass** (model-agnostic): opens the tenant-scoped connection and, for each
+  exportable collection, projects only the file-reference fields (`filePath`, `thumbPath`,
+  `photos`), never loading full docs. References are validated as clean,
+  `STORAGE_ROOT`-relative paths (blanks, absolute paths and `..` traversal rejected as
+  defence-in-depth), then deduped and sorted.
+- **Filesystem pass**: `stat`s each reference under `STORAGE_ROOT` (size only, never
+  content). A reference that escapes the root, is missing, or errors is reported
+  `exists: false, bytes: 0` rather than throwing, so one bad reference cannot sink the
+  whole manifest.
+
+**OSS parity:** SaaS-only. The DB reader refuses the implicit default tenant (self-hosted
+has its own file-preserving JSON backup/restore) and the route is 404 when `SAAS_MODE` is
+off, so the self-hosted single-user app is untouched. The payload shape:
+
+```json
+{
+  "format": "pharos.workspace-files-manifest",
+  "version": 1,
+  "generatedAt": "2026-07-06T00:00:00.000Z",
+  "notice": "Manifest of the binary files (receipt/statement PDFs, item photos) referenced by this Pharos workspace …",
+  "workspace": { "slug": "acme", "name": "Acme", "plan": "pro", "status": "active" },
+  "totals": { "files": 340, "present": 338, "missing": 2, "bytes": 51234567 },
+  "files": [
+    { "path": "receipts/2026/06/04_skroutz_wd_blue.jpg", "bucket": "receipts", "exists": true, "bytes": 184320 },
+    { "path": "statements/2026/mastercard_7791_06.pdf", "bucket": "statements", "exists": true, "bytes": 220114 }
+  ]
+}
+```
+
+Files are sorted by path so successive manifests diff cleanly, and `totals` are computed
+from the `files` list so the header never disagrees with the entries. Only the whitelisted
+workspace display fields (`slug`/`name`/`plan`/`status`) are projected into the envelope,
+never secrets. The `bucket` field is the top-level storage bucket (receipts / statements /
+equipment / expenses / …) for grouping.
+
 ### Workspace erasure (GDPR)
 
 The workspace owner can **schedule the permanent deletion** of a workspace and its
@@ -477,6 +536,84 @@ masked `••••<last 4>` preview. Set/clear operations are written to the a
 | --- | --- | --- | --- |
 | `GET` | `/api/saas/audit` | `?tenant=<slug>&action=<verb>&limit=<n>&before=<iso>` | Append-only activity trail for the workspace, newest first (members added/removed, role changes, invites, plan changes, `ai_key` events). Owner/admin only. `limit` is 1..200 (default 50); `before` is an ISO timestamp cursor returning events strictly older than it, for pagination; an unknown `action` applies no filter. The serializer projects whitelisted fields only, so no secret leaks. |
 
+### Superadmin console (§8)
+
+A separate, **platform-operator** surface for the person running the Pharos
+deployment, distinct from the per-workspace owner/admin roles above. A
+superadmin can see the control plane across **all** tenants; it is not a role
+stored on any workspace, and there is no in-app path to become one.
+
+Authorization is an **env allowlist**, `SAAS_SUPERADMIN_EMAILS`, matched against
+the signed-in account's email (comma, semicolon, or whitespace separated;
+entries without an `@` are dropped). Because membership lives in env and not the
+database, a compromised account row cannot mint a superadmin. An empty or unset
+allowlist means the console is simply not enabled.
+
+| Method | Path | Query | Result |
+| --- | --- | --- | --- |
+| `GET` | `/api/saas/admin/tenants` | `?status=<s>&q=<term>&limit=<n>&offset=<n>` | Read-only, cross-tenant registry listing, newest first. Returns a display-safe summary per workspace: `slug`, `name`, `plan`, `status`, `tier`, `customDomain`, `trialEndsAt`, `erasureScheduledAt`, `billingLinked` (a Stripe customer or subscription id is set), `aiByoKey`, `createdAt`, `updatedAt`. `no-store`. |
+
+Query rules:
+
+- `limit` is clamped to 1..100 (default 50); a non-numeric or non-positive value
+  falls back to the default. `offset` is floored to `≥ 0`.
+- `status` filters on an exact `Tenant` status (`pending`, `trialing`,
+  `active`, `suspended`, `canceled`); any other value is ignored (no filter).
+- `q` is a case-insensitive substring match across `slug`, `name`, and
+  `customDomain`. The term is regex-escaped, so metacharacters are matched
+  literally, never interpreted as a pattern.
+
+Authorization order (each hides the console a little more from non-operators):
+
+| Condition | Response |
+| --- | --- |
+| `SAAS_MODE` off / `AUTH_SECRET` unset | `404` / `500` (endpoint absent for self-hosted) |
+| `SAAS_SUPERADMIN_EMAILS` unset or empty | `404` (console not enabled; existence not revealed) |
+| Not signed in | `401` |
+| Signed in, email not in the allowlist | `403` |
+| Allowed, but the account row was deleted | `401` (stale cookie) |
+
+Response envelope (`format: pharos.admin-tenant-listing`, version `1`):
+
+```json
+{
+  "format": "pharos.admin-tenant-listing",
+  "version": 1,
+  "generatedAt": "2026-07-07T13:00:00.000Z",
+  "total": 128,
+  "count": 50,
+  "limit": 50,
+  "offset": 0,
+  "filter": { "status": "active", "q": null },
+  "tenants": [
+    {
+      "id": "665f...",
+      "slug": "acme",
+      "name": "Acme",
+      "plan": "shared",
+      "status": "active",
+      "tier": "pro",
+      "customDomain": null,
+      "trialEndsAt": null,
+      "erasureScheduledAt": null,
+      "billingLinked": true,
+      "aiByoKey": false,
+      "createdAt": "2026-06-01T09:00:00.000Z",
+      "updatedAt": "2026-07-01T09:00:00.000Z"
+    }
+  ]
+}
+```
+
+`total` is the full match count for the filter (for paging); `count` is the
+number of rows in this page. The console is **observability only**: it reads
+just the central `Tenant` registry, never opens a per-tenant data database, and
+never writes. Destructive operations stay manual and out of scope here.
+
+**OSS parity:** SaaS-only. The route is `404` when `SAAS_MODE` is off, and there
+is no equivalent in the self-hosted single-tenant app (there is nothing to list
+across; the operator owns the one deployment).
+
 ## SaaS environment variables
 
 These are needed **only** in SaaS mode. Use placeholders; never commit real
@@ -488,6 +625,7 @@ secrets. They are not part of the self-hosted `.env.example` yet
 | `SAAS_MODE` | Master switch (see above). |
 | `SAAS_BASE_DOMAIN` | Base domain for tenant subdomains (`<slug>.<domain>`). Defaults to `ph-aros.com`; override for localhost/staging. |
 | `SAAS_SESSION_IDLE_HOURS` | Idle lifetime for the account session cookie. |
+| `SAAS_SUPERADMIN_EMAILS` | Allowlist of platform-operator emails for the [superadmin console](#superadmin-console-8) (comma / semicolon / whitespace separated). Unset or empty disables the console entirely (`404`). |
 | `AUTH_SECRET` | Shared secret used to sign session cookies (also required by the self-hosted app) and to derive the AES-256-GCM key that encrypts BYO-key AI secrets at rest. Rotating it invalidates existing encrypted keys, so keep it stable. |
 | `AUTH_COOKIE_SECURE` | Force the `Secure` flag on cookies (behind HTTPS). |
 | `STRIPE_SECRET_KEY` | Stripe secret key. When unset, billing reports "not configured" and checkout/portal are unavailable. |

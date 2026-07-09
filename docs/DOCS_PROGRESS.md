@@ -891,3 +891,103 @@ Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/sa
 Επομενο run: ERASURE_GRACE_DAYS λειπει απο τον env-vars πινακα (gap εντοπισμενο)· η stale-forward-ref
 sweep αν εκτεθουν τα export/erasure στο workspace-settings UI (features.md). Τα 29 saas routes
 πλεον ολα τεκμηριωμενα.
+
+## 2026-07-06 (saas.md: workspace FILE-BINARY export manifest, GDPR Art. 20 §8)
+
+Το πιο προσφατο commit `20c12bd` (feat(saas): workspace file-binary export manifest —
+report-only) προσθεσε νεο SaaS route `GET /api/saas/workspace/export/files[?tenant=<slug>]`
+που **δεν** ηταν τεκμηριωμενο (grep "export/files" σε saas.md = 0 hits). Ειναι το binary-file
+συμπληρωμα του content export (#46): τα receipt/statement PDFs + item photos ζουν στον δισκο
+(STORAGE_ROOT), οχι στη Mongo, οποτε το collection dump μονο του ηταν incomplete.
+
+Διαβασα τα πραγματικα αρχεια (`app/api/saas/workspace/export/files/route.ts` +
+`lib/tenancy/workspaceFiles.ts`) και προσθεσα νεα subsection **#### Workspace file-binary
+manifest (GDPR portability)** μεσα στο "Data export (GDPR)", αμεσως μετα το content-export
+payload και πριν το "Workspace erasure (GDPR)".
+
+Τι εγραψα:
+- Πινακας 1 γραμμης: `GET` owner/admin-only (requireManage), attachment JSON
+  `pharos-workspace-<slug>-files.json`, `Cache-Control: no-store`. Status: `404` SaaS off,
+  `401` signed out, `403` non-owner/admin. Δουλευει σε suspended/canceled (allowInactive).
+- Report-only by design (mirror του erasure purge scan, με anchor link): ΠΟΤΕ δεν διαβαζει
+  file content, ΚΑΝΕΝΑ archive — packaging deferred ("Needs Achilleas"). Μονο control-plane
+  audit row `workspace.files_manifested` (files/present/missing/bytes στο meta).
+- Δυο read-only passes: (α) DB pass model-agnostic, projection ΜΟΝΟ file-ref fields
+  (filePath/thumbPath/photos), path validation storage-relative (reject absolute + `..`
+  traversal), dedupe+sort· (β) filesystem pass = stat μονο (size, οχι content), bad ref →
+  exists:false bytes:0 χωρις throw.
+- OSS parity callout: SaaS-only, reader refuses default tenant, 404 οταν SAAS_MODE off·
+  self-hosted εχει file-preserving JSON backup/restore.
+- JSON sample (format `pharos.workspace-files-manifest` v1, workspace slug/name/plan/status
+  whitelist, totals files/present/missing/bytes, files[] path/bucket/exists/bytes). Files
+  sorted by path (clean diffs), totals derived απο τη λιστα (header δεν αποκλινει), bucket =
+  top-level storage bucket.
+
+Accuracy: καμια τιμη/header/status/format εφευρεθηκε — cross-checked με τον κωδικα (saasGuard
++ resolveWorkspaceSession(slug,true,true) = requireManage+allowInactive, audit action string
+`workspace.files_manifested`, filename `pharos-workspace-<safe>-files.json`, format/version/
+notice/totals keys, isStorageRelative reject rules, SINGLE_FILE_FIELDS/ARRAY_FILE_FIELDS).
+Placeholders μονο `<slug>`/`acme`.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 10 markers
+(5 balanced blocks, +1 νεο). Anchor `#erasure-purge-scan-report-only` ταιριαζει το heading
+(γραμμη 422). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/
+CRON_SECRET=<value>) → clean. Κανενα "N routes" count text στο saas.md για update.
+
+Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/saas.md +
+docs/DOCS_PROGRESS.md.
+
+Επομενο run: ERASURE_GRACE_DAYS λειπει ακομα απο τον env-vars πινακα (gap εντοπισμενο δυο runs
+πριν, δεν υπαρχει στο saas.md)· η stale-forward-ref sweep αν εκτεθουν export/erasure/files στο
+workspace-settings UI (features.md).
+
+## 2026-07-09 (saas.md: Superadmin console §8 + SAAS_SUPERADMIN_EMAILS)
+
+Το commit `c282c68` (feat(saas): superadmin console scaffold, read-only cross-tenant listing)
+προσθεσε νεο control-plane route `GET /api/saas/admin/tenants` που ηταν εντελως ατεκμηριωτο
+(grep "admin/tenants" σε saas.md = 0 hits). Ειναι το πρωτο platform-operator surface, ξεχωριστο
+απο το per-workspace owner/admin authz.
+
+Διαβασα τα πραγματικα αρχεια (`app/api/saas/admin/tenants/route.ts`, `lib/tenancy/superadmin.ts`,
+`lib/tenancy/adminTenants.ts`) και προσθεσα νεα ενοτητα **### Superadmin console (§8)** αμεσως
+μετα το "Activity (audit)" και πριν το "SaaS environment variables". Επισης νεα γραμμη στον
+env-vars πινακα: **SAAS_SUPERADMIN_EMAILS**.
+
+Τι εγραψα:
+- Env allowlist gate (comma/semicolon/whitespace separated, entries χωρις @ dropped, empty/unset
+  → console disabled 404). Τονισα οτι η ιδιοτητα ζει στο env οχι στη DB, οποτε compromised account
+  row δεν μπορει να mint superadmin· κανενα in-app escalation path.
+- Πινακας route: `GET /api/saas/admin/tenants` με query `status/q/limit/offset`, read-only registry
+  listing newest-first, display-safe summary fields (slug/name/plan/status/tier/customDomain/
+  trialEndsAt/erasureScheduledAt/billingLinked/aiByoKey/createdAt/updatedAt), `no-store`.
+- Query rules: limit clamp 1..100 default 50, offset floor ≥0, status exact-match στο Tenant enum
+  (pending/trialing/active/suspended/canceled) αλλιως αγνοειται, q case-insensitive substring
+  regex-escaped across slug/name/customDomain.
+- Authorization-order πινακας (5 states): SAAS_MODE off/AUTH_SECRET unset→404/500, allowlist empty
+  →404, not signed in→401, not in allowlist→403, account row deleted→401.
+- JSON sample (format `pharos.admin-tenant-listing` v1: generatedAt/total/count/limit/offset/filter/
+  tenants[]). total=full match count για paging, count=rows στη σελιδα. Τονισα observability-only
+  (μονο central Tenant registry, ποτε per-tenant data-db, ποτε write, destructive ops out of scope).
+- OSS parity callout: SaaS-only, 404 οταν SAAS_MODE off, κανενα equivalent στο self-hosted single-tenant.
+
+Accuracy: καμια τιμη/status/field/format εφευρεθηκε, cross-checked με τον κωδικα (requireSuperadmin
+gate ordering, parseSuperadminEmails separators + @-filter, parseAdminTenantQuery clamps,
+TENANT_STATUSES, buildTenantQueryFilter regex-escape, summarizeTenant fields + billingLinked =
+billingCustomerId||billingSubscriptionId, AdminTenantListing envelope keys). Placeholders μονο
+`<slug>`/`acme`.
+
+ΔΙΟΡΘΩΣΗ προηγουμενης σημειωσης: το ERASURE_GRACE_DAYS ΔΕΝ ειναι env var, ειναι hardcoded
+compile-time constant (30) στο `lib/tenancy/erasure.ts` (δεν διαβαζεται απο process.env). Το
+προηγουμενο "gap" ηταν λαθος υποθεση· διαβαζοντας τον κωδικα αποφευχθηκε λαθος καταχωρηση στον
+env-vars πινακα. ΔΕΝ προστεθηκε.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 12 markers
+(6 balanced blocks, +1 νεο). Anchor `#superadmin-console-8` ταιριαζει το heading "### Superadmin
+console (§8)" (parens + § stripped απο GitHub slug). Secret scan (sk_live/sk_test/sk-ant-/
+AUTH_SECRET=/STRIPE_SECRET_KEY=/CRON_SECRET=<value>) → clean.
+
+Collision guard: `git status --short` πριν το add· stage ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: superadmin console = πιθανον να αποκτησει κι αλλα routes (per-tenant detail, actions)
+καθως το §8 scaffold μεγαλωνει, watch τα νεα admin/* commits· η stale-forward-ref sweep αν εκτεθουν
+export/erasure/files/superadmin στο workspace-settings UI (features.md).
