@@ -408,3 +408,63 @@ data-db/User-path/bearer-path αγγίχτηκε. Collision guard: staging κα�
 **Next task:** increment 52 — είτε (α) LIVE on-demand `db.stats()` reader (data plane read-only →
 άδεια), είτε (β) user-facing workspace-settings UI panels (control-plane APIs έτοιμα → UI territory),
 είτε (γ) actual binary packaging / BYO-key AI-dispatch (shared runtime / archive dep → άδεια).
+
+## 2026-07-09 (increment 52 — Superadmin LIVE db.stats() reader: on-demand footprint, §8)
+**Το κενό:** τα increments 48-51 έχτισαν το superadmin console ΜΟΝΟ πάνω στο central
+registry (listing/detail/usage-rollup/fleet-overview). Το tenant DETAIL usage rollup (#50)
+έδειχνε επίτηδες το **ΤΕΛΕΥΤΑΙΟ sampled** storage figure από το control-plane `Usage`
+ledger, και σημείωσε ρητά το επόμενο κομμάτι: έναν **LIVE, on-demand** reader που τρέχει
+`db.stats()` στη βάση ενός tenant **τώρα**, αντί να περιμένει το περιοδικό `sampleAllTenants`
+cron. Το έκλεισα. Ο brief το είχε flag-άρει «(α) data plane read-only → άδεια»· το έκρινα
+ασφαλές να προχωρήσω **αυτόνομα** γιατί: (1) είναι **strictly read-only** — το `db.stats()`
+είναι diagnostic command (διαβάζει collection/index size metadata, ΟΧΙ τα documents) και ο
+reader **δεν γράφει ποτέ** (σε αντίθεση με το `sampleTenantStorage`, ΔΕΝ push-άρει sample στο
+Usage ledger — το view ενός footprint έχει μηδέν side effects)· (2) **reuse** του ΗΔΗ
+existing+tested `readDbStats`/`billedBytes` (`lib/billing/dbStats.ts`, που ήδη τρέχει στο cron)
+— πρώτος on-demand consumer, μηδέν νέο data-plane code· (3) fully gated (SAAS off → 404,
+superadmin off → 404) ⇒ zero effect self-hosted· (4) υλοποιεί ρητά το §8 «dbStats() size
+metering». ΟΛΟ additive + SaaS-gated + operator-gated, σε δικά μου SAAS αρχεία:
+- `lib/tenancy/adminTenantDbStats.ts` (νέο). **PURE** shapers (unit-tested):
+  `summarizeLiveDbStats(raw, fileBytes)` → display-safe {dataSize, storageSize, indexSize,
+  objects, dbBytes(=billedBytes storage+index με COERCED values → single source of truth),
+  fileBytes, totalBytes(=dbBytes+fileBytes)}· defensive `bytes()` NaN/±Inf/negative/fractional
+  → floored non-neg· null raw → zero db footprint αλλά μετράει file bytes. `buildLiveDbStats(
+  {slug,dbName,raw,fileBytes,generatedAt})` → σταθερό envelope {format:'pharos.admin-tenant-
+  dbstats', version:1, generatedAt(ISO safe→epoch), slug/dbName(non-string→''), **measured**
+  (raw!=null → ξεχωρίζει «couldn't read» από «zero footprint»), live}. **Impure**
+  `readLiveDbStatsForAdmin(slug, now?)` = ο ΜΟΝΟΣ reader: `Tenant.findOne({slug})` (registry·
+  null → caller 404) → build ctx (isDefault:false — ο default tenant ΔΕΝ έχει registry row,
+  άρα ποτέ db.stats στη default/self-hosted βάση) → `readDbStats(ctx)` LIVE read-only +
+  `tenantFileBytes(ctx)`, το καθένα σε try/catch (ένα bad db → not-measured envelope, ΟΧΙ 500,
+  mirror του sampleAllTenants isolation).
+- `app/api/saas/admin/tenants/[slug]/dbstats/route.ts` (νέο) — `GET`, `runtime=nodejs`,
+  `force-dynamic`, `saasGuard` (404 off) + `requireSuperadmin` (404 console-off / 401 / 403) +
+  unknown slug → 404· `no-store`. Read-only. Next 15 param convention (`params: Promise<{slug}>`).
+- `lib/tenancy/adminTenantDbStats.test.ts` (νέο) — 8 PURE tests (summarize full/null/coerce/
+  floor· build envelope measured true/false + invalid-gen→epoch + non-string slug/dbName→'').
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run adminTenantDbStats.test.ts` →
+**8/8 green**· full suite `npx vitest run` → **1765/1765 green** (133 files, καμία regression).
+External importers του νέου module από feature code → **κανένας** (μόνο το δικό μου route).
+Route SAAS-gated (404 off) + operator-gated (404 όταν `SAAS_SUPERADMIN_EMAILS` κενό)· ο reader
+αγγίζει data plane **read-only** (db.stats), μηδέν write πουθενά. ⇒ `SAAS_MODE` off / self-
+hosted = **zero effect** (route δεν mount-άρει, gate inert, default tenant δεν έχει registry
+row → μηδέν db.stats στη self-hosted βάση). Κανένας Docker rebuild (additive gated route +
+node-only read module, reuse existing data-plane code — μηδέν shared runtime wiring, type-check+
+tests καλύπτουν)· καμία νέα εξάρτηση· κανένα feature route/User-path/bearer-path/write αγγίχτηκε.
+Collision guard: staging καθαρό (τίποτα pre-staged· τα foreign `apps/landing/**` του start-
+snapshot είχαν ήδη commit-αριστεί από concurrent routine), μόνο τα δικά μου 3 paths.
+
+**## Needs Achilleas** (superadmin console):
+- **`SAAS_SUPERADMIN_EMAILS` env** (από #48) για ενεργοποίηση σε production. Κενό = disabled (404).
+- **Superadmin UI page** (`/admin`) που καταναλώνει listing (#48) + detail-με-usage (#49/#50) +
+  fleet overview (#51) + LIVE dbstats (#52) — deferred (UI territory).
+- **On-demand write-back**: το LIVE reader σκόπιμα ΔΕΝ γράφει sample στο ledger· αν θελήσεις ένα
+  «refresh now» που ΚΑΙ ενημερώνει το cached figure, θα ήταν χωριστό opt-in action (write) — όχι
+  από routine αυτόματα.
+- **Write/destructive superadmin actions** (suspend/reactivate/force-plan/drop-tenant) = **ΠΟΤΕ από routine**.
+
+**Next task:** increment 53 — είτε (α) storage-quota ENFORCEMENT surface στο superadmin (over-quota
+tenants flag στο fleet overview/detail, read-only πάνω στο υπάρχον `checkStorageQuota` → control
+plane, ασφαλές), είτε (β) user-facing workspace-settings UI panels (control-plane APIs έτοιμα → UI
+territory), είτε (γ) actual binary packaging / BYO-key AI-dispatch (shared runtime / archive dep → άδεια).
