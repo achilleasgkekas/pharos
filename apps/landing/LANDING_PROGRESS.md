@@ -1287,3 +1287,47 @@ Needs-Achilleas (open):
 - Annual billing: discount πριν φτιαξω toggle.
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-09 — (e) polish: «Copy link» affordance σε καθε ανοιχτη FAQ απαντηση
+
+Task: (e) polish. Τα δυο blocked increments (real app screenshots -> assets· annual-billing toggle ->
+Needs-Achilleas τιμες) μενουν κλειστα, οποτε πηρα το φρεσκο self-contained που ειχα σημειωσει προηγουμενως:
+«copy link» πανω σε καθε ανοιχτη FAQ. Μεχρι τωρα το deep-linking (FaqDeepLink) εγραφε το hash στο address
+bar οταν ανοιγες ερωτηση, αλλα δεν υπηρχε ρητο affordance για να αντιγραψεις/μοιραστεις τον συνδεσμο· ενα
+hosted-support reply («δες το FAQ για backups») δεν ειχε ευκολο κουμπι να δωσει τον ακριβη συνδεσμο.
+
+Τι εφτιαξα:
+- `app/components/FaqCopyLink.tsx` (νεο, `'use client'`, progressive enhancement σαν το CopyButton):
+  μικρο inline κουμπι «Copy link» στο τελος καθε απαντησης. On click αντιγραφει τον shareable deep link
+  (`origin+pathname#faq-...`, χτισμενο client-side ωστε να ειναι σωστος σε localhost/preview/prod χωρις baked
+  base URL) + ενημερωνει το hash μεσω `replaceState` (οχι history spam) + flip σε «Copied» για ~1.8s.
+  Mountαρει ΜΟΝΟ αν υπαρχει Clipboard API -> no-JS/SSR readers κραταν πληρες FAQ, απλα χωρις το shortcut.
+  Distinct link-chain εικονιδιο (οχι το copy-clipboard του CopyButton) για να διαβαζεται «συνδεσμος».
+- `app/page.tsx`: το `<p className="faq-a">` εγινε `<div className="faq-a"><p>{a}</p><FaqCopyLink id=.../></div>`
+  ωστε το κουμπι να καθεται κατω απο το κειμενο· import του FaqCopyLink.
+- `app/globals.css`: `.faq-a` -> layout container (κρατα padding/max-width), το χρωμα/μεγεθος κειμενου
+  μεταφερθηκε σε `.faq-a p`· νεα `.faq-copy` / `.faq-copy:hover` / `.faq-copy-done` (subtle faint chip,
+  accent οταν copied, honours το global reduced-motion transition override).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static· `/` 3.08 -> 3.27 kB (client component + markup, καμια νεα route).
+- Prerendered `.next/server/app/index.html`: 9 `class="faq-a"` wrappers present· `faq-copy` = 0 στο prerender,
+  ΑΝΑΜΕΝΟΜΕΝΟ (το κουμπι renderαρει μονο client-side αφου το `supported` γινεται true σε useEffect, ιδιο
+  pattern με CopyButton) -> zero SSR regression, το FAQ δουλευει και χωρις JS.
+- em-dash check: 0 σε FaqCopyLink.tsx + page.tsx.
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev στον φακελο· verify μεσω build output + prerendered
+  HTML)· δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> κανενα foreign staged file· stage ΜΟΝΟ τα δικα μου
+  (page.tsx, globals.css, FaqCopyLink.tsx, LANDING_PROGRESS.md), τα foreign modified (PRODUCT_BACKLOG,
+  mobile, docs) δεν τα αγγιξα.
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets· annual-billing toggle
+ΜΟΝΟ αφου κλεισουν ετησιες τιμες.
+
+Needs-Achilleas (open):
+- Terms + Privacy: review + finalize (billing terms, governing-law jurisdiction, provider/processor ονοματα)
+  ΠΡΙΝ hosted launch· μετα flip `robots:{index:false}` -> indexable + add στο sitemap.
+- Annual billing: discount πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.

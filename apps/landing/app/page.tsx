@@ -6,6 +6,7 @@ import { ScrollSpy } from './components/ScrollSpy';
 import { BackToTop } from './components/BackToTop';
 import { CopyButton } from './components/CopyButton';
 import { FaqDeepLink } from './components/FaqDeepLink';
+import { FaqCopyLink } from './components/FaqCopyLink';
 
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const SITE_URL = 'https://ph-aros.com';
@@ -1286,7 +1287,10 @@ export default function Home() {
                     <Icon name="chevron" size={18} />
                   </span>
                 </summary>
-                <p className="faq-a">{f.a}</p>
+                <div className="faq-a">
+                  <p>{f.a}</p>
+                  <FaqCopyLink id={faqId(f.q)} />
+                </div>
               </details>
             ))}
           </div>

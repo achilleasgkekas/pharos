@@ -995,10 +995,37 @@ h1, h2, h3 {
   color: var(--accent);
 }
 .faq-a {
-  color: var(--text-dim);
-  font-size: 0.95rem;
   padding: 0 0 18px;
   max-width: 620px;
+}
+.faq-a p {
+  color: var(--text-dim);
+  font-size: 0.95rem;
+}
+.faq-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.faq-copy:hover {
+  color: var(--text);
+  border-color: var(--border-light);
+  background: var(--surface-2);
+}
+.faq-copy-done {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 /* Compare table (self-host vs hosted) */
