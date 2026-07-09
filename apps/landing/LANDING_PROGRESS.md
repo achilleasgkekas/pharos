@@ -1375,3 +1375,46 @@ Needs-Achilleas (open):
 - Annual billing: discount πριν φτιαξω toggle.
 - Contact inbox `hello@ph-aros.com` — να επιβεβαιωθει πριν launch.
 - GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.
+
+## 2026-07-09 — (e) polish: print / save-to-PDF stylesheet
+
+Task: (e) polish. Τα δυο blocked increments (real app screenshots -> assets· annual-billing toggle ->
+Needs-Achilleas τιμες) μενουν κλειστα. Φρεσκο self-contained: ενα `@media print` stylesheet. Μεχρι τωρα,
+οποιος τυπωνε ή εκανε save-to-PDF την pricing/landing (dark-first, 17 sections) εβγαζε μαυρο φοντο
+(σπαταλη μελανιου), το gradient-clipped hero title («everything you run.») τυπωνοταν κενο (transparent
+fill), και το sticky translucent header + το ambient grid/glow + τα floating chrome (scroll beam,
+back-to-top, mobile burger) βρωμιζαν τη σελιδα.
+
+Τι εφτιαξα:
+- `app/globals.css`: νεο `@media print` block στο τελος (μετα το reduced-motion). Στρατηγικη: flip των
+  palette CSS vars σε light μεσα στο print scope (`:root { --bg:#fff; --text:#111; --accent:#00994d
+  darkened· ... }`) -> re-themes ΚΑΙ τις class-based ΚΑΙ τις inline `var(...)` χρησεις του page.tsx με μια
+  κινηση. Επιπλεον: `body::before/after` (grid+glow) display:none, `header` un-stick (position:static +
+  bg #fff + no backdrop-filter, override των inline styles με !important), hide `.scroll-progress`/
+  `.back-to-top`/`.skip-link`/`.nav-burger`/`.drawer-*`, `*` box-shadow+text-shadow none (flat cards),
+  `break-inside:avoid` σε cards + `break-after:avoid` σε h1-h3.
+- `app/page.tsx`: εδωσα class `hero-highlight` στο gradient hero span (κραταει τα inline gradient styles)
+  ωστε το print rule να κανει override το inline `color:transparent` -> solid accent ink (stylesheet
+  !important νικαει non-important inline). Μηδεν αλλη αλλαγη markup.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static· `/` 3.48 kB (μονο CSS + ενα className, καμια νεα JS/route).
+- Built CSS `.next/static/css/*.css`: το `@media print{:root{--bg:#ffffff;...}}` block present· `hero-highlight`
+  σε CSS + prerendered `index.html` (class attr + inlined critical style) -> zero SSR regression.
+- em-dash check: 0 σε page.tsx + ολα τα components· το νεο CSS comment γραφτηκε ΧΩΡΙΣ em-dash (comma style,
+  σε αντιθεση με το προϋπαρχον file convention lines 1490/1516/1539/1574) -> hard-rule compliant.
+- Δεν σηκωσα dev server (αλλη ρουτινα τρεχει ηδη dev στον φακελο· print media δεν ειναι screen-observable,
+  verify μεσω build output + built CSS grep)· δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: git status πριν το commit -> κανενα foreign staged file· stage ΜΟΝΟ τα δικα μου
+  (page.tsx, globals.css, LANDING_PROGRESS.md).
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets· annual-billing toggle
+ΜΟΝΟ αφου κλεισουν ετησιες τιμες· ισως OG-image polish ή content copy pass.
+
+Needs-Achilleas (open):
+- Terms + Privacy: review + finalize (billing terms, governing-law jurisdiction, provider/processor ονοματα)
+  ΠΡΙΝ hosted launch· μετα flip `robots:{index:false}` -> indexable + add στο sitemap.
+- Annual billing: discount πριν φτιαξω toggle.
+- Contact inbox `hello@ph-aros.com` να επιβεβαιωθει πριν launch.
+- GitHub repo public ΠΡΙΝ launch + `git push --force origin main` (mbox purge)· μετα flip `REPO_PUBLIC=true`.

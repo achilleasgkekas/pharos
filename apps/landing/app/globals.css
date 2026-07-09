@@ -1604,3 +1604,87 @@ button:focus-visible,
     transform: none;
   }
 }
+
+/* Print / save-to-PDF. The site is dark-first, but a printed page should be
+   light (save ink, stay legible). Flipping the palette vars re-themes both the
+   CSS classes and the inline `var(...)` usages in page.tsx in one place. Also
+   drops the ambient background, un-sticks the header, and hides floating chrome
+   (scroll beam, back-to-top, mobile burger) that has no meaning on paper. */
+@media print {
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #ffffff;
+    --surface-3: #f5f5f5;
+    --border: #cccccc;
+    --border-light: #dddddd;
+    --text: #111111;
+    --text-dim: #444444;
+    --text-faint: #666666;
+    --accent: #00994d; /* darkened green stays legible on white */
+    --cyan: #0077a3;
+    --purple: #7a3fc0;
+    --gold: #a8820a;
+    --red: #cc3344;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+  body {
+    background: #ffffff;
+    color: #111111;
+    overflow-x: visible;
+  }
+  /* Kill the ambient grid + glow layers */
+  body::before,
+  body::after {
+    display: none !important;
+  }
+
+  /* Un-stick the translucent header (inline styles → override with !important) */
+  header {
+    position: static !important;
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Floating / interactive-only chrome has no place on paper */
+  .scroll-progress,
+  .back-to-top,
+  .skip-link,
+  .nav-burger,
+  .drawer-scrim,
+  .drawer-panel {
+    display: none !important;
+  }
+
+  /* Gradient-clipped hero text prints blank (transparent fill) → solid ink */
+  .hero-highlight {
+    background: none !important;
+    color: var(--accent) !important;
+    -webkit-text-fill-color: var(--accent) !important;
+  }
+
+  /* Flatten glows/shadows so cards print as clean bordered boxes */
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Keep cards and headings from splitting across page breaks */
+  .card,
+  .feature-card,
+  .price-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+}

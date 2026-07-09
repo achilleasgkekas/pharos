@@ -641,6 +641,7 @@ export default function Home() {
           <h1 style={{ fontSize: 'clamp(2.4rem, 6vw, 4.2rem)', fontWeight: 800, marginBottom: 22 }}>
             One light over{' '}
             <span
+              className="hero-highlight"
               style={{
                 background: 'linear-gradient(90deg, var(--accent), var(--cyan), var(--purple))',
                 WebkitBackgroundClip: 'text',
