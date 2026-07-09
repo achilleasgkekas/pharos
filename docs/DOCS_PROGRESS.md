@@ -1148,3 +1148,49 @@ docs/DOCS_PROGRESS.md.
 #51, live db.stats #52 — ολα τα read-only endpoints τεκμηριωμενα. Watch νεα admin/* commits για
 τα πρωτα superadmin WRITE actions (suspend/reactivate/impersonate) ή UI console page. Εναλλακτικα:
 stale-forward sweep του features.md αν εκτεθουν export/erasure στο workspace-settings UI.
+
+## 2026-07-10 (saas.md §8: superadmin console UI — /admin shell + Fleet overview page)
+
+Το commit `c9f68a6 feat(saas): superadmin console UI` εισηγαγε την ΠΡΩΤΗ SaaS UI (αυτο που
+"watch"-αρα στο προηγουμενο run). Μεχρι τωρα το §8 τεκμηριωνε ΜΟΝΟ τα API endpoints (listing
+#48, detail #49/#50, fleet overview #51, live db.stats #52). Προσθεσα νεο #### subsection
+"Console UI (`/admin`)" στο τελος του §8 (πριν το "SaaS environment variables") που καλυπτει
+τον browser console shell.
+
+Διαβασα τα πραγματικα αρχεια πριν γραψω:
+- app/admin/layout.tsx → self-contained segment με δικο του chrome (Pharos wordmark + Admin
+  badge + AdminNav + operator email), force-dynamic, metadata robots noindex/nofollow.
+- app/admin/page.tsx → Fleet overview page· consume-ει readFleetOverviewForAdmin() (ιδιο
+  aggregate με GET /api/saas/admin/overview)· StatTile grid (Workspaces/Accounts/Active
+  members/Billing linked+BYO-key/AI calls/tokens/cost/Storage+reporting) + BreakdownList
+  (by plan/status/tier) + Custom domain/Erasure scheduled + empty-state οταν total===0.
+- lib/tenancy/superadminPage.ts → requireSuperadminPage(): page-shaped mirror του
+  requireSuperadmin()· ΟΛΑ τα non-operator branches → notFound() (ενα 404), ΙΔΙΑ σειρα με το
+  API gate (saasMode/accountAuthConfigured → empty allowlist → not signed in → not in
+  allowlist → deleted account row). ΚΑΝΕΝΑ login redirect (θα αποκαλυπτε οτι υπαρχει ο
+  console). Gate σε layout ΚΑΙ page (defence in depth).
+- components/saas/AdminNav.tsx → μονο "Overview" entry σημερα (additive).
+- components/saas/format.ts → pure/client-safe defensive helpers (formatInt/formatBytes base-
+  1024/formatCostMicros micros/1e6/formatWhen)· non-finite ή negative → sane zero (0/0 B/
+  $0.00/—), οχι NaN/-1 B.
+
+Accuracy: cross-checked κατα του κωδικα (route table = μονο /admin σημερα, gate order = ακριβως
+οι πεντε branches του superadminPage.ts ολες σε 404, OSS byte-for-byte unchanged γιατι additive
+νεοι φακελοι app/admin + components/saas). Cross-ref #fleet-overview resolve-ει (υπαρχον
+heading). Placeholders μονο (acme.example). Καμια εφευρεση field.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence parity saas.md = 18 markers (9
+balanced blocks, ΚΑΝΕΝΑ νεο code fence — μονο 2 tables). Secret scan (sk_live/sk_test/sk-ant-/
+AUTH_SECRET=/STRIPE_SECRET_KEY=/CRON_SECRET=<value>) → clean.
+
+Collision guard (ΕΝΕΡΓΟΠΟΙΗΘΗΚΕ): `git diff --cached` εδειξε foreign STAGED files
+(apps/web/src/app/search-actions.ts + lib/receiptSearch.ts + receiptSearch.test.ts) — stale WIP,
+αμεταβλητα απο την αρχη του run, ΚΑΝΕΝΑ .git/index.lock (οχι mid-commit). ΔΕΝ τα αγγιξα· commit
+ΜΟΝΟ των docs/saas.md + docs/DOCS_PROGRESS.md με explicit pathspec ωστε τα foreign staged files
+να μεινουν staged/uncommitted.
+
+Επομενο run: το §8 τωρα καλυπτει και τα read-only endpoints ΚΑΙ τον /admin console UI shell.
+Watch νεα admin/*.tsx console pages (π.χ. tenant listing/detail page) ή τα πρωτα superadmin
+WRITE actions (suspend/reactivate/impersonate). Εναλλακτικα user-facing: features.md/reports
+stale-forward για τα νεα P27 suggested-budgets + PA2 net-worth time-series (commits 773a0e9 +
+67bffc9) που δεν καλυπτονται ακομα στο features.md.

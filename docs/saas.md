@@ -848,6 +848,52 @@ sampler uses — and `totalBytes` = `dbBytes + fileBytes`, the figure a storage
 quota is checked against. `fileBytes` is the tenant's binary-file footprint (`0`
 until the storage layer is tenant-aware). SaaS-only: `404` when SaaS mode is off.
 
+#### Console UI (`/admin`)
+
+The endpoints above are the read-only data plane; this is the **browser console**
+that surfaces them. It is a self-contained App Router segment (`/admin/*`) with
+its **own** chrome — a minimal operator shell (Pharos wordmark, an `Admin` badge,
+the console nav, and the signed-in operator's email), deliberately **not** the
+app's tenant-facing navigation, so no shared layout or component is touched.
+
+| Route | Renders |
+| --- | --- |
+| `/admin` | **Fleet overview** — the same aggregate as [`GET /api/saas/admin/overview`](#fleet-overview), rendered as stat tiles (workspaces, accounts, active members, billing-linked / BYO-key, this month's AI calls / tokens / cost, storage + reporting count) and breakdown lists (by plan, status, tier) plus custom-domain and erasure-scheduled counts. Shows an empty-state line until the first tenants sign up and metering runs. |
+
+The nav lists only the Overview page today; more console pages are additive
+entries as they land.
+
+**Self-gating (the console does not exist for non-operators).** A page cannot
+return a status code, so instead of the API's `requireSuperadmin()` (which returns
+`401`/`403`/`404` responses), the pages use a page-shaped mirror,
+`requireSuperadminPage()`, that resolves the viewer or throws `notFound()`. Every
+non-operator branch collapses to the **same 404**, in the same order as the API
+gate:
+
+| Condition | Result |
+| --- | --- |
+| `SAAS_MODE` off, or account auth not configured (`AUTH_SECRET` unset) | `404` (segment absent for the self-hosted app) |
+| `SAAS_SUPERADMIN_EMAILS` unset or empty | `404` (console not enabled; existence not revealed) |
+| Not signed in | `404` (**no** login redirect — a form would reveal the console exists) |
+| Signed in, email not in the allowlist | `404` |
+| Allowed, but the account row was deleted | `404` (stale cookie; defence in depth) |
+
+There is **no** login prompt on purpose: an operator signs in through the normal
+SaaS auth flow, and only then does `/admin` resolve. The gate runs on **both** the
+segment layout and each page (defence in depth), the segment is `force-dynamic` so
+the authorization decision is never cached, and the shell is marked
+`noindex, nofollow`.
+
+The display formatting (`components/saas/format.ts`) is pure and client-safe (no
+DB, no `next/*`, no node builtins) and defensive: non-finite or negative inputs
+render a sane zero (`0`, `0 B`, `$0.00`, `—`) rather than `NaN` / `-1 B`, because a
+garbled number on an operator dashboard reads as a real, alarming value.
+
+**OSS parity:** SaaS-only, and entirely additive (new `app/admin` and
+`components/saas` folders; no existing file changed). With `SAAS_MODE` off the
+whole segment self-gates to `404`, so the self-hosted build is byte-for-byte
+unchanged and `/admin` simply does not exist.
+
 ## SaaS environment variables
 
 These are needed **only** in SaaS mode. Use placeholders; never commit real
