@@ -3,6 +3,31 @@
 Ημερολόγιο της OSS-release + test routine (τρέχει ωριαία, unattended). Κάθε εγγραφή:
 τι έγινε, τι επαληθεύτηκε, και το επόμενο προτεινόμενο βήμα.
 
+## 2026-07-10 (statements/route.test.ts — collection LIST envelope + card filter + withDeleted cursor)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/statements/route.test.ts` για το GET του `/api/v1/statements`.**
+
+Επιλογή target: τα εύκολα single-action `{ rows }` wrappers (trash, jobs, search) ΕΓΙΝΑΝ. Αντί για τα βαριά multi-model routes (overview/calendar/reports), διάλεξα το untested `statements/route.ts` — collection LIST route με πλήρη list-envelope λογική (`listParams`/`withSince`/`listEnvelope`/`iso`), πανομοιότυπο chain-mock μοτίβο με το ήδη-tested `subscriptions/route.ts` (self-returning find chain + thenable countQuery), GET-only οπότε πιο απλό. Route-only logic που ζει αποκλειστικά εδώ και τροφοδοτεί το mobile credit-card statements list:
+- **Auth gate**: withAuth → 401 χωρίς token (καμία Statement.find/countDocuments call).
+- **`card` filter**: `?card=` present → `{ card }` φίλτρο σε find ΚΑΙ count· absent → `{}` (all cards).
+- **sort**: `{ period: -1 }` (newest statement first)· skip/limit paging window.
+- **updatedSince cursor**: προσθέτει `updatedAt.$gte` ΚΑΙ flips `withDeleted:true` σε ΚΑΙ ΤΙΣ ΔΥΟ queries (incremental sync βλέπει soft-deleted rows), combines με το card filter.
+- **trim() projection + defaults**: last4 ?? '', totalAmount/minimumPayment/paidAmount ?? 0, currency ?? 'EUR', txnCount = transactions?.length ?? 0, deleted = !!deletedAt, iso() σε statementDate/dueDate/updatedAt (null όταν λείπει).
+
+Mock pattern: DB seam (connectDB + User findOne chain για τον ΠΡΑΓΜΑΤΙΚΟ withAuth + Statement find/countDocuments). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiList helpers ώστε filtering + serialization να τρέχουν αληθινά.
+
+Τι έγινε: Νέο `route.test.ts` (12 tests). **auth gate** (2: no-token→401 + no DB, unknown-token→401 + no DB). **listing** (10: full doc + near-empty doc εξασκούν κάθε ?? / iso() fallback· empty envelope· card filter σε find+count· κενό card→`{}`· sort `{period:-1}`· skip/limit window· updatedSince→$gte + withDeleted σε find+count· updatedSince + card combine· no-cursor→no withDeleted· deletedAt→deleted:true + txnCount από transactions.length).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/statements/route.test.ts` → 12/12 passed.
+- `npx vitest run` (όλο το suite) → 138 files, 1803/1803 passed (ήταν 1781).
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: ΠΡΟΣΟΧΗ — άλλο concurrent routine ήταν mid-commit ΟΛΗ τη διάρκεια του run· `git diff --cached` έδειχνε σταθερά foreign staged files (`PROGRESS.md`, `search-actions.ts`, `receiptSearch.ts`+`.test.ts`) που ΔΕΝ καθάρισαν μετά από ~90s wait+recheck. Αντί για plain `git commit` (που θα τα σάρωνε μαζί), commit-άρισα ΜΟΝΟ τα δικά μου paths με explicit pathspec (`git commit -- <mypaths>`), που αφήνει τα foreign staged αμετάβλητα· επαλήθευσα με `git show --stat` ότι το commit περιέχει ΜΟΝΟ statements/route.test.ts + OSS_PROGRESS.md πριν το push. Foreign WIP άλλων routines στο tree (settings/i18n [M], budgetSuggest [??]) — κανένα δεν άγγιξα.
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run. Απομένουν τα βαριά multi-model routes (σπάσε τα ή δώσε τους ολόκληρο run): `overview/route.ts` (7 countDocuments + computeInstallmentPlans — envelope shape + auth), `calendar/route.ts` (5 models + date-stepping), `reports/route.ts`. Χαμηλής αξίας trivial `{rows}` wrapper: `history/route.ts` (single-action seam σε getConversations, γρήγορη κάλυψη αν θες εύκολο run). Εναλλακτικά DB-free: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
 ## 2026-07-02 (cont. — apiAuth.test.ts / apiError)
 
 **Task: (f συνέχεια, μετάβαση σε validation-helper tests) Test file `apps/web/src/lib/apiAuth.test.ts`
