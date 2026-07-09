@@ -15,6 +15,40 @@
 
 ---
 
+## Web Debt Queue — ενεργά items (49η σάρωση 2026-07-09)
+
+> Σύνοψη 49ης: v1 surface **αμετάβλητος** από την 48η (`git log --since=2026-07-06 -- apps/web/src/app/api/v1` = μηδέν commit) και **100% καθαρός** (type/validation/auth/mongoose/dup = 0). Οι 2 recommendations της 48ης έκλεισαν: SaaS guardless reads/cron → **DONE** (`d0c9364`), search-actions typing → **DONE** (`d9af6d0`). type-check → **EXIT 0**. 2 νέα ευρήματα, αμφότερα SaaS control-plane error-handling holdouts (dead-until-SaaS, unattended-safe μηχανικά wraps).
+
+### `audit/route.ts` — DB-touching session-gated read χωρίς try/catch → HTML 500 αντί `{ error }`
+- Priority: P2
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/saas/audit/route.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα:** το GET (`audit/route.ts:41`) κάνει δύο `await` DB reads (`AuditEvent.find(...).lean()` γρ.64 + `Account.find({ _id: { $in: actorIds } }).lean()` γρ.79) **μετά** το `resolveWorkspaceSession` gate, αλλά **χωρίς try/catch**. Ο κώδικας είναι καλογραμμένος (batched actor lookup = μηδέν N+1, `.select()`+`.limit()`+`.lean()`), όμως ένα thrown DB error (Mongo failover / connection drop) βγαίνει ως Next default HTML 500, ΟΧΙ ως το `{ error }` JSON shape. Δεν χρησιμοποιεί `saasGuard` γιατί το gating είναι session-based (`resolveWorkspaceSession`, 404/401/403), όχι το standard workspace-session ladder των write routes — άρα χρειάζεται plain try/catch, όχι `saasGuard` wrap.
+  - **Fix:** τύλιξε το σώμα μετά το gate (`if ('response' in resolved) return resolved.response;`) σε `try { ... } catch (e) { return NextResponse.json({ error: (e as Error).message?.slice(0,200) || 'Server error' }, { status: 500 }); }`. Ίδιο shape με το `withAuth`/`saasGuard` catch.
+  - Το gate ladder (404 SAAS off / 401 no-session / 403 non-admin), το serializer whitelist projection, το keyset-pagination cursor + η batched actor resolution ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500. SaaS-only (SAAS_MODE off = 404), μηδέν επίδραση στον v1 mobile surface.
+  - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/audit/route.ts` → ≥1.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, 2 unguarded `await` DB reads γρ.64+79)
+
+### `workspace/erasure/purge/route.ts` — cron scan χωρίς try/catch → HTML 500 στον scheduler
+- Priority: P2
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/saas/workspace/erasure/purge/route.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα:** το POST (γρ. μετά το CRON_SECRET token gate) κάνει `const result = await runErasurePurgeScan();` (report-only GDPR Art. 17 scan) **χωρίς try/catch**. Αν το scan throw-άρει (DB access σε control-plane Tenant collection), ο scheduler λαμβάνει Next HTML 500 αντί για το `{ error }` JSON που παίρνει κάθε άλλο cron route. Είναι holdout της ίδιας κλάσης με τα cron routes που τυλίχτηκαν στο `d0c9364` (`usage/sample`, `trials/sweep`) — απλώς δεν ήταν στο σετ εκείνης της σάρωσης.
+  - **Fix:** τύλιξε το `await runErasurePurgeScan()` (μετά το `saasMode()`/`CRON_SECRET`/token gate που επιστρέφουν early χωρίς throw) σε `try { const result = await runErasurePurgeScan(); return NextResponse.json({ ok: true, ...result }); } catch (e) { return NextResponse.json({ error: (e as Error).message?.slice(0,200) || 'Server error' }, { status: 500 }); }`.
+  - Τα gates (404 SAAS off / 500 no CRON_SECRET / 401 bad token) + το report-only `dryRun:true` contract ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500. SaaS-only, μηδέν επίδραση στον v1 mobile surface. (`auth/logout` = μηδέν DB read [μόνο `clearAccountCookie`] → σκόπιμα εκτός· `billing/webhook`+`invites/accept` έχουν ήδη δικό τους try/catch.)
+  - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/workspace/erasure/purge/route.ts` → ≥1.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, `await runErasurePurgeScan()` unguarded)
+
+---
+
 ## Web Debt Queue — ενεργά items (48η σάρωση 2026-07-06)
 
 ### Guardless DB-touching SaaS read + cron routes → ασυνεπές HTML 500 αντί `{ error }`
@@ -44,7 +78,7 @@
   - Το output (`SearchHit[]` shape: type/id/title/subtitle/href) + η ranking σειρά + τα `cur()`/`OWNED_STATUSES` reads ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· καθαρά type-safety, μηδέν αλλαγή συμπεριφοράς.
   - Μηδέν `as any` απομένει στο `search-actions.ts` (`grep -c 'as any' apps/web/src/app/search-actions.ts` = 0).
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-06, 48η σάρωση· live: γρ.67/78/88/98/108/118/129 `as any[]`)
+- Status: DONE (verified 2026-07-09, 49η σάρωση) — ο builder το κατανάλωσε στο commit `d9af6d0` («refactor(search): type search-actions lean projections, drop 7× as any[]»)· live: `grep -c 'as any\[\]' src/app/search-actions.ts` = **0** (το εναπομείναν match στη γρ.22 είναι σχόλιο που περιγράφει το παλιό cast). Τα 7 lean results φέρουν πλέον narrow projection types· output shape/ranking αμετάβλητα.
 
 ---
 

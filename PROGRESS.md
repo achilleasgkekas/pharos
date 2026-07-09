@@ -4266,3 +4266,29 @@ Read-only code-quality audit της Next.js web επιφάνειας (fresh grep
 - **Reset-request timing side-channel** (`saas/account/reset/request/route.ts:43` no-account fast-path πριν mint+mail): delivery-semantics tradeoff (`void sendEmail` vs `await`), θέλει σκόπιμη απόφαση.
 - **getTenantConnection readyState guard** (`connection.ts:54` δέχεται readyState 0 disconnected ως cached-live): ambiguous rebuild-semantic, 0 importers, dead-until-SaaS.
 - **saasGuard read-route revisit:** το νέο P2/S item ξαναεξετάζει τη σκόπιμη «read-only exemption» του item 565. Αν ο Achilleas προτιμά να μείνουν εξαιρεμένα (rarely-throw stance), κλείσε το ως WONTFIX· αλλιώς ο builder μπορεί να το καταναλώσει unattended (μηχανικό, μηδέν product decision).
+
+## 2026-07-09 (web-code-quality auditor, 49η σάρωση)
+Read-only code-quality audit της Next.js web επιφάνειας (fresh grep, όχι docs read-back). `cd apps/web && npm run type-check` → **EXIT 0**. Σαρώθηκαν: 51 v1 route files + 27 saas route files + `apiAuth`/`apiBody`/`apiList` + `lib/tenancy/*` + `lib/billing/*` + `search-actions.ts`.
+
+**Builder έκλεισε 2 items** από τον 48ο marker (live-verified): (α) **SaaS guardless DB reads/cron → `saasGuard`** (commit `d0c9364` «wrap 5 guardless DB-touching SaaS read+cron routes in saasGuard») → **DONE**· (β) **`search-actions.ts` 7× `as any[]` → typed lean projections** (commit `d9af6d0`) → **DONE** (`grep -c 'as any[]'` = 0, το εναπομείναν match στη γρ.22 είναι σχόλιο).
+
+**Ευρήματα ανά διάσταση:**
+- **Type safety:** **0** — μηδέν μη-infra `as any`/`@ts-ignore` σε ολόκληρο το `src` (τα 23 grep hits = comments με τη λέξη «any», test `@ts-expect-error` deliberate-garbage, `softDelete.ts:38` Mongoose pre-hook override· όλα false positives). type-check EXIT 0.
+- **Input validation:** **0** — κάθε write route μέσω `readBody`/`apiBody` helpers· μηδέν `req.json().catch` σε v1 (μόνο `auth/login` έχει δικό του JSON-parse guard, known).
+- **Error handling:** **2 νέα** (SaaS control-plane holdouts) — `audit/route.ts` (session-gated DB read, `try {`=0, 2 unguarded `await` reads) + `workspace/erasure/purge/route.ts` (cron scan, `try {`=0). Αμφότερα → HTML 500 αντί `{ error }` σε DB throw· μηχανικό try/catch wrap. `auth/logout` (μηδέν DB) + `billing/webhook`+`invites/accept` (ήδη έχουν try) = καθαρά.
+- **Auth:** **0** — κάθε v1 route εκτός `auth/login` περνά από `withAuth` (401 χωρίς token)· κάθε saas route gated (session/CRON-token/webhook-sig).
+- **Mongoose:** **0** — v1 read routes `.lean()`+`.limit()`· το νέο `audit/route.ts` είναι ήδη βέλτιστο (batched actor lookup = μηδέν N+1, `.select()`+`.limit()`+`.lean()`)· hot-path indexes καλυμμένα.
+- **Duplication/dead code:** **0 νέα**.
+- **Web UX states:** global `app/error.tsx` υπάρχει· μηδέν `loading.tsx` = σκόπιμο (CLAUDE.md 2026-06-08 cont.²).
+
+**Counts: P1=0, P2=2 νέα (error-handling holdouts), P3=0 νέα.** 49η συνεχόμενη σάρωση χωρίς P1· ο v1 mobile surface είναι **αμετάβλητος** από την 48η (μηδέν v1 commit) και **100% καθαρός**.
+
+**Top 3 για τον builder (unattended-safe):**
+1. **[P2/S] `audit/route.ts` try/catch wrap** — session-gated DB read χωρίς error boundary· μηχανικό, tsc-verifiable, SaaS-only (dead-until-SaaS, μηδέν v1 impact).
+2. **[P2/S] `workspace/erasure/purge/route.ts` try/catch wrap** — cron scan holdout της ίδιας κλάσης με `d0c9364`· μηχανικό, tsc-verifiable.
+3. (καμία άλλη auto-buildable· τα 2 decision-flag παρακάτω θέλουν απόφαση).
+
+### Needs Achilleas
+- **Reset-request timing side-channel** (`saas/account/reset/request/route.ts:43` no-account fast-path πριν mint+mail): delivery-semantics tradeoff, θέλει σκόπιμη απόφαση· dead-until-SaaS.
+- **getTenantConnection readyState guard** (`connection.ts:54` δέχεται readyState 0 disconnected ως cached-live): ambiguous rebuild-semantic, 0 importers, dead-until-SaaS.
+- **v1 data-path tenant-scoping**: ο `withAuth`→`bearerUser` (by `apiToken`) ΔΕΝ είναι tenant-scoped, άρα δεν υπάρχει σημείο για `tenant.status` gate στο v1· εξαρτάται από μεγαλύτερο SaaS data-isolation κομμάτι + read-vs-write απόφαση.
