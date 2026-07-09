@@ -5,6 +5,47 @@
 <!-- reviewed: c11d296 -->
 <!-- docker-validated: 163a0ab -->
 
+## 2026-07-10 (pharos-daily-dev — P27 suggested budgets από ιστορικό δαπανών)
+- **Τι έκανα:** έχτισα το Approved item **P27** (Suggest budgets from spending history). Το στήσιμο budgets ήταν
+  100% χειροκίνητο (κενό input ανά κατηγορία → κανείς δεν το κάνει). Νέο **«Suggest from history»** button στο
+  Settings → Budgets: με ένα κλικ προσυμπληρώνει τα budget inputs ανά κατηγορία από το ιστορικό δαπανών. Ντετερμινιστικό,
+  **μηδέν AI**, μηδέν migration.
+- **Approved-queue check:** OWNER_DECISIONS #8 (P2/P4/P10 = PA1/PA2/PA3) όλα ήδη SHIPPED → η δική μου decision-queue
+  άδεια. Fallback στο PRODUCT_BACKLOG `## Approved`, με σειρά value/effort. Το κορυφαίο «πολύ ψηλό value/effort» P22 το
+  δουλεύει ήδη άλλο routine (uncommitted `receiptSearch.ts`/`search-actions.ts` staged στο tree) → το απέφυγα για
+  collision. Επόμενο καθαρό, self-contained, μηδέν-collision = **P27**.
+- **Locked defaults (OWNER_DECISIONS builder default):** median των **3 τελευταίων ΠΛΗΡΩΝ μηνών** ανά κατηγορία (ο
+  τρέχων μερικός μήνας εξαιρείται ώστε να μη ρίχνει τεχνητά τη διάμεσο), στρογγυλοποίηση στα **€5**, skip κατηγορίες με
+  **<2 μήνες** δεδομένων, drop suggestion που στρογγυλοποιείται σε 0. **suggest ≠ auto-apply**: μόνο pre-fill, ο χρήστης
+  ελέγχει/επεξεργάζεται πριν πατήσει Save budgets.
+- **Design (testable):** νέο pure **`lib/budgetSuggest.ts suggestBudgetsFromExpenses(rows, opts)`** (framework-free,
+  buckets non-income expenses ανά category×month, median των present-months, rounding, trailing-window) — sync & unit-testable
+  χωρίς DB. Server action **`suggestBudgets()`** στο `settings/actions.ts` τροφοδοτεί lean Expense rows (`kind != income`).
+  UI στο `SettingsClient BudgetsManager`: button + Loader2 spinner + result message («Suggested N from your last 3 months»).
+  i18n keys σε **en + el** (fallback-complete μέσω resolveDict spread του en). Καμία αλλαγή σε shape/endpoint → μηδέν
+  επίπτωση mobile/reports.
+- **Verify:** `npm run type-check` → **EXIT 0**. Νέο `budgetSuggest.test.ts` → **10/10 pass** (empty/null input, median,
+  same-month sum, min-months skip, current-partial-month + out-of-window exclusion, income/non-positive ignore, date-bucketing,
+  «other» fallback, zero-round drop, custom window/rounding). i18n suite **53/53 pass** (completeness/no-empty). **Safe Docker
+  rebuild** (άγγιξα web runtime): docker mutex acquired· mongo `healthy` πριν+μετά· `docker compose build web` (image-only,
+  Built) → mongo παρέμεινε healthy → `up -d web` → `/login` **200** (1η προσπάθεια), web RestartCount **0**, OOM **false**·
+  `docker builder prune -f` → **2.135GB** cache ανακτημένα (SAFE)· lock released· flaresolverr παρέμεινε stopped. **Κανένα AI call.**
+- **Git hygiene:** stage ΜΟΝΟ τα 6 δικά μου paths (`lib/budgetSuggest.ts` + `.test.ts`, `settings/actions.ts`,
+  `SettingsClient.tsx`, `i18n/locales/en.ts` + `el.ts`) με explicit `git commit -- <paths>` ώστε να ΜΗΝ committαριστούν τα
+  προ-staged ξένα αρχεία (P22 `receiptSearch.*`/`search-actions.ts`, `api/v1/statements/route.test.ts`) — παρέμειναν
+  ανέγγιχτα/staged. Commit `773a0e9`, pushed. Μαρκάρισα P27 done στο **PRODUCT_BACKLOG.md** (ήταν clean).
+- **Προτεινόμενο επόμενο task:** **P28** bill/payable status tracker (due→paid→overdue) — reuse recurring-series +
+  `runAlertChecks`/`dispatchAlert`· ή **P29** asset depreciation model (computed-on-read, ενισχύει PA2 net-worth + P13
+  export). Και τα δύο self-contained. Απόφευγε P22 όσο τα `receiptSearch.*` μένουν uncommitted στο tree.
+
+## 2026-07-09 (pharos-daily-dev — P22 global search: surface matched receipt line-item)
+- **Τι έκανα:** έκλεισα το εναπομείναν κενό του Approved item **P22** (full-text search σε receipt line-items). Το `searchAll()` ΗΔΗ έψαχνε `lineItems.name`/`lineItems.refinedName` (substring match, δωρεάν) — αλλά όταν το query ταίριαζε ένα προϊόν **μέσα** σε απόδειξη (όχι το store), το hit εμφάνιζε μόνο `store · date · total`, οπότε ο χρήστης δεν έβλεπε **ποιο** είδος ταίριαξε (το «πού το αγόρασα αυτό;» use case έμενε μισό). Τώρα το receipt hit subtitle δείχνει το matched line-item name όταν το match ήρθε από line item κι όχι από το store.
+- **Design (behavior-preserving, στοχευμένο):** νέο pure helper **`lib/receiptSearch.ts matchedLineItemName(rx, lineItems)`** (refinedName-preferred display, non-global regex reuse-safe, defensive σε blank names) — έξω από το `'use server'` search-actions.ts (που εξάγει μόνο async) ώστε να είναι sync + unit-testable χωρίς DB. Στο `search-actions.ts`: (α) `ReceiptLean` +`lineItems`, (β) `.select('... lineItems.name lineItems.refinedName')`, (γ) receipt hit builder υπολογίζει `matched = r.test(store) ? null : matchedLineItemName(r, lineItems)` και το προσθέτει στο subtitle. Καμία αλλαγή στο `SearchHit` shape → μηδέν επίπτωση στο mobile/άλλους consumers. Μηδέν AI, μηδέν migration, μηδέν νέο endpoint.
+- **Verify:** `npm run type-check` → **EXIT 0**. Νέο `receiptSearch.test.ts` → **7/7 pass** (empty/missing items, raw vs refined preference, first-match, no-match, case-insensitive repeat-call χωρίς /g state, blank-name defense). **Safe Docker rebuild** (άγγιξα web runtime): βρήκα ΟΛΟ το homepage stack **Exited (137) = OOM-killed** ~10 λεπτά πριν (web/mongo/searxng) — pre-existing, όχι από εμένα. Το ανέκτησα: `up -d mongo` (existing image) → **healthy** σε 2 polls, `docker compose build web` (image-only, exit 0, mongo παρέμεινε healthy όλο το build), `up -d web searxng` → `/login` **200**, web RestartCount **0**, OOM **false**. `docker builder prune -f` → **3.19GB** cache ανακτημένα (SAFE, μόνο cache). flaresolverr παρέμεινε exited. **Κανένα AI call.**
+- **Git hygiene:** stage ΜΟΝΟ τα 3 δικά μου code paths (`lib/receiptSearch.ts` + `lib/receiptSearch.test.ts` + `app/search-actions.ts`) + `PROGRESS.md`, με explicit `git add`, ΟΧΙ `-A`. **Working tree έχει εκτεταμένο WIP άλλων** (net-worth PA2: `lib/netWorth.ts`/`.test.ts`, `models/NetWorthSnapshot.ts`, + modified reports/settings/AppConfig/appSettings/i18n· επίσης `PRODUCT_BACKLOG.md`, `docker-compose.yml`, apps/landing) → **δεν αγγίχτηκαν**. Γι' αυτό ΔΕΝ σημείωσα το P22 done στο `PRODUCT_BACKLOG.md` (θα κλόταρα το WIP diff του)· αφήνω το marking σε routine που το owner-άρει καθαρό.
+- **Γιατί ΟΧΙ PA2 net-worth:** είναι το επόμενο Approved decision-#8 item, αλλά υπάρχει ήδη coherent WIP στο working tree (3 νέα αρχεία + 8 modified) → collision-risk· δεν το πήρα για να μη σπάσω/committάρω ξένο WIP. Διάλεξα το self-contained P22 που δεν αγγίζει κανένα WIP αρχείο.
+- **Προτεινόμενο επόμενο task:** μόλις committαριστεί/καθαρίσει το net-worth WIP, τρέξε PA2 (P4 net-worth time-series) end-to-end. Εναλλακτικά καθαρά self-contained Approved items χωρίς collision: **P24** outbound event webhooks (Settings → Integrations, reuse `runAlertChecks` triggers, HMAC), ή **P14** subscription price-hike watch (reuse vendorKey-series + anomaly + dispatchAlert). Απόφευγε P27 (suggested budgets) & P29 όσο τα reports/settings είναι dirty.
+
 ## 2026-07-09 (reviewer — range 5c2abf3..c11d296, tsc web+mobile+landing EXIT 0, μηδέν regression)
 - **Range:** 12 commits από τον προηγ. marker `5c2abf3` έως HEAD `c11d296`. **11 από 12 = docs-only** (.md: MOBILE_PARITY/OWNER_DECISIONS/PRODUCT_BACKLOG/PROGRESS/STATUS/WEB_DEBT/LANDING_PROGRESS/DOCS_PROGRESS/saas.md). **Το μόνο code commit = `8798bea`** (`feat(landing): copy-link affordance on each open FAQ answer`).
 - **Type-checks (read-only):** `apps/web` `npm run type-check` → **EXIT 0**. `apps/mobile` `npx tsc --noEmit` → **EXIT 0**. Επιπλέον `apps/landing` `npm run type-check` → **EXIT 0** (εκεί ζει η μόνη code αλλαγή).
