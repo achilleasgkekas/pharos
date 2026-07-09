@@ -1,29 +1,27 @@
 # Pharos Monitor — STATUS
 
-## 2026-07-09 14:33
+## 2026-07-09 14:57
 
-**Ετυμηγορια: ολες STALE, αλλα ΟΧΙ συναγερμος — η μηχανη ηταν κλειστη.** Το τελευταιο commit ειναι 2026-07-07 16:04 (πανω απο 46 ωρες πριν), και υπηρχε ηδη κενο ~33 ωρων πριν απο αυτο (2026-07-06 06:42 εως 2026-07-07 15:58). Κανενα footprint καμιας ρουτινας μεσα στο τελευταιο ~7ωρο παραθυρο. Ολες STALE κατα παρομοιο βαθμο, που ειναι το κλασικο αποτυπωμα «ο υπολογιστης ηταν σβηστος», οχι σπασμενη ρουτινα. Ο builder ηταν ο μονος που εγραψε στις 07-07 (τρια saas commits σε παραθυρο 6 λεπτων)· οι υπολοιπες πεντε σταματησαν στον πρωινο κυκλο της 07-06.
+**Ετυμηγορια: ΟΛΑ ΟΚ.** Η μηχανη ξυπνησε και ολες οι εξι ρουτινες ετρεξαν μεσα σε ενα σφιχτο παραθυρο 14:35–14:57 σημερα. Καθε ρουτινα αφησε φρεσκο αποτυπωμα, ολα τα markers προχωρησαν, μηδεν STALE. Ο builder εκλεισε το OWNER_DECISIONS #3 (SSRF IPv4-mapped fix, `5c2abf3`), ο reviewer επιβεβαιωσε 1659/1659 tests green, και ο docker guard επικυρωσε το stack. Το προηγουμενο STATUS (14:33) ειχε ολες STALE λογω σβηστης μηχανης· αυτο πλεον λυθηκε πληρως στον κυκλο που μολις ετρεξε.
 
 | routine | τελευταια δραστηριοτητα | OK/STALE | τι εκανε (συντομα) |
 |---|---|---|---|
-| builder (Pharos daily dev) | 2026-07-07 16:04 | STALE | τρια saas commits: fix per-tenant notifier+OneDrive (b01f579), fix per-tenant AI/prompt/storage caches (083a32a), feat superadmin console scaffold (c282c68)· ολα touch apps/web |
-| parity auditor | 2026-07-06 01:18 | STALE | 46η σαρωση mobile-parity, εκλεισε το τελευταιο #5 gap (merge/bind), route 50→51 (541af0b) |
-| ui auditor | 2026-07-06 02:48 | STALE | 47η σαρωση mobile-ui, working tree καθαρο, 2 items ξεμπλοκαραν (875ba83) |
-| web auditor | 2026-07-06 04:07 | STALE | 48η σαρωση web-debt, tsc EXIT 0, 2 items εκλεισαν, +2 auto-buildable (a986750) |
-| reviewer | 2026-07-06 04:34 | STALE | range 5667e5b..62d0a86, tsc web+mobile EXIT 0, 1542 tests green (add8079, marker → 62d0a86, αμετακινητος) |
-| docker guard | 2026-07-06 03:31 | STALE | validate stack at 51d43ba, safe web rebuild (33d6ef9, marker → 51d43ba, αμετακινητος) |
+| builder (Pharos daily dev) | 2026-07-09 14:40 | OK | SSRF IPv4-mapped IPv6 bypass fix στο ssrf.ts (5c2abf3), progress log + concurrency incident (b1213fe)· touch apps/web |
+| parity auditor | 2026-07-09 14:41 | OK | 47η σαρωση mobile-parity, νεο functional GAP Receipts quick-verify P1/M (6135bd8) |
+| ui auditor | 2026-07-09 14:39 | OK | 48η σαρωση mobile-ui, RADIUS drift + brand-typography gap + loader consistency (7dbd43a) |
+| web auditor | 2026-07-09 14:56 | OK | 50η σαρωση web-debt, v1 καθαρος, νεο invites/accept guardless write P2/S (c11d296) |
+| reviewer | 2026-07-09 14:57 | OK | range 5c2abf3..c11d296, tsc web+mobile+landing EXIT 0, FAQ copy-link, μηδεν regression (d05e2a9, marker → c11d296) |
+| docker guard | 2026-07-09 14:51 | OK | validate stack at 163a0ab, health-only δεν χρειαστηκε rebuild (docs-only diff), healthy (9ca5115, marker → 4ca5649) |
 
 ## Open queue counts
-- Build Queue (MOBILE_PARITY): **5** TODO
-- UI Debt Queue (MOBILE_PARITY): **2** TODO
-- Web Debt Queue (WEB_DEBT): **3** TODO
+- Build Queue (MOBILE_PARITY): **6** TODO
+- UI Debt Queue (MOBILE_PARITY): **5** TODO
+- Web Debt Queue (WEB_DEBT): **5** TODO
 
-Συγκριση με προηγουμενο STATUS (2026-07-06 06:14: Build 5 / UI 2 / Web 3): **Build 5→5 (0)**, **UI 2→2 (0)**, **Web 3→3 (0)**. Καμια μεταβολη σε καμια ουρα. Αναμενομενο, αφου οι τρεις auditors δεν ετρεξαν απο τοτε ωστε να προσθεσουν ευρηματα, και ο builder στην 07-07 δουλεψε αποκλειστικα σε saas features (οχι σε queue items). Καμια συσσωρευση.
+Συγκριση με προηγουμενο STATUS (2026-07-09 14:33: Build 5 / UI 2 / Web 3): **Build 5→6 (+1)**, **UI 2→5 (+3)**, **Web 3→5 (+2)**. Ολες οι ουρες μεγαλωσαν, που ειναι το αναμενομενο και υγιες αποτελεσμα: το προηγουμενο snapshot ηταν παρμενο ενω η μηχανη ηταν σβηστη (οι auditors δεν ειχαν τρεξει)· τωρα οι τρεις auditors σαρωσαν και προσθεσαν νεα ευρηματα. Καμια ανησυχητικη συσσωρευση, ο builder δουλευει παραλληλα (εκλεισε το SSRF item).
 
 ## Προσοχη
 
-Ολες οι εξι ρουτινες ειναι STALE, ομως το μοτιβο δειχνει **σβηστη/κοιμισμενη μηχανη**, οχι βλαβη: το git δεν εχει κανενα commit εδω και ~46 ωρες, και μολις 6 λεπτα δραστηριοτητας σε ολη τη 07-07. Οι τοπικες ρουτινες τρεχουν μονο οταν ο υπολογιστης ειναι ξυπνιος, αρα αυτο εξηγειται πληρως απο μη-διαθεσιμοτητα μηχανης.
+Κανενα προβλημα. Ολες οι ρουτινες φρεσκες, ολα τα markers συγχρονισμενα (reviewer → c11d296, docker-validated → 4ca5649). Τα δυο κολλημενα markers που ειχε επισημανει το προηγουμενο STATUS (reviewer 62d0a86, docker 51d43ba) εχουν πλεον προχωρησει κανονικα στον σημερινο κυκλο.
 
-Τι να ελεγξει ο Αχιλλεας οταν ξαναναψει η μηχανη:
-- Επιβεβαιωσε οτι ο επομενος κυκλος πιανει τα δυο markers που εμειναν πισω: **reviewer marker = 62d0a86** και **docker-validated = 51d43ba** ειναι και τα δυο κολλημενα απο 2026-07-06, ενω ο builder εγραψε 6 νεα commits απο τοτε (73f3e54 εως b01f579). Οταν ξυπνησει το μηχανημα, ο reviewer πρεπει να καλυψει το range 62d0a86..b01f579 και ο docker guard να επικυρωσει το stack στο b01f579.
-- Αν μετα απο εναν πληρη ξυπνιο κυκλο καποια ρουτινα παραμεινει STALE ενω οι αλλες ανανεωθηκαν, τοτε (και μονο τοτε) ειναι πραγματικο προβλημα αξιο διερευνησης. Προς το παρον: κανενα.
+Μια παρατηρηση προς ενημερωση (οχι συναγερμος): το `apps/mobile/src/screens/ReceiptsScreen.tsx` παραμενει uncommitted στο working tree (ξενη WIP migration einput→Input/TextArea, ημιτελης απο 2026-07-06)· ο builder το εχει καταγραψει και δεν το αγγιξε καμια ρουτινα. Αν παραμεινει, επομενο builder run να το υιοθετησει ή να το καθαρισει. Επισης ο builder κατεγραψε concurrency incident (ταυτοχρονες routines stage-αραν κατα το run του)· χωρις απωλεια δεδομενων, αλλα αξιζει ο Αχιλλεας να δει το δικο του σημειωμα στο PROGRESS.md για το διδαγμα με τα ρητα pathspecs.
