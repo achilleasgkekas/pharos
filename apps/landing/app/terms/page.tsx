@@ -158,11 +158,12 @@ export default function TermsOfService() {
 
         <Section id="billing" title="6. Plans and billing">
           <p>
-            Paid hosted plans are billed in advance through a third-party payment
-            processor. Fees, billing cycles, and any trial terms will be shown at
-            checkout before you are charged. You can cancel to stop future renewals;
-            unless stated otherwise, cancellation takes effect at the end of the current
-            billing period. Final pricing is not yet published.
+            Paid hosted plans are billed in advance through Stripe, our third-party
+            payment processor. Current plans are Free, Pro, and Dedicated; the exact
+            fees, billing cycle, and any trial terms are shown at checkout before you
+            are charged. Annual billing is offered at a discount to paying monthly. You
+            can cancel to stop future renewals; unless stated otherwise, cancellation
+            takes effect at the end of the current billing period and is not prorated.
           </p>
         </Section>
 

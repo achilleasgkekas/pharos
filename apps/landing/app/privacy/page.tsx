@@ -149,8 +149,9 @@ export default function PrivacyPolicy() {
               long as needed to keep the service safe.
             </li>
             <li style={{ marginBottom: 8 }}>
-              <strong style={{ color: 'var(--text)' }}>Payment data:</strong> handled by a
-              third-party payment processor. We never see or store full card numbers.
+              <strong style={{ color: 'var(--text)' }}>Payment data:</strong> handled by
+              Stripe, our payment processor. Card details go directly to Stripe; we never
+              see or store full card numbers.
             </li>
           </ul>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: '18px 0 8px', color: 'var(--text)' }}>
@@ -158,10 +159,38 @@ export default function PrivacyPolicy() {
           </h3>
           <p>
             Hosted plans include AI receipt and document parsing. The content you scan
-            is sent to the AI provider that powers your plan solely to extract the
-            fields, and is not used to train third-party models where the provider
-            offers that guarantee. You can bring your own AI key so processing runs
-            under your own provider account instead.
+            is sent to the AI provider that powers your plan (currently Anthropic) solely
+            to extract the fields, and is not used to train third-party models where the
+            provider offers that guarantee. You can bring your own AI key so processing
+            runs under your own provider account instead.
+          </p>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 600, margin: '18px 0 8px', color: 'var(--text)' }}>
+            Who processes data for us
+          </h3>
+          <p>
+            To run the hosted service we rely on a small set of sub-processors, each
+            handling only the data needed for their function:
+          </p>
+          <ul style={{ margin: '14px 0 0', paddingLeft: 20 }}>
+            <li style={{ marginBottom: 8 }}>
+              <strong style={{ color: 'var(--text)' }}>Stripe</strong> — payments and
+              subscription billing.
+            </li>
+            <li style={{ marginBottom: 8 }}>
+              <strong style={{ color: 'var(--text)' }}>Resend</strong> — transactional
+              email (verification, password reset, team invites).
+            </li>
+            <li style={{ marginBottom: 8 }}>
+              <strong style={{ color: 'var(--text)' }}>Anthropic</strong> — AI parsing of
+              the documents you scan, unless you bring your own key.
+            </li>
+            <li style={{ marginBottom: 8 }}>
+              Our hosting and infrastructure provider, which stores the encrypted service
+              database and files.
+            </li>
+          </ul>
+          <p style={{ marginTop: 14 }}>
+            We do not sell your data or share it with anyone else for their own purposes.
           </p>
         </Section>
 
