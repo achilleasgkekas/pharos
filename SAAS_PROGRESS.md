@@ -2013,3 +2013,50 @@ bearer-path/audit αγγίχτηκε. Collision guard: staging καθαρό (τ�
 tenants/[slug]` → single-tenant control-plane view + usage/dbStats summary, read-only), είτε (β)
 user-facing workspace-settings UI panels (ΟΛΑ τα read/write control-plane APIs έτοιμα), είτε (γ)
 actual binary packaging / BYO-key AI-dispatch (shared runtime / archive dep → άδεια).
+
+## 2026-07-09 (increment 49 — Superadmin tenant DETAIL: read-only single-workspace view, §8)
+**Το κενό:** το increment 48 έδωσε το superadmin cross-tenant LISTING (paginated registry
+scan), αλλά δεν υπήρχε τρόπος να δει ο operator ΕΝΑ workspace σε βάθος — ποιοι είναι τα
+μέλη του, σε ποιους ρόλους, αν έχει owner. Έκλεισα το επόμενο, ασφαλέστερο κομμάτι του
+console: ένα **READ-ONLY** single-tenant detail (`GET admin/tenants/[slug]`) = registry
+summary + member roster + role/status tally. Καμία write/destructive δυνατότητα· διαβάζει
+ΜΟΝΟ το central registry (Tenant/Membership/Account), ΠΟΤΕ per-tenant data db. ΟΛΟ additive
++ SaaS-gated + operator-gated, σε δικά μου SAAS αρχεία:
+- `lib/tenancy/adminTenantDetail.ts` (νέο). **PURE** shapers (unit-tested), reuse του
+  `summarizeTenant`/`TenantSummary` από το #48: `summarizeMember(membership, account)` →
+  display-safe view (accountId/email/name/role/status/invitedBy/createdAt ISO· dangling
+  membership χωρίς account → κενά email/name, ποτέ throw· ΠΟΤΕ passwordHash/tokens),
+  `tallyMembers` (counts by status + roles μόνο για ACTIVE members ώστε το `owners` να
+  δείχνει live owners → spot ownerless workspace), `buildTenantDetail(tenant, members, gen)`
+  → σταθερό envelope `{format:'pharos.admin-tenant-detail', version:1, generatedAt(ISO safe→
+  epoch), tenant, memberCounts(derived), members}`. **Impure** `getTenantDetailForAdmin(slug)`
+  = ο ΜΟΝΟΣ reader: `Tenant.findOne({slug})` (null → caller 404) + `Membership.find({tenant})`
+  sorted + `Account.find({_id:$in})` join· αγγίζει ΜΟΝΟ registry, ΠΟΤΕ data plane.
+- `app/api/saas/admin/tenants/[slug]/route.ts` (νέο) — `GET`, `runtime=nodejs`, `force-dynamic`,
+  `saasGuard` (404 off) + `requireSuperadmin` (404 console-off / 401 / 403) + unknown slug →
+  404· `no-store`. Read-only. Next 15 param convention (`params: Promise<{slug}>` + await).
+- `lib/tenancy/adminTenantDetail.test.ts` (νέο) — 6 PURE tests (summarizeMember join+ISO+
+  dangling+invalid-date-null· tallyMembers status/active-only-roles + empty· buildTenantDetail
+  envelope+derived-counts + invalid-gen→epoch).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run adminTenantDetail.test.ts` →
+**6/6 green**· full suite `npx vitest run` → **1677/1677 green** (125 files, καμία regression).
+External importers του νέου module από feature code (εκτός του δικού μου route) → **κανένας**·
+το route SAAS-gated (404 off) + operator-gated (404 όταν `SAAS_SUPERADMIN_EMAILS` κενό)· ο
+reader αγγίζει μόνο registry. ⇒ `SAAS_MODE` off / self-hosted = **zero effect** (route δεν
+mount-άρει, gate inert, μηδέν per-tenant DB hit). Κανένας Docker rebuild (νέα PURE-heavy module
++ additive gated route, μηδέν shared runtime wiring — type-check+tests καλύπτουν)· καμία νέα
+εξάρτηση· κανένα feature route/data-db/User-path/bearer-path/audit αγγίχτηκε. Collision guard:
+staging καθαρό (τίποτα pre-staged), μόνο τα δικά μου 3 paths.
+
+**## Needs Achilleas** (superadmin console):
+- **`SAAS_SUPERADMIN_EMAILS` env** (από #48) για ενεργοποίηση σε production. Κενό = disabled (404).
+- **Superadmin UI page** (`/admin`) που καταναλώνει το listing (#48) + αυτό το detail — deferred (UI territory).
+- **Per-tenant db/usage stats στο detail** (dbStats/AI usage): θα άγγιζε το data plane (`useDb`) →
+  ξεχωριστό προσεκτικό increment, εσκεμμένα εκτός αυτού του registry-only detail.
+- **Write/destructive superadmin actions** (suspend/reactivate/force-plan/drop-tenant) = **ΠΟΤΕ από routine**.
+
+**Next task:** increment 50 — είτε (α) superadmin per-tenant db/usage-stats στο detail (αγγίζει data
+plane read-only → προσοχή/άδεια), είτε (β) user-facing workspace-settings UI panels (ΟΛΑ τα read/write
+control-plane APIs έτοιμα), είτε (γ) actual binary packaging / BYO-key AI-dispatch (shared runtime /
+archive dep → άδεια).
