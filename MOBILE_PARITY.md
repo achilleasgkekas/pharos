@@ -106,6 +106,63 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 
 ---
 
+## UI Debt Queue
+
+> **UI-consistency σάρωση 2026-07-10 (ui-auditor, 1η αποκλειστικά UI):** στόχος = πόσο «universal» είναι το mobile UI vs το web design system, ΟΧΙ functional parity (αυτό ζει στο Build Queue). **Θεμέλιο ΥΠΑΡΧΕΙ ήδη**, οπότε ΔΕΝ χρειάζεται P1 foundation item: `apps/mobile/src/theme.ts` καθρεφτίζει πλήρως τα web tokens (`apps/web/src/app/globals.css:8-22` — bg/surface/border/text/accent/cyan/red/gold/purple/orange ολα ταιριαστα· + SPACE/RADIUS/SIZE/scrim/alpha scales) και `apps/mobile/src/ui.tsx` εκθέτει centralized primitives (`Button`/`IconButton`/`Card`/`ListItem`/`Input`/`TextArea`/`Badge`/`Chip`/`Check`/`Header`/`Spinner`/`Empty`/`ErrorText`/`ModalSheet`/`contentWidth`). **Καθαρές διαστάσεις:** hardcoded hex στα screens = **0**· rgba literals στα screens = **0** (ολα μεσω `alpha()`)· `contentWidth` cap εφαρμοσμενο και στα 14 list screens· state-primitives (`<Spinner>`/`<Empty>`/`<ErrorText>`) χρησιμοποιουνται απο 10-12 screens το καθενα. **Παραβιασεις που βρεθηκαν (5 dimensions):** reusable-component re-impl ×2 (Shopping inline loading/empty· Receipts cell-inputs)· token magic-number ×1 (Receipts `borderRadius: 8` εκτος RADIUS scale)· adaptive/safe-area ×1 (legacy `SafeAreaView`, χωρις landscape/bottom insets)· theme/dark-mode ×1 (mobile dark-only ενω web εχει `data-theme='light'`). `apps/mobile npx tsc --noEmit` → **EXIT 0**. Σειρα: μικρα + υψηλη προτεραιοτητα πρωτα.
+
+### ShoppingScreen: inline loading/empty → shared `<Spinner>`/`<Empty>`
+- Priority: P2
+- Size: S
+- Web ref: state primitives (file: apps/mobile/src/ui.tsx:31-39 `Spinner`/`Empty`)
+- Mobile files: apps/mobile/src/screens/ShoppingScreen.tsx
+- Depends on: none
+- Acceptance:
+  - Η γραμμη `if (loading) return <View style={s.center}><ActivityIndicator color={C.accent} /></View>;` (ShoppingScreen.tsx:69) αντικαθισταται με `<Spinner />`.
+  - Το `ListEmptyComponent={<Text style={s.empty}>…</Text>}` (ShoppingScreen.tsx:97) χρησιμοποιει το shared `<Empty>` primitive.
+  - Τα local StyleSheet entries `center` και `empty` (byte-dupes του ui.tsx `center`/`empty`, ShoppingScreen.tsx:152) διαγραφονται, μηδεν αχρησιμοποιητο style μενει.
+  - `apps/mobile npx tsc --noEmit` → EXIT 0.
+- Status: TODO
+
+### ReceiptsScreen: line-item cell inputs → shared `<Input>` (kill raw TextInput + magic radius)
+- Priority: P2
+- Size: S
+- Web ref: Input token (file: apps/mobile/src/ui.tsx:77-85 `Input`, RADIUS scale apps/mobile/src/theme.ts:26)
+- Mobile files: apps/mobile/src/screens/ReceiptsScreen.tsx (+ ίσως compact/`cell` variant στο apps/mobile/src/ui.tsx)
+- Depends on: none
+- Acceptance:
+  - Τα 3 raw `<TextInput>` cells (QTY/NET/VAT %, ReceiptsScreen.tsx:279-281) χρησιμοποιουν το shared `<Input>` primitive (νεο compact `cell` variant αν χρειαζεται συμπαγες padding), οχι raw TextInput + inline `placeholderTextColor`.
+  - Το local `cellInput` style (ReceiptsScreen.tsx:388) φευγει· κανενα `borderRadius: 8` magic number (χρησιμοποιησε RADIUS token).
+  - Raw-`<TextInput>` grep στο `src/screens/` = 0 (μονο ο import μενει αν χρησιμοποιειται αλλου).
+  - `apps/mobile npx tsc --noEmit` → EXIT 0.
+- Status: TODO
+
+### Safe-area: adopt `react-native-safe-area-context` (landscape + bottom home-indicator inset)
+- Priority: P2
+- Size: M
+- Web ref: adaptive/safe layout (no direct web token — RN-specific· web reference = mobile-first CLAUDE.md principle)
+- Mobile files: apps/mobile/App.tsx, apps/mobile/package.json (add dep), apps/mobile/src/nav.tsx (Drawer bottom items)
+- Depends on: none
+- Acceptance:
+  - Το legacy `SafeAreaView` απο `react-native` (App.tsx:2,88 — iOS-only top/bottom, μηδεν left/right insets σε landscape) αντικαθισταται με `SafeAreaProvider` + `useSafeAreaInsets` απο `react-native-safe-area-context` (Expo SDK 54 συμβατο).
+  - Το bottom home-indicator inset εφαρμοζεται στο shell/Drawer ωστε τα bottom items να μην κρυβονται κατω απο το indicator.
+  - Το χειροκινητο `paddingTop` Android hack (App.tsx:111) καλυπτεται απο τα insets, οχι διπλο padding.
+  - `apps/mobile npx tsc --noEmit` → EXIT 0.
+- Status: TODO
+
+### Light-theme parity: mobile dark-only vs web `data-theme='light'`
+- Priority: P3
+- Size: L
+- Web ref: light theme override palette (file: apps/web/src/app/globals.css:33-50 `html[data-theme='light']`)
+- Mobile files: apps/mobile/src/theme.ts (light palette + theme context), apps/mobile/src/ui.tsx (primitives να διαβαζουν context αντι const `C`), apps/mobile/src/screens/SettingsScreen.tsx (theme toggle)
+- Depends on: none
+- Acceptance:
+  - Ορισμος light palette (mirror του globals.css:37-50) + theme provider/context· τα primitives διαβαζουν την ενεργη παλετα αντι για το const `C`.
+  - Settings theme toggle (dark/light/follow-system) που περνα ολα τα screens.
+  - **NEEDS DECISION (Αχιλλεας):** θελει καν light mode στο mobile, ή follow-system, ή μενει dark-only για τωρα; Το web light theme ειναι «for later» (CLAUDE.md), οποτε χαμηλη προτεραιοτητα μεχρι απαντηση. Μεχρι τοτε ΔΕΝ ειναι unattended auto-buildable.
+- Status: TODO
+
+---
+
 ## Build Queue
 > **Re-audit 2026-07-09 (parity-auditor, 47η σάρωση· ΝΕΟ functional GAP βρέθηκε — quick-verify):** inventory ξαναχτισμένο από τον κώδικα (όχι docs). **51 route.ts κάτω από `api/v1`** (login + 50 bearer), **19 web pages** (calendar/expenses/history/income/items/jobs/login/receipts/reports/settings/setup/shopping/shopping-list/statements/subscriptions/tasks/trash/vouchers· **ΟΧΙ /network** — δεν υπάρχει πια web page ούτε v1 route, άρα δεν είναι mobile gap), **16 mobile screens**, **84 exported api-functions**. **api.ts↔screens (μηχανικός loop):** και οι 84 api-functions + τα 51 route bases έχουν ≥1 mobile consumer → **μηδέν orphan endpoint, μηδέν unwired wrapper** (spot-check: addReceiptToLibrary/aiFillItem/convertItemToTask/getItemPlans/linkItemPlan/unlinkItemPlan/logItemPrice/getInstallmentPlans/mergePlans/unmergePlan/scanProduct/importItemUrl/suggestSub/getHistory/getTrash/restoreTrash/purgeTrash/createCard/…/saveList = όλα used σε ≥1 screen). mobile `npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). **ΝΕΟ εύρημα (1 auto-buildable functional GAP που οι endpoint-centric προηγ. σαρώσεις έχασαν):** **Receipts quick-verify rapid queue.** Το web έχει `apps/web/src/app/receipts/QuickVerify.tsx` (focused queue: μία unverified απόδειξη τη φορά, editable store/date/total + Verify/Skip/Edit/Not-a-receipt + progress). Το mobile ReceiptsScreen έχει ΜΟΝΟ per-receipt detail-modal με «Verified» toggle (line 222) — **καμία rapid queue**. Γιατί χάθηκε: το QuickVerify δεν εκθέτει νέο endpoint (χρησιμοποιεί web server-actions `quickVerifyReceipt`+`archiveReceipt`), αλλά το mobile PATCH `/api/v1/receipts/[id]` κάνει **partial `$set`** (route.ts:37-58 — θέτει ΜΟΝΟ τα passed fields, δεν αγγίζει lineItems), οπότε `updateReceipt(id,{store,date,total,verified:true})` + `updateReceipt(id,{archived:true})` **αναπαράγουν πλήρως** τη συμπεριφορά με τα ΥΠΑΡΧΟΝΤΑ endpoints — μηδέν νέο route, μηδέν AI cost, μηδέν product decision. → μπήκε στην κορυφή του Build Queue (P1/M). **Counts: DONE 8 / auto-buildable functional GAP 1 (νέο· quick-verify) / NEEDS DECISION 0 νέα.** **Ranked top-3 (unattended-safe):** (1) **Receipts quick-verify queue** [P1/M, νέο, endpoint υπάρχει, structural verify — δεν καλεί AI]· (2) fresh pure-lib **vitest coverage** (`lib/cards.ts`/`lib/taxonomies.ts normalizeList`/`lib/itemStatus.ts`, μηδέν rebuild)· (3) ReceiptsScreen `einput`→`<Input>` [P3/S, tsc-verifiable, μηδέν rebuild]. **Needs Achilleas (αμετάβλητα + 2 confirm):** duplicate-detection στο mobile (receipts/stores/items — web `DuplicatesModal`/`StoreDuplicatesModal`/`ItemDuplicatesModal` = server-actions, **ΚΑΝΕΝΑ v1 endpoint** → θέλει endpoint-design + mobile-UX decision), backup/restore + CSV export στα Settings (web server-actions `exportData`/`importData`, **κανένα v1 endpoint**, file-download UX awkward σε mobile), safe-area dep, language switcher + light/dark theme context, AI-engine/storage/OneDrive στα Settings, statements PDF-import (upload endpoint), extra reports charts (charting lib), remote push (EAS + APNs), Tasks Kanban board, lucide icon set (cosmetic swap).
 > **Re-audit 2026-07-06 (parity-auditor, 46η σάρωση· CONFIRMATION + 2 σημαντικά state changes, μηδέν νέο functional GAP):** inventory ξαναχτισμένο από τον κώδικα (όχι docs). **51 route.ts κάτω από `api/v1`** (login + 50 bearer· **+1 vs 45η**), **51 μοναδικά base paths**, **16 mobile screens**. **Το +1 route = `statements/plans/merge` (POST+DELETE)** που προστέθηκε με το `08ced6d` και το mobile ΤΟ ΚΑΤΑΝΑΛΩΝΕΙ (`api.ts` `statements/plans/merge` ×2 → `mergePlans`/`unmergePlan`). **Route↔consumer (μηχανικός loop όλων των base paths vs `apps/mobile/src/api.ts`):** και τα 51 bases έχουν ≥1 mobile consumer → **μηδέν orphan endpoint**. **Δέλτα portable-surface από την 45η (`git log --since=2026-07-05 -- apps/mobile/src apps/web/src/app/api/v1`):** μόνο **1 feat commit** → **`08ced6d`** (`feat(mobile): installment plan merge/bind (last #5 parity gap)`) — **ΕΚΛΕΙΣΕ ΤΟ ΤΕΛΕΥΤΑΙΟ #5 write-op parity gap** (statements merge/bind· ήταν μέχρι τώρα «Needs Achilleas»). Roadmap #5 πλέον 100% ✅. Οι υπόλοιποι commits = test-only (`test(api/v1)` receipts/statements/vouchers/merge coverage) → **μηδέν v1 shape change, μηδέν νέο portable feature**. **2 STATE CHANGES από την 45η:** (α) **working tree ΚΑΘΑΡΟ** (τα πρώην WIP Receipts/Settings/Shopping έγιναν commit — `6835e6a` `<Input>` primitive + `0ac7a37` hitSlop· άρα το προηγούμενο «WIP-blocked» Input/hitSlop debt ξεμπλόκαρε)· (β) το πρώην «statements merge-bind = Needs Achilleas» ΔΕΝ ισχύει πια (χτίστηκε). mobile `tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors). **Raw-`<TextInput>` audit (live grep `src/screens/`):** μόνο **ReceiptsScreen 9** (`einput` ×6 store/date/pay/total/name/notes + `cellInput` ×3 qty/net/vat) — **τώρα committed/non-WIP** (όχι πια WIP-blocked)· ItemsScreen/SettingsScreen/ShoppingScreen = 0 raw. **Counts: DONE 8 (parity queue 6/6 + Activity + πλέον merge/bind) / auto-buildable functional GAP 0 / NEEDS DECISION 0 νέα.** Ενεργό auto-buildable **functional** parity TODO **κανένα** — πλήρης functional parity. **Ranked top-3 (unattended-safe, non-WIP):** (1) **ReceiptsScreen `einput`→`<Input>`** (τα 5-6 top-level fields store/date/pay/total/notes· P3/S, tsc-verifiable, mobile-only, μηδέν rebuild· άνοιξε τώρα που έγινε commit· τα 3 compact `cellInput` qty/net/vat = attended-preferred visual delta)· (2) fresh pure-lib **vitest coverage** (`lib/cards.ts` / `lib/taxonomies.ts normalizeList` / `lib/itemStatus.ts`, μηδέν rebuild)· (3) `<Chip>`/`<Badge>`/`<ListItem>` holdout σάρωση για non-WIP raw clusters (P3/S, tsc-verifiable). **Needs Achilleas (ενημερωμένα — αφαιρέθηκε το statements merge-bind, χτίστηκε):** safe-area dep (`react-native-safe-area-context` ΑΠΟΝ), theme toggle + language switcher + light/dark context, AI-engine/storage/OneDrive στα Settings, statements **PDF-import** (θέλει upload endpoint), extra reports charts (charting lib), remote push (EAS + APNs), Tasks Kanban board, lucide icon set (μεγάλο cosmetic swap), rate-limit 429 backoff στο mobile `api.ts` (config-gated, off by default).

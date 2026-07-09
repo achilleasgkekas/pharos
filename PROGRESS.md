@@ -4485,3 +4485,16 @@ Read-only code-quality audit της Next.js web επιφάνειας (fresh grep
 **Follow-ups που άφησα**: mobile/v1 expose του net worth (όπως PA1/PA3)· τα NetWorthSnapshot (και τα Expense, προϋπάρχον κενό) λείπουν από το `BACKUP_MODELS` του backup export· opt-in «AI categorise» για uncategorised CSV imports (PA1).
 
 **Επόμενο suggested task**: το Approved queue συνεχίζει με τα «πολύ ψηλό value/effort»: **P27 suggested budgets** (S, ντετερμινιστικό, φαίνεται ιδανικό για ένα run) ή **P22 full-text search** (ΠΡΟΣΟΧΗ: φαίνεται να το δουλεύει ήδη άλλη routine — υπάρχει uncommitted receiptSearch.ts στο tree, κάνε verify-pre-build πρώτα) ή **P14 price-hike watch** (S).
+
+## 2026-07-10 (ui-auditor, 1η αποκλειστικά UI-consistency σάρωση)
+Πρωτη σαρωση με στοχο mobile UI consistency vs web design system (οχι functional parity, αυτο μενει στο Build Queue). Read-only, μηδεν app-code edits, μηδεν Docker, μηδεν AI jobs.
+
+**Θεμελιο ΥΠΑΡΧΕΙ (καμια P1 foundation ελλειψη):** `apps/mobile/src/theme.ts` καθρεφτιζει πληρως τα web tokens (`globals.css:8-22`) + SPACE/RADIUS/SIZE/scrim/alpha· `apps/mobile/src/ui.tsx` = centralized primitives (Button/IconButton/Card/ListItem/Input/TextArea/Badge/Chip/Check/Header/Spinner/Empty/ErrorText/ModalSheet/contentWidth).
+
+**Παραβιασεις ανα dimension:** hardcoded-hex στα screens **0**· rgba-literals **0** (ολα `alpha()`)· `contentWidth` cap **14/14** list screens· tokens/magic-number **1** (Receipts `borderRadius: 8`)· reusable-component re-impl **2** (Shopping inline loading/empty· Receipts 3 raw `<TextInput>` cells)· states-consistency **1** (Shopping παρακαμπτει Spinner/Empty με local `center`/`empty` byte-dupes)· adaptive/safe-area **1** (legacy `SafeAreaView`, χωρις landscape/bottom insets, `react-native-safe-area-context` δεν ειναι installed)· theme/dark-mode **1** (mobile dark-only ενω web εχει `data-theme='light'` πληρη palette). `apps/mobile npx tsc --noEmit` → **EXIT 0**.
+
+**False positive που απορριφθηκε:** ItemsScreen local `empty` style (line 518) ΔΕΝ ειναι byte-dupe — ειναι διαφορετικο small-italic sub-section label, ενω το list-empty ηδη χρησιμοποιει `<Empty>`. Δεν μπηκε στο queue.
+
+**Top-3 για τον builder (μικρα πρωτα, unattended-safe):** (1) **ShoppingScreen inline loading/empty → `<Spinner>`/`<Empty>`** [P2/S, tsc-verifiable, μηδεν rebuild]· (2) **ReceiptsScreen cell-inputs → shared `<Input>`** [P2/S, σβηνει 3 raw TextInput + magic radius 8]· (3) **safe-area-context adoption** [P2/M, landscape + bottom home-indicator inset]. Το light-theme parity [P3/L] ειναι NEEDS DECISION (θελει καν light mode στο mobile;) — οχι auto-buildable μεχρι απαντηση Αχιλλεα.
+
+Ολη η ουρα με build-ready format στο MOBILE_PARITY.md → `## UI Debt Queue`.
