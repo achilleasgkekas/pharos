@@ -2,15 +2,28 @@ import { describe, it, expect } from 'vitest';
 import { workspaceTabs } from './workspaceTabs';
 
 describe('workspaceTabs', () => {
-  it('returns Overview + Members + Usage + Billing in order', () => {
+  it('returns Overview + Members + Usage + Activity + Billing in order', () => {
     const tabs = workspaceTabs('overview', undefined);
-    expect(tabs.map((t) => t.label)).toEqual(['Overview', 'Members', 'Usage', 'Billing']);
+    expect(tabs.map((t) => t.label)).toEqual([
+      'Overview',
+      'Members',
+      'Usage',
+      'Activity',
+      'Billing',
+    ]);
     expect(tabs.map((t) => t.href)).toEqual([
       '/account/workspace',
       '/account/workspace/members',
       '/account/workspace/usage',
+      '/account/workspace/activity',
       '/account/workspace/billing',
     ]);
+  });
+
+  it('flags the Activity tab as active when selected', () => {
+    const tabs = workspaceTabs('activity', undefined);
+    expect(tabs.find((t) => t.label === 'Activity')?.active).toBe(true);
+    expect(tabs.filter((t) => t.active)).toHaveLength(1);
   });
 
   it('flags the Usage tab as active when selected', () => {
@@ -48,7 +61,8 @@ describe('workspaceTabs', () => {
     expect(tabs[0].href).toBe('/account/workspace?w=acme%20corp');
     expect(tabs[1].href).toBe('/account/workspace/members?w=acme%20corp');
     expect(tabs[2].href).toBe('/account/workspace/usage?w=acme%20corp');
-    expect(tabs[3].href).toBe('/account/workspace/billing?w=acme%20corp');
+    expect(tabs[3].href).toBe('/account/workspace/activity?w=acme%20corp');
+    expect(tabs[4].href).toBe('/account/workspace/billing?w=acme%20corp');
   });
 
   it('trims the slug and treats non-strings as absent', () => {

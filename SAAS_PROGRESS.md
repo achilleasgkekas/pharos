@@ -2529,3 +2529,75 @@ self-gates σε notFound() μέσω requireSaasUiEnabled πριν render· η α
 erasure) — χρειάζεται πρώτα PATCH/DELETE στο `/api/saas/admin/tenants/[slug]` (backend), μετά UI·
 είτε (β) **sign-out control** στο account landing/workspace shell (POST → api/saas/auth/logout)·
 είτε (γ) wiring του `recordAiUsage` στα AI call-sites ώστε το Usage tab να δείχνει πραγματικά νούμερα.
+
+## 2026-07-10 (increment 61 — sign-out control on account landing: /account, §8 UI-first)
+**Το κενό (ανοιχτό από #60):** ο signed-in Account στο `/account` (workspace chooser ή το
+empty-state των μηδέν workspaces) δεν είχε **κανένα** τρόπο να αποσυνδεθεί — μόνο το
+`WorkspaceShell` (workspace-settings pages) έδειχνε το `SignOutButton`. Έτσι, ένας χρήστης που
+προσγειώνεται στον chooser έμενε stranded. Το έκλεισα με το ΗΔΗ υπάρχον client `SignOutButton`
+(POST → `/api/saas/auth/logout` → navigate `/account/login`), σε δικό μου gated page:
+- `app/(saas)/account/page.tsx` (δικό μου) — νέο local `AccountTopBar()` (server-safe): `← Pharos`
+  link (αριστερά) + `<SignOutButton />` (δεξιά), ακριβώς το idiom του WorkspaceShell header (ίδια
+  tokens/placement). Mount σε **αμφότερες** τις καταστάσεις: chooser (πάνω από το header) και
+  empty-state (τυλίχτηκε σε max-w-md wrapper με το top bar πάνω, κρατώντας το κείμενο center).
+  Η `single` περίπτωση δεν επηρεάζεται (redirect πριν render). Μηδέν νέο component/dependency —
+  reuse του committed SignOutButton.
+
+**Verified:** `npm run type-check` → **EXIT 0**. ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε
+(μόνο το δικό μου account/page). `SAAS_MODE` off / self-hosted = **zero effect** (το (saas)
+segment self-gates σε notFound() μέσω getSaasViewer/requireSaasUiEnabled πριν render). Κανένας
+Docker rebuild (additive gated segment + ήδη υπάρχον client component, μηδέν shared runtime
+wiring)· καμία νέα εξάρτηση. Collision guard: μηδέν staged foreign files πριν το commit· foreign
+modified/untracked (search-actions/docs/features/receiptSearch από άλλες routines) ΔΕΝ αγγίχτηκαν·
+isolated pathspec commit μόνο του account/page.tsx.
+
+**## Needs Achilleas** (account sign-out):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η σελίδα (αλλιώς 404). Self-hosted
+  = disabled, zero risk.
+
+**Next task:** increment 62 — είτε (α) **admin tenant ACTIONS** (suspend/plan-change/schedule-
+erasure) — χρειάζεται πρώτα PATCH/DELETE στο `/api/saas/admin/tenants/[slug]` (backend), μετά UI·
+είτε (β) **create-another-workspace** flow για signed-in account με 0/N workspaces (backend
+increment: POST create workspace για υπάρχον account, μετά UI κουμπί στο empty-state/chooser)·
+είτε (γ) wiring του `recordAiUsage` στα AI call-sites ώστε το Usage tab να δείχνει πραγματικά νούμερα.
+
+## 2026-07-10 (increment 62 — Activity tab: workspace audit trail viewer, §UI-first)
+**Το κενό:** το control-plane audit trail (`models/AuditEvent` + `GET /api/saas/audit`, ήδη
+χτισμένα) **δεν είχε ΚΑΝΕΝΑ UI** — κανένα workspace-settings panel το κατανάλωνε. Ένας owner/
+admin δεν μπορούσε να δει «ποιος έκανε τι» (members added/removed, role changes, invites,
+plan/workspace changes). Το έκλεισα με νέο **Activity tab** στο workspace shell, UI-first,
+καταναλώνοντας το ήδη υπάρχον trail (SSR read, μηδέν νέο backend).
+- **`components/saas/activityView.ts`** (δικό μου, νέο) — PURE/client-safe mapper: `actionLabel`
+  (curated copy για τα 21 AUDIT_ACTIONS + title-case fallback για unmapped verbs), `actionTone`
+  (noun→PillTone· destructive suffixes removed/revoked/canceled/suspended/cleared → πάντα red),
+  `actorLabel` (name → email → «System»), `metaSummary` (flat «key: value · …», capped 6 entries
+  / 60 chars/value, arrays→commas, nested→{…}), `toActivityRow[s]`. **18 unit tests**.
+- **`components/saas/ActivityPanel.tsx`** (νέο) — server-safe presentational λίστα (Pill + actor +
+  target + meta + formatWhen timestamp), empty-state placeholder· ίδια design tokens, μηδέν shared
+  CSS.
+- **`app/(saas)/account/workspace/activity/page.tsx`** (νέο) — SSR gated ακριβώς όπως το usage
+  page (getSaasViewer → login redirect· pickWorkspace· getTenantContext). **Owner/admin only**
+  (`canManageMembers`, parity με το 403 του audit route)· plain member → read-only notice. Διαβάζει
+  AuditEvent **απευθείας** (limit 50, newest-first) + batched Account lookup για actor email/name
+  (μηδέν N+1, ακριβώς το idiom του route)· μηδέν self-fetch.
+- **`components/saas/workspaceTabs.ts` + test** (δικά μου) — νέο tab key `activity` (μετά το Usage,
+  πριν το Billing)· test updated (νέα σειρά + active-flag + ?w= carry-through index shift). **8
+  tests** pass.
+
+**Verified:** `npm run type-check` → **EXIT 0**· `vitest run activityView + workspaceTabs` →
+**26/26 pass**. ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο τα δικά μου saas paths).
+`SAAS_MODE` off / self-hosted = **zero effect** (το (saas) segment self-gates σε notFound() πριν
+render). Κανένας Docker rebuild (additive gated segment + presentational components, μηδέν shared
+runtime wiring)· καμία νέα εξάρτηση. Collision guard: μηδέν staged foreign files πριν το commit·
+foreign modified/untracked (docs/features/DOCS_PROGRESS από άλλες routines) ΔΕΝ αγγίχτηκαν·
+isolated pathspec commit μόνο των saas paths + SAAS_PROGRESS.md.
+
+**## Needs Achilleas** (activity tab):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η σελίδα (αλλιώς 404). Self-hosted
+  = disabled, zero risk. Το trail γεμίζει από το ήδη-wired `recordAudit` στα workspace mutations.
+
+**Next task:** increment 63 — είτε (α) **admin tenant ACTIONS** (suspend/reactivate/plan-change) —
+backend PATCH στο `/api/saas/admin/tenants/[slug]` πρώτα, μετά UI κουμπιά· είτε (β) **Activity σε
+admin console** (superadmin cross-tenant activity view, καταναλώνει audit με `?tenant=` filter)·
+είτε (γ) **action filter** στο Activity tab (dropdown ανά AUDIT_ACTION, ήδη υποστηρίζεται από το
+route `?action=`).
