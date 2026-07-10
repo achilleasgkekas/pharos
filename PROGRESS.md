@@ -4,6 +4,27 @@
 
 <!-- reviewed: 22750b2 -->
 
+## 2026-07-15 (web code-quality auditor — 52η σάρωση· read-only· type-check EXIT 0· 1 νέο P2 mobile-parity + 3 SaaS holdouts)
+
+**Μετρήσεις ανά διάσταση** (fresh grep, όχι docs):
+- **Type safety:** 0 ευρήματα. Μηδέν `: any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ολο το `src/app/api/v1` (εκτός test). `npm run type-check` → EXIT 0.
+- **Input validation:** 0 νέα. Κάθε body-reading v1 route περνά από `readBody` + `strField`/`numField`/`enumField`/`boolField` + `isObjectId`. (Το write-parity item παρακάτω προσθέτει πεδία, δεν διορθώνει gap.)
+- **Error handling:** 3 ανοιχτά (SaaS control-plane, από 49η/50ή, αμετάβλητα — μηδέν API commit από την 51η): `invites/accept` (try=1, μόνο create-race· 8 DB ops guardless), `audit` (try=0), `workspace/erasure/purge` (try=0). Όλα dead-until-SaaS, unattended-safe wraps. Παραμένουν στην ουρά.
+- **Auth:** 0 ευρήματα. Κάθε v1 route εκτός `auth/login` (σωστά public) περνά από `withAuth`.
+- **Mongoose:** 0 νέα. Κάθε read route `.lean()`-backed + `.limit()`-bounded.
+- **Duplication/dead code:** 0 νέα.
+- **Web UX states:** εκτός scope αυτού του run (v1 focus).
+- **Consistency (mobile-parity):** **1 νέο P2** — v1 expenses surface δεν εκθέτει/δέχεται τα `space` (P34) + `split[]` (P35) που πρόσθεσε το app στο `Expense` model + `ExpensesClient`. `trimExpense`/`ExpenseLean` (read) + POST + PATCH (write) όλα λείπουν τα 2 πεδία → web-vs-mobile data drift. Splitαρισμένο σε 2 P2/S items.
+
+**Top 3 για τον builder** (με σειρά):
+1. **v1 expenses GET/detail shape — space + split** (P2/S, `expenses/serialize.ts`) — read parity, no deps. Ξεκλειδώνει το mobile detail/list να δείχνει split/space.
+2. **v1 expenses POST + PATCH — space + split** (P2/S, `route.ts` + `[id]/route.ts`) — write parity, depends-on το #1. Επαναχρησιμοποίησε `cleanSplit` από `app/expenses/actions.ts`.
+3. **`invites/accept` guardless write route** (P2/S) — top-level try/catch wrap (SaaS, dead-until-SaaS αλλά μηχανικό/ασφαλές).
+
+**Επιλογές (auditor defaults, καταγράφονται):** το mobile-parity εύρημα προτεραιοποιήθηκε **πάνω** από τους 3 SaaS holdouts παρότι ίδιας κλάσης P2/S — γιατι είναι live mobile-facing (data drift τώρα), ενώ οι SaaS holdouts είναι dead-until-SaaS (SAAS_MODE off = 404 upstream). Split σε read/write αντί ενός M item ώστε το καθένα να είναι reviewable αυτόνομα (read parity δεν εξαρτάται από write· write depends-on το read shape).
+
+**## Needs Achilleas:** αμετάβλητο — 2 decision-flag P3 (reset-request timing side-channel· `getTenantConnection` readyState guard) παραμένουν στο WEB_DEBT `## Needs Achilleas`, δεν χρειάζονται νέα απόφαση αυτό το run.
+
 ## 2026-07-10 (reviewer — range 65b81a2..22750b2· tsc web+mobile EXIT 0· μηδέν regression· flag el.ts i18n gap)
 
 **Τι έλεγξα**: 63 commits από τον τελευταίο marker (`65b81a2..22750b2`) — feat(saas) auth/workspace/members/billing/usage/activity/dbstats UI, feat(expenses) split P35 + per-space P34 + vendor-rules P15, feat(bills) P28, feat(vouchers) gift-card P32, feat(reports) safe-to-spend P19 + envelope P25, feat(statements) reconcile P18, feat(calendar) iCal P6, feat(subscriptions) trial reminder P33, feat(search) line-item P22, + landing/docs/api-v1 tests.

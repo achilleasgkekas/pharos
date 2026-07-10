@@ -3,6 +3,51 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-15 52η σάρωση· type-check EXIT 0· v1 surface τυπολογικά καθαρός· 1 νέο P2 mobile-parity εύρημα [expenses v1 shape λείπει space/split] + 3 SaaS error-handling holdouts της 51ης παραμένουν ανοιχτά)
+
+- **type-check:** `cd apps/web && npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
+- **Μηδέν API commit από την 51η:** `git log --since=2026-07-10 -- apps/web/src/app/api/v1 apps/web/src/app/api/saas` = **μηδέν commit**. Οι 3 SaaS holdouts (`invites/accept` try=1 [create-race μόνο], `audit` try=0, `workspace/erasure/purge` try=0) **παραμένουν ανοιχτοί** — ο builder δεν τους κατανάλωσε. Δεν ξαναγράφονται (ήδη στην ουρά, 49η/50η σάρωση).
+- **v1 surface τυπολογικά καθαρός:** fresh grep σε ολο το `src/app/api/v1` (εκτός test) → μηδέν `: any`/`as any`/`@ts-ignore`/`@ts-expect-error`. Κάθε read route `.lean()`-backed· κάθε route εκτός `auth/login` περνά από `withAuth`.
+- **1 νέο εύρημα (mobile-parity/consistency, P2):** το app προσθέτει **`space` (P34, commit `6b1de5c`)** και **`split[]` (P35, commit `26eed90`)** στο `Expense` model + web `ExpensesClient`, αλλά ο **v1 mobile surface δεν τα εκθέτει ούτε τα δέχεται**. Ρίζα: (α) `expenses/serialize.ts` — ο `ExpenseLean` type + ο `trimExpense()` (μοναδική JSON shape, χρησιμοποιείται από GET list, GET [id], POST [id]/rescan, PATCH [id]) **δεν έχουν** `space`/`split` πεδία· (β) `POST /api/v1/expenses` **δεν διαβάζει** `space`/`split` από το body· (γ) `PATCH /api/v1/expenses/:id` επίσης όχι. Αποτέλεσμα: mobile client **δεν βλέπει** ποιος χρωστάει τι / σε ποιο space, **ούτε μπορεί να δημιουργήσει/επεξεργαστεί** έξοδο με split ή space tag → data drift web-vs-mobile. Flagged και στο PROGRESS.md (07-15, «suggested next: split στο v1 expenses GET shape»). Splitαρισμένο σε 2 P2/S items (read parity → write parity depends-on).
+- **Ουρά μετά το run:** 2 νέα auto-buildable P2/S (expenses v1 read parity· write parity) στην κορυφή [πάνω από τους 3 dead-until-SaaS holdouts, γιατι mobile-facing = υψηλότερη αξία] + 3 SaaS error-handling P2/S της 49ης/50ής + 2 decision-flag [Achilleas] στο `## Needs Achilleas`.
+
+---
+
+## Web Debt Queue — ενεργά items (52η σάρωση 2026-07-15)
+
+> Σύνοψη 52ής: v1 τυπολογικά καθαρός, type-check EXIT 0. Νέο P2 mobile-parity gap — τα P34 `space` + P35 `split` δεν περνούν στον v1 expenses surface (ούτε read ούτε write). Splitαρισμένο σε read-parity (top) + write-parity (depends-on). Οι 3 SaaS holdouts παραμένουν από κάτω (unattended-safe, dead-until-SaaS).
+
+### v1 expenses GET/detail shape — λείπουν `space` (P34) + `split[]` (P35) → mobile δεν τα βλέπει
+- Priority: P2
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/v1/expenses/serialize.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα:** ο `trimExpense()` (γρ.17-38, μοναδική JSON shape για GET list + GET/PATCH [id] + POST [id]/rescan) δεν εκθέτει τα δύο νεότερα `Expense` πεδία: `space` (string, `models/Expense.ts:16`) και `split[]` (subdoc `{name, share, settled}`, `models/Expense.ts:37-49`). Ο `ExpenseLean` type (γρ.4-8) επίσης δεν τα δηλώνει → ένα lean read τα σβήνει σιωπηλά. Το mobile detail/list δεν μπορεί να δείξει ποιος χρωστάει τι ή σε ποιο space.
+  - **Fix:** στο `ExpenseLean` πρόσθεσε `space?: string;` και `split?: { name?: string; share?: number; settled?: boolean }[];`. Στο επιστρεφόμενο object του `trimExpense` πρόσθεσε `space: e.space ?? ''` και `split: (e.split ?? []).map(s => ({ name: s.name ?? '', share: s.share ?? 0, settled: !!s.settled }))`. Ευθυγράμμισε με το web serialize (`app/expenses/lib.ts` — defensive coercion, ίδιο shape).
+  - Το GET list (`route.ts`), GET/PATCH `[id]/route.ts`, POST `[id]/rescan/route.ts` παίρνουν αυτόματα τα νέα πεδία (όλα καλούν `trimExpense`). Μηδέν αλλαγή στα call sites.
+  - Επαλήθευση: `grep -c "space\|split" apps/web/src/app/api/v1/expenses/serialize.ts` → ≥2· ένα GET /api/v1/expenses επιστρέφει `space` + `split[]` σε κάθε expense object.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-15, 52η σάρωση· live: `trimExpense` 20 πεδία, μηδέν space/split· `ExpenseLean` 20 keys)
+
+### v1 expenses POST + PATCH — δέχονται `space` + `split[]` (write parity)
+- Priority: P2
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/v1/expenses/route.ts, apps/web/src/app/api/v1/expenses/[id]/route.ts
+- Depends on: v1 expenses GET/detail shape — λείπουν `space` (P34) + `split[]` (P35)
+- Acceptance:
+  - **Το πρόβλημα:** `POST /api/v1/expenses` (`route.ts:43-56`) και `PATCH /api/v1/expenses/:id` (`[id]/route.ts:18-30`) δεν διαβάζουν `space`/`split` από το body → το mobile δεν μπορεί να δημιουργήσει ή να επεξεργαστεί έξοδο με space tag ή split. Το web `app/expenses/actions.ts` τα χειρίζεται ήδη (μέσω `cleanSplit` + UpdateSchema).
+  - **Fix (POST):** στο `Expense.create({...})` πρόσθεσε `space: strField(b, 'space', '')` και `split: cleanSplit(b.split)`. Επαναχρησιμοποίησε τη λογική καθαρισμού από `app/expenses/actions.ts` (`cleanSplit`: trim name, drop nameless, round cents στο share, coerce settled) — export-άρισέ την αν δεν είναι ήδη exported ώστε να μην διπλασιαστεί (μην αντιγράψεις inline).
+  - **Fix (PATCH):** στο `set` object πρόσθεσε guarded `if (typeof b.space === 'string') set.space = b.space;` και `if (Array.isArray(b.split)) set.split = cleanSplit(b.split);` (ίδιο pattern με τα υπόλοιπα optional set fields).
+  - Οι responses παραμένουν `trimExpense` (γεμίζουν από το read-parity item) → round-trip create/patch → read δείχνει space/split.
+  - Επαλήθευση: POST με `{vendor, amount, space:"Εξοχικό", split:[{name:"Νίκος", share:20}]}` → 201 + read-back δείχνει space + split· `grep -c "cleanSplit\|space" apps/web/src/app/api/v1/expenses/route.ts` ≥2.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-15, 52η σάρωση· live: POST create 12 πεδία χωρίς space/split· PATCH set-map 10 fields χωρίς space/split)
+
+---
+
 ## Σύνοψη audit (2026-07-10 51η σάρωση· type-check EXIT 0· v1 surface 100% καθαρός· μηδέν νέο εύρημα· μηδέν API commit από την 50η — 3 SaaS error-handling holdouts παραμένουν ανοιχτά)
 
 - **type-check:** `cd apps/web && npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
