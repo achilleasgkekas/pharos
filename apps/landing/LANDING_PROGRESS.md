@@ -1774,3 +1774,36 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-10 (cont.⁷) — (e) polish/content: Features copy ευθυγραμμιση με 2 shipped capabilities (P32, P33)
+
+Increment (e) polish, content-accuracy micro-pass. Δυο modules ειχαν αποκτησει νεες δυνατοτητες στο κυριο app
+(git log) που το landing ΔΕΝ αντικατοπτριζε ακομα:
+- Vouchers: gift-card / store-credit **balance tracker** (P32, commit 052ee64).
+- Subscriptions: **free-trial cancel-before-charge reminder** (P33, commit bfd96ba).
+
+Αλλαγες (app/page.tsx, FEATURES array μονο, μηδεν UI/CSS/dependency/bundle change):
+- Subscriptions desc: προστεθηκε «plus free-trial reminders that ping you to cancel before the first charge
+  lands.» (πριν σταματουσε στο renewal calendar).
+- Vouchers desc: «with expiry reminders» -> «track the balance left on each one, and get expiry reminders
+  before value slips away» (αντικατοπτριζει το balance tracker + κραταει το expiry reminder).
+Και τα δυο ειναι ακριβη σε πραγματικα-shipped features, οχι roadmap. Δεν αγγιξα ROADMAP/FAQ/Pricing.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static, / route 5.33 kB (αμεταβλητο, copy-only).
+- Prerender (.next/server/app/index.html): «track the balance left on each one» + «free-trial reminders that
+  ping you to cancel» -> present. Content/non-visual -> verified στο static output (separate non-Docker app,
+  δεν σηκωσα preview server).
+- em-dash: 0 στα δυο strings που edit-αρα (commas μονο). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (page.tsx + αυτο το log) μεσω explicit pathspec· foreign unstaged
+  files αλλου routine (apps/web/search-actions.ts, receiptSearch*) τα αφησα αθικτα (collision guard).
+
+Επομενο increment: (e) polish συνεχεια — reconciliation (receipt <-> transaction, P18) ισως αξιζει μια FAQ
+γραμμη· ή annual Offers στα per-tier Pricing aria labels· ή real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

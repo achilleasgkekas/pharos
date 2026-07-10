@@ -65,13 +65,13 @@ const FEATURES: {
     icon: 'calendar',
     color: 'var(--accent)',
     title: 'Subscriptions',
-    desc: 'Every recurring charge in one place with a renewal calendar, so nothing bills you by surprise.',
+    desc: 'Every recurring charge in one place with a renewal calendar, plus free-trial reminders that ping you to cancel before the first charge lands.',
   },
   {
     icon: 'ticket',
     color: 'var(--red)',
     title: 'Vouchers & coupons',
-    desc: 'Store gift cards and discount codes with expiry reminders. Add them by hand or let AI read them from a screenshot.',
+    desc: 'Store gift cards and discount codes, track the balance left on each one, and get expiry reminders before value slips away. Add them by hand or let AI read them from a screenshot.',
   },
   {
     icon: 'chart',
