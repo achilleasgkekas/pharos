@@ -1,17 +1,18 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp } from 'lucide-react';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, suggestBudgets, saveAssetAccounts, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, suggestBudgets, saveAssetAccounts, saveDepreciation, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { AI_FEATURES } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, SCRAPER_RECOMMEND, type FetchedModel } from '@/lib/aiModels';
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
+import { rateForCategory } from '@/lib/depreciation';
 import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, testNotifierChannel, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow } from './actions';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
@@ -218,6 +219,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             <>
               <BudgetsManager settings={info.settings} />
               <AssetAccountsManager settings={info.settings} />
+              <DepreciationManager settings={info.settings} />
               <CardsManager cards={info.cardList} />
             </>
           )}
@@ -1614,6 +1616,89 @@ function AssetAccountsManager({ settings }: { settings: AppSettings }) {
           {pending ? t('common.saving') : t('set.saveAccounts')}
         </button>
         <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.accountsTotal', { amount: `${cur()}${total.toLocaleString('en-GB')}` })}</span>
+        {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
+      </div>
+    </Section>
+  );
+}
+
+/** Asset depreciation model (P29). Owned-inventory value on Reports is estimated
+ *  from purchase price + date via a per-category declining-balance curve instead of
+ *  staying frozen at cost. Toggle, salvage floor, default rate, and per-category rates. */
+function DepreciationManager({ settings }: { settings: AppSettings }) {
+  const t = useT();
+  const dep = settings.depreciation;
+  const [pending, startTransition] = useTransition();
+  const [enabled, setEnabled] = useState(dep.enabled);
+  const [floorPct, setFloorPct] = useState(String(dep.floorPct));
+  const [defaultRate, setDefaultRate] = useState(String(dep.defaultRate));
+  const [rates, setRates] = useState<Record<string, string>>(() =>
+    Object.fromEntries(settings.itemCategories.map((c) => [c, dep.rates[c] != null ? String(dep.rates[c]) : '']))
+  );
+  const [msg, setMsg] = useState<string | null>(null);
+
+  function save() {
+    setMsg(null);
+    // Only non-empty inputs become explicit overrides; empty → the default rate
+    // applies at read time (so "empty" ≠ "0% / never depreciates").
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(rates)) {
+      if (v.trim() === '') continue;
+      const n = Number(v);
+      if (Number.isFinite(n) && n >= 0) out[k] = n;
+    }
+    startTransition(async () => {
+      await saveDepreciation({ enabled, floorPct: Number(floorPct) || 0, defaultRate: Number(defaultRate) || 0, rates: out });
+      setMsg(t('common.savedOk'));
+    });
+  }
+
+  return (
+    <Section title={t('set.depreciationTitle')} icon={<TrendingDown size={15} />}>
+      <p className="text-xs text-[color:var(--color-text-dim)] mb-3">{t('set.depreciationDesc')}</p>
+      <label className="flex items-center justify-between gap-3 mb-3">
+        <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.depreciationEnabled')}</span>
+        <Switch checked={enabled} onChange={setEnabled} />
+      </label>
+      {enabled && (
+        <>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <label className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
+              <span className="text-[11px] text-[color:var(--color-text-dim)] flex-1">{t('set.depreciationDefaultRate')}</span>
+              <input type="number" min="0" max="100" inputMode="decimal" value={defaultRate} onChange={(e) => setDefaultRate(e.target.value)} className="w-14 bg-transparent text-right text-xs text-[color:var(--color-text)] focus:outline-none" />
+              <span className="text-[10px] text-[color:var(--color-text-faint)]">%/yr</span>
+            </label>
+            <label className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
+              <span className="text-[11px] text-[color:var(--color-text-dim)] flex-1">{t('set.depreciationFloor')}</span>
+              <input type="number" min="0" max="100" inputMode="decimal" value={floorPct} onChange={(e) => setFloorPct(e.target.value)} className="w-14 bg-transparent text-right text-xs text-[color:var(--color-text)] focus:outline-none" />
+              <span className="text-[10px] text-[color:var(--color-text-faint)]">%</span>
+            </label>
+          </div>
+          <p className="text-[11px] text-[color:var(--color-text-faint)] mb-2">{t('set.depreciationRatesLabel')}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {settings.itemCategories.map((c) => (
+              <label key={c} className="flex items-center gap-1.5 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5">
+                <span className="text-[11px] text-[color:var(--color-text-dim)] flex-1 truncate" title={c}>{c}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  inputMode="decimal"
+                  value={rates[c] ?? ''}
+                  onChange={(e) => setRates((p) => ({ ...p, [c]: e.target.value }))}
+                  placeholder={String(rateForCategory({ ...dep, rates: {} }, c))}
+                  className="w-12 bg-transparent text-right text-xs text-[color:var(--color-text)] focus:outline-none"
+                />
+                <span className="text-[10px] text-[color:var(--color-text-faint)]">%</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="flex items-center gap-3 mt-3">
+        <button onClick={save} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
+          {pending ? t('common.saving') : t('set.depreciationSave')}
+        </button>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
       </div>
     </Section>

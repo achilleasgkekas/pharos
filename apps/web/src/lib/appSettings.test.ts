@@ -5,6 +5,7 @@ import {
   DEFAULT_ITEM_CATEGORIES,
   DEFAULT_SUBSCRIPTION_CATEGORIES,
 } from './taxonomies';
+import { resolveDepreciation } from './depreciation';
 
 describe('numMap', () => {
   it('keeps only positive finite numbers', () => {
@@ -56,6 +57,7 @@ describe('normalizeSettings', () => {
       subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,
       budgets: {},
       assetAccounts: {},
+      depreciation: resolveDepreciation(undefined),
     };
     expect(normalizeSettings(null)).toEqual(expected);
     expect(normalizeSettings(undefined)).toEqual(expected);

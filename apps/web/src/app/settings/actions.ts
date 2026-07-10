@@ -1024,6 +1024,38 @@ export async function saveAssetAccounts(accounts: Record<string, number>): Promi
   return { ok: true };
 }
 
+/** Save the asset depreciation model (P29): master toggle, salvage floor %, a
+ *  default annual rate, and per item-category annual rates. Percent values are
+ *  clamped to 0..100. Categories the user left empty are simply not sent (the
+ *  built-in per-category default applies at read time). Affects the depreciated
+ *  owned-inventory value on Reports. */
+export async function saveDepreciation(cfg: {
+  enabled: boolean;
+  floorPct: number;
+  defaultRate: number;
+  rates: Record<string, number>;
+}): Promise<{ ok: boolean }> {
+  await connectDB();
+  const clampPct = (n: unknown) => Math.min(100, Math.max(0, Number(n) || 0));
+  const rates: Record<string, number> = {};
+  for (const [k, v] of Object.entries(cfg?.rates || {})) {
+    const key = k.trim();
+    const n = Number(v);
+    if (key && Number.isFinite(n) && n >= 0) rates[key.slice(0, 60)] = Math.min(100, n);
+  }
+  const clean = {
+    enabled: cfg?.enabled !== false,
+    floorPct: clampPct(cfg?.floorPct),
+    defaultRate: clampPct(cfg?.defaultRate),
+    rates,
+  };
+  await AppConfig.updateOne({ key: 'singleton' }, { $set: { depreciation: clean } }, { upsert: true });
+  invalidateAppSettings();
+  revalidatePath('/reports');
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
 /** A stored file reference is safe only if it's a contained relative path. A
  *  tampered backup must not be able to point filePath/thumbPath/photos at e.g.
  *  ../../etc/passwd, which would then be served or unlinked by purge. */

@@ -7,6 +7,7 @@ import { Expense } from '@/models/Expense';
 import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
+import { estimatedItemValue } from '@/lib/depreciation';
 import { captureAndListSnapshots } from '@/lib/netWorth';
 import type { SerializedStatement } from '@/types';
 import { ReportsClient } from './ReportsClient';
@@ -30,6 +31,7 @@ type LeanItem = {
   status?: string;
   purchasedPrice?: number | null;
   currentPrice?: number;
+  purchasedAt?: string | Date | null;
   warrantyUntil?: string | Date | null;
 };
 type LeanSub = { amount?: number; billingCycle?: string; category?: string };
@@ -46,7 +48,7 @@ async function getReports(monthsBack = 12) {
 
   const [receiptsRaw, itemsRaw, subsRaw, statementsRaw, expensesRaw] = await Promise.all([
     Receipt.find().select('store date total vatAmount').lean(),
-    Item.find().select('title category status purchasedPrice currentPrice warrantyUntil').lean(),
+    Item.find().select('title category status purchasedPrice currentPrice purchasedAt warrantyUntil').lean(),
     Subscription.find({ active: true }).select('amount billingCycle category').lean(),
     Statement.find().lean(),
     Expense.find().select('kind amount date period category').lean(),
@@ -161,7 +163,10 @@ async function getReports(monthsBack = 12) {
     .slice(0, 8)
     .map((r) => ({ store: r.store || '—', total: Math.round(r.total || 0), date: r.date ? String(r.date) : '' }));
 
-  // ── Spend by category (owned items) ──────────────────────────────────────
+  // ── Inventory value by category (owned items) ────────────────────────────
+  // Owned value is the depreciation-adjusted estimate (P29): assets are valued at
+  // an estimated current worth from purchase price + date, not stuck at cost.
+  // When depreciation is disabled the estimate collapses to the old formula.
   const catSpend = new Map<string, number>();
   let ownedValue = 0;
   let shoppingValue = 0;
@@ -171,7 +176,7 @@ async function getReports(monthsBack = 12) {
     const owned = ownedSet.has(i.status || '');
     const shopping = shoppingSet.has(i.status || '') && i.status !== 'deferred';
     if (owned) {
-      const v = i.purchasedPrice ?? i.currentPrice ?? 0;
+      const v = estimatedItemValue(i, appSettings.depreciation, now);
       ownedValue += v;
       if (v > 0) {
         const c = i.category || 'other';

@@ -58,6 +58,11 @@ const AppConfigSchema = new Schema(
     // (cash, bank accounts — no integration, the user updates balances by hand).
     assetAccounts: { type: Schema.Types.Mixed, default: {} },
 
+    // Asset depreciation model (P29). { enabled, floorPct, defaultRate, rates:{cat→%} }.
+    // Estimates a current value for owned inventory from purchase price + date, so
+    // net worth (PA2) does not overvalue aging gear. See lib/depreciation.ts.
+    depreciation: { type: Schema.Types.Mixed, default: {} },
+
     // ── Notifications ──
     // Legacy single ntfy channel (migrated into `notifiers` on first save).
     ntfyUrl: { type: String, default: '' }, // e.g. https://ntfy.sh/your-topic (or self-hosted)
