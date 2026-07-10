@@ -1668,3 +1668,38 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον.
+
+## 2026-07-10 (cont.⁴) — (e) polish/a11y: always-present live region στο Waitlist submit
+
+Increment (e) polish, accessibility. Το Waitlist submit feedback («Your email app should be opening…»)
+render-αροταν ΜΟΝΟ αφου `sent` γινοταν true, δηλαδη το `role="status"` element μπαινε στο DOM μαζι με το
+κειμενο του. Πολλα screen readers ΔΕΝ announce-αρουν live region που mount-αρεται ταυτοχρονα με το
+περιεχομενο του: το live region πρεπει να προϋπαρχει στο DOM και μετα να αλλαξει το text του για να
+πυροδοτησει announcement. Αρα ο AT χρηστης που πατουσε «Join the waitlist» μπορει να μην ακουγε τιποτα.
+
+- `app/components/Waitlist.tsx`: νεο ALWAYS-mounted `.sr-only` `<p role="status" aria-live="polite">` στην
+  κορυφη της φορμας· κενο by default, populate-αρεται με «Opening your email app to write to
+  hello@ph-aros.com.» οταν `sent` -> true. Reuse του υπαρχοντος `.sr-only` utility, μηδεν νεο CSS/dependency.
+- Αφαιρεσα το `role="status"` απο το ΟΡΑΤΟ `waitlist-note` (μενει ως πλην visible text) ωστε να μην γινεται
+  διπλο announcement (visible note + sr-only region).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static, / route 5.33 kB (+0.02 kB, inline text, αμελητεο).
+- Prerender (.next/server/app/index.html): 2× `aria-live="polite"` (Pricing billing toggle + νεο Waitlist)
+  + 2× `role="status"`. Το Waitlist sr-only region προϋπαρχει στο static output (κενο, sent=false) -> η
+  always-present απαιτηση επιβεβαιωμενη στο prerender. Non-visual a11y -> verified static output οπως τα
+  προηγουμενα non-visual increments (separate non-Docker app, δεν σηκωσα preview server).
+- em-dash: 0 στο Waitlist.tsx. Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (Waitlist.tsx + αυτο το log) μεσω explicit pathspec· foreign staged
+  files αλλου routine (apps/web/search-actions.ts, receiptSearch*, WorkspaceShell/chooseWorkspace/SignOut)
+  τα αφησα αθικτα (collision guard, 0 staged πριν το commit).
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets (blocked)· ή reduced-motion
+audit (pulsing beacon/scroll-progress σε `prefers-reduced-motion`)· ή content micro-pass στα features.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον.

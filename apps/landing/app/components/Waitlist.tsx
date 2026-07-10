@@ -23,6 +23,9 @@ export function Waitlist() {
 
   return (
     <form className="waitlist-form" onSubmit={handleSubmit} noValidate>
+      <p className="sr-only" role="status" aria-live="polite">
+        {sent ? `Opening your email app to write to ${CONTACT_EMAIL}.` : ''}
+      </p>
       <input
         type="email"
         inputMode="email"
@@ -41,7 +44,7 @@ export function Waitlist() {
         Join the waitlist
       </button>
       {sent && (
-        <p className="waitlist-note" role="status">
+        <p className="waitlist-note">
           Your email app should be opening. If not, write to{' '}
           <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: 'var(--accent)' }}>
             {CONTACT_EMAIL}
