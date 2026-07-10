@@ -361,6 +361,26 @@ export const en = {
   'ex.emptyNone': 'No {label} yet. Drop a file above or add one.',
   'ex.emptyFiltered': 'Nothing matches these filters.',
 
+  // ── Expense splitting (P35 — "who owes what") ────────────────────────────
+  'ex.splitTitle': 'Split with people',
+  'ex.splitEmpty': 'You paid the full amount. Add people to split it and track what they owe you.',
+  'ex.splitName': 'Name',
+  'ex.splitAddPerson': 'Add person',
+  'ex.splitEqually': 'Split equally',
+  'ex.splitIncludeMe': 'count me in',
+  'ex.splitMarkPaid': 'Mark paid back',
+  'ex.splitOwedYou': '{amt} owed to you',
+  'ex.splitSettled': '{amt} settled',
+  'ex.splitYourShare': 'your share {amt}',
+  'ex.balancesTitle': 'Balances — who owes you',
+  'ex.balancesBtn': 'Balances',
+  'ex.balancesEmpty': 'No split expenses yet.',
+  'ex.balancesSettled': 'Settled up',
+  'ex.balanceEntries': '{n} shared expense(s)',
+  'ex.settleUp': 'Settle up',
+  'ex.settleTitle': 'Settle up with {name}?',
+  'ex.settleBody': 'Mark the {amt} {name} owes you as paid back? This clears their outstanding shares across all expenses.',
+
   // ── CSV import (bank / generic export) ───────────────────────────────────
   'csv.button': 'Import CSV',
   'csv.title': 'Import from CSV (bank export)',

@@ -32,6 +32,22 @@ const ExpenseSchema = new Schema(
     paymentMethod: { type: String, default: '' },
     notes: { type: String, default: '' },
 
+    // Expense splitting (P35 — Splitwise-lite). You paid the total; each entry is another
+    // person (free-form name, not an app account) who owes you `share`. `settled` = paid back.
+    split: {
+      type: [
+        new Schema(
+          {
+            name: { type: String, default: '' },
+            share: { type: Number, default: 0 },
+            settled: { type: Boolean, default: false },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+
     rawAiResponse: { type: String, default: '' },
     aiModel: { type: String, default: '' },
     aiParsedAt: { type: Date, default: null },

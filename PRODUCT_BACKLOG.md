@@ -76,13 +76,23 @@ _(κενό — P32-P36 εγκρίθηκαν 2026-07-10· ο planner προσθέ
 - **Ανοιχτή απόφαση (builder default):** ένα optional `space` string (editable list σαν τα categories)· κενό = «όλα»·
   reuse του taxonomy pattern· default view = all-spaces (μη βαρύνει όποιον δεν το χρησιμοποιεί).
 
-### P35. Expense splitting / «ποιος χρωστάει τι» (Splitwise-lite) — M — both
-- **Αξία:** για κοινές αγορές (sailing trip με φίλους, κοινόχρηστα, δώρα): κατέγραψε ένα έξοδο, μοίρασέ το σε άτομα
-  (ίσα ή custom), δες «ο Α μου χρωστάει €X» + settle-up. **Διακριτό** από P31 (household = app accounts σε κοινά δεδομένα):
-  εδώ τα «άτομα» είναι απλά ονόματα/επαφές, το κομμάτι είναι **debt tracking μεταξύ ανθρώπων**, όχι logins.
-- **Module:** Expenses (νέο `split[]` ανά έξοδο) + μικρή «Balances» όψη (ποιος χρωστάει σε ποιον).
-- **Ανοιχτή απόφαση (builder default):** ελεύθερα ονόματα (όχι user accounts) πρώτα· equal-split default + custom· settle-up =
-  manual mark-paid· μηδέν AI. ΣΗΜ: ταιριάζει με το personal context (πρόταση γάμου σε καταμαράν με group).
+### P35. Expense splitting / «ποιος χρωστάει τι» (Splitwise-lite) — ✅ SHIPPED 2026-07-15 (pharos-daily-dev)
+- **Υλοποίηση:** Νέο pure **`lib/split.ts`** (`equalSplit`, `splitTotals`, `computeBalances`, `totalOwed` + `SplitEntry`,
+  DB-free, **+11 unit tests**). `Expense.split[]` subdoc (name/share/settled, `_id:false`) + serialize + `SerializedExpense.split`.
+  Convention: ΕΣΥ πλήρωσες το total· κάθε entry = άλλο άτομο (ελεύθερο όνομα, ΟΧΙ app account) που σου χρωστά `share`,
+  `settled` = σε πλήρωσε πίσω· το δικό σου μερίδιο = total − Σ(shares) implicit. `actions.ts`: `split` στο UpdateSchema +
+  `cleanSplit` (trim/drop nameless/round cents) wired σε add/update + νέο **`settlePerson(name)`** (bulk-mark settled ΟΛΩΝ
+  των unsettled shares ενός ατόμου, case-insensitive, cross-expense). UI (`ExpensesClient`): **SplitEditor** μέσα στη φόρμα
+  (expense-only· add person, per-row share + mark-paid toggle, «Split equally» με «count me in» checkbox, «your share»
+  live), **SplitBadge** σε card/row (cyan owed / accent ✓ όταν settled), header **«Balances»** button (μόνο expense +
+  ≥1 split· «who owes you» modal με per-person owed + settle-up confirm). Builder defaults: equal-split absorbs το rounding
+  στο ΕΣΥ όταν includeSelf· settle-up = manual mark-paid· μηδέν AI, μηδέν migration (default []). i18n keys ΜΟΝΟ en.ts.
+- **Verify:** `npm run type-check` EXIT 0· full `npx vitest run` **2154 passed / 168 files**. Safe Docker rebuild
+  (VM 8GB, ~1GB in use → όχι contention): homepage-web clean start (0 restarts), /login 200, /expenses & /income 307
+  (auth-gate compiled), Mongo healthy throughout, build cache pruned.
+- **Follow-ups:** split στο `/api/v1` expenses shape (mobile parity)· optional linked-expense/settle-up ιστορικό·
+  per-space × per-person cross-view (P34 συνδυασμός). Income δεν έχει split (μόνο expenses χρεώνονται).
+- **Module:** Expenses (νέο `split[]` ανά έξοδο) + «Balances» modal (ποιος χρωστάει σε ποιον).
 
 ### P36. Open Banking auto-sync συναλλαγών (GoCardless/Nordigen EU free tier) — L — both (μεγάλος SaaS lever)
 - **Αξία:** το επόμενο σκαλί μετά το PA1 (χειροκίνητο CSV): **αυτόματο** import συναλλαγών μέσω Open Banking (GoCardless

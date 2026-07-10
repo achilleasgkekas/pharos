@@ -1,6 +1,7 @@
 // Pure helpers for expenses — kept OUT of actions.ts because a 'use server' module
 // may only export async functions.
 import type { SerializedExpense } from '@/types';
+import type { SplitEntry } from '@/lib/split';
 
 const GREEK: Record<string, string> = {
   α: 'a', β: 'v', γ: 'g', δ: 'd', ε: 'e', ζ: 'z', η: 'i', θ: 'th', ι: 'i', κ: 'k', λ: 'l', μ: 'm',
@@ -43,6 +44,12 @@ export function serializeExpense(e: Record<string, unknown>): SerializedExpense 
     fileSize: s.fileSize ?? 0,
     paymentMethod: s.paymentMethod ?? '',
     notes: s.notes ?? '',
+    split: Array.isArray(s.split)
+      ? (s.split as unknown[]).map((r): SplitEntry => {
+          const e = r as Record<string, unknown>;
+          return { name: String(e.name ?? ''), share: Number(e.share) || 0, settled: !!e.settled };
+        })
+      : [],
     aiModel: s.aiModel ?? '',
     aiParsedAt: s.aiParsedAt ?? null,
     verified: !!s.verified,

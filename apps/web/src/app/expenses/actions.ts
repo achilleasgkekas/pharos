@@ -277,8 +277,26 @@ const UpdateSchema = z.object({
   recurringCycle: z.enum(['monthly', 'quarterly', 'yearly', 'weekly', '']).default(''),
   paymentMethod: z.string().default(''),
   notes: z.string().default(''),
+  // Expense splitting (P35): people who owe you a share of this expense.
+  split: z
+    .array(
+      z.object({
+        name: z.string().max(80).default(''),
+        share: z.coerce.number().default(0),
+        settled: z.boolean().default(false),
+      })
+    )
+    .max(50)
+    .default([]),
   verified: z.boolean().default(false),
 });
+
+/** Clean split rows: trim names, drop empties/nameless, round shares to cents. */
+function cleanSplit(rows: Array<{ name: string; share: number; settled: boolean }>): Array<{ name: string; share: number; settled: boolean }> {
+  return (rows || [])
+    .map((r) => ({ name: (r.name || '').trim(), share: Math.round((Number(r.share) || 0) * 100) / 100, settled: !!r.settled }))
+    .filter((r) => r.name.length > 0);
+}
 
 export async function updateExpense(id: string, data: z.input<typeof UpdateSchema>): Promise<{ ok: boolean; error?: string }> {
   const p = UpdateSchema.safeParse(data);
@@ -306,6 +324,7 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
           recurringCycle: d.recurringCycle,
           paymentMethod: d.paymentMethod,
           notes: d.notes,
+          split: cleanSplit(d.split),
           verified: d.verified,
         },
       }
@@ -348,6 +367,7 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
       recurringCycle: d.recurringCycle || rule?.recurringCycle || (inherited?.recurringCycle as typeof d.recurringCycle) || '',
       paymentMethod: d.paymentMethod,
       notes: d.notes,
+      split: cleanSplit(d.split),
       verified: true,
     });
     revalidatePath('/expenses');
@@ -356,6 +376,46 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }
+  });
+}
+
+/**
+ * Settle up with one person (P35): mark every unsettled split entry with this name
+ * (case-insensitive) as settled, across ALL expenses. Manual "they paid me back"
+ * confirmation — deterministic, zero AI. Returns how many entries were settled.
+ */
+export async function settlePerson(name: string): Promise<{ ok: boolean; settled: number; error?: string }> {
+  const target = (name || '').trim().toLowerCase();
+  if (!target) return { ok: false, settled: 0, error: 'No name' };
+  return withRequestTenant(async () => {
+    try {
+      await connectDB();
+      const Expense = await currentModel(ExpenseModel);
+      const rows = await Expense.find({ 'split.name': { $exists: true } }).select('split').lean();
+      type SplitRow = { name?: string; share?: number; settled?: boolean };
+      const ops: Array<{ updateOne: { filter: { _id: unknown }; update: { $set: { split: SplitRow[] } } } }> = [];
+      let settled = 0;
+      for (const r of rows) {
+        const split = (r.split as SplitRow[] | undefined) ?? [];
+        let changed = false;
+        const next: SplitRow[] = split.map((s) => {
+          if (!s.settled && (s.name || '').trim().toLowerCase() === target) {
+            changed = true;
+            settled++;
+            return { name: s.name, share: s.share, settled: true };
+          }
+          return s;
+        });
+        if (changed) ops.push({ updateOne: { filter: { _id: r._id }, update: { $set: { split: next } } } });
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (ops.length) await Expense.bulkWrite(ops as any);
+      revalidatePath('/expenses');
+      revalidatePath('/income');
+      return { ok: true, settled };
+    } catch (err) {
+      return { ok: false, settled: 0, error: (err as Error).message };
+    }
   });
 }
 

@@ -114,6 +114,8 @@ export type SerializedExpense = {
   fileSize: number;
   paymentMethod: string;
   notes: string;
+  // Expense splitting (P35): people who owe you a share of this expense.
+  split: import('@/lib/split').SplitEntry[];
   aiModel: string;
   aiParsedAt: string | null;
   verified: boolean;

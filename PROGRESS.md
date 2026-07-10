@@ -4,6 +4,46 @@
 
 <!-- reviewed: 65b81a2 -->
 
+## 2026-07-15 (pharos-daily-dev — P35 expense splitting / Splitwise-lite SHIPPED)
+
+**Τι έγινε**: Υλοποιήθηκε το **P35 (expense splitting «ποιος χρωστάει τι»)** από το `## Approved` — το κορυφαίο
+αχτίστο item στη σειρά value/effort (P33/P32/P34 shipped· P36 = L, τελευταίο). Ήταν και το suggested-next του
+προηγούμενου run. Self-contained (Expenses module), ντετερμινιστικό, μηδέν AI, μηδέν external creds, μηδέν migration.
+Ταιριάζει με το personal context (κοινές αγορές sailing trip / group). Το P22 (receipt line-item search) το ΑΠΕΦΥΓΑ
+ξανά — παραμένει ξένο uncommitted WIP στο tree (`search-actions.ts` + `lib/receiptSearch.{ts,test.ts}`), δεν το άγγιξα.
+
+**Τι μπήκε**:
+- **`lib/split.ts`** (νέο, pure/DB-free): `equalSplit(total, names, includeSelf)` (cent-exact· όταν includeSelf, ΕΣΥ
+  απορροφάς το rounding), `splitTotals` (owed vs settled ανά έξοδο), `computeBalances` (per-person aggregation cross-expense,
+  case-insensitive), `totalOwed`, type `SplitEntry`. **+11 unit tests** (`split.test.ts`).
+- **`models/Expense.ts`**: `split[]` subdoc (`{name, share, settled}`, `_id:false`, default []).
+- **`app/expenses/lib.ts`** + **`types.ts`**: `SerializedExpense.split` + serialization (defensive coercion). Ενημερώθηκαν
+  τα 3 exact-object `serializeExpense` tests (`lib.test.ts`).
+- **`app/expenses/actions.ts`**: `split` στο UpdateSchema (+`cleanSplit`: trim, drop nameless, round cents) wired σε
+  add/update + νέο **`settlePerson(name)`** (bulkWrite mark-settled ΟΛΩΝ των unsettled shares ενός ατόμου, cross-expense).
+- **`app/expenses/ExpensesClient.tsx`**: **SplitEditor** μέσα στη φόρμα (expense-only, gated `form.kind!=='income'`):
+  add-person rows (name + share + mark-paid toggle + remove), «Split equally» με «count me in» checkbox, live «your share».
+  **SplitBadge** σε card/row (cyan = owed / accent ✓ = settled). Header **«Balances»** button (μόνο expenses + ≥1 split·
+  αλλιώς dormant) → «who owes you» modal με per-person owed + settle-up (confirm).
+- **`lib/i18n/locales/en.ts`**: `ex.split*` / `ex.balances*` / `ex.settle*` keys (en source-of-truth· locales fallback).
+
+**Επιλογές (builder defaults, καταγράφονται)**: (α) **convention = ΕΣΥ πλήρωσες το total**, τα split entries = άλλοι που
+σου χρωστάνε (το δικό σου μερίδιο implicit)· (β) ελεύθερα ονόματα, ΟΧΙ user accounts (διακριτό από P31 household)·
+(γ) equal-split default + custom per-row· settle-up = manual mark-paid· (δ) split ΜΟΝΟ σε expenses (income δεν χρεώνεται)·
+(ε) feature **dormant** όταν κανένα split (Balances button + badges κρυφά, όπως το P34 spaces).
+
+**Verified**: `npm run type-check` → **EXIT 0**. Full `npx vitest run` → **2154 passed / 168 files** (2129 πριν + 25 νέα:
+split ×11 + updated lib ×14). **Safe Docker rebuild** (ΣΗΜ: ο VM είναι πλέον **8GB** όχι ~1.9GB όπως έλεγε το task file →
+όχι contention παρά τα 2 live stacks homepage+bakecore με ~1GB σε χρήση): `docker compose build web` → mongo healthy →
+`up -d web` → **homepage-web 0 restarts, /login 200, /expenses & /income 307 (auth-gate compiled)**, mongo healthy
+throughout, `docker builder prune -f`. Lock acquired/released καθαρά.
+
+**Working tree**: ρητό `git add` ΜΟΝΟ τα 10 δικά μου αρχεία· το ξένο P22 WIP δεν αγγίχτηκε.
+
+**Επόμενο suggested task**: (α) split στο `/api/v1` expenses GET shape (mobile parity — μαζί με το P34 space + P33 trial
+πεδία που επίσης λείπουν από το v1 shape)· ή (β) επόμενο Approved item: **P24 outbound webhooks** (M, OSS self-host lever,
+χωρίς σύγκρουση με το P22 WIP) ή **P31 household shared access** (M). Απόφυγε το P22 όσο υπάρχει uncommitted receiptSearch.
+
 ## 2026-07-14 (pharos-daily-dev, P34 per-space / per-property ledger tag SHIPPED)
 
 **Τι έγινε**: Υλοποιήθηκε το **P34 (per-space / per-property ledger tag)** από το `## Approved` — το κορυφαίο αχτίστο newly-approved item (P33/P32 ήδη shipped, P36 τελευταίο/L). Commit `6b1de5c` (pushed). Λύνει το «πόσο κοστίζει το εξοχικό» δίνοντας ένα προαιρετικό `space` tag στα expenses/income + per-space breakdown στα Reports. Το P22 (receipt line-item search) παραμένει μπλοκαρισμένο από ξένο uncommitted WIP στο tree (`search-actions.ts` + `lib/receiptSearch.{ts,test.ts}`) → ΔΕΝ το άγγιξα.
