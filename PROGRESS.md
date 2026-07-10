@@ -5,6 +5,26 @@
 <!-- reviewed: 65b81a2 -->
 <!-- docker-validated: f8f345c -->
 
+## 2026-07-10 (pharos-daily-dev — P19 «Safe-to-spend» forward cashflow SHIPPED)
+
+**Τι έγινε**: Υλοποιήθηκε το **P19 (Safe-to-spend forward cashflow)**, το κορυφαίο unshipped Approved item («ψηλό value/effort», S/M, ντετερμινιστικό, μηδέν AI) — ρητά προτεινόμενο ως επόμενο από το προηγούμενο run. Commit `d3e191d` (pushed). Τα υπόλοιπα ψηλότερα Approved είναι είτε shipped (P32/P33/P27/P29/P14/P15/P18/P6) είτε μπλοκαρισμένα (P22 = uncommitted receiptSearch WIP στο tree, το άφησα άθικτο· P30 push = χρειάζεται EAS/APNs credentials· P36 open-banking = χρειάζεται GoCardless creds).
+
+Τι μπήκε:
+- **`lib/safeToSpend.ts`** (pure, DB-free, 6 unit tests): `computeSafeToSpend(months, now)` παίρνει τα `AgendaMonth[]` του υπάρχοντος `computeMoneyAgenda` (η ίδια 3-μηνη projection που τρέφει το `/calendar` + το .ics feed) και τα αθροίζει σε (α) «διαθέσιμα για το υπόλοιπο του μήνα» = αναμενόμενα recurring έσοδα − πάγιες μελλοντικές χρεώσεις, (β) 30/60/90-day windows. Μετράει ΜΟΝΟ entries με ημερομηνία σήμερα-ή-μετά και ρητό ποσό· income προσθέτει, όλα τα άλλα (renewal/installments/bill) αφαιρούν· τα null-amount expiries (warranty/voucher) αγνοούνται. `now` injectable για ντετερμινιστικά tests.
+- **`reports/page.tsx`**: `getReports` καλεί `computeMoneyAgenda()` → `computeSafeToSpend()` → νέο `safeToSpend` πεδίο στο return.
+- **`ReportsClient.tsx`**: νέο card κάτω από το net-worth banner (χρωματιστός αριθμός accent/red = net του μήνα + `+income / -fixed` breakdown + 3 window chips 30/60/90 + explanatory note). Wallet icon.
+- **i18n**: `reports.safeToSpend` + `stsIncome`/`stsFixed`/`stsWindow`/`stsNote` σε en + el· τα άλλα 6 locales fallback στα αγγλικά (established pattern).
+
+**Επιλογές (builder defaults, καταγράφονται)**: (α) surfaced ΜΟΝΟ στο Reports, ΟΧΙ homepage card — η αρχική σελίδα κρατήθηκε σκόπιμα modules-only (CLAUDE.md: «τα στατιστικά να φύγουν στα reports»), οπότε το «Reports + Homepage card» του spec έγινε Reports-only για συνέπεια· (β) phase 1 αφαιρεί μόνο σταθερές γνωστές χρεώσεις, τα μεταβλητά καθημερινά έξοδα ΔΕΝ αφαιρούνται (variable median = phase 2, εγκεκριμένο default)· (γ) income = tracked recurring μόνο (manual «expected income» = follow-up)· (δ) το 90-day tail μπορεί να υποεκτιμά ελαφρώς events πέρα από το ~3-μηνο agenda window (αποδεκτό για «known fixed charges»).
+
+**Verified**: `npm run type-check` → **EXIT 0**. Στοχευμένα vitest: `lib/safeToSpend.test.ts` **6 passed** (νέα) + `i18n/locales.test.ts` **18 passed** (νέες reports.sts* keys OK). 24 tests green.
+
+**Docker rebuild SKIPPED (memory contention — τεκμηριωμένο)**: ο μοιραζόμενος VM (~1.9GB RAM) έτρεχε ΤΑΥΤΟΧΡΟΝΑ ολόκληρο το bakecore stack (web/api/admin/redis/mongo/landing, healthy) + homepage-web/landing/mongo/searxng. `docker run alpine free -m` → **μόνο ~594MB available** (219 free + 464 buff/cache) με ΔΥΟ live MongoDB (το bakecore-mongodb εξυπηρετεί ενεργό ξένο session). Ένα `next build` θέλει ~1GB+ → σχεδόν σίγουρο OOM που θα crash-άρει το mongo (ακριβώς το documented failure mode· τα 2 προηγ. runs το skip-άρανε για τον ίδιο λόγο). Docker mutex αποκτήθηκε/απελευθερώθηκε καθαρά, `docker builder prune -f` (safe, disk-only, 0B), VM αφέθηκε ήσυχο. Το change είναι additive + pure-lib + καλυμμένο από type-check + 24 unit tests· ο reports refactor είναι απλή server-side reuse του ήδη-shipped agenda. **Λειτουργικό serve-check του Reports card εκκρεμεί μέχρι ελεύθερος VM**.
+
+**Working tree**: ρητό `git add` με τα 6 δικά μου αρχεία· το ξένο P22 WIP (`search-actions.ts`, `lib/receiptSearch.{ts,test.ts}`) ΔΕΝ αγγίχτηκε.
+
+**Επόμενο suggested task**: (α) όταν ο VM είναι ελεύθερος, safe rebuild + serve-check του `/reports` (το safe-to-spend card renders με πραγματικά δεδομένα)· ή (β) επόμενο Approved buildable: **P28 Bill/payable status tracker** (M, «ψηλό value/effort», due→paid→overdue, ντετερμινιστικό, reuse recurring-series + runAlertChecks) ή **P7 auto-discovery untracked recurring charges** (S/M) ή **P12 savings/financial goals** (S/M). Απόφυγε το P22 όσο υπάρχει uncommitted receiptSearch στο tree.
+
 ## 2026-07-13 (pharos-daily-dev — P32 gift-card / store-credit balance tracker SHIPPED)
 
 **Τι έγινε**: Έχτισα το **P32 (gift-card / store-credit balance tracker)**, το ranked-πρώτο εναπομείναν Approved item (S/M,

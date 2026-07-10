@@ -193,13 +193,19 @@ _(κενό — P32-P36 εγκρίθηκαν 2026-07-10· ο planner προσθέ
   ποσού/ημέρας)· δεν προστέθηκε ρητό view. Docker serve-check pending (VM contention).
 - **Module:** Statements + Receipts (`matchedReceiptId` + reconciliation modal).
 
-### P19. «Safe-to-spend» forward cashflow (τι μένει, όχι τι ξόδεψες) — S/M — both (ψηλό value/effort)
-- **Αξία:** «αυτόν τον μήνα έχεις €X income − €Y γνωστές μελλοντικές χρεώσεις = €Z διαθέσιμα» + mini προβολή
-  30/60/90 ημερών. Ο υπολογισμός μελλοντικών events **υπάρχει ήδη** στο `/calendar` — εδώ αθροίζεται σε ένα
-  actionable αριθμό. **Διακριτό** από PA2 (net-worth = στοκ) και P12 (goals = αποταμίευση).
-- **Module:** Reports + Homepage card (reuse calendar projection).
-- **Ανοιχτή απόφαση (builder default):** income = tracked recurring + optional manual «expected income»·
-  ξεκίνα αφαιρώντας μόνο σταθερές γνωστές χρεώσεις (variable median = phase 2).
+### P19. «Safe-to-spend» forward cashflow (τι μένει, όχι τι ξόδεψες) — ✅ SHIPPED 2026-07-10 (pharos-daily-dev, commit d3e191d)
+- **Υλοποίηση:** νέο pure `lib/safeToSpend.ts` (`computeSafeToSpend`, DB-free, 6 unit tests) που τρέφεται από το
+  υπάρχον `computeMoneyAgenda` (η ίδια 3-μηνη projection του `/calendar`) και το αθροίζει σε: (α) «διαθέσιμα για
+  το υπόλοιπο του μήνα» = αναμενόμενα επαναλαμβανόμενα έσοδα − πάγιες μελλοντικές χρεώσεις (συνδρομές, δόσεις,
+  recurring bills)· (β) 30/60/90-day windows. Μετράει ΜΟΝΟ entries με ημερομηνία σήμερα-ή-μετά και ρητό ποσό
+  (τα warranty/voucher expiries με null amount αγνοούνται)· income προσθέτει, όλα τα άλλα αφαιρούν. Surfaced ως
+  card στο `/reports` κάτω από το net-worth banner (χρωματιστός αριθμός accent/red + 3 window chips + note).
+  en/el i18n· τα άλλα 6 locales fallback στα αγγλικά. Commit `d3e191d`.
+- **Locked defaults (builder):** phase 1 αφαιρεί ΜΟΝΟ σταθερές γνωστές χρεώσεις (τα μεταβλητά καθημερινά έξοδα
+  ΔΕΝ αφαιρούνται — variable median = phase 2)· income = tracked recurring μόνο (manual «expected income» =
+  follow-up)· surfaced στο Reports (ΟΧΙ homepage — η αρχική σελίδα κρατήθηκε modules-only σκόπιμα, βλ. CLAUDE.md)·
+  90-day tail μπορεί να υποεκτιμά ελαφρώς όσα events πέφτουν πέρα από το ~3-μηνο agenda window (αποδεκτό).
+- **Module:** Reports (reuse calendar projection).
 
 ### P6. iCal (.ics) subscription feed για Calendar — ✅ SHIPPED 2026-07-10 (pharos-daily-dev, commit ac2e2d5)
 - **Υλοποίηση:** νέο pure `lib/ics.ts` (RFC 5545 VCALENDAR builder + 18 unit tests) + shared `lib/moneyAgenda.ts` (αποσπάστηκε από το v1 calendar route, το τρέχουν και τα δύο) + route `GET /api/calendar.ics?token=…` (text/calendar, token-scoped). Auth μέσω dedicated **low-scope `User.calendarToken`** (ΟΧΙ το full API bearer — leaked subscribe URL δεν δίνει API access· απόκλιση από το reuse-apiToken default για ασφάλεια). All-day VEVENTs, [Category] prefix + ποσό, stable UIDs. Settings → `CalendarFeedManager` (generate/rotate/revoke + copy URL) + en/el i18n. Τα 13 υπάρχοντα v1 route tests πέρασαν αμετάβλητα (refactor transparent). Commit `ac2e2d5`.
