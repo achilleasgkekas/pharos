@@ -1521,3 +1521,37 @@ commit ΜΟΝΟ docs/features.md + docs/DOCS_PROGRESS.md με explicit pathspec.
 Επομενο run: (α) features.md — P34 per-space/per-property ledger tag (Expense.space field, ΔΕΝ
 documented ακομα· check αν εχει UI surface στο settings/expenses filter) + P25 budget envelope/
 rollover στο Reports section· ή (β) api.md stale-forward αν shipαρει GET /api/v1/bills.
+
+## 2026-07-10 (features.md: Per-space / per-property ledger tag — P34)
+
+Πρωτα commit+push το ημιτελες προηγουμενο run που ειχε μεινει uncommitted στο working tree
+(P35 expense splitting features.md + DOCS_PROGRESS entry, complete+validated, δικο μου territory,
+zero foreign staged) → commit 779feae. Μετα πηρα το suggested (α): P34 per-space ledger tag, που
+ελειπε εντελως απο τα docs. Διαβασα το πραγματικο code πριν γραψω:
+
+- `models/Expense.ts:16` — `space: String, default '', index true` (P34 comment inline).
+- `app/expenses/actions.ts` — inheritFromSeries επιστρεφει space· CreateSchema/UpdateSchema
+  space z.string().max(40)· νεες εγγραφες κληρονομουν space απο το vendor's last entry.
+- `ExpensesClient.tsx` (grep -a, multibyte) — spaceFilter + NO_SPACE sentinel στο filter sidebar,
+  Space field (SearchableSelect allowCustom, μονο οταν spaces.length>0), MapPin purple badge σε
+  cards/rows, spaces περναει σαν prop απο page.
+- `app/expenses/page.tsx:61` — spaces: settings.spaces.
+- `lib/appSettings.ts` — spaces taxonomy (normalizeSpaces, DEFAULT_SPACES, empty=dormant)·
+  `SettingsClient.tsx:2781` SpacesManager (Settings → Money → Spaces).
+- `reports/page.tsx:120` expSpaceMap + `ReportsClient.tsx:380` "Expenses by space/property" bar
+  chart (μονο οταν expenseBySpace.length>0).
+
+Νεα ### subsection "Per-space / per-property ledger tag" μεσα στο Expenses & Income (μετα το
+Expense splitting), οχι top-level heading → συνεπες, δεν μπαινει στο Contents index. Καλυπτει:
+dormant-until-defined, Settings → Money → Spaces, space field + inherit-per-vendor, filter+search,
+Reports breakdown. Ξεκαθαρισα οτι space ≠ category (μπορεις και τα δυο μαζι).
+
+Validation: markdown only, κανενα build/Docker/AI. features.md fence count = 0 (καμια code fence,
+ζυγο). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/CRON_SECRET=) clean.
+
+Collision guard: git status δειχνει ΜΟΝΟ docs/features.md dirty (κανενα foreign uncommitted/staged
+τωρα)· commit ΜΟΝΟ docs/features.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επομενο run: (α) features.md — P25 budget envelope/rollover στο Reports/Settings section (check
+budgets + budgetRollover στο appSettings, ΔΕΝ documented ακομα)· ή (β) api.md stale-forward αν
+shipαρει GET /api/v1/bills (Bill model εχει ηδη updatedAt index for it).

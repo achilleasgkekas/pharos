@@ -146,6 +146,29 @@ portion is implicit (total minus the sum of the shares).
 Everything is deterministic (no AI) and computed on read; only the `split` rows are
 stored on each expense.
 
+### Per-space / per-property ledger tag
+
+An optional **space** tag on each expense, for splitting spending across separate
+contexts, most obviously a second home or rental (for example "Athens flat" vs
+"Ionian cottage"), but equally a project, a business, or a car. It is a free-form
+label, distinct from category: a €40 electricity bill can be `utilities` **and**
+tagged to the Ionian cottage at the same time.
+
+- **Dormant until you use it.** Define your spaces in **Settings → Money → Spaces**.
+  With no spaces defined the whole feature stays hidden, so nothing changes for a
+  single-property setup.
+- **On the expense.** Once at least one space exists, the expense form shows a
+  **Space** field (searchable, and you can type a new one inline). Tagged records
+  show the space with a pin badge on their card and row.
+- **Inherited per vendor.** A new entry inherits the space from that vendor's last
+  entry, so a recurring bill keeps landing on the same property without re-tagging.
+- **Filter and search.** The expenses filter sidebar gains a **Space** filter,
+  including a "no space assigned" option to find untagged records; the free-text
+  search also matches on the space label.
+- **Reports.** When you have tagged spaces, Reports adds an **"Expenses by space /
+  property"** breakdown so you can see, at a glance, how much each property or
+  context costs.
+
 ## Statements & installments
 
 Upload a credit-card statement PDF (`/statements`) and PHAROS parses the
