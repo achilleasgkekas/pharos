@@ -3,6 +3,31 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 65b81a2 -->
+
+## 2026-07-14 (pharos-daily-dev, P34 per-space / per-property ledger tag SHIPPED)
+
+**Τι έγινε**: Υλοποιήθηκε το **P34 (per-space / per-property ledger tag)** από το `## Approved` — το κορυφαίο αχτίστο newly-approved item (P33/P32 ήδη shipped, P36 τελευταίο/L). Commit `6b1de5c` (pushed). Λύνει το «πόσο κοστίζει το εξοχικό» δίνοντας ένα προαιρετικό `space` tag στα expenses/income + per-space breakdown στα Reports. Το P22 (receipt line-item search) παραμένει μπλοκαρισμένο από ξένο uncommitted WIP στο tree (`search-actions.ts` + `lib/receiptSearch.{ts,test.ts}`) → ΔΕΝ το άγγιξα.
+
+**Τι μπήκε**:
+- **`lib/taxonomies.ts`**: νέο pure `normalizeSpaces()` + `DEFAULT_SPACES=[]`. UNLIKE τα category taxonomies: default ΚΕΝΟ (feature dormant μέχρι ο χρήστης να ονομάσει space), casing preserved (ελληνικά proper nouns «Εξοχικό»/«Σπίτι»), κανένα forced «other». Dedupe case-insensitive, cap 40 chars / 24 spaces. +5 unit tests.
+- **`lib/appSettings.ts`** + **`models/AppConfig.ts`**: `spaces: string[]` (dedicated field, ΟΧΙ κάτω από `lists` — τα spaces δεν ταιριάζουν στο taxonomy pattern λόγω των διαφορετικών semantics). +1 test assertion + updated exact-object test.
+- **`models/Expense.ts`** + **`app/expenses/lib.ts`** + **`types.ts`**: `Expense.space` (indexed) + serialization + `SerializedExpense.space`. +updated serializeExpense exact-object tests.
+- **`app/expenses/actions.ts`**: UpdateSchema `space` + wiring σε add/update· **inheritFromSeries** επιστρέφει space → μια νέα απόδειξη ίδιου vendor κληρονομεί το space (uploadExpense/addExpense).
+- **`app/expenses/ExpensesClient.tsx`** + **`page.tsx`**: sidebar Space filter (+ «Unassigned» sentinel `NO_SPACE`) + form Space field + space chip σε card/row· ΟΛΑ hidden μέχρι `spaces.length>0` (μη βαρύνει όποιον δεν το χρησιμοποιεί).
+- **`components/ui/SearchableSelect.tsx`**: optional `labels` map (sentinel value → display label· backward-compatible, reusable).
+- **`app/reports/page.tsx`** + **`ReportsClient.tsx`**: κάρτα «Expenses by space» (bar) — μόνο όταν υπάρχει ≥1 named space (αλλιώς [] → κρυφή· single «unassigned» bar = zero signal).
+- **`app/settings/actions.ts`** + **`SettingsClient.tsx`**: `saveSpaces` action + `SpacesManager` (chips add/remove, Settings → Stores & lists).
+- **`lib/i18n/locales/en.ts`**: `ex.space/fSpace/allSpaces/spaceNone`, `reports.cExpBySpace`, `set.spaces*` (en-only, locales fallback).
+
+**Επιλογές (builder defaults, καταγράφονται)**: (α) **MVP = Expenses first** (το primary money model όπου ζει το per-property cost· Receipts/Subscriptions = follow-up)· (β) **space κληρονομείται** από τη σειρά vendor στα scans (continuity, όπως category/recurring)· (γ) dedicated `AppConfig.spaces` field αντί contort του shared TAXONOMY_META (empty-default + no-forced-other + casing preservation δεν ταιριάζουν)· (δ) feature **dormant** όταν κενό (μηδέν UI noise για default installs).
+
+**Verified**: `apps/web npm run type-check` → **EXIT 0**. Full `npx vitest run` → **2129 passed / 165 files** (incl. τα νέα normalizeSpaces ×5, appSettings.spaces, serializeExpense.space assertions).
+
+**Docker rebuild SKIPPED (VM contention, όπως P25)**: ο μοιραζόμενος ~1.9GB VM έτρεχε **ΔΥΟ live stacks** (homepage web/landing/mongo/searxng + bakecore web/api/admin/redis/mongodb/landing = 11 containers) + flaresolverr. Ένα Next build εκεί έχει ξανα-OOM-crash-loop-άρει το mongo (P25/P6). Έκανα safe housekeeping (`docker compose stop flaresolverr` — opt-in scraper sidecar) + πήρα/άφησα καθαρά το `/tmp/claude-docker.lock` (χωρίς build). Το change είναι additive + type-checked + fully unit-proven. **Λειτουργικό serve-check του Space filter/Reports/Settings εκκρεμεί μέχρι ελεύθερος VM.**
+
+**Working tree**: ρητό `git add` με τα 18 δικά μου αρχεία· το ξένο P22 WIP (`search-actions.ts` + `receiptSearch.*`) ΔΕΝ αγγίχτηκε (παραμένει unstaged/untracked).
+
+**Επόμενο suggested task**: (α) όταν ο VM είναι ελεύθερος, safe rebuild + browser serve-check του P34 (Settings → add space «Εξοχικό» → tag ένα expense → sidebar filter + Reports «Expenses by space»)· ή (β) επόμενο Approved item χωρίς σύγκρουση με το P22 WIP: **P35 expense splitting (Splitwise-lite)** (M) ή **P24 outbound webhooks** (M). Follow-up του ίδιου P34: space σε Receipts/Subscriptions + `/api/v1` expenses shape (mobile parity). Απόφυγε το P22 όσο υπάρχει uncommitted receiptSearch στο tree.
 <!-- docker-validated: f8f345c -->
 
 ## 2026-07-13 (pharos-daily-dev — P28 bill / payable status tracker SHIPPED)
