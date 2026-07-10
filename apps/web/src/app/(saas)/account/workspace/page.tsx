@@ -106,10 +106,10 @@ export default async function WorkspaceOverviewPage({
   const billingCta =
     billing.action === 'subscribe'
       ? billing.billingConfigured
-        ? 'Subscribe from the Billing settings (coming soon).'
+        ? 'Choose a plan from the Billing tab.'
         : 'Billing is not configured on this deployment yet.'
       : billing.action === 'manage'
-        ? 'Manage your subscription from the Billing settings (coming soon).'
+        ? 'Manage your subscription from the Billing tab.'
         : 'Only owners and admins can change billing.';
 
   return (

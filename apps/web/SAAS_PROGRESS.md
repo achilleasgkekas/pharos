@@ -498,3 +498,68 @@ storage totals) + `components/saas/**` πρώτα atoms (StatCard/Table). Server
 fetch-άρουν απ' τα admin read APIs (ή καλούν κατευθείαν τους registry readers server-side).
 Μετά: tenant list → tenant detail (με usage + LIVE dbstats button). Το quota-enforcement surface
 (πρώην #53 backend option) υποβιβάζεται σε «μετά το UI».
+
+## 2026-07-10 (increment 58 — user-facing BILLING panel: /account/workspace/billing, §8 UI-first)
+**Το κενό:** τα increments 56/57 έχτισαν Workspace **Overview** + **Members**, αλλά ο tenant δεν
+είχε πουθενά να δει τις επιλογές plan ή να ξεκινήσει/διαχειριστεί συνδρομή. Οι Stripe action routes
+(`/api/saas/billing/checkout` + `/portal`) + ο read summary (`/api/saas/billing`) ήταν έτοιμα εδώ
+και βδομάδες με ΜΗΔΕΝ UI — η Overview απλώς έδειχνε το billing state read-only με «coming soon».
+Έχτισα το τρίτο workspace-settings κομμάτι — **Billing** — SSR-loading το billing summary
+κατευθείαν server-side (idiomatic, η σελίδα είναι ήδη gated) + client panel που κάνει POST στα
+action routes και redirect-άρει off-origin στη Stripe-hosted σελίδα. ΟΛΟ additive, σε δικούς μου
+φακέλους:
+- `components/saas/workspaceTabs.ts` (δικό μου) — πρόσθεσα `'billing'` στο `WorkspaceTabKey` +
+  ένα TAB entry (`/account/workspace/billing`). Επειδή Overview + Members render-άρουν το ίδιο
+  `workspaceTabs(...)`, το Billing tab εμφανίζεται αυτόματα σε όλα τα panels — μηδέν edit στα
+  αδελφικά pages (μόνο το `active` argument αλλάζει ανά page).
+- `components/saas/workspaceTabs.test.ts` (δικό μου) — ενημέρωσα το order test (Overview/Members/
+  Billing) + νέο active-flag test για το Billing tab + carry-through του `?w=` και στο 3ο href.
+- `components/saas/billingView.ts` (νέο) — **PURE + client-safe** view builder πάνω απ' το pure
+  plan ladder (`PLANS`): `priceLabel`/`aiLabel`/`storageLabel`/`seatsLabel` formatters +
+  `planCards({currentPlan, canManage, hasSubscription})` που μαρκάρει το τρέχον plan και ποια
+  paid plans είναι `checkoutable` (mirror του checkout-route `checkoutablePlan` gate: manager +
+  ΚΑΝΕΝΑ live subscription + paid + όχι το τρέχον· μόλις υπάρχει subscription, οι αλλαγές πάνε
+  μέσω portal → τίποτα inline checkoutable). Μηδέν env/DB/next imports.
+- `components/saas/billingView.test.ts` (νέο, 11 tests) — labels (free/paid, unlimited-AI grouping,
+  seats singular/plural), plan order, current-plan flagging, unknown→free fallback,
+  checkoutable-only-for-manager-without-sub, nothing-checkoutable-with-sub, current-paid-not-recheckoutable.
+- `components/saas/BillingPanel.tsx` (νέο, client) — 3 plan cards (features + Subscribe κουμπί
+  ΜΟΝΟ στα checkoutable) + «Open billing portal» section όταν υπάρχει subscription + read-only
+  note για plain members. Κάθε action → POST στο route με το chosen slug (`tenant` field) →
+  ΣΤΟ success **full navigation** `window.location.href = data.url` (off-origin Stripe, ΟΧΙ
+  router push)· `friendlyError(status)` map (503 not-configured / 409 no-sub / 502 upstream /
+  403 forbidden) + network-catch. `billingConfigured` false → gold warning banner + disabled
+  buttons.
+- `app/(saas)/account/workspace/billing/page.tsx` (νέο) — gate→viewer (logged-out → redirect
+  login)→`accountTenants` (empty → redirect /account/workspace empty-state)→`pickWorkspace`
+  (unknown `?w=` → `notFound()`)→`getTenantContext`→Tenant doc→`buildBillingSummary`. Render
+  WorkspaceShell με tabs('billing') + «Current subscription» Panel (plan/price/subscription/trial/
+  included AI+storage) + `BillingPanel`.
+- `app/(saas)/account/workspace/page.tsx` (Overview — δικό μου) — ενημέρωσα το `billingCta` string
+  από «Billing settings (coming soon)» → «Choose a plan from the Billing tab» / «Manage your
+  subscription from the Billing tab» (μόνη additive αλλαγή, τώρα που το tab υπάρχει).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run billingView.test.ts
+workspaceTabs.test.ts` → **17/17**· full suite `npx vitest run` → **2028/2028 green** (156 files,
+καμία regression). ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο νέα app/(saas)/account/
+workspace/billing/** + components/saas/billingView*/BillingPanel + additive tabs στο δικό μου
+workspaceTabs + δικό μου Overview CTA). `SAAS_MODE` off / self-hosted = **zero effect** (η σελίδα
+self-gates σε `notFound()` μέσω `getSaasViewer()`→`requireSaasUiEnabled()` πριν render). Κανένας
+Docker rebuild (additive gated segment + client/pure modules, μηδέν shared runtime wiring)· καμία
+νέα εξάρτηση. Collision guard: foreign modified/untracked (search-actions/receiptSearch από άλλες
+routines) ΔΕΝ αγγίχτηκαν· isolated pathspec commit μόνο των δικών μου αρχείων.
+
+**## Needs Achilleas** (billing panel):
+- **Stripe keys:** τα κουμπιά Subscribe/Portal δουλεύουν end-to-end ΜΟΝΟ με configured Stripe
+  (`STRIPE_SECRET_KEY` + `STRIPE_PRICE_SHARED`/`STRIPE_PRICE_DEDICATED` + webhook secret). Χωρίς
+  αυτά τα routes γυρνάνε 503 και το panel δείχνει gold «not configured» banner + disabled buttons
+  (graceful). Keys deferred by Achilleas — γενικό SaaS Needs-Achilleas.
+- **Plan pricing/quotas:** τα €9/€29 + οι quotas (`plans.ts`) είναι placeholders μέχρι ο Αχιλλέας
+  κλειδώσει το τελικό pricing.
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η σελίδα (αλλιώς 404). Self-hosted
+  = disabled, zero risk.
+
+**Next task:** increment 59 — είτε (α) **email-verify / password-reset** UI (APIs έτοιμα, μόνο τα
+panels λείπουν), είτε (β) **Usage** deep-dive panel/tab (πέρα από τα summary numbers του Overview),
+είτε (γ) **root-app landing** μετά το login (πώς φαίνεται το `/` για signed-in Account χωρίς
+per-tenant User session — παραμένει ανοιχτό από increment 56).

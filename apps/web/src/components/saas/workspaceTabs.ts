@@ -6,7 +6,7 @@
 import { normalizeSlug } from './chooseWorkspace';
 
 /** Which settings panel is currently shown (drives the `active` flag). */
-export type WorkspaceTabKey = 'overview' | 'members';
+export type WorkspaceTabKey = 'overview' | 'members' | 'billing';
 
 /** Structurally identical to WorkspaceShell's WorkspaceTab; declared locally so this pure
  *  helper (and its test) never pull the component module graph. */
@@ -15,6 +15,7 @@ export type WorkspaceTabLink = { href: string; label: string; active: boolean };
 const TABS: readonly { key: WorkspaceTabKey; label: string; path: string }[] = [
   { key: 'overview', label: 'Overview', path: '/account/workspace' },
   { key: 'members', label: 'Members', path: '/account/workspace/members' },
+  { key: 'billing', label: 'Billing', path: '/account/workspace/billing' },
 ] as const;
 
 /**
