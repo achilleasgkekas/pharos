@@ -19,6 +19,7 @@ export function SearchableSelect({
   clearable = false,
   size = 'md',
   className,
+  labels,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -28,8 +29,11 @@ export function SearchableSelect({
   clearable?: boolean;
   size?: 'sm' | 'md';
   className?: string;
+  /** Optional display labels per option value (e.g. a sentinel → "Unassigned"). */
+  labels?: Record<string, string>;
 }) {
   const t = useT();
+  const labelFor = (v: string) => labels?.[v] ?? v;
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -43,7 +47,7 @@ export function SearchableSelect({
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open]);
 
-  const filtered = options.filter((o) => o.toLowerCase().includes(q.trim().toLowerCase()));
+  const filtered = options.filter((o) => `${o} ${labelFor(o)}`.toLowerCase().includes(q.trim().toLowerCase()));
   const showCustom =
     allowCustom && q.trim() && !options.some((o) => o.toLowerCase() === q.trim().toLowerCase());
 
@@ -66,7 +70,7 @@ export function SearchableSelect({
         )}
       >
         <span className={cn('truncate', !value && 'text-[color:var(--color-text-faint)]')}>
-          {value || placeholder}
+          {value ? labelFor(value) : placeholder}
         </span>
         <span className="flex items-center gap-1 shrink-0">
           {clearable && value && (
@@ -116,7 +120,7 @@ export function SearchableSelect({
                 onClick={() => pick(o)}
                 className="w-full flex items-center justify-between gap-2 text-left px-3 py-1.5 text-xs text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface-3)] hover:text-[color:var(--color-text)]"
               >
-                <span className="truncate">{o}</span>
+                <span className="truncate">{labelFor(o)}</span>
                 {o === value && <Check size={13} className="text-[color:var(--color-accent)] shrink-0" />}
               </button>
             ))}

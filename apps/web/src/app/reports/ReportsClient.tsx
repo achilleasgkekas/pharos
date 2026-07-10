@@ -60,6 +60,7 @@ type Data = {
   installmentPlans: InstallmentPlanRow[];
   incomeExpense: { key: string; label: string; income: number; expense: number }[];
   expenseByCategory: { name: string; value: number }[];
+  expenseBySpace: { name: string; value: number }[];
   budgetVsActual: { name: string; budget: number; actual: number; carried?: number; effective?: number }[];
   budgetRollover?: boolean;
   summary: {
@@ -375,6 +376,24 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
             </ResponsiveContainer>
           )}
         </Card>
+
+        {/* Expenses by space / property (P34) — only when the user has tagged spaces */}
+        {data.expenseBySpace.length > 0 && (
+          <Card title={t('reports.cExpBySpace')}>
+            <ResponsiveContainer width="100%" height={Math.max(200, data.expenseBySpace.length * 34)}>
+              <BarChart data={data.expenseBySpace.map((s) => ({ name: s.name || t('ex.spaceNone'), value: s.value }))} layout="vertical" margin={{ left: 8, right: 16 }}>
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${cur()}${v.toLocaleString('en-GB')}`, 'total']} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+                <Bar dataKey="value" radius={[0, 5, 5, 0]}>
+                  {data.expenseBySpace.map((_, i) => (
+                    <Cell key={i} fill={PALETTE[(i + 1) % PALETTE.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        )}
 
         {/* Subscriptions monthly by category */}
         <Card title={t('reports.cSubsByCat', { cur: cur() })}>

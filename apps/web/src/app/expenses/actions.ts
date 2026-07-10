@@ -101,12 +101,12 @@ export async function scanExpenseImage(formData: FormData): Promise<ScanExpenseR
 
 /** Inherit category / recurring from an existing record of the same vendor (the
  *  "continuity" the user asked for: a new ΔΕΗ bill joins the existing ΔΕΗ series). */
-async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string } | null> {
+async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string; space?: string } | null> {
   if (!vKey) return null;
   const Expense = await currentModel(ExpenseModel);
   const prev = await Expense.findOne({ kind, vendorKey: vKey }).sort({ date: -1 }).lean();
   if (!prev) return null;
-  return { category: prev.category, recurring: prev.recurring, recurringCycle: prev.recurringCycle };
+  return { category: prev.category, recurring: prev.recurring, recurringCycle: prev.recurringCycle, space: prev.space };
 }
 
 function periodFrom(date: Date, parsedPeriod?: string): string {
@@ -236,6 +236,7 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
       vendor,
       vendorKey: vKey,
       category: rule?.category || parsed?.category || inherited?.category || 'other',
+      space: inherited?.space || '', // inherit the ledger tag from the vendor's last entry (P34)
       amount: parsed?.amount ?? 0,
       currency: parsed?.currency || 'EUR',
       date,
@@ -267,6 +268,7 @@ const UpdateSchema = z.object({
   kind: z.enum(['income', 'expense']).default('expense'),
   vendor: z.string().default(''),
   category: z.string().default('other'),
+  space: z.string().max(40).default(''),
   amount: z.coerce.number().default(0),
   currency: z.string().default('EUR'),
   date: z.string(),
@@ -295,6 +297,7 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
           vendor: d.vendor,
           vendorKey: vendorKey(d.vendor),
           category: d.category,
+          space: d.space.trim(),
           amount: d.amount,
           currency: d.currency,
           date,
@@ -336,6 +339,7 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
       vendor: d.vendor,
       vendorKey: vendorKey(d.vendor),
       category: explicit || rule?.category || inherited?.category || 'other',
+      space: d.space.trim() || inherited?.space || '',
       amount: d.amount,
       currency: d.currency,
       date,

@@ -54,7 +54,7 @@ async function getReports(monthsBack = 12) {
     Item.find().select('title category status purchasedPrice currentPrice purchasedAt warrantyUntil').lean(),
     Subscription.find({ active: true }).select('amount billingCycle category').lean(),
     Statement.find().lean(),
-    Expense.find().select('kind amount date period category').lean(),
+    Expense.find().select('kind amount date period category space').lean(),
   ]);
 
   const receipts = JSON.parse(JSON.stringify(receiptsRaw)) as LeanReceipt[];
@@ -93,6 +93,7 @@ async function getReports(monthsBack = 12) {
     date?: string | Date | null;
     period?: string;
     category?: string;
+    space?: string;
   }[];
   const ie = months.map((m) => ({ key: m.key, label: m.label, income: 0, expense: 0 }));
   const ieIdx = new Map(ie.map((m, i) => [m.key, i]));
@@ -103,6 +104,7 @@ async function getReports(monthsBack = 12) {
   let incomeMonth = 0;
   let expenseMonth = 0;
   const expCatMap = new Map<string, number>();
+  const expSpaceMap = new Map<string, number>(); // expense per space/ledger tag (P34); '' = unassigned
   const thisMonthCat = new Map<string, number>(); // expense per category, THIS month (for budgets)
   // Per (month → category) expense totals + per-month expense total, used by the
   // envelope/rollover budget carry (P25). Only expense (non-income) rows count.
@@ -113,7 +115,11 @@ async function getReports(monthsBack = 12) {
     if (amt <= 0) continue;
     const isIncome = e.kind === 'income';
     const cat = e.category || 'other';
-    if (!isIncome) expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt);
+    if (!isIncome) {
+      expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt);
+      const sp = (e.space || '').trim();
+      expSpaceMap.set(sp, (expSpaceMap.get(sp) ?? 0) + amt);
+    }
     // Bucket by period (YYYY-MM) if present, else by date.
     let mk = e.period && /^\d{4}-\d{2}$/.test(e.period) ? e.period : '';
     if (!mk && e.date) {
@@ -175,6 +181,16 @@ async function getReports(monthsBack = 12) {
     .map(([name, value]) => ({ name, value: Math.round(value) }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 8);
+  // Per-space / per-property breakdown (P34). Only surfaced once the user has actually
+  // tagged some expense with a named space — otherwise it's a single "unassigned" bar
+  // that adds no signal, so we return [] and the card stays hidden.
+  const hasNamedSpace = [...expSpaceMap.keys()].some((k) => k !== '');
+  const expenseBySpace = hasNamedSpace
+    ? [...expSpaceMap.entries()]
+        .map(([name, value]) => ({ name, value: Math.round(value) }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10)
+    : [];
 
   // ── Spend by store (top 8) ───────────────────────────────────────────────
   const storeMap = new Map<string, { total: number; count: number }>();
@@ -311,6 +327,7 @@ async function getReports(monthsBack = 12) {
     installmentPlans,
     incomeExpense,
     expenseByCategory,
+    expenseBySpace,
     budgetVsActual,
     budgetRollover: appSettings.budgetRollover,
     summary: {

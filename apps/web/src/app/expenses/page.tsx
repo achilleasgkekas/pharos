@@ -58,6 +58,7 @@ export async function getExpenseData(kind: 'income' | 'expense') {
     vendors,
     ollamaUp,
     categories: settings.expenseCategories,
+    spaces: settings.spaces,
   };
   });
 }

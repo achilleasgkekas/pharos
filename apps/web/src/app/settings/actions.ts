@@ -35,7 +35,7 @@ import {
   invalidatePromptsCache,
   type PromptKey,
 } from '@/lib/prompts';
-import { TAXONOMY_META, normalizeList, type TaxonomyKey } from '@/lib/taxonomies';
+import { TAXONOMY_META, normalizeList, normalizeSpaces, type TaxonomyKey } from '@/lib/taxonomies';
 import { getStorageConfig, invalidateStorageConfig, type StorageBackend } from '@/lib/storageConfig';
 import { pushBatchToRemote, testRemote, type RemoteFile } from '@/lib/remoteStorage';
 import { renderStoragePath, DEFAULT_FOLDER_TEMPLATE, DEFAULT_NAME_TEMPLATE } from '@/lib/storagePath';
@@ -815,6 +815,21 @@ export async function saveList(key: string, values: string[]): Promise<{ ok: boo
     await AppConfig.updateOne({ key: 'singleton' }, { $unset: { [path]: '' } }, { upsert: true });
   } else {
     await AppConfig.updateOne({ key: 'singleton' }, { $set: { [path]: cleaned } }, { upsert: true });
+  }
+  invalidateAppSettings();
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+/** Save the per-property / per-context ledger tags (P34). Empty list clears them
+ *  (the feature goes dormant). Deterministic, no AI. */
+export async function saveSpaces(values: string[]): Promise<{ ok: boolean }> {
+  await connectDB();
+  const cleaned = normalizeSpaces(Array.isArray(values) ? values : []);
+  if (cleaned.length === 0) {
+    await AppConfig.updateOne({ key: 'singleton' }, { $unset: { spaces: '' } }, { upsert: true });
+  } else {
+    await AppConfig.updateOne({ key: 'singleton' }, { $set: { spaces: cleaned } }, { upsert: true });
   }
   invalidateAppSettings();
   revalidatePath('/', 'layout');

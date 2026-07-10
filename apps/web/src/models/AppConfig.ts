@@ -43,6 +43,10 @@ const AppConfigSchema = new Schema(
     // User-editable dropdown lists (category taxonomies). Map taxonomyKey → string[].
     lists: { type: Schema.Types.Mixed, default: {} },
 
+    // Per-property / per-context ledger tags (P34). E.g. ["Σπίτι", "Εξοχικό"].
+    // Empty = feature dormant. Applied to expenses/income as an optional `space`.
+    spaces: { type: [String], default: [] },
+
     // ── Extra AI providers (key + model each; provider picked via aiProvider) ──
     openaiApiKey: { type: String, default: '' },
     openaiModel: { type: String, default: '' },

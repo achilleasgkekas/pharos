@@ -30,6 +30,7 @@ export function serializeExpense(e: Record<string, unknown>): SerializedExpense 
     vendor: s.vendor ?? '',
     vendorKey: s.vendorKey ?? '',
     category: s.category ?? 'other',
+    space: s.space ?? '',
     amount: s.amount ?? 0,
     currency: s.currency ?? 'EUR',
     date: s.date ?? '',

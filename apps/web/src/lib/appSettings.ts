@@ -9,9 +9,11 @@ import { setCurrencySymbol, currencySymbol } from './money';
 import './tenancy/currencyBinding';
 import {
   resolveTaxonomy,
+  normalizeSpaces,
   DEFAULT_EXPENSE_CATEGORIES,
   DEFAULT_ITEM_CATEGORIES,
   DEFAULT_SUBSCRIPTION_CATEGORIES,
+  DEFAULT_SPACES,
 } from './taxonomies';
 import { resolveDepreciation, DEFAULT_DEPRECIATION, type DepreciationConfig } from './depreciation';
 import { resolveCategoryRules, type CategoryRule } from './categoryRules';
@@ -32,6 +34,7 @@ export type AppSettings = {
   expenseCategories: string[];
   itemCategories: string[];
   subscriptionCategories: string[];
+  spaces: string[]; // per-property / per-context ledger tags (P34); empty = feature dormant
   budgets: Record<string, number>; // monthly budget per expense category (€)
   budgetRollover: boolean; // envelope mode (P25): carry net unspent budget into this month
   assetAccounts: Record<string, number>; // manual asset accounts for net worth (name → balance)
@@ -54,6 +57,7 @@ export type RawAppConfigDoc = {
   defaultVatRate?: number;
   defaultReturnWindowDays?: number;
   lists?: Record<string, unknown>;
+  spaces?: unknown;
   budgets?: Record<string, unknown>;
   budgetRollover?: boolean;
   assetAccounts?: Record<string, unknown>;
@@ -89,6 +93,7 @@ const DEFAULTS: AppSettings = {
   expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
   itemCategories: DEFAULT_ITEM_CATEGORIES,
   subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,
+  spaces: DEFAULT_SPACES,
   budgets: {},
   budgetRollover: false,
   assetAccounts: {},
@@ -129,6 +134,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     expenseCategories: resolveTaxonomy('expenseCategories', doc?.lists, DEFAULT_EXPENSE_CATEGORIES),
     itemCategories: resolveTaxonomy('itemCategories', doc?.lists, DEFAULT_ITEM_CATEGORIES),
     subscriptionCategories: resolveTaxonomy('subscriptionCategories', doc?.lists, DEFAULT_SUBSCRIPTION_CATEGORIES),
+    spaces: normalizeSpaces(doc?.spaces),
     budgets: numMap(doc?.budgets),
     budgetRollover: !!doc?.budgetRollover,
     assetAccounts: numMap(doc?.assetAccounts),
@@ -149,7 +155,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     // untouched, same query as before).
     const Config = await currentModel(AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets budgetRollover assetAccounts depreciation categoryRules')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules')
       .lean();
   } catch {
     /* DB down → hard defaults */

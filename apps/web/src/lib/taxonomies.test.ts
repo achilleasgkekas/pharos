@@ -5,6 +5,7 @@ import {
   DEFAULT_SUBSCRIPTION_CATEGORIES,
   TAXONOMY_META,
   normalizeList,
+  normalizeSpaces,
   resolveTaxonomy,
 } from './taxonomies';
 
@@ -133,5 +134,30 @@ describe('defaults & metadata', () => {
       expect(m.label.length).toBeGreaterThan(0);
       expect(m.where.length).toBeGreaterThan(0);
     }
+  });
+});
+
+// ── Spaces / ledgers (P34) ──────────────────────────────────────────────────
+describe('normalizeSpaces', () => {
+  it('trims, collapses inner whitespace, drops empties', () => {
+    expect(normalizeSpaces(['  Home ', 'Holiday   house', '', '   '])).toEqual(['Home', 'Holiday house']);
+  });
+  it('dedupes case-insensitively but preserves the first spelling', () => {
+    expect(normalizeSpaces(['Home', 'home', 'HOME', 'Office'])).toEqual(['Home', 'Office']);
+  });
+  it('preserves casing (Greek proper nouns), unlike category lists', () => {
+    expect(normalizeSpaces(['Εξοχικό', 'Σπίτι'])).toEqual(['Εξοχικό', 'Σπίτι']);
+  });
+  it('never forces an "other" bucket and returns [] for empty/invalid input', () => {
+    expect(normalizeSpaces([])).toEqual([]);
+    expect(normalizeSpaces('nope' as unknown as string[])).toEqual([]);
+    expect(normalizeSpaces(undefined as unknown as string[])).toEqual([]);
+    expect(normalizeSpaces(null as unknown as string[])).toEqual([]);
+  });
+  it('caps each value length and the total count', () => {
+    const long = 'x'.repeat(60);
+    expect(normalizeSpaces([long])[0].length).toBe(40);
+    const many = Array.from({ length: 40 }, (_, i) => `s${i}`);
+    expect(normalizeSpaces(many).length).toBe(24);
   });
 });

@@ -13,6 +13,7 @@ const ExpenseSchema = new Schema(
     vendor: { type: String, default: '', index: true }, // ΔΕΗ, landlord, employer…
     vendorKey: { type: String, default: '', index: true }, // normalized vendor → groups a recurring series
     category: { type: String, default: 'other', index: true }, // rent/utilities/fuel/salary/insurance/…
+    space: { type: String, default: '', index: true }, // per-property/context ledger tag (P34); '' = unassigned
     amount: { type: Number, default: 0 }, // gross amount (income positive, expense positive)
     currency: { type: String, default: 'EUR' },
     date: { type: Date, required: true, index: true },

@@ -58,6 +58,7 @@ describe('normalizeSettings', () => {
       expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
       itemCategories: DEFAULT_ITEM_CATEGORIES,
       subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,
+      spaces: [],
       budgets: {},
       budgetRollover: false,
       assetAccounts: {},
@@ -135,6 +136,14 @@ describe('normalizeSettings', () => {
   it('empty override arrays fall back to defaults', () => {
     const v = normalizeSettings({ lists: { expenseCategories: [] } });
     expect(v.expenseCategories).toEqual(DEFAULT_EXPENSE_CATEGORIES);
+  });
+
+  it('spaces default to empty and are normalized when present (P34)', () => {
+    expect(normalizeSettings({}).spaces).toEqual([]);
+    expect(normalizeSettings({ spaces: ['Home', ' Holiday house '] }).spaces).toEqual(['Home', 'Holiday house']);
+    // case-insensitive dedupe, casing preserved; non-array → []
+    expect(normalizeSettings({ spaces: ['Home', 'home'] }).spaces).toEqual(['Home']);
+    expect(normalizeSettings({ spaces: 'nope' as unknown as string[] }).spaces).toEqual([]);
   });
 
   it('coerces the budgets map (drops non-positive/invalid)', () => {

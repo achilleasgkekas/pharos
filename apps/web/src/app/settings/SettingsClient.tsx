@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags } from 'lucide-react';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -15,7 +15,7 @@ import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
 import { rateForCategory } from '@/lib/depreciation';
-import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, testNotifierChannel, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow } from './actions';
+import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, testNotifierChannel, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow } from './actions';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
 import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, changeOwnPassword, type UserRow } from './users.actions';
@@ -266,6 +266,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             <>
               <StoresManager stores={info.stores} />
               <ListsManager lists={info.lists} />
+              <SpacesManager spaces={info.settings.spaces} />
             </>
           )}
 
@@ -2772,6 +2773,51 @@ function ListEditor({ entry }: { entry: ListEditorEntry }) {
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
       </div>
     </div>
+  );
+}
+
+/** Per-property / per-context ledger tags (P34). Unlike category lists, spaces
+ *  default to empty (feature dormant), keep their casing, and have no forced entry. */
+function SpacesManager({ spaces }: { spaces: string[] }) {
+  const t = useT();
+  const [values, setValues] = useState<string[]>(spaces);
+  const [input, setInput] = useState('');
+  const [pending, startTransition] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+
+  function add() {
+    const v = input.trim().replace(/\s+/g, ' ');
+    if (v && !values.some((x) => x.toLowerCase() === v.toLowerCase())) setValues((s) => [...s, v]);
+    setInput('');
+  }
+  function save(next: string[]) {
+    startTransition(async () => {
+      await saveSpaces(next);
+      setMsg(t('common.savedOk'));
+      setTimeout(() => setMsg(null), 1800);
+    });
+  }
+  return (
+    <Section title={t('set.spaces')} icon={<MapPin size={15} />}>
+      <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-2">{t('set.spacesDesc')}</p>
+      <div className="rounded-xl border border-[color:var(--color-border)] p-3">
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {values.length === 0 && <span className="text-[11px] text-[color:var(--color-text-faint)] italic">{t('set.spacesEmpty')}</span>}
+          {values.map((v) => (
+            <span key={v} className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              {v}
+              <button onClick={() => setValues((s) => s.filter((x) => x !== v))} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]"><X size={11} /></button>
+            </span>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} placeholder={t('set.spacesPlaceholder')} className={cn(inputClass, 'text-xs py-1.5')} />
+          <button onClick={add} className={ghostBtn}><Plus size={13} /></button>
+          <button onClick={() => save(values)} disabled={pending} className={saveBtn}>{pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}</button>
+          {msg && <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>}
+        </div>
+      </div>
+    </Section>
   );
 }
 

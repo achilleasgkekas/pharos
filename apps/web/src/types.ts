@@ -101,6 +101,7 @@ export type SerializedExpense = {
   vendor: string;
   vendorKey: string;
   category: string;
+  space: string; // per-property/context ledger tag (P34); '' = unassigned
   amount: number;
   currency: string;
   date: string;

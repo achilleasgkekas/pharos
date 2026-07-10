@@ -34,3 +34,30 @@ export function resolveTaxonomy(key: TaxonomyKey, overrides: Record<string, unkn
   if (Array.isArray(v) && v.length) return v.map(String);
   return fallback;
 }
+
+// ── Spaces / ledgers (P34) ────────────────────────────────────────────────
+// A per-property / per-context ledger tag (e.g. "Σπίτι", "Εξοχικό", "Δουλειά")
+// so money data can be split by space. UNLIKE the category taxonomies above,
+// spaces default to EMPTY (the feature stays dormant until the user names a
+// space), keep their original casing (Greek proper nouns), and never force an
+// "other" bucket. Empty space = "unassigned / all".
+export const DEFAULT_SPACES: string[] = [];
+const MAX_SPACES = 24;
+
+/** Clean a user-entered spaces list: trim, drop empties, dedupe case-insensitively
+ *  (keeping the first spelling), cap length + count. Casing preserved for display. */
+export function normalizeSpaces(items: unknown): string[] {
+  if (!Array.isArray(items)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of items) {
+    const v = String(raw ?? '').trim().replace(/\s+/g, ' ').slice(0, 40);
+    if (!v) continue;
+    const k = v.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(v);
+    if (out.length >= MAX_SPACES) break;
+  }
+  return out;
+}
