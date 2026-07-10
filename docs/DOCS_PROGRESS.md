@@ -1453,3 +1453,34 @@ lib/receiptSearch.ts/.test.ts) stale απο την αρχη του run, ΟΥΤΕ
 Επομενο run: (α) configuration.md — calendar feed subscribe walkthrough (Google/Apple/Outlook
 βηματα) + MCP-connect-from-Claude section, που ακομα λειπουν· ή (β) features.md stale-forward για
 οποιο νεο user-facing feature εχει shipαρει στο μεταξυ.
+
+## 2026-07-10 (features.md: Bills & payables — P28 tracker + stale-forward)
+
+Το προηγουμενο suggested (α) calendar/MCP walkthrough ειχε ηδη γινει (commit 67120d8), οποτε
+πηρα το (β) features.md stale-forward. Το P28 bill/payable tracker (`/bills`, feat a737bbc) ελειπε
+εντελως. Διαβασα το πραγματικο code πριν γραψω: `models/Bill.ts`, `lib/bill.ts` (billStatus
+paid/overdue/due-soon/upcoming derived, nextBillDue), `app/bills/actions.ts` (createBill/updateBill/
+markBillPaid/markBillUnpaid/setBillArchived/deleteBill), `app/bills/page.tsx` (sort paidAt→dueDate),
+notifications/actions.ts (bill NotifKind), SiteNav.tsx (nav.bills).
+
+- Νεα section "Bills & payables" μετα το Subscriptions: distinct απο Subscription (auto charge) και
+  Calendar (projection)· derived status (paid/overdue/due-soon 7d/upcoming)· mark paid/unpaid με
+  optional payment date + opt-in expense log (linked)· recurring cycle spawn-next-once-on-first-pay·
+  notifications overdue/due-soon auto-expire· archive + soft-delete→Trash.
+- Contents index += Bills & payables anchor.
+- Notifications section διευρυνθηκε: πριν ελεγε μονο deals/installments/warranties/network·
+  τωρα + bills overdue/due-soon, price hikes, trials ending, gift cards (verified απο AUTO_KINDS
+  στο notifications/actions.ts).
+- Trash section: πρoστεθηκε "bills" στη λιστα soft-deleted types (deleteBill κανει $set deletedAt).
+
+Validation: markdown only, κανενα build/Docker/AI. features.md fence count = 0 (καμια code fence),
+secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/CRON_SECRET=) clean. Internal
+anchor #bills--payables ταιριαζει με το heading.
+
+Collision guard: foreign uncommitted WIP (apps/web/src/app/search-actions.ts +
+lib/receiptSearch.ts/.test.ts) stale/unstaged απο την αρχη του run — ΔΕΝ τα αγγιζω, commit ΜΟΝΟ
+docs/features.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επομενο run: (α) features.md — P25 budget envelope/rollover + P34 per-space/per-property ledger tag
+αν εχουν user-facing surface (check settings/expenses)· ή (β) api.md stale-forward αν shipαρει
+GET /api/v1/bills (το Bill model εχει ηδη updatedAt index "for a future GET /api/v1/bills").

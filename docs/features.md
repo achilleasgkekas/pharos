@@ -21,6 +21,7 @@ the REST API (`/api/v1`) that the mobile companion app uses; see the
 - [Expenses & Income](#expenses--income)
 - [Statements & installments](#statements--installments)
 - [Subscriptions](#subscriptions)
+- [Bills & payables](#bills--payables)
 - [Vouchers](#vouchers)
 - [Calendar](#calendar)
 - [Reports](#reports)
@@ -149,6 +150,41 @@ software. Each has a provider / name, amount, billing cycle
 shows monthly / yearly totals and an upcoming-renewals banner, with the same
 grid / list and filter layout as the rest of the app.
 
+## Bills & payables
+
+A tracker (`/bills`) for the bills you pay **by hand**, such as electricity (ΔΕΗ),
+telephone (ΟΤΕ), or building fees (κοινόχρηστα). This is distinct from
+Subscriptions (an **automatic** recurring charge) and from the Calendar (which only
+**projects** the future): a bill has a lifecycle you follow, "is it due?, did I
+pay it?, was it forgotten?".
+
+Each bill has a title, vendor / payee, amount, due date, category, optional notes,
+and an optional billing cycle. Its **status is derived** from the due date and
+whether it has been paid, so nothing drifts out of sync:
+
+- **paid** — a payment has been recorded,
+- **overdue** — unpaid and the due date has passed,
+- **due-soon** — unpaid and due within the next 7 days,
+- **upcoming** — unpaid and further out.
+
+The list shows unpaid bills first, then the soonest due, so you triage in order.
+
+Highlights:
+
+- **Mark paid / unpaid.** One click records the payment (with an optional payment
+  date). You can undo it, which never touches any expense that was logged.
+- **Log an expense on payment (opt-in).** Marking a bill paid can create a matching,
+  verified expense (vendor, amount, category, date), linked back to the bill.
+- **Recurring bills.** Give a bill a cycle (weekly / monthly / quarterly / yearly)
+  and paying it once spawns the **next pending instance** one cycle ahead, so the
+  series keeps rolling without a background job. The spawn happens exactly once, on
+  the first payment.
+- **Notifications.** An unpaid bill that is overdue or due within the alert window
+  triggers a notification; the alert auto-expires once the bill is paid.
+- **Archive** a one-off you no longer care about, or delete it (soft delete → Trash).
+
+Deleting a bill is a soft delete, so it lands in Trash and can be restored.
+
 ## Vouchers
 
 Discount codes and coupons (`/vouchers`): title, code, store, discount,
@@ -240,7 +276,8 @@ example `/items?open=<id>`).
 ## Notifications
 
 Alert checks scan for deals (target price hit), installments due this month,
-warranties expiring within your lead time, and network issues, then send a
+warranties expiring within your lead time, bills that are overdue or due soon,
+price hikes, trials ending, expiring gift cards, and network issues, then send a
 summary through your configured channel (ntfy and other providers, see
 [Configuration → Notifications](configuration.md#notifications)). You can trigger
 a check on demand or send a test message from
@@ -249,7 +286,7 @@ Settings. The mobile app can also register for push notifications.
 ## Trash (soft delete)
 
 Most deletes are reversible. Items, receipts, expenses, subscriptions, vouchers,
-and tasks are **soft-deleted** (hidden, files and references kept) and land in
+bills, and tasks are **soft-deleted** (hidden, files and references kept) and land in
 **Trash** (Settings → Storage) where you can restore them or delete them forever.
 Trash auto-purges entries older than 30 days. (Statements are hard-deleted, to
 avoid blocking a re-import of the same month.)
