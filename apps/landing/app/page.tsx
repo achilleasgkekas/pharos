@@ -524,13 +524,20 @@ const JSON_LD = {
       softwareHelp: `${GITHUB_URL}/blob/main/README.md`,
       // Per-plan Offers, one per priced tier (Free self-host + Solo/Family/Pro hosted).
       // Hosted tiers expose BOTH billing options: monthly, and annual (monthly x10 = 2 months free).
+      // Availability reflects the real pre-launch state so search engines are not told
+      // an item is buyable when it is not: the free self-host tier tracks REPO_PUBLIC
+      // (PreOrder while the repo is private, InStock the moment it opens), and the paid
+      // hosted tiers stay PreOrder for as long as they are waitlist-gated.
       offers: TIERS.filter((t) => t.amount !== undefined).map((t) => ({
         '@type': 'Offer',
         name: `PHAROS ${t.name}`,
         price: t.amount,
         priceCurrency: 'EUR',
         description: t.tagline,
-        availability: 'https://schema.org/InStock',
+        availability:
+          t.amount === '0' && REPO_PUBLIC
+            ? 'https://schema.org/InStock'
+            : 'https://schema.org/PreOrder',
         ...(t.amount !== '0' && {
           priceSpecification: [
             {

@@ -1739,3 +1739,38 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον.
+
+## 2026-07-10 (cont.⁶) — (e) polish/SEO: pre-launch Offer availability (InStock -> PreOrder)
+
+Increment (e) polish, structured-data correctness. Το JSON-LD `SoftwareApplication.offers` δηλωνε ολα τα
+tiers ως `availability: schema.org/InStock`, αλλα τιποτα ΔΕΝ ειναι αγοραστο ακομα: το self-host repo ειναι
+private (`REPO_PUBLIC=false`, οι CTAs κουβαλανε «soon» badge) και τα hosted plans (Solo/Family/Pro) ειναι
+waitlist-only («Join the waitlist»). Το να λες σε search engines «InStock» για κατι μη-αγοραστο ειναι
+misleading και μπορει να πυροδοτησει rich-result penalty (Google Merchant/rich results ελεγχουν availability).
+
+- `app/page.tsx` (JSON_LD offers map): νεα availability λογικη που αντικατοπτριζει το πραγματικο pre-launch
+  state. Free self-host tier (amount '0') -> `InStock` ΜΟΝΟ οταν `REPO_PUBLIC` (αλλιως `PreOrder`), ωστε να
+  auto-corrects τη στιγμη που ανοιξει το repo. Paid hosted tiers (amount != '0') -> παντα `PreOrder` οσο ειναι
+  waitlist-gated. Μονο comment + η μια ternary αλλαξαν, μηδεν copy/UI/CSS change, μηδεν dependency.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static, / route 5.33 kB (αμεταβλητο, JSON-LD-only).
+- Prerender (.next/server/app/index.html): `"availability":"schema.org/InStock"` -> 0 occurrences (σωστο, ολα
+  pre-launch)· `schema.org/PreOrder` -> 4 offers (free + Solo/Family/Pro), 8 raw hits (Next εμφανιζει το JSON-LD
+  και στο script tag ΚΑΙ στο RSC payload -> ×2, consistent). Structured-data/non-visual -> verified στο static
+  output οπως τα προηγουμενα non-visual increments (separate non-Docker app, δεν σηκωσα preview server).
+- em-dash: 0 στην περιοχη που edit-αρα. Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ το δικο μου landing file (app/page.tsx + αυτο το log) μεσω explicit pathspec· foreign unstaged
+  files αλλου routine (apps/web/search-actions.ts, receiptSearch*) τα αφησα αθικτα (collision guard, 0 staged
+  πριν το commit).
+
+Επομενο increment: (e) polish συνεχεια — οταν REPO_PUBLIC γινει true, το InStock θα ενεργοποιηθει αυτοματα
+για το free tier (no code change)· ή content micro-pass στα features· ή real app screenshots οταν υπαρξουν
+assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
