@@ -573,12 +573,13 @@ than one). Each page is `force-dynamic` and marked `noindex, nofollow`.
 | --- | --- |
 | `/account/workspace` | **Overview** — the account's landing for workspace settings. Consolidates the read surfaces into one server-rendered page: four stat tiles (members, AI calls with quota, storage with quota, this month's AI cost), a **Workspace** panel (slug, custom domain, isolation tier, created), a **Plan & billing** panel (plan, price, subscription status, trial note, AI + storage included) mirroring [`GET /api/saas/billing`](#billing-stripe), and a **Usage** panel for the current period (AI calls vs quota, input / output tokens, storage vs quota, estimated AI cost) mirroring [`GET /api/saas/usage`](#usage). SSR reads the billing/usage helpers directly rather than self-fetching. |
 | `/account/workspace/members` | **Members** — the roster and pending invitations, mirroring [`GET /api/saas/members`](#members-and-invitations). Any active member may **view** the roster; only owners and admins (`canManage`) see the management controls (invite / add by email, change role, remove member, revoke invite), which the client panel performs against `/api/saas/members` and `/api/saas/invites`. Invites are read only for managers. |
+| `/account/workspace/billing` | **Billing** — subscription management and invoice history. Shows the current plan (name, price, interval), subscription status, trial dates when applicable, and historical invoices from Stripe (if available). Owner/admin only. |
+| `/account/workspace/usage` | **Usage** — detailed AI and storage consumption for the current period. Breaks down AI calls (input / output tokens, cost) per model and per day, and storage bytes used vs quota. Useful for understanding quota burndown. Any workspace member can view. |
+| `/account/workspace/activity` | **Activity** — an audit trail of workspace changes. Shows append-only events (members added/removed, role changes, invites sent, plan changes, BYO-key events), newest first, with optional filtering by action type. Owner/admin only. Mirrors [`GET /api/saas/audit`](#activity-audit). |
 
-The tab bar (`workspaceTabs`) lists **Overview** and **Members**; more panels
-(Billing, Usage, General settings) are additive entries as they land. Every tab link
-carries the active `?w=<slug>` workspace selection through, so switching panels stays
-on the same workspace; a blank selection yields clean URLs against the account's first
-workspace.
+The tab bar (`workspaceTabs`) lists **Overview**, **Members**, **Billing**, **Usage**, and **Activity**.
+Every tab link carries the active `?w=<slug>` workspace selection through, so switching panels stays
+on the same workspace; a blank selection yields clean URLs against the account's first workspace.
 
 **Empty and edge states.** A signed-in account with **zero** memberships (for example,
 removed from its last workspace) is a real state, not an error: Overview renders a

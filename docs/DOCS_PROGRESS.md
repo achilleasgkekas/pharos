@@ -1552,6 +1552,39 @@ Validation: markdown only, κανενα build/Docker/AI. features.md fence count
 Collision guard: git status δειχνει ΜΟΝΟ docs/features.md dirty (κανενα foreign uncommitted/staged
 τωρα)· commit ΜΟΝΟ docs/features.md + docs/DOCS_PROGRESS.md με explicit pathspec.
 
-Επομενο run: (α) features.md — P25 budget envelope/rollover στο Reports/Settings section (check
-budgets + budgetRollover στο appSettings, ΔΕΝ documented ακομα)· ή (β) api.md stale-forward αν
-shipαρει GET /api/v1/bills (Bill model εχει ηδη updatedAt index for it).
+## 2026-07-10 (P25 budget envelope/rollover + SaaS workspace tabs Billing/Usage/Activity)
+
+Δυο improvements του content set που ηδη exist στον κωδικα αλλα δεν εχουν τεκμηριωθει:
+
+**P25 Budget envelope/rollover (features.md)**: Εγραψα νεο subsection μετα το Asset depreciation.
+Διαβασα `lib/budgetRollover.ts` (ROLLOVER_WINDOW=3, categoryRollover helper), `app/reports/page.tsx`
+(budget-rollover conditionals), `SettingsClient.tsx` (toggle setting). Το νεο subsection εξηγει
+envelope mode vs traditional budget reset, το carry-forward pattern (base + 3-month surplus/deficit),
+την opt-in toggle στο Settings → Money → Budgets, και οτι φαινεται στα Reports ως effective budget.
+Ακριβες παραδειγμα € values απο τη βιβλιοθηκη (€100 base, €70/80/90 spends → €40 carry → €140 effective).
+
+**SaaS Workspace console tabs (saas.md)**: Εγραψα νεα εγγραφες στο Workspace console UI table που ειχε
+μονο 2 tabs (Overview + Members) και σημειωσει "more panels as they land". Τωρα documentαρει 3 νεα:
+- `/account/workspace/billing` (Stripe subscription mgmt + invoices, owner/admin only)
+- `/account/workspace/usage` (AI token + storage consumption breakdown per model/day, any member)
+- `/account/workspace/activity` (audit trail, append-only events mirroring GET /api/saas/audit, owner/admin)
+
+Ενημερωσα και το tab-bar εξηγηση (αλλα απο «Overview, Members» σε πληρες list). Διαβασα τα route
+files (activity/page.tsx + billing/page.tsx + usage/page.tsx απο το git show) για ακριβεια.
+
+Accuracy check: απο τα route files (commit f5a457f/7d56b2a/81ec1c5) — Billing = Stripe subscription
+display (no write, CTAs "coming soon" for cancel), Usage = current-period usage stats (AI input/output/
+cost, storage), Activity = `/api/saas/audit` events + filters. Κανενα secret τιμη, μονο placeholder
+role descriptions.
+
+Validation: markdown only, κανενα build/Docker/AI call. Code fences: features.md=0, saas.md=18 (even,
+balanced). Ολα τα internal .md links resolve (test -e: self-hosting.md, configuration.md, api.md,
+../SECURITY.md). Anchor-check: saas.md links προς #billing-stripe + #usage + #activity-audit υπαρχουν
+(οι ακριβες ονοματα απο τη δομη του αρχειου).
+
+Collision guard: `git status --short` πριν το add — ΜΟΝΟ `M docs/features.md` + `M docs/saas.md`
+(δικα μου), κανενα foreign uncommitted/staged. Stage ΜΟΝΟ docs/features.md + docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: (α) features.md — αν shipαρει Bill/payable model με v1 API routes, η (β) saas.md stale-
+forward scan για «coming soon» CTAs σε billing/workspace tabs (τωρα accurate), ή (γ) sync api.md
+εναντι τυχον νεων v1 routes που μπηκαν. Ολα τα content docs accurate, 0 broken links.

@@ -282,6 +282,17 @@ on read (nothing stored), a genuine manual current value on an item still wins,
 and the whole model (toggle, floor, default rate, per-category rates) is
 configurable in Settings → Money → Depreciation (on by default).
 
+**Budget envelope / rollover (P25).** A traditional monthly budget resets to its
+full cap every month: unspent money is simply lost, and a one-off overspend is
+forgotten next month. Envelope mode instead carries the net unspent balance from
+the prior three complete months into the current month, so consistent saving
+accumulates room and an overspend eats into the following envelope. For example,
+if a category has a €100 base budget and you spent €70, €80, €90 last month, you
+carry €10 + €20 + €10 = €40 into this month, so your effective budget is €140.
+Empty or untracked months are skipped so they never manufacture a phantom surplus.
+This is opt-in (Settings → Money → Budgets) and shows up in Reports as the
+effective budget (base + carried, floored at zero).
+
 ## Tasks
 
 A planner (`/tasks`) with a **Kanban board** (Todo / In-Progress / Blocked / Done)
