@@ -9,6 +9,7 @@ import { notFound } from 'next/navigation';
 import { requireSuperadminPage } from '@/lib/tenancy/superadminPage';
 import { getTenantDetailForAdmin } from '@/lib/tenancy/adminTenantDetail';
 import { StatTile } from '@/components/saas/StatTile';
+import { LiveDbStatsPanel } from '@/components/saas/LiveDbStatsPanel';
 import {
   TenantStatusBadge,
   MemberStatusBadge,
@@ -147,6 +148,9 @@ export default async function AdminTenantDetailPage({
           </div>
         </div>
       </section>
+
+      {/* Live, on-demand storage footprint (fresh db.stats(), zero side effects) */}
+      <LiveDbStatsPanel slug={slug} />
 
       {/* Member roster */}
       <section>

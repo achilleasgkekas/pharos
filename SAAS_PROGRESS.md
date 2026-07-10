@@ -2437,3 +2437,46 @@ files πριν το commit· foreign modified/untracked (search-actions/receiptS
 **Next task:** increment 59 — είτε (α) **Billing** action κουμπιά αν λείπουν (client checkout/
 portal POST), είτε (β) **root-app landing** μετά το login για signed-in Account (ανοιχτό από #56),
 είτε (γ) wiring του `recordAiUsage` στα AI call-sites ώστε το Usage tab να δείχνει πραγματικά νούμερα.
+
+## 2026-07-10 (increment 59 — superadmin LIVE storage-footprint panel: /admin/tenants/[slug], §8 UI-first)
+**Το κενό:** το `GET /api/saas/admin/tenants/[slug]/dbstats` (increment 52) εκθέτει μια LIVE,
+on-demand, read-only `db.stats()` footprint (billed db bytes + on-disk file bytes + total,
+ΧΩΡΙΣ να γράφει Usage sample → μηδέν side effects), αλλά είχε **ΜΗΔΕΝ UI**: η σελίδα
+`/admin/tenants/[slug]` έδειχνε μόνο το LAST SAMPLED νούμερο από το Usage ledger. Έχτισα το
+UI-first κομμάτι που καταναλώνει αυτό το endpoint — ένας operator μπορεί τώρα να τραβήξει φρέσκο
+footprint ενός workspace με ένα κουμπί. ΟΛΟ additive, σε δικούς μου φακέλους:
+- `components/saas/dbStatsView.ts` (νέο) — **PURE + client-safe** `dbStatsView(input)` → view
+  model { measured, dbName, generatedAt, total, db, files, objects, data, storage, index }.
+  Defensive: non-object/missing `live` → all-zero not-measured· κάθε numeric field floored@0
+  (NaN/±Infinity/negative → 0)· `measured` true ΜΟΝΟ για πραγματικό boolean true· non-string
+  dbName/generatedAt → ''. Ώστε garbage body να μη βγάζει "NaN"/"-1 B" σε operator dashboard.
+- `components/saas/dbStatsView.test.ts` (νέο, 6 tests) — non-object collapse, well-formed
+  projection, measured-strict-boolean, floor-garbage, missing-live-block, non-string fallbacks.
+- `components/saas/LiveDbStatsPanel.tsx` (νέο, client) — «Measure now/Re-measure» button →
+  `fetch GET /api/saas/admin/tenants/<slug>/dbstats` (no-store) → 4 StatTiles (Total billed /
+  Database / Files / Documents) + breakdown dl (data logical / collections on disk / indexes on
+  disk / db name / measured-at). `friendlyError` map ανά status (401/403/404/503)· not-measured
+  → gold note· styled ΜΟΝΟ με υπάρχοντα Pharos tokens, μηδέν shared CSS. Slug encodeURIComponent.
+- `app/admin/tenants/[slug]/page.tsx` (δικό μου admin page) — 2 additive γραμμές: import +
+  `<LiveDbStatsPanel slug={slug} />` (URL param, όχι `t.slug`, ώστε το fetch να resolve-άρει το
+  ίδιο tenant) ανάμεσα στο registry/usage grid και στο member roster.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run dbStatsView.test.ts` → **6/6**·
+full suite `npx vitest run` → **2123/2123 green** (165 files, καμία regression). ΚΑΝΕΝΑ υπάρχον
+feature αρχείο δεν αγγίχτηκε (μόνο νέα dbStatsView*/LiveDbStatsPanel + additive mount στο δικό μου
+admin detail page). `SAAS_MODE` off / self-hosted = **zero effect** (το /admin segment self-gates
+σε 404 μέσω requireSuperadmin πριν render· το route επίσης absent). Κανένας Docker rebuild
+(additive gated segment + client component, μηδέν shared runtime wiring)· καμία νέα εξάρτηση.
+Collision guard: μηδέν staged foreign files πριν το commit· foreign modified/untracked
+(search-actions/receiptSearch από άλλες routines) ΔΕΝ αγγίχτηκαν· isolated pathspec commit.
+
+**## Needs Achilleas** (dbstats panel):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16) + `SAAS_SUPERADMIN_EMAILS`** για να υπάρχει καν η
+  console/σελίδα (αλλιώς 404). Self-hosted = disabled, zero risk.
+- **File-byte footprint:** το `fileBytes` μένει 0 μέχρι το storage layer να γίνει tenant-aware
+  (`tenantFileBytes` επιστρέφει 0 σήμερα)· το db-byte κομμάτι είναι πλήρως live.
+
+**Next task:** increment 60 — είτε (α) **admin tenant ACTIONS** (suspend/plan-change/schedule-
+erasure) — χρειάζεται πρώτα PATCH/DELETE στο `/api/saas/admin/tenants/[slug]` (backend), μετά UI·
+είτε (β) **root-app landing** μετά το login για signed-in Account (ανοιχτό από #56)· είτε (γ)
+wiring του `recordAiUsage` στα AI call-sites ώστε το Usage tab να δείχνει πραγματικά νούμερα.
