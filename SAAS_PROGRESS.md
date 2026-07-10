@@ -2332,3 +2332,54 @@ pathspec commit μόνο των δικών μου αρχείων.
 **Next task:** increment 57 — είτε (α) **Members** panel (list + role-change/remove/invite,
 read/write control-plane έτοιμο· client interactivity), είτε (β) **Billing** panel με τα
 checkout/portal action κουμπιά, είτε (γ) **email-verify / password-reset** UI (APIs έτοιμα).
+
+## 2026-07-12 (increment 57 — user-facing MEMBERS panel: /account/workspace/members, §8 UI-first)
+**Το κενό:** το increment 56 έχτισε το Workspace **Overview** page, αλλά δεν υπήρχε κανένα
+user-facing σημείο για member management — ο tenant δεν μπορούσε να δει/προσκαλέσει/αλλάξει
+ρόλο/αφαιρέσει μέλη ή να ανακαλέσει invites. Οι control-plane routes ήταν έτοιμες εδώ και
+βδομάδες (`/api/saas/members` GET/POST/PATCH/DELETE + `/api/saas/invites` DELETE) με **ΜΗΔΕΝ UI**.
+Έχτισα το δεύτερο workspace-settings κομμάτι — **Members** — SSR-loading το roster + pending
+invites κατευθείαν server-side (idiomatic, η σελίδα είναι ήδη gated) + client interactivity για
+τα mutations. ΟΛΟ additive, σε δικούς μου φακέλους:
+- `components/saas/workspaceTabs.ts` (νέο) — **PURE + client-safe** tab builder: `workspaceTabs
+  (active, wParam)` → Overview/Members links που κουβαλάνε το τρέχον `?w=<slug>` selection
+  (clean URLs για default workspace, `?w=` encoded+lowercased αλλιώς — ίδιο rule με το
+  pickWorkspace/τα READ routes). Ώστε το switch μεταξύ panels να μένει στο ίδιο workspace.
+- `components/saas/workspaceTabs.test.ts` (νέο, 5 tests) — order, active-flagging, clean-URL για
+  default, `?w=` carry-through + encoding, trim/non-string handling.
+- `components/saas/MembersPanel.tsx` (νέο, client) — roster (name/email + status/role badges),
+  role `<select>` + Remove ανά μέλος (owner/admin μόνο), pending-invites list + Revoke,
+  invite/add form (email + role). Κάθε mutation → route call με το chosen slug (`tenant` field,
+  ώστε `?w=` σωστό) → `router.refresh()`. `assignableRoles` κρύβει το owner από admins (mirror
+  του `canAssignRole`)· inline error/notice banner· `devToken` echo όταν το route το επιστρέφει
+  (dev, unwired mailer). Plain member → read-only roster (canManage false).
+- `app/(saas)/account/workspace/members/page.tsx` (νέο) — gate→viewer (logged-out → redirect
+  login)→`accountTenants` (empty → redirect /account/workspace empty-state)→`pickWorkspace`
+  (unknown `?w=` → `notFound()`)→`getTenantContext`. `loadMembers` (batched Account lookup, όχι
+  N+1, non-removed only) + `loadInvites` (pending, μόνο για owner/admin) parallel. Render
+  WorkspaceShell με tabs + MembersPanel.
+- `app/(saas)/account/workspace/page.tsx` (Overview — δικό μου) — πρόσθεσα `tabs=workspaceTabs
+  ('overview', w)` ώστε τα δύο panels να συνδέονται (μόνη additive αλλαγή, ίδιο μοτίβο).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run workspaceTabs.test.ts` →
+**5/5**· full suite `npx vitest run` → **1983/1983 green** (153 files, καμία regression).
+ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο νέα app/(saas)/account/workspace/members/** +
+components/saas/workspaceTabs*/MembersPanel + additive tabs στο δικό μου Overview page).
+`SAAS_MODE` off / self-hosted = **zero effect** (self-gates σε `notFound()` μέσω `getSaasViewer()`
+→`requireSaasUiEnabled()` πριν render). Κανένας Docker rebuild (additive gated segment + client/
+node modules, μηδέν shared runtime wiring)· καμία νέα εξάρτηση. Collision guard: μηδέν staged
+foreign files πριν το commit· foreign modified/untracked (search-actions/receiptSearch από άλλη
+routine) ΔΕΝ αγγίχτηκαν· isolated pathspec commit μόνο των δικών μου αρχείων.
+
+**## Needs Achilleas** (members panel):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η σελίδα (αλλιώς 404). Self-hosted
+  = disabled, zero risk.
+- **Email delivery για invites:** το invite-to-unregistered path μπαίνει σε λειτουργία μόνο με
+  configured mailer (SMTP)· χωρίς αυτό το route echo-άρει `devToken` σε dev (το panel το δείχνει)
+  και το drop-άρει σιωπηλά σε production. SMTP creds = ανοιχτό (γενικό SaaS Needs-Achilleas).
+- **Root-app landing μετά το login:** παραμένει ανοιχτό (increment 56)· οι tenants πάνε
+  χειροκίνητα στο /account/workspace[/members].
+
+**Next task:** increment 58 — είτε (α) **Billing** panel με τα checkout/portal action κουμπιά
+(client POST → api/saas/billing/checkout|portal· read state ήδη στο Overview), είτε (β)
+**email-verify / password-reset** UI (APIs έτοιμα), είτε (γ) **Usage** deep-dive panel/tab.

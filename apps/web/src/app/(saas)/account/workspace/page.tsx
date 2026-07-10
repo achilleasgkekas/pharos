@@ -19,6 +19,7 @@ import { currentUsage, aiQuotaStatus, storageQuotaStatus } from '@/lib/billing/u
 import { buildBillingSummary } from '@/lib/billing/billingSummary';
 import { stripeConfigured } from '@/lib/billing/stripe';
 import { pickWorkspace } from '@/components/saas/chooseWorkspace';
+import { workspaceTabs } from '@/components/saas/workspaceTabs';
 import { WorkspaceShell, Panel, DefRow } from '@/components/saas/WorkspaceShell';
 import { StatTile } from '@/components/saas/StatTile';
 import { formatInt, formatBytes, formatCostMicros, formatWhen } from '@/components/saas/format';
@@ -117,6 +118,7 @@ export default async function WorkspaceOverviewPage({
       plan={chosen.plan}
       status={chosen.status}
       role={chosen.role}
+      tabs={workspaceTabs('overview', w)}
       switchTargets={tenants.map((t) => ({
         slug: t.slug,
         name: t.name,
