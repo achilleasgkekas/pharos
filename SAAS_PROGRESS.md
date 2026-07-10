@@ -2278,3 +2278,57 @@ modules, μηδέν shared runtime wiring)· καμία νέα εξάρτηση.
 **Next task:** increment 56 — είτε (α) user-facing **workspace-settings** panels (members/billing/
 usage — όλα τα read/write control-plane APIs έτοιμα), είτε (β) **email-verify / password-reset**
 UI (APIs έτοιμα), είτε (γ) **workspace switcher** post-login landing (accountTenants έτοιμο).
+
+## 2026-07-10 (increment 56 — user-facing WORKSPACE OVERVIEW page: /account/workspace, §8 UI-first)
+**Το κενό:** το increment 55 έχτισε την (saas) auth UI (login/signup), αλλά μετά το sign-in
+ΔΕΝ υπήρχε κανένα user-facing workspace-settings σημείο — ο tenant δεν είχε πού να δει το
+workspace του, το plan/status, τη χρήση ή το billing. Τα read surfaces (`api/saas/workspace`,
+`/members`, `/usage`, `/billing`) ήταν έτοιμα εδώ και βδομάδες με ΜΗΔΕΝ UI. Έχτισα το πρώτο
+workspace-settings κομμάτι — **Workspace Overview** — καταναλώνοντας τους ήδη-χτισμένους readers
+κατευθείαν server-side (idiomatic SSR, η σελίδα είναι ήδη gated, όχι self-fetch, όπως τα /admin
+pages). ΟΛΟ additive, σε δικούς μου φακέλους:
+- `components/saas/chooseWorkspace.ts` (νέο) — **PURE + client-safe** workspace picker:
+  `normalizeSlug` (trim+lowercase, non-string→''), `pickWorkspace(tenants, want)` (empty→null·
+  blank want→first membership· matching slug case-insensitive· unknown want→null όπως τα READ
+  routes που κάνουν 403), `workspaceQuery(slug, isDefault)` (καθαρό URL για default, `?w=<slug>`
+  αλλιώς, URL-encoded).
+- `components/saas/chooseWorkspace.test.ts` (νέο, 11 tests) — normalize, pick-first-default,
+  case-insensitive select, unknown-slug→null, non-string want, query builder + encoding.
+- `components/saas/WorkspaceShell.tsx` (νέο, server-safe) — settings-page container: header με
+  workspace name + plan/status/role badges (reuse StatusBadge Pills), **workspace switcher**
+  (renders ΜΟΝΟ όταν >1 membership, `?w=` links), back-to-app + sign-out, optional tab bar.
+  + `Panel`/`DefRow` helpers. Styled ΜΟΝΟ με τα υπάρχοντα Pharos design tokens, μηδέν shared CSS.
+- `components/saas/SignOutButton.tsx` (νέο, client) — POST `/api/saas/auth/logout` (JSON, clears
+  httpOnly cookie) → full navigation στο `/account/login` ώστε το φρέσκο render να δει το cleared
+  cookie (plain form POST θα άφηνε τον χρήστη στο JSON body του route).
+- `app/(saas)/account/workspace/page.tsx` (νέο) — **Workspace Overview**: gate → viewer
+  (logged-out → `redirect(/account/login?next=…)`) → `accountTenants` (empty → "No workspace yet"
+  empty state) → `pickWorkspace` (unknown `?w=` → `notFound()`) → `getTenantContext` → parallel
+  load Tenant doc + active member count + `currentUsage`. Render: 4 StatTiles (Members / AI calls
+  με quota / Storage με quota / AI cost this month), Workspace panel (slug/domain/tier/created),
+  Plan & billing panel (`buildBillingSummary`: plan/price/subscription/trial/included AI+storage
+  + read-only CTA note), Usage panel (`aiQuotaStatus`/`storageQuotaStatus` + tokens + cost +
+  "metering inactive" note). ΟΛΑ τα numbers μέσα από τους defensive formatters (#53).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run chooseWorkspace.test.ts` →
+**11/11**· full suite `npx vitest run` → **1944/1944 green** (150 files, καμία regression).
+ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο νέα app/(saas)/account/workspace/** +
+components/saas/chooseWorkspace*/WorkspaceShell/SignOutButton). `SAAS_MODE` off / self-hosted =
+**zero effect** (η σελίδα self-gates σε `notFound()` μέσω `getSaasViewer()`→`requireSaasUiEnabled()`
+πριν render). Κανένας Docker rebuild (additive gated segment, μηδέν shared runtime wiring)· καμία
+νέα εξάρτηση. Collision guard: μηδέν staged foreign files πριν το commit· foreign modified/untracked
+(search-actions/receiptSearch/categoryRules κ.λπ. από άλλες routines) ΔΕΝ αγγίχτηκαν· isolated
+pathspec commit μόνο των δικών μου αρχείων.
+
+**## Needs Achilleas** (workspace overview):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η σελίδα (αλλιώς 404). Self-hosted
+  = disabled, zero risk.
+- **Billing actions (checkout/portal):** η σελίδα δείχνει το billing state read-only + CTA note·
+  τα κουμπιά που καλούν `api/saas/billing/checkout|portal` (client POST) = ξεχωριστό increment.
+- **Root-app landing μετά το login:** το `next` default = `/`, που gate-άρεται από per-tenant
+  `User` session (self-hosted). Πώς φαίνεται το `/` για signed-in Account = ακόμα ανοιχτό· προς
+  το παρόν οι tenants πάνε χειροκίνητα στο `/account/workspace`.
+
+**Next task:** increment 57 — είτε (α) **Members** panel (list + role-change/remove/invite,
+read/write control-plane έτοιμο· client interactivity), είτε (β) **Billing** panel με τα
+checkout/portal action κουμπιά, είτε (γ) **email-verify / password-reset** UI (APIs έτοιμα).
