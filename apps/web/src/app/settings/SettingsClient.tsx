@@ -1,12 +1,14 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus } from 'lucide-react';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, suggestBudgets, saveAssetAccounts, saveDepreciation, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
+import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
+import type { CategoryRule } from '@/lib/categoryRules';
 import { AI_FEATURES } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, SCRAPER_RECOMMEND, type FetchedModel } from '@/lib/aiModels';
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
@@ -219,6 +221,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
           {tab === 'money' && (
             <>
               <BudgetsManager settings={info.settings} />
+              <CategoryRulesManager settings={info.settings} />
               <AssetAccountsManager settings={info.settings} />
               <DepreciationManager settings={info.settings} />
               <CardsManager cards={info.cardList} />
@@ -1559,6 +1562,125 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
 
 /** Manual asset accounts (cash, bank balances) counted into net worth (PA2).
  *  Free-form name + balance rows — no bank integration, the user updates by hand. */
+/** Vendor→category auto-rules (P15). Deterministic (zero AI): "if the vendor/description
+ *  matches X → category Y (+ optional recurring)". Applied to every new expense/income on
+ *  create; "Apply to existing" retro-tags uncategorised records. */
+type RuleRow = {
+  match: string;
+  matchType: 'vendor' | 'text';
+  category: string;
+  recurring: boolean;
+  recurringCycle: '' | 'monthly' | 'quarterly' | 'yearly' | 'weekly';
+};
+
+function CategoryRulesManager({ settings }: { settings: AppSettings }) {
+  const t = useT();
+  const [pending, startTransition] = useTransition();
+  const [applying, setApplying] = useState(false);
+  const [rows, setRows] = useState<RuleRow[]>(() =>
+    (settings.categoryRules as CategoryRule[]).map((r) => ({
+      match: r.match,
+      matchType: r.matchType,
+      category: r.category,
+      recurring: r.recurring,
+      recurringCycle: r.recurringCycle,
+    }))
+  );
+  const [msg, setMsg] = useState<string | null>(null);
+  const cats = settings.expenseCategories;
+  const cellCls =
+    'bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]';
+
+  function set(i: number, patch: Partial<RuleRow>) {
+    setRows((p) => p.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  }
+
+  function save() {
+    setMsg(null);
+    const clean = rows.filter((r) => r.match.trim() && r.category.trim());
+    startTransition(async () => {
+      await saveCategoryRules(clean);
+      setRows(clean);
+      setMsg(t('common.savedOk'));
+    });
+  }
+
+  function applyExisting() {
+    setMsg(null);
+    setApplying(true);
+    (async () => {
+      try {
+        // Persist first so the server applies exactly what's on screen.
+        await saveCategoryRules(rows.filter((r) => r.match.trim() && r.category.trim()));
+        const res = await applyCategoryRulesToExisting();
+        setMsg(res.ok ? t('set.rulesApplied', { n: res.updated }) : res.error || 'Error');
+      } finally {
+        setApplying(false);
+      }
+    })();
+  }
+
+  return (
+    <Section title={t('set.rulesTitle')} icon={<Tags size={15} />}>
+      <p className="text-xs text-[color:var(--color-text-dim)] mb-3">{t('set.rulesDesc')}</p>
+      <div className="space-y-2">
+        {rows.length === 0 && <p className="text-[11px] text-[color:var(--color-text-faint)]">{t('set.rulesEmpty')}</p>}
+        {rows.map((r, i) => (
+          <div key={i} className="flex flex-wrap items-center gap-2">
+            <input
+              value={r.match}
+              onChange={(e) => set(i, { match: e.target.value })}
+              placeholder={t('set.rulesMatchPlaceholder')}
+              className={`${cellCls} flex-1 min-w-[120px]`}
+            />
+            <select value={r.matchType} onChange={(e) => set(i, { matchType: e.target.value as RuleRow['matchType'] })} className={cellCls} title={t('set.rulesMatchType')}>
+              <option value="vendor">{t('set.rulesMatchVendor')}</option>
+              <option value="text">{t('set.rulesMatchText')}</option>
+            </select>
+            <span className="text-[color:var(--color-text-faint)] text-xs">→</span>
+            <select value={r.category} onChange={(e) => set(i, { category: e.target.value })} className={cellCls}>
+              <option value="">{t('set.rulesPickCategory')}</option>
+              {cats.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+              {r.category && !cats.includes(r.category) && <option value={r.category}>{r.category}</option>}
+            </select>
+            <label className="flex items-center gap-1 text-[11px] text-[color:var(--color-text-dim)]" title={t('set.rulesRecurringHint')}>
+              <input type="checkbox" checked={r.recurring} onChange={(e) => set(i, { recurring: e.target.checked })} />
+              {t('set.rulesRecurring')}
+            </label>
+            {r.recurring && (
+              <select value={r.recurringCycle} onChange={(e) => set(i, { recurringCycle: e.target.value as RuleRow['recurringCycle'] })} className={cellCls}>
+                <option value="">{t('set.rulesCycleAny')}</option>
+                <option value="weekly">{t('sub.weekly')}</option>
+                <option value="monthly">{t('sub.monthly')}</option>
+                <option value="quarterly">{t('sub.quarterly')}</option>
+                <option value="yearly">{t('sub.yearly')}</option>
+              </select>
+            )}
+            <button onClick={() => setRows((p) => p.filter((_, j) => j !== i))} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" title={t('common.delete')}>
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3 mt-3 flex-wrap">
+        <button onClick={() => setRows((p) => [...p, { match: '', matchType: 'vendor', category: '', recurring: false, recurringCycle: '' }])} className="flex items-center gap-1 text-xs text-[color:var(--color-cyan)] hover:text-[color:var(--color-accent)]">
+          <Plus size={13} /> {t('set.rulesAdd')}
+        </button>
+        <button onClick={save} disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
+          {pending ? t('common.saving') : t('set.rulesSave')}
+        </button>
+        <button onClick={applyExisting} disabled={applying || rows.length === 0} title={t('set.rulesApplyHint')} className="text-xs px-3 py-1.5 rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-border-light)] disabled:opacity-50 inline-flex items-center gap-1.5">
+          {applying ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          {t('set.rulesApply')}
+        </button>
+        {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
+      </div>
+    </Section>
+  );
+}
+
 function AssetAccountsManager({ settings }: { settings: AppSettings }) {
   const t = useT();
   const [pending, startTransition] = useTransition();

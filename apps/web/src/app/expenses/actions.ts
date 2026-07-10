@@ -11,6 +11,7 @@ import { ocrImage, looksLikeUsableOcr } from '@/lib/ocr';
 import { pdfFirstPageJpeg } from '@/lib/pdfThumb';
 import { safeDate } from '@/lib/dates';
 import { getAppSettings } from '@/lib/appSettings';
+import { matchCategoryRule } from '@/lib/categoryRules';
 import { mirrorFileToRemote } from '@/lib/mirror';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -227,17 +228,20 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
     const vendor = parsed?.vendor || '';
     const vKey = vendorKey(vendor);
     const inherited = await inheritFromSeries(kind, vKey);
+    // Deterministic vendor→category auto-rule (P15). A user-defined rule is an explicit
+    // instruction, so it wins over the AI guess and any inherited series category.
+    const rule = matchCategoryRule((await getAppSettings()).categoryRules, { vendor });
     const exp = await Expense.create({
       kind: parsed?.kind || kind,
       vendor,
       vendorKey: vKey,
-      category: parsed?.category || inherited?.category || 'other',
+      category: rule?.category || parsed?.category || inherited?.category || 'other',
       amount: parsed?.amount ?? 0,
       currency: parsed?.currency || 'EUR',
       date,
       period: periodFrom(date, parsed?.period),
-      recurring: inherited?.recurring ?? false,
-      recurringCycle: (parsed?.recurringCycle || inherited?.recurringCycle || '') as '' | 'monthly' | 'quarterly' | 'yearly' | 'weekly',
+      recurring: rule?.recurring || inherited?.recurring || false,
+      recurringCycle: (rule?.recurringCycle || parsed?.recurringCycle || inherited?.recurringCycle || '') as '' | 'monthly' | 'quarterly' | 'yearly' | 'weekly',
       paymentMethod: parsed?.paymentMethod || '',
       filePath: relativePath,
       fileType: file.type || (isPdf ? 'application/pdf' : `image/${ext}`),
@@ -323,17 +327,21 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
     const Expense = await currentModel(ExpenseModel);
     const date = safeDate(d.date);
     const inherited = await inheritFromSeries(d.kind, vendorKey(d.vendor));
+    // Apply a vendor→category auto-rule (P15) only when the user did NOT pick a category
+    // (the form defaults to 'other'); an explicit choice always wins.
+    const explicit = d.category && d.category !== 'other' ? d.category : '';
+    const rule = explicit ? null : matchCategoryRule((await getAppSettings()).categoryRules, { vendor: d.vendor, description: d.notes });
     const exp = await Expense.create({
       kind: d.kind,
       vendor: d.vendor,
       vendorKey: vendorKey(d.vendor),
-      category: d.category || inherited?.category || 'other',
+      category: explicit || rule?.category || inherited?.category || 'other',
       amount: d.amount,
       currency: d.currency,
       date,
       period: d.period || periodFrom(date),
-      recurring: d.recurring || inherited?.recurring || false,
-      recurringCycle: d.recurringCycle || (inherited?.recurringCycle as typeof d.recurringCycle) || '',
+      recurring: d.recurring || rule?.recurring || inherited?.recurring || false,
+      recurringCycle: d.recurringCycle || rule?.recurringCycle || (inherited?.recurringCycle as typeof d.recurringCycle) || '',
       paymentMethod: d.paymentMethod,
       notes: d.notes,
       verified: true,
@@ -431,23 +439,28 @@ export async function importExpensesCsv(
         return inheritCache.get(k) ?? null;
       }
 
+      // Vendor→category auto-rules (P15) — loaded once, applied to rows without an
+      // explicit CSV category (deterministic, zero AI, same as the rest of the import).
+      const categoryRules = (await getAppSettings()).categoryRules;
+
       const docs = [];
       let skippedDupes = 0;
       for (const r of prepared) {
         if (seen.has(r.key)) { skippedDupes++; continue; }
         seen.add(r.key); // intra-batch dedupe too
         const inh = r.category ? null : await inherited(r.kind, r.vKey);
+        const rule = r.category ? null : matchCategoryRule(categoryRules, { vendor: r.vendor, description: r.notes });
         const date = new Date(`${r.date}T00:00:00Z`);
         docs.push({
           kind: r.kind,
           vendor: r.vendor,
           vendorKey: r.vKey,
-          category: r.category || inh?.category || 'other',
+          category: r.category || rule?.category || inh?.category || 'other',
           amount: r.amount,
           date,
           period: periodFrom(date),
-          recurring: inh?.recurring ?? false,
-          recurringCycle: (inh?.recurringCycle || '') as '' | 'monthly' | 'quarterly' | 'yearly' | 'weekly',
+          recurring: rule?.recurring || inh?.recurring || false,
+          recurringCycle: (rule?.recurringCycle || inh?.recurringCycle || '') as '' | 'monthly' | 'quarterly' | 'yearly' | 'weekly',
           notes: r.notes,
           aiModel: 'csv-import',
           verified: true, // deterministic bank data, not an AI guess — no review queue
@@ -500,5 +513,43 @@ export async function rescanExpense(id: string, useOcr: boolean): Promise<{ ok: 
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }
+  });
+}
+
+/**
+ * Apply the vendor→category auto-rules (P15) to EXISTING uncategorised records
+ * (category 'other' or empty). Forward rule-matching happens on create; this is the
+ * one-off "apply to what I already have" the user triggers from Settings. Deterministic,
+ * zero AI. Returns how many records were recategorised.
+ */
+export async function applyCategoryRulesToExisting(): Promise<{ ok: boolean; updated: number; error?: string }> {
+  return withRequestTenant(async () => {
+    try {
+      await connectDB();
+      const rules = (await getAppSettings()).categoryRules;
+      if (!rules.length) return { ok: true, updated: 0 };
+      const Expense = await currentModel(ExpenseModel);
+      const rows = await Expense.find({ $or: [{ category: 'other' }, { category: '' }, { category: { $exists: false } }] })
+        .select('vendor notes category recurring recurringCycle')
+        .lean();
+      const ops: Array<{ updateOne: { filter: { _id: unknown }; update: { $set: Record<string, unknown> } } }> = [];
+      for (const r of rows) {
+        const rule = matchCategoryRule(rules, { vendor: r.vendor, description: r.notes });
+        if (!rule || rule.category === r.category) continue;
+        const set: Record<string, unknown> = { category: rule.category };
+        if (rule.recurring && !r.recurring) {
+          set.recurring = true;
+          if (rule.recurringCycle) set.recurringCycle = rule.recurringCycle;
+        }
+        ops.push({ updateOne: { filter: { _id: r._id }, update: { $set: set } } });
+      }
+      if (ops.length) await Expense.bulkWrite(ops);
+      revalidatePath('/expenses');
+      revalidatePath('/income');
+      revalidatePath('/reports');
+      return { ok: true, updated: ops.length };
+    } catch (err) {
+      return { ok: false, updated: 0, error: (err as Error).message };
+    }
   });
 }

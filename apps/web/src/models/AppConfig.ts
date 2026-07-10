@@ -54,6 +54,12 @@ const AppConfigSchema = new Schema(
     // Monthly budget per expense category. Map category → € amount.
     budgets: { type: Schema.Types.Mixed, default: {} },
 
+    // Vendor→category auto-rules (P15). Array of
+    // { id, match, matchType:'vendor'|'text', category, recurring, recurringCycle }.
+    // Applied deterministically (zero AI) to every new expense/income on create.
+    // See lib/categoryRules.ts.
+    categoryRules: { type: [Schema.Types.Mixed], default: [] },
+
     // Manual asset accounts for net worth (PA2). Map account name → balance
     // (cash, bank accounts — no integration, the user updates balances by hand).
     assetAccounts: { type: Schema.Types.Mixed, default: {} },

@@ -14,6 +14,7 @@ import {
   DEFAULT_SUBSCRIPTION_CATEGORIES,
 } from './taxonomies';
 import { resolveDepreciation, DEFAULT_DEPRECIATION, type DepreciationConfig } from './depreciation';
+import { resolveCategoryRules, type CategoryRule } from './categoryRules';
 
 export type AppSettings = {
   defaultItemView: 'grid' | 'list';
@@ -31,6 +32,7 @@ export type AppSettings = {
   budgets: Record<string, number>; // monthly budget per expense category (€)
   assetAccounts: Record<string, number>; // manual asset accounts for net worth (name → balance)
   depreciation: DepreciationConfig; // asset depreciation model (P29) for owned-inventory valuation
+  categoryRules: CategoryRule[]; // vendor→category auto-rules (P15), applied on create
 };
 
 /** Raw AppConfig singleton fields relevant to app settings (all optional). */
@@ -48,6 +50,7 @@ export type RawAppConfigDoc = {
   budgets?: Record<string, unknown>;
   assetAccounts?: Record<string, unknown>;
   depreciation?: Record<string, unknown>;
+  categoryRules?: unknown;
 };
 
 /** Coerce a Mixed map to { key: positiveNumber }. */
@@ -78,6 +81,7 @@ const DEFAULTS: AppSettings = {
   budgets: {},
   assetAccounts: {},
   depreciation: DEFAULT_DEPRECIATION,
+  categoryRules: [],
 };
 
 // Cache keyed by tenant. Default/self-hosted tenant uses the '' key so its behaviour and
@@ -113,6 +117,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     budgets: numMap(doc?.budgets),
     assetAccounts: numMap(doc?.assetAccounts),
     depreciation: resolveDepreciation(doc?.depreciation),
+    categoryRules: resolveCategoryRules(doc?.categoryRules),
   };
 }
 
@@ -128,7 +133,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     // untouched, same query as before).
     const Config = await currentModel(AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets assetAccounts depreciation')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets assetAccounts depreciation categoryRules')
       .lean();
   } catch {
     /* DB down → hard defaults */

@@ -58,6 +58,7 @@ describe('normalizeSettings', () => {
       budgets: {},
       assetAccounts: {},
       depreciation: resolveDepreciation(undefined),
+      categoryRules: [],
     };
     expect(normalizeSettings(null)).toEqual(expected);
     expect(normalizeSettings(undefined)).toEqual(expected);

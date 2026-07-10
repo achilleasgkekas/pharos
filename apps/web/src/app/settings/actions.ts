@@ -40,6 +40,7 @@ import { Types } from 'mongoose';
 import { getStores, invalidateStoreCache, type StoreLite } from '@/lib/storeService';
 import { effectiveReturnWindow, returnDaysLeft } from '@/lib/returnWindow';
 import { suggestBudgetsFromExpenses, type BudgetExpenseRow } from '@/lib/budgetSuggest';
+import { resolveCategoryRules } from '@/lib/categoryRules';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import { anthropicTest } from '@/lib/anthropic';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
@@ -1006,6 +1007,17 @@ export async function saveBudgets(budgets: Record<string, number>): Promise<{ ok
   await AppConfig.updateOne({ key: 'singleton' }, { $set: { budgets: clean } }, { upsert: true });
   invalidateAppSettings();
   revalidatePath('/reports');
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
+/** Save the vendor→category auto-rules (P15). Cleaned/validated via resolveCategoryRules
+ *  (drops entries missing a match or category). Applied on create by the expense actions. */
+export async function saveCategoryRules(rules: unknown): Promise<{ ok: boolean }> {
+  await connectDB();
+  const clean = resolveCategoryRules(rules);
+  await AppConfig.updateOne({ key: 'singleton' }, { $set: { categoryRules: clean } }, { upsert: true });
+  invalidateAppSettings();
   revalidatePath('/settings');
   return { ok: true };
 }

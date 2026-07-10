@@ -115,13 +115,16 @@ _(κενό — P27-P31 εγκρίθηκαν 2026-07-09· ο planner προσθέ
 - **Module:** Expenses (vendorKey series) + Notifications (bell + ntfy). **Σημείωση:** τα Subscriptions κρατούν
   μία τρέχουσα τιμή (χωρίς ιστορικό) → η ανίχνευση τρέχει πάνω στις Expense σειρές που έχουν τα ανά-κύκλο ποσά.
 
-### P15. Vendor→category auto-rules (ντετερμινιστικοί κανόνες κατηγοριοποίησης) — S/M — both (πολύ ψηλό value/effort)
-- **Αξία:** rules engine «αν vendor/description περιέχει X → category Y (+ optional tax flag / recurring)»
-  αυτόματα σε κάθε νέο έξοδο/απόδειξη/transaction. **Ντετερμινιστικό, μηδέν AI κόστος** (offline, δωρεάν παντού).
-  «Learn from this» όταν ο χρήστης αλλάζει κατηγορία → προτείνει κανόνα. Reuse vendorKey normalization.
-- **Module:** Expenses/Receipts/Statements (+ Settings για τη διαχείριση κανόνων).
-- **Ανοιχτή απόφαση (builder default):** match σε vendorKey (κανονικοποιημένο) πρώτα, raw/regex advanced·
-  κανόνες forward + optional «apply to existing uncategorised».
+### P15. Vendor→category auto-rules (ντετερμινιστικοί κανόνες κατηγοριοποίησης) — ✅ SHIPPED 2026-07-11 (pharos-daily-dev)
+- **Υλοποίηση:** pure `lib/categoryRules.ts` (resolve/match, reuse vendorKey normalization, +20 unit tests) +
+  AppConfig `categoryRules[]` + appSettings resolve + wiring στο category-resolution chain των **Expenses**
+  (uploadExpense scan / addExpense manual / importExpensesCsv) + Settings → Money `CategoryRulesManager`
+  (match + vendor/text mode + category + recurring/cycle) + `saveCategoryRules` + `applyCategoryRulesToExisting`
+  (retro-tag uncategorised) + en/el i18n. Builder defaults: rule wins πάνω από AI-guess & inherited στα scans·
+  στο manual add εφαρμόζεται μόνο όταν ο χρήστης ΔΕΝ διάλεξε κατηγορία· match σε vendorKey (default) ή raw text.
+  Scope MVP = Expenses (το μόνο module με πεδίο `category` + vendorKey)· Receipts/Statements categorisation =
+  follow-up (δεν έχουν σήμερα έννοια category). «Learn from this» suggestion = follow-up. Commit TBD.
+- **Module:** Expenses (+ Settings για τη διαχείριση κανόνων).
 
 ### P18. Receipt ↔ statement transaction reconciliation (auto-match) — S/M — both (πολύ ψηλό value/effort)
 - **Αξία:** auto-match (κατάστημα/ποσό/ημερομηνία ±μέρες) απόδειξης ↔ statement transaction: «αυτή η €287
