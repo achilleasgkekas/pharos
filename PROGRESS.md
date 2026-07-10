@@ -3,7 +3,46 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: c11d296 -->
-<!-- docker-validated: 163a0ab -->
+<!-- docker-validated: 20bd514 -->
+
+## 2026-07-10 (pharos-daily-dev — P29 asset depreciation model για αξία inventory)
+- **Τι έκανα:** έχτισα το Approved item **P29** (asset depreciation). Η αξία των owned items έμενε «κολλημένη»
+  στην τιμή αγοράς για πάντα → το PA2 net-worth (και μελλοντικά το P13 insurance export) **υπερεκτιμούσαν** τον
+  παλιό εξοπλισμό (π.χ. RTX 5080 στην αρχική τιμή μετά από χρόνια). Τώρα η αξία owned inventory στα Reports είναι
+  **estimated current value**: declining-balance `value = price * (1-rate)^years`, floored σε salvage %, με
+  ρυθμιζόμενο ετήσιο ρυθμό ανά κατηγορία. **Ντετερμινιστικό, μηδέν AI, computed-on-read** (όπως το expense `anomaly`),
+  τίποτα stored.
+- **Approved-queue check:** OWNER_DECISIONS #8 (PA1/PA2/PA3) όλα SHIPPED, P27 SHIPPED χθες. Το κορυφαίο «πολύ ψηλό
+  value/effort» P22 έχει ακόμα uncommitted WIP στο tree (`receiptSearch.*`/`search-actions.ts` staged από άλλο routine)
+  → το απέφυγα για collision. P28 (bill tracker) = ολόκληρο νέο module (M, νέο Bill model + lifecycle + calendar +
+  alerts) → πολύ μεγάλο για ένα καθαρό run. Διάλεξα **P29** (S/M, self-contained, ενισχύει το ήδη-shipped PA2).
+- **Locked defaults (OWNER builder default):** default rates ανά κατηγορία (network 15%, storage 20%, compute 25%,
+  audio 12%, video 20%, mobile 25%, peripheral 18%, consumable 50%, other 15% — editable στο Settings), floor **10%**
+  salvage, default fallback rate **15%**, **enabled=true** (το feature θα ήταν no-op αλλιώς· ρητός toggle στο Settings
+  για off). **Manual override wins:** μια χειροκίνητη τρέχουσα αξία σε item υπερισχύει — αλλά ΜΟΝΟ όταν το `currentPrice`
+  είναι θετικό ΚΑΙ διαφέρει από το `purchasedPrice`. Κρίσιμο εύρημα: το receipt→item import βάζει
+  `currentPrice === purchasedPrice` (grossUnit) ως seed, οπότε ένας αφελής κανόνας «currentPrice wins» θα μπλόκαρε
+  την απόσβεση για τα ΠΕΡΙΣΣΟΤΕΡΑ owned items· ο `Math.abs(cp-pp) > 0.005` guard τα αφήνει να αποσβένονται.
+- **Design (testable):** νέο pure **`lib/depreciation.ts`** (`resolveDepreciation`, `rateForCategory`,
+  `depreciatedValue`, `estimatedItemValue`, DB-free). `AppConfig.depreciation` (Mixed) + `appSettings.depreciation`
+  (resolved μέσω `resolveDepreciation`, merge stored rates πάνω στα defaults). Reports: `estimatedItemValue(i, cfg, now)`
+  για το ownedValue (τροφοδοτεί net-worth snapshot + inventory-by-category pie)· πρόσθεσα `purchasedAt` στο select.
+  Settings: `saveDepreciation()` action + `DepreciationManager` UI (toggle + floor + default rate + per-category grid)
+  στο Money tab. i18n keys σε **en + el**. **Disabled → byte-for-byte το παλιό `purchasedPrice ?? currentPrice ?? 0`.**
+- **Verify:** `npm run type-check` → **EXIT 0**. Νέο `depreciation.test.ts` → **16/16** (resolve/clamp/merge, declining
+  balance 1yr/2yr, floor, same-day/future no-appreciation, missing/invalid date, 0% rate, receipt-seed depreciates,
+  genuine override wins, disabled=old-formula). Ενημέρωσα το `appSettings.test.ts` (shape +depreciation) → 19/19.
+  **Full suite: 140 files / 1831 tests pass.** **Safe Docker rebuild** (άγγιξα web runtime): mutex acquired, mongo
+  `healthy` πριν+μετά, `docker compose build web` (image-only, Built), `up -d web` → `/login` **200** (1η προσπάθεια),
+  RestartCount **0**, OOM **false**, `/reports`+`/settings` **307** (auth redirect, όχι 500). `docker builder prune -f`
+  → **2.137GB** cache ανακτημένα. Lock released, flaresolverr παρέμεινε exited. **Κανένα AI call.**
+- **Git hygiene:** commit ΜΟΝΟ τα 10 δικά μου paths με explicit `git commit -- <paths>` (partial commit) ώστε να ΜΗΝ
+  committαριστούν τα προ-staged ξένα P22 αρχεία (`receiptSearch.*`, `search-actions.ts`) — παρέμειναν staged/ανέγγιχτα.
+  Commit `20bd514`. Μαρκάρισα P29 done στο `PRODUCT_BACKLOG.md` (ήταν clean εκτός των P22 staged).
+- **Προτεινόμενο επόμενο task:** **follow-up P29 surface** — δείξε το depreciated est. value ως chip στην κάρτα owned
+  item (ItemCard/ItemsClient· `estimatedItemValue` computed-on-read, ίδιο pattern με anomaly) ώστε να φαίνεται και
+  εκτός Reports· ΚΑΙ expose στο `/api/v1/items` + PA2 mobile. Ή **P28** bill/payable tracker (μεγαλύτερο, νέο module).
+  Απόφευγε P22 όσο τα `receiptSearch.*` μένουν uncommitted.
 
 ## 2026-07-10 (pharos-daily-dev — P27 suggested budgets από ιστορικό δαπανών)
 - **Τι έκανα:** έχτισα το Approved item **P27** (Suggest budgets from spending history). Το στήσιμο budgets ήταν

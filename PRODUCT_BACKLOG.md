@@ -52,7 +52,7 @@ _(κενό — P27-P31 εγκρίθηκαν 2026-07-09· ο planner προσθέ
 - **Ανοιχτή απόφαση (builder default):** recurring bill templates → auto-generate pending instances ανά κύκλο· «mark paid»
   δημιουργεί expense (opt-in link)· overdue = due date πέρασε & όχι paid.
 
-### P29. Asset depreciation model για αξία inventory — S/M — both (ενισχύει PA2/P13)
+### P29. Asset depreciation model για αξία inventory — ✅ SHIPPED 2026-07-10 (pharos-daily-dev)
 - **Αξία:** η αξία των owned assets μένει «κολλημένη» στην τιμή αγοράς εκτός αν την ενημερώνεις χειροκίνητα → net-worth
   (PA2) και insurance export (P13) υπερεκτιμούν. Απλό depreciation curve ανά κατηγορία (π.χ. electronics −X%/έτος,
   straight-line ή declining) → computed «estimated current value» από ημ. αγοράς. Ντετερμινιστικό, μηδέν AI, reuse purchasedPrice/date.
