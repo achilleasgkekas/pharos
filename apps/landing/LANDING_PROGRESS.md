@@ -1837,3 +1837,40 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-10 (cont.⁹) — (e) polish/content: Statements += receipt reconciliation (P18), Expenses += budget envelope rollover (P25)
+
+Increment (e) polish, content-accuracy micro-pass. Δυο modules απεκτησαν shipped δυνατοτητες στο κυριο app
+(git log) που το landing FEATURES ΔΕΝ αντικατοπτριζε:
+- Statements: receipt <-> transaction reconciliation (P18, commit 07fba9f) — deterministic auto-SUGGEST
+  match αποδειξεων στις χρεωσεις ενος εκκαθαριστικου (ποσο ±€0.02, ημερομηνια ±3 μερες), με confirm.
+- Expenses: budget envelope / rollover mode (P25, commit 9dabfe9) — opt-in carry του net-unspent budget
+  καθε κατηγοριας απο προηγουμενους μηνες στον τρεχοντα (classic per-month budgets μενει το default).
+
+Αλλαγες (app/page.tsx, FEATURES array μονο, μηδεν UI/CSS/dependency/bundle change):
+- Statements desc: «...merge the same purchase across months. Always know what you still owe.» ->
+  «...merge the same purchase across months. Reconcile charges against your receipts, and always know what
+  you still owe.»
+- Expenses desc: «...Budgets per category.» -> «...Budgets per category, with optional envelope rollover so
+  an unspent month carries forward.»
+Και τα δυο ακριβη σε real-shipped features (οχι roadmap). Δεν αγγιξα ROADMAP/FAQ/Pricing/JSON-LD.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (/ route αμεταβλητο, copy-only, μηδεν bundle impact).
+- Prerender (.next/server/app/index.html): «Reconcile charges against your receipts» + «envelope rollover so
+  an unspent month carries forward» -> και τα δυο present. Content/non-visual -> verified στο static output
+  (separate non-Docker app, δεν σηκωσα preview server).
+- em-dash: 0 σε ολο το page.tsx (commas μονο). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (page.tsx + αυτο το log) μεσω explicit pathspec· collision guard
+  πριν το commit.
+
+Επομενο increment: (e) polish συνεχεια — reconciliation ισως αξιζει και μια FAQ γραμμη («does it match my
+receipts to card charges?»)· ή annual Offers στα per-tier Pricing aria labels· ή real app screenshots οταν
+υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

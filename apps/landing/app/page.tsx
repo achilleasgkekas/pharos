@@ -53,13 +53,13 @@ const FEATURES: {
     icon: 'wallet',
     color: 'var(--gold)',
     title: 'Expenses & income',
-    desc: 'Bills and payslips scanned, recurring series auto-detected, anomaly flags when a vendor charges more than usual. Budgets per category.',
+    desc: 'Bills and payslips scanned, recurring series auto-detected, anomaly flags when a vendor charges more than usual. Budgets per category, with optional envelope rollover so an unspent month carries forward.',
   },
   {
     icon: 'card',
     color: 'var(--purple)',
     title: 'Statements & installments',
-    desc: 'Import credit-card PDFs, parse installment plans, and merge the same purchase across months. Always know what you still owe.',
+    desc: 'Import credit-card PDFs, parse installment plans, and merge the same purchase across months. Reconcile charges against your receipts, and always know what you still owe.',
   },
   {
     icon: 'calendar',
