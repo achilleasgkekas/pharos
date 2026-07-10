@@ -36,14 +36,17 @@ _(κενό — P32-P36 εγκρίθηκαν 2026-07-10· ο planner προσθέ
 > Εξαρτήσεις: P5/P17/P23 δένουν με `/api/v1` (§5) + mobile MVP (§6)· P6 feed βοηθά το PA3/P20.
 > **Νεοεγκεκριμένα 2026-07-10 (interactive):** P33, P32, P34, P35, P36 (ranked value/effort· P36 τελευταίο, L).
 
-### P33. Free-trial / cancel-before-charge reminder — S/M — both (χρημοανταλλακτικό, ψηλό value/effort)
-- **Αξία:** το πιο άμεσο money-saver που λείπει: μια συνδρομή σε **δωρεάν δοκιμή** που αυτο-μετατρέπεται σε πληρωμένη.
-  Πεδίο `trialEndsAt` (+ optional `firstChargeAmount`) σε Subscription → alert «η δοκιμή X λήγει σε 2 μέρες, θα χρεωθείς €Y —
-  ακύρωσε ή κράτησέ την». **Διακριτό** από P7 (discover *untracked*), P14 (ανατίμηση *υπάρχουσας*), P28 (manual bills):
-  εδώ το event είναι «trial → paid conversion», που κανένα module δεν πιάνει.
-- **Module:** Subscriptions (+ Notifications bell/ntfy, reuse `runAlertChecks`/`dispatchAlert` + `computeAlerts` NotifKind).
-- **Ανοιχτή απόφαση (builder default):** ένα νέο `trialend` NotifKind· lead-time = 2 μέρες πριν (ρυθμιζόμενο)· ντετερμινιστικό,
-  μηδέν AI, μηδέν migration πέρα από 1-2 optional πεδία στο Subscription.
+### P33. Free-trial / cancel-before-charge reminder — ✅ SHIPPED 2026-07-12 (pharos-daily-dev, commit bfd96ba)
+- **Υλοποίηση:** `Subscription.trialEndsAt` (Date|null) + optional `firstChargeAmount` (auto-serialized). Νέο **`trialend`
+  NotifKind** (Notification enum + NotifKind union + AUTO_KINDS): `computeAlerts` → active subs με `trialEndsAt` εντός
+  lead-time window (days≥0 && ≤`trialAlertDays`)· dedupeKey `trialend:<id>:<date>` (re-alert αν μετακινηθεί η ημ.,
+  auto-expire αφού περάσει). Bell = AlarmClock/purple + `notif.trialSub`/`trialTodaySub` (en+el). ntfy γραμμή στο
+  `runAlertChecks` («⏳ N free trial(s) ending ≤Xd: …»). SubForm πεδία «Free trial ends» (date) + «First charge»
+  (fallback στο recurring amount). **Lead-time ρυθμιζόμενο** (όπως ζητούσε το backlog): `AppConfig.trialAlertDays`
+  (default 2) + appSettings (+2 test assertions) + Settings → Defaults input + `saveDefaults` (0 = off). Ντετερμινιστικό,
+  μηδέν AI. Verify: type-check EXIT 0, vitest 1978 passed. **Follow-up:** τα νέα πεδία δεν εκτίθενται ακόμα στο v1
+  mobile API (`trim()` shape) → mobile-parity item. Docker serve-check pending (VM contention).
+- **Module:** Subscriptions (+ Notifications bell/ntfy).
 
 ### P32. Gift-card / store-credit balance tracker (υπόλοιπα που φθίνουν) — S/M — both
 - **Αξία:** πραγματικό κενό — τα Vouchers είναι **coupons** (% έκπτωση/κωδικός) και το P20 είναι **loyalty barcode**· κανένα

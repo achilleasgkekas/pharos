@@ -5,6 +5,44 @@
 <!-- reviewed: 65b81a2 -->
 <!-- docker-validated: f8f345c -->
 
+## 2026-07-12 (pharos-daily-dev — P33 free-trial cancel-before-charge reminder SHIPPED, interactive «go on»)
+
+**Τι έγινε**: Δεύτερο item του ίδιου session (ο Αχιλλέας παρών, «go on»). Έχτισα το **P33 (free-trial / cancel-before-charge
+reminder)**, το ranked-πρώτο από τα νεοεγκεκριμένα (2026-07-10) Approved items (S/M, «ψηλό value/effort»). Commit
+`bfd96ba` (pushed). Ο πιο άμεσος money-saver: μια συνδρομή σε δωρεάν δοκιμή που αυτο-μετατρέπεται σε πληρωμένη →
+ειδοποίηση πριν χρεωθείς.
+
+Τι μπήκε (reuse του notification framework, ίδιο pattern με P14 price-hike):
+- **Subscription model**: `+trialEndsAt` (Date|null) `+firstChargeAmount` (optional). Auto-serialize (JSON.stringify) +
+  `SerializedSubscription` type + SubForm πεδία «Free trial ends» (date) + «First charge» (placeholder = recurring amount)
+  + hint. zod schema + create/update μετατρέπουν '' → null.
+- **Νέο `trialend` NotifKind**: Notification enum + `NotifKind` union + `AUTO_KINDS`. `computeAlerts` (notifications/
+  actions.ts) → active subs με `trialEndsAt` εντός lead-time (days ≥0 && ≤ `s.trialAlertDays`)· body `<days>|<charge>`·
+  dedupeKey `trialend:<id>:<trialDate>` (re-alert αν μετακινηθεί η ημ., auto-expire μόλις περάσει). Bell (NotificationBell):
+  AlarmClock icon + purple + `describe` case → `notif.trialSub` / `notif.trialTodaySub`.
+- **ntfy** (`runAlertChecks`, settings/actions.ts): γραμμή «⏳ N free trial(s) ending ≤Xd: Name (2d, €Y)…», soonest first.
+- **Lead-time ρυθμιζόμενο** (το backlog το ζητούσε ρητά): `AppConfig.trialAlertDays` default 2 + appSettings (type/raw/
+  DEFAULTS/normalize/select, +2 test assertions) + Settings → Defaults number input + `saveDefaults` clamp 0-60 (0 = off).
+
+**Scope/builder-default απόφαση (καταγράφεται)**: `firstChargeAmount` optional → όταν κενό, ο alert πέφτει στο recurring
+`amount`. Το v1 mobile API `trim()` shape ΔΕΝ εκτέθηκε ακόμα στα νέα πεδία (self-contained, το route test έμεινε πράσινο)
+→ mobile-parity follow-up. Μηδέν migration (τα πεδία έχουν defaults null/0).
+
+**Verified**: `apps/web npm run type-check` → **EXIT 0**. Πλήρες `npx vitest run` → **1978 passed / 152 files** (τα +2
+appSettings assertions· locales.test πράσινο με τα νέα `notif.*`/`sub.*`/`set.trialAlert` keys· v1 subs route test
+αμετάβλητο). **Μηδέν regression**.
+
+**Docker rebuild SKIPPED (ίδια αιτία με το P18 run παραπάνω)**: ο ~1.9GB VM έτρεχε 11 containers (homepage + bakecore ×6,
+πιθανή live session)· Next build κάτω από συμφόρηση = OOM-crash-loop risk στη Mongo. Additive change + type-check + 1978
+tests. **Serve-check pending**: Settings → Defaults «Free-trial alert · days», Subscriptions → new/edit → βάλε trial date
+2 μέρες μπροστά → bell + ntfy δείχνουν «⏳ trial ending».
+
+**Working tree**: ρητό `git add` 14 αρχείων· το ξένο P22 WIP (`receiptSearch.*`, `search-actions.ts`) ΔΕΝ αγγίχτηκε.
+
+**Επόμενο suggested task**: επόμενο Approved «ranked value/effort»: **P32 gift-card/store-credit balance tracker** (S/M,
+tab στα Vouchers, υπόλοιπο που φθίνει) ή **P34 per-space ledger tag** (M, τα 2 σπίτια του Αχιλλέα)· ή P19 safe-to-spend
+cashflow. Απόφυγε το P22 όσο υπάρχει uncommitted receiptSearch στο tree.
+
 ## 2026-07-12 (pharos-daily-dev — P18 receipt↔statement reconciliation SHIPPED)
 
 **Τι έγινε**: Έχτισα το **P18 (receipt ↔ statement transaction reconciliation)**, το επόμενο Approved «πολύ ψηλό
