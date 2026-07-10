@@ -1950,3 +1950,42 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-10 (cont.¹²) — (e) polish/content: FAQ += per-space / per-property ledger split (P34)
+
+Increment (e) polish, content-accuracy micro-pass. Το P34 (shipped, commit 6b1de5c `feat(expenses)`) εδωσε
+optional `space` (ledger) tag στα expenses/income ωστε τα χρηματα να split-αρονται ανα property/context
+(κεντρικο σπιτι vs εξοχικο), με per-space Reports breakdown («ποσο κοστιζει το εξοχικο»). Ηταν το ρητο
+«επομενο increment» απο το cont.¹¹, και ειναι ΑΜΕΣΑ relevant στον 2-homes profile του Achilleas (κεντρικο +
+εξοχικο Καλαμος) + στον homelabber persona. Κανενα section του landing δεν ανεφερε αυτη τη δυνατοτητα.
+
+Αλλαγη (app/page.tsx, FAQS array μονο, μηδεν UI/CSS/dependency/bundle change):
+- Νεα FAQ εγγραφη «Can I split spending across more than one home or property?» αμεσως πριν το «How do
+  backups work?» (money-tracking cluster, μετα το bills Q). Απαντηση ακριβης σε real-shipped feature: tag
+  εξοδου/εσοδου σε space, sidebar filter, per-space Reports breakdown, recurring bill κραταει το space στο
+  scan (ΔΕΗ εξοχικου μενει tagged), dormant μεχρι να προσθεσεις space (μηδεν forced tagging).
+- Ρεει αυτοματα στο FAQPage JSON-LD (FAQS.map) + deterministic anchor id
+  `faq-can-i-split-spending-across-more-than-one-home-or-property` (deep-link stays valid).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (11 routes), / route 5.33 kB (αμεταβλητο, copy-only, μηδεν bundle
+  impact).
+- Prerender (.next/server/app/index.html): «how much does the cottage cost» -> 4 hits (HTML + JSON-LD + RSC
+  payload + deep-link, consistent)· anchor id `faq-can-i-split-spending-across-more-than-one-home-or-property`
+  present. Content/non-visual -> verified στο static output (separate non-Docker app, δεν σηκωσα preview
+  server).
+- em-dash: 0 σε ολο το page.tsx (commas μονο). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (page.tsx + αυτο το log) μεσω explicit pathspec· foreign unstaged
+  files αλλου routine (apps/web/search-actions.ts, receiptSearch*, SAAS_PROGRESS.md, docs/*) τα αφησα αθικτα
+  (collision guard).
+
+Επομενο increment: (e) polish συνεχεια — annual Offers στα per-tier Pricing aria labels· ή expense-splitting
+/ «who owes what» (P35, shipped) ισως αξιζει μια Expenses copy γραμμη ή FAQ· ή real app screenshots οταν
+υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
