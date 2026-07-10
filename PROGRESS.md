@@ -5,6 +5,54 @@
 <!-- reviewed: 65b81a2 -->
 <!-- docker-validated: f8f345c -->
 
+## 2026-07-13 (pharos-daily-dev — P28 bill / payable status tracker SHIPPED)
+
+**Τι έγινε**: Έχτισα το **P28 (bill / payable status tracker, due → paid → overdue)**, Approved item «ψηλό value/effort»,
+ένα από τα δύο suggested-next του προηγούμενου run (P34 vs P28). **Διάλεξα P28 αντί P34**: το P34 (per-space ledger)
+είναι cross-cutting (expenses+receipts+subscriptions+reports+settings ταυτόχρονα) = sprawling regression risk, ενώ το P28
+είναι **αυτόνομο νέο module** που καθρεφτίζει ακριβώς το proven P32 gift-card pattern (χαμηλό ρίσκο, focused). Commit
+`a737bbc` (pushed). Πραγματικό κενό: subscriptions = *αυτόματες* χρεώσεις, `/calendar` μόνο **προβάλλει**· κανένα module
+δεν κρατούσε τον κύκλο ζωής ενός λογαριασμού που **πληρώνεις χειροκίνητα** (ΔΕΗ/ΟΤΕ/κοινόχρηστα).
+
+Τι μπήκε (builder-defaults καταγράφονται):
+- **`models/Bill.ts`** (title/vendor/amount/dueDate/paidAt/category/cycle/notes/archived/linkedExpenseId, soft-delete,
+  updatedAt index) + pure **`lib/bill.ts`** (`billStatus` = paid/overdue/due-soon/upcoming **derived** από dueDate+paidAt,
+  `billDaysUntilDue`, `billIsOpen`, `nextBillDue`, **+22 unit tests**) + `SerializedBill`.
+- **`bills/actions.ts`**: create/update/delete(soft→Trash)/setArchived + `markBillPaid` / `markBillUnpaid`. **markBillPaid**:
+  opt-in log matching expense (reuse `addExpense`), και για recurring bill (cycle set) **spawn-άρει την επόμενη pending
+  instance** μία περίοδο μπροστά. **Builder-default: spawn-on-pay** (ΟΧΙ background generator· αποφεύγει idempotency churn,
+  ντετερμινιστικό). Guard `!wasPaid` → μόνο στην πρώτη πληρωμή spawn-άρει, ποτέ σε re-mark.
+- **UI** (`BillsClient`): triage list ταξινομημένο overdue→due-soon→upcoming→paid, filters (open/overdue/paid/all),
+  one-click mark-paid (check button), per-bill modal form (repeat select + category datalist από expenseCategories),
+  header «€X to pay · N overdue». Empty state.
+- **Notifications**: νέο **`bill` NotifKind** (Notification enum + NotifKind union + AUTO_KINDS). `computeAlerts` → unpaid
+  bills overdue ή due εντός window· body `<days>|<amount>` (days<0 = overdue)· dedupeKey `bill:<id>:<dueIso>` (re-alert στο
+  move, auto-expire όταν paid· overdue nag χωρίς lower bound). Bell = FileText/gold + `notif.billDue/Today/OverdueSub`.
+  ntfy γραμμή («🧾 N bill(s) due/overdue: … (Nd overdue)»).
+- **Lead-time ρυθμιζόμενο**: `AppConfig.billAlertDays` default 5 + appSettings (type/raw/DEFAULTS/normalize/select, +2 test
+  assertions) + Settings → Defaults input (`set.billAlert`, clamp 0-90, 0 = off).
+- **Nav + home + Trash**: nav link (Money group, FileText) + homepage NavCard (open-bills count μέσω `Bill.countDocuments`
+  στο getStats) + Trash type `bill` (TRASH_MODELS/trashLabel/TrashClient TYPE_META + v1 trash route TYPES). i18n keys ΜΟΝΟ
+  στο en.ts.
+
+**Scope/builder-default**: Calendar paid-vs-pending coloring **skipped** (focus· τα recurring bills δεν διπλο-προβάλλονται
+εκεί ακόμα). GET `/api/v1/bills` **δεν** εκτέθηκε (mobile-parity follow-up· updatedAt index υπάρχει). Μηδέν migration
+(νέο collection + πεδία με defaults), μηδέν AI.
+
+**Verified**: `apps/web npm run type-check` → **EXIT 0**. Full `npx vitest run` → **2117 passed / 164 files** (+22 bill,
++2 appSettings). **Docker rebuild (mutex-guarded)**: `docker compose build web` (image-only, exit 0), Mongo έμεινε healthy,
+`docker compose up -d web` → homepage-web **0 restarts**, `curl /login` **200**, `curl /bills` **307** (auth-gated route
+compiled σωστά). `docker builder prune -f` (−2.1GB cache). Serve-check του UI περιεχομένου θέλει login (unattended =
+δεν γίνεται)· το 307 επιβεβαιώνει ότι η route χτίστηκε.
+
+**Working tree**: ρητό `git add` 20 αρχείων· τα ξένα WIP (`search-actions.ts`, `receiptSearch.*`, `api/v1/scan/expense/
+route.test.ts`) ΔΕΝ αγγίχτηκαν.
+
+**Επόμενο suggested task**: επόμενο ranked Approved: **P34 per-space / per-property ledger tag** (M, τα 2 σπίτια —
+cross-cutting, καλύτερα με προσοχή σε ένα focused run: πρώτα το `space` πεδίο + editable list + ένα-δύο money views, όχι
+όλα μαζί) ή **P35 expense splitting** (Splitwise-lite). Follow-up P28: GET `/api/v1/bills` (mobile parity) + Calendar
+paid/pending coloring. Απόφυγε το P22 όσο υπάρχει uncommitted receiptSearch στο tree.
+
 ## 2026-07-10 (pharos-daily-dev — P19 «Safe-to-spend» forward cashflow SHIPPED)
 
 **Τι έγινε**: Υλοποιήθηκε το **P19 (Safe-to-spend forward cashflow)**, το κορυφαίο unshipped Approved item («ψηλό value/effort», S/M, ντετερμινιστικό, μηδέν AI) — ρητά προτεινόμενο ως επόμενο από το προηγούμενο run. Commit `d3e191d` (pushed). Τα υπόλοιπα ψηλότερα Approved είναι είτε shipped (P32/P33/P27/P29/P14/P15/P18/P6) είτε μπλοκαρισμένα (P22 = uncommitted receiptSearch WIP στο tree, το άφησα άθικτο· P30 push = χρειάζεται EAS/APNs credentials· P36 open-banking = χρειάζεται GoCardless creds).
