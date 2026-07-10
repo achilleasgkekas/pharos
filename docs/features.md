@@ -168,12 +168,23 @@ Everything is derived live from your data; nothing extra is stored.
 Analytics (`/reports`) over your data with a selectable window (6 / 12 / 24
 months):
 
-- **Net position** (inventory value minus installments owed, plus card balance),
+- **Net worth** — assets (owned-inventory value plus any manual asset accounts)
+  minus liabilities (remaining installments plus outstanding card balances), with
+  breakdown chips and a monthly trend chart. The owned-inventory value uses the
+  depreciation estimate (see below) rather than raw purchase cost.
 - monthly spend, cash flow (income vs expense), spend by store,
-- inventory value by category, subscriptions by category,
+- inventory value by category (depreciated), subscriptions by category,
 - **budgets** (per-category targets set in Settings, with progress bars that turn
   red when over),
 - warranties expiring soon, biggest purchases, and installment payoff.
+
+**Asset depreciation.** Owned gear is valued from its purchase price using a
+declining-balance curve (value = price × (1 − rate)^years, floored at a salvage
+fraction), with per-category annual rates. This keeps net worth and inventory
+value realistic as equipment ages instead of holding cost forever. It is computed
+on read (nothing stored), a genuine manual current value on an item still wins,
+and the whole model (toggle, floor, default rate, per-category rates) is
+configurable in Settings → Money → Depreciation (on by default).
 
 ## Tasks
 
@@ -235,7 +246,9 @@ Configuration is grouped into tabs:
 
 - **General** — appearance, currency, default VAT, default item view, warranty
   defaults, budgets, about.
-- **Money** — budgets and payment cards.
+- **Money** — budgets (with a **Suggest from history** button that pre-fills
+  per-category targets from the median of your last three complete months),
+  manual asset accounts, asset depreciation, and payment cards.
 - **AI** — provider (Ollama / Anthropic / OpenAI / Gemini / OpenRouter / Custom),
   a separate scraper AI, and editable AI prompts.
 - **Network** — UniFi host / user / connection test.

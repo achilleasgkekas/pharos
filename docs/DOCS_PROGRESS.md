@@ -1194,3 +1194,39 @@ Watch νεα admin/*.tsx console pages (π.χ. tenant listing/detail page) ή τ
 WRITE actions (suspend/reactivate/impersonate). Εναλλακτικα user-facing: features.md/reports
 stale-forward για τα νεα P27 suggested-budgets + PA2 net-worth time-series (commits 773a0e9 +
 67bffc9) που δεν καλυπτονται ακομα στο features.md.
+
+## 2026-07-10 (features.md stale-forward: net-worth PA2 + depreciation P29 + suggest-budgets P27)
+
+Εφερα το features.md στο ιδιο επιπεδο με τα προσφατα user-facing commits που δεν καλυπτονταν:
+
+- **Reports → Net worth (PA2, 67bffc9)**: το bullet "Net position" εγινε "Net worth" —
+  assets (owned-inventory value + manual asset accounts) μειον liabilities (remaining
+  installments + outstanding card balances), breakdown chips + monthly trend chart. Σημειωσα
+  οτι το owned-inventory value χρησιμοποιει πλεον το depreciation estimate (οχι raw cost) και
+  στο "inventory value by category (depreciated)".
+- **Asset depreciation (P29, 20bd514)**: νεα παραγραφος στο Reports — declining-balance
+  (value = price × (1−rate)^years, floored σε salvage fraction), per-category annual rates,
+  computed-on-read (τιποτα stored), manual current value νικαει, configurable σε
+  Settings → Money → Depreciation (on by default).
+- **Settings → Money**: το bullet επεκταθηκε με το "Suggest from history" button (P27, 773a0e9 —
+  median των τελευταιων 3 complete months ανα category) + manual asset accounts + depreciation.
+
+Διαβασα τον πραγματικο κωδικα πριν γραψω (δεν μαντεψα):
+- lib/depreciation.ts → DEFAULT_DEPRECIATION {enabled:true, floorPct:10, defaultRate:15},
+  DEFAULT_DEPRECIATION_RATES per-category (network 15, storage 20, compute 25, consumable 50…),
+  declining-balance formula, computed-on-read (σαν expense anomaly).
+- SettingsClient.tsx → DepreciationManager + AssetAccountsManager renderαρονται στο tab === 'money'
+  (οχι δικο τους tab· το commit message ελεγε "Settings → Depreciation" γενικα, το επιβεβαιωσα
+  οτι ζει στο Money tab), suggestBudgets action στο BudgetsManager.
+
+Accuracy/validation: markdown only, κανενα build/Docker/AI call. features.md fence count = 0
+(καμια code fence, ζυγο), secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/
+CRON_SECRET) clean. Καμια εφευρεση αριθμου — μονο τα πραγματικα defaults απο τον κωδικα.
+
+Collision guard: πριν το commit θα ελεγξω `git status --short` + `git diff --cached`· τα foreign
+staged WIP files (search-actions.ts + receiptSearch.ts/.test.ts) ειναι stale απο την αρχη του run —
+ΔΕΝ τα αγγιζω, commit ΜΟΝΟ των docs/features.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επομενο run: (α) saas.md §8 stale-forward για το νεο /admin/tenants Workspaces console (listing +
+[slug] detail, commit f6a4f27) που δεν καλυπτεται ακομα στο console UI section· ή (β) συνεχεια
+features.md — mobile companion app section αν εχει νεα, ή insurance export (P13) οταν shipαρει.
