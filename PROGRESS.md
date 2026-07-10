@@ -2,7 +2,20 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 65b81a2 -->
+<!-- reviewed: 22750b2 -->
+
+## 2026-07-10 (reviewer — range 65b81a2..22750b2· tsc web+mobile EXIT 0· μηδέν regression· flag el.ts i18n gap)
+
+**Τι έλεγξα**: 63 commits από τον τελευταίο marker (`65b81a2..22750b2`) — feat(saas) auth/workspace/members/billing/usage/activity/dbstats UI, feat(expenses) split P35 + per-space P34 + vendor-rules P15, feat(bills) P28, feat(vouchers) gift-card P32, feat(reports) safe-to-spend P19 + envelope P25, feat(statements) reconcile P18, feat(calendar) iCal P6, feat(subscriptions) trial reminder P33, feat(search) line-item P22, + landing/docs/api-v1 tests.
+
+**Checks**: `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**. Secret scan στο diff (sk-ant/sk_live/AUTH_SECRET=/STRIPE_SECRET_KEY=/CRON_SECRET=/mongodb creds) → **clean** (μόνο progress-log prose + `MIN_PASSWORD=8` constant).
+
+**API-shape (mobile-safe)**: το `feat(calendar)` refactor (ac2e2d5) έβγαλε τη λογική στο `lib/moneyAgenda.ts` αλλά κράτησε **ΙΔΙΟ** το `/api/v1/calendar` response shape (`{ currency, dueThisMonth, months, events }`· `dueThisMonth === months[0].out`, verified). Το `feat(search)` P22 (68acb9a) μόνο augment-άρει το receipt subtitle όταν το query matched line-item (όχι store) — μηδέν breaking change. Το trash route `[type]/[id]` πρόσθεσε `giftcard`+`bill` types, consistent με `TRASH_MODELS`/`trashLabel`/`restoreFromTrash`/`purgeTrashEntry` (settings/actions.ts:1241-1263, verified). Νέες pure libs (`split.ts`, `bill.ts`, `giftcard.ts`, `reconcile.ts`, `receiptSearch.ts`) fully typed + unit-tested, μηδέν DB/AI/any.
+
+**Τι διόρθωσα**: τίποτα — το tree ήταν ήδη πράσινο + καθαρό, κανένα small-safe fix δεν χρειάστηκε.
+
+**Τι flag-άρισα**: **el.ts i18n gap** (WEB_DEBT.md, P3/M) — τα P28/P32/P34/P35 πρόσθεσαν **38 νέα κλειδιά** στο `en.ts` χωρίς ελληνικές μεταφράσεις στο `el.ts` (en=1179, el=1141). Ο resolver κάνει graceful English fallback (`index.ts:22`), άρα ΔΕΝ σπάει UI ούτε type-check, αλλά ο Greek-first χρήστης βλέπει split/gift-card/bills/per-space strings στα αγγλικά. 38 μεταφράσεις = judgment call ακριβείας → builder, όχι reviewer.
+
 
 ## 2026-07-15 (pharos-daily-dev — P35 expense splitting / Splitwise-lite SHIPPED)
 

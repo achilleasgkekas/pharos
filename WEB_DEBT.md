@@ -1079,6 +1079,20 @@
   - npm run type-check exits 0
 - Status: TODO (flagged 2026-07-01 reviewer, commit `1a7d16e`· 37η σάρωση επιβεβαίωσε ανοιχτό: `connection.ts:54` guard επιστρέφει cached conn εκτός αν `readyState === 99` (uninitialized)· readyState 0 (disconnected) περνά ακόμα)
 
+### el.ts i18n gap — 38 κλειδιά των νέων features μόνο στα αγγλικά (Greek-first χρήστης βλέπει English fallback)
+- Priority: P3
+- Size: M
+- Area: web
+- Files: apps/web/src/lib/i18n/locales/el.ts (source keys: apps/web/src/lib/i18n/locales/en.ts)
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα:** τα features P35 (expense split), P34 (per-space ledger tag), P32 (gift-card), P28 (bills) πρόσθεσαν 38 νέα κλειδιά στο `en.ts` **χωρίς** αντίστοιχες ελληνικές μεταφράσεις στο `el.ts`. Ο resolver (`i18n/index.ts:22` `dict[key] ?? en[key] ?? String(key)`) κάνει graceful fallback στα αγγλικά, άρα **δεν σπάει το UI** (καμία raw-key εμφάνιση, type-check EXIT 0 γιατί `el: Partial<Dict>`). Όμως ο χρήστης είναι Greek-first (CLAUDE.md), οπότε τα split / gift-card / bills / per-space UI strings εμφανίζονται στα αγγλικά αντί ελληνικά.
+  - **Τα 38 κλειδιά** (comm en−el): `ex.allSpaces`, `ex.balanceEntries`, `ex.balancesBtn`, `ex.balancesEmpty`, `ex.balancesSettled`, `ex.balancesTitle`, `ex.fSpace`, `ex.settleBody`, `ex.settleTitle`, `ex.settleUp`, `ex.space`, `ex.spaceNone`, `ex.splitAddPerson`, `ex.splitEmpty`, `ex.splitEqually`, `ex.splitIncludeMe`, `ex.splitMarkPaid`, `ex.splitName`, `ex.splitOwedYou`, `ex.splitSettled`, `ex.splitTitle`, `ex.splitYourShare`, `home.dBills`, `nav.bills`, `notif.billDueSub`, `notif.billOverdueSub`, `notif.billTodaySub`, `notif.giftcardSub`, `notif.giftcardTodaySub`, `reports.cExpBySpace`, `set.billAlert`, `set.giftCardAlert`, `set.spaces`, `set.spacesDesc`, `set.spacesEmpty`, `set.spacesPlaceholder`, `trash.tBill`, `trash.tGiftCard`.
+  - **Fix:** πρόσθεσε ελληνική τιμή για κάθε ένα στο `el.ts` (χρησιμοποίησε το en string ως πηγή· κράτα το ίδιο interpolation-placeholder format π.χ. `{n}`, `{name}`). Καμία αλλαγή σε keys/en.ts.
+  - **ΣΗΜ (γιατί flag, όχι fix από reviewer):** 38 μεταφράσεις είναι judgment call ακριβείας (el = primary γλώσσα του χρήστη), όχι μηχανικό one-liner· ανήκει στον builder. Μη-blocking (English fallback ενεργό).
+  - Επαλήθευση: `comm -23 <(grep -oE "^\s+'[^']+':" en.ts|sed "s/[': ]//g"|sort -u) <(grep -oE "^\s+'[^']+':" el.ts|sed "s/[': ]//g"|sort -u)` → μηδέν γραμμές· npm run type-check exits 0.
+- Status: TODO (flagged 2026-07-10 reviewer· live: en=1179 keys, el=1141, 38 missing από P28/P32/P34/P35)
+
 ---
 
 ## Δεν είναι debt (επιβεβαιωμένο, μην ανοίξεις item)
