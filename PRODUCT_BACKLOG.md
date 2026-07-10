@@ -48,7 +48,7 @@ _(κενό — P32-P36 εγκρίθηκαν 2026-07-10· ο planner προσθέ
   mobile API (`trim()` shape) → mobile-parity item. Docker serve-check pending (VM contention).
 - **Module:** Subscriptions (+ Notifications bell/ntfy).
 
-### P32. Gift-card / store-credit balance tracker (υπόλοιπα που φθίνουν) — S/M — both
+### P32. Gift-card / store-credit balance tracker (υπόλοιπα που φθίνουν) — ✅ SHIPPED 2026-07-13 (pharos-daily-dev)
 - **Αξία:** πραγματικό κενό — τα Vouchers είναι **coupons** (% έκπτωση/κωδικός) και το P20 είναι **loyalty barcode**· κανένα
   δεν κρατά ένα **χρηματικό υπόλοιπο** (δωροκάρτα, store credit από επιστροφή, prepaid) που **μειώνεται** καθώς το ξοδεύεις.
   Απλό: κάρτα με αρχικό ποσό + καταχωρήσεις χρήσης → τρέχον υπόλοιπο + «λήγει σε Nd» alert + «ξέχασες €X σε 3 κάρτες».

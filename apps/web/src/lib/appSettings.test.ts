@@ -47,6 +47,7 @@ describe('normalizeSettings', () => {
       defaultWarrantyMonths: 24,
       warrantyAlertDays: 90,
       trialAlertDays: 2,
+      giftCardAlertDays: 30,
       autoAddStores: true,
       ntfyUrl: '',
       ntfyEnabled: false,
@@ -85,19 +86,21 @@ describe('normalizeSettings', () => {
   });
 
   it('numeric fields honour 0 (typeof number) instead of falling back to defaults', () => {
-    const v = normalizeSettings({ defaultWarrantyMonths: 0, warrantyAlertDays: 0, defaultVatRate: 0, trialAlertDays: 0 });
+    const v = normalizeSettings({ defaultWarrantyMonths: 0, warrantyAlertDays: 0, defaultVatRate: 0, trialAlertDays: 0, giftCardAlertDays: 0 });
     expect(v.defaultWarrantyMonths).toBe(0);
     expect(v.warrantyAlertDays).toBe(0);
     expect(v.defaultVatRate).toBe(0);
     expect(v.trialAlertDays).toBe(0);
+    expect(v.giftCardAlertDays).toBe(0);
   });
 
   it('numeric fields use stored values when present', () => {
-    const v = normalizeSettings({ defaultWarrantyMonths: 12, warrantyAlertDays: 30, defaultVatRate: 19, trialAlertDays: 5 });
+    const v = normalizeSettings({ defaultWarrantyMonths: 12, warrantyAlertDays: 30, defaultVatRate: 19, trialAlertDays: 5, giftCardAlertDays: 45 });
     expect(v.defaultWarrantyMonths).toBe(12);
     expect(v.warrantyAlertDays).toBe(30);
     expect(v.defaultVatRate).toBe(19);
     expect(v.trialAlertDays).toBe(5);
+    expect(v.giftCardAlertDays).toBe(45);
   });
 
   it('defaultReturnWindowDays honours 0 (off) and stored values, rejects negatives', () => {

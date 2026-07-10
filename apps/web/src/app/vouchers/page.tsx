@@ -1,17 +1,21 @@
 import { connectDB } from '@/lib/db';
 import { Voucher } from '@/models/Voucher';
-import { VouchersClient } from './VouchersClient';
-import type { SerializedVoucher } from '@/types';
+import { GiftCard } from '@/models/GiftCard';
+import { VouchersShell } from './VouchersShell';
+import type { SerializedVoucher, SerializedGiftCard } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-async function getVouchers(): Promise<SerializedVoucher[]> {
+async function getData(): Promise<{ vouchers: SerializedVoucher[]; giftCards: SerializedGiftCard[] }> {
   await connectDB();
-  const vouchers = await Voucher.find().sort({ used: 1, expiresAt: 1, createdAt: -1 }).lean();
-  return JSON.parse(JSON.stringify(vouchers));
+  const [vouchers, giftCards] = await Promise.all([
+    Voucher.find().sort({ used: 1, expiresAt: 1, createdAt: -1 }).lean(),
+    GiftCard.find().sort({ archived: 1, expiresAt: 1, createdAt: -1 }).lean(),
+  ]);
+  return JSON.parse(JSON.stringify({ vouchers, giftCards }));
 }
 
 export default async function VouchersPage() {
-  const vouchers = await getVouchers();
-  return <VouchersClient vouchers={vouchers} />;
+  const { vouchers, giftCards } = await getData();
+  return <VouchersShell vouchers={vouchers} giftCards={giftCards} />;
 }

@@ -7,12 +7,14 @@ import { Item } from '@/models/Item';
 import { Statement } from '@/models/Statement';
 import { Expense } from '@/models/Expense';
 import { Subscription } from '@/models/Subscription';
+import { GiftCard } from '@/models/GiftCard';
 import { Notification } from '@/models/Notification';
+import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
 
-export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'system';
+export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'system';
 
 export type SerializedNotification = {
   _id: string;
@@ -25,7 +27,7 @@ export type SerializedNotification = {
 };
 
 type Alert = { dedupeKey: string; kind: NotifKind; title: string; body: string; href: string };
-const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend'] as const;
+const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard'] as const;
 
 /** Recompute the live alerts (deals / warranties / installments-due) — the same
  *  three the ntfy check uses, but as structured payloads the bell can localize. */
@@ -112,6 +114,24 @@ async function computeAlerts(): Promise<Alert[]> {
       body: `${days}|${charge}`,
       href: `/subscriptions?open=${id}`,
     });
+  }
+
+  // Gift-card / store-credit expiring with money still on it (P32): don't let a
+  // balance quietly expire. Only cards with a remaining balance and an expiry
+  // within the configured window. dedupeKey carries the expiry date so it
+  // auto-expires once past and re-alerts if the date is moved.
+  const giftCards = (await GiftCard.find({ archived: { $ne: true }, expiresAt: { $ne: null } })
+    .select('title initialAmount uses expiresAt')
+    .lean()) as Array<{ _id: unknown; title: string; initialAmount?: number; uses?: { amount?: number }[]; expiresAt?: string | Date | null }>;
+  for (const g of giftCards) {
+    const balance = giftCardBalance(g.initialAmount ?? 0, g.uses ?? []);
+    if (balance <= 0.009) continue;
+    const days = giftCardDaysLeft(g.expiresAt ?? null, now);
+    if (days === null || days < 0 || days > s.giftCardAlertDays) continue;
+    const id = String(g._id);
+    const iso = new Date(g.expiresAt as string).toISOString().slice(0, 10);
+    // body = "<days>|<balance>" (raw; the bell formats with the symbol)
+    alerts.push({ dedupeKey: `giftcard:${id}:${iso}`, kind: 'giftcard', title: g.title, body: `${days}|${balance}`, href: '/vouchers' });
   }
 
   return alerts;

@@ -21,6 +21,7 @@ export type AppSettings = {
   defaultWarrantyMonths: number;
   warrantyAlertDays: number;
   trialAlertDays: number; // lead time (days) for free-trial "cancel before charge" alert (P33)
+  giftCardAlertDays: number; // window (days) for "gift card expiring with balance" alert (P32); 0 = off
   autoAddStores: boolean;
   ntfyUrl: string;
   ntfyEnabled: boolean;
@@ -42,6 +43,7 @@ export type RawAppConfigDoc = {
   defaultWarrantyMonths?: number;
   warrantyAlertDays?: number;
   trialAlertDays?: number;
+  giftCardAlertDays?: number;
   autoAddStores?: boolean;
   ntfyUrl?: string;
   ntfyEnabled?: boolean;
@@ -72,6 +74,7 @@ const DEFAULTS: AppSettings = {
   defaultWarrantyMonths: 24,
   warrantyAlertDays: 90,
   trialAlertDays: 2,
+  giftCardAlertDays: 30,
   autoAddStores: true,
   ntfyUrl: '',
   ntfyEnabled: false,
@@ -106,6 +109,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     defaultWarrantyMonths: typeof doc?.defaultWarrantyMonths === 'number' ? doc.defaultWarrantyMonths : DEFAULTS.defaultWarrantyMonths,
     warrantyAlertDays: typeof doc?.warrantyAlertDays === 'number' ? doc.warrantyAlertDays : DEFAULTS.warrantyAlertDays,
     trialAlertDays: typeof doc?.trialAlertDays === 'number' ? doc.trialAlertDays : DEFAULTS.trialAlertDays,
+    giftCardAlertDays: typeof doc?.giftCardAlertDays === 'number' ? doc.giftCardAlertDays : DEFAULTS.giftCardAlertDays,
     autoAddStores: doc?.autoAddStores !== false,
     ntfyUrl: doc?.ntfyUrl || '',
     ntfyEnabled: !!doc?.ntfyEnabled,
@@ -137,7 +141,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     // untouched, same query as before).
     const Config = await currentModel(AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets assetAccounts depreciation categoryRules')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets assetAccounts depreciation categoryRules')
       .lean();
   } catch {
     /* DB down → hard defaults */

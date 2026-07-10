@@ -137,6 +137,28 @@ export type SerializedVoucher = {
   updatedAt: string;
 };
 
+export type SerializedGiftCardUse = {
+  _id: string;
+  amount: number;
+  date: string | null;
+  note: string;
+};
+
+// P32 — gift-card / store-credit / prepaid with a decreasing monetary balance.
+export type SerializedGiftCard = {
+  _id: string;
+  title: string;
+  store: string;
+  code: string;
+  initialAmount: number;
+  expiresAt: string | null;
+  archived: boolean;
+  notes: string;
+  uses: SerializedGiftCardUse[];
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SerializedCard = {
   _id: string;
   name: string;
