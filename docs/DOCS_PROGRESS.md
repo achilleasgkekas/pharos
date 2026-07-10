@@ -1352,3 +1352,33 @@ staged WIP (search-actions.ts + receiptSearch.ts/.test.ts) ειναι stale απ
 Επομενο run: (α) api.md — προσθηκη του non-v1 `/api/calendar.ics` endpoint (method/token/response)
 σε δικη του "Other endpoints" section, ή (β) configuration.md — calendar feed subscribe walkthrough
 (Google/Apple/Outlook steps) κατω απο connectors.
+
+## 2026-07-10 (api.md: non-v1 /api/calendar.ics endpoint — iCal feed)
+
+Καλυψα το suggested (α) του προηγουμενου run: το `/api/calendar.ics` (P6, ac2e2d5) ζουσε στο
+features.md/configuration.md αλλα ΕΛΕΙΠΕ εντελως απο το api.md (το οποιο τιτλοφορειται "REST API
+v1" και δεν ειχε non-v1 endpoint). Διαβασα το πραγματικο route (apps/web/src/app/api/calendar.ics/
+route.ts) πριν γραψω — καμια εφευρεση:
+
+- Νεα section "Other endpoints (outside /api/v1)" μετα το Trash, με sub-section "Calendar feed (iCal)".
+- Table row: GET /api/calendar.ics?token=… → read-only iCal (RFC 5545) της 3-month money agenda.
+- Auth: dedicated LOW-SCOPE `?token=` (User.calendarToken), ΟΧΙ το full phk_ bearer — leaked
+  subscribe URL δεν δινει API access (verbatim απο το route doc-comment).
+- Response: 200 text/calendar; charset=utf-8, 12h refresh advertised, Cache-Control private/no-store.
+- Errors: 401 "Missing token" (absent) + 401 "Invalid or revoked token" (no match) — ακριβως οπως
+  τα string literals του route.
+- Σημειωσα οτι το token ΔΕΝ manageται μεσω REST — γεννιεται/rotateαρεται/revokeαρεται σε Settings →
+  AI → Calendar feed (server action calendarFeedActions.ts, οχι v1 endpoint· το επιβεβαιωσα με grep).
+- curl example + link προς configuration.md για το subscribe walkthrough.
+
+Validation: markdown only, κανενα build/Docker/AI call. api.md fence count = 20 (ζυγο, 10 blocks).
+Ολα τα internal links (README/configuration/self-hosting/features/mobile) resolve. Secret scan
+(sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/CRON_SECRET=) clean.
+
+Collision guard: foreign staged/uncommitted WIP (apps/web/src/app/search-actions.ts +
+lib/receiptSearch.ts/.test.ts) stale απο την αρχη του run — ΔΕΝ τα αγγιζω, commit ΜΟΝΟ
+docs/api.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επομενο run: (α) api.md — το δευτερο non-v1 route `/api/mcp` (Model Context Protocol endpoint,
+apps/web/src/app/api/mcp/route.ts) στην ιδια "Other endpoints" section· ή (β) configuration.md —
+calendar feed subscribe walkthrough (Google/Apple/Outlook βηματα) αν λειπει ακομα.

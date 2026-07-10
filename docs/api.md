@@ -352,6 +352,44 @@ Each plan in the `GET /statements/plans` response is:
 
 ---
 
+## Other endpoints (outside `/api/v1`)
+
+A few endpoints live outside the versioned `/api/v1` tree because their callers
+cannot use a normal `Authorization: Bearer` header.
+
+### Calendar feed (iCal)
+
+| Method | Path                          | Description |
+|--------|-------------------------------|-------------|
+| GET    | `/api/calendar.ics?token=…`   | Read-only [iCal / RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545) feed of the 3-month money agenda — subscription renewals, card installments, projected recurring bills/income, and warranty / voucher expiries — for subscribing from Google, Apple, or Outlook Calendar. |
+
+Note the path is `/api/calendar.ics` (not under `/api/v1`).
+
+Authentication is by a **dedicated low-scope feed token** carried in the URL
+(`?token=…`), because calendar clients cannot send an `Authorization` header.
+This is **not** the full API bearer (`phk_…`) token: it authorizes only this
+read-only agenda feed, so a leaked subscribe URL never grants API access. The
+token is a per-user, revocable secret (`User.calendarToken`).
+
+- **Response:** `200` with `Content-Type: text/calendar; charset=utf-8` and the
+  `.ics` body. The feed advertises a 12-hour refresh interval; responses are sent
+  `Cache-Control: private, no-store`. Times use the calendar's own semantics
+  (all-day / dated events derived from the agenda).
+- **Errors:** `401 Missing token` when `token` is absent; `401 Invalid or revoked
+  token` when it does not match any user.
+
+The token is **not** managed through this REST API. Generate, copy, rotate, or
+revoke it in **Settings → AI → Calendar feed** in the web app. Rotating the token
+immediately invalidates the old subscribe URL. See
+[Configuration](configuration.md) for the subscribe walkthrough.
+
+```bash
+# Subscribe from any calendar client, or fetch it directly:
+curl -s "http://localhost:3000/api/calendar.ics?token=YOUR_CALENDAR_TOKEN"
+```
+
+---
+
 ## Quick start
 
 ```bash
