@@ -1807,3 +1807,33 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-10 (cont.⁸) — (e) polish/content: Reports feature copy += safe-to-spend forward cashflow (P19)
+
+Increment (e) polish, content-accuracy micro-pass. Το Reports module απεκτησε νεα δυνατοτητα στο κυριο app
+(git log: d3e191d feat(reports): safe-to-spend forward cashflow (P19), shipped) που το landing ΔΕΝ
+αντικατοπτριζε: forward-looking safe-to-spend view (projected cashflow μετα τα upcoming bills).
+
+Αλλαγη (app/page.tsx, FEATURES array μονο, μηδεν UI/CSS/dependency/bundle change):
+- Reports desc: προστεθηκε «plus a forward safe-to-spend view that projects what is left after upcoming
+  bills» αναμεσα στα charts και στο κλεισιμο «See where the money actually goes.». Ακριβες σε real-shipped
+  feature, οχι roadmap.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static (wait: 11 routes shown), / route 5.33 kB (αμεταβλητο, copy-only).
+- Prerender (.next/server/app/index.html): «forward safe-to-spend view that projects» -> 2 hits (script tag +
+  RSC payload, consistent). Content/non-visual -> verified στο static output (separate non-Docker app, δεν
+  σηκωσα preview server).
+- em-dash: 0 σε ολο το page.tsx (commas μονο). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (page.tsx + αυτο το log) μεσω explicit pathspec· collision guard πριν
+  το commit.
+
+Επομενο increment: (e) polish συνεχεια — reconciliation (receipt <-> transaction, P18) ισως αξιζει μια FAQ
+γραμμη· ή annual Offers στα per-tier Pricing aria labels· ή real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

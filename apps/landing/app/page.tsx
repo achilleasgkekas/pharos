@@ -77,7 +77,7 @@ const FEATURES: {
     icon: 'chart',
     color: 'var(--cyan)',
     title: 'Reports',
-    desc: 'Cash flow, spend by store and category, net position, and price history charts. See where the money actually goes.',
+    desc: 'Cash flow, spend by store and category, net position, and price history charts, plus a forward safe-to-spend view that projects what is left after upcoming bills. See where the money actually goes.',
   },
   {
     icon: 'wifi',
