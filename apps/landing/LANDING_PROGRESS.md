@@ -1874,3 +1874,37 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-10 (cont.¹⁰) — (e) polish/content: FAQ += receipt<->charge reconciliation (P18)
+
+Increment (e) polish, content-accuracy micro-pass. Το FAQ ειχε ερωτησεις για reading receipts/statements
+αλλα ΚΑΜΙΑ για το reconciliation (P18, shipped) που τωρα το FEATURES Statements desc αναφερει. Κενο: ενας
+επισκεπτης που ρωταει «ταιριαζει τις αποδειξεις μου στις χρεωσεις;» δεν εβρισκε απαντηση.
+
+Αλλαγη (app/page.tsx, FAQS array μονο, μηδεν UI/CSS/dependency change):
+- Νεα FAQ εγγραφη «Does it match my receipts to card charges?» αμεσως μετα το «Can it read receipts and
+  statements I already have?». Απαντηση: statement import -> suggest ποιες αποδειξεις ανηκουν σε καθε χρεωση
+  (amount ±λιγα λεπτα, date ±λιγες μερες), confirm -> reconcile ενος μηνα σε λιγα κλικ. Ακριβες σε
+  real-shipped feature (P18, commit 07fba9f).
+- Η εγγραφη ρεει αυτοματα και στο FAQPage JSON-LD (FAQS.map) + παιρνει deterministic anchor id
+  `faq-does-it-match-my-receipts-to-card-charges` (deep-link stays valid).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static, / route 5.33 kB (αμεταβλητο, copy-only, μηδεν bundle impact).
+- Prerender (.next/server/app/index.html): «which of your receipts each charge belongs» -> 2 hits (HTML +
+  RSC payload, consistent)· anchor id `faq-does-it-match-my-receipts-to-card-charges` present. Content/
+  non-visual -> verified στο static output (separate non-Docker app, δεν σηκωσα preview server).
+- em-dash: 0 σε ολο το page.tsx (commas μονο). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (page.tsx + αυτο το log) μεσω explicit pathspec· foreign unstaged
+  files αλλου routine (apps/web/search-actions.ts, receiptSearch*) τα αφησα αθικτα (collision guard).
+
+Επομενο increment: (e) polish συνεχεια — annual Offers στα per-tier Pricing aria labels· ή bill/payable
+tracker (P28, shipped) ισως αξιζει μια Expenses copy γραμμη ή FAQ· ή real app screenshots οταν υπαρξουν
+assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
