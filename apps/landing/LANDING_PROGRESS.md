@@ -1989,3 +1989,44 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-10 (cont.¹³) — (e) polish/content: FAQ += expense splitting / "who owes what" (P35)
+
+Increment (e) polish, content-accuracy micro-pass. Ητο ο ρητος «επομενο increment» απο το cont.¹²: το P35
+(shipped, commit 26eed90 `feat(expenses)` + 779feae docs) εδωσε Splitwise-lite expense splitting μεσα στη
+φορμα εξοδου, και ΚΑΝΕΝΑ section του landing δεν το ανεφερε. Διαβασα το πραγματικο feature (docs/features.md
++ commit body) πριν γραψω, καμια εφευρεση.
+
+Feature convention (verbatim απο code): ΕΣΥ πληρωσες το total· καθε split row = αλλο ατομο (free-form name,
+ΟΧΙ Pharos account) που σου χρωσταει το share· settled = σου το εδωσε πισω· δικο σου μεριδιο implicit
+(total − Σ shares). Split editor («Split equally» + count-me-in, live your-share/owed, mark paid-back),
+split badge (amount owed) σε cards/rows, «Balances, who owes you» modal (per-person aggregate) + settlePerson
+(one-click settle ολων των shares ενος ατομου cross-expense). Dormant μεχρι να προσθεσεις split.
+
+Αλλαγη (app/page.tsx, FAQS array μονο, μηδεν UI/CSS/dependency/bundle change):
+- Νεα FAQ εγγραφη «Can it split a shared cost and track who owes me?» αμεσως πριν το «How do backups work?»
+  (money-tracking cluster, μετα το per-space/property Q). Απαντηση ακριβης: add people by name (no account),
+  set share ή «Split equally» + slice for yourself, badge με owed, «Balances, who owes you» per-person total,
+  one-click settle-up cross-expense, dormant μεχρι να split-αρεις.
+- Ρεει αυτοματα στο FAQPage JSON-LD (FAQS.map) + deterministic anchor id
+  `faq-can-it-split-a-shared-cost-and-track-who-owes-me` (deep-link stays valid).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (11 routes), / route 5.33 kB (αμεταβλητο, copy-only, μηδεν bundle
+  impact).
+- Prerender (.next/server/app/index.html): «who owes me» -> 5 hits, «Balances, who owes you» -> 4 hits
+  (HTML + JSON-LD + RSC payload + deep-link, consistent)· anchor id
+  `faq-can-it-split-a-shared-cost-and-track-who-owes-me` present. Content/non-visual -> verified στο static
+  output (separate non-Docker app, δεν σηκωσα preview server).
+- em-dash: 0 σε ολο το page.tsx (commas μονο). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (page.tsx + αυτο το log) μεσω explicit pathspec (collision guard).
+
+Επομενο increment: (e) polish συνεχεια — annual Offers στα per-tier Pricing aria labels· ή real app
+screenshots οταν υπαρξουν assets (blocked)· ή νεοτερο shipped module αν εμφανιστει gap.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

@@ -482,6 +482,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. If you run more than one place, a main home and a cottage for example, you can tag each expense or income to a space and see exactly what each one costs. Add your spaces once and PHAROS filters spending by them and breaks it down in a per-space Reports view, so "how much does the cottage cost" is a glance. A recurring bill keeps its space when scanned, so a power bill for the cottage stays tagged. Leave it off and nothing changes; the feature only appears once you add a space.',
   },
   {
+    q: 'Can it split a shared cost and track who owes me?',
+    a: 'Yes. On any expense you paid, a built-in Splitwise-lite editor lets you add people by name (no account needed for them) and set each share, or press "Split equally" with an optional slice for yourself. Cards show a small badge with what is still owed on that expense, and a "Balances, who owes you" view rolls every split into a per-person total. When someone pays you back you settle them up in one click across all their shares at once. It stays dormant until you split something, so nothing changes for expenses you keep to yourself.',
+  },
+  {
     q: 'How do backups work?',
     a: 'Self-hosted ships with a nightly backup you can point at a NAS, plus one-click JSON and CSV exports any time. You can also mirror your files to SMB, FTP, or OneDrive for a proper 3-2-1 setup. On hosted, nightly backups are handled for you.',
   },
