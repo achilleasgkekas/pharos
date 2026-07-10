@@ -400,6 +400,16 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - Δομικό verify μόνο (δεν τρέχτηκε πραγματικό AI)· web+mobile tsc EXIT 0 ✓
 - Status: DONE (2026-07-01) — νέο route `items/[id]/ai-fill` (id-guard 24-hex, withAuth, mode default 'specs', AI-feature-gated μέσω των actions)· mobile `aiFillItem(id, mode)` + AI bar (specs/info) στο edit modal· on-success → re-fetch detail + list refresh, 'specs' γεμίζει το textarea, 'info' → Alert με τα filled πεδία. Structural verify: safe rebuild → /login 200, web restarts 0, ai-fill no-token → 401. **Parity queue: 6/6 DONE.**
 
+### Notifications — νέο `pricehike` kind (P14) δεν χειρίζεται στο mobile
+- Priority: P3 | Size: S | no AI
+- Web ref: P14 price-hike/drop watch (commit 74f9cd4)· `NotifKind` += `'pricehike'` (file: apps/web/src/app/notifications/actions.ts), bell icon `TrendingUp`/red + format «Rose {prev} → {curr} ({pct})» (file: apps/web/src/components/NotificationBell.tsx), body wire-format `"prev|curr|pct"`, title = vendor
+- API: GET /api/v1/notifications (exists: yes, ΑΜΕΤΑΒΛΗΤΟ route) — μπορεί πλέον να επιστρέψει item με `kind:'pricehike'` (additive, μη-breaking). Το route.ts δεν άλλαξε· η νέα τιμή έρχεται από το `computeAlerts`.
+- Πρόβλημα (graceful, ΟΧΙ crash): (1) mobile `NotifKind` union (apps/mobile/src/api.ts:465) = `'deal'|'installment'|'warranty'|'system'` → stale, λείπει `'pricehike'`· (2) `NOTIF_ICON` (apps/mobile/src/screens/ActivityScreen.tsx:22-24) δεν έχει key `pricehike` → **κενό emoji icon** στο alert row· (3) το `AlertsTab` δείχνει `item.body` **raw** (γρ.101) → «13|15|15» αντί «Rose €13 → €15 (+15%)» (ίδιο pre-existing debt με το `installment` body «222|5»).
+- Mobile files: apps/mobile/src/api.ts (`NotifKind` += `'pricehike'`), apps/mobile/src/screens/ActivityScreen.tsx (`NOTIF_ICON.pricehike` = π.χ. '📈'· προαιρετικά split-format του `prev|curr|pct` body ώστε να διαβάζεται)
+- Acceptance:
+  - Alert row για price-hike δείχνει icon (όχι κενό) + ανθρώπινο κείμενο· mobile tsc EXIT 0
+- Status: TODO (flagged by reviewer 2026-07-11). Αφέθηκε ΑΔΙΟΡΘΩΤΟ στο review: η επιλογή emoji + το body-formatting είναι product-level (και το raw-body είναι κοινό pre-existing gap με το installment). Χαμηλή προτεραιότητα — καθαρή graceful degradation, μηδέν crash.
+
 ---
 
 ## UI Debt Queue

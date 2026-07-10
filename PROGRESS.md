@@ -2,8 +2,23 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: c11d296 -->
+<!-- reviewed: 65b81a2 -->
 <!-- docker-validated: 20bd514 -->
+
+## 2026-07-11 (reviewer — range c11d296..65b81a2)
+- **Τι έλεγξα:** 45 commits (κυρίως docs/tests/landing/saas· ουσιαστικός κώδικας = P14 price-hike, PA2 net-worth,
+  P29 depreciation, PA1 CSV import, superadmin console/db.stats). `apps/web npm run type-check` → **EXIT 0**·
+  `apps/mobile npx tsc --noEmit` → **EXIT 0**. Δεν άγγιξα τα uncommitted P22 `receiptSearch.*` + `search-actions.ts`
+  (WIP άλλου routine).
+- **Ποιότητα:** καθαρή. Το `lib/priceHike.ts` είναι pure + tested (11/11), το `pricehike` NotifKind enum είναι
+  **additive/μη-breaking**, το superadmin `dbstats/route.ts` είναι σωστά gated (`requireSuperadmin`, read-only,
+  no-store). **Καμία αλλαγή σε υπάρχον `/api/v1` route shape** (τα νέα routes είναι superadmin-only, δεν τα καταναλώνει
+  το mobile) → μηδέν mobile-breaking API change. Μηδέν secret committed (μόνο env names). **Μηδέν regression.**
+- **Δεν διόρθωσα τίποτα** (και τα δύο tsc ήδη πράσινα, μηδέν obvious-fix defect στον committed κώδικα).
+- **Flagged → MOBILE_PARITY.md** (νέο ### item, P3/S, TODO): το νέο web `pricehike` notification kind δεν χειρίζεται
+  στο mobile — (1) `NotifKind` union (api.ts:465) stale/λείπει `'pricehike'`, (2) `NOTIF_ICON` (ActivityScreen:22-24)
+  χωρίς `pricehike` key → **κενό icon**, (3) `AlertsTab` δείχνει body raw «13|15|15». Graceful degradation, ΟΧΙ crash·
+  αφέθηκε αδιόρθωτο (emoji + body-format = product-level· raw-body = κοινό pre-existing gap με το installment).
 
 ## 2026-07-11 (pharos-daily-dev — P14 recurring price-hike/drop watch)
 - **Τι έκανα:** έχτισα το Approved item **P14** (subscription/bill price-hike watch). Όταν μια επαναλαμβανόμενη
