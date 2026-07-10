@@ -2165,3 +2165,54 @@ isolated pathspec commit μονο των δικων μου 7 αρχειων ωσ
 καταναλωνει το listing (#48) + per-tenant detail drill-down (#49/#50), είτε (β) user-facing
 **(saas) auth UI** (signup/login panels που καταναλωνουν api/saas/auth/*), είτε (γ) user-facing
 **workspace-settings** panels (members/billing/usage, ολα τα read/write control-plane APIs ετοιμα).
+
+## 2026-07-10 (increment 54 — Superadmin WORKSPACES UI: /admin/tenants listing + [slug] detail, §8 UI-first)
+**Το κενό:** το increment 53 έστησε το /admin shell + Fleet Overview, αλλά ο operator δεν
+είχε τρόπο να **δει τη λίστα** των workspaces ούτε να κάνει **drill-down** σε ένα. Όλα τα
+backend readers ήταν έτοιμα εδώ και βδομάδες (listing #48, detail+usage #49/#50) αλλά ΜΗΔΕΝ
+UI τα κατανάλωνε. Έχτισα το δεύτερο console κομμάτι — **Workspaces listing + Workspace detail**
+— καταναλώνοντας τους ήδη-χτισμένους read-only registry readers κατευθείαν server-side (idiomatic
+SSR, η σελίδα είναι ήδη gated, όχι self-fetch). ΟΛΟ additive, σε δικούς μου φακέλους:
+- `components/saas/StatusBadge.tsx` (νέο) — presentational pills + **PURE** tone mappers
+  (`tenantStatusTone`/`memberStatusTone`/`memberRoleTone`, unknown→neutral) + `Pill`/
+  `TenantStatusBadge`/`MemberStatusBadge`/`MemberRoleBadge`, styled ΜΟΝΟ με τα υπάρχοντα Pharos
+  design tokens (`var(--color-*)` + `color-mix` tinted border), server-safe. Label = raw string
+  → ένα unmapped status renders legibly, ΠΟΤΕ blank σε operator dashboard.
+- `components/saas/StatusBadge.test.ts` (νέο, 4 tests) — κάθε known status/role → tone + fallback.
+- `app/admin/tenants/page.tsx` (νέο) — **Workspaces listing**: gate (defence-in-depth) →
+  `parseAdminTenantQuery` + `listTenantsForAdmin` (registry-only). GET filter form (search q +
+  status select + reset· URL = source of truth, μηδέν client JS → shareable/bookmarkable),
+  responsive table (name/slug/domain link → detail, plan, status badge, tier, billing/byo-key
+  pills, created), **prev/next pagination** (offset±limit, "from–to of total"), empty-state.
+- `app/admin/tenants/[slug]/page.tsx` (νέο) — **Workspace detail**: gate → `getTenantDetailForAdmin`
+  (unknown slug → `notFound()`). Registry field list (slug/plan/tier/domain/billing/trial/
+  erasure/created/updated), member tally tiles (**ownerless→red warn**), usage rollup tiles
+  (AI calls/tokens/cost totals + storage gauge με measured-at), member roster table (email/name,
+  role+status pills, joined). ΟΛΑ τα numbers μέσα από τους defensive formatters (#53).
+- `components/saas/AdminNav.tsx` (edit, δικό μου #53) — προστέθηκε **Workspaces** link +
+  prefix-aware active highlight (`isActive`: Overview exact, section links match sub-paths).
+
+**Verified:** `npm run type-check` → **EXIT 0** (έπιασα 2 self-inflicted λάθη πριν το commit:
+ένα garbled function-name + λάθος `latestPeriod.period` όπου το πεδίο είναι `string|null`).
+`npx vitest run StatusBadge.test.ts` → **4/4**· full suite `npx vitest run` → **1845/1845 green**
+(142 files, καμία regression). ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο νέα app/admin/
+tenants/** + components/saas/StatusBadge* + το δικό μου AdminNav). `SAAS_MODE` off / self-hosted
+= **zero effect** (και οι δύο σελίδες self-gate σε `notFound()` μέσω `requireSuperadminPage()`
+πριν render· οι readers επιστρέφουν empty αφού ο DEFAULT_TENANT δεν έχει Tenant/Usage rows).
+Κανένας Docker rebuild (additive gated segment, μηδέν shared runtime wiring)· καμία νέα εξάρτηση.
+Collision guard: 3 foreign files (search-actions/receiptSearch από άλλη routine) ήταν pre-staged
+απ' την αρχή → **δεν** τα άγγιξα· isolated pathspec commit μόνο των δικών μου αρχείων.
+
+**## Needs Achilleas** (superadmin console):
+- **`SAAS_SUPERADMIN_EMAILS` + `SAAS_MODE=on` + `AUTH_SECRET`** για ενεργοποίηση του /admin σε
+  production. Κενό/off = console disabled (404), zero risk.
+- **Superadmin sign-in:** το /admin απαιτεί ενεργό Account session· η (saas) login UI δεν έχει
+  χτιστεί ακόμα → ο operator συνδέεται μέσω `POST api/saas/auth/login`. Επόμενο μεγάλο UI κομμάτι.
+- **LIVE per-tenant `db.stats()`** στο detail (on-demand data-plane read αντί για cached ledger) =
+  ξεχωριστό increment με άδεια. Το detail σήμερα δείχνει το τελευταίο sampled Usage snapshot.
+- **Write/destructive superadmin actions** (suspend/reactivate/force-plan/drop-tenant) = **ΠΟΤΕ από routine**.
+
+**Next task:** increment 55 — είτε (α) user-facing **(saas) auth UI** (signup/login panels που
+καταναλώνουν api/saas/auth/*, ξεκλειδώνει και το operator sign-in για το /admin), είτε (β)
+user-facing **workspace-settings** panels (members/billing/usage — όλα τα read/write control-plane
+APIs έτοιμα), είτε (γ) superadmin **live db.stats()** drill-down (data plane read-only → άδεια).
