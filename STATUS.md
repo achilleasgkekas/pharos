@@ -1,27 +1,27 @@
 # Pharos Monitor — STATUS
 
-## 2026-07-09 14:57
+## 2026-07-10 08:36
 
-**Ετυμηγορια: ΟΛΑ ΟΚ.** Η μηχανη ξυπνησε και ολες οι εξι ρουτινες ετρεξαν μεσα σε ενα σφιχτο παραθυρο 14:35–14:57 σημερα. Καθε ρουτινα αφησε φρεσκο αποτυπωμα, ολα τα markers προχωρησαν, μηδεν STALE. Ο builder εκλεισε το OWNER_DECISIONS #3 (SSRF IPv4-mapped fix, `5c2abf3`), ο reviewer επιβεβαιωσε 1659/1659 tests green, και ο docker guard επικυρωσε το stack. Το προηγουμενο STATUS (14:33) ειχε ολες STALE λογω σβηστης μηχανης· αυτο πλεον λυθηκε πληρως στον κυκλο που μολις ετρεξε.
+**Ετυμηγορια: 1 πιθανο προβλημα (parity auditor STALE).** Η μηχανη ηταν σβηστη 2026-07-09 15:12 εως 21:19, και απο τοτε ξυπνια συνεχομενα (21:19 εως 07:54 σημερα, ~11h awake window). Μεσα σε αυτο το παραθυρο ετρεξαν 5 απο τις 6 ρουτινες με φρεσκο αποτυπωμα (builder πολυ ενεργος, web auditor, ui auditor, reviewer, docker guard). Ο **parity auditor** ομως δεν αφησε καμια δικη του σαρωση Build Queue: τελευταιο ιχνος του η 47η σαρωση στις 2026-07-09 14:41, δηλαδη ~18h πριν. Αφου ολες οι αλλες ρουτινες ετρεξαν κανονικα στο ιδιο awake window, αυτο ΔΕΝ ειναι artifact σβηστης μηχανης, ειναι πραγματικο STALE.
 
 | routine | τελευταια δραστηριοτητα | OK/STALE | τι εκανε (συντομα) |
 |---|---|---|---|
-| builder (Pharos daily dev) | 2026-07-09 14:40 | OK | SSRF IPv4-mapped IPv6 bypass fix στο ssrf.ts (5c2abf3), progress log + concurrency incident (b1213fe)· touch apps/web |
-| parity auditor | 2026-07-09 14:41 | OK | 47η σαρωση mobile-parity, νεο functional GAP Receipts quick-verify P1/M (6135bd8) |
-| ui auditor | 2026-07-09 14:39 | OK | 48η σαρωση mobile-ui, RADIUS drift + brand-typography gap + loader consistency (7dbd43a) |
-| web auditor | 2026-07-09 14:56 | OK | 50η σαρωση web-debt, v1 καθαρος, νεο invites/accept guardless write P2/S (c11d296) |
-| reviewer | 2026-07-09 14:57 | OK | range 5c2abf3..c11d296, tsc web+mobile+landing EXIT 0, FAQ copy-link, μηδεν regression (d05e2a9, marker → c11d296) |
-| docker guard | 2026-07-09 14:51 | OK | validate stack at 163a0ab, health-only δεν χρειαστηκε rebuild (docs-only diff), healthy (9ca5115, marker → 4ca5649) |
+| builder (Pharos daily dev) | 2026-07-10 07:54 | OK | P6 iCal (.ics) subscription feed για το money agenda (ac2e2d5) + progress log (f8555fd)· πληθος feat commits στο awake window (asset-depreciation P29, suggested budgets P27, net-worth PA2, bank/CSV import PA1) |
+| parity auditor | 2026-07-09 14:41 | **STALE** | 47η σαρωση mobile-parity, νεο GAP Receipts quick-verify P1/M (6135bd8)· καμια δικη του σαρωση εκτοτε παρα το ~11h awake window |
+| ui auditor | 2026-07-10 02:48 | OK | 1η αποκλειστικα UI-consistency σαρωση (theme foundation OK, 5 dims, top-3 builder items) → UI Debt Queue (0b88a14) |
+| web auditor | 2026-07-10 04:05 | OK | 51η σαρωση web-debt, v1 100% καθαρος, 3 SaaS error-handling holdouts ανοιχτα (f0ae2ca) |
+| reviewer | 2026-07-10 04:36 | OK | range c11d296..65b81a2, tsc web+mobile EXIT 0, μηδεν regression, flag pricehike mobile-parity gap (0f472dc, marker → 65b81a2) |
+| docker guard | 2026-07-10 03:39 | OK | docker-health OOM recovery + rebuild timeout, HEAD αμεταβλητο, health-only (f8f345c, marker → 20bd514) |
 
 ## Open queue counts
 - Build Queue (MOBILE_PARITY): **6** TODO
-- UI Debt Queue (MOBILE_PARITY): **5** TODO
+- UI Debt Queue (MOBILE_PARITY): **9** TODO
 - Web Debt Queue (WEB_DEBT): **5** TODO
 
-Συγκριση με προηγουμενο STATUS (2026-07-09 14:33: Build 5 / UI 2 / Web 3): **Build 5→6 (+1)**, **UI 2→5 (+3)**, **Web 3→5 (+2)**. Ολες οι ουρες μεγαλωσαν, που ειναι το αναμενομενο και υγιες αποτελεσμα: το προηγουμενο snapshot ηταν παρμενο ενω η μηχανη ηταν σβηστη (οι auditors δεν ειχαν τρεξει)· τωρα οι τρεις auditors σαρωσαν και προσθεσαν νεα ευρηματα. Καμια ανησυχητικη συσσωρευση, ο builder δουλευει παραλληλα (εκλεισε το SSRF item).
+Συγκριση με προηγουμενο STATUS (2026-07-09 14:57: Build 6 / UI 5 / Web 5): **Build 6→6 (σταθερο)**, **UI 5→9 (+4)**, **Web 5→5 (σταθερο)**. Η αυξηση στο UI ειναι αναμενομενη και υγιης: ο ui auditor εκανε 1η αποκλειστικη UI-consistency σαρωση και προσθεσε νεα ευρηματα. Το Build Queue μενει σταθερο, κατι που ταιριαζει με το οτι ο parity auditor δεν ετρεξε (δεν προστεθηκαν νεα functional GAPs). Το Web σταθερο (v1 καθαρος, μονο 3 SaaS holdouts). Καμια ανησυχητικη συσσωρευση.
 
 ## Προσοχη
 
-Κανενα προβλημα. Ολες οι ρουτινες φρεσκες, ολα τα markers συγχρονισμενα (reviewer → c11d296, docker-validated → 4ca5649). Τα δυο κολλημενα markers που ειχε επισημανει το προηγουμενο STATUS (reviewer 62d0a86, docker 51d43ba) εχουν πλεον προχωρησει κανονικα στον σημερινο κυκλο.
+- **parity auditor — STALE (~18h).** Τελευταια δικη του σαρωση Build Queue: 2026-07-09 14:41 (47η, 6135bd8). Στο awake window 21:19→08:36 (~11h) οπου ολες οι αλλες 5 ρουτινες ετρεξαν, ο parity auditor δεν εγραψε καμια νεα σαρωση. Τι να ελεγξει ο Αχιλλεας: (α) οτι το scheduled task «Auditor pharos» ειναι ενεργο και δεν κολλησε σε προηγουμενο run· (β) μηπως εμποδιζεται απο το ξενο uncommitted WIP στο tree (search-actions.ts + lib/receiptSearch.ts/.test.ts, P22) και βγαινει νωρις· (γ) τα markers των αλλων ειναι συγχρονισμενα, οποτε το προβλημα ειναι απομονωμενο στον parity, οχι συστημικο.
 
-Μια παρατηρηση προς ενημερωση (οχι συναγερμος): το `apps/mobile/src/screens/ReceiptsScreen.tsx` παραμενει uncommitted στο working tree (ξενη WIP migration einput→Input/TextArea, ημιτελης απο 2026-07-06)· ο builder το εχει καταγραψει και δεν το αγγιξε καμια ρουτινα. Αν παραμεινει, επομενο builder run να το υιοθετησει ή να το καθαρισει. Επισης ο builder κατεγραψε concurrency incident (ταυτοχρονες routines stage-αραν κατα το run του)· χωρις απωλεια δεδομενων, αλλα αξιζει ο Αχιλλεας να δει το δικο του σημειωμα στο PROGRESS.md για το διδαγμα με τα ρητα pathspecs.
+- **Ενημερωση, οχι συναγερμος:** ο reviewer marker (65b81a2) και ο docker-validated marker (20bd514) ειναι πισω απο το HEAD (f8555fd), γιατι μετα το τελευταιο τους run μπηκαν νεα builder commits (saas auth UI, iCal, price-hike). Φυσιολογικο· θα τα πιασουν στο επομενο run. Ο docker guard σκοπιμα απεφυγε rebuild λογω OOM contention στον μοιραζομενο VM (bakecore stack παραλληλα), κατι που κατεγραψε ο ιδιος. Το ξενο P22 WIP παραμενει uncommitted και καμια ρουτινα δεν το εχει αγγιξει.
