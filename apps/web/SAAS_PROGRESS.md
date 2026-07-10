@@ -563,3 +563,63 @@ routines) ΔΕΝ αγγίχτηκαν· isolated pathspec commit μόνο των
 panels λείπουν), είτε (β) **Usage** deep-dive panel/tab (πέρα από τα summary numbers του Overview),
 είτε (γ) **root-app landing** μετά το login (πώς φαίνεται το `/` για signed-in Account χωρίς
 per-tenant User session — παραμένει ανοιχτό από increment 56).
+
+## 2026-07-10 (increment 59 — account-recovery + email-verification UI: /account/reset[/confirm] + /account/verify, §8 UI-first)
+**Το κενό:** τα increments 55-58 έχτισαν login/signup + όλο το workspace-settings (Overview/
+Members/Billing), αλλά η auth UI ήταν μισή — δεν υπήρχε ΚΑΝΕΝΑ σημείο για «forgot password» ή για
+email verification. Οι server routes (`api/saas/account/reset/request|confirm` +
+`account/verify/request|confirm`) ήταν έτοιμες εδώ και βδομάδες με ΜΗΔΕΝ UI: ένας χρήστης που
+ξεχνούσε password ή έπαιρνε verification email δεν είχε πουθενά να πάει. Έχτισα το recovery +
+verification UI, καταναλώνοντας τα ήδη-χτισμένα routes. ΟΛΟ additive, σε δικούς μου φακέλους:
+- `components/saas/recoveryValidation.ts` (νέο) — **PURE + client-safe** (import μόνο τα policy
+  constants απ' το sibling `authValidation`): `resetRequestReady` (email-shape front-stop, ΠΟΤΕ
+  δεν αποκαλύπτει existence — το route απαντά neutral), `newPasswordError(pw, confirm)` (mirror
+  του server `resetPasswordError` MIN_PASSWORD=8 + client-only match check), `resetConfirmReady`,
+  `describeRecoveryError(status, serverError)` (server message-first, αλλιώς status fallback),
+  `tokenLink(base, token)` (same-origin encoded confirm link για τα dev-echoed tokens).
+- `components/saas/recoveryValidation.test.ts` (νέο, 12 tests) — email guard, short/mismatch/
+  non-string password, confirm-ready token+pair, error map (server-first + κάθε status), token
+  link encode/trim.
+- `components/saas/ResetRequestForm.tsx` (νέο, client) — email → POST `reset/request`. ΚΑΘΕ 2xx →
+  ίδιο neutral «if that email exists, a link is on its way» (anti-enumeration — το UI ΠΟΤΕ δεν
+  λέει αν υπάρχει account)· dev `devToken` → gold one-click «reset link».
+- `components/saas/ResetConfirmForm.tsx` (νέο, client) — token (από το emailed link, server-passed)
+  + new password + confirm → POST `reset/confirm` → success **full navigation** `/account/login`
+  (fresh signed-out render· τα υπάρχοντα sessions ΔΕΝ force-expire, το νέο hash πιάνει στο επόμενο
+  login, consistent με το route). Missing-token → terminal message + «request a new link».
+- `components/saas/VerifyEmail.tsx` (νέο, client) — δύο entry points: (α) με token (inbox link) →
+  **auto-POST** `verify/confirm` on mount (`ranRef` guard κατά του React 18 double-invoke) →
+  confirming/success/error· (β) χωρίς token → prompt· signed-in → «Resend» (POST `verify/request`,
+  authenticated, dev `devToken` → link)· logged-out → «Sign in to resend» (`?next=/account/verify`).
+- `app/(saas)/account/reset/page.tsx` (νέο) — gate `requireSaasUiEnabled` → AuthShell +
+  ResetRequestForm + footer back-to-login.
+- `app/(saas)/account/reset/confirm/page.tsx` (νέο) — gate → read `?token` server-side → AuthShell
+  + ResetConfirmForm.
+- `app/(saas)/account/verify/page.tsx` (νέο) — `getSaasViewer` (gate + viewer-or-null) → read
+  `?token` → AuthShell + VerifyEmail (`loggedIn` από το viewer, ώστε το resend να εμφανίζεται μόνο
+  σε session).
+- `app/(saas)/account/login/page.tsx` (δικό μου) — πρόσθεσα «Forgot your password?» link στο
+  footer (μόνη additive αλλαγή, τώρα που το reset flow υπάρχει).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run recoveryValidation.test.ts` →
+**12/12**· full suite `npx vitest run` → **2059/2059 green** (159 files, καμία regression).
+ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο νέα app/(saas)/account/{reset,verify}/** +
+components/saas/recoveryValidation*/ResetRequestForm/ResetConfirmForm/VerifyEmail + additive
+footer link στο δικό μου login page). `SAAS_MODE` off / self-hosted = **zero effect** (κάθε σελίδα
+self-gates σε `notFound()` μέσω `requireSaasUiEnabled()`/`getSaasViewer()` πριν render). Κανένας
+Docker rebuild (additive gated segment + client/pure modules, μηδέν shared runtime wiring)· καμία
+νέα εξάρτηση. Collision guard: foreign modified/untracked (search-actions/receiptSearch από άλλη
+routine) ΔΕΝ αγγίχτηκαν· isolated pathspec commit μόνο των δικών μου αρχείων.
+
+**## Needs Achilleas** (recovery/verify UI):
+- **SMTP / mailer:** τα reset + verify links φτάνουν στον χρήστη ΜΟΝΟ με configured mailer. Χωρίς
+  αυτό, σε dev τα routes echo-άρουν `devToken` (τα panels δείχνουν one-click link) και σε production
+  το drop-άρουν σιωπηλά (fail closed, μηδέν leak). SMTP creds = ανοιχτό (γενικό SaaS Needs-Achilleas).
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχουν καν οι σελίδες (αλλιώς 404). Self-hosted
+  = disabled, zero risk.
+
+**Next task:** increment 60 — είτε (α) **Usage** deep-dive panel/tab (πέρα από τα summary numbers
+του Overview: AI-call ledger breakdown, storage footprint), είτε (β) **account profile** panel
+(name/email/password change — `account/profile` + `account/password` routes έτοιμα), είτε (γ)
+**root-app landing** μετά το login (πώς φαίνεται το `/` για signed-in Account χωρίς per-tenant User
+session — παραμένει ανοιχτό από increment 56).

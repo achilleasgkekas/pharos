@@ -37,6 +37,13 @@ export default async function LoginPage({
           >
             Create one
           </Link>
+          <br />
+          <Link
+            href="/account/reset"
+            className="font-medium text-[color:var(--color-accent)] hover:underline"
+          >
+            Forgot your password?
+          </Link>
         </>
       }
     >
