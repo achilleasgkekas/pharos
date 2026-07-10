@@ -5,6 +5,53 @@
 <!-- reviewed: 65b81a2 -->
 <!-- docker-validated: f8f345c -->
 
+## 2026-07-12 (pharos-daily-dev — P18 receipt↔statement reconciliation SHIPPED)
+
+**Τι έγινε**: Έχτισα το **P18 (receipt ↔ statement transaction reconciliation)**, το επόμενο Approved «πολύ ψηλό
+value/effort» item (το προηγούμενο, P22 receipt full-text search, το δουλεύει ο Αχιλλέας — `receiptSearch.*` +
+`search-actions.ts` ήταν uncommitted στο tree, **δεν τα άγγιξα**). Commit `07fba9f` (pushed).
+
+Τι μπήκε:
+- **`lib/reconcile.ts`** (pure, DB-free, +17 unit tests): `reconcile(txns, receipts, opts)` → για κάθε χρέωση
+  ranked candidate αποδείξεις. Κανόνες: ποσό `|charge| == receipt.total` εντός ±€0.02 (abs ώστε να πιάνει
+  refunds/credits), ημερομηνία εντός ±3 μέρες (default, tunable), store-token overlap ως tiebreaker/booster
+  (ΟΧΙ hard requirement — τα statement descriptors είναι terse). Deterministic stable sort (score→dayDiff→
+  amountDiff→id), cap maxCandidates=3, + `unmatchedReceiptIds` (αποδείξεις μη confirm-linked σε καμία χρέωση).
+- **Server actions** (`statements/actions.ts`): `getReconciliation(statementId)` — φορτώνει receipts σε window
+  −45/+5 μέρες γύρω από statementDate (κρατά τα suggestions relevant + cheap), τρέχει το engine, και υπολογίζει
+  «αποδείξεις χωρίς αντίστοιχη χρέωση» global (σαρώνει τα matchedReceiptId ΟΛΩΝ των statements). +
+  `linkTransactionReceipt` / `unlinkTransactionReceipt` (set/clear `matchedReceiptId` — το πεδίο **προϋπήρχε**
+  στο TransactionSchema από παλιότερα, μηδέν migration). **Builder defaults (καταγράφονται)**: auto-suggest **με
+  confirm** (όχι silent auto-link, όπως ζητούσε το backlog), ±3 μέρες, ±€0.02 ποσό.
+- **`ReconcilePanel.tsx`**: self-contained modal — statement picker (αν >1), κάθε χρέωση με state (matched
+  πράσινο / suggested cyan με candidates+«Link» / no-match γκρι), unlink, + section «αποδείξεις χωρίς χρέωση».
+  Lazy-loads suggestions ανά statement. Wired ως «Reconcile» button στο header των /statements (μόνο όταν
+  statements.length>0). i18n `rec.*` (en source + el· άλλα 6 locales fallback στα αγγλικά).
+
+**Scope απόφαση (καταγράφεται)**: το backlog ανέφερε και «flag διπλοχρεώσεων» — αυτό είναι derivable (πολλές
+χρεώσεις ίδιου ποσού+ημέρας) και δεν πρόσθεσα ρητό view για να μη sprawl-άρει· το «receipt without statement» ΚΑΙ
+το «charge without receipt» (candidates.length===0) καλύφθηκαν. Δεν άγγιξα τον 1551-γραμμο StatementDetail — το
+reconciliation ζει σε δικό του panel για coherence + reviewability.
+
+**Verified**: `apps/web npm run type-check` → **EXIT 0**. Πλήρες `npx vitest run` → **1961 passed / 151 files**
+(τα νέα 17 reconcile tests + locales.test πράσινο με τα νέα `rec.*` keys). **Μηδέν regression**.
+
+**Docker rebuild SKIPPED (memory contention, established precedent)**: ο μοιραζόμενος ~1.9GB VM έτρεχε 11 containers
+(homepage web/mongo/searxng/landing + bakecore ×6, up 4h → πιθανή live session). Ένα Next production build κάτω από
+αυτή τη συμφόρηση έχει OOM-crash-loop-άρει τη Mongo σε προηγούμενα runs → θα ρίσκαρε να destabilise-άρει live
+bakecore stack. Το change είναι πλήρως additive (μηδέν migration) + καλυμμένο από type-check + 1961 tests. Πήρα/
+απελευθέρωσα σωστά το `/tmp/claude-docker.lock` mutex (δεν έτρεξε build). **Serve-check pending** μέχρι ελεύθερος
+VM: /statements → «Reconcile» button → modal → διάλεξε statement → οι χρεώσεις δείχνουν suggested αποδείξεις →
+«Link» → γίνεται matched (πράσινο)· «unmatched receipts» section δείχνει αποδείξεις της περιόδου χωρίς χρέωση.
+
+**Working tree**: ρητό `git add` με τα 7 δικά μου αρχεία· το ξένο P22 WIP (`receiptSearch.ts/.test.ts`,
+`search-actions.ts`) ΔΕΝ αγγίχτηκε (unstaged).
+
+**Επόμενο suggested task**: (α) όταν ελεύθερος VM, safe rebuild + serve-check του P18 (link/unlink end-to-end)· ή
+(β) επόμενο Approved: **P19 safe-to-spend forward cashflow** (S/M «ψηλό value/effort», reuse `lib/moneyAgenda.ts`
+projection → sum μελλοντικών γνωστών χρεώσεων − income σε 30/60/90 μέρες, Reports+Homepage card) ή **P28 bill/payable
+status tracker** (M). Απόφυγε το P22 όσο υπάρχει uncommitted receiptSearch στο tree.
+
 ## 2026-07-11 (pharos-daily-dev, P15 Vendor→category auto-rules SHIPPED)
 
 **Τι έγινε**: Υλοποιήθηκε το **P15 (vendor→category auto-rules)**, Approved item «πολύ ψηλό value/effort», size S/M, ντετερμινιστικό/μηδέν AI. Commit `5f13b7c` (pushed). Το επέλεξα από την ουρά των «πολύ ψηλό value/effort» Approved που δεν συγκρούεται με το ξένο uncommitted WIP (P22 receiptSearch στο tree, δεν το άγγιξα — έμεινε unstaged).

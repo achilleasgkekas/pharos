@@ -173,12 +173,20 @@
   follow-up (δεν έχουν σήμερα έννοια category). «Learn from this» suggestion = follow-up. Commit TBD.
 - **Module:** Expenses (+ Settings για τη διαχείριση κανόνων).
 
-### P18. Receipt ↔ statement transaction reconciliation (auto-match) — S/M — both (πολύ ψηλό value/effort)
-- **Αξία:** auto-match (κατάστημα/ποσό/ημερομηνία ±μέρες) απόδειξης ↔ statement transaction: «αυτή η €287
-  χρέωση = αυτή η απόδειξη» + flag «χρεώσεις χωρίς απόδειξη» / «αποδείξεις χωρίς statement». Πιάνει
-  διπλοχρεώσεις. Reuse signature/description-normalization + link machinery· εδώ link-to-receipt.
-- **Module:** Statements + Receipts (νέο `matchedReceiptId` + reconciliation view).
-- **Ανοιχτή απόφαση (builder default):** auto-suggest **με confirm** (όχι silent auto-link)· ανοχή ±3 μέρες.
+### P18. Receipt ↔ statement transaction reconciliation (auto-match) — ✅ SHIPPED 2026-07-12 (pharos-daily-dev, commit 07fba9f)
+- **Υλοποίηση:** pure `lib/reconcile.ts` (`reconcile()`, DB-free, +17 unit tests): για κάθε χρέωση ενός
+  εκκαθαριστικού, ranked candidate αποδείξεις με **auto-SUGGEST (ΟΧΙ silent-link)** — match ανά ποσό
+  (`|charge| == total`, ±€0.02, abs για refunds), ημερομηνία (±3 μέρες default), store-token tiebreaker·
+  deterministic stable ordering + unmatched-receipt flagging. Το πεδίο `matchedReceiptId` **προϋπήρχε** στο
+  TransactionSchema (μηδέν migration). Server actions: `getReconciliation(statementId)` (date-windowed γύρω
+  από statementDate −45/+5 μέρες, unmatched = αποδείξεις μη-linked σε ΚΑΜΙΑ χρέωση global) +
+  `linkTransactionReceipt` / `unlinkTransactionReceipt`. UI: `ReconcilePanel.tsx` (statement picker + χρεώσεις
+  με matched/suggested/no-match state + link/unlink + «αποδείξεις χωρίς χρέωση» section), wired ως «Reconcile»
+  button στο header των /statements. i18n `rec.*` (en+el). Verify: type-check EXIT 0, vitest 1961 passed.
+- **Locked defaults (builder):** ανοχή ημερομηνίας ±3 μέρες (tunable), ποσό ±€0.02 (τιμές card charge = total στο
+  cent), auto-suggest με confirm. **Follow-up:** το «flag διπλοχρεώσεων» = derivable (πολλές χρεώσεις ίδιου
+  ποσού/ημέρας)· δεν προστέθηκε ρητό view. Docker serve-check pending (VM contention).
+- **Module:** Statements + Receipts (`matchedReceiptId` + reconciliation modal).
 
 ### P19. «Safe-to-spend» forward cashflow (τι μένει, όχι τι ξόδεψες) — S/M — both (ψηλό value/effort)
 - **Αξία:** «αυτόν τον μήνα έχεις €X income − €Y γνωστές μελλοντικές χρεώσεις = €Z διαθέσιμα» + mini προβολή
