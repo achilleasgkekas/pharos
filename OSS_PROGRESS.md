@@ -1450,3 +1450,27 @@ Mock pattern: action-seam (όπως trash/search/notifications/lists) — mock �
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλων routines (landing Docker: `apps/landing/next.config.ts` [M] + `.dockerignore`/`Dockerfile` [??]· `search-actions.ts` [M]· `docker-compose.yml` [M]· `lib/receiptSearch.ts`+`.test.ts` [??]) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα μόνο τα δικά μου paths (jobs/route.test.ts + OSS_PROGRESS.md).
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run. Τα εύκολα single-action `{ rows }` wrappers (trash, jobs) ΕΓΙΝΑΝ. Απομένουν τα πιο βαριά (multi-model mocks — σπάσε τα ή δώσε τους ολόκληρο run): `overview/route.ts` (7 countDocuments + computeInstallmentPlans — envelope shape + auth), `calendar/route.ts` (5 models + date-stepping), `reports/route.ts`. Χαμηλή αξία (trivial `{rows}` wrapper): `history/route.ts`. Εναλλακτικά, αν προτιμάς DB-free: κοίτα untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `find src -name '*.test.ts'` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-10 (cont. — overview/route.test.ts, counts filters + installments roll-up + envelope)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/overview/route.test.ts` για το GET του `/api/v1/overview`.**
+
+Επιλογή target: τα εύκολα single-action `{ rows }` wrappers (trash, jobs) έγιναν· από τα εναπομείναντα «βαριά» routes (overview/calendar/reports) διάλεξα το **`overview/route.ts`** γιατί είναι το πιο manageable: 6 `countDocuments` (απλά number returns) + ένα `Statement.find().lean()` + `computeInstallmentPlans` (pure lib, ήδη tested — το mock-άρω ως seam) + `getAppSettings` (currency). Route-only logic που ζει αποκλειστικά εδώ και τροφοδοτεί το mobile dashboard (headline counts + χρωστούμενα δόσεων):
+- **Auth gate**: withAuth → 401 χωρίς token (καμία DB read — ούτε countDocuments, ούτε Statement.find, ούτε computeInstallmentPlans).
+- **Count filters**: shoppingList μόνο `{checked:false}`, subscriptions μόνο `{active:true}`, openTasks μόνο `{status:{$ne:'done'}}`· τα υπόλοιπα (items/receipts/expenses) raw χωρίς arg.
+- **Installments roll-up**: computeInstallmentPlans πάνω στα statements → κρατά μόνο `!done` → sum(remainingAmount) → `Math.round` = `installmentsOwed`, count = `activeInstallmentPlans`. Ένα done plan με remainingAmount που μένει ΔΕΝ μετράει.
+- **Envelope**: `{ counts:{items,shoppingList,receipts,expenses,subscriptions,openTasks}, installmentsOwed, activeInstallmentPlans, currency }`.
+
+Mock pattern: DB-mock (όπως τα heavier routes) — mock και τα 7 models (countDocuments returns number, Statement.find→lean array) + `@/lib/installments` computeInstallmentPlans (configurable plans) + `@/lib/appSettings` getAppSettings (currency) + auth seam (`@/lib/db` connectDB + `@/models/User` findOne chain). Τρέχω τον ΠΡΑΓΜΑΤΙΚΟ withAuth helper.
+
+Τι έγινε: Νέο `route.test.ts` (10 tests). **auth gate** (2: no-token→401 + μηδέν DB· unknown-token→401 + μηδέν DB). **counts envelope** (3: κάθε countDocuments→σωστό key· filters shoppingList/subs/tasks + raw items/receipts/expenses· zeros σε empty install). **installments roll-up** (3: sum μόνο !done + round=151 από 150.7 + active=2 [done plan €999 excluded]· 0/0 σε no plans· 0 active όταν όλα done ακόμα κι αν remainingAmount μένει). **currency** (2: USD pass-through από getAppSettings· full top-level envelope keys).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/overview/route.test.ts` → 10/10 passed.
+- `npx vitest run` (όλο το suite) → 141 files, 1841/1841 passed (ήταν 1781).
+- `npm run type-check` → exit 0 (καθαρό, μηδέν errors).
+- Collision guard: `git diff --cached` ΕΙΧΕ foreign staged files άλλου routine (`search-actions.ts` + `receiptSearch.ts`/`.test.ts` — receipt-search feature) που έμειναν staged unchanged >60s (stalled/abandoned mid-commit). Δεν έκανα plain commit (θα τα ρουφούσε). Committed ΜΟΝΟ τα δικά μου explicit paths με pathspec (`git commit -- overview/route.test.ts OSS_PROGRESS.md`) → τα foreign staged files μένουν άθικτα στο index. Άλλο foreign WIP (unstaged): reports/page.tsx, settings/*, appSettings*, i18n/*, AppConfig.ts, depreciation.* — κανένα δεν άγγιξα.
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run. Απομένουν βαριά (multi-model): `calendar/route.ts` (5 models + date-stepping — σπάσε το σε auth + envelope shape με mocked models) και `reports/route.ts` (6 models + πολλή pure aggregation — μεγάλο, δώσε του ολόκληρο run ή σπάσε σε επιμέρους describe blocks: net-position, cash-flow windows, by-category, spend-by-store, installment-payoff). Χαμηλή αξία (trivial `{rows}` wrapper): `history/route.ts`. DB-free εναλλακτική: untested pure libs (`notifiers.shared.ts` — client-safe types/const). Δες ΠΡΩΤΑ το κάθε route πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
