@@ -9,6 +9,7 @@ import { Subscription } from '@/models/Subscription';
 import { Expense } from '@/models/Expense';
 import { Voucher } from '@/models/Voucher';
 import { OWNED_STATUSES } from '@/lib/itemStatus';
+import { matchedLineItemName } from '@/lib/receiptSearch';
 
 export type SearchHit = {
   type: 'item' | 'receipt' | 'statement' | 'task' | 'subscription' | 'expense' | 'voucher';
@@ -22,7 +23,7 @@ export type SearchHit = {
 // (plus the implicit `_id`). Replaces the old `as any[]` casts so the field
 // access in the hit-builders is type-checked against what was actually selected.
 type ItemLean = { _id: unknown; title: string; status: string; currentPrice?: number | null; purchasedPrice?: number | null };
-type ReceiptLean = { _id: unknown; store: string; date: string | Date; total?: number };
+type ReceiptLean = { _id: unknown; store: string; date: string | Date; total?: number; lineItems?: { name?: string; refinedName?: string }[] };
 type StatementLean = { _id: unknown; card: string; period: string; totalAmount?: number };
 type TaskLean = { _id: unknown; title: string; status: string };
 type SubscriptionLean = { _id: unknown; name: string; amount?: number; billingCycle?: string };
@@ -49,7 +50,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
       $or: [{ store: r }, { 'lineItems.name': r }, { 'lineItems.refinedName': r }, { paymentMethod: r }],
     })
       .limit(8)
-      .select('store date total')
+      .select('store date total lineItems.name lineItems.refinedName')
       .lean<ReceiptLean[]>(),
     Statement.find({ $or: [{ card: r }, { period: r }, { 'transactions.description': r }] })
       .limit(6)
@@ -88,11 +89,14 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
   }
   for (const rc of receipts) {
     const id = String(rc._id);
+    // If the query matched a product inside the receipt (not the store name),
+    // surface that line item so the user sees *why* this receipt appeared (P22).
+    const matched = r.test(rc.store) ? null : matchedLineItemName(r, rc.lineItems);
     hits.push({
       type: 'receipt',
       id,
       title: rc.store,
-      subtitle: `Receipt · ${new Date(rc.date).toLocaleDateString('en-GB')} · ${cur()}${rc.total}`,
+      subtitle: `Receipt · ${new Date(rc.date).toLocaleDateString('en-GB')} · ${cur()}${rc.total}${matched ? ` · ${matched}` : ''}`,
       href: `/receipts?open=${id}`,
     });
   }
