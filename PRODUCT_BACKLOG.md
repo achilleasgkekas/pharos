@@ -138,7 +138,8 @@ _(κενό — P27-P31 εγκρίθηκαν 2026-07-09· ο planner προσθέ
 - **Ανοιχτή απόφαση (builder default):** income = tracked recurring + optional manual «expected income»·
   ξεκίνα αφαιρώντας μόνο σταθερές γνωστές χρεώσεις (variable median = phase 2).
 
-### P6. iCal (.ics) subscription feed για Calendar — S — both (πολύ ψηλό value/effort)
+### P6. iCal (.ics) subscription feed για Calendar — ✅ SHIPPED 2026-07-10 (pharos-daily-dev, commit ac2e2d5)
+- **Υλοποίηση:** νέο pure `lib/ics.ts` (RFC 5545 VCALENDAR builder + 18 unit tests) + shared `lib/moneyAgenda.ts` (αποσπάστηκε από το v1 calendar route, το τρέχουν και τα δύο) + route `GET /api/calendar.ics?token=…` (text/calendar, token-scoped). Auth μέσω dedicated **low-scope `User.calendarToken`** (ΟΧΙ το full API bearer — leaked subscribe URL δεν δίνει API access· απόκλιση από το reuse-apiToken default για ασφάλεια). All-day VEVENTs, [Category] prefix + ποσό, stable UIDs. Settings → `CalendarFeedManager` (generate/rotate/revoke + copy URL) + en/el i18n. Τα 13 υπάρχοντα v1 route tests πέρασαν αμετάβλητα (refactor transparent). Commit `ac2e2d5`.
 - **Αξία:** read-only `.ics` feed URL (token-scoped) → subscribe από Google/Apple/Outlook Calendar· όλα τα
   οικονομικά deadlines δίπλα στο κανονικό ημερολόγιο. Ο υπολογισμός events υπάρχει· μένει VCALENDAR + route.
 - **Module:** Calendar (+ auth token, reuse `User.apiToken` scope).
