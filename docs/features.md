@@ -115,6 +115,12 @@ Receipts: dropzone scan, manual add, grid / list, and a filter sidebar.
 - **Anomaly detection.** For a vendor with enough history, an entry that deviates
   more than ~30% from the median is flagged with a badge (for example "-50% vs this
   vendor's usual"), computed on the fly.
+- **Category auto-rules.** A deterministic (no AI) rules engine: "if the vendor or
+  description matches X, set the category to Y (and optionally mark it recurring)".
+  Rules run on create across all three entry paths (AI scan, manual add, CSV import) —
+  a rule wins over the AI guess but a manual add only applies one when you left the
+  category unset. An "Apply to existing" button retro-tags uncategorised records.
+  Configure the rules in Settings → Money.
 
 ## Statements & installments
 
@@ -162,6 +168,14 @@ A three-month agenda (`/calendar`) that unifies everything with a date:
 
 Each month shows money-out / money-in totals and a "due this month" header.
 Everything is derived live from your data; nothing extra is stored.
+
+**Calendar subscription feed.** The same three-month agenda is published as a
+read-only iCal (`.ics`) feed at `/api/calendar.ics?token=…`, so you can subscribe
+to it from Google, Apple, or Outlook Calendar and see renewals, installments,
+projected bills, and expiries alongside your other events. The feed is authed by a
+dedicated low-scope calendar token (not your full API bearer, so a leaked subscribe
+URL never grants API access); generate, copy, rotate, or revoke it in
+Settings → AI.
 
 ## Reports
 
@@ -250,7 +264,8 @@ Configuration is grouped into tabs:
   per-category targets from the median of your last three complete months),
   manual asset accounts, asset depreciation, and payment cards.
 - **AI** — provider (Ollama / Anthropic / OpenAI / Gemini / OpenRouter / Custom),
-  a separate scraper AI, and editable AI prompts.
+  a separate scraper AI, editable AI prompts, and the calendar feed token
+  (generate / copy / rotate / revoke).
 - **Network** — UniFi host / user / connection test.
 - **Storage & backup** — file storage backend (local / SMB / FTP / OneDrive),
   folder / filename templates, mirror-on-verify, sync, backup / restore, CSV

@@ -1274,3 +1274,32 @@ staged WIP files (search-actions.ts + receiptSearch.ts/.test.ts) ειναι stal
 Επομενο run: (α) saas.md §8 stale-forward για το νεο /admin/tenants Workspaces console (listing +
 [slug] detail, commit f6a4f27) που δεν καλυπτεται ακομα στο console UI section· ή (β) συνεχεια
 features.md — mobile companion app section αν εχει νεα, ή insurance export (P13) οταν shipαρει.
+
+## 2026-07-11 (features.md stale-forward: iCal calendar feed P6 + category auto-rules P15)
+
+Δυο user-facing features που ειχαν shipαρει (commits ac2e2d5 + 5f13b7c) αλλα δεν καλυπτονταν
+ακομα στο features.md:
+
+- **Calendar → subscription feed (P6, ac2e2d5)**: νεα παραγραφος στη Calendar section — read-only
+  iCal (.ics) στο `/api/calendar.ics?token=…`, subscribe απο Google/Apple/Outlook, authed με
+  dedicated low-scope calendar token (ΟΧΙ το full API bearer, ωστε leaked subscribe URL να μη
+  δινει API access). Manage (generate/copy/rotate/revoke) σε Settings → AI.
+- **Expenses → category auto-rules (P15, 5f13b7c)**: νεο bullet στο Expenses & Income — deterministic
+  (zero-AI) rules "vendor/description matches X → category Y (+optional recurring)", τρεχει on create
+  σε ολα τα 3 entry paths (scan/manual/CSV), rule wins over AI guess, manual add μονο οταν category
+  unset, + "Apply to existing" retro-tag. Config σε Settings → Money.
+- Settings → AI bullet επεκταθηκε με το calendar feed token.
+
+Διαβασα τα πραγματικα commit diffs (git show ac2e2d5/5f13b7c) πριν γραψω — καμια εφευρεση. Τα
+security details (low-scope token, οχι bearer) ηρθαν verbatim απο το commit body.
+
+Validation: markdown only, κανενα build/Docker/AI call. features.md fence count = 0 (ζυγο),
+secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/CRON_SECRET=) clean.
+
+Collision guard: πριν το commit ελεγχος `git status --short` + `git diff --cached`· τα foreign
+staged WIP (search-actions.ts + receiptSearch.ts/.test.ts) ειναι stale απο την αρχη — ΔΕΝ τα
+αγγιζω, commit ΜΟΝΟ docs/features.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επομενο run: (α) api.md — προσθηκη του non-v1 `/api/calendar.ics` endpoint (method/token/response)
+σε δικη του "Other endpoints" section, ή (β) configuration.md — calendar feed subscribe walkthrough
+(Google/Apple/Outlook steps) κατω απο connectors.
