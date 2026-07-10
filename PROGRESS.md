@@ -3,7 +3,20 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 65b81a2 -->
-<!-- docker-validated: 20bd514 -->
+<!-- docker-validated: f8f345c -->
+
+## 2026-07-10 (docker-health — attended rebuild ΠΕΤΥΧΕ, marker 20bd514→f8f345c)
+- **Follow-up του προηγούμενου run:** ο Αχιλλέας ζήτησε ρητά «κάνε build» (παρών, χωρίς το 10λεπτο όριο). Έτρεξα το
+  rebuild με τη σωστή στρατηγική για το μικρό VM: **σταμάτησα το web** ώστε το build να μη συναγωνίζεται RAM με τη
+  Mongo, `docker compose build web` στο **background** (δεν κόβεται στα 10min), μετά swap.
+- **Αποτέλεσμα:** build **exit 0** σε ~4.5min (η Mongo έγινε στιγμιαία `unhealthy` στο peak του type-checking αλλά
+  ανέκαμψε μόνη της· δεν χρειάστηκε παρέμβαση). `docker compose up -d web` → **serving 200**, web restarts **0**,
+  Mongo healthy. Ο νέος κώδικας deployed.
+- **Marker → `f8f345c`** (HEAD τη στιγμή του build-start). ΠΡΟΣΟΧΗ: 15 commits ήρθαν από concurrent routines ΚΑΤΑ/
+  ΜΕΤΑ το build (P6 iCal feed, P14 price-hike watch, SaaS auth UI `/account/login|signup`, νέα api/v1 route tests) →
+  **ΔΕΝ είναι στο deployed image**. Τα άφησα εκτός marker επίτηδες ώστε το επόμενο docker-health run να τα ξαναχτίσει
+  και να τα validated-άρει. Δεν είναι regression, απλά ουρά για το επόμενο build.
+- **Disk:** prune 2.145GB build cache. Τελικό: Images 4.50GB, Build Cache 1.07GB.
 
 ## 2026-07-11 (reviewer — range c11d296..65b81a2)
 - **Τι έλεγξα:** 45 commits (κυρίως docs/tests/landing/saas· ουσιαστικός κώδικας = P14 price-hike, PA2 net-worth,
