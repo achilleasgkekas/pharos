@@ -1648,6 +1648,14 @@ button:focus-visible,
     animation: none;
     opacity: 1;
   }
+  /* The reading-progress beam is a glowing, decorative element (aria-hidden)
+     that visually glides across the top as you scroll. WCAG 2.3.3 (Animation
+     from Interactions): non-essential motion triggered by scrolling should be
+     avoidable, and the native scrollbar already conveys reading position, so
+     hide the beam entirely for reduced-motion users. */
+  .scroll-progress {
+    display: none;
+  }
   *,
   *::before,
   *::after {

@@ -1703,3 +1703,39 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον.
+
+## 2026-07-10 (cont.⁵) — (e) polish/a11y: hide scroll-progress beam σε reduced-motion
+
+Increment (e) polish, reduced-motion audit (το προηγουμενο run εβαλε aria-live στο Waitlist). Σαρωσα ολο
+το motion surface: το μονο infinite animation ειναι το `.beacon` (ηδη `animation:none` σε reduced-motion),
+το `scroll-behavior` γινεται `auto`, οι JS smooth-scrolls (BackToTop/FaqDeepLink) ελεγχουν το reduce flag,
+και το universal nuke rule (`transition-duration:0.01ms !important`) σκοτωνει καθε glide. Ενα genuine κενο
+εμεινε: το `.scroll-progress` beam (glowing accent->cyan bar, JS scaleX ανα scroll) ειναι decorative
+(aria-hidden) αλλα εξακολουθει να ολισθαινει οπτικα καθως scroll-αρεις. WCAG 2.3.3 (Animation from
+Interactions): non-essential motion πυροδοτημενο απο scroll πρεπει να ειναι avoidable, και το native
+scrollbar ηδη δειχνει reading position.
+
+- `app/globals.css`: στο `@media (prefers-reduced-motion: reduce)` block, νεο `.scroll-progress{display:none}`
+  (κρυβει ολοκληρο το beam για reduced-motion χρηστες). Μηδεν νεο CSS αλλου, μηδεν JS αλλαγη (ο
+  ScrollProgress component μενει ως-εχει, απλα το container του κρυβεται), μηδεν dependency, μηδεν bundle impact.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static, / route 5.33 kB (αμεταβλητο, CSS-only).
+- Compiled CSS (.next/static/css): `.scroll-progress{display:none}` present μεσα στο reduced-motion block.
+  Non-visual/media-query a11y -> verified στο minified output οπως τα προηγουμενα non-visual increments
+  (separate non-Docker app, δεν σηκωσα preview server).
+- em-dash: το comment που προσθεσα χρησιμοποιει μονο commas/colon/parentheses (τα 4 em-dashes στο globals.css
+  ειναι pre-existing, οχι δικα μου). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (globals.css + αυτο το log) μεσω explicit pathspec· foreign unstaged
+  files αλλου routine (apps/web/search-actions.ts, receiptSearch*) τα αφησα αθικτα (collision guard, 0 staged
+  πριν το commit).
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets (blocked)· ή content
+micro-pass στα features (micro-copy)· ή annual Offers στα per-tier Pricing aria labels.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον.
