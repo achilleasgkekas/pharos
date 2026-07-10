@@ -1502,3 +1502,33 @@ Mock pattern: DB-mock (όπως overview) — mock και τα 5 models (find→
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλου routine (receipt-search: `app/search-actions.ts` [M] + `lib/receiptSearch.ts`/`.test.ts` [??]) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα ΜΟΝΟ τα δικά μου paths (calendar/route.test.ts + OSS_PROGRESS.md) με explicit pathspec.
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run. Απομένει το βαρύ **`reports/route.ts`** (6 models + πολλή pure aggregation — μεγάλο, δώσε του ολόκληρο run ή σπάσε σε describe blocks: net-position, cash-flow windows, by-category, spend-by-store, installment-payoff· δες αν χρειάζεται fake-timers όπως το calendar). Χαμηλής αξίας trivial wrapper: `history/route.ts` (`{ rows }`). Untested scan/mutation routes (POST-heavy, θέλουν body-validation seam): `scan/receipt|expense|product|voucher`, `settings/route.ts`, `push/register`, `auth/login` (rate-limit gate). DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-10 (cont.² — reports/route.test.ts, το τελευταίο βαρύ v1 route: net-position, cash-flow windows, by-category, payoff)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/reports/route.test.ts` για το GET του `/api/v1/reports`.**
+
+Επιλογή target: ακολούθησα το suggested next task — απέμενε το βαρύ `reports/route.ts` (5 models: Expense/Item/Statement/Receipt/Subscription + computeInstallmentPlans seam + getAppSettings). Είναι το πιο aggregation-heavy v1 route και τροφοδοτεί το mobile Reports/analytics screen (mirror του web /reports), οπότε κάθε drift χαλάει σιωπηλά τα mobile charts. Route-only συμπεριφορές που καλύφθηκαν:
+- **Auth gate**: withAuth → 401 χωρίς token, καμία DB read.
+- **Net position**: owned-inventory value (purchasedPrice ?? currentPrice, μόνο OWNED_STATUSES received/installed/sold/broken) − active installmentsOwed (done plans excluded)· net + activePlans· inventoryByCategory (value>0, rounded, desc).
+- **?months= selector**: default asymmetric legacy windows (monthly=6, cash-flow=12) με `months:12`· 6 → και τα δύο 6· 24 → 24· invalid (9) → fallback στα legacy defaults. Επαλήθευσα τα ακριβή period arrays (monthly τελειώνει στον τρέχοντα μήνα, ie 12-πίσω).
+- **Sums**: this-month/this-year income+expense από amount>0 docs (amount<=0 skipped)· top-8 byCategory (year expense, desc)· monthly + incomeExpense bucketing ανά period.
+- **Budgets**: this-month spend vs configured budgets, zero/blank limits dropped, sort limit desc.
+- **Receipts**: spendByStore (ΟΛΑ τα stores, count+total, ΟΧΙ total>0 filter — αντίθετα με biggestPurchases που κόβει τα μηδενικά).
+- **Warranties**: owned items 0..150 days out, soonest-first.
+- **Subs by category**: monthly-equivalent (CYCLE_PER_MONTH multiplier: yearly→/12, quarterly→/3), grouped.
+- **Installment payoff**: linked plans resolve item titles ως label, fallback στο plan.label· linked flag.
+- **Envelope**: πλήρη 16 top-level keys + currency pass-through.
+
+Mock pattern: DB-mock (όπως calendar/overview) — mock και τα 5 models (find→[select→]lean chains) + `@/lib/installments` computeInstallmentPlans (seam) + `@/lib/appSettings` getAppSettings (currency+budgets) + auth seam. Τρέχω τον ΠΡΑΓΜΑΤΙΚΟ withAuth helper. **Fake timers** (pin 15 July 2026) γιατί το route διαβάζει `new Date()`· ΟΛΑ τα test dates με local `new Date(y,m,d)` για timezone-stable month-bucketing. **makeReq** επεκτάθηκε με `nextUrl` (URL με searchParams) γιατί το route διαβάζει `req.nextUrl.searchParams.get('months')` (όχι μόνο headers όπως το calendar).
+
+Τι έγινε: Νέο `route.test.ts` (17 tests): auth gate (2), net-position + inventory-by-category (2), ?months= windows (4), income/expense sums + by-category (2), budgets (1), spend-by-store + biggest-purchases (1), warranties (1), subs-by-category (1), payoff labels (1), envelope + upcoming (2). Ένα iteration fix: το spendByStore ΔΕΝ φιλτράρει total>0 (μόνο biggestPurchases) — διόρθωσα το expectation.
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/reports/route.test.ts` → 17/17 passed.
+- `npx vitest run` (όλο το suite) → 147 files, 1913/1913 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλων routines (calendar.ics feed: `api/calendar.ics/`, `settings/CalendarFeedManager.tsx`, `calendarFeedActions.ts`, `lib/ics.ts`/`.test.ts`, `lib/moneyAgenda.ts`· receipt-search: `search-actions.ts` [M], `lib/receiptSearch.ts`/`.test.ts`· άλλα: `calendar/route.ts` [M], `settings/SettingsClient.tsx`, `i18n/locales/*`, `models/User.ts`) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα ΜΟΝΟ τα δικά μου paths με explicit pathspec.
+
+Suggested next task: (β συνέχεια) Τα βαριά GET report routes (overview/calendar/reports) ΕΓΙΝΑΝ ΟΛΑ. Επόμενα εύκολα-έως-μεσαία: `history/route.ts` (trivial `{ rows }` wrapper — γρήγορη κάλυψη σαν trash/jobs) και οι POST scan/mutation routes που θέλουν body-validation seam: `scan/receipt|expense|product|voucher` (multipart/base64 image → parsed shape, mock το AI seam), `settings/route.ts` (PATCH settings), `push/register/route.ts` (token dedup), `auth/login/route.ts` (rate-limit gate — δες το rateLimitConfig env-gate). DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling — π.χ. `notifiers.shared.ts`). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
