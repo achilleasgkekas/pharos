@@ -13,16 +13,30 @@
 > **⚑ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «μετακίνησέ τα εσύ» → **P27-P31 μετακινήθηκαν στο «Approved»**.
 > **8η σάρωση (2026-07-10):** ο builder έστειλε P6 (iCal), P14 (price-hike), P15 (category rules), P27 (suggested
 > budgets), P29 (depreciation) → σημειώθηκαν SHIPPED μέσα στο «Approved» (αναμονή τελικού Done από τον Αχιλλέα).
-> Προστέθηκαν **5 νέοι candidates P32-P36** — όλοι distinct από τα ήδη-tracked (verified με grep). Awaiting έγκριση.
+> Προστέθηκαν **5 νέοι candidates P32-P36** — όλοι distinct από τα ήδη-tracked (verified με grep).
+> **⚑ ΕΓΚΡΙΣΗ 2026-07-10 (Αχιλλέας, interactive):** «i approve» → **P32-P36 μετακινήθηκαν στο «Approved»**.
+> Το «Proposed» είναι πάλι κενό· ο planner θα προσθέτει νέους candidates σε επόμενα runs.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
-> 8η σάρωση (2026-07-10). Κάθε ένα ελέγχθηκε με grep να μην διπλασιάζει υπάρχον Approved/TODO item.
-> Ranked κατά value/effort (ψηλότερα = καλύτερη σχέση).
+_(κενό — P32-P36 εγκρίθηκαν 2026-07-10· ο planner προσθέτει νέους candidates σε επόμενες σαρώσεις)_
 
-### P33. Free-trial / cancel-before-charge reminder (χρημοανταλλακτικό, ψηλό value/effort) — S/M — both
+---
+
+## Approved
+
+> Οι builder/daily-dev routines χτίζουν ΜΟΝΟ από εδώ — **ένα item ανά run**, verify-pre-build πρώτα,
+> με τη σειρά value/effort (τα «πολύ ψηλό value/effort» πρώτα). **Κανόνας ανοιχτών αποφάσεων:** όπου
+> ένα item έχει «Απόφαση που χρειάζεται» και ο Αχιλλέας ΔΕΝ την έλυσε ρητά (μόνο τα PA1/PA2/PA3 έχουν
+> locked defaults), ο builder παίρνει **sensible default**: (α) free-tier behaviour **non-metered**,
+> heavy/AI/SaaS-touching κομμάτια **opt-in**· (β) reuse υπάρχοντος pipeline/pattern· (γ) ξεκίνα από το
+> πιο απλό MVP (heuristic/deterministic πριν AI, single πριν multi). Κατέγραψε την επιλογή στο progress log.
+> Εξαρτήσεις: P5/P17/P23 δένουν με `/api/v1` (§5) + mobile MVP (§6)· P6 feed βοηθά το PA3/P20.
+> **Νεοεγκεκριμένα 2026-07-10 (interactive):** P33, P32, P34, P35, P36 (ranked value/effort· P36 τελευταίο, L).
+
+### P33. Free-trial / cancel-before-charge reminder — S/M — both (χρημοανταλλακτικό, ψηλό value/effort)
 - **Αξία:** το πιο άμεσο money-saver που λείπει: μια συνδρομή σε **δωρεάν δοκιμή** που αυτο-μετατρέπεται σε πληρωμένη.
   Πεδίο `trialEndsAt` (+ optional `firstChargeAmount`) σε Subscription → alert «η δοκιμή X λήγει σε 2 μέρες, θα χρεωθείς €Y —
   ακύρωσε ή κράτησέ την». **Διακριτό** από P7 (discover *untracked*), P14 (ανατίμηση *υπάρχουσας*), P28 (manual bills):
@@ -64,19 +78,7 @@
   **Διακριτό** από PA1 (manual), §13 (bots), P11 (email IMAP).
 - **Module:** νέος `lib/openBanking.ts` connector + Settings → Data (connect bank) + Expenses (ingest).
 - **Ανοιχτή απόφαση (Αχιλλέας):** μεγάλο (OAuth-style consent flow, token refresh, ανά-τράπεζα quirks, 90d re-consent).
-  Αξίζει; Ξεκίνα με έναν provider (GoCardless) + read-only· metered/paid στο SaaS, BYO-key στο OSS. ΣΗΜ: L — τελευταίο σε σειρά.
-
----
-
-## Approved
-
-> Οι builder/daily-dev routines χτίζουν ΜΟΝΟ από εδώ — **ένα item ανά run**, verify-pre-build πρώτα,
-> με τη σειρά value/effort (τα «πολύ ψηλό value/effort» πρώτα). **Κανόνας ανοιχτών αποφάσεων:** όπου
-> ένα item έχει «Απόφαση που χρειάζεται» και ο Αχιλλέας ΔΕΝ την έλυσε ρητά (μόνο τα PA1/PA2/PA3 έχουν
-> locked defaults), ο builder παίρνει **sensible default**: (α) free-tier behaviour **non-metered**,
-> heavy/AI/SaaS-touching κομμάτια **opt-in**· (β) reuse υπάρχοντος pipeline/pattern· (γ) ξεκίνα από το
-> πιο απλό MVP (heuristic/deterministic πριν AI, single πριν multi). Κατέγραψε την επιλογή στο progress log.
-> Εξαρτήσεις: P5/P17/P23 δένουν με `/api/v1` (§5) + mobile MVP (§6)· P6 feed βοηθά το PA3/P20.
+  Ξεκίνα με έναν provider (GoCardless) + read-only· metered/paid στο SaaS, BYO-key στο OSS. ΣΗΜ: L — τελευταίο σε σειρά.
 
 ### P27. Suggested budgets από ιστορικό δαπανών — ✅ SHIPPED 2026-07-10 (pharos-daily-dev)
 - **Υλοποίηση:** «Suggest from history» button στο Settings → Budgets (`suggestBudgets()` action + pure
