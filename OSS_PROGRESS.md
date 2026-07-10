@@ -1532,3 +1532,23 @@ Mock pattern: DB-mock (όπως calendar/overview) — mock και τα 5 models
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλων routines (calendar.ics feed: `api/calendar.ics/`, `settings/CalendarFeedManager.tsx`, `calendarFeedActions.ts`, `lib/ics.ts`/`.test.ts`, `lib/moneyAgenda.ts`· receipt-search: `search-actions.ts` [M], `lib/receiptSearch.ts`/`.test.ts`· άλλα: `calendar/route.ts` [M], `settings/SettingsClient.tsx`, `i18n/locales/*`, `models/User.ts`) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα ΜΟΝΟ τα δικά μου paths με explicit pathspec.
 
 Suggested next task: (β συνέχεια) Τα βαριά GET report routes (overview/calendar/reports) ΕΓΙΝΑΝ ΟΛΑ. Επόμενα εύκολα-έως-μεσαία: `history/route.ts` (trivial `{ rows }` wrapper — γρήγορη κάλυψη σαν trash/jobs) και οι POST scan/mutation routes που θέλουν body-validation seam: `scan/receipt|expense|product|voucher` (multipart/base64 image → parsed shape, mock το AI seam), `settings/route.ts` (PATCH settings), `push/register/route.ts` (token dedup), `auth/login/route.ts` (rate-limit gate — δες το rateLimitConfig env-gate). DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling — π.χ. `notifiers.shared.ts`). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-10 (cont.³ — history/route.test.ts, το trivial `{ rows }` wrapper του AI-conversation history)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/history/route.test.ts` για το GET του `/api/v1/history`.**
+
+Επιλογή target: ακολούθησα το suggested next task — τα βαριά GET report routes (overview/calendar/reports) έγιναν ΟΛΑ, οπότε πήρα το εύκολο-γρήγορο `history/route.ts` (trivial `{ rows }` wrapper, ίδιο pattern με trash/jobs). Είναι thin verbatim delegate στο `getConversations` (find→sort→limit 200→shape), αλλά δύο route-only συμπεριφορές ζουν ΜΟΝΟ εδώ και τροφοδοτούν το mobile History tab: (α) Bearer-auth gate (withAuth → 401 ΠΡΙΝ οποιοδήποτε getConversations call), (β) το envelope = bare `{ rows }` (καμία projection/filter/list-envelope, ίδιο ConversationRow[] verbatim, incl. nested messages/actions).
+
+Mock pattern: DB-mock (όπως trash) — mock `@/app/history/actions` getConversations + auth seam (`@/lib/db` connectDB + `@/models/User` findOne→select→lean chain). Τρέχω τον ΠΡΑΓΜΑΤΙΚΟ withAuth helper. Χωρίς fake timers (το route δεν διαβάζει `new Date()`).
+
+Τι έγινε: Νέο `route.test.ts` (5 tests): auth gate (2: no token, unknown token — και τα δύο μηδέν DB read), listing (3: verbatim wrap under `{ rows }`, empty → `{ rows: [] }`, no-reshape passthrough με nested messages+actions).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/history/route.test.ts` → 5/5 passed.
+- `npx vitest run` (όλο το suite) → 148 files, 1918/1918 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλου routine (receipt-search: `app/search-actions.ts` [M] + `lib/receiptSearch.ts`/`.test.ts` [??]) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα ΜΟΝΟ τα δικά μου paths (history/route.test.ts + OSS_PROGRESS.md) με explicit pathspec.
+
+Suggested next task: (β συνέχεια) Τα εύκολα `{ rows }` wrappers (trash/jobs/history) + τα βαριά GET reports (overview/calendar/reports) ΕΓΙΝΑΝ. Επόμενα, ένα module ανά run: POST scan routes με AI seam — `scan/receipt|expense|product|voucher/route.ts` (multipart/base64 image → parsed shape· mock το AI/parse seam, δες body-validation + 400 σε missing image)· mutation routes με body-validation — `settings/route.ts` (PATCH), `push/register/route.ts` (token dedup), `auth/login/route.ts` (rate-limit gate — δες το rateLimitConfig env-gate)· item sub-routes `items/[id]/price|link-plan|plans|ai-fill|convert-to-task`· `receipts/[id]/rescan|add-to-library`· `expenses/[id]/rescan`· `trash/[type]/[id]` (restore/purge). DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
