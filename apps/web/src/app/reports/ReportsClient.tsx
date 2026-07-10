@@ -60,7 +60,8 @@ type Data = {
   installmentPlans: InstallmentPlanRow[];
   incomeExpense: { key: string; label: string; income: number; expense: number }[];
   expenseByCategory: { name: string; value: number }[];
-  budgetVsActual: { name: string; budget: number; actual: number }[];
+  budgetVsActual: { name: string; budget: number; actual: number; carried?: number; effective?: number }[];
+  budgetRollover?: boolean;
   summary: {
     receiptsTotal: number;
     receiptsVat: number;
@@ -257,19 +258,35 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         )}
       </Card>
 
-      {/* Budget · this month (per category, actual vs budget) */}
+      {/* Budget · this month (per category, actual vs budget). In envelope mode
+          (P25) the limit is the rolling `effective` budget and a chip shows the
+          net carried-in balance. */}
       {data.budgetVsActual.length > 0 && (
-        <Card title={t('reports.cBudget')}>
+        <Card title={data.budgetRollover ? t('reports.cBudgetEnvelope') : t('reports.cBudget')}>
           <div className="space-y-2.5">
             {data.budgetVsActual.map((b) => {
-              const pct = b.budget > 0 ? Math.min(100, Math.round((b.actual / b.budget) * 100)) : 0;
-              const over = b.actual > b.budget;
+              const rollover = data.budgetRollover && b.effective != null;
+              const limit = rollover ? (b.effective as number) : b.budget;
+              const carried = b.carried ?? 0;
+              const pct = limit > 0 ? Math.min(100, Math.round((b.actual / limit) * 100)) : 0;
+              const over = b.actual > limit;
               return (
                 <div key={b.name}>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-[color:var(--color-text-dim)]">{b.name}</span>
+                    <span className="text-[color:var(--color-text-dim)] flex items-center gap-1.5">
+                      {b.name}
+                      {rollover && carried !== 0 && (
+                        <span
+                          title={t('reports.budgetCarriedHint')}
+                          style={{ fontFamily: 'var(--font-mono)' }}
+                          className={`text-[10px] px-1.5 py-px rounded ${carried > 0 ? 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10' : 'text-[color:var(--color-red)] bg-[color:var(--color-red)]/10'}`}
+                        >
+                          {carried > 0 ? '+' : '−'}{cur()}{Math.abs(carried).toLocaleString('en-GB')}
+                        </span>
+                      )}
+                    </span>
                     <span style={{ fontFamily: 'var(--font-mono)' }} className={over ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-text-dim)]'}>
-                      {cur()}{b.actual.toLocaleString('en-GB')} / {cur()}{b.budget.toLocaleString('en-GB')}{over ? ` · over ${cur()}${(b.actual - b.budget).toLocaleString('en-GB')}` : ''}
+                      {cur()}{b.actual.toLocaleString('en-GB')} / {cur()}{limit.toLocaleString('en-GB')}{over ? ` · over ${cur()}${(b.actual - limit).toLocaleString('en-GB')}` : ''}
                     </span>
                   </div>
                   <div className="h-2 rounded-full bg-[color:var(--color-surface-2)] overflow-hidden">

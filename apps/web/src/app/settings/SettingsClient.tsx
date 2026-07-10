@@ -6,7 +6,7 @@ import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
 import type { CategoryRule } from '@/lib/categoryRules';
 import { AI_FEATURES } from '@/lib/aiFeatures';
@@ -1485,7 +1485,15 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
   );
   const [msg, setMsg] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState(false);
+  const [rollover, setRollover] = useState(settings.budgetRollover);
   const total = Object.values(budgets).reduce((s, v) => s + (Number(v) || 0), 0);
+
+  function toggleRollover(v: boolean) {
+    setRollover(v);
+    startTransition(async () => {
+      await saveBudgetRollover(v);
+    });
+  }
 
   function save() {
     setMsg(null);
@@ -1556,6 +1564,13 @@ function BudgetsManager({ settings }: { settings: AppSettings }) {
         <span className="text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.budgetTotal', { amount: `${cur()}${total.toLocaleString('en-GB')}` })}</span>
         {msg && <span className="text-[11px] text-[color:var(--color-accent)]">{msg}</span>}
       </div>
+      <label className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-[color:var(--color-border)] cursor-pointer">
+        <span className="min-w-0">
+          <span className="text-xs font-medium block">{t('set.budgetRollover')}</span>
+          <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.budgetRolloverDesc')}</span>
+        </span>
+        <Switch checked={rollover} onChange={toggleRollover} />
+      </label>
     </Section>
   );
 }

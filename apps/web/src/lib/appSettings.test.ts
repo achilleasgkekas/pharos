@@ -58,6 +58,7 @@ describe('normalizeSettings', () => {
       itemCategories: DEFAULT_ITEM_CATEGORIES,
       subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,
       budgets: {},
+      budgetRollover: false,
       assetAccounts: {},
       depreciation: resolveDepreciation(undefined),
       categoryRules: [],
@@ -136,5 +137,11 @@ describe('normalizeSettings', () => {
   it('coerces the budgets map (drops non-positive/invalid)', () => {
     const v = normalizeSettings({ budgets: { rent: 500, junk: -1, bad: 'x' } });
     expect(v.budgets).toEqual({ rent: 500 });
+  });
+
+  it('reads the budgetRollover flag (default false, coerced to boolean)', () => {
+    expect(normalizeSettings({}).budgetRollover).toBe(false);
+    expect(normalizeSettings({ budgetRollover: true }).budgetRollover).toBe(true);
+    expect(normalizeSettings({ budgetRollover: undefined }).budgetRollover).toBe(false);
   });
 });

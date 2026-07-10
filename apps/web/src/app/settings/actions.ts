@@ -1058,6 +1058,17 @@ export async function saveBudgets(budgets: Record<string, number>): Promise<{ ok
   return { ok: true };
 }
 
+/** Toggle envelope / rollover budgeting (P25). When on, Reports carries the net
+ *  unspent balance from recent complete months into this month's budget. */
+export async function saveBudgetRollover(enabled: boolean): Promise<{ ok: boolean }> {
+  await connectDB();
+  await AppConfig.updateOne({ key: 'singleton' }, { $set: { budgetRollover: !!enabled } }, { upsert: true });
+  invalidateAppSettings();
+  revalidatePath('/reports');
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
 /** Save the vendor→category auto-rules (P15). Cleaned/validated via resolveCategoryRules
  *  (drops entries missing a match or category). Applied on create by the expense actions. */
 export async function saveCategoryRules(rules: unknown): Promise<{ ok: boolean }> {

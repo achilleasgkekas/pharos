@@ -8,6 +8,7 @@ import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
 import { estimatedItemValue } from '@/lib/depreciation';
+import { categoryRollover, ROLLOVER_WINDOW } from '@/lib/budgetRollover';
 import { captureAndListSnapshots } from '@/lib/netWorth';
 import { computeMoneyAgenda } from '@/lib/moneyAgenda';
 import { computeSafeToSpend } from '@/lib/safeToSpend';
@@ -103,6 +104,10 @@ async function getReports(monthsBack = 12) {
   let expenseMonth = 0;
   const expCatMap = new Map<string, number>();
   const thisMonthCat = new Map<string, number>(); // expense per category, THIS month (for budgets)
+  // Per (month → category) expense totals + per-month expense total, used by the
+  // envelope/rollover budget carry (P25). Only expense (non-income) rows count.
+  const catByMonth = new Map<string, Map<string, number>>();
+  const totalByMonth = new Map<string, number>();
   for (const e of expensesData) {
     const amt = e.amount || 0;
     if (amt <= 0) continue;
@@ -116,6 +121,12 @@ async function getReports(monthsBack = 12) {
       if (!isNaN(d.getTime())) mk = monthKey(d);
     }
     if (!mk) continue;
+    if (!isIncome) {
+      totalByMonth.set(mk, (totalByMonth.get(mk) ?? 0) + amt);
+      let byCat = catByMonth.get(mk);
+      if (!byCat) catByMonth.set(mk, (byCat = new Map<string, number>()));
+      byCat.set(cat, (byCat.get(cat) ?? 0) + amt);
+    }
     const idx = ieIdx.get(mk);
     if (idx != null) {
       if (isIncome) ie[idx].income += amt;
@@ -134,10 +145,31 @@ async function getReports(monthsBack = 12) {
     }
   }
   const incomeExpense = ie.map((m) => ({ ...m, income: Math.round(m.income), expense: Math.round(m.expense) }));
-  // Budget vs actual (this month), per budgeted category.
+  // Budget vs actual (this month), per budgeted category. In envelope mode (P25)
+  // each category also gets a `carried` (net unspent from recent complete months)
+  // and an `effective` budget = base + carried, so the bar tracks the rolling
+  // envelope instead of the flat monthly cap.
   const appSettings = await getAppSettings();
+  // The last ROLLOVER_WINDOW complete months (excluding the current partial month),
+  // restricted to months that actually had tracked expense — an untracked/empty
+  // month must not manufacture a phantom surplus.
+  const rolloverMonthKeys: string[] = [];
+  if (appSettings.budgetRollover) {
+    for (let n = 1; n <= ROLLOVER_WINDOW; n++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
+      const mk = monthKey(d);
+      if ((totalByMonth.get(mk) ?? 0) > 0) rolloverMonthKeys.push(mk);
+    }
+  }
   const budgetVsActual = Object.entries(appSettings.budgets)
-    .map(([name, budget]) => ({ name, budget: Math.round(budget), actual: Math.round(thisMonthCat.get(name) ?? 0) }))
+    .map(([name, budget]) => {
+      const base = Math.round(budget);
+      const actual = Math.round(thisMonthCat.get(name) ?? 0);
+      if (!appSettings.budgetRollover) return { name, budget: base, actual };
+      const priorSpends = rolloverMonthKeys.map((mk) => catByMonth.get(mk)?.get(name) ?? 0);
+      const { carried, effective } = categoryRollover(base, priorSpends);
+      return { name, budget: base, actual, carried, effective };
+    })
     .sort((a, b) => b.budget - a.budget);
   const expenseByCategory = [...expCatMap.entries()]
     .map(([name, value]) => ({ name, value: Math.round(value) }))
@@ -280,6 +312,7 @@ async function getReports(monthsBack = 12) {
     incomeExpense,
     expenseByCategory,
     budgetVsActual,
+    budgetRollover: appSettings.budgetRollover,
     summary: {
       receiptsTotal: Math.round(receiptsTotal),
       receiptsVat: Math.round(receiptsVat),

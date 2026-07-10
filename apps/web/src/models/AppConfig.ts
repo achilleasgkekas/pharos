@@ -56,6 +56,12 @@ const AppConfigSchema = new Schema(
     // Monthly budget per expense category. Map category → € amount.
     budgets: { type: Schema.Types.Mixed, default: {} },
 
+    // Envelope / rollover budgeting (P25). When true, Reports carries the net
+    // unspent balance from recent complete months into this month's budget
+    // (under-spending accumulates, overspend eats into the next envelope). Off →
+    // classic per-month budgets that reset in full each month. See lib/budgetRollover.ts.
+    budgetRollover: { type: Boolean, default: false },
+
     // Vendor→category auto-rules (P15). Array of
     // { id, match, matchType:'vendor'|'text', category, recurring, recurringCycle }.
     // Applied deterministically (zero AI) to every new expense/income on create.

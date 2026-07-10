@@ -32,6 +32,7 @@ export type AppSettings = {
   itemCategories: string[];
   subscriptionCategories: string[];
   budgets: Record<string, number>; // monthly budget per expense category (€)
+  budgetRollover: boolean; // envelope mode (P25): carry net unspent budget into this month
   assetAccounts: Record<string, number>; // manual asset accounts for net worth (name → balance)
   depreciation: DepreciationConfig; // asset depreciation model (P29) for owned-inventory valuation
   categoryRules: CategoryRule[]; // vendor→category auto-rules (P15), applied on create
@@ -52,6 +53,7 @@ export type RawAppConfigDoc = {
   defaultReturnWindowDays?: number;
   lists?: Record<string, unknown>;
   budgets?: Record<string, unknown>;
+  budgetRollover?: boolean;
   assetAccounts?: Record<string, unknown>;
   depreciation?: Record<string, unknown>;
   categoryRules?: unknown;
@@ -85,6 +87,7 @@ const DEFAULTS: AppSettings = {
   itemCategories: DEFAULT_ITEM_CATEGORIES,
   subscriptionCategories: DEFAULT_SUBSCRIPTION_CATEGORIES,
   budgets: {},
+  budgetRollover: false,
   assetAccounts: {},
   depreciation: DEFAULT_DEPRECIATION,
   categoryRules: [],
@@ -123,6 +126,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     itemCategories: resolveTaxonomy('itemCategories', doc?.lists, DEFAULT_ITEM_CATEGORIES),
     subscriptionCategories: resolveTaxonomy('subscriptionCategories', doc?.lists, DEFAULT_SUBSCRIPTION_CATEGORIES),
     budgets: numMap(doc?.budgets),
+    budgetRollover: !!doc?.budgetRollover,
     assetAccounts: numMap(doc?.assetAccounts),
     depreciation: resolveDepreciation(doc?.depreciation),
     categoryRules: resolveCategoryRules(doc?.categoryRules),
@@ -141,7 +145,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     // untouched, same query as before).
     const Config = await currentModel(AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets assetAccounts depreciation categoryRules')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets budgetRollover assetAccounts depreciation categoryRules')
       .lean();
   } catch {
     /* DB down → hard defaults */
