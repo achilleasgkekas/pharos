@@ -16,6 +16,7 @@ import { accountTenants } from '@/lib/tenancy/saasApi';
 import { accountLanding } from '@/components/saas/accountLanding';
 import { workspaceQuery } from '@/components/saas/chooseWorkspace';
 import { TenantStatusBadge, MemberRoleBadge, Pill } from '@/components/saas/StatusBadge';
+import { SignOutButton } from '@/components/saas/SignOutButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,23 @@ export const metadata = {
   title: 'Your workspaces · Pharos',
   robots: { index: false, follow: false },
 };
+
+// Account-level top bar (Pharos link + sign out) shared by every state of this landing, so a
+// signed-in account is never stranded here without a way to leave or sign out. Matches the
+// WorkspaceShell header idiom exactly (same tokens, same placement).
+function AccountTopBar() {
+  return (
+    <div className="mb-8 flex items-center justify-between gap-3">
+      <Link
+        href="/"
+        className="text-xs font-mono uppercase tracking-widest text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]"
+      >
+        ← Pharos
+      </Link>
+      <SignOutButton />
+    </div>
+  );
+}
 
 export default async function AccountHomePage() {
   // Gate (throws notFound when SaaS off) + current viewer claims.
@@ -44,12 +62,15 @@ export default async function AccountHomePage() {
   if (decision.kind === 'empty') {
     return (
       <div className="min-h-screen bg-[color:var(--color-bg)] px-4 py-16 text-[color:var(--color-text)]">
-        <div className="mx-auto max-w-md text-center">
-          <h1 className="text-xl font-semibold">No workspace yet</h1>
-          <p className="mt-2 text-sm text-[color:var(--color-text-dim)]">
-            Your account is not a member of any workspace. Ask an owner to invite you by email,
-            and it will show up here once you accept.
-          </p>
+        <div className="mx-auto max-w-md">
+          <AccountTopBar />
+          <div className="text-center">
+            <h1 className="text-xl font-semibold">No workspace yet</h1>
+            <p className="mt-2 text-sm text-[color:var(--color-text-dim)]">
+              Your account is not a member of any workspace. Ask an owner to invite you by email,
+              and it will show up here once you accept.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -60,6 +81,7 @@ export default async function AccountHomePage() {
   return (
     <div className="min-h-screen bg-[color:var(--color-bg)] px-4 py-12 text-[color:var(--color-text)]">
       <div className="mx-auto max-w-3xl">
+        <AccountTopBar />
         <header className="mb-8">
           <p className="text-[11px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
             {viewer.email || 'Signed in'}
