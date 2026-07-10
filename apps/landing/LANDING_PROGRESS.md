@@ -1607,3 +1607,34 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον.
+
+## 2026-07-10 (cont.²) — (e) polish/a11y: live-region για το billing toggle
+
+Increment (e) polish, accessibility pass (τα προηγουμενα 3 runs ηταν JSON-LD + FAQ content). Το Pricing
+billing toggle (Monthly/Annual) αλλαζει τις τιμες in place στις καρτες, αλλα δεν υπηρχε καμια αναγγελια
+σε screen readers: ενας AT χρηστης που πατα «Annual» δεν ακουγε οτι τα νουμερα απο κατω αλλαξαν. Μηδεν
+`aria-live` σε ολο το app (grep=0) πριν απο αυτο.
+
+- `app/components/Pricing.tsx`: νεο `.sr-only` `<p role="status" aria-live="polite">` κατω απο το toggle,
+  που announce-αρει «Showing annual pricing: pay for 10 months, get 2 months free.» / «Showing monthly
+  pricing.» οταν flip-αρει το `annual` state. Reuse του υπαρχοντος `.sr-only` utility (globals.css:1089),
+  μηδεν νεο CSS, μηδεν νεο dependency, μηδεν bundle impact (ιδιο client component).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static, / route 5.31 kB (αμελητεο +0.06 kB, inline text).
+- Prerender (.next/server/app/index.html): «Showing monthly pricing» present (default state) + ενα
+  `aria-live="polite"`. Non-visual a11y region -> verified στο static output (ιδιο pattern με τα προηγουμενα
+  non-visual increments· separate non-Docker app, δεν σηκωσα preview server).
+- em-dash: 0 στο Pricing.tsx. Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (Pricing.tsx + αυτο το log) μεσω explicit pathspec· foreign staged
+  files αλλου routine (apps/web/receiptSearch*, search-actions.ts) τα αφησα αθικτα (collision guard).
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets (blocked)· ή aria-live
+και στο Waitlist submit feedback αν λειπει· ή content copy micro-pass στα features.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον.

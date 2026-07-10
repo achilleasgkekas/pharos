@@ -58,6 +58,14 @@ export function Pricing({
         </button>
       </div>
 
+      {/* Prices update in place when the toggle flips; announce the change so
+          screen-reader users know the figures below just changed. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {annual
+          ? 'Showing annual pricing: pay for 10 months, get 2 months free.'
+          : 'Showing monthly pricing.'}
+      </p>
+
       <div className="pricing-grid">
         {tiers.map((t) => {
           const hosted = isHosted(t);
