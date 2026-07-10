@@ -5,6 +5,32 @@
 <!-- reviewed: c11d296 -->
 <!-- docker-validated: 20bd514 -->
 
+## 2026-07-10 (docker-health — OOM recovery + rebuild timeout, HEAD αμετάβλητο μη-validated)
+- **Αρχική κατάσταση:** ο guard βρήκε τη Mongo σε **restart loop** (health=`starting`, 38 restarts, «Detected unclean
+  shutdown» → επαναλαμβανόμενο WiredTiger recovery που σκοτωνόταν κάθε ~30s) και το web να ΜΗΝ σερβίρει (`/login`=000,
+  8 restarts). Κλασικό OOM στο μικρό VM (~1.9GB RAM) με τη Mongo να ανακτά ΚΑΙ το web να crash-loop-άρει ταυτόχρονα.
+- **Recovery (μη-καταστροφικό):** `docker builder prune -f` (cache), σταμάτησα ΠΡΟΣΩΡΙΝΑ το web για να αποφορτίσω
+  τη RAM → η Mongo ολοκλήρωσε το WiredTiger recovery και γύρισε **healthy** μέσα σε ~30s (restarts σταθεροποιήθηκαν),
+  μετά `docker compose up -d web` → **serving 200** στο `/login`. Υπηρεσία αποκαταστάθηκε πλήρως.
+- **Rebuild (ΑΠΕΤΥΧΕ να ολοκληρωθεί):** 264 web-runtime αρχεία άλλαξαν από το validated `20bd514` → HEAD `c1947b0`,
+  οπότε δοκίμασα το safe `docker compose build web` (image-only). Το production build **ξεπέρασε το 10λεπτο παράθυρο
+  (SIGTERM)** και κατά τη διάρκειά του η μνήμη πίεσε ξανά τον stack (Mongo +17 restarts → 60, web +12 → 12). ΜΟΛΙΣ
+  σταμάτησε το build, ο stack **αυτο-ανέκαμψε**: Mongo healthy, web serving 200 στην ΠΑΛΙΑ image (δεν έγινε swap — το
+  build δεν πειράζει το running container). Δεν έκανα retry (κανόνας: no loop).
+- **Αποτέλεσμα:** stack **healthy + serving** στην τελευταία validated image. Marker **ΠΑΡΑΜΕΝΕΙ `20bd514`** — το HEAD
+  `c1947b0` **ΔΕΝ validated** (build incomplete).
+- **Disk:** ανακτήθηκαν ~3.4GB (1.5GB build cache + ~1.9GB stale image layers, Images 6.37GB→4.50GB). flaresolverr
+  δεν έτρεχε. Τελικό: Images 4.50GB, Build Cache 1.07GB.
+
+### Needs Achilleas
+- **Το HEAD (`c1947b0`) δεν χτίζεται unattended σε αυτό το VM.** Το Next.js production build των 264 αλλαγμένων web
+  αρχείων (κυρίως το νέο SaaS/landing surface) ΔΕΝ ολοκληρώνεται μέσα σε 10min και προκαλεί OOM churn σε Mongo+web στο
+  ~1.9GB VM. Χρειάζεται **χειροκίνητο rebuild με περισσότερους πόρους**: είτε (α) αύξηση Docker Desktop → Resources →
+  Memory (π.χ. 3-4GB) πριν το `docker compose build web`, είτε (β) build εκτός ωρών με το web σταματημένο ώστε να μη
+  συναγωνίζεται RAM (`docker compose stop web && docker compose build web && docker compose up -d web`), είτε (γ)
+  έλεγχος αν το build time/μνήμη έχει ανέβει λόγω του SaaS module και optimize (π.χ. `NODE_OPTIONS=--max-old-space-size`).
+  Μέχρι τότε ο stack τρέχει σωστά στην προηγούμενη validated image, αλλά οι SaaS/landing αλλαγές ΔΕΝ είναι deployed.
+
 ## 2026-07-10 (pharos-daily-dev — P29 asset depreciation model για αξία inventory)
 - **Τι έκανα:** έχτισα το Approved item **P29** (asset depreciation). Η αξία των owned items έμενε «κολλημένη»
   στην τιμή αγοράς για πάντα → το PA2 net-worth (και μελλοντικά το P13 insurance export) **υπερεκτιμούσαν** τον
