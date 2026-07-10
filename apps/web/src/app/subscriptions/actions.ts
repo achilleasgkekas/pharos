@@ -38,6 +38,8 @@ const SubFormSchema = z.object({
   currency: z.string().default('EUR'),
   billingCycle: z.enum(CYCLES).default('monthly'),
   startDate: z.string(),
+  trialEndsAt: z.string().optional().default(''), // '' = no trial
+  firstChargeAmount: z.coerce.number().min(0).default(0),
   paymentMethod: z.string().default(''),
   url: z.string().default(''),
   notes: z.string().default(''),
@@ -80,6 +82,7 @@ export async function createSubscription(formData: FormData) {
   await Subscription.create({
     ...parsed,
     startDate,
+    trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,
     nextRenewal: computeNextRenewal(startDate, parsed.billingCycle),
     active: true,
   });
@@ -93,6 +96,7 @@ export async function updateSubscription(id: string, formData: FormData) {
   await Subscription.findByIdAndUpdate(id, {
     ...parsed,
     startDate,
+    trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,
     nextRenewal: computeNextRenewal(startDate, parsed.billingCycle),
   });
   revalidatePath('/subscriptions');

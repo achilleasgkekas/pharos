@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, X } from 'lucide-react';
+import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { cur } from '@/lib/money';
 import { useT } from '@/components/LocaleProvider';
@@ -16,12 +16,13 @@ import {
   type NotifKind,
 } from '@/app/notifications/actions';
 
-const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, system: Bell };
+const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, system: Bell };
 const KIND_COLOR: Record<NotifKind, string> = {
   deal: 'var(--color-accent)',
   warranty: 'var(--color-gold)',
   installment: 'var(--color-cyan)',
   pricehike: 'var(--color-red)',
+  trialend: 'var(--color-purple)',
   system: 'var(--color-text-dim)',
 };
 
@@ -86,6 +87,11 @@ export function NotificationBell() {
         heading: n.title,
         sub: t(key, { prev: cur() + prev, curr: cur() + curr, pct: `${p > 0 ? '+' : ''}${pct}%` }),
       };
+    }
+    if (n.kind === 'trialend') {
+      const [days, amount] = n.body.split('|');
+      const key = Number(days) <= 0 ? 'notif.trialTodaySub' : 'notif.trialSub';
+      return { heading: n.title, sub: t(key, { days, amount: cur() + amount }) };
     }
     return { heading: n.title, sub: n.body };
   }

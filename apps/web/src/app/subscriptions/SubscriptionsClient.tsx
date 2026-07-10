@@ -447,6 +447,8 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
     currency: sub?.currency ?? 'EUR',
     billingCycle: sub?.billingCycle ?? 'monthly',
     startDate: sub?.startDate ? sub.startDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+    trialEndsAt: sub?.trialEndsAt ? sub.trialEndsAt.slice(0, 10) : '',
+    firstChargeAmount: (sub?.firstChargeAmount ?? '') ? String(sub?.firstChargeAmount) : '',
     paymentMethod: sub?.paymentMethod ?? '',
     url: sub?.url ?? '',
     notes: sub?.notes ?? '',
@@ -565,6 +567,19 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
           <CardSelect cards={cards} value={form.paymentMethod} onChange={(v) => setForm((p) => ({ ...p, paymentMethod: v }))} />
         </Field>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label={t('sub.fTrialEnds')}>
+          <Input type="date" value={form.trialEndsAt} onChange={set('trialEndsAt')} />
+        </Field>
+        <Field label={t('sub.fFirstCharge', { cur: cur() })}>
+          <Input type="number" step="0.01" min="0" value={form.firstChargeAmount} onChange={set('firstChargeAmount')} placeholder={form.amount || '9.99'} />
+        </Field>
+      </div>
+      {form.trialEndsAt && (
+        <p className="text-[10px] text-[color:var(--color-purple)] -mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+          {t('sub.trialHint')}
+        </p>
+      )}
       <Field label="URL">
         <Input value={form.url} onChange={set('url')} placeholder="https://..." />
       </Field>

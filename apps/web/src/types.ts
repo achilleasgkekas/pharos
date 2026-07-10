@@ -162,6 +162,8 @@ export type SerializedSubscription = {
   billingCycle: string;
   startDate: string;
   nextRenewal: string | null;
+  trialEndsAt: string | null;
+  firstChargeAmount: number;
   cancelledAt: string | null;
   active: boolean;
   paymentMethod: string;

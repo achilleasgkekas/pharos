@@ -19,6 +19,10 @@ const SubscriptionSchema = new Schema(
     },
     startDate: { type: Date, required: true },
     nextRenewal: { type: Date, index: true },
+    // Free trial (P33): when the trial converts to a paid charge, and (optionally)
+    // the amount of that first charge. Drives the "cancel before charge" reminder.
+    trialEndsAt: { type: Date, default: null },
+    firstChargeAmount: { type: Number, default: 0 },
     cancelledAt: { type: Date, default: null },
     active: { type: Boolean, default: true, index: true },
     paymentMethod: { type: String, default: '' },

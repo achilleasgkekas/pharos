@@ -6,12 +6,13 @@ import { cur } from '@/lib/money';
 import { Item } from '@/models/Item';
 import { Statement } from '@/models/Statement';
 import { Expense } from '@/models/Expense';
+import { Subscription } from '@/models/Subscription';
 import { Notification } from '@/models/Notification';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
 
-export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'system';
+export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'system';
 
 export type SerializedNotification = {
   _id: string;
@@ -24,7 +25,7 @@ export type SerializedNotification = {
 };
 
 type Alert = { dedupeKey: string; kind: NotifKind; title: string; body: string; href: string };
-const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike'] as const;
+const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend'] as const;
 
 /** Recompute the live alerts (deals / warranties / installments-due) — the same
  *  three the ntfy check uses, but as structured payloads the bell can localize. */
@@ -86,6 +87,30 @@ async function computeAlerts(): Promise<Alert[]> {
       title: h.vendor,
       body: `${h.prev}|${h.curr}|${h.deltaPct}`,
       href: '/expenses',
+    });
+  }
+
+  // Free-trial "cancel before charge" (P33): an active subscription whose trial
+  // ends within the lead-time window. dedupeKey carries the trial date so moving
+  // the date re-alerts, and the alert auto-expires once the date has passed.
+  const trials = (await Subscription.find({ active: true, trialEndsAt: { $ne: null } })
+    .select('name amount trialEndsAt firstChargeAmount')
+    .lean()) as Array<{ _id: unknown; name: string; amount?: number; trialEndsAt?: string | Date | null; firstChargeAmount?: number }>;
+  for (const sub of trials) {
+    const ends = new Date(sub.trialEndsAt as string).getTime();
+    if (Number.isNaN(ends)) continue;
+    const days = Math.ceil((ends - now) / 86400000);
+    if (days < 0 || days > s.trialAlertDays) continue;
+    const id = String(sub._id);
+    const charge = (sub.firstChargeAmount ?? 0) > 0 ? (sub.firstChargeAmount as number) : sub.amount ?? 0;
+    const iso = new Date(ends).toISOString().slice(0, 10);
+    // body = "<days>|<chargeAmount>" (raw; the bell formats with the symbol)
+    alerts.push({
+      dedupeKey: `trialend:${id}:${iso}`,
+      kind: 'trialend',
+      title: sub.name,
+      body: `${days}|${charge}`,
+      href: `/subscriptions?open=${id}`,
     });
   }
 

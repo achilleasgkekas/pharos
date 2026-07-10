@@ -289,6 +289,9 @@ export const en = {
   'sub.fBillingCycle': 'Billing cycle',
   'sub.fStartDate': 'Start date',
   'sub.fPayment': 'Payment',
+  'sub.fTrialEnds': 'Free trial ends',
+  'sub.fFirstCharge': 'First charge ({cur})',
+  'sub.trialHint': "You'll be reminded before the trial converts to a paid charge.",
   'sub.fNotes': 'Notes',
 
   // ── Tasks ────────────────────────────────────────────────────────────────
@@ -663,6 +666,7 @@ export const en = {
   'set.defaultWarranty': 'Default warranty (months)',
   'set.warrantyAlert': 'Warranty alert · days before expiry',
   'set.returnWindow': 'Default return window · days',
+  'set.trialAlert': 'Free-trial alert · days before charge',
   'set.autoAddStores': 'Auto-add unknown stores',
   'set.autoAddStoresDesc': 'New receipt store names join the list automatically.',
   'set.saveDefaults': 'Save defaults',
@@ -868,6 +872,8 @@ export const en = {
   'notif.installmentSub': '{amount} across {n} plans',
   'notif.priceHikeSub': 'Rose {prev} → {curr} ({pct})',
   'notif.priceDropSub': 'Dropped {prev} → {curr} ({pct})',
+  'notif.trialSub': 'Free trial ends in {days}d · then {amount} — cancel to avoid the charge',
+  'notif.trialTodaySub': 'Free trial ends today · then {amount} — cancel to avoid the charge',
   // Standalone shopping list (photo scan)
   'nav.shoppingList': 'Shopping list',
   'home.dShoppingList': 'Quick to-buy list with photo scanning',

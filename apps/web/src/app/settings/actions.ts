@@ -266,6 +266,9 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   const view = String(formData.get('defaultItemView') || 'grid') === 'list' ? 'list' : 'grid';
   const warrantyMonths = Math.max(0, Math.min(120, Number(formData.get('defaultWarrantyMonths')) || 24));
   const alertDays = Math.max(0, Math.min(730, Number(formData.get('warrantyAlertDays')) || 90));
+  // 0 is meaningful (trial alerts off), so parse explicitly instead of `|| 2`.
+  const trialRaw = Number(formData.get('trialAlertDays'));
+  const trialAlertDays = Number.isFinite(trialRaw) ? Math.max(0, Math.min(60, Math.round(trialRaw))) : 2;
   const autoAdd = formData.get('autoAddStores') === 'true';
   const currency = (String(formData.get('currency') || 'EUR').trim().toUpperCase()) || 'EUR';
   const vatRate = Math.max(0, Math.min(100, Number(formData.get('defaultVatRate')) || 24));
@@ -279,6 +282,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
         defaultItemView: view,
         defaultWarrantyMonths: warrantyMonths,
         warrantyAlertDays: alertDays,
+        trialAlertDays,
         autoAddStores: autoAdd,
         currency,
         defaultVatRate: vatRate,
@@ -407,6 +411,20 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
     .lean()) as HikeEntry[];
   const hikes = detectPriceHikes(hikeRows);
 
+  // Free-trial "cancel before charge" (P33): active subs whose trial ends within
+  // the lead-time window, soonest first.
+  const trialSubs = (await Subscription.find({ active: true, trialEndsAt: { $ne: null } })
+    .select('name amount trialEndsAt firstChargeAmount')
+    .lean()) as Array<{ name: string; amount?: number; trialEndsAt?: string | Date | null; firstChargeAmount?: number }>;
+  const trialsEnding = trialSubs
+    .map((sub) => ({
+      name: sub.name,
+      days: Math.ceil((new Date(sub.trialEndsAt as string).getTime() - now) / 86400000),
+      charge: (sub.firstChargeAmount ?? 0) > 0 ? (sub.firstChargeAmount as number) : sub.amount ?? 0,
+    }))
+    .filter((tr) => !isNaN(tr.days) && tr.days >= 0 && tr.days <= s.trialAlertDays)
+    .sort((a, b) => a.days - b.days);
+
   const lines: string[] = [];
   if (deals.length) lines.push(`🎯 ${deals.length} deal(s): ${deals.slice(0, 5).map((d) => d.title).join(', ')}`);
   if (dueThisMonth > 0) lines.push(`💳 installments this month: ${cur()}${dueThisMonth.toFixed(0)} (${plans.length} plans)`);
@@ -424,6 +442,13 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
       `📈 ${hikes.length} recurring price change(s): ${hikes
         .slice(0, 5)
         .map((h) => `${h.vendor} ${cur()}${h.prev}→${cur()}${h.curr} (${h.deltaPct > 0 ? '+' : ''}${h.deltaPct}%)`)
+        .join(', ')}`
+    );
+  if (trialsEnding.length)
+    lines.push(
+      `⏳ ${trialsEnding.length} free trial(s) ending ≤${s.trialAlertDays}d: ${trialsEnding
+        .slice(0, 5)
+        .map((tr) => `${tr.name} (${tr.days}d${tr.charge > 0 ? `, ${cur()}${tr.charge}` : ''})`)
         .join(', ')}`
     );
 
