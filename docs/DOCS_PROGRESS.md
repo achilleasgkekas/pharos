@@ -4,6 +4,55 @@
 (συν μία γραμμή link στο README αν λείπει). Γλώσσα των docs: Αγγλικά (public
 audience). Σημειώσεις εδώ: Ελληνικά, χωρίς παύλες.
 
+## 2026-07-12 (saas.md §8: user-facing Workspace console UI /account/workspace)
+
+Δυο νεοι SaaS user-facing commits μετα το τελευταιο DOCS run δεν καλυπτονταν στα docs:
+`af27abb` (Workspace Overview /account/workspace) + `7202e1c` (Members panel
+/account/workspace/members). Το saas.md ειχε ΜΟΝΟ το operator-facing "Superadmin console
+(§8)" (Console UI /admin) + το "Browser sign-in UI", αλλα ΚΑΝΕΝΑ doc για το member-facing
+workspace console. Προσθεσα νεο `### Workspace console UI (/account/workspace)` ΑΚΡΙΒΩΣ
+πριν το Superadmin console (user-facing πριν operator-facing).
+
+Τι εγραψα (διαβασα τον πραγματικο κωδικα, δεν μαντεψα):
+- Πινακας 2 routes: `/account/workspace` (Overview — 4 stat tiles members/AI-calls+quota/
+  storage+quota/AI-cost + Workspace panel slug/domain/tier/created + Plan & billing mirror
+  του GET /api/saas/billing + Usage panel current-period mirror του GET /api/saas/usage·
+  SSR reads billing/usage helpers directly, οχι self-fetch) + `/account/workspace/members`
+  (roster + pending invites mirror του GET /api/saas/members· any active member VIEW, μονο
+  owner/admin canManage → invite/add/change-role/remove/revoke μεσω /api/saas/members +
+  /api/saas/invites· invites read μονο για managers).
+- workspaceTabs: Overview + Members, καθε tab κρατα το ?w=<slug> selection, blank → clean URLs.
+- Empty/edge states: zero-membership account → "No workspace yet" (Overview) / redirect
+  (Members)· unknown ?w= slug → notFound 404· unwired billing CTAs → "coming soon" copy.
+- Gating: (saas) layout 404 οταν SAAS_MODE off / AUTH_SECRET unset· logged-out → redirect
+  /account/login?next=… (preserving ?w=), ΣΕ ΑΝΤΙΘΕΣΗ με το Superadmin console (no login prompt).
+- OSS parity: SaaS-only, additive, self-hosted byte-for-byte unchanged.
+
+Πηγες: app/(saas)/account/workspace/page.tsx + members/page.tsx (getSaasViewer gate,
+accountTenants, pickWorkspace, getTenantContext, currentUsage/aiQuotaStatus/storageQuotaStatus,
+buildBillingSummary, canManageMembers, force-dynamic + robots noindex), components/saas/
+workspaceTabs.ts (TABS overview/members, ?w= carry-through).
+
+Bonus: api.md sync check — 51 route.ts τωρα (ηταν 50 στο 2026-07-04). Το νεο ειναι
+`statements/plans/merge` (commit 08ced6d, POST bind + DELETE unbind) — ηδη documented στο
+api.md (γρ. 241-242, {sourceKey,targetKey}/{key} → {ok,moved}). Καμια αλλαγη χρειαστηκε,
+in-sync.
+
+Accuracy/validation: markdown only, κανενα build/Docker/AI call. Anchor check — τα in-doc
+links resolve: #billing-stripe (γρ.512 "Billing (Stripe)"), #usage (γρ.521), #members-and-
+invitations (γρ.494), #superadmin-console-8 (γρ.600 "Superadmin console (§8)"). Fence count
+saas.md = 18 (ζυγο). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/re_)
+clean.
+
+Collision guard: `git status --short` πριν το commit — τα 3 foreign WIP files (search-actions.ts
+M + receiptSearch.ts/.test.ts untracked) ειναι stale απο την αρχη του run, ΚΑΝΕΝΑ staged· ΔΕΝ τα
+αγγιζω. Stage ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επομενο run: (α) saas.md §8 continuation οταν landαρουν οι υπολοιπες workspace panels (Billing /
+Usage / General settings tabs στο (saas) segment) ή superadmin WRITE actions (suspend/reactivate/
+impersonate)· (β) api.md sync αν προστεθουν νεα api/v1 routes· (γ) features.md — insurance export
+(P13) ή αλλα νεα modules οταν shipαρουν.
+
 ## 2026-07-10 (saas.md §8 stale-forward: Workspaces console + user-facing auth UI)
 
 Εφερα το saas.md §8 στο ιδιο επιπεδο με τα δυο νεοτερα SaaS commits που δεν καλυπτονταν:

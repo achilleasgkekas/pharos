@@ -560,6 +560,43 @@ masked `••••<last 4>` preview. Set/clear operations are written to the a
 | --- | --- | --- | --- |
 | `GET` | `/api/saas/audit` | `?tenant=<slug>&action=<verb>&limit=<n>&before=<iso>` | Append-only activity trail for the workspace, newest first (members added/removed, role changes, invites, plan changes, `ai_key` events). Owner/admin only. `limit` is 1..200 (default 50); `before` is an ISO timestamp cursor returning events strictly older than it, for pagination; an unknown `action` applies no filter. The serializer projects whitelisted fields only, so no secret leaks. |
 
+### Workspace console UI (`/account/workspace`)
+
+The API sections above are the control-plane data plane; this is the **member-facing
+browser console** that surfaces them — the signed-in account's self-service settings
+for the workspaces it belongs to. It is a self-contained `(saas)` App Router segment
+rendered inside a chrome-less shell (`WorkspaceShell`: workspace name, plan / status /
+role badges, a tab bar, and a workspace switcher when the account is a member of more
+than one). Each page is `force-dynamic` and marked `noindex, nofollow`.
+
+| Route | Renders |
+| --- | --- |
+| `/account/workspace` | **Overview** — the account's landing for workspace settings. Consolidates the read surfaces into one server-rendered page: four stat tiles (members, AI calls with quota, storage with quota, this month's AI cost), a **Workspace** panel (slug, custom domain, isolation tier, created), a **Plan & billing** panel (plan, price, subscription status, trial note, AI + storage included) mirroring [`GET /api/saas/billing`](#billing-stripe), and a **Usage** panel for the current period (AI calls vs quota, input / output tokens, storage vs quota, estimated AI cost) mirroring [`GET /api/saas/usage`](#usage). SSR reads the billing/usage helpers directly rather than self-fetching. |
+| `/account/workspace/members` | **Members** — the roster and pending invitations, mirroring [`GET /api/saas/members`](#members-and-invitations). Any active member may **view** the roster; only owners and admins (`canManage`) see the management controls (invite / add by email, change role, remove member, revoke invite), which the client panel performs against `/api/saas/members` and `/api/saas/invites`. Invites are read only for managers. |
+
+The tab bar (`workspaceTabs`) lists **Overview** and **Members**; more panels
+(Billing, Usage, General settings) are additive entries as they land. Every tab link
+carries the active `?w=<slug>` workspace selection through, so switching panels stays
+on the same workspace; a blank selection yields clean URLs against the account's first
+workspace.
+
+**Empty and edge states.** A signed-in account with **zero** memberships (for example,
+removed from its last workspace) is a real state, not an error: Overview renders a
+"No workspace yet" empty state and Members redirects to it. A `?w=<slug>` the account
+is not a member of is `notFound()` (`404`). Billing / management CTAs that are not yet
+wired (subscribe / manage subscription) render as "coming soon" copy rather than dead
+buttons.
+
+**Gating.** The `(saas)` segment layout `404`s the whole tree when `SAAS_MODE` is off
+or account auth is not configured (`AUTH_SECRET` unset), so the self-hosted app never
+mounts these routes and stays byte-for-byte unchanged. A logged-out viewer is
+redirected to `/account/login?next=…` (preserving the `?w=` selection), unlike the
+[Superadmin console](#superadmin-console-8), which shows no login prompt on purpose.
+
+**OSS parity:** SaaS-only and entirely additive (new `app/(saas)/account/workspace`
+pages plus `components/saas/*`). With `SAAS_MODE` off the segment self-gates to `404`,
+so nothing changes for the self-hosted build.
+
 ### Superadmin console (§8)
 
 A separate, **platform-operator** surface for the person running the Pharos
