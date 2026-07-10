@@ -3,6 +3,31 @@
 Ημερολόγιο της OSS-release + test routine (τρέχει ωριαία, unattended). Κάθε εγγραφή:
 τι έγινε, τι επαληθεύτηκε, και το επόμενο προτεινόμενο βήμα.
 
+## 2026-07-13 (push/register/route.test.ts — Expo token register/unregister: auth gate + format guard + $addToSet/$pull)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/push/register/route.test.ts` για τα POST + DELETE του `/api/v1/push/register`.**
+
+Επιλογή target: ακολούθησα το suggested next task — τα βαριά GET reports (overview/calendar/reports) + τα `{ rows }` wrappers (trash/jobs/history) ΕΓΙΝΑΝ ΟΛΑ, οπότε πήρα το πρώτο untested POST/mutation route με body-validation seam: το `push/register`. Είναι μικρό, deterministic, DB-mockable, και τα route-only behaviours του ζουν ΜΟΝΟ εδώ — τροφοδοτεί την εγγραφή/διαγραφή του Expo push token της mobile app (χωρίς σωστό token, μηδέν push notifications στη συσκευή). Route-only συμπεριφορές που καλύφθηκαν:
+- **Auth gate** (POST + DELETE): withAuth → 401 χωρίς/με άγνωστο token, ΠΡΙΝ οποιοδήποτε DB write (καμία `User.updateOne`).
+- **POST format guard**: το body.token περνά από τον ΠΡΑΓΜΑΤΙΚΟ `isExpoPushToken` regex (`ExponentPushToken[..]` / `ExpoPushToken[..]`)· ό,τι άλλο (plain string, χωρίς brackets, missing, non-string number) → 400 `'valid Expo push token required'` ΧΩΡΙΣ write. Επιτυχία → `$addToSet` το **trimmed** token, `{ ok:true }`.
+- **POST trimming**: leading/trailing whitespace κόβεται πριν το store (`$addToSet: { pushTokens: <trimmed> }`).
+- **DELETE (καμία format check)**: οποιοδήποτε non-empty (post-trim) string γίνεται δεκτό → `$pull` το trimmed token (device μπορεί να drop-άρει legacy token που δεν parse-άρει πια)· empty / whitespace-only / missing / non-string → 400 `'token required'` ΧΩΡΙΣ write.
+- **Filter shape**: και οι δύο mutations στοχεύουν `{ _id: user.id }` (= 'u1' από το auth mock).
+
+Mock pattern: DB seam μόνο — mock `@/lib/db` (connectDB) + `@/models/User` (`findOne` chain για τον ΠΡΑΓΜΑΤΙΚΟ withAuth/bearerUser + `updateOne` για τη mutation, captured args). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ apiAuth/apiBody/expoPush helpers (withAuth + readBody + isExpoPushToken) ώστε validation + trimming να τρέχουν αληθινά. Χωρίς fake timers (το route δεν διαβάζει `new Date()`).
+
+Τι έγινε: Νέο `route.test.ts` (17 tests): auth gate (3: POST no-token, POST unknown-token, DELETE no-token — όλα μηδέν write), POST register (8: canonical + short variant + trim + 4 rejections [plain/no-bracket/missing/number]), DELETE unregister (6: pull canonical + accept-any-non-expo + trim + 4 rejections [empty/whitespace/missing/number]).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/push/register/route.test.ts` → 17/17 passed.
+- `npx vitest run` (όλο το suite) → 152 files, 1978/1978 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλου routine (receipt-search: `app/search-actions.ts` [M] + `lib/receiptSearch.ts`/`.test.ts` [??]) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα ΜΟΝΟ τα δικά μου paths (push/register/route.test.ts + OSS_PROGRESS.md) με explicit pathspec.
+
+Suggested next task: (β συνέχεια) Συνέχισε POST/mutation coverage, ένα module ανά run. Επόμενα με body-validation seam: `settings/route.ts` (PATCH settings — δες allowed keys + validation), `settings/test-notify/route.ts` (fire-and-report), `auth/login/route.ts` (rate-limit gate — δες το `rateLimitConfig` env-gate + `rateLimit(key)` 429 headers). POST scan routes με AI seam: `scan/receipt|expense|product|voucher` (multipart/base64 image → parsed shape, mock το AI/parse seam, 400 σε missing image). Item sub-routes: `items/[id]/price|link-plan|plans|ai-fill|convert-to-task`· `receipts/[id]/rescan|add-to-library`· `expenses/[id]/rescan`· `trash/[type]/[id]` (restore/purge). DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling — π.χ. `notifiers.shared.ts`). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
 ## 2026-07-10 (statements/route.test.ts — collection LIST envelope + card filter + withDeleted cursor)
 
 **Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/statements/route.test.ts` για το GET του `/api/v1/statements`.**
