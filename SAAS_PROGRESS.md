@@ -2383,3 +2383,57 @@ routine) ΔΕΝ αγγίχτηκαν· isolated pathspec commit μόνο των 
 **Next task:** increment 58 — είτε (α) **Billing** panel με τα checkout/portal action κουμπιά
 (client POST → api/saas/billing/checkout|portal· read state ήδη στο Overview), είτε (β)
 **email-verify / password-reset** UI (APIs έτοιμα), είτε (γ) **Usage** deep-dive panel/tab.
+
+## 2026-07-10 (increment 58 — user-facing USAGE deep-dive tab: /account/workspace/usage, §8 UI-first)
+**Το κενό:** τα increments 56-57 (+ οι παράλληλες runs για billing/recovery UI) έχτισαν
+Overview/Members/Billing/auth-recovery panels, αλλά το Usage φαινόταν ΜΟΝΟ ως summary panel μέσα
+στο Overview — καμία deep-dive. Το `api/saas/usage` (+ `currentUsage`/`aiQuotaStatus`/
+`storageQuotaStatus`/`buildCostSummary`) εκθέτουν πλούσια δεδομένα (quota `ratio`/`remaining`,
+token breakdown input/output, cost micros) που το Overview δεν renderάρει. Έχτισα το τέταρτο
+workspace-settings κομμάτι — **Usage** — SSR-loading τους ήδη-χτισμένους readers κατευθείαν
+server-side (idiomatic, η σελίδα είναι ήδη gated, όχι self-fetch). ΟΛΟ additive, σε δικούς μου
+φακέλους:
+- `components/saas/quota.ts` (νέο) — **PURE + client-safe** `quotaBarView(input)` → view model
+  { unlimited, percent(0..100 int), tone(ok/warn/full), remaining }. Unlimited (null/≤0 limit) →
+  flat "ok" track, μηδέν remaining. Fill fraction προτιμά explicit `ratio` (clamp 0..1), αλλιώς
+  used/limit· percent clamp 0..100 (over-quota → full bar, όχι overflow). Tone thresholds 75%→warn,
+  100%→full. Defensive: garbage/NaN/negative → 0, ποτέ NaN/negative width. (ονομάστηκε `quota.ts`
+  όχι `quotaBar.ts` για αποφυγή case-only collision με το `QuotaBar.tsx` στο case-insensitive FS).
+- `components/saas/quota.test.ts` (νέο, 8 tests) — unlimited/null/≤0 limit, computed percent+
+  remaining, ratio-preferred-over-limit, warn@75%/full@100%, over-quota clamp, rounding,
+  garbage-input defensiveness.
+- `components/saas/QuotaBar.tsx` (νέο, server-safe) — labelled progress bar: caption "used / limit"
+  (∞ όταν unlimited), fill χρωματισμένο κατά tone (accent/gold/red), "N% used" + "X left",
+  `role="progressbar"` + aria-value*. Styled ΜΟΝΟ με υπάρχοντα Pharos tokens, μηδέν shared CSS.
+- `app/(saas)/account/workspace/usage/page.tsx` (νέο) — gate→viewer (logged-out → redirect login)
+  →`accountTenants` (empty → redirect /account/workspace, που owns το empty state)→`pickWorkspace`
+  (unknown `?w=` → `notFound()`)→`getTenantContext`→`currentUsage` + quota status + cost summary.
+  Render: 4 StatTiles (AI calls / Total tokens / Storage / AI cost), Quotas panel (2 QuotaBars με
+  τα quota ratios + "metering inactive" note), AI token breakdown panel (input/output/total tokens
+  + recorded calls + estimated cost). ΟΛΑ τα numbers μέσα από τους defensive formatters.
+- `components/saas/workspaceTabs.ts` (+`.test.ts`) — πρόσθεσα `'usage'` στο `WorkspaceTabKey` +
+  TABS (Overview→Members→**Usage**→Billing)· ο νέος tab εμφανίζεται αυτόματα σε ΟΛΑ τα panels.
+  Test επεκτάθηκε (order 4 tabs, Usage active flag, `?w=` carry-through indices).
+
+**Verified:** `npm run type-check` → **EXIT 0** (χρειάστηκε rename quotaBar→quota λόγω case-only
+FS collision, διορθώθηκε). `npx vitest run quota.test.ts workspaceTabs.test.ts` → **15/15**·
+full suite `npx vitest run` → **2094/2094 green** (162 files, καμία regression). ΚΑΝΕΝΑ υπάρχον
+feature αρχείο δεν αγγίχτηκε (μόνο νέα usage/** + quota*/QuotaBar + additive tab στο δικό μου
+workspaceTabs). `SAAS_MODE` off / self-hosted = **zero effect** (self-gates σε `notFound()` μέσω
+`getSaasViewer()`→`requireSaasUiEnabled()` πριν render). Κανένας Docker rebuild (additive gated
+segment, μηδέν shared runtime wiring)· καμία νέα εξάρτηση. Collision guard: μηδέν staged foreign
+files πριν το commit· foreign modified/untracked (search-actions/receiptSearch από άλλες routines)
+ΔΕΝ αγγίχτηκαν· isolated pathspec commit μόνο των δικών μου αρχείων.
+
+**## Needs Achilleas** (usage tab):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η σελίδα (αλλιώς 404). Self-hosted
+  = disabled, zero risk.
+- **AI-usage wiring:** τα numbers μένουν μηδέν μέχρι το `recordAiUsage` να καλείται στα AI
+  call-sites (ledger υπάρχει, wiring = ξεχωριστό backend increment)· το panel το δηλώνει με
+  "metering inactive" note.
+- **Storage sampling:** το storageBytes γεμίζει από το cron `POST /api/saas/usage/sample`
+  (CRON_SECRET + scheduler) — δεν τρέχει αυτόματα σε αυτό το deployment ακόμα.
+
+**Next task:** increment 59 — είτε (α) **Billing** action κουμπιά αν λείπουν (client checkout/
+portal POST), είτε (β) **root-app landing** μετά το login για signed-in Account (ανοιχτό από #56),
+είτε (γ) wiring του `recordAiUsage` στα AI call-sites ώστε το Usage tab να δείχνει πραγματικά νούμερα.
