@@ -22,6 +22,7 @@ export type AppSettings = {
   warrantyAlertDays: number;
   trialAlertDays: number; // lead time (days) for free-trial "cancel before charge" alert (P33)
   giftCardAlertDays: number; // window (days) for "gift card expiring with balance" alert (P32); 0 = off
+  billAlertDays: number; // lead-time (days) for "bill due / overdue" alert (P28); 0 = off
   autoAddStores: boolean;
   ntfyUrl: string;
   ntfyEnabled: boolean;
@@ -45,6 +46,7 @@ export type RawAppConfigDoc = {
   warrantyAlertDays?: number;
   trialAlertDays?: number;
   giftCardAlertDays?: number;
+  billAlertDays?: number;
   autoAddStores?: boolean;
   ntfyUrl?: string;
   ntfyEnabled?: boolean;
@@ -77,6 +79,7 @@ const DEFAULTS: AppSettings = {
   warrantyAlertDays: 90,
   trialAlertDays: 2,
   giftCardAlertDays: 30,
+  billAlertDays: 5,
   autoAddStores: true,
   ntfyUrl: '',
   ntfyEnabled: false,
@@ -113,6 +116,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     warrantyAlertDays: typeof doc?.warrantyAlertDays === 'number' ? doc.warrantyAlertDays : DEFAULTS.warrantyAlertDays,
     trialAlertDays: typeof doc?.trialAlertDays === 'number' ? doc.trialAlertDays : DEFAULTS.trialAlertDays,
     giftCardAlertDays: typeof doc?.giftCardAlertDays === 'number' ? doc.giftCardAlertDays : DEFAULTS.giftCardAlertDays,
+    billAlertDays: typeof doc?.billAlertDays === 'number' ? doc.billAlertDays : DEFAULTS.billAlertDays,
     autoAddStores: doc?.autoAddStores !== false,
     ntfyUrl: doc?.ntfyUrl || '',
     ntfyEnabled: !!doc?.ntfyEnabled,
@@ -145,7 +149,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     // untouched, same query as before).
     const Config = await currentModel(AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets budgetRollover assetAccounts depreciation categoryRules')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists budgets budgetRollover assetAccounts depreciation categoryRules')
       .lean();
   } catch {
     /* DB down → hard defaults */

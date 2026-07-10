@@ -159,6 +159,23 @@ export type SerializedGiftCard = {
   updatedAt: string;
 };
 
+// P28 — a manually-paid bill/payable whose status (paid/overdue/due-soon) is derived.
+export type SerializedBill = {
+  _id: string;
+  title: string;
+  vendor: string;
+  amount: number;
+  dueDate: string | null;
+  paidAt: string | null;
+  category: string;
+  cycle: '' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  notes: string;
+  archived: boolean;
+  linkedExpenseId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type SerializedCard = {
   _id: string;
   name: string;

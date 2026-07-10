@@ -1854,6 +1854,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   const [alertDays, setAlertDays] = useState(String(settings.warrantyAlertDays));
   const [trialDays, setTrialDays] = useState(String(settings.trialAlertDays));
   const [giftDays, setGiftDays] = useState(String(settings.giftCardAlertDays));
+  const [billDays, setBillDays] = useState(String(settings.billAlertDays));
   const [autoAdd, setAutoAdd] = useState(settings.autoAddStores);
   const [currency, setCurrency] = useState(settings.currency);
   const [vatRate, setVatRate] = useState(String(settings.defaultVatRate));
@@ -1867,6 +1868,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     fd.set('warrantyAlertDays', alertDays);
     fd.set('trialAlertDays', trialDays);
     fd.set('giftCardAlertDays', giftDays);
+    fd.set('billAlertDays', billDays);
     fd.set('autoAddStores', String(autoAdd));
     fd.set('currency', currency);
     fd.set('defaultVatRate', vatRate);
@@ -1923,6 +1925,10 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.giftCardAlert')}</span>
           <input type="number" min="0" max="365" value={giftDays} onChange={(e) => setGiftDays(e.target.value)} className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.billAlert')}</span>
+          <input type="number" min="0" max="90" value={billDays} onChange={(e) => setBillDays(e.target.value)} className={inputClass} />
         </label>
         <div className="flex items-center justify-between gap-3 self-end pb-1">
           <span className="min-w-0">

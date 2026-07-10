@@ -7,7 +7,7 @@ import { softDeletePlugin } from '@/lib/softDelete';
 const NotificationSchema = new Schema(
   {
     dedupeKey: { type: String, required: true, index: true },
-    kind: { type: String, enum: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'system'], default: 'system', index: true },
+    kind: { type: String, enum: ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill', 'system'], default: 'system', index: true },
     title: { type: String, default: '' }, // optional — installments derive their heading in the bell
 
     body: { type: String, default: '' },

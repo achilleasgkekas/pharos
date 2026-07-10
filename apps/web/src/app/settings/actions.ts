@@ -10,6 +10,8 @@ import { Subscription } from '@/models/Subscription';
 import { Voucher } from '@/models/Voucher';
 import { GiftCard } from '@/models/GiftCard';
 import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
+import { Bill } from '@/models/Bill';
+import { billDaysUntilDue } from '@/lib/bill';
 import { Card } from '@/models/Card';
 import { Task } from '@/models/Task';
 import { Expense } from '@/models/Expense';
@@ -274,6 +276,9 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   // 0 is meaningful (gift-card expiry alerts off), so parse explicitly instead of `|| 30`.
   const giftRaw = Number(formData.get('giftCardAlertDays'));
   const giftCardAlertDays = Number.isFinite(giftRaw) ? Math.max(0, Math.min(365, Math.round(giftRaw))) : 30;
+  // 0 is meaningful (bill due/overdue alerts off), so parse explicitly instead of `|| 5`.
+  const billRaw = Number(formData.get('billAlertDays'));
+  const billAlertDays = Number.isFinite(billRaw) ? Math.max(0, Math.min(90, Math.round(billRaw))) : 5;
   const autoAdd = formData.get('autoAddStores') === 'true';
   const currency = (String(formData.get('currency') || 'EUR').trim().toUpperCase()) || 'EUR';
   const vatRate = Math.max(0, Math.min(100, Number(formData.get('defaultVatRate')) || 24));
@@ -289,6 +294,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
         warrantyAlertDays: alertDays,
         trialAlertDays,
         giftCardAlertDays,
+        billAlertDays,
         autoAddStores: autoAdd,
         currency,
         defaultVatRate: vatRate,
@@ -440,6 +446,16 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
     .filter((g) => g.balance > 0.009 && g.days !== null && g.days >= 0 && g.days <= s.giftCardAlertDays)
     .sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
 
+  // Bills / payables (P28): unpaid bills that are overdue or due within the
+  // lead-time window (overdue nag until paid), most-overdue first.
+  const billRows = (await Bill.find({ paidAt: null, archived: { $ne: true } })
+    .select('title amount dueDate')
+    .lean()) as Array<{ title: string; amount?: number; dueDate?: string | Date | null }>;
+  const billsDue = billRows
+    .map((b) => ({ title: b.title, amount: b.amount ?? 0, days: billDaysUntilDue(b.dueDate ?? null, now) }))
+    .filter((b) => b.days !== null && (b.days as number) <= s.billAlertDays)
+    .sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
+
   const lines: string[] = [];
   if (deals.length) lines.push(`🎯 ${deals.length} deal(s): ${deals.slice(0, 5).map((d) => d.title).join(', ')}`);
   if (dueThisMonth > 0) lines.push(`💳 installments this month: ${cur()}${dueThisMonth.toFixed(0)} (${plans.length} plans)`);
@@ -471,6 +487,13 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
       `💳 ${giftsExpiring.length} gift card(s) expiring ≤${s.giftCardAlertDays}d: ${giftsExpiring
         .slice(0, 5)
         .map((g) => `${g.title} (${cur()}${g.balance.toFixed(0)}, ${g.days}d)`)
+        .join(', ')}`
+    );
+  if (billsDue.length)
+    lines.push(
+      `🧾 ${billsDue.length} bill(s) due/overdue: ${billsDue
+        .slice(0, 5)
+        .map((b) => `${b.title}${b.amount > 0 ? ` ${cur()}${b.amount.toFixed(0)}` : ''} (${(b.days ?? 0) < 0 ? `${-(b.days ?? 0)}d overdue` : `${b.days}d`})`)
         .join(', ')}`
     );
 
@@ -1200,7 +1223,7 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
 // place that restores or permanently purges them. Auto-purge after 30 days.
 
 export type TrashRow = { type: TrashType; id: string; title: string; subtitle: string; deletedAt: string };
-export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'task';
+export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'bill' | 'task';
 
 const TRASH_MODELS: Record<TrashType, typeof Item> = {
   item: Item,
@@ -1209,6 +1232,7 @@ const TRASH_MODELS: Record<TrashType, typeof Item> = {
   subscription: Subscription as unknown as typeof Item,
   voucher: Voucher as unknown as typeof Item,
   giftcard: GiftCard as unknown as typeof Item,
+  bill: Bill as unknown as typeof Item,
   task: Task as unknown as typeof Item,
 };
 const TRASH_RETENTION_DAYS = 30;
@@ -1221,6 +1245,7 @@ function trashLabel(type: TrashType, d: Record<string, unknown>): { title: strin
     case 'subscription': return { title: String(d.name || '—'), subtitle: `€${d.amount ?? 0}/${d.billingCycle || ''}` };
     case 'voucher': return { title: String(d.title || '—'), subtitle: String(d.store || '') };
     case 'giftcard': return { title: String(d.title || '—'), subtitle: `${d.store || ''} · €${d.initialAmount ?? 0}`.trim() };
+    case 'bill': return { title: String(d.title || '—'), subtitle: `${d.vendor || ''} · €${d.amount ?? 0}`.trim() };
     case 'task': return { title: String(d.title || '—'), subtitle: String(d.status || '') };
   }
 }

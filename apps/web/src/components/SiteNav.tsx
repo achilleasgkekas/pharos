@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
   Package, ShoppingCart, ShoppingBasket, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
   Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, CalendarDays,
-  LogOut, UserRound, Activity, MessageSquare, Trash2,
+  LogOut, UserRound, Activity, MessageSquare, Trash2, FileText,
 } from 'lucide-react';
 import { cn } from './ui/cn';
 import { useTheme } from './ThemeProvider';
@@ -29,6 +29,7 @@ const STUFF: NavLink[] = [
 const MONEY: NavLink[] = [
   { href: '/receipts', key: 'nav.receipts', icon: ReceiptIcon },
   { href: '/expenses', key: 'nav.expenses', icon: Wallet },
+  { href: '/bills', key: 'nav.bills', icon: FileText },
   { href: '/income', key: 'nav.income', icon: Banknote },
   { href: '/statements', key: 'nav.statements', icon: CreditCard },
   { href: '/subscriptions', key: 'nav.subscriptions', icon: CalendarClock },

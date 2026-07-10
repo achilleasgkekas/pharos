@@ -1,0 +1,35 @@
+import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
+import { softDeletePlugin } from '@/lib/softDelete';
+
+// P28 — bill / payable status tracker (due → paid → overdue). Distinct from
+// Subscription (an AUTOMATIC recurring charge) and from /calendar (which only
+// PROJECTS the future): a Bill is something you pay by HAND (ΔΕΗ, ΟΤΕ, κοινόχρηστα)
+// whose lifecycle we track — "is it due?, did I pay it?, was it forgotten → overdue".
+// Status is DERIVED from dueDate + paidAt (see lib/bill.ts), never stored.
+const BillSchema = new Schema(
+  {
+    title: { type: String, required: true }, // "ΔΕΗ ρεύμα", "Κοινόχρηστα Ιουλίου"
+    vendor: { type: String, default: '', index: true }, // payee
+    amount: { type: Number, required: true, default: 0 },
+    dueDate: { type: Date, required: true, index: true },
+    paidAt: { type: Date, default: null }, // null = still unpaid
+    category: { type: String, default: 'other' }, // reused when a payment logs an expense
+    // '' = one-off. Otherwise a recurring template: paying it spawns the next
+    // pending instance one cycle ahead (see markBillPaid).
+    cycle: { type: String, enum: ['', 'weekly', 'monthly', 'quarterly', 'yearly'], default: '' },
+    notes: { type: String, default: '' },
+    archived: { type: Boolean, default: false, index: true },
+    linkedExpenseId: { type: String, default: '' }, // set when "mark paid" also logged an expense
+  },
+  { timestamps: true }
+);
+
+// Incremental-sync cursor (lib/apiList withSince → updatedAt $gte) for a future GET /api/v1/bills.
+BillSchema.index({ updatedAt: -1 });
+
+BillSchema.plugin(softDeletePlugin);
+
+export type BillDoc = InferSchemaType<typeof BillSchema> & { _id: string };
+
+export const Bill: Model<BillDoc> =
+  (models.Bill as Model<BillDoc>) || model<BillDoc>('Bill', BillSchema);

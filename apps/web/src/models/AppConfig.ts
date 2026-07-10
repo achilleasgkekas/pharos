@@ -35,6 +35,7 @@ const AppConfigSchema = new Schema(
     warrantyAlertDays: { type: Number, default: 90 }, // "expiring soon" window for the badge + alerts
     trialAlertDays: { type: Number, default: 2 }, // free-trial "cancel before charge" lead time (P33)
     giftCardAlertDays: { type: Number, default: 30 }, // "gift card expiring with balance" window (P32)
+    billAlertDays: { type: Number, default: 5 }, // "bill due / overdue" lead time (P28)
     autoAddStores: { type: Boolean, default: true }, // auto-add unknown receipt stores to the list
     currency: { type: String, default: 'EUR' }, // display currency symbol (ISO 4217 code)
     defaultVatRate: { type: Number, default: 24 }, // fallback VAT/sales-tax % when a receipt doesn't show one

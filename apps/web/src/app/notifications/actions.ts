@@ -8,13 +8,15 @@ import { Statement } from '@/models/Statement';
 import { Expense } from '@/models/Expense';
 import { Subscription } from '@/models/Subscription';
 import { GiftCard } from '@/models/GiftCard';
+import { Bill } from '@/models/Bill';
 import { Notification } from '@/models/Notification';
 import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
+import { billDaysUntilDue } from '@/lib/bill';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
 
-export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'system';
+export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'bill' | 'system';
 
 export type SerializedNotification = {
   _id: string;
@@ -27,7 +29,7 @@ export type SerializedNotification = {
 };
 
 type Alert = { dedupeKey: string; kind: NotifKind; title: string; body: string; href: string };
-const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard'] as const;
+const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill'] as const;
 
 /** Recompute the live alerts (deals / warranties / installments-due) — the same
  *  three the ntfy check uses, but as structured payloads the bell can localize. */
@@ -132,6 +134,22 @@ async function computeAlerts(): Promise<Alert[]> {
     const iso = new Date(g.expiresAt as string).toISOString().slice(0, 10);
     // body = "<days>|<balance>" (raw; the bell formats with the symbol)
     alerts.push({ dedupeKey: `giftcard:${id}:${iso}`, kind: 'giftcard', title: g.title, body: `${days}|${balance}`, href: '/vouchers' });
+  }
+
+  // Bills / payables (P28): an unpaid bill that's overdue or due within the
+  // configured lead-time window. dedupeKey carries the due date so moving it
+  // re-alerts; it auto-expires once the bill is paid (leaves the query). Overdue
+  // ones keep nagging (no lower bound) until paid.
+  const openBills = (await Bill.find({ paidAt: null, archived: { $ne: true } })
+    .select('title vendor amount dueDate')
+    .lean()) as Array<{ _id: unknown; title: string; vendor?: string; amount?: number; dueDate?: string | Date | null }>;
+  for (const b of openBills) {
+    const days = billDaysUntilDue(b.dueDate ?? null, now);
+    if (days === null || days > s.billAlertDays) continue;
+    const id = String(b._id);
+    const iso = new Date(b.dueDate as string).toISOString().slice(0, 10);
+    // body = "<days>|<amount>" (raw; days<0 = overdue; the bell formats with the symbol)
+    alerts.push({ dedupeKey: `bill:${id}:${iso}`, kind: 'bill', title: b.title, body: `${days}|${b.amount ?? 0}`, href: '/bills' });
   }
 
   return alerts;
