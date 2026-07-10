@@ -474,6 +474,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. When you import a statement, PHAROS suggests which of your receipts each charge belongs to, matching on amount (within a couple of cents) and date (within a few days). You confirm the ones it gets right, so reconciling a month of spending is a few clicks instead of a spreadsheet.',
   },
   {
+    q: 'Does it track bills I pay by hand, like utilities?',
+    a: 'Yes. Bills you pay manually (power, phone, shared building costs) get their own tracker, separate from subscriptions that charge a card automatically. Each bill moves through due-soon, overdue, and paid on its own, worked out from the due date, so a triage list always shows what needs paying first. Mark one paid in a click, optionally log the matching expense, and a recurring bill queues up the next one. Reminders ping you a few days before anything falls due.',
+  },
+  {
     q: 'How do backups work?',
     a: 'Self-hosted ships with a nightly backup you can point at a NAS, plus one-click JSON and CSV exports any time. You can also mirror your files to SMB, FTP, or OneDrive for a proper 3-2-1 setup. On hosted, nightly backups are handled for you.',
   },

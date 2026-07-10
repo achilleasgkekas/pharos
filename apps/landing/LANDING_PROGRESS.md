@@ -1908,3 +1908,45 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-10 (cont.¹¹) — (e) polish/content: FAQ += manual bills / payables tracker (P28)
+
+Increment (e) polish, content-accuracy micro-pass. Το πιο προσφατο shipped module στο κυριο app (P28,
+commit a737bbc `feat(bills)` + cd296b8 docs) ΔΕΝ ειχε καμια αντιστοιχια στο landing: νεο `/bills` module για
+λογαριασμους που πληρωνεις με το χερι (ΔΕΗ, ΟΤΕ, κοινοχρηστα), ΞΕΧΩΡΙΣΤΟ απο τα Subscriptions (automatic
+charge) — status due-soon/overdue/paid DERIVED απο dueDate + paidAt, triage list, one-click mark-paid (opt-in
+log matching expense), recurring bill spawns την επομενη instance, bill-due alerts (billAlertDays, default 5).
+Ενας επισκεπτης που ρωταει «παρακολουθει τους λογαριασμους που πληρωνω χειροκινητα;» δεν εβρισκε απαντηση, και
+το Expenses FEATURES desc («Bills and payslips scanned») μπορει να μπερδεψει bills=scanned-expense με το
+payable tracker.
+
+Αλλαγη (app/page.tsx, FAQS array μονο, μηδεν UI/CSS/dependency/bundle change):
+- Νεα FAQ εγγραφη «Does it track bills I pay by hand, like utilities?» αμεσως πριν το «How do backups work?»
+  (money-tracking cluster, μετα το reconciliation Q). Απαντηση: manual bills → δικος τους tracker, ξεχωριστος
+  απο τα subscriptions· κινειται due-soon/overdue/paid απο το due date· triage list· one-click mark-paid +
+  optional log expense· recurring bill queues την επομενη· reminders λιγες μερες πριν. Ακριβες σε real-shipped
+  feature (P28).
+- Ρεει αυτοματα στο FAQPage JSON-LD (FAQS.map) + deterministic anchor id
+  `faq-does-it-track-bills-i-pay-by-hand-like-utilities` (deep-link stays valid).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (11 routes), / route 5.33 kB (αμεταβλητο, copy-only, μηδεν bundle
+  impact).
+- Prerender (.next/server/app/index.html): «Bills you pay manually» -> 4 hits (HTML + JSON-LD + RSC payload +
+  deep-link, consistent)· anchor id `faq-does-it-track-bills-i-pay-by-hand-like-utilities` present.
+  Content/non-visual -> verified στο static output (separate non-Docker app, δεν σηκωσα preview server).
+- em-dash: 0 σε ολο το page.tsx (commas μονο). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (page.tsx + αυτο το log) μεσω explicit pathspec· foreign unstaged
+  files αλλου routine (apps/web/search-actions.ts, receiptSearch*) τα αφησα αθικτα (collision guard).
+
+Επομενο increment: (e) polish συνεχεια — P34 per-space / per-property ledger tag (split expenses ανα σπιτι,
+«ποσο κοστιζει το εξοχικο») ισως αξιζει μια Reports/Expenses copy γραμμη ή FAQ (relevant στον 2-homes /
+homelabber persona)· ή annual Offers στα per-tier Pricing aria labels· ή real app screenshots οταν υπαρξουν
+assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
