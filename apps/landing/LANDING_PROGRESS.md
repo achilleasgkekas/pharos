@@ -1638,3 +1638,33 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον.
+
+## 2026-07-10 (cont.³) — (e) polish/sync: annual billing στο llms.txt (AI-crawler parity)
+
+Increment (e) polish, sync pass. Το `public/llms.txt` (AI-crawler summary) στην ενοτητα Pricing εδειχνε
+ΜΟΝΟ monthly τιμες (€4/€8/€15), αλλα η σελιδα προσφερει πλεον προμιναντ και annual billing: ο Pricing
+toggle (Monthly/Annual), το JSON-LD annual Offers (×10, δυο μηνες δωρεαν) και το pricing footnote. Ενας
+AI crawler που διαβαζε το llms.txt εχανε εντελως την annual επιλογη -> stale/ελλιπες summary.
+
+- `public/llms.txt`: νεα παραγραφος κατω απο το Pro tier — annual = 10 μηνες προπληρωμη (2 μηνες δωρεαν/ετος),
+  με τις concrete ετησιες τιμες (Solo €40, Family €80, Pro €150) + «includes AI parsing and nightly backups,
+  cancel anytime». Ευθυγραμμισμενο verbatim με το JSON-LD (amount ×10) και το ορατο pricing footnote.
+
+Verify:
+- `npm run type-check` -> exit 0 (static txt δεν type-check-αρεται, αλλα καθαρο).
+- `npm run build` -> success, route set αμεταβλητο (public/*.txt αντιγραφονται ως-εχουν, μηδεν bundle impact).
+- Served-file check: `grep "Annual billing charges ten months"` -> 1 occurrence στο public/llms.txt.
+- em-dash: 0 στο llms.txt. Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (public/llms.txt + αυτο το log) μεσω explicit pathspec· foreign
+  staged files αλλου routine (apps/web/search-actions.ts, receiptSearch*) τα αφησα αθικτα (collision guard,
+  0 staged πριν το commit).
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets (blocked)· ή Waitlist
+always-present aria-live region (το status note render-αρεται μονο μετα το sent, ισως δεν announce-αρεται
+απο ολους τους AT)· ή content micro-pass στα features.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον.

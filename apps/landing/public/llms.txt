@@ -24,6 +24,8 @@ Design principles: local-first, privacy-first (financial data stays under your c
 - [Family · €8/month](https://ph-aros.com/#pricing): Shared household hub for up to 5 members, higher AI limits, priority email support. (Hosted beta, waitlist.)
 - [Pro · €15/month](https://ph-aros.com/#pricing): Everything in Family plus REST API access and highest AI limits. (Hosted beta, waitlist.)
 
+Every hosted plan can be billed monthly or annually. Annual billing charges ten months up front, so two months are free per year (Solo €40/year, Family €80/year, Pro €150/year). Every hosted plan includes AI parsing and nightly backups, and you can cancel anytime.
+
 Hosted prices are indicative during the beta and may change before general availability.
 
 ## Getting started
