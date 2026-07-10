@@ -1576,3 +1576,34 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον.
+
+## 2026-07-10 (cont.) — (e) polish: 3 νεες FAQ (multi-user, updates, mobile)
+
+Increment (e) polish, content pass αντι για ακομα ενα SEO-only run (τα προηγουμενα ηταν ολα JSON-LD).
+Το FAQ ειχε 9 items αλλα ελειπαν 3 πολυ κοινες pre-purchase ερωτησεις. Προσθεσα στο `FAQS` array
+(app/page.tsx) — αυτοματα τρεφουν και το ορατο accordion ΚΑΙ το FAQPage JSON-LD (maps πανω στο ιδιο array):
+
+- «Can my household or team share one instance?» — login + accounts, self-host χωρις seat limits, hosted
+  scale solo -> family/team. Συνεπες με τα Family/Pro tiers + το login/users που ηδη υπαρχει.
+- «How do updates work?» — self-host: git pull + docker compose up (pin σε version)· hosted: auto rollout.
+- «Is there a mobile app?» — native iOS/Android (Expo) που κανει sign-in στον δικο σου server. Ευθυγραμμισμενο
+  verbatim με το υπαρχον #mobile section («native iOS and Android app, built with Expo»), οχι overpromise.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13/13 static, / route 5.25 kB (μηδεν bundle impact, inline content).
+- Prerender (.next/server/app/index.html): και οι 3 ερωτησεις ×5 occurrences (ορατο HTML + JSON-LD raw +
+  escaped + deep-link anchors)· `FAQPage` present. Non-visual + static -> verified στο prerender οπως ολα
+  τα προηγουμενα FAQ/JSON-LD increments (δεν σηκωσα preview server· separate non-Docker app).
+- em-dash: 0 στο app/page.tsx. Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Staged ΜΟΝΟ τα δικα μου landing files (page.tsx + αυτο το log) μεσω explicit pathspec· foreign staged
+  files αλλου routine (apps/web/receiptSearch*, search-actions.ts) τα αφησα αθικτα (collision guard).
+
+Επομενο increment: (e) polish συνεχεια — real app screenshots οταν υπαρξουν assets (blocked)· ή ακομα
+content copy pass (π.χ. features micro-copy)· ή annual Offers στα per-tier Pricing.tsx aria labels.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον.

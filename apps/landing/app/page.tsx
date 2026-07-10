@@ -450,6 +450,18 @@ const FAQS: { q: string; a: string }[] = [
     a: 'It is the same app. With hosted we handle the server, updates, and nightly backups, and AI parsing is included so there is nothing to configure. Self-hosted gives you full control and keeps every byte on your own hardware.',
   },
   {
+    q: 'Can my household or team share one instance?',
+    a: 'Yes. Each instance sits behind a login and you can add accounts for the people you share with, so everyone signs into the same hub. Self-hosting has no seat limits at all; hosted plans scale from a single person up to a shared family or team workspace.',
+  },
+  {
+    q: 'How do updates work?',
+    a: 'Self-hosted updates are a git pull and one docker compose up, so you upgrade on your own schedule and can pin to a version you trust. On hosted we roll out updates for you, so you are always on the latest release with nothing to maintain.',
+  },
+  {
+    q: 'Is there a mobile app?',
+    a: 'Yes. A native iOS and Android app, built with Expo, signs into your own server, self-hosted or hosted. Scan receipts and products on the go, get push alerts, and reach every module from your phone. The responsive web app also works well in any mobile browser.',
+  },
+  {
     q: 'Can I move between self-hosted and hosted?',
     a: 'Yes. PHAROS exports your whole dataset to JSON and imports it back by merging on record id, so you can start self-hosted and move to hosted later, or the other way round, without losing anything.',
   },
