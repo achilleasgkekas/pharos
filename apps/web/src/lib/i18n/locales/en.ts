@@ -406,6 +406,28 @@ export const en = {
   'st.completed': 'Completed ({n})',
   'st.installments': '{n} installments',
 
+  // ── Statements → receipt reconciliation (P18) ────────────────────────────
+  'rec.button': 'Reconcile',
+  'rec.title': 'Match charges to receipts',
+  'rec.pickStatement': 'Statement',
+  'rec.loading': 'Finding matches…',
+  'rec.charges': 'Charges',
+  'rec.noCharges': 'This statement has no transactions.',
+  'rec.matched': 'Matched',
+  'rec.suggest': 'Suggested match',
+  'rec.suggestN': '{n} possible matches',
+  'rec.noMatch': 'No receipt found',
+  'rec.link': 'Link',
+  'rec.unlink': 'Unlink',
+  'rec.change': 'Change',
+  'rec.dayExact': 'same day',
+  'rec.dayOff': '{n}d apart',
+  'rec.storeHint': 'store matches',
+  'rec.unmatchedTitle': 'Receipts with no matching charge ({n})',
+  'rec.unmatchedHint': 'These receipts in this period are not linked to any statement charge.',
+  'rec.allMatched': 'Every charge with a candidate is linked. 🎉',
+  'rec.summary': '{matched} of {total} charges linked',
+
   // ── Items (shell: header + filters) ──────────────────────────────────────
   'it.searchPlaceholder': 'Search title, specs, tags...',
   'it.allStores': 'All stores',

@@ -25,6 +25,7 @@ import type { SerializedStatement, SerializedTransaction, SerializedCard } from 
 import { periodLabel } from '@/lib/cards';
 import { computeInstallmentPlans, type InstallmentPlan } from '@/lib/installments';
 import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
+import { ReconcilePanel } from './ReconcilePanel';
 import { useOpenParam } from '@/components/useOpenParam';
 import {
   createStatement,
@@ -91,6 +92,7 @@ export function StatementsClient({
   const t = useT();
   const [showCreate, setShowCreate] = useState(false);
   const [showCards, setShowCards] = useState(false);
+  const [showReconcile, setShowReconcile] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [cardFilter, setCardFilter] = useState('all');
   const [uploading, setUploading] = useState(false);
@@ -212,6 +214,11 @@ export function StatementsClient({
                 </span>
               </div>
             )}
+            {statements.length > 0 && (
+              <Button variant="secondary" size="sm" onClick={() => setShowReconcile(true)}>
+                <Link2 size={14} /> {t('rec.button')}
+              </Button>
+            )}
             <Button variant="secondary" size="sm" onClick={() => setShowCards(true)}>
               <Wallet size={14} /> {t('st.cards', { n: cards.length })}
             </Button>
@@ -318,6 +325,10 @@ export function StatementsClient({
 
       <Modal open={showCards} onClose={() => setShowCards(false)} title={t("stm.manageCards")} size="xl">
         <CardsManager cards={cards} statements={statements} />
+      </Modal>
+
+      <Modal open={showReconcile} onClose={() => setShowReconcile(false)} title={t('rec.title')} size="lg">
+        <ReconcilePanel statements={statements.map((s) => ({ _id: s._id, card: s.card, period: s.period }))} />
       </Modal>
     </main>
   );

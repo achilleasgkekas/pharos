@@ -2,6 +2,7 @@
 import { connectDB } from '@/lib/db';
 import { Statement } from '@/models/Statement';
 import { Card } from '@/models/Card';
+import { Receipt } from '@/models/Receipt';
 import { saveFile, deleteFile, readFile } from '@/lib/storage';
 import { extractPdfText, looksLikeScannedPdf } from '@/lib/pdf';
 import { ocrPdf } from '@/lib/ocr';
@@ -11,6 +12,7 @@ import { safeDate, safeDateOrNull } from '@/lib/dates';
 import { normalizeLast4, detectCardType, buildCardLabel } from '@/lib/cards';
 import { mirrorFileToRemote } from '@/lib/mirror';
 import { installmentSignature } from '@/lib/installments';
+import { reconcile, type ReconTxnResult, type ReconReceiptInput } from '@/lib/reconcile';
 import type { SerializedTransaction, SerializedStatement } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { Types } from 'mongoose';
@@ -374,6 +376,127 @@ export async function unlinkInstallment(
 export async function unlinkPlanByKey(signature: string): Promise<{ ok: boolean }> {
   await connectDB();
   await clearLinkBySignature(signature);
+  revalidateInstallments();
+  return { ok: true };
+}
+
+// ─── Receipt ↔ transaction reconciliation (P18) ──────────────────────────────
+
+export type ReconReceiptView = { id: string; store: string; date: string; total: number };
+export type ReconTxnView = ReconTxnResult & { description: string; amount: number; date: string };
+export type ReconciliationResult = {
+  ok: boolean;
+  error?: string;
+  txns: ReconTxnView[];
+  receipts: Record<string, ReconReceiptView>;
+  unmatchedReceipts: ReconReceiptView[];
+};
+
+// A statement bills roughly one month of charges; only receipts in this window
+// around the statement date are plausible matches (keeps suggestions relevant).
+const RECON_WINDOW_BEFORE_DAYS = 45;
+const RECON_WINDOW_AFTER_DAYS = 5;
+
+/**
+ * Suggest receipt matches for every charge on a statement (auto-SUGGEST, never
+ * silent-link). Also flags receipts in the window that are not linked to ANY
+ * statement charge ("receipt without a matching statement transaction").
+ */
+export async function getReconciliation(statementId: string): Promise<ReconciliationResult> {
+  const empty: ReconciliationResult = { ok: false, txns: [], receipts: {}, unmatchedReceipts: [] };
+  if (!Types.ObjectId.isValid(statementId)) return { ...empty, error: 'Invalid statement id' };
+  await connectDB();
+
+  const stmt = await Statement.findById(statementId).lean();
+  if (!stmt) return { ...empty, error: 'Statement not found' };
+
+  const anchor = new Date(stmt.statementDate);
+  const from = new Date(anchor.getTime() - RECON_WINDOW_BEFORE_DAYS * 86_400_000);
+  const to = new Date(anchor.getTime() + RECON_WINDOW_AFTER_DAYS * 86_400_000);
+
+  const receiptDocs = await Receipt.find({
+    archived: { $ne: true },
+    total: { $gt: 0 },
+    date: { $gte: from, $lte: to },
+  })
+    .select('store date total')
+    .lean();
+
+  // Global set of receipts already linked to any statement charge, so "unmatched"
+  // means unmatched across the whole ledger, not just this one statement.
+  const linkedAnywhere = new Set<string>();
+  const allStmts = await Statement.find().select('transactions.matchedReceiptId').lean();
+  for (const s of allStmts) {
+    for (const tx of s.transactions ?? []) {
+      if (tx.matchedReceiptId) linkedAnywhere.add(String(tx.matchedReceiptId));
+    }
+  }
+
+  const receipts: Record<string, ReconReceiptView> = {};
+  const pool: ReconReceiptInput[] = [];
+  for (const r of receiptDocs) {
+    const id = String(r._id);
+    const view: ReconReceiptView = {
+      id,
+      store: r.store ?? '',
+      date: new Date(r.date).toISOString(),
+      total: r.total ?? 0,
+    };
+    receipts[id] = view;
+    pool.push({ id, store: view.store, date: view.date, total: view.total });
+  }
+
+  const txnInputs = (stmt.transactions ?? []).map((tx) => ({
+    id: String(tx._id),
+    date: new Date(tx.date).toISOString(),
+    description: tx.description ?? '',
+    amount: tx.amount ?? 0,
+    matchedReceiptId: tx.matchedReceiptId ? String(tx.matchedReceiptId) : null,
+  }));
+
+  const result = reconcile(txnInputs, pool);
+  const txnById = new Map(txnInputs.map((t) => [t.id, t]));
+  const txns: ReconTxnView[] = result.txns.map((r) => {
+    const src = txnById.get(r.txnId)!;
+    return { ...r, description: src.description, amount: src.amount, date: src.date };
+  });
+
+  const unmatchedReceipts = pool
+    .filter((r) => !linkedAnywhere.has(r.id))
+    .map((r) => receipts[r.id])
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  return { ok: true, txns, receipts, unmatchedReceipts };
+}
+
+/** Confirm a receipt ↔ transaction match (user-triggered from the suggestions). */
+export async function linkTransactionReceipt(
+  statementId: string,
+  transactionId: string,
+  receiptId: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!Types.ObjectId.isValid(receiptId)) return { ok: false, error: 'Invalid receipt id' };
+  await connectDB();
+  const stmt = await Statement.findById(statementId);
+  const tx = stmt?.transactions.id(transactionId);
+  if (!stmt || !tx) return { ok: false, error: 'Transaction not found' };
+  tx.matchedReceiptId = new Types.ObjectId(receiptId) as unknown as typeof tx.matchedReceiptId;
+  await stmt.save();
+  revalidateInstallments();
+  return { ok: true };
+}
+
+/** Clear a confirmed receipt ↔ transaction match. */
+export async function unlinkTransactionReceipt(
+  statementId: string,
+  transactionId: string
+): Promise<{ ok: boolean; error?: string }> {
+  await connectDB();
+  const stmt = await Statement.findById(statementId);
+  const tx = stmt?.transactions.id(transactionId);
+  if (!stmt || !tx) return { ok: false, error: 'Transaction not found' };
+  tx.matchedReceiptId = null;
+  await stmt.save();
   revalidateInstallments();
   return { ok: true };
 }
