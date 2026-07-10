@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown } from 'lucide-react';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -18,6 +18,7 @@ import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/no
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
 import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, changeOwnPassword, type UserRow } from './users.actions';
 import { McpManager } from './McpManager';
+import { CalendarFeedManager } from './CalendarFeedManager';
 import { RecomputePricesButton } from './RecomputePricesButton';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
@@ -232,6 +233,9 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
               <AiPromptsManager prompts={info.prompts} />
               <Section title={t('set.mobileMcpTitle')} icon={<Plug size={15} />}>
                 <McpManager />
+              </Section>
+              <Section title={t('ics.title')} icon={<CalendarPlus size={15} />}>
+                <CalendarFeedManager />
               </Section>
             </>
           )}
