@@ -4667,3 +4667,25 @@ Read-only audit του Next.js web (έμφαση στο `/api/v1` που κατ�
 **ΣΗΜ (αυτο-παρατήρηση)**: κατά το build wait έτρεξα κατά λάθος ένα δεύτερο ταυτόχρονο `docker compose build` (buggy `while` loop) που επιδείνωσε τη μνήμη· το σκότωσα αμέσως (`pkill`), 0 stray builds μετά. Στα επόμενα runs: ΠΟΤΕ background build μέσα σε loop.
 
 **Επόμενο suggested task**: (α) όταν ο VM είναι ελεύθερος, safe rebuild + serve-check του `/api/calendar.ics` (401/200) για να κλείσει το verification loop· ή (β) επόμενο Approved «πολύ ψηλό value/effort»: **P15 vendor→category auto-rules** (S/M, ντετερμινιστικό, μηδέν AI) ή **P18 receipt↔statement reconciliation** (S/M) ή **P19 safe-to-spend cashflow** (S/M). Απόφυγε το P22 όσο υπάρχει uncommitted receiptSearch στο tree.
+
+## 2026-07-10 (mobile-parity-auditor, 48η σάρωση)
+Read-only parity audit web↔mobile, inventory ξαναχτισμένο από τον κώδικα (docs τελευταία). **50 route.ts κάτω από `api/v1`** (login + 49 bearer), **17 mobile screens** (16 + Assistant), mobile `npx tsc --noEmit` → **EXIT 0**. Route↔consumer loop: μηδέν orphan endpoint. Working tree στην αρχή είχε ξένα uncommitted του Αχιλλέα (`search-actions.ts` + untracked `lib/receiptSearch.{ts,test.ts}` + `api/v1/history/route.test.ts` = P22 WIP άλλης routine) — ΔΕΝ αγγίχτηκαν· stage-άρισα ΜΟΝΟ τα 2 doc files.
+
+**Γιατί βρέθηκε κάτι μετά από 5 «GAP 0» σαρώσεις:** από την 46η (2026-07-06) το web shipped **5 features με ρητά flagged mobile follow-ups** που οι endpoint-centric σαρώσεις δεν έπιασαν (server-actions ή computed πεδία, όχι νέα routes). Ο κώδικας (όχι τα docs) τα ανέδειξε.
+
+**Counts: DONE 9 / auto-buildable functional GAP 3 (νέα) / NEEDS DECISION 3 νέα.**
+
+**Τα 3 νέα auto-buildable GAP (μπήκαν στην κορυφή του Build Queue, ranked):**
+1. **pricehike notification icon** (P2/S) — το P14 (`74f9cd4`) πρόσθεσε kind `pricehike` στο `Notification` enum (`models/Notification.ts:10`)· το mobile `NOTIF_ICON` (`ActivityScreen.tsx:22`) + `NotifKind` (`api.ts:465`) δεν το έχουν → κενό glyph. Pure mobile, μηδέν API, μηδέν rebuild.
+2. **return-window badge receipts** (P2/M) — το PA3 (`0514499`) δείχνει chip «Nd return» στο web (computed `returnDaysLeft` via pure `lib/returnWindow.ts`)· ο v1 receipts serializer δεν το εκθέτει. Web-half (serializer field) + mobile chip· deterministic, μηδέν AI.
+3. **net-worth headline/breakdown στο Reports** (P2/M) — το PA2 (`67bffc9`) εμπλούτισε το web «Net worth» (inventory + manual accounts − installments − card balances)· το v1 reports route επιστρέφει μόνο το παλιό `netPosition`. Chart-free headline+chips slice είναι auto-buildable· το snapshot AreaChart trend deferred (RN charting lib).
+
+**Top 3 για τον builder (πάρε με τη σειρά):** (1) pricehike icon· (2) return-window badge· (3) net-worth headline. Και τα 3 unattended-safe (το #1 μηδέν rebuild, τα #2/#3 web+mobile tsc + safe rebuild· κανένα AI call).
+
+**DONE επιβεβαιώσεις (μη-stale):** τα 46η→48η mobile-src commits `b397bc0` (Receipts einput→Input), `00d6f46` (quick-verify — ΕΚΛΕΙΣΕ το 47η top item), `f7527e0` (ShoppingScreen ModalSheet) όλα shipped.
+
+### Needs Achilleas
+- **PA1 bank/CSV import στο mobile** — το web είναι server-action (`importExpensesCsv`), **κανένα v1 endpoint**. Θέλει (α) νέο upload/parse endpoint στο v1 + (β) απόφαση για mobile file-picker (`expo-document-picker` dep-add). NEEDS DECISION (M/L).
+- **P6 iCal feed Settings connector στο mobile** — το web `CalendarFeedManager` (generate/rotate/revoke `calendarToken`) είναι server-actions, **κανένα v1 endpoint**. Θέλει endpoint-design decision (και το token είναι low-scope by design). NEEDS DECISION (S/M).
+- **net-worth AreaChart snapshot trend** — το `captureAndListSnapshots` series θέλει RN charting lib (το ReportsScreen είναι chart-free by design). Το headline/breakdown slice χτίζεται χωρίς αυτό (βλ. Build Queue item 3). NEEDS DECISION.
+- **Αμετάβλητα από προηγ.:** safe-area insets (`react-native-safe-area-context` ΑΠΟΝ), theme toggle + light/dark context + language switcher, AI-engine/storage/OneDrive Settings panels, statements PDF-import (upload endpoint), remote push (EAS + APNs), Tasks Kanban board, lucide icon set (cosmetic swap, attended), rate-limit 429 backoff στο mobile `api.ts` (config-gated, off by default).
