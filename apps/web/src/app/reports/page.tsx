@@ -9,6 +9,8 @@ import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
 import { estimatedItemValue } from '@/lib/depreciation';
 import { captureAndListSnapshots } from '@/lib/netWorth';
+import { computeMoneyAgenda } from '@/lib/moneyAgenda';
+import { computeSafeToSpend } from '@/lib/safeToSpend';
 import type { SerializedStatement } from '@/types';
 import { ReportsClient } from './ReportsClient';
 
@@ -259,8 +261,14 @@ async function getReports(monthsBack = 12) {
     liabCards: outstanding,
   });
 
+  // Safe-to-spend forward cashflow (P19) — reuse the /calendar money agenda and
+  // distil it into a single available figure + 30/60/90-day windows.
+  const { months: agendaMonths } = await computeMoneyAgenda();
+  const safeToSpend = computeSafeToSpend(agendaMonths);
+
   return {
     netWorth: { accountsTotal: Math.round(accountsTotal), series: netWorthSeries },
+    safeToSpend,
     monthlySpend,
     upcomingInstallments,
     spendByStore,

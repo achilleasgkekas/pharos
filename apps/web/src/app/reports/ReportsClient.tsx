@@ -16,7 +16,7 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts';
-import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard } from 'lucide-react';
+import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet } from 'lucide-react';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
 
@@ -41,8 +41,15 @@ type NetWorthPoint = {
   net: number;
 };
 
+type SafeToSpend = {
+  monthLabel: string;
+  thisMonth: { income: number; outflow: number; net: number };
+  windows: { days: number; income: number; outflow: number; net: number }[];
+};
+
 type Data = {
   netWorth: { accountsTotal: number; series: NetWorthPoint[] };
+  safeToSpend: SafeToSpend;
   monthlySpend: { key: string; label: string; total: number; count: number }[];
   upcomingInstallments: { label: string; amount: number }[];
   spendByStore: { name: string; total: number; count: number }[];
@@ -149,6 +156,35 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
         ) : (
           <p className="mt-3 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.netWorthTrendNote')}</p>
         )}
+      </div>
+
+      {/* Safe-to-spend (P19) — known expected income minus fixed future charges, as a
+          single available figure for the rest of this month + 30/60/90-day windows. */}
+      <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+              <Wallet size={12} /> {t('reports.safeToSpend')} · {data.safeToSpend.monthLabel}
+            </p>
+            <p className="text-3xl md:text-4xl font-bold" style={{ fontFamily: 'var(--font-display)', color: data.safeToSpend.thisMonth.net >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
+              {data.safeToSpend.thisMonth.net >= 0 ? '' : '-'}{cur()}{Math.abs(data.safeToSpend.thisMonth.net).toLocaleString('en-GB')}
+            </p>
+            <p className="text-[11px] text-[color:var(--color-text-dim)] mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className="text-[color:var(--color-accent)]">+{cur()}{data.safeToSpend.thisMonth.income.toLocaleString('en-GB')}</span> {t('reports.stsIncome')} · <span className="text-[color:var(--color-red)]">-{cur()}{data.safeToSpend.thisMonth.outflow.toLocaleString('en-GB')}</span> {t('reports.stsFixed')}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {data.safeToSpend.windows.map((w) => (
+              <div key={w.days} className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 min-w-[92px]" style={{ fontFamily: 'var(--font-mono)' }}>
+                <span className="block text-[10px] text-[color:var(--color-text-faint)] mb-0.5">{t('reports.stsWindow', { d: w.days })}</span>
+                <span className="block text-sm font-semibold" style={{ color: w.net >= 0 ? 'var(--color-accent)' : 'var(--color-red)' }}>
+                  {w.net >= 0 ? '' : '-'}{cur()}{Math.abs(w.net).toLocaleString('en-GB')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="mt-3 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.stsNote')}</p>
       </div>
 
       {/* Summary cards */}
