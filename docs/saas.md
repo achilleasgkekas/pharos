@@ -173,6 +173,30 @@ signup/login, not a bearer token.
 | `POST` | `/api/saas/auth/logout` | — | Clears the session cookie. Idempotent `200 { ok: true }`. |
 | `GET` | `/api/saas/auth/session` | — | `{ account, tenants }` when signed in, or `{ account: null }` when logged out or the account no longer exists. |
 
+#### Browser sign-in UI (`/account/login`, `/account/signup`)
+
+The two pages above are the user-facing front-end for the auth API. They live in
+a self-gating `(saas)` route segment: its layout calls `requireSaasUiEnabled()`,
+which throws `notFound()` when `SAAS_MODE` is off or `AUTH_SECRET` is unset, so
+the pages **do not exist** for the self-hosted build (the OSS app is unchanged).
+The segment is `force-dynamic` and marked `noindex, nofollow`, and each page is
+chrome-less (no `SiteNav`, since there is no per-tenant `User` session yet) —
+each renders inside a shared `AuthShell` card.
+
+| Route | Renders |
+| --- | --- |
+| `/account/login` | Email + password form. Posts to [`POST /api/saas/auth/login`](#authentication); on success does a **full** page navigation (not a client route change) to the sanitized `next` path so the fresh server render picks up the just-set httpOnly session cookie. Links to signup. |
+| `/account/signup` | Email + password (≥ 8 chars) plus **optional** display name and workspace name. Posts to [`POST /api/saas/auth/signup`](#authentication), which provisions a first workspace with an owner membership. Links to login. |
+
+Both pages redirect an **already-signed-in** viewer straight to `next` instead of
+showing a form (this is also how a superadmin reaches `/admin`: sign in here,
+then navigate). The `next` query param is always run through a `safeNextPath`
+allow-list (same-origin relative paths only) before use, on both the page and the
+form, so it cannot be turned into an open redirect. Client-side validation
+(valid email, minimum password length) only shapes the UX — the API re-validates
+authoritatively, and both wrong-email and wrong-password collapse to the same
+`401` (no account enumeration).
+
 ### Account profile
 
 | Method | Path | Body | Result |
@@ -859,9 +883,13 @@ app's tenant-facing navigation, so no shared layout or component is touched.
 | Route | Renders |
 | --- | --- |
 | `/admin` | **Fleet overview** — the same aggregate as [`GET /api/saas/admin/overview`](#fleet-overview), rendered as stat tiles (workspaces, accounts, active members, billing-linked / BYO-key, this month's AI calls / tokens / cost, storage + reporting count) and breakdown lists (by plan, status, tier) plus custom-domain and erasure-scheduled counts. Shows an empty-state line until the first tenants sign up and metering runs. |
+| `/admin/tenants` | **Workspaces listing** — the same registry reader as [`GET /api/saas/admin/tenants`](#superadmin-console-8), rendered as a paginated table (workspace name + slug + custom domain, plan, status badge, tier, billing / BYO-key pills, created). Filter by status and free-text search (slug, name or domain) via a plain **GET** form, so the URL is the source of truth and every filtered view is shareable and bookmarkable with no client state. Prev / next links preserve the active filter. Each row links to the detail page. |
+| `/admin/tenants/[slug]` | **Workspace detail** — the same detail reader as the [single-tenant](#single-tenant-detail) API: a registry summary (slug, plan, tier, custom domain, billing / BYO-key, trial-ends, erasure-scheduled, created / updated), a member tally (total, active, owners — flagged red **ownerless!** at zero, invited, removed), a usage roll-up (total AI calls / tokens / cost across periods, latest storage footprint), and the full member roster (email, role badge, status badge, joined). An unknown slug is `notFound()` (`404`). |
 
-The nav lists only the Overview page today; more console pages are additive
-entries as they land.
+The nav (`AdminNav`) lists Overview and Workspaces; more console pages are
+additive entries as they land. Section links match their sub-paths (so
+`/admin/tenants/<slug>` keeps **Workspaces** highlighted), while Overview matches
+`/admin` exactly.
 
 **Self-gating (the console does not exist for non-operators).** A page cannot
 return a status code, so instead of the API's `requireSuperadmin()` (which returns

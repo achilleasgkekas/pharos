@@ -4,6 +4,50 @@
 (συν μία γραμμή link στο README αν λείπει). Γλώσσα των docs: Αγγλικά (public
 audience). Σημειώσεις εδώ: Ελληνικά, χωρίς παύλες.
 
+## 2026-07-10 (saas.md §8 stale-forward: Workspaces console + user-facing auth UI)
+
+Εφερα το saas.md §8 στο ιδιο επιπεδο με τα δυο νεοτερα SaaS commits που δεν καλυπτονταν:
+
+- **Console UI (§8) Workspaces rows (f6a4f27)**: το routes table στο "Console UI (/admin)"
+  ειχε ΜΟΝΟ το /admin (Fleet overview) + stale γραμμη "nav lists only the Overview page today".
+  Προσθεσα 2 rows: `/admin/tenants` (paginated listing, GET-form filter status+search, URL =
+  source of truth, prev/next preserving filter, links to detail) + `/admin/tenants/[slug]`
+  (registry summary + member tally με red "ownerless!" στο zero + usage roll-up + full member
+  roster· unknown slug → 404). Ενημερωσα το nav-line σε "Overview + Workspaces" + section-link
+  sub-path matching (AdminNav.isActive).
+- **Browser sign-in UI (bb8fabe)**: νεο subsection "#### Browser sign-in UI (/account/login,
+  /account/signup)" κατω απο το Authentication API table — οι user-facing σελιδες που οδηγουν
+  το auth API. Self-gating (saas) segment (requireSaasUiEnabled → notFound οταν SAAS_MODE off ή
+  no AUTH_SECRET), force-dynamic + noindex, chrome-less μεσα σε AuthShell. Table login/signup +
+  full-navigation-on-success (session cookie), already-signed-in → redirect, safeNextPath
+  allow-list (no open redirect), MIN_PASSWORD=8, same-401 anti-enumeration.
+
+Διαβασα τον πραγματικο κωδικα πριν γραψω (δεν μαντεψα):
+- app/admin/tenants/page.tsx + [slug]/page.tsx → parseAdminTenantQuery/listTenantsForAdmin,
+  getTenantDetailForAdmin, GET-form filter, memberCounts (owners===0 → red "ownerless!"),
+  usage totals + latestStorageBytes.
+- components/saas/AdminNav.tsx → LINKS = [Overview /admin, Workspaces /admin/tenants],
+  isActive sub-path match.
+- app/(saas)/account/login+signup/page.tsx + layout.tsx → getSaasViewer redirect,
+  requireSaasUiEnabled, force-dynamic + robots noindex.
+- components/saas/AuthForm.tsx + authValidation.ts → MIN_PASSWORD=8, safeNextPath, full
+  window.location.assign on success, describeAuthError.
+
+Accuracy/validation: markdown only, κανενα build/Docker/AI call. Anchor check — τα 4 internal
+links resolve: #authentication (line 167), #superadmin-console-8 (το listing endpoint ζει ΕΚΕΙ,
+οχι στο #single-tenant-detail — το διορθωσα μετα τον πρωτο anchor), #single-tenant-detail (line
+641), #fleet-overview. Fence count = 18 (ζυγο). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/
+STRIPE_SECRET_KEY=/CRON_SECRET=) clean.
+
+Collision guard: πριν το commit ελεγξα `git status --short`· τα 3 foreign WIP files
+(search-actions.ts + receiptSearch.ts/.test.ts) ειναι stale απο την αρχη του run, κανενα staged —
+ΔΕΝ τα αγγιζω, commit ΜΟΝΟ των docs/saas.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επομενο run: (α) features.md — mobile companion app section αν εχει νεα, ή insurance export (P13)
+οταν shipαρει· ή (β) api.md sync αν προστεθηκαν νεα api/v1 routes· ή (γ) saas.md §8 continuation
+οταν landαρουν superadmin WRITE actions (suspend/reactivate/impersonate) ή workspace-settings
+panels στο (saas) segment.
+
 ## 2026-07-06 (saas.md: πληρες account/verify/reset/password reference + D6 constant-time)
 
 Το git log εδειξε δυο SaaS commits που δεν καλυπτονταν στα docs: `e75cd74` (D6, constant-time
