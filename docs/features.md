@@ -123,6 +123,29 @@ Receipts: dropzone scan, manual add, grid / list, and a filter sidebar.
   category unset. An "Apply to existing" button retro-tags uncategorised records.
   Configure the rules in Settings → Money.
 
+### Expense splitting ("who owes what")
+
+A Splitwise-lite tracker built into the expense form for shared costs (a dinner,
+a group order, a shared bill). The convention is simple: **you paid the total**, and
+each split row is another person, a **free-form name** (not a Pharos account), who
+**owes you** their share. `settled` marks that they have paid you back; your own
+portion is implicit (total minus the sum of the shares).
+
+- **Split editor.** In an expense's form, add people and set each person's share, or
+  press **"Split equally"** (with an optional "count me in" so you take an equal
+  slice too). The editor shows your live share and the total owed to you, and you can
+  mark any row **paid back**. It stays dormant until you add someone, so nothing
+  changes for expenses you did not split.
+- **Split badge.** Expense cards and rows show a small badge with the amount still
+  owed to you on that expense.
+- **Balances.** A **"Balances — who owes you"** modal (button in the expenses header)
+  aggregates every split across all your expenses into a per-person balance sheet
+  (largest debtor first, names matched case-insensitively). **Settle up** with one
+  person clears all their outstanding shares across every expense at once.
+
+Everything is deterministic (no AI) and computed on read; only the `split` rows are
+stored on each expense.
+
 ## Statements & installments
 
 Upload a credit-card statement PDF (`/statements`) and PHAROS parses the

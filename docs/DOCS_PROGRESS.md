@@ -1484,3 +1484,40 @@ docs/features.md + docs/DOCS_PROGRESS.md με explicit pathspec.
 Επομενο run: (α) features.md — P25 budget envelope/rollover + P34 per-space/per-property ledger tag
 αν εχουν user-facing surface (check settings/expenses)· ή (β) api.md stale-forward αν shipαρει
 GET /api/v1/bills (το Bill model εχει ηδη updatedAt index "for a future GET /api/v1/bills").
+
+## 2026-07-10 (features.md: Expense splitting — P35 "who owes what")
+
+Το προηγουμενο suggested (α)/(β). Επελεξα να καλυψω πρωτα το ΝΕΟΤΕΡΟ user-facing feature που
+ελειπε εντελως: το P35 expense splitting (commit 26eed90), Splitwise-lite. Διαβασα το πραγματικο
+code πριν γραψω, καμια εφευρεση:
+
+- `lib/split.ts` — pure helpers: equalSplit (includeSelf flag, cent-exact leftover distribution),
+  splitTotals (owed/settled/count per expense), computeBalances (per-person, case-insensitive
+  name match, sorted largest-debtor-first), totalOwed. Convention: ΕΣΥ πληρωσες το total, καθε
+  SplitEntry = αλλο ατομο (free-form name, ΟΧΙ app account) που σου χρωσταει `share`· settled =
+  σου το εδωσε πισω· δικο σου μεριδιο implicit (total − Σ shares).
+- `models/Expense.ts` — split[] subdoc {name, share, settled}, default [].
+- `ExpensesClient.tsx` (binary diff λογω multibyte — grep -a): SplitEditor στη φορμα (add person,
+  per-row share + mark-paid, "Split equally" + count-me-in, live your-share/owed), SplitBadge σε
+  cards/rows (amount owed), BalancesModal ("Balances — who owes you" header button) → per-person
+  settle-up.
+- `actions.ts` settlePerson(name) — bulkWrite που κανει settled:true ολα τα unsettled shares
+  ΕΝΟΣ ατοματος σε ΟΛΑ τα expenses ταυτοχρονα (case-insensitive), revalidate /expenses + /income.
+  UpdateSchema δεχεται split[] (max 50, cleanSplit trim/drop-nameless/round-cents).
+
+Νεα ### subsection "Expense splitting (who owes what)" μεσα στο Expenses & Income (μετα το
+Category auto-rules), οχι top-level heading — συνεπες με τα αλλα subsections (Asset depreciation,
+Category auto-rules) που ΔΕΝ μπαινουν στο Contents index. Καλυπτει: convention, split editor,
+split badge, balances modal + settle-up, "deterministic no-AI, dormant until a split exists".
+
+Validation: markdown only, κανενα build/Docker/AI call. features.md fence count = 0 (καμια code
+fence, ζυγο). Secret scan (sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/CRON_SECRET=)
+clean.
+
+Collision guard: foreign uncommitted WIP (apps/web/src/app/(saas)/account/page.tsx +
+search-actions.ts + lib/receiptSearch.ts/.test.ts) unstaged απο αλλη routine — ΔΕΝ τα αγγιζω,
+commit ΜΟΝΟ docs/features.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επομενο run: (α) features.md — P34 per-space/per-property ledger tag (Expense.space field, ΔΕΝ
+documented ακομα· check αν εχει UI surface στο settings/expenses filter) + P25 budget envelope/
+rollover στο Reports section· ή (β) api.md stale-forward αν shipαρει GET /api/v1/bills.
