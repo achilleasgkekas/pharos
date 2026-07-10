@@ -3,6 +3,31 @@
 Ημερολόγιο της OSS-release + test routine (τρέχει ωριαία, unattended). Κάθε εγγραφή:
 τι έγινε, τι επαληθεύτηκε, και το επόμενο προτεινόμενο βήμα.
 
+## 2026-07-10 (cont.⁵ — items/[id]/price/route.test.ts, το POST "log a price" body-validation seam)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/items/[id]/price/route.test.ts` για το POST του `/api/v1/items/:id/price`.**
+
+Επιλογή target: ακολούθησα το suggested next task — από τα item sub-routes, το `price` είναι το καθαρότερο body-validation seam (thin gate μπροστά στο proven `logItemPrice` action). Τροφοδοτεί το mobile "log a price" action στην item-detail / price-panel οθόνη. Route-only συμπεριφορές που ζουν ΜΟΝΟ εδώ:
+- **Auth gate**: withAuth → 401 χωρίς/με άγνωστο token, ΠΡΙΝ οποιοδήποτε action call.
+- **ObjectId guard**: malformed :id → 400 `'bad id'` ΠΡΙΝ body read / action.
+- **Price gate**: `Number(b.price)` + `!(price > 0)` → numeric STRING δεκτό (`Number('250')===250`), αλλά 0 / negative / non-numeric (→NaN) → 400 `'price must be greater than 0'` ΧΩΡΙΣ action call.
+- **Store passthrough**: `typeof b.store === 'string' ? b.store : ''` — non-string store → '' (ο route ΔΕΝ κάνει trim· το action trim-άρει/defaults σε 'manual'). String store forwarded verbatim.
+- **Failure remap**: `logItemPrice { ok:false }` → 400 με το error του (ή `'failed'` fallback).
+
+Mock pattern: DB-mock — auth seam (`@/lib/db` connectDB + `@/models/User` findOne→select→lean) + το action seam `@/app/items/actions` logItemPrice (record forwarded args). Τρέχω τον ΠΡΑΓΜΑΤΙΚΟ withAuth + apiBody helpers (isObjectId/readBody). Χωρίς fake timers (ο route δεν διαβάζει `new Date()`).
+
+Τι έγινε: Νέο `route.test.ts` (13 tests): auth gate (2), id guard (1), price validation (5: missing/zero/negative/non-numeric/numeric-string-coerce), store passthrough (2: verbatim string, non-string→''), happy path + failure remap (3).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/items/[id]/price/route.test.ts` → 13/13 passed.
+- `npx vitest run` (όλο το suite) → 158 files, 2047/2047 passed.
+- `npm run type-check` → exit 0 (καθαρό, μηδέν foreign errors αυτή τη φορά).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλου routine (receipt-search: `app/search-actions.ts` [M], `lib/receiptSearch.ts`/`.test.ts` [??]) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα ΜΟΝΟ τα δικά μου paths με explicit pathspec.
+
+Suggested next task: (β συνέχεια) Επόμενα item/mutation sub-routes, ένα module ανά run: `items/[id]/link-plan|plans|ai-fill|convert-to-task` (link-plan = body-validation seam σαν το price)· POST scan routes με AI seam — `scan/receipt|expense|product|voucher/route.ts` (multipart/base64 image → parsed shape· mock το AI/parse seam, 400 σε missing image)· `auth/login/route.ts` (rate-limit gate — δες rateLimitConfig env-gate)· `receipts/[id]/rescan|add-to-library`· `expenses/[id]/rescan`· `trash/[type]/[id]` (PATCH restore / DELETE purge admin-gated)· `items/import`. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
 ## 2026-07-13 (push/register/route.test.ts — Expo token register/unregister: auth gate + format guard + $addToSet/$pull)
 
 **Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/push/register/route.test.ts` για τα POST + DELETE του `/api/v1/push/register`.**
