@@ -40,6 +40,7 @@ import { Types } from 'mongoose';
 import { getStores, invalidateStoreCache, type StoreLite } from '@/lib/storeService';
 import { effectiveReturnWindow, returnDaysLeft } from '@/lib/returnWindow';
 import { suggestBudgetsFromExpenses, type BudgetExpenseRow } from '@/lib/budgetSuggest';
+import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import { anthropicTest } from '@/lib/anthropic';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
 import { requireAdmin } from '@/lib/auth';
@@ -397,6 +398,14 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   );
   const dueThisMonth = plans.reduce((sum, p) => sum + p.perAmount, 0);
 
+  // Price-hike watch (P14): a recurring bill/subscription that moved vs its previous
+  // charge (Netflix €13→€15, ΔΕΗ +18%). Deterministic, no AI — same vendorKey series
+  // the anomaly/recurring logic uses.
+  const hikeRows = (await Expense.find({ amount: { $gt: 0 } })
+    .select('vendor vendorKey amount date recurring kind')
+    .lean()) as HikeEntry[];
+  const hikes = detectPriceHikes(hikeRows);
+
   const lines: string[] = [];
   if (deals.length) lines.push(`🎯 ${deals.length} deal(s): ${deals.slice(0, 5).map((d) => d.title).join(', ')}`);
   if (dueThisMonth > 0) lines.push(`💳 installments this month: ${cur()}${dueThisMonth.toFixed(0)} (${plans.length} plans)`);
@@ -407,6 +416,13 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
       `↩ ${returnsClosing.length} return window(s) closing ≤3d: ${returnsClosing
         .slice(0, 5)
         .map((r) => `${r.store}${r.total > 0 ? ` ${cur()}${r.total}` : ''} (${r.days}d)`)
+        .join(', ')}`
+    );
+  if (hikes.length)
+    lines.push(
+      `📈 ${hikes.length} recurring price change(s): ${hikes
+        .slice(0, 5)
+        .map((h) => `${h.vendor} ${cur()}${h.prev}→${cur()}${h.curr} (${h.deltaPct > 0 ? '+' : ''}${h.deltaPct}%)`)
         .join(', ')}`
     );
 

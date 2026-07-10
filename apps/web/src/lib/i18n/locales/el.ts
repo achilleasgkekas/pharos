@@ -789,6 +789,8 @@ export const el: Partial<Dict> = {
   'notif.warrantySub': 'Η εγγύηση λήγει σε {days}μ',
   'notif.installmentHeading': 'Δόσεις αυτόν τον μήνα',
   'notif.installmentSub': '{amount} σε {n} πλάνα',
+  'notif.priceHikeSub': 'Ανέβηκε {prev} → {curr} ({pct})',
+  'notif.priceDropSub': 'Έπεσε {prev} → {curr} ({pct})',
   'nav.shoppingList': 'Λίστα αγορών',
   'home.dShoppingList': 'Γρήγορη λίστα για ψώνια με σάρωση φωτό',
   'sl.toBuy': '{n} για αγορά',

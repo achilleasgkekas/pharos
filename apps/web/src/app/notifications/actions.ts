@@ -5,11 +5,13 @@ import { getAppSettings } from '@/lib/appSettings';
 import { cur } from '@/lib/money';
 import { Item } from '@/models/Item';
 import { Statement } from '@/models/Statement';
+import { Expense } from '@/models/Expense';
 import { Notification } from '@/models/Notification';
 import { computeInstallmentPlans } from '@/lib/installments';
+import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
 
-export type NotifKind = 'deal' | 'installment' | 'warranty' | 'system';
+export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'system';
 
 export type SerializedNotification = {
   _id: string;
@@ -22,7 +24,7 @@ export type SerializedNotification = {
 };
 
 type Alert = { dedupeKey: string; kind: NotifKind; title: string; body: string; href: string };
-const AUTO_KINDS = ['deal', 'installment', 'warranty'] as const;
+const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike'] as const;
 
 /** Recompute the live alerts (deals / warranties / installments-due) — the same
  *  three the ntfy check uses, but as structured payloads the bell can localize. */
@@ -67,6 +69,24 @@ async function computeAlerts(): Promise<Alert[]> {
     const period = new Date().toISOString().slice(0, 7); // YYYY-MM → one per month
     // body = "<amount>|<planCount>"
     alerts.push({ dedupeKey: `installments:${period}`, kind: 'installment', title: '', body: `${Math.round(due)}|${plans.length}`, href: '/calendar' });
+  }
+
+  // Recurring price hikes/drops (P14): a bill/subscription that changed vs its
+  // previous charge. dedupeKey carries the new amount so a fresh change re-alerts
+  // even if an earlier one was dismissed, and it auto-expires once that amount
+  // becomes the steady state.
+  const hikeRows = (await Expense.find({ amount: { $gt: 0 } })
+    .select('vendor vendorKey amount date recurring kind')
+    .lean()) as HikeEntry[];
+  for (const h of detectPriceHikes(hikeRows)) {
+    // body = "<vendor>|<prev>|<curr>|<pct>" (raw; the bell formats with the symbol)
+    alerts.push({
+      dedupeKey: `pricehike:${h.vendorKey}:${h.curr}`,
+      kind: 'pricehike',
+      title: h.vendor,
+      body: `${h.prev}|${h.curr}|${h.deltaPct}`,
+      href: '/expenses',
+    });
   }
 
   return alerts;

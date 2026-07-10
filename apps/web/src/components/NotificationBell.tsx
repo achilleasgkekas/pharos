@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Tag, ShieldCheck, CreditCard, X } from 'lucide-react';
+import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { cur } from '@/lib/money';
 import { useT } from '@/components/LocaleProvider';
@@ -16,11 +16,12 @@ import {
   type NotifKind,
 } from '@/app/notifications/actions';
 
-const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, system: Bell };
+const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, system: Bell };
 const KIND_COLOR: Record<NotifKind, string> = {
   deal: 'var(--color-accent)',
   warranty: 'var(--color-gold)',
   installment: 'var(--color-cyan)',
+  pricehike: 'var(--color-red)',
   system: 'var(--color-text-dim)',
 };
 
@@ -76,6 +77,15 @@ export function NotificationBell() {
     if (n.kind === 'installment') {
       const [amount, count] = n.body.split('|');
       return { heading: t('notif.installmentHeading'), sub: t('notif.installmentSub', { amount: cur() + amount, n: count }) };
+    }
+    if (n.kind === 'pricehike') {
+      const [prev, curr, pct] = n.body.split('|');
+      const p = Number(pct);
+      const key = p >= 0 ? 'notif.priceHikeSub' : 'notif.priceDropSub';
+      return {
+        heading: n.title,
+        sub: t(key, { prev: cur() + prev, curr: cur() + curr, pct: `${p > 0 ? '+' : ''}${pct}%` }),
+      };
     }
     return { heading: n.title, sub: n.body };
   }

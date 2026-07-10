@@ -817,6 +817,8 @@ export const en = {
   'notif.warrantySub': 'Warranty expires in {days}d',
   'notif.installmentHeading': 'Installments due this month',
   'notif.installmentSub': '{amount} across {n} plans',
+  'notif.priceHikeSub': 'Rose {prev} → {curr} ({pct})',
+  'notif.priceDropSub': 'Dropped {prev} → {curr} ({pct})',
   // Standalone shopping list (photo scan)
   'nav.shoppingList': 'Shopping list',
   'home.dShoppingList': 'Quick to-buy list with photo scanning',
