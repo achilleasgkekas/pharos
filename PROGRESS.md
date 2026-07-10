@@ -5,6 +5,53 @@
 <!-- reviewed: 65b81a2 -->
 <!-- docker-validated: f8f345c -->
 
+## 2026-07-13 (pharos-daily-dev — P32 gift-card / store-credit balance tracker SHIPPED)
+
+**Τι έγινε**: Έχτισα το **P32 (gift-card / store-credit balance tracker)**, το ranked-πρώτο εναπομείναν Approved item (S/M,
+«ψηλό value/effort», το προτεινόμενο next-task του προηγούμενου run). Commit `052ee64` (pushed). Πραγματικό κενό: τα
+Vouchers είναι coupons (% έκπτωση/κωδικός), το P20 loyalty barcode· κανένα δεν κρατά **χρηματικό υπόλοιπο** (δωροκάρτα,
+store credit από επιστροφή, prepaid) που **μειώνεται** καθώς το ξοδεύεις.
+
+Τι μπήκε (builder-default: **tab μέσα στα Vouchers**, όπως ζητούσε ρητά το backlog· ντετερμινιστικό, μηδέν AI):
+- **`models/GiftCard.ts`**: title/store/code/initialAmount/expiresAt/archived/notes + `uses[]` (amount ±, date, note).
+  Soft-delete plugin + updatedAt index. Balance = initialAmount − Σ(uses), **ποτέ stored** (derived).
+- **`lib/giftcard.ts`** (pure, DB-free, **+14 unit tests**): `giftCardBalance`/`SpentPct`/`DaysLeft`/`IsLive`. Θετικό use
+  = spend, αρνητικό = reload/top-up (κάποια store credits φορτίζονται ξανά) → και οι δύο φορές δουλεύει με το ίδιο άθροισμα.
+- **`vouchers/giftcardActions.ts`**: create/update/delete(soft→Trash)/setArchived + `addGiftCardUse` (spend/reload,
+  clamp cents, validate non-zero) + `removeGiftCardUse` (`$pull` by _id).
+- **UI**: `GiftCardsClient` (balance hero + progress bar remaining% + expiry badge [expired/soon/normal] + «€X unspent
+  across N cards» header + quick spend/reload row + history list με per-entry delete + archive/reopen) + `VouchersShell`
+  (thin tab wrapper **Coupons | Gift cards** με counts· κάθε tab renders το δικό του `<main>`). `page.tsx` φέρνει και τα δύο.
+- **Notifications (P32)**: νέο **`giftcard` NotifKind** (Notification enum + `NotifKind` union + `AUTO_KINDS`). `computeAlerts`
+  → κάρτες **με balance που λήγουν** εντός window· body `<days>|<balance>`· dedupeKey `giftcard:<id>:<iso>` (re-alert αν
+  μετακινηθεί η ημ., auto-expire μόλις περάσει). Bell: Wallet icon + cyan + `notif.giftcardSub`/`giftcardTodaySub`. ntfy
+  (`runAlertChecks`): «💳 N gift card(s) expiring ≤Xd: Title (€Y, Nd)», soonest first.
+- **Lead-time ρυθμιζόμενο**: `AppConfig.giftCardAlertDays` default 30 + appSettings (type/raw/DEFAULTS/normalize/select,
+  +2 test assertions) + Settings → Defaults number input (`set.giftCardAlert`) + `saveDefaults` clamp 0-365 (0 = off).
+- **Trash**: νέο `giftcard` TrashType (TRASH_MODELS/trashLabel/restore/purge γενικά — καμία file/reference cleanup) + v1
+  trash route TYPES + TrashClient TYPE_META (CreditCard icon + `trash.tGiftCard`).
+
+**Scope/builder-default (καταγράφεται)**: «ξέχασες €X σε 3 κάρτες» → καλύπτεται από το UI header «€X unspent across N cards»
+(δεν έφτιαξα ξεχωριστό periodic reminder — δύσκολο dedupe, χαμηλή αξία). Το optional «spend → linked expense» **δεν** μπήκε
+(opt-in follow-up· ο ίδιος ο spend log αρκεί για v1). Νέα i18n keys ΜΟΝΟ στο `en.ts` (source of truth· τα άλλα locales
+fallback αυτόματα, locales.test πράσινο). **Μηδέν migration** (νέο collection + πεδία με defaults). v1 **δεν** εκτέθηκε GET
+`/api/v1/giftcards` ακόμα (mobile-parity follow-up· index υπάρχει).
+
+**Verified**: `apps/web npm run type-check` → **EXIT 0**. Πλήρες `npx vitest run` → **2016 passed / 155 files** (+14 giftcard,
++2 appSettings· locales/exhaustive-Record NotifKind+TrashType πράσινα). Μηδέν regression.
+
+**Docker rebuild SKIPPED** (ίδια αιτία P33/P18): ο ~1.9GB VM έτρεχε **11 containers** (homepage full stack + bakecore ×6,
+live). Next build υπό συμφόρηση = OOM-crash-loop risk στη Mongo. Additive change + type-check + 2016 tests. **Serve-check
+pending**: /vouchers → tab «Gift cards» → New card (face value 50) → Spend €12 → balance €38 + bar· βάλε expiry 20 μέρες
+μπροστά → bell + ntfy «💳 gift card expiring». Settings → Defaults «Gift-card expiry alert · days ahead».
+
+**Working tree**: ρητό `git add` 20 αρχείων· το ξένο P22 WIP (`receiptSearch.*`, `search-actions.ts`) ΔΕΝ αγγίχτηκε.
+
+**Επόμενο suggested task**: επόμενο Approved «ranked value/effort»: **P34 per-space / per-property ledger tag** (M, τα 2
+σπίτια του Αχιλλέα, personal-hub differentiator) ή **P28 bill/payable status tracker** (due→paid→overdue, ψηλό value/effort)
+ή **P19 safe-to-spend cashflow**. Απόφυγε το P22 όσο υπάρχει uncommitted receiptSearch στο tree. Follow-up P32: GET
+`/api/v1/giftcards` (mobile parity) + optional spend→linked-expense.
+
 ## 2026-07-12 (pharos-daily-dev — P33 free-trial cancel-before-charge reminder SHIPPED, interactive «go on»)
 
 **Τι έγινε**: Δεύτερο item του ίδιου session (ο Αχιλλέας παρών, «go on»). Έχτισα το **P33 (free-trial / cancel-before-charge
