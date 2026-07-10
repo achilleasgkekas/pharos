@@ -5007,3 +5007,23 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 **Working tree**: ρητό `git add` με τα 11 δικά μου αρχεία· το ξένο P22 WIP ΔΕΝ αγγίχτηκε (παραμένει unstaged).
 
 **Επόμενο suggested task**: (α) όταν ο VM είναι ελεύθερος, safe rebuild + browser serve-check του envelope toggle (Settings → Budgets → on → Reports «Budget · this month · envelope» με carried chip)· ή (β) επόμενο Approved item που δεν συγκρούεται με το P22 WIP: **P28 Bill/payable status tracker** (M, ψηλό value/effort — νέο μικρό module) ή **P34 per-space ledger tag** (M) ή **P24 outbound webhooks** (M). Απόφυγε το P22 όσο υπάρχει uncommitted receiptSearch στο tree.
+
+## 2026-07-10 (pharos-daily-dev, P22 receipt line-item search SHIPPED — orphaned WIP recovered)
+
+**Τι έγινε**: Έκλεισε το **P22 (full-text search πάνω σε receipt line-items)** — το **#1 value/effort Approved item** («πολύ ψηλό value/effort»). Commit `68acb9a` (pushed). Το OWNER_DECISIONS #8 queue (PA1/PA2/PA3) είναι όλο shipped εδώ και μέρες· το P22 έμενε ανοιχτό.
+
+**Γιατί δεν είχε γίνει**: η υλοποίηση κάθονταν **uncommitted στο working tree από ~2026-07-10** (`search-actions.ts` diff + untracked `lib/receiptSearch.{ts,test.ts}`). Πέντε+ προηγούμενα runs (και ο mobile-parity-auditor) την πέρασαν ως «ξένο WIP του Αχιλλέα» και την **απέφευγαν ρητά**, μπλοκάροντας το queue. Επιθεώρησα τον κώδικα προσεκτικά: είναι **αναμφίβολα routine artifact** — `(P22)` backlog-ID comments (ο Αχιλλέας δεν αναφέρει internal backlog IDs σε code comments), pure-helper + vitest pattern, comment για `/g` lastIndex guard. Orphaned δουλειά, όχι hand-edit. Την υιοθέτησα, validated, committed.
+
+**Τι μπήκε (η recovered υλοποίηση)**:
+- **`lib/receiptSearch.ts` (+`.test.ts`, 7 tests)**: pure/DB-free `matchedLineItemName(rx, lineItems)` — πρώτο line item που ματσάρει, refinedName preferred για display, non-global regex (no lastIndex state). Κρατημένο εκτός του `'use server'` αρχείου ώστε να μένει sync + unit-testable.
+- **`app/search-actions.ts`**: το query-level matching σε `lineItems.name`/`lineItems.refinedName` προϋπήρχε· τώρα κάνει `select` αυτά τα πεδία και, όταν το query ΔΕΝ ματσάρει το store name, βάζει το matched προϊόν στο subtitle του receipt hit («Receipt · date · €X · <matched product>»). Skip όταν το store ματσάρει (το store ΕΙΝΑΙ ο λόγος εμφάνισης).
+
+**Επιλογές/defaults**: substring/regex match (μηδέν migration, όπως builder default)· default = line-item names (όχι raw AI text — λιγότερο noise/privacy, όπως spec)· Mongo `$text` index deferred (μόνο αν χρειαστεί perf).
+
+**Verified**: `apps/web npm run type-check` → **EXIT 0**· full `npx vitest run` → **2160 passed / 169 files** (τα 7 νέα receiptSearch tests πράσινα). Δεν υπάρχει `search-actions.test.ts` (είναι `'use server'` με DB access — καλύπτεται από τον pure helper + type-check).
+
+**Docker rebuild SKIPPED (VM contention)**: 10 live containers (bakecore full stack ενός άλλου live session + homepage web/landing/mongo/searxng). Ένα Next build κάτω από αυτή τη μνήμη έχει ξανα-OOM-crash-loop-άρει το mongo σε προηγούμενα runs. Το change είναι additive `'use server'` search-action, καλυμμένο από type-check + 2160 tests. Δεν πήρα docker lock (μηδέν Docker work). **Serve-check του search dropdown (query «sn570» → receipt hit με ορατό matched προϊόν) εκκρεμεί μέχρι ελεύθερος VM.**
+
+**Working tree**: ρητό `git add` ΜΟΝΟ των 3 P22 code files· τα ξένα doc edits άλλων routines (`SAAS_PROGRESS.md`, `docs/DOCS_PROGRESS.md`, `docs/features.md`) ΔΕΝ αγγίχτηκαν (παραμένουν unstaged).
+
+**Επόμενο suggested task**: (α) όταν ο VM είναι ελεύθερος, safe rebuild + serve-check του global search dropdown για P22· ή (β) επόμενο καθαρό Approved item (το tree είναι πλέον χωρίς blocking WIP): **P7 auto-discovery untracked recurring charges** (S/M, heuristic-only, μηδέν AI) ή **P12 savings/financial goals** (S/M) ή **P24 outbound event webhooks** (M). Το P36 (Open Banking) + P11 (IMAP) θέλουν credentials/decision Achilleas → skip.

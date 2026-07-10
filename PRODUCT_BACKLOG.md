@@ -164,14 +164,23 @@ _(κενό — P32-P36 εγκρίθηκαν 2026-07-10· ο planner προσθέ
 - **Απόφαση που χρειάζεται (Αχιλλέας):** in-instance multi-user για το OSS, ή single-user OSS + βασίσου αποκλειστικά στο §8
   multi-tenancy; **δεν λύθηκε ρητά στην έγκριση** → builder default = shared-data + 3 ρόλοι (admin/member/viewer), χωρίς email/MFA στο OSS tier.
 
-### P22. Full-text search πάνω σε receipt line-items & parsed text — S/M — both (πολύ ψηλό value/effort)
-- **Αξία:** το global search (`searchAll`) ψάχνει σήμερα δομημένα πεδία (store/vendor/notes/τίτλους),
-  αλλά ΟΧΙ το περιεχόμενο των αποδείξεων — τα ονόματα των line items ή το raw parsed κείμενο. Επέκταση
-  του search index ώστε να καλύπτει line-item names (+ optionally raw AI text) κλείνει το πιο συχνό
-  «πού το αγόρασα αυτό;». Reuse σχεδόν όλο το υπάρχον search machinery· μόνο επέκταση projection + matcher.
+### P22. Full-text search πάνω σε receipt line-items & parsed text — ✅ SHIPPED 2026-07-10 (pharos-daily-dev, commit 68acb9a)
+- **Υλοποίηση:** το `searchAll` ήδη έκανε match σε `lineItems.name`/`lineItems.refinedName` σε επίπεδο query
+  (substring/regex, μηδέν migration — builder default τηρήθηκε), αλλά ένα receipt hit έδειχνε ΜΟΝΟ το store name,
+  οπότε ένα query σαν «sn570» προσγειωνόταν σε απόδειξη χωρίς ορατό λόγο. Νέο pure **`lib/receiptSearch.ts`**
+  `matchedLineItemName(rx, lineItems)` (κρατημένο εκτός του `'use server'` ώστε να μένει sync + unit-testable,
+  **+7 tests**): επιστρέφει το πρώτο line item που ματσάρει (refinedName preferred για display), non-global regex
+  required (no lastIndex state). Το `searchAll` κάνει select τα line-item πεδία και **παρακάμπτει** το lookup όταν
+  το ίδιο το store name ματσάρει (το store ΕΙΝΑΙ ο λόγος) → το matched προϊόν μπαίνει στο subtitle του hit
+  («where did I buy this?»). Ντετερμινιστικό, μηδέν AI, μηδέν migration. Default = line-item names (όχι raw AI text,
+  λιγότερο noise/privacy) — όπως το spec.
+- **Verify:** `npm run type-check` EXIT 0· full `npx vitest run` **2160 passed / 169 files**. Docker serve-check
+  skipped (VM με 2 live stacks — additive server-action καλυμμένο από tests). **Follow-up:** το v1 search endpoint (αν
+  υπάρξει mobile global-search) θα εκθέσει το ίδιο matched-line-item πεδίο· Mongo `$text` index μόνο αν χρειαστεί perf.
 - **Module:** Search (+ Receipts data shape).
-- **Ανοιχτή απόφαση (builder default):** ξεκίνα με substring match (δωρεάν, μηδέν migration)· Mongo `$text`
-  index μόνο αν χρειαστεί performance· default = line-item names, όχι raw AI text (λιγότερο noise/privacy).
+- **Σημείωση (orphaned WIP recovered):** η υλοποίηση κάθονταν uncommitted στο tree από ~2026-07-10· προηγούμενα runs
+  την πέρασαν ως «ξένο WIP» και την απέφευγαν, μπλοκάροντας το #1 value/effort Approved item. Αναγνωρίστηκε ως
+  routine artifact (P22 comments, pure-helper+vitest pattern), validated + committed.
 
 ### P24. Outbound event webhooks / automation hooks (Home Assistant / n8n) — M — both (OSS self-host lever)
 - **Αξία:** το §3 notifier framework στέλνει *alert μηνύματα*. Λείπει το generic **event webhook**:
