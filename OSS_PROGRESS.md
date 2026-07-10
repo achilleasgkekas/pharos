@@ -1474,3 +1474,31 @@ Mock pattern: DB-mock (όπως τα heavier routes) — mock και τα 7 mode
 - Collision guard: `git diff --cached` ΕΙΧΕ foreign staged files άλλου routine (`search-actions.ts` + `receiptSearch.ts`/`.test.ts` — receipt-search feature) που έμειναν staged unchanged >60s (stalled/abandoned mid-commit). Δεν έκανα plain commit (θα τα ρουφούσε). Committed ΜΟΝΟ τα δικά μου explicit paths με pathspec (`git commit -- overview/route.test.ts OSS_PROGRESS.md`) → τα foreign staged files μένουν άθικτα στο index. Άλλο foreign WIP (unstaged): reports/page.tsx, settings/*, appSettings*, i18n/*, AppConfig.ts, depreciation.* — κανένα δεν άγγιξα.
 
 Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run. Απομένουν βαριά (multi-model): `calendar/route.ts` (5 models + date-stepping — σπάσε το σε auth + envelope shape με mocked models) και `reports/route.ts` (6 models + πολλή pure aggregation — μεγάλο, δώσε του ολόκληρο run ή σπάσε σε επιμέρους describe blocks: net-position, cash-flow windows, by-category, spend-by-store, installment-payoff). Χαμηλή αξία (trivial `{rows}` wrapper): `history/route.ts`. DB-free εναλλακτική: untested pure libs (`notifiers.shared.ts` — client-safe types/const). Δες ΠΡΩΤΑ το κάθε route πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-11 (cont. — calendar/route.test.ts, 3-month money agenda: window + stepping + projection + envelope)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/calendar/route.test.ts` για το GET του `/api/v1/calendar`.**
+
+Επιλογή target: ακολούθησα το suggested next task — τα εύκολα single-action `{ rows }` wrappers (trash, jobs) + το overview έγιναν· από τα εναπομείναντα «βαριά» διάλεξα το **`calendar/route.ts`** (5 models + date-stepping). Είναι το πιο λογικό επόμενο γιατί έχει πλούσια shaping logic που ζει ΜΟΝΟ εδώ και τροφοδοτεί το mobile 3-month agenda. Route-only συμπεριφορές που καλύφθηκαν:
+- **Auth gate**: withAuth → 401 χωρίς token, καμία DB read (ούτε Subscription.find, ούτε Statement.find, ούτε computeInstallmentPlans).
+- **Window skeleton**: 3 month-blocks (τρέχων + 2), keys `2026-07/08/09`, labels `July/August/September 2026`, entries[]/out 0/inc 0 σε fresh install.
+- **Subscription renewals (stepped)**: monthly sub βηματίζει σε ΚΑΘΕ μήνα του window (out += amount)· renewal με nextRenewal ΠΡΙΝ το windowStart proj-άρεται μόλις το stepping μπει εντός (guard windowStart).
+- **Installments (pinned aggregate)**: ΕΝΑ pinned line/μήνα, gated by `remainingInstallments >= i+1` (remaining 2 → μήνες 1+2 όχι 3)· done plan excluded ΠΡΙΝ το loop· sum perAmount + '1 active plan' vs 'N active plans'.
+- **Recurring bills/income (projected)**: future bills → out, future income → inc· dedup ανά `kind|vendorKey` (μόνο το latest entry proj-άρει, find newest-first).
+- **Expiries**: warranty + voucher με `amount:null` → ΔΕΝ κουνάνε out/inc, μπαίνουν στον σωστό μήνα.
+- **Backward-compat `events`**: flat array ΜΟΝΟ renewal/voucher/warranty (όχι installments/bill/income), sorted ascending.
+- **Per-month sort**: pinned installments ΠΡΙΝ same-month renewal.
+
+Mock pattern: DB-mock (όπως overview) — mock και τα 5 models (find→[sort→]select→lean chains) + `@/lib/installments` computeInstallmentPlans (seam) + `@/lib/appSettings` getAppSettings (currency) + auth seam (`@/lib/db` connectDB + `@/models/User` findOne chain). Τρέχω τον ΠΡΑΓΜΑΤΙΚΟ withAuth helper. **Νέο vs προηγ. runs**: το route διαβάζει `new Date()` → **fake timers** (`vi.useFakeTimers()` + `vi.setSystemTime(new Date(2026,6,15,12,0,0))` σε beforeEach, `vi.useRealTimers()` σε afterEach)· ΟΛΑ τα test dates κατασκευάζονται με local `new Date(y,m,d)` ώστε το month-bucketing (getFullYear/getMonth) να είναι timezone-stable.
+
+Τι έγινε: Νέο `route.test.ts` (13 tests): auth gate (2), window skeleton + envelope (2), subscription renewals (2), installments (2), recurring bills/income (2), expiries + events backcompat (2), per-month sort (1).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/calendar/route.test.ts` → 13/13 passed.
+- `npx vitest run` (όλο το suite) → 144 files, 1869/1869 passed.
+- `npm run type-check` → exit 0 (καθαρό).
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλου routine (receipt-search: `app/search-actions.ts` [M] + `lib/receiptSearch.ts`/`.test.ts` [??]) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα ΜΟΝΟ τα δικά μου paths (calendar/route.test.ts + OSS_PROGRESS.md) με explicit pathspec.
+
+Suggested next task: (β συνέχεια) Συνέχισε endpoint-shape coverage, ένα route ανά run. Απομένει το βαρύ **`reports/route.ts`** (6 models + πολλή pure aggregation — μεγάλο, δώσε του ολόκληρο run ή σπάσε σε describe blocks: net-position, cash-flow windows, by-category, spend-by-store, installment-payoff· δες αν χρειάζεται fake-timers όπως το calendar). Χαμηλής αξίας trivial wrapper: `history/route.ts` (`{ rows }`). Untested scan/mutation routes (POST-heavy, θέλουν body-validation seam): `scan/receipt|expense|product|voucher`, `settings/route.ts`, `push/register`, `auth/login` (rate-limit gate). DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope shape + filters + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
