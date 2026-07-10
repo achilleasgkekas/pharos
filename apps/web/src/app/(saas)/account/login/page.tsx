@@ -16,13 +16,18 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  const target = safeNextPath(next);
+  // Default post-login destination is the account home (/account) — the workspace chooser — not
+  // the self-hosted root. A logged-in viewer is bounced straight there; an explicit safe `next`
+  // still wins.
+  const target = safeNextPath(next, '/account');
+  const explicitNext = target !== '/account';
 
   const viewer = await getSaasViewer(); // gate + current claims (throws notFound when SaaS off)
   if (viewer) redirect(target);
 
-  const signupHref =
-    target === '/' ? '/account/signup' : `/account/signup?next=${encodeURIComponent(target)}`;
+  const signupHref = explicitNext
+    ? `/account/signup?next=${encodeURIComponent(target)}`
+    : '/account/signup';
 
   return (
     <AuthShell

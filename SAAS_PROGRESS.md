@@ -2480,3 +2480,52 @@ Collision guard: μηδέν staged foreign files πριν το commit· foreign 
 erasure) — χρειάζεται πρώτα PATCH/DELETE στο `/api/saas/admin/tenants/[slug]` (backend), μετά UI·
 είτε (β) **root-app landing** μετά το login για signed-in Account (ανοιχτό από #56)· είτε (γ)
 wiring του `recordAiUsage` στα AI call-sites ώστε το Usage tab να δείχνει πραγματικά νούμερα.
+
+## 2026-07-10 (increment 60 — post-login ACCOUNT HOME / workspace chooser: /account, §8 UI-first)
+**Το κενό (ανοιχτό από #56):** μετά το login ο signed-in Account πήγαινε στο `/` (self-hosted
+root) και έπρεπε **χειροκίνητα** να πάει στο `/account/workspace`. Δεν υπήρχε landing που να
+δείχνει ΟΛΑ τα workspaces ενός account (multi-membership) ούτε post-auth προορισμός στο SaaS
+segment. Έχτισα το `/account` index — το φυσικό post-login landing — που δρομολογεί ανάλογα με
+το πλήθος memberships. ΟΛΟ additive, σε δικούς μου φακέλους:
+- `components/saas/accountLanding.ts` (νέο) — **PURE + client-safe** `accountLanding(tenants)` →
+  decision { kind: 'empty' | 'single' | 'choose' }. Rules: non-array/empty → empty· ακριβώς 1 →
+  single(slug)· ≥2 → choose(workspaces copy). Defensive: bad input → empty, μηδέν throw. Επιστρέφει
+  **αντίγραφο** της λίστας (όχι το ίδιο reference).
+- `components/saas/accountLanding.test.ts` (νέο, 6 tests) — empty/non-array collapse, single+slug,
+  single με missing slug → '', choose preserves order, choose returns a copy.
+- `app/(saas)/account/page.tsx` (νέο) — gate→viewer (logged-out → redirect `/account/login?next=
+  /account`)→`connectDB`+`accountTenants(viewer.sub)`→`accountLanding`. single → `redirect('/account/
+  workspace')` (skip τον chooser· το workspace page resolve-άρει το first membership by default,
+  clean URL). empty → informational empty state (καμία broken link). choose → grid από workspace
+  cards: κάθε card = Link σε `/account/workspace${workspaceQuery(slug, i===0)}` (clean URL για το
+  πρώτο, `?w=slug` για τα υπόλοιπα — ίδιο με pickWorkspace default) + name/slug/plan Pill/status
+  TenantStatusBadge/role MemberRoleBadge + hover accent border. Styled ΜΟΝΟ με υπάρχοντα Pharos
+  tokens, μηδέν shared CSS· reuse StatusBadge/Pill.
+- `app/(saas)/account/login/page.tsx` + `signup/page.tsx` (δικά μου) — 2 additive αλλαγές το καθένα:
+  default post-auth target `safeNextPath(next, '/account')` (αντί '/') ώστε το post-login/signup
+  landing να είναι ο chooser· ο cross-link (signup↔login) href βασίζεται πλέον στο `explicitNext =
+  target !== '/account'` (carry μόνο πραγματικό safe `next`, αλλιώς clean link). Explicit safe
+  `?next=` εξακολουθεί να κερδίζει.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run accountLanding.test.ts` → **6/6**·
+full suite `npx vitest run` → **2143/2143 green** (167 files, καμία regression). ΚΑΝΕΝΑ υπάρχον
+feature αρχείο δεν αγγίχτηκε (μόνο νέα account/page + accountLanding*/ + additive-only edits σε
+δικά μου login/signup pages). `SAAS_MODE` off / self-hosted = **zero effect** (το (saas) segment
+self-gates σε notFound() μέσω requireSaasUiEnabled πριν render· η αλλαγή default target ζει μόνο
+μέσα στο gated segment). Κανένας Docker rebuild (additive gated segment + client-safe modules,
+μηδέν shared runtime wiring)· καμία νέα εξάρτηση. Collision guard: μηδέν staged foreign files πριν
+το commit· foreign modified/untracked (search-actions/receiptSearch από άλλες routines) ΔΕΝ
+αγγίχτηκαν· isolated pathspec commit μόνο των δικών μου αρχείων.
+
+**## Needs Achilleas** (account home):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η σελίδα (αλλιώς 404). Self-hosted
+  = disabled, zero risk.
+- **Additional-workspace creation:** ένας signed-in account με 0 workspaces (π.χ. removed από το
+  τελευταίο του) βλέπει informational empty state — δεν υπάρχει ακόμα «create another workspace»
+  flow για υπάρχον account (μόνο το signup προμηθεύει το πρώτο). Ανοιχτό backend increment.
+- **Sign-out από το landing:** δεν προστέθηκε (logout είναι POST)· ανοιχτό μικρό UI.
+
+**Next task:** increment 61 — είτε (α) **admin tenant ACTIONS** (suspend/plan-change/schedule-
+erasure) — χρειάζεται πρώτα PATCH/DELETE στο `/api/saas/admin/tenants/[slug]` (backend), μετά UI·
+είτε (β) **sign-out control** στο account landing/workspace shell (POST → api/saas/auth/logout)·
+είτε (γ) wiring του `recordAiUsage` στα AI call-sites ώστε το Usage tab να δείχνει πραγματικά νούμερα.

@@ -16,13 +16,17 @@ export default async function SignupPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  const target = safeNextPath(next);
+  // Default post-signup destination is the account home (/account) — the new owner lands on the
+  // workspace chooser, which redirects into their sole workspace. An explicit safe `next` wins.
+  const target = safeNextPath(next, '/account');
+  const explicitNext = target !== '/account';
 
   const viewer = await getSaasViewer();
   if (viewer) redirect(target);
 
-  const loginHref =
-    target === '/' ? '/account/login' : `/account/login?next=${encodeURIComponent(target)}`;
+  const loginHref = explicitNext
+    ? `/account/login?next=${encodeURIComponent(target)}`
+    : '/account/login';
 
   return (
     <AuthShell
