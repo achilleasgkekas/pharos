@@ -226,9 +226,14 @@ _(κενό — P32-P36 εγκρίθηκαν 2026-07-10· ο planner προσθέ
 - **Module:** Reports (νέα «Goals» ενότητα) + Homepage card.
 - **Ανοιχτή απόφαση (builder default):** πολλά ταυτόχρονα goals· manual contributions πρώτα, auto-feed από κατηγορία phase 2.
 
-### P25. Budget rollover / envelope mode (μεταφορά αδιάθετου υπολοίπου) — S/M — both
-- **Αξία:** optional **rollover** (envelope method): το αδιάθετο υπόλοιπο του μήνα προστίθεται στο επόμενο.
-  Πιο ρεαλιστικό για ανομοιόμορφα έξοδα (δίμηνοι ΟΤΕ/ΔΕΗ). Reuse budgets + reports aggregation.
+### P25. Budget rollover / envelope mode (μεταφορά αδιάθετου υπολοίπου) — ✅ SHIPPED 2026-07-10 (pharos-daily-dev, commit 9dabfe9)
+- **Υλοποίηση:** opt-in envelope mode (`AppConfig.budgetRollover`, Settings → Budgets toggle). Νέο pure `lib/budgetRollover.ts`
+  (+11 unit tests, DB-free): `categoryRollover(base, priorSpends)` = Σ(base − spent) πάνω σε bounded 3-μηνο παράθυρο,
+  `effective = base + carried` (floor 0). Το Reports χτίζει per-(month,category) expense totals και **περιορίζει το carry
+  window σε μήνες με tracked spend** (κενοί/untracked μήνες ΔΕΝ φτιάχνουν phantom surplus), εκθέτει `carried`/`effective` ανά
+  budgeted κατηγορία + chip «+/−€X carried». Off → κλασικοί μηνιαίοι budgets (reset κάθε μήνα). Μηδέν AI, ντετερμινιστικό,
+  μηδέν migration. **Απόκλιση από builder default (per-category opt-in)**: γίνεται **global toggle** (απλούστερο MVP· ο carry
+  είναι net — θετικά ΚΑΙ αρνητικά υπόλοιπα, true envelope). Verify: type-check EXIT 0, vitest 67 passed στα affected suites.
 - **Module:** Budgets (Settings) + Reports «Budget · this month».
 - **Ανοιχτή απόφαση (builder default):** rollover **per-category opt-in**· μεταφορά θετικών υπολοίπων (negative rollover = opt-in).
 

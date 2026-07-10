@@ -4874,3 +4874,23 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 - **P6 iCal feed Settings connector στο mobile** — το web `CalendarFeedManager` (generate/rotate/revoke `calendarToken`) είναι server-actions, **κανένα v1 endpoint**. Θέλει endpoint-design decision (και το token είναι low-scope by design). NEEDS DECISION (S/M).
 - **net-worth AreaChart snapshot trend** — το `captureAndListSnapshots` series θέλει RN charting lib (το ReportsScreen είναι chart-free by design). Το headline/breakdown slice χτίζεται χωρίς αυτό (βλ. Build Queue item 3). NEEDS DECISION.
 - **Αμετάβλητα από προηγ.:** safe-area insets (`react-native-safe-area-context` ΑΠΟΝ), theme toggle + light/dark context + language switcher, AI-engine/storage/OneDrive Settings panels, statements PDF-import (upload endpoint), remote push (EAS + APNs), Tasks Kanban board, lucide icon set (cosmetic swap, attended), rate-limit 429 backoff στο mobile `api.ts` (config-gated, off by default).
+
+## 2026-07-10 (pharos-daily-dev, P25 budget envelope / rollover mode SHIPPED)
+
+**Τι έγινε**: Υλοποιήθηκε το **P25 (Budget rollover / envelope mode)** από το `## Approved` του PRODUCT_BACKLOG. Commit `9dabfe9` (pushed). Το OWNER_DECISIONS #8 queue (P2/P4/P10 = PA1/PA2/PA3) είναι όλο shipped· το «πολύ ψηλό value/effort» P22 (receipt line-item search) παραμένει **μπλοκαρισμένο** από ξένο uncommitted WIP στο tree (`search-actions.ts` + `lib/receiptSearch.{ts,test.ts}`) → ΔΕΝ το άγγιξα ξανά. Τράβηξα το επόμενο καθαρό, ντετερμινιστικό, καλά-απομονωμένο Approved item.
+
+**Τι μπήκε**:
+- **`lib/budgetRollover.ts` (+`.test.ts`, 11 unit tests)**: pure/DB-free `categoryRollover(base, priorSpends)` = Σ(base − spent) πάνω σε bounded 3-μηνο window (`ROLLOVER_WINDOW`), `effective = base + carried` (floor 0), αρνητικά spend clamped, στρογγυλοποίηση σε ακέραιες μονάδες. Μηδέν AI.
+- **`app/reports/page.tsx`**: κατά το υπάρχον expense loop χτίζει per-(month→category) totals + per-month total. Το budget-vs-actual: όταν envelope on, βρίσκει τους τελευταίους 3 ΠΛΗΡΕΙΣ μήνες **που είχαν tracked spend** (κενοί/untracked μήνες εξαιρούνται ώστε να μη φτιάχνουν phantom surplus), καλεί `categoryRollover`, εκθέτει `carried`/`effective` ανά κατηγορία + το flag `budgetRollover`.
+- **`app/reports/ReportsClient.tsx`**: η κάρτα «Budget · this month» δείχνει το rolling `effective` ως όριο + chip «+/−€X carried» (πράσινο surplus / κόκκινο deficit) + τίτλος «· envelope». Χωρίς envelope, byte-for-byte η παλιά συμπεριφορά.
+- **Toggle**: `AppConfig.budgetRollover` + `appSettings` (type/default/normalize/select) + `saveBudgetRollover` action + Switch στο Settings → Budgets (save-on-change) + en/el i18n (`reports.cBudgetEnvelope`, `reports.budgetCarriedHint`, `set.budgetRollover(+Desc)`).
+
+**Επιλογές (builder defaults, καταγράφονται)**: (α) **global toggle** αντί per-category opt-in (απλούστερο MVP, ένα switch)· (β) **net carry** (θετικά ΚΑΙ αρνητικά υπόλοιπα — αληθινό envelope, όχι μόνο surplus)· (γ) window **3 πλήρεις μήνες** (ίδιο με το P27 suggest-budgets, bounded ώστε ένα stale budget να μη φουσκώνει τον carry)· (δ) **restrict σε μήνες με tracked spend** για να λύσει το «empty months inflate carryover».
+
+**Verified**: `apps/web npm run type-check` → **EXIT 0**. Στοχευμένα vitest: `budgetRollover` **10**, `appSettings` **20** (+3 νέα assertions για το flag· ενημερώθηκε το exact-object test), `api/v1/settings/route` **19 ΑΜΕΤΑΒΛΗΤΑ**, `i18n/locales` **18** = 67 passed.
+
+**Docker rebuild SKIPPED (VM contention)**: ο μοιραζόμενος VM έτρεχε ΔΥΟ live stacks (bakecore web/api/admin/redis/mongodb/landing + homepage web/landing/mongo/searxng, ~10 containers). Ένα Next build κάτω από αυτή τη μνήμη έχει ξανα-OOM-crash-loop-άρει το mongo (P6 run 2026-07-10). Πήρα/άφησα καθαρά το `/tmp/claude-docker.lock` (χωρίς build). Το change είναι additive + type-checked + 67 unit tests· ο πυρήνας (`budgetRollover`) unit-proven. **Λειτουργικό serve-check του Reports/Settings toggle εκκρεμεί μέχρι ελεύθερος VM.**
+
+**Working tree**: ρητό `git add` με τα 11 δικά μου αρχεία· το ξένο P22 WIP ΔΕΝ αγγίχτηκε (παραμένει unstaged).
+
+**Επόμενο suggested task**: (α) όταν ο VM είναι ελεύθερος, safe rebuild + browser serve-check του envelope toggle (Settings → Budgets → on → Reports «Budget · this month · envelope» με carried chip)· ή (β) επόμενο Approved item που δεν συγκρούεται με το P22 WIP: **P28 Bill/payable status tracker** (M, ψηλό value/effort — νέο μικρό module) ή **P34 per-space ledger tag** (M) ή **P24 outbound webhooks** (M). Απόφυγε το P22 όσο υπάρχει uncommitted receiptSearch στο tree.
