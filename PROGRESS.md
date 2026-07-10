@@ -5,6 +5,45 @@
 <!-- reviewed: c11d296 -->
 <!-- docker-validated: 20bd514 -->
 
+## 2026-07-11 (pharos-daily-dev — P14 recurring price-hike/drop watch)
+- **Τι έκανα:** έχτισα το Approved item **P14** (subscription/bill price-hike watch). Όταν μια επαναλαμβανόμενη
+  χρέωση αλλάζει vs την προηγούμενη (Netflix €13→€15, ΔΕΗ +18%), ειδοποίηση «η X ανέβηκε €Y (+Z%)». Εμφανίζεται
+  και στο **ntfy alert summary** και στο **in-app notification bell**. Ντετερμινιστικό, **μηδέν AI**, μηδέν migration.
+- **Approved-queue check:** OWNER_DECISIONS #8 (PA1/PA2/PA3) όλα SHIPPED. Στο PRODUCT_BACKLOG `## Approved`: P27+P29
+  shipped, **P22 το δουλεύει άλλο routine** (uncommitted `receiptSearch.*` + `search-actions.ts` staged στο tree →
+  το απέφυγα για collision), P28 = ολόκληρο νέο module (πολύ μεγάλο για ένα run). Διάλεξα **P14**: «S / πολύ ψηλό
+  value/effort», self-contained, reuse σχεδόν όλης της υπάρχουσας machinery (vendorKey series + `runAlertChecks`/
+  `computeAlerts`).
+- **Locked defaults (builder, όπως εγκρίθηκε):** κατώφλι **≥5% Ή ≥€1**· πιάνει και **μειώσεις** (direction up/down —
+  «ίσως λάθος χρέωση»). Watched series = flagged `recurring` **ή** ≥3 priced entries (αποφεύγει false-positive σε
+  one-off vendor με 2 άσχετες αγορές). Σύγκριση **των δύο πιο πρόσφατων** χρεώσεων (recurring-auto duplicates έχουν
+  ίδιο ποσό → delta 0 → δεν χτυπάνε). Το income εξαιρείται.
+- **Design (testable):** νέο pure **`lib/priceHike.ts`** (`detectPriceHikes(rows, opts)`, DB-free) που τρέφεται με
+  lean Expense rows. Wired: (α) `runAlertChecks` (settings/actions) → νέα γραμμή «📈 N recurring price change(s): …»·
+  (β) `computeAlerts` (notifications/actions) → νέο **`pricehike`** NotifKind, dedupeKey `pricehike:<vendorKey>:<curr>`
+  (νέα αλλαγή ξανα-ειδοποιεί ακόμη κι αν παλιά dismiss-αρίστηκε· αυτο-λήγει όταν η νέα τιμή γίνει steady state). Model
+  enum +`pricehike`. Bell: κόκκινο `TrendingUp` icon + en/el strings (`notif.priceHikeSub`/`priceDropSub`).
+- **Verify:** `npm run type-check` → **EXIT 0**. Νέο `priceHike.test.ts` → **11/11** (hike/drop, two-most-recent,
+  sub-threshold no-op, €1-absolute rule, ≥3-entry gate για non-recurring, income/empty-key/zero skip, bad-date skip,
+  multi-series sort, custom thresholds). `notifiers.dispatch.test.ts` (touched surface) → 16/16. **Δεν έκανα Docker
+  rebuild:** ο stack είναι **healthy + serving 200** στο `/login`, αλλά το προηγούμενο run τεκμηρίωσε ότι το πλήρες
+  `docker compose build web` **δεν ολοκληρώνεται στο 10λεπτο παράθυρο και OOM-άρει** το μικρό VM (τρέχει και το
+  bakecore παράλληλα). Δεν ρίσκαρα να αποσταθεροποιήσω έναν υγιή multi-project stack για ένα build γνωστό ότι αποτυγχάνει·
+  η αλλαγή είναι πλήρως validated σε επίπεδο κώδικα (tsc + 11 unit tests). **Κανένα AI call.**
+- **Git hygiene:** staged ΜΟΝΟ τα 8 δικά μου αρχεία με explicit `git add <paths>` (τα P22 `receiptSearch.*` +
+  `search-actions.ts` + `WEB_DEBT.md` έμειναν ανέγγιχτα/unstaged). Commit `74f9cd4`. Μαρκάρισα P14 done στο
+  `PRODUCT_BACKLOG.md`.
+- **Προτεινόμενο επόμενο task:** **P15** (vendor→category auto-rules — «S/M, πολύ ψηλό value/effort», ντετερμινιστικό,
+  reuse vendorKey normalization) ή **P18** (receipt↔statement reconciliation, «S/M, πολύ ψηλό»). Απόφευγε P22 όσο τα
+  `receiptSearch.*` μένουν uncommitted. Follow-up P14: κατώφλι ρυθμιζόμενο από Settings (τώρα hard-coded 5%/€1 default).
+
+### Needs Achilleas
+- **Το HEAD δεν χτίζεται unattended σε αυτό το VM** (μεταφέρεται από 2026-07-10): το Next.js production build ΔΕΝ
+  ολοκληρώνεται σε 10min και OOM-άρει Mongo+web στο ~1.9GB VM (πόσο μάλλον με το bakecore παράλληλα). Χρειάζεται
+  **χειροκίνητο rebuild με περισσότερους πόρους** (Docker Desktop → Memory 3-4GB, ή build με το web σταματημένο εκτός
+  ωρών). Μέχρι τότε ο stack σερβίρει σωστά στην προηγούμενη image αλλά οι πρόσφατες αλλαγές (SaaS/landing + **αυτό το
+  P14**) **ΔΕΝ είναι deployed** — ζουν μόνο στο git.
+
 ## 2026-07-10 (docker-health — OOM recovery + rebuild timeout, HEAD αμετάβλητο μη-validated)
 - **Αρχική κατάσταση:** ο guard βρήκε τη Mongo σε **restart loop** (health=`starting`, 38 restarts, «Detected unclean
   shutdown» → επαναλαμβανόμενο WiredTiger recovery που σκοτωνόταν κάθε ~30s) και το web να ΜΗΝ σερβίρει (`/login`=000,
