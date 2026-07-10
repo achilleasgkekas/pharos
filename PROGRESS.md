@@ -5,6 +5,26 @@
 <!-- reviewed: 65b81a2 -->
 <!-- docker-validated: f8f345c -->
 
+## 2026-07-11 (pharos-daily-dev, P15 Vendor→category auto-rules SHIPPED)
+
+**Τι έγινε**: Υλοποιήθηκε το **P15 (vendor→category auto-rules)**, Approved item «πολύ ψηλό value/effort», size S/M, ντετερμινιστικό/μηδέν AI. Commit `5f13b7c` (pushed). Το επέλεξα από την ουρά των «πολύ ψηλό value/effort» Approved που δεν συγκρούεται με το ξένο uncommitted WIP (P22 receiptSearch στο tree, δεν το άγγιξα — έμεινε unstaged).
+
+Τι μπήκε:
+- **`lib/categoryRules.ts`** (pure, +20 unit tests): `resolveCategoryRules` (coerce/validate raw Mixed → CategoryRule[], drop entries χωρίς match/category), `matchCategoryRule` (first-match-wins· **vendor mode** = vendorKey-normalized containment ώστε accents/legal-suffixes/spacing να μη μετράνε· **text mode** = case-insensitive substring σε vendor+description), `categoryFromRules`. Reuse του `vendorKey` (expenses/lib) όπως ζητούσε το backlog.
+- **AppConfig `categoryRules[]`** + `appSettings` (type/DEFAULT/normalize/select) → κάθε server path βλέπει τους κανόνες μέσω `getAppSettings()`.
+- **Wiring στο category-resolution chain των Expenses** και στα 3 entry paths: `uploadExpense` (scan), `addExpense` (manual), `importExpensesCsv`. **Builder defaults (καταγράφονται)**: (α) στα scans/CSV ο κανόνας κερδίζει πάνω από το AI-guess ΚΑΙ το inherited-series category (explicit user intent)· (β) στο manual add ο κανόνας εφαρμόζεται ΜΟΝΟ όταν ο χρήστης άφησε την κατηγορία στο default 'other' (ρητή επιλογή κερδίζει πάντα)· (γ) ο κανόνας μπορεί να force-άρει recurring+cycle.
+- **Settings → Money `CategoryRulesManager`**: add/edit/delete rows (match input + vendor/text mode + category select από expenseCategories + recurring checkbox + cycle) + `saveCategoryRules` + `applyCategoryRulesToExisting` (retro-tag υπαρχόντων uncategorised = category 'other'/''/missing, μέσω bulkWrite, μηδέν AI) + en/el i18n (τα άλλα 6 locales fallback στα αγγλικά).
+
+**Scope απόφαση (καταγράφεται)**: MVP = **μόνο Expenses** (το μοναδικό module με πεδίο `category` + vendorKey σήμερα). Το backlog ανέφερε και Receipts/Statements, αλλά αυτά ΔΕΝ έχουν έννοια category (receipts = line items, statement txs = χωρίς category) → categorisation τους = follow-up. Το «Learn from this» (auto-suggest κανόνα όταν ο χρήστης αλλάζει κατηγορία) = follow-up.
+
+**Verified**: `apps/web npm run type-check` → **EXIT 0**. Πλήρες `npx vitest run` → **1933 passed / 149 files** (νέα 20 categoryRules tests + updated appSettings shape test με `categoryRules: []` + locales.test OK με τα νέα `set.rules*` keys). Μηδέν regression.
+
+**Docker rebuild SKIPPED (memory contention, established precedent)**: ο μοιραζόμενος VM (~1.9GB RAM) έτρεχε ΚΑΙ το bakecore stack (11 containers total: bakecore web/api/admin/redis/mongodb/landing + homepage web/mongo/searxng/landing). `docker compose build web` (Next build) κάτω από αυτή τη συμφόρηση OOM-άρισε στο προηγούμενο run και θα ρίσκαρε να crash-loop-άρει το mongo άλλου session. Επιπλέον το ήδη-running `homepage-web` (Up 2 min) προϋπήρχε των edits μου, οπότε serve-check του δεν θα δοκίμαζε καν την αλλαγή. Το change είναι additive (μηδέν migration) + καλυμμένο από type-check + 1933 tests. **Λειτουργικό serve-check εκκρεμεί μέχρι ελεύθερος VM**: build web → mongo healthy → up -d web → Settings → Money δείχνει «Auto-category rules», πρόσθεσε rule «cosmote → utilities», upload/add ένα COSMOTE expense → κατηγορία = utilities· «Apply to existing» → retro-tag.
+
+**Working tree**: ρητό `git add` με τα 11 δικά μου αρχεία· το ξένο P22 WIP (`search-actions.ts`, `lib/receiptSearch.ts`, `lib/receiptSearch.test.ts`) ΔΕΝ αγγίχτηκε (unstaged).
+
+**Επόμενο suggested task**: (α) όταν ο VM είναι ελεύθερος, safe rebuild + serve-check του P15 (Settings UI + rule application end-to-end)· ή (β) επόμενο Approved «πολύ ψηλό value/effort»: **P18 receipt↔statement reconciliation** (S/M, auto-match store/amount/date ±3d, confirm-not-silent) ή **P19 safe-to-spend cashflow** (S/M, reuse calendar projection). Απόφυγε το P22 όσο υπάρχει uncommitted receiptSearch στο tree.
+
 ## 2026-07-10 (docker-health — attended rebuild ΠΕΤΥΧΕ, marker 20bd514→f8f345c)
 - **Follow-up του προηγούμενου run:** ο Αχιλλέας ζήτησε ρητά «κάνε build» (παρών, χωρίς το 10λεπτο όριο). Έτρεξα το
   rebuild με τη σωστή στρατηγική για το μικρό VM: **σταμάτησα το web** ώστε το build να μη συναγωνίζεται RAM με τη
