@@ -2216,3 +2216,65 @@ Collision guard: 3 foreign files (search-actions/receiptSearch από άλλη r
 καταναλώνουν api/saas/auth/*, ξεκλειδώνει και το operator sign-in για το /admin), είτε (β)
 user-facing **workspace-settings** panels (members/billing/usage — όλα τα read/write control-plane
 APIs έτοιμα), είτε (γ) superadmin **live db.stats()** drill-down (data plane read-only → άδεια).
+
+## 2026-07-10 (increment 55 — user-facing (saas) AUTH UI: /account/login + /account/signup, §8 UI-first)
+**Το κενό:** τα increments 53-54 έχτισαν το superadmin console (/admin shell + Fleet Overview
++ Workspaces listing/detail), ΑΛΛΑ το /admin απαιτεί ενεργό Account session και **δεν υπήρχε
+UI για να συνδεθεί κανείς** — ούτε operator ούτε απλός tenant. Τα auth API routes
+(`api/saas/auth/signup|login|logout|session`) ήταν έτοιμα εδώ και βδομάδες με ΜΗΔΕΝ UI. Έχτισα
+το πρώτο user-facing SaaS κομμάτι — **signup + login panels** — που ξεκλειδώνει ΚΑΙ το operator
+sign-in για το /admin (increment 53 «Needs Achilleas»). ΟΛΟ additive, σε δικούς μου φακέλους:
+- `components/saas/authValidation.ts` (νέο) — **PURE + client-safe** validators σε lockstep με
+  την server policy (EMAIL_RE + MIN_PASSWORD=8 του `api/saas/auth/signup`): `isValidEmail`,
+  `loginReady`, `signupReady`, `describeAuthError(status, serverError?)` (προτιμά το server
+  `error` string, αλλιώς status-derived — ποτέ bare "undefined"), και **`safeNextPath`**
+  (open-redirect guard: μόνο leading single "/", απορρίπτει `//host`, `/\host`, backslashes,
+  scheme-bearing, non-string → fallback "/"). API re-validate authoritatively· αυτά μόνο UX.
+- `components/saas/authValidation.test.ts` (νέο, 10 tests) — email shape, login/signup readiness,
+  error mapping (server-preferred + status fallbacks + non-string ignore), safeNextPath open-
+  redirect matrix + custom fallback.
+- `components/saas/AuthShell.tsx` (νέο) — presentational, **server-safe** centered auth card,
+  styled ΜΟΝΟ με τα υπάρχοντα Pharos design tokens (`var(--color-*)`), μηδέν shared CSS/globals.
+- `components/saas/AuthForm.tsx` (νέο, client) — ΕΝΑ component, δύο modes: login POST
+  `{email,password}` → `api/saas/auth/login`· signup POST `{email,password,name?,workspace?}` →
+  `api/saas/auth/signup`. On success **full navigation** (`window.location.assign(safeNext)`)
+  ώστε το φρέσκο server render να πιάσει το μόλις-set httpOnly account cookie. Inline field
+  errors, disabled-until-ready button, `role="alert"` error box, autocomplete hints.
+- `lib/tenancy/saasPage.ts` (νέο) — **PAGE-side gate** = page-shaped καθρέφτης του `saasAuthGate()`
+  (API). `requireSaasUiEnabled()` → `notFound()` όταν SAAS_MODE off Ή AUTH_SECRET λείπει (fail
+  closed)· `getSaasViewer()` → gate + current AccountClaims|null (token-only). Διακριτό από το
+  `requireSuperadminPage()` — αυτό ΔΕΝ απαιτεί allowlist (ordinary tenant-facing).
+- `app/(saas)/layout.tsx` (νέο) — **self-gating** segment shell (requireSaasUiEnabled → 404 για
+  self-hosted/misconfig), `robots: noindex`, force-dynamic. Chrome-less (κάθε page μέσα σε
+  AuthShell)· σε SaaS mode το root layout δεν render-άρει SiteNav (δεν υπάρχει per-tenant `User`).
+- `app/(saas)/account/login/page.tsx` + `app/(saas)/account/signup/page.tsx` (νέα) — gate +
+  already-signed-in → `redirect(safeNext)` + AuthShell + AuthForm + cross-link. **Mount σε
+  `/account/*`** (ΟΧΙ `/login`|`/signup`) επίτηδες: το `app/login` (self-hosted User login)
+  υπάρχει ήδη → route-group `(saas)/login` θα resolve-άρε στο ίδιο `/login` URL = build collision.
+  Το SaaS Account auth είναι διακριτή έννοια από το per-tenant User login, άρα διακριτό path.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run authValidation.test.ts` →
+**10/10**· full suite `npx vitest run` → **1879/1879 green** (145 files, καμία regression).
+ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο νέα app/(saas)/**, components/saas/auth*, το
+νέο lib/tenancy/saasPage). `SAAS_MODE` off / self-hosted = **zero effect** (το (saas) segment
+self-gates σε `notFound()` μέσω `requireSaasUiEnabled()` πριν render· το self-hosted `/login`
+μένει byte-for-byte αμετάβλητο). Κανένας Docker rebuild (additive gated segment + node/client
+modules, μηδέν shared runtime wiring)· καμία νέα εξάρτηση. Collision guard: 3 foreign files
+(search-actions/receiptSearch από άλλη routine) untracked/modified απ' την αρχή → **δεν** τα
+άγγιξα· isolated pathspec commit μόνο των δικών μου αρχείων.
+
+**## Needs Achilleas** ((saas) auth UI):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16 chars)** για να υπάρχουν καν οι σελίδες (αλλιώς 404).
+  Self-hosted = disabled, zero risk.
+- **Post-auth destination:** το `next` default = `/` (app root), που σήμερα gate-άρεται από το
+  per-tenant `User` session (self-hosted). Η SaaS-mode root-app rendering (πώς φαίνεται το `/`
+  για signed-in Account χωρίς User session) = **ξεχωριστό increment** — η auth UI εδώ απλώς
+  authenticate-άρει το Account σωστά.
+- **Email verification / password reset UI:** τα APIs (`emailVerify`/`passwordReset` libs)
+  υπάρχουν· τα panels δεν χτίστηκαν ακόμα. Επόμενο υποψήφιο κομμάτι.
+- **Workspace switcher / multi-tenant landing:** ένα Account μπορεί να έχει πολλά tenants
+  (`accountTenants`)· UI για επιλογή workspace μετά το login = μελλοντικό increment.
+
+**Next task:** increment 56 — είτε (α) user-facing **workspace-settings** panels (members/billing/
+usage — όλα τα read/write control-plane APIs έτοιμα), είτε (β) **email-verify / password-reset**
+UI (APIs έτοιμα), είτε (γ) **workspace switcher** post-login landing (accountTenants έτοιμο).
