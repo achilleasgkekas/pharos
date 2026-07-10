@@ -1,6 +1,43 @@
 # DOCS_PROGRESS
 
-Ημερολόγιο της DOCS routine (τρέχει ωριαία, unattended). Territory: μόνο `docs/**`
+## 2026-07-10 (configuration.md: Calendar feed + Remote access [MCP] walkthroughs)
+
+Καλυψα και τα δυο suggested (α) του προηγουμενου run: το configuration.md ελεγε μονο 4 areas
+(AI/storage/notifications/i18n) και δεν ειχε ΚΑΘΟΛΟΥ calendar feed ουτε MCP-connect walkthrough,
+ενω το api.md link-αρε ρητα "See Configuration for the subscribe walkthrough" (broken promise).
+Διαβασα τον πραγματικο κωδικα πριν γραψω, καμια εφευρεση:
+
+- `apps/web/src/app/api/calendar.ics/route.ts` (low-scope `?token=` feed, User.calendarToken, RFC
+  5545, 12h TTL, 401 Missing/Invalid) + `settings/CalendarFeedManager.tsx` (Generate/Rotate/Revoke
+  + copyable URL `<origin>/api/calendar.ics?token=…`) + `SettingsClient.tsx:240` (ζει στο tab **AI**,
+  μαζι με το McpManager) → επιβεβαιωσα οτι το api.md "Settings → AI → Calendar feed" ειναι σωστο.
+- `settings/McpManager.tsx`: connector URL `<origin>/api/mcp`, token `phk_…` shown-once, Generate/
+  Revoke, ΙΔΙΟ bearer με REST+mobile (οχι low-scope σαν το calendar).
+
+Νεες section στο configuration.md (+2 TOC entries, "four areas"→"areas"):
+- **## Calendar feed**: get-subscribe-URL (Settings → AI → Generate/Rotate) + low-scope token
+  εξηγηση (χωριστο απο phk_, revocable) + subscribe βηματα ανα client (Google web From-URL, Apple
+  macOS File→New Subscription + iOS Add-Subscribed-Calendar, Outlook web Subscribe-from-web) +
+  reachability/HTTPS caveat + curl smoke-test + link σε api.md#calendar-feed-ical.
+- **## Remote access (MCP / mobile app)**: generate phk_ token (shown-once) + connector URL
+  `/api/mcp` + connect απο mobile/Claude-Code/MCP-aware + curl tools/list smoke-test + link σε
+  api.md#mcp-server-model-context-protocol + mobile.md. Footer "See also" += mobile.md.
+
+Validation: markdown only, κανενα build/Docker/AI call. 8 fence markers = 4 balanced blocks (τα 2
+ειναι list-indented, γι' αυτο το `^\`\`\`` count δειχνει 4). Ολα τα internal links resolve
+(self-hosting/features/api/mobile.md υπαρχουν· api.md anchors calendar-feed-ical +
+mcp-server-model-context-protocol ταιριαζουν με τα heading slugs). Secret scan
+(sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/CRON_SECRET=/phk_…) clean.
+
+Collision guard: foreign uncommitted WIP (admin/tenants page, search-actions.ts,
+components/saas/*, lib/receiptSearch*) — ΚΑΝΕΝΑ staged, ΔΕΝ τα αγγιζω· commit ΜΟΝΟ
+docs/configuration.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επομενο run: (α) features.md stale-forward — το P28 bill/payable status tracker (due → paid →
+overdue) shipαρε (commit a737bbc) αλλα ισως λειπει απο το Expenses/features module description·
+ή (β) self-hosting.md cross-check env vars vs .env.example για οποιο νεο SaaS/Stripe var μπηκε.
+
+Ημερολογιο της DOCS routine (τρέχει ωριαία, unattended). Territory: μόνο `docs/**`
 (συν μία γραμμή link στο README αν λείπει). Γλώσσα των docs: Αγγλικά (public
 audience). Σημειώσεις εδώ: Ελληνικά, χωρίς παύλες.
 

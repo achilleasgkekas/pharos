@@ -3,12 +3,14 @@
 Almost everything in Pharos is configured from the **Settings** page inside the
 app (stored in the database, no restart needed). A handful of secrets and
 infrastructure defaults come from environment variables at boot. This guide
-covers the four areas most people ask about:
+covers the areas most people ask about:
 
 - [AI providers](#ai-providers)
 - [Storage backends](#storage-backends) (local / SMB / FTP / OneDrive)
 - [Notifications](#notifications) (ntfy / Discord / Slack / Telegram / webhook)
 - [Language (i18n)](#language-i18n)
+- [Calendar feed](#calendar-feed) (subscribe from Google / Apple / Outlook)
+- [Remote access (MCP / mobile app)](#remote-access-mcp--mobile-app)
 
 For the full list of boot-time environment variables, see
 [self-hosting.md](self-hosting.md).
@@ -219,5 +221,109 @@ browser/session.
 
 ---
 
+## Calendar feed
+
+Pharos can publish your money agenda (the next three months of subscription
+renewals, card installments, projected recurring bills/income, and warranty /
+voucher expiries) as a read-only [iCal / RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545)
+feed. Subscribe to it once from Google, Apple, or Outlook Calendar and those
+events show up alongside the rest of your calendar, refreshing automatically.
+
+### Get your subscribe URL
+
+1. Open **Settings → AI** in the web app and find the **Calendar feed** section.
+2. Click **Generate** (labelled **Rotate** if you already have one). A subscribe
+   URL appears in the form:
+
+   ```
+   https://your-pharos-host/api/calendar.ics?token=<calendarToken>
+   ```
+
+3. Click the copy button next to it.
+
+The token in the URL is a **dedicated low-scope, revocable secret**
+(`User.calendarToken`), separate from your API bearer (`phk_…`) token. It grants
+access to nothing except this read-only agenda feed, so pasting the subscribe URL
+into a calendar app never exposes the rest of your data. If a URL leaks, click
+**Rotate** to invalidate it (old subscriptions stop working immediately) or
+**Revoke** to turn the feed off entirely.
+
+> The token rides in the URL on purpose: calendar clients cannot send an
+> `Authorization` header, so there is no other way to authenticate a subscription.
+> Keep the URL private and prefer HTTPS in production.
+
+### Subscribe from a calendar client
+
+The URL must be reachable from the device running the calendar app. On a LAN or
+over your VPN, `http://…` works; over the public internet, put Pharos behind
+HTTPS first (see [self-hosting.md](self-hosting.md)).
+
+- **Google Calendar** (web): left sidebar → **Other calendars** → **+** → **From
+  URL** → paste the subscribe URL → **Add calendar**. Google refreshes external
+  feeds on its own schedule (typically several hours), not on demand.
+- **Apple Calendar** (macOS): **File → New Calendar Subscription…** → paste the
+  URL → **Subscribe** → set **Auto-refresh** (e.g. every hour). On iPhone/iPad:
+  **Settings → Calendar → Accounts → Add Account → Other → Add Subscribed
+  Calendar**.
+- **Outlook** (web): **Calendar → Add calendar → Subscribe from web** → paste the
+  URL → name it → **Import**.
+
+The feed advertises a 12-hour refresh hint (`X-PUBLISHED-TTL`); each client
+ultimately decides how often it polls. To confirm the feed works before
+subscribing, fetch it directly:
+
+```bash
+curl -s "https://your-pharos-host/api/calendar.ics?token=YOUR_CALENDAR_TOKEN"
+```
+
+The endpoint itself is documented in [api.md](api.md#calendar-feed-ical).
+
+---
+
+## Remote access (MCP / mobile app)
+
+Pharos exposes a remote [Model Context Protocol](https://modelcontextprotocol.io)
+server so an external Claude client (the companion mobile app, Claude Code, or the
+MCP Inspector) can drive it with the same tools as the in-app AI command bar (add /
+update / search records, get an overview, and so on).
+
+### Generate an API token
+
+1. Open **Settings → AI** in the web app and find the mobile / remote-access
+   section.
+2. Click **Generate** to mint a personal API token (`phk_…`). It is shown **once**,
+   right after generation, so copy it immediately; you can **Revoke** and generate
+   a new one at any time.
+3. Note the connector URL shown next to it:
+
+   ```
+   https://your-pharos-host/api/mcp
+   ```
+
+Unlike the calendar feed token, this **is** the full API bearer: it is the same
+token the [REST API](api.md) and the [mobile app](mobile.md) use, sent as
+`Authorization: Bearer phk_…`. Treat it like a password.
+
+### Connect a client
+
+- **Mobile app** — enter the server URL and paste the token; see
+  [mobile.md](mobile.md).
+- **Claude Code** — add it as a remote MCP server pointing at
+  `https://your-pharos-host/api/mcp` with the bearer token above.
+- **Anything MCP-aware** — the transport is JSON-RPC 2.0 over Streamable-HTTP
+  (tools only, plain-JSON responses). The wire protocol and every method are
+  documented in [api.md](api.md#mcp-server-model-context-protocol).
+
+Quick smoke test that the token and endpoint are live:
+
+```bash
+curl -s https://your-pharos-host/api/mcp \
+  -H "Authorization: Bearer phk_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+---
+
 See also: [self-hosting.md](self-hosting.md) · [features.md](features.md) ·
-[api.md](api.md)
+[api.md](api.md) · [mobile.md](mobile.md)
