@@ -1382,3 +1382,37 @@ docs/api.md + docs/DOCS_PROGRESS.md με explicit pathspec.
 Επομενο run: (α) api.md — το δευτερο non-v1 route `/api/mcp` (Model Context Protocol endpoint,
 apps/web/src/app/api/mcp/route.ts) στην ιδια "Other endpoints" section· ή (β) configuration.md —
 calendar feed subscribe walkthrough (Google/Apple/Outlook βηματα) αν λειπει ακομα.
+
+## 2026-07-10 (api.md: non-v1 /api/mcp endpoint — remote MCP server)
+
+Καλυψα το suggested (α) του προηγουμενου run: το `/api/mcp` (remote MCP / JSON-RPC 2.0
+Streamable-HTTP server, apps/web/src/app/api/mcp/route.ts) ελειπε εντελως απο το api.md. Διαβασα
+το πραγματικο route πριν γραψω, καμια εφευρεση:
+
+- Διευρυνα το intro της "Other endpoints (outside /api/v1)" section — πριν ελεγε μονο "callers
+  cannot send Authorization: Bearer", αλλα το MCP ΧΡΗΣΙΜΟΠΟΙΕΙ bearer· τωρα λεει "different protocol
+  (JSON-RPC over Streamable-HTTP) or callers cannot send a bearer (calendar)".
+- Νεα sub-section "MCP server (Model Context Protocol)" μετα το Calendar feed: table (POST /api/mcp
+  JSON-RPC + GET liveness probe με το πραγματικο info blob {name:pharos, transport:streamable-http}).
+- Auth: standard `Authorization: Bearer phk_…` (ιδιο apiToken με το REST, ΟΧΙ low-scope σαν το
+  calendar), exempt απο cookie middleware, own bearer check, no-token → -32001 Unauthorized / 401.
+- Ολες οι JSON-RPC methods verbatim απο τον switch: initialize (protocolVersion 2025-06-18,
+  capabilities.tools, serverInfo pharos 1.0.0), notifications/initialized → 202, ping → {},
+  tools/list ({name,description,inputSchema}), tools/call ({name,arguments} → content[text],
+  unknown → -32602). + -32700 Parse error / -32601 Method not found.
+- ΕΠΑΛΗΘΕΥΣΑ (οχι μαντεψα) οτι τα MCP tools ειναι ΙΔΙΑ με το AI command bar: και το
+  aiCommandActions.ts και το route.ts import-αρουν TOOLS/execute απο το ιδιο @/app/aiTools →
+  linkαρα το bullet στο #ai-command-bar section.
+- curl tools/list example + οδηγια για Claude Code remote MCP connect.
+
+Validation: markdown only, κανενα build/Docker/AI call. api.md fence count = 22 (ζυγο, 11 blocks).
+Ολα τα internal .md links (README/configuration/features/mobile/self-hosting) resolve. Secret scan
+(sk_live/sk_test/sk-ant-/AUTH_SECRET=/STRIPE_SECRET_KEY=/CRON_SECRET=) clean.
+
+Collision guard: foreign uncommitted WIP (apps/web/src/app/search-actions.ts +
+lib/receiptSearch.ts/.test.ts) stale απο την αρχη του run, ΟΥΤΕ staged — ΔΕΝ τα αγγιζω, commit
+ΜΟΝΟ docs/api.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επομενο run: (α) configuration.md — calendar feed subscribe walkthrough (Google/Apple/Outlook
+βηματα) + MCP-connect-from-Claude section, που ακομα λειπουν· ή (β) features.md stale-forward για
+οποιο νεο user-facing feature εχει shipαρει στο μεταξυ.

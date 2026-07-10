@@ -354,8 +354,9 @@ Each plan in the `GET /statements/plans` response is:
 
 ## Other endpoints (outside `/api/v1`)
 
-A few endpoints live outside the versioned `/api/v1` tree because their callers
-cannot use a normal `Authorization: Bearer` header.
+A few endpoints live outside the versioned `/api/v1` tree because they speak a
+different protocol (JSON-RPC over Streamable-HTTP) or because their callers cannot
+send a normal `Authorization: Bearer` header (calendar clients).
 
 ### Calendar feed (iCal)
 
@@ -387,6 +388,50 @@ immediately invalidates the old subscribe URL. See
 # Subscribe from any calendar client, or fetch it directly:
 curl -s "http://localhost:3000/api/calendar.ics?token=YOUR_CALENDAR_TOKEN"
 ```
+
+### MCP server (Model Context Protocol)
+
+| Method | Path       | Description |
+|--------|------------|-------------|
+| POST   | `/api/mcp` | Remote [MCP](https://modelcontextprotocol.io) server (JSON-RPC 2.0 over Streamable-HTTP) exposing the same AI-command-bar tools as callable MCP tools, so an external Claude (the mobile app, Claude Code, or MCP Inspector) can drive Pharos. |
+| GET    | `/api/mcp` | Liveness / info probe. Returns `{ "name": "pharos", "transport": "streamable-http", "note": "…" }`. |
+
+Note the path is `/api/mcp` (not under `/api/v1`).
+
+Unlike the calendar feed, this endpoint **does** authenticate with the standard
+`Authorization: Bearer <token>` header, using the same per-user API token (`phk_…`)
+as the REST API. It is exempt from the cookie session middleware and performs its
+own bearer check. A request without a valid token gets JSON-RPC error
+`-32001 Unauthorized` with HTTP `401`.
+
+The transport is tools-only, so responses are plain JSON (no SSE stream is
+required). Supported JSON-RPC methods:
+
+- **`initialize`** — handshake; returns `protocolVersion` (`2025-06-18`),
+  `capabilities: { tools: {} }`, and `serverInfo` (`{ name: "pharos", version: "1.0.0" }`).
+- **`notifications/initialized`** / **`initialized`** — acknowledged with HTTP `202`
+  and no body (it is a notification, not a request).
+- **`ping`** — returns an empty result `{}`.
+- **`tools/list`** — returns every tool as `{ name, description, inputSchema }`. The
+  tool set is identical to the [AI command bar](#ai-command-bar) tools (add / update /
+  search records, get an overview, and so on).
+- **`tools/call`** — runs a tool. Params are `{ name, arguments }`; the result is
+  `{ content: [{ type: "text", text: "…" }] }`. An unknown tool name returns
+  JSON-RPC error `-32602`.
+
+Malformed JSON returns `-32700 Parse error` (HTTP `400`); an unrecognized method
+returns `-32601 Method not found`.
+
+```bash
+# Handshake, then list the available tools:
+curl -s http://localhost:3000/api/mcp \
+  -H "Authorization: Bearer phk_YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+To connect Claude Code, add it as a remote MCP server pointing at
+`https://your-pharos-host/api/mcp` with the bearer token above.
 
 ---
 
