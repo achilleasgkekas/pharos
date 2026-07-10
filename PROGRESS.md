@@ -4563,3 +4563,31 @@ Read-only code-quality audit της Next.js web επιφάνειας (fresh grep
 **Top-3 για τον builder (μικρα πρωτα, unattended-safe):** (1) **ShoppingScreen inline loading/empty → `<Spinner>`/`<Empty>`** [P2/S, tsc-verifiable, μηδεν rebuild]· (2) **ReceiptsScreen cell-inputs → shared `<Input>`** [P2/S, σβηνει 3 raw TextInput + magic radius 8]· (3) **safe-area-context adoption** [P2/M, landscape + bottom home-indicator inset]. Το light-theme parity [P3/L] ειναι NEEDS DECISION (θελει καν light mode στο mobile;) — οχι auto-buildable μεχρι απαντηση Αχιλλεα.
 
 Ολη η ουρα με build-ready format στο MOBILE_PARITY.md → `## UI Debt Queue`.
+
+## 2026-07-10 (web-code-quality, 51η σάρωση)
+
+Read-only audit του Next.js web (έμφαση στο `/api/v1` που καταναλώνει το mobile). Μηδέν app-code edit, μηδέν Docker, μηδέν AI job. `cd apps/web && npm run type-check` → **EXIT 0**.
+
+**Ευρήματα ανά dimension:**
+- **Type safety:** 0. Μηδέν `: any`/`as any`/`@ts-ignore`/`@ts-expect-error` σε ολο το `src/app/api/v1` (51 route files, εκτός test). Το μοναδικό μη-infra `as any` στο `src/app/search-actions.ts` είναι πλέον σχόλιο (γρ.23) — DONE.
+- **Input validation:** 0. Τα δύο μόνα body-reading v1 routes (`auth/login`, `items/[id]/ai-fill`) κάνουν guarded JSON parse (try/catch) + manual field validation· το ai-fill έχει και `isObjectId` gate.
+- **Error handling:** 3 (ολα προϋπάρχοντα SaaS holdouts, δες παρακάτω). Ο v1 surface έχει uniform error shape μέσω `withAuth`/`apiError`.
+- **Auth:** 0. Κάθε v1 route εκτός `auth/login` (public, σωστά) περνά από `withAuth`.
+- **Mongoose:** 0. Κάθε v1 read `.lean()`-backed + `.limit()`/pagination· hot lookups indexed.
+- **Duplication/dead code:** 0 νέο.
+- **UX states:** εκτός scope αυτής της σάρωσης (καλύπτεται από ui-auditor / MOBILE_PARITY).
+- **type-check:** EXIT 0 → 0 P1.
+
+**Μηδέν αλλαγή στο API από την 50η:** `git log --since=2026-07-08 -- apps/web/src/app/api/{v1,saas}` = μηδέν commit. Ο builder δεν κατανάλωσε τα 3 ανοιχτά items. Επιβεβαιώθηκε ότι τα προηγούμενα κλεισίματα (48η saasGuard reads/cron, canonical Tenant-status enforcement, search-actions typing) παραμένουν κλειστά live.
+
+**Νέο (untracked WIP Αχιλλέα, read-only audit):** `apps/web/src/lib/receiptSearch.ts` (P22 helper) — pure, fully-typed, μηδέν `any`/DB. Καθαρό, δεν μπήκε στην ουρά.
+
+**Top-3 για τον builder (ολα P2/S, μηχανικά try/catch wraps, unattended-safe, dead-until-SaaS):**
+1. `api/saas/audit/route.ts` — 6 inline DB reads μετά το `resolveWorkspaceSession` gate χωρίς try/catch → HTML 500 αντί `{ error }`. (49η)
+2. `api/saas/workspace/erasure/purge/route.ts` — `await runErasurePurgeScan()` (cron) unguarded → HTML 500 στον scheduler. (49η)
+3. `api/saas/invites/accept/route.ts` — 8 DB ops, μόνο η create-race έχει try/catch· top-level body unguarded. (50η)
+
+Ολα τα build-ready items με το per-item format στο `WEB_DEBT.md` → «## Web Debt Queue» (49η + 50η sections).
+
+### Needs Achilleas
+- Καμία νέα απόφαση αυτό το run. Παραμένουν από προηγούμενες σαρώσεις: (α) reset-request timing side-channel (P3, product/security trade-off)· (β) `getTenantConnection` cache-reuse `readyState` guard (P3)· (γ) v1 feature-data-path tenant-scoping (το v1 `withAuth`→`bearerUser` resolve-άρει User by apiToken χωρίς tenant context, οπότε δεν υπάρχει σημείο για `tenant.status` gate στο v1 data path μέχρι το v1 να γίνει tenant-scoped — μεγαλύτερο SaaS-isolation κομμάτι).
