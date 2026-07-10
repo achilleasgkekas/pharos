@@ -6,18 +6,65 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-09 (7η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-10 (8η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «τα εγκρίνω όλα» → **ΟΛΑ** τα προηγούμενα Proposed
 > (P1, P3, P5-P26) μετακινήθηκαν στο «Approved», μαζί με τα ήδη-εγκεκριμένα PA1/PA2/PA3.
 > **7η σάρωση (2026-07-09):** PA1 (bank/CSV import) shipped → «Done»· προστέθηκαν 5 νέοι candidates P27-P31.
 > **⚑ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «μετακίνησέ τα εσύ» → **P27-P31 μετακινήθηκαν στο «Approved»**.
-> Το «Proposed» είναι πάλι κενό· ο planner θα προσθέτει νέους candidates σε επόμενα runs.
+> **8η σάρωση (2026-07-10):** ο builder έστειλε P6 (iCal), P14 (price-hike), P15 (category rules), P27 (suggested
+> budgets), P29 (depreciation) → σημειώθηκαν SHIPPED μέσα στο «Approved» (αναμονή τελικού Done από τον Αχιλλέα).
+> Προστέθηκαν **5 νέοι candidates P32-P36** — όλοι distinct από τα ήδη-tracked (verified με grep). Awaiting έγκριση.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
-_(κενό — P27-P31 εγκρίθηκαν 2026-07-09· ο planner προσθέτει νέους candidates σε επόμενες σαρώσεις)_
+> 8η σάρωση (2026-07-10). Κάθε ένα ελέγχθηκε με grep να μην διπλασιάζει υπάρχον Approved/TODO item.
+> Ranked κατά value/effort (ψηλότερα = καλύτερη σχέση).
+
+### P33. Free-trial / cancel-before-charge reminder (χρημοανταλλακτικό, ψηλό value/effort) — S/M — both
+- **Αξία:** το πιο άμεσο money-saver που λείπει: μια συνδρομή σε **δωρεάν δοκιμή** που αυτο-μετατρέπεται σε πληρωμένη.
+  Πεδίο `trialEndsAt` (+ optional `firstChargeAmount`) σε Subscription → alert «η δοκιμή X λήγει σε 2 μέρες, θα χρεωθείς €Y —
+  ακύρωσε ή κράτησέ την». **Διακριτό** από P7 (discover *untracked*), P14 (ανατίμηση *υπάρχουσας*), P28 (manual bills):
+  εδώ το event είναι «trial → paid conversion», που κανένα module δεν πιάνει.
+- **Module:** Subscriptions (+ Notifications bell/ntfy, reuse `runAlertChecks`/`dispatchAlert` + `computeAlerts` NotifKind).
+- **Ανοιχτή απόφαση (builder default):** ένα νέο `trialend` NotifKind· lead-time = 2 μέρες πριν (ρυθμιζόμενο)· ντετερμινιστικό,
+  μηδέν AI, μηδέν migration πέρα από 1-2 optional πεδία στο Subscription.
+
+### P32. Gift-card / store-credit balance tracker (υπόλοιπα που φθίνουν) — S/M — both
+- **Αξία:** πραγματικό κενό — τα Vouchers είναι **coupons** (% έκπτωση/κωδικός) και το P20 είναι **loyalty barcode**· κανένα
+  δεν κρατά ένα **χρηματικό υπόλοιπο** (δωροκάρτα, store credit από επιστροφή, prepaid) που **μειώνεται** καθώς το ξοδεύεις.
+  Απλό: κάρτα με αρχικό ποσό + καταχωρήσεις χρήσης → τρέχον υπόλοιπο + «λήγει σε Nd» alert + «ξέχασες €X σε 3 κάρτες».
+- **Module:** νέο μικρό «Gift cards / credit» (ή tab στα Vouchers) + Notifications (expiry/unused reminder).
+- **Ανοιχτή απόφαση (builder default):** tab μέσα στα Vouchers πρώτα (μοιάζει με voucher lifecycle)· υπόλοιπο = αρχικό −
+  Σ(χρήσεις)· optional «spend €X» button που δημιουργεί linked expense (opt-in). Ντετερμινιστικό, μηδέν AI.
+
+### P34. Per-space / per-property ledger tag (2 σπίτια, προσωπικό vs κοινό) — M — both (personal-hub differentiator)
+- **Αξία:** ο Αχιλλέας έχει **δύο σπίτια** (κεντρικό + εξοχικό Kalamos)· σήμερα δεν μπορεί να δει «πόσο κοστίζει το εξοχικό».
+  First-class **space/ledger** πεδίο (π.χ. «Σπίτι», «Εξοχικό», «Δουλειά») σε expenses/receipts/subscriptions + global
+  space-filter σε όλα τα money views + per-space totals στα Reports. **Διακριτό** από §8 multi-tenancy (ξεχωριστές βάσεις)
+  και P31 household (πολλαπλά logins)· εδώ = οργάνωση **των δικών σου** δεδομένων σε χώρους. Τα tags υπάρχουν αλλά είναι
+  free-form χωρίς roll-up· ένα δομημένο space δίνει καθαρό per-property P&L.
+- **Module:** cross-cutting (Expenses/Receipts/Subscriptions + Reports + Settings για τη λίστα spaces).
+- **Ανοιχτή απόφαση (builder default):** ένα optional `space` string (editable list σαν τα categories)· κενό = «όλα»·
+  reuse του taxonomy pattern· default view = all-spaces (μη βαρύνει όποιον δεν το χρησιμοποιεί).
+
+### P35. Expense splitting / «ποιος χρωστάει τι» (Splitwise-lite) — M — both
+- **Αξία:** για κοινές αγορές (sailing trip με φίλους, κοινόχρηστα, δώρα): κατέγραψε ένα έξοδο, μοίρασέ το σε άτομα
+  (ίσα ή custom), δες «ο Α μου χρωστάει €X» + settle-up. **Διακριτό** από P31 (household = app accounts σε κοινά δεδομένα):
+  εδώ τα «άτομα» είναι απλά ονόματα/επαφές, το κομμάτι είναι **debt tracking μεταξύ ανθρώπων**, όχι logins.
+- **Module:** Expenses (νέο `split[]` ανά έξοδο) + μικρή «Balances» όψη (ποιος χρωστάει σε ποιον).
+- **Ανοιχτή απόφαση (builder default):** ελεύθερα ονόματα (όχι user accounts) πρώτα· equal-split default + custom· settle-up =
+  manual mark-paid· μηδέν AI. ΣΗΜ: ταιριάζει με το personal context (πρόταση γάμου σε καταμαράν με group).
+
+### P36. Open Banking auto-sync συναλλαγών (GoCardless/Nordigen EU free tier) — L — both (μεγάλος SaaS lever)
+- **Αξία:** το επόμενο σκαλί μετά το PA1 (χειροκίνητο CSV): **αυτόματο** import συναλλαγών μέσω Open Banking (GoCardless
+  Bank Account Data = δωρεάν EU tier, ελληνικές τράπεζες υποστηρίζονται) → οι χρεώσεις μπαίνουν μόνες τους, dedupe +
+  category inheritance (reuse PA1 pipeline). Ισχυρότατο SaaS differentiator· OSS = BYO GoCardless secret (self-host).
+  **Διακριτό** από PA1 (manual), §13 (bots), P11 (email IMAP).
+- **Module:** νέος `lib/openBanking.ts` connector + Settings → Data (connect bank) + Expenses (ingest).
+- **Ανοιχτή απόφαση (Αχιλλέας):** μεγάλο (OAuth-style consent flow, token refresh, ανά-τράπεζα quirks, 90d re-consent).
+  Αξίζει; Ξεκίνα με έναν provider (GoCardless) + read-only· metered/paid στο SaaS, BYO-key στο OSS. ΣΗΜ: L — τελευταίο σε σειρά.
 
 ---
 
