@@ -305,6 +305,10 @@ export const en = {
   'sub.fFirstCharge': 'First charge ({cur})',
   'sub.trialHint': "You'll be reminded before the trial converts to a paid charge.",
   'sub.fNotes': 'Notes',
+  'sub.discoveredTitle': 'Possible untracked subscriptions ({n})',
+  'sub.discoveredOccurrences': '{n}x seen',
+  'sub.discoveredTrack': 'Track',
+  'sub.discoveredDismiss': 'Dismiss (until reload)',
 
   // ── Tasks ────────────────────────────────────────────────────────────────
   'tk.openTotal': '{open} open · {total} total',

@@ -1,11 +1,14 @@
 'use server';
 import { connectDB } from '@/lib/db';
 import { Subscription } from '@/models/Subscription';
+import { Expense } from '@/models/Expense';
 import { suggestSubscription, type ParsedSubscription } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { addDays, addMonths, addWeeks, addYears, isBefore } from 'date-fns';
+import { vendorKey } from '@/app/expenses/lib';
+import { discoverRecurringCandidates, type RecurringCandidate } from '@/lib/recurringDiscovery';
 
 export type SuggestResult =
   | { ok: true; data: ParsedSubscription }
@@ -115,5 +118,53 @@ export async function deleteSubscription(id: string) {
   await connectDB();
   // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
   await Subscription.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+  revalidatePath('/subscriptions');
+}
+
+/**
+ * Scan Expense series for a regular cadence (P7) that has no matching Subscription
+ * yet, so the Subscriptions page can offer a one-click "Track this". Heuristic-only
+ * (zero AI): a vendor is excluded once ANY existing subscription's name or provider
+ * normalizes to the same vendorKey.
+ */
+export async function discoverUntrackedRecurring(): Promise<RecurringCandidate[]> {
+  await connectDB();
+  const [expenses, subs] = await Promise.all([
+    Expense.find({ kind: 'expense', amount: { $gt: 0 } })
+      .select('vendor vendorKey amount date category kind')
+      .lean(),
+    Subscription.find().select('name provider').lean(),
+  ]);
+  const excludeVendorKeys = new Set<string>();
+  for (const s of subs) {
+    const nk = vendorKey(s.name || '');
+    if (nk) excludeVendorKeys.add(nk);
+    const pk = vendorKey(s.provider || '');
+    if (pk) excludeVendorKeys.add(pk);
+  }
+  return discoverRecurringCandidates(expenses, { excludeVendorKeys });
+}
+
+/** Create a Subscription from a discovered candidate (one-click "Track"). */
+export async function trackDiscoveredSubscription(candidate: {
+  vendor: string;
+  amount: number;
+  cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  firstDate: string;
+}) {
+  const name = (candidate.vendor || 'Untitled').trim() || 'Untitled';
+  const startDate = candidate.firstDate ? new Date(candidate.firstDate) : new Date();
+  await connectDB();
+  await Subscription.create({
+    name,
+    provider: name,
+    category: 'other',
+    amount: candidate.amount,
+    currency: 'EUR',
+    billingCycle: candidate.cycle,
+    startDate,
+    nextRenewal: computeNextRenewal(startDate, candidate.cycle),
+    active: true,
+  });
   revalidatePath('/subscriptions');
 }

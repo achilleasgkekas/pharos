@@ -1,7 +1,7 @@
 'use client';
 import { cur } from "@/lib/money";
 import { useState, useTransition, useMemo } from 'react';
-import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, LayoutGrid, List as ListIcon, SlidersHorizontal } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Radar, X } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -13,12 +13,14 @@ import { useOpenParam } from '@/components/useOpenParam';
 import type { SerializedSubscription, SerializedCard } from '@/types';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
+import type { RecurringCandidate } from '@/lib/recurringDiscovery';
 import {
   createSubscription,
   updateSubscription,
   deleteSubscription,
   toggleSubscriptionActive,
   suggestSubscriptionInfo,
+  trackDiscoveredSubscription,
 } from './actions';
 
 const CATEGORIES = [
@@ -74,10 +76,12 @@ export function SubscriptionsClient({
   subscriptions,
   cards,
   categoryList = [],
+  candidates = [],
 }: {
   subscriptions: SerializedSubscription[];
   cards: SerializedCard[];
   categoryList?: string[];
+  candidates?: RecurringCandidate[];
 }) {
   if (categoryList.length) _subCats = categoryList;
   const [showCreate, setShowCreate] = useState(false);
@@ -85,6 +89,21 @@ export function SubscriptionsClient({
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const t = useT();
+  // Discovered untracked recurring charges (P7). Ephemeral hide list — "dismiss" is
+  // per-session only (no persisted ignore list yet); "track" removes it via the
+  // vendorKey now existing as a real Subscription on next page load too.
+  const [hiddenCandidates, setHiddenCandidates] = useState<Set<string>>(new Set());
+  const [trackingKey, setTrackingKey] = useState<string | null>(null);
+  const visibleCandidates = candidates.filter((c) => !hiddenCandidates.has(c.vendorKey));
+  const handleTrack = async (c: RecurringCandidate) => {
+    setTrackingKey(c.vendorKey);
+    try {
+      await trackDiscoveredSubscription({ vendor: c.vendor, amount: c.lastAmount, cycle: c.cycle, firstDate: c.firstDate });
+      setHiddenCandidates((prev) => new Set(prev).add(c.vendorKey));
+    } finally {
+      setTrackingKey(null);
+    }
+  };
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'cancelled'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'amount' | 'renewal'>('name');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
@@ -270,6 +289,49 @@ export function SubscriptionsClient({
                 </button>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Discovered untracked recurring charges (P7) */}
+      {visibleCandidates.length > 0 && (
+        <div className="mb-6 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl p-4">
+          <h3
+            className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em] mb-3"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
+            <Radar size={12} /> {t('sub.discoveredTitle', { n: visibleCandidates.length })}
+          </h3>
+          <div className="flex flex-col gap-2">
+            {visibleCandidates.map((c) => (
+              <div
+                key={c.vendorKey}
+                className="flex items-center gap-3 flex-wrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-3 py-2"
+              >
+                <span className="text-sm font-semibold flex-1 min-w-[100px] truncate">{c.vendor || c.vendorKey}</span>
+                <span className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                  ~{cur()}{c.avgAmount.toFixed(2)} · {t(`sub.${c.cycle}` as TKey)} · {t('sub.discoveredOccurrences', { n: c.occurrences })}
+                </span>
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleTrack(c)}
+                    disabled={trackingKey === c.vendorKey}
+                  >
+                    {trackingKey === c.vendorKey ? <Loader2 size={13} className="animate-spin" /> : null}
+                    {t('sub.discoveredTrack')}
+                  </Button>
+                  <button
+                    onClick={() => setHiddenCandidates((prev) => new Set(prev).add(c.vendorKey))}
+                    title={t('sub.discoveredDismiss')}
+                    className="p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-3)] transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
