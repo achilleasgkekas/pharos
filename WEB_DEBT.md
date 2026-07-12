@@ -29,7 +29,7 @@
   - Το GET list (`route.ts`), GET/PATCH `[id]/route.ts`, POST `[id]/rescan/route.ts` παίρνουν αυτόματα τα νέα πεδία (όλα καλούν `trimExpense`). Μηδέν αλλαγή στα call sites.
   - Επαλήθευση: `grep -c "space\|split" apps/web/src/app/api/v1/expenses/serialize.ts` → ≥2· ένα GET /api/v1/expenses επιστρέφει `space` + `split[]` σε κάθε expense object.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-15, 52η σάρωση· live: `trimExpense` 20 πεδία, μηδέν space/split· `ExpenseLean` 20 keys)
+- Status: DONE (2026-07-12, pharos-daily-dev, commit `b4f32af`) — `ExpenseLean`/`trimExpense()` πλέον εκθέτουν `space`/`split[]` (μέσω νέου exported `cleanSplit` στο `lib/split.ts`, reused από web+v1). +9 νέα tests στο `serialize.test.ts`.
 
 ### v1 expenses POST + PATCH — δέχονται `space` + `split[]` (write parity)
 - Priority: P2
@@ -44,7 +44,7 @@
   - Οι responses παραμένουν `trimExpense` (γεμίζουν από το read-parity item) → round-trip create/patch → read δείχνει space/split.
   - Επαλήθευση: POST με `{vendor, amount, space:"Εξοχικό", split:[{name:"Νίκος", share:20}]}` → 201 + read-back δείχνει space + split· `grep -c "cleanSplit\|space" apps/web/src/app/api/v1/expenses/route.ts` ≥2.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-15, 52η σάρωση· live: POST create 12 πεδία χωρίς space/split· PATCH set-map 10 fields χωρίς space/split)
+- Status: DONE (2026-07-12, pharos-daily-dev, commit `b4f32af`) — POST δέχεται `space` (trim+cap 40) + `split` (νέο `parseSplitField()` στο serialize.ts)· PATCH ίδιο guarded pattern με τα υπόλοιπα optional πεδία. +16 νέα tests στα route.test.ts/[id]/route.test.ts. Mobile `api.ts` Expense type + addExpense/updateExpense params ενημερώθηκαν παράλληλα (type parity).
 
 ---
 
