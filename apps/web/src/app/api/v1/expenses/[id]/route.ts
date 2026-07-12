@@ -4,12 +4,12 @@ import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
 import { vendorKey } from '@/app/expenses/lib';
-import { trimExpense, type ExpenseLean } from '../serialize';
+import { trimExpense, parseSplitField, type ExpenseLean } from '../serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** PATCH /api/v1/expenses/:id  { vendor?, amount?, category?, kind?, notes?, date?, period?, recurring?, recurringCycle?, paymentMethod? } */
+/** PATCH /api/v1/expenses/:id  { vendor?, amount?, category?, space?, kind?, notes?, date?, period?, recurring?, recurringCycle?, paymentMethod?, split? } */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
@@ -19,6 +19,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof b.vendor === 'string' && b.vendor.trim()) { set.vendor = b.vendor.trim(); set.vendorKey = vendorKey(b.vendor.trim()); }
     if (b.amount != null && Number.isFinite(Number(b.amount))) set.amount = Number(b.amount);
     if (typeof b.category === 'string') set.category = b.category;
+    if (typeof b.space === 'string') set.space = b.space.trim().slice(0, 40);
     if (b.kind === 'income' || b.kind === 'expense') set.kind = b.kind;
     if (typeof b.notes === 'string') set.notes = b.notes;
     if (b.date) { const d = new Date(String(b.date)); if (!Number.isNaN(d.getTime())) set.date = d; }
@@ -27,6 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // empty string clears the cycle; same enum guard as POST /api/v1/expenses
     if (b.recurringCycle === '' || ['monthly', 'quarterly', 'yearly', 'weekly'].includes(String(b.recurringCycle))) set.recurringCycle = String(b.recurringCycle);
     if (typeof b.paymentMethod === 'string') set.paymentMethod = b.paymentMethod;
+    if (Array.isArray(b.split)) set.split = parseSplitField(b.split);
     if (!Object.keys(set).length) return apiError('no valid fields');
     await connectDB();
     const doc = await Expense.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();

@@ -1,10 +1,12 @@
 import { iso } from '@/lib/apiList';
+import { cleanSplit, type SplitEntry } from '@/lib/split';
 
 /** Lean Expense doc shape as read from Mongo (fields the v1 surface exposes). */
 export type ExpenseLean = {
-  _id: unknown; kind?: string; vendor?: string; vendorKey?: string; category?: string; amount?: number; currency?: string;
+  _id: unknown; kind?: string; vendor?: string; vendorKey?: string; category?: string; space?: string; amount?: number; currency?: string;
   date?: Date; period?: string; recurring?: boolean; recurringCycle?: string; paymentMethod?: string;
   notes?: string; filePath?: string; thumbPath?: string; verified?: boolean; updatedAt?: Date; deletedAt?: Date | null;
+  split?: SplitEntry[];
 };
 
 /**
@@ -20,6 +22,7 @@ export function trimExpense(e: ExpenseLean, anomaly?: number) {
     kind: e.kind ?? 'expense',
     vendor: e.vendor ?? '',
     category: e.category ?? 'other',
+    space: e.space ?? '',
     amount: e.amount ?? 0,
     currency: e.currency ?? 'EUR',
     date: iso(e.date),
@@ -33,8 +36,22 @@ export function trimExpense(e: ExpenseLean, anomaly?: number) {
     verified: !!e.verified,
     updatedAt: iso(e.updatedAt),
     deleted: !!e.deletedAt,
+    split: Array.isArray(e.split) ? cleanSplit(e.split) : [],
     ...(anomaly !== undefined ? { anomaly } : {}),
   };
+}
+
+/** Coerce a raw JSON-body value (POST/PATCH `split`) into a clean SplitEntry[].
+ *  Defensive against non-array input and malformed rows — mirrors the web form's
+ *  `cleanSplit` sanitation so a split submitted from the mobile app matches. */
+export function parseSplitField(v: unknown): SplitEntry[] {
+  if (!Array.isArray(v)) return [];
+  return cleanSplit(
+    v.map((r) => {
+      const row = (r ?? {}) as Record<string, unknown>;
+      return { name: typeof row.name === 'string' ? row.name : '', share: Number(row.share) || 0, settled: !!row.settled };
+    })
+  );
 }
 
 /**

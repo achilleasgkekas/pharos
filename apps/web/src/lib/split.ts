@@ -84,3 +84,12 @@ export function computeBalances(expenses: Array<{ split?: SplitEntry[] | null }>
 export function totalOwed(expenses: Array<{ split?: SplitEntry[] | null }>): number {
   return r2(computeBalances(expenses).reduce((s, b) => s + b.owed, 0));
 }
+
+/** Clean raw split rows: trim names, drop empties/nameless, round shares to cents.
+ *  Shared by the web server action and the /api/v1 write routes (POST/PATCH) so
+ *  a split submitted from the mobile app is sanitized identically. */
+export function cleanSplit(rows: Array<{ name: string; share: number; settled: boolean }>): SplitEntry[] {
+  return (rows || [])
+    .map((r) => ({ name: (r.name || '').trim(), share: r2(Number(r.share) || 0), settled: !!r.settled }))
+    .filter((r) => r.name.length > 0);
+}

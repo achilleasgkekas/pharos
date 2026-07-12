@@ -5,7 +5,7 @@ import { readBody, strField, numField, enumField, boolField } from '@/lib/apiBod
 import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
 import { vendorKey } from '@/app/expenses/lib';
-import { trimExpense, computeAnomalies, type ExpenseLean } from './serialize';
+import { trimExpense, computeAnomalies, parseSplitField, type ExpenseLean } from './serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** POST /api/v1/expenses  { kind?, vendor, amount, date?, category?, period?, recurring?, recurringCycle?, notes? } */
+/** POST /api/v1/expenses  { kind?, vendor, amount, date?, category?, space?, period?, recurring?, recurringCycle?, notes?, split? } */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const b = await readBody(req);
@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
       vendor,
       vendorKey: vendorKey(vendor),
       category: strField(b, 'category', 'other'),
+      space: strField(b, 'space').trim().slice(0, 40),
       amount,
       date,
       period: strField(b, 'period'),
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
       recurringCycle: enumField(b, 'recurringCycle', ['monthly', 'quarterly', 'yearly', 'weekly'], ''),
       paymentMethod: strField(b, 'paymentMethod'),
       notes: strField(b, 'notes'),
+      split: parseSplitField(b.split),
       verified: true, // manually entered → trusted
     });
     return NextResponse.json({ expense: trimExpense(doc.toObject() as ExpenseLean) }, { status: 201 });

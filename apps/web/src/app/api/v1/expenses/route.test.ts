@@ -187,6 +187,27 @@ describe('POST validation', () => {
     expect(c.kind).toBe('expense');
     expect(c.recurringCycle).toBe('');
   });
+
+  it('trims+caps space to 40 chars and cleans a submitted split array', async () => {
+    await POST(makeReq({
+      body: {
+        vendor: 'Sailing supplies', amount: 60,
+        space: '  ' + 'Kalamos'.repeat(10) + '  ',
+        split: [{ name: '  Anna  ', share: '30', settled: false }, { name: '   ', share: 5, settled: false }],
+      },
+    }));
+    const c = state.lastCreate as Record<string, unknown>;
+    expect((c.space as string).length).toBe(40);
+    expect(c.space).toBe('Kalamos'.repeat(10).slice(0, 40));
+    expect(c.split).toEqual([{ name: 'Anna', share: 30, settled: false }]);
+  });
+
+  it('defaults space to "" and split to [] when omitted', async () => {
+    await POST(makeReq({ body: { vendor: 'Coffee', amount: 3 } }));
+    const c = state.lastCreate as Record<string, unknown>;
+    expect(c.space).toBe('');
+    expect(c.split).toEqual([]);
+  });
 });
 
 describe('GET listing', () => {
@@ -201,15 +222,15 @@ describe('GET listing', () => {
     const json = (await res.json()) as { data: Record<string, unknown>[]; total: number; limit: number; offset: number };
     expect(json).toMatchObject({ total: 2, limit: 50, offset: 0 });
     expect(json.data[0]).toEqual({
-      id: 'e1', kind: 'income', vendor: 'Acme', category: 'salary', amount: 1500, currency: 'USD',
+      id: 'e1', kind: 'income', vendor: 'Acme', category: 'salary', space: '', amount: 1500, currency: 'USD',
       date: '2026-06-01T00:00:00.000Z', period: '2026-06', recurring: true, recurringCycle: 'monthly',
       paymentMethod: 'bank', notes: 'pay', file: '/f.pdf', thumb: '/t.jpg', verified: true,
-      updatedAt: '2026-07-01T00:00:00.000Z', deleted: false,
+      updatedAt: '2026-07-01T00:00:00.000Z', deleted: false, split: [],
     });
     expect(json.data[1]).toEqual({
-      id: 'e2', kind: 'expense', vendor: 'Bare', category: 'other', amount: 0, currency: 'EUR',
+      id: 'e2', kind: 'expense', vendor: 'Bare', category: 'other', space: '', amount: 0, currency: 'EUR',
       date: null, period: '', recurring: false, recurringCycle: '', paymentMethod: '', notes: '',
-      file: null, thumb: null, verified: false, updatedAt: null, deleted: false,
+      file: null, thumb: null, verified: false, updatedAt: null, deleted: false, split: [],
     });
     // single-doc series (<3) → no anomaly key on either row
     expect(json.data[0]).not.toHaveProperty('anomaly');

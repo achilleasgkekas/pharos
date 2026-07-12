@@ -115,6 +115,42 @@ describe('PATCH partial-update', () => {
     const res = await PATCH(makeReq({ body: { amount: 10 } }), ctx(OID));
     expect(res.status).toBe(404);
   });
+
+  it('trims+caps space to 40 chars', async () => {
+    updateState.doc = { _id: OID, vendor: 'X' };
+    await PATCH(makeReq({ body: { space: '  ' + 'Kalamos'.repeat(10) + '  ' } }), ctx(OID));
+    const space = lastSet().space as string;
+    expect(space.length).toBe(40);
+    expect(space).toBe('Kalamos'.repeat(10).slice(0, 40));
+  });
+
+  it('accepts an empty space (clear)', async () => {
+    updateState.doc = { _id: OID, vendor: 'X' };
+    await PATCH(makeReq({ body: { space: '' } }), ctx(OID));
+    expect(lastSet().space).toBe('');
+  });
+
+  it('cleans a submitted split array (trim/round/drop-nameless)', async () => {
+    updateState.doc = { _id: OID, vendor: 'X' };
+    await PATCH(makeReq({
+      body: { split: [{ name: '  Anna  ', share: '15.5', settled: true }, { name: '  ', share: 5, settled: false }] },
+    }), ctx(OID));
+    expect(lastSet().split).toEqual([{ name: 'Anna', share: 15.5, settled: true }]);
+  });
+
+  it('an explicit empty split array clears all rows', async () => {
+    updateState.doc = { _id: OID, vendor: 'X' };
+    await PATCH(makeReq({ body: { split: [] } }), ctx(OID));
+    expect(lastSet().split).toEqual([]);
+  });
+
+  it('omitting space/split leaves them out of $set entirely', async () => {
+    updateState.doc = { _id: OID, vendor: 'X' };
+    await PATCH(makeReq({ body: { amount: 10 } }), ctx(OID));
+    const set = lastSet();
+    expect(set).not.toHaveProperty('space');
+    expect(set).not.toHaveProperty('split');
+  });
 });
 
 describe('DELETE soft-delete', () => {

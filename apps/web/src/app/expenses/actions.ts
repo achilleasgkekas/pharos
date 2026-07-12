@@ -13,6 +13,7 @@ import { safeDate } from '@/lib/dates';
 import { getAppSettings } from '@/lib/appSettings';
 import { matchCategoryRule } from '@/lib/categoryRules';
 import { mirrorFileToRemote } from '@/lib/mirror';
+import { cleanSplit } from '@/lib/split';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { SerializedExpense } from '@/types';
@@ -290,13 +291,6 @@ const UpdateSchema = z.object({
     .default([]),
   verified: z.boolean().default(false),
 });
-
-/** Clean split rows: trim names, drop empties/nameless, round shares to cents. */
-function cleanSplit(rows: Array<{ name: string; share: number; settled: boolean }>): Array<{ name: string; share: number; settled: boolean }> {
-  return (rows || [])
-    .map((r) => ({ name: (r.name || '').trim(), share: Math.round((Number(r.share) || 0) * 100) / 100, settled: !!r.settled }))
-    .filter((r) => r.name.length > 0);
-}
 
 export async function updateExpense(id: string, data: z.input<typeof UpdateSchema>): Promise<{ ok: boolean; error?: string }> {
   const p = UpdateSchema.safeParse(data);

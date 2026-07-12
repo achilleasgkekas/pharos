@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { trimExpense, computeAnomalies, type ExpenseLean } from './serialize';
+import { trimExpense, computeAnomalies, parseSplitField, type ExpenseLean } from './serialize';
 
 // Pure API-shape contract for the mobile expenses endpoints (list GET, rescan POST
 // both share trimExpense so the detail can re-prefill in place from either). No
@@ -18,6 +18,7 @@ describe('trimExpense', () => {
       kind: 'expense',
       vendor: '',
       category: 'other',
+      space: '',
       amount: 0,
       currency: 'EUR',
       date: null,
@@ -31,6 +32,7 @@ describe('trimExpense', () => {
       verified: false,
       updatedAt: null,
       deleted: false,
+      split: [],
     });
   });
 
@@ -40,6 +42,7 @@ describe('trimExpense', () => {
       kind: 'income',
       vendor: 'Cosmote',
       category: 'utilities',
+      space: 'Kalamos',
       amount: 29.51,
       currency: 'USD',
       period: '2026-06',
@@ -51,6 +54,7 @@ describe('trimExpense', () => {
       kind: 'income',
       vendor: 'Cosmote',
       category: 'utilities',
+      space: 'Kalamos',
       amount: 29.51,
       currency: 'USD',
       period: '2026-06',
@@ -58,6 +62,22 @@ describe('trimExpense', () => {
       paymentMethod: 'card',
       notes: 'δίμηνος λογαριασμός',
     });
+  });
+
+  it('cleans a populated split array (trim/round/drop-nameless, same as the web form)', () => {
+    const out = trimExpense({
+      _id: 'a',
+      split: [
+        { name: '  Anna  ', share: 10.006, settled: false },
+        { name: '   ', share: 5, settled: false }, // dropped: nameless
+      ],
+    });
+    expect(out.split).toEqual([{ name: 'Anna', share: 10.01, settled: false }]);
+  });
+
+  it('defaults split to [] when missing or not an array', () => {
+    expect(trimExpense({ _id: 'a' }).split).toEqual([]);
+    expect(trimExpense({ _id: 'a', split: null as unknown as undefined }).split).toEqual([]);
   });
 
   it('keeps amount 0 rather than substituting the default (0 is a real value)', () => {
@@ -132,6 +152,7 @@ describe('trimExpense', () => {
       [
         'amount',
         'category',
+        'space',
         'currency',
         'date',
         'deleted',
@@ -142,6 +163,7 @@ describe('trimExpense', () => {
         'period',
         'recurring',
         'recurringCycle',
+        'split',
         'thumb',
         'updatedAt',
         'vendor',
@@ -149,6 +171,31 @@ describe('trimExpense', () => {
         'id',
       ].sort(),
     );
+  });
+});
+
+describe('parseSplitField', () => {
+  it('returns [] for non-array input (undefined, null, object, string)', () => {
+    expect(parseSplitField(undefined)).toEqual([]);
+    expect(parseSplitField(null)).toEqual([]);
+    expect(parseSplitField({})).toEqual([]);
+    expect(parseSplitField('nope')).toEqual([]);
+  });
+
+  it('coerces raw JSON-body rows (as POSTed by the mobile app) into clean SplitEntry[]', () => {
+    expect(
+      parseSplitField([
+        { name: '  Anna  ', share: '15.5', settled: true },
+        { name: 'Bob', share: 10, settled: 0 },
+      ])
+    ).toEqual([
+      { name: 'Anna', share: 15.5, settled: true },
+      { name: 'Bob', share: 10, settled: false },
+    ]);
+  });
+
+  it('drops malformed rows (missing/non-string name, non-numeric share) without throwing', () => {
+    expect(parseSplitField([null, 42, { share: 5 }, { name: '   ' }])).toEqual([]);
   });
 });
 

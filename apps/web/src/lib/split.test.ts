@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { equalSplit, splitTotals, computeBalances, totalOwed, type SplitEntry } from './split';
+import { equalSplit, splitTotals, computeBalances, totalOwed, cleanSplit, type SplitEntry } from './split';
 
 describe('equalSplit', () => {
   it('divides evenly among others when it splits clean', () => {
@@ -97,5 +97,28 @@ describe('totalOwed', () => {
       { split: [{ name: 'B', share: 15, settled: false }, { name: 'C', share: 5, settled: true }] },
     ];
     expect(totalOwed(expenses)).toBe(25);
+  });
+});
+
+describe('cleanSplit', () => {
+  it('trims names, rounds shares to cents, coerces settled to boolean', () => {
+    expect(cleanSplit([{ name: '  Anna  ', share: 10.006, settled: true as unknown as boolean }])).toEqual([
+      { name: 'Anna', share: 10.01, settled: true },
+    ]);
+  });
+
+  it('drops rows with a blank or whitespace-only name', () => {
+    expect(cleanSplit([{ name: '   ', share: 5, settled: false }, { name: '', share: 5, settled: false }])).toEqual([]);
+  });
+
+  it('defaults a non-numeric share to 0 and a missing settled to false', () => {
+    expect(cleanSplit([{ name: 'Bob', share: NaN, settled: undefined as unknown as boolean }])).toEqual([
+      { name: 'Bob', share: 0, settled: false },
+    ]);
+  });
+
+  it('handles undefined/empty input', () => {
+    expect(cleanSplit(undefined as unknown as [])).toEqual([]);
+    expect(cleanSplit([])).toEqual([]);
   });
 });
