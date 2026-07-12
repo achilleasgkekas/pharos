@@ -5079,3 +5079,21 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 **Working tree**: ρητό `git add` με τα 6 δικά μου αρχεία (4 modified + 2 νέα). Μηδέν ξένο WIP στο tree στην αρχή του run.
 
 **Επόμενο suggested task**: (α) P12 savings/financial goals (S/M, builder default: πολλαπλά goals, manual contributions πρώτα)· ή (β) P24 outbound event webhooks (M, builder default: events receipt.parsed/budget.exceeded/installment.due/price.drop, HMAC ON)· ή (γ) P20 loyalty/membership card wallet (S/M, tab μέσα στα Vouchers) — και τα τρία καθαρά Approved items χωρίς ανοιχτή απόφαση που μπλοκάρει. Το P36 (Open Banking) + P31 (household multi-user) + P11 (IMAP) χρειάζονται ρητή απόφαση/credentials Achilleas → skip. Επίσης: browser-verify του discovery panel (χρειάζεται login session, ΔΕΝ testable unattended) όταν ο Αχιλλέας το δει live.
+
+## 2026-07-12 (pharos-daily-dev, v1 expenses mobile-parity fix — space + split — SHIPPED, commit b4f32af)
+
+**Τι έγινε**: Το OWNER_DECISIONS #8 queue (PA1/PA2/PA3) και όλα τα καθαρά value/effort Approved items (P6/P7/P14/P15/P18/P19/P22/P25/P27/P28/P29/P32/P33/P34/P35) ήταν ήδη shipped στο HEAD (`daf88ed`, P7 auto-discovery). Αντί να τραβήξω ένα καινούριο μεγάλο P-item, πρώτισα το **P2/S mobile-parity gap** που flag-άρισε ο web-code-quality auditor στην πιο πρόσφατη σάρωσή του (52η, στην κορυφή του PROGRESS.md) και που το ίδιο το προηγούμενο daily-dev run (P35) πρότεινε ως πρώτη επιλογή: το `/api/v1/expenses` read+write shape δεν εξέθετε καθόλου τα `space` (P34) και `split[]` (P35) πεδία που το web ήδη έχει εδώ και μέρες — **live data drift**, το mobile app βλέπει/γράφει λιγότερα από το web. Μικρό, ντετερμινιστικό, μηδέν AI, μηδέν migration, καλά απομονωμένο — ιδανικό για ένα run.
+
+**Τι μπήκε**:
+- **`lib/split.ts`**: το `cleanSplit` (trim/round-to-cents/drop-nameless) μετακινήθηκε εδώ από το `expenses/actions.ts` (ήταν module-private σε ένα `'use server'` αρχείο, άρα μη-exportable ως sync helper) και έγινε exported, ώστε το web action ΚΑΙ το νέο v1 write path να καθαρίζουν split rows πανομοιότυπα. **+4 νέα unit tests**.
+- **`api/v1/expenses/serialize.ts`**: `ExpenseLean`/`trimExpense()` πλέον κουβαλάνε `space`/`split` (read parity)· νέο **`parseSplitField(v: unknown)`** που κάνει defensive coerce ενός raw JSON-body split array (όπως θα το POST-άρει το mobile app) σε καθαρά entries μέσω του `cleanSplit`.
+- **`api/v1/expenses/route.ts`** (POST) + **`[id]/route.ts`** (PATCH): δέχονται+αποθηκεύουν `space` (trim + cap 40 chars, ίδιο όριο με το web Zod schema) και `split` (write parity).
+- **`mobile/api.ts`**: το `Expense` type + τα params του `addExpense`/`updateExpense` απέκτησαν `space`/`split` (τύπος `SplitEntry`) — ξεκλειδώνει μελλοντικό mobile UI να τα δείξει/επεξεργαστεί χωρίς άλλο API work.
+
+**Verified**: `apps/web npm run type-check` → **EXIT 0**· `apps/mobile npx tsc --noEmit` → **EXIT 0**· στοχευμένα vitest (split/serialize/route/[id]-route/expenses-lib) → **89 passed**· πλήρες `npx vitest run` → **2218 passed / 172 files** (2202 πριν + 16 νέα assertions, μηδέν regression). Safe Docker rebuild: `docker compose build web` καθαρό, mongo healthy, `up -d web` → `homepage-web` **0 restarts**, `/login` 200, `/expenses` 307 (auth-gated route compiled OK), logs χωρίς νέα errors (μόνο το προϋπάρχον pdfjs-dist/@napi-rs/canvas warning). `docker builder prune -f` freed 2.18GB. Δεν έγινε live curl με πραγματικό API token (δεν φτιάχνω/διαρρέω credentials σε unattended run) — η κάλυψη είναι μέσω των 25 νέων dedicated unit tests πάνω στο ακριβές request/response shape.
+
+**Working tree**: ρητό `git add` με τα 10 δικά μου αρχεία. Μηδέν ξένο WIP στο tree στην αρχή του run.
+
+**Follow-ups**: `trialEndsAt`/`firstChargeAmount` (P33) είναι σε Subscriptions όχι Expenses — ξεχωριστό mobile-parity item αν χρειαστεί. Καμία αλλαγή στο mobile UI (MoneyScreen) — μόνο API-shape + type parity, όπως το πρότεινε ρητά ο auditor· η mobile προβολή/επεξεργασία split/space είναι follow-up UI work.
+
+**Επόμενο suggested task**: επόμενο Approved item χωρίς ανοιχτή απόφαση: **P24 outbound webhooks** (M)· ή **P12 savings/financial goals** (S/M)· ή **P20 loyalty/membership card wallet** (S/M). Το P36 (Open Banking) + P31 (household) + P11 (IMAP) χρειάζονται ρητή απόφαση/credentials Achilleas → skip.
