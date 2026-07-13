@@ -5113,3 +5113,33 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 **Working tree**: ρητό `git add` με τα 10 δικά μου code files (`git status` στην αρχή του run ήταν καθαρό, μηδέν ξένο WIP) + `MOBILE_PARITY.md` (doc update, ξεχωριστό commit).
 
 **Επόμενο suggested task**: **item #3 του Build Queue — net-worth headline/breakdown στο v1 Reports** (P2/M): το `/api/v1/reports` route επιστρέφει ακόμα μόνο το παλιό `netPosition` (inventory − installmentsOwed)· το web `/reports` δείχνει πλέον εμπλουτισμένο «Net worth» (+ manual assetAccounts − card balances, από το PA2/`lib/netWorth.ts`). Headline/breakdown slice = auto-buildable (chart deferred, χρειάζεται RN charting lib = needs-decision). Αλλιώς: επόμενο καθαρό Approved item — P12 savings/financial goals (S/M) ή P20 loyalty/membership card wallet (S/M). Το P36 (Open Banking) χρειάζεται ρητή απόφαση/credentials Achilleas → skip.
+
+## 2026-07-13 (mobile-parity-auditor, 49η σάρωση)
+
+**Πρώτα, doc-hygiene**: το top-2 Build Queue items (pricehike notif icon, receipt return-window badge) ήταν όντως shipped σήμερα το πρωί (`6ea29a0`, βλ. προηγούμενη καταχώρηση), αλλά το MOBILE_PARITY.md είχε μείνει με stale `Status: TODO` στα ίδια τα item entries (μόνο η audit-note στην κορυφή το ανέφερε). Διορθώθηκε — και τα δύο entries πήραν `✅ DONE` με αναφορά στο commit + verification πλέον.
+
+**Κύριο εύρημα**: `git log --since=2026-07-10 -- apps/web/src apps/mobile/src` δείχνει **9 approved backlog P-items** (P7, P15, P18, P19, P22, P25, P28, P32, P33) που έγιναν ship ως web features μεταξύ 2026-07-11 και σήμερα, αλλά **κανένα από αυτά δεν άγγιξε ούτε `apps/web/src/app/api/v1` ούτε `apps/mobile/src`** (επιβεβαιωμένο ανά commit με `git show --stat`, καθώς και live grep πάνω στα ίδια τα v1 routes για κάθε νέο field/model). Αυτό σημαίνει ότι η "Approved P-items" ουρά του daily-dev routine χτίζει αποκλειστικά web-first και ΔΕΝ κλείνει αυτόματα το mobile-parity loop, κάτι που η σημερινή προηγούμενη PROGRESS καταχώρηση υπονοούσε λανθασμένα (\"Approved P-items ... ήταν ήδη shipped\" αναφερόταν μόνο στο web).
+
+**8 νέα auto-buildable PARITY GAP μπήκαν στο Build Queue** (ranked, βλ. MOBILE_PARITY.md για πλήρη specs):
+1. **Expenses category-rule wiring στο v1 POST route** (P1/S) — functional bug, όχι απλά missing UI: `POST /api/v1/expenses` βάζει literal `'other'` όταν λείπει category αντί να καλέσει το ήδη-υπάρχον `matchCategoryRule()` (apps/web/src/lib/categoryRules.ts) όπως κάνουν όλα τα web actions. Μια απόδειξη/έξοδο από mobile παίρνει σήμερα ΛΑΘΟΣ category σε σχέση με το ίδιο vendor από web. Μηδέν mobile UI αλλαγή χρειάζεται — καθαρά web-side one-liner.
+2. **Subscriptions trial field exposure** (P2/S) — `trialEndsAt` δεν υπάρχει σε κανένα v1 subscriptions route ούτε στο mobile type/form, αν και το notif icon shipped σήμερα.
+3. **Reports safe-to-spend κάρτα** (P2/M) — `computeSafeToSpend` pure lib υπάρχει, v1 reports route δεν το εκθέτει.
+4. **Reports/Settings budget rollover mode** (P2/M) — `categoryRollover` pure lib υπάρχει, ούτε το settings ούτε το reports v1 route το εκθέτουν/δέχονται.
+5. **Subscriptions auto-discover suggestions** (P2/M) — `discoverRecurringCandidates` pure lib υπάρχει, μηδέν v1 exposure.
+6. **Bills payable tracker** (P2/L) — εντελώς νέο entity (`models/Bill.ts`), μηδέν v1 route καθόλου.
+7. **Gift cards balance tracker** (P2/L) — εντελώς νέο entity (`models/GiftCard.ts`), μηδέν v1 route καθόλου.
+8. **Search matched-line-item snippet** (P3/S) — `lib/receiptSearch.ts` pure lib υπάρχει, v1 search route δεν το εκθέτει.
+
+**Item #3 της 48ης σάρωσης (Reports net-worth headline/breakdown, P2/M) παραμένει ανοιχτό**, αμετάβλητο, ακόμα το πιο ώριμο-speced item.
+
+**Επιβεβαιώθηκε ΟΧΙ gap**: οι `feat(saas)` commits (account/workspace/billing/members/admin, Activity audit-trail tab κλπ) είναι για το hosted-SaaS multi-tenant web account portal, όχι για το self-hosted personal-use mobile companion app — καμία ένδειξη ότι το mobile πρέπει να γίνει multi-tenant-aware. ΔΕΝ μπήκαν στο queue.
+
+`apps/mobile npx tsc --noEmit` → **EXIT 0** (μηδέν P1 type errors, αμετάβλητο).
+
+**Ranked top-3 (unattended-safe)**: (1) Expenses category-rule wiring [P1/S, web-only one-liner]· (2) Subscriptions trial field exposure [P2/S]· (3) Reports net-worth headline/breakdown [P2/M, ήδη speced, item #3 της 48ης].
+
+## Needs Achilleas
+
+- **Receipt↔transaction reconciliation στο mobile (P18, `07fba9f`)**: το web έχει interactive matching panel (`ReconcilePanel.tsx`, 233 γραμμές) για να συνδέεις unlinked statement transactions με receipts. Ασαφές αν το mobile θέλει πλήρες interactive matching (μεγάλο UX effort σε μικρή οθόνη) ή μια απλή read-only λίστα προτεινόμενων ταιριασμάτων πρώτα (auto-buildable subset). Χρειάζεται ρητή απόφαση scope πριν μπει στο Build Queue.
+- **Confirm εκτός scope**: τα SaaS multi-tenant web-only surfaces (account/workspace/billing/members/admin panels) — η υπόθεσή μου είναι ότι δεν χρειάζονται mobile parity ποτέ (hosted-SaaS account management, όχι personal-use feature), αλλά χρειάζεται επιβεβαίωση από τον Αχιλλέα ότι αυτό είναι σωστό ώστε να σταματήσω να τα ελέγχω σε κάθε σάρωση.
+- Τα προϋπάρχοντα (αμετάβλητα): safe-area dep, theme/light-dark/language switcher, AI-engine/storage/OneDrive Settings, statements PDF-import, remote push (EAS+APNs), Tasks Kanban board, lucide icon set, rate-limit 429 backoff.

@@ -164,6 +164,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ---
 
 ## Build Queue
+> **Re-audit 2026-07-13 (mobile-parity-auditor, 49η σάρωση· 8 ΝΕΑ auto-buildable GAP από backlog P-items shipped 2026-07-11/13, μηδέν από αυτά ported στο v1 API):** Inventory ξαναχτισμένο από τον κώδικα. **51 v1 routes** (αμετάβλητο), **16 mobile screens**, **84 exported api-functions**, mobile `npx tsc --noEmit` → **EXIT 0**. Επιβεβαίωσα πρώτα ότι τα top-2 items της 48ης (pricehike icon, return-window badge) όντως shipped σήμερα (`6ea29a0`) — το doc είχε μείνει με stale `Status: TODO` σε αυτά τα 2 items ενώ το PROGRESS.md ήδη τα έλεγε κλειστά· διορθώθηκε. **Νέο εύρημα:** `git log --since=2026-07-10 -- apps/web/src apps/mobile/src` δείχνει **9 approved backlog P-items** (P7/P15/P18/P19/P22/P25/P28/P32/P33) shipped ως web features (pure libs + server actions), ΑΛΛΑ **μηδέν από αυτά άγγιξε `apps/web/src/app/api/v1` ή `apps/mobile/src`** (επιβεβαιωμένο ανά commit `git show --stat`) — η "Approved P-items queue" του daily-dev routine χτίζει web-first και δεν κλείνει αυτόματα το mobile loop, σε αντίθεση με ό,τι υπονοούσε η σημερινή PROGRESS καταχώρηση. Live-verified με grep στα ίδια routes: `GET /api/v1/reports` δεν έχει `safeToSpend` ούτε rollover-adjusted budgets (μόνο raw `budgets[]`), `GET/PATCH /api/v1/settings` δεν εκθέτει `categoryRules`/`budgetRollover`/`trialAlertDays`/`billAlertDays`, `POST /api/v1/expenses` (route.ts:47) βάζει literal `'other'` όταν λείπει category αντί να καλέσει το ήδη-υπάρχον `matchCategoryRule()` (**functional inconsistency, όχι απλά missing UI** — μια απόδειξη/έξοδο που δημιουργείται από mobile παίρνει ΛΑΘΟΣ category ενώ η ίδια θα έπαιρνε σωστή από το web), `subscriptions` routes δεν έχουν `trialEndsAt`, `GET /api/v1/search` δεν έχει matched-line-item snippet, και δύο εντελώς νέα entities (**Bill**, **GiftCard**) δεν έχουν v1 route καθόλου. **Counts: DONE 11 (+2 σήμερα) / auto-buildable functional GAP 8 νέα / NEEDS DECISION 1 νέο.** **Ranked top-3 (unattended-safe):** (1) **Expenses category-rule wiring στο v1 POST route** [P1/S, functional bug fix, ΜΗΔΕΝ mobile UI change, καθαρά web-side]· (2) **Subscriptions trial field exposure** [P2/S, additive 2 πεδία]· (3) **Reports net-worth headline/breakdown** [P2/M, ήδη speced από την 48η, παραμένει ανοιχτό]. Οι SaaS multi-tenant επιφάνειες (`feat(saas)` commits: account/workspace/billing/members/admin, Activity audit-trail tab) **ΔΕΝ μπήκαν στο queue** — προορίζονται για το hosted-SaaS web account portal, όχι για το self-hosted personal-use mobile companion app (καμία ένδειξη ότι το mobile πρέπει να γίνει multi-tenant-aware)· flagged ως προς επιβεβαίωση στο PROGRESS. **Needs Achilleas (νέο):** receipt↔transaction reconciliation (P18, `07fba9f`) — interactive matching UI (`ReconcilePanel.tsx`, 233 γραμμές) στο web· ασαφές αν το mobile θέλει πλήρες interactive matching ή απλή read-only λίστα προτεινόμενων ταιριασμάτων πρώτα, βλ. PROGRESS.
 > **Update 2026-07-13 (pharos-daily-dev): top-2 items ΕΚΛΕΙΣΑΝ.** (1) **pricehike notification icon** — έγινε ευρύτερο
 > από το flag: το `models/Notification.ts` enum έχει πλέον **4** κενά kinds στο mobile (`pricehike` [P14] + `trialend`
 > [P33] + `giftcard` [P32] + `bill` [P28], όχι μόνο pricehike — τα 3 τελευταία shipped ΜΕΤΑ την 48η σάρωση). Fix:
@@ -225,6 +226,95 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 
 > **Re-audit 2026-07-02 (mobile-parity-auditor, 38η σάρωση):** inventory ξαναχτισμένο από τον κώδικα (όχι docs). **50 v1 routes** (login + 49 bearer, `find api/v1 -name route.ts`), **16 mobile screens**, mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** route → **μηδέν endpoint-level gap** (και τα νέα `expenses/[id]/rescan` + `statements/plans` δεμένα). Mobile `npx tsc --noEmit` → **EXIT 0**. Επιβεβαίωσα στον κώδικα ότι τα 2 GAP της προηγ. σάρωσης έκλεισαν: bill image (`fileSource(editing.file)` στο MoneyScreen) + Expenses/Income re-scan (`rescanExpense` + rescanBar) → **DONE**. **ΝΕΟ εύρημα (2 auto-buildable GAP, τοποθετημένα στην κορυφή):** (α) **Expense anomaly badges** — το web υπολογίζει `anomaly` (±% απόκλιση από το vendor median, `page.tsx:25-46`, pure stats μηδέν AI) και δείχνει `AnomalyBadge`, αλλά ο v1 serializer (`serialize.ts`) ΔΕΝ εκθέτει το πεδίο → το mobile δεν μπορεί να το δείξει· port = additive `anomaly?` στο list route (ήδη import-άρει `vendorKey`) + badge στο MoneyScreen. (β) **Expense vendor autocomplete** — το web add-form έχει vendor autocomplete· το mobile MoneyScreen add-form είναι plain `Input` (line 147), μηδέν suggestions· auto-buildable client-side (derive distinct vendors από την ήδη-φορτωμένη λίστα, μηδέν endpoint). Τα εναπομείναντα παλιά TODO (lucide icons, language switcher) μένουν attended-preferred → κάτω από τα 2 νέα un-attended.
 
+### Expenses — vendor→category auto-rules δεν εφαρμόζονται στο v1 create route (P15 gap, functional bug)
+- Priority: P1 | Size: S | no AI, no decision, no mobile UI change — web-side wiring only
+- Web ref: P15 vendor→category auto-rules (`5f13b7c`) — `matchCategoryRule()` (apps/web/src/lib/categoryRules.ts:71) εφαρμόζεται σε ΚΑΘΕ web expense-creation path (apps/web/src/app/expenses/actions.ts:234,349,502,587) μέσω `(await getAppSettings()).categoryRules`.
+- API: POST /api/v1/expenses (exists: yes, apps/web/src/app/api/v1/expenses/route.ts:47) — όταν το mobile client παραλείπει category, μπαίνει literal `'other'` (`strField(b,'category','other')`), **παρακάμπτοντας εντελώς το rule engine**. Αποτέλεσμα: το ίδιο vendor δίνει ΔΙΑΦΟΡΕΤΙΚΗ category ανάλογα με το αν το expense καταχωρήθηκε από web ή mobile — silent data inconsistency, όχι απλά missing UI. Έλεγξε επίσης το PATCH (`expenses/[id]/route.ts`) για το ίδιο pattern αν το vendor/notes αλλάζουν.
+- Mobile files: apps/web/src/app/api/v1/expenses/route.ts (πριν το create: αν δεν δόθηκε ρητή category, `matchCategoryRule((await getAppSettings()).categoryRules, {vendor, description: notes})?.category` ίδιο με το web action) — **μηδέν mobile-side αλλαγή**, το MoneyScreen add-form ήδη παραλείπει category by default οπότε το fix διορθώνει άμεσα ό,τι βλέπει ο mobile χρήστης.
+- Acceptance:
+  - `POST /api/v1/expenses` με vendor που ταιριάζει σε configured rule, χωρίς ρητή category → response category = της rule, όχι `'other'`
+  - explicit-category requests ανεπηρέαστα (η rule εφαρμόζεται μόνο όταν η category λείπει/κενή)
+  - tsc καθαρό (web)· +1 νέο route test για το rule-applied path
+- Status: TODO
+
+### Subscriptions — free-trial πεδίο στο mobile create/edit (P33 gap, notif icon ήδη shipped)
+- Priority: P2 | Size: S | no AI, no decision
+- Web ref: P33 (`bfd96ba`) — `Subscription.trialEndsAt` (apps/web/src/models/Subscription.ts) settable στο web SubscriptionsClient form· `trialAlertDays` στα Settings ελέγχει το lead time. Το notif icon (`trialend`) shipped σήμερα, αλλά το ίδιο το πεδίο δεν είναι readable/settable στο mobile.
+- API: GET/POST/PATCH /api/v1/subscriptions(/[id]) (exist: yes) — κανένα δεν διαβάζει/γράφει/επιστρέφει `trialEndsAt` (grep confirmed). GET/PATCH /api/v1/settings — κανένα `trialAlertDays`.
+- Mobile files: apps/web/src/app/api/v1/subscriptions/route.ts + [id]/route.ts (+`trialEndsAt` GET/POST/PATCH, ίδιο optional-date pattern με `nextRenewal`), apps/web/src/app/api/v1/settings/route.ts (+`trialAlertDays` GET/PATCH), apps/mobile/src/api.ts (`Subscription` += `trialEndsAt?: string | null`), apps/mobile/src/screens/SubscriptionsScreen.tsx (optional date field στο add/edit + μικρό «Trial» badge όταν μελλοντικό)
+- Acceptance:
+  - Create/edit subscription με `trialEndsAt` από mobile → persists, round-trips
+  - tsc καθαρό web+mobile
+- Status: TODO
+
+### Reports — net-worth headline + breakdown στο mobile (PA2 gap)
+> Ήδη speced στην προηγούμενη σάρωση (48η, 2026-07-10) — βλ. πλήρες entry παρακάτω («Reports — net-worth headline + breakdown στο mobile (PA2 gap)»). Παραμένει ανοιχτό, item #3 του builder queue.
+
+### Reports — safe-to-spend forward cashflow κάρτα στο mobile (P19 gap)
+- Priority: P2 | Size: M | no AI, no decision
+- Web ref: P19 (`d3e191d`) — pure `computeSafeToSpend(agendaMonths)` (apps/web/src/lib/safeToSpend.ts:34) τροφοδοτείται από το ήδη-computed `computeMoneyAgenda` series, renders ως κάρτα στο `/reports` κάτω από το net-worth banner (apps/web/src/app/reports/ReportsClient.tsx, apps/web/src/app/reports/page.tsx:315-319).
+- API: GET /api/v1/reports (exists: yes, κανένα `safeToSpend` πεδίο) — additive: το route ήδη χτίζει agenda-months structure για άλλους υπολογισμούς· κάλεσε `computeSafeToSpend` και πρόσθεσε το αποτέλεσμα.
+- Mobile files: apps/web/src/app/api/v1/reports/route.ts (+`safeToSpend`), apps/mobile/src/api.ts (`Reports` += `safeToSpend?: {...}` mirror του web type), apps/mobile/src/screens/ReportsScreen.tsx (νέα κάρτα, 30/60/90-day windows)
+- Acceptance:
+  - GET /api/v1/reports επιστρέφει `safeToSpend` (additive, no-auth ακόμα 401 όχι 500)
+  - ReportsScreen δείχνει «Safe to spend» κάρτα με τα 3 windows όταν παρόν
+  - tsc καθαρό web+mobile
+- Status: TODO
+
+### Reports/Settings — budget envelope / rollover mode στο mobile (P25 gap)
+- Priority: P2 | Size: M | no AI, no decision
+- Web ref: P25 (`9dabfe9`) — `AppConfig.budgetRollover: boolean` toggle στα Settings· όταν on, `categoryRollover()` (apps/web/src/lib/budgetRollover.ts:34) μεταφέρει unspent budget από τους προηγ. `ROLLOVER_WINDOW`(=3) μήνες στο effective budget του τρέχοντος μήνα (apps/web/src/app/reports/page.tsx:163-176).
+- API: GET/PATCH /api/v1/settings (exists: yes) — ΔΕΝ εκθέτει/δέχεται `budgetRollover` (grep confirmed 0 matches). GET /api/v1/reports (exists: yes) — `budgets[]` (route.ts:44-51) χρησιμοποιεί raw per-category limit, όχι το rollover-adjusted `effective`.
+- Mobile files: apps/web/src/app/api/v1/settings/route.ts (GET επιστρέφει `budgetRollover`, PATCH το δέχεται· boolean coerce, ίδιο pattern με άλλα flags), apps/web/src/app/api/v1/reports/route.ts (όταν `settings.budgetRollover`, τρέξε `categoryRollover` ανά budgeted category, πρόσθεσε `effective`/`carried` στο κάθε `budgets[]` row), apps/mobile/src/screens/SettingsScreen.tsx (toggle), apps/mobile/src/screens/ReportsScreen.tsx (budget κάρτα δείχνει carried/effective όταν παρόν)
+- Acceptance:
+  - PATCH /api/v1/settings `{budgetRollover:true}` persists, GET το αντανακλά
+  - GET /api/v1/reports budget rows έχουν `effective`/`carried` ΜΟΝΟ όταν rollover on (additive, off = αμετάβλητο shape)
+  - tsc καθαρό web+mobile
+- Status: TODO
+
+### Subscriptions — auto-discover untracked recurring charges στο mobile (P7 gap)
+- Priority: P2 | Size: M | no AI (καθαρή heuristic), no decision — builder defaults ήδη locked (>=3 occurrences, ±5 μέρες tolerance)
+- Web ref: P7 (`97a7d66`) — `discoverRecurringCandidates(expenses, {excludeVendorKeys})` (apps/web/src/lib/recurringDiscovery.ts:69) τρέχει πάνω στο Expense history μέσα στο subscriptions server action (apps/web/src/app/subscriptions/actions.ts:145), εμφανίζεται ως Add/Dismiss suggestion chips (dismiss = session-only, καμία persisted ignore-list).
+- API: GET /api/v1/subscriptions (exists: yes) — κανένα suggestions πεδίο. Χρειάζεται νέο additive computation (reuse το pure lib, χρειάζεται `Expense.find()` ίδιο με το web action) — inline στο GET response (`suggestions: RecurringCandidate[]`) είναι το απλούστερο (ίδιο idiom με τα υπόλοιπα additive πεδία σε αυτό το file).
+- Mobile files: apps/web/src/app/api/v1/subscriptions/route.ts (+`suggestions` στο GET, reuse `discoverRecurringCandidates` + τα υπάρχοντα subscription vendorKeys ως excludeVendorKeys), apps/mobile/src/api.ts (list response type += `suggestions?: RecurringCandidate[]`), apps/mobile/src/screens/SubscriptionsScreen.tsx (suggestion chips block: «Add» → `createSubscription` με name/amount/cycle του candidate, «Dismiss» → local state μόνο, mirror του web's non-persisted dismiss)
+- Acceptance:
+  - GET /api/v1/subscriptions επιστρέφει `suggestions` (additive, κενό array όταν τίποτα — φθηνή heuristic, μηδέν AI)
+  - mobile δείχνει Add/Dismiss chips όταν υπάρχουν suggestions· Add δημιουργεί πραγματική subscription μέσω του υπάρχοντος POST
+  - tsc καθαρό web+mobile
+- Status: TODO
+
+### Bills — payable/due tracker στο mobile (P28 gap, νέο entity — μηδέν v1 route ακόμα)
+- Priority: P2 | Size: L | no AI, no decision — mirrors υπάρχον CRUD entity pattern (vouchers/subscriptions), απλά μεγαλύτερο σε επιφάνεια
+- Web ref: P28 (`a737bbc`) — νέο `models/Bill.ts` (amount, dueDate, paidAt, recurring/cycle, archived) + pure `lib/bill.ts` (`billStatus` παράγει paid/overdue/due-soon/upcoming από dueDate+paidAt, ποτέ αποθηκευμένο) + Settings `billAlertDays` + NotificationBell integration. Ξεχωριστή λίστα recurring payables (ενοίκιο/λογαριασμοί), διαφορετικό από Expense.
+- API: κανένα δεν υπάρχει. Χρειάζεται νέο `GET/POST /api/v1/bills` + `GET/PATCH/DELETE /api/v1/bills/[id]`, mirror του shape/auth/error-envelope του `apps/web/src/app/api/v1/vouchers/route.ts` (πλησιέστερο sibling: απλό CRUD + derived status πεδίο, μηδέν AI-scan variant).
+- Mobile files: νέα v1 routes παραπάνω, apps/mobile/src/api.ts (+`Bill` type, +CRUD fns), νέο apps/mobile/src/screens/BillsScreen.tsx (ή section μέσα στο MoneyScreen — η τοποθέτηση δεν μπλοκάρει το build, default σε ξεχωριστή screen αφού το web το βλέπει ως distinct λίστα) + nav entry
+- Acceptance:
+  - Πλήρες CRUD round-trip μέσω των νέων v1 routes, auth-gated 401 χωρίς token
+  - mobile list δείχνει bill rows με derived status badge (paid/overdue/due-soon/upcoming), mark-paid action
+  - tsc καθαρό web+mobile
+- Status: TODO
+
+### Gift cards — store-credit balance tracker στο mobile (P32 gap, νέο entity — μηδέν v1 route ακόμα)
+- Priority: P2 | Size: L | no AI, no decision — mirrors υπάρχον CRUD entity pattern
+- Web ref: P32 (`052ee64`) — νέο `models/GiftCard.ts` (title, store, initialAmount, uses[] με signed amounts spend/reload) + pure `lib/giftcard.ts` (`giftCardBalance`, `giftCardSpentPct`, `giftCardDaysLeft`, `giftCardIsLive`) — ζει ως tab μέσα στο web `/vouchers` (apps/web/src/app/vouchers/page.tsx:3-13 φορτώνει Voucher+GiftCard παράλληλα).
+- API: κανένα δεν υπάρχει. Χρειάζεται νέο `GET/POST /api/v1/giftcards` + `GET/PATCH/DELETE /api/v1/giftcards/[id]` (+ τρόπος να κατοχυρωθεί ένα use/spend — additive sub-array push).
+- Mobile files: νέα v1 routes παραπάνω, apps/mobile/src/api.ts (+`GiftCard` type, +CRUD fns), apps/mobile/src/screens/VouchersScreen.tsx (πρόσθεσε gift-card section/tab δίπλα στη λίστα vouchers, mirror του web's ίδιας-σελίδας tab — κρατά το mobile nav 1:1 με το web αντί για νέα top-level screen)
+- Acceptance:
+  - Πλήρες CRUD + log-a-use round-trip μέσω των νέων v1 routes, auth-gated
+  - mobile VouchersScreen δείχνει gift-card λίστα με live balance + days-left + spent%
+  - tsc καθαρό web+mobile
+- Status: TODO
+
+### Search — εμφάνιση matched receipt line-item στα mobile αποτελέσματα (P22 gap)
+- Priority: P3 | Size: S | no AI, no decision
+- Web ref: P22 (`68acb9a`) — `apps/web/src/lib/receiptSearch.ts` (pure, 27 γραμμές) βρίσκει ποιο line-item ταίριαξε σε ένα search query· το web global search (`search-actions.ts:10-13`) περιλαμβάνει το snippet.
+- API: GET /api/v1/search (exists: yes) — δεν περιλαμβάνει το matched line-item snippet.
+- Mobile files: apps/web/src/app/api/v1/search/route.ts (reuse `receiptSearch.ts`, πρόσθεσε snippet field στα receipt hits), apps/mobile/src/api.ts (search result type += `matchedItem?: string`), apps/mobile/src/screens/SearchScreen.tsx (δείξε το snippet κάτω από τη receipt row όταν παρόν)
+- Acceptance:
+  - Search όρου που ταιριάζει ΜΟΝΟ σε line-item (όχι store/vendor) επιστρέφει το receipt hit με το matched item name
+  - tsc καθαρό web+mobile
+- Status: TODO
+
 ### Notifications — pricehike icon στο mobile Activity (P14 gap)
 - Priority: P2 | Size: S | no AI, no decision, no endpoint, no native dep
 - Web ref: P14 price-hike/drop watch (`74f9cd4`) πρόσθεσε kind `pricehike` στο enum (file: apps/web/src/models/Notification.ts:10 `enum: ['deal','installment','warranty','pricehike','system']`)· το web NotificationBell το χειρίζεται, το mobile όχι.
@@ -234,7 +324,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - `NOTIF_ICON` καλύπτει και τα 5 kinds (deal/installment/warranty/pricehike/system)· καμία `pricehike` ειδοποίηση δεν renderάρει κενό glyph
   - `NotifKind` union περιλαμβάνει `pricehike` (αλλιώς tsc σπάει στο `Record` map)
   - tsc καθαρό (mobile)· μηδέν νέο endpoint/dep, μηδέν rebuild
-- Status: TODO
+- Status: ✅ DONE 2026-07-13 (pharos-daily-dev, `6ea29a0`) — επιβεβαιωμένο στον κώδικα: `NotifKind` (api.ts:466) έχει και τα 4 (pricehike/trialend/giftcard/bill), `NOTIF_ICON` (ActivityScreen.tsx:22) όλα mapped. mobile tsc EXIT 0.
 
 ### Receipts — return-window badge στο mobile (PA3 gap)
 - Priority: P2 | Size: M | no AI, no decision · web-half (v1 serializer) + mobile-half
@@ -245,7 +335,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - `GET /api/v1/receipts` επιστρέφει `returnDaysLeft` σε αποδείξεις εντός παραθύρου (additive· no-auth ακόμα 401, όχι 500)· αρχειοθετημένες/εκτός-παραθύρου → χωρίς το πεδίο
   - mobile receipts card δείχνει «Nd return» chip· ≤3 μέρες → gold· χωρίς πεδίο → κανένα chip
   - tsc καθαρό (web + mobile)· safe rebuild → /login 200, web restarts 0
-- Status: TODO
+- Status: ✅ DONE 2026-07-13 (pharos-daily-dev, `6ea29a0`) — επιβεβαιωμένο στον κώδικα: `trimReceipt(r, returnDaysLeft?)` (serialize.ts:33) + list/detail routes το υπολογίζουν, mobile `ReceiptSummary.returnDaysLeft?` + `<Badge>` σε λίστα+modal (ReceiptsScreen.tsx:223-224,239-240). +9 route tests, vitest 2227/172 EXIT 0.
 
 ### Reports — net-worth headline + breakdown στο mobile (PA2 gap)
 - Priority: P2 | Size: M | no AI, no decision (chart deferred → Needs Achilleas)
