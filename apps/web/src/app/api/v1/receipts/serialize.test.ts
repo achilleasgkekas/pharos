@@ -130,4 +130,13 @@ describe('trimReceipt', () => {
     // empty string path collapses to null (|| null)
     expect(trimReceipt({ ...base, filePath: '', thumbPath: '' })).toMatchObject({ file: null, thumb: null });
   });
+
+  it('omits returnDaysLeft entirely when not passed (not present, not null)', () => {
+    expect(trimReceipt(base)).not.toHaveProperty('returnDaysLeft');
+  });
+
+  it('includes returnDaysLeft (even 0) when the caller passes it', () => {
+    expect(trimReceipt(base, 9).returnDaysLeft).toBe(9);
+    expect(trimReceipt(base, 0).returnDaysLeft).toBe(0);
+  });
 });

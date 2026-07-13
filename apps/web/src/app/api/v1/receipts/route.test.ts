@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 // GET /api/v1/receipts is one of the ~50 REST endpoints the Expo mobile app drives.
@@ -16,7 +16,11 @@ import type { NextRequest } from 'next/server';
 //   - the trimReceipt mapping (itemCount from lineItems.length, file/thumb ?? null, deleted flag).
 // We exercise the REAL apiAuth/apiList helpers and the REAL trimReceipt; only the DB seam is mocked.
 
-const { connectDBMock, userFindOne, userState, receiptFind, receiptCount, findQuery, countQuery, state } =
+// getStores/getAppSettings back the PA3 return-window badge (mirrors the web
+// receipts page.tsx). settingsState.defaultReturnWindowDays defaults to 0 (off)
+// so the existing exact-shape assertions below are unaffected unless a test
+// opts in.
+const { connectDBMock, userFindOne, userState, receiptFind, receiptCount, findQuery, countQuery, state, getStoresMock, storesState, getAppSettingsMock, settingsState } =
   vi.hoisted(() => {
     const state: { docs: unknown[]; total: number } = { docs: [], total: 0 };
     // User model — bearerUser does User.findOne(...).select(...).lean()
@@ -34,12 +38,21 @@ const { connectDBMock, userFindOne, userState, receiptFind, receiptCount, findQu
       then: (resolve: (n: number) => void) => resolve(state.total),
     };
     const receiptCount = vi.fn(() => countQuery);
-    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, receiptFind, receiptCount, findQuery, countQuery, state };
+    const storesState: { rows: { name: string; returnWindowDays?: number | null }[] } = { rows: [] };
+    const getStoresMock = vi.fn(async () => storesState.rows);
+    const settingsState: { defaultReturnWindowDays: number } = { defaultReturnWindowDays: 0 };
+    const getAppSettingsMock = vi.fn(async () => ({ defaultReturnWindowDays: settingsState.defaultReturnWindowDays }));
+    return {
+      connectDBMock: vi.fn(async () => {}), userFindOne, userState, receiptFind, receiptCount, findQuery, countQuery, state,
+      getStoresMock, storesState, getAppSettingsMock, settingsState,
+    };
   });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/models/Receipt', () => ({ Receipt: { find: receiptFind, countDocuments: receiptCount } }));
+vi.mock('@/lib/storeService', () => ({ getStores: getStoresMock }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 
 import { GET } from './route';
 
@@ -64,6 +77,8 @@ function countFilter(): Record<string, unknown> {
 beforeEach(() => {
   state.docs = [];
   state.total = 0;
+  storesState.rows = [];
+  settingsState.defaultReturnWindowDays = 0;
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
   vi.clearAllMocks();
   // clearAllMocks resets return values on the chain stubs → re-point them.
@@ -73,6 +88,8 @@ beforeEach(() => {
   userFindOne.mockImplementation(() => ({ select: () => ({ lean: async () => userState.doc }) }));
   receiptFind.mockImplementation(() => findQuery);
   receiptCount.mockImplementation(() => countQuery);
+  getStoresMock.mockImplementation(async () => storesState.rows);
+  getAppSettingsMock.mockImplementation(async () => ({ defaultReturnWindowDays: settingsState.defaultReturnWindowDays }));
 });
 
 describe('auth gate', () => {
@@ -170,5 +187,61 @@ describe('GET listing', () => {
     const res = await GET(makeReq({ url: `${BASE}?updatedSince=2026-07-01T00:00:00.000Z` }));
     const json = (await res.json()) as { data: { deleted: boolean }[] };
     expect(json.data[0].deleted).toBe(true);
+  });
+});
+
+// PA3 return-window badge (mirrors apps/web/src/app/receipts/page.tsx): the field
+// is entirely additive — omitted (not present, not null) whenever it doesn't apply.
+describe('PA3 return-window badge', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-10T00:00:00Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('adds returnDaysLeft when a global default window applies', async () => {
+    settingsState.defaultReturnWindowDays = 14;
+    state.docs = [{ _id: 'r1', store: 'Plaisio', date: new Date('2026-07-05T00:00:00Z') }];
+    state.total = 1;
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { data: { returnDaysLeft?: number }[] };
+    expect(json.data[0].returnDaysLeft).toBe(9);
+  });
+
+  it('a per-store override wins over the global default', async () => {
+    settingsState.defaultReturnWindowDays = 14;
+    storesState.rows = [{ name: 'Plaisio', returnWindowDays: 30 }];
+    state.docs = [{ _id: 'r1', store: 'Plaisio', date: new Date('2026-07-05T00:00:00Z') }];
+    state.total = 1;
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { data: { returnDaysLeft?: number }[] };
+    expect(json.data[0].returnDaysLeft).toBe(25);
+  });
+
+  it('omits the field once the window has closed', async () => {
+    settingsState.defaultReturnWindowDays = 14;
+    state.docs = [{ _id: 'r1', store: 'Plaisio', date: new Date('2026-06-01T00:00:00Z') }];
+    state.total = 1;
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { data: Record<string, unknown>[] };
+    expect(json.data[0]).not.toHaveProperty('returnDaysLeft');
+  });
+
+  it('omits the field for archived receipts even inside the window', async () => {
+    settingsState.defaultReturnWindowDays = 14;
+    state.docs = [{ _id: 'r1', store: 'Plaisio', date: new Date('2026-07-05T00:00:00Z'), archived: true }];
+    state.total = 1;
+    const res = await GET(makeReq({ url: `${BASE}?archived=1` }));
+    const json = (await res.json()) as { data: Record<string, unknown>[] };
+    expect(json.data[0]).not.toHaveProperty('returnDaysLeft');
+  });
+
+  it('skips the cross-doc lookups entirely on an incremental (updatedSince) sync', async () => {
+    settingsState.defaultReturnWindowDays = 14;
+    state.docs = [{ _id: 'r1', store: 'Plaisio', date: new Date('2026-07-05T00:00:00Z') }];
+    state.total = 1;
+    await GET(makeReq({ url: `${BASE}?updatedSince=2026-07-01T00:00:00.000Z` }));
+    expect(getStoresMock).not.toHaveBeenCalled();
+    expect(getAppSettingsMock).not.toHaveBeenCalled();
   });
 });

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, TextInput, Image, Pressable, FlatList, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim, RADIUS, SIZE } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check, Button, Input, TextArea, contentWidth } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Button, Input, TextArea, Badge, contentWidth } from '../ui';
 import { getReceipts, getReceipt, scanReceipt, rescanReceipt, updateReceipt, addReceiptToLibrary, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
 
 type LineEdit = { name: string; qty: string; price: string; vatRate: string };
@@ -218,7 +218,12 @@ export function ReceiptsScreen() {
               {src ? <Image source={src} style={s.thumb} resizeMode="cover" /> : <View style={[s.thumb, s.thumbEmpty]}><Text style={s.thumbTxt}>🧾</Text></View>}
               <View style={{ flex: 1 }}>
                 <Text style={s.store} numberOfLines={1}>{item.store}</Text>
-                <Text style={s.meta}>{[shortDate(item.date), `${item.itemCount} item${item.itemCount === 1 ? '' : 's'}`].filter(Boolean).join('  ·  ')}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={s.meta}>{[shortDate(item.date), `${item.itemCount} item${item.itemCount === 1 ? '' : 's'}`].filter(Boolean).join('  ·  ')}</Text>
+                  {item.returnDaysLeft != null && (
+                    <Badge label={`↩ ${item.returnDaysLeft}d return`} color={item.returnDaysLeft <= 3 ? C.gold : C.cyan} />
+                  )}
+                </View>
               </View>
               <Text style={s.total}>{money(item.total, item.currency)}</Text>
             </Pressable>
@@ -231,6 +236,9 @@ export function ReceiptsScreen() {
           <View style={s.modal}>
             <View style={s.modalHead}>
               <Text style={s.modalTitle} numberOfLines={1}>{detail?.store || 'Receipt'}</Text>
+              {detail?.returnDaysLeft != null && (
+                <Badge label={`↩ ${detail.returnDaysLeft}d return`} color={detail.returnDaysLeft <= 3 ? C.gold : C.cyan} style={{ marginRight: 8 }} />
+              )}
               <Pressable onPress={() => setDetail(null)} hitSlop={10}><Text style={s.close}>✕</Text></Pressable>
             </View>
             {detailLoading && !detail ? <ActivityIndicator color={C.accent} style={{ margin: 30 }} /> : detail ? (

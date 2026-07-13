@@ -117,7 +117,7 @@ export type Task = { id: string; title: string; status: string; priority: string
 export type SplitEntry = { name: string; share: number; settled: boolean };
 export type Expense = { id: string; kind: string; vendor: string; category: string; space: string; amount: number; currency: string; date: string | null; period: string; recurring: boolean; recurringCycle: string; paymentMethod: string; notes: string; file: string | null; thumb: string | null; verified: boolean; split: SplitEntry[]; anomaly?: number };
 export type Subscription = { id: string; name: string; provider: string; category: string; amount: number; currency: string; billingCycle: string; nextRenewal: string | null; active: boolean };
-export type ReceiptSummary = { id: string; store: string; date: string | null; total: number; currency: string; itemCount: number; verified: boolean; archived: boolean; file: string | null; thumb: string | null };
+export type ReceiptSummary = { id: string; store: string; date: string | null; total: number; currency: string; itemCount: number; verified: boolean; archived: boolean; file: string | null; thumb: string | null; returnDaysLeft?: number };
 export type ReceiptLine = { name: string; qty: number; price: number; vatRate: number };
 export type ReceiptDetail = ReceiptSummary & { subtotal: number; vatAmount: number; paymentMethod: string; warrantyMonths: number; notes: string; lineItems: ReceiptLine[] };
 export type Item = { id: string; num: string; title: string; status: string; category: string; currentPrice: number; purchasedPrice: number | null; targetPrice: number | null; specs: string; warrantyUntil: string | null; tags: string[]; photo: string | null };
@@ -463,7 +463,7 @@ export async function getHistory(): Promise<ConversationRow[]> {
   return (await request<{ rows: ConversationRow[] }>('/api/v1/history')).rows ?? [];
 }
 
-export type NotifKind = 'deal' | 'installment' | 'warranty' | 'system';
+export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'bill' | 'system';
 export type NotificationRow = { _id: string; kind: NotifKind; title: string; body: string; href: string; read: boolean; createdAt: string };
 export async function getNotifications(): Promise<{ items: NotificationRow[]; unread: number }> {
   return request<{ items: NotificationRow[]; unread: number }>('/api/v1/notifications');

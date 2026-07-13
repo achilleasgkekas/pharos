@@ -20,7 +20,7 @@ const TRASH_ICON: Record<TrashType, string> = {
   item: '📦', receipt: '🧾', expense: '💸', subscription: '🔁', voucher: '🎟', task: '✓',
 };
 const NOTIF_ICON: Record<NotifKind, string> = {
-  deal: '🏷', installment: '💳', warranty: '🛡', system: '🔔',
+  deal: '🏷', installment: '💳', warranty: '🛡', pricehike: '📈', trialend: '⏰', giftcard: '🎁', bill: '📄', system: '🔔',
 };
 
 function relTime(iso: string | null | undefined): string {

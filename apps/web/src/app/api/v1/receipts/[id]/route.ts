@@ -4,6 +4,9 @@ import { isObjectId, readBody } from '@/lib/apiBody';
 import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
 import { Receipt } from '@/models/Receipt';
+import { getStores } from '@/lib/storeService';
+import { getAppSettings } from '@/lib/appSettings';
+import { effectiveReturnWindow, returnDaysLeft as computeReturnDays } from '@/lib/returnWindow';
 import { trimReceipt, serializeLineItems } from '../serialize';
 
 export const runtime = 'nodejs';
@@ -18,9 +21,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const doc = await Receipt.findById(id).select('-rawAiResponse').lean();
     if (!doc) return apiError('not found', 404);
     const r = doc as Parameters<typeof trimReceipt>[0] & { notes?: string };
+    // PA3 return-window badge (mirrors the list route + apps/web/src/app/receipts/page.tsx).
+    let days: number | undefined;
+    if (!r.archived) {
+      const [stores, settings] = await Promise.all([getStores(), getAppSettings()]);
+      const win = effectiveReturnWindow(r.store, stores, settings.defaultReturnWindowDays);
+      days = computeReturnDays(r.date, win) ?? undefined;
+    }
     return NextResponse.json({
       receipt: {
-        ...trimReceipt(r),
+        ...trimReceipt(r, days),
         notes: r.notes ?? '',
         lineItems: serializeLineItems(r.lineItems),
       },

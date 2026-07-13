@@ -27,7 +27,10 @@ export function serializeLineItems(lines: unknown): ReceiptLine[] {
   }));
 }
 
-export function trimReceipt(r: ReceiptLean) {
+// `returnDaysLeft` (PA3 return-window, optional) is a cross-doc computation — it
+// needs the store list + app settings — so it's passed in by the route, same
+// pattern as the expenses `anomaly` field.
+export function trimReceipt(r: ReceiptLean, returnDaysLeft?: number) {
   return {
     id: String(r._id),
     store: r.store,
@@ -45,5 +48,6 @@ export function trimReceipt(r: ReceiptLean) {
     thumb: r.thumbPath || null,
     updatedAt: iso(r.updatedAt),
     deleted: !!r.deletedAt,
+    ...(returnDaysLeft !== undefined ? { returnDaysLeft } : {}),
   };
 }

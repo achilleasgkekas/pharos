@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 // GET/PATCH /api/v1/receipts/:id backs the mobile receipt-detail + edit screen. It is the richest
@@ -21,7 +21,11 @@ import type { NextRequest } from 'next/server';
 //
 // We run the REAL apiAuth/apiBody/apiList helpers and mock only the DB seam.
 
-const { connectDBMock, userFindOne, userState, receiptFindById, findByIdState, receiptUpdate, updateState } = vi.hoisted(() => {
+// getStores/getAppSettings back the PA3 return-window badge on GET (mirrors the
+// list route + the web receipts page.tsx). storesState/settingsState default to
+// "off" (no stores, 0-day default window) so the existing exact-shape assertions
+// below are unaffected unless a test opts in.
+const { connectDBMock, userFindOne, userState, receiptFindById, findByIdState, receiptUpdate, updateState, getStoresMock, storesState, getAppSettingsMock, settingsState } = vi.hoisted(() => {
   const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
   const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
   // Receipt.findById(id).select('-rawAiResponse').lean() → GET detail doc
@@ -36,7 +40,14 @@ const { connectDBMock, userFindOne, userState, receiptFindById, findByIdState, r
     updateState.calls.push({ id, update, opts });
     return { select: () => ({ lean: async () => updateState.doc }) };
   });
-  return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, receiptFindById, findByIdState, receiptUpdate, updateState };
+  const storesState: { rows: { name: string; returnWindowDays?: number | null }[] } = { rows: [] };
+  const getStoresMock = vi.fn(async () => storesState.rows);
+  const settingsState: { defaultReturnWindowDays: number } = { defaultReturnWindowDays: 0 };
+  const getAppSettingsMock = vi.fn(async () => ({ defaultReturnWindowDays: settingsState.defaultReturnWindowDays }));
+  return {
+    connectDBMock: vi.fn(async () => {}), userFindOne, userState, receiptFindById, findByIdState, receiptUpdate, updateState,
+    getStoresMock, storesState, getAppSettingsMock, settingsState,
+  };
 });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
@@ -44,6 +55,8 @@ vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/models/Receipt', () => ({
   Receipt: { findById: receiptFindById, findByIdAndUpdate: receiptUpdate },
 }));
+vi.mock('@/lib/storeService', () => ({ getStores: getStoresMock }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 
 import { GET, PATCH } from './route';
 
@@ -77,9 +90,13 @@ beforeEach(() => {
   findByIdState.doc = null;
   updateState.calls = [];
   updateState.doc = { _id: 'r1', store: 'X' };
+  storesState.rows = [];
+  settingsState.defaultReturnWindowDays = 0;
   connectDBMock.mockClear();
   receiptFindById.mockClear();
   receiptUpdate.mockClear();
+  getStoresMock.mockClear();
+  getAppSettingsMock.mockClear();
 });
 
 describe('GET /api/v1/receipts/:id — auth + id guard', () => {
@@ -190,6 +207,32 @@ describe('GET /api/v1/receipts/:id — serialization', () => {
     const res = await GET(makeReq(), ctx(OID));
     const { receipt } = await res.json();
     expect(receipt.deleted).toBe(true);
+  });
+
+  describe('PA3 return-window badge', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-07-10T00:00:00Z'));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it('adds returnDaysLeft while a purchase is inside its window', async () => {
+      settingsState.defaultReturnWindowDays = 14;
+      findByIdState.doc = receiptDoc({ date: new Date('2026-07-05T00:00:00Z') });
+      const res = await GET(makeReq(), ctx(OID));
+      const { receipt } = await res.json();
+      expect(receipt.returnDaysLeft).toBe(9);
+    });
+
+    it('omits the field for an archived receipt, without even looking up stores/settings', async () => {
+      settingsState.defaultReturnWindowDays = 14;
+      findByIdState.doc = receiptDoc({ date: new Date('2026-07-05T00:00:00Z'), archived: true });
+      const res = await GET(makeReq(), ctx(OID));
+      const { receipt } = await res.json();
+      expect(receipt).not.toHaveProperty('returnDaysLeft');
+      expect(getStoresMock).not.toHaveBeenCalled();
+      expect(getAppSettingsMock).not.toHaveBeenCalled();
+    });
   });
 });
 
