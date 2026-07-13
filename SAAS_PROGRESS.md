@@ -2601,3 +2601,58 @@ backend PATCH στο `/api/saas/admin/tenants/[slug]` πρώτα, μετά UI κ
 admin console** (superadmin cross-tenant activity view, καταναλώνει audit με `?tenant=` filter)·
 είτε (γ) **action filter** στο Activity tab (dropdown ανά AUDIT_ACTION, ήδη υποστηρίζεται από το
 route `?action=`).
+
+## 2026-07-14 (increment 63 — admin tenant ACTIONS: suspend/reactivate/cancel + plan override, §UI-first)
+**Το κενό:** ο superadmin console ήταν 100% read-only (registry listing + tenant detail + live
+dbstats + activity trail) — καμία write ενέργεια. Ένα tenant που κολλάει σε dunning/suspended,
+ή χρειάζεται comped upgrade, δεν είχε operator path χωρίς mongosh. Έχτισα το ΕΝΑ write surface
+του console (backend PATCH πρώτα, μετά UI), όπως πρότεινε το προηγούμενο log entry:
+- **`lib/tenancy/adminTenantActions.ts`** (νέο, PURE) — `isValidTenantStatus`/`isValidPlanKey`
+  (reuse `TENANT_STATUSES`/`PLAN_KEYS` από τα ήδη υπάρχοντα `adminTenants.ts`/`billing/plans.ts`,
+  μηδέν duplicate enum) + **`planAdminTenantPatch(input, current)`** — validate/diff ενός `{status?,
+  plan?}` request: unknown enum ή κενό body → `ok:false`+error· ίδια τιμή με το τρέχον → no-op
+  (`ok:true`, άδειο `set`, μηδέν audit — idempotent σαν το erasure route)· status transition →
+  reuse το ΗΔΗ υπάρχον `statusAuditAction` (billing/statusAudit) για το σωστό audit verb
+  (`workspace.suspended`/`workspace.canceled`/`workspace.reactivated`, ή `null` για μη-mapped
+  transitions όπως pending→active)· plan αλλαγή → `planAudit:true` (→ `plan.changed`, ίδιο verb
+  με το billing webhook, `meta.by:'admin'` το ξεχωρίζει). **14 unit tests** (invalid enum/κενό
+  body/no-op και στα δύο πεδία/3 status verbs/fresh-activation-not-reactivation/plan-only/both-
+  together/invalid-plan-short-circuits-πριν-γράψει-status).
+- **`app/api/saas/admin/tenants/[slug]/route.ts`** (δικό μου, additive) — νέο **`PATCH`** δίπλα στο
+  ήδη υπάρχον GET: `requireSuperadmin` (ίδιο gate)→ `Tenant.findOne(slug).select('_id slug status
+  plan')` → `planAdminTenantPatch` → αν `set` μη-άδειο: `Tenant.updateOne($set)` + `recordAudit`
+  ανά αλλαγμένο πεδίο (status/plan ανεξάρτητα, `auditCtx(tenantId)` — καμία workspace session,
+  ο superadmin ΔΕΝ είναι member) → επιστρέφει το ίδιο `getTenantDetailForAdmin` envelope (reuse,
+  μηδέν διπλό shape). 400 σε invalid enum/κενό body, 404 σε άγνωστο slug, `no-store`.
+- **`components/saas/TenantActionsPanel.tsx`** (νέο, client) — «Operator actions» panel: 3 status
+  κουμπιά (Suspend/Reactivate/Cancel, disabled όταν ήδη σε αυτό το status, `window.confirm` στα
+  destructive-ish Suspend/Cancel) + plan `<select>`+«Change plan» (confirm, disabled αν ίδιο plan)
+  → `fetch PATCH` → busy/error/notice states → **`router.refresh()`** (idiom του `MembersPanel`,
+  ΟΧΙ local state mirror — ξαναδιαβάζει το server component ώστε status badge/plan text στην ίδια
+  σελίδα μένουν πάντα σε sync με τη DB). Styled ΜΟΝΟ με υπάρχοντα Pharos tokens, μηδέν shared CSS.
+- **`app/admin/tenants/[slug]/page.tsx`** (δικό μου) — 2 additive γραμμές: import + mount
+  `<TenantActionsPanel slug={slug} status={t.status} plan={t.plan} />` ανάμεσα στο registry/usage
+  grid και το live-dbstats panel.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run adminTenantActions.test.ts` →
+**14/14**· full suite `npx vitest run` → **2241/2241 green** (173 files, καμία regression). ΚΑΝΕΝΑ
+υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο νέα adminTenantActions*/TenantActionsPanel + additive
+edits στο δικό μου admin detail route/page). `SAAS_MODE` off / self-hosted = **zero effect** (το
+`/admin` segment self-gates σε 404 μέσω `requireSuperadmin` πριν καν φτάσει στο PATCH branch· το
+route/component είναι absent σε build που δεν τα mount-άρει ποτέ εκτός SaaS mode). Κανένας Docker
+rebuild (additive gated route handler + client component, μηδέν shared runtime wiring, ίδιο
+pattern με τα increments 58-62)· καμία νέα εξάρτηση. Collision guard: μηδέν staged foreign files
+πριν το commit· isolated pathspec commit μόνο των δικών μου paths.
+
+**## Needs Achilleas** (admin tenant actions):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16) + `SAAS_SUPERADMIN_EMAILS`** για να υπάρχει καν το
+  console/PATCH (αλλιώς 404). Self-hosted = disabled, zero risk.
+- **Manual plan override ≠ billing sync:** αλλάζοντας plan από το console ΔΕΝ αγγίζει Stripe
+  (billingCustomerId/SubscriptionId μένουν ως έχουν) — είναι επίτηδες ένα προσωρινό/comped
+  override· αν το tenant έχει ενεργή Stripe subscription, ο επόμενος Stripe webhook μπορεί να
+  ξαναγράψει το plan σύμφωνα με το πραγματικό subscription (αναμενόμενο, δεν είναι bug).
+
+**Next task:** increment 64 — είτε (α) **Activity σε admin console** (superadmin cross-tenant
+activity view, καταναλώνει audit με `?tenant=` filter, ήδη υποστηρίζεται από το route)· είτε (β)
+**action filter** στο workspace Activity tab (dropdown ανά AUDIT_ACTION)· είτε (γ) wiring του
+`recordAiUsage` στα AI call-sites ώστε το Usage tab να δείχνει πραγματικά νούμερα.

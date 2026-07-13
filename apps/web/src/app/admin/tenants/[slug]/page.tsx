@@ -10,6 +10,7 @@ import { requireSuperadminPage } from '@/lib/tenancy/superadminPage';
 import { getTenantDetailForAdmin } from '@/lib/tenancy/adminTenantDetail';
 import { StatTile } from '@/components/saas/StatTile';
 import { LiveDbStatsPanel } from '@/components/saas/LiveDbStatsPanel';
+import { TenantActionsPanel } from '@/components/saas/TenantActionsPanel';
 import {
   TenantStatusBadge,
   MemberStatusBadge,
@@ -148,6 +149,9 @@ export default async function AdminTenantDetailPage({
           </div>
         </div>
       </section>
+
+      {/* Operator write actions (suspend/reactivate/cancel + plan override) */}
+      <TenantActionsPanel slug={slug} status={t.status} plan={t.plan} />
 
       {/* Live, on-demand storage footprint (fresh db.stats(), zero side effects) */}
       <LiveDbStatsPanel slug={slug} />
