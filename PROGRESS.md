@@ -5143,3 +5143,18 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 - **Receipt↔transaction reconciliation στο mobile (P18, `07fba9f`)**: το web έχει interactive matching panel (`ReconcilePanel.tsx`, 233 γραμμές) για να συνδέεις unlinked statement transactions με receipts. Ασαφές αν το mobile θέλει πλήρες interactive matching (μεγάλο UX effort σε μικρή οθόνη) ή μια απλή read-only λίστα προτεινόμενων ταιριασμάτων πρώτα (auto-buildable subset). Χρειάζεται ρητή απόφαση scope πριν μπει στο Build Queue.
 - **Confirm εκτός scope**: τα SaaS multi-tenant web-only surfaces (account/workspace/billing/members/admin panels) — η υπόθεσή μου είναι ότι δεν χρειάζονται mobile parity ποτέ (hosted-SaaS account management, όχι personal-use feature), αλλά χρειάζεται επιβεβαίωση από τον Αχιλλέα ότι αυτό είναι σωστό ώστε να σταματήσω να τα ελέγχω σε κάθε σάρωση.
 - Τα προϋπάρχοντα (αμετάβλητα): safe-area dep, theme/light-dark/language switcher, AI-engine/storage/OneDrive Settings, statements PDF-import, remote push (EAS+APNs), Tasks Kanban board, lucide icon set, rate-limit 429 backoff.
+
+## 2026-07-13 (ui-auditor — 50η σάρωση mobile parity· read-only· tsc EXIT 0 web+mobile)
+
+**Μετρήσεις ανά διάσταση** (fresh audit, commits `6ea29a0..HEAD` mobile):
+- **Tokens**: εξακολουθούν τα magic-number violations από τη 49η (~100 hardcoded borderRadius/fontSize/padding literals σε screens)· ΔΕΝ νέα regression (οι τελευταίοι commits επεκτείνουν πρωτότυπα, δεν προσθέτουν magic literals).
+- **Shared theme + primitives**: Foundation πάντα ικανό — `theme.ts` mirrored, `ui.tsx` exports 18 reusable components, `contentWidth` εφαρμοσμένο σε 14 screens. Τελευταίοι commits (`b397bc0`/`6835e6a`/`c9fef1b`/`0ac7a37`) consolidate Input/ModalSheet/button patterns, ο αντίθετη κατεύθυνση της builder.
+- **Dark-mode only**: mobile ακόμη στο dark-only σε αντίθεση με web light toggle. P3 item, no regression.
+- **Safe-area insets**: δεν εφαρμοσμένα — P2 item, no regression.
+- **Touch targets**: όλοι ≥44pt ή έχουν hitSlop (2 commits `0ac7a37` + prior fixes). Τα 24×24 checkboxes consolidate-δ σε shared `<Check>` primitive.
+- **Adaptive**: contentWidth standard στη σχεδόν όλα τα κύρια list views.
+
+**Σύμπερασμα**: **Zero violations νέα σήμερα — ο tree παραμένει στη 49η scan state.** Τα υπάρχοντα P2/P3 TODOs (RADIUS adoption, fontSize scale, light theme, fonts) αναμένουν builder action, όχι νέα audit. Τελευταίος update ad57b3c `fix(api-v1)` είναι API fix, όχι UI code.
+
+**Σύσταση επόμενου run**: εφαρμογή του P2 RADIUS adoption (47 sites, S χρόνος) ή P2 safe-area-context (M χρόνος). Κανένα blocker.
+
