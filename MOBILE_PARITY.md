@@ -100,7 +100,10 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 5. ✅ **Statement transactions** — per-statement detail με transactions + per-charge installment badges + **aggregated installment-plan overview** (cross-statement payoff, active-first) + **link plans to products** (item PlansBlock) + **merge/bind plans** (overview «⑂ Merge into…» picker + «Unmerge», 2026-07-05). *Complete — closes the last #5 write-op gap.*
 6. 🟡 **Settings** — editable preferences (currency/VAT/warranty/auto-add), editable budgets, payment cards CRUD, stores CRUD, dropdown-lists editor, ntfy URL/enable/test ✅. *Remaining: theme toggle, language, AI engine, storage/OneDrive (βλ. Needs Achilleas).*
 7. ✅ **Activity** — Alerts (notification feed) + Trash (restore/purge) + Jobs + History.
-8. 🟡 **Push notifications** — in-app feed ✅· remote push pipeline buildable αλλά αδοκίμαστο (needs device + APNs).
+8. 🟡 **Push notifications** — in-app feed ✅· remote push pipeline **ΗΔΗ ΧΤΙΣΜΕΝΟ** (commit `2156a83`, 2026-06-29 — token
+   registry, `sendExpoPush`/`pushAllDevices`, `/api/v1/push/register`, mobile `registerForPush`/`unregisterForPush` wired
+   στο `App.tsx`, `runAlertChecks` fan-out). Doc ήταν stale (έλεγε "buildable αλλά" σαν να μην είχε χτιστεί ακόμα) — fixed
+   2026-07-14. Μόνο E2E delivery σε πραγματική συσκευή (EAS dev build + APNs/FCM) μένει αδοκίμαστο, βλ. Needs Achilleas.
 
 > Progress: tap any row on Tasks / Expenses / Income / Subscriptions / Vouchers / **Items** to **edit**; long-press to delete. Items edit covers title, status, category, price, target, specs + full PricePanel + plan-link.
 
@@ -304,6 +307,17 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - mobile VouchersScreen δείχνει gift-card λίστα με live balance + days-left + spent%
   - tsc καθαρό web+mobile
 - Status: TODO
+
+### Items — document/manual vault στο mobile (P21 gap, νέο πεδίο σε υπάρχον entity — μηδέν v1 exposure ακόμα)
+- Priority: P2 | Size: M | no AI, no decision — reuse του `/api/files` serving pattern (ίδιο με photos)
+- Web ref: P21 (2026-07-14) — `models/Item.ts` νέο `attachments[]` ({path, name, mimeType, size, uploadedAt}), server actions `uploadItemAttachments`/`deleteItemAttachment` (equipment bucket, reuse `saveFile`), `apps/web/src/app/items/ItemDocuments.tsx` (list + upload + delete UI στο item detail modal).
+- API: `GET/PATCH /api/v1/items/[id]` δεν εκθέτει ακόμα `attachments` (mirror του πώς εκτέθηκαν τα `photos` ήδη). Upload χρειάζεται multipart endpoint (δεν υπάρχει σήμερα κανένα v1 file-upload route — το mobile στέλνει JSON, όχι FormData· πρώτο instance αυτού του pattern στο v1 API, βλ. Needs Achilleas για upload-endpoint design).
+- Mobile files: v1 serializer (+`attachments` read-only πρώτα), apps/mobile/src/api.ts (+`Attachment` type), apps/mobile/src/screens/ItemsScreen.tsx (read-only λίστα εγγράφων στο item detail με tap-to-open· upload = phase 2 μετά το endpoint decision)
+- Acceptance:
+  - GET item detail δείχνει `attachments[]` με path/name/size
+  - mobile item detail rendάρει λίστα εγγράφων, tap ανοίγει το αρχείο (browser/in-app viewer)
+  - tsc καθαρό web+mobile
+- Status: TODO (read-only πρώτα· upload χρειάζεται νέο v1 multipart pattern, βλ. Needs Achilleas)
 
 ### Search — εμφάνιση matched receipt line-item στα mobile αποτελέσματα (P22 gap)
 - Priority: P3 | Size: S | no AI, no decision

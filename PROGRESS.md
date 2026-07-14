@@ -5158,3 +5158,29 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 
 **Σύσταση επόμενου run**: εφαρμογή του P2 RADIUS adoption (47 sites, S χρόνος) ή P2 safe-area-context (M χρόνος). Κανένα blocker.
 
+## 2026-07-14 (pharos-daily-dev — P21 document/manual vault + P30 stale-doc correction)
+
+**Βήμα 0**: pause switch απών, Docker lock αποκτήθηκε καθαρά (κανένα stale lock).
+
+**Εύρημα πριν χτίσω οτιδήποτε**: έλεγξα το Approved queue (OWNER_DECISIONS.md + PRODUCT_BACKLOG.md → ## Approved) πριν διαλέξω task. Το **P30 (mobile push notifications)** φαινόταν σαν το πιο ώριμο ανοιχτό item (matches επίσης MOBILE_PARITY roadmap #8), αλλά investigation έδειξε ότι είναι **ήδη πλήρως χτισμένο από τις 2026-06-29** (commit `2156a83` `feat(mobile+api): remote push pipeline — token registry + Expo send`): `User.pushTokens` + `lib/expoPush.ts` (`sendExpoPush`/`pushAllDevices`) + `POST/DELETE /api/v1/push/register` (με tests) + mobile `push.ts` (`registerForPush`/`unregisterForPush`) wired στο `App.tsx` + `runAlertChecks` καλεί `pushAllDevices` fire-and-forget. Το backlog entry ήταν stale (γράφτηκε σαν candidate σε μεταγενέστερη σάρωση που δεν το έπιασε ως ήδη-done). **Καμία αλλαγή κώδικα** — μόνο διόρθωσα το PRODUCT_BACKLOG.md (P30 → ✅ ήδη shipped, με το σωστό commit) + MOBILE_PARITY.md roadmap #8 (ήταν 🟡 «buildable αλλά», τώρα σωστά αναφέρει ότι είναι χτισμένο, μόνο το physical-device E2E test μένει Needs Achilleas — αμετάβλητο).
+
+**Πραγματικό task αυτού του run: P21 — Document / manual vault στα inventory items** (Approved, S/M, «OSS differentiator»). Αξία: warranty PDFs, manuals, serial-number φωτο κρατιόντουσαν πουθενά — μόνο free-form `notes`/`tags`. Υλοποίηση (reuse-first, όπως λέει το builder-default του queue header):
+- `models/Item.ts`: νέο `attachments[]` subdocument (`path/name/mimeType/size/uploadedAt`, `_id:false`), ξεχωριστό από το `photos[]` (product gallery).
+- `types.ts`: νέο `SerializedAttachment` type + πεδίο στο `SerializedItem`.
+- `items/actions.ts`: `uploadItemAttachments`/`deleteItemAttachment` (reuse `saveFile`/`deleteFile`, `equipment` bucket — μηδέν νέο storage bucket να καλωδιωθεί σε remote sync/mirror/OneDrive). Whitelist εξτένσεων pdf/jpg/jpeg/png/webp/heic/doc/docx/txt. `mergeItems` ενημερώθηκε να κάνει union τα attachments (mirror του πώς κάνει ήδη union τα photos) όταν merge-άρονται duplicate items, + clear στο dropped doc ώστε το trash-purge να μην σβήσει shared αρχεία.
+- `settings/actions.ts`: `purgeTrashEntry` διαγράφει τώρα και τα attachment αρχεία (item type)· `importData` (backup restore) sanitize-άρει `attachments[].path` με το ήδη-υπάρχον `isSafeStoredPath` guard (defense-in-depth κατά path traversal από tampered backup, ίδιο pattern με photos/filePath).
+- Νέο component `apps/web/src/app/items/ItemDocuments.tsx` (λίστα εγγράφων: icon ανά mime/PDF/εικόνα, όνομα, μέγεθος, view link, delete· upload button multi-file) — renders στο item detail modal κάτω από το PricePanel.
+- i18n keys (`it.documents`/`it.addDocument`/`it.noDocuments`/`it.deleteDocument`) σε en.ts + el.ts.
+- **Σημαντικό correctness guard**: το `attachments` πεδίο είναι νέο· τα read paths (`items/page.tsx`, `shopping/page.tsx`) κάνουν `Item.find().lean()` χωρίς select, που **ΔΕΝ εφαρμόζει schema defaults** — υπάρχοντα items στη ζωντανή DB δεν θα έχουν το πεδίο μέχρι να ξανα-γραφτούν. `ItemsClient` περνάει `item.attachments ?? []` στο νέο component ώστε ένα legacy item να μην κάνει crash το UI.
+- **Builder defaults τηρήθηκαν**: manual upload μόνο (AI/web-search auto-fetch = phase 2, δεν χτίστηκε)· quota per-item στο SaaS = δεν χτίστηκε (δεν είναι blocking για OSS MVP).
+
+**Verify**: `npm run type-check` (apps/web) → **EXIT 0**. `npx vitest run` → **2241 passed / 173 files** (μηδέν regression). Docker safe rebuild (`docker compose build web` → mongo ήδη healthy → `up -d web`): `RestartCount=0`, `curl /login` → 200, `curl /items` → 307 (auth-gated, compiled χωρίς server error — δεν testable σε UI-level χωρίς τα credentials του Αχιλλέα, ίδιος περιορισμός με προηγούμενα runs). `docker builder prune -f` έτρεξε μετά (cache-only, ασφαλές). Docker lock released.
+
+**Follow-up (μπήκε στο MOBILE_PARITY.md ως νέο TODO)**: το `attachments` δεν εκτίθεται ακόμα στο `/api/v1/items` serializer ούτε στο mobile — πρώτη φορά που ένα upload θα χρειαστεί multipart v1 endpoint (το mobile API σήμερα στέλνει μόνο JSON σε PATCH/POST). Read-only exposure πρώτα είναι auto-buildable· το upload-endpoint design flagged ως Needs Achilleas (νέο pattern, αξίζει ρητή απόφαση σχήματος πριν χτιστεί).
+
+**Suggested next task**: είτε (α) top-3 της 49ης mobile-parity σάρωσης [Expenses category-rule wiring στο v1 POST route, P1/S, web-only one-liner — bug fix, ΟΧΙ feature] είτε (β) το επόμενο buildable Approved item [P12 savings/financial goals, S/M, ή P26 onboarding checklist, S].
+
+## Needs Achilleas (νέο, αυτό το run)
+
+- **P21 mobile upload endpoint design**: το document-vault upload θέλει πρώτη-φορά multipart `/api/v1` route (τα υπάρχοντα routes είναι όλα JSON body). Ασαφές αν αξίζει νέο σχήμα (π.χ. base64-in-JSON για απλότητα vs πραγματικό multipart) πριν χτιστεί mobile upload UI — read-only exposure (GET μόνο) είναι auto-buildable χωρίς αυτή την απόφαση.
+

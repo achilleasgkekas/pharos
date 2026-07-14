@@ -202,12 +202,18 @@
 - **Ανοιχτή απόφαση (builder default):** default rates ανά κατηγορία (editable Settings), floor στο ~10% salvage·
   computed on-read (όπως το expense `anomaly`)· manual override ανά item κερδίζει πάντα.
 
-### P30. Mobile push notifications (Expo) για alerts & reminders — M — both (mobile-native engagement)
-- **Αξία:** το §3 notifier framework στέλνει σε ntfy/Discord/Slack/webhook (HTTP), αλλά **όχι native push** στο κινητό.
-  Expo push tokens + device registration → οι ίδιες ειδοποιήσεις (δόση λήγει, return window κλείνει, budget ξεπεράστηκε,
-  bill overdue) φτάνουν ως native push. Μεγαλώνει το retention του mobile app. **Διακριτό** από §3 (HTTP) & §13 (inbound bots).
-- **Module:** Mobile (Expo Notifications + token registration) + `/api/v1` (register device) + `dispatchAlert` (νέο push channel).
-- **Εξάρτηση:** mobile MVP (§6) + `/api/v1` (§5). **Builder default:** ένα «push» notifier channel που reuse-άρει το event fan-out.
+### P30. Mobile push notifications (Expo) για alerts & reminders — ✅ ΗΔΗ SHIPPED πριν την έγκριση (commit `2156a83`, 2026-06-29)
+- **Εύρημα (9η σάρωση planner, 2026-07-14, verified by daily-dev πριν χτίσει κάτι νέο):** αυτό το item ήταν ΗΔΗ πλήρως
+  υλοποιημένο μήνες πριν μπει στο backlog ως candidate — προφανώς μια παλιότερη σάρωση δεν το έπιασε ως done. Πλήρες
+  pipeline: `User.pushTokens` (model) + `apps/web/src/lib/expoPush.ts` (`isExpoPushToken`, `sendExpoPush`, `pushAllDevices`,
+  batching 100/request, best-effort/never-throws) + `POST/DELETE /api/v1/push/register` (Bearer-gated, format-validated,
+  tests σε `route.test.ts`) + `apps/mobile/src/push.ts` (`registerForPush`/`unregisterForPush`, guarded no-op σε
+  simulator/Expo-Go-iOS/χωρίς EAS project) + wired στο `App.tsx` (register on auth, unregister on sign-out) + `runAlertChecks`
+  καλεί `pushAllDevices('Pharos alerts', summary)` fire-and-forget. **Μόνο ό,τι χρειάζεται πραγματικό EAS dev build +
+  Apple APNs key/Android FCM (physical device) μένει αδοκίμαστο** — αυτό ήταν ήδη γνωστό ως «Needs Achilleas» στο
+  `MOBILE_PARITY.md` roadmap #8 πριν από αυτή τη σάρωση. Καμία αλλαγή κώδικα χρειάστηκε· μόνο διόρθωση του doc (ήταν
+  stale, έλεγε ακόμα ότι χρειάζεται να χτιστεί).
+- **Module:** Mobile (Expo Notifications + token registration) + `/api/v1` (register device) + `runAlertChecks` (push fan-out).
 
 ### P31. Household / shared access — multi-user σε ένα self-host instance — M — OSS (adoption) / SaaS seed
 - **Αξία:** σήμερα single-user per deployment· μια οικογένεια/νοικοκυριό θέλει **πολλαπλά logins πάνω στα ίδια δεδομένα**
@@ -387,11 +393,28 @@
 - **Module:** νέο μικρό module «Cards/Wallet» (ή tab στα Vouchers) + Mobile barcode render.
 - **Ανοιχτή απόφαση (builder default):** tab μέσα στα Vouchers πρώτα· client-side barcode render (μικρή lib, OSS-ok).
 
-### P21. Document / manual vault στα inventory items — S/M — OSS (κυρίως) (personal-hub differentiator)
-- **Αξία:** attachments slot ανά item (manuals PDF, warranty certs, serial φωτο, service τιμολόγια). Reuse
-  storage/upload/thumbnail pipeline. **Διακριτό** από P13 (export bundle) — εδώ ongoing αποθετήριο ανά είδος.
-- **Module:** Items/Inventory (νέο `attachments[]`, reuse storage backends + `/api/files`).
-- **Ανοιχτή απόφαση (builder default):** manual upload πρώτα (AI/web-search auto-fetch phase 2)· quota per-item στο SaaS.
+### P21. Document / manual vault στα inventory items — ✅ SHIPPED 2026-07-14 (pharos-daily-dev)
+- **Υλοποίηση:** νέο `Item.attachments[]` (`{path, name, mimeType, size, uploadedAt}`, `_id:false`) στο `models/Item.ts` —
+  ξεχωριστό από το `photos[]` (product gallery). Reuse πλήρες: ίδιο `saveFile`/`deleteFile` (`lib/storage.ts`), ίδιο
+  `equipment` bucket (μηδέν νέο storage backend/bucket να καλωδιωθεί στο remote sync/mirror), ίδιο `/api/files` serving
+  (PDF/εικόνες render inline, `.doc/.docx/.txt` κατεβαίνουν — αποδεκτό MVP). Νέες server actions `uploadItemAttachments`
+  (whitelist εξτένσεων pdf/jpg/jpeg/png/webp/heic/doc/docx/txt, cap 15MB/request από το υπάρχον `serverActions.bodySizeLimit`)
+  + `deleteItemAttachment`. Νέο `components` **`ItemDocuments.tsx`** (λίστα με icon ανά mime, όνομα, μέγεθος, view/delete) —
+  renders στο item detail modal, κάτω από το PricePanel. **`mergeItems`** ενημερώθηκε να κάνει union τα attachments (όπως
+  τα photos) όταν merge-άρονται διπλότυπα items· **trash purge** διαγράφει τα υποκείμενα αρχεία· **backup restore**
+  sanitize-άρει τα `attachments[].path` (ίδιο `isSafeStoredPath` guard με photos/filePath, defense-in-depth κατά path
+  traversal από tampered backup). **Guard σημαντικό:** τα read-paths (items/shopping `page.tsx`) κάνουν `.lean()` χωρίς
+  select, άρα ΔΕΝ παίρνουν schema defaults — υπάρχοντα items πριν από αυτό το commit δεν έχουν το πεδίο μέχρι να
+  ξανα-γραφτούν· το `ItemsClient` περνάει `item.attachments ?? []` στο component ώστε να μην σκάσει σε legacy items.
+  i18n keys (`it.documents`/`it.addDocument`/`it.noDocuments`/`it.deleteDocument`) σε en+el. **Builder default τηρήθηκε:**
+  manual upload μόνο (AI/web-search auto-fetch = phase 2, δεν χτίστηκε)· quota per-item στο SaaS = δεν χτίστηκε (θα
+  μπει όταν χρειαστεί metering, δεν είναι blocking για το OSS MVP).
+- **Verify:** `npm run type-check` EXIT 0, `npx vitest run` **2241 passed / 173 files** (μηδέν regression). Docker safe
+  rebuild (`docker compose build web` → mongo healthy → `up -d web`): `RestartCount=0`, `/login` 200, `/items` 307
+  (auth-gated, compiled OK — δεν testable UI-level χωρίς τα credentials του Αχιλλέα).
+- **Follow-up (μηδέν v1 mobile route ακόμα):** web-only για τώρα· mobile parity θα χρειαστεί `attachments` στο
+  `/api/v1/items` serializer + ItemsScreen UI, ίδιο pattern με τα Bill/GiftCard entities (P28/P32) πριν πάρουν mobile.
+- **Module:** Items/Inventory (`attachments[]`, reuse storage backends + `/api/files`).
 
 ### P5. Browser extension / bookmarklet — quick capture — M — both
 - **Αξία:** από e-shop, ένα κλικ → «add to Pharos shopping» (reuse `importItemFromUrl`). Καταναλώνει `/api/v1`.
