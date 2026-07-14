@@ -45,6 +45,7 @@ const IT_FLAG_KEY: Record<string, TKey> = { deal: 'it.fDeals', photo: 'it.fPhoto
 import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
+import { ItemDocuments } from './ItemDocuments';
 import { createItem, updateItem, deleteItem, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, convertItemToTask, type DupItem } from './actions';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
@@ -1584,6 +1585,13 @@ function ItemDetailModal({
           <PricePanel item={item} summary={view === 'shopping'} onChanged={() => router.refresh()} onSearchOnline={() => setShowPriceSearch(true)} />
         </div>
       )}
+
+      {/* Documents / manual vault (P21) — manuals, warranty certs, serial photos.
+          `?? []` guards items saved before this field existed (lean() reads skip
+          schema defaults, so an untouched legacy doc has no `attachments` at all). */}
+      <div className="mb-4">
+        <ItemDocuments key={`docs-${item._id}-${item.updatedAt}`} itemId={item._id} attachments={item.attachments ?? []} />
+      </div>
 
       <ItemForm key={`f-${item._id}-${item.updatedAt}`} item={item} onSuccess={onClose} onDelete={handleDelete} deletePending={pending} />
     </Modal>

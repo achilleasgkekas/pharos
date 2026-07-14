@@ -29,6 +29,19 @@ const LinkSchema = new Schema(
   { _id: false }
 );
 
+// Document / manual vault (P21): manuals, warranty certs, serial-number photos —
+// an ongoing per-item repository, distinct from `photos` (product gallery shots).
+const AttachmentSchema = new Schema(
+  {
+    path: { type: String, required: true }, // storage-relative path (equipment bucket, reused)
+    name: { type: String, default: '' },
+    mimeType: { type: String, default: '' },
+    size: { type: Number, default: 0 },
+    uploadedAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const ItemSchema = new Schema(
   {
     num: { type: String, default: '' },
@@ -61,6 +74,7 @@ const ItemSchema = new Schema(
 
     receiptIds: { type: [Schema.Types.ObjectId], ref: 'Receipt', default: [] },
     photos: { type: [String], default: [] },
+    attachments: { type: [AttachmentSchema], default: [] },
 
     warrantyUntil: { type: Date, default: null },
     serialNumber: { type: String, default: '' },

@@ -1255,6 +1255,10 @@ export const en = {
   'it.searchPhotos': 'Search the web (and the product link) for product photos',
   'it.setCover': 'Set as cover',
   'it.deletePhoto': 'Delete photo',
+  'it.documents': 'Documents',
+  'it.addDocument': 'Add document',
+  'it.noDocuments': 'No manuals, warranty certs, or photos on file yet.',
+  'it.deleteDocument': 'Delete document',
   'reports.payoffTitle': 'Installment payoff',
 } as const;
 

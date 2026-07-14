@@ -1218,6 +1218,11 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
         if (k in rest && !isSafeStoredPath(rest[k])) delete rest[k];
       }
       if (Array.isArray(rest.photos)) rest.photos = rest.photos.filter(isSafeStoredPath);
+      if (Array.isArray(rest.attachments)) {
+        rest.attachments = (rest.attachments as unknown[]).filter(
+          (a) => a && typeof a === 'object' && isSafeStoredPath((a as Record<string, unknown>).path)
+        );
+      }
       try {
         if (_id) await (Model as typeof Item).updateOne({ _id }, { $set: rest }, { upsert: true }).setOptions({ withDeleted: true });
         else await (Model as typeof Item).create(rest);
@@ -1320,6 +1325,7 @@ export async function purgeTrashEntry(type: TrashType, id: string): Promise<{ ok
   }
   if (type === 'item') {
     for (const p of (doc.photos as string[] | undefined) ?? []) await deleteFile(p).catch(() => {});
+    for (const a of (doc.attachments as { path?: string }[] | undefined) ?? []) if (a.path) await deleteFile(a.path).catch(() => {});
     await Receipt.updateMany({ itemIds: oid }, { $pull: { itemIds: oid } });
     await Receipt.updateMany(
       { 'lineItems.matchedItemId': oid },

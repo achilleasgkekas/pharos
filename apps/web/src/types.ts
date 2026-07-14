@@ -8,6 +8,14 @@ export type SerializedPriceEntry = {
   inStock: boolean;
 };
 
+export type SerializedAttachment = {
+  path: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+};
+
 export type SerializedItem = {
   _id: string;
   num: string;
@@ -26,6 +34,7 @@ export type SerializedItem = {
   links: { label: string; url: string; price?: number | null }[];
   receiptIds: string[];
   photos: string[];
+  attachments: SerializedAttachment[];
   warrantyUntil: string | null;
   serialNumber: string;
   location: string;

@@ -18,7 +18,7 @@ import { revalidatePath } from 'next/cache';
 import { safeRevalidate } from '@/lib/revalidate';
 import { Types } from 'mongoose';
 import { z } from 'zod';
-import type { SerializedItem } from '@/types';
+import type { SerializedItem, SerializedAttachment } from '@/types';
 
 const CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'] as const;
 const STATUSES = ['researching', 'decided', 'ordered', 'received', 'installed', 'deferred', 'sold', 'broken'] as const;
@@ -190,6 +190,93 @@ export async function setItemCover(itemId: string, relativePath: string): Promis
   revalidatePath('/items');
   revalidatePath('/shopping');
   return { ok: true, photos: [...item.photos] };
+  });
+}
+
+// ─── Documents / manual vault (P21) ──────────────────────────────────────
+// An ongoing per-item repository (manuals, warranty certs, serial photos),
+// distinct from `photos` (product gallery). Reuses the same equipment bucket
+// and storage pipeline as photos — no new storage backend/bucket to wire up.
+
+const DOC_EXTS = new Set(['pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic', 'doc', 'docx', 'txt']);
+const DOC_MIME: Record<string, string> = {
+  pdf: 'application/pdf',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  txt: 'text/plain',
+};
+
+/** Upload one or more documents (manuals, warranty certs, serial-number photos). */
+export async function uploadItemAttachments(
+  itemId: string,
+  formData: FormData
+): Promise<{ ok: boolean; added: number; attachments: SerializedAttachment[]; error?: string }> {
+  return withRequestTenant(async () => {
+  const files = formData.getAll('files').filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) return { ok: false, added: 0, attachments: [], error: 'No file selected' };
+
+  await connectDB();
+  const Item = await currentModel(ItemModel);
+  const item = await Item.findById(itemId);
+  if (!item) return { ok: false, added: 0, attachments: [], error: 'Item not found' };
+
+  let added = 0;
+  for (const file of files) {
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!DOC_EXTS.has(ext)) continue;
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const { relativePath } = await saveFile('equipment', bytes, ext);
+    item.attachments.push({
+      path: relativePath,
+      name: file.name.slice(0, 200),
+      mimeType: DOC_MIME[ext] ?? 'application/octet-stream',
+      size: file.size,
+      uploadedAt: new Date(),
+    } as (typeof item.attachments)[number]);
+    added++;
+  }
+  if (added > 0) {
+    item.markModified('attachments');
+    await item.save();
+  }
+
+  revalidatePath('/items');
+  revalidatePath('/shopping');
+  return {
+    ok: added > 0,
+    added,
+    attachments: JSON.parse(JSON.stringify(item.attachments)) as SerializedAttachment[],
+    error: added === 0 ? 'Unsupported file type' : undefined,
+  };
+  });
+}
+
+/** Remove a document (and delete the underlying file). */
+export async function deleteItemAttachment(
+  itemId: string,
+  path: string
+): Promise<{ ok: boolean; attachments: SerializedAttachment[] }> {
+  return withRequestTenant(async () => {
+  await connectDB();
+  const Item = await currentModel(ItemModel);
+  const item = await Item.findById(itemId);
+  if (!item) return { ok: false, attachments: [] };
+  item.attachments = item.attachments.filter((a) => a.path !== path) as typeof item.attachments;
+  item.markModified('attachments');
+  await item.save();
+  try {
+    await deleteFile(path);
+  } catch {
+    /* file already gone */
+  }
+  revalidatePath('/items');
+  revalidatePath('/shopping');
+  return { ok: true, attachments: JSON.parse(JSON.stringify(item.attachments)) as SerializedAttachment[] };
   });
 }
 
@@ -1183,6 +1270,18 @@ export async function mergeItems(
       } as (typeof keep.priceHistory)[number]);
     }
     for (const p of d.photos ?? []) if (!keep.photos.includes(p)) keep.photos.push(p);
+    // Union attachments (documents follow the same file-ownership transfer as photos)
+    for (const a of d.attachments ?? []) {
+      if (!keep.attachments.some((k) => k.path === a.path)) {
+        keep.attachments.push({
+          path: a.path,
+          name: a.name,
+          mimeType: a.mimeType,
+          size: a.size,
+          uploadedAt: a.uploadedAt,
+        } as (typeof keep.attachments)[number]);
+      }
+    }
     // Union receiptIds
     for (const rid of d.receiptIds ?? []) {
       if (!keep.receiptIds.some((x) => String(x) === String(rid))) keep.receiptIds.push(rid);
@@ -1196,6 +1295,7 @@ export async function mergeItems(
   keep.markModified('links');
   keep.markModified('priceHistory');
   keep.markModified('photos');
+  keep.markModified('attachments');
   keep.markModified('receiptIds');
   await keep.save();
 
@@ -1219,9 +1319,9 @@ export async function mergeItems(
       { $pull: { 'transactions.$[t].matchedItemIds': dOid } },
       { arrayFilters: [{ 't.matchedItemIds': dOid }] }
     );
-    // Soft-delete the duplicate + release its photo paths (files now live on `keep`,
-    // so a later Trash purge of this shell won't delete the shared files).
-    await Item.updateOne({ _id: d._id }, { $set: { deletedAt: new Date(), photos: [] } });
+    // Soft-delete the duplicate + release its photo/attachment paths (files now live
+    // on `keep`, so a later Trash purge of this shell won't delete the shared files).
+    await Item.updateOne({ _id: d._id }, { $set: { deletedAt: new Date(), photos: [], attachments: [] } });
   }
 
   revalidatePath('/items');

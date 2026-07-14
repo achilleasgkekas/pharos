@@ -1174,6 +1174,10 @@ export const el: Partial<Dict> = {
   'it.searchPhotos': 'Αναζήτηση στο web (και στο link προϊόντος) για φωτογραφίες',
   'it.setCover': 'Ορισμός ως εξώφυλλο',
   'it.deletePhoto': 'Διαγραφή φωτογραφίας',
+  'it.documents': 'Έγγραφα',
+  'it.addDocument': 'Προσθήκη εγγράφου',
+  'it.noDocuments': 'Δεν υπάρχουν ακόμα εγχειρίδια, πιστοποιητικά εγγύησης ή φωτογραφίες.',
+  'it.deleteDocument': 'Διαγραφή εγγράφου',
   'reports.payoffTitle': 'Εξόφληση δόσεων',
 
 };
