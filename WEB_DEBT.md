@@ -3,6 +3,40 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-15 53η σάρωση· type-check EXIT 0· expenses space/split parity ΕΚΛΕΙΣΕ (DONE, commit `b4f32af`)· 1 νέο P2 file-delete IDOR εύρημα στο P21 document vault· reset-request timing item ΕΚΛΕΙΣΕ (stale-marked TODO)· 3 SaaS error-handling holdouts παραμένουν ανοιχτά)
+
+- **type-check:** `cd apps/web && npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
+- **Νέος κώδικας από την 52η ελέγχθηκε (2 commits):** `9fee9b0` (admin tenant ACTIONS: suspend/reactivate/cancel + plan override) και `29685cf` (P21 document/manual vault στα items).
+  - **`admin/tenants/[slug]/route.ts` PATCH (νέο write surface, superadmin-only) → exemplary.** Το μοναδικό write του superadmin console: `saasGuard`-wrapped (try/catch έτοιμο), `requireSuperadmin()` gate, pure planning helper `planAdminTenantPatch()` (`lib/tenancy/adminTenantActions.ts`, πλήρως unit-tested — δες `adminTenantActions.test.ts`) που κάνει validate+diff+idempotent no-op πριν το `$set`, κάθε write logged μέσω `recordAudit`. Μηδέν `any`, μηδέν N+1 (`getTenantDetailForAdmin` κάνει batched `Account.find({_id:{$in:accountIds}})` αντί per-member query). **Μηδέν νέο debt.**
+  - **P21 document vault (`items/actions.ts` `uploadItemAttachments`/`deleteItemAttachment`) → 1 νέο P2 εύρημα, δες item παρακάτω.** Καλά scoped (whitelist εξτένσεων, reuse storage pipeline, `mergeItems` κάνει σωστά dedup-by-path union), αλλά το delete path λείπει ownership-check πριν σβήσει το υποκείμενο αρχείο — ίδιο pattern προϋπάρχει ΚΑΙ στο `deleteItemPhoto` (φωτογραφίες, όχι νέο σε αυτό το session, αλλά ποτέ δεν είχε flagged).
+- **Ένα TODO ΕΚΛΕΙΣΕ χωρίς να ενημερωθεί (stale):** το «Reset-request route — timing side-channel» (flagged 2026-07-02, 37η σάρωση) βρέθηκε ήδη διορθωμένο live από το commit `e75cd74` («feat(saas): constant-time reset-request response (D6)») — fire-and-forget email + σταθερός response floor (`settleMinResponseTime`). Μαρκαρίστηκε DONE στη θέση του (δες γραμμή στο item).
+- **el.ts i18n gap μεγάλωσε:** 38→**42** missing κλειδιά (+4 από το P7 auto-discovery panel, commit `97a7d66`, `sub.discovered*`). Παραμένει TODO, ίδιο P3/M item, ενημερώθηκε η λίστα κλειδιών.
+- **Οι 3 SaaS error-handling holdouts (`invites/accept`, `audit`, `workspace/erasure/purge`) παραμένουν ανοιχτοί** (`grep -c 'try {'` = 1/0/0 αντίστοιχα, αμετάβλητο από την 50η/49η) — ο builder δεν τους κατανάλωσε ακόμα.
+- **v1 surface τυπολογικά καθαρός:** fresh grep σε ολο το `src/app/api/v1` (εκτός test) → μηδέν `: any`/`as any`/`@ts-ignore`/`@ts-expect-error`. Κάθε read route `.lean()`-backed· κάθε route εκτός `auth/login` περνά από `withAuth`.
+- **Ουρά μετά το run:** 1 νέο auto-buildable P2/S (item photo/attachment delete IDOR, στην κορυφή — αγγίζει live single-user data safety, ΟΧΙ dead-until-SaaS) + 3 SaaS error-handling P2/S της 49ης/50ής (dead-until-SaaS) + 1 P3/M i18n gap + 1 P3/S decision-flag (`getTenantConnection` readyState guard) στο `## Needs Achilleas`.
+
+---
+
+## Web Debt Queue — ενεργά items (53η σάρωση 2026-07-15)
+
+> Σύνοψη 53ης: νέο εύρημα στο μόλις-shipped P21 document vault (item attachments) — το ίδιο ακριβώς gap προϋπήρχε ήδη στο item-photo delete, ποτέ flagged πριν. Οι 3 SaaS holdouts + το el.ts gap παραμένουν από κάτω αμετάβλητα.
+
+### `deleteItemPhoto`/`deleteItemAttachment` — διαγράφουν οποιοδήποτε storage αρχείο δίνει ο client, χωρίς να επιβεβαιώνουν ότι ανήκει στο item
+- Priority: P2
+- Size: S
+- Area: api
+- Files: apps/web/src/app/items/actions.ts, apps/web/src/app/items/ItemDocuments.tsx
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα:** `deleteItemPhoto(itemId, relativePath)` (`items/actions.ts:161`) και `deleteItemAttachment(itemId, path)` (`items/actions.ts:260`, νέο στο P21 vault) είναι Next.js Server Actions — καλούνται από τον client με `itemId` + ένα raw path string (`ItemDocuments.tsx:54` περνάει το `a.path` που βλέπει στο UI, αλλά ένα server action είναι καλέσιμο με ΟΠΟΙΟΔΗΠΟΤΕ όρισμα από τον browser, όχι μόνο μέσω του κανονικού UI). Και τα δύο κάνουν `item.photos/attachments = [...].filter(p => p !== path)` (silently no-op αν δεν βρεθεί match) ΚΑΙ ΜΕΤΑ, ΑΝΕΞΑΡΤΗΤΑ από το αν κάτι πράγματι αφαιρέθηκε, καλούν `deleteFile(path)` (`lib/storage.ts:53`) που σβήνει ΟΠΟΙΟΔΗΠΟΤΕ αρχείο κάτω από `STORAGE_ROOT` όσο το path δεν κάνει `..` traversal (`resolveWithinStorage` block μόνο escape-from-root, ΟΧΙ ownership). Άρα ένα request με ένα valid-αλλά-ξένο relative path (π.χ. path άλλου item's photo, ή ενός receipt/statement/expense αρχείου — το storage tree είναι ΚΟΙΝΟ, δεν είναι tenant/item-partitioned) σβήνει το πραγματικό αρχείο στο δίσκο ΑΚΟΜΑ ΚΙ ΑΝ ποτέ δεν ανήκε στο `itemId` που δόθηκε.
+  - **Γιατί έχει σημασία τώρα:** το P21 vault μόλις πρόσθεσε 2ο call site με το ΙΔΙΟ σχήμα (το photo-delete το είχε ήδη, αλλά ποτέ δεν είχε flagged σε 52 προηγούμενες σαρώσεις)· δύο ανεξάρτητα σημεία με το ίδιο gap αξίζει shared fix. Δεν είναι μόνο θεωρητικό: ένα λάθος στο client state (stale `attachments` array μετά από ένα merge/undo) ή ένα future mobile/SaaS write path θα μπορούσε να στείλει λάθος path και να σβήσει δεδομένα κάποιου άλλου item/tenant αθόρυβα (η function πάντα επιστρέφει `ok:true`).
+  - **Fix:** σε ΚΑΙ ΤΑ ΔΥΟ, υπολόγισε το `found` ΠΡΙΝ το filter (`const found = item.photos.includes(relativePath)` / `item.attachments.some(a => a.path === path)`)· κάλεσε `deleteFile(...)` **μόνο όταν** `found` ήταν true· επίστρεψε `{ ok: found, photos/attachments: [...] }` (found=false → δεν αγγίζεις ΤΙΠΟΤΑ, ούτε save ούτε deleteFile). Ίδιο μικρό pattern και στα δύο, καμία αλλαγή σε response shape πέρα από το `ok` να αντανακλά πλέον σωστά αν κάτι όντως αφαιρέθηκε.
+  - Μηδέν αλλαγή στο happy-path UI (το `ItemDocuments.tsx`/όποιο component καλεί το photo-delete πάντα στέλνει ένα path που ΟΝΤΩΣ υπάρχει στο item, άρα `found` είναι πάντα true στην κανονική χρήση).
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-15, 53η σάρωση web-code-quality auditor· live: `items/actions.ts:269` filter χωρίς προηγούμενο `found`-check, `deleteFile(path)` unconditional στη γρ.273· ίδιο pattern στο `deleteItemPhoto` γρ.166-172)
+
+---
+
 ## Σύνοψη audit (2026-07-15 52η σάρωση· type-check EXIT 0· v1 surface τυπολογικά καθαρός· 1 νέο P2 mobile-parity εύρημα [expenses v1 shape λείπει space/split] + 3 SaaS error-handling holdouts της 51ης παραμένουν ανοιχτά)
 
 - **type-check:** `cd apps/web && npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
@@ -763,7 +797,7 @@
   - **ΣΗΜ (γιατί flag, όχι fix):** dead-until-SaaS (gated πίσω από `saasAuthGate()`, `SAAS_MODE` off = μηδέν επίδραση στο single-user app). Η μείωση του gap είναι tradeoff, όχι μηχανικό swap: το members route κάνει ήδη fire-and-forget `void sendEmail(...)`, οπότε το reset route θα μπορούσε να το ίδιο (αφαιρεί το network-time delta + ευθυγραμμίζεται) — ΑΛΛΑ το `await` υπάρχει σκόπιμα ώστε να εξασφαλίζεται η αποστολή πριν το response· `void` σε πιθανό serverless deploy ρισκάρει να κοπεί το send. Το DB-write delta παραμένει ούτως ή άλλως. Θέλει σκόπιμη απόφαση delivery-semantics, όχι unattended fix.
   - Πιθανή κατεύθυνση (αν εγκριθεί): fire-and-forget `void sendEmail(...)` όπως το members route (ίδιο best-effort pattern), ή/και ενοποίηση των δύο branch-times ώστε registered/non-registered να έχουν παρόμοιο κόστος.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-02 reviewer, range 12b80a1..7a0af2b· 37η σάρωση επιβεβαίωσε ανοιχτό: `reset/request/route.ts:43` no-account fast-path `return {ok:true}` πριν το mint+store+mail → μετρήσιμη timing διαφορά που αποδυναμώνει το anti-enumeration)
+- Status: DONE (verified 2026-07-15, 53η σάρωση web-code-quality auditor) — live: το route έχει ξαναγραφτεί από τότε (commit `e75cd74` «feat(saas): constant-time reset-request response (D6)», μαζί με νέο `lib/tenancy/resetTiming.ts`). Ο κώδικας πλέον: (α) ξεκινά `startedAt = Date.now()` πριν από οποιαδήποτε account-dependent δουλειά, (β) το outbound email πάει μέσω fire-and-forget `void sendEmail(...).catch(() => {})` (μηδέν network latency στο timed path, ακριβώς η κατεύθυνση που πρότεινε το item), (γ) ΚΑΘΕ response (found ή not-found) περνάει από `await settleMinResponseTime(startedAt)` πριν το `return` — padding σε σταθερό floor (`RESET_MIN_RESPONSE_MS = 500`, pure+unit-tested `resetResponseDelayMs`). Το παλιό «no-account fast-path πριν το mint+store+mail» δεν υπάρχει πια· και τα δύο branches settle στον ίδιο χρόνο. Ο builder το έκλεισε χωρίς να ενημερώσει το item (stale-marked TODO).
 
 ### Dedup ObjectId-validation regex — SaaS billing webhook (isObjectId re-introduced inline)
 - Priority: P3
@@ -1132,11 +1166,11 @@
 - Depends on: none
 - Acceptance:
   - **Το πρόβλημα:** τα features P35 (expense split), P34 (per-space ledger tag), P32 (gift-card), P28 (bills) πρόσθεσαν 38 νέα κλειδιά στο `en.ts` **χωρίς** αντίστοιχες ελληνικές μεταφράσεις στο `el.ts`. Ο resolver (`i18n/index.ts:22` `dict[key] ?? en[key] ?? String(key)`) κάνει graceful fallback στα αγγλικά, άρα **δεν σπάει το UI** (καμία raw-key εμφάνιση, type-check EXIT 0 γιατί `el: Partial<Dict>`). Όμως ο χρήστης είναι Greek-first (CLAUDE.md), οπότε τα split / gift-card / bills / per-space UI strings εμφανίζονται στα αγγλικά αντί ελληνικά.
-  - **Τα 38 κλειδιά** (comm en−el): `ex.allSpaces`, `ex.balanceEntries`, `ex.balancesBtn`, `ex.balancesEmpty`, `ex.balancesSettled`, `ex.balancesTitle`, `ex.fSpace`, `ex.settleBody`, `ex.settleTitle`, `ex.settleUp`, `ex.space`, `ex.spaceNone`, `ex.splitAddPerson`, `ex.splitEmpty`, `ex.splitEqually`, `ex.splitIncludeMe`, `ex.splitMarkPaid`, `ex.splitName`, `ex.splitOwedYou`, `ex.splitSettled`, `ex.splitTitle`, `ex.splitYourShare`, `home.dBills`, `nav.bills`, `notif.billDueSub`, `notif.billOverdueSub`, `notif.billTodaySub`, `notif.giftcardSub`, `notif.giftcardTodaySub`, `reports.cExpBySpace`, `set.billAlert`, `set.giftCardAlert`, `set.spaces`, `set.spacesDesc`, `set.spacesEmpty`, `set.spacesPlaceholder`, `trash.tBill`, `trash.tGiftCard`.
+  - **Τα κλειδιά** (comm en−el, 42 live στη 53η σάρωση — 4 νέα από το P7 auto-discovery panel σε σχέση με τα αρχικά 38): `ex.allSpaces`, `ex.balanceEntries`, `ex.balancesBtn`, `ex.balancesEmpty`, `ex.balancesSettled`, `ex.balancesTitle`, `ex.fSpace`, `ex.settleBody`, `ex.settleTitle`, `ex.settleUp`, `ex.space`, `ex.spaceNone`, `ex.splitAddPerson`, `ex.splitEmpty`, `ex.splitEqually`, `ex.splitIncludeMe`, `ex.splitMarkPaid`, `ex.splitName`, `ex.splitOwedYou`, `ex.splitSettled`, `ex.splitTitle`, `ex.splitYourShare`, `home.dBills`, `nav.bills`, `notif.billDueSub`, `notif.billOverdueSub`, `notif.billTodaySub`, `notif.giftcardSub`, `notif.giftcardTodaySub`, `reports.cExpBySpace`, `set.billAlert`, `set.giftCardAlert`, `set.spaces`, `set.spacesDesc`, `set.spacesEmpty`, `set.spacesPlaceholder`, `trash.tBill`, `trash.tGiftCard`, **+νέα**: `sub.discoveredDismiss`, `sub.discoveredOccurrences`, `sub.discoveredTitle`, `sub.discoveredTrack` (P7 auto-discovery, commit `97a7d66`).
   - **Fix:** πρόσθεσε ελληνική τιμή για κάθε ένα στο `el.ts` (χρησιμοποίησε το en string ως πηγή· κράτα το ίδιο interpolation-placeholder format π.χ. `{n}`, `{name}`). Καμία αλλαγή σε keys/en.ts.
   - **ΣΗΜ (γιατί flag, όχι fix από reviewer):** 38 μεταφράσεις είναι judgment call ακριβείας (el = primary γλώσσα του χρήστη), όχι μηχανικό one-liner· ανήκει στον builder. Μη-blocking (English fallback ενεργό).
   - Επαλήθευση: `comm -23 <(grep -oE "^\s+'[^']+':" en.ts|sed "s/[': ]//g"|sort -u) <(grep -oE "^\s+'[^']+':" el.ts|sed "s/[': ]//g"|sort -u)` → μηδέν γραμμές· npm run type-check exits 0.
-- Status: TODO (flagged 2026-07-10 reviewer· live: en=1179 keys, el=1141, 38 missing από P28/P32/P34/P35)
+- Status: TODO (flagged 2026-07-10 reviewer· live: en=1179 keys, el=1141, 38 missing από P28/P32/P34/P35· 53η σάρωση 2026-07-15 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό ΚΑΙ μεγαλύτερο: 42 missing πλέον, +4 από το P7 auto-discovery panel `sub.discovered*`)
 
 ---
 

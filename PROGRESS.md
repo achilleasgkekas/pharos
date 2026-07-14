@@ -5184,3 +5184,30 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 
 - **P21 mobile upload endpoint design**: το document-vault upload θέλει πρώτη-φορά multipart `/api/v1` route (τα υπάρχοντα routes είναι όλα JSON body). Ασαφές αν αξίζει νέο σχήμα (π.χ. base64-in-JSON για απλότητα vs πραγματικό multipart) πριν χτιστεί mobile upload UI — read-only exposure (GET μόνο) είναι auto-buildable χωρίς αυτή την απόφαση.
 
+
+## 2026-07-15 (web-code-quality auditor, 53η σάρωση)
+
+**Ορίστε πλαίσιο**: τελευταία web-code-quality σάρωση (52η) ήταν νωρίτερα σήμερα. Από τότε προστέθηκαν 2 commits: `9fee9b0` (admin tenant ACTIONS — suspend/reactivate/cancel + plan override) και `29685cf` (P21 document/manual vault στα items). Επίσης το `pharos-daily-dev` έκλεισε το mobile-parity gap που είχε flag-αριστεί στην 52η (expenses `space`/`split`, commit `b4f32af`, ήδη DONE στο WEB_DEBT.md).
+
+**type-check**: `cd apps/web && npm run type-check` → **EXIT 0**.
+
+**Νέος κώδικας ελέγχθηκε**:
+- **`admin/tenants/[slug]/route.ts` PATCH** (νέο write surface στο superadmin console): exemplary. `saasGuard`-wrapped, `requireSuperadmin()` gate, καθαρή pure planning helper (`lib/tenancy/adminTenantActions.ts`, `planAdminTenantPatch` — validate+diff+idempotent no-op, πλήρως unit-tested), κάθε write logged μέσω `recordAudit`. `getTenantDetailForAdmin` batched account lookup (μηδέν N+1). Μηδέν νέο debt.
+- **P21 document vault** (`uploadItemAttachments`/`deleteItemAttachment`): καλά scoped feature (whitelist εξτένσεων, reuse storage pipeline, σωστό dedup-by-path στο `mergeItems`), αλλά βρήκα **1 νέο P2 εύρημα** — δες παρακάτω.
+
+**Νέο εύρημα (P2, στην κορυφή της ουράς)**: `deleteItemPhoto`/`deleteItemAttachment` (`apps/web/src/app/items/actions.ts`) είναι Server Actions που δέχονται ένα raw path string από τον client και καλούν `deleteFile(path)` **χωρίς να επιβεβαιώσουν πρώτα ότι το path όντως ανήκει στο item** — το `.filter(p => p !== path)` δεν ελέγχεται για match πριν το unconditional `deleteFile()`. Επειδή το storage tree είναι κοινό (`STORAGE_ROOT`, ΟΧΙ tenant/item-partitioned) και το `resolveWithinStorage` guard μπλοκάρει μόνο path-traversal (όχι ownership), ένα request με valid-αλλά-ξένο path θα σβήσει το πραγματικό αρχείο κάποιου άλλου item/receipt/tenant. Το ίδιο ακριβώς pattern προϋπήρχε ήδη στο `deleteItemPhoto` (φωτογραφίες) — ποτέ δεν είχε flagged σε 52 προηγούμενες σαρώσεις· το P21 vault απλά πρόσθεσε 2ο call site με το ίδιο gap, που το έκανε αρκετά ορατό ώστε να αξίζει fix. Fix προτεινόμενο: υπολόγισε `found` πριν το filter, κάλεσε `deleteFile` μόνο όταν `found`, επίστρεψε `ok:found`. Πλήρες spec στο WEB_DEBT.md.
+
+**Stale item έκλεισε**: το «Reset-request route — timing side-channel» (flagged 2026-07-02, 37η σάρωση) ήταν ήδη διορθωμένο live από νωρίτερο commit (`e75cd74`, «feat(saas): constant-time reset-request response (D6)») — fire-and-forget email + σταθερός response floor. Μαρκαρίστηκε DONE στη θέση του.
+
+**el.ts i18n gap μεγάλωσε**: 38→42 missing κλειδιά (+4 από το P7 auto-discovery panel `sub.discovered*`, commit `97a7d66`). Παραμένει TODO (P3/M, judgment-call μεταφράσεις, δεν είναι unattended-mechanical fix).
+
+**3 SaaS error-handling holdouts παραμένουν ανοιχτά** (`invites/accept` try=1 [μόνο create-race]· `audit` try=0· `workspace/erasure/purge` try=0) — αμετάβλητα από την 49η/50η, ο builder δεν τα κατανάλωσε ακόμα.
+
+**Top-3 για τον builder**:
+1. **`deleteItemPhoto`/`deleteItemAttachment` ownership check** (P2/S, νέο σήμερα) — μηχανικό, αγγίζει live data safety (όχι dead-until-SaaS).
+2. **`invites/accept` guardless write route try/catch** (P2/S, 50η σάρωση) — μηχανικό wrap.
+3. **`audit`/`workspace/erasure/purge` guardless read/cron try/catch** (P2/S ×2, 49η σάρωση) — μηχανικά wraps, ίδιας κλάσης.
+
+## Needs Achilleas
+
+- **`getTenantConnection` readyState guard semantics** (dead-until-SaaS, `lib/tenancy/connection.ts:55`): ασαφές το σωστό rebuild-semantic όταν η cached connection είναι `readyState 0` (disconnected) — θέλει σκόπιμη απόφαση, όχι μηχανικό swap (αμετάβλητο από 37η σάρωση).
