@@ -5211,3 +5211,56 @@ Read-only parity audit web↔mobile, inventory ξαναχτισμένο από �
 ## Needs Achilleas
 
 - **`getTenantConnection` readyState guard semantics** (dead-until-SaaS, `lib/tenancy/connection.ts:55`): ασαφές το σωστό rebuild-semantic όταν η cached connection είναι `readyState 0` (disconnected) — θέλει σκόπιμη απόφαση, όχι μηχανικό swap (αμετάβλητο από 37η σάρωση).
+
+## 2026-07-15 (pharos-daily-dev — P12 savings/financial goals SHIPPED)
+
+**Βήμα 0**: pause switch απών· Docker lock αποκτήθηκε καθαρά (κανένα stale lock)· tree ήταν καθαρό στην αρχή του run.
+
+**Έλεγχος Approved queue πρώτα** (όπως ζητά η προτεραιότητα του routine): OWNER_DECISIONS.md §8 + PRODUCT_BACKLOG.md
+`## Approved` — τα περισσότερα approved items είχαν ήδη shipped από προηγούμενα runs (P33/P32/P34/P35/P27/P28/P29/P30/
+P22/P14/P15/P18/P19/P6/P7/P25/P21). Η τελευταία 2026-07-14 καταχώρηση πρότεινε ρητά **P12 (savings/financial goals,
+S/M)** ή P26 (onboarding checklist, S) ως επόμενα candidates· διάλεξα το **P12** (μεγαλύτερη product αξία, καλά
+speced builder default). ΣΗΜ: η ίδια μέρα μια ξεχωριστή `web-code-quality` auditor σάρωση (53η) flag-άρισε ένα P2
+ownership-check gap στο `deleteItemPhoto`/`deleteItemAttachment` — το άφησα στην ουρά του WEB_DEBT.md (out of scope
+για αυτό το routine, το Approved-queue-πρώτα κανόνα του δικού μου task file ρητά βάζει τα εγκεκριμένα features πάνω
+από αυτο-επιλεγμένα items· η ουρά αυτή είναι δουλειά άλλου builder run).
+
+**Τι μπήκε (P12)**:
+- **`models/Goal.ts`**: `title`, `targetAmount`, optional `targetDate`, free-form `category`, `notes`, `archived`,
+  embedded `contributions[]` (`{amount,date,note}`, ίδιο σχήμα με `GiftCard.uses[]`). Soft-delete plugin, `updatedAt`
+  index (μελλοντικό `/api/v1/goals` sync cursor).
+- **`lib/goals.ts` (+10 unit tests)**: pure/DB-free `goalCurrent`/`goalProgress` — το `current` είναι πάντα derived
+  (Σ contributions, floor 0), ποτέ stored, ίδιο derive-on-read pattern με `lib/bill.ts`. `goalProgress` δίνει
+  target/remaining/pct(0-100, cap)/done/monthsLeft/perMonth («χρειάζεσαι €X/μήνα» μέχρι το deadline, null χωρίς
+  targetDate, full-remaining-now αν περασμένη προθεσμία, null όταν done).
+- **`app/reports/goalsActions.ts`**: create/update/archive/delete goal + add/remove contribution — mirror του
+  `giftcardActions.ts` pattern (απευθείας `connectDB()`+model import, όχι tenancy-aware `currentModel` — ίδιο με
+  Bill/GiftCard, μικρά standalone modules δεν είναι tenancy-critical σαν Item/Receipt/Expense).
+- **UI**: νέα «Goals» κάρτα μέσα στο `/reports` (`ReportsClient.tsx`, `id="goals"` anchor) — inline «+ New goal» φόρμα
+  (τίτλος/target/optional deadline), grid από goal cards (progress bar, current/target/%, «need €X/mo» hint όταν έχει
+  deadline, inline add-contribution input+button, delete με `useConfirm`). Homepage νέο NavCard
+  (`href="/reports#goals"`, count = active goals, `Target` icon).
+- **Trash wiring**: `goal` προστέθηκε στο `TrashType` union + `TRASH_MODELS` + `trashLabel` switch
+  (`settings/actions.ts`) + `TYPE_META` (`TrashClient.tsx`) — soft-delete/restore/purge δουλεύει όπως τα άλλα μικρά
+  modules (Bill/GiftCard). Reused `isSafeStoredPath`-class δεν χρειάστηκε (goals δεν έχουν αρχεία).
+- **i18n**: 14 νέα κλειδιά στο `en.ts` (`reports.cGoals`/`gNewGoal`/`gNoGoals`/`gTitle`/`gTitlePlaceholder`/`gTarget`/
+  `gDeadline`/`gReached`/`gPerMonth`/`gAddAmount`/`gDeleteTitle`/`gDeleteBody`, `home.dGoals`, `trash.tGoal`). ΔΕΝ
+  προστέθηκαν στο `el.ts` (ίδιο precedent με το P7 auto-discovery — ο ελληνικός gap μεγαλώνει σκόπιμα, φεύγει σε
+  ξεχωριστό μεταφραστικό pass, όπως ήδη καταγράφεται στο WEB_DEBT.md).
+- **Builder default τηρήθηκε**: πολλά ταυτόχρονα goals επιτρέπονται· manual contributions μόνο (auto-feed από
+  κατηγορία = phase 2, δεν χτίστηκε).
+
+**Verify**: `npm run type-check` (apps/web) → **EXIT 0**. `npx vitest run` → **2251 passed / 174 files** (+10 νέα,
+μηδέν regression). Safe Docker rebuild (`docker compose build web` → mongo ήδη healthy → `up -d web`):
+`RestartCount=0`, `curl /login` → 200, `curl /reports` + `curl /` → 307 (auth-gated, compiled χωρίς server error —
+δεν testable UI-level χωρίς τα credentials του Αχιλλέα, ίδιος περιορισμός με προηγούμενα runs)· `docker logs` καθαρό
+(μόνο τα προϋπάρχοντα άσχετα `@napi-rs/canvas` warnings). `docker builder prune -f` μετά (−2.18GB, cache-only, ασφαλές).
+Docker lock released.
+
+**Follow-up (μηδέν v1 mobile route ακόμα)**: web-only για τώρα· mobile parity θα χρειαστεί `Goal` exposure στο
+`/api/v1` (νέο endpoint, ίδιο pattern με το Bill/GiftCard P28/P32 πριν πήραν mobile) + GoalsScreen UI. Καταγράφηκε
+στο `PRODUCT_BACKLOG.md` ως follow-up, ΟΧΙ Needs Achilleas (auto-buildable όποτε ο builder φτάσει σε αυτό).
+
+**Suggested next task**: (α) **P26 onboarding checklist** (S, το άλλο candidate της 2026-07-14 καταχώρησης, ακόμα
+ανοιχτό στο Approved queue)· ή (β) αν προτιμηθεί debt-first: το top item του `WEB_DEBT.md` (`deleteItemPhoto`/
+`deleteItemAttachment` ownership-check gap, P2/S, flagged σήμερα από την 53η web-code-quality σάρωση).
