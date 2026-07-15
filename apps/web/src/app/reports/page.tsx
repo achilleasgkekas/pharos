@@ -4,6 +4,7 @@ import { Receipt } from '@/models/Receipt';
 import { Statement } from '@/models/Statement';
 import { Subscription } from '@/models/Subscription';
 import { Expense } from '@/models/Expense';
+import { Goal } from '@/models/Goal';
 import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
@@ -12,6 +13,7 @@ import { categoryRollover, ROLLOVER_WINDOW } from '@/lib/budgetRollover';
 import { captureAndListSnapshots } from '@/lib/netWorth';
 import { computeMoneyAgenda } from '@/lib/moneyAgenda';
 import { computeSafeToSpend } from '@/lib/safeToSpend';
+import { goalProgress } from '@/lib/goals';
 import type { SerializedStatement } from '@/types';
 import { ReportsClient } from './ReportsClient';
 
@@ -49,12 +51,13 @@ function monthLabel(d: Date): string {
 async function getReports(monthsBack = 12) {
   await connectDB();
 
-  const [receiptsRaw, itemsRaw, subsRaw, statementsRaw, expensesRaw] = await Promise.all([
+  const [receiptsRaw, itemsRaw, subsRaw, statementsRaw, expensesRaw, goalsRaw] = await Promise.all([
     Receipt.find().select('store date total vatAmount').lean(),
     Item.find().select('title category status purchasedPrice currentPrice purchasedAt warrantyUntil').lean(),
     Subscription.find({ active: true }).select('amount billingCycle category').lean(),
     Statement.find().lean(),
     Expense.find().select('kind amount date period category space').lean(),
+    Goal.find({ archived: { $ne: true } }).sort({ createdAt: -1 }).lean(),
   ]);
 
   const receipts = JSON.parse(JSON.stringify(receiptsRaw)) as LeanReceipt[];
@@ -314,6 +317,20 @@ async function getReports(monthsBack = 12) {
   const { months: agendaMonths } = await computeMoneyAgenda();
   const safeToSpend = computeSafeToSpend(agendaMonths);
 
+  // ── Savings / financial goals (P12) — progress is derived, never stored ──
+  const goals = (goalsRaw as unknown as { _id: unknown; title?: string; targetAmount?: number; targetDate?: string | Date | null; category?: string; contributions?: { amount?: number; date?: string | Date; note?: string; _id?: unknown }[] }[]).map((g) => {
+    const progress = goalProgress({ targetAmount: g.targetAmount || 0, targetDate: g.targetDate, contributions: (g.contributions ?? []).map((c) => ({ amount: c.amount || 0 })) });
+    return {
+      _id: String(g._id),
+      title: g.title || '—',
+      targetAmount: g.targetAmount || 0,
+      targetDate: g.targetDate ? String(g.targetDate) : null,
+      category: g.category || '',
+      contributions: (g.contributions ?? []).map((c) => ({ _id: String(c._id), amount: c.amount || 0, date: String(c.date), note: c.note || '' })),
+      ...progress,
+    };
+  });
+
   return {
     netWorth: { accountsTotal: Math.round(accountsTotal), series: netWorthSeries },
     safeToSpend,
@@ -330,6 +347,7 @@ async function getReports(monthsBack = 12) {
     expenseBySpace,
     budgetVsActual,
     budgetRollover: appSettings.budgetRollover,
+    goals,
     summary: {
       receiptsTotal: Math.round(receiptsTotal),
       receiptsVat: Math.round(receiptsVat),

@@ -1,6 +1,8 @@
 'use client';
+import { useState, useTransition } from 'react';
 import { cur } from "@/lib/money";
 import { useT } from '@/components/LocaleProvider';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -16,7 +18,8 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts';
-import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet } from 'lucide-react';
+import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X } from 'lucide-react';
+import { createGoal, addGoalContribution, deleteGoal } from './goalsActions';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
 
@@ -47,6 +50,22 @@ type SafeToSpend = {
   windows: { days: number; income: number; outflow: number; net: number }[];
 };
 
+type GoalRow = {
+  _id: string;
+  title: string;
+  targetAmount: number;
+  targetDate: string | null;
+  category: string;
+  contributions: { _id: string; amount: number; date: string; note: string }[];
+  current: number;
+  target: number;
+  remaining: number;
+  pct: number;
+  done: boolean;
+  monthsLeft: number | null;
+  perMonth: number | null;
+};
+
 type Data = {
   netWorth: { accountsTotal: number; series: NetWorthPoint[] };
   safeToSpend: SafeToSpend;
@@ -63,6 +82,7 @@ type Data = {
   expenseBySpace: { name: string; value: number }[];
   budgetVsActual: { name: string; budget: number; actual: number; carried?: number; effective?: number }[];
   budgetRollover?: boolean;
+  goals: GoalRow[];
   summary: {
     receiptsTotal: number;
     receiptsVat: number;
@@ -498,7 +518,154 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           </div>
         )}
       </Card>
+
+      {/* Savings / financial goals (P12) — targets to reach, distinct from budgets
+          (spending limits). Progress is derived from contributions, never stored. */}
+      <div id="goals">
+        <GoalsCard goals={data.goals} className="mt-4" />
+      </div>
     </main>
+  );
+}
+
+function GoalsCard({ goals, className }: { goals: GoalRow[]; className?: string }) {
+  const t = useT();
+  const [adding, setAdding] = useState(false);
+  return (
+    <div className={`bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-5 ${className ?? ''}`}>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="flex items-center gap-1.5 text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.15em]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <Target size={12} /> {t('reports.cGoals')}
+        </h2>
+        <button
+          onClick={() => setAdding((v) => !v)}
+          className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/20 transition-colors"
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          {adding ? <X size={12} /> : <Plus size={12} />} {t('reports.gNewGoal')}
+        </button>
+      </div>
+
+      {adding && <NewGoalForm onDone={() => setAdding(false)} />}
+
+      {goals.length === 0 && !adding ? (
+        <Empty text={t('reports.gNoGoals')} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+          {goals.map((g) => (
+            <GoalItem key={g._id} g={g} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NewGoalForm({ onDone }: { onDone: () => void }) {
+  const t = useT();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function submit(formData: FormData) {
+    setError(null);
+    startTransition(async () => {
+      const res = await createGoal(formData);
+      if (res.ok) onDone();
+      else setError(res.error ?? 'Failed');
+    });
+  }
+
+  return (
+    <form action={submit} className="mb-4 p-3 rounded-xl bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] flex flex-wrap gap-2 items-end">
+      <div className="flex-1 min-w-[140px]">
+        <label className="block text-[10px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gTitle')}</label>
+        <input name="title" required placeholder={t('reports.gTitlePlaceholder')} className="w-full bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]" />
+      </div>
+      <div className="w-28">
+        <label className="block text-[10px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gTarget')} ({cur()})</label>
+        <input name="targetAmount" type="number" min="0" step="0.01" required className="w-full bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]" />
+      </div>
+      <div className="w-36">
+        <label className="block text-[10px] text-[color:var(--color-text-faint)] mb-1">{t('reports.gDeadline')}</label>
+        <input name="targetDate" type="date" className="w-full bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2.5 py-1.5 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]" />
+      </div>
+      <button type="submit" disabled={pending} className="text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-black font-semibold hover:opacity-90 disabled:opacity-50">
+        {pending ? t('common.saving') : t('common.save')}
+      </button>
+      {error && <p className="w-full text-[11px] text-[color:var(--color-red)]">{error}</p>}
+    </form>
+  );
+}
+
+function GoalItem({ g }: { g: GoalRow }) {
+  const t = useT();
+  const confirm = useConfirm();
+  const [pending, startTransition] = useTransition();
+  const [amount, setAmount] = useState('');
+
+  function contribute() {
+    const n = Number(amount);
+    if (!Number.isFinite(n) || n <= 0) return;
+    startTransition(async () => {
+      await addGoalContribution(g._id, n);
+      setAmount('');
+    });
+  }
+
+  async function remove() {
+    const ok = await confirm({ title: t('reports.gDeleteTitle', { title: g.title }), message: t('reports.gDeleteBody'), danger: true });
+    if (!ok) return;
+    startTransition(async () => {
+      await deleteGoal(g._id);
+    });
+  }
+
+  return (
+    <div className="rounded-xl bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] p-3">
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold truncate flex items-center gap-1.5">
+            {g.title}
+            {g.done && <span className="text-[10px] px-1.5 py-px rounded bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]">{t('reports.gReached')}</span>}
+          </p>
+          {g.category && <p className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5">{g.category}</p>}
+        </div>
+        <button onClick={remove} disabled={pending} className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors">
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      <div className="h-2 rounded-full bg-[color:var(--color-surface-3)] overflow-hidden mb-1.5">
+        <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(g.pct, g.current > 0 ? 3 : 0)}%`, background: g.done ? 'var(--color-accent)' : 'var(--color-cyan)' }} />
+      </div>
+
+      <div className="flex items-center justify-between text-[10px] text-[color:var(--color-text-dim)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+        <span>{cur()}{g.current.toLocaleString('en-GB')} / {cur()}{g.target.toLocaleString('en-GB')}</span>
+        <span>{g.pct}%</span>
+      </div>
+
+      {!g.done && g.perMonth != null && (
+        <p className="text-[10px] text-[color:var(--color-text-faint)] mb-2">{t('reports.gPerMonth', { x: `${cur()}${g.perMonth.toFixed(0)}` })}</p>
+      )}
+
+      {!g.done && (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && contribute()}
+            placeholder={t('reports.gAddAmount')}
+            className="flex-1 min-w-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2 py-1 text-[11px] text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+          />
+          <button onClick={contribute} disabled={pending} className="shrink-0 text-[11px] px-2 py-1 rounded-lg bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/20 disabled:opacity-50">
+            <Plus size={12} />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

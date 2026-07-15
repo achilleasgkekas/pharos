@@ -7,11 +7,12 @@ import { Subscription } from '@/models/Subscription';
 import { Statement } from '@/models/Statement';
 import { ShoppingListItem } from '@/models/ShoppingListItem';
 import { Bill } from '@/models/Bill';
+import { Goal } from '@/models/Goal';
 import { isAiReady } from '@/lib/ollama';
 import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
-import { Package, ShoppingCart, ShoppingBasket, ListChecks, BarChart3, Receipt as ReceiptIcon, CalendarClock, CreditCard, ArrowRight, Wallet, Banknote, CalendarDays, FileText } from 'lucide-react';
+import { Package, ShoppingCart, ShoppingBasket, ListChecks, BarChart3, Receipt as ReceiptIcon, CalendarClock, CreditCard, ArrowRight, Wallet, Banknote, CalendarDays, FileText, Target } from 'lucide-react';
 import { PharosMark } from '@/components/PharosMark';
 import { getServerT } from '@/lib/i18n/server';
 
@@ -31,6 +32,7 @@ async function getStats() {
     subscriptionCount,
     shoppingListCount,
     openBillsCount,
+    activeGoalsCount,
     statements,
     itemTitles,
     ollamaUp,
@@ -47,6 +49,7 @@ async function getStats() {
     Subscription.countDocuments({ active: true }),
     ShoppingListItem.countDocuments({ checked: false }),
     Bill.countDocuments({ paidAt: null, archived: { $ne: true } }),
+    Goal.countDocuments({ archived: { $ne: true } }),
     Statement.find().lean(),
     Item.find().select('title').lean(),
     isAiReady(),
@@ -96,6 +99,7 @@ async function getStats() {
     subscriptionCount,
     shoppingListCount,
     openBillsCount,
+    activeGoalsCount,
     budget: budgetAgg[0]?.total ?? 0,
     spent: spentAgg[0]?.total ?? 0,
     statementCount: statements.length,
@@ -151,6 +155,7 @@ export default async function HomePage() {
           <NavCard href="/subscriptions" title={t('nav.subscriptions')} count={stats.subscriptionCount} description={t('home.dSubscriptions')} open={t('home.open')} color="red" icon={<CalendarClock size={20} />} />
           <NavCard href="/tasks" title={t('nav.tasks')} count={stats.openTasks} description={t('home.dTasks')} open={t('home.open')} color="cyan" icon={<ListChecks size={20} />} />
           <NavCard href="/reports" title={t('nav.reports')} count={null} description={t('home.dReports')} open={t('home.open')} color="gold" icon={<BarChart3 size={20} />} />
+          <NavCard href="/reports#goals" title={t('reports.cGoals')} count={stats.activeGoalsCount} description={t('home.dGoals')} open={t('home.open')} color="cyan" icon={<Target size={20} />} />
           <NavCard href="/calendar" title={t('nav.calendar')} count={null} description={t('home.dCalendar')} open={t('home.open')} color="purple" icon={<CalendarDays size={20} />} />
         </div>
       </section>

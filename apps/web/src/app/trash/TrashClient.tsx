@@ -3,7 +3,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Trash2, RotateCcw, Search, X, Package, Receipt as ReceiptIcon,
-  Wallet, CalendarClock, Ticket, CreditCard, CheckSquare, FileText, Loader2,
+  Wallet, CalendarClock, Ticket, CreditCard, CheckSquare, FileText, Loader2, Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -21,6 +21,7 @@ const TYPE_META: Record<TrashType, { labelKey: TKey; Icon: React.ComponentType<{
   voucher: { labelKey: 'trash.tVoucher', Icon: Ticket },
   giftcard: { labelKey: 'trash.tGiftCard', Icon: CreditCard },
   bill: { labelKey: 'trash.tBill', Icon: FileText },
+  goal: { labelKey: 'trash.tGoal', Icon: Target },
   task: { labelKey: 'trash.tTask', Icon: CheckSquare },
 };
 

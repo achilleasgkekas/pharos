@@ -15,6 +15,7 @@ import { billDaysUntilDue } from '@/lib/bill';
 import { Card } from '@/models/Card';
 import { Task } from '@/models/Task';
 import { Expense } from '@/models/Expense';
+import { Goal } from '@/models/Goal';
 import { invalidateAiConfigCache, getAiConfig } from '@/lib/aiConfig';
 import {
   invalidateOllamaHealth,
@@ -1243,7 +1244,7 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
 // place that restores or permanently purges them. Auto-purge after 30 days.
 
 export type TrashRow = { type: TrashType; id: string; title: string; subtitle: string; deletedAt: string };
-export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'bill' | 'task';
+export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'bill' | 'goal' | 'task';
 
 const TRASH_MODELS: Record<TrashType, typeof Item> = {
   item: Item,
@@ -1253,6 +1254,7 @@ const TRASH_MODELS: Record<TrashType, typeof Item> = {
   voucher: Voucher as unknown as typeof Item,
   giftcard: GiftCard as unknown as typeof Item,
   bill: Bill as unknown as typeof Item,
+  goal: Goal as unknown as typeof Item,
   task: Task as unknown as typeof Item,
 };
 const TRASH_RETENTION_DAYS = 30;
@@ -1266,6 +1268,7 @@ function trashLabel(type: TrashType, d: Record<string, unknown>): { title: strin
     case 'voucher': return { title: String(d.title || '—'), subtitle: String(d.store || '') };
     case 'giftcard': return { title: String(d.title || '—'), subtitle: `${d.store || ''} · €${d.initialAmount ?? 0}`.trim() };
     case 'bill': return { title: String(d.title || '—'), subtitle: `${d.vendor || ''} · €${d.amount ?? 0}`.trim() };
+    case 'goal': return { title: String(d.title || '—'), subtitle: `€${d.targetAmount ?? 0}${d.targetDate ? ` · ${new Date(d.targetDate as string).toLocaleDateString('en-GB')}` : ''}` };
     case 'task': return { title: String(d.title || '—'), subtitle: String(d.status || '') };
   }
 }

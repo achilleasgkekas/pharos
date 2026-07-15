@@ -90,6 +90,7 @@ export const en = {
   'home.dSubscriptions': 'Recurring expenses + renewals',
   'home.dTasks': 'Kanban planner with notes + checklists',
   'home.dReports': 'Charts: spend, categories, warranties, installments',
+  'home.dGoals': 'Savings targets with a deadline and progress',
   'home.dCalendar': "What's coming up: renewals, installments, bills, expiries",
 
   // ── Relative time ────────────────────────────────────────────────────────
@@ -112,6 +113,7 @@ export const en = {
   'trash.tVoucher': 'Vouchers',
   'trash.tGiftCard': 'Gift cards',
   'trash.tBill': 'Bills',
+  'trash.tGoal': 'Goals',
   'trash.tTask': 'Tasks',
   'trash.selectAllN': 'select all {n}',
   'trash.selected': '{n} selected',
@@ -220,6 +222,18 @@ export const en = {
   'reports.in': 'in',
   'reports.out': 'out',
   'reports.net': 'net',
+  'reports.cGoals': 'Goals',
+  'reports.gNewGoal': 'New goal',
+  'reports.gNoGoals': 'No goals yet — set a savings target',
+  'reports.gTitle': 'Goal',
+  'reports.gTitlePlaceholder': 'Emergency fund, sailing trip…',
+  'reports.gTarget': 'Target',
+  'reports.gDeadline': 'Deadline (optional)',
+  'reports.gReached': 'reached ✓',
+  'reports.gPerMonth': 'need {x}/mo to hit the deadline',
+  'reports.gAddAmount': 'Add amount',
+  'reports.gDeleteTitle': 'Delete "{title}"?',
+  'reports.gDeleteBody': 'This permanently removes the goal and its contribution history. It cannot be undone.',
 
   // ── Calendar ─────────────────────────────────────────────────────────────
   'cal.next3': 'next 3 months',
