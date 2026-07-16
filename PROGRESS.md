@@ -5264,3 +5264,63 @@ Docker lock released.
 **Suggested next task**: (α) **P26 onboarding checklist** (S, το άλλο candidate της 2026-07-14 καταχώρησης, ακόμα
 ανοιχτό στο Approved queue)· ή (β) αν προτιμηθεί debt-first: το top item του `WEB_DEBT.md` (`deleteItemPhoto`/
 `deleteItemAttachment` ownership-check gap, P2/S, flagged σήμερα από την 53η web-code-quality σάρωση).
+
+## 2026-07-16 (pharos-daily-dev — P26 onboarding checklist SHIPPED)
+
+**Βήμα 0**: pause switch απών· Docker lock αποκτήθηκε καθαρά (κανένα stale lock)· tree ήταν καθαρό στην αρχή του run
+(τελευταίο commit `7b53bd2`, ξένο test file από νωρίτερα σήμερα, άσχετο).
+
+**Έλεγχος Approved queue πρώτα**: OWNER_DECISIONS.md §8 + PRODUCT_BACKLOG.md `## Approved` — όλα τα approved items
+ήταν ήδη shipped εκτός από **P26** (in-app onboarding checklist, S, το candidate που πρότεινε ρητά η 2026-07-15
+καταχώρηση) και **P36** (Open Banking auto-sync, L, χρειάζεται ρητή Achilleas απόφαση/OAuth setup — σκόπιμα τελευταίο
+στη σειρά). Διάλεξα το **P26**: μικρό, πλήρως speced με builder defaults, καμία ανοιχτή απόφαση που να χρειάζεται
+τον Αχιλλέα.
+
+**Τι μπήκε (P26)**:
+- `models/AppConfig.ts`: νέο `onboardingDismissed: Boolean` (ίδιο pattern με το προϋπάρχον `aiOnboardingDismissed`).
+- `lib/appSettings.ts`: το πεδίο προστέθηκε στο `AppSettings` type/`RawAppConfigDoc`/`DEFAULTS`/`normalizeSettings()`/
+  `.select()` string — ίδιο μοτίβο με τα υπόλοιπα boolean settings (`ntfyEnabled`, `budgetRollover`).
+- `app/settings/actions.ts`: νέο `dismissOnboarding()` action, mirror ακριβώς του `dismissAiOnboarding` (χωρίς
+  `requireAdmin` — κάθε signed-in χρήστης το κλείνει, όχι μόνο admin).
+- Νέο `components/OnboardingChecklist.tsx` (client): dismissable card με **5 βήματα** (builder default): connect
+  storage / add first receipt / set a budget / add a payment card / enable notifications. Κάθε βήμα = deep-link
+  card με ✓ tick όταν done. **Collapsible μετά την ολοκλήρωση** (auto-collapse σε compact «All set» bar όταν και τα 5
+  done — ξεχωριστό από το ρητό X που το κρύβει μόνιμα μέσω `onboardingDismissed`). Optimistic hide πριν το server
+  action resolve-άρει, ίδιο pattern με το `AiOnboardingBanner`.
+- `app/page.tsx getStats()`: τα 5 signals υπολογίστηκαν μέσα στο ήδη-υπάρχον `Promise.all` (προστέθηκαν
+  `Card.countDocuments()`, `getAppSettings()`, `getStorageConfig()`, `getNotifiers()` — reuse των ήδη-υπαρχόντων
+  helpers, μηδέν νέο query pattern). Το checklist ρεντεράρεται αμέσως κάτω από το hero, πάνω από τα Modules.
+- i18n: 7 νέα `home.onb*` κλειδιά μόνο στο `en.ts` (ίδιο precedent με P7/P12/P34/P35 — ελληνικό μεταφραστικό pass
+  ξεχωριστό, ήδη καταγεγραμμένο στο WEB_DEBT.md ως ανοιχτό item).
+
+**Σημείωση συνέπειας (όχι νέο bug, pre-existing gap που ΔΕΝ άγγιξα)**: το `page.tsx` και το `settings/actions.ts`
+κάνουν ήδη direct model imports (`Item`, `AppConfig`, `Card`, ...) χωρίς `currentModel()`/`withRequestTenant` — σε
+αντίθεση με `receipts/page.tsx`/`shopping/page.tsx`/`expenses/page.tsx`/`items/page.tsx` που είναι tenant-aware. Αυτό
+σημαίνει ότι σε SaaS multi-tenant mode το homepage (και άρα και το νέο μου checklist) διαβάζει πάντα το DEFAULT
+tenant, όχι το τρέχον. Ακολούθησα ρητά το **υπάρχον local convention** και των δύο αρχείων (δεν εισήγαγα νέο μοτίβο
+tenancy σε ένα μόνο σημείο, που θα δημιουργούσε ασυνέπεια) — το ίδιο gap προϋπήρχε ήδη σε ΟΛΑ τα άλλα homepage stats
+(itemCount, receiptCount, κλπ) πριν αγγίξω τίποτα. Flag-άρεται παρακάτω για μελλοντική διόρθωση σε ξεχωριστό run
+(αφορά όλο το homepage, όχι μόνο το P26 checklist — out of scope για ένα S-size task).
+
+**Verify**: `npm run type-check` (apps/web) → **EXIT 0**. `npx vitest run` → **2265 passed / 175 files** (+1 fixture
+update στο `appSettings.test.ts` για το νέο `onboardingDismissed:false` πεδίο στο expected-defaults object, μηδέν
+άλλο regression). Safe Docker rebuild (`docker compose build web` → mongo ήδη healthy → `up -d web`): clean start
+(`ExitCode:0`, `Running:true`), `docker logs` καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning), `/login`
+200 (browser-checked μέσω Claude Browser pane — τίτλος «Sign in · Pharos», **μηδέν console errors**), `/` + `/settings`
+307 (auth-gated, compiled χωρίς server error — δεν testable UI-level το ίδιο το checklist χωρίς τα credentials του
+Αχιλλέα, ίδιος περιορισμός με όλα τα προηγούμενα runs). `docker builder prune -f` μετά (−2.18GB, cache-only, ασφαλές).
+Docker lock released.
+
+**Follow-up (μηδέν v1 mobile route)**: το checklist είναι web-only, καθαρά homepage UI state — δεν χρειάζεται καν
+mobile parity (δεν υπάρχει αντίστοιχο "getting started" concept στο mobile app roadmap ακόμα, ΟΧΙ needs-Achilleas,
+απλά δεν είναι σχετικό).
+
+**Suggested next task**: (α) το pre-existing `page.tsx`/`settings/actions.ts` tenancy gap (SaaS mode homepage stats +
+settings actions διαβάζουν πάντα default tenant) — μεγαλύτερο M-size refactor, θα χρειαστεί το δικό του run· ή (β) το
+top item του `WEB_DEBT.md` (`deleteItemPhoto`/`deleteItemAttachment` ownership-check gap, P2/S, ακόμα ανοιχτό από την
+53η σάρωση)· ή (γ) το επόμενο mobile-parity Build Queue item (Expenses category-rule wiring στο v1 POST route, P1/S).
+
+## Needs Achilleas
+
+- Τίποτα νέο αυτό το run. (P36 Open Banking παραμένει το μόνο ανοιχτό Approved item που χρειάζεται ρητή απόφαση
+  scope πριν χτιστεί, αμετάβλητο.)

@@ -64,6 +64,7 @@ describe('normalizeSettings', () => {
       assetAccounts: {},
       depreciation: resolveDepreciation(undefined),
       categoryRules: [],
+      onboardingDismissed: false,
     };
     expect(normalizeSettings(null)).toEqual(expected);
     expect(normalizeSettings(undefined)).toEqual(expected);

@@ -8,13 +8,19 @@ import { Statement } from '@/models/Statement';
 import { ShoppingListItem } from '@/models/ShoppingListItem';
 import { Bill } from '@/models/Bill';
 import { Goal } from '@/models/Goal';
+import { Card as PaymentCard } from '@/models/Card';
 import { isAiReady } from '@/lib/ollama';
 import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { computeInstallmentPlans } from '@/lib/installments';
+import { getAppSettings } from '@/lib/appSettings';
+import { getStorageConfig } from '@/lib/storageConfig';
+import { getNotifiers } from '@/lib/notifiers';
 import type { SerializedStatement } from '@/types';
 import { Package, ShoppingCart, ShoppingBasket, ListChecks, BarChart3, Receipt as ReceiptIcon, CalendarClock, CreditCard, ArrowRight, Wallet, Banknote, CalendarDays, FileText, Target } from 'lucide-react';
 import { PharosMark } from '@/components/PharosMark';
+import { OnboardingChecklist, type OnboardingStep } from '@/components/OnboardingChecklist';
 import { getServerT } from '@/lib/i18n/server';
+import type { TFunc } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +44,10 @@ async function getStats() {
     ollamaUp,
     budgetAgg,
     spentAgg,
+    cardCount,
+    appSettings,
+    storageConfig,
+    notifiers,
   ] = await Promise.all([
     Item.countDocuments(),
     Item.countDocuments({ status: { $in: OWNED_STATUSES } }),
@@ -62,6 +72,10 @@ async function getStats() {
       { $match: { purchasedPrice: { $ne: null }, deletedAt: null } },
       { $group: { _id: null, total: { $sum: '$purchasedPrice' } } },
     ]),
+    PaymentCard.countDocuments(),
+    getAppSettings(),
+    getStorageConfig(),
+    getNotifiers(),
   ]);
 
   // Installment plans (δόσεις) — active ones + total still owed
@@ -108,11 +122,38 @@ async function getStats() {
     monthlySchedule,
     itemTitleMap,
     ollamaUp,
+    onboarding: {
+      dismissed: appSettings.onboardingDismissed,
+      storageConnected: storageConfig.backend !== 'local',
+      hasReceipt: receiptCount > 0,
+      hasBudget: Object.keys(appSettings.budgets).length > 0,
+      hasCard: cardCount > 0,
+      notifyEnabled: notifiers.some((n) => n.enabled),
+    },
   };
 }
 
 const mono = { fontFamily: 'var(--font-mono)' } as const;
 const display = { fontFamily: 'var(--font-display)' } as const;
+
+type OnboardingSignals = {
+  dismissed: boolean;
+  storageConnected: boolean;
+  hasReceipt: boolean;
+  hasBudget: boolean;
+  hasCard: boolean;
+  notifyEnabled: boolean;
+};
+
+function onboardingSteps(o: OnboardingSignals, t: TFunc): OnboardingStep[] {
+  return [
+    { key: 'storage', label: t('home.onbStorage'), done: o.storageConnected, href: '/settings?tab=storage' },
+    { key: 'receipt', label: t('home.onbReceipt'), done: o.hasReceipt, href: '/receipts' },
+    { key: 'budget', label: t('home.onbBudget'), done: o.hasBudget, href: '/settings?tab=money' },
+    { key: 'card', label: t('home.onbCard'), done: o.hasCard, href: '/settings?tab=money' },
+    { key: 'notify', label: t('home.onbNotify'), done: o.notifyEnabled, href: '/settings?tab=notifications' },
+  ];
+}
 
 export default async function HomePage() {
   const stats = await getStats();
@@ -137,6 +178,14 @@ export default async function HomePage() {
           {t('home.subtitle')}
         </p>
       </section>
+
+      <OnboardingChecklist
+        dismissed={stats.onboarding.dismissed}
+        title={t('home.onbTitle')}
+        subtitle={t('home.onbSubtitle')}
+        doneLabel={t('home.onbDone')}
+        steps={onboardingSteps(stats.onboarding, t)}
+      />
 
       {/* Modules */}
       <section className="max-w-[1400px] mx-auto px-4 pb-16">

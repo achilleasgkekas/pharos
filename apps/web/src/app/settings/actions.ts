@@ -264,6 +264,15 @@ export async function dismissAiOnboarding(): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
+/** Permanently hide the homepage "getting started" checklist (P26, any signed-in user). */
+export async function dismissOnboarding(): Promise<{ ok: boolean }> {
+  await connectDB();
+  await AppConfig.updateOne({ key: 'singleton' }, { $set: { onboardingDismissed: true } }, { upsert: true });
+  invalidateAppSettings();
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
 // ─── Defaults & alerts + Notifications ───────────────────────────────────────
 
 export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }> {

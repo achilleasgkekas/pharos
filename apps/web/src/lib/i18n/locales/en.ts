@@ -93,6 +93,16 @@ export const en = {
   'home.dGoals': 'Savings targets with a deadline and progress',
   'home.dCalendar': "What's coming up: renewals, installments, bills, expiries",
 
+  // ── Home page: onboarding checklist (P26) ───────────────────────────────
+  'home.onbTitle': 'Getting started',
+  'home.onbSubtitle': 'A few steps to get Pharos tracking your own stuff.',
+  'home.onbDone': 'All set — getting started complete',
+  'home.onbStorage': 'Connect a storage backend (Settings → Storage)',
+  'home.onbReceipt': 'Add your first receipt',
+  'home.onbBudget': 'Set a monthly budget',
+  'home.onbCard': 'Add a payment card',
+  'home.onbNotify': 'Turn on notifications',
+
   // ── Relative time ────────────────────────────────────────────────────────
   'time.justNow': 'just now',
   'time.minutes': '{n}m ago',

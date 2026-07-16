@@ -40,6 +40,7 @@ export type AppSettings = {
   assetAccounts: Record<string, number>; // manual asset accounts for net worth (name → balance)
   depreciation: DepreciationConfig; // asset depreciation model (P29) for owned-inventory valuation
   categoryRules: CategoryRule[]; // vendor→category auto-rules (P15), applied on create
+  onboardingDismissed: boolean; // hides the homepage "getting started" checklist (P26)
 };
 
 /** Raw AppConfig singleton fields relevant to app settings (all optional). */
@@ -63,6 +64,7 @@ export type RawAppConfigDoc = {
   assetAccounts?: Record<string, unknown>;
   depreciation?: Record<string, unknown>;
   categoryRules?: unknown;
+  onboardingDismissed?: boolean;
 };
 
 /** Coerce a Mixed map to { key: positiveNumber }. */
@@ -99,6 +101,7 @@ const DEFAULTS: AppSettings = {
   assetAccounts: {},
   depreciation: DEFAULT_DEPRECIATION,
   categoryRules: [],
+  onboardingDismissed: false,
 };
 
 // Cache keyed by tenant. Default/self-hosted tenant uses the '' key so its behaviour and
@@ -140,6 +143,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     assetAccounts: numMap(doc?.assetAccounts),
     depreciation: resolveDepreciation(doc?.depreciation),
     categoryRules: resolveCategoryRules(doc?.categoryRules),
+    onboardingDismissed: !!doc?.onboardingDismissed,
   };
 }
 
@@ -155,7 +159,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     // untouched, same query as before).
     const Config = await currentModel(AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed')
       .lean();
   } catch {
     /* DB down → hard defaults */

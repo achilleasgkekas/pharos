@@ -28,6 +28,9 @@ const AppConfigSchema = new Schema(
     aiEnabled: { type: Boolean, default: true },
     aiFeatures: { type: Schema.Types.Mixed, default: {} },
     aiOnboardingDismissed: { type: Boolean, default: false },
+    // Hides the homepage "getting started" checklist (P26) once the user closes it,
+    // regardless of how many of its steps are actually complete.
+    onboardingDismissed: { type: Boolean, default: false },
 
     // ── Defaults & alerts ──
     defaultItemView: { type: String, enum: ['grid', 'list'], default: 'grid' },
