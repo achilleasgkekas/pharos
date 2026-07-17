@@ -5324,3 +5324,78 @@ top item του `WEB_DEBT.md` (`deleteItemPhoto`/`deleteItemAttachment` ownershi
 
 - Τίποτα νέο αυτό το run. (P36 Open Banking παραμένει το μόνο ανοιχτό Approved item που χρειάζεται ρητή απόφαση
   scope πριν χτιστεί, αμετάβλητο.)
+
+## 2026-07-17 (pharos-daily-dev — P1 demo/sample-data mode SHIPPED)
+
+**Βήμα 0**: pause switch απών· Docker lock αποκτήθηκε καθαρά (κανένα stale lock)· tree ήταν καθαρό στην αρχή του run
+(τελευταίο commit `223c2cf`).
+
+**Έλεγχος Approved queue πρώτα**: OWNER_DECISIONS.md §8 + PRODUCT_BACKLOG.md `## Approved` — σχεδόν όλα τα approved
+items είχαν ήδη shipped από προηγούμενα runs. Τα μόνα ανοιχτά ήταν: **P36** (Open Banking, L, χρειάζεται ρητή
+Achilleas απόφαση/OAuth setup — σκόπιμα τελευταίο) και ένα σύνολο M-size items χωρίς blocking απόφαση (P31
+household/shared-access, P24 webhooks, P23 mobile share-sheet, P13 insurance export, P8 tax tagging, P16 migration
+importers, P11 email-IMAP, P17 mobile barcode, P5 browser extension, P3 AI month-review, P9 multi-currency L) και
+**P1** (demo/sample-data mode, S) + **P20** (loyalty card wallet, S/M). Διάλεξα το **P1**: μικρότερο effort από όλα
+τα υπόλοιπα, πλήρως speced με builder default («locale-aware demo data»), καμία ανοιχτή απόφαση, και ξεχωριστό value
+(OSS adoption lever — νέος self-host βλέπει αμέσως τι κάνει το app χωρίς να πρέπει να σκανάρει πρώτα πραγματικές
+αποδείξεις). Το P31 (household/shared-access) είναι το επόμενο υψηλής αξίας item αλλά αγγίζει auth/ρόλους βαθιά· ένα
+S-size item ταίριαζε καλύτερα σε ένα run.
+
+**Τι μπήκε (P1)**:
+- Νέο `isSample: Boolean` (default false, indexed) στα 4 μοντέλα `Item`/`Receipt`/`Expense`/`Subscription` — ο μόνος
+  δείκτης «αυτό είναι demo data», ώστε το clear να είναι ακριβές (μηδέν side-effect στα πραγματικά δεδομένα).
+- Νέο pure **`lib/sampleData.ts`** `buildSampleData(now, locale)` (DB-free, ντετερμινιστικό δεδομένου του `now`,
+  **+9 unit tests**): 6 items (mix inventory/shopping status/κατηγορίες), 4 receipts (`filePath:''` — αξιοποιεί το
+  ήδη-υπάρχον «No scan file» placeholder αντί να χρειάζεται fake binary αρχεία), 10 expenses (rent+utilities
+  recurring 3 μηνών, salary recurring 2 μηνών, fuel+groceries one-off), 3 subscriptions (Netflix/Spotify/iCloud+).
+  Category slugs = ακριβώς τα `DEFAULT_*_CATEGORIES` (`lib/taxonomies.ts`) ώστε τα built-in icons/χρώματα να
+  δουλεύουν κανονικά, όχι fallback «other» παντού. **Locale-aware** (builder default τηρήθηκε): `el` παίρνει
+  ξεχωριστό ελληνικό copy (τίτλοι/vendors/stores μεταφρασμένα — π.χ. «ΔΕΗ» αντί «Electricity Co», «Skroutz» αντί
+  «Amazon» — category slugs μένουν ίδια), όλα τα άλλα locales fallback σε English (ίδιο precedent με το i18n
+  rollout).
+- Νέο **`app/settings/sampleDataActions.ts`** (`requireAdmin`-gated, ίδιο direct-model-import convention με το
+  `exportData`/`importData`/`getTrash` στο ίδιο αρχείο — μικρό standalone admin tool, όχι tenancy-critical per-page
+  data): `loadSampleData()` idempotent (σβήνει το προηγούμενο `isSample:true` set πρώτα, μετά insertMany φρέσκο set
+  με ημερομηνίες σχετικές με το σήμερα) + `clearSampleData()` (hard delete, ΜΟΝΟ `isSample:true` — matched strictly,
+  τα πραγματικά δεδομένα δεν αγγίζονται ποτέ) + `getSampleDataStatus()` (counts, για το UI toggle).
+- **UI**: νέο `SampleDataManager` Section στο Settings → Storage & backup (κάτω από το υπάρχον Backup/Restore) —
+  «Load sample data» / «Reload sample data» button (το label αλλάζει όταν ήδη loaded, με confirm dialog πριν το
+  reload) + «Clear sample data» (confirm, εμφανίζεται μόνο όταν κάτι είναι loaded) + live counts γραμμή
+  («N items · N receipts · N expenses · N subscriptions»). i18n keys `set.sample*` (11 νέα) μόνο στο en.ts (ίδιο
+  precedent με P7/P12/P26 — ελληνικό μεταφραστικό pass ξεχωριστό, ήδη καταγεγραμμένο στο WEB_DEBT.md).
+- **Builder default τηρήθηκε ρητά**: locale-aware demo data ✓. Setup-wizard optional step = ΔΕΝ χτίστηκε (out of
+  scope για S-size, μένει follow-up)· η δυνατότητα ζει μόνο στο Settings για αυτό το run.
+
+**Verify**: `npm run type-check` (apps/web) → **EXIT 0**. Full `npx vitest run` → **2274 passed / 176 files** (+9
+νέα, μηδέν regression). Safe Docker rebuild (`docker compose build web` → mongo ήδη healthy → `up -d web`):
+`RestartCount=0`, `ExitCode=0`, `docker logs` καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning), `/login`
+200 (browser-checked μέσω Claude Browser pane — τίτλος «Sign in · Pharos», **μηδέν console errors**), `/` +
+`/settings` 307 (auth-gated, compiled χωρίς server error — δεν testable UI-level το ίδιο το Settings toggle χωρίς τα
+credentials του Αχιλλέα, ίδιος περιορισμός με όλα τα προηγούμενα runs). `docker builder prune -f` μετά (−2.19GB,
+cache-only, ασφαλές). Docker lock released.
+
+**Σχεδιαστικές επιλογές που άξιζε να καταγραφούν**:
+- Τα sample receipts χρησιμοποιούν `filePath:''` αντί fake binary αρχείο — το UI έχει ήδη clean «No scan file»
+  placeholder γι' αυτό (από παλιότερο session, βλ. CLAUDE.md 2026-06-10 cont.¹⁰), οπότε μηδέν νέος κώδικας
+  χρειάστηκε για το προβολής-χωρίς-αρχείο state.
+- Το `isSample` ΔΕΝ φιλτράρεται από Reports/budgets/net-worth aggregates — σκόπιμο, το demo data πρέπει να
+  «γεμίζει» ρεαλιστικά ό,τι βλέπει ο νέος χρήστης, όχι να μένει αόρατο από τα analytics views.
+- Κανένα visual «DEMO» badge στα item/receipt/expense/subscription cards — θα χρειαζόταν το `isSample` πεδίο
+  εκτεθειμένο στους serializers + types + 4 ξεχωριστά client components (ItemCard/ReceiptCard/ExpenseCard/
+  SubscriptionCard). Out of scope για S-size, follow-up αν ζητηθεί.
+
+**Follow-up (καταγράφηκε στο PRODUCT_BACKLOG.md)**: setup-wizard optional step, «DEMO» badge στα cards, mobile
+parity (δεν χρειάζεται κατά την κρίση μου — το Settings toggle είναι web-only admin tool, δεν υπάρχει καν precedent
+για data-management actions στο mobile app σήμερα).
+
+**Suggested next task**: (α) **P31 household/shared-access** (M, το επόμενο υψηλής αξίας Approved item — αγγίζει
+auth/ρόλους, builder default ήδη locked: shared-data + 3 ρόλοι admin/member/viewer, χωρίς email/MFA στο OSS tier —
+αξίζει το δικό του πλήρες run λόγω του auth surface)· ή (β) **P20 loyalty/membership card wallet** (S/M, tab μέσα στα
+Vouchers, builder default: client-side barcode render lib)· ή (γ) αν προτιμηθεί debt-first: έλεγξε το WEB_DEBT.md
+για ό,τι top item έχει μείνει ανοιχτό (`deleteItemPhoto`/`deleteItemAttachment` ownership-check ήταν το τελευταίο
+γνωστό, P2/S, από την 53η web-code-quality σάρωση — επιβεβαίωσε ότι δεν το κατανάλωσε ήδη κάποιο άλλο run).
+
+## Needs Achilleas
+
+- Τίποτα νέο αυτό το run. (P36 Open Banking παραμένει το μόνο ανοιχτό Approved item που χρειάζεται ρητή απόφαση
+  scope πριν χτιστεί, αμετάβλητο.)
