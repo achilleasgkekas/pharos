@@ -44,6 +44,9 @@ const ReceiptSchema = new Schema(
     notes: { type: String, default: '' },
 
     itemIds: { type: [Schema.Types.ObjectId], ref: 'Item', default: [] },
+
+    // Demo/sample-data mode (P1): see Item.isSample.
+    isSample: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }
 );

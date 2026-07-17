@@ -28,6 +28,9 @@ const SubscriptionSchema = new Schema(
     paymentMethod: { type: String, default: '' },
     notes: { type: String, default: '' },
     url: { type: String, default: '' },
+
+    // Demo/sample-data mode (P1): see Item.isSample.
+    isSample: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }
 );

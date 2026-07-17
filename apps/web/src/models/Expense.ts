@@ -52,6 +52,9 @@ const ExpenseSchema = new Schema(
     aiModel: { type: String, default: '' },
     aiParsedAt: { type: Date, default: null },
     verified: { type: Boolean, default: false },
+
+    // Demo/sample-data mode (P1): see Item.isSample.
+    isSample: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }
 );

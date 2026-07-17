@@ -442,11 +442,30 @@
 - **Module:** Reports + Notifications (+ AI).
 - **Ανοιχτή απόφαση (builder default):** auto-schedule 1η κάθε μήνα· on-demand button· free-tier περιορισμένο, paid = full.
 
-### P1. Demo / sample-data mode σε fresh install — S — OSS (κυρίως), both
-- **Αξία:** «Load sample data» / «Clear sample data» γεμίζει items/receipts/expenses/subscriptions με ρεαλιστικά
-  demo δεδομένα → νέος self-host βλέπει αμέσως τι κάνει το app. Adoption multiplier.
-- **Module:** cross-cutting (Settings → Data, ή setup wizard).
-- **Ανοιχτή απόφαση (builder default):** locale-aware demo data· optional βήμα στο setup wizard.
+### P1. Demo / sample-data mode σε fresh install — ✅ SHIPPED 2026-07-17 (pharos-daily-dev)
+- **Υλοποίηση:** νέο `isSample: Boolean` (default false, indexed) στο `Item`/`Receipt`/`Expense`/`Subscription`.
+  Νέο pure **`lib/sampleData.ts`** `buildSampleData(now, locale)` (DB-free, +9 unit tests, ντετερμινιστικό): 6 items
+  (mix inventory/shopping status), 4 receipts (`filePath:''` → δείχνει το ήδη-υπάρχον «No scan file» placeholder, μηδέν
+  fake binary), 10 expenses (rent+utilities recurring 3 μηνών, salary recurring 2 μηνών, fuel+groceries one-off), 3
+  subscriptions (Netflix/Spotify/iCloud+). Category slugs = ακριβώς τα `DEFAULT_*_CATEGORIES` (lib/taxonomies.ts) ώστε
+  τα icons/χρώματα να δουλεύουν κανονικά. **Locale-aware**: `el` παίρνει ξεχωριστό ελληνικό copy (τίτλοι/vendors/stores
+  μεταφρασμένα, category slugs ίδια), όλα τα άλλα locales fallback σε English (ίδιο precedent με το i18n rollout).
+  Νέο **`app/settings/sampleDataActions.ts`** (`requireAdmin`-gated): `loadSampleData()` idempotent (delete existing
+  `isSample:true` πρώτα, μετά insertMany φρέσκο set με σημερινές σχετικές ημερομηνίες) + `clearSampleData()` (hard
+  delete μόνο `isSample:true`) + `getSampleDataStatus()` (counts, για το UI toggle). **UI**: νέο `SampleDataManager`
+  Section στο Settings → Storage & backup (κάτω από Backup/Restore) — «Load sample data» / «Reload sample data» button
+  (αλλάζει label όταν ήδη loaded) + confirm πριν reload + «Clear sample data» (confirm, εμφανίζεται μόνο όταν loaded) +
+  live counts. i18n keys `set.sample*` μόνο στο en.ts (ίδιο precedent με P7/P12/P26 — ελληνικό gap ήδη καταγεγραμμένο).
+- **Builder default τηρήθηκε:** locale-aware demo data ✓· setup-wizard integration = follow-up (out of scope, S-size),
+  έμεινε στο Settings μόνο για αυτό το run.
+- **Verify:** `npm run type-check` EXIT 0. Full `npx vitest run` **2274 passed / 176 files** (+9 νέα, μηδέν
+  regression). Safe Docker rebuild (`docker compose build web` → mongo healthy → `up -d web`): `RestartCount=0`,
+  `/login` 200 (browser-checked, μηδέν console errors), `/` + `/settings` 307 (auth-gated, compiled χωρίς server
+  error). `docker builder prune -f` μετά (−2.19GB). Docker lock released.
+- **Follow-up:** setup-wizard optional step (δεν χτίστηκε)· κανένα visual «DEMO» badge στα cards (out of scope,
+  θα χρειαστεί serializer+type εκτεθειμένο στους 4 client components — follow-up αν ζητηθεί)· `isSample` δεν
+  φιλτράρεται από Reports/budgets/net-worth aggregates (σκόπιμα — το demo πρέπει να «γεμίζει» ρεαλιστικά).
+- **Module:** cross-cutting (Settings → Storage & backup) + 4 models (Item/Receipt/Expense/Subscription).
 
 ### P26. In-app onboarding checklist / getting-started guide — ✅ SHIPPED 2026-07-16 (pharos-daily-dev)
 - **Υλοποίηση:** `AppConfig.onboardingDismissed` (boolean, ίδιο pattern με `aiOnboardingDismissed`) + `AppSettings.onboardingDismissed`

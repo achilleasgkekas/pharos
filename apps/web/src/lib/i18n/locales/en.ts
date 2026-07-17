@@ -1065,6 +1065,17 @@ export const en = {
   'set.restored': '✓ Restored {n} records',
   'set.spreadsheetCsv': 'Spreadsheet (CSV):',
   'set.backupNote': 'JSON backup = full restore (metadata only; binary files stay on disk). CSV = open in Excel/Sheets for an accountant or tax.',
+  'set.sampleData': 'Sample data',
+  'set.sampleDataDesc': 'Fill Items, Receipts, Expenses and Subscriptions with a realistic demo set so you can see what Pharos looks like in use. Everything is tagged and can be wiped in one click — your real data is never touched.',
+  'set.sampleLoad': 'Load sample data',
+  'set.sampleReload': 'Reload sample data',
+  'set.sampleClear': 'Clear sample data',
+  'set.sampleReloadTitle': 'Reload sample data?',
+  'set.sampleReloadConfirm': 'Replaces the current sample set with a fresh one. Your real data is never touched.',
+  'set.sampleClearTitle': 'Clear sample data?',
+  'set.sampleClearConfirm': 'Removes every sample record. This cannot be undone (but you can always load a fresh set again).',
+  'set.sampleLoaded': '✓ Loaded {n} sample records',
+  'set.sampleCleared': '✓ Sample data cleared',
 
   // Login + first-run setup
   'login.tagline': 'One light over everything you run.',

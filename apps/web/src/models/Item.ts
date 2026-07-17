@@ -81,6 +81,10 @@ const ItemSchema = new Schema(
     location: { type: String, default: '' }, // where it physically lives (room / rack / shelf)
 
     aiFilledAt: { type: Date, default: null }, // last time AI fill-from-web enriched it (status badge → don't re-do)
+
+    // Demo/sample-data mode (P1): true for records seeded by "Load sample data" in
+    // Settings → Storage & backup, so they can be cleanly wiped without touching real data.
+    isSample: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }
 );

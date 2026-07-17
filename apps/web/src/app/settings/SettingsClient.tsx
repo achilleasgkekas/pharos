@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin } from 'lucide-react';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -22,6 +22,7 @@ import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, cha
 import { McpManager } from './McpManager';
 import { CalendarFeedManager } from './CalendarFeedManager';
 import { RecomputePricesButton } from './RecomputePricesButton';
+import { getSampleDataStatus, loadSampleData, clearSampleData } from './sampleDataActions';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
 import { CURRENCIES } from '@/lib/money';
 import type { SerializedCard } from '@/types';
@@ -258,6 +259,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
                 <BackupRestore />
                 <RecomputePricesButton />
               </Section>
+              <SampleDataManager />
               <TrashManager />
             </>
           )}
@@ -2226,6 +2228,83 @@ function TrashManager() {
             {t('set.emptyTrash', { n: rows.length })}
           </button>
         </>
+      )}
+    </Section>
+  );
+}
+
+function SampleDataManager() {
+  const t = useT();
+  const [status, setStatus] = useState<{ loaded: boolean; counts: Record<string, number> } | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+  const confirm = useConfirm();
+
+  function load() {
+    startTransition(async () => setStatus(await getSampleDataStatus()));
+  }
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleLoad() {
+    if (status?.loaded) {
+      const ok = await confirm({
+        title: t('set.sampleReloadTitle'),
+        message: t('set.sampleReloadConfirm'),
+        confirmLabel: t('common.confirm'),
+      });
+      if (!ok) return;
+    }
+    setMsg(null);
+    startTransition(async () => {
+      const r = await loadSampleData();
+      const n = r.counts.items + r.counts.receipts + r.counts.expenses + r.counts.subscriptions;
+      setMsg(t('set.sampleLoaded', { n }));
+      load();
+    });
+  }
+
+  async function handleClear() {
+    const ok = await confirm({
+      title: t('set.sampleClearTitle'),
+      message: t('set.sampleClearConfirm'),
+      confirmLabel: t('common.deleteForever'),
+      danger: true,
+    });
+    if (!ok) return;
+    setMsg(null);
+    startTransition(async () => {
+      await clearSampleData();
+      setMsg(t('set.sampleCleared'));
+      load();
+    });
+  }
+
+  const btn =
+    'flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50';
+
+  return (
+    <Section title={t('set.sampleData')} icon={<FlaskConical size={15} />}>
+      <p className="text-xs text-[color:var(--color-text-faint)]">{t('set.sampleDataDesc')}</p>
+      <div className="flex items-center gap-2 flex-wrap mt-2">
+        <button type="button" onClick={handleLoad} disabled={pending} className={cn(btn, 'text-[color:var(--color-accent)]')}>
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <FlaskConical size={13} />}
+          {status?.loaded ? t('set.sampleReload') : t('set.sampleLoad')}
+        </button>
+        {status?.loaded && (
+          <button type="button" onClick={handleClear} disabled={pending} className={cn(btn, 'text-[color:var(--color-red)]')}>
+            <Trash2 size={13} /> {t('set.sampleClear')}
+          </button>
+        )}
+        {msg && (
+          <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {msg}
+          </span>
+        )}
+      </div>
+      {status?.loaded && (
+        <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+          {status.counts.items} items · {status.counts.receipts} receipts · {status.counts.expenses} expenses · {status.counts.subscriptions} subscriptions
+        </p>
       )}
     </Section>
   );
