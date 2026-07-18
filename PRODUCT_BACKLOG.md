@@ -462,11 +462,35 @@
 - **Module:** Mobile (camera-scan) + Items/Inventory (+ `/api/v1` §5, product-lookup helper).
 - **Εξάρτηση:** mobile MVP (§6). **Builder default:** lookup = δωρεάν Open Food Facts / UPC DB, AI fallback.
 
-### P20. Loyalty / membership card wallet (barcode display στο checkout) — S/M — both (mobile-native)
-- **Αξία:** αποθήκευση καρτών μέλους (super market/καύσιμα/φαρμακείο) με αριθμό + barcode/QR· mobile tap →
-  fullscreen barcode (max brightness) για το ταμείο. **Διακριτό** από Vouchers (coupons) και P17 (scan-to-add).
-- **Module:** νέο μικρό module «Cards/Wallet» (ή tab στα Vouchers) + Mobile barcode render.
-- **Ανοιχτή απόφαση (builder default):** tab μέσα στα Vouchers πρώτα· client-side barcode render (μικρή lib, OSS-ok).
+### P20. Loyalty / membership card wallet (barcode display στο checkout) — ✅ SHIPPED 2026-07-18 (pharos-daily-dev, commit `536a3d8`)
+- **Υλοποίηση:** νέο `models/LoyaltyCard.ts` (title/store/cardNumber/barcodeFormat/notes/archived, soft-delete, ίδιο
+  σχήμα-στυλ με το `GiftCard`). Νέο pure **`lib/loyaltyCard.ts`** (`guessBarcodeFormat`/`resolveBarcodeFormat`/
+  `isValidForFormat`, DB-free, **+13 unit tests**): 13-ψήφιος αριθμός → EAN13, 12-ψήφιος → UPC, αλλιώς CODE128
+  (encodes οτιδήποτε) — deterministic, μηδέν χειροκίνητο picking στις περισσότερες περιπτώσεις, override διαθέσιμο.
+  `app/vouchers/loyaltyActions.ts` (CRUD, mirror του `giftcardActions.ts`). Νέο **`components/BarcodeDisplay.tsx`**:
+  client-side render μέσω **jsbarcode** (νέο dep, MIT, **μηδέν runtime dependencies**, dynamically imported ώστε να
+  μην μπει στο shared bundle, ίδιο lazy pattern με το recharts). **Σημαντικό functional detail**: το barcode
+  render-άρεται ΠΑΝΤΑ μαύρο-πάνω-σε-άσπρο ανεξαρτήτως theme (dark/light) — ένας πραγματικός scanner στο ταμείο
+  χρειάζεται σκούρες γραμμές σε ανοιχτό φόντο για να διαβάσει αξιόπιστα, οπότε αυτή η μία επιφάνεια αγνοεί σκόπιμα
+  τα theme tokens (θα ήταν λειτουργικό bug αν η κάρτα σε dark mode έδειχνε λευκές γραμμές σε μαύρο φόντο — άσπαστο
+  barcode). **UI**: 3ο tab στο `/vouchers` (Coupons | Gift cards | **Loyalty cards**, `Barcode` icon) — tile grid,
+  tap στην κάρτα → **fullscreen barcode modal** (το κύριο flow: «είμαι στο ταμείο, δείξε μου την κάρτα»), μικρό
+  hover pencil icon για edit (secondary flow). Wired στο **Trash** (restore/purge + νέο `trash.tLoyaltyCard` i18n
+  key) ακολουθώντας ακριβώς το precedent του GiftCard/P32 — **ΔΕΝ** μπήκε στο JSON backup/export (το GiftCard/Bill/
+  Goal είναι επίσης εκτός εκείνης της λίστας, συνειδητά ίδιο gap). **Builder defaults τηρήθηκαν**: tab μέσα στα
+  Vouchers ✓, client-side barcode lib ✓. Καμία i18n μετάφραση μέσα στο ίδιο tab UI (mirror του GiftCardsClient, που
+  είναι επίσης English-only — πιο σχετικό precedent από τη γενική en+el σύμβαση άλλων σελίδων).
+- **Verify:** `npm run type-check` EXIT 0· full `npx vitest run` **2298 passed / 178 files**. Safe Docker rebuild
+  (mongo ήδη healthy → `up -d web`): `RestartCount=0`, `/login` 200 (Claude Browser pane, τίτλος «Sign in · Pharos»,
+  **μηδέν console errors**), `/vouchers` 307 (auth-gated, compiled καθαρό — δεν testable UI-level το ίδιο το tab
+  χωρίς τα credentials του Αχιλλέα, ίδιος περιορισμός με όλα τα προηγούμενα runs). `docker builder prune -f` μετά
+  (−2.2GB, cache-only).
+- **Follow-up:** μηδέν v1 mobile API ακόμα (web-only για τώρα, ίδιο notice με GiftCard/P32/P28 — mobile parity θα
+  χρειαστεί `/api/v1/loyaltycards` + LoyaltyScreen όταν έρθει η σειρά του mobile roadmap)· καμία notification/alert
+  γι' αυτές τις κάρτες (δεν έχει expiry/balance-at-risk σαν το GiftCard/Voucher, εκτός σκοπού)· mobile «max
+  brightness» behavior (το backlog το ανέφερε) δεν είναι εφικτό από web JS (καμία τέτοια browser API) — καθαρά
+  mobile-native follow-up αν/όταν χτιστεί το companion app UI για αυτό το module.
+- **Module:** νέο tab «Loyalty cards» στο `/vouchers` (+ Trash).
 
 ### P21. Document / manual vault στα inventory items — ✅ SHIPPED 2026-07-14 (pharos-daily-dev)
 - **Υλοποίηση:** νέο `Item.attachments[]` (`{path, name, mimeType, size, uploadedAt}`, `_id:false`) στο `models/Item.ts` —

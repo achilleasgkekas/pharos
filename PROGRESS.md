@@ -5565,3 +5565,82 @@ uncommitted WIP άλλου routine (P20 loyalty-card wallet: `LoyaltyCardsClient
 ως in-progress). ΔΕΝ είναι committed κώδικας, οπότε δεν μπαίνει στο WEB_DEBT.md ως P1 item (out of scope, θα
 κλείσει μόνο του όταν ολοκληρωθεί/committaριστεί το P20 WIP). Το type-check EXIT 0 που αναφέρεται πιο πάνω σε
 αυτή την καταχώρηση ήταν ακριβές τη στιγμή που τρέχτηκε (πριν εμφανιστεί το WIP στο tree).
+
+## 2026-07-18 (pharos-daily-dev — P20 loyalty/membership card wallet SHIPPED)
+
+**Βήμα 0**: pause switch απών. Docker lock αποκτήθηκε καθαρά (κανένα stale lock). Tree ήταν καθαρό στην αρχή
+του run (`git status` clean, τελευταίο commit `d0a592a`).
+
+**Έλεγχος Approved queue πρώτα**: OWNER_DECISIONS.md §8 + PRODUCT_BACKLOG.md `## Approved` — το μόνο item που
+χρειάζεται ρητή Achilleas απόφαση παραμένει το **P36** (Open Banking, L, σκόπιμα τελευταίο). Από τα υπόλοιπα
+buildable-with-defaults (P31 household/shared-access, P24 webhooks, P23 mobile share-sheet, P13 insurance
+export, P8 tax tagging, P16 migration importers, P11 email-IMAP, P17 mobile barcode, **P20 loyalty wallet**, P5
+browser extension, P3 AI month-review, P9 multi-currency) διάλεξα το **P20**: πλήρως speced builder default
+(«tab μέσα στα Vouchers, client-side barcode lib»), web-only MVP εφικτό σε ένα run (mobile barcode-render/
+brightness follow-up ρητά out of scope), και έχει άμεσο, καθαρό precedent να ακολουθήσει (`GiftCard`/P32 —
+ίδιο μοτίβο tab-in-Vouchers, ίδιο μέγεθος module). Το P31 (household/shared-access) παραμένει το επόμενο
+υψηλότερης αξίας item αλλά αγγίζει auth/ρόλους βαθιά· κρίθηκε ξανά ότι αξίζει το δικό του πλήρες run (ίδια
+απόφαση με το 07-17 run).
+
+**Τι μπήκε**:
+- Νέο `models/LoyaltyCard.ts` (title/store/cardNumber/barcodeFormat/notes/archived + soft-delete), σχεδόν ίδιο
+  σχήμα-στυλ με το `GiftCard` αλλά **χωρίς balance** (καμία μονετική αξία — μόνο ένα ID που σκανάρει το ταμείο).
+- Νέο pure **`lib/loyaltyCard.ts`** (+13 unit tests, DB-free): `guessBarcodeFormat` (13-ψήφιος αριθμός → EAN13,
+  12-ψήφιος → UPC, αλλιώς CODE128 που encodes οτιδήποτε) + `resolveBarcodeFormat` (stored/submitted override ή
+  fallback στο guess) + `isValidForFormat` (προ-έλεγχος πριν καλέσει τον barcode renderer, που αλλιώς θα έκανε
+  throw). Deterministic, μηδέν χειροκίνητο picking στις περισσότερες περιπτώσεις.
+- Νέο dep **`jsbarcode`** (+`@types/jsbarcode`, MIT, **μηδέν runtime dependencies** — έλεγξα πριν το install,
+  καθαρό package-lock diff, 2 πακέτα προστέθηκαν). Νέο **`components/BarcodeDisplay.tsx`**: client-only render
+  μέσω `import('jsbarcode')` δυναμικά (ίδιο lazy pattern με το recharts — ποτέ στο shared bundle).
+  **Σημαντική σχεδιαστική απόφαση**: το barcode render-άρεται **πάντα μαύρο-πάνω-σε-άσπρο**, αγνοώντας το
+  dark/light theme της εφαρμογής σκόπιμα — ένας πραγματικός scanner στο ταμείο χρειάζεται σκούρες γραμμές σε
+  ανοιχτό φόντο για αξιόπιστη ανάγνωση· αν το είχα αφήσει theme-aware (π.χ. ανοιχτόχρωμες γραμμές σε σκούρο
+  φόντο στο default dark mode), το barcode θα ήταν de facto άσπαστο σε πραγματικό ταμείο — θα ήταν λειτουργικό
+  bug, όχι απλά αισθητικό.
+- `app/vouchers/loyaltyActions.ts` (CRUD, mirror του `giftcardActions.ts`).
+- **UI**: 3ο tab στο `/vouchers` (`VouchersShell.tsx`): Coupons | Gift cards | **Loyalty cards** (`Barcode`
+  icon). Tile grid· tap στην κάρτα → **fullscreen barcode modal** (το κύριο use-case: «είμαι στο ταμείο»)·
+  μικρό hover pencil icon ανά tile για edit (secondary, λιγότερο συχνό flow) — reuse του ίδιου hover-icon
+  pattern που υπάρχει ήδη αλλού στο app (π.χ. item-detail unlink ×). Καμία i18n μετάφραση μέσα στο ίδιο tab UI
+  (mirror του `GiftCardsClient`, που είναι ήδη English-only — πιο σχετικό precedent εδώ από τη γενική en+el
+  σύμβαση άλλων σελίδων).
+- **Trash**: wired (`TrashType`/`TRASH_MODELS`/`trashLabel` στο `settings/actions.ts` + νέο `trash.tLoyaltyCard`
+  i18n key en.ts + `TrashClient.tsx` icon/label entry), ακολουθώντας ακριβώς το precedent του GiftCard/P32.
+  **ΔΕΝ** μπήκε στο JSON backup/export (`BACKUP_MODELS`) — έλεγξα πρώτα ότι το GiftCard/Bill/Goal είναι επίσης
+  σκόπιμα εκτός εκείνης της λίστας (συνειδητό υπάρχον gap, όχι δικό μου λάθος) και ακολούθησα το ίδιο.
+
+**Coordination note (χρήσιμο για μελλοντικά runs)**: ενώ έτρεχε αυτό το run, δύο ξεχωριστά read-only auditor
+routines (`mobile-parity` commit `f647f43`, `web-debt` commit `da036c9`) είδαν τα δικά μου uncommitted P20 αρχεία
+στο shared working tree και σωστά τα άφησαν ανέγγιχτα, καταγράφοντάς τα ως «WIP άλλου routine» (σωστή
+συμπεριφορά — δεν ήταν δικά τους αρχεία, το coordination model δούλεψε όπως πρέπει). Το type-check error που
+ανέφερε το `da036c9` entry ήταν στιγμιαίο (μέρος του δικού μου ημιτελούς commit), λύθηκε μόλις committed. Καμία
+πραγματική σύγκρουση κώδικα — κανένα από τα ενδιάμεσα commits (`da036c9`/`7aaab8f`/`f647f43`/`82e008c`/`e1ad3d4`/
+`2046133`/`7c65308`/`037c4eb`/`9abf501`/`d724e9f`, όλα ήδη στο origin πριν το push μου) άγγιξε `vouchers/`,
+`LoyaltyCard`, ή σχετικά αρχεία. Fast-forward καθαρό, μηδέν merge conflict.
+
+**Verify**: `npm run type-check` (apps/web) → **EXIT 0**. Full `npx vitest run` → **2298 passed / 178 files**
+(+13 νέα, μηδέν regression). Safe Docker rebuild (`docker compose build web` → mongo ήδη healthy → `up -d web`):
+`RestartCount=0`, `ExitCode=0`, `docker logs` καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning),
+`/login` 200 (browser-checked μέσω Claude Browser pane — τίτλος «Sign in · Pharos», **μηδέν console errors**),
+`/vouchers` 307 (auth-gated, compiled χωρίς server error — δεν testable UI-level το ίδιο το νέο tab χωρίς τα
+credentials του Αχιλλέα, ίδιος περιορισμός με όλα τα προηγούμενα runs). `docker builder prune -f` μετά
+(−2.2GB, cache-only, ασφαλές). Docker lock released.
+
+**Follow-up (καταγράφηκε στο PRODUCT_BACKLOG.md)**: μηδέν v1 mobile API ακόμα (web-only, ίδιο notice με
+GiftCard/P32/P28/P21 — mobile parity θα χρειαστεί `/api/v1/loyaltycards` + LoyaltyScreen όταν έρθει η σειρά)·
+καμία notification για αυτές τις κάρτες (δεν έχει expiry/balance-at-risk σαν GiftCard/Voucher, εκτός σκοπού)·
+το «max brightness» mobile behavior που ανέφερε το backlog δεν είναι εφικτό από web JS (καμία τέτοια browser
+API) — καθαρά mobile-native follow-up.
+
+**Suggested next task**: (α) **P31 household/shared-access** (M, το επόμενο υψηλής αξίας Approved item —
+αγγίζει auth/ρόλους, builder default ήδη locked: shared-data + 3 ρόλοι admin/member/viewer, χωρίς email/MFA
+στο OSS tier — αξίζει το δικό του πλήρες run λόγω του auth surface)· ή (β) **P24 outbound webhooks** (M, καθαρό
+builder default: receipt.parsed/budget.exceeded/installment.due/price.drop events, HMAC signature ON, reuse
+existing trigger points)· ή (γ) αν προτιμηθεί mobile-parity: έλεγξε το `MOBILE_PARITY.md` Build Queue για το
+επόμενο ανοιχτό item (πιθανώς `attachments`/`split`/`space` πεδία στα αντίστοιχα v1 routes, follow-ups από
+P21/P35/P34).
+
+## Needs Achilleas
+
+- Τίποτα νέο αυτό το run. (P36 Open Banking παραμένει το μόνο ανοιχτό Approved item που χρειάζεται ρητή απόφαση
+  scope πριν χτιστεί, αμετάβλητο.)
