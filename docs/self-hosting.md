@@ -72,7 +72,7 @@ This uses the default `docker-compose.yml`, which builds the `web` image locally
 Open `.env` and set the secrets. **Three values are required** and the app fails
 closed without the auth ones.
 
-Generate them:
+Generate required secrets:
 
 ```bash
 openssl rand -base64 32   # → AUTH_SECRET
@@ -80,19 +80,75 @@ openssl rand -base64 32   # → NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
 openssl rand -base64 24   # → MONGO_PASS
 ```
 
-| Variable | Required | Purpose |
+### Required variables
+
+| Variable | Purpose |
+|---|---|
+| `AUTH_SECRET` | Signs the session cookie. If unset, nobody can log in. Rotating it logs everyone out. |
+| `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | Stable key so Server Action IDs survive rebuilds/restarts (keeps open tabs working). |
+| `MONGO_USER` / `MONGO_PASS` | MongoDB root credentials. Baked into the data volume on **first** init only; changing later requires `db.changeUserPassword` on the running container. |
+
+### Optional — connection & session
+
+| Variable | Default | Purpose |
 |---|---|---|
-| `AUTH_SECRET` | **yes** | Signs the session cookie. If unset, nobody can log in. Rotating it logs everyone out. |
-| `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | **yes** | Stable key so Server Action IDs survive rebuilds/restarts (open tabs don't break). |
-| `MONGO_USER` / `MONGO_PASS` | **yes** | MongoDB root credentials. Baked into the data volume on **first** init only; changing later also needs `db.changeUserPassword` on the running container. |
-| `AUTH_COOKIE_SECURE` | no (default `false`) | Set `true` **only** when served over HTTPS. On plain-HTTP LAN/VPN, leaving it `true` stops the login cookie from being set. |
-| `SESSION_IDLE_HOURS` | no (default `12`) | Idle timeout in hours; slid forward on each request. |
-| `ME_USER` / `ME_PASS` | no | Basic-auth for the optional Mongo Express UI (`tools` profile). |
-| `OLLAMA_MODEL` | no (default `qwen2.5vl:7b`) | Default local vision model, if you use Ollama. |
-| `OLLAMA_NUM_CTX` | no (default `8192`) | LLM context window. Larger fits bigger pages but uses more RAM. |
-| `SOLVER_URL` | no | FlareSolverr endpoint for Cloudflare-protected shops (`scraper` profile). |
-| `SCRAPER_CRON` / `PRICE_DROP_ALERT_PCT` | no | Price-scraper schedule and drop-alert threshold (`scraper` profile). |
-| `NTFY_URL` / `NTFY_TOPIC` | no | ntfy push alerts on price drops. Empty `NTFY_TOPIC` disables. |
+| `AUTH_COOKIE_SECURE` | `false` | Set `true` **only** when served over HTTPS. On plain-HTTP LAN/VPN, leaving it `false` allows login cookies to be set. |
+| `SESSION_IDLE_HOURS` | `12` | Session timeout (hours) without activity; resets on each request. |
+| `ME_USER` / `ME_PASS` | (none) | Basic-auth for the optional Mongo Express UI (`:8081`, `tools` profile). |
+
+### Optional — AI providers
+
+The app defaults to **local Ollama** (private, zero-cost). Cloud AI providers are optional; only configure if you want to use them. Keys are stored server-side and never sent to the browser.
+
+| Variable | Purpose |
+|---|---|
+| `ANTHROPIC_API_KEY` | Claude API key (optional fallback; can also be set in Settings → AI) |
+| `OPENAI_API_KEY` | OpenAI API key (optional; can also be set in Settings → AI) |
+| `GEMINI_API_KEY` | Google Gemini API key (optional; can also be set in Settings → AI) |
+| `OLLAMA_HOST` | Ollama server URL (default `http://localhost:11434`). Use a LAN URL to run inference on another machine. |
+| `OLLAMA_MODEL` | Default text model (default `qwen2.5vl:7b`). Overridable in Settings → AI. |
+| `OLLAMA_VISION_MODEL` | Default vision model for receipt/card images (default `qwen2.5vl:7b`). Overridable in Settings. |
+| `OLLAMA_NUM_CTX` | Context window size (default `8192`). Larger fits bigger pages but uses more RAM. |
+| `OLLAMA_KEEP_ALIVE` | How long Ollama keeps a model warm in RAM (default `30m`). |
+
+### Optional — integration & scraping
+
+| Variable | Purpose |
+|---|---|
+| `SEARXNG_URL` | SearXNG metasearch server for "AI fill from web" and product-photo lookup (default `http://searxng:8080` in compose). |
+| `SOLVER_URL` | FlareSolverr endpoint for Cloudflare-protected shops (default `http://flaresolverr:8191` in compose). Only needed if using the `scraper` profile. |
+| `SCRAPER_CRON` | Price-scraper schedule (cron format; default `0 */6 * * *` = every 6 hours). |
+| `PRICE_DROP_ALERT_PCT` | Alert threshold for price drops (default `10` = 10% drop triggers alert). |
+| `NTFY_URL` | ntfy server URL (default `https://ntfy.sh`). |
+| `NTFY_TOPIC` | Topic name for push alerts. Empty disables alerts. |
+
+### Optional — rate limiting
+
+On a shared or public deployment, rate limit API calls to prevent brute-force login or runaway clients. Single-user self-hosted setups do not need this.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `API_RATE_LIMIT` | (disabled) | Max requests per window (e.g. `120`). Empty or `0` disables rate limiting. |
+| `API_RATE_WINDOW_MS` | `60000` | Time window for rate limiting (in milliseconds). `60000` = 1 minute. |
+
+### SaaS-only (ignored in self-hosted)
+
+**Self-hosted deployments should leave all of these blank.** These variables only matter when running the paid, multi-tenant SaaS version.
+
+| Variable | Purpose |
+|---|---|
+| `SAAS_MODE` | Set to `"true"` to enable multi-tenant mode. Anything else keeps single-user mode (the default). |
+| `SAAS_BASE_DOMAIN` | Apex domain for tenant subdomains (e.g. `ph-aros.com`). Default `ph-aros.com`. |
+| `SAAS_PUBLIC_URL` | Public origin for links in transactional emails and Stripe redirects. Falls back to `APP_URL`, then the request origin. |
+| `APP_URL` | Fallback app origin. |
+| `SAAS_SESSION_IDLE_HOURS` | Session timeout for hosted accounts (default `12`). Clamped 0.25–8760 hours. |
+| `SAAS_SUPERADMIN_EMAILS` | Comma/semicolon-separated allowlist of operator emails for the superadmin console. Empty disables the console. |
+| `CRON_SECRET` | Shared secret (generate with `openssl rand -base64 32`) required to call internal cron endpoints (e.g. usage sampling). |
+| `STRIPE_SECRET_KEY` | Stripe secret API key from the Stripe dashboard. |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret. |
+| `STRIPE_PRICE_SHARED` | Stripe price ID for the shared-account tier (price_...). |
+| `STRIPE_PRICE_DEDICATED` | Stripe price ID for the dedicated-account tier (price_...). |
+| `RESEND_API_KEY` | Resend API key for transactional emails (verification, password reset, invites). |
 
 > Never commit `.env`. It holds your database password and secrets.
 

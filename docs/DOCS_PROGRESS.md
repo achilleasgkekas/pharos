@@ -1,5 +1,39 @@
 # DOCS_PROGRESS
 
+## 2026-07-18 (self-hosting.md: comprehensive env vars cross-check + SaaS/Stripe/rate-limit docs)
+
+Το self-hosting.md ειχε ελλειμα: δεν εγραφε τις νεες SaaS/Stripe vars, τις cloud AI provider
+keys, ή το rate limiting. Διαβασα το .env.example πρωτη φορα γιατι source of truth και
+ανακατασκευασα ολη τη "Configure `.env`" ενοτητα με σαφη υποενοτητες ανα κατηγορια.
+
+Τι αλλαξα:
+- Νεο table layout με subsections: Required · Optional (connection/session) · Optional (AI
+  providers, integration/scraping, rate limiting) · SaaS-only (με ρητο "self-hosted
+  deployments should leave all of these blank").
+- Προσθεσα πατρι σεκων που λειπαν: `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`
+  (cloud AI), `API_RATE_LIMIT` / `API_RATE_WINDOW_MS` (optional rate limiting), και ολες τις
+  SaaS vars (SAAS_MODE / SAAS_BASE_DOMAIN / SAAS_PUBLIC_URL / SAAS_SESSION_IDLE_HOURS /
+  SAAS_SUPERADMIN_EMAILS / CRON_SECRET + ολες τις STRIPE_* / RESEND_API_KEY).
+- Ενημερωσα defaults column σε SaarXNG_URL (ηταν κρυμμενο στο .env.example comment).
+- Δες .env.example γραμμη 87-118 για το SaaS block — αντιγραψα τις περιγραφες απο τα
+  comments και διατηρησα την ακριβεια (π.χ. default SAAS_BASE_DOMAIN=ph-aros.com, STRIPE
+  price ID format price_..., RESEND για email κλπ).
+
+Validation (markdown only, κανενα build/Docker/AI):
+- Code fences: 10 blocks (20 backticks, ζυγα).
+- Internal links: 4 targets (backup-and-restore.md, configuration.md, updating.md,
+  ../SECURITY.md) — ολα υπαρχουν ✓.
+- Secret scan: κανενα literal sk_live/sk_test/secret value — ολα placeholder ή change-me ✓.
+
+Collision guard: git status --short δειχνει 3 foreign WIP files ανατμημενα (app admin/
+tenants/[slug], app items/actions.ts, app api/v1/ai/subscription/route.test.ts) — κανενα
+staged. STAGE ΜΟΝΟ docs/self-hosting.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: (α) features.md stale-forward — το P28 bill/payable status tracker ή τα νεα
+P37-P40 candidates μαλλον — ή (β) βλεπε αν ειναι αλλες ακομη gaps σε SaaS docs (ο superadmin
+console διευκρινησαν στο saas.md αλλα μαλλον χρειαζονται περισσοτερη λεπτομερεια απο τις
+recent tenant ACTIONS commits).
+
 ## 2026-07-10 (configuration.md: Calendar feed + Remote access [MCP] walkthroughs)
 
 Καλυψα και τα δυο suggested (α) του προηγουμενου run: το configuration.md ελεγε μονο 4 areas
