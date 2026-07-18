@@ -3,6 +3,43 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-18 54η σάρωση· type-check EXIT 0· v1 surface αμετάβλητος και καθαρός· 1 νέο P2 tenancy-parity εύρημα στο μόλις-shipped P1 sample-data mode· deleteItemPhoto/Attachment IDOR ΕΚΛΕΙΣΕ live κατά τη διάρκεια του run (commit `82e008c`)· 3 SaaS holdouts παραμένουν ανοιχτοί αμετάβλητοι· el.ts gap πήδηξε 42→75)
+
+> **ΣΗΜ concurrent activity**: αυτό το run έτρεξε παράλληλα με άλλα automated routines (reviewer/mobile-parity-auditor/pharos-daily-dev) στο ίδιο working tree — το working tree προχώρησε αρκετά commits (`d0a592a`→`f647f43`, +7) ΚΑΤΑ τη διάρκεια του audit. Ένα από αυτά τα commits (`82e008c`) έκλεισε ΤΟ TOP item της αρχικής μου ουράς (deleteItemPhoto/Attachment IDOR) πριν προλάβω να κάνω commit το δικό μου WEB_DEBT.md update — το item ενημερώθηκε σε DONE στη θέση του αντί να μείνει λανθασμένα TODO. Confirmed live: `items/actions.ts:167-168` + `:270-271`.
+
+- **type-check:** `cd apps/web && npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
+- **Νέος κώδικας από την 53η ελέγχθηκε (3 commits, `git log --since=2026-07-15 -- apps/web/src/app/api apps/web/src/app/items apps/web/src/app/expenses apps/web/src/app/reports apps/web/src/app/settings`):** `7b53bd2` (test-only, v1 `ai/route.test.ts` — μηδέν shape change), `223c2cf` (P26 in-app onboarding checklist), `61e2524` (P1 demo/sample-data mode).
+  - **P26 onboarding checklist (`app/page.tsx`, `components/OnboardingChecklist.tsx`) → καθαρό, μηδέν νέο debt.** Reuse existing `getAppSettings`/`getStorageConfig`/`getNotifiers` helpers μέσα στο ήδη-υπάρχον `Promise.all`, μηδέν νέο query pattern. Ο ίδιος ο commit-author σημείωσε ήδη ρητά (PROGRESS.md 2026-07-16) ότι το `page.tsx` διαβάζει πάντα το DEFAULT tenant (pre-existing gap, ακολούθησε το τοπικό convention σκόπιμα) — δεν το ξαναγράφω εδώ, ήδη καταγεγραμμένο ως follow-up.
+  - **P1 sample-data mode (`app/settings/sampleDataActions.ts`, νέο αρχείο) → 1 νέο P2 εύρημα, δες item παρακάτω.** Writes (`loadSampleData`/`clearSampleData`) είναι σωστά `requireAdmin()`-gated και strictly scoped (`{isSample:true}` filter σε delete/count, ποτέ αγγίζει πραγματικά records) — αλλά χρησιμοποιούν direct model imports (`Item`, `Receipt`, `Expense`, `Subscription`) αντί το `currentModel()`/`withRequestTenant()` pattern που **ήδη υπάρχει και χρησιμοποιείται ενεργά** για 3 από τα 4 ίδια models σε sibling κώδικα (`items/actions.ts`+`page.tsx`, `receipts/actions.ts`+`page.tsx`, `expenses/actions.ts`+`page.tsx`).
+- **v1 API surface αμετάβλητος:** μηδέν commit άγγιξε `src/app/api/v1` από την 53η. Fresh grep: μηδέν `: any`/`as any`/`@ts-ignore`/`@ts-expect-error` (εκτός test), κάθε read route με `.find()` παραμένει `.lean()`-backed, κάθε route εκτός `auth/login` περνά από `withAuth`.
+- **el.ts i18n gap πήδηξε σημαντικά:** 42→**75** missing κλειδιά (+33, από P12 savings/goals [12 κλειδιά] + P26 onboarding [8] + P1 sample-data [11] + `nav.bills` παλαιότερο miss [1] — τρία διαδοχικά features σε 3 μέρες, κανένα δεν πρόσθεσε ελληνική μετάφραση, ίδιο σκόπιμο precedent με πριν). Το χάσμα μεγαλώνει με σταθερό ρυθμό (38→42→75σε ~1 εβδομάδα) — αξίζει προτεραιοποίηση ενός αφιερωμένου μεταφραστικού pass πριν γίνει δυσδιαχείριστο. Παραμένει P3/M, ενημερώθηκε η πλήρης λίστα κλειδιών.
+- **1 item ΕΚΛΕΙΣΕ live κατά τη διάρκεια του run:** `deleteItemPhoto`/`deleteItemAttachment` ownership-check (P2/S, 53η) → **DONE**, commit `82e008c` (concurrent fix commit, δες σημείωση πάνω). Μαρκαρίστηκε DONE στη θέση του.
+- **3 προϋπάρχοντα SaaS holdouts confirmed ΑΚΟΜΑ ανοιχτά, live-verified, μηδέν αλλαγή:** `invites/accept` guardless write (P2/S, 50η)· `audit`/`workspace/erasure/purge` guardless read/cron (P2/S ×2, 49η). Κανένας builder run δεν τα κατανάλωσε ακόμα.
+- **Ουρά μετά το run:** 1 νέο auto-buildable P2/S (sample-data tenancy-parity gap, στην κορυφή — μηχανικό fix, dead-until-SaaS σήμερα αλλά ίδιας κλάσης με sibling κώδικα που ΗΔΗ το κάνει σωστά) + 3 προϋπάρχοντα P2/S SaaS error-handling holdouts + 1 P3/M i18n gap (μεγαλύτερο πλέον) + 1 P3/S decision-flag (`getTenantConnection` readyState guard) στο `## Needs Achilleas`.
+
+---
+
+## Web Debt Queue — ενεργά items (54η σάρωση 2026-07-18)
+
+> Σύνοψη 54ης: νέο tenancy-parity εύρημα στο μόλις-shipped P1 sample-data mode — writes σε 4 models μέσω direct import αντί του `currentModel`/`withRequestTenant` pattern που sibling κώδικας (items/receipts/expenses) ήδη χρησιμοποιεί ενεργά για 3 από τα 4 ίδια models. Dead-until-SaaS σήμερα (SAAS_MODE off self-hosted), αλλά εύκολο μηχανικό fix τώρα που είναι μικρό (3 functions, 1 αρχείο) πριν μεγαλώσει η επιφάνεια. Το deleteItemPhoto/Attachment IDOR item ΕΚΛΕΙΣΕ live κατά τη διάρκεια αυτού του run (concurrent commit `82e008c`) — marked DONE στη θέση του. Οι 3 SaaS holdouts + το el.ts gap παραμένουν από κάτω (στις αρχικές τους θέσεις, αμετάβλητα εκτός από τα Status-line confirmations).
+
+### `sampleDataActions.ts` — «Load/Clear sample data» γράφει πάντα στο DEFAULT tenant, όχι στον τρέχοντα (bypass του υπάρχοντος tenancy pattern)
+- Priority: P2
+- Size: S
+- Area: db
+- Files: apps/web/src/app/settings/sampleDataActions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα:** το νέο `sampleDataActions.ts` (commit `61e2524`, P1 demo/sample-data mode) κάνει `import { Item } from '@/models/Item'` κ.λπ. (γρ.11-14) και τα χρησιμοποιεί απευθείας στα `sampleCounts()`/`getSampleDataStatus()`/`loadSampleData()`/`clearSampleData()` — `Item.countDocuments(...)`, `Item.deleteMany({isSample:true})`, `Item.insertMany(data.items)` κ.ο.κ. για **Item, Receipt, Expense, Subscription**. Αυτά τα models είναι πάντα bound στο **DEFAULT Mongoose connection** (`connectDB()`, μηδέν tenant resolution). Όμως 3 από τα 4 (Item, Receipt, Expense) έχουν ΗΔΗ ένα καθιερωμένο, ενεργά-χρησιμοποιούμενο tenant-scoped equivalent: `items/actions.ts`+`items/page.tsx`, `receipts/actions.ts`+`receipts/page.tsx`, `expenses/actions.ts`+`expenses/page.tsx` κάνουν όλα `return withRequestTenant(async () => { const Item = await currentModel(ItemModel); ... })` ώστε οι queries να χτυπάνε τη σωστή tenant database (`lib/tenancy/connection.ts` `currentModel`, `lib/tenancy/request.ts` `withRequestTenant`).
+  - **Γιατί έχει σημασία:** σε SaaS multi-tenant mode (`SAAS_MODE=on`), ένας tenant που πατά «Load sample data» στο Settings θα κάνει `deleteMany`/`insertMany` στο **DEFAULT** tenant DB, ΟΧΙ στη δική του — τα δείγματα δεν θα εμφανιστούν καν στο δικό του `/items`/`/receipts`/`/expenses` (που ΣΩΣΤΑ διαβάζουν από το tenant DB τους μέσω `currentModel`), ενώ «Clear sample data» θα διαγράψει sample-tagged records από το DEFAULT DB ανεξάρτητα από ποιος το πάτησε — silent cross-tenant confusion/data-mixing σε ένα write path που κάνει `deleteMany`+`insertMany`, όχι απλό read.
+  - **Fix:** mirror το ήδη-υπάρχον pattern 1:1. Import `withRequestTenant` από `@/lib/tenancy/request` + `currentModel` από `@/lib/tenancy/connection`· μετονόμασε τα imports σε `Item as ItemModel`/`Receipt as ReceiptModel`/`Expense as ExpenseModel`/`Subscription as SubscriptionModel`· τύλιξε το σώμα κάθε exported function (`sampleCounts` helper, `getSampleDataStatus`, `loadSampleData`, `clearSampleData`) σε `return withRequestTenant(async () => { ... })`· μέσα, `const Item = await currentModel(ItemModel);` (ίδιο για τα άλλα 3) πριν τα `.countDocuments`/`.deleteMany`/`.insertMany` calls. Το `Subscription` model δεν έχει ακόμα δικό του tenant-scoped call site αλλού στο app, αλλά το `currentModel()` helper είναι γενικό (δουλεύει για οποιοδήποτε Mongoose model) — ίδιο wiring, καμία εξάρτηση.
+  - Σε self-hosted (SAAS_MODE off, ο τρόπος που τρέχει σήμερα ο Αχιλλέας) το `currentModel()`/`withRequestTenant()` no-op στο ίδιο DEFAULT connection (δες `connection.ts:100-104` OSS-parity σχόλιο) — άρα **μηδέν συμπεριφορική αλλαγή σήμερα**, καθαρά προετοιμασία/συνέπεια για όταν ενεργοποιηθεί το SaaS mode.
+  - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/settings/sampleDataActions.ts` ≥ 8 (4 functions × wrap + per-model resolve)· npm run type-check exits 0· existing `sampleData.test.ts` (pure, DB-free) παραμένει green αμετάβλητο.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-18, 54η σάρωση web-code-quality auditor· live: `sampleDataActions.ts:11-14` direct model imports, μηδέν `withRequestTenant`/`currentModel` σε ολόκληρο το αρχείο· sibling `items/actions.ts:4,8-9` δείχνει το ήδη-καθιερωμένο pattern για reference)
+
+---
+
 ## Σύνοψη audit (2026-07-15 53η σάρωση· type-check EXIT 0· expenses space/split parity ΕΚΛΕΙΣΕ (DONE, commit `b4f32af`)· 1 νέο P2 file-delete IDOR εύρημα στο P21 document vault· reset-request timing item ΕΚΛΕΙΣΕ (stale-marked TODO)· 3 SaaS error-handling holdouts παραμένουν ανοιχτά)
 
 - **type-check:** `cd apps/web && npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
@@ -33,7 +70,7 @@
   - **Fix:** σε ΚΑΙ ΤΑ ΔΥΟ, υπολόγισε το `found` ΠΡΙΝ το filter (`const found = item.photos.includes(relativePath)` / `item.attachments.some(a => a.path === path)`)· κάλεσε `deleteFile(...)` **μόνο όταν** `found` ήταν true· επίστρεψε `{ ok: found, photos/attachments: [...] }` (found=false → δεν αγγίζεις ΤΙΠΟΤΑ, ούτε save ούτε deleteFile). Ίδιο μικρό pattern και στα δύο, καμία αλλαγή σε response shape πέρα από το `ok` να αντανακλά πλέον σωστά αν κάτι όντως αφαιρέθηκε.
   - Μηδέν αλλαγή στο happy-path UI (το `ItemDocuments.tsx`/όποιο component καλεί το photo-delete πάντα στέλνει ένα path που ΟΝΤΩΣ υπάρχει στο item, άρα `found` είναι πάντα true στην κανονική χρήση).
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-15, 53η σάρωση web-code-quality auditor· live: `items/actions.ts:269` filter χωρίς προηγούμενο `found`-check, `deleteFile(path)` unconditional στη γρ.273· ίδιο pattern στο `deleteItemPhoto` γρ.166-172)
+- Status: **DONE (2026-07-18, commit `82e008c` "fix(items,saas): close item photo/attachment delete IDOR; dedupe plan-key list")** — και τα δύο actions υπολογίζουν πλέον `found` (`item.photos.includes(relativePath)` / `item.attachments.some(a => a.path === path)`) πριν το filter· `return {ok:false, photos/attachments:[...]}` όταν `found` είναι false, χωρίς filter/save/deleteFile. Ακριβώς όπως speced. Confirmed live κατά τη 54η σάρωση (concurrent commit landed ενώ έτρεχε αυτό το run). (flagged αρχικά 2026-07-15, 53η σάρωση web-code-quality auditor)
 
 ---
 
@@ -124,7 +161,7 @@
   - SaaS-only (SAAS_MODE off = 404 upstream), μηδέν επίδραση στον v1 mobile surface. Διορθώνει και την ανακριβή σημείωση στη γρ.45 του `erasure/purge` item («invites/accept έχει ήδη δικό του try/catch» — ισχύει μόνο για την create-race).
   - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/invites/accept/route.ts` → ≥2 (create-race + νέο top-level).
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-09, 50η σάρωση· live: `try {` = 1 [create-race μόνο], 8 unguarded DB ops γρ.44-122)
+- Status: TODO (flagged 2026-07-09, 50η σάρωση· live: `try {` = 1 [create-race μόνο], 8 unguarded DB ops γρ.44-122· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό, `try {` count αμετάβλητο)
 
 ---
 
@@ -144,7 +181,7 @@
   - Το gate ladder (404 SAAS off / 401 no-session / 403 non-admin), το serializer whitelist projection, το keyset-pagination cursor + η batched actor resolution ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500. SaaS-only (SAAS_MODE off = 404), μηδέν επίδραση στον v1 mobile surface.
   - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/audit/route.ts` → ≥1.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, 2 unguarded `await` DB reads γρ.64+79)
+- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, 2 unguarded `await` DB reads γρ.64+79· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό)
 
 ### `workspace/erasure/purge/route.ts` — cron scan χωρίς try/catch → HTML 500 στον scheduler
 - Priority: P2
@@ -158,7 +195,7 @@
   - Τα gates (404 SAAS off / 500 no CRON_SECRET / 401 bad token) + το report-only `dryRun:true` contract ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500. SaaS-only, μηδέν επίδραση στον v1 mobile surface. (`auth/logout` = μηδέν DB read [μόνο `clearAccountCookie`] → σκόπιμα εκτός· `billing/webhook`+`invites/accept` έχουν ήδη δικό τους try/catch.)
   - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/workspace/erasure/purge/route.ts` → ≥1.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, `await runErasurePurgeScan()` unguarded)
+- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, `await runErasurePurgeScan()` unguarded· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό)
 
 ---
 
@@ -1158,19 +1195,20 @@
   - npm run type-check exits 0
 - Status: TODO (flagged 2026-07-01 reviewer, commit `1a7d16e`· 37η σάρωση επιβεβαίωσε ανοιχτό: `connection.ts:54` guard επιστρέφει cached conn εκτός αν `readyState === 99` (uninitialized)· readyState 0 (disconnected) περνά ακόμα)
 
-### el.ts i18n gap — 38 κλειδιά των νέων features μόνο στα αγγλικά (Greek-first χρήστης βλέπει English fallback)
+### el.ts i18n gap — 75 κλειδιά των νέων features μόνο στα αγγλικά (Greek-first χρήστης βλέπει English fallback)
 - Priority: P3
 - Size: M
 - Area: web
 - Files: apps/web/src/lib/i18n/locales/el.ts (source keys: apps/web/src/lib/i18n/locales/en.ts)
 - Depends on: none
 - Acceptance:
-  - **Το πρόβλημα:** τα features P35 (expense split), P34 (per-space ledger tag), P32 (gift-card), P28 (bills) πρόσθεσαν 38 νέα κλειδιά στο `en.ts` **χωρίς** αντίστοιχες ελληνικές μεταφράσεις στο `el.ts`. Ο resolver (`i18n/index.ts:22` `dict[key] ?? en[key] ?? String(key)`) κάνει graceful fallback στα αγγλικά, άρα **δεν σπάει το UI** (καμία raw-key εμφάνιση, type-check EXIT 0 γιατί `el: Partial<Dict>`). Όμως ο χρήστης είναι Greek-first (CLAUDE.md), οπότε τα split / gift-card / bills / per-space UI strings εμφανίζονται στα αγγλικά αντί ελληνικά.
-  - **Τα κλειδιά** (comm en−el, 42 live στη 53η σάρωση — 4 νέα από το P7 auto-discovery panel σε σχέση με τα αρχικά 38): `ex.allSpaces`, `ex.balanceEntries`, `ex.balancesBtn`, `ex.balancesEmpty`, `ex.balancesSettled`, `ex.balancesTitle`, `ex.fSpace`, `ex.settleBody`, `ex.settleTitle`, `ex.settleUp`, `ex.space`, `ex.spaceNone`, `ex.splitAddPerson`, `ex.splitEmpty`, `ex.splitEqually`, `ex.splitIncludeMe`, `ex.splitMarkPaid`, `ex.splitName`, `ex.splitOwedYou`, `ex.splitSettled`, `ex.splitTitle`, `ex.splitYourShare`, `home.dBills`, `nav.bills`, `notif.billDueSub`, `notif.billOverdueSub`, `notif.billTodaySub`, `notif.giftcardSub`, `notif.giftcardTodaySub`, `reports.cExpBySpace`, `set.billAlert`, `set.giftCardAlert`, `set.spaces`, `set.spacesDesc`, `set.spacesEmpty`, `set.spacesPlaceholder`, `trash.tBill`, `trash.tGiftCard`, **+νέα**: `sub.discoveredDismiss`, `sub.discoveredOccurrences`, `sub.discoveredTitle`, `sub.discoveredTrack` (P7 auto-discovery, commit `97a7d66`).
+  - **Το πρόβλημα:** διαδοχικά features (P35 expense split, P34 per-space ledger tag, P32 gift-card, P28 bills, P7 auto-discovery, P12 savings/goals, P26 onboarding checklist, P1 sample-data mode) πρόσθεσαν νέα κλειδιά στο `en.ts` **χωρίς** αντίστοιχες ελληνικές μεταφράσεις στο `el.ts`. Ο resolver (`i18n/index.ts:22` `dict[key] ?? en[key] ?? String(key)`) κάνει graceful fallback στα αγγλικά, άρα **δεν σπάει το UI** (καμία raw-key εμφάνιση, type-check EXIT 0 γιατί `el: Partial<Dict>`). Όμως ο χρήστης είναι Greek-first (CLAUDE.md), οπότε όλα αυτά τα UI strings εμφανίζονται στα αγγλικά αντί ελληνικά.
+  - **Το χάσμα μεγαλώνει σταθερά, ίδιο-scoped commits το κάνουν σκόπιμα (documented precedent, δες PROGRESS.md 2026-07-15/07-16 runs)**: 38 (2026-07-10) → 42 (53η σάρωση, 2026-07-15, +4 P7) → **75 (54η σάρωση, 2026-07-18, +33)**. Τα +33 της τελευταίας περιόδου: `reports.cGoals`/`gNewGoal`/`gNoGoals`/`gTitle`/`gTitlePlaceholder`/`gTarget`/`gDeadline`/`gReached`/`gPerMonth`/`gAddAmount`/`gDeleteTitle`/`gDeleteBody`/`home.dGoals`/`trash.tGoal` (P12 savings/goals, 12 κλειδιά)· `home.onbTitle`/`onbSubtitle`/`onbDone`/`onbStorage`/`onbReceipt`/`onbBudget`/`onbCard`/`onbNotify` (P26 onboarding, 8 κλειδιά)· `set.sampleData`/`sampleDataDesc`/`sampleLoad`/`sampleReload`/`sampleClear`/`sampleReloadTitle`/`sampleReloadConfirm`/`sampleClearTitle`/`sampleClearConfirm`/`sampleLoaded`/`sampleCleared` (P1 sample-data, 11 κλειδιά)· `nav.bills` (1, παλαιότερο miss).
+  - **Πλήρης λίστα (comm en−el, 75 live στη 54η σάρωση):** `nav.bills`, `home.dBills`, `home.dGoals`, `home.onbTitle`, `home.onbSubtitle`, `home.onbDone`, `home.onbStorage`, `home.onbReceipt`, `home.onbBudget`, `home.onbCard`, `home.onbNotify`, `trash.tGiftCard`, `trash.tBill`, `trash.tGoal`, `reports.cExpBySpace`, `reports.cGoals`, `reports.gNewGoal`, `reports.gNoGoals`, `reports.gTitle`, `reports.gTitlePlaceholder`, `reports.gTarget`, `reports.gDeadline`, `reports.gReached`, `reports.gPerMonth`, `reports.gAddAmount`, `reports.gDeleteTitle`, `reports.gDeleteBody`, `sub.discoveredTitle`, `sub.discoveredOccurrences`, `sub.discoveredTrack`, `sub.discoveredDismiss`, `ex.space`, `ex.fSpace`, `ex.allSpaces`, `ex.spaceNone`, `ex.splitTitle`, `ex.splitEmpty`, `ex.splitName`, `ex.splitAddPerson`, `ex.splitEqually`, `ex.splitIncludeMe`, `ex.splitMarkPaid`, `ex.splitOwedYou`, `ex.splitSettled`, `ex.splitYourShare`, `ex.balancesTitle`, `ex.balancesBtn`, `ex.balancesEmpty`, `ex.balancesSettled`, `ex.balanceEntries`, `ex.settleUp`, `ex.settleTitle`, `ex.settleBody`, `set.giftCardAlert`, `set.billAlert`, `set.spaces`, `set.spacesDesc`, `set.spacesEmpty`, `set.spacesPlaceholder`, `notif.giftcardSub`, `notif.giftcardTodaySub`, `notif.billDueSub`, `notif.billTodaySub`, `notif.billOverdueSub`, `set.sampleData`, `set.sampleDataDesc`, `set.sampleLoad`, `set.sampleReload`, `set.sampleClear`, `set.sampleReloadTitle`, `set.sampleReloadConfirm`, `set.sampleClearTitle`, `set.sampleClearConfirm`, `set.sampleLoaded`, `set.sampleCleared`.
   - **Fix:** πρόσθεσε ελληνική τιμή για κάθε ένα στο `el.ts` (χρησιμοποίησε το en string ως πηγή· κράτα το ίδιο interpolation-placeholder format π.χ. `{n}`, `{name}`). Καμία αλλαγή σε keys/en.ts.
-  - **ΣΗΜ (γιατί flag, όχι fix από reviewer):** 38 μεταφράσεις είναι judgment call ακριβείας (el = primary γλώσσα του χρήστη), όχι μηχανικό one-liner· ανήκει στον builder. Μη-blocking (English fallback ενεργό).
-  - Επαλήθευση: `comm -23 <(grep -oE "^\s+'[^']+':" en.ts|sed "s/[': ]//g"|sort -u) <(grep -oE "^\s+'[^']+':" el.ts|sed "s/[': ]//g"|sort -u)` → μηδέν γραμμές· npm run type-check exits 0.
-- Status: TODO (flagged 2026-07-10 reviewer· live: en=1179 keys, el=1141, 38 missing από P28/P32/P34/P35· 53η σάρωση 2026-07-15 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό ΚΑΙ μεγαλύτερο: 42 missing πλέον, +4 από το P7 auto-discovery panel `sub.discovered*`)
+  - **ΣΗΜ (γιατί flag, όχι fix από reviewer):** 75 μεταφράσεις είναι judgment call ακριβείας (el = primary γλώσσα του χρήστη), όχι μηχανικό one-liner· ανήκει στον builder, ιδανικά σε ένα αφιερωμένο μεταφραστικό pass (το χάσμα θα συνεχίσει να μεγαλώνει ανά feature αν δεν γίνει). Μη-blocking (English fallback ενεργό).
+  - Επαλήθευση: `node -e "const fs=require('fs');const k=s=>{const re=/^\s*'([A-Za-z0-9_.]+)':/gm;const set=new Set();let m;while(m=re.exec(s))set.add(m[1]);return set};const en=k(fs.readFileSync('src/lib/i18n/locales/en.ts','utf8'));const el=k(fs.readFileSync('src/lib/i18n/locales/el.ts','utf8'));console.log([...en].filter(x=>!el.has(x)).length)"` (τρέξε μέσα στο `apps/web`) → 0· npm run type-check exits 0.
+- Status: TODO (flagged 2026-07-10 reviewer· live: en=1179 keys, el=1141, 38 missing από P28/P32/P34/P35· 53η σάρωση 2026-07-15: 42 missing (+4 P7)· **54η σάρωση 2026-07-18: 75 missing (+33, από P12/P26/P1)** — en=1220, el=1145, gap μεγαλώνει σταθερά, αξίζει προτεραιοποίηση πριν φτάσει σε δύσκολο-να-καλυφθεί μέγεθος)
 
 ---
 

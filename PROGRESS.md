@@ -5551,3 +5551,17 @@ onboarding 8, P1 sample-data 11, +1 παλαιότερο `nav.bills` miss). Ο �
 
 - Τίποτα νέο αυτό το run. Το `getTenantConnection` readyState guard semantics (dead-until-SaaS, αμετάβλητο από
   37η σάρωση) παραμένει το μόνο ανοιχτό decision-flag.
+
+**Διόρθωση (concurrent write, ίδιο run)**: ενώ έτρεχε αυτή η 54η σάρωση, ένα ξεχωριστό routine έκανε commit
+`82e008c` («fix(items,saas): close item photo/attachment delete IDOR») που έκλεισε ακριβώς το item #2 του
+top-3 παραπάνω (`deleteItemPhoto`/`deleteItemAttachment` ownership check). Το WEB_DEBT.md ενημερώθηκε σε DONE
+στη θέση του πριν το commit αυτού του run — το top-3 πάνω σε αυτή την καταχώρηση μένει ως ιστορικό snapshot της
+στιγμής που γράφτηκε, δες WEB_DEBT.md για την τρέχουσα (ορθή) κατάσταση.
+
+**ΣΗΜ τελικό type-check (μετά τη διόρθωση)**: re-run `npm run type-check` λίγο πριν το commit αυτού του run
+βγάζει **1 σφάλμα** (`vouchers/page.tsx(20,11)`, λείπει `loyaltyCards` prop) — προέρχεται από ξεχωριστό,
+uncommitted WIP άλλου routine (P20 loyalty-card wallet: `LoyaltyCardsClient.tsx`/`loyaltyActions.ts`/
+`loyaltyCard.ts` untracked + `VouchersShell.tsx`/`types.ts` modified, όλα ήδη σημειωμένα στο commit `f647f43`
+ως in-progress). ΔΕΝ είναι committed κώδικας, οπότε δεν μπαίνει στο WEB_DEBT.md ως P1 item (out of scope, θα
+κλείσει μόνο του όταν ολοκληρωθεί/committaριστεί το P20 WIP). Το type-check EXIT 0 που αναφέρεται πιο πάνω σε
+αυτή την καταχώρηση ήταν ακριβές τη στιγμή που τρέχτηκε (πριν εμφανιστεί το WIP στο tree).
