@@ -1748,3 +1748,25 @@ Mock pattern: DB-mock + REAL helpers. Mock ΜΟΝΟ το DB seam (`@/lib/db` con
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = μόνο το δικό μου νέο αρχείο (`??  ai/route.test.ts`), μηδέν foreign WIP αυτή τη φορά. Στάγιαρα ΜΟΝΟ τα δικά μου paths (ai/route.test.ts + OSS_PROGRESS.md) με explicit pathspec.
 
 Suggested next task: (β συνέχεια) `ai/route.ts` έγινε· απομένει `ai/subscription/route.ts` (ίδια οικογένεια — AI command seam, δες αν μοιράζεται τον ίδιο agent/mock pattern ή έχει δικό του seam). Μετά: item sub-routes `items/[id]/link-plan|plans|ai-fill|convert-to-task`· `receipts/[id]/rescan|add-to-library`· `expenses/[id]/rescan`· `items/import`· `settings/test-notify`. ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified (έλεγξε `git status` πρώτα). DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-18 (cont.¹¹ — ai/subscription/route.test.ts, το subscription AI-fill-by-name seam)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/ai/subscription/route.test.ts` για το POST του `/api/v1/ai/subscription`.**
+
+Επιλογή target: επόμενο στη σειρά της οικογένειας AI-seam routes (`ai/route.ts` έγινε προηγούμενο run). Αυτό είναι μικρότερο route — «AI-fill by name» (π.χ. δίνεις «Netflix», γυρνάει provider/amount/billingCycle/category) που χρησιμοποιεί το New-Subscription form (web + mobile). Δεν μοιράζεται mock pattern με το `ai/route.ts` (διαφορετικό action: `suggestSubscriptionInfo` από `@/app/subscriptions/actions`, όχι `runAiCommand`), αλλά ίδιο σκελετό auth (`withAuth`+`bearerUser`→`@/models/User`).
+
+Route-only συμπεριφορά που δοκιμάστηκε: (α) `name = String(b.name || '').trim()` → non-string bodies coerced (`42`→`'42'`), whitespace-only (`'   '`) trims σε κενό → 400 «name required» ΧΩΡΙΣ να καλέσει το action (μηδέν σπάταλο AI call), (β) το trimmed name (όχι το raw) προωθείται στο `suggestSubscriptionInfo`, (γ) envelope: ok → 200 `{ data }` (το `ParsedSubscription` verbatim)· not-ok → `apiError(r.error, 400)` — **χωρίς fallback μήνυμα** (σε αντίθεση με το `ai/route.ts` που έχει `r.error || 'AI failed'`) — δοκιμάστηκαν 2 ξεχωριστά error strings (feature-off + Ollama-unreachable, και τα δύο έρχονται από το ίδιο `ok:false` shape του `suggestSubscriptionInfo`).
+
+Mock pattern: DB-mock (`@/lib/db` connectDB, `@/models/User` findOne→select→lean) + REAL `withAuth`/`readBody` + mock `@/app/subscriptions/actions` (`suggestSubscriptionInfo` μόνο, χωρίς να αγγίξω τα υπόλοιπα exports του module — το `vi.mock` factory επιστρέφει μόνο αυτό που χρειάζεται το route).
+
+Τι έγινε: Νέο `route.test.ts` (11 tests): auth gate (2: no-token, unknown-token — action ποτέ δεν καλείται), name validation (6: missing key, empty string, whitespace-only, malformed JSON→{}, non-string coerced+forwarded ως string, trim πριν forward), envelope (3: ok→200 {data} verbatim, not-ok feature-off→400 {error} exact, not-ok Ollama-unreachable→400 {error} exact χωρίς fallback).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/ai/subscription/route.test.ts` → 11/11 passed.
+- `npx vitest run` (όλο το suite) → 177 files, 2285/2285 passed (+2 files/+20 tests από concurrent routines μεταξύ των δύο runs, όχι δικά μου· δεν άγγιξα τίποτα άλλο).
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό.
+- Collision guard: πριν το stage, `git diff --cached` κενό. `git status --short` έδειξε foreign WIP (`M apps/web/src/app/items/actions.ts`, unrelated running routine) — ΔΕΝ το άγγιξα/staged. Στάγιαρα ΜΟΝΟ τα δικά μου paths (ai/subscription/route.test.ts + OSS_PROGRESS.md) με explicit pathspec.
+
+Suggested next task: (β συνέχεια) Η οικογένεια `ai/*` seam routes ΕΓΙΝΕ (route.ts + subscription/route.ts). Επόμενα, ένα module ανά run: item sub-routes `items/[id]/link-plan|plans|ai-fill|convert-to-task`· `receipts/[id]/rescan|add-to-library`· `expenses/[id]/rescan`· `items/import`· `settings/test-notify`. ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified (έλεγξε `git status` πρώτα, όπως και το `items/actions.ts` — δες αν επηρεάζει `items/[id]/ai-fill` πριν το πιάσεις). DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
