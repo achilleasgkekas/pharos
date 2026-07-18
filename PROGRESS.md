@@ -2,7 +2,51 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 22750b2 -->
+<!-- reviewed: 82e008c -->
+
+## 2026-07-18 (reviewer — έλεγχος 22750b2..82e008c, 1 fix commit)
+
+**Εύρος**: 23 commits από το τελευταίο reviewed marker (`22750b2`) μέχρι το `d0a592a` (P1 demo/sample-data,
+P26 onboarding checklist, P12 savings/goals, P7 subscription auto-discovery, admin tenant ACTIONS,
+P21 document vault, mobile-parity fixes για expenses space/split + receipts return-window badge + notif
+icon kinds, νέο `ai/route.test.ts`).
+
+**Checks**: `cd apps/web && npm run type-check` → **EXIT 0**. `cd apps/mobile && npx tsc --noEmit` →
+**EXIT 0**. `npx vitest run` (apps/web) → **2298 passed / 178 files**.
+
+**Review**: mobile API parity (v1 receipts/expenses routes ↔ `apps/mobile/src/api.ts` + Screens) σωστά
+ευθυγραμμισμένα (`space`/`split`/`returnDaysLeft`/νέα `NotifKind` values όλα wired και στις δύο πλευρές).
+Admin tenant PATCH (`adminTenantActions.ts`) καθαρό, pure+unit-tested, ίδια εκτίμηση με το προηγούμενο
+53η-σάρωση review («exemplary»). `sampleDataActions.ts` (P1) σωστά scoped (`isSample:true` strict match,
+`requireAdmin` gate, ποτέ δεν αγγίζει πραγματικά δεδομένα). `recurringDiscovery.ts`/`goals.ts`/`split.ts`
+pure + καλά testable, καμία προφανής bug.
+
+**Fixed (2 μικρά, safe, verified)**:
+1. **`deleteItemPhoto`/`deleteItemAttachment` IDOR** (`apps/web/src/app/items/actions.ts`) — το ήδη-
+   τεκμηριωμένο εύρημα από την 53η web-code-quality σάρωση (βλ. `WEB_DEBT.md`, ίδιο commit range). Και
+   οι δύο server actions έσβηναν το underlying storage αρχείο ΧΩΡΙΣ να επιβεβαιώσουν ότι το path όντως
+   ανήκει στο item. Fix ακριβώς όπως speced: υπολογισμός `found` πριν το filter, `deleteFile`/save μόνο
+   όταν `found`, `ok` reflects πλέον σωστά αν κάτι αφαιρέθηκε. Μηδέν αλλαγή στο happy-path (το UI πάντα
+   στέλνει valid path).
+2. **`TenantActionsPanel.tsx` plan-list dedup**: το hardcoded `PLAN_OPTIONS = ['free','shared','dedicated']`
+   αντικαταστάθηκε με import του `PLAN_KEYS` από `lib/billing/plans.ts` (pure, no-imports module, ήδη η
+   πηγή αλήθειας που χρησιμοποιεί το ίδιο το PATCH route για validation) — μηδέν πλέον διπλό-λίστα drift.
+
+**ΣΗΜ concurrent write**: κατά τη διάρκεια αυτού του review, ένα άλλο routine (πιθανώς pharos-daily-dev)
+έκανε commit+push νέα δουλειά (μέχρι `e1ad3d4`, P41-P44 backlog candidates + cross-tenant activity trail)
+ΚΑΙ άφησε uncommitted WIP στο ίδιο working tree (`apps/web/src/app/vouchers/loyaltyActions.ts` +
+`BarcodeDisplay.tsx` + `loyaltyCard.ts`/`.test.ts` + `models/LoyaltyCard.ts`, μαζί με modified
+`MOBILE_PARITY.md`/`WEB_DEBT.md`/`package.json`/`types.ts` — μοιάζει με P20 loyalty-card wallet σε εξέλιξη).
+Δεν το άγγιξα καθόλου (ούτε stage ούτε commit) — το commit μου περιείχε ΜΟΝΟ τα 2 αρχεία που όντως
+έγραψα, το push ήταν clean fast-forward (`e1ad3d4..82e008c`).
+
+**Flagged**: τίποτα νέο. Οι 3 SaaS error-handling holdouts + το el.ts i18n gap (μεγαλύτερο πλέον μετά τα
+P7/P12/P26/P1 νέα strings, ΟΛΑ μόνο στο en.ts — ίδιο προϋπάρχον pattern, ασφαλές fallback στο `makeT`)
+παραμένουν όπως ήταν, θα καταγραφούν στο επόμενο web-code-quality run.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το review.
 
 ## 2026-07-15 (web code-quality auditor — 52η σάρωση· read-only· type-check EXIT 0· 1 νέο P2 mobile-parity + 3 SaaS holdouts)
 
@@ -5462,3 +5506,48 @@ headline/breakdown** [P2/M, ήδη πλήρως speced]· (4, νέο) **Goals en
   SaaS multi-tenant surfaces confirm-out-of-scope, safe-area dep, theme/light-dark + language switcher,
   AI-engine/storage/OneDrive Settings, statements PDF-import, remote push E2E σε πραγματική συσκευή (EAS+APNs), Tasks
   Kanban board, lucide icon set, rate-limit 429 backoff.
+
+## 2026-07-18 (web-code-quality auditor, 54η σάρωση)
+
+**Ορίστε πλαίσιο**: τελευταία web-code-quality σάρωση (53η) ήταν 2026-07-15. Από τότε 3 commits άγγιξαν τα
+ελεγχόμενα paths: `7b53bd2` (test-only, v1 `ai/route.test.ts`), `223c2cf` (P26 in-app onboarding checklist),
+`61e2524` (P1 demo/sample-data mode).
+
+**type-check**: `cd apps/web && npm run type-check` → **EXIT 0**.
+
+**Νέος κώδικας ελέγχθηκε**:
+- **P26 onboarding checklist** (`app/page.tsx`, `components/OnboardingChecklist.tsx`): καθαρό, reuse existing
+  helpers μέσα στο ήδη-υπάρχον `Promise.all`, μηδέν νέο query pattern. Ο ίδιος ο builder run το σημείωσε ήδη
+  (2026-07-16 entry παρακάτω) ότι το `page.tsx` διαβάζει πάντα DEFAULT tenant — pre-existing, όχι νέο σε αυτό το
+  session.
+- **P1 sample-data mode** (`app/settings/sampleDataActions.ts`, νέο αρχείο): writes σωστά `requireAdmin()`-gated
+  και strictly scoped (`{isSample:true}` filter, ποτέ αγγίζει πραγματικά records) — αλλά **1 νέο P2 εύρημα**:
+  χρησιμοποιεί direct model imports (`Item`/`Receipt`/`Expense`/`Subscription`) αντί το `currentModel()`/
+  `withRequestTenant()` pattern που sibling κώδικας (`items/`, `receipts/`, `expenses/` actions+pages) ΗΔΗ
+  χρησιμοποιεί ενεργά για 3 από τα 4 ίδια models. Dead-until-SaaS σήμερα (SAAS_MODE off), αλλά αξίζει το μηχανικό
+  fix τώρα (3 functions, 1 αρχείο, μικρό) πριν μεγαλώσει η επιφάνεια sample-data σε περισσότερα models. Πλήρες
+  spec στο WEB_DEBT.md.
+
+**v1 API surface αμετάβλητος και καθαρός**: μηδέν commit άγγιξε `src/app/api/v1`. Fresh grep: μηδέν `any`/`as any`/
+`@ts-ignore` (εκτός test), κάθε read route `.lean()`-backed, κάθε route εκτός `auth/login` περνά από `withAuth`.
+
+**el.ts i18n gap πήδηξε σημαντικά**: 42→**75** missing κλειδιά (+33 σε 3 μέρες: P12 savings/goals 12 κλειδιά, P26
+onboarding 8, P1 sample-data 11, +1 παλαιότερο `nav.bills` miss). Ο ρυθμός επιτάχυνε (38→42 σε μία εβδομάδα,
+42→75 σε 3 μέρες) — σημείωσα ρητά στο item ότι αξίζει προτεραιοποίηση ενός αφιερωμένου μεταφραστικού pass πριν
+γίνει δυσδιαχείριστο μέγεθος.
+
+**4 προϋπάρχοντα items confirmed ΑΚΟΜΑ ανοιχτά, live-verified, μηδέν αλλαγή στον κώδικα**: `deleteItemPhoto`/
+`deleteItemAttachment` ownership-check (P2/S, 53η)· `invites/accept` guardless write (P2/S, 50η)· `audit`/
+`workspace/erasure/purge` guardless read/cron (P2/S ×2, 49η). Κανένας builder run δεν τα κατανάλωσε ακόμα.
+
+**Top-3 για τον builder**:
+1. **`sampleDataActions.ts` tenancy-parity gap** (P2/S, νέο σήμερα) — μηχανικό, mirror ενός ήδη-υπάρχοντος pattern.
+2. **`deleteItemPhoto`/`deleteItemAttachment` ownership check** (P2/S, 53η) — αγγίζει live data safety, ακόμα
+   ανοιχτό μετά από 1 εβδομάδα.
+3. **3× SaaS error-handling holdouts** (`invites/accept`, `audit`, `workspace/erasure/purge`, P2/S, 49η/50η) —
+   μηχανικά wraps, dead-until-SaaS.
+
+## Needs Achilleas
+
+- Τίποτα νέο αυτό το run. Το `getTenantConnection` readyState guard semantics (dead-until-SaaS, αμετάβλητο από
+  37η σάρωση) παραμένει το μόνο ανοιχτό decision-flag.
