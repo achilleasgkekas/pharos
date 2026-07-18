@@ -165,6 +165,8 @@ export async function deleteItemPhoto(itemId: string, relativePath: string): Pro
   const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, photos: [] };
+  const found = item.photos.includes(relativePath);
+  if (!found) return { ok: false, photos: [...item.photos] };
   item.photos = item.photos.filter((p) => p !== relativePath);
   await item.save();
   try {
@@ -266,6 +268,8 @@ export async function deleteItemAttachment(
   const Item = await currentModel(ItemModel);
   const item = await Item.findById(itemId);
   if (!item) return { ok: false, attachments: [] };
+  const found = item.attachments.some((a) => a.path === path);
+  if (!found) return { ok: false, attachments: JSON.parse(JSON.stringify(item.attachments)) as SerializedAttachment[] };
   item.attachments = item.attachments.filter((a) => a.path !== path) as typeof item.attachments;
   item.markModified('attachments');
   await item.save();

@@ -9,8 +9,7 @@
 // SAAS_MODE + superadmin gated /admin segment, so it never exists in the self-hosted build.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-const PLAN_OPTIONS = ['free', 'shared', 'dedicated'] as const;
+import { PLAN_KEYS } from '@/lib/billing/plans';
 
 type Props = {
   slug: string;
@@ -151,7 +150,7 @@ export function TenantActionsPanel({ slug, status, plan }: Props) {
           disabled={busy !== null}
           className="rounded-lg border border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] px-2 py-1.5 text-xs capitalize text-[color:var(--color-text)] disabled:opacity-40"
         >
-          {PLAN_OPTIONS.map((p) => (
+          {PLAN_KEYS.map((p) => (
             <option key={p} value={p}>
               {p}
             </option>
