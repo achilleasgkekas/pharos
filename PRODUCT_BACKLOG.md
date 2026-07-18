@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-13 (9η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-18 (10η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «τα εγκρίνω όλα» → **ΟΛΑ** τα προηγούμενα Proposed
 > (P1, P3, P5-P26) μετακινήθηκαν στο «Approved», μαζί με τα ήδη-εγκεκριμένα PA1/PA2/PA3.
 > **7η σάρωση (2026-07-09):** PA1 (bank/CSV import) shipped → «Done»· προστέθηκαν 5 νέοι candidates P27-P31.
@@ -20,12 +20,73 @@
 > decision/provider signup Achilleas). Προστέθηκαν **4 νέοι candidates P37-P40** — verified distinct από τα
 > ήδη-tracked (grep για «contract/commitment», «insurance», «bundle/build», «update-check/version» = μηδέν hits
 > εκτός του P13 export-bundle context, που είναι διαφορετικό concept).
+> **10η σάρωση (2026-07-18):** P37-P40 παραμένουν αμετάβλητα awaiting Achilleas (καμία ρητή απόφαση/έγκριση σε
+> αυτό το unattended run — μόνο ο Achilleas μετακινεί Proposed→Approved). Στο «Approved» queue παραμένουν ανοιχτά
+> (χωρίς SHIPPED tag): P36 (blocked, ρητά τελευταίο), P31/P24/P23/P13/P8/P16/P11/P17/P5/P3/P9 (M/L, χωρίς
+> blocking decision — αρκετό υλικό για τον builder, δεν χρειάζεται νέο Approved item τώρα). Προστέθηκαν
+> **4 νέοι candidates P41-P44** — verified distinct (grep για «maintenance/service interval», «wishlist/public
+> share link», «passport/document expiry», «RMA/warranty claim» = μηδέν hits σε PRODUCT_BACKLOG.md/TODO.md/
+> WEB_DEBT.md/MOBILE_PARITY.md πριν από αυτό το run).
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P44. Warranty claim / RMA tracker (κύκλος ζωής μιας πραγματικής επιστροφής) — S/M — OSS (κυρίως)
+- **Αξία:** σήμερα το warranty tracking σταματά στο «λήγει σε Nd» (expiry alert). Καμία δομή δεν καλύπτει τι
+  γίνεται **όταν χαλάσει κάτι και ανοίγεις πραγματικό RMA/claim**: ημ. αναφοράς βλάβης, αριθμός RMA/ticket του
+  κατασκευαστή/καταστήματος, status (submitted/shipped-for-repair/replaced/refunded/rejected), tracking number,
+  συνημμένα (email αλληλογραφίας, φωτο βλάβης). Ο Αχιλλέας έχει πολλά ακριβά electronics (RTX 5080, δίκτυο,
+  Battle Station) όπου ένα RMA μπορεί να κρατήσει εβδομάδες — σήμερα αυτό ζει μόνο σε memory/email, όχι στο app.
+  **Διακριτό** από P38 (Insurance = ασφάλιστρα που πληρώνεις, όχι claims πάνω σε προϊόντα) και το υπάρχον
+  warranty-expiry alert (εδώ = ενεργή διαδικασία μετά τη βλάβη, όχι προειδοποίηση πριν τη λήξη).
+- **Module:** Items/Inventory (νέο optional `Item.warrantyClaims[]` subdoc ή lightweight top-level model, reuse
+  storage pattern του P21 vault για συνημμένα) + Notifications (stale-claim nudge, π.χ. «καμία ενημέρωση 14+ μέρες»).
+- **Ανοιχτή απόφαση (builder default):** embedded subdoc πάνω στο Item (απλούστερο, ίδιο pattern με το `attachments[]`
+  του P21) αντί νέο top-level module· status ως enum (submitted/in-repair/replaced/refunded/rejected)· manual
+  entry μόνο (μηδέν AI email-parsing σε αυτή τη φάση).
+
+### P43. Public read-only wishlist share link (χωρίς login, για δωροεπιλογή) — S/M — both (SaaS = growth lever)
+- **Αξία:** τα shopping-status items είναι ήδη ένα δομημένο wishlist (τίτλος/τιμή/link/specs) αλλά ορατό μόνο στον
+  ίδιο τον χρήστη. Ένα **read-only, token-scoped public URL** (π.χ. `/wishlist/<token>`) που δείχνει μόνο επιλεγμένα
+  shopping items (όχι owned/inventory, όχι οικονομικά στοιχεία σπιτιού) θα επέτρεπε σε φίλους/οικογένεια να δουν τι
+  θέλει κάποιος για δώρο, χωρίς λογαριασμό. Χρήσιμο ΚΑΙ ως **SaaS growth loop**: μια δημόσια branded σελίδα Pharos
+  που βλέπουν μη-χρήστες = οργανικό awareness (παρόμοιο μηχανισμό με τα Calendly/Splitwise share links).
+  **Διακριτό** από P5 (browser ext = εισαγωγή προς τα μέσα) και P23 (mobile share-sheet = επίσης inbound capture)·
+  εδώ η ροή είναι **προς τα έξω** (μοιράζεσαι μια λίστα).
+- **Module:** νέο endpoint/route `/wishlist/[token]` (public, καμία auth) + Items/Shopping (opt-in per-item ή
+  per-list toggle «include in shared wishlist») + Settings (generate/rotate/revoke token, ίδιο pattern με το
+  `calendarToken` του P6).
+- **Ανοιχτή απόφαση (builder default):** ένα token ανά χρήστη (όχι per-list), opt-in checkbox ανά item (default
+  off — ρητή επιλογή τι μοιράζεσαι)· η δημόσια σελίδα δείχνει ΜΟΝΟ τίτλο/φωτο/τιμή/store-link, ΠΟΤΕ οικονομικά
+  aggregates ή owned inventory.
+
+### P42. Personal document expiry tracker (διαβατήριο, ταυτότητα, δίπλωμα, άδεια κυκλοφορίας) — S/M — OSS (κυρίως), «Personal Hub» fit
+- **Αξία:** το PHAROS backronym είναι ρητά «Personal Hub» (CLAUDE.md), αλλά κανένα module σήμερα δεν κρατά τα πιο
+  βασικά **προσωπικά έγγραφα με ημερομηνία λήξης** (διαβατήριο, ταυτότητα, δίπλωμα οδήγησης, κάρτα διαμονής, άδεια
+  κυκλοφορίας οχήματος/ΚΤΕΟ) — μόνο αντικείμενα (Items) και ασφαλιστικά συμβόλαια (P38) έχουν αυτή τη δομή.
+  Ένα μικρό generic «Document» record (τύπος, κάτοχος, αριθμός, ημ. λήξης, συνημμένο σκαναρισμένο PDF/φωτο) +
+  renewal alert (reuse `dispatchAlert`) καλύπτει ένα πραγματικό predictable ανάγκη κάθε νοικοκυριού.
+  **Διακριτό** από P38 (Insurance = επαναλαμβανόμενο ασφάλιστρο, όχι στατικό έγγραφο) και P21 (item vault = per-item
+  αρχεία, όχι person-level έγγραφα άσχετα με συγκεκριμένο αντικείμενο).
+- **Module:** νέο μικρό «Documents» module (list+detail, reuse storage/upload pattern του P21) + Notifications (renewal).
+- **Ανοιχτή απόφαση (builder default):** standalone module (όχι tab πάνω σε άλλο, το lifecycle είναι διαφορετικό)·
+  free-form `type` (όχι hardcoded enum, ώστε να καλύπτει τοπικές παραλλαγές εγγράφων)· optional κάτοχος (name string,
+  για νοικοκυριά με πάνω από ένα άτομο, βλ. P31)· ίδιο renewal lead-time pattern με P28/P33 (`AppConfig` alert-days).
+
+### P41. Maintenance / service reminders για owned items (όχι εγγύηση, όχι χρέωση) — S/M — OSS (dogfooding-heavy)
+- **Αξία:** η εγγύηση λήγει μια φορά· τα Bills/Subscriptions είναι οικονομικές υποχρεώσεις· αλλά πολλά owned
+  αντικείμενα χρειάζονται **περιοδική φυσική συντήρηση χωρίς κόστος/λογαριασμό** — καθάρισμα φίλτρων στο UniFi
+  rack, αλλαγή nozzle/καθάρισμα στο 3D printer, dust-cleaning στο Battle Station PC, rotation σε κάτι εποχικό.
+  Νέο optional `Item.maintenanceIntervalDays` + `lastMaintenanceAt` (+ «mark done» button που ξαναθέτει το
+  timer) → computed «next due» + alert (reuse `dispatchAlert`). Ντετερμινιστικό, μηδέν AI. **Διακριτό** από
+  warranty (one-time expiry, όχι recurring) και P37 (commitment-end = οικονομική δέσμευση, όχι φυσική εργασία).
+- **Module:** Items/Inventory (2 νέα optional πεδία + «mark maintenance done» action) + Notifications.
+- **Ανοιχτή απόφαση (builder default):** πεδία μόνο σε items με status received/installed (owned, όχι shopping)·
+  «mark done» απλά προωθεί το `lastMaintenanceAt` σε σήμερα (χωρίς ιστορικό log αρχικά, MVP)· κανένα preset
+  interval ανά κατηγορία (ο χρήστης βάζει το δικό του αριθμό).
 
 ### P40. Self-host update-available banner (GHCR version check) — S — OSS (adoption/retention lever)
 - **Αξία:** το TODO §4 δημοσιεύει ήδη versioned images στο GHCR (`vX.Y.Z`/`latest`), αλλά ένας self-host χρήστης
