@@ -2656,3 +2656,52 @@ pattern με τα increments 58-62)· καμία νέα εξάρτηση. Collis
 activity view, καταναλώνει audit με `?tenant=` filter, ήδη υποστηρίζεται από το route)· είτε (β)
 **action filter** στο workspace Activity tab (dropdown ανά AUDIT_ACTION)· είτε (γ) wiring του
 `recordAiUsage` στα AI call-sites ώστε το Usage tab να δείχνει πραγματικά νούμερα.
+
+## 2026-07-18 (increment 64 — admin console: cross-tenant Activity view on tenant detail, §UI-first)
+**Το κενό:** το επόμενο-task σημείωμα του #63 έλεγε "activity με `?tenant=` filter, ήδη
+υποστηρίζεται από το route" — αυτό αποδείχτηκε **ανακριβές στην εξέταση**: το
+`GET /api/saas/audit` περνάει από `resolveWorkspaceSession` (membership-scoped, `requireManage`)
+όχι `requireSuperadmin` — ένας superadmin που δεν είναι member ενός tenant θα έπαιρνε 403/404 από
+αυτό το route, όχι cross-tenant πρόσβαση. Άρα ο superadmin console ήταν ακόμα 100% χωρίς
+activity view (μόνο registry/usage/members/dbstats). Το έκλεισα με τον **απλούστερο δυνατό
+δρόμο**: SSR read κατευθείαν στο ήδη-ανοιχτό `app/admin/tenants/[slug]/page.tsx` (όχι νέο API
+route — η σελίδα είναι ήδη πίσω από `requireSuperadminPage()`, το ίδιο idiom με το ήδη υπάρχον
+`getTenantDetailForAdmin` SSR call στην ίδια σελίδα):
+- **`app/admin/tenants/[slug]/page.tsx`** (δικό μου, additive): μετά το `getTenantDetailForAdmin`,
+  ένα δεύτερο query `AuditEvent.find({tenant: t.id}).limit(50)` (mirror ακριβώς του
+  `(saas)/account/workspace/activity/page.tsx` SSR pattern) + batched Account lookup για
+  actor email/name (μηδέν N+1, reuse `collectActorIds`/`auditView` από `lib/tenancy/audit.ts`) +
+  `toActivityRows` (reuse `components/saas/activityView.ts`) → νέο **Activity section** στο τέλος
+  της σελίδας, καταναλώνοντας το ήδη-committed **`ActivityPanel`** component (reused ΑΥΤΟΥΣΙΟ,
+  μηδέν νέο component — το generic empty-state text του ταιριάζει). Σε αντίθεση με το workspace
+  Activity tab, **ΔΕΝ υπάρχει role-gate εδώ** (πάντα δείχνει το trail) — η εξουσιοδότηση είναι το
+  `requireSuperadminPage()` operator gate, όχι per-workspace role· ο superadmin βλέπει ΚΑΘΕ tenant
+  απλά επισκεπτόμενος `/admin/tenants/<slug>`, χωρίς να χρειάζεται membership.
+- Μηδέν νέο API route, μηδέν νέο component, μηδέν νέο dependency — καθαρά επαναχρησιμοποίηση
+  ήδη-committed κομματιών (audit lib + activityView + ActivityPanel) σε νέο context.
+
+**Verified:** `npm run type-check` → **EXIT 0**. Full suite `npx vitest run` → **2285/2285 green**
+(177 files, καμία regression — δεν πρόσθεσα νέο test file αφού δεν άλλαξε καμία pure function,
+μόνο η SSR σελίδα κατανάλωσε ήδη-tested helpers). ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε
+(μόνο το δικό μου admin detail page). `SAAS_MODE` off / self-hosted = **zero effect** (η `/admin`
+σελίδα self-gates σε `notFound()` μέσω `requireSuperadminPage()` πριν φτάσει καν στο νέο query·
+απών από build που δεν την mount-άρει ποτέ εκτός SaaS mode + superadmin allowlist). Κανένας Docker
+rebuild (additive SSR read μέσα σε ήδη-gated page component, μηδέν shared runtime wiring, ίδιο
+pattern με τα increments 58-63). Collision guard: πριν το commit `git status --short` έδειξε
+**foreign staged files** (`docs/DOCS_PROGRESS.md`, `docs/self-hosting.md` — άλλη routine mid-
+commit) + foreign unstaged (`apps/web/src/app/items/actions.ts` — άλλη routine, δεν το άγγιξα) →
+isolated pathspec `git add "apps/web/src/app/admin/tenants/[slug]/page.tsx"` μόνο, verified
+`git diff --cached --name-only` = ένα αρχείο πριν commit.
+
+**## Needs Achilleas** (admin activity view):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16) + `SAAS_SUPERADMIN_EMAILS`** για να υπάρχει καν το
+  console (αλλιώς 404). Self-hosted = disabled, zero risk.
+- Δεν έχει δικό του pagination cursor (σταθερό `limit=50`, ίδιο με το workspace tab) — αν ένα
+  tenant έχει πυκνό trail, ο operator βλέπει μόνο τα 50 πιο πρόσφατα events (αποδεκτό για observability
+  surface, matching το υπάρχον workspace-side όριο).
+
+**Next task:** increment 65 — είτε (α) **action filter** στο workspace Activity tab (dropdown ανά
+AUDIT_ACTION, ήδη υποστηρίζεται από το `/api/saas/audit` route `?action=`)· είτε (β) wiring του
+`recordAiUsage` στα AI call-sites ώστε το Usage tab (workspace + admin) να δείχνει πραγματικά
+νούμερα αντί μηδενικών· είτε (γ) **create-another-workspace** flow για signed-in account (backend
+increment: POST create workspace, μετά UI κουμπί στο account chooser/empty-state, ανοιχτό από #60).

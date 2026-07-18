@@ -6,11 +6,17 @@
 // byte-for-byte unchanged.
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { connectDB } from '@/lib/db';
 import { requireSuperadminPage } from '@/lib/tenancy/superadminPage';
 import { getTenantDetailForAdmin } from '@/lib/tenancy/adminTenantDetail';
+import { auditView, collectActorIds } from '@/lib/tenancy/audit';
+import { AuditEvent, type AuditEventDoc } from '@/models/AuditEvent';
+import { Account } from '@/models/Account';
 import { StatTile } from '@/components/saas/StatTile';
 import { LiveDbStatsPanel } from '@/components/saas/LiveDbStatsPanel';
 import { TenantActionsPanel } from '@/components/saas/TenantActionsPanel';
+import { ActivityPanel } from '@/components/saas/ActivityPanel';
+import { toActivityRows, type ActivityInput } from '@/components/saas/activityView';
 import {
   TenantStatusBadge,
   MemberStatusBadge,
@@ -18,6 +24,11 @@ import {
   Pill,
 } from '@/components/saas/StatusBadge';
 import { formatInt, formatBytes, formatCostMicros, formatWhen } from '@/components/saas/format';
+
+// Bound the window shown on the tenant-detail page; an operator wanting more paginates via
+// the workspace's own /account/workspace/activity (same trail, member-scoped) or a future
+// dedicated admin audit endpoint. Mirrors the workspace Activity tab's PAGE_LIMIT.
+const ACTIVITY_LIMIT = 50;
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +58,37 @@ export default async function AdminTenantDetailPage({
   const mc = detail.memberCounts;
   const u = detail.usage;
   const latest = u.latestPeriod;
+
+  // Cross-tenant activity view (superadmin console, TODO §8): the same append-only audit
+  // trail an owner sees on their own workspace's Activity tab, read here for ANY tenant by
+  // slug — the operator-facing counterpart. Reads only AuditEvent + a batched Account lookup
+  // (never a per-tenant data database, never a write); authorization is requireSuperadminPage
+  // above, not per-workspace membership, so this is intentionally NOT gated by role.
+  await connectDB();
+  const events = (await AuditEvent.find({ tenant: t.id })
+    .select('action actor target meta createdAt')
+    .sort({ createdAt: -1 })
+    .limit(ACTIVITY_LIMIT)
+    .lean()) as unknown as (AuditEventDoc & { createdAt?: Date })[];
+  const actorIds = collectActorIds(events);
+  const emailById = new Map<string, string>();
+  const nameById = new Map<string, string>();
+  if (actorIds.length) {
+    const actors = (await Account.find({ _id: { $in: actorIds } })
+      .select('email name')
+      .lean()) as unknown as { _id: unknown; email?: string | null; name?: string | null }[];
+    for (const a of actors) {
+      const id = String(a._id);
+      if (a.email) emailById.set(id, a.email);
+      const name = a.name?.trim();
+      if (name) nameById.set(id, name);
+    }
+  }
+  const activityViews: ActivityInput[] = events.map((ev) => {
+    const id = ev.actor != null ? String(ev.actor) : null;
+    return auditView(ev, id ? emailById.get(id) ?? null : null, id ? nameById.get(id) ?? null : null);
+  });
+  const activityRows = toActivityRows(activityViews);
 
   return (
     <div className="space-y-6">
@@ -203,6 +245,16 @@ export default async function AdminTenantDetailPage({
             </table>
           </div>
         )}
+      </section>
+
+      {/* Activity trail (cross-tenant superadmin view — every event, no role restriction) */}
+      <section>
+        <h2 className="mb-2 text-[11px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
+          Activity · latest {activityRows.length}
+        </h2>
+        <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4">
+          <ActivityPanel rows={activityRows} />
+        </div>
       </section>
     </div>
   );
