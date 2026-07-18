@@ -5414,3 +5414,51 @@ Vouchers, builder default: client-side barcode render lib)· ή (γ) αν προ
 
 - Τίποτα νέο αυτό το run. (P36 Open Banking παραμένει το μόνο ανοιχτό Approved item που χρειάζεται ρητή απόφαση
   scope πριν χτιστεί, αμετάβλητο.)
+
+## 2026-07-18 (mobile-parity-auditor, 50η σάρωση)
+
+**Βήμα 0**: read-only run, μηδέν Docker build, μηδέν AI call. tree είχε ήδη ξένα uncommitted αλλαγές στην αρχή
+(`apps/web/src/app/items/actions.ts`, `TenantActionsPanel.tsx`, νέο `apps/web/src/lib/loyaltyCard.ts`+test — WIP
+κάποιου άλλου routine, πιθανώς `pharos-daily-dev` πάνω στο P20 loyalty wallet που πρότεινε το προηγούμενο run).
+**Δεν άγγιξα κανένα από αυτά** — stage μόνο `MOBILE_PARITY.md`+`PROGRESS.md` παρακάτω.
+
+**Inventory από τον κώδικα (όχι από τα docs)**: **51 v1 routes** κάτω από `apps/web/src/app/api/v1` (login + 50
+bearer), **16 mobile screens**, **84 exported api-functions** στο `apps/mobile/src/api.ts` — και τα τρία
+**αμετάβλητα** vs την 49η σάρωση (2026-07-13). `apps/mobile npx tsc --noEmit` → **EXIT 0**.
+
+**Δέλτα από την 49η σάρωση** (`git log --since=2026-07-13 -- apps/web/src apps/mobile/src`): **5 commits**, κανένα
+δεν άγγιξε `api/v1` ή `apps/mobile/src` (επιβεβαιωμένο ανά `git show --stat` σε καθένα):
+1. **`29685cf` P21 document/manual vault** — η 49η σάρωση είχε ήδη γράψει το σωστό Build Queue entry γι' αυτό **πριν
+   καν χτιστεί το web feature** (attachments[] shape/actions/component ταιριάζουν 1:1 με ό,τι shipped). Entry
+   παραμένει αμετάβλητο, ακόμα `Status: TODO`.
+2. **`78ebd76` P12 savings/financial goals** — **νέο εύρημα**. Εντελώς νέο entity (`models/Goal.ts`), μηδέν v1
+   route, ίδιο μοτίβο με το ήδη-ουρασμένο Bill/GiftCard (P28/P32). Πρόσθεσα πλήρες Build Queue entry (P2/L) στο
+   MOBILE_PARITY.md, mirror του GiftCard format ακριβώς (endpoint shape/mobile files/acceptance).
+3. **`223c2cf` P26 onboarding checklist** — επιβεβαίωσα ΟΧΙ mobile gap. Το ίδιο το daily-dev PROGRESS entry
+   (2026-07-16) το είχε ήδη κρίνει ρητά «web-only homepage state, δεν υπάρχει "getting started" concept στο mobile
+   roadmap» — συμφωνώ, δεν μπαίνει στο queue.
+4. **`61e2524` P1 demo/sample-data mode** — ομοίως, επιβεβαιώθηκε ΟΧΙ gap (daily-dev 2026-07-17: admin-only Settings
+   dev-tool, κανένα precedent για data-management actions στο mobile app).
+5. **`9fee9b0` SaaS admin tenant ACTIONS** — hosted-SaaS multi-tenant admin surface, ήδη confirmed εκτός mobile scope
+   σε προηγούμενη σάρωση, αμετάβλητο.
+
+**Έλεγχος κώδικα (όχι μόνο commit messages)**: επιβεβαίωσα με grep ότι `apps/web/src/app/api/v1/items/[id]/route.ts`
+δεν εκθέτει `attachments` (P21, ήδη γνωστό) και ότι `apps/web/src/app/api/v1/reports/route.ts` ακόμα δεν έχει
+`netWorth` (item #3 της ουράς, παραμένει ανοιχτό, ίδιο speced entry αμετάβλητο).
+
+**MOBILE_PARITY.md αλλαγές**: (α) νέο top-of-queue re-audit blockquote (50η σάρωση)· (β) νέο πλήρες entry «Reports —
+savings/financial goals στο mobile (P12 gap)» ανάμεσα στο Gift cards και στο Items/document-vault entry. Καμία άλλη
+αλλαγή — όλα τα υπόλοιπα entries (Expenses category-rule, Subscriptions trial field, Reports net-worth,
+safe-to-spend, budget rollover, auto-discover, Bills, Gift cards, Items attachments, Search snippet) επιβεβαιώθηκαν
+ακόμα ανοιχτά/ακριβή, δεν χρειάζονταν update.
+
+**Ranked top-3+1 (unattended-safe)**: (1) **Expenses category-rule wiring στο v1 POST route** [P1/S, functional bug
+fix, καθαρά web-side, μηδέν mobile UI]· (2) **Subscriptions trial field exposure** [P2/S]· (3) **Reports net-worth
+headline/breakdown** [P2/M, ήδη πλήρως speced]· (4, νέο) **Goals entity exposure** [P2/L].
+
+## Needs Achilleas
+
+- Τίποτα νέο αυτό το run. Τα προϋπάρχοντα παραμένουν αμετάβλητα: receipt↔transaction reconciliation scope (P18),
+  SaaS multi-tenant surfaces confirm-out-of-scope, safe-area dep, theme/light-dark + language switcher,
+  AI-engine/storage/OneDrive Settings, statements PDF-import, remote push E2E σε πραγματική συσκευή (EAS+APNs), Tasks
+  Kanban board, lucide icon set, rate-limit 429 backoff.
