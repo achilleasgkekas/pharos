@@ -122,6 +122,7 @@ export const en = {
   'trash.tSubscription': 'Subscriptions',
   'trash.tVoucher': 'Vouchers',
   'trash.tGiftCard': 'Gift cards',
+  'trash.tLoyaltyCard': 'Loyalty cards',
   'trash.tBill': 'Bills',
   'trash.tGoal': 'Goals',
   'trash.tTask': 'Tasks',

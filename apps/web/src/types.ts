@@ -171,6 +171,19 @@ export type SerializedGiftCard = {
   updatedAt: string;
 };
 
+// P20 — loyalty/membership card wallet entry (no monetary balance, unlike GiftCard).
+export type SerializedLoyaltyCard = {
+  _id: string;
+  title: string;
+  store: string;
+  cardNumber: string;
+  barcodeFormat: string;
+  notes: string;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 // P28 — a manually-paid bill/payable whose status (paid/overdue/due-soon) is derived.
 export type SerializedBill = {
   _id: string;

@@ -9,6 +9,7 @@ import { Statement } from '@/models/Statement';
 import { Subscription } from '@/models/Subscription';
 import { Voucher } from '@/models/Voucher';
 import { GiftCard } from '@/models/GiftCard';
+import { LoyaltyCard } from '@/models/LoyaltyCard';
 import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { Bill } from '@/models/Bill';
 import { billDaysUntilDue } from '@/lib/bill';
@@ -1253,7 +1254,7 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
 // place that restores or permanently purges them. Auto-purge after 30 days.
 
 export type TrashRow = { type: TrashType; id: string; title: string; subtitle: string; deletedAt: string };
-export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'bill' | 'goal' | 'task';
+export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'loyaltycard' | 'bill' | 'goal' | 'task';
 
 const TRASH_MODELS: Record<TrashType, typeof Item> = {
   item: Item,
@@ -1262,6 +1263,7 @@ const TRASH_MODELS: Record<TrashType, typeof Item> = {
   subscription: Subscription as unknown as typeof Item,
   voucher: Voucher as unknown as typeof Item,
   giftcard: GiftCard as unknown as typeof Item,
+  loyaltycard: LoyaltyCard as unknown as typeof Item,
   bill: Bill as unknown as typeof Item,
   goal: Goal as unknown as typeof Item,
   task: Task as unknown as typeof Item,
@@ -1276,6 +1278,7 @@ function trashLabel(type: TrashType, d: Record<string, unknown>): { title: strin
     case 'subscription': return { title: String(d.name || '—'), subtitle: `€${d.amount ?? 0}/${d.billingCycle || ''}` };
     case 'voucher': return { title: String(d.title || '—'), subtitle: String(d.store || '') };
     case 'giftcard': return { title: String(d.title || '—'), subtitle: `${d.store || ''} · €${d.initialAmount ?? 0}`.trim() };
+    case 'loyaltycard': return { title: String(d.title || '—'), subtitle: String(d.store || '') };
     case 'bill': return { title: String(d.title || '—'), subtitle: `${d.vendor || ''} · €${d.amount ?? 0}`.trim() };
     case 'goal': return { title: String(d.title || '—'), subtitle: `€${d.targetAmount ?? 0}${d.targetDate ? ` · ${new Date(d.targetDate as string).toLocaleDateString('en-GB')}` : ''}` };
     case 'task': return { title: String(d.title || '—'), subtitle: String(d.status || '') };
