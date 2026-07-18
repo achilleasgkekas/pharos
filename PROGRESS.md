@@ -5395,6 +5395,21 @@ Vouchers, builder default: client-side barcode render lib)· ή (γ) αν προ
 για ό,τι top item έχει μείνει ανοιχτό (`deleteItemPhoto`/`deleteItemAttachment` ownership-check ήταν το τελευταίο
 γνωστό, P2/S, από την 53η web-code-quality σάρωση — επιβεβαίωσε ότι δεν το κατανάλωσε ήδη κάποιο άλλο run).
 
+## 2026-07-18 (ui-auditor — 41η σάρωση)
+
+**Βήμα 0**: pause switch απών; Docker lock καθαρό; tree ήταν καθαρό στην αρχή του run (τελευταίο commit `d0a592a`).
+
+**Κύριο finding — μηδέν νέα violations**: fresh read-only grep audit (όχι docs read-back). **17 mobile source files** (16 screens + `ui.tsx`), foundation `theme.ts` (C/SPACE/RADIUS/SIZE/scrim/alpha) + `ui.tsx` primitives (ΟΛΑ παρόντα). mobile `npx tsc --noEmit` → **EXIT 0** (καμία TypeScript error). **(Tokens)** hardcoded hex εκτός `theme.ts` = **0**, rgba = **0** — token layer πλήρως καθαρό. **(Reusable)** raw `<TextInput>` = **3** (ReceiptsScreen cellInput για QTY/NET/VAT — WIP του Αχιλλέα το 2026-07-05, κατάχρηση → buildable αν αποφασιστεί migrate). Ghost buttons = **3 uses** του `Button variant="ghost"` (VouchersScreen Cancel, ReceiptsScreen Skip/Edit-fully) — καλή κατάχρηση primitives. **(Theme)** dark-only, μηδέν light context (ακόμα P3/L). **(Adaptive)** `contentWidth` ✓, safe-area σαφώς απών (ακόμα P2/M). **(Touch)** τα μικρά targets έχουν `hitSlop` (11 sites), Settings `rm`/`swatch` χωρίς (WIP-blocked).
+
+**Σύγκριση με 40ο audit (2026-07-03)**: Hardcoded hex/rgba, theme dark-only, safe-area, touch targets (Settings swatch) — **αμετάβλητο**. Raw TextInput: τότε 11, τώρα **3** — **ο Αχιλλέας έχει migrate-άρει τα 8** σε `<Input>` primitives (commits `7b53bd2` onwards). Button ghost: πήραν `variant="ghost"`, **primitive adoption κοντα**.
+
+**Top-3 unblocked για builder (αμετάβλητο)**:
+1. **ReceiptsScreen cellInput ×3 → `<Input variant="surface">` (P2/S, buildable, μηδέν WIP)**. 
+2. **safe-area-context adoption (P2/M)**: package.json + App.tsx provider, useSafeAreaInsets().
+3. **Light theme via theme context (P3/L)**: useColorScheme() hook, app-wide provider, light palette.
+
+**Μηδέν νέα debt item**: ευρήματα κατά διάσταση καλύπτονται πλήρως από υπάρχον Queue. **Status**: UI Debt Queue αμετάβλητο.
+
 ## Needs Achilleas
 
 - Τίποτα νέο αυτό το run. (P36 Open Banking παραμένει το μόνο ανοιχτό Approved item που χρειάζεται ρητή απόφαση
