@@ -1812,3 +1812,27 @@ Mock pattern: DB-mock (`@/lib/db` connectDB, `@/models/User`) + mock `@/app/stat
 - Collision guard: `git diff --cached` κενό πριν το stage· `git status --short` = μόνο το δικό μου νέο αρχείο, μηδέν foreign WIP. Στάγιαρα ΜΟΝΟ τα δικά μου paths.
 
 Suggested next task: (β συνέχεια) Απομένουν: `items/[id]/plans`, `items/[id]/ai-fill`, `items/[id]/convert-to-task`, `receipts/[id]/rescan`, `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Έλεγξε `git status` πριν πιάσεις οτιδήποτε — ιδίως αν `items/actions.ts` έχει foreign WIP (επηρεάζει το `ai-fill`/`convert-to-task`/`import`). ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-20 (cont.¹⁴ — items/[id]/plans/route.test.ts, το GET δόσεις-picker reshape)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/items/[id]/plans/route.test.ts` για το GET του `/api/v1/items/:id/plans`.**
+
+Επιλογή target: πρώτο από τα εναπομείναντα `items/[id]/*` sub-routes της λίστας. `git status` στην αρχή έδειχνε foreign WIP σε Settings/AppConfig/i18n (IMAP auto-import feature, `imapConfig.ts`/`imapImport.ts`/`imapConfig.test.ts`) από concurrent routine — καμία επικάλυψη με το target μου, δεν το άγγιξα· μέχρι το commit had ήδη landed (`3a7be9b feat(receipts): email-in IMAP auto-import (P11)`) χωρίς να χρειαστεί να περιμένω.
+
+Backs το mobile item-detail "link a δόσεις plan" picker — GET λίστα ΟΛΩΝ των installment plans (cross-statement) με flag ποιο είναι ήδη linked σε αυτό το item. Σε αντίθεση με το `link-plan` sibling (POST/DELETE, delegates σε actions), αυτό το route κάνει τη δουλειά ΜΟΝΟ του: `Statement.find().sort().lean()` → `computeInstallmentPlans` (ήδη δικό του pure-lib test στο `installments.test.ts`, εδώ mocked) → reshape.
+
+Route-only συμπεριφορά που δοκιμάστηκε: (α) ObjectId guard πριν οποιοδήποτε Statement query (auth `connectDB` βέβαια τρέχει πρώτο, μέσα στο `withAuth`/`bearerUser` — pin-αρισμένο ρητά, ΔΕΝ το μπέρδεψα με "connectDB ποτέ δεν καλείται"), (β) `linked = p.itemIds.includes(id)` per plan, φρέσκο υπολογισμένο, (γ) **reshape**: το wire shape είναι ΣΤΕΝΟΤΕΡΟ από το lib `InstallmentPlan` — χάνονται `key/itemIds/paidAmount/firstDate/lastDate/occurrences/merged`, προστίθενται `itemCount` (=itemIds.length) + `linked`, (δ) **δεύτερο sort pass** πάνω από ό,τι sort έχει ήδη κάνει το lib: linked plans πρώτα (stable, `a.linked===b.linked?0:a.linked?-1:1`) — δοκιμάστηκε ότι η σχετική σειρά ΜΕΣΑ σε κάθε group διατηρείται, (ε) `currency` από `getAppSettings()`, default 'EUR'.
+
+Mock pattern: DB-mock (`@/lib/db`, `@/models/User`) + mock `@/models/Statement` (Statement.find), `@/lib/appSettings` (getAppSettings), και `@/lib/installments` (computeInstallmentPlans — mocked ώστε το test να μετράει το route's reshape/sort, όχι τα installment μαθηματικά που ήδη καλύπτονται αλλού). Πραγματικοί `withAuth`/`isObjectId`.
+
+Τι έγινε: Νέο `route.test.ts` (10 tests): auth gate (2: no-token connectDB ποτέ, unknown-token statementFind ποτέ), id guard (1: malformed id → 400 bad id, statementFind ποτέ — connectDB ΝΑΙ γιατί τρέχει στο auth πριν το guard, pin-αρισμένο σωστά μετά από 1 αρχικό λάθος), forward-to-lib (1: raw statements περνάνε ως έχουν), reshape (1: πλήρες shape-diff pin), linked-flag (1: true/false ανά itemIds membership), sort (1: linked-first με stable within-group order σε 4-plan μείγμα), currency (2: default EUR + configured USD), empty (1: 0 statements → 200 {plans:[]}).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/api/v1/items/[id]/plans/route.test.ts"` → αρχικά 9/10 (1 λάθος assertion: περίμενα connectDB να ΜΗΝ καλείται στο malformed-id case, αλλά το `withAuth`/`bearerUser` καλεί connectDB ΠΡΙΝ τρέξει το route callback που κάνει το guard — διόρθωσα το assertion, ίδιο pattern με το `link-plan` sibling test που ΔΕΝ κάνει αυτόν τον ισχυρισμό). Μετά fix → 10/10 passed.
+- `npx vitest run` (όλο το suite) → 186 files, 2395/2395 passed.
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό.
+- Collision guard: πριν το stage, `git diff --cached` κενό. `git status --short` μετά το IMAP commit = μόνο `PRODUCT_BACKLOG.md` [M] (άλλο routine, foreign) + το δικό μου νέο αρχείο — ΔΕΝ άγγιξα το `PRODUCT_BACKLOG.md`. Στάγιαρα ΜΟΝΟ το δικό μου path.
+
+Suggested next task: (β συνέχεια) Απομένουν: `items/[id]/ai-fill`, `items/[id]/convert-to-task`, `receipts/[id]/rescan`, `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Έλεγξε `git status` πριν πιάσεις οτιδήποτε — ιδίως αν `items/actions.ts` έχει foreign WIP (επηρεάζει `ai-fill`/`convert-to-task`/`import`). ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις — ιδίως πρόσεξε ΠΟΤΕ το `connectDB` τρέχει (μέσα στο `withAuth`/`bearerUser`, ΠΡΙΝ οποιοδήποτε route-level guard) ώστε να μην ξαναγράψεις το ίδιο λάθος assertion. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
