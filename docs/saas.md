@@ -204,6 +204,18 @@ authoritatively, and both wrong-email and wrong-password collapse to the same
 | `GET` | `/api/saas/account` | — | The caller's own profile: `{ account: { id, email, name, emailVerified, lastLoginAt, createdAt } }`. |
 | `PATCH` | `/api/saas/account` | `{ name?, email? }` | Update display name and/or email. `409` if the new email is taken. |
 
+### Workspace creation
+
+An already-signed-in account may provision additional workspaces without signing out (the "create another workspace" flow). This mirrors the signup flow but for an existing account: it provisions a fresh Tenant with the caller as owner. Useful for household + side-project isolation, or separate client/business workspaces under one account.
+
+Gating: 404 when SaaS off, 401 when not authenticated, 400 if name is invalid/missing or the account has reached its workspace limit (default 20 per account, adjustable in code).
+
+| Method | Path | Body | Result |
+| --- | --- | --- | --- |
+| `POST` | `/api/saas/account/workspaces` | `{ name }` | **Authenticated.** Provisions a new Tenant with the caller as owner. Name is required (≤80 chars). Returns `201 { tenant: { id, slug, name, createdAt, … }, tenants: […] }` (the full tenant list so the client can update its workspace chooser). `400` if name is empty, >80 chars, or the account already owns 20 workspaces. |
+
+The response mirrors `/api/saas/auth/signup`, and the audit trail records `workspace.created` with `actor` = the Account id and `meta.selfServe = true`.
+
 ### Email verification & password
 
 All of these live under `/api/saas/account/**`. The confirm and reset-request
@@ -582,11 +594,14 @@ Every tab link carries the active `?w=<slug>` workspace selection through, so sw
 on the same workspace; a blank selection yields clean URLs against the account's first workspace.
 
 **Empty and edge states.** A signed-in account with **zero** memberships (for example,
-removed from its last workspace) is a real state, not an error: Overview renders a
-"No workspace yet" empty state and Members redirects to it. A `?w=<slug>` the account
-is not a member of is `notFound()` (`404`). Billing / management CTAs that are not yet
-wired (subscribe / manage subscription) render as "coming soon" copy rather than dead
-buttons.
+removed from its last workspace) is a real state, not an error: `/account` renders a
+"No workspace yet" empty state with a **"Create workspace" form** auto-opened (the `CreateWorkspaceForm`
+component wrapping [`POST /api/saas/account/workspaces`](#workspace-creation)), allowing the account
+to immediately provision a new workspace. Members tab redirects to the same empty state. A `?w=<slug>`
+the account is not a member of is `notFound()` (`404`). Billing / management CTAs that are not yet
+wired (subscribe / manage subscription) render as "coming soon" copy rather than dead buttons. When
+an account has one or more workspaces, the create form is available as a collapsed toggle in the
+workspace chooser header (not auto-opened).
 
 **Gating.** The `(saas)` segment layout `404`s the whole tree when `SAAS_MODE` is off
 or account auth is not configured (`AUTH_SECRET` unset), so the self-hosted app never

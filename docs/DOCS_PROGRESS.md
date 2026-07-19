@@ -1715,3 +1715,33 @@ Collision guard: `git status --short` πριν το add — ΜΟΝΟ `M docs/fea
 Επομενο run: (α) features.md — αν shipαρει Bill/payable model με v1 API routes, η (β) saas.md stale-
 forward scan για «coming soon» CTAs σε billing/workspace tabs (τωρα accurate), ή (γ) sync api.md
 εναντι τυχον νεων v1 routes που μπηκαν. Ολα τα content docs accurate, 0 broken links.
+
+## 2026-07-20 (second run)
+
+Νεα feature: "create-another-workspace" flow (commit da3c242). Εγραψα:
+
+**saas.md** — νεα subsection "### Workspace creation" μετα το "Account profile":
+- POST /api/saas/account/workspaces endpoint με request/response shapes
+- Αναφορα στο mirror idiom (signup flow reused via provisionTenant)
+- Περιορισμοι: max 80 chars name, max 20 workspaces per account
+- Audit trail: workspace.created action + selfServe flag
+
+Επισης ενημερωσα την "Empty and edge states" παραγραφο στο Workspace console UI section:
+- Περιγραφη του auto-opened CreateWorkspaceForm στο κενο /account page
+- Link προς το νεο endpoint
+- Αναφορα οτι η φορμα ειναι collapsed toggle αν υπαρχουν ηδη workspaces
+
+Validation: markdown clean (18 fences, balanced), ολα τα internal links resolve (#workspace-creation
+anchor defined and referenced), κανενα secret values (μονο variable names), git status δειχνει μονο
+docs/saas.md modified.
+
+Accuracy verified εναντι τον source code:
+- apps/web/src/app/api/saas/account/workspaces/route.ts (endpoint)
+- apps/web/src/components/saas/CreateWorkspaceForm.tsx (UI component)
+- apps/web/src/components/saas/createWorkspace.ts (helper)
+
+Collision guard: git status --short ΜΟΝΟ docs/saas.md (no foreign staged/uncommitted).
+
+Επομενο run: (α) αν νεοι Bill/payable routes (v1 API) landed, update features.md ή api.md · (β) YNAB
+import (P16) feature land verification (ηδη merged 2026-07-19, δες CLAUDE.md P16 notes) · (γ) ελεγχος
+αν αλλα workspace features (quotas, billing CTAs) εχουν πια concrete implementation.
