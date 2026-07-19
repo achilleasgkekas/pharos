@@ -1,5 +1,26 @@
 # DOCS_PROGRESS
 
+## 2026-07-20 (P24 event webhooks + item attachments API gap)
+
+Τρία docs files ενημερώθηκαν για να καλύψουν P24 (webhooks για automation) και API gap (item attachments):
+
+Τι έγραψα:
+- **api.md**: Προσθεση note στη GET /items/:id που λέει ότι attachments υπάρχουν αποθηκευμένα αλλά ΔΕΝ expose-άρονται στο REST API (gap: P21 feature model field δεν έχει endpoint). Suggestion να χρησιμοποιήσουν το web UI.
+- **features.md**: Rewrite Notifications section από απλή παράγραφο σε 2 subsections: (α) Alert summaries (ίδια, βελτιωμένη) με λίστα καναλιών (ntfy, Discord, Slack, Telegram, webhook), (β) Event webhooks for automation (NEW) που εξηγάει P24 (receipt.parsed, budget.exceeded, installment.due, price.drop, HMAC signing). Ενημέρωση Settings tab description να αναφέρει "outbound event webhooks" όπως και alert channels.
+- **configuration.md**: Νέα subsection "Event webhooks for automation (P24)" αμέσως μετά τα price-drop alerts, με table των events + payloads + HMAC header documentation.
+
+Validation (markdown only, κανενα Docker/build/AI):
+- Code fences: ολα ισορροπημένα (22 σύνολο σε απόλυτο).
+- Internal links: όλα τα configuration.md#notifications / features.md / api.md / self-hosting.md υπάρχουν ✓.
+- Secret scan: κανένα sk_/pk_/AUTH_ literal ✓.
+- Markdown tables: σύνταξη ok (configuration.md event webhooks table αν.
+
+Collision guard: git status --short: μόνο 3 modified docs files staged, app/web files untouched. Committed 037f33d.
+
+Επόμενο run: (α) ίσως documentation για άλλα undocumented P features (ψάξε git log grep για "feat(.*)" commits 1-2 εβδομάδες πίσω και σύγκρινε με τα documented sections σε features.md), ή (β) api.md — verify ότι όλα τα νέα endpoints που προστέθηκαν πρόσφατα (event webhooks API?) έχουν documented, ή (γ) mobile.md — check αν το mobile app πρέπει να ενημερωθεί για τα event webhooks ή attachments API gap.
+
+---
+
 ## 2026-07-19 (features.md: P7/P12/P26 documentation + getting started intro)
 
 Το features.md είχε gaps από recent shipped features που δεν ήταν documented:
