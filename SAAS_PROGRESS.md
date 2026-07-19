@@ -2797,3 +2797,77 @@ flow για signed-in account (backend increment: POST create workspace για �
 (β) **admin console search/filter** στο tenant registry list (`/admin/tenants`, πιθανώς ήδη flat
 list χωρίς search box — έλεγξε πρώτα)· (γ) αν κανένα άλλο UI-first item δεν βρεθεί, εξέτασε αν
 υπάρχει pagination cursor gap στο activity views (και τα δύο σταθερά limit=50, καμία "load more").
+
+## 2026-07-20 (increment 67 — create-another-workspace flow for a signed-in Account, §UI-first)
+**Το κενό:** το next-task σημείωμα του #66 πρότεινε (α) create-another-workspace, (β) admin
+tenant-registry search/filter, (γ) activity pagination. Έλεγξα πρώτα το (β): το
+`/admin/tenants` **έχει ήδη** search (`q`) + status filter + prev/next pagination
+(`listTenantsForAdmin`/`parseAdminTenantQuery`, increment 48) — μηδέν κενό εκεί. Διάλεξα (α):
+το `(saas)/account/page.tsx` (chooser/empty-state) έδειχνε τα workspaces ενός account αλλά
+**καμία σελίδα δεν πρόσφερε δρόμο να φτιάξει ένα ΔΕΥΤΕΡΟ** — το empty-state text έλεγε μόνο
+"ζήτα να σε προσκαλέσουν". Ταυτόχρονα ανακάλυψα ότι το **`workspace.created` audit action
+υπήρχε ήδη στο `AUDIT_ACTIONS` (audit.ts) από πάντα, αλλά ΔΕΝ καταγραφόταν ΠΟΥΘΕΝΑ** — ούτε
+καν στο `/api/saas/auth/signup` — άρα κάθε νέο tenant μέχρι σήμερα γεννιόταν χωρίς κανένα
+audit trail entry. Το έκλεισα και τα δύο μαζί.
+
+**Built** (νέο backend route + νέο client component + additive edit στη δική μου account page):
+- **`app/api/saas/account/workspaces/route.ts`** (νέο) — `POST { name }`: `saasAuthGate()` +
+  `getCurrentAccount()` (401 αν logged out) → validate name (non-blank, ≤80 chars, ίδιο cap με
+  το client validator) → **defensive cap `MAX_WORKSPACES_PER_ACCOUNT=20`** (`Membership.
+  countDocuments({account, status:'active'})` — δεν είναι plan/pricing concept, απλά όριο
+  anti-abuse ώστε ένας λογαριασμός να μη φτιάχνει άπειρα free-trialing tenants· εύκολα
+  ανεβάζεται αργότερα) → **reuse `provisionTenant`** (`lib/tenancy/provision.ts`, το ΙΔΙΟ
+  helper που καλεί το `/api/saas/auth/signup` — ταυτόσημη slug/trial-stamp λογική, μηδέν νέος
+  κώδικας provisioning) → **`recordAudit(auditCtx(tenant.tenantId), {action:'workspace.
+  created', actor: claims.sub, target: tenant.slug, meta:{name, selfServe:true}})`** — πρώτη
+  φορά που αυτό το action γράφεται ποτέ (bare-tenant-id idiom, ίδιο με invites/accept + billing
+  webhook, αφού δεν υπάρχει ακόμα workspace session για ένα tenant που δεν υπήρχε πριν 1ms).
+  Επιστρέφει `{tenant, tenants: accountTenants(...)}` (ίδιο σχήμα με το signup response).
+- **`components/saas/createWorkspace.ts`** (νέο, PURE) — `workspaceNameReady`/
+  `describeCreateWorkspaceError`/`MAX_WORKSPACE_NAME=80`, mirror του `authValidation.ts`
+  idiom (client-side UX shortcut, το API re-validates authoritative). **10 unit tests**
+  (blank/whitespace, boundary στο cap ακριβώς/+1, server-error passthrough, status fallbacks).
+- **`components/saas/CreateWorkspaceForm.tsx`** (νέο client component) — collapsed **"+ New
+  workspace"** toggle button (compact — δεν πιάνει χώρο στο συνηθισμένο 0/1-workspace path) →
+  expands σε inline `name` input + Create/Cancel· `autoOpen` prop για το empty-state (όπου δεν
+  υπάρχει τίποτα άλλο να κάνει ο χρήστης, οπότε ανοιχτό εξ αρχής, χωρίς Cancel). POST στο νέο
+  route → **full navigation** (`window.location.assign('/account/workspace?w=<slug>')`, ίδιο
+  idiom με AuthForm/SignOutButton) ώστε η fresh server render να δει το μεγαλύτερο membership
+  list. `?w=<slug>` δουλεύει σωστά είτε είναι το πρώτο workspace του account είτε το δέκατο
+  (το `pickWorkspace` ταιριάζει by slug ανεξαρτήτως θέσης, ήδη-tested στο #chooseWorkspace).
+- **`(saas)/account/page.tsx`** (δικό μου, additive): empty-state πήρε `<CreateWorkspaceForm
+  autoOpen />` κάτω από το επεξηγηματικό κείμενο (ενημερωμένο copy: "...or start your own
+  below")· ο πολύ-workspace chooser πήρε το compact toggle στη δεξιά πλευρά του header
+  (`flex justify-between`, ίδιο idiom με τα άλλα header actions στο codebase).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run createWorkspace.test.ts` →
+**6/6**· full suite `npx vitest run` → **2401/2401 green** (187 files, καμία regression).
+ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο νέα αρχεία + additive edit στη δική μου
+account/page.tsx). `SAAS_MODE` off / self-hosted = **zero effect** (το `(saas)` segment
+self-gates σε `notFound()` πριν φτάσει καν στη νέα σελίδα/route· ο νέος route γυρνάει 404 μέσω
+`saasAuthGate()` πριν αγγίξει DB). Κανένας Docker rebuild (νέο API route + νέο client component
++ additive SSR page edit, μηδέν shared runtime wiring, μηδέν νέα εξάρτηση — ίδιο σκεπτικό με τα
+increments 58-66). Browser-verify skipped (θα χρειαζόταν rebuild για να φανεί στο live :3000 —
+απαγορεύεται μόνο-για-verify, ίδιο idiom με το #66). Collision guard: `git status --short` πριν
+το commit έδειξε **μηδέν foreign staged/modified files** → isolated pathspec commit των 5 δικών
+μου αρχείων, `git diff --cached --name-only` επιβεβαίωσε exact match. Pushed `da3c242`.
+
+**## Needs Achilleas** (create-another-workspace):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η `(saas)` σελίδα/route (αλλιώς
+  404). Self-hosted = disabled, zero risk.
+- **`MAX_WORKSPACES_PER_ACCOUNT=20`** είναι δική μου αυθαίρετη αλλά ασφαλή προεπιλογή (anti-
+  abuse, όχι plan/pricing decision) — πες αν θες διαφορετικό όριο ή αν θες να λείπει εντελώς
+  σε αυτό το στάδιο (π.χ. free-trial economics θα το χρειαστούν σαν πραγματικό plan quota
+  αργότερα στο `lib/billing/entitlements.ts`, όχι σαν hardcoded constant εδώ).
+- Κάθε νέο self-serve workspace ξεκινά σε **plan `free` / status `trialing`** (ίδιο με το
+  signup path) — δεν υπάρχει κανένα guardrail σήμερα που να αποτρέπει έναν χρήστη από το να
+  φτιάχνει πολλά ξεχωριστά trials (πέρα από το παραπάνω hard cap). Αποδεκτό στο τρέχον στάδιο
+  (pre-Stripe-live), σημειωμένο εδώ ώστε να μην ξεχαστεί όταν μπει πραγματικό billing enforcement.
+
+**Next task:** increment 68 — candidates: (α) **activity pagination** (και workspace-tab και
+admin-console section έχουν σταθερό `limit=50`, καμία "load more"/cursor — μικρό, καθαρά
+in-territory, reuse existing SSR pattern)· (β) η αδερφή **"leave workspace"** ενέργεια (ένα
+member σε >1 workspace θέλει να αφήσει ένα από αυτά χωρίς να περιμένει τον owner — backend
+route + κουμπί στο account chooser, συμμετρικό με το create που μόλις χτίστηκε)· (γ) αν το
+`recordAiUsage` wiring βγει ρητά in-scope κάποια στιγμή, το Usage tab δείχνει σήμερα πάντα
+μηδενικά.
