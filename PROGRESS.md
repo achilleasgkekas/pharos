@@ -5934,3 +5934,29 @@ GiftCard pattern) ή P31 αν ο Αχιλλέας θέλει να αφιερώσ
 ## Needs Achilleas
 
 - Τίποτα νέο.
+
+## 2026-07-19 (ui-auditor — 49η σάρωση mobile parity)
+
+**Τι έγινε**: Αυτόνομη read-only αναμέτρηση mobile UI consistency σε 19 screens + ui.tsx primitives. Grep ανά διάσταση (tokens, theme, components, touch, adaptive) έναντι web design system. Κανένα Docker, κανένα build, κανένα AI job.
+
+**Checks**: `cd apps/mobile && npx tsc --noEmit` → **EXIT 0** ✓· working tree clean (εκτός WIP ReceiptsScreen του χρήστη).
+
+**Findings (σύνοψη)**:
+- **RADIUS literals**: ~47 sites (6/8/9/10/12/14/16/18/20) αντί RADIUS.* — P2/S item EXISTS, unstarted
+- **fontSize literals**: **229 hardcodes** (10..22) σε 19 screens αντί SIZE.* — ζει υπό P2/M "Brand typography"
+- **padding/margin literals**: extensive (4..24) σε screens — δευτερογενής του Typography task, δεν δημιουργώ item
+- **fontFamily**: **0 results** (σύστημα font παντού) — P2/M item, status TODO
+- **Light theme**: χωρίς context/switch — P3/L item, status TODO
+- **Safe-area**: χωρίς SafeAreaView — αναβάλλεται (δεν έχει item)
+- **Touch targets**: ✓ PASS (hitSlop 8-10, sizes 40-46)
+- **ReceiptsScreen**: 3 raw TextInput uncommitted (Achilleas WIP, γραμμές 211-213)
+
+**Τι αποφάσισα**:
+- UI Debt Queue **παραμένει ακριβής**. Δεν προσθέτω νέα items.
+- Ενημέρωσα το MOBILE_PARITY.md με αριθμητικές λεπτομέρειες (47 RADIUS sites, 229 fontSize hardcodes).
+- Επόμενο builder pass: **P2/S RADIUS first** (mechanical, byte-safe), μετά **P2/M Typography** (fontFamily load + SIZE.* adoption, margin/padding follow-through).
+
+**Working tree**: ρητό `git add` ΜΟΝΟ τα doc αρχεία που έγραψα (MOBILE_PARITY.md, PROGRESS.md).
+
+**Committed**: 49η audit entry → MOBILE_PARITY.md καθαρά.
+

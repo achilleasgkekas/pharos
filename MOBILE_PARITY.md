@@ -831,3 +831,42 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - inline button-busy `<ActivityIndicator>` (μέσα σε save/scan/AI buttons) ΜΕΝΟΥΝ ως έχουν (διαφορετικό pattern)
   - mobile `npx tsc --noEmit` EXIT 0
 - Status: TODO
+
+---
+
+## 2026-07-19 (49η σάρωση — ui-auditor read-only grep audit)
+
+**Σκοπός**: αυτόνομη αναμέτρηση mobile UI consistency μετά από 10 commits (από την 48η σάρωση στις 2026-07-09). Κανένα νέο item, αλλά **λεπτομέρειες των υπαρχόντων P2/P3** items που χρειάζονται μεγαλύτερη ποσοστιαία κάλυψη.
+
+**Ευρήματα (ανά διάσταση):**
+
+1. **Token adoption (RADIUS)**: μη-deterministic grep `borderRadius:` across 12 screens + ui.tsx → **~47 hardcoded literals** (6/8/9/10/12/14/16/18/20) αντί RADIUS.*. Τα non-scale radii (5/4/3 για dots/tracks σκόπιμα) → P2/S item υπάρχει.
+
+2. **Font sizes**: `fontSize:` grep → **229 hardcoded values** (10..22) σε 19 screens, αντί SIZE.* tokens (SIZE = xs11/sm13/base14/md15/lg16/xl19). Αυτό είναι μεγάλο consistency gap και ζει υπό το P2/M "Brand typography" item (που καλύπτει ΟΛΕΣ τις font πτυχές: fontFamily + fontSize token).
+
+3. **Padding/margin**: χιλιάδες literals (4..24) σκορπισμένα αντί SPACE.*. Δεν έχει ξεχωριστό item — αυτό κρύβεται ίσως κάτω από τη routing-priority άρνησης (ο builder κάνει RADIUS πρώτα, μετά Typography, τα margins παρακολουθούνται ως "secondary gaps" του Typography migration όπου τα μεγάλα padding blocks εναλλάσσονται σε StyleSheet)· δεν δημιουργώ νέο item για αυτό.
+
+4. **fontFamily**: grep → **0 results**. Σύστημα font παντού. Υπάρχει P2/M item, **status TODO**.
+
+5. **Light theme**: χωρίς `useColorScheme`/`ColorScheme`/context. P3/L item υπάρχει, **status TODO**.
+
+6. **Safe-area handling**: χωρίς SafeAreaView/useSafeAreaInsets. Δεν έχει item (κατάταξη απόφαση: mobile notches < desktop breakpoint risk, αναβάλλεται). ΣΗΜ: `react-native-safe-area-context` ΔΕΝ installed.
+
+7. **Touch targets**: `hitSlop` καθαρό (8–10), button widths 40–46 → PASS. Αποδεκτό.
+
+8. **ReceiptsScreen WIP**: γραμμές 211–213 (3 `<TextInput>` raw, qty/net/vat fields) → Achilleas uncommitted, παραμένει blocked.
+
+9. **ModalSheet**: ShoppingScreen holdout **ΚΛΕΙΣΙΜΕΝΟ** μετά την 48η σάρωση.
+
+**Σύνολο δεδομένων:**
+- mobile `npx tsc --noEmit` → **EXIT 0** ✓
+- Working tree: clean (εκτός ReceiptsScreen WIP του χρήστη)
+- 19 screens, ~1450 lines logic σε screens/, 310 lines primitives (`ui.tsx`)
+
+**Κατεύθυνση**: η UI Debt Queue παραμένει ακριβής. Δεν προσθέτω νέα items, αλλά τα P2 items (RADIUS + Typography) χρειάζονται **μεγαλύτερη κάλυψη σε στατιστικά**. Ο επόμενος builder pass πρέπει να κατηγοριοποιήσει:
+- **P2/S RADIUS**: ~47 sites σε screens + ui.tsx, byte-safe, μηδέν οπτική αλλαγή
+- **P2/M Typography**: fontFamily (0 μέρη), fontSize (229 σημεία, 19 files), margin/padding δευτερογενής
+- **P3 items**: ασφαλή αργότερα
+
+Επόμενο suggested: builder να αρχίσει με P2/S (RADIUS), μετά P2/M (Typography: fontFamily load + SIZE.*).
+
