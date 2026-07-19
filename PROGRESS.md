@@ -5971,3 +5971,62 @@ GiftCard pattern) ή P31 αν ο Αχιλλέας θέλει να αφιερώσ
 
 **Committed**: 49η audit entry → MOBILE_PARITY.md καθαρά.
 
+## 2026-07-19 (mobile-parity-auditor, 51η σάρωση)
+
+**Βήμα 0**: read-only run, μηδέν Docker build, μηδέν AI call, μηδέν rebuild. Working tree ήταν καθαρό στην αρχή
+(`git status` → nothing to commit). Διάβασα CLAUDE.md, MOBILE_PARITY.md (833 γραμμές, πολύ μεγάλα single-line
+paragraphs — διαβάστηκε τμηματικά), BACKLOG.md/TODO.md (και τα δύο σαφώς stale/αρχειοθετημένα — BACKLOG σταματά
+2026-06-08, TODO 2026-06-23, το ενεργό source of truth είναι το `MOBILE_PARITY.md Build Queue` + `PROGRESS.md`),
+`git log --oneline -15`.
+
+**Inventory από τον κώδικα**: **51 v1 routes** κάτω από `apps/web/src/app/api/v1` (`find ... -name route.ts | wc -l`
+= 51), **16 mobile screens**, **84 exported api-functions** (`grep -cE '^export (async function|function|const .* = )'`
+στο `api.ts`) — και τα τρία **αμετάβλητα** vs την 50η σάρωση (2026-07-18). `apps/mobile npx tsc --noEmit` → **EXIT 0**.
+
+**Δέλτα από την 50η σάρωση** (`git log --since=2026-07-18 -- apps/web/src apps/mobile/src`): **5 commits**.
+1. **`d5a9684` + `8c3ccda`** — τα ΙΔΙΑ top-2 items που η 50η σάρωση κατέταξε #1/#2 («Expenses category-rule wiring»,
+   «Subscriptions trial field exposure») **έκλεισαν ήδη από το ίδιο daily-dev routine** πριν καν ξεκινήσει αυτή η
+   σάρωση (commit messages: «Closes the #1 mobile-parity Build Queue item» / «P33 mobile-parity gap»). Επιβεβαίωσα
+   και τα δύο στον κώδικα (`matchCategoryRule()` στο `POST /api/v1/expenses`· `trialEndsAt`/`firstChargeAmount` στο
+   subscriptions GET/POST/PATCH + `trialAlertDays` στο settings) — και τα δύο ήδη σωστά `Status: ✅ DONE` στο doc
+   (το `8c3ccda` update το ίδιο το doc), καμία αλλαγή χρειάστηκε.
+2. **`536a3d8` P20 loyalty/membership card wallet** — **νέο εύρημα**. Νέο `models/LoyaltyCard.ts` + `lib/loyaltyCard.ts`
+   (barcode-format guess/validate, ήδη 13 unit tests) + τρίτο tab στο web `/vouchers`, **μηδέν v1 route, μηδέν mobile
+   exposure** — ίδιο μοτίβο με το ήδη-ουρασμένο Bill/GiftCard/Goal. Πρόσθεσα πλήρες Build Queue entry (P2/L) στο
+   MOBILE_PARITY.md, mirror του GiftCard format· **ΣΗΜΑΝΤΙΚΗ διαφορά από τα sibling entries**: η web υλοποίηση
+   χρησιμοποιεί `jsbarcode` (DOM/canvas, δεν τρέχει σε RN) — flagged ρητά στο entry ότι το mobile χρειάζεται δικό του
+   barcode-rendering dep (πρότεινα `react-native-barcode-svg`, pure SVG/zero-native-dep, ίδιο πνεύμα με το web pick)·
+   αυτό είναι τεχνική επιλογή lib, ΟΧΙ product ασάφεια, άρα παραμένει auto-buildable, όχι needs-decision.
+3. **`ded86eb` P24 outbound event webhooks** + **`6ed76b6` P16 YNAB CSV migration importer** — έλεγχος `git show
+   --stat` σε καθένα: **μηδέν touch σε `api/v1` ή `apps/mobile/src`**, και τα δύο ζουν αποκλειστικά ως Settings
+   server-actions/UI. Έκρινα **ΟΧΙ auto-buildable mobile gap** (όχι απλά «δεν έχει route ακόμα»): P24 = power-user
+   integration config (Home Assistant/n8n URL + HMAC secret + test-fire), P16 = one-time desktop-filesystem CSV
+   migration tool — και τα δύο ίδιο idiom με το ήδη-flagged backup/restore CSV export/AI-engine/storage Settings
+   («Needs Achilleas», όχι buildable queue item χωρίς σαφές mobile precedent για occasional-use power tools).
+4. **`32ca74c`** SSRF fix στο notifiers — καθαρά security, μηδέν product surface, δεν αφορά mobile.
+
+**Έλεγχος κώδικα (όχι μόνο commit messages)**: `grep netWorth apps/web/src/app/api/v1/reports/route.ts` = 0 ματς →
+το item #3 της παλιάς ουράς (Reports net-worth, PA2) παραμένει πράγματι ανοιχτό, όπως speced.
+
+**MOBILE_PARITY.md αλλαγές**: (α) νέο top-of-queue re-audit blockquote (51η σάρωση)· (β) νέο πλήρες entry «Loyalty
+cards — membership card wallet στο mobile (P20 gap)» ανάμεσα στο Items/document-vault entry, mirror του GiftCard
+format + το barcode-lib σημείωμα. Καμία άλλη αλλαγή στα υπόλοιπα entries (όλα επιβεβαιώθηκαν ακόμα ανοιχτά/ακριβή).
+
+**Ranking**: αφού τα #1/#2 (P15/P33) έκλεισαν, το **Reports net-worth headline/breakdown (PA2)** ανεβαίνει στην
+#1 θέση (το παλαιότερο ανοιχτό fully-speced item, P2/M). Ranked top-3+1: (1) **Reports net-worth headline/breakdown**
+[P2/M, ήδη πλήρως speced από την 48η]· (2) **Reports safe-to-spend forward-cashflow κάρτα** [P2/M, P19, ήδη πλήρως
+speced]· (3) **Reports/Settings budget envelope/rollover mode** [P2/M, P25, ήδη πλήρως speced]· (4, νέο) **Loyalty
+card wallet** [P2/L, νέο entity + νέο mobile barcode-rendering dep]. Ισοδύναμες M-tier εναλλακτικές: P7 (subscription
+auto-discover), P21 (document vault, ήδη speced).
+
+## Needs Achilleas
+
+- Τίποτα ασαφές/needs-decision νέο αυτό το run (το P24/P16 out-of-scope κρίθηκε από μένα με σαφή αιτιολόγηση, όχι
+  ασάφεια — απλά σημειώνονται εδώ ως confirmed non-gaps, όχι ερώτημα). Τα προϋπάρχοντα παραμένουν αμετάβλητα:
+  receipt↔transaction reconciliation scope (P18), SaaS multi-tenant surfaces confirm-out-of-scope, safe-area dep,
+  theme/light-dark + language switcher, AI-engine/storage/OneDrive Settings, statements PDF-import, remote push E2E
+  σε πραγματική συσκευή (EAS+APNs), Tasks Kanban board, lucide icon set, rate-limit 429 backoff, **+2 νέα confirmed
+  out-of-scope (όχι ερώτημα, μόνο για ενημέρωση):** P24 webhooks config UI (power-user integration, αν ο Αχιλλέας
+  θέλει mobile Settings surface γι' αυτό κάποια στιγμή, είναι ρητή απόφαση όχι default), P16 YNAB CSV import
+  (desktop-file-picker migration tool, one-time use, χαμηλή αξία για mobile).
+
