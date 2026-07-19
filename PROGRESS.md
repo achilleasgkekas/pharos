@@ -5767,3 +5767,68 @@ CLAUDE.md/memory «Docker rebuild → hard refresh»), ΟΧΙ regression από 
 ## Needs Achilleas
 
 - Τίποτα νέο.
+
+## 2026-07-19 (pharos-daily-dev, cont.² — P16 migration importer: YNAB CSV import)
+
+Ο χρήστης είπε «Go on» ξανά μετά το SSRF follow-up πιο πάνω, στην ίδια session. Coordination guard (pause
+switch/inbox/git status) ελέγχθηκε ξανά — καθαρό. Approved queue outranks Build Queue queue ακόμα (κανόνας
+του routine), οπότε συνέχισα από εκεί αντί το Build Queue's #1 item.
+
+**Επιλογή**: από τα buildable Approved items (P13 insurance export, P16 migration importers, P8 tax tagging,
+P11 email-IMAP, P17 mobile barcode, P5 browser extension, P3 AI month-review, P9 multi-currency — το P31
+παραμένει σκόπιμα deferred για dedicated auth-heavy run), διάλεξα το **P16 (migration importers)** — locked
+builder default speced ήδη, και σημαντικό εύρημα: το PA1 (bank/generic CSV import, ήδη shipped) έδωσε ΗΔΗ ένα
+proven, tested pipeline (`lib/csvImport.ts` pure parser + `importExpensesCsv` server action με dedupe/category-
+inheritance/tenant-scoping) που ένας app-specific importer μπορεί να ΤΡΟΦΟΔΟΤΗΣΕΙ αντί να ξαναγράψει — χαμηλό
+πρόσθετο ρίσκο. Απέκλεισα το P13/P8 (χρειάζονται νέο PDF-generation + ZIP dependency, το app δεν έχει κανένα
+σήμερα — νέα heavy dependency σε unattended run = ρίσκο), το P11 (χρειάζεται τα IMAP credentials του χρήστη,
+credentials-boundary), το P17 (mobile-native, χρειάζεται camera testing σε simulator που δεν επιτρέπεται
+unattended), το P5 (ολόκληρο νέο browser-extension subproject, μεγάλο scope), το P3 (AI-heavy, incremental
+value μικρότερο), το P9 (L-size, μεγάλο blast radius σε money.ts παντού).
+
+**Research πρώτα (WebSearch/WebFetch)**: το backlog έλεγε «πρώτα Firefly III + YNAB». Έψαξα και τα δύο exact
+export formats πριν γράψω κώδικα (χρηματοοικονομικά δεδομένα — λάθος πρόσημο/mapping = σιωπηλά λάθος ledger).
+**YNAB**: cross-confirmed register export columns (Account/Flag/Date/Payee/Category Group/Category/Memo/
+Outflow/Inflow/Cleared, με γνωστό legacy YNAB4 variant Master Category/Sub Category) από πολλαπλές πηγές.
+**Firefly III**: τα ίδια τα official docs (`docs.firefly-iii.org`, GitHub) λένε ρητά ότι το export format
+**ΔΕΝ είναι σταθερά τεκμηριωμένο** — «exported CSV files from Firefly III cannot be directly re-imported»
+(ούτε στο ίδιο!). **Builder decision: Firefly III deferred** — χτίζοντας πάνω σε άγνωστο schema χωρίς
+πραγματικό δείγμα αρχείου θα ρίσκαρε λάθος οικονομικά δεδομένα σε ένα unattended run, μη αποδεκτό. Grocy
+(marked "optional" στο spec) επίσης εκκρεμεί. Καταγράφηκε ρητά στο PRODUCT_BACKLOG.md ως builder-decision
+scope-down, όχι ξεχασμένο.
+
+**Τι μπήκε (YNAB CSV import)**:
+- Νέο pure **`lib/ynabImport.ts`** (+20 unit tests, DB-free): `detectYnabColumns()` tolerant keyword matching
+  (ΟΧΙ hardcoded header order — reuse `parseCsv`) πιάνει ΚΑΙ το σύγχρονο nYNAB web export ΚΑΙ το legacy YNAB4
+  desktop export. `mapYnabRows()` συνδυάζει τα ξεχωριστά Outflow/Inflow σε ένα signed amount, και **αποκλείει
+  ρητά** «Starting Balance»/«Reconciliation Balance Adjustment» (bookkeeping, όχι πραγματική συναλλαγή) και
+  «Transfer : <account>» (θα διπλομετρούσε spend ως income+expense) — μετρημένα ξεχωριστά από invalid rows.
+- Τα mapped rows τροφοδοτούν **απευθείας το ήδη-existing `importExpensesCsv(rows,{signSplit:true})`** (PA1) —
+  **μηδέν νέος DB-writing κώδικας**, μόνο διαφορετική «μπροστινή πόρτα» πάνω στο ίδιο proven/tested pipeline.
+- Νέο **`app/settings/YnabImportModal.tsx`** (auto-detected columns, καμία χειροκίνητη mapping-UI αφού το
+  format είναι γνωστό — σε αντίθεση με το generic `CsvImportModal`) + `MigrationImportManager` section στο
+  Settings → Storage & backup tab (icon `Upload`, ήδη imported).
+- i18n keys μπήκαν μόνο στο `en.ts` (source locale, fallback αυτόματο για τα άλλα 7 — ίδιο established pattern
+  με τα P26/P1/P12, tracked ξεχωριστά από το web-debt i18n-gap auditor, ΔΕΝ blocking).
+
+**Εύρημα εν παρόδω (καταγράφηκε στο PRODUCT_BACKLOG.md, ΔΕΝ διορθώθηκε — εκτός scope)**: το ήδη-υπάρχον
+`app/expenses/CsvImportModal.tsx` (PA1) φαίνεται **orphaned** — μηδέν import site πουθενά στο codebase (dead
+UI code, ποτέ wired σε page). Η server action που χρησιμοποιεί (`importExpensesCsv`) παραμένει απόλυτα
+λειτουργική και είναι αυτή που μόλις reused εδώ. Follow-up: wire το modal σε ένα «Import CSV» button στο
+/expenses (η αρχική πρόθεση), ή σβήσε το αν κρίθηκε ξεπερασμένο.
+
+**Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` **2337 passed / 181 files** (+20 νέα, μηδέν
+regression). Safe Docker rebuild: build OK, `RestartCount=0`, `docker logs` καθαρό. Browser-checked (Claude
+Browser pane): `/login` → «Sign in · Pharos», μηδέν console errors. `/settings` UI δεν testable end-to-end
+χωρίς πραγματικό YNAB export file + credentials του Αχιλλέα (ίδιος περιορισμός με κάθε προηγούμενο Settings
+run) — η λογική επαληθεύτηκε πλήρως μέσω των 20 unit tests. `docker builder prune -f` μετά (−2.2GB). Docker
+lock released.
+
+**Suggested next task**: P31 household/shared-access (M, παραμένει το επόμενο υψηλής αξίας Approved item,
+αγγίζει auth/ρόλους — αξίζει το δικό του πλήρες run) ή το orphaned CsvImportModal follow-up (S, μηχανικό) ή
+MOBILE_PARITY.md Build Queue.
+
+## Needs Achilleas
+
+- Τίποτα νέο. (Firefly III/Grocy importers χρειάζονται πραγματικό sample export file ή προσεκτικότερο manual
+  session — δεν είναι κατάλληλα για άλλο best-effort unattended run, βλ. PRODUCT_BACKLOG.md P16.)

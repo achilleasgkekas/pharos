@@ -477,11 +477,43 @@
 - **Module:** Expenses/Receipts (+ Reports/Settings για το export).
 - **Ανοιχτή απόφαση (builder default):** free-form tags + optional preset (GR)· tagging παντού, ZIP-με-αρχεία = paid στο SaaS.
 
-### P16. Migration importers από άλλα finance/self-host apps (Firefly III / YNAB / Grocy) — M — OSS (adoption lever)
+### P16. Migration importers από άλλα finance/self-host apps (Firefly III / YNAB / Grocy) — 🟡 YNAB SHIPPED 2026-07-19 (pharos-daily-dev), Firefly III/Grocy εκκρεμούν
 - **Αξία:** δέξου export ανταγωνιστή → μειώνει switching cost. Importer για Firefly III (JSON/CSV), YNAB (CSV),
   optional Grocy. **Διακριτό από PA1** (γενικό bank CSV· εδώ app-specific με mapping presets).
-- **Module:** Settings → Data (νέο «Import from another app») + Expenses/Items.
-- **Ανοιχτή απόφαση (builder default):** πρώτα Firefly III + YNAB· transactions + categories (balances phase 2).
+- **Module:** Settings → Storage & backup → νέο «Import from another app» + Expenses.
+- **YNAB v1 υλοποίηση**: νέο pure **`lib/ynabImport.ts`** (+20 unit tests) — `detectYnabColumns()` tolerant
+  keyword-matching (ΟΧΙ hardcoded header order) πάνω στο ήδη-υπάρχον `parseCsv`/`parseCsvDate`/`parseCsvAmount`
+  (`lib/csvImport.ts`, PA1) — καλύπτει ΚΑΙ το σύγχρονο nYNAB web export («Category Group/Category») ΚΑΙ το
+  legacy YNAB4 desktop export («Master Category»/«Sub Category»). `mapYnabRows()` συνδυάζει τα ξεχωριστά
+  Outflow/Inflow columns σε ένα signed amount (αρνητικό=έξοδο) και **αποκλείει ρητά** δύο κατηγορίες γραμμών
+  που θα χάλαγαν πραγματικά δεδομένα αν εισάγονταν: **«Starting Balance»/«Reconciliation Balance Adjustment»**
+  (YNAB bookkeeping, όχι πραγματική συναλλαγή) και **«Transfer : <account>»** (μεταφορά ανάμεσα σε δικούς του
+  λογαριασμούς — θα διπλομετρούσε το spend ως income+expense). Τα mapped rows τροφοδοτούν **απευθείας το ήδη
+  existing+tested `importExpensesCsv(rows, {signSplit:true})`** (PA1, `app/expenses/actions.ts`) — **μηδέν νέος
+  DB-writing κώδικας**, μόνο διαφορετική «μπροστινή πόρτα» πάνω στο ίδιο proven pipeline (dedupe, category
+  inheritance, tenant scoping όλα reused ατόφια). Νέο `components/settings/YnabImportModal.tsx` (auto-detected
+  columns, καμία χειροκίνητη mapping-UI σε αντίθεση με το generic CSV modal — το YNAB format είναι γνωστό) +
+  `MigrationImportManager` section στο Settings → Storage & backup tab.
+- **Firefly III ΣΚΟΠΙΜΑ deferred** (builder decision, απόκλιση από το αρχικό «πρώτα Firefly III + YNAB»):
+  research (WebSearch/WebFetch σε official docs + GitHub) έδειξε ότι το export format του Firefly III **δεν
+  είναι σταθερά τεκμηριωμένο** — τα ίδια τα official docs λένε ρητά ότι τα δικά του CSV exports «δεν μπορούν να
+  ξαναγίνουν import» ούτε στο ίδιο το Firefly III. Χτίζοντας έναν importer πάνω σε άγνωστο/άτεστο schema θα
+  ρίσκαρε **σιωπηλά λάθος οικονομικά δεδομένα** (λάθος πρόσημο, λάθος λογαριασμός) σε ένα unattended run χωρίς
+  δυνατότητα να το επαληθεύσω με πραγματικό δείγμα αρχείου — μη αποδεκτό ρίσκο. Grocy επίσης εκκρεμεί (marked
+  "optional" στο αρχικό spec). **Follow-up**: Firefly III/Grocy χρειάζονται είτε πραγματικό sample export file
+  από τον χρήστη είτε προσεκτικότερο manual verify session, όχι άλλο ένα best-effort unattended run.
+- **Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` **2337 passed / 181 files** (+20 νέα, μηδέν
+  regression). Safe Docker rebuild: build OK, `RestartCount=0`, `docker logs` καθαρό (μόνο το προϋπάρχον άσχετο
+  `@napi-rs/canvas` warning), browser-checked (Claude Browser pane) `/login` → «Sign in · Pharos», μηδέν
+  console errors. `/settings` UI δεν testable end-to-end χωρίς πραγματικό YNAB export file + τα credentials του
+  Αχιλλέα, ίδιος περιορισμός με κάθε προηγούμενο Settings-only run — η λογική επαληθεύτηκε πλήρως μέσω των 20
+  unit tests (συμπεριλαμβανομένου ενός full-CSV end-to-end test με πραγματικό-shaped δεδομένα).
+- **Εύρημα εν παρόδω (καταγράφηκε, ΔΕΝ διορθώθηκε — εκτός scope)**: το ήδη-υπάρχον `app/expenses/CsvImportModal.tsx`
+  (PA1, γενικό bank CSV) φαίνεται **orphaned** — μηδέν import site βρέθηκε πουθενά στο codebase (dead code,
+  UI ποτέ wired σε κανένα page). Η ίδια η server action `importExpensesCsv` που χρησιμοποιεί παραμένει
+  απόλυτα λειτουργική/tested και reused εδώ. Αξίζει follow-up: είτε wire το modal σε ένα «Import CSV» button
+  στο /expenses (η αρχική πρόθεση του PA1 feature), είτε το σβήσε αν κρίθηκε ξεπερασμένο από το generic Backup
+  JSON export/import.
 
 ### P11. Email-in auto-import — self-hosted IMAP receipt inbox — M — both (ψηλό value/effort)
 - **Αξία:** συνεχής αυτόματη σύλληψη: IMAP creds (ή forwarding address) → poller → υπάρχον pipeline

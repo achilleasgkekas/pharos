@@ -434,6 +434,16 @@ export const en = {
   'csv.doneImported': 'Imported {n} records.',
   'csv.doneSkipped': '{dupes} duplicates skipped · {invalid} rows unreadable',
 
+  // ── Migration importers (P16) ─────────────────────────────────────────────
+  'migrate.sectionTitle': 'Import from another app',
+  'migrate.sectionHint': 'Bring your transaction history over from an app you used before Pharos.',
+  'migrate.ynabButton': 'Import from YNAB',
+  'ynab.title': 'Import from YNAB (Register.csv export)',
+  'ynab.dropHint': 'Click to pick your YNAB "Register.csv" export',
+  'ynab.formats': 'Export from YNAB → File → Export Budget Data, then pick the Register.csv',
+  'ynab.notYnab': "This doesn't look like a YNAB register export (no Date/Payee/Outflow-Inflow columns found).",
+  'ynab.summary': '{valid} transactions ready · {excluded} transfers/balance entries skipped · {invalid} rows unreadable',
+
   'ex.fVendor': 'Vendor / payer',
   'ex.fVendorPlaceholder': 'e.g. utility, landlord…',
   'ex.fAmount': 'Amount ({cur})',

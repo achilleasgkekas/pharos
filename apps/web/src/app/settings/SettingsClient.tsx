@@ -12,6 +12,7 @@ import type { CategoryRule } from '@/lib/categoryRules';
 import { AI_FEATURES } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, SCRAPER_RECOMMEND, type FetchedModel } from '@/lib/aiModels';
 import { StoreDuplicatesModal } from './StoreDuplicatesModal';
+import { YnabImportModal } from './YnabImportModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
 import { rateForCategory } from '@/lib/depreciation';
@@ -260,6 +261,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
                 <BackupRestore />
                 <RecomputePricesButton />
               </Section>
+              <MigrationImportManager />
               <SampleDataManager />
               <TrashManager />
             </>
@@ -2441,6 +2443,20 @@ function TrashManager() {
           </button>
         </>
       )}
+    </Section>
+  );
+}
+
+function MigrationImportManager() {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <Section title={t('migrate.sectionTitle')} icon={<Upload size={15} />}>
+      <p className="text-xs text-[color:var(--color-text-dim)] -mt-1">{t('migrate.sectionHint')}</p>
+      <button type="button" onClick={() => setOpen(true)} className={cn(ghostBtn)}>
+        <Upload size={13} /> {t('migrate.ynabButton')}
+      </button>
+      {open && <YnabImportModal onClose={() => setOpen(false)} onImported={() => {}} />}
     </Section>
   );
 }
