@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-18 (10η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-19 (11η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «τα εγκρίνω όλα» → **ΟΛΑ** τα προηγούμενα Proposed
 > (P1, P3, P5-P26) μετακινήθηκαν στο «Approved», μαζί με τα ήδη-εγκεκριμένα PA1/PA2/PA3.
 > **7η σάρωση (2026-07-09):** PA1 (bank/CSV import) shipped → «Done»· προστέθηκαν 5 νέοι candidates P27-P31.
@@ -27,12 +27,69 @@
 > **4 νέοι candidates P41-P44** — verified distinct (grep για «maintenance/service interval», «wishlist/public
 > share link», «passport/document expiry», «RMA/warranty claim» = μηδέν hits σε PRODUCT_BACKLOG.md/TODO.md/
 > WEB_DEBT.md/MOBILE_PARITY.md πριν από αυτό το run).
+> **11η σάρωση (2026-07-19):** P37-P44 παραμένουν αμετάβλητα awaiting Αχιλλέας (καμία ρητή απόφαση/έγκριση σε
+> αυτό το unattended run). Έλεγχος κώδικα (όχι μόνο docs) επιβεβαίωσε ότι κανένα από τα P37-P44 δεν έχει χτιστεί
+> εν τω μεταξύ (grep `warrantyClaims`/`Document.ts`/`maintenanceIntervalDays`/`versionCheck`/`bundleId`/
+> `commitmentEndsAt`/`Insurance` = μηδέν hits). Στο «Approved» queue παραμένουν ανοιχτά (χωρίς SHIPPED tag):
+> P36 (blocked, ρητά τελευταίο), P31 (deferred 4η φορά, scoped και έτοιμο για supervised session — βλ. σημείωμα
+> μέσα στο item), P24/P23/P13/P8/P16(YNAB done, Firefly III/Grocy εκκρεμούν)/P11/P17/P5/P3/P9. Προστέθηκαν
+> **4 νέοι candidates P45-P48** — βρέθηκαν με ζωντανό grep στο codebase (όχι μόνο docs): κανένα `pausedUntil`
+> σε Subscription, κανένα `findDuplicateExpenses`-style pattern (ενώ Receipts/Stores/Items έχουν ήδη ακριβώς αυτό
+> το pattern), κανένα `lentTo`/δανεισμός σε Item, κανένα `lastSuccessfulSyncAt`/staleness σε storage config —
+> όλα verified distinct από τα ήδη-tracked P37-P44/Approved/TODO/WEB_DEBT/MOBILE_PARITY.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P48. Storage mirror sync-staleness alert (backup peace-of-mind) — S — both
+- **Αξία:** ο χρήστης έχει ήδη remote mirror (OneDrive/SMB/FTP, βλ. CLAUDE.md) αλλά το sync είναι **μόνο
+  χειροκίνητο** («Sync now» στο Settings → File storage) — αν ξεχαστεί για βδομάδες, το remote αντίγραφο μένει
+  σιωπηλά πίσω από τα τοπικά αρχεία, ενώ ο χρήστης νομίζει ότι έχει ενεργό 3-2-1 backup. Κανένα σημείο σήμερα
+  δεν κρατά «πότε ολοκληρώθηκε το τελευταίο επιτυχές sync» ούτε ειδοποιεί αν περάσει πολύς καιρός χωρίς ένα.
+  Νέο: αποθήκευσε `lastSuccessfulSyncAt` (ήδη υπάρχει το ίδιο το sync action, μόνο λείπει το timestamp-write) →
+  alert (reuse `dispatchAlert`) όταν περάσουν >N μέρες από το τελευταίο επιτυχές sync ΚΑΙ backend≠local ΚΑΙ
+  mirror ενεργό. Ντετερμινιστικό, μηδέν AI. **Διακριτό** από P40 (update-available = νέα έκδοση app, όχι backup
+  freshness) — εδώ ο κίνδυνος είναι δεδομένα, όχι λογισμικό.
+- **Module:** Settings → File storage (νέο timestamp πεδίο στο AppConfig) + Notifications.
+- **Ανοιχτή απόφαση (builder default):** default threshold 7 μέρες (ρυθμιζόμενο, ίδιο lead-time pattern με τα
+  υπόλοιπα alert-days)· no-op όταν backend=local ή mirror off (δεν έχει νόημα το alert).
+
+### P47. Item lending tracker (δανεικά σε φίλους/οικογένεια) — S/M — OSS
+- **Αξία:** πραγματικό «Personal Hub» κενό (βλ. CLAUDE.md backronym) — ο χρήστης έχει ακριβό εξοπλισμό (Battle
+  Station parts, δίκτυο, εργαλεία, gadgets) που μπορεί να δανείζει σε φίλους/οικογένεια. Σήμερα κανένα module δεν
+  κρατά «ποιος το έχει τώρα και πότε το περιμένεις πίσω» — το item status μένει owned (received/installed) σαν να
+  είναι ακόμα στο σπίτι. Νέο optional `Item.lentTo` (free-form name) + `lentAt`/`expectedReturnAt` + «mark
+  returned» action → badge στην κάρτα («→ δανεισμένο σε X») + overdue-return alert. **Διακριτό** από P44 (RMA =
+  προϊόν πάει σε κατασκευαστή για επισκευή, όχι σε φίλο) και P41 (maintenance = φυσική συντήρηση, όχι δανεισμός).
+- **Module:** Items/Inventory (νέα optional πεδία + «mark returned» action) + Notifications (overdue-return nudge).
+- **Ανοιχτή απόφαση (builder default):** free-form όνομα δανειζόμενου (καμία σύνδεση με λογαριασμό χρήστη/P31)·
+  `expectedReturnAt` optional (κενό = «out on loan» χωρίς προθεσμία, χωρίς alert)· διαθέσιμο μόνο σε
+  owned items (received/installed), όχι shopping.
+
+### P46. Expense duplicate detection & merge (mirror του ήδη-υπάρχοντος pattern) — S — OSS
+- **Αξία:** τα Receipts, Stores, και Items έχουν ήδη ένα δουλεμένο «find duplicates» modal (group κατά κλειδί +
+  review + merge, βλ. `findDuplicateReceipts`/`findDuplicateStores`/`findDuplicateItems`) — τα **Expenses δεν
+  έχουν το ίδιο**, παρόλο που ο κίνδυνος υπάρχει εξίσου (διπλό import ενός λογαριασμού, ίδια recurring εγγραφή
+  δύο φορές λόγω race στο auto-mirror-on-verify ή διπλό CSV/YNAB import). Ίδιο group-by (vendorKey+ημέρα+ποσό,
+  ίδιο κλειδί με το recurring-detection/anomaly) + merge, ελάχιστο νέο effort αφού το UI pattern
+  (`DuplicatesModal`-style) υπάρχει ήδη τρεις φορές ως πρότυπο να αντιγραφεί.
+- **Module:** Expenses (+ Income, ίδιο μοντέλο/kind πεδίο).
+- **Ανοιχτή απόφαση (builder default):** group by `vendorKey` (ήδη υπάρχει η normalize function) + ίδια ημέρα +
+  ποσό· reuse UI pattern από το `ReceiptsClient` DuplicatesModal ατόφιο (ίδιο review-before-merge flow).
+
+### P45. Subscription pause/skip χωρίς πλήρη ακύρωση — S — both
+- **Αξία:** σήμερα το `Subscription.active` είναι δυαδικό on/off. Αν κάποιος παγώσει προσωρινά μια συνδρομή
+  (π.χ. γυμναστήριο «freeze» 2 μήνες, ταξίδι, εποχική υπηρεσία), η μόνη επιλογή είναι είτε να τη σβήσει/κάνει
+  inactive (χάνει τον υπολογισμό renewal/ιστορικό μόλις την ξανα-ενεργοποιήσει), είτε να τη μείνει active και να
+  ξεχάσει ότι έπαψε πραγματικά να χρεώνεται (λάθος στα cash-flow/reports προβλέψεις). Νέο optional `pausedUntil`
+  (Date|null) → renewal/alert/calendar/cash-flow υπολογισμοί την αγνοούν μέχρι εκείνη την ημερομηνία, μετά
+  ξαναμετράει αυτόματα ως ενεργή χωρίς χειροκίνητο unpause. Ντετερμινιστικό, reuse `computeNextRenewal`.
+- **Module:** Subscriptions (+ Calendar/Reports/safe-to-spend υπολογισμοί που ήδη διαβάζουν `active`).
+- **Ανοιχτή απόφαση (builder default):** «Pause until…» date picker στη φόρμα (κενό = όχι paused)· expired pause
+  ξαναμετράει αυτόματα στο επόμενο load (όχι background job, ίδιο on-read pattern με το `generateDueRecurring`).
 
 ### P44. Warranty claim / RMA tracker (κύκλος ζωής μιας πραγματικής επιστροφής) — S/M — OSS (κυρίως)
 - **Αξία:** σήμερα το warranty tracking σταματά στο «λήγει σε Nd» (expiry alert). Καμία δομή δεν καλύπτει τι
