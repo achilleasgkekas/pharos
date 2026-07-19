@@ -1858,3 +1858,25 @@ Mock pattern: DB-mock (`@/lib/db` connectDB, `@/models/User`) + mock `@/app/item
 - Collision guard: πριν το stage, `git diff --cached` κενό. `git status --short` = μόνο το δικό μου νέο αρχείο, μηδέν foreign WIP. Στάγιαρα ΜΟΝΟ το δικό μου path.
 
 Suggested next task: (β συνέχεια) Απομένουν: `items/[id]/ai-fill`, `receipts/[id]/rescan`, `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Έλεγξε `git status` πριν πιάσεις οτιδήποτε — ιδίως αν `items/actions.ts` έχει foreign WIP (επηρεάζει `ai-fill`/`import`, το `convert-to-task` του export έγινε ήδη). ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam, ιδίως failure-remap ναι/όχι) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-20 (cont.¹⁶ — items/[id]/ai-fill/route.test.ts, POST με mode-resolution + failure-remap ανά mode)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/items/[id]/ai-fill/route.test.ts` για το POST του `/api/v1/items/:id/ai-fill`.**
+
+Επιλογή target: πρώτο από την εναπομείνασα λίστα (`git status` καθαρό, μηδέν foreign WIP σε `items/actions.ts` ή αλλού). Backs τα «AI fill specs» / «AI fill info» κουμπιά στο item-detail (web+mobile). Thin wrapper πάνω στα δύο ξεχωριστά actions `aiFillSpecs`/`aiFillInfo` (items/actions.ts) — η δική τους web-fetch/AI-parse/merge λογική ΔΕΝ ξανα-δοκιμάζεται εδώ.
+
+Route-only συμπεριφορά που δοκιμάστηκε: (α) ObjectId guard πριν οποιοδήποτε body read / action call, (β) **mode resolution**: `body.mode === 'info'` διαλέγει το `aiFillInfo`· ΟΤΙΔΗΠΟΤΕ άλλο (κενό body, unparsable JSON — το route τυλίγει το `req.json()` σε δικό του try/catch, `'specs'` explicit, άσχετο string, number, null) πέφτει σε default **'specs'** → `aiFillSpecs`, (γ) **shape ανά mode**: 'specs' → `{ok:true, mode:'specs', specs}` (ΧΩΡΙΣ filled, ΧΩΡΙΣ item)· 'info' → `{ok:true, mode:'info', filled}` (ΧΩΡΙΣ specs, ΧΩΡΙΣ item) — pin-αρισμένο ρητά ότι το `item` (που επιστρέφουν και τα δύο actions) ΔΕΝ διαρρέει, σύμφωνα με το route comment «client re-fetches GET /items/:id», (δ) **failure remap ανά mode**: `{ok:false,error}` → 400 με το action error message, ή mode-specific fallback ('AI specs failed' / 'AI fill failed') όταν το error είναι falsy — δοκιμάστηκε explicit-error + falsy-error και για τα δύο modes.
+
+Mock pattern: DB-mock (`@/lib/db`, `@/models/User`) + mock `@/app/items/actions` (aiFillSpecs+aiFillInfo και τα δύο, record forwarded id). Πραγματικοί `withAuth`/`isObjectId`. makeReq: `json()` δέχεται `body:'throw'` sentinel για να προσομοιώσει reject (κενό/unparsable body) — καλύπτει το route's δικό του try/catch γύρω από το `req.json()`.
+
+Τι έγινε: Νέο `route.test.ts` (14 tests): auth gate (2), id guard (1: κανένα body read, το `json()` δεν καλείται καν γιατί ο guard τρέχει πρώτος), mode-resolution-defaults-to-specs (6: throw/κενό body/no-mode-field/explicit 'specs'/άσχετο string/number/null — 6 παραλλαγές), mode info (1), failure remap (4: specs explicit-error + specs falsy-error + info explicit-error + info falsy-error).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/api/v1/items/[id]/ai-fill/route.test.ts"` → 14/14 passed.
+- `npx vitest run` (όλο το suite) → 190 files, 2426/2426 passed.
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό.
+- Collision guard: `git diff --cached` κενό πριν το stage. `git status --short` = μόνο το δικό μου νέο αρχείο, μηδέν foreign WIP. Στάγιαρα ΜΟΝΟ το δικό μου path.
+
+Suggested next task: (β συνέχεια) Απομένουν: `receipts/[id]/rescan`, `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Έλεγξε `git status` πριν πιάσεις οτιδήποτε. ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam, ιδίως failure-remap ναι/όχι, ιδίως αν κάνει κάτι πολυπλοκότερο σαν multi-mode branching όπως εδώ) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
