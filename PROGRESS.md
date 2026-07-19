@@ -2,8 +2,48 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 82e008c -->
+<!-- reviewed: 638e33a -->
 <!-- docker-validated: 7179b6f -->
+
+## 2026-07-19 (reviewer — έλεγχος 82e008c..638e33a, 1 fix commit)
+
+**Εύρος**: 11 commits από το τελευταίο reviewed marker (`82e008c`): P20 loyalty/membership card wallet
+(`536a3d8`), P24 outbound event webhooks (`ded86eb`), SSRF fix στα notifiers (ntfy/Discord/Slack/generic
+webhook, `32ca74c`), P16 YNAB CSV migration importer (`6ed76b6`), mobile expense category-rule wiring
+(`d5a9684`) + subscription free-trial fields (`8c3ccda`), + docs/health-check commits.
+
+**Checks**: `cd apps/web && npm run type-check` → **EXIT 0**. `cd apps/mobile && npx tsc --noEmit` →
+**EXIT 0**. `npx vitest run` (apps/web) → **2349 passed / 181 files**, μηδέν regression.
+
+**Review**: `lib/webhooks.ts` (P24) καθαρό — reuse του υπάρχοντος `assertPublicUrl` SSRF guard πριν από
+κάθε POST (subscribe-time validation στο `saveWebhookSubscriptions` ΚΑΙ delivery-time στο `postOne`),
+Stripe-style HMAC signing (`t=...,v1=...`), fire-and-forget `dispatchEventWebhooks` (ποτέ throw, no-op
+όταν καμία subscription). Η SSRF fix στο `notifiers.ts`/`notify.ts` σωστή και συνεπής (4 call sites, ίδιο
+inline σχόλιο). `lib/loyaltyCard.ts`/`lib/budgetAlert.ts`/`lib/ynabImport.ts` pure+framework-free, καλά
+unit-tested (13/7/20 tests αντίστοιχα), YNAB transfer/balance-adjustment exclusion λογική σωστή (δεν θα
+double-count-άρει). `LoyaltyCard`/`LoyaltyCardsClient`/`loyaltyActions.ts` mirror ακριβώς το ήδη-υπάρχον
+`GiftCard`/`GiftCardsClient`/`giftcardActions.ts` pattern (ίδιο tenancy-scoping gap ΚΑΙ ίδιο i18n-wiring
+gap με το sibling, όχι νέο precedent — βλ. WEB_DEBT.md update παρακάτω). Mobile subscription trial-field
+diff (`api.ts`/`SubscriptionsScreen.tsx`) σωστά wired και στις δύο κατευθύνσεις (PATCH `null`=clear vs
+`undefined`=no-change στο mobile form, matching το API's semantics).
+
+**Fixed (1 μικρό, safe, verified)**:
+1. **`YnabImportModal.tsx:146`** — το τελικό "done" summary περνούσε hardcoded `invalid: 0` στο
+   `t('csv.doneSkipped', ...)` αντί το πραγματικό `parsed.invalid` (το sibling `CsvImportModal.tsx:219`
+   περνάει σωστά `result.invalid`). Αποτέλεσμα: ο χρήστης έβλεπε πάντα «0 rows unreadable» μετά από ένα
+   YNAB import ακόμα κι αν κάποιες γραμμές ήταν αδιάβαστες (το `parsed.invalid` υπολογιζόταν ήδη σωστά
+   και εμφανιζόταν σωστά στο PRE-import summary, μόνο το POST-import μήνυμα το hardcoded-άρε). Fix:
+   `invalid: parsed?.invalid ?? 0` (το `parsed` state παραμένει populated μετά το import, δεν χρειάστηκε
+   νέο state). Re-verified: type-check EXIT 0.
+
+**Ενημερώθηκε WEB_DEBT.md** (ήδη-tracked item, όχι νέο): το el.ts i18n gap μεγάλωσε 75→**84** (+9, από
+`trash.tLoyaltyCard` [P20] + 8× `migrate.*`/`ynab.*` [P16]). Πρόσθεσα σημείωση ότι το νέο
+`LoyaltyCardsClient.tsx` επίσης δεν περνάει από `t()` (mirror του ήδη-γνωστού gift-card gap, όχι νέο
+pattern) — δεν άνοιξα ξεχωριστό item.
+
+**Needs Achilleas**: τίποτα νέο. Ένα untracked test file (`api/v1/settings/test-notify/route.test.ts`)
+βρέθηκε στο working tree κατά την έναρξη του run — φαίνεται mid-flight work από άλλη concurrent routine
+(passes, 6 tests), δεν το άγγιξα (δεν είναι δικό μου, ούτε μέρος του review range).
 
 ## 2026-07-19 (docker-health — health check 03:03)
 

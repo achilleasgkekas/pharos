@@ -143,7 +143,7 @@ export function YnabImportModal({ onClose, onImported }: Props) {
             <CheckCircle2 size={28} className="mx-auto text-[color:var(--color-accent)]" />
             <p className="text-sm text-[color:var(--color-text)]">{t('csv.doneImported', { n: result.imported })}</p>
             <p className="text-xs text-[color:var(--color-text-faint)]">
-              {t('csv.doneSkipped', { dupes: result.skipped, invalid: 0 })}
+              {t('csv.doneSkipped', { dupes: result.skipped, invalid: parsed?.invalid ?? 0 })}
             </p>
             <Button onClick={onClose} className="mt-2">{t('common.close')}</Button>
           </div>
