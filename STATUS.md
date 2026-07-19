@@ -1,40 +1,38 @@
 # Pharos Monitor — STATUS
 
-## 2026-07-18 10:55
+## 2026-07-19 22:45
 
-**Ετυμηγορια: ΚΡΙΤΙΚΗ ΚΑΤΑΣΤΑΣΗ — Builder STALE, λοιπές ρουτίνες παρατεταμένα αδρανείς.**
+**Ετυμηγορια: ΟΛΑ ΟΚ — Builder + docker ενεργές, auditors ενημερωμένες.**
 
-Μηχανή ενεργή (ώρες: άγνωστο). **Κύριο ζήτημα:** ο Builder (Pharos daily dev) δεν ετρέξε σήμερα το πρωί (07-18 ~03:00) όπως είναι προγραμματισμένος. Όλες οι άλλες ρουτίνες επίσης σε παρατεταμένη αδράνεια (3-8+ ημέρες).
+Μηχανή ενεργή (22:41 τελευταίο commit). Ο builder που ήταν STALE στις 07-18 έχει ξαναζωντανέψει — 5 code commits σήμερα μεταξύ 03:26-22:34. Docker-health ελέγχθηκε στις 03:03. Ο parity auditor έγραψε έναν ενημέρωση 51η σάρωση στις 22:41.
 
 | routine | τελευταια δραστηριοτητα | OK/STALE | τι εκανε (συντομα) |
 |---|---|---|---|
-| builder (Pharos daily dev) | 2026-07-17 03:18 | **STALE** | P1 sample-data run; **δεν ετρέξε 2026-07-18 ~03:00** — άνω του προγραμματισμού κατά ~8h |
-| parity auditor (mobile-parity) | 2026-07-13 06:45 | **STALE** | 49η σάρωση — 8 νέοι P-item gaps; 4d 4h ago |
-| web code-quality auditor | 2026-07-15 01:17 | **STALE** | 53η σάρωση — item file-delete IDOR, el.ts i18n gap; 3d 9.5h ago |
-| ui auditor (mobile-ui) | 2026-07-09 14:38 | **VERY STALE** | 48η σάρωση — RADIUS drift, brand typography, loader consistency; 8d 20h ago |
-| code reviewer | 2026-07-10 04:36 | **VERY STALE** | range 65b81a2..22750b2, tsc web+mobile EXIT 0; 8d 6h ago |
-| docker guard | 2026-07-10 08:44 | **VERY STALE** | attended rebuild success (from 2026-07-10 STATUS); 8d 2h ago |
+| builder (Pharos daily dev) | 2026-07-19 22:34 | **OK** | 5 commits σήμερα (webhooks, notifiers SSRF, YNAB CSV, vendor-rules, P33 subscription trial) |
+| docker guard (health check) | 2026-07-19 03:03 | **OK** | Stack health check 03:03 — MongoDB/web healthy, no rebuild needed |
+| parity auditor (mobile-parity) | 2026-07-19 22:41 | **OK** | 51η σάρωση — P15/P33 top-2 closed by daily-dev; doc commit |
+| web code-quality auditor | 2026-07-15 01:17 | STALE | 53η σάρωση — 4d 21h ago; queue items: el.ts i18n gap + 3 SaaS error-handling |
+| ui auditor (mobile-ui) | 2026-07-09 14:38 | VERY STALE | 48η σάρωση — 10d 8h ago; queue: RADIUS drift + brand typography |
+| code reviewer | 2026-07-18 11:00 | OK-ISH | range 22750b2..82e008c; IDOR fix + plan-key dedup; 1d 11h ago (τελευταίο review marker 82e008c) |
 
 ## Open queue counts
 
-- Build Queue (MOBILE_PARITY): **17** TODO (was 8 on 2026-07-10, +9 από 49η parity audit 2026-07-13)
-- UI Debt Queue (MOBILE_PARITY): **4** TODO (unchanged since 2026-07-10)
-- Web Debt Queue (WEB_DEBT): **6** TODO (was 8 on 2026-07-10, −2)
+- **Build Queue** (MOBILE_PARITY § Build Queue): **27 TODO** (ήταν 17 στις 07-18, +10 νέα από parity audit)
+- **UI Debt Queue** (MOBILE_PARITY § UI Debt Queue): **9 TODO** (ήταν 4, +5 νέα)
+- **Web Debt Queue** (WEB_DEBT § Web Debt Queue): **6 TODO** (σταθερό)
 
-**Σύγκριση με προηγούμενο STATUS (2026-07-10 18:15: Build 8 / UI 4 / Web 8):** 
-- Build +9 (νέα functional GAP από parity auditor, δεν αντικατάστησαν παλιά)
-- UI σταθερό (μηδέν προόδου τα τελευταία 8 ημέρες)
-- Web −2 (κάπως μείωση, αλλά αδρανής όπως και τα άλλα)
+Σύγκριση με προηγούμενο STATUS (2026-07-18 10:55: Build 17 / UI 4 / Web 6):
+- Build +10 (ενδο-σάρωσης νέα gaps από parity auditor 07-19)
+- UI +5 (πιθανώς νέα από ίδιο parity run)
+- Web σταθερό (δεν ηττήθη ή αναβαθμίστηκε από auditor run τα τελευταία 4d)
 
 ## Προσοχη
 
-**ΚΡΙΤΙΚΟ:** Ο Builder (Pharos daily dev) δεν ετρέξε σήμερα το πρωί. Τυπικά τρέχει κάθε ημέρα ~03:00-03:30 EEST. Η τελευταία εκτέλεση ήταν 2026-07-17 03:17 (P1 sample-data run). Αν η μηχανή ήταν ενεργή, θα ήταν πρέπει να ετρέξε ~07:55 UTC (10:55 EEST) ήδη. Πιθανές αιτίες:
-1. Ο Builder ήταν σχεδιασμένος να σταματήσει ή ο ρουτινάρης απενεργοποιήθηκε
-2. Docker/scheduler προβλήματα
-3. Η μηχανή ήταν κλειστή κατά τη σχεδιασμένη ώρα (αλλά τώρα είναι ανοιχτή)
+**Χθες 07-18 ΚΡΙΣΙΜΟ**: ο builder είχε σταματήσει (τελευταία run 07-17 03:17). Σήμερα 07-19 έχει ξαναζωντανέψει με 5 commits σε ημέρα. Πιθανή αιτία: ο χρήστης ενεργοποίησε την ρουτίνα ξανά, ή ο scheduler αυτο-επανεκκινήθηκε.
 
-**ΔΕΥΤΕΡΕΥΟΝ:** Όλες οι άλλες ρουτίνες (parity auditor, web auditor, ui auditor, reviewer, docker) είναι σε παρατεταμένη αδράνεια 3-8+ ημερών. Δεν είναι σαφές αν αυτές έχουν επίσης σταματήσει, ή αν τρέχουν σε χαμηλότερη συχνότητα. Ο Builder είναι ο κύριος ρουτινάρης και θα πρέπει να προσέχουμε αν ενεργοποιείται ξανά.
+**Δευτερεύον**: Το parity auditor έσαρώσε και τα δύο audit queues σήμερα (Build + UI), κι έκλεισε 2 top-items (P15/P33). Τα Build+UI TODOs αυξήθηκαν όπως ήταν αναμενόμενο από τη νέα σάρωση.
 
-**Ανεπιβεβαίωτο εύρημα:** Υπάρχει ένα αδέσμευτο αρχείο `apps/web/src/app/api/v1/ai/subscription/route.test.ts` στο working tree. Αυτό προτείνει ότι κάποιος ρουτινάρης (πιθανώς Builder ή Reviewer) άφησε WIP χωρίς commit.
+**Web auditor αδρανής 4d** — αν χρειάζεται el.ts i18n gap (38 νέα keys από 7 νέα features) και 3 SaaS error-handling holdouts, θα χρειάζεται run. Αλλά δεν είναι urgent (SaaS κόντρα off).
 
-**Σύσταση:** Ελέγξτε τον Builder scheduler (π.χ. `launchd` πρόφιλ) και βεβαιωθείτε ότι τρέχει. Σε περίπτωση που η μηχανή ήταν κλειστή και μόλις έγινε προσβάσιμη, ενδεχομένως θα χρειάζεται μια manual Builder run για να συγχρονιστεί.
+**UI auditor 10d VERY STALE** — δεν έχει τρέξει εδώ και 10 μέρες. Αν υπάρχουν UI regressions από τα 5 νέα commits του builder σήμερα, δεν θα ανιχνευθούν μέχρι να τρέξει ξανά.
+
