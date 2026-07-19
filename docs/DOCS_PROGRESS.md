@@ -1,5 +1,23 @@
 # DOCS_PROGRESS
 
+## 2026-07-20 (cont. — P11 IMAP auto-import + leave-workspace endpoint)
+
+Δύο νέα docs files για features που shipαρίστηκαν τα τελευταία ώρες:
+
+Τι έγραψα:
+- **saas.md**: Προσθεση DELETE row στην "Workspace creation" σεκτιον. Το `/api/saas/account/workspaces` ειχε μονο POST (create another workspace) — προσθεσα το DELETE endpoint για να φυγεις απο workspace (self-service, any role). Gating: 404/401 normally, 409 αν εισαι ο last active owner. Audit trail records `membership.removed`.
+- **features.md**: Προσθεση bullet point στο "Receipts" σεκτιον για P11 (email-in IMAP auto-import). Εξηγηση: connect IMAP inbox, poll για receipt emails (attachments+HTML body), φέρνονται μέσα στο same upload+parse pipeline. Manual "Check inbox now" trigger στο Settings → Storage & backup → Email-in (IMAP), capped 25 messages/check, first run limited to last 7 days. Self-hosted only, no background cron.
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: saas.md αθικτο (14 fences, ζυγο), features.md +1 line inline bullet (0 fences).
+- Internal links: όλα τα referenced docs/endpoints υπάρχουν ✓.
+- Secret scan: κανένα sk_/pk_/AUTH_ ✓.
+- Markdown structure: ✓.
+
+Collision guard: git status --short δείχνει μόνο 2 modified docs files (saas.md, features.md), staged κενο. ΔΕΝ υπάρχουν foreign WIP files. Stage ΜΟΝΟ docs/saas.md + docs/features.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επόμενο run: (α) εάν αλλα νέα features shipαρίστηκαν (P12, P13, P45+), update docs ανάλογα, ή (β) api.md sync αν νέα /api/saas/** endpoints προστέθηκαν.
+
 ## 2026-07-20 (P24 event webhooks + item attachments API gap)
 
 Τρία docs files ενημερώθηκαν για να καλύψουν P24 (webhooks για automation) και API gap (item attachments):

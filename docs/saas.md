@@ -213,8 +213,9 @@ Gating: 404 when SaaS off, 401 when not authenticated, 400 if name is invalid/mi
 | Method | Path | Body | Result |
 | --- | --- | --- | --- |
 | `POST` | `/api/saas/account/workspaces` | `{ name }` | **Authenticated.** Provisions a new Tenant with the caller as owner. Name is required (≤80 chars). Returns `201 { tenant: { id, slug, name, createdAt, … }, tenants: […] }` (the full tenant list so the client can update its workspace chooser). `400` if name is empty, >80 chars, or the account already owns 20 workspaces. |
+| `DELETE` | `/api/saas/account/workspaces` | `{ tenant: slug }` | **Authenticated.** The caller leaves a workspace they currently belong to (self-service, any role). Returns `200 { ok: true, tenants: […] }` (the updated tenant list). `404` if the workspace does not exist or the caller is not a member. `409` if the caller is the workspace's last active owner — a workspace may never end up with zero owners; a sole owner must first promote another member to owner before leaving. |
 
-The response mirrors `/api/saas/auth/signup`, and the audit trail records `workspace.created` with `actor` = the Account id and `meta.selfServe = true`.
+The POST response mirrors `/api/saas/auth/signup`, and the audit trail records `workspace.created` with `actor` = the Account id and `meta.selfServe = true`. The DELETE operation records `membership.removed` with `actor` = the leaving Account and `target` = the workspace slug.
 
 ### Email verification & password
 

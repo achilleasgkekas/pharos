@@ -110,6 +110,7 @@ date / total with keyboard shortcuts. You can also:
 - **Add items to library** — turn receipt line items into Inventory items,
   optionally with a warranty end date.
 - **Archive** documents that are not receipts (shipping notices, T&Cs, marketing).
+- **Email-in (IMAP auto-import).** Connect your email inbox (IMAP) and poll it for receipt emails. The app fetches attachments (PDFs/images) and HTML bodies and feeds each one through the same upload + parse pipeline as a manual upload — one AI parse per message. Manual "Check inbox now" trigger in Settings → Storage & backup → Email-in (IMAP). Capped at 25 messages per check; the first run is limited to the last 7 days to avoid re-processing old mail. Self-hosted only (no background cron in this app).
 - Import receipts in bulk from a Gmail Takeout export (see the project history).
 
 ## Expenses & Income
