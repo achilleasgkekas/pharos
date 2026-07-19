@@ -3,6 +3,60 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-07-19 55η σάρωση· type-check EXIT 0· 1 νέο P1 auth εύρημα [Settings→Notifications ntfy/notifier-channels/event-webhooks actions χωρίς requireAdmin]· 1 νέο P2 tenancy-parity εύρημα [Voucher/GiftCard/LoyaltyCard actions, ίδιας κλάσης με το ήδη-ανοιχτό sampleDataActions.ts item]· sampleDataActions.ts + 3 SaaS holdouts confirmed ακόμα ανοιχτά· el.ts i18n item ήδη φρέσκο από concurrent reviewer run [84 keys])
+
+> **ΣΗΜ concurrent activity**: αυτό το run έτρεξε παράλληλα με άλλα automated routines στο ίδιο working tree (το working tree προχώρησε `da036c9`→`83f392f`, +14 commits, ΚΑΤΑ τη διάρκεια του audit, μεταξύ αυτών ένα «reviewer» run που ήδη ενημέρωσε το el.ts i18n item [count 75→84] και έκλεισε ένα YNAB-importer bug). Κάθε εύρημα παρακάτω επαληθεύτηκε live στο ΤΡΕΧΟΝ working tree (όχι από cached docs) αμέσως πριν το commit.
+
+- **type-check:** `cd apps/web && npm run type-check` → **EXIT 0** (μηδέν P1 από type errors).
+- **Νέος κώδικας από την 54η ελέγχθηκε (commits `536a3d8`..`83f392f`):** `536a3d8` (P20 loyalty-card wallet), `ded86eb` (P24 outbound event webhooks), `32ca74c` (SSRF fix στους notifiers — ήδη σωστό, δες παρακάτω), `6ed76b6` (P16 YNAB CSV migration importer), `d5a9684`+`8c3ccda` (mobile-parity fixes, ήδη reviewed από pharos-daily-dev το ίδιο session), + docs/test-only commits.
+  - **P24 event webhooks (`lib/webhooks.ts`) → exemplary, μηδέν νέο debt.** `dispatchEventWebhooks`/`postOne` περνούν από `assertPublicUrl` (SSRF guard) πριν από κάθε POST, tenant-scoped read μέσω `currentModel(AppConfig)`, per-subscription rate-limit, HMAC signing pure+unit-tested, never-throws fire-and-forget contract σεβαστό στα call sites.
+  - **SSRF fix στους notifiers (`32ca74c`) → επιβεβαιώθηκε σωστό.** `sendOne()`/`sendNtfyTo()` καλούν πλέον `assertPublicUrl` πριν το POST σε ntfy/Discord/Slack/generic-webhook (Telegram σκόπιμα εξαιρείται, hardcoded host). Μηδέν νέο debt.
+  - **Auth gap ΝΕΟ εύρημα (`settings/actions.ts:332-439`) → δες item #1 παρακάτω.** Το write path του P24 (`saveWebhookSubscriptions`/`testWebhookSubscription`) και το ήδη-προϋπάρχον notifier-channels block (`saveNtfy`/`sendTestNtfy`/`getNotifierChannels`/`saveNotifierChannels`/`testNotifierChannel`) είναι το ΜΟΝΟ σημείο σε ολόκληρο το `settings/actions.ts` (17 άλλα exports καλούν `requireAdmin()`) που λείπει το admin-gate, ενώ χειρίζεται literal secrets (Telegram bot token, webhook HMAC secret) και το αντίστοιχο Settings tab δεν είναι `adminOnly`.
+  - **P20 loyalty-card wallet (`vouchers/loyaltyActions.ts`, νέο αρχείο) → 1 νέο P2 εύρημα, δες item #2 παρακάτω.** Model/lib/tests καθαρά (soft-delete, indexed, pure barcode-format helper με 13 tests), αλλά οι 5 server actions κάνουν direct `LoyaltyCard` import αντί tenant-scoped `currentModel` — mirror του ήδη-γνωστού sibling gap στο `vouchers/actions.ts` (Voucher) + `vouchers/giftcardActions.ts` (GiftCard), κανένα από τα τρία ποτέ flagged πριν.
+  - **P16 YNAB importer (`lib/ynabImport.ts`, `YnabImportModal.tsx`) → καθαρό, μηδέν νέο debt.** Pure+tested column-detection, μηδέν νέο DB-write κώδικα (front-door πάνω στο ήδη-tenant-scoped+validated `importExpensesCsv`). Ένα μικρό bug (summary count) βρέθηκε ΚΑΙ διορθώθηκε ήδη από concurrent commit (`83f392f`) πριν προλάβω να το φλάγκάρω — confirmed live καθαρό.
+- **v1 API surface:** μηδέν commit άγγιξε `src/app/api/v1` πέρα από τα ήδη-reviewed mobile-parity fixes (`d5a9684`/`8c3ccda`) + το νέο test-only `settings/test-notify/route.test.ts` (`adfe2c9`). Fresh grep: μηδέν `: any`/`as any`/`@ts-ignore`/`@ts-expect-error` (εκτός test), κάθε read route `.lean()`-backed, κάθε route εκτός `auth/login` περνά από `withAuth`.
+- **sampleDataActions.ts (54η item) confirmed ΑΚΟΜΑ ανοιχτό, live-verified, μηδέν αλλαγή:** `grep -c "withRequestTenant\|currentModel" apps/web/src/app/settings/sampleDataActions.ts` = 0.
+- **3 προϋπάρχοντα SaaS holdouts confirmed ΑΚΟΜΑ ανοιχτά, live-verified, μηδέν αλλαγή:** `invites/accept` guardless write (P2/S, 50η)· `audit`/`workspace/erasure/purge` guardless read/cron (P2/S ×2, 49η).
+- **el.ts i18n gap:** ήδη ενημερωμένο από concurrent «reviewer» run σε 84 missing κλειδιά (δες item κάτω στο αρχείο) — καλύπτει και τα P20/P16/P24 features αυτού του range. Δεν το ξαναγράφω, απλά confirmed accurate.
+- **Ουρά μετά το run:** 1 νέο auto-buildable **P1/S** (Notifications requireAdmin gap, στην κορυφή — αγγίζει real single-user+multi-user auth σήμερα, ΟΧΙ dead-until-SaaS) + 1 νέο auto-buildable **P2/M** (Voucher/GiftCard/LoyaltyCard tenancy-parity, ίδιας κλάσης με το ήδη-ανοιχτό sampleDataActions.ts item) + το ήδη-ανοιχτό sampleDataActions.ts P2/S + 3 προϋπάρχοντα P2/S SaaS error-handling holdouts + 1 P3/M i18n gap + 1 P3/S decision-flag (`getTenantConnection` readyState guard) στο `## Needs Achilleas`.
+
+---
+
+## Web Debt Queue — ενεργά items (55η σάρωση 2026-07-19)
+
+> Σύνοψη 55ής: νέο **P1** εύρημα (το μοναδικό αυτού του run) — 8 Settings server actions που διαχειρίζονται integration secrets (ntfy URL, Telegram bot token, webhook HMAC secrets) λείπουν το `requireAdmin()` gate που έχει ΚΑΘΕ άλλο mutating export στο ίδιο αρχείο, και το αντίστοιχο UI tab δεν είναι `adminOnly` — ένας non-admin household member μπορεί σήμερα να διαβάσει/αλλάξει αυτά τα secrets μέσω της κανονικής Settings σελίδας. Δεύτερο νέο εύρημα (P2/M) — το μόλις-shipped P20 loyalty-card wallet επαναλαμβάνει το ίδιο tenancy-parity gap που το sampleDataActions.ts item ήδη έχει ανοιχτό, αλλά σε 3 sibling αρχεία (Voucher/GiftCard/LoyaltyCard). Το sampleDataActions.ts item + οι 3 SaaS holdouts παραμένουν από κάτω στις αρχικές τους θέσεις, confirmed ανοιχτά.
+
+### Settings → Notifications (ntfy / notifier channels / event webhooks) — 8 server actions λείπουν `requireAdmin()`, εκθέτουν secrets σε non-admin members
+- Priority: P1
+- Size: S
+- Area: api
+- Files: apps/web/src/app/settings/actions.ts, apps/web/src/app/settings/SettingsClient.tsx
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα:** `settings/actions.ts` έχει 17 mutating exports που καλούν `await requireAdmin();` ως πρώτη γραμμή (π.χ. `saveAiConfig:123`, `saveStorageConfig:770`, `saveScraperAi:717`, `exportData:1136`, ακόμα και το νέο `sampleDataActions.ts` P1-feature). Όμως το block **`saveNtfy` (γρ.332), `sendTestNtfy` (343), `getNotifierChannels` (353), `saveNotifierChannels` (360), `testNotifierChannel` (383), `getWebhookSubscriptions` (397), `saveWebhookSubscriptions` (405), `testWebhookSubscription` (431)** — 8 συνεχόμενα exports, ΟΛΑ σχετικά με outbound integrations — δεν καλούν `requireAdmin()` ΠΟΥΘΕΝΑ. Το middleware (`src/middleware.ts`) gate-άρει μόνο «έχει valid session» (οποιοσδήποτε ρόλος), όχι admin ειδικά· το admin-vs-member διαχωρισμό τον κάνει αποκλειστικά η ίδια η action function.
+  - **Γιατί έχει σημασία τώρα (όχι dead-until-SaaS, real gap σήμερα):** η εφαρμογή έχει ήδη πλήρες multi-user households σήμερα (`models/User.ts` role admin|member, Settings→Users CRUD, self-hosted όχι SaaS-only). Το «Notifications» tab (`SettingsClient.tsx:100`) **δεν είναι `adminOnly`** (σε αντίθεση με το «Users» tab, `SettingsClient.tsx:101`) → ένας logged-in member βλέπει κανονικά το tab στο UI. `getNotifierChannels()`/`getWebhookSubscriptions()` επιστρέφουν `NotifierConfig.token` (Telegram bot token, `notifiers.shared.ts:12`) και `WebhookSubscription.secret` (HMAC signing secret, `webhooks.shared.ts`) **σε plaintext** σε ΚΑΘΕ caller χωρίς κανένα role-check. `saveNotifierChannels`/`saveWebhookSubscriptions`/`testNotifierChannel`(`testNotifier` πραγματικό POST)/`testWebhookSubscription` επιτρέπουν σε ΚΑΘΕ member να αλλάξει πού πηγαίνουν τα alerts (redirect σε δικό του endpoint) ή να διαβάσει/exfiltrate-άρει τα ήδη-αποθηκευμένα secrets ενός admin.
+  - **Fix:** πρόσθεσε `await requireAdmin();` ως πρώτη γραμμή στα 8 exports (ίδιο 1-liner idiom με τα υπόλοιπα 17 στο ίδιο αρχείο, ήδη imported `requireAdmin` στη γρ.53). Προαιρετικό αλλά συνιστώμενο για UX-consistency (ΟΧΙ το security boundary — αυτό είναι το server-side gate): πρόσθεσε `adminOnly: true` στο `{ id: 'notifications', ... }` entry του `TABS` array (`SettingsClient.tsx:100`), ίδιο pattern με το `users` tab (`:101`), ώστε ένα member να μη βλέπει καν το tab.
+  - Μηδέν αλλαγή σε response shape/behavior για admin χρήστες (το μόνο happy-path σήμερα, single-admin self-hosted). Redirect-to-login για logged-out (ήδη γίνεται από το middleware πριν φτάσει καν εδώ)· `Forbidden: admin access required` throw για non-admin members (ίδιο error message idiom με τα υπόλοιπα 17 requireAdmin call sites — τα caller components ήδη χειρίζονται thrown server-action errors generically).
+  - Επαλήθευση: `grep -n "requireAdmin" apps/web/src/app/settings/actions.ts | wc -l` πάει 17→25· `sed -n '332,439p' apps/web/src/app/settings/actions.ts | grep -c requireAdmin` ≥ 8· npm run type-check exits 0.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-19, 55η σάρωση web-code-quality auditor· live: `settings/actions.ts:332-439` μηδέν `requireAdmin` σε 8 exports, `SettingsClient.tsx:100` `notifications` tab χωρίς `adminOnly` ενώ το `users` tab στη γρ.101 το έχει)
+
+### Voucher / GiftCard / LoyaltyCard server actions bypass tenant-scoping (ίδιο gap με sampleDataActions.ts, 3 sibling αρχεία)
+- Priority: P2
+- Size: M
+- Area: db
+- Files: apps/web/src/app/vouchers/actions.ts, apps/web/src/app/vouchers/giftcardActions.ts, apps/web/src/app/vouchers/loyaltyActions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα:** και τα τρία αρχεία που τροφοδοτούν το `/vouchers` (3-tab: Coupons | Gift cards | Loyalty cards) κάνουν direct model import (`import { Voucher } from '@/models/Voucher'`, `import { GiftCard } from '@/models/GiftCard'`, `import { LoyaltyCard } from '@/models/LoyaltyCard'`) και τα χρησιμοποιούν απευθείας σε κάθε CRUD export (`createVoucher`/`updateVoucher`/`deleteVoucher`, `createGiftCard`/…, `createLoyaltyCard`/`updateLoyaltyCard`/`setLoyaltyCardArchived`/`deleteLoyaltyCard`) — μηδέν `currentModel()`/`withRequestTenant()` σε κανένα από τα τρία (`grep -c "withRequestTenant\|currentModel" apps/web/src/app/vouchers/{actions,giftcardActions,loyaltyActions}.ts` = 0,0,0). Το `LoyaltyCard` (P20, `536a3d8`) είναι η ΝΕΟΤΕΡΗ instance αυτού του gap· το `Voucher`/`GiftCard` προϋπήρχαν χωρίς να έχουν flagged ποτέ πριν.
+  - **Γιατί έχει σημασία:** ίδιο σχήμα με το ήδη-ανοιχτό `sampleDataActions.ts` item (54η σάρωση) — σε SaaS multi-tenant mode (`SAAS_MODE=on`) αυτά τα CRUD θα διάβαζαν/έγραφαν πάντα στο **DEFAULT** tenant DB αντί του τρέχοντος, ενώ το sibling `items/actions.ts`+`receipts/actions.ts`+`expenses/actions.ts` ΗΔΗ χρησιμοποιούν σωστά `withRequestTenant(async () => { const X = await currentModel(XModel); ... })`. Σε self-hosted (SAAS_MODE off, ο τρόπος του Αχιλλέα σήμερα) **μηδέν συμπεριφορική αλλαγή** — `currentModel()`/`withRequestTenant()` no-op στο ίδιο DEFAULT connection.
+  - **Fix:** mirror το ίδιο pattern και στα τρία αρχεία (ίδιο recipe με το sampleDataActions.ts item): import `withRequestTenant` από `@/lib/tenancy/request` + `currentModel` από `@/lib/tenancy/connection`· rename το model import σε `Voucher as VoucherModel` (κ.ο.κ.)· τύλιξε το σώμα κάθε exported function σε `return withRequestTenant(async () => { const Voucher = await currentModel(VoucherModel); ... });`. Μπορεί να γίνει ένα-ένα αρχείο (ανεξάρτητα, ίδιο recipe) ή και τα τρία μαζί σε ένα PR αφού τροφοδοτούν την ίδια σελίδα.
+  - Επαλήθευση ανά αρχείο: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/vouchers/<file>.ts` ≥ (αριθμός exported functions)· npm run type-check exits 0· υπάρχοντα tests (`loyaltyCard.test.ts`, όσα υπάρχουν για vouchers/giftcards) παραμένουν green.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-19, 55η σάρωση web-code-quality auditor· live: 3 αρχεία, μηδέν `withRequestTenant`/`currentModel` σε κανένα)
+
+---
+
 ## Σύνοψη audit (2026-07-18 54η σάρωση· type-check EXIT 0· v1 surface αμετάβλητος και καθαρός· 1 νέο P2 tenancy-parity εύρημα στο μόλις-shipped P1 sample-data mode· deleteItemPhoto/Attachment IDOR ΕΚΛΕΙΣΕ live κατά τη διάρκεια του run (commit `82e008c`)· 3 SaaS holdouts παραμένουν ανοιχτοί αμετάβλητοι· el.ts gap πήδηξε 42→75)
 
 > **ΣΗΜ concurrent activity**: αυτό το run έτρεξε παράλληλα με άλλα automated routines (reviewer/mobile-parity-auditor/pharos-daily-dev) στο ίδιο working tree — το working tree προχώρησε αρκετά commits (`d0a592a`→`f647f43`, +7) ΚΑΤΑ τη διάρκεια του audit. Ένα από αυτά τα commits (`82e008c`) έκλεισε ΤΟ TOP item της αρχικής μου ουράς (deleteItemPhoto/Attachment IDOR) πριν προλάβω να κάνω commit το δικό μου WEB_DEBT.md update — το item ενημερώθηκε σε DONE στη θέση του αντί να μείνει λανθασμένα TODO. Confirmed live: `items/actions.ts:167-168` + `:270-271`.
@@ -36,7 +90,7 @@
   - Σε self-hosted (SAAS_MODE off, ο τρόπος που τρέχει σήμερα ο Αχιλλέας) το `currentModel()`/`withRequestTenant()` no-op στο ίδιο DEFAULT connection (δες `connection.ts:100-104` OSS-parity σχόλιο) — άρα **μηδέν συμπεριφορική αλλαγή σήμερα**, καθαρά προετοιμασία/συνέπεια για όταν ενεργοποιηθεί το SaaS mode.
   - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/settings/sampleDataActions.ts` ≥ 8 (4 functions × wrap + per-model resolve)· npm run type-check exits 0· existing `sampleData.test.ts` (pure, DB-free) παραμένει green αμετάβλητο.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-18, 54η σάρωση web-code-quality auditor· live: `sampleDataActions.ts:11-14` direct model imports, μηδέν `withRequestTenant`/`currentModel` σε ολόκληρο το αρχείο· sibling `items/actions.ts:4,8-9` δείχνει το ήδη-καθιερωμένο pattern για reference)
+- Status: TODO (flagged 2026-07-18, 54η σάρωση web-code-quality auditor· live: `sampleDataActions.ts:11-14` direct model imports, μηδέν `withRequestTenant`/`currentModel` σε ολόκληρο το αρχείο· sibling `items/actions.ts:4,8-9` δείχνει το ήδη-καθιερωμένο pattern για reference· 55η σάρωση 2026-07-19 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό, αμετάβλητο· ίδιας κλάσης νέο item [Voucher/GiftCard/LoyaltyCard] προστέθηκε αυτό το run)
 
 ---
 
@@ -161,7 +215,7 @@
   - SaaS-only (SAAS_MODE off = 404 upstream), μηδέν επίδραση στον v1 mobile surface. Διορθώνει και την ανακριβή σημείωση στη γρ.45 του `erasure/purge` item («invites/accept έχει ήδη δικό του try/catch» — ισχύει μόνο για την create-race).
   - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/invites/accept/route.ts` → ≥2 (create-race + νέο top-level).
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-09, 50η σάρωση· live: `try {` = 1 [create-race μόνο], 8 unguarded DB ops γρ.44-122· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό, `try {` count αμετάβλητο)
+- Status: TODO (flagged 2026-07-09, 50η σάρωση· live: `try {` = 1 [create-race μόνο], 8 unguarded DB ops γρ.44-122· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό, `try {` count αμετάβλητο· 55η σάρωση 2026-07-19 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό)
 
 ---
 
@@ -181,7 +235,7 @@
   - Το gate ladder (404 SAAS off / 401 no-session / 403 non-admin), το serializer whitelist projection, το keyset-pagination cursor + η batched actor resolution ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500. SaaS-only (SAAS_MODE off = 404), μηδέν επίδραση στον v1 mobile surface.
   - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/audit/route.ts` → ≥1.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, 2 unguarded `await` DB reads γρ.64+79· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό)
+- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, 2 unguarded `await` DB reads γρ.64+79· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό· 55η σάρωση 2026-07-19 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό)
 
 ### `workspace/erasure/purge/route.ts` — cron scan χωρίς try/catch → HTML 500 στον scheduler
 - Priority: P2
@@ -195,7 +249,7 @@
   - Τα gates (404 SAAS off / 500 no CRON_SECRET / 401 bad token) + το report-only `dryRun:true` contract ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500. SaaS-only, μηδέν επίδραση στον v1 mobile surface. (`auth/logout` = μηδέν DB read [μόνο `clearAccountCookie`] → σκόπιμα εκτός· `billing/webhook`+`invites/accept` έχουν ήδη δικό τους try/catch.)
   - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/workspace/erasure/purge/route.ts` → ≥1.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, `await runErasurePurgeScan()` unguarded· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό)
+- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, `await runErasurePurgeScan()` unguarded· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό· 55η σάρωση 2026-07-19 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό)
 
 ---
 

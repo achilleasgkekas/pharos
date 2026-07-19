@@ -6070,3 +6070,62 @@ auto-discover), P21 (document vault, ήδη speced).
   θέλει mobile Settings surface γι' αυτό κάποια στιγμή, είναι ρητή απόφαση όχι default), P16 YNAB CSV import
   (desktop-file-picker migration tool, one-time use, χαμηλή αξία για mobile).
 
+## 2026-07-19 (web-code-quality auditor — 55η σάρωση)
+
+Αυτόνομος read-only έλεγχος ποιότητας κώδικα του web app (χωρίς Docker builds, χωρίς AI jobs, χωρίς edits σε
+app code). Ξεκίνησα από CLAUDE.md/BACKLOG.md/TODO.md/PROGRESS.md (τελευταία εγγραφή) + `git log --oneline -15`,
+μετά review τον νέο κώδικα από την 54η σάρωση (`git log da036c9..HEAD`).
+
+**ΣΗΜ concurrent activity σημαντικό**: το working tree προχώρησε **+15 commits** ενώ έτρεχε αυτό το audit
+(`da036c9`→`dcd527b`), μεταξύ αυτών ένα «reviewer» run που ήδη ενημέρωσε το el.ts i18n item του WEB_DEBT.md
+(75→84 keys) και ένα fix (`83f392f`) που έκλεισε ένα YNAB-importer bug πριν προλάβω να το φλαγκάρω. Κάθε
+εύρημα παρακάτω επαληθεύτηκε live στο ΤΡΕΧΟΝ working tree αμέσως πριν το commit, όχι από cached state.
+
+**Έλεγχος (dimensions)**: type safety, input validation, error handling, auth (v1 bearer + web requireAdmin),
+Mongoose (indexes/N+1/lean/pagination), duplication/dead code, UI loading/error states. `cd apps/web && npm run
+type-check` → **EXIT 0**.
+
+**Νέος κώδικας από την 54η ελέγχθηκε**: `536a3d8` (P20 loyalty-card wallet), `ded86eb` (P24 outbound event
+webhooks), `32ca74c` (SSRF fix στους notifiers), `6ed76b6` (P16 YNAB CSV migration importer), + τα ήδη-reviewed
+από pharos-daily-dev mobile-parity fixes (`d5a9684`/`8c3ccda`).
+
+**2 νέα ευρήματα, καταγράφηκαν στο WEB_DEBT.md**:
+
+1. **P1/S — Settings → Notifications actions λείπουν `requireAdmin()`.** Το πιο σημαντικό εύρημα αυτού του run.
+   8 συνεχόμενα exports στο `settings/actions.ts` (`saveNtfy:332`, `sendTestNtfy:343`, `getNotifierChannels:353`,
+   `saveNotifierChannels:360`, `testNotifierChannel:383`, `getWebhookSubscriptions:397`,
+   `saveWebhookSubscriptions:405`, `testWebhookSubscription:431`) είναι το ΜΟΝΟ σημείο σε ολόκληρο το αρχείο
+   (17 άλλα exports καλούν `requireAdmin()`) που λείπει το admin-gate — ενώ χειρίζονται literal secrets
+   (Telegram bot token, webhook HMAC secret) που επιστρέφονται σε plaintext σε κάθε caller. Το «Notifications»
+   Settings tab δεν είναι `adminOnly` (σε αντίθεση με το «Users» tab) → ένας non-admin household member βλέπει
+   κανονικά το tab και μπορεί να διαβάσει/αλλάξει integration secrets ή να redirect-άρει τα alerts σε δικό του
+   endpoint. Δεν είναι dead-until-SaaS — η εφαρμογή έχει ΗΔΗ multi-user households σήμερα (role admin|member).
+   Μηχανικό fix (8× `await requireAdmin();`, ίδιο 1-liner idiom με τα υπόλοιπα 17).
+2. **P2/M — Voucher/GiftCard/LoyaltyCard actions bypass tenant-scoping.** Και τα τρία αρχεία που τροφοδοτούν
+   το `/vouchers` (`vouchers/actions.ts`, `giftcardActions.ts`, `loyaltyActions.ts`) κάνουν direct model import
+   αντί `currentModel()`/`withRequestTenant()` — ίδιο gap class με το ήδη-ανοιχτό `sampleDataActions.ts` item
+   (54η σάρωση), αλλά σε 3 sibling αρχεία. Το `loyaltyActions.ts` (P20, μόλις-shipped) είναι η νεότερη instance·
+   το `Voucher`/`GiftCard` προϋπήρχαν χωρίς να έχουν flagged ποτέ πριν. Dead-until-SaaS σήμερα (SAAS_MODE off).
+
+**Επιβεβαιώθηκαν ακόμα ανοιχτά, μηδέν αλλαγή (Status-line confirmations στο WEB_DEBT.md)**: sampleDataActions.ts
+tenancy gap (54η)· 3 SaaS holdouts (`invites/accept` guardless write, `audit`+`workspace/erasure/purge` guardless
+read/cron, 49η/50η).
+
+**Επιβεβαιώθηκαν καθαρά, μηδέν νέο debt**: P24 event webhooks dispatcher (`lib/webhooks.ts` — SSRF-guarded,
+tenant-scoped read, rate-limited, tested)· SSRF fix στους notifiers (`32ca74c`, ήδη σωστά εφαρμοσμένο)· P16 YNAB
+importer (pure+tested column detection, μηδέν νέο DB-write κώδικα, front-door πάνω στο ήδη-tenant-scoped
+`importExpensesCsv`)· v1 API surface αμετάβλητο και καθαρό (μηδέν `any`/`as any`/`@ts-ignore`, κάθε read route
+`.lean()`, κάθε route εκτός `auth/login` περνά από `withAuth`).
+
+**el.ts i18n gap**: ήδη ενημερωμένο από concurrent reviewer run σε 84 missing κλειδιά (καλύπτει και τα
+P20/P16/P24 features αυτού του range) — δεν το ξαναέγραψα, απλά confirmed accurate live.
+
+**Suggested next 3 για τον builder**: (1) Settings→Notifications requireAdmin gate [P1/S, top — security fix,
+μηχανικό]· (2) Voucher/GiftCard/LoyaltyCard tenancy-parity [P2/M]· (3) sampleDataActions.ts tenancy-parity
+[P2/S, ήδη στην ουρά από την 54η, ίδιας κλάσης με #2 — μπορούν να γίνουν μαζί σε ένα PR].
+
+## Needs Achilleas
+
+- Τίποτα νέο. Παραμένουν τα προϋπάρχοντα decision-flags (v1 feature-data-path tenant-scoping για SaaS data
+  isolation· `getTenantConnection` readyState guard semantics).
+

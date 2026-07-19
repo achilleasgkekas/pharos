@@ -1,5 +1,29 @@
 # DOCS_PROGRESS
 
+## 2026-07-19 (features.md: P20 loyalty cards + P32 gift cards + P16 YNAB import)
+
+Το features.md ειχε 3 gaps απο recent features που δεν ειχαν καλυφθει:
+- P20 (loyalty card wallet), P32 (gift card balance tracker): το Vouchers section ηταν μονο 4-σειρες που εμνιαν "coupons" μονο
+- P16 (YNAB CSV migration import): ηταν αναφορα στο CSV import ως εργαλειο σχεδιασης αλλα ΚΑΘΟΛΟΥ λεπτομερεια τι ειναι
+
+Τι εγραψα:
+- Rewrite Vouchers header → "Vouchers & Payment methods" + subsection structure με 3 tabs (Coupons | Gift cards | Loyalty cards)
+- Νεα subsection **Coupons & discount codes**: αντιγραφη του παλιου κειμενου, βελτιωση σε "promotional offers" + "archive or delete expired"
+- Νεα subsection **Gift cards & store credit**: τι ειναι (balance tracker), fields (title/store/code/initialAmount/expiresAt/notes), παραγραφ balance calculation (initial − spends + reloads), spending log, expiry tracking (60d badge + calendar), notifications
+- Νεα subsection **Loyalty & membership cards**: τι ειναι (barcode), fields (title/store/cardNumber/notes), barcode format guessing (EAN13/UPC/CODE128), τap-to-scan (fullscreen barcode, black-on-white), quick edit, notifications (archive soft-delete)
+- Προσθεση εις "Expenses & Income" section: νεο bullet point **Migration import (YNAB / other tools)** — εξηγηση YNAB CSV upload, column mapping, multi-currency, category-rules run. Θεση: Settings → Storage & backup → Migrate data.
+- Update Settings section: "Storage & backup" bullet προσθεση "migration import (YNAB and other tools)" στη λιστα.
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: 0 (features.md δεν εχει code blocks, ζυγα).
+- Internal links: ολα τα referenced files υπαρχουν (self-hosting.md, configuration.md, api.md) ✓.
+- Secret scan: κανενα sk_live/sk_test/AUTH_SECRET/STRIPE_SECRET/api_key ✓.
+- Markdown structure: ολα τα ### headers εχουν αντιστοιχο section-level hierarchy ✓.
+
+Collision guard: `git status --short` δειχνει 3 foreign WIP files εκτος docs (WEB_DEBT.md M, app changes) — κανενα staged. Stage ΜΟΝΟ docs/features.md + docs/DOCS_PROGRESS.md με explicit pathspec.
+
+Επομενο run: (α) api.md — check αν υπαρχουν νεα loyalty/giftcard API endpoints που δεν εχουν documented (π.χ. POST /api/v1/vouchers/loyalty-cards, POST /api/v1/vouchers/gift-cards/{id}/uses) ή (β) features.md stale-forward αν αλλα νεα features έχουν shipped (π.χ. P37-P40 candidates).
+
 ## 2026-07-18 (self-hosting.md: comprehensive env vars cross-check + SaaS/Stripe/rate-limit docs)
 
 Το self-hosting.md ειχε ελλειμα: δεν εγραφε τις νεες SaaS/Stripe vars, τις cloud AI provider

@@ -122,6 +122,11 @@ Receipts: dropzone scan, manual add, grid / list, and a filter sidebar.
   a rule wins over the AI guess but a manual add only applies one when you left the
   category unset. An "Apply to existing" button retro-tags uncategorised records.
   Configure the rules in Settings → Money.
+- **Migration import (YNAB / other tools).** Upload a CSV export from YNAB (You Need
+  A Budget) or another expense tracker to bulk-import historical transactions. The
+  importer maps common columns (date, description, amount, category, account), handles
+  multi-currency, and runs each imported entry through category auto-rules so you get
+  consistent tagging. Available in Settings → Storage & backup → **Migrate data**.
 
 ### Expense splitting ("who owes what")
 
@@ -231,13 +236,48 @@ Highlights:
 
 Deleting a bill is a soft delete, so it lands in Trash and can be restored.
 
-## Vouchers
+## Vouchers & Payment methods
 
-Discount codes and coupons (`/vouchers`): title, code, store, discount,
+A unified wallet for payment-related items (`/vouchers`), organised into three
+tabs:
+
+### Coupons & discount codes
+
+Discount codes and promotional offers: title, code, store, discount %/amount,
 expiry date, URL, and notes. **AI fill** reads a pasted message or a screenshot
 and extracts the fields (for example "15% off Skroutz code SUMMER15 until
-31/12/2026 min 50 euros"). Expiring vouchers surface in the Calendar and can
-trigger notifications.
+31/12/2026 min 50 euros"). Expiring coupons surface in the Calendar and can
+trigger notifications; archive or delete expired ones.
+
+### Gift cards & store credit
+
+A balance tracker for gift cards, prepaid cards, and store credit that deplete
+as you spend them. Each card holds an initial amount, an optional expiry date,
+and a spending history: title, store, card code, initial balance, and notes.
+
+- **Balance calculation.** The live balance is the initial amount minus all
+  recorded spends, plus any reloads / top-ups (negative spends). Never stored,
+  always computed.
+- **Spending log.** Record each purchase that uses the card, with the amount and
+  date. Mark money back as a negative spend (reload).
+- **Expiry tracking.** Gift cards expiring within 60 days show a warning badge;
+  they also surface in the Calendar so you don't forget to use them.
+- **Notifications.** A card running low (<10% balance) or expiring soon can
+  trigger a reminder.
+
+### Loyalty & membership cards
+
+Membership cards and loyalty programs that track a card number but no monetary
+balance: title, store, card number, and notes. The app guesses the barcode format
+from the card number's shape (EAN13 for 13 digits, UPC for 12, CODE128 otherwise).
+
+- **Tap to scan.** Tap any loyalty card to show a full-screen barcode your phone
+  can display at checkout. The barcode always renders black-on-white so a
+  real scanner can read it reliably.
+- **Quick edit.** A small hover icon opens the card's edit form (title, store,
+  number, notes).
+- **Notifications.** Archive a card if you no longer use that loyalty program; it
+  soft-deletes to Trash so you can restore it later.
 
 ## Calendar
 
@@ -363,7 +403,7 @@ Configuration is grouped into tabs:
 - **Network** — UniFi host / user / connection test.
 - **Storage & backup** — file storage backend (local / SMB / FTP / OneDrive),
   folder / filename templates, mirror-on-verify, sync, backup / restore, CSV
-  export, and Trash.
+  export, **migration import** (YNAB and other tools), and Trash.
 - **Stores & lists** — known stores (with duplicate detection / merge) and the
   editable dropdown taxonomies (item / expense / subscription categories).
 - **Notifications** — ntfy and other channels, with test and check-now buttons.
