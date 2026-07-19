@@ -3,6 +3,17 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 82e008c -->
+<!-- docker-validated: 7179b6f -->
+
+## 2026-07-19 (docker-health — health check 03:03)
+
+**Stack status**: MongoDB healthy (36h uptime), web running (6m uptime, responds 200 on /login), flaresolverr stopped (memory). Build cache clean (0B).
+
+**Rebuild decision**: NO — HEAD 7179b6f είναι docs commit (mobile-parity review log), zero code changes σε apps/web. No uncommitted WIP. Web responds healthy.
+
+**Disk management**: flaresolverr stopped (was running orphan), `docker builder prune -f` (0B reclaimed, cache already clean).
+
+**Needs Achilleas**: Τίποτα. Stack healthy, no action required.
 
 ## 2026-07-18 (reviewer — έλεγχος 22750b2..82e008c, 1 fix commit)
 
