@@ -2750,3 +2750,50 @@ routes, θέλει ρητή άδεια/feature-builder)· είτε (β) **create
 signed-in account (backend increment: POST create workspace για υπάρχον account, μετά UI κουμπί
 στο account chooser/empty-state, ανοιχτό από #60)· είτε (γ) ίδιο action-filter dropdown στο
 **admin console's** cross-tenant Activity section (increment 64), reusing `ACTIVITY_FILTER_OPTIONS`.
+
+## 2026-07-19 (increment 66 — action filter on the admin console's cross-tenant Activity section, §UI-first)
+**Το κενό:** το next-task σημείωμα του #65 έδωσε τρεις επιλογές· (α) `recordAiUsage` wiring αγγίζει
+feature AI call-sites εκτός territory (ρητά flagged ως "θέλει ρητή άδεια/feature-builder"), (β)
+create-another-workspace = νέος backend increment, (γ) ίδιο action-filter dropdown στο admin
+console's cross-tenant Activity section (increment 64) — καθαρή επανάχρηση του `activityFilter.ts`
+που μόλις χτίστηκε, μηδέν νέο route/component/dependency. Διάλεξα (γ): το admin tenant-detail
+page (`/admin/tenants/[slug]`) έδειχνε πάντα τα τελευταία 50 events χωρίς κανένα φίλτρο, ενώ η
+αδερφή workspace-side σελίδα το είχε ήδη.
+
+**Built** (καθαρά additive edit σε ήδη-gated σελίδα, μηδέν νέο αρχείο):
+- **`app/admin/tenants/[slug]/page.tsx`** (δικό μου): η σελίδα δέχεται πλέον `searchParams:
+  Promise<{ action?: string }>` → `parseAuditAction(actionRaw)` (reuse, ίδιο idiom με το
+  workspace tab — άγνωστο/κενό action ποτέ 400, απλά "no filter") → merge στο `AuditEvent.find`
+  query (`{tenant: t.id, action?}`). Νέο **plain GET `<form>`** πάνω από το `ActivityPanel` μέσα
+  στο ήδη υπάρχον Activity section (μηδέν client JS/hook — η σελίδα μένει server component):
+  `<select>` από `ACTIVITY_FILTER_OPTIONS` + Filter submit + «Clear» link όταν ενεργό filter,
+  action target = `/admin/tenants/<slug>` (χωρίς `w` hidden field — το admin console δεν έχει
+  workspace-switcher, άσχετο εδώ). Section heading επεκτάθηκε με το action label όταν φιλτραρισμένο
+  (ίδιο idiom με τον τίτλο του workspace Panel). Import `ACTIVITY_FILTER_OPTIONS`/`ALL_ACTIONS_VALUE`
+  από το ήδη-committed `components/saas/activityFilter.ts` + `parseAuditAction` από `lib/tenancy/audit`
+  — καμία νέα pure function, καμία νέα εξάρτηση.
+
+**Verified:** `npm run type-check` → **EXIT 0**. Full suite `npx vitest run` → **2376/2376 green**
+(184 files, καμία regression· δεν πρόσθεσα νέο test file — καμία νέα pure function, μόνο SSR page
+που καταναλώνει ήδη-tested `activityFilter.ts`/`parseAuditAction`, ίδιο σκεπτικό με το #65 log).
+ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο το δικό μου admin detail page, 1 αρχείο).
+`SAAS_MODE` off / self-hosted = **zero effect** (η `/admin` σελίδα self-gates σε `notFound()` μέσω
+`requireSuperadminPage()` πριν φτάσει καν στο filter query). Κανένας Docker rebuild (additive SSR
+form + query filter μέσα σε ήδη-gated page component, μηδέν shared runtime wiring, μηδέν νέο API
+route, μηδέν νέα εξάρτηση — ο running `homepage-web` container σερβίρει ακόμα το προηγούμενο
+bundle μέχρι το επόμενο build, αναμενόμενο για μη-runtime αλλαγή). Browser-verify skipped
+(θα χρειαζόταν rebuild για να φανεί στο live :3000 — απαγορεύεται μόνο-για-verify). Collision
+guard: `git status --short` πριν το commit έδειξε **μηδέν foreign staged/modified files** →
+isolated pathspec commit ενός αρχείου, `git diff --cached --name-only` επιβεβαίωσε.
+
+**## Needs Achilleas** (admin activity filter):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16) + `SAAS_SUPERADMIN_EMAILS`** για να υπάρχει καν το
+  console (αλλιώς 404). Self-hosted = disabled, zero risk.
+
+**Next task:** increment 67 — τα δύο εναπομείναντα non-AI-touching options είναι πλέον εξαντλημένα
+σε αυτό το batch (activity filter × 2 σελίδες έγινε)· καλά candidates: (α) **create-another-workspace**
+flow για signed-in account (backend increment: POST create workspace για υπάρχον account, μετά UI
+κουμπί στο account chooser/empty-state, ανοιχτό από #60· μεγαλύτερο σε scope, καθαρά in-territory)·
+(β) **admin console search/filter** στο tenant registry list (`/admin/tenants`, πιθανώς ήδη flat
+list χωρίς search box — έλεγξε πρώτα)· (γ) αν κανένα άλλο UI-first item δεν βρεθεί, εξέτασε αν
+υπάρχει pagination cursor gap στο activity views (και τα δύο σταθερά limit=50, καμία "load more").
