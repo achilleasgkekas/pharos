@@ -2705,3 +2705,48 @@ AUDIT_ACTION, ήδη υποστηρίζεται από το `/api/saas/audit` ro
 `recordAiUsage` στα AI call-sites ώστε το Usage tab (workspace + admin) να δείχνει πραγματικά
 νούμερα αντί μηδενικών· είτε (γ) **create-another-workspace** flow για signed-in account (backend
 increment: POST create workspace, μετά UI κουμπί στο account chooser/empty-state, ανοιχτό από #60).
+
+## 2026-07-19 (increment 65 — action filter on the workspace Activity tab, §UI-first)
+**Το κενό:** το επόμενο-task σημείωμα του #64 πρότεινε το action filter ως το πιο απλό, καθαρά
+in-territory increment — ο `/api/saas/audit` route ήδη υποστηρίζει `?action=<verb>`, αλλά η
+`(saas)/account/workspace/activity` σελίδα διαβάζει το `AuditEvent` απευθείας (SSR, όχι μέσω του
+route) και δεν είχε ΚΑΝΕΝΑ filter — έδειχνε πάντα τα τελευταία 50 events ανεξαρτήτως τύπου. Οι
+άλλες δύο επιλογές (recordAiUsage wiring, create-another-workspace) απαιτούν edit εκτός SAAS
+territory (feature AI call-sites / νέο backend increment)· αυτό δεν χρειάζεται κανένα από τα δύο.
+
+**Built** (ΟΛΟ σε νέο αρχείο + additive edit στη δική μου σελίδα, μηδέν νέο API route):
+- **`components/saas/activityFilter.ts`** (νέο, PURE) — `ACTIVITY_FILTER_OPTIONS`: «All actions»
+  + ένα option ανά `AUDIT_ACTIONS` verb (ίδια σειρά, ίδιο label με το `actionLabel` που ήδη
+  χρησιμοποιεί το activity list — η dropdown copy ταιριάζει ΠΑΝΤΑ με τα pills). `ALL_ACTIONS_VALUE`
+  sentinel (κενό string, ίδιο με το πώς το `parseAuditAction` αντιμετωπίζει άδειο/άγνωστο ως
+  «no filter»). **5 unit tests** (πρώτο option, μήκος, σειρά == AUDIT_ACTIONS, γνωστό label,
+  κανένα κενό label).
+- **`app/(saas)/account/workspace/activity/page.tsx`** (δικό μου, additive): `searchParams`
+  δέχεται πλέον `action?: string`· `parseAuditAction(actionRaw)` (reuse, ίδιο validation με το
+  API route — άγνωστο/κενό → χωρίς filter, ποτέ 400) → merge στο ήδη υπάρχον `AuditEvent.find`
+  query (`{tenant, action?}`, ίδιο idiom με το route). Νέο **plain GET `<form>`** πάνω από το
+  `ActivityPanel` (**μηδέν client JS/hook** — server component παραμένει server-safe): hidden
+  `w` field (carry-through του τρέχοντος workspace, ίδιο idiom με τα tabs) + `<select
+  name="action">` από τα `ACTIVITY_FILTER_OPTIONS` + Filter submit + «Clear» link όταν
+  ενεργό filter. Panel title επεκτάθηκε: `latest N · <Action label>` όταν φιλτραρισμένο.
+  Styled ΜΟΝΟ με υπάρχοντα Pharos tokens (ίδιο idiom με το plan-select του `TenantActionsPanel`).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run activityFilter.test.ts` →
+**5/5**· full suite `npx vitest run` → **2360/2360 green** (183 files, καμία regression). ΚΑΝΕΝΑ
+υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο νέο activityFilter*/ + additive edit στη δική μου
+activity/page.tsx). `SAAS_MODE` off / self-hosted = **zero effect** (η (saas) σελίδα self-gates
+σε notFound() πριν φτάσει καν στο filter). Κανένας Docker rebuild (additive SSR form + pure
+module μέσα σε ήδη-gated page, μηδέν shared runtime wiring, μηδέν νέο API route, μηδέν νέα
+εξάρτηση). Collision guard: `git status --short` πριν το commit έδειξε μηδέν foreign staged/
+modified files → isolated pathspec commit μόνο των 3 δικών μου αρχείων.
+
+**## Needs Achilleas** (activity filter):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η σελίδα (αλλιώς 404). Self-hosted
+  = disabled, zero risk.
+
+**Next task:** increment 66 — είτε (α) wiring του `recordAiUsage` στα AI call-sites ώστε το
+Usage tab (workspace + admin) να δείχνει πραγματικά νούμερα αντί μηδενικών (αγγίζει feature AI
+routes, θέλει ρητή άδεια/feature-builder)· είτε (β) **create-another-workspace** flow για
+signed-in account (backend increment: POST create workspace για υπάρχον account, μετά UI κουμπί
+στο account chooser/empty-state, ανοιχτό από #60)· είτε (γ) ίδιο action-filter dropdown στο
+**admin console's** cross-tenant Activity section (increment 64), reusing `ACTIVITY_FILTER_OPTIONS`.

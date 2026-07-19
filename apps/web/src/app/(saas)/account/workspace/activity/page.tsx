@@ -16,7 +16,7 @@ import { getSaasViewer } from '@/lib/tenancy/saasPage';
 import { accountTenants } from '@/lib/tenancy/saasApi';
 import { getTenantContext } from '@/lib/tenancy/context';
 import { canManageMembers } from '@/lib/tenancy/members';
-import { auditView, collectActorIds } from '@/lib/tenancy/audit';
+import { auditView, collectActorIds, parseAuditAction } from '@/lib/tenancy/audit';
 import { AuditEvent, type AuditEventDoc } from '@/models/AuditEvent';
 import { Account } from '@/models/Account';
 import { pickWorkspace } from '@/components/saas/chooseWorkspace';
@@ -24,6 +24,7 @@ import { workspaceTabs } from '@/components/saas/workspaceTabs';
 import { WorkspaceShell, Panel } from '@/components/saas/WorkspaceShell';
 import { ActivityPanel } from '@/components/saas/ActivityPanel';
 import { toActivityRows, type ActivityInput } from '@/components/saas/activityView';
+import { ACTIVITY_FILTER_OPTIONS, ALL_ACTIONS_VALUE } from '@/components/saas/activityFilter';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,9 +39,12 @@ const PAGE_LIMIT = 50;
 export default async function WorkspaceActivityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ w?: string }>;
+  searchParams: Promise<{ w?: string; action?: string }>;
 }) {
-  const { w } = await searchParams;
+  const { w, action: actionRaw } = await searchParams;
+  // A stray/unknown `?action=` is treated as "no filter" (parity with the API route), so a
+  // bad query string never 400s the page — it just shows the unfiltered trail.
+  const action = parseAuditAction(actionRaw);
 
   // Gate (throws notFound when SaaS off) + current viewer claims.
   const viewer = await getSaasViewer();
@@ -90,7 +94,10 @@ export default async function WorkspaceActivityPage({
     );
   }
 
-  const events = (await AuditEvent.find({ tenant: ctx.tenantId })
+  const query: Record<string, unknown> = { tenant: ctx.tenantId };
+  if (action) query.action = action;
+
+  const events = (await AuditEvent.find(query)
     .select('action actor target meta createdAt')
     .sort({ createdAt: -1 })
     .limit(PAGE_LIMIT)
@@ -122,9 +129,53 @@ export default async function WorkspaceActivityPage({
     );
   });
   const rows = toActivityRows(views);
+  const title = action
+    ? `Activity · latest ${rows.length} · ${ACTIVITY_FILTER_OPTIONS.find((o) => o.value === action)?.label ?? action}`
+    : `Activity · latest ${rows.length}`;
 
   return shell(
-    <Panel title={`Activity · latest ${rows.length}`}>
+    <Panel title={title}>
+      {/* Plain GET form — no client JS needed. `w` is carried as a hidden field so switching
+          the action filter never drops the current workspace selection. */}
+      <form
+        action="/account/workspace/activity"
+        method="get"
+        className="mb-4 flex flex-wrap items-center gap-2 border-b border-[color:var(--color-border)] pb-4"
+      >
+        {w && <input type="hidden" name="w" value={w} />}
+        <label
+          htmlFor="activity-action-filter"
+          className="text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]"
+        >
+          Action
+        </label>
+        <select
+          id="activity-action-filter"
+          name="action"
+          defaultValue={action ?? ALL_ACTIONS_VALUE}
+          className="rounded-lg border border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] px-2 py-1.5 text-xs text-[color:var(--color-text)]"
+        >
+          {ACTIVITY_FILTER_OPTIONS.map((opt) => (
+            <option key={opt.value || 'all'} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          className="rounded-lg border border-[color:var(--color-cyan)] px-3 py-1.5 text-xs font-medium text-[color:var(--color-cyan)] hover:bg-[color:var(--color-cyan)]/10"
+        >
+          Filter
+        </button>
+        {action && (
+          <a
+            href={w ? `/account/workspace/activity?w=${encodeURIComponent(w)}` : '/account/workspace/activity'}
+            className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"
+          >
+            Clear
+          </a>
+        )}
+      </form>
       <ActivityPanel rows={rows} />
     </Panel>,
   );
