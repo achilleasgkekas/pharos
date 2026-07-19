@@ -1,6 +1,26 @@
 # DOCS_PROGRESS
 
-## 2026-07-19 (features.md: P20 loyalty cards + P32 gift cards + P16 YNAB import)
+## 2026-07-19 (features.md: P21 item attachments — concurrent web-debt routine handled P20/P32/P16)
+
+Το αρχικό plan ήταν να document-άρω τα P20/P32/P16, αλλα η concurrent web-debt routine τα έκανε ήδη (commit bb5ebcf, 2026-07-19 22:50). Collision guard ενεργό: δεν commit-άρα τα duplicate edits.
+
+Τι έκανα αντί: document-άρω το P21 (item attachments) που είχε ship-αριστει στο commit 29685cf (2026-07-14) αλλα δεν ήταν στη features.md.
+
+Τι εγραψα:
+- Προσθεση bullet point στη "Inventory & Shopping" section μετά το "Link to installment plans": **Attachments** (manuals, warranty certificates, serial number photos) — εξηγηση ότι αποθηκεύονται στο item και συγχρονίζονται με το file storage backend (local/SMB/FTP/OneDrive).
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: 0 (features.md δεν εχει code blocks).
+- Internal links: καμια αλλαγη σε links.
+- Secret scan: κανενα secret ✓.
+
+Collision guard: git status --short δειχνει 2 foreign WIP files εκτος docs — κανενα staged. Commit ΜΟΝΟ docs/features.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: (α) api.md — check αν υπάρχουν νεα item attachment API endpoints που δεν εχουν documented ή (β) P24 webhooks documentation αν χρειάζεται σε features.md/configuration.md.
+
+---
+
+## 2026-07-19 (features.md: P20 loyalty cards + P32 gift cards + P16 YNAB import — handled by concurrent web-debt routine)
 
 Το features.md ειχε 3 gaps απο recent features που δεν ειχαν καλυφθει:
 - P20 (loyalty card wallet), P32 (gift card balance tracker): το Vouchers section ηταν μονο 4-σειρες που εμνιαν "coupons" μονο

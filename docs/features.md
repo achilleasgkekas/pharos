@@ -66,6 +66,9 @@ Highlights:
 - **Convert to task** for items that need follow-up work.
 - **Link to installment plans** so a purchase on your credit-card statement points
   back at the product it paid for (see Statements below).
+- **Attachments** (manuals, warranty certificates, serial number photos) can be
+  uploaded and stored with each item. The attachments are synced with your file
+  storage backend (local, SMB, FTP, OneDrive) alongside receipt and statement files.
 
 ## Shopping list
 
