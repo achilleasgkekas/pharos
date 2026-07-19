@@ -45,6 +45,7 @@ const ACTION_LABELS: Record<string, string> = {
   'member.added': 'Member added',
   'member.role_changed': 'Role changed',
   'member.removed': 'Member removed',
+  'member.left': 'Member left',
   'invite.sent': 'Invite sent',
   'invite.resent': 'Invite resent',
   'invite.accepted': 'Invite accepted',

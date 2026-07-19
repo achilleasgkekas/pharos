@@ -18,6 +18,7 @@ import { workspaceQuery } from '@/components/saas/chooseWorkspace';
 import { TenantStatusBadge, MemberRoleBadge, Pill } from '@/components/saas/StatusBadge';
 import { SignOutButton } from '@/components/saas/SignOutButton';
 import { CreateWorkspaceForm } from '@/components/saas/CreateWorkspaceForm';
+import { LeaveWorkspaceButton } from '@/components/saas/LeaveWorkspaceButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,34 +103,38 @@ export default async function AccountHomePage() {
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {workspaces.map((ws, i) => (
             <li key={ws.slug || i}>
-              <Link
-                href={`/account/workspace${workspaceQuery(ws.slug, i === 0)}`}
-                className="group flex h-full flex-col gap-3 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 transition-colors hover:border-[color:var(--color-accent)]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-display text-base font-semibold">
-                      {ws.name || ws.slug || 'Untitled workspace'}
+              <div className="group flex h-full flex-col gap-3 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 transition-colors hover:border-[color:var(--color-accent)]">
+                <Link href={`/account/workspace${workspaceQuery(ws.slug, i === 0)}`} className="flex flex-1 flex-col gap-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-display text-base font-semibold">
+                        {ws.name || ws.slug || 'Untitled workspace'}
+                      </div>
+                      <div className="mt-0.5 truncate font-mono text-xs text-[color:var(--color-text-faint)]">
+                        {ws.slug || '—'}
+                      </div>
                     </div>
-                    <div className="mt-0.5 truncate font-mono text-xs text-[color:var(--color-text-faint)]">
-                      {ws.slug || '—'}
+                    <TenantStatusBadge status={ws.status} />
+                  </div>
+                  <div className="mt-auto flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Pill tone="cyan">{ws.plan || 'free'}</Pill>
+                      <MemberRoleBadge role={ws.role} />
                     </div>
+                    <span
+                      aria-hidden
+                      className="text-[color:var(--color-text-faint)] transition-colors group-hover:text-[color:var(--color-accent)]"
+                    >
+                      →
+                    </span>
                   </div>
-                  <TenantStatusBadge status={ws.status} />
+                </Link>
+                {/* Outside the Link (invalid to nest a button in an anchor) — a member may
+                    always walk away from their own membership, no owner/admin needed. */}
+                <div className="flex items-center justify-end border-t border-[color:var(--color-border)] pt-2">
+                  <LeaveWorkspaceButton slug={ws.slug} name={ws.name || ws.slug} />
                 </div>
-                <div className="mt-auto flex items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-1">
-                    <Pill tone="cyan">{ws.plan || 'free'}</Pill>
-                    <MemberRoleBadge role={ws.role} />
-                  </div>
-                  <span
-                    aria-hidden
-                    className="text-[color:var(--color-text-faint)] transition-colors group-hover:text-[color:var(--color-accent)]"
-                  >
-                    →
-                  </span>
-                </div>
-              </Link>
+              </div>
             </li>
           ))}
         </ul>

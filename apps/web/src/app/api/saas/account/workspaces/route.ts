@@ -6,6 +6,8 @@ import { saasAuthGate, saasGuard, accountTenants } from '@/lib/tenancy/saasApi';
 import { getCurrentAccount } from '@/lib/tenancy/accountSession';
 import { provisionTenant } from '@/lib/tenancy/provision';
 import { recordAudit, auditCtx } from '@/lib/tenancy/audit';
+import { getTenantContext } from '@/lib/tenancy/context';
+import { wouldOrphanOwners, type MemberLite, type OrgRole } from '@/lib/tenancy/members';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,5 +67,74 @@ export async function POST(req: NextRequest) {
       { tenant, tenants: await accountTenants(claims.sub) },
       { status: 201 }
     );
+  });
+}
+
+/**
+ * DELETE /api/saas/account/workspaces { tenant: slug }
+ *   → the CALLER leaves a workspace they currently belong to (self-service, any role — unlike
+ *     DELETE /api/saas/members, which is the owner/admin removing SOMEONE ELSE). Symmetric with
+ *     the POST above: same account-session gate, no owner/admin check, since a member is always
+ *     free to walk away from their own membership.
+ * Blocked (409) when the caller is the workspace's last active owner, mirroring
+ * members.route's `wouldOrphanOwners` guard — a workspace may never end up with zero owners.
+ * A sole owner who wants to leave must first promote another member to owner.
+ */
+export async function DELETE(req: NextRequest) {
+  return saasGuard(async () => {
+    const gate = saasAuthGate();
+    if (gate) return gate;
+
+    const claims = await getCurrentAccount();
+    if (!claims) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
+    const b = await readBody(req);
+    const slug = strField(b, 'tenant', '', true).toLowerCase();
+    if (!slug) return NextResponse.json({ error: 'A workspace is required' }, { status: 400 });
+
+    await connectDB();
+
+    const ctx = await getTenantContext({ slug });
+    if (!ctx || !ctx.tenantId) {
+      return NextResponse.json({ error: 'workspace not found' }, { status: 404 });
+    }
+    const tenantId = ctx.tenantId;
+
+    const memberships = await Membership.find({ tenant: tenantId, status: 'active' })
+      .select('account role status')
+      .lean();
+    const lite: MemberLite[] = memberships.map((m) => ({
+      accountId: String(m.account),
+      role: m.role as OrgRole,
+      status: String(m.status),
+    }));
+    const mine = lite.find((m) => m.accountId === claims.sub);
+    if (!mine) {
+      return NextResponse.json({ error: 'you are not a member of that workspace' }, { status: 404 });
+    }
+
+    if (wouldOrphanOwners(lite, claims.sub)) {
+      return NextResponse.json(
+        {
+          error: 'you are the last owner; promote another member to owner before leaving',
+          code: 'last_owner',
+        },
+        { status: 409 }
+      );
+    }
+
+    await Membership.updateOne(
+      { account: claims.sub, tenant: tenantId },
+      { $set: { status: 'removed' } }
+    );
+
+    await recordAudit(auditCtx(tenantId), {
+      action: 'member.left',
+      actor: claims.sub,
+      target: claims.email || claims.sub,
+      meta: { role: mine.role, slug },
+    });
+
+    return NextResponse.json({ left: slug, tenants: await accountTenants(claims.sub) });
   });
 }
