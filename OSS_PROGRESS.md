@@ -1836,3 +1836,25 @@ Mock pattern: DB-mock (`@/lib/db`, `@/models/User`) + mock `@/models/Statement` 
 - Collision guard: πριν το stage, `git diff --cached` κενό. `git status --short` μετά το IMAP commit = μόνο `PRODUCT_BACKLOG.md` [M] (άλλο routine, foreign) + το δικό μου νέο αρχείο — ΔΕΝ άγγιξα το `PRODUCT_BACKLOG.md`. Στάγιαρα ΜΟΝΟ το δικό μου path.
 
 Suggested next task: (β συνέχεια) Απομένουν: `items/[id]/ai-fill`, `items/[id]/convert-to-task`, `receipts/[id]/rescan`, `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Έλεγξε `git status` πριν πιάσεις οτιδήποτε — ιδίως αν `items/actions.ts` έχει foreign WIP (επηρεάζει `ai-fill`/`convert-to-task`/`import`). ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις — ιδίως πρόσεξε ΠΟΤΕ το `connectDB` τρέχει (μέσα στο `withAuth`/`bearerUser`, ΠΡΙΝ οποιοδήποτε route-level guard) ώστε να μην ξαναγράψεις το ίδιο λάθος assertion. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-20 (cont.¹⁵ — items/[id]/convert-to-task/route.test.ts, POST με failure-remap σε 404)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/items/[id]/convert-to-task/route.test.ts` για το POST του `/api/v1/items/:id/convert-to-task`.**
+
+Επιλογή target: πρώτο από την εναπομείνασα λίστα (`git status` καθαρό, μηδέν foreign WIP). Backs το «Convert to task» κουμπί στο item-detail (web+mobile) — φτιάχνει ένα νέο Task σπαρμένο από το item (title, price, links ως HTML), το item μένει άθικτο. Thin wrapper πάνω στο `convertItemToTask` (items/actions.ts).
+
+Route-only συμπεριφορά που δοκιμάστηκε: (α) ObjectId guard πριν οποιαδήποτε action call, (β) **failure remap** (σε αντίθεση με το `link-plan` sibling που κάνει echo χωρίς remap): ένα action `{ ok: false }` γίνεται **404** apiError με το error message του action, ή fallback **'convert failed'** όταν το error είναι κενό/falsy (δοκιμάστηκα με 3 παραλλαγές: explicit error string, κενό string, undefined field — και τα 3 στο ίδιο 404 shape), (γ) happy path επιστρέφει ΑΚΡΙΒΩΣ `{ ok: true, taskId }` — τίποτα άλλο από το action result δεν διαρρέει.
+
+Mock pattern: DB-mock (`@/lib/db` connectDB, `@/models/User`) + mock `@/app/items/actions` (`convertItemToTask` μόνο, factory return μόνο αυτό το export). Πραγματικοί `withAuth`/`isObjectId`. makeReq απλό (μόνο headers.get authorization· το route δεν διαβάζει body καθόλου — POST χωρίς payload).
+
+Τι έγινε: Νέο `route.test.ts` (7 tests): auth gate (2: no-token, unknown-token — action ποτέ), id guard (1: malformed id → 400 bad id, action ποτέ), happy path (1: {ok:true,taskId} exact + forwarded id), failure remap (3: explicit error→404, κενό error→'convert failed', undefined error→'convert failed').
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/api/v1/items/[id]/convert-to-task/route.test.ts"` → 7/7 passed.
+- `npx vitest run` (όλο το suite) → 188 files, 2408/2408 passed.
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό.
+- Collision guard: πριν το stage, `git diff --cached` κενό. `git status --short` = μόνο το δικό μου νέο αρχείο, μηδέν foreign WIP. Στάγιαρα ΜΟΝΟ το δικό μου path.
+
+Suggested next task: (β συνέχεια) Απομένουν: `items/[id]/ai-fill`, `receipts/[id]/rescan`, `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Έλεγξε `git status` πριν πιάσεις οτιδήποτε — ιδίως αν `items/actions.ts` έχει foreign WIP (επηρεάζει `ai-fill`/`import`, το `convert-to-task` του export έγινε ήδη). ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam, ιδίως failure-remap ναι/όχι) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
