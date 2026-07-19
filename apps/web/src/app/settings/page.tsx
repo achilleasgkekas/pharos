@@ -10,7 +10,7 @@ import { getAiConfig } from '@/lib/aiConfig';
 import { getAppSettings } from '@/lib/appSettings';
 import { getStores } from '@/lib/storeService';
 import { SettingsClient } from './SettingsClient';
-import { listOllamaModels, getPromptsForEditor, getScraperAi, getStorageInfo, getListsForEditor } from './actions';
+import { listOllamaModels, getPromptsForEditor, getScraperAi, getStorageInfo, getListsForEditor, getImapInfo } from './actions';
 import { requireUser } from '@/lib/auth';
 import type { SerializedCard } from '@/types';
 
@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 
 async function getInfo() {
   await connectDB();
-  const [items, receipts, statements, subscriptions, cards, cardList, ollamaUp, aiReady, cfg, installed, doc, stores, settings, prompts, scraperAi, storage] =
+  const [items, receipts, statements, subscriptions, cards, cardList, ollamaUp, aiReady, cfg, installed, doc, stores, settings, prompts, scraperAi, storage, imap] =
     await Promise.all([
       Item.countDocuments(),
       Receipt.countDocuments(),
@@ -36,6 +36,7 @@ async function getInfo() {
       getPromptsForEditor(),
       getScraperAi(),
       getStorageInfo(),
+      getImapInfo(),
     ]);
   const lists = await getListsForEditor();
   return {
@@ -48,6 +49,7 @@ async function getInfo() {
     prompts,
     scraperAi,
     storage,
+    imap,
     ai: {
       // What the user picked (may differ from effective if no key yet)
       selectedProvider: ((doc?.aiProvider as string) || 'ollama') as 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom',

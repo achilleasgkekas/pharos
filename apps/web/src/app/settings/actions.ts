@@ -42,6 +42,9 @@ import { getStorageConfig, invalidateStorageConfig, type StorageBackend } from '
 import { pushBatchToRemote, testRemote, type RemoteFile } from '@/lib/remoteStorage';
 import { renderStoragePath, DEFAULT_FOLDER_TEMPLATE, DEFAULT_NAME_TEMPLATE } from '@/lib/storagePath';
 import { readFile, deleteFile } from '@/lib/storage';
+import { getImapConfig, invalidateImapConfig } from '@/lib/imapConfig';
+import { testImapConnection, fetchNewEmails } from '@/lib/imapImport';
+import { uploadReceipt } from '@/app/receipts/actions';
 import { Types } from 'mongoose';
 import { getStores, invalidateStoreCache, type StoreLite } from '@/lib/storeService';
 import { effectiveReturnWindow, returnDaysLeft } from '@/lib/returnWindow';
@@ -886,6 +889,94 @@ export async function syncToRemote(): Promise<SyncResult> {
   }
   const res = await pushBatchToRemote(s.remote, files);
   return { ok: res.failed === 0, pushed: res.pushed, failed: res.failed, skipped, errors: res.errors };
+}
+
+// ─── Email-in (IMAP) auto-import (P11) ─────────────────────────────────────────
+// Self-hosted only: poll an existing mailbox for receipt emails (attachments or
+// HTML body) and feed each one through the same upload+parse pipeline as a manual
+// drop. No background cron — a manual "Check inbox now" button, mirroring the
+// OneDrive "Test connection" / storage "Sync now" UX.
+
+export type ImapInfo = {
+  enabled: boolean; host: string; port: number; user: string; secure: boolean; folder: string;
+  hasPass: boolean; lastCheckedAt: string; lastImportedAt: string;
+};
+
+export async function getImapInfo(): Promise<ImapInfo> {
+  const c = await getImapConfig();
+  return {
+    enabled: c.enabled, host: c.host, port: c.port, user: c.user, secure: c.secure, folder: c.folder,
+    hasPass: c.hasPass, lastCheckedAt: c.lastCheckedAt, lastImportedAt: c.lastImportedAt,
+  };
+}
+
+export async function saveImapConfigAction(formData: FormData): Promise<{ ok: boolean }> {
+  await requireAdmin();
+  await connectDB();
+  const update: Record<string, unknown> = {
+    imapEnabled: formData.get('imapEnabled') === 'true',
+    imapHost: String(formData.get('imapHost') || '').trim(),
+    imapPort: Math.max(1, Math.min(65535, Number(formData.get('imapPort')) || 993)),
+    imapUser: String(formData.get('imapUser') || '').trim(),
+    imapSecure: formData.get('imapSecure') !== 'false',
+    imapFolder: String(formData.get('imapFolder') || '').trim() || 'INBOX',
+  };
+  const pass = String(formData.get('imapPass') || '');
+  if (pass) update.imapPass = pass; // blank → keep the existing one
+  await AppConfig.updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
+  invalidateImapConfig();
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
+/** Verify the SAVED imap config (Save first, then Test) — read-only, no message fetch. */
+export async function testImapConnectionAction(): Promise<{ ok: boolean; error?: string; messageCount?: number }> {
+  const cfg = await getImapConfig();
+  const r = await testImapConnection(cfg);
+  return r.ok ? { ok: true, messageCount: r.messageCount } : { ok: false, error: r.error };
+}
+
+/** Fetch new messages since the last check and import each as a draft receipt
+ *  (attachments and/or the HTML body), same pipeline as a manual drag-drop upload —
+ *  one AI parse call per message, gated by the receipts AI-feature toggle like any
+ *  other upload. Advances the resume point (imapLastUid) even on partial failures. */
+export async function checkImapInboxNow(): Promise<{ ok: boolean; imported: number; skipped: number; error?: string }> {
+  await requireAdmin();
+  const cfg = await getImapConfig();
+  if (!cfg.enabled) return { ok: false, imported: 0, skipped: 0, error: 'Email-in is not enabled' };
+  const r = await fetchNewEmails(cfg);
+  if (!r.ok) return { ok: false, imported: 0, skipped: 0, error: r.error };
+
+  let imported = 0;
+  let skipped = 0;
+  for (const email of r.emails) {
+    const items: { filename: string; contentType: string; bytes: Buffer }[] = email.attachments.length > 0
+      ? email.attachments.map((a) => ({ filename: a.filename, contentType: a.contentType, bytes: a.content }))
+      : email.html
+        ? [{ filename: `${email.subject || 'email'}.html`.replace(/[\\/:*?"<>|]/g, '_'), contentType: 'text/html', bytes: Buffer.from(email.html, 'utf8') }]
+        : [];
+    for (const it of items) {
+      try {
+        const fd = new FormData();
+        fd.set('file', new File([new Uint8Array(it.bytes)], it.filename, { type: it.contentType }));
+        const res = await uploadReceipt(fd);
+        if (res.ok) imported++; else skipped++;
+      } catch {
+        skipped++;
+      }
+    }
+  }
+
+  await connectDB();
+  await AppConfig.updateOne(
+    { key: 'singleton' },
+    { $set: { imapLastUid: r.maxUid, imapLastCheckedAt: new Date(), ...(imported > 0 ? { imapLastImportedAt: new Date() } : {}) } },
+    { upsert: true }
+  );
+  invalidateImapConfig();
+  revalidatePath('/settings');
+  revalidatePath('/receipts');
+  return { ok: true, imported, skipped };
 }
 
 // ─── Editable dropdown lists (category taxonomies) ────────────────────────────

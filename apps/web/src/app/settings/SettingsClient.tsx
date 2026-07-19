@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook } from 'lucide-react';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -16,7 +16,7 @@ import { YnabImportModal } from './YnabImportModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
 import { rateForCategory } from '@/lib/depreciation';
-import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, testNotifierChannel, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow } from './actions';
+import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, testNotifierChannel, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
 import { WEBHOOK_EVENTS, type WebhookSubscription, type WebhookEvent } from '@/lib/webhooks.shared';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
@@ -66,6 +66,7 @@ type Info = {
   prompts: PromptEditorEntry[];
   scraperAi: ScraperAiConfig;
   storage: StorageInfo;
+  imap: ImapInfo;
   cardList: SerializedCard[];
   lists: ListEditorEntry[];
 };
@@ -262,6 +263,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
                 <RecomputePricesButton />
               </Section>
               <MigrationImportManager />
+              <ImapImportManager imap={info.imap} />
               <SampleDataManager />
               <TrashManager />
             </>
@@ -2457,6 +2459,133 @@ function MigrationImportManager() {
         <Upload size={13} /> {t('migrate.ynabButton')}
       </button>
       {open && <YnabImportModal onClose={() => setOpen(false)} onImported={() => {}} />}
+    </Section>
+  );
+}
+
+function ImapImportManager({ imap }: { imap: ImapInfo }) {
+  const t = useT();
+  const [pending, startTransition] = useTransition();
+  const [enabled, setEnabled] = useState(imap.enabled);
+  const [host, setHost] = useState(imap.host);
+  const [port, setPort] = useState(String(imap.port || 993));
+  const [user, setUser] = useState(imap.user);
+  const [pass, setPass] = useState('');
+  const [secure, setSecure] = useState(imap.secure);
+  const [folder, setFolder] = useState(imap.folder);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [test, setTest] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [lastChecked, setLastChecked] = useState(imap.lastCheckedAt);
+  const [lastImported, setLastImported] = useState(imap.lastImportedAt);
+
+  function fmt(iso: string): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${d.toLocaleDateString('en-GB')} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  function save() {
+    const fd = new FormData();
+    fd.set('imapEnabled', String(enabled));
+    fd.set('imapHost', host.trim());
+    fd.set('imapPort', port.trim());
+    fd.set('imapUser', user.trim());
+    if (pass) fd.set('imapPass', pass);
+    fd.set('imapSecure', String(secure));
+    fd.set('imapFolder', folder.trim());
+    setMsg(null);
+    setTest(null);
+    startTransition(async () => {
+      await saveImapConfigAction(fd);
+      setPass('');
+      setMsg('Saved ✓');
+      setTimeout(() => setMsg(null), 2500);
+    });
+  }
+
+  function doTest() {
+    setTest('testing…');
+    startTransition(async () => {
+      const r = await testImapConnectionAction();
+      setTest(r.ok ? `Connection OK ✓ (${r.messageCount} message${r.messageCount === 1 ? '' : 's'})` : `Failed: ${r.error}`);
+    });
+  }
+
+  function doCheck() {
+    setChecking(true);
+    setMsg(null);
+    startTransition(async () => {
+      const r = await checkImapInboxNow();
+      if (r.ok) {
+        setMsg(`Imported ${r.imported}${r.skipped ? ` · ${r.skipped} skipped` : ''}`);
+        const now = new Date().toISOString();
+        setLastChecked(now);
+        if (r.imported > 0) setLastImported(now);
+      } else {
+        setMsg(`Failed: ${r.error}`);
+      }
+      setChecking(false);
+    });
+  }
+
+  return (
+    <Section title={t('set.imapTitle')} icon={<Mail size={15} />}>
+      <p className="text-[11px] text-[color:var(--color-text-dim)] -mt-1 mb-1">{t('set.imapDesc')}</p>
+
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-medium">{t('set.imapEnabled')}</span>
+        <Switch checked={enabled} onChange={setEnabled} />
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3 pt-1">
+        <Field label={t('set.imapHost')}>
+          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="imap.gmail.com" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} autoComplete="off" />
+        </Field>
+        <Field label={t('set.imapPort')}>
+          <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="993" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+        </Field>
+        <Field label={t('set.imapUsername')}>
+          <input value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} autoComplete="off" />
+        </Field>
+        <Field label={imap.hasPass ? t('set.imapPasswordSaved') : t('set.imapPassword')}>
+          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={imap.hasPass ? '••••••••' : ''} className={inputClass} autoComplete="off" />
+        </Field>
+        <Field label={t('set.imapFolder')}>
+          <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="INBOX" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
+        </Field>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[color:var(--color-text-dim)]">{t('set.imapSecure')}</span>
+          <Switch checked={secure} onChange={setSecure} />
+        </div>
+      </div>
+      <p className="text-[10px] text-[color:var(--color-text-faint)]">{t('set.imapAppPasswordHint')}</p>
+
+      <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[color:var(--color-border)] mt-1">
+        <button type="button" onClick={save} disabled={pending} className={saveBtn}>
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} {t('common.save')}
+        </button>
+        <button type="button" onClick={doTest} disabled={pending} className={ghostBtn}>
+          <Plug size={13} /> {t('set.testConnection')}
+        </button>
+        {enabled && (
+          <button type="button" onClick={doCheck} disabled={pending || checking} className={ghostBtn}>
+            {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} {t('set.imapCheckNow')}
+          </button>
+        )}
+        {test && (
+          <span className={cn('text-[11px]', test.startsWith('Connection OK') ? 'text-[color:var(--color-accent)]' : test === 'testing…' ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+            {test}
+          </span>
+        )}
+        {msg && (
+          <span className="text-[11px] text-[color:var(--color-accent)]" style={{ fontFamily: 'var(--font-mono)' }}>{msg}</span>
+        )}
+      </div>
+      <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+        {lastChecked ? t('set.imapLastChecked', { when: fmt(lastChecked) }) : t('set.imapNeverChecked')}
+        {lastImported ? ` · ${t('set.imapLastImported', { when: fmt(lastImported) })}` : ''}
+      </p>
     </Section>
   );
 }

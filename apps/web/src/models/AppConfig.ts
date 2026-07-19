@@ -127,6 +127,21 @@ const AppConfigSchema = new Schema(
     // ── Naming / folder templates (tokens: {kind} {store} {year} {month} {day} {date} {total} {id} {original} {ext}) ──
     folderTemplate: { type: String, default: '{kind}/{year}/{month}' },
     fileNameTemplate: { type: String, default: '{date}_{store}_{id}' },
+
+    // ── Email-in (IMAP) auto-import (P11) ── self-hosted only: poll an existing
+    // mailbox for receipt emails and feed them through the SAME upload+parse pipeline
+    // as a manual drop (uploadReceipt). Manual "Check inbox now" trigger for now (no
+    // background cron in this app) — see lib/imapImport.ts + lib/imapConfig.ts.
+    imapEnabled: { type: Boolean, default: false },
+    imapHost: { type: String, default: '' },
+    imapPort: { type: Number, default: 993 },
+    imapUser: { type: String, default: '' },
+    imapPass: { type: String, default: '' }, // server-only, never sent to the client
+    imapSecure: { type: Boolean, default: true }, // TLS (IMAPS)
+    imapFolder: { type: String, default: 'INBOX' },
+    imapLastUid: { type: Number, default: 0 }, // resume point in imapFolder
+    imapLastCheckedAt: { type: Date, default: null },
+    imapLastImportedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
