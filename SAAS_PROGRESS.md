@@ -2871,3 +2871,77 @@ member σε >1 workspace θέλει να αφήσει ένα από αυτά χ�
 route + κουμπί στο account chooser, συμμετρικό με το create που μόλις χτίστηκε)· (γ) αν το
 `recordAiUsage` wiring βγει ρητά in-scope κάποια στιγμή, το Usage tab δείχνει σήμερα πάντα
 μηδενικά.
+
+## 2026-07-20 (increment 68 — leave-workspace self-service flow for a signed-in Account, §UI-first)
+**Το κενό:** το next-task σημείωμα του #67 έδωσε τρεις επιλογές· (α) activity pagination, (β)
+leave-workspace (συμμετρικό με το create-workspace του #67), (γ) `recordAiUsage` wiring (εκτός
+territory, θέλει ρητή άδεια). Διάλεξα (β): ο `/account` chooser (πολλαπλά workspaces) έδειχνε
+κάθε membership σαν κάρτα-link προς το workspace, αλλά **καμία σελίδα δεν πρόσφερε δρόμο να
+φύγει** ένα account από ένα workspace χωρίς να περιμένει owner/admin — το `DELETE
+/api/saas/members` (member.removed) είναι ρητά owner/admin-only (`resolveWorkspaceSession(...,
+true)`), δεν καλύπτει "I want out of my own membership".
+
+**Built** (νέος DELETE handler σε ήδη-δικό μου route + νέο client component + additive edit στη
+δική μου account page):
+- **`app/api/saas/account/workspaces/route.ts`** (δικό μου, additive — μόνο DELETE προστέθηκε
+  δίπλα στο ήδη υπάρχον POST): `DELETE { tenant: slug }` — `saasAuthGate()` + `getCurrentAccount()`
+  (401 logged out) → `getTenantContext({slug})` (404 άγνωστο workspace) → φορτώνει τα active
+  memberships του tenant σε `MemberLite[]` (ίδιο σχήμα με το `members/route.ts loadMembers`) →
+  αν ο caller δεν είναι member → 404 → **reuse `wouldOrphanOwners`** (`lib/tenancy/members`, το
+  ΙΔΙΟ guard που το `DELETE /api/saas/members` χρησιμοποιεί για owner/admin-initiated removal)
+  → 409 `last_owner` αν ο caller είναι ο μοναδικός ενεργός owner (πρέπει πρώτα να προάγει άλλον)
+  → αλλιώς `Membership.updateOne({status:'removed'})` (soft-remove, ίδιο idiom) + **νέο audit
+  action `member.left`** (`recordAudit` με bare-tenant-id `auditCtx`, ίδιο idiom με το
+  `workspace.created` του #67 — καμία workspace session, ο caller μόλις έφυγε). Επιστρέφει
+  `{left: slug, tenants: accountTenants(...)}` (ίδιο σχήμα με το POST response).
+- **`lib/tenancy/audit.ts`** (δικό μου, additive): `'member.left'` προστέθηκε στο `AUDIT_ACTIONS`
+  (νέα γραμμή στο membership group, δίπλα στο `member.removed`) — καθαρά additive σε closed-set
+  array, μηδέν migration (δεν είναι mongoose enum). Το `activityFilter.test.ts`
+  (`toHaveLength(AUDIT_ACTIONS.length+1)`) περνάει ΧΩΡΙΣ αλλαγή γιατί ήδη διαβάζει το length
+  δυναμικά· το `audit.test.ts` loop `for (const a of AUDIT_ACTIONS)` ίδιο.
+- **`components/saas/activityView.ts`** (δικό μου, additive): `ACTION_LABELS['member.left'] =
+  'Member left'` ώστε το νέο verb να έχει curated copy στο Activity feed αντί για fallback
+  title-case (ίδιο idiom με τα υπόλοιπα membership actions).
+- **`components/saas/leaveWorkspace.ts`** (νέο, PURE) — `describeLeaveWorkspaceError`/
+  `isLastOwnerError`, mirror του `createWorkspace.ts` idiom (client-side error-shape mapper,
+  server παραμένει authoritative). **4 unit tests**.
+- **`components/saas/LeaveWorkspaceButton.tsx`** (νέο client component) — μικρό «Leave» link
+  ανά κάρτα, `window.confirm()` guard (destructive, no custom modal — ίδιο lightweight idiom
+  με τα υπόλοιπα one-off destructive actions του codebase) → DELETE → **full navigation**
+  `window.location.assign('/account')` (ίδιο idiom με CreateWorkspaceForm/SignOutButton) ώστε
+  η fresh server render να δείξει τη μικρότερη λίστα workspaces.
+- **`(saas)/account/page.tsx`** (δικό μου, additive): ο πολύ-workspace chooser card
+  αναδιαρθρώθηκε — το εξωτερικό `<Link>` (που κάλυπτε ΟΛΗ την κάρτα) έγινε `<div>` (visual card,
+  border/hover) που περιέχει **εσωτερικό `<Link>`** μόνο γύρω από το navigable περιεχόμενο
+  (τίτλος/badges/βέλος) + **νέα κάτω γραμμή** (`border-t`, δεξιά-στοιχισμένη) με το
+  `<LeaveWorkspaceButton>`. Σκόπιμη επιλογή έναντι ενός "stretched-link" overlay pattern
+  (absolute-positioned anchor + z-index button) — απλούστερο, valid HTML (όχι button-in-anchor
+  nesting), και δεν χρειάζεται stacking-context reasoning για να είναι σωστό το click hit-test.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run leaveWorkspace.test.ts
+audit.test.ts activityFilter.test.ts createWorkspace.test.ts` → **59/59**· full suite `npx
+vitest run` → **2412/2412 green** (189 files, +11 tests/+2 files έναντι του #67, καμία
+regression). ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (μόνο το δικό μου workspaces route +
+2 δικά μου additive edits σε activityView/audit + νέα αρχεία). `SAAS_MODE` off / self-hosted =
+**zero effect** (το `(saas)` segment self-gates σε `notFound()` πριν φτάσει καν στη νέα σελίδα/
+route· ο DELETE handler γυρνάει το gate response πριν αγγίξει DB). Κανένας Docker rebuild (νέος
+handler σε ήδη-υπάρχον API route + νέο client component + additive SSR page edit, μηδέν shared
+runtime wiring, μηδέν νέα εξάρτηση — ίδιο σκεπτικό με τα increments 58-67). Browser-verify
+skipped (θα χρειαζόταν rebuild για να φανεί στο live :3000 — απαγορεύεται μόνο-για-verify, ίδιο
+idiom με τα #66/#67). Collision guard: `git status --short` πριν το commit έδειξε **μηδέν
+foreign staged/modified files** → isolated pathspec commit των 7 δικών μου αρχείων, `git diff
+--cached --name-only` επιβεβαίωσε exact match. Pushed `d736d30`.
+
+**## Needs Achilleas** (leave-workspace):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η `(saas)` σελίδα/route (αλλιώς
+  404). Self-hosted = disabled, zero risk.
+- Ο sole-owner guard μπλοκάρει με 409 αντί να προσφέρει αυτόματο "transfer ownership + leave"
+  σε ένα βήμα — ο χρήστης πρέπει πρώτα να πάει στο Members tab και να προάγει κάποιον άλλον σε
+  owner. Αποδεκτό για τώρα (ίδιο μοτίβο με το DELETE /api/saas/members), αλλά αν φανεί τριβή σε
+  πραγματική χρήση, ένα combined "transfer & leave" action θα ήταν το επόμενο βήμα.
+
+**Next task:** increment 69 — candidates: (α) **activity pagination** (και τα δύο activity
+views έχουν σταθερό `limit=50`, καμία "load more"/cursor)· (β) αν το `recordAiUsage` wiring
+βγει ρητά in-scope κάποια στιγμή, το Usage tab δείχνει σήμερα πάντα μηδενικά· (γ) έλεγξε αν
+υπάρχει ακόμα κάποιο self-service gap συμμετρικό με create/leave-workspace (π.χ. rename
+workspace από τον owner, αν δεν υπάρχει ήδη στο settings tab — έλεγξε πρώτα πριν χτίσεις).
