@@ -15,7 +15,18 @@ import type { NotifierConfig, NotifierType } from './notifiers.shared';
 const sendNtfyTo = vi.fn(async (..._args: unknown[]) => true);
 vi.mock('./notify', () => ({ sendNtfyTo: (...a: unknown[]) => sendNtfyTo(...a) }));
 
+// discord/slack/webhook URLs are user-supplied, so sendOne() runs them through
+// assertPublicUrl() (lib/ssrf.ts) before POSTing, which resolves the hostname via
+// node:dns — mock that so tests never hit a real resolver, same pattern as
+// ssrf.test.ts. Default to a public address so the existing happy-path tests keep
+// passing unchanged. (telegram's URL host is a hardcoded api.telegram.org, not
+// user-supplied, so that branch is not guarded and needs no mock here.)
+vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
+
+import { lookup } from 'node:dns/promises';
 import { testNotifier } from './notifiers';
+
+const mockLookup = vi.mocked(lookup);
 
 /** Read the (url, init) of the last fetch call and its parsed JSON body. */
 function lastFetch() {
@@ -36,6 +47,8 @@ const cfg = (over: Partial<NotifierConfig> & { type: NotifierType }): NotifierCo
 beforeEach(() => {
   sendNtfyTo.mockClear();
   sendNtfyTo.mockResolvedValue(true);
+  mockLookup.mockReset();
+  mockLookup.mockResolvedValue([{ address: '203.0.113.10', family: 4 }] as never);
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => ({ ok: true })),
@@ -167,5 +180,23 @@ describe('testNotifier — fail-closed contract', () => {
   it('returns false for an unknown channel type', async () => {
     expect(await testNotifier(cfg({ type: 'carrier-pigeon' as NotifierType }))).toBe(false);
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('testNotifier — SSRF guard on user-supplied URLs', () => {
+  it.each(['discord', 'slack', 'webhook'] as const)(
+    'returns false and never fetches a %s URL that resolves to a private address',
+    async (type) => {
+      mockLookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }] as never);
+      await expect(testNotifier(cfg({ type, url: 'https://attacker.example/x' }))).resolves.toBe(false);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not guard telegram — its URL host (api.telegram.org) is hardcoded, not user-supplied', async () => {
+    mockLookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }] as never); // would reject if checked
+    const ok = await testNotifier(cfg({ type: 'telegram', token: 'BOT123', target: '99887' }));
+    expect(ok).toBe(true);
+    expect(globalThis.fetch).toHaveBeenCalled();
   });
 });

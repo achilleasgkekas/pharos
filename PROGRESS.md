@@ -5721,3 +5721,49 @@ Queue για το επόμενο ανοιχτό item.
 
 - Τίποτα νέο αυτό το run. (P36 Open Banking παραμένει το μόνο ανοιχτό Approved item που χρειάζεται ρητή απόφαση
   scope πριν χτιστεί, αμετάβλητο.)
+
+## 2026-07-19 (pharos-daily-dev, cont. — SSRF guard follow-up on notifier channels)
+
+Ο χρήστης είπε «Ok go on» μετά το P24 run πιο πάνω, στην ίδια session. Συνέχισα με το follow-up (β) που
+πρότεινα: το SSRF gap στο `lib/notifiers.ts`/`sendOne()` που εντόπισα κατά την έρευνα του P24 αλλά δεν ήταν
+μέρος του scope του.
+
+**Πρόβλημα**: το `lib/webhooks.ts` (P24, μόλις shipped) περνάει κάθε outbound POST από `assertPublicUrl()`
+πριν το fetch, αλλά το sibling `lib/notifiers.ts` (τα προϋπάρχοντα ntfy/Discord/Slack/Telegram/webhook alert
+channels) **δεν** το έκανε — ένας χρήστης θα μπορούσε να βάλει Discord/Slack/generic-webhook/ntfy URL που
+δείχνει σε `http://localhost:8081` (mongo-express), `http://searxng:8080`, `http://host.docker.internal:11434`
+(Ollama) κλπ, και το «Check & notify now» θα έκανε server-side POST εκεί.
+
+**Fix (2 αρχεία, 4 call sites)**:
+- **`lib/notify.ts`** `sendNtfyTo()`: `await assertPublicUrl(url)` μέσα στο ήδη-υπάρχον try/catch, πριν το
+  fetch. Αυτό καλύπτει ΚΑΙ το ntfy branch του `sendOne()` (delegates εκεί) ΚΑΙ το direct `sendTestNtfy` action.
+- **`lib/notifiers.ts`** `sendOne()`: πρόσθεσα το guard στα **discord/slack/webhook** branches (user-supplied
+  URL, πραγματικό SSRF vector). **Το telegram branch ΔΕΝ το χρειάζεται** — το URL του είναι πάντα
+  `https://api.telegram.org/bot${token}/sendMessage` (fixed host, ο χρήστης δίνει μόνο token+chat-id, όχι URL),
+  οπότε δεν είναι SSRF vector· άφησα το ρητά χωρίς guard με σχόλιο εξήγησης αντί να προσθέσω αχρείαστο DNS
+  lookup.
+- Δεν άγγιξα το `lib/webhooks.ts` (ήδη είχε το guard από το P24 run).
+
+**Tests**: το `assertPublicUrl` κάνει πραγματικό DNS lookup (`node:dns/promises`), άρα τα υπάρχοντα
+`notify.test.ts`/`notifiers.dispatch.test.ts` (14+20 tests, όλα με πραγματικά public hostnames σαν
+`ntfy.sh`/`discord.com`) θα έκαναν πραγματικό network call χωρίς mock. Πρόσθεσα `vi.mock('node:dns/promises')`
+και στα δύο αρχεία (ίδιο pattern με το ήδη-υπάρχον `ssrf.test.ts`), `beforeEach` resolve σε public IP ώστε τα
+happy-path tests να μείνουν αμετάβλητα deterministic, + **6 νέα tests**: private-address rejection για
+ntfy/discord/slack/webhook, non-http(s) scheme rejection, και ένα explicit test ότι το telegram branch
+ΣΥΝΕΧΙΖΕΙ να δουλεύει ακόμα κι όταν το (άσχετο) DNS mock θα απέρριπτε — αποδεικνύει ότι το guard εκεί σκόπιμα
+λείπει, όχι ξεχάστηκε.
+
+**Verify**: `npm run type-check` EXIT 0. Στοχευμένο `vitest run` στα 5 σχετικά αρχεία (notify/notifiers/ssrf)
+→ **100/100 passed**. Full `npx vitest run` → **2317 passed / 180 files** (+6, μηδέν regression). Safe Docker
+rebuild (ίδιο πρωτόκολλο με πάνω): build OK, `RestartCount=0`. `docker logs` έδειξε 3× «Failed to find Server
+Action» — **γνωστό, προϋπάρχον stale-bundle artifact** (ανοιχτό browser tab με παλιό bundle μετά rebuild, βλ.
+CLAUDE.md/memory «Docker rebuild → hard refresh»), ΟΧΙ regression από αυτό το αλλαγή· επιβεβαιώθηκε με φρέσκο
+`navigate` στο Claude Browser pane → «Sign in · Pharos», **μηδέν console errors**. `docker builder prune -f`
+μετά (−2.2GB). Docker lock released.
+
+**Suggested next task**: P31 household/shared-access (M, παραμένει το επόμενο υψηλής αξίας Approved item,
+αγγίζει auth/ρόλους — αξίζει το δικό του πλήρες run) ή MOBILE_PARITY.md Build Queue.
+
+## Needs Achilleas
+
+- Τίποτα νέο.

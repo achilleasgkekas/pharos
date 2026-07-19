@@ -1,18 +1,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { sendNtfyTo } from './notify';
 
 // `sendNtfyTo` is the low-level ntfy sender used by every alert (price drops,
 // installments due, warranties expiring). It POSTs the message body to a topic
 // URL and assembles the ntfy headers. The important invariant is the Title
 // header: ntfy rejects non-ASCII header values, so a Greek title would silently
 // break the notification. The code strips the Title to ASCII and keeps Greek
-// text in the body instead. It is also fail-closed: an empty URL or any network
-// error returns false rather than throwing. These tests mock global fetch so we
-// can assert both the headers we send and the return value, with no real I/O.
+// text in the body instead. It is also fail-closed: an empty URL, an SSRF-guard
+// rejection, or any network error returns false rather than throwing. These
+// tests mock global fetch so we can assert both the headers we send and the
+// return value, with no real I/O.
 //
 // The module imports getAppSettings at the top (which pulls in the DB layer),
 // but that is import-time only and never runs here — sendNtfyTo takes an explicit
 // URL and does not touch settings, so no mock is needed.
+//
+// It also calls assertPublicUrl() (lib/ssrf.ts) before every POST, which resolves
+// the hostname via node:dns — mock that so tests never hit a real resolver, same
+// pattern as ssrf.test.ts. Default to a public address so the existing happy-path
+// tests (all using https://ntfy.sh/topic) keep passing unchanged.
+vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
+
+import { lookup } from 'node:dns/promises';
+import { sendNtfyTo } from './notify';
+
+const mockLookup = vi.mocked(lookup);
 
 function mockFetch(impl: (url: string, init: RequestInit) => Response | Promise<Response>) {
   const fn = vi.fn(impl as unknown as typeof fetch);
@@ -31,6 +42,8 @@ const ok = () => new Response('', { status: 200 });
 describe('sendNtfyTo', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
+    mockLookup.mockReset();
+    mockLookup.mockResolvedValue([{ address: '203.0.113.10', family: 4 }] as never);
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -124,5 +137,18 @@ describe('sendNtfyTo', () => {
       throw new Error('network down');
     });
     await expect(sendNtfyTo('https://ntfy.sh/topic', 'Alert', 'body')).resolves.toBe(false);
+  });
+
+  it('returns false (never throws) and never calls fetch when the URL resolves to a private address', async () => {
+    mockLookup.mockResolvedValue([{ address: '192.168.1.5', family: 4 }] as never);
+    const fn = mockFetch(() => ok());
+    await expect(sendNtfyTo('https://internal.example/topic', 'Alert', 'body')).resolves.toBe(false);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('returns false and never calls fetch for a non-http(s) URL', async () => {
+    const fn = mockFetch(() => ok());
+    await expect(sendNtfyTo('ftp://ntfy.sh/topic', 'Alert', 'body')).resolves.toBe(false);
+    expect(fn).not.toHaveBeenCalled();
   });
 });

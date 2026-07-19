@@ -2,6 +2,7 @@ import { connectDB } from './db';
 import { AppConfig } from '@/models/AppConfig';
 import { currentModel } from './tenancy/connection';
 import { sendNtfyTo } from './notify';
+import { assertPublicUrl } from './ssrf';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from './notifiers.shared';
 
 export { NOTIFIER_TYPES };
@@ -28,6 +29,7 @@ async function sendOne(c: NotifierConfig, title: string, message: string): Promi
         return c.url ? sendNtfyTo(c.url, title, message, { tags: ['bell'] }) : false;
       case 'discord': {
         if (!c.url) return false;
+        await assertPublicUrl(c.url); // user-supplied webhook URL — refuse private/internal targets
         const res = await fetch(c.url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -38,6 +40,7 @@ async function sendOne(c: NotifierConfig, title: string, message: string): Promi
       }
       case 'slack': {
         if (!c.url) return false;
+        await assertPublicUrl(c.url); // user-supplied webhook URL — refuse private/internal targets
         const res = await fetch(c.url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -58,6 +61,7 @@ async function sendOne(c: NotifierConfig, title: string, message: string): Promi
       }
       case 'webhook': {
         if (!c.url) return false;
+        await assertPublicUrl(c.url); // user-supplied webhook URL — refuse private/internal targets
         const res = await fetch(c.url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

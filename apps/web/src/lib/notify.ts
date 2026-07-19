@@ -1,4 +1,5 @@
 import { getAppSettings } from './appSettings';
+import { assertPublicUrl } from './ssrf';
 
 type NtfyOpts = { priority?: number; tags?: string[] };
 
@@ -7,6 +8,9 @@ type NtfyOpts = { priority?: number; tags?: string[] };
 export async function sendNtfyTo(url: string, title: string, message: string, opts?: NtfyOpts): Promise<boolean> {
   if (!url) return false;
   try {
+    // SSRF guard: the topic URL is user-supplied (Settings), so refuse anything
+    // that resolves to a private/loopback/internal address before POSTing.
+    await assertPublicUrl(url);
     const headers: Record<string, string> = {};
     // ntfy requires the Title header to be ASCII; strip anything else.
     const asciiTitle = (title || '').replace(/[^\x20-\x7e]/g, '').trim();
