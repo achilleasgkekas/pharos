@@ -5894,3 +5894,43 @@ reports net-worth headline #3)· ή P31 τώρα με το ακριβές scopin
 - Τίποτα νέο άμεσα. Το P31 παραμένει το μεγαλύτερο ανοιχτό Approved item — τώρα με πλήρες scoping στο
   PRODUCT_BACKLOG.md ώστε είτε ένα μελλοντικό daily-dev run είτε ο ίδιος ο Αχιλλέας να μπορεί να αποφασίσει
   πόσο βαθιά να πάει το enforcement (π.χ. μόνο money-mutating actions πρώτα, ή ΚΑΘΕ mutating action παντού).
+
+## 2026-07-19 (pharos-daily-dev, cont.⁴ — mobile-parity: subscription trial fields στο v1 API)
+
+Νέο automated run του scheduled task (μετά τα cont.¹-³ της ίδιας ημέρας). Coordination guard πρώτα (pause
+switch: απών· ask-inbox: κενό· `git status`: clean) — καθαρό, προχώρησα.
+
+**Approved queue επανεξετάστηκε**: όλα τα υπόλοιπα buildable Approved items (P13/P8 νέο PDF+ZIP dependency,
+P11 IMAP credentials, P17 mobile simulator, P5 νέο browser-extension subproject, P3 AI-heavy/κόστος, P9 L-size
+μεγάλο blast radius, P36 L χρειάζεται decision, P31 χρειάζεται dedicated supervised session) παραμένουν
+deferred/blocked με τους ίδιους λόγους που καταγράφηκαν στο cont.³ — καμία νέα πληροφορία που να αλλάζει αυτό.
+Fallback (b) στο **MOBILE_PARITY.md Build Queue #2**: «Subscriptions — free-trial πεδίο στο mobile create/edit»
+(P2/S, μηδέν AI, μηδέν ανοιχτή απόφαση, ήδη πλήρως speced από την 49η/50η σάρωση με ακριβή αρχεία/acceptance).
+
+**Τι μπήκε**: το `Subscription.trialEndsAt`+`firstChargeAmount` (P33, ήδη στο μοντέλο) ήταν αόρατα στο v1 API.
+`apps/web/src/app/api/v1/subscriptions/route.ts` (trim + POST) και `[id]/route.ts` (PATCH) πήραν τα δύο πεδία,
+ίδιο optional-date pattern με το `nextRenewal` — με **μια διαφορά σκόπιμη**: το PATCH δέχεται explicit `null`
+για να **καθαρίσει** το trial (`b.trialEndsAt === null` → `set.trialEndsAt = null`), κάτι που το `nextRenewal`
+δεν υποστηρίζει (δεν βγάζει νόημα να καθαρίσεις ένα nextRenewal, αλλά ένα trial "λήγει" όταν μετατραπεί σε paid
+ή ακυρωθεί). `apps/web/src/app/api/v1/settings/route.ts` GET+PATCH πήρε `trialAlertDays` (clamp 0–60, ίδιο
+range με το ήδη-υπάρχον web `saveDefaults` action). Mobile: `Subscription` type +2 πεδία, `addSubscription`/
+`updateSubscription` δέχονται τα νέα πεδία (η γρήγορη "add" γραμμή δεν τα εκθέτει σκόπιμα, μόνο το edit modal —
+ίδιο minimal-quick-add pattern με τα υπόλοιπα πεδία), `SubscriptionsScreen` edit modal νέο «FREE TRIAL ENDS»
+date input (κενό = clear) + gold `<Badge label="Trial">` στη λίστα όταν η ημερομηνία είναι μελλοντική — reused
+το ήδη-shipped `Badge` component (ίδιο pattern με το return-window badge στο Receipts, PA3).
+
+**Verify**: `npm run type-check` EXIT 0 (web+mobile). +8 νέα unit tests (subscriptions POST valid/invalid/
+default trialEndsAt+firstChargeAmount, PATCH set/clear/no-change-on-malformed/firstChargeAmount, settings
+clamp 0–60). Full `npx vitest run` **2349 passed / 181 files** (+8, μηδέν regression). Safe Docker rebuild
+(lock acquired/released καθαρά): build OK, mongo healthy πριν το `up -d web`, container `Up` χωρίς restart,
+`docker logs` καθαρό (μόνο το προϋπάρχον αβλαβές `@napi-rs/canvas` warning, άσχετο). Browser-checked (Claude
+Browser pane): `/login` → «Sign in · Pharos», μηδέν console errors. `docker builder prune -f` μετά (−2.2GB).
+`MOBILE_PARITY.md` item ενημερώθηκε σε ✅ DONE. Commit `8c3ccda`, pushed.
+
+**Suggested next task**: MOBILE_PARITY.md Build Queue #3 (Reports net-worth headline/breakdown, P2/M, ήδη
+πλήρως speced με ακριβή fields/files) ή #4 (Goals entity v1 API route, P2/L, νέο entity mirror του Bill/
+GiftCard pattern) ή P31 αν ο Αχιλλέας θέλει να αφιερώσει dedicated session.
+
+## Needs Achilleas
+
+- Τίποτα νέο.
