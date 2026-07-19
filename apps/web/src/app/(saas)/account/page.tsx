@@ -17,6 +17,7 @@ import { accountLanding } from '@/components/saas/accountLanding';
 import { workspaceQuery } from '@/components/saas/chooseWorkspace';
 import { TenantStatusBadge, MemberRoleBadge, Pill } from '@/components/saas/StatusBadge';
 import { SignOutButton } from '@/components/saas/SignOutButton';
+import { CreateWorkspaceForm } from '@/components/saas/CreateWorkspaceForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,9 +68,12 @@ export default async function AccountHomePage() {
           <div className="text-center">
             <h1 className="text-xl font-semibold">No workspace yet</h1>
             <p className="mt-2 text-sm text-[color:var(--color-text-dim)]">
-              Your account is not a member of any workspace. Ask an owner to invite you by email,
-              and it will show up here once you accept.
+              Your account is not a member of any workspace. Ask an owner to invite you by email
+              and it will show up here once you accept, or start your own below.
             </p>
+          </div>
+          <div className="mt-6">
+            <CreateWorkspaceForm autoOpen />
           </div>
         </div>
       </div>
@@ -82,14 +86,17 @@ export default async function AccountHomePage() {
     <div className="min-h-screen bg-[color:var(--color-bg)] px-4 py-12 text-[color:var(--color-text)]">
       <div className="mx-auto max-w-3xl">
         <AccountTopBar />
-        <header className="mb-8">
-          <p className="text-[11px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
-            {viewer.email || 'Signed in'}
-          </p>
-          <h1 className="mt-1 font-display text-2xl font-bold">Your workspaces</h1>
-          <p className="mt-1 text-sm text-[color:var(--color-text-dim)]">
-            Pick a workspace to open its settings and usage.
-          </p>
+        <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
+              {viewer.email || 'Signed in'}
+            </p>
+            <h1 className="mt-1 font-display text-2xl font-bold">Your workspaces</h1>
+            <p className="mt-1 text-sm text-[color:var(--color-text-dim)]">
+              Pick a workspace to open its settings and usage.
+            </p>
+          </div>
+          <CreateWorkspaceForm />
         </header>
 
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
