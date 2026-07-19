@@ -241,7 +241,13 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - `POST /api/v1/expenses` με vendor που ταιριάζει σε configured rule, χωρίς ρητή category → response category = της rule, όχι `'other'`
   - explicit-category requests ανεπηρέαστα (η rule εφαρμόζεται μόνο όταν η category λείπει/κενή)
   - tsc καθαρό (web)· +1 νέο route test για το rule-applied path
-- Status: TODO
+- Status: ✅ DONE 2026-07-19 (pharos-daily-dev) — `matchCategoryRule((await getAppSettings()).categoryRules, {vendor, description: notes})`
+  εφαρμόζεται πριν το `Expense.create()`, μόνο όταν η category είναι κενή/absent (explicit category, ΚΑΙ literal
+  `'other'`, δεν αλλάζει — presence-check, όχι το web form's `!== 'other'` heuristic, καθαρότερο για JSON API). Το
+  PATCH (`expenses/[id]/route.ts`) ελέγχθηκε — ήδη σωστό, ΔΕΝ default-άρει category όταν λείπει (partial-update
+  semantics), άρα δεν είχε το ίδιο bug· σκόπιμα ΔΕΝ προστέθηκε auto-rule-on-vendor-change εκεί (θα άλλαζε silently
+  μια ήδη-καθορισμένη category σε κάθε edit — surprising behavior, εκτός acceptance criteria). +4 νέα route tests
+  (rule-applied/explicit-wins/no-match-fallback/text-matchType) — 27/27 passed. tsc καθαρό, full vitest 2341/181.
 
 ### Subscriptions — free-trial πεδίο στο mobile create/edit (P33 gap, notif icon ήδη shipped)
 - Priority: P2 | Size: S | no AI, no decision

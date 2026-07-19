@@ -277,12 +277,36 @@
 - **Module:** Mobile (Expo Notifications + token registration) + `/api/v1` (register device) + `runAlertChecks` (push fan-out).
 
 ### P31. Household / shared access — multi-user σε ένα self-host instance — M — OSS (adoption) / SaaS seed
-- **Αξία:** σήμερα single-user per deployment· μια οικογένεια/νοικοκυριό θέλει **πολλαπλά logins πάνω στα ίδια δεδομένα**
-  (κοινό inventory/έξοδα) με ρόλους (admin/member/viewer) + «ποιος καταχώρησε τι» attribution. Ισχυρό OSS self-host lever
-  και σπόρος για το SaaS team-plan. **Διακριτό από §8** (multi-tenancy = ξεχωριστές βάσεις) και **§9** (SaaS-grade email verify/MFA/OAuth).
+- **Αξία:** μια οικογένεια/νοικοκυριό θέλει **πολλαπλά logins πάνω στα ίδια δεδομένα** (κοινό inventory/έξοδα) με
+  ρόλους (admin/member/viewer) + «ποιος καταχώρησε τι» attribution. Ισχυρό OSS self-host lever και σπόρος για το
+  SaaS team-plan. **Διακριτό από §8** (multi-tenancy = ξεχωριστές βάσεις) και **§9** (SaaS-grade email verify/MFA/OAuth).
 - **Module:** Auth/Users (ρόλοι + invite εντός instance) + cross-cutting attribution (createdBy).
 - **Απόφαση που χρειάζεται (Αχιλλέας):** in-instance multi-user για το OSS, ή single-user OSS + βασίσου αποκλειστικά στο §8
   multi-tenancy; **δεν λύθηκε ρητά στην έγκριση** → builder default = shared-data + 3 ρόλοι (admin/member/viewer), χωρίς email/MFA στο OSS tier.
+- **Scoping research 2026-07-19 (pharos-daily-dev, 4ο consecutive deferral — αλλά τώρα με ακριβή θεμελίωση, ΟΧΙ
+  ξανά «άγγιξε auth, ρίσκο»)**: research agent χαρτογράφησε το ΥΠΑΡΧΟΝ auth σύστημα πριν αποφασίσω να deferάρω
+  ξανά. **Σημαντική διόρθωση της αρχικής premise**: το «shared-data» μοντέλο του P31 **ήδη υπάρχει 100% σήμερα**
+  — `models/User.ts` έχει ήδη `role: 'admin'|'member'` enum, JWT session (`lib/auth.ts`/`lib/session.ts`,
+  `requireAdmin()`/`requireUser()` idiom), πλήρες Settings→Users CRUD (`app/settings/users.actions.ts`:
+  create/delete/setRole/changePassword — άμεση δημιουργία, ΧΩΡΙΣ invite/email flow, ήδη ακριβώς όπως το «no
+  email/MFA» builder default ζητούσε), first-run setup wizard. **Confirmed μηδέν per-user data filtering
+  πουθενά** (`items/actions.ts`/`expenses/actions.ts` δεν κάνουν καν `requireUser()` πριν το read/write) — άρα
+  ΚΑΘΕ logged-in χρήστης βλέπει ήδη ΟΛΑ τα δεδομένα, exactly the P31 shared-data model.
+  **Το πραγματικό κενό (3 πράγματα)**: (1) 3ος ρόλος `viewer` λείπει (σήμερα δυαδικό admin/member μόνο,
+  τύπος σε 3 σημεία: `User.ts`, `lib/session.ts` `Role` type, `users.actions.ts` `UserRow`)· (2) **μηδέν
+  enforcement οπουδήποτε** — κανένα existing mutating action ελέγχει role πριν γράψει (το SaaS-side membership
+  σύστημα ΕΧΕΙ ήδη ένα καθαρό 3-role ladder να μιμηθεί: `lib/tenancy/members.ts` `canManageMembers`/
+  `canAssignRole`, pure+testable idiom — καλό πρότυπο, αλλά χρειάζεται wiring σε **δεκάδες** mutating actions
+  cross-domain [items/expenses/receipts/statements/subscriptions/vouchers/tasks])· (3) `createdBy` attribution
+  = μηδέν σήμερα, πουθενά σε κανένα μοντέλο.
+  **Γιατί ΞΑΝΑ-deferred (και όχι απλά προσθήκη του enum)**: προσθέτοντας `viewer` στο UI/enum ΧΩΡΙΣ πλήρες
+  enforcement θα ήταν **χειρότερο από το να μην υπάρχει καθόλου** — ψευδής αίσθηση ασφάλειας (ο χρήστης θα
+  έδινε σε κάποιον «viewer» νομίζοντας ότι δεν μπορεί να γράψει, ενώ στην πραγματικότητα θα μπορούσε πλήρως,
+  αφού μηδέν action θα το ήλεγχε). Το πλήρες enforcement αγγίζει live production data σε δεκάδες αρχεία, με
+  **μηδέν τρόπο να το επαληθεύσω end-to-end unattended** (χρειάζεται live login ως 3 διαφορετικούς ρόλους,
+  credentials που δεν έχω)· αξίζει ένα δικό του **supervised session** (ο Αχιλλέας δοκιμάζει live), όχι άλλο
+  ένα best-effort autonomous run. Η ίδια απόφαση με τα 3 προηγούμενα runs, αλλά τώρα τεκμηριωμένη ακριβώς —
+  το επόμενο run (ή ο Αχιλλέας) μπορεί να ξεκινήσει κατευθείαν από αυτό το scoping χωρίς re-research.
 
 ### P22. Full-text search πάνω σε receipt line-items & parsed text — ✅ SHIPPED 2026-07-10 (pharos-daily-dev, commit 68acb9a)
 - **Υλοποίηση:** το `searchAll` ήδη έκανε match σε `lineItems.name`/`lineItems.refinedName` σε επίπεδο query

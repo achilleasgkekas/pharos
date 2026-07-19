@@ -5,6 +5,8 @@ import { readBody, strField, numField, enumField, boolField } from '@/lib/apiBod
 import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
 import { vendorKey } from '@/app/expenses/lib';
+import { getAppSettings } from '@/lib/appSettings';
+import { matchCategoryRule } from '@/lib/categoryRules';
 import { trimExpense, computeAnomalies, parseSplitField, type ExpenseLean } from './serialize';
 
 export const runtime = 'nodejs';
@@ -40,11 +42,20 @@ export async function POST(req: NextRequest) {
     const date = b.date ? new Date(String(b.date)) : new Date();
     if (Number.isNaN(date.getTime())) return apiError('invalid date');
     await connectDB();
+    // Vendor→category auto-rule (P15): the web actions apply this on every creation
+    // path (see app/expenses/actions.ts addExpense/uploadExpense) — this route was the
+    // one gap, so the same vendor got a different category depending on whether the
+    // expense was entered from web or mobile. An explicit category from the client
+    // still always wins; the rule only fills in the default 'other'.
+    const explicitCategory = strField(b, 'category', '');
+    const category = explicitCategory
+      ? explicitCategory
+      : matchCategoryRule((await getAppSettings()).categoryRules, { vendor, description: strField(b, 'notes', '') })?.category || 'other';
     const doc = await Expense.create({
       kind: enumField(b, 'kind', ['income', 'expense'], 'expense'),
       vendor,
       vendorKey: vendorKey(vendor),
-      category: strField(b, 'category', 'other'),
+      category,
       space: strField(b, 'space').trim().slice(0, 40),
       amount,
       date,

@@ -5832,3 +5832,65 @@ MOBILE_PARITY.md Build Queue.
 
 - Τίποτα νέο. (Firefly III/Grocy importers χρειάζονται πραγματικό sample export file ή προσεκτικότερο manual
   session — δεν είναι κατάλληλα για άλλο best-effort unattended run, βλ. PRODUCT_BACKLOG.md P16.)
+
+## 2026-07-19 (pharos-daily-dev, cont.³ — P31 scoping research + mobile-parity bug fix)
+
+Ο χρήστης είπε «Go on» για 4η φορά στην ίδια session. Coordination guard ξαναελέγχθηκε — καθαρό, μη-paused.
+
+**P31 research πρώτα (χωρίς κώδικα)**: αντί να ξαναδεφέρω το P31 σαν τα προηγούμενα 3 runs χωρίς νέα
+πληροφορία, έστειλα Explore agent να χαρτογραφήσει ακριβώς τι υπάρχει ήδη. **Εύρημα σημαντικό**: το
+shared-data μοντέλο του P31 **ήδη υπάρχει 100%** σήμερα (`models/User.ts` έχει ήδη `role: admin|member`,
+session/JWT auth, `requireAdmin()`/`requireUser()` idiom, πλήρες Settings→Users CRUD UI, first-run setup
+wizard — ΚΑΝΕΝΑ query πουθενά στο items/expenses/receipts κάνει per-user filtering, όλοι οι logged-in
+χρήστες βλέπουν ήδη τα ίδια δεδομένα). Το **πραγματικό κενό** είναι: (1) τρίτος ρόλος `viewer` (σήμερα μόνο
+admin/member δυαδικό), (2) enforcement — **μηδέν existing action ελέγχει role πριν από write** σήμερα (ένας
+μελλοντικός viewer θα είχε πλήρη write access αν απλά προστεθεί το enum χωρίς wiring σε ΚΑΘΕ mutating action
+σε items/expenses/receipts/statements/subscriptions/vouchers/tasks — δεκάδες αρχεία), (3) `createdBy`
+attribution (μηδέν σήμερα, πουθενά). **Απόφαση: ΠΑΛΙ deferred, αλλά τώρα με ακριβή τεκμηρίωση scope** — το
+να προσθέσω `viewer` role στο enum/UI ΧΩΡΙΣ να το wire-άρω παντού θα ήταν **επικίνδυνο** (ψευδής αίσθηση
+ασφάλειας — ο χρήστης θα νόμιζε ότι ένας «viewer» λογαριασμός δεν μπορεί να γράψει, ενώ στην πραγματικότητα
+θα μπορούσε). Το πλήρες enforcement αγγίζει δεκάδες mutating actions σε live production data με ΜΗΔΕΝ τρόπο
+να το επαληθεύσω end-to-end (δεν έχω credentials 3 διαφορετικών ρόλων για live browser test) — πραγματικά
+αξίζει το δικό του supervised session, όχι ακόμα ένα best-effort unattended run. Καταγράφηκε το πλήρες
+scoping (τι υπάρχει/τι λείπει, ακριβή αρχεία) στο PRODUCT_BACKLOG.md ώστε το επόμενο run (ή ο ίδιος ο
+Αχιλλέας) να ξεκινήσει από ακριβή θεμέλιο αντί να ξαναερευνήσει από την αρχή.
+
+**Fallback στο Build Queue (justified)**: μετά το P31 research, επανεξέτασα ΟΛΑ τα υπόλοιπα buildable
+Approved items (P13/P8 χρειάζονται νέο PDF+ZIP dependency που δεν υπάρχει σήμερα στο app — ρίσκο· P11
+χρειάζεται τα IMAP credentials του χρήστη· P17 χρειάζεται mobile simulator testing που απαγορεύεται
+unattended· P5 = ολόκληρο νέο browser-extension subproject· P9 = L-size, μεγάλο blast radius σε money.ts
+παντού· P3 = AI-heavy, core value αδύνατο να επαληθευτεί χωρίς να «σπαταλήσω» Anthropic API κόστος
+unattended). Με ΟΛΑ τα Approved items είτε deferred για καλό λόγο είτε genuinely blocked, το routine's δικό
+του fallback κανόνας («μόνο αν η Approved queue είναι κενή ή κάθε item είναι blocked») ενεργοποιείται
+νόμιμα → πήγα στο **MOBILE_PARITY.md Build Queue #1 item**, που κάθεται TODO για πολλές συνεχόμενες
+σαρώσεις: **«Expenses vendor→category auto-rules δεν εφαρμόζονται στο v1 POST route» (P1/S, functional
+bug)**.
+
+**Τι έγινε**: `app/api/v1/expenses/route.ts` POST — πριν, μια παραλειπόμενη category γινόταν πάντα literal
+`'other'` (`strField(b,'category','other')`), **παρακάμπτοντας εντελώς** το ήδη-υπάρχον P15 vendor→category
+rule engine (που ΚΑΘΕ web creation path ήδη εφαρμόζει). Αποτέλεσμα πριν το fix: το ίδιο vendor έδινε
+ΔΙΑΦΟΡΕΤΙΚΗ category ανάλογα με το αν το expense καταχωρήθηκε από web ή mobile — silent data inconsistency.
+Fix: `matchCategoryRule((await getAppSettings()).categoryRules, {vendor, description:notes})?.category`
+εφαρμόζεται μόνο όταν η category είναι absent/κενή (presence-check, καθαρότερο από το web form's `!== 'other'`
+heuristic αφού ένα JSON API δεν έχει το form-default-value πρόβλημα). Έλεγξα και το PATCH endpoint (η
+mobile-parity σημείωση το ζητούσε ρητά) — ήδη σωστό (ποτέ default-άρει category όταν λείπει, partial-update
+semantics), δεν είχε το bug· σκόπιμα ΔΕΝ πρόσθεσα auto-rule-on-vendor-edit εκεί (θα άλλαζε silently μια ήδη
+καθορισμένη category σε κάθε edit — surprising behavior, εκτός acceptance criteria, δική μου απόφαση scope).
++4 νέα route tests (rule εφαρμόζεται όταν λείπει category / explicit category κερδίζει πάντα / fallback σε
+'other' όταν καμία rule δεν ταιριάζει / matchType:'text' ταιριάζει στα notes).
+
+**Verify**: `npm run type-check` EXIT 0. `route.test.ts` **27/27 passed** (+4 νέα). Full `npx vitest run`
+**2341 passed / 181 files** (μηδέν regression). Safe Docker rebuild: build OK, `RestartCount=0`, `docker logs`
+καθαρό. Browser-checked (Claude Browser pane): `/login` → «Sign in · Pharos», μηδέν console errors. Επιπλέον
+sanity: `curl -X POST /api/v1/expenses` χωρίς bearer token → **401** (σωστό fail-closed, όχι 500 crash).
+`docker builder prune -f` μετά. Docker lock released.
+
+**Suggested next task**: επόμενο MOBILE_PARITY.md Build Queue item (π.χ. subscriptions trial field #2, ή
+reports net-worth headline #3)· ή P31 τώρα με το ακριβές scoping παραπάνω, αν ο Αχιλλέας θέλει να αφιερώσει
+ένα dedicated supervised session σε αυτό· ή το orphaned CsvImportModal follow-up από το προηγούμενο P16 run.
+
+## Needs Achilleas
+
+- Τίποτα νέο άμεσα. Το P31 παραμένει το μεγαλύτερο ανοιχτό Approved item — τώρα με πλήρες scoping στο
+  PRODUCT_BACKLOG.md ώστε είτε ένα μελλοντικό daily-dev run είτε ο ίδιος ο Αχιλλέας να μπορεί να αποφασίσει
+  πόσο βαθιά να πάει το enforcement (π.χ. μόνο money-mutating actions πρώτα, ή ΚΑΘΕ mutating action παντού).

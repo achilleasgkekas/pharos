@@ -17,13 +17,16 @@ import type { NextRequest } from 'next/server';
 // We exercise the REAL apiAuth/apiBody/apiList helpers, the REAL vendorKey + trimExpense/
 // computeAnomalies, and only mock the DB seam.
 
-const { connectDBMock, userFindOne, userState, expenseFind, expenseCount, expenseCreate, findQuery, countQuery, state } =
+const { connectDBMock, userFindOne, userState, expenseFind, expenseCount, expenseCreate, findQuery, countQuery, state, appSettingsState, getAppSettingsMock } =
   vi.hoisted(() => {
     const state: { docs: unknown[]; total: number; lastCreate: Record<string, unknown> | null } = {
       docs: [],
       total: 0,
       lastCreate: null,
     };
+    // getAppSettings() — the route only reads .categoryRules (P15 vendor→category auto-rule).
+    const appSettingsState: { categoryRules: unknown[] } = { categoryRules: [] };
+    const getAppSettingsMock = vi.fn(async () => ({ categoryRules: appSettingsState.categoryRules }));
     // User model — bearerUser does User.findOne(...).select(...).lean()
     const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
     const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
@@ -44,12 +47,13 @@ const { connectDBMock, userFindOne, userState, expenseFind, expenseCount, expens
       state.lastCreate = arg;
       return { toObject: () => ({ _id: 'newid', updatedAt: new Date('2026-07-06T00:00:00Z'), ...arg }) };
     });
-    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, expenseFind, expenseCount, expenseCreate, findQuery, countQuery, state };
+    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, expenseFind, expenseCount, expenseCreate, findQuery, countQuery, state, appSettingsState, getAppSettingsMock };
   });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/models/Expense', () => ({ Expense: { find: expenseFind, countDocuments: expenseCount, create: expenseCreate } }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 
 import { GET, POST } from './route';
 
@@ -77,6 +81,7 @@ beforeEach(() => {
   state.total = 0;
   state.lastCreate = null;
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
+  appSettingsState.categoryRules = [];
   vi.clearAllMocks();
   // clearAllMocks resets return values on the chain stubs → re-point them.
   for (const m of ['sort', 'skip', 'limit', 'setOptions']) (findQuery[m] as ReturnType<typeof vi.fn>).mockImplementation(() => findQuery);
@@ -89,6 +94,7 @@ beforeEach(() => {
     state.lastCreate = arg;
     return { toObject: () => ({ _id: 'newid', updatedAt: new Date('2026-07-06T00:00:00Z'), ...arg }) };
   });
+  getAppSettingsMock.mockImplementation(async () => ({ categoryRules: appSettingsState.categoryRules }));
 });
 
 describe('auth gate', () => {
@@ -162,6 +168,47 @@ describe('POST validation', () => {
     expect(json).not.toHaveProperty('ok');
     expect(json).not.toHaveProperty('data');
     expect(json.expense).toMatchObject({ id: 'newid', kind: 'expense', vendor: 'Coffee', amount: 3.5, category: 'other', verified: true });
+  });
+
+  // P15 vendor→category auto-rule (mobile-parity gap): the web actions apply this on
+  // every creation path; this route was the one gap where an omitted category always
+  // became the literal 'other', bypassing the rule engine — same vendor, different
+  // category depending on whether the expense came from web or mobile.
+  it('applies a matching vendor→category rule when category is omitted', async () => {
+    appSettingsState.categoryRules = [
+      { id: 'r1', match: 'Netflix', matchType: 'vendor', category: 'subscription', recurring: false, recurringCycle: '' },
+    ];
+    const res = await POST(makeReq({ body: { vendor: 'Netflix', amount: 15.99 } }));
+    expect(res.status).toBe(201);
+    expect((state.lastCreate as Record<string, unknown>).category).toBe('subscription');
+    const json = (await res.json()) as { expense: Record<string, unknown> };
+    expect(json.expense.category).toBe('subscription');
+  });
+
+  it('an explicit category always wins over a matching rule', async () => {
+    appSettingsState.categoryRules = [
+      { id: 'r1', match: 'Netflix', matchType: 'vendor', category: 'subscription', recurring: false, recurringCycle: '' },
+    ];
+    const res = await POST(makeReq({ body: { vendor: 'Netflix', amount: 15.99, category: 'entertainment' } }));
+    expect(res.status).toBe(201);
+    expect((state.lastCreate as Record<string, unknown>).category).toBe('entertainment');
+  });
+
+  it('falls back to "other" when category is omitted and no rule matches', async () => {
+    appSettingsState.categoryRules = [
+      { id: 'r1', match: 'Netflix', matchType: 'vendor', category: 'subscription', recurring: false, recurringCycle: '' },
+    ];
+    const res = await POST(makeReq({ body: { vendor: 'Random Shop', amount: 9 } }));
+    expect(res.status).toBe(201);
+    expect((state.lastCreate as Record<string, unknown>).category).toBe('other');
+  });
+
+  it('matches a rule against notes when the vendor alone does not match (matchType: text)', async () => {
+    appSettingsState.categoryRules = [
+      { id: 'r1', match: 'grocery run', matchType: 'text', category: 'groceries', recurring: false, recurringCycle: '' },
+    ];
+    const res = await POST(makeReq({ body: { vendor: 'Corner Store', amount: 22, notes: 'weekly grocery run' } }));
+    expect((state.lastCreate as Record<string, unknown>).category).toBe('groceries');
   });
 
   it('coerces a full body: enum kind/cycle, trimmed fields, parsed date, Greek→latin vendorKey', async () => {
