@@ -13,6 +13,14 @@ Everything below is available both in the web app and, for most modules, through
 the REST API (`/api/v1`) that the mobile companion app uses; see the
 [API reference](api.md).
 
+**Getting started.** On first launch, the homepage displays an **onboarding
+checklist** (P26) with 5 quick-start steps: connect your file storage, add a
+receipt, set a budget, add a payment card, and enable notifications. Each step
+deep-links to the relevant settings or form. The checklist auto-hides once all
+steps are completed, or you can dismiss it permanently. The homepage also shows
+an **at-a-glance dashboard** with key stats (net worth, total owed, recurring
+subscriptions, upcoming bills/renewals), recent activity, and module shortcuts.
+
 ## Contents
 
 - [Inventory & Shopping (Items)](#inventory--shopping-items)
@@ -204,6 +212,27 @@ software. Each has a provider / name, amount, billing cycle
 shows monthly / yearly totals and an upcoming-renewals banner, with the same
 grid / list and filter layout as the rest of the app.
 
+Highlights:
+
+- **Next renewal date:** Computed from the most recent renewal + billing cycle, so
+  the calendar and alerts stay in sync as you pay.
+- **Free-trial tracking (P33):** Optional trial period before the first charge;
+  the app tracks when the trial ends and the paid subscription begins, with a
+  notification as the trial expires.
+- **Auto-discover untracked recurring charges (P7):** The app heuristically scans
+  your Expenses history for patterns of regular charges (e.g., 3+ charges from the
+  same vendor at roughly monthly intervals within ±5 days). Any series that does not
+  already have a matching Subscription is surfaced as a candidate ("Possible
+  untracked subscriptions" panel). One-click Track converts the candidate into a
+  Subscription; Dismiss hides it (session-only). The detection is deterministic
+  (no AI) and excludes any vendor already covered by an existing subscription.
+- **Notifications:** Renewal alerts are configurable (1, 3, 7, or 14 days before;
+  or none). Trial-end and over-due alerts also trigger.
+- **Calendar integration:** Subscriptions appear on the Calendar view with their
+  next renewal date, so you can plan cash flow in advance.
+- **Archive or delete:** Pause a subscription (soft mark as inactive) or delete it
+  (soft delete → Trash).
+
 ## Bills & payables
 
 A tracker (`/bills`) for the bills you pay **by hand**, such as electricity (ΔΕΗ),
@@ -315,6 +344,10 @@ months):
 - inventory value by category (depreciated), subscriptions by category,
 - **budgets** (per-category targets set in Settings, with progress bars that turn
   red when over),
+- **savings goals (P12)** — set a target amount and optional deadline for money you
+  want to save (e.g., "€5000 for new laptop by 2026-12-31"), track progress with a
+  bar and a computed monthly contribution rate needed to hit the deadline, and add
+  contributions manually. Multiple goals can run in parallel.
 - warranties expiring soon, biggest purchases, and installment payoff.
 
 **Asset depreciation.** Owned gear is valued from its purchase price using a

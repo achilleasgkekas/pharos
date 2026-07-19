@@ -1,5 +1,33 @@
 # DOCS_PROGRESS
 
+## 2026-07-19 (features.md: P7/P12/P26 documentation + getting started intro)
+
+Το features.md είχε gaps από recent shipped features που δεν ήταν documented:
+- P26 (onboarding checklist, commit 223c2cf) — new homepage getting-started guide
+- P7 (auto-discover recurring charges, commit 97a7d66) — Subscriptions feature
+- P12 (savings/financial goals, commit 78ebd76) — Reports feature
+- P33 (free-trial tracking) — Subscriptions feature
+- Plus overview note: API attachment gap found (P21 model field exists but GET /items/:id δεν το expose-άρει)
+
+Τι έγραψα:
+- **Getting started intro:** Νέα παράγραφος αμέσως μετά το opening paragraph + πριν τα Contents, περιγράφοντας την P26 onboarding checklist + dashboard stats (net worth, owed, subscriptions, bills, activity shortcuts).
+- **Subscriptions section rewrite:** Τα βασικά (provider, cycle, next renewal) + 6 highlights: (α) next renewal computed, (β) P33 free-trial tracking, (γ) P7 auto-discovery (heuristic pattern matching ±5 days), (δ) configurable renewal alerts, (ε) calendar integration, (ζ) archive/delete. Ο P7 εξηγεί το deterministic αλγόριθμο (weekly/monthly/quarterly/yearly cycles, min 3 occurrences).
+- **Reports section addition:** Bullet point για P12 savings goals (target + deadline + progress bar + monthly rate calculation + manual contributions).
+
+Validation (markdown only, κανενα build/Docker/AI):
+- Code fences: 0 (features.md δεν έχει code blocks).
+- Internal links: ολες υπάρχουν (self-hosting.md, configuration.md, api.md) ✓.
+- Secret scan: κανένα sk_/AUTH_/api_key ✓.
+- Markdown structure: ✓.
+
+**API gap found (not fixed here):** Item attachments exist στο Item model (`attachments: SerializedAttachment[]`) και στο item/actions.ts (`uploadItemAttachments`, `deleteItemAttachment`), αλλά το GET /api/v1/items/:id route δεν expose-άρει το attachments field (ItemDetailLean type δεν το περιλαμβάνει). Mobile app πιθανώς δεν μπορεί να retrieve attachments μέσω API. This is a separate API bug/gap — flagged για next run.
+
+Collision guard: git status --short δείχνει μόνο docs/features.md (MODIFIED). Stage + commit.
+
+Επόμενο run: (α) api.md — add item attachments to GET /items/:id response (fix the gap που βρήκα), ή (β) configuration.md P24 event webhooks documentation (Stripe-style HMAC signed webhooks για automation platforms), ή (γ) features.md check για άλλα undocumented recent features (grep commits από 2 weeks ago προς πίσω).
+
+---
+
 ## 2026-07-19 (features.md: P21 item attachments — concurrent web-debt routine handled P20/P32/P16)
 
 Το αρχικό plan ήταν να document-άρω τα P20/P32/P16, αλλα η concurrent web-debt routine τα έκανε ήδη (commit bb5ebcf, 2026-07-19 22:50). Collision guard ενεργό: δεν commit-άρα τα duplicate edits.
