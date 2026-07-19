@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
       defaultItemView: s.defaultItemView,
       defaultWarrantyMonths: s.defaultWarrantyMonths,
       warrantyAlertDays: s.warrantyAlertDays,
+      trialAlertDays: s.trialAlertDays,
       autoAddStores: s.autoAddStores,
       ntfyUrl: s.ntfyUrl,
       ntfyEnabled: s.ntfyEnabled,
@@ -78,6 +79,7 @@ export async function PATCH(req: NextRequest) {
     if (b.defaultItemView != null) set.defaultItemView = b.defaultItemView === 'list' ? 'list' : 'grid';
     if (b.defaultWarrantyMonths != null && Number.isFinite(Number(b.defaultWarrantyMonths))) set.defaultWarrantyMonths = clamp(Number(b.defaultWarrantyMonths), 0, 120);
     if (b.warrantyAlertDays != null && Number.isFinite(Number(b.warrantyAlertDays))) set.warrantyAlertDays = clamp(Number(b.warrantyAlertDays), 0, 730);
+    if (b.trialAlertDays != null && Number.isFinite(Number(b.trialAlertDays))) set.trialAlertDays = clamp(Number(b.trialAlertDays), 0, 60);
     if (typeof b.autoAddStores === 'boolean') set.autoAddStores = b.autoAddStores;
     if (typeof b.ntfyUrl === 'string') set.ntfyUrl = b.ntfyUrl.trim();
     if (typeof b.ntfyEnabled === 'boolean') set.ntfyEnabled = b.ntfyEnabled;

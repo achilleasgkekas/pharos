@@ -105,6 +105,34 @@ describe('PATCH partial-update', () => {
     const res = await PATCH(makeReq({ body: { amount: 10 } }), ctx(OID));
     expect(res.status).toBe(404);
   });
+
+  it('sets trialEndsAt from a valid date string', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { trialEndsAt: '2026-08-01' } }), ctx(OID));
+    const set = lastSet();
+    expect(set.trialEndsAt).toBeInstanceOf(Date);
+    expect((set.trialEndsAt as Date).toISOString()).toBe('2026-08-01T00:00:00.000Z');
+  });
+
+  it('explicitly clears trialEndsAt when sent as null', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { trialEndsAt: null } }), ctx(OID));
+    expect(lastSet()).toEqual({ trialEndsAt: null });
+  });
+
+  it('ignores a malformed trialEndsAt (no change, not an empty-changeset 400)', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { amount: 20, trialEndsAt: 'nope' } }), ctx(OID));
+    const set = lastSet();
+    expect(set.amount).toBe(20);
+    expect(set).not.toHaveProperty('trialEndsAt');
+  });
+
+  it('sets firstChargeAmount', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { firstChargeAmount: 9.99 } }), ctx(OID));
+    expect(lastSet()).toEqual({ firstChargeAmount: 9.99 });
+  });
 });
 
 describe('DELETE soft-delete', () => {

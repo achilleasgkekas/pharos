@@ -257,7 +257,13 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Acceptance:
   - Create/edit subscription με `trialEndsAt` από mobile → persists, round-trips
   - tsc καθαρό web+mobile
-- Status: TODO
+- Status: ✅ DONE 2026-07-19 (pharos-daily-dev) — `trialEndsAt`+`firstChargeAmount` στο v1 subscriptions GET/POST/PATCH
+  (trim/route.ts), `trialAlertDays` στο v1 settings GET/PATCH (clamp 0–60, ίδιο με το web action). PATCH υποστηρίζει
+  explicit `null` για clear του trial (πέρα από set-with-date/omit). Mobile: `Subscription` type +2 πεδία,
+  `addSubscription`/`updateSubscription` δέχονται τα νέα πεδία, `SubscriptionsScreen` edit modal νέο «FREE TRIAL ENDS»
+  date input (blank=clear) + gold `<Badge label="Trial">` στη λίστα όταν η ημερομηνία είναι μελλοντική (ίδιο pattern
+  με το ήδη-shipped return-window badge στο Receipts). +8 νέα unit tests (POST/PATCH valid/invalid/clear/no-change).
+  tsc καθαρό web+mobile, vitest 2349/181 (+8, μηδέν regression). Docker rebuild clean, browser-verified /login.
 
 ### Reports — net-worth headline + breakdown στο mobile (PA2 gap)
 > Ήδη speced στην προηγούμενη σάρωση (48η, 2026-07-10) — βλ. πλήρες entry παρακάτω («Reports — net-worth headline + breakdown στο mobile (PA2 gap)»). Παραμένει ανοιχτό, item #3 του builder queue.

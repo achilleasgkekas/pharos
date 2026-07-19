@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Chip, ListItem, ModalSheet, contentWidth } from '../ui';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Chip, Badge, ListItem, ModalSheet, contentWidth } from '../ui';
 import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription } from '../api';
 
 const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
@@ -19,6 +19,7 @@ export function SubscriptionsScreen() {
   const [eCycle, setECycle] = useState('monthly');
   const [eRenewal, setERenewal] = useState('');
   const [eActive, setEActive] = useState(true);
+  const [eTrialEndsAt, setETrialEndsAt] = useState('');
 
   const load = useCallback(async () => {
     setErr(null);
@@ -55,6 +56,7 @@ export function SubscriptionsScreen() {
     setECycle(it.billingCycle || 'monthly');
     setERenewal(it.nextRenewal ? it.nextRenewal.slice(0, 10) : '');
     setEActive(it.active);
+    setETrialEndsAt(it.trialEndsAt ? it.trialEndsAt.slice(0, 10) : '');
   }
   async function saveEdit() {
     if (!editing) return;
@@ -63,6 +65,9 @@ export function SubscriptionsScreen() {
     // nextRenewal: valid YYYY-MM-DD → send; blank/malformed → omit (the API ignores falsy values)
     const r = eRenewal.trim();
     const renewal = /^\d{4}-\d{2}-\d{2}$/.test(r) && !Number.isNaN(new Date(r).getTime()) ? r : undefined;
+    // trialEndsAt: blank → explicit null (clears it), valid YYYY-MM-DD → send, malformed → omit (no change)
+    const t = eTrialEndsAt.trim();
+    const trialEndsAt = t === '' ? null : /^\d{4}-\d{2}-\d{2}$/.test(t) && !Number.isNaN(new Date(t).getTime()) ? t : undefined;
     setEditing(null);
     try {
       await updateSubscription(id, {
@@ -71,6 +76,7 @@ export function SubscriptionsScreen() {
         billingCycle: eCycle,
         nextRenewal: renewal,
         active: eActive,
+        trialEndsAt,
       });
       await load();
     } catch (e) { setErr((e as Error).message); }
@@ -103,6 +109,9 @@ export function SubscriptionsScreen() {
               <Text style={s.name}>{item.name}</Text>
               <Text style={s.meta}>{[item.billingCycle, item.nextRenewal ? `renews ${shortDate(item.nextRenewal)}` : '', !item.active ? 'cancelled' : ''].filter(Boolean).join('  ·  ')}</Text>
             </View>
+            {!!item.trialEndsAt && new Date(item.trialEndsAt).getTime() > Date.now() && (
+              <Badge label="Trial" color={C.gold} style={{ marginRight: 8 }} />
+            )}
             <Text style={s.amount}>{money(item.amount, item.currency)}</Text>
           </ListItem>
         )}
@@ -122,6 +131,8 @@ export function SubscriptionsScreen() {
             </View>
             <Text style={s.mlabel}>NEXT RENEWAL</Text>
             <Input variant="modal" value={eRenewal} onChangeText={setERenewal} autoCapitalize="none" autoCorrect={false} placeholder="YYYY-MM-DD" />
+            <Text style={s.mlabel}>FREE TRIAL ENDS</Text>
+            <Input variant="modal" value={eTrialEndsAt} onChangeText={setETrialEndsAt} autoCapitalize="none" autoCorrect={false} placeholder="YYYY-MM-DD (blank = no trial)" />
             <Pressable onPress={() => setEActive((v) => !v)} style={s.toggle}>
               <Check checked={!!eActive} />
               <Text style={s.tlabel}>Active</Text>

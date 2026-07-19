@@ -42,6 +42,7 @@ const {
       defaultItemView: 'grid',
       defaultWarrantyMonths: 24,
       warrantyAlertDays: 90,
+      trialAlertDays: 2,
       autoAddStores: true,
       ntfyUrl: '',
       ntfyEnabled: false,
@@ -109,6 +110,7 @@ beforeEach(() => {
     defaultItemView: 'grid',
     defaultWarrantyMonths: 24,
     warrantyAlertDays: 90,
+    trialAlertDays: 2,
     autoAddStores: true,
     ntfyUrl: '',
     ntfyEnabled: false,
@@ -158,6 +160,7 @@ describe('GET — preferences envelope', () => {
       defaultItemView: 'grid',
       defaultWarrantyMonths: 24,
       warrantyAlertDays: 90,
+      trialAlertDays: 2,
       autoAddStores: true,
       ntfyUrl: '',
       ntfyEnabled: false,
@@ -227,9 +230,14 @@ describe('PATCH — field whitelist + coercion', () => {
 
   it('clamps numeric fields into their ranges', async () => {
     await PATCH(
-      makeReq({ body: { defaultVatRate: 250, defaultWarrantyMonths: -3, warrantyAlertDays: 9999 } })
+      makeReq({ body: { defaultVatRate: 250, defaultWarrantyMonths: -3, warrantyAlertDays: 9999, trialAlertDays: 999 } })
     );
-    expect(lastSet()).toEqual({ defaultVatRate: 100, defaultWarrantyMonths: 0, warrantyAlertDays: 730 });
+    expect(lastSet()).toEqual({ defaultVatRate: 100, defaultWarrantyMonths: 0, warrantyAlertDays: 730, trialAlertDays: 60 });
+  });
+
+  it('clamps trialAlertDays into 0–60 and allows 0 (off)', async () => {
+    await PATCH(makeReq({ body: { trialAlertDays: -5 } }));
+    expect(lastSet()).toEqual({ trialAlertDays: 0 });
   });
 
   it('normalizes defaultItemView to list|grid', async () => {

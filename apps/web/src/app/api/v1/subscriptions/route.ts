@@ -13,7 +13,7 @@ const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
 export type SubLean = {
   _id: unknown; name: string; provider?: string; category?: string; amount?: number; currency?: string;
   billingCycle?: string; startDate?: Date; nextRenewal?: Date | null; active?: boolean; paymentMethod?: string;
-  url?: string; notes?: string; updatedAt?: Date; deletedAt?: Date | null;
+  url?: string; notes?: string; trialEndsAt?: Date | null; firstChargeAmount?: number; updatedAt?: Date; deletedAt?: Date | null;
 };
 
 /** Single source of truth for the v1 Subscription JSON shape (list, POST, PATCH). */
@@ -32,6 +32,8 @@ export function trim(s: SubLean) {
     paymentMethod: s.paymentMethod ?? '',
     url: s.url ?? '',
     notes: s.notes ?? '',
+    trialEndsAt: iso(s.trialEndsAt),
+    firstChargeAmount: s.firstChargeAmount ?? 0,
     updatedAt: iso(s.updatedAt),
     deleted: !!s.deletedAt,
   };
@@ -53,7 +55,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** POST /api/v1/subscriptions  { name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url? } */
+/** POST /api/v1/subscriptions  { name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url?, trialEndsAt?, firstChargeAmount? } */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const b = await readBody(req);
@@ -63,6 +65,12 @@ export async function POST(req: NextRequest) {
     if (amount === null) return apiError('amount must be a number');
     const startDate = b.startDate ? new Date(String(b.startDate)) : new Date();
     if (Number.isNaN(startDate.getTime())) return apiError('invalid startDate');
+    let trialEndsAt: Date | null = null;
+    if (b.trialEndsAt) {
+      const d = new Date(String(b.trialEndsAt));
+      if (Number.isNaN(d.getTime())) return apiError('invalid trialEndsAt');
+      trialEndsAt = d;
+    }
     await connectDB();
     const doc = await Subscription.create({
       name,
@@ -75,6 +83,8 @@ export async function POST(req: NextRequest) {
       paymentMethod: strField(b, 'paymentMethod'),
       url: strField(b, 'url'),
       notes: strField(b, 'notes'),
+      trialEndsAt,
+      firstChargeAmount: numField(b, 'firstChargeAmount') ?? 0,
     });
     return NextResponse.json({ subscription: trim(doc.toObject() as SubLean) }, { status: 201 });
   });

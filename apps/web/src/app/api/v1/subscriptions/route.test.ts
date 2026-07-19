@@ -178,6 +178,26 @@ describe('POST validation', () => {
     await POST(makeReq({ body: { name: 'X', amount: 5 } }));
     expect(state.lastCreate?.startDate).toBeInstanceOf(Date);
   });
+
+  it('defaults trialEndsAt to null and firstChargeAmount to 0 when omitted', async () => {
+    await POST(makeReq({ body: { name: 'X', amount: 5 } }));
+    expect(state.lastCreate?.trialEndsAt).toBeNull();
+    expect(state.lastCreate?.firstChargeAmount).toBe(0);
+  });
+
+  it('parses a valid trialEndsAt and firstChargeAmount', async () => {
+    await POST(makeReq({ body: { name: 'Netflix', amount: 15, trialEndsAt: '2026-08-01', firstChargeAmount: 15 } }));
+    const { trialEndsAt } = state.lastCreate as { trialEndsAt: Date };
+    expect(trialEndsAt.toISOString()).toBe('2026-08-01T00:00:00.000Z');
+    expect(state.lastCreate?.firstChargeAmount).toBe(15);
+  });
+
+  it('rejects an invalid trialEndsAt with 400 and no create', async () => {
+    const res = await POST(makeReq({ body: { name: 'X', amount: 5, trialEndsAt: 'not-a-date' } }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'invalid trialEndsAt' });
+    expect(subCreate).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET listing', () => {
