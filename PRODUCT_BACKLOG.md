@@ -302,14 +302,46 @@
   την πέρασαν ως «ξένο WIP» και την απέφευγαν, μπλοκάροντας το #1 value/effort Approved item. Αναγνωρίστηκε ως
   routine artifact (P22 comments, pure-helper+vitest pattern), validated + committed.
 
-### P24. Outbound event webhooks / automation hooks (Home Assistant / n8n) — M — both (OSS self-host lever)
-- **Αξία:** το §3 notifier framework στέλνει *alert μηνύματα*. Λείπει το generic **event webhook**:
-  «όταν συμβεί X (νέα απόδειξη parsed, budget ξεπεράστηκε, δόση λήγει, τιμή έπεσε) → POST structured JSON».
-  Ξεκλειδώνει automation για το self-host/homelab κοινό (Home Assistant, n8n, Node-RED). Reuse των event
-  trigger points που ήδη υπάρχουν (`runAlertChecks`/verify/import hooks).
-- **Module:** Settings → Integrations (νέο «Webhooks») + event dispatch points.
-- **Ανοιχτή απόφαση (builder default):** πρώτα events = receipt.parsed, budget.exceeded, installment.due,
-  price.drop· HMAC signature ON· free & rate-limited στο SaaS.
+### P24. Outbound event webhooks / automation hooks (Home Assistant / n8n) — ✅ SHIPPED 2026-07-19 (pharos-daily-dev)
+- **Υλοποίηση:** νέο **`models/AppConfig.eventWebhooks`** (array of `{id,url,secret,enabled,label,events[]}`,
+  distinct από το `notifiers` array — εκείνο στέλνει human-readable alert summaries, αυτό στέλνει ένα signed JSON
+  POST ανά structured event). Client/server split σαν το `notifiers.shared.ts`/`notifiers.ts`: νέο
+  **`lib/webhooks.shared.ts`** (τύποι + `WEBHOOK_EVENTS` meta, client-safe) + **`lib/webhooks.ts`** (server —
+  `signWebhookPayload` Stripe-style `t=<unix>,v1=<hmac-sha256 hex>` πάνω σε `${t}.${body}`, `dispatchEventWebhooks`
+  fan-out σε κάθε enabled+subscribed subscription μέσω `Promise.allSettled` [ποτέ throw], `getEventWebhooks`
+  tenant-scoped read μέσω `currentModel(AppConfig)`). **SSRF guard**: κάθε outbound POST περνά από
+  `assertPublicUrl()` πριν το fetch (ο ίδιος guard validate-άρει και στο save, ώστε ένα κακό URL να μην κάθεται
+  σιωπηλά αποτυγχάνοντας κάθε delivery)· **rate-limit** (SaaS): νέο `WEBHOOK_RATE_LIMIT`/`WEBHOOK_RATE_WINDOW_MS`
+  env, reuse του `rateHit()` pure helper (apiRateLimit.ts) πάνω σε ξεχωριστό per-subscription store, off by
+  default (μηδέν επίδραση σε self-hosted).
+- **4 events, κρεμασμένα στα ήδη-υπάρχοντα trigger points (καμία νέα event-bus)**: **`receipt.parsed`** →
+  `receipts/actions.ts` (`uploadReceipt` + `rescanReceipt`, μόνο όταν το AI όντως parse-άρει, όχι σε draft/AI-off
+  saves)· **`budget.exceeded`** → νέο pure **`lib/budgetAlert.ts`** `detectBudgetExceeded()` (+7 unit tests,
+  DB-free, flat-budget only — ΧΩΡΙΣ το envelope/rollover math του Reports page, builder-simplified v1) wired στο
+  `runAlertChecks` (`settings/actions.ts`)· **`installment.due`** και **`price.drop`** → reuse των ήδη
+  υπολογισμένων `dueThisMonth`/`deals` μέσα στο ίδιο `runAlertChecks`. Σημείωση cadence: το `runAlertChecks`
+  καλείται σήμερα ΜΟΝΟ χειροκίνητα (Settings → Notifications → «Check & notify now» — δεν υπάρχει cron στο
+  codebase, ίδιο pre-existing gap με τα υπόλοιπα alert checks)· το UI copy το εξηγεί ρητά.
+- **UI**: νέο **`WebhookManager`** section μέσα στο υπάρχον Settings → Notifications tab (όχι νέο top-level
+  «Integrations» tab — μικρότερο diff, ίδιο section pattern με το ήδη-υπάρχον notifier-channels editor ακριβώς
+  από πάνω). Κάρτα ανά subscription: label, URL, secret (server-generated στο save αν αφεθεί κενό, copy button),
+  toggle chips για τα 4 events, enabled switch, per-subscription «Test» button. Actions:
+  `getWebhookSubscriptions`/`saveWebhookSubscriptions`/`testWebhookSubscription` (settings/actions.ts, mirror του
+  notifier-channels τριάδας).
+- **Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` **2311 passed / 180 files** (+13 νέα: 6
+  `webhooks.test.ts` + 7 `budgetAlert.test.ts`, μηδέν regression). Safe Docker rebuild — **1 build error
+  βρέθηκε+διορθώθηκε**: αρχικά είχα `export { WEBHOOK_EVENTS }`/`export type { WebhookSubscription }`
+  re-exports μέσα στο `'use server'` actions.ts, που έσπασε το build («A "use server" file can only export
+  async functions, found object» — Next.js περιορισμός). Fix: αφαιρέθηκαν, το client component εισάγει
+  types/metadata απευθείας από το `webhooks.shared.ts` (ήδη το έκανε ούτως ή άλλως). Μετά το fix: build OK,
+  `RestartCount=0`, `docker logs` καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning), `/login` 200
+  (browser-checked, «Sign in · Pharos», μηδέν console errors). `/settings` δεν testable UI-level χωρίς τα
+  credentials του Αχιλλέα (ίδιος περιορισμός με κάθε προηγούμενο run).
+- **Follow-up (out of scope εδώ)**: μηδέν v1 mobile API/UI (web-only, όπως κάθε recent Settings-only feature)·
+  το `budget.exceeded` δεν λαμβάνει υπόψη envelope/rollover mode (P25) — flat budget only· κανένα cron καλεί το
+  `runAlertChecks` σήμερα (pre-existing gap, ΟΧΙ κάτι που εισήγαγε το P24)· ένα webhook receiver πρέπει να
+  διαβάσει το header `X-Pharos-Signature` (`t=…,v1=…`) και να επαληθεύσει HMAC-SHA256 πάνω σε `${t}.${rawBody}`
+  με το secret του, ίδιο σχήμα με το Stripe.
 
 ### P23. Mobile share-sheet quick capture (share-to-Pharos) — M — both (mobile-native, ψηλό value/effort)
 - **Αξία:** από ΟΠΟΙΑΔΗΠΟΤΕ app (Photos, Files, browser, email PDF) → «Share → Pharos» → η φωτο/PDF μπαίνει

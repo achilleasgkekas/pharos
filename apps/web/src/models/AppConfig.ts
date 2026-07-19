@@ -93,6 +93,12 @@ const AppConfigSchema = new Schema(
     // type ∈ ntfy | discord | slack | telegram | webhook. See lib/notifiers.ts.
     notifiers: { type: [Schema.Types.Mixed], default: [] },
 
+    // Outbound event webhooks (P24) — automation hooks for Home Assistant/n8n/Node-RED.
+    // Array of { id, url, secret, enabled, label, events: WebhookEvent[] }. Distinct from
+    // `notifiers` above (those fan out human-readable *alert summaries*; these fire one
+    // signed JSON POST per structured *event*). See lib/webhooks.ts.
+    eventWebhooks: { type: [Schema.Types.Mixed], default: [] },
+
     // ── Editable AI prompts ── map of promptKey → override text (empty/absent = use
     // the built-in default). Lets the user tune every AI query from Settings.
     prompts: { type: Schema.Types.Mixed, default: {} },

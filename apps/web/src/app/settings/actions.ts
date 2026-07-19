@@ -59,6 +59,16 @@ import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '
 import { pushAllDevices } from '@/lib/expoPush';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { generateNotifications } from '@/app/notifications/actions';
+import { detectBudgetExceeded, type BudgetAlertRow } from '@/lib/budgetAlert';
+import {
+  getEventWebhooks,
+  dispatchEventWebhooks,
+  testEventWebhook,
+  generateWebhookSecret,
+  WEBHOOK_EVENTS,
+  type WebhookSubscription,
+} from '@/lib/webhooks';
+import { assertPublicUrl } from '@/lib/ssrf';
 import type { SerializedStatement } from '@/types';
 import { revalidatePath } from 'next/cache';
 
@@ -375,6 +385,59 @@ export async function testNotifierChannel(channel: NotifierConfig): Promise<{ ok
   return ok ? { ok: true } : { ok: false, error: 'Delivery failed — check the URL/token' };
 }
 
+// ─── Outbound event webhooks (P24) ───────────────────────────────────────────
+// Distinct from the notifier channels above: those push human-readable alert
+// summaries, these fire one signed JSON POST per structured event for
+// automation (Home Assistant/n8n/Node-RED). See lib/webhooks.ts. Types/metadata
+// (WebhookSubscription, WEBHOOK_EVENTS) are imported by the client straight from
+// the shared module, not re-exported here — a 'use server' file may only export
+// async functions.
+
+/** Subscriptions for the Settings editor. */
+export async function getWebhookSubscriptions(): Promise<WebhookSubscription[]> {
+  return getEventWebhooks();
+}
+
+/** Replace the whole subscription list. Rejects (whole save) if any URL is not a
+ *  reachable public http(s) address — same SSRF guard the dispatcher itself uses,
+ *  so a bad entry can't silently sit there failing every delivery. Generates a
+ *  secret for any new/blank entry so HMAC signing is on by default. */
+export async function saveWebhookSubscriptions(subs: WebhookSubscription[]): Promise<{ ok: boolean; error?: string }> {
+  await connectDB();
+  const clean: WebhookSubscription[] = [];
+  for (const [i, s] of (Array.isArray(subs) ? subs : []).entries()) {
+    const url = (s.url || '').trim();
+    if (!url) continue;
+    try {
+      await assertPublicUrl(url);
+    } catch (err) {
+      return { ok: false, error: `${url}: ${(err as Error).message}` };
+    }
+    clean.push({
+      id: String(s.id || `w${i}`),
+      url,
+      secret: (s.secret || '').trim() || generateWebhookSecret(),
+      enabled: s.enabled !== false,
+      label: (s.label || '').slice(0, 60),
+      events: Array.isArray(s.events) ? s.events.filter((e) => WEBHOOK_EVENTS.some((w) => w.type === e)) : [],
+    });
+  }
+  await AppConfig.updateOne({ key: 'singleton' }, { $set: { eventWebhooks: clean } }, { upsert: true });
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
+/** Send a one-off test payload to a single (possibly unsaved) subscription. */
+export async function testWebhookSubscription(sub: WebhookSubscription): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await assertPublicUrl(sub.url || '');
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+  const ok = await testEventWebhook(sub);
+  return ok ? { ok: true } : { ok: false, error: 'Delivery failed — check the URL' };
+}
+
 /** Scan for deals, δόσεις due this month, and expiring warranties; ntfy a summary. */
 export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; summary: string }> {
   const s = await getAppSettings();
@@ -433,6 +496,16 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
     .select('vendor vendorKey amount date recurring kind')
     .lean()) as HikeEntry[];
   const hikes = detectPriceHikes(hikeRows);
+
+  // Budget-exceeded watch (P24 webhook event): this month's expense spend per
+  // category vs the flat budgets configured in Settings → Money. Deterministic,
+  // no AI/rollover math (see lib/budgetAlert.ts).
+  const monthStart = new Date(new Date(now).getFullYear(), new Date(now).getMonth(), 1);
+  const budgetRows = (await Expense.find({ amount: { $gt: 0 }, date: { $gte: monthStart } })
+    .select('category amount date kind')
+    .lean()) as BudgetAlertRow[];
+  const budgetMonthKey = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`;
+  const budgetsExceeded = detectBudgetExceeded(budgetRows, s.budgets, budgetMonthKey);
 
   // Free-trial "cancel before charge" (P33): active subs whose trial ends within
   // the lead-time window, soonest first.
@@ -507,6 +580,13 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
         .map((b) => `${b.title}${b.amount > 0 ? ` ${cur()}${b.amount.toFixed(0)}` : ''} (${(b.days ?? 0) < 0 ? `${-(b.days ?? 0)}d overdue` : `${b.days}d`})`)
         .join(', ')}`
     );
+  if (budgetsExceeded.length)
+    lines.push(
+      `💰 ${budgetsExceeded.length} budget(s) exceeded: ${budgetsExceeded
+        .slice(0, 5)
+        .map((b) => `${b.category} ${cur()}${b.actual}/${cur()}${b.budget} (${b.pct}%)`)
+        .join(', ')}`
+    );
 
   // Also surface these alerts in the in-app notification bell.
   try {
@@ -514,6 +594,14 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   } catch {
     /* the bell is best-effort — never fail the ntfy check over it */
   }
+
+  // Outbound event webhooks (P24) — independent of the notifier channels above; a
+  // Home Assistant/n8n listener wants raw structured events, not the human summary.
+  // Fire-and-forget: dispatchEventWebhooks never throws and no-ops with zero
+  // configured/matching subscriptions.
+  if (dueThisMonth > 0) void dispatchEventWebhooks('installment.due', { amount: Math.round(dueThisMonth), plans: plans.length });
+  if (deals.length) void dispatchEventWebhooks('price.drop', { items: deals.map((d) => ({ title: d.title, target: d.targetPrice ?? 0 })) });
+  if (budgetsExceeded.length) void dispatchEventWebhooks('budget.exceeded', { categories: budgetsExceeded });
 
   const summary = lines.length ? lines.join('\n') : 'All clear — nothing to report.';
   let sent = false;

@@ -5644,3 +5644,80 @@ P21/P35/P34).
 
 - Τίποτα νέο αυτό το run. (P36 Open Banking παραμένει το μόνο ανοιχτό Approved item που χρειάζεται ρητή απόφαση
   scope πριν χτιστεί, αμετάβλητο.)
+
+## 2026-07-19 (pharos-daily-dev — P24 outbound event webhooks SHIPPED)
+
+**Βήμα 0**: pause switch απών. ASK_ACHILλέας inbox κενό (χωρίς open items για αυτό το routine). Docker lock
+αποκτήθηκε καθαρά (κανένα stale lock). Tree ήταν καθαρό στην αρχή του run (`git status` clean, τελευταίο commit
+`434489a`).
+
+**Έλεγχος Approved queue πρώτα**: PRODUCT_BACKLOG.md `## Approved` — το προηγούμενο run (P20 loyalty wallet)
+πρότεινε είτε **P31** (household/shared-access, αγγίζει auth/ρόλους βαθιά) είτε **P24** (outbound webhooks,
+πλήρως speced defaults). Διάλεξα το **P24**: καθαρά additive (νέο μοντέλο πεδίο + 2 νέα lib αρχεία + wiring σε
+2 υπάρχοντα actions αρχεία + 1 νέο Settings section), μηδέν αλλαγή σε auth/permissions/roles, άρα καταλληλότερο
+για ένα μονό unattended run χωρίς επίβλεψη. Το P31 παραμένει ανοιχτό για επόμενο run με τον ίδιο συλλογισμό
+όπως τα προηγούμενα 2 runs.
+
+**Τι μπήκε**:
+- Νέο `models/AppConfig.eventWebhooks` (array of `{id,url,secret,enabled,label,events[]}`), ξεχωριστό από το
+  ήδη-υπάρχον `notifiers` (εκείνο = human-readable alert summaries σε ntfy/Discord/Slack/Telegram/webhook·
+  αυτό = ένα signed structured JSON POST ανά domain event, για automation).
+- Client/server split ίδιο μοτίβο με `notifiers.shared.ts`/`notifiers.ts`: νέο **`lib/webhooks.shared.ts`**
+  (τύποι + `WEBHOOK_EVENTS` meta, client-safe) + **`lib/webhooks.ts`** (server) με `signWebhookPayload`
+  (Stripe-style `t=<unix>,v1=<hmac-sha256 hex>` πάνω σε `${t}.${body}`, ίδιο σχήμα με το ήδη-υπάρχον
+  `verifyStripeSignature` του billing module — αναγνωρίσιμο σε όποιον έχει ξαναδουλέψει με Stripe webhooks),
+  `dispatchEventWebhooks` (fan-out `Promise.allSettled`, ποτέ throw), `getEventWebhooks` (tenant-scoped read
+  μέσω `currentModel(AppConfig)`, ίδιο pattern με το `notifiers.ts`). **SSRF guard**: κάθε outbound POST περνά
+  `assertPublicUrl()` πριν το fetch — υπήρχε ήδη σαν βοηθός στο `lib/ssrf.ts` αλλά το sibling
+  `notifiers.ts`/`sendOne()` δεν το χρησιμοποιεί (pre-existing gap, ΔΕΝ το άγγιξα, out of scope εδώ αλλά αξίζει
+  follow-up). **Rate-limit** (SaaS μόνο): νέο `WEBHOOK_RATE_LIMIT`/`WEBHOOK_RATE_WINDOW_MS` env, reuse του
+  pure `rateHit()` helper (`apiRateLimit.ts`) πάνω σε ξεχωριστό store, off by default.
+- **4 events, όλα κρεμασμένα σε ήδη-υπάρχοντα trigger points, μηδέν νέο event-bus**: `receipt.parsed` →
+  `receipts/actions.ts` (`uploadReceipt`+`rescanReceipt`, μόνο σε πραγματικό AI parse)· `budget.exceeded` → νέο
+  pure **`lib/budgetAlert.ts`** `detectBudgetExceeded()` (+7 unit tests, flat-budget only, ΧΩΡΙΣ το
+  envelope/rollover math του Reports — builder-simplified v1, σημειωμένο ρητά)· `installment.due`/`price.drop`
+  → reuse των ήδη υπολογισμένων `dueThisMonth`/`deals` μέσα στο `runAlertChecks` (`settings/actions.ts`).
+- **UI**: νέο `WebhookManager` section μέσα στο ΗΔΗ υπάρχον Settings → Notifications tab (όχι νέο top-level
+  «Integrations» tab όπως έλεγε το αρχικό backlog draft — μικρότερο diff, ίδιο section pattern με το
+  notifier-channels editor ακριβώς από πάνω, ο χρήστης ήδη ψάχνει notification-related ρυθμίσεις εκεί). Κάρτα
+  ανά subscription: label/URL/server-generated secret (copy button)/event toggle chips/enabled switch/Test.
+
+**Bug βρέθηκε+διορθώθηκε στο build**: αρχικό draft είχε `export { WEBHOOK_EVENTS }` + `export type
+{ WebhookSubscription }` re-exports μέσα στο `'use server'` `settings/actions.ts` (για να μην χρειάζεται το
+client δύο import sources) → **έσπασε το production build** («A "use server" file can only export async
+functions, found object» — Next.js server-actions περιορισμός, ΔΕΝ το πιάνει το `tsc --noEmit`, μόνο το
+`next build`). Fix: αφαιρέθηκαν τα re-exports· το `SettingsClient.tsx` ήδη εισήγε τα types/metadata απευθείας
+από το `webhooks.shared.ts` (σωστό από την αρχή), οπότε το fix ήταν καθαρή αφαίρεση, μηδέν side-effect.
+**Σημείωση για μελλοντικά runs**: το `tsc --noEmit` ΔΕΝ πιάνει αυτή την κατηγορία σφάλματος (server-actions
+directive constraints) — μόνο ένα πλήρες `next build` (μέσα στο Docker build εδώ) το εντοπίζει. Άξιζε τον
+πλήρη rebuild-πριν-commit κανόνα του routine.
+
+**Verify**: `npm run type-check` (apps/web) → **EXIT 0**. Full `npx vitest run` → **2311 passed / 180 files**
+(+13 νέα: 6 `webhooks.test.ts` + 7 `budgetAlert.test.ts`, μηδέν regression). Safe Docker rebuild (`docker
+compose build web` → mongo ήδη healthy → `up -d web`): πρώτο build error βρέθηκε+διορθώθηκε (βλ. πάνω), δεύτερο
+build OK. `RestartCount=0`, `/login` 200, `docker logs` καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas`
+warning). Browser-checked (Claude Browser pane): τίτλος «Sign in · Pharos», **μηδέν console errors**.
+`/settings` δεν testable UI-level το ίδιο το νέο Webhooks section χωρίς τα credentials του Αχιλλέα, ίδιος
+περιορισμός με κάθε προηγούμενο run. `docker builder prune -f` μετά (−2.2GB, cache-only, ασφαλές). Docker lock
+released.
+
+**Follow-up (καταγράφηκε στο PRODUCT_BACKLOG.md)**: μηδέν v1 mobile API/UI (web-only, όπως κάθε πρόσφατο
+Settings-only feature)· το `budget.exceeded` δεν λαμβάνει υπόψη envelope/rollover mode (P25, flat budget only,
+builder-simplified)· κανένα cron καλεί το `runAlertChecks` σήμερα (pre-existing gap, όχι κάτι που εισήγαγε το
+P24 — τα events fire μόνο όταν κάποιος πατήσει «Check & notify now» ή στήσει δικό του εξωτερικό cron πάνω στο
+ίδιο action)· ένας webhook receiver πρέπει να διαβάσει `X-Pharos-Signature: t=…,v1=…` και να επαληθεύσει
+HMAC-SHA256 πάνω σε `${t}.${rawBody}` με το δικό του secret (Stripe-style, documented στο κάρτα-copy του UI ως
+"Signed via X-Pharos-Signature")· το `notifiers.ts`/`sendOne()` (sibling feature, alert channels) δεν περνά
+από `assertPublicUrl()` πριν το POST — SSRF gap που *δεν* εισήγαγε το P24 αλλά που εντόπισα κατά την έρευνα,
+αξίζει μικρό follow-up fix (1 call site, ίδιο guard που μόλις πρόσθεσα στο webhooks.ts).
+
+**Suggested next task**: (α) **P31 household/shared-access** (M, το επόμενο υψηλής αξίας Approved item που
+αγγίζει auth/ρόλους — αξίζει το δικό του πλήρες run, ίδιος συλλογισμός με τα 2 προηγούμενα runs)· ή (β) μικρό
+security follow-up: SSRF guard στο `lib/notifiers.ts`/`sendOne()` (S, 1 call site, reuse `assertPublicUrl()`
+όπως μόλις έγινε στο `webhooks.ts`)· ή (γ) αν προτιμηθεί mobile-parity: έλεγξε το `MOBILE_PARITY.md` Build
+Queue για το επόμενο ανοιχτό item.
+
+## Needs Achilleas
+
+- Τίποτα νέο αυτό το run. (P36 Open Banking παραμένει το μόνο ανοιχτό Approved item που χρειάζεται ρητή απόφαση
+  scope πριν χτιστεί, αμετάβλητο.)

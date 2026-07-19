@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical } from 'lucide-react';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -15,8 +15,9 @@ import { StoreDuplicatesModal } from './StoreDuplicatesModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
 import { rateForCategory } from '@/lib/depreciation';
-import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, testNotifierChannel, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow } from './actions';
+import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, testNotifierChannel, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow } from './actions';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
+import { WEBHOOK_EVENTS, type WebhookSubscription, type WebhookEvent } from '@/lib/webhooks.shared';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
 import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, changeOwnPassword, type UserRow } from './users.actions';
 import { McpManager } from './McpManager';
@@ -272,7 +273,12 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          {tab === 'notifications' && <NotificationsManager />}
+          {tab === 'notifications' && (
+            <>
+              <NotificationsManager />
+              <WebhookManager />
+            </>
+          )}
 
           {tab === 'users' && isAdmin && <UsersManager currentUserId={currentUser.id} />}
         </div>
@@ -2127,6 +2133,212 @@ function NotificationsManager() {
         </button>
         <button type="button" onClick={check} disabled={pending || channels === null} className={cn(ghostBtn, 'text-[color:var(--color-gold)]')}>
           <Sparkles size={13} /> Check & notify now
+        </button>
+      </div>
+      {msg && (
+        <p className={cn('text-[11px]', msg.startsWith('Failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+          {msg}
+        </p>
+      )}
+    </Section>
+  );
+}
+
+function newWebhook(): WebhookSubscription {
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `w${Date.now()}`;
+  return { id, url: '', secret: '', enabled: true, label: '', events: [] };
+}
+
+function WebhookCard({
+  sub,
+  onChange,
+  onRemove,
+  onTest,
+  testing,
+  testMsg,
+  onCopySecret,
+  copied,
+}: {
+  sub: WebhookSubscription;
+  onChange: (s: WebhookSubscription) => void;
+  onRemove: () => void;
+  onTest: () => void;
+  testing: boolean;
+  testMsg?: string;
+  onCopySecret: () => void;
+  copied: boolean;
+}) {
+  const set = (patch: Partial<WebhookSubscription>) => onChange({ ...sub, ...patch });
+  function toggleEvent(ev: WebhookEvent) {
+    const has = sub.events.includes(ev);
+    set({ events: has ? sub.events.filter((e) => e !== ev) : [...sub.events, ev] });
+  }
+  return (
+    <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3 space-y-2.5">
+      <div className="flex items-center gap-2">
+        <input
+          value={sub.label || ''}
+          onChange={(e) => set({ label: e.target.value })}
+          placeholder="Label (optional)"
+          className={cn(inputClass, 'flex-1')}
+        />
+        <Switch checked={sub.enabled} onChange={(v) => set({ enabled: v })} />
+        <button type="button" onClick={onRemove} className="p-1.5 rounded-lg text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]" aria-label="Remove webhook">
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      <input
+        value={sub.url}
+        onChange={(e) => set({ url: e.target.value })}
+        placeholder="https://your-automation.example/hook"
+        className={inputClass}
+        style={{ fontFamily: 'var(--font-mono)' }}
+      />
+
+      <div className="flex items-center gap-2">
+        <code
+          className="flex-1 min-w-0 text-xs bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 truncate"
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          {sub.secret || '(generated on save)'}
+        </code>
+        {sub.secret && (
+          <button
+            type="button"
+            onClick={onCopySecret}
+            className="shrink-0 p-2 rounded-lg bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]"
+            title="Copy signing secret"
+          >
+            {copied ? <Check size={14} className="text-[color:var(--color-accent)]" /> : <Copy size={14} />}
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {WEBHOOK_EVENTS.map((ev) => (
+          <button
+            key={ev.type}
+            type="button"
+            onClick={() => toggleEvent(ev.type)}
+            title={ev.hint}
+            className={cn(
+              'text-[11px] px-2.5 py-1 rounded-full border transition-colors',
+              sub.events.includes(ev.type)
+                ? 'bg-[color:var(--color-accent)] text-black border-[color:var(--color-accent)]'
+                : 'border-[color:var(--color-border)] text-[color:var(--color-text-faint)] hover:border-[color:var(--color-accent)]'
+            )}
+          >
+            {ev.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] text-[color:var(--color-text-faint)]">Signed via X-Pharos-Signature (HMAC-SHA256).</span>
+        <button type="button" onClick={onTest} disabled={testing || !sub.url} className={cn(ghostBtn, 'text-[color:var(--color-cyan)] py-1.5')}>
+          {testing ? <Loader2 size={12} className="animate-spin" /> : <Webhook size={12} />} Test
+        </button>
+      </div>
+      {testMsg && (
+        <p className={cn('text-[11px]', testMsg.startsWith('Failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
+          {testMsg}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function WebhookManager() {
+  const [pending, startTransition] = useTransition();
+  const [subs, setSubs] = useState<WebhookSubscription[] | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [testing, setTesting] = useState<string>('');
+  const [testMsgs, setTestMsgs] = useState<Record<string, string>>({});
+  const [copiedId, setCopiedId] = useState('');
+
+  useEffect(() => {
+    startTransition(async () => setSubs(await getWebhookSubscriptions()));
+  }, []);
+
+  function update(id: string, s: WebhookSubscription) {
+    setSubs((p) => (p ?? []).map((x) => (x.id === id ? s : x)));
+  }
+  function add() {
+    setSubs((p) => [...(p ?? []), newWebhook()]);
+  }
+  function remove(id: string) {
+    setSubs((p) => (p ?? []).filter((x) => x.id !== id));
+  }
+  function save() {
+    setMsg('Saving…');
+    startTransition(async () => {
+      const r = await saveWebhookSubscriptions(subs ?? []);
+      if (!r.ok) {
+        setMsg(`Failed: ${r.error}`);
+        return;
+      }
+      setSubs(await getWebhookSubscriptions()); // pick up server-generated secrets
+      setMsg('Saved ✓');
+    });
+  }
+  function testOne(s: WebhookSubscription) {
+    setTesting(s.id);
+    setTestMsgs((p) => ({ ...p, [s.id]: '' }));
+    startTransition(async () => {
+      const r = await testWebhookSubscription(s);
+      setTestMsgs((p) => ({ ...p, [s.id]: r.ok ? 'Test sent ✓' : `Failed: ${r.error}` }));
+      setTesting('');
+    });
+  }
+  function copySecret(secret: string, id: string) {
+    navigator.clipboard?.writeText(secret);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(''), 1500);
+  }
+
+  return (
+    <Section title="Webhooks" icon={<Webhook size={15} />}>
+      <p className="text-xs text-[color:var(--color-text-dim)] -mt-1">
+        Automation hooks for Home Assistant, n8n, or Node-RED — each subscription fires a signed JSON POST when
+        one of its selected events happens. <span className="text-[color:var(--color-accent)]">Receipt parsed</span> fires
+        immediately on every scan; <span className="text-[color:var(--color-accent)]">budget exceeded</span>,{' '}
+        <span className="text-[color:var(--color-accent)]">installment due</span>, and{' '}
+        <span className="text-[color:var(--color-accent)]">price drop</span> fire when the alert scan above runs
+        (&quot;Check &amp; notify now&quot;, or your own cron hitting the same check).
+      </p>
+
+      <div className="space-y-2.5">
+        {subs === null ? (
+          <p className="text-xs text-[color:var(--color-text-faint)] py-4 flex items-center gap-2">
+            <Loader2 size={13} className="animate-spin" /> Loading webhooks…
+          </p>
+        ) : subs.length === 0 ? (
+          <p className="text-xs text-[color:var(--color-text-faint)] py-3">No webhooks yet.</p>
+        ) : (
+          subs.map((s) => (
+            <WebhookCard
+              key={s.id}
+              sub={s}
+              onChange={(ns) => update(s.id, ns)}
+              onRemove={() => remove(s.id)}
+              onTest={() => testOne(s)}
+              testing={testing === s.id}
+              testMsg={testMsgs[s.id]}
+              onCopySecret={() => copySecret(s.secret, s.id)}
+              copied={copiedId === s.id}
+            />
+          ))
+        )}
+      </div>
+
+      <button type="button" onClick={add} className={cn(ghostBtn, 'w-full justify-center')}>
+        <Plus size={13} /> Add webhook
+      </button>
+
+      <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-[color:var(--color-border)] mt-1">
+        <button type="button" onClick={save} disabled={pending || subs === null} className={saveBtn}>
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save
         </button>
       </div>
       {msg && (

@@ -14,6 +14,7 @@ import { safeDate } from '@/lib/dates';
 import { safeRevalidate } from '@/lib/revalidate';
 import { getAppSettings } from '@/lib/appSettings';
 import { mirrorFileToRemote } from '@/lib/mirror';
+import { dispatchEventWebhooks } from '@/lib/webhooks';
 import { htmlReceiptToText } from '@/lib/htmlReceipt';
 import { revalidatePath } from 'next/cache';
 import { Types } from 'mongoose';
@@ -204,6 +205,14 @@ export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
     });
 
     revalidatePath('/receipts');
+    if (parsed) {
+      void dispatchEventWebhooks('receipt.parsed', {
+        id: String(receipt._id),
+        store: receipt.store,
+        total: receipt.total,
+        date: receipt.date,
+      });
+    }
     return { ok: true, id: String(receipt._id), aiUsed: parsed !== null, aiError };
   } catch (err) {
     return { ok: false, error: `DB error: ${(err as Error).message}` };
@@ -322,6 +331,15 @@ async function rescanReceiptOne(id: string, useOcr: boolean): Promise<RescanResu
     await receipt.save();
   } catch (e) {
     return { ok: false, aiUsed: false, error: `Save failed: ${(e as Error).message.slice(0, 120)}` };
+  }
+
+  if (parsed) {
+    void dispatchEventWebhooks('receipt.parsed', {
+      id: String(receipt._id),
+      store: receipt.store,
+      total: receipt.total,
+      date: receipt.date,
+    });
   }
 
   safeRevalidate('/receipts');
