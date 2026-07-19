@@ -9,7 +9,7 @@ import { notFound } from 'next/navigation';
 import { connectDB } from '@/lib/db';
 import { requireSuperadminPage } from '@/lib/tenancy/superadminPage';
 import { getTenantDetailForAdmin } from '@/lib/tenancy/adminTenantDetail';
-import { auditView, collectActorIds } from '@/lib/tenancy/audit';
+import { auditView, collectActorIds, parseAuditAction } from '@/lib/tenancy/audit';
 import { AuditEvent, type AuditEventDoc } from '@/models/AuditEvent';
 import { Account } from '@/models/Account';
 import { StatTile } from '@/components/saas/StatTile';
@@ -17,6 +17,7 @@ import { LiveDbStatsPanel } from '@/components/saas/LiveDbStatsPanel';
 import { TenantActionsPanel } from '@/components/saas/TenantActionsPanel';
 import { ActivityPanel } from '@/components/saas/ActivityPanel';
 import { toActivityRows, type ActivityInput } from '@/components/saas/activityView';
+import { ACTIVITY_FILTER_OPTIONS, ALL_ACTIONS_VALUE } from '@/components/saas/activityFilter';
 import {
   TenantStatusBadge,
   MemberStatusBadge,
@@ -46,11 +47,17 @@ function Field({ label, children }: { label: string; children?: React.ReactNode 
 
 export default async function AdminTenantDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ action?: string }>;
 }) {
   await requireSuperadminPage();
   const { slug } = await params;
+  const { action: actionRaw } = await searchParams;
+  // Same treatment as the workspace Activity tab: an unknown/stray `?action=` is "no filter",
+  // never a 400 — the operator just sees the unfiltered trail.
+  const action = parseAuditAction(actionRaw);
   const detail = await getTenantDetailForAdmin(slug);
   if (!detail) notFound();
 
@@ -65,7 +72,9 @@ export default async function AdminTenantDetailPage({
   // (never a per-tenant data database, never a write); authorization is requireSuperadminPage
   // above, not per-workspace membership, so this is intentionally NOT gated by role.
   await connectDB();
-  const events = (await AuditEvent.find({ tenant: t.id })
+  const activityQuery: Record<string, unknown> = { tenant: t.id };
+  if (action) activityQuery.action = action;
+  const events = (await AuditEvent.find(activityQuery)
     .select('action actor target meta createdAt')
     .sort({ createdAt: -1 })
     .limit(ACTIVITY_LIMIT)
@@ -251,8 +260,48 @@ export default async function AdminTenantDetailPage({
       <section>
         <h2 className="mb-2 text-[11px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
           Activity · latest {activityRows.length}
+          {action && ` · ${ACTIVITY_FILTER_OPTIONS.find((o) => o.value === action)?.label ?? action}`}
         </h2>
         <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4">
+          {/* Plain GET form — same idiom as the workspace Activity tab's filter, no client JS. */}
+          <form
+            action={`/admin/tenants/${encodeURIComponent(slug)}`}
+            method="get"
+            className="flex flex-wrap items-center gap-2 border-b border-[color:var(--color-border)] py-4"
+          >
+            <label
+              htmlFor="admin-activity-action-filter"
+              className="text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]"
+            >
+              Action
+            </label>
+            <select
+              id="admin-activity-action-filter"
+              name="action"
+              defaultValue={action ?? ALL_ACTIONS_VALUE}
+              className="rounded-lg border border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] px-2 py-1.5 text-xs text-[color:var(--color-text)]"
+            >
+              {ACTIVITY_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value || 'all'} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="rounded-lg border border-[color:var(--color-cyan)] px-3 py-1.5 text-xs font-medium text-[color:var(--color-cyan)] hover:bg-[color:var(--color-cyan)]/10"
+            >
+              Filter
+            </button>
+            {action && (
+              <a
+                href={`/admin/tenants/${encodeURIComponent(slug)}`}
+                className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"
+              >
+                Clear
+              </a>
+            )}
+          </form>
           <ActivityPanel rows={activityRows} />
         </div>
       </section>
