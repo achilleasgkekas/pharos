@@ -1770,3 +1770,23 @@ Mock pattern: DB-mock (`@/lib/db` connectDB, `@/models/User` findOne→select→
 - Collision guard: πριν το stage, `git diff --cached` κενό. `git status --short` έδειξε foreign WIP (`M apps/web/src/app/items/actions.ts`, unrelated running routine) — ΔΕΝ το άγγιξα/staged. Στάγιαρα ΜΟΝΟ τα δικά μου paths (ai/subscription/route.test.ts + OSS_PROGRESS.md) με explicit pathspec.
 
 Suggested next task: (β συνέχεια) Η οικογένεια `ai/*` seam routes ΕΓΙΝΕ (route.ts + subscription/route.ts). Επόμενα, ένα module ανά run: item sub-routes `items/[id]/link-plan|plans|ai-fill|convert-to-task`· `receipts/[id]/rescan|add-to-library`· `expenses/[id]/rescan`· `items/import`· `settings/test-notify`. ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified (έλεγξε `git status` πρώτα, όπως και το `items/actions.ts` — δες αν επηρεάζει `items/[id]/ai-fill` πριν το πιάσεις). DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-19 (cont.¹² — settings/test-notify/route.test.ts, το no-body notify-check route)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/settings/test-notify/route.test.ts` για το POST του `/api/v1/settings/test-notify`.**
+
+Επιλογή target: το τελευταίο ΑΠΛΟ route από την προηγούμενη suggested λίστα (`link-plan|plans|ai-fill|convert-to-task|rescan|add-to-library|import` όλα θέλουν `[id]` params + πιο σύνθετο mocking — καλύτερα για επόμενο run ένα-ένα). Το `settings/test-notify` τροφοδοτεί το κουμπί «Send test notification» στο Settings → Notifications (web + mobile) — στέλνει ΕΝΑ one-off ntfy push με το ήδη-αποθηκευμένο config, **χωρίς κανένα request body** (το route δεν διαβάζει ούτε json ούτε formData, μόνο headers.get για το auth). Route-only συμπεριφορά: (α) Bearer-auth gate (withAuth → 401 ΠΡΙΝ το sendTestNtfy), (β) envelope — ok → 200 `{ ok: true }`· not-ok → `apiError(r.error || 'Notification failed')` = 400 { error } με **'Notification failed' fallback** όταν το action γυρίζει empty/undefined error.
+
+Mock pattern: DB-mock + REAL helpers (ίδιο σκελετό με τα scan/* siblings). Mock ΜΟΝΟ το DB seam (`@/lib/db` connectDB + `@/models/User` findOne→select→lean για auth) + το action (`@/app/settings/actions` sendTestNtfy, no-arg). Τρέχω τους ΠΡΑΓΜΑΤΙΚΟΥΣ withAuth + apiError. makeReq το πιο απλό ως τώρα — μόνο headers.get(authorization), μηδέν body/form.
+
+Τι έγινε: Νέο `route.test.ts` (6 tests): auth gate (2: no-token, unknown-token — sendTestNtfy ποτέ δεν καλείται), envelope (4: ok→200 {ok:true} + called with zero args, not-ok με μήνυμα→400 {error} exact, empty-error string→400 {error:'Notification failed'} fallback, undefined error field→ίδιο fallback).
+
+Τι επαληθεύτηκε:
+- `npx vitest run src/app/api/v1/settings/test-notify/route.test.ts` → 6/6 passed.
+- `npx vitest run` (όλο το suite) → 182 files, 2355/2355 passed.
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό.
+- Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλου routine (`WEB_DEBT.md`, `YnabImportModal.tsx` [M]) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα ΜΟΝΟ τα δικά μου paths (settings/test-notify/route.test.ts + OSS_PROGRESS.md) με explicit pathspec.
+
+Suggested next task: (β συνέχεια) Απομένουν τα `[id]`-param routes: `items/[id]/link-plan`, `items/[id]/plans`, `items/[id]/ai-fill`, `items/[id]/convert-to-task`, `receipts/[id]/rescan`, `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Πριν πιάσεις οτιδήποτε στο `items/[id]/*` ή `items/import`, έλεγξε `git status` για foreign WIP στο `items/actions.ts` (είχε σημειωθεί σε προηγούμενο run ως πιθανό σημείο σύγκρουσης). ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
