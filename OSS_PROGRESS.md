@@ -1790,3 +1790,25 @@ Mock pattern: DB-mock + REAL helpers (ίδιο σκελετό με τα scan/* s
 - Collision guard: πριν το stage, `git diff --cached` κενό (κανένα concurrent routine mid-commit)· `git status --short` = foreign WIP άλλου routine (`WEB_DEBT.md`, `YnabImportModal.tsx` [M]) — ΚΑΝΕΝΑ δεν άγγιξα/staged. Στάγιαρα ΜΟΝΟ τα δικά μου paths (settings/test-notify/route.test.ts + OSS_PROGRESS.md) με explicit pathspec.
 
 Suggested next task: (β συνέχεια) Απομένουν τα `[id]`-param routes: `items/[id]/link-plan`, `items/[id]/plans`, `items/[id]/ai-fill`, `items/[id]/convert-to-task`, `receipts/[id]/rescan`, `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Πριν πιάσεις οτιδήποτε στο `items/[id]/*` ή `items/import`, έλεγξε `git status` για foreign WIP στο `items/actions.ts` (είχε σημειωθεί σε προηγούμενο run ως πιθανό σημείο σύγκρουσης). ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-19 (cont.¹³ — items/[id]/link-plan/route.test.ts, POST+DELETE δίχως failure-remap)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/items/[id]/link-plan/route.test.ts` για POST+DELETE του `/api/v1/items/:id/link-plan`.**
+
+Επιλογή target: πρώτο από τα `items/[id]/*` sub-routes της λίστας (`git status` καθαρό, μηδέν foreign WIP στο `items/actions.ts` αυτή τη φορά — δεν το αγγίζει άλλωστε, το route χρησιμοποιεί `@/app/statements/actions`). Backs το «link this product to an installment plan» / «unlink» στο item-detail (web+mobile) — additive linking, ένα plan μπορεί να έχει πολλά προϊόντα.
+
+Route-only συμπεριφορά: (α) ObjectId guard πριν οποιοδήποτε body read/action call, (β) signature gate `typeof b.signature === 'string' ? b.signature.trim() : ''` — non-string ή whitespace-only → 400 'signature required' χωρίς action call, (γ) το TRIMMED signature προωθείται (όχι το raw), (δ) **ΚΡΙΣΙΜΗ διαφορά από το `items/[id]/price`**: αυτά τα δύο handlers ΔΕΝ κάνουν failure remap — απλά κάνουν echo `{ ok: r.ok, linked: r.linked }` (POST) / `{ ok: r.ok }` (DELETE) σε 200, ΑΚΟΜΑ ΚΙ ΑΝ το action γυρίσει `{ ok: false }`. Pin-άρηκε ρητά και για τα δύο methods.
+
+Mock pattern: DB-mock (`@/lib/db` connectDB, `@/models/User`) + mock `@/app/statements/actions` (`linkPlanToItem`+`removeItemFromPlanByKey`, record τα forwarded args). Πραγματικοί `withAuth`/`isObjectId`/`readBody`.
+
+Τι έγινε: Νέο `route.test.ts` (16 tests): POST (auth 2, id guard 1, signature validation 4, happy+no-remap 2) + DELETE (auth 2, id guard 1, signature validation 2, happy+no-remap 2).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/api/v1/items/[id]/link-plan/route.test.ts"` → 16/16 passed.
+- `npx vitest run` (όλο το suite) → 184 files, 2376/2376 passed.
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό.
+- Collision guard: `git diff --cached` κενό πριν το stage· `git status --short` = μόνο το δικό μου νέο αρχείο, μηδέν foreign WIP. Στάγιαρα ΜΟΝΟ τα δικά μου paths.
+
+Suggested next task: (β συνέχεια) Απομένουν: `items/[id]/plans`, `items/[id]/ai-fill`, `items/[id]/convert-to-task`, `receipts/[id]/rescan`, `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Έλεγξε `git status` πριν πιάσεις οτιδήποτε — ιδίως αν `items/actions.ts` έχει foreign WIP (επηρεάζει το `ai-fill`/`convert-to-task`/`import`). ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
