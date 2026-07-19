@@ -6129,3 +6129,60 @@ P20/P16/P24 features αυτού του range) — δεν το ξαναέγραψ
 - Τίποτα νέο. Παραμένουν τα προϋπάρχοντα decision-flags (v1 feature-data-path tenant-scoping για SaaS data
   isolation· `getTenantConnection` readyState guard semantics).
 
+## 2026-07-20 (pharos-daily-dev — P11 email-in IMAP auto-import SHIPPED)
+
+**Ουρά ελέγχθηκε πρώτα**: `ASK_ACHILLEAS.md` κενό (μηδέν ANSWERED items προς αυτή τη routine). `OWNER_DECISIONS.md`
+§8 + `PRODUCT_BACKLOG.md → ## Approved`: μοναδικά unshipped items ήταν όλα M/L (κανένα S πλέον στην ουρά).
+Sκόπησα: P31 (household/multi-user, ήδη 4× deferred με τεκμηριωμένο scoping — χρειάζεται supervised session,
+όχι άλλο best-effort run)· P36 (Open Banking, L, ρητά «τελευταίο σε σειρά»)· P8/P13 (tax export + insurance
+export, και τα δύο χρειάζονται «ZIP with files» = νέο dependency χωρίς καμία υπάρχουσα zip/pdf-write υποδομή
+στο repo — μεγαλύτερο ρίσκο από ένα single-session αύξημα)· P17/P23 (mobile-native camera/share-sheet, μηδέν
+τρόπος να επαληθευτούν έστω και μερικώς χωρίς physical device, σε αντίθεση με ένα web backend feature)· P5
+(browser extension, εντελώς ξεχωριστό deliverable/packaging, εκτός του υπάρχοντος monorepo pattern). Διάλεξα
+**P11 (email-in IMAP)**: αμιγώς web backend + Settings UI, well-scoped, reuse-heavy (ίδιο pattern με το ήδη-
+δουλεμένο OneDrive device-code config: config get/save/test + manual trigger, μηδέν background cron infra
+που να χρειαστεί να χτιστεί από το μηδέν), και verifiable μέσω unit tests + type-check + Docker serve-check
+ακόμα κι όταν δεν υπάρχει πραγματικό mailbox για live test.
+
+**Υλοποίηση**: `lib/imapConfig.ts` (tenant-scoped cached getter, ατόφιο mirror του `lib/storageConfig.ts`,
+`normalizeImapConfig` pure + 9 unit tests) + `lib/imapImport.ts` (`imapflow` connect/search/fetch + `mailparser`
+parse, cap 25 μηνύματα/check, first-run lookback 7 μέρες ώστε να μη «χύσει» ολόκληρο ιστορικό mailbox σε ένα
+click) + 4 νέα settings actions (`getImapInfo`/`saveImapConfigAction`/`testImapConnectionAction`/
+`checkImapInboxNow`) που **reuse το `uploadReceipt` ατόφιο** (Buffer→`File`→`FormData`, ίδιο ακριβώς pipeline
+με μια χειροκίνητη μεταφόρτωση — save+parse+draft, ένα AI call ανά μήνυμα, gated από το receipts AI-feature
+toggle) — μηδέν νέος draft-creation κώδικας. Νέο Settings section «Email-in (IMAP)» δίπλα στο YNAB import
+manager (host/port/user/pass/folder/TLS + Save/Test/«Check inbox now» + last-checked/last-imported). Builder
+default (καμία ρητή Αχιλλέα-απόφαση στο backlog item): IMAP polling πρώτα (όχι forwarding-address)· χειροκίνητο
+trigger ΟΧΙ background cron (η εφαρμογή δεν έχει node-cron infra σήμερα — follow-up αν χρειαστεί ποτέ)·
+ingest free (ίδιο κόστος με κάθε manual upload, όχι bulk-job μέτρημα).
+
+**Follow-up εύρημα εν παρόδω, διορθώθηκε**: το P16 (YNAB importer, 2026-07-19) είχε καταγράψει το
+`app/expenses/CsvImportModal.tsx` ως «orphaned/dead code» (μηδέν import site). Ήλεγξα πριν το χτίσω κάτι
+παρόμοιο — **ήταν λάθος**: το modal ΕΙΝΑΙ ήδη σωστά wired στο `ExpensesClient.tsx` από το ίδιο commit `bed7f73`
+(PA1) που το δημιούργησε (state `importingCsv` + κουμπί header + render). Διόρθωσα το stale note στο
+`PRODUCT_BACKLOG.md` (P16 section), μηδέν ενέργεια κώδικα χρειαζόταν.
+
+**Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` **2385 passed / 185 files** (+9 νέα, μηδέν
+regression). Docker: safe rebuild (`build web` → `--no-cache` για να είμαι σίγουρος μετά την προσθήκη 2 νέων
+deps· ΣΗΜ debugging note: ένας αρχικός έλεγχος «λείπει το imapflow από το image» ήταν false-positive από
+λάθος-inspection ενός stale τοπικού `.next` build artifact, ΟΧΙ από το πραγματικό Docker image — το σωστό
+`docker run ... grep` στο πραγματικό container επιβεβαίωσε ότι το `imapflow`/`mailparser` bundle-άρονται σωστά
+inline στα webpack server chunks, μηδέν πρόβλημα). `homepage-mongo` healthy πριν το `up -d web`,
+`RestartCount=0`, `/login` 200, `/settings` 307 (auth-gated, compiled), `docker logs` καθαρό (μόνο το
+προϋπάρχον άσχετο `@napi-rs/canvas` warning). Browser-checked (Claude Browser pane): `/login` → «Sign in ·
+Pharos», μηδέν console errors. `docker builder prune -f` μετά (4.5GB, δύο πλήρη rebuilds). **ΔΕΝ testable
+end-to-end** (χρειάζεται πραγματικό mailbox + credentials του Αχιλλέα, ίδιος περιορισμός με κάθε προηγούμενο
+credentials-based integration σε αυτό το project) — verified μέσω unit tests στον pure normalizer + το ίδιο-
+proven `uploadReceipt` pipeline reuse.
+
+**Suggested next task**: πρώτα δες αν το Approved queue απέκτησε νέα S/M items ευκολότερα scoped (π.χ. αν ο
+Αχιλλέας απαντήσει στο P31 scoping ή εγκρίνει νέα Proposed items από την επόμενη planner σάρωση). Αλλιώς,
+από το ό,τι μένει Approved: P8/P13 (χρειάζονται πρώτα να προστεθεί μια zip-write dependency, π.χ. `jszip`,
+πριν χτιστεί το export bundle feature το ίδιο — ίσως αξίζει ξεχωριστό μικρό προπαρασκευαστικό commit πρώτα)
+είναι τα πιο κοντινά σε «απλώς χτίσ' το» μετά το P11.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Το IMAP feature χρειάζεται τον Αχιλλέα να βάλει πραγματικά mailbox credentials
+  (Settings → Storage & backup → Email-in) για να δοκιμαστεί live — αναμενόμενο, ίδιο pattern με OneDrive/SMB/FTP.
+

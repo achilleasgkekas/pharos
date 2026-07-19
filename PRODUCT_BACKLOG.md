@@ -589,18 +589,41 @@
   console errors. `/settings` UI δεν testable end-to-end χωρίς πραγματικό YNAB export file + τα credentials του
   Αχιλλέα, ίδιος περιορισμός με κάθε προηγούμενο Settings-only run — η λογική επαληθεύτηκε πλήρως μέσω των 20
   unit tests (συμπεριλαμβανομένου ενός full-CSV end-to-end test με πραγματικό-shaped δεδομένα).
-- **Εύρημα εν παρόδω (καταγράφηκε, ΔΕΝ διορθώθηκε — εκτός scope)**: το ήδη-υπάρχον `app/expenses/CsvImportModal.tsx`
+- **Διόρθωση (2026-07-20, P11 run):** το παρακάτω εύρημα ήταν **λάθος/stale** — το `app/expenses/CsvImportModal.tsx`
+  ΕΙΝΑΙ ήδη wired στο `ExpensesClient.tsx` (state `importingCsv` + κουμπί «Import CSV» στο header + render του modal),
+  από το ΙΔΙΟ commit `bed7f73` (PA1) που το δημιούργησε — μηδέν dead code, μηδέν ενέργεια χρειάζεται.
+- **Εύρημα εν παρόδω (ΛΑΝΘΑΣΜΕΝΟ, βλ. διόρθωση παραπάνω)**: το ήδη-υπάρχον `app/expenses/CsvImportModal.tsx`
   (PA1, γενικό bank CSV) φαίνεται **orphaned** — μηδέν import site βρέθηκε πουθενά στο codebase (dead code,
   UI ποτέ wired σε κανένα page). Η ίδια η server action `importExpensesCsv` που χρησιμοποιεί παραμένει
   απόλυτα λειτουργική/tested και reused εδώ. Αξίζει follow-up: είτε wire το modal σε ένα «Import CSV» button
   στο /expenses (η αρχική πρόθεση του PA1 feature), είτε το σβήσε αν κρίθηκε ξεπερασμένο από το generic Backup
   JSON export/import.
 
-### P11. Email-in auto-import — self-hosted IMAP receipt inbox — M — both (ψηλό value/effort)
-- **Αξία:** συνεχής αυτόματη σύλληψη: IMAP creds (ή forwarding address) → poller → υπάρχον pipeline
-  (attachment/html→text→AI parse→dedupe→draft). «Κάθε νέα απόδειξη μπαίνει μόνη της». Συμπληρώνει το TODO §13.
-- **Module:** Receipts (+ νέος `lib/imap.ts` poller / cron, reuse email-inbox import).
-- **Ανοιχτή απόφαση (builder default):** IMAP polling (κρατά creds, self-host) πρώτα· poll ανά 15-30′· ingest free, parse metered στο SaaS.
+### P11. Email-in auto-import — self-hosted IMAP receipt inbox — ✅ SHIPPED 2026-07-20 (pharos-daily-dev)
+- **Υλοποίηση:** νέο **`lib/imapConfig.ts`** (tenant-scoped cached config getter, ατόφιο mirror του
+  `lib/storageConfig.ts`, `normalizeImapConfig` pure+testable + 9 unit tests) + **`lib/imapImport.ts`**
+  (`imapflow` connect/search/fetch + `mailparser` extract attachments/html, capped **25 μηνύματα/check**,
+  πρώτο-ποτέ check περιορισμένο στις τελευταίες 7 μέρες ώστε να μη «χύσει» ολόκληρο ιστορικό mailbox).
+  Νέα settings actions (`getImapInfo`/`saveImapConfigAction`/`testImapConnectionAction`/`checkImapInboxNow`)
+  **reuse το υπάρχον `uploadReceipt`** ατόφιο (Buffer→`File`→`FormData`→ίδιο pipeline μιας χειροκίνητης
+  μεταφόρτωσης: save+OCR/vision/text parse+draft, ένα AI call ανά μήνυμα, gated από το ίδιο receipts
+  AI-feature toggle) — **μηδέν νέος draft-creation κώδικας**. UI: νέο section «Email-in (IMAP)» στο
+  Settings → Storage & backup, δίπλα στο YNAB import manager (host/port/user/pass/folder/TLS + Save/Test/
+  «Check inbox now» + last-checked/last-imported timestamps). **Builder default** (καμία ρητή απόφαση
+  Αχιλλέα): IMAP polling πρώτα (self-host creds, ΟΧΙ forwarding-address εναλλακτική)· **χειροκίνητο
+  «Check inbox now» κουμπί, ΟΧΙ background cron** (η εφαρμογή δεν έχει node-cron infra σήμερα — το ίδιο
+  MVP pattern με το OneDrive «Test connection»/storage «Sync now», background polling = μελλοντικό follow-up
+  αν χρειαστεί)· ingest free (ίδιο κόστος με κάθε χειροκίνητο upload, όχι επιπλέον bulk-job μέτρημα).
+- **Verify:** `npm run type-check` EXIT 0. Full `npx vitest run` **2385 passed / 185 files** (+9 νέα, μηδέν
+  regression). Docker rebuild (--no-cache, καθαρή επαλήθευση ότι το `imapflow`/`mailparser` bundle-άρονται
+  σωστά στο standalone output μετά την προσθήκη 2 νέων deps — αρχικός έλεγχος σε λάθος stale local `.next`
+  φάνηκε ύποπτος, διορθώθηκε ελέγχοντας το πραγματικό image μέσω `docker run`): `RestartCount=0`, `/login`
+  200, `/settings` 307 (auth-gated, compiled). Browser-checked (Claude Browser pane): `/login` → «Sign in ·
+  Pharos», μηδέν console errors. **ΔΕΝ testable end-to-end** (χρειάζεται πραγματικό mailbox + credentials
+  του Αχιλλέα) — verified μέσω unit tests στον pure normalizer + το ίδιο-proven `uploadReceipt` pipeline.
+- **Follow-up εύρημα (καταγράφηκε εν παρόδω)**: το `app/expenses/CsvImportModal.tsx` που το P16 σημείωνε ως
+  «orphaned/dead code» **ήταν ήδη σωστά wired** στο `ExpensesClient.tsx` από το ίδιο commit `bed7f73` (PA1) —
+  stale note, διορθώθηκε εδώ. Καμία ενέργεια χρειάστηκε.
 
 ### P17. Mobile barcode/QR scan → γρήγορη προσθήκη στο inventory — M — both (mobile-native)
 - **Αξία:** barcode/QR scan (EAN/UPC) → lookup → prefill τίτλου/κατηγορίας/specs → one-tap add σε inventory/shopping.
