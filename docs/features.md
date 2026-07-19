@@ -408,13 +408,27 @@ example `/items?open=<id>`).
 
 ## Notifications
 
+Pharos has two notification systems:
+
+### Alert summaries
+
 Alert checks scan for deals (target price hit), installments due this month,
-warranties expiring within your lead time, bills that are overdue or due soon,
+budgets exceeded, warranties expiring within your lead time, bills that are overdue or due soon,
 price hikes, trials ending, expiring gift cards, and network issues, then send a
-summary through your configured channel (ntfy and other providers, see
+human-readable summary through your configured channel (ntfy, Discord, Slack, Telegram,
+or a generic webhook; see
 [Configuration → Notifications](configuration.md#notifications)). You can trigger
 a check on demand or send a test message from
 Settings. The mobile app can also register for push notifications.
+
+### Event webhooks for automation (P24)
+
+For integration with automation platforms (Home Assistant, n8n, Node-RED, Zapier),
+you can subscribe Pharos to send machine-readable JSON POSTs to your webhooks on
+specific events: `receipt.parsed` (when a receipt is AI-scanned), `budget.exceeded`,
+`installment.due` (this month), and `price.drop` (for tracked items). Each webhook
+call includes a Stripe-style HMAC signature (using a shared secret) to prove it came
+from your Pharos instance. Configure these in **Settings → Notifications → Webhooks**.
 
 ## Trash (soft delete)
 
@@ -442,7 +456,7 @@ Configuration is grouped into tabs:
   export, **migration import** (YNAB and other tools), and Trash.
 - **Stores & lists** — known stores (with duplicate detection / merge) and the
   editable dropdown taxonomies (item / expense / subscription categories).
-- **Notifications** — ntfy and other channels, with test and check-now buttons.
+- **Notifications** — alert channels (ntfy, Discord, Slack, Telegram, webhook), test and check-now buttons; outbound event webhooks for automation platforms.
 
 See the [Configuration guide](configuration.md) for the details of AI providers,
 storage backends, notifications, and internationalisation.

@@ -192,6 +192,27 @@ The opt-in price scraper has its own ntfy alert path via environment variables
 - `PRICE_DROP_ALERT_PCT` (default `10`) — alert threshold vs the lowest known
   price.
 
+### Event webhooks for automation (P24)
+
+In addition to human-readable alert summaries, Pharos can send machine-readable JSON
+events to automation platforms (Home Assistant, n8n, Node-RED, Zapier, etc.). Configure
+subscriptions under **Settings → Notifications → Webhooks**.
+
+Each webhook includes a **Stripe-style HMAC-SHA256 signature** in the `x-pharos-signature`
+header. Verify it using your shared secret (shown when you create the subscription) to
+prove the request came from your Pharos instance.
+
+Supported events:
+
+| Event             | Fired on                                   | Payload                                |
+|-------------------|--------------------------------------------|----------------------------------------|
+| `receipt.parsed`  | Receipt uploaded and AI-scanned successfully | `{ kind: 'receipt', id, store, total, date, itemCount }` |
+| `budget.exceeded` | This month's spending exceeds your category limit | `{ kind: 'budget', category, spent, limit, month }` |
+| `installment.due` | An installment payment is due this month   | `{ kind: 'installment', itemId, amount, dueDate, remainingMonths }` |
+| `price.drop`      | A watched item's best price falls by 10%+ | `{ kind: 'price', itemId, title, oldPrice, newPrice, store }` |
+
+All webhooks include metadata: `{ event, ts (ISO 8601), tenantId (SaaS only) }`.
+
 ---
 
 ## Language (i18n)

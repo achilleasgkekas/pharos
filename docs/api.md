@@ -182,7 +182,7 @@ These are flagged **(AI)** below with the feature name.
 |--------|-----------------------------------|-------------|
 | GET    | `/items?status=shopping\|inventory\|all` | List items (+ `limit`/`offset`/`updatedSince`). |
 | POST   | `/items`                          | Create. Body `{ title, status?, category?, currentPrice? }` → `{ item }`. |
-| GET    | `/items/:id`                      | Full detail (links, price history, photos, warranty, purchase) + a computed `price` block (best-now, lowest/highest, trend, verdict, where-to-buy) for the mobile price panel. |
+| GET    | `/items/:id`                      | Full detail (links, price history, photos, warranty, purchase) + a computed `price` block (best-now, lowest/highest, trend, verdict, where-to-buy) for the mobile price panel. **Note:** Attachments (manuals, warranty certificates, serial-number photos) are stored per item but not yet exposed via the REST API; use the web UI to manage them. |
 | PATCH  | `/items/:id`                      | Update `{ title?, status?, category?, currentPrice?, targetPrice?, specs?, tags? }`. |
 | DELETE | `/items/:id`                      | Soft-delete. |
 | POST   | `/items/import`                   | **(AI: itemsImport)** Fetch a product page, AI-parse, add or merge. Body `{ url, view? }` (`view` = `shopping` default \| `inventory`) → `{ ok, id, title, price, store, updated }`. |
