@@ -532,10 +532,11 @@ when signed out, 403 when not a member (GET) or not an owner/admin (write).
 | `PATCH` | `/api/saas/members` | `{ accountId, role }` | Change a member's role. Cannot orphan the last owner. |
 | `DELETE` | `/api/saas/members` | `{ accountId }` | Remove a member. Cannot remove the last active owner. |
 
-Redeeming an invite:
+#### Invite management
 
 | Method | Path | Body | Result |
 | --- | --- | --- | --- |
+| `POST` | `/api/saas/invites/resend` | `{ inviteId, tenant? }` | **Authenticated; owner/admin only.** Re-mints a fresh token for an existing pending invite and re-sends the signup link to the invitee in a single call. Useful when the original link has expired before the invitee claimed it. The old token is invalidated (newest link wins). Idempotent for an invite awaiting the resend. `404` if there is no pending invite with that id in this workspace (an accepted or revoked invite cannot be resent — revoke-then-reinvite via `POST /api/saas/members` instead). `400` if the `inviteId` is malformed. Returns `{ resent: inviteId, invite: { email, role, status, expires }, devToken? }`. |
 | `POST` | `/api/saas/invites/accept` | `{ token, password?, name? }` | Unauthenticated by design. Looks the token up by hash; if valid (pending + unexpired) creates or reuses the invited account, mints an active membership with the invited role, marks the invite accepted, and logs the account in. `password` is required only when no account exists yet. `410` for an invalid/expired token. |
 
 ### Billing (Stripe)
@@ -601,7 +602,7 @@ than one). Each page is `force-dynamic` and marked `noindex, nofollow`.
 | Route | Renders |
 | --- | --- |
 | `/account/workspace` | **Overview** — the account's landing for workspace settings. Consolidates the read surfaces into one server-rendered page: four stat tiles (members, AI calls with quota, storage with quota, this month's AI cost), a **Workspace** panel (slug, custom domain, isolation tier, created), a **Plan & billing** panel (plan, price, subscription status, trial note, AI + storage included) mirroring [`GET /api/saas/billing`](#billing-stripe), and a **Usage** panel for the current period (AI calls vs quota, input / output tokens, storage vs quota, estimated AI cost) mirroring [`GET /api/saas/usage`](#usage). SSR reads the billing/usage helpers directly rather than self-fetching. |
-| `/account/workspace/members` | **Members** — the roster and pending invitations, mirroring [`GET /api/saas/members`](#members-and-invitations). Any active member may **view** the roster; only owners and admins (`canManage`) see the management controls (invite / add by email, change role, remove member, revoke invite), which the client panel performs against `/api/saas/members` and `/api/saas/invites`. Invites are read only for managers. |
+| `/account/workspace/members` | **Members** — the roster and pending invitations, mirroring [`GET /api/saas/members`](#members-and-invitations). Any active member may **view** the roster; only owners and admins (`canManage`) see the management controls (invite / add by email, change role, remove member, **resend** pending invite, revoke invite), which the client panel performs against `/api/saas/members` and `/api/saas/invites`. The **Resend** action re-mints a fresh token and re-sends the signup link for an expired-but-pending invite (calls [`POST /api/saas/invites/resend`](#invite-management)). Invites are read only for managers. |
 | `/account/workspace/billing` | **Billing** — subscription management and invoice history. Shows the current plan (name, price, interval), subscription status, trial dates when applicable, and historical invoices from Stripe (if available). Owner/admin only. |
 | `/account/workspace/usage` | **Usage** — detailed AI and storage consumption for the current period. Breaks down AI calls (input / output tokens, cost) per model and per day, and storage bytes used vs quota. Useful for understanding quota burndown. Any workspace member can view. |
 | `/account/workspace/activity` | **Activity** — an audit trail of workspace changes. Shows append-only events (members added/removed, role changes, invites sent, plan changes, BYO-key events), newest first, with optional filtering by action type. Owner/admin only. Mirrors [`GET /api/saas/audit`](#activity-audit). |

@@ -1836,3 +1836,27 @@ internal UI improvement (adds Load more links), δεν αγγιζει API docs.
 Επομενο run: (α) αν αλλα νέα SaaS routes ή tabs προστεθουν (π.χ. billing/usage
 enrichment), update saas.md · (β) api.md sync αν νέα v1 routes landed · (γ)
 features.md stale-forward για αλλα νέα shipped features.
+
+## 2026-07-20 (fifth run — resend pending invite button)
+
+Νέα feature landed: "Resend button for pending workspace invites" (commit 200bc4c). Εγραψα:
+
+**saas.md** — προσθεσα νεα row στην "### Members and invitations" section:
+- Reformat της invite management section header απο "Redeeming an invite" σε "Invite management" (scope broadened)
+- Προσθεσα `POST /api/saas/invites/resend` endpoint row μετα πριν το accept endpoint
+- Εξηγηση: re-mints fresh token για existing pending invite (useful για expired-but-pending), invalidates old link (newest-link-wins), owner/admin only, 404 αν accepted/revoked
+- Ενημερωσα το `/account/workspace/members` UI row να αναφερει "resend pending invite" ως νεα management action
+
+Τι εγραψα:
+- Endpoint details: τι ειναι το inviteId, τι γυρναει (resent id + invite fields + devToken scaffold), status codes (400 malformed, 404 not pending in workspace)
+- Σημειωση στο Members UI ότι resend κάνει `POST /api/saas/invites/resend`
+
+Accuracy verified εναντι κώδικα:
+- apps/web/src/app/api/saas/invites/resend/route.ts (POST endpoint, re-mints token, 404 if not pending, records audit action invite.resent)
+- apps/web/src/components/saas/MembersPanel.tsx (UI component με Resend button)
+
+Validation: markdown only, κανενα build/Docker/AI call. Code fences: saas.md = 18 (even, balanced). Internal links: όλες υπάρχουν ✓. Secret scan: κανένα literal credential ✓.
+
+Collision guard: git status --short δειχνει μονο docs/saas.md staged (δικο μου), 6 foreign WIP files (apps/web edits, ΔΕΝ τα αγγιζω). Commit ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: (α) αν αλλα νέα SaaS routes ή tabs προστεθουν, update saas.md · (β) api.md sync αν νέα v1 routes landed · (γ) features.md stale-forward για αλλα νέα shipped features.
