@@ -6,6 +6,28 @@
 <!-- docker-validated: 6ff8678 -->
 <!-- ui-audited: 06f950f -->
 
+## 2026-07-20 (web code-quality auditor — 56η σάρωση, CONFIRMATION run)
+
+**Αναφορά**: unattended read-only audit (26 commits από τον προηγ. marker `83f392f`, 71 αρχεία). `cd apps/web && npm run type-check` → **EXIT 0**.
+
+**Μετρήσεις ανά διάσταση** (fresh grep, όχι docs):
+- **Type safety:** 0 νέα ευρήματα (fresh grep σε `src/app/api/v1` + νέος κώδικας του range).
+- **Input validation:** 0 νέα.
+- **Error handling:** 3 προϋπάρχοντα SaaS holdouts (`invites/accept`, `audit`, `workspace/erasure/purge`) confirmed ΑΚΟΜΑ ανοιχτά, live-verified, αμετάβλητα. Ο νέος write route `api/saas/account/workspaces/route.ts` (POST/DELETE) ΚΑΝΕΙ το σωστό — ολόκληρο το σώμα μέσα σε `saasGuard(...)` — καλό reference pattern για τον builder όταν πιάσει τα 3 holdouts.
+- **Auth:** 1 προϋπάρχον P1 confirmed ΑΚΟΜΑ ανοιχτό (Settings→Notifications 8 exports χωρίς `requireAdmin`, γρ.339-446 πλέον [μετατοπίστηκε από νέα imports, ίδιο gap]). Ο νέος BYO AI key route (`api/saas/workspace/ai-key/route.ts`, increment 75) είναι exemplary: `requireManage=true`, AES-256-GCM at-rest, ποτέ plaintext key στο response, audit-logged.
+- **Mongoose/tenancy:** 2 προϋπάρχοντα P2 confirmed ΑΚΟΜΑ ανοιχτά (Voucher/GiftCard/LoyaltyCard tenancy-parity, sampleDataActions.ts tenancy-parity). Ο νέος `lib/imapConfig.ts` (email-in credentials) κάνει το σωστό pattern (`currentModel(AppConfig)`, tenant-scoped) — δεν προστέθηκε στο gap.
+- **Duplication/dead code:** 0 νέα.
+- **i18n (el.ts):** gap **84→110** (+26) — 4 νέα self-hosted features σε αυτό το διάστημα (P3 Month-in-Review, P11 IMAP email-in, P13 insurance export, P8 tax-deductible/export) πρόσθεσαν 26 κλειδιά μόνο στο en.ts. Ενημερώθηκε η πλήρης λίστα στο WEB_DEBT.md.
+
+**Παρατήρηση (όχι νέο item)**: `testAnthropic`/`testRemoteConnection`/`testOnedriveConnection`/`testImapConnectionAction` επίσης λείπουν `requireAdmin()`, ίδιο σχήμα με το ήδη-ανοιχτό P1 notifications item αλλά χαμηλότερης σοβαρότητας (δεν επιστρέφουν κανένα secret, μόνο ok/error). Σημειώθηκε στο WEB_DEBT.md ως follow-up του P1 fix, όχι ξεχωριστό item.
+
+**Top 3 για τον builder** (αμετάβλητα από την 55η — ο builder δεν κατανάλωσε κανένα αυτό το διάστημα):
+1. **Settings→Notifications requireAdmin gap** (P1/S) — 8 server actions εκθέτουν integration secrets (Telegram token, webhook HMAC) σε non-admin household members.
+2. **Voucher/GiftCard/LoyaltyCard tenancy-parity** (P2/M) — dead-until-SaaS, μηχανικό fix.
+3. **sampleDataActions.ts tenancy-parity** (P2/S) — ίδιας κλάσης, μικρότερο.
+
+**Needs Achilleas**: αμετάβλητο — `getTenantConnection` readyState guard decision-flag (P3/S) παραμένει, δεν χρειάζεται νέα απόφαση αυτό το run.
+
 ## 2026-07-20 (ui-auditor — 52η σάρωση, mobile UI consistency audit)
 
 **Αναφορά**: unattended read-only grep audit. Σκοπός = μέτρηση mobile UI consistency vs web design tokens (όχι functional parity).
