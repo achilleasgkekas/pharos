@@ -500,6 +500,10 @@ const FAQS: { q: string; a: string }[] = [
     q: 'Is my financial data secure?',
     a: 'PHAROS is built for private access, not the open internet: reach it over your LAN or your own VPN, behind a login. There is no public sign-up and no telemetry, so your receipts, statements, and balances stay yours.',
   },
+  {
+    q: 'Can I permanently delete my account and all its data?',
+    a: 'Yes. On hosted, the workspace owner has a "Delete workspace" control in settings: request it and every member loses access with all data erased after a 30-day grace window, plenty of time to change your mind, and you can cancel any time before then. Self-hosted has no server-side account at all, so deleting your data just means removing the Docker volumes on your own hardware.',
+  },
 ];
 
 // Stable, human-readable anchor id for each FAQ item, e.g. "faq-how-do-backups-work".
