@@ -1880,3 +1880,25 @@ Mock pattern: DB-mock (`@/lib/db`, `@/models/User`) + mock `@/app/items/actions`
 - Collision guard: `git diff --cached` κενό πριν το stage. `git status --short` = μόνο το δικό μου νέο αρχείο, μηδέν foreign WIP. Στάγιαρα ΜΟΝΟ το δικό μου path.
 
 Suggested next task: (β συνέχεια) Απομένουν: `receipts/[id]/rescan`, `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Έλεγξε `git status` πριν πιάσεις οτιδήποτε. ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam, ιδίως failure-remap ναι/όχι, ιδίως αν κάνει κάτι πολυπλοκότερο σαν multi-mode branching όπως εδώ) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-20 (cont.¹⁷ — receipts/[id]/rescan/route.test.ts, POST με strict-boolean ocr flag + διπλό failure-remap)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/receipts/[id]/rescan/route.test.ts` για το POST του `/api/v1/receipts/:id/rescan`.**
+
+Επιλογή target: πρώτο από την εναπομείνασα λίστα (`git status` καθαρό, μηδέν foreign WIP). Backs το «Re-scan» κουμπί στο receipt-detail (mobile) — ξανατρέχει το AI parse πάνω στο ήδη αποθηκευμένο αρχείο. Thin wrapper πάνω στο shared `rescanReceipt` action (items/receipts/actions.ts, ίδιο action με το web receipt-detail) — η δική του OCR/AI-parse λογική ΔΕΝ ξανα-δοκιμάζεται εδώ.
+
+Route-only συμπεριφορά που δοκιμάστηκε: (α) id guard τρέχει ΠΡΙΝ το `readBody` (malformed id → 400 χωρίς καν να διαβαστεί το body), (β) **`useOcr = b.ocr === true`** — strict boolean equality, όχι truthiness: `ocr:true` μόνο περνάει `true`· missing body, `'true'` string, αριθμός `1`, explicit `false` όλα περνάνε `false` (δοκιμάστηκε με `it.each` τα 4 non-true cases + το true case ξεχωριστά), (γ) **failure remap μοναδικό pattern** (διαφορετικό από τα προηγούμενα routes): `rescanReceipt` `{ok:false, error}` → 404 ΜΟΝΟ αν το error string ταιριάζει `/not found|missing/i` (τα δύο ρεαλιστικά action errors: 'Receipt or file not found' + 'File missing from storage'), αλλιώς **500** (π.χ. 'AI parse failed')· falsy error → fallback 'rescan failed' που ΔΕΝ ταιριάζει το regex άρα ΚΑΙ ΑΥΤΟ 500 (pin-αρίστηκε ρητά, εύκολο λάθος να υποθέσεις 404 default), (δ) στο success path γίνεται **δεύτερο, ανεξάρτητο DB read** (`Receipt.findById(id).select('-rawAiResponse').lean()`) που re-σερβίρει με ΑΚΡΙΒΩΣ το ίδιο shape με το GET detail (trimReceipt + notes fallback + serializeLineItems, imported από το shared `../../serialize` module) + `aiUsed/model/aiError` από το rescan result, (ε) αν αυτό το δεύτερο read γυρίσει null (π.χ. deleted ανάμεσα στο write και το re-read) → **δικό του, ξεχωριστό 404 'not found'** — ΔΕΝ περνάει από το failure-remap regex του (δ).
+
+Mock pattern: DB-mock (`@/lib/db`, `@/models/User`, `@/models/Receipt` findById μόνο) + mock `@/app/receipts/actions` (`rescanReceipt` μόνο). Πραγματικοί `withAuth`/`isObjectId`/`readBody` + το πραγματικό `serialize.ts` (δεν το mockάρισα — είναι pure, ήδη καλυμμένο έμμεσα από το `receipts/[id]/route.test.ts`, εδώ απλά επαληθεύω ότι η ROUTE το καλεί σωστά με το σωστό doc shape).
+
+Τι έγινε: Νέο `route.test.ts` (14 tests): auth+id guard (3), ocr flag strict-boolean (1 + `it.each` 4 = 5 συνολικά), failure remap (4: not-found→404, missing→404, unrelated→500, falsy-fallback→500), success re-read+serialization (2: πλήρες shape+aiUsed/model/aiError pin, δεύτερο-read 404 ανεξάρτητο).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/api/v1/receipts/[id]/rescan/route.test.ts"` → 14/14 passed.
+- `npx vitest run` (όλο το suite) → 193 files, 2459/2459 passed.
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό.
+- Collision guard: πριν το stage, `git diff --cached` κενό. `git status --short` = μόνο το δικό μου νέο αρχείο, μηδέν foreign WIP. Στάγιαρα ΜΟΝΟ το δικό μου path.
+
+Suggested next task: (β συνέχεια) Απομένουν: `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Έλεγξε `git status` πριν πιάσεις οτιδήποτε. ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam, ιδίως failure-remap ναι/όχι — το rescan pattern εδώ [regex-based 404-vs-500] μπορεί να επαναληφθεί στο `receipts/[id]/add-to-library` ή `expenses/[id]/rescan` αφού είναι sibling actions) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
