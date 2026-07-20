@@ -631,11 +631,33 @@
 - **Module:** Items/Inventory (+ Settings για το export).
 - **Follow-up:** P8 (tax export) μπορεί τώρα να κάνει reuse του ίδιου jszip pipeline (νέα dependency ήδη μέσα).
 
-### P8. Tax / deductible tagging + year-end export bundle — M — both (SaaS = premium)
-- **Αξία:** flag «tax-deductible» (+ optional tax category) → year-end «Tax export» = σύνοψη ανά κατηγορία +
-  ZIP με συνημμένα. Paid-tier differentiator· βασικό tagging OSS.
-- **Module:** Expenses/Receipts (+ Reports/Settings για το export).
-- **Ανοιχτή απόφαση (builder default):** free-form tags + optional preset (GR)· tagging παντού, ZIP-με-αρχεία = paid στο SaaS.
+### P8. Tax / deductible tagging + year-end export bundle — ✅ SHIPPED 2026-07-20 (pharos-daily-dev, commit `e0124d8`)
+- **Υλοποίηση:** νέα `Expense.taxDeductible` (Boolean) + `Expense.taxCategory` (free string) — inherited από την
+  τελευταία εγγραφή του ίδιου vendor (`inheritFromSeries`, ίδιο idiom με category/space/recurring), ώστε μια νέα
+  απόδειξη γιατρού να κληρονομεί αυτόματα «tax-deductible». UI (`ExpensesClient.tsx`, expense-only, όχι income):
+  toggle «Tax deductible» + `SearchableSelect` (allowCustom) με **GR presets** (`lib/taxonomies.ts
+  TAX_CATEGORY_PRESETS`: Ιατρικά έξοδα/Δωρεές/Τόκοι στεγαστικού/…) + νέο sidebar φίλτρο «Tax deductible only» +
+  gold `Landmark` badge σε card/row. Νέο **`lib/taxExport.ts`** (πλήρως pure, +11 unit tests, mirror του
+  `lib/insuranceExport.ts` P13): `buildTaxCsv` (accountant-ready CSV) + `buildTaxHtml` (standalone report
+  grouped ανά tax category με subtotal + grand total). Settings → Backup: νέο **«Tax export (ZIP)»** button + year
+  picker (τελευταία 5 χρόνια) → `exportTaxBundle(year)` (settings/actions.ts) φέρνει τα tax-deductible expenses
+  του επιλεγμένου έτους + το αρχείο κάθε λογαριασμού μέσα σε `files/<id>/` (JSZip, ίδιο pattern με το insurance
+  export). **Builder default** (καμία ρητή απόφαση Αχιλλέα): free-form tag με GR presets (όχι enforced enum,
+  διαφορετικά κράτη έχουν διαφορετικούς κανόνες)· η ZIP-με-αρχεία εξαγωγή χτίστηκε **ungated** (ίδιο με κάθε άλλο
+  export στην εφαρμογή, π.χ. insurance/CSV/JSON backup — κανένα από αυτά δεν ελέγχει SaaS plan tier σήμερα)· το
+  «SaaS = paid» differentiator από το spec μένει follow-up entitlement-gating, όχι κάτι που μαντεύτηκε εδώ.
+- **Verify:** `npm run type-check` EXIT 0. Full `npx vitest run` **2614 passed / 205 files** (+11 νέα taxExport
+  tests, +2 ενημερωμένα serializeExpense tests για τα νέα πεδία, μηδέν regression). Safe Docker rebuild
+  (`docker compose build web` → mongo healthy → `up -d web`): `RestartCount=0`, `/login` 200. Browser-checked
+  (Claude Browser pane): `/login` → «Sign in · Pharos», μηδέν console errors. `docker builder prune -f` μετά
+  (6.575GB). **`/settings` UI + το πραγματικό ZIP content ΔΕΝ testable end-to-end unattended** (χρειάζεται login +
+  πραγματικά tax-deductible expenses) — ίδιος περιορισμός με κάθε προηγούμενο Settings-only run, verified πλήρως
+  μέσω των unit tests στους pure builders + type-check + clean serve-check.
+- **Follow-ups:** `taxDeductible`/`taxCategory` δεν εκτίθενται ακόμα στο `/api/v1/expenses` shape (mobile parity,
+  ίδιο gap με P34 space/P35 split)· SaaS entitlement-gating του ZIP export (αν τελικά θεωρηθεί paid-only feature)·
+  Receipts δεν έχουν το ίδιο flag (το spec ανέφερε Expenses+Receipts, το v1 έμεινε στο Expenses — τα bills/λογαριασμοί
+  είναι το πρωτεύον use-case, τα line-item receipts λιγότερο σχετικά με tax deductions στην πράξη).
+- **Module:** Expenses (+ Settings/Backup για το export).
 
 ### P16. Migration importers από άλλα finance/self-host apps (Firefly III / YNAB / Grocy) — 🟡 YNAB SHIPPED 2026-07-19 (pharos-daily-dev), Firefly III/Grocy εκκρεμούν
 - **Αξία:** δέξου export ανταγωνιστή → μειώνει switching cost. Importer για Firefly III (JSON/CSV), YNAB (CSV),

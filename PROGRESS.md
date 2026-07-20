@@ -6382,3 +6382,56 @@ P7/P21 παραμένουν ισοδύναμες εναλλακτικές στο
   webhooks config UI, P16 YNAB CSV import, **+2 νέα confirmed out-of-scope (όχι ερώτημα, μόνο ενημέρωση):**
   P13 insurance export ZIP (desktop file-download power tool, ίδιο idiom με backup/restore CSV), P11 IMAP
   email-in config (self-hosted mailbox polling, ίδιο idiom με storage/OneDrive Settings).
+
+## 2026-07-20 (pharos-daily-dev)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε → συνέχισα. `ASK_ACHILLEAS.md` είχε μόνο ένα OPEN item
+του bakecore-finance routine (άσχετο με Pharos) → τίποτα να εφαρμόσω πρώτα. Στο working tree βρήκα uncommitted
+WIP **που δεν είναι δικό μου**: `components/saas/AiKeyPanel.tsx` + `aiKeySettings.ts`/`.test.ts` + edit στο
+`(saas)/account/workspace/settings/page.tsx` (φαίνεται δουλειά ενός concurrent SaaS routine πάνω στο BYO-key
+route, καλά τεκμηριωμένο, πιθανώς mid-run) — αφέθηκε **εντελώς άθικτο**, δεν staged/committed/touched καθόλου
+(βλ. `routine-coordination` memory, κοινό checkout).
+
+**Approved queue check (βήμα a, priority)**: `OWNER_DECISIONS.md` απόφαση #8 (P2/P4/P10) ήταν ήδη πλήρως SHIPPED
+(verified: PA2←P4, PA1←P2, PA3←P10 όλα ✅ στο `PRODUCT_BACKLOG.md`, τίποτα να χτίσω εκεί). Το `PRODUCT_BACKLOG.md`
+12η-σάρωση note έλεγε ρητά ότι το μόνο **αδέσμευτο, buildable** item που έμενε ήταν το **P8** (το suggested next
+task από το προηγούμενο run μου) — τα υπόλοιπα ανοιχτά (P31/P36 supervised/blocked, P17/P23 mobile-simulator,
+P5 ξεχωριστό deliverable, P16 Firefly/Grocy χρειάζεται sample file, P9 L-size) δεν ήταν κατάλληλα για ένα
+αυτόνομο run.
+
+**P8. Tax / deductible tagging + year-end export bundle — ✅ SHIPPED** (commit `e0124d8`). Πλήρες detail στο
+`PRODUCT_BACKLOG.md` P8 entry. Σύνοψη: `Expense.taxDeductible`+`taxCategory` (inherited ανά vendor series, ίδιο
+idiom με category/space) + form toggle/badge/filter στο `ExpensesClient.tsx` + νέο pure `lib/taxExport.ts`
+(CSV+HTML builders, +11 tests, mirror του `lib/insuranceExport.ts` P13) + Settings→Backup «Tax export (ZIP)»
+button με year picker → `exportTaxBundle(year)` bundle-άρει τα tax-deductible expenses του έτους + τα αρχεία τους.
+Builder default: free-form tag με GR presets, export **ungated** (ίδιο με insurance/CSV/JSON exports — κανένα
+δεν ελέγχει SaaS plan σήμερα)· το «SaaS=paid» differentiator μένει follow-up αν χρειαστεί entitlement-gating.
+
+**Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` **2614 passed / 205 files** (+11 νέα taxExport
+tests, +2 ενημερωμένα serializeExpense tests, μηδέν regression). Docker: `mkdir /tmp/claude-docker.lock` (lock
+acquired) → `docker compose build web` OK → mongo healthy → `up -d web` → `RestartCount=0`, `/login` 200 σε 1
+προσπάθεια. Browser-checked (Claude Browser pane): `/login` → «Sign in · Pharos», μηδέν console errors.
+`docker builder prune -f` (6.575GB freed). **ΣΗΜ lock oddity**: το `rmdir` στο τέλος βρήκε τον φάκελο ήδη
+ανύπαρκτο (πιθανώς host/sandbox particularity ή stale-check από άλλη διεργασία· δεν ήταν >30min ώστε να
+δικαιολογείται staleness-based removal) — αβλαβές, το Docker work είχε ήδη ολοκληρωθεί κανονικά πριν το
+παρατηρήσω, καμία σύγκρουση με άλλο build παρατηρήθηκε. `/settings` UI + το πραγματικό ZIP content ΔΕΝ testable
+end-to-end unattended (χρειάζεται login + real tax-deductible expenses) — ίδιος περιορισμός με κάθε προηγούμενο
+Settings-only run, verified πλήρως μέσω unit tests στους pure builders.
+
+**Follow-ups (καταγράφηκαν στο PRODUCT_BACKLOG.md P8 entry)**: `taxDeductible`/`taxCategory` δεν εκτίθενται ακόμα
+στο `/api/v1/expenses` (mobile parity, ίδιο gap με P34/P35)· SaaS entitlement-gating του export (αν χρειαστεί)·
+Receipts δεν έχουν το ίδιο flag (Expenses = πρωτεύον use-case για bills/λογαριασμούς).
+
+**Suggested next task**: το Approved queue έμεινε πλέον χωρίς κανένα αδέσμευτο «απλώς χτίσ' το» item (P31/P36
+χρειάζονται supervised session/provider-decision, P17/P23 mobile-simulator, P5 ξεχωριστό deliverable, P16
+Firefly/Grocy sample file, P9 L-size χωρίς urgency). Το επόμενο run θα πρέπει είτε (α) να διαλέξει ένα από τα
+P37-P51 candidates που περιμένουν έγκριση Αχιλλέα (καμία δράση δυνατή χωρίς αυτήν)· είτε (β) να προτείνει το P34
+follow-up (space σε Receipts/Subscriptions) ή το P8 follow-up (`/api/v1/expenses` mobile-parity fields
+`taxDeductible`/`taxCategory`/`space`/`split`) ως μικρά, ασφαλή, αυτόνομα-buildable items χωρίς να περιμένουν
+νέα έγκριση· είτε (γ) να πέσει πίσω στο `MOBILE_PARITY.md` roadmap (item #6 Settings ή το top-ranked P3 Month
+in Review gap).
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Το Approved queue είναι πλέον σχεδόν άδειο (μόνο P31/P36 πραγματικά blocked) — αν
+  δεν εγκριθεί κάτι από τα P37-P51 candidates σύντομα, τα επόμενα runs θα στραφούν σε mobile-parity follow-ups.
