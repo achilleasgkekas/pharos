@@ -6,13 +6,17 @@
 // against those three routes and refreshes. AiKeyPanel is the sibling for the BYO-key route
 // (GET/PUT/DELETE /api/saas/workspace/ai-key, TODO §11/§14) — same idiom, initial masked status
 // server-read here via describeTenantAiKey/byoKeyReady so the first paint needs no client fetch.
+// ErasurePanel is the sibling for the GDPR right-to-erasure route (GET/POST/DELETE
+// /api/saas/workspace/erasure, TODO §11/§14/D-erasure) — same idiom again, initial state
+// server-read here via `erasureView` on the already-fetched `tenant` doc so this page needed no
+// extra query for it either.
 //
 // Gating: the (saas) layout 404s the whole segment when SAAS_MODE is off / AUTH_SECRET missing.
 // A logged-out viewer is redirected to /account/login. Any active member may VIEW this page;
-// only owner/admin get the rename control and only the owner gets cancel/reactivate/AI-key —
-// mirrored client-side from canManage/isOwner so the panel never offers an action the API would
-// reject. Additive + SaaS-only — the self-hosted app never mounts this route, so it stays
-// byte-for-byte unchanged.
+// only owner/admin get the rename control and only the owner gets cancel/reactivate/AI-key/
+// erasure — mirrored client-side from canManage/isOwner so the panel never offers an action the
+// API would reject. Additive + SaaS-only — the self-hosted app never mounts this route, so it
+// stays byte-for-byte unchanged.
 import { redirect, notFound } from 'next/navigation';
 import { connectDB } from '@/lib/db';
 import { getSaasViewer } from '@/lib/tenancy/saasPage';
@@ -22,11 +26,13 @@ import { Tenant, type TenantDoc } from '@/models/Tenant';
 import { Membership } from '@/models/Membership';
 import { canManageMembers } from '@/lib/tenancy/members';
 import { workspaceView } from '@/lib/tenancy/workspace';
+import { erasureView, ERASURE_GRACE_DAYS } from '@/lib/tenancy/erasure';
 import { pickWorkspace } from '@/components/saas/chooseWorkspace';
 import { workspaceTabs } from '@/components/saas/workspaceTabs';
 import { WorkspaceShell } from '@/components/saas/WorkspaceShell';
 import { WorkspaceSettingsPanel } from '@/components/saas/WorkspaceSettingsPanel';
 import { AiKeyPanel } from '@/components/saas/AiKeyPanel';
+import { ErasurePanel } from '@/components/saas/ErasurePanel';
 import { byoKeyReady } from '@/lib/billing/byoKey';
 import { describeTenantAiKey } from '@/lib/billing/byoKeyStore';
 
@@ -101,6 +107,12 @@ export default async function WorkspaceSettingsPage({
           canManage={canManageMembers(chosen.role)}
           cryptoReady={byoKeyReady()}
           initialKey={aiKeyMask}
+        />
+        <ErasurePanel
+          tenantSlug={chosen.slug}
+          isOwner={chosen.role === 'owner'}
+          graceDays={ERASURE_GRACE_DAYS}
+          initial={erasureView(tenant)}
         />
       </div>
     </WorkspaceShell>
