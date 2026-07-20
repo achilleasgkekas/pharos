@@ -2230,7 +2230,57 @@ Needs-Achilleas (open, αμεταβλητα):
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
 
-## 2026-07-20 (cont.⁴) — (e) polish/content: FAQ += notifications & automation webhooks
+## 2026-07-20 (cont.⁵) — (e) polish/content: Vouchers card += loyalty & membership cards
+
+Increment (e). Πριν το ξεκινημα διαβασα `git log --oneline -8` του κυριου repo (νεοτερα απο το προηγουμενο
+`e1e00d8` log entry). Νεα commits: `7c90186 feat(saas)` MFA enrollment core (Account fields + start/confirm/
+disable routes) και `fa6b7f2 feat(mobile)` budget envelope/rollover mobile parity. Ελεγξα και τα δυο: το MFA
+commit message ειναι ρητο **«Not yet wired into login, that is the deliberately separate, riskier increment
+80c»** -> οχι user-facing ακομα, ιδιο συμπερασμα με το προηγουμενο TOTP/MFA scaffold (bb49b36) -> skip. Το
+budget rollover ειναι mobile-parity fix για feature που ηδη καλυπτεται πληρως στο landing (`grep budget` ->
+Expenses card desc ηδη λεει «Budgets per category, with optional envelope rollover so an unspent month
+carries forward») -> ηδη καλυμμενο, skip.
+
+Ακολουθησα το gap που ειχε ηδη επισημανθει στο προηγουμενο log entry: loyalty/membership cards. Επιβεβαιωσα
+στο `docs/features.md` («Loyalty & membership cards» section, μετα το Gift cards) -> πληρες, τεκμηριωμενο,
+user-facing feature: barcode-format αυτο-ανιχνευση απο το shape του καρτ-αριθμου (EAN13/UPC/CODE128), tap
+για full-screen scannable barcode στο checkout, black-on-white render για αξιοπιστο scan. `grep -n loyalty
+page.tsx` πριν το increment = μηδεν hits. Το Vouchers card καλυπτε ΜΟΝΟ τα μονεταρια gift cards/discount
+codes, τιποτα για membership/loyalty.
+
+Αλλαγη (app/page.tsx, ΕΝΑ string μονο, μηδεν UI/CSS/dependency/bundle change): στο `FEATURES` array, το
+«Vouchers & coupons» card desc προσθεσε προταση «Loyalty and membership cards work too, tap one to show a
+scannable barcode at checkout.» αναμεσα στο gift-card sentence και το AI-scan sentence (ιδιο patteren με
+προηγουμενα increments που διπλωσαν μικρα gaps μεσα σε υπαρχουσα card copy αντι για νεο section, π.χ. το
+budget-rollover μεσα στο Expenses desc).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (11 routes)· `/` route 5.33 kB, αμεταβλητο (copy-only, ιδιο μεγεθος
+  με πριν).
+- Browser preview (in-app Browser): port 3100 κατειλημμενο απο Docker (`com.docke` listening, οπως παντα),
+  χρησιμοποιηθηκε port 3105 (`next start` production build, οχι dev). `get_page_text` επιβεβαιωσε ολοκληρο
+  το Features section με το νεο sentence στη σωστη θεση μεσα στο Vouchers card, σωστη σειρα προτασεων.
+  `read_console_messages` onlyErrors -> «No console logs.» (καθαρο). Server σταματησε μετα (`pkill`), `lsof`
+  επιβεβαιωσε 3105 clear.
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  `git diff --cached --name-only` κενο πριν το stage -> κανενα ξενο staged file (κανενα concurrent routine
+  mid-commit). Staged+committed ΜΟΝΟ το δικο μου path.
+- Commit `8042740`, pushed καθαρα (`41138d9..8042740 main -> main`), κανενα rebase χρειαστηκε.
+
+Επομενο increment: (e) polish συνεχεια, real app screenshots οταν υπαρξουν assets (blocked)· ή νεοτερο
+shipped module αν εμφανιστει gap (τσεκαρε `git log --oneline -10` του κυριου repo στην αρχη καθε run, οχι
+μονο features.md/saas.md). Αν το increment 80c (MFA wiring στο login flow) γινει σε επομενο κυριο-repo run
+και μπει σε χρηση, αξιζει δικο του FAQ item (money/data/security cluster, μετα το «Is my financial data
+secure?»).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
 
 Increment (e). Πριν το ξεκινημα διαβασα `git log --oneline -15` του κυριου repo· τα νεοτερα commits ηταν
 `82cc718 feat(saas)` TOTP+recovery-code core για MFA και `0554035 feat(mobile)` safe-to-spend forward
