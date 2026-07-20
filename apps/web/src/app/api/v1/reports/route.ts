@@ -8,13 +8,14 @@ import { Statement } from '@/models/Statement';
 import { Subscription } from '@/models/Subscription';
 import { getAppSettings } from '@/lib/appSettings';
 import { computeInstallmentPlans } from '@/lib/installments';
+import { buildMonthReview } from '@/lib/monthReview';
 import type { SerializedStatement } from '@/types';
 import { OWNED_STATUSES } from '@/lib/itemStatus';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type Lean = { kind?: string; amount?: number; category?: string; date?: Date; period?: string };
+type Lean = { kind?: string; amount?: number; category?: string; date?: Date; period?: string; vendor?: string; vendorKey?: string; recurring?: boolean };
 type ItemLean = { _id?: unknown; status?: string; purchasedPrice?: number; currentPrice?: number; warrantyUntil?: string | Date; title?: string; category?: string };
 type ReceiptLean = { store?: string; date?: Date; total?: number };
 type SubLean = { amount?: number; billingCycle?: string; category?: string };
@@ -25,6 +26,9 @@ const ymOf = (d: Lean): string => {
   const dt = d.date ? new Date(d.date) : null;
   return dt ? `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}` : '';
 };
+// Mirrors web /reports page.tsx MN + monthLabel().
+const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthLabel = (d: Date): string => `${MN[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
 
 /** GET /api/v1/reports → money summary (net position, this month / year, by-category, last-6-months). */
 export async function GET(req: NextRequest) {
@@ -39,7 +43,7 @@ export async function GET(req: NextRequest) {
     const flowWindow = selMonths ?? 12;
     await connectDB();
     const [docs, items, statementsRaw, receipts, subs, settings] = await Promise.all([
-      Expense.find({}).select('kind amount category date period').lean() as Promise<Lean[]>,
+      Expense.find({}).select('kind amount category date period vendor vendorKey recurring').lean() as Promise<Lean[]>,
       Item.find().select('status purchasedPrice currentPrice warrantyUntil title category').lean() as Promise<ItemLean[]>,
       Statement.find().lean(),
       Receipt.find().select('store date total').lean() as Promise<ReceiptLean[]>,
@@ -139,6 +143,14 @@ export async function GET(req: NextRequest) {
       }))
       .sort((a, b) => b.limit - a.limit);
 
+    // ── Month in Review (P3) — deterministic narrative digest, reuses the
+    //    already-fetched expense rows + item warranties + budgets. Mirrors web
+    //    /reports page.tsx monthReview (zero new DB round-trips). ──
+    const monthReview = {
+      ...buildMonthReview(docs, { monthKey: thisYM, budgets: budgetMap, warranties: items, now }),
+      monthLabel: monthLabel(now),
+    };
+
     // ── Spend by store (top 8). Mirrors web /reports. ──
     const storeMap = new Map<string, { total: number; count: number }>();
     for (const r of receipts) {
@@ -204,6 +216,7 @@ export async function GET(req: NextRequest) {
       // (no param) reports 12 but keeps the asymmetric 6/12 arrays for old clients.
       months: selMonths ?? 12,
       netPosition,
+      monthReview,
       thisMonth: { income: sum.mInc, expense: sum.mExp, net: sum.mInc - sum.mExp },
       thisYear: { income: sum.yInc, expense: sum.yExp, net: sum.yInc - sum.yExp },
       byCategory,

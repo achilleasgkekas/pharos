@@ -292,6 +292,40 @@ describe('budgets (this month, budgeted categories only)', () => {
   });
 });
 
+describe('month in review (P3 digest, additive)', () => {
+  it('composes a narrative + monthLabel from this month vs last month spend', async () => {
+    expenseState.rows = [
+      { kind: 'expense', amount: 100, category: 'utilities', period: '2026-07' },
+      { kind: 'income', amount: 500, category: 'salary', period: '2026-07' },
+      { kind: 'expense', amount: 80, category: 'utilities', period: '2026-06' }, // prior month
+    ];
+    const res = await GET(makeReq());
+    const json = (await res.json()) as Body & { monthReview: { monthKey: string; monthLabel: string; totalSpent: number; totalIncome: number; net: number; narrative: string; overBudget: unknown[]; priceChanges: unknown[]; warrantiesExpiringSoon: unknown[] } };
+    expect(json.monthReview.monthKey).toBe('2026-07');
+    expect(json.monthReview.monthLabel).toBe('Jul 26');
+    expect(json.monthReview.totalSpent).toBe(100);
+    expect(json.monthReview.totalIncome).toBe(500);
+    expect(json.monthReview.net).toBe(400);
+    expect(json.monthReview.narrative).toContain('€100');
+    expect(json.monthReview.overBudget).toEqual([]);
+  });
+
+  it('flags an over-budget category and folds it into the narrative + overBudget list', async () => {
+    settingsState.budgets = { utilities: 50 };
+    expenseState.rows = [{ kind: 'expense', amount: 90, category: 'utilities', period: '2026-07', date: new Date(2026, 6, 10) }];
+    const res = await GET(makeReq());
+    const json = (await res.json()) as Body & { monthReview: { overBudget: Array<{ category: string; budget: number; actual: number }>; narrative: string } };
+    expect(json.monthReview.overBudget).toEqual([{ category: 'utilities', budget: 50, actual: 90, pct: 180 }]);
+    expect(json.monthReview.narrative).toContain('Over budget');
+  });
+
+  it('says "Nothing unusual to flag" with no budget/price/warranty signals', async () => {
+    const res = await GET(makeReq());
+    const json = (await res.json()) as Body & { monthReview: { narrative: string } };
+    expect(json.monthReview.narrative).toContain('Nothing unusual to flag.');
+  });
+});
+
 describe('receipts: spend by store + biggest purchases', () => {
   it('aggregates store totals+counts and surfaces the biggest single receipts', async () => {
     receiptState.rows = [
@@ -374,7 +408,7 @@ describe('envelope', () => {
     expect(json.currency).toBe('USD');
     expect(Object.keys(json).sort()).toEqual(
       [
-        'currency', 'months', 'netPosition', 'thisMonth', 'thisYear', 'byCategory', 'budgets',
+        'currency', 'months', 'netPosition', 'monthReview', 'thisMonth', 'thisYear', 'byCategory', 'budgets',
         'monthly', 'incomeExpense', 'upcomingInstallments', 'spendByStore', 'subsByCategory',
         'inventoryByCategory', 'biggestPurchases', 'warrantiesExpiring', 'installmentPayoff',
       ].sort()

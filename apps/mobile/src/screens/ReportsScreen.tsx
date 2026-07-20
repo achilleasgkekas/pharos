@@ -106,6 +106,32 @@ export function ReportsScreen() {
       <ErrorText>{err}</ErrorText>
       {d && (
         <>
+          {d.monthReview && (
+            <View style={s.reviewCard}>
+              <Text style={s.cardLabel}>MONTH IN REVIEW · {d.monthReview.monthLabel}</Text>
+              <Text style={s.reviewNarrative}>{d.monthReview.narrative}</Text>
+              {(d.monthReview.overBudget.length > 0 || d.monthReview.priceChanges.length > 0 || d.monthReview.warrantiesExpiringSoon.length > 0) && (
+                <View style={s.reviewChips}>
+                  {d.monthReview.overBudget.map((b) => (
+                    <View key={`b-${b.category}`} style={[s.reviewChip, { borderColor: C.red }]}>
+                      <Text style={[s.reviewChipText, { color: C.red }]}>{b.category} {money(b.actual, cur)}/{money(b.budget, cur)}</Text>
+                    </View>
+                  ))}
+                  {d.monthReview.priceChanges.slice(0, 5).map((p) => (
+                    <View key={`p-${p.vendorKey}`} style={[s.reviewChip, { borderColor: C.gold }]}>
+                      <Text style={[s.reviewChipText, { color: C.gold }]}>{p.vendor} {p.direction === 'up' ? '+' : ''}{p.deltaPct}%</Text>
+                    </View>
+                  ))}
+                  {d.monthReview.warrantiesExpiringSoon.slice(0, 5).map((w) => (
+                    <View key={`w-${w.title}`} style={[s.reviewChip, { borderColor: C.cyan }]}>
+                      <Text style={[s.reviewChipText, { color: C.cyan }]}>{w.title} · {w.days}d</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
           <View style={s.netCard}>
             <Text style={s.cardLabel}>NET POSITION</Text>
             <Text style={[s.netVal, { color: d.netPosition.net >= 0 ? C.accent : C.red }]}>{money(d.netPosition.net, cur)}</Text>
@@ -233,6 +259,11 @@ export function ReportsScreen() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
+  reviewCard: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 16, marginBottom: 12 },
+  reviewNarrative: { color: C.text, fontSize: 13, lineHeight: 19, marginTop: 6 },
+  reviewChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
+  reviewChip: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1 },
+  reviewChipText: { fontSize: 11 },
   netCard: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.borderLight, borderRadius: 16, padding: 16, marginBottom: 12 },
   netVal: { fontSize: 28, fontWeight: '800', marginTop: 4 },
   cards: { flexDirection: 'row', gap: 12 },

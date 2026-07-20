@@ -381,6 +381,21 @@ export type Reports = {
   currency: string;
   months?: number; // effective trend window (6/12/24); absent on older servers
   netPosition: { inventoryValue: number; installmentsOwed: number; activePlans: number; net: number };
+  // Deterministic "Month in Review" narrative digest (P3). Absent on older servers.
+  monthReview?: {
+    monthKey: string;
+    monthLabel: string;
+    totalSpent: number;
+    totalIncome: number;
+    net: number;
+    prevMonthSpent: number;
+    pctChange: number | null;
+    topCategory: { name: string; amount: number } | null;
+    overBudget: { category: string; budget: number; actual: number; pct: number }[];
+    priceChanges: { vendorKey: string; vendor: string; deltaPct: number; direction: 'up' | 'down' }[];
+    warrantiesExpiringSoon: { title: string; days: number }[];
+    narrative: string;
+  };
   thisMonth: { income: number; expense: number; net: number };
   thisYear: { income: number; expense: number; net: number };
   byCategory: { category: string; total: number }[];
