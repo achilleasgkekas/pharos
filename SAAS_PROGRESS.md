@@ -3694,3 +3694,78 @@ input όταν `mfaEnabled` ήδη true) → δείξε `secret`+`uri` (manual-e
 inline SVG QR χωρίς νέα εξάρτηση) → input για πρώτο κωδικό → `POST .../mfa/confirm` → δείξε τα
 recovery codes ΜΙΑ φορά → "Disable" flow (password re-entry, `DELETE .../mfa`). Μετά, ΤΕΛΕΥΤΑΙΟ:
 increment 80c = login-flow wiring.
+
+## 2026-07-20 (increment 82 — MFA enrollment UI panel: AccountSettingsPanel.tsx)
+
+Συνέχεια του #79/80a/81 πλάνου — αυτό είναι το **(β)** (enrollment UI), το τελευταίο πριν το
+πιο ρισκαρισμένο (γ) = login-flow wiring (80c). Καταναλώνει τα ήδη-χτισμένα routes (`GET/POST/
+DELETE /api/saas/account/mfa` + `POST .../mfa/confirm`) που μέχρι τώρα δεν είχαν καμία UI.
+
+**Built:**
+- **`components/saas/mfaSettings.ts`** (νέο, PURE + client-safe, ίδιο idiom με
+  `accountSettings.ts`): `mfaCodeReady(code)` (ακριβώς 6 ψηφία, trimmed — καθρεφτίζει το
+  `totp.ts`'s digit-count check), `mfaPasswordReady(password)` (non-blank gate), `describeMfaError
+  (status, serverError)` (μεταφράζει τα reason-code strings του `mfaStore.ts` σε φιλικό κείμενο:
+  `invalid_code`/`no_pending`/`crypto_unavailable`/`not_found`/`Invalid credentials`/`password is
+  required`).
+- **`AccountSettingsPanel.tsx`** (additive edit): νέο section «**Two-factor authentication**»
+  ανάμεσα σε Password και Your-data, δικό του state machine (`MfaStage`: idle → enrolling →
+  recovery-codes, + need-password-to-start/need-password-to-disable). Ροές:
+  - **Enable** (πρώτη φορά, `mfaEnabled=false`): κλικ → `POST /api/saas/account/mfa` χωρίς
+    password (ο server δεν το απαιτεί σε πρώτη εγγραφή, βλ. increment 81's
+    `mfaEnrollRequiresReauth`) → δείχνει **manual-entry secret** (select-all monospace box) + το
+    πλήρες `otpauth://` URI ως κείμενο (ΧΩΡΙΣ QR-rendering — αποφασίστηκε να παραλειφθεί σε αυτό
+    το increment, βλ. Needs Achilleas) → input 6-ψήφιου κωδικού → `POST .../mfa/confirm` → αν ΟΚ:
+    δείχνει τα **recovery codes ΜΙΑ φορά** (gold warning box + grid μονόχωρων codes,
+    `select-all`) με κουμπί «I've saved these codes» που κλείνει τη ροή.
+  - **Replace authenticator app** (`mfaEnabled=true`, restart enrollment): κλικ → πρώτα ζητά
+    **password** (mirrors `mfaEnrollRequiresReauth===true`) → `POST .../mfa {password}` → ίδια
+    enrolling/confirm/recovery-codes ροή όπως πάνω.
+  - **Disable**: κλικ → password prompt → `DELETE .../mfa {password}` → enabled=false, notice.
+  - Κάθε βήμα έχει «Cancel» (επιστρέφει σε idle, καθαρίζει state — το server-side pending secret
+    ΜΕΝΕΙ μέχρι νέο enrollment/confirm/disable, δεν είναι ενεργό οπότε δεν πειράζει).
+- **`(saas)/account/settings/page.tsx`** (additive edit): select επεκτάθηκε με `mfaEnabled` +
+  νέο prop `mfaCryptoReady={secretCryptoReady()}` (server-side, sync, από
+  `lib/tenancy/secretCrypto.ts` — ήδη pure/no-DB) περνιέται στο panel. Όταν `!mfaCryptoReady`
+  (λείπει `AUTH_SECRET`) το section δείχνει static μήνυμα «not available on this server yet»
+  αντί για buttons που θα αποτύχουν.
+- **`mfaSettings.test.ts`** (νέο, 10 tests): πάνω στους 3 pure helpers.
+
+**Απόφαση (μη ζητήθηκε ρητά, μικρή/reversible — δεν μπήκε στο ask-inbox)**: **καμία QR-code
+rendering σε αυτό το increment.** Το manual-entry secret + το πλήρες `otpauth://` URI ως
+selectable κείμενο καλύπτουν λειτουργικά το v1 (πολλά authenticator apps δέχονται paste του URI
+ή manual secret entry) χωρίς νέα εξάρτηση ή δικό μου QR-generation code. Αν το Achilleas το
+θεωρήσει must-have, είναι μικρό follow-up increment (π.χ. lightweight inline SVG QR, καμία lib).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run mfaSettings.test.ts
+accountSettings.test.ts mfaStore.test.ts` → **32/32**· full suite `npx vitest run` → **2845/2845
+green** (219 files). Κανένα shared component/layout/globals.css αγγίχτηκε, μηδέν νέα εξάρτηση.
+`SAAS_MODE` off/self-hosted = **zero effect** (το `(saas)` layout 404άρει όλο το segment πριν
+φτάσει στο panel· επιβεβαιώθηκε ότι ο τρέχων Docker container του Achilleas ΔΕΝ έχει `SAAS_MODE`
+set, άρα η σελίδα θα 404άρει ούτως ή άλλως εκεί). **Docker: ΔΕΝ έγινε rebuild** — καθαρό UI-layer
+πάνω σε ήδη-existing routes, μηδέν runtime wiring/env/dependency change, οπότε εκτός σκοπής για
+αυτό το run (βλ. οδηγία §3: rebuild μόνο όταν άλλαξε runtime wiring). **Browser-verify: skipped**
+για τον ίδιο λόγο — ο ζωντανός container τρέχει παλιότερο bundle χωρίς αυτές τις αλλαγές
+(rebuild θα ήταν εκτός σκοπής μόνο-για-verify) ΚΑΙ `SAAS_MODE` είναι off σε αυτή την
+εγκατάσταση, οπότε η σελίδα θα 404άρει ακόμα κι αν γινόταν rebuild. Collision guard: `git status
+--short` πριν το staging έδειξε μόνο τα 4 δικά μου αρχεία (καθαρό από τα ταυτόχρονα mobile-
+routine αρχεία που ήταν στο working tree νωρίτερα στη μέρα — committed από εκείνη τη routine στο
+μεταξύ), `git diff --cached --name-only` επιβεβαίωσε exact match.
+
+**## Needs Achilleas:**
+- Αξίζει ένα scannable **QR code** στο enrollment step (αντί μόνο manual-entry secret/URI); αν
+  ναι, lightweight inline SVG QR generator (καμία νέα εξάρτηση) είναι μικρό follow-up.
+- Timing του **increment 80c** (login-flow wiring): το πιο ρισκαρισμένο κομμάτι ακόμα — θέλει
+  ιδιαίτερη προσοχή στο session sequencing (interim "MFA-pending" state πριν την πλήρη σύνδεση)
+  και recovery-code consumption path. Θα προχωρήσω μόνο του σε επόμενο run, με προσοχή, εκτός αν
+  προτιμάς να το κάνω πιο σταδιακά/να το ελέγξεις πρώτα.
+
+**Next task:** increment 83 = **80c, login-flow wiring** — το `POST /api/saas/auth/login`
+χρειάζεται δεύτερο βήμα όταν `Account.mfaEnabled`: αντί για άμεσο session cookie, επιστρέφει ένα
+προσωρινό "MFA required" state (π.χ. short-lived signed token/cookie που ταυτοποιεί ΠΟΙΟΝ
+λογαριασμό, ΧΩΡΙΣ ακόμα να δίνει πρόσβαση) → νέο route/βήμα που δέχεται TOTP code Ή recovery
+code (`matchRecoveryCode`'s ήδη-έτοιμο index-splice contract, ΑΚΟΜΑ δεν καλείται από πουθενά) →
+μόνο τότε εκδίδεται το πραγματικό session cookie. Login UI (`(saas)/account/login/page.tsx`)
+χρειάζεται δικό του δεύτερο βήμα/state. Ιδιαίτερη προσοχή στο πλήρες test suite μετά (αγγίζει
+shared, security-critical auth plumbing) + στο recovery-code consumption (πρέπει να το βγάζει
+από τη λίστα ώστε να μη χρησιμοποιηθεί ξανά — `matchRecoveryCode` splice contract).

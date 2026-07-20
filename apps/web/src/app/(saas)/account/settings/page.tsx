@@ -5,6 +5,11 @@
 // the client. Account-level (not workspace-scoped) — mirrors AccountHomePage's top bar rather
 // than WorkspaceShell, since a viewer may have zero/one/many workspaces here.
 //
+// Increment 82 additive extension: also seeds the panel's "Two-factor authentication" section
+// (POST/DELETE /api/saas/account/mfa + POST .../mfa/confirm, built increment 80a) with the
+// account's current mfaEnabled flag + whether the server can even do the crypto
+// (secretCryptoReady — AUTH_SECRET configured). Still NOT wired into the login flow (80c).
+//
 // Gating: the (saas) layout 404s the whole segment when SAAS_MODE is off / AUTH_SECRET missing.
 // A logged-out viewer is redirected to /account/login. Additive + SaaS-only — the self-hosted
 // app never mounts this route, so it stays byte-for-byte unchanged.
@@ -13,6 +18,7 @@ import { redirect } from 'next/navigation';
 import { connectDB } from '@/lib/db';
 import { getSaasViewer } from '@/lib/tenancy/saasPage';
 import { Account } from '@/models/Account';
+import { secretCryptoReady } from '@/lib/tenancy/secretCrypto';
 import { SignOutButton } from '@/components/saas/SignOutButton';
 import { AccountSettingsPanel } from '@/components/saas/AccountSettingsPanel';
 
@@ -31,8 +37,8 @@ export default async function AccountSettingsPage() {
 
   await connectDB();
   const account = await Account.findById(viewer.sub)
-    .select('_id email name emailVerified')
-    .lean<{ _id: unknown; email?: string; name?: string; emailVerified?: boolean } | null>();
+    .select('_id email name emailVerified mfaEnabled')
+    .lean<{ _id: unknown; email?: string; name?: string; emailVerified?: boolean; mfaEnabled?: boolean } | null>();
   if (!account) {
     redirect(`/account/login?next=${encodeURIComponent('/account/settings')}`);
   }
@@ -61,6 +67,8 @@ export default async function AccountSettingsPage() {
           email={account.email || ''}
           name={account.name || ''}
           emailVerified={!!account.emailVerified}
+          mfaEnabled={!!account.mfaEnabled}
+          mfaCryptoReady={secretCryptoReady()}
         />
       </div>
     </div>

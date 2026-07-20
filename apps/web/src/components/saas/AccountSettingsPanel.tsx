@@ -1,12 +1,15 @@
 'use client';
 
 // Client interactivity for the user-facing account "Settings" page ((saas)/account/settings).
-// Consumes three already-built control-plane routes that had zero UI until now:
-//   PATCH /api/saas/account           — update display name / email (own account)
-//   POST  /api/saas/account/password  — change password (re-verifies the current one)
-//   GET   /api/saas/account/export    — download a JSON copy of the account's own data
-// The page server-renders the initial profile; the profile/password mutations here
-// router.refresh() afterwards so the server re-reads the source of truth, same idiom as
+// Consumes control-plane routes that had zero UI until now:
+//   PATCH  /api/saas/account            — update display name / email (own account)
+//   POST   /api/saas/account/password   — change password (re-verifies the current one)
+//   GET    /api/saas/account/export     — download a JSON copy of the account's own data
+//   GET/POST/DELETE /api/saas/account/mfa + POST .../mfa/confirm — TOTP enrollment (increment
+//     82, following 80a's routes + 81's re-auth fix). NOT wired into login yet (80c) — enabling
+//     this here does not yet change what a sign-in requires.
+// The page server-renders the initial profile/MFA status; the mutations here router.refresh()
+// afterwards so the server re-reads the source of truth, same idiom as
 // WorkspaceSettingsPanel/MembersPanel. The export is a plain authenticated `<a>` link — the
 // browser sends the session cookie itself, no client JS needed to trigger the download.
 import { useState } from 'react';
@@ -16,12 +19,23 @@ import {
   passwordSaveReady,
   describeAccountSettingsError,
 } from './accountSettings';
+import { mfaCodeReady, mfaPasswordReady, describeMfaError } from './mfaSettings';
 
 type Props = {
   email: string;
   name: string;
   emailVerified: boolean;
+  mfaEnabled: boolean;
+  mfaCryptoReady: boolean;
 };
+
+/** Which sub-form the "Two-factor authentication" section is currently showing. */
+type MfaStage =
+  | 'idle'
+  | 'need-password-to-start' // restart enrollment while already enabled (mfaEnrollRequiresReauth)
+  | 'enrolling' // secret/uri shown, waiting for the first code
+  | 'need-password-to-disable'
+  | 'recovery-codes'; // one-time display right after a successful confirm
 
 async function callJson(
   url: string,
@@ -47,7 +61,7 @@ async function callJson(
   return { ok: res.ok, status: res.status, data };
 }
 
-export function AccountSettingsPanel({ email, name, emailVerified }: Props) {
+export function AccountSettingsPanel({ email, name, emailVerified, mfaEnabled, mfaCryptoReady }: Props) {
   const router = useRouter();
 
   const [current, setCurrent] = useState({ name, email });
@@ -64,6 +78,18 @@ export function AccountSettingsPanel({ email, name, emailVerified }: Props) {
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordNotice, setPasswordNotice] = useState<string | null>(null);
+
+  const [mfaOn, setMfaOn] = useState(mfaEnabled);
+  const [mfaStage, setMfaStage] = useState<MfaStage>('idle');
+  const [mfaSecret, setMfaSecret] = useState<string | null>(null);
+  const [mfaUri, setMfaUri] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaReauthPassword, setMfaReauthPassword] = useState('');
+  const [mfaDisablePassword, setMfaDisablePassword] = useState('');
+  const [mfaRecoveryCodes, setMfaRecoveryCodes] = useState<string[] | null>(null);
+  const [mfaBusy, setMfaBusy] = useState(false);
+  const [mfaError, setMfaError] = useState<string | null>(null);
+  const [mfaNotice, setMfaNotice] = useState<string | null>(null);
 
   const canSaveProfile =
     !profileBusy && profileSaveReady({ name: nameInput, email: emailInput }, current);
@@ -116,6 +142,90 @@ export function AccountSettingsPanel({ email, name, emailVerified }: Props) {
     setNewPassword('');
     setConfirmPassword('');
     setPasswordNotice('Password changed.');
+  }
+
+  function resetMfaFlow() {
+    setMfaStage('idle');
+    setMfaSecret(null);
+    setMfaUri(null);
+    setMfaCode('');
+    setMfaReauthPassword('');
+    setMfaDisablePassword('');
+    setMfaError(null);
+  }
+
+  /** Click "Enable" (never enrolled) or "Replace authenticator app" (already enabled). The
+   * server requires a password re-check only in the latter case (mfaEnrollRequiresReauth) —
+   * mirrored here so a first-time enrollment skips straight to the QR/secret step. */
+  function clickStartEnrollment() {
+    setMfaError(null);
+    setMfaNotice(null);
+    if (mfaOn) {
+      setMfaStage('need-password-to-start');
+    } else {
+      void beginEnrollment();
+    }
+  }
+
+  async function beginEnrollment(password?: string) {
+    setMfaBusy(true);
+    setMfaError(null);
+    const { ok, status, data } = await callJson('/api/saas/account/mfa', 'POST', password ? { password } : {});
+    setMfaBusy(false);
+    if (!ok) {
+      setMfaError(describeMfaError(status, data.error));
+      return;
+    }
+    setMfaSecret((data.secret as string) ?? null);
+    setMfaUri((data.uri as string) ?? null);
+    setMfaReauthPassword('');
+    setMfaCode('');
+    setMfaStage('enrolling');
+  }
+
+  async function confirmEnrollment() {
+    if (!mfaCodeReady(mfaCode)) return;
+    setMfaBusy(true);
+    setMfaError(null);
+    const { ok, status, data } = await callJson('/api/saas/account/mfa/confirm', 'POST', {
+      code: mfaCode.trim(),
+    });
+    setMfaBusy(false);
+    if (!ok) {
+      setMfaError(describeMfaError(status, data.error));
+      return;
+    }
+    setMfaOn(true);
+    setMfaRecoveryCodes((data.recoveryCodes as string[]) ?? []);
+    setMfaSecret(null);
+    setMfaUri(null);
+    setMfaCode('');
+    setMfaStage('recovery-codes');
+    router.refresh();
+  }
+
+  function finishRecoveryCodes() {
+    setMfaRecoveryCodes(null);
+    setMfaNotice('Two-factor authentication is enabled.');
+    resetMfaFlow();
+  }
+
+  async function confirmDisable() {
+    if (!mfaPasswordReady(mfaDisablePassword)) return;
+    setMfaBusy(true);
+    setMfaError(null);
+    const { ok, status, data } = await callJson('/api/saas/account/mfa', 'DELETE', {
+      password: mfaDisablePassword,
+    });
+    setMfaBusy(false);
+    if (!ok) {
+      setMfaError(describeMfaError(status, data.error));
+      return;
+    }
+    setMfaOn(false);
+    setMfaNotice('Two-factor authentication is disabled.');
+    resetMfaFlow();
+    router.refresh();
   }
 
   return (
@@ -248,6 +358,216 @@ export function AccountSettingsPanel({ email, name, emailVerified }: Props) {
           >
             {passwordBusy ? 'Saving…' : 'Change password'}
           </button>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
+        <h2 className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
+          Two-factor authentication
+          {mfaOn && (
+            <span className="rounded-full border border-[color:var(--color-accent)]/40 px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-accent)]">
+              enabled
+            </span>
+          )}
+        </h2>
+        <div className="mt-3 space-y-3">
+          {mfaError && (
+            <div
+              role="status"
+              className="rounded-lg border border-[color:var(--color-red)]/45 bg-[color:var(--color-red)]/10 px-3 py-2 text-sm text-[color:var(--color-red)]"
+            >
+              {mfaError}
+            </div>
+          )}
+          {mfaNotice && !mfaError && mfaStage === 'idle' && (
+            <div
+              role="status"
+              className="rounded-lg border border-[color:var(--color-accent)]/45 bg-[color:var(--color-accent)]/10 px-3 py-2 text-sm text-[color:var(--color-accent)]"
+            >
+              {mfaNotice}
+            </div>
+          )}
+
+          {!mfaCryptoReady && (
+            <p className="text-sm text-[color:var(--color-text-dim)]">
+              Two-factor authentication is not available on this server yet.
+            </p>
+          )}
+
+          {mfaCryptoReady && mfaStage === 'idle' && (
+            <>
+              <p className="text-sm text-[color:var(--color-text-dim)]">
+                {mfaOn
+                  ? 'An authenticator app is required at sign-in in addition to your password.'
+                  : 'Require a code from an authenticator app (Google Authenticator, 1Password, …) in addition to your password.'}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={clickStartEnrollment}
+                  disabled={mfaBusy}
+                  className="rounded-lg border border-[color:var(--color-accent)] px-4 py-2 text-sm font-medium text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/10 disabled:opacity-40"
+                >
+                  {mfaOn ? 'Replace authenticator app' : 'Enable two-factor authentication'}
+                </button>
+                {mfaOn && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMfaError(null);
+                      setMfaStage('need-password-to-disable');
+                    }}
+                    disabled={mfaBusy}
+                    className="rounded-lg border border-[color:var(--color-red)]/50 px-4 py-2 text-sm font-medium text-[color:var(--color-red)] hover:bg-[color:var(--color-red)]/10 disabled:opacity-40"
+                  >
+                    Disable
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          {mfaStage === 'need-password-to-start' && (
+            <div className="space-y-3">
+              <p className="text-sm text-[color:var(--color-text-dim)]">
+                Enter your password to replace your current authenticator app.
+              </p>
+              <input
+                type="password"
+                value={mfaReauthPassword}
+                onChange={(e) => setMfaReauthPassword(e.target.value)}
+                autoComplete="current-password"
+                disabled={mfaBusy}
+                className="w-full max-w-sm rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 text-sm text-[color:var(--color-text)] disabled:opacity-60"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => beginEnrollment(mfaReauthPassword)}
+                  disabled={mfaBusy || !mfaPasswordReady(mfaReauthPassword)}
+                  className="rounded-lg border border-[color:var(--color-accent)] px-4 py-2 text-sm font-medium text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/10 disabled:opacity-40"
+                >
+                  {mfaBusy ? 'Continuing…' : 'Continue'}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetMfaFlow}
+                  disabled={mfaBusy}
+                  className="rounded-lg border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-text-dim)] hover:border-[color:var(--color-border-light)]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mfaStage === 'enrolling' && mfaSecret && (
+            <div className="space-y-3">
+              <p className="text-sm text-[color:var(--color-text-dim)]">
+                Add this key to your authenticator app, then enter the 6-digit code it shows.
+              </p>
+              <div className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3">
+                <p className="text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
+                  Manual entry key
+                </p>
+                <p className="mt-1 select-all break-all font-mono text-sm text-[color:var(--color-text)]">
+                  {mfaSecret}
+                </p>
+                {mfaUri && (
+                  <p className="mt-2 select-all break-all font-mono text-xs text-[color:var(--color-text-faint)]">
+                    {mfaUri}
+                  </p>
+                )}
+              </div>
+              <label className="block text-sm">
+                <span className="text-[color:var(--color-text-dim)]">6-digit code</span>
+                <input
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="000000"
+                  disabled={mfaBusy}
+                  className="mt-1 w-full max-w-[10rem] rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 text-center font-mono text-lg tracking-[0.3em] text-[color:var(--color-text)] disabled:opacity-60"
+                />
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={confirmEnrollment}
+                  disabled={mfaBusy || !mfaCodeReady(mfaCode)}
+                  className="rounded-lg border border-[color:var(--color-accent)] px-4 py-2 text-sm font-medium text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/10 disabled:opacity-40"
+                >
+                  {mfaBusy ? 'Verifying…' : 'Confirm'}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetMfaFlow}
+                  disabled={mfaBusy}
+                  className="rounded-lg border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-text-dim)] hover:border-[color:var(--color-border-light)]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mfaStage === 'need-password-to-disable' && (
+            <div className="space-y-3">
+              <p className="text-sm text-[color:var(--color-text-dim)]">
+                Enter your password to disable two-factor authentication.
+              </p>
+              <input
+                type="password"
+                value={mfaDisablePassword}
+                onChange={(e) => setMfaDisablePassword(e.target.value)}
+                autoComplete="current-password"
+                disabled={mfaBusy}
+                className="w-full max-w-sm rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 text-sm text-[color:var(--color-text)] disabled:opacity-60"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={confirmDisable}
+                  disabled={mfaBusy || !mfaPasswordReady(mfaDisablePassword)}
+                  className="rounded-lg border border-[color:var(--color-red)]/50 px-4 py-2 text-sm font-medium text-[color:var(--color-red)] hover:bg-[color:var(--color-red)]/10 disabled:opacity-40"
+                >
+                  {mfaBusy ? 'Disabling…' : 'Disable two-factor authentication'}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetMfaFlow}
+                  disabled={mfaBusy}
+                  className="rounded-lg border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-text-dim)] hover:border-[color:var(--color-border-light)]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {mfaStage === 'recovery-codes' && mfaRecoveryCodes && (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-[color:var(--color-gold)]/45 bg-[color:var(--color-gold)]/10 px-3 py-2 text-sm text-[color:var(--color-gold)]">
+                Save these recovery codes now — each works once, and they will not be shown
+                again. Use one if you ever lose access to your authenticator app.
+              </div>
+              <div className="grid grid-cols-2 gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3 font-mono text-sm text-[color:var(--color-text)]">
+                {mfaRecoveryCodes.map((c) => (
+                  <span key={c} className="select-all">
+                    {c}
+                  </span>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={finishRecoveryCodes}
+                className="rounded-lg border border-[color:var(--color-accent)] px-4 py-2 text-sm font-medium text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/10"
+              >
+                I've saved these codes
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
