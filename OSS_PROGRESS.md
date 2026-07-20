@@ -2124,3 +2124,27 @@ Collision guard: `git status --short` στην αρχή έδειξε ΚΑΘΑΡ�
 **Το notifications module test coverage ΕΚΛΕΙΣΕ ΠΛΗΡΩΣ (μέρος 1+2/2)**.
 
 Sweep για επόμενα targets: `app/*/actions.ts` χωρίς sibling test — **μικρά καλά candidates** (χαμηλό mocking surface, σαν τα cards/giftcard/tasks): `login/actions.ts` (32 γραμμές), `history/actions.ts` (50), `setup/actions.ts` (59), `vouchers/actions.ts` (78, ΠΡΟΣΟΧΗ διαφορετικό απ' το ήδη-καλυμμένο `giftcardActions.ts`/`loyaltyActions.ts` στον ίδιο φάκελο), `bills/actions.ts` (122), `shopping-list/actions.ts` (127), `subscriptions/actions.ts` (170). **Απόφυγε** τα μεγάλα ήδη-έμμεσα-καλυμμένα (`items/actions.ts` 1569 γραμμές, `settings/actions.ts` 1789, `statements/actions.ts` 928, `receipts/actions.ts` 756, `expenses/actions.ts` 621 — όλα πλούσια exercised μέσω των αντίστοιχων `api/v1/*/route.test.ts`, direct-testing θα ήταν βαρύ mocking για μερική επικάλυψη). Διάβασε ΠΡΩΤΑ το κάθε υποψήφιο αρχείο πριν διαλέξεις (μέγεθος δεν αρκεί, δες αν έχει actual validation/branching λογική άξια pin-αρίσματος όπως το tasks.ts asymmetric completedAt finding, ή αν είναι τετριμμένο σαν το απορριφθέν `i18nActions.ts`). Έλεγξε ΠΑΝΤΑ πρώτα `git status` collision-guard. Ένα module ανά run.
+
+---
+
+## 2026-07-20 (cont.²⁸ — bills/actions.test.ts, CRUD + pay/unpay lifecycle)
+
+**Task: DB-mocked unit test για `apps/web/src/app/bills/actions.ts`** (P28, 122 γραμμές) — επόμενο από τη sweep-λίστα του προηγούμενου run.
+
+Collision guard: `git status --short` στην αρχή έδειξε 4 foreign αρχεία (mobile/api.ts, mobile/SubscriptionsScreen.tsx, api/v1/subscriptions/route.ts+test — WIP κάποιας άλλης routine), κανένα από τα δικά μου target files. Δεν τα άγγιξα. Μέχρι το commit είχαν ήδη εξαφανιστεί από το `git status` (η άλλη routine έκανε commit στο μεταξύ) — το δικό μου staged diff έδειξε ΜΟΝΟ το νέο μου αρχείο.
+
+Διάβασα ολόκληρο το αρχείο: `createBill`/`updateBill` (Zod `BillFormSchema` με defaults + `safeDateOrNull` στο dueDate), `setBillArchived`/`deleteBill` (soft delete), και το πιο ενδιαφέρον κομμάτι, `markBillPaid` — opt-in expense logging (μόνο όταν `!wasPaid && !linkedExpenseId && amount>0`) + idempotent recurring spawn (νέο Bill instance ΜΟΝΟ την πρώτη φορά που πληρώνεται μια recurring bill, guard `!wasPaid`, `dueDate` προχωρημένο μέσω του πραγματικού `nextBillDue`). `markBillUnpaid` καθαρό clear.
+
+**Σχεδιαστική επιλογή (ίδιο pattern με τα προηγούμενα direct-actions tests)**: `lib/bill.ts` (`nextBillDue`) και `lib/dates.ts` (`safeDateOrNull`) ΔΕΝ mockαρίστηκαν — και τα δύο pure/deterministic με ΔΙΚΑ ΤΟΥΣ dedicated test files ήδη· τρέχοντας τα πραγματικά pin-άρει το end-to-end wiring (σωστό cycle-advance, σωστό date-parse) αντί για hand-rolled stand-in. Mockαρίστηκαν μόνο: `@/lib/db` (connectDB), `@/models/Bill` (create/findById/findByIdAndUpdate/updateOne), `@/app/expenses/actions` (`addExpense` — cross-module server action, δικιά του λογική ήδη καλυμμένη αλλού), `next/cache`.
+
+Τι έγινε: Νέο `bills/actions.test.ts` (30 tests): createBill (7: defaults, amount-coerce, missing-title-key vs empty-string-title δύο διαφορετικά zod μηνύματα, ίδιο για dueDate, invalid cycle enum, revalidate-only-on-success), updateBill (4), setBillArchived (2), deleteBill (1: soft-delete assertion), markBillPaid (12: not-found short-circuit, default-now paidAt+preserves-existing-linkedExpenseId, explicit paidDate parse, blank-paidDate fallback, logExpense happy-path+vendor-fallback-to-title, logExpense skipped σε 3 guard-permutations [already-paid / already-linked / amount-zero], addExpense-failure-leaves-linkedExpenseId-empty, recurring-spawn-once + skip-on-re-mark + skip-on-one-off), markBillUnpaid (1).
+
+**Bug στο 1ο πέρασμα (διορθώθηκε)**: υπέθεσα ότι missing title/dueDate θα έβγαζε τα custom `.min(1,'...')` μηνύματα, αλλά ένα ΑΠΟΝ form key (όχι empty string) δεν περνάει καν από το min-check — η zod default `"Required"` error βγαίνει πρώτη. Split σε 2 ξεχωριστά tests ανά πεδίο (missing-key→"Required", empty-string→custom message) ώστε να πιαστεί η πραγματική συμπεριφορά αντί να υποτεθεί.
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/bills/actions.test.ts"` → 30/30 passed.
+- `npx vitest run` (όλο το suite) → **215 files, 2787/2787 passed** (από 213/2749).
+- `npm run type-check` (tsc --noEmit) → 1 σφάλμα αρχικά (`addExpenseMock`'s inferred return type δεν δεχόταν το `{ok:false, error}` variant σε ένα test) → fix με explicit union type cast στο hoisted mock → exit 0, καθαρό.
+- Collision guard: `git status --short`/`git diff --cached --name-only` πριν το commit έδειξαν ΜΟΝΟ το νέο αρχείο μου. `git fetch origin main` → ahead 1, καθαρό fast-forward, push σε `origin main` επιτυχές (31cc37c..2a904ab), χωρίς rebase ανάγκη.
+
+Suggested next task: επόμενο από την ίδια sweep-λίστα (αγγικτο ακόμα): `shopping-list/actions.ts` (127 γραμμές) ή `subscriptions/actions.ts` (170 γραμμές, ΠΡΟΣΟΧΗ πιθανό foreign WIP εκεί από άλλη routine — έλεγξε `git status` πρώτα, αν κάτι αγγίζει subscriptions skip το αυτή τη φορά) ή τα μικρότερα `login/actions.ts`/`history/actions.ts`/`setup/actions.ts`/`vouchers/actions.ts`. Διάβασε ΠΡΩΤΑ το υποψήφιο πριν διαλέξεις. Έλεγξε ΠΑΝΤΑ πρώτα `git status` collision-guard. Ένα module ανά run.
