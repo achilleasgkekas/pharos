@@ -472,6 +472,28 @@ is `false` and the timestamp fields are `null`.
 > GitHub/Google-style scheduled-deletion window) held in a single named constant; the
 > final product value is still to be decided.
 
+#### Delete workspace UI (settings page)
+
+The workspace owner can request erasure via the **"Delete workspace" danger-zone panel**
+in the workspace settings page (`/account/workspace/<slug>/settings`). The panel is
+**owner-only** (members and admins see no button) and displays two states:
+
+**Not requested (initial state):**
+- Button: "Delete workspace" (red border + text)
+- Copy: "Permanently delete this workspace and every member's data. There is a N-day grace window to change your mind before anything is erased."
+- Clicking triggers a confirmation dialog: "Schedule this workspace for permanent deletion in N days? Every member will lose access and all data will be erased. You can cancel any time before then."
+- On confirmation, sends `POST /api/saas/workspace/erasure` with `{ tenant: <slug> }`
+
+**Requested (deletion scheduled):**
+- Button: "Cancel deletion" (accent border + text)
+- Copy: "Permanent deletion is scheduled (N days left). Every member will permanently lose access and all data will be erased once the window closes."
+  - The countdown phrase updates live based on the server's `graceDaysLeft`: "1 day left", "due for deletion now", or "N days left"
+- Clicking sends `DELETE /api/saas/workspace/erasure?tenant=<slug>` to cancel
+
+**Error handling:** Failed requests (401/403/404/500) display a red error box with a human-readable message below the copy, and the button remains enabled for retry.
+
+**Implementation:** The panel consumes the `/api/saas/workspace/erasure` GET endpoint (on page load, read server-side by the page layout) and the POST/DELETE endpoints (called from the client via the `ErasurePanel.tsx` component). Panel state refreshes via `router.refresh()` after every request, ensuring the countdown and button state are in sync with the server.
+
 #### Erasure purge scan (report-only)
 
 Once a workspace passes its grace window (`due: true`), it awaits **permanent
