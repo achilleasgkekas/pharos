@@ -1884,3 +1884,39 @@ Validation: markdown only, κανενα build/Docker/AI call. Code fences: saas.
 Collision guard: git status --short = ΜΟΝΟ docs/saas.md (δικο μου), 0 staged/uncommitted foreign files.
 
 Επομενο run: (α) αν αλλα νέα SaaS routes ή pages προστεθουν (π.χ. workspace-onboarding checklist), update saas.md · (β) api.md sync αν νέα v1 routes landed (π.χ. bills/* endpoints που περιμένουν) · (γ) features.md stale-forward για αλλα νέα shipped features.
+
+## 2026-07-20 (seventh run — workspace data export UI documentation)
+
+Νέα feature landed: "workspace data export links" (commit b39a168, increment 74). Το feature
+ενσωματώνει UI links για τις already-documented export endpoints στο WorkspaceSettingsPanel
+(Data export section).
+
+Τι εγραψα:
+- **saas.md**: ενημέρωσα το `/account/workspace/settings` row (line 609) στην "Workspace
+console UI" table να αναφέρει τη νέα "Data export" section (owner/admin only). Προσθεσα
+λεπτομέρειες για τις δύο download links:
+  - "Download workspace data" → GET /api/saas/workspace/export (Mongo content dump as JSON)
+  - "Download file manifest" → GET /api/saas/workspace/export/files (file metadata only)
+- Διευκρίνησα ότι και οι δύο links χρησιμοποιούν το ίδιο download idiom με το account-level
+GDPR export (/account/settings), απλώς scoped σε `?tenant=` αντί `?account=`.
+- Linked σε τις already-documented export sections (lines 311, 361) ώστε αναγνώστης να
+μπορεί να βρει τη πλήρη τεχνική τεκμηρίωση και payload shapes.
+
+Accuracy verified εναντι κώδικα:
+- apps/web/src/components/saas/WorkspaceSettingsPanel.tsx (commits b39a168): Data export
+section render, δύο plain `<a>` download links με href `/api/saas/workspace/export`
+και `/api/saas/workspace/export/files`, scoped με `?tenant=` query param.
+- Endpoints ήδη documented (lines 311, 361, μόνο add UI mention).
+
+Validation: markdown only, κανενα build/Docker/AI call. Code fences: 18 (9 balanced blocks,
+αθικτα). Internal links resolve: `#account-settings-ui-accountsettings` (line 200) ✓,
+`#workspace-content-export-gdpr-portability` (line 311) ✓, `#workspace-file-binary-manifest-gdpr-portability`
+(line 361) ✓. Secret scan: κανένα literal credential ✓.
+
+Collision guard: git status --short = ΜΟΝΟ docs/saas.md modified (δικο μου), 0 staged/uncommitted
+foreign files. Commit e15b67f pushed main.
+
+Επομενο run: (α) αν αλλα νέα SaaS features προστεθουν (π.χ. billing/subscription management
+links, custom domain management, SSO configuration), update saas.md · (β) api.md sync αν νέα
+v1 routes landed · (γ) features.md stale-forward για άλλα shipped features.
+
