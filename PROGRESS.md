@@ -6769,3 +6769,74 @@ queue παραμένει σχεδόν άδειο (μόνο P31/P36/P16 blocked) 
 ## Needs Achilleas
 
 - Τίποτα νέο από αυτό το run.
+
+## 2026-07-21 (pharos-daily-dev, 1ο run της ημέρας)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `mkdir /tmp/claude-docker.lock` (lock acquired καθαρά,
+κανένα άλλο routine έτρεχε build). `ASK_ACHILLEAS.md` είχε 2 OPEN items, και τα δύο από άλλο routine
+(`bakecore-finance`, άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή, μηδέν
+uncommitted commits από το χθεσινό (τελευταίο commit `2672c8d`, 2026-07-20 23:49).
+
+**Approved queue check (βήμα a)**: επιβεβαίωσα το `PRODUCT_BACKLOG.md → ## Approved` section: μόνο **P31**
+(household/shared access, 4ο deferral, χρειάζεται supervised session — auth enforcement σε δεκάδες αρχεία,
+μηδέν τρόπος να επαληθευτεί unattended) και **P36** (Open Banking, χρειάζεται provider-decision) + **P16**
+Firefly III/Grocy (χρειάζεται πραγματικό sample export file) παραμένουν πραγματικά blocked, ίδια εικόνα με
+το χθεσινό run. **Fallback στο βήμα (b)**: το suggested next task του χθεσινού (6ου) run: top-2 ισοδύναμες
+επιλογές ήταν **P20** loyalty card wallet (L, νέο entity + νέο RN barcode-rendering dep) και **P21**
+document/manual vault (M, read-only πρώτα, reuse του ήδη-existing photos serving pattern). Διάλεξα το **P21**
+ως πιο ασφαλές scope για ένα unattended run (μηδέν νέο native dependency, ίδιο idiom με τα ήδη-shipped
+photos/links blocks) — το P20 παραμένει το επόμενο buildable item.
+
+**Item document/manual vault στο mobile (P21 gap) — ✅ SHIPPED (read-only phase)** (commit `ab2687e`). Πλήρες
+detail στο `MOBILE_PARITY.md` entry (τώρα marked DONE). Σύνοψη: `GET /api/v1/items/[id]`
+(`apps/web/src/app/api/v1/items/[id]/route.ts`) πλέον επιστρέφει `attachments: [{path,name,mimeType,size,
+uploadedAt}]` (mirror του πώς εκτίθεται το ήδη-υπάρχον `photos` array, defaults σε `[]`). Mobile: `api.ts`
+νέο `Attachment` type + `ItemDetail.attachments`· `ItemsScreen.tsx` `PriceBlock` νέο **«DOCUMENTS»** section
+(ανάμεσα σε Photos και Links blocks) — κάθε row: icon-by-mimetype (🖼/📄/📎) ή thumbnail (image mimeType,
+reuse `fileSource()` ίδιο idiom με τα photos), όνομα, formatted size chip.
+
+**Gotcha που βρέθηκε κατά την υλοποίηση (research agent, ΟΧΙ needs-Achilleas — τεχνικός περιορισμός)**: το
+`/api/files` route δέχεται session-cookie ΕΙΤΕ Bearer header, ΟΧΙ query-param token. Το `fileSource()` λύνει
+αυτό για `<Image>` (RN `source.headers` στέλνει το auth header) — δουλεύει ήδη για photos ΚΑΙ τώρα για
+image-type attachments. Αλλά το `Linking.openURL()` (το μοναδικό «open externally» μηχανισμό στο screen)
+ανοίγει bare URL χωρίς κανένα header → ένα πραγματικό PDF manual θα έπαιρνε σιωπηλό 401. **Fix**: non-image
+attachments δεν καλούν `Linking.openURL`· tap δείχνει `Alert.alert` «Open "…" from the Pharos web app for
+now» (honest degrade αντί για broken/silent-fail tap). **Follow-up για πλήρες tap-to-open**: νέο RN dep
+(`expo-file-system`+`expo-sharing` για download-then-share, ή `react-native-webview` με headers prop — κανένα
+δεν είναι installed σήμερα) ή backend addition (short-lived signed query-param token στο `/api/files`).
+**Νέο εύρημα για το upload follow-up (phase 2)**: υπάρχει ΗΔΗ multipart precedent στο v1 API
+(`/api/v1/scan/receipt|expense|product` δέχονται `multipart/form-data`) — ο μελλοντικός
+`POST /api/v1/items/[id]/attachments` μπορεί να mirror-άρει αυτό το idiom αντί να σχεδιαστεί from scratch.
+
+**Verify**: `npm run type-check` (web) EXIT 0· `apps/mobile npx tsc --noEmit` EXIT 0. `npx vitest run
+src/app/api/v1/items` (targeted) **122/122 passed** (+2 νέα στο `[id]/route.test.ts`: attachments map +
+empty-default). Full `npx vitest run` **2848 passed / 15 skipped / 219 of 220 files** — 1 προϋπάρχον/άσχετο
+failure (`src/lib/tenancy/workspaceFiles.test.ts`, hook timeout 10s, SaaS tenancy file test, μηδέν σχέση με
+τα items/attachments που άγγιξα, πιθανώς system load από παράλληλα background type-checks· δεν το άγγιξα).
+Docker: `mkdir /tmp/claude-docker.lock` (lock acquired καθαρά) → `docker compose build web` OK → mongo ήδη
+healthy → `up -d web` → `RestartCount=0`, `/login` 200 στην 1η προσπάθεια. `curl /api/v1/items` +
+`/api/v1/items/:id` χωρίς token + bogus token → και τα τρία 401 (όχι 500 — το additive `attachments` πεδίο
+δεν έσπασε το auth gate). `docker logs` καθαρό (μόνο το προϋπάρχον stale-Server-Action noise από ένα
+ήδη-ανοιχτό browser tab, γνωστό/documented, χρειάζεται hard-refresh όχι server fix). Browser-checked (Claude
+Browser pane): `/login` → «Sign in · Pharos», μηδέν console errors. `docker builder prune -f` (7.172MB
+freed), lock released καθαρά. **Το πραγματικό mobile UI (Documents section rendering) ΔΕΝ testable
+end-to-end unattended** (χρειάζεται login + real item με attachments + Expo simulator) — verified πλήρως
+μέσω route tests + type-check και στα δύο apps, ίδιος περιορισμός με κάθε προηγούμενο mobile-parity
+shipment.
+
+**Working tree note**: στο τέλος του run υπήρχαν uncommitted αλλαγές σε 4 SaaS/MFA αρχεία (`api/saas/auth/
+login/route.ts`, `components/saas/mfaSettings.ts`, `lib/tenancy/accountSession.ts`, `lib/tenancy/mfaStore.ts`)
++ νέος φάκελος `api/saas/auth/mfa/` — προφανώς in-progress δουλειά από άλλο routine (saas-core, MFA
+enrollment). Δεν τα άγγιξα, δεν τα stage-αρα (explicit `git add` μόνο στα 5 δικά μου αρχεία), τα άφησα
+uncommitted στο working tree όπως τα βρήκα.
+
+**Suggested next task**: **loyalty card wallet στο mobile** (P20 gap, P2/L, ήδη πλήρως speced στο
+`MOBILE_PARITY.md` — νέο `LoyaltyCard` v1 CRUD routes + RN barcode-display primitive
+[`react-native-barcode-svg` προτεινόμενο]). Ισοδύναμη εναλλακτική: το tap-to-open follow-up για το P21 που
+μόλις έκλεισε (χρειάζεται builder decision ανάμεσα σε νέο RN file-viewer dep vs signed-URL backend addition
+— δες παραπάνω, ΟΧΙ needs-Achilleas, καθαρά τεχνική επιλογή). Το Approved queue παραμένει σχεδόν άδειο
+(μόνο P31/P36/P16 blocked) — αν εγκριθεί κάτι νέο νωρίτερα, αυτό βγαίνει προτεραιότητα (βήμα a).
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run.
