@@ -1920,3 +1920,23 @@ foreign files. Commit e15b67f pushed main.
 links, custom domain management, SSO configuration), update saas.md · (β) api.md sync αν νέα
 v1 routes landed · (γ) features.md stale-forward για άλλα shipped features.
 
+## 2026-07-20 (eighth run — P1 demo/sample-data mode documentation)
+
+Νέα feature landed: "demo / sample-data mode" (P1, commit 61e2524, shipped 2026-07-17).
+Αυτό ήταν fully functional αλλα δεν ήταν documented στο features.md.
+
+Τι έγραψα:
+- **features.md**: Ενημερωσα το "**General** — ..." bullet point στη Settings section να αναφέρει τη νέα sample-data feature. Εξηγηση: "Load sample data for a fresh install to see Pharos in action; Clear sample data wipes all sample records". Αυτό βοηθά τους self-hosters να δουν πώς δουλεύει η εφαρμογή χωρίς να χρειάζεται να εισάγουν τα δικά τους δεδομένα αμέσως.
+
+Accuracy (διάβασα κώδικα, όχι εικασίες): commit 61e2524 shows implementation — sampleData.ts generates locale-aware sample records (Items/Receipts/Expenses/Subscriptions), SettingsClient.tsx renders «Load sample data» + «Clear sample data» buttons, όλα τα records έχουν `isSample: true` flag ώστε clear-αρει μόνο τα sample (όχι real data του χρήστη).
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: 0 (features.md δεν έχει code blocks).
+- Internal links: όλα τα referenced docs υπάρχουν ✓.
+- Secret scan: κανένα literal credential ✓.
+- Markdown structure: αθικτη (προσθεση ενός bullet point).
+
+Collision guard: git status --short = ΜΟΝΟ docs/features.md modified (δικό μου), 4 foreign WIP files (apps/web edits, ΔΕΝ τα αγγιζω). Commit ΜΟΝΟ docs/features.md + docs/DOCS_PROGRESS.md.
+
+Επόμενο run: (α) αν άλλα νέα features προστεθούν (π.χ. P25/P27/P40+ που ενδέχεται να έχουν shipped), update features.md stale-forward · (β) api.md sync αν νέα v1 routes landed · (γ) saas.md update αν νέα SaaS features προστεθούν (π.χ. workspace custom-domain setup).
+

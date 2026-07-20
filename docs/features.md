@@ -451,7 +451,8 @@ avoid blocking a re-import of the same month.)
 Configuration is grouped into tabs:
 
 - **General** — appearance, currency, default VAT, default item view, warranty
-  defaults, budgets, about.
+  defaults, budgets, **demo / sample data** (Load sample data for a fresh install
+  to see Pharos in action; Clear sample data wipes all sample records), about.
 - **Money** — budgets (with a **Suggest from history** button that pre-fills
   per-category targets from the median of your last three complete months),
   manual asset accounts, asset depreciation, and payment cards.
