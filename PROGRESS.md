@@ -6504,3 +6504,50 @@ rollover mode (P25 gap, M), και τα δύο ήδη πλήρως speced στο
 ## Needs Achilleas
 
 - Τίποτα νέο από αυτό το run.
+
+## 2026-07-20 (pharos-daily-dev, 3ο run της ημέρας)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε μόνο ένα OPEN item από το
+bakecore-finance routine (άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή, κανένα
+foreign uncommitted WIP αυτή τη φορά.
+
+**Approved queue check (βήμα a)**: επιβεβαίωσα ξανά ότι το `PRODUCT_BACKLOG.md` Approved queue παραμένει με ΜΟΝΟ
+P31 (deferred, supervised session) και P36 (blocked, provider-decision) πραγματικά ανοιχτά — καμία αλλαγή από το
+1ο σημερινό run. **Fallback στο βήμα (b)**: το suggested next task του 2ου σημερινού run, top-ranked mobile-parity
+item: **Reports — net-worth headline/breakdown στο mobile (PA2 gap, P2/M)**, ήδη πλήρως speced στο `MOBILE_PARITY.md`.
+
+**Reports — net-worth headline + breakdown στο mobile (PA2 gap) — ✅ SHIPPED** (commit `20cd073`). Πλήρες detail
+στο `MOBILE_PARITY.md` entry (τώρα marked DONE). Σύνοψη: `GET /api/v1/reports` παίρνει νέο additive `netWorth`
+object (`assetsInventory`/`assetsAccounts`/`liabInstallments`/`liabCards`/`net`), mirror του web `/reports`
+«Net worth» banner (assets = owned inventory + manual `assetAccounts`, liabilities = remaining installments +
+last-statement-per-card outstanding balance). **Σκόπιμη απόκλιση από το spec**: ΔΕΝ καλώ το `captureAndListSnapshots`
+(θα έγραφε ένα `NetWorthSnapshot` doc σε ΚΑΘΕ mobile poll — ανεπιθύμητο side-effect για ένα read endpoint που το
+mobile μπορεί να χτυπά συχνά)· αντ' αυτού reuse του ήδη-υπάρχοντος pure `netWorthOf()` helper (`lib/netWorth.ts`)
+για το headline number, με τα breakdown πεδία υπολογισμένα inline στο route (assetsAccounts από
+`getAppSettings().assetAccounts`, liabCards = ίδιο byCard/outstanding block με το web `page.tsx`). Το `netPosition`
+έμεινε 100% αμετάβλητο (το χρησιμοποιούν ήδη aiTools + το νέο mobile fallback path). Mobile: `ReportsScreen.tsx`
+net-card δείχνει «NET WORTH» headline + 4 read-only breakdown chips (Inventory/Accounts/Installments/Cards, ίδιο
+χρωματικό coding με το web: text/cyan/red/gold) όταν το server στέλνει `netWorth`, αλλιώς fallback στο παλιό
+«NET POSITION» one-liner (παλιότερος server backward-compat). `api.ts` `Reports` type += optional `netWorth`.
+
+**Verify**: `npm run type-check` (web) EXIT 0· `apps/mobile npx tsc --noEmit` EXIT 0. Full `npx vitest run`
+**2668 passed / 208 files** (+2 νέα route tests [manual-accounts + last-statement-per-card cases με μια παλιά
+statement που πρέπει να αγνοηθεί], +2 ενημερωμένα net-position/envelope tests, μηδέν regression). Docker:
+`mkdir /tmp/claude-docker.lock` (lock acquired καθαρά) → `docker compose build web` OK → mongo healthy πριν το
+`up -d web` → `RestartCount=0`, `/login` 200 στην 1η προσπάθεια. `curl /api/v1/reports` χωρίς token + bogus token
+→ και τα δύο 401 (όχι 500 — το additive field δεν έσπασε το auth gate). Browser-checked (Claude Browser pane):
+`/reports` → redirect σε «Sign in · Pharos» (αναμενόμενο, auth-gated, χωρίς credentials εδώ), μηδέν console errors.
+`docker builder prune -f`, lock released καθαρά. **Το πραγματικό mobile UI (headline+chips) ΔΕΝ testable end-to-end
+unattended** (χρειάζεται login + real assetAccounts/statements + Expo simulator) — verified πλήρως μέσω route
+tests στο πραγματικό αποτέλεσμα του υπολογισμού + type-check και στα δύο apps, ίδιος περιορισμός με κάθε
+προηγούμενο mobile-parity shipment σήμερα.
+
+**Suggested next task**: το επόμενο-ψηλότερο mobile-parity item είναι **Reports safe-to-spend forward-cashflow
+κάρτα στο mobile** (P19 gap, P2/M, ήδη πλήρως speced) — βλ. `MOBILE_PARITY.md` entry. Μετά από αυτό: **budget
+envelope/rollover mode** (P25 gap, M) και **loyalty card wallet** (P20 gap, L, χρειάζεται νέο RN barcode-display
+primitive). Το Approved queue παραμένει σχεδόν άδειο (μόνο P31/P36 blocked) — αν εγκριθεί κάτι νέο από τα P37-P51
+candidates νωρίτερα, αυτό βγαίνει προτεραιότητα (βήμα a) στο επόμενο run.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run.
