@@ -2130,3 +2130,56 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-20 (cont.²) — (e) polish/content: FAQ += permanent account deletion / GDPR erasure (P76)
+
+Increment (e). Πριν το ξεκινημα διαβασα `git log --oneline -20` του κυριου repo (οχι μονο features.md,
+οπως ζητησε ρητα το προηγουμενο log entry) και βρηκα το πιο προσφατο commit: `a2e6923 feat(saas): GDPR
+erasure self-service UI for workspace settings (increment 76)`, ship-αρε σημερα λιγες ωρες πριν αυτο το
+run, τεκμηριωμενο στο `docs/saas.md:475` («Delete workspace UI (settings page)»). Καθαρο content gap:
+`grep -i "gdpr\|erasure\|delete my account"` στο page.tsx = μηδεν hits πριν το increment.
+
+Τι ειναι το feature (απο docs/saas.md + `apps/web/src/lib/tenancy/erasure.ts`): owner-only «Delete
+workspace» danger-zone panel στο `/account/workspace/<slug>/settings`. Δυο states: not-requested (κουμπι
+«Delete workspace» + confirm dialog) και requested (κουμπι «Cancel deletion» + live countdown
+«N days left» / «due for deletion now»). Grace window = **30 μερες** (`ERASURE_GRACE_DAYS = 30` στο
+erasure.ts), reversible μεχρι να κλεισει το παραθυρο.
+
+Αλλαγη (app/page.tsx, FAQS array μονο, μηδεν UI/CSS/dependency/bundle change):
+- Νεα FAQ εγγραφη «Can I permanently delete my account and all its data?» **τελευταια** στο FAQS array
+  (μετα το «Is my financial data secure?», κλεινει το money/data/security cluster). Απαντηση: hosted path
+  (owner-only «Delete workspace» control, 30-day grace window, cancel any time) + self-hosted equivalent
+  (δεν υπαρχει server-side account καθολου, deletion = αφαιρεση των δικων σου Docker volumes).
+- Δεν αγγιξα το ROADMAP array: το feature ειναι hosted-only υπο-χαρακτηριστικο του ηδη υπαρχοντος
+  «Building» bullet «Managed multi-tenant hosted edition» (οπως και τα BYO-AI-key/GDPR-adjacent SaaS
+  αυξηματα πριν απο αυτο), δεν χρειαζεται δικο του roadmap bullet.
+- Ρεει αυτοματα στο FAQPage JSON-LD (FAQS.map) + deterministic anchor id
+  `faq-can-i-permanently-delete-my-account-and-all-its-data`.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (11 routes, αμεταβλητο)· `/` route 5.33 kB, αμεταβλητο (copy-only).
+- Prerender (`.next/server/app/index.html`): «delete my account and all its data» -> 5 hits, «30-day grace
+  window» -> 4 hits, anchor id `faq-can-i-permanently-delete-my-account-and-all-its-data` -> 5 hits (HTML +
+  JSON-LD + RSC payload, consistent).
+- Browser preview (in-app Browser, port 3100 ηταν κατειλημμενο απο **Docker** αυτη τη φορα οχι απο stale
+  next-dev process — `lsof` εδειξε `com.docke` listening· χρησιμοποιηθηκε port 3102 καθαρο): `get_page_text`
+  επιβεβαιωσε ολο το FAQ section rendering σωστα· `javascript_tool` επιβεβαιωσε το πληρες text content του
+  νεου anchor στο live DOM· `read_console_messages` onlyErrors καθαρο· mobile viewport (375px) screenshot
+  δειχνει το νεο item σωστα τοποθετημενο ως τελευταιο FAQ, πριν το «Hosted beta» waitlist CTA, μηδεν
+  overflow/breakage. Server σταματησε μετα (`pkill`), δεν εμεινε τιποτα τρεχει.
+- em-dash: 0 σε ολο το page.tsx (commas μονο). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το commit εδειξε ΜΟΝΟ `apps/landing/app/page.tsx`, `git diff
+  --cached --name-only` κενο πριν το add· staged+committed ΜΟΝΟ το δικο μου landing path.
+- Commit `f5a3d2e`, pushed καθαρα (`4b518d4..f5a3d2e main -> main`), κανενα rebase χρειαστηκε.
+
+Επομενο increment: (e) polish συνεχεια — savings goals (P12) ή IMAP email-in (P11) δικο τους FAQ αν
+δεν καλυφθουν αλλου (τωρα μονο σε Roadmap/Shipped bullet)· annual Offers στα per-tier Pricing aria
+labels· ή real app screenshots οταν υπαρξουν assets (blocked)· ή νεοτερο shipped module αν εμφανιστει
+gap (τσεκαρε `git log --oneline -20` του κυριου repo στην αρχη καθε run, οχι μονο features.md/saas.md).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
