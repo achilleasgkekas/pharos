@@ -281,7 +281,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - tsc καθαρό web+mobile
 - Status: DONE. Υλοποίηση ταίριαξε ακριβώς το spec: `route.ts` select += `vendor vendorKey recurring`, νέο additive `monthReview` (reuse του ήδη-υπάρχοντος `budgetMap`, όχι διπλό variable), `api.ts` type += `monthReview?`, `ReportsScreen.tsx` νέα κάρτα πριν το NET POSITION (narrative + chips, ίδιο χρωματικό coding με το web: red overBudget / gold priceChanges / cyan warranties). +3 νέα route tests (narrative/net σύνολα, over-budget flag με σωστό `date` field στο test row — το `detectBudgetExceeded` κλειδώνει σε `date` όχι `period`, λεπτομέρεια που χρειάστηκε προσοχή στο test data), + 1 ενημερωμένο envelope-shape test (top-level keys). `npm run type-check` + `apps/mobile npx tsc --noEmit` EXIT 0 και τα δύο. Full `npx vitest run` 2641 passed/206 files. Docker: lock acquired καθαρά, mongo healthy πριν το `up -d web`, clean start (0 restarts εκτός του γνωστού άσχετου `@napi-rs/canvas` warning), `/login` 200, `/api/v1/reports` no-auth+bad-token και τα δύο 401 (όχι 500 — additive field δεν έσπασε το auth gate). Browser-checked: `/reports` → redirect σε «Sign in · Pharos» (αναμενόμενο, auth-gated, χωρίς credentials), μηδέν console errors. `docker builder prune -f` (2.3GB freed), lock released.
 
-### Reports — safe-to-spend forward cashflow κάρτα στο mobile (P19 gap)
+### Reports — safe-to-spend forward cashflow κάρτα στο mobile (P19 gap) — ✅ DONE 2026-07-20 (pharos-daily-dev, 4ο run)
 - Priority: P2 | Size: M | no AI, no decision
 - Web ref: P19 (`d3e191d`) — pure `computeSafeToSpend(agendaMonths)` (apps/web/src/lib/safeToSpend.ts:34) τροφοδοτείται από το ήδη-computed `computeMoneyAgenda` series, renders ως κάρτα στο `/reports` κάτω από το net-worth banner (apps/web/src/app/reports/ReportsClient.tsx, apps/web/src/app/reports/page.tsx:315-319).
 - API: GET /api/v1/reports (exists: yes, κανένα `safeToSpend` πεδίο) — additive: το route ήδη χτίζει agenda-months structure για άλλους υπολογισμούς· κάλεσε `computeSafeToSpend` και πρόσθεσε το αποτέλεσμα.
@@ -290,7 +290,15 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - GET /api/v1/reports επιστρέφει `safeToSpend` (additive, no-auth ακόμα 401 όχι 500)
   - ReportsScreen δείχνει «Safe to spend» κάρτα με τα 3 windows όταν παρόν
   - tsc καθαρό web+mobile
-- Status: TODO
+- Status: ✅ DONE — additive `safeToSpend` field στο `GET /api/v1/reports` (route.ts καλεί το ήδη-υπάρχον
+  `computeMoneyAgenda()` + `computeSafeToSpend()`, mirror του web `/reports` server component, δικό του DB
+  round-trip όπως και το web). `route.test.ts`: mockάρω το `computeMoneyAgenda` ως seam (ίδιο idiom με το
+  `computeInstallmentPlans` — το πραγματικό `computeSafeToSpend` έχει ήδη δικά του unit tests στο
+  `safeToSpend.test.ts`, το DB-wiring του `computeMoneyAgenda` καλύπτεται ήδη από το `calendar/route.test.ts`),
+  +2 νέα tests (agenda→windows pass-through, fresh-install zero-state). `api.ts` `Reports` += `safeToSpend?`
+  (optional, mirror του web type). `ReportsScreen.tsx`: νέα κάρτα ανάμεσα στο net-worth/net-position card και
+  στο this-month/this-year stat row — headline net (πράσινο/κόκκινο) + income/outflow υπότιτλος + 3 chips
+  (30d/60d/90d, ίδιο idiom με τα `reviewChip` chips του Month-in-Review card).
 
 ### Reports/Settings — budget envelope / rollover mode στο mobile (P25 gap)
 - Priority: P2 | Size: M | no AI, no decision

@@ -157,6 +157,25 @@ export function ReportsScreen() {
             )}
           </View>
 
+          {d.safeToSpend && (
+            <View style={s.stsCard}>
+              <Text style={s.cardLabel}>SAFE TO SPEND · {d.safeToSpend.monthLabel}</Text>
+              <Text style={[s.netVal, { color: d.safeToSpend.thisMonth.net >= 0 ? C.accent : C.red }]}>
+                {money(d.safeToSpend.thisMonth.net, cur)}
+              </Text>
+              <Text style={s.cardSub}>
+                <Text style={{ color: C.accent }}>+{money(d.safeToSpend.thisMonth.income, cur)}</Text> income · <Text style={{ color: C.red }}>-{money(d.safeToSpend.thisMonth.outflow, cur)}</Text> fixed charges
+              </Text>
+              <View style={s.reviewChips}>
+                {d.safeToSpend.windows.map((w) => (
+                  <View key={w.days} style={[s.reviewChip, { borderColor: w.net >= 0 ? C.accent : C.red }]}>
+                    <Text style={[s.reviewChipText, { color: w.net >= 0 ? C.accent : C.red }]}>{w.days}d {w.net >= 0 ? '' : '-'}{money(Math.abs(w.net), cur)}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
           <View style={s.cards}>
             <View style={s.card}>
               <Text style={s.cardLabel}>THIS MONTH · NET</Text>
@@ -284,6 +303,7 @@ const s = StyleSheet.create({
   reviewChip: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1 },
   reviewChipText: { fontSize: 11 },
   netCard: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.borderLight, borderRadius: 16, padding: 16, marginBottom: 12 },
+  stsCard: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 16, marginBottom: 12 },
   netVal: { fontSize: 28, fontWeight: '800', marginTop: 4 },
   cards: { flexDirection: 'row', gap: 12 },
   card: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 16, padding: 14 },

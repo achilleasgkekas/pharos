@@ -384,6 +384,13 @@ export type Reports = {
   // Net worth = inventory + manual asset accounts − installments − card balances (PA2 gap). Absent on
   // older servers → screen falls back to the plain netPosition headline.
   netWorth?: { assetsInventory: number; assetsAccounts: number; liabInstallments: number; liabCards: number; net: number };
+  // Safe-to-spend forward cashflow (P19 gap): known expected income minus fixed future
+  // charges — the rest of this month + rolling 30/60/90-day windows. Absent on older servers.
+  safeToSpend?: {
+    monthLabel: string;
+    thisMonth: { income: number; outflow: number; net: number };
+    windows: { days: number; income: number; outflow: number; net: number }[];
+  };
   // Deterministic "Month in Review" narrative digest (P3). Absent on older servers.
   monthReview?: {
     monthKey: string;

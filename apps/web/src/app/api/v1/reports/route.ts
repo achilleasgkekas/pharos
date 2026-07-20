@@ -10,6 +10,8 @@ import { getAppSettings } from '@/lib/appSettings';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { buildMonthReview } from '@/lib/monthReview';
 import { netWorthOf } from '@/lib/netWorth';
+import { computeMoneyAgenda } from '@/lib/moneyAgenda';
+import { computeSafeToSpend } from '@/lib/safeToSpend';
 import type { SerializedStatement } from '@/types';
 import { OWNED_STATUSES } from '@/lib/itemStatus';
 
@@ -167,6 +169,15 @@ export async function GET(req: NextRequest) {
       }))
       .sort((a, b) => b.limit - a.limit);
 
+    // ── Safe-to-spend (P19) — known expected income minus fixed future charges,
+    //    as a single available figure + 30/60/90-day windows. Mirrors web
+    //    /reports page.tsx (its own DB round-trip via computeMoneyAgenda, same
+    //    as the web server component does — the agenda spans subs/statements/
+    //    items/vouchers/recurring-expenses, none of which the fields above
+    //    already fetch in the right shape). ──
+    const { months: agendaMonths } = await computeMoneyAgenda();
+    const safeToSpend = computeSafeToSpend(agendaMonths);
+
     // ── Month in Review (P3) — deterministic narrative digest, reuses the
     //    already-fetched expense rows + item warranties + budgets. Mirrors web
     //    /reports page.tsx monthReview (zero new DB round-trips). ──
@@ -241,6 +252,7 @@ export async function GET(req: NextRequest) {
       months: selMonths ?? 12,
       netPosition,
       netWorth,
+      safeToSpend,
       monthReview,
       thisMonth: { income: sum.mInc, expense: sum.mExp, net: sum.mInc - sum.mExp },
       thisYear: { income: sum.yInc, expense: sum.yExp, net: sum.yInc - sum.yExp },

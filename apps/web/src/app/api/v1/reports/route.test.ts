@@ -16,9 +16,11 @@ import type { NextRequest } from 'next/server';
 //   - active subscriptions by category as a monthly-equivalent (billing-cycle multiplier),
 //   - installment payoff (all plans, linked plans resolve item titles as label),
 //   - the top-level envelope { currency, months, netPosition, thisMonth, thisYear, ... }.
+//   - safe-to-spend (P19): known expected income minus fixed future charges, additive.
 // The route reads the real clock (new Date()), so we pin system time with fake timers for
 // determinism. We exercise the REAL apiAuth helper (withAuth) and mock the DB (auth chain +
-// the 5 models), computeInstallmentPlans (seam — the pure lib is tested on its own), and
+// the 5 models), computeInstallmentPlans + computeMoneyAgenda (seams — the pure libs they
+// feed, computeSafeToSpend and safeToSpend itself, are tested on their own), and
 // getAppSettings.
 
 const {
@@ -37,6 +39,8 @@ const {
   subState,
   computePlansMock,
   plansState,
+  computeAgendaMock,
+  agendaState,
   getAppSettingsMock,
   settingsState,
 } = vi.hoisted(() => {
@@ -52,6 +56,8 @@ const {
   const subFind = vi.fn(() => ({ select: () => ({ lean: async () => subState.rows }) }));
   const plansState: { plans: unknown[] } = { plans: [] };
   const computePlansMock = vi.fn(() => plansState.plans);
+  const agendaState: { months: unknown[] } = { months: [] };
+  const computeAgendaMock = vi.fn(async () => ({ months: agendaState.months, dueThisMonth: 0 }));
   const settingsState: { currency: string; budgets: Record<string, number>; assetAccounts: Record<string, number> } = { currency: 'EUR', budgets: {}, assetAccounts: {} };
   const getAppSettingsMock = vi.fn(async () => ({ currency: settingsState.currency, budgets: settingsState.budgets, assetAccounts: settingsState.assetAccounts }));
   const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
@@ -72,6 +78,8 @@ const {
     subState,
     computePlansMock,
     plansState,
+    computeAgendaMock,
+    agendaState,
     getAppSettingsMock,
     settingsState,
   };
@@ -85,6 +93,7 @@ vi.mock('@/models/Statement', () => ({ Statement: { find: statementFind } }));
 vi.mock('@/models/Receipt', () => ({ Receipt: { find: receiptFind } }));
 vi.mock('@/models/Subscription', () => ({ Subscription: { find: subFind } }));
 vi.mock('@/lib/installments', () => ({ computeInstallmentPlans: computePlansMock }));
+vi.mock('@/lib/moneyAgenda', () => ({ computeMoneyAgenda: computeAgendaMock }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 
 import { GET } from './route';
@@ -106,6 +115,7 @@ type Body = {
   months: number;
   netPosition: { inventoryValue: number; installmentsOwed: number; activePlans: number; net: number };
   netWorth: { assetsInventory: number; assetsAccounts: number; liabInstallments: number; liabCards: number; net: number };
+  safeToSpend: { monthLabel: string; thisMonth: { income: number; outflow: number; net: number }; windows: Array<{ days: number; income: number; outflow: number; net: number }> };
   thisMonth: { income: number; expense: number; net: number };
   thisYear: { income: number; expense: number; net: number };
   byCategory: Array<{ category: string; total: number }>;
@@ -132,6 +142,7 @@ beforeEach(() => {
   receiptState.rows = [];
   subState.rows = [];
   plansState.plans = [];
+  agendaState.months = [];
   settingsState.currency = 'EUR';
   settingsState.budgets = {};
   settingsState.assetAccounts = {};
@@ -144,6 +155,7 @@ beforeEach(() => {
   receiptFind.mockImplementation(() => ({ select: () => ({ lean: async () => receiptState.rows }) }));
   subFind.mockImplementation(() => ({ select: () => ({ lean: async () => subState.rows }) }));
   computePlansMock.mockImplementation(() => plansState.plans);
+  computeAgendaMock.mockImplementation(async () => ({ months: agendaState.months, dueThisMonth: 0 }));
   getAppSettingsMock.mockImplementation(async () => ({ currency: settingsState.currency, budgets: settingsState.budgets, assetAccounts: settingsState.assetAccounts }));
 });
 
@@ -421,6 +433,38 @@ describe('installment payoff labels', () => {
   });
 });
 
+describe('safe-to-spend (P19 gap, additive)', () => {
+  it('passes the agenda through computeSafeToSpend and returns the resulting windows', async () => {
+    // Pinned clock: 15 Jul 2026. One future income entry (rest of month) + one
+    // future outflow entry (within 30 days) — mirrors a subscription renewal.
+    agendaState.months = [
+      {
+        key: '2026-07',
+        label: 'July 2026',
+        entries: [
+          { date: new Date(2026, 6, 20).toISOString(), kind: 'income', label: 'Salary', sub: '', amount: 1000 },
+          { date: new Date(2026, 6, 25).toISOString(), kind: 'renewal', label: 'Netflix', sub: '', amount: 15 },
+        ],
+        out: 15,
+        inc: 1000,
+      },
+    ];
+    const res = await GET(makeReq());
+    const json = (await res.json()) as Body;
+    expect(computeAgendaMock).toHaveBeenCalledOnce();
+    expect(json.safeToSpend.monthLabel).toBe('July 2026');
+    expect(json.safeToSpend.thisMonth).toEqual({ income: 1000, outflow: 15, net: 985 });
+    expect(json.safeToSpend.windows.map((w) => w.days)).toEqual([30, 60, 90]);
+  });
+
+  it('zeroes out for an empty agenda (fresh install)', async () => {
+    const res = await GET(makeReq());
+    const json = (await res.json()) as Body;
+    expect(json.safeToSpend.thisMonth).toEqual({ income: 0, outflow: 0, net: 0 });
+    expect(json.safeToSpend.windows.every((w) => w.net === 0)).toBe(true);
+  });
+});
+
 describe('envelope', () => {
   it('exposes the full top-level report shape and passes through currency', async () => {
     settingsState.currency = 'USD';
@@ -430,7 +474,7 @@ describe('envelope', () => {
     expect(json.currency).toBe('USD');
     expect(Object.keys(json).sort()).toEqual(
       [
-        'currency', 'months', 'netPosition', 'netWorth', 'monthReview', 'thisMonth', 'thisYear', 'byCategory', 'budgets',
+        'currency', 'months', 'netPosition', 'netWorth', 'safeToSpend', 'monthReview', 'thisMonth', 'thisYear', 'byCategory', 'budgets',
         'monthly', 'incomeExpense', 'upcomingInstallments', 'spendByStore', 'subsByCategory',
         'inventoryByCategory', 'biggestPurchases', 'warrantiesExpiring', 'installmentPayoff',
       ].sort()
