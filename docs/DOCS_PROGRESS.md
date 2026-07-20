@@ -1,5 +1,23 @@
 # DOCS_PROGRESS
 
+## 2026-07-20 (ninth run — MFA enrollment documentation [increment 80a])
+
+Σάρωση git log για undocumented features από τα τελευταία commits. Ανακάλυψα ότι το **increment 80a (MFA enrollment core, commit 7c90186, 2026-07-20 18:41)** ήταν shipped αλλά ΔΕΝ ήταν documented στο saas.md.
+
+Τι έγραψα:
+- **saas.md**: Προσθεση νέας section "### Multi-factor authentication (MFA)" μετά το "### Email verification & password" section. Περιγραφη: TOTP-based 2FA enrollment flow, δύο-βήματα design (pending secret → user confirms με κωδικό → activation), recovery codes (10 single-use codes, shown once). Πίνακας με 4 endpoints (GET /mfa για status, POST /mfa για enrollment start, POST /mfa/confirm για verification, DELETE /mfa για disable). Implementation note που λέει ότι login integration δεν είναι ακόμα wired (increment 80c, separate).
+
+Validation (markdown only, κανενα build/Docker/AI):
+- Code fences: 18 σύνολο (balanced, ίδια με πριν) ✓.
+- Internal links: 1 reference σε #saas-environment-variables (υπάρχει) ✓.
+- Secret scan: κανένα sk_/pk_/literal credential (AUTH_SECRET είναι variable placeholder) ✓.
+- Markdown structure: 1 subsection (####), πίνακας με 4 endpoints, implementation note, recovery codes explanation ✓.
+- Spelling / consistency: Ακολουθεί το pattern των άλλων auth sections (Email verification, Password reset).
+
+Collision guard: git status --short = ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md modified (δικά μου). Δεν υπάρχουν foreign staged files.
+
+Επόμενο run: (α) grep για άλλα νέα features που shipαρίστηκαν (π.χ. budget envelope parity, increment 75 BYO-AI UI για workspace settings) και δεν είναι documented, ή (β) api.md — verify ότι τα νέα /api/saas/account/mfa/** endpoints είναι listed.
+
 ## 2026-07-20 (eighth run — P19 safe-to-spend forward cashflow documentation)
 
 Σάρωση git log για undocumented features από τα τελευταία commits. Ανακάλυψα ότι το **P19 (safe-to-spend forward cashflow, commit 0554035, 2026-07-20 16:15)** ήταν shipped αλλά ΔΕΝ ήταν documented στο features.md/api.md.

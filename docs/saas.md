@@ -259,6 +259,39 @@ sessions; the new hash takes effect on the next login.
 > closed), so nothing leaks. See [SaaS environment variables](#saas-environment-variables)
 > for `RESEND_API_KEY` / `SMTP_URL` and the mailer setup.
 
+### Multi-factor authentication (MFA)
+
+A signed-in account can enable TOTP-based two-factor authentication (RFC 6238) to
+protect against unauthorized access, even if the password is compromised. MFA
+enrollment is optional and self-service; no account is forced to enable it.
+
+The enrollment flow is **two-step by design**: a pending secret is generated first,
+displayed as a QR code for the user's authenticator app, and only confirmed
+(activated) after the user enters a valid TOTP code. This ensures a half-finished
+setup can never silently activate MFA.
+
+> **Implementation note:** MFA status tracking (pending vs. enabled) and recovery
+> codes are stored in the Account document, encrypted at rest (AES-256-GCM) using
+> the same `AUTH_SECRET`-derived key as BYO-key AI. **Login integration is not
+> yet wired** (increment 80c, separate); enabling MFA here does not yet change
+> what `POST /api/saas/auth/login` requires. Use `GET /api/saas/account/mfa` to
+> query current status during development.
+
+| Method | Path | Body | Result |
+| --- | --- | --- | --- |
+| `GET` | `/api/saas/account/mfa` | — | **Authenticated.** Returns the caller's MFA status: `{ enabled: boolean, pending: boolean, cryptoReady: boolean }`. `enabled` = MFA is active (a TOTP code was verified). `pending` = enrollment in progress (secret generated, awaiting confirmation). `cryptoReady` = the server has a valid `AUTH_SECRET` for encryption; a `false` value means recovery codes cannot be safely generated. `401` when signed out, `404` when the account no longer exists. |
+| `POST` | `/api/saas/account/mfa` | — | **Authenticated.** Begins (or restarts) enrollment. Generates a fresh TOTP secret and returns `{ secret: string, uri: string }`. The `uri` is an `otpauth://` link (RFC 6238 format); render it as a QR code for the user's authenticator app, or display the plaintext `secret` for manual entry. The `secret` persists in the `mfaPendingSecretEnc` field and is replaced if the user calls this again before confirming. Does not activate MFA; must be confirmed with a real TOTP code via `POST .../mfa/confirm`. |
+| `POST` | `/api/saas/account/mfa/confirm` | `{ code: string }` | **Authenticated.** Verifies the 6-digit TOTP `code` against the pending secret. On success (code matches within 30s window ±1 tick), activates MFA (`mfaEnabled = true`) and returns `{ enabled: true, recoveryCodes: string[] }`. **Recovery codes are shown exactly once**; the caller must display them to the user immediately for backup. Only scrypt hashes are stored; plaintext is never persisted. On failure (wrong code, missing secret, crypto unavailable), the account's MFA state is untouched and a generic `400` is returned. |
+| `DELETE` | `/api/saas/account/mfa` | `{ password: string }` | **Authenticated.** Disables MFA and clears all secrets and recovery codes. Requires re-verification of the current password (`password` field) so a hijacked session alone cannot turn off the second factor. Returns `{ enabled: false }`. `401` on wrong credentials, `404` when the account no longer exists. Does not force-expire existing sessions; the disabled state takes effect on the next login. |
+
+**Recovery codes:** When a user confirms MFA for the first time, the server generates
+**10 single-use recovery codes** (e.g., `ABC12-34567-DEF89`). Each code can replace
+one TOTP response if the user loses access to their authenticator. The server stores
+only scrypt-hashed copies and splices out a hash when a code is used; once consumed,
+the code is gone. Recovery codes are displayed as a downloadable list at enrollment
+time; if lost, the only recovery path is `DELETE /api/saas/account/mfa` (password
+re-verification required) to disable MFA entirely and start over.
+
 ### Data export (GDPR)
 
 A signed-in account can download a machine-readable copy of the personal data the
