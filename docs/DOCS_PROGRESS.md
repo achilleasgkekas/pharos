@@ -1,5 +1,24 @@
 # DOCS_PROGRESS
 
+## 2026-07-20 (eighth run — P19 safe-to-spend forward cashflow documentation)
+
+Σάρωση git log για undocumented features από τα τελευταία commits. Ανακάλυψα ότι το **P19 (safe-to-spend forward cashflow, commit 0554035, 2026-07-20 16:15)** ήταν shipped αλλά ΔΕΝ ήταν documented στο features.md/api.md.
+
+Τι έγραψα:
+- **features.md**: Προσθεση νέας bullet point στη Reports σεκτιον για P19 (Safe-to-spend forward cashflow). Περιγραφη: deterministic projection "what can I safely spend?" σε 30/60/90-day windows (known income minus fixed future charges μόνο, χωρίς bank balance ή median spend), με this-month aggregate επίσης δειχμένη. Σημειώσιμο: zero-AI, zero-cost, χρησιμοποιεί server-side money agenda computation. Actionable για quick "is this a good time to buy?" decisions.
+- **api.md**: Ενημέρωση του GET /reports endpoint description να αναφέρει το safeToSpend field (30/60/90-day windows).
+
+Validation (markdown only, κανενα build/Docker/AI):
+- Code fences: 0 σε features.md, 0 σε api.md (καμια code προστέθηκε) ✓.
+- Internal links: μηδέν νέες εξωτερικές αναφορές ✓.
+- Secret scan: κανένα credential ✓.
+- Markdown structure: ✓ (features.md +7 lines στη Reports section, api.md single-line table edit).
+- Spelling / consistency: P19 description ακολουθεί το pattern των άλλων Reports features (P3, P12, P25).
+
+Collision guard: git status --short = ΜΟΝΟ docs/features.md + docs/api.md modified (δικά μου), git diff --cached = ΜΟΝΟ τα 2 αρχεία. Committed 8a772aa. Pushed origin/main ✓.
+
+Επόμενο run: (α) grep για άλλα νέα features από το τελευταίο run (P20+) που ίσως δεν είναι documented, ή (β) openapi.yaml sync (βλ. αν χρειάζεται ενημέρωση το reports endpoint schema), ή (γ) configuration.md — έλεγχος αν υπάρχουν νέες config options που χρειάζονται documentation.
+
 ## 2026-07-20 (seventh run — P13 insurance export documentation)
 
 Σάρωση git log για undocumented features που shipαρίστηκαν τα τελευταία ώρες. Ανακάλυψα ότι το **P13 (home-inventory insurance export bundle, commit 7373035, 2026-07-20 06:48)** ήταν shipped αλλά ΔΕΝ ήταν documented στο features.md.
