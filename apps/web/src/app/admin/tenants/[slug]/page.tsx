@@ -19,6 +19,13 @@ import { ActivityPanel } from '@/components/saas/ActivityPanel';
 import { toActivityRows, type ActivityInput } from '@/components/saas/activityView';
 import { ACTIVITY_FILTER_OPTIONS, ALL_ACTIONS_VALUE } from '@/components/saas/activityFilter';
 import {
+  decodeActivityCursor,
+  cursorAfterRow,
+  cursorFilter,
+  encodeActivityCursor,
+  splitPage,
+} from '@/components/saas/activityCursor';
+import {
   TenantStatusBadge,
   MemberStatusBadge,
   MemberRoleBadge,
@@ -26,9 +33,8 @@ import {
 } from '@/components/saas/StatusBadge';
 import { formatInt, formatBytes, formatCostMicros, formatWhen } from '@/components/saas/format';
 
-// Bound the window shown on the tenant-detail page; an operator wanting more paginates via
-// the workspace's own /account/workspace/activity (same trail, member-scoped) or a future
-// dedicated admin audit endpoint. Mirrors the workspace Activity tab's PAGE_LIMIT.
+// One page of the cross-tenant trail at a time; older rows load via the keyset "Load more" link
+// (?before=), same shared cursor helpers as the workspace Activity tab.
 const ACTIVITY_LIMIT = 50;
 
 export const dynamic = 'force-dynamic';
@@ -50,14 +56,16 @@ export default async function AdminTenantDetailPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ action?: string }>;
+  searchParams: Promise<{ action?: string; before?: string }>;
 }) {
   await requireSuperadminPage();
   const { slug } = await params;
-  const { action: actionRaw } = await searchParams;
+  const { action: actionRaw, before: beforeRaw } = await searchParams;
   // Same treatment as the workspace Activity tab: an unknown/stray `?action=` is "no filter",
-  // never a 400 — the operator just sees the unfiltered trail.
+  // never a 400 — the operator just sees the unfiltered trail. Likewise a malformed `?before=`
+  // is "no cursor" — the first page.
   const action = parseAuditAction(actionRaw);
+  const cursor = decodeActivityCursor(beforeRaw);
   const detail = await getTenantDetailForAdmin(slug);
   if (!detail) notFound();
 
@@ -74,11 +82,14 @@ export default async function AdminTenantDetailPage({
   await connectDB();
   const activityQuery: Record<string, unknown> = { tenant: t.id };
   if (action) activityQuery.action = action;
-  const events = (await AuditEvent.find(activityQuery)
+  if (cursor) Object.assign(activityQuery, cursorFilter(cursor));
+  // Fetch one extra row so `hasMore` is known without a second countDocuments query.
+  const fetchedEvents = (await AuditEvent.find(activityQuery)
     .select('action actor target meta createdAt')
-    .sort({ createdAt: -1 })
-    .limit(ACTIVITY_LIMIT)
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(ACTIVITY_LIMIT + 1)
     .lean()) as unknown as (AuditEventDoc & { createdAt?: Date })[];
+  const { items: events, hasMore } = splitPage(fetchedEvents, ACTIVITY_LIMIT);
   const actorIds = collectActorIds(events);
   const emailById = new Map<string, string>();
   const nameById = new Map<string, string>();
@@ -98,6 +109,19 @@ export default async function AdminTenantDetailPage({
     return auditView(ev, id ? emailById.get(id) ?? null : null, id ? nameById.get(id) ?? null : null);
   });
   const activityRows = toActivityRows(activityViews);
+
+  // Builds an /admin/tenants/[slug] URL with the given action/before params (either omitted
+  // entirely when null/undefined). Shared by the "Clear", "Back to latest", and "Load more"
+  // links so the three stay in sync with each other.
+  const buildActivityHref = (params: { action?: string | null; before?: string | null }) => {
+    const sp = new URLSearchParams();
+    if (params.action) sp.set('action', params.action);
+    if (params.before) sp.set('before', params.before);
+    const qs = sp.toString();
+    const base = `/admin/tenants/${encodeURIComponent(slug)}`;
+    return qs ? `${base}?${qs}` : base;
+  };
+  const nextActivityCursor = hasMore ? cursorAfterRow(activityRows[activityRows.length - 1]) : null;
 
   return (
     <div className="space-y-6">
@@ -259,11 +283,13 @@ export default async function AdminTenantDetailPage({
       {/* Activity trail (cross-tenant superadmin view — every event, no role restriction) */}
       <section>
         <h2 className="mb-2 text-[11px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
-          Activity · latest {activityRows.length}
+          Activity · {cursor ? 'earlier' : 'latest'} {activityRows.length}
           {action && ` · ${ACTIVITY_FILTER_OPTIONS.find((o) => o.value === action)?.label ?? action}`}
         </h2>
         <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4">
-          {/* Plain GET form — same idiom as the workspace Activity tab's filter, no client JS. */}
+          {/* Plain GET form — same idiom as the workspace Activity tab's filter, no client JS.
+              Submitting a new filter always starts back at page 1 (the form has no `before`
+              field), same reasoning as the workspace tab. */}
           <form
             action={`/admin/tenants/${encodeURIComponent(slug)}`}
             method="get"
@@ -293,9 +319,9 @@ export default async function AdminTenantDetailPage({
             >
               Filter
             </button>
-            {action && (
+            {(action || cursor) && (
               <a
-                href={`/admin/tenants/${encodeURIComponent(slug)}`}
+                href={buildActivityHref({})}
                 className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"
               >
                 Clear
@@ -303,6 +329,28 @@ export default async function AdminTenantDetailPage({
             )}
           </form>
           <ActivityPanel rows={activityRows} />
+          {(cursor || nextActivityCursor) && (
+            <div className="flex items-center justify-between gap-2 border-t border-[color:var(--color-border)] py-4">
+              {cursor ? (
+                <a
+                  href={buildActivityHref({ action })}
+                  className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"
+                >
+                  ← Back to latest
+                </a>
+              ) : (
+                <span />
+              )}
+              {nextActivityCursor && (
+                <a
+                  href={buildActivityHref({ action, before: encodeActivityCursor(nextActivityCursor) })}
+                  className="rounded-lg border border-[color:var(--color-border-light)] px-3 py-1.5 text-xs font-medium text-[color:var(--color-text)] hover:border-[color:var(--color-cyan)] hover:text-[color:var(--color-cyan)]"
+                >
+                  Load more
+                </a>
+              )}
+            </div>
+          )}
         </div>
       </section>
     </div>

@@ -3023,3 +3023,64 @@ views έχουν σταθερό `limit=50`, καμία "load more"/cursor — π
 σήμερα πάντα μηδενικά· (γ) custom-domain self-service (το `Tenant.customDomain` φαίνεται
 read-only στο Overview panel — αν υπάρχει ήδη κάποιο DNS/cert flow αλλού, έλεγξε πριν χτίσεις
 ένα edit UI εδώ).
+
+## 2026-07-20 (increment 70 — Activity trail pagination, workspace + admin, §UI-first)
+**Το κενό:** ανοιχτό ρητά από τα #68/#69's next-task σημειώματα: και τα δύο Activity views
+((saas)/account/workspace/activity + admin/tenants/[slug]) είχαν σταθερό `limit(50)` χωρίς
+κανένα "load more"/cursor — ένα workspace με >50 events στο audit trail έδειχνε πάντα μόνο
+τα πιο πρόσφατα 50, με ΜΗΔΕΝ δρόμο να δει κανείς παλιότερα. Το admin page είχε μάλιστα ήδη
+comment που το προέβλεπε ("an operator wanting more paginates via... a future dedicated
+admin audit endpoint").
+
+**Built** (νέο PURE module + additive edits στις 2 δικές μου activity σελίδες):
+- **`components/saas/activityCursor.ts`** (νέο, PURE, χωρίς DB/next/React) — τα keyset-
+  pagination primitives, shared και από τις δύο σελίδες: `encodeActivityCursor`/
+  `decodeActivityCursor` (opaque `${createdAt}~${id}` string στο `?before=`, malformed input
+  → null αντί throw, ίδιο lenient idiom με το `parseAuditAction`) + `cursorAfterRow` (φτιάχνει
+  τον επόμενο cursor από την τελευταία ActivityRow μιας σελίδας) + **`cursorFilter`** (το
+  σωστό keyset `$or` shape — `createdAt < X OR (createdAt = X AND _id < Y)` — που μένει σωστό
+  ακόμα κι όταν πολλά events μοιράζονται το ίδιο millisecond, σε αντίθεση με ένα απλό
+  `createdAt: {$lt}` που θα παρέκαμπτε/επανέλαβε σειρές σε tie) + **`splitPage`** (generic
+  helper: fetch `limit+1`, γύρνα `{items, hasMore}` χωρίς δεύτερο `countDocuments`). **15 unit
+  tests** (round-trip encode/decode, κάθε malformed-input branch, cursorFilter shape, splitPage
+  boundary/no-mutation/empty).
+- **`(saas)/account/workspace/activity/page.tsx`** (δικό μου, additive): νέο `before`
+  searchParam → `decodeActivityCursor` → αν valid, `cursorFilter(cursor)` merge στο query
+  (tenant + optional action + το `$or`) · sort έγινε `{createdAt:-1, _id:-1}` (tiebreak) ·
+  fetch `PAGE_LIMIT+1` → `splitPage`. Νέο `buildHref({action, before})` helper (shared από
+  Clear/Back-to-latest/Load-more links, ώστε τα τρία να μη διαφωνήσουν ποτέ για ποια params
+  κρατάνε). UI: **"Load more"** button (plain `<a>`, ίδιο no-client-JS idiom με το action
+  filter) όταν `hasMore`, **"← Back to latest"** όταν βρίσκεσαι σε παλιότερη σελίδα (cursor
+  active) · title "latest N" → "earlier N" όταν paginated · το "Clear" τώρα καθαρίζει ΚΑΙ
+  action ΚΑΙ cursor (fresh page 1). Submit του filter form (δεν έχει `before` field) πάντα
+  γυρνάει σε page 1 — σωστό: διαφορετικό φίλτρο σημαίνει διαφορετικό "page 2".
+- **`admin/tenants/[slug]/page.tsx`** (δικό μου, additive): ΙΔΙΟ pattern 1:1 (`ACTIVITY_LIMIT`
+  αντί `PAGE_LIMIT`, `buildActivityHref` αντί `buildHref`, `nextActivityCursor`) — cross-tenant
+  operator view τώρα επίσης paginate-άρει. Το παλιό comment ("future dedicated admin audit
+  endpoint") ενημερώθηκε — αυτό ΕΙΝΑΙ πλέον το load-more.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run activityCursor.test.ts
+activityView.test.ts activityFilter.test.ts` → **38/38**· full suite `npx vitest run` →
+**2474/2474 green** (194 files, +3 files/+40 tests έναντι του #69's 2434 — 15 δικά μου νέα
+tests + tests άλλων routines που προσγειώθηκαν στο main στο μεταξύ). ΚΑΝΕΝΑ υπάρχον feature
+αρχείο δεν αγγίχτηκε (1 νέο module + 1 test file + additive edits στις 2 δικές μου activity
+pages). `SAAS_MODE` off / self-hosted = **zero effect** (και οι δύο σελίδες ήδη self-gate σε
+`notFound()`/`requireSuperadminPage` πριν φτάσουν στο νέο query code· `docker exec
+homepage-web printenv SAAS_MODE` στο live container επιβεβαίωσε κενό). Κανένας Docker rebuild
+(1 νέο PURE module + additive page edits, μηδέν shared runtime wiring, μηδέν νέα εξάρτηση —
+ίδιο σκεπτικό με τα increments 58-69). Browser-verify skipped: το live `:3000` δεν έχει
+`SAAS_MODE` set, οπότε και οι δύο routes θα έδειχναν 404 (σωστό self-hosted behavior, τίποτα
+νέο να δει κανείς)· θα χρειαζόταν rebuild με το flag μόνο-για-verify — απαγορεύεται, ίδιο idiom
+με τα #66-69. Collision guard: `git status --short` πριν το staging έδειξε μόνο τα 4 δικά μου
+αρχεία (2 modified + 2 new), `git diff --cached --name-only` επιβεβαίωσε exact match.
+
+**## Needs Achilleas** (activity pagination):
+- Τίποτα νέο — καθαρό UI/query-shape improvement πάνω σε ήδη-εγκεκριμένο read surface, καμία
+  νέα policy απόφαση.
+
+**Next task:** increment 71 — candidates: (α) αν το `recordAiUsage` wiring βγει ρητά in-scope,
+το Usage tab δείχνει σήμερα πάντα μηδενικά· (β) custom-domain self-service (το
+`Tenant.customDomain` φαίνεται read-only στο Overview panel — έλεγξε αν υπάρχει ήδη κάποιο
+DNS/cert flow αλλού πριν χτίσεις ένα edit UI εδώ)· (γ) έλεγξε αν η `/admin` κεντρική λίστα
+tenants (admin/tenants index, όχι το detail page) έχει ήδη search/filter/pagination — αν όχι,
+συμμετρικό gap με αυτό το increment.

@@ -25,6 +25,13 @@ import { WorkspaceShell, Panel } from '@/components/saas/WorkspaceShell';
 import { ActivityPanel } from '@/components/saas/ActivityPanel';
 import { toActivityRows, type ActivityInput } from '@/components/saas/activityView';
 import { ACTIVITY_FILTER_OPTIONS, ALL_ACTIONS_VALUE } from '@/components/saas/activityFilter';
+import {
+  decodeActivityCursor,
+  cursorAfterRow,
+  cursorFilter,
+  encodeActivityCursor,
+  splitPage,
+} from '@/components/saas/activityCursor';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,18 +40,20 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-// Show a bounded, snappy window of recent activity; the full trail paginates via the API.
+// One page of the trail at a time; older rows load via the keyset "Load more" link (?before=).
 const PAGE_LIMIT = 50;
 
 export default async function WorkspaceActivityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ w?: string; action?: string }>;
+  searchParams: Promise<{ w?: string; action?: string; before?: string }>;
 }) {
-  const { w, action: actionRaw } = await searchParams;
+  const { w, action: actionRaw, before: beforeRaw } = await searchParams;
   // A stray/unknown `?action=` is treated as "no filter" (parity with the API route), so a
   // bad query string never 400s the page — it just shows the unfiltered trail.
   const action = parseAuditAction(actionRaw);
+  // Likewise, a malformed/tampered `?before=` is treated as "no cursor" — the first page.
+  const cursor = decodeActivityCursor(beforeRaw);
 
   // Gate (throws notFound when SaaS off) + current viewer claims.
   const viewer = await getSaasViewer();
@@ -96,12 +105,15 @@ export default async function WorkspaceActivityPage({
 
   const query: Record<string, unknown> = { tenant: ctx.tenantId };
   if (action) query.action = action;
+  if (cursor) Object.assign(query, cursorFilter(cursor));
 
-  const events = (await AuditEvent.find(query)
+  // Fetch one extra row so `hasMore` is known without a second countDocuments query.
+  const fetched = (await AuditEvent.find(query)
     .select('action actor target meta createdAt')
-    .sort({ createdAt: -1 })
-    .limit(PAGE_LIMIT)
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(PAGE_LIMIT + 1)
     .lean()) as unknown as (AuditEventDoc & { createdAt?: Date })[];
+  const { items: events, hasMore } = splitPage(fetched, PAGE_LIMIT);
 
   // Resolve every actor's email + display name in ONE batched lookup (never N+1). System
   // events (null actor) and deleted accounts simply have no entry.
@@ -130,13 +142,28 @@ export default async function WorkspaceActivityPage({
   });
   const rows = toActivityRows(views);
   const title = action
-    ? `Activity · latest ${rows.length} · ${ACTIVITY_FILTER_OPTIONS.find((o) => o.value === action)?.label ?? action}`
-    : `Activity · latest ${rows.length}`;
+    ? `Activity · ${cursor ? 'earlier' : 'latest'} ${rows.length} · ${ACTIVITY_FILTER_OPTIONS.find((o) => o.value === action)?.label ?? action}`
+    : `Activity · ${cursor ? 'earlier' : 'latest'} ${rows.length}`;
+
+  // Builds a /account/workspace/activity URL preserving the current workspace, with the given
+  // action/before params (either omitted entirely when null/undefined). Shared by the "Clear",
+  // "Back to latest", and "Load more" links so the three stay in sync with each other.
+  const buildHref = (params: { action?: string | null; before?: string | null }) => {
+    const sp = new URLSearchParams();
+    if (w) sp.set('w', w);
+    if (params.action) sp.set('action', params.action);
+    if (params.before) sp.set('before', params.before);
+    const qs = sp.toString();
+    return qs ? `/account/workspace/activity?${qs}` : '/account/workspace/activity';
+  };
+  const nextCursor = hasMore ? cursorAfterRow(rows[rows.length - 1]) : null;
 
   return shell(
     <Panel title={title}>
       {/* Plain GET form — no client JS needed. `w` is carried as a hidden field so switching
-          the action filter never drops the current workspace selection. */}
+          the action filter never drops the current workspace selection. Submitting a new filter
+          always starts back at page 1 (the form has no `before` field), which is the correct
+          behaviour — a narrower/wider filter changes what "page 2" even means. */}
       <form
         action="/account/workspace/activity"
         method="get"
@@ -167,9 +194,9 @@ export default async function WorkspaceActivityPage({
         >
           Filter
         </button>
-        {action && (
+        {(action || cursor) && (
           <a
-            href={w ? `/account/workspace/activity?w=${encodeURIComponent(w)}` : '/account/workspace/activity'}
+            href={buildHref({})}
             className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"
           >
             Clear
@@ -177,6 +204,28 @@ export default async function WorkspaceActivityPage({
         )}
       </form>
       <ActivityPanel rows={rows} />
+      {(cursor || nextCursor) && (
+        <div className="mt-4 flex items-center justify-between gap-2 border-t border-[color:var(--color-border)] pt-4">
+          {cursor ? (
+            <a
+              href={buildHref({ action })}
+              className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]"
+            >
+              ← Back to latest
+            </a>
+          ) : (
+            <span />
+          )}
+          {nextCursor && (
+            <a
+              href={buildHref({ action, before: encodeActivityCursor(nextCursor) })}
+              className="rounded-lg border border-[color:var(--color-border-light)] px-3 py-1.5 text-xs font-medium text-[color:var(--color-text)] hover:border-[color:var(--color-cyan)] hover:text-[color:var(--color-cyan)]"
+            >
+              Load more
+            </a>
+          )}
+        </div>
+      )}
     </Panel>,
   );
 }
