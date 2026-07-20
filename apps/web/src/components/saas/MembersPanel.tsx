@@ -8,11 +8,12 @@
 // route with the chosen workspace slug (so `?w=` stays correct) and then router.refresh() so the
 // server re-reads the source of truth. Only ever mounted inside the SAAS_MODE-gated (saas)
 // segment; when the viewer is a plain member (`canManage` false) it renders a read-only roster.
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pill, MemberRoleBadge, MemberStatusBadge } from './StatusBadge';
 import { ORG_ROLES, type OrgRole } from '@/lib/tenancy/members';
-import { resendNotice } from './inviteResend';
+import { resendNoticeText } from './inviteResend';
+import { inviteAcceptHref } from './inviteAccept';
 
 export type MemberRow = {
   accountId: string;
@@ -62,6 +63,31 @@ async function callJson(
   return { ok: res.ok, data };
 }
 
+/**
+ * Dev-mode notice suffix shown when an invite route echoes back a `devToken` (no mailer
+ * configured, non-production only — see the invites/members routes' SCAFFOLD notes). Renders
+ * the token as a clickable `inviteAcceptHref` link instead of raw text, so the local-testing
+ * loop closes with one click. Opens in a new tab: following it in-place would navigate the
+ * admin's own tab away (and, per the accept route's design, can switch their session).
+ */
+function devTokenNotice(text: string, devToken: string | null): ReactNode {
+  if (!devToken) return text;
+  return (
+    <>
+      {text}{' '}
+      <a
+        href={inviteAcceptHref(devToken)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline hover:text-[color:var(--color-accent)]"
+      >
+        Open invite link
+      </a>{' '}
+      (dev mode, no mailer configured)
+    </>
+  );
+}
+
 export function MembersPanel({
   tenantSlug,
   viewerAccountId,
@@ -73,7 +99,7 @@ export function MembersPanel({
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<ReactNode>(null);
 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<OrgRole>('member');
@@ -132,8 +158,8 @@ export function MembersPanel({
     if (!ok) return fail(data, 'Could not add member');
     setInviteEmail('');
     if (data.inviteByEmail) {
-      const dev = typeof data.devToken === 'string' ? ` (dev token: ${data.devToken})` : '';
-      setNotice(`Invitation sent to ${email}.${dev}`);
+      const devToken = typeof data.devToken === 'string' ? data.devToken : null;
+      setNotice(devTokenNotice(`Invitation sent to ${email}.`, devToken));
     } else {
       setNotice(`${email} added to the workspace.`);
     }
@@ -152,7 +178,7 @@ export function MembersPanel({
     setBusy(null);
     if (!ok) return fail(data, 'Could not resend invitation');
     const devToken = typeof data.devToken === 'string' ? data.devToken : null;
-    setNotice(resendNotice(email, devToken));
+    setNotice(devTokenNotice(resendNoticeText(email), devToken));
     router.refresh();
   }
 
