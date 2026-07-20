@@ -2229,3 +2229,63 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-20 (cont.⁴) — (e) polish/content: FAQ += notifications & automation webhooks
+
+Increment (e). Πριν το ξεκινημα διαβασα `git log --oneline -15` του κυριου repo· τα νεοτερα commits ηταν
+`82cc718 feat(saas)` TOTP+recovery-code core για MFA και `0554035 feat(mobile)` safe-to-spend forward
+cashflow card. Ελεγξα και τα δυο: το TOTP/MFA ειναι **ρητα "scaffold" only** (commit message: «Nothing is
+wired into Account, any route, or the login flow yet»· `grep -i totp/mfa docs/saas.md` = μηδεν hits) αρα
+οχι user-facing, δεν ειναι landing gap ακομα. Το safe-to-spend ειναι ηδη καλυμμενο στο Reports feature card
+(«plus a forward safe-to-spend view that projects what is left after upcoming bills»). Κανενα απο τα δυο
+δεν ηταν gap.
+
+Ακολουθησα το προτεινομενο απο το προηγουμενο log entry: εξετασα το IMAP email-in FAQ candidate αλλα το
+πρωτο `grep -rli imap apps/web/src` + το SettingsClient.tsx `ImapImportManager` δειχνουν το IMAP panel
+**παντα ορατο** στο Settings, χωρις κανενα SAAS_MODE/tenant gate γυρω του· το «Self-hosted only» στο
+`docs/features.md:120` φαινεται να σημαινει «no background cron» (χρειαζεται χειροκινητο "Check inbox now"
+και στις δυο εκδοσεις) οχι «hosted δεν το εχει καθολου». Ρισκο ανακριβειας αν προσθετα Compare row/FAQ που
+να ισχυριζεται αποκλειστικοτητα self-host, οποτε το παρελειψα (οπως ειχε ηδη προειδοποιησει το προηγουμενο
+log entry: «ισως δεν αξιζει»). Το annual-Offers-aria-labels item αποδειχθηκε **ηδη done**: διαβασα ολοκληρο
+το `Pricing.tsx` component, εχει ηδη πληρες monthly/annual toggle (`role="group" aria-label="Billing
+period"`, `aria-pressed` ανα κουμπι) + `role="status" aria-live="polite"` sr-only ανακοινωση οταν αλλαζει η
+τιμη· η JSON-LD Offers εχουν ηδη annual `UnitPriceSpecification`. Τιποτα να προσθεσω εκει.
+
+Αντ' αυτου βρηκα **πραγματικο, τεκμηριωμενο, εντελως ακαλυπτο gap**: `docs/features.md:453-475`
+(Notifications) περιγραφει δυο συστηματα, alert summaries (deals/installments/budgets/warranties/bills/
+price-hikes/gift-cards -> ntfy/Discord/Slack/Telegram/generic webhook) ΚΑΙ **event webhooks για automation**
+(P24: Home Assistant/n8n/Node-RED/Zapier, signed HMAC JSON POST σε `receipt.parsed`/`budget.exceeded`/
+`installment.due`/`price.drop`). `grep -ni "webhook\|discord\|slack\|telegram" page.tsx` πριν το increment
+= μηδεν hits (μονο «ntfy push» σε ενα stack chip, χωρις λεπτομερεια). Ισχυρο, διαφοροποιητικο power-user
+feature (ταιριαζει ακριβως με το target audience «Homelabbers» persona που ηδη υπαρχει στο page) που δεν
+ειχε καμια αναφορα.
+
+Αλλαγη (app/page.tsx, FAQS array μονο, μηδεν UI/CSS/dependency/bundle change):
+- Νεα εγγραφη «Can it notify me or plug into home automation?» αμεσως μετα το «Can it help me save toward
+  a goal?» και πριν το «How do backups work?» (κλεινει το money/reports cluster, ανοιγει το infra cluster).
+  Απαντηση: alert-summary καναλια (ntfy/Discord/Slack/Telegram/generic webhook) + automation event webhooks
+  με HMAC signature + τα 4 event types + 3 πλατφορμες παραδειγμα (Home Assistant/n8n/Node-RED/Zapier).
+- Ρεει αυτοματα στο FAQPage JSON-LD + anchor id `faq-can-it-notify-me-or-plug-into-home-automation`.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (11 routes, αμεταβλητο)· `/` route 5.33 kB, αμεταβλητο (copy-only).
+- Prerender (`.next/server/app/index.html`): «Can it notify me or plug into home automation?» -> 5 hits,
+  anchor id `faq-can-it-notify-me-or-plug-into-home-automation` -> 5 hits (HTML + JSON-LD + RSC payload).
+- Browser preview (in-app Browser): port 3100 κατειλημμενο απο Docker (`com.docke` listening), χρησιμο-
+  ποιηθηκε port 3104. `get_page_text` επιβεβαιωσε ολοκληρο το FAQ section με το νεο item στη σωστη θεση
+  (μετα savings goals, πριν backups)· `read_console_messages` onlyErrors καθαρο. Server σταματησε μετα
+  (`pkill`), `lsof` επιβεβαιωσε μηδεν listener στο 3104.
+- em-dash: 0 σε ολο το page.tsx (commas μονο, το νεο item χρησιμοποιει comma-lists για τα event types).
+  Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+
+Επομενο increment: (e) polish συνεχεια, real app screenshots οταν υπαρξουν assets (blocked)· ή νεοτερο
+shipped module αν εμφανιστει gap (τσεκαρε `git log --oneline -20` του κυριου repo στην αρχη καθε run).
+Loyalty/membership cards (`docs/features.md:330`) ειναι ισως ξεχωριστο απο vouchers/coupons, θα μπορουσε
+να αξιζει δικια του γραμμη στο Features καρτα «Vouchers & coupons» αν φανει gap σε επομενο run.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

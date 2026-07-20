@@ -497,6 +497,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. Reports has savings goals: set a target amount and an optional deadline (e.g. "€5000 for new laptop by 2026-12-31"), then log contributions as you set money aside. A progress bar and a computed monthly contribution rate show whether you are on track to hit the deadline. Run as many goals in parallel as you like.',
   },
   {
+    q: 'Can it notify me or plug into home automation?',
+    a: 'Yes. Alert checks watch for deals hitting your target price, installments due this month, budgets going over, warranties expiring soon, bills due or overdue, price hikes, and expiring gift cards, then push a plain-language summary to ntfy, Discord, Slack, Telegram, or a generic webhook (Settings → Notifications). For automation platforms like Home Assistant, n8n, Node-RED, or Zapier, event webhooks send a signed JSON POST (Stripe-style HMAC signature) on specific triggers, receipt scanned, budget exceeded, installment due, price drop, so you can wire PHAROS into your own workflows.',
+  },
+  {
     q: 'How do backups work?',
     a: 'Self-hosted ships with a nightly backup you can point at a NAS, plus one-click JSON and CSV exports any time. You can also mirror your files to SMB, FTP, or OneDrive for a proper 3-2-1 setup. On hosted, nightly backups are handled for you.',
   },
