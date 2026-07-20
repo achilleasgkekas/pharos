@@ -1902,3 +1902,25 @@ Mock pattern: DB-mock (`@/lib/db`, `@/models/User`, `@/models/Receipt` findById 
 - Collision guard: πριν το stage, `git diff --cached` κενό. `git status --short` = μόνο το δικό μου νέο αρχείο, μηδέν foreign WIP. Στάγιαρα ΜΟΝΟ το δικό μου path.
 
 Suggested next task: (β συνέχεια) Απομένουν: `receipts/[id]/add-to-library`, `expenses/[id]/rescan`, `items/import`. Έλεγξε `git status` πριν πιάσεις οτιδήποτε. ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. DB-free εναλλακτική: untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam, ιδίως failure-remap ναι/όχι — το rescan pattern εδώ [regex-based 404-vs-500] μπορεί να επαναληφθεί στο `receipts/[id]/add-to-library` ή `expenses/[id]/rescan` αφού είναι sibling actions) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-20 (cont.¹⁸ — receipts/[id]/add-to-library/route.test.ts, POST με 400-based failure-remap)
+
+**Task: (β συνέχεια) API-shape/validation test `apps/web/src/app/api/v1/receipts/[id]/add-to-library/route.test.ts` για το POST του `/api/v1/receipts/:id/add-to-library`.**
+
+Επιλογή target: πρώτο από την εναπομείνασα λίστα (`git status` καθαρό, μηδέν foreign WIP). Backs το «Add to library» κουμπί στο receipt-detail (mobile) — μετατρέπει τα line items της απόδειξης σε inventory Items (find-or-create by title, link το receipt). Thin wrapper πάνω στο shared `addReceiptItemsToLibrary` action (receipts/actions.ts) — η δική του find-or-create/warranty/DB λογική ΔΕΝ ξανα-δοκιμάζεται εδώ.
+
+Route-only συμπεριφορά που δοκιμάστηκε: (α) ObjectId guard πριν οποιαδήποτε action call (το route δεν διαβάζει body καθόλου — POST χωρίς payload, ίδιο με το `convert-to-task` sibling), (β) **failure remap σε 400** (ΟΧΙ 404 όπως το `convert-to-task` sibling — διαφορετικό status ανά route, πρέπει να το διαβάσεις ρητά κάθε φορά): `{ok:false,error}` → 400 apiError με το action error message, ή fallback **'failed'** όταν το error είναι κενό/undefined (δοκιμάστηκα explicit-error + κενό string + undefined field), (γ) happy path επιστρέφει ΑΚΡΙΒΩΣ `{ok:true, created, linked}` (τίποτα άλλο από το action result διαρρέει) + ξεχωριστό test για `created:0, linked:0` (receipt χωρίς line items) που παραμένει `ok:true`, όχι error.
+
+Mock pattern: DB-mock (`@/lib/db`, `@/models/User`) + mock `@/app/receipts/actions` (`addReceiptItemsToLibrary` μόνο). Πραγματικοί `withAuth`/`isObjectId`. makeReq ίδιο minimal στυλ με το `convert-to-task` test (μόνο headers.get, το route δεν διαβάζει body).
+
+Τι έγινε: Νέο `route.test.ts` (8 tests): auth gate (2), id guard (1), happy path (2: created/linked exact pass-through + zero-zero ok:true), failure remap (3: explicit error→400, κενό error→'failed', undefined error→'failed').
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/api/v1/receipts/[id]/add-to-library/route.test.ts"` → 8/8 passed.
+- `npx vitest run` (όλο το suite) → 195 files, 2482/2482 passed.
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό.
+- Collision guard: `git diff --cached` κενό πριν το stage, `git status --short` = μόνο το δικό μου νέο αρχείο, μηδέν foreign WIP. Στάγιαρα ΜΟΝΟ το δικό μου path. Push σε `origin main` καθαρό (fast-forward, χωρίς rebase ανάγκη).
+
+Suggested next task: (β συνέχεια) Απομένουν: `expenses/[id]/rescan`, `items/import`. Έλεγξε `git status` πριν πιάσεις οτιδήποτε — ιδίως αν `items/actions.ts` έχει foreign WIP (επηρεάζει το `import`). ΑΠΟΦΥΓΕ ΓΙΑ ΤΩΡΑ το `trash/[type]/[id]/route.ts` αν είναι foreign-WIP-modified. Μετά από αυτά τα δύο, η λίστα των `items/[id]/*` + `receipts/[id]/*` sub-routes θα έχει ΟΛΟΚΛΗΡΩΘΕΙ πλήρως· επόμενο βήμα θα είναι είτε τα top-level list routes (`items/route.ts` GET/POST, `receipts/route.ts`) είτε untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling) είτε νέο batch από `statements/[id]`, `subscriptions/[id]`, `vouchers/[id]`, `tasks/[id]`, `cards/[id]`, `stores/[id]` (ακόμα άθικτα, καλά targets). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam, ιδίως failure-remap status code — 400 vs 404 vs 500 διαφέρει ανά route, μην υποθέτεις) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
