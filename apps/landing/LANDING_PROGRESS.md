@@ -2391,3 +2391,67 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-20 (cont.⁸) — (e) polish/content: Reports card += Month in Review narrative digest
+
+Increment (e). Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος
+`~/.claude/ASK_ACHILLEAS.md` (δυο OPEN entries, και τα δυο bakecore-finance, τιποτα για landing/pharos), και
+`git log --oneline -40` του κυριου repo (feature/content commits μονο, φιλτραρισμενο). Νεοτερα απο το
+προηγουμενο log entry: `2965e57 feat(saas)` MFA enrollment UI panel (increment 82) και `af8bc68 feat(mobile)`
+Bills payable/due tracker (P28 mobile parity).
+
+Ελεγξα και τα δυο: το MFA (`docs/saas.md:262-293`) ειναι ρητα **ακομα οχι-wired στο login**
+(«increment 80c, separate» ρητα αναφερεται σαν μελλοντικο, `POST /api/saas/auth/login` δεν το απαιτει ακομα)
+-> ιδιο συμπερασμα με προηγουμενα runs, skip, οχι user-facing complete feature ακομα. Το Bills tracker
+αποδειχθηκε **ηδη πληρως καλυμμενο**: `docs/features.md:266-291` + FAQ `docs/features.md:476-477»
+(«Does it track bills I pay by hand, like utilities?») ηδη υπαρχουν στο `page.tsx` (βρεθηκαν και τα δυο με
+grep), το mobile commit ειναι απλως parity για κατι που το web ηδη διαφημιζει. Κανενα απο τα δυο δεν ηταν
+gap.
+
+Επεκτεινα την αναζητηση πισω (`git log --oneline -40` φιλτραρισμενο σε feat/content commits, οχι μονο τα 2
+τελευταια) για να πιασω οτιδηποτε ξεφυγε απο προηγουμενα runs: budget envelope/rollover (P25 mobile parity),
+safe-to-spend forward cashflow (P19 mobile parity), tax-deductible tagging (P8), insurance export (P13),
+BYO AI key (increment 75), GDPR erasure (increment 76) -> ολα ηδη καλυμμενα στο page.tsx (grep confirmed:
+"rollover", "safe-to-spend", "tax-deductible", "insurance export", "Bring your own AI/key", "delete my
+account"). Ενα πραγματικο ακαλυπτο ευρημα: **Month in Review** (`docs/features.md:369-375`) -- ενα
+deterministic (zero-AI) narrative digest στην κορυφη του Reports page που συνοψιζει τον τρεχοντα μηνα σε μια
+προταση (total spent/income/net position + % change, top category, over-budget categories, recurring-charge
+αλλαγες, warranties ληγουν σε 90d). `grep -ni "month in review" page.tsx` πριν το increment = μηδεν hits.
+Δυνατο, διαφοροποιητικο σημειο (zero-AI, δειχνει οτι το app κανει πραγματικη αναλυση οχι μονο data entry)
+που ταιριαζει ακριβως με το ηδη-υπαρχον persona targeting («deterministic», «zero-cost» οπως και το
+safe-to-spend βρισκεται ηδη στην ιδια καρτα).
+
+Αλλαγη (app/page.tsx, FEATURES array, Reports card desc, μια προταση μονο, μηδεν UI/CSS/dependency/bundle
+change): προσθεσα «A zero-AI Month in Review digest opens the page with a one-sentence summary of what
+changed.» αναμεσα στο safe-to-spend sentence και το closing «See where the money actually goes.» (ιδιο
+patteren με ολα τα προηγουμενα increments που διπλωσαν μικρα gaps μεσα σε υπαρχουσα card copy).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (το build αργησε πολυ, ~25 λεπτα wall-clock, λογω πολυ υψηλου system load
+  average [67-80] απο ~14 ταυτοχρονες Claude routine διεργασιες στο μηχανημα· περιμενα με Monitor αντι για
+  arbitrary sleep, το process ολοκληρωθηκε καθαρα exit 0, οχι hang). Ολα static (13 routes)· `/` route
+  5.33 kB, αμεταβλητο (copy-only, ιδιο μεγεθος με πριν).
+- Browser preview (in-app Browser): port 3100 κατειλημμενο απο Docker (`com.docke` listening, οπως παντα),
+  χρησιμοποιηθηκε port 3107 (`next start` πανω στο production build, οχι dev). `get_page_text` επιβεβαιωσε
+  ολοκληρο το Reports card με τη νεα προταση στη σωστη θεση (μετα το safe-to-spend sentence, πριν το closing
+  sentence)· `read_console_messages` onlyErrors -> «No console logs.» (καθαρο). Server σταματησε μετα
+  (`pkill`), `lsof` επιβεβαιωσε 3107 clear.
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  `git diff --cached --name-only` κενο πριν το stage -> κανενα ξενο staged file (κανενα concurrent routine
+  mid-commit). Staged+committed ΜΟΝΟ τα δικα μου landing paths.
+
+Επομενο increment: (e) polish συνεχεια, real app screenshots οταν υπαρξουν assets (blocked)· ή νεοτερο
+shipped module αν εμφανιστει gap (τσεκαρε `git log --oneline -20..40` του κυριου repo στην αρχη καθε run,
+φιλτραρισμενο σε feat/content commits· η ευρυτερη αναζητηση αυτου του run [-40 αντι -15] επιβεβαιωσε οτι
+δεν υπαρχουν αλλα ξεχασμενα gaps προς το παρον). Αν το MFA login-wiring («increment 80c») γινει live σε
+επομενο κυριο-repo run, αξιζει δικο του FAQ item (money/data/security cluster, μετα το «Is my financial data
+secure?»).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
