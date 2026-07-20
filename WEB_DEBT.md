@@ -772,6 +772,21 @@
 
 ## Web Debt Queue
 
+### MFA re-enrollment (`POST /api/saas/account/mfa` + `.../mfa/confirm`) δεν απαιτεί re-auth όταν το MFA είναι ΗΔΗ ενεργό — ασύμμετρο με το disable path
+- Priority: P2
+- Size: S
+- Area: api
+- Files: apps/web/src/app/api/saas/account/mfa/route.ts, apps/web/src/app/api/saas/account/mfa/confirm/route.ts, apps/web/src/lib/tenancy/mfaStore.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα (βρέθηκε από reviewer, 2026-07-20, review εύρους `638e33a..HEAD`, increment 80a):** το `DELETE /api/saas/account/mfa` (disable) σωστά re-verifies το τρέχον password πριν καλέσει `disableMfa` (`mfa/route.ts:65-79`, ίδιο idiom με το password-change route). Όμως το **`POST /api/saas/account/mfa`** (begin/restart enrollment, `mfa/route.ts:46-63`) και το **`POST .../mfa/confirm`** (`confirm/route.ts`) απαιτούν ΜΟΝΟ valid session, καμία επιβεβαίωση password/υπάρχοντος TOTP κωδικού, πριν αντικαταστήσουν `mfaPendingSecretEnc` και (στο confirm) το ενεργό `mfaSecretEnc` + εκδώσουν νέα recovery codes.
+  - **Failure scenario:** ένας attacker που κλέβει ένα ήδη-authenticated session (hijacked cookie/XSS) για λογαριασμό που ΗΔΗ έχει ενεργό MFA μπορεί να καλέσει `POST /mfa` → παίρνει νέο secret → το εγγράφει στο δικό του authenticator app → `POST /mfa/confirm` με δικό του κωδικό → αντικαθιστά σιωπηλά το MFA secret + recovery codes του θύματος, χωρίς κανένα re-auth prompt. Ασύμμετρο με το disable path που ήδη προστατεύεται σωστά.
+  - **ΣΗΜ επίπτωσης σήμερα:** χαμηλή πρακτική έκθεση ΤΩΡΑ — το MFA δεν είναι ακόμα wired στο login flow (αυτό είναι το ξεχωριστό, σκόπιμα μεταγενέστερο increment 80c, per `mfaStore.ts`'s scope note + `SAAS_PROGRESS.md`), άρα ένα ενεργό session ήδη σημαίνει πλήρη πρόσβαση χωρίς MFA gate να έχει σημασία ακόμα. Αξίζει όμως να διορθωθεί ΠΡΙΝ το 80c wiring, ώστε το API contract να είναι ήδη σωστό όταν ενεργοποιηθεί η επιβολή στο login.
+  - **Fix:** mirror το ίδιο pattern με το DELETE handler — απαίτησε `password` στο body του `POST /mfa` (begin/restart) όταν `mfaEnabled` είναι ήδη `true` (verify μέσω `Account.passwordHash`, ίδιο idiom με `mfa/route.ts:70-73`)· επίτρεψε begin-χωρίς-password μόνο στο πρώτο enrollment (`mfaEnabled===false`). Το `POST .../mfa/confirm` δεν χρειάζεται δικό του re-auth αν το begin ήδη το απαιτεί (η pending-secret ροή παραμένει two-step by design), αλλά επιβεβαίωσε ότι `confirmMfaEnrollment` δεν μπορεί να ενεργοποιηθεί χωρίς να έχει προηγηθεί ένα re-authed begin όταν ήδη ενεργό.
+  - Επαλήθευση: unit test στο `mfa/route.ts` (ή νέο route test) — `mfaEnabled:true` + `POST /mfa` χωρίς password → 401· με σωστό password → 200 (ίδιο idiom με τα DELETE tests αν υπάρχουν)· `mfaEnabled:false` + `POST /mfa` χωρίς password → 200 (πρώτο enrollment αμετάβλητο). npm run type-check exits 0. Full `npx vitest run` παραμένει green.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-20, reviewer· live-verified `mfa/route.ts:46-63` + `confirm/route.ts` μηδέν password/TOTP re-check όταν `mfaEnabled===true`, ενώ το DELETE στο ίδιο αρχείο το κάνει σωστά γρ.70-73)
+
 ### auth/login — inline `NextResponse.json({ error })` αντί για τον shared `apiError()` helper (response-shape consistency)
 - Priority: P3
 - Size: S

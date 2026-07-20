@@ -2,9 +2,33 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 638e33a -->
+<!-- reviewed: 779970a -->
 <!-- docker-validated: 6ff8678 -->
 <!-- ui-audited: 06f950f -->
+
+## 2026-07-20 (reviewer — έλεγχος 109 commits από τον προηγ. marker `638e33a`)
+
+**Εύρος**: `638e33a..779970a` (109 commits, ο προηγ. reviewer marker ήταν σχεδόν 1 μέρα πίσω — κάλυψε ΟΛΗ τη σημερινή δραστηριότητα: MFA/TOTP core [increments 79/80a], mobile-parity batch [safe-to-spend/budget-rollover/net-worth/Month-in-Review], SaaS control-plane UI batch [account settings/workspace settings/BYO AI key/invite-accept/resend-invite/leave-workspace/create-workspace/activity pagination], 4 νέα self-hosted features [P3 Month-in-Review, P11 IMAP email-in, P13 insurance export, P8 tax export], notifications reconcile test coverage, landing content). Ένα μεγάλο μέρος (`83f392f..HEAD`, 26 commits) είχε ήδη ελεγχθεί από τον web-code-quality auditor's 56η σάρωση (confirmed exemplary, 0 νέο P1/P2 εκτός i18n) — δεν το ξαναδουλεύω, εστίασα στα υπόλοιπα ~83 commits + ειδικά στα security-sensitive νέα (MFA core, δεν είχαν καλυφθεί από την 56η).
+
+**Checks**: `cd apps/web && npm run type-check` → **EXIT 0**. `cd apps/mobile && npx tsc --noEmit` → **EXIT 0**. Μηδέν committed secret (grep για key/token/password patterns στο πλήρες diff, μόνο `process.env.*` references).
+
+**Review (3 παράλληλα read-only sub-review batches, security-sensitive πρώτα)**:
+- **MFA/TOTP core (increments 79/80a)**: `lib/tenancy/totp.ts` (RFC 6238, 5/5 official test vectors, `timingSafeEqual`), `recoveryCodes.ts` (scrypt-hashed, ποτέ plaintext at rest), `mfaStore.ts` (AES-256-GCM secret, ίδιο envelope με BYO AI key) → **PASS**. **1 νέο εύρημα ΑΝΟΙΞΕ ως WEB_DEBT item (P2/S)**: το `POST /api/saas/account/mfa` (begin/restart enrollment) + `POST .../mfa/confirm` δεν απαιτούν password/TOTP re-check όταν `mfaEnabled` είναι ήδη `true`, ασύμμετρο με το `DELETE` (disable) που σωστά το κάνει → hijacked-session attacker θα μπορούσε να αντικαταστήσει σιωπηλά το MFA secret ενός θύματος. Χαμηλή πρακτική έκθεση σήμερα (το MFA δεν είναι ακόμα wired στο login, increment 80c εκκρεμεί) αλλά αξίζει fix πριν το wiring. Δες WEB_DEBT.md.
+- **AI key (BYO)/account settings (password change)/GDPR erasure/IMAP email-in credentials** → **PASS σε όλα**: AES-256-GCM at-rest για το AI key, password change re-verifies current password, erasure owner-only+tenant-scoped+report-only purge, IMAP password plaintext στο AppConfig αλλά **ίδιο σκόπιμο precedent** με τα υπόλοιπα self-hosted single-owner secrets (`secretCrypto.ts`'s δικό του "OSS PARITY" σχόλιο το επιβεβαιώνει) — όχι νέο gap, `getImapInfo()` ποτέ δεν επιστρέφει το plaintext σε κανέναν caller.
+- **SaaS workspace/invite flows** (invite-accept, leave-workspace, create-workspace, workspace settings rename/cancel/reactivate, resend-invite, activity keyset-pagination+filter) → **PASS σε tenant-isolation/orphan-guard/permission-checks σε όλα**. **1 design-note ΑΝΟΙΞΕ ως `## Needs Achilleas`** (όχι bug, ήδη ρητά τεκμηριωμένο στο ίδιο το route ως intentional): το `POST /api/saas/invites/accept` κάνει `setAccountCookie(...)` (πλήρες session login) ΧΩΡΙΣ κανένα password-check όταν το invited email αντιστοιχεί σε ΗΔΗ υπάρχον Account (route.ts:26-29 «no password needed, none accepted» — comment ήδη το λέει ρητά ως συνειδητή απόφαση). Πρακτικά αυτό σημαίνει ότι όποιος αποκτήσει το raw invite token (leak μέσω forwarded email/log/browser-history/shared clipboard) παίρνει πλήρες account takeover στον υπάρχοντα λογαριασμό, όχι μόνο πρόσβαση στο workspace. Θέλει την κρίση του Αχιλλέα: είναι αποδεκτό ρίσκο (SaaS invite tokens ήδη θεωρούνται υψηλής εμπιστοσύνης, μεταδίδονται μέσω email που ήδη είναι bearer-token-equivalent σε πολλά SaaS) ή θέλει tightening (π.χ. απαίτησε password ΚΑΙ για existing-account acceptance, ή μην κάνεις auto-login, redirect σε /login με μήνυμα «joined, please sign in»)·
+- **Mobile-parity API shape** (safe-to-spend/budget-rollover/net-worth/Month-in-Review στο `GET /api/v1/reports` + `budgetRollover` στο `/api/v1/settings`) → **PASS σε όλα**: αμιγώς additive πεδία, mobile types + null-guards ταιριάζουν byte-for-byte, pure calc libs (`budgetRollover.ts`/`safeToSpend.ts`/`monthReview.ts`) χωρίς off-by-one/NaN/div-by-zero. `imapImport.ts` error-handling/dedup (UID watermark) σωστό, always-`logout()` finally· 1 μικρή παρατήρηση (ΟΧΙ queue item, design tradeoff ήδη αποδεκτό στο ρυθμό «no background cron, manual check»): μια αποτυχημένη per-attachment `uploadReceipt` δεν ξανα-δοκιμάζεται στο επόμενο check αφού το UID watermark προχωράει ούτως ή άλλως.
+- **Λοιπά μικρά additive diffs** (models/AppConfig.ts/Expense.ts/types.ts, taxonomies.ts TAX_CATEGORY_PRESETS, audit.ts/activityView.ts `member.left` label, WorkspaceShell.tsx account-settings link, MembersPanel.tsx resend button, workspaceTabs.ts Settings tab, settings/page.tsx imap wiring) → όλα ελεγμένα, καθαρά, μηδέν regression.
+- **Test-only commits** (notifications reconcile part 1+2, tasks/actions.test.ts, giftcardActions.test.ts, cards.test.ts, aiFeatures.server.test.ts, κ.ά.) → μηδέν production-code diff, δεν ελέγχθηκαν σε βάθος (test-only, χαμηλό ρίσκο).
+
+**Fixes**: κανένα small-safe fix χρειάστηκε (type-check ήδη EXIT 0 και στα δύο apps, μηδέν type error/missing await/unused import/typo βρέθηκε).
+
+**Flagged**: 1 νέο WEB_DEBT.md item (MFA re-enrollment re-auth gap, P2/S, auto-buildable) + 1 νέο `## Needs Achilleas` design-decision (invite-accept passwordless login για existing accounts, δες παραπάνω).
+
+**Git hygiene**: staged ΜΟΝΟ `WEB_DEBT.md` + `PROGRESS.md` (reviewed marker + αυτή η εγγραφή). Μηδέν αλλαγή σε app code/secrets/.env.
+
+## Needs Achilleas
+
+- **Invite-accept passwordless login για ήδη-υπάρχοντα accounts** (`api/saas/invites/accept/route.ts`) — δες ανάλυση παραπάνω. Decision: αποδεκτό ρίσκο ή θέλει tightening (password re-check ή no-auto-login);
 
 ## 2026-07-20 (web code-quality auditor — 56η σάρωση, CONFIRMATION run)
 
