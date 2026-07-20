@@ -6604,3 +6604,54 @@ queue παραμένει σχεδόν άδειο (μόνο P31/P36 blocked) — 
 ## Needs Achilleas
 
 - Τίποτα νέο από αυτό το run.
+
+## 2026-07-20 (pharos-daily-dev, 5ο run της ημέρας)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε μόνο ένα OPEN item από το
+bakecore-finance routine (άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή.
+
+**Approved queue check (βήμα a)**: επιβεβαίωσα ξανά ότι το Approved queue παραμένει με ΜΟΝΟ P31/P36
+πραγματικά blocked (P31 = deferred, χρειάζεται supervised session· P36 = χρειάζεται provider-decision από
+τον Αχιλλέα), καμία αλλαγή από τα προηγούμενα 4 σημερινά runs. **Fallback στο βήμα (b)**: το suggested next
+task του 4ου σημερινού run, top-ranked mobile-parity item: **Reports/Settings budget envelope/rollover mode
+στο mobile (P25 gap, P2/M)**, ήδη πλήρως speced στο `MOBILE_PARITY.md`.
+
+**Budget envelope/rollover mode στο mobile (P25 gap) — ✅ SHIPPED** (commit `fa6b7f2`). Πλήρες detail στο
+`MOBILE_PARITY.md` entry (τώρα marked DONE). Σύνοψη: `GET /api/v1/settings` += flat `budgetRollover` boolean
+(ίδιο pattern με τα άλλα flags)· `PATCH /api/v1/settings` δέχεται `budgetRollover` boolean-only (μη-boolean
+τιμές αγνοούνται, ίδιο idiom με `autoAddStores`/`ntfyEnabled`). `GET /api/v1/reports`: πρόσθεσα `catByMonth`/
+`totalByMonth` μέσα στο ήδη-υπάρχον loop πάνω στα Expense `docs` (μηδέν νέο DB round-trip) + reuse του
+ήδη-tested pure `categoryRollover()`/`ROLLOVER_WINDOW` (`lib/budgetRollover.ts`, ίδιο lib με το web `/reports`
+page.tsx). Όταν `settings.budgetRollover` on, κάθε budgeted category row στο `budgets[]` παίρνει additive
+`carried`/`effective` (rolloverMonthKeys = οι τελευταίοι 3 πλήρεις μήνες που είχαν **πραγματικό tracked spend**
+— ένας άδειος μήνας δεν κατασκευάζει πλασματικό surplus, ίδιο guard με το web). Off (default) = shape 100%
+αμετάβλητο. Mobile: `api.ts` types += `budgetRollover`/`carried?`/`effective?`. `SettingsScreen.tsx` νέο Toggle
+«Envelope mode (roll over unspent)» + helper text μέσα στο BUDGETS section. `ReportsScreen.tsx` `BudgetBar`
+δείχνει το `effective` ως εμφανιζόμενο limit + carried chip (πράσινο +/κόκκινο −) όταν rollover on· card title
+γίνεται «BUDGET ENVELOPE · THIS MONTH».
+
+**Verify**: `npm run type-check` (web) EXIT 0· `apps/mobile npx tsc --noEmit` EXIT 0. Full `npx vitest run`
+**2730 passed / 212 files** (+3 νέα στο `settings/route.test.ts` [GET envelope στο preferences envelope +
+PATCH boolean-only coerce], +3 νέα στο `reports/route.test.ts` [off→χωρίς carried/effective keys, on→σωστός
+υπολογισμός με ένα tracked + ένα untracked prior month, zero-spend edge case], μηδέν regression). Docker:
+`mkdir /tmp/claude-docker.lock` (lock acquired καθαρά, κανένα άλλο routine έτρεχε build) → `docker compose
+build web` OK → mongo ήδη healthy → `up -d web` → `RestartCount=0`, `/login` 200 στην 1η προσπάθεια. `curl
+/api/v1/settings` + `/api/v1/reports` χωρίς token + bogus token → και τα 4 401 (όχι 500 — τα additive πεδία
+δεν έσπασαν το auth gate). `docker logs` καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning).
+Browser-checked (Claude Browser pane): `/settings` → redirect σε «Sign in · Pharos» (αναμενόμενο, auth-gated,
+χωρίς credentials εδώ), μηδέν console errors. `docker builder prune -f` (2.313GB freed), lock released καθαρά.
+**Το πραγματικό mobile UI (toggle + chip + envelope title) ΔΕΝ testable end-to-end unattended** (χρειάζεται
+login + real budgets/expense history + Expo simulator) — verified πλήρως μέσω route tests στο πραγματικό
+αποτέλεσμα του `categoryRollover` + type-check και στα δύο apps, ίδιος περιορισμός με κάθε προηγούμενο
+mobile-parity shipment σήμερα.
+
+**Suggested next task**: το επόμενο-ψηλότερο mobile-parity item είναι **loyalty card wallet στο mobile**
+(P20 gap, P2/L, ήδη πλήρως speced στο `MOBILE_PARITY.md` — νέο `LoyaltyCard` v1 CRUD routes + RN barcode-display
+primitive, μεγαλύτερο effort από τα προηγούμενα M-size items). Ισοδύναμες εναλλακτικές στο ίδιο tier: **P7**
+subscription auto-discover (M, ήδη πλήρως speced) και **P21** document vault (χρειάζεται έλεγχο specing). Το
+Approved queue παραμένει σχεδόν άδειο (μόνο P31/P36 blocked) — αν εγκριθεί κάτι νέο από τα P37-P51 candidates
+νωρίτερα, αυτό βγαίνει προτεραιότητα (βήμα a) στο επόμενο run.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run.
