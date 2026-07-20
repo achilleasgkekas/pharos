@@ -3449,3 +3449,57 @@ flag-guarded (no-op εγγυημένο από το ίδιο το aiMeter.ts docs
 τους. Χρειάζεται προσοχή γιατί το `lib/ollama.ts` το αγγίζουν συχνά κι άλλες routines — μικρό,
 surgical diff, τρέξε ολόκληρο το test suite μετά)· (β) polish pass πάνω στα ήδη-χτισμένα panels
 (π.χ. το dev-token echo→clickable link candidate από το #73, ακόμα ανοιχτό, μικρό scope).
+
+## 2026-07-20 (increment 77 — dev-token invite echo → clickable link, §polish)
+**Correction πρώτα:** το candidate (α) του #76's next-task ("AI-metering wiring ΠΟΤΕ δεν
+καλείται από `runVisionJSON`/`runTextJSON`") ήταν **ήδη λάθος/stale όταν γράφτηκε** — grep σε
+`lib/ollama.ts` έδειξε `assertAiQuota`/`meterAiResult` ήδη wired σε 2 call sites, commit
+`9cb635e feat(saas): wire AI-metering into the central AI dispatch` (μαζί με tests στο
+`0770afb`). Αυτό το commit landάρισε **πολύ νωρίτερα** στο git history (πριν καν τα increments
+70+) από άλλη routine/run, και ήδη τεκμηριωμένο νωρίτερα σε αυτό το ίδιο αρχείο (γραμμές ~1572-
+1700) — απλά το `next task` copy-paste text στο τέλος του αρχείου δεν είχε ενημερωθεί μετά. Η
+"§UI-first backlog εξαντλημένο" σάρωση του #76 παραμένει σωστή. Διάλεξα λοιπόν candidate (β).
+
+**Το κενό:** το `MembersPanel.tsx` (invite + resend) όταν δεν υπάρχει mailer configured (dev/
+local, βλ. `/api/saas/invites`+`/api/saas/invites/resend`'s SCAFFOLD notes) echo-άρει το raw
+`devToken` ως **plain text** στο notice bar ("(dev token: xxx)") — ο χρήστης έπρεπε copy-paste
+το token χειροκίνητα στο `/signup?invite=…` URL. Το `inviteAcceptHref(token)` helper (χτισμένο
+από το #73, `components/saas/inviteAccept.ts`, ήδη tested) υπήρχε ήδη ακριβώς γι' αυτό αλλά
+ποτέ δεν καλούνταν από το MembersPanel.
+
+**Built** (2 additive/refactor edits σε δικά μου SaaS-only αρχεία, μηδέν νέο αρχείο):
+- **`inviteResend.ts`**: το `resendNotice(email, devToken)` (embeds raw token ως text) →
+  **`resendNoticeText(email)`** (τοκenless πρόταση μόνο — το token πλέον γίνεται ξεχωριστό link
+  element, όχι κομμάτι του string). Tests ξαναγράφτηκαν αντίστοιχα (5→2, αφαιρέθηκαν τα
+  token-echo cases που δεν εφαρμόζονται πια σε αυτό το επίπεδο).
+- **`MembersPanel.tsx`**: `notice` state `string | null` → **`ReactNode`** (matches το `#73`'s
+  προβλεπόμενο refactor). Νέο μικρό presentational helper `devTokenNotice(text, devToken)`
+  (inline στο component, JSX-only — το project δεν test-άρει `.tsx`/JSX, μόνο pure `.ts`, ίδιο
+  idiom με `AiKeyPanel`/`ErasurePanel`): όταν υπάρχει token, append `<a href={inviteAcceptHref
+  (devToken)} target="_blank" rel="noopener noreferrer">Open invite link</a>` (νέο tab σκόπιμα —
+  ένα in-place click θα πήγαινε το admin's tab μακριά από τη members σελίδα, και το `/signup`
+  accept-flow μπορεί να αλλάξει session αν ο admin προχωρήσει, βλ. increment 73's note). Δύο
+  call sites (submitInvite + resendInvite) το χρησιμοποιούν πλέον αντί για raw-text interpolation.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run inviteResend.test.ts
+inviteAccept.test.ts` → **10/10**· full suite `npx vitest run` → **2689/2689 green** (209 files).
+ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (2 τροποποιημένα SaaS-only αρχεία + 1 test file, μηδέν
+shared component/layout/globals.css, μηδέν νέα εξάρτηση). `SAAS_MODE` off / self-hosted = **zero
+effect** (η `(saas)` σελίδα ήδη 404άρει πριν φτάσει στο MembersPanel). Κανένας Docker rebuild
+(καθαρό component refactor, μηδέν shared runtime wiring). Browser-verify skipped: `docker exec
+homepage-web printenv SAAS_MODE` → κενό (exit 1) στο live `:3000` container, ίδιο idiom με τα
+#66-76. Collision guard: `git status --short` πριν το staging έδειξε μόνο τα 3 δικά μου αρχεία,
+`git diff --cached --name-only` επιβεβαίωσε exact match. Pushed `00216c7`.
+
+**## Needs Achilleas:**
+- Τίποτα νέο — καθαρό UI polish πάνω σε ήδη-tested helper (`inviteAcceptHref`). Πραγματικό
+  end-to-end click-through (πραγματικό invite → dev-token link → accept) χρειάζεται live
+  SaaS-mode deployment· δεν είναι testable από εδώ πέρα από unit tests + tsc.
+
+**Next task:** increment 78 — το §UI-first backlog παραμένει εξαντλημένο (βλ. σάρωση #76) και
+το AI-metering wiring ήδη γίνεται (βλ. correction παραπάνω). Candidates: (α) η **Usage tab
+μηδενικά** (§#72-77's carried-over) — αφού το metering ΕΙΝΑΙ wired (`9cb635e`), ίσως τα μηδενικά
+είναι απλά επειδή δεν έχει τρέξει ποτέ πραγματικό AI call σε SaaS-mode tenant (αναμενόμενο, όχι
+bug) — αξίζει να επαληθευτεί διαβάζοντας το Usage tab's data-source route πριν υποθέσεις κάτι
+σπασμένο· (β) νέα σάρωση για οποιοδήποτε άλλο μικρό UX gap σε ήδη-χτισμένα SaaS panels (π.χ.
+error-message clarity, empty-states, loading-states) αφού το route-level backlog έχει εξαντληθεί.
