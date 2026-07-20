@@ -204,6 +204,7 @@ export const en = {
   'reports.stsFixed': 'known fixed charges',
   'reports.stsWindow': 'next {d}d',
   'reports.stsNote': 'Expected recurring income minus fixed upcoming charges (subscriptions, installments, recurring bills). Variable everyday spending is not deducted.',
+  'reports.monthReview': 'Month in review',
   'reports.receiptsTotal': 'Receipts total',
   'reports.receiptsSub': '{n} receipts · {vat} VAT',
   'reports.spendAvg': 'Spend / month avg',

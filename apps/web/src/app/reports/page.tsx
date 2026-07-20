@@ -14,6 +14,7 @@ import { captureAndListSnapshots } from '@/lib/netWorth';
 import { computeMoneyAgenda } from '@/lib/moneyAgenda';
 import { computeSafeToSpend } from '@/lib/safeToSpend';
 import { goalProgress } from '@/lib/goals';
+import { buildMonthReview } from '@/lib/monthReview';
 import type { SerializedStatement } from '@/types';
 import { ReportsClient } from './ReportsClient';
 
@@ -56,7 +57,7 @@ async function getReports(monthsBack = 12) {
     Item.find().select('title category status purchasedPrice currentPrice purchasedAt warrantyUntil').lean(),
     Subscription.find({ active: true }).select('amount billingCycle category').lean(),
     Statement.find().lean(),
-    Expense.find().select('kind amount date period category space').lean(),
+    Expense.find().select('kind amount date period category space vendor vendorKey recurring').lean(),
     Goal.find({ archived: { $ne: true } }).sort({ createdAt: -1 }).lean(),
   ]);
 
@@ -97,6 +98,9 @@ async function getReports(monthsBack = 12) {
     period?: string;
     category?: string;
     space?: string;
+    vendor?: string;
+    vendorKey?: string;
+    recurring?: boolean;
   }[];
   const ie = months.map((m) => ({ key: m.key, label: m.label, income: 0, expense: 0 }));
   const ieIdx = new Map(ie.map((m, i) => [m.key, i]));
@@ -331,9 +335,17 @@ async function getReports(monthsBack = 12) {
     };
   });
 
+  // ── Month in Review (P3) — deterministic narrative digest, reuses the already-
+  // fetched expense rows + item warranties + budgets (zero new DB round-trips).
+  const monthReview = {
+    ...buildMonthReview(expensesData, { monthKey: thisMonthKey, budgets: appSettings.budgets, warranties: items, now }),
+    monthLabel: monthLabel(now),
+  };
+
   return {
     netWorth: { accountsTotal: Math.round(accountsTotal), series: netWorthSeries },
     safeToSpend,
+    monthReview,
     monthlySpend,
     upcomingInstallments,
     spendByStore,

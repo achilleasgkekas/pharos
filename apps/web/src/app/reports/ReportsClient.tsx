@@ -18,7 +18,7 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts';
-import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X } from 'lucide-react';
+import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles } from 'lucide-react';
 import { createGoal, addGoalContribution, deleteGoal } from './goalsActions';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
@@ -50,6 +50,21 @@ type SafeToSpend = {
   windows: { days: number; income: number; outflow: number; net: number }[];
 };
 
+type MonthReview = {
+  monthKey: string;
+  monthLabel: string;
+  totalSpent: number;
+  totalIncome: number;
+  net: number;
+  prevMonthSpent: number;
+  pctChange: number | null;
+  topCategory: { name: string; amount: number } | null;
+  overBudget: { category: string; budget: number; actual: number; pct: number }[];
+  priceChanges: { vendorKey: string; vendor: string; deltaPct: number; direction: 'up' | 'down' }[];
+  warrantiesExpiringSoon: { title: string; days: number }[];
+  narrative: string;
+};
+
 type GoalRow = {
   _id: string;
   title: string;
@@ -69,6 +84,7 @@ type GoalRow = {
 type Data = {
   netWorth: { accountsTotal: number; series: NetWorthPoint[] };
   safeToSpend: SafeToSpend;
+  monthReview: MonthReview;
   monthlySpend: { key: string; label: string; total: number; count: number }[];
   upcomingInstallments: { label: string; amount: number }[];
   spendByStore: { name: string; total: number; count: number }[];
@@ -207,6 +223,34 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           </div>
         </div>
         <p className="mt-3 text-[11px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('reports.stsNote')}</p>
+      </div>
+
+      {/* Month in Review (P3) — deterministic narrative digest (budget/price-hike/
+          warranty signals already computed elsewhere, zero AI, zero new queries). */}
+      <div className="mb-6 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
+        <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-text-faint)] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+          <Sparkles size={12} /> {t('reports.monthReview')} · {data.monthReview.monthLabel}
+        </p>
+        <p className="text-sm md:text-base leading-relaxed text-[color:var(--color-text)]">{data.monthReview.narrative}</p>
+        {(data.monthReview.overBudget.length > 0 || data.monthReview.priceChanges.length > 0 || data.monthReview.warrantiesExpiringSoon.length > 0) && (
+          <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {data.monthReview.overBudget.map((b) => (
+              <span key={`b-${b.category}`} className="px-2 py-1 rounded-md border border-[color:var(--color-red)]/40 text-[color:var(--color-red)]">
+                {b.category} {cur()}{b.actual}/{cur()}{b.budget}
+              </span>
+            ))}
+            {data.monthReview.priceChanges.slice(0, 5).map((p) => (
+              <span key={`p-${p.vendorKey}`} className="px-2 py-1 rounded-md border border-[color:var(--color-gold)]/40 text-[color:var(--color-gold)]">
+                {p.vendor} {p.direction === 'up' ? '+' : ''}{p.deltaPct}%
+              </span>
+            ))}
+            {data.monthReview.warrantiesExpiringSoon.slice(0, 5).map((w) => (
+              <span key={`w-${w.title}`} className="px-2 py-1 rounded-md border border-[color:var(--color-cyan)]/40 text-[color:var(--color-cyan)]">
+                {w.title} · {w.days}d
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Summary cards */}
