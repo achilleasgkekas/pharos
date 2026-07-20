@@ -2039,3 +2039,26 @@ Collision guard: `git status --short` = ΜΟΝΟ docs/features.md + docs/saas.md
 `#workspace-ai-key-management-byo-key` αλλα το σωστό anchor είναι `#bring-your-own-key-management`
 (το actual markdown header είναι «### Bring-your-own-key management» on line 572).
 Διόρθωσα την αναφορά στην /account/workspace/settings row.
+
+## 2026-07-20 (tenth run — P7 mobile parity documentation)
+
+Σάρωση git log για undocumented features από τα τελευταία commits. Ανακάλυψα ότι το **P7 (subscription auto-discover on mobile, commit 31cc37c, 2026-07-20 20:23)** ήταν shipped αλλά δεν ήταν documented στο mobile.md.
+
+Τι έγραψα:
+- **mobile.md**: Ενημέρωση του Subscriptions row στον "What it does" πίνακα (line 25) να αναφέρει «**auto-discover untracked recurring charges**». Αυτό καθρεφτίζει την feature που ήδη ήταν documented στο features.md (P7, auto-discover untracked subscriptions από expense history).
+
+Accuracy verified εναντι κώδικα:
+- apps/mobile/src/app/api/v1/subscriptions/route.ts (νέο `discoverSuggestions()` call, additive top-level field με RecurringCandidate array).
+- apps/mobile/src/screens/SubscriptionsScreen.tsx (discover-box πάνω από τη λίστα με Track/Dismiss chips).
+- Existing route test coverage (4 νέα test cases: empty-suggestions default, 3-occurrence monthly series, vendor exclusion, updatedSince cursor skip).
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: mobile.md = 8 (balanced, 4 pairs, 0 προστέθηκαν) ✓.
+- Internal links: αναφορές σε features.md, api.md, self-hosting.md (όλες υπάρχουν) ✓.
+- Secret scan: κανένα literal credential ✓.
+- Markdown table structure: 1 row edit (Subscriptions), column alignment maintained ✓.
+
+Collision guard: git status --short = ΜΟΝΟ docs/mobile.md + docs/DOCS_PROGRESS.md modified (δικά μου). Δεν υπάρχουν foreign staged files.
+
+Επόμενο run: (α) continue scanning αν άλλα νέα features προστεθούν (pi.x P25, P19 ήδη documented στο features.md / saas.md) · (β) api.md/openapi.yaml sync αν νέα v1 routes landed · (γ) configuration.md stale-forward αν νέα AI provider ή storage backend options προστεθούν.
+

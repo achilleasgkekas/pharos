@@ -22,7 +22,7 @@ The mobile app mirrors most of the web modules, backed by the same API client
 | Receipts | list, detail, camera scan + AI parse, re-scan, add to library |
 | Inventory (Items) | list, detail, price status, log a price, link installment plans |
 | Expenses / Income | list, add, edit, bill/payslip AI scan |
-| Subscriptions | list, add, edit |
+| Subscriptions | list, add, edit, **auto-discover untracked recurring charges** |
 | Statements | list + transactions, installment-plan overview |
 | Vouchers | list, add, edit, AI fill (text/photo) |
 | Calendar | 3-month agenda of renewals, installments, bills, expiries |
