@@ -3577,3 +3577,60 @@ POST confirm με πρώτο κωδικό για να ενεργοποιηθεί
 `api/saas/auth/login` όταν `mfaEnabled`, session/cookie sequencing) — ΝΑ ΓΙΝΕΙ ΤΕΛΕΥΤΑΙΟ, μόνο
 αφού τα (α)+(β) έχουν δοκιμαστεί, και με ιδιαίτερη προσοχή στο πλήρες test suite μετά (αγγίζει
 shared auth plumbing).
+
+## 2026-07-20 (increment 80a — MFA enrollment core: Account fields + start/confirm/disable routes)
+
+Συνέχεια του #79's πλάνο (α)+(β)+(γ) σε 3 ξεχωριστά increments. Αυτό είναι το **(α)**: μόνο
+data-model + enrollment API routes, **μηδέν wiring στο login flow ακόμα** (αυτό είναι το (γ),
+σκόπιμα τελευταίο και ξεχωριστό — αγγίζει shared, security-critical plumbing).
+
+**Σχεδιασμός (mirrors `lib/billing/byoKeyStore.ts` 1:1, ίδιο idiom)**: two-step enrollment
+(`mfaPendingSecretEnc` → confirmed `mfaSecretEnc`) ώστε ένα μισοτελειωμένο setup να ΜΗΝ μπορεί
+ποτέ να ενεργοποιήσει σιωπηλά MFA σε λογαριασμό — μόνο αφού ο χρήστης αποδείξει ότι το authenticator
+app σκάναρε σωστά (πρώτος κωδικός verified) γίνεται `mfaEnabled:true`.
+
+**Built:**
+- **`models/Account.ts`** (additive edit): 4 νέα πεδία `mfaEnabled`/`mfaSecretEnc`/
+  `mfaPendingSecretEnc`/`mfaRecoveryHashes` (default false/null/null/[]). Zero αλλαγή σε
+  υπάρχον πεδίο/index/behavior.
+- **`lib/tenancy/mfaStore.ts`** (νέο): 3 PURE `plan*` builders (`planMfaEnrollStart`/
+  `planMfaConfirm`/`planMfaDisable`, unit-testable χωρίς DB — ίδιο σχήμα με `planAiKeyUpdate`/
+  `planAiKeyClear`) + 4 thin DB wrappers: `beginMfaEnrollment` (generate secret → encrypt via
+  `secretCrypto` → store pending → επιστρέφει PLAINTEXT secret+otpauth URI μία φορά),
+  `confirmMfaEnrollment` (decrypt pending → `verifyTotpCode` → αν σωστό: generate+hash recovery
+  codes → activate, επιστρέφει τα plaintext codes μία φορά), `disableMfa`, `describeMfaStatus`.
+- **3 νέα API routes** (SaaS-mode only, `saasAuthGate`+`saasGuard`, λειτουργούν πάνω στο caller's
+  own Account session, ίδιο idiom με `account/password`): **`GET/POST/DELETE
+  /api/saas/account/mfa`** (status· begin/restart enrollment· disable — το DELETE re-verifies το
+  **τρέχον password** πριν σβήσει, ίδιο idiom με το password-change route, ώστε ένα hijacked
+  session μόνο του να ΜΗΝ μπορεί να κλείσει το 2ο factor) + **`POST
+  /api/saas/account/mfa/confirm`** (πρώτος κωδικός → activate + one-time recovery-code batch).
+- **4 νέα unit tests** (`mfaStore.test.ts`) πάνω στους 3 PURE planners — ίδια σύμβαση με το
+  `byoKeyStore.test.ts` (μόνο οι planners tested μεμονωμένα, οι DB wrappers μέσω integration/API
+  routes αργότερα).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run mfaStore.test.ts totp.test.ts
+recoveryCodes.test.ts` → **31/31**· full suite `npx vitest run` → **2753/2753 green** (214
+files — η αύξηση από το #79's 2726/212 οφείλεται σε άλλα routines' commits που έχουν μπει στο
+μεταξύ, όχι σε regression, `git log` το επιβεβαιώνει). ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν
+αγγίχτηκε (1 additive model edit + 4 νέα αρχεία, μηδέν shared component/layout/globals.css,
+μηδέν νέα εξάρτηση). `SAAS_MODE` off/self-hosted = **zero effect** (τα νέα routes 404άρουν πριν
+φτάσουν οπουδήποτε κοντά σε DB query, `User`/bearer path αναπάφητο). Κανένας Docker rebuild
+(καθαρό νέο backend code, μηδέν runtime wiring/env change, μηδέν UI ακόμα ώστε browser-verify
+N/A). Collision guard: `git status --short` πριν το staging έδειξε μόνο τα 4 δικά μου αρχεία (+1
+edit), `git diff --cached --name-only` επιβεβαίωσε exact match. Pushed `7c90186`.
+
+**## Needs Achilleas:**
+- Τίποτα ακόμα — αμιγώς additive core + routes, μηδέν wiring σε ό,τι επηρεάζει live login
+  behavior, μηδέν decision-point.
+
+**Next task:** increment 80b — **enrollment UI panel** στο `(saas)/account/settings`
+(`AccountSettingsPanel.tsx`, δίπλα στα υπάρχοντα password/export panels): κουμπί "Enable
+two-factor" → `POST /api/saas/account/mfa` → δείξε `secret`+`uri` (manual-entry text ΚΑΙ ίσως
+lightweight inline SVG QR χωρίς νέα εξάρτηση — να αποφασιστεί στο 80b αν αξίζει τον κόπο ή αν
+απλά το manual-entry secret αρκεί για v1) → input για τον πρώτο κωδικό → `POST
+/api/saas/account/mfa/confirm` → δείξε τα recovery codes ΜΙΑ φορά (download/copy prompt, δεν θα
+ξαναφανούν) → "Disable" flow (password re-entry, `DELETE .../mfa`). Μετά, ΤΕΛΕΥΤΑΙΟ: increment
+80c = login-flow wiring (το πιο ρισκαρισμένο, χρειάζεται προσοχή στο session sequencing και στο
+recovery-code consumption path — `matchRecoveryCode`'s index-splice contract ήδη υπάρχει, απλά
+δεν καλείται ακόμα από πουθενά).
