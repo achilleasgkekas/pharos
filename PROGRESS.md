@@ -3,7 +3,19 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 638e33a -->
-<!-- docker-validated: 7179b6f -->
+<!-- docker-validated: 6ff8678 -->
+
+## 2026-07-20 (docker-health — rebuild + health check 03:03)
+
+**Stack status**: MongoDB healthy (40h uptime), web rebuilt + running (3m uptime, responds 200 on /login), flaresolverr stopped (memory hygiene). Mongo remains healthy post-rebuild.
+
+**Rebuild decision**: YES — 16 commits since last validated sha `7179b6f`, including 7 feature/test commits with runtime code changes (P3 month-in-review, P11 email-in IMAP, P7 workspace creation, P26 workspace leave, plus test coverage adds for items routes). Upstream `apps/web/` touched: package.json, 30+ component/route/test files.
+
+**Build result**: `docker compose build web` succeeded in 193s, image exported cleanly. Container recreated, `/login` returns 200 within 3s.
+
+**Disk management**: `docker builder prune -f` reclaimed 193.7 MB (expired cache from prior builds). Remaining images: 3.798 GB (stable).
+
+**Needs Achilleas**: Τίποτα. Stack healthy post-rebuild, disk cleaned. No uncommitted WIP detected.
 
 ## 2026-07-19 (reviewer — έλεγχος 82e008c..638e33a, 1 fix commit)
 
