@@ -1,5 +1,22 @@
 # DOCS_PROGRESS
 
+## 2026-07-20 (sixth run — P76 GDPR erasure self-service UI)
+
+Σάρωση git log για undocumented features. Ανακάλυψα ότι το P76 (workspace deletion) shipαρίστηκε (commit a2e6923, 2026-07-20 12:04) και εχει **ErasurePanel.tsx** component για owner-only "Delete workspace" danger-zone panel στο workspace settings, αλλα το UI δεν ήταν documented στο saas.md.
+
+Τι έγραψα:
+- **saas.md**: Προσθεση νέας subsection "#### Delete workspace UI (settings page)" αμέσως μετά το "Workspace erasure (GDPR)" section API docs και πριν το "Erasure purge scan" subsection. Περιγραφη του 2-state panel: (α) not requested (button "Delete workspace", confirmation dialog, POST endpoint), (β) requested (countdown "N days left", button "Cancel deletion", DELETE endpoint). Error handling (red box), live countdown phrase updates, implementation notes (GET on page load, POST/DELETE on action, router.refresh()).
+
+Validation (markdown only, κανενα build/Docker/AI):
+- Code fences: 18 total στο saas.md (ζυγό, balanced).
+- Internal links: καμια αναφορά σε άλλα docs. Όλα τα endpoints referenced (GET/POST/DELETE /api/saas/workspace/erasure) υπάρχουν already documented σε προηγούμενη section.
+- Secret scan: κανένα literal credential (μόνο placeholder `<slug>`).
+- Markdown structure: 4 hashes (####) για subsection level, ίδιο με άλλα peer subsections.
+
+Collision guard: git status --short = ΜΟΝΟ docs/saas.md modified, staged κενο αρχικά. Stage + verify δεν υπάρχουν foreign files. Committed c4f2c93.
+
+Επόμενο run: (α) grep για άλλα νέα features που ίσως shipαρίστηκαν χθες ή σήμερα (P77+) και δεν είναι documented στο features.md/configuration.md, ή (β) api.md — verify ότι όλα τα σύσφατα /api/saas/** endpoints είναι up-to-date, ή (γ) mobile.md — check αν mobile app πρέπει να support-άρει τα νέα SaaS features.
+
 ## 2026-07-20 (fifth run — account Settings page UI documentation)
 
 Νέα feature landed: Account settings page (commit 97debbf) που παρέχει UI για PATCH /api/saas/account, POST /api/saas/account/password, και GET /api/saas/account/export. Αυτές οι API routes ήταν ήδη documented αλλα η **user-facing page** ήταν κενό. Εγραψα:
