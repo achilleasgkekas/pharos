@@ -2030,3 +2030,59 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-20 — (e) polish/content: ROADMAP accuracy fix + FAQ += insurance export (P13)
+
+Increment (e) πριν το ξεκινημα του run, διαβασα ολοκληρο το `git log --oneline -40` του κυριου app (οχι
+μονο features.md) και βρηκα κατι σοβαρο: το `ROADMAP` section («Exploring, on the backlog, not yet
+scheduled») εδειχνε 3 στοιχεια, αλλα τα 2 απο τα 3 ειχαν **ηδη ship-αρει** εδω και καιρο:
+- «IMAP email-in for hands-off receipt capture» = P11 (commit `3a7be9b feat(receipts)`, τεκμηριωμενο στο
+  `docs/features.md:113`).
+- «Savings goals & insurance export» = δυο ξεχωριστα shipped features: savings goals = P12
+  (`docs/features.md:355`, ηδη παλιοτερο)· insurance export = P13, εγινε ship **σημερα** (commit `7373035
+  feat(items): home-inventory insurance export bundle`, ~2.5 ωρες πριν αυτο το run).
+Μονο το «Return-window reminders for recent buys» (P10 candidate, καμια αναφορα πουθενα στο features.md)
+ειναι πραγματικα ακομα backlog. Το να δειχνεις σε επισκεπτες live features σαν «not yet scheduled» ειναι
+ενα content-accuracy/trust θεμα (υποτιμα το προιον) και το ζητησε ρητα το προηγουμενο log entry
+(«ή νεοτερο shipped module αν εμφανιστει gap»).
+
+Αλλαγη (app/page.tsx, μονο 2 arrays + 1 FAQ, μηδεν UI/CSS/dependency change):
+- `ROADMAP`: αφαιρεθηκαν τα 2 ηδη-shipped bullets απο το `Exploring` array· προστεθηκε ΕΝΑ νεο bullet
+  στο `Shipped` array («IMAP email-in, savings goals & insurance export bundle»)· το `Exploring` εμεινε με
+  το μοναδικο πραγματικα-ανοιχτο στοιχειο (return-window reminders), ειναι εντιμο ετσι με 1 item.
+- `FAQS`: νεα εγγραφη «Can it produce an export for an insurance claim?» αμεσως πριν το «How do backups
+  work?» (money/data cluster). Απαντηση ακριβης απο το commit body του P13: Settings → Storage & backup →
+  «Insurance export (ZIP)», CSV manifest + standalone printable HTML report ανα item (value/serial/
+  warranty) + photos/manuals/linked receipts, ιδιο depreciation-adjusted value estimate με τα Reports.
+  Ρεει αυτοματα στο FAQPage JSON-LD + deterministic anchor id
+  `faq-can-it-produce-an-export-for-an-insurance-claim`.
+- Savings goals (P12) και IMAP email-in (P11) ΔΕΝ πηραν δικο τους FAQ σε αυτο το increment (μονο
+  roadmap-bucket fix)· μενουν σαν πιθανα επομενα increments αν χρειαστει βαθυτερη coverage.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (11 routes), `/` route 5.33 kB (αμεταβλητο, copy-only, μηδεν
+  bundle impact).
+- Prerender (`.next/server/app/index.html`): «IMAP email-in, savings goals» -> 3 hits· «Insurance export
+  (ZIP)» -> 1 hit· «insurance claim?» -> 3 hits (HTML + JSON-LD + RSC payload, consistent)· anchor id
+  `faq-can-it-produce-an-export-for-an-insurance-claim` present.
+- Browser preview (in-app Browser, νεο tool αυτο το session): `preview_start` στο apps/landing (port 3100,
+  χωρις launch.json entry, next dev standalone), `get_page_text` επιβεβαιωσε ολο το ROADMAP section
+  (Shipped/Building/Exploring με τα σωστα bullets) + το νεο FAQ item ρεουν σωστα στο rendered DOM, μηδεν
+  console errors (`read_console_messages` καθαρο). Server σταματησε μετα (`preview_stop`), δεν εμεινε
+  τιποτα τρεχει.
+- em-dash: 0 σε ολο το page.tsx (commas μονο). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το commit εδειξε 4 foreign paths αλλου routine
+  (`apps/web/src/app/(saas)/account/workspace/settings/page.tsx` + 3 νεα `apps/web/src/components/saas/
+  AiKeyPanel*`), κανενα σταθηκε (`git diff --cached --name-only` κενο)· staged ΜΟΝΟ τα δικα μου landing
+  paths μεσω explicit pathspec.
+
+Επομενο increment: (e) polish συνεχεια — μπορει να αξιζει δικο του FAQ/copy line για savings goals (P12)
+ή IMAP email-in (P11) αν δεν καλυφθουν αλλου· annual Offers στα per-tier Pricing aria labels· ή real app
+screenshots οταν υπαρξουν assets (blocked)· ή νεοτερο shipped module αν εμφανιστει gap.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

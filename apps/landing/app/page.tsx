@@ -404,6 +404,7 @@ const ROADMAP: {
       'Card statements with installment plans',
       'Subscriptions, reports & UniFi network dashboard',
       'Mobile app plus SMB, FTP & OneDrive backups',
+      'IMAP email-in, savings goals & insurance export bundle',
     ],
   },
   {
@@ -422,8 +423,6 @@ const ROADMAP: {
     note: 'On the backlog, not yet scheduled',
     items: [
       'Return-window reminders for recent buys',
-      'IMAP email-in for hands-off receipt capture',
-      'Savings goals & insurance export',
     ],
   },
 ];
@@ -484,6 +483,10 @@ const FAQS: { q: string; a: string }[] = [
   {
     q: 'Can it split a shared cost and track who owes me?',
     a: 'Yes. On any expense you paid, a built-in Splitwise-lite editor lets you add people by name (no account needed for them) and set each share, or press "Split equally" with an optional slice for yourself. Cards show a small badge with what is still owed on that expense, and a "Balances, who owes you" view rolls every split into a per-person total. When someone pays you back you settle them up in one click across all their shares at once. It stays dormant until you split something, so nothing changes for expenses you keep to yourself.',
+  },
+  {
+    q: 'Can it produce an export for an insurance claim?',
+    a: 'Yes. Settings → Storage & backup has a one-click "Insurance export (ZIP)" that bundles a CSV manifest and a standalone printable HTML report of every owned item, its value, serial number, and warranty, together with its photos, manuals, and linked receipts, exactly what an insurer asks for after a claim. Values use the same depreciation-adjusted estimate as Reports, so aging gear is not overstated.',
   },
   {
     q: 'How do backups work?',
