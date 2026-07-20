@@ -25,6 +25,7 @@ The mobile app mirrors most of the web modules, backed by the same API client
 | Subscriptions | list, add, edit, **auto-discover untracked recurring charges** |
 | Statements | list + transactions, installment-plan overview |
 | Vouchers | list, add, edit, AI fill (text/photo) |
+| Bills | list, add, edit, mark paid (spawns next recurring), due-soon/overdue status |
 | Calendar | 3-month agenda of renewals, installments, bills, expiries |
 | Reports | net position, this month/year, by-category, budgets |
 | Tasks | list, add, status, steps |

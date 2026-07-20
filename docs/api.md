@@ -288,6 +288,15 @@ Each plan in the `GET /statements/plans` response is:
 | PATCH  | `/vouchers/:id`     | Update `{ title?, code?, store?, discount?, url?, expiresAt?, used? }`. |
 | DELETE | `/vouchers/:id`     | Soft-delete. |
 
+### Bills
+
+| Method | Path                        | Description |
+|--------|-----------------------------|----|
+| GET    | `/bills?archived=0&paid=0`  | List (+ `limit`/`offset`/`updatedSince`). Default excludes archived bills. Filter `paid=0` to show unpaid only. Each bill has a computed `status` field (paid/overdue/due-soon/upcoming) derived from `dueDate` and `paidAt`. |
+| POST   | `/bills`                    | Create `{ title, vendor?, amount?, dueDate, category?, cycle?, notes? }` (cycles: empty/'weekly'/'monthly'/'quarterly'/'yearly'). |
+| PATCH  | `/bills/:id`                | Update `{ title?, vendor?, amount?, dueDate?, category?, cycle?, notes?, archived?, paid?, paidDate? }`. Special: `paid: true` marks paid and (for recurring bills on first mark) spawns the next due instance one cycle ahead. Response includes `{ bill: …, spawnedNext: boolean }`. |
+| DELETE | `/bills/:id`                | Soft-delete. |
+
 ### Tasks
 
 | Method | Path                                        | Description |
