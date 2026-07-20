@@ -1,5 +1,23 @@
 # DOCS_PROGRESS
 
+## 2026-07-20 (seventh run — P13 insurance export documentation)
+
+Σάρωση git log για undocumented features που shipαρίστηκαν τα τελευταία ώρες. Ανακάλυψα ότι το **P13 (home-inventory insurance export bundle, commit 7373035, 2026-07-20 06:48)** ήταν shipped αλλά ΔΕΝ ήταν documented στο features.md.
+
+Τι έγραψα:
+- **features.md**: Προσθεση νέας bullet point στα Inventory & Shopping highlights για το P13 (Insurance export) που περιγράφει το feature: bundles items with depreciation-adjusted value, serial, warranty, photos, και linked receipts σε ZIP για insurance claims. Εξηγηση της χρήσης (damage/theft/disaster claims). Ενημέρωση κι του Settings section για να αναφέρει το insurance export (ZIP) μαζί με τα άλλα export options (CSV, migration import).
+
+Validation (markdown only, κανενα build/Docker/AI):
+- Code fences: 0 (features.md δεν έχει code blocks) ✓.
+- Internal links: όλες υπάρχουν (Navigation to Settings section, no external links) ✓.
+- Secret scan: κανένα credential ✓.
+- Markdown structure: ✓ (features.md 493→501 lines, +8 για τα 2 edits).
+- Spelling / consistency: Insurance export description ακολουθεί το ίδιο pattern με άλλα export features (Tax-deductible tagging, IMAP auto-import).
+
+Collision guard: git status --short = ΜΟΝΟ docs/features.md modified (δικό μου), git diff --cached = ΜΟΝΟ αυτό το αρχείο. Committed 2155b31. Pushed origin/main ✓.
+
+Επόμενο run: (α) grep για άλλα P77+ features που ίσως shipαρίστηκαν και δεν είναι documented (αν υπάρχουν), ή (β) api.md sync αν νέα endpoints προστέθηκαν, ή (γ) mobile.md — update αν mobile app πρέπει να support insurance export (probably no, αφού είναι settings-level feature).
+
 ## 2026-07-20 (sixth run — P76 GDPR erasure self-service UI)
 
 Σάρωση git log για undocumented features. Ανακάλυψα ότι το P76 (workspace deletion) shipαρίστηκε (commit a2e6923, 2026-07-20 12:04) και εχει **ErasurePanel.tsx** component για owner-only "Delete workspace" danger-zone panel στο workspace settings, αλλα το UI δεν ήταν documented στο saas.md.
