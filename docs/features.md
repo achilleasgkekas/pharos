@@ -77,6 +77,13 @@ Highlights:
 - **Attachments** (manuals, warranty certificates, serial number photos) can be
   uploaded and stored with each item. The attachments are synced with your file
   storage backend (local, SMB, FTP, OneDrive) alongside receipt and statement files.
+- **Insurance export (P13).** Settings → Storage & backup → **Insurance export
+  (ZIP)** bundles every owned item (with depreciation-adjusted value, serial
+  number, warranty expiry) into a ZIP file with: (1) a CSV manifest for
+  spreadsheet review, (2) a standalone printable HTML report (view, print, and
+  sign for your claim), (3) all item photos, (4) linked receipt PDFs (proof of
+  purchase). Perfect for filing an insurance claim after damage, theft, or
+  disaster — give the ZIP to your insurer.
 
 ## Shopping list
 
@@ -484,7 +491,8 @@ Configuration is grouped into tabs:
 - **Network** — UniFi host / user / connection test.
 - **Storage & backup** — file storage backend (local / SMB / FTP / OneDrive),
   folder / filename templates, mirror-on-verify, sync, backup / restore, CSV
-  export, **migration import** (YNAB and other tools), and Trash.
+  export, **insurance export (ZIP)** with inventory manifest, photos, and
+  printable receipts report, **migration import** (YNAB and other tools), and Trash.
 - **Stores & lists** — known stores (with duplicate detection / merge) and the
   editable dropdown taxonomies (item / expense / subscription categories).
 - **Notifications** — alert channels (ntfy, Discord, Slack, Telegram, webhook), test and check-now buttons; outbound event webhooks for automation platforms.
