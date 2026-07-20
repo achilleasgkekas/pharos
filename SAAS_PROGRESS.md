@@ -3211,3 +3211,79 @@ rebuild με το flag μόνο-για-verify — απαγορεύεται, ίδ
 #67-72, αλλά μπορεί να έχει πλέον εξαντληθεί — αν η επόμενη σάρωση βγει άδεια, γράψε το ρητά
 εδώ και προχώρα σε (α))· (γ) custom-domain self-service παραμένει blocked σε αρχιτεκτονική
 απόφαση (§#71, χρειάζεται DNS/cert flow decision, δεν είναι blocking — low priority).
+
+## 2026-07-20 (increment 73 — Invite-accept UI: /signup?invite=… actually joins a workspace, §UI-first)
+**Το κενό:** ξανα-σάρωσα τα `api/saas/**` routes (candidate (β) του #72) grep-άροντας κάθε route
+path μέσα σε `(saas)/**` + `admin/**` + `components/saas/**` για fetch-callers. Βρήκα **6** routes
+με μηδέν UI caller: `auth/session`, `invites/accept`, `workspace/ai-key`, `workspace/erasure`,
+`workspace/export`, `workspace/export/files`. Τα scheduler-only (`trials/sweep`, `usage/sample`,
+`workspace/erasure/purge`) εξαιρέθηκαν σωστά (bearer-token cron endpoints, δεν έχουν καν νόημα σε
+UI)· το `admin/overview` εξαιρέθηκε επίσης (το `admin/page.tsx` ήδη καλεί το `readFleetOverviewFor
+Admin()` απευθείας SSR, όχι μέσω fetch — όχι dead). Από τα 6, το **`invites/accept`** ξεχώρισε ως
+το πιο κρίσιμο: το `lib/tenancy/mailer.ts`'s `inviteLinkUrl()` ήδη χτίζει `/signup?invite=<token>`
+και το docstring του route λέει ρητά "a /signup page reads the token and posts it" — αλλά το
+`(saas)/account/signup/page.tsx` δεν διάβαζε καν `?invite=` παρά μόνο `?next=`. Δηλαδή **ολόκληρο
+το invite flow ήταν σπασμένο end-to-end για πραγματικούς χρήστες**: το `MembersPanel` μπορεί να
+στείλει invite (ήδη built, #προηγούμενα increments), αλλά ο invited χρήστης που πατάει το link στο
+inbox του δεν είχε καμία σελίδα να το ολοκληρώσει — μόνο χειροκίνητο POST θα δούλευε. Πιο σοβαρό
+από τα υπόλοιπα 5 dead routes (GDPR export/erasure/BYO-key = προαιρετικά self-service settings·
+αυτό = ο βασικός onboarding μηχανισμός για νέα μέλη).
+
+**Built** (2 νέα PURE+tested modules, 1 νέο client component, additive rewrite του δικού μου
+`(saas)/account/signup/page.tsx`):
+- **`components/saas/inviteAccept.ts`** (νέο, PURE, mirrors το `recoveryValidation.ts` idiom) —
+  `inviteAcceptReady(password)` (password **OPTIONAL** — ο invitee μπορεί να έχει ήδη account για
+  το invited email, οπότε δεν χρειάζεται κωδικό· το route ζητάει password μόνο όταν πρέπει να
+  δημιουργήσει νέο account, και το reportάρει μέσω `password_required` αν ο client μάντεψε λάθος)·
+  `inviteAcceptHref(token)` (σχετικό `/signup?invite=…` link, mirror του server `inviteLinkUrl`
+  minus origin). **8 unit tests.**
+- **`components/saas/InviteAcceptForm.tsx`** (νέο client component, mirrors το `ResetConfirmForm`/
+  `AuthForm` idiom) — Name (optional) + Password (optional, με helper text "leave blank if you
+  already have a Pharos account") → POST `/api/saas/invites/accept` `{token, password?, name?}` →
+  success = full navigation (`window.location.assign`) ώστε να πιάσει το φρέσκο session cookie.
+  Reuses το ήδη-υπάρχον `describeRecoveryError` για error mapping (το route πάντα επιστρέφει ένα
+  user-facing `error` string σε κάθε failure path, οπότε ο generic status-fallback σχεδόν ποτέ δεν
+  ενεργοποιείται — μηδέν ανάγκη για δικό μου bespoke describe-error, λιγότερος κώδικας).
+- **`(saas)/account/signup/page.tsx`** (δικό μου, rewrite) — νέο `invite` searchParam. Όταν
+  παρόν: server-side **preview** (νέο local `loadInvitePreview()`, `connectDB()` + `Invite.findOne
+  ({tokenHash})` + `Tenant.findById` για display name — **μόνο για εμφάνιση**, το POST re-validates
+  αυθεντικά) → δείχνει "Join {workspace}" + "You've been invited as {email}" + `InviteAcceptForm`
+  όταν το token είναι valid+pending, αλλιώς "Invitation not available" (invalid/expired/άγνωστο
+  token, ένα ενιαίο μήνυμα ώστε να μη διαρρέει ποιο ακριβώς έφταιξε). **Σκόπιμα ΔΕΝ κάνει redirect
+  έναν ήδη-signed-in viewer μακριά** όταν υπάρχει invite token (το accept route είναι unauthenticated
+  by design και πάντα resolve-άρει στο email ΤΟΥ invite, όχι του caller's session — ένας logged-in
+  χρήστης πρέπει να μπορεί να redeem ένα invite για άλλη διεύθυνσή του)· subtitle προειδοποιεί
+  "Accepting will switch your session to this account" όταν το viewer email διαφέρει. Χωρίς invite
+  param → η παλιά συμπεριφορά αμετάβλητη byte-for-byte (ίδιο early-redirect, ίδιο AuthForm).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run inviteAccept.test.ts` → **8/8**·
+full suite `npx vitest run` → **2555/2555 green** (201 files, +3 files/+37 tests έναντι του #72's
+2518 — 8 δικά μου νέα tests + tests άλλων routines που προσγειώθηκαν στο main στο μεταξύ). ΚΑΝΕΝΑ
+υπάρχον feature αρχείο δεν αγγίχτηκε (3 νέα αρχεία + 1 rewrite σε δικό μου SaaS-only page, μηδέν
+shared component/layout/globals.css). `SAAS_MODE` off / self-hosted = **zero effect** (το `(saas)`
+segment self-gates σε `notFound()` πριν φτάσει καν στη νέα λογική· χωρίς `?invite=` το page render
+είναι ίδιο με πριν). Κανένας Docker rebuild (2 νέα PURE/client αρχεία + 1 page rewrite, μηδέν
+shared runtime wiring, μηδέν νέα εξάρτηση — ίδιο σκεπτικό με τα increments 58-72). Browser-verify
+skipped: `docker exec homepage-web printenv SAAS_MODE` → κενό (exit 1) στο live `:3000` container,
+άρα η `/signup` σελίδα ήδη 404άρει ανεξαρτήτως `?invite=` (σωστό self-hosted behavior, τίποτα νέο
+να δει κανείς)· θα χρειαζόταν rebuild με το flag μόνο-για-verify — απαγορεύεται, ίδιο idiom με τα
+#66-72. Collision guard: `git status --short` πριν το staging έδειξε μόνο τα 4 δικά μου αρχεία (1
+modified + 3 new), `git diff --cached --name-only` επιβεβαίωσε exact match.
+
+**## Needs Achilleas** (invite accept):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η `(saas)` σελίδα/route (αλλιώς 404).
+  Self-hosted = disabled, zero risk.
+- Ένα πραγματικό end-to-end test (invite → email link ή dev-token → `/signup?invite=…` → accept →
+  landing στο workspace) χρειάζεται live SaaS-mode deployment· δεν είναι testable από εδώ πέρα από
+  unit tests + tsc.
+
+**Next task:** increment 74 — candidates: (α) MembersPanel's dev-token echo (όταν δεν υπάρχει
+mailer configured) είναι σήμερα plain text "(dev token: xxx)" — θα μπορούσε να γίνει clickable
+`inviteAcceptHref(token)` link (το helper υπάρχει ήδη από αυτό το increment) ώστε το local-testing
+loop να κλείνει με ένα κλικ αντί για copy-paste· χρειάζεται να αλλάξει το `notice` state από string
+σε ReactNode (μικρό αλλά όχι μηδενικό refactor, παραλείφθηκε αυτό το increment για να μείνει
+scoped)· (β) τα υπόλοιπα 4 dead-UI routes από τη σημερινή σάρωση (`auth/session`, `workspace/
+ai-key`, `workspace/erasure`, `workspace/export`+`workspace/export/files`) — προαιρετικά self-
+service settings (BYO AI key, GDPR erasure/export), μικρότερης προτεραιότητας από το onboarding
+που μόλις έκλεισε αλλά ακόμα gaps· (γ) η **Usage tab μηδενικά** παραμένει (§#72's carried-over (α),
+`recordAiUsage` wiring εκτός του δικού μου territory).
