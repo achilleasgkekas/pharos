@@ -493,6 +493,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. Mark any expense "tax-deductible" and give it a tax category (office supplies, travel, professional fees, or a custom one for your jurisdiction); a recurring bill inherits the flag so you only set it once. A "Tax-deductible only" filter and a gold badge make deductible spend easy to spot all year. At year-end, Settings → Backup has a "Tax export (ZIP)" button that bundles a CSV grouped by category, a printable HTML report, and every linked receipt or bill, ready to hand to an accountant or enter into tax software.',
   },
   {
+    q: 'Can it help me save toward a goal?',
+    a: 'Yes. Reports has savings goals: set a target amount and an optional deadline (e.g. "€5000 for new laptop by 2026-12-31"), then log contributions as you set money aside. A progress bar and a computed monthly contribution rate show whether you are on track to hit the deadline. Run as many goals in parallel as you like.',
+  },
+  {
     q: 'How do backups work?',
     a: 'Self-hosted ships with a nightly backup you can point at a NAS, plus one-click JSON and CSV exports any time. You can also mirror your files to SMB, FTP, or OneDrive for a proper 3-2-1 setup. On hosted, nightly backups are handled for you.',
   },
