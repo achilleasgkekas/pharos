@@ -3163,3 +3163,51 @@ ask-inbox entry αν παραμείνει το μοναδικό backend-wiring �
 routes για τυχόν άλλο dead-UI route (το ίδιο μοτίβο απέδωσε 4 φορές σερί, #67-71 — πιθανώς
 υπάρχουν κι άλλα)· (γ) invites: το admin console δείχνει tenants αλλά υπάρχει self-service
 "resend invite" UI στο Members panel; έλεγξε πριν χτίσεις.
+
+## 2026-07-20 (increment 72 — Resend button for pending invites, §UI-first)
+**Το κενό:** έλεγξα το candidate (γ) του #71 πρώτο — ήταν σωστό μαντάρισμα. Το
+**`POST /api/saas/invites/resend`** route ήταν ήδη πλήρως χτισμένο, gated (`saasGuard` +
+`resolveWorkspaceSession`, owner/admin only), tested (re-mints token, invalidates παλιό link,
+`recordAudit('invite.resent', ...)` ήδη registered στο `activityView.ts`'s action-label map)
+— αλλά το **`MembersPanel.tsx`** (δικό μου) είχε μόνο **Revoke** στα pending invites, όχι
+Resend. Πριν από αυτό, ένα expired-but-pending invite μπορούσε μόνο να revoke-αριστεί και να
+ξαναγίνει invite από την αρχή (νέα εγγραφή) — αντί για ένα κλικ που ξαναστέλνει το ίδιο invite
+με φρέσκο token. 5ο σερί dead-backend-route εύρημα (#67-71 → τώρα #72), ίδιο μοτίβο.
+
+**Built** (1 νέο PURE+tested module, additive edit στο δικό μου `MembersPanel.tsx`):
+- **`components/saas/inviteResend.ts`** (νέο, PURE) — `resendNotice(email, devToken?)`, mirror
+  του ήδη-υπάρχοντος inline notice-formatting idiom του `submitInvite` (ίδιο dev-token-echo
+  σκεπτικό με το route's SCAFFOLD note: όταν δεν υπάρχει mailer configured και όχι production,
+  το plaintext token επιστρέφεται μία φορά ώστε το flow να μένει testable local). **5 unit
+  tests** (plain resend, dev-token echo, empty-email fallback, null vs empty-string devToken —
+  και τα δύο falsy, καμία διαφορά).
+- **`MembersPanel.tsx`** (δικό μου, additive) — νέο `resendInvite(id, email)` handler (ίδιο
+  busy/error/notice pattern με το ήδη-υπάρχον `revokeInvite`) → `POST /api/saas/invites/resend`
+  → `resendNotice` για το notice text → `router.refresh()`. Νέο **"Resend"** button δίπλα στο
+  "Revoke" σε κάθε pending-invite row (`canManage` only, ίδιο guard) — accent-color hover
+  (πράσινο, θετική ενέργεια) σε αντίθεση με το κόκκινο hover του Revoke.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run inviteResend.test.ts` →
+**5/5**· full suite `npx vitest run` → **2518/2518 green** (198 files, +1 file/+20 tests έναντι
+του #71's 2498 — 5 δικά μου νέα tests + tests άλλων routines που προσγειώθηκαν στο main στο
+μεταξύ). ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (1 νέο module + 1 test file + additive
+edit σε 1 δικό μου client component, μηδέν shared component/layout/globals.css). `SAAS_MODE`
+off / self-hosted = **zero effect** (`(saas)` segment self-gates πριν φτάσει καν στο
+`MembersPanel`). Κανένας Docker rebuild (1 νέο PURE module + additive client-component edit,
+μηδέν shared runtime wiring, μηδέν νέα εξάρτηση — ίδιο σκεπτικό με τα increments 58-71).
+Browser-verify skipped: `docker exec homepage-web printenv SAAS_MODE` → κενό στο live `:3000`
+container, άρα η members σελίδα θα έδειχνε 404 ήδη (σωστό self-hosted behavior)· θα χρειαζόταν
+rebuild με το flag μόνο-για-verify — απαγορεύεται, ίδιο idiom με τα #66-71. Collision guard:
+`git status --short` πριν το staging έδειξε μόνο τα 3 δικά μου αρχεία (1 modified + 2 new),
+`git diff --cached --name-only` επιβεβαίωσε exact match. Pushed `200bc4c`.
+
+**## Needs Achilleas** (resend invite):
+- Τίποτα νέο — καθαρό UI wiring πάνω σε ήδη-εγκεκριμένο, ήδη-tested backend route, καμία νέα
+  policy απόφαση.
+
+**Next task:** increment 73 — candidates: (α) η **Usage tab μηδενικά** (#72's carried-over (α),
+βλ. παραπάνω — ίσως ώρα για ask-inbox entry αν παραμείνει το μοναδικό κενό μετά την επόμενη
+σάρωση)· (β) ξανα-σάρωσε τα `api/saas/**` routes για άλλο dead-UI route (απέδωσε 5 φορές σερί
+#67-72, αλλά μπορεί να έχει πλέον εξαντληθεί — αν η επόμενη σάρωση βγει άδεια, γράψε το ρητά
+εδώ και προχώρα σε (α))· (γ) custom-domain self-service παραμένει blocked σε αρχιτεκτονική
+απόφαση (§#71, χρειάζεται DNS/cert flow decision, δεν είναι blocking — low priority).
