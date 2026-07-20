@@ -6457,3 +6457,50 @@ in Review gap).
 
 - Τίποτα νέο από αυτό το run. Το Approved queue είναι πλέον σχεδόν άδειο (μόνο P31/P36 πραγματικά blocked) — αν
   δεν εγκριθεί κάτι από τα P37-P51 candidates σύντομα, τα επόμενα runs θα στραφούν σε mobile-parity follow-ups.
+
+## 2026-07-20 (pharos-daily-dev, 2ο run της ημέρας)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε μόνο ένα OPEN item από το
+bakecore-finance routine (άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή.
+
+**Approved queue check (βήμα a)**: επιβεβαίωσα ξανά (μετά το προηγούμενο σημερινό run που έκλεισε το P8) ότι το
+`PRODUCT_BACKLOG.md` Approved queue δεν έχει κανένα αδέσμευτο buildable item: P36 (L, needs Achilleas OAuth-flow
+decision), P31 (blocked, χρειάζεται supervised session), P23/P17 (mobile-native, χρειάζονται simulator), P5
+(ξεχωριστό deliverable), P9 (L, χωρίς urgency), P16 Firefly III/Grocy (χρειάζεται πραγματικό sample export file,
+ήδη σκόπιμα deferred με πλήρη αιτιολόγηση). Μηδέν νέο P37-P51 approved από τον Αχιλλέα. **Fallback στο βήμα (b)**:
+`MOBILE_PARITY.md` roadmap, top-ranked item από την 52η σάρωση.
+
+**Reports — Month in Review narrative digest στο mobile (P3 gap) — ✅ SHIPPED** (commit `6bcb7bc`). Πλήρες
+detail στο `MOBILE_PARITY.md` entry (τώρα marked DONE). Σύνοψη: το ήδη-tested `buildMonthReview()` (web-only,
+P3, shipped νωρίτερα σήμερα από άλλο σημερινό run) δεν ήταν εκτεθειμένο στο v1 API. Πρόσθεσα `vendor vendorKey
+recurring` στο υπάρχον `Expense.find().select(...)` του `GET /api/v1/reports` (μηδέν νέο DB round-trip), νέο
+additive `monthReview` field (reuse του ήδη-υπολογισμένου `budgetMap`, πρόσεξα να ΜΗΝ φτιάξω duplicate variable),
+mobile `api.ts` type += `monthReview?`, νέα κάρτα στην κορυφή του `ReportsScreen.tsx` (πριν το NET POSITION —
+narrative sentence + chips όταν overBudget/priceChanges/warrantiesExpiringSoon μη-κενά, ίδιο χρωματικό coding
+με το web: red/gold/cyan). +3 νέα route tests + 1 ενημερωμένο envelope-shape test (το top-level keys array
+χρειαζόταν το νέο `monthReview` key). **Λεπτομέρεια που χρειάστηκε προσοχή στα tests**: το `detectBudgetExceeded`
+(reused detector) κλειδώνει στο `date` πεδίο, ΟΧΙ στο `period` (σε αντίθεση με το `buildMonthReview`'s δικό του
+month-bucketing που προτιμά `period`) — ένα test row με μόνο `period` δεν θα ενεργοποιούσε το over-budget flag,
+το διόρθωσα προσθέτοντας το `date` (real DB rows έχουν πάντα και τα δύο, το schema το κάνει `required`).
+
+**Verify**: `npm run type-check` EXIT 0 (web)· `apps/mobile npx tsc --noEmit` EXIT 0. Full `npx vitest run`
+**2641 passed / 206 files** (+4 νέα/ενημερωμένα στο `route.test.ts`, μηδέν regression). Docker: `mkdir
+/tmp/claude-docker.lock` (lock acquired καθαρά, κανένα άλλο routine έτρεχε build) → `docker compose build web`
+OK → mongo healthy πριν το `up -d web` → clean start, `/login` 200 στην 1η προσπάθεια, `docker logs` καθαρό
+(μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning). `curl /api/v1/reports` χωρίς token + με bogus token →
+και τα δύο 401 (όχι 500 — το additive field δεν έσπασε το auth gate, όπως ζητά το acceptance criteria).
+Browser-checked (Claude Browser pane): `/reports` → redirect σε «Sign in · Pharos» (αναμενόμενο, auth-gated,
+χωρίς credentials εδώ), μηδέν console errors. `docker builder prune -f` (2.3GB freed), lock released καθαρά.
+**Το πραγματικό mobile UI (κάρτα + chips) ΔΕΝ testable end-to-end unattended** (χρειάζεται login + real δεδομένα
++ Expo simulator) — verified πλήρως μέσω των route tests στο πραγματικό αποτέλεσμα του `buildMonthReview` +
+type-check και στα δύο apps.
+
+**Suggested next task**: το επόμενο-ψηλότερο mobile-parity item είναι **Reports net-worth headline/breakdown
+στο mobile** (PA2 gap, P2/M, πλήρως speced ήδη από την 48η σάρωση, βλ. `MOBILE_PARITY.md` entry «Reports —
+net-worth headline + breakdown στο mobile (PA2 gap)») — το παλαιότερο ανοιχτό item στην ουρά, ελαφρώς μεγαλύτερο
+(M όχι S) από το σημερινό. Μετά από αυτό: safe-to-spend forward-cashflow κάρτα (P19 gap, M) και budget envelope/
+rollover mode (P25 gap, M), και τα δύο ήδη πλήρως speced στο ίδιο doc.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run.

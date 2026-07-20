@@ -270,7 +270,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ### Reports — net-worth headline + breakdown στο mobile (PA2 gap)
 > Ήδη speced στην προηγούμενη σάρωση (48η, 2026-07-10) — βλ. πλήρες entry παρακάτω («Reports — net-worth headline + breakdown στο mobile (PA2 gap)»). Παραμένει ανοιχτό, item #3 του builder queue.
 
-### Reports — Month in Review narrative digest στο mobile (P3 gap, νέο 52η σάρωση)
+### Reports — Month in Review narrative digest στο mobile (P3 gap, νέο 52η σάρωση) — ✅ DONE 2026-07-20 (pharos-daily-dev, commit `6bcb7bc`)
 - Priority: P2 | Size: S | no AI (deterministic template, ήδη unit-tested), no decision
 - Web ref: P3 (`029d7ae`) — pure `buildMonthReview(rows, opts)` (apps/web/src/lib/monthReview.ts:59) ξαναχρησιμοποιεί τους ήδη-tested `detectBudgetExceeded` (P24) + `detectPriceHikes` (P14) detectors πάνω σε lean Expense rows + budgets + item warranties (apps/web/src/app/reports/page.tsx:338-343), renders ως πρώτη κάρτα στο `/reports` (apps/web/src/app/reports/ReportsClient.tsx:230-250: narrative πρόταση + έως 3 chips ανά κατηγορία eventi όταν overBudget/priceChanges/warrantiesExpiringSoon υπάρχουν).
 - API: GET /api/v1/reports (exists: yes, κανένα `monthReview` πεδίο) — additive: το route ήδη κάνει `Expense.find({}).select('kind amount category date period')` (route.ts:36) για τα υπόλοιπα charts· χρειάζεται +3 πεδία στο select (`vendor vendorKey recurring`, τα μόνα που λείπουν από το `HikeEntry` shape του detector) ώστε το ΙΔΙΟ query να τροφοδοτήσει `buildMonthReview` χωρίς δεύτερο DB round-trip.
@@ -279,7 +279,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - GET /api/v1/reports επιστρέφει `monthReview` (additive, no-auth ακόμα 401 όχι 500)
   - ReportsScreen δείχνει την narrative πρόταση στην κορυφή + τα chips όταν overBudget/priceChanges/warrantiesExpiringSoon μη-κενά, «Nothing unusual to flag.» όταν όλα κενά
   - tsc καθαρό web+mobile
-- Status: TODO
+- Status: DONE. Υλοποίηση ταίριαξε ακριβώς το spec: `route.ts` select += `vendor vendorKey recurring`, νέο additive `monthReview` (reuse του ήδη-υπάρχοντος `budgetMap`, όχι διπλό variable), `api.ts` type += `monthReview?`, `ReportsScreen.tsx` νέα κάρτα πριν το NET POSITION (narrative + chips, ίδιο χρωματικό coding με το web: red overBudget / gold priceChanges / cyan warranties). +3 νέα route tests (narrative/net σύνολα, over-budget flag με σωστό `date` field στο test row — το `detectBudgetExceeded` κλειδώνει σε `date` όχι `period`, λεπτομέρεια που χρειάστηκε προσοχή στο test data), + 1 ενημερωμένο envelope-shape test (top-level keys). `npm run type-check` + `apps/mobile npx tsc --noEmit` EXIT 0 και τα δύο. Full `npx vitest run` 2641 passed/206 files. Docker: lock acquired καθαρά, mongo healthy πριν το `up -d web`, clean start (0 restarts εκτός του γνωστού άσχετου `@napi-rs/canvas` warning), `/login` 200, `/api/v1/reports` no-auth+bad-token και τα δύο 401 (όχι 500 — additive field δεν έσπασε το auth gate). Browser-checked: `/reports` → redirect σε «Sign in · Pharos» (αναμενόμενο, auth-gated, χωρίς credentials), μηδέν console errors. `docker builder prune -f` (2.3GB freed), lock released.
 
 ### Reports — safe-to-spend forward cashflow κάρτα στο mobile (P19 gap)
 - Priority: P2 | Size: M | no AI, no decision
