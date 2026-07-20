@@ -6186,3 +6186,51 @@ proven `uploadReceipt` pipeline reuse.
 - Τίποτα νέο από αυτό το run. Το IMAP feature χρειάζεται τον Αχιλλέα να βάλει πραγματικά mailbox credentials
   (Settings → Storage & backup → Email-in) για να δοκιμαστεί live — αναμενόμενο, ίδιο pattern με OneDrive/SMB/FTP.
 
+
+## 2026-07-20 (pharos-daily-dev, cont.² — P3 Month-in-Review digest SHIPPED)
+
+**Ουρά ελέγχθηκε πρώτα**: `ASK_ACHILLEAS.md` κενό. `OWNER_DECISIONS.md` §8 items (P2/P4/P10 → PA1/PA2/PA3)
+ήδη shipped από τις 2026-07-09. Approved queue: P11 μόλις shipped νωρίτερα σήμερα (προηγούμενο run). Ξανα-
+σκόπησα ό,τι έμενε unshipped: P31/P36 ήδη τεκμηριωμένα deferred (χρειάζονται supervised session / Αχιλλέα)·
+P8/P13 χρειάζονται νέο zip-write dependency πρώτα· P17/P23 mobile-native, αδοκίμαστα unattended· P5 browser
+extension, ξεχωριστό deliverable. Διάλεξα **P3 (AI «Month in Review» digest)**: αμιγώς web backend + Reports
+UI, well-scoped, reuse-heavy πάνω σε ήδη-tested detectors (P14 price-hike, P24 budget-exceeded), verifiable
+πλήρως μέσω unit tests.
+
+**Builder default (απόκλιση από το backlog-title «AI digest»)**: το v1 είναι **ντετερμινιστικό, ΧΩΡΙΣ AI** —
+μια αφηγηματική πρόταση χτισμένη από ήδη-υπολογισμένα σήματα (spend/income, %-change, top κατηγορία,
+over-budget, price-hikes, ληγμένες εγγυήσεις), όχι LLM-generated κείμενο. Λόγοι: (1) μηδέν ρίσκο
+hallucinated αριθμών σε οικονομικό digest, (2) μηδέν AI-cost metering hook χρειάζεται σε αυτό το run, (3) ο
+κανόνας «no bulk AI unattended» ισχύει εξίσου εδώ. Ένα AI-φρασεολογημένο upgrade πάνω στην ίδια δομημένη
+έξοδο μένει ξεκάθαρο SaaS-metered follow-up.
+
+**Υλοποίηση**: νέο pure `lib/monthReview.ts` (`buildMonthReview()`, DB-free, +11 unit tests) — reuse
+`detectBudgetExceeded` (P24)/`detectPriceHikes` (P14) ατόφια, μηδέν επανάληψη λογικής. `app/reports/page.tsx`
+`getReports()` τον καλεί πάνω στα ΗΔΗ φερμένα Expense rows (επεκτάθηκε το `.select()` με `vendor vendorKey
+recurring`) + item warranties + budgets → **μηδέν νέο DB round-trip**. Νέα κάρτα «Month in review» στην
+κορυφή του `/reports` (`ReportsClient.tsx`, πριν τα Summary stats) με narrative + chips. i18n key
+`reports.monthReview` μόνο en.ts (ίδιο precedent με P7/P12/P24/P26).
+
+**Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` **2445 passed / 192 files** (+11 νέα, μηδέν
+regression). Docker: mutex acquired, `docker compose build web` OK, mongo healthy πριν το `up -d web`,
+`RestartCount=0`, `/login` 200, `/reports` 307 (auth-gated, compiled καθαρό), `docker logs` καθαρό (μόνο το
+προϋπάρχον άσχετο `@napi-rs/canvas` warning). Browser-checked (Claude Browser pane): `/login` → «Sign in ·
+Pharos», μηδέν console errors. `docker builder prune -f` μετά (193.7MB), lock released. **ΔΕΝ testable
+end-to-end** (χρειάζεται τα credentials του Αχιλλέα για live `/reports` UI) — verified πλήρως μέσω των 11
+unit tests πάνω στο pure `buildMonthReview` + το ήδη-tested reuse.
+
+**Σημείωση race**: το πρώτο `git commit` προσπάθησε ενώ ένα ΑΛΛΟ concurrent routine (docs-progress) έκανε
+commit `48a38a9` (docs/saas.md) την ίδια στιγμή — το index είχε αδειάσει όταν έφτασε το δικό μου commit
+(exit 1, "nothing to commit" μετά την προηγούμενη επιτυχή στοίχιση). Fix: `git status` για επιβεβαίωση,
+re-`git add` μόνο τα 5 δικά μου αρχεία (ΠΟΤΕ `docs/saas.md`/`docs/DOCS_PROGRESS.md` που ανήκαν στο άλλο
+routine), retry commit → πέτυχε καθαρά. Commit `029d7ae`, pushed.
+
+**Suggested next task**: το Approved queue έμεινε με μόνο M/L items που είτε χρειάζονται Αχιλλέα (P31/P36)
+είτε νέο dependency πρώτα (P8/P13 → jszip) είτε mobile-native χωρίς δυνατότητα unattended verify (P17/P23)
+είτε ξεχωριστό deliverable (P5 browser extension). Το πιο κοντινό «απλώς χτίσ' το» παραμένει P8/P13, ή ένα
+follow-up πάνω στο μόλις-shipped P3 (notification-framework digest integration, bell+ntfy μηνιαίο).
+
+## Needs Achilleas
+
+- Τίποτα νέο. Ίδια προϋπάρχοντα decision-flags (P31 household enforcement, P36 Open Banking OAuth scope,
+  IMAP live test credentials).

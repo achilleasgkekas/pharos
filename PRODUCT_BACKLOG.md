@@ -688,12 +688,41 @@
 - **Module:** Items / Shopping (+ REST API).
 - **Εξάρτηση:** `/api/v1` (§5). **Builder default:** απλό bookmarklet πρώτα, MV3 extension phase 2.
 
-### P3. AI «Month in Review» digest — M — both (SaaS = metered)
+### P3. AI «Month in Review» digest — ✅ SHIPPED 2026-07-20 (pharos-daily-dev, commit `029d7ae`) — v1 ΧΩΡΙΣ AI
+- **Υλοποίηση:** νέο pure **`lib/monthReview.ts`** (`buildMonthReview()`, DB-free, **+11 unit tests**) που
+  συνθέτει: σύνολο εξόδων/εσόδων/net του μήνα, **% μεταβολή vs προηγούμενο μήνα**, top κατηγορία, over-budget
+  κατηγορίες (reuse του ήδη-tested `detectBudgetExceeded` από το P24), recurring χρεώσεις που άλλαξαν τιμή
+  (reuse του ήδη-tested `detectPriceHikes` από το P14, φιλτραρισμένο στον στοχευμένο μήνα), εγγυήσεις που
+  λήγουν εντός 90 ημερών, τα οποία συνθέτει σε **μία αφηγηματική πρόταση** («You spent €500 this month, up 12%
+  vs last month. Top category: utilities (€200). …»). **Builder default (απόκλιση από το αρχικό «AI digest»
+  όνομα)**: v1 = **ΧΩΡΙΣ AI**, ντετερμινιστικό template πάνω σε ήδη-υπολογισμένα σήματα — μηδέν νέο AI-cost
+  metering hook χρειάστηκε, μηδέν ρίσκο σε unattended run (καμία πιθανότητα hallucinated αριθμών). Ένα
+  AI-γραμμένο, πιο «φυσικό» phrasing μένει follow-up (SaaS-metered, ξεκάθαρη μελλοντική αναβάθμιση πάνω στην
+  ίδια δομημένη έξοδο). **Ενσωμάτωση**: `getReports()` (`app/reports/page.tsx`) καλεί το `buildMonthReview`
+  πάνω στα ΗΔΗ φερμένα Expense rows + item warranties + budgets (**μηδέν νέο DB round-trip** — απλώς
+  επεκτάθηκε το `.select()` του Expense query με `vendor vendorKey recurring`, πεδία που χρειάζεται το
+  price-hike detector). Νέα κάρτα «Month in review» στην κορυφή του `/reports` (πριν τα Summary stats),
+  narrative + chips για over-budget/price-changes/warranties. `reports.monthReview` i18n key μόνο στο
+  `en.ts` (ίδιο precedent με P7/P12/P26/P24 — ελληνικό μεταφραστικό gap ήδη καταγεγραμμένο).
+  **Ανοιχτή απόφαση (builder default) τηρήθηκε ως προς το UI**: in-app card (Reports) ✓· notification-framework
+  integration (bell/ntfy digest) **ΔΕΝ** χτίστηκε αυτό το run (θα χρειαζόταν νέο NotifKind + dedupeKey σχήμα +
+  cron/manual-trigger, μεγαλύτερο diff) — follow-up. Auto-schedule 1η/μήνα ΔΕΝ χτίστηκε (η εφαρμογή δεν έχει
+  cron infra σήμερα, ίδιο pre-existing gap με P11/P24/P28) — η κάρτα υπολογίζεται on-demand σε κάθε φόρτωση
+  του `/reports` (ισοδύναμο του «on-demand button», μηδέν επιπλέον κλικ).
+- **Verify:** `npm run type-check` EXIT 0. Full `npx vitest run` **2445 passed / 192 files** (+11 νέα, μηδέν
+  regression). Safe Docker rebuild (`docker compose build web` → mongo ήδη healthy → `up -d web`):
+  `RestartCount=0`, `/login` 200, `/reports` 307 (auth-gated, compiled καθαρό), `docker logs` καθαρό (μόνο το
+  προϋπάρχον άσχετο `@napi-rs/canvas` warning). Browser-checked (Claude Browser pane): `/login` → «Sign in ·
+  Pharos», μηδέν console errors. `docker builder prune -f` μετά. `/reports` UI δεν testable end-to-end χωρίς
+  τα credentials του Αχιλλέα (ίδιος περιορισμός με κάθε προηγούμενο auth-gated-only run) — η λογική
+  επαληθεύτηκε πλήρως μέσω των 11 unit tests πάνω στο pure `buildMonthReview`.
 - **Αξία:** αφηγηματική σύνοψη μήνα («ξόδεψες €X, +12%, top κατηγορία, 2 ασυνήθιστες χρεώσεις, 3 εγγυήσεις
-  λήγουν») μέσω notification framework (§3) + in-app card. Δομικά στοιχεία υπάρχουν (anomaly, aggregations,
-  get_overview). Monetizable (ανά-digest AI metering).
-- **Module:** Reports + Notifications (+ AI).
-- **Ανοιχτή απόφαση (builder default):** auto-schedule 1η κάθε μήνα· on-demand button· free-tier περιορισμένο, paid = full.
+  λήγουν») ως in-app card. Δομικά στοιχεία υπήρχαν ήδη (budget-exceeded, price-hike, get_overview) — v1 τα
+  ενοποιεί σε μία αναγνώσιμη πρόταση αντί σκόρπιων αριθμών.
+- **Module:** Reports (+ Notifications follow-up).
+- **Follow-up:** notification-framework digest (bell + ntfy, μηνιαίο dedupeKey)· AI-generated phrasing πάνω
+  στην ήδη-δομημένη έξοδο (SaaS-metered)· `/api/v1` mobile exposure (web-only για τώρα, ίδιο notice με κάθε
+  πρόσφατο Reports/Settings-only feature).
 
 ### P1. Demo / sample-data mode σε fresh install — ✅ SHIPPED 2026-07-17 (pharos-daily-dev)
 - **Υλοποίηση:** νέο `isSample: Boolean` (default false, indexed) στο `Item`/`Receipt`/`Expense`/`Subscription`.
