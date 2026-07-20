@@ -316,7 +316,32 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - GET /api/v1/subscriptions επιστρέφει `suggestions` (additive, κενό array όταν τίποτα — φθηνή heuristic, μηδέν AI)
   - mobile δείχνει Add/Dismiss chips όταν υπάρχουν suggestions· Add δημιουργεί πραγματική subscription μέσω του υπάρχοντος POST
   - tsc καθαρό web+mobile
-- Status: TODO
+- Status: ✅ DONE 2026-07-20 (pharos-daily-dev, 6ο run της ημέρας). `GET /api/v1/subscriptions` νέο `discoverSuggestions()`
+  (mirror 1:1 του web `discoverUntrackedRecurring()`: ίδιο `Expense.find({kind:'expense',amount:{$gt:0}})` select +
+  ίδιο vendorKey-exclusion από `Subscription.find().select('name provider')`) → additive top-level `suggestions:
+  RecurringCandidate[]` στο response (εκτός envelope, όχι per-item)· **skipped στα incremental `updatedSince` polls**
+  (δεν είναι updatedAt-tracked resource, θα επανελάμβανε την ίδια δουλειά σε κάθε delta poll χωρίς όφελος — builder
+  decision, καμία ασάφεια). Mobile: `api.ts` νέο `RecurringCandidate` type, `getSubscriptions()` signature άλλαξε
+  σε `{subscriptions, suggestions}` (μοναδικό call site, καμία backward-compat ανάγκη)· `SubscriptionsScreen.tsx`
+  νέο discover-box πάνω από τη λίστα (mirror του web «N possible untracked subscriptions» card) με per-candidate
+  vendor/avgAmount/cycle/occurrences + **Track** (POST μέσω υπάρχοντος `addSubscription`, ίδιο idiom με `handleTrack`)
+  + **Dismiss** (session-only local Set, μηδέν persisted ignore-list, ίδιο με το web). **Verify**: `npm run
+  type-check` (web) EXIT 0· `apps/mobile npx tsc --noEmit` EXIT 0. Full `npx vitest run` **2757 passed / 214 files**
+  (+4 νέα στο `subscriptions/route.test.ts`: empty-suggestions default, 3-occurrence monthly series flagged,
+  already-tracked vendor excluded, updatedSince skip χωρίς κανένα `Expense.find` call· μηδέν regression στα
+  υπόλοιπα 27 pre-existing tests του ίδιου αρχείου — χρειάστηκε επέκταση του test mock chain: `Subscription.find`
+  απέκτησε `.select()` [reused chain, ίδιο idiom με το `.sort/.skip/.limit`] + νέο `vi.mock('@/models/Expense')`).
+  Docker: `mkdir /tmp/claude-docker.lock` (lock acquired καθαρά) → `docker compose build web` OK → mongo ήδη
+  healthy → `up -d web` → `RestartCount=0`, `/login` 200 στην 1η προσπάθεια. `curl /api/v1/subscriptions` χωρίς
+  token + bogus token → και τα δύο 401 (όχι 500 — το additive πεδίο δεν έσπασε το auth gate). `docker logs`
+  καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning + stale-Server-Action errors από ένα ήδη-ανοιχτό
+  browser tab με παλιό bundle, γνωστό/documented στο CLAUDE.md, χρειάζεται hard-refresh όχι server fix).
+  Browser-checked (Claude Browser pane): `/subscriptions` → redirect σε «Sign in · Pharos» (αναμενόμενο,
+  auth-gated, χωρίς credentials εδώ), μηδέν console errors. `docker builder prune -f` (2.316GB freed), lock
+  released καθαρά. **Το πραγματικό mobile UI (discover-box + Track/Dismiss chips) ΔΕΝ testable end-to-end
+  unattended** (χρειάζεται login + πραγματικό expense history με regular cadence + Expo simulator) — verified
+  πλήρως μέσω route tests στο πραγματικό αποτέλεσμα του `discoverRecurringCandidates` + type-check και στα δύο
+  apps, ίδιος περιορισμός με κάθε προηγούμενο mobile-parity shipment.
 
 ### Bills — payable/due tracker στο mobile (P28 gap, νέο entity — μηδέν v1 route ακόμα)
 - Priority: P2 | Size: L | no AI, no decision — mirrors υπάρχον CRUD entity pattern (vouchers/subscriptions), απλά μεγαλύτερο σε επιφάνεια

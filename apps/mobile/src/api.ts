@@ -117,6 +117,8 @@ export type Task = { id: string; title: string; status: string; priority: string
 export type SplitEntry = { name: string; share: number; settled: boolean };
 export type Expense = { id: string; kind: string; vendor: string; category: string; space: string; amount: number; currency: string; date: string | null; period: string; recurring: boolean; recurringCycle: string; paymentMethod: string; notes: string; file: string | null; thumb: string | null; verified: boolean; split: SplitEntry[]; anomaly?: number };
 export type Subscription = { id: string; name: string; provider: string; category: string; amount: number; currency: string; billingCycle: string; nextRenewal: string | null; active: boolean; trialEndsAt?: string | null; firstChargeAmount?: number };
+/** Auto-discovered untracked recurring charge (P7), mirrors apps/web/src/lib/recurringDiscovery.ts. */
+export type RecurringCandidate = { vendorKey: string; vendor: string; category: string; occurrences: number; avgAmount: number; lastAmount: number; lastDate: string; firstDate: string; avgIntervalDays: number; cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly' };
 export type ReceiptSummary = { id: string; store: string; date: string | null; total: number; currency: string; itemCount: number; verified: boolean; archived: boolean; file: string | null; thumb: string | null; returnDaysLeft?: number };
 export type ReceiptLine = { name: string; qty: number; price: number; vatRate: number };
 export type ReceiptDetail = ReceiptSummary & { subtotal: number; vatAmount: number; paymentMethod: string; warrantyMonths: number; notes: string; lineItems: ReceiptLine[] };
@@ -184,8 +186,9 @@ export async function scanExpenseText(text: string): Promise<ParsedExpenseData> 
 }
 
 // ---- Subscriptions ----
-export async function getSubscriptions(): Promise<Subscription[]> {
-  return (await request<{ data: Subscription[] }>('/api/v1/subscriptions?limit=200')).data ?? [];
+export async function getSubscriptions(): Promise<{ subscriptions: Subscription[]; suggestions: RecurringCandidate[] }> {
+  const json = await request<{ data: Subscription[]; suggestions?: RecurringCandidate[] }>('/api/v1/subscriptions?limit=200');
+  return { subscriptions: json.data ?? [], suggestions: json.suggestions ?? [] };
 }
 export function addSubscription(data: { name: string; amount: number; billingCycle?: string; trialEndsAt?: string; firstChargeAmount?: number }) {
   return request<{ subscription: Subscription }>('/api/v1/subscriptions', { method: 'POST', body: JSON.stringify(data) });

@@ -6679,3 +6679,62 @@ Approved queue παραμένει σχεδόν άδειο (μόνο P31/P36 bloc
 ## Needs Achilleas
 
 - Τίποτα νέο από αυτό το run.
+
+## 2026-07-20 (pharos-daily-dev, 6ο run της ημέρας)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε μόνο ένα OPEN item από άλλο routine
+(`bakecore-finance`, άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή.
+
+**Approved queue check (βήμα a)**: επιβεβαίωσα ότι το `PRODUCT_BACKLOG.md` «## Approved» section παραμένει με
+μόνο P31/P36 πραγματικά blocked (P31 = deferred household multi-user, χρειάζεται supervised session· P36 = Open
+Banking, χρειάζεται provider-decision από τον Αχιλλέα) + P16 Firefly III/Grocy (χρειάζεται πραγματικό sample
+export file, δεν είναι unattended-safe, ήδη documented follow-up). Τα P37-P40 (self-host update banner, item
+bundles, fixed-term contracts, insurance tracker) ζουν ΠΑΝΩ από το «## Approved» heading — δηλαδή είναι ακόμα
+**candidates**, όχι εγκεκριμένα· δεν τα άγγιξα. **Fallback στο βήμα (b)**: το suggested next task του 5ου
+σημερινού run, top-ranked mobile-parity item στο `MOBILE_PARITY.md`: **Subscriptions auto-discover untracked
+recurring charges στο mobile (P7 gap, P2/M)**, ήδη πλήρως speced. Προτίμησα το M-size P7 από το ισοδύναμο-tier
+L-size P20 (loyalty card wallet, χρειάζεται νέο native RN barcode dependency + 2 νέες routes + νέο μοντέλο) ως
+πιο ασφαλές, καλά-ελεγμένο scope για ένα unattended run· το P20 παραμένει το επόμενο buildable item.
+
+**Subscriptions auto-discover στο mobile (P7 gap) — ✅ SHIPPED**. Πλήρες detail στο `MOBILE_PARITY.md` entry
+(τώρα marked DONE). Σύνοψη: `GET /api/v1/subscriptions` νέο `discoverSuggestions()` (mirror 1:1 του web
+`discoverUntrackedRecurring()` server action — ίδιο `Expense.find({kind:'expense',amount:{$gt:0}})` select +
+ίδιο vendorKey-exclusion από τα ονόματα/providers των ήδη-existing subscriptions) → additive top-level
+`suggestions: RecurringCandidate[]` πεδίο στο response (reuse του ήδη-tested pure `discoverRecurringCandidates`
+lib, μηδέν AI, μηδέν νέο model). **Builder decision**: skipped στα incremental (`updatedSince`) polls — δεν
+είναι updatedAt-tracked resource, θα ξανάτρεχε την ίδια heuristic σε κάθε delta poll χωρίς κανένα όφελος.
+Mobile: `api.ts` νέο `RecurringCandidate` type + `getSubscriptions()` signature άλλαξε από `Subscription[]` σε
+`{subscriptions, suggestions}` (μοναδικό call site στο repo, καμία backward-compat ανάγκη)· `SubscriptionsScreen.tsx`
+νέο discover-box πάνω από τη λίστα (mirror του web «N possible untracked subscriptions» card): vendor/avgAmount/
+cycle/occurrences ανά candidate + **Track** (POST μέσω του ήδη-υπάρχοντος `addSubscription`) + **Dismiss**
+(session-only local Set state, μηδέν persisted ignore-list, ίδιο idiom με το web `hiddenCandidates`).
+
+**Verify**: `npm run type-check` (web) EXIT 0· `apps/mobile npx tsc --noEmit` EXIT 0. Full `npx vitest run`
+**2757 passed / 214 files** (+4 νέα στο `subscriptions/route.test.ts`: empty-suggestions default, 3-occurrence
+monthly series flagged σωστά, ήδη-tracked vendor εξαιρείται, updatedSince cursor skip χωρίς κανένα `Expense.find`
+call· μηδέν regression στα υπόλοιπα 27 pre-existing tests του ίδιου αρχείου — χρειάστηκε επέκταση του test mock
+chain, `Subscription.find` απέκτησε `.select()` [ίδιο idiom με το ήδη-υπάρχον `.sort/.skip/.limit` self-returning
+chain] + νέο `vi.mock('@/models/Expense')`). Docker: `mkdir /tmp/claude-docker.lock` (lock acquired καθαρά,
+κανένα άλλο routine έτρεχε build) → `docker compose build web` OK → mongo ήδη healthy → `up -d web` →
+`RestartCount=0`, `/login` 200 στην 1η προσπάθεια. `curl /api/v1/subscriptions` χωρίς token + bogus token → και
+τα δύο 401 (όχι 500 — το additive πεδίο δεν έσπασε το auth gate). `docker logs` καθαρό (μόνο το προϋπάρχον
+άσχετο `@napi-rs/canvas` warning + stale-Server-Action errors από ένα ήδη-ανοιχτό browser tab με παλιό bundle,
+γνωστό/documented, χρειάζεται hard-refresh όχι server fix). Browser-checked (Claude Browser pane): `/subscriptions`
+→ redirect σε «Sign in · Pharos» (αναμενόμενο, auth-gated, χωρίς credentials εδώ), μηδέν console errors.
+`docker builder prune -f` (2.316GB freed), lock released καθαρά. **Το πραγματικό mobile UI (discover-box +
+Track/Dismiss chips) ΔΕΝ testable end-to-end unattended** (χρειάζεται login + πραγματικό expense history με
+regular cadence + Expo simulator) — verified πλήρως μέσω route tests στο πραγματικό αποτέλεσμα του
+`discoverRecurringCandidates` + type-check και στα δύο apps, ίδιος περιορισμός με κάθε προηγούμενο mobile-parity
+shipment σήμερα.
+
+**Suggested next task**: το επόμενο-ψηλότερο mobile-parity item είναι **loyalty card wallet στο mobile** (P20
+gap, P2/L, ήδη πλήρως speced στο `MOBILE_PARITY.md` — νέο `LoyaltyCard` v1 CRUD routes + RN barcode-display
+primitive [`react-native-barcode-svg` προτεινόμενο, builder decision όχι needs-Achilleas], μεγαλύτερο effort
+από το σημερινό P7). Ισοδύναμη εναλλακτική: **P21** document/manual vault στο mobile (P2/M, read-only πρώτα
+σκόπιμα — το upload θέλει νέο v1 multipart pattern, δες Needs Achilleas του `MOBILE_PARITY.md`). Το Approved
+queue παραμένει σχεδόν άδειο (μόνο P31/P36/P16 blocked) — αν εγκριθεί κάτι νέο από τα P37-P40 candidates
+νωρίτερα, αυτό βγαίνει προτεραιότητα (βήμα a) στο επόμενο run.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run.

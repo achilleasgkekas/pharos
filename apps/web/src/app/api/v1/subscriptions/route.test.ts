@@ -15,7 +15,7 @@ import type { NextRequest } from 'next/server';
 // (connectDB + the User/Subscription models), so validation + serialization run for real.
 
 // Hoisted so the vi.mock factories (which run before imports) can reference the plumbing.
-const { connectDBMock, userFindOne, userState, subFind, subCount, subCreate, findQuery, countQuery, state } =
+const { connectDBMock, userFindOne, userState, subFind, subCount, subCreate, findQuery, countQuery, expenseFind, expenseState, state } =
   vi.hoisted(() => {
     const state: { docs: unknown[]; total: number; lastCreate: Record<string, unknown> | null } = {
       docs: [],
@@ -25,10 +25,12 @@ const { connectDBMock, userFindOne, userState, subFind, subCount, subCreate, fin
     // User model — bearerUser does User.findOne(...).select(...).lean()
     const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
     const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
-    // Subscription.find(filter).sort().skip().limit()[.setOptions()].lean() — a self-returning chain.
+    // Subscription.find(filter).sort().skip().limit()[.setOptions()].lean() — a self-returning chain,
+    // PLUS Subscription.find().select('name provider').lean() (the P7 discoverSuggestions() vendorKey
+    // exclusion lookup) — same mock, `select` just re-returns the same chain.
     const lean = vi.fn(async () => state.docs);
     const findQuery: Record<string, unknown> = {};
-    for (const m of ['sort', 'skip', 'limit', 'setOptions']) findQuery[m] = vi.fn(() => findQuery);
+    for (const m of ['sort', 'skip', 'limit', 'setOptions', 'select']) findQuery[m] = vi.fn(() => findQuery);
     findQuery.lean = lean;
     const subFind = vi.fn(() => findQuery);
     // Subscription.countDocuments(filter) — thenable resolving to the total, self-returning setOptions.
@@ -42,12 +44,21 @@ const { connectDBMock, userFindOne, userState, subFind, subCount, subCreate, fin
       state.lastCreate = arg;
       return { toObject: () => ({ _id: 'newid', updatedAt: new Date('2026-07-04T00:00:00Z'), ...arg }) };
     });
-    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, subFind, subCount, subCreate, findQuery, countQuery, state };
+    // Expense.find(filter).select(...).lean() — the P7 discoverSuggestions() candidate source.
+    const expenseState: { docs: unknown[] } = { docs: [] };
+    const expenseQuery: Record<string, unknown> = { select: vi.fn(() => expenseQuery), lean: vi.fn(async () => expenseState.docs) };
+    const expenseFind = vi.fn(() => expenseQuery);
+    return {
+      connectDBMock: vi.fn(async () => {}),
+      userFindOne, userState, subFind, subCount, subCreate, findQuery, countQuery,
+      expenseFind, expenseState, state,
+    };
   });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/models/Subscription', () => ({ Subscription: { find: subFind, countDocuments: subCount, create: subCreate } }));
+vi.mock('@/models/Expense', () => ({ Expense: { find: expenseFind } }));
 
 import { GET, POST } from './route';
 
@@ -67,15 +78,17 @@ beforeEach(() => {
   state.docs = [];
   state.total = 0;
   state.lastCreate = null;
+  expenseState.docs = [];
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
   vi.clearAllMocks();
   // clearAllMocks resets return values on the chain stubs → re-point them.
-  for (const m of ['sort', 'skip', 'limit', 'setOptions']) (findQuery[m] as ReturnType<typeof vi.fn>).mockImplementation(() => findQuery);
+  for (const m of ['sort', 'skip', 'limit', 'setOptions', 'select']) (findQuery[m] as ReturnType<typeof vi.fn>).mockImplementation(() => findQuery);
   (findQuery.lean as ReturnType<typeof vi.fn>).mockImplementation(async () => state.docs);
   (countQuery.setOptions as ReturnType<typeof vi.fn>).mockImplementation(() => countQuery);
   userFindOne.mockImplementation(() => ({ select: () => ({ lean: async () => userState.doc }) }));
   subFind.mockImplementation(() => findQuery);
   subCount.mockImplementation(() => countQuery);
+  expenseFind.mockImplementation(() => ({ select: () => ({ lean: async () => expenseState.docs }) }));
 });
 
 describe('auth gate', () => {
@@ -261,5 +274,49 @@ describe('GET listing', () => {
     const json = (await res.json()) as { data: Array<{ active: boolean; deleted: boolean }> };
     expect(json.data[0].active).toBe(false);
     expect(json.data[0].deleted).toBe(true);
+  });
+});
+
+describe('P7 auto-discovered suggestions (additive, mirrors discoverUntrackedRecurring)', () => {
+  it('returns an empty suggestions array when there are no priced expenses', async () => {
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { suggestions: unknown[] };
+    expect(json.suggestions).toEqual([]);
+  });
+
+  it('flags a regular-cadence expense series with no matching subscription', async () => {
+    expenseState.docs = [
+      { vendor: 'Netflix', vendorKey: 'netflix', amount: 15, date: '2026-04-05', category: 'entertainment', kind: 'expense' },
+      { vendor: 'Netflix', vendorKey: 'netflix', amount: 15, date: '2026-05-05', category: 'entertainment', kind: 'expense' },
+      { vendor: 'Netflix', vendorKey: 'netflix', amount: 15, date: '2026-06-05', category: 'entertainment', kind: 'expense' },
+    ];
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { suggestions: Array<{ vendorKey: string; vendor: string; cycle: string; occurrences: number }> };
+    expect(json.suggestions).toHaveLength(1);
+    expect(json.suggestions[0]).toMatchObject({ vendorKey: 'netflix', vendor: 'Netflix', cycle: 'monthly', occurrences: 3 });
+  });
+
+  it('excludes a vendor already tracked by an existing Subscription (by name)', async () => {
+    expenseState.docs = [
+      { vendor: 'Netflix', vendorKey: 'netflix', amount: 15, date: '2026-04-05', kind: 'expense' },
+      { vendor: 'Netflix', vendorKey: 'netflix', amount: 15, date: '2026-05-05', kind: 'expense' },
+      { vendor: 'Netflix', vendorKey: 'netflix', amount: 15, date: '2026-06-05', kind: 'expense' },
+    ];
+    state.docs = [{ _id: 's1', name: 'Netflix', amount: 15 }]; // shared with the main listing query's mock
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { suggestions: unknown[] };
+    expect(json.suggestions).toEqual([]);
+  });
+
+  it('skips discovery entirely on an incremental (updatedSince) poll', async () => {
+    expenseState.docs = [
+      { vendor: 'Netflix', vendorKey: 'netflix', amount: 15, date: '2026-04-05', kind: 'expense' },
+      { vendor: 'Netflix', vendorKey: 'netflix', amount: 15, date: '2026-05-05', kind: 'expense' },
+      { vendor: 'Netflix', vendorKey: 'netflix', amount: 15, date: '2026-06-05', kind: 'expense' },
+    ];
+    const res = await GET(makeReq({ url: `${BASE}?updatedSince=2026-06-01T00:00:00.000Z` }));
+    const json = (await res.json()) as { suggestions: unknown[] };
+    expect(json.suggestions).toEqual([]);
+    expect(expenseFind).not.toHaveBeenCalled();
   });
 });

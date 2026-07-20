@@ -4,6 +4,9 @@ import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
 import { readBody, strField, numField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Subscription } from '@/models/Subscription';
+import { Expense } from '@/models/Expense';
+import { vendorKey } from '@/app/expenses/lib';
+import { discoverRecurringCandidates, type RecurringCandidate } from '@/lib/recurringDiscovery';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,6 +42,29 @@ export function trim(s: SubLean) {
   };
 }
 
+/**
+ * Deterministic auto-discovery of untracked recurring charges (P7), mirrors the
+ * web `discoverUntrackedRecurring()` server action (apps/web/src/app/subscriptions/actions.ts).
+ * Zero AI: groups priced Expense rows by vendorKey, excludes vendors already tracked
+ * by an existing Subscription (by name or provider), flags regular-cadence series.
+ */
+async function discoverSuggestions(): Promise<RecurringCandidate[]> {
+  const [expenses, subs] = await Promise.all([
+    Expense.find({ kind: 'expense', amount: { $gt: 0 } })
+      .select('vendor vendorKey amount date category kind')
+      .lean(),
+    Subscription.find().select('name provider').lean(),
+  ]);
+  const excludeVendorKeys = new Set<string>();
+  for (const s of subs) {
+    const nk = vendorKey(s.name || '');
+    if (nk) excludeVendorKeys.add(nk);
+    const pk = vendorKey(s.provider || '');
+    if (pk) excludeVendorKeys.add(pk);
+  }
+  return discoverRecurringCandidates(expenses, { excludeVendorKeys });
+}
+
 /** GET /api/v1/subscriptions?active=1&limit&offset&updatedSince */
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
@@ -50,8 +76,15 @@ export async function GET(req: NextRequest) {
     const find = Subscription.find(filter).sort({ nextRenewal: 1 }).skip(p.offset).limit(p.limit);
     const count = Subscription.countDocuments(filter);
     if (p.updatedSince) { find.setOptions({ withDeleted: true }); count.setOptions({ withDeleted: true }); }
-    const [docs, total] = await Promise.all([find.lean() as Promise<SubLean[]>, count]);
-    return NextResponse.json(listEnvelope(docs.map(trim), total, p));
+    // Suggestions are skipped on incremental (updatedSince) polls: they are not a
+    // updatedAt-tracked resource, and re-including them on every delta poll would
+    // just repeat the same discovery work for no benefit.
+    const [docs, total, suggestions] = await Promise.all([
+      find.lean() as Promise<SubLean[]>,
+      count,
+      p.updatedSince ? Promise.resolve([]) : discoverSuggestions(),
+    ]);
+    return NextResponse.json({ ...listEnvelope(docs.map(trim), total, p), suggestions });
   });
 }
 

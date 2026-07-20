@@ -2,12 +2,17 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Chip, Badge, ListItem, ModalSheet, contentWidth } from '../ui';
-import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription } from '../api';
+import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription, type RecurringCandidate } from '../api';
 
 const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
 
 export function SubscriptionsScreen() {
   const [rows, setRows] = useState<Subscription[]>([]);
+  // Auto-discovered untracked recurring charges (P7 mobile parity). Dismiss is
+  // session-only (mirrors the web's ephemeral hide list, no persisted ignore list).
+  const [suggestions, setSuggestions] = useState<RecurringCandidate[]>([]);
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+  const [trackingKey, setTrackingKey] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(true);
@@ -23,7 +28,11 @@ export function SubscriptionsScreen() {
 
   const load = useCallback(async () => {
     setErr(null);
-    try { setRows(await getSubscriptions()); } catch (e) { setErr((e as Error).message); }
+    try {
+      const { subscriptions, suggestions } = await getSubscriptions();
+      setRows(subscriptions);
+      setSuggestions(suggestions);
+    } catch (e) { setErr((e as Error).message); }
   }, []);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
@@ -82,11 +91,48 @@ export function SubscriptionsScreen() {
     } catch (e) { setErr((e as Error).message); }
   }
 
+  async function trackCandidate(c: RecurringCandidate) {
+    setTrackingKey(c.vendorKey);
+    try {
+      await addSubscription({ name: c.vendor || c.vendorKey, amount: c.lastAmount, billingCycle: c.cycle });
+      setHiddenKeys((prev) => new Set(prev).add(c.vendorKey));
+      await load();
+    } catch (e) { setErr((e as Error).message); }
+    finally { setTrackingKey(null); }
+  }
+  function dismissCandidate(key: string) {
+    setHiddenKeys((prev) => new Set(prev).add(key));
+  }
+
   if (loading) return <Spinner />;
   const active = rows.filter((r) => r.active);
+  const visibleSuggestions = suggestions.filter((c) => !hiddenKeys.has(c.vendorKey));
 
   return (
     <View style={s.wrap}>
+      {visibleSuggestions.length > 0 && (
+        <View style={s.discoverBox}>
+          <Text style={s.discoverTitle}>{visibleSuggestions.length} possible untracked subscription{visibleSuggestions.length === 1 ? '' : 's'}</Text>
+          {visibleSuggestions.map((c) => (
+            <View key={c.vendorKey} style={s.discoverRow}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.discoverVendor} numberOfLines={1}>{c.vendor || c.vendorKey}</Text>
+                <Text style={s.discoverMeta}>~{money(c.avgAmount)} · {c.cycle} · {c.occurrences}×</Text>
+              </View>
+              <Button
+                label="Track"
+                onPress={() => trackCandidate(c)}
+                busy={trackingKey === c.vendorKey}
+                style={s.discoverTrackBtn}
+                textStyle={s.discoverTrackText}
+              />
+              <Pressable onPress={() => dismissCandidate(c.vendorKey)} hitSlop={8} style={s.discoverDismiss}>
+                <Text style={s.discoverDismissText}>✕</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      )}
       <View style={s.addRow}>
         <Input value={name} onChangeText={setName} placeholder="name" style={{ flex: 2 }} />
         <Input value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="€/mo" style={{ flex: 1 }} />
@@ -148,6 +194,15 @@ export function SubscriptionsScreen() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
+  discoverBox: { marginHorizontal: 16, marginTop: 16, padding: 12, borderRadius: 14, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
+  discoverTitle: { color: C.faint, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 },
+  discoverRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10, marginBottom: 6 },
+  discoverVendor: { color: C.text, fontSize: 13, fontWeight: '600' },
+  discoverMeta: { color: C.dim, fontSize: 11, marginTop: 2 },
+  discoverTrackBtn: { paddingVertical: 6, paddingHorizontal: 12 },
+  discoverTrackText: { fontSize: 12 },
+  discoverDismiss: { padding: 4 },
+  discoverDismissText: { color: C.faint, fontSize: 14 },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
   aiBtn: { width: 40, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
   aiText: { color: C.cyan, fontSize: 18, fontWeight: '700' },
