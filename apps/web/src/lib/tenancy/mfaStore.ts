@@ -49,6 +49,19 @@ export function planMfaDisable(): MfaDisableUpdate {
   return { $set: { mfaEnabled: false, mfaSecretEnc: null, mfaPendingSecretEnc: null, mfaRecoveryHashes: [] } };
 }
 
+/**
+ * PURE: whether `POST /api/saas/account/mfa` (begin/restart enrollment) must re-verify the
+ * caller's password before it may overwrite `mfaPendingSecretEnc`. True whenever MFA is
+ * already active on the account — mirrors the `DELETE` (disable) path's re-auth requirement, so
+ * a hijacked session alone can't silently replace an already-enrolled factor with one the
+ * attacker controls. False only for a brand-new (never-enabled) enrollment, where there is
+ * nothing yet to protect. (Flagged by review 2026-07-20, WEB_DEBT.md P2/S — the DELETE handler
+ * already re-checked the password correctly; POST/confirm did not.)
+ */
+export function mfaEnrollRequiresReauth(mfaEnabled: boolean): boolean {
+  return mfaEnabled;
+}
+
 export type BeginEnrollResult =
   | { ok: true; secret: string; uri: string }
   | { ok: false; reason: 'crypto_unavailable' | 'not_found' };

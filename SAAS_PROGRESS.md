@@ -3634,3 +3634,63 @@ lightweight inline SVG QR χωρίς νέα εξάρτηση — να αποφα
 80c = login-flow wiring (το πιο ρισκαρισμένο, χρειάζεται προσοχή στο session sequencing και στο
 recovery-code consumption path — `matchRecoveryCode`'s index-splice contract ήδη υπάρχει, απλά
 δεν καλείται ακόμα από πουθενά).
+
+## 2026-07-20 (increment 81 — fix MFA re-enrollment re-auth gap, §security)
+
+**Πηγή:** ο reviewer routine (commit `db4bceb`, ίδια μέρα) διάβασε τα increments 79/80a και
+flagged ένα πραγματικό P2/S gap σε `WEB_DEBT.md`: το `DELETE /api/saas/account/mfa` (disable)
+σωστά re-verifies το password πριν προχωρήσει, αλλά το `POST /api/saas/account/mfa` (begin/
+restart enrollment) δεν απαιτούσε τίποτα πέρα από valid session, ΑΚΟΜΑ κι όταν το MFA ήταν ήδη
+ενεργό — ασύμμετρο με το disable path. Failure scenario: hijacked session σε λογαριασμό με ήδη
+ενεργό MFA θα μπορούσε να ξεκινήσει νέο enrollment, το επιβεβαιώσει με δικό του authenticator
+app, και αντικαταστήσει σιωπηλά το factor του θύματος. Χαμηλή πρακτική έκθεση σήμερα (το MFA δεν
+είναι ακόμα wired στο login, το 80c είναι μεταγενέστερο) αλλά σωστό να διορθωθεί πριν το wiring
+ώστε το API contract να είναι ήδη σωστό. Αυτό είναι squarely στο δικό μου territory (αρχεία που
+έχτισα στο 80a) και είναι μικρό, additive, χωρίς decision-point — προχώρησα χωρίς ask-inbox entry,
+πριν το προγραμματισμένο 80b (UI panel), γιατί ένα flagged security gap στα δικά μου αρχεία
+προηγείται από UI polish.
+
+**Fix (mirrors το DELETE handler's idiom 1:1):**
+- **`lib/tenancy/mfaStore.ts`**: νέα PURE `mfaEnrollRequiresReauth(mfaEnabled: boolean): boolean`
+  (= `return mfaEnabled` — τετριμμένο σαν λογική, αλλά named+exported+tested ώστε το decision να
+  ζει σε ένα σημείο, ίδια σύμβαση με τα υπόλοιπα `plan*` builders του ίδιου αρχείου).
+- **`mfa/route.ts`'s `POST`**: πλέον κάνει `Account.findById(...).select('_id passwordHash
+  mfaEnabled')` πρώτα (πριν ήταν session-only). Όταν `mfaEnrollRequiresReauth(account.mfaEnabled)`
+  γυρνά `true` → απαιτεί `password` στο body + `verifyPassword` (401 αν λείπει/λάθος), ΠΡΙΝ καλέσει
+  `beginMfaEnrollment`. Πρώτο enrollment (`mfaEnabled===false`) παραμένει password-less,
+  αμετάβλητο — δεν υπάρχει τίποτα να προστατευτεί ακόμα σε αυτή την περίπτωση. Doc-comment στην
+  κορυφή του αρχείου ενημερώθηκε να περιγράφει το νέο conditional `password?` στο POST.
+- **`.../mfa/confirm/route.ts`**: **καμία αλλαγή** — επιβεβαιώθηκε ότι δεν χρειάζεται δικό του
+  re-auth, όπως προέβλεπε το debt item's fix note: δεν μπορεί να ενεργοποιηθεί χωρίς προηγούμενο
+  re-authed `begin` που να έχει γράψει νέο `mfaPendingSecretEnc` πρώτα (η two-step ροή είναι ήδη
+  το guard).
+- **`mfaStore.test.ts`**: 2 νέα tests πάνω στο pure decision function (`true`/`false` cases).
+  Route-level test (`mfaEnabled:true` + POST χωρίς password → 401 κλπ, όπως πρότεινε το debt item)
+  παραλήφθηκε σκόπιμα — **κανένα route κάτω από `api/saas/**` δεν έχει ακόμα DB-mocked test
+  harness σε όλο το repo** (το `mfaStore.test.ts`'s ίδιο το header comment το λέει: "the DB-
+  touching wrappers ... are exercised via the API routes / integration", δηλαδή manual/future,
+  όχι automated ακόμα εδώ) — η pure-function-test σύμβαση είναι η established μέθοδος αυτού του
+  module, δεν εφηύρα νέο pattern.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run mfaStore.test.ts totp.test.ts
+recoveryCodes.test.ts` → **33/33**· full suite `npx vitest run` → **2789/2789 green** (215
+files). ΚΑΝΕΝΑ shared component/layout/globals.css/νέα εξάρτηση. `SAAS_MODE` off/self-hosted =
+**zero effect** (το route ήδη 404άρει πριν φτάσει σε αυτόν τον κώδικα). Κανένας Docker rebuild
+(pure backend logic, μηδέν runtime wiring/env change, μηδέν UI ακόμα ώστε browser-verify N/A,
+ίδιο idiom με τα #79-80a). Collision guard: `git status --short` πριν το staging έδειξε μόνο τα
+δικά μου 4 αρχεία (2 code + 1 test + `WEB_DEBT.md`), `git diff --cached --name-only` επιβεβαίωσε
+exact match.
+
+**WEB_DEBT.md**: το P2/S item flipped TODO → **DONE** με πλήρη περιγραφή του fix.
+
+**## Needs Achilleas:**
+- Τίποτα νέο.
+
+**Next task:** increment 82 = το προγραμματισμένο **80b** (τώρα μετονομάζεται λόγω του
+security-fix interrupt) — **enrollment UI panel** στο `(saas)/account/settings`
+(`AccountSettingsPanel.tsx`): κουμπί "Enable two-factor" → `POST /api/saas/account/mfa` (σημείωσε
+το νέο conditional `password` πεδίο όταν ήδη ενεργό — restart-enrollment UI θα χρειαστεί password
+input όταν `mfaEnabled` ήδη true) → δείξε `secret`+`uri` (manual-entry text ΚΑΙ ίσως lightweight
+inline SVG QR χωρίς νέα εξάρτηση) → input για πρώτο κωδικό → `POST .../mfa/confirm` → δείξε τα
+recovery codes ΜΙΑ φορά → "Disable" flow (password re-entry, `DELETE .../mfa`). Μετά, ΤΕΛΕΥΤΑΙΟ:
+increment 80c = login-flow wiring.
