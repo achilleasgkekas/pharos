@@ -1940,3 +1940,25 @@ Collision guard: git status --short = ΜΟΝΟ docs/features.md modified (δικ
 
 Επόμενο run: (α) αν άλλα νέα features προστεθούν (π.χ. P25/P27/P40+ που ενδέχεται να έχουν shipped), update features.md stale-forward · (β) api.md sync αν νέα v1 routes landed · (γ) saas.md update αν νέα SaaS features προστεθούν (π.χ. workspace custom-domain setup).
 
+
+## 2026-07-20 (ninth run — P75 BYO AI key UI + P8 tax-deductible tagging)
+
+Δύο νέα features που landed (commits c9c48a0 + e0124d8) χρειάζονταν documenting:
+
+Τι έγραψα:
+- **saas.md**: Ενημέρωσα την `/account/workspace/settings` σειρά στον "Workspace console UI" πίνακα να αναφέρει τη νέα **AI key** section για το P75. Εξήγηση: owners/admins μπορούν να αποθηκεύσουν το δικό τους encrypted AI provider key (GET/PUT/DELETE /api/saas/workspace/ai-key) ώστε η workspace χρησιμοποιεί το δικό τους key (unmetered, zero platform cost) αντί του shared platform key. Plaintext never returns — μόνο masked last-4 preview. Διατηρήθηκαν τα API endpoints (ήδη documented στις γραμμές 583-585).
+- **features.md**: Προσθεσα νέα subsection "### Tax-deductible tagging & year-end export" στο Expenses & Income section για το P8. Περιγράφεται η tax-deductible flag (inherited ανά vendor recurring series), tax category (free-form με GR presets), tax-only filter, gold badge σε cards/rows, year-end tax export (CSV + HTML + ZIP με files), available σε Settings → Backup.
+
+Accuracy (διάβασα κώδικα, όχι εικασίες):
+- P75: apps/web/src/components/saas/AiKeyPanel.tsx (new component, GET/PUT/DELETE flows), /api/saas/workspace/ai-key/route.ts (3 methods). Endpoints ήδη documented στο saas.md.
+- P8: apps/web/src/app/expenses/ExpensesClient.tsx (tax toggle + filter), lib/taxExport.ts (CSV/HTML report), Settings Backup gets "Tax export (ZIP)" button, Expense.taxDeductible/taxCategory fields.
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: features.md=0, saas.md αθικτα (αθροισμα 18, ζυγα).
+- Internal links: ολα τα referenced docs υπάρχουν ✓ (saas.md → #workspace-ai-key-management-byo-key).
+- Secret scan: κανένα literal credential ✓.
+- Markdown structure: ολα OK.
+
+Collision guard: `git status --short` = ΜΟΝΟ docs/features.md + docs/saas.md modified (δικα μου), 0 staged foreign files.
+
+Επόμενο run: (α) αν άλλα νέα features προστεθούν (ψάξε git log grep για «feat(«), update docs αναλογα · (β) api.md sync αν νέα v1 routes landed · (γ) saas.md stale-forward αν νέα SaaS features προστεθούν (π.χ. workspace custom-domain, subscription management).

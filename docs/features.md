@@ -186,6 +186,28 @@ tagged to the Ionian cottage at the same time.
   property"** breakdown so you can see, at a glance, how much each property or
   context costs.
 
+### Tax-deductible tagging & year-end export
+
+Mark expenses as tax-deductible and organize them by tax category (for example
+"office supplies", "travel", "professional fees") for accurate bookkeeping and
+easier end-of-year tax filing.
+
+- **Tax-deductible flag.** When creating or editing an expense, check the
+  **"Tax-deductible"** toggle. The flag is inherited across a vendor's recurring
+  series (so a recurring utility bill stays marked without re-checking on every entry).
+- **Tax category.** Choose from pre-defined categories (Greece, Germany, and other
+  common locales) or type a custom category (for example "R&D", "client meals",
+  "equipment depreciation"). The category is free-form, allowing flexibility for
+  your jurisdiction.
+- **Tax filter.** In the expenses sidebar, a **"Tax-deductible only"** filter shows
+  just the records you've marked. Cards and rows show a gold **tax badge** on
+  deductible entries so you can spot them at a glance.
+- **Year-end export.** Settings → Backup gets a **"Tax export (ZIP)"** button.
+  Choose a year, and it bundles a CSV summary (grouped by tax category), a printable
+  HTML report, and every receipt/bill file you've linked to a deductible entry.
+  Great for handing to an accountant or for manual tax software entry. The export
+  is ungated (available to all users, not a paid feature).
+
 ## Statements & installments
 
 Upload a credit-card statement PDF (`/statements`) and PHAROS parses the
