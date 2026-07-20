@@ -2148,3 +2148,25 @@ Collision guard: `git status --short` στην αρχή έδειξε 4 foreign �
 - Collision guard: `git status --short`/`git diff --cached --name-only` πριν το commit έδειξαν ΜΟΝΟ το νέο αρχείο μου. `git fetch origin main` → ahead 1, καθαρό fast-forward, push σε `origin main` επιτυχές (31cc37c..2a904ab), χωρίς rebase ανάγκη.
 
 Suggested next task: επόμενο από την ίδια sweep-λίστα (αγγικτο ακόμα): `shopping-list/actions.ts` (127 γραμμές) ή `subscriptions/actions.ts` (170 γραμμές, ΠΡΟΣΟΧΗ πιθανό foreign WIP εκεί από άλλη routine — έλεγξε `git status` πρώτα, αν κάτι αγγίζει subscriptions skip το αυτή τη φορά) ή τα μικρότερα `login/actions.ts`/`history/actions.ts`/`setup/actions.ts`/`vouchers/actions.ts`. Διάβασε ΠΡΩΤΑ το υποψήφιο πριν διαλέξεις. Έλεγξε ΠΑΝΤΑ πρώτα `git status` collision-guard. Ένα module ανά run.
+
+---
+
+## 2026-07-20 (cont.²⁹ — shopping-list/actions.test.ts, CRUD + AI photo scan)
+
+**Task: DB-mocked unit test για `apps/web/src/app/shopping-list/actions.ts`** (127 γραμμές, το ελαφρύ "to-buy" list module) — επόμενο από την sweep-λίστα του προηγούμενου run. Το `subscriptions/actions.ts` παραλείφθηκε αυτό το run όπως προειδοποιούσε το προηγούμενο (πρόσφατα commits `feat(subscriptions): auto-discover untracked recurring charges (P7)` + `feat(mobile): subscription auto-discover suggestions` δείχνουν ενεργή δουλειά εκεί).
+
+Collision guard: `git status --short` στην αρχή έδειξε foreign WIP σε 4 mobile files (App.tsx/api.ts/nav.tsx/HomeScreen.tsx modified) + νέο untracked `BillsScreen.tsx` + το ήδη-γνωστό untracked `api/v1/bills/` (μια άλλη routine φτιάχνει mobile bills UI) — κανένα δεν αγγίζει το δικό μου target, δεν τα άγγιξα.
+
+Διάβασα ολόκληρο το αρχείο: `serialize()` (defaults optional πεδία σε `''`, `!!` coerce σε checked/aiScanned), `scanProductPhoto` (gate πίσω από `isFeatureEnabled('productPhoto')`, no-file/empty-file guard, `aiError()` helper που ξεχωρίζει ECONNREFUSED/fetch-failed/ENOTFOUND σε φιλικό "AI not reachable" μήνυμα από γενικό truncated "AI failed: ..."), `addListItem` (trim όλων των text πεδίων, `checked` πάντα `false` ό,τι κι αν σταλεί, κενό/whitespace name → error πριν το connectDB), `updateListItem`/`toggleListItem`/`deleteListItem` (report `found` από `matchedCount`, ΟΧΙ assumed success· το `updateListItem` κάνει `$set` ΜΟΝΟ στα keys που υπάρχουν στο partial), `deleteListItem` (soft delete), `clearChecked` (`updateMany({checked:true}, ...)`, report `modifiedCount` ως `cleared`).
+
+Mock pattern: ίδιο με τα προηγούμενα direct-actions tests, mockαρίστηκαν μόνο `@/lib/db`, `@/models/ShoppingListItem` (find/create/updateOne/updateMany), `@/lib/aiFeatures.server` (`isFeatureEnabled`), `@/lib/ollama` (`parseProductPhoto`), `next/cache`.
+
+Τι έγινε: Νέο `shopping-list/actions.test.ts` (19 tests): `getListItems` (2: defaults-to-empty-string+false, passes-through-explicit-values), `scanProductPhoto` (6: feature-off, no-file, empty-file, success-base64-encodes, ECONNREFUSED→friendly-message, generic-error→truncated-message), `addListItem` (3: trims+forces-checked-false, blank-name-rejected-before-DB, defaults-optional-fields), `updateListItem` (2: partial-$set-only-present-keys, found-false-on-no-match), `toggleListItem` (2), `deleteListItem` (2: soft-delete-assertion, found-false), `clearChecked` (2: modifiedCount-as-cleared, zero-when-nothing-checked).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/shopping-list/actions.test.ts"` → 19/19 passed.
+- `npx vitest run` (όλο το suite) → **218 files, 2835/2835 passed** (από 215/2787· η αύξηση αρχείων/tests πέρα από τα δικά μου 19 οφείλεται σε παράλληλες routines).
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό στην πρώτη προσπάθεια.
+- Collision guard: `git status --short`/`git diff --cached --name-only` πριν το commit έδειξαν ΜΟΝΟ το νέο αρχείο μου. `git fetch origin main` → ahead 1, καθαρό fast-forward, push σε `origin main` επιτυχές (6d0b9c3..a4b62e6), χωρίς rebase ανάγκη.
+
+Suggested next task: από την ίδια sweep-λίστα, ακόμα ανέγγιχτα: `login/actions.ts` (32 γραμμές, μικρό/απλό — καλό επόμενο), `history/actions.ts` (50), `setup/actions.ts` (59), `vouchers/actions.ts` (78, το plain `actions.ts` του φακέλου, ΟΧΙ το ήδη-καλυμμένο `giftcardActions.ts`/`loyaltyActions.ts`). Έλεγξε ξανά αν το `subscriptions/actions.ts` (170 γραμμές) έχει ηρεμήσει (καμία πρόσφατη commit πάνω του) πριν το πιάσεις — αν όχι ακόμα, προτίμησε τα μικρότερα. Διάβασε ΠΡΩΤΑ το υποψήφιο πριν διαλέξεις. Έλεγξε ΠΑΝΤΑ πρώτα `git status` collision-guard. Ένα module ανά run.
