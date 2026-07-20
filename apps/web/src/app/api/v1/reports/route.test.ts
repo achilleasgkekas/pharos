@@ -52,8 +52,8 @@ const {
   const subFind = vi.fn(() => ({ select: () => ({ lean: async () => subState.rows }) }));
   const plansState: { plans: unknown[] } = { plans: [] };
   const computePlansMock = vi.fn(() => plansState.plans);
-  const settingsState: { currency: string; budgets: Record<string, number> } = { currency: 'EUR', budgets: {} };
-  const getAppSettingsMock = vi.fn(async () => ({ currency: settingsState.currency, budgets: settingsState.budgets }));
+  const settingsState: { currency: string; budgets: Record<string, number>; assetAccounts: Record<string, number> } = { currency: 'EUR', budgets: {}, assetAccounts: {} };
+  const getAppSettingsMock = vi.fn(async () => ({ currency: settingsState.currency, budgets: settingsState.budgets, assetAccounts: settingsState.assetAccounts }));
   const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
   const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
   return {
@@ -105,6 +105,7 @@ type Body = {
   currency: string;
   months: number;
   netPosition: { inventoryValue: number; installmentsOwed: number; activePlans: number; net: number };
+  netWorth: { assetsInventory: number; assetsAccounts: number; liabInstallments: number; liabCards: number; net: number };
   thisMonth: { income: number; expense: number; net: number };
   thisYear: { income: number; expense: number; net: number };
   byCategory: Array<{ category: string; total: number }>;
@@ -133,6 +134,7 @@ beforeEach(() => {
   plansState.plans = [];
   settingsState.currency = 'EUR';
   settingsState.budgets = {};
+  settingsState.assetAccounts = {};
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
   vi.clearAllMocks();
   userFindOne.mockImplementation(() => ({ select: () => ({ lean: async () => userState.doc }) }));
@@ -142,7 +144,7 @@ beforeEach(() => {
   receiptFind.mockImplementation(() => ({ select: () => ({ lean: async () => receiptState.rows }) }));
   subFind.mockImplementation(() => ({ select: () => ({ lean: async () => subState.rows }) }));
   computePlansMock.mockImplementation(() => plansState.plans);
-  getAppSettingsMock.mockImplementation(async () => ({ currency: settingsState.currency, budgets: settingsState.budgets }));
+  getAppSettingsMock.mockImplementation(async () => ({ currency: settingsState.currency, budgets: settingsState.budgets, assetAccounts: settingsState.assetAccounts }));
 });
 
 afterEach(() => {
@@ -190,6 +192,8 @@ describe('net position + inventory by category', () => {
       { name: 'compute', value: 500 },
       { name: 'network', value: 300 },
     ]);
+    // netWorth (PA2 gap): same inventory/installments inputs, zero accounts/cards → net == netPosition.net
+    expect(json.netWorth).toEqual({ assetsInventory: 800, assetsAccounts: 0, liabInstallments: 200, liabCards: 0, net: 600 });
   });
 
   it('zeroes net position for a fresh install', async () => {
@@ -197,6 +201,24 @@ describe('net position + inventory by category', () => {
     const json = (await res.json()) as Body;
     expect(json.netPosition).toEqual({ inventoryValue: 0, installmentsOwed: 0, activePlans: 0, net: 0 });
     expect(json.inventoryByCategory).toEqual([]);
+    expect(json.netWorth).toEqual({ assetsInventory: 0, assetsAccounts: 0, liabInstallments: 0, liabCards: 0, net: 0 });
+  });
+});
+
+describe('net worth breakdown (PA2 gap: manual accounts + last-statement-per-card balance)', () => {
+  it('adds manual asset accounts and subtracts the latest statement balance per card', async () => {
+    settingsState.assetAccounts = { savings: 1000, brokerage: 500 };
+    // Two statements on the same card (by last4): the OLDER one must be ignored, only the latest counts.
+    statementState.rows = [
+      { last4: '7791', card: 'Εθνική Mastercard', period: '2026-06', statementDate: '2026-06-05', totalAmount: 300, paidAmount: 300 }, // older, fully paid → irrelevant
+      { last4: '7791', card: 'Εθνική Mastercard', period: '2026-07', statementDate: '2026-07-05', totalAmount: 250, paidAmount: 100 }, // latest → owes 150
+      { last4: '4321', card: 'Other card', period: '2026-07', statementDate: '2026-07-01', totalAmount: 80, paidAmount: 80 }, // latest, fully paid → owes 0
+    ];
+    const res = await GET(makeReq());
+    const json = (await res.json()) as Body;
+    expect(json.netWorth.assetsAccounts).toBe(1500);
+    expect(json.netWorth.liabCards).toBe(150);
+    expect(json.netWorth.net).toBe(0 + 1500 - 0 - 150); // assetsInventory 0 (no items) here
   });
 });
 
@@ -408,7 +430,7 @@ describe('envelope', () => {
     expect(json.currency).toBe('USD');
     expect(Object.keys(json).sort()).toEqual(
       [
-        'currency', 'months', 'netPosition', 'monthReview', 'thisMonth', 'thisYear', 'byCategory', 'budgets',
+        'currency', 'months', 'netPosition', 'netWorth', 'monthReview', 'thisMonth', 'thisYear', 'byCategory', 'budgets',
         'monthly', 'incomeExpense', 'upcomingInstallments', 'spendByStore', 'subsByCategory',
         'inventoryByCategory', 'biggestPurchases', 'warrantiesExpiring', 'installmentPayoff',
       ].sort()

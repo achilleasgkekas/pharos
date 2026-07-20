@@ -9,6 +9,7 @@ import { Subscription } from '@/models/Subscription';
 import { getAppSettings } from '@/lib/appSettings';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { buildMonthReview } from '@/lib/monthReview';
+import { netWorthOf } from '@/lib/netWorth';
 import type { SerializedStatement } from '@/types';
 import { OWNED_STATUSES } from '@/lib/itemStatus';
 
@@ -69,7 +70,8 @@ export async function GET(req: NextRequest) {
     const inventoryByCategory = [...invByCat.entries()]
       .map(([name, value]) => ({ name, value: Math.round(value) }))
       .sort((a, b) => b.value - a.value);
-    const plans = computeInstallmentPlans(JSON.parse(JSON.stringify(statementsRaw)) as SerializedStatement[]);
+    const serializedStatements = JSON.parse(JSON.stringify(statementsRaw)) as SerializedStatement[];
+    const plans = computeInstallmentPlans(serializedStatements);
     const active = plans.filter((p) => !p.done);
     const installmentsOwed = active.reduce((s, p) => s + p.remainingAmount, 0);
     const netPosition = {
@@ -77,6 +79,28 @@ export async function GET(req: NextRequest) {
       installmentsOwed: Math.round(installmentsOwed),
       activePlans: active.length,
       net: Math.round(inventoryValue - installmentsOwed),
+    };
+
+    // ── Net worth (PA2 gap): assets (inventory + manual accounts) minus
+    //    liabilities (remaining installments + last-statement-per-card balance).
+    //    Mirrors web /reports page.tsx netWorthNow. Chart/snapshot series is
+    //    deliberately NOT captured here (would spam NetWorthSnapshot on every
+    //    mobile poll) — headline + breakdown only, chart deferred. ──
+    const byCard = new Map<string, SerializedStatement>();
+    for (const st of serializedStatements) {
+      const k = st.last4 || st.card || st._id;
+      const cur = byCard.get(k);
+      if (!cur || new Date(st.period || st.statementDate) > new Date(cur.period || cur.statementDate)) byCard.set(k, st);
+    }
+    const liabCards = [...byCard.values()].reduce((s, st) => s + Math.max(0, (st.totalAmount || 0) - (st.paidAmount || 0)), 0);
+    const assetsAccountsMap = (settings.assetAccounts || {}) as Record<string, number>;
+    const assetsAccounts = Object.values(assetsAccountsMap).reduce((s, v) => s + (v || 0), 0);
+    const netWorth = {
+      assetsInventory: Math.round(inventoryValue),
+      assetsAccounts: Math.round(assetsAccounts),
+      liabInstallments: Math.round(installmentsOwed),
+      liabCards: Math.round(liabCards),
+      net: netWorthOf({ assetsInventory: inventoryValue, assetsAccounts, accounts: assetsAccountsMap, liabInstallments: installmentsOwed, liabCards }),
     };
     const now = new Date();
 
@@ -216,6 +240,7 @@ export async function GET(req: NextRequest) {
       // (no param) reports 12 but keeps the asymmetric 6/12 arrays for old clients.
       months: selMonths ?? 12,
       netPosition,
+      netWorth,
       monthReview,
       thisMonth: { income: sum.mInc, expense: sum.mExp, net: sum.mInc - sum.mExp },
       thisYear: { income: sum.yInc, expense: sum.yExp, net: sum.yInc - sum.yExp },

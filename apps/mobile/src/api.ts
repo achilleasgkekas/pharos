@@ -381,6 +381,9 @@ export type Reports = {
   currency: string;
   months?: number; // effective trend window (6/12/24); absent on older servers
   netPosition: { inventoryValue: number; installmentsOwed: number; activePlans: number; net: number };
+  // Net worth = inventory + manual asset accounts − installments − card balances (PA2 gap). Absent on
+  // older servers → screen falls back to the plain netPosition headline.
+  netWorth?: { assetsInventory: number; assetsAccounts: number; liabInstallments: number; liabCards: number; net: number };
   // Deterministic "Month in Review" narrative digest (P3). Absent on older servers.
   monthReview?: {
     monthKey: string;

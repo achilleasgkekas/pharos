@@ -133,9 +133,28 @@ export function ReportsScreen() {
           )}
 
           <View style={s.netCard}>
-            <Text style={s.cardLabel}>NET POSITION</Text>
-            <Text style={[s.netVal, { color: d.netPosition.net >= 0 ? C.accent : C.red }]}>{money(d.netPosition.net, cur)}</Text>
-            <Text style={s.cardSub}>{money(d.netPosition.inventoryValue, cur)} owned − {money(d.netPosition.installmentsOwed, cur)} owed{d.netPosition.activePlans > 0 ? ` · ${d.netPosition.activePlans} plan${d.netPosition.activePlans === 1 ? '' : 's'}` : ''}</Text>
+            <Text style={s.cardLabel}>{d.netWorth ? 'NET WORTH' : 'NET POSITION'}</Text>
+            <Text style={[s.netVal, { color: (d.netWorth ? d.netWorth.net : d.netPosition.net) >= 0 ? C.accent : C.red }]}>
+              {money(d.netWorth ? d.netWorth.net : d.netPosition.net, cur)}
+            </Text>
+            {d.netWorth ? (
+              <View style={s.reviewChips}>
+                <View style={[s.reviewChip, { borderColor: C.dim }]}>
+                  <Text style={[s.reviewChipText, { color: C.text }]}>Inventory {money(d.netWorth.assetsInventory, cur)}</Text>
+                </View>
+                <View style={[s.reviewChip, { borderColor: C.cyan }]}>
+                  <Text style={[s.reviewChipText, { color: C.cyan }]}>Accounts {money(d.netWorth.assetsAccounts, cur)}</Text>
+                </View>
+                <View style={[s.reviewChip, { borderColor: C.red }]}>
+                  <Text style={[s.reviewChipText, { color: C.red }]}>Installments -{money(d.netWorth.liabInstallments, cur)}</Text>
+                </View>
+                <View style={[s.reviewChip, { borderColor: C.gold }]}>
+                  <Text style={[s.reviewChipText, { color: C.gold }]}>Cards -{money(d.netWorth.liabCards, cur)}</Text>
+                </View>
+              </View>
+            ) : (
+              <Text style={s.cardSub}>{money(d.netPosition.inventoryValue, cur)} owned − {money(d.netPosition.installmentsOwed, cur)} owed{d.netPosition.activePlans > 0 ? ` · ${d.netPosition.activePlans} plan${d.netPosition.activePlans === 1 ? '' : 's'}` : ''}</Text>
+            )}
           </View>
 
           <View style={s.cards}>

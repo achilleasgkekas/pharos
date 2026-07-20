@@ -411,7 +411,23 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - mobile Reports δείχνει net-worth headline + 4 breakdown chips· manual accounts κενά → assetsAccounts 0 (δεν σπάει)
   - tsc καθαρό (web + mobile)· safe rebuild → /login 200, web restarts 0
   - ΣΗΜ: το snapshot AreaChart trend (`captureAndListSnapshots` series) ΔΕΝ μπαίνει εδώ — θέλει RN charting lib (Needs Achilleas)· αυτό το item είναι το chart-free headline/breakdown slice
-- Status: TODO
+- Status: ✅ DONE 2026-07-20 (pharos-daily-dev, 3ο run της ημέρας). Υλοποίηση σχεδόν 1:1 με το spec, με μία σκόπιμη
+  απόκλιση: το `GET /api/v1/reports` ΔΕΝ καλεί το `captureAndListSnapshots` (θα έγραφε NetWorthSnapshot σε κάθε mobile
+  poll — side-effect ανεπιθύμητο για ένα read endpoint)· αντ' αυτού reuse του pure `netWorthOf()` helper από το ίδιο
+  `lib/netWorth.ts` για το headline number, με τα breakdown πεδία υπολογισμένα inline στο route (assetsAccounts από
+  `getAppSettings().assetAccounts`, liabCards = last-statement-per-card outstanding, mirror του web `page.tsx`
+  byCard/outstanding block). `netPosition` έμεινε ανέγγιχτο (το χρησιμοποιούν ήδη aiTools + το mobile fallback).
+  Mobile: `ReportsScreen.tsx` net-card δείχνει «NET WORTH» headline + 4 read-only breakdown chips (Inventory/
+  Accounts/Installments/Cards, ίδιο χρωματικό coding με το web: text/cyan/red/gold) όταν υπάρχει `netWorth`, αλλιώς
+  fallback στο παλιό «NET POSITION» one-liner (παλιότερος server). +2 νέα route tests (breakdown με manual accounts
+  + 2 κάρτες όπου η παλιά statement μιας κάρτας αγνοείται) + 1 ενημερωμένο net-position test + envelope-keys test.
+  Verify: `npm run type-check` (web) EXIT 0· `apps/mobile npx tsc --noEmit` EXIT 0· full `npx vitest run`
+  **2668 passed / 208 files**. Docker: lock acquired καθαρά, `docker compose build web` OK, mongo healthy πριν το
+  `up -d web`, `/login` 200 στην 1η προσπάθεια, `RestartCount=0`. `curl /api/v1/reports` χωρίς token + bogus token →
+  και τα δύο 401 (όχι 500). Browser-checked: `/reports` → redirect σε «Sign in · Pharos» (auth-gated, αναμενόμενο),
+  μηδέν console errors. `docker builder prune -f`, lock released καθαρά. Το πραγματικό mobile UI (headline+chips)
+  ΔΕΝ testable end-to-end unattended (χρειάζεται login + real assetAccounts/statements + Expo simulator) — verified
+  πλήρως μέσω route tests + type-check, ίδιος περιορισμός με κάθε προηγούμενο mobile-parity shipment.
 
 ### Receipts — quick-verify rapid queue στο mobile — ✅ DONE 2026-07-09 (daily-dev, `00d6f46`)
 - Priority: P1 | Size: M
