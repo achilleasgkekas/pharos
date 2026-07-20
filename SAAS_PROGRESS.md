@@ -3084,3 +3084,82 @@ homepage-web printenv SAAS_MODE` στο live container επιβεβαίωσε κ
 DNS/cert flow αλλού πριν χτίσεις ένα edit UI εδώ)· (γ) έλεγξε αν η `/admin` κεντρική λίστα
 tenants (admin/tenants index, όχι το detail page) έχει ήδη search/filter/pagination — αν όχι,
 συμμετρικό gap με αυτό το increment.
+
+## 2026-07-20 (increment 71 — Account Settings page: profile/password/GDPR export, §UI-first)
+**Το κενό:** έλεγξα τα 3 candidates του #70. (γ) **admin/tenants index** — ΗΔΗ πλήρες (search
+`q`, status filter, prev/next pagination, `parseAdminTenantQuery`/`listTenantsForAdmin`) — καμία
+δουλειά εκεί. (β) **custom-domain self-service** — δεν έχει κανένα PATCH endpoint καν (το
+`workspace` route docstring λέει ρητά "Slug/dbName are immutable... NOT changeable here", το
+customDomain μένει read-only field στο Tenant μοντέλο) και θα χρειαζόταν πραγματικό DNS/cert
+verification flow (ποιος proxy layer, TXT record ή CNAME, ποιος εκδίδει το TLS cert) — αρχιτεκ-
+τονική απόφαση που χρειάζεται τον Αχιλλέα, όχι κάτι για να μαντέψω. Το παρέκαμψα (δεν το έβαλα
+καν στο ask-inbox — δεν είναι blocking, απλώς low-priority χωρίς infra ακόμα). Ψάχνοντας για
+ένα τρίτο καθαρό UI-first gap βρήκα κάτι μεγαλύτερο από τα 3 candidates: **`GET/PATCH
+/api/saas/account`** (profile: name/email), **`POST /api/saas/account/password`** (change
+password) και **`GET /api/saas/account/export`** (GDPR Art.15/20 data export) ήταν **και τα
+τρία πλήρως χτισμένα, gated, tested — μηδέν UI να τα καλέσει.** Μόνο το verify-email flow
+(`/account/verify` + `VerifyEmail.tsx`) είχε ήδη UI· το profile/password/export ήταν 100% dead
+weight. Αντίστοιχο μοτίβο με τα #67-70 (backend routes χτισμένα εν αναμονή UI που ποτέ δεν
+ήρθε).
+
+**Built** (2 νέα PURE+tested modules, 1 νέο client component, 1 νέα page, additive links στα
+δικά μου `account/page.tsx` + `WorkspaceShell.tsx`):
+- **`components/saas/accountSettings.ts`** (νέο, PURE — μόνο imports από ήδη-pure modules
+  `lib/tenancy/accountProfile.ts` + `lib/tenancy/members.ts`, μηδέν DB/env): `profileNameChanged`/
+  `profileEmailChanged` (mirror server normalizers ώστε whitespace-only diffs να μη ενεργο-
+  ποιούν sameν Save)· `profileSaveReady` (κάτι άλλαξε KAI αν άλλαξε το email είναι syntactically
+  valid — mirrors το PATCH route's guard)· `passwordSaveReady` (wraps το ήδη-υπάρχον server
+  `passwordChangeError` + confirm-match, ίδιο idiom με `resetConfirmReady`)· `describeAccount
+  SettingsError` (mirror του `describeWorkspaceSettingsError`, στατάρει 401/404/409/5xx). **16
+  unit tests.**
+- **`components/saas/AccountSettingsPanel.tsx`** (νέο client component) — τρία panels: **Profile**
+  (name+email inputs, Save· αν το email άλλαξε → βγάζει "needs to be verified" notice + το
+  emailVerified badge γυρνάει σε unverified τοπικά χωρίς reload)· **Password** (current/new/
+  confirm, ίδιο styling idiom με το `WorkspaceSettingsPanel`)· **Your data** (plain `<a href=
+  "/api/saas/account/export">` — GET authenticated με cookie, μηδέν client JS χρειάζεται για
+  το download, ο browser το κατεβάζει ως attachment λόγω του route's `Content-Disposition`).
+  Email-verified badge δείχνει είτε πράσινο "verified" είτε gold link "unverified · verify" →
+  `/account/verify` (επαναχρησιμοποιεί το ήδη-υπάρχον resend flow, καμία διπλή λογική).
+- **`(saas)/account/settings/page.tsx`** (νέο) — account-level (ΟΧΙ workspace-scoped, σε αντί-
+  θεση με το `/account/workspace/settings`): gate `getSaasViewer()` + redirect-to-login + direct
+  `Account.findById` (idiomatic SSR read, ίδιο με τα άλλα (saas) pages) → περνά email/name/
+  emailVerified στο panel. Δικό του top bar (mirror του `AccountTopBar` στο account/page.tsx),
+  ΟΧΙ `WorkspaceShell` (ένας viewer μπορεί να έχει 0/1/πολλά workspaces εδώ, δεν έχει νόημα ένα
+  workspace-header).
+- **Discoverability**: additive edit στο δικό μου `account/page.tsx`'s `AccountTopBar` (νέο
+  "Account settings" link δίπλα στο Sign out) + στο δικό μου `WorkspaceShell.tsx`'s header (ίδιο
+  link, ώστε να είναι προσβάσιμο και μέσα από κάθε workspace subpage, όχι μόνο από το account
+  landing).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run accountSettings.test.ts` →
+**16/16**· full suite `npx vitest run` → **2498/2498 green** (196 files, +2 files/+24 tests
+έναντι του #70's 2474 — 16 δικά μου νέα tests + tests άλλων routines που προσγειώθηκαν στο main
+στο μεταξύ). ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν αγγίχτηκε (4 νέα αρχεία + additive edits στα 2
+δικά μου UI-chrome αρχεία, μηδέν shared component/layout/globals.css). `SAAS_MODE` off /
+self-hosted = **zero effect** (το `(saas)` segment self-gates σε `notFound()` πριν φτάσει καν
+στη νέα σελίδα· ο `WorkspaceShell`/`account/page.tsx` link προστίθενται μόνο μέσα σε ήδη-gated
+δέντρο, ΔΕΝ είναι ορατά ποτέ στο self-hosted build). Κανένας Docker rebuild (2 νέα PURE/client
+αρχεία + 1 νέα page + additive link edits, μηδέν shared runtime wiring, μηδέν νέα εξάρτηση —
+ίδιο σκεπτικό με τα increments 58-70). Browser-verify skipped: `docker exec homepage-web
+printenv SAAS_MODE` → κενό (exit 1) στο live `:3000` container, άρα το `(saas)` segment θα
+έδειχνε 404 (σωστό self-hosted behavior, τίποτα νέο να δει κανείς)· θα χρειαζόταν rebuild με
+το flag μόνο-για-verify — απαγορεύεται, ίδιο idiom με τα #66-70. Collision guard: `git status
+--short` πριν το staging έδειξε μόνο τα 6 δικά μου αρχεία (2 modified + 4 new), `git diff
+--cached --name-only` επιβεβαίωσε exact match. Pushed `97debbf`.
+
+**## Needs Achilleas** (account settings):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η `(saas)` σελίδα/route (αλλιώς
+  404). Self-hosted = disabled, zero risk.
+- **Custom-domain self-service** (ξανά-καταγεγραμμένο, ρητά παρακαμφθέν αυτό το increment):
+  χρειάζεται αρχιτεκτονική απόφαση για DNS/cert verification (proxy layer, TXT/CNAME
+  verification, TLS issuance) πριν χτιστεί οποιοδήποτε self-service edit UI. Δεν μπήκε στο
+  ask-inbox γιατί δεν είναι blocking κάτι — θα μπει όταν/αν γίνει ρητά in-scope.
+
+**Next task:** increment 72 — candidates: (α) η **Usage tab δείχνει πάντα μηδενικά** (το
+`recordAiUsage`/`assertAiQuota`/`meterAiResult` wiring μένει ασύνδετο από τα πραγματικά AI
+dispatch call sites στο `lib/ollama.ts` — ΕΚΤΟΣ του δικού μου territory να το συνδέσω μόνος μου,
+θα χρειαζόταν να αγγίξω ένα shared feature file εκτός `lib/tenancy|billing/**` — ίσως αξίζει ένα
+ask-inbox entry αν παραμείνει το μοναδικό backend-wiring κενό)· (β) ξανα-σάρωσε τα `api/saas/**`
+routes για τυχόν άλλο dead-UI route (το ίδιο μοτίβο απέδωσε 4 φορές σερί, #67-71 — πιθανώς
+υπάρχουν κι άλλα)· (γ) invites: το admin console δείχνει tenants αλλά υπάρχει self-service
+"resend invite" UI στο Members panel; έλεγξε πριν χτίσεις.
