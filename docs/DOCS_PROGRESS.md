@@ -1763,3 +1763,30 @@ Collision guard: git status --short ΜΟΝΟ docs/saas.md (no foreign staged/unc
 Επομενο run: (α) αν νεοι Bill/payable routes (v1 API) landed, update features.md ή api.md · (β) YNAB
 import (P16) feature land verification (ηδη merged 2026-07-19, δες CLAUDE.md P16 notes) · (γ) ελεγχος
 αν αλλα workspace features (quotas, billing CTAs) εχουν πια concrete implementation.
+
+## 2026-07-20 (third run — workspace Settings tab)
+
+Νέα feature: "workspace Settings" panel (commit 1448dac). Το saas.md documentation είχε gap: η
+workspace console tab-bar ειχε μόνο 5 tabs (Overview, Members, Billing, Usage, Activity) αλλα το commit
+1448dac προσθεσε τη Settings tab για rename workspace, cancel/reactivate (owner-only). Ήταν documented
+αρχική το endpoint (PATCH/DELETE /api/saas/workspace) αλλα ΟΧΙ η UI που το οδηγει.
+
+Τι εγραψα:
+- Προσθεσα row στο workspace console table (docs/saas.md) για `/account/workspace/settings`: λεπτομερεια
+για rename (owner/admin), cancel/reactivate (owner-only), routes που καλεί (PATCH, DELETE, POST .../reactivate).
+- Ενημερωσα το tab-bar line να αναφερει 6 tabs αντι 5 (προσθηκη Settings).
+
+Accuracy verified εναντι κώδικα:
+- apps/web/src/app/(saas)/account/workspace/settings/page.tsx (force-dynamic route)
+- apps/web/src/components/saas/WorkspaceSettingsPanel.tsx (client mutations: PATCH rename, DELETE cancel,
+POST reactivate, router.refresh after)
+
+Validation: markdown only, κανενα build/Docker/AI call. Code fences: saas.md = 18 (9 balanced blocks).
+Internal links: όλες υπάρχουν ✓. Secret scan: κανένα literal credential ✓.
+
+Collision guard: git status --short δειχνει μονο docs/saas.md staged (δικο μου), 4 foreign WIP files
+(apps/web edits, ΔΕΝ τα αγγιζω). Commit ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
+
+Επομενο run: (α) αν αλλα νέα SaaS routes ή tabs προστεθουν (π.χ. billing CTAs λυμενες, usage analytics
+enrichment), update saas.md · (β) api.md sync αν νέα v1 routes landed (π.χ. bills/charges model για
+payable tracking) · (γ) features.md stale-forward για νέα shipped features.

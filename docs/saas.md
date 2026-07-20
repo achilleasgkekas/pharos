@@ -589,8 +589,9 @@ than one). Each page is `force-dynamic` and marked `noindex, nofollow`.
 | `/account/workspace/billing` | **Billing** — subscription management and invoice history. Shows the current plan (name, price, interval), subscription status, trial dates when applicable, and historical invoices from Stripe (if available). Owner/admin only. |
 | `/account/workspace/usage` | **Usage** — detailed AI and storage consumption for the current period. Breaks down AI calls (input / output tokens, cost) per model and per day, and storage bytes used vs quota. Useful for understanding quota burndown. Any workspace member can view. |
 | `/account/workspace/activity` | **Activity** — an audit trail of workspace changes. Shows append-only events (members added/removed, role changes, invites sent, plan changes, BYO-key events), newest first, with optional filtering by action type. Owner/admin only. Mirrors [`GET /api/saas/audit`](#activity-audit). |
+| `/account/workspace/settings` | **Settings** — general workspace settings and dangerous zone. Owners and admins can rename the workspace display name (calls `PATCH /api/saas/workspace` with `{ name, tenant }`). The owner can soft-cancel the workspace (calls `DELETE /api/saas/workspace`, all members lose access) or reactivate a canceled workspace (calls `POST /api/saas/workspace/reactivate`). Cancellation is reversible; reactivation restores member access. Owner/admin for rename; owner only for cancel/reactivate. |
 
-The tab bar (`workspaceTabs`) lists **Overview**, **Members**, **Billing**, **Usage**, and **Activity**.
+The tab bar (`workspaceTabs`) lists **Overview**, **Members**, **Billing**, **Usage**, **Activity**, and **Settings**.
 Every tab link carries the active `?w=<slug>` workspace selection through, so switching panels stays
 on the same workspace; a blank selection yields clean URLs against the account's first workspace.
 
