@@ -3388,3 +3388,64 @@ danger-zone addition, ακόμα dead-UI από τη σάρωση του #73)· 
 παραμένει (§#72-75's carried-over, `recordAiUsage` wiring εκτός territory — ίσως ώρα για
 ask-inbox entry αν δεν βρεθεί άλλο UI-first κενό στο επόμενο run)· (γ) ξανα-σάρωσε `api/saas/**`
 για νέα dead-UI routes (απέδωσε αρκετές φορές σειρά, ίσως πλέον εξαντλημένο πέρα από το erasure).
+
+## 2026-07-20 (increment 76 — GDPR erasure self-service UI, §UI-first)
+**Το κενό:** από το #75's next-task λίστα, το `workspace/erasure` (GET/POST/DELETE, GDPR Art. 17
+right-to-erasure — schedule/cancel μιας reversible marker για permanent deletion μετά από ένα
+30-day grace window, βλ. `lib/tenancy/erasure.ts`) ήταν ήδη πλήρες backend, tested, χωρίς UI.
+Μαζί με αυτό, ξανα-σάρωσα ολόκληρο το `api/saas/**` (32 routes) για callers μέσα σε `app/(saas)`,
+`app/admin`, `components/saas` — οι μόνες υπόλοιπες 0-hit διαδρομές είναι σκόπιμα χωρίς UI:
+`billing/webhook` (Stripe-only), `trials/sweep`+`usage/sample` (cron/internal), `auth/session`
+(client-side helper, όχι σελίδα), `workspace/erasure/purge` (η destructive drop, ρητά "manual/
+gated flow, ΠΟΤΕ από UI button" στο route's docstring), `admin/overview`+`admin/tenants/[slug]`+
+`.../dbstats` (αρχικό grep false-negative — δυναμικά segments, ήδη wired μέσω `TenantActionsPanel`/
+`LiveDbStatsPanel`/SSR reader, verified). **Η dead-UI σάρωση θεωρείται πλέον εξαντλημένη.**
+
+**Built:**
+- **`components/saas/erasureSettings.ts`** (νέο, PURE) — `describeErasureError` (re-export του
+  `describeWorkspaceSettingsError`, όχι duplicate — το erasure route επιστρέφει ίδιου σχήματος
+  user-facing `error` strings σε κάθε failure path, ίδιο σκεπτικό με το #74's export links) +
+  `describeErasureCountdown(daysLeft)` (μικρή pure formatting: "N days left" / "1 day left" /
+  "due for deletion now" / κενό όταν δεν υπάρχει schedule — ξεχωριστά branches ώστε το panel να
+  μην ισχυρίζεται λάθος pluralization ή stale "N days" μετά το elapse). 5 unit tests.
+- **`components/saas/ErasurePanel.tsx`** (νέο, client) — owner-only "Delete workspace" section,
+  sibling του `WorkspaceSettingsPanel`'s cancel/reactivate danger-zone (ξεχωριστό bordered section,
+  διαφορετική/σοβαρότερη ενέργεια). `window.confirm(...)` πριν το POST (ίδιο idiom με το
+  cancelWorkspace, ΟΧΙ typed-slug confirmation — δεν υπάρχει τέτοιο idiom πουθενά αλλού στο
+  codebase, το grace window το κάνει ήδη reversible). POST/DELETE → ενημερώνει το τοπικό
+  `ErasureView` state από το response's `erasure` field + `router.refresh()`.
+- **`(saas)/account/workspace/settings/page.tsx`** (δικό μου, additive edit) — server-side
+  `erasureView(tenant)` πάνω στο ήδη-fetched `tenant` doc (μηδέν επιπλέον query, τα
+  `erasureRequestedAt`/`erasureScheduledAt`/`erasureRequestedBy` πεδία υπάρχουν ήδη στο lean doc)
+  + `ERASURE_GRACE_DAYS` constant, mount μετά το `AiKeyPanel`.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run erasureSettings.test.ts` →
+**5/5**· full suite `npx vitest run` → **2667/2667 green** (208 files, +5 δικά μου tests). ΚΑΝΕΝΑ
+υπάρχον feature αρχείο δεν αγγίχτηκε (3 νέα αρχεία + 1 additive edit σε δικό μου SaaS-only page,
+μηδέν shared component/layout/globals.css). `SAAS_MODE` off / self-hosted = **zero effect** (το
+`(saas)` segment ήδη 404άρει πριν φτάσει στο νέο panel). Κανένας Docker rebuild (πλήρως additive,
+μηδέν shared runtime wiring, μηδέν νέα εξάρτηση, ίδιο σκεπτικό με τα increments 58-75).
+Browser-verify skipped: `docker exec homepage-web printenv SAAS_MODE` → κενό (exit 1) στο live
+`:3000` container, ίδιο idiom με τα #66-75. Collision guard: `git status --short` πριν το staging
+έδειξε μόνο τα 4 δικά μου αρχεία, `git diff --cached --name-only` επιβεβαίωσε exact match. Pushed
+`a2e6923`.
+
+**## Needs Achilleas:**
+- Τίποτα νέο — καθαρό UI wiring πάνω σε ήδη-εγκεκριμένο, ήδη-tested backend route. Το 30-day
+  grace window (`ERASURE_GRACE_DAYS`) παραμένει το ήδη-τεκμηριωμένο placeholder value από το
+  `erasure.ts` module (named constant, one-edit αν θελήσει διαφορετικό αριθμό αργότερα).
+- Πραγματικό end-to-end test (request → grace countdown → cancel ή actual purge-job drop) χρειάζεται
+  live SaaS-mode deployment· δεν είναι testable από εδώ πέρα από unit tests + tsc.
+
+**Next task:** increment 77 — το UI-first backlog πάνω σε ήδη-χτισμένα `api/saas/**` routes
+θεωρείται πλέον **εξαντλημένο** (βλ. σάρωση παραπάνω). Candidates: (α) **AI-metering wiring**
+(`lib/billing/aiMeter.ts`'s `assertAiQuota`/`meterAiResult` είναι πλήρη, tested, no-op-by-design
+για self-hosted/SAAS-off, αλλά ΠΟΤΕ δεν καλούνται από το πραγματικό AI dispatch — `runVisionJSON`/
+`runTextJSON` σε `lib/ollama.ts` — άρα το Usage tab δείχνει πάντα μηδέν σε πραγματική χρήση. Αυτό
+είναι shared-plumbing edit (`lib/ollama.ts`, ΟΧΙ αμιγώς δικό μου territory) αλλά ρητά additive +
+flag-guarded (no-op εγγυημένο από το ίδιο το aiMeter.ts docstring) — επιτρέπεται από τον κανόνα
+"additive-only edits to shared plumbing ONLY when strictly needed and flag-guarded". Scoped ως:
+2 call sites (πριν/μετά από κάθε provider call) × ~2 συναρτήσεις, καμία αλλαγή στη public API
+τους. Χρειάζεται προσοχή γιατί το `lib/ollama.ts` το αγγίζουν συχνά κι άλλες routines — μικρό,
+surgical diff, τρέξε ολόκληρο το test suite μετά)· (β) polish pass πάνω στα ήδη-χτισμένα panels
+(π.χ. το dev-token echo→clickable link candidate από το #73, ακόμα ανοιχτό, μικρό scope).
