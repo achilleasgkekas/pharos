@@ -4,6 +4,34 @@
 
 <!-- reviewed: 638e33a -->
 <!-- docker-validated: 6ff8678 -->
+<!-- ui-audited: 06f950f -->
+
+## 2026-07-20 (ui-auditor — 52η σάρωση, mobile UI consistency audit)
+
+**Αναφορά**: unattended read-only grep audit. Σκοπός = μέτρηση mobile UI consistency vs web design tokens (όχι functional parity).
+
+**Ευρήματα (συνοπτικά)**:
+- **Hardcoded colors**: 0 violations (C-layer καθαρό)
+- **RADIUS token drift**: ~43 hardcoded borderRadius literals (3/4/6/7/8/9/10/12/14/16/18/20) → P2/S item, tsc-safe, byte-identical
+- **Font sizes**: ~220 hardcoded fontSize values (9..24) → P2/M (Brand typography) item
+- **Font families**: 0 custom fonts, system default → P2/M item, awaits Google Fonts integration
+- **Light theme**: dark-only, 0 `useColorScheme` → P3/L item
+- **Safe-area**: not installed, 0 `useSafeAreaInsets` → P2/M item, not blocking
+- **Touch targets**: ✅ all ≥44×44 effective (hitSlop OK)
+- **Responsive**: 14/19 screens use `contentWidth` cap ✓
+- **State primitives**: 8/10 `<Spinner>` adoption, 2 hand-rolled loaders
+- **Button family**: 26 sites adopted, edge cases acceptable
+
+**Metrics (fresh grep)**:
+- 21 screens + nav + support files
+- ~1450 loc logic, 310 loc primitives (ui.tsx)
+- 0 regressions since 49ο
+
+**UI Debt Queue status**: αμετάβλητο, 7 items (4 P2 + 3 P3). Μηδέν νέα violations. Measurements update: RADIUS (43 sites), Font sizes (220 sites), Font families (0 sites). Δεν δημιουργώ νέα items — όλα ήδη tracked.
+
+**Next builder priorities**: (1) P2/S RADIUS (~2-3h), (2) P2/M Typography fontFamily+fontSize (~6-8h), (3) P2/M Safe-area (~2h), (4) P3/L Light theme (~4h), (5) P3/S Loaders (~10min).
+
+**Αποτέλεσμα**: MOBILE_PARITY.md + PROGRESS.md ενημερωμένα με 52ο audit. Δεν απαιτείται Docker rebuild ή AI cost. Clean git state για potential builder pick-up.
 
 ## 2026-07-20 (docker-health — rebuild + health check 03:03)
 

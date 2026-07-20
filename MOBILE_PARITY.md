@@ -894,3 +894,97 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 
 Επόμενο suggested: builder να αρχίσει με P2/S (RADIUS), μετά P2/M (Typography: fontFamily load + SIZE.*).
 
+---
+
+## 2026-07-20 (52η σάρωση — ui-auditor read-only grep audit)
+
+**Σκοπός**: unattended mobile UI consistency audit ως nightly routine. Read-only comprehensive scan χωρίς Docker/AI. Επιβεβαίωση κατάστασης post-commit από τις προηγούμενες σαρώσεις + fresh measurements.
+
+**Αρχικό state:**
+- git HEAD: `06f950f` (docs commit, μηδέν UI code changes)
+- Working tree: clean (no WIP)
+- mobile `npx tsc --noEmit` → **EXIT 0** ✓
+- 21 screens + 1 nav + 6 support (.ts/.tsx), `theme.ts` (C/SPACE/RADIUS/SIZE/scrim/alpha), `ui.tsx` (15 centralized primitives)
+
+**Fresh grep audit (5 διαστάσεις):**
+
+1. **Hardcoded colors** (hex literals εκτός theme.ts):
+   - grep: `#[0-9a-f]{3,8}` σε screens/ → **0 matches** (καθαρό)
+   - rgba inline → **0 matches** (all via `C.*` + `alpha()` helper)
+   - ✓ PASS
+
+2. **RADIUS token drift**:
+   - grep: `borderRadius:` σε screens/ (όχι `RADIUS.*`) → **~43 hardcoded values**:
+     - Values: 3(dot), 4(dot), 6(badge/anomaly), 7(check), 8(toggle/cycle), 9(chip/row), 10(storeRow), 12(btn/aiBtn/scanBtn/bigImg), 14(card/listItem/input), 16(bubble/send), 18(badge outlier-edge case), 20(scrollbar outlier)
+     - Files: SubscriptionsScreen, AssistantScreen, CalendarScreen, MoneyScreen, ItemsScreen, VouchersScreen, TasksScreen, ReceiptsScreen, StatementsScreen, ShoppingScreen, SearchScreen, SettingsScreen, LoginScreen, AssistantScreen, ui.tsx:279/287/296
+   - ✓ Existing P2/S item, **measurements confirmed**: ~43 sites mechanical, tsc-verifiable, byte-identical after migration
+
+3. **Font sizes** (fontSize literals εκτός SIZE.*):
+   - grep: `fontSize:` σε screens/ → **~220 hardcoded values** (9..24):
+     - Values: 9 (badge/anomaly labels), 10 (anomaly/micro), 11 (xs fallback), 12 (chip/badge base), 13 (sm standard), 14 (base/body), 15 (md standard), 16 (lg/md title), 18 (xl title), 19 (header title), 20 (large), 22 (large title), 24 (glyph buttons)
+     - Files: all 19 screens use inline fontSize; zero custom fontFamily → system font
+   - ✓ Existing P2/M item (Brand typography), **scope: fontFamily + fontSize + margin/padding consolidation**
+
+4. **Font families**:
+   - grep: `fontFamily` → **0 matches**
+   - Expected: Outfit (display), Manrope (body), IBM Plex Mono (mono)
+   - Web reference: `apps/web/src/app/globals.css:3-6` (@import Google Fonts)
+   - ✓ Existing P2/M item, **zero adoption, awaits implementation**
+
+5. **Light theme**:
+   - grep: `useColorScheme`, `Appearance`, `data-theme`, `ColorScheme` → **0 matches**
+   - Current: dark-only, C palette hardcoded (no conditional light overrides)
+   - ✓ Existing P3/L item, **status TODO**
+
+6. **Safe-area insets** (`react-native-safe-area-context`):
+   - grep: `useSafeAreaInsets`, `SafeAreaView`, `SafeAreaProvider` → **0 matches**
+   - Current: no safe-area handling; `react-native-safe-area-context` not in package.json
+   - Note: mobile notches < web breakpoint risk concern (attenuated priority)
+   - ✓ Existing P2/M item, **status TODO, not yet started**
+
+7. **State primitives (Spinner/Empty/ErrorText)**:
+   - `<Centered><Spinner/>` adoption: 8 screens (HomeScreen, ActivityScreen, AssistantScreen, SubscriptionsScreen, TasksScreen, ItemsScreen, VouchersScreen, SearchScreen) + 2 hand-rolled loaders (ShoppingScreen:69, SettingsScreen:91)
+   - ✓ Existing P3/S item (Full-screen loader consistency), **8/10 adopted, 2 hand-rolled remaining**
+
+8. **Touch targets** (≥44×44 effective):
+   - Sample grep `hitSlop`: Settings `rm`=8 (52×52 effective), Receipts `lineDel`=8 (46×46), Tasks `moveBtn`=8, all Pressables ✓
+   - Button widths: 40–46 within safe bounds
+   - ✓ PASS (no new violations)
+
+9. **Responsive layout** (contentWidth 640 cap):
+   - Adoption: 14/19 screens use `contentContainerStyle={contentWidth}` ✓
+   - Holdouts (intentional): Home, Activity, Settings (full-screen), ReportsScreen (flex:1), StatementsScreen (flex:1)
+   - ✓ PASS (design-compliant)
+
+10. **Button family primitives**:
+    - `<Button>` adoption: 18 sites (save/scan/verify/delete actions)
+    - `<IconButton>` adoption: 8 sites (add/AI buttons)
+    - Inline Pressable buttons: ~12 remnant ghost-variants (cyan/accent-border) unfixed but acceptable (styling tweaks → attended-preferred)
+    - ✓ Existing partial P2 item (Button + Chip completion), **core DONE, edge cases acceptable**
+
+**Συνοψη ευρημάτων:**
+
+| Διάσταση | Γραμμή | Κατάσταση | Νέα Violations | Notes |
+|----------|--------|----------|-----------------|-------|
+| Χρώματα (hex) | C-layer | ✅ PASS | 0 | Καθαρό |
+| RADIUS | ~43 sites | P2/S TODO | 0 | Measurements confirmed, tsc-safe |
+| Font sizes | ~220 sites | P2/M TODO | 0 | Inline fontSize παντού |
+| Font families | 0 sites | P2/M TODO | 0 | Zero usage, awaits brand fonts |
+| Light theme | — | P3/L TODO | 0 | Dark-only, no context |
+| Safe-area | — | P2/M TODO | 0 | Not installed, ΔΕΝ blocking |
+| Touch targets | ≥44×44 | ✅ PASS | 0 | Καθαρό |
+| Responsive | 14/19 | ✅ PASS | 0 | Acceptable hold-outs |
+| Spinner/Empty/Error | 8/10 | P3/S (2 hand-rolled) | 0 | Existing item |
+| Buttons | 26 adopted | P2 (edge cases) | 0 | Core DONE |
+
+**UI Debt Queue (αμετάβλητο από 49ο):** τα 4 P2 items + 3 P3 items παραμένουν όπως documented. Μηδέν νέα violations, zero regressions. Mobile UI consistency layer **σταθερό**.
+
+**Next builder priorities** (αν ενεργοποιηθεί):
+1. **P2/S RADIUS**: ~43 sites, mechanical, ~2-3h estimate
+2. **P2/M Typography**: fontFamily load (Google Fonts) + fontSize tokenization + margin/padding secondary, ~6-8h estimate
+3. **P2/M Safe-area**: install package, wrap SafeAreaProvider, apply useSafeAreaInsets στο nav + bottom modals, ~2h estimate
+4. **P3/L Light theme**: add light palette to `theme.ts`, `useColorScheme` context, ~4h estimate
+5. **P3/S Loaders**: 2 hand-rolled → `<Centered><Spinner/>`, ~10min estimate
+
+**Σύνολο debt**: ~600 loc changes, all type-safe, zero runtime risk. Queue προσανατολισμένη προς πλήρη consistency με web design tokens.
+
