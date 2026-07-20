@@ -65,7 +65,7 @@ const FEATURES: {
     icon: 'calendar',
     color: 'var(--accent)',
     title: 'Subscriptions',
-    desc: 'Every recurring charge in one place with a renewal calendar, plus free-trial reminders that ping you to cancel before the first charge lands.',
+    desc: 'Every recurring charge in one place with a renewal calendar, plus free-trial reminders that ping you to cancel before the first charge lands. It also scans your expense history for regular charges you never tracked and lets you add them as a subscription in one click.',
   },
   {
     icon: 'ticket',

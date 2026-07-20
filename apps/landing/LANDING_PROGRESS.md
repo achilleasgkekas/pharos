@@ -2339,3 +2339,55 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-20 (cont.⁷) — (e) polish/content: Subscriptions card += auto-discover untracked charges (P7)
+
+Increment (e). Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει, δεν εγινε
+pause), ελεγχος `~/.claude/ASK_ACHILLEAS.md` (δυο OPEN entries, και τα δυο bakecore-finance, τιποτα για
+landing/pharos), και `git log --oneline -15` του κυριου repo. Νεοτερα commits απο το προηγουμενο log entry:
+`31cc37c feat(mobile)` subscription auto-discover suggestions (P7 mobile parity), `7c90186`+`df676f8
+feat/fix(saas)` MFA enrollment core + password re-auth fix, `2a904ab`+`5b3c81c` (tests μονο). Ελεγξα το MFA:
+ιδιο συμπερασμα με προηγουμενα runs, ρητα "Not yet wired into login" στο commit message -> οχι user-facing
+ακομα, skip.
+
+Το `31cc37c` (mobile parity) εδειξε οτι το P7 auto-discover ειναι πλεον feature και στις δυο πλατφορμες
+(web ηδη shipped, docs/features.md:252-258, mobile μολις ηρθε). Επιβεβαιωσα: `grep -n auto-discover
+page.tsx` πριν το increment = μηδεν hits. Το feature: heuristic scan (deterministic, οχι AI) στο Expenses
+history για 3+ χρεωσεις απο τον ιδιο vendor σε ~μηνιαια διαστηματα (±5 μερες) χωρις αντιστοιχη υπαρχουσα
+Subscription -> εμφανιζεται σαν "possible untracked subscription" candidate, one-click Track το μετατρεπει.
+Πραγματικο, τεκμηριωμενο, ακαλυπτο gap στο Subscriptions card (το οποιο μιλουσε μονο για renewal calendar
++ trial reminders, τιποτα για ανιχνευση).
+
+Αλλαγη (app/page.tsx, FEATURES array, μια προταση μονο στο Subscriptions card desc, μηδεν UI/CSS/dependency/
+bundle change): «It also scans your expense history for regular charges you never tracked and lets you add
+them as a subscription in one click.» (ιδιο patteren με τα προηγουμενα increments που διπλωσαν μικρα gaps
+μεσα σε υπαρχουσα card copy, π.χ. loyalty cards -> Vouchers, budget rollover -> Expenses).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (foreground timeout στα 120s, ολοκληρωθηκε background σε background bash·
+  process wait αντι για arbitrary sleep), ολα static (11 routes, αμεταβλητο)· `/` route 5.33 kB, αμεταβλητο
+  (copy-only, ιδιο μεγεθος με πριν).
+- Browser preview (in-app Browser): port 3100 κατειλημμενο απο Docker (`com.docke` listening, οπως παντα).
+  Χρησιμοποιηθηκε port 3106, `next start` πανω στο production build (οχι dev server). `get_page_text`
+  επιβεβαιωσε πληρες Subscriptions card με τη νεα προταση στη σωστη θεση (μετα το trial-reminder sentence).
+  `read_console_messages` onlyErrors -> «No console logs.» (καθαρο). Server σταματησε μετα (`pkill`), `lsof`
+  επιβεβαιωσε 3106 clear.
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  `git diff --cached --name-only` κενο πριν το stage -> κανενα ξενο staged file. Staged+committed ΜΟΝΟ τα
+  δικα μου landing paths (page.tsx + αυτο το log entry).
+
+Επομενο increment: (e) polish συνεχεια, real app screenshots οταν υπαρξουν assets (blocked)· loyalty/
+membership cards ηδη καλυφθηκε (cont.⁵)· ή νεοτερο shipped module αν εμφανιστει gap (τσεκαρε
+`git log --oneline -15..20` του κυριου repo στην αρχη καθε run, οχι μονο docs/features.md/saas.md). Αν το
+MFA login-wiring (αναφερομενο σαν "increment 80c" σε προηγουμενα commit messages) γινει live σε επομενο
+κυριο-repo run, αξιζει δικο του FAQ item (money/data/security cluster, μετα το «Is my financial data
+secure?»).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
