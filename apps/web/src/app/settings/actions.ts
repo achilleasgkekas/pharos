@@ -63,6 +63,9 @@ import { pushAllDevices } from '@/lib/expoPush';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { generateNotifications } from '@/app/notifications/actions';
 import { detectBudgetExceeded, type BudgetAlertRow } from '@/lib/budgetAlert';
+import { estimatedItemValue } from '@/lib/depreciation';
+import { buildInsuranceCsv, buildInsuranceHtml, type InsuranceItem } from '@/lib/insuranceExport';
+import JSZip from 'jszip';
 import {
   getEventWebhooks,
   dispatchEventWebhooks,
@@ -1269,6 +1272,131 @@ export async function exportCSV(kind: 'receipts' | 'expenses' | 'items'): Promis
     ['Title', 'Category', 'Status', 'Current price', 'Paid', 'Bought from', 'Serial', 'Location', 'Warranty until'],
     rows.map((r) => [String(r.title ?? ''), String(r.category ?? ''), String(r.status ?? ''), Number(r.currentPrice ?? 0), r.purchasedPrice == null ? '' : Number(r.purchasedPrice), String(r.purchasedFrom ?? ''), String(r.serialNumber ?? ''), String(r.location ?? ''), isoDay(r.warrantyUntil)])
   );
+}
+
+type InsuranceItemDoc = {
+  _id: Types.ObjectId;
+  title: string;
+  category: string;
+  serialNumber: string;
+  location: string;
+  purchasedAt: Date | null;
+  purchasedFrom: string;
+  warrantyUntil: Date | null;
+  currentPrice: number | null;
+  purchasedPrice: number | null;
+  photos: string[];
+  attachments: { path: string; name: string }[];
+  receiptIds: Types.ObjectId[];
+};
+
+/** Sanitize a filename fragment for a ZIP entry (no path separators / traversal). */
+function safeZipName(name: string, fallback: string): string {
+  const base = (name || '').split(/[\\/]/).pop() || '';
+  const clean = base.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+  return clean || fallback;
+}
+
+/**
+ * Insurance / proof-of-ownership export (P13). ZIP containing a CSV manifest, a
+ * standalone HTML report (opens straight out of the ZIP, prints to PDF), and the
+ * photos/manuals/receipts for every currently-owned item — everything an insurer
+ * would ask for after a claim. v1 builder default: no PDF-writing dependency —
+ * the HTML report covers the same need (viewable + printable) without one; value
+ * = the depreciation-adjusted estimate (P29) so it doesn't overstate aging gear,
+ * falling back to purchase price when depreciation is off (same formula as
+ * Reports/net-worth). Only 'received'/'installed' items count as currently owned
+ * (excludes 'sold' — no longer yours — and shopping-list statuses).
+ */
+export async function exportInsuranceBundle(): Promise<{ base64: string; itemCount: number; totalValue: number }> {
+  await requireAdmin();
+  await connectDB();
+  const [settings, items] = await Promise.all([
+    getAppSettings(),
+    Item.find({ status: { $in: ['received', 'installed'] } })
+      .select('title category serialNumber location purchasedAt purchasedFrom warrantyUntil currentPrice purchasedPrice photos attachments receiptIds')
+      .sort({ title: 1 })
+      .lean<InsuranceItemDoc[]>(),
+  ]);
+
+  const receiptIds = [...new Set(items.flatMap((i) => (i.receiptIds || []).map((id) => String(id))))];
+  const receipts = receiptIds.length
+    ? await Receipt.find({ _id: { $in: receiptIds } }).select('store date filePath').lean<{ _id: Types.ObjectId; store: string; date: Date; filePath: string }[]>()
+    : [];
+  const receiptById = new Map(receipts.map((r) => [String(r._id), r]));
+
+  const zip = new JSZip();
+  const insuranceItems: InsuranceItem[] = [];
+  let totalValue = 0;
+
+  for (const it of items) {
+    const id = String(it._id);
+    const value = estimatedItemValue(
+      { category: it.category, purchasedPrice: it.purchasedPrice, purchasedAt: it.purchasedAt, currentPrice: it.currentPrice },
+      settings.depreciation
+    );
+    if (value > 0) totalValue += value;
+
+    const folder = zip.folder(`files/${id}`)!;
+    const photoFiles: string[] = [];
+    for (const [idx, relPath] of (it.photos || []).entries()) {
+      try {
+        const buf = await readFile(relPath);
+        const ext = relPath.split('.').pop() || 'jpg';
+        const name = `photo_${idx}.${ext}`;
+        folder.file(name, buf);
+        photoFiles.push(name);
+      } catch {
+        // Missing file on disk (orphaned reference) — skip, don't fail the whole export.
+      }
+    }
+    const attachmentFiles: { file: string; name: string }[] = [];
+    for (const [idx, att] of (it.attachments || []).entries()) {
+      try {
+        const buf = await readFile(att.path);
+        const name = safeZipName(att.name || att.path, `document_${idx}`);
+        folder.file(name, buf);
+        attachmentFiles.push({ file: name, name: att.name || name });
+      } catch {
+        // same as above
+      }
+    }
+    const receiptFiles: { file: string; store: string; date: string | null }[] = [];
+    for (const [idx, rid] of (it.receiptIds || []).entries()) {
+      const r = receiptById.get(String(rid));
+      if (!r) continue;
+      try {
+        const buf = await readFile(r.filePath);
+        const ext = r.filePath.split('.').pop() || 'pdf';
+        const name = `receipt_${idx}.${ext}`;
+        folder.file(name, buf);
+        receiptFiles.push({ file: name, store: r.store || '', date: r.date ? new Date(r.date).toISOString() : null });
+      } catch {
+        // same as above
+      }
+    }
+
+    insuranceItems.push({
+      id,
+      title: it.title || 'Untitled',
+      category: it.category || 'other',
+      serialNumber: it.serialNumber || '',
+      location: it.location || '',
+      purchasedAt: it.purchasedAt ? new Date(it.purchasedAt).toISOString() : null,
+      purchasedFrom: it.purchasedFrom || '',
+      warrantyUntil: it.warrantyUntil ? new Date(it.warrantyUntil).toISOString() : null,
+      value,
+      photoFiles,
+      attachmentFiles,
+      receiptFiles,
+    });
+  }
+
+  zip.file('insurance-manifest.csv', '﻿' + buildInsuranceCsv(insuranceItems));
+  zip.file('insurance-manifest.html', buildInsuranceHtml(insuranceItems, { generatedAt: new Date().toISOString().slice(0, 10), currencySymbol: cur() }));
+
+  const base64 = await zip.generateAsync({ type: 'base64', compression: 'DEFLATE' });
+  return { base64, itemCount: insuranceItems.length, totalValue: Math.round(totalValue * 100) / 100 };
 }
 
 /** Save monthly budgets (expense category → € amount). Empty/0 values are dropped. */

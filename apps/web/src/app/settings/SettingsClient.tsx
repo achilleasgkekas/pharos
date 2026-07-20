@@ -6,7 +6,7 @@ import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, exportInsuranceBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
 import type { CategoryRule } from '@/lib/categoryRules';
 import { AI_FEATURES } from '@/lib/aiFeatures';
@@ -2731,6 +2731,28 @@ function BackupRestore() {
     });
   }
 
+  function handleInsuranceExport() {
+    setMsg(null);
+    startTransition(async () => {
+      try {
+        const { base64, itemCount, totalValue } = await exportInsuranceBundle();
+        const bin = atob(base64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: 'application/zip' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `pharos-insurance-export-${new Date().toISOString().slice(0, 10)}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setMsg(t('set.insuranceExportDone', { n: itemCount, total: `${cur()}${totalValue.toFixed(2)}` }));
+      } catch (e) {
+        setMsg(`Insurance export failed: ${(e as Error).message.slice(0, 80)}`);
+      }
+    });
+  }
+
   const btn =
     'flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50';
 
@@ -2769,6 +2791,14 @@ function BackupRestore() {
       </div>
       <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
         {t('set.backupNote')}
+      </p>
+      <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-[color:var(--color-border)]">
+        <button type="button" onClick={handleInsuranceExport} disabled={pending} className={cn(btn, 'text-[color:var(--color-purple)]')}>
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />} {t('set.insuranceExport')}
+        </button>
+      </div>
+      <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        {t('set.insuranceExportDesc')}
       </p>
     </div>
   );

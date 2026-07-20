@@ -22,6 +22,7 @@
     "imapflow": "^1.4.7",
     "jose": "^6.2.3",
     "jsbarcode": "^3.12.3",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.460.0",
     "mailparser": "^3.9.14",
     "mongoose": "^8.8.0",
