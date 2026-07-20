@@ -546,11 +546,34 @@
 - **Module:** Budgets (Settings) + Reports «Budget · this month».
 - **Ανοιχτή απόφαση (builder default):** rollover **per-category opt-in**· μεταφορά θετικών υπολοίπων (negative rollover = opt-in).
 
-### P13. Home-inventory insurance export bundle — M — both (OSS differentiator)
+### P13. Home-inventory insurance export bundle — ✅ SHIPPED 2026-07-20 (pharos-daily-dev, commit `7373035`)
 - **Αξία:** «Insurance / proof-of-ownership export» = PDF/ZIP με λίστα assets (κατηγορία, αξία, serial, ημ.
   αγοράς) + συνημμένες αποδείξεις/φωτο + σύνολο ασφαλιστέας αξίας. **Διακριτό από P8** (P8 = tax-deductible).
-- **Module:** Items/Inventory (+ Reports/Settings για το export).
-- **Ανοιχτή απόφαση (builder default):** αξία = currentPrice (fallback purchasedPrice)· PDF + optional ZIP· παντού (OSS).
+- **Υλοποίηση:** νέο Settings → Storage & backup → «Insurance export (ZIP)» κουμπί. Νέο pure
+  **`lib/insuranceExport.ts`** (`buildInsuranceCsv`/`buildInsuranceHtml`, DB-free, **+11 unit tests**) + νέα server
+  action **`exportInsuranceBundle()`** (`settings/actions.ts`, `requireAdmin()`-gated — bundle περιέχει φωτο/receipts/
+  manuals, ίδιο επίπεδο προστασίας με το `exportData` JSON backup). Query = **owned items** (`status ∈
+  {received, installed}` — ρητά αποκλείει `sold`, δεν είναι πια δικό σου, και τα shopping statuses). **Value =
+  reuse του ήδη-υπάρχοντος `estimatedItemValue` (P29 depreciation-adjusted estimate)**, όχι flat `currentPrice`
+  (ο P29 docstring το προειδοποιούσε ρητά: «net worth και insurance export overestimate αν μείνουν στην τιμή
+  αγοράς»)· fallback στο pre-P29 formula όταν το depreciation είναι off. `jszip` (νέο, **zero runtime deps δικά
+  του**, Alpine-safe) χτίζει το ZIP: `insurance-manifest.csv` + `insurance-manifest.html` (αυτόνομη, inline CSS,
+  ανοίγει απευθείας από το ZIP, printable→PDF) + `files/<itemId>/photo_N.*`, `attachment_N.*`, `receipt_N.*`
+  (missing/orphaned file references παραλείπονται σιωπηλά ανά αρχείο, δεν ρίχνουν όλο το export). Base64-encoded
+  response μέσω server action (ίδιο pattern με το JSON backup), client decode→Blob→download.
+- **Ανοιχτή απόφαση (builder default, απόκλιση από το αρχικό «PDF»):** **v1 = ZIP με CSV + HTML report, ΟΧΙ PDF-
+  writing dependency.** Το repo δεν είχε καμία υπάρχουσα PDF-generation υποδομή (μόνο `pdfjs-dist`, reader-only)·
+  ένα αυτόνομο HTML report ανοίγει/εκτυπώνεται σε PDF από τον ίδιο τον χρήστη χωρίς νέο native dependency —
+  ασφαλέστερο MVP από ένα άτεστο PDF-writer σε unattended run. Value = `estimatedItemValue` (depreciation-aware,
+  καλύτερο από το αρχικό «currentPrice fallback purchasedPrice» builder-default πρόταση, reuse αντί επανάληψης).
+- **Verify:** `npm run type-check` EXIT 0· full `npx vitest run` **2529 passed / 199 files** (+11 νέα, μηδέν
+  regression). Safe Docker rebuild: `homepage-mongo` healthy πριν το `up -d web`, `RestartCount=0`, `/login` 200,
+  Docker logs καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning). Browser-checked (Claude Browser pane):
+  `/login` → «Sign in · Pharos», μηδέν console errors. `docker builder prune -f` μετά, lock released. **`/settings`
+  UI + το πραγματικό ZIP περιεχόμενο ΔΕΝ testable end-to-end unattended** (χρειάζεται login + πραγματικά owned
+  items με φωτο/receipts) — verified πλήρως μέσω των 11 unit tests στους pure CSV/HTML builders + type-check.
+- **Module:** Items/Inventory (+ Settings για το export).
+- **Follow-up:** P8 (tax export) μπορεί τώρα να κάνει reuse του ίδιου jszip pipeline (νέα dependency ήδη μέσα).
 
 ### P8. Tax / deductible tagging + year-end export bundle — M — both (SaaS = premium)
 - **Αξία:** flag «tax-deductible» (+ optional tax category) → year-end «Tax export» = σύνοψη ανά κατηγορία +

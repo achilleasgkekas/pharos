@@ -6246,3 +6246,51 @@ follow-up πάνω στο μόλις-shipped P3 (notification-framework digest i
 
 - Τίποτα νέο. Ίδια προϋπάρχοντα decision-flags (P31 household enforcement, P36 Open Banking OAuth scope,
   IMAP live test credentials).
+
+## 2026-07-20 (pharos-daily-dev, cont.³ — P13 insurance export bundle SHIPPED)
+
+**Ουρά ελέγχθηκε πρώτα**: `ASK_ACHILLEAS.md` κενό. `OWNER_DECISIONS.md` §8 items όλα shipped. Approved queue
+(`PRODUCT_BACKLOG.md`): μετά τα σημερινά P11+P3, το προηγούμενο run είχε εντοπίσει **P8/P13** ως τα πιο κοντινά
+«απλώς χτίσ' το» items (χρειάζονται μόνο μια νέα zip-write dependency, όχι Αχιλλέα/credentials/mobile-simulator).
+Διάλεξα **P13 (insurance export)** αντί P8 (tax export): πιο well-scoped module (μόνο Items, όχι Expenses+Receipts
+tax-category taxonomy design) και OSS-only (P8 έχει SaaS-premium implications που θα ήθελαν ξεχωριστό metering
+decision).
+
+**Υλοποίηση** (detail στο `PRODUCT_BACKLOG.md → P13`): νέο pure `lib/insuranceExport.ts` (CSV+HTML builders,
++11 tests) + `exportInsuranceBundle()` server action (`requireAdmin()`-gated) που μαζεύει owned items
+(`status ∈ {received,installed}`), υπολογίζει value μέσω του **ήδη-υπάρχοντος `estimatedItemValue` (P29
+depreciation)** αντί να ξαναγράψει flat-price λογική, διαβάζει photos/attachments/linked-receipt files από το
+storage, και τα πακετάρει σε ZIP με `jszip` (νέο dependency, zero runtime deps δικά του). Settings →
+Storage & backup απέκτησε «Insurance export (ZIP)» κουμπί δίπλα στο JSON/CSV backup.
+
+**Builder default (απόκλιση από το αρχικό backlog «PDF»):** v1 = ZIP με CSV + αυτόνομο printable HTML report,
+**όχι PDF-writing dependency** — το repo δεν είχε καμία υπάρχουσα PDF-generation υποδομή (μόνο `pdfjs-dist`,
+reader-only), οπότε ένα HTML report που ο ίδιος ο χρήστης ανοίγει/εκτυπώνει σε PDF είναι ασφαλέστερο MVP από
+ένα νέο, άτεστο PDF-writer σε unattended run. Καταγράφηκε ρητά στο backlog ως follow-up ιδέα αν χρειαστεί
+πραγματικό PDF αργότερα.
+
+**Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` **2529 passed / 199 files** (+11 νέα, μηδέν
+regression). Docker: mutex acquired καθαρά (κανένα άλλο routine έτρεχε build τη στιγμή εκείνη), `docker compose
+build web` OK, mongo healthy πριν το `up -d web`, `RestartCount=0`, `/login` 200, `docker logs` καθαρό (μόνο το
+προϋπάρχον άσχετο `@napi-rs/canvas` warning + ένα αναμενόμενο stale-Server-Action error από παλιό ανοιχτό tab,
+ίδιο documented pattern με κάθε προηγούμενο rebuild). Browser-checked (Claude Browser pane): `/login` → «Sign in ·
+Pharos», μηδέν console errors. `docker builder prune -f` μετά (194MB), lock released. **`/settings` UI + το
+πραγματικό ZIP content ΔΕΝ testable end-to-end unattended** (χρειάζεται login + πραγματικά owned items με
+φωτο/receipts) — verified πλήρως μέσω των 11 unit tests στους pure builders + type-check + clean serve-check.
+
+**Σημείωση shared-repo**: κατά τη διάρκεια αυτού του run ένα ΑΛΛΟ concurrent routine έκανε commit
+(`f100c26`, «docs(saas): resend button for pending workspace invites») απευθείας στο ίδιο local checkout — αναμενόμενο
+σε αυτό το fleet setup (βλ. `routine-coordination` memory). Staged/committed ΜΟΝΟ τα δικά μου 7 αρχεία με explicit
+paths, μηδέν επαφή με το δικό του commit ή με το ασχετο untracked `apps/web/src/app/api/v1/items/import/route.test.ts`
+που βρέθηκε στο tree μετά (ξένο WIP, αφέθηκε άθικτο). Commit `7373035` amend-αρίστηκε ΜΙΑ φορά πριν το push (μόνο
+για να διορθώσω το commit-scope label `saas`→`items`, το commit ήταν ακόμα local/unpushed τη στιγμή εκείνη).
+
+**Suggested next task**: P8 (tax export) είναι τώρα ακόμα πιο εύκολο — το jszip dependency υπάρχει ήδη, μπορεί να
+κάνει reuse το ίδιο ZIP-assembly pattern πάνω σε Expenses/Receipts με tax-deductible flag. Μετά από αυτό, το
+Approved queue θα μείνει μόνο με M/L items που χρειάζονται είτε Αχιλλέα (P31/P36) είτε mobile-native χωρίς
+δυνατότητα unattended verify (P17/P23) είτε ξεχωριστό deliverable (P5 browser extension) είτε πραγματικό sample
+file (P16 Firefly III/Grocy).
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run.
