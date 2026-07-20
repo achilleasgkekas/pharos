@@ -1,5 +1,24 @@
 # DOCS_PROGRESS
 
+## 2026-07-20 (fifth run — account Settings page UI documentation)
+
+Νέα feature landed: Account settings page (commit 97debbf) που παρέχει UI για PATCH /api/saas/account, POST /api/saas/account/password, και GET /api/saas/account/export. Αυτές οι API routes ήταν ήδη documented αλλα η **user-facing page** ήταν κενό. Εγραψα:
+
+Τι έγραψα:
+- **saas.md**: Νέα subsection "#### Account settings UI (`/account/settings`)" αμέσως μετά το "Browser sign-in UI" section. Περιγραφη: account-scoped settings page (όχι workspace-scoped), accessible μόνο όταν signed in. Τράπεζα τριών settings: Profile (edit name/email, trigger verification αν αλλάξει email), Password (re-verify current, set new ≥8 chars, takes effect on next login), Data export GDPR (download account JSON via authenticated link). Σημειώσεις για gating (notFound όταν SAAS_MODE off), redirect (unsigned → /account/login?next=), noindex marking, SaaS-only additive (self-hosted unchanged).
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: 0 (saas.md total = 18, balanced).
+- Internal links (3): #account-profile, #email-verification--password, #data-export-gdpr — όλες υπάρχουν στο ίδιο αρχείο ✓.
+- Secret scan: κανένα literal credential ✓.
+- Markdown table syntax: 2 rows (Profile, Password, Data export), ζυγό ✓.
+
+Accuracy (διάβασα κώδικα, όχι εικασίες): `/account/settings/page.tsx` → force-dynamic, getSaasViewer redirect, Account.findById select email/name/emailVerified, renders AccountSettingsPanel. AccountSettingsPanel.tsx → PATCH /api/saas/account (name, email), POST /api/saas/account/password (currentPassword, newPassword), GET /api/saas/account/export (link). Τα 3 components καλούν ακριβώς αυτές τις routes με τα σωστά bodies.
+
+Collision guard: git status --short = ΜΟΝΟ docs/saas.md modified (δικό μου), 0 staged foreign files.
+
+Επόμενο run: (α) αν άλλα νέα SaaS routes ή pages προστεθούν (π.χ. workspace tab richness), update saas.md · (β) api.md sync αν νέα v1 routes landed · (γ) features.md stale-forward για άλλα shipped features.
+
 ## 2026-07-20 (cont. — P11 IMAP auto-import + leave-workspace endpoint)
 
 Δύο νέα docs files για features που shipαρίστηκαν τα τελευταία ώρες:

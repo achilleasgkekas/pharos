@@ -197,6 +197,22 @@ form, so it cannot be turned into an open redirect. Client-side validation
 authoritatively, and both wrong-email and wrong-password collapse to the same
 `401` (no account enumeration).
 
+#### Account settings UI (`/account/settings`)
+
+Once signed in, the user can visit `/account/settings` to manage their account-level
+settings: update profile (display name and email), change password, and download a
+copy of their personal data for GDPR portability. The page is **account-scoped** (not
+workspace-scoped), accessible from the account home (`/account`), and only available
+when signed in.
+
+| Setting | Behavior |
+| --- | --- |
+| **Profile** | Edit display name and email address. Both are optional; changing the email marks it unverified and triggers a new verification email. Form posts to [`PATCH /api/saas/account`](#account-profile); server re-reads the source of truth after save, so the UI always shows the canonical state. `409` if the new email is taken. |
+| **Password** | Change your password by providing the current one (for re-verification) and the new password (≥ 8 chars). Form posts to [`POST /api/saas/account/password`](#email-verification--password); the new hash takes effect on next login. `401` if the current password is wrong or the account is missing. |
+| **Data export (GDPR)** | Download a JSON snapshot of your account's personal data (profile + workspace memberships, no workspace content) via [`GET /api/saas/account/export`](#data-export-gdpr). The link is a standard authenticated `<a>` — the browser sends the session cookie automatically. |
+
+The page is gating-safe (`notFound` when SaaS mode is off), redirect-safe (unsigned-in viewers are sent to `/account/login?next=/account/settings`), and marked `noindex, nofollow`. Like all user-facing SaaS pages, it is **SaaS-only additive** — the self-hosted app's byte-for-byte build is unchanged.
+
 ### Account profile
 
 | Method | Path | Body | Result |
