@@ -1942,3 +1942,27 @@ Mock pattern: DB-mock (`@/lib/db`, `@/models/User`, `@/models/Expense` findById 
 - Collision guard: `git diff --cached` κενό πριν το stage, `git status --short` = μόνο το δικό μου νέο αρχείο, μηδέν foreign WIP. Στάγιαρα ΜΟΝΟ το δικό μου path. Push σε `origin main` fast-forward καθαρό.
 
 Suggested next task: (β συνέχεια, τελευταίο item της τρέχουσας λίστας) `items/import/route.ts` — έλεγξε ΠΡΩΤΑ `git status` για foreign WIP στο `items/actions.ts` (επηρεάζει το import route). Μετά από αυτό, η λίστα των `items/[id]/*` + `receipts/[id]/*` + `expenses/[id]/*` sub-routes θα έχει ΟΛΟΚΛΗΡΩΘΕΙ πλήρως· επόμενο βήμα θα είναι είτε τα top-level list routes (`items/route.ts` GET/POST, `receipts/route.ts`, `expenses/route.ts`) είτε untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling) είτε νέο batch από `statements/[id]`, `subscriptions/[id]`, `vouchers/[id]`, `tasks/[id]`, `cards/[id]`, `stores/[id]` (ακόμα άθικτα, καλά targets). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam, ιδίως failure-remap status code/regex — διαφέρει ανά route, μην υποθέτεις ότι siblings είναι πανομοιότυπα, όπως αποδείχτηκε εδώ) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
+
+---
+
+## 2026-07-20 (cont.²⁰ — items/import/route.test.ts, POST χωρίς dynamic segment, το τελευταίο item της λίστας)
+
+**Task: (β συνέχεια, τελευταίο item της τρέχουσας λίστας) API-shape/validation test `apps/web/src/app/api/v1/items/import/route.test.ts` για το POST του `/api/v1/items/import`.**
+
+Επιλογή target: το μοναδικό εναπομείναν item από τη λίστα (`git status` στην αρχή έδειχνε foreign WIP σε Settings/AppConfig/i18n/insuranceExport — καμία επικάλυψη με `items/actions.ts` ή το target μου· μέχρι το τέλος του run τα foreign αρχεία είχαν ήδη committed από άλλο routine, δεν χρειάστηκε αναμονή). Backs το «paste a product URL» import στο web+mobile item creation — fetch σελίδας + AI parse + είτε δημιουργία νέου item είτε merge τιμής/link σε υπάρχον matching (dedup). Thin wrapper πάνω στο shared `importItemFromUrl` action (items/actions.ts) — η δική του fetch/AI-parse/dedup λογική ΔΕΝ ξανα-δοκιμάζεται εδώ.
+
+**Διαφορά από όλα τα προηγούμενα routes της λίστας**: αυτό το route ΔΕΝ έχει dynamic `[id]` segment — άρα ΚΑΝΕΝΑ ObjectId guard, ΚΑΝΕΝΑ `ctx(id)` param. Ο δικός του guard είναι το σχήμα του `url` field: `String(b.url || '').trim()` πρέπει να ταιριάζει `/^https?:\/\//i` πριν κληθεί καθόλου το action (κενό body, unparsable JSON, μη-http(s) scheme, non-string value μέσω String() coercion — όλα 400 'valid http(s) url required', action ποτέ). Valid url trim-άρεται πριν προωθηθεί (δοκιμάστηκε ρητά). **`view` resolution**: `b.view === 'inventory'` περνάει 'inventory' αυτούσιο· ΟΤΙΔΗΠΟΤΕ άλλο (missing, 'shopping' explicit, άσχετο string, αριθμός) πέφτει σε default **'shopping'**. **Failure remap**: `{ok:false,error}` → 400 με το action error message αυτούσιο (ΧΩΡΙΣ route-level fallback text — το `ImportItemResult` failure type έχει `error` ως required string, όχι optional, άρα δεν υπάρχει falsy-fallback περίπτωση να pin-αριστεί, σε αντίθεση με τα περισσότερα `[id]/*` siblings). Happy path: ΑΚΡΙΒΩΣ `{ok:true, id, title, price, store, updated}` (updated true/false και τα δύο δοκιμάστηκαν).
+
+Mock pattern: DB-mock (`@/lib/db`, `@/models/User`) + mock `@/app/items/actions` (`importItemFromUrl` μόνο, record forwarded url+view). Πραγματικοί `withAuth`/`readBody`. makeReq ίδιο στυλ με το `ai-fill` sibling (`body:'throw'` sentinel για reject json()).
+
+Τι έγινε: Νέο `route.test.ts` (18 tests): auth gate (2), url validation (7: missing/throw/ftp/javascript-scheme/number-coerced/trim/uppercase-scheme), view resolution (5: missing/inventory/shopping-explicit/άσχετο/number), happy path (2: νέο item + merged/updated), failure remap (2: δύο διαφορετικά error strings, αμφότερα verbatim).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/api/v1/items/import/route.test.ts"` → 18/18 passed.
+- `npx vitest run` (όλο το suite) → 200 files, 2547/2547 passed.
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό.
+- Collision guard: πριν το stage, `git diff --cached` κενό. `git status --short` = μόνο το δικό μου νέο αρχείο, μηδέν foreign WIP (τα Settings/i18n/insuranceExport αρχεία που φαίνονταν στην αρχή του run είχαν ήδη committed από άλλο routine μέχρι το στάδιο του staging). Στάγιαρα ΜΟΝΟ το δικό μου path.
+
+**Η λίστα των `items/[id]/*` + `receipts/[id]/*` + `expenses/[id]/*` sub-routes (+ αυτό, `items/import`) έχει ΟΛΟΚΛΗΡΩΘΕΙ πλήρως.**
+
+Suggested next task: επόμενο βήμα είτε (α) τα top-level list routes (`items/route.ts` GET/POST, `receipts/route.ts`, `expenses/route.ts` — προσοχή, αυτά έχουν συνήθως πλουσιότερη query/filter λογική από τα `[id]` siblings, δες το route πρώτα), είτε (β) untested pure libs (grep `src/lib/*.ts` χωρίς `.test.ts` sibling — DB-free, γρηγορότερο να γραφτεί), είτε (γ) νέο batch sub-routes από `statements/[id]`, `subscriptions/[id]`, `vouchers/[id]`, `tasks/[id]`, `cards/[id]`, `stores/[id]` (ακόμα άθικτα, καλά targets — έλεγξε πρώτα αν έχουν dynamic sub-routes σαν τα items/receipts/expenses ή είναι μόνο flat `[id]/route.ts`). Δες ΠΡΩΤΑ το κάθε route (envelope + validation + auth seam, ιδίως failure-remap status code/regex — διαφέρει ανά route, μην υποθέτεις ότι siblings είναι πανομοιότυπα) πριν γράψεις. Τρέξε πρώτα `find src/app/api/v1 -name route.ts` + `git status` collision-guard. Ένα module ανά run. Το SSRF "## Needs Achilleas" item είναι CLOSED.
