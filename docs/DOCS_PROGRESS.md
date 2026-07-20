@@ -1962,3 +1962,8 @@ Validation (markdown only, κανένα build/Docker/AI call):
 Collision guard: `git status --short` = ΜΟΝΟ docs/features.md + docs/saas.md modified (δικα μου), 0 staged foreign files.
 
 Επόμενο run: (α) αν άλλα νέα features προστεθούν (ψάξε git log grep για «feat(«), update docs αναλογα · (β) api.md sync αν νέα v1 routes landed · (γ) saas.md stale-forward αν νέα SaaS features προστεθούν (π.χ. workspace custom-domain, subscription management).
+
+**ERRATUM (same run)**: Διόρθωσα λάθος anchor reference στο saas.md. Αρχικά έγραφα
+`#workspace-ai-key-management-byo-key` αλλα το σωστό anchor είναι `#bring-your-own-key-management`
+(το actual markdown header είναι «### Bring-your-own-key management» on line 572).
+Διόρθωσα την αναφορά στην /account/workspace/settings row.
