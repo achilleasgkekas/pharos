@@ -16,6 +16,7 @@ function linkHost(url: string): string {
 
 type LinkLean = { label?: string; url: string; price?: number | null };
 type HistLean = { _id?: unknown; price: number; store: string; date: Date | string };
+type AttachmentLean = { path: string; name?: string; mimeType?: string; size?: number; uploadedAt?: Date | string };
 
 /** Mirror of components/PricePanel.tsx priceStatus(): one coherent price picture
  *  (best-now, lowest/highest seen, trend, verdict, where-to-buy) computed server-side
@@ -57,7 +58,7 @@ type ItemDetailLean = {
   currentPrice?: number; purchasedPrice?: number | null; targetPrice?: number | null;
   specs?: string; notes?: string; warrantyUntil?: Date | string | null;
   purchasedFrom?: string; purchasedAt?: Date | string | null; location?: string; serialNumber?: string;
-  tags?: string[]; photos?: string[]; links?: LinkLean[]; priceHistory?: HistLean[]; updatedAt?: Date;
+  tags?: string[]; photos?: string[]; attachments?: AttachmentLean[]; links?: LinkLean[]; priceHistory?: HistLean[]; updatedAt?: Date;
 };
 
 /** GET /api/v1/items/:id → full item detail (links, price history, photos, warranty, purchase)
@@ -74,6 +75,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .map((h) => ({ price: h.price, store: h.store, date: new Date(h.date).toISOString() }))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const price = priceStatus({ currentPrice: doc.currentPrice ?? 0, targetPrice: doc.targetPrice ?? null, links, priceHistory });
+    const attachments = (doc.attachments ?? []).map((a) => ({
+      path: a.path,
+      name: a.name ?? '',
+      mimeType: a.mimeType ?? '',
+      size: a.size ?? 0,
+      uploadedAt: a.uploadedAt ? new Date(a.uploadedAt).toISOString() : new Date(0).toISOString(),
+    }));
     return NextResponse.json({
       item: {
         id: String(doc._id),
@@ -94,6 +102,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         tags: doc.tags ?? [],
         photos: doc.photos ?? [],
         photo: doc.photos?.[0] ?? null,
+        attachments,
         links,
         priceHistory,
         price,

@@ -150,6 +150,26 @@ describe('GET serialization', () => {
     expect(item.links).toEqual([{ label: '', url: 'https://skroutz.gr/x', price: null }]);
   });
 
+  it('maps attachments (path/name/mimeType/size/uploadedAt) and defaults to [] when absent', async () => {
+    findByIdState.doc = itemDoc({
+      attachments: [
+        { path: 'equipment/manual.pdf', name: 'Manual.pdf', mimeType: 'application/pdf', size: 12345, uploadedAt: '2026-05-01T00:00:00.000Z' },
+      ],
+    });
+    const res = await GET(makeReq(), ctx(OID));
+    const { item } = await res.json();
+    expect(item.attachments).toEqual([
+      { path: 'equipment/manual.pdf', name: 'Manual.pdf', mimeType: 'application/pdf', size: 12345, uploadedAt: '2026-05-01T00:00:00.000Z' },
+    ]);
+  });
+
+  it('attachments default to [] when the doc has none', async () => {
+    findByIdState.doc = itemDoc();
+    const res = await GET(makeReq(), ctx(OID));
+    const { item } = await res.json();
+    expect(item.attachments).toEqual([]);
+  });
+
   it('sorts priceHistory newest-first and emits ISO dates', async () => {
     findByIdState.doc = itemDoc({
       priceHistory: [

@@ -16,6 +16,17 @@ function verdictMeta(v: Verdict): { label: string; color: string } | null {
 }
 const clampPct = (n: number): DimensionValue => `${Math.max(0, Math.min(100, n))}%` as DimensionValue;
 
+function docIcon(mimeType: string): string {
+  if (mimeType.startsWith('image/')) return '🖼';
+  if (mimeType === 'application/pdf') return '📄';
+  return '📎';
+}
+function fmtSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return bytes > 0 ? `${bytes} B` : '';
+}
+
 /** Read-only price picture mirroring the web PricePanel: best-now + verdict, position bar,
  *  where-to-buy (tap → open store), log-a-price, full history, photos, warranty, links. */
 function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () => void }) {
@@ -125,6 +136,30 @@ function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () =
             <Image key={i} source={fileSource(ph)} style={pb.photo} />
           ))}
         </ScrollView>
+      )}
+
+      {/* Documents (manuals, warranty certs — read-only) */}
+      {detail.attachments.length > 0 && (
+        <View style={{ marginTop: 14 }}>
+          <Text style={pb.section}>DOCUMENTS</Text>
+          {detail.attachments.slice(0, 20).map((a, i) => (
+            <Pressable
+              key={i}
+              onPress={() => {
+                if (!a.mimeType.startsWith('image/')) {
+                  Alert.alert('Not available yet', `Open "${a.name || 'this file'}" from the Pharos web app for now.`);
+                }
+              }}
+              style={pb.docRow}
+            >
+              {a.mimeType.startsWith('image/')
+                ? <Image source={fileSource(a.path)} style={pb.docThumb} />
+                : <Text style={pb.docIcon}>{docIcon(a.mimeType)}</Text>}
+              <Text style={pb.linkLabel} numberOfLines={1}>{a.name || a.path.split('/').pop()}</Text>
+              {!!fmtSize(a.size) && <Text style={pb.docSize}>{fmtSize(a.size)}</Text>}
+            </Pressable>
+          ))}
+        </View>
       )}
 
       {/* Links (non-priced too) */}
@@ -510,6 +545,10 @@ const pb = StyleSheet.create({
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
   linkLabel: { flex: 1, color: C.cyan, fontSize: 13 },
   meta: { color: C.dim, fontSize: 12 },
+  docRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
+  docIcon: { fontSize: 16, width: 22, textAlign: 'center' },
+  docThumb: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.surface },
+  docSize: { color: C.faint, fontSize: 11 },
 });
 
 const pl = StyleSheet.create({

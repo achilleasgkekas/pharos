@@ -124,6 +124,7 @@ export type ReceiptLine = { name: string; qty: number; price: number; vatRate: n
 export type ReceiptDetail = ReceiptSummary & { subtotal: number; vatAmount: number; paymentMethod: string; warrantyMonths: number; notes: string; lineItems: ReceiptLine[] };
 export type Item = { id: string; num: string; title: string; status: string; category: string; currentPrice: number; purchasedPrice: number | null; targetPrice: number | null; specs: string; warrantyUntil: string | null; tags: string[]; photo: string | null };
 export type ItemLink = { label: string; url: string; price: number | null };
+export type Attachment = { path: string; name: string; mimeType: string; size: number; uploadedAt: string };
 export type PriceEntry = { price: number; store: string; date: string };
 export type PriceStore = { store: string; url: string; price: number };
 export type Verdict = 'deal' | 'dropping' | 'rising' | 'good' | 'high' | 'none';
@@ -134,7 +135,7 @@ export type PriceStatus = {
 };
 export type ItemDetail = Item & {
   notes: string; purchasedFrom: string; purchasedAt: string | null; location: string; serialNumber: string;
-  links: ItemLink[]; priceHistory: PriceEntry[]; photos: string[]; price: PriceStatus;
+  links: ItemLink[]; priceHistory: PriceEntry[]; photos: string[]; attachments: Attachment[]; price: PriceStatus;
 };
 
 // ---- Tasks ----
