@@ -6294,3 +6294,63 @@ file (P16 Firefly III/Grocy).
 ## Needs Achilleas
 
 - Τίποτα νέο από αυτό το run.
+
+## 2026-07-20 (mobile-parity-auditor, 52η σάρωση)
+
+**Βήμα 0**: read-only run, μηδέν Docker build, μηδέν AI call, μηδέν edit σε app code. Working tree καθαρό στην
+αρχή (`git status` → nothing to commit, branch up to date με origin/main). Διάβασα CLAUDE.md, MOBILE_PARITY.md
+(884 γραμμές, τμηματικά λόγω πολύ μεγάλων single-line banner-παραγράφων), BACKLOG.md/PROGRESS.md (τελευταία
+εγγραφή), `git log --oneline -15`. TODO.md δεν υπάρχει πια στο repo root (αφαιρέθηκε/μετονομάστηκε σε κάποιο
+προηγούμενο run· δεν το χρειάστηκα, το ενεργό source of truth παραμένει `MOBILE_PARITY.md Build Queue`).
+
+**Inventory από τον κώδικα**: **51 v1 routes** (`find apps/web/src/app/api/v1 -name route.ts | wc -l`), **16
+mobile screens**, **84 exported api-functions** (`grep -cE '^export (async function|function|const)' api.ts`) —
+και τα τρία **αμετάβλητα** vs την 51η σάρωση. `apps/mobile npx tsc --noEmit` → **EXIT 0**.
+
+**Δέλτα από την 51η σάρωση** (`git log --since=2026-07-19 -- apps/web/src apps/mobile/src`): **28 commits**.
+Πρώτα επιβεβαίωσα ότι τα top-2 items της 51ης (`d5a9684` category-rule, `8c3ccda` subscription trial fields)
+ήταν όντως ήδη σωστά `Status: ✅ DONE 2026-07-19` στο doc (και τα δύο έγιναν το ίδιο πρωί, πριν καν ξεκινήσει
+η 51η σάρωση) — καμία αλλαγή χρειάστηκε. Ταξινόμηση των υπόλοιπων 26:
+1. **10 SaaS multi-tenant commits** (account/workspace Settings, invite-accept, leave/create-workspace, admin+
+   workspace Activity action-filters, data-export links) — **confirmed out-of-scope**, ίδια κρίση με κάθε
+   προηγούμενη σάρωση (hosted-SaaS web account portal, όχι το self-hosted personal-use mobile companion app).
+2. **8 test-only commits** (route coverage για ήδη-υπάρχοντα v1 routes) — μηδέν shape change, καμία ενέργεια.
+3. **1 bug fix εκτός mobile-scope** (`83f392f`, YNAB import invalid-row count) + **1 security fix backend-only**
+   (`32ca74c`, SSRF στους notifiers) — κανένα mobile UI touch.
+4. **3 νέα web features, έλεγχος ανά feature**:
+   - `7373035` **P13 insurance export ZIP** — Settings/backup power tool, μηδέν `api/v1` touch (confirmed
+     `find apps/web/src/app/api/v1 -iname '*insur*'` = 0). Ίδιο idiom με το ήδη-flagged backup/restore CSV
+     export — file-download UX δυσανάλογη σε mobile για occasional-use insurance-claim εργαλείο. **ΟΧΙ
+     mobile gap**, fold στο Needs Achilleas.
+   - `3a7be9b` **P11 IMAP email-in auto-import** — self-hosted mailbox-polling config (host/user/pass/folder +
+     «Check inbox now» κουμπί στο Settings), μηδέν `api/v1` touch. Ίδιο idiom με το ήδη-flagged storage/OneDrive
+     Settings — κανένα mobile precedent για inbound-mail configuration. **ΟΧΙ mobile gap**, fold στο Needs
+     Achilleas.
+   - `029d7ae` **P3 Month in Review narrative digest — ΝΕΟ auto-buildable GAP**. Pure `buildMonthReview()`
+     (apps/web/src/lib/monthReview.ts, ήδη 11 unit tests) reuses τους ήδη-shipped budget-exceeded (P24) +
+     price-hike (P14) detectors πάνω σε data που το `GET /api/v1/reports` **ήδη φέρνει** (Expense rows +
+     budgets + item warranties) — χρειάζεται μόνο +3 select πεδία (`vendor vendorKey recurring`) στο υπάρχον
+     query + ένα additive `monthReview` output field. Μηδέν νέο DB round-trip, μηδέν AI, μηδέν product decision.
+     Πρόσθεσα πλήρες Build Queue entry (P2/S — μικρότερο από τα υπόλοιπα ανοιχτά P2/M Reports items).
+
+**MOBILE_PARITY.md αλλαγές**: (α) νέο top-of-queue re-audit blockquote (52η σάρωση)· (β) νέο πλήρες entry
+«Reports — Month in Review narrative digest στο mobile (P3 gap)» ανάμεσα στο PA2-pointer και το P19 entry,
+mirror του format των sibling Reports items (safe-to-spend/budget-rollover). Καμία άλλη αλλαγή στα υπόλοιπα
+entries (όλα επιβεβαιώθηκαν ακόμα ανοιχτά/ακριβή).
+
+**Ranking**: το νέο S-size item ανεβαίνει στην #1 θέση (μικρότερο από τα υπόλοιπα ανοιχτά P2/M items). Ranked
+top-4: (1, νέο) **Month in Review narrative digest** [P2/S, πλήρως speced]· (2) **Reports net-worth headline/
+breakdown** [P2/M, PA2, παλαιότερο ανοιχτό item]· (3) **Reports safe-to-spend forward-cashflow κάρτα** [P2/M,
+P19]· (4) **Reports/Settings budget envelope/rollover mode** [P2/M, P25]. Loyalty card wallet (P20, P2/L) +
+P7/P21 παραμένουν ισοδύναμες εναλλακτικές στο επόμενο tier.
+
+## Needs Achilleas
+
+- Τίποτα ασαφές/needs-decision νέο αυτό το run (το P13/P11 out-of-scope κρίθηκε με σαφή αιτιολόγηση, όχι
+  ασάφεια — σημειώνονται εδώ μόνο ως confirmed non-gaps). Τα προϋπάρχοντα παραμένουν αμετάβλητα: receipt↔
+  transaction reconciliation scope (P18), SaaS multi-tenant surfaces confirm-out-of-scope, safe-area dep,
+  theme/light-dark + language switcher, AI-engine/storage/OneDrive Settings, statements PDF-import, remote
+  push E2E σε πραγματική συσκευή (EAS+APNs), Tasks Kanban board, lucide icon set, rate-limit 429 backoff, P24
+  webhooks config UI, P16 YNAB CSV import, **+2 νέα confirmed out-of-scope (όχι ερώτημα, μόνο ενημέρωση):**
+  P13 insurance export ZIP (desktop file-download power tool, ίδιο idiom με backup/restore CSV), P11 IMAP
+  email-in config (self-hosted mailbox polling, ίδιο idiom με storage/OneDrive Settings).
