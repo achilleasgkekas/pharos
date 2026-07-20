@@ -3503,3 +3503,77 @@ homepage-web printenv SAAS_MODE` → κενό (exit 1) στο live `:3000` conta
 bug) — αξίζει να επαληθευτεί διαβάζοντας το Usage tab's data-source route πριν υποθέσεις κάτι
 σπασμένο· (β) νέα σάρωση για οποιοδήποτε άλλο μικρό UX gap σε ήδη-χτισμένα SaaS panels (π.χ.
 error-message clarity, empty-states, loading-states) αφού το route-level backlog έχει εξαντληθεί.
+
+## 2026-07-20 (increment 79 — TOTP + recovery-code core for MFA, §backend-scaffold)
+**Correction πρώτα:** το candidate (α) του #78's next-task ("Usage tab μηδενικά") επαληθεύτηκε
+οριστικά ΟΧΙ bug: `lib/billing/usage.ts`'s `currentUsage()` επιστρέφει `metered:false` +
+zeroed snapshot για το default/self-hosted tenant ΚΑΙ όταν `SAAS_MODE` off (by design, μηδέν DB
+access), και τα δύο σχετικά panels (`workspace/page.tsx`, `workspace/usage/page.tsx`) ήδη δείχνουν
+ρητό μήνυμα «Metering is inactive for this workspace» σε αυτή την περίπτωση — καμία αλλαγή
+χρειάζεται. Μετά επανέλαβα ολόκληρη τη σάρωση candidate (β) («νέο μικρό UX gap σε ήδη-χτισμένα
+panels») διαβάζοντας ΟΛΑ τα `components/saas/*.tsx` (ActivityPanel/BillingPanel/MembersPanel/
+WorkspaceSettingsPanel/AccountSettingsPanel/TenantActionsPanel/AuthForm/VerifyEmail/
+ResetRequestForm) + `app/(saas)/**` + `app/admin/**` πλήρως: loading/busy states, error messages,
+empty states, dev-token-link consistency (ήδη ομοιόμορφο παντού μέσω `tokenLink`/
+`inviteAcceptHref`), tab/nav parity (`workspaceTabs`↔6 σελίδες, `AdminNav`↔2 σελίδες, όλα exact
+match) — **μηδέν νέο gap βρέθηκε**. Το §UI-first backlog + το §polish backlog θεωρούνται πλέον
+**και τα δύο εξαντλημένα** μετά από 3 συνεχόμενες σαρώσεις (increments 76-79).
+
+**Το κενό (νέα κατεύθυνση):** `grep -rli "totp\|mfa\b" lib components app models` = **μηδέν hits**
+σε όλο το repo. Το TODO.md §9 "Accounts & auth (web-grade)" λέει ρητά "MFA (TOTP + recovery
+codes), session management" — αυτό είναι backend feature που δεν υπάρχει καθόλου ακόμα, σε
+αντίθεση με τα routes-without-UI που εξαντλήθηκαν. Δεν χρειάζεται Stripe keys/SMTP/pricing
+decisions (out of scope per routine's territory) — το TOTP (RFC 6238) είναι τυποποιημένο
+πρωτόκολλο, υλοποιήσιμο πλήρως με `node:crypto` μόνο, μηδέν νέα εξάρτηση, μηδέν external
+service, άρα ασφαλές να ξεκινήσει τώρα χωρίς ask-inbox entry.
+
+**Scope (σκόπιμα στενό):** ΜΟΝΟ το algorithm/storage-codec core, ως 2 νέα isolated αρχεία.
+**ΚΑΝΕΝΑ wiring** σε Account model/route/login flow ακόμα — αυτό αγγίζει shared, security-critical
+plumbing (το login route) και είναι ξεχωριστό, πιο ρισκαρισμένο increment μόλις αυτό το core
+αποδειχθεί σωστό.
+
+**Built:**
+- **`lib/tenancy/totp.ts`** (νέο, PURE, node:crypto μόνο) — `base32Encode`/`base32Decode` (RFC
+  4648, unpadded — ό,τι δέχονται Google/Microsoft/Authy/1Password authenticator apps),
+  `generateTotpSecret()` (20 τυχαία bytes, RFC 6238 reference length), `totpUri(secret, email,
+  issuer)` (otpauth:// URI για QR code, στο label τα ':' strip-άρονται — otpauth reserved
+  separator), `hotp()` (RFC 4226 primitive, internal), `generateTotpCode`/`verifyTotpCode`
+  (6-digit/30s default, ±1-step clock-drift window, `timingSafeEqual` σύγκριση ανά candidate —
+  ίδιο idiom με το `lib/auth.ts`'s `verifyPassword`).
+- **`lib/tenancy/recoveryCodes.ts`** (νέο, PURE) — `generateRecoveryCodes(count=10)` ("XXXX-XXXX"
+  format, alphabet χωρίς 0/O/1/I/L look-alikes), `hashRecoveryCodes`/`matchRecoveryCode`
+  (normalize case/whitespace/dash πριν hash/lookup) — **reuse** του ήδη-υπάρχοντος `lib/auth.ts`
+  `hashPassword`/`verifyPassword` (scrypt) αντί νέου KDF, μηδέν νέο crypto surface.
+- **27 νέα unit tests** (`totp.test.ts` 18, `recoveryCodes.test.ts` 9) — περιλαμβάνουν τα **5
+  επίσημα RFC 6238 Appendix B test vectors** (SHA1, 8-digit, γνωστό secret/time/code triples) ως
+  correctness anchor πέρα από self-consistency, + RFC 4648 base32 vectors, + drift/malformed-input/
+  timing edge cases. 2 test bugs βρέθηκαν+διορθώθηκαν στο πρώτο run (URL.pathname επιστρέφει
+  percent-encoded — το test decode-άρει τώρα· recovery-alphabet ασυνέπεια, το 'L' ήταν ακόμα μέσα
+  ενώ το comment/test το ήθελε εκτός — αφαιρέθηκε από το `CODE_ALPHABET`).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run totp.test.ts
+recoveryCodes.test.ts` → **27/27**· full suite `npx vitest run` → **2726/2726 green** (212 files,
++37 από το #78's 2689). ΚΑΝΕΝΑ υπάρχον αρχείο δεν αγγίχτηκε (2 νέα lib αρχεία + 2 test αρχεία,
+μηδέν model/route/component edit). `SAAS_MODE` on/off = **zero effect και στις δύο περιπτώσεις**
+(τα αρχεία δεν εισάγονται από πουθενά ακόμα). Κανένας Docker rebuild (καθαρό νέο pure library
+code, μηδέν runtime wiring, μηδέν νέα εξάρτηση). Browser-verify N/A (όχι UI ακόμα). Collision
+guard: `git status --short` πριν το staging έδειξε μόνο τα 4 δικά μου νέα αρχεία, `git diff
+--cached --name-only` επιβεβαίωσε exact match. Pushed `82cc718`.
+
+**## Needs Achilleas:**
+- Τίποτα ακόμα — αμιγώς additive core χωρίς wiring, μηδέν decision-point.
+
+**Next task:** increment 80 — η φυσική συνέχεια είναι το **MFA wiring** σε 3 μικρά βήματα (κάθε
+ένα δικό του increment, να μη γίνει ένα μεγάλο risky diff):
+(α) **Account model πεδία** (additive edit σε υπάρχον `models/Account.ts`: `mfaSecret` (encrypted
+via `secretCrypto.ts`, ίδιο idiom με το BYO AI key), `mfaEnabled: boolean`, `mfaRecoveryHashes:
+string[]`) + **enrollment API routes** (`api/saas/account/mfa`: POST generate+preview secret/QR,
+POST confirm με πρώτο κωδικό για να ενεργοποιηθεί, DELETE disable) — αμιγώς additive, μηδέν αλλαγή
+στο login route ακόμα·
+(β) **enrollment UI panel** στο `(saas)/account/settings` (QR code μέσω data-URI, ή απλά δείξε το
+`otpauth://` URI + manual-entry secret αν δεν θέλουμε νέο QR-rendering dependency — να αποφασιστεί,
+ίσως lightweight inline SVG QR χωρίς εξάρτηση)·
+(γ) **login flow wiring** (το πιο ρισκαρισμένο κομμάτι — προσθήκη δεύτερου βήματος στο
+`api/saas/auth/login` όταν `mfaEnabled`, session/cookie sequencing) — ΝΑ ΓΙΝΕΙ ΤΕΛΕΥΤΑΙΟ, μόνο
+αφού τα (α)+(β) έχουν δοκιμαστεί, και με ιδιαίτερη προσοχή στο πλήρες test suite μετά (αγγίζει
+shared auth plumbing).
