@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-19 (11η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-20 (12η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «τα εγκρίνω όλα» → **ΟΛΑ** τα προηγούμενα Proposed
 > (P1, P3, P5-P26) μετακινήθηκαν στο «Approved», μαζί με τα ήδη-εγκεκριμένα PA1/PA2/PA3.
 > **7η σάρωση (2026-07-09):** PA1 (bank/CSV import) shipped → «Done»· προστέθηκαν 5 νέοι candidates P27-P31.
@@ -37,12 +37,68 @@
 > σε Subscription, κανένα `findDuplicateExpenses`-style pattern (ενώ Receipts/Stores/Items έχουν ήδη ακριβώς αυτό
 > το pattern), κανένα `lentTo`/δανεισμός σε Item, κανένα `lastSuccessfulSyncAt`/staleness σε storage config —
 > όλα verified distinct από τα ήδη-tracked P37-P44/Approved/TODO/WEB_DEBT/MOBILE_PARITY.
+> **12η σάρωση (2026-07-20):** ο builder έχει προλάβει να shippάρει σχεδόν ΟΛΟ το «Approved» queue από την
+> προηγούμενη σάρωση (P13/P3/P11 μπήκαν SHIPPED μέσα σε αυτό το ίδιο 24ωρο, βλ. `PROGRESS.md`) — **⚑ σημαντικό
+> flag για τον Αχιλλέα:** το Approved queue έχει μείνει με ΜΟΝΟ P31 (deferred, χρειάζεται supervised session) και
+> P36 (blocked, χρειάζεται provider-decision) ως πραγματικά ανοιχτά· P8/P16(Firefly/Grocy)/P17/P23/P5/P9 μένουν
+> τεχνικά «ανοιχτά» αλλά είτε χρειάζονται νέο dependency-decision είτε mobile-simulator/real-sample-file που δεν
+> είναι testable unattended. Αν δεν εγκριθεί κάτι νέο από το Proposed queue σύντομα, ο builder μπορεί να μείνει
+> χωρίς ξεκάθαρο «απλώς χτίσ' το» item τις επόμενες μέρες. Verified με ζωντανό grep ότι κανένα από τα P37-P48
+> δεν έχει χτιστεί εν τω μεταξύ (μηδέν hits: `pausedUntil`/`lentTo`/`warrantyClaims`/`bundleId`/`meterReading`/
+> `birthday`/`LocalAuthentication` σε `apps/web/src`+`apps/mobile/src`). P37-P48 παραμένουν αμετάβλητα. Προστέθηκαν
+> **3 νέοι candidates P49-P51** (συντηρητικός αριθμός λόγω ήδη-μεγάλης ουράς 12 Proposed items) — «Personal Hub»
+> κενά distinct από όλα τα tracked: κανένα μέτρημα κατανάλωσης (kWh/m³, distinct από το ποσό λογαριασμού που ήδη
+> παρακολουθείται), καμία γενέθλια/επέτειος υπενθύμιση, κανένα biometric app-lock στο mobile (grep επιβεβαίωσε
+> μηδέν hits και στα δύο apps πριν προστεθούν).
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P51. Mobile app-lock (Face ID / Touch ID / device PIN) — S — both (mobile-native, trust lever)
+- **Αξία:** το Expo app σήμερα ανοίγει κατευθείαν στα δεδομένα μόλις είναι logged-in (token-based session,
+  βλ. `MOBILE_PARITY.md`) — αν κάποιος βρει το ξεκλείδωτο κινητό, βλέπει receipts/expenses/inventory χωρίς άλλο
+  εμπόδιο. Ένα **local app-lock** (biometric ή device PIN πριν εμφανιστεί οτιδήποτε μετά το cold-start/resume από
+  background) είναι καθαρά mobile-native προστασία, ΔΕΝ αγγίζει το server-side auth (§9 web MFA είναι διαφορετικό
+  πράγμα: λογαριασμός vs φυσική συσκευή). Μικρό effort (`expo-local-authentication`, ήδη στο Expo SDK managed
+  workflow) με πραγματική αξία εμπιστοσύνης για ένα app που κρατά οικονομικά δεδομένα σπιτιού.
+  **Διακριτό** από §9 (TODO, web account MFA/TOTP) και από P31 (household roles — αυτό είναι per-device, όχι
+  per-user permission).
+- **Module:** Mobile (`apps/mobile`) — νέο lock-screen gate στο app entry/resume + Settings toggle.
+- **Ανοιχτή απόφαση (builder default):** opt-in toggle (default off, ώστε να μη σπάσει κανέναν existing χρήστη
+  απροειδοποίητα)· fallback σε device passcode όταν βιομετρικά μη διαθέσιμα/αποτύχουν (όχι δικό του PIN, reuse
+  του OS)· lock on background→foreground resume, όχι μόνο cold start.
+
+### P50. Special dates & gift reminders (γενέθλια/επέτειοι) — S — OSS, «Personal Hub» fit
+- **Αξία:** το PHAROS backronym (CLAUDE.md) είναι ρητά «Personal Hub», αλλά κανένα module σήμερα δεν κρατά τις πιο
+  βασικές επαναλαμβανόμενες προσωπικές ημερομηνίες — γενέθλια/επέτειοι φίλων/οικογένειας. Ένα μικρό `SpecialDate`
+  (όνομα, τύπος free-form, ημ/μηνία **χωρίς υποχρεωτικό έτος** — οι γιορτές επαναλαμβάνονται ετησίως, όχι one-off)
+  + lead-time alert (reuse `dispatchAlert`, ίδιο pattern με τα υπόλοιπα lead-time settings) καλύπτει ένα πραγματικό
+  καθημερινό need. **Bonus σύνδεση με P43** (public wishlist link): όταν προστεθεί το P43, μια ειδοποίηση «η γιορτή
+  του Χ σε 5 μέρες» θα μπορούσε να δείχνει κατευθείαν το wishlist link του, αλλά αυτό το item στέκεται και μόνο του
+  χωρίς εξάρτηση. **Διακριτό** από P42 (documents = στατικά έγγραφα με λήξη, όχι επαναλαμβανόμενες γιορτές) και
+  P37 (commitment-end = οικονομική δέσμευση).
+- **Module:** νέο μικρό «Special dates» module (list+quick-add, reuse notifier pipeline) + optional homepage widget.
+- **Ανοιχτή απόφαση (builder default):** recurring-by-month-day (όχι πλήρες έτος, εκτός αν ο χρήστης θέλει να
+  δείχνει ηλικία/χρόνια γάμου — προαιρετικό `yearOfBirth`/`sinceYear` field)· ένα ενιαίο lead-time setting (ίδιο
+  με warranty/trial/bill patterns)· κανένα linked-item/gift-tracking αρχικά (MVP = ημερομηνία + υπενθύμιση μόνο).
+
+### P49. Utility meter reading / consumption tracker (kWh/m³, όχι μόνο το ποσό λογαριασμού) — S/M — OSS (dogfooding-heavy)
+- **Αξία:** τα Expenses παρακολουθούν ήδη το **ποσό** των λογαριασμών (ΔΕΗ/ΟΤΕ/νερό, βλ. CLAUDE.md ιστορικό expense
+  recovery) αλλά όχι την **κατανάλωση** (kWh/m³) πίσω από εκείνο το ποσό — δύο σπίτια (κεντρικό + εξοχικό Kalamos,
+  βλ. P34 spaces) με διαφορετικά προφίλ χρήσης θα μπορούσαν να δείξουν αν μια αύξηση οφείλεται σε τιμή/tariff ή σε
+  πραγματική αυξημένη κατανάλωση (π.χ. διαρροή νερού, νέα συσκευή). Νέο μικρό `MeterReading` (utility type
+  electricity/water/gas/other free-form, ημ/reading value, optional linked space από P34) → trend chart +
+  computed period-consumption (delta μεταξύ διαδοχικών readings). **Διακριτό** από το ήδη-υπάρχον expense
+  price-hike detector (P14, που πιάνει μόνο το **ποσό**, όχι τη φυσική κατανάλωση) και από P41 (maintenance =
+  φυσική εργασία, όχι μετρήσιμη ποσότητα).
+- **Module:** νέο μικρό «Utilities» module (ίδιο μέγεθος με Bill/GiftCard/LoyaltyCard — standalone list+chart) +
+  optional σύνδεση με Expenses (P34 space) για side-by-side κόστος-vs-κατανάλωση.
+- **Ανοιχτή απόφαση (builder default):** manual reading entry μόνο (μηδέν smart-meter integration σε αυτή τη
+  φάση)· utility type free-form string (όχι hardcoded enum, ίδιο pattern με P42 document type)· καμία alert αρχικά
+  εκτός αν ζητηθεί ρητά (MVP = tracking + chart, όχι notification).
 
 ### P48. Storage mirror sync-staleness alert (backup peace-of-mind) — S — both
 - **Αξία:** ο χρήστης έχει ήδη remote mirror (OneDrive/SMB/FTP, βλ. CLAUDE.md) αλλά το sync είναι **μόνο
