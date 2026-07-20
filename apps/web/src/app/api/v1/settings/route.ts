@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
       autoAddStores: s.autoAddStores,
       ntfyUrl: s.ntfyUrl,
       ntfyEnabled: s.ntfyEnabled,
+      budgetRollover: s.budgetRollover,
       expenseCategories: s.expenseCategories,
       period,
       budgets,
@@ -83,6 +84,7 @@ export async function PATCH(req: NextRequest) {
     if (typeof b.autoAddStores === 'boolean') set.autoAddStores = b.autoAddStores;
     if (typeof b.ntfyUrl === 'string') set.ntfyUrl = b.ntfyUrl.trim();
     if (typeof b.ntfyEnabled === 'boolean') set.ntfyEnabled = b.ntfyEnabled;
+    if (typeof b.budgetRollover === 'boolean') set.budgetRollover = b.budgetRollover;
 
     if (b.budgets && typeof b.budgets === 'object') {
       const clean: Record<string, number> = {};

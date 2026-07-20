@@ -8,6 +8,7 @@ import { Statement } from '@/models/Statement';
 import { Subscription } from '@/models/Subscription';
 import { getAppSettings } from '@/lib/appSettings';
 import { computeInstallmentPlans } from '@/lib/installments';
+import { categoryRollover, ROLLOVER_WINDOW } from '@/lib/budgetRollover';
 import { buildMonthReview } from '@/lib/monthReview';
 import { netWorthOf } from '@/lib/netWorth';
 import { computeMoneyAgenda } from '@/lib/moneyAgenda';
@@ -136,6 +137,11 @@ export async function GET(req: NextRequest) {
     const byCat: Record<string, number> = {};
     const thisMonthCat: Record<string, number> = {}; // expense per category, THIS month (for budgets)
     const sum = { mExp: 0, mInc: 0, yExp: 0, yInc: 0 };
+    // Per (month → category) expense totals + per-month expense total, used by the
+    // envelope/rollover budget carry (P25). Only expense (non-income) rows count.
+    // Mirrors web /reports page.tsx catByMonth/totalByMonth.
+    const catByMonth = new Map<string, Map<string, number>>();
+    const totalByMonth = new Map<string, number>();
 
     for (const d of docs) {
       const ym = ymOf(d);
@@ -147,6 +153,12 @@ export async function GET(req: NextRequest) {
       if (bucket) { if (inc) bucket.income += amt; else bucket.expense += amt; }
       const ieBucket = ie.find((b) => b.period === ym);
       if (ieBucket) { if (inc) ieBucket.income += amt; else ieBucket.expense += amt; }
+      if (!inc && ym) {
+        totalByMonth.set(ym, (totalByMonth.get(ym) ?? 0) + amt);
+        let byCatMonth = catByMonth.get(ym);
+        if (!byCatMonth) catByMonth.set(ym, (byCatMonth = new Map<string, number>()));
+        byCatMonth.set(cat, (byCatMonth.get(cat) ?? 0) + amt);
+      }
       if (ym === thisYM) {
         if (inc) sum.mInc += amt;
         else { sum.mExp += amt; thisMonthCat[cat] = (thisMonthCat[cat] || 0) + amt; }
@@ -159,14 +171,30 @@ export async function GET(req: NextRequest) {
     const byCategory = Object.entries(byCat).map(([category, total]) => ({ category, total })).sort((a, b) => b.total - a.total).slice(0, 8);
 
     // Budget vs actual (this month), per budgeted category. Mirrors web /reports "Budget · this month".
+    // In envelope mode (P25) each row also gets `carried` (net unspent from recent
+    // complete months) and `effective` (base + carried, floored at 0) — additive,
+    // present only when settings.budgetRollover is on so an un-updated client sees
+    // the same shape as before.
     const budgetMap = (settings.budgets || {}) as Record<string, number>;
+    const rolloverOn = !!settings.budgetRollover;
+    const rolloverMonthKeys: string[] = [];
+    if (rolloverOn) {
+      for (let n = 1; n <= ROLLOVER_WINDOW; n++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - n, 1);
+        const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if ((totalByMonth.get(mk) ?? 0) > 0) rolloverMonthKeys.push(mk);
+      }
+    }
     const budgets = Object.entries(budgetMap)
       .filter(([, limit]) => Number(limit) > 0)
-      .map(([category, limit]) => ({
-        category,
-        limit: Number(limit),
-        spent: Math.round((thisMonthCat[category] || 0) * 100) / 100,
-      }))
+      .map(([category, limit]) => {
+        const base = Number(limit);
+        const spent = Math.round((thisMonthCat[category] || 0) * 100) / 100;
+        if (!rolloverOn) return { category, limit: base, spent };
+        const priorSpends = rolloverMonthKeys.map((mk) => catByMonth.get(mk)?.get(category) ?? 0);
+        const { carried, effective } = categoryRollover(Math.round(base), priorSpends);
+        return { category, limit: base, spent, carried, effective };
+      })
       .sort((a, b) => b.limit - a.limit);
 
     // ── Safe-to-spend (P19) — known expected income minus fixed future charges,

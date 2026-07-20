@@ -28,6 +28,7 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
   const [warranty, setWarranty] = useState('24');
   const [alertDays, setAlertDays] = useState('90');
   const [autoAdd, setAutoAdd] = useState(true);
+  const [rollover, setRollover] = useState(false);
   const [ntfyUrl, setNtfyUrl] = useState('');
   const [ntfyOn, setNtfyOn] = useState(false);
   const [budgets, setBudgets] = useState<Record<string, string>>({});
@@ -41,6 +42,7 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
     setWarranty(String(s.defaultWarrantyMonths ?? 24));
     setAlertDays(String(s.warrantyAlertDays ?? 90));
     setAutoAdd(s.autoAddStores !== false);
+    setRollover(!!s.budgetRollover);
     setNtfyUrl(s.ntfyUrl || '');
     setNtfyOn(!!s.ntfyEnabled);
     const bm: Record<string, string> = {};
@@ -69,6 +71,7 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
         defaultWarrantyMonths: parseInt(warranty, 10) || 0,
         warrantyAlertDays: parseInt(alertDays, 10) || 0,
         autoAddStores: autoAdd,
+        budgetRollover: rollover,
         ntfyUrl: ntfyUrl.trim(),
         ntfyEnabled: ntfyOn,
         budgets: budgetMap,
@@ -123,6 +126,8 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
 
       <Text style={s.section}>BUDGETS · THIS MONTH</Text>
       <View style={s.cardPad}>
+        <Toggle label="Envelope mode (roll over unspent)" on={rollover} onToggle={() => setRollover((v) => !v)} />
+        <Text style={s.hint}>Carries each category's net unspent budget from the last few complete months into this month. Under-spending accumulates; an overspend eats into the next envelope.</Text>
         {Object.keys(budgets).length === 0 && <Text style={s.hint}>No budgets set. Add one below.</Text>}
         {Object.entries(budgets).map(([cat, val]) => {
           const row = cfg?.budgets.find((b) => b.category === cat);

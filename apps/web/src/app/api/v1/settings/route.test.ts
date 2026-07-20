@@ -46,6 +46,7 @@ const {
       autoAddStores: true,
       ntfyUrl: '',
       ntfyEnabled: false,
+      budgetRollover: false,
       expenseCategories: ['utilities', 'groceries'],
       budgets: {} as Record<string, number>,
     },
@@ -114,6 +115,7 @@ beforeEach(() => {
     autoAddStores: true,
     ntfyUrl: '',
     ntfyEnabled: false,
+    budgetRollover: false,
     expenseCategories: ['utilities', 'groceries'],
     budgets: {},
   };
@@ -164,6 +166,7 @@ describe('GET — preferences envelope', () => {
       autoAddStores: true,
       ntfyUrl: '',
       ntfyEnabled: false,
+      budgetRollover: false,
       expenseCategories: ['utilities', 'groceries'],
       period: '2026-07',
       budgets: [],
@@ -258,6 +261,15 @@ describe('PATCH — field whitelist + coercion', () => {
     const res = await PATCH(makeReq({ body: { autoAddStores: 'yes' } }));
     expect(res.status).toBe(400);
     expect(appConfigUpdateOne).not.toHaveBeenCalled();
+  });
+
+  it('accepts a boolean budgetRollover (P25 envelope-mode toggle) and ignores non-boolean values', async () => {
+    await PATCH(makeReq({ body: { budgetRollover: true } }));
+    expect(lastSet()).toEqual({ budgetRollover: true });
+    await PATCH(makeReq({ body: { budgetRollover: false } }));
+    expect(lastSet()).toEqual({ budgetRollover: false });
+    const res = await PATCH(makeReq({ body: { budgetRollover: 'yes' } }));
+    expect(res.status).toBe(400);
   });
 
   it('cleans the budgets map: drop non-positive/non-finite, trim keys, round to cents', async () => {

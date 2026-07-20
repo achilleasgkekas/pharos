@@ -58,8 +58,8 @@ const {
   const computePlansMock = vi.fn(() => plansState.plans);
   const agendaState: { months: unknown[] } = { months: [] };
   const computeAgendaMock = vi.fn(async () => ({ months: agendaState.months, dueThisMonth: 0 }));
-  const settingsState: { currency: string; budgets: Record<string, number>; assetAccounts: Record<string, number> } = { currency: 'EUR', budgets: {}, assetAccounts: {} };
-  const getAppSettingsMock = vi.fn(async () => ({ currency: settingsState.currency, budgets: settingsState.budgets, assetAccounts: settingsState.assetAccounts }));
+  const settingsState: { currency: string; budgets: Record<string, number>; assetAccounts: Record<string, number>; budgetRollover: boolean } = { currency: 'EUR', budgets: {}, assetAccounts: {}, budgetRollover: false };
+  const getAppSettingsMock = vi.fn(async () => ({ currency: settingsState.currency, budgets: settingsState.budgets, assetAccounts: settingsState.assetAccounts, budgetRollover: settingsState.budgetRollover }));
   const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
   const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
   return {
@@ -146,6 +146,7 @@ beforeEach(() => {
   settingsState.currency = 'EUR';
   settingsState.budgets = {};
   settingsState.assetAccounts = {};
+  settingsState.budgetRollover = false;
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
   vi.clearAllMocks();
   userFindOne.mockImplementation(() => ({ select: () => ({ lean: async () => userState.doc }) }));
@@ -156,7 +157,7 @@ beforeEach(() => {
   subFind.mockImplementation(() => ({ select: () => ({ lean: async () => subState.rows }) }));
   computePlansMock.mockImplementation(() => plansState.plans);
   computeAgendaMock.mockImplementation(async () => ({ months: agendaState.months, dueThisMonth: 0 }));
-  getAppSettingsMock.mockImplementation(async () => ({ currency: settingsState.currency, budgets: settingsState.budgets, assetAccounts: settingsState.assetAccounts }));
+  getAppSettingsMock.mockImplementation(async () => ({ currency: settingsState.currency, budgets: settingsState.budgets, assetAccounts: settingsState.assetAccounts, budgetRollover: settingsState.budgetRollover }));
 });
 
 afterEach(() => {
@@ -323,6 +324,44 @@ describe('budgets (this month, budgeted categories only)', () => {
       { category: 'utilities', limit: 100, spent: 120 },
       { category: 'fuel', limit: 50, spent: 30 },
     ]);
+  });
+});
+
+describe('budgets — envelope / rollover mode (P25 gap, additive)', () => {
+  it('off by default: budget rows carry no carried/effective fields', async () => {
+    settingsState.budgets = { utilities: 100 };
+    expenseState.rows = [{ kind: 'expense', amount: 30, category: 'utilities', period: '2026-07' }];
+    const res = await GET(makeReq());
+    const json = (await res.json()) as Body;
+    expect(json.budgets).toEqual([{ category: 'utilities', limit: 100, spent: 30 }]);
+  });
+
+  it('when on, carries net unspent from tracked prior complete months into an `effective` budget', async () => {
+    settingsState.budgetRollover = true;
+    settingsState.budgets = { utilities: 100 };
+    expenseState.rows = [
+      { kind: 'expense', amount: 30, category: 'utilities', period: '2026-07' }, // this month
+      { kind: 'expense', amount: 60, category: 'utilities', period: '2026-06' }, // prior, under budget by 40
+      { kind: 'expense', amount: 150, category: 'utilities', period: '2026-05' }, // prior, over budget by 50
+      // 2026-04 has zero expense rows → untracked, excluded from the carry window
+    ];
+    const res = await GET(makeReq());
+    const json = (await res.json()) as Body & {
+      budgets: Array<{ category: string; limit: number; spent: number; carried?: number; effective?: number }>;
+    };
+    // carried = (100-60) + (100-150) = 40 - 50 = -10; effective = max(0, 100 - 10) = 90
+    expect(json.budgets).toEqual([{ category: 'utilities', limit: 100, spent: 30, carried: -10, effective: 90 }]);
+  });
+
+  it('an untracked prior month never manufactures a phantom surplus', async () => {
+    settingsState.budgetRollover = true;
+    settingsState.budgets = { travel: 200 };
+    expenseState.rows = []; // zero spend anywhere → all 3 prior months untracked
+    const res = await GET(makeReq());
+    const json = (await res.json()) as Body & {
+      budgets: Array<{ category: string; limit: number; spent: number; carried?: number; effective?: number }>;
+    };
+    expect(json.budgets).toEqual([{ category: 'travel', limit: 200, spent: 0, carried: 0, effective: 200 }]);
   });
 });
 

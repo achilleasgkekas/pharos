@@ -15,16 +15,27 @@ function Bar({ label, value, max, cur, color }: { label: string; value: number; 
   );
 }
 
-function BudgetBar({ category, spent, limit, cur }: { category: string; spent: number; limit: number; cur: string }) {
-  const ratio = limit > 0 ? spent / limit : 0;
+/** carried/effective (P25 envelope mode) are present only when rollover is on. */
+function BudgetBar({ category, spent, limit, carried, effective, cur }: { category: string; spent: number; limit: number; carried?: number; effective?: number; cur: string }) {
+  const rollover = effective != null;
+  const shownLimit = rollover ? (effective as number) : limit;
+  const ratio = shownLimit > 0 ? spent / shownLimit : 0;
   const over = ratio > 1;
   const pct = Math.max(2, Math.min(100, Math.round(ratio * 100)));
   const color = over ? C.red : ratio >= 0.8 ? C.gold : C.accent;
+  const c = carried ?? 0;
   return (
     <View style={s.budgetRow}>
       <View style={s.budgetHead}>
-        <Text style={s.budgetCat} numberOfLines={1}>{category}</Text>
-        <Text style={[s.budgetAmt, over && { color: C.red }]}>{money(spent, cur)} / {money(limit, cur)}</Text>
+        <View style={s.budgetCatRow}>
+          <Text style={s.budgetCat} numberOfLines={1}>{category}</Text>
+          {rollover && c !== 0 && (
+            <View style={[s.carriedChip, { borderColor: c > 0 ? C.accent : C.red }]}>
+              <Text style={[s.carriedChipText, { color: c > 0 ? C.accent : C.red }]}>{c > 0 ? '+' : '−'}{money(Math.abs(c), cur)}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={[s.budgetAmt, over && { color: C.red }]}>{money(spent, cur)} / {money(shownLimit, cur)}</Text>
       </View>
       <View style={s.track}><View style={[s.fill, { width: `${pct}%`, backgroundColor: color }]} /></View>
     </View>
@@ -191,8 +202,8 @@ export function ReportsScreen() {
 
           {d.budgets.length > 0 && (
             <>
-              <Text style={s.section}>BUDGET · THIS MONTH</Text>
-              {d.budgets.map((b) => <BudgetBar key={b.category} category={b.category} spent={b.spent} limit={b.limit} cur={cur} />)}
+              <Text style={s.section}>{d.budgets.some((b) => b.effective != null) ? 'BUDGET ENVELOPE · THIS MONTH' : 'BUDGET · THIS MONTH'}</Text>
+              {d.budgets.map((b) => <BudgetBar key={b.category} category={b.category} spent={b.spent} limit={b.limit} carried={b.carried} effective={b.effective} cur={cur} />)}
             </>
           )}
 
@@ -330,8 +341,11 @@ const s = StyleSheet.create({
   flowVal: { color: C.text, fontSize: 11, width: 72, textAlign: 'right' },
   budgetRow: { marginBottom: 12 },
   budgetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
-  budgetCat: { color: C.dim, fontSize: 12, flex: 1, marginRight: 8 },
+  budgetCatRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 },
+  budgetCat: { color: C.dim, fontSize: 12, flexShrink: 1 },
   budgetAmt: { color: C.text, fontSize: 12 },
+  carriedChip: { paddingVertical: 1, paddingHorizontal: 6, borderRadius: 6, borderWidth: 1 },
+  carriedChipText: { fontSize: 10, fontWeight: '700' },
   listRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.border },
   listMain: { flex: 1, marginRight: 8 },
   listTitle: { color: C.text, fontSize: 13 },

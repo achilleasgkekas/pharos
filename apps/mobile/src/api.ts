@@ -321,7 +321,9 @@ export function unmergePlan(key: string) {
 }
 
 // ---- App settings (preferences + this-month budgets) ----
-export type BudgetRow = { category: string; limit: number; spent: number };
+// carried/effective (P25 envelope mode) are present only when budgetRollover is on
+// (additive — absent means "off" on an older server or non-rollover category).
+export type BudgetRow = { category: string; limit: number; spent: number; carried?: number; effective?: number };
 export type AppSettings = {
   currency: string;
   defaultVatRate: number;
@@ -331,6 +333,7 @@ export type AppSettings = {
   autoAddStores: boolean;
   ntfyUrl: string;
   ntfyEnabled: boolean;
+  budgetRollover: boolean;
   expenseCategories: string[];
   period: string;
   budgets: BudgetRow[];
@@ -347,6 +350,7 @@ export type SettingsPatch = Partial<{
   autoAddStores: boolean;
   ntfyUrl: string;
   ntfyEnabled: boolean;
+  budgetRollover: boolean;
   budgets: Record<string, number>;
 }>;
 export function updateSettings(patch: SettingsPatch) {
