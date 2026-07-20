@@ -385,6 +385,13 @@ months):
   want to save (e.g., "€5000 for new laptop by 2026-12-31"), track progress with a
   bar and a computed monthly contribution rate needed to hit the deadline, and add
   contributions manually. Multiple goals can run in parallel.
+- **Safe-to-spend forward cashflow (P19)** — deterministic projection of "what can I
+  safely spend?" over 30 / 60 / 90-day windows: known expected income minus known fixed
+  future charges (subscription renewals, card installments, recurring bills) without
+  guessing a bank balance or median spend. This month's aggregate (income, outflow, net)
+  is shown alongside the forward windows, all zero-AI and zero-cost (uses the money
+  agenda computed server-side). Actionable for quick "is this a good time to buy?"
+  decisions.
 - warranties expiring soon, biggest purchases, and installment payoff.
 
 **Asset depreciation.** Owned gear is valued from its purchase price using a

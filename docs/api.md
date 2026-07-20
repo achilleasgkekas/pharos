@@ -172,7 +172,7 @@ These are flagged **(AI)** below with the feature name.
 | Method | Path            | Description |
 |--------|-----------------|-------------|
 | GET    | `/overview`     | Headline counts (items, shopping list, receipts, expenses, subscriptions, open tasks) + installments owed, active plan count, currency. For a mobile dashboard. |
-| GET    | `/reports`      | Money summary: net position, this month/year, by-category, last 6 months. |
+| GET    | `/reports`      | Money summary: net position, this month/year, by-category, last 6 months, safe-to-spend forward cashflow (30/60/90-day windows of income minus fixed charges). |
 | GET    | `/calendar`     | 3-month money agenda: subscription renewals (stepped per cycle), card installments aggregated per month, projected recurring bills/income, warranty + voucher expiries, per-month in/out totals. Also a flat `events` array for backward compatibility. |
 | GET    | `/search?q=`    | Global search across all data → `{ hits: [{ type, id, title, subtitle }] }`. |
 
