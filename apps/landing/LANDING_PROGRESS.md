@@ -2086,3 +2086,47 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-20 (cont.) — (e) polish/content: FAQ += tax-deductible tagging & year-end export (P8)
+
+Increment (e). Διαβασα το `git log --oneline -15` του κυριου repo και το `docs/features.md` πριν γραψω· το
+P8 «Tax-deductible tagging & year-end export» ship-αρε σημερα (commit `e0124d8 feat(expenses)`, ~λιγες ωρες
+πριν αυτο το run, αμεσως πριν το προηγουμενο landing commit `11331cd`) και δεν ειχε ΚΑΜΙΑ αναφορα πουθενα
+στο landing (grep για "tax" στο page.tsx = μηδεν hits πριν το increment). Καθαρο gap, ιδιο cluster με το
+insurance-export FAQ που προστεθηκε στο προηγουμενο run.
+
+Αλλαγη (app/page.tsx, FAQS array μονο, μηδεν UI/CSS/dependency/bundle change):
+- Νεα FAQ εγγραφη «Can it help with tax filing at year-end?» αμεσως μετα το «Can it produce an export for
+  an insurance claim?» (money/data cluster, πριν το backups Q). Απαντηση ακριβης απο το
+  `docs/features.md:189-207`: tax-deductible toggle (inherited σε recurring series), free-form tax
+  category, «Tax-deductible only» filter + gold badge, year-end «Tax export (ZIP)» απο Settings -> Backup
+  (CSV grouped by category + printable HTML report + κάθε linked receipt/bill).
+- Ρεει αυτοματα στο FAQPage JSON-LD (FAQS.map) + deterministic anchor id
+  `faq-can-it-help-with-tax-filing-at-year-end` (deep-link stays valid).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (11 routes, αμεταβλητο)· `/` route 5.33 kB, αμεταβλητο, copy-only,
+  μηδεν bundle impact.
+- Prerender (`.next/server/app/index.html`): «help with tax filing at year-end» -> 2 hits (HTML + JSON-LD)·
+  anchor id `faq-can-it-help-with-tax-filing-at-year-end` present.
+- Browser preview (in-app Browser): port 3100 ηταν κατειλημμενο απο αλλη (ασχετη) Docker διεργασια, χρησι-
+  μοποιηθηκε port 3101 (`next dev -p 3101`)· `get_page_text` επιβεβαιωσε την πληρη ερωτηση+απαντηση στο
+  rendered DOM (μετα το insurance-claim item, πριν το backups item), σωστη σειρα· `read_console_messages`
+  onlyErrors καθαρο· mobile viewport (375px) render OK (ασχετο section, μηδεν breakage). Server σταματησε
+  μετα (`pkill`), δεν εμεινε τιποτα τρεχει.
+- em-dash: 0 σε ολο το page.tsx (commas μονο). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το commit εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` (κανενα
+  foreign staged/unstaged path αλλου routine αυτη τη φορα)· staged ΜΟΝΟ τα δικα μου landing paths μεσω
+  explicit pathspec.
+
+Επομενο increment: (e) polish συνεχεια — savings goals (P12) ή IMAP email-in (P11) FAQ αν δεν καλυφθουν
+αλλου (αναφερονται μονο στο Roadmap/Shipped bullet, οχι σε δικο τους FAQ)· annual Offers στα per-tier
+Pricing aria labels· ή real app screenshots οταν υπαρξουν assets (blocked)· ή νεοτερο shipped module αν
+εμφανιστει gap.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
