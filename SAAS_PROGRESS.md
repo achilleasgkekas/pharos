@@ -2945,3 +2945,81 @@ views έχουν σταθερό `limit=50`, καμία "load more"/cursor)· (β
 βγει ρητά in-scope κάποια στιγμή, το Usage tab δείχνει σήμερα πάντα μηδενικά· (γ) έλεγξε αν
 υπάρχει ακόμα κάποιο self-service gap συμμετρικό με create/leave-workspace (π.χ. rename
 workspace από τον owner, αν δεν υπάρχει ήδη στο settings tab — έλεγξε πρώτα πριν χτίσεις).
+
+## 2026-07-20 (increment 69 — workspace Settings tab: rename + cancel/reactivate UI, §UI-first)
+**Το κενό:** το next-task σημείωμα του #68 πρότεινε ρητά να ελεγχθεί αν υπάρχει ήδη rename-
+workspace UI στο settings tab πριν χτιστεί κάτι νέο. Έλεγξα: **δεν υπάρχει κανένα "Settings"
+tab καν** — το `workspaceTabs.ts` έχει μόνο Overview/Members/Usage/Activity/Billing. Πιο
+σημαντικό εύρημα: το `app/api/saas/workspace/route.ts` (PATCH rename) έχει ήδη docstring
+που λέει ρητά *"Complements the members/invites/billing/usage/audit read surfaces so a
+workspace-settings page has a 'General' tab"* — δηλαδή αυτό το route **χτίστηκε εν αναμονή
+ενός UI που ποτέ δεν ήρθε**. Έλεγξα και τα αδέρφια του: **DELETE** (soft-cancel,
+`canCancelWorkspace`, owner-only) και **POST /api/saas/workspace/reactivate**
+(`canReactivateWorkspace`, owner-only) — και τα δύο πλήρως χτισμένα, testable, gated,
+audit-logged, **μηδέν σημείο του UI να τα καλεί**. Τρία ολοκληρωμένα backend routes χωρίς
+κανένα client, ό,τι πιο "UI-first gap" υπάρχει αυτή τη στιγμή στο territory.
+
+**Built** (νέο tab + νέος pure helper + νέο client component + νέα page, additive edit μόνο
+στο δικό μου `workspaceTabs.ts`):
+- **`components/saas/workspaceTabs.ts`** (δικό μου, additive): `WorkspaceTabKey` +=
+  `'settings'`, νέα καταχώρηση `{key:'settings', label:'Settings', path:'/account/workspace/
+  settings'}` **δεύτερη στη σειρά** (μετά το Overview — το πιο "γενικό" tab, πριν τα πιο
+  ειδικά Members/Usage/Activity/Billing). `workspaceTabs.test.ts` ενημερώθηκε (νέα σειρά
+  6 tabs + νέο test "flags the Settings tab as active").
+- **`components/saas/workspaceSettings.ts`** (νέο, PURE) — `workspaceRenameReady(name,
+  currentName)` (non-blank + εντός cap + **διαφορετικό από το τρέχον** — mirrors το server's
+  no-op short-circuit ώστε το Save να απενεργοποιείται φυσικά όταν δεν άλλαξε τίποτα) +
+  `describeWorkspaceSettingsError(status, serverError)` (mirror του `createWorkspace.ts`/
+  `leaveWorkspace.ts` idiom, καλύπτει 401/403/404/409/5xx και τα τρία routes). **7 unit
+  tests** (boundary στο cap, unchanged-name rejection, server-error passthrough, status
+  fallbacks).
+- **`components/saas/WorkspaceSettingsPanel.tsx`** (νέο client component) — δύο panels: **"
+  General"** (name input + Save, owner/admin only· read-only "only an owner or admin can
+  rename" note στα plain members· slug πάντα read-only με σημείωση "permanent") + **"Danger
+  zone"** (owner-only, `hidden` εντελώς σε admin/member — δεν φαίνεται καν το section):
+  Cancel workspace button (μόνο όταν active/trialing, `window.confirm()` guard πριν το DELETE,
+  ίδιο lightweight idiom με το `LeaveWorkspaceButton`) ⇄ Reactivate workspace button (μόνο όταν
+  canceled) ⇄ read-only μήνυμα για `suspended` (δεν είναι manual flip — resolved από billing,
+  ίδιο σκεπτικό με το `reactivateStatusError`). Στυλ/idiom **αντιγραμμένο 1:1 από το
+  `TenantActionsPanel.tsx`** (superadmin console) — `role="status"` error/notice boxes,
+  `border-[color:var(--color-red/accent)]` κουμπιά με `/10` hover tint — ίδια "γλώσσα" απλά σε
+  self-service context. Κάθε mutation → `fetch` + `router.refresh()` (όχι full navigation,
+  ο χρήστης μένει στο ίδιο tab, ίδιο idiom με `MembersPanel`/`TenantActionsPanel`).
+- **`(saas)/account/workspace/settings/page.tsx`** (νέο) — SSR mirror του `page.tsx`
+  (overview)/`members/page.tsx`: gate + `pickWorkspace` + `getTenantContext` + φόρτωση
+  Tenant+memberCount → `workspaceView()` (ήδη-υπάρχον pure builder από το `lib/tenancy/
+  workspace.ts`, το ΙΔΙΟ που χρησιμοποιεί το PATCH route) → περνά `canManage=
+  canManageMembers(role)` / `isOwner=role==='owner'` στο panel (ίδιο naming idiom με το
+  `MembersPanel`'s `canManage`/`isOwner` props).
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run workspaceSettings.test.ts
+workspaceTabs.test.ts` → **16/16**· full suite `npx vitest run` → **2434/2434 green** (191
+files — η αύξηση από το #68's 2412 περιλαμβάνει και δύο `test(api-v1)` commits άλλης routine
+που προσγειώθηκαν στο main στο μεταξύ, όχι μόνο τα δικά μου 8 νέα tests). ΚΑΝΕΝΑ υπάρχον
+feature αρχείο δεν αγγίχτηκε (μόνο 4 νέα αρχεία + additive edit στα δικά μου
+`workspaceTabs.ts`/`.test.ts`). `SAAS_MODE` off / self-hosted = **zero effect** (το `(saas)`
+segment self-gates σε `notFound()` πριν φτάσει καν στη νέα σελίδα· ο υπάρχων `/api/saas/
+workspace` route ήταν ήδη gated, μηδέν αλλαγή εκεί). Κανένας Docker rebuild (2 νέα client/
+server αρχεία + 1 νέα page + additive tab-list edit, μηδέν shared runtime wiring, μηδέν νέα
+εξάρτηση — ίδιο σκεπτικό με τα increments 58-68). Browser-verify skipped: το live `:3000`
+container τρέχει **χωρίς `SAAS_MODE` env** (`docker exec homepage-web printenv SAAS_MODE` →
+κενό) οπότε το `(saas)` segment θα έδειχνε απλά 404 (σωστό self-hosted behavior, όχι κάτι νέο
+να δει κανείς)· θα χρειαζόταν rebuild με το flag για ουσιαστικό verify — απαγορεύεται μόνο-
+για-verify, ίδιο idiom με τα #66-68. Collision guard: `git status --short` πριν το commit
+έδειξε **μηδέν foreign staged/modified files** (HEAD ίδιο `533f677` με την αρχή του run) →
+isolated pathspec commit των 6 δικών μου αρχείων, `git diff --cached --name-only` επιβεβαίωσε
+exact match. Pushed `1448dac`.
+
+**## Needs Achilleas** (workspace Settings tab):
+- **`SAAS_MODE=on` + `AUTH_SECRET` (≥16)** για να υπάρχει καν η `(saas)` σελίδα/route (αλλιώς
+  404). Self-hosted = disabled, zero risk.
+- Τίποτα νέο πέρα από τα ήδη καταγεγραμμένα στα #67/#68 (workspace limits/trial economics) —
+  αυτό το increment είναι καθαρά UI πάνω σε ήδη-εγκεκριμένα backend routes, καμία νέα policy
+  απόφαση.
+
+**Next task:** increment 70 — candidates: (α) **activity pagination** (και τα δύο activity
+views έχουν σταθερό `limit=50`, καμία "load more"/cursor — παραμένει ανοιχτό από το #68)·
+(β) αν το `recordAiUsage` wiring βγει ρητά in-scope κάποια στιγμή, το Usage tab δείχνει
+σήμερα πάντα μηδενικά· (γ) custom-domain self-service (το `Tenant.customDomain` φαίνεται
+read-only στο Overview panel — αν υπάρχει ήδη κάποιο DNS/cert flow αλλού, έλεγξε πριν χτίσεις
+ένα edit UI εδώ).
