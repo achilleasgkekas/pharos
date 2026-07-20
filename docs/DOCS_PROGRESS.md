@@ -2062,3 +2062,30 @@ Collision guard: git status --short = ΜΟΝΟ docs/mobile.md + docs/DOCS_PROGRE
 
 Επόμενο run: (α) continue scanning αν άλλα νέα features προστεθούν (pi.x P25, P19 ήδη documented στο features.md / saas.md) · (β) api.md/openapi.yaml sync αν νέα v1 routes landed · (γ) configuration.md stale-forward αν νέα AI provider ή storage backend options προστεθούν.
 
+
+## 2026-07-20 (eleventh run — P28 Bills mobile parity documentation)
+
+Σάρωση git log για undocumented features από τα τελευταία commits. Ανακάλυψα ότι το **P28 (Bills payable/due tracker mobile parity, commit af8bc68, 2026-07-20 22:53)** ήταν shipped αλλά δεν ήταν documented σε api.md ή mobile.md.
+
+Τι έγραψα:
+- **api.md**: Προσθεση νέας "### Bills" section μετά το Vouchers section (line 291) με πίνακα endpoints:
+  - GET /bills?archived=0&paid=0 — λίστα με filters για unarchived/unpaid bills, με computed status (paid/overdue/due-soon/upcoming)
+  - POST /bills — create με title/vendor/amount/dueDate/category/cycle/notes fields
+  - PATCH /bills/:id — update fields + special paid/paidDate transition που spawns next recurring instance (first mark only), returns spawnedNext flag
+  - DELETE /bills/:id — soft-delete
+- **mobile.md**: Προσθεση νέας Bills row στο "What it does" table (μετά το Vouchers row, πριν το Calendar), με περιγραφη: "list, add, edit, mark paid (spawns next recurring), due-soon/overdue status"
+
+Accuracy verified εναντι κώδικα:
+- apps/web/src/app/api/v1/bills/route.ts (GET/POST endpoints)
+- apps/web/src/app/api/v1/bills/[id]/route.ts (PATCH/DELETE endpoints, paid transition logic)
+- apps/mobile/src/screens/BillsScreen.tsx (mobile component)
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: api.md=22 (11 balanced pairs), mobile.md=8 (4 balanced pairs) ✓.
+- Internal links: αναφορές σε features.md, self-hosting.md, configuration.md (όλες υπάρχουν) ✓.
+- Secret scan: κανένα literal credential ✓.
+- Markdown table structure: 4 rows στο Bills section, alignment maintained ✓.
+
+Collision guard: git status --short = ΜΟΝΟ docs/api.md + docs/mobile.md modified (δικά μου). Δεν υπάρχουν foreign staged files. Commit 334fa00 pushed origin/main ✓.
+
+Επόμενο run: (α) continue scanning για άλλα νέα features που ίσως shipαρίστηκαν (grep commits από 2 ώρες πίσω) · (β) api.md/openapi.yaml sync αν άλλα v1 routes landed · (γ) features.md stale-forward αν νέα SaaS features προστεθούν (π.χ. MFA enforcement στο workspace settings).
