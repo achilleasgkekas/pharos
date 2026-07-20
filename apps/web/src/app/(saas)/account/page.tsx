@@ -39,7 +39,15 @@ function AccountTopBar() {
       >
         ← Pharos
       </Link>
-      <SignOutButton />
+      <div className="flex items-center gap-4">
+        <Link
+          href="/account/settings"
+          className="text-xs font-mono uppercase tracking-widest text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]"
+        >
+          Account settings
+        </Link>
+        <SignOutButton />
+      </div>
     </div>
   );
 }
