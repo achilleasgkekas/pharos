@@ -2183,3 +2183,49 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-20 (cont.³) — (e) polish/content: FAQ += savings goals (P12)
+
+Increment (e). Πριν το ξεκινημα διαβασα `git log --oneline -25` του κυριου repo (οχι μονο features.md) —
+τα νεοτερα commits ηταν `00216c7 feat(saas)` dev-token invite link (increment 77, internal-facing dev/
+onboarding UX, δεν ειναι user-facing feature αξιο FAQ) και `20cd073 feat(mobile)` net-worth στο mobile
+Reports (parity fix, το net-worth ηδη καλυπτεται στο landing μεσω αλλων σημειων/mockup, οχι νεο feature).
+Κανενα απο τα δυο ηταν landing gap. Το προηγουμενο log entry ομως ειχε ηδη επισημανει gap: savings goals
+(P12) και IMAP email-in (P11) εμφανιζονται ΜΟΝΟ σαν bullet μεσα στο Shipped-roadmap string («IMAP email-in,
+savings goals & insurance export bundle»), χωρις δικο τους FAQ. Διαλεξα το savings goals (πιο καθαρο,
+αυτοτελες feature απο το IMAP email-in που ειναι self-hosted-only technicality).
+
+Τι ειναι το feature (`docs/features.md:384-387`, commit `78ebd76 feat(reports)`): στο /reports, savings
+goals (target amount + optional deadline, π.χ. «€5000 for new laptop by 2026-12-31»), progress bar,
+computed **monthly contribution rate** χρειαζεται για να πιασεις το deadline, manual contributions,
+πολλαπλα goals παραλληλα.
+
+Αλλαγη (app/page.tsx, FAQS array μονο, μηδεν UI/CSS/dependency/bundle change):
+- Νεα εγγραφη «Can it help me save toward a goal?» αμεσως πριν το «How do backups work?» (κλεινει το
+  money/reports cluster, ιδιο σημειο που μπηκαν τα insurance-export/tax FAQ προηγουμενα increments).
+- Ρεει αυτοματα στο FAQPage JSON-LD + anchor id `faq-can-it-help-me-save-toward-a-goal`.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, ολα static (11 routes)· `/` route 5.33 kB, αμεταβλητο (copy-only).
+- Prerender (`.next/server/app/index.html`): «Can it help me save toward a goal?» -> 5 hits, anchor id
+  -> 5 hits (HTML + JSON-LD + RSC payload, consistent).
+- Browser preview (in-app Browser): port 3100 κατειλημμενο απο Docker (`com.docke` listening, οπως και σε
+  προηγουμενο run)· χρησιμοποιηθηκε port 3103. `get_page_text` επιβεβαιωσε ολοκληρο το FAQ section με το
+  νεο item στη σωστη σειρα (μετα «tax filing», πριν «backups»)· `read_console_messages` onlyErrors καθαρο.
+  Server σταματησε μετα (`pkill`), `lsof` επιβεβαιωσε μηδεν listener στο 3103.
+- em-dash: 0 σε ολο το page.tsx (commas μονο). Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx`· staged+
+  committed ΜΟΝΟ το δικο μου landing path.
+- Commit `f8f0e92`.
+
+Επομενο increment: (e) polish συνεχεια, IMAP email-in (P11) δικο του FAQ αν χρειαστει (self-hosted-only
+technicality, ισως δεν αξιζει ξεχωριστο απο το roadmap bullet)· annual Offers στα per-tier Pricing aria
+labels· real app screenshots οταν υπαρξουν assets (blocked)· ή νεοτερο shipped module αν εμφανιστει gap
+(τσεκαρε `git log --oneline -25` του κυριου repo στην αρχη καθε run, οχι μονο features.md/saas.md).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
