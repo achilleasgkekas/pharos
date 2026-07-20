@@ -337,6 +337,13 @@ Settings → AI.
 Analytics (`/reports`) over your data with a selectable window (6 / 12 / 24
 months):
 
+- **Month in Review (P3)** — a deterministic narrative digest at the top of the
+  reports page that summarizes the current month: total spent, income, net
+  position, and % change from the previous month; top spending category and
+  over-budget categories (if any); recurring charges that changed their amount;
+  and any warranties expiring within 90 days. The narrative composes these
+  insights into a single sentence. This is a zero-AI summary using built-in
+  detectors for budget-exceeded and price-hike patterns.
 - **Net worth** — assets (owned-inventory value plus any manual asset accounts)
   minus liabilities (remaining installments plus outstanding card balances), with
   breakdown chips and a monthly trend chart. The owned-inventory value uses the

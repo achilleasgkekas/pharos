@@ -1790,3 +1790,30 @@ Collision guard: git status --short δειχνει μονο docs/saas.md staged 
 Επομενο run: (α) αν αλλα νέα SaaS routes ή tabs προστεθουν (π.χ. billing CTAs λυμενες, usage analytics
 enrichment), update saas.md · (β) api.md sync αν νέα v1 routes landed (π.χ. bills/charges model για
 payable tracking) · (γ) features.md stale-forward για νέα shipped features.
+
+## 2026-07-20 (fourth run — P3 Month-in-Review documentation)
+
+Νέα feature landed: P3 (Month-in-Review narrative digest) commit 029d7ae. Εγραψα:
+
+**features.md** — προσθεσα νεο bullet point στη Reports section (πρωτο στη λιστα):
+- **Month in Review (P3)**: Περιγραφη του deterministic narrative digest που εμφανιζεται
+στην κορυφη του /reports page με summary του τρεχοντος μηνα (total spent/income/net,
+% change vs last month, top category, over-budget categories, recurring charges
+that changed, warranties expiring within 90 days). Σημειωση οτι ειναι zero-AI
+summary (δεν χρησιμοποιει AI, reuses built-in budget-exceeded + price-hike detectors).
+
+Accuracy (διαβασα κωδικα, οχι εικασιες): commit 029d7ae shows implementation
+αναλυονται τα στοιχεια του summary (spend/income/net, % change, top category,
+over-budget, recurring charges moved, warranties ≤90d), narrative composition
+στο monthReview.ts.
+
+Validation: markdown only, κανενα build/Docker/AI call. Fence count features.md
+αθικτο (0 code blocks). Internal links (/) αθικτα. Καμια secret τιμη.
+
+Collision guard: `git status --short` δειχνει μονο docs/features.md modified
+(δικο μου), 0 staged foreign files. Keyset pagination commit (7346502) ειναι
+internal UI improvement (adds Load more links), δεν αγγιζει API docs.
+
+Επομενο run: (α) αν αλλα νέα SaaS routes ή tabs προστεθουν (π.χ. billing/usage
+enrichment), update saas.md · (β) api.md sync αν νέα v1 routes landed · (γ)
+features.md stale-forward για αλλα νέα shipped features.
