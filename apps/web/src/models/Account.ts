@@ -26,6 +26,16 @@ const AccountSchema = new Schema(
     resetTokenHash: { type: String, default: null },
     resetTokenExpires: { type: Date, default: null },
     lastLoginAt: { type: Date, default: null },
+    // MFA (TOTP + recovery codes, TODO §9). `mfaSecretEnc` is only set once enrollment is
+    // CONFIRMED (first code verified); `mfaPendingSecretEnc` holds a not-yet-confirmed secret
+    // during enrollment so a half-finished setup can never silently enable MFA. Both are
+    // secretCrypto (AES-256-GCM) envelopes, same idiom as the tenant BYO AI key — plaintext
+    // never touches this document. `mfaRecoveryHashes` are scrypt hashes (lib/auth.ts), one
+    // consumed (spliced out) per use. See lib/tenancy/mfaStore.ts for the read/write API.
+    mfaEnabled: { type: Boolean, default: false },
+    mfaSecretEnc: { type: String, default: null },
+    mfaPendingSecretEnc: { type: String, default: null },
+    mfaRecoveryHashes: { type: [String], default: [] },
   },
   { timestamps: true }
 );
