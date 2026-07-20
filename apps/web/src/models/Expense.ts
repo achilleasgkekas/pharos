@@ -14,6 +14,12 @@ const ExpenseSchema = new Schema(
     vendorKey: { type: String, default: '', index: true }, // normalized vendor → groups a recurring series
     category: { type: String, default: 'other', index: true }, // rent/utilities/fuel/salary/insurance/…
     space: { type: String, default: '', index: true }, // per-property/context ledger tag (P34); '' = unassigned
+
+    // Tax / deductible tagging (P8). Free-form taxCategory (optional GR presets suggested in
+    // the UI) so the year-end export can group by it; taxDeductible gates which expenses that
+    // export includes at all.
+    taxDeductible: { type: Boolean, default: false, index: true },
+    taxCategory: { type: String, default: '' },
     amount: { type: Number, default: 0 }, // gross amount (income positive, expense positive)
     currency: { type: String, default: 'EUR' },
     date: { type: Date, required: true, index: true },

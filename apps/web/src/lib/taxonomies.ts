@@ -44,6 +44,22 @@ export function resolveTaxonomy(key: TaxonomyKey, overrides: Record<string, unkn
 export const DEFAULT_SPACES: string[] = [];
 const MAX_SPACES = 24;
 
+// ── Tax categories (P8) ───────────────────────────────────────────────────
+// Suggested labels for the "tax category" free-text field, shown as options in a
+// SearchableSelect (allowCustom) — NOT an enforced taxonomy like the categories
+// above (every country's deduction rules differ, and this app has no per-country
+// setting). GR-flavoured since that's the primary user base; free text otherwise.
+export const TAX_CATEGORY_PRESETS: string[] = [
+  'Ιατρικά έξοδα',
+  'Δωρεές',
+  'Τόκοι στεγαστικού δανείου',
+  'Ενοίκιο (φοιτητές/παιδιά)',
+  'Ασφάλιστρα ζωής',
+  'Δαπάνες αναπηρίας',
+  'Επαγγελματικά έξοδα',
+  'Άλλο',
+];
+
 /** Clean a user-entered spaces list: trim, drop empties, dedupe case-insensitively
  *  (keeping the first spelling), cap length + count. Casing preserved for display. */
 export function normalizeSpaces(items: unknown): string[] {

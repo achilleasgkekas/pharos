@@ -6,7 +6,7 @@ import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, exportInsuranceBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
 import type { CategoryRule } from '@/lib/categoryRules';
 import { AI_FEATURES } from '@/lib/aiFeatures';
@@ -2673,6 +2673,8 @@ function BackupRestore() {
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const confirm = useConfirm();
+  const nowYear = new Date().getFullYear();
+  const [taxYear, setTaxYear] = useState(nowYear);
 
   function handleExport() {
     setMsg(null);
@@ -2753,6 +2755,28 @@ function BackupRestore() {
     });
   }
 
+  function handleTaxExport() {
+    setMsg(null);
+    startTransition(async () => {
+      try {
+        const { base64, itemCount, totalValue } = await exportTaxBundle(taxYear);
+        const bin = atob(base64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: 'application/zip' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `pharos-tax-export-${taxYear}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setMsg(t('set.taxExportDone', { n: itemCount, total: `${cur()}${totalValue.toFixed(2)}` }));
+      } catch (e) {
+        setMsg(`Tax export failed: ${(e as Error).message.slice(0, 80)}`);
+      }
+    });
+  }
+
   const btn =
     'flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50';
 
@@ -2799,6 +2823,24 @@ function BackupRestore() {
       </div>
       <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
         {t('set.insuranceExportDesc')}
+      </p>
+      <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-[color:var(--color-border)]">
+        <select
+          value={taxYear}
+          onChange={(e) => setTaxYear(Number(e.target.value))}
+          className="text-xs px-2 py-1.5 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)]"
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          {Array.from({ length: 5 }, (_, i) => nowYear - i).map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+        <button type="button" onClick={handleTaxExport} disabled={pending} className={cn(btn, 'text-[color:var(--color-gold)]')}>
+          {pending ? <Loader2 size={13} className="animate-spin" /> : <Landmark size={13} />} {t('set.taxExport')}
+        </button>
+      </div>
+      <p className="text-[10px] text-[color:var(--color-text-faint)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        {t('set.taxExportDesc')}
       </p>
     </div>
   );

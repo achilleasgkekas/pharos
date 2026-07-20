@@ -65,6 +65,7 @@ import { generateNotifications } from '@/app/notifications/actions';
 import { detectBudgetExceeded, type BudgetAlertRow } from '@/lib/budgetAlert';
 import { estimatedItemValue } from '@/lib/depreciation';
 import { buildInsuranceCsv, buildInsuranceHtml, type InsuranceItem } from '@/lib/insuranceExport';
+import { buildTaxCsv, buildTaxHtml, type TaxExpenseRow } from '@/lib/taxExport';
 import JSZip from 'jszip';
 import {
   getEventWebhooks,
@@ -1397,6 +1398,79 @@ export async function exportInsuranceBundle(): Promise<{ base64: string; itemCou
 
   const base64 = await zip.generateAsync({ type: 'base64', compression: 'DEFLATE' });
   return { base64, itemCount: insuranceItems.length, totalValue: Math.round(totalValue * 100) / 100 };
+}
+
+type TaxExpenseDoc = {
+  _id: Types.ObjectId;
+  vendor: string;
+  category: string;
+  taxCategory: string;
+  amount: number;
+  date: Date;
+  notes: string;
+  filePath: string;
+};
+
+/**
+ * Year-end tax export bundle (P8). ZIP containing a CSV manifest, a standalone
+ * HTML report grouped by tax category (opens straight out of the ZIP, prints
+ * to PDF), and the original bill/receipt file for every tax-deductible expense
+ * dated within the given year — the paper trail an accountant asks for. Same
+ * v1 trade-off as exportInsuranceBundle: no PDF-writing dependency, the HTML
+ * report covers viewing + printing. Only 'expense' kind counts (income is
+ * never "deductible"); `taxDeductible` gates inclusion, `taxCategory` groups.
+ */
+export async function exportTaxBundle(year: number): Promise<{ base64: string; itemCount: number; totalValue: number }> {
+  await requireAdmin();
+  await connectDB();
+  const y = Number.isFinite(year) ? Math.trunc(year) : new Date().getFullYear();
+  const from = new Date(Date.UTC(y, 0, 1));
+  const to = new Date(Date.UTC(y + 1, 0, 1));
+  const [settings, rows] = await Promise.all([
+    getAppSettings(),
+    Expense.find({ kind: 'expense', taxDeductible: true, date: { $gte: from, $lt: to } })
+      .select('vendor category taxCategory amount date notes filePath')
+      .sort({ date: 1 })
+      .lean<TaxExpenseDoc[]>(),
+  ]);
+
+  const zip = new JSZip();
+  const taxRows: TaxExpenseRow[] = [];
+  let totalValue = 0;
+
+  for (const [idx, r] of rows.entries()) {
+    const id = String(r._id);
+    totalValue += r.amount || 0;
+
+    let fileName = '';
+    if (r.filePath) {
+      try {
+        const buf = await readFile(r.filePath);
+        const ext = r.filePath.split('.').pop() || 'pdf';
+        fileName = `bill_${idx}.${ext}`;
+        zip.folder(`files/${id}`)!.file(fileName, buf);
+      } catch {
+        // Missing file on disk (orphaned reference) — skip, don't fail the whole export.
+      }
+    }
+
+    taxRows.push({
+      id,
+      date: r.date ? new Date(r.date).toISOString() : '',
+      vendor: r.vendor || '',
+      category: r.category || 'other',
+      taxCategory: r.taxCategory || '',
+      amount: r.amount || 0,
+      notes: r.notes || '',
+      fileName,
+    });
+  }
+
+  zip.file('tax-manifest.csv', '﻿' + buildTaxCsv(taxRows));
+  zip.file('tax-manifest.html', buildTaxHtml(taxRows, { year: y, generatedAt: new Date().toISOString().slice(0, 10), currencySymbol: cur() }));
+
+  const base64 = await zip.generateAsync({ type: 'base64', compression: 'DEFLATE' });
+  return { base64, itemCount: taxRows.length, totalValue: Math.round(totalValue * 100) / 100 };
 }
 
 /** Save monthly budgets (expense category → € amount). Empty/0 values are dropped. */

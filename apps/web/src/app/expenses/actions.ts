@@ -102,12 +102,12 @@ export async function scanExpenseImage(formData: FormData): Promise<ScanExpenseR
 
 /** Inherit category / recurring from an existing record of the same vendor (the
  *  "continuity" the user asked for: a new ΔΕΗ bill joins the existing ΔΕΗ series). */
-async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string; space?: string } | null> {
+async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?: string; recurring?: boolean; recurringCycle?: string; space?: string; taxDeductible?: boolean; taxCategory?: string } | null> {
   if (!vKey) return null;
   const Expense = await currentModel(ExpenseModel);
   const prev = await Expense.findOne({ kind, vendorKey: vKey }).sort({ date: -1 }).lean();
   if (!prev) return null;
-  return { category: prev.category, recurring: prev.recurring, recurringCycle: prev.recurringCycle, space: prev.space };
+  return { category: prev.category, recurring: prev.recurring, recurringCycle: prev.recurringCycle, space: prev.space, taxDeductible: prev.taxDeductible, taxCategory: prev.taxCategory };
 }
 
 function periodFrom(date: Date, parsedPeriod?: string): string {
@@ -238,6 +238,8 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
       vendorKey: vKey,
       category: rule?.category || parsed?.category || inherited?.category || 'other',
       space: inherited?.space || '', // inherit the ledger tag from the vendor's last entry (P34)
+      taxDeductible: inherited?.taxDeductible || false, // inherit tax flag (P8) — e.g. a doctor's bill vendor stays tax-deductible
+      taxCategory: inherited?.taxCategory || '',
       amount: parsed?.amount ?? 0,
       currency: parsed?.currency || 'EUR',
       date,
@@ -270,6 +272,8 @@ const UpdateSchema = z.object({
   vendor: z.string().default(''),
   category: z.string().default('other'),
   space: z.string().max(40).default(''),
+  taxDeductible: z.boolean().default(false),
+  taxCategory: z.string().max(60).default(''),
   amount: z.coerce.number().default(0),
   currency: z.string().default('EUR'),
   date: z.string(),
@@ -310,6 +314,8 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
           vendorKey: vendorKey(d.vendor),
           category: d.category,
           space: d.space.trim(),
+          taxDeductible: d.taxDeductible,
+          taxCategory: d.taxCategory.trim(),
           amount: d.amount,
           currency: d.currency,
           date,
@@ -353,6 +359,8 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
       vendorKey: vendorKey(d.vendor),
       category: explicit || rule?.category || inherited?.category || 'other',
       space: d.space.trim() || inherited?.space || '',
+      taxDeductible: d.taxDeductible || inherited?.taxDeductible || false,
+      taxCategory: d.taxCategory.trim() || inherited?.taxCategory || '',
       amount: d.amount,
       currency: d.currency,
       date,

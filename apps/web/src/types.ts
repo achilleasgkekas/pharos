@@ -111,6 +111,10 @@ export type SerializedExpense = {
   vendorKey: string;
   category: string;
   space: string; // per-property/context ledger tag (P34); '' = unassigned
+  // Tax / deductible tagging (P8): taxDeductible gates inclusion in the year-end export,
+  // taxCategory is a free-form (optionally preset) label used to group that export.
+  taxDeductible: boolean;
+  taxCategory: string;
   amount: number;
   currency: string;
   date: string;
