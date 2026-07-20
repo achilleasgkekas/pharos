@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pill, MemberRoleBadge, MemberStatusBadge } from './StatusBadge';
 import { ORG_ROLES, type OrgRole } from '@/lib/tenancy/members';
+import { resendNotice } from './inviteResend';
 
 export type MemberRow = {
   accountId: string;
@@ -136,6 +137,22 @@ export function MembersPanel({
     } else {
       setNotice(`${email} added to the workspace.`);
     }
+    router.refresh();
+  }
+
+  async function resendInvite(id: string, email: string) {
+    if (busy) return;
+    setBusy(id);
+    setError(null);
+    setNotice(null);
+    const { ok, data } = await callJson('/api/saas/invites/resend', 'POST', {
+      inviteId: id,
+      tenant: tenantSlug,
+    });
+    setBusy(null);
+    if (!ok) return fail(data, 'Could not resend invitation');
+    const devToken = typeof data.devToken === 'string' ? data.devToken : null;
+    setNotice(resendNotice(email, devToken));
     router.refresh();
   }
 
@@ -264,6 +281,16 @@ export function MembersPanel({
                   </div>
                   <div className="flex items-center gap-2">
                     <MemberRoleBadge role={inv.role} />
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={() => resendInvite(inv.id, inv.email)}
+                        disabled={rowBusy}
+                        className="rounded-lg border border-[color:var(--color-border)] px-2 py-1 text-xs text-[color:var(--color-text-dim)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)] disabled:opacity-50"
+                      >
+                        {rowBusy ? 'Resending…' : 'Resend'}
+                      </button>
+                    )}
                     {canManage && (
                       <button
                         type="button"
