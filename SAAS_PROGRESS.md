@@ -3342,3 +3342,49 @@ grace-days countdown, owner-only danger-zone addition· χρειάζεται π�
 προφανές/κατά-λάθος-clickable, ίδιο επίπεδο σοβαρότητας με cancel-workspace)· (γ) η **Usage tab
 μηδενικά** παραμένει (§#72-74's carried-over, `recordAiUsage` wiring εκτός territory — ίσως ώρα
 για ask-inbox entry αν δεν βρεθεί άλλο UI-first κενό στο επόμενο run).
+
+## 2026-07-20 (increment 75 — BYO AI key UI for workspace settings, §UI-first)
+**Context:** το work αυτού του increment είχε ήδη ξεκινήσει σε προηγούμενο (interrupted) run —
+βρέθηκε uncommitted στο working tree στην αρχή αυτού του run (`page.tsx` modified + 3 νέα αρχεία).
+Ήταν candidate (α) του #74's next-task λίστα: `workspace/ai-key` GET/PUT/DELETE route (ήδη
+χτισμένο, TODO §11/§14/D5 — BYO AI provider key ώστε τα AI calls του workspace να τρέχουν
+unmetered στο δικό του key αντί του platform shared key) χωρίς κανένα UI caller.
+
+**Built** (βρέθηκε ήδη πλήρες, επιβεβαιώθηκε + committed):
+- **`components/saas/aiKeySettings.ts`** (νέο, PURE) — `AI_KEY_PROVIDERS` (mirror χειροκίνητα του
+  server's `BYO_PROVIDERS`, ΟΧΙ re-export γιατί το server module σέρνει `node:crypto` μέσω
+  `lib/tenancy/secretCrypto` που δεν πρέπει να μπει σε client bundle — ίδιο trade-off με το
+  `authValidation`'s EMAIL_RE/MIN_PASSWORD mirrors), `aiKeyProviderLabel`, `aiKeySaveReady`
+  (mirrors το server's `encodeAiKey` guard: cryptoReady + valid provider + non-blank key),
+  `describeAiKeyError` (prefers server-provided error string, fallback ανά status). 11 unit tests.
+- **`components/saas/AiKeyPanel.tsx`** (νέο, client) — masked-status display ("Using your own
+  {provider} key, ending in {masked}") + provider select + password-type key input + Save/Remove
+  (Remove με `window.confirm`) → PUT/DELETE `/api/saas/workspace/ai-key` → `router.refresh()`.
+  `canManage`-gated (owner/admin only, mirrors route's `requireManage=true`)· `cryptoReady`-gated
+  μήνυμα όταν `AUTH_SECRET` λείπει (503 guard, ίδιο idiom με τα υπόλοιπα secret-dependent panels).
+- **`(saas)/account/workspace/settings/page.tsx`** (δικό μου, additive edit) — server-side reads
+  `describeTenantAiKey(ctx.tenantId)` + `byoKeyReady()` παράλληλα με το tenant/memberCount fetch,
+  wraps το υπάρχον `WorkspaceSettingsPanel` + νέο `AiKeyPanel` σε `space-y-6` div.
+
+**Verified:** `npm run type-check` → **EXIT 0**. `npx vitest run aiKeySettings.test.ts` → **11/11**·
+full suite `npx vitest run` → **2635/2635 green** (206 files). ΚΑΝΕΝΑ υπάρχον feature αρχείο δεν
+αγγίχτηκε (3 νέα αρχεία + 1 additive edit σε δικό μου SaaS-only page, μηδέν shared component/
+layout/globals.css). `SAAS_MODE` off / self-hosted = **zero effect** (η `(saas)` σελίδα ήδη 404
+πριν φτάσει στο νέο panel). Κανένας Docker rebuild (πλήρως additive, μηδέν shared runtime wiring,
+μηδέν νέα εξάρτηση). Browser-verify skipped: `docker exec homepage-web printenv SAAS_MODE` → κενό
+(exit 1) στο live `:3000` container, ίδιο idiom με τα #66-74. Collision guard: `git status --short`
+πριν το staging έδειξε μόνο τα 4 δικά μου αρχεία, `git diff --cached --name-only` επιβεβαίωσε exact
+match. Pushed `c9c48a0`.
+
+**## Needs Achilleas:**
+- Τίποτα νέο — καθαρό UI wiring πάνω σε ήδη-εγκεκριμένο, ήδη-tested backend route.
+- Πραγματικό end-to-end test (save πραγματικό provider key, δες ότι το AI call το χρησιμοποιεί)
+  χρειάζεται live SaaS-mode deployment + `AUTH_SECRET` set· δεν είναι testable από εδώ πέρα από
+  unit tests + tsc.
+
+**Next task:** increment 76 — candidates: (α) **GDPR erasure self-service UI** (`workspace/
+erasure` GET/POST/DELETE — schedule/cancel deletion με grace-days countdown, owner-only
+danger-zone addition, ακόμα dead-UI από τη σάρωση του #73)· (β) η **Usage tab μηδενικά**
+παραμένει (§#72-75's carried-over, `recordAiUsage` wiring εκτός territory — ίσως ώρα για
+ask-inbox entry αν δεν βρεθεί άλλο UI-first κενό στο επόμενο run)· (γ) ξανα-σάρωσε `api/saas/**`
+για νέα dead-UI routes (απέδωσε αρκετές φορές σειρά, ίσως πλέον εξαντλημένο πέρα από το erasure).
