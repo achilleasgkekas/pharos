@@ -288,6 +288,27 @@ export function addVoucher(data: { title: string; code?: string; store?: string;
   return request<{ voucher: Voucher }>('/api/v1/vouchers', { method: 'POST', body: JSON.stringify(data) });
 }
 
+// ---- Bills (P28 mobile parity) ----
+export type BillStatus = 'paid' | 'overdue' | 'due-soon' | 'upcoming';
+export type Bill = {
+  id: string; title: string; vendor: string; amount: number; dueDate: string | null; paidAt: string | null;
+  category: string; cycle: '' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'; notes: string; archived: boolean;
+  status: BillStatus;
+};
+export async function getBills(): Promise<Bill[]> {
+  return (await request<{ data: Bill[] }>('/api/v1/bills?limit=200')).data ?? [];
+}
+export function addBill(data: { title: string; vendor?: string; amount?: number; dueDate: string; category?: string; cycle?: string; notes?: string }) {
+  return request<{ bill: Bill }>('/api/v1/bills', { method: 'POST', body: JSON.stringify(data) });
+}
+export const updateBill = (id: string, data: { title?: string; vendor?: string; amount?: number; dueDate?: string; category?: string; cycle?: string; notes?: string; archived?: boolean }) =>
+  patch(`/api/v1/bills/${id}`, data);
+export const deleteBill = (id: string) => del(`/api/v1/bills/${id}`);
+/** Mark paid (spawns the next instance one cycle ahead for a recurring bill, server-side)
+ *  or unpaid (paid: false, undo). Caller reloads the list afterwards, same idiom as updateBill. */
+export const setBillPaid = (id: string, paid: boolean, paidDate?: string) =>
+  patch(`/api/v1/bills/${id}`, { paid, ...(paidDate ? { paidDate } : {}) });
+
 // ---- Statements ----
 export type Statement = { id: string; card: string; last4: string; period: string; statementDate: string | null; dueDate: string | null; totalAmount: number; minimumPayment: number; paidAmount: number; currency: string; txnCount: number };
 export async function getStatements(): Promise<Statement[]> {

@@ -15,6 +15,7 @@ import { SubscriptionsScreen } from './src/screens/SubscriptionsScreen';
 import { ItemsScreen } from './src/screens/ItemsScreen';
 import { AssistantScreen } from './src/screens/AssistantScreen';
 import { VouchersScreen } from './src/screens/VouchersScreen';
+import { BillsScreen } from './src/screens/BillsScreen';
 import { StatementsScreen } from './src/screens/StatementsScreen';
 import { CalendarScreen } from './src/screens/CalendarScreen';
 import { ReportsScreen } from './src/screens/ReportsScreen';
@@ -25,7 +26,7 @@ import { ActivityScreen } from './src/screens/ActivityScreen';
 const TITLES: Record<ScreenKey, string> = {
   home: 'Pharos', assistant: 'AI assistant', shopping: 'Shopping list', receipts: 'Receipts',
   tasks: 'Tasks', expenses: 'Expenses', income: 'Income', subscriptions: 'Subscriptions', items: 'Inventory',
-  vouchers: 'Vouchers', statements: 'Statements', calendar: 'Calendar', reports: 'Reports', settings: 'Settings',
+  vouchers: 'Vouchers', statements: 'Statements', bills: 'Bills', calendar: 'Calendar', reports: 'Reports', settings: 'Settings',
   search: 'Search', activity: 'Activity',
 };
 
@@ -75,6 +76,7 @@ export default function App() {
       case 'items': return <ItemsScreen />;
       case 'vouchers': return <VouchersScreen />;
       case 'statements': return <StatementsScreen />;
+      case 'bills': return <BillsScreen />;
       case 'calendar': return <CalendarScreen />;
       case 'reports': return <ReportsScreen />;
       case 'settings': return <SettingsScreen onSignOut={signOut} />;

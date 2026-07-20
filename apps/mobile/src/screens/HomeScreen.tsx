@@ -4,7 +4,7 @@ import { C } from '../theme';
 import { money, Spinner, ErrorText, contentWidth } from '../ui';
 import { getOverview, type Overview } from '../api';
 
-export type ScreenKey = 'home' | 'shopping' | 'receipts' | 'tasks' | 'expenses' | 'income' | 'subscriptions' | 'items' | 'assistant' | 'vouchers' | 'statements' | 'calendar' | 'reports' | 'settings' | 'search' | 'activity';
+export type ScreenKey = 'home' | 'shopping' | 'receipts' | 'tasks' | 'expenses' | 'income' | 'subscriptions' | 'items' | 'assistant' | 'vouchers' | 'statements' | 'bills' | 'calendar' | 'reports' | 'settings' | 'search' | 'activity';
 
 type Tile = { key: ScreenKey; label: string; count?: (o: Overview) => number; color: string };
 const TILES: Tile[] = [
@@ -16,6 +16,7 @@ const TILES: Tile[] = [
   { key: 'expenses', label: 'Expenses', count: (o) => o.counts.expenses, color: C.gold },
   { key: 'income', label: 'Income', color: C.accent },
   { key: 'subscriptions', label: 'Subscriptions', count: (o) => o.counts.subscriptions, color: C.cyan },
+  { key: 'bills', label: 'Bills', color: C.red },
   { key: 'vouchers', label: 'Vouchers', color: C.gold },
   { key: 'statements', label: 'Statements', color: C.purple },
   { key: 'calendar', label: 'Calendar', color: C.cyan },

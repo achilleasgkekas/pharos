@@ -6,6 +6,37 @@
 <!-- docker-validated: 6ff8678 -->
 <!-- ui-audited: 06f950f -->
 
+## 2026-07-20 (builder — Bills mobile parity, P28 gap, 7ο run της ημέρας)
+
+**Επιλογή task**: ελέγχθηκε πρώτα το Approved queue (`OWNER_DECISIONS.md` #8 + `PRODUCT_BACKLOG.md → ##
+Approved`) — σχεδόν εξαντλημένο· μόνο P31 (household roles, ρητά deferred 4η φορά, χρειάζεται supervised
+live-login session) και P36 (open banking, blocked σε provider decision) μένουν πραγματικά ανοιχτά, τα
+υπόλοιπα (P23/P17/P5 mobile-native, P9 multi-currency L, P16 Firefly/Grocy) χρειάζονται είτε Expo simulator
+είτε πραγματικό sample file/decision που δεν είναι testable unattended. Fallback στο `MOBILE_PARITY.md` Build
+Queue (P2/L items, «mirrors υπάρχον CRUD entity pattern»): επιλέχθηκε **Bills** (P28 gap) ως το απλούστερο από
+τα 4 ισοδύναμα (Bills/GiftCards/Goals/LoyaltyCards) — καθαρό CRUD χωρίς nested sub-array (GiftCard uses[]/Goal
+contributions[]) ή νέο native dependency (LoyaltyCard barcode rendering).
+
+**Υλοποίηση**: νέο `GET/POST /api/v1/bills` + `PATCH/DELETE /api/v1/bills/[id]` (mirror του `vouchers` v1 route
+ατόφιο) + derived `status` πεδίο (reuse `lib/bill.ts billStatus`) + `PATCH {paid, paidDate?}` που mirror-άρει το
+web `markBillPaid` (spawn του επόμενου recurring instance μόνο την πρώτη φορά που πληρώνεται, idempotent).
+Mobile: νέο `BillsScreen.tsx` (mirror του `VouchersScreen.tsx` pattern) + `api.ts` CRUD fns + wiring σε
+`HomeScreen`/`nav.tsx`/`App.tsx`. Πλήρες detail στο `MOBILE_PARITY.md` (Bills entry).
+
+**Verify**: `npm run type-check` (web) EXIT 0· `apps/mobile npx tsc --noEmit` EXIT 0· full `npx vitest run`
+**2835 passed / 218 files** (+27 νέα route tests, μηδέν regression). Docker: lock acquired/released καθαρά,
+mongo healthy πριν το `up -d web`, `RestartCount=0`, `/login` 200 στην 1η προσπάθεια. `curl /api/v1/bills`
+χωρίς token/bogus token/PATCH χωρίς token → και τα τρία 401 (όχι 500). Browser-checked (Claude Browser pane):
+`/login` → «Sign in · Pharos», μηδέν console errors. `docker builder prune -f`, lock released.
+
+**Follow-ups (out of scope εδώ)**: το mobile `PATCH` δεν υποστηρίζει το προαιρετικό «auto-log expense on pay»
+του web action (opt-in ακόμα και στο web)· `/api/v1/overview` δεν έχει bills count ακόμα (το homepage tile
+μένει χωρίς badge αριθμό)· Bill δεν έχει per-record `currency` (ίδιο με το web model, `money()` fallback EUR).
+
+**Next task**: επόμενο P2/L item από το ίδιο Build Queue pattern — GiftCards (P32 gap) ή Goals (P12 gap) ή
+LoyaltyCards (P20 gap, χρειάζεται επιπλέον `react-native-barcode-svg` dependency). Αν το Approved queue
+παραμένει άδειο, αξίζει να το επισημανθεί ξανά στον Αχιλλέα (βλ. PRODUCT_BACKLOG.md 12η σάρωση flag).
+
 ## 2026-07-20 (reviewer — έλεγχος 109 commits από τον προηγ. marker `638e33a`)
 
 **Εύρος**: `638e33a..779970a` (109 commits, ο προηγ. reviewer marker ήταν σχεδόν 1 μέρα πίσω — κάλυψε ΟΛΗ τη σημερινή δραστηριότητα: MFA/TOTP core [increments 79/80a], mobile-parity batch [safe-to-spend/budget-rollover/net-worth/Month-in-Review], SaaS control-plane UI batch [account settings/workspace settings/BYO AI key/invite-accept/resend-invite/leave-workspace/create-workspace/activity pagination], 4 νέα self-hosted features [P3 Month-in-Review, P11 IMAP email-in, P13 insurance export, P8 tax export], notifications reconcile test coverage, landing content). Ένα μεγάλο μέρος (`83f392f..HEAD`, 26 commits) είχε ήδη ελεγχθεί από τον web-code-quality auditor's 56η σάρωση (confirmed exemplary, 0 νέο P1/P2 εκτός i18n) — δεν το ξαναδουλεύω, εστίασα στα υπόλοιπα ~83 commits + ειδικά στα security-sensitive νέα (MFA core, δεν είχαν καλυφθεί από την 56η).

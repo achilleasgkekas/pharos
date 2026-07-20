@@ -352,7 +352,38 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - Πλήρες CRUD round-trip μέσω των νέων v1 routes, auth-gated 401 χωρίς token
   - mobile list δείχνει bill rows με derived status badge (paid/overdue/due-soon/upcoming), mark-paid action
   - tsc καθαρό web+mobile
-- Status: TODO
+- Status: ✅ DONE 2026-07-20 (pharos-daily-dev). Νέο **`GET/POST /api/v1/bills`** + **`PATCH/DELETE
+  /api/v1/bills/[id]`** (mirror shape/auth/error-envelope του `vouchers` route ατόφιο, ίδιο `trim()`/`isObjectId`/
+  `withAuth` idiom). `trim()` επιπλέον υπολογίζει **`status`** (`billStatus(dueDate, paidAt)`, reuse του ήδη-tested
+  pure `lib/bill.ts`) ώστε το mobile να μην ξαναγράφει τη λογική. GET default εξαιρεί archived (`?archived=1` τα
+  δείχνει), `?paid=0` φιλτράρει σε unpaid μόνο, sort dueDate ascending (πιο επείγον πρώτο). POST απαιτεί
+  title+έγκυρο dueDate, `cycle` enum-gated. **PATCH `{paid, paidDate?}`** mirror-άρει το web `markBillPaid`: `paid:
+  true` θέτει `paidAt` (now ή `paidDate`) και — μόνο την ΠΡΩΤΗ φορά που πληρώνεται ένα recurring bill (`cycle`
+  set, guard στο προϋπάρχον `paidAt`) — spawn-άρει το επόμενο pending instance έναν κύκλο μπροστά
+  (`nextBillDue`, ίδιο idempotent-on-first-pay σχήμα)· `paid: false` καθαρίζει το `paidAt` (undo). Response
+  `{bill, spawnedNext}` (additive flag, το mobile δεν το χρειάζεται να το διαβάσει — απλά reload-άρει τη λίστα).
+  **Δεν** υλοποιήθηκε το προαιρετικό «auto-log expense on pay» του web action (out of scope, opt-in ακόμα και στο
+  web, follow-up αν χρειαστεί). Mobile: `api.ts` νέο `Bill`/`BillStatus` type + `getBills`/`addBill`/`updateBill`/
+  `deleteBill`/`setBillPaid`, νέο **`BillsScreen.tsx`** (mirror του `VouchersScreen.tsx` pattern: quick add μέσα
+  σε modal [όχι inline row, το Bill χρειάζεται minimum title+dueDate], Open/All filter chips + overdue count
+  hint, κάρτα ανά bill με χρωματιστό status `Badge` [παρόμοιο coding με το web: overdue=red / due-soon=gold /
+  paid=accent / upcoming=faint], ξεχωριστό «Mark paid»/«Mark unpaid» `Pressable` **sibling** μέσα στην κάρτα -ΟΧΙ
+  nested μέσα σε Card.onPress- ώστε να μην συγκρούεται με το tap-to-edit, edit modal με cycle chips + delete).
+  Wired: `HomeScreen.tsx` `ScreenKey`+tile (κόκκινο, χωρίς overview count — το `/api/v1/overview` δεν έχει bills
+  count ακόμα, follow-up μικρό), `nav.tsx` Money group, `App.tsx` import+TITLES+case. **Δεν** έχει per-bill
+  currency (το Bill model δεν αποθηκεύει `currency`, ίδιο με το web· `money()` fallback EUR, follow-up αν
+  χρειαστεί multi-currency parity). **Verify**: `npm run type-check` (web) EXIT 0· `apps/mobile npx tsc --noEmit`
+  EXIT 0. Full `npx vitest run` **2835 passed / 218 files** (+27 νέα route tests: GET filters/sort/status-compute,
+  POST validation/defaults/cycle-gate, PATCH plain-field/paid-transition/recurring-spawn-once/paidDate/unpaid,
+  DELETE soft-delete, 404s παντού, auth gate). Docker: lock acquired καθαρά, mongo ήδη healthy, `docker compose
+  build web` OK, `up -d web` → `/login` 200 στην 1η προσπάθεια, `RestartCount=0`. `curl /api/v1/bills` χωρίς token
+  + bogus token + PATCH χωρίς token → και τα τρία 401 (όχι 500). `docker logs` καθαρό (μόνο το προϋπάρχον άσχετο
+  `@napi-rs/canvas` warning + stale-Server-Action errors από ένα ήδη-ανοιχτό browser tab με παλιό bundle, γνωστό/
+  documented, χρειάζεται hard-refresh όχι server fix). Browser-checked (Claude Browser pane): `/login` → «Sign in
+  · Pharos», μηδέν console errors. `docker builder prune -f`, lock released καθαρά. **Το πραγματικό mobile UI
+  (BillsScreen κάρτες/badges/mark-paid) ΔΕΝ testable end-to-end unattended** (χρειάζεται login + Expo simulator) —
+  verified πλήρως μέσω route tests + type-check και στα δύο apps, ίδιος περιορισμός με κάθε προηγούμενο
+  mobile-parity shipment.
 
 ### Gift cards — store-credit balance tracker στο mobile (P32 gap, νέο entity — μηδέν v1 route ακόμα)
 - Priority: P2 | Size: L | no AI, no decision — mirrors υπάρχον CRUD entity pattern
