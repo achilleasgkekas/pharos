@@ -2170,3 +2170,25 @@ Mock pattern: ίδιο με τα προηγούμενα direct-actions tests, mo
 - Collision guard: `git status --short`/`git diff --cached --name-only` πριν το commit έδειξαν ΜΟΝΟ το νέο αρχείο μου. `git fetch origin main` → ahead 1, καθαρό fast-forward, push σε `origin main` επιτυχές (6d0b9c3..a4b62e6), χωρίς rebase ανάγκη.
 
 Suggested next task: από την ίδια sweep-λίστα, ακόμα ανέγγιχτα: `login/actions.ts` (32 γραμμές, μικρό/απλό — καλό επόμενο), `history/actions.ts` (50), `setup/actions.ts` (59), `vouchers/actions.ts` (78, το plain `actions.ts` του φακέλου, ΟΧΙ το ήδη-καλυμμένο `giftcardActions.ts`/`loyaltyActions.ts`). Έλεγξε ξανά αν το `subscriptions/actions.ts` (170 γραμμές) έχει ηρεμήσει (καμία πρόσφατη commit πάνω του) πριν το πιάσεις — αν όχι ακόμα, προτίμησε τα μικρότερα. Διάβασε ΠΡΩΤΑ το υποψήφιο πριν διαλέξεις. Έλεγξε ΠΑΝΤΑ πρώτα `git status` collision-guard. Ένα module ανά run.
+
+---
+
+## 2026-07-21 (cont.³⁰ — setup/actions.test.ts, onboarding wizard)
+
+**Task: DB-mocked unit test για `apps/web/src/app/setup/actions.ts`** (59 γραμμές, ο first-run onboarding wizard) — από την ίδια sweep-λίστα του προηγούμενου run. `subscriptions/actions.ts` παρέμεινε ανενεργό ξανά (πρόσφατο `feat(subscriptions): auto-discover untracked recurring charges (P7)` στο ιστορικό) → skip όπως προειδοποιούσε.
+
+Collision guard: `git status --short` στην αρχή έδειξε foreign uncommitted WIP σε 4 αρχεία (mobile/api.ts, mobile/ItemsScreen.tsx, `api/v1/items/[id]/route.ts`+`.test.ts` — μια άλλη routine στο items API), κανένα από τα δικά μου target. Δεν τα άγγιξα, έμειναν άθικτα και μετά το commit.
+
+Διάβασα ολόκληρο το αρχείο: `createFirstAdmin` (guard `User.countDocuments()>0` → «Setup already completed.» πριν καν διαβάσει τα form fields, username lowercase+trim πριν το length/regex check, password length + confirm-match, `User.create` με `role:'admin'` hardcoded + `hashPassword`, `setSessionCookie` με name fallback στο username), `saveSetupBasics` (`requireAdmin`, currency default 'EUR'+uppercase, VAT clamp `Math.max(0,Math.min(100,...))` με NaN fallback σε 24), `saveSetupAi` (delegate πλήρες στο `saveAiConfig` cross-module action, μετά `aiEnabled:true` + cache invalidate), `finishWithoutAi` (`aiEnabled:false` + invalidate).
+
+**Σχεδιαστική επιλογή**: το `@/lib/auth` module mockαρίστηκε **partial** μέσω `importOriginal` — `hashPassword`/`verifyPassword` έμειναν ΠΡΑΓΜΑΤΙΚΑ (pure/deterministic, ήδη πλήρως pinned στο δικό τους `lib/auth.test.ts`), ενώ μόνο `setSessionCookie`/`requireAdmin` (πραγματικό I/O boundary μέσω `next/headers` cookies/redirect) mockαρίστηκαν. Αυτό επιτρέπει στο "on success" test να καλέσει το πραγματικό `verifyPassword` πάνω στο αποθηκευμένο hash και να επιβεβαιώσει end-to-end ότι το password πράγματι round-trips (αντί να mockάρεις hashPassword και να πιστεύεις τυφλά ότι περνιέται σωστά). `saveAiConfig` (`@/app/settings/actions`) mockαρίστηκε πλήρως ως cross-module boundary με δική του κάλυψη αλλού.
+
+Τι έγινε: Νέο `setup/actions.test.ts` (16 tests): createFirstAdmin (8: already-setup-guard, username-too-short, username-bad-charset, uppercase-username-lowercased, password-too-short, password-mismatch, success-hash-roundtrips+role+cookie, name-falls-back-to-username), saveSetupBasics (6: requires-admin, uppercases-currency+valid-vat-passthrough, blank-currency-defaults-EUR, negative-vat-clamped-0, vat-above-100-clamped-100, NaN-vat-falls-back-24), saveSetupAi (1: requires-admin+delegates+enables+invalidates), finishWithoutAi (1).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/setup/actions.test.ts"` → 16/16 passed (~14s· το «on success» test κάνει 3 πραγματικά scrypt calls μέσω hashPassword/verifyPassword×2, ~9.5s μόνο του — αναμενόμενο, το ίδιο pattern με το lib/auth.test.ts).
+- `npx vitest run` (όλο το suite) → **220 files, 2861/2861 passed** (από 218/2835).
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό στην πρώτη προσπάθεια.
+- Collision guard: `git status --short`/`git diff --cached --name-only` πριν το commit έδειξαν ΜΟΝΟ το νέο αρχείο μου (τα 4 foreign αρχεία παρέμειναν modified/untracked, εκτός staging). `git fetch origin main` → ahead 1, καθαρό fast-forward, push σε `origin main` επιτυχές (2672c8d..2784779), χωρίς rebase ανάγκη.
+
+Suggested next task: από την ίδια sweep-λίστα, ακόμα ανέγγιχτα: `login/actions.ts` (32 γραμμές, μικρό/απλό — καλό επόμενο, mock `@/models/User`+partial `@/lib/auth` όπως εδώ) ή `history/actions.ts` (50, Conversation model mock + string-strip preview logic) ή `vouchers/actions.ts` (78, το plain actions.ts, ΟΧΙ giftcardActions/loyaltyActions). Έλεγξε ξανά αν το `subscriptions/actions.ts` (170 γραμμές) έχει ηρεμήσει πριν το πιάσεις. Διάβασε ΠΡΩΤΑ το υποψήφιο πριν διαλέξεις. Έλεγξε ΠΑΝΤΑ πρώτα `git status` collision-guard. Ένα module ανά run.
