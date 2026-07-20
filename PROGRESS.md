@@ -6551,3 +6551,56 @@ candidates νωρίτερα, αυτό βγαίνει προτεραιότητα 
 ## Needs Achilleas
 
 - Τίποτα νέο από αυτό το run.
+
+## 2026-07-20 (pharos-daily-dev, 4ο run της ημέρας)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε μόνο ένα OPEN item από το
+bakecore-finance routine (άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή.
+
+**Approved queue check (βήμα a)**: επιβεβαίωσα ξανά ότι το Approved queue παραμένει με ΜΟΝΟ P31/P36
+πραγματικά blocked, καμία αλλαγή από τα προηγούμενα σημερινά runs. **Fallback στο βήμα (b)**: το suggested
+next task του 3ου σημερινού run, top-ranked mobile-parity item: **Reports safe-to-spend forward-cashflow
+κάρτα στο mobile (P19 gap, P2/M)**, ήδη πλήρως speced στο `MOBILE_PARITY.md`.
+
+**Reports — safe-to-spend forward cashflow κάρτα στο mobile (P19 gap) — ✅ SHIPPED** (commit `0554035`). Πλήρες
+detail στο `MOBILE_PARITY.md` entry (τώρα marked DONE). Σύνοψη: `GET /api/v1/reports` παίρνει νέο additive
+`safeToSpend` field — καλεί το ήδη-υπάρχον `computeMoneyAgenda()` (δικό του DB round-trip, ίδιο idiom με το
+web `/reports` server component, το οποίο επίσης κάνει ξεχωριστό call αντί να ξαναχρησιμοποιήσει τα ήδη-fetched
+πεδία, αφού ο agenda χρειάζεται subs/statements/items/vouchers/recurring-expenses σε διαφορετικό σχήμα) →
+`computeSafeToSpend(agendaMonths)` (ήδη-tested pure lib από το web P19). Mobile: `api.ts` `Reports` +=
+optional `safeToSpend` (mirror του web type)· `ReportsScreen.tsx` νέα κάρτα ανάμεσα στο net-worth/net-position
+card και το this-month/this-year stat row — headline net (πράσινο/κόκκινο) + income/outflow υπότιτλος + 3 chips
+(30d/60d/90d, reuse το ήδη-υπάρχον `reviewChip` idiom του Month-in-Review card, νέο μόνο το `stsCard` style).
+
+**Test seam decision**: αντί να μοντάρω ξανά τα 5 υποκείμενα models (Subscription/Voucher/Item/Statement/
+Expense) στο `reports/route.test.ts` για να τρέξει το πραγματικό `computeMoneyAgenda` (θα χρειαζόταν νέο
+Voucher mock + ένα `.sort()` στο Expense chain που το υπάρχον mock δεν υποστηρίζει), μοντάρισα το
+`computeMoneyAgenda` ολόκληρο ως seam (`vi.mock('@/lib/moneyAgenda', ...)`) — ίδιο idiom με το ήδη-υπάρχον
+`computeInstallmentPlans` seam στο ίδιο αρχείο. Το πραγματικό `computeSafeToSpend` έχει ήδη τα δικά του unit
+tests (`safeToSpend.test.ts`, από το αρχικό web P19)· το DB-wiring του `computeMoneyAgenda` καλύπτεται ήδη από
+το `calendar/route.test.ts` (που ΤΟ μοντάρει με τα πραγματικά 5 models, αφού εκεί είναι το subject υπό test).
++2 νέα tests στο `reports/route.test.ts` (agenda→windows pass-through με σωστό μήνα-label + income/outflow/net,
+fresh-install zero-state).
+
+**Verify**: `npm run type-check` (web) EXIT 0· `apps/mobile npx tsc --noEmit` EXIT 0. Full `npx vitest run`
+**2691 passed / 209 files** (+2 νέα στο `route.test.ts`, μηδέν regression). Docker: `mkdir
+/tmp/claude-docker.lock` (lock acquired καθαρά) → `docker compose build web` OK → mongo ήδη healthy → `up -d
+web` → `RestartCount=0`, `/login` 200 στην 1η προσπάθεια. `curl /api/v1/reports` χωρίς token + bogus token →
+και τα δύο 401 (όχι 500 — το additive field δεν έσπασε το auth gate). `docker logs` καθαρό (μόνο το
+προϋπάρχον άσχετο `@napi-rs/canvas` warning). Browser-checked (Claude Browser pane): `/reports` → redirect σε
+«Sign in · Pharos» (αναμενόμενο, auth-gated, χωρίς credentials εδώ), μηδέν console errors. `docker builder
+prune -f` (2.313GB), lock released καθαρά. **Το πραγματικό mobile UI (κάρτα + 3 chips) ΔΕΝ testable end-to-end
+unattended** (χρειάζεται login + real agenda δεδομένα + Expo simulator) — verified πλήρως μέσω route tests στο
+πραγματικό αποτέλεσμα του υπολογισμού + type-check και στα δύο apps, ίδιος περιορισμός με κάθε προηγούμενο
+mobile-parity shipment σήμερα.
+
+**Suggested next task**: το επόμενο-ψηλότερο mobile-parity item είναι **budget envelope/rollover mode στο
+mobile** (P25 gap, P2/M, ήδη πλήρως speced στο `MOBILE_PARITY.md` — `AppConfig.budgetRollover` toggle +
+GET/PATCH `/api/v1/settings` + additive `effective`/`carried` στα budget rows του `/api/v1/reports`). Μετά από
+αυτό: loyalty card wallet στο mobile (P20 gap, P2/L, χρειάζεται νέο RN barcode-display primitive). Το Approved
+queue παραμένει σχεδόν άδειο (μόνο P31/P36 blocked) — αν εγκριθεί κάτι νέο από τα P37-P51 candidates νωρίτερα,
+αυτό βγαίνει προτεραιότητα (βήμα a) στο επόμενο run.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run.
