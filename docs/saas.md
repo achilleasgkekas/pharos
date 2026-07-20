@@ -186,7 +186,7 @@ each renders inside a shared `AuthShell` card.
 | Route | Renders |
 | --- | --- |
 | `/account/login` | Email + password form. Posts to [`POST /api/saas/auth/login`](#authentication); on success does a **full** page navigation (not a client route change) to the sanitized `next` path so the fresh server render picks up the just-set httpOnly session cookie. Links to signup. |
-| `/account/signup` | Email + password (≥ 8 chars) plus **optional** display name and workspace name. Posts to [`POST /api/saas/auth/signup`](#authentication), which provisions a first workspace with an owner membership. Links to login. |
+| `/account/signup` | Dual-mode page serving two flows. **Normal signup:** email + password (≥ 8 chars) plus optional display name and workspace name; posts to [`POST /api/saas/auth/signup`](#authentication), which provisions a first workspace with an owner membership. **Invite acceptance:** if a `?invite=<token>` query param is present, the page server-renders an invite preview (invitee email and workspace name) and shows a lightweight `InviteAcceptForm` (confirm button + optionally set password if no account exists yet) instead. The form posts to [`POST /api/saas/invites/accept`](#invite-management) with the token. Invalid or expired invites show an "Invitation not available" message with fallback links to login/signup. A viewer already signed in to a different email is allowed to accept (the session switches to the invited account). Both flows redirect an already-signed-in viewer to `next` instead of showing a form. Links to login. |
 
 Both pages redirect an **already-signed-in** viewer straight to `next` instead of
 showing a form (this is also how a superadmin reaches `/admin`: sign in here,

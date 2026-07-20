@@ -1860,3 +1860,27 @@ Validation: markdown only, κανενα build/Docker/AI call. Code fences: saas.
 Collision guard: git status --short δειχνει μονο docs/saas.md staged (δικο μου), 6 foreign WIP files (apps/web edits, ΔΕΝ τα αγγιζω). Commit ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md.
 
 Επομενο run: (α) αν αλλα νέα SaaS routes ή tabs προστεθουν, update saas.md · (β) api.md sync αν νέα v1 routes landed · (γ) features.md stale-forward για αλλα νέα shipped features.
+
+## 2026-07-20 (sixth run — P0 invite-accept UI documentation)
+
+Νέα feature landed: "invite-accept UI" (commit bed9789). Ο χρήστης κάνει invite σε κάποιον, στέλνει email με link `/signup?invite=<token>`, και ο προσκεκλημένος κάνει sign-up μέσω της invite form. Αυτό ήταν πλήρως functional αλλα δεν ήταν documented.
+
+Τι εγραψα:
+- **saas.md**: Ενημερωσα το `/account/signup` row στη Browser sign-in UI table να καλύπτει dual-mode flow:
+  - Normal signup: email + password + optional name/workspace, creates first workspace with owner membership
+  - Invite acceptance: reads `?invite=<token>`, server-renders invite preview (email, workspace name), shows lightweight InviteAcceptForm (confirm + password if needed)
+  - Invalid/expired invites show "Invitation not available" + fallback links
+  - Already-signed-in viewers can accept to switch sessions (e.g. logged in as alice@, accept invite for bob@)
+  - Both flows redirect already-signed-in to `next`
+- Λεπτομέρειες: αναφορά σε POST /api/saas/invites/accept endpoint + InviteAcceptForm component εξηγήθηκαν με ακρίβεια
+
+Accuracy verified εναντι κώδικα:
+- apps/web/src/app/(saas)/account/signup/page.tsx (loadInvitePreview, dual-mode flow comment, InviteAcceptForm conditional render, already-signed-in session-switch note)
+- apps/web/src/components/saas/InviteAcceptForm.tsx (exists, confirm button + password field)
+- apps/web/src/app/api/saas/invites/accept/route.ts (POST endpoint, creates/reuses account, sets session)
+
+Validation: markdown only, κανενα build/Docker/AI call. Code fences: saas.md = 18 (even, 9 balanced blocks, αθικτα). Internal links: #invite-management resolve-ει (γραμμη 535), #authentication resolve-ει (γραμμη 167). Secret scan: κανένα literal credential ✓.
+
+Collision guard: git status --short = ΜΟΝΟ docs/saas.md (δικο μου), 0 staged/uncommitted foreign files.
+
+Επομενο run: (α) αν αλλα νέα SaaS routes ή pages προστεθουν (π.χ. workspace-onboarding checklist), update saas.md · (β) api.md sync αν νέα v1 routes landed (π.χ. bills/* endpoints που περιμένουν) · (γ) features.md stale-forward για αλλα νέα shipped features.
