@@ -1,5 +1,23 @@
 # DOCS_PROGRESS
 
+## 2026-07-21 (tenth run — MFA enrollment UI documentation [increment 82])
+
+Σάρωση git log για undocumented features από τα τελευταία commits. Ανακάλυψα ότι το **increment 82 (MFA enrollment UI panel, commit 2965e57, 2026-07-20 23:02)** ήταν shipped (follow-up στο 80a που έκανε τα API routes) αλλά ΔΕΝ ήταν documented στο saas.md.
+
+Τι έγραψα:
+- **saas.md**: Προσθεση νέας subsection "#### MFA enrollment UI (`/account/settings`)" αμέσως μετά την recovery codes παραγράφο και πριν τα "Data export (GDPR)". Περιγραφη: state machine UI flow με 5 κύρια states (idle — disabled, idle — enabled, password-re-auth-to-start, enrollment, recovery-codes, password-re-auth-to-disable). Λεπτομέρεια για κάθε state: buttons που δείχνονται, input fields, inline copy, API endpoints που καλούνται, validation. Error handling σεκτιον με `describeMfaError()` mapping. SaaS-only note (404 όταν SAAS_MODE off).
+
+Validation (markdown only, κανενα build/Docker/AI):
+- Code fences: 18 σύνολο (balanced, ίδια με πριν) ✓.
+- Internal links: 1 internal reference σε `mfaSettings.ts` (υπάρχει ως file path, όχι κατ'ευθείαν link αλλά είναι αναφορά στο κώδικα) ✓.
+- Secret scan: κανένα sk_/pk_/literal credential; μόνο placeholder example `JBSWY3DPEBLW64TMMQ======` ✓.
+- Markdown structure: 1 subsection (####), 6 substates ως **bold headers** με bullet lists, implementation notes, SaaS-only disclaimer ✓.
+- Spelling / consistency: ακολουθεί το pattern των άλλων MFA sections (endpoints, recovery codes explanation); το "increment 82" αναφερόμενο για context.
+
+Collision guard: git status --short = ΜΟΝΟ docs/saas.md + docs/DOCS_PROGRESS.md modified (δικά μου). Δεν υπάρχουν foreign staged files (τα apps/mobile/* και apps/web/* που φαίνονται είναι dirty από άλλο work, ΟΧΙ staged).
+
+Επόμενο run: (α) grep για άλλα νέα features που shipαρίστηκαν (π.χ. από τα πιο πρόσφατα commits που δεν είναι yet documented), ή (β) api.md — verify ότι τα MFA endpoints λίστα είναι complete στο OpenAPI schema, ή (γ) mobile.md — check αν mobile app πρέπει να support MFA flows (probably no, αφού auth είναι web-only SaaS).
+
 ## 2026-07-20 (ninth run — MFA enrollment documentation [increment 80a])
 
 Σάρωση git log για undocumented features από τα τελευταία commits. Ανακάλυψα ότι το **increment 80a (MFA enrollment core, commit 7c90186, 2026-07-20 18:41)** ήταν shipped αλλά ΔΕΝ ήταν documented στο saas.md.

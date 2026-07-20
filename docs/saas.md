@@ -292,6 +292,72 @@ the code is gone. Recovery codes are displayed as a downloadable list at enrollm
 time; if lost, the only recovery path is `DELETE /api/saas/account/mfa` (password
 re-verification required) to disable MFA entirely and start over.
 
+#### MFA enrollment UI (`/account/settings`)
+
+The account settings page exposes MFA enrollment as a sub-form within the "Two-factor
+authentication" section (increment 82). The user-facing flow is state-machine-driven,
+consuming the endpoints above:
+
+**Idle state** — if MFA is disabled:
+- Button **"Enable two-factor authentication"** starts enrollment (calls `POST
+  /api/saas/account/mfa` without a password).
+- Inline copy: "Require a code from an authenticator app (Google Authenticator, 1Password,
+  …) in addition to your password."
+
+**Idle state** — if MFA is already enabled:
+- Section header displays an "enabled" badge.
+- Button **"Replace authenticator app"** restarts enrollment; requires password
+  re-verification first (transitions to "need-password-to-start").
+- Button **"Disable"** turns off MFA; requires password re-verification first (transitions
+  to "need-password-to-disable").
+- Inline copy: "An authenticator app is required at sign-in in addition to your password."
+
+**Password re-auth (to start / to disable)** — if already enabled and user clicked replace/disable:
+- Password field (`<input type="password">`).
+- "Continue" button (enabled only when password is non-empty; disables on submit).
+- "Cancel" button resets the flow.
+- On "Continue", calls `POST /api/saas/account/mfa` (with `{ password }` body for
+  replace) or transitions to password-to-disable.
+
+**Enrollment** — after `POST /api/saas/account/mfa` succeeds:
+- Displays the plaintext `secret` (e.g., `JBSWY3DPEBLW64TMMQ======`) in a monospace
+  box labeled "Manual entry key".
+- Below it, displays the `uri` (RFC 6238 `otpauth://…` link) for QR code rendering;
+  this UI shows it as plaintext for users who prefer to scan from another device.
+- Input field for 6-digit TOTP code (`<input inputMode="numeric">`, auto-strips non-digits,
+  max 6 characters).
+- "Confirm" button (enabled only when code is exactly 6 digits; disables on submit).
+- "Cancel" button resets the flow.
+- On "Confirm", calls `POST /api/saas/account/mfa/confirm` with `{ code }`.
+
+**Recovery codes display** — if confirmation succeeds:
+- Warning box (gold/warning styling): "Save these recovery codes now — each works once,
+  and they will not be shown again. Use one if you ever lose access to your authenticator
+  app."
+- 2-column grid of 10 recovery codes (monospace, fully selectable).
+- "I've saved these codes" button finalizes the flow.
+- After this, the section transitions back to idle state with "enabled" badge and "Replace"
+  / "Disable" buttons.
+
+**Password re-auth (to disable)** — if user is already MFA-enabled and clicks "Disable":
+- Password field.
+- "Disable two-factor authentication" button (red styling; enabled only when password is
+  non-empty).
+- "Cancel" button resets the flow.
+- On submit, calls `DELETE /api/saas/account/mfa` with `{ password }`.
+
+**Error handling:**
+- All endpoints return a generic `400` on invalid code, missing password, crypto unavailable,
+  etc.
+- The UI maps HTTP status + server error string to user-friendly messages via
+  `describeMfaError()` (e.g., "That code did not match. Check the time on your device
+  and try again."). See `mfaSettings.ts` for the error dictionary.
+- Validation gates are instant: the form disables buttons until code is 6 digits or
+  password is non-empty, preventing submit of invalid state.
+
+**SaaS-only.** When `SAAS_MODE` is off, this section does not render (the route is 404).
+Self-hosted app has no account login / multi-tenant features; MFA is out of scope.
+
 ### Data export (GDPR)
 
 A signed-in account can download a machine-readable copy of the personal data the
