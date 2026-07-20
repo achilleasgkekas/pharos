@@ -71,7 +71,7 @@ const FEATURES: {
     icon: 'ticket',
     color: 'var(--red)',
     title: 'Vouchers & coupons',
-    desc: 'Store gift cards and discount codes, track the balance left on each one, and get expiry reminders before value slips away. Add them by hand or let AI read them from a screenshot.',
+    desc: 'Store gift cards and discount codes, track the balance left on each one, and get expiry reminders before value slips away. Loyalty and membership cards work too, tap one to show a scannable barcode at checkout. Add them by hand or let AI read them from a screenshot.',
   },
   {
     icon: 'chart',
