@@ -3287,3 +3287,58 @@ ai-key`, `workspace/erasure`, `workspace/export`+`workspace/export/files`) — �
 service settings (BYO AI key, GDPR erasure/export), μικρότερης προτεραιότητας από το onboarding
 που μόλις έκλεισε αλλά ακόμα gaps· (γ) η **Usage tab μηδενικά** παραμένει (§#72's carried-over (α),
 `recordAiUsage` wiring εκτός του δικού μου territory).
+
+## 2026-07-20 (increment 74 — Workspace data export links, §UI-first)
+**Το κενό:** από τη σάρωση του #73, 4 dead-UI routes έμειναν: `auth/session`, `workspace/ai-key`,
+`workspace/erasure`, `workspace/export`+`workspace/export/files`. Το `auth/session` δεν χρειάζεται
+UI caller (client-side session refresh helper, το `WorkspaceShell`/κάθε σελίδα ήδη διαβάζει το
+session server-side μέσω `getSaasViewer()`)· το `ai-key` (BYO AI key, χρειάζεται provider-select
+form) και το `erasure` (GDPR right-to-erasure, χρειάζεται confirm+countdown UI για το grace
+window) είναι μεγαλύτερα scoped increments. Διάλεξα το `workspace/export`+`workspace/export/files`
+πρώτο: 2 ήδη-χτισμένα, ήδη-tested GET routes (content dump JSON + binary-file manifest JSON,
+owner/admin only) χωρίς κανένα UI, ενώ το ακριβώς ίδιο μοτίβο (plain authenticated `<a>` download
+link) υπάρχει ήδη στο `AccountSettingsPanel`'s "Your data" section (`/api/saas/account/export`,
+increment 71) — μηδέν νέο idiom να επινοηθεί, μόνο επανάληψη του ίδιου pattern σε νέο scope.
+
+**Built** (additive edit στο δικό μου `WorkspaceSettingsPanel.tsx`, μηδέν νέο αρχείο):
+- Νέο **"Data export"** section ανάμεσα στο "General" και το "Danger zone" — gated στο ήδη-υπάρχον
+  `canManage` prop (mirror του routes' `requireManage=true`, το dump περιέχει δεδομένα ΟΛΩΝ των
+  μελών άρα δεν είναι self-service για απλό member). Δύο plain `<a href>` downloads (GET, καμία
+  client-side mutation state χρειάζεται): "Download workspace data" →
+  `/api/saas/workspace/export?tenant=<slug>` (Mongo collections dump) και "Download file manifest"
+  → `/api/saas/workspace/export/files?tenant=<slug>` (ποια αρχεία στο δίσκο ανήκουν στο workspace +
+  παρόντα/λείπουν + μέγεθος — report-only, δεν packάρει τα binaries, ήδη τεκμηριωμένο στο route's
+  docstring). Ίδιο styling idiom με το account-export button. `tenantSlug` prop ήδη υπήρχε στο
+  component (χρησιμοποιείται ήδη από τα rename/cancel/reactivate calls) — μηδέν νέο prop threading
+  χρειάστηκε στη σελίδα.
+
+**Verified:** `npm run type-check` → **EXIT 0**. Full suite `npx vitest run` → **2581/2581 green**
+(202 files — ίδιος αριθμός με το #73's 2555 +23 από routines που προσγειώθηκαν στο μεταξύ, μηδέν
+δικά μου νέα tests αφού δεν υπάρχει νέα pure λογική, μόνο JSX/markup). ΚΑΝΕΝΑ υπάρχον feature
+αρχείο δεν αγγίχτηκε (1 additive edit σε δικό μου SaaS-only client component, μηδέν shared
+component/layout/globals.css). `SAAS_MODE` off / self-hosted = **zero effect** (το section
+render-άρεται μόνο μέσα στο ήδη-gated `(saas)` segment). Κανένας Docker rebuild (καθαρό
+additive JSX σε ήδη-mounted component, μηδέν shared runtime wiring, μηδέν νέα εξάρτηση — ίδιο
+σκεπτικό με τα increments 58-73). Browser-verify skipped: `docker exec homepage-web printenv
+SAAS_MODE` → κενό (exit 1) στο live `:3000` container, άρα η settings σελίδα ήδη 404άρει
+ανεξαρτήτως του νέου section (σωστό self-hosted behavior, τίποτα νέο να δει κανείς)· θα
+χρειαζόταν rebuild με το flag μόνο-για-verify — απαγορεύεται, ίδιο idiom με τα #66-73. Collision
+guard: `git status --short` πριν το staging έδειξε αρχικά ΚΑΙ ένα `PRODUCT_BACKLOG.md` modified
+(concurrent routine mid-commit) — ΔΕΝ staged/committed τότε, ξανα-έλεγξα λίγο μετά και το αρχείο
+είχε ήδη committed από την άλλη routine (`6a38327`, εκτός δικού μου territory) και εξαφανίστηκε
+από το `git status`· `git diff --cached --name-only` επιβεβαίωσε exact 1-file match πριν το commit.
+
+**## Needs Achilleas** (workspace data export):
+- Τίποτα νέο — καθαρό UI wiring πάνω σε ήδη-εγκεκριμένα, ήδη-tested, read-only backend routes.
+  Το ήδη-τεκμηριωμένο "packaging the binaries is a separate, deferred step" (από το `export/files`
+  route's docstring) παραμένει ανοιχτό αν ο χρήστης θελήσει ποτέ πραγματικό ZIP-download των
+  αρχείων αντί για manifest-only — δεν είναι blocking, χαμηλή προτεραιότητα.
+
+**Next task:** increment 75 — candidates: (α) **BYO AI key UI** (`workspace/ai-key` GET/PUT/DELETE
+— provider-select form + masked-key display + clear button, μεγαλύτερο scope από τα exports·
+mirrors AccountSettingsPanel's password-change form idiom για το PUT/DELETE state)· (β) **GDPR
+erasure self-service UI** (`workspace/erasure` GET/POST/DELETE — schedule/cancel deletion με
+grace-days countdown, owner-only danger-zone addition· χρειάζεται προσεκτικό UX ώστε να μην είναι
+προφανές/κατά-λάθος-clickable, ίδιο επίπεδο σοβαρότητας με cancel-workspace)· (γ) η **Usage tab
+μηδενικά** παραμένει (§#72-74's carried-over, `recordAiUsage` wiring εκτός territory — ίσως ώρα
+για ask-inbox entry αν δεν βρεθεί άλλο UI-first κενό στο επόμενο run).

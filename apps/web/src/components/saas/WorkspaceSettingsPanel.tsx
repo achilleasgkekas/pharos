@@ -1,15 +1,20 @@
 'use client';
 
 // Client interactivity for the user-facing workspace "Settings" panel
-// ((saas)/account/workspace/settings). Consumes three already-built control-plane routes that
-// had zero UI until now:
-//   PATCH  /api/saas/workspace             — rename the display name (owner/admin)
-//   DELETE /api/saas/workspace             — soft-cancel the workspace (owner only)
-//   POST   /api/saas/workspace/reactivate  — reverse a soft-cancel (owner only)
+// ((saas)/account/workspace/settings). Consumes control-plane routes that had zero UI until now:
+//   PATCH  /api/saas/workspace              — rename the display name (owner/admin)
+//   DELETE /api/saas/workspace              — soft-cancel the workspace (owner only)
+//   POST   /api/saas/workspace/reactivate   — reverse a soft-cancel (owner only)
+//   GET    /api/saas/workspace/export       — download the workspace's Mongo content as JSON
+//   GET    /api/saas/workspace/export/files — download the workspace's binary-file manifest
 // The page server-renders the initial name/status; every mutation here calls the route with
 // the chosen workspace slug (so `?w=` stays correct) and then router.refresh() so the server
-// re-reads the source of truth, same idiom as MembersPanel/TenantActionsPanel. Only ever
-// mounted inside the SAAS_MODE-gated (saas) segment.
+// re-reads the source of truth, same idiom as MembersPanel/TenantActionsPanel. The two export
+// routes are plain authenticated `<a>` downloads (GET, no mutation) — same idiom as
+// AccountSettingsPanel's "Your data" section, just scoped to `?tenant=` and gated on
+// canManage (the routes themselves require owner/admin — this is a data-controller action
+// since the dump covers every member's data, not just the viewer's own). Only ever mounted
+// inside the SAAS_MODE-gated (saas) segment.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MAX_WORKSPACE_NAME } from '@/lib/tenancy/workspace';
@@ -187,6 +192,40 @@ export function WorkspaceSettingsPanel({ tenantSlug, slug, name, status, canMana
           </p>
         </div>
       </section>
+
+      {canManage && (
+        <section className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
+          <h2 className="text-[11px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
+            Data export
+          </h2>
+          <div className="mt-3 space-y-3">
+            <div className="space-y-2">
+              <p className="text-sm text-[color:var(--color-text-dim)]">
+                Download this workspace&apos;s data as JSON (every member&apos;s items, receipts,
+                and other records).
+              </p>
+              <a
+                href={`/api/saas/workspace/export?tenant=${encodeURIComponent(tenantSlug)}`}
+                className="inline-block rounded-lg border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-text)] hover:border-[color:var(--color-border-light)]"
+              >
+                Download workspace data
+              </a>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-[color:var(--color-text-dim)]">
+                Download a manifest of receipt/statement/photo files stored on disk for this
+                workspace (file list only, not the file contents).
+              </p>
+              <a
+                href={`/api/saas/workspace/export/files?tenant=${encodeURIComponent(tenantSlug)}`}
+                className="inline-block rounded-lg border border-[color:var(--color-border)] px-4 py-2 text-sm font-medium text-[color:var(--color-text)] hover:border-[color:var(--color-border-light)]"
+              >
+                Download file manifest
+              </a>
+            </div>
+          </div>
+        </section>
+      )}
 
       {isOwner && (
         <section className="rounded-2xl border border-[color:var(--color-red)]/30 bg-[color:var(--color-surface)] p-5">
