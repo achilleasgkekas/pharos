@@ -2455,3 +2455,68 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-21 — (e) polish/content: FAQ += AI command bar (natural-language assistant)
+
+Increment (e). Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος
+`~/.claude/ASK_ACHILLEAS.md` (δυο OPEN entries, και τα δυο bakecore-finance, τιποτα για landing/pharos), και
+`git log --oneline -25` του κυριου repo. Νεοτερο απο το προηγουμενο log entry: `215e692 docs(saas)` MFA
+enrollment UI documentation (increment 82), + δυο test/docs commits (setup wizard test coverage). Ελεγξα το
+MFA (`docs/saas.md:273-277`): ρητα ΑΚΟΜΑ **"not yet wired"** στο login (`POST /api/saas/auth/login` δεν το
+απαιτει, increment 80c ξεχωριστο) -> ιδιο συμπερασμα με ολα τα προηγουμενα runs, οχι user-facing complete
+feature ακομα, skip.
+
+Δεδομενου οτι δεν υπηρχε νεο shipped module στο main repo, εκανα συστηματικο sweep: συγκρινα καθε κεφαλαιο
+του `docs/features.md` (grep-άροντας τον τιτλο του καθε module στο `page.tsx`) για να βρω ξεχασμενα κενα
+πεσω απο τα ηδη-καλυμμενα (Inventory/Receipts/Expenses/Statements/Subscriptions/Vouchers/Reports/Network/
+Bills/Splitting/Spaces/Tax/Insurance/Goals/Notifications/Trash, ολα ηδη βρεθηκαν). Δυο modules βγηκαν
+**τελειως ακαλυπτα**: **Tasks** (Kanban planner, `docs/features.md:416-421`) και **AI command bar**
+(conversational agent στο navbar, `docs/features.md:433-446`). Το AI command bar ειναι το πιο δυνατο απο τα
+δυο, ενα πραγματικο διαφοροποιητικο σημειο (natural-language agent που εκτελει actions, οχι απλα chat) και
+ειχε **μηδεν** δικια του αναφορα σε ολο το page.tsx (`grep -in "AI command\|command bar" page.tsx` = μηδεν
+hits πριν το increment)· η μονη σχετικη αναφορα ηταν ενα φευγαλεο «AI assistant» μεσα στο mobile FAQ, χωρις
+καμια εξηγηση τι κανει. Διαλεξα αυτο για το increment (ενα increment/run)· το Tasks planner μενει σαν
+candidate για επομενο run (βλ. Επομενο increment).
+
+Αλλαγη (app/page.tsx, FAQS array μονο, μηδεν UI/CSS/dependency/bundle change): νεα εγγραφη «Can I talk to it
+in plain English instead of clicking through menus?» αμεσως μετα το «Do I need an AI API key?» και πριν το
+«What do I need to run it?» (φυσικη συνεχεια: αφου εξηγειται οτι το AI ειναι optional/BYO-key, εξηγειται τι
+κανει πραγματικα η assistant). Απαντηση: navbar command bar (διπλασιαζει ρολο και ως global search) ->
+φυσικη γλωσσα εντολες ("add a YouTube subscription", "log expense OTE 84 euros") -> tool-using agent που
+προσθετει/ενημερωνει/διαγραφει expenses/income/subscriptions/tasks/items, log price, η απανταει σε ερωτησεις
+overview· ρωταει follow-up σε ασαφη αιτηματα· AI history κρατα το ιστορικο· απαιτει Anthropic-capable
+provider.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (background process, ~94s compile λογω υψηλου system load απο τις υπολοιπες
+  routines· περιμενα το task-notification αντι για arbitrary sleep, exit 0 καθαρο). Ολα static (11 routes,
+  αμεταβλητο)· `/` route 5.33 kB, αμεταβλητο (copy-only, ιδιο μεγεθος με πριν).
+- Browser preview: το `mcp__Claude_Browser__*` toolset **δεν ηταν διαθεσιμο αυτο το run** (hook timeout,
+  "host client may be unreachable", 2 retries και τα δυο απετυχαν) -> best-effort fallback σε curl-based
+  text verification (η task file επιτρεπει ρητα best-effort skip οταν τα browser tools λειπουν). `next start
+  -p 3108` πανω στο production build (3100/3000 κατειλημμενα απο Docker, οπως παντα)· `curl` επιβεβαιωσε: η
+  νεα ερωτηση εμφανιζεται 2× (SSR html + RSC payload), το deterministic anchor id
+  `faq-can-i-talk-to-it-in-plain-english-instead-of-clicking-through-menus` υπαρχει (FAQPage JSON-LD + DOM),
+  και η σειρα ειναι σωστη (Do I need an AI API key? -> νεο item -> What do I need to run it?, σε ολα τα 4×
+  occurrences του HTML). Server σταματησε μετα (`pkill -f "next start -p 3108"`), `lsof` επιβεβαιωσε 3108
+  clear.
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified (τα
+  αλλα modified αρχεια απο το αρχικο snapshot της συνεδριας, apps/mobile/apps/web, ειχαν ηδη committed απο
+  αλλες routines μεχρι να ξεκινησει αυτο το run, εκτος του territory μου ουτως ή αλλως), `git diff --cached
+  --name-only` κενο πριν το stage -> κανενα ξενο staged file. Staged+committed ΜΟΝΟ τα δικα μου landing
+  paths.
+
+Επομενο increment: **Tasks / Kanban planner** ειναι το επομενο κατι candidate, μηδεν αναφορα πουθενα στο
+page.tsx (`grep -in task page.tsx` = μηδεν hits πριν αυτο το run)· θα μπορουσε να παρει δικια του γραμμη σε
+υπαρχουσα καρτα ή νεα FAQ, εξαρταται τι χωρος υπαρχει στο επομενο run. Αλλιως (e) polish συνεχεια, real app
+screenshots οταν υπαρξουν assets (blocked). Αν το MFA login-wiring («increment 80c») γινει live, αξιζει δικο
+του FAQ item (money/data/security cluster, μετα το «Is my financial data secure?»).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

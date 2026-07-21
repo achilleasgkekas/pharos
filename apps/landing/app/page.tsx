@@ -441,6 +441,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'No. AI is optional and can be toggled off per feature. Bring your own key (Anthropic, OpenAI, Gemini, OpenRouter) or run a local model with Ollama. The manual entry, tracking, and reporting work without any AI at all.',
   },
   {
+    q: 'Can I talk to it in plain English instead of clicking through menus?',
+    a: 'Yes. A conversational AI command bar lives in the navbar (it doubles as global search) where you can type things like "add a YouTube subscription, 15 euros a month" or "log expense OTE 84 euros" and it acts directly on your data: adding expenses, income, subscriptions, tasks, or items, updating or deleting a record, logging a price, or just answering "what did I spend this month?". If a request is ambiguous it asks a short follow-up before doing anything, and every conversation is kept under AI history so you can look back at what it did. It needs an Anthropic-capable AI provider to run.',
+  },
+  {
     q: 'What do I need to run it?',
     a: 'Docker and a machine that stays on: a Mac mini, a NAS, a Proxmox LXC, or a spare mini PC all work. One docker compose up brings up the web app, MongoDB, and search. Reach it over your LAN or your own VPN.',
   },
