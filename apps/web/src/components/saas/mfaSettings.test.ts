@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mfaCodeReady, mfaPasswordReady, describeMfaError } from './mfaSettings';
+import { mfaCodeReady, mfaPasswordReady, mfaLoginCodeReady, describeMfaError } from './mfaSettings';
 
 describe('mfaCodeReady', () => {
   it('accepts exactly 6 digits', () => {
@@ -34,6 +34,27 @@ describe('mfaPasswordReady', () => {
   });
 });
 
+describe('mfaLoginCodeReady', () => {
+  it('accepts a 6-digit TOTP code', () => {
+    expect(mfaLoginCodeReady('123456')).toBe(true);
+  });
+
+  it('accepts an 8-character recovery code, dashed or not', () => {
+    expect(mfaLoginCodeReady('ABCD-EFGH')).toBe(true);
+    expect(mfaLoginCodeReady('ABCDEFGH')).toBe(true);
+  });
+
+  it('rejects anything under 6 significant characters', () => {
+    expect(mfaLoginCodeReady('12345')).toBe(false);
+    expect(mfaLoginCodeReady('')).toBe(false);
+    expect(mfaLoginCodeReady('   ')).toBe(false);
+  });
+
+  it('ignores surrounding whitespace and internal dashes when measuring length', () => {
+    expect(mfaLoginCodeReady('  12-34-56  ')).toBe(true);
+  });
+});
+
 describe('describeMfaError', () => {
   it('maps known reason codes to friendlier text', () => {
     expect(describeMfaError(400, 'invalid_code')).toMatch(/did not match/);
@@ -42,6 +63,12 @@ describe('describeMfaError', () => {
     expect(describeMfaError(404, 'not_found')).toBe('Account not found.');
     expect(describeMfaError(401, 'Invalid credentials')).toBe('Incorrect password.');
     expect(describeMfaError(400, 'password is required')).toMatch(/Enter your password/);
+  });
+
+  it('maps the login step-2 (increment 83) reason codes', () => {
+    expect(describeMfaError(401, 'no_pending_login')).toMatch(/log in again/);
+    expect(describeMfaError(401, 'not_enabled')).toMatch(/no longer required/);
+    expect(describeMfaError(400, 'code is required')).toMatch(/Enter the code/);
   });
 
   it('passes through an unmapped server error string verbatim', () => {

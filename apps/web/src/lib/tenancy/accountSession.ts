@@ -84,3 +84,76 @@ export async function clearAccountCookie(): Promise<void> {
   const store = await cookies();
   store.delete(ACCOUNT_COOKIE);
 }
+
+// --- MFA login-step-2 pending state (increment 83, TODO §9 "wiring MFA into login") ---------
+//
+// When `Account.mfaEnabled` is true, `POST /api/saas/auth/login` must NOT hand out a real
+// session on a correct password alone — it needs a second factor first. This short-lived,
+// SEPARATELY-COOKIED token carries "this password was just verified for this account id" across
+// the two requests (login → mfa-verify) without granting any access itself: it is never accepted
+// by `verifyAccountSession` (different cookie, and a distinct signed `typ` claim below rejects it
+// even if a future route mistakenly tried to read it as a real session). Cleared as soon as the
+// second factor succeeds (real cookie takes over) or the user backs out.
+
+export const MFA_PENDING_COOKIE = 'pharos_account_mfa_pending';
+
+// Only spans "user is mid-login, typing a 6-digit code" — a few minutes is generous. Own knob,
+// independent of ACCOUNT_MAX_AGE.
+const MFA_PENDING_MINUTES = Math.min(60, Math.max(1, Number(process.env.SAAS_MFA_PENDING_MINUTES) || 5));
+export const MFA_PENDING_MAX_AGE = Math.round(MFA_PENDING_MINUTES * 60); // seconds
+
+export function mfaPendingCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    secure: process.env.AUTH_COOKIE_SECURE === 'true',
+    path: '/',
+    maxAge: MFA_PENDING_MAX_AGE,
+  };
+}
+
+/** Sign a pending-MFA token: only the account id (no email, no tenant data) + a `typ` marker
+ *  that makes it structurally distinct from a real account session token. */
+export async function signMfaPendingToken(accountId: string): Promise<string> {
+  const secret = getSecret();
+  if (!secret) throw new Error('AUTH_SECRET is not set (min 16 chars)');
+  return await new SignJWT({ typ: 'mfa_pending' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(accountId)
+    .setIssuedAt()
+    .setExpirationTime(`${MFA_PENDING_MAX_AGE}s`)
+    .sign(secret);
+}
+
+/** Verify a pending-MFA token → the account id it names, or null on any failure: bad signature,
+ *  expired, missing subject, or a `typ` that isn't `mfa_pending` (rejects a real session token —
+ *  or anything else — handed to this verifier by mistake). Never throws. */
+export async function verifyMfaPendingToken(token: string | undefined | null): Promise<string | null> {
+  if (!token) return null;
+  const secret = getSecret();
+  if (!secret) return null;
+  try {
+    const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] });
+    if (payload.typ !== 'mfa_pending') return null;
+    return typeof payload.sub === 'string' && payload.sub ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setMfaPendingCookie(accountId: string): Promise<void> {
+  const token = await signMfaPendingToken(accountId);
+  const store = await cookies();
+  store.set(MFA_PENDING_COOKIE, token, mfaPendingCookieOptions());
+}
+
+export async function clearMfaPendingCookie(): Promise<void> {
+  const store = await cookies();
+  store.delete(MFA_PENDING_COOKIE);
+}
+
+/** Read + verify the pending-MFA cookie → the account id it names, or null when absent/invalid. */
+export async function getMfaPendingAccountId(): Promise<string | null> {
+  const store = await cookies();
+  return verifyMfaPendingToken(store.get(MFA_PENDING_COOKIE)?.value);
+}

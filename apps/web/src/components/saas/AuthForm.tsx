@@ -6,6 +6,13 @@
 // navigation (window.location.assign) to the sanitized `next` path so the fresh server render
 // picks up the just-set httpOnly account cookie.
 //
+// Login-only second step (increment 83): when the account has MFA enabled, the login response
+// is `{ mfaRequired: true }` instead of a session — no cookie is set yet, only a short-lived
+// pending-MFA cookie the server already holds. This form then swaps to a code-entry step that
+// POSTs { code } to api/saas/auth/mfa; only THAT call's success sets the real session cookie.
+// "Use a different account" cancels the pending state (DELETE api/saas/auth/mfa) and returns to
+// the credentials step. Signup never returns mfaRequired, so this step never triggers there.
+//
 // Validation reuses the pure helpers in authValidation.ts (in lockstep with the server policy).
 // The API re-validates authoritatively — these checks only shape the UX (disable the button,
 // surface the field error) before the round-trip.
@@ -18,8 +25,10 @@ import {
   safeNextPath,
   MIN_PASSWORD,
 } from './authValidation';
+import { mfaLoginCodeReady, describeMfaError } from './mfaSettings';
 
 type Mode = 'login' | 'signup';
+type Step = 'credentials' | 'mfa';
 
 const INPUT_CLASS =
   'w-full rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 text-sm text-[color:var(--color-text)] outline-none transition focus:border-[color:var(--color-accent)]';
@@ -33,6 +42,8 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
   const [workspace, setWorkspace] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState<Step>('credentials');
+  const [mfaCode, setMfaCode] = useState('');
 
   const isSignup = mode === 'signup';
   const ready = isSignup ? signupReady(email, password) : loginReady(email, password);
@@ -66,14 +77,21 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      let data: { error?: unknown; mfaRequired?: boolean } = {};
+      try {
+        data = await res.json();
+      } catch {
+        /* non-JSON body → fall back to status below */
+      }
       if (!res.ok) {
-        let serverError: unknown;
-        try {
-          serverError = (await res.json())?.error;
-        } catch {
-          /* non-JSON body → fall back to status */
-        }
-        setError(describeAuthError(res.status, serverError));
+        setError(describeAuthError(res.status, data.error));
+        setBusy(false);
+        return;
+      }
+      if (!isSignup && data.mfaRequired) {
+        // Password checked out, but a second factor is required — no session yet. Swap to the
+        // code-entry step; the password field is no longer needed (or shown).
+        setStep('mfa');
         setBusy(false);
         return;
       }
@@ -83,6 +101,103 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
       setError('Network error. Please try again');
       setBusy(false);
     }
+  }
+
+  async function onSubmitMfa(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setError('');
+    setBusy(true);
+    try {
+      const res = await fetch('/api/saas/auth/mfa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: mfaCode.trim() }),
+      });
+      if (!res.ok) {
+        let serverError: unknown;
+        try {
+          serverError = (await res.json())?.error;
+        } catch {
+          /* non-JSON body → fall back to status */
+        }
+        setError(describeMfaError(res.status, serverError));
+        setBusy(false);
+        return;
+      }
+      window.location.assign(target);
+    } catch {
+      setError('Network error. Please try again');
+      setBusy(false);
+    }
+  }
+
+  async function useDifferentAccount() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await fetch('/api/saas/auth/mfa', { method: 'DELETE' });
+    } catch {
+      /* best-effort — the pending cookie also just expires on its own */
+    }
+    setStep('credentials');
+    setPassword('');
+    setMfaCode('');
+    setError('');
+    setBusy(false);
+  }
+
+  if (step === 'mfa') {
+    return (
+      <form onSubmit={onSubmitMfa} className="space-y-4" noValidate>
+        <div>
+          <label className={LABEL_CLASS} htmlFor="auth-mfa-code">
+            Two-factor code
+          </label>
+          <input
+            id="auth-mfa-code"
+            type="text"
+            inputMode="text"
+            autoComplete="one-time-code"
+            autoFocus
+            className={INPUT_CLASS}
+            value={mfaCode}
+            onChange={(e) => setMfaCode(e.target.value)}
+            disabled={busy}
+            placeholder="123456 or a recovery code"
+          />
+          <p className="mt-1 text-xs text-[color:var(--color-text-faint)]">
+            Enter the 6-digit code from your authenticator app, or one of your recovery codes.
+          </p>
+        </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg border border-[color:var(--color-red)]/40 bg-[color:var(--color-red)]/10 px-3 py-2 text-sm text-[color:var(--color-red)]"
+          >
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={busy || !mfaLoginCodeReady(mfaCode)}
+          className="w-full rounded-lg bg-[color:var(--color-accent)] px-4 py-2 text-sm font-semibold text-[color:var(--color-bg)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? 'Verifying…' : 'Verify'}
+        </button>
+
+        <button
+          type="button"
+          onClick={useDifferentAccount}
+          disabled={busy}
+          className="w-full text-center text-xs text-[color:var(--color-text-dim)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Use a different account
+        </button>
+      </form>
+    );
   }
 
   return (

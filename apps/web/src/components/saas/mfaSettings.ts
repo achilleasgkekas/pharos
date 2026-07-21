@@ -16,6 +16,14 @@ export function mfaPasswordReady(password: string): boolean {
   return password.trim().length > 0;
 }
 
+/** The login-time second-factor field (increment 83) accepts EITHER a 6-digit TOTP code or an
+ * 8-character recovery code (with or without its "XXXX-XXXX" dash) — unlike `mfaCodeReady`,
+ * which only ever sees a TOTP code from the enrollment flow. Just a length floor for the submit
+ * button; `verifyMfaLogin` on the server is the real check either way. */
+export function mfaLoginCodeReady(code: string): boolean {
+  return code.trim().replace(/[\s-]/g, '').length >= 6;
+}
+
 /**
  * Map an MFA API failure (begin/confirm/disable) to a human message. Prefers the server's
  * `error` string, and gives a few known reason codes (the result-type enums returned by
@@ -32,6 +40,10 @@ export function describeMfaError(status: number, serverError?: unknown): string 
       not_found: 'Account not found.',
       'Invalid credentials': 'Incorrect password.',
       'password is required': 'Enter your password to continue.',
+      // Login step-2 (increment 83) reason codes — verifyMfaLogin / the pending-cookie check.
+      no_pending_login: 'Your sign-in session expired. Please log in again.',
+      not_enabled: 'Two-factor authentication is no longer required on this account — please log in again.',
+      'code is required': 'Enter the code from your authenticator app or a recovery code.',
     };
     return known[raw] ?? raw;
   }

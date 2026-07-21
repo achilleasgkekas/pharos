@@ -19,7 +19,7 @@
 import { Account } from '@/models/Account';
 import { encryptSecret, decryptSecret, secretCryptoReady } from './secretCrypto';
 import { generateTotpSecret, totpUri, verifyTotpCode } from './totp';
-import { generateRecoveryCodes, hashRecoveryCodes } from './recoveryCodes';
+import { generateRecoveryCodes, hashRecoveryCodes, matchRecoveryCode } from './recoveryCodes';
 
 /** Mongo `$set` that stashes a freshly generated (not yet confirmed) TOTP secret. */
 export type MfaEnrollStartUpdate = { $set: { mfaPendingSecretEnc: string } };
@@ -112,6 +112,38 @@ export async function confirmMfaEnrollment(accountId: string, code: string): Pro
 export async function disableMfa(accountId: string): Promise<boolean> {
   const res = await Account.updateOne({ _id: accountId }, planMfaDisable());
   return res.matchedCount > 0;
+}
+
+export type VerifyMfaLoginResult =
+  | { ok: true; usedRecoveryCode: boolean }
+  | { ok: false; reason: 'invalid_code' | 'not_enabled' | 'crypto_unavailable' | 'not_found' };
+
+/**
+ * Check a login-time second-factor submission against the account's ACTIVE (confirmed) secret/
+ * recovery hashes — never the pending-enrollment ones (increment 83, the login-flow wiring this
+ * module's doc-comment flagged as a separate, riskier step). Tries the TOTP code first, then
+ * falls back to a recovery code. A matched recovery code is immediately spliced out and
+ * persisted (single-use — `recoveryCodes.ts`'s `matchRecoveryCode` contract) so it can never be
+ * replayed. On any failure the account's MFA state is left untouched.
+ */
+export async function verifyMfaLogin(accountId: string, code: string): Promise<VerifyMfaLoginResult> {
+  const account = await Account.findById(accountId).select('_id mfaEnabled mfaSecretEnc mfaRecoveryHashes');
+  if (!account) return { ok: false, reason: 'not_found' };
+  if (!account.mfaEnabled || !account.mfaSecretEnc) return { ok: false, reason: 'not_enabled' };
+
+  const secret = decryptSecret(account.mfaSecretEnc);
+  if (secret && verifyTotpCode(secret, code)) return { ok: true, usedRecoveryCode: false };
+
+  const hashes = account.mfaRecoveryHashes || [];
+  const idx = matchRecoveryCode(code, hashes);
+  if (idx !== -1) {
+    const remaining = hashes.slice();
+    remaining.splice(idx, 1);
+    await Account.updateOne({ _id: accountId }, { $set: { mfaRecoveryHashes: remaining } });
+    return { ok: true, usedRecoveryCode: true };
+  }
+
+  return secret ? { ok: false, reason: 'invalid_code' } : { ok: false, reason: 'crypto_unavailable' };
 }
 
 export type MfaStatus = { enabled: boolean; pending: boolean };

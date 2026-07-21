@@ -3769,3 +3769,83 @@ code (`matchRecoveryCode`'s ήδη-έτοιμο index-splice contract, ΑΚΟΜ�
 χρειάζεται δικό του δεύτερο βήμα/state. Ιδιαίτερη προσοχή στο πλήρες test suite μετά (αγγίζει
 shared, security-critical auth plumbing) + στο recovery-code consumption (πρέπει να το βγάζει
 από τη λίστα ώστε να μη χρησιμοποιηθεί ξανά — `matchRecoveryCode` splice contract).
+
+## 2026-07-21 (increment 83 — 80c, MFA login-flow wiring)
+
+Το τελευταίο κομμάτι του πλάνου #79/80a/81/82: το `Account.mfaEnabled` επιτέλους **κάνει
+κάτι** στο login — μέχρι τώρα η ενεργοποίηση MFA στο settings panel ήταν αποθηκευτικό only,
+το login δούλευε ίδιο. Το πιο ρισκαρισμένο increment της σειράς (αγγίζει shared login
+plumbing) — προχώρησα προσεκτικά, με πλήρες test-suite run στο τέλος όπως προειδοποίησε το
+προηγούμενο log entry.
+
+**Design (νέο pending-session state, δεν αγγίζει το υπάρχον `pharos_account` cookie)**:
+- **`lib/tenancy/accountSession.ts`**: νέο `MFA_PENDING_COOKIE` (`pharos_account_mfa_pending`,
+  ΞΕΧΩΡΙΣΤΟ όνομα από το real session cookie) + `signMfaPendingToken`/`verifyMfaPendingToken`
+  (jose, ίδιο idiom με το υπάρχον sign/verifyAccountSession) + `set/clear/getMfaPendingAccountId`.
+  Ο token κουβαλάει ΜΟΝΟ το account id (όχι email/tenant) + ένα `typ:'mfa_pending'` claim ώστε
+  να είναι δομικά διακριτό από ένα πραγματικό session token ακόμα κι αν κάποιο route το
+  διάβαζε λάθος — δεν είναι απλά διαφορετικό cookie name, είναι διαφορετικό-looking token.
+  Δικό του knob `SAAS_MFA_PENDING_MINUTES` (default 5, clamp 1-60) — μικρό παράθυρο, μόνο όσο
+  ο χρήστης πληκτρολογεί τον κωδικό.
+- **`lib/tenancy/mfaStore.ts`**: νέο `verifyMfaLogin(accountId, code)` — δοκιμάζει πρώτα TOTP
+  (decrypt `mfaSecretEnc` + `verifyTotpCode`), μετά recovery code (`matchRecoveryCode` πάνω στα
+  `mfaRecoveryHashes` — αν matchάρει, **splice + persist immediately** ώστε να μην μπορεί να
+  ξαναχρησιμοποιηθεί, ακριβώς το single-use contract που ανέφερε το προηγούμενο log entry σαν
+  "ακόμα δεν καλείται από πουθενά"). Reason codes: `invalid_code`/`not_enabled`
+  (edge case: MFA απενεργοποιήθηκε ανάμεσα σε login-step1 και step2)/`crypto_unavailable`/
+  `not_found`.
+- **`api/saas/auth/login/route.ts`**: όταν `account.mfaEnabled` → ΔΕΝ βάζει το real cookie,
+  βάζει το pending cookie, γυρνά `{mfaRequired:true}` (το `lastLoginAt` stamp μετακινήθηκε να
+  γίνεται ΜΟΝΟ όταν το login ολοκληρωθεί πραγματικά — είτε εδώ όταν MFA off, είτε στο νέο route
+  από κάτω όταν MFA on).
+- **Νέο `api/saas/auth/mfa/route.ts`** (ξεχωριστό από το ήδη υπάρχον `api/saas/account/mfa`
+  route — εκείνο είναι enrollment/settings πάνω σε ενεργό session, αυτό είναι login step-2 πάνω
+  σε pending cookie, καμία επικάλυψη): **POST `{code}`** → `getMfaPendingAccountId()` (401
+  `no_pending_login` αν λείπει/έληξε) → `verifyMfaLogin` → επιτυχία: clear pending cookie +
+  `setAccountCookie` (πραγματικό session) + stamp `lastLoginAt` + γυρνά **το ίδιο shape** με
+  το no-MFA login (`{account, tenants}` + `usedRecoveryCode`) ώστε ο client να μην χρειάζεται
+  τρίτο code path. **DELETE** (χωρίς body) → clear pending cookie, "use a different account".
+- **UI (`components/saas/AuthForm.tsx`)**: login response `{mfaRequired:true}` → swap σε
+  δεύτερο βήμα (code input, `autoComplete="one-time-code"`, δέχεται TOTP ή recovery code) →
+  POST στο νέο route → success = ίδιο `window.location.assign(target)` με πριν. "Use a
+  different account" link καλεί το DELETE και γυρνά στο credentials step. Signup mode
+  ανεπηρέαστο (δεν επιστρέφει ποτέ `mfaRequired`).
+- **`components/saas/mfaSettings.ts`**: νέο `mfaLoginCodeReady(code)` (>=6 σημαντικοί χαρακτήρες
+  μετά strip whitespace/dashes — δέχεται ΚΑΙ 6-digit TOTP ΚΑΙ 8-char recovery code, σε αντίθεση
+  με το υπάρχον `mfaCodeReady` που είναι στενά 6-digit-only για το enrollment flow) + 3 νέα
+  reason codes στο `describeMfaError`'s known map (`no_pending_login`/`not_enabled`/
+  `code is required`).
+
+**Tests (νέα)**: **`lib/tenancy/accountSession.test.ts`** (νέο αρχείο — το accountSession.ts
+δεν είχε ΚΑΝΕΝΑ test μέχρι τώρα· κάλυψα ΚΑΙ τις ήδη-υπάρχουσες sign/verifyAccountSession ΚΑΙ τις
+νέες pending-token functions, ίδιο idiom με `lib/session.test.ts` — foreign-secret/expired/
+no-subject/garbage-token cases, + ένα specific test ότι ένα πραγματικό account-session token
+ΔΕΝ γίνεται δεκτό από τον pending-token verifier λόγω του `typ` claim mismatch). `verifyMfaLogin`
+ΔΕΝ unit-testάρεται (DB-touching, ίδια σύμβαση με beginMfaEnrollment/confirmMfaEnrollment/
+disableMfa — "εξετάζονται via τα routes/integration" όπως λέει το ίδιο το mfaStore.ts's header
+comment). `mfaSettings.test.ts` +5 tests για το νέο helper+error codes.
+
+**Verified**: `npm run type-check` → **EXIT 0**. `npx vitest run` (πλήρες suite) → **2883/2883
+green** (221 files, ήταν 2845 πριν — +38 από τα νέα tests). Κανένα shared component/layout/
+globals.css αγγίχτηκε, μηδέν νέα εξάρτηση. `SAAS_MODE` off/self-hosted = **zero effect** (το
+login route ήδη ίδιο πριν, ο νέος κλάδος μόνο πυροδοτείται όταν `account.mfaEnabled` που δεν
+υπάρχει καθόλου στο self-hosted `User` model). **Docker: ΔΕΝ έγινε rebuild** — καμία αλλαγή σε
+runtime wiring/env/dependency, και ο live container του Achilleas τρέχει χωρίς `SAAS_MODE` set
+ούτως ή άλλως (ίδιο σκεπτικό με το increment 82's log entry). **Browser-verify: skipped** για
+τον ίδιο λόγο (θα 404άρει). Collision guard: `git status --short` πριν το staging έδειξε
+`apps/landing/app/page.tsx` modified από άλλη ταυτόχρονη routine (landing) — ΔΕΝ το άγγιξα,
+stage-άρησα ρητά μόνο τα 8 δικά μου αρχεία, `git diff --cached --name-only` επιβεβαίωσε exact
+match.
+
+**## Needs Achilleas:**
+- Τίποτα νέο — το MFA feature (TODO §9's "MFA (TOTP + recovery codes)") είναι πλέον **πλήρως
+  end-to-end**: enrollment (82) + login enforcement (83). Instructive follow-ups αν θέλεις:
+  (α) rate-limiting στο login-step-2 (σήμερα δεν υπάρχει brute-force throttle πάνω στον
+  6-digit κωδικό πέρα από το ίδιο το `verifyTotpCode`'s ±30s window — μικρό, θα ήθελε δική του
+  απόφαση σχεδίασης/κόστους), (β) το QR-code follow-up που ανέφερε το 82.
+
+**Next task:** το MFA πλάνο έκλεισε. Επόμενο increment: γύρισμα σε ένα νέο §9/§10/§11/§12 item
+από το TODO.md (AI metering ή billing/plans, ανάλογα με τι λείπει ακόμα — δες TODO.md #5-#12 στο
+επόμενο run) ΚΑΙ, σύμφωνα με το priority-guidance (UI πρώτα), σκέψου αν κάποιο ήδη-χτισμένο
+read-only control-plane API (admin ή account) λείπει ακόμα από ένα UI panel πριν προσθέσεις νέο
+backend surface.
