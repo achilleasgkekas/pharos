@@ -4,7 +4,44 @@
 
 <!-- reviewed: 779970a -->
 <!-- docker-validated: 6ff8678 -->
-<!-- ui-audited: 06f950f -->
+<!-- ui-audited: faa3530 -->
+
+## 2026-07-22 (ui-auditor — comprehensive mobile UI consistency scan, 53η σάρωση)
+
+**Εκτέλεση**: automated read-only token audit, grep quantification, zero Docker/AI cost.
+
+**Αρχικό state**: git HEAD `faa3530`, working tree clean, `npx tsc --noEmit` → EXIT 0.
+
+**Audit dimensions** (comprehensive με quantification):
+- **Hardcoded borderRadius: 90 sites** (κύριο εύρημα, νέο P2/M item) — mapped to RADIUS scale
+- **Magic padding/gap: 158 sites** (νέο P2/L item) — mapped to SPACE scale
+- **Raw ActivityIndicator: 33 uses** (νέο P2/M item) — should use shared `<Spinner>`
+- **Raw TextInput (ReceiptsScreen): 3 cells** (ήδη στο queue)
+- **ListEmptyComponent inconsistency: 16 custom** (P3/S, mixed adoption)
+- **Token colors**: 0 violations (καθαρό)
+- **Safe-area-context**: not installed (P2/M existing item)
+- **Light theme**: dark-only intentional (P3/L existing item)
+
+**Key findings**:
+- Το 52ο σάρωση reported ~43 borderRadius hardcoded; ο 53ος ανακάλυψε 90 όταν έγιναν πιο sensitive grep. **Τα numbers έχουν διπλασιαστεί** (σημάδι ότι το comprehensiveness βελτιώθηκε).
+- Το padding/gap magic-numbers είναι **κρυμμένη κλίμακα** ΔΕΝ caught από το προηγ. scans. **158 sites είναι μεγάλο**.
+- Το ActivityIndicator raw-uses είναι 0% adoption του shared `<Spinner>` primitive (υπάρχει αλλά ΔΕΝ χρησιμοποιείται).
+
+**Queue updates**:
+- Προστέθηκαν 4 νέα P2 items στο MOBILE_PARITY.md → **UI Debt Queue** section
+- Updated την 52η σάρωση με νέα measurements
+- Reordered priority: padding/gap + borderRadius standardization = **foundation items**, πρέπει να τρέξουν ΠΡΩΤΑ
+
+**Recommendation**:
+Builder να ξεκινήσει με:
+1. **P2/L — padding/gap standardization** (158 sites) — foundational, 4-5h
+2. **P2/M — borderRadius standardization** (90 sites) — foundational, 3-4h
+3. **P2/M — ActivityIndicator → Spinner** (33 uses) — component consolidation, 2h
+4. Μετά: P2/S (raw TextInput) + P3/S (ListEmptyComponent) + P2/M (safe-area)
+
+**Σύνολο new debt estimate**: ~10-12 hours, all mechanical + type-safe, zero functional risk.
+
+---
 
 ## 2026-07-20 (builder — Bills mobile parity, P28 gap, 7ο run της ημέρας)
 

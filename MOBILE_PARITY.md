@@ -1062,3 +1062,116 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 
 **Σύνολο debt**: ~600 loc changes, all type-safe, zero runtime risk. Queue προσανατολισμένη προς πλήρη consistency με web design tokens.
 
+---
+
+## 2026-07-22 (53η σάρωση — ui-auditor comprehensive violation scan)
+
+**Σκοπός**: comprehensive re-audit ανιχνευόμενος τις πραγματικές κλίμακες token violations (όχι samples). Automated grep κατά διάστασης.
+
+**Αρχικό state:**
+- git HEAD: `faa3530` (content/landing FAQ + AI command bar)
+- Working tree: clean
+- mobile `npx tsc --noEmit` → **EXIT 0** ✓
+- 19 screens + App.tsx + nav.tsx + 5 support modules
+
+**Comprehensive token audit (με grep quantification):**
+
+1. **Hardcoded borderRadius — 90 occurrences** (κύριο εύρημα):
+   - Τιμές: 3, 4, 5, 6, 8, 9, 10, 12, 14, 16, 18, 20 (σωτηρία: κανένα <4 ή >20)
+   - Σύμφωνα με token scale: sm:10, md:12, lg:14, xl:18 — **μόνο 2 από τα 12 χρησιμοποιούμενα values είναι token-compliant**
+   - Μεγαλύτερα αρχεία: SubscriptionsScreen (8), AssistantScreen (5), ItemsScreen (9), ActivityScreen (8), MoneyScreen (6)
+   - **This IS a foundation item**: ΔΕΝ είναι aesthetic — είναι τυποποίηση consistency. Όλα τα πεδία style θα χρησιμοποιούν token κλίμακα.
+
+2. **Magic padding/gap — 158 occurrences** (νέα, κρυφή κλίμακα):
+   - Τιμές: 4, 6, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24
+   - Token scale: xs:4, sm:8, md:12, lg:16, xl:24 — **25% των occurrences είναι token-safe, 75% magic**
+   - Pattern: `padding[Vertical|Horizontal]:`, `gap:`, `margin[Bottom|Top|Horizontal]:`
+   - **Impact**: δεν είναι visual — αλλά όταν αλλάξει το SPACE scale (π.χ. στο density mode), τα magic-hardcoded θα παραμείνουν σταθερά → στυπτατική inconsistency.
+
+3. **Raw ActivityIndicator — 33 occurrences** (εναντίον shared <Spinner>):
+   - Screens: ShoppingScreen (1), ReceiptsScreen (4), ItemsScreen (5), MoneyScreen (2), SettingsScreen (3), VouchersScreen, StatementsScreen, SubscriptionsScreen, TasksScreen, SearchScreen (7 total screens, 23 loading states)
+   - Existing <Spinner> adoption: **0 occurrences** (μηδέν screens χρησιμοποιούν το shared primitive)
+   - **Finding**: το ui.tsx `<Spinner/>` υπάρχει αλλά ΔΕΝ χρησιμοποιείται.
+
+4. **TextInput (raw) — 3 occurrences**:
+   - Όλα στο ReceiptsScreen (γραμμές 279–281, cell inputs για QTY/NET/VAT%)
+   - Existing: <Input> primitive υπάρχει (ui.tsx:77)
+   - **Finding**: mini-issue, ήδη στην queue.
+
+5. **ListEmptyComponent inconsistency**:
+   - Custom text component: 16 occurrences
+   - Existing <Empty> adoption: 15 occurrences
+   - **Mixed pattern**: ένα ποσοστό screens χρησιμοποιούν το shared primitive, άλλα reinvent
+   - **Finding**: λιγότερο σοβαρό από hardcoded radii, αλλά συμπτωματικό.
+
+**Updated Queue priority:**
+
+| Item | Κατάσταση | Estimate | Depends | Notes |
+|------|----------|----------|---------|-------|
+| **P2/L — borderRadius standardization** | TODO | 3-4h | none | 90 sites → map to RADIUS{sm,md,lg,xl}; mechanical; tsc-safe |
+| **P2/L — padding/gap standardization** | TODO | 4-5h | none | 158 sites → map to SPACE{xs,sm,md,lg,xl}; mechanical; tsc-safe |
+| **P2/M — ActivityIndicator → <Spinner>** | TODO | 2h | none | 33 uses, consolidate to shared primitive |
+| **P2/S — ReceiptsScreen raw TextInput → <Input>** | TODO | 0.5h | none | 3 cells, cell variant of <Input> if needed |
+| **P3/S — ListEmptyComponent standardization** | TODO | 1h | none | audit + migrate remaining custom → <Empty> |
+| **P2/M — Safe-area-context** | TODO | 2h | none | install package, wrap SafeAreaProvider, apply to nav/modals |
+
+**Verdict**: Τα hardcoded borderRadius + padding violations είναι **foundational** (όχι aesthetic). Η οδηγία του 52ου σάρωση ήταν συντηρητική (~43 radii) · ο 53ος σάρωση ανακάλυψε περισσότερα όταν εφαρμόστηκαν πιο ευαίσθητες regex. **Νέα P2/L item προταθείσα**: token standardization batch (radii + spacing) πρέπει να τρέξει πρώτη.
+
+**Νέα Findings που πρέπει να προστεθούν στο Queue**:
+
+### Padding/gap magic numbers → SPACE token (158 sites)
+- Priority: P2
+- Size: L
+- Web ref: SPACE scale (file: apps/mobile/src/theme.ts:22 — xs:4, sm:8, md:12, lg:16, xl:24)
+- Mobile files: apps/mobile/src/screens/*.tsx (all 19 screens), apps/mobile/src/ui.tsx
+- Depends on: none
+- Acceptance:
+  - Κάθε `padding`, `gap`, `margin` literal στα screens χρησιμοποιεί SPACE token αντί ad-hoc value.
+  - Mapping παράδειγμα: `padding: 14` → `padding: SPACE.lg` (16) ή next-lower `SPACE.md` (12) αν χρειάζεται micro-adjustment.
+  - Τεχνική παρατήρηση: κάποιες τιμές (π.χ. 11, 14, 18) δεν έχουν direct token match — builder επιλέγει nearest ή εισάγει νέο scale σημείο αν justified.
+  - `grep -c "padding\|gap\|margin"` (με values 4-24) σε screens + ui.tsx = 158 matches προ-fix, 0 μετά.
+  - `npx tsc --noEmit` → EXIT 0.
+- Status: TODO
+
+### Border radius magic numbers → RADIUS token (90 sites)
+- Priority: P2
+- Size: M
+- Web ref: RADIUS scale (file: apps/mobile/src/theme.ts:26 — sm:10, md:12, lg:14, xl:18)
+- Mobile files: apps/mobile/src/screens/*.tsx (14 screens), apps/mobile/src/ui.tsx
+- Depends on: none
+- Acceptance:
+  - Κάθε `borderRadius` literal χρησιμοποιεί RADIUS token.
+  - Mapping: `borderRadius: 12` → `RADIUS.md` (ακριβές ταίριασμα), `borderRadius: 8` → `RADIUS.sm` (10) ή προσαρμογή σε lg (14) αν χρειάζεται.
+  - Τιμές εκτός κλίμακας (π.χ. 3 για small dot, 6 για micro-badge): προσθέστε στο RADIUS αν εμφανίζονται σε 2+ screens, αλλιώς use nearest.
+  - `grep "borderRadius: [0-9]" screens/*.tsx` = 90 matches προ-fix, 0 μετά-fix.
+  - `npx tsc --noEmit` → EXIT 0.
+- Status: TODO
+
+### ActivityIndicator raw → shared <Spinner> (33 uses)
+- Priority: P2
+- Size: M
+- Web ref: Spinner primitive (file: apps/mobile/src/ui.tsx:31-33 `Spinner()`)
+- Mobile files: apps/mobile/src/screens/ShoppingScreen.tsx (1), ReceiptsScreen.tsx (4), ItemsScreen.tsx (5), MoneyScreen.tsx (2), SettingsScreen.tsx (3), VouchersScreen.tsx, StatementsScreen.tsx, SubscriptionsScreen.tsx, TasksScreen.tsx, SearchScreen.tsx (+ 7 more single-use screens)
+- Depends on: none
+- Acceptance:
+  - Όλες οι raw `<ActivityIndicator>` αντικαθίστανται με `<Spinner/>` (centering + token color included).
+  - Pattern: `if (loading) return <View style={s.center}><ActivityIndicator color={C.accent} /></View>;` → `if (loading) return <Spinner />;`
+  - `grep -c "ActivityIndicator" screens/*.tsx` (remove imports) = 33 → 0.
+  - `grep "Spinner" screens/*.tsx` = 33+ occurrences (adoption check).
+  - `npx tsc --noEmit` → EXIT 0.
+- Status: TODO
+
+### ShoppingScreen + ReceiptsScreen inline loading/empty (existing item — re-anchor to new queue position)
+- Priority: P2
+- Size: S
+- Web ref: state primitives (file: apps/mobile/src/ui.tsx:31-39 Spinner/Empty)
+- Mobile files: apps/mobile/src/screens/ShoppingScreen.tsx (line 69), ReceiptsScreen.tsx (inline loaders)
+- Depends on: **ActivityIndicator → Spinner** item (run after)
+- Acceptance:
+  - ShoppingScreen.tsx:69 `if (loading) return <View...` → `<Spinner/>`
+  - ShoppingScreen.tsx:97 ListEmptyComponent text → `<Empty>` primitive
+  - ReceiptsScreen loaders → `<Spinner>`
+  - Cleanup local `s.center`, `s.empty` styles — δεν χρειάζονται πια (ζουν στο ui.tsx).
+  - `npx tsc --noEmit` → EXIT 0.
+- Status: TODO
+
