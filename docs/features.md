@@ -93,6 +93,25 @@ product-tracking Items above. Entries are just a name, quantity (free text like
 Meant for groceries and quick captures. You can add an entry by photographing a
 product, and AI extracts the name.
 
+### Quick-capture bookmarklet (P5)
+
+Add any product from any e-shop to your inventory or shopping list in one click,
+without leaving the webpage. **How it works:** Visit Settings → Storage & backup →
+**Bookmarklet**. You'll see a "Add to Pharos" link (drag it to your bookmarks bar)
+and a copy-paste code fallback. Then, while browsing an e-shop (Amazon, Skroutz,
+Ubiquiti, AliExpress, etc.), click the bookmarklet. A small popup opens on top of
+the page, auto-previews the current product, and AI extracts: title, price, store,
+specs, and category. You see the preview and choose: **Add to Shopping** (for
+products you are researching) or **Add to Inventory** (if you already own it). The
+item is added to your PHAROS and the popup closes — zero page reload, zero login
+required (it uses your existing browser session cookie).
+
+**Technical note:** The bookmarklet is a self-contained `javascript:` URI (no
+external dependencies or tokens), and the popup is same-origin (`/capture?url=...`)
+so it avoids CORS and API-token exposure. If the product already exists in your
+library, it merges the new store link and price instead of duplicating it. Phase 2
+(MV3 Chrome extension) is planned.
+
 ## Receipts
 
 Drag-and-drop (or camera) upload of receipts as images or PDFs (`/receipts`). The

@@ -1,5 +1,23 @@
 # DOCS_PROGRESS
 
+## 2026-07-22 (eleventh run — P5 quick-capture bookmarklet documentation)
+
+Σάρωση git log για undocumented features που shipαρίστηκαν τα τελευταία ώρες. Ανακάλυψα ότι το **P5 (quick-capture bookmarklet, commit 93cc862, 2026-07-22 11:36)** ήταν shipped (logged αλλά ΔΕΝ ήταν documented στο features.md).
+
+Τι έγραψα:
+- **features.md**: Προσθεση νέας subsection "### Quick-capture bookmarklet (P5)" αμέσως μετά το "## Shopping list" section. Περιγραφη: browser bookmarklet που προσθέτει products από e-shops σε ένα click, zero-page-reload, ίδιο session cookie (no CORS/token exposure). How-it-works: drag λινκ από Settings → Bookmarklet → click στο bookmarklet ενώ φυλλομετράς e-shop → small popup → AI reads page → preview card → choose add-to-shopping or add-to-inventory. Technical note: self-contained javascript: URI, same-origin popup (/capture?url=...), merges if product exists, Phase 2 (MV3 extension) planned.
+
+Validation (markdown only, κανενα build/Docker/AI):
+- Code fences: 0 (features.md δεν έχει code blocks) ✓.
+- Internal links: όλες υπάρχουν (Settings reference, no external links) ✓.
+- Secret scan: κανένα credential ✓.
+- Markdown structure: ✓ (features.md +21 lines στη Shopping section, subsection level ===).
+- Spelling / consistency: P5 description ακολουθεί το pattern των άλλων features (Settings references, How-it-works explanations, Technical notes).
+
+Collision guard: git status --short = ΜΟΝΟ docs/features.md modified (δικό μου), git diff --cached = ΜΟΝΟ αυτό το αρχείο. Πρόκειται να commit + push.
+
+Επόμενο run: (α) grep για άλλα undocumented P* features (P21 mobile document vault, ή άλλα από τα recent commits), ή (β) api.md — verify capture endpoint documentation, ή (γ) mobile.md — check αν mobile app πρέπει να support bookmarklet share flows (probably no, αφού bookmarklet είναι web-only).
+
 ## 2026-07-21 (tenth run — MFA enrollment UI documentation [increment 82])
 
 Σάρωση git log για undocumented features από τα τελευταία commits. Ανακάλυψα ότι το **increment 82 (MFA enrollment UI panel, commit 2965e57, 2026-07-20 23:02)** ήταν shipped (follow-up στο 80a που έκανε τα API routes) αλλά ΔΕΝ ήταν documented στο saas.md.
