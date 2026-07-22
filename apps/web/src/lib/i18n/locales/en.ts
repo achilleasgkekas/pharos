@@ -439,6 +439,24 @@ export const en = {
   'csv.doneImported': 'Imported {n} records.',
   'csv.doneSkipped': '{dupes} duplicates skipped · {invalid} rows unreadable',
 
+  // ── Quick-capture bookmarklet (P5 phase 1) ────────────────────────────────
+  'bm.title': 'Quick capture (bookmarklet)',
+  'bm.intro': 'Drag this to your bookmarks bar. On any product page, click it to add that page to Pharos in one step.',
+  'bm.buttonLabel': '+ Add to Pharos',
+  'bm.dragHint': 'Drag me to your bookmarks bar',
+  'bm.copyCode': 'Copy code',
+  'bm.hint': "Can't drag it? Copy the code and create a bookmark manually, then paste it as the URL. It opens a small Pharos popup for the page you're on — no extension to install, no account details in the link itself.",
+  'cap.title': 'Add to Pharos',
+  'cap.urlPlaceholder': 'Product page URL',
+  'cap.fetching': 'Reading the product page…',
+  'cap.matchesExisting': 'Matches an item you already have: {title}',
+  'cap.addShopping': 'Add to Shopping',
+  'cap.addInventory': 'Add to Inventory',
+  'cap.added': 'Added "{title}"',
+  'cap.updatedExisting': 'Updated "{title}" with this store link',
+  'cap.closeHint': 'You can close this window now.',
+  'cap.close': 'Close window',
+
   // ── Migration importers (P16) ─────────────────────────────────────────────
   'migrate.sectionTitle': 'Import from another app',
   'migrate.sectionHint': 'Bring your transaction history over from an app you used before Pharos.',

@@ -784,10 +784,44 @@
   `/api/v1/items` serializer + ItemsScreen UI, ίδιο pattern με τα Bill/GiftCard entities (P28/P32) πριν πάρουν mobile.
 - **Module:** Items/Inventory (`attachments[]`, reuse storage backends + `/api/files`).
 
-### P5. Browser extension / bookmarklet — quick capture — M — both
+### P5. Browser extension / bookmarklet — quick capture — 🟡 Bookmarklet phase SHIPPED 2026-07-22 (pharos-daily-dev), MV3 extension εκκρεμεί
 - **Αξία:** από e-shop, ένα κλικ → «add to Pharos shopping» (reuse `importItemFromUrl`). Καταναλώνει `/api/v1`.
 - **Module:** Items / Shopping (+ REST API).
 - **Εξάρτηση:** `/api/v1` (§5). **Builder default:** απλό bookmarklet πρώτα, MV3 extension phase 2.
+- **Υλοποίηση (bookmarklet phase — απόκλιση από τον αρχικό σχεδιασμό, ΟΧΙ `/api/v1` + embedded token)**: το
+  αρχικό spec («καταναλώνει `/api/v1`») θα σήμαινε embedding το προσωπικό API token μέσα στο ίδιο το
+  bookmarklet link (ορατό ως plain text σε bookmarks bar/export/sync) **ΚΑΙ** θα χρειαζόταν νέο CORS layer
+  στο `/api/v1` (σήμερα μηδέν `Access-Control-*`/`OPTIONS` handling πουθενά — ένα cross-origin fetch από
+  τυχαία e-shop σελίδα θα μπλοκαριζόταν στο browser preflight χωρίς αυτό). **Builder decision**: session-cookie
+  popup pattern αντί για token-in-link (ίδιο idiom με Pocket/Instapaper-style «save» bookmarklets) — μηδέν
+  CORS, μηδέν token exposure. Το bookmarklet (νέο pure **`lib/bookmarklet.ts`** `buildBookmarklet(origin)`,
+  **+5 unit tests**) είναι ένα μικρό `javascript:` URI που ανοίγει `window.open(origin+'/capture?url='+
+  encodeURIComponent(location.href), ...)` — ένα **same-origin** popup στο ίδιο Pharos domain, οπότε παίρνει
+  το ήδη-υπάρχον session cookie ατόφιο (η global middleware ήδη κάνει gate + κρατά `?next=` round-trip, άρα
+  login-μέσα-στο-popup-και-γύρισε-στο-capture δουλεύει ΧΩΡΙΣ καμία αλλαγή στο auth flow). Νέα σελίδα
+  **`/capture`** (`app/capture/page.tsx` + `CaptureClient.tsx`, chromeless όπως `/login`/`/setup` — μικρό
+  440×640 popup, νέα γραμμή στο `layout.tsx` chromeless check) reuses **ατόφιο** το ήδη-υπάρχον preview→approve
+  pipeline του Items page (`previewItemFromUrl`/`confirmImportItem`, `app/items/actions.ts`) — μηδέν νέος
+  DB-writing κώδικας, μηδέν νέο AI-cost path. Settings → Storage & backup, νέο **`BookmarkletManager.tsx`**
+  section (drag-to-bookmarks-bar link, `href` set imperatively μέσω `useEffect`/`setAttribute` ώστε να μην
+  ενεργοποιήσει το React `javascript:` href dev-warning, + «Copy code» fallback button για browsers/setups
+  όπου το drag δεν είναι βολικό). i18n keys `bm.*`/`cap.*` μόνο στο en.ts (ίδιο precedent με κάθε πρόσφατο
+  Settings-only feature).
+- **Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` **2888 passed / 222 files** (+5 νέα, μηδέν
+  regression). Safe Docker rebuild (`docker compose build web` → mongo ήδη healthy → `up -d web`):
+  `RestartCount=0`, `/login` 200 στην 1η προσπάθεια, `docker logs` καθαρό (μόνο το προϋπάρχον άσχετο
+  `@napi-rs/canvas` warning). `curl -D- /capture?url=...` χωρίς session → **307 → `/login?next=%2Fcapture%3F
+  url%3D...`** (επιβεβαιώνει ότι το login→return-to-capture round-trip θα δουλέψει)· `POST /api/v1/items/import`
+  χωρίς token → 401 (αμετάβλητο, το v1 route ΔΕΝ αγγίχτηκε τελικά — η υλοποίηση προτίμησε το session-cookie
+  path). Browser-checked (Claude Browser pane): `/capture?url=...` → redirect σε «Sign in · Pharos» (chromeless,
+  σωστό), μηδέν console errors. `docker builder prune -f` (195.6MB freed), lock released καθαρά. **Το
+  πραγματικό capture-popup UI (preview card + Add to Shopping/Inventory) ΔΕΝ testable end-to-end unattended**
+  (χρειάζεται login με τα credentials του Αχιλλέα + πραγματική AI item-import call) — verified πλήρως μέσω
+  unit tests στο pure `buildBookmarklet` + type-check + το ήδη-proven `previewItemFromUrl`/`confirmImportItem`
+  pipeline (reused ατόφιο, καμία νέα λογική εκεί).
+- **Follow-up**: MV3 browser extension (phase 2, ξεχωριστό packaging/deliverable εκτός monorepo build — γι' αυτό
+  παραμένει phase 2, ίδιο σκεπτικό με τα προηγούμενα deferrals)· mobile share-sheet (P23) είναι το ισοδύναμο
+  quick-capture flow για mobile, ξεχωριστό item.
 
 ### P3. AI «Month in Review» digest — ✅ SHIPPED 2026-07-20 (pharos-daily-dev, commit `029d7ae`) — v1 ΧΩΡΙΣ AI
 - **Υλοποίηση:** νέο pure **`lib/monthReview.ts`** (`buildMonthReview()`, DB-free, **+11 unit tests**) που

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail } from 'lucide-react';
+import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -23,6 +23,7 @@ import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/stat
 import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, changeOwnPassword, type UserRow } from './users.actions';
 import { McpManager } from './McpManager';
 import { CalendarFeedManager } from './CalendarFeedManager';
+import { BookmarkletManager } from './BookmarkletManager';
 import { RecomputePricesButton } from './RecomputePricesButton';
 import { getSampleDataStatus, loadSampleData, clearSampleData } from './sampleDataActions';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
@@ -264,6 +265,9 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
               </Section>
               <MigrationImportManager />
               <ImapImportManager imap={info.imap} />
+              <Section title={t('bm.title')} icon={<Bookmark size={15} />}>
+                <BookmarkletManager />
+              </Section>
               <SampleDataManager />
               <TrashManager />
             </>

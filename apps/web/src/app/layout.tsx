@@ -45,9 +45,10 @@ export default async function RootLayout({
   const { locale, dict } = await getServerT();
   // Keep /login and /setup chrome-less even when signed in — the setup wizard signs
   // you in at step 1, so `user` alone would leak the navbar onto steps 2-4. The path
-  // comes from middleware (x-pathname header).
+  // comes from middleware (x-pathname header). /capture is the bookmarklet's small
+  // same-origin popup window — a navbar would waste half its 440x640 real estate.
   const pathname = (await headers()).get('x-pathname') || '';
-  const chromeless = pathname === '/login' || pathname === '/setup';
+  const chromeless = pathname === '/login' || pathname === '/setup' || pathname === '/capture';
   // Read the display currency once per request → set server symbol + hand to the client.
   const { currency } = await getAppSettings();
   const symbol = currencySymbol(currency);
