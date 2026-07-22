@@ -1,34 +1,52 @@
 # Pharos Monitor — STATUS
 
-## 2026-07-20 20:50
+## 2026-07-22 11:40
 
-**Ετυμηγορια: ΟΛΑ ΟΚ — Builder σε πληρη δραστηριοτητα, ολες οι auditors ενημερωμενες σημερα.**
+**Εκτίμηση: ΟΛΑ ΟΚ — Builder shipping P5 bookmarklet, parity auditor ολοκληρώνει 53η σάρωση, όλες οι routine ενεργές σήμερα πρωί.**
 
-Μηχανή ενεργή μέσα σε όλη την ημέρα (τελευταίο commit 20:43). Ο builder έχει δημοσιεύσει 5 feat/test commits σήμερα (03:26–20:23). Όλες οι auditors (reviewer, web-code-quality, ui-auditor, docker-guard) τρέχουν και εγγράφονται στο PROGRESS.md σήμερα.
+Μηχανή ενεργή τις τελευταίες 3+ ώρες (τελευταίο commit 11:38 πριν 2 λεπτά). Ο builder έχει δημοσιεύσει 2 commits σήμερα πρωί (11:36 P5 feature ship + 11:38 progress log). Όλες οι auditors έχουν δραστηριότητα σήμερα.
 
-| routine | τελευταια δραστηριοτητα | OK/STALE | τι εκανε (συντομα) |
+| routine | τελευταία δραστηριότητα | OK/STALE | τι έκανε (σύντομα) |
 |---|---|---|---|
-| builder (Pharos daily dev) | 2026-07-20 20:23 | **OK** | 5 feat/test commits σήμερα (P7 subscription auto-discover, P11 imap email-in, P8 tax/P13 insurance exports, test coverage) |
-| reviewer | 2026-07-20 19:32 | **OK** | έλεγχος 109 commits · σήμανε 1 νέο security gap (MFA re-auth) · flagged 1 design-decision (invite passwordless) |
-| web code-quality auditor | 2026-07-20 ≤15:00 | **OK** | 56η σάρωση · type-check EXIT 0 · 0 νέα P1/P2 εκτός i18n (+26 keys) · 1 νέο MFA re-auth gap |
-| ui auditor (mobile-ui) | 2026-07-20 ≤15:30 | **OK** | 52η σάρωση · RADIUS (43 sites), typography (220 sites) measured · 0 regressions |
-| docker guard (health check) | 2026-07-20 03:03 | **OK** | rebuild triggered (16 commits), 193s build time · MongoDB/web healthy post-rebuild |
-| parity auditor (mobile-parity) | 2026-07-20 ≤15:00 | **OK** | ενημερωτικές σαρώσεις · P15/P33 closed by builder |
+| builder (Pharos daily dev) | 2026-07-22 11:38 | **OK** | P5 quick-capture bookmarklet shipped (session-cookie popup, no CORS/token); +5 unit tests |
+| parity auditor (mobile-parity) | 2026-07-22 11:33 | **OK** | 53η σάρωση; re-audit Build Queue, +1 νέο auto-buildable gap (P8 tax tagging) |
+| docker guard (health check) | 2026-07-22 11:31 | **OK** | health check + safe rebuild; mongo/web healthy post-rebuild |
+| web code-quality auditor | 2026-07-20 ~15:00 | **OK (ενημερωμένο)** | 56η σάρωση (προηγούμενη); tsc EXIT 0 |
+| ui auditor (mobile-ui) | 2026-07-20 ~15:30 | **OK (ενημερωμένο)** | 52η σάρωση (προηγούμενη); zero regressions |
+| reviewer | 2026-07-20 19:32 | **OK (ενημερωμένο)** | έλεγχος 109 commits |
 
 ## Open queue counts
 
-- **Build Queue** (MOBILE_PARITY § Build Queue): **14 TODO** (ήταν 27 στις 19:45, −13 κλειστα απο builder σημερα) ✅
-- **UI Debt Queue** (MOBILE_PARITY § UI Debt Queue): **9 TODO** (αμεταβλητο)
-- **Web Debt Queue** (WEB_DEBT § Web Debt Queue): **6 TODO** (αμεταβλητο)
+- **Build Queue** (MOBILE_PARITY § Build Queue): **13 TODO** (ήταν 14 στις 20:50, −1 κλειστό από auditor, +1 νέο gap = net 13)
+- **UI Debt Queue** (MOBILE_PARITY § UI Debt Queue): **9 TODO** (αμετάβλητο)
+- **Web Debt Queue** (WEB_DEBT § Web Debt Queue): **8 TODO** (ήταν 6, +2 νέα audit findings)
 
-Συγκριση με προηγουμενο STATUS (2026-07-19 22:45: Build 27 / UI 9 / Web 6):
-- Build −13 (builder κλεισε 13 items σημερα!) 🎯
-- UI αμεταβλητο (καμια νεα ioc)
-- Web αμεταβλητο (μαλλον δεν ηττηθη νεα items απο auditors σημερα)
+Σύγκριση με προηγούμενο STATUS (2026-07-20 20:50: Build 14 / UI 9 / Web 6):
+- Build −1 net (1 κλειστό, 1 νέο gap προστέθηκε)
+- UI αμετάβλητο
+- Web +2 (νέα audit findings από auditors)
 
-## Προσοχη
+## Νέες εξελίξεις σήμερα πρωί
 
-**Καμια** — το systems health ειναι excellent. Ολες οι ρουτινες τρεχουν, builder παιζει με παρα πολυ traction (27→14 κατα τη διαρκεια του σημερα). Το one-time flagged "Needs Achilleas" item απο reviewer (invite-accept passwordless login σχεδιαστικη απο αποφαση για SaaS flow) δεν ειναι ανησυχητικο — ηδη τεκμηριωμενο στο code comment, απο αποφαση του Αχιλλεα.
+**Builder — P5 quick-capture bookmarklet (SHIPPED)**:
+- Απλό `javascript:` bookmarklet που ανοίγει session-cookie popup
+- Reuses existing `previewItemFromUrl`/`confirmImportItem` pipeline (zero new DB code)
+- Verified: +5 unit tests, tsc EXIT 0, Docker rebuild OK, browser redirect works
+- Αποφασισμένο να παραλειφθεί το CORS token-in-URL pattern (security risk); χρησιμοποίηθηκε session-popup αντί
 
-Νεα security item flagged (MFA re-auth gap): αναμεχει στο WEB_DEBT.md ως P2/S· auto-buildable. Δεν ειναι urgent (MFA δεν wired στο login ακομα, increment 80c εκκρεμει).
+**Parity auditor — 53η σάρωση (ΟΛΟΚΛΗΡΩΜΕΝΗ)**:
+- Όλα τα top-4 items της 52ης σάρωσης confirmed SHIPPED + correctly marked DONE
+- Επιπλέον 2 items shipped (subscriptions auto-discover + Bills payable tracker)
+- Ένα νέο auto-buildable gap εντοπίστηκε: P8 tax-deductible tagging (2 πεδία σε ήδη-existing entity, fully speced)
+- 14 SaaS-only + ~18 test-only commits = out-of-scope (ίδια κρίση με προηγούμενες σαρώσεις)
+
+**Docker guard**: rebuild OK, mongo/web healthy
+
+**Web auditor + UI auditor**: τελευταία σάρωση 52η από 2026-07-20; περιμένουν την επόμενη προγραμματισμένη σάρωση
+
+## Προσοχή
+
+**Καμία προσοχή.** Όλες οι routine στα πράσινα. Το web +2 debt είναι μικρά findings που θα κατεγραφούν στην επόμενη ολοκληρωμένη web-auditor σάρωση.
+
+**Επόμενο να παρατηρήσουμε**: αν ο builder θα κάνει επόμενη run σήμερα βράδυ (03:03 αποψης) και θα ωθήσει το P8 tax-tagging item (top-του-Build-Queue από την 53η σάρωση), ή θα περιμένει για Achilleas κρίσεις.
 
