@@ -2,9 +2,53 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 779970a -->
+<!-- reviewed: 3ad1fea -->
 <!-- docker-validated: 065ecd8 -->
 <!-- ui-audited: faa3530 -->
+
+## 2026-07-22 (reviewer — έλεγχος 779970a..58b6437, 24 commits)
+
+**Εύρος**: `779970a..58b6437` (24 commits εκτός merge, βλ. `git log 779970a..HEAD`). Κύρια νέα surface: **MFA login-flow wiring** (increments 82-83, `feat(saas)` ×3 + `fix(saas)` re-auth), **P28 Bills v1 API** (`api/v1/bills`+`[id]`) + mobile `BillsScreen`, **P7 subscriptions auto-discover** στο `GET /api/v1/subscriptions`, **P21 mobile document/manual vault** (read-only, `items/[id]` attachments), **P5 quick-capture bookmarklet** (νέο `/capture` popup + `BookmarkletManager`), + landing-content/docs commits.
+
+**Checks**:
+- `cd apps/web && npm run type-check` → **EXIT 0**.
+- `cd apps/mobile && npx tsc --noEmit` → **EXIT 0** (μηδέν output).
+- Targeted `npx vitest run` σε ολόκληρο το reviewed range (bills route+actions, mfaStore, accountSession, mfaSettings, subscriptions route, bookmarklet) → **132+5 = 137 tests, όλα πράσινα**.
+
+**Review**:
+- **Bills API** (`api/v1/bills`+`[id]`) → σωστό: `withAuth`+`isObjectId`+`readBody` helpers, soft-delete, `nextBillDue`/`billStatus` pure+consistent με το ήδη-υπάρχον web `markBillPaid` (ίδιο `wasPaid` guard, spawns επόμενο instance ΜΙΑ φορά). Μηδέν tenant-scoping στο μοντέλο, αλλά ίδιο (σκόπιμο) pattern με ΟΛΑ τα υπόλοιπα v1 models (single-tenant-per-deployment self-hosted design) — όχι regression.
+- **MFA login wiring** (`accountSession.ts`, `mfaStore.ts`, `auth/mfa/route.ts`, `AuthForm.tsx`) → καλά σχεδιασμένο (distinct signed `typ:'mfa_pending'` cookie/claim, single-use recovery-code splice, `mfaEnrollRequiresReauth` fix από το `df676f8` σωστά εφαρμοσμένο και verified). **Ένα εύρημα**: το νέο `POST /api/saas/auth/mfa` δεν καλεί πουθενά το ήδη-υπάρχον `lib/apiRateLimit.ts`/`rateLimit()` helper (ήδη wired στο `POST /api/v1/auth/login`) → ένα attacker με σωστό password (και άρα ήδη ικανό να παράξει pending-MFA cookie) μπορεί να brute-force-άρει το 6-ψήφιο TOTP απεριόριστα εντός του 5λεπτου pending-window, ό,τι ξανά-ξεκινώντας το login για νέο cookie. **Ήδη εντοπισμένο και τεκμηριωμένο ανεξάρτητα από concurrent «web code-quality auditor» run (WEB_DEBT.md, 57η σάρωση, ίδια ημερομηνία)** ως **P1/S TODO** με πλήρες fix-plan (mirror του ήδη-shipped v1 pattern, keyed by accountId στο mfa-verify / IP στο login) — επιβεβαίωσα ανεξάρτητα το ίδιο εύρημα, δεν ανοίγω duplicate item, απλά confirm live.
+- **P5 bookmarklet** (`/capture`, `bookmarklet.ts`, `BookmarkletManager.tsx`) → καθαρό: μηδέν token/secret στο bookmarklet link (rides session cookie only), `window.open(...,'noopener,noreferrer')` σωστά (reverse-tabnabbing), `/capture` ΔΕΝ εξαιρείται από το auth middleware matcher (redirect σε `/login?next=` χωρίς session, όπως κάθε άλλη σελίδα), reuses το ήδη-existing `previewItemFromUrl`/`confirmImportItem` pipeline χωρίς αλλαγή.
+- **P21 mobile document vault**, **P7 auto-discover suggestions** → additive, read-only ή ήδη-tenant-safe patterns, μηδέν νέο debt.
+- Landing-content commits (FAQ/Reports/Subscriptions cards) → marketing copy only, μηδέν κώδικας πέρα από `apps/landing/app/page.tsx` static strings.
+- Μηδέν committed secret (grep για password/key/token patterns στο διάστημα → μόνο test fixtures).
+
+**Fixes**: κανένα small-safe fix χρειάστηκε — type-check ήδη EXIT 0 και στα δύο apps, μηδέν type error/missing await/unused import/typo βρέθηκε στο reviewed range.
+
+**Flagged**: κανένα νέο item (το μοναδικό ουσιαστικό εύρημα, SaaS MFA rate-limit, ήδη σωστά καταγεγραμμένο ως P1/S TODO από concurrent auditor run πριν προλάβω να το γράψω — απλά confirmed, δεν διπλασιάζω).
+
+**Git hygiene**: δεν χρειάστηκε staging/commit (μηδέν fix, μόνο ο marker + αυτή η εγγραφή σε αυτό το αρχείο· θα γίνει commit μαζί, μόνο `PROGRESS.md`).
+
+## 2026-07-22 (reviewer — έλεγχος 58b6437..3ad1fea, 4 commits)
+
+**Εύρος**: `58b6437..3ad1fea` (4 commits: `db9af7c`, `7cc5b10`, `6e36f7e`, `3ad1fea`). Όλα **docs-only**
+(`git diff --stat 58b6437..HEAD -- apps/` = μηδέν αλλαγές) — WEB_DEBT.md 57η σάρωση εύρημα (SaaS auth/MFA-verify
+rate-limit gap, P1/S), monitor STATUS.md ενημέρωση 11:40, PRODUCT_BACKLOG.md 13η σάρωση (+P52-P54), docs/features.md
++ docs/DOCS_PROGRESS.md documentation του P5 bookmarklet.
+
+**Checks**:
+- `cd apps/web && npm run type-check` → **EXIT 0**.
+- `cd apps/mobile && npx tsc --noEmit` → **EXIT 0** (μηδέν output).
+
+**Review**: μηδέν κώδικας για έλεγχο regressions σε αυτό το εύρος. Επαλήθευσα μία factual claim του docs
+auditor (features.md: bookmarklet ζει στο Settings → Storage & backup) έναντι του πραγματικού
+`SettingsClient.tsx` (γρ.268-270, `Section` μέσα στο storage tab block με `BookmarkletManager`) → **σωστό**.
+Το νέο WEB_DEBT.md P1 (SaaS auth+MFA rate-limit) είναι καλά τεκμηριωμένο, mirror ήδη-shipped pattern, δεν
+χρειάζεται δικό μου duplicate flag. Μηδέν committed secret στο diff (μόνο prose/markdown).
+
+**Fixes**: κανένα (τίποτα κώδικα να διορθωθεί σε αυτό το εύρος).
+
+**Flagged**: κανένα νέο.
 
 ## 2026-07-22 (docker-health — safe rebuild, health validated)
 
