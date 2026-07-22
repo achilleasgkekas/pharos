@@ -3,8 +3,28 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 779970a -->
-<!-- docker-validated: 6ff8678 -->
+<!-- docker-validated: 065ecd8 -->
 <!-- ui-audited: faa3530 -->
+
+## 2026-07-22 (docker-health — safe rebuild, health validated)
+
+**Εκτέλεση**: automated docker health check + safe rebuild, zero AI/Git cost.
+
+**State check**: Mongo healthy, web RestartCount=0, mongo RestartCount=0, flaresolverr stopped (expected).
+
+**Rebuild decision**: 20+ files changed in apps/web since last validation (6ff8678..065ecd8) including package.json, SaaS MFA routes, API endpoints, tests — rebuild warranted.
+
+**Rebuild execution**:
+- `docker compose build web` → SUCCESS (42.6s builder, 4.2s export)
+- Mongo health verified BEFORE `up -d web` → healthy
+- `docker compose up -d web` → STARTED
+- Poll `/login` → HTTP 200 on first attempt (instant)
+- Restart counts: web=0, mongo=0 (no loops, no crashes)
+- Cache prune: 195.4MB freed from build cache
+
+**Result**: ✓ Docker stack healthy, web rebuilt and serving, validation marker updated to HEAD (065ecd8).
+
+---
 
 ## 2026-07-22 (ui-auditor — comprehensive mobile UI consistency scan, 53η σάρωση)
 
