@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-20 (12η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-22 (13η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «τα εγκρίνω όλα» → **ΟΛΑ** τα προηγούμενα Proposed
 > (P1, P3, P5-P26) μετακινήθηκαν στο «Approved», μαζί με τα ήδη-εγκεκριμένα PA1/PA2/PA3.
 > **7η σάρωση (2026-07-09):** PA1 (bank/CSV import) shipped → «Done»· προστέθηκαν 5 νέοι candidates P27-P31.
@@ -50,12 +50,68 @@
 > κενά distinct από όλα τα tracked: κανένα μέτρημα κατανάλωσης (kWh/m³, distinct από το ποσό λογαριασμού που ήδη
 > παρακολουθείται), καμία γενέθλια/επέτειος υπενθύμιση, κανένα biometric app-lock στο mobile (grep επιβεβαίωσε
 > μηδέν hits και στα δύο apps πριν προστεθούν).
+> **13η σάρωση (2026-07-22):** καμία ρητή απόφαση/έγκριση Αχιλλέα σε αυτό το unattended run — P37-P51 παραμένουν
+> αμετάβλητα awaiting approval (live grep επιβεβαίωσε ξανά μηδέν hits: `MeterReading`/`SpecialDate`/
+> `expo-local-authentication`/`LocalAuthentication`, άρα P49-P51 από την προηγούμενη σάρωση δεν έχουν χτιστεί
+> εν τω μεταξύ). Το Approved queue έμεινε στην ίδια εικόνα με την 12η σάρωση εκτός του **P5** (bookmarklet phase
+> shipped 2026-07-22, βλ. `PROGRESS.md`· η MV3-extension φάση 2 μένει ανοιχτή) — ⚑ **η ίδια ανησυχία ισχύει
+> ακόμα πιο έντονα**: μετά το P5 shipped, το Approved queue έχει ΜΟΝΟ P36 (blocked)/P31 (needs supervised
+> session)/P16 remainder (needs sample file) ως ρητά μη-buildable, ενώ P9/P17/P23 μένουν τεχνικά ανοιχτά αλλά
+> systematically παραλείπονται εδώ και >10 σαρώσεις (P9 = ρητά «τελευταίο» L, P17/P23 = «no unattended verify
+> χωρίς physical device» — σκεπτικό που ίσως αξίζει να ξανακοιτάξει ο Αχιλλέας τώρα που το mobile app MVP +
+> Expo push υπάρχουν ήδη, ίδιο re-examination που έλυσε το P5 phase-1/phase-2 stuck state στην προηγούμενη
+> σάρωση). **Δεν μετακίνησα τίποτα** (δεν είναι ο ρόλος μου) — απλά το σημειώνω ξανά για ορατότητα.
+> Προστέθηκαν **3 νέοι candidates P52-P54** (ζωντανό grep επιβεβαίωσε distinct: κανένα `restockIntervalDays`/
+> `lowStock` πάνω στο ήδη-υπάρχον `ShoppingListItem`, κανένα recurring/repeat πεδίο στο `Task` model, μηδέν
+> encryption στο JSON backup export path).
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P54. Encrypted local backup export (passphrase-protected JSON/ZIP) — S/M — OSS (self-host security lever)
+- **Αξία:** το `exportData()` JSON backup + το nightly `backup.sh` (CLAUDE.md) γράφουν **plaintext** αρχεία με
+  πλήρη οικονομικά δεδομένα (receipts/expenses/κάρτες/statements) — ένας self-host χρήστης που αντιγράφει αυτά
+  τα backups σε λιγότερο έμπιστο μέσο (USB stick, κοινόχρηστος NAS φάκελος, cloud drive χωρίς δικιά του
+  encryption) έχει μηδέν προστασία αν διαρρεύσει το αρχείο. Optional **passphrase-protected export** (AES-256-GCM
+  + scrypt-derived key, ίδια primitives με το ήδη-shipped MFA secret-at-rest encryption — reuse pattern, όχι νέα
+  κρυπτογραφική επιλογή να επαληθευτεί) πάνω στο ήδη-υπάρχον backup JSON· «Restore encrypted backup» path που
+  ζητά την passphrase πριν το decrypt+import. **Διακριτό** από §14 (SaaS encryption-at-rest σε επίπεδο DB/storage
+  backend, δεν αγγίζει το OSS backup-file flow) και από P48 (staleness alert, όχι confidentiality).
+- **Module:** Settings → Storage & backup (Backup/Restore section, νέο toggle+passphrase prompt).
+- **Ανοιχτή απόφαση (builder default):** opt-in (default = σημερινό plaintext behavior, μη σπάσει existing
+  scripted `backup.sh` flows απροειδοποίητα)· passphrase ζητείται only-in-memory (ποτέ αποθηκευμένο)· αποτυχημένο
+  decrypt (λάθος passphrase) = ξεκάθαρο error, όχι silent corruption.
+
+### P53. Pantry / consumables restock reminder (πάνω στο ήδη-υπάρχον to-buy list) — S — OSS (dogfooding-heavy)
+- **Αξία:** το `ShoppingListItem` (`/shopping-list`) είναι ήδη ένα ελαφρύ «to-buy» checklist (name/quantity/
+  category, tick όταν αγοράστηκε) αλλά **δεν ξέρει να επαναλαμβάνεται** — καταναλώσιμα σπιτιού που τελειώνουν
+  περιοδικά (καφές, φίλτρα νερού, χαρτί υγείας, σακούλες σκούπας) σήμερα είτε ξαναγράφονται χειροκίνητα κάθε
+  φορά, είτε ξεχνιούνται. Optional `restockIntervalDays` + `lastRestockedAt` ανά named list item (μόνο σε
+  entries που το θέλει ο χρήστης, όχι force σε όλα) → όταν περάσει το διάστημα από το τελευταίο «bought»,
+  το item **ξαναμπαίνει αυτόματα unchecked** στη λίστα (ίδιο on-read pattern με `generateDueRecurring`).
+  **Διακριτό** από P49 (utility meter = μετρήσιμη κατανάλωση kWh/m³, όχι διακριτά καταναλώσιμα) και από τα
+  durable-goods Items/Inventory (τα οποία δεν «τελειώνουν» ποτέ, απλώς φθείρονται/αντικαθίστανται).
+- **Module:** `/shopping-list` (2 νέα optional πεδία στο `ShoppingListItem` + on-read re-surface logic).
+- **Ανοιχτή απόφαση (builder default):** πεδίο εμφανίζεται μόνο όταν ο χρήστης το θέσει ρητά (edit ανά item,
+  κενό = one-off όπως σήμερα)· «bought» (check) ενημερώνει αυτόματα `lastRestockedAt = now`· μηδέν notification
+  αρχικά (MVP = απλά re-surface στη λίστα, δεν χρειάζεται bell/ntfy).
+
+### P52. Recurring household task/chore templates (Tasks module) — S/M — OSS, «Personal Hub» fit
+- **Αξία:** το `Task` model έχει σήμερα **μόνο one-off `dueDate`** (κανένα recurring/repeat πεδίο, verified με
+  grep) — δουλειές σπιτιού που επαναλαμβάνονται σε τακτό διάστημα (πότισμα φυτών κάθε βδομάδα, καθάρισμα
+  φίλτρων UniFi rack, backup-verify κάθε μήνα, cleaning nozzle 3D printer) σήμερα είτε ζουν έξω από την
+  εφαρμογή, είτε ο χρήστης πρέπει να ξαναφτιάχνει το ίδιο task χειροκίνητα κάθε φορά που το κλείνει. Optional
+  `Task.repeatEveryDays` (+ αυτόματο re-spawn μιας νέας `todo` instance μία περίοδο μπροστά όταν η τρέχουσα
+  γίνεται `done`, mirror του ήδη-shipped spawn-on-pay pattern του Bill/P28). **Διακριτό** από P41 (item-scoped
+  maintenance, δεμένο σε συγκεκριμένο owned item) — αυτό είναι **γενικό** repeating chore, χωρίς απαραίτητο
+  linked item (π.χ. «βγάλε τα σκουπίδια» δεν έχει Item).
+- **Module:** Tasks (νέο optional πεδίο + spawn-on-complete logic).
+- **Ανοιχτή απόφαση (builder default):** spawn-on-complete (ΟΧΙ background generator, ίδιο ντετερμινιστικό
+  MVP-first pattern με P28/P45)· κενό `repeatEveryDays` = σημερινή one-off συμπεριφορά αμετάβλητη· optional
+  linked item παραμένει, δεν αφαιρείται.
 
 ### P51. Mobile app-lock (Face ID / Touch ID / device PIN) — S — both (mobile-native, trust lever)
 - **Αξία:** το Expo app σήμερα ανοίγει κατευθείαν στα δεδομένα μόλις είναι logged-in (token-based session,
