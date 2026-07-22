@@ -7021,3 +7021,72 @@ physical device — ΔΕΝ αλλάζει η προηγούμενη κρίση, 
 ## Needs Achilleas
 
 - Τίποτα νέο από αυτό το run.
+
+## 2026-07-22 (web-code-quality auditor, 57η σάρωση)
+
+**Read-only audit run.** Διάβασα CLAUDE.md, BACKLOG.md, TODO.md, PROGRESS.md (τελευταία entries), `git log
+--oneline -15`. Marker: προηγ. WEB_DEBT.md audit commit `88e5d58` (56η σάρωση) → HEAD, **61 commits**
+(`88e5d58..HEAD`, εκτός test/docs-only). `npm run type-check` → **EXIT 0**.
+
+**Κύρια νέα επιφάνεια αυτού του διαστήματος**: το **login-flow wiring του MFA** (increment 82-83, πάνω στο
+TOTP+recovery-code scaffold της 56ης) — νέα routes `api/saas/account/mfa`+`/confirm`, `api/saas/auth/mfa`,
++ αλλαγές στο `api/saas/auth/login` για το δεύτερο βήμα· `lib/tenancy/accountSession.ts` απέκτησε το
+pending-MFA cookie mechanism. Παράλληλα: **P28 Bills v1 API** (`api/v1/bills`+`[id]`, νέο mobile-parity
+surface), **P7 subscriptions auto-discover v1** (`suggestions[]` στο GET), **P21 items attachments** στο v1
+detail shape, + 8 νέα `*.actions.test.ts` αρχεία (μηδέν production diff).
+
+**Ευρήματα ανά dimension**:
+- **Type safety**: 0 νέο (`: any`/`as any`/`@ts-ignore` sweep καθαρό στο v1 + νέο MFA κώδικα).
+- **Input validation**: 0 νέο — τα νέα `api/v1/bills*` routes χρησιμοποιούν πλήρως τα shared `readBody`/
+  `strField`/`numField`/`enumField` helpers, ίδιο idiom με τα υπόλοιπα 7 synced resources.
+- **Error handling**: 0 νέο — όλα τα νέα routes περνούν από `withAuth`/`saasGuard` (κεντρικό try/catch,
+  συνεπές `{ error }` shape). Οι 3 προϋπάρχοντες SaaS guardless holdouts (`invites/accept`, `audit`,
+  `workspace/erasure/purge`) confirmed ΑΚΟΜΑ ανοιχτοί, αμετάβλητοι.
+- **Auth: 1 νέο P1.** Το ήδη-shipped, config-gated `rateLimit()` helper (`lib/apiAuth.ts`, wired στο
+  `POST /api/v1/auth/login` από την 48η σάρωση) δεν καλείται πουθενά στα `/api/saas/auth/*` routes. Αυτό
+  ήταν standing «login brute-force» observational note για πολλές σαρώσεις (framed ως πιθανό
+  reverse-proxy/product decision) — αλλά το νέο **`POST /api/saas/auth/mfa`** (ο δεύτερος παράγοντας)
+  αλλάζει τα δεδομένα: ένας attacker που ήδη ξέρει το password μπορεί μόνος του να φτάσει στο pending-MFA
+  cookie και μετά να brute-force-άρει το 6-ψήφιο TOTP code (ή ένα από τα 10 recovery codes) χωρίς κανένα
+  throttle — η απουσία rate-limit εκεί ακυρώνει ουσιαστικά το νόημα του δεύτερου παράγοντα. Άνοιξα
+  συγκεκριμένο, μηχανικό, auto-buildable item (P1/S) στο WEB_DEBT.md αντί να το αφήσω σαν ασαφές standing
+  note — mirror του ήδη-shipped+ήδη-accepted pattern, config-gated/μηδέν ρίσκο για το self-hosted
+  single-user mode σήμερα.
+- **Mongoose**: 0 νέο — bills model index-consistent (`updatedAt`), το νέο `Expense.find()` χωρίς limit στο
+  subscriptions-discover mirror του ήδη-υπάρχοντος web action pattern (`subscriptions/actions.ts:133`,
+  προϋπήρχε) — ίδιας κλάσης με το ήδη-accepted «Δεν είναι debt» item, δεν άνοιξα νέο.
+- **Duplication/dead code**: 0 νέο.
+- **UX states**: 0 νέο (loading.tsx παραμένει σκόπιμα απόν, βλ. «Δεν είναι debt»).
+- **`npm run type-check`**: EXIT 0, 0 P1 από type errors.
+
+**MFA κρυπτο/storage layer re-reviewed (ήδη υπήρχε από την 56η, τώρα ενεργά wired) → exemplary**:
+`verifyTotpCode` timing-safe (`timingSafeEqual` ανά candidate offset), RFC 6238 Appendix B test vectors,
+recovery codes scrypt-hashed, secret at-rest AES-256-GCM, two-step enroll (pending→confirmed). Ο re-auth
+gap που η 55η/56η είχε flag-άρει (`mfaEnrollRequiresReauth`) **ΕΚΛΕΙΣΕ** ήδη (commit `df676f8`, confirmed
+live).
+
+**Confirmed ΑΚΟΜΑ ανοιχτά, live-verified, μηδέν αλλαγή**: Notifications requireAdmin gap (P1/S)· Voucher/
+GiftCard/LoyaltyCard tenancy-parity (P2/M, `grep -c` = 0 και στα τρία)· sampleDataActions.ts tenancy-parity
+(P2/S)· `invites/accept`/`audit`/`workspace/erasure/purge` guardless SaaS holdouts (P2/S ×3)·
+`getTenantConnection` readyState decision-flag (P3/S, `## Needs Achilleas`).
+
+**el.ts i18n gap**: 110→**126** (+16, node-verified `en=1271, el=1145`). Συνεχίζει να μεγαλώνει σταθερά
+ανά feature (P28 Bills + P7 discover-suggestions + νέα MFA UI strings). Παραμένει P3/M.
+
+**Top 3 για τον builder**:
+1. **SaaS auth + MFA-verify rate-limit** (νέο P1/S) — το πιο value-dense: 2 routes, mirror ήδη-shipped
+   pattern, ασφάλεια δεύτερου παράγοντα.
+2. **Settings→Notifications requireAdmin gap** (P1/S, ανοιχτό από 19/7) — 1-liner ×8, real gap σήμερα σε
+   multi-user households.
+3. **Voucher/GiftCard/LoyaltyCard tenancy-parity** (P2/M, ανοιχτό από 19/7) — μηχανικό mirror, 3 αρχεία.
+
+**Git hygiene**: `git add WEB_DEBT.md PROGRESS.md` (explicit, όχι `-A`) → commit → push. Δεν άγγιξα τα
+uncommitted WIP του Αχιλλέα (`MOBILE_PARITY.md`, `SettingsClient.tsx`, `en.ts`, `apps/web/src/app/capture/`,
+`BookmarkletManager.tsx`, `bookmarklet.ts`/`.test.ts`).
+
+### Needs Achilleas
+
+- Τίποτα νέο πέρα από το ήδη-εξειδικευμένο rate-limit item παραπάνω (τώρα queue item, όχι πια ασαφές note).
+  Standing items αμετάβλητα: `getTenantConnection` readyState guard decision (P3/S)· SaaS multi-tenancy/
+  billing rollout env boundary· mobile native-dep approvals· Settings theme/language/AI-engine/storage/
+  OneDrive credentials boundary.
