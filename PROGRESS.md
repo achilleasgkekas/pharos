@@ -6956,3 +6956,68 @@ ui-auditor's 065ecd8 — padding/gap + borderRadius standardization, βλ. εκ�
   SaaS multi-tenant surfaces + safe-area/theme/language/AI-engine/storage Settings + Tasks Kanban + lucide
   icons + rate-limit backoff παραμένουν στην ίδια «γνωστή, όχι-unattended-buildable» κατηγορία με τις
   προηγούμενες σαρώσεις.
+
+## 2026-07-22 (pharos-daily-dev)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `mkdir /tmp/claude-docker.lock` (lock acquired καθαρά,
+κανένα άλλο routine έτρεχε build· released στο τέλος). `ASK_ACHILLEAS.md` είχε 2 OPEN items, και τα δύο από
+άλλο routine (`bakecore-finance`, άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή.
+
+**Approved queue check (βήμα a)**: `PRODUCT_BACKLOG.md → ## Approved` επιβεβαιώθηκε ξανά: το μόνο πραγματικά
+blocked (P31 supervised session, P36 provider-decision, P16 Firefly/Grocy sample file) παρέμειναν ίδια. Τα
+υπόλοιπα unshipped items (**P5** browser bookmarklet, **P9** multi-currency L «τελευταίο», **P17**/**P23**
+mobile-native camera/share-sheet) είχαν σκόπιμα παραλειφθεί σε ΚΑΘΕ προηγούμενο run (βλ. σημείωση στο
+2026-07-20 P11 entry) με το σκεπτικό «P5 = ξεχωριστό packaging/deliverable, P17/P23 = μηδέν τρόπος να
+επαληθευτούν χωρίς physical device». **Επανεξέτασα το P5 σκεπτικό**: το ίδιο το backlog item λέει ρητά
+«builder default: **απλό bookmarklet πρώτα**, MV3 extension phase 2» — ένα απλό `javascript:` bookmarklet
+ΔΕΝ είναι ξεχωριστό packaging/deliverable (αυτό είναι μόνο η MV3-extension φάση 2), είναι απλώς μια σελίδα +
+μια μικρή JS συνάρτηση μέσα στο ίδιο monorepo. Το προηγούμενο repeated-skip σκεπτικό ίσχυε για το πλήρες
+«extension», όχι για το phase-1 MVP. Διάλεξα να το χτίσω τώρα (πρώτη φορά η ουρά προχωρά πέρα από το
+mobile-parity fallback εδώ και μέρες).
+
+**Quick-capture bookmarklet (P5 phase 1) — ✅ SHIPPED** (commit `93cc862`). Το αρχικό spec έλεγε «καταναλώνει
+`/api/v1`» — το απέρριψα ρητά ως builder decision, γιατί θα σήμαινε είτε (α) το προσωπικό API token να ζει σε
+plain text μέσα στο ίδιο το bookmarklet link (ορατό σε bookmarks export/sync/backup), είτε (β) νέο CORS layer
+στο v1 API (σήμερα μηδέν `Access-Control-*`/`OPTIONS` handling οπουδήποτε — ένα cross-origin fetch από τυχαία
+e-shop σελίδα θα μπλοκαριζόταν στο browser preflight χωρίς αυτό, νέο attack-surface αν ανοίξω CORS `*` σε
+authenticated write endpoint). **Αντ' αυτού**: session-cookie same-origin popup pattern (ίδιο idiom με
+Pocket/Instapaper-style «save» bookmarklets). Νέο pure **`lib/bookmarklet.ts`** `buildBookmarklet(origin)`
+(**+5 unit tests**) παράγει ένα μικρό `javascript:` URI: `window.open(origin+'/capture?url='+
+encodeURIComponent(location.href), 'pharosCapture', ...)`. Το popup ανοίγει στο **ίδιο Pharos domain** →
+παίρνει το ήδη-υπάρχον session cookie ατόφιο, καμία αλλαγή στο auth. Νέα σελίδα **`app/capture/page.tsx`**
++ **`CaptureClient.tsx`** (chromeless, ίδιο με `/login`/`/setup` — προστέθηκε γραμμή στο `layout.tsx`) reuses
+**ατόφιο** το ήδη-υπάρχον preview→approve pipeline του Items page (`previewItemFromUrl`/`confirmImportItem`,
+`app/items/actions.ts`) — μηδέν νέος DB-writing κώδικας, μηδέν νέο AI-cost path. Settings → Storage & backup,
+νέο **`BookmarkletManager.tsx`** section: drag-to-bookmarks-bar link (`href` set imperatively μέσω
+`useEffect`/`setAttribute`, ώστε να μην ενεργοποιήσει το React `javascript:`-href dev-warning) + «Copy code»
+fallback button. **Bonus find**: το `middleware.ts` ΗΔΗ κρατούσε `?next=<path>` στο login-redirect (δεν το
+χρησιμοποιούσε κανένα υπάρχον flow ρητά μέχρι τώρα εκτός του login form) → login-μέσα-στο-popup-και-γύρισε-
+στο-capture δουλεύει ΧΩΡΙΣ καμία επιπλέον αλλαγή στο auth flow, verified live (βλ. curl παρακάτω).
+
+**Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` **2888 passed / 222 files** (+5 νέα στο
+`bookmarklet.test.ts`, μηδέν regression). Docker: `mkdir /tmp/claude-docker.lock` → `docker compose build web`
+OK (βλέπω `/capture` στο route list του build output) → mongo ήδη healthy → `up -d web` → `RestartCount=0`,
+`/login` 200 στην 1η προσπάθεια, `docker logs` καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning).
+`curl -D- '/capture?url=https://example.com/product'` χωρίς session → **307 → `/login?next=%2Fcapture%3Furl
+%3Dhttps%253A%252F%252Fexample.com%252Fproduct`** (επιβεβαιώνει το login→return-to-capture round-trip)·
+`POST /api/v1/items/import` χωρίς token → 401 αμετάβλητο (το v1 route ΔΕΝ αγγίχτηκε τελικά — η υλοποίηση
+προτίμησε το session-cookie path αντί του token path). Browser-checked (Claude Browser pane): `/capture?url=
+...` → redirect σε «Sign in · Pharos» (chromeless, σωστό — ίδιο rendering με `/login`), μηδέν console errors·
+`/settings` επίσης redirect χωρίς session, μηδέν console errors. `docker builder prune -f` (195.6MB freed),
+lock released καθαρά. **Το πραγματικό capture-popup UI (preview card + Add to Shopping/Add to Inventory
+buttons) ΔΕΝ testable end-to-end unattended** (χρειάζεται login με τα credentials του Αχιλλέα + πραγματική
+AI item-import call σε ένα προϊόν) — verified πλήρως μέσω unit tests στο pure `buildBookmarklet` + type-check
++ το ήδη-proven `previewItemFromUrl`/`confirmImportItem` pipeline (reused ατόφιο, καμία νέα λογική εκεί),
+ίδιος περιορισμός με κάθε προηγούμενο auth-gated-only feature run.
+
+**Suggested next task**: το ίδιο top-item του σημερινού mobile-parity-auditor scan (53η σάρωση, βλ. entry
+ακριβώς πάνω): **Expenses tax-deductible tagging στο mobile** (P8 gap, P2/S — μικρό, additive 2 πεδία
+[`taxDeductible`/`taxCategory`] πάνω σε ήδη-existing entity που το mobile ήδη edit-άρει πλήρως, πλήρως speced
+στο `MOBILE_PARITY.md` Build Queue). Το Approved queue παραμένει με **P9** (multi-currency, L, ρητά
+«τελευταίο»)· **P17**/**P23** (mobile-native camera/share-sheet, ακόμα μηδέν τρόπος να επαληθευτούν χωρίς
+physical device — ΔΕΝ αλλάζει η προηγούμενη κρίση, μόνο το P5 είχε το phase-1/phase-2 διαχωρισμό που το
+έκανε ασφαλές)· P31/P36/P16 μπλοκαρισμένα όπως πάντα.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run.
