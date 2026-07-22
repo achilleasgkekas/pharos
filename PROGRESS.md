@@ -6897,3 +6897,62 @@ uncommitted στο working tree όπως τα βρήκα.
 ## Needs Achilleas
 
 - Τίποτα νέο από αυτό το run.
+
+## 2026-07-22 (mobile-parity-auditor, 53η σάρωση — Build Queue)
+
+**Read-only audit run** (auditor-pharos scheduled task). Working tree καθαρό στην αρχή. Διάβασα CLAUDE.md,
+MOBILE_PARITY.md, BACKLOG.md (stale, Ιούνιος sessions, μη ενεργό), TODO.md, PROGRESS.md (τελευταία 2026-07-21).
+ΣΗΜ: κατά τη διάρκεια αυτού του run, ένα ξεχωριστό `ui-auditor` routine έτρεξε παράλληλα (commit `065ecd8`,
+UI Debt Queue token-standardization findings) — άσχετο section, μηδέν σύγκρουση με τη δική μου δουλειά στο
+Build Queue.
+
+**Inventory ξαναχτισμένο από τον κώδικα**: **53 v1 routes** (`find apps/web/src/app/api/v1 -name route.ts`,
+ανέβηκε από 51 — νέα `bills` + `bills/[id]`), **17 mobile screens** (ανέβηκε από 16 — νέο `BillsScreen.tsx`).
+`apps/mobile npx tsc --noEmit` → **EXIT 0**.
+
+**Diff από την 52η σάρωση (2026-07-20)**: `git log --since=2026-07-20 -- apps/web/src apps/mobile/src` έδειξε
+**43 commits**. Επιβεβαίωσα ότι **όλα τα top-4 items** της 52ης σάρωσης (Month in Review, net-worth headline/
+breakdown [PA2], safe-to-spend forward cashflow [P19], budget envelope/rollover [P25]) **έχουν ήδη shipped**
+και είναι σωστά marked `Status: DONE` στο `MOBILE_PARITY.md` — με **μία εξαίρεση**: η forward-reference
+stub-γραμμή στην αρχή του Build Queue για το PA2 item έλεγε ακόμα «Ήδη speced στην 48η σάρωση... Παραμένει
+ανοιχτό, item #3 του builder queue» ενώ το πλήρες entry παρακάτω ήταν ήδη marked DONE — **stale doc
+inconsistency, διορθώθηκε**. Επιπλέον **3 items πέρα από το top-4** shipped το ίδιο 24ωρο (subscriptions
+auto-discover [P7], Bills payable/due tracker [P28, νέο entity + 2 νέα routes], items document/manual vault
+read-only [P21]) — και τα τρία ήδη σωστά marked DONE, καμία διόρθωση χρειάστηκε.
+
+**Υπόλοιπες commits**: **~14 SaaS multi-tenant/MFA surfaces** (`feat(saas)`/`fix(saas)`: TOTP+recovery-code
+core, MFA enrollment UI+routes, login-flow wiring, GDPR erasure, workspace rename/leave/create, invite-accept/
+resend, account Settings, data-export links, keyset pagination) — grep-confirmed **μηδέν** hit σε `api/v1` ή
+`apps/mobile/src` για κάθε commit → **confirmed out-of-scope** (ίδια κρίση με 10+ προηγούμενες σαρώσεις,
+hosted-SaaS web account portal, όχι το self-hosted personal-use mobile companion)· **~18 test-only commits**
+(route/action coverage, μηδέν shape change).
+
+**1 νέο web feature, split σε buildable + out-of-scope μέρη**: `e0124d8` (P8, tax-deductible tagging + year-end
+export bundle). Το **export ZIP** μέρος = ΟΧΙ mobile gap (ίδιο idiom με το ήδη-flagged P13/P11 desktop
+file-download power tools). ΑΛΛΑ το **tagging** μέρος (`Expense.taxDeductible`/`taxCategory`, δύο μικρά πεδία
+πάνω σε ήδη-υπάρχον entity που το mobile ήδη πλήρως edit-άρει) **ΕΙΝΑΙ auto-buildable PARITY GAP** — νέο entry
+προστέθηκε στο `MOBILE_PARITY.md` Build Queue.
+
+**Counts**: DONE +7 (Month-in-Review/net-worth/safe-to-spend/budget-envelope/P7/P21/P28, όλα ήδη σωστά marked
+εκτός της 1 stale stub-γραμμής που διορθώθηκε σήμερα) / auto-buildable GAP 1 νέο (P8 tagging) / NEEDS DECISION
+0 νέα.
+
+**Top 3 για το επόμενο builder run (Build Queue track)**:
+1. **Expenses tax-deductible tagging** (P8, P2/S) — μικρότερο από τα υπόλοιπα, additive 2 πεδία + mobile toggle/
+   input/badge, πλήρως speced.
+2. **Gift cards store-credit tracker** (P32, P2/L) — παλαιότερο ανοιχτό L-size item, νέο entity, μηδέν v1 route.
+3. **Savings/financial goals** (P12, P2/L) — νέο entity + nested contributions ledger, μηδέν v1 route.
+
+Loyalty card wallet (P20, P2/L) παραμένει ισοδύναμη εναλλακτική στο ίδιο tier (χρειάζεται νέο RN barcode-display
+dep — builder decision, όχι needs-Achilleas). Search matched-line-item snippet (P22, P3/S) μένει χαμηλότερης
+προτεραιότητας παρά το μικρό μέγεθος. (Το ξεχωριστό UI Debt Queue track έχει τα δικά του top items από το
+ui-auditor's 065ecd8 — padding/gap + borderRadius standardization, βλ. εκείνο το section.)
+
+**Git hygiene**: `git add MOBILE_PARITY.md PROGRESS.md` (explicit, όχι `-A`) → commit → push.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Το P8 export-ZIP μέρος + όλα τα υπόλοιπα power-tools (P13/P11/P24/P16) +
+  SaaS multi-tenant surfaces + safe-area/theme/language/AI-engine/storage Settings + Tasks Kanban + lucide
+  icons + rate-limit backoff παραμένουν στην ίδια «γνωστή, όχι-unattended-buildable» κατηγορία με τις
+  προηγούμενες σαρώσεις.
