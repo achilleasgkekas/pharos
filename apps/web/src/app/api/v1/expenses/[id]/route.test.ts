@@ -151,6 +151,23 @@ describe('PATCH partial-update', () => {
     expect(set).not.toHaveProperty('space');
     expect(set).not.toHaveProperty('split');
   });
+
+  it('accepts taxDeductible (boolean) and taxCategory (trimmed+capped string)', async () => {
+    updateState.doc = { _id: OID, vendor: 'X' };
+    await PATCH(makeReq({ body: { taxDeductible: true, taxCategory: '  ' + 'Ιατρικά'.repeat(10) + '  ' } }), ctx(OID));
+    const set = lastSet();
+    expect(set.taxDeductible).toBe(true);
+    expect((set.taxCategory as string).length).toBe(60);
+    expect(set.taxCategory).toBe('Ιατρικά'.repeat(10).slice(0, 60));
+  });
+
+  it('omitting taxDeductible/taxCategory leaves them out of $set entirely', async () => {
+    updateState.doc = { _id: OID, vendor: 'X' };
+    await PATCH(makeReq({ body: { amount: 10 } }), ctx(OID));
+    const set = lastSet();
+    expect(set).not.toHaveProperty('taxDeductible');
+    expect(set).not.toHaveProperty('taxCategory');
+  });
 });
 
 describe('DELETE soft-delete', () => {

@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** POST /api/v1/expenses  { kind?, vendor, amount, date?, category?, space?, period?, recurring?, recurringCycle?, notes?, split? } */
+/** POST /api/v1/expenses  { kind?, vendor, amount, date?, category?, space?, period?, recurring?, recurringCycle?, notes?, split?, taxDeductible?, taxCategory? } */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const b = await readBody(req);
@@ -65,6 +65,8 @@ export async function POST(req: NextRequest) {
       paymentMethod: strField(b, 'paymentMethod'),
       notes: strField(b, 'notes'),
       split: parseSplitField(b.split),
+      taxDeductible: boolField(b, 'taxDeductible'),
+      taxCategory: strField(b, 'taxCategory').trim().slice(0, 60),
       verified: true, // manually entered → trusted
     });
     return NextResponse.json({ expense: trimExpense(doc.toObject() as ExpenseLean) }, { status: 201 });

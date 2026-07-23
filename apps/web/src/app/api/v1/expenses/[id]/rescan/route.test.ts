@@ -193,6 +193,8 @@ describe('POST /api/v1/expenses/:id/rescan — success re-read + serialization',
       updatedAt: null,
       deleted: false,
       split: [],
+      taxDeductible: false,
+      taxCategory: '',
     });
   });
 

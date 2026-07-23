@@ -255,6 +255,21 @@ describe('POST validation', () => {
     expect(c.space).toBe('');
     expect(c.split).toEqual([]);
   });
+
+  it('accepts taxDeductible + trims/caps taxCategory to 60 chars, defaults false/""', async () => {
+    await POST(makeReq({
+      body: { vendor: 'Doctor', amount: 40, taxDeductible: true, taxCategory: '  ' + 'Ιατρικά'.repeat(10) + '  ' },
+    }));
+    const c = state.lastCreate as Record<string, unknown>;
+    expect(c.taxDeductible).toBe(true);
+    expect((c.taxCategory as string).length).toBe(60);
+    expect(c.taxCategory).toBe('Ιατρικά'.repeat(10).slice(0, 60));
+
+    await POST(makeReq({ body: { vendor: 'Coffee', amount: 3 } }));
+    const c2 = state.lastCreate as Record<string, unknown>;
+    expect(c2.taxDeductible).toBe(false);
+    expect(c2.taxCategory).toBe('');
+  });
 });
 
 describe('GET listing', () => {
@@ -272,12 +287,12 @@ describe('GET listing', () => {
       id: 'e1', kind: 'income', vendor: 'Acme', category: 'salary', space: '', amount: 1500, currency: 'USD',
       date: '2026-06-01T00:00:00.000Z', period: '2026-06', recurring: true, recurringCycle: 'monthly',
       paymentMethod: 'bank', notes: 'pay', file: '/f.pdf', thumb: '/t.jpg', verified: true,
-      updatedAt: '2026-07-01T00:00:00.000Z', deleted: false, split: [],
+      updatedAt: '2026-07-01T00:00:00.000Z', deleted: false, split: [], taxDeductible: false, taxCategory: '',
     });
     expect(json.data[1]).toEqual({
       id: 'e2', kind: 'expense', vendor: 'Bare', category: 'other', space: '', amount: 0, currency: 'EUR',
       date: null, period: '', recurring: false, recurringCycle: '', paymentMethod: '', notes: '',
-      file: null, thumb: null, verified: false, updatedAt: null, deleted: false, split: [],
+      file: null, thumb: null, verified: false, updatedAt: null, deleted: false, split: [], taxDeductible: false, taxCategory: '',
     });
     // single-doc series (<3) → no anomaly key on either row
     expect(json.data[0]).not.toHaveProperty('anomaly');

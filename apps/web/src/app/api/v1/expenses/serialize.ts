@@ -6,7 +6,7 @@ export type ExpenseLean = {
   _id: unknown; kind?: string; vendor?: string; vendorKey?: string; category?: string; space?: string; amount?: number; currency?: string;
   date?: Date; period?: string; recurring?: boolean; recurringCycle?: string; paymentMethod?: string;
   notes?: string; filePath?: string; thumbPath?: string; verified?: boolean; updatedAt?: Date; deletedAt?: Date | null;
-  split?: SplitEntry[];
+  split?: SplitEntry[]; taxDeductible?: boolean; taxCategory?: string;
 };
 
 /**
@@ -37,6 +37,8 @@ export function trimExpense(e: ExpenseLean, anomaly?: number) {
     updatedAt: iso(e.updatedAt),
     deleted: !!e.deletedAt,
     split: Array.isArray(e.split) ? cleanSplit(e.split) : [],
+    taxDeductible: !!e.taxDeductible,
+    taxCategory: e.taxCategory ?? '',
     ...(anomaly !== undefined ? { anomaly } : {}),
   };
 }

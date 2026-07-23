@@ -235,7 +235,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 
 > **Re-audit 2026-07-02 (mobile-parity-auditor, 38η σάρωση):** inventory ξαναχτισμένο από τον κώδικα (όχι docs). **50 v1 routes** (login + 49 bearer, `find api/v1 -name route.ts`), **16 mobile screens**, mobile `api.ts` καταναλώνει **1:1 ΚΑΘΕ** route → **μηδέν endpoint-level gap** (και τα νέα `expenses/[id]/rescan` + `statements/plans` δεμένα). Mobile `npx tsc --noEmit` → **EXIT 0**. Επιβεβαίωσα στον κώδικα ότι τα 2 GAP της προηγ. σάρωσης έκλεισαν: bill image (`fileSource(editing.file)` στο MoneyScreen) + Expenses/Income re-scan (`rescanExpense` + rescanBar) → **DONE**. **ΝΕΟ εύρημα (2 auto-buildable GAP, τοποθετημένα στην κορυφή):** (α) **Expense anomaly badges** — το web υπολογίζει `anomaly` (±% απόκλιση από το vendor median, `page.tsx:25-46`, pure stats μηδέν AI) και δείχνει `AnomalyBadge`, αλλά ο v1 serializer (`serialize.ts`) ΔΕΝ εκθέτει το πεδίο → το mobile δεν μπορεί να το δείξει· port = additive `anomaly?` στο list route (ήδη import-άρει `vendorKey`) + badge στο MoneyScreen. (β) **Expense vendor autocomplete** — το web add-form έχει vendor autocomplete· το mobile MoneyScreen add-form είναι plain `Input` (line 147), μηδέν suggestions· auto-buildable client-side (derive distinct vendors από την ήδη-φορτωμένη λίστα, μηδέν endpoint). Τα εναπομείναντα παλιά TODO (lucide icons, language switcher) μένουν attended-preferred → κάτω από τα 2 νέα un-attended.
 
-### Expenses — tax-deductible tagging στο mobile (P8 gap, νέο πεδίο σε υπάρχον entity)
+### Expenses — tax-deductible tagging στο mobile (P8 gap, νέο πεδίο σε υπάρχον entity) — ✅ DONE 2026-07-24 (pharos-daily-dev)
 - Priority: P2 | Size: S | no AI, no decision — additive πεδία πάνω σε ήδη-υπάρχον entity, ίδιο tier με το ήδη-shipped «Subscriptions trial field exposure»
 - Web ref: P8 (`e0124d8`) — `models/Expense.ts:21-22` νέα `taxDeductible: Boolean` (default false, indexed) + `taxCategory: String` (free-form, GR presets προτεινόμενα στο UI dropdown). Inherited across a vendor's recurring series (`apps/web/src/app/expenses/actions.ts:105-110` `inheritFromSeries`, ίδιο idiom με category/recurring). `ExpensesClient.tsx` έχει toggle + tax-category picker στο create/edit form + gold badge στην κάρτα/row + «Tax only» filter chip. Το year-end export ZIP (`lib/taxExport.ts`) είναι ξεχωριστό desktop power-tool, βλ. Needs Achilleas — ΔΕΝ είναι μέρος αυτού του item.
 - API: GET/POST/PATCH /api/v1/expenses (+ /api/v1/expenses/[id]/rescan) (exist: yes, κανένα από τα δύο πεδία εκτίθεται) — `ExpenseLean`/`trimExpense` (apps/web/src/app/api/v1/expenses/serialize.ts:5-31) δεν διαβάζουν/επιστρέφουν `taxDeductible`/`taxCategory` καθόλου (grep-confirmed 0 hits). Additive: πρόσθεσε τα 2 πεδία στο `ExpenseLean` type + `trimExpense` output (ίδιο pattern με τα υπόλοιπα boolean/string πεδία εκεί)· POST route (`route.ts`) δέχεται προαιρετικά `taxDeductible`(bool)/`taxCategory`(string, trim+cap ~60 chars, ίδιο guard με το web zod schema) και τα περνά στο `Expense.create`· PATCH (`[id]/route.ts`) δέχεται τα ίδια 2 πεδία ως optional patch.
@@ -245,7 +245,26 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - POST/PATCH δέχονται και τα δύο πεδία προαιρετικά, default `false`/`''` όταν παραλείπονται
   - mobile MoneyScreen edit modal έχει το toggle + input, gold badge εμφανίζεται στην κάρτα όταν `taxDeductible===true`
   - tsc καθαρό (web + mobile)· safe rebuild → /login 200, web restarts 0
-- Status: TODO
+- Status: ✅ DONE — `serialize.ts` (`ExpenseLean`+`trimExpense` += 2 πεδία), `route.ts` POST δέχεται
+  `taxDeductible`(boolField)/`taxCategory`(strField trim+cap 60, ίδιο cap με το web zod schema), `[id]/route.ts`
+  PATCH ίδιο optional-patch idiom με τα υπόλοιπα scalar πεδία (`typeof b.x === 'boolean'|'string'` guard). Mobile:
+  `api.ts` `Expense` type + `addExpense`/`updateExpense` params += τα 2 πεδία. `MoneyScreen.tsx`: edit modal νέο
+  toggle «🏛 Tax deductible» (mirror του ήδη-υπάρχοντος Recurring toggle style) ακριβώς κάτω από το category
+  picker + conditional «TAX CATEGORY» text input με τα ίδια 8 GR presets του web ως suggestion chips (mirror
+  vendor-autocomplete row idiom, `TAX_CATEGORY_PRESETS` const τοπικό στο screen — free-form field, τα presets
+  είναι απλά προτάσεις, ίδιο idiom με τα υπόλοιπα mobile-side literal lists πριν το tokens-consolidation refactor).
+  Gold badge «🏛 tax» στην κάρτα/row (glyph, ΟΧΙ lucide icon — το mobile icon-set refactor παραμένει ξεχωριστό
+  ανοιχτό UI-debt item, βλ. «αντικατάσταση emoji/glyph icons με lucide» παρακάτω· συνεπές με τα ήδη-υπάρχοντα
+  glyphs στο ίδιο screen ✦/＋) δίπλα στο anomaly badge, ίδιο μέγεθος/χρώμα style. **Verify**: `npm run type-check`
+  EXIT 0 (web + mobile). Full `npx vitest run` **2892 passed / 222 files** (+3 νέα test assertions στο
+  serialize/route/[id]-route + 1 pre-existing exhaustive key-set contract test ενημερώθηκε, μηδέν regression).
+  Safe Docker rebuild: `homepage-web` clean start (`RestartCount=0`), `/login` 200, `docker logs` καθαρό (μόνο
+  το προϋπάρχον άσχετο `@napi-rs/canvas` warning), `GET /api/v1/expenses` χωρίς token → 401 (`{error:
+  "Unauthorized…"}`, όχι 500). Browser-checked (Claude Browser pane): `/login` → «Sign in · Pharos», μηδέν
+  console errors. **Το πραγματικό mobile UI (toggle/input/badge σε πραγματική RN συσκευή) ΔΕΝ testable
+  unattended** (χρειάζεται simulator/device boot, εκτός scope του routine) — verified μέσω tsc + το reused,
+  ήδη-proven modal/toggle/Chip primitives pattern (ίδιο idiom με Recurring toggle + vendor-suggestion chips
+  ακριβώς από πάνω στο ίδιο αρχείο).
 
 ### Expenses — vendor→category auto-rules δεν εφαρμόζονται στο v1 create route (P15 gap, functional bug)
 - Priority: P1 | Size: S | no AI, no decision, no mobile UI change — web-side wiring only

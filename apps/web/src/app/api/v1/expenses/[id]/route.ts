@@ -9,7 +9,7 @@ import { trimExpense, parseSplitField, type ExpenseLean } from '../serialize';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** PATCH /api/v1/expenses/:id  { vendor?, amount?, category?, space?, kind?, notes?, date?, period?, recurring?, recurringCycle?, paymentMethod?, split? } */
+/** PATCH /api/v1/expenses/:id  { vendor?, amount?, category?, space?, kind?, notes?, date?, period?, recurring?, recurringCycle?, paymentMethod?, split?, taxDeductible?, taxCategory? } */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
@@ -29,6 +29,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (b.recurringCycle === '' || ['monthly', 'quarterly', 'yearly', 'weekly'].includes(String(b.recurringCycle))) set.recurringCycle = String(b.recurringCycle);
     if (typeof b.paymentMethod === 'string') set.paymentMethod = b.paymentMethod;
     if (Array.isArray(b.split)) set.split = parseSplitField(b.split);
+    if (typeof b.taxDeductible === 'boolean') set.taxDeductible = b.taxDeductible;
+    if (typeof b.taxCategory === 'string') set.taxCategory = b.taxCategory.trim().slice(0, 60);
     if (!Object.keys(set).length) return apiError('no valid fields');
     await connectDB();
     const doc = await Expense.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();

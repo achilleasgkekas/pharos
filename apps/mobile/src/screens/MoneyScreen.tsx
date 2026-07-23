@@ -6,6 +6,8 @@ import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, I
 import { getExpenses, addExpense, deleteExpense, updateExpense, rescanExpense, scanExpenseImage, fileSource, type Expense, type ParsedExpenseData } from '../api';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
+// Same GR presets as the web tax-category picker (lib/taxonomies.ts TAX_CATEGORY_PRESETS) — free-form field, these are just suggestion chips.
+const TAX_CATEGORY_PRESETS = ['Ιατρικά έξοδα', 'Δωρεές', 'Τόκοι στεγαστικού δανείου', 'Ενοίκιο (φοιτητές/παιδιά)', 'Ασφάλιστρα ζωής', 'Δαπάνες αναπηρίας', 'Επαγγελματικά έξοδα', 'Άλλο'];
 
 export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [rows, setRows] = useState<Expense[]>([]);
@@ -24,6 +26,8 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [eCycle, setECycle] = useState('');
   const [ePayment, setEPayment] = useState('');
   const [eNotes, setENotes] = useState('');
+  const [eTaxDeductible, setETaxDeductible] = useState(false);
+  const [eTaxCategory, setETaxCategory] = useState('');
   const [scanning, setScanning] = useState(false);
   const [draft, setDraft] = useState<ParsedExpenseData | null>(null);
   const [dVendor, setDVendor] = useState('');
@@ -106,6 +110,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
     setEDate(it.date ? it.date.slice(0, 10) : ''); setEPeriod(it.period || '');
     setERecurring(!!it.recurring); setECycle(it.recurringCycle || '');
     setEPayment(it.paymentMethod || ''); setENotes(it.notes || '');
+    setETaxDeductible(!!it.taxDeductible); setETaxCategory(it.taxCategory || '');
   }
   function openEdit(it: Expense) { setEditing(it); prefill(it); }
 
@@ -138,6 +143,8 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         recurringCycle: eRecurring ? eCycle : '',
         paymentMethod: ePayment.trim(),
         notes: eNotes.trim(),
+        taxDeductible: eTaxDeductible,
+        taxCategory: eTaxCategory.trim(),
       });
       await load();
     } catch (e) { setErr((e as Error).message); }
@@ -185,6 +192,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
             </View>
             <View style={{ alignItems: 'flex-end', gap: 4 }}>
               <Text style={[s.amount, { color: kind === 'income' ? C.accent : C.text }]}>{money(item.amount, item.currency)}</Text>
+              {item.taxDeductible && <Text style={s.taxBadge}>🏛 tax</Text>}
               {item.anomaly != null && (
                 <Text style={s.anomaly}>⚠ {item.anomaly > 0 ? '+' : ''}{item.anomaly}%</Text>
               )}
@@ -239,6 +247,23 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
               <Text style={s.mlabel}>PAYMENT</Text>
               <Input variant="modal" value={ePayment} onChangeText={setEPayment} placeholder="card, cash…" />
               <View style={s.recRow}>
+                <Text style={s.recLabel}>🏛 Tax deductible</Text>
+                <Pressable onPress={() => setETaxDeductible((v) => !v)} style={[s.toggle, eTaxDeductible && s.toggleOn]}>
+                  <Text style={[s.toggleText, eTaxDeductible && s.toggleTextOn]}>{eTaxDeductible ? 'ON' : 'OFF'}</Text>
+                </Pressable>
+              </View>
+              {eTaxDeductible && (
+                <>
+                  <Text style={s.mlabel}>TAX CATEGORY</Text>
+                  <Input variant="modal" value={eTaxCategory} onChangeText={setETaxCategory} placeholder="e.g. Ιατρικά έξοδα" />
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={s.suggestRow}>
+                    {TAX_CATEGORY_PRESETS.map((c) => (
+                      <Chip key={c} label={c} onPress={() => setETaxCategory(c)} />
+                    ))}
+                  </ScrollView>
+                </>
+              )}
+              <View style={s.recRow}>
                 <Text style={s.recLabel}>Recurring</Text>
                 <Pressable onPress={() => setERecurring((v) => !v)} style={[s.toggle, eRecurring && s.toggleOn]}>
                   <Text style={[s.toggleText, eRecurring && s.toggleTextOn]}>{eRecurring ? 'ON' : 'OFF'}</Text>
@@ -282,6 +307,7 @@ const s = StyleSheet.create({
   meta: { color: C.faint, fontSize: 12, marginTop: 3 },
   amount: { fontSize: 16, fontWeight: '700' },
   anomaly: { color: C.gold, fontSize: 10, fontWeight: '700', backgroundColor: C.surface2, borderWidth: 1, borderColor: C.gold, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
+  taxBadge: { color: C.gold, fontSize: 10, fontWeight: '700', backgroundColor: C.surface2, borderWidth: 1, borderColor: C.gold, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
   modalMax: { maxHeight: '88%' },
   bigImg: { width: '100%', height: 220, borderRadius: 12, backgroundColor: C.surface2, marginTop: 12 },
   rescanBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.border },

@@ -115,7 +115,7 @@ export async function scanProduct(uri: string): Promise<ScannedProduct> {
 export type TaskStep = { id?: string; text: string; done: boolean };
 export type Task = { id: string; title: string; status: string; priority: string; tags: string[]; steps?: TaskStep[]; dueDate: string | null; completedAt: string | null; updatedAt: string | null };
 export type SplitEntry = { name: string; share: number; settled: boolean };
-export type Expense = { id: string; kind: string; vendor: string; category: string; space: string; amount: number; currency: string; date: string | null; period: string; recurring: boolean; recurringCycle: string; paymentMethod: string; notes: string; file: string | null; thumb: string | null; verified: boolean; split: SplitEntry[]; anomaly?: number };
+export type Expense = { id: string; kind: string; vendor: string; category: string; space: string; amount: number; currency: string; date: string | null; period: string; recurring: boolean; recurringCycle: string; paymentMethod: string; notes: string; file: string | null; thumb: string | null; verified: boolean; split: SplitEntry[]; taxDeductible: boolean; taxCategory: string; anomaly?: number };
 export type Subscription = { id: string; name: string; provider: string; category: string; amount: number; currency: string; billingCycle: string; nextRenewal: string | null; active: boolean; trialEndsAt?: string | null; firstChargeAmount?: number };
 /** Auto-discovered untracked recurring charge (P7), mirrors apps/web/src/lib/recurringDiscovery.ts. */
 export type RecurringCandidate = { vendorKey: string; vendor: string; category: string; occurrences: number; avgAmount: number; lastAmount: number; lastDate: string; firstDate: string; avgIntervalDays: number; cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly' };
@@ -155,6 +155,7 @@ export async function getExpenses(kind: 'expense' | 'income'): Promise<Expense[]
 export function addExpense(data: {
   vendor: string; amount: number; kind: 'expense' | 'income';
   category?: string; space?: string; date?: string; period?: string; recurringCycle?: string; paymentMethod?: string; split?: SplitEntry[];
+  taxDeductible?: boolean; taxCategory?: string;
 }) {
   return request<{ expense: Expense }>('/api/v1/expenses', { method: 'POST', body: JSON.stringify(data) });
 }
@@ -537,7 +538,7 @@ export function unregisterPush(token: string) {
 
 // ---- Edits (PATCH) ----
 const patch = (path: string, data: object) => request<{ ok: boolean }>(path, { method: 'PATCH', body: JSON.stringify(data) });
-export const updateExpense = (id: string, data: { vendor?: string; amount?: number; category?: string; space?: string; kind?: string; date?: string; period?: string; recurring?: boolean; recurringCycle?: string; paymentMethod?: string; notes?: string; split?: SplitEntry[] }) => patch(`/api/v1/expenses/${id}`, data);
+export const updateExpense = (id: string, data: { vendor?: string; amount?: number; category?: string; space?: string; kind?: string; date?: string; period?: string; recurring?: boolean; recurringCycle?: string; paymentMethod?: string; notes?: string; split?: SplitEntry[]; taxDeductible?: boolean; taxCategory?: string }) => patch(`/api/v1/expenses/${id}`, data);
 export const updateSubscription = (id: string, data: { name?: string; amount?: number; billingCycle?: string; nextRenewal?: string | null; category?: string; active?: boolean; trialEndsAt?: string | null; firstChargeAmount?: number }) => patch(`/api/v1/subscriptions/${id}`, data);
 export const updateVoucher = (id: string, data: { title?: string; code?: string; store?: string; discount?: string; expiresAt?: string | null; url?: string; used?: boolean }) => patch(`/api/v1/vouchers/${id}`, data);
 export const updateReceipt = (id: string, data: { store?: string; total?: number; subtotal?: number; vatAmount?: number; date?: string; verified?: boolean; archived?: boolean; paymentMethod?: string; notes?: string; lineItems?: ReceiptLine[] }) => patch(`/api/v1/receipts/${id}`, data);

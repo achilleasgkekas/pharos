@@ -33,6 +33,8 @@ describe('trimExpense', () => {
       updatedAt: null,
       deleted: false,
       split: [],
+      taxDeductible: false,
+      taxCategory: '',
     });
   });
 
@@ -62,6 +64,14 @@ describe('trimExpense', () => {
       paymentMethod: 'card',
       notes: 'δίμηνος λογαριασμός',
     });
+  });
+
+  it('passes through taxDeductible/taxCategory (P8 mobile-parity fields)', () => {
+    expect(trimExpense({ _id: 'a', taxDeductible: true, taxCategory: 'Ιατρικά έξοδα' })).toMatchObject({
+      taxDeductible: true,
+      taxCategory: 'Ιατρικά έξοδα',
+    });
+    expect(trimExpense({ _id: 'b' })).toMatchObject({ taxDeductible: false, taxCategory: '' });
   });
 
   it('cleans a populated split array (trim/round/drop-nameless, same as the web form)', () => {
@@ -164,6 +174,8 @@ describe('trimExpense', () => {
         'recurring',
         'recurringCycle',
         'split',
+        'taxDeductible',
+        'taxCategory',
         'thumb',
         'updatedAt',
         'vendor',
