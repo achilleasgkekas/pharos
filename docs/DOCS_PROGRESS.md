@@ -1,5 +1,28 @@
 # DOCS_PROGRESS
 
+## 2026-07-24 (twelfth run — P8 tax-deductible tagging mobile API documentation)
+
+Σάρωση git log για undocumented features από τα τελευταία commits μετά την τελευταία DOCS_PROGRESS entry (2026-07-22). Ανακάλυψα ότι το **P8 (tax-deductible tagging mobile parity, commit fc1f5e3, 2026-07-24 00:13)** ήταν shipped και logged (d1924ee) αλλα ΔΕΝ ήταν documented στο api.md + mobile.md για την mobile API exposure των tax fields.
+
+Τι έγραψα:
+- **api.md**: Ενημέρωση του Expenses section POST + PATCH rows για να αναφέρουν τα νέα πεδία `split?`, `taxDeductible?`, `taxCategory?` (προστέθηκαν στη commit fc1f5e3 αλλα ήταν κρυμμένα στην τεκμηρίωση). Πρόσθεσα και `split?` αν και δεν τεκμηριώθηκε πριν (είναι ήδη στον κώδικα).
+- **mobile.md**: Ενημέρωση του Expenses / Income row στο "What it does" table από "list, add, edit, bill/payslip AI scan" → "list, add, edit, bill/payslip AI scan, **mark as tax-deductible + category**" (reflects η νέα MoneyScreen.tsx UI που προστέθηκε στη commit fc1f5e3 με το tax toggle και tax-category input).
+
+Accuracy verified εναντι κώδικα:
+- apps/web/src/app/api/v1/expenses/route.ts (POST line 34, 68-69 accepts taxDeductible + taxCategory)
+- apps/web/src/app/api/v1/expenses/[id]/route.ts (PATCH line 12, 32-33 accepts both fields)
+- apps/mobile/src/screens/MoneyScreen.tsx (commit fc1f5e3 shows tax toggle + tax-category input)
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: api.md = 22 balanced (ζυγό, 0 προστέθηκαν), mobile.md = 8 balanced ✓.
+- Internal links: καμια νέα αναφορά (μόνο inline updates) ✓.
+- Secret scan: κανένα literal credential ✓.
+- Markdown table syntax: ζυγό, στήλες aligned ✓.
+
+Collision guard: git status --short = ΜΟΝΟ docs/api.md + docs/mobile.md modified (δικά μου), 0 staged foreign files.
+
+Επόμενο run: (α) grep για άλλα νέα features που shipαρίστηκαν από τις 2026-07-22 (π.χ. P1 SaaS auth rate-limit fix, commit 3206fa3 που μπορεί να χρειάζεται saas.md documentation), ή (β) features.md stale-forward αν άλλα P* shipped, ή (γ) openapi.yaml sync αν νέα endpoints landed.
+
 ## 2026-07-22 (eleventh run — P5 quick-capture bookmarklet documentation)
 
 Σάρωση git log για undocumented features που shipαρίστηκαν τα τελευταία ώρες. Ανακάλυψα ότι το **P5 (quick-capture bookmarklet, commit 93cc862, 2026-07-22 11:36)** ήταν shipped (logged αλλά ΔΕΝ ήταν documented στο features.md).
