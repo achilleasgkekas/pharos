@@ -2216,3 +2216,25 @@ Collision guard: `git status --short` στην αρχή έδειξε **καθα�
 - Collision guard: `git status --short` πριν το commit έδειξε ΜΟΝΟ το νέο αρχείο μου.
 
 Suggested next task: από την ίδια sweep-λίστα, ακόμα ανέγγιχτα: `history/actions.ts` (50 γραμμές, Conversation model mock + string-strip preview logic) ή `vouchers/actions.ts` (78, το plain actions.ts, ΟΧΙ giftcardActions/loyaltyActions). Έλεγξε ξανά αν το `subscriptions/actions.ts` (170 γραμμές) έχει ηρεμήσει (καμία πρόσφατη commit πάνω του) πριν το πιάσεις. Διάβασε ΠΡΩΤΑ το υποψήφιο πριν διαλέξεις. Έλεγξε ΠΑΝΤΑ πρώτα `git status` collision-guard. Ένα module ανά run.
+
+---
+
+## 2026-07-24 (cont.³² — history/actions.test.ts, AI command-bar conversation log)
+
+**Task: DB-mocked unit test για `apps/web/src/app/history/actions.ts`** (50 γραμμές, backing το `/history` page) — από την ίδια sweep-λίστα του προηγούμενου run.
+
+Collision guard: `git status --short` στην αρχή έδειξε **καθαρό working tree**, κανένα foreign WIP. `git log --oneline -5 -- apps/web/src/app/subscriptions/actions.ts` έδειξε το ίδιο πρόσφατο `feat(subscriptions): auto-discover untracked recurring charges (P7)` όπως το προηγούμενο run το είχε προειδοποιήσει → παρέμεινε skip, `history/actions.ts` επιλέχθηκε (μικρότερο από `vouchers/actions.ts`, καθαρή pure-logic επιφάνεια).
+
+Διάβασα ολόκληρο το αρχείο: `getConversations` (`Conversation.find({}).sort({updatedAt:-1}).limit(200).lean()`, mapping σε `ConversationRow` — title/turns defaults όταν falsy, `updatedAt.toISOString()`, κάθε message παίρνει content/actions defaults όταν λείπουν, και το ενδιαφέρον κομμάτι: **`preview`** = το περιεχόμενο του **ΤΕΛΕΥΤΑΙΟΥ** assistant μηνύματος (`[...messages].reverse().find(...)`, ΟΧΙ το πρώτο) με τα `**` markdown αφαιρεμένα και capped στους 160 χαρακτήρες, `''` όταν δεν υπάρχει κανένα assistant μήνυμα), `deleteConversation` (`deleteOne({_id})` + revalidate + `{ok:true}`), `clearConversations` (`deleteMany({})` + revalidate + `{ok:true}`).
+
+Mock pattern: ίδιο self-returning-chain idiom με το `api/v1/tasks/route.test.ts` (`Task.find().sort().limit().lean()`) αλλά εφαρμοσμένο στο `Conversation.find` (μόνο `sort`+`limit`, όχι `skip`/`setOptions` — το `getConversations` δεν τα χρησιμοποιεί). Mockαρίστηκαν `@/lib/db`, `@/models/Conversation` (find/deleteOne/deleteMany), `next/cache`.
+
+Τι έγινε: Νέο `history/actions.test.ts` (10 tests): getConversations (8: query-shape find({})+sort+limit(200), full-doc-mapping-with-real-updatedAt-ISO, title/turns-default-when-falsy, message-content/actions-default-when-missing, **preview-picks-LAST-assistant-not-first**, preview-strips-**-and-caps-at-160, preview-empty-string-when-no-assistant-message, empty-array-when-no-docs), deleteConversation (1), clearConversations (1).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/history/actions.test.ts"` → 10/10 passed.
+- `npx vitest run` (όλο το suite) → **226 files, 2936/2936 passed** (από 223/2903· η αύξηση πέρα από τα δικά μου 10 tests/1 file οφείλεται σε παράλληλες routines).
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό στην πρώτη προσπάθεια.
+- Collision guard: `git status --short` πριν το commit έδειξε ΜΟΝΟ το νέο αρχείο μου. `git fetch origin main` → ahead 1, καθαρό fast-forward, push σε `origin main` επιτυχές (ca16943..11a226b), χωρίς rebase ανάγκη.
+
+Suggested next task: από την ίδια sweep-λίστα, ακόμα ανέγγιχτο: `vouchers/actions.ts` (78 γραμμές, το plain `actions.ts` του φακέλου — scanVoucherText/scanVoucherImage με το ίδιο `isFeatureEnabled`+`aiError` guard pattern σαν το ήδη-καλυμμένο `shopping-list/actions.ts`, + Zod `VoucherFormSchema` CRUD + soft-delete. ΠΡΟΣΟΧΗ: ΟΧΙ το ήδη-καλυμμένο `giftcardActions.ts`/`loyaltyActions.ts` στον ίδιο φάκελο). Μετά από αυτό, η αρχική sweep-λίστα (login/history/setup/vouchers/bills/shopping-list/subscriptions) θα έχει ΚΛΕΙΣΕΙ σχεδόν πλήρως (μόνο `subscriptions/actions.ts` θα μένει, αν ηρεμήσει). Έλεγξε ξανά αν έχει ηρεμήσει πριν το πιάσεις (τελευταίο γνωστό: `feat(subscriptions): auto-discover untracked recurring charges (P7)`). Αν και το vouchers και το subscriptions είναι κλειδωμένα/busy, σάρωσε ΝΕΑ `app/*/actions.ts` χωρίς sibling test (`find src/app -maxdepth 2 -name actions.ts | while read f; do [ -f "${f%.ts}.test.ts" ] || echo "$f"; done`) για το επόμενο candidate. Διάβασε ΠΡΩΤΑ το υποψήφιο πριν διαλέξεις. Έλεγξε ΠΑΝΤΑ πρώτα `git status` collision-guard. Ένα module ανά run.
