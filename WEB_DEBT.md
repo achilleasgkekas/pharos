@@ -268,7 +268,7 @@
   - SaaS-only (SAAS_MODE off = 404 upstream), μηδέν επίδραση στον v1 mobile surface. Διορθώνει και την ανακριβή σημείωση στη γρ.45 του `erasure/purge` item («invites/accept έχει ήδη δικό του try/catch» — ισχύει μόνο για την create-race).
   - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/invites/accept/route.ts` → ≥2 (create-race + νέο top-level).
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-09, 50η σάρωση· live: `try {` = 1 [create-race μόνο], 8 unguarded DB ops γρ.44-122· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό, `try {` count αμετάβλητο· 55η σάρωση 2026-07-19 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό· 56η σάρωση 2026-07-20 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό, `try {` count αμετάβλητο [=1]. ΣΗΜ: νέος sibling write route αυτού του διαστήματος, `api/saas/account/workspaces/route.ts` [POST+DELETE], κάνει το σωστό — ολόκληρο το σώμα κάθε handler μέσα σε `saasGuard(...)` [try/catch built-in] — καλό reference pattern για το fix εδώ.)
+- Status: DONE (fixed 2026-07-24, saas-core routine, increment 85) — το σώμα μετά το `token`/`connectDB()` gate (Invite lookup + validity 410, account resolve/create [με το προϋπάρχον nested create-race try/catch αμετάβλητο], membership upsert, invite-consume, audit, cookie, response) τυλίχτηκε σε top-level `try { ... } catch (e) { return NextResponse.json({ error: (e as Error).message?.slice(0,200) || 'Server error' }, { status: 500 }); }`, ίδιο shape με τα `saasGuard`-wrapped routes. Τα early-return validation gates (missing-token 400, invalid/expired-invite 410, weak-password 400) ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν (μέσα στο try, όπως speced — και το `Invite.findOne`/`connectDB()` μπορούν να throw). Verified: `grep -c 'try {' apps/web/src/app/api/saas/invites/accept/route.ts` → **2** (create-race + νέο top-level). `npm run type-check` EXIT 0, full `npx vitest run` → **226 files / 2936 tests green**. Docker: δεν έγινε rebuild (logic-only edit μέσα σε ήδη-existing route, καμία αλλαγή σε runtime wiring/env/dependency· ο live container του Achilleas δεν έχει SAAS_MODE set). Browser-verify: skipped (backend-only, μηδέν UI).
 
 ---
 
@@ -288,7 +288,7 @@
   - Το gate ladder (404 SAAS off / 401 no-session / 403 non-admin), το serializer whitelist projection, το keyset-pagination cursor + η batched actor resolution ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500. SaaS-only (SAAS_MODE off = 404), μηδέν επίδραση στον v1 mobile surface.
   - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/audit/route.ts` → ≥1.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, 2 unguarded `await` DB reads γρ.64+79· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό· 55η σάρωση 2026-07-19 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό· 56η σάρωση 2026-07-20 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό, αμετάβλητο)
+- Status: DONE (fixed 2026-07-24, saas-core routine, increment 85) — το σώμα μετά το `resolveWorkspaceSession` gate (limit/cursor parsing, `AuditEvent.find`, batched actor `Account.find`, response) τυλίχτηκε σε `try { ... } catch (e) { return NextResponse.json({ error: (e as Error).message?.slice(0,200) || 'Server error' }, { status: 500 }); }`, ίδιο shape με `withAuth`/`saasGuard`. Το gate ladder (404/401/403), το projection whitelist, το keyset cursor και η batched actor-lookup ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. Verified: `grep -c 'try {' apps/web/src/app/api/saas/audit/route.ts` → **1**. `npm run type-check` EXIT 0, full `npx vitest run` → **226 files / 2936 tests green**. Docker: δεν έγινε rebuild. Browser-verify: skipped (backend-only, μηδέν UI).
 
 ### `workspace/erasure/purge/route.ts` — cron scan χωρίς try/catch → HTML 500 στον scheduler
 - Priority: P2
@@ -302,7 +302,7 @@
   - Τα gates (404 SAAS off / 500 no CRON_SECRET / 401 bad token) + το report-only `dryRun:true` contract ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500. SaaS-only, μηδέν επίδραση στον v1 mobile surface. (`auth/logout` = μηδέν DB read [μόνο `clearAccountCookie`] → σκόπιμα εκτός· `billing/webhook`+`invites/accept` έχουν ήδη δικό τους try/catch.)
   - Επαλήθευση: `grep -c 'try {' apps/web/src/app/api/saas/workspace/erasure/purge/route.ts` → ≥1.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-09, 49η σάρωση· live: `try {` = 0, `await runErasurePurgeScan()` unguarded· 54η σάρωση 2026-07-18 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό· 55η σάρωση 2026-07-19 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό· 56η σάρωση 2026-07-20 επιβεβαίωσε ΑΚΟΜΑ ανοιχτό, αμετάβλητο)
+- Status: DONE (fixed 2026-07-24, saas-core routine, increment 85) — `await runErasurePurgeScan()` (μετά το `saasMode()`/`CRON_SECRET`/token gate που ήδη επιστρέφουν early χωρίς throw) τυλίχτηκε σε `try { const result = await runErasurePurgeScan(); return NextResponse.json({ ok: true, ...result }); } catch (e) { return NextResponse.json({ error: (e as Error).message?.slice(0,200) || 'Server error' }, { status: 500 }); }`. Τα gates + το report-only `dryRun:true` contract ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν. Verified: `grep -c 'try {' apps/web/src/app/api/saas/workspace/erasure/purge/route.ts` → **1**. `npm run type-check` EXIT 0, full `npx vitest run` → **226 files / 2936 tests green**. Docker: δεν έγινε rebuild. Browser-verify: skipped (backend-only cron route, μηδέν UI).
 
 ---
 

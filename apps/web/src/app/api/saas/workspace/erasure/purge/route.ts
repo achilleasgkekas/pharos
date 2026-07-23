@@ -42,6 +42,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  const result = await runErasurePurgeScan();
-  return NextResponse.json({ ok: true, ...result });
+  try {
+    const result = await runErasurePurgeScan();
+    return NextResponse.json({ ok: true, ...result });
+  } catch (e) {
+    return NextResponse.json(
+      { error: (e as Error).message?.slice(0, 200) || 'Server error' },
+      { status: 500 }
+    );
+  }
 }

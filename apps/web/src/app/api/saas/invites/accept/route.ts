@@ -39,88 +39,95 @@ export async function POST(req: NextRequest) {
   const token = strField(b, 'token', '', true);
   if (!token) return NextResponse.json({ error: 'An invite token is required' }, { status: 400 });
 
-  await connectDB();
+  try {
+    await connectDB();
 
-  const invite = (await Invite.findOne({ tokenHash: hashInviteToken(token) })) as InviteDoc | null;
-  if (!invite || !isInviteValid(invite.status, invite.expires)) {
-    return NextResponse.json({ error: 'This invitation is invalid or has expired' }, { status: 410 });
-  }
-
-  const email = String(invite.email);
-  const role = String(invite.role) as OrgRole;
-  const tenantId = invite.tenant;
-
-  // Reuse the account if it exists (they may have signed up between invite and accept);
-  // otherwise create it, which requires a password.
-  let account = await Account.findOne({ email }).select('_id email name');
-  if (!account) {
-    const password = strField(b, 'password');
-    if (password.length < MIN_PASSWORD) {
-      return NextResponse.json(
-        { error: `Password must be at least ${MIN_PASSWORD} characters`, code: 'password_required' },
-        { status: 400 }
-      );
+    const invite = (await Invite.findOne({ tokenHash: hashInviteToken(token) })) as InviteDoc | null;
+    if (!invite || !isInviteValid(invite.status, invite.expires)) {
+      return NextResponse.json({ error: 'This invitation is invalid or has expired' }, { status: 410 });
     }
-    const name = strField(b, 'name', '', true);
-    try {
-      account = await Account.create({ email, name, passwordHash: hashPassword(password) });
-    } catch (e) {
-      // Race: someone created the account concurrently — fall back to reusing it.
-      if ((e as { code?: number }).code === 11000) {
-        account = await Account.findOne({ email }).select('_id email name');
-      } else {
-        throw e;
+
+    const email = String(invite.email);
+    const role = String(invite.role) as OrgRole;
+    const tenantId = invite.tenant;
+
+    // Reuse the account if it exists (they may have signed up between invite and accept);
+    // otherwise create it, which requires a password.
+    let account = await Account.findOne({ email }).select('_id email name');
+    if (!account) {
+      const password = strField(b, 'password');
+      if (password.length < MIN_PASSWORD) {
+        return NextResponse.json(
+          { error: `Password must be at least ${MIN_PASSWORD} characters`, code: 'password_required' },
+          { status: 400 }
+        );
+      }
+      const name = strField(b, 'name', '', true);
+      try {
+        account = await Account.create({ email, name, passwordHash: hashPassword(password) });
+      } catch (e) {
+        // Race: someone created the account concurrently — fall back to reusing it.
+        if ((e as { code?: number }).code === 11000) {
+          account = await Account.findOne({ email }).select('_id email name');
+        } else {
+          throw e;
+        }
       }
     }
-  }
-  if (!account) {
-    return NextResponse.json({ error: 'Could not resolve the invited account' }, { status: 500 });
-  }
+    if (!account) {
+      return NextResponse.json({ error: 'Could not resolve the invited account' }, { status: 500 });
+    }
 
-  const accountId = String(account._id);
+    const accountId = String(account._id);
 
-  // Create or (re)activate the membership with the invited role. Idempotent: accepting an
-  // invite twice, or for an already-active member, leaves a single active membership.
-  const existing = (await Membership.findOne({ account: accountId, tenant: tenantId })
-    .select('status')
-    .lean()) as Pick<MembershipDoc, 'status'> | null;
-  if (existing) {
-    await Membership.updateOne(
-      { account: accountId, tenant: tenantId },
-      { $set: { status: 'active', role, invitedBy: invite.invitedBy ?? null } }
+    // Create or (re)activate the membership with the invited role. Idempotent: accepting an
+    // invite twice, or for an already-active member, leaves a single active membership.
+    const existing = (await Membership.findOne({ account: accountId, tenant: tenantId })
+      .select('status')
+      .lean()) as Pick<MembershipDoc, 'status'> | null;
+    if (existing) {
+      await Membership.updateOne(
+        { account: accountId, tenant: tenantId },
+        { $set: { status: 'active', role, invitedBy: invite.invitedBy ?? null } }
+      );
+    } else {
+      await Membership.create({
+        account: accountId,
+        tenant: tenantId,
+        role,
+        status: 'active',
+        invitedBy: invite.invitedBy ?? null,
+      });
+    }
+
+    // Consume the invite so the token cannot be replayed.
+    await Invite.updateOne(
+      { _id: invite._id },
+      { $set: { status: 'accepted', acceptedBy: accountId, acceptedAt: new Date() } }
     );
-  } else {
-    await Membership.create({
-      account: accountId,
-      tenant: tenantId,
-      role,
-      status: 'active',
-      invitedBy: invite.invitedBy ?? null,
+
+    // The invitee is the actor of their own acceptance. No workspace session yet, so build a
+    // bare audit context from the invite's tenant.
+    await recordAudit(auditCtx(String(tenantId)), {
+      action: 'invite.accepted',
+      actor: accountId,
+      target: email,
+      meta: { role },
     });
+
+    await setAccountCookie({ sub: accountId, email });
+
+    return NextResponse.json(
+      {
+        account: { id: accountId, email, name: account.name || '' },
+        tenants: await accountTenants(accountId),
+      },
+      { status: 201 }
+    );
+  } catch (e) {
+    return NextResponse.json(
+      { error: (e as Error).message?.slice(0, 200) || 'Server error' },
+      { status: 500 }
+    );
   }
-
-  // Consume the invite so the token cannot be replayed.
-  await Invite.updateOne(
-    { _id: invite._id },
-    { $set: { status: 'accepted', acceptedBy: accountId, acceptedAt: new Date() } }
-  );
-
-  // The invitee is the actor of their own acceptance. No workspace session yet, so build a
-  // bare audit context from the invite's tenant.
-  await recordAudit(auditCtx(String(tenantId)), {
-    action: 'invite.accepted',
-    actor: accountId,
-    target: email,
-    meta: { role },
-  });
-
-  await setAccountCookie({ sub: accountId, email });
-
-  return NextResponse.json(
-    {
-      account: { id: accountId, email, name: account.name || '' },
-      tenants: await accountTenants(accountId),
-    },
-    { status: 201 }
-  );
 }
