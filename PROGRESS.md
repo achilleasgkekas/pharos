@@ -7236,3 +7236,95 @@ card wallet** (P20, νέο entity + χρειάζεται νέο RN barcode-displ
   P23 share-sheet)· P36 Open Banking provider decision· P31 household enforcement supervised session· P16
   Firefly III/Grocy real sample-file need· Settings theme/language/AI-engine/storage/OneDrive credentials
   boundary· P8 tax-export ZIP desktop power tool (separate from the tagging shipped here).
+
+## 2026-07-24 (pharos-daily-dev, cont.)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε 2 OPEN items, και τα δύο από άλλο
+routine (`bakecore-finance`, άσχετο project) → τίποτα να εφαρμόσω πρώτα. `mkdir /tmp/claude-docker.lock` (lock
+acquired καθαρά, released στο τέλος). Working tree καθαρό στην αρχή (το προηγούμενο run του ίδιου routine σήμερα
+[`fc1f5e3`, tax-tagging mobile-parity] είχε ήδη committed+pushed, μαζί με 4 ακόμα commits από άλλα routines μετά
+από αυτό — `git log --oneline -15` το επιβεβαίωσε).
+
+**Approved queue check (βήμα a)**: αμετάβλητο vs το προηγούμενο run σήμερα — P36/P31/P16/P17/P23/P5(phase2)/P9
+παραμένουν blocked (needs-Achilleas ή needs-physical-device, ίδια κρίση με 10+ προηγούμενα runs). Πέρασα στο
+βήμα (b): το ίδιο suggested-next-task του προηγούμενου run σήμερα.
+
+**Gift cards store-credit tracker → mobile parity (P32 gap) — ✅ SHIPPED (commit `bef65fe`)**. Top item του Build
+Queue μετά την 53η mobile-parity-auditor σάρωση (2026-07-22). Το web feature (P32, `052ee64`) ήταν πλήρες
+(`models/GiftCard.ts` + `lib/giftcard.ts` derived-balance helpers + tab στο web `/vouchers`), αλλά μηδέν v1 API
+route ή mobile UI — το μοντέλο είχε ήδη ρητό σχόλιο στον κώδικα «for a future GET /api/v1/giftcards», ίδιο
+idiom με το Goal/Bill precedent.
+
+**Web (v1 API)**: νέα **`apps/web/src/app/api/v1/giftcards/route.ts`** (GET list + POST create) +
+**`giftcards/[id]/route.ts`** (PATCH + DELETE) — mirror ακριβώς του ήδη-shipped Bills (P28) v1 pattern: shared
+`withAuth`/`apiError`/`listParams`/`withSince`/`listEnvelope`/`readBody`/`strField`/`numField`/`isObjectId`
+helpers, μία `trim()` single-source-of-truth στο `route.ts` re-exported στο `[id]/route.ts`. `trim()` υπολογίζει
+`balance`/`spentPct`/`daysLeft` server-side καλώντας τα ήδη-existing `lib/giftcard.ts` pure helpers (ίδια τιμή
+που το web client υπολογίζει σήμερα, ποτέ stored — mirror του πώς το Bills `status` δουλεύει ήδη). GET default
+εξαιρεί archived (`?archived=1` τα δείχνει), sort `{archived:1, expiresAt:1, createdAt:-1}` (ίδιο με το web
+`vouchers/page.tsx` query). POST clamp-άρει αρνητικό `initialAmount` σε 0 (mirror του Zod `.min(0)` στο web
+`createGiftCard`). **PATCH σχεδιαστική απόφαση (builder default)**: αντί για ξεχωριστό endpoint για spend/reload,
+το ίδιο PATCH δέχεται προαιρετικά `addUse: {amount, note?, date?}` (`$push`, θετικό amount=spend/αρνητικό=reload
+— ίδια σύμβαση με το web `addGiftCardUse`) **ή** `removeUseId` (`$pull` by `_id`, mirror του `removeGiftCardUse`)
+μαζί με τα plain field edits στο ίδιο request (mirror του πώς το Bills PATCH ήδη συνδυάζει field-edits +
+`paid`/`paidDate` transition σε ένα call) — τα δύο νέα optional params αμοιβαία αποκλειόμενα (400 αν σταλούν
+μαζί, αφού και τα δύο πειράζουν το ίδιο `uses` subarray, ασαφές ordering αλλιώς). **Trash: μηδέν αλλαγή
+χρειάστηκε** — το `giftcard` ήταν ήδη μέσα στο `TrashType` union + `api/v1/trash/[type]/[id]` `TYPES` array
+(από τότε που το web feature shipped), άρα restore/purge δούλευε ήδη generic μέσω `getTrash()`/
+`restoreFromTrash()`/`purgeTrashEntry()` — απλά επιβεβαιώθηκε, όχι νέος κώδικας.
+
+**Mobile**: `apps/mobile/src/api.ts` += `GiftCard`/`GiftCardUse` types + `getGiftCards`/`addGiftCard`/
+`updateGiftCard`/`deleteGiftCard`/`addGiftCardUse`/`removeGiftCardUse` (mirror του ήδη-existing Bills client
+block ακριβώς πάνω από αυτό). **`VouchersScreen.tsx` restructured**: η παλιά μονολιθική flat-list λογική
+(vouchers/coupons) έγινε αυτούσια `CouponsTab()`, το top-level component πλέον δείχνει ένα **Chip segmented
+toggle** («Coupons» | «Gift cards», mirror του ήδη-existing filter-Chip idiom από το BillsScreen open/all) και
+routes σε ένα νέο `GiftCardsTab()`. Το νέο tab: FlatList κάρτες (τίτλος/store/balance bold σε accent χρώμα +
+«of €X» face-value όταν υπάρχει + thin progress bar spent-vs-face-value + expiry Badge [gold ≤30d, faint
+αλλιώς, «expired»/«today»/«Nd left»] — ίδιοι thresholds με το web `ExpiryBadge`), tap→edit modal (title/store/
+code/face-value/expires/notes πεδία, mirror του BillsScreen form layout) + **inline spend/reload row** μέσα
+στο ίδιο modal (amount+note inputs, «− Spend»/«+ Reload» ghost buttons → `addGiftCardUse` → re-fetch τη λίστα
+ώστε το modal να δείχνει την ενημερωμένη balance/uses στο επόμενο άνοιγμα, mirror του web `GiftCardForm`'s
+quick-spend row) + uses-history λίστα μέσα στο modal (amount/note/date + «×» remove button →
+`removeGiftCardUse`) + long-press-to-delete (Alert confirm, ίδιο idiom με CouponsTab/BillsScreen). **Builder
+default**: δεν πρόσθεσα archive/reopen toggle στο mobile modal (το web το έχει) — το mobile delete ήδη
+soft-deletes σε Trash (restore διαθέσιμο από εκεί), θεωρήθηκε redundant δεύτερο state-toggle για ένα πρώτο
+mobile pass· follow-up αν χρειαστεί.
+
+**Verify**: `npm run type-check` (web) EXIT 0. Full `npx vitest run` **2926 passed / 225 files** (+23 νέα: 10
+στο `giftcards/route.test.ts` [auth gate/GET filters+sort/derived-fields/POST validation+clamp] + 13 στο
+`giftcards/[id]/route.test.ts` [auth/id-guard/field-updates/addUse validation+rounding+sign/removeUseId/
+mutual-exclusion/soft-delete], μηδέν regression αλλού). `apps/mobile npx tsc --noEmit` EXIT 0. **Docker safe
+rebuild**: mongo ήδη healthy → `docker compose build web` OK (route εμφανίστηκε στο build output route-list) →
+`up -d web` → clean start (`docker inspect` State: Running, ExitCode 0, μηδέν restart), `/login` 200 στην 1η
+προσπάθεια, `docker logs` καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning). `curl GET
+/api/v1/giftcards` χωρίς token → **401** (`{"error":"Unauthorized…"}`, auth gate intact). Browser-checked
+(Claude Browser pane): `/login` → «Sign in · Pharos», μηδέν console errors. `docker builder prune -f` (195.9MB
+freed), lock released καθαρά. **Το πραγματικό mobile UI (GiftCardsTab κάρτες/modal/spend-reload σε πραγματική
+RN συσκευή) ΔΕΝ testable end-to-end unattended** (χρειάζεται login + Expo simulator boot, εκτός scope του
+routine) — verified πλήρως μέσω των 23 νέων route tests + tsc και στα δύο apps, ίδιος περιορισμός με κάθε
+προηγούμενο mobile-parity shipment.
+
+**`MOBILE_PARITY.md`** ενημερώθηκε: το Gift cards entry marked `✅ DONE 2026-07-24 (pharos-daily-dev)` με πλήρη
+υλοποίηση + verify λεπτομέρειες (η επόμενη mobile-parity-auditor σάρωση θα το επιβεβαιώσει + θα ξαναϋπολογίσει
+το ranked top-N· τα επόμενα ισοδύναμα L-tier candidates παραμένουν **Savings/financial goals** [P12, νέο entity
+`Goal`, μηδέν v1 route ακόμα] και **Loyalty card wallet** [P20, νέο entity + χρειάζεται νέο RN barcode-display
+dep — builder decision]).
+
+**Suggested next task**: **Savings/financial goals → mobile exposure** (P12 gap, P2/L, νέο entity `Goal` με
+embedded `contributions[]`, ήδη σχολιασμένο στον κώδικα «for a future GET /api/v1/goals» — mirror ακριβώς του
+ίδιου pattern που μόλις χτίστηκε εδώ για το GiftCard `uses[]`: `addContribution`/`removeContribution` ως
+`$push`/`$pull` PATCH operations, ζει είτε ως νέο `GoalsScreen.tsx` είτε ως section μέσα στο `ReportsScreen.tsx`
+[το web το δείχνει μέσα στο `/reports`, ίδιο default προτείνεται]). Loyalty card wallet (P20) μένει δεύτερη
+επιλογή στο ίδιο tier (χρειάζεται νέο RN barcode-display dep, builder decision όχι needs-Achilleas). Search
+matched-line-item snippet (P22, P3/S) μένει χαμηλότερης προτεραιότητας tier παρά το μικρό μέγεθος.
+
+**Git hygiene**: `git add` explicit (MOBILE_PARITY.md + 6 web/mobile source+test αρχεία, όχι `-A`) → commit
+`bef65fe` → push.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα (ίδια λίστα με το προηγούμενο run σήμερα):
+  `getTenantConnection` readyState guard decision (P3/S)· SaaS multi-tenancy/billing rollout env boundary·
+  mobile native-dep approvals (P20 barcode lib, P17 camera, P23 share-sheet)· P36 Open Banking provider
+  decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file need· Settings
+  theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power tool.
