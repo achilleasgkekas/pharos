@@ -297,6 +297,15 @@ Each plan in the `GET /statements/plans` response is:
 | PATCH  | `/bills/:id`                | Update `{ title?, vendor?, amount?, dueDate?, category?, cycle?, notes?, archived?, paid?, paidDate? }`. Special: `paid: true` marks paid and (for recurring bills on first mark) spawns the next due instance one cycle ahead. Response includes `{ bill: …, spawnedNext: boolean }`. |
 | DELETE | `/bills/:id`                | Soft-delete. |
 
+### Gift cards
+
+| Method | Path                           | Description |
+|--------|--------------------------------|-------------|
+| GET    | `/giftcards?archived=0&limit&offset&updatedSince` | List (+ `limit`/`offset`/`updatedSince`). Default excludes archived cards. Each card has computed `balance`, `spentPct`, and `daysLeft` fields derived from spending history. |
+| POST   | `/giftcards`                   | Create `{ title, store?, code?, initialAmount?, expiresAt?, notes? }`. |
+| PATCH  | `/giftcards/:id`               | Update `{ title?, store?, code?, initialAmount?, expiresAt?, notes?, archived? }`. Special: `addUse: { amount, note?, date? }` records a spend (positive) or reload (negative); `removeUseId` undoes one entry. Both are mutually exclusive. Response includes `{ giftCard: … }`. |
+| DELETE | `/giftcards/:id`               | Soft-delete (recoverable from Trash). |
+
 ### Tasks
 
 | Method | Path                                        | Description |

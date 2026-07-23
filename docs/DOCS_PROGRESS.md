@@ -1,5 +1,28 @@
 # DOCS_PROGRESS
 
+## 2026-07-24 (thirteenth run — P32 gift-cards mobile parity + P1 rate-limit docs)
+
+Σάρωση git log για undocumented features που shipped σήμερα. Ανακάλυψα δύο gaps:
+
+**P32 gift-cards mobile parity (commit bef65fe, 2026-07-24 02:16)**: Το core P32 feature ήταν ήδη documented στο features.md (2026-07-19), αλλα η mobile parity (API endpoints + VouchersScreen tabs) ήταν καινούρια και ΔΕΝ ήταν documented.
+
+**P1 rate-limit security (commit 3206fa3, 2026-07-24 00:39)**: Το SaaS auth/login + auth/mfa endpoints φέρουν rate limiting για brute-force protection, αλλα δεν ήταν documented.
+
+Τι έγραψα:
+- **api.md**: Νέα section "### Gift cards" μετά τα Bills (κατρέφτης του Bills pattern). Τεκμηρίωση των 4 endpoints (GET/POST/PATCH/DELETE) με το σωστό request/response σχήμα: computed fields balance/spentPct/daysLeft server-side, PATCH με addUse (spend/reload) και removeUseId (undo) mutually exclusive. Accuracy cross-checked σε /giftcards/route.ts + [id]/route.ts.
+- **mobile.md**: Ενημέρωση Vouchers row από "list, add, edit, AI fill" → "…; **Coupons / Gift cards / Loyalty cards** tabs" (reflects το νέο VouchersScreen.tsx που προστέθηκε στο commit bef65fe).
+- **saas.md**: Νέα subsection "#### Rate limiting (P1 security)" αμέσως μετά το auth API table. Εξήγηση της rate limiting στο login (per-IP) και mfa (per-account), σημείωση ότι είναι config-gated και default off, mention 429 response + Retry-After header + note για self-hosted operators που μπορούν να το disable.
+
+Validation (markdown only, κανενα build/Docker/AI):
+- Code fences: api.md +1 table (ζυγό), mobile.md 0 tables (αθικτο), saas.md +0 code blocks (ζυγό).
+- Internal links: ολα τα referenced files υπάρχουν ✓.
+- Secret scan: κανένα sk_/AUTH_/STRIPE_ ✓.
+- Markdown structure: νέα section σε api.md με @@ alignment, νέα subsection σε saas.md με #### (σωστό hierarchy level).
+
+Collision guard: `git status --short` δείχνει ΜΟΝΟ 3 modified docs files (api.md, mobile.md, saas.md), κανενα staged foreign files, κανενα concurrent routine mid-commit.
+
+Επόμενο run: (α) grep αν άλλα features shipped σήμερα (π.χ. increment 85 SaaS try/catch fix είναι bug fix, όχι feature), ή (β) features.md stale-forward-check για νεα P* features απο πρόσφατα commits, ή (γ) openapi.yaml sync αν υπάρχει.
+
 ## 2026-07-24 (twelfth run — P8 tax-deductible tagging mobile API documentation)
 
 Σάρωση git log για undocumented features από τα τελευταία commits μετά την τελευταία DOCS_PROGRESS entry (2026-07-22). Ανακάλυψα ότι το **P8 (tax-deductible tagging mobile parity, commit fc1f5e3, 2026-07-24 00:13)** ήταν shipped και logged (d1924ee) αλλα ΔΕΝ ήταν documented στο api.md + mobile.md για την mobile API exposure των tax fields.

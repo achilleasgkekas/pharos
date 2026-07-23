@@ -173,6 +173,18 @@ signup/login, not a bearer token.
 | `POST` | `/api/saas/auth/logout` | — | Clears the session cookie. Idempotent `200 { ok: true }`. |
 | `GET` | `/api/saas/auth/session` | — | `{ account, tenants }` when signed in, or `{ account: null }` when logged out or the account no longer exists. |
 
+#### Rate limiting (P1 security)
+
+The login and MFA verification endpoints are protected by rate limiting to prevent
+brute-force attacks:
+- **`POST /api/saas/auth/login`** — rate limited per client IP address.
+- **`POST /api/saas/auth/mfa`** (second-factor verification) — rate limited per pending account.
+
+Rate limiting is **config-gated** and **off by default** for single-user self-hosted deployments.
+When enabled, exceeding the limit returns `429 Too Many Requests` with a `Retry-After` header.
+Self-hosted operators can disable it if running behind a reverse proxy that already enforces
+rate limits.
+
 #### Browser sign-in UI (`/account/login`, `/account/signup`)
 
 The two pages above are the user-facing front-end for the auth API. They live in
