@@ -2,9 +2,29 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 3ad1fea -->
+<!-- reviewed: 066b1c6 -->
 <!-- docker-validated: 065ecd8 -->
 <!-- ui-audited: faa3530 -->
+
+## 2026-07-22 (reviewer — έλεγχος 3ad1fea..066b1c6, 2 commits)
+
+**Εύρος**: `3ad1fea..066b1c6` (2 commits: `c7e3201` προηγούμενο reviewer-sweep log entry, `066b1c6` monitor
+STATUS.md ενημέρωση 20:55). `git diff --stat 3ad1fea..HEAD` = μόνο `PROGRESS.md` + `STATUS.md`, **μηδέν
+αλλαγές σε `apps/`**.
+
+**Checks**:
+- `cd apps/web && npm run type-check` → **EXIT 0**.
+- `cd apps/mobile && npx tsc --noEmit` → **EXIT 0** (μηδέν output).
+
+**Review**: μηδέν κώδικας για έλεγχο regressions σε αυτό το εύρος (καθαρά docs/monitor commits). Το
+STATUS.md update σημειώνει ότι το auditor batch (builder/parity/docker/web-code-quality) είναι STALE ~9+
+ώρες, αλλά αυτό είναι monitor-routine ευθύνη, όχι κάτι που ο reviewer μπορεί ή πρέπει να διορθώσει. Μηδέν
+committed secret στο diff (μόνο prose/markdown).
+
+**Fixes**: κανένα (τίποτα κώδικα να διορθωθεί σε αυτό το εύρος).
+
+**Flagged**: κανένα νέο· το ήδη-ανοιχτό MFA rate-limit P1/S (WEB_DEBT.md, 57η σάρωση) παραμένει η μόνη
+εκκρεμότητα, αμετάβλητο.
 
 ## 2026-07-22 (reviewer — έλεγχος 779970a..58b6437, 24 commits)
 
