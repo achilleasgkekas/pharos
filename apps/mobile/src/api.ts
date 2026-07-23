@@ -290,6 +290,30 @@ export function addVoucher(data: { title: string; code?: string; store?: string;
   return request<{ voucher: Voucher }>('/api/v1/vouchers', { method: 'POST', body: JSON.stringify(data) });
 }
 
+// ---- Gift cards / store credit (P32 mobile parity) ----
+export type GiftCardUse = { id: string; amount: number; date: string | null; note: string };
+export type GiftCard = {
+  id: string; title: string; store: string; code: string; initialAmount: number;
+  expiresAt: string | null; archived: boolean; notes: string; balance: number; spentPct: number;
+  daysLeft: number | null; uses: GiftCardUse[];
+};
+export async function getGiftCards(): Promise<GiftCard[]> {
+  return (await request<{ data: GiftCard[] }>('/api/v1/giftcards?limit=200')).data ?? [];
+}
+export function addGiftCard(data: { title: string; store?: string; code?: string; initialAmount?: number; expiresAt?: string | null; notes?: string }) {
+  return request<{ giftCard: GiftCard }>('/api/v1/giftcards', { method: 'POST', body: JSON.stringify(data) });
+}
+export const updateGiftCard = (id: string, data: { title?: string; store?: string; code?: string; initialAmount?: number; expiresAt?: string | null; notes?: string; archived?: boolean }) =>
+  patch(`/api/v1/giftcards/${id}`, data);
+export const deleteGiftCard = (id: string) => del(`/api/v1/giftcards/${id}`);
+/** Record a spend (positive amount) or reload/top-up (negative amount) against the card.
+ *  Mirrors the web `addGiftCardUse` action. Caller reloads the list afterwards. */
+export const addGiftCardUse = (id: string, amount: number, note?: string) =>
+  patch(`/api/v1/giftcards/${id}`, { addUse: { amount, note } });
+/** Undo a single spend/reload entry. Mirrors the web `removeGiftCardUse` action. */
+export const removeGiftCardUse = (id: string, useId: string) =>
+  patch(`/api/v1/giftcards/${id}`, { removeUseId: useId });
+
 // ---- Bills (P28 mobile parity) ----
 export type BillStatus = 'paid' | 'overdue' | 'due-soon' | 'upcoming';
 export type Bill = {
