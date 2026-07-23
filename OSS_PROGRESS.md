@@ -2192,3 +2192,27 @@ Collision guard: `git status --short` στην αρχή έδειξε foreign unc
 - Collision guard: `git status --short`/`git diff --cached --name-only` πριν το commit έδειξαν ΜΟΝΟ το νέο αρχείο μου (τα 4 foreign αρχεία παρέμειναν modified/untracked, εκτός staging). `git fetch origin main` → ahead 1, καθαρό fast-forward, push σε `origin main` επιτυχές (2672c8d..2784779), χωρίς rebase ανάγκη.
 
 Suggested next task: από την ίδια sweep-λίστα, ακόμα ανέγγιχτα: `login/actions.ts` (32 γραμμές, μικρό/απλό — καλό επόμενο, mock `@/models/User`+partial `@/lib/auth` όπως εδώ) ή `history/actions.ts` (50, Conversation model mock + string-strip preview logic) ή `vouchers/actions.ts` (78, το plain actions.ts, ΟΧΙ giftcardActions/loyaltyActions). Έλεγξε ξανά αν το `subscriptions/actions.ts` (170 γραμμές) έχει ηρεμήσει πριν το πιάσεις. Διάβασε ΠΡΩΤΑ το υποψήφιο πριν διαλέξεις. Έλεγξε ΠΑΝΤΑ πρώτα `git status` collision-guard. Ένα module ανά run.
+
+---
+
+## 2026-07-24 (cont.³¹ — login/actions.test.ts, browser login form + logout)
+
+**Task: DB-mocked unit test για `apps/web/src/app/login/actions.ts`** (32 γραμμές) — από την ίδια sweep-λίστα του προηγούμενου run.
+
+Collision guard: `git status --short` στην αρχή έδειξε **καθαρό working tree**, κανένα foreign WIP. Δεν υπήρχε τίποτα να προσέξω πριν ξεκινήσω.
+
+Διάβασα ολόκληρο το αρχείο: `loginAction` (fail-closed guard `authConfigured()` ΠΡΙΝ διαβάσει καν το formData όταν λείπει `AUTH_SECRET` → μήνυμα να το βάλει στο `.env`, username trim+lowercase / password ως-έχει, missing-either → γενικό "Enter your username and password." χωρίς DB read, `User.findOne({username}).lean()`, unknown-user ΚΑΙ wrong-password μοιράζονται το ΙΔΙΟ μήνυμα "Wrong username or password." — δεν αποκαλύπτει αν το username υπάρχει — με `verifyPassword` να καλείται ΜΟΝΟ όταν βρέθηκε user, success → `setSessionCookie({sub, role, name})` με role hardcoded σε 'admin' ΜΟΝΟ αν είναι ρητά 'admin' (οτιδήποτε άλλο → 'member', ίδιο defensive pattern με το mobile login route) + name fallback σε username). `logoutAction` (clearSessionCookie → redirect('/login'), σειρά σημαντική).
+
+**Διαφορά από το ήδη-υπάρχον `api/v1/auth/login/route.test.ts`**: αυτό εδώ είναι η φόρμα browser login (session cookie, καμία mint-token/rate-limit λογική) — ξεχωριστό module, ξεχωριστή επιφάνεια.
+
+**Σχεδιαστική επιλογή (ίδιο pattern με setup/actions.test.ts)**: `hashPassword`/`verifyPassword` (`lib/auth.ts`) ΔΕΝ mockαρίστηκαν (partial mock μέσω `importOriginal`, μόνο `setSessionCookie`/`clearSessionCookie` mocked ως το πραγματικό I/O boundary) — το "success" test φτιάχνει ένα ΠΡΑΓΜΑΤΙΚΟ scrypt hash με `hashPassword('hunter2')` και επαληθεύει ότι το login πράγματι round-trips μέσω του αληθινού `verifyPassword`, αντί να πιστεύει τυφλά ένα mock. Το `next/navigation` `redirect` mockαρίστηκε να πετάει (matching το πραγματικό Next.js behavior) ώστε το `logoutAction` test να το επιβεβαιώσει με `rejects.toThrow`.
+
+Τι έγινε: Νέο `login/actions.test.ts` (11 tests): loginAction (9: auth-not-configured-fails-closed-no-db, missing-username, missing-password, whitespace-only-username, trims+lowercases-before-lookup, unknown-user-generic-message-no-verifyPassword-call, wrong-password-same-generic-message, success-sets-cookie-sub-role-name, non-admin-role-string-downgraded-to-member, blank-name-falls-back-to-username), logoutAction (1: clears-cookie-then-redirects).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/login/actions.test.ts"` → 11/11 passed.
+- `npx vitest run` (όλο το suite) → **223 files, 2903/2903 passed** (από 220/2861· η αύξηση αρχείων πέρα από το δικό μου 1 οφείλεται σε παράλληλες routines στο μεταξύ).
+- `npm run type-check` (tsc --noEmit) → exit 0, καθαρό στην πρώτη προσπάθεια.
+- Collision guard: `git status --short` πριν το commit έδειξε ΜΟΝΟ το νέο αρχείο μου.
+
+Suggested next task: από την ίδια sweep-λίστα, ακόμα ανέγγιχτα: `history/actions.ts` (50 γραμμές, Conversation model mock + string-strip preview logic) ή `vouchers/actions.ts` (78, το plain actions.ts, ΟΧΙ giftcardActions/loyaltyActions). Έλεγξε ξανά αν το `subscriptions/actions.ts` (170 γραμμές) έχει ηρεμήσει (καμία πρόσφατη commit πάνω του) πριν το πιάσεις. Διάβασε ΠΡΩΤΑ το υποψήφιο πριν διαλέξεις. Έλεγξε ΠΑΝΤΑ πρώτα `git status` collision-guard. Ένα module ανά run.
