@@ -21,6 +21,13 @@ export function rateLimit(key: string): NextResponse | null {
   return r;
 }
 
+/** Best-effort client IP for keying an IP-based rate limit (proxy headers → 'unknown'). */
+export function clientIp(req: NextRequest): string {
+  const fwd = req.headers.get('x-forwarded-for');
+  if (fwd) return fwd.split(',')[0].trim();
+  return req.headers.get('x-real-ip') || 'unknown';
+}
+
 /** Resolve the Bearer-token user, or null. Shared by every /api/v1 route. The token
  *  is the per-user `apiToken` (generated at first login or in Settings → Mobile/MCP). */
 export async function bearerUser(req: NextRequest): Promise<ApiUser | null> {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import { Account } from '@/models/Account';
 import { readBody, strField } from '@/lib/apiBody';
+import { rateLimit } from '@/lib/apiAuth';
 import { saasAuthGate, saasGuard, accountTenants } from '@/lib/tenancy/saasApi';
 import {
   getMfaPendingAccountId,
@@ -41,6 +42,11 @@ export async function POST(req: NextRequest) {
     if (!accountId) {
       return NextResponse.json({ error: 'no_pending_login' }, { status: 401 });
     }
+
+    // Keyed by account id, not IP: the pending cookie already narrows the guess target to one
+    // account, so an attacker spreading attempts across IPs must still be throttled per-account.
+    const limited = rateLimit(`saas-mfa:${accountId}`);
+    if (limited) return limited;
 
     const b = await readBody(req);
     const code = strField(b, 'code', '', true);

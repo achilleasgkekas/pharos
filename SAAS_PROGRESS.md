@@ -3849,3 +3849,47 @@ match.
 επόμενο run) ΚΑΙ, σύμφωνα με το priority-guidance (UI πρώτα), σκέψου αν κάποιο ήδη-χτισμένο
 read-only control-plane API (admin ή account) λείπει ακόμα από ένα UI panel πριν προσθέσεις νέο
 backend surface.
+
+## 2026-07-24 (increment 84 — SaaS auth/mfa rate-limit fix, P1 web-debt item)
+
+Πριν από νέο UI increment, διάβασα το ask-inbox (τίποτα addressed σε saas-core) και το
+`WEB_DEBT.md` — ο web-code-quality auditor είχε ανοίξει (57η σάρωση, `db9af7c`) ένα **P1/S**,
+πλήρως-specified, auto-buildable item ακριβώς στο δικό μου territory (`api/saas/auth/*`):
+το `POST /api/saas/auth/login` και το ολοκαίνουριο (increment 83) `POST /api/saas/auth/mfa`
+δεν καλούσαν πουθενά το ήδη-shipped `rateLimit()` helper (`lib/apiAuth.ts`, ήδη wired στο v1
+login) — η MFA-verify δεύτερη γραμμή άμυνας ήταν πρακτικά brute-forceable (6-digit TOTP ή
+8-char recovery code, μόνο 5-min pending-cookie TTL ως όριο). Το priority-guidance λέει "UI
+πρώτα", αλλά ένα well-specified P1 security gap στο ίδιο μου το feature (MFA, που μόλις έχτισα
+στα increments 79-83) βγαίνει μπροστά.
+
+**Fix (ακριβώς όπως speced το item):**
+- **`lib/apiAuth.ts`**: νέο exported `clientIp(req)` (best-effort proxy-header IP, extracted
+  από το v1 login route — dedup όπως πρότεινε το item ως optional).
+- **`api/v1/auth/login/route.ts`**: εισάγει το shared `clientIp` αντί για local copy (καμία
+  behavior αλλαγή).
+- **`api/saas/auth/login/route.ts`**: `rateLimit(\`saas-login:${clientIp(req)}\`)` ως πρώτη
+  γραμμή μέσα στο `saasGuard` closure, πριν το `saasAuthGate()`/DB.
+- **`api/saas/auth/mfa/route.ts`** (POST): `rateLimit(\`saas-mfa:${accountId}\`)` αμέσως μετά
+  το `getMfaPendingAccountId()` (account-id keyed, ΟΧΙ IP — ο πραγματικός σπάνιος πόρος σε
+  brute force είναι το account, IP-keying θα άφηνε distributed guessing ανοιχτό), πριν το
+  `connectDB()`/`verifyMfaLogin`. Over-limit → το ίδιο `NextResponse` (429 + `Retry-After`/
+  `X-RateLimit-*`) που ήδη φτιάχνει το helper, μηδέν custom shape.
+
+Config-gated off by default (`API_RATE_LIMIT` unset) — μηδέν behavior αλλαγή κάτω από το όριο,
+το self-hosted single-user Pharos του Αχιλλέα ανεπηρέαστο (SAAS_MODE off ούτως ή άλλως).
+
+**Verified:** `grep -rn "rateLimit" apps/web/src/app/api/saas/auth/` → 2 hits (login+mfa).
+`npm run type-check` → **EXIT 0**. `npx vitest run` (πλήρες suite) → **2903/2903 green**
+(223 files, `apiRateLimit.test.ts` αμετάβλητο 12/12). Κανένα shared component/layout/UI
+αγγίχτηκε, μηδέν νέα εξάρτηση. **Docker: ΔΕΝ έγινε rebuild** (καμία αλλαγή σε runtime
+wiring/env/dependency — backend logic-only edit μέσα σε ήδη-existing routes). **Browser-
+verify: skipped** (backend-only, μηδέν UI, ο live container δεν έχει SAAS_MODE set ούτως ή
+άλλως). Collision guard: `git status --short` πριν το staging έδειξε ΜΟΝΟ τα 4 δικά μου
+αρχεία (καθαρό working tree στην αρχή του run), `git diff --cached --name-only` επιβεβαίωσε
+exact match. `WEB_DEBT.md`'s item ενημερώθηκε TODO → DONE με το ίδιο verification detail.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** γύρισμα στο UI-first priority-guidance — έλεγξε ξανά αν κάποιο ήδη-χτισμένο
+read-only control-plane API (admin ή account) λείπει ακόμα από ένα UI panel πριν προσθέσεις
+νέο backend surface (βλ. προηγούμενο log entry's "next task" note, ίδιο ερώτημα ακόμα ανοιχτό).

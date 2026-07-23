@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Account } from '@/models/Account';
 import { verifyPassword } from '@/lib/auth';
 import { readBody, strField } from '@/lib/apiBody';
+import { rateLimit, clientIp } from '@/lib/apiAuth';
 import { saasAuthGate, saasGuard, accountTenants } from '@/lib/tenancy/saasApi';
 import { setAccountCookie, setMfaPendingCookie } from '@/lib/tenancy/accountSession';
 
@@ -21,6 +22,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: NextRequest) {
   return saasGuard(async () => {
+    const limited = rateLimit(`saas-login:${clientIp(req)}`);
+    if (limited) return limited;
+
     const gate = saasAuthGate();
     if (gate) return gate;
 
