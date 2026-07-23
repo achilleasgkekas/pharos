@@ -19,7 +19,7 @@ Validation (markdown only, κανενα build/Docker/AI):
 - Secret scan: κανένα sk_/AUTH_/STRIPE_ ✓.
 - Markdown structure: νέα section σε api.md με @@ alignment, νέα subsection σε saas.md με #### (σωστό hierarchy level).
 
-Collision guard: `git status --short` δείχνει ΜΟΝΟ 3 modified docs files (api.md, mobile.md, saas.md), κανενα staged foreign files, κανενα concurrent routine mid-commit.
+Collision guard: `git status --short` δείχνει ΜΟΝΟ 4 modified docs files (api.md, mobile.md, saas.md, DOCS_PROGRESS.md), κανενα foreign WIP files staged, κανενα concurrent routine mid-commit. Staged ΜΟΝΟ docs/*.md με explicit pathspec. Committed 4ef9603 + pushed origin/main ✓.
 
 Επόμενο run: (α) grep αν άλλα features shipped σήμερα (π.χ. increment 85 SaaS try/catch fix είναι bug fix, όχι feature), ή (β) features.md stale-forward-check για νεα P* features απο πρόσφατα commits, ή (γ) openapi.yaml sync αν υπάρχει.
 
