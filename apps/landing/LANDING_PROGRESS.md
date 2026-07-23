@@ -2586,3 +2586,73 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-24 — (e) polish/content: FAQ += Calendar / iCal feed
+
+Increment (e). Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος
+`~/.claude/ASK_ACHILLEAS.md` (δυο OPEN entries, και τα δυο bakecore-finance, τιποτα για landing/pharos).
+
+Σημειωση για το ιδιο το log αρχειο: το τελευταιο entry πριν απο αυτο (2026-07-21, "FAQ += AI command bar")
+ειχε μεινει στην κυριολεκτικη ουρα του αρχειου με "Επομενο increment: Tasks/Kanban planner", αλλα το git log
+του κυριου repo (`git log --format='%h %ad %s' -- apps/landing`) δειχνει οτι ενα ΠΙΟ προσφατο commit
+(`2240ac9`, 2026-07-23 23:03, "FEATURES += Tasks & planning card") ειχε ηδη γινει ΜΕΤΑ το AI-command-bar
+commit, με το αντιστοιχο log entry του γραμμενο ΠΡΙΝ στο αρχειο (οχι στην κυριολεκτικη ουρα). Επιβεβαιωσα
+με `grep -in "kanban\|task" page.tsx` οτι το Tasks/Kanban card ΚΑΙ το AI-command-bar FAQ ειναι και τα δυο
+ηδη live στον κωδικα (γραμμες 83-86 και 450-451 αντιστοιχα) -> καμια εκκρεμοτητα εκει, το "next increment"
+pointer του τελευταιου entry ηταν ηδη ικανοποιημενο απο ενα προηγουμενο run, απλα το log ordering ειναι
+ελαφρως εκτος χρονολογικης σειρας (πιθανον απο δυο runs πολυ κοντα χρονικα). Δεν διορθωσα το log ordering
+(out of scope, δεν αλλαζει το περιεχομενο, μονο η σειρα εγγραφων).
+
+Δεδομενου οτι δεν υπηρχε νεο pointer, εκανα συστηματικο sweep συγκρινοντας τους τιτλους του `docs/features.md`
+(`grep -n "^## \|^### "`) με τα FEATURES/FAQS titles στο `page.tsx`. Το **Calendar** module
+(`docs/features.md:363-381`) βγηκε **τελειως ακαλυπτο**: μηδεν αναφορα στο page.tsx (η μονη λεξη "calendar"
+που υπηρχε ηταν το icon name για το Subscriptions card, ασχετο). Το module ειναι πληρως shipped: three-month
+agenda (`/calendar`) που ενωνει subscription renewals + installments aggregated per month + projected
+recurring bills/income + warranty/voucher expiries, με money-in/money-out totals ανα μηνα· ΚΑΙ ενα read-only
+**iCal (.ics) feed** subscribable απο Google/Apple/Outlook Calendar, authed με ξεχωριστο low-scope calendar
+token (οχι το full API bearer, ωστε ενα leaked subscribe URL να μην δινει API access), generate/copy/
+rotate/revoke απο Settings -> AI. Πραγματικο διαφοροποιητικο σημειο (λιγα personal-finance apps προσφερουν
+subscribe-able calendar feed) και θεματικα φυσικη προεκταση της ηδη-υπαρχουσας ερωτησης για bills.
+
+Αλλαγη (`apps/landing/app/page.tsx`, FAQS array μονο, μηδεν UI/CSS/dependency/bundle-size change πλην του
+νεου κειμενου): νεα εγγραφη «Can I see all my renewals, installments, and bills in one calendar?» αμεσως
+μετα το «Does it track bills I pay by hand, like utilities?» και πριν το «Can I split spending across more
+than one home or property?» (θεματικη γειτονια: ολα «τι εχει due date/repeats»). Απαντηση: three-month
+agenda unifying renewals/installments/bills/expiries + money-in/out per month + iCal feed subscription
+(Google/Apple/Outlook) με το δικο του low-scope token, generate/rotate στο Settings -> AI.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (απο 5.33 kB, αναμενομενο
+  λογω νεου κειμενου FAQ).
+- Browser preview: `next start -p 3110` πανω στο production build (3000/3100 κατειλημμενα απο Docker, οπως
+  παντα). `mcp__Claude_Browser__*` ηταν διαθεσιμο αυτο το run. `preview_start` + `read_console_messages`
+  (onlyErrors) -> «No console logs.» καθαρο. `get_page_text` (20000 chars) επιβεβαιωσε: η νεα ερωτηση
+  εμφανιζεται στη σωστη σειρα στη FAQ λιστα (μετα «Does it track bills...», πριν «Can I split spending...»),
+  ολες οι υπολοιπες sections (hero/features/pricing/roadmap/footer) renders σωστα, μηδεν regression.
+  `javascript_tool` επιβεβαιωσε: το πληρες answer text υπαρχει στο DOM (`outerHTML.includes(...)` -> true,
+  σωστο αφου το FAQ accordion κρυβει το answer οπτικα αλλα το κραταει στο DOM), και το deterministic anchor
+  id `faq-can-i-see-all-my-renewals-installments-and-bills-in-one-calendar` υπαρχει
+  (`getElementById(...)` -> true). Screenshot του hero επιβεβαιωσε clean render. Server σταματησε μετα
+  (`pkill -f "next start -p 3110"`), `ps aux` επιβεβαιωσε καμια next-server process (το `lsof -i :3110`
+  εδειξε αρχικα false-positive matches, ασχετες Claude-app "sim-control" TCP συνδεσεις που τυχαινει να
+  εχουν το ιδιο service-name mapping στο macOS `/etc/services`, οχι το node process μου· `ps aux | grep
+  "next start"` επιβεβαιωσε κενο).
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  `git diff --cached --name-only` κενο πριν το stage -> κανενα ξενο staged file (κανενα concurrent routine
+  mid-commit). Staged+committed ΜΟΝΟ το δικο μου landing path.
+
+Επομενο increment: sweep του `docs/features.md` δεν βρηκε αλλα τελειως ακαλυπτα modules μετα το Calendar
+(Search, Settings, Trash καλυπτονται εμμεσα μεσα σε αλλα items/stack list). Επομενο candidate: `docs/saas.md`
+sweep για hosted-only functionality που ισως αξιζει δικια της αναφορα (π.χ. MFA login-wiring αν επιβεβαιωθει
+live σε επομενο run· `96e5cbb`/`3206fa3` κλπ commits του κυριου repo αφορουν rate-limiting, εσωτερικο
+security hardening οχι user-facing feature, δεν χρειαζεται δικια του FAQ γραμμη). Αλλιως (e) polish
+συνεχεια, real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

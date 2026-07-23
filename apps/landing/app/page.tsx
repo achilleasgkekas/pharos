@@ -487,6 +487,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. Bills you pay manually (power, phone, shared building costs) get their own tracker, separate from subscriptions that charge a card automatically. Each bill moves through due-soon, overdue, and paid on its own, worked out from the due date, so a triage list always shows what needs paying first. Mark one paid in a click, optionally log the matching expense, and a recurring bill queues up the next one. Reminders ping you a few days before anything falls due.',
   },
   {
+    q: 'Can I see all my renewals, installments, and bills in one calendar?',
+    a: 'Yes. A three-month agenda unifies subscription renewals, credit-card installments aggregated per month, projected recurring bills and income, and warranty or voucher expiries, with a money-in / money-out total for each month, so "what is due this month" is a glance. The same agenda also publishes as a read-only iCal feed you can subscribe to from Google, Apple, or Outlook Calendar, authed by its own low-scope token so a leaked subscribe link never grants API access; generate, copy, or rotate it in Settings → AI.',
+  },
+  {
     q: 'Can I split spending across more than one home or property?',
     a: 'Yes. If you run more than one place, a main home and a cottage for example, you can tag each expense or income to a space and see exactly what each one costs. Add your spaces once and PHAROS filters spending by them and breaks it down in a per-space Reports view, so "how much does the cottage cost" is a glance. A recurring bill keeps its space when scanned, so a power bill for the cottage stays tagged. Leave it off and nothing changes; the feature only appears once you add a space.',
   },
