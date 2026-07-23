@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-22 (13η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-23 (14η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «τα εγκρίνω όλα» → **ΟΛΑ** τα προηγούμενα Proposed
 > (P1, P3, P5-P26) μετακινήθηκαν στο «Approved», μαζί με τα ήδη-εγκεκριμένα PA1/PA2/PA3.
 > **7η σάρωση (2026-07-09):** PA1 (bank/CSV import) shipped → «Done»· προστέθηκαν 5 νέοι candidates P27-P31.
@@ -64,12 +64,71 @@
 > Προστέθηκαν **3 νέοι candidates P52-P54** (ζωντανό grep επιβεβαίωσε distinct: κανένα `restockIntervalDays`/
 > `lowStock` πάνω στο ήδη-υπάρχον `ShoppingListItem`, κανένα recurring/repeat πεδίο στο `Task` model, μηδέν
 > encryption στο JSON backup export path).
+> **14η σάρωση (2026-07-23):** καμία ρητή απόφαση/έγκριση Αχιλλέα σε αυτό το unattended run — P37-P54 παραμένουν
+> αμετάβλητα awaiting approval. Το Approved queue παραμένει στην ίδια εικόνα με την 13η σάρωση (P36 blocked/
+> P31 needs supervised session/P16 remainder needs sample file/P9 ρητά τελευταίο/P17+P23 no unattended verify
+> χωρίς physical device) — ⚑ ίδια standing παρατήρηση επαναλαμβάνεται (>10 σαρώσεις): αν δεν εγκριθεί κάτι
+> νέο, ο builder μένει χωρίς καθαρό «απλώς χτίσ' το» item. **Δεν μετακίνησα τίποτα.** Προστέθηκαν **3 νέοι
+> candidates P55-P57** (ζωντανό grep επιβεβαίωσε distinct: κανένα `soldPrice`/`soldAt`/`soldTo` πάνω στο ήδη-
+> υπάρχον `Item.status='sold'` [το status υπάρχει από παλιά αλλά είναι «κενό»· δεν αποθηκεύει τίποτα σχετικό
+> με την πώληση], μηδέν `qrcode`/`assetTag` οπουδήποτε στο codebase [παρόλο που το `jsbarcode` υπάρχει ήδη
+> εγκατεστημένο από το P20 loyalty-cards και θα μπορούσε να ξαναχρησιμοποιηθεί], μηδέν `lastReviewedAt`/
+> subscription-audit-nudge pattern).
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P57. Subscription/asset «still using this?» periodic review nudge — S — OSS (dogfooding-heavy), behavioral (όχι οικονομικό υπολογισμό)
+- **Αξία:** το P7 (auto-discovery) βρίσκει άγνωστες επαναλαμβανόμενες χρεώσεις, το P14 (price-hike) πιάνει ανατιμήσεις,
+  το P45 (pause/skip) χειρίζεται προσωρινό πάγωμα — αλλά **καμία υπενθύμιση δεν ρωτάει ποτέ «τη χρησιμοποιείς ακόμα;»**
+  για μια συνδρομή που εξακολουθεί να χρεώνεται κανονικά, χωρίς ανατιμήσεις, απλώς ξεχασμένη (π.χ. ένα δεύτερο
+  streaming service που δεν άνοιξε 6+ μήνες). Αυτό είναι **behavioral nudge**, όχι οικονομικός υπολογισμός — καθαρά
+  distinct από τα 3 παραπάνω items που όλα βασίζονται σε αριθμούς (τιμή/κύκλο), ενώ αυτό βασίζεται μόνο στον χρόνο
+  από την τελευταία επιβεβαίωση του ίδιου του χρήστη. Optional `Subscription.lastReviewedAt` (+ «still using it ✓»
+  one-click που το ενημερώνει σε now) → alert όταν περάσει `reviewIntervalDays` (default π.χ. 180) από την τελευταία
+  επιβεβαίωση (ή από τη δημιουργία αν ποτέ δεν επιβεβαιώθηκε). Ντετερμινιστικό, μηδέν AI, reuse `dispatchAlert`.
+- **Module:** Subscriptions (νέο optional πεδίο + «still using it» action) + Notifications.
+- **Ανοιχτή απόφαση (builder default):** opt-in globally (ένα `AppConfig` interval, ίδιο lead-time pattern με τα
+  υπόλοιπα alert-days settings, 0 = off)· «still using it» button = μόνο timestamp bump, καμία άλλη πλευρική ενέργεια
+  (δεν κάνει pause/cancel μόνο του, αφήνει την απόφαση στον χρήστη)· καμία επίδραση σε subscriptions με `pausedUntil`
+  ενεργό (P45) — αυτές είναι ήδη ρητά «σε παύση», δεν χρειάζονται νέο nudge.
+
+### P56. Printable QR asset-tag labels για inventory items (scan-to-view) — S/M — OSS (dogfooding-heavy, «Personal Hub» fit)
+- **Αξία:** ο Αχιλλέας έχει φυσικό εξοπλισμό σε κουτιά/rack/σπίτια (Battle Station parts, δίκτυο, 3D printer, 2 σπίτια)
+  όπου το «ποιο κουτί/ράφι έχει τι» είναι καθαρά φυσικό πρόβλημα οργάνωσης — σήμερα το `Item.location` (free string,
+  CLAUDE.md) λέει *πού πρέπει να είναι* αλλά τίποτα δεν γεφυρώνει το φυσικό αντικείμενο με την ψηφιακή εγγραφή του.
+  Ένα μικρό **printable QR label ανά item** (κωδικοποιεί direct-link URL στη σελίδα του item, π.χ. `/items?open=<id>`)
+  κολλάει πάνω στο κουτί/rack unit → σκανάρεις με το κινητό → βλέπεις specs/warranty/manual (P21 vault)/purchase
+  history αμέσως, χωρίς να ψάχνεις στην εφαρμογή. **Μηδέν νέο dependency**: το `jsbarcode` υπάρχει ήδη εγκατεστημένο
+  (P20 loyalty cards, client-side, dynamically imported) και υποστηρίζει ήδη format `qrcode` — καθαρό reuse, όχι νέα
+  βιβλιοθήκη να επαληθευτεί. **Διακριτό** από P20 (barcode = προϋπάρχον κωδικό καταστήματος, εδώ = link προς το ίδιο
+  το app) και P39 (bundles = λογική ομαδοποίηση, όχι φυσική ετικέτα).
+  Session-gated: το scan θα πάει σε login αν δεν είσαι ήδη μέσα (ίδιο idiom με το `?next=` round-trip του P5 bookmarklet),
+  άρα κανένα δημόσιο exposure δεν χρειάζεται.
+- **Module:** Items/Inventory (νέο small component reuse jsbarcode `format:'qrcode'`) + νέα «Print labels» ενέργεια
+  (select items → printable sheet, `window.print()` CSS, ίδιο zero-backend pattern με άλλα print-friendly views).
+- **Ανοιχτή απόφαση (builder default):** single-item label στο detail modal πρώτα (μικρότερο MVP)· bulk «print sheet
+  για N επιλεγμένα items» ως δεύτερο βήμα αν αξίζει· URL μέσα στο QR = relative-to-deployment path (self-host friendly,
+  δουλεύει σε οποιοδήποτε domain/IP χωρίς hardcoded host).
+
+### P55. Item resale / disposal proceeds tracking (το «sold» status να αποθηκεύει κάτι) — S — OSS
+- **Αξία:** το `Item.status` έχει ήδη τιμές **`sold`/`broken`** (verified: `models/Item.ts` `ITEM_STATUSES`) αλλά
+  **κανένα πεδίο δεν αποθηκεύει τίποτα σχετικό με την πώληση** — το να βάλεις ένα item σε `sold` σήμερα είναι απλά
+  μια ετικέτα, χωρίς τιμή πώλησης/αγοραστή/ημερομηνία. Ο Αχιλλέας αναβαθμίζει τακτικά hardware (Battle Station parts,
+  δίκτυο εξοπλισμός) και συχνά πουλάει το παλιό κομμάτι — σήμερα αυτό το πραγματικό χρηματικό γεγονός (π.χ. πούλησε
+  την παλιά κάρτα γραφικών €200) **δεν πιάνεται πουθενά**, ενώ το net-worth (PA2) και το depreciation model (P29)
+  θα έδειχναν εσφαλμένα είτε μηδενική αξία (σωστό) είτε ακόμα την παλιά τιμή αν κάποιος ξεχάσει να αλλάξει status.
+  Optional `Item.soldPrice`/`soldAt`/`soldTo` (free-form όνομα/site, π.χ. «Skroutz marketplace», «φίλος») στο υπάρχον
+  `sold` status flow → realized gain/loss έναντι `purchasedPrice` εμφανίζεται στο item detail + optional **«log as
+  income»** one-click (δημιουργεί linked Expense kind=income, opt-in, reuse `addExpense`). **Διακριτό** από P47
+  (lending = προσωρινό, το item παραμένει δικό σου) και P44 (RMA = επιστροφή/επισκευή, όχι πώληση).
+- **Module:** Items/Inventory (3 νέα optional πεδία στο υπάρχον status-change flow) + optional σύνδεση με Expenses (income).
+- **Ανοιχτή απόφαση (builder default):** τα πεδία εμφανίζονται μόνο όταν ο χρήστης θέτει status→`sold` (modal prompt
+  ή inline στη φόρμα, κενό = παλιά συμπεριφορά αμετάβλητη)· «log as income» = προαιρετικό κουμπί, ΟΧΙ αυτόματο
+  (αποφυγή διπλο-καταγραφής αν ο χρήστης το καταγράψει ήδη χειροκίνητα αλλού).
 
 ### P54. Encrypted local backup export (passphrase-protected JSON/ZIP) — S/M — OSS (self-host security lever)
 - **Αξία:** το `exportData()` JSON backup + το nightly `backup.sh` (CLAUDE.md) γράφουν **plaintext** αρχεία με
