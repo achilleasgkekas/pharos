@@ -3893,3 +3893,55 @@ exact match. `WEB_DEBT.md`'s item ενημερώθηκε TODO → DONE με το
 **Next task:** γύρισμα στο UI-first priority-guidance — έλεγξε ξανά αν κάποιο ήδη-χτισμένο
 read-only control-plane API (admin ή account) λείπει ακόμα από ένα UI panel πριν προσθέσεις
 νέο backend surface (βλ. προηγούμενο log entry's "next task" note, ίδιο ερώτημα ακόμα ανοιχτό).
+
+## 2026-07-24 (cont. — increment 85, 3× guardless DB-touching route fix, P2 web-debt)
+
+Πριν από νέο UI-first increment (το ερώτημα του προηγούμενου entry παρέμεινε ανοιχτό), έλεγξα
+το ask-inbox (τίποτα addressed σε saas-core) και το `WEB_DEBT.md` — 3 πλήρως-specified,
+auto-buildable **P2/S** items βρίσκονταν ακόμα ανοιχτά, ακριβώς στο δικό μου territory
+(`api/saas/**`), confirmed αμετάβλητα σε 4-5 διαδοχικές σαρώσεις (2026-07-09 → 2026-07-20)
+χωρίς κανένας builder να τα καταναλώσει. Ίδιο σκεπτικό με το increment 84: ένα well-specified
+security/robustness gap στο δικό μου territory βγαίνει μπροστά από ένα νέο UI panel.
+
+**Πρόβλημα (και στα 3):** DB-touching handlers μετά το gate ladder τους χωρίς try/catch → ένα
+mid-handler throw (Mongo failover/net blip) έβγαινε ως Next default **HTML 500** αντί για το
+uniform `{ error }` JSON shape που έχει κάθε άλλο SaaS route (το ίδιο pattern που το `saasGuard`
+helper λύνει αλλού, αλλά αυτά τα 3 δεν μπορούν να χρησιμοποιήσουν το `saasGuard` γιατί δεν έχουν
+το standard workspace-session ladder — χρειάζονταν plain try/catch).
+
+**Fix (μηχανικό, exactly-as-speced από το WEB_DEBT.md, μηδέν αλλαγή σε συμπεριφορά/gates):**
+- **`api/saas/invites/accept/route.ts`**: το σώμα μετά το `connectDB()` (invite lookup+410,
+  account resolve/create [το προϋπάρχον nested create-race try/catch έμεινε ακριβώς ως έχει],
+  membership upsert, invite-consume, audit, cookie, response) → top-level try/catch.
+- **`api/saas/audit/route.ts`** (GET): το σώμα μετά το `resolveWorkspaceSession` gate (cursor/
+  limit parsing, `AuditEvent.find`, batched actor `Account.find`, response) → try/catch.
+- **`api/saas/workspace/erasure/purge/route.ts`** (POST, cron): `await runErasurePurgeScan()`
+  (μετά το CRON_SECRET/token gate) → try/catch.
+
+Και τα 3 gate ladders (404 SAAS off / 401-403 auth / 400-410 validation / 401 bad cron token)
+ΜΕΝΟΥΝ ΑΚΡΙΒΩΣ ως έχουν· αλλάζει ΜΟΝΟ ο unexpected throw → καθαρό `{ error }` 500.
+
+**Verified**: `grep -c 'try {'` → invites/accept **2** (create-race + νέο top-level), audit **1**,
+erasure/purge **1** (όλα matching το acceptance criterion του κάθε item). `npm run type-check`
+→ **EXIT 0**. Πλήρες `npx vitest run` → **226 files / 2936 tests green** (καμία αλλαγή σε
+test-count, logic-only edit). `WEB_DEBT.md`'s 3 items ενημερώθηκαν TODO → DONE με το ίδιο
+verification detail. **Docker: ΔΕΝ έγινε rebuild** (logic-only edits μέσα σε ήδη-existing
+routes, καμία αλλαγή σε runtime wiring/env/dependency· ο live container του Achilleas δεν έχει
+`SAAS_MODE` set ούτως ή άλλως). **Browser-verify: skipped** (backend-only, μηδέν UI, ίδιο
+σκεπτικό με το increment 84). Collision guard: `git status --short` πριν το staging έδειξε
+ΜΟΝΟ τα 4 δικά μου αρχεία (καθαρό working tree στην αρχή του run), `git diff --cached
+--name-only` επιβεβαίωσε exact match.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** το UI-first ερώτημα (γύρισε σε ένα ήδη-χτισμένο read-only control-plane API
+που λείπει από UI panel) έλεγχθηκε αυτό το run — γρήγορη επισκόπηση όλων των `(saas)/**`,
+`admin/**`, και `components/saas/**` δείχνει ότι **κάθε** υπάρχον `api/saas/*` route (account,
+workspace, members, invites, billing, admin/tenants, admin/overview, activity/audit, ai-key,
+erasure, usage, dbstats) έχει ήδη κάποιο consuming UI panel (grep `api/saas` σε κάθε
+`components/saas/*.tsx` επιβεβαίωσε 1-προς-1 mapping· μόνο τα 2 cron endpoints `usage/sample`+
+`trials/sweep` δεν έχουν UI, σωστά — scheduler-only, δεν χρειάζονται). Άρα το UI-first backlog
+από τα ήδη-built read APIs έχει **εξαντληθεί**. Επόμενο increment: γύρισμα στο TODO.md §10-§14
+(π.χ. Stripe live-wiring scaffold πέρα από checkout/portal/webhook stubs, ή audit-log
+rate-limiting follow-up που ανέφερε το increment 84's Needs-Achilleas) — ή, αν προκύψει νέο
+well-specified item στο `WEB_DEBT.md` μέσα στο δικό μου territory σε επόμενη σάρωση, αυτό πρώτα.
