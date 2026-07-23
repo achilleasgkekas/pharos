@@ -7154,3 +7154,85 @@ uncommitted WIP του Αχιλλέα (`MOBILE_PARITY.md`, `SettingsClient.tsx`,
   Standing items αμετάβλητα: `getTenantConnection` readyState guard decision (P3/S)· SaaS multi-tenancy/
   billing rollout env boundary· mobile native-dep approvals· Settings theme/language/AI-engine/storage/
   OneDrive credentials boundary.
+
+## 2026-07-24 (pharos-daily-dev)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `mkdir /tmp/claude-docker.lock` (lock acquired καθαρά,
+κανένα άλλο routine έτρεχε build· released στο τέλος). `ASK_ACHILLEAS.md` είχε 2 OPEN items, και τα δύο από
+άλλο routine (`bakecore-finance`, άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή.
+
+**Approved queue check (βήμα a)**: `PRODUCT_BACKLOG.md → ## Approved` re-confirmed — σχεδόν όλα τα items είναι
+πλέον ✅ SHIPPED. Τα εναπομείναντα unshipped: **P36** Open Banking (L, χρειάζεται explicit Αχιλλέα decision·
+blocked), **P31** Household multi-user (M, χρειάζεται supervised session λόγω enforcement risk· blocked), **P16**
+Firefly III/Grocy importers (χρειάζονται πραγματικό sample export file· blocked, YNAB μέρος ήδη shipped), **P23**
+mobile share-sheet + **P17** mobile barcode scan (mobile-native, μηδέν τρόπος να verify χωρίς physical device·
+ίδια κρίση με 10+ προηγούμενα runs), **P5** MV3 browser extension (ξεχωριστό packaging/deliverable εκτός
+monorepo build, ρητά phase 2· η bookmarklet phase 1 ήδη shipped 2026-07-22), **P9** multi-currency (L, ρητά
+«τελευταίο» στην έγκριση). **Καμία αλλαγή στην κρίση** — Approved queue = effectively εξαντλημένη για ό,τι είναι
+unattended-buildable τώρα. Πέρασα στο βήμα (b): `MOBILE_PARITY.md` Build Queue top item.
+
+**Expenses tax-deductible tagging → mobile parity (P8 gap) — ✅ SHIPPED (commit `fc1f5e3`)**. Αυτό ήταν το top
+item της 53ης mobile-parity-auditor σάρωσης (2026-07-22) και το ίδιο που το προηγούμενο daily-dev run (2026-07-22)
+είχε προτείνει ως next task. Το web feature (P8, `e0124d8`, 2026-07-20) ήταν ήδη πλήρες (`Expense.taxDeductible`/
+`taxCategory` + form toggle + GR-preset picker + gold badge + «Tax only» filter στο web), αλλά **μηδέν** από αυτό
+έφτανε στο v1 API ή στο mobile app — καθαρό additive parity gap, όχι νέα product decision.
+
+**Web (v1 API)**: `apps/web/src/app/api/v1/expenses/serialize.ts` — `ExpenseLean` + `trimExpense` output += 2 πεδία
+(`taxDeductible: boolean`, `taxCategory: string`, ίδιο `!!`/`??` fallback idiom με τα υπόλοιπα scalar πεδία).
+`route.ts` POST δέχεται προαιρετικά `taxDeductible`(`boolField`)/`taxCategory`(`strField`, trim+cap 60 chars — ίδιο
+cap με το web zod schema στο `expenses/actions.ts`) και τα περνά στο `Expense.create`. `[id]/route.ts` PATCH δέχεται
+τα ίδια 2 πεδία ως optional patch (`typeof b.x === 'boolean'|'string'` guard, ίδιο idiom με τα υπόλοιπα scalar
+πεδία εκεί — προαιρετικά, αμετάβλητα αν παραλειφθούν).
+
+**Mobile**: `apps/mobile/src/api.ts` — `Expense` type += `taxDeductible: boolean; taxCategory: string`,
+`addExpense`/`updateExpense` params += optional `taxDeductible?`/`taxCategory?`. `MoneyScreen.tsx` edit modal: νέο
+toggle **«🏛 Tax deductible»** (mirror του ήδη-υπάρχοντος Recurring toggle style/χρώματα) ακριβώς κάτω από το
+category field (ίδια θέση με το web form) + conditional **«TAX CATEGORY»** text input με τα ίδια **8 GR presets**
+του web (`TAX_CATEGORY_PRESETS` const, τοπικό στο screen, ίδιο idiom με το ήδη-υπάρχον `CYCLES` const) ως
+suggestion chips (mirror του ήδη-υπάρχοντος vendor-autocomplete row πάνω στο ίδιο αρχείο). Gold **«🏛 tax»** badge
+στην κάρτα/row δίπλα στο anomaly badge όταν `taxDeductible===true` — glyph (ΟΧΙ lucide icon· το mobile icon-set
+refactor παραμένει ξεχωριστό ανοιχτό UI-debt item, βλ. `MOBILE_PARITY.md`), συνεπές με τα ήδη-υπάρχοντα ✦/＋
+glyphs στο ίδιο screen.
+
+**Builder defaults (χωρίς ασάφεια, additive-only)**: το export-ZIP μέρος του P8 (`lib/taxExport.ts`) **ΔΕΝ** είναι
+μέρος αυτού του item — παραμένει desktop file-download power tool (ίδιο idiom με P13/P11), ήδη σωστά flagged στο
+`## Needs Achilleas`. Καμία αλλαγή στο «Tax only» filter chip (web-only UI convenience, δεν χρειάζεται mobile
+ισοδύναμο σε αυτό το πέρασμα).
+
+**Verify**: `npm run type-check` EXIT 0 (web + mobile). Full `npx vitest run` **2892 passed / 222 files** — 1
+pre-existing exhaustive key-set contract test (`serialize.test.ts` "exposes exactly the documented key set")
+χρειάστηκε ενημέρωση (τα 2 νέα πεδία προστέθηκαν στη λίστα, expected fail-then-fix, ΟΧΙ regression) + πρόσθεσα
+νέα coverage: 1 test στο `serialize.test.ts` (taxDeductible/taxCategory passthrough), 1 στο `route.test.ts` (POST
+accept+trim+default), 2 στο `[id]/route.test.ts` (PATCH accept+trim + omit-leaves-out-of-$set), 1 στο
+`[id]/rescan/route.test.ts` (exact-match update). Μηδέν regression αλλού. **Docker safe rebuild**: mongo ήδη
+healthy → `docker compose build web` OK → `up -d web` → `RestartCount=0`, `/login` 200 στην 1η προσπάθεια,
+`docker logs` καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning). `curl GET /api/v1/expenses` χωρίς token
+→ **401** (`{"error":"Unauthorized…"}`, όχι 500 — additive αλλαγή δεν έσπασε το auth gate). Browser-checked (Claude
+Browser pane): `/login` → «Sign in · Pharos», μηδέν console errors. `docker builder prune -f` (195.6MB freed), lock
+released καθαρά. **Το πραγματικό mobile UI (toggle/input/badge σε πραγματική RN συσκευή) ΔΕΝ testable end-to-end
+unattended** (χρειάζεται simulator/device boot, εκτός scope του routine) — verified πλήρως μέσω tsc + το reused,
+ήδη-proven modal/toggle/Chip primitives pattern (ίδιο idiom με το Recurring toggle + vendor-suggestion chips
+ακριβώς πάνω στο ίδιο αρχείο), ίδιος περιορισμός με κάθε προηγούμενο mobile-screen run.
+
+**`MOBILE_PARITY.md`** ενημερώθηκε: το entry marked `✅ DONE 2026-07-24 (pharos-daily-dev)` με πλήρη υλοποίηση +
+verify λεπτομέρειες (η επόμενη mobile-parity-auditor σάρωση θα το επιβεβαιώσει + θα ξαναϋπολογίσει το ranked
+top-N).
+
+**Suggested next task**: το επόμενο top item στο Build Queue (μετά την 53η σάρωση ranking) είναι **Gift cards
+store-credit tracker → mobile exposure** (P32 gap, P2/L, νέο entity `GiftCard` — μηδέν v1 route ακόμα, χρειάζεται
+νέο `api/v1/giftcards(/[id])` mirror του ήδη-shipped Bill (P28) v1 pattern + νέο mobile screen ή tab). Ισοδύναμες
+εναλλακτικές στο ίδιο L-tier: **Savings/financial goals** (P12, νέο entity `Goal`, μηδέν v1 route) και **Loyalty
+card wallet** (P20, νέο entity + χρειάζεται νέο RN barcode-display dep — builder decision, όχι needs-Achilleas).
+**Search matched-line-item snippet** (P22, P3/S) μένει χαμηλότερης προτεραιότητας tier παρά το μικρό μέγεθος (ίδια
+κρίση με την 53η σάρωση). Το Approved queue παραμένει με P36/P31/P16/P17/P23/P5(phase2)/P9 blocked όπως πάντα.
+
+**Git hygiene**: `git add` explicit (MOBILE_PARITY.md + 9 web/mobile source+test αρχεία, όχι `-A`) → commit
+`fc1f5e3` → push.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: `getTenantConnection` readyState guard decision (P3/S)·
+  SaaS multi-tenancy/billing rollout env boundary· mobile native-dep approvals (P20 barcode lib, P17 camera,
+  P23 share-sheet)· P36 Open Banking provider decision· P31 household enforcement supervised session· P16
+  Firefly III/Grocy real sample-file need· Settings theme/language/AI-engine/storage/OneDrive credentials
+  boundary· P8 tax-export ZIP desktop power tool (separate from the tagging shipped here).
