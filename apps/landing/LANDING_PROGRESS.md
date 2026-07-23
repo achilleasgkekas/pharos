@@ -2456,6 +2456,72 @@ Needs-Achilleas (open, αμεταβλητα):
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
 
+## 2026-07-21 (cont.) — (e) polish/content: FEATURES += Tasks & planning card
+
+Increment (e). Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος
+`~/.claude/ASK_ACHILLEAS.md` (δυο OPEN entries, και τα δυο bakecore-finance, τιποτα για landing/pharos), και
+`git log --oneline -60` του κυριου repo φιλτραρισμενο σε feat/content commits. Νεοτερο απο το προηγουμενο
+log entry: `96e5cbb feat(saas)` MFA login-flow wiring (increment 83, TODO §9), + mobile item-document-vault
+(P21 parity) + landing FAQ commit (το ιδιο μου το προηγουμενο run).
+
+Ελεγξα το MFA (`docs/saas.md`): το `96e5cbb` λεει ρητα «login-flow wiring» στο commit title, αρα ισως πλεον
+ειναι πραγματικα wired (σε αντιθεση με τα προηγουμενα runs που το εβρισκαν "not yet wired"). Δεν το αγγιξα
+ομως αυτο το run (ηδη διαλεξα αλλο gap πριν το ψαξω σε βαθος)· σημειωνεται σαν πρωτος candidate για επομενο
+run αν επιβεβαιωθει live-wired (βλ. Επομενο increment).
+
+Το προηγουμενο log entry (2026-07-21) ειχε ηδη εντοπισει το **Tasks / Kanban planner module** σαν το
+επομενο ακαλυπτο κενο (μηδεν αναφορα πουθενα στο page.tsx). Επιβεβαιωσα ξανα πριν το increment
+(`grep -in "task\|kanban" page.tsx` = μηδεν hits εκτος cosmetic "browser tab" nowhere). Το module ειναι
+πληρως shipped (`docs/features.md:435-440`): planner (`/tasks`) με Kanban board (Todo/In-Progress/Blocked/
+Done) + list view, quick-add με `#tag` parsing, drag-and-drop η arrow-key moves μεταξυ columns, per-project
+progress bar οταν φιλτραρεις ανα tag, convert items απο Inventory/Shopping σε tasks. Αρκετα σημαντικο modulo
+(οχι minor feature) ωστε να παρει δικια του card στο FEATURES grid, οχι απλα μια προταση μεσα σε αλλη καρτα.
+
+Αλλαγες:
+- `apps/landing/app/components/Icon.tsx`: νεο icon `kanban` (τρεις καθετες γραμμες διαφορετικου υψους,
+  ιδιο glyph με το πραγματικο lucide "kanban" icon, συνεπες με τα υπολοιπα stroke-only icons του αρχειου).
+- `apps/landing/app/page.tsx` (FEATURES array μονο, μηδεν CSS/layout change): νεα καρτα «Tasks & planning»
+  αναμεσα στο Reports και στο Network (ιδια σειρα με το docs/features.md, οπου το Tasks section ερχεται
+  ακριβως πριν το Network section)· color `var(--purple)` (ισοζυγιο χρωματων: accent/cyan/gold ηταν ηδη 2x
+  το καθενα, purple/red 1x το καθενα πριν το increment). Το `.feature-grid` ειναι responsive CSS grid
+  (repeat(4,1fr) -> 2 -> 1 σε μικροτερα viewports, οχι fixed-count layout σαν το SHOWCASE_MODS dashboard
+  mock)· 9 καρτες αντι 8 απλα αφηνει την τελευταια σειρα με 1 καρτα, αποδεκτο visual trade-off, δεν το
+  αγγιξα το SHOWCASE_MODS mock (αυτο ειναι fixed 8-tile mock του πραγματικου homepage grid, θα χρειαζοταν
+  CSS change εκτος του πεδιου αυτου του content-only increment).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο πληθος)· `/` route 5.35 kB (απο 5.33 kB, αναμενομενο
+  λογω νεου κειμενου καρτας).
+- Browser preview: `next start -p 3109` (3000/3100 κατειλημμενα απο Docker, οπως παντα). `get_page_text` +
+  `read_page` (accessibility tree) επιβεβαιωσαν πληρες περιεχομενο: το `article` «Tasks & planning» εμφανιζεται
+  στη σωστη θεση (μετα Reports, πριν Network) με το πληρες κειμενο της περιγραφης· `read_console_messages`
+  onlyErrors -> «No console logs.» (καθαρο). Η ιδια in-app Browser pane εμφανισε ενα rendering glitch αυτο
+  το run (screenshot επεστρεφε μαυρη/κενη εικονα σε 2 διαφορετικα tabs μετα απο scroll/navigate ενεργειες,
+  ενω το `get_page_text`/`read_page`/`read_console_messages` δουλευαν κανονικα και σε νεο tab η πρωτη
+  screenshot ΠΡΙΝ οποιαδηποτε scroll ενεργεια εδειξε το hero σωστα) -> tool-side pane issue, οχι προβλημα
+  του page/code (η task file επιτρεπει best-effort όταν τα browser tools δεν συνεργαζονται καθαρα, εδω
+  χρησιμοποιηθηκε το text-based fallback που ηδη επιβεβαιωσε πληρως το αλλαγμενο περιεχομενο). Server
+  σταματησε μετα (`pkill -f "next start -p 3109"`), `lsof` επιβεβαιωσε 3109 clear.
+- em-dash: 0 και στα δυο αλλαγμενα αρχεια (`page.tsx`, `Icon.tsx`). Δεν αγγιξα Docker/:3000/web/mobile,
+  μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ τα δυο δικα μου αρχεια modified
+  (`apps/landing/app/components/Icon.tsx`, `apps/landing/app/page.tsx`)· `git diff --cached --name-only`
+  κενο πριν το stage -> κανενα ξενο staged file (κανενα concurrent routine mid-commit). Staged+committed
+  ΜΟΝΟ τα δικα μου landing paths.
+
+Επομενο increment: επιβεβαιωσε αν το `96e5cbb feat(saas) MFA login-flow wiring` σημαινει οτι το MFA ειναι
+πλεον πραγματικα wired στο login (`POST /api/saas/auth/login` requires it) -> αν ναι, νεο δικο του FAQ item
+(money/data/security cluster, μετα το «Is my financial data secure?»)· αν οχι ακομα (ιδιο "not yet wired"
+pattern με ολα τα προηγουμενα runs), skip ξανα. Αλλιως (e) polish συνεχεια, real app screenshots οταν
+υπαρξουν assets (blocked), ή νεοτερο shipped module αν εμφανιστει gap.
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
 ## 2026-07-21 — (e) polish/content: FAQ += AI command bar (natural-language assistant)
 
 Increment (e). Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος

@@ -80,6 +80,12 @@ const FEATURES: {
     desc: 'Cash flow, spend by store and category, net position, and price history charts, plus a forward safe-to-spend view that projects what is left after upcoming bills. A zero-AI Month in Review digest opens the page with a one-sentence summary of what changed. See where the money actually goes.',
   },
   {
+    icon: 'kanban',
+    color: 'var(--purple)',
+    title: 'Tasks & planning',
+    desc: 'A Kanban board (Todo, In-Progress, Blocked, Done) plus a list view. Quick-add with #tag parsing, drag-and-drop or arrow-key moves between columns, and a per-project progress bar when you filter by tag. Turn any inventory or shopping item straight into a task.',
+  },
+  {
     icon: 'wifi',
     color: 'var(--gold)',
     title: 'Network',
