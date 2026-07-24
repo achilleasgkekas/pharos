@@ -7612,3 +7612,76 @@ sites — χρειάζεται προσεκτικό scoping ώστε να μεί
   P36 Open Banking provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real
   sample-file need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export
   ZIP desktop power tool.
+
+## 2026-07-24 (mobile-parity-auditor, 54η σάρωση)
+
+Read-only mobile-parity audit run (scheduled task `auditor-pharos`). Δεν άγγιξα app code, δεν έτρεξα Docker
+builds, δεν πυροδότησα AI jobs — μόνο `git log`, grep/read, και `apps/mobile npx tsc --noEmit` (EXIT 0).
+
+**Inventory ξαναχτισμένο από τον κώδικα** (όχι από τα docs): **59 v1 routes** κάτω από
+`apps/web/src/app/api/v1/` (53→59 από την προηγούμενη σάρωση, +`giftcards`/`giftcards/[id]`/`goals`/
+`goals/[id]`/`loyaltycards`/`loyaltycards/[id]`), **18 mobile screens** κάτω από
+`apps/mobile/src/screens/` (17→18, +`GoalsScreen.tsx`).
+
+**Επιβεβαίωση top-4 items της 53ης σάρωσης**: όλα ήδη shipped ΚΑΙ σωστά marked `Status: ✅ DONE` στο
+`MOBILE_PARITY.md` πριν καν ξεκινήσει αυτή η σάρωση (ίδιο daily-dev routine, ίδιο 24ωρο): `fc1f5e3` Expenses
+tax-deductible tagging (P8), `bef65fe` Gift cards store-credit tracker (P32), `a900670` Savings/financial goals
+(P12, standalone `GoalsScreen.tsx`), `f58d818` Loyalty cards wallet (P20, νέο RN dep
+`react-native-barcode-svg@0.0.15`). Grep-verified στον πραγματικό κώδικα, όχι μόνο στα docs (π.χ.
+`apps/mobile/src/api.ts` έχει `getGoals`/`addGoal`/κλπ, `GET/POST /api/v1/goals` + `/[id]` υπάρχουν).
+
+**`git log --since=2026-07-22 -- apps/web/src apps/mobile/src` → 16 commits**: τα 4 παραπάνω shipments + 10
+SaaS/web-debt/test-only commits (rate-limit fix P1, guardless-route try/catch P2, `getTenantConnection`
+cache-guard P3, 5× route/action test-coverage — μηδέν από αυτά αγγίζει `api/v1`/`apps/mobile`) + 1 νέο web
+feature: `93cc862` (P5, quick-capture bookmarklet). **Έλεγχος P5**: `git show --stat 93cc862` = μηδέν hit σε
+`api/v1`/`apps/mobile/src`. Το commit message δηλώνει ρητά ότι είναι browser-only same-origin popup
+(`/capture?url=`) που ride-άρει το υπάρχον session cookie, ΣΚΟΠΙΜΑ όχι το Bearer-token v1 API (θα εξέθετε το
+token plaintext μέσα στο bookmarklet link) — «MV3 extension μένει phase 2» δηλώνει ρητά ότι mobile/extension
+exposure είναι μελλοντική απόφαση, όχι σημερινό gap. **Confirmed OUT-OF-SCOPE**, fold στο Needs Achilleas
+(ίδιο idiom με τα προηγούμενα desktop-only power tools P11/P13/P16).
+
+**1 νέο εύρημα — όχι από κάποιο commit, αλλά από doc-consistency ανάγνωση του ίδιου του Build Queue**: το
+entry «Notifications — νέο `pricehike` kind (P14) δεν χειρίζεται στο mobile» ήταν **stale duplicate**. Το
+κομμάτι icon είχε ήδη κλείσει στις 2026-07-13 (`6ea29a0`) — υπάρχει ξεχωριστό entry «pricehike icon» σωστά
+marked `✅ DONE`, και grep-verified στον κώδικα (`ActivityScreen.tsx:23` `NOTIF_ICON.pricehike='📈'`,
+`api.ts:585` `NotifKind` έχει `'pricehike'`) — αλλά το παλιό duplicate entry είχε μείνει ξεχασμένο με
+`Status: TODO`, ρίχνοντας μπέρδεμα για μελλοντικές σαρώσεις. Διαβάζοντας το ίδιο το reference που παρέθετε
+(`apps/web/src/components/NotificationBell.tsx:74-110` `describe()`), βρήκα ότι το **πραγματικό υπολειπόμενο
+πρόβλημα είναι πολύ ευρύτερο** από τον τίτλο: ΟΛΑ τα 7 non-system notification kinds (`deal`/`warranty`/
+`installment`/`pricehike`/`trialend`/`giftcard`/`bill`) αποθηκεύουν pipe-delimited raw payload
+(π.χ. `"13|15|15"`) και ο web `describe()` helper τα μετατρέπει σε ανθρώπινο κείμενο — αλλά το mobile
+`AlertsTab` (`ActivityScreen.tsx:101`) δείχνει `{item.body}` **αυτούσιο, χωρίς κανένα formatting**, για
+ΚΑΙ τα 7 kinds, όχι μόνο pricehike. Βρήκα επίσης ότι το `GET /api/v1/notifications` δεν επιστρέφει `currency`
+(χρειάζεται για τα money-amounts μέσα στα formatted strings) — mirror fix υπάρχει ήδη ως πρότυπο στο
+`apps/web/src/app/api/v1/calendar/route.ts:24` (`currency: settings.currency || 'EUR'`), και το mobile
+`CUR: Record<string,string>` map (`apps/mobile/src/ui.tsx:13`) υπάρχει ήδη αλλά είναι αχρησιμοποίητο (0 hits
+`CUR[` σε screens σήμερα) — θα γίνει το πρώτο use-site. **Ξαναέγραψα πλήρως το entry** στο
+`MOBILE_PARITY.md` (νέο title/scope/spec με ακριβή file/line pointers και για τα δύο apps), παραμένει
+`Status: TODO` αλλά τώρα σωστά scoped ως immediately-buildable P2/S item — αυτό γίνεται το νέο #1 στο queue.
+
+**Counts**: DONE (ήδη κλειστά πριν τη σάρωση) **+4** (P8/P32/P12/P20) / auto-buildable GAP **0 νέο από
+commits, 1 διορθωμένο/re-scoped από doc-audit** (notifications body-humanization) / NEEDS DECISION **0 νέα**
+/ OUT-OF-SCOPE confirmed **1** (P5 bookmarklet). `apps/mobile npx tsc --noEmit` → **EXIT 0**.
+
+**Top-3 προτεινόμενα για το επόμενο builder run**:
+1. **Notifications — humanize raw pipe-delimited body στο mobile Alerts tab** [P2/S] — μοναδικό ανοιχτό
+   functional gap αυτή τη στιγμή, πλήρως speced στο `MOBILE_PARITY.md` (mirror του web `describe()` helper,
+   +1 additive `currency` field στο notifications route, καθαρό string-formatting, μηδέν AI/decision).
+2. Αν εξαντληθεί #1: **UI Debt Queue** — emoji→lucide icon replacement [P2/M, decision ήδη ληφθεί από τον
+   Αχιλλέα, αλλά attended-preferred για οπτικό verify, όχι πλήρως unattended-safe] ή safe-area dep adoption
+   [P2/M, `react-native-safe-area-context`, μηχανικό].
+3. Αν και αυτό μπλοκάρει: περαιτέρω pure-lib test coverage σε αρχεία χωρίς tests (ίδιο πρότυπο με τα
+   τελευταία runs) — δεν είναι mobile-parity per se αλλά κρατά το repo υγιές μέχρι το επόμενο functional gap.
+
+**Git hygiene**: `git add` explicit (μόνο `MOBILE_PARITY.md` + `PROGRESS.md`, όχι `-A`/`.`/`-a`) → commit →
+push σε `main`.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα (βλ. προηγούμενες καταχωρήσεις για πλήρη λίστα):
+  `getTenantConnection` readyState guard decision (P3/S)· SaaS multi-tenancy/billing rollout env boundary·
+  mobile native-dep approvals (P17 camera, P23 share-sheet)· P36 Open Banking provider decision· P31 household
+  enforcement supervised session· P16 Firefly III/Grocy real sample-file need· Settings
+  theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power tool· P5
+  bookmarklet MV3-extension phase 2 (confirmed browser-only phase 1 σήμερα, extension = ξεχωριστή μελλοντική
+  απόφαση αν αξίζει καν).
