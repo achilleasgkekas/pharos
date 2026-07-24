@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import Barcode from 'react-native-barcode-svg';
 import { C } from '../theme';
 import { shortDate, money, Spinner, ErrorText, Empty, Check, Input, TextArea, Button, IconButton, Card, Badge, Chip, ModalSheet, contentWidth } from '../ui';
 import {
   getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, scanVoucherImage, type Voucher, type ParsedVoucherData,
   getGiftCards, addGiftCard, updateGiftCard, deleteGiftCard, addGiftCardUse, removeGiftCardUse, type GiftCard,
+  getLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, type LoyaltyCard, type BarcodeFormat,
 } from '../api';
 
 type Draft = { title: string; code: string; store: string; discount: string; expiresAt: string; url: string; used: boolean };
@@ -14,14 +16,15 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ymd = (iso: string | null) => (iso ? iso.slice(0, 10) : '');
 
 export function VouchersScreen() {
-  const [tab, setTab] = useState<'coupons' | 'giftcards'>('coupons');
+  const [tab, setTab] = useState<'coupons' | 'giftcards' | 'loyalty'>('coupons');
   return (
     <View style={s.wrap}>
       <View style={s.tabRow}>
         <Chip label="Coupons" on={tab === 'coupons'} onPress={() => setTab('coupons')} />
         <Chip label="Gift cards" on={tab === 'giftcards'} onPress={() => setTab('giftcards')} />
+        <Chip label="Loyalty" on={tab === 'loyalty'} onPress={() => setTab('loyalty')} />
       </View>
-      {tab === 'coupons' ? <CouponsTab /> : <GiftCardsTab />}
+      {tab === 'coupons' ? <CouponsTab /> : tab === 'giftcards' ? <GiftCardsTab /> : <LoyaltyCardsTab />}
     </View>
   );
 }
@@ -385,6 +388,156 @@ function GiftCardsTab() {
   );
 }
 
+// P20 mobile parity — loyalty/membership card wallet. Web renders the barcode via `jsbarcode`
+// (DOM/canvas-only, doesn't run in React Native); this uses `react-native-barcode-svg` (pure
+// SVG, zero native deps, already sits on top of the app's existing react-native-svg dep) as
+// the RN-native equivalent. `guessBarcodeFormat` duplicates the tiny pure heuristic from the
+// web's lib/loyaltyCard.ts (mobile has no shared package with the web app to import it from) —
+// keep the two in sync if the shape rules ever change. Barcode rendering, like the web
+// BarcodeDisplay, is ALWAYS dark-on-light regardless of app theme: a real checkout scanner
+// needs dark bars on a light background to read reliably.
+const BARCODE_FORMATS: BarcodeFormat[] = ['CODE128', 'EAN13', 'UPC', 'CODE39'];
+function guessBarcodeFormat(cardNumber: string): BarcodeFormat {
+  const v = cardNumber.trim();
+  if (/^\d{13}$/.test(v)) return 'EAN13';
+  if (/^\d{12}$/.test(v)) return 'UPC';
+  return 'CODE128';
+}
+
+type LcDraft = { title: string; store: string; cardNumber: string; barcodeFormat: BarcodeFormat; notes: string };
+const LC_EMPTY: LcDraft = { title: '', store: '', cardNumber: '', barcodeFormat: 'CODE128', notes: '' };
+
+function LoyaltyCardsTab() {
+  const [rows, setRows] = useState<LoyaltyCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const [editing, setEditing] = useState<LoyaltyCard | 'new' | null>(null);
+  const [viewing, setViewing] = useState<LoyaltyCard | null>(null);
+  const [form, setForm] = useState<LcDraft>(LC_EMPTY);
+  const setF = (k: keyof LcDraft, v: string) => setForm((p) => ({ ...p, [k]: v } as LcDraft));
+
+  const load = useCallback(async () => {
+    setErr(null);
+    try { setRows(await getLoyaltyCards()); } catch (e) { setErr((e as Error).message); }
+  }, []);
+  useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
+  const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
+
+  function openNew() { setForm(LC_EMPTY); setEditing('new'); }
+  function openEdit(it: LoyaltyCard) {
+    setForm({ title: it.title, store: it.store, cardNumber: it.cardNumber, barcodeFormat: it.barcodeFormat, notes: it.notes });
+    setEditing(it);
+  }
+
+  function remove(it: LoyaltyCard) {
+    Alert.alert('Delete', `Delete "${it.title}"? It moves to Trash.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { setRows((p) => p.filter((x) => x.id !== it.id)); try { await deleteLoyaltyCard(it.id); } catch { await load(); } } },
+    ]);
+  }
+
+  async function saveForm() {
+    if (!editing || !form.title.trim() || !form.cardNumber.trim()) return;
+    const payload = {
+      title: form.title.trim(), store: form.store.trim(), cardNumber: form.cardNumber.trim(),
+      barcodeFormat: form.barcodeFormat, notes: form.notes.trim(),
+    };
+    const target = editing;
+    setEditing(null);
+    try {
+      if (target === 'new') await addLoyaltyCard(payload);
+      else await updateLoyaltyCard(target.id, payload);
+      await load();
+    } catch (e) { setErr((e as Error).message); }
+  }
+
+  if (loading) return <Spinner />;
+  const isNew = editing === 'new';
+
+  return (
+    <View style={s.tabWrap}>
+      <View style={s.headRow}>
+        <Text style={s.headHint}>{rows.filter((c) => !c.archived).length} card{rows.filter((c) => !c.archived).length === 1 ? '' : 's'}</Text>
+        <IconButton glyph="＋" onPress={openNew} />
+      </View>
+      <ErrorText>{err}</ErrorText>
+      <FlatList
+        data={rows}
+        keyExtractor={(c) => c.id}
+        contentContainerStyle={[{ padding: 16, paddingTop: 8 }, contentWidth]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+        ListEmptyComponent={<Empty>No loyalty cards. Add a membership/loyalty card number to show its barcode at checkout.</Empty>}
+        renderItem={({ item }) => (
+          <Card onPress={() => setViewing(item)} onLongPress={() => remove(item)} style={item.archived && s.faded}>
+            <View style={s.top}>
+              <Text style={s.title} numberOfLines={2}>{item.title}</Text>
+              {item.archived && <Badge label="archived" color={C.faint} />}
+            </View>
+            <Text style={s.meta}>{item.store || 'loyalty card'}</Text>
+            <Text style={s.lcNumber} numberOfLines={1}>{item.cardNumber}</Text>
+            <View style={s.lcShowRow}>
+              <Text style={s.lcShow}>▦ Show barcode</Text>
+            </View>
+          </Card>
+        )}
+      />
+
+      <ModalSheet visible={!!viewing} onClose={() => setViewing(null)}>
+        {viewing && (
+          <View style={{ alignItems: 'center' }}>
+            <Text style={s.modalTitle}>{viewing.title}</Text>
+            {!!viewing.store && <Text style={[s.meta, { marginTop: 4 }]}>{viewing.store}</Text>}
+            <View style={s.barcodeBox}>
+              <Barcode value={viewing.cardNumber} format={viewing.barcodeFormat} height={100} maxWidth={280} />
+            </View>
+            <Button label="Edit" onPress={() => { const v = viewing; setViewing(null); openEdit(v); }} variant="ghost" style={{ marginTop: 16 }} />
+          </View>
+        )}
+      </ModalSheet>
+
+      <ModalSheet visible={!!editing} onClose={() => setEditing(null)}>
+        <Text style={s.modalTitle}>{isNew ? 'New loyalty card' : 'Edit loyalty card'}</Text>
+        <ScrollView style={{ maxHeight: 460 }} keyboardShouldPersistTaps="handled">
+          <Text style={s.mlabel}>TITLE</Text>
+          <Input variant="modal" value={form.title} onChangeText={(v) => setF('title', v)} placeholder="AB Card" />
+          <Text style={s.mlabel}>STORE</Text>
+          <Input variant="modal" value={form.store} onChangeText={(v) => setF('store', v)} placeholder="AB Vassilopoulos" />
+          <Text style={s.mlabel}>CARD NUMBER</Text>
+          <Input
+            variant="modal"
+            value={form.cardNumber}
+            onChangeText={(v) => { setF('cardNumber', v); setForm((p) => ({ ...p, barcodeFormat: v.trim() ? guessBarcodeFormat(v) : p.barcodeFormat })); }}
+            placeholder="the number printed under the barcode"
+            autoCapitalize="none"
+          />
+          <Text style={s.mlabel}>BARCODE FORMAT</Text>
+          <View style={s.formatRow}>
+            {BARCODE_FORMATS.map((f) => (
+              <Chip key={f} label={f} on={form.barcodeFormat === f} onPress={() => setF('barcodeFormat', f)} />
+            ))}
+          </View>
+          <Text style={s.mlabel}>NOTES</Text>
+          <Input variant="modal" value={form.notes} onChangeText={(v) => setF('notes', v)} placeholder="optional" />
+
+          {form.cardNumber.trim() && (
+            <View style={[s.barcodeBox, { marginTop: 16 }]}>
+              <Barcode value={form.cardNumber} format={form.barcodeFormat} height={80} maxWidth={260} />
+            </View>
+          )}
+        </ScrollView>
+        <View style={s.mbtns}>
+          <Button label={isNew ? 'Add' : 'Save'} onPress={saveForm} disabled={!form.title.trim() || !form.cardNumber.trim()} />
+          {!isNew && editing && (
+            <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e && typeof e !== 'string') remove(e); }} variant="danger" />
+          )}
+        </View>
+      </ModalSheet>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   tabWrap: { flex: 1 },
@@ -422,4 +575,9 @@ const s = StyleSheet.create({
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tlabel: { color: C.text, fontSize: 15 },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
+  lcNumber: { color: C.faint, fontSize: 12, fontFamily: 'monospace', marginTop: 6 },
+  lcShowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  lcShow: { color: C.purple, fontSize: 12, fontWeight: '700' },
+  barcodeBox: { backgroundColor: '#fff', borderRadius: 12, padding: 14, alignItems: 'center', alignSelf: 'stretch' },
+  formatRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
 });

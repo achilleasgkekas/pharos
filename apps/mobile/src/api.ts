@@ -338,6 +338,22 @@ export const addGoalContribution = (id: string, amount: number, note?: string) =
 export const removeGoalContribution = (id: string, contributionId: string) =>
   patch(`/api/v1/goals/${id}`, { removeContributionId: contributionId });
 
+// ---- Loyalty / membership cards (P20 mobile parity) ----
+export type BarcodeFormat = 'CODE128' | 'EAN13' | 'UPC' | 'CODE39';
+export type LoyaltyCard = {
+  id: string; title: string; store: string; cardNumber: string; barcodeFormat: BarcodeFormat;
+  notes: string; archived: boolean;
+};
+export async function getLoyaltyCards(): Promise<LoyaltyCard[]> {
+  return (await request<{ data: LoyaltyCard[] }>('/api/v1/loyaltycards?limit=200')).data ?? [];
+}
+export function addLoyaltyCard(data: { title: string; cardNumber: string; store?: string; barcodeFormat?: BarcodeFormat; notes?: string }) {
+  return request<{ loyaltyCard: LoyaltyCard }>('/api/v1/loyaltycards', { method: 'POST', body: JSON.stringify(data) });
+}
+export const updateLoyaltyCard = (id: string, data: { title?: string; store?: string; cardNumber?: string; barcodeFormat?: BarcodeFormat; notes?: string; archived?: boolean }) =>
+  patch(`/api/v1/loyaltycards/${id}`, data);
+export const deleteLoyaltyCard = (id: string) => del(`/api/v1/loyaltycards/${id}`);
+
 // ---- Bills (P28 mobile parity) ----
 export type BillStatus = 'paid' | 'overdue' | 'due-soon' | 'upcoming';
 export type Bill = {
@@ -527,7 +543,7 @@ export const deleteSubscription = (id: string) => del(`/api/v1/subscriptions/${i
 export const deleteVoucher = (id: string) => del(`/api/v1/vouchers/${id}`);
 
 // ---- Trash (soft-deleted records: restore / purge) ----
-export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'bill' | 'goal' | 'task';
+export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'loyaltycard' | 'bill' | 'goal' | 'task';
 export type TrashRow = { type: TrashType; id: string; title: string; subtitle: string; deletedAt: string };
 export async function getTrash(): Promise<TrashRow[]> {
   return (await request<{ rows: TrashRow[] }>('/api/v1/trash')).rows ?? [];

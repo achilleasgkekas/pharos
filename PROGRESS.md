@@ -7439,3 +7439,103 @@ cards + Goals shipped) είναι **Loyalty card wallet → mobile exposure** (P
   decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file need·
   Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power
   tool.
+
+## 2026-07-24 (pharos-daily-dev, cont.³)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε 2 OPEN items, και τα δύο από
+`bakecore-finance` (άσχετο project) → τίποτα να εφαρμόσω πρώτα. `mkdir /tmp/claude-docker.lock` (lock
+acquired καθαρά, released στο τέλος). Working tree καθαρό στην αρχή, `git log --oneline -15` επιβεβαίωσε τα
+δύο προηγούμενα runs σήμερα (gift cards + goals mobile parity) ήδη committed+pushed.
+
+**Approved queue check (βήμα a)**: το `OWNER_DECISIONS.md` #8 (P2/P4/P10) είναι ήδη πλήρως shipped
+(επιβεβαιώθηκε grep στο `PRODUCT_BACKLOG.md` → PA1/PA2/PA3 mappings, όλα `✅ SHIPPED 2026-07-09`). Το
+`PRODUCT_BACKLOG.md → ## Approved` section δεν έχει άλλα unshipped items εκτός από P36 (Open Banking,
+needs-Achilleas decision), P31 (household, deferred για supervised session), P16 (Firefly III/Grocy, needs
+real sample file), P17/P23 (mobile native-dep approvals, needs-Achilleas). Approved queue = άδεια για
+αυτόνομο build. Πέρασα στο βήμα (b): το suggested-next-task των δύο προηγούμενων runs σήμερα.
+
+**Loyalty card wallet → mobile parity (P20 gap) — ✅ SHIPPED**. Top item του MOBILE_PARITY Build Queue μετά
+τα Gift cards + Goals shipped νωρίτερα σήμερα. Το web feature (P20, `536a3d8`) ήταν πλήρες (`models/
+LoyaltyCard.ts` + `lib/loyaltyCard.ts` pure format-guess helpers + `components/BarcodeDisplay.tsx` [jsbarcode]
++ τρίτο tab στο web `/vouchers`), αλλά μηδέν v1 route ή mobile UI — το model είχε ήδη σχόλιο στον κώδικα «for
+a future GET /api/v1/loyaltycards», ίδιο idiom με το Bill/GiftCard/Goal precedent.
+
+**Web (v1 API)**: νέα **`apps/web/src/app/api/v1/loyaltycards/route.ts`** (GET list + POST create) +
+**`loyaltycards/[id]/route.ts`** (PATCH + DELETE) — mirror ακριβώς του ήδη-shipped GiftCard/Vouchers v1
+pattern, ίδια shared `withAuth`/`apiError`/`listParams`/`withSince`/`listEnvelope`/`readBody`/`strField`/
+`isObjectId` helpers. `trim()` είναι απλός field mirror (LoyaltyCard δεν έχει υπόλοιπο να παράγει, σε
+αντίθεση με GiftCard/Goal). GET default εξαιρεί archived, sort `{archived:1, title:1}`. POST απαιτεί title
+ΚΑΙ cardNumber, resolve-άρει `barcodeFormat` από το shape του cardNumber όταν λείπει (reuse `lib/
+loyaltyCard.ts resolveBarcodeFormat`). **PATCH σχεδιαστική απόφαση** (βλ. inline σχόλιο στον κώδικα):
+`barcodeFormat` αλλάζει ΜΟΝΟ όταν (α) δοθεί ρητό valid format — τίθεται verbatim ανεξαρτήτως cardNumber, ή
+(β) το `cardNumber` ΑΛΛΑΖΕΙ χωρίς ρητό valid format — τότε re-guess από το νέο shape. Ένα invalid/απόν format
+με αμετάβλητο cardNumber δεν αγγίζει καθόλου το πεδίο (απόκλιση από το web action's "πάντα resolve" — εδώ
+αποφεύγεται να χαλάσει ένα καλό αποθηκευμένο format βασισμένο σε guess χωρίς πλήρες cardNumber context στο
+request).
+
+**Trash fix (εν παρόδω, ίδιο pattern με το `goal` fix στο προηγούμενο run)**: το `'loyaltycard'` ήταν ήδη
+μέσα στο `TrashType` union + `TRASH_MODELS` (`app/settings/actions.ts`) αλλά **έλειπε** από το `api/v1/
+trash/[type]/[id]` route's local `TYPES` allow-list — το test file το είχε ρητά pinned ως known gap μαζί με
+το goal gap. Πρόσθεσα `'loyaltycard'` σε αυτό το array (1 γραμμή) ώστε mobile restore/purge να δουλεύει
+πραγματικά· το test file ενημερώθηκε (loyaltycard μετακινήθηκε από reject-list σε accept-list και στα δύο
+PATCH/DELETE type-guard describe blocks, +2 νέα positive tests).
+
+**Mobile — νέο RN dependency**: `react-native-barcode-svg@0.0.15` (`npm install`, builder decision όπως ήδη
+speced στο MOBILE_PARITY entry, όχι needs-Achilleas — καθαρά τεχνική επιλογή lib). `npm view` επιβεβαίωσε
+peer deps `react`/`react-native`/`react-native-svg>=11.0.1` όλα ήδη present στο `apps/mobile/package.json`
+(το `react-native-svg` ήταν ήδη dep) → **μηδέν native rebuild χρειάζεται**, pure SVG package.
+
+`apps/mobile/src/api.ts` += `BarcodeFormat`/`LoyaltyCard` types + `getLoyaltyCards`/`addLoyaltyCard`/
+`updateLoyaltyCard`/`deleteLoyaltyCard` (mirror του GiftCard client block) + **`TrashType` union +=
+`'loyaltycard'`**. **`VouchersScreen.tsx`**: τρίτο Chip tab «Loyalty» δίπλα σε Coupons/Gift cards → νέο
+**`LoyaltyCardsTab()`** (mirror του `GiftCardsTab()` σκελετού): FlatList κάρτες (τίτλος/store eyebrow +
+cardNumber mono truncated + «▦ Show barcode» affordance, tap→fullscreen barcode modal, long-press-to-delete
+Alert confirm → soft-delete Trash), fullscreen barcode `ModalSheet` (title/store + `<Barcode value cardNumber
+format height maxWidth>` σε λευκό card container, **πάντα dark-on-light ανεξαρτήτως app theme** ίδιο idiom
+με το web `BarcodeDisplay` — real scanner χρειάζεται σκούρες γραμμές σε ανοιχτό φόντο — + «Edit» κουμπί),
+edit/create modal (title/store/cardNumber/notes πεδία + 4-Chip barcode-format picker + live preview barcode
+κάτω από τη φόρμα όταν υπάρχει cardNumber). **`guessBarcodeFormat` duplicated τοπικά** στο screen (mobile
+δεν έχει shared package με το web ώστε να import-άρει το `lib/loyaltyCard.ts` pure helper — ίδια ~10-γραμμών
+heuristic, σχολιασμένο inline «keep in sync αν αλλάξουν οι κανόνες»· server-side POST/PATCH παραμένουν η
+authoritative πηγή, το client guess είναι μόνο για live-preview UX κατά την πληκτρολόγηση). `ActivityScreen.
+tsx` `TRASH_ICON` += `loyaltycard: '🪪'` (ίδιο emoji με το web empty-state, χρειάστηκε γιατί το `Record
+<TrashType,string>` type θα έσπαγε χωρίς το νέο key).
+
+**Verify**: `npm run type-check` (web) EXIT 0. Full `npx vitest run` **3009 passed / 231 files** (+51 νέα:
+route tests στα δύο νέα loyaltycards route files + edits στο trash `[type]/[id]/route.test.ts`, μηδέν
+regression αλλού). `apps/mobile npx tsc --noEmit` EXIT 0. **Docker safe rebuild**: mongo ήδη healthy →
+`docker compose build web` OK (επιβεβαιώθηκε μέσω `docker run --entrypoint find ... -path "*loyaltycards*"`
+μέσα στο image ότι οι routes compiled: `route.js` + `[id]/route.js` present) → `up -d web` → clean start
+(`RestartCount=0`, State=running, ExitCode=0), `/login` 200 στην 1η προσπάθεια, `docker logs` καθαρό (μόνο το
+προϋπάρχον άσχετο `@napi-rs/canvas` warning). `curl GET /api/v1/loyaltycards` + `PATCH /api/v1/trash/
+loyaltycard/:id` χωρίς token → **401** και στα δύο (auth gate intact). Browser-checked (Claude Browser pane):
+`/login` → «Sign in · Pharos», μηδέν console errors. `docker builder prune -f` (196.4MB freed), lock
+acquired+released καθαρά. **Το πραγματικό mobile UI (LoyaltyCardsTab κάρτες/fullscreen barcode/edit-form σε
+πραγματική RN συσκευή) ΔΕΝ testable end-to-end unattended** (χρειάζεται login + Expo simulator boot, εκτός
+scope του routine) — verified πλήρως μέσω των νέων route tests + tsc και στα δύο apps, ίδιος περιορισμός με
+κάθε προηγούμενο mobile-parity shipment.
+
+**`MOBILE_PARITY.md`** ενημερώθηκε: το Loyalty cards entry marked `✅ DONE 2026-07-24 (pharos-daily-dev,
+cont.³)` με πλήρη υλοποίηση + verify λεπτομέρειες (η επόμενη mobile-parity-auditor σάρωση θα το επιβεβαιώσει
++ θα ξαναϋπολογίσει το ranked top-N — δεν άγγιξα εγώ το ranking, αφήνεται στον auditor ίδια σύμβαση με τα
+προηγούμενα runs).
+
+**Suggested next task**: το Build Queue functional-gaps tier αδειάζει — τα τρία top-tier L-size items
+(Gift cards, Goals, Loyalty cards) έχουν πλέον ΟΛΑ shipped σήμερα. Το επόμενο ανοιχτό item στο ίδιο doc είναι
+**Search matched-line-item snippet** (P22, P3/S — χαμηλότερης προτεραιότητας tier παρά το μικρό μέγεθος, ίδια
+κρίση με προηγούμενες σαρώσεις) ή περιμένει την επόμενη mobile-parity-auditor σάρωση για νέο ranking. Αν δεν
+υπάρχει άλλο auto-buildable gap, το επόμενο run θα πρέπει να ελέγξει ξανά το Approved queue (PRODUCT_BACKLOG.
+md) πρώτα (κανόνας βήμα a) πριν καταφύγει σε MOBILE_PARITY.md fallback — τα P36/P31/P16/P9/P17/P23 παραμένουν
+blocked/deferred όπως πάντα σήμερα.
+
+**Git hygiene**: `git add` explicit (MOBILE_PARITY.md + PROGRESS.md + 6 νέα/τροποποιημένα web route/test
+αρχεία + 3 mobile source αρχεία + package.json/package-lock.json, όχι `-A`) → commit → push.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: `getTenantConnection` readyState guard decision
+  (P3/S)· SaaS multi-tenancy/billing rollout env boundary· mobile native-dep approvals (P17 camera, P23
+  share-sheet — P20 barcode lib ΠΛΕΟΝ ΛΥΜΕΝΟ, `react-native-barcode-svg` installed+shipped αυτό το run)· P36
+  Open Banking provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real
+  sample-file need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export
+  ZIP desktop power tool.
