@@ -2171,3 +2171,30 @@ Validation (markdown only, κανενα build/Docker/AI call):
 Collision guard: git status --short = ΜΟΝΟ docs/api.md + docs/mobile.md modified (δικά μου). Δεν υπάρχουν foreign staged files. Commit 334fa00 pushed origin/main ✓.
 
 Επόμενο run: (α) continue scanning για άλλα νέα features που ίσως shipαρίστηκαν (grep commits από 2 ώρες πίσω) · (β) api.md/openapi.yaml sync αν άλλα v1 routes landed · (γ) features.md stale-forward αν νέα SaaS features προστεθούν (π.χ. MFA enforcement στο workspace settings).
+
+## 2026-07-24 (twelfth run — P12 goals mobile parity documentation)
+
+Σάρωση git log για undocumented features από τα τελευταία commits. Ανακάλυψα ότι το **P12 (Goals/Savings tracker mobile parity, commit a900670, 2026-07-24 04:16)** ήταν shipped αλλά δεν ήταν documented σε api.md ή mobile.md.
+
+Τι έγραψα:
+- **api.md**: Προσθεση νέας "### Goals" section μετά το Gift cards section με πίνακα endpoints:
+  - GET /goals?archived=0&limit&offset&updatedSince — λίστα με computed fields (current/remaining/pct/done/monthsLeft/perMonth)
+  - POST /goals — create με title/targetAmount/targetDate/category/notes
+  - PATCH /goals/:id — update fields + addContribution (positive contribution) / removeContributionId (undo) management, mutually exclusive
+  - DELETE /goals/:id — soft-delete
+- **mobile.md**: Προσθεση νέας Goals/Savings row στο "What it does" table μετά το Bills, με περιγραφη: "list, add, edit, log contribution, progress tracking"
+
+Accuracy verified εναντι κώδικα:
+- apps/web/src/app/api/v1/goals/route.ts (GET/POST endpoints, trim() function computes derived fields)
+- apps/web/src/app/api/v1/goals/[id]/route.ts (PATCH/DELETE endpoints, contribution management)
+- apps/mobile/src/screens/GoalsScreen.tsx (new mobile component with full CRUD)
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: api.md=22 (11 balanced pairs), mobile.md=8 (4 balanced pairs) ✓.
+- Internal links: καμια αναφορα αλλα τα referenced docs υπάρχουν ✓.
+- Secret scan: κανένα literal credential ✓.
+- Markdown table structure: 2 νέες σειρές (api.md 4-row Goals table, mobile.md 1 row), alignment maintained ✓.
+
+Collision guard: git status --short = ΜΟΝΟ docs/api.md + docs/mobile.md modified (δικά μου). Δεν υπάρχουν foreign staged files. Commit f4933e0 pushed origin/main ✓.
+
+Επόμενο run: (α) continue scanning για άλλα νέα features (π.χ. αν άλλα v1 routes landed) · (β) features.md stale-forward αν νέα SaaS features προστεθούν · (γ) openapi.yaml sync αν νέα endpoints προστεθούν.
