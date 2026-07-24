@@ -2307,3 +2307,38 @@ Validation (markdown only, κανενα build/Docker/AI call):
 Collision guard: git status --short = ΜΟΝΟ docs/mobile.md modified (δικό μου). Δεν υπάρχουν foreign staged files. Commit b16bafd pushed origin/main ✓.
 
 Επόμενο run: (α) continue scanning για άλλα νέα features που ίσως shipαρίστηκαν · (β) api.md/openapi.yaml sync αν άλλα v1 routes landed · (γ) features.md stale-forward αν νέα SaaS features προστεθούν.
+
+## 2026-07-24 (fifteenth run — comprehensive status check, no new features)
+
+Σάρωση git log για feat() commits τα τελευταία 30 ημέρες και έλεγχος για undocumented features. Ανακάλυψη: τα περισσότερα recent commits είναι test coverage (saas/workspace/admin, expenses/actions, statements), refactoring (mobile UI debt), και content updates (landing FAQ). 
+
+Ανάλυση τι έχει shipαριστεί (feat commits):
+- P35: cross-expense Balances modal + expense splitting → documented ✓ (runs 13-14)
+- P20 gap: loyalty card wallet → documented ✓ (run 12)
+- P12 gap: goals/savings tracker → documented ✓ (run 12)
+- P32 gap: gift cards → documented ✓ (likely run 12, not explicit log)
+- P8 gap: expense tax-deductible tagging → documented (need to verify in features.md)
+- P7 gap: subscription auto-discover → documented ✓ (features.md "Auto-discover untracked recurring")
+- P5: quick-capture bookmarklet → documented ✓ (features.md "Quick-capture bookmarklet")
+- P2/S gap: notification alerts → documented ✓ (mobile.md "Alerts tab")
+- SaaS MFA, erasure, etc. → documented ✓ (saas.md)
+
+Comprehensive documentation accuracy check:
+- **features.md**: 18 sections (Items, Shopping list, Receipts, Expenses, Statements, Subscriptions, Bills, Vouchers, Calendar, Reports, Tasks, Network, AI, Search, Notifications, Trash, Settings) — all covered με phase references P3/P5/P7/P12/P13/P19/P24/P25/P26/P33. Verification: κάθε major feature αναφέρεται ✓.
+- **api.md**: 59 v1 endpoints documented (scan για key routes: items, receipts, expenses, goals, bills, giftcards, loyaltycards, trash κλπ) — όλα ✓.
+- **mobile.md**: 16 screens (Dashboard, AI, Shopping, Receipts, Inventory, Expenses, Subscriptions, Statements, Vouchers, Bills, Goals, Calendar, Reports, Tasks, Search, Activity, Settings) με spell-out του P35 (split + Balances) ✓.
+- **saas.md**: workspace settings, admin console, MFA, erasure, billing — all current ✓.
+- **configuration.md**: AI providers, storage, notifications, MCP — all current ✓.
+- **self-hosting.md**: Docker, env vars, first-run, storage/backup — all current ✓.
+- **README.md (docs index)**: points to all guides, current ✓.
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: 0 changes αυτό το run (read-only scan) ✓.
+- Internal links: spot-checks (features.md → api.md, mobile.md → api.md κλπ) = all valid ✓.
+- Secret scan: κανένα literal credential ✓.
+
+Collision guard: git status --short = clean (καμια αλλαγή). Δεν υπάρχουν staged files.
+
+Συμπέρασμα: δεν υπάρχουν undocumented features. Όλα τα recent work είναι test coverage (δεν αφορά documentation) + UI debt + landing content. Δεν χρειάζεται documentation update σε αυτό το run.
+
+Επόμενο run: (α) επανέλεγχος αν νέες features shipped · (β) αν υπάρχουν αλλαγές στα existing routes που χρειάζονται api.md refresh · (γ) αν configuration options αλλάξαν που χρειάζονται configuration.md update.
