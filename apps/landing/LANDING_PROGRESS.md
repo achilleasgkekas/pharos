@@ -2996,3 +2996,81 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-24 (8) — ROADMAP section hygiene: 3 items ξεπερασμενα, βρεθηκαν νεα unshipped candidates
+
+Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος `~/.claude/
+ASK_ACHILLEAS.md` (3 OPEN entries, ολα bakecore, τιποτα για landing/pharos). `git log --oneline
+e3f5919..HEAD` (e3f5919 = τελευταιο commit που αγγιξε το page.tsx) εδειξε 7 commits, μηδεν νεο `feat(`
+απο το κυριο repo (μονο tests/docs/refactor) — αρα το FAQ sweep του προηγουμενου entry (docs/saas.md,
+ολοκληρωμενο) δεν ειχε νεο υλικο να προσθεσει.
+
+Αντ' αυτου εκανα κατι διαφορετικο: **audit του `ROADMAP` array** (Shipped/Building/Exploring columns,
+γραμμη 397+) εναντια στον πραγματικο κωδικα, γιατι αυτο το section δεν ειχε ξανα-ελεγχθει απο οταν
+γραφτηκε και το site εχει προχωρησει πολυ απο τοτε. Βρηκα **3 σαφως ξεπερασμενα items**:
+
+1. **«Bring-your-own-key AI billing policy»** (Building) — ηδη SHIPPED: `apps/web/src/app/api/saas/
+   workspace/ai-key/route.ts` υπαρχει και λειτουργει, και το ιδιο το FAQ array (γραμμη 450, commit
+   `714ea71`, ΙΔΙΑ ημερα 2026-07-24) το περιγραφει ηδη σαν ζωντανο feature (AES-256-GCM encrypted key,
+   masked display, fallback σε shared quota).
+2. **«Eight-language interface localisation»** (Building) — ηδη SHIPPED: `apps/web/src/lib/i18n/locales/`
+   εχει ακριβως 8 αρχεια (de/el/en/es/fr/it/nl/pt), `LocaleProvider.tsx` + `i18nActions.ts` wired στο
+   layout/navbar. (Υπαρχει γνωστο partial-translation debt στο el.ts, καταγεγραμμενο στο `WEB_DEBT.md`,
+   αλλα το ιδιο το feature, 8 επιλεξιμες γλωσσες με graceful English fallback, ειναι λειτουργικο· δεν
+   ειναι «still building».)
+3. **«Return-window reminders for recent buys»** (Exploring, «not yet scheduled») — ηδη SHIPPED (PA3):
+   `apps/web/src/lib/returnWindow.ts` (+ `returnWindow.test.ts`) υπαρχει, wired σε
+   `ReceiptsClient.tsx`/`receipts/page.tsx` (badge + closing alert) ΚΑΙ configurable global/per-store στο
+   Settings.
+
+**Fix**: και τα 3 μετακινηθηκαν στο **Shipped** column (μαζι με τα υπαρχοντα 6, τωρα 9 items). Αυτο
+αδειασε το Building σε 1 μονο item («Managed multi-tenant hosted edition», που παραμενει σωστα «σε
+εξελιξη», η SaaS engineering δουλεια ειναι εκτενης [βλ. `SAAS_PROGRESS.md`, route-test hardening] αλλα
+το hosted προιον δεν εχει ακομα launch-αρει σε πραγματικους πελατες, `REPO_PUBLIC=false`) και το
+Exploring σε 0.
+
+Για να μην μεινει το Exploring column αδειο (θα εδειχνε σπασμενο σε ενα 3-column roadmap grid), εψαξα
+το **`PRODUCT_BACKLOG.md` → `## Approved`** section (η αυθεντικη πηγη για εγκεκριμενα-αλλα-ανεπτυκτα
+items, πιο αξιοπιστη απο manual grepping) για γνησια unshipped candidates αντι να μαντεψω:
+- **P36** Open Banking auto-sync (GoCardless/Nordigen EU free tier), L, μεγαλος SaaS lever, ρητα
+  unshipped («τελευταιο σε σειρα»).
+- **P23**/**P17** Mobile share-sheet quick capture + barcode/QR scan, και τα δυο M, mobile-native,
+  unshipped, ενωθηκαν σε μια γραμμη («Mobile share-sheet & barcode quick capture») γιατι ειναι
+  θεματικα γειτονικα (mobile quick-capture).
+- **P9** Multi-currency (per-transaction + FX), L, ρητα unshipped, τελευταιο σε προτεραιοτητα.
+(Το **P31** household-multi-user deferred item ΔΕΝ το εβαλα, ειναι scoping-level nuance για ενα ηδη-
+υπαρχον feature [self-host ηδη εχει admin/member roles], οχι ξεχωριστο νεο roadmap-worthy item για
+marketing σελιδα.)
+
+Αλλαγη (`apps/landing/app/page.tsx`, `ROADMAP` const μονο, γραμμες 397-434, μηδεν αλλο UI/CSS/dependency
+change): 3 items μετακινηθηκαν Building/Exploring -> Shipped, Building εμεινε με 1 item, Exploring
+αντικατασταθηκε με τα 3 νεα γνησια unshipped items.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (ιδιο μεγεθος, το ROADMAP
+  const ειναι build-time data μονο, μηδεν αλλαγη σε rendered bundle size).
+- Browser preview: `next start -p 3150` πανω στο production build (κανενα port 3100-3190 κατειλημμενο
+  αυτη τη φορα). `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` -> "No console logs."· hero
+  screenshot καθαρο (lighthouse mark, gradient τιτλος, CTAs, τριπλο badge row). `javascript_tool`
+  επιβεβαιωσε το πραγματικο DOM state του roadmap grid (`.roadmap-col` query): Shipped=9 items (τα 6
+  παλια + τα 3 νεα, σωστη σειρα)· Building=1 item («Managed multi-tenant hosted edition»)· Exploring=3
+  items (Open Banking / mobile share-sheet+barcode / multi-currency), ολα σωστα. Ενα scroll-attempt μετα
+  εδειξε στιγμιαιο μαυρο screenshot (renderer glitch, οχι regression, `get_page_text` αμεσως μετα εδειξε
+  το πληρες σωστο περιεχομενο ακομα φορτωμενο, μηδεν console error). Server σταματησε μετα (`pkill -f
+  "next start -p 3150"`), `lsof -i :3150` καθαρο εκτος απο το γνωστο false-positive Claude-app TCP
+  CLOSE_WAIT match (σημειωμενο ηδη σε προηγουμενα entries).
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: το ROADMAP audit αυτο αξιζει επαναληψη περιοδικα (καθε φορα που shipped features
+συσσωρευονται χωρις να ξανα-ελεγχθει το section, οπως συνεβη εδω). Αλλιως: νεα modules/commits απο το
+κυριο repo, ή (e) polish συνεχεια, real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

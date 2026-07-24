@@ -411,6 +411,9 @@ const ROADMAP: {
       'Subscriptions, reports & UniFi network dashboard',
       'Mobile app plus SMB, FTP & OneDrive backups',
       'IMAP email-in, savings goals & insurance export bundle',
+      'Eight-language interface localisation',
+      'Return-window reminders for recent purchases',
+      'Bring-your-own-key AI billing for hosted workspaces',
     ],
   },
   {
@@ -419,8 +422,6 @@ const ROADMAP: {
     note: 'In active development now',
     items: [
       'Managed multi-tenant hosted edition',
-      'Eight-language interface localisation',
-      'Bring-your-own-key AI billing policy',
     ],
   },
   {
@@ -428,7 +429,9 @@ const ROADMAP: {
     color: 'var(--purple)',
     note: 'On the backlog, not yet scheduled',
     items: [
-      'Return-window reminders for recent buys',
+      'Open Banking bank-transaction sync (EU)',
+      'Mobile share-sheet & barcode quick capture',
+      'Multi-currency support',
     ],
   },
 ];
