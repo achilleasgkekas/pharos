@@ -4121,3 +4121,54 @@ diff --cached --name-only` επιβεβαίωσε exact match. Pushed `cadb513`.
 `api/saas/workspace/erasure`/`erasure/purge` (ήδη guarded από increment 85, GDPR-critical
 data-deletion path, ανεξέταστο). Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση
 `WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-24 (cont. — increment 89, route-level test coverage για τα billing checkout + portal endpoints)
+
+Πριν από νέο increment: ask-inbox (τα 2 OPEN entries είναι bakecore-finance, τίποτα για
+saas-core), `WEB_DEBT.md` (ακόμα η 57η σάρωση 2026-07-22, όλα τα items στο δικό μου territory
+ήδη DONE), UI-first backlog (ακόμα εξαντλημένο, confirmed στο increment 86). Ακολούθησα το
+leftover next-task από το increment 88: πρώτος υποψήφιος στη λίστα ήταν
+`api/saas/billing/checkout`/`portal` — session-gated (owner/admin μόνο), mint πραγματικό
+Stripe session, μηδέν route-level test μέχρι τώρα (grep `api/saas/**/*.test.ts` έδειχνε μόνο
+billing/webhook + invites/accept).
+
+**Νέα `checkout/route.test.ts`** (11 tests) **+ `portal/route.test.ts`** (8 tests), μηδέν
+production code αλλαγή, ίδιο module-boundary precedent με τα δύο προηγούμενα route tests: σε
+κάθε ένα mocked μόνο `@/lib/billing/billingSession` (`resolveBillingSession`), `@/lib/billing/
+stripe` (`createCheckoutSession`/`createPortalSession`), και `@/lib/tenancy/audit` (μόνο
+`recordAudit` mocked, `auditCtx` πραγματικό μέσω `vi.importActual`). Οι ήδη-unit-tested pure
+helpers (`checkoutablePlan`/`pickBaseUrl`/`checkoutUrls`/`portalReturnUrl` στο
+`billingRoutes.test.ts`, `checkoutAuditMeta`/`portalAuditMeta` στα δικά τους test αρχεία)
+τρέχουν πραγματικά, όχι mocked — το route test εξετάζει τι κάνει το ΙΔΙΟ το route (session
+resolution ordering, plan validation πριν το Stripe call, status-code mapping από
+`result.reason`, ότι το audit ΔΕΝ καλείται σε κανένα failure path, env-priority
+`SAAS_PUBLIC_URL` > request origin).
+
+Καλύπτει checkout: (1) resolveBillingSession's short-circuit response περνάει αναλλοίωτο
+(gate/401/403/404), μηδέν Stripe call· (2) tenant slug από το body προωθείται σωστά (ή null
+όταν λείπει)· (3) missing/free/unknown plan → 400, μηδέν Stripe call· (4) Stripe
+not-configured→503, οποιοδήποτε άλλο Stripe failure→502, ΚΑΝΕΝΑ από τα δύο δεν audits· (5)
+success→200 `{url,id}`, σωστά πεδία στο Stripe call (plan/tenantId/customerId/customerEmail/
+successUrl/cancelUrl), `SAAS_PUBLIC_URL` override· (6) audit `billing.checkout_started` με
+ΜΟΝΟ το whitelisted `{plan, checkoutId}` meta, μετά το success. Portal ίδιο σχήμα plus (7) no
+billing customer→409, μηδέν Stripe call/audit.
+
+**Verified**: και τα δύο νέα test files **19/19 green** μαζί· πλήρες `npx vitest run` →
+**239 files / 3115 tests green** (ήταν 236/3084 στο increment 88 — η διαφορά +3 files/+31
+tests περιλαμβάνει τα δικά μου +2 files/+19 tests + tests από concurrent routines). `npm run
+type-check` → **EXIT 0** καθαρά, χωρίς κανένα intermediate error αυτή τη φορά. **Docker: ΔΕΝ
+έγινε rebuild** (test-only αρχεία, μηδέν production code/runtime wiring αλλαγή). **Browser-
+verify: skipped** (test files, μηδέν UI/observable behavior αλλαγή). Collision guard: `git
+status --short` πριν το staging έδειξε ΜΟΝΟ τα 2 δικά μου νέα αρχεία (+ `apps/landing/app/
+page.tsx` modified από άλλη concurrent routine, ΔΕΝ το άγγιξα — stage-άρησα ρητά μόνο τα 2
+δικά μου), `git diff --cached --name-only` επιβεβαίωσε exact match. Pushed `55c2c8b`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο σε επόμενο ανεξέταστο route — καλός υποψήφιος τώρα:
+`api/saas/workspace/erasure`/`erasure/purge` (ήδη guarded από increment 85, GDPR-critical
+data-deletion path, ανεξέταστο ακόμα). Λοιπά ανεξέταστα surfaces (χαμηλότερης
+προτεραιότητας, session-only reads χωρίς destructive side-effect): `account/*` routes
+(password/mfa/reset/verify), `admin/*`, `members`, `workspace/route.ts`, `usage`. Πριν
+ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν
+βρεθεί, πάει πρώτο).
