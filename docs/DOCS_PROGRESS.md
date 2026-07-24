@@ -1,5 +1,20 @@
 # DOCS_PROGRESS
 
+## 2026-07-24 (seventeenth run — status check: all documented)
+
+Σάρωση git log για νέα feat() commits μετά το τελευταίο run (dfac7c6, 2026-07-24 16:47:03). Ανακάλυψη: ΔΕΝ υπάρχουν νέα feat() commits — όλα τα recent work είναι test coverage, refactor (UI debt), landing content maintenance.
+
+Ανακεφαλαίωση status:
+- **P2/S gap** (commit ee894a3, 2026-07-24 10:10): notification humanization → documented ✓ (run 16)
+- **P35 gap #1** (commit 904795d, 2026-07-24 12:15): expense splitting UI mobile parity → documented ✓ (dedicated run d9d21dc)
+- **P35 gap #2** (commit 823b05e, 2026-07-24 14:08): cross-expense Balances modal → documented ✓ (dedicated run b16bafd)
+
+Collision guard: git status --short = κανένα modified file, κανένα staged foreign, κανένα concurrent routine mid-commit.
+
+Ενέργεια: Καμία. Όλα τα shipped features είναι documented. Κανένα work χρειάζεται αυτό το run.
+
+Επόμενο run: (α) αν νέα features shipped μετά τις 16:47 (όπως P51-P55 candidates ή άλλα undocumented), update docs · (β) αν χρειάζεται OpenAPI schema refresh για νέα endpoints.
+
 ## 2026-07-24 (sixteenth run — P2/S gap: mobile notifications humanization)
 
 Ελεγχος git log για νέα features — ανακάλυψα ότι το **P2/S gap (commit ee894a3, 2026-07-24 10:10)** shipped αλλά ΔΕΝ ήταν documented: mobile Alerts tab τώρα δείχνει humanized formatted notifications αντί raw pipe-delimited payload ("13|15|15" → "€13.00 / €15.00 / €15.00"). Το API προσθέτει `currency` field στο GET /api/v1/notifications.
