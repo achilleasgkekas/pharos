@@ -4290,3 +4290,66 @@ self-service, 8 files), `admin/overview` + `admin/tenants` list (read-only conso
 `auth/{login,logout,mfa,session,signup}`, `audit`, `trials/sweep`, `billing/route.ts`. Πριν
 ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί,
 πάει πρώτο).
+
+## 2026-07-24 (cont. — increment 92, route-level test coverage για το workspace general-settings endpoint)
+
+Πριν από νέο increment: ask-inbox (τα 2 OPEN entries είναι ακόμα bakecore-finance/
+bakecore-redesigner, τίποτα addressed σε saas-core), `WEB_DEBT.md` (ίδια 58η σάρωση
+2026-07-24 — confirmed CONFIRMATION run, τα 3 ανοιχτά auto-buildable items αφορούν
+`app/settings/actions.ts`/`app/vouchers/*.ts`, ρητά ΕΚΤΟΣ territory, δεν τα ανέλαβα).
+**UI-first backlog re-verified εξαντλημένο σε αυτό το run** (όχι απλά confirmed από
+προηγούμενο log): `grep`-άρισα όλα τα `api/saas/**/route.ts` (38 endpoints) έναντι όλων
+των `app/admin/**` + `app/(saas)/**` + `components/saas/**` — κάθε read/write surface
+έχει ήδη ένα consuming UI panel (π.χ. `account/workspaces`→`CreateWorkspaceForm`/
+`LeaveWorkspaceButton`, `workspace/{ai-key,erasure,export,reactivate}`→
+`AiKeyPanel`/`ErasurePanel`/`WorkspaceSettingsPanel`, `admin/tenants/[slug]/dbstats`→
+`LiveDbStatsPanel`). Μηδέν ασυνόδευτο API surface βρέθηκε, άρα ακολούθησα το leftover
+next-task από το increment 91: route-level test gap.
+
+Sweep όλων των `api/saas/**/route.ts` έναντι `route.test.ts` δίπλα τους: **31 από τα 38
+routes ήταν ακόμα ανεξέταστα** σε route-level (μόνο billing/{webhook,portal,checkout},
+invites/accept, workspace/erasure{,/purge}, admin/tenants/[slug] είχαν κάλυψη). Διάλεξα
+**`workspace/route.ts`** (GET/PATCH/DELETE, «General» tab του workspace self-service) —
+υψηλότερου ρίσκου από τα καθαρά read-only clusters (`usage`, `admin/overview`, `account/
+route.ts`) γιατί το DELETE είναι ο owner-only soft-cancel του ΟΛΟΚΛΗΡΟΥ workspace (`status:
+'canceled'`, blocks access για όλους).
+
+**Νέο `workspace/route.test.ts`** (17 tests, GET+PATCH+DELETE), μηδέν production code
+αλλαγή, ίδιο module-boundary precedent με τα προηγούμενα route tests: mocks `@/lib/tenancy/
+workspaceSession` (`resolveWorkspaceSession`), `@/models/Tenant` (`updateOne`), `@/models/
+Membership` (`countDocuments`), `@/lib/tenancy/audit` (μόνο `recordAudit` mocked, το
+υπόλοιπο πραγματικό μέσω `vi.importActual`). Οι ήδη-unit-tested pure helpers
+(`sanitizeWorkspaceName`/`workspaceNameError`/`canCancelWorkspace`/`workspaceView` στο
+`workspace.test.ts`) τρέχουν πραγματικά εδώ, όχι mocked.
+
+Καλύπτει GET: (1) short-circuit περνάει αναλλοίωτο· (2) `?tenant=` slug forwarding με
+`(slug, false, true)`· (3) `workspaceView` με το live `Membership.countDocuments({tenant,
+status:'active'})`. Καλύπτει PATCH: (4) short-circuit πριν το write· (5) resolve με
+`requireManage=true` (owner/admin only) + trimmed tenant field (κενό→null)· (6) blank name
+(μετά sanitize)→400, μηδέν write/audit· (7) name αμετάβλητο (ίδιο με το τρέχον)→200, μηδέν
+write/audit· (8) πραγματικό rename→`$set{name}` + audit `workspace.updated`
+{field,from,to}· (9) mid-handler throw→καθαρό 500. Καλύπτει DELETE: (10) short-circuit
+πριν το role-check· (11) resolve με `(slug, false, true)`· (12) admin→403, (13) member→403
+(και τα δύο μηδέν write/audit)· (14) ήδη-canceled→idempotent 200 no-op· (15) owner σε
+active workspace→`$set{status:'canceled'}` + audit `workspace.canceled`
+{field:'status',from:'active',to:'canceled'}· (16) mid-handler throw→καθαρό 500.
+
+**Verified**: νέο test file **17/17 green** μόνο του· πλήρες `npx vitest run` → **246
+files / 3230 tests green** (ήταν 244/3199 στο increment 91 — η διαφορά +2 files/+31 tests
+περιλαμβάνει το δικό μου +1 file/+17 tests + tests από concurrent routine). `npm run
+type-check` → **EXIT 0** καθαρά. **Docker: ΔΕΝ έγινε rebuild** (test-only αρχείο, μηδέν
+production code/runtime wiring αλλαγή). **Browser-verify: skipped** (test file, μηδέν UI/
+observable behavior αλλαγή). Collision guard: `git status --short` πριν το staging έδειξε
+ΜΟΝΟ το 1 δικό μου νέο αρχείο (καθαρό working tree), `git diff --cached --name-only`
+επιβεβαίωσε exact match. Pushed `66e3372`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο σε επόμενο ανεξέταστο route-cluster (30 routes ακόμα χωρίς
+route-level test) — καλοί υποψήφιοι τώρα: `account/*` self-service routes (password/mfa/
+mfa/confirm/reset/request/reset/confirm/verify/request/verify/confirm/workspaces/export, 9
+files, session-gated), `admin/overview` + `admin/tenants` list (read-only console
+surfaces), `members`, `usage` + `usage/sample`, `workspace/{ai-key,export,export/files,
+reactivate}`, `invites/{resend,route}`, `auth/{login,logout,mfa,session,signup}`, `audit`,
+`trials/sweep`, `billing/route.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση
+`WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
