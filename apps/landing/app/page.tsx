@@ -510,6 +510,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. Bills you pay manually (power, phone, shared building costs) get their own tracker, separate from subscriptions that charge a card automatically. Each bill moves through due-soon, overdue, and paid on its own, worked out from the due date, so a triage list always shows what needs paying first. Mark one paid in a click, optionally log the matching expense, and a recurring bill queues up the next one. Reminders ping you a few days before anything falls due.',
   },
   {
+    q: 'Can it learn to auto-categorize my expenses?',
+    a: 'Yes. Settings → Money lets you define rules that map a vendor name, or any bit of text, to a category, and optionally mark it recurring with a cycle. New expenses run through your rules automatically whether they arrived from a scanned bill, a manual entry, or a CSV import, so a recognised vendor is already categorized when it lands. A one-click "Apply to existing" backfills every already-uncategorized expense retroactively, so turning this on later still cleans up your history.',
+  },
+  {
     q: 'Can I see all my renewals, installments, and bills in one calendar?',
     a: 'Yes. A three-month agenda unifies subscription renewals, credit-card installments aggregated per month, projected recurring bills and income, and warranty or voucher expiries, with a money-in / money-out total for each month, so "what is due this month" is a glance. The same agenda also publishes as a read-only iCal feed you can subscribe to from Google, Apple, or Outlook Calendar, authed by its own low-scope token so a leaked subscribe link never grants API access; generate, copy, or rotate it in Settings → AI.',
   },

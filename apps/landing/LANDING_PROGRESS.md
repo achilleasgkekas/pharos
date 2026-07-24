@@ -3198,3 +3198,65 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+
+## 2026-07-24 (11) — FAQ += vendor→category auto-rules (P15 Expenses feature)
+
+Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος
+`~/.claude/ASK_ACHILLEAS.md` (3 OPEN entries, ολα bakecore finance/redesigner, τιποτα για landing/pharos).
+
+Συνεχεια απο το προηγουμενο entry (10): απο τα 2 υπολοιπα candidates του `feat(` sweep, vendor->category
+auto-rules (P15) και bank/generic CSV import (PA1), διαλεξα το πρωτο για αυτο το run (μια αλλαγη τη φορα,
+το CSV import μενει για το επομενο). Εστειλα background agent (sonnet, read-only, χωρις guessing) να
+διαβασει τον πραγματικο κωδικα πριν γραψω οποιαδηποτε copy. Ευρηματα: η συναρτηση
+`applyCategoryRulesToExisting()` (`apps/web/src/app/expenses/actions.ts:591-621`) ειναι ενα manual
+"backfill" action (βρισκει Expense/Income με category='other'/κενο, τα τρεχει μεσα απο `matchCategoryRule`,
+bulk-update). Το ιδιο rules engine (`apps/web/src/lib/categoryRules.ts`, τυπος `CategoryRule` με
+match/matchType vendor-η-text/category/recurring/recurringCycle) τρεχει ΚΑΙ αυτοματα σε 3 σημεια
+δημιουργιας (`createExpense` απο file upload, `addExpense` χειροκινητο, `importExpensesCsv`), οχι μονο
+σε backfill οπως υπεθεσα αρχικα απο το ονομα της συναρτησης. Rules αποθηκευονται σε
+`AppConfig.categoryRules`, UI = `CategoryRulesManager` στο Settings -> Money (πινακας edit rows + "Save"
++ "Apply to existing" combo button). Scope: ΜΟΝΟ Expense/Income (οχι Receipt), καθαρα διαφορετικο απο τα
+line-item receipt store-name aliases. Δεν υπαρχει "inline always-categorize-X-as-Y" prompt πουθενα, ειναι
+καθαρα settings-page rule editor· διορθωσα την αρχικη μου υποθεση στην FAQ copy ωστε να μην πλαστει οτι
+υπαρχει τετοιο inline prompt.
+
+Αλλαγη (`apps/landing/app/page.tsx`, `FAQS` array μονο, μηδεν αλλο UI/CSS/dependency change): νεα εγγραφη
+«Can it learn to auto-categorize my expenses?» αμεσως μετα το «Does it track bills I pay by hand, like
+utilities?» και πριν το «Can I see all my renewals, installments, and bills in one calendar?» (ιδιο
+expenses-organization cluster).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (ιδιο μεγεθος, το FAQS
+  array ειναι build-time data μονο, μηδεν αλλαγη σε rendered bundle size). Το build αργησε παλι πανω απο
+  2 λεπτα (background-tracked), ιδιο pattern με το προηγουμενο entry, πιθανον system load απο αλλες
+  routines, οχι regression.
+- Browser preview: 3100 κατειλημμενο (Docker), `next start -p 3110` πανω στο production build (γνωστο
+  harmless "next start does not work with output:standalone" warning). `mcp__Claude_Browser__*`
+  διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο. `javascript_tool`
+  επιβεβαιωσε: deterministic anchor id `faq-can-it-learn-to-auto-categorize-my-expenses`, σωστο πληρες
+  `textContent`, σωστη σειρα γειτονων στο DOM (["faq-does-it-track-bills-i-pay-by-hand-like-utilities",
+  **αυτο**, "faq-can-i-see-all-my-renewals-installments-and-bills-in-one-calendar"]). Hero screenshot
+  καθαρο (lighthouse mark, gradient τιτλος, CTAs, τριπλο badge row). ΣΗΜΕΙΩΣΗ: το πρωτο `pkill -f "next
+  start -p 3110"` σκοτωσε μονο το npm-wrapper script, οχι το πραγματικο `next-server` child process
+  (`lsof` εδειξε το process ακομα LISTEN μετα)· χρειαστηκε ενα δευτερο `kill <pid>` απευθειας στο
+  next-server PID για να ελευθερωθει πραγματικα το port 3110. Καλο να το θυμαμαι σε επομενα runs
+  (ελεγχος `lsof -i :<port>` ΜΕΤΑ το pkill, οχι μονο πριν).
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call (η μονη agent-χρηση ηταν read-only research, οχι write).
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: bank/generic CSV import (PA1), ηδη research-αρισμενο (το ιδιο background agent call
+διαβασε και το `CsvImportModal.tsx`/`csvImport.ts`/`importExpensesCsv` -> RFC-4180 parser με
+auto-delimiter-detect, column-mapping preview με live table, dedup key, sign-split option, ξεχωριστο και
+συμπληρωματικο απο το statement PDF import). Ετοιμο για μια FAQ εγγραφη το επομενο run. Αλλιως: νεα
+modules/commits απο το κυριο repo, ή (e) polish συνεχεια, real app screenshots οταν υπαρξουν assets
+(blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
