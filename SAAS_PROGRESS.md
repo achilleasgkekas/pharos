@@ -4065,3 +4065,59 @@ increment 85 αλλά ανεξέταστο σε route-level) — ίδιο πρό
 §14 audit-log rate-limiting follow-up (το increment 84 κάλυψε μόνο auth/mfa, όχι το
 `audit/route.ts` GET read endpoint το ίδιο — ελέγξτε αν χρειάζεται, πιθανώς όχι high-value
 αφού είναι session-gated read όχι brute-forceable secret).
+
+## 2026-07-24 (cont. — increment 88, route-level test coverage για το invites/accept endpoint)
+
+Πριν από νέο increment: ask-inbox (τα 2 OPEN entries είναι bakecore-finance, τίποτα για
+saas-core), `WEB_DEBT.md` (ακόμα η 57η σάρωση, όλα τα items στο δικό μου territory ήδη DONE),
+UI-first backlog (ακόμα εξαντλημένο, confirmed στο increment 86). Ακολούθησα το leftover
+next-task από το increment 87: `api/saas/invites/accept/route.ts` ήταν ήδη guarded με
+top-level try/catch (increment 85, WEB_DEBT P2) αλλά **ανεξέταστο σε route-level** — grep
+`api/saas/**/*.test.ts` έδειχνε ΜΟΝΟ το `billing/webhook/route.test.ts` (increment 87).
+Το invites/accept είναι το ΜΟΝΟ **unauthenticated** SaaS route που φτιάχνει Account+Membership
+από ένα mailed token (signup/login απαιτούν ήδη κάτι, membership creation αλλού απαιτεί
+session) — υψηλό-ρίσκο endpoint χωρίς κανένα route-level test.
+
+**Νέο `invites/accept/route.test.ts`** (14 tests, μηδέν production code αλλαγή), ίδιο module-
+boundary mocking precedent με το webhook test (increment 87): mocks `@/lib/db`,
+`@/models/Account` (findOne chain `.select()` + create), `@/models/Membership` (findOne chain
+`.select().lean()` + updateOne + create), `@/models/Invite` (findOne + updateOne),
+`@/lib/auth` (hashPassword), `@/lib/tenancy/saasApi` (saasAuthGate + accountTenants),
+`@/lib/tenancy/accountSession` (setAccountCookie), `@/lib/tenancy/audit` (μόνο recordAudit
+mocked, auditCtx πραγματικό μέσω `vi.importActual`). Το **`@/lib/tenancy/invites` έμεινε
+ΠΛΗΡΩΣ πραγματικό** (κανένα mock) — καθαρές pure functions ήδη unit-tested αλλού
+(`hashInviteToken`/`isInviteValid`), χρησιμοποιήθηκαν για να χτίσουν ρεαλιστικά fake Invite
+rows (`makeInvite()` helper με πραγματικό `hashInviteToken(GOOD_TOKEN)`).
+
+Καλύπτει: (1) gate ladder (saasAuthGate response pass-through, missing token→400), (2)
+invite lookup (άγνωστο token→410, expired→410, already-accepted→410 = anti-replay), (3)
+**fresh invitee** (χωρίς υπάρχον Account): password<8 chars→400 `password_required`,
+valid password→δημιουργεί Account+Membership+consume invite+audit `invite.accepted`+cookie+
+201, **race στο Account.create (duplicate key 11000)**→fallback στο post-race findOne (2ο
+mockResolvedValueOnce), account ΑΚΟΜΑ null μετά το fallback→500 «could not resolve», μη-11000
+error στο create→500 clean JSON (mid-handler throw, όχι swallowed), (4) **ήδη-υπάρχον
+Account** (invitee έκανε ήδη signup πριν αποδεχτεί): ΚΑΘΟΛΟΥ password requirement, reuse
+account, νέο membership αν δεν υπάρχει, **updateOne (reactivate) αντί create** αν υπάρχει ήδη
+membership (removed ή ήδη active — idempotent double-accept), (5) mid-handler DB throw
+(connectDB rejects)→καθαρό 500 JSON.
+
+**Verified**: νέο test file **14/14 green** μόνο του· πλήρες `npx vitest run` → **236 files /
+3084 tests green** (ήταν 233/3049 στο increment 87 — η διαφορά +3 files/+35 tests
+περιλαμβάνει τα δικά μου +1 file/+14 tests + tests από concurrent routines). `npm run
+type-check` → αρχικά **1 error** (TS narrow-άρισε το inferred return type του
+`accountCreateMock`'s αρχικό factory σε `{ _id: string }` μόνο, αγνοώντας το spread
+`Record<string, unknown>` — το `mockResolvedValueOnce({ _id, email, name })` σε επόμενο test
+απέτυχε type-check) → fix: explicit `Promise<Record<string, unknown>>` return-type annotation
+στο hoisted factory → **EXIT 0**. **Docker: ΔΕΝ έγινε rebuild** (test-only αρχείο, μηδέν
+production code/runtime wiring αλλαγή). **Browser-verify: skipped** (test file, μηδέν UI/
+observable behavior αλλαγή, ο hook το επιβεβαίωσε κι αυτό). Collision guard: `git status
+--short` πριν το staging έδειξε ΜΟΝΟ το 1 δικό μου νέο αρχείο (καθαρό working tree), `git
+diff --cached --name-only` επιβεβαίωσε exact match. Pushed `cadb513`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο σε επόμενο ανεξέταστο route — καλοί υποψήφιοι:
+`api/saas/billing/checkout`/`portal` (mint Stripe sessions, session-gated), ή
+`api/saas/workspace/erasure`/`erasure/purge` (ήδη guarded από increment 85, GDPR-critical
+data-deletion path, ανεξέταστο). Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση
+`WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
