@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, StyleSheet, Alert } from 'react-native';
 import { C, alpha } from '../theme';
-import { shortDate, Spinner, ErrorText, Empty, Card, Badge, contentWidth } from '../ui';
+import { shortDate, money, Spinner, ErrorText, Empty, Card, Badge, contentWidth } from '../ui';
 import {
   getTrash, restoreTrash, purgeTrash, currentUser,
   getJobs, getHistory, getNotifications, markNotificationRead,
@@ -22,6 +22,52 @@ const TRASH_ICON: Record<TrashType, string> = {
 const NOTIF_ICON: Record<NotifKind, string> = {
   deal: '🏷', installment: '💳', warranty: '🛡', pricehike: '📈', trialend: '⏰', giftcard: '🎁', bill: '📄', system: '🔔',
 };
+
+// `body` is a structured pipe-delimited payload (e.g. "13|15|15"), not display text — this
+// mirrors apps/web/src/components/NotificationBell.tsx `describe()` block-by-block so the two
+// clients read the same stored alert the same way. Mobile has no i18n yet (English literals,
+// same as the rest of this screen), so the phrasing is copied from the `notif.*` en.ts strings.
+function describeAlert(n: NotificationRow, currency: string): { heading: string; sub: string } {
+  const m = (v: string) => money(Number(v), currency);
+  if (n.kind === 'deal') {
+    const [lo, target] = n.body.split('|');
+    return { heading: n.title, sub: `Now ${m(lo)} · at or under your target ${m(target)}` };
+  }
+  if (n.kind === 'warranty') return { heading: n.title, sub: `Warranty expires in ${n.body}d` };
+  if (n.kind === 'installment') {
+    const [amount, count] = n.body.split('|');
+    return { heading: n.title || 'Installments due this month', sub: `${m(amount)} across ${count} plans` };
+  }
+  if (n.kind === 'pricehike') {
+    const [prev, curr, pct] = n.body.split('|');
+    const p = Number(pct);
+    return { heading: n.title, sub: `${p >= 0 ? 'Rose' : 'Dropped'} ${m(prev)} → ${m(curr)} (${p > 0 ? '+' : ''}${pct}%)` };
+  }
+  if (n.kind === 'trialend') {
+    const [days, amount] = n.body.split('|');
+    const sub = Number(days) <= 0
+      ? `Free trial ends today · then ${m(amount)} — cancel to avoid the charge`
+      : `Free trial ends in ${days}d · then ${m(amount)} — cancel to avoid the charge`;
+    return { heading: n.title, sub };
+  }
+  if (n.kind === 'giftcard') {
+    const [days, balance] = n.body.split('|');
+    const sub = Number(days) <= 0
+      ? `Gift card expires today with ${m(balance)} still on it · use it now`
+      : `Gift card expires in ${days}d with ${m(balance)} still on it · use it before it lapses`;
+    return { heading: n.title, sub };
+  }
+  if (n.kind === 'bill') {
+    const [days, amount] = n.body.split('|');
+    const d = Number(days);
+    const sub =
+      d < 0 ? `Bill of ${m(amount)} is ${Math.abs(d)}d overdue · pay it and mark it paid`
+      : d === 0 ? `Bill of ${m(amount)} is due today · don't let it slip into overdue`
+      : `Bill of ${m(amount)} due in ${d}d · mark it paid when you settle it`;
+    return { heading: n.title, sub };
+  }
+  return { heading: n.title, sub: n.body };
+}
 
 function relTime(iso: string | null | undefined): string {
   if (!iso) return '';
@@ -56,13 +102,18 @@ export function ActivityScreen() {
 // ---- Alerts (in-app notification feed) ----
 function AlertsTab() {
   const [items, setItems] = useState<NotificationRow[]>([]);
+  const [currency, setCurrency] = useState('EUR');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setErr(null);
-    try { setItems((await getNotifications()).items); } catch (e) { setErr((e as Error).message); }
+    try {
+      const r = await getNotifications();
+      setItems(r.items);
+      setCurrency(r.currency || 'EUR');
+    } catch (e) { setErr((e as Error).message); }
   }, []);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
@@ -92,19 +143,22 @@ function AlertsTab() {
         contentContainerStyle={s.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         ListEmptyComponent={<Empty>No alerts.</Empty>}
-        renderItem={({ item }) => (
-          <Card onPress={() => readOne(item)} style={!item.read && s.unreadCard}>
-            <View style={s.head}>
-              <Text style={s.icon}>{NOTIF_ICON[item.kind]}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={s.title} numberOfLines={2}>{item.title || item.kind}</Text>
-                {!!item.body && <Text style={s.preview} numberOfLines={3}>{item.body}</Text>}
-                <Text style={s.meta}>{relTime(item.createdAt)}</Text>
+        renderItem={({ item }) => {
+          const d = describeAlert(item, currency);
+          return (
+            <Card onPress={() => readOne(item)} style={!item.read && s.unreadCard}>
+              <View style={s.head}>
+                <Text style={s.icon}>{NOTIF_ICON[item.kind]}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.title} numberOfLines={2}>{d.heading || item.kind}</Text>
+                  {!!d.sub && <Text style={s.preview} numberOfLines={3}>{d.sub}</Text>}
+                  <Text style={s.meta}>{relTime(item.createdAt)}</Text>
+                </View>
+                {!item.read && <View style={s.dot} />}
               </View>
-              {!item.read && <View style={s.dot} />}
-            </View>
-          </Card>
-        )}
+            </Card>
+          );
+        }}
       />
     </>
   );

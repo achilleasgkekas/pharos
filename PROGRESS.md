@@ -6,6 +6,59 @@
 <!-- docker-validated: 7698ef1 -->
 <!-- ui-audited: c5b45dc -->
 
+## 2026-07-24 (pharos-daily-dev — Notifications body-humanization στο mobile, P2/S gap SHIPPED)
+
+**Coordination guard**: `~/.claude/ROUTINES_PAUSED` απόν → proceed. `~/.claude/ASK_ACHILLEAS.md` ελέγχθηκε —
+μηδέν ANSWERED entry για το `pharos-daily-dev`, τα OPEN entries είναι όλα `bakecore-finance` (άσχετα).
+Docker mutex δεν χρειάστηκε καν να αποκτηθεί (δεν έγινε κανένα rebuild/boot, βλ. verify παρακάτω).
+
+**Approved queue check (βήμα a)**: ξανασάρωσα το `PRODUCT_BACKLOG.md → ## Approved` — τα ίδια blocked/deferred
+items με το προηγούμενο run (P36 Open Banking needs-Achilleas, P31 household 4η αναβολή, P16 Firefly
+III/Grocy χρειάζεται sample file, P17/P23 mobile-native deps needs-approval, P9 multi-currency ρητά
+τελευταίο). Μηδέν νέο buildable Approved item → βήμα (b).
+
+**Fallback (βήμα b)**: η 54η mobile-parity-auditor σάρωση (ίδιο 24ωρο, commit `84c1645`) είχε ρητά re-scoped
+το queue top-1 σε **«Notifications — humanize raw pipe-delimited body στο mobile Alerts tab»** [P2/S], με
+πλήρες reference-spec (exact file/line pointers και στα δύο apps). Το πήρα as-is.
+
+**Τι χτίστηκε**: το `models/Notification.ts` αποθηκεύει 7 non-system kinds (`deal`/`warranty`/`installment`/
+`pricehike`/`trialend`/`giftcard`/`bill`) με pipe-delimited raw payload (π.χ. `"13|15|15"`) — το web
+`NotificationBell.tsx describe(n)` το μετατρέπει σε ανθρώπινο κείμενο, το mobile `ActivityScreen.tsx AlertsTab`
+έδειχνε `{item.body}` αυτούσιο. (1) **Web**: `apps/web/src/app/api/v1/notifications/route.ts` GET →
+`Promise.all([getNotifications(), getAppSettings()])` → `{ currency: settings.currency || 'EUR', ...feed }`
+(additive top-level πεδίο, ίδιο idiom με το ήδη-υπάρχον `/api/v1/calendar`). (2) **Mobile**: νέο
+`describeAlert(n, currency)` helper στο `ActivityScreen.tsx` (mirror του web `describe()`, block-by-block, ένα
+`if` ανά kind, literal English strings αφού το mobile δεν είναι i18n-wired ακόμα — ίδιο idiom με τα υπόλοιπα
+screens), χρησιμοποιεί το **ήδη-υπάρχον αλλά αχρησιμοποίητο** `money(n, cur)` helper (`ui.tsx:14`, πρώτο
+use-site — grep confirmed 0 hits πριν). `api.ts getNotifications()` return type += `currency: string`.
+`AlertsTab` κρατά `currency` state από το response· render `{item.body}` → `{describeAlert(item,
+currency).sub}` + heading fallback για `installment` (stored `title:''` → «Installments due this month»,
+mirror του web `t('notif.installmentHeading')`).
+
+**Verify**: web `npm run type-check` EXIT 0. `route.test.ts` ενημερώθηκε (mock `@/lib/appSettings`, ίδιο
+πρότυπο με `calendar/route.test.ts`) + 1 νέο test (currency passthrough + EUR default όταν κενό) — **10/10
+passed**. Full `npx vitest run` **236 files / 3085 tests passed**, μηδέν regression. mobile `npx tsc --noEmit`
+EXIT 0. **Docker rebuild ΔΕΝ χρειάστηκε**: το web-side αλλαγή είναι πλήρως route-test-covered (mobile app δεν
+κάνει browser-testable UI, χρειάζεται simulator που δεν τρέχει unattended) — άρα ούτε το Docker mutex
+χρειάστηκε να αποκτηθεί.
+
+**Queue status**: το MOBILE_PARITY.md Build Queue functional-gaps tier είναι πλέον ΞΑΝΑ άδειο (αυτό ήταν το
+μοναδικό speced TODO item). Το επόμενο run πρέπει (βήμα a πρώτα) να ξαναδεί το Approved queue, και αν
+συνεχίζει άδειο, το UI Debt Queue (RADIUS token adoption / border-radius magic numbers, ή brand typography
+gap) ή περαιτέρω pure-lib test coverage είναι λογικές επιλογές — ίδια σύσταση με το doc entry.
+
+**Git hygiene**: `git add` explicit (`MOBILE_PARITY.md` + `PROGRESS.md` + τα 4 code files), ΟΧΙ `-A` — το
+working tree είχε ήδη uncommitted `apps/landing/app/page.tsx` (ξένη δουλειά, πιθανόν άλλη routine/ο ίδιος ο
+Αχιλλέας) που ΔΕΝ αγγίχτηκε.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα (βλ. προηγούμενες καταχωρήσεις): `getTenantConnection`
+  readyState guard (P3/S)· SaaS multi-tenancy/billing rollout env boundary· mobile native-dep approvals (P17
+  camera, P23 share-sheet)· P36 Open Banking provider decision· P31 household enforcement supervised session·
+  P16 Firefly III/Grocy sample-file need· Settings theme/language/AI-engine/storage/OneDrive credentials
+  boundary· P8 tax-export ZIP desktop power tool· P5 bookmarklet MV3-extension phase 2.
+
 ## 2026-07-24 (ui-auditor — 54η σάρωση, consistency monitoring)
 
 **Εκτέλεση**: automated mobile UI consistency audit, 18 screens, token violation tracking.

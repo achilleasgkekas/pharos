@@ -15,16 +15,18 @@ import type { NextRequest } from 'next/server';
 // We exercise the REAL apiAuth/apiBody helpers (withAuth + readBody + isObjectId) and only mock
 // the DB (auth chain) + the notifications actions seam.
 
-const { connectDBMock, userFindOne, userState, getNotificationsMock, markOneMock, markAllMock, state } =
+const { connectDBMock, userFindOne, userState, getNotificationsMock, markOneMock, markAllMock, getAppSettingsMock, settingsState, state } =
   vi.hoisted(() => {
     const state: {
       feed: { items: unknown[]; unread: number };
       markedOne: string | null;
       markedAllCount: number;
     } = { feed: { items: [], unread: 0 }, markedOne: null, markedAllCount: 0 };
+    const settingsState: { currency: string } = { currency: 'EUR' };
     const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
     const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
     const getNotificationsMock = vi.fn(async () => state.feed);
+    const getAppSettingsMock = vi.fn(async () => ({ currency: settingsState.currency }));
     const markOneMock = vi.fn(async (id: string) => {
       state.markedOne = id;
       return { ok: true };
@@ -40,6 +42,8 @@ const { connectDBMock, userFindOne, userState, getNotificationsMock, markOneMock
       getNotificationsMock,
       markOneMock,
       markAllMock,
+      getAppSettingsMock,
+      settingsState,
       state,
     };
   });
@@ -51,6 +55,7 @@ vi.mock('@/app/notifications/actions', () => ({
   markNotificationRead: markOneMock,
   markAllNotificationsRead: markAllMock,
 }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 
 import { GET, PATCH } from './route';
 
@@ -71,10 +76,12 @@ beforeEach(() => {
   state.feed = { items: [], unread: 0 };
   state.markedOne = null;
   state.markedAllCount = 0;
+  settingsState.currency = 'EUR';
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
   vi.clearAllMocks();
   userFindOne.mockImplementation(() => ({ select: () => ({ lean: async () => userState.doc }) }));
   getNotificationsMock.mockImplementation(async () => state.feed);
+  getAppSettingsMock.mockImplementation(async () => ({ currency: settingsState.currency }));
   markOneMock.mockImplementation(async (id: string) => {
     state.markedOne = id;
     return { ok: true };
@@ -112,15 +119,26 @@ describe('GET feed', () => {
     };
     const res = await GET(makeReq());
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { items: unknown[]; unread: number };
-    expect(json).toEqual(state.feed);
+    const json = (await res.json()) as { currency: string; items: unknown[]; unread: number };
+    expect(json).toEqual({ currency: 'EUR', ...state.feed });
     expect(json).not.toHaveProperty('data');
     expect(json).not.toHaveProperty('total');
   });
 
   it('returns an empty feed when there is nothing', async () => {
     const res = await GET(makeReq());
-    expect(await res.json()).toEqual({ items: [], unread: 0 });
+    expect(await res.json()).toEqual({ currency: 'EUR', items: [], unread: 0 });
+  });
+
+  it('passes through the configured currency from getAppSettings, defaulting to EUR when unset', async () => {
+    settingsState.currency = 'USD';
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { currency: string };
+    expect(json.currency).toBe('USD');
+
+    settingsState.currency = '';
+    const res2 = await GET(makeReq());
+    expect(((await res2.json()) as { currency: string }).currency).toBe('EUR');
   });
 });
 

@@ -2,15 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '@/app/notifications/actions';
+import { getAppSettings } from '@/lib/appSettings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** GET /api/v1/notifications → { items: [{ _id, kind, title, body, href, read, createdAt }], unread }.
- *  Surfaces the live alert feed (deals / installments / warranties / system), newest-unread first. */
+/** GET /api/v1/notifications → { currency, items: [{ _id, kind, title, body, href, read, createdAt }], unread }.
+ *  Surfaces the live alert feed (deals / installments / warranties / system), newest-unread first.
+ *  `currency` lets the mobile app format the pipe-delimited money amounts baked into `body`
+ *  (mirrors the same additive field on GET /api/v1/calendar). */
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
-    return NextResponse.json(await getNotifications());
+    const [feed, settings] = await Promise.all([getNotifications(), getAppSettings()]);
+    return NextResponse.json({ currency: settings.currency || 'EUR', ...feed });
   });
 }
 

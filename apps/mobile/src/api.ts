@@ -584,8 +584,8 @@ export async function getHistory(): Promise<ConversationRow[]> {
 
 export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'bill' | 'system';
 export type NotificationRow = { _id: string; kind: NotifKind; title: string; body: string; href: string; read: boolean; createdAt: string };
-export async function getNotifications(): Promise<{ items: NotificationRow[]; unread: number }> {
-  return request<{ items: NotificationRow[]; unread: number }>('/api/v1/notifications');
+export async function getNotifications(): Promise<{ currency: string; items: NotificationRow[]; unread: number }> {
+  return request<{ currency: string; items: NotificationRow[]; unread: number }>('/api/v1/notifications');
 }
 /** Mark one notification read (pass id) or all read (omit). */
 export function markNotificationRead(id?: string) {
