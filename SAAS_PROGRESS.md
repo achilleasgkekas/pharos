@@ -4353,3 +4353,55 @@ surfaces), `members`, `usage` + `usage/sample`, `workspace/{ai-key,export,export
 reactivate}`, `invites/{resend,route}`, `auth/{login,logout,mfa,session,signup}`, `audit`,
 `trials/sweep`, `billing/route.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση
 `WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-24 (cont. — increment 93, route-level test coverage για το auth/login endpoint)
+
+Πριν από νέο increment: ask-inbox (τα 3 OPEN entries είναι ακόμα bakecore-finance ×2/
+bakecore-redesigner ×1, τίποτα addressed σε saas-core), `WEB_DEBT.md` (ίδια 58η σάρωση
+2026-07-24, τα 3 ανοιχτά auto-buildable items αφορούν `app/settings/actions.ts`/
+`app/vouchers/*.ts`, ρητά ΕΚΤΟΣ territory, δεν τα ανέλαβα). UI-first backlog παραμένει
+εξαντλημένο (καμία νέα `api/saas/**` route χωρίς UI consumer από το increment 92). Ακολούθησα
+το leftover next-task: από τη λίστα ανεξέταστων route-clusters διάλεξα **`auth/login`** — η
+είσοδος ΟΛΟΥ του SaaS auth surface, υψηλότερου ρίσκου από τα υπόλοιπα ανεξέταστα (`account/*`,
+`members`, `usage`) γιατί ένα bug εδώ είτε διαρρέει account-enumeration είτε μοιράζει session
+χωρίς πραγματικά επαληθευμένο password.
+
+**Νέο `auth/login/route.test.ts`** (12 tests), μηδέν production code αλλαγή. Mocks: `@/lib/
+apiAuth` (`rateLimit`/`clientIp`), `@/lib/db` (connectDB no-op), `@/models/Account`
+(`findOne().select()` chain επιστρέφει fake doc με spyable `.save()`), `@/lib/auth`
+(`verifyPassword`), `@/lib/tenancy/accountSession` (`setAccountCookie`/`setMfaPendingCookie`).
+Το `@/lib/tenancy/saasApi` mock χρησιμοποιεί `vi.importActual` για το **πραγματικό `saasGuard`**
+(καθαρή try/catch λογική, μηδέν DB/env reads) ενώ mocks μόνο `saasAuthGate`/`accountTenants` —
+το mid-handler-throw test εξετάζει έτσι το ΠΡΑΓΜΑΤΙΚΟ error-shaping, όχι αναπαραγωγή του.
+
+Καλύπτει: (1) rate-limited request → 429 as-is, μηδέν saasAuthGate/DB call (τεκμηριώνει ότι το
+route ελέγχει rate-limit ΠΡΙΝ το saasAuthGate — as-coded ordering, όχι σχόλιο προτίμησης)· (2)
+το rate-limit key = `saas-login:<clientIp>`· (3) saasAuthGate short-circuit περνάει αναλλοίωτο,
+μηδέν DB· (4)(5) missing email/password → 400, μηδέν DB· (6) email lowercased+trimmed πριν το
+lookup· (7) άγνωστο account → 401 "Invalid credentials", **verifyPassword ΠΟΤΕ δεν καλείται**
+(το `||` short-circuit)· (8) γνωστό account + λάθος password → η ΙΔΙΑ 401 απάντηση (no account
+enumeration)· (9) σωστό password + mfaEnabled=false → lastLoginAt stamped + save() + πραγματικό
+account cookie + account/tenants response, μηδέν mfa-pending cookie· (10) κενό name fallback·
+(11) σωστό password + mfaEnabled=true → OYTE lastLoginAt OYTE save() OYTE account cookie, μόνο
+mfa-pending cookie + `{mfaRequired:true}`, μηδέν accountTenants call· (12) mid-handler throw
+(account.save() rejects) → καθαρό 500 JSON μέσω του πραγματικού saasGuard.
+
+**Verified**: νέο test file **12/12 green** μόνο του· πλήρες `npx vitest run` → **248 files /
+3268 tests green** (ήταν 246/3230 στο increment 92 — η διαφορά +2 files/+38 tests περιλαμβάνει
+το δικό μου +1 file/+12 tests + tests από concurrent routine). `npm run type-check` → **EXIT 0**
+καθαρά. **Docker: ΔΕΝ έγινε rebuild** (test-only αρχείο, μηδέν production code/runtime wiring
+αλλαγή). **Browser-verify: skipped** (test file, μηδέν UI/observable behavior αλλαγή).
+Collision guard: `git status --short` πριν το staging έδειξε ΜΟΝΟ το 1 δικό μου νέο αρχείο
+(καθαρό working tree), `git diff --cached --name-only` επιβεβαίωσε exact match. Pushed `3c82137`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο σε επόμενο ανεξέταστο route-cluster (29 routes ακόμα χωρίς
+route-level test) — καλοί υποψήφιοι τώρα: `auth/{signup,session,logout,mfa}` (υπόλοιπο auth
+surface, `mfa` ειδικά αξίζει γιατί είναι ο δεύτερος παράγοντας), `account/*` self-service routes
+(password/mfa/mfa-confirm/reset-request/reset-confirm/verify-request/verify-confirm/workspaces/
+export, 9 files, session-gated), `admin/overview` + `admin/tenants` list (read-only console
+surfaces), `members`, `usage` + `usage/sample`, `workspace/{ai-key,export,export/files,
+reactivate}`, `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`. Πριν
+ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί,
+πάει πρώτο).
