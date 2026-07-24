@@ -487,6 +487,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. PHAROS exports your whole dataset to JSON and imports it back by merging on record id, so you can start self-hosted and move to hosted later, or the other way round, without losing anything.',
   },
   {
+    q: 'Can I add something to my list straight from a store’s page?',
+    a: 'Yes. Paste a product URL into a new item and PHAROS fetches the page, then AI fills in the price, specs, category, and a photo. For a one-click path, drag a "Save to PHAROS" bookmarklet to your bookmarks bar from Settings → Storage & backup (a copy-code fallback covers browsers where dragging a link is awkward): click it on any product page and a small same-origin popup opens, riding your existing signed-in session, no API token exposed and nothing to install, then runs the same preview-before-you-confirm import.',
+  },
+  {
     q: 'Can it read receipts and statements I already have?',
     a: 'Yes. Drag in a PDF or a photo and PHAROS parses the store, date, total, and line items automatically. Card statements are read the same way, including installment plans split across months. You can also bulk-import receipts straight from a Gmail export.',
   },
