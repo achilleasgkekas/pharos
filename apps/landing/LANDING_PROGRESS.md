@@ -2771,3 +2771,58 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-24 (4) — FAQ += GDPR data export/portability (hosted)
+
+Increment (e), συνεχεια του `docs/saas.md` sweep. Πριν το ξεκινημα: coordination guard
+(`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος `~/.claude/ASK_ACHILLEAS.md` (δυο OPEN entries, και τα
+δυο bakecore-finance, τιποτα για landing/pharos). `git log --oneline -15` εδειξε αλλα routines να δουλευουν
+στο μεταξυ (mobile API docs, subscription/voucher tests) — εκτος του δικου μου territory, δεν τα αγγιξα.
+
+Το προηγουμενο entry σημερα ειχε σαν ανοιχτο candidate το «GDPR account-level data-export endpoint (αν
+χρειαστει τελικα ρητη γραμμη)». Διαβασα `docs/saas.md` γυρω απο τα GDPR sections (γραμμες 210-260, 373-380,
+422-475, 531-, και το `/account/workspace/settings` entry στον UI-pages πινακα) και βρηκα **τρια ξεχωριστα
+GDPR-portability endpoints χωρις καμια ρητη landing αναφορα**: (1) `GET /api/saas/account/export` απο
+`/account/settings`, personal data JSON (profile+memberships) — Art. 15/20 right of access· (2)
+`GET /api/saas/workspace/export` απο `/account/workspace/settings` (owner/admin only), πληρες workspace
+content JSON· (3) `GET /api/saas/workspace/export/files` (owner/admin only), file-path manifest (metadata
+only, οχι περιεχομενα). Η υπαρχουσα FAQ «Can I move between self-hosted and hosted?» καλυπτει ΗΔΗ ενα
+διαφορετικο export (το whole-dataset merge-by-id migration export/import, self-hosted+hosted και τα δυο),
+οχι τα GDPR rights-request downloads (hosted-only, account/workspace scoped, on-demand). Δυο διακριτα
+concepts, αξιζε ξεχωριστη γραμμη ωστε να μην μπερδευονται.
+
+Αλλαγη (`apps/landing/app/page.tsx`, FAQS array μονο, μηδεν UI/CSS/dependency/bundle-size change πλην του
+νεου κειμενου): νεα εγγραφη «Can I download a copy of everything you have on me?» αμεσως μετα το «Does it
+support two-factor authentication?» και πριν το «Can I permanently delete my account and all its data?»
+(account/security/GDPR cluster στο τελος της λιστας, ιδιο idiom με τα προηγουμενα δυο increments). Απαντηση:
+περιγραφει και τα τρια hosted downloads (account settings 1-click, workspace settings 2 ακομα για
+owner/admin), ρητη αντιπαραβολη με το ηδη-καλυμμενο migration export, και μια γραμμη για self-hosted (ηδη
+ολα τοπικα, τιποτα να ζητησεις).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (ιδιο rounded μεγεθος).
+- Browser preview: `next start -p 3140` πανω στο production build (3000/3100-3130 κατειλημμενα απο
+  Docker/προηγουμενα runs). `mcp__Claude_Browser__*` διαθεσιμο, `preview_start` OK, `read_console_messages`
+  (onlyErrors) -> "No console logs." καθαρο. `javascript_tool` επιβεβαιωσε: το deterministic anchor id
+  `faq-can-i-download-a-copy-of-everything-you-have-on-me` υπαρχει (`getElementById` -> true), το DOM
+  περιεχει "GDPR" (σωστο answer text), και η σειρα ειναι σωστη (`idx: 24`, neighbors =
+  [faq-does-it-support-two-factor-authentication, **αυτο**,
+  faq-can-i-permanently-delete-my-account-and-all-its-data]). Hero screenshot καθαρο, μηδεν regression.
+  Server σταματησε μετα (`pkill -f "next start -p 3140"`), `lsof -i :3140` επιβεβαιωσε port clear.
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `app/page.tsx` modified, `git diff --cached
+  --name-only` κενο πριν το stage -> κανενα ξενο staged file. Staged ΜΟΝΟ `apps/landing/app/page.tsx`.
+
+Επομενο increment: το `docs/saas.md` sweep εχει πλεον καλυψει ολα τα βασικα rights/account/security
+sections (2FA, invites/roles, GDPR export ×3). Επομενο περασμα: ξανα-διαβασμα του docs/saas.md απο την
+αρχη για οτιδηποτε αλλο module-level feature χωρις landing αναφορα (π.χ. superadmin/admin console, billing
+webhook edge cases, bring-your-own-key AI ανα workspace — αυτο μπορει να αξιζει δικια του FAQ γραμμη, οχι
+μονο mention μεσα σε αλλη). Αλλιως (e) polish συνεχεια, real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

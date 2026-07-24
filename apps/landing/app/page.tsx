@@ -531,6 +531,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'On hosted, yes: turn on TOTP-based two-factor authentication from account settings with any authenticator app (Google Authenticator, 1Password, and so on), confirm it with a 6-digit code, and save the one-time recovery codes it gives you. Once enabled, every login asks for that second factor, not just this browser or device. Self-hosted sits behind your own LAN or VPN with a single shared login rather than per-person accounts, so this extra layer is a hosted feature.',
   },
   {
+    q: 'Can I download a copy of everything you have on me?',
+    a: 'Yes. On hosted, account settings has a one-click download of your personal data (profile and workspace memberships) for GDPR portability, and a workspace owner or admin gets two more from workspace settings: the full workspace content as JSON (items, receipts, expenses, and the rest, for every member) and a manifest of stored file paths for receipts, statements, and photos. These are quick, on-demand downloads for a rights request, separate from the whole-dataset export used to migrate between self-hosted and hosted. Self-hosted already keeps everything on your own disk, so there is nothing to request.',
+  },
+  {
     q: 'Can I permanently delete my account and all its data?',
     a: 'Yes. On hosted, the workspace owner has a "Delete workspace" control in settings: request it and every member loses access with all data erased after a 30-day grace window, plenty of time to change your mind, and you can cancel any time before then. Self-hosted has no server-side account at all, so deleting your data just means removing the Docker volumes on your own hardware.',
   },
