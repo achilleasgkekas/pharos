@@ -4234,3 +4234,59 @@ exact match.
 (superadmin console reads/writes), `members`, `workspace/route.ts` (GET/PATCH/DELETE), `usage`.
 Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν
 βρεθεί, πάει πρώτο).
+
+## 2026-07-24 (cont. — increment 91, route-level test coverage για το admin/tenants/[slug] endpoint)
+
+Πριν από νέο increment: ask-inbox (τα 2 OPEN entries είναι ακόμα bakecore-finance, τίποτα για
+saas-core), `WEB_DEBT.md` (ίδια 58η σάρωση 2026-07-24, τα 3 ανοιχτά items εκτός territory όπως
+και στο increment 90), UI-first backlog (ακόμα εξαντλημένο). Ακολούθησα το leftover next-task
+από το increment 90: από τους 4 προτεινόμενους clusters (`account/*`, `admin/*`, `members`,
+`workspace/route.ts`, `usage`) διάλεξα **`admin/tenants/[slug]`** — το ΜΟΝΟ write surface της
+superadmin console (`GET` detail + `PATCH` manual status/plan override), υψηλότερου ρίσκου από
+τα read-only `usage`/`members GET`/`account/route.ts` reads γιατί ένας operator μπορεί να
+suspend/reactivate/cancel οποιοδήποτε tenant ή να αλλάξει το plan του χωρίς Stripe.
+
+**Νέο `admin/tenants/[slug]/route.test.ts`** (17 tests, GET+PATCH), μηδέν production code
+αλλαγή, ίδιο module-boundary precedent με τα προηγούμενα route tests: mocks `@/lib/db`
+(connectDB no-op), `@/lib/tenancy/superadmin` (`requireSuperadmin`), `@/lib/tenancy/
+adminTenantDetail` (`getTenantDetailForAdmin`), `@/models/Tenant` (`findOne` chain
+`.select().lean()` + `updateOne`), `@/lib/tenancy/audit` (μόνο `recordAudit` mocked, `auditCtx`
+πραγματικό μέσω `vi.importActual`). Οι ήδη-unit-tested pure helpers (`planAdminTenantPatch` στο
+`adminTenantActions.test.ts`, το allowlist-matching στο `superadmin.test.ts`, η shaping-λογική
+στο `adminTenantDetail.test.ts`) τρέχουν πραγματικά αλλού, ΟΧΙ εδώ — αυτό το test εξετάζει τι
+κάνει το ΙΔΙΟ το route: gate ordering, 404-πριν-το-read-του-body, idempotent no-op, ποιο audit
+row γράφεται πότε.
+
+Καλύπτει GET: (1) `requireSuperadmin` short-circuit περνάει αναλλοίωτο, μηδέν detail-read· (2)
+άγνωστο slug→404· (3) γνωστό slug→το πραγματικό detail verbatim + `Cache-Control: no-store`.
+Καλύπτει PATCH: (4) gate short-circuit πριν καν το `Tenant.findOne`· (5) άγνωστο slug→404
+**πριν διαβαστεί το body** (η σειρά του handler: lookup πρώτα, μετά `readBody`)· (6) άκυρο
+status/plan value→400, μηδέν write/audit· (7) κενό body (ούτε status ούτε plan)→400· (8)
+idempotent no-op (ίδια τιμή με το τρέχον)→200, μηδέν `Tenant.updateOne`/`recordAudit`· (9)
+status-only change→σωστό `$set` + audit `workspace.suspended` με actor=operator· (10) plan-only
+change→audit `plan.changed`· (11) **status+plan μαζί σε ΕΝΑ request→ΕΝΑ `updateOne` με combined
+`$set` + ΔΥΟ audit rows** (μία ανά field)· (12) benign transition χωρίς mapped audit action
+(π.χ. active→trialing, όχι recovery από suspended/canceled)→γράφει αλλά ΔΕΝ audits (mirrors
+`statusAuditAction` returning null)· (13) re-read του detail μετά το write για το response body·
+(14) tenant που εξαφανίζεται ανάμεσα στο write και το re-read→404· (15) mid-handler DB
+throw→καθαρό 500 JSON (saasGuard)· (16) slug trim+lowercase πριν το lookup.
+
+**Verified**: νέο test file **17/17 green** μόνο του· πλήρες `npx vitest run` → **244 files /
+3199 tests green** (ήταν 242/3161 στο increment 90 — η διαφορά +2 files/+38 tests περιλαμβάνει
+τα δικά μου +1 file/+17 tests + tests από concurrent routines). `npm run type-check` →
+**EXIT 0** καθαρά, χωρίς κανένα intermediate error. **Docker: ΔΕΝ έγινε rebuild** (test-only
+αρχείο, μηδέν production code/runtime wiring αλλαγή). **Browser-verify: skipped** (test file,
+μηδέν UI/observable behavior αλλαγή). Collision guard: `git status --short` πριν το staging
+έδειξε ΜΟΝΟ το 1 δικό μου νέο αρχείο (καθαρό working tree), `git diff --cached --name-only`
+επιβεβαίωσε exact match. Pushed `446714e`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο σε επόμενο ανεξέταστο route-cluster — καλοί υποψήφιοι τώρα:
+`account/*` routes (password/mfa/reset/verify/mfa-confirm/workspaces/export, session-gated
+self-service, 8 files), `admin/overview` + `admin/tenants` list (read-only console surfaces),
+`members`, `workspace/route.ts` (GET/PATCH/DELETE), `usage`, `usage/sample`,
+`workspace/{ai-key,export,export/files,reactivate}`, `invites/resend`, `invites/route.ts`,
+`auth/{login,logout,mfa,session,signup}`, `audit`, `trials/sweep`, `billing/route.ts`. Πριν
+ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί,
+πάει πρώτο).
