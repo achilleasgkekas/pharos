@@ -4172,3 +4172,65 @@ data-deletion path, ανεξέταστο ακόμα). Λοιπά ανεξέτα�
 (password/mfa/reset/verify), `admin/*`, `members`, `workspace/route.ts`, `usage`. Πριν
 ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν
 βρεθεί, πάει πρώτο).
+
+## 2026-07-24 (cont. — increment 90, route-level test coverage για τα workspace/erasure + erasure/purge endpoints)
+
+Πριν από νέο increment: ask-inbox (τα 2 OPEN entries είναι bakecore-finance, τίποτα για
+saas-core), `WEB_DEBT.md` (ακόμα η 58η σάρωση 2026-07-24, τα 3 ανοιχτά items — Notifications
+requireAdmin/Voucher-GiftCard-LoyaltyCard tenancy/sampleDataActions.ts tenancy — αγγίζουν
+`app/settings/actions.ts` και `app/vouchers/*.ts`, ΕΚΤΟΣ του δικού μου territory [`api/saas/**`,
+`lib/tenancy/**`, `lib/billing/**`], άρα δεν τα ανέλαβα), UI-first backlog (ακόμα εξαντλημένο,
+confirmed στο increment 86). Ακολούθησα το leftover next-task από το increment 89: το GDPR-
+critical `api/saas/workspace/erasure`/`erasure/purge` route pair (ήδη guarded με try/catch από
+το increment 85, αλλά ανεξέταστο σε route-level).
+
+**Νέα `workspace/erasure/route.test.ts`** (15 tests, GET+POST+DELETE) **+
+`workspace/erasure/purge/route.test.ts`** (9 tests), μηδέν production code αλλαγή, ίδιο
+module-boundary precedent με τα προηγούμενα route tests: το πρώτο mocks `@/lib/tenancy/
+workspaceSession` (`resolveWorkspaceSession`), `@/models/Tenant` (`updateOne`), `@/lib/tenancy/
+audit` (μόνο `recordAudit` mocked, το υπόλοιπο module πραγματικό μέσω `vi.importActual`) — οι
+ήδη-unit-tested pure helpers (`erasure.ts`: `planErasureRequest`/`planErasureCancel`/
+`erasureView`/`isErasureRequested`) τρέχουν πραγματικά, όχι mocked. Το δεύτερο mocks `@/lib/
+tenancy/saasMode` + `@/lib/tenancy/erasurePurge` (`runErasurePurgeScan`) — το route's δικό του
+constant-time bearer-compare (`tokenMatches`) τρέχει πραγματικό.
+
+Καλύπτει erasure/route.ts: (1) και τα 3 handlers περνούν αναλλοίωτα το short-circuit response
+του `resolveWorkspaceSession` (gate/401/403/404), μηδέν write/audit· (2) owner-only gate (admin/
+member → 403 σε POST+DELETE, ίδιο error-message assertion)· (3) idempotency και στις δύο
+κατευθύνσεις (POST σε ήδη-pending, DELETE σε τίποτα-pending → επιστρέφουν το τρέχον state,
+ΜΗΔΕΝ `Tenant.updateOne`/`recordAudit`)· (4) το happy path γράφει το σωστό `$set` +audits το
+σωστό action/actor/target (`workspace.erasure_requested`/`workspace.erasure_canceled`)· (5)
+tenant-slug forwarding (trim, allowInactive=true ώστε ένας ήδη-suspended owner να μπορεί ακόμα
+να δει/ακυρώσει)· (6) mid-handler DB throw και στα δύο mutating handlers → clean 500 JSON
+(`saasGuard`), όχι HTML crash page.
+
+Καλύπτει erasure/purge/route.ts: (1) SAAS_MODE off → 404, ΔΕΝ διαβάζει καν το CRON_SECRET· (2)
+CRON_SECRET unset → 500 fail-closed· (3) bearer-gate ladder (missing header, non-Bearer scheme,
+wrong-same-length token, wrong-different-length token — το τελευταίο επιβεβαιώνει ότι το
+length-guard πριν το `timingSafeEqual` δεν κάνει throw σε mismatched buffer lengths, exactly το
+σχόλιο του route)· (4) σωστό token → καλεί το scan, `{ ok:true, ...result }`· (5) trim στο
+bearer value πριν το compare· (6) mid-handler throw από το scan → clean 500 JSON.
+
+**Bug στο πρώτο μου πέρασμα (καλό σημάδι)**: αρχικά έφτιαξα το mock `runErasurePurgeScan`
+return shape λάθος (`{dryRun, due: string[], checked}` — δικό μου μάντεμα χωρίς να διαβάσω το
+πραγματικό `ErasurePurgeScanResult` type πρώτα) → tsc TS2322. Διόρθωσα διαβάζοντας το
+πραγματικό type (`erasurePurge.ts:109-118`: `{scanned, dryRun:true, due:number, targets:
+PurgeTarget[]}`) και ευθυγράμμισα το test fixture + assertion με το πραγματικό σχήμα (καμία
+αλλαγή στον production κώδικα, μόνο στο δικό μου test file).
+
+**Verified**: και τα δύο νέα test files **24/24 green** μαζί (15+9). `npm run type-check` →
+**EXIT 0** (μετά το fix). Πλήρες `npx vitest run` → **242 files / 3161 tests green** (ήταν
+239/3115 στο increment 89 — η διαφορά +3 files/+46 tests περιλαμβάνει τα δικά μου +2 files/+24
+tests + tests από concurrent routines). **Docker: ΔΕΝ έγινε rebuild** (test-only αρχεία, μηδέν
+production code/runtime wiring αλλαγή). **Browser-verify: skipped** (test files, μηδέν UI/
+observable behavior αλλαγή). Collision guard: `git status --short` πριν το staging έδειξε ΜΟΝΟ
+τα 2 δικά μου νέα αρχεία (καθαρό working tree), `git diff --cached --name-only` επιβεβαίωσε
+exact match.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο σε επόμενο ανεξέταστο route-cluster — καλοί υποψήφιοι τώρα:
+`account/*` routes (password/mfa/reset/verify, session-gated self-service), `admin/*`
+(superadmin console reads/writes), `members`, `workspace/route.ts` (GET/PATCH/DELETE), `usage`.
+Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν
+βρεθεί, πάει πρώτο).
