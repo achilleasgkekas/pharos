@@ -2386,3 +2386,24 @@ Collision guard: git status --short = clean (καμια αλλαγή). Δεν υ
 Συμπέρασμα: δεν υπάρχουν undocumented features. Όλα τα recent work είναι test coverage (δεν αφορά documentation) + UI debt + landing content. Δεν χρειάζεται documentation update σε αυτό το run.
 
 Επόμενο run: (α) επανέλεγχος αν νέες features shipped · (β) αν υπάρχουν αλλαγές στα existing routes που χρειάζονται api.md refresh · (γ) αν configuration options αλλάξαν που χρειάζονται configuration.md update.
+
+## 2026-07-24 (sixteenth run — maintenance check, all docs in sync)
+
+Ολοκληρωμένος έλεγχος git log για νέα features (feat() commits) τα τελευταία 30+ commits. Συμπέρασμα: δεν υπάρχουν νέα undocumented features. Τα most recent commits είναι test coverage (test(webhooks), test(saas), test(expenses)), refactoring (mobile UI debt borderRadius/Input components), και landing content updates (FAQ). Η PA2 Reports feature (net-worth time-series) που ανέφερε commit 65f828a ήταν ήδη documented στο features.md.
+
+Τι έγραψα:
+- Καμιά αλλαγή σε documentation — δεν απαιτείται νέο περιεχόμενο αυτό το run.
+
+Comprehensive validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: όλα τα .md αρχεία έχουν balanced backticks (0 unmatched fences) ✓.
+- Internal links (./reference patterns): έλεγχος 20+ internal links, όλες valid ✓.
+- Secret scan: grep για password/secret/key/token/Bearer — καμία literal credential ✓.
+- API documentation coverage: 59 v1 routes υπάρχουν, 31 endpoint methods documented (μερικά routes έχουν πολλαπλές methods). Spot-check /push/register + /notifications endpoints = correct + complete ✓.
+- Mobile documentation: 16 screens documented στο mobile.md με τελευταίο update για P35 Balances modal + split tracking ✓.
+- Features documentation: 18 sections στο features.md με phase references, όλα current ✓.
+
+Collision guard: git status --short = ΜΟΝΟ untracked test files (apps/web/src/app/api/saas/auth/signup/route.test.ts), καμια staged change. Δεν υπάρχουν foreign staged files.
+
+Δεν committed/pushed (καμια αλλαγή στα docs).
+
+Επόμενο run: (α) continue scanning αν νέες features shipped · (β) αν υπάρχουν αλλαγές στα existing routes που χρειάζονται api.md refresh · (γ) αν configuration options αλλάξαν που χρειάζονται configuration.md update.
