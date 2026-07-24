@@ -17,7 +17,7 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 const TRASH_ICON: Record<TrashType, string> = {
-  item: '📦', receipt: '🧾', expense: '💸', subscription: '🔁', voucher: '🎟', task: '✓',
+  item: '📦', receipt: '🧾', expense: '💸', subscription: '🔁', voucher: '🎟', giftcard: '🎁', bill: '📄', goal: '🎯', task: '✓',
 };
 const NOTIF_ICON: Record<NotifKind, string> = {
   deal: '🏷', installment: '💳', warranty: '🛡', pricehike: '📈', trialend: '⏰', giftcard: '🎁', bill: '📄', system: '🔔',

@@ -5,7 +5,7 @@ import type { ScreenKey } from './screens/HomeScreen';
 
 const GROUPS: { title: string; items: { key: ScreenKey; label: string }[] }[] = [
   { title: 'Stuff', items: [{ key: 'shopping', label: 'Shopping list' }, { key: 'items', label: 'Inventory' }] },
-  { title: 'Money', items: [{ key: 'receipts', label: 'Receipts' }, { key: 'expenses', label: 'Expenses' }, { key: 'income', label: 'Income' }, { key: 'subscriptions', label: 'Subscriptions' }, { key: 'bills', label: 'Bills' }, { key: 'vouchers', label: 'Vouchers' }, { key: 'statements', label: 'Statements' }] },
+  { title: 'Money', items: [{ key: 'receipts', label: 'Receipts' }, { key: 'expenses', label: 'Expenses' }, { key: 'income', label: 'Income' }, { key: 'subscriptions', label: 'Subscriptions' }, { key: 'bills', label: 'Bills' }, { key: 'goals', label: 'Goals' }, { key: 'vouchers', label: 'Vouchers' }, { key: 'statements', label: 'Statements' }] },
   { title: 'Plan', items: [{ key: 'tasks', label: 'Tasks' }, { key: 'calendar', label: 'Calendar' }, { key: 'reports', label: 'Reports' }] },
 ];
 

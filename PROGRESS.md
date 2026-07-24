@@ -7348,3 +7348,94 @@ matched-line-item snippet (P22, P3/S) μένει χαμηλότερης προτ
   mobile native-dep approvals (P20 barcode lib, P17 camera, P23 share-sheet)· P36 Open Banking provider
   decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file need· Settings
   theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power tool.
+
+## 2026-07-24 (pharos-daily-dev, cont.²)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε 2 OPEN items, και τα δύο από
+`bakecore-finance` (άσχετο project) → τίποτα να εφαρμόσω πρώτα. `mkdir /tmp/claude-docker.lock` (lock acquired
+καθαρά, released στο τέλος). Working tree καθαρό στην αρχή (το προηγούμενο run του ίδιου routine σήμερα
+[`bef65fe`, gift-cards mobile parity] ήταν ήδη committed+pushed, `git log --oneline -15` το επιβεβαίωσε, +4
+commits από άλλα routines μετά από αυτό).
+
+**Approved queue check (βήμα a)**: αμετάβλητο vs τα προηγούμενα runs σήμερα (P36/P31/P16/P9/P17/P23 παραμένουν
+blocked ή systematically deferred >10 σαρώσεις, ίδια κρίση με τον product-planner). Πέρασα στο βήμα (b): το
+suggested-next-task των δύο προηγούμενων runs σήμερα.
+
+**Savings/financial goals → mobile parity (P12 gap) — ✅ SHIPPED**. Top item του Build Queue μετά την 53η
+mobile-parity-auditor σάρωση (2026-07-22). Το web feature (P12, `78ebd76`) ήταν πλήρες (`models/Goal.ts` +
+`lib/goals.ts` derived-progress helpers + κάρτα στο web `/reports`), αλλά μηδέν v1 API route ή mobile UI — το
+μοντέλο είχε ήδη ρητό σχόλιο στον κώδικα «for a future GET /api/v1/goals», ίδιο idiom με το ήδη-shipped
+Bill/GiftCard precedent.
+
+**Web (v1 API)**: νέα **`apps/web/src/app/api/v1/goals/route.ts`** (GET list + POST create) +
+**`goals/[id]/route.ts`** (PATCH + DELETE) — mirror ακριβώς του ήδη-shipped GiftCard (P32) v1 pattern: ίδια
+shared `withAuth`/`apiError`/`listParams`/`withSince`/`listEnvelope`/`readBody`/`strField`/`numField`/
+`isObjectId` helpers, μία `trim()` single-source-of-truth στο `route.ts` re-exported στο `[id]/route.ts`.
+`trim()` υπολογίζει `current`/`remaining`/`pct`/`done`/`monthsLeft`/`perMonth` server-side καλώντας το
+ήδη-existing `lib/goals.ts goalProgress()` pure helper. GET default εξαιρεί archived, sort
+`{archived:1, targetDate:1, createdAt:-1}`. **PATCH σχεδιαστική απόφαση**: αντί ξεχωριστό endpoint για
+contributions, το ίδιο PATCH δέχεται προαιρετικά `addContribution: {amount, note?, date?}` (`$push`) **ή**
+`removeContributionId` (`$pull`) μαζί με plain field edits — αμοιβαία αποκλειόμενα (400 αν σταλούν μαζί).
+**Απόκλιση από το GiftCard `addUse` idiom**: το `addContribution.amount` πρέπει να είναι **αυστηρά θετικό**
+(400 σε 0/αρνητικό) — ένα goal κερδίζει χρήματα ΜΟΝΟ μέσω contributions, καμία «reload» έννοια σαν το gift
+card· λάθος entries αναιρούνται με `removeContributionId`, όχι με αρνητικό ποσό.
+
+**Trash fix (εν παρόδω, directly σχετικό)**: το `'goal'` ήταν ήδη μέσα στο `TrashType` union + `TRASH_MODELS`
+(`app/settings/actions.ts`, από τότε που το web feature shipped) αλλά **έλειπε** από το
+`api/v1/trash/[type]/[id]` route's local `TYPES` allow-list — ένα προγενέστερο test file το είχε ρητά pinned
+ως known gap («'goal' 400s bad type at the route even though the action would accept it»). Πρόσθεσα `'goal'`
+σε αυτό το array (1 γραμμή) ώστε mobile restore/purge να δουλεύει πραγματικά για goals που σβήνονται από το
+mobile app· ενημέρωσα το test file ώστε το `'goal'` να μετακινηθεί από το reject-list στο accept-list (το
+`'loyaltycard'` παραμένει έξω, ξεχωριστό item, εκτός scope εδώ).
+
+**Mobile**: `apps/mobile/src/api.ts` += `Goal`/`GoalContribution` types + `getGoals`/`addGoal`/`updateGoal`/
+`deleteGoal`/`addGoalContribution`/`removeGoalContribution` (mirror του ήδη-existing GiftCard client block) +
+**`TrashType` union επεκτάθηκε** (`giftcard`/`bill`/`goal` προστέθηκαν — τα πρώτα δύο έλειπαν ήδη από πριν,
+silent gap στο mobile Activity→Trash tab για GiftCard/Bill rows, fixed εν παρόδω μαζί με το goal, ίδιο μικρό
+low-risk cleanup). **Builder decision (απόκλιση από το default του MOBILE_PARITY entry)**: αντί section μέσα
+στο `ReportsScreen.tsx` (που είναι καθαρά read-only aggregation, τροφοδοτείται από ΕΝΑ `getReports()` call),
+έφτιαξα **standalone `GoalsScreen.tsx`** (mirror του `BillsScreen.tsx` modal-CRUD σκελετού + του GiftCards-tab
+contribution-ledger pattern) — τα Goals χρειάζονται πλήρες CRUD (add/edit/delete goal + add/remove
+contribution), δυσανάλογο βάρος για ένα read-only screen. Κάρτες: τίτλος + category/target-date meta +
+current/target bold + progress bar (accent αν done, cyan αλλιώς) + «€X/mo needed» hint· edit modal:
+title/target-amount/target-date/category/notes + inline «+ Add contribution» row (μόνο θετικό ποσό) +
+contributions-history με «×» remove· long-press-to-delete (Alert confirm, soft-delete → Trash). Wired: νέο
+`ScreenKey='goals'` (`HomeScreen.tsx`+`App.tsx`), homepage Tile (purple), Drawer nav entry στο «Money» group
+(`nav.tsx`), `TITLES['goals']='Goals'`, `ActivityScreen.tsx TRASH_ICON` += giftcard/bill/goal glyphs.
+
+**Verify**: `npm run type-check` (web) EXIT 0. Full `npx vitest run` **2958 passed / 228 files** (+23 νέα: 10
+στο `goals/route.test.ts` + 13 στο `goals/[id]/route.test.ts`, + 3 τροποποιημένα σε-place στο
+`trash/[type]/[id]/route.test.ts` [goal reject→accept-list, ίδιο πλήθος tests], μηδέν regression αλλού).
+`apps/mobile npx tsc --noEmit` EXIT 0. **Docker safe rebuild**: mongo ήδη healthy → `docker compose build web`
+OK → `up -d web` → clean start (`RestartCount=0`, State=running, ExitCode=0), `/login` 200 στην 1η προσπάθεια,
+`docker logs` καθαρό (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning). `curl GET /api/v1/goals` χωρίς
+token → **401** (auth gate intact). Browser-checked (Claude Browser pane): `/login` → «Sign in · Pharos»,
+μηδέν console errors. `docker builder prune -f` (196.1MB freed), lock released καθαρά. **Το πραγματικό mobile
+UI (GoalsScreen κάρτες/modal/contribution-ledger σε πραγματική RN συσκευή) ΔΕΝ testable end-to-end unattended**
+(χρειάζεται login + Expo simulator boot, εκτός scope του routine) — verified πλήρως μέσω των 23 νέων route
+tests + tsc και στα δύο apps, ίδιος περιορισμός με κάθε προηγούμενο mobile-parity shipment.
+
+**`MOBILE_PARITY.md`** ενημερώθηκε: το Goals entry marked `✅ DONE 2026-07-24 (pharos-daily-dev)` με πλήρη
+υλοποίηση + verify λεπτομέρειες (η επόμενη mobile-parity-auditor σάρωση θα το επιβεβαιώσει + θα ξαναϋπολογίσει
+το ranked top-N).
+
+**Suggested next task**: το επόμενο top item του Build Queue (μετά την 53η σάρωση ranking, μετά και τα Gift
+cards + Goals shipped) είναι **Loyalty card wallet → mobile exposure** (P20 gap, P2/L, νέο entity
+`LoyaltyCard`, μηδέν v1 route ακόμα) — ΑΛΛΑ χρειάζεται builder decision για RN barcode-rendering dep (η web
+υλοποίηση χρησιμοποιεί `jsbarcode`, DOM/canvas-based, ΔΕΝ τρέχει σε React Native· `react-native-barcode-svg`
+[pure SVG, zero native deps] είναι η προφανής επιλογή, βλ. MOBILE_PARITY.md entry για λεπτομέρειες — καθαρά
+τεχνική επιλογή, όχι needs-Achilleas). **Search matched-line-item snippet** (P22, P3/S) μένει χαμηλότερης
+προτεραιότητας tier παρά το μικρό μέγεθος (ίδια κρίση με προηγούμενες σαρώσεις). Το Approved queue παραμένει
+με P36/P31/P16/P9/P17/P23 blocked/deferred όπως πάντα.
+
+**Git hygiene**: `git add` explicit (MOBILE_PARITY.md + 8 web/mobile source+test αρχεία + 1 νέο mobile screen
++ 4 νέα web route/test αρχεία, όχι `-A`) → commit → push.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: `getTenantConnection` readyState guard decision
+  (P3/S)· SaaS multi-tenancy/billing rollout env boundary· mobile native-dep approvals (P20 barcode lib —
+  `react-native-barcode-svg` builder-proposed, P17 camera, P23 share-sheet)· P36 Open Banking provider
+  decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file need·
+  Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power
+  tool.

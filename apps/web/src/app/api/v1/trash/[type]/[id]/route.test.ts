@@ -9,9 +9,11 @@ import type { NextRequest } from 'next/server';
 //
 // Route-only behaviour pinned here:
 //   1. the local `:type` allow-list is a NARROWER copy of the action layer's `TrashType` union —
-//      it's missing 'loyaltycard' and 'goal' (present in settings/actions.ts TRASH_MODELS) — so
-//      those two 400 'bad type' at the route even though the action would accept them. Pinned as
-//      current behaviour, not "fixed" here (out of this test's scope).
+//      it's missing 'loyaltycard' (present in settings/actions.ts TRASH_MODELS) — so that one
+//      400s 'bad type' at the route even though the action would accept it. 'goal' was added to
+//      the allow-list alongside the P12 v1 goals route (mobile parity needs goal-trash restore to
+//      actually work) — pinned as current behaviour, not "fixed" here (loyaltycard remains out of
+//      this test's scope).
 //   2. PATCH has NO role check — any authenticated user can restore.
 //   3. DELETE's admin-role check runs BEFORE the type/id guards — a non-admin gets 403 without
 //      the route ever validating (or even reading) :type/:id, and without calling the action.
@@ -109,7 +111,7 @@ describe('PATCH (restore) — auth gate', () => {
 });
 
 describe('PATCH (restore) — type guard', () => {
-  it.each(['item', 'receipt', 'expense', 'subscription', 'voucher', 'giftcard', 'bill', 'task'])(
+  it.each(['item', 'receipt', 'expense', 'subscription', 'voucher', 'giftcard', 'bill', 'goal', 'task'])(
     'accepts allow-listed type %s',
     async (type) => {
       const res = await PATCH(makeReq(type, OID), ctx(type, OID));
@@ -118,7 +120,7 @@ describe('PATCH (restore) — type guard', () => {
     }
   );
 
-  it.each(['loyaltycard', 'goal'])(
+  it.each(['loyaltycard'])(
     'rejects %s — present in the action-layer TrashType union but NOT in this route\'s local allow-list',
     async (type) => {
       const res = await PATCH(makeReq(type, OID), ctx(type, OID));
@@ -193,7 +195,7 @@ describe('DELETE (purge) — admin gate runs BEFORE type/id validation', () => {
 });
 
 describe('DELETE (purge) — type guard (admin)', () => {
-  it.each(['loyaltycard', 'goal'])('rejects %s — not in the local allow-list', async (type) => {
+  it.each(['loyaltycard'])('rejects %s — not in the local allow-list', async (type) => {
     const res = await DELETE(makeReq(type, OID), ctx(type, OID));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: 'bad type' });
