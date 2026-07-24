@@ -4454,3 +4454,58 @@ verify-request/verify-confirm/workspaces/export, 9 files, session-gated), `admin
 `workspace/{ai-key,export,export/files,reactivate}`, `invites/{resend,route}`, `audit`,
 `trials/sweep`, `billing/route.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση
 `WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-24 (cont. — increment 95, route-level test coverage για το auth/signup endpoint)
+
+Πριν από νέο increment: ask-inbox (τα 3 OPEN entries είναι ακόμα bakecore-finance ×2/
+bakecore-redesigner ×1, τίποτα addressed σε saas-core). `WEB_DEBT.md` re-checked (58η σάρωση
+παραμένει η πιο πρόσφατη· τα 3 ανοιχτά auto-buildable items αφορούν `app/settings/actions.ts`/
+`app/vouchers/*.ts`, ρητά ΕΚΤΟΣ territory — δεν τα ανέλαβα). UI-first backlog παραμένει
+εξαντλημένο (καμία νέα `api/saas/**` route χωρίς UI consumer). Ακολούθησα το leftover next-task:
+από τα 27 ανεξέταστα route-clusters διάλεξα **`auth/signup`** — το σημείο που δημιουργεί ΝΕΟ
+global Account + το πρώτο Tenant του (owner Membership), υψηλότερου ρίσκου από τα υπόλοιπα
+υπόλοιπα auth routes (`session`/`logout`) γιατί λάθος εδώ σημαίνει είτε duplicate account
+δημιουργείται (race στο unique index) είτε ένα provisioned Tenant μένει ορφανό από μισο-χτισμένο
+Account.
+
+**Νέο `auth/signup/route.test.ts`** (14 tests), μηδέν production code αλλαγή. Mocks: `@/lib/db`
+(connectDB no-op), `@/models/Account` (`exists`/`create`), `@/lib/auth` (`hashPassword`), `@/lib/
+tenancy/provision` (`provisionTenant`), `@/lib/tenancy/accountSession` (`setAccountCookie`).
+`@/lib/tenancy/saasApi` mock χρησιμοποιεί `vi.importActual` για το πραγματικό `saasGuard` (ίδιο
+module-boundary precedent με τα auth/login+auth/mfa tests), mocks μόνο `saasAuthGate`/
+`accountTenants`.
+
+Καλύπτει: (1) gate short-circuit περνάει αναλλοίωτο, μηδέν DB· (2)(3) missing/malformed email →
+400, μηδέν DB· (4)(5) password <8 chars ή missing → 400, μηδέν DB· (6) email lowercased+trimmed
+πριν το `exists()` ΚΑΙ το `create()`· (7) γνωστό email (exists()=true) → 409, `Account.create`
+ΠΟΤΕ δεν καλείται· (8) **race-safety fallback**: `exists()=false` αλλά `create()` πετάει Mongo
+11000 → η ΙΔΙΑ 409 απάντηση, όχι 500, μηδέν provisionTenant/cookie· (9) οποιοδήποτε ΑΛΛΟ σφάλμα
+στο `create()` (όχι 11000) → περνάει καθαρό μέσα από το 500 του `saasGuard`, ΔΕΝ καταπίνεται σαν
+409· (10)(11)(12) **workspace-name fallback chain**: explicit `workspace` κερδίζει το `name`,
+`name` κερδίζει το email local-part, όταν και τα δύο λείπουν → `email.split('@')[0]`· (13)
+success path: `hashPassword` καλείται με το raw password (ΠΟΤΕ δεν αποθηκεύεται raw),
+`provisionTenant({accountId, workspaceName})`, `setAccountCookie({sub,email})`, response 201
+`{account, tenants}` με `tenants` από `accountTenants(accountId)`· (14) κενό name fallback στο
+response.
+
+**Verified**: νέο test file **14/14 green** μόνο του· πλήρες `npx vitest run` → **253 files /
+3339 tests green** (ήταν 250/3308 στο increment 94 — η διαφορά +3 files/+31 tests περιλαμβάνει
+το δικό μου +1 file/+14 tests + tests από concurrent routine [`expenses/actions.rules.test.ts`
+φάνηκε staged από άλλη routine στο πρώτο `git status --short`, collision guard καθάρισε μόνο του
+15s αργότερα]). `npm run type-check` → **EXIT 0** καθαρά. **Docker: ΔΕΝ έγινε rebuild**
+(test-only αρχείο, μηδέν production code/runtime wiring αλλαγή). **Browser-verify: skipped**
+(test file, μηδέν UI/observable behavior αλλαγή). Collision guard: το αρχικό `git status --short`
+έδειξε ένα ΞΕΝΟ staged αρχείο (concurrent routine mid-commit) → περίμενα, ξανα-έλεγξα, καθάρισε →
+staged+committed ΜΟΝΟ το δικό μου 1 νέο αρχείο, `git diff --cached --name-only` επιβεβαίωσε exact
+match. Pushed `e599bac`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο σε επόμενο ανεξέταστο route-cluster (26 routes ακόμα χωρίς
+route-level test) — καλοί υποψήφιοι τώρα: `auth/{session,logout}` (κλείνει όλο το auth surface),
+`account/*` self-service routes (password/mfa/mfa-confirm/reset-request/reset-confirm/
+verify-request/verify-confirm/workspaces/export, 9 files, session-gated), `admin/overview` +
+`admin/tenants` list (read-only console surfaces), `members`, `usage` + `usage/sample`,
+`workspace/{ai-key,export,export/files,reactivate}`, `invites/{resend,route}`, `audit`,
+`trials/sweep`, `billing/route.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση
+`WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
