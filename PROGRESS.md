@@ -7755,3 +7755,72 @@ push σε `main`.
   theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power tool· P5
   bookmarklet MV3-extension phase 2 (confirmed browser-only phase 1 σήμερα, extension = ξεχωριστή μελλοντική
   απόφαση αν αξίζει καν).
+
+## 2026-07-24 (web-code-quality auditor, 58η σάρωση)
+
+Read-only audit run (scheduled task `web-code-quality`). Διάβασα CLAUDE.md, BACKLOG.md, TODO.md, PROGRESS.md
+(τελευταία entries), `git log --oneline -15`. Δεν άγγιξα app code, δεν έτρεξα Docker builds, δεν πυροδότησα AI
+jobs — μόνο `git log`/`git show`, grep/read, `npm run type-check`, και ένα μικρό `npx tsx` one-liner για το
+i18n key-diff. Working tree είχε 1 uncommitted αλλαγή στην αρχή (`apps/landing/app/page.tsx`, ξένο WIP) — δεν
+το άγγιξα, δεν το πρόσθεσα στο commit.
+
+**Marker**: προηγ. web-code-quality audit commit `db9af7c` (57η σάρωση, 2026-07-22) → HEAD, **~65 commits**
+(`db9af7c..HEAD`, εκτός test/docs/content-only). `npm run type-check` → **EXIT 0**.
+
+**Κύρια νέα επιφάνεια αυτού του διαστήματος**: 3 νέα v1 mobile-parity resources (`api/v1/goals`+`[id]` P12,
+`api/v1/giftcards`+`[id]` P32, `api/v1/loyaltycards`+`[id]` P20) + `api/v1/expenses` += `taxDeductible`/
+`taxCategory` (P8) + `api/v1/notifications` GET += `currency`. Παράλληλα ο builder (saas-core routine,
+increment 84-85) κατανάλωσε **και τα 4 items** που είχε ανοίξει η 57η σάρωση.
+
+**Ευρήματα ανά dimension**:
+- **Type safety**: 0 νέο (`: any`/`as any`/`@ts-ignore` sweep καθαρό στα νέα v1 routes).
+- **Input validation**: 0 νέο — τα 3 νέα resources χρησιμοποιούν πλήρως τα shared `readBody`/`strField`/
+  `numField`/`isObjectId` helpers, ίδιο idiom με Bills/Expenses.
+- **Error handling**: 0 νέο — όλα περνούν από `withAuth` (κεντρικό try/catch+shape).
+- **Auth**: 0 νέο gap — κάθε νέο v1 route έχει `withAuth`.
+- **Mongoose**: 0 νέο — Goal/GiftCard/LoyaltyCard models index-consistent (`archived`, date field, `updatedAt`
+  για το incremental-sync cursor), soft-delete plugin, `.lean()` παντού.
+- **Duplication/dead code**: 0 νέο (τα 3 resources επαναλαμβάνουν το ίδιο σκελετό σκόπιμα, ίδιο established
+  mirror-pattern με Bills, όχι νέο debt).
+- **UX states**: 0 νέο (`loading.tsx` παραμένει σκόπιμα απόν, βλ. παλαιότερη «Δεν είναι debt» απόφαση).
+- **`npm run type-check`**: EXIT 0.
+
+**4 items ΕΚΛΕΙΣΑΝ από την προηγ. σάρωση, verified live, ήδη marked DONE στο WEB_DEBT.md από τον ίδιο τον
+builder**: SaaS auth/mfa rate-limit (P1, commit `3206fa3`)· 3× guardless SaaS routes try/catch (P2/S ×3, commit
+`6f3de54`)· **και το standing `getTenantConnection` readyState decision-flag** (P3, commit `318a1ef`) — αυτό
+ήταν `## Needs Achilleas` item για 10+ σαρώσεις (37η→57η, ambiguous rebuild-semantic), αλλά ο builder το
+έκλεισε μόνος του με το προφανώς-σωστό tightening (reuse μόνο σε connected(1)/connecting(2), όχι πια
+disconnected(0)/disconnecting(3)) μόλις το `tenantDb()` απέκτησε πραγματικούς callers — δεν χρειάστηκε τελικά
+ρητή απόφαση του Αχιλλέα.
+
+**Confirmed ΑΚΟΜΑ ανοιχτά, live-verified, μηδέν αλλαγή**: Settings→Notifications requireAdmin gap (P1/S, 8
+exports ακόμα χωρίς `requireAdmin`, tab ακόμα χωρίς `adminOnly`)· Voucher/GiftCard/LoyaltyCard tenancy-parity
+(P2/M, `grep -c` = 0/0/0 και στα τρία web server-action αρχεία — ΣΗΜ: το νέο v1 API code για GiftCard/LoyaltyCard
+έχει την ίδια μηδέν-tenancy ιδιότητα, αλλά αυτό είναι συνεπές με ολόκληρο το v1 surface [59 routes, καμία δεν
+κάνει tenancy — αρχιτεκτονική απόφαση, όχι νέο εύρημα]· το ανοιχτό item αφορά μόνο τα 3 web actions αρχεία)·
+sampleDataActions.ts tenancy-parity (P2/S, ίδιο = 0).
+
+**el.ts i18n gap**: **126** σταθερό (node-verified `en=1271, el=1145`, μηδέν αλλαγή σε en.ts/el.ts αυτό το
+διάστημα — τα νέα mobile-parity items είναι mobile-only, μηδέν νέο web UI string). Παραμένει P3/M.
+
+**`## Needs Achilleas` άδειο πλέον από decision-flags** — το `getTenantConnection` ήταν το τελευταίο standing
+item εκεί, τώρα DONE (δες πάνω).
+
+**Top 3 για τον builder**:
+1. **Settings→Notifications requireAdmin gap** (P1/S, ανοιχτό από 19/7) — 1-liner ×8, real gap σήμερα σε
+   multi-user households, ίδιο idiom με τα υπόλοιπα 17 exports στο ίδιο αρχείο.
+2. **Voucher/GiftCard/LoyaltyCard tenancy-parity** (P2/M, ανοιχτό από 19/7) — μηχανικό mirror, 3 αρχεία,
+   dead-until-SaaS αλλά ίδιας κλάσης με sibling κώδικα που ήδη το κάνει σωστά.
+3. **sampleDataActions.ts tenancy-parity** (P2/S, ανοιχτό από 18/7) — ίδιο μηχανικό mirror, 1 αρχείο.
+
+**Git hygiene**: `git add WEB_DEBT.md PROGRESS.md` (explicit, όχι `-A`) → commit → push. Δεν άγγιξα το
+uncommitted `apps/landing/app/page.tsx` (ξένο WIP).
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: SaaS multi-tenancy/billing rollout env boundary·
+  mobile native-dep approvals (P17 camera, P23 share-sheet)· P36 Open Banking provider decision· P31 household
+  enforcement supervised session· P16 Firefly III/Grocy real sample-file need· Settings theme/language/
+  AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power tool· P5 bookmarklet MV3-
+  extension phase 2. (`getTenantConnection` readyState guard, standing από 37η σάρωση, ΕΚΛΕΙΣΕ αυτό το
+  διάστημα χωρίς να χρειαστεί απόφαση — δες πάνω.)
