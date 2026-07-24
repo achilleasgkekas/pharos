@@ -7824,3 +7824,77 @@ uncommitted `apps/landing/app/page.tsx` (ξένο WIP).
   AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power tool· P5 bookmarklet MV3-
   extension phase 2. (`getTenantConnection` readyState guard, standing από 37η σάρωση, ΕΚΛΕΙΣΕ αυτό το
   διάστημα χωρίς να χρειαστεί απόφαση — δες πάνω.)
+
+## 2026-07-24 (pharos-daily-dev, cont.⁵ — expense splitting (P35) mobile parity)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε 2 OPEN items, και τα δύο από
+`bakecore-finance` (άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή. Μηδέν Docker
+build/boot αυτό το run (μόνο mobile TypeScript αλλαγή) → το `/tmp/claude-docker.lock` δεν χρειάστηκε καν.
+
+**Approved queue check (βήμα a)**: ξανασάρωσα `PRODUCT_BACKLOG.md → ## Approved` γραμμή-γραμμή. Ίδιο
+αποτέλεσμα με το προηγούμενο run: **P36** (needs-Achilleas provider decision)· **P31** (4ο+ deferral, χρειάζεται
+supervised live-login session)· **P16** Firefly III/Grocy (χρειάζεται πραγματικό sample file)· **P17**/**P23**
+(mobile-native dep approvals)· **P9** multi-currency (L, ρητά «άφησέ το τελευταίο» στο ίδιο το backlog). Μηδέν
+νέο buildable Approved item → βήμα (b).
+
+**Fallback (βήμα b)**: το `MOBILE_PARITY.md` Build Queue functional-gaps tier ήταν γνήσια άδειο (το τελευταίο
+item, notifications body-humanization, ήδη ✅ DONE από προηγούμενο run σήμερα ίδιας ημέρας). Το UI Debt Queue
+top items (emoji→lucide, safe-area-context dep) ήταν flagged attended-preferred/needs-Achilleas στην πιο
+πρόσφατη mobile-parity-auditor σάρωση (54η) — το safe-area item ειδικά θα πρόσθετε νέο native dependency
+(`react-native-safe-area-context` δεν υπάρχει καν σήμερα στο `node_modules`, ΔΕΝ είναι transitive μέσω κάποιου
+`@react-navigation` — το app έχει custom hand-rolled drawer, όχι React Navigation) → το ίδιο tier με
+P17/P23 camera/share-sheet mobile-native dep approvals, οπότε το άφησα blocked όπως και αυτά.
+
+**Νέο εύρημα, ΟΧΙ στο doc ακόμα**: διερεύνησα το ήδη-SHIPPED **P35 (expense splitting / «ποιος χρωστάει τι»)**
+για mobile parity, αφού το backlog item ανέφερε ρητά follow-up «split στο `/api/v1` expenses shape (mobile
+parity)». Βρήκα ότι αυτό το follow-up **ΕΙΧΕ ήδη κλείσει** σε προηγούμενο run (`b4f32af`, «expose space + split
+on the expenses mobile shape») — το `apps/mobile/src/api.ts` ήδη τύπωνε `split: SplitEntry[]` στο `Expense`
+type ΚΑΙ στο `updateExpense()` payload. **ΑΛΛΑ** το `apps/mobile/src/screens/MoneyScreen.tsx` (η οθόνη που
+πραγματικά render-άρει τα expenses) δεν είχε ΚΑΜΙΑ αναφορά στο `split` — grep-confirmed μηδέν hits (`grep -a
+-in split MoneyScreen.tsx` κενό). Δηλαδή: το data-layer ήταν wired, αλλά η UI δεν το έδειχνε ή επεξεργαζόταν
+ποτέ — ο χρήστης δεν μπορούσε να δει «ποιος του χρωστάει» ή να προσθέσει split από το κινητό, παρόλο που το
+API το υποστήριζε ήδη. Ίδιου τύπου κενό με τα προηγούμενα false-positive/negative ευρήματα άλλων routines (π.χ.
+pricehike stale duplicate, P22 search snippet) — ένα wired API field που ποτέ δεν έφτασε στην πραγματική
+οθόνη.
+
+**Τι έγινε**: διάβασα την πλήρη web υλοποίηση (`apps/web/src/app/expenses/ExpensesClient.tsx` `SplitEditor`/
+`SplitBadge`/`BalancesModal` + `apps/web/src/lib/split.ts` pure helpers) και έχτισα mobile parity μέσα στο
+`MoneyScreen.tsx` (μόνο αυτό το αρχείο άλλαξε, μηδέν backend αλλαγή — το API ήταν ήδη έτοιμο):
+- Δύο νέα **local pure helpers** (`splitTotals`, `equalSplit`) — mirror byte-για-byte της λογικής του web
+  `lib/split.ts` (μηδέν shared package web/mobile, ίδιο idiom με τα υπόλοιπα mobile-local helpers).
+- **List row split badge**: cyan `⇄ €X owed` / `⇄ ✓` chip δίπλα στο ποσό (Card ΚΑΙ list row, mirror του web
+  `SplitBadge`), εμφανίζεται μόνο όταν `item.split.length > 0`.
+- **Edit modal `SplitEditor`**: per-person rows (name input + share input + settled-toggle + remove, με
+  `hitSlop={8}` στα δύο μικρά 30×30 tap targets ώστε να μείνουν ≥44pt effective, mirror του established
+  `lineDel` pattern που ήδη flagged το UI-auditor) + «+ add person» + «⇄ split equally» (με «count me in»
+  toggle, ίδιο include-self flag με το web) + live «your share» γραμμή. Prefill από `it.split || []` στο
+  `prefill()`, save περνάει `split: eSplit` στο `updateExpense`.
+- **Follow-up σκόπιμα ΕΚΤΟΣ scope**: η cross-expense **«Balances» modal** (who-owes-you σύνολο σε όλα τα
+  expenses + settle-up ανά άτομο μέσω `settlePerson()`) ΔΕΝ χτίστηκε — θα χρειαζόταν είτε νέο v1 aggregation
+  endpoint είτε client-side computation πάνω από την ήδη-φορτωμένη λίστα (bigger/M scope, documented ως
+  follow-up στο doc ώστε το επόμενο run να το βρει έτοιμο speced αν θέλει να συνεχίσει).
+- **`MOBILE_PARITY.md`** ενημερώθηκε (Expenses & Income table row) με το νέο ✅ + το follow-up.
+
+**Verify**: `apps/mobile npx tsc --noEmit` EXIT 0 (πριν ΚΑΙ μετά το `hitSlop` προσθήκη). Καμία web αλλαγή, άρα
+μηδέν ανάγκη για `npm run type-check`/vitest/Docker rebuild στο web (το backend API ήταν ήδη shipped και
+αμετάβλητο). `git status --short` επιβεβαίωσε ΜΟΝΟ το `apps/mobile/src/screens/MoneyScreen.tsx` άλλαξε πριν το
+commit (καμία ανάμειξη με άλλο uncommitted WIP — δεν υπήρχε κανένα στην αρχή).
+
+**Suggested next task**: αν ξαναγίνει fallback στο MOBILE_PARITY UI Debt Queue, ελέγξτε πρώτα αν ο Αχιλλέας
+έχει απαντήσει στο standing native-dep boundary (safe-area-context/camera/share-sheet) πριν προχωρήσετε.
+Εναλλακτικά, η **Balances cross-expense modal** (follow-up αυτού του run, τώρα speced στο doc) είναι ένα καλό
+αυτόνομο, μη-μπλοκαρισμένο επόμενο item αν χρειαστεί άλλο mobile parity work. Αν αυτό εξαντληθεί επίσης,
+γυρίστε στο pure-lib test coverage pattern (ίδιο με τα τελευταία runs).
+
+**Git hygiene**: `git add` explicit (μόνο `apps/mobile/src/screens/MoneyScreen.tsx` + `MOBILE_PARITY.md` +
+`PROGRESS.md`, όχι `-A`) → commit → push.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: `getTenantConnection` readyState guard decision
+  (P3/S, ΗΔΗ ΚΛΕΙΣΤΟ — βλ. πάνω, κρατείται εδώ μόνο μέχρι να καθαριστεί σε επόμενη επιμέλεια)· SaaS
+  multi-tenancy/billing rollout env boundary· mobile native-dep approvals (P17 camera, P23 share-sheet, και
+  τώρα το safe-area-context UI-debt dep στο ίδιο tier)· P36 Open Banking provider decision· P31 household
+  enforcement supervised session· P16 Firefly III/Grocy real sample-file need· Settings theme/language/
+  AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power tool· P5 bookmarklet MV3-
+  extension phase 2.

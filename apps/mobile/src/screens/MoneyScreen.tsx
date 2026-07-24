@@ -3,11 +3,40 @@ import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet
 import * as ImagePicker from 'expo-image-picker';
 import { C } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem, Chip, ModalSheet, contentWidth } from '../ui';
-import { getExpenses, addExpense, deleteExpense, updateExpense, rescanExpense, scanExpenseImage, fileSource, type Expense, type ParsedExpenseData } from '../api';
+import { getExpenses, addExpense, deleteExpense, updateExpense, rescanExpense, scanExpenseImage, fileSource, type Expense, type ParsedExpenseData, type SplitEntry } from '../api';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
 // Same GR presets as the web tax-category picker (lib/taxonomies.ts TAX_CATEGORY_PRESETS) — free-form field, these are just suggestion chips.
 const TAX_CATEGORY_PRESETS = ['Ιατρικά έξοδα', 'Δωρεές', 'Τόκοι στεγαστικού δανείου', 'Ενοίκιο (φοιτητές/παιδιά)', 'Ασφάλιστρα ζωής', 'Δαπάνες αναπηρίας', 'Επαγγελματικά έξοδα', 'Άλλο'];
+
+// P35 mobile parity — mirrors apps/web/src/lib/split.ts (kept tiny + local, no shared
+// package between web/mobile). YOU paid the total; each SplitEntry is another person
+// who owes you their `share` (settled = paid back).
+function splitTotals(split: SplitEntry[] = []): { owed: number; settled: number } {
+  let owed = 0;
+  let settled = 0;
+  for (const s of split) {
+    if (s?.settled) settled += Number(s.share) || 0;
+    else owed += Number(s?.share) || 0;
+  }
+  return { owed: Math.round(owed * 100) / 100, settled: Math.round(settled * 100) / 100 };
+}
+function equalSplit(total: number, names: string[], includeSelf: boolean): SplitEntry[] {
+  const clean = (names || []).map((n) => (n || '').trim()).filter(Boolean);
+  if (clean.length === 0) return [];
+  const gross = Math.max(0, Math.round((Number(total) || 0) * 100));
+  const parts = includeSelf ? clean.length + 1 : clean.length;
+  const baseCents = Math.floor(gross / parts);
+  if (includeSelf) {
+    const share = baseCents / 100;
+    return clean.map((name) => ({ name, share, settled: false }));
+  }
+  let remainder = gross - baseCents * parts;
+  return clean.map((name) => {
+    const cents = baseCents + (remainder-- > 0 ? 1 : 0);
+    return { name, share: cents / 100, settled: false };
+  });
+}
 
 export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [rows, setRows] = useState<Expense[]>([]);
@@ -28,6 +57,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [eNotes, setENotes] = useState('');
   const [eTaxDeductible, setETaxDeductible] = useState(false);
   const [eTaxCategory, setETaxCategory] = useState('');
+  const [eSplit, setESplit] = useState<SplitEntry[]>([]);
   const [scanning, setScanning] = useState(false);
   const [draft, setDraft] = useState<ParsedExpenseData | null>(null);
   const [dVendor, setDVendor] = useState('');
@@ -111,6 +141,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
     setERecurring(!!it.recurring); setECycle(it.recurringCycle || '');
     setEPayment(it.paymentMethod || ''); setENotes(it.notes || '');
     setETaxDeductible(!!it.taxDeductible); setETaxCategory(it.taxCategory || '');
+    setESplit(it.split || []);
   }
   function openEdit(it: Expense) { setEditing(it); prefill(it); }
 
@@ -145,6 +176,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         notes: eNotes.trim(),
         taxDeductible: eTaxDeductible,
         taxCategory: eTaxCategory.trim(),
+        split: eSplit,
       });
       await load();
     } catch (e) { setErr((e as Error).message); }
@@ -192,6 +224,11 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
             </View>
             <View style={{ alignItems: 'flex-end', gap: 4 }}>
               <Text style={[s.amount, { color: kind === 'income' ? C.accent : C.text }]}>{money(item.amount, item.currency)}</Text>
+              {item.split && item.split.length > 0 && (
+                <Text style={s.splitBadge}>
+                  {splitTotals(item.split).owed > 0.009 ? `⇄ ${money(splitTotals(item.split).owed, item.currency)}` : '⇄ ✓'}
+                </Text>
+              )}
               {item.taxDeductible && <Text style={s.taxBadge}>🏛 tax</Text>}
               {item.anomaly != null && (
                 <Text style={s.anomaly}>⚠ {item.anomaly > 0 ? '+' : ''}{item.anomaly}%</Text>
@@ -280,12 +317,77 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
               )}
               <Text style={s.mlabel}>NOTES</Text>
               <TextArea variant="modal" value={eNotes} onChangeText={setENotes} style={{ minHeight: 60 }} />
+              <SplitEditor split={eSplit} amount={Number(eAmount.replace(',', '.')) || 0} onChange={setESplit} />
             </ScrollView>
             <View style={s.mbtns}>
               <Button label="Save" onPress={saveEdit} />
               <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} variant="danger" />
             </View>
       </ModalSheet>
+    </View>
+  );
+}
+
+/** Expense splitting (P35 mobile parity): list the people who owe you a share of this
+ *  expense. You paid the total; each row is another person and what they owe.
+ *  "Split equally" divides the amount among the named people (optionally counting
+ *  yourself). Mirrors the web SplitEditor in apps/web/src/app/expenses/ExpensesClient.tsx. */
+function SplitEditor({ split, amount, onChange }: { split: SplitEntry[]; amount: number; onChange: (s: SplitEntry[]) => void }) {
+  const [includeSelf, setIncludeSelf] = useState(true);
+  const totals = splitTotals(split);
+  const yourShare = Math.round((amount - split.reduce((sum, e) => sum + (e.share || 0), 0)) * 100) / 100;
+
+  function setRow(i: number, p: Partial<SplitEntry>) {
+    onChange(split.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
+  }
+  function addRow() { onChange([...split, { name: '', share: 0, settled: false }]); }
+  function removeRow(i: number) { onChange(split.filter((_, idx) => idx !== i)); }
+  function splitEqually() {
+    const names = split.map((r) => r.name);
+    if (names.filter((n) => n.trim()).length === 0) return;
+    const fresh = equalSplit(amount, names, includeSelf);
+    onChange(fresh.map((f) => ({ ...f, settled: split.find((r) => r.name.trim().toLowerCase() === f.name.toLowerCase())?.settled ?? false })));
+  }
+
+  return (
+    <View style={s.splitBox}>
+      <View style={s.splitHeader}>
+        <Text style={s.splitTitle}>⇄ Split</Text>
+        {split.length > 0 && (
+          <Text style={s.splitHint}>
+            {money(totals.owed)} owed to you{totals.settled > 0 ? ` · ${money(totals.settled)} settled` : ''}
+          </Text>
+        )}
+      </View>
+      {split.length === 0 ? (
+        <Text style={s.splitHint}>No split yet — everyone pays their own way.</Text>
+      ) : (
+        split.map((r, i) => (
+          <View key={i} style={s.splitRow}>
+            <Input variant="modal" value={r.name} onChangeText={(t) => setRow(i, { name: t })} placeholder="Name" style={{ flex: 1 }} />
+            <Input variant="modal" value={r.share ? String(r.share) : ''} onChangeText={(t) => setRow(i, { share: parseFloat(t.replace(',', '.')) || 0 })} keyboardType="decimal-pad" placeholder="0.00" style={{ width: 72 }} />
+            <Pressable onPress={() => setRow(i, { settled: !r.settled })} hitSlop={8} style={[s.splitMark, r.settled && s.splitMarkOn]}>
+              <Text style={[s.splitMarkText, r.settled && s.splitMarkTextOn]}>✓</Text>
+            </Pressable>
+            <Pressable onPress={() => removeRow(i)} hitSlop={8} style={s.splitDel}>
+              <Text style={s.splitDelText}>✕</Text>
+            </Pressable>
+          </View>
+        ))
+      )}
+      <View style={s.splitActions}>
+        <Pressable onPress={addRow}><Text style={s.splitAction}>+ add person</Text></Pressable>
+        {split.some((r) => r.name.trim()) && (
+          <>
+            <Pressable onPress={splitEqually}><Text style={[s.splitAction, { color: C.cyan }]}>⇄ split equally</Text></Pressable>
+            <Pressable onPress={() => setIncludeSelf((v) => !v)} style={s.splitSelf}>
+              <View style={[s.checkboxSm, includeSelf && s.checkboxSmOn]}>{includeSelf ? <Text style={s.checkboxSmMark}>✓</Text> : null}</View>
+              <Text style={s.splitHint}>count me in</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+      {split.length > 0 && <Text style={s.splitYourShare}>your share: {money(yourShare)}</Text>}
     </View>
   );
 }
@@ -328,4 +430,23 @@ const s = StyleSheet.create({
   cycleText: { color: C.dim, fontSize: 12, fontWeight: '600' },
   cycleTextOn: { color: C.cyan },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
+  splitBadge: { color: C.cyan, fontSize: 10, fontWeight: '700', backgroundColor: C.surface2, borderWidth: 1, borderColor: C.cyan, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
+  splitBox: { borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 12, marginTop: 14 },
+  splitHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  splitTitle: { color: C.cyan, fontSize: 13, fontWeight: '700' },
+  splitHint: { color: C.faint, fontSize: 11 },
+  splitRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  splitMark: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  splitMarkOn: { borderColor: C.accent, backgroundColor: C.surface2 },
+  splitMarkText: { color: C.faint, fontSize: 13, fontWeight: '700' },
+  splitMarkTextOn: { color: C.accent },
+  splitDel: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  splitDelText: { color: C.faint, fontSize: 13 },
+  splitActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, marginTop: 4 },
+  splitAction: { color: C.accent, fontSize: 12, fontWeight: '600' },
+  splitSelf: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  checkboxSm: { width: 16, height: 16, borderRadius: 4, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  checkboxSmOn: { borderColor: C.cyan, backgroundColor: C.cyan },
+  checkboxSmMark: { color: C.onAccent, fontSize: 10, fontWeight: '800' },
+  splitYourShare: { color: C.faint, fontSize: 11, marginTop: 8, textAlign: 'right' },
 });
