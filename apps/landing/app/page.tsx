@@ -462,6 +462,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Docker and a machine that stays on: a Mac mini, a NAS, a Proxmox LXC, or a spare mini PC all work. One docker compose up brings up the web app, MongoDB, and search. Reach it over your LAN or your own VPN.',
   },
   {
+    q: 'Can I see what it looks like before adding my own data?',
+    a: 'Yes. Settings has a one-click "Load sample data" that fills items, receipts, expenses, and subscriptions with a small realistic set, dates spread over the last few months, so a brand-new install already looks lived-in. Every sample record is tagged behind the scenes, so "Clear sample data" removes exactly those and nothing you added yourself. Available on both self-hosted and hosted.',
+  },
+  {
     q: 'How is hosted different from self-hosted?',
     a: 'It is the same app. With hosted we handle the server, updates, and nightly backups, and AI parsing is included so there is nothing to configure. Self-hosted gives you full control and keeps every byte on your own hardware.',
   },

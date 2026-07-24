@@ -3074,3 +3074,63 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-24 (9) — FAQ += "Load sample data" (P1) before-you-commit onboarding
+
+Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος
+`~/.claude/ASK_ACHILLEAS.md` (3 OPEN entries, ολα bakecore, τιποτα για landing/pharos).
+
+`git log --oneline -- apps/landing/app/page.tsx` -> τελευταιο commit `a543502` (ROADMAP hygiene).
+`git log --oneline a543502..HEAD` εδειξε 6 commits, μηδεν νεο `feat(` (μονο tests/docs/refactor) —
+αρα το επομενο βημα που προτεινε το προηγουμενο entry («σαρωση για νεα modules/commits») δεν ειχε
+νεο υλικο απο εκει.
+
+Αντ' αυτου εκανα ενα ευρυτερο περασμα: `git log --oneline -300 | grep "feat("` σε ολοκληρο το repo
+(οχι μονο μετα το τελευταιο landing commit) για candidates που μπορει να ειχαν περασει απο προηγουμενα
+sweeps. Ελεγξα καθε ονομα-feature (webhooks, YNAB import, IMAP email-in, bills tracker, expense
+splitting, per-property tag, global-search line-items, onboarding checklist, demo mode) εναντια στο
+υπαρχον `page.tsx` κειμενο (grep keyword-by-keyword). Τα περισσοτερα ηδη καλυπτονται καπου (webhooks
+στην alerts FAQ γραμμη 534, YNAB ΔΕΝ αναφερεται ρητα αλλα ειναι πολυ niche/implementation-level για
+FAQ, splitting/per-property/global-search ολα ηδη εχουν δικια τους FAQ γραμμη). Βρηκα ομως ενα σαφες
+κενο: **`61e2524 feat(settings): demo / sample-data mode (P1)`** — «Load sample data» στο Settings
+γεμιζει Items/Receipts/Expenses/Subscriptions με ενα μικρο ρεαλιστικο locale-aware σετ (`isSample:true`
+tagged, `lib/sampleData.ts`) ωστε μια φρεσκια self-host εγκατασταση να δειχνει αμεσως πως μοιαζει η
+εφαρμογη σε χρηση, χωρις να χρειαζεται πραγματικα δεδομενα πρωτα, και «Clear sample data» το καθαριζει
+χωρις να αγγιξει πραγματικα records. **Δεν αναφεροταν πουθενα** στη landing σελιδα, ουτε στα FEATURES
+cards ουτε στο FAQ, παρολο που απαντα σε μια φυσικη αντιρρηση νεου χρηστη («θα καταλαβω πως δουλευει
+πριν βαλω τα πραγματικα οικονομικα μου δεδομενα;»).
+
+Αλλαγη (`apps/landing/app/page.tsx`, `FAQS` array μονο, μηδεν UI/CSS/dependency change): νεα εγγραφη
+«Can I see what it looks like before adding my own data?» αμεσως μετα το «What do I need to run it?»
+(ιδιο getting-started cluster, πριν το hosted-vs-self-hosted question) — περιγραφει το one-click load,
+τα 4 τυπους δεδομενων, το isSample tagging/clean wipe, και οτι διαθεσιμο και στα δυο (self-hosted +
+hosted).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (ιδιο μεγεθος με ολα τα
+  προηγουμενα increments, το FAQS array ειναι build-time data μονο).
+- Browser preview: κανενα port 3100-3190 κατειλημμενο (μονο 3000/3100 απο Docker), `next start -p 3170`
+  πανω στο production build. `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors)
+  -> "No console logs." καθαρο. `javascript_tool` επιβεβαιωσε: deterministic anchor id
+  `faq-can-i-see-what-it-looks-like-before-adding-my-own-data`, σωστο `textContent` (πληρες σωστο
+  κειμενο), σωστη σειρα στο DOM (neighbors = [faq-what-do-i-need-to-run-it, **αυτο**,
+  faq-how-is-hosted-different-from-self-hosted]). Server σταματησε μετα (`pkill -f "next start -p
+  3170"`), `lsof -i :3170` εδειξε μονο το γνωστο false-positive Claude-app TCP CLOSE_WAIT match
+  (σημειωμενο ηδη σε προηγουμενα entries), οχι το node process.
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: το ευρυτερο `feat(` sweep σε ολοκληρο το repo (οχι μονο μετα το τελευταιο landing
+commit) αποδειχτηκε χρησιμο, θα το επαναλαβω περιοδικα. Υπολοιπο niche candidate που δεν κρινεται
+FAQ-worthy: YNAB CSV migration importer (πολυ implementation-level/niche για marketing FAQ, καλυτερα
+σε docs). Αλλιως: νεα modules/commits απο το κυριο repo μετα απο αυτο το run, ή (e) polish συνεχεια,
+real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
