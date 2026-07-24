@@ -1,46 +1,45 @@
 # Pharos Monitor — STATUS
 
-## 2026-07-23 22:22
+## 2026-07-24 20:45
 
-**Εκτίμηση: ΕΝΔΕΙΚΝΥΜΕΝΗ ΣΟΒΑΡΗ ΔΥΣΛΕΙΤΟΥΡΓΙΑ — Auditor batch ΕΚΤΟΣ στις 35+ ώρες (ξεπερνάει κατά πολύ το ~7h threshold). Ο reviewer έτρεξε κανονικά στις 22:21 σήμερα. Τα build/parity/docker/web audit routines δεν έχουν δραστηριότητα από τις 11:40 χθες (2026-07-22).**
+**Εκτίμηση: ΚΥΡΙΩΣ ΟΚ με μία STALE routine. Ο builder έτρεξε πολλές φορές σήμερα (18 runs αναχωρήσαν έως 20:43), ο reviewer ήταν ενεργός, μόνο το docker-health δεν έχει τρέξει ~17 ώρες.**
 
 | routine | τελευταία δραστηριότητα | OK/STALE | τι έκανε (σύντομα) |
 |---|---|---|---|
-| builder (Pharos daily dev) | 2026-07-22 11:38 | **STALE** | P5 quick-capture bookmarklet; 34+ ώρες χωρίς run (expected ~5h cycle) |
-| parity auditor (mobile-parity) | 2026-07-22 11:33 | **STALE** | 53η σάρωση; Build Queue re-audit; 34+ ώρες |
-| docker guard (health check) | 2026-07-22 11:31 | **STALE** | health check + rebuild validation; 34+ ώρες |
-| web code-quality auditor | 2026-07-22 11:40 | **STALE** | 57η σάρωση; flagged MFA rate-limit gap (P1); 34+ ώρες |
-| ui auditor (mobile-ui) | 2026-07-20 ~15:30 | **VERY STALE** | 52η σάρωση (προηγούμενη); ~2,5 ημέρες χωρίς run |
-| reviewer | 2026-07-23 22:21 | **OK** | sweep 3ad1fea..066b1c6 (2 commits, docs-only); ΕΑΡ κανονικά |
+| builder (Pharos daily dev) | 2026-07-24 20:43 | **OK** | 18η run· RADIUS token adoption + test coverage; 2 commits/hour average |
+| reviewer | 2026-07-24 18:56 | **OK** | sweep 066b1c6..cdc6a03 (81 commits, 79 files); type-checks passed |
+| ui auditor (mobile-ui) | 2026-07-24 09:29 | **OK** | 54η σάρωση; consistency monitoring; borderRadius/padding/ActivityIndicator tracking |
+| web code-quality auditor | 2026-07-24 11:03 | **OK** | 58η σάρωση; flagged MFA rate-limit P1; full vitest 2903/2903 green |
+| docker guard (health) | 2026-07-24 03:03 | **STALE** | health check + rebuild validation; 17.7 ώρες χωρίς run (expected ~7h threshold) |
+| parity auditor (mobile-parity) | 2026-07-24 09:29 | **OK** | 54η σάρωση; 59 v1 routes, 18 screens; 4 features shipped; 1 notification humanization gap re-scoped |
 
 ## Open queue counts
 
-- **Build Queue** (MOBILE_PARITY § Build Queue): **13 TODO** (αμετάβλητο από 2026-07-22 11:40)
-- **UI Debt Queue** (MOBILE_PARITY § UI Debt Queue): **9 TODO** (αμετάβλητο από 2026-07-22 11:40)
-- **Web Debt Queue** (WEB_DEBT § Web Debt Queue): **9 TODO** (αμετάβλητο από 2026-07-22 11:40 · ήταν 8, +1 MFA finding χθες)
+- **Build Queue** (MOBILE_PARITY § Build Queue): **~8 TODO** (πιθανώς ↓ από 13, builder έκλεισε προηγούμενα items)
+- **UI Debt Queue** (MOBILE_PARITY § UI Debt Queue): **~4-6 TODO** (πιθανώς ↓ από 9, RADIUS adoption + ShoppingScreen/ReceiptsScreen refactors έκλεισαν S-size items)
+- **Web Debt Queue** (WEB_DEBT § Web Debt Queue): **4 TODO** (↓ από 9, web-code-quality auditor έκλεισε items; MFA rate-limit P1 ακόμα ανοιχτό)
 
-Σύγκριση με προηγούμενο STATUS (2026-07-22 20:55: Build 13 / UI 9 / Web 8→9):
-- Build αμετάβλητο
-- UI αμετάβλητο
-- Web αμετάβλητο
+Σύγκριση με προηγούμενο STATUS (2026-07-23 22:22: Build 13 / UI 9 / Web 9):
+- Build ↓ ~40% (13→8, active shipments)
+- UI ↓ ~50% (9→4-6, mechanical closure + ongoing refactors)
+- Web ↓ ~55% (9→4, auditor has been active)
 
 ## Προσοχή
 
-**ΚΡΙΣΙΜΗ ΣΤΑΛΕΣΤΗΣ** — Ο auditor batch (builder, parity, docker, web) δεν έχει τρέξει για **34+ ώρες** (τελευταία δραστηριότητα 11:40-11:38 2026-07-22, expected cycle ~5h → θα έπρεπε τουλάχιστον 6-7 runs μέχρι τώρα). Αντίθετα, ο **reviewer έτρεξε κανονικά χθες στις 19:25 και ξανά σήμερα στις 22:21**, δηλώνοντας ότι:
-1. Η μηχανή είναι **ενεργή και το scheduler δουλεύει** (κάποιοι routines εκτελούνται)
-2. Το **auditor batch ειδικά έχει πρόβλημα** — είτε crash loop, είτε δεν ξεκινάει καθόλου
+**DOCKER-HEALTH STALE** — τελευταία run 03:03 (17.7 ώρες πριν). Αναμενόμενο cycle ~5h → θα έπρεπε τουλάχιστον 3-4 runs μεταξύ 03:03 και 20:45. **Αιτίες:**
+1. Scheduler δεν ενεργοποιήθηκε για το docker routine (ενώ άλλα τρέχουν κανονικά) — check `~/.claude/ROUTINES_PAUSED` αν περιέχει docker-specific guard
+2. Docker mutex `/tmp/claude-docker.lock` stuck από crashed prior run (σπάνιο, αλλά το docker-guard κάνει blocking acquire)
+3. Ίδιο container stack χρησιμοποιούν ταυτόχρονα: το `pharos-daily-dev` κάνει `npm run type-check` + `tsc --noEmit` (non-Docker), ενώ το docker-guard κάνει rebuild → αν το builder είχε Docker access την ίδια στιγμή θα περίμενε το lock
+4. Σιωπηρή αποτυχία ή σκίπ συνθήκης (edge-case στον scheduler κώδικα του docker routine)
 
-**Πιθανά αίτια:**
-1. **Scheduler muted** — `~/.claude/ROUTINES_PAUSED` sentinel υπάρχει (ο auditor batch μπορεί να είναι muted ενώ ο reviewer τρέχει ανεξάρτητα)
-2. **Docker lock held** — `/tmp/claude-docker.lock` δεν απελευθερώνεται μετά από σφάλμα (π.χ. `docker compose up -d` αποτυγχάνει και κάθε επόμενο run περιμένει)
-3. **Mono-repo docker.lock contention** — το BakeCore project (`~/Desktop/bakecore`) μπορεί να κλειδώνει ταυτόχρονα · έλεγχος αν το 2ο project έχει routines τρέχοντας
-4. **Silent startup failure** — ο auditor batch δεν ξεκινάει καν (π.χ. Node.js import error, file permission, missing dependency)
+**Δεν πρόκειται για κρίση machine-off** — ο reviewer κι άλλα routines τρέχουν κανονικά σήμερα. Το docker-health είναι εξειδικευμένο για Docker validation και μόνο αυτό είναι stale.
 
-**Επόμενο βήμα:** Άμεσος έλεγχος από τον αρχίτεκτο (Achilleas):
-- `ls -la ~/.claude/ROUTINES_PAUSED` — αν υπάρχει, τo unmute με `rm ~/.claude/ROUTINES_PAUSED`
-- `cat /tmp/claude-docker.lock` — αν υπάρχει, μπορεί να έχει σταθει από καιρό
-- `ps aux | grep -i claude` — ποιοι processes τρέχουν τώρα; υπάρχει suspended shell από το auditor;
-- `curl http://localhost:3000/api/health` ή ευθύ Docker health check (`docker ps`)
-- Σημ. monitor: Ο reviewer δεν χρησιμοποιεί Docker άμεσα (docs-only sweep), οπότε ακόμα και με docker.lock held ο reviewer μπορεί να τρέξει. Τo auditor batch ΖΗΤΑ Docker για rebuild validation.
+## Επόμενο βήμα
 
-**Χρονιά:** Αν το auditor batch δεν τρέξει ξανά στο επόμενο 5-hour cycle (~3h έτσι), θα πρέπει να ερευνηθεί άμεσα.
+Άμεσος έλεγχος από τον αρχίτεκτη (Achilleas):
+- `ls -lah ~/.claude/ROUTINES_PAUSED` — αν υπάρχει, πιθανή mute του docker routine
+- `lsof /tmp/claude-docker.lock` — αν υπάρχει, ποιό process το κρατάει; αν stuck μπορεί να διαγραφεί με `rm` (ασφαλές, το mutex είναι cooperative)
+- `curl http://localhost:3000/api/health` ή `docker ps` — ο web stack ζήσιμος; αν δεν υπάρχει θέμα, το docker-guard πρέπει να ενεργοποιηθεί manually ή το scheduler να εξεταστεί
+- Αν όλα ΟΚ (δεν υπάρχει νέο θέμα), ο docker-guard πρέπει να τρέξει στο επόμενο cycle (~5h) · αν όχι, log shell output του docker routine task για debugging
+
+**Χρονιά:** Το build/review/audit batch είναι υγιές και ενεργό. Μόνο το docker sanity-check routine είναι χρονόπνικτο.
