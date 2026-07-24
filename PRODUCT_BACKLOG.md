@@ -6,80 +6,71 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-23 (14η σάρωση planner).
-> **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «τα εγκρίνω όλα» → **ΟΛΑ** τα προηγούμενα Proposed
-> (P1, P3, P5-P26) μετακινήθηκαν στο «Approved», μαζί με τα ήδη-εγκεκριμένα PA1/PA2/PA3.
-> **7η σάρωση (2026-07-09):** PA1 (bank/CSV import) shipped → «Done»· προστέθηκαν 5 νέοι candidates P27-P31.
-> **⚑ ΕΓΚΡΙΣΗ 2026-07-09 (Αχιλλέας, interactive):** «μετακίνησέ τα εσύ» → **P27-P31 μετακινήθηκαν στο «Approved»**.
-> **8η σάρωση (2026-07-10):** ο builder έστειλε P6 (iCal), P14 (price-hike), P15 (category rules), P27 (suggested
-> budgets), P29 (depreciation) → σημειώθηκαν SHIPPED μέσα στο «Approved» (αναμονή τελικού Done από τον Αχιλλέα).
-> Προστέθηκαν **5 νέοι candidates P32-P36** — όλοι distinct από τα ήδη-tracked (verified με grep).
-> **⚑ ΕΓΚΡΙΣΗ 2026-07-10 (Αχιλλέας, interactive):** «i approve» → **P32-P36 μετακινήθηκαν στο «Approved»**.
-> **9η σάρωση (2026-07-13):** μεγάλη πλειοψηφία του «Approved» queue είναι πλέον SHIPPED (P6/P7/P14/P15/
-> P18/P19/P22/P25/P27-P29/P32-P35)· μόνο το P36 (Open Banking) μένει ανοιχτό, ρητά μπλοκαρισμένο (χρειάζεται
-> decision/provider signup Achilleas). Προστέθηκαν **4 νέοι candidates P37-P40** — verified distinct από τα
-> ήδη-tracked (grep για «contract/commitment», «insurance», «bundle/build», «update-check/version» = μηδέν hits
-> εκτός του P13 export-bundle context, που είναι διαφορετικό concept).
-> **10η σάρωση (2026-07-18):** P37-P40 παραμένουν αμετάβλητα awaiting Achilleas (καμία ρητή απόφαση/έγκριση σε
-> αυτό το unattended run — μόνο ο Achilleas μετακινεί Proposed→Approved). Στο «Approved» queue παραμένουν ανοιχτά
-> (χωρίς SHIPPED tag): P36 (blocked, ρητά τελευταίο), P31/P24/P23/P13/P8/P16/P11/P17/P5/P3/P9 (M/L, χωρίς
-> blocking decision — αρκετό υλικό για τον builder, δεν χρειάζεται νέο Approved item τώρα). Προστέθηκαν
-> **4 νέοι candidates P41-P44** — verified distinct (grep για «maintenance/service interval», «wishlist/public
-> share link», «passport/document expiry», «RMA/warranty claim» = μηδέν hits σε PRODUCT_BACKLOG.md/TODO.md/
-> WEB_DEBT.md/MOBILE_PARITY.md πριν από αυτό το run).
-> **11η σάρωση (2026-07-19):** P37-P44 παραμένουν αμετάβλητα awaiting Αχιλλέας (καμία ρητή απόφαση/έγκριση σε
-> αυτό το unattended run). Έλεγχος κώδικα (όχι μόνο docs) επιβεβαίωσε ότι κανένα από τα P37-P44 δεν έχει χτιστεί
-> εν τω μεταξύ (grep `warrantyClaims`/`Document.ts`/`maintenanceIntervalDays`/`versionCheck`/`bundleId`/
-> `commitmentEndsAt`/`Insurance` = μηδέν hits). Στο «Approved» queue παραμένουν ανοιχτά (χωρίς SHIPPED tag):
-> P36 (blocked, ρητά τελευταίο), P31 (deferred 4η φορά, scoped και έτοιμο για supervised session — βλ. σημείωμα
-> μέσα στο item), P24/P23/P13/P8/P16(YNAB done, Firefly III/Grocy εκκρεμούν)/P11/P17/P5/P3/P9. Προστέθηκαν
-> **4 νέοι candidates P45-P48** — βρέθηκαν με ζωντανό grep στο codebase (όχι μόνο docs): κανένα `pausedUntil`
-> σε Subscription, κανένα `findDuplicateExpenses`-style pattern (ενώ Receipts/Stores/Items έχουν ήδη ακριβώς αυτό
-> το pattern), κανένα `lentTo`/δανεισμός σε Item, κανένα `lastSuccessfulSyncAt`/staleness σε storage config —
-> όλα verified distinct από τα ήδη-tracked P37-P44/Approved/TODO/WEB_DEBT/MOBILE_PARITY.
-> **12η σάρωση (2026-07-20):** ο builder έχει προλάβει να shippάρει σχεδόν ΟΛΟ το «Approved» queue από την
-> προηγούμενη σάρωση (P13/P3/P11 μπήκαν SHIPPED μέσα σε αυτό το ίδιο 24ωρο, βλ. `PROGRESS.md`) — **⚑ σημαντικό
-> flag για τον Αχιλλέα:** το Approved queue έχει μείνει με ΜΟΝΟ P31 (deferred, χρειάζεται supervised session) και
-> P36 (blocked, χρειάζεται provider-decision) ως πραγματικά ανοιχτά· P8/P16(Firefly/Grocy)/P17/P23/P5/P9 μένουν
-> τεχνικά «ανοιχτά» αλλά είτε χρειάζονται νέο dependency-decision είτε mobile-simulator/real-sample-file που δεν
-> είναι testable unattended. Αν δεν εγκριθεί κάτι νέο από το Proposed queue σύντομα, ο builder μπορεί να μείνει
-> χωρίς ξεκάθαρο «απλώς χτίσ' το» item τις επόμενες μέρες. Verified με ζωντανό grep ότι κανένα από τα P37-P48
-> δεν έχει χτιστεί εν τω μεταξύ (μηδέν hits: `pausedUntil`/`lentTo`/`warrantyClaims`/`bundleId`/`meterReading`/
-> `birthday`/`LocalAuthentication` σε `apps/web/src`+`apps/mobile/src`). P37-P48 παραμένουν αμετάβλητα. Προστέθηκαν
-> **3 νέοι candidates P49-P51** (συντηρητικός αριθμός λόγω ήδη-μεγάλης ουράς 12 Proposed items) — «Personal Hub»
-> κενά distinct από όλα τα tracked: κανένα μέτρημα κατανάλωσης (kWh/m³, distinct από το ποσό λογαριασμού που ήδη
-> παρακολουθείται), καμία γενέθλια/επέτειος υπενθύμιση, κανένα biometric app-lock στο mobile (grep επιβεβαίωσε
-> μηδέν hits και στα δύο apps πριν προστεθούν).
-> **13η σάρωση (2026-07-22):** καμία ρητή απόφαση/έγκριση Αχιλλέα σε αυτό το unattended run — P37-P51 παραμένουν
-> αμετάβλητα awaiting approval (live grep επιβεβαίωσε ξανά μηδέν hits: `MeterReading`/`SpecialDate`/
-> `expo-local-authentication`/`LocalAuthentication`, άρα P49-P51 από την προηγούμενη σάρωση δεν έχουν χτιστεί
-> εν τω μεταξύ). Το Approved queue έμεινε στην ίδια εικόνα με την 12η σάρωση εκτός του **P5** (bookmarklet phase
-> shipped 2026-07-22, βλ. `PROGRESS.md`· η MV3-extension φάση 2 μένει ανοιχτή) — ⚑ **η ίδια ανησυχία ισχύει
-> ακόμα πιο έντονα**: μετά το P5 shipped, το Approved queue έχει ΜΟΝΟ P36 (blocked)/P31 (needs supervised
-> session)/P16 remainder (needs sample file) ως ρητά μη-buildable, ενώ P9/P17/P23 μένουν τεχνικά ανοιχτά αλλά
-> systematically παραλείπονται εδώ και >10 σαρώσεις (P9 = ρητά «τελευταίο» L, P17/P23 = «no unattended verify
-> χωρίς physical device» — σκεπτικό που ίσως αξίζει να ξανακοιτάξει ο Αχιλλέας τώρα που το mobile app MVP +
-> Expo push υπάρχουν ήδη, ίδιο re-examination που έλυσε το P5 phase-1/phase-2 stuck state στην προηγούμενη
-> σάρωση). **Δεν μετακίνησα τίποτα** (δεν είναι ο ρόλος μου) — απλά το σημειώνω ξανά για ορατότητα.
-> Προστέθηκαν **3 νέοι candidates P52-P54** (ζωντανό grep επιβεβαίωσε distinct: κανένα `restockIntervalDays`/
-> `lowStock` πάνω στο ήδη-υπάρχον `ShoppingListItem`, κανένα recurring/repeat πεδίο στο `Task` model, μηδέν
-> encryption στο JSON backup export path).
-> **14η σάρωση (2026-07-23):** καμία ρητή απόφαση/έγκριση Αχιλλέα σε αυτό το unattended run — P37-P54 παραμένουν
-> αμετάβλητα awaiting approval. Το Approved queue παραμένει στην ίδια εικόνα με την 13η σάρωση (P36 blocked/
-> P31 needs supervised session/P16 remainder needs sample file/P9 ρητά τελευταίο/P17+P23 no unattended verify
-> χωρίς physical device) — ⚑ ίδια standing παρατήρηση επαναλαμβάνεται (>10 σαρώσεις): αν δεν εγκριθεί κάτι
-> νέο, ο builder μένει χωρίς καθαρό «απλώς χτίσ' το» item. **Δεν μετακίνησα τίποτα.** Προστέθηκαν **3 νέοι
-> candidates P55-P57** (ζωντανό grep επιβεβαίωσε distinct: κανένα `soldPrice`/`soldAt`/`soldTo` πάνω στο ήδη-
-> υπάρχον `Item.status='sold'` [το status υπάρχει από παλιά αλλά είναι «κενό»· δεν αποθηκεύει τίποτα σχετικό
-> με την πώληση], μηδέν `qrcode`/`assetTag` οπουδήποτε στο codebase [παρόλο που το `jsbarcode` υπάρχει ήδη
-> εγκατεστημένο από το P20 loyalty-cards και θα μπορούσε να ξαναχρησιμοποιηθεί], μηδέν `lastReviewedAt`/
-> subscription-audit-nudge pattern).
+> Τελευταία ενημέρωση: 2026-07-24 (15η σάρωση planner).
+> **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
+> και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
+> ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
+> **Standing κατάσταση (15η σάρωση, 2026-07-24):** το «Approved» queue έχει μείνει ουσιαστικά χωρίς αυτόνομα-
+> buildable items — μόνο P36 (Open Banking, blocked σε provider decision), P31 (household multi-user, χρειάζεται
+> supervised session), P16 remainder (Firefly III/Grocy importers, χρειάζεται πραγματικό sample file), P9
+> (multi-currency, ρητά τελευταίο, L), P17/P23 (mobile native-dep approvals) μένουν τεχνικά ανοιχτά αλλά κανένα
+> δεν είναι «απλώς χτίσ' το» unattended. **Καμία ρητή έγκριση Proposed→Approved σε >10 διαδοχικές σαρώσεις** —
+> ο Αχιλλέας ίσως αξίζει να ξανακοιτάξει το Proposed queue (P37-P57, 21 items) ή να ξανα-εξετάσει τα P9/P17/P23
+> τώρα που mobile MVP + Expo push υπάρχουν ήδη (ίδιο re-examination που ξεμπλόκαρε το P5 phase-1/phase-2).
+> Ζωντανό grep σε κάθε σάρωση επιβεβαιώνει ότι κανένα Proposed item δεν έχει χτιστεί εν τω μεταξύ χωρίς ρητή
+> έγκριση. Προστέθηκαν **3 νέοι candidates P58-P60** αυτή τη σάρωση (verified distinct: μηδέν `nodemailer`/SMTP
+> notifier channel type, μηδέν widget/Siri/shortcut config πουθενά στο `apps/mobile`, μηδέν alias-learning
+> write-path πάνω στο ήδη-υπάρχον `Store.aliases[]` — μόνο manual seed edits σήμερα).
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P60. Store/vendor auto-detection correction feedback loop (μάθε από τις διορθώσεις) — S — OSS (dogfooding-heavy)
+- **Αξία:** το AI receipt/expense parsing μαντεύει store/vendor από ελεύθερο κείμενο, και όταν κάνει λάθος η μόνη
+  διόρθωση σήμερα είναι **χειροκίνητη ανά εγγραφή** ή manual edit στο `lib/stores.ts` seed aliases (developer-only,
+  όχι κάτι διαθέσιμο μέσα από το UI). Πραγματικό, ήδη-καταγεγραμμένο περιστατικό (CLAUDE.md, session 2026-06-10
+  cont.¹¹): το AI έβλεπε το νομικό όνομα του TechLamb και μάντευε «Κωτσόβολος» — χρειάστηκε χειροκίνητο prompt+DB
+  fix από τον ίδιο τον developer. **Καμία ανάδραση δεν «μαθαίνει»** από μια χρηστική διόρθωση — το ίδιο λάθος θα
+  ξανασυμβεί στην επόμενη παρόμοια απόδειξη. Νέο: όταν ο χρήστης αλλάζει το store πεδίο σε μια ήδη-verified
+  receipt/expense, αποθήκευσε αυτόματα το πρωτότυπο AI-guessed κείμενο ως νέο **alias** του διορθωμένου store
+  (reuse το ήδη-υπάρχον `Store.aliases[]` + `resolveStore` matching — απλά γράφει σε αυτό αντί να το διαβάζει
+  μόνο). Ντετερμινιστικό, μηδέν νέο AI call, καθαρό feedback-loop πάνω σε ήδη-υπάρχον μηχανισμό.
+- **Module:** Receipts + Expenses (update-store handler) + Store model (ήδη έχει `aliases[]`, μόνο write-path λείπει).
+- **Ανοιχτή απόφαση (builder default):** learn μόνο όταν `verified===true` (σήμα εμπιστοσύνης, όχι στη μεταβατική
+  κατάσταση πριν το review)· dedupe case-insensitive πριν το append· ΔΕΝ πειράζει τα ήδη-υπάρχοντα seed aliases,
+  μόνο προσθέτει νέα.
+
+### P59. Mobile home-screen widget (quick-glance / quick-add) — S/M — both (mobile-native, quick-capture friction)
+- **Αξία:** το app έχει ήδη 3 quick-capture κανάλια (P5 bookmarklet, P23 mobile share-sheet approved-pending,
+  P11 email-in) αλλά **καμία native home-screen widget** στο κινητό — για ένα personal-finance app, ένα widget
+  «safe-to-spend αυτόν τον μήνα» (reuse P19, ήδη-shipped) ή «+ Add expense» deep-link θα ήταν πιο σύντομος δρόμος
+  από open-app→tap→type. Το Expo SDK managed workflow υποστηρίζει iOS/Android home-screen widgets μέσω config
+  plugins (React Native community packages), χωρίς bare eject. **Χρησιμοποιεί το ήδη-υπάρχον `/api/v1` + token
+  auth** — μηδέν νέα backend δουλειά. **Διακριτό** από P17/P23 (αυτά είναι in-app capture flows, το widget ζει
+  εκτός app, στο home screen).
+- **Module:** Mobile (`apps/mobile`) — νέο native config plugin + μικρό widget UI.
+- **Ανοιχτή απόφαση (builder default):** MVP = **read-only «safe-to-spend» snapshot widget** πρώτα (απλούστερο,
+  καμία write-path/auth-in-widget complexity)· quick-add-expense deep-link widget ως follow-up· iOS πρώτα
+  (μεγαλύτερο platform-widget ecosystem support σε Expo σήμερα), Android follow-up.
+
+### P58. Native SMTP email notifier channel (χωρίς Zapier/n8n μεσάζοντα) — S/M — both, foundation-lever
+- **Αξία:** το ήδη-shipped notifier framework (ntfy/Discord/Slack/Telegram/webhook) καλύπτει email **μόνο έμμεσα**
+  μέσω generic webhook→Zapier/n8n (βλ. `lib/notifiers.shared.ts` hint: «Routes to email via Zapier/n8n»). Αυτό
+  είναι υψηλό friction για έναν τυπικό self-host χρήστη που θέλει απλά «στείλε μου email» με το δικό του Gmail
+  app-password ή μικρό SMTP relay (Resend/Postmark/δικό του mailcow) — να χρειάζεται λογαριασμό σε τρίτο
+  automation SaaS για κάτι τόσο βασικό είναι αντίθετο στο self-hosted/privacy-first ήθος του project (CLAUDE.md
+  design principles). Μια native `email` channel type (nodemailer + SMTP host/port/user/pass/from config στο
+  Settings, ίδιο pattern με τα υπόλοιπα channels) καλύπτει αυτό **ΚΑΙ** θέτει το θεμέλιο για το ήδη-tracked
+  password-reset/email-verification (TODO §9, LATER SaaS) χωρίς δεύτερη υλοποίηση email-sending αργότερα —
+  καθαρό reuse ενός θεμελίου που έτσι κι αλλιώς θα χρειαστεί.
+- **Module:** `lib/notifiers.ts`/`notifiers.shared.ts` (νέο channel type) + Settings → Notifications (SMTP config
+  fields, ίδιο `ChannelCard` pattern).
+- **Ανοιχτή απόφαση (builder default):** `nodemailer` (καθιερωμένο, καμία εναλλακτική να αξιολογηθεί)· SMTP
+  password αποθηκεύεται με το ίδιο επίπεδο προστασίας με τα υπόλοιπα notifier secrets· plain-text email body
+  αρχικά (όχι HTML template, MVP)· opt-in ανά χρήστη ίδιο με τα υπόλοιπα κανάλια.
 
 ### P57. Subscription/asset «still using this?» periodic review nudge — S — OSS (dogfooding-heavy), behavioral (όχι οικονομικό υπολογισμό)
 - **Αξία:** το P7 (auto-discovery) βρίσκει άγνωστες επαναλαμβανόμενες χρεώσεις, το P14 (price-hike) πιάνει ανατιμήσεις,
