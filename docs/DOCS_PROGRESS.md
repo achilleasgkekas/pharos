@@ -2284,3 +2284,26 @@ Validation (markdown only, κανενα build/Docker/AI call):
 Collision guard: git status --short = ΜΟΝΟ docs/mobile.md modified (δικό μου). Δεν υπάρχουν foreign staged files. Commit d9d21dc pushed origin/main ✓.
 
 Επόμενο run: (α) continue scanning για άλλα νέα features που ίσως shipαρίστηκαν · (β) api.md/openapi.yaml sync αν άλλα v1 routes landed · (γ) configuration.md stale-forward αν νέα options προστεθούν.
+
+## 2026-07-24 (fourteenth run — P35 follow-up Balances modal documentation)
+
+Σάρωση git log για undocumented features από τα τελευταία commits. Ανακάλυψα ότι το **commit 823b05e (cross-expense Balances modal, 2026-07-24 14:08)** ήταν shipped αλλά δεν ήταν documented στο mobile.md.
+
+Τι έγραψα:
+- **mobile.md**: Ενημέρωσα το Expenses/Income row στον "What it does" πίνακα (line 24) να αναφέρει **Balances modal (cross-expense aggregation, settle-up per person)**
+- Προσθεσα εξηγητική παράγραφο μετά το πίνακα που περιγράφει το feature: aggregates unsettled splits, no new v1 endpoint, uses existing updateExpense path.
+
+Accuracy verified εναντι κώδικα:
+- apps/mobile/src/screens/MoneyScreen.tsx: computeBalances() function (mirrors web lib/split.ts), Balances pressable button under total, per-person settle-up action (SettlePerson async function).
+- Uses existing updateExpense() route (PATCH /api/v1/expenses/:id), no new endpoint.
+- Mobile-only feature (balances.length > 0 guard ensures button appears only if splits exist).
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: 8 backticks = 4 balanced pairs (61-65, 134-140, 155-160, 173-188) ✓.
+- Internal links: api.md, configuration.md, self-hosting.md (όλες υπάρχουν) ✓.
+- Secret scan: κανένα literal credential ✓.
+- Markdown table structure: 1 row edit (Expenses/Income), column alignment maintained + 1 new explanatory paragraph ✓.
+
+Collision guard: git status --short = ΜΟΝΟ docs/mobile.md modified (δικό μου). Δεν υπάρχουν foreign staged files. Commit b16bafd pushed origin/main ✓.
+
+Επόμενο run: (α) continue scanning για άλλα νέα features που ίσως shipαρίστηκαν · (β) api.md/openapi.yaml sync αν άλλα v1 routes landed · (γ) features.md stale-forward αν νέα SaaS features προστεθούν.
