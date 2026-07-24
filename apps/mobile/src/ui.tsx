@@ -66,20 +66,23 @@ export function ModalSheet({ visible, onClose, children, wrapStyle, cardStyle }:
   );
 }
 
-type InputProps = TextInputProps & { variant?: 'surface' | 'modal' };
+type InputProps = TextInputProps & { variant?: 'surface' | 'modal' | 'cell' };
 
 /**
  * Single-line text field. `surface` (default) sits on the page background;
- * `modal` sits on surface-2 inside a bottom-sheet/modal. Unifies the borderRadius/
- * padding/fontSize tokens that used to diverge per screen. Pass `style` to add
- * layout props (e.g. `{ flex: 1 }`); it merges on top of the base.
+ * `modal` sits on surface-2 inside a bottom-sheet/modal; `cell` is a compact
+ * variant for narrow inline fields (e.g. a QTY/NET/VAT row of 3 side-by-side
+ * inputs) — smaller padding/font than `surface`, same token scale. Unifies the
+ * borderRadius/padding/fontSize tokens that used to diverge per screen. Pass
+ * `style` to add layout props (e.g. `{ flex: 1 }`); it merges on top of the base.
  */
 export function Input({ variant = 'surface', style, ...rest }: InputProps) {
+  const base = variant === 'modal' ? s.inputModal : variant === 'cell' ? s.inputCell : s.inputSurface;
   return (
     <TextInput
       placeholderTextColor={C.faint}
       {...rest}
-      style={[variant === 'modal' ? s.inputModal : s.inputSurface, style]}
+      style={[base, style]}
     />
   );
 }
@@ -304,6 +307,7 @@ const s = StyleSheet.create({
   btnDim: { opacity: 0.4 },
   inputSurface: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.md, paddingHorizontal: SPACE.md, paddingVertical: 11, color: C.text, fontSize: SIZE.md },
   inputModal: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.sm, paddingHorizontal: SPACE.md, paddingVertical: 10, color: C.text, fontSize: SIZE.md },
+  inputCell: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.sm, paddingHorizontal: SPACE.sm, paddingVertical: SPACE.sm, color: C.text, fontSize: SIZE.base },
   textArea: { textAlignVertical: 'top' },
   modalWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'center', padding: SPACE.xl },
   modalCard: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.xl, padding: 20 },

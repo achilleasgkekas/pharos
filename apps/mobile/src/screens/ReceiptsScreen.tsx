@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, TextInput, Image, Pressable, FlatList, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, Image, Pressable, FlatList, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim, RADIUS, SIZE } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Check, Button, Input, TextArea, Badge, contentWidth } from '../ui';
@@ -284,9 +284,9 @@ export function ReceiptsScreen() {
                       <Pressable onPress={() => removeLine(i)} hitSlop={8} style={s.lineDel}><Text style={s.lineDelTxt}>✕</Text></Pressable>
                     </View>
                     <View style={s.lineSub}>
-                      <View style={s.lineCell}><Text style={s.cellLab}>QTY</Text><TextInput value={l.qty} onChangeText={(v) => setLine(i, 'qty', v)} keyboardType="decimal-pad" style={s.cellInput} placeholderTextColor={C.faint} /></View>
-                      <View style={s.lineCell}><Text style={s.cellLab}>NET {detail.currency}</Text><TextInput value={l.price} onChangeText={(v) => setLine(i, 'price', v)} keyboardType="decimal-pad" style={s.cellInput} placeholderTextColor={C.faint} /></View>
-                      <View style={s.lineCell}><Text style={s.cellLab}>VAT %</Text><TextInput value={l.vatRate} onChangeText={(v) => setLine(i, 'vatRate', v)} keyboardType="decimal-pad" style={s.cellInput} placeholderTextColor={C.faint} /></View>
+                      <View style={s.lineCell}><Text style={s.cellLab}>QTY</Text><Input variant="cell" value={l.qty} onChangeText={(v) => setLine(i, 'qty', v)} keyboardType="decimal-pad" /></View>
+                      <View style={s.lineCell}><Text style={s.cellLab}>NET {detail.currency}</Text><Input variant="cell" value={l.price} onChangeText={(v) => setLine(i, 'price', v)} keyboardType="decimal-pad" /></View>
+                      <View style={s.lineCell}><Text style={s.cellLab}>VAT %</Text><Input variant="cell" value={l.vatRate} onChangeText={(v) => setLine(i, 'vatRate', v)} keyboardType="decimal-pad" /></View>
                       <Text style={s.lineGross}>{money(lineGross(l), detail.currency)}</Text>
                     </View>
                   </View>
@@ -393,7 +393,6 @@ const s = StyleSheet.create({
   lineSub: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 8 },
   lineCell: { flex: 1 },
   cellLab: { color: C.faint, fontSize: 9, letterSpacing: 0.8, marginBottom: 4 },
-  cellInput: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 8, color: C.text, fontSize: 14 },
   lineGross: { color: C.dim, fontSize: 13, fontWeight: '600', paddingBottom: 9, minWidth: 56, textAlign: 'right' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tlabel: { color: C.text, fontSize: 15 },

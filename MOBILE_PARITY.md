@@ -139,7 +139,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - Το local `cellInput` style (ReceiptsScreen.tsx:388) φευγει· κανενα `borderRadius: 8` magic number (χρησιμοποιησε RADIUS token).
   - Raw-`<TextInput>` grep στο `src/screens/` = 0 (μονο ο import μενει αν χρησιμοποιειται αλλου).
   - `apps/mobile npx tsc --noEmit` → EXIT 0.
-- Status: TODO
+- Status: ✅ DONE 2026-07-24 (pharos-daily-dev) — `Input` (apps/mobile/src/ui.tsx) απέκτησε νέο `variant="cell"` (`s.inputCell`: `RADIUS.sm` αντί για το magic `borderRadius: 8`, `SPACE.sm` padding, `SIZE.base` font — ίδιες διαστάσεις με το παλιό `cellInput`, απλά token-based). Τα 3 raw `<TextInput>` cells στο ReceiptsScreen.tsx (QTY/NET/VAT %) έγιναν `<Input variant="cell" .../>`· το local `cellInput` StyleSheet entry + το πλέον-αχρησιμοποίητο `TextInput` import αφαιρέθηκαν. `grep -rn "<TextInput" apps/mobile/src/screens/` = 0 hits. `apps/mobile npx tsc --noEmit` EXIT 0.
 
 ### Safe-area: adopt `react-native-safe-area-context` (landscape + bottom home-indicator inset)
 - Priority: P2

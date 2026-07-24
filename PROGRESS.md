@@ -7964,6 +7964,59 @@ pure-lib test coverage pattern (ίδιο με τα πρόσφατα runs) ή σ�
   need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
   power tool· P5 bookmarklet MV3-extension phase 2.
 
+## 2026-07-24 (pharos-daily-dev, cont.⁸ — ReceiptsScreen UI Debt: cell inputs → shared `<Input variant="cell">`)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε 3 OPEN items, όλα από
+`bakecore-*` (άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή. Μηδέν Docker
+build/boot αυτό το run (μόνο mobile TypeScript + doc αλλαγή) → το `/tmp/claude-docker.lock` δεν χρειάστηκε.
+
+**Approved queue check (βήμα a)**: ξανασάρωσα `PRODUCT_BACKLOG.md → ## Approved` (29 items). Ίδιο standing
+αποτέλεσμα με τα προηγούμενα runs σήμερα: **P36** (needs-Achilleas provider decision, L)· **P31** (4ο+
+deferral, supervised live-login session)· **P16** Firefly III/Grocy (χρειάζεται sample file)· **P17**/**P23**
+(mobile-native dep approvals, standing)· **P5** MV3 extension phase 2 (deferred)· **P9** multi-currency (L,
+ρητά τελευταίο). Μηδέν νέο buildable Approved item → βήμα (b).
+
+**Fallback (βήμα b)**: το `MOBILE_PARITY.md` Build Queue functional-gaps ήταν ξανά άδειο (το top-ranked item
+από την 54η σάρωση, «Notifications — humanize raw pipe-delimited body», ήταν ήδη `✅ DONE 2026-07-24` — commit
+`ee894a3`, verified με `git log`). Κατέβηκα στο **UI Debt Queue**: το top-2 item του ίδιου tier ("ReceiptsScreen:
+line-item cell inputs → shared `<Input>`") ήταν ακόμα `Status: TODO` — μηχανικό (3 raw `<TextInput>` → shared
+primitive + νέο compact variant), μηδέν decision, μηδέν rebuild ανάγκη. Verified πρώτα ότι δεν είχε ήδη γίνει
+(`grep -n "cellInput|<TextInput" ReceiptsScreen.tsx` έδειξε το παλιό raw pattern ακόμα στη θέση του).
+
+**Τι έγινε** (`apps/mobile/src/ui.tsx`, `apps/mobile/src/screens/ReceiptsScreen.tsx`, `MOBILE_PARITY.md`, μηδέν
+backend αλλαγή):
+- `Input` (ui.tsx) απέκτησε νέο `variant="cell"` (τρίτη επιλογή δίπλα στο `surface`/`modal`): `s.inputCell` =
+  `RADIUS.sm` (10, token) αντί για το προηγούμενο magic `borderRadius: 8`, `SPACE.sm` padding (8, ίδιο με πριν),
+  `SIZE.base` font (14, ίδιο με πριν) — οπτικά σχεδόν ταυτόσημο με το παλιό `cellInput` (μόνο η ακτίνα γωνίας
+  10 αντί 8, αμελητέο), τώρα πλήρως στο token scale.
+- Τα 3 raw `<TextInput>` cells (QTY/NET/VAT %, ReceiptsScreen.tsx) έγιναν `<Input variant="cell" .../>` (το
+  `Input` primitive ήταν ήδη imported εκεί, χρησιμοποιείται στο πεδίο "item name" ένα-παρακάτω).
+- Αφαιρέθηκε το local `cellInput` StyleSheet entry (byte-dupe πλέον) + το πλέον-αχρησιμοποίητο `TextInput`
+  import από το `react-native` (το `C`/theme import έμεινε, χρησιμοποιείται αλλού 43 φορές στο αρχείο).
+- `MOBILE_PARITY.md` ενημερώθηκε: το item marked `✅ DONE 2026-07-24 (pharos-daily-dev)`.
+
+**Verify**: `apps/mobile npx tsc --noEmit` EXIT 0. `grep -rn "<TextInput" apps/mobile/src/screens/` = μηδέν
+matches (ολόκληρο mobile UI Debt Queue's «raw TextInput = 0» acceptance criterion πλέον καλυμμένο, όχι μόνο
+αυτό το screen). Καμία web αλλαγή → μηδέν ανάγκη για `npm run type-check`/vitest/Docker rebuild στο web.
+`git status --short` πριν το commit επιβεβαίωσε ΜΟΝΟ τα 3 προγραμματισμένα αρχεία.
+
+**Suggested next task**: το UI Debt Queue functional-mechanical tier είναι πλέον άδειο (τα 2 μικρά S-size items
+έκλεισαν σήμερα). Τα εναπομείναντα UI Debt items χρειάζονται decision ή είναι M/L: safe-area-context dep [P2/M,
+νέο native dependency, ίδιο tier με P17/P23 approvals]· light-theme parity [P3/L, ρητά NEEDS DECISION αν θέλει
+καν light mode στο mobile]. Αν αυτά μπλοκάρουν, γυρίστε σε pure-lib test coverage pattern (ίδιο με τα πρόσφατα
+runs) ή σε νέα σάρωση του mobile-parity-auditor/ui-auditor αν έχουν περάσει αρκετά commits από την τελευταία.
+
+**Git hygiene**: `git add` explicit (μόνο `apps/mobile/src/ui.tsx` + `apps/mobile/src/screens/ReceiptsScreen.tsx`
++ `MOBILE_PARITY.md` + `PROGRESS.md`, όχι `-A`) → commit → push.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: SaaS multi-tenancy/billing rollout env boundary·
+  mobile native-dep approvals (P17 camera, P23 share-sheet, safe-area-context UI-debt dep)· P36 Open Banking
+  provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file
+  need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
+  power tool· P5 bookmarklet MV3-extension phase 2· light-theme parity mobile decision.
+
 ## 2026-07-24 (pharos-daily-dev, cont.⁷ — ShoppingScreen UI Debt: shared `<Spinner>`/`<Empty>`)
 
 **Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε 3 OPEN items, όλα από
