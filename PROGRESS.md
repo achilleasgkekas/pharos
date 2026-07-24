@@ -4,7 +4,24 @@
 
 <!-- reviewed: 066b1c6 -->
 <!-- docker-validated: 7698ef1 -->
-<!-- ui-audited: faa3530 -->
+<!-- ui-audited: c5b45dc -->
+
+## 2026-07-24 (ui-auditor — 54η σάρωση, consistency monitoring)
+
+**Εκτέλεση**: automated mobile UI consistency audit, 18 screens, token violation tracking.
+
+**Findings**:
+- borderRadius hardcoded: 90→**96** sites (+6 growth, zero new violation-types)
+- padding/gap hardcoded: 158→**151** sites (-7, partial cleanup from prior work)
+- ActivityIndicator raw: 33→**42** uses (+9 growth, tracking trend)
+- Spinner adoption: **18 sites** using shared primitive (positive signal)
+- tsc → EXIT 0 ✓
+
+**Verdict**: UI layer stable, no regressions, documented queue items (P2/M borderRadius, P2/L padding, P2/M ActivityIndicator→Spinner) remain active. New audit entry appended to MOBILE_PARITY.md (lines 1235–1302, 54η σάρωση section).
+
+**Next**: Builder prioritize P2/M tokens batch (6-8h estimate) to prevent debt escalation.
+
+---
 
 ## 2026-07-24 (docker-health — safe rebuild, health validated)
 

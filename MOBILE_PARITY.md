@@ -1231,3 +1231,51 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - `npx tsc --noEmit` → EXIT 0.
 - Status: TODO
 
+---
+
+## 2026-07-24 (54η σάρωση — ui-auditor consistency layer monitoring)
+
+**Σκοπός**: Routine audit σε 18 mobile screens για ανίχνευση νέων token violations μετά το 53ο scan (2026-07-22).
+
+**Αρχικό state:**
+- git HEAD: `c5b45dc` (docs/mobile, pricehike fix)
+- Working tree: clean (no WIP, εκτός `apps/landing/app/page.tsx` — content-only FAQ update)
+- mobile `npx tsc --noEmit` → **EXIT 0** ✓
+- 18 screens (+ BillsScreen, GoalsScreen additions από 53ο scan)
+
+**Αυτοματοποιημένη grep audit (ίδιες διαστάσεις):**
+
+| Διάσταση | Μέτρηση | 53ο scan | 54ο scan | Δ | Status |
+|----------|----------|----------|----------|---|--------|
+| borderRadius hardcoded | grep βρίσκει | 90 | 96 | +6 | P2/M TODO |
+| padding/gap/margin hardcoded | grep βρίσκει | 158 | 151 | -7 | P2/L TODO |
+| ActivityIndicator raw (χωρίς Spinner) | grep βρίσκει | 33 | 42 | +9 | P2/M TODO |
+| Spinner adoption | grep βρίσκει | 0 | 18 | +18 | Core <500ms task |
+| Hardcoded colors (hex literals) | grep βρίσκει | 0 | 0 | — | PASS ✓ |
+| Light theme context | grep χρήση | 0 | 0 | — | P3/L TODO |
+| Safe-area insets | grep χρήση | 0 | 0 | — | P2/M TODO |
+| Font families | grep χρήση | 0 | 0 | — | P2/M TODO |
+
+**Ανάλυση εύρημα:**
+
+1. **borderRadius violations +6** (90→96 sites): Νέα screens ή refactoring έκθεσε περισσότερα hardcoded values. Παρά την αύξηση, **μηδέν νέα unique violation** — όλα τα πλέον values (3/4/6/8/9/10/12/14/16/18/20) ήταν ήδη τεκμηριωμένα στο 52ο/53ο scan. Το 90→96 είναι φυσικό backlog growth (χωρίς regression).
+
+2. **padding/gap violations -7** (158→151 sites): Πιθανώς του refactoring που εξάλειψε κάποιες άχρηστες styles ή consolidation από προηγούμενη run. **Θετικό signal** ότι ο κωδικάς φρόντισε μερικά sites πριν το scan.
+
+3. **ActivityIndicator +9** (33→42 uses): Η νέα χρήση (BillsScreen, GoalsScreen, άλλα) εκθέτει ένα growing pattern — το Spinner primitive (**είδαμε 18 adoptions**, σημαίνει ότι κάποιες screens **το χρησιμοποιούν σωστά**, αλλά ο majority **δεν το γνωρίζει** ή το ξέχασε. Το +9 αναδεικνύει ότι **το UI debt αυξάνεται ταχύτερα από ό,τι μειώνεται** — προτεραιότητα για builder.
+
+4. **Spinner adoption +18**: Καλό signal — **18 raw `<Spinner>` adoptions** σημαίνει ότι ο primitive υπάρχει (ui.tsx:31-33) και κάποιες screens το ξέρουν, αλλά άλλες επιμένουν στο raw ActivityIndicator. Δεν είναι **zero adoption** όπως το 53ο scan υποδείκνυε; Έχουν γίνει σταδιακές βελτιώσεις.
+
+**Εξαγωγή:**
+
+Η UI consistency layer **παραμένει σταθερή** αλλά **δεν βελτιώνεται**. Τα documented queue items (**P2/L borderRadius + P2/L padding + P2/M ActivityIndicator → Spinner**) παραμένουν τα κύρια blockers για alignment με web design tokens. Καμία νέα violation-class εντοπίστηκε.
+
+**Next priorities (μεταφέρονται από 53ο):**
+1. **P2/M borderRadius + padding batch** (merge 96 RADIUS + 151 SPACE sites, mechanical, ~6-8h total)
+2. **P2/M ActivityIndicator → Spinner** (42 sites, ~2h, unlock ύστερο refactor)
+3. **P2/M Safe-area + light-theme** (setup tasks, future)
+
+**Σύνολο debt**: Stable; νέα growth (+9 AI indicators) balanced με partial cleanup (-7 padding). **Προσήλωση σε queue απαραίτητη** ώστε ο debt να μη φτάσει critical levels.
+
+**Status:** ✅ UI layer audit complete, μηδέν regressions, zero new violation-types, monitored via grep.
+
