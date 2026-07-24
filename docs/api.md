@@ -362,7 +362,7 @@ Each plan in the `GET /statements/plans` response is:
 
 | Method | Path                    | Description |
 |--------|-------------------------|-------------|
-| GET    | `/notifications`        | `{ items: [{ _id, kind, title, body, href, read, createdAt }], unread }`, newest-unread first (deals / installments / warranties / system). |
+| GET    | `/notifications`        | `{ currency, items: [{ _id, kind, title, body, href, read, createdAt }], unread }`, newest-unread first (deals / installments / warranties / system). The `currency` field (mirrors `/calendar`) lets clients format the pipe-delimited money amounts embedded in `body` (e.g., "13\|15\|15" → "€13.00 / €15.00 / €15.00"). |
 | PATCH  | `/notifications`        | Mark read. Body `{ id }` for one; no id → mark all read. |
 | GET    | `/jobs`                 | Recent background AI jobs (running first, then newest). Read-only. |
 | POST   | `/push/register`        | Store an Expo push token on the current user. Body `{ token }`. |

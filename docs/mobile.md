@@ -31,7 +31,7 @@ The mobile app mirrors most of the web modules, backed by the same API client
 | Reports | net position, this month/year, by-category, budgets |
 | Tasks | list, add, status, steps |
 | Search | global search across records |
-| Activity | background AI jobs, saved AI conversations, notifications |
+| Activity | background AI jobs, saved AI conversations, **alerts (humanized formatted notifications — deals, installments, warranties)** |
 | Settings | preferences, budgets, cards, stores, lists, sign-out |
 
 Navigation is a top app bar (menu, search, notification bell with unread badge)

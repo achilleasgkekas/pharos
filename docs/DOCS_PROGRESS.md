@@ -1,5 +1,23 @@
 # DOCS_PROGRESS
 
+## 2026-07-24 (sixteenth run — P2/S gap: mobile notifications humanization)
+
+Ελεγχος git log για νέα features — ανακάλυψα ότι το **P2/S gap (commit ee894a3, 2026-07-24 10:10)** shipped αλλά ΔΕΝ ήταν documented: mobile Alerts tab τώρα δείχνει humanized formatted notifications αντί raw pipe-delimited payload ("13|15|15" → "€13.00 / €15.00 / €15.00"). Το API προσθέτει `currency` field στο GET /api/v1/notifications.
+
+Τι έγραψα:
+- **api.md**: Ενημέρωση του GET /notifications row για να προσθέσει το νέο `currency` field στο response top-level (mirrors GET /calendar). Πρόσθεσα περιγραφή ότι το `currency` επιτρέπει σε clients να format-άρουν τα pipe-delimited money amounts μέσα στο body.
+- **mobile.md**: Ενημέρωση του Activity row από "background AI jobs, saved AI conversations, notifications" → "...alerts (humanized formatted notifications — deals, installments, warranties)". Πιο ειδικό ονοματολογία.
+
+Validation (markdown only, κανένα build/Docker/AI):
+- Code fences: 0 προστέθηκαν (ζυγό).
+- Internal links: 0 νέες (api.md εσωτερικά στο /api/v1 context ✓, mobile.md standalone ✓).
+- Secret scan: κανένα sk_/AUTH_/phk_ literal ✓.
+- Markdown table syntax: api.md row balanced pipes, mobile.md row balanced pipes ✓.
+
+Collision guard: `git status --short` = ΜΟΝΟ docs/api.md + docs/mobile.md modified (δικά μου), κανένα staged foreign, κανένα concurrent routine mid-commit.
+
+Επόμενο run: (α) grep για άλλα νέα features (π.χ. P51-P55 candidates ή άλλα undocumented που ίσως shipping σήμερα), ή (β) features.md stale-forward έλεγχος για άλλα P* modules.
+
 ## 2026-07-24 (fifteenth run — status check: no new features since P20)
 
 Σάρωση git log για undocumented features που έχουν shipped μετά την P20 loyalty-cards documentation (commit 2b6f437, 2026-07-24 06:45). Ανακάλυψα ότι ΔΕΝ υπάρχουν νέα feat() commits — μόνο test coverage κι bug-fixes:
