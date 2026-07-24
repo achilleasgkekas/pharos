@@ -1,5 +1,24 @@
 # DOCS_PROGRESS
 
+## 2026-07-24 (fourteenth run — P20 loyalty cards API documentation)
+
+Σάρωση git log για undocumented features που shipped από το τελευταίο run. Ανακάλυψα ότι το **P20 (loyalty card wallet, commit f58d818, 2026-07-24 15:42)** ήταν shipped με τα API routes αλλά ΔΕΝ ήταν documented στο api.md.
+
+Τι έγραψα:
+- **api.md**: Νέα section "### Loyalty cards" αμέσως ΜΕΤΑ το Vouchers και ΠΡΙΝ το Bills. Τεκμηρίωση των 4 endpoints (GET/POST/PATCH/DELETE) με ακριβή request/response σχήμα: κανένα computed fields (σε αντίθεση με GiftCard που έχει balance), plain field edits, `barcodeFormat` auto-guesses από `cardNumber` όταν λείπει ή άκυρο. Accuracy cross-checked στα /loyaltycards/route.ts + [id]/route.ts.
+
+Validation (markdown only, κανένα build/Docker/AI):
+- Code fences: +1 table στο api.md (ζυγό, αθικτα τα άλλα).
+- Internal links: όλες υπάρχουν ✓.
+- Secret scan: κανένα sk_/AUTH_ ✓.
+- Markdown structure: νέα section #### με σωστό alignment (matching Bills/GiftCards pattern).
+
+Collision guard: git status --short πριν το stage δείχνει ΜΟΝΟ 2 modified docs files (api.md, DOCS_PROGRESS.md), κανένα staged foreign, κανένα concurrent routine mid-commit.
+
+Σημ: mobile.md ήδη αναφέρει loyalty cards (line 27, "Coupons / Gift cards / Loyalty cards tabs"), επομένως κανένα update χρειάζεται εκεί.
+
+Επόμενο run: (α) grep για άλλα νέα features που shipped (π.χ. increment 86 subscription alerts rethink, increment 84-85 SaaS route fixes είναι bug-fixes όχι features), ή (β) features.md stale-forward για άλλα P* που δεν είναι documented, ή (γ) configuration.md cross-check αν νέα config options προστέθηκαν.
+
 ## 2026-07-24 (thirteenth run — P32 gift-cards mobile parity + P1 rate-limit docs)
 
 Σάρωση git log για undocumented features που shipped σήμερα. Ανακάλυψα δύο gaps:

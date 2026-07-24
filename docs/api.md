@@ -288,6 +288,15 @@ Each plan in the `GET /statements/plans` response is:
 | PATCH  | `/vouchers/:id`     | Update `{ title?, code?, store?, discount?, url?, expiresAt?, used? }`. |
 | DELETE | `/vouchers/:id`     | Soft-delete. |
 
+### Loyalty cards
+
+| Method | Path                             | Description |
+|--------|----------------------------------|-------------|
+| GET    | `/loyaltycards?archived=0&limit&offset&updatedSince` | List (+ `limit`/`offset`/`updatedSince`). Default excludes archived cards. |
+| POST   | `/loyaltycards`                  | Create `{ title, cardNumber, store?, barcodeFormat?, notes? }`. `barcodeFormat` (when missing or invalid) falls back to a shape-based guess from `cardNumber`. |
+| PATCH  | `/loyaltycards/:id`              | Update `{ title?, store?, cardNumber?, barcodeFormat?, notes?, archived? }`. If `cardNumber` changes without explicit `barcodeFormat`, the format is re-guessed. |
+| DELETE | `/loyaltycards/:id`              | Soft-delete (recoverable from Trash). |
+
 ### Bills
 
 | Method | Path                        | Description |
