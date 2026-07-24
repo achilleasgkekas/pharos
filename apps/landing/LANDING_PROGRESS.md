@@ -2826,3 +2826,53 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-24 (5) — FAQ += bring-your-own-key AI per hosted workspace
+
+Increment (e), συνεχεια του `docs/saas.md` sweep. Πριν το ξεκινημα: coordination guard
+(`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος `~/.claude/ASK_ACHILLEAS.md` (δυο OPEN entries, και τα
+δυο bakecore-finance, τιποτα για landing/pharos). `git status --short` εδειξε ηδη ενα uncommitted
+`apps/landing/app/page.tsx` απο προηγουμενο run που δεν προλαβε να κανει commit (interrupted mid-increment,
+οχι δικια μου αλλαγη αυτου του run) — ακριβως το candidate που ανεφερε το entry (4): "bring-your-own-key AI
+ανα workspace". Το δουλεψα σαν in-progress συνεχεια αντι να το πεταξω (καμια αλλη ξενη αλλαγη στο tree).
+
+Η υπαρχουσα αλλαγη (ηδη γραμμενη στο FAQS array, `apps/landing/app/page.tsx:449-452`): νεα εγγραφη «Can I
+plug my own AI key into a hosted workspace too?» αμεσως μετα το «Do I need an AI API key?» και πριν το
+«Can I talk to it in plain English instead of clicking through menus?» (AI cluster, θεματικη γειτονια).
+Απαντηση: workspace settings δεχονται δικο σου Anthropic/OpenAI/Gemini/OpenRouter key, απο τοτε η AI χρηση
+τρεχει πανω σε αυτο αντι για το shared platform quota (δεν μετραει πλεον στο μηνιαιο AI limit του plan), το
+key ειναι encrypted at rest (AES-256-GCM, φρεσκια encryption καθε φορα) και δειχνεται πισω μονο masked
+(τελευταια 4 χαρακτηρες, ποτε πληρες), clear οποτεδηποτε για επιστροφη στο included platform key· ρητη
+σημειωση οτι το self-hosted παντα φερνει δικο του key ή τοπικο Ollama, αρα αυτο αφορα μονο hosted.
+
+Verify (αυτο το run, απο το ηδη-γραμμενο κειμενο):
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (ιδιο rounded μεγεθος με τα
+  προηγουμενα increments).
+- Browser preview: `next start -p 3150` πανω στο production build (3000/3100-3140 κατειλημμενα απο
+  Docker/προηγουμενα runs). `mcp__Claude_Browser__*` διαθεσιμο, `preview_start` OK, `read_console_messages`
+  (onlyErrors) -> "No console logs." καθαρο. `javascript_tool` επιβεβαιωσε: το deterministic anchor id
+  `faq-can-i-plug-my-own-ai-key-into-a-hosted-workspace-too` υπαρχει (`getElementById` -> true), σωστη σειρα
+  (`idx: 3`, neighbors = [faq-do-i-need-an-ai-api-key, **αυτο**,
+  faq-can-i-talk-to-it-in-plain-english-instead-of-clicking-through-menus]), και το DOM περιεχει
+  "AES-256-GCM" (σωστο answer text). Hero screenshot καθαρο (lighthouse mark, gradient τιτλος, CTAs, τριπλο
+  badge row), μηδεν regression. Server σταματησε μετα (`pkill -f "next start -p 3150"`), `lsof -i :3150`
+  εδειξε μονο τα γνωστα false-positive Claude-app "nm-asses-admin" TCP CLOSE_WAIT matches (σημειωμενα ηδη σε
+  προηγουμενα entries), οχι το node process.
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  `git diff --cached --name-only` κενο πριν το stage -> κανενα ξενο staged file. Staged+committed ΜΟΝΟ το
+  δικο μου landing path.
+
+Επομενο increment: το `docs/saas.md` sweep απο την αρχη εχει πλεον καλυψει τα βασικα rights/account/security/
+AI-BYOK sections. Επομενο περασμα: superadmin/admin console section (αν υπαρχει ρητο module χωρις landing
+αναφορα), billing webhook edge cases (πιθανον πολυ implementation-level για FAQ, χρειαζεται ελεγχος πρωτα),
+ή νεα modules/commits απο το κυριο repo μετα απο αυτο το run. Αλλιως (e) polish συνεχεια, real app
+screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

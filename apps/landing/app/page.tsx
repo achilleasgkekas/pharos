@@ -447,6 +447,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'No. AI is optional and can be toggled off per feature. Bring your own key (Anthropic, OpenAI, Gemini, OpenRouter) or run a local model with Ollama. The manual entry, tracking, and reporting work without any AI at all.',
   },
   {
+    q: 'Can I plug my own AI key into a hosted workspace too?',
+    a: 'Yes. Workspace settings let you store your own Anthropic, OpenAI, Gemini, or OpenRouter key, and from then on that workspace runs its AI calls on it instead of the shared platform quota, so they stop counting against your plan’s monthly AI limit. The key is encrypted at rest (AES-256-GCM, a fresh encryption each time) and only ever shown back masked, last four characters, never in full; clear it any time to fall back to the included platform key. Self-hosted always brings its own key or a local Ollama model, so this only matters if you are on hosted.',
+  },
+  {
     q: 'Can I talk to it in plain English instead of clicking through menus?',
     a: 'Yes. A conversational AI command bar lives in the navbar (it doubles as global search) where you can type things like "add a YouTube subscription, 15 euros a month" or "log expense OTE 84 euros" and it acts directly on your data: adding expenses, income, subscriptions, tasks, or items, updating or deleting a record, logging a price, or just answering "what did I spend this month?". If a request is ambiguous it asks a short follow-up before doing anything, and every conversation is kept under AI history so you can look back at what it did. It needs an Anthropic-capable AI provider to run.',
   },
