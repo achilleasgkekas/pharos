@@ -4509,3 +4509,55 @@ verify-request/verify-confirm/workspaces/export, 9 files, session-gated), `admin
 `workspace/{ai-key,export,export/files,reactivate}`, `invites/{resend,route}`, `audit`,
 `trials/sweep`, `billing/route.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση
 `WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-25 (increment 96, route-level test coverage για το auth/session endpoint)
+
+Πριν από νέο increment: ask-inbox (τα 3 OPEN entries είναι ΟΛΑ bakecore-finance ×2/
+bakecore-redesigner ×1, τίποτα addressed σε saas-core — δεν υπήρχε τίποτα να εφαρμόσω πρώτα).
+`WEB_DEBT.md` re-checked (η πιο πρόσφατη σάρωση αναφέρει ρητά ότι τα μόνα ανοιχτά auto-buildable
+items αφορούν `app/settings/actions.ts` [requireAdmin gap στο notifier/webhook block] και
+`app/vouchers/*.ts` [currentModel tenant-scoping gap] — και τα δύο ρητά ΕΚΤΟΣ territory, δεν τα
+ανέλαβα). UI-first backlog παραμένει εξαντλημένο (καμία νέα `api/saas/**` route χωρίς UI
+consumer, το admin console + όλα τα account/workspace panels υπάρχουν ήδη). Ακολούθησα το
+leftover next-task: από τα 23 ανεξέταστα route-clusters διάλεξα **`auth/session`** — το "am I
+logged in" probe που κάθε SaaS σελίδα/panel καλεί στο load· έκλεισε το core auth-surface loop
+μαζί με τα ήδη-καλυμμένα login/mfa/signup (το `auth/logout` που έμεινε είναι σκόπιμα trivial,
+3 γραμμές λογικής, χαμηλής αξίας test σε σύγκριση).
+
+**Νέο `auth/session/route.test.ts`** (10 tests), μηδέν production code αλλαγή. Mocks: `@/lib/db`
+(connectDB no-op), `@/models/Account` (`findById().select().lean()` chain → spyable), `@/lib/
+tenancy/accountSession` (`getCurrentAccount`), `@/lib/tenancy/saasApi` (`vi.importActual` για το
+πραγματικό `saasGuard`, mocks μόνο `saasAuthGate`/`accountTenants` — ίδιο module-boundary
+precedent με τα προηγούμενα 3 auth route tests).
+
+Καλύπτει: (1) gate short-circuit περνάει αναλλοίωτο, μηδέν `getCurrentAccount`/DB call· (2) καμία
+cookie (`getCurrentAccount`→null) → `{account:null}`, μηδέν DB· (3) **έγκυρη cookie αλλά ο
+λογαριασμός έχει διαγραφεί** (`findById` επιστρέφει null μέσω του lean chain) → **επίσης**
+`{account:null}` — μια dangling cookie ΠΟΤΕ δεν λογίζεται "logged in", `accountTenants` δεν
+καλείται· (4) valid cookie + υπαρκτός λογαριασμός → `{account,tenants}` σωστά σχηματισμένα από
+το DB doc· (5) **fallback chain**: email πέφτει πίσω στο cookie's email όταν το DB doc δεν έχει
+(προστασία σε legacy/incomplete doc), name πέφτει σε `''` όταν κενό· (6) το response id διαβάζει
+το `_id` του DB doc (όχι το cookie `sub`) — σε περίπτωση απόκλισης το DB κερδίζει, και το
+`accountTenants` καλείται με το DB id· (7) mid-handler throw (`findById().select().lean()`
+rejects) → καθαρό 500 JSON μέσω του πραγματικού `saasGuard`.
+
+**Verified**: νέο test file **10/10 green** μόνο του (7 named tests, μερικά με πολλαπλά
+assertions)· πλήρες `npx vitest run` → **255 files / 3364 tests green**. `npm run type-check` →
+**EXIT 0** καθαρά. **Docker: ΔΕΝ έγινε rebuild** (test-only αρχείο, μηδέν production code/runtime
+wiring αλλαγή). **Browser-verify: skipped** (test file, μηδέν UI/observable behavior αλλαγή).
+Collision guard: `git status --short` πριν το staging έδειξε μόνο 2 ΞΕΝΑ **modified** (όχι
+staged) αρχεία από το live working tree του Achilleas (`settings/SettingsClient.tsx`+
+`settings/actions.ts`, ήδη εκτός territory) + το δικό μου 1 νέο αρχείο — μηδέν staged conflict,
+`git add` μόνο το δικό μου path, `git diff --cached --name-only` επιβεβαίωσε exact match. Pushed
+`b1ba3ae`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο σε επόμενο ανεξέταστο route-cluster (22 routes ακόμα χωρίς
+route-level test) — καλοί υποψήφιοι τώρα: `account/*` self-service routes (password/mfa/
+mfa-confirm/reset-request/reset-confirm/verify-request/verify-confirm/workspaces/export, 9
+files, session-gated — η μεγαλύτερη εναπομείνασα ομάδα), `admin/overview` + `admin/tenants` list
+(read-only console surfaces), `members`, `usage` + `usage/sample`, `workspace/{ai-key,export,
+export/files,reactivate}`, `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`,
+και το trivial `auth/logout` (αν εξαντληθούν όλα τα υπόλοιπα πρώτα). Πριν ξεκινήσεις: ask-inbox
+πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
