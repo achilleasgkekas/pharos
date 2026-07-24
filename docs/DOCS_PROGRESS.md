@@ -1,5 +1,33 @@
 # DOCS_PROGRESS
 
+## 2026-07-24 (fifteenth run — status check: no new features since P20)
+
+Σάρωση git log για undocumented features που έχουν shipped μετά την P20 loyalty-cards documentation (commit 2b6f437, 2026-07-24 06:45). Ανακάλυψα ότι ΔΕΝ υπάρχουν νέα feat() commits — μόνο test coverage κι bug-fixes:
+
+- cadb513 test(saas): invites/accept endpoint coverage (increment 88)
+- 8bf1c3c test(statements): CRUD slice coverage
+- 7a4f5b1 test(search): P22 receipt matched-line-item behavior pin
+- 30e4420 test(saas): Stripe webhook billing coverage
+- a668c7b test(subscriptions): CRUD + recurring-discovery
+- d150a95 test(vouchers): plain voucher/coupon actions
+
+Ολα τα test()/fix() commits — κανένα feat() ή doc().
+
+Κατάσταση documentation:
+- features.md: ✓ 27 sections, όλα τα shipped features (P1-P32 + basics).
+- api.md: ✓ 59 routes, 97 endpoints (last update 2b6f437 P20).
+- mobile.md: ✓ module screens ενημερωμένα.
+- configuration.md: ✓ AI/storage/notifications/i18n/calendar/MCP.
+- saas.md: ✓ auth/MFA/workspace console.
+- self-hosting.md: ✓ deploy + env vars.
+- Ολες οι internal links: ✓.
+
+Ενέργεια: Καμία. Κανένα work αυτό το run — όλα τα shipped features είναι documented.
+
+Collision guard: git status --short = κανένα modified docs file. Δεν υπάρχουν staged foreign.
+
+Επόμενο run: (α) αν νέα features shipαρούν (π.χ. P58-P60 candidates), update docs · (β) αν χρειάζεται OpenAPI schema, θα είναι ξεχωριστό project.
+
 ## 2026-07-24 (fourteenth run — P20 loyalty cards API documentation)
 
 Σάρωση git log για undocumented features που shipped από το τελευταίο run. Ανακάλυψα ότι το **P20 (loyalty card wallet, commit f58d818, 2026-07-24 15:42)** ήταν shipped με τα API routes αλλά ΔΕΝ ήταν documented στο api.md.
