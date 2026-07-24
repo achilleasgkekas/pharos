@@ -2876,3 +2876,64 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-24 (6) — FAQ += what happens when the free trial ends
+
+Increment (e), συνεχεια του `docs/saas.md` sweep. Πριν το ξεκινημα: coordination guard
+(`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος `~/.claude/ASK_ACHILLEAS.md` (δυο OPEN entries, και τα
+δυο bakecore-finance, τιποτα για landing/pharos). `git status --short` καθαρο (το προηγουμενο entry ειχε
+προλαβει να κανει commit). `git log --oneline -15` εδειξε αλλα routines να δουλευουν στο μεταξυ (mobile
+expense splitting, saas erasure-purge tests, statements installment tests) — εκτος του δικου μου territory,
+δεν τα αγγιξα.
+
+Το προηγουμενο entry σημειωσε δυο candidates: superadmin console και billing webhook edge cases. Διαβασα
+και τα δυο (`docs/saas.md` γραμμες 768-846 για το superadmin, 675-684 για το billing) και κατεληξα: το
+superadmin console ειναι **αμιγως platform-operator** surface (env allowlist `SAAS_SUPERADMIN_EMAILS`,
+observability-only, καμια in-app διαδρομη για να γινει καποιος superadmin) — δεν αφορα πελατη, δεν αξιζει
+FAQ γραμμη σε marketing σελιδα. Το billing webhook (Stripe checkout/portal/webhook mapping σε
+Tenant.status) ειναι πολυ implementation-level, οχι ερωτηση που θα εκανε υποψηφιος πελατης.
+
+Αντ' αυτου βρηκα ενα **κενο που αξιζε**: διαβαζοντας το «Workspace lifecycle» + «Trial dunning and lapse
+sweep» section (γραμμες 89-130), το hosted trial μηχανισμο (14-μερο default trial, warn email 3 μερες πριν
+τη ληξη, μετα suspend αν δεν προστεθει billing, οχι canceled/delete, ο owner το λυνει προσθετοντας billing
+οποτεδηποτε) **δεν εμφανιζεται πουθενα στη landing σελιδα** (ουτε στα TIERS cards, ουτε στα FAQ) παρολο που
+ειναι ακριβως το ειδος ερωτησης που θα εκανε καποιος πριν κανει "Join the waitlist" σε ενα πληρωμενο plan.
+Ιδιο idiom με τα προηγουμενα increments (2FA/invites/GDPR): τεκμηριωνουμε hosted mechanics πριν το launch.
+
+Αλλαγη (`apps/landing/app/page.tsx`, FAQS array μονο, μηδεν UI/CSS/dependency/bundle-size change πλην του
+νεου κειμενου): νεα εγγραφη «What happens when my free trial ends?» αμεσως μετα το «How is hosted different
+from self-hosted?» και πριν το «Can my household or team share one instance?» (hosted-lifecycle cluster,
+θεματικη γειτονια). Απαντηση: 14-day trial, no card required to start, ενα reminder email 3 μερες πριν τη
+ληξη, suspend (οχι delete) αν ληξει χωρις billing, recoverable με προσθηκη payment method οποτεδηποτε.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (ιδιο rounded μεγεθος με ολα
+  τα προηγουμενα increments).
+- Browser preview: `next start -p 3160` πανω στο production build (3000/3100-3150 κατειλημμενα απο
+  Docker/προηγουμενα runs). `mcp__Claude_Browser__*` διαθεσιμο, `preview_start` OK, `read_console_messages`
+  (onlyErrors) -> "No console logs." καθαρο. `javascript_tool` επιβεβαιωσε: το deterministic anchor id
+  `faq-what-happens-when-my-free-trial-ends` υπαρχει (`getElementById` -> βρεθηκε), σωστη σειρα (`idx: 7`,
+  neighbors = [faq-how-is-hosted-different-from-self-hosted, **αυτο**,
+  faq-can-my-household-or-team-share-one-instance]), και το `textContent` περιεχει το πληρες σωστο κειμενο
+  ("14-day free trial", "suspended rather than deleted", κλπ). Hero screenshot καθαρο (lighthouse mark,
+  gradient τιτλος, CTAs, τριπλο badge row), μηδεν regression. Server σταματησε μετα (`pkill -f "next start
+  -p 3160"`), `lsof -i :3160` εδειξε μονο τα γνωστα false-positive Claude-app TCP CLOSE_WAIT matches
+  (σημειωμενα ηδη σε προηγουμενα entries), οχι το node process.
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  `git diff --cached --name-only` κενο πριν το stage -> κανενα ξενο staged file. Staged+committed ΜΟΝΟ τα
+  δυο δικα μου landing paths.
+
+Επομενο increment: το `docs/saas.md` sweep εχει πλεον καλυψει ολα τα σαφως customer-facing hosted mechanics
+που εντοπιστηκαν (2FA, invites/roles, GDPR export ×3, BYO-key AI, trial lifecycle). Τα δυο εναπομειναντα
+candidates (superadmin console, billing webhook internals) κρινονται non-FAQ-worthy (operator-only /
+πολυ implementation-level). Επομενο περασμα: ξανα-ελεγχος για νεα modules/commits απο το κυριο repo μετα
+απο αυτο το run, αλλιως (e) polish συνεχεια, real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

@@ -463,6 +463,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'It is the same app. With hosted we handle the server, updates, and nightly backups, and AI parsing is included so there is nothing to configure. Self-hosted gives you full control and keeps every byte on your own hardware.',
   },
   {
+    q: 'What happens when my free trial ends?',
+    a: 'Every new hosted workspace starts on a 14-day free trial with full access, no card required to start. Three days before it ends you get one reminder email. If it lapses without adding billing, the workspace is suspended rather than deleted, a recoverable hold with nothing lost: add a payment method whenever you are ready and it reactivates instantly.',
+  },
+  {
     q: 'Can my household or team share one instance?',
     a: 'Yes. Each instance sits behind a login and you can add accounts for the people you share with, so everyone signs into the same hub. Self-hosting has no seat limits at all; hosted plans scale from a single person up to a shared family or team workspace.',
   },
