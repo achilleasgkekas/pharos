@@ -3998,3 +3998,70 @@ territory — `lib/i18n/*`, δεν είναι SaaS-only). Επόμενο increme
 `WEB_DEBT.md` για νέο item στο territory πρώτα· αλλιώς γύρισμα στο TODO.md §12 (Stripe
 live-wiring πέρα από τα ήδη-shipped checkout/portal/webhook stubs) ή §14 follow-up
 (audit-log rate-limiting, αν δεν έχει ήδη καλυφθεί από το increment 84's rate-limit fix).
+
+## 2026-07-24 (cont. — increment 87, route-level test coverage για το Stripe billing webhook)
+
+Πριν από νέο increment: ask-inbox (τα 2 OPEN entries είναι bakecore-finance, τίποτα για
+saas-core), `WEB_DEBT.md` (ακόμα η 57η σάρωση, όλα τα items στο δικό μου territory ήδη DONE),
+και το UI-first backlog (confirmed εξαντλημένο στο increment 86 — κάθε read API έχει ήδη
+consuming UI panel). Το «TODO.md §12 Stripe live-wiring» leftover next-task έλεγξα πρώτα:
+το `lib/billing/stripe.ts` (`createCheckoutSession`/`createPortalSession`/
+`verifyStripeSignature`) είναι ήδη **live** (πραγματικό fetch στο Stripe REST API, όχι
+mock/stub — χρειάζεται μόνο τα πραγματικά `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/
+price-id envs από τον Achilleas για end-to-end δοκιμή, βλ. ήδη-καταγεγραμμένο Needs-Achilleas
+σε προηγούμενα entries) — δεν υπάρχει άλλο μηχανικό βήμα εκεί χωρίς credentials.
+
+**Αντ' αυτού βρήκα ένα πραγματικό, μη-καταγεγραμμένο test-coverage gap**: `grep`-άροντας ΟΛΟ
+το `api/saas/**` για `*.test.ts` βγήκε **μηδέν route-level tests πουθενά** στο SaaS API
+surface (η λογική τεσταρίζεται μόνο έμμεσα, μέσω pure lib helpers όπως `statusAuditAction`/
+`planForPriceId`). Το πιο κρίσιμο ανεξέταστο route είναι ακριβώς το **`api/saas/billing/
+webhook/route.ts`** — το ΜΟΝΟ σημείο που η κατάσταση της Stripe συνδρομής (plan/status ενός
+πληρωμένου tenant) γράφεται στο control plane. Βρήκα προηγούμενο precedent για route-level
+testing με πλήρη module-boundary mocking (`api/v1/receipts/route.test.ts`, mocks μόνο DB/
+model seams, τρέχει το πραγματικό handler) και το εφάρμοσα εδώ.
+
+**Νέο `webhook/route.test.ts`** (18 tests, μηδέν production code αλλαγή): mocks `@/lib/db`,
+`@/models/Tenant` (findById/findOne + fake tenant με spy `save()`), `@/lib/tenancy/saasMode`,
+`@/lib/billing/stripe` (verifyStripeSignature/webhookSecret — πλήρης έλεγχος του gate ladder
+χωρίς να χρειάζεται πραγματικό HMAC construction), `@/lib/billing/plans` (planForPriceId).
+Το `@/lib/tenancy/audit`/`@/lib/billing/statusAudit` έμειναν **πραγματικά** (μέσω
+`vi.importActual`, μόνο το `recordAudit` mocked ως spy) — καθαρές pure functions, θέλαμε να
+τεσταριστεί η πραγματική integration μαζί τους, όχι stub. Καλύπτει: (1) gate ladder
+(SAAS_MODE off→404, no secret→503, bad sig→400, malformed JSON→400, unhandled event
+type→200 no-op), (2) tenant resolution (metadata.tenantId προτεραιότητα έναντι
+billingCustomerId fallback, no-match no-op), (3) `checkout.session.completed`
+(customer/subscription ids + status='active' + `workspace.reactivated` audit όταν το
+tenant ήταν suspended, όχι audit σε φυσιολογικό pending→active onboarding), (4)
+`customer.subscription.created/updated` (plan mapping από priceId, active/trialing→active,
+past_due/unpaid→suspended + `workspace.suspended` audit, unmapped price ⇒ plan αμετάβλητο),
+(5) `customer.subscription.deleted` (status=canceled + plan=free + **2** audit rows
+[`workspace.canceled` + `plan.changed`], no-op αν ήδη canceled+free), (6) mid-handler DB
+throw → 500 (ώστε το Stripe να κάνει retry, όχι silent-swallow σε 200).
+
+**Bug στο πρώτο μου πέρασμα (καλό σημάδι ότι το test όντως εξετάζει κάτι πραγματικό)**: αρχικά
+περίμενα 1 audit row στο subscription.deleted (μόνο status), αλλά ο κώδικας καλεί ΚΑΙ
+`auditPlanChange` (shared→free = πραγματική αλλαγή, δικό της `'plan.changed'` verb) ΚΑΙ
+`auditStatusChange` — διόρθωσα το expectation στο σωστό 2, όχι τον κώδικα (καμία αλλαγή
+συμπεριφοράς, ο κώδικας ήταν ήδη σωστός — το test μου έδειξε λάθος αρχική υπόθεση).
+
+**Verified**: νέο test file **18/18 green** μόνο του· πλήρες `npx vitest run` → **233 files
+/ 3049 tests green** (ήταν 229/2980 στο increment 86 — η διαφορά +4 files/+69 tests
+περιλαμβάνει τα δικά μου +1 file/+18 tests + tests από concurrent routines). `npm run
+type-check` → **EXIT 0**. **Docker: ΔΕΝ έγινε rebuild** (test-only αρχείο, μηδέν production
+code/runtime wiring αλλαγή). **Browser-verify: skipped** (test file, μηδέν UI/observable
+behavior αλλαγή). Collision guard: `git status --short` πριν το staging έδειξε ΜΟΝΟ το 1
+δικό μου νέο αρχείο (καθαρό working tree), `git diff --cached --name-only` επιβεβαίωσε exact
+match. Pushed `30e4420`.
+
+**## Needs Achilleas:** τίποτα νέο (το standing Stripe-live-keys item παραμένει όπως ήταν —
+`STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_SHARED`/`STRIPE_PRICE_DEDICATED`
+χρειάζονται πραγματικά credentials πριν γίνει end-to-end δοκιμή του checkout flow· το
+scaffold είναι πλήρες και live-ready).
+
+**Next task:** αν καμία νέα σάρωση WEB_DEBT δεν φέρει item στο territory, το επόμενο route
+χωρίς δικό του test είναι καλός υποψήφιος επόμενο increment (π.χ. `api/saas/billing/
+checkout`/`portal` routes, ή `api/saas/invites/accept` — ήδη guarded με try/catch από το
+increment 85 αλλά ανεξέταστο σε route-level) — ίδιο πρότυπο mocking. Εναλλακτικά: TODO.md
+§14 audit-log rate-limiting follow-up (το increment 84 κάλυψε μόνο auth/mfa, όχι το
+`audit/route.ts` GET read endpoint το ίδιο — ελέγξτε αν χρειάζεται, πιθανώς όχι high-value
+αφού είναι session-gated read όχι brute-forceable secret).
