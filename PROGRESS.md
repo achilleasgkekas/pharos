@@ -7531,11 +7531,84 @@ blocked/deferred όπως πάντα σήμερα.
 **Git hygiene**: `git add` explicit (MOBILE_PARITY.md + PROGRESS.md + 6 νέα/τροποποιημένα web route/test
 αρχεία + 3 mobile source αρχεία + package.json/package-lock.json, όχι `-A`) → commit → push.
 
+## 2026-07-24 (pharos-daily-dev, cont.⁴)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε 2 OPEN items, και τα δύο από
+`bakecore-finance` (άσχετο project) → τίποτα να εφαρμόσω πρώτα. `mkdir /tmp/claude-docker.lock` δεν χρειάστηκε
+αυτό το run (μηδέν Docker build/boot, βλ. παρακάτω). Working tree καθαρό στην αρχή.
+
+**Approved queue check (βήμα a)**: ξανασάρωσα το `PRODUCT_BACKLOG.md → ## Approved` section γραμμή-γραμμή
+(361-1026). Κάθε ανοιχτό item είναι είτε ήδη SHIPPED είτε ρητά blocked: **P36** Open Banking (needs-Achilleas,
+μεγάλο OAuth-style consent flow)· **P31** household/shared-access (4ο consecutive deferral, τεκμηριωμένο ήδη
+γιατί χρειάζεται supervised live-login session, όχι άλλο best-effort run)· **P16** Firefly III/Grocy importers
+(χρειάζεται πραγματικό sample export file από τον Αχιλλέα)· **P17** mobile barcode/QR scan (mobile-native camera
+dep, needs-Achilleas approval)· **P23** mobile share-sheet (mobile-native iOS Share Extension/Android intent,
+ίδιο needs-Achilleas tier)· **P9** multi-currency (L-size, ρητά «άφησέ το τελευταίο» στο ίδιο το backlog λόγω
+ρίσκου/κόπου). Μηδέν νέο buildable Approved item → πέρασα στο βήμα (b).
+
+**Fallback (βήμα b) — MOBILE_PARITY.md Build Queue**: το functional-gaps tier είχε ένα μοναδικό ανοιχτό
+(`Status: TODO`) item, το ίδιο που είχε προτείνει το προηγούμενο run: **Search — matched receipt line-item
+snippet στα mobile αποτελέσματα (P22 gap)**. Πριν αρχίσω να το χτίζω (route change + mobile type + UI, όπως
+speced), διάβασα το ΥΠΑΡΧΟΝ `apps/web/src/app/search-actions.ts` για να καταλάβω ακριβώς πού θα κουμπώσει το
+νέο πεδίο.
+
+**Εύρημα: το gap ΔΕΝ υπάρχει — false positive, 4+ σαρώσεις (49η→53η) το είχαν λάθος**. Το `searchAll()`
+(`search-actions.ts:90-98`, commit `68acb9a`, 2026-07-10 — το ΙΔΙΟ commit που το ίδιο το doc παραθέτει ως «web
+ref») ήδη προσθέτει το matched line item **μέσα στο `subtitle` string** ενός receipt hit
+(`Receipt · <date> · €<total> · <matched item>`), ΟΧΙ σε ξεχωριστό πεδίο. Το `GET /api/v1/search`
+(`api/v1/search/route.ts:13`) δεν έχει δικό του query logic — καλεί `searchAll()` απευθείας και περνάει το
+`subtitle` αυτούσιο στο mobile client. Το `apps/mobile/src/screens/SearchScreen.tsx:73` ήδη δείχνει
+`item.subtitle` αυτούσιο. Άρα ο χρήστης βλέπει ΗΔΗ το matched item name σήμερα στο mobile search — απλά ως
+τμήμα του υπάρχοντος subtitle string, όχι ως διακριτό στυλιζαρισμένο snippet. Η ιδέα ενός ξεχωριστού
+`matchedItem?` πεδίου (πιο «καθαρό» για custom mobile styling) παραμένει μια έγκυρη μελλοντική polish, αλλά
+είναι βελτίωση πάνω σε κάτι που ήδη δουλεύει functionally, όχι parity gap — **δεν χτίστηκε** (θα ήταν
+αδικαιολόγητη πολυπλοκότητα/scope creep για μηδενικό functional gain, αντίθετο με «don't add complexity
+beyond what's needed»).
+
+**Γιατί έμεινε λάθος τόσες σαρώσεις**: κάθε mobile-parity-auditor σάρωση χρησιμοποιεί έναν μηχανικό heuristic
+(«ποια commits άγγιξαν `api/v1`/`apps/mobile`;» μέσω `git show --stat`) που δουλεύει σωστά για όλα τα άλλα
+P-items, αλλά έδωσε ψευδές αρνητικό εδώ ακριβώς επειδή το v1 route δεν έχει δική του παράλληλη υλοποίηση —
+import-άρει και καλεί `searchAll` απευθείας, οπότε το `68acb9a` (καθαρά web-side αρχεία στο diff) έλυσε το
+mobile-side gap emergently, χωρίς να αγγίξει ποτέ `api/v1`/`apps/mobile`. Κανένα από τα 4+ audit passes δεν
+διάβασε το session ΜΕΣΑ στο ίδιο `search-actions.ts` για να το προσέξει.
+
+**Τι έγινε αντ' αυτού**: (1) **`MOBILE_PARITY.md`** — το entry (P22) διορθώθηκε από `Status: TODO` σε
+«✅ ΗΔΗ ΙΚΑΝΟΠΟΙΕΙΤΑΙ» με πλήρη εξήγηση (evidence + γιατί έμεινε λάθος) ώστε καμία μελλοντική σάρωση να μην το
+ξανα-ερευνήσει από την αρχή. (2) **Νέο `apps/web/src/app/search-actions.test.ts`** (+6 tests) — το
+`searchAll()` δεν είχε ΠΟΤΕ δικό του integration test file (μόνο το pure `matchedLineItemName` helper στο
+`lib/receiptSearch.test.ts` και το route-level auth/projection wiring στο `api/v1/search/route.test.ts`, που
+mock-άρει ολόκληρο το `searchAll` — άρα κανένα test δεν pin-άρει σήμερα την ΠΡΑΓΜΑΤΙΚΗ end-to-end συμπεριφορά).
+Νέο test file mock-άρει `connectDB` + και τα 7 model `.find().limit().select().lean()` chains (κοινή shape,
+μία shared factory) και πιστοποιεί: store-name match → μηδέν appended snippet (ακόμα κι όταν ΚΑΙ ένα line item
+τυχαία ταιριάζει)· line-item-only match → appended `· <matched item>` στο subtitle· κανένα match → clean
+subtitle χωρίς κενό trailing separator· πολλαπλά line items → πρώτο match, refinedName preferred· και ένα
+ρητό «this is exactly what the v1 mobile route forwards» test που επιβεβαιώνει το `{ type, id, title,
+subtitle }` shape end-to-end. Regression guard ώστε ένα μελλοντικό refactor του search-actions.ts να μην
+σβήσει σιωπηλά αυτό το already-shipped mobile-visible behavior.
+
+**Verify**: `npm run type-check` (web) EXIT 0. Full `npx vitest run` **3055 passed / 234 files** (+6 νέα,
+μηδέν regression). `apps/mobile npx tsc --noEmit` EXIT 0 (μηδέν mobile-side αλλαγή χρειάστηκε — καμία υπήρχε
+να γίνει). **Docker rebuild ΔΕΝ χρειάστηκε** (μηδέν αλλαγή σε runtime κώδικα, μόνο test file + docs — δεν
+υπάρχει τίποτα νέο να σερβίρει ο container), άρα το Docker mutex lock δεν χρειάστηκε καν να αποκτηθεί αυτό το
+run.
+
+**Suggested next task**: το MOBILE_PARITY Build Queue functional-gaps tier είναι πλέον **γνήσια άδειο** (το
+τελευταίο TODO item ήταν αυτό το false-positive). Το επόμενο run πρέπει (κανόνας βήμα a) να ξανα-ελέγξει το
+Approved queue πρώτα (P36/P31/P16/P9/P17/P23 παραμένουν blocked/deferred, απίθανο να αλλάξει χωρίς input του
+Αχιλλέα)· αν συνεχίζει άδειο, καλή επιλογή θα ήταν είτε να περιμένει την επόμενη mobile-parity-auditor σάρωση
+για νέο ranking, είτε να δουλέψει στο **UI Debt Queue** (θεματικό tokens/primitives sweep, π.χ. «Padding/gap
+magic numbers → SPACE token» ή «Border radius magic numbers → RADIUS token», μηχανικά αλλά μεγάλα σε αριθμό
+sites — χρειάζεται προσεκτικό scoping ώστε να μείνει «ένα focused change» και όχι sprawling rewrite), είτε να
+γράψει επιπλέον pure-lib test coverage σε αρχεία χωρίς tests ακόμα (ίδιο πρότυπο με τα τελευταία 3-4 runs).
+
+**Git hygiene**: `git add` explicit (μόνο `MOBILE_PARITY.md` + `PROGRESS.md` + το νέο
+`apps/web/src/app/search-actions.test.ts`, όχι `-A`) → commit → push.
+
 ## Needs Achilleas
 
 - Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: `getTenantConnection` readyState guard decision
   (P3/S)· SaaS multi-tenancy/billing rollout env boundary· mobile native-dep approvals (P17 camera, P23
-  share-sheet — P20 barcode lib ΠΛΕΟΝ ΛΥΜΕΝΟ, `react-native-barcode-svg` installed+shipped αυτό το run)· P36
-  Open Banking provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real
+  share-sheet — P20 barcode lib ΠΛΕΟΝ ΛΥΜΕΝΟ, `react-native-barcode-svg` installed+shipped 2026-07-24 cont.³)·
+  P36 Open Banking provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real
   sample-file need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export
   ZIP desktop power tool.

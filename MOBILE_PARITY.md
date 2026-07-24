@@ -466,7 +466,29 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Acceptance:
   - Search όρου που ταιριάζει ΜΟΝΟ σε line-item (όχι store/vendor) επιστρέφει το receipt hit με το matched item name
   - tsc καθαρό web+mobile
-- Status: TODO
+- Status: ✅ ΗΔΗ ΙΚΑΝΟΠΟΙΕΙΤΑΙ (βρέθηκε 2026-07-24, pharos-daily-dev) — **stale gap, καμία υλοποίηση χρειάστηκε**. Η
+  `matchedLineItemName()` κλήση ζει ΗΔΗ μέσα στην ΙΔΙΑ `searchAll()` (`apps/web/src/app/search-actions.ts:90-98`,
+  commit `68acb9a`, 2026-07-10 — το ΙΔΙΟ commit που το doc παραθέτει ως «web ref») που τροφοδοτεί ΚΑΙ το web dropdown
+  ΚΑΙ το `GET /api/v1/search` (το route δεν έχει δικό του query logic, καλεί `searchAll()` απευθείας και περνάει το
+  `subtitle` string αυτούσιο — `apps/web/src/app/api/v1/search/route.ts:13`). Το matched line item **ΕΙΝΑΙ ήδη μέσα
+  στο `subtitle`** (`Receipt · <date> · €<total> · <matched item>`), όχι σε ξεχωριστό πεδίο· το mobile
+  `SearchScreen.tsx:73` ήδη δείχνει `item.subtitle` αυτούσιο → ο χρήστης βλέπει ήδη το matched item name σήμερα,
+  απλά ως τμήμα του ίδιου string αντί για ξεχωριστό στυλιζαρισμένο snippet. Η πρόταση για διακριτό `matchedItem?`
+  πεδίο (πιο «καθαρό» για custom mobile styling) παραμένει έγκυρη ιδέα αλλά είναι polish πάνω σε κάτι που ήδη
+  δουλεύει, όχι parity gap — δεν χτίστηκε (θα ήταν αδικαιολόγητη πολυπλοκότητα για μηδενικό functional gain).
+  **Γιατί έμεινε λάθος 4+ σαρώσεις** (49η→53η, 2026-07-13 έως 2026-07-24): κάθε επόμενη σάρωση έκανε endpoint-shape
+  diff (ports/routes/types) χωρίς να διαβάσει το session μέσα στο ίδιο `search-actions.ts` που ήδη έλυνε το gap
+  emergently μέσω κοινόχρηστου κώδικα — το `git show --stat` του `68acb9a` έδειχνε ΜΟΝΟ web-side αρχεία
+  (search-actions.ts/receiptSearch.ts), οπότε ο μηχανικός "commit touched api/v1 or mobile?" heuristic (σωστός
+  για τα υπόλοιπα P-items) έδωσε ψευδές αρνητικό εδώ ακριβώς επειδή το v1 route ΗΔΗ import-άρει `searchAll` απευθείας
+  αντί να έχει δική του παράλληλη υλοποίηση. **Προστέθηκε νέο `apps/web/src/app/search-actions.test.ts`** (+6 tests,
+  ΠΟΤΕ δεν είχε δικό του test file πριν — μόνο το pure `matchedLineItemName` helper και το route wiring ήταν
+  tested, όχι η ίδια η `searchAll()` integration) που pin-άρει ρητά αυτή τη συμπεριφορά end-to-end (store-match
+  vs line-item-match vs no-match vs multi-item-first-match) + ένα explicit test που δείχνει ακριβώς το `{ type,
+  id, title, subtitle }` shape που θα δει το mobile API — regression guard ώστε ένα μελλοντικό refactor του
+  search-actions.ts να μην σβήσει σιωπηλά αυτό το already-shipped mobile-visible behavior. `npm run type-check`
+  EXIT 0, full `npx vitest run` **3055 passed / 234 files** (+6 νέα, μηδέν regression). mobile
+  `npx tsc --noEmit` EXIT 0 (μηδέν mobile-side αλλαγή χρειάστηκε).
 
 ### Notifications — pricehike icon στο mobile Activity (P14 gap)
 - Priority: P2 | Size: S | no AI, no decision, no endpoint, no native dep
