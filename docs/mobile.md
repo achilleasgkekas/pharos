@@ -21,7 +21,7 @@ The mobile app mirrors most of the web modules, backed by the same API client
 | Shopping list | add/check/delete + **camera product scan** |
 | Receipts | list, detail, camera scan + AI parse, re-scan, add to library |
 | Inventory (Items) | list, detail, price status, log a price, link installment plans |
-| Expenses / Income | list, add, edit, bill/payslip AI scan, **mark as tax-deductible + category**, **split (who owes what)** |
+| Expenses / Income | list, add, edit, bill/payslip AI scan, **mark as tax-deductible + category**, **split (who owes what)** + **Balances modal (cross-expense aggregation, settle-up per person)** |
 | Subscriptions | list, add, edit, **auto-discover untracked recurring charges** |
 | Statements | list + transactions, installment-plan overview |
 | Vouchers | list, add, edit, AI fill (text/photo); **Coupons / Gift cards / Loyalty cards** tabs |
@@ -36,6 +36,11 @@ The mobile app mirrors most of the web modules, backed by the same API client
 
 Navigation is a top app bar (menu, search, notification bell with unread badge)
 plus a slide-out drawer. There are no native tabs; screens switch from the drawer.
+
+**Note on Balances:** When you split expenses, a **Balances** button appears under the
+total (mobile only) that aggregates all unsettled splits across every expense and shows
+who owes you in total. Tap to see a per-person breakdown and settle up (marking their
+shares as paid). This uses the existing expense update endpoint; no new API call is needed.
 
 ---
 
