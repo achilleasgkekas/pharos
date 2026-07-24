@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, Pressable, Modal, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
-import { C, scrim } from '../theme';
+import { C, RADIUS, scrim } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Card, Badge, Input, contentWidth } from '../ui';
 import { getStatements, getStatementTxns, getInstallmentPlans, mergePlans, unmergePlan, type Statement, type StatementTxn, type InstallmentPlan } from '../api';
 
@@ -196,7 +196,7 @@ const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   plansBox: { marginBottom: 16 },
   plansHead: { color: C.faint, fontSize: 10, letterSpacing: 1.4, fontWeight: '700', marginBottom: 8 },
-  plan: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 12, marginBottom: 8 },
+  plan: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.md, padding: 12, marginBottom: 8 },
   planDone: { opacity: 0.6 },
   planTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   planLabel: { color: C.text, fontSize: 14, fontWeight: '700', flex: 1 },
@@ -207,7 +207,7 @@ const s = StyleSheet.create({
   mergeBtn: { color: C.dim, fontSize: 12, fontWeight: '600' },
   mergeBtnDisabled: { opacity: 0.4 },
   unmergeBtn: { color: C.red, fontSize: 12, fontWeight: '600' },
-  mergeBox: { backgroundColor: C.surface2, borderRadius: 10, padding: 8, marginTop: 9, gap: 6 },
+  mergeBox: { backgroundColor: C.surface2, borderRadius: RADIUS.sm, padding: 8, marginTop: 9, gap: 6 },
   mergeHint: { color: C.faint, fontSize: 9, letterSpacing: 1.2, fontWeight: '700' },
   mergeSearch: { marginBottom: 2 },
   mergeItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 8, backgroundColor: C.surface },
@@ -226,7 +226,7 @@ const s = StyleSheet.create({
   sheetSub: { color: C.faint, fontSize: 13, marginTop: 3 },
   close: { color: C.dim, fontSize: 20, fontWeight: '700', paddingHorizontal: 4 },
   totals: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  totBox: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 10 },
+  totBox: { flex: 1, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.md, padding: 10 },
   totLabel: { color: C.faint, fontSize: 9, letterSpacing: 1.2 },
   totVal: { color: C.accent, fontSize: 16, fontWeight: '800', marginTop: 3 },
   totValDim: { color: C.text, fontSize: 15, fontWeight: '700', marginTop: 3 },

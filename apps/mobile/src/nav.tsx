@@ -1,5 +1,5 @@
 import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { C, scrim } from './theme';
+import { C, RADIUS, scrim } from './theme';
 import { PharosMark } from './PharosMark';
 import type { ScreenKey } from './screens/HomeScreen';
 
@@ -88,7 +88,7 @@ const s = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, marginBottom: 16 },
   brand: { color: C.text, fontSize: 20, fontWeight: '800', letterSpacing: 3 },
   group: { color: C.faint, fontSize: 10, letterSpacing: 1.4, paddingHorizontal: 10, marginBottom: 4 },
-  item: { paddingVertical: 11, paddingHorizontal: 10, borderRadius: 10 },
+  item: { paddingVertical: 11, paddingHorizontal: 10, borderRadius: RADIUS.sm },
   itemText: { color: C.dim, fontSize: 15, fontWeight: '600' },
   itemActive: { color: C.accent },
   signout: { borderTopWidth: 1, borderTopColor: C.border, paddingTop: 14, marginTop: 8, paddingHorizontal: 10 },

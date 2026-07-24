@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal } from 'react-native';
-import { C, alpha, scrim } from '../theme';
+import { C, RADIUS, alpha, scrim } from '../theme';
 import { money, ErrorText, Check, Input, TextArea, Chip, contentWidth } from '../ui';
 import { PharosMark } from '../PharosMark';
 import { APP_VERSION } from '../config';
@@ -603,8 +603,8 @@ const s = StyleSheet.create({
   loadWrap: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   logo: { alignItems: 'center', marginVertical: 18 },
   section: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 18, marginBottom: 8 },
-  card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 14 },
-  cardPad: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14 },
+  card: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg, paddingHorizontal: 14 },
+  cardPad: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg, padding: 14 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border },
   noBorder: { borderBottomWidth: 0 },
   rowLabel: { color: C.dim, fontSize: 14 },
@@ -626,14 +626,14 @@ const s = StyleSheet.create({
   over: { color: C.red },
   budgetEdit: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   curSym: { color: C.dim, fontSize: 15 },
-  rm: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: C.border },
+  rm: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.sm, borderWidth: 1, borderColor: C.border },
   rmText: { color: C.red, fontSize: 14, fontWeight: '700' },
-  testBtn: { marginTop: 14, borderWidth: 1, borderColor: C.cyan, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  testBtn: { marginTop: 14, borderWidth: 1, borderColor: C.cyan, borderRadius: RADIUS.md, paddingVertical: 12, alignItems: 'center' },
   testText: { color: C.cyan, fontSize: 14, fontWeight: '700' },
   dim: { opacity: 0.45 },
-  saveBtn: { marginTop: 20, backgroundColor: C.accent, borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
+  saveBtn: { marginTop: 20, backgroundColor: C.accent, borderRadius: RADIUS.md, paddingVertical: 15, alignItems: 'center' },
   saveText: { color: C.onAccent, fontSize: 15, fontWeight: '800' },
-  signout: { marginTop: 26, borderWidth: 1, borderColor: alpha(C.red, 0.25), backgroundColor: alpha(C.red, 0.08), borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  signout: { marginTop: 26, borderWidth: 1, borderColor: alpha(C.red, 0.25), backgroundColor: alpha(C.red, 0.08), borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center' },
   signoutText: { color: C.red, fontSize: 15, fontWeight: '700' },
   // cards
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border },
@@ -663,10 +663,10 @@ const s = StyleSheet.create({
   valChipText: { color: C.text, fontSize: 12, fontWeight: '600' },
   valChipX: { color: C.faint, fontSize: 11, fontWeight: '700' },
   listAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  listAddBtn: { width: 44, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: C.cyan },
+  listAddBtn: { width: 44, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.sm, backgroundColor: C.cyan },
   listAddText: { color: C.onAccent, fontSize: 20, fontWeight: '800' },
   listBtns: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
-  listSaveBtn: { backgroundColor: C.accent, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 22, alignItems: 'center' },
+  listSaveBtn: { backgroundColor: C.accent, borderRadius: RADIUS.sm, paddingVertical: 9, paddingHorizontal: 22, alignItems: 'center' },
   listSaveText: { color: C.onAccent, fontSize: 13, fontWeight: '800' },
   listResetBtn: { paddingVertical: 9, paddingHorizontal: 6 },
   listResetText: { color: C.dim, fontSize: 12, fontWeight: '600' },
@@ -674,6 +674,6 @@ const s = StyleSheet.create({
   modalSheet: { backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: C.border, maxHeight: '90%' },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800', marginBottom: 12 },
   modalBtns: { flexDirection: 'row', gap: 12, marginTop: 22, alignItems: 'stretch' },
-  cancelBtn: { paddingHorizontal: 20, justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: C.border },
+  cancelBtn: { paddingHorizontal: 20, justifyContent: 'center', borderRadius: RADIUS.md, borderWidth: 1, borderColor: C.border },
   cancelText: { color: C.dim, fontSize: 15, fontWeight: '600' },
 });

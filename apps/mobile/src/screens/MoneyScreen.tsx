@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { C } from '../theme';
+import { C, RADIUS } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem, Chip, ModalSheet, contentWidth } from '../ui';
 import { getExpenses, addExpense, deleteExpense, updateExpense, rescanExpense, scanExpenseImage, fileSource, type Expense, type ParsedExpenseData, type SplitEntry } from '../api';
 
@@ -487,7 +487,7 @@ const s = StyleSheet.create({
   totalLabel: { color: C.faint, fontSize: 11, letterSpacing: 1 },
   total: { fontSize: 22, fontWeight: '800' },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
-  scanBtn: { width: 46, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
+  scanBtn: { width: 46, borderRadius: RADIUS.md, borderWidth: 1, borderColor: C.cyan, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
   scanText: { color: C.cyan, fontSize: 20, fontWeight: '700' },
   suggestRow: { gap: 6, paddingHorizontal: 16, paddingBottom: 6 },
   hint: { color: C.faint, fontSize: 11, paddingHorizontal: 16, marginTop: -2, marginBottom: 4 },
@@ -500,10 +500,10 @@ const s = StyleSheet.create({
   anomaly: { color: C.gold, fontSize: 10, fontWeight: '700', backgroundColor: C.surface2, borderWidth: 1, borderColor: C.gold, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
   taxBadge: { color: C.gold, fontSize: 10, fontWeight: '700', backgroundColor: C.surface2, borderWidth: 1, borderColor: C.gold, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
   modalMax: { maxHeight: '88%' },
-  bigImg: { width: '100%', height: 220, borderRadius: 12, backgroundColor: C.surface2, marginTop: 12 },
+  bigImg: { width: '100%', height: 220, borderRadius: RADIUS.md, backgroundColor: C.surface2, marginTop: 12 },
   rescanBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.border },
   rescanLabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, flex: 1 },
-  rescanBtn: { borderWidth: 1, borderColor: C.cyan, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16, minWidth: 56, alignItems: 'center' },
+  rescanBtn: { borderWidth: 1, borderColor: C.cyan, borderRadius: RADIUS.sm, paddingVertical: 8, paddingHorizontal: 16, minWidth: 56, alignItems: 'center' },
   rescanText: { color: C.cyan, fontSize: 13, fontWeight: '700' },
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
@@ -520,7 +520,7 @@ const s = StyleSheet.create({
   cycleTextOn: { color: C.cyan },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 },
   splitBadge: { color: C.cyan, fontSize: 10, fontWeight: '700', backgroundColor: C.surface2, borderWidth: 1, borderColor: C.cyan, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
-  splitBox: { borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 12, marginTop: 14 },
+  splitBox: { borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.md, padding: 12, marginTop: 14 },
   splitHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   splitTitle: { color: C.cyan, fontSize: 13, fontWeight: '700' },
   splitHint: { color: C.faint, fontSize: 11 },
@@ -540,10 +540,10 @@ const s = StyleSheet.create({
   splitYourShare: { color: C.faint, fontSize: 11, marginTop: 8, textAlign: 'right' },
   balancesRow: { paddingHorizontal: 16, marginTop: 6 },
   balancesBtn: { color: C.cyan, fontSize: 12, fontWeight: '700' },
-  balanceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8, backgroundColor: C.surface },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8, backgroundColor: C.surface },
   balanceName: { color: C.text, fontSize: 15, fontWeight: '700' },
   balanceAmount: { color: C.gold, fontSize: 16, fontWeight: '800' },
-  settleBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: C.surface2, minWidth: 58, alignItems: 'center' },
+  settleBtn: { borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.sm, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: C.surface2, minWidth: 58, alignItems: 'center' },
   settleBtnText: { color: C.accent, fontSize: 12, fontWeight: '700' },
   balanceRowSettled: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, paddingVertical: 6 },
   balanceCheck: { color: C.accent, fontSize: 13, fontWeight: '800' },

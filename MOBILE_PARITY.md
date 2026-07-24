@@ -954,13 +954,21 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 - Priority: P2
 - Size: S
 - Web ref: consistent radius scale (mobile `theme.ts:26` RADIUS = sm10/md12/lg14/xl18, mirror του web card/pill radii)
-- Mobile files: apps/mobile/src/ui.tsx (chip:279 `borderRadius:10`, iconBtn:287 `borderRadius:12`) + 12 screens (47 sites, π.χ. ItemsScreen aiBtn/wrap/storeRow, MoneyScreen scanBtn/bigImg, SettingsScreen card/saveBtn/testBtn, StatementsScreen plan/totBox, Subscriptions/Vouchers aiBtn, Assistant example/send, Activity tab/restore, Login btn)
+- Mobile files: apps/mobile/src/ui.tsx (chip:279 `borderRadius:10`, iconBtn:287 `borderRadius:12`) + apps/mobile/src/nav.tsx + 11 screens (47 sites, π.χ. ItemsScreen aiBtn/wrap/storeRow, MoneyScreen scanBtn/bigImg, SettingsScreen card/saveBtn/testBtn, StatementsScreen plan/totBox, Subscriptions/Vouchers aiBtn, Assistant example/send, Activity tab/restore, Login btn)
 - Depends on: none
 - Acceptance:
   - μηδέν `borderRadius: (10|12|14|18)` numeric literal σε `apps/mobile/src/screens/*.tsx` και `ui.tsx` (όλα → `RADIUS.sm/md/lg/xl`)
   - non-scale radii (16/9/8/6/5/4/3 = cards/chips/tracks/dots) μένουν literal σκόπιμα (δεν υπάρχει token) — μην τα αγγίξεις
   - mobile `npx tsc --noEmit` EXIT 0· byte-identical rendered output (μηδέν οπτική αλλαγή)
-- Status: TODO
+- Status: ✅ DONE 2026-07-24 (pharos-daily-dev). Live grep βρήκε **54** exact-match sites (10/12/14/18, όχι 47 —
+  μεγάλωσε ελαφρώς από προηγούμενα commits) σε 13 αρχεία (`ui.tsx` + `nav.tsx` + 11 screens): `perl -pi` mechanical
+  swap `borderRadius: N` → `borderRadius: RADIUS.sm|md|lg|xl` με word-boundary regex (επιβεβαιώθηκε προηγουμένως
+  ότι κανένα site δεν είχε decimal τιμή όπως `10.5` που θα έσπαγε το boundary match, και ότι τιμές όπως `100`/`180`
+  δεν matchάρουν λόγω `\b`). `RADIUS` προστέθηκε στο theme import των 11 αρχείων που δεν το είχαν ήδη (`ui.tsx`+
+  `ReceiptsScreen.tsx` το είχαν από πριν). **Μηδέν non-scale radius αγγίχτηκε** (καμία τιμή 18 βρέθηκε ούτε καν —
+  `RADIUS.xl` παραμένει αχρησιμοποίητο σε αυτό το pass, όχι λάθος). Verify: `grep -rnE "borderRadius:\s*(10|12|14|18)\b"`
+  στα 13 αρχεία → **0 matches** μετά· `apps/mobile npx tsc --noEmit` EXIT 0· `git status --short` πριν το commit
+  επιβεβαίωσε ΜΟΝΟ τα 13 προγραμματισμένα αρχεία (working tree ήταν ήδη καθαρό στην αρχή, μηδέν ξένο WIP).
 
 ### Brand typography (Outfit / Manrope / IBM Plex Mono) via expo-font
 - Priority: P2

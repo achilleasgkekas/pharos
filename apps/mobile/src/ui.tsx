@@ -279,7 +279,7 @@ export function Chip({ label, on, onPress, style, textStyle }: ChipProps) {
 
 const s = StyleSheet.create({
   bar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border, gap: 4 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
+  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.sm, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
   chipOn: { backgroundColor: C.accent, borderColor: C.accent },
   chipText: { color: C.dim, fontSize: 12, fontWeight: '600' },
   chipTextOn: { color: C.onAccent },
@@ -287,7 +287,7 @@ const s = StyleSheet.create({
   listItem: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg, padding: 14, marginBottom: 10 },
   badge: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   badgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
-  iconBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 46, borderRadius: RADIUS.md, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   iconBtnText: { color: C.onAccent, fontSize: 24, fontWeight: '700' },
   backBtn: { width: 40, height: 36, alignItems: 'center', justifyContent: 'center' },
   back: { color: C.accent, fontSize: 30, lineHeight: 32, marginTop: -3 },

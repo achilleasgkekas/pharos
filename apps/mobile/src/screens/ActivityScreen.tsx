@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, StyleSheet, Alert } from 'react-native';
-import { C, alpha } from '../theme';
+import { C, RADIUS, alpha } from '../theme';
 import { shortDate, money, Spinner, ErrorText, Empty, Card, Badge, contentWidth } from '../ui';
 import {
   getTrash, restoreTrash, purgeTrash, currentUser,
@@ -343,7 +343,7 @@ function HistoryTab() {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
   tabOn: { borderColor: C.accent, backgroundColor: alpha(C.accent, 0.08) },
   tabText: { color: C.dim, fontSize: 13, fontWeight: '600' },
   tabTextOn: { color: C.accent, fontWeight: '700' },
@@ -359,16 +359,16 @@ const s = StyleSheet.create({
   title: { color: C.text, fontSize: 15, fontWeight: '600' },
   meta: { color: C.faint, fontSize: 12, marginTop: 4 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  restore: { borderWidth: 1, borderColor: C.accent, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
+  restore: { borderWidth: 1, borderColor: C.accent, borderRadius: RADIUS.sm, paddingVertical: 9, paddingHorizontal: 16 },
   restoreText: { color: C.accent, fontSize: 14, fontWeight: '700' },
-  purge: { borderWidth: 1, borderColor: alpha(C.red, 0.25), backgroundColor: alpha(C.red, 0.07), borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
+  purge: { borderWidth: 1, borderColor: alpha(C.red, 0.25), backgroundColor: alpha(C.red, 0.07), borderRadius: RADIUS.sm, paddingVertical: 9, paddingHorizontal: 16 },
   purgeText: { color: C.red, fontSize: 14, fontWeight: '600' },
   jobHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   track: { height: 6, borderRadius: 3, backgroundColor: C.surface2, marginTop: 8, overflow: 'hidden' },
   fill: { height: 6, borderRadius: 3 },
   preview: { color: C.dim, fontSize: 13, marginTop: 8, lineHeight: 18 },
   thread: { marginTop: 10, gap: 8 },
-  msg: { borderRadius: 10, padding: 10 },
+  msg: { borderRadius: RADIUS.sm, padding: 10 },
   msgUser: { backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border },
   msgBot: { backgroundColor: alpha(C.cyan, 0.06), borderWidth: 1, borderColor: alpha(C.cyan, 0.2) },
   role: { color: C.faint, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 3, textTransform: 'uppercase' },

@@ -3,7 +3,7 @@ import {
   View, Text, Pressable, FlatList, ActivityIndicator, RefreshControl, StyleSheet, Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { C } from '../theme';
+import { C, RADIUS } from '../theme';
 import {
   getShoppingList, addListItem, toggleListItem, deleteListItem, scanProduct, type ListItem, type ScannedProduct,
 } from '../api';
@@ -145,10 +145,10 @@ const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg, padding: 16 },
   h1: { color: C.text, fontSize: 26, fontWeight: '800', marginBottom: 14 },
   addRow: { flexDirection: 'row', gap: 8 },
-  scanBtn: { marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface2, paddingVertical: 12, alignItems: 'center' },
+  scanBtn: { marginTop: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface2, paddingVertical: 12, alignItems: 'center' },
   scanText: { color: C.cyan, fontSize: 15, fontWeight: '600' },
   error: { color: C.red, fontSize: 13, marginTop: 10 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginTop: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg, padding: 14, marginTop: 10 },
   eyebrow: { color: C.faint, fontSize: 10, letterSpacing: 1 },
   name: { color: C.text, fontSize: 15, fontWeight: '600' },
   struck: { textDecorationLine: 'line-through', color: C.dim },

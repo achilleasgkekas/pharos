@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
-import { C } from '../theme';
+import { C, RADIUS } from '../theme';
 import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button, Chip, ListItem, ModalSheet, contentWidth } from '../ui';
 import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
 
@@ -505,14 +505,14 @@ const s = StyleSheet.create({
   statusChip: { paddingHorizontal: 11, borderRadius: 9 },
   mbtns: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22 },
   aiBar: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  aiBtn: { flex: 1, borderRadius: 12, borderWidth: 1, borderColor: C.accent, paddingVertical: 10, alignItems: 'center' },
+  aiBtn: { flex: 1, borderRadius: RADIUS.md, borderWidth: 1, borderColor: C.accent, paddingVertical: 10, alignItems: 'center' },
   aiBtnText: { color: C.accent, fontSize: 14, fontWeight: '600' },
-  convertBtn: { marginTop: 16, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, paddingVertical: 11, alignItems: 'center' },
+  convertBtn: { marginTop: 16, borderRadius: RADIUS.md, borderWidth: 1, borderColor: C.cyan, paddingVertical: 11, alignItems: 'center' },
   convertBtnText: { color: C.cyan, fontSize: 14, fontWeight: '600' },
 });
 
 const pb = StyleSheet.create({
-  wrap: { marginTop: 14, padding: 14, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 14 },
+  wrap: { marginTop: 14, padding: 14, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg },
   heroRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   hero: { color: C.text, fontSize: 30, fontWeight: '800' },
   heroAt: { color: C.dim, fontSize: 12, marginBottom: 4 },
@@ -524,7 +524,7 @@ const pb = StyleSheet.create({
   scaleRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   scale: { color: C.faint, fontSize: 10 },
   section: { color: C.faint, fontSize: 10, letterSpacing: 1, marginBottom: 7 },
-  storeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.surface, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 9, marginBottom: 6 },
+  storeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.surface, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 9, marginBottom: 6 },
   storeDot: { width: 6, height: 6, borderRadius: 3 },
   storeName: { flex: 1, color: C.dim, fontSize: 13 },
   cheapest: { color: C.accent, fontSize: 9, fontWeight: '800' },
@@ -534,14 +534,14 @@ const pb = StyleSheet.create({
   targetTxt: { color: C.dim, fontSize: 12 },
   logBtn: { color: C.accent, fontSize: 13, fontWeight: '600' },
   logRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  logSave: { backgroundColor: C.accent, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9, alignItems: 'center', justifyContent: 'center' },
+  logSave: { backgroundColor: C.accent, borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 9, alignItems: 'center', justifyContent: 'center' },
   logSaveText: { color: C.onAccent, fontSize: 13, fontWeight: '700' },
   histToggle: { color: C.dim, fontSize: 12, fontWeight: '600' },
-  histRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.surface, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginTop: 6 },
+  histRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.surface, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 8, marginTop: 6 },
   histPrice: { color: C.text, fontSize: 13, fontWeight: '700' },
   histStore: { flex: 1, color: C.dim, fontSize: 12 },
   histDate: { color: C.faint, fontSize: 11 },
-  photo: { width: 72, height: 72, borderRadius: 10, marginRight: 8, backgroundColor: C.surface },
+  photo: { width: 72, height: 72, borderRadius: RADIUS.sm, marginRight: 8, backgroundColor: C.surface },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
   linkLabel: { flex: 1, color: C.cyan, fontSize: 13 },
   meta: { color: C.dim, fontSize: 12 },
@@ -552,14 +552,14 @@ const pb = StyleSheet.create({
 });
 
 const pl = StyleSheet.create({
-  wrap: { marginTop: 12, padding: 14, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 14 },
+  wrap: { marginTop: 12, padding: 14, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.lg },
   toggle: { color: C.accent, fontSize: 13, fontWeight: '600' },
   empty: { color: C.faint, fontSize: 12, fontStyle: 'italic', marginVertical: 6 },
-  linkedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.surface, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 9, marginBottom: 8 },
+  linkedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.surface, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 9, marginBottom: 8 },
   linkedLabel: { color: C.text, fontSize: 13, fontWeight: '600' },
   linkedMeta: { color: C.faint, fontSize: 11, marginTop: 2 },
   unlink: { color: C.red, fontSize: 15, fontWeight: '700', paddingHorizontal: 4 },
-  availRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10, borderWidth: 1, borderColor: C.border, marginBottom: 6 },
+  availRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 9, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: C.border, marginBottom: 6 },
   availLabel: { color: C.dim, fontSize: 13, fontWeight: '600' },
   availMeta: { color: C.faint, fontSize: 11, marginTop: 2 },
   plus: { color: C.accent, fontSize: 18, fontWeight: '800', paddingHorizontal: 4 },

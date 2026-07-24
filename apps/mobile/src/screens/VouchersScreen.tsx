@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Barcode from 'react-native-barcode-svg';
-import { C } from '../theme';
+import { C, RADIUS } from '../theme';
 import { shortDate, money, Spinner, ErrorText, Empty, Check, Input, TextArea, Button, IconButton, Card, Badge, Chip, ModalSheet, contentWidth } from '../ui';
 import {
   getVouchers, addVoucher, deleteVoucher, updateVoucher, scanVoucherText, scanVoucherImage, type Voucher, type ParsedVoucherData,
@@ -545,7 +545,7 @@ const s = StyleSheet.create({
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
   headHint: { color: C.faint, fontSize: 12 },
-  aiBtn: { width: 40, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
+  aiBtn: { width: 40, borderRadius: RADIUS.md, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
   aiText: { color: C.cyan, fontSize: 18, fontWeight: '700' },
   dim: { opacity: 0.4 },
   faded: { opacity: 0.55 },
@@ -570,7 +570,7 @@ const s = StyleSheet.create({
   modalTitle: { color: C.text, fontSize: 18, fontWeight: '800' },
   mlabel: { color: C.faint, fontSize: 10, letterSpacing: 1.2, marginTop: 12, marginBottom: 6 },
   rowFields: { flexDirection: 'row', gap: 10 },
-  photoBtn: { marginTop: 16, borderWidth: 1, borderColor: C.cyan, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  photoBtn: { marginTop: 16, borderWidth: 1, borderColor: C.cyan, borderRadius: RADIUS.md, paddingVertical: 13, alignItems: 'center' },
   photoText: { color: C.cyan, fontSize: 15, fontWeight: '700' },
   toggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 16 },
   tlabel: { color: C.text, fontSize: 15 },
@@ -578,6 +578,6 @@ const s = StyleSheet.create({
   lcNumber: { color: C.faint, fontSize: 12, fontFamily: 'monospace', marginTop: 6 },
   lcShowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
   lcShow: { color: C.purple, fontSize: 12, fontWeight: '700' },
-  barcodeBox: { backgroundColor: '#fff', borderRadius: 12, padding: 14, alignItems: 'center', alignSelf: 'stretch' },
+  barcodeBox: { backgroundColor: '#fff', borderRadius: RADIUS.md, padding: 14, alignItems: 'center', alignSelf: 'stretch' },
   formatRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
 });

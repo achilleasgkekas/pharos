@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { C } from '../theme';
+import { C, RADIUS } from '../theme';
 import { Input } from '../ui';
 import { DEFAULT_API_BASE } from '../config';
 import { login, type SessionUser } from '../api';
@@ -75,7 +75,7 @@ const s = StyleSheet.create({
   tagline: { color: C.dim, fontSize: 13, textAlign: 'center', marginTop: 6, marginBottom: 32 },
   label: { color: C.faint, fontSize: 10, letterSpacing: 1.4, marginBottom: 6, marginTop: 14 },
   error: { color: C.red, fontSize: 13, marginTop: 14 },
-  btn: { backgroundColor: C.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
+  btn: { backgroundColor: C.accent, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
   btnDisabled: { opacity: 0.4 },
   btnText: { color: C.onAccent, fontSize: 15, fontWeight: '700' },
 });

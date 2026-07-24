@@ -6,6 +6,75 @@
 <!-- docker-validated: 7698ef1 -->
 <!-- ui-audited: c5b45dc -->
 
+## 2026-07-24 (pharos-daily-dev, cont.⁹ — Mobile UI Debt: RADIUS token adoption, 54 sites / 13 files)
+
+**Coordination guard**: `~/.claude/ROUTINES_PAUSED` απόν → proceed. `~/.claude/ASK_ACHILLEAS.md` ελέγχθηκε — τα
+3 OPEN entries είναι όλα `bakecore-*` (άσχετο project), μηδέν ANSWERED item για `pharos-daily-dev`. Working tree
+καθαρό στην αρχή (`git status` clean). Μηδέν Docker build/boot αυτό το run (καθαρά mobile TypeScript + docs
+αλλαγή, καμία web αλλαγή) → το `/tmp/claude-docker.lock` δεν χρειάστηκε καν να αποκτηθεί.
+
+**Approved queue check (βήμα a)**: ξανασάρωσα `PRODUCT_BACKLOG.md → ## Approved` γραμμή-γραμμή. Ίδιο standing
+αποτέλεσμα με τα σημερινά προηγούμενα runs: **P36** Open Banking (needs-Achilleas provider decision, L)· **P31**
+household (πολλαπλά deferrals, χρειάζεται supervised live-login session)· **P16** Firefly III/Grocy (χρειάζεται
+πραγματικό sample export file)· **P17**/**P23** (mobile-native dep approvals — camera/share-sheet, standing
+Needs-Achilleas)· **P5** MV3 browser extension phase 2 (deferred, ξεχωριστό packaging εκτός monorepo)· **P9**
+multi-currency (L, ρητά τελευταίο σε σειρά). Μηδέν νέο buildable Approved item → βήμα (b).
+
+**Fallback (βήμα b)**: το `MOBILE_PARITY.md` Build Queue functional-gaps tier ήταν ξανά άδειο. Το UI Debt Queue
+top-item ήταν πλέον (μετά τα δύο S-size closures νωρίτερα σήμερα, cont.⁷/cont.⁸) το **«RADIUS token adoption»**
+[P2/S] — ρητά προτεινόμενο ως next-step από το προηγούμενο pharos-daily-dev run σήμερα (γραμμή 80-83 του doc:
+«UI Debt Queue (RADIUS token adoption / border-radius magic numbers...)»). Mechanical, tsc-verifiable, ρητά
+«byte-identical rendered output» στο acceptance — καμία decision, κανένα native dep, ασφαλές για unattended.
+**Σημείωση**: αγνόησα σκόπιμα το πιο πρόσφατο (αλλά πιο επιθετικό) duplicate item παρακάτω στο ίδιο doc
+(«Border radius magic numbers → RADIUS token, 90 sites», από μεταγενέστερη σάρωση) — εκείνο προτείνει mapping
+μη-ταιριαστών τιμών (π.χ. `borderRadius:8` → nearest `RADIUS.sm`) που θα άλλαζε την πραγματική εμφάνιση κατά
+1-2px· το αρχικό conservative item (μόνο exact-match 10/12/14/18 → RADIUS.sm/md/lg/xl, non-scale τιμές μένουν
+άθικτες) είναι το ασφαλές unattended-verifiable subset — ίδια αρχή builder-default με «ξεκίνα από το πιο απλό
+MVP» του Approved queue header.
+
+**Τι έγινε** (13 mobile αρχεία, μηδέν backend/web αλλαγή):
+- Live grep βρήκε **54** exact-match `borderRadius: (10|12|14|18)` sites (όχι 47 όπως έλεγε το doc — μεγάλωσε
+  ελαφρώς από commits ανάμεσα) σε `apps/mobile/src/ui.tsx` + `nav.tsx` + 11 screens (Activity/Assistant/Items/
+  Login/Money/Receipts/Settings/Shopping/Statements/Subscriptions/Vouchers). Πρώτα επιβεβαίωσα ότι ΚΑΝΕΝΑ site
+  δεν είχε decimal τιμή (π.χ. `10.5`) που θα έσπαγε το word-boundary regex, και ότι τιμές όπως `100`/`180` δεν
+  matchάρουν λόγω `\b` (επιβεβαιώθηκε: μηδέν false-positive).
+- `perl -pi` mechanical swap ανά αρχείο: `borderRadius: 10|12|14|18` → `borderRadius: RADIUS.sm|md|lg|xl`
+  (θεμα-1:1 mapping από `theme.ts:26`, `RADIUS = {sm:10, md:12, lg:14, xl:18}`). Μηδέν τιμή `18`/`RADIUS.xl`
+  βρέθηκε σε αυτό το pass (όχι λάθος, απλά δεν υπάρχει sample).
+- `RADIUS` προστέθηκε στο theme import 11 από τα 13 αρχείων (`ui.tsx`+`ReceiptsScreen.tsx` το είχαν ήδη από
+  προηγούμενα runs).
+- **Μηδέν non-scale radius αγγίχτηκε** (16/9/8/6/5/4/3 = cards/chips/tracks/dots, όπως ρητά έλεγε το acceptance
+  — «δεν υπάρχει token, μην τα αγγίξεις»).
+- `MOBILE_PARITY.md`: το item marked `✅ DONE` με πλήρη λεπτομέρεια (54 sites, verify commands, το conservative
+  vs aggressive item σχόλιο).
+
+**Verify**: `grep -rnE "borderRadius:\s*(10|12|14|18)\b"` στα 13 αρχεία → **0 matches** μετά (πριν: 54).
+`apps/mobile npx tsc --noEmit` → **EXIT 0**. `git status --short` πριν το commit επιβεβαίωσε ΜΟΝΟ τα 13
+προγραμματισμένα mobile αρχεία + `MOBILE_PARITY.md` + `PROGRESS.md` (working tree ήταν ήδη καθαρό στην αρχή,
+μηδέν ξένο WIP ανάμειξη). Καμία web αλλαγή → μηδέν ανάγκη για `npm run type-check`/vitest/Docker rebuild.
+
+**Suggested next task**: το UI Debt Queue conservative/mechanical tier είναι πλέον άδειο (3 S-size items έκλεισαν
+σήμερα: Shopping Spinner/Empty, Receipts Input cell, RADIUS adoption). Τα εναπομείναντα items χρειάζονται είτε
+decision είτε native dep είτε attended visual verify: **Brand typography** [P2/M, expo-font, attended-preferred
+για font rendering verify]· **safe-area-context** [P2/M, νέο native dep, ίδιο approval-tier με P17/P23]·
+**light-theme parity** [P3/L, ρητά needs-decision αν θέλει καν light mode στο mobile]· **αντικατάσταση emoji→lucide
+icons** [P2/M, decision ήδη έγινε αλλά attended-preferred, 58 sites/12 αρχεία — μεγάλο για ένα run, ίσως σπάσιμο
+σε passes σαν το παλιό Input-primitive migration]· **language switcher** [P3/L, ρητά attended-preferred, string-
+extraction heavy σε 16 screens]· το πιο επιθετικό duplicate RADIUS/SPACE items (90/158 sites) που θα άλλαζαν
+πραγματικές τιμές = attended-preferred (οπτικό verify). Αν όλα αυτά μπλοκάρουν, γυρίστε στο pure-lib test
+coverage pattern ή σε νέα σάρωση αν έχουν περάσει αρκετά commits από την τελευταία mobile-parity-auditor/ui-auditor.
+
+**Git hygiene**: `git add` explicit (τα 13 mobile source αρχεία + `MOBILE_PARITY.md` + `PROGRESS.md`, ΟΧΙ `-A`).
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: SaaS multi-tenancy/billing rollout env boundary· mobile
+  native-dep approvals (P17 camera, P23 share-sheet, safe-area-context UI-debt dep)· P36 Open Banking provider
+  decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file need· Settings
+  theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power tool· P5
+  bookmarklet MV3-extension phase 2· light-theme parity mobile decision· emoji→lucide icon migration (attended
+  visual verify preferred, decision already made).
+
 ## 2026-07-24 (reviewer — έλεγχος 066b1c6..cdc6a03, 81 commits)
 
 **Εύρος**: `066b1c6..cdc6a03` (81 commits, marker stale από την προηγούμενη σάρωση, κάλυψε ολόκληρο το

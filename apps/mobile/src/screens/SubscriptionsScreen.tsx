@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, StyleSheet, Alert } from 'react-native';
-import { C } from '../theme';
+import { C, RADIUS } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Chip, Badge, ListItem, ModalSheet, contentWidth } from '../ui';
 import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription, type RecurringCandidate } from '../api';
 
@@ -194,9 +194,9 @@ export function SubscriptionsScreen() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg },
-  discoverBox: { marginHorizontal: 16, marginTop: 16, padding: 12, borderRadius: 14, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
+  discoverBox: { marginHorizontal: 16, marginTop: 16, padding: 12, borderRadius: RADIUS.lg, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
   discoverTitle: { color: C.faint, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 },
-  discoverRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10, marginBottom: 6 },
+  discoverRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border, borderRadius: RADIUS.sm, paddingVertical: 8, paddingHorizontal: 10, marginBottom: 6 },
   discoverVendor: { color: C.text, fontSize: 13, fontWeight: '600' },
   discoverMeta: { color: C.dim, fontSize: 11, marginTop: 2 },
   discoverTrackBtn: { paddingVertical: 6, paddingHorizontal: 12 },
@@ -204,7 +204,7 @@ const s = StyleSheet.create({
   discoverDismiss: { padding: 4 },
   discoverDismissText: { color: C.faint, fontSize: 14 },
   addRow: { flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 8 },
-  aiBtn: { width: 40, borderRadius: 12, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
+  aiBtn: { width: 40, borderRadius: RADIUS.md, borderWidth: 1, borderColor: C.cyan, alignItems: 'center', justifyContent: 'center' },
   aiText: { color: C.cyan, fontSize: 18, fontWeight: '700' },
   dim: { opacity: 0.4 },
   head: { color: C.faint, fontSize: 11, letterSpacing: 1, marginBottom: 10 },
