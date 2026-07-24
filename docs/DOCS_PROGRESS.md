@@ -2263,3 +2263,24 @@ Validation (markdown only, κανενα build/Docker/AI call):
 Collision guard: git status --short = ΜΟΝΟ docs/api.md + docs/mobile.md modified (δικά μου). Δεν υπάρχουν foreign staged files. Commit f4933e0 pushed origin/main ✓.
 
 Επόμενο run: (α) continue scanning για άλλα νέα features (π.χ. αν άλλα v1 routes landed) · (β) features.md stale-forward αν νέα SaaS features προστεθούν · (γ) openapi.yaml sync αν νέα endpoints προστεθούν.
+
+## 2026-07-24 (thirteenth run — P35 expense splitting mobile parity documentation)
+
+Σάρωση git log για undocumented features από τα τελευταία commits. Ανακάλυψα ότι το **P35 (expense splitting mobile UI parity, commit 904795d, 2026-07-24 12:13)** ήταν shipped αλλά δεν ήταν documented στο mobile.md.
+
+Τι έγραψα:
+- **mobile.md**: Ενημέρωσα το Expenses / Income row στον "What it does" πίνακα (line 24) να αναφέρει **split (who owes what)**. Αυτό καθρεφτίζει την feature που ήδη ήταν documented στο features.md (expense splitting για διαμοίραση εξόδων και tracking ποιος σας χρωστάει).
+
+Accuracy verified εναντι κώδικα:
+- apps/mobile/src/screens/MoneyScreen.tsx (νέο SplitEditor component, splitTotals() helper, mirrors web implementation). P35 comment ορατό στη κώδικα που επιβεβαιώνει την feature πληρότητα.
+- Split entries tracking (owed vs settled), support για "split equally" logic, matches web app UX.
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: mobile.md = 8 (4 balanced pairs, 0 προστέθηκαν) ✓.
+- Internal links: αναφορές σε features.md (expense splitting section) ✓.
+- Secret scan: κανένα literal credential ✓.
+- Markdown table structure: 1 row edit (Expenses), column alignment maintained ✓.
+
+Collision guard: git status --short = ΜΟΝΟ docs/mobile.md modified (δικό μου). Δεν υπάρχουν foreign staged files. Commit d9d21dc pushed origin/main ✓.
+
+Επόμενο run: (α) continue scanning για άλλα νέα features που ίσως shipαρίστηκαν · (β) api.md/openapi.yaml sync αν άλλα v1 routes landed · (γ) configuration.md stale-forward αν νέα options προστεθούν.
