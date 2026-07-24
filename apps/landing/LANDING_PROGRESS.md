@@ -2937,3 +2937,62 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-24 (7) — FAQ += quick-capture bookmarklet / paste-a-URL import
+
+Increment (e), σαρωση για νεα customer-facing features απο το κυριο repo (οπως προτεινε το προηγουμενο
+entry). Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος
+`~/.claude/ASK_ACHILLEAS.md` (δυο OPEN entries, και τα δυο bakecore-finance, τιποτα για landing/pharos).
+
+Σαρωσα `git log --oneline -150 | grep feat(` για πραγματικα νεα features (οχι tests/docs) μετα το
+τελευταιο landing entry: οι περισσοτερες προσφατες `feat(mobile)` commits ειναι parity-exposure ηδη-
+υπαρχοντων web features (loyalty cards, savings goals, gift cards, expense splitting, bills tracker) που
+ηδη καλυπτονται απο υπαρχοντα FAQ/feature-card κειμενο (feature-generic, οχι platform-specific, αρα
+παραμενουν σωστα μετα το mobile parity). Βρηκα ομως ενα πραγματικο κενο: `93cc862 feat(items): quick-
+capture bookmarklet` (P5 phase 1, merged πριν απο αυτο το run) πρoσθεσε ενα browser bookmarklet
+(Settings → Storage & backup) που ανοιγει ενα same-origin `/capture?url=` popup πανω στο υπαρχον session
+cookie (μηδεν CORS, μηδεν token στο link) και τρεχει το ηδη-υπαρχον `previewItemFromUrl`/
+`confirmImportItem` pipeline· **δεν υπηρχε καμια αναφορα** σε αυτο, ουτε καν στο γενικοτερο paste-a-URL
+AI-fill μηχανισμο, πουθενα στη landing σελιδα (ουτε FAQ ουτε feature cards).
+
+Αλλαγη (`apps/landing/app/page.tsx`, FAQS array μονο, μηδεν UI/CSS/dependency/bundle-size change πλην του
+νεου κειμενου): νεα εγγραφη «Can I add something to my list straight from a store's page?» αμεσως μετα το
+«Can I move between self-hosted and hosted?» και πριν το «Can it read receipts and statements I already
+have?» (capture/import cluster, θεματικη γειτονια). Απαντηση: paste URL -> AI fill (price/specs/category/
+photo), και το bookmarklet ("Save to PHAROS", drag-to-bookmarks-bar + copy-code fallback απο Settings ->
+Storage & backup) -> same-origin popup πανω στο υπαρχον session, οχι token, οχι extension, ιδιο preview-
+before-confirm flow.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (ιδιο rounded μεγεθος με ολα
+  τα προηγουμενα increments).
+- Browser preview: `next start -p 3170` πανω στο production build (3000/3100-3160 κατειλημμενα απο
+  Docker/προηγουμενα runs). `mcp__Claude_Browser__*` διαθεσιμο, `preview_start` OK, `read_console_messages`
+  (onlyErrors) -> "No console logs." καθαρο. `javascript_tool` επιβεβαιωσε: το deterministic anchor id
+  ειναι `faq-can-i-add-something-to-my-list-straight-from-a-store-s-page` (το apostrophe γινεται `-s-` στο
+  slug, οχι κοπτεται), σωστη σειρα (neighbors = [faq-can-i-move-between-self-hosted-and-hosted, **αυτο**,
+  faq-can-it-read-receipts-and-statements-i-already-have]), και το `textContent` περιεχει το πληρες σωστο
+  κειμενο ("Save to PHAROS", "same-origin popup", "no API token exposed"). Hero screenshot καθαρο
+  (lighthouse mark, gradient τιτλος, CTAs, τριπλο badge row), μηδεν regression. Server σταματησε μετα
+  (`pkill -f "next start -p 3170"`), `lsof -i :3170` εδειξε μονο τα γνωστα false-positive Claude-app TCP
+  CLOSE_WAIT matches (σημειωμενα ηδη σε προηγουμενα entries), οχι το node process.
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  `git diff --cached --name-only` κενο πριν το stage -> κανενα ξενο staged file. Staged+committed ΜΟΝΟ τα
+  δυο δικα μου landing paths.
+
+Επομενο increment: η σαρωση `feat(` commits εδειξε ενα ακομα πιθανο candidate οχι ακομα καλυμμενο ρητα σαν
+standalone feature: το item document/manual vault (`ab2687e`, manuals/warranty-certs/serial-number photos
+attached σε κοθε item) αναφερεται εμμεσα μονο μεσα στο insurance-export FAQ, οχι σαν δικια του γραμμη ή
+feature-card mention. Υποψηφιο για επομενο περασμα αν κριθει αξιολογο σαν ξεχωριστη FAQ γραμμη (πιθανον
+οχι, μαλλον καλυμμενο αρκετα μεσα στο υπαρχον insurance-export κειμενο). Αλλιως: νεα modules/commits απο
+το κυριο repo μετα απο αυτο το run, ή (e) polish συνεχεια, real app screenshots οταν υπαρξουν assets
+(blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
