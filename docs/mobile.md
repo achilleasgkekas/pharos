@@ -26,6 +26,7 @@ The mobile app mirrors most of the web modules, backed by the same API client
 | Statements | list + transactions, installment-plan overview |
 | Vouchers | list, add, edit, AI fill (text/photo); **Coupons / Gift cards / Loyalty cards** tabs |
 | Bills | list, add, edit, mark paid (spawns next recurring), due-soon/overdue status |
+| Goals / Savings | list, add, edit, log contribution, progress tracking |
 | Calendar | 3-month agenda of renewals, installments, bills, expiries |
 | Reports | net position, this month/year, by-category, budgets |
 | Tasks | list, add, status, steps |

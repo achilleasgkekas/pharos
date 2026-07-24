@@ -306,6 +306,15 @@ Each plan in the `GET /statements/plans` response is:
 | PATCH  | `/giftcards/:id`               | Update `{ title?, store?, code?, initialAmount?, expiresAt?, notes?, archived? }`. Special: `addUse: { amount, note?, date? }` records a spend (positive) or reload (negative); `removeUseId` undoes one entry. Both are mutually exclusive. Response includes `{ giftCard: … }`. |
 | DELETE | `/giftcards/:id`               | Soft-delete (recoverable from Trash). |
 
+### Goals
+
+| Method | Path                                  | Description |
+|--------|---------------------------------------|-------------|
+| GET    | `/goals?archived=0&limit&offset&updatedSince` | List (+ `limit`/`offset`/`updatedSince`). Default excludes archived goals. Each goal has computed `current`, `remaining`, `pct`, `done`, `monthsLeft`, and `perMonth` derived from contributions (never stored). |
+| POST   | `/goals`                              | Create `{ title, targetAmount?, targetDate?, category?, notes? }`. |
+| PATCH  | `/goals/:id`                          | Update `{ title?, targetAmount?, targetDate?, category?, notes?, archived? }`. Special: `addContribution: { amount, note?, date? }` records a contribution (must be positive); `removeContributionId` undoes one. Both are mutually exclusive. Response includes `{ goal: … }`. |
+| DELETE | `/goals/:id`                          | Soft-delete (recoverable from Trash). |
+
 ### Tasks
 
 | Method | Path                                        | Description |
