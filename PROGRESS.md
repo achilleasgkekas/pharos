@@ -6,6 +6,75 @@
 <!-- docker-validated: 7698ef1 -->
 <!-- ui-audited: c5b45dc -->
 
+## 2026-07-24 (pharos-daily-dev, cont.¹⁰ — pure-lib test coverage: `webhooks.shared.ts`)
+
+**Coordination guard**: `~/.claude/ROUTINES_PAUSED` απόν → proceed. `~/.claude/ASK_ACHILLEAS.md` ελέγχθηκε — τα
+3 OPEN entries είναι όλα `bakecore-*` (άσχετο project), μηδέν ANSWERED item για `pharos-daily-dev`. Working tree
+καθαρό στην αρχή (`git status` clean). Μηδέν Docker build/boot αυτό το run (καθαρά test-only αρχείο, μηδέν
+runtime αλλαγή) → το `/tmp/claude-docker.lock` δεν χρειάστηκε καν να αποκτηθεί.
+
+**Approved queue check (βήμα a)**: ξανασάρωσα `PRODUCT_BACKLOG.md → ## Approved` γραμμή-γραμμή. Ίδιο standing
+αποτέλεσμα με όλα τα σημερινά προηγούμενα runs: **P36** Open Banking (needs-Achilleas provider decision, L)·
+**P31** household (πολλαπλά deferrals, χρειάζεται supervised live-login session)· **P16** Firefly III/Grocy
+(χρειάζεται πραγματικό sample export file)· **P17**/**P23** (mobile-native dep approvals — camera/share-sheet,
+standing Needs-Achilleas)· **P5** MV3 browser extension phase 2 (deferred)· **P9** multi-currency (L, ρητά
+τελευταίο σε σειρά). Μηδέν νέο buildable Approved item → βήμα (b).
+
+**Fallback (βήμα b)**: το `MOBILE_PARITY.md` Build Queue functional-gaps tier + το UI Debt Queue mechanical tier
+ήταν και τα δύο πλέον γνήσια άδεια (3 S-size UI Debt items έκλεισαν νωρίτερα σήμερα: Shopping Spinner/Empty,
+Receipts Input cell, RADIUS token adoption). Τα εναπομείναντα MOBILE_PARITY items χρειάζονται είτε decision
+(light-theme, language switcher) είτε νέο native dep approval (safe-area-context) είτε attended visual verify
+(lucide icons, brand typography) — όλα ρητά flagged ως τέτοια στο ίδιο doc, βλ. το «Suggested next task» του
+προηγούμενου run (cont.⁹, γρ.56-65). Ακολούθησα το ρητά προτεινόμενο fallback: **pure-lib test coverage
+pattern** (established στο ίδιο routine, βλ. πολλαπλές παλιότερες `pharos-daily-dev` καταχωρήσεις πιο κάτω στο
+ίδιο αρχείο, π.χ. `lib/taxonomies.ts`/`lib/itemStatus.ts`/`lib/cards.ts`/`lib/aiFeatures.ts` κλπ. — όλα ήδη
+tested).
+
+**Εύρεση gap**: `apps/web/src/lib` σάρωση για `.ts` αρχεία χωρίς matching test — 8 αρχικά hits (`db.ts`,
+`imapImport.ts`, `jobRunner.ts`, `moneyAgenda.ts`, `notifiers.shared.ts`, `pdfThumb.ts`, `remoteStorage.ts`,
+`webhooks.shared.ts`), αλλά τα περισσότερα είναι DB/fs/network-bound (όχι pure) ή ήδη καλυμμένα από
+differently-named test αρχεία (π.χ. `notifiers.shared.ts` καλύπτεται πλήρως από το ήδη-υπάρχον
+`notifiers.test.ts`, verified με grep). **`moneyAgenda.ts`**: DB-bound (`connectDB`+Mongoose queries άμεσα στο
+σώμα της function) → όχι pure-unit-testable χωρίς DB mock, skip. **`webhooks.shared.ts`** (`WEBHOOK_EVENTS`
+array + `WebhookSubscription`/`WebhookEvent` types, client-safe metadata, ΜΗΔΕΝ DB/server import) ήταν το μόνο
+γνήσιο κενό: το `webhooks.test.ts` καλύπτει το `signWebhookPayload`/`coerceWebhookSubscription` (server logic,
+`webhooks.ts`) αλλά ΠΟΤΕ δεν κάνει import από το `webhooks.shared.ts` το ίδιο (grep confirmed, μηδέν hits) — η
+ίδια η μεταδεδομένη λίστα (unique types/labels/hints, πλήρης κάλυψη του `WebhookEvent` union) έμενε χωρίς direct
+invariant test, ίδιο class of gap με το ήδη-tested `notifiers.shared.ts`/`NOTIFIER_TYPES` (mirror pattern,
+`notifiers.test.ts`).
+
+**Τι έγινε**: Νέο `apps/web/src/lib/webhooks.shared.test.ts` (mirror style του `notifiers.test.ts`, 5 tests):
+non-empty list· καλύπτει ακριβώς το `WebhookEvent` union (cross-checked με grep στα πραγματικά
+`dispatchEventWebhooks(...)` call sites — `app/receipts/actions.ts` [`receipt.parsed` ×2] +
+`app/settings/actions.ts` [`installment.due`/`price.drop`/`budget.exceeded`], επιβεβαιώνοντας ότι τα 4 events
+του doc-comment στο `webhooks.ts` ταιριάζουν 1:1 με τον πραγματικό κώδικα)· unique types· κάθε event έχει
+non-empty label+hint· lookup-by-type για όλα τα 4. Μηδέν production code άλλαξε (μόνο νέο test αρχείο).
+
+**Verify**: `npx vitest run src/lib/webhooks.shared.test.ts` → 5/5 passed. `npm run type-check` → EXIT 0
+(μηδέν output). Full `npx vitest run` → **251 test files passed / 3313 tests passed** (μηδέν regression). Καμία
+web runtime αλλαγή → μηδέν ανάγκη για Docker rebuild (test-only αρχείο, ίδιο idiom με τα προηγούμενα test-only
+commits του project). `git status --short` πριν το commit επιβεβαίωσε ΜΟΝΟ το 1 νέο αρχείο (working tree ήταν
+ήδη καθαρό στην αρχή, μηδέν ξένο WIP ανάμειξη).
+
+**Suggested next task**: το pure-lib surface στο `apps/web/src/lib` είναι πλέον σχεδόν εξαντλημένο (τα
+εναπομείναντα untested αρχεία — `db.ts`/`imapImport.ts`/`jobRunner.ts`/`pdfThumb.ts`/`remoteStorage.ts` — είναι
+όλα DB/fs/network-bound, όχι pure-unit-testable χωρίς mocking infra). Αν χρειαστεί άλλο ένα fallback run, ελέγξτε
+πρώτα αν πέρασαν αρκετά commits για νέα mobile-parity-auditor/ui-auditor/web-code-quality σάρωση (θα ανοίξει
+φρέσκα items αν κάτι άλλαξε), αλλιώς εξετάστε ένα ελαφρύ refactor-extract (π.χ. ένα pure helper μέσα από ένα
+DB-bound module, σαν το `asciiTitle` sanitize idea από παλιότερο entry) ή σκεφτείτε αν αξίζει ένα mocking-based
+test για ένα από τα DB-bound modules (μεγαλύτερο lift, attended-preferred review προτιμότερο).
+
+**Git hygiene**: `git add` explicit (μόνο `apps/web/src/lib/webhooks.shared.test.ts` + `PROGRESS.md`, όχι `-A`).
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: SaaS multi-tenancy/billing rollout env boundary· mobile
+  native-dep approvals (P17 camera, P23 share-sheet, safe-area-context UI-debt dep)· P36 Open Banking provider
+  decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file need· Settings
+  theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power tool· P5
+  bookmarklet MV3-extension phase 2· light-theme parity mobile decision· emoji→lucide icon migration (attended
+  visual verify preferred, decision already made).
+
 ## 2026-07-24 (pharos-daily-dev, cont.⁹ — Mobile UI Debt: RADIUS token adoption, 54 sites / 13 files)
 
 **Coordination guard**: `~/.claude/ROUTINES_PAUSED` απόν → proceed. `~/.claude/ASK_ACHILLEAS.md` ελέγχθηκε — τα
