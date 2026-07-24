@@ -38,7 +38,7 @@ vi.mock('@/lib/db', () => ({
   connectDB: async () => ({ connection: defaultConn }),
 }));
 
-import { currentModel, tenantModel } from './connection';
+import { currentModel, getTenantConnection, tenantModel } from './connection';
 
 // A stand-in feature model: identity is enough to assert "returned unchanged".
 const OriginalModel = { modelName: 'Item', schema: { __schema: true } } as unknown as Model<unknown>;
@@ -94,5 +94,51 @@ describe('tenantModel', () => {
     const first = tenantModel(tenantConn, OriginalModel);
     const second = tenantModel(tenantConn, OriginalModel);
     expect(second).toBe(first);
+  });
+});
+
+// The cache-reuse guard in getTenantConnection: a cached connection is handed back only
+// while it is connected (1) or actively connecting (2) — anything else (disconnected 0,
+// disconnecting 3, uninitialized 99) is treated as a dropped/torn-down socket and rebuilt
+// via useDb(). See WEB_DEBT.md "getTenantConnection cache-reuse guard" for the history.
+// readyState is a read-only property on the real mongoose Connection type; our fakes are
+// plain mutable objects underneath, so a narrow cast lets tests simulate state transitions.
+function setReadyState(conn: Connection, state: number): void {
+  (conn as unknown as { readyState: number }).readyState = state;
+}
+
+describe('getTenantConnection — cache reuse guard', () => {
+  const useDbMock = (defaultConn as unknown as { useDb: ReturnType<typeof vi.fn> }).useDb;
+
+  it('reuses a cached connection while it is connected (1) or connecting (2), no rebuild', async () => {
+    const dbName = 'tenant_guard_open';
+    const conn = makeConn(dbName);
+    setReadyState(conn, 1);
+    useDbMock.mockImplementationOnce(() => conn);
+
+    const first = await getTenantConnection(dbName);
+    expect(first).toBe(conn);
+    expect(useDbMock).toHaveBeenCalledTimes(1);
+
+    setReadyState(conn, 2); // still mid-handshake, but a live/usable handle (commands buffer)
+    const second = await getTenantConnection(dbName);
+    expect(second).toBe(conn);
+    expect(useDbMock).toHaveBeenCalledTimes(1); // no rebuild
+  });
+
+  it.each([0, 3, 99])('rebuilds when the cached connection has readyState %i', async (deadState) => {
+    const dbName = `tenant_guard_dead_${deadState}`;
+    const stale = makeConn(dbName);
+    setReadyState(stale, deadState);
+    const rebuilt = makeConn(dbName);
+    setReadyState(rebuilt, 1);
+    useDbMock.mockImplementationOnce(() => stale).mockImplementationOnce(() => rebuilt);
+
+    const first = await getTenantConnection(dbName);
+    expect(first).toBe(stale); // first call always builds + caches, regardless of readyState
+
+    const second = await getTenantConnection(dbName);
+    expect(second).toBe(rebuilt); // stale cache entry was not reused
+    expect(useDbMock).toHaveBeenCalledTimes(2);
   });
 });

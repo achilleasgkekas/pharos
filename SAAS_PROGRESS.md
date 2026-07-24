@@ -3945,3 +3945,56 @@ erasure, usage, dbstats) έχει ήδη κάποιο consuming UI panel (grep `
 (π.χ. Stripe live-wiring scaffold πέρα από checkout/portal/webhook stubs, ή audit-log
 rate-limiting follow-up που ανέφερε το increment 84's Needs-Achilleas) — ή, αν προκύψει νέο
 well-specified item στο `WEB_DEBT.md` μέσα στο δικό μου territory σε επόμενη σάρωση, αυτό πρώτα.
+
+## 2026-07-24 (cont. — increment 86, getTenantConnection cache-reuse guard fix, P3 decision-flag item)
+
+Πριν από νέο increment, διάβασα το ask-inbox (τίποτα addressed σε saas-core) και το
+`WEB_DEBT.md` (57η σάρωση, 2026-07-22, ακόμα το πιο πρόσφατο) — το UI-first backlog παραμένει
+εξαντλημένο (βλ. προηγούμενο log entry), και τα δύο P1/P2 items του τελευταίου scan στο δικό
+μου territory ήταν ήδη DONE (increments 84-85). Το μόνο εναπομείναν item στο δικό μου
+territory ήταν το standing **P3/S decision-flag `getTenantConnection cache-reuse guard`**
+(`lib/tenancy/connection.ts`) — flagged από 2026-07-01, σε πολλαπλές σαρώσεις, πάντα σαν
+«dead-until-SaaS, 0 importers, θέλει σκόπιμη απόφαση όχι μηχανικό swap».
+
+**Γιατί το ανέλαβα τώρα**: επαλήθευσα ξανά με `grep` και **δεν είναι πια 0 importers** —
+`tenantDb()` (που καλεί το `getTenantConnection`) έχει τώρα **3 πραγματικούς καλούντες**
+(`lib/tenancy/workspaceFiles.ts`, `lib/tenancy/workspaceExport.ts`, `lib/billing/dbStats.ts`
+— workspace export/erasure files + db-stats metering, όλα ήδη shipped SaaS-mode features).
+Η stale WEB_DEBT.md παρατήρηση «0 importers» δεν ίσχυε πια, οπότε το bug αξίζει πλέον
+πραγματικό fix (ακόμα gated πίσω από `SAAS_MODE` off = μηδέν επίδραση στο self-hosted app
+σήμερα). Η ίδια η απόφαση που το item ζητούσε («reuse μόνο readyState 1 connected ή 2
+connecting, αλλιώς rebuild») ήταν ήδη η προτεινόμενη λύση μέσα στο ίδιο το item — μηχανικό
+fix πάνω σε ήδη-speced εναλλακτική, όχι νέα αρχιτεκτονική απόφαση, οπότε το έκανα ο ίδιος
+αντί να ανοίξω νέο ask-inbox entry.
+
+**Fix**: `connection.ts`'s `getTenantConnection` guard `existing.readyState !== 99` (δεχόταν
+0=disconnected και 3=disconnecting ως «ακόμα ζωντανό») → **`existing.readyState === 1 ||
+existing.readyState === 2`** (reuse ΜΟΝΟ connected ή connecting — Mongoose buffers commands
+σε «connecting» οπότε είναι ακόμα usable handle· disconnected/disconnecting/uninitialized
+πάντα rebuild). Σχόλιο ευθυγραμμίστηκε με το πραγματικό behavior.
+
+**Νέα tests** (`connection.test.ts`, δεν υπήρχε καθόλου κάλυψη πάνω στο guard πριν): νέο
+describe block «getTenantConnection — cache reuse guard» (8 tests) — reuse όταν readyState
+1→2 χωρίς δεύτερο `useDb()` call· rebuild (νέο `useDb()` call, νέο connection object) σε
+κάθε ένα από τα 3 «dead» states (0/3/99, `it.each`). Νέο local `setReadyState()` test helper
+(cast-around το readonly `Connection.readyState` type — το πραγματικό mongoose Connection το
+έχει read-only, οι test fakes είναι plain mutable objects).
+
+**Verified**: `npm run type-check` → **EXIT 0**. `npx vitest run` (πλήρες suite) → **229
+files / 2980 tests green** (ήταν 226/2936 στο increment 85· η διαφορά περιλαμβάνει tests από
+άλλες concurrent routines + τα 8 νέα δικά μου). `WEB_DEBT.md`'s item ενημερώθηκε TODO → DONE.
+**Docker: ΔΕΝ έγινε rebuild** (logic+test-only edit μέσα σε ήδη-existing, `SAAS_MODE`-gated
+module· καμία αλλαγή runtime wiring/env/dependency· ο live container του Achilleas δεν έχει
+`SAAS_MODE` set). **Browser-verify: skipped** (backend-only, μηδέν UI, μηδέν observable
+αλλαγή στο τρέχον self-hosted deployment). Collision guard: `git status --short` πριν το
+staging έδειξε ΜΟΝΟ τα 3 δικά μου αρχεία (καθαρό working tree στην αρχή του run), `git diff
+--cached --name-only` επιβεβαίωσε exact match.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** το `WEB_DEBT.md` P3 decision-flag backlog στο δικό μου territory είναι πλέον
+**άδειο** (μόνο το P3/M el.ts i18n gap μένει ανοιχτό γενικά στο repo, αλλά είναι εκτός
+territory — `lib/i18n/*`, δεν είναι SaaS-only). Επόμενο increment: επόμενη σάρωση του
+`WEB_DEBT.md` για νέο item στο territory πρώτα· αλλιώς γύρισμα στο TODO.md §12 (Stripe
+live-wiring πέρα από τα ήδη-shipped checkout/portal/webhook stubs) ή §14 follow-up
+(audit-log rate-limiting, αν δεν έχει ήδη καλυφθεί από το increment 84's rate-limit fix).

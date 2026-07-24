@@ -50,9 +50,11 @@ export async function getTenantConnection(dbName: string): Promise<Connection> {
   if (!dbName) return defaultConn;
 
   const existing = cache.conns.get(dbName);
-  // Reuse only while the underlying connection is still open; a dropped socket would make
-  // a stale entry unusable, so fall through and rebuild it.
-  if (existing && existing.readyState !== 99 /* uninitialized */) return existing;
+  // Reuse only while the underlying connection is connected (1) or actively connecting (2) —
+  // Mongoose buffers commands during "connecting" so that's still a live, usable handle. A
+  // disconnected (0), disconnecting (3), or uninitialized (99) entry is a dropped/torn-down
+  // socket that would make a stale cache entry unusable, so fall through and rebuild it.
+  if (existing && (existing.readyState === 1 || existing.readyState === 2)) return existing;
 
   // useCache lets Mongoose reuse the same scoped connection internally too; our Map is the
   // explicit, process-wide handle we hand back to callers.
