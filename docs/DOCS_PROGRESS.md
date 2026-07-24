@@ -1,5 +1,34 @@
 # DOCS_PROGRESS
 
+## 2026-07-24 (eighteenth run — routine verification: all features documented, no changes needed)
+
+Σάρωση git log για νέα feat() commits μετά τη seventeenth run (dfac7c6). Ανακάλυψη: 6 new feature commits landed on 2026-07-24 (00:13–10:10):
+- fc1f5e3: P8 gap (expense tax-deductible tagging + v1 API + mobile) ✓
+- 3206fa3: auth rate-limiting (P1 web-debt) — fix, όχι feature
+- bef65fe: P32 gap (gift cards tracker) ✓
+- a900670: P12 gap (goals/savings tracker) ✓
+- f58d818: P20 gap (loyalty card wallet) ✓
+- ee894a3: P2/S gap (notification humanization) ✓
+
+Comprehensive documentation accuracy check:
+- **features.md**: Goals/Savings (sec. 10), Gift cards (vouchers section), Loyalty cards (vouchers section), Tax-deductible (expenses section), Notification humanization (notifications section) — all present ✓.
+- **api.md**: /goals endpoints (Goals section), /giftcards, /loyaltycards, /expenses (taxDeductible field), /notifications (currency field for humanization) — all documented ✓.
+- **mobile.md**: Goals/Savings row, Vouchers+Gift/Loyalty tabs, Expenses tax-deductible, Alerts humanized — all present ✓.
+- **Internal links**: Verified 20+ cross-references between docs (features→api, mobile→features κλπ), all valid ✓.
+- **Link integrity**: All 11 referenced docs exist (api.md, configuration.md, README.md, architecture.md, features.md, mobile.md, self-hosting.md, saas.md, FAQ.md, security.md, backup-and-restore.md) ✓.
+- **Code fences**: 0 broken pairs (scanned all docs) ✓.
+- **Secret scan**: 0 literal credentials (grep -r sk_/AUTH_/phk_) ✓.
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Markdown table syntax: api.md 59 rows (Goals, Loyaltycards, Giftcards sections), balanced pipes ✓.
+- Features section coverage: 27 major sections tracking P1–P35 phases ✓.
+
+Collision guard: `git status --short` = κανένα modified file, κανένα staged foreign, κανένα concurrent routine mid-commit ✓.
+
+Συμπέρασμα: Όλα τα features που shipped στις 2026-07-24 είναι ήδη documented και accurate. Κανένα work χρειάζεται αυτό το run. Η documentation παραμένει synchronized με τη codebase.
+
+Επόμενο run: (α) αν νέα features ship μετά τις 10:10, update docs · (β) αν OpenAPI.yaml χρειάζεται schema refresh για auth rate-limiting fix.
+
 ## 2026-07-24 (seventeenth run — status check: all documented)
 
 Σάρωση git log για νέα feat() commits μετά το τελευταίο run (dfac7c6, 2026-07-24 16:47:03). Ανακάλυψη: ΔΕΝ υπάρχουν νέα feat() commits — όλα τα recent work είναι test coverage, refactor (UI debt), landing content maintenance.
