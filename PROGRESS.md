@@ -7898,3 +7898,68 @@ commit (καμία ανάμειξη με άλλο uncommitted WIP — δεν υ�
   enforcement supervised session· P16 Firefly III/Grocy real sample-file need· Settings theme/language/
   AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop power tool· P5 bookmarklet MV3-
   extension phase 2.
+
+## 2026-07-24 (pharos-daily-dev, cont.⁶ — Balances cross-expense modal (P35 follow-up) mobile parity)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε 2 OPEN items, και τα δύο από
+`bakecore-finance` (άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή. Μηδέν Docker
+build/boot αυτό το run (μόνο mobile TypeScript αλλαγή) → το `/tmp/claude-docker.lock` δεν χρειάστηκε.
+
+**Approved queue check (βήμα a)**: ξανασάρωσα ολόκληρο το `PRODUCT_BACKLOG.md → ## Approved` γραμμή-γραμμή
+(28 items). Όλα εκτός 7 είναι ήδη `✅ SHIPPED`. Τα 7 ανοιχτά είναι όλα μπλοκαρισμένα με ήδη-τεκμηριωμένο τρόπο:
+**P36** (needs-Achilleas provider decision, L)· **P31** (4ο+ deferral, χρειάζεται supervised live-login
+session)· **P16** Firefly III/Grocy (χρειάζεται πραγματικό sample file)· **P17**/**P23** (mobile-native dep
+approvals, camera/share-sheet)· **P5** MV3 extension phase 2 (deferred, phase 1 bookmarklet ήδη shipped)·
+**P9** multi-currency (L, ρητά «άφησέ το τελευταίο» στο ίδιο το backlog). Μηδέν νέο buildable Approved item →
+βήμα (b).
+
+**Fallback (βήμα b)**: το προηγούμενο run (cont.⁵, ίδια ημέρα) πρότεινε ρητά ως επόμενο task την cross-expense
+**Balances modal** (follow-up του P35 expense splitting, ήδη speced στο `MOBILE_PARITY.md`). Αυτόνομο,
+μη-μπλοκαρισμένο, well-scoped → το πήρα.
+
+**Τι βρέθηκε πριν χτίσω**: διάβασα την πλήρη web υλοποίηση (`apps/web/src/lib/split.ts` `computeBalances`/
+`totalOwed` + `apps/web/src/app/expenses/actions.ts` `settlePerson` server action + `ExpensesClient.tsx`
+`BalancesModal`). ΣΗΜ διαγνωστικό: το αρχείο `ExpensesClient.tsx` περιέχει non-UTF8 bytes (πιθανόν emoji/greek
+mixed encoding artifact) που κάνουν το `grep` χωρίς `-a` να το αγνοεί σιωπηλά ως binary — αρχικά νόμιζα ότι το
+BalancesModal δεν υπήρχε καν στο web (μηδέν matches), μέχρι που ξαναέτρεξα με `grep -a` και το βρήκα πλήρες.
+Καταγράφεται εδώ ώστε το επόμενο run να μην ξαναπέσει στην ίδια παγίδα με `grep`/`ripgrep` σε αυτό το
+συγκεκριμένο αρχείο.
+
+**Τι έγινε** (μόνο `apps/mobile/src/screens/MoneyScreen.tsx` + `MOBILE_PARITY.md`, μηδέν backend αλλαγή):
+- Νέος local pure helper **`computeBalances(expenses)`** (byte-mirror του web `lib/split.ts` `computeBalances`
+  — aggregate split entries ανά άτομο case-insensitive, sorted by owed desc) + `PersonBalance` type.
+- **«⇄ Balances · €X owed» pressable** κάτω από το total row, εμφανίζεται μόνο όταν `kind==='expense'` (το
+  income δεν έχει split, ίδιο guard με το web `!isIncome`) **και** `balances.length>0` (mirror του web
+  `!isIncome && balances.length > 0` condition).
+- **BalancesModal** (`ModalSheet`): owing section (name + entries count + settled-so-far hint + owed amount +
+  per-person **«settle»** button) + settled-up collapsed section (checkmark row) + empty state.
+- **Settle-up χωρίς νέο v1 endpoint** (builder default, ίδιο option που είχε ήδη τεκμηριωθεί στο doc ως «option
+  B»): το web έχει ξεχωριστό bulk server action `settlePerson(name)` (Mongo `bulkWrite` πάνω σε ΟΛΑ τα
+  expenses), αλλά αυτό δεν υπάρχει στο `/api/v1` (mobile-only reachable surface). Το mobile `settlePerson(name)`
+  κάνει **client-side aggregation** πάνω στην ήδη-φορτωμένη `rows` λίστα: φιλτράρει τα expenses με unsettled
+  entry για το όνομα (case-insensitive), και κάνει loop `updateExpense(id, {split: nextSplit})` (ήδη υπάρχον
+  PATCH-based write path, το ίδιο που χρησιμοποιεί το per-expense `SplitEditor`) ανά επηρεαζόμενο expense, μετά
+  `load()`. Reuse υπάρχοντος pipeline, μηδέν νέο endpoint — συνεπές με τη builder-default αρχή του backlog
+  («reuse existing pattern» πριν προσθέσεις νέο surface). Confirm μέσω `Alert.alert` (ίδιο idiom με το υπάρχον
+  `remove()`).
+- `MOBILE_PARITY.md` ενημερώθηκε (ίδια γραμμή Expenses & Income) με το νέο ✅ follow-up.
+
+**Verify**: `apps/mobile npx tsc --noEmit` EXIT 0 (μηδέν errors). Καμία web αλλαγή → μηδέν ανάγκη για
+`npm run type-check`/vitest/Docker rebuild στο web. `git status --short` πριν το commit επιβεβαίωσε ΜΟΝΟ τα 2
+προγραμματισμένα αρχεία (καμία ανάμειξη με ξένο WIP· working tree ήταν ήδη καθαρό στην αρχή).
+
+**Suggested next task**: το mobile P35 follow-up είναι πλέον πλήρες (per-expense split editor + cross-expense
+Balances, και τα δύο shipped). Αν ξαναγίνει fallback, ελέγξτε πρώτα αν ο Αχιλλέας απάντησε στο standing
+native-dep boundary (safe-area-context/camera/share-sheet) ή στο P31/P36 scoping. Εναλλακτικά γυρίστε στο
+pure-lib test coverage pattern (ίδιο με τα πρόσφατα runs) ή σε ένα mobile UI Debt Queue item.
+
+**Git hygiene**: `git add` explicit (μόνο `apps/mobile/src/screens/MoneyScreen.tsx` + `MOBILE_PARITY.md`, όχι
+`-A`) → commit `823b05e` → pushed.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: SaaS multi-tenancy/billing rollout env boundary·
+  mobile native-dep approvals (P17 camera, P23 share-sheet, safe-area-context UI-debt dep)· P36 Open Banking
+  provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file
+  need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
+  power tool· P5 bookmarklet MV3-extension phase 2.
