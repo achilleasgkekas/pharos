@@ -463,6 +463,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. Each instance sits behind a login and you can add accounts for the people you share with, so everyone signs into the same hub. Self-hosting has no seat limits at all; hosted plans scale from a single person up to a shared family or team workspace.',
   },
   {
+    q: 'How do I invite people to a hosted workspace, and what can they do?',
+    a: 'Send an email invite from Settings → Members and pick a role: owner, admin, or member. The invitee gets a signup link, and owners or admins can change roles, resend an expired invite, revoke a pending one, or remove someone later, with every change landing in an append-only activity log. Only an owner can promote someone else to owner, and a workspace can never end up with zero owners. Self-hosted skips all of this in favor of one shared login behind your LAN or VPN.',
+  },
+  {
     q: 'How do updates work?',
     a: 'Self-hosted updates are a git pull and one docker compose up, so you upgrade on your own schedule and can pin to a version you trust. On hosted we roll out updates for you, so you are always on the latest release with nothing to maintain.',
   },

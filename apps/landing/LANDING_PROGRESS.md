@@ -2717,3 +2717,57 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-24 (3) — FAQ += Hosted workspace invites & roles
+
+Increment (e), συνεχεια του `docs/saas.md` sweep απο τα δυο προηγουμενα entries σημερα. Πριν το ξεκινημα:
+coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος `~/.claude/ASK_ACHILLEAS.md` (δυο OPEN
+entries, και τα δυο bakecore-finance, τιποτα για landing/pharos).
+
+Το προηγουμενο entry σημερα ειχε σαν επομενα candidates το «Workspace console UI» (member management) και
+τα GDPR export/erasure sections. Διαβασα `docs/saas.md:656-742` (Members and invitations, Invite management,
+Workspace console UI) και βρηκα οτι ειναι **πληρως καλυμμενο live feature χωρις καθολου landing αναφορα**:
+email invite με ρολο (owner/admin/member), `POST /api/saas/invites/resend` (re-mint token για ληγμενο
+invite), revoke, remove member, και ενα append-only activity/audit trail (`GET /api/saas/audit`, owner/admin
+only). Η υπαρχουσα FAQ γραμμη «Can my household or team share one instance?» ελεγε μονο «add accounts for
+the people you share with», ασαφες για hosted (που εχει πραγματικο email-invite flow με ρολους, οχι απλα
+«προσθεσε λογαριασμο»). Το GDPR data-export/erasure αφησα εκτος αυτου του run: το «Can I permanently delete
+my account and all its data?» ηδη καλυπτει το erasure grace-window με ακριβεια, και το επιπλεον account-level
+JSON-snapshot endpoint (`/api/saas/account/export`, profile+memberships only) θα ηταν πολυ λεπτη διακριση
+απο το ηδη-καλυμμενο "JSON backup/import" για να αξιζει δικια του γραμμη, ρισκο redundancy στη FAQ λιστα.
+
+Αλλαγη (`apps/landing/app/page.tsx`, FAQS array μονο, μηδεν UI/CSS/dependency/bundle-size change πλην του
+νεου κειμενου): νεα εγγραφη «How do I invite people to a hosted workspace, and what can they do?» αμεσως
+μετα το «Can my household or team share one instance?» και πριν το «How do updates work?» (θεματικη γειτονια,
+share/team cluster). Απαντηση: email invite απο Settings → Members με ρολο (owner/admin/member),
+resend/revoke/remove, append-only activity log, μονο owner μπορει να κανει promote σε owner, workspace ποτε
+δεν μενει με μηδεν owners, με ρητη αντιπαραβολη στο self-hosted single shared login (ιδιο idiom με το
+two-factor FAQ contrast line).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (ιδιο rounded μεγεθος με το
+  προηγουμενο increment).
+- Browser preview: `next start -p 3130` πανω στο production build (3000/3100/3120 κατειλημμενα απο
+  Docker/προηγουμενα runs). `mcp__Claude_Browser__*` διαθεσιμο, `preview_start` OK, `read_console_messages`
+  (onlyErrors) -> "No console logs." καθαρο. `javascript_tool` επιβεβαιωσε: το deterministic anchor id
+  `faq-how-do-i-invite-people-to-a-hosted-workspace-and-what-can-they-do` υπαρχει (`getElementById` -> true),
+  σωστη σειρα (`idx: 7`, neighbors = [faq-can-my-household-or-team-share-one-instance, **αυτο**,
+  faq-how-do-updates-work]), και το DOM περιεχει "resend an expired invite" (σωστο answer text).
+  Screenshot του hero καθαρο, μηδεν regression. Server σταματησε μετα (`pkill -f "next start -p 3130"`),
+  `ps aux | grep "next start"` επιβεβαιωσε κενο (το `lsof -i :3130` εδειξε παλι τα ιδια false-positive
+  Claude-app "icpv2" TCP matches που εχουν σημειωθει σε προηγουμενα entries, οχι το node process μου).
+- em-dash: 0 σε ολο το page.tsx. Δεν αγγιξα Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `app/page.tsx` modified (τρεχω απο το
+  `apps/landing` cwd), `git diff --cached --name-only` κενο πριν το stage -> κανενα ξενο staged file.
+  Staged ΜΟΝΟ `apps/landing/app/page.tsx`.
+
+Επομενο increment: το `docs/saas.md` sweep συνεχιζεται· απομενει το GDPR account-level data-export
+endpoint (αν χρειαστει τελικα ρητη γραμμη) και τυχον νεα modules/commits απο το κυριο repo μετα απο αυτο το
+run. Αλλιως (e) polish συνεχεια, real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
