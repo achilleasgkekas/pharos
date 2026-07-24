@@ -38,6 +38,28 @@ function equalSplit(total: number, names: string[], includeSelf: boolean): Split
   });
 }
 
+// Balances (P35 follow-up, mobile parity): aggregate split entries across ALL expenses
+// into a per-person balance sheet. Mirrors apps/web/src/lib/split.ts computeBalances().
+type PersonBalance = { name: string; owed: number; settled: number; entries: number };
+function computeBalances(expenses: Array<{ split?: SplitEntry[] | null }>): PersonBalance[] {
+  const m = new Map<string, PersonBalance>();
+  for (const e of expenses) {
+    for (const s of e.split ?? []) {
+      const name = (s?.name || '').trim();
+      const key = name.toLowerCase();
+      if (!key) continue;
+      const cur = m.get(key) ?? { name, owed: 0, settled: 0, entries: 0 };
+      if (s.settled) cur.settled += Number(s.share) || 0;
+      else cur.owed += Number(s.share) || 0;
+      cur.entries += 1;
+      m.set(key, cur);
+    }
+  }
+  return [...m.values()]
+    .map((b) => ({ ...b, owed: Math.round(b.owed * 100) / 100, settled: Math.round(b.settled * 100) / 100 }))
+    .sort((a, b) => b.owed - a.owed || a.name.localeCompare(b.name));
+}
+
 export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [rows, setRows] = useState<Expense[]>([]);
   const [vendor, setVendor] = useState('');
@@ -64,6 +86,8 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [dAmount, setDAmount] = useState('');
   const [dCategory, setDCategory] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showBalances, setShowBalances] = useState(false);
+  const [settling, setSettling] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -82,6 +106,28 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const vendorSuggestions = vq
     ? vendorList.filter((v) => v.toLowerCase().includes(vq) && v.toLowerCase() !== vq).slice(0, 6)
     : [];
+
+  // Balances (P35 follow-up): only expenses carry a split, income never does.
+  const balances = useMemo(() => (kind === 'expense' ? computeBalances(rows) : []), [rows, kind]);
+  const totalOwedToYou = useMemo(() => Math.round(balances.reduce((s, b) => s + b.owed, 0) * 100) / 100, [balances]);
+
+  // Settle up with one person: mark every unsettled split entry with this name (case-
+  // insensitive) as settled, across every expense that has one. No dedicated v1 endpoint
+  // for this yet, so it patches each affected expense's split via the existing PATCH.
+  async function settlePerson(name: string) {
+    const target = name.trim().toLowerCase();
+    const affected = rows.filter((r) => (r.split || []).some((sp) => !sp.settled && sp.name.trim().toLowerCase() === target));
+    if (affected.length === 0) return;
+    setSettling(name);
+    try {
+      for (const r of affected) {
+        const next = (r.split || []).map((sp) => (sp.name.trim().toLowerCase() === target ? { ...sp, settled: true } : sp));
+        await updateExpense(r.id, { split: next });
+      }
+      await load();
+    } catch (e) { setErr((e as Error).message); }
+    finally { setSettling(null); }
+  }
 
   async function add() {
     const v = vendor.trim();
@@ -193,6 +239,11 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         <Text style={s.totalLabel}>{kind === 'income' ? 'INCOME' : 'EXPENSES'} · {rows.length}</Text>
         <Text style={[s.total, { color: kind === 'income' ? C.accent : C.text }]}>{money(total, cur)}</Text>
       </View>
+      {balances.length > 0 && (
+        <Pressable onPress={() => setShowBalances(true)} style={s.balancesRow} hitSlop={6}>
+          <Text style={s.balancesBtn}>⇄ Balances{totalOwedToYou > 0.009 ? ` · ${money(totalOwedToYou, cur)} owed` : ''}</Text>
+        </Pressable>
+      )}
       <View style={s.addRow}>
         <Input value={vendor} onChangeText={setVendor} placeholder={label} style={{ flex: 2 }} />
         <Input value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" style={{ flex: 1 }} />
@@ -324,6 +375,44 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
               <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} variant="danger" />
             </View>
       </ModalSheet>
+
+      <ModalSheet visible={showBalances} onClose={() => setShowBalances(false)} cardStyle={s.modalMax}>
+            <Text style={s.modalTitle}>Balances</Text>
+            <Text style={s.scanNote}>Who owes you, across all expenses.</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ marginTop: 12 }}>
+              {balances.filter((b) => b.owed > 0.009).map((b) => (
+                <View key={b.name} style={s.balanceRow}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={s.balanceName} numberOfLines={1}>{b.name}</Text>
+                    <Text style={s.splitHint}>{b.entries} entr{b.entries === 1 ? 'y' : 'ies'}{b.settled > 0.009 ? ` · ${money(b.settled, cur)} settled` : ''}</Text>
+                  </View>
+                  <Text style={s.balanceAmount}>{money(b.owed, cur)}</Text>
+                  <Pressable
+                    onPress={() => Alert.alert('Settle up', `Mark ${b.name}'s ${money(b.owed, cur)} as paid back?`, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Mark paid', onPress: () => settlePerson(b.name) },
+                    ])}
+                    disabled={settling === b.name}
+                    style={[s.settleBtn, settling === b.name && s.dim]}
+                  >
+                    {settling === b.name ? <ActivityIndicator color={C.accent} size="small" /> : <Text style={s.settleBtnText}>settle</Text>}
+                  </Pressable>
+                </View>
+              ))}
+              {balances.filter((b) => b.owed <= 0.009).length > 0 && (
+                <>
+                  <Text style={s.mlabel}>SETTLED UP</Text>
+                  {balances.filter((b) => b.owed <= 0.009).map((b) => (
+                    <View key={b.name} style={s.balanceRowSettled}>
+                      <Text style={s.splitHint} numberOfLines={1}>{b.name}</Text>
+                      <Text style={s.balanceCheck}>✓</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+              {balances.length === 0 && <Empty>No one owes you anything yet.</Empty>}
+            </ScrollView>
+      </ModalSheet>
     </View>
   );
 }
@@ -449,4 +538,13 @@ const s = StyleSheet.create({
   checkboxSmOn: { borderColor: C.cyan, backgroundColor: C.cyan },
   checkboxSmMark: { color: C.onAccent, fontSize: 10, fontWeight: '800' },
   splitYourShare: { color: C.faint, fontSize: 11, marginTop: 8, textAlign: 'right' },
+  balancesRow: { paddingHorizontal: 16, marginTop: 6 },
+  balancesBtn: { color: C.cyan, fontSize: 12, fontWeight: '700' },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8, backgroundColor: C.surface },
+  balanceName: { color: C.text, fontSize: 15, fontWeight: '700' },
+  balanceAmount: { color: C.gold, fontSize: 16, fontWeight: '800' },
+  settleBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: C.surface2, minWidth: 58, alignItems: 'center' },
+  settleBtnText: { color: C.accent, fontSize: 12, fontWeight: '700' },
+  balanceRowSettled: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, paddingVertical: 6 },
+  balanceCheck: { color: C.accent, fontSize: 13, fontWeight: '800' },
 });
