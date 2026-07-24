@@ -3134,3 +3134,67 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-24 (10) — FAQ += net-worth time-series (PA2 Reports feature)
+
+Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος
+`~/.claude/ASK_ACHILLEAS.md` (3 OPEN entries, ολα bakecore finance/redesigner, τιποτα για landing).
+
+`git log --oneline cdc6a03..HEAD | grep "feat("` -> κενο (μονο tests/docs/refactor commits μετα το
+τελευταιο landing commit) — αρα συνεχισα με το ευρυτερο σαρωμα ολοκληρου του `feat(` ιστορικου
+(`git log --oneline --all | grep "feat("`, 272 commits) που το προηγουμενο entry (9) ειχε ξεκινησει
+σαν πρακτικη. Cross-check keyword-by-keyword εναντια στο υπαρχον `page.tsx`: τα περισσοτερα candidates
+(splitting/who-owes-me, per-property tags, budget envelope, safe-to-spend, bills tracker, tax-deductible,
+depreciation, return-window, IMAP email-in, bookmarklet, document vault, gift-card/store-credit, loyalty
+card, price-hike alerts, webhooks, reconciliation, GDPR, MFA, BYO AI key) ηδη καλυπτονται (το πρωτο
+grep-pass εδωσε false negatives σε μερικα γιατι η υπαρχουσα φραση δεν εχει την ακριβη λεξη-keyword,
+π.χ. "split a shared cost" αντι "splitting" literal).
+
+Βρηκα 4 γνησια κενα: net-worth time-series (PA2), vendor->category auto-rules (P15), bank/generic CSV
+import (PA1), in-app onboarding checklist (P26). Εστειλα ερευνα σε background agent (sonnet, χωρις
+guessing) να διαβασει τον πραγματικο κωδικα και να κρινει καθε ενα. Αποτελεσμα: net-worth (`lib/netWorth.ts`,
+`models/NetWorthSnapshot.ts`) = μηνιαιο snapshot (assets: inventory value + manual accounts οπως μετρητα/
+τραπεζικο υπολοιπο· liabilities: δοσεις + card balances), auto-upsert σε καθε ανοιγμα Reports, trend chart
+μετα απο 2+ μηνες ιστορικο, δουλευει ιδια hosted/self-hosted (μηδεν local-file/AI dependency) — καθαρα
+διαφορετικο απο το ηδη-mentioned "net position" (inventory - installments) που ειναι στιγμιαιο, οχι
+time-series. Auto-rules + CSV import ειναι επισης καλα candidates αλλα αφησα τα για επομενο increment
+(μια αλλαγη τη φορα). Onboarding checklist: ο agent προτεινε να ΜΗΝ μπει σε FAQ (implementation-level UI
+chrome, οχι κατι που διαλεγεις το προιον γι' αυτο, και μια απο τις 5 steps [connect storage] ειναι
+φρασεολογημενη γυρω απο self-hosted-style storage backends που θα ακουγοταν παραξενα σε καθαρα hosted
+context) — συμφωνησα, το αφησα εξω.
+
+Αλλαγη (`apps/landing/app/page.tsx`, `FAQS` array μονο, μηδεν αλλο UI/CSS/dependency change): νεα εγγραφη
+«Does it track my net worth over time?» αμεσως μετα το «Can it help me save toward a goal?» (ιδιο Reports
+cluster, savings goals -> net worth), πριν το «Can it notify me...» question.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (ιδιο μεγεθος, το FAQS
+  array ειναι build-time data μονο, μηδεν αλλαγη σε rendered bundle size). Το build αργησε ασυνηθιστα
+  πολυ αυτη τη φορα (πανω απο 2 λεπτα, background-tracked μεχρι να τελειωσει) — πιθανον system load απο
+  αλλες παραλληλες routines/Docker builds, οχι regression στο ιδιο το page.tsx.
+- Browser preview: κανενα port 3100-3190 κατειλημμενο εκτος του 3100 (Docker), `next start -p 3110` πανω
+  στο production build (γνωστο harmless "next start does not work with output:standalone" warning, ιδιο
+  με ολα τα προηγουμενα increments — σερβιρει σωστα ουτως ή αλλως). `mcp__Claude_Browser__*` διαθεσιμο·
+  `read_console_messages` (onlyErrors) -> "No console logs." καθαρο. `javascript_tool` επιβεβαιωσε: το νεο
+  FAQ item βρεθηκε στο DOM (`found:true`), σωστη σειρα γειτονων (["Can it help me save toward a goal?",
+  **αυτο**, "Can it notify me or plug into home automation?"]), deterministic anchor id
+  `faq-does-it-track-my-net-worth-over-time`, σωστο πληρες `textContent`. Hero screenshot καθαρο
+  (lighthouse mark, gradient τιτλος, CTAs, τριπλο badge row). Server σταματησε μετα (`pkill -f "next
+  start -p 3110"`), λιμανι 3110 ελευθερο εκτος απο το γνωστο false-positive Claude-app TCP CLOSE_WAIT
+  match (σημειωμενο ηδη σε προηγουμενα entries).
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call (η μονη agent-χρηση ηταν read-only research, οχι write).
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: τα 2 υπολοιπα candidates απο αυτο το σαρωμα, vendor->category auto-rules (P15) και
+bank/generic CSV import (PA1), και τα δυο ηδη research-αρισμενα (βλ. πανω) και ετοιμα για μια FAQ
+εγγραφη το καθενα. Αλλιως: νεα modules/commits απο το κυριο repo, ή (e) polish συνεχεια, real app
+screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

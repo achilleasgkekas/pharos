@@ -534,6 +534,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. Reports has savings goals: set a target amount and an optional deadline (e.g. "€5000 for new laptop by 2026-12-31"), then log contributions as you set money aside. A progress bar and a computed monthly contribution rate show whether you are on track to hit the deadline. Run as many goals in parallel as you like.',
   },
   {
+    q: 'Does it track my net worth over time?',
+    a: 'Yes. Reports keeps a monthly net-worth snapshot: everything you own (your inventory’s current value, plus any manual accounts you add for cash or bank balances) minus everything you owe (remaining installments and card balances). Opening Reports quietly upserts the current month, past months stay frozen, and once you have a couple of months of history a trend chart shows whether it is climbing or slipping, not just today’s number.',
+  },
+  {
     q: 'Can it notify me or plug into home automation?',
     a: 'Yes. Alert checks watch for deals hitting your target price, installments due this month, budgets going over, warranties expiring soon, bills due or overdue, price hikes, and expiring gift cards, then push a plain-language summary to ntfy, Discord, Slack, Telegram, or a generic webhook (Settings → Notifications). For automation platforms like Home Assistant, n8n, Node-RED, or Zapier, event webhooks send a signed JSON POST (Stripe-style HMAC signature) on specific triggers, receipt scanned, budget exceeded, installment due, price drop, so you can wire PHAROS into your own workflows.',
   },
