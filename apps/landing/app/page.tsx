@@ -523,6 +523,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'PHAROS is built for private access, not the open internet: reach it over your LAN or your own VPN, behind a login. There is no public sign-up and no telemetry, so your receipts, statements, and balances stay yours.',
   },
   {
+    q: 'Does it support two-factor authentication?',
+    a: 'On hosted, yes: turn on TOTP-based two-factor authentication from account settings with any authenticator app (Google Authenticator, 1Password, and so on), confirm it with a 6-digit code, and save the one-time recovery codes it gives you. Once enabled, every login asks for that second factor, not just this browser or device. Self-hosted sits behind your own LAN or VPN with a single shared login rather than per-person accounts, so this extra layer is a hosted feature.',
+  },
+  {
     q: 'Can I permanently delete my account and all its data?',
     a: 'Yes. On hosted, the workspace owner has a "Delete workspace" control in settings: request it and every member loses access with all data erased after a 30-day grace window, plenty of time to change your mind, and you can cancel any time before then. Self-hosted has no server-side account at all, so deleting your data just means removing the Docker volumes on your own hardware.',
   },

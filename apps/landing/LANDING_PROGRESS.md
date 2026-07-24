@@ -2656,3 +2656,64 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-24 (2) — FAQ += Two-factor authentication (hosted MFA)
+
+Increment (e), συνεχεια του docs/saas.md sweep απο το προηγουμενο entry σημερα. Πριν το ξεκινημα:
+coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος `~/.claude/ASK_ACHILLEAS.md` (δυο OPEN
+entries, και τα δυο bakecore-finance, τιποτα για landing/pharos).
+
+Το προηγουμενο entry σημερα ειχε σαν επομενο candidate ενα sweep του `docs/saas.md` για hosted-only
+functionality χωρις δικια της FAQ γραμμη, με ρητη αναφορα στο MFA login-wiring "αν επιβεβαιωθει live".
+Διαβασα `docs/saas.md` (## Multi-factor authentication, γραμμες 274-373) και βρηκα οτι η ιδια η τεκμηριωση
+ΑΚΟΜΑ λεει "Login integration is not yet wired (increment 80c, separate)" δηλ. σταλε doc note. Ελεγξα το
+πραγματικο git log του κυριου repo (`git log --oneline --all | grep -i mfa`) και βρηκα commit `96e5cbb`
+"feat(saas): MFA login-flow wiring (increment 83, TODO §9)", ημερομηνια 2026-07-21 (πριν σημερα), που
+καλωδιωνει πλημως το `POST /api/saas/auth/login` -> pending-MFA cookie -> `POST/DELETE
+/api/saas/auth/mfa` (TOTP η recovery-code verify) -> real session. Επιβεβαιωσα διαβαζοντας το πραγματικο
+route `apps/web/src/app/api/saas/auth/mfa/route.ts` (υπαρχει, module-level doc-comment περιγραφει ακριβως
+το two-step login flow). Δηλαδη το MFA ειναι **πληρως live** (enrollment απο 80a/82 + login-gating απο 83),
+οχι απλα enrollment-only οπως υπαινισσεται το stale doc note· ασφαλες θεμα για δικια του FAQ γραμμη τωρα.
+
+Αλλαγη (`apps/landing/app/page.tsx`, FAQS array μονο, μηδεν UI/CSS/dependency/bundle-size change πλην του
+νεου κειμενου): νεα εγγραφη «Does it support two-factor authentication?» αμεσως μετα το «Is my financial
+data secure?» και πριν το «Can I permanently delete my account and all its data?» (θεματικη γειτονια, ολα
+security/account cluster). Απαντηση: TOTP-based 2FA στο hosted (οποιοδηποτε authenticator app, QR/6-ψηφιο
+confirm, one-time recovery codes), obligatory σε καθε login μολις ενεργοποιηθει, ρητα σημειωνω οτι το
+self-hosted εχει ενα shared login πισω απο LAN/VPN αντι για per-person accounts αρα αυτο το layer ειναι
+hosted-only (ακριβες, βασισμενο στο `docs/self-hosting.md` AUTH_SECRET single-session μοντελο).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (ιδιο μεγεθος με το
+  προηγουμενο increment, μικρη διαφορα κειμενου δεν αλλαξε το rounded kB).
+- Browser preview: `next start -p 3120` πανω στο production build (3000/3100 κατειλημμενα απο Docker, οπως
+  παντα). `mcp__Claude_Browser__*` διαθεσιμο, `preview_start` OK, `read_console_messages` (onlyErrors) ->
+  "No console logs." καθαρο (2×, πριν και μετα απο navigation). `javascript_tool` επιβεβαιωσε: το
+  deterministic anchor id `faq-does-it-support-two-factor-authentication` υπαρχει
+  (`getElementById(...)` -> true), το DOM περιεχει "recovery codes" (σωστο answer text), και η σειρα ειναι
+  σωστη (`idx: 22`, neighbors = [faq-is-my-financial-data-secure, **αυτο**,
+  faq-can-i-permanently-delete-my-account-and-all-its-data]). `get_page_text` επιβεβαιωσε clean render του
+  hero/features/modules χωρις regression. Οπτικο screenshot της FAQ γραμμης απετυχε (`computer` scroll/
+  screenshot timeout μετα απο ενα JS click, "Browser pane is currently hidden" σφαλμα, πιθανον προσωρινο
+  rendering glitch του pane οχι της εφαρμογης) αλλα το hero screenshot πριν απο αυτο ηταν καθαρο και τα DOM/
+  console checks ειναι επαρκης επιβεβαιωση (best-effort, η task file το επιτρεπει). Server σταματησε μετα
+  (`pkill -f "next start -p 3120"`), `lsof -i :3120` επιβεβαιωσε clear.
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  `git diff --cached --name-only` κενο πριν το stage -> κανενα ξενο staged file. Staged+committed ΜΟΝΟ το
+  δικο μου landing path.
+
+Επομενο increment: το `docs/saas.md` sweep συνεχιζεται· απομενουν sections χωρις ρητη landing αναφορα οπως
+"Workspace console UI" (member management UI, ισως ηδη καλυπτεται εμμεσα απο το "add accounts for the
+people you share with") και "Data export (GDPR)"/"Workspace erasure (GDPR)" (το delete-account FAQ ηδη
+καλυπτει το erasure μερος σε γενικες γραμμες, το GDPR data-export endpoint ισως αξιζει ρητη αναφορα αν
+διαφερει απο το ηδη-καλυμμενο JSON backup/export). Αλλιως (e) polish συνεχεια, real app screenshots οταν
+υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
