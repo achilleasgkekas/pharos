@@ -7963,3 +7963,55 @@ pure-lib test coverage pattern (ίδιο με τα πρόσφατα runs) ή σ�
   provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file
   need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
   power tool· P5 bookmarklet MV3-extension phase 2.
+
+## 2026-07-24 (pharos-daily-dev, cont.⁷ — ShoppingScreen UI Debt: shared `<Spinner>`/`<Empty>`)
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε 3 OPEN items, όλα από
+`bakecore-*` (άσχετο project, `bakecore-finance` ×2 + `bakecore-redesigner` ×1) → τίποτα να εφαρμόσω πρώτα.
+Working tree καθαρό στην αρχή. Μηδέν Docker build/boot αυτό το run (μόνο mobile TypeScript + doc αλλαγή) →
+το `/tmp/claude-docker.lock` δεν χρειάστηκε.
+
+**Approved queue check (βήμα a)**: ξανασάρωσα `PRODUCT_BACKLOG.md → ## Approved` γραμμή-γραμμή (28 items). Ίδιο
+standing αποτέλεσμα με τα προηγούμενα runs σήμερα: **P36** (needs-Achilleas provider decision, L)· **P31** (4ο+
+deferral, χρειάζεται supervised live-login session)· **P16** Firefly III/Grocy (χρειάζεται πραγματικό sample
+file)· **P17**/**P23** (mobile-native dep approvals)· **P5** MV3 extension phase 2 (deferred)· **P9**
+multi-currency (L, ρητά τελευταίο). Μηδέν νέο buildable Approved item → βήμα (b).
+
+**Fallback (βήμα b)**: το `MOBILE_PARITY.md` Build Queue functional-gaps tier ήταν πλέον ΚΑΙ ΠΑΛΙ γνήσια άδειο
+— και τα δύο top-1 items που είχαν μείνει ανοιχτά από προηγούμενα runs σήμερα (P35 Balances modal, notifications
+body-humanization) ήταν ήδη ✅ DONE (commits `823b05e`/`ee894a3`, verified με `git log`). Κατέβηκα στο **UI Debt
+Queue** (ρητά προτεινόμενο fallback tier σε προηγούμενα entries): το top-2 item "ShoppingScreen: inline
+loading/empty → shared `<Spinner>`/`<Empty>`" [P2/S] ήταν ακόμα `Status: TODO`, μηχανικό, μηδέν decision, μηδέν
+native dep, μηδέν rebuild ανάγκη — πήρα αυτό. Verified πρώτα ότι δεν είχε ήδη γίνει (`grep -n "ActivityIndicator|
+ListEmptyComponent" ShoppingScreen.tsx` έδειξε το παλιό raw pattern ακόμα στη θέση του).
+
+**Τι έγινε** (μόνο `apps/mobile/src/screens/ShoppingScreen.tsx` + `MOBILE_PARITY.md`, μηδέν backend αλλαγή):
+- `if (loading) return <View style={s.center}><ActivityIndicator color={C.accent} /></View>;` → `return <Spinner />;`
+  (το shared primitive, `apps/mobile/src/ui.tsx:31-33`, ήδη κάνει accent-colored `ActivityIndicator` μέσα σε
+  centered `View`, byte-ίδιο behaviour).
+- `ListEmptyComponent={<Text style={s.empty}>Your list is empty…</Text>}` → `<Empty>Your list is empty…</Empty>`
+  (shared primitive, ίδιο στυλ).
+- Αφαιρέθηκαν τα local StyleSheet entries `center`/`empty` (byte-dupes του ui.tsx, πλέον αχρησιμοποίητα) — μηδέν
+  dead style έμεινε.
+- `MOBILE_PARITY.md` ενημερώθηκε: το item marked `✅ DONE 2026-07-24 (pharos-daily-dev)`.
+
+**Verify**: `apps/mobile npx tsc --noEmit` EXIT 0. `grep -n "s\.center|s\.empty" ShoppingScreen.tsx` = μηδέν
+matches (κανένα dangling reference). Καμία web αλλαγή → μηδέν ανάγκη για `npm run type-check`/vitest/Docker
+rebuild στο web. `git status --short` πριν το commit επιβεβαίωσε ΜΟΝΟ τα 2 προγραμματισμένα αρχεία.
+
+**Suggested next task**: το επόμενο UI Debt Queue item ("ReceiptsScreen: line-item cell inputs → shared
+`<Input>`", ίδιο P2/S tier, ίδιο doc section) είναι το φυσικό επόμενο βήμα — απαιτεί πιθανώς νέο compact `cell`
+variant στο `<Input>` primitive (τα 3 QTY/NET/VAT inputs είναι πιο στενά/συμπαγή από το standard full-width
+`<Input>`). Αν αυτό μπλοκάρει (attended-preferred λόγω visual delta), τα επόμενα διαθέσιμα tiers είναι: safe-area
+dep adoption (P2/M, νέο native dependency — ίδιο tier με P17/P23 approvals) ή pure-lib test coverage.
+
+**Git hygiene**: `git add` explicit (μόνο `apps/mobile/src/screens/ShoppingScreen.tsx` + `MOBILE_PARITY.md` +
+`PROGRESS.md`, όχι `-A`) → commit → push.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: SaaS multi-tenancy/billing rollout env boundary·
+  mobile native-dep approvals (P17 camera, P23 share-sheet, safe-area-context UI-debt dep)· P36 Open Banking
+  provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file
+  need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
+  power tool· P5 bookmarklet MV3-extension phase 2.

@@ -7,7 +7,7 @@ import { C } from '../theme';
 import {
   getShoppingList, addListItem, toggleListItem, deleteListItem, scanProduct, type ListItem, type ScannedProduct,
 } from '../api';
-import { Button, Check, IconButton, Input, ModalSheet, contentWidth } from '../ui';
+import { Button, Check, Empty, IconButton, Input, ModalSheet, Spinner, contentWidth } from '../ui';
 
 export function ShoppingScreen() {
   const [items, setItems] = useState<ListItem[]>([]);
@@ -66,7 +66,7 @@ export function ShoppingScreen() {
     finally { setScanning(false); }
   }
 
-  if (loading) return <View style={s.center}><ActivityIndicator color={C.accent} /></View>;
+  if (loading) return <Spinner />;
 
   const sorted = [...items].sort((a, b) => (a.checked ? 1 : 0) - (b.checked ? 1 : 0) || b.createdAt.localeCompare(a.createdAt));
 
@@ -94,7 +94,7 @@ export function ShoppingScreen() {
         keyExtractor={(i) => i._id}
         contentContainerStyle={[{ paddingBottom: 40 }, contentWidth]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
-        ListEmptyComponent={<Text style={s.empty}>Your list is empty — add an item or scan a product.</Text>}
+        ListEmptyComponent={<Empty>Your list is empty — add an item or scan a product.</Empty>}
         renderItem={({ item }) => (
           <Pressable onPress={() => toggle(item)} onLongPress={() => remove(item)} style={s.row}>
             <Check checked={!!item.checked} />
@@ -143,13 +143,11 @@ export function ShoppingScreen() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg, padding: 16 },
-  center: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   h1: { color: C.text, fontSize: 26, fontWeight: '800', marginBottom: 14 },
   addRow: { flexDirection: 'row', gap: 8 },
   scanBtn: { marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface2, paddingVertical: 12, alignItems: 'center' },
   scanText: { color: C.cyan, fontSize: 15, fontWeight: '600' },
   error: { color: C.red, fontSize: 13, marginTop: 10 },
-  empty: { color: C.faint, fontSize: 14, textAlign: 'center', marginTop: 50 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 14, marginTop: 10 },
   eyebrow: { color: C.faint, fontSize: 10, letterSpacing: 1 },
   name: { color: C.text, fontSize: 15, fontWeight: '600' },

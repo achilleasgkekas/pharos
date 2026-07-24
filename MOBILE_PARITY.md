@@ -126,7 +126,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - Το `ListEmptyComponent={<Text style={s.empty}>…</Text>}` (ShoppingScreen.tsx:97) χρησιμοποιει το shared `<Empty>` primitive.
   - Τα local StyleSheet entries `center` και `empty` (byte-dupes του ui.tsx `center`/`empty`, ShoppingScreen.tsx:152) διαγραφονται, μηδεν αχρησιμοποιητο style μενει.
   - `apps/mobile npx tsc --noEmit` → EXIT 0.
-- Status: TODO
+- Status: ✅ DONE 2026-07-24 (pharos-daily-dev) — `if (loading) return <Spinner />;` (ShoppingScreen.tsx), `ListEmptyComponent={<Empty>…</Empty>}`, local `center`/`empty` StyleSheet entries removed. `apps/mobile npx tsc --noEmit` EXIT 0.
 
 ### ReceiptsScreen: line-item cell inputs → shared `<Input>` (kill raw TextInput + magic radius)
 - Priority: P2
