@@ -4405,3 +4405,52 @@ surfaces), `members`, `usage` + `usage/sample`, `workspace/{ai-key,export,export
 reactivate}`, `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`. Πριν
 ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί,
 πάει πρώτο).
+
+## 2026-07-24 (cont. — increment 94, route-level test coverage για το auth/mfa endpoint)
+
+Πριν από νέο increment: ask-inbox (τα 3 OPEN entries είναι ακόμα bakecore-finance ×2/
+bakecore-redesigner ×1, τίποτα addressed σε saas-core). `WEB_DEBT.md` re-checked (ίδια 58η
+σάρωση, τα 3 ανοιχτά auto-buildable items αφορούν `app/settings/actions.ts`/`app/vouchers/*.ts`,
+ρητά ΕΚΤΟΣ territory). UI-first backlog παραμένει εξαντλημένο. Ακολούθησα το leftover next-task
+και διάλεξα **`auth/mfa`** (login step-2 / δεύτερος παράγοντας) — το ίδιο increment-93 log το
+είχε ήδη σημειώσει ως τον πιο αξιόλογο επόμενο στόχο μέσα στο υπόλοιπο auth surface.
+
+**Νέο `auth/mfa/route.test.ts`** (17 tests, POST+DELETE), μηδέν production code αλλαγή. Mocks:
+`@/lib/apiAuth` (`rateLimit`), `@/lib/db` (connectDB no-op), `@/models/Account`
+(`findById().select()` chain → spyable `.save()` fake doc), `@/lib/tenancy/mfaStore`
+(`verifyMfaLogin`), `@/lib/tenancy/accountSession` (`getMfaPendingAccountId`/
+`clearMfaPendingCookie`/`setAccountCookie`), `@/lib/tenancy/saasApi` (`vi.importActual` για το
+πραγματικό `saasGuard`, mocks μόνο `saasAuthGate`/`accountTenants`) — ίδιο module-boundary
+precedent με το increment-93 auth/login test.
+
+Καλύπτει POST: (1) gate short-circuit ΠΡΙΝ το pending-cookie read· (2) καμία pending cookie →
+401 "no_pending_login", μηδέν rate-limit/DB· (3) rate limit keyed **ανά account id, όχι IP**
+(η pending cookie ήδη περιορίζει τον στόχο σε ένα account)· (4) rate-limited → 429 as-is, μηδέν
+connectDB/verifyMfaLogin· (5)(6) κενό/blank code → 400, μηδέν DB· (7) **και τα 4 failure reasons
+του `verifyMfaLogin`** (not_found/not_enabled/invalid_code/crypto_unavailable) → όλα 401 με το
+reason ως error body (`it.each`, τεκμηριώνει το as-coded hardcoded-401 bug/quirk χωρίς να το
+"διορθώνει")· (8) account εξαφανίζεται ανάμεσα σε verify-ok και το re-read → 401 "not_found",
+ΚΑΝΕΝΑ cookie δεν αγγίζεται· (9) TOTP success → lastLoginAt stamped+save+clear-pending+real
+cookie+account/tenants/usedRecoveryCode:false· (10) recovery-code success →
+usedRecoveryCode:true· (11) κενό name fallback· (12) mid-handler throw (account.save rejects) →
+καθαρό 500 μέσω πραγματικού saasGuard. Καλύπτει DELETE: (13) gate short-circuit πριν το cookie
+clear· (14) normal path → clear+`{ok:true}`.
+
+**Verified**: νέο test file **17/17 green** μόνο του· πλήρες `npx vitest run` → **250 files /
+3308 tests green** (ήταν 248/3268 στο increment 93 — η διαφορά +2 files/+40 tests περιλαμβάνει
+το δικό μου +1 file/+17 tests + tests από concurrent routine). `npm run type-check` → **EXIT 0**
+καθαρά. **Docker: ΔΕΝ έγινε rebuild** (test-only αρχείο). **Browser-verify: skipped** (test file,
+μηδέν UI/observable behavior αλλαγή). Collision guard: `git status --short` πριν το staging
+έδειξε ΜΟΝΟ το 1 δικό μου νέο αρχείο, `git diff --cached --name-only` επιβεβαίωσε exact match.
+Pushed `c8bf23f`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο σε επόμενο ανεξέταστο route-cluster (28 routes ακόμα χωρίς
+route-level test) — καλοί υποψήφιοι τώρα: `auth/{signup,session,logout}` (υπόλοιπο auth
+surface), `account/*` self-service routes (password/mfa/mfa-confirm/reset-request/reset-confirm/
+verify-request/verify-confirm/workspaces/export, 9 files, session-gated), `admin/overview` +
+`admin/tenants` list (read-only console surfaces), `members`, `usage` + `usage/sample`,
+`workspace/{ai-key,export,export/files,reactivate}`, `invites/{resend,route}`, `audit`,
+`trials/sweep`, `billing/route.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση
+`WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
