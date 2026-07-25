@@ -8639,3 +8639,77 @@ run: Approved queue check ως συνήθως· αν είναι πάλι άδε�
 - Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P23 share-sheet native dep· P36 Open
   Banking provider decision· P31 household supervised session· P16 Firefly III/Grocy real sample-file·
   Settings credentials boundary· P8 tax-export ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
+## 2026-07-25 (P9 slice 1: multi-currency foundation + Expenses)
+
+**Approved queue check (βήμα a)**: σάρωσα `PRODUCT_BACKLOG.md → ## Approved` + `OWNER_DECISIONS.md`. Τα unshipped:
+**P36** (Open Banking, L, θέλει απόφαση provider + credentials), **P31** (household, ρητά supervised session βάσει
+του scoping του 2026-07-19), **P17** (server μισό shipped χθες, camera UI θέλει `expo-camera` έγκριση), **P23**
+(share-sheet, native dep) και **P9** (multi-currency, L, «τελευταίο σε σειρά»).
+
+**Απόφαση αυτού του run**: το προηγούμενο run πρότεινε να εφαρμοστεί στο **P23** το μοτίβο «χτίσε το server μισό».
+**Το έλεγξα πρώτα και ΔΕΝ ισχύει**: το server μισό του P23 **υπάρχει ήδη πλήρες** — το `POST /api/v1/scan/receipt`
+δέχεται multipart file, το σώζει, τρέχει το AI parse και δημιουργεί το receipt. Ένα share-extension δεν χρειάζεται
+τίποτα άλλο server-side. Άρα το P23 είναι **αποκλειστικά** μπλοκαρισμένο στο native dep, δεν έχει sliceable server
+κομμάτι (καταγράφεται εδώ ώστε τα επόμενα runs να μην το ξανα-ψάξουν).
+
+Οπότε πήγα στο **P9**, το μόνο εναπομείναν Approved item που δεν θέλει απόφαση, credentials, native dep, ούτε
+supervised session. Είναι L και δεν τελειώνει σε ένα run, οπότε το έκοψα σε ένα **αυτοτελές slice**.
+
+**Το πραγματικό εύρημα που καθόρισε το slice**: το `Expense.currency` **αποθηκεύεται ήδη** (το EXPENSE_PROMPT το
+parse-άρει από τον λογαριασμό) αλλά **ΚΑΝΕΝΑ path δεν το τιμούσε** — κάθε display περνά από `cur()` (το σύμβολο του
+deployment) και κάθε aggregation αθροίζει σκέτο `amount`. Δηλαδή μια απόδειξη **$88 έμπαινε σιωπηλά ως €88** στα
+σύνολα, στα budgets, στο cash flow, στα split shares. Δεν είναι «νέο feature», είναι υπαρκτό σφάλμα ορθότητας που
+γίνεται ορατό.
+
+**Κλειδωμένη αρχιτεκτονική απόφαση (builder default, καταγραφή όπως ζητά το backlog)**: το **`amount` είναι ΠΑΝΤΑ σε
+base currency**. Έτσι ΚΑΘΕ υπάρχον aggregation (reports, budgets, cash flow, anomaly medians, split, net worth)
+συνεχίζει να δουλεύει **χωρίς μία γραμμή αλλαγής και χωρίς migration**, και το multi-currency γίνεται καθαρά
+προσθετικό. Το foreign έγγραφο κρατά ΕΠΙΠΛΕΟΝ το τυπωμένο σκέλος: `currency` (τυπωμένος κωδικός) + νέα `origAmount`
++ νέο `fxRate`, με `amount = origAmount * fxRate`. Η εναλλακτική (να μένει το `amount` στο ξένο νόμισμα και να
+μετατρέπουν τα aggregations) θα άγγιζε δεκάδες σημεία και θα ρίσκαρε live οικονομικά δεδομένα, για μηδέν όφελος.
+Δεύτερη απόφαση: όταν **λείπει το rate ΔΕΝ εφευρίσκεται 1:1** — το `amount` μένει ο τυπωμένος αριθμός (byte-for-byte
+η παλιά συμπεριφορά, ώστε **κανένα αποθηκευμένο σύνολο να μη μετακινηθεί** από αυτό το commit) και σημαίνεται, ώστε
+το UI να ζητήσει rate αντί να ανακατέψει σιωπηλά νομίσματα. Τρίτη: **opt-in ανά deployment**
+(`AppConfig.multiCurrency`, default **false**) όπως το ζητούσε ρητά το spec — off σημαίνει μηδέν επιπλέον πεδίο.
+
+**Τι χτίστηκε**: νέο pure **`lib/fx.ts`** (client-safe, DB-free, **+25 unit tests**) με τον κανόνα σε ΕΝΑ μέρος:
+`normalizeCurrency`, `isForeignCurrency`, `convertToBase` (round στα cents), `deriveFxRate`, `resolveFx` (η μοναδική
+απόφαση μετατροπής), `formatMoney`, `fxBadgeLabel`. Wiring: `Expense.origAmount`/`fxRate` + serialize +
+`SerializedExpense`· **και τα 4 write paths** (uploadExpense/addExpense/updateExpense/rescanExpense) περνούν από
+`resolveFx` (**+5 integration tests** που καρφώνουν ότι το `amount` στη DB είναι base)· `generateDueRecurring`
+στάμπαρε πλέον base currency (μια προβολή είναι base by definition, δεν κληρονομεί ξένο κωδικό)·
+`AppConfig.multiCurrency` + appSettings + `saveDefaults` + Switch στο Settings → Defaults· `/api/v1/expenses` shape
++= origAmount/fxRate (**mobile parity μέσα στο ίδιο run, όχι follow-up**) + τεκμηρίωση στο `API.md` με το τι
+σημαίνει `fxRate: 0`. UI: currency select δίπλα στο amount + FX row με **δύο δρόμους** («rate» απευθείας, ή «or
+charged» που κάνει back-out του rate μέσω `deriveFxRate`, γιατί όποιος διαβάζει statement ξέρει τι χρεώθηκε αλλά όχι
+την ισοτιμία) + live preview του ποσού που θα αποθηκευτεί + **`FxBadge`** σε card/row (purple όταν το rate είναι
+γνωστό, **gold ⚠ όταν λείπει**, γιατί τότε το ποσό στα σύνολα είναι ακόμα ξένο νόμισμα).
+
+**Λεπτομέρεια που έπιασα χτίζοντας**: τα form defaults ήταν hardcoded `'EUR'` (`toForm` + create form). Με το
+resolveFx αυτό θα έκανε **κάθε** χειροκίνητη εγγραφή «foreign» σε ένα non-EUR deployment. Τα defaults παίρνουν πλέον
+τη base currency, και το `toForm` φορτώνει το **τυπωμένο** ποσό (`origAmount`) σε foreign εγγραφή ώστε ένα re-save
+χωρίς αλλαγή να μην ξανα-μετατρέπει (pinned με τεστ idempotency).
+
+**Verify**: `npm run type-check` **EXIT 0**· full `npx vitest run` **3523 passed / 264 files** (+30 νέα, **μηδέν
+regression**). 7 assertions «exact shape / documented key set» έσπασαν σωστά και ενημερώθηκαν για τα 2 νέα πεδία
+(τα fixtures έγιναν συνεπή: 1543.20 × 0.8 = 1234.56, ώστε να διαβάζονται και ως τεκμηρίωση). Docker: mutex
+acquired → `docker compose build web` → mongo **healthy** → `up -d web` → `/login` **200 με την πρώτη προσπάθεια**,
+**0 restarts**, `/expenses` + `/settings` 307 (auth-gated, δηλαδή compiled) → `docker builder prune -f` (197MB) →
+lock **released**. Browser-verify: η εφαρμογή renders, **μηδέν console errors**. Το authed `/expenses` **δεν** είναι
+επαληθεύσιμο unattended (θέλει login credentials) — καλύπτεται από τα 30 tests + το γεγονός ότι το `next build`
+μέσα στο image θα είχε αποτύχει σε λάθος στο client component.
+
+**Suggested next task**: το P9 είναι 🟡 και το επόμενο slice είναι **ίδιο μοτίβο, μηδέν νέα απόφαση**: τα ίδια 3
+πεδία σε **Receipts** (και μετά Statements/Subscriptions/Items) — αποθηκεύουν κι αυτά `currency` που αγνοείται, άρα
+έχουν **το ίδιο latent bug**. Το `lib/fx.ts` είναι έτοιμο, οπότε είναι κυρίως wiring + UI badge. Μετά: `resolveFx`
+στο CSV import (PA1) και στο email-in. Ως συνήθως τρέξε πρώτα το Approved queue check (βήμα a).
+
+## Needs Achilleas
+
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: το P17 server half είναι shipped+tested και το P23 server
+  half **υπάρχει ήδη** (`POST /api/v1/scan/receipt`). Και τα δύο μένουν πίσω από native dep + EAS dev build σε
+  φυσική συσκευή. Καταγράφηκε και στο `~/.claude/ASK_ACHILLEAS.md` (`pharos-daily-dev-20260725-1425`).
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
+  household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
+  ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
