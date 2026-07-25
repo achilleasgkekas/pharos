@@ -202,6 +202,12 @@ These are flagged **(AI)** below with the feature name.
 | PATCH  | `/shopping-list/:id`      | Update `{ checked?, name?, quantity?, category?, brand?, note? }`. |
 | DELETE | `/shopping-list/:id`      | Remove. |
 
+### Barcode product lookup
+
+| Method | Path                           | Description |
+|--------|--------------------------------|-------------|
+| GET    | `/lookup/barcode?code=<gtin>`  | Look up a barcode (EAN/UPC, 8–14 digits) across OpenFoodFacts, OpenProductsFacts, and OpenBeautyfacts (free, no API key). Returns `{ product: { name, brand, category, quantity, images }, code }` or `{ product: null, code }` if not found. **Errors:** `400` if the `code` is not a valid GTIN; `502` if all product databases are unreachable. Used by the mobile camera scan to suggest products before the user confirms and adds to shopping list or inventory. **(P17 server-half.)** |
+
 ### Receipts
 
 | Method | Path                              | Description |

@@ -112,6 +112,10 @@ so it avoids CORS and API-token exposure. If the product already exists in your
 library, it merges the new store link and price instead of duplicating it. Phase 2
 (MV3 Chrome extension) is planned.
 
+### Barcode product lookup (P17)
+
+Scan a product barcode with the mobile camera and instantly look it up. **How it works:** Point your phone at a barcode (EAN/UPC) on any product — the mobile camera captures it, and the app queries a **free, zero-config product database** (the Open*Facts family: OpenFoodFacts, OpenProductsFacts, OpenBeautyfacts) across three sources in parallel. If a match is found, you see the product details (name, brand, category, quantity, image) in a preview card. You confirm or edit, then add to your shopping list or inventory. If no match is found, you can type the name by hand or use the AI photo scan as an alternative. **Why free and deterministic:** barcode lookup is intentionally NOT an AI fallback — a lookup is zero-cost (no per-call charge), instant (<6s latency, crucial for a shopper standing in an aisle), and deterministic (the same barcode always gives the same answer).
+
 ## Receipts
 
 Drag-and-drop (or camera) upload of receipts as images or PDFs (`/receipts`). The

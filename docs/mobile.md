@@ -101,7 +101,7 @@ Bearer-protected files (receipt images, item photos, thumbnails) are fetched via
 
 Several screens can scan with the camera and let the AI prefill a form:
 
-- **Shopping list** → product scan (`POST /api/v1/scan/product`).
+- **Shopping list** → barcode scan (instant product lookup via `GET /api/v1/lookup/barcode`, zero AI cost) or product photo scan with AI (`POST /api/v1/scan/product`).
 - **Receipts** → receipt scan + AI parse (`POST /api/v1/scan/receipt`), plus
   re-scan of a stored file.
 - **Expenses** → bill/payslip scan (`POST /api/v1/scan/expense`).
