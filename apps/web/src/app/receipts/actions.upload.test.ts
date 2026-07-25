@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Second slice of app/receipts/actions.ts (756 lines) — the shared OCR-first parse
-// pipeline (private `runReceiptParse`) exercised through its three callers: `uploadReceipt`
+// pipeline (private `runReceiptParse`) exercised through its four callers: `uploadReceipt`
 // (save-a-file draft), `rescanReceipt`/`rescanReceiptOne` (re-run AI on the already-
-// stored file), and `rescanReceiptsBulk` (explicit-id batch wrapper around
+// stored file), `rescanReceiptsBulk` (explicit-id batch wrapper around
 // `rescanReceiptOne`, reusing every mock in this file 1-to-1 — see its own describe
+// block), and `backfillReceiptThumbs` (unrelated to the parse pipeline itself, but reuses
+// this file's readFile/pdfFirstPageJpeg/saveFile mocks 1-to-1 — see its own describe
 // block at the bottom). Same idiom as expenses/actions.scan.test.ts: text-PDF -> embedded text,
 // scanned-PDF -> rasterize+OCR -> text model (or vision fallback when OCR is unusable),
 // image -> OCR-first -> text model (or vision fallback), plus an .html/.htm branch unique
@@ -43,6 +45,7 @@ const {
   receiptCreate,
   receiptFindById,
   receiptFindByIdAndUpdate,
+  receiptFindMock,
   getAppSettingsMock,
   isFeatureEnabledMock,
   parseReceiptMock,
@@ -65,6 +68,9 @@ const {
   receiptCreate: vi.fn(async (doc: Record<string, any>) => ({ ...doc, _id: 'r1' })),
   receiptFindById: vi.fn(async (_id: string) => null as Record<string, any> | null),
   receiptFindByIdAndUpdate: vi.fn(async (_id: string, _update: Record<string, any>) => ({})),
+  // backfillReceiptThumbs' `Receipt.find({...}).limit(n)` shape — a chained `.limit()`
+  // resolving to the array, not a plain find() promise like the other model calls here.
+  receiptFindMock: vi.fn((_query: Record<string, any>) => ({ limit: (_n: number) => Promise.resolve([] as Record<string, any>[]) })),
   getAppSettingsMock: vi.fn(async () => ({ defaultWarrantyMonths: 24, defaultVatRate: 24 })),
   isFeatureEnabledMock: vi.fn(async () => true),
   parseReceiptMock: vi.fn(async (_b64: string) => ({ parsed: null as any, raw: '', model: 'vision-model' })),
@@ -86,6 +92,7 @@ const receiptModel = {
   create: receiptCreate,
   findById: receiptFindById,
   findByIdAndUpdate: receiptFindByIdAndUpdate,
+  find: receiptFindMock,
 };
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
@@ -106,7 +113,7 @@ vi.mock('@/lib/webhooks', () => ({ dispatchEventWebhooks: dispatchEventWebhooksM
 vi.mock('@/lib/htmlReceipt', () => ({ htmlReceiptToText: htmlReceiptToTextMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
-import { uploadReceipt, rescanReceipt, rescanReceiptsBulk } from './actions';
+import { uploadReceipt, rescanReceipt, rescanReceiptsBulk, backfillReceiptThumbs } from './actions';
 
 function makeFile(name: string, bytes: string, type: string, size?: number): File {
   const blob = new Blob([bytes], { type });
@@ -134,6 +141,7 @@ beforeEach(() => {
   looksLikeUsableOcrMock.mockReturnValue(false);
   pdfFirstPageJpegMock.mockResolvedValue(null);
   htmlReceiptToTextMock.mockImplementation((html: string) => `TEXT:${html}`);
+  receiptFindMock.mockImplementation(() => ({ limit: () => Promise.resolve([]) }));
 });
 
 describe('uploadReceipt — validation', () => {
@@ -626,5 +634,92 @@ describe('rescanReceiptsBulk', () => {
     expect(revalidatePathMock).toHaveBeenCalledTimes(1);
     expect(revalidatePathMock).toHaveBeenCalledWith('/receipts');
     expect(safeRevalidateMock).toHaveBeenCalledWith('/receipts');
+  });
+});
+
+describe('backfillReceiptThumbs', () => {
+  it('queries pending PDFs (missing/empty thumbPath) capped at the given limit, no revalidate/webhook side effects', async () => {
+    await backfillReceiptThumbs(5);
+    expect(receiptFindMock).toHaveBeenCalledWith({
+      fileType: /pdf/i,
+      $or: [{ thumbPath: { $exists: false } }, { thumbPath: '' }],
+    });
+    const limitMock = vi.fn(() => Promise.resolve([]));
+    receiptFindMock.mockReturnValueOnce({ limit: limitMock });
+    await backfillReceiptThumbs(5);
+    expect(limitMock).toHaveBeenCalledWith(5);
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(dispatchEventWebhooksMock).not.toHaveBeenCalled();
+  });
+
+  it('defaults the limit to 12 when not given', async () => {
+    const limitMock = vi.fn(() => Promise.resolve([]));
+    receiptFindMock.mockReturnValueOnce({ limit: limitMock });
+    await backfillReceiptThumbs();
+    expect(limitMock).toHaveBeenCalledWith(12);
+  });
+
+  it('returns 0 and touches nothing else when there are no pending receipts', async () => {
+    const done = await backfillReceiptThumbs();
+    expect(done).toBe(0);
+    expect(readFileMock).not.toHaveBeenCalled();
+    expect(pdfFirstPageJpegMock).not.toHaveBeenCalled();
+    expect(saveFileMock).not.toHaveBeenCalled();
+  });
+
+  it('skips a pending receipt that has no filePath (never reads/renders/saves for it)', async () => {
+    const doc = makeReceiptDoc({ fileType: 'application/pdf' }); // no filePath
+    receiptFindMock.mockReturnValueOnce({ limit: () => Promise.resolve([doc]) });
+    const done = await backfillReceiptThumbs();
+    expect(done).toBe(0);
+    expect(readFileMock).not.toHaveBeenCalled();
+    expect(doc.save).not.toHaveBeenCalled();
+  });
+
+  it('renders + saves a 480px thumbnail for a pending PDF and counts it as done', async () => {
+    const doc = makeReceiptDoc({ filePath: 'receipts/2026/06/r.pdf', fileType: 'application/pdf' });
+    receiptFindMock.mockReturnValueOnce({ limit: () => Promise.resolve([doc]) });
+    readFileMock.mockResolvedValueOnce(Buffer.from('pdf-bytes'));
+    pdfFirstPageJpegMock.mockResolvedValueOnce(Buffer.from('thumb-jpeg'));
+    saveFileMock.mockResolvedValueOnce({ relativePath: 'receipts/2026/06/r-thumb.jpg' });
+    const done = await backfillReceiptThumbs();
+    expect(done).toBe(1);
+    expect(pdfFirstPageJpegMock).toHaveBeenCalledWith(Buffer.from('pdf-bytes'), 480);
+    expect(saveFileMock).toHaveBeenCalledWith('receipts', Buffer.from('thumb-jpeg'), 'jpg');
+    expect(doc.thumbPath).toBe('receipts/2026/06/r-thumb.jpg');
+    expect(doc.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not count (and does not save) a receipt whose rendered jpeg comes back falsy', async () => {
+    const doc = makeReceiptDoc({ filePath: 'receipts/2026/06/r.pdf', fileType: 'application/pdf' });
+    receiptFindMock.mockReturnValueOnce({ limit: () => Promise.resolve([doc]) });
+    pdfFirstPageJpegMock.mockResolvedValueOnce(null);
+    const done = await backfillReceiptThumbs();
+    expect(done).toBe(0);
+    expect(saveFileMock).not.toHaveBeenCalled();
+    expect(doc.save).not.toHaveBeenCalled();
+  });
+
+  it('one bad receipt (readFile throws) does not abort the batch: skipped, the rest still processes', async () => {
+    const bad = makeReceiptDoc({ filePath: 'receipts/bad.pdf', fileType: 'application/pdf' });
+    const good = makeReceiptDoc({ filePath: 'receipts/good.pdf', fileType: 'application/pdf' });
+    receiptFindMock.mockReturnValueOnce({ limit: () => Promise.resolve([bad, good]) });
+    readFileMock.mockRejectedValueOnce(new Error('disk error')).mockResolvedValueOnce(Buffer.from('pdf-bytes'));
+    pdfFirstPageJpegMock.mockResolvedValueOnce(Buffer.from('thumb-jpeg'));
+    saveFileMock.mockResolvedValueOnce({ relativePath: 'receipts/2026/06/good-thumb.jpg' });
+    const done = await backfillReceiptThumbs();
+    expect(done).toBe(1);
+    expect(bad.save).not.toHaveBeenCalled();
+    expect(good.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not count a receipt when its own .save() throws', async () => {
+    const doc = makeReceiptDoc({ filePath: 'receipts/r.pdf', fileType: 'application/pdf' });
+    doc.save = vi.fn(async () => { throw new Error('save failed'); });
+    receiptFindMock.mockReturnValueOnce({ limit: () => Promise.resolve([doc]) });
+    pdfFirstPageJpegMock.mockResolvedValueOnce(Buffer.from('thumb-jpeg'));
+    saveFileMock.mockResolvedValueOnce({ relativePath: 'receipts/2026/06/r-thumb.jpg' });
+    const done = await backfillReceiptThumbs();
+    expect(done).toBe(0);
   });
 });
