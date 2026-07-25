@@ -3555,3 +3555,63 @@ search, P21 document/manual vault). Αλλιως: νεος `git log --oneline 25
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-25 (16) — P9 Subscriptions multi-currency: fix stale FAQ claim + roadmap wording
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε (8 OPEN
+entries πλεον, ολα bakecore + το pharos-daily-dev mobile-camera question, τιποτα ANSWERED προς αυτη τη
+routine).
+
+`git log --oneline 25cb2c2..HEAD | grep "feat("` (25cb2c2 = τελευταιο commit που αγγιξε το apps/landing,
+προηγουμενο entry) εβγαλε ενα φρεσκο: `b2e72ce feat(money): multi-currency for Subscriptions (P9 slice 3)`.
+Υπηρχε επισης `3c9d170 docs(P9): document multi-currency support for Subscriptions`, αλλα αυτο ειναι δικο
+του pharos-daily-dev commit που αγγιξε `docs/api.md`/`docs/features.md` (γενικο repo docs), οχι το landing
+site· δεν καλυπτει τη δουλεια αυτου του run.
+
+Ιδιο pattern με τα δυο προηγουμενα entries: η ηδη-υπαρχουσα multi-currency FAQ (απο #14/#15) εχει τωρα
+ξεπερασμενο ισχυρισμο ("statements and subscriptions are still base-currency only for now" — το
+subscriptions κομματι πλεον ψευδες).
+
+Read-only research (Read directly, μηδεν subagent, μικρο scope): `models/Subscription.ts` (νεα πεδια
+`origAmount`/`fxRate`, ιδιο invariant με Receipts/Expenses — `amount` παντα base currency) και
+`app/subscriptions/actions.ts` (`resolveSubFx` helper, γραμμες 87-105): το **ιδιο rate** converts ΚΑΙ το
+recurring `amount` ΚΑΙ το post-trial `firstChargeAmount` (οχι μονο ενα απο τα δυο), γιατι και τα δυο
+αθροιζονται σε base currency αλλου (monthly/yearly totals, calendar agenda, trial-charge digest) — ενα
+μισο-converted subscription θα εμπλεκε δυο νομισματα μεσα στην ιδια εγγραφη. Αγνωστο rate: το printed
+number μενει αναλλοιωτο, ιδιο pattern με τα αλλα (gold badge, οχι σιωπηλο 1:1 guess).
+
+Αλλαγες (`apps/landing/app/page.tsx`, 2 σημεια, ιδιο αρχειο με παντα):
+1. FAQ fix: το ιδιο question "Can it handle an expense in a currency other than my main one?" (anchor id
+   αμεταβλητο) — νεο answer: "the expense, income, receipt, and subscription forms" (πριν χωρις
+   subscription), νεα προταση για το subscription behavior ("A foreign-currency subscription converts its
+   recurring charge and its post-trial first-charge amount with that same rate too, so a 'cancel before
+   you get charged' reminder and the monthly/yearly totals never mix currencies inside one record."), και
+   το τελευταιο προταση εγινε "It currently covers expenses, income, receipts, and subscriptions;
+   statements are still base-currency only for now." (αντι "...receipts; statements and subscriptions...").
+2. Roadmap fix: "Opt-in multi-currency for expenses, income & receipts" -> "Opt-in multi-currency for
+   expenses, income, receipts & subscriptions" στο Shipped block.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη).
+- Πορτες 3100-3130: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build.
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` επιβεβαιωσε: `found:true`, σωστη σειρα γειτονων στο DOM
+  (["faq-can-i-bulk-import-expenses-from-a-bank-export", **αυτο**,
+  "faq-can-i-see-all-my-renewals-installments-and-bills-in-one-calendar"]), σωστο textContent με "the
+  expense, income, receipt, and subscription forms". Roadmap check: νεο wording "Opt-in multi-currency for
+  expenses, income, receipts & subscriptions" παρον (`hasNew:true`), παλιο wording απουσιαζει
+  (`hasOld:false`). Hero screenshot καθαρο (lighthouse mark, gradient τιτλος, nav, τριπλο badge row).
+  `pkill -f "next start -p 3110"` -> επιβεβαιωθηκε οτι κανενα `next-server` process δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx.
+- Δεν αγγιξα Docker/:3000/web/mobile. Η μονη agent-χρηση ηταν read-only Read (χωρις subagent), μηδεν AI
+  call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: 2 candidates παραμενουν απο τη λιστα προτεραιοτητας (P22 receipt line-item global
+search, P21 document/manual vault). Αλλιως: νεος `git log --oneline b2e72ce..HEAD | grep "feat("` ελεγχος
+στην αρχη του επομενου run, ή polish συνεχεια / real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).

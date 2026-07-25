@@ -414,7 +414,7 @@ const ROADMAP: {
       'Eight-language interface localisation',
       'Return-window reminders for recent purchases',
       'Bring-your-own-key AI billing for hosted workspaces',
-      'Opt-in multi-currency for expenses, income & receipts',
+      'Opt-in multi-currency for expenses, income, receipts & subscriptions',
     ],
   },
   {
@@ -523,7 +523,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Can it handle an expense in a currency other than my main one?',
-    a: 'Yes, opt-in. Turn on multi-currency in Settings and the expense, income, and receipt forms grow a currency picker plus an exchange-rate field: enter the printed foreign amount and either the rate or what your card actually got charged, and PHAROS backs the rate out for you. On a receipt every amount converts with that same rate, not just the total, since reports sum VAT and the item library copies line prices into your inventory, so a half-converted receipt would throw both off. Reports, budgets, and net worth keep summing everything in your base currency underneath, so nothing else changes. Leave a rate unset and a gold badge flags it rather than silently guessing a 1:1 conversion. It currently covers expenses, income, and receipts; statements and subscriptions are still base-currency only for now.',
+    a: 'Yes, opt-in. Turn on multi-currency in Settings and the expense, income, receipt, and subscription forms grow a currency picker plus an exchange-rate field: enter the printed foreign amount and either the rate or what your card actually got charged, and PHAROS backs the rate out for you. On a receipt every amount converts with that same rate, not just the total, since reports sum VAT and the item library copies line prices into your inventory, so a half-converted receipt would throw both off. A foreign-currency subscription converts its recurring charge and its post-trial first-charge amount with that same rate too, so a "cancel before you get charged" reminder and the monthly/yearly totals never mix currencies inside one record. Reports, budgets, and net worth keep summing everything in your base currency underneath, so nothing else changes. Leave a rate unset and a gold badge flags it rather than silently guessing a 1:1 conversion. It currently covers expenses, income, receipts, and subscriptions; statements are still base-currency only for now.',
   },
   {
     q: 'Can I see all my renewals, installments, and bills in one calendar?',
