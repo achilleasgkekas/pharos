@@ -176,9 +176,10 @@ Receipts: dropzone scan, manual add, grid / list, and a filter sidebar.
   Configure the rules in Settings → Money.
 - **Migration import (YNAB / other tools).** Upload a CSV export from YNAB (You Need
   A Budget) or another expense tracker to bulk-import historical transactions. The
-  importer maps common columns (date, description, amount, category, account), handles
-  multi-currency, and runs each imported entry through category auto-rules so you get
-  consistent tagging. Available in Settings → Storage & backup → **Migrate data**.
+  importer maps common columns (date, description, amount, category, account) and runs
+  each imported entry through category auto-rules so you get consistent tagging. A YNAB
+  register export is denominated in the budget's own currency, so it always imports as
+  your base currency. Available in Settings → Storage & backup → **Migrate data**.
 
 ### Multi-currency support (P9)
 
@@ -189,6 +190,7 @@ Handle expenses in multiple currencies while keeping reports and budgets in your
 - **Rate handling.** If the exchange rate is known (entered manually or looked up), a green FxBadge shows the stored amount and the applied rate. If the rate is unknown, a gold warning badge appears — the amount stored defaults to the printed number (same as the old behaviour when multi-currency was unsupported), so no existing totals shift.
 - **Deterministic conversion.** `amount` (what you see in reports and budgets) is always in base currency. `origAmount` and `fxRate` are kept for audit trail and future rate lookup / correction. All existing aggregations (cash flow, anomaly medians, split shares, net worth) keep summing `amount` unchanged, so you can enable multi-currency mid-year without migrating historical data.
 - **Inherited per vendor.** A new entry inherits the currency from that vendor's last entry, so repeat bills keep landing in the same foreign currency without re-selecting it each time.
+- **Bank CSV imports too.** The CSV importer maps an optional **Currency** column (and, when the file has none, reads a code or symbol straight off the amount cell, so `88.00 USD` is no longer rejected as unreadable). Because a bank export prints a code per line but never a rate, you enter **one rate per currency** found in the file, right in the import dialog; the preview then shows each foreign row as `printed → stored`. Rows whose currency you leave without a rate are still imported, keeping their printed amount and code, and the dialog reports how many need a rate so you can fix them per record. Re-importing the same file is still deduplicated, because both sides compare the printed figure.
 
 ### Expense splitting ("who owes what")
 

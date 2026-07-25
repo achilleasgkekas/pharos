@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   detectDelimiter, parseCsv, guessMapping, looksLikeHeader,
   parseCsvAmount, parseCsvDate, mapCsvRow, csvDedupeKey,
+  parseCsvCurrency, currencyFromAmountCell,
 } from './csvImport';
 
 // lib/csvImport.ts is the pure half of the bank/CSV import (PA1): RFC-4180 parsing,
@@ -61,6 +62,13 @@ describe('parseCsvAmount', () => {
     expect(parseCsvAmount('')).toBeNull();
     expect(parseCsvAmount('12abc')).toBeNull();
   });
+  it('drops any 3-letter currency code around the number, not just EUR/USD/GBP', () => {
+    expect(parseCsvAmount('88.00 CHF')).toBe(88);
+    expect(parseCsvAmount('CHF 88,00')).toBe(88);
+    expect(parseCsvAmount('-88,00 usd')).toBe(-88);
+    expect(parseCsvAmount('(12.30 USD)')).toBe(-12.3);
+    expect(parseCsvAmount('12,30EUR')).toBe(12.3); // legacy: the trio still strips unseparated
+  });
 });
 
 describe('parseCsvDate', () => {
@@ -111,12 +119,64 @@ describe('mapCsvRow', () => {
   const mapping = { date: 0, amount: 1, vendor: 2, notes: 3 };
   it('produces a parsed row from mapped cells', () => {
     const r = mapCsvRow(['09/07/2026', '-45,90', 'ΔΕΗ', 'ρεύμα'], mapping);
-    expect(r).toEqual({ ok: true, row: { date: '2026-07-09', amount: -45.9, vendor: 'ΔΕΗ', category: '', notes: 'ρεύμα' } });
+    expect(r).toEqual({ ok: true, row: { date: '2026-07-09', amount: -45.9, vendor: 'ΔΕΗ', category: '', notes: 'ρεύμα', currency: '' } });
   });
   it('flags rows with a bad date, bad/zero amount, or no vendor', () => {
     expect(mapCsvRow(['garbage', '10', 'X'], mapping)).toEqual({ ok: false, error: 'bad-date' });
     expect(mapCsvRow(['09/07/2026', '0,00', 'X'], mapping)).toEqual({ ok: false, error: 'bad-amount' });
     expect(mapCsvRow(['09/07/2026', '10', ''], mapping)).toEqual({ ok: false, error: 'no-vendor' });
+  });
+  it('takes the currency from a mapped currency column (P9)', () => {
+    const r = mapCsvRow(['09/07/2026', '88.00', 'Backblaze', '', 'usd'], { ...mapping, currency: 4 });
+    expect(r).toEqual({ ok: true, row: { date: '2026-07-09', amount: 88, vendor: 'Backblaze', category: '', notes: '', currency: 'USD' } });
+  });
+  it('falls back to sniffing the amount cell when no currency column is mapped', () => {
+    const r = mapCsvRow(['09/07/2026', '88.00 USD', 'Backblaze', ''], mapping);
+    expect(r.ok && r.row).toMatchObject({ amount: 88, currency: 'USD' });
+  });
+  it('leaves currency blank for a plain base-currency row (single-currency deployments unchanged)', () => {
+    const r = mapCsvRow(['09/07/2026', '45,90', 'ΔΕΗ', ''], mapping);
+    expect(r.ok && r.row.currency).toBe('');
+  });
+});
+
+describe('parseCsvCurrency', () => {
+  it('accepts an ISO code in any case and a bare symbol', () => {
+    expect(parseCsvCurrency('usd')).toBe('USD');
+    expect(parseCsvCurrency(' CHF ')).toBe('CHF');
+    expect(parseCsvCurrency('€')).toBe('EUR');
+    expect(parseCsvCurrency('£')).toBe('GBP');
+  });
+  it('returns empty for blank or unusable cells', () => {
+    expect(parseCsvCurrency('')).toBe('');
+    expect(parseCsvCurrency('dollars')).toBe('');
+    expect(parseCsvCurrency('12.30')).toBe('');
+  });
+});
+
+describe('currencyFromAmountCell', () => {
+  it('reads a code or symbol off the amount cell', () => {
+    expect(currencyFromAmountCell('88.00 USD')).toBe('USD');
+    expect(currencyFromAmountCell('CHF 88')).toBe('CHF');
+    expect(currencyFromAmountCell('-88,00 usd')).toBe('USD');
+    expect(currencyFromAmountCell('$88.00')).toBe('USD');
+    expect(currencyFromAmountCell('45,00 €')).toBe('EUR');
+  });
+  it('returns empty for a plain number', () => {
+    expect(currencyFromAmountCell('88.00')).toBe('');
+    expect(currencyFromAmountCell('1.234,56')).toBe('');
+    expect(currencyFromAmountCell('')).toBe('');
+  });
+});
+
+describe('guessMapping — currency column', () => {
+  it('picks up common currency header names without stealing the amount column', () => {
+    const m = guessMapping(['Date', 'Amount', 'Currency', 'Description']);
+    expect(m).toMatchObject({ date: 0, amount: 1, currency: 2, vendor: 3 });
+  });
+  it('does not mistake a "Current balance" column for the currency', () => {
+    const m = guessMapping(['Date', 'Amount', 'Current balance', 'Description']);
+    expect(m.currency).toBeUndefined();
   });
 });
 

@@ -430,6 +430,7 @@ export const en = {
   'csv.f_vendor': 'Vendor / description',
   'csv.f_category': 'Category',
   'csv.f_notes': 'Notes',
+  'csv.f_currency': 'Currency',
   'csv.firstRowHeaders': 'First row is headers',
   'csv.signSplit': 'Split by sign: negative → expense, positive → income',
   'csv.allAsKind': 'All rows import as {kind} (sign is ignored).',
@@ -438,6 +439,10 @@ export const en = {
   'csv.importingN': 'Importing {i}/{n}…',
   'csv.doneImported': 'Imported {n} records.',
   'csv.doneSkipped': '{dupes} duplicates skipped · {invalid} rows unreadable',
+  'csv.fxRates': 'Exchange rates',
+  'csv.fxRateFor': '1 {code} = ? {base}',
+  'csv.fxRatesHint': 'One rate per currency found in the file. Rows left without a rate keep their printed amount and can be fixed per record.',
+  'csv.doneNeedsRate': '{n} foreign rows imported without a rate — open them to set one.',
 
   // ── Quick-capture bookmarklet (P5 phase 1) ────────────────────────────────
   'bm.title': 'Quick capture (bookmarklet)',

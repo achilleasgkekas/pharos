@@ -46,12 +46,12 @@ describe('mapYnabRows', () => {
     const { rows, invalid, excluded } = mapYnabRows([['01/15/2026', 'Whole Foods', 'Groceries', '', '45.00', '']], mapping);
     expect(invalid).toBe(0);
     expect(excluded).toBe(0);
-    expect(rows).toEqual([{ date: '2026-01-15', amount: -45, vendor: 'Whole Foods', category: 'Groceries', notes: '' }]);
+    expect(rows).toEqual([{ date: '2026-01-15', amount: -45, vendor: 'Whole Foods', category: 'Groceries', notes: '', currency: '' }]);
   });
 
   it('maps an inflow row to a positive amount', () => {
     const { rows } = mapYnabRows([['01/20/2026', 'Employer', 'Salary', 'Jan paycheck', '', '2500.00']], mapping);
-    expect(rows).toEqual([{ date: '2026-01-20', amount: 2500, vendor: 'Employer', category: 'Salary', notes: 'Jan paycheck' }]);
+    expect(rows).toEqual([{ date: '2026-01-20', amount: 2500, vendor: 'Employer', category: 'Salary', notes: 'Jan paycheck', currency: '' }]);
   });
 
   it('excludes a Transfer row and counts it separately from invalid rows', () => {
@@ -96,13 +96,13 @@ describe('mapYnabRows', () => {
 
   it('treats an explicit "0.00" outflow/inflow as absent (falls through to the other column)', () => {
     const { rows } = mapYnabRows([['01/15/2026', 'Store', '', '', '0.00', '12.00']], mapping);
-    expect(rows).toEqual([{ date: '2026-01-15', amount: 12, vendor: 'Store', category: '', notes: '' }]);
+    expect(rows).toEqual([{ date: '2026-01-15', amount: 12, vendor: 'Store', category: '', notes: '', currency: '' }]);
   });
 
   it('works with no category/memo columns (mapping index -1)', () => {
     const m = { date: 0, payee: 1, category: -1, memo: -1, outflow: 2, inflow: 3 };
     const { rows } = mapYnabRows([['01/15/2026', 'Store', '10.00', '']], m);
-    expect(rows).toEqual([{ date: '2026-01-15', amount: -10, vendor: 'Store', category: '', notes: '' }]);
+    expect(rows).toEqual([{ date: '2026-01-15', amount: -10, vendor: 'Store', category: '', notes: '', currency: '' }]);
   });
 });
 

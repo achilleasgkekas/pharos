@@ -305,7 +305,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
         <ExpenseDetail expense={selected} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} seriesCount={selected.vendorKey ? seriesCount[selected.vendorKey] || 1 : 1} onClose={() => setSelected(null)} onChanged={() => router.refresh()} confirm={confirm} />
       )}
       {creating && <ExpenseCreate kind={kind} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); router.refresh(); }} />}
-      {importingCsv && <CsvImportModal kind={kind} onClose={() => setImportingCsv(false)} onImported={() => router.refresh()} />}
+      {importingCsv && <CsvImportModal kind={kind} fx={fx} onClose={() => setImportingCsv(false)} onImported={() => router.refresh()} />}
       {showBalances && <BalancesModal balances={balances} onClose={() => setShowBalances(false)} onChanged={() => router.refresh()} confirm={confirm} />}
     </main>
   );

@@ -3,7 +3,7 @@
 // No dependencies: bank exports are small enough that a hand-rolled RFC-4180
 // parser (quotes, embedded newlines/delimiters, CRLF, BOM) is simpler than a lib.
 
-export type CsvField = 'date' | 'amount' | 'vendor' | 'category' | 'notes';
+export type CsvField = 'date' | 'amount' | 'vendor' | 'category' | 'notes' | 'currency';
 
 /** Column index per logical field; -1 / undefined = not mapped. */
 export type CsvMapping = Partial<Record<CsvField, number>>;
@@ -16,6 +16,14 @@ export type CsvParsedRow = {
   vendor: string;
   category: string;
   notes: string;
+  /**
+   * Multi-currency (P9): ISO 4217 code as PRINTED on the statement line, '' when the
+   * file says nothing (which the importer then reads as the base currency). Sniffed
+   * from the amount cell ("88.00 USD") when no dedicated currency column is mapped,
+   * so a foreign row can no longer land in the ledger as if it were base currency.
+   * The rate is NOT per row: it is entered once per currency at import time.
+   */
+  currency: string;
 };
 
 export type CsvRowResult =
@@ -80,6 +88,8 @@ const HEADER_HINTS: Record<CsvField, string[]> = {
   vendor: ['vendor', 'description', 'περιγραφ', 'merchant', 'payee', 'δικαιουχος', 'δικαιούχος', 'name', 'αιτιολογ', 'details', 'memo', 'επωνυμ'],
   category: ['category', 'κατηγορ'],
   notes: ['notes', 'σημει', 'comment', 'reference'],
+  // Deliberately NOT 'curr' — that would swallow a "Current balance" column.
+  currency: ['currency', 'νομισμα', 'νόμισμα', 'ccy', 'valuta', 'währung', 'waehrung', 'moneda', 'devise'],
 };
 
 /** Guess which column holds each field from the header row. First match wins;
@@ -87,7 +97,7 @@ const HEADER_HINTS: Record<CsvField, string[]> = {
 export function guessMapping(header: string[]): CsvMapping {
   const mapping: CsvMapping = {};
   const taken = new Set<number>();
-  for (const field of ['date', 'amount', 'vendor', 'category', 'notes'] as CsvField[]) {
+  for (const field of ['date', 'amount', 'currency', 'vendor', 'category', 'notes'] as CsvField[]) {
     const hints = HEADER_HINTS[field];
     const idx = header.findIndex((h, i) => !taken.has(i) && hints.some((k) => h.toLowerCase().includes(k)));
     if (idx >= 0) { mapping[field] = idx; taken.add(idx); }
@@ -108,15 +118,46 @@ export function looksLikeHeader(rows: string[][]): boolean {
   return rows.slice(1, 4).some((r) => r.some((c) => parseCsvAmount(c) !== null || parseCsvDate(c) !== null));
 }
 
+// Currency symbols a bank export is likely to glue onto the amount cell.
+const SYMBOL_CODES: Record<string, string> = { '€': 'EUR', $: 'USD', '£': 'GBP', '₺': 'TRY', '₣': 'CHF', '¥': 'JPY' };
+
+/** A currency cell → ISO 4217 code, or '' when it holds nothing usable.
+ *  Accepts a code in any case ("usd") and a bare symbol ("€"). */
+export function parseCsvCurrency(raw: string): string {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  const code = s.toUpperCase();
+  if (/^[A-Z]{3}$/.test(code)) return code;
+  for (const [sym, iso] of Object.entries(SYMBOL_CODES)) if (s.includes(sym)) return iso;
+  return '';
+}
+
+/** Fallback for files with no currency column: read the code/symbol off the amount
+ *  cell itself ("88.00 USD", "$88.00", "CHF 88"). '' when the cell is plain digits. */
+export function currencyFromAmountCell(raw: string): string {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  for (const [sym, iso] of Object.entries(SYMBOL_CODES)) if (s.includes(sym)) return iso;
+  const code = s.match(/(?:^|[\s(])([A-Za-z]{3})(?=[\s(+-]|\d)|(?<=[\d\s)])([A-Za-z]{3})$/);
+  const hit = code?.[1] || code?.[2];
+  return hit ? hit.toUpperCase() : '';
+}
+
 /** Parse an amount in EU ("1.234,56"), US ("1,234.56"), plain ("12.30" / "12,30"),
- *  parenthesised-negative ("(12.30)") or currency-prefixed ("€ 12,30") form.
+ *  parenthesised-negative ("(12.30)") or currency-prefixed ("€ 12,30" / "USD 12.30" /
+ *  "12.30 CHF") form. Any 3-letter code around the number is dropped, not just the
+ *  euro/dollar/pound trio, so a foreign line is imported instead of being rejected as
+ *  unreadable (the code itself is kept by currencyFromAmountCell).
  *  Returns null when the cell is not a number. */
 export function parseCsvAmount(raw: string): number | null {
   let s = (raw || '').trim();
   if (!s) return null;
   let negative = false;
   if (/^\(.*\)$/.test(s)) { negative = true; s = s.slice(1, -1); }
-  s = s.replace(/[€$£₺\s]|EUR|USD|GBP/gi, '');
+  // Drop a 3-letter currency code around the number. A TRAILING code must be separated
+  // by whitespace, so "12abc" stays unreadable (pinned behaviour) while "12.30 CHF" parses.
+  s = s.replace(/\s+[A-Za-z]{3}$/, '').replace(/^[A-Za-z]{3}\s*(?=[-+]?[\d.,])/, '');
+  s = s.replace(/[€$£₺₣¥\s]|EUR|USD|GBP/gi, '');
   if (s.startsWith('-')) { negative = true; s = s.slice(1); }
   else if (s.startsWith('+')) s = s.slice(1);
   if (!s || !/^[\d.,]+$/.test(s)) return null;
@@ -181,11 +222,17 @@ export function mapCsvRow(cells: string[], mapping: CsvMapping): CsvRowResult {
   if (amount === null || amount === 0) return { ok: false, error: 'bad-amount' };
   const vendor = cell('vendor');
   if (!vendor) return { ok: false, error: 'no-vendor' };
-  return { ok: true, row: { date, amount, vendor, category: cell('category'), notes: cell('notes') } };
+  // A mapped currency column wins; otherwise sniff the amount cell (many exports write
+  // "88.00 USD" in one column and have no currency column at all).
+  const currency = parseCsvCurrency(cell('currency')) || currencyFromAmountCell(cell('amount'));
+  return { ok: true, row: { date, amount, vendor, category: cell('category'), notes: cell('notes'), currency } };
 }
 
 /** Dedupe identity for an imported row: same kind + vendor + calendar day +
- *  absolute amount = the same transaction. Shared by client preview + server. */
+ *  absolute amount = the same transaction. Shared by client preview + server.
+ *  `amount` must be the PRINTED figure on both sides (a foreign record stores its
+ *  printed number in `origAmount`), otherwise re-importing the same foreign file
+ *  would compare a converted amount against a printed one and insert duplicates. */
 export function csvDedupeKey(kind: 'income' | 'expense', vendorKey: string, dateIso: string, amount: number): string {
   return `${kind}|${vendorKey}|${dateIso.slice(0, 10)}|${Math.abs(amount).toFixed(2)}`;
 }

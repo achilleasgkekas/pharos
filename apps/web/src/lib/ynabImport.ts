@@ -105,6 +105,9 @@ export function mapYnabRows(rows: string[][], mapping: YnabMapping): YnabMapResu
       vendor: payee,
       category: cell(r, mapping.category),
       notes: cell(r, mapping.memo),
+      // A YNAB register export is denominated in the budget's own currency and never
+      // prints a code per row, so it always imports as the base currency (P9).
+      currency: '',
     });
   }
 

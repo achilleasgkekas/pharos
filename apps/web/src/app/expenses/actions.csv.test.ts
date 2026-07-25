@@ -16,7 +16,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //  - Existing-record dedupe: one bounded `find({date:{$gte,$lt}})` query over the
 //    whole batch's date range (min..max+1day), matched via the REAL `csvDedupeKey`
 //    (kind|vendorKey|date|amount) — a duplicate of an already-stored row is skipped,
-//    not re-inserted.
+//    not re-inserted. Both sides key on the PRINTED amount, so a foreign record
+//    (converted `amount`, printed `origAmount`) does not re-import as a new row.
+//  - Multi-currency (P9): `opts.fxRates` carries ONE rate per foreign code for the
+//    whole file (bank exports print codes, never rates). The REAL `resolveFx` decides
+//    what lands in `amount`: base-currency rows keep today's exact shape (origAmount 0,
+//    fxRate 0); a foreign row with a rate is converted and remembers its printed figure;
+//    a foreign row WITHOUT a rate is still imported with its printed amount, counted in
+//    `needsRate`, never guessed as 1:1.
 //  - Intra-batch dedupe: two rows in the SAME call that collide on the same key only
 //    insert the first; the rest count toward `skippedDupes` too.
 //  - Category/recurring resolution only runs when the CSV row left `category` blank:
@@ -58,7 +65,7 @@ const {
     expenseFindOne: vi.fn((_filter: Record<string, any>) => ({ sort: () => ({ lean: expenseFindOneLean }) })),
     expenseFindOneLean,
     expenseInsertMany: vi.fn(async (_docs: any[]) => ({})),
-    getAppSettingsMock: vi.fn(async () => ({ categoryRules: [] as any[] })),
+    getAppSettingsMock: vi.fn(async () => ({ categoryRules: [] as any[], currency: 'EUR' as string })),
     revalidatePathMock: vi.fn(),
   };
 });
@@ -87,7 +94,7 @@ import { importExpensesCsv } from './actions';
 
 const RULE_DEI = { id: 'r1', match: 'ΔΕΗ', matchType: 'vendor' as const, category: 'utilities', recurring: true, recurringCycle: 'monthly' as const };
 
-function row(over: Partial<{ vendor: string; amount: number; date: string; category: string; notes: string }> = {}) {
+function row(over: Partial<{ vendor: string; amount: number; date: string; category: string; notes: string; currency: string }> = {}) {
   return { vendor: 'ΔΕΗ', amount: 45.9, date: '2026-06-15', category: '', notes: '', ...over };
 }
 
@@ -95,7 +102,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   expenseFindLean.mockResolvedValue([]);
   expenseFindOneLean.mockResolvedValue(null);
-  getAppSettingsMock.mockResolvedValue({ categoryRules: [] });
+  getAppSettingsMock.mockResolvedValue({ categoryRules: [], currency: 'EUR' });
 });
 
 describe('importExpensesCsv — guard clauses', () => {
@@ -147,7 +154,7 @@ describe('importExpensesCsv — sign / kind routing', () => {
       [row({ vendor: 'A', amount: -45.9 }), row({ vendor: 'B', amount: 100 })],
       { kind: 'expense', signSplit: true }
     );
-    expect(res).toEqual({ ok: true, imported: 2, skippedDupes: 0 });
+    expect(res).toEqual({ ok: true, imported: 2, skippedDupes: 0, needsRate: 0 });
     const docs = expenseInsertMany.mock.calls[0][0];
     const a = docs.find((d: any) => d.vendor === 'A');
     const b = docs.find((d: any) => d.vendor === 'B');
@@ -172,7 +179,7 @@ describe('importExpensesCsv — existing-record dedupe', () => {
       { kind: 'expense', vendorKey: 'dei', date: '2026-06-15T00:00:00.000Z', amount: 45.9 },
     ]);
     const res = await importExpensesCsv([row()], { kind: 'expense', signSplit: false });
-    expect(res).toEqual({ ok: true, imported: 0, skippedDupes: 1 });
+    expect(res).toEqual({ ok: true, imported: 0, skippedDupes: 1, needsRate: 0 });
     expect(expenseInsertMany).not.toHaveBeenCalled();
   });
 
@@ -181,7 +188,7 @@ describe('importExpensesCsv — existing-record dedupe', () => {
       { kind: 'income', vendorKey: 'dei', date: '2026-06-15T00:00:00.000Z', amount: 45.9 },
     ]);
     const res = await importExpensesCsv([row()], { kind: 'expense', signSplit: false });
-    expect(res).toEqual({ ok: true, imported: 1, skippedDupes: 0 });
+    expect(res).toEqual({ ok: true, imported: 1, skippedDupes: 0, needsRate: 0 });
   });
 
   it('bounds the existing-record query to the batch date range (min..max+1day)', async () => {
@@ -199,7 +206,7 @@ describe('importExpensesCsv — existing-record dedupe', () => {
 describe('importExpensesCsv — intra-batch dedupe', () => {
   it('imports only the first of two identical rows in the same batch, counting the rest as skipped', async () => {
     const res = await importExpensesCsv([row(), row()], { kind: 'expense', signSplit: false });
-    expect(res).toEqual({ ok: true, imported: 1, skippedDupes: 1 });
+    expect(res).toEqual({ ok: true, imported: 1, skippedDupes: 1, needsRate: 0 });
     expect(expenseInsertMany.mock.calls[0][0]).toHaveLength(1);
   });
 
@@ -208,7 +215,7 @@ describe('importExpensesCsv — intra-batch dedupe', () => {
       { kind: 'expense', vendorKey: 'dei', date: '2026-06-15T00:00:00.000Z', amount: 45.9 },
     ]);
     const res = await importExpensesCsv([row(), row()], { kind: 'expense', signSplit: false });
-    expect(res).toEqual({ ok: true, imported: 0, skippedDupes: 2 });
+    expect(res).toEqual({ ok: true, imported: 0, skippedDupes: 2, needsRate: 0 });
     expect(expenseInsertMany).not.toHaveBeenCalled();
     // still revalidates even though nothing was actually written
     expect(revalidatePathMock).toHaveBeenCalledWith('/expenses');
@@ -216,9 +223,83 @@ describe('importExpensesCsv — intra-batch dedupe', () => {
   });
 });
 
+describe('importExpensesCsv — multi-currency (P9)', () => {
+  it('stores a base-currency row exactly as before: base code, no printed amount, no rate', async () => {
+    await importExpensesCsv([row()], { kind: 'expense', signSplit: false });
+    const doc = expenseInsertMany.mock.calls[0][0][0];
+    expect(doc).toMatchObject({ amount: 45.9, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+
+  it('converts a foreign row with the batch rate and keeps the printed figure', async () => {
+    const res = await importExpensesCsv([row({ vendor: 'Backblaze', amount: 88, currency: 'USD' })], {
+      kind: 'expense',
+      signSplit: false,
+      fxRates: { USD: 0.92 },
+    });
+    expect(res).toEqual({ ok: true, imported: 1, skippedDupes: 0, needsRate: 0 });
+    const doc = expenseInsertMany.mock.calls[0][0][0];
+    expect(doc).toMatchObject({ amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 });
+  });
+
+  it('matches the rate map case-insensitively', async () => {
+    await importExpensesCsv([row({ vendor: 'Backblaze', amount: 88, currency: 'usd' })], {
+      kind: 'expense',
+      signSplit: false,
+      fxRates: { usd: 0.92 },
+    });
+    expect(expenseInsertMany.mock.calls[0][0][0]).toMatchObject({ amount: 80.96, currency: 'USD', fxRate: 0.92 });
+  });
+
+  it('still imports a foreign row with no rate, flagging it instead of inventing 1:1', async () => {
+    const res = await importExpensesCsv([row({ vendor: 'Backblaze', amount: 88, currency: 'USD' })], {
+      kind: 'expense',
+      signSplit: false,
+    });
+    expect(res).toEqual({ ok: true, imported: 1, skippedDupes: 0, needsRate: 1 });
+    const doc = expenseInsertMany.mock.calls[0][0][0];
+    // amount stays the printed number (today's behaviour) but the code + printed figure
+    // are recorded, so the record can be fixed later instead of the file being lost.
+    expect(doc).toMatchObject({ amount: 88, currency: 'USD', origAmount: 88, fxRate: 0 });
+  });
+
+  it('ignores a zero/negative/garbage rate in the map (treated as unknown)', async () => {
+    const res = await importExpensesCsv([row({ vendor: 'Backblaze', amount: 88, currency: 'USD' })], {
+      kind: 'expense',
+      signSplit: false,
+      fxRates: { USD: 0 },
+    });
+    expect(res).toMatchObject({ ok: true, needsRate: 1 });
+    expect(expenseInsertMany.mock.calls[0][0][0]).toMatchObject({ amount: 88, fxRate: 0 });
+  });
+
+  it('treats a row in the deployment base currency as domestic even when the column is filled', async () => {
+    getAppSettingsMock.mockResolvedValue({ categoryRules: [], currency: 'USD' });
+    await importExpensesCsv([row({ vendor: 'Backblaze', amount: 88, currency: 'USD' })], {
+      kind: 'expense',
+      signSplit: false,
+      fxRates: { USD: 0.92 },
+    });
+    expect(expenseInsertMany.mock.calls[0][0][0]).toMatchObject({ amount: 88, currency: 'USD', origAmount: 0, fxRate: 0 });
+  });
+
+  it('dedupes a foreign row against the stored PRINTED amount, not the converted one', async () => {
+    // Same file imported twice: the stored record holds amount 80.96 / origAmount 88.
+    expenseFindLean.mockResolvedValue([
+      { kind: 'expense', vendorKey: 'backblaze', date: '2026-06-15T00:00:00.000Z', amount: 80.96, origAmount: 88 },
+    ]);
+    const res = await importExpensesCsv([row({ vendor: 'Backblaze', amount: 88, currency: 'USD' })], {
+      kind: 'expense',
+      signSplit: false,
+      fxRates: { USD: 0.92 },
+    });
+    expect(res).toMatchObject({ ok: true, imported: 0, skippedDupes: 1 });
+    expect(expenseInsertMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('importExpensesCsv — category/recurring resolution chain', () => {
   it('an explicit row category wins outright, skipping both the rule and series lookup', async () => {
-    getAppSettingsMock.mockResolvedValue({ categoryRules: [RULE_DEI] });
+    getAppSettingsMock.mockResolvedValue({ categoryRules: [RULE_DEI], currency: 'EUR' });
     expenseFindOneLean.mockResolvedValue({ category: 'from-series', recurring: true, recurringCycle: 'yearly' });
     const res = await importExpensesCsv([row({ category: 'travel' })], { kind: 'expense', signSplit: false });
     expect(res.ok).toBe(true);
@@ -229,7 +310,7 @@ describe('importExpensesCsv — category/recurring resolution chain', () => {
   });
 
   it('a matching vendor rule wins over the inherited series when the row category is blank', async () => {
-    getAppSettingsMock.mockResolvedValue({ categoryRules: [RULE_DEI] });
+    getAppSettingsMock.mockResolvedValue({ categoryRules: [RULE_DEI], currency: 'EUR' });
     expenseFindOneLean.mockResolvedValue({ category: 'from-series', recurring: false, recurringCycle: '' });
     const res = await importExpensesCsv([row({ category: '' })], { kind: 'expense', signSplit: false });
     expect(res.ok).toBe(true);

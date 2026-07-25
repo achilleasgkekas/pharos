@@ -14,7 +14,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { matchCategoryRule } from '@/lib/categoryRules';
 import { mirrorFileToRemote } from '@/lib/mirror';
 import { cleanSplit } from '@/lib/split';
-import { resolveFx } from '@/lib/fx';
+import { resolveFx, normalizeCurrency } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { SerializedExpense } from '@/types';
@@ -472,38 +472,60 @@ const CsvRowSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   category: z.string().max(60).default(''),
   notes: z.string().max(500).default(''),
+  // Multi-currency (P9): the code PRINTED on the line; blank = the base currency.
+  currency: z.string().max(8).default(''),
 });
 
 const MAX_CSV_ROWS_PER_CALL = 500;
 
 export type CsvImportResult =
-  | { ok: true; imported: number; skippedDupes: number }
+  | { ok: true; imported: number; skippedDupes: number; needsRate: number }
   | { ok: false; error: string };
 
 /**
  * Import mapped CSV rows as expenses/income.
  * `signSplit`: negative amounts → expense, positive → income (typical bank export);
  * otherwise every row gets `kind` and the sign is dropped (amounts stored positive).
+ * `fxRates` (P9): base units per 1 unit of a foreign code, e.g. `{USD: 0.92}` — one
+ * rate per currency for the whole file, because a bank export prints a code per line
+ * but never a rate. A foreign row whose code has no rate is still imported (with its
+ * printed amount and code recorded, exactly like the AI-scan path) and counted in
+ * `needsRate`, so the user can fix the rate per record instead of the import silently
+ * adding a foreign number into a base-currency total.
  */
 export async function importExpensesCsv(
   rows: Array<z.input<typeof CsvRowSchema>>,
-  opts: { kind: Kind; signSplit: boolean }
+  opts: { kind: Kind; signSplit: boolean; fxRates?: Record<string, number> }
 ): Promise<CsvImportResult> {
   if (!Array.isArray(rows) || rows.length === 0) return { ok: false, error: 'No rows to import' };
   if (rows.length > MAX_CSV_ROWS_PER_CALL) return { ok: false, error: `Too many rows (max ${MAX_CSV_ROWS_PER_CALL} per batch)` };
   const parsed = z.array(CsvRowSchema).safeParse(rows);
   if (!parsed.success) return { ok: false, error: 'Invalid rows' };
   const kind = asKind(opts.kind);
+  // Normalize the per-currency rate map once (callers may pass lowercase codes).
+  const rates = new Map<string, number>();
+  for (const [code, rate] of Object.entries(opts.fxRates ?? {})) {
+    const c = normalizeCurrency(code);
+    const n = Number(rate);
+    if (c && Number.isFinite(n) && n > 0) rates.set(c, n);
+  }
 
   return withRequestTenant(async () => {
     try {
       await connectDB();
       const Expense = await currentModel(ExpenseModel);
+      const settings = await getAppSettings();
 
       const prepared = parsed.data.map((r) => {
         const rowKind: Kind = opts.signSplit ? (r.amount < 0 ? 'expense' : 'income') : kind;
         const vKey = vendorKey(r.vendor);
-        return { ...r, kind: rowKind, vKey, amount: Math.abs(r.amount), key: csvDedupeKey(rowKind, vKey, r.date, r.amount) };
+        // `printed` is what the file says; resolveFx decides what lands in `amount`.
+        const printed = Math.abs(r.amount);
+        const fx = resolveFx(
+          { amount: printed, currency: r.currency, fxRate: rates.get(normalizeCurrency(r.currency)) ?? 0 },
+          settings.currency
+        );
+        return { ...r, kind: rowKind, vKey, amount: printed, fx, key: csvDedupeKey(rowKind, vKey, r.date, printed) };
       });
 
       // Existing-record dedupe: one bounded query over the batch's date range.
@@ -512,11 +534,18 @@ export async function importExpensesCsv(
       const max = new Date(Math.max(...dates.map((d) => d.getTime())));
       max.setUTCDate(max.getUTCDate() + 1);
       const existing = await Expense.find({ date: { $gte: min, $lt: max } })
-        .select('kind vendorKey date amount')
+        .select('kind vendorKey date amount origAmount')
         .lean();
       const seen = new Set(
         existing.map((e) =>
-          csvDedupeKey(e.kind === 'income' ? 'income' : 'expense', e.vendorKey || '', new Date(e.date).toISOString(), e.amount || 0)
+          csvDedupeKey(
+            e.kind === 'income' ? 'income' : 'expense',
+            e.vendorKey || '',
+            new Date(e.date).toISOString(),
+            // Compare printed against printed: a foreign record keeps its printed
+            // figure in origAmount while `amount` holds the converted one.
+            (e.origAmount || 0) > 0 ? e.origAmount : e.amount || 0
+          )
         )
       );
 
@@ -530,13 +559,15 @@ export async function importExpensesCsv(
 
       // Vendor→category auto-rules (P15) — loaded once, applied to rows without an
       // explicit CSV category (deterministic, zero AI, same as the rest of the import).
-      const categoryRules = (await getAppSettings()).categoryRules;
+      const categoryRules = settings.categoryRules;
 
       const docs = [];
       let skippedDupes = 0;
+      let needsRate = 0;
       for (const r of prepared) {
         if (seen.has(r.key)) { skippedDupes++; continue; }
         seen.add(r.key); // intra-batch dedupe too
+        if (r.fx.needsRate) needsRate++;
         const inh = r.category ? null : await inherited(r.kind, r.vKey);
         const rule = r.category ? null : matchCategoryRule(categoryRules, { vendor: r.vendor, description: r.notes });
         const date = new Date(`${r.date}T00:00:00Z`);
@@ -545,7 +576,10 @@ export async function importExpensesCsv(
           vendor: r.vendor,
           vendorKey: r.vKey,
           category: r.category || rule?.category || inh?.category || 'other',
-          amount: r.amount,
+          amount: r.fx.amount,
+          currency: r.fx.currency,
+          origAmount: r.fx.origAmount,
+          fxRate: r.fx.fxRate,
           date,
           period: periodFrom(date),
           recurring: rule?.recurring || inh?.recurring || false,
@@ -559,7 +593,7 @@ export async function importExpensesCsv(
       if (docs.length) await Expense.insertMany(docs);
       revalidatePath('/expenses');
       revalidatePath('/income');
-      return { ok: true, imported: docs.length, skippedDupes };
+      return { ok: true, imported: docs.length, skippedDupes, needsRate };
     } catch (err) {
       return { ok: false, error: (err as Error).message };
     }

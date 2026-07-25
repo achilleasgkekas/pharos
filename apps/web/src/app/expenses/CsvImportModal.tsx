@@ -10,6 +10,7 @@ import {
   parseCsv, guessMapping, looksLikeHeader, mapCsvRow,
   type CsvField, type CsvMapping, type CsvParsedRow,
 } from '@/lib/csvImport';
+import { isForeignCurrency, normalizeCurrency, convertToBase, formatMoney } from '@/lib/fx';
 import { importExpensesCsv } from './actions';
 
 const labelCls = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5';
@@ -25,9 +26,15 @@ const MAPPED_FIELDS: Array<{ field: CsvField; required: boolean }> = [
 
 const CHUNK = 300;
 
-type Props = { kind: 'income' | 'expense'; onClose: () => void; onImported: () => void };
+type Props = {
+  kind: 'income' | 'expense';
+  /** Multi-currency (P9): base code + whether the per-entry currency controls are on. */
+  fx: { base: string; enabled: boolean };
+  onClose: () => void;
+  onImported: () => void;
+};
 
-export function CsvImportModal({ kind, onClose, onImported }: Props) {
+export function CsvImportModal({ kind, fx, onClose, onImported }: Props) {
   const t = useT();
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<string[][] | null>(null);
@@ -37,8 +44,11 @@ export function CsvImportModal({ kind, onClose, onImported }: Props) {
   const [signSplit, setSignSplit] = useState(false);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState('');
-  const [result, setResult] = useState<{ imported: number; skipped: number; invalid: number } | null>(null);
+  const [result, setResult] = useState<{ imported: number; skipped: number; invalid: number; needsRate: number } | null>(null);
   const [error, setError] = useState('');
+  // One rate per foreign currency found in the file (a bank export prints codes, never
+  // rates). Kept as raw strings so the inputs stay editable while half-typed.
+  const [rateInput, setRateInput] = useState<Record<string, string>>({});
 
   async function handleFile(f: File | null) {
     if (!f) return;
@@ -53,6 +63,7 @@ export function CsvImportModal({ kind, onClose, onImported }: Props) {
       setHasHeader(header);
       setMapping(guessMapping(parsed[0]));
       setResult(null);
+      setRateInput({});
     } catch {
       setError(t('csv.readError'));
     }
@@ -76,6 +87,36 @@ export function CsvImportModal({ kind, onClose, onImported }: Props) {
   const canImport = mapping.date !== undefined && mapping.amount !== undefined && mapping.vendor !== undefined && mapped.good.length > 0;
   const hasNegatives = useMemo(() => mapped.good.some((r) => r.amount < 0), [mapped]);
 
+  // Distinct foreign codes in the file → one rate input each. Rows whose code has no
+  // rate still import (flagged), they just keep their printed amount for now.
+  const foreignCodes = useMemo(() => {
+    if (!fx.enabled) return [] as string[];
+    const codes = new Set<string>();
+    for (const r of mapped.good) if (isForeignCurrency(r.currency, fx.base)) codes.add(normalizeCurrency(r.currency));
+    return [...codes].sort();
+  }, [mapped, fx.enabled, fx.base]);
+
+  const fxRates = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const code of foreignCodes) {
+      const n = Number(rateInput[code]);
+      if (Number.isFinite(n) && n > 0) out[code] = n;
+    }
+    return out;
+  }, [foreignCodes, rateInput]);
+
+  const mappedFields = useMemo(
+    () => (fx.enabled ? [...MAPPED_FIELDS, { field: 'currency' as CsvField, required: false }] : MAPPED_FIELDS),
+    [fx.enabled]
+  );
+
+  /** Printed amount as it will be stored: converted when a rate is known. */
+  function rowBase(r: CsvParsedRow): number | null {
+    const code = normalizeCurrency(r.currency);
+    if (!isForeignCurrency(code, fx.base) || !fxRates[code]) return null;
+    return convertToBase(Math.abs(r.amount), fxRates[code]);
+  }
+
   function columnLabel(i: number): string {
     const name = header?.[i]?.trim();
     return name ? `${name}` : t('csv.columnN', { n: i + 1 });
@@ -87,15 +128,17 @@ export function CsvImportModal({ kind, onClose, onImported }: Props) {
     setError('');
     let imported = 0;
     let skipped = 0;
+    let needsRate = 0;
     try {
       for (let i = 0; i < mapped.good.length; i += CHUNK) {
         setProgress(t('csv.importingN', { i: Math.min(i + CHUNK, mapped.good.length), n: mapped.good.length }));
-        const r = await importExpensesCsv(mapped.good.slice(i, i + CHUNK), { kind, signSplit });
+        const r = await importExpensesCsv(mapped.good.slice(i, i + CHUNK), { kind, signSplit, fxRates });
         if (!r.ok) { setError(r.error); break; }
         imported += r.imported;
         skipped += r.skippedDupes;
+        needsRate += r.needsRate;
       }
-      setResult({ imported, skipped, invalid: mapped.invalid });
+      setResult({ imported, skipped, invalid: mapped.invalid, needsRate });
       if (imported > 0) onImported();
     } finally {
       setImporting(false);
@@ -133,7 +176,7 @@ export function CsvImportModal({ kind, onClose, onImported }: Props) {
             <div>
               <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('csv.mapColumns')}</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {MAPPED_FIELDS.map(({ field, required }) => (
+                {mappedFields.map(({ field, required }) => (
                   <div key={field}>
                     <p className="text-[10px] text-[color:var(--color-text-dim)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
                       {t(`csv.f_${field}` as Parameters<typeof t>[0])}{required && ' *'}
@@ -169,6 +212,34 @@ export function CsvImportModal({ kind, onClose, onImported }: Props) {
               <p className="text-[10px] text-[color:var(--color-text-faint)]">{t('csv.allAsKind', { kind: kind === 'income' ? t('nav.income') : t('nav.expenses') })}</p>
             )}
 
+            {/* Multi-currency (P9): one rate per foreign code found in the file. */}
+            {foreignCodes.length > 0 && (
+              <div>
+                <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('csv.fxRates')}</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {foreignCodes.map((code) => (
+                    <div key={code}>
+                      <p className="text-[10px] text-[color:var(--color-text-dim)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+                        {t('csv.fxRateFor', { code, base: normalizeCurrency(fx.base) || 'EUR' })}
+                      </p>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        min="0"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={rateInput[code] ?? ''}
+                        onChange={(e) => setRateInput((m) => ({ ...m, [code]: e.target.value }))}
+                        className={selCls}
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[10px] text-[color:var(--color-text-faint)]">{t('csv.fxRatesHint')}</p>
+              </div>
+            )}
+
             {/* Preview */}
             {preview.length > 0 && (
               <div>
@@ -191,7 +262,16 @@ export function CsvImportModal({ kind, onClose, onImported }: Props) {
                           <td className="px-3 py-1.5 whitespace-nowrap" style={{ fontFamily: 'var(--font-mono)' }}>{r.date}</td>
                           <td className="px-3 py-1.5 max-w-[220px] truncate">{r.vendor}</td>
                           <td className={cn('px-3 py-1.5 text-right whitespace-nowrap', r.amount < 0 ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
-                            {r.amount < 0 ? '-' : ''}{cur()}{Math.abs(r.amount).toFixed(2)}
+                            {r.amount < 0 ? '-' : ''}
+                            {isForeignCurrency(r.currency, fx.base)
+                              ? formatMoney(Math.abs(r.amount), normalizeCurrency(r.currency))
+                              : `${cur()}${Math.abs(r.amount).toFixed(2)}`}
+                            {(() => {
+                              const b = rowBase(r);
+                              return b === null ? null : (
+                                <span className="ml-1 text-[color:var(--color-text-faint)]">→ {formatMoney(b, fx.base)}</span>
+                              );
+                            })()}
                           </td>
                           <td className="px-3 py-1.5 text-[color:var(--color-text-faint)]">{r.category || '—'}</td>
                         </tr>
@@ -218,6 +298,11 @@ export function CsvImportModal({ kind, onClose, onImported }: Props) {
             <p className="text-xs text-[color:var(--color-text-faint)]">
               {t('csv.doneSkipped', { dupes: result.skipped, invalid: result.invalid })}
             </p>
+            {result.needsRate > 0 && (
+              <p className="text-xs text-[color:var(--color-gold)] flex items-center justify-center gap-1.5">
+                <AlertTriangle size={13} /> {t('csv.doneNeedsRate', { n: result.needsRate })}
+              </p>
+            )}
             <Button onClick={onClose} className="mt-2">{t('common.close')}</Button>
           </div>
         )}
