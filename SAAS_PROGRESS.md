@@ -4561,3 +4561,67 @@ files, session-gated — η μεγαλύτερη εναπομείνασα ομά
 export/files,reactivate}`, `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`,
 και το trivial `auth/logout` (αν εξαντληθούν όλα τα υπόλοιπα πρώτα). Πριν ξεκινήσεις: ask-inbox
 πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-25 (cont. — increment 97, route-level test coverage για το account/password endpoint)
+
+Πριν από νέο increment: ask-inbox (τα 3 OPEN entries είναι ΟΛΑ bakecore-finance ×2/
+bakecore-redesigner ×1, τίποτα addressed σε saas-core). `WEB_DEBT.md` re-checked (η ενεργή ουρά
+παραμένει μηδέν P1/P2, το summary row 823 δεν λέει νέο auto-buildable item στο territory). UI-first
+backlog παραμένει εξαντλημένο. Ακολούθησα το leftover next-task: από τα 22 ανεξέταστα
+route-clusters διάλεξα **`account/password`** — το self-service password-change (πρώτο από την
+account/* ομάδα των 9 files που το increment-96 log σημείωσε ως η μεγαλύτερη εναπομείνασα ομάδα),
+write route υψηλού ρίσκου (λάθος εδώ = είτε account lockout είτε info-leak μεταξύ "δεν υπάρχει
+λογαριασμός" vs "λάθος password").
+
+**Νέο `account/password/route.test.ts`** (9 tests), μηδέν production code αλλαγή. Mocks: `@/lib/db`
+(connectDB no-op), `@/models/Account` (`findById().select()` chain → spyable), `@/lib/auth`
+(`hashPassword`/`verifyPassword`), `@/lib/tenancy/accountProfile` (`passwordChangeError`), `@/lib/
+tenancy/accountSession` (`getCurrentAccount`), `@/lib/tenancy/saasApi` (`vi.importActual` για το
+πραγματικό `saasGuard`, mocks μόνο `saasAuthGate` — ίδιο module-boundary precedent με τα
+προηγούμενα auth route tests).
+
+Καλύπτει: (1) gate short-circuit περνάει αναλλοίωτο, μηδέν session/DB touch· (2) καμία session
+cookie (`getCurrentAccount`→null) → 401 "Not authenticated", μηδέν DB touch· (3)(4) missing
+currentPassword/newPassword → 400, μηδέν DB touch· (5) policy rejection (`passwordChangeError`
+non-null, π.χ. πολύ κοντό ή ίδιο με το τρέχον) → 400 με το ακριβές μήνυμα, μηδέν DB touch· (6)
+dangling cookie (account row λείπει) → 401 "Invalid credentials"· (7) λάθος current password
+(`verifyPassword`=false) → **ΙΔΙΟ** 401 "Invalid credentials" (no information leak μεταξύ των δύο
+αποτυχιών, `.save()` ποτέ δεν καλείται)· (8) success: `hashPassword` καλείται με το ΝΕΟ password
+(ποτέ με το raw current), το doc's `passwordHash` overwrite-άρεται, `.save()` καλείται, response
+`{ok:true}`· (9) mid-handler throw (`account.save()` rejects) → καθαρό 500 μέσω πραγματικού
+`saasGuard`.
+
+**Verified**: νέο test file **9/9 green** μόνο του· πλήρες `npx vitest run` → **256 files / 3373
+tests green**. `npm run type-check` → **EXIT 0** καθαρά. **Docker: ΔΕΝ έγινε rebuild** (test-only
+αρχείο, μηδέν production code/runtime wiring αλλαγή). **Browser-verify: skipped** (test file,
+μηδέν UI/observable behavior αλλαγή).
+
+**Collision-guard race που έπιασα ΠΡΙΝ το push** (νέο, αξίζει να καταγραφεί ως precedent): το
+αρχικό `git status --short` πριν το staging έδειξε 1 ΞΕΝΟ **modified** (όχι staged) αρχείο
+(`docs/DOCS_PROGRESS.md`, live docs-progress routine mid-write) + το δικό μου 1 νέο αρχείο. Έκανα
+`git add` μόνο το δικό μου path, `git diff --cached --name-only` επιβεβαίωσε exact match — αλλά
+ανάμεσα σε εκείνον τον έλεγχο και το `git commit`, η docs routine πρόλαβε να κάνει `git add` στο
+δικό της αρχείο, και το επόμενο `git commit` (χωρίς `-a`, αλλά staged state είχε αλλάξει
+ενδιάμεσα) το συμπεριέλαβε ΚΑΙ τα δύο αρχεία στο ίδιο commit. Το `git show --stat HEAD` το
+αποκάλυψε αμέσως μετά (2 files changed αντί 1). Επειδή **δεν είχε γίνει ακόμα push**
+(`git log -1 origin/main` = προηγούμενο commit), το διόρθωσα καθαρά: `git reset --soft HEAD~1` →
+`git reset HEAD -- docs/DOCS_PROGRESS.md` (unstage μόνο εκείνο, μένει dirty στο working tree για
+να το commit-άρει η δική του routine αργότερα) → re-commit ΜΟΝΟ το δικό μου αρχείο (`git show
+--stat` επιβεβαίωσε 1 file) → μετά push. Lesson για μελλοντικά runs: το `git diff --cached
+--name-only` check ΠΡΙΝ το commit δεν είναι πλήρης εγγύηση σε πολύ στενό timing window (~1s)· το
+**`git show --stat HEAD` ΑΜΕΣΩΣ μετά το commit, πριν το push**, είναι το τελικό safety net — αν
+δείξει ξένο αρχείο, `git reset --soft HEAD~1` + unstage-only-theirs + re-commit διορθώνει καθαρά
+όσο δεν έχει γίνει ακόμα push. Pushed `10903b5` (μόνο το δικό μου αρχείο).
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο στα υπόλοιπα 8 files της account/* ομάδας (mfa, mfa/confirm,
+reset/{request,confirm}, verify/{request,confirm}, workspaces, export, route.ts GET+PATCH) —
+καλός επόμενος υποψήφιος **`account/mfa`** (enable/disable TOTP, υψηλού ρίσκου self-service
+security setting) ή **`account/route.ts`** (GET+PATCH profile, το πιο βασικό account CRUD ακόμα
+χωρίς coverage). Μετά: `admin/overview` + `admin/tenants` list (read-only console surfaces),
+`members`, `usage` + `usage/sample`, `workspace/{ai-key,export,export/files,reactivate}`,
+`invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`. Πριν
+ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί,
+πάει πρώτο). **Νέο lesson να θυμάσαι:** `git show --stat HEAD` μετά από κάθε commit, πριν το
+push, ως τελικό collision-guard check.
