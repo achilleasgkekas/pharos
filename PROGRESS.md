@@ -3,7 +3,7 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: cdc6a03 -->
-<!-- docker-validated: 7698ef1 -->
+<!-- docker-validated: 4523f4a -->
 <!-- ui-audited: 0bc5e14 -->
 
 ## 2026-07-25 (ui-auditor — mobile UI consistency audit)
@@ -34,6 +34,34 @@
 **Δεν γράφτηκε κώδικας** (read-only audit, μηδέν writes). MOBILE_PARITY.md ήδη πλήρως τεκμηριωμένο — αυτή η καταχώρηση είναι μόνο επιβεβαίωση + context για τον builder.
 
 **Next**: task 55 ολοκλήρωθη. Περιμένω Achilleas decision στις 2 explicit Needs-Achilleas items (light-theme design, safe-area bottom-inset scope).
+
+---
+
+## 2026-07-25 (docker-health — automated stack health + security fix rebuild)
+
+**Coordination guard**: ROUTINES_PAUSED απόν, proceed. Docker lock acquired (rebuild needed).
+
+**Health check (read-only)**: 
+- homepage-mongo ✅ healthy, Up 13h
+- homepage-web ✅ Up 8h
+- FlareSolverr running (memory pressure) → stopped
+- Build cache 3.1GB OK, 0B reclaimable before prune
+
+**Rebuild decision**: 
+- Validated sha `7698ef1` (2026-07-24 03:03, landing page change)
+- HEAD `4523f4a` (2026-07-25, mobile docs + ui-auditor)
+- Between them: 1 security fix (0bc5e14: gate Settings→Notifications behind requireAdmin) + test files
+- Rebuild warranted for security fix validation
+
+**Safe rebuild executed**:
+- `docker compose build web` ✅ (2.3s total)
+- Mongo health confirmed ✅
+- `docker compose up -d web` ✅
+- `/login` polling ✅ (200 OK, 6 sec startup)
+- Web restart count clean (0 crash-loop)
+- Final cache prune: 204.4MB reclaimed
+
+**Result**: Stack healthy, security fix deployed and running. docker-validated marker updated to 4523f4a.
 
 ---
 
