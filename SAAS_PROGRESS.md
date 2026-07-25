@@ -4902,3 +4902,53 @@ Collision guard: `git status --short` πριν το staging έδειξε ΜΟΝ�
 `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`,
 `account/{reset/*,verify/*}`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
 για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-25 (cont. — increment 104, route-level test coverage για το account/workspaces endpoint)
+
+Πριν από νέο increment: ask-inbox re-checked (7 OPEN entries — 5× bakecore [finance ×2,
+redesigner, reviewer ×2, ui-rebuild], bakecore-tests macOS-TCC flag, pharos-daily-dev P17/P23
+mobile-camera approval· τίποτα addressed σε saas-core, ίδιο κενό όπως τα προηγούμενα runs).
+`WEB_DEBT.md` re-checked (η ενεργή ουρά είναι πλέον 0 items — το τελευταίο, i18n el.ts gap,
+έκλεισε από το pharos-daily-dev στο ίδιο διάστημα). UI-first backlog παραμένει εξαντλημένο
+(admin console + auth/workspace panels όλα ήδη χτισμένα). Ακολούθησα το leftover next-task από
+το increment-103 log.
+
+**Νέο `account/workspaces/route.test.ts`** (17 tests), μηδέν production code αλλαγή. Route =
+POST (self-serve "create another workspace" — provisionTenant + audit) + DELETE (self-serve
+"leave a workspace" — mirrors το `wouldOrphanOwners` guard του `members` route, αλλά χωρίς
+owner/admin check αφού ο caller αποχωρεί από τη ΔΙΚΗ του membership). Mocks: connectDB,
+`Membership` (countDocuments/find/updateOne), `saasAuthGate`+`accountTenants` (`saasGuard`
+μένει real, ίδιο idiom με `account/route.test.ts`), `getCurrentAccount`, `provisionTenant`,
+`getTenantContext`, `recordAudit` (`auditCtx` μένει real/pure)· `readBody`/`strField`
+(lib/apiBody) και `wouldOrphanOwners` (lib/tenancy/members) τρέχουν ΠΡΑΓΜΑΤΙΚΑ (pure helpers,
+ήδη unit-tested αλλού) ώστε τα tests να εξασκούν το πραγματικό validation/orphan-guard logic.
+
+Καλύπτει: **POST** — gate/401 short-circuits· blank name/over-80-char name → 400 πριν από
+οποιοδήποτε DB touch· 20-workspace cap → 400 `provisionTenant` ποτέ δεν καλείται· success →
+`provisionTenant({accountId, workspaceName: trimmed})` + `recordAudit(workspace.created,
+selfServe:true)` + 201 `{tenant, tenants}`· mid-handler throw → καθαρό 500 μέσω πραγματικού
+saasGuard. **DELETE** — gate/401 ίδια· missing slug → 400· `getTenantContext` → null Ή
+`tenantId:null` → 404 "workspace not found"· caller απών από το membership list → 404 "not a
+member"· caller = μοναδικός active owner → 409 `last_owner`, `updateOne` ΠΟΤΕ δεν καλείται
+(πραγματικό `wouldOrphanOwners` το αποφασίζει)· co-owner ή plain member φεύγει επιτυχώς →
+`updateOne({account, tenant}, {$set:{status:'removed'}})` + `recordAudit(member.left)` + 200
+`{left, tenants}`· slug lower-cased πριν περάσει στο `getTenantContext`· mid-handler throw →
+καθαρό 500.
+
+**Verified**: νέο test file **17/17 green** μόνο του· πλήρες `npx vitest run` → **272 files /
+3708 tests green** (αυξήθηκε από 270/3659 του increment-103 log). `npm run type-check` → **EXIT
+0** καθαρά. **Docker: ΔΕΝ έγινε rebuild** (test-only αρχείο, μηδέν production code/runtime wiring
+αλλαγή). **Browser-verify: skipped** (test file, μηδέν UI/observable behavior αλλαγή).
+Collision guard: `git status --short` πριν το staging έδειξε ΜΟΝΟ το δικό μου 1 νέο αρχείο
+(clean tree)· `git diff --cached --name-only` μετά το staging επιβεβαίωσε exact 1-file match
+πριν το commit/push. Pushed `cac8b71`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** επόμενοι υποψήφιοι χωρίς route-level coverage: **`account/export`** (data-export
+trigger, mirrors το ήδη-tested `workspace/export` idiom), **`members`** (owner/admin member-
+management, μεγαλύτερο surface: role assign/remove + το ίδιο `wouldOrphanOwners` guard από την
+άλλη πλευρά), `usage`+`usage/sample`, `workspace/{ai-key,export/files,reactivate}`,
+`invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`,
+`account/{reset/*,verify/*}`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
+για item στο territory (αν βρεθεί, πάει πρώτο).
