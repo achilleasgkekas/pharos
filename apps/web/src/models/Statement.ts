@@ -37,7 +37,13 @@ const StatementSchema = new Schema(
     totalAmount: { type: Number, required: true },
     minimumPayment: { type: Number, default: 0 },
     paidAmount: { type: Number, default: 0 },
+    // P9 multi-currency. `currency` is the code PRINTED on the statement; every stored
+    // amount (total, minimum, paid, and each transaction) is nonetheless in the
+    // deployment's base currency, converted with the single `fxRate` below. `origAmount`
+    // keeps the printed headline total. See lib/fx.ts for the invariant.
     currency: { type: String, default: 'EUR' },
+    origAmount: { type: Number, default: 0 },
+    fxRate: { type: Number, default: 0 },
     transactions: { type: [TransactionSchema], default: [] },
     filePath: { type: String, default: '' }, // PDF location
     notes: { type: String, default: '' },

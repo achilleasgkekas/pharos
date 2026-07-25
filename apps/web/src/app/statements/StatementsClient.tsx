@@ -1,5 +1,5 @@
 'use client';
-import { cur } from "@/lib/money";
+import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
 import { useState, useTransition, useMemo, useRef } from 'react';
 import {
   Plus,
@@ -51,6 +51,15 @@ import { CreditCard as CreditCardIcon, Wallet, Power, Camera, ScanLine } from 'l
 import { shrinkImage } from '@/lib/clientImage';
 import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useT } from '@/components/LocaleProvider';
+import { FxBadge } from '@/components/FxBadge';
+import {
+  isForeignCurrency,
+  normalizeCurrency,
+  toPrinted,
+  deriveFxRate,
+  convertToBase,
+  formatMoney,
+} from '@/lib/fx';
 
 export type ItemOption = {
   _id: string;
@@ -69,6 +78,15 @@ function fileUrl(filePath: string) {
   return `/api/files/${filePath.split('/').map(encodeURIComponent).join('/')}`;
 }
 
+/** Multi-currency context (P9): the deployment's base currency code + whether the
+ *  per-statement currency/FX controls are switched on at all. */
+type FxCtx = { base: string; enabled: boolean };
+
+/** P9: the base code always comes first, even when it is not one of the built-ins. */
+function currencyCodes(base: string): string[] {
+  return [...new Set([normalizeCurrency(base) || 'EUR', ...CURRENCIES.map((c) => c.code)])];
+}
+
 /** Display title for a statement: "Ιούνιος 2026 · ···1234". */
 function statementTitle(s: SerializedStatement): string {
   const month = periodLabel(s.period) || s.period;
@@ -83,13 +101,18 @@ export function StatementsClient({
   cards,
   items,
   ollamaUp,
+  baseCurrency = 'EUR',
+  multiCurrency = false,
 }: {
   statements: SerializedStatement[];
   cards: SerializedCard[];
   items: ItemOption[];
   ollamaUp: boolean;
+  baseCurrency?: string;
+  multiCurrency?: boolean;
 }) {
   const t = useT();
+  const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
   const [showCards, setShowCards] = useState(false);
   const [showReconcile, setShowReconcile] = useState(false);
@@ -297,7 +320,7 @@ export function StatementsClient({
               </h2>
               <div className="space-y-2">
                 {list.map((s) => (
-                  <StatementRow key={s._id} statement={s} onOpen={() => setActiveId(s._id)} />
+                  <StatementRow key={s._id} statement={s} base={fx.base} onOpen={() => setActiveId(s._id)} />
                 ))}
               </div>
             </div>
@@ -314,13 +337,14 @@ export function StatementsClient({
             cards={cards}
             items={items}
             itemMap={itemMap}
+            fx={fx}
             onClose={() => setActiveId(null)}
           />
         </Modal>
       )}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t("stm.newStatement")} size="md">
-        <StatementForm cards={cards} onSuccess={() => setShowCreate(false)} />
+        <StatementForm cards={cards} fx={fx} onSuccess={() => setShowCreate(false)} />
       </Modal>
 
       <Modal open={showCards} onClose={() => setShowCards(false)} title={t("stm.manageCards")} size="xl">
@@ -641,9 +665,11 @@ function PlanMergeControl({ plan, allPlans }: { plan: InstallmentPlan; allPlans:
 
 function StatementRow({
   statement,
+  base,
   onOpen,
 }: {
   statement: SerializedStatement;
+  base: string;
   onOpen: () => void;
 }) {
   const t = useT();
@@ -660,6 +686,8 @@ function StatementRow({
         {periodLabel(statement.period) || statement.period}
       </span>
       <div className="flex-1" />
+      {/* P9: what the statement actually printed, when it is not in the base currency. */}
+      <FxBadge doc={statement} base={base} />
       {installmentCount > 0 && (
         <span
           className="hidden sm:flex items-center gap-1 text-[10px] text-[color:var(--color-purple)]"
@@ -699,12 +727,14 @@ function StatementDetail({
   cards,
   items,
   itemMap,
+  fx,
   onClose,
 }: {
   statement: SerializedStatement;
   cards: SerializedCard[];
   items: ItemOption[];
   itemMap: Map<string, ItemOption>;
+  fx: FxCtx;
   onClose: () => void;
 }) {
   const t = useT();
@@ -763,6 +793,7 @@ function StatementDetail({
       <StatementForm
         key={`form-${rev}`}
         cards={cards}
+        fx={fx}
         statement={current}
         onSuccess={onClose}
         onDelete={handleDeleteStatement}
@@ -1172,32 +1203,45 @@ const selectClass =
 function StatementForm({
   cards,
   statement,
+  fx,
   onSuccess,
   onDelete,
   deletePending,
 }: {
   cards: SerializedCard[];
   statement?: SerializedStatement;
+  fx: FxCtx;
   onSuccess: () => void;
   onDelete?: () => void;
   deletePending?: boolean;
 }) {
   const t = useT();
   const [pending, startTransition] = useTransition();
+  // P9: the form always holds PRINTED figures (what the statement says), never the stored
+  // base-currency ones. The server converts on save, so re-saving an unchanged foreign
+  // statement can never double-convert it.
+  const wasForeign = isForeignCurrency(statement?.currency, fx.base);
+  const storedRate = wasForeign ? statement?.fxRate || 0 : 0;
+  const printed = (v: number | undefined) => (v == null ? '' : String(toPrinted(v, storedRate)));
   const [form, setForm] = useState({
     card: statement?.card ?? (cards[0] ? cardLabel(cards[0]) : ''),
     period: statement?.period ?? new Date().toISOString().slice(0, 7),
     statementDate: statement?.statementDate ? statement.statementDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
     dueDate: statement?.dueDate ? statement.dueDate.slice(0, 10) : '',
-    totalAmount: (statement?.totalAmount ?? '').toString(),
-    minimumPayment: (statement?.minimumPayment ?? '').toString(),
-    paidAmount: (statement?.paidAmount ?? '').toString(),
+    // The headline total keeps its exact printed value in origAmount; the rest is backed out.
+    totalAmount: ((wasForeign ? statement?.origAmount || statement?.totalAmount : statement?.totalAmount) ?? '').toString(),
+    minimumPayment: statement ? printed(statement.minimumPayment) : '',
+    paidAmount: statement ? printed(statement.paidAmount) : '',
+    currency: wasForeign ? normalizeCurrency(statement?.currency) : normalizeCurrency(fx.base) || 'EUR',
+    fxRate: wasForeign && statement?.fxRate ? String(statement.fxRate) : '',
     notes: statement?.notes ?? '',
   });
 
   const set = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  const foreign = fx.enabled && isForeignCurrency(form.currency, fx.base);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -1237,19 +1281,29 @@ function StatementForm({
           <Input type="date" value={form.statementDate} onChange={set('statementDate')} />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className={cn('grid grid-cols-2 gap-3', fx.enabled && 'sm:grid-cols-3')}>
         <Field label={t('stm.paymentDue')}>
           <Input type="date" value={form.dueDate} onChange={set('dueDate')} />
         </Field>
-        <Field label={t('stm.totalAmount', { cur: cur() })}>
+        <Field label={t('stm.totalAmount', { cur: fx.enabled ? currencySymbol(form.currency).trim() : cur() })}>
           <Input type="number" step="0.01" value={form.totalAmount} onChange={set('totalAmount')} required />
         </Field>
+        {fx.enabled && (
+          <Field label={t('ex.fCurrency')}>
+            <select value={form.currency} onChange={set('currency')} className={selectClass}>
+              {currencyCodes(fx.base).map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </Field>
+        )}
       </div>
+      {foreign && <StatementFxFields form={form} setRate={(v) => setForm((p) => ({ ...p, fxRate: v }))} base={fx.base} />}
       <div className="grid grid-cols-2 gap-3">
-        <Field label={t('stm.minPayment', { cur: cur() })}>
+        <Field label={t('stm.minPayment', { cur: fx.enabled ? currencySymbol(form.currency).trim() : cur() })}>
           <Input type="number" step="0.01" value={form.minimumPayment} onChange={set('minimumPayment')} />
         </Field>
-        <Field label={t('stm.paid', { cur: cur() })}>
+        <Field label={t('stm.paid', { cur: fx.enabled ? currencySymbol(form.currency).trim() : cur() })}>
           <Input type="number" step="0.01" value={form.paidAmount} onChange={set('paidAmount')} />
         </Field>
       </div>
@@ -1272,6 +1326,64 @@ function StatementForm({
         )}
       </div>
     </form>
+  );
+}
+
+/** Multi-currency (P9): shown only when the statement's currency differs from the base one.
+ *  Two ways in, because someone reading the bank's own conversion knows what was debited but
+ *  not the rate: type the rate, or type the amount actually charged and let deriveFxRate()
+ *  back it out. The preview is the total that will be stored — and, with it, every charge on
+ *  the statement, since one rate converts the whole document. */
+function StatementFxFields({
+  form,
+  setRate,
+  base,
+}: {
+  form: { totalAmount: string; currency: string; fxRate: string };
+  /** Only the rate is editable here, so the parent's full form type stays out of this component. */
+  setRate: (v: string) => void;
+  base: string;
+}) {
+  const t = useT();
+  const [charged, setCharged] = useState('');
+  const printedTotal = Number(form.totalAmount) || 0;
+  const rate = Number(form.fxRate) || 0;
+  const code = normalizeCurrency(form.currency);
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end rounded-lg border border-[color:var(--color-purple)]/30 bg-[color:var(--color-surface-2)] p-3">
+      <Field label={t('ex.fFxRate', { code, base })}>
+        <Input
+          type="number"
+          step="0.000001"
+          value={form.fxRate}
+          onChange={(e) => {
+            setCharged('');
+            setRate(e.target.value);
+          }}
+          placeholder="0.92"
+        />
+      </Field>
+      <Field label={t('ex.fFxCharged', { cur: currencySymbol(base).trim() })}>
+        <Input
+          type="number"
+          step="0.01"
+          value={charged}
+          onChange={(e) => {
+            const v = e.target.value;
+            setCharged(v);
+            const derived = deriveFxRate(printedTotal, Number(v) || 0);
+            setRate(derived ? String(derived) : '');
+          }}
+        />
+      </Field>
+      <p className="text-[11px] pb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+        {rate > 0 ? (
+          <span className="text-[color:var(--color-purple)]">= {formatMoney(convertToBase(printedTotal, rate), base)}</span>
+        ) : (
+          <span className="text-[color:var(--color-gold)]">⚠ {t('ex.fxNoRate', { base })}</span>
+        )}
+      </p>
+    </div>
   );
 }
 

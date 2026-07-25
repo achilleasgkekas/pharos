@@ -110,6 +110,8 @@ describe('GET /api/v1/statements/:id — statement envelope', () => {
       minimumPayment: 62,
       paidAmount: 200,
       currency: 'USD',
+      origAmount: 1337.55,
+      fxRate: 0.923,
       transactions: [],
     });
     const res = await GET(makeReq(), ctx(OID));
@@ -125,7 +127,10 @@ describe('GET /api/v1/statements/:id — statement envelope', () => {
       totalAmount: 1234.56,
       minimumPayment: 62,
       paidAmount: 200,
+      // P9: the amounts above are base currency; these three say what the paper printed.
       currency: 'USD',
+      origAmount: 1337.55,
+      fxRate: 0.923,
     });
     expect(body.transactions).toEqual([]);
   });
@@ -145,6 +150,8 @@ describe('GET /api/v1/statements/:id — statement envelope', () => {
       minimumPayment: 0,
       paidAmount: 0,
       currency: 'EUR',
+      origAmount: 0,
+      fxRate: 0,
     });
     expect(transactions).toEqual([]); // missing transactions → []
   });

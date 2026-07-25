@@ -1087,7 +1087,7 @@
   enable notifications) με progress ticks → activation. **Διακριτό** από P1 (demo data) — εδώ τα *δικά του* δεδομένα.
 - **Module:** Homepage / Dashboard (dismissable card) + Settings state reads.
 
-### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + EXPENSES + RECEIPTS + SUBSCRIPTIONS + ITEMS SHIPPED 2026-07-25 (pharos-daily-dev), υπόλοιπα modules εκκρεμούν
+### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + EXPENSES + RECEIPTS + SUBSCRIPTIONS + ITEMS + STATEMENTS SHIPPED 2026-07-25 (pharos-daily-dev), imports (PA1/email-in) + rate-feed εκκρεμούν
 - **Τι χτίστηκε (slice 1 από L item):** νέο pure **`lib/fx.ts`** (+25 unit tests, client-safe, DB-free) που κρατά
   **ΤΟΝ ΕΝΑΝ κανόνα** σε ένα μέρος: `normalizeCurrency`, `isForeignCurrency`, `convertToBase`, `deriveFxRate`,
   `resolveFx`, `formatMoney`, `fxBadgeLabel`. **Κλειδωμένη αρχιτεκτονική απόφαση (builder default, μηδέν migration):
@@ -1152,9 +1152,28 @@
   σείρνεται στο form ως printed, ώστε re-save χωρίς αλλαγή να μην ξανα-μετατρέπει. UI: currency select + η ίδια FX
   γραμμή (rate ή «or charged») + `FxBadge` σε card/row/detail. `/api/v1/items` shape += currency/origAmount/fxRate +
   POST/PATCH δέχονται currency/fxRate (**mobile parity μαζί**) + τεκμηρίωση στο `API.md`. **+23 tests** (3636).
-- **Εκκρεμούν (επόμενα slices):** Statements ίδια 3 πεδία (το `currency` του αποθηκεύεται ήδη αγνοημένο, ίδιο latent
-  bug)· `resolveFx` στο CSV import (PA1) και στο email-in· προαιρετικό δωρεάν rate-feed (phase 2, τώρα
-  το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία (το API τα εκθέτει ήδη σε 4 modules).
+- **Τι χτίστηκε (slice 5 — Statements, 2026-07-25):** ίδια 3 πεδία στο `Statement` (`currency` υπήρχε ήδη αγνοημένο,
+  + `origAmount`/`fxRate`) και **και τα 5 write paths** (createStatement/updateStatement/addTransaction/
+  importStatementPdf/rescanStatement). **Διαφορά από τα προηγούμενα**: μια κάρτα εκδίδει το statement σε **ΕΝΑ**
+  νόμισμα, οπότε **ΕΝΑ per-statement rate** μετατρέπει ΟΛΟ το έγγραφο: total + minimum + paid **ΚΑΙ κάθε χρέωση**
+  (`transactions[].amount`). Οι χρεώσεις μετράνε όσο και το total, γιατί το `computeInstallmentPlans` τις αθροίζει σε
+  per-plan payoff που δείχνουν homepage («total owed»), `/calendar` και `/reports` σε base currency: μισο-μετατρεπμένο
+  statement θα άφηνε τις ίδιες του τις γραμμές να μην βγάζουν το total του. Νέο pure **`fx.resolveStatementAmounts()`**
+  (+9 unit tests). Το `origAmount` κρατά το τυπωμένο **headline total**. `updateStatement` **ξε-μετατρέπει πρώτα** τις
+  αποθηκευμένες χρεώσεις (`toPrinted` με το ΠΑΛΙΟ rate) πριν εφαρμόσει το νέο, ώστε μια διόρθωση rate να πέφτει στα
+  ΤΥΠΩΜΕΝΑ νούμερα και όχι πάνω σε προηγούμενη μετατροπή (ίδιο rate = no-op, pinned με τεστ)· το `addTransaction`
+  μετατρέπει με το rate του ίδιου του statement. Ο parser **δεν διαβάζει νόμισμα** (το `ParsedStatementSchema` δεν έχει
+  τέτοιο πεδίο, μηδέν αλλαγή prompt), οπότε το foreign το μαρκάρει ο χρήστης μία φορά στη φόρμα και το **re-import του
+  ίδιου μήνα ΞΑΝΑΧΡΗΣΙΜΟΠΟΙΕΙ** αυτή την απόφαση (ίδιος κανόνας με το re-scan που κρατά το rate) αντί να γυρίσει σιωπηλά
+  τον μήνα σε base. Στο re-scan διορθώθηκε και το preservation key (τα παλιά lines συγκρίνονται πλέον σε **printed**
+  ποσά, αλλιώς σε foreign statement κάθε installment edit + product link θα χανόταν στο re-scan). UI: currency select
+  δίπλα στο total + η ίδια FX γραμμή (rate ή «or charged») + `FxBadge` στη λίστα. `/api/v1/statements` και
+  `/statements/:id` shape += origAmount/fxRate (**mobile parity μαζί**) + τεκμηρίωση στο `docs/api.md`. **+18 tests**
+  (3677). **Follow-up**: `fxBadgeLabel` δεν renders σε credit balance (αρνητικό printed total, guard `orig <= 0`) —
+  τα ποσά μετατρέπονται σωστά, απλά λείπει το chip.
+- **Εκκρεμούν (επόμενα slices):** `resolveFx` στο CSV import (PA1) και στο email-in· προαιρετικό δωρεάν rate-feed
+  (phase 2, τώρα το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία (το API τα εκθέτει ήδη σε 5
+  modules).
 - **Αξία (αρχικό):** ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency. Πραγματικό κενό
   (CLAUDE.md). Μεγάλο: αγγίζει schema (amount+currency+rate), aggregations, imports, όλα τα money views.
 - **Module:** cross-cutting (Expenses/Receipts/Statements/Reports + `lib/money.ts`).

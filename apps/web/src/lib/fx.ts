@@ -160,6 +160,59 @@ export function resolveItemPrices(input: ItemPricesInput, base: string): ItemPri
   };
 }
 
+/** Every money figure printed on a card statement, as PRINTED (pre-conversion). */
+export type StatementAmountsInput = {
+  totalAmount: number;
+  minimumPayment?: number | null;
+  paidAmount?: number | null;
+  /** Each charge on the statement, in statement order (the array shape is preserved). */
+  txAmounts?: number[];
+  currency?: string | null;
+  fxRate?: number | null;
+};
+
+export type StatementAmountsResolved = {
+  currency: string;
+  origAmount: number;
+  fxRate: number;
+  /** All ALWAYS base currency (see resolveFx for the unknown-rate carve-out). */
+  totalAmount: number;
+  minimumPayment: number;
+  paidAmount: number;
+  txAmounts: number[];
+};
+
+/**
+ * P9 for Statements. A card issues its statement in ONE currency, so ONE rate converts the
+ * WHOLE document: the headline `totalAmount`, the `minimumPayment`/`paidAmount` pair, and
+ * every single charge in `transactions`. The charges matter as much as the total, because
+ * `computeInstallmentPlans` sums transaction amounts into per-plan payoff figures that the
+ * homepage ("total owed"), /calendar and /reports all show in base currency; converting the
+ * total but not its lines would leave a statement whose own charges no longer add up to it.
+ *
+ * `origAmount` remembers the printed HEADLINE total, the figure a person recognises off the
+ * paper. The secondary fields are stored converted and come back for editing through
+ * toPrinted(), so re-saving an unchanged statement can never double-convert it.
+ *
+ * Base-currency input passes straight through with fxRate 0, so a single-currency deployment
+ * stores exactly what it stored before this existed; an unknown rate is never guessed as 1:1.
+ */
+export function resolveStatementAmounts(input: StatementAmountsInput, base: string): StatementAmountsResolved {
+  const fx = resolveFx({ amount: Number(input.totalAmount) || 0, currency: input.currency, fxRate: input.fxRate }, base);
+  // fxRate 0 = not foreign, or foreign with no rate yet; either way nothing is converted.
+  const conv = (v: number | null | undefined): number =>
+    fx.fxRate > 0 ? convertToBase(Number(v) || 0, fx.fxRate) : Number(v) || 0;
+  return {
+    currency: fx.currency,
+    origAmount: fx.origAmount,
+    fxRate: fx.fxRate,
+    totalAmount: fx.amount,
+    minimumPayment: conv(input.minimumPayment),
+    paidAmount: conv(input.paidAmount),
+    txAmounts: (input.txAmounts ?? []).map(conv),
+  };
+}
+
 /** `$88.00` — symbol + 2dp, for showing the printed amount next to the base one. */
 export function formatMoney(amount: number, code: string): string {
   const n = Number(amount);

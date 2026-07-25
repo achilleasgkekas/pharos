@@ -3,6 +3,7 @@ import { Statement } from '@/models/Statement';
 import { Card } from '@/models/Card';
 import { Item } from '@/models/Item';
 import { isAiReady } from '@/lib/ollama';
+import { getAppSettings } from '@/lib/appSettings';
 import { StatementsClient, type ItemOption } from './StatementsClient';
 import type { SerializedStatement, SerializedCard } from '@/types';
 
@@ -30,6 +31,15 @@ async function getData(): Promise<{
 }
 
 export default async function StatementsPage() {
-  const { statements, cards, items, ollamaUp } = await getData();
-  return <StatementsClient statements={statements} cards={cards} items={items} ollamaUp={ollamaUp} />;
+  const [{ statements, cards, items, ollamaUp }, settings] = await Promise.all([getData(), getAppSettings()]);
+  return (
+    <StatementsClient
+      statements={statements}
+      cards={cards}
+      items={items}
+      ollamaUp={ollamaUp}
+      baseCurrency={settings.currency}
+      multiCurrency={settings.multiCurrency} // P9: off = no per-statement currency controls at all
+    />
+  );
 }

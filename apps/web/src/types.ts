@@ -289,7 +289,12 @@ export type SerializedStatement = {
   totalAmount: number;
   minimumPayment: number;
   paidAmount: number;
+  // P9: `currency` is what the statement PRINTS; every amount above (and each
+  // transaction) is stored in base currency, converted with this one `fxRate`.
+  // `origAmount` is the printed headline total. 0 rate = not foreign, or no rate yet.
   currency: string;
+  origAmount?: number;
+  fxRate?: number;
   transactions: SerializedTransaction[];
   filePath: string;
   notes: string;

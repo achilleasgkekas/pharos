@@ -27,6 +27,8 @@ type StatementLean = {
   minimumPayment?: number;
   paidAmount?: number;
   currency?: string;
+  origAmount?: number;
+  fxRate?: number;
   transactions?: TxLean[];
 };
 
@@ -64,7 +66,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         totalAmount: s.totalAmount ?? 0,
         minimumPayment: s.minimumPayment ?? 0,
         paidAmount: s.paidAmount ?? 0,
+        // P9: amounts (here and in every transaction below) are base currency; these three
+        // say what the paper printed. One rate converts the whole document.
         currency: s.currency ?? 'EUR',
+        origAmount: s.origAmount ?? 0,
+        fxRate: s.fxRate ?? 0,
       },
       transactions,
     });

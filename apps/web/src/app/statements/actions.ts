@@ -13,6 +13,8 @@ import { normalizeLast4, detectCardType, buildCardLabel } from '@/lib/cards';
 import { mirrorFileToRemote } from '@/lib/mirror';
 import { installmentSignature } from '@/lib/installments';
 import { reconcile, type ReconTxnResult, type ReconReceiptInput } from '@/lib/reconcile';
+import { getAppSettings } from '@/lib/appSettings';
+import { resolveStatementAmounts, toPrinted, convertToBase } from '@/lib/fx';
 import type { SerializedTransaction, SerializedStatement } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { Types } from 'mongoose';
@@ -181,8 +183,21 @@ const StatementFormSchema = z.object({
   totalAmount: z.coerce.number(),
   minimumPayment: z.coerce.number().default(0),
   paidAmount: z.coerce.number().default(0),
+  // P9: what the statement prints. Blank = base currency (single-currency deployments
+  // never submit these fields at all).
+  currency: z.string().default(''),
+  fxRate: z.coerce.number().default(0),
   notes: z.string().default(''),
 });
+
+/**
+ * P9: turn the PRINTED figures a statement carries into the stored base-currency ones.
+ * The rule (one rate for the whole document, transactions included) lives in lib/fx.ts;
+ * this only supplies the deployment's base code.
+ */
+async function resolveStmtFx(input: Parameters<typeof resolveStatementAmounts>[0]) {
+  return resolveStatementAmounts(input, (await getAppSettings()).currency);
+}
 
 const TransactionSchema = z.object({
   date: z.string(),
@@ -195,15 +210,19 @@ const TransactionSchema = z.object({
 
 export async function createStatement(formData: FormData) {
   const raw = StatementFormSchema.parse(Object.fromEntries(formData));
+  const money = await resolveStmtFx(raw);
   await connectDB();
   await Statement.create({
     card: raw.card,
     period: raw.period,
     statementDate: safeDate(raw.statementDate),
     dueDate: safeDateOrNull(raw.dueDate) ?? undefined,
-    totalAmount: raw.totalAmount,
-    minimumPayment: raw.minimumPayment,
-    paidAmount: raw.paidAmount,
+    totalAmount: money.totalAmount,
+    minimumPayment: money.minimumPayment,
+    paidAmount: money.paidAmount,
+    currency: money.currency,
+    origAmount: money.origAmount,
+    fxRate: money.fxRate,
     notes: raw.notes,
   });
   revalidatePath('/statements');
@@ -212,16 +231,34 @@ export async function createStatement(formData: FormData) {
 export async function updateStatement(id: string, formData: FormData) {
   const raw = StatementFormSchema.parse(Object.fromEntries(formData));
   await connectDB();
-  await Statement.findByIdAndUpdate(id, {
+  // P9: the form submits PRINTED figures, but the transactions are not part of it — they
+  // sit in the DB already converted with the OLD rate. Un-convert them first so a rate
+  // edit re-applies to the printed charges instead of stacking on a past conversion
+  // (re-submitting the same rate is then a no-op; both paths are pinned by tests).
+  const stmt = await Statement.findById(id);
+  const oldRate = stmt?.fxRate ?? 0;
+  const printedTx = (stmt?.transactions ?? []).map((t) => toPrinted(t.amount ?? 0, oldRate));
+  const money = await resolveStmtFx({ ...raw, txAmounts: printedTx });
+  const update: Record<string, unknown> = {
     card: raw.card,
     period: raw.period,
     statementDate: safeDate(raw.statementDate),
     dueDate: safeDateOrNull(raw.dueDate),
-    totalAmount: raw.totalAmount,
-    minimumPayment: raw.minimumPayment,
-    paidAmount: raw.paidAmount,
+    totalAmount: money.totalAmount,
+    minimumPayment: money.minimumPayment,
+    paidAmount: money.paidAmount,
+    currency: money.currency,
+    origAmount: money.origAmount,
+    fxRate: money.fxRate,
     notes: raw.notes,
-  });
+  };
+  if (stmt && money.txAmounts.some((v, i) => v !== stmt.transactions[i]?.amount)) {
+    stmt.transactions.forEach((t, i) => {
+      t.amount = money.txAmounts[i];
+    });
+    update.transactions = stmt.transactions;
+  }
+  await Statement.findByIdAndUpdate(id, update);
   revalidatePath('/statements');
 }
 
@@ -251,12 +288,16 @@ export async function addTransaction(statementId: string, formData: FormData) {
       : null;
 
   await connectDB();
+  // P9: a charge typed onto a foreign statement is typed in the currency the statement
+  // PRINTS, so it converts with that statement's own rate — the whole document shares one.
+  const host = await Statement.findById(statementId);
+  const rate = host?.fxRate ?? 0;
   await Statement.findByIdAndUpdate(statementId, {
     $push: {
       transactions: {
         date: safeDate(raw.date),
         description: raw.description,
-        amount: raw.amount,
+        amount: rate > 0 ? convertToBase(raw.amount, rate) : raw.amount,
         category: raw.category,
         installmentInfo,
       },
@@ -723,8 +764,23 @@ export async function importStatementPdf(formData: FormData): Promise<ImportResu
     // A misread date (e.g. an April statement parsed as March) drops it onto the
     // wrong month and the upsert would silently overwrite that month. Flag it so
     // the UI can warn the user instead of losing a statement quietly.
-    const existing = await Statement.findOne({ card, period }, { filePath: 1 }).lean();
+    const existing = await Statement.findOne({ card, period }, { filePath: 1, currency: 1, fxRate: 1 }).lean();
     const replacedExisting = !!(existing && existing.filePath && existing.filePath !== relativePath);
+    // P9: the parser reads the printed figures, it does not detect the currency — so a
+    // foreign statement is marked as such by the user, once, in the edit form. Re-importing
+    // the same month REUSES that decision (same rule as re-scan keeping a user's rate),
+    // instead of silently reverting the month to base currency. A first import has nothing
+    // to reuse and passes through as base currency, exactly as before P9.
+    const money = await resolveStmtFx({
+      totalAmount: parsed?.totalAmount ?? 0,
+      minimumPayment: parsed?.minimumPayment ?? 0,
+      txAmounts: transactions.map((t) => t.amount),
+      currency: existing?.currency,
+      fxRate: existing?.fxRate,
+    });
+    transactions.forEach((t, i) => {
+      t.amount = money.txAmounts[i];
+    });
     // Upsert by card + period (matches the unique index)
     const stmt = await Statement.findOneAndUpdate(
       { card, period },
@@ -735,8 +791,11 @@ export async function importStatementPdf(formData: FormData): Promise<ImportResu
         period,
         statementDate: safeDate(parsed?.statementDate),
         dueDate: safeDateOrNull(parsed?.dueDate) ?? undefined,
-        totalAmount: parsed?.totalAmount ?? 0,
-        minimumPayment: parsed?.minimumPayment ?? 0,
+        totalAmount: money.totalAmount,
+        minimumPayment: money.minimumPayment,
+        currency: money.currency,
+        origAmount: money.origAmount,
+        fxRate: money.fxRate,
         transactions,
         filePath: relativePath,
       },
@@ -834,8 +893,13 @@ export async function rescanStatement(id: string, useOcr: boolean): Promise<Stat
     matchedItemIds: string[];
   };
   const oldByKey = new Map<string, Preserved>();
+  // P9: the key must compare like with like. A fresh parse yields PRINTED amounts while the
+  // stored ones are already converted, so on a foreign statement the old lines are keyed by
+  // their printed figures — otherwise every installment edit and product link would be lost
+  // on re-scan purely because the two sides were denominated differently.
+  const storedRate = stmt.fxRate ?? 0;
   for (const t of stmt.transactions ?? []) {
-    oldByKey.set(keyOf(t.description, t.amount), {
+    oldByKey.set(keyOf(t.description, toPrinted(t.amount, storedRate)), {
       installmentInfo: t.installmentInfo
         ? {
             currentInstallment: t.installmentInfo.currentInstallment ?? undefined,
@@ -902,10 +966,29 @@ export async function rescanStatement(id: string, useOcr: boolean): Promise<Stat
     if (t.matchedItemIds.length) preservedLinks++;
   }
 
+  // P9: convert the freshly-parsed printed figures with the rate the user already set on
+  // this statement (the currency/rate themselves are never touched by a re-scan — the
+  // parser does not read them, so re-scanning must not clear the user's decision).
+  const money = await resolveStmtFx({
+    totalAmount: parsed.totalAmount ?? 0,
+    minimumPayment: parsed.minimumPayment ?? 0,
+    txAmounts: newTx.map((t) => t.amount),
+    currency: stmt.currency,
+    fxRate: storedRate,
+  });
+  newTx.forEach((t, i) => {
+    t.amount = money.txAmounts[i];
+  });
+
   // Refresh transactions + totals; keep card/period/file untouched.
   stmt.transactions = newTx as unknown as typeof stmt.transactions;
-  if (typeof parsed.totalAmount === 'number') stmt.totalAmount = parsed.totalAmount;
-  if (typeof parsed.minimumPayment === 'number') stmt.minimumPayment = parsed.minimumPayment;
+  if (typeof parsed.totalAmount === 'number') {
+    stmt.totalAmount = money.totalAmount;
+    stmt.origAmount = money.origAmount;
+    stmt.fxRate = money.fxRate;
+    stmt.currency = money.currency;
+  }
+  if (typeof parsed.minimumPayment === 'number') stmt.minimumPayment = money.minimumPayment;
   try {
     await stmt.save();
   } catch (e) {

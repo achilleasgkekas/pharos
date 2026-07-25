@@ -9,6 +9,7 @@ import {
   fxBadgeLabel,
   toPrinted,
   resolveItemPrices,
+  resolveStatementAmounts,
 } from './fx';
 
 describe('normalizeCurrency', () => {
@@ -282,5 +283,94 @@ describe('resolveItemPrices (P9 — Items)', () => {
     expect(again.currentPrice).toBe(stored.currentPrice);
     expect(again.purchasedPrice).toBe(stored.purchasedPrice);
     expect(again.origAmount).toBe(88);
+  });
+});
+
+describe('resolveStatementAmounts', () => {
+  const eur = (i: Parameters<typeof resolveStatementAmounts>[0]) => resolveStatementAmounts(i, 'EUR');
+
+  it('passes a base-currency statement straight through, untouched', () => {
+    const r = eur({ totalAmount: 245.9, minimumPayment: 20, paidAmount: 100, txAmounts: [39.47, 25.25] });
+    expect(r).toEqual({
+      currency: 'EUR',
+      origAmount: 0,
+      fxRate: 0,
+      totalAmount: 245.9,
+      minimumPayment: 20,
+      paidAmount: 100,
+      txAmounts: [39.47, 25.25],
+    });
+  });
+
+  it('converts the WHOLE document with one rate — total, minimum, paid and every charge', () => {
+    const r = eur({ totalAmount: 200, minimumPayment: 20, paidAmount: 50, txAmounts: [100, 60, 40], currency: 'USD', fxRate: 0.9 });
+    expect(r.totalAmount).toBe(180);
+    expect(r.minimumPayment).toBe(18);
+    expect(r.paidAmount).toBe(45);
+    // The charges must still add up to the converted total; a half-converted statement
+    // would leave computeInstallmentPlans summing foreign amounts into base-currency payoffs.
+    expect(r.txAmounts).toEqual([90, 54, 36]);
+    expect(r.txAmounts.reduce((a, b) => a + b, 0)).toBe(r.totalAmount);
+  });
+
+  it('remembers the printed HEADLINE total in origAmount', () => {
+    const r = eur({ totalAmount: 200, currency: 'USD', fxRate: 0.9 });
+    expect(r.origAmount).toBe(200);
+    expect(r.currency).toBe('USD');
+    expect(r.fxRate).toBe(0.9);
+  });
+
+  it('never guesses 1:1 — an unknown rate keeps every printed number and flags nothing converted', () => {
+    const r = eur({ totalAmount: 200, minimumPayment: 20, paidAmount: 50, txAmounts: [100, 100], currency: 'USD', fxRate: 0 });
+    expect(r.totalAmount).toBe(200);
+    expect(r.minimumPayment).toBe(20);
+    expect(r.paidAmount).toBe(50);
+    expect(r.txAmounts).toEqual([100, 100]);
+    expect(r.fxRate).toBe(0);
+    expect(r.origAmount).toBe(200); // still remembered, so the UI can ask for a rate
+  });
+
+  it('treats missing optional figures as 0 and an absent transaction list as empty', () => {
+    const r = eur({ totalAmount: 100, currency: 'USD', fxRate: 0.9 });
+    expect(r.minimumPayment).toBe(0);
+    expect(r.paidAmount).toBe(0);
+    expect(r.txAmounts).toEqual([]);
+  });
+
+  it('handles a credit balance (negative total) without flipping its sign', () => {
+    const r = eur({ totalAmount: -120, txAmounts: [-120], currency: 'USD', fxRate: 0.9 });
+    expect(r.totalAmount).toBe(-108);
+    expect(r.txAmounts).toEqual([-108]);
+  });
+
+  it('rounds every converted field to cents', () => {
+    const r = eur({ totalAmount: 33.33, minimumPayment: 3.33, txAmounts: [11.11], currency: 'USD', fxRate: 0.923456 });
+    expect(r.totalAmount).toBe(30.78);
+    expect(r.minimumPayment).toBe(3.08);
+    expect(r.txAmounts).toEqual([10.26]);
+  });
+
+  it('honours a non-EUR base currency', () => {
+    const r = resolveStatementAmounts({ totalAmount: 50, txAmounts: [50], currency: 'USD', fxRate: 1.1 }, 'USD');
+    // Same code as base = not foreign, whatever the rate says.
+    expect(r.fxRate).toBe(0);
+    expect(r.totalAmount).toBe(50);
+    expect(r.txAmounts).toEqual([50]);
+    expect(r.currency).toBe('USD');
+  });
+
+  it('round-trips with toPrinted, so re-saving an unchanged statement is stable', () => {
+    const stored = eur({ totalAmount: 200, minimumPayment: 20, paidAmount: 50, txAmounts: [100, 100], currency: 'USD', fxRate: 0.9 });
+    // What the edit form seeds itself with (origAmount for the headline, toPrinted for the
+    // rest), then submits unchanged — plus the charges un-converted out of the DB.
+    const again = eur({
+      totalAmount: stored.origAmount,
+      minimumPayment: toPrinted(stored.minimumPayment, stored.fxRate),
+      paidAmount: toPrinted(stored.paidAmount, stored.fxRate),
+      txAmounts: stored.txAmounts.map((v) => toPrinted(v, stored.fxRate)),
+      currency: stored.currency,
+      fxRate: stored.fxRate,
+    });
+    expect(again).toEqual(stored);
   });
 });

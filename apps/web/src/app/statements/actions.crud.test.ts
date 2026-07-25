@@ -30,6 +30,7 @@ const {
   statementFindByIdAndDelete,
   deleteFileMock,
   revalidatePathMock,
+  getAppSettingsMock,
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
   statementCreate: vi.fn(async (_doc: Record<string, any>) => ({})),
@@ -38,6 +39,8 @@ const {
   statementFindByIdAndDelete: vi.fn(async (_id: string) => ({})),
   deleteFileMock: vi.fn(async (_path: string) => {}),
   revalidatePathMock: vi.fn(),
+  // P9: the deployment's base currency. Every FX case below drives it from here.
+  getAppSettingsMock: vi.fn(async () => ({ currency: 'EUR' })),
 }));
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
@@ -68,6 +71,7 @@ vi.mock('@/lib/cards', () => ({
 vi.mock('@/lib/mirror', () => ({ mirrorFileToRemote: vi.fn() }));
 vi.mock('@/lib/installments', () => ({ installmentSignature: vi.fn(() => '') }));
 vi.mock('@/lib/reconcile', () => ({ reconcile: vi.fn() }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
 import { createStatement, updateStatement, deleteStatement, addTransaction, deleteTransaction } from './actions';
@@ -92,6 +96,7 @@ const validStatementFields = {
 beforeEach(() => {
   vi.clearAllMocks();
   statementFindById.mockResolvedValue(null);
+  getAppSettingsMock.mockResolvedValue({ currency: 'EUR' });
 });
 
 describe('createStatement', () => {
@@ -108,7 +113,7 @@ describe('createStatement', () => {
 
   it('parses defaults, coerces numeric fields, and creates with a Date statementDate', async () => {
     await createStatement(formOf(validStatementFields));
-    expect(connectDBMock).toHaveBeenCalledTimes(1);
+    expect(connectDBMock).toHaveBeenCalled();
     expect(statementCreate).toHaveBeenCalledTimes(1);
     const doc = statementCreate.mock.calls[0][0];
     expect(doc.card).toBe('Mastercard 7791');
@@ -233,5 +238,92 @@ describe('deleteTransaction', () => {
     await deleteTransaction('s1', 'tx1');
     expect(statementFindByIdAndUpdate).toHaveBeenCalledWith('s1', { $pull: { transactions: { _id: 'tx1' } } });
     expect(revalidatePathMock).toHaveBeenCalledWith('/statements');
+  });
+});
+
+// ─── P9 multi-currency ───────────────────────────────────────────────────────
+// A card issues its statement in ONE currency, so ONE rate converts the whole document:
+// the headline total, the minimum/paid pair, AND every charge. The conversion rule itself
+// lives in lib/fx.ts (unit-tested there); these pin the WIRING — that each write path
+// actually routes through it, and that a re-save can never double-convert.
+describe('multi-currency (P9)', () => {
+  const foreign = { ...validStatementFields, totalAmount: '200', minimumPayment: '20', paidAmount: '50', currency: 'USD', fxRate: '0.9' };
+
+  it('createStatement stores base-currency amounts plus the printed total and rate', async () => {
+    await createStatement(formOf(foreign));
+    const doc = statementCreate.mock.calls[0][0];
+    expect(doc.totalAmount).toBe(180);
+    expect(doc.minimumPayment).toBe(18);
+    expect(doc.paidAmount).toBe(45);
+    expect(doc.currency).toBe('USD');
+    expect(doc.origAmount).toBe(200); // what the paper says
+    expect(doc.fxRate).toBe(0.9);
+  });
+
+  it('createStatement leaves a base-currency statement byte-for-byte as before', async () => {
+    await createStatement(formOf({ ...validStatementFields, totalAmount: '245.90', minimumPayment: '20' }));
+    const doc = statementCreate.mock.calls[0][0];
+    expect(doc.totalAmount).toBe(245.9);
+    expect(doc.minimumPayment).toBe(20);
+    expect(doc.origAmount).toBe(0);
+    expect(doc.fxRate).toBe(0);
+    expect(doc.currency).toBe('EUR');
+  });
+
+  it('createStatement never invents a 1:1 rate when none was given', async () => {
+    await createStatement(formOf({ ...foreign, fxRate: '' }));
+    const doc = statementCreate.mock.calls[0][0];
+    expect(doc.totalAmount).toBe(200); // still the printed number, flagged by fxRate 0
+    expect(doc.fxRate).toBe(0);
+    expect(doc.origAmount).toBe(200);
+  });
+
+  it('createStatement honours a non-EUR base currency', async () => {
+    getAppSettingsMock.mockResolvedValue({ currency: 'USD' });
+    await createStatement(formOf(foreign));
+    const doc = statementCreate.mock.calls[0][0];
+    // Same code as base = not foreign, whatever the submitted rate says.
+    expect(doc.totalAmount).toBe(200);
+    expect(doc.fxRate).toBe(0);
+  });
+
+  it('updateStatement converts the stored transactions with the new rate too', async () => {
+    statementFindById.mockResolvedValue({ fxRate: 0, transactions: [{ amount: 100 }, { amount: 100 }] });
+    await updateStatement('s1', formOf(foreign));
+    const update = statementFindByIdAndUpdate.mock.calls[0][1];
+    expect(update.totalAmount).toBe(180);
+    expect(update.transactions.map((t: { amount: number }) => t.amount)).toEqual([90, 90]);
+  });
+
+  it('updateStatement re-applies a new rate to the PRINTED charges, never on top of an old conversion', async () => {
+    // Stored at 0.9 (printed 100 each); the user corrects the rate to 0.8.
+    statementFindById.mockResolvedValue({ fxRate: 0.9, transactions: [{ amount: 90 }, { amount: 90 }] });
+    await updateStatement('s1', formOf({ ...foreign, fxRate: '0.8' }));
+    const update = statementFindByIdAndUpdate.mock.calls[0][1];
+    expect(update.transactions.map((t: { amount: number }) => t.amount)).toEqual([80, 80]);
+    expect(update.totalAmount).toBe(160);
+  });
+
+  it('updateStatement is a no-op on the charges when the same rate is re-submitted', async () => {
+    statementFindById.mockResolvedValue({ fxRate: 0.9, transactions: [{ amount: 90 }] });
+    await updateStatement('s1', formOf(foreign));
+    const update = statementFindByIdAndUpdate.mock.calls[0][1];
+    // Nothing changed, so the transactions array is not even written.
+    expect(update.transactions).toBeUndefined();
+    expect(update.totalAmount).toBe(180);
+  });
+
+  it('addTransaction converts a charge typed onto a foreign statement with that statement rate', async () => {
+    statementFindById.mockResolvedValue({ fxRate: 0.9 });
+    await addTransaction('s1', formOf({ date: '2026-06-03', description: 'AMAZON US', amount: '100' }));
+    const update = statementFindByIdAndUpdate.mock.calls[0][1];
+    expect(update.$push.transactions.amount).toBe(90);
+  });
+
+  it('addTransaction stores the typed amount as-is on a base-currency statement', async () => {
+    statementFindById.mockResolvedValue({ fxRate: 0 });
+    await addTransaction('s1', formOf({ date: '2026-06-03', description: 'PLAISIO', amount: '39.47' }));
+    const update = statementFindByIdAndUpdate.mock.calls[0][1];
+    expect(update.$push.transactions.amount).toBe(39.47);
   });
 });

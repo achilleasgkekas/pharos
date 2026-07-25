@@ -253,6 +253,8 @@ These are flagged **(AI)** below with the feature name.
 | POST   | `/statements/plans/merge` | Merge two plans into one payoff. Body `{ sourceKey, targetKey }` → `{ ok, moved }`. |
 | DELETE | `/statements/plans/merge` | Undo a merge, splitting charges back into their own plans. Body `{ key }` → `{ ok, moved }`. |
 
+**Multi-currency fields (P9):** a card issues its statement in ONE currency, so `GET /statements` and `GET /statements/:id` return `currency` (the code printed on the statement), `origAmount` (the printed HEADLINE total) and `fxRate` (base units per 1 unit of `currency`). Every amount in the response, `totalAmount`/`minimumPayment`/`paidAmount` and each transaction's `amount`, is already in the deployment's base currency, converted with that single rate, so a client can sum them without conversion; divide by `fxRate` for the printed figure. Both extra fields are `0` on an ordinary statement. `fxRate: 0` with a foreign `currency` means no rate has been entered yet, so the amounts are still the printed numbers: show them as unconverted rather than mixing them into a base-currency total.
+
 Each plan in the `GET /statements/plans` response is:
 
 ```json
