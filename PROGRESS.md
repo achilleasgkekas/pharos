@@ -8876,3 +8876,65 @@ auditor το είχε ήδη προαναγγείλει ως follow-up στο po
 ## Needs Achilleas
 
 - Τίποτα νέο από αυτό το run.
+
+## 2026-07-25 (cont. — P9 slice 4: multi-currency για Items)
+
+**Guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` σαρώθηκε: 8 OPEN entries, όλα `bakecore-*` εκτός του
+`pharos-daily-dev-20260725-1425` (P17/P23 native-dep έγκριση) που είναι **ακόμα OPEN, χωρίς Answer** ,οπότε τα δύο
+αυτά Approved items μένουν μπλοκαρισμένα και δεν πιάστηκαν. Working tree καθαρό στην αρχή.
+
+**Επιλογή (βήμα a — Approved queue)**: το Approved queue έχει P36 (Open Banking, θέλει credentials/provider απόφαση),
+P31 (household, θέλει supervised session), P16 (Firefly/Grocy, θέλει πραγματικό sample file), P5 phase 2, P17/P23
+(μπλοκαρισμένα παραπάνω) και **P9 multi-currency** που είναι το μόνο buildable. Το προηγούμενο run πρότεινε ρητά
+**Items** ως επόμενο slice (τροφοδοτεί net worth + insurance export), οπότε αυτό χτίστηκε.
+
+**Τι χτίστηκε**: `Item.currency`/`origAmount`/`fxRate` + και τα 4 write paths (createItem/updateItem/`POST` v1/
+`PATCH` v1) περνούν από τον resolver. **Η διαφορά από τα προηγούμενα slices**: ένα item έχει **ΤΡΙΑ** ποσά
+(`purchasedPrice`, `currentPrice`, `targetPrice`) γραμμένα στο ίδιο χαρτί/shop page, οπότε μετατρέπονται όλα με **ΤΟ
+ΙΔΙΟ rate**: μισο-μετατρεπμένο item θα δηλητηρίαζε ταυτόχρονα net worth, το insurance export (P13), το inventory
+value ανά κατηγορία και το shopping budget. Ο κανόνας μπήκε σε ένα νέο pure **`fx.resolveItemPrices()`** που τον
+μοιράζονται action + API route (μηδέν duplication).
+
+**Αποφάσεις που πήρα μόνος μου** (καταγράφονται όπως ζητά η εντολή):
+- **`origAmount` = η τυπωμένη ANCHOR τιμή**: ό,τι **πλήρωσες** όταν το item είναι owned, αλλιώς η τιμή ζήτησης. Είναι
+  ο αριθμός που αναγνωρίζει κανείς κοιτώντας την απόδειξη, και αυτόν δείχνει το κοινό `FxBadge` χωρίς αλλαγή.
+- **ΔΕΝ μετατρέπονται** οι τιμές των store links (`links[].price`, ό,τι quote-άρει το shop/ο scraper) ούτε το παλιό
+  `priceHistory[].currency`. Έτσι το derived «cheapest link» currentPrice συμπεριφέρεται **ακριβώς** όπως πριν, και
+  το per-store price tracking μένει άθικτο (είναι διαφορετικό, παλαιότερο πράγμα).
+- **Un-convert πριν το re-resolve σε ΔΥΟ σημεία**, αλλιώς ένα δεύτερο save μετατρέπει ήδη-μετατρεπμένο νούμερο: το
+  `PATCH` ξαναδιαβάζει το doc και περνά τις αποθηκευμένες τιμές από `toPrinted()` (νέο rate εφαρμόζεται στα ΤΥΠΩΜΕΝΑ
+  νούμερα, όχι πάνω σε προηγούμενη μετατροπή) και η edit φόρμα σείρνεται με printed figures. Και τα δύο pinned με
+  τεστ (re-sending του ίδιου rate = no-op).
+
+**UI**: currency select δίπλα στην τιμή + η ίδια FX γραμμή (rate ή «or charged» με back-out μέσω `deriveFxRate`) +
+live preview + `FxBadge` σε card/row/detail. Όλα πίσω από το υπάρχον `AppConfig.multiCurrency` (default off), οπότε
+ένας single-currency χρήστης δεν βλέπει ούτε ένα επιπλέον πεδίο.
+
+**API**: `/api/v1/items` shape += currency/origAmount/fxRate, POST/PATCH δέχονται currency/fxRate (**mobile parity
+μαζί, όχι follow-up**) + τεκμηρίωση στο `API.md`. ΣΗΜ: το `trim`/`ItemLean` δεν μπορούν να γίνουν export από route
+file (Next.js typed-routes constraint, το tsc το έπιασε αμέσως), οπότε έμειναν module-local.
+
+**Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` → **3636 passed / 268 files** (+23: 11 unit για το
+`resolveItemPrices`, 4 POST, 8 PATCH· μηδέν regression). 4 υπάρχοντα exact-shape PATCH assertions ενημερώθηκαν
+επειδή ένα money-touching body κάνει πλέον re-read και γράφει και τα 3 FX πεδία (σωστή νέα συμπεριφορά, όχι break).
+Docker κάτω από το mutex: `build web` → mongo healthy → `up -d web` → `/login` **200 με την πρώτη**, **0 restarts**,
+`/items`+`/shopping`+`/settings` 307 (auth-gated, άρα compiled) → `docker builder prune -f` (197MB) → lock released.
+Browser: app renders, **μηδέν console errors** (το authed `/items` δεν επαληθεύεται unattended, credentials boundary).
+
+**Git hygiene**: explicit `git add` 14 αρχείων (όχι `-A`) → commit `8e13724` → pushed.
+
+**Επόμενο task (πρόταση)**: **P9 slice 5 — Statements**, το τελευταίο module με ίδιο latent bug (το `currency` του
+αποθηκεύεται ήδη αγνοημένο). Προσοχή: ένα statement έχει ΠΟΛΛΑ transactions με δικά τους ποσά, οπότε το ερώτημα
+σχεδίασης είναι αν το rate ζει στο statement (ένα per-statement rate) ή ανά transaction: θα πρότεινα per-statement,
+γιατί μια κάρτα εκδίδει το statement σε ΕΝΑ νόμισμα. Μετά μένουν `resolveFx` στο CSV import (PA1) και στο email-in.
+Ως συνήθως τρέξε **πρώτα** το Approved queue check (βήμα a): αν έχει απαντηθεί το `expo-camera` ερώτημα, το P17
+camera UI προηγείται.
+
+## Needs Achilleas
+
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο. Το P17 server half είναι shipped+tested και
+  του P23 υπάρχει ήδη (`POST /api/v1/scan/receipt`). Ερώτημα: `~/.claude/ASK_ACHILLEAS.md` →
+  `pharos-daily-dev-20260725-1425` (ακόμα OPEN).
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
+  household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
+  ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
