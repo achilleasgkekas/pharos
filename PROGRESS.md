@@ -8349,3 +8349,65 @@ tenancy-parity (ίδιο recipe, 1 αρχείο, μικρότερο) — και 
   provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file
   need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
   power tool· P5 bookmarklet MV3-extension phase 2· light-theme parity mobile decision.
+
+## 2026-07-25 (mobile-parity-auditor — 55η σάρωση, confirmation run)
+
+**Orient**: CLAUDE.md → MOBILE_PARITY.md → BACKLOG.md/TODO.md → `git log --oneline -15`. HEAD στην αρχή: `0bc5e14`
+(security fix, requireAdmin gate στο Settings→Notifications). Working tree καθαρό.
+
+**Inventory ξαναχτισμένο από τον κώδικα (όχι από τα docs)**: **59 v1 routes** (`find apps/web/src/app/api/v1 -name
+route.ts | wc -l`, αμετάβλητο vs 54η σάρωση), **18 mobile screens** (`ls apps/mobile/src/screens`, αμετάβλητο).
+`apps/mobile npx tsc --noEmit` → **EXIT 0**.
+
+**Diff vs την 54η σάρωση (2026-07-24)**: `git log --since=2026-07-24 -- apps/web/src apps/mobile/src` δείχνει
+**μόλις 3 commits**: `0bc5e14` (**backend-only** security fix — `requireAdmin()` σε 8 Settings→Notifications
+actions, γρ.339-446 του `apps/web/src/app/settings/actions.ts` [ntfy URL, notifier channels Discord/Slack/
+Telegram-token, outbound webhooks HMAC-secret] — grep-confirmed `git show --stat 0bc5e14` = μηδέν hit σε
+`api/v1`/`apps/mobile/src`, δεν αγγίζει το mobile API surface καθόλου) + `b1ba3ae`/`71eaf74` (2 test-only
+commits, route/action coverage, μηδέν shape change). **Μηδέν νέο functional parity gap.**
+
+**Επιβεβαίωση top-1 item της 54ης**: το «Notifications — humanize raw pipe-delimited body στο mobile Alerts tab»
+είχε ήδη shipped **πριν** ξεκινήσει η 54η σάρωση (commit `ee894a3`, σωστά marked `Status: ✅ DONE 2026-07-24`
+στο doc). Live re-verified στον κώδικα (όχι μόνο doc-trust): `apps/web/src/app/api/v1/notifications/route.ts`
+GET επιστρέφει `currency` (`Promise.all([getNotifications(), getAppSettings()])`), `apps/mobile/src/screens/
+ActivityScreen.tsx` έχει `describeAlert(n, currency)` helper + `AlertsTab` render `{describeAlert(item,
+currency).sub}` αντί για raw `{item.body}`. Confirmed done, όχι stale.
+
+**Ground-truth grep audit** (πέρα από τα docs, ίδιες διαστάσεις με το UI Debt Queue monitoring): borderRadius
+hardcoded `borderRadius: [0-9]` στα screens = **51**· padding/margin/gap numeric literals = **389** (ευρύτερο
+grep pattern από προηγούμενα scans, περιλαμβάνει `paddingTop/Bottom/Left/Right` ξεχωριστά — όχι directly
+comparable με το παλιό 151/158 count, απλά baseline για το επόμενο scan)· `ActivityIndicator` raw = **42**
+(ταιριάζει ακριβώς με το 54ο scan, αμετάβλητο)· `<Spinner` adoption = **19**· `react-native-safe-area-context`
+usage = **0** (επιβεβαιώνει το P2/M safe-area item ακόμα genuinely TODO, όχι stale)· theme-context/light-palette
+usage = **0** (επιβεβαιώνει το P3/L light-theme item ακόμα genuinely TODO, needs-decision παραμένει)· raw
+`<TextInput>` σε screens = **0** (επιβεβαιώνει ότι το ReceiptsScreen cell-input fix [`0bce960`] καθάρισε πλήρως)·
+hex literal εκτός `theme.ts` = **1 hit** μόνο (`VouchersScreen.tsx:581` `backgroundColor:'#fff'` στο barcode-
+display container) — εξετάστηκε και **δεν είναι violation**: σκόπιμο functional exception ώστε το loyalty-card
+barcode να έχει λευκό φόντο ανεξαρτήτως theme (contrast requirement για σωστό optical scan), όχι design-token
+παράλειψη· δεν προστέθηκε στο queue.
+
+**Counts: DONE 0 νέα σε αυτό το run (το item της 54ης είχε ήδη κλείσει πριν ξεκινήσει) / auto-buildable
+functional GAP 0 νέο / NEEDS DECISION 0 νέα.**
+
+**Top 3 προτεινόμενα για τον builder** (το functional Build Queue είναι γνήσια άδειο — 55 συνεχόμενες σαρώσεις
+χωρίς κανένα mobile-blocking web feature να μείνει unported πάνω από 24ωρο· το daily-dev routine κλείνει το
+parity loop πολύ γρήγορα πλέον· τα επόμενα διαθέσιμα tiers είναι όλα UI Debt, όχι functional parity):
+1. **ActivityIndicator → shared `<Spinner>`** (P2/M, 42 sites σε 10+ screens, μηχανικό pattern-swap, tsc-
+   verifiable, μηδέν decision) — μεγαλύτερο ROI/effort ratio από τα υπόλοιπα UI-debt items.
+2. **Safe-area-context adoption** (P2/M, νέο RN dep `react-native-safe-area-context`, landscape + bottom
+   home-indicator inset, ήδη πλήρως speced στο doc).
+3. **borderRadius/padding token standardization batch** (P2/M-L, μηχανικό αλλά μεγάλο surface — 51 borderRadius
+   + ~389 padding/margin/gap sites, καλύτερα ως ξεχωριστό attended-preferred batch λόγω μεγέθους).
+
+**Docs**: `MOBILE_PARITY.md` → νέα 55η re-audit note στην κορυφή του Build Queue section (πάνω από την 54η,
+ίδιο append-only convention με τα προηγούμενα 54 scans).
+
+**Git hygiene**: `git add MOBILE_PARITY.md PROGRESS.md` (explicit, όχι `-A`) → commit → push.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: SaaS multi-tenancy/billing rollout env boundary·
+  mobile native-dep approvals (P17 camera, P23 share-sheet, safe-area-context UI-debt dep)· P36 Open Banking
+  provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file
+  need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
+  power tool· P5 bookmarklet MV3-extension phase 2· light-theme parity mobile decision.
