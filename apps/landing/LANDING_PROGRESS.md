@@ -3675,3 +3675,63 @@ line-item global search, P21 document/manual vault, ή νεος `git log --oneli
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-26 — P9 slice 6: bank CSV import multi-currency (last write path closed)
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε (12 OPEN
+entries πλεον, ολα bakecore + το pharos-daily-dev mobile-camera question, τιποτα ANSWERED προς αυτη τη
+routine).
+
+`git log --oneline 2e408ff..HEAD | grep "feat("` (2e408ff = τελευταιο source commit που αντικατοπτριστηκε
+στο landing, βλ. entry #17) εβγαλε ενα φρεσκο: `901d7d0 feat(money): multi-currency for the bank CSV
+import (P9 slice 6)`.
+
+Read-only research (commit message, χωρις subagent, μικρο scope): το CSV importer (PA1, το ηδη-υπαρχον FAQ
+"Can I bulk-import expenses from a bank export?") δεν ειχε καμια εννοια νομισματος, μια γραμμη Revolut/Wise
+"88.00 USD" ειτε απορριπτονταν ειτε το USD πεταγονταν και τα 88 μπαιναν σαν ευρω. Το commit message το λεει
+ρητα: αυτο ηταν "the last write path that could still create a record with a foreign amount stored as base
+currency" (το email-in path ηδη καλυπτεται απο slice 2 μεσω του receipt AI parse). Behavior: νεο `currency`
+CsvField + header hints σε 5 γλωσσες, sniff του code/symbol απο το ιδιο το amount cell οταν δεν υπαρχει
+ξεχωριστη στηλη, `fxRates` = ΕΝΑ rate ανα νομισμα για ολοκληρο το αρχειο (οχι ανα γραμμη, γιατι μια τραπεζα
+τυπωνει codes αλλα ποτε rates), και γραμμες χωρις rate ΔΕΝ χανονται/μαντευονται 1:1 αλλα μπαινουν με το
+τυπωμενο ποσο+code + μετρωνται στο νεο `needsRate` πεδιο. Side-fix: το dedupe key ελεγχε το τυπωμενο ποσο
+του CSV εναντια στο ΗΔΗ-converted stored ποσο, άρα re-import του ιδιου foreign αρχειου θα δημιουργουσε
+duplicates· τωρα και οι δυο πλευρες κλειδωνουν στο τυπωμενο νουμερο (origAmount οταν υπαρχει).
+
+Αλλαγες (`apps/landing/app/page.tsx`, 3 σημεια, ιδιο αρχειο με παντα):
+1. CSV-import FAQ (`faq-can-i-bulk-import-expenses-from-a-bank-export`, anchor αμεταβλητο): προσθεσε
+   τελευταια προταση για multi-currency behavior (currency column ή sniff απο το amount cell, ΕΝΑ rate ανα
+   νομισμα για ολο το αρχειο στο preview, unrated γραμμη εισαγεται με το printed ποσο+code + μετραγεται στο
+   result panel, οχι σιωπηλη προσθεση σε base-currency totals).
+2. Multi-currency FAQ (`faq-can-it-handle-an-expense-in-a-currency-other-than-my-main-one`): το κλεισιμο
+   αλλαξε απο "It now covers every money-holding record in the app: expenses, income, receipts,
+   subscriptions, items, and statements." σε "...every money-holding record in the app and every way it
+   gets in: expenses, income, receipts, subscriptions, items, and statements typed in or scanned, plus
+   foreign-currency rows in a bank CSV import." (η διακριση "record types" vs "write paths" ειναι σκοπιμη,
+   το CSV import δεν ειναι νεος τυπος εγγραφης, ειναι το τελευταιο σημειο εισαγωγης που καλυφθηκε).
+3. Roadmap Shipped block: "...items & statements" -> "...items, statements & CSV imports".
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη).
+- Πορτες 3100-3130: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build
+  (το standalone-output warning ειναι γνωστο/αβλαβες, ο server σερβιρει κανονικα).
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` επιβεβαιωσε και τα δυο FAQ ids found:true, το CSV FAQ περιεχει "Revolut or Wise export
+  mixing EUR and USD rows is read correctly", το multi-currency FAQ περιεχει "foreign-currency rows in a
+  bank CSV import", roadmap νεο wording παρον / παλιο wording απουσιαζει (και τα 3 checks true/false οπως
+  αναμενοταν). Hero screenshot καθαρο (lighthouse mark, gradient τιτλος, nav, τριπλο badge row). Server
+  τερματιστηκε (`pkill -f "next start -p 3110"`), κανενα `next-server` process δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx.
+- Δεν αγγιξα Docker/:3000/web/mobile. Η μονη agent-χρηση ηταν read-only Read/git-show (χωρις subagent,
+  μικρο scope), μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: P9 (record types + write paths) πλεον πληρως καλυμμενο στο landing wording. Candidates:
+P22 receipt line-item global search, P21 document/manual vault, ή νεος
+`git log --oneline 901d7d0..HEAD | grep "feat("` ελεγχος στην αρχη του επομενου run, ή polish συνεχεια /
+real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
