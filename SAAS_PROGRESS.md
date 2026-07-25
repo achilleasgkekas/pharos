@@ -4677,3 +4677,60 @@ reactivate}`, `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.
 Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν
 βρεθεί, πάει πρώτο — η ουρά ήταν άδεια σε αυτό το run αλλά μπορεί να ανοίξει νέο item η επόμενη
 σάρωση του auditor).
+
+## 2026-07-25 (cont. — increment 99, route-level test coverage για το account profile endpoint GET+PATCH)
+
+Πριν από νέο increment: ask-inbox re-checked (5 OPEN entries, όλα bakecore — 2× bakecore-finance,
+bakecore-redesigner, bakecore-tests macOS-TCC flag, bakecore-reviewer macOS-TCC flag· τίποτα
+addressed σε saas-core, ίδιο κενό όπως τα προηγούμενα runs). `WEB_DEBT.md` re-checked (58η σάρωση
+παραμένει το latest· η ενεργή ουρά είναι άδεια, μηδέν νέο P1/P2/P3 item στο territory). UI-first
+backlog παραμένει εξαντλημένο. Ακολούθησα το leftover next-task από το increment-98 log.
+
+**Νέο `account/route.test.ts`** (17 tests), μηδέν production code αλλαγή. Route = self-service
+profile (GET own account / PATCH name+email), το πιο βασικό account CRUD που έμενε ακόμα χωρίς
+route-level coverage. Mocks: `@/lib/db` (connectDB no-op), `@/models/Account` (findById().select()
+chain + `Account.exists`), `@/lib/tenancy/accountSession` (getCurrentAccount + setAccountCookie),
+`@/lib/tenancy/saasApi` (vi.importActual για το πραγματικό saasGuard, mocks μόνο saasAuthGate +
+accountTenants — ίδιο module-boundary precedent με τα προηγούμενα auth route tests). **Νέο
+choice**: `normalizeEmail`/`looksLikeEmail` (lib/tenancy/members) και `sanitizeName` (lib/tenancy/
+accountProfile) ΔΕΝ mockαρίστηκαν — τετριμμένα pure string helpers, το να τα αφήσω πραγματικά
+εξετάζει το actual normalization behavior που βασίζεται η route (π.χ. το «email unchanged»
+test επιβεβαιώνει ότι `' Jo@Example.com '` normalizes στο ήδη-αποθηκευμένο `jo@example.com` και
+ΔΕΝ πυροδοτεί uniqueness-check/cookie-refresh — θα ήταν αδύνατο να το εξετάσω αν το normalizeEmail
+ήταν mocked). Νέο `chainable()` helper λύνει το ότι το GET κάνει `.select().lean()` ενώ το PATCH
+κάνει `.select()` χωρίς `.lean()` (το select() return value είναι ταυτόχρονα thenable ΚΑΙ έχει
+`.lean()` method, ίδιο mock function εξυπηρετεί και τα δύο call-shapes).
+
+Καλύπτει: **GET** — gate/401/account-gone→404/success maps πλήρη lean doc verbatim (dates→ISO)/
+success defaults λείποντα optional πεδία (email/name→''· emailVerified→false· dates→null)/
+mid-handler throw (connectDB rejects)→καθαρό 500 μέσω πραγματικού saasGuard. **PATCH** —
+gate/401/**ούτε name ούτε email στο body→400 "Nothing to update", μηδέν DB touch**/malformed
+email→400 ΠΡΙΝ οποιοδήποτε uniqueness check (Account.exists ποτέ)/account-gone→404/**email
+normalizes στην ΙΔΙΑ ήδη-αποθηκευμένη τιμή**→Account.exists ΠΟΤΕ δεν καλείται, emailVerified
+ΔΕΝ resets, setAccountCookie ΠΟΤΕ δεν καλείται (save καλείται ούτως ή άλλως, unconditional)/
+email αλλάζει σε ήδη-χρησιμοποιούμενο (Account.exists→true)→409, save ΠΟΤΕ/email αλλάζει σε
+ελεύθερο→email updated + emailVerified reset σε false + setAccountCookie καλείται με το ΝΕΟ
+email + response περιλαμβάνει accountTenants(accountId)/name-only update→sanitizeName (trim)
+εφαρμόζεται, save καλείται, setAccountCookie **ΔΕΝ** καλείται (email αμετάβλητο)/**save() race
+(throw `{code:11000}`)→το ΙΔΙΟ 409 μήνυμα με το pre-check**/οποιοδήποτε άλλο save() throw→
+καθαρό 500 μέσω πραγματικού saasGuard.
+
+**Verified**: νέο test file **17/17 green** μόνο του· πλήρες `npx vitest run` → **263 files /
+3493 tests green** (αυξήθηκε από 258/3424 του increment-98 log — άλλες παράλληλες routines
+πρόσθεσαν test files ενδιάμεσα, αναμενόμενο σε shared repo). `npm run type-check` → **EXIT 0**
+καθαρά. **Docker: ΔΕΝ έγινε rebuild** (test-only αρχείο, μηδέν production code/runtime wiring
+αλλαγή). **Browser-verify: skipped** (test file, μηδέν UI/observable behavior αλλαγή).
+Collision guard: `git status --short` πριν το staging έδειξε ΜΟΝΟ το δικό μου 1 νέο αρχείο
+(clean tree)· `git diff --cached --name-only` + `git show --stat HEAD` μετά το commit
+επιβεβαίωσαν exact 1-file match πριν το push. Pushed `0e5c580`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο στα υπόλοιπα route-clusters χωρίς coverage — καλύτεροι επόμενοι
+υποψήφιοι: **`account/mfa/confirm`** (φυσική συνέχεια του mfa enrollment flow, confirmMfaEnrollment
+ήδη unit-tested αλλά το route wrapping όχι), **`admin/overview`**/**`admin/tenants`** (read-only
+superadmin console surfaces, ακόμα untested), ή **`account/{workspaces,export}`**. Μετά: `members`,
+`usage`+`usage/sample`, `workspace/{ai-key,export,export/files,reactivate}`, `invites/{resend,
+route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`, `account/{reset/*,verify/*}`,
+`admin/tenants/[slug]/dbstats`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
+για item στο territory (αν βρεθεί, πάει πρώτο).
