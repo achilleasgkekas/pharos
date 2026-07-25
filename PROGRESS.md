@@ -8515,3 +8515,63 @@ standing-blocked (βλ. Needs Achilleas).
   provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file
   need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
   power tool· P5 bookmarklet MV3-extension phase 2· light-theme parity mobile decision.
+
+## 2026-07-25 (P3/M i18n gap: 126 ελληνικά κλειδιά, el.ts πλήρες)
+
+**Approved queue check (βήμα a)**: ξανασάρωσα `PRODUCT_BACKLOG.md → ## Approved` γραμμή-γραμμή. Ίδιο standing
+αποτέλεσμα με τα προηγούμενα runs, μηδέν αλλαγή: **P36** Open Banking (needs-Achilleas provider decision)·
+**P31** household (supervised session)· **P17**/**P23** (mobile native-dep approvals)· **P9** multi-currency
+(L, ρητά «άφησέ το τελευταίο» στο ίδιο το backlog). Μηδέν buildable Approved item → fallback (βήμα b).
+
+**ΣΥΓΚΡΟΥΣΗ ΠΟΥ ΑΠΟΦΕΥΧΘΗΚΕ (αξίζει να σημειωθεί)**: το suggested-next-task του προηγούμενου run ήταν το
+**P2/M** Voucher/GiftCard/LoyaltyCard tenancy-parity. Ξεκίνησα από εκεί, αλλά το pre-build verify έδειξε ότι
+τα 3 αρχεία ήταν **ήδη μισο-αλλαγμένα** (το `loyaltyActions.ts` είχε renamed imports αλλά τα σώματα ακόμα
+αναφέρονταν στο πλέον ανύπαρκτο `LoyaltyCard`). `ls -lT` → mtimes **δευτερόλεπτα πριν**, δηλαδή **άλλη
+διεργασία τα επεξεργαζόταν εκείνη τη στιγμή**. Αποσύρθηκα αμέσως αντί να γράψω πάνω τους. Επιβεβαιώθηκε λίγο
+αργότερα: η άλλη routine τα commit-άρε ως **`315cd26`** («fix(saas): tenant-scope voucher/giftcard/loyalty
+actions»). Το item είναι πλέον κλειστό από εκείνη, όχι από εμένα. **Δίδαγμα για επόμενα runs**: το
+suggested-next-task ενός προηγούμενου run ΔΕΝ είναι δεσμευμένο, άλλη routine μπορεί να το έχει πάρει· το
+verify-pre-build αξίζει να κοιτά και mtimes, όχι μόνο «είναι ακόμα ανοιχτό;».
+
+**Τι έγινε αντ' αυτού**: το **τελευταίο εναπομείναν auto-buildable web-debt item**, το **P3/M i18n gap** —
+μηδενικό collision risk με το `app/vouchers/**` της άλλης διεργασίας, και πραγματική αξία για Greek-first
+χρήστη. Το χάσμα ήταν **126 κλειδιά** (node-verified `en=1271, el=1145`), δηλαδή +16 από τα 110 της 56ης
+σάρωσης (νέα: P5 bookmarklet/quick-capture `bm.*`+`cap.*`, P16 YNAB import `migrate.*`+`ynab.*`). Όλα αυτά
+εμφανίζονταν **αγγλικά** στο UI μέσω του English fallback του resolver.
+
+Προστέθηκαν και τα **126** στο `apps/web/src/lib/i18n/locales/el.ts`, **στη σειρά που έχουν στο `en.ts`**:
+για κάθε missing key, εισαγωγή αμέσως μετά το πλησιέστερο προηγούμενο en-key που υπήρχε ήδη στο `el.ts`
+(126 γραμμές σε 17 anchors, **μηδέν αναδιάταξη** υπαρχόντων κλειδιών, μηδέν αλλαγή σε keys ή στο `en.ts`).
+Τα interpolation placeholders (`{n}`, `{title}`, `{amt}`, `{days}`, `{when}`, `{x}`,
+`{valid}`/`{excluded}`/`{invalid}`) πέρασαν αυτούσια. Ακολούθησα τις συμβάσεις που ήδη έχει το αρχείο αντί
+να επιβάλω δικές μου: ελληνικά εισαγωγικά «…» στα confirm titles (όπως `it.confirmDeleteItem`), «μέρες»
+(όπως `set.warrantyAlert`), `·` ως separator, ορολογία «Είδη»/«Αποθήκη»/«Λογαριασμοί».
+
+**Verify**: το ίδιο το acceptance one-liner του item → **0 missing, 0 extra** (`en=1271, el=1271`)·
+`npm run type-check` καθαρό ως προς `el.ts`· `npx vitest run src/lib/i18n` → **53/53 green** (incl.
+`locales.test.ts`, που ελέγχει placeholder parity)· full `npx vitest run` → **3401 passed / 256 από 257
+files**. Οι **3 αποτυχίες** (και το ένα type error) ανήκουν όλες στο **untracked**
+`receipts/actions.upload.test.ts` άλλης διεργασίας, **baseline-confirmed πριν αγγίξω οτιδήποτε** (το είχα
+τρέξει στην αρχή του run) — μηδέν σχέση με το `el.ts`, και δεν το πείραξα.
+
+**Docker rebuild: skipped, τεκμηριωμένα.** Πήρα κανονικά το mutex (`mkdir /tmp/claude-docker.lock`, mongo
+`healthy`, `/login` 200) αλλά **δεν έχτισα** και το απελευθέρωσα αμέσως: το `tsconfig.json` κάνει include
+`**/*.ts` και το `next.config.ts` **δεν** έχει `ignoreBuildErrors`, οπότε το `next build` θα έσκαγε πάνω στο
+ξένο untracked test αρχείο, όχι σε αυτή την αλλαγή. Επιπλέον, ένα rebuild εκείνη τη στιγμή θα έψηνε στο live
+container τα τότε-ακόμα-uncommitted (και μισοτελειωμένα) vouchers edits της άλλης routine. Locale-data-only
+αλλαγή, πλήρως καλυμμένη από τα i18n tests. **Browser-verify**: skipped για τον ίδιο λόγο — ο τρέχων
+container σερβίρει το προηγούμενο bundle, οπότε δεν θα έδειχνε καθόλου τα νέα ελληνικά strings (θα ήταν
+ψευδο-απόδειξη). Θα φανούν στο επόμενο κανονικό rebuild.
+
+**Docs**: `WEB_DEBT.md` → το i18n item marked `Status: DONE (fixed 2026-07-25, pharos-daily-dev)` στη θέση του.
+
+**Suggested next task**: με το i18n κλειστό, η **auto-buildable ουρά του `WEB_DEBT.md` αδειάζει** (το P1/S
+requireAdmin, το P2/S sampleData και το P2/M vouchers έκλεισαν όλα μέσα στο τελευταίο 24ωρο). Επόμενο run:
+τρέξε πρώτα το Approved queue check (βήμα a) ως συνήθως, και αν είναι πάλι άδειο, το φυσικό fallback είναι
+**`MOBILE_PARITY.md`** (τα follow-ups των P28/P32/P34/P35 v1 shapes) ή μια νέα σάρωση web-debt. ΣΗΜ: το
+i18n χάσμα **ξαναμεγαλώνει ανά feature** (38→42→75→84→110→126 σε ~2 εβδομάδες) — αξίζει να μπαίνουν τα
+ελληνικά κλειδιά **μαζί** με κάθε νέο feature αντί για περιοδικά catch-up passes.
+
+**Git hygiene**: `git add` explicit (μόνο `apps/web/src/lib/i18n/locales/el.ts` + `WEB_DEBT.md` +
+`PROGRESS.md`, όχι `-A`) → commit → push. Το untracked `receipts/actions.upload.test.ts` και το commit
+`315cd26` της άλλης routine **δεν αγγίχτηκαν**.
