@@ -3432,3 +3432,67 @@ screenshots οταν υπαρξουν assets (blocked).
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενο entry (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-25 (14) — P9 multi-currency (Expenses/Income): νεα FAQ + roadmap fix
+
+Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος
+`~/.claude/ASK_ACHILLEAS.md` (6 OPEN entries πλεον, ολα bakecore + το pharos-daily-dev mobile-camera
+question, τιποτα για landing/pharos-landing). `git log --oneline 57a58bb..HEAD | grep "feat("` (57a58bb =
+τελευταιο commit που αγγιξε το apps/landing) εβγαλε 2 φρεσκα: `f83ff71 feat(money): multi-currency
+foundation + Expenses (P9 slice 1)` και `83750f6 feat(api): barcode product lookup endpoint (P17 server
+half)`.
+
+Το P17 ειναι μονο server-half (το UI/mobile κομματι ειναι blocked, βλ. OPEN ερωτηση
+`pharos-daily-dev-20260725-1425` στο inbox: περιμενει εγκριση για `expo-camera`) -> δεν ειναι ακομα user-
+facing feature, δεν ειναι ετοιμο για landing copy. Επελεγη το **P9 multi-currency** για αυτο το run: εχει
+πραγματικο shipped UI (opt-in toggle, δουλευει σημερα).
+
+Espesta agent (Explore, read-only) διαβασε τον πραγματικο κωδικα πριν γραψω copy (οχι μονο τα docs/*.md
+summaries): `lib/fx.ts` (pure module, `AppConfig.multiCurrency` = ενα deployment-wide boolean, off by
+default -> μηδεν αλλαγη στη φορμα οταν off), `models/Expense.ts` (νεα πεδια `origAmount`/`fxRate`, το
+`amount` μενει ΠΑΝΤΑ base-currency, `amount = origAmount * fxRate`), το FX rate ειναι **χειροκινητο** (οχι
+API fetch) — direct rate field ή "τι σε χρεωσε τελικα" back-out field (`deriveFxRate`). Αν μεινει
+αγνωστο (rate=0), ΔΕΝ μαντευει 1:1, δειχνει gold warning badge. Scope: ΜΟΝΟ Expenses+Income (ιδιο μοντελο,
+kind income/expense) — Receipts/Statements/Subscriptions/Items ΔΕΝ αγγιχτηκαν ακομα (PRODUCT_BACKLOG.md το
+σημειωνει ρητα ως επομενο slice). CURRENCIES = 14 built-in codes αλλα `normalizeCurrency()` δεχεται
+οποιοδηποτε ISO 4217 3-γραμματο code.
+
+Αλλαγες (`apps/landing/app/page.tsx`, 2 σημεια, ιδιο αρχειο με παντα):
+1. Νεα FAQ εγγραφη «Can it handle an expense in a currency other than my main one?» στο money/expenses
+   cluster, αμεσως μετα το «Can I bulk-import expenses from a bank export?» και πριν το «Can I see all my
+   renewals, installments, and bills in one calendar?».
+2. **Roadmap fix**: το `ROADMAP` array ειχε "Multi-currency support" ακομα κατω απο **Exploring** ("not yet
+   scheduled") — ξεπερασμενο τωρα που ειναι πραγματικα shipped. Μετακινηθηκε στο **Shipped** ως "Opt-in
+   multi-currency for expenses & income" (ακριβες wording, οχι υπερβολικο "multi-currency support" γενικα
+   αφου δεν καλυπτει ολα τα modules ακομα), και αφαιρεθηκε απο το Exploring block.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη αφου
+  ολα build-time data).
+- Πορτες 3100-3130: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build
+  (γνωστο harmless standalone warning). `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages`
+  (onlyErrors) -> "No console logs." καθαρο. `javascript_tool` επιβεβαιωσε: `found:true`, σωστο anchor id
+  `faq-can-it-handle-an-expense-in-a-currency-other-than-my-main-one`, σωστη σειρα γειτονων στο DOM
+  (["faq-can-i-bulk-import-expenses-from-a-bank-export", **αυτο**,
+  "faq-can-i-see-all-my-renewals-installments-and-bills-in-one-calendar"]). Roadmap check: body text
+  περιεχει "Opt-in multi-currency for expenses & income" κατω απο Shipped, και το bare "Multi-currency
+  support" εφυγε απο το Exploring block (regex check και στα δυο). Hero screenshot καθαρο (lighthouse mark,
+  gradient τιτλος, nav με Compare/Roadmap links, τριπλο badge row). `pkill -f "next start -p 3110"` ->
+  επιβεβαιωθηκε οτι κανενα `next-server` process δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx.
+- Δεν αγγιξα Docker/:3000/web/mobile. Η μονη agent-χρηση ηταν read-only research (Explore), μηδεν AI call
+  για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Commit `d3bae99`, pushed στο `origin/main` (792a028..d3bae99).
+
+Επομενο increment: 2 candidates απο την προηγουμενη λιστα προτεραιοτητας παραμενουν ανοιχτα (P22 receipt
+line-item global search, P21 document/manual vault). Επισης νεο εδω: αν το P17 mobile UI εγκριθει και
+χτιστει σε επομενο pharos-daily-dev run, θα γινει landing-worthy τοτε (τωρα μονο server-half, οχι ακομα).
+Αλλιως: νεος `git log --oneline d3bae99..HEAD | grep "feat("` ελεγχος, ή polish συνεχεια / real app
+screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενο entry (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
