@@ -414,6 +414,7 @@ const ROADMAP: {
       'Eight-language interface localisation',
       'Return-window reminders for recent purchases',
       'Bring-your-own-key AI billing for hosted workspaces',
+      'Opt-in multi-currency for expenses & income',
     ],
   },
   {
@@ -431,7 +432,6 @@ const ROADMAP: {
     items: [
       'Open Banking bank-transaction sync (EU)',
       'Mobile share-sheet & barcode quick capture',
-      'Multi-currency support',
     ],
   },
 ];
@@ -520,6 +520,10 @@ const FAQS: { q: string; a: string }[] = [
   {
     q: 'Can I bulk-import expenses from a bank export?',
     a: 'Yes. Expenses → Import CSV takes any bank or card export: it auto-detects the delimiter (comma, semicolon, or tab), guesses which column is the date, amount, vendor, category, and notes from common English and Greek header names, and shows a live preview table so you can fix the mapping before anything is saved. Dates and amounts parse in both EU (day-first, comma-decimal) and US formats. If your export mixes money in and out in one signed amount column, a "split by sign" option sorts negative rows into expenses and positive rows into income automatically; otherwise every row lands in whichever tab you opened it from. Rows that match one you already imported (same vendor, day, and amount) are skipped, and your category rules run on the new ones automatically.',
+  },
+  {
+    q: 'Can it handle an expense in a currency other than my main one?',
+    a: 'Yes, opt-in. Turn on multi-currency in Settings and the expense and income forms grow a currency picker plus an exchange-rate field: enter the printed foreign amount and either the rate or what your card actually got charged, and PHAROS backs the rate out for you. Reports, budgets, and net worth keep summing everything in your base currency underneath, so nothing else changes. Leave a rate unset and a gold badge flags it rather than silently guessing a 1:1 conversion. It currently covers expenses and income; receipts, statements, and subscriptions are still base-currency only for now.',
   },
   {
     q: 'Can I see all my renewals, installments, and bills in one calendar?',
