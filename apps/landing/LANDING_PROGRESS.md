@@ -3615,3 +3615,63 @@ search, P21 document/manual vault). Αλλιως: νεος `git log --oneline b2
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-25 (17) — P9 Items + Statements multi-currency: FAQ/roadmap now cover all 6 record types
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε (11 OPEN
+entries πλεον, ολα bakecore + το pharos-daily-dev mobile-camera question, τιποτα ANSWERED προς αυτη τη
+routine).
+
+`git log --oneline b2e72ce..HEAD | grep "feat("` (b2e72ce = τελευταιο source commit που αντικατοπτριστηκε
+στο landing, βλ. entry #16) εβγαλε δυο φρεσκα: `8e13724 feat(money): multi-currency for Items (P9 slice 4)`
+και `2e408ff feat(money): multi-currency for Statements (P9 slice 5)`. Το `PRODUCT_BACKLOG.md` header για
+P9 πλεον λεει "FOUNDATION + EXPENSES + RECEIPTS + SUBSCRIPTIONS + ITEMS + STATEMENTS SHIPPED" — αυτο ειναι
+ολοκληρωση ολων των record types που ειχε στοχευσει το P9 (μονο imports/rate-feed εκκρεμουν, εκτος landing
+scope).
+
+Read-only research (Read directly, μηδεν subagent, 2 μικρα `git show --stat`/commit-message reads):
+διαβασα τα commit messages των 8e13724 και 2e408ff (οχι πληρες diff, το commit message ηδη περιγραφει το
+behavior με ακριβεια αρκετη για marketing copy). Items: ΤΡΙΑ money πεδια (purchasedPrice/currentPrice/
+targetPrice) converts μαζι με ΕΝΑ rate (fx.resolveItemPrices), γιατι net worth + P13 insurance export τα
+αθροιζουν και τα δυο· origAmount = οτι πληρωθηκε αν owned, αλλιως η ζητουμενη τιμη· store-link τιμες
+(links[].price) και παλιο priceHistory[].currency ΔΕΝ converts (σκοπιμα, ωστε το "cheapest link" να μενει
+ιδιο). Statements: ΕΝΑ rate converts ΟΛΟΚΛΗΡΟ το εγγραφο (total/minimum/paid ΚΑΙ καθε transaction amount),
+γιατι το computeInstallmentPlans αθροιζει τα charges σε payoff figures που δειχνει το homepage/calendar/
+reports σε base currency· update un-converts με το OLD rate πριν εφαρμοσει νεο (rate correction παει στα
+τυπωμενα νουμερα, οχι stack πανω σε past conversion) — ιδιο invariant pattern με τα προηγουμενα 4 slices.
+
+Αλλαγες (`apps/landing/app/page.tsx`, 2 σημεια, ιδιο αρχειο με παντα):
+1. FAQ fix: το ιδιο question/anchor id αμεταβλητο — νεο answer προσθεσε "item, and statement" στη λιστα
+   forms, δυο νεες προτασεις (Items: "purchased, current, and target prices together... one consistent
+   figure instead of a euro number quietly standing in for dollars"· Statements: "converts as a whole
+   document too: the total, minimum payment, and every individual charge, since installment payoff
+   figures are summed from those same charges"), και το κλεισιμο εγινε "It now covers every money-holding
+   record in the app: expenses, income, receipts, subscriptions, items, and statements." (αντι
+   "...statements are still base-currency only for now" — δεν υπαρχει πλεον κανενα εκκρεμες record type
+   να αναφερθει, οποτε το wording αλλαξε απο "covers X, Y still pending" σε "covers everything").
+2. Roadmap fix: "Opt-in multi-currency for expenses, income, receipts & subscriptions" -> "Opt-in
+   multi-currency for expenses, income, receipts, subscriptions, items & statements" στο Shipped block.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη).
+- Πορτες 3100-3130: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build.
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` επιβεβαιωσε: `found:true`, νεο FAQ text περιεχει "item, and statement forms" ΚΑΙ
+  "expenses, income, receipts, subscriptions, items, and statements" (hasNewFaq:true), roadmap
+  hasNewRoadmap:true / hasOldRoadmap:false. Hero screenshot καθαρο (lighthouse mark, gradient τιτλος, nav,
+  τριπλο badge row). `pkill -f "next start -p 3110"` -> επιβεβαιωθηκε οτι κανενα `next-server` process δεν
+  εμεινε.
+- em-dash: 0 σε ολο το page.tsx.
+- Δεν αγγιξα Docker/:3000/web/mobile. Η μονη agent-χρηση ηταν read-only Read (χωρις subagent, μικρο
+  scope), μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: P9 ολοκληρωθηκε (ολα τα 6 record types πλεον στο landing wording· μονο imports/rate-feed
+εκκρεμουν στο backlog, εκτος landing scope μεχρι να γινει user-facing feature). Candidates: P22 receipt
+line-item global search, P21 document/manual vault, ή νεος `git log --oneline 2e408ff..HEAD | grep "feat("`
+ελεγχος στην αρχη του επομενου run, ή polish συνεχεια / real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
