@@ -12,6 +12,13 @@ const SubscriptionSchema = new Schema(
     },
     amount: { type: Number, required: true },
     currency: { type: String, default: 'EUR' },
+    // Multi-currency (P9): `amount` (and `firstChargeAmount`) are ALWAYS denominated in the
+    // deployment's base currency, so every existing roll-up (monthly equivalent, calendar
+    // agenda, reports, price-hike watch) keeps summing them untouched. A foreign-currency
+    // subscription additionally remembers what its invoice actually says: `origAmount` is the
+    // printed figure and `fxRate` the base units per 1 unit of `currency`. See lib/fx.ts.
+    origAmount: { type: Number, default: 0 },
+    fxRate: { type: Number, default: 0 },
     billingCycle: {
       type: String,
       enum: ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'],

@@ -16,7 +16,7 @@ import { ShoppingListItem } from '@/models/ShoppingListItem';
 import { addExpense } from './expenses/actions';
 import { importItemFromUrl, logItemPrice } from './items/actions';
 import { getAppSettings } from '@/lib/appSettings';
-import { cur } from '@/lib/money';
+import { cur, currencySymbol } from '@/lib/money';
 import { searchAll } from './search-actions';
 import { safeDate } from '@/lib/dates';
 import { revalidatePath } from 'next/cache';
@@ -197,8 +197,11 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
       const renewalStr = s(input, 'nextRenewal');
       const nextRenewal = renewalStr ? safeDate(renewalStr) : new Date();
       // `name` is the required display field on the Subscription model — set it!
-      await Subscription.create({ name: provider, provider, category, amount, currency: 'EUR', billingCycle: cycle, startDate: new Date(), nextRenewal, active: true, notes, url });
-      const sum = `subscription ${provider} €${amount}/${cycle}`;
+      // Currency is the deployment's base one (P9): the amount the assistant captured is spoken
+      // in the user's own currency, so a hardcoded 'EUR' would mislabel it on a non-EUR install.
+      const baseCurrency = (await getAppSettings()).currency || 'EUR';
+      await Subscription.create({ name: provider, provider, category, amount, currency: baseCurrency, billingCycle: cycle, startDate: new Date(), nextRenewal, active: true, notes, url });
+      const sum = `subscription ${provider} ${currencySymbol(baseCurrency)}${amount}/${cycle}`;
       return { summary: sum, content: `Added ${sum}${renewalStr ? `, renews ${renewalStr}` : ''}` };
     }
     case 'add_task': {

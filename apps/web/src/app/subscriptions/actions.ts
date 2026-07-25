@@ -9,6 +9,8 @@ import { z } from 'zod';
 import { addDays, addMonths, addWeeks, addYears, isBefore } from 'date-fns';
 import { vendorKey } from '@/app/expenses/lib';
 import { discoverRecurringCandidates, type RecurringCandidate } from '@/lib/recurringDiscovery';
+import { getAppSettings } from '@/lib/appSettings';
+import { resolveFx, convertToBase, normalizeCurrency } from '@/lib/fx';
 
 export type SuggestResult =
   | { ok: true; data: ParsedSubscription }
@@ -39,6 +41,8 @@ const SubFormSchema = z.object({
   category: z.enum(CATEGORIES).default('other'),
   amount: z.coerce.number().min(0),
   currency: z.string().default('EUR'),
+  // P9: base units per 1 unit of `currency`; 0/absent = single-currency form (or rate unknown).
+  fxRate: z.coerce.number().min(0).default(0),
   billingCycle: z.enum(CYCLES).default('monthly'),
   startDate: z.string(),
   trialEndsAt: z.string().optional().default(''), // '' = no trial
@@ -78,12 +82,37 @@ function computeNextRenewal(startDate: Date, cycle: string): Date | null {
   return next;
 }
 
+/**
+ * P9: turn the PRINTED figures the form submitted into the stored ones. Every money field on a
+ * subscription (the recurring `amount` and the post-trial `firstChargeAmount`) is converted with
+ * THE SAME rate, because both are summed in base currency elsewhere (monthly/yearly totals, the
+ * calendar agenda, the trial-charge digest); converting only one would mix two currencies inside
+ * a single record. A base-currency subscription passes straight through, so a single-currency
+ * deployment stores exactly what it stored before.
+ */
+async function resolveSubFx(parsed: { amount: number; currency: string; fxRate: number; firstChargeAmount: number }) {
+  const fx = resolveFx(
+    { amount: parsed.amount, currency: parsed.currency, fxRate: parsed.fxRate },
+    (await getAppSettings()).currency
+  );
+  return {
+    amount: fx.amount,
+    currency: fx.currency,
+    origAmount: fx.origAmount,
+    fxRate: fx.fxRate,
+    // Unknown rate: keep the printed number untouched, exactly as `amount` does above.
+    firstChargeAmount: fx.fxRate > 0 ? convertToBase(parsed.firstChargeAmount, fx.fxRate) : parsed.firstChargeAmount,
+  };
+}
+
 export async function createSubscription(formData: FormData) {
   const parsed = SubFormSchema.parse(Object.fromEntries(formData));
   const startDate = new Date(parsed.startDate);
+  const money = await resolveSubFx(parsed);
   await connectDB();
   await Subscription.create({
     ...parsed,
+    ...money,
     startDate,
     trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,
     nextRenewal: computeNextRenewal(startDate, parsed.billingCycle),
@@ -95,9 +124,11 @@ export async function createSubscription(formData: FormData) {
 export async function updateSubscription(id: string, formData: FormData) {
   const parsed = SubFormSchema.parse(Object.fromEntries(formData));
   const startDate = new Date(parsed.startDate);
+  const money = await resolveSubFx(parsed);
   await connectDB();
   await Subscription.findByIdAndUpdate(id, {
     ...parsed,
+    ...money,
     startDate,
     trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,
     nextRenewal: computeNextRenewal(startDate, parsed.billingCycle),
@@ -154,13 +185,17 @@ export async function trackDiscoveredSubscription(candidate: {
 }) {
   const name = (candidate.vendor || 'Untitled').trim() || 'Untitled';
   const startDate = candidate.firstDate ? new Date(candidate.firstDate) : new Date();
+  // The candidate is derived from Expense.amount, which is already base currency (P9), so it is
+  // stamped with the deployment's own code rather than a hardcoded 'EUR' — on a non-EUR
+  // deployment the old literal made every tracked candidate look foreign.
+  const currency = normalizeCurrency((await getAppSettings()).currency) || 'EUR';
   await connectDB();
   await Subscription.create({
     name,
     provider: name,
     category: 'other',
     amount: candidate.amount,
-    currency: 'EUR',
+    currency,
     billingCycle: candidate.cycle,
     startDate,
     nextRenewal: computeNextRenewal(startDate, candidate.cycle),

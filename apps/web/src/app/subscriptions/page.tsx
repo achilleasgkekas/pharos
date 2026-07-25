@@ -35,6 +35,8 @@ export default async function SubscriptionsPage() {
       cards={cards}
       categoryList={settings.subscriptionCategories}
       candidates={candidates}
+      baseCurrency={settings.currency}
+      multiCurrency={settings.multiCurrency} // P9: off = no per-subscription currency controls at all
     />
   );
 }

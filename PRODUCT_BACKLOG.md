@@ -1087,7 +1087,7 @@
   enable notifications) με progress ticks → activation. **Διακριτό** από P1 (demo data) — εδώ τα *δικά του* δεδομένα.
 - **Module:** Homepage / Dashboard (dismissable card) + Settings state reads.
 
-### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + EXPENSES + RECEIPTS SHIPPED 2026-07-25 (pharos-daily-dev), υπόλοιπα modules εκκρεμούν
+### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + EXPENSES + RECEIPTS + SUBSCRIPTIONS SHIPPED 2026-07-25 (pharos-daily-dev), υπόλοιπα modules εκκρεμούν
 - **Τι χτίστηκε (slice 1 από L item):** νέο pure **`lib/fx.ts`** (+25 unit tests, client-safe, DB-free) που κρατά
   **ΤΟΝ ΕΝΑΝ κανόνα** σε ένα μέρος: `normalizeCurrency`, `isForeignCurrency`, `convertToBase`, `deriveFxRate`,
   `resolveFx`, `formatMoney`, `fxBadgeLabel`. **Κλειδωμένη αρχιτεκτονική απόφαση (builder default, μηδέν migration):
@@ -1124,9 +1124,22 @@
   στο total + η ίδια FX γραμμή (rate ή «or charged») + το `FxBadge` **εξήχθη σε κοινό `components/FxBadge.tsx`**
   (structural typing) και χρησιμοποιείται πλέον από expenses ΚΑΙ receipts (card/row/quick-verify).
   `/api/v1/receipts` shape += origAmount/fxRate + τεκμηρίωση στο `API.md`. **+9 tests** (3553 total).
-- **Εκκρεμούν (επόμενα slices):** Statements/Subscriptions/Items ίδια 3 πεδία (το `currency` τους αποθηκεύεται ήδη
-  αγνοημένο, ίδιο latent bug)· `resolveFx` στο CSV import (PA1) και στο email-in· προαιρετικό δωρεάν rate-feed
-  (phase 2, τώρα το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία.
+- **Τι χτίστηκε (slice 3 — Subscriptions, 2026-07-25):** ίδια 3 πεδία στο `Subscription` + **και τα 4 write paths**
+  (createSubscription/updateSubscription/`POST` v1/`PATCH` v1) περνούν από `resolveFx`. **Διαφορά από τα expenses**:
+  μια συνδρομή έχει ΔΥΟ ποσά (το recurring `amount` + το post-trial `firstChargeAmount`), οπότε μετατρέπονται
+  **μαζί με ΤΟ ΙΔΙΟ rate** (και τα δύο αθροίζονται/εμφανίζονται σε base currency: monthly/yearly totals, `/calendar`
+  agenda, trial-charge digest του P33). Το `PATCH` **ξαναδιαβάζει το τρέχον doc** όταν το body αγγίζει money field,
+  ώστε ένα partial update (μόνο rate, μόνο currency, μόνο amount) να μην αφήνει ΠΟΤΕ μισο-μετατρεπμένη εγγραφή·
+  bodies χωρίς money field δεν πληρώνουν το extra read. **Δύο υπαρκτά bugs έκλεισαν στην πορεία**: το
+  `trackDiscoveredSubscription` (P7 «Track this») και το AI `add_subscription` στάμπαραν **hardcoded `'EUR'`** — σε
+  non-EUR deployment κάθε τέτοια εγγραφή γεννιόταν «foreign» ενώ το ποσό ήταν ήδη base· τώρα παίρνουν τη base
+  currency. UI: currency select + η ίδια FX γραμμή (rate ή «or charged») + `FxBadge` στην κάρτα· το AI-suggested
+  currency τιμάται **μόνο** όταν το multi-currency είναι on (αλλιώς θα μάρκαρε foreign μια single-currency εγγραφή).
+  `/api/v1/subscriptions` shape += origAmount/fxRate + POST/PATCH δέχονται currency/fxRate + τεκμηρίωση στο `API.md`
+  (μαζί καθαρίστηκε stale roadmap γραμμή που έλεγε ότι PATCH/DELETE εκκρεμούν ενώ ήδη υπάρχουν). **+36 tests** (3589).
+- **Εκκρεμούν (επόμενα slices):** Statements/Items ίδια 3 πεδία (το `currency` τους αποθηκεύεται ήδη αγνοημένο,
+  ίδιο latent bug)· `resolveFx` στο CSV import (PA1) και στο email-in· προαιρετικό δωρεάν rate-feed (phase 2, τώρα
+  το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία (το API τα εκθέτει ήδη σε 3 modules).
 - **Αξία (αρχικό):** ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency. Πραγματικό κενό
   (CLAUDE.md). Μεγάλο: αγγίζει schema (amount+currency+rate), aggregations, imports, όλα τα money views.
 - **Module:** cross-cutting (Expenses/Receipts/Statements/Reports + `lib/money.ts`).

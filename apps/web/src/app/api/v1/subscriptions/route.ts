@@ -3,6 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
 import { readBody, strField, numField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
+import { getAppSettings } from '@/lib/appSettings';
+import { resolveFx, convertToBase } from '@/lib/fx';
 import { Subscription } from '@/models/Subscription';
 import { Expense } from '@/models/Expense';
 import { vendorKey } from '@/app/expenses/lib';
@@ -15,6 +17,7 @@ const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
 
 export type SubLean = {
   _id: unknown; name: string; provider?: string; category?: string; amount?: number; currency?: string;
+  origAmount?: number; fxRate?: number;
   billingCycle?: string; startDate?: Date; nextRenewal?: Date | null; active?: boolean; paymentMethod?: string;
   url?: string; notes?: string; trialEndsAt?: Date | null; firstChargeAmount?: number; updatedAt?: Date; deletedAt?: Date | null;
 };
@@ -28,6 +31,11 @@ export function trim(s: SubLean) {
     category: s.category ?? 'other',
     amount: s.amount ?? 0,
     currency: s.currency ?? 'EUR',
+    // P9: `amount` is always base currency. On a foreign-currency subscription these two carry
+    // the printed figure and the rate used (fxRate 0 = not foreign, or rate still unknown, in
+    // which case `amount` is the printed number and NOT yet converted).
+    origAmount: s.origAmount ?? 0,
+    fxRate: s.fxRate ?? 0,
     billingCycle: s.billingCycle ?? 'monthly',
     startDate: iso(s.startDate),
     nextRenewal: iso(s.nextRenewal),
@@ -88,7 +96,10 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** POST /api/v1/subscriptions  { name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url?, trialEndsAt?, firstChargeAmount? } */
+/** POST /api/v1/subscriptions  { name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url?, trialEndsAt?, firstChargeAmount?, currency?, fxRate? }
+ *  P9: `amount`/`firstChargeAmount` are read as PRINTED figures; when `currency` differs from the
+ *  deployment's base one they are converted with `fxRate` before storage, so what lands in the DB
+ *  is always base currency. Omitting both keeps the previous single-currency behaviour exactly. */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const b = await readBody(req);
@@ -105,11 +116,19 @@ export async function POST(req: NextRequest) {
       trialEndsAt = d;
     }
     await connectDB();
+    const fx = resolveFx(
+      { amount, currency: strField(b, 'currency'), fxRate: numField(b, 'fxRate') ?? 0 },
+      (await getAppSettings()).currency
+    );
+    const printedFirstCharge = numField(b, 'firstChargeAmount') ?? 0;
     const doc = await Subscription.create({
       name,
       provider: strField(b, 'provider'),
       category: strField(b, 'category', 'other'),
-      amount,
+      amount: fx.amount,
+      currency: fx.currency,
+      origAmount: fx.origAmount,
+      fxRate: fx.fxRate,
       billingCycle: enumField(b, 'billingCycle', CYCLES, 'monthly'),
       startDate,
       nextRenewal: b.nextRenewal ? new Date(String(b.nextRenewal)) : startDate,
@@ -117,7 +136,9 @@ export async function POST(req: NextRequest) {
       url: strField(b, 'url'),
       notes: strField(b, 'notes'),
       trialEndsAt,
-      firstChargeAmount: numField(b, 'firstChargeAmount') ?? 0,
+      // Same rate as `amount` (see resolveSubFx in app/subscriptions/actions.ts for why both
+      // money fields must move together); unknown rate leaves the printed number alone.
+      firstChargeAmount: fx.fxRate > 0 ? convertToBase(printedFirstCharge, fx.fxRate) : printedFirstCharge,
     });
     return NextResponse.json({ subscription: trim(doc.toObject() as SubLean) }, { status: 201 });
   });

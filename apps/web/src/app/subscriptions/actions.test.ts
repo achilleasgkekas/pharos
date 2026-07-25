@@ -35,7 +35,14 @@ const {
   suggestSubscriptionMock,
   revalidatePathMock,
   discoverRecurringCandidatesMock,
-} = vi.hoisted(() => ({
+  settingsState,
+  getAppSettingsMock,
+} = vi.hoisted(() => {
+  // P9: the base currency the write paths resolve foreign amounts against.
+  const settingsState = { currency: 'EUR' };
+  return {
+  settingsState,
+  getAppSettingsMock: vi.fn(async () => settingsState),
   connectDBMock: vi.fn(async () => {}),
   subCreate: vi.fn(async (_doc: Record<string, any>) => ({})),
   subFindByIdAndUpdate: vi.fn(async (_id: string, _update: Record<string, any>) => ({})),
@@ -55,7 +62,8 @@ const {
   discoverRecurringCandidatesMock: vi.fn(
     (_rows: Array<Record<string, unknown>>, _opts: { excludeVendorKeys: Set<string> }) => [] as unknown[]
   ),
-}));
+  };
+});
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Subscription', () => ({
@@ -70,6 +78,7 @@ vi.mock('@/models/Expense', () => ({
   Expense: { find: expenseFind },
 }));
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: isFeatureEnabledMock }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/lib/ollama', () => ({ suggestSubscription: suggestSubscriptionMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 vi.mock('@/lib/recurringDiscovery', () => ({ discoverRecurringCandidates: discoverRecurringCandidatesMock }));
@@ -92,6 +101,8 @@ function fd(fields: Record<string, string>): FormData {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  settingsState.currency = 'EUR';
+  getAppSettingsMock.mockImplementation(async () => settingsState);
   isFeatureEnabledMock.mockResolvedValue(true);
   subFind.mockReturnValue({ select: () => ({ lean: async () => [] }) });
   expenseFind.mockReturnValue({ select: () => ({ lean: async () => [] }) });
@@ -298,5 +309,91 @@ describe('trackDiscoveredSubscription', () => {
     const doc = subCreate.mock.calls[0][0];
     expect(doc.startDate.getTime()).toBeGreaterThanOrEqual(before);
     expect(doc.startDate.getTime()).toBeLessThanOrEqual(after);
+  });
+});
+
+// P9 multi-currency. The stored `amount` is ALWAYS base currency (lib/fx.ts), so that every
+// existing roll-up (monthly equivalent, calendar agenda, reports) keeps summing it untouched.
+// These pin the two halves of that promise: a foreign sub is converted before storage, and a
+// base-currency sub is written byte-for-byte as it was before the feature existed.
+describe('createSubscription / updateSubscription — multi-currency (P9)', () => {
+  const baseForm = { name: 'Netflix', startDate: '2026-01-15', billingCycle: 'monthly' };
+
+  it('stores a base-currency subscription exactly as before (no FX fields set)', async () => {
+    await createSubscription(fd({ ...baseForm, amount: '15.99', currency: 'EUR' }));
+    const doc = subCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(15.99);
+    expect(doc.currency).toBe('EUR');
+    expect(doc.origAmount).toBe(0);
+    expect(doc.fxRate).toBe(0);
+  });
+
+  it('converts a foreign amount to base currency and keeps the printed one', async () => {
+    await createSubscription(fd({ ...baseForm, amount: '10', currency: 'USD', fxRate: '0.92' }));
+    const doc = subCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(9.2);
+    expect(doc.currency).toBe('USD');
+    expect(doc.origAmount).toBe(10);
+    expect(doc.fxRate).toBe(0.92);
+  });
+
+  it('does NOT invent a 1:1 rate: a foreign amount with no rate stays the printed number', async () => {
+    await createSubscription(fd({ ...baseForm, amount: '10', currency: 'USD' }));
+    const doc = subCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(10);
+    expect(doc.origAmount).toBe(10);
+    expect(doc.fxRate).toBe(0);
+  });
+
+  it('converts firstChargeAmount with the SAME rate as amount', async () => {
+    await createSubscription(fd({ ...baseForm, amount: '10', currency: 'USD', fxRate: '0.5', firstChargeAmount: '4' }));
+    const doc = subCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(5);
+    expect(doc.firstChargeAmount).toBe(2);
+  });
+
+  it('leaves firstChargeAmount alone when the rate is unknown (same rule as amount)', async () => {
+    await createSubscription(fd({ ...baseForm, amount: '10', currency: 'USD', firstChargeAmount: '4' }));
+    const doc = subCreate.mock.calls[0][0];
+    expect(doc.firstChargeAmount).toBe(4);
+  });
+
+  it('is relative to the deployment base currency, not to EUR', async () => {
+    settingsState.currency = 'USD';
+    await createSubscription(fd({ ...baseForm, amount: '10', currency: 'USD', fxRate: '0.92' }));
+    const doc = subCreate.mock.calls[0][0];
+    // USD IS the base here, so the rate is irrelevant and nothing is converted.
+    expect(doc.amount).toBe(10);
+    expect(doc.currency).toBe('USD');
+    expect(doc.origAmount).toBe(0);
+    expect(doc.fxRate).toBe(0);
+  });
+
+  it('re-saving a foreign subscription unchanged does not double-convert it', async () => {
+    // The form always submits the PRINTED figure, so the same input yields the same stored one.
+    const form = { ...baseForm, amount: '10', currency: 'USD', fxRate: '0.92' };
+    await createSubscription(fd(form));
+    await updateSubscription('sub1', fd(form));
+    expect(subCreate.mock.calls[0][0].amount).toBe(9.2);
+    expect(subFindByIdAndUpdate.mock.calls[0][1].amount).toBe(9.2);
+  });
+
+  it('updateSubscription writes all four money fields', async () => {
+    await updateSubscription('sub1', fd({ ...baseForm, amount: '200', currency: 'GBP', fxRate: '1.17' }));
+    const update = subFindByIdAndUpdate.mock.calls[0][1];
+    expect(update.amount).toBe(234);
+    expect(update.currency).toBe('GBP');
+    expect(update.origAmount).toBe(200);
+    expect(update.fxRate).toBe(1.17);
+  });
+});
+
+describe('trackDiscoveredSubscription — currency (P9)', () => {
+  it('stamps the deployment base currency, not a hardcoded EUR', async () => {
+    settingsState.currency = 'USD';
+    await trackDiscoveredSubscription({ vendor: 'DEH', amount: 60, cycle: 'monthly', firstDate: '2026-01-01' });
+    // The candidate comes from Expense.amount, which is already base currency, so it must NOT
+    // look foreign on a non-EUR deployment.
+    expect(subCreate.mock.calls[0][0].currency).toBe('USD');
   });
 });

@@ -63,8 +63,12 @@ List responses are wrapped: `{ "data": [ … ], "total": N, "limit": L, "offset"
 - `POST /api/v1/expenses` `{ vendor, amount, kind?, date?, category?, period?, recurring?, recurringCycle?, notes? }` → `{ expense }` (groups into the vendor's recurring series automatically)
 
 ### Subscriptions
-- `GET /api/v1/subscriptions?active=1` (+ list params) → `{ data: [{ id, name, provider, category, amount, currency, billingCycle, startDate, nextRenewal, active, paymentMethod, url, notes, updatedAt, deleted }], total, limit, offset }`
-- `POST /api/v1/subscriptions` `{ name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url? }` → `{ subscription }`
+- `GET /api/v1/subscriptions?active=1` (+ list params) → `{ data: [{ id, name, provider, category, amount, currency, origAmount, fxRate, billingCycle, startDate, nextRenewal, active, paymentMethod, url, notes, trialEndsAt, firstChargeAmount, updatedAt, deleted }], total, limit, offset }`
+  - `amount` and `firstChargeAmount` are ALWAYS in the deployment's base currency (Settings → Currency), so a client can sum them without conversion. On a foreign-currency subscription, `origAmount` is the amount as printed on the invoice and `fxRate` is base units per 1 unit of `currency` (`amount = origAmount * fxRate`); divide `firstChargeAmount` by `fxRate` to get its printed value. Both are `0` for an ordinary subscription. `fxRate: 0` with a foreign `currency` means no rate is known yet, so `amount` is still the printed number: show it as unconverted rather than mixing it into a base-currency total.
+- `POST /api/v1/subscriptions` `{ name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url?, notes?, trialEndsAt?, firstChargeAmount?, currency?, fxRate? }` → `{ subscription }`
+  - `amount`/`firstChargeAmount` are read as PRINTED figures: when `currency` differs from the base one they are converted with `fxRate` before storage. Omit both to keep plain single-currency behaviour.
+- `PATCH /api/v1/subscriptions/:id` `{ name?, amount?, billingCycle?, nextRenewal?, category?, active?, trialEndsAt?, firstChargeAmount?, currency?, fxRate? }` → `{ subscription }`
+  - Sending ANY money field (`amount`, `currency`, `fxRate`, `firstChargeAmount`) re-resolves the whole set against the current row, so a partial update can never leave it half-converted. `trialEndsAt: null` explicitly clears the trial.
 
 ### Receipts (read)
 - `GET /api/v1/receipts?store=&archived=1` (+ list params) → `{ data: [{ id, store, date, total, subtotal, vatAmount, currency, origAmount, fxRate, paymentMethod, warrantyMonths, itemCount, verified, archived, file, thumb, updatedAt, deleted }], total, limit, offset }`
@@ -108,5 +112,4 @@ Paths returned by the API (an item's `photo`, a receipt's `file`/`thumb`) are se
 `POST /api/mcp` — a JSON-RPC 2.0 (Streamable-HTTP) MCP server, same bearer token. Methods: `initialize`, `tools/list`, `tools/call`, `ping`. Add it in Claude as a custom connector (URL `https://<host>/api/mcp`) or test with MCP Inspector / Claude Code. See **Settings → Mobile / MCP**.
 
 ## Roadmap (next additions)
-- PATCH/DELETE for expenses & subscriptions.
 - Optional per-token scopes.

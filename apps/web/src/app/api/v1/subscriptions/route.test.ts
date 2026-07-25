@@ -15,7 +15,7 @@ import type { NextRequest } from 'next/server';
 // (connectDB + the User/Subscription models), so validation + serialization run for real.
 
 // Hoisted so the vi.mock factories (which run before imports) can reference the plumbing.
-const { connectDBMock, userFindOne, userState, subFind, subCount, subCreate, findQuery, countQuery, expenseFind, expenseState, state } =
+const { connectDBMock, userFindOne, userState, subFind, subCount, subCreate, findQuery, countQuery, expenseFind, expenseState, state, settingsState, getAppSettingsMock } =
   vi.hoisted(() => {
     const state: { docs: unknown[]; total: number; lastCreate: Record<string, unknown> | null } = {
       docs: [],
@@ -48,14 +48,18 @@ const { connectDBMock, userFindOne, userState, subFind, subCount, subCreate, fin
     const expenseState: { docs: unknown[] } = { docs: [] };
     const expenseQuery: Record<string, unknown> = { select: vi.fn(() => expenseQuery), lean: vi.fn(async () => expenseState.docs) };
     const expenseFind = vi.fn(() => expenseQuery);
+    // P9: POST resolves foreign amounts against the deployment's base currency.
+    const settingsState = { currency: 'EUR' };
+    const getAppSettingsMock = vi.fn(async () => settingsState);
     return {
       connectDBMock: vi.fn(async () => {}),
       userFindOne, userState, subFind, subCount, subCreate, findQuery, countQuery,
-      expenseFind, expenseState, state,
+      expenseFind, expenseState, state, settingsState, getAppSettingsMock,
     };
   });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/models/Subscription', () => ({ Subscription: { find: subFind, countDocuments: subCount, create: subCreate } }));
 vi.mock('@/models/Expense', () => ({ Expense: { find: expenseFind } }));
@@ -80,7 +84,9 @@ beforeEach(() => {
   state.lastCreate = null;
   expenseState.docs = [];
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
+  settingsState.currency = 'EUR';
   vi.clearAllMocks();
+  getAppSettingsMock.mockImplementation(async () => settingsState);
   // clearAllMocks resets return values on the chain stubs → re-point them.
   for (const m of ['sort', 'skip', 'limit', 'setOptions', 'select']) (findQuery[m] as ReturnType<typeof vi.fn>).mockImplementation(() => findQuery);
   (findQuery.lean as ReturnType<typeof vi.fn>).mockImplementation(async () => state.docs);
@@ -318,5 +324,51 @@ describe('P7 auto-discovered suggestions (additive, mirrors discoverUntrackedRec
     const json = (await res.json()) as { suggestions: unknown[] };
     expect(json.suggestions).toEqual([]);
     expect(expenseFind).not.toHaveBeenCalled();
+  });
+});
+
+// P9 multi-currency. The mobile client posts what the invoice PRINTS; the route stores base
+// currency, so `amount` stays directly summable everywhere it already is.
+describe('POST multi-currency (P9)', () => {
+  it('converts a foreign amount and records the printed figure + rate', async () => {
+    await POST(makeReq({ body: { name: 'Netflix', amount: 10, currency: 'USD', fxRate: 0.92 } }));
+    expect(state.lastCreate?.amount).toBe(9.2);
+    expect(state.lastCreate?.currency).toBe('USD');
+    expect(state.lastCreate?.origAmount).toBe(10);
+    expect(state.lastCreate?.fxRate).toBe(0.92);
+  });
+
+  it('stores a body without currency/fxRate exactly as before the feature', async () => {
+    await POST(makeReq({ body: { name: 'Netflix', amount: 15 } }));
+    expect(state.lastCreate?.amount).toBe(15);
+    expect(state.lastCreate?.currency).toBe('EUR');
+    expect(state.lastCreate?.origAmount).toBe(0);
+    expect(state.lastCreate?.fxRate).toBe(0);
+  });
+
+  it('does NOT invent a 1:1 rate when the rate is missing', async () => {
+    await POST(makeReq({ body: { name: 'Netflix', amount: 10, currency: 'USD' } }));
+    expect(state.lastCreate?.amount).toBe(10);
+    expect(state.lastCreate?.fxRate).toBe(0);
+    expect(state.lastCreate?.origAmount).toBe(10);
+  });
+
+  it('converts firstChargeAmount with the same rate as amount', async () => {
+    await POST(makeReq({ body: { name: 'Netflix', amount: 10, currency: 'USD', fxRate: 0.5, firstChargeAmount: 4 } }));
+    expect(state.lastCreate?.amount).toBe(5);
+    expect(state.lastCreate?.firstChargeAmount).toBe(2);
+  });
+
+  it('is relative to the deployment base currency (USD base → a USD body is not foreign)', async () => {
+    settingsState.currency = 'USD';
+    await POST(makeReq({ body: { name: 'Netflix', amount: 10, currency: 'USD', fxRate: 0.92 } }));
+    expect(state.lastCreate?.amount).toBe(10);
+    expect(state.lastCreate?.origAmount).toBe(0);
+  });
+
+  it('exposes origAmount/fxRate in the POST response shape', async () => {
+    const res = await POST(makeReq({ body: { name: 'Netflix', amount: 10, currency: 'USD', fxRate: 0.92 } }));
+    const json = (await res.json()) as { subscription: Record<string, unknown> };
+    expect(json.subscription).toMatchObject({ amount: 9.2, currency: 'USD', origAmount: 10, fxRate: 0.92 });
   });
 });

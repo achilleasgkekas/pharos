@@ -236,6 +236,10 @@ export type SerializedSubscription = {
   category: string;
   amount: number;
   currency: string;
+  /** P9: printed figure on a foreign-currency invoice; 0 when the sub is in base currency. */
+  origAmount: number;
+  /** P9: base units per 1 unit of `currency`; 0 when not foreign or still unknown. */
+  fxRate: number;
   billingCycle: string;
   startDate: string;
   nextRenewal: string | null;

@@ -12,20 +12,28 @@ import type { NextRequest } from 'next/server';
 // We exercise the REAL apiAuth/apiBody/apiList helpers + the real trim serializer (imported
 // by the route from ../route), and only mock the DB seam.
 
-const { connectDBMock, userFindOne, userState, subUpdate, updateState } = vi.hoisted(() => {
-  const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
-  const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
-  const updateState: { doc: unknown; calls: Array<{ id: unknown; update: unknown; opts: unknown }> } = { doc: null, calls: [] };
-  const subUpdate = vi.fn((id: unknown, update: unknown, opts: unknown) => {
-    updateState.calls.push({ id, update, opts });
-    return { lean: async () => updateState.doc };
+const { connectDBMock, userFindOne, userState, subUpdate, updateState, subFindById, existingState, getAppSettingsMock, settingsState } =
+  vi.hoisted(() => {
+    const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
+    const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
+    const updateState: { doc: unknown; calls: Array<{ id: unknown; update: unknown; opts: unknown }> } = { doc: null, calls: [] };
+    const subUpdate = vi.fn((id: unknown, update: unknown, opts: unknown) => {
+      updateState.calls.push({ id, update, opts });
+      return { lean: async () => updateState.doc };
+    });
+    // P9: a money-touching PATCH re-reads the current doc so it can merge the fields the
+    // caller did not send (printed amount / currency / rate) before re-resolving all of them.
+    const existingState: { doc: unknown } = { doc: { _id: 'a1b2c3d4e5f6a1b2c3d4e5f6', amount: 10, currency: 'EUR', origAmount: 0, fxRate: 0 } };
+    const subFindById = vi.fn(() => ({ lean: async () => existingState.doc }));
+    const settingsState = { currency: 'EUR' };
+    const getAppSettingsMock = vi.fn(async () => settingsState);
+    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, subUpdate, updateState, subFindById, existingState, getAppSettingsMock, settingsState };
   });
-  return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, subUpdate, updateState };
-});
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
-vi.mock('@/models/Subscription', () => ({ Subscription: { findByIdAndUpdate: subUpdate } }));
+vi.mock('@/models/Subscription', () => ({ Subscription: { findByIdAndUpdate: subUpdate, findById: subFindById } }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 
 import { PATCH, DELETE } from './route';
 
@@ -52,7 +60,11 @@ beforeEach(() => {
   updateState.doc = null;
   updateState.calls = [];
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
+  existingState.doc = { _id: OID, amount: 10, currency: 'EUR', origAmount: 0, fxRate: 0 };
+  settingsState.currency = 'EUR';
   vi.clearAllMocks();
+  subFindById.mockImplementation(() => ({ lean: async () => existingState.doc }));
+  getAppSettingsMock.mockImplementation(async () => settingsState);
   userFindOne.mockImplementation(() => ({ select: () => ({ lean: async () => userState.doc }) }));
   subUpdate.mockImplementation((id: unknown, update: unknown, opts: unknown) => {
     updateState.calls.push({ id, update, opts });
@@ -128,10 +140,95 @@ describe('PATCH partial-update', () => {
     expect(set).not.toHaveProperty('trialEndsAt');
   });
 
-  it('sets firstChargeAmount', async () => {
+  it('sets firstChargeAmount, re-stamping the (unchanged) currency fields alongside it', async () => {
     updateState.doc = { _id: OID, name: 'Netflix' };
     await PATCH(makeReq({ body: { firstChargeAmount: 9.99 } }), ctx(OID));
-    expect(lastSet()).toEqual({ firstChargeAmount: 9.99 });
+    // P9: any money field re-resolves the whole set against the base currency, so a
+    // base-currency row is rewritten with exactly the values it already had (no drift).
+    expect(lastSet()).toEqual({ firstChargeAmount: 9.99, amount: 10, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+});
+
+// P9 multi-currency. `amount` is stored in base currency, so PATCH must merge whatever the
+// caller omitted from the CURRENT doc before converting — otherwise a partial update
+// (rate-only, currency-only, amount-only) would leave the row half-converted.
+describe('PATCH multi-currency (P9)', () => {
+  it('converts a foreign amount with the supplied rate and keeps the printed one', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { amount: 88, currency: 'USD', fxRate: 0.92 } }), ctx(OID));
+    const set = lastSet();
+    expect(set.amount).toBe(80.96); // 88 * 0.92, rounded to cents
+    expect(set.currency).toBe('USD');
+    expect(set.origAmount).toBe(88);
+    expect(set.fxRate).toBe(0.92);
+  });
+
+  it('a rate-only PATCH converts the printed amount already stored on the doc', async () => {
+    existingState.doc = { _id: OID, amount: 88, currency: 'USD', origAmount: 88, fxRate: 0 };
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { fxRate: 0.5 } }), ctx(OID));
+    const set = lastSet();
+    expect(set.amount).toBe(44); // 88 (origAmount, NOT the un-converted amount) * 0.5
+    expect(set.origAmount).toBe(88);
+    expect(set.currency).toBe('USD');
+  });
+
+  it('an amount-only PATCH on a foreign row re-uses the stored rate', async () => {
+    existingState.doc = { _id: OID, amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 };
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { amount: 100 } }), ctx(OID));
+    const set = lastSet();
+    expect(set.amount).toBe(92);
+    expect(set.origAmount).toBe(100);
+    expect(set.fxRate).toBe(0.92);
+  });
+
+  it('does NOT invent a 1:1 rate: a foreign amount with no rate is stored as printed', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { amount: 88, currency: 'USD' } }), ctx(OID));
+    const set = lastSet();
+    expect(set.amount).toBe(88);
+    expect(set.fxRate).toBe(0);
+    expect(set.origAmount).toBe(88);
+  });
+
+  it('switching a foreign row back to the base currency clears origAmount/fxRate', async () => {
+    existingState.doc = { _id: OID, amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 };
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { currency: 'EUR' } }), ctx(OID));
+    const set = lastSet();
+    expect(set.currency).toBe('EUR');
+    expect(set.origAmount).toBe(0);
+    expect(set.fxRate).toBe(0);
+    expect(set.amount).toBe(88); // the printed figure, now read as base currency
+  });
+
+  it('converts firstChargeAmount with the SAME rate as amount', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { amount: 10, currency: 'USD', fxRate: 0.5, firstChargeAmount: 4 } }), ctx(OID));
+    const set = lastSet();
+    expect(set.amount).toBe(5);
+    expect(set.firstChargeAmount).toBe(2);
+  });
+
+  it('a currency-only body is a valid changeset (not an empty-changeset 400)', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    const res = await PATCH(makeReq({ body: { currency: 'USD' } }), ctx(OID));
+    expect(res.status).toBe(200);
+  });
+
+  it('a non-money PATCH skips the extra read entirely', async () => {
+    updateState.doc = { _id: OID, name: 'Netflix' };
+    await PATCH(makeReq({ body: { name: 'Netflix Premium' } }), ctx(OID));
+    expect(subFindById).not.toHaveBeenCalled();
+    expect(lastSet()).toEqual({ name: 'Netflix Premium' });
+  });
+
+  it('404s (without writing) when a money PATCH targets a missing row', async () => {
+    existingState.doc = null;
+    const res = await PATCH(makeReq({ body: { amount: 5 } }), ctx(OID));
+    expect(res.status).toBe(404);
+    expect(subUpdate).not.toHaveBeenCalled();
   });
 });
 

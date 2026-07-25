@@ -1,5 +1,7 @@
 'use client';
-import { cur } from "@/lib/money";
+import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
+import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
+import { FxBadge } from '@/components/FxBadge';
 import { useState, useTransition, useMemo } from 'react';
 import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Radar, X } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -59,6 +61,11 @@ function categoryMeta(cat: string) {
   return CATEGORIES.find((c) => c.value === cat) ?? CATEGORIES[CATEGORIES.length - 1];
 }
 
+/** P9: the base code always comes first, even when it is not one of the built-ins. */
+function currencyCodes(base: string): string[] {
+  return [...new Set([normalizeCurrency(base) || 'EUR', ...CURRENCIES.map((c) => c.code)])];
+}
+
 function monthlyEquivalent(amount: number, cycle: string): number {
   const c = CYCLES.find((x) => x.value === cycle);
   return amount * (c?.perMonth ?? 1);
@@ -70,6 +77,10 @@ function daysUntil(dateStr: string | null): number | null {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
+/** Multi-currency context (P9): the deployment's base currency code + whether the per-entry
+ *  currency/FX controls are switched on at all. One object, so prop lists grow by one entry. */
+type FxCtx = { base: string; enabled: boolean };
+
 // ─── Main component ────────────────────────────────────────────────────────
 
 export function SubscriptionsClient({
@@ -77,13 +88,18 @@ export function SubscriptionsClient({
   cards,
   categoryList = [],
   candidates = [],
+  baseCurrency = 'EUR',
+  multiCurrency = false,
 }: {
   subscriptions: SerializedSubscription[];
   cards: SerializedCard[];
   categoryList?: string[];
   candidates?: RecurringCandidate[];
+  baseCurrency?: string;
+  multiCurrency?: boolean;
 }) {
   if (categoryList.length) _subCats = categoryList;
+  const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<SerializedSubscription | null>(null);
   const [search, setSearch] = useState('');
@@ -362,7 +378,7 @@ export function SubscriptionsClient({
             <div className={cn(layout === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3' : 'flex flex-col gap-2')}>
               {visible.map((s) => (
                 <div key={s._id} className={cn(!s.active && 'opacity-60')}>
-                  <SubCard sub={s} onEdit={() => setEditing(s)} />
+                  <SubCard sub={s} base={fx.base} onEdit={() => setEditing(s)} />
                 </div>
               ))}
             </div>
@@ -372,13 +388,13 @@ export function SubscriptionsClient({
 
       {/* Create */}
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title={t('sub.newSubscription')} size="xl">
-        <SubForm cards={cards} onSuccess={() => setShowCreate(false)} />
+        <SubForm cards={cards} fx={fx} onSuccess={() => setShowCreate(false)} />
       </Modal>
 
       {/* Edit */}
       {editing && (
         <Modal open onClose={() => setEditing(null)} title={editing.name} size="xl">
-          <SubForm cards={cards} sub={editing} onSuccess={() => setEditing(null)} onDeleted={() => setEditing(null)} />
+          <SubForm cards={cards} fx={fx} sub={editing} onSuccess={() => setEditing(null)} onDeleted={() => setEditing(null)} />
         </Modal>
       )}
     </main>
@@ -387,7 +403,7 @@ export function SubscriptionsClient({
 
 // ─── Sub Card ──────────────────────────────────────────────────────────────
 
-function SubCard({ sub, onEdit }: { sub: SerializedSubscription; onEdit: () => void }) {
+function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: string; onEdit: () => void }) {
   const t = useT();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
@@ -436,6 +452,8 @@ function SubCard({ sub, onEdit }: { sub: SerializedSubscription; onEdit: () => v
         <span className="text-xs text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
           / {cycleLabel.toLowerCase()}
         </span>
+        {/* P9: what the invoice actually says, when it is not in the base currency. */}
+        <FxBadge doc={sub} base={base} />
       </div>
 
       {sub.active && d !== null && (
@@ -497,20 +515,26 @@ function SubCard({ sub, onEdit }: { sub: SerializedSubscription; onEdit: () => v
 
 // ─── Sub Form ──────────────────────────────────────────────────────────────
 
-function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscription; cards: SerializedCard[]; onSuccess: () => void; onDeleted?: () => void }) {
+function SubForm({ sub, cards, fx, onSuccess, onDeleted }: { sub?: SerializedSubscription; cards: SerializedCard[]; fx: FxCtx; onSuccess: () => void; onDeleted?: () => void }) {
   const t = useT();
   const [pending, startTransition] = useTransition();
   const confirm = useConfirm();
+  // P9: the form always holds PRINTED figures (what the invoice says), never the stored
+  // base-currency ones. The server converts on save, so re-saving an unchanged foreign
+  // subscription can never double-convert it.
+  const wasForeign = isForeignCurrency(sub?.currency, fx.base);
+  const storedRate = wasForeign ? sub?.fxRate || 0 : 0;
   const [form, setForm] = useState({
     name: sub?.name ?? '',
     provider: sub?.provider ?? '',
     category: sub?.category ?? 'other',
-    amount: (sub?.amount ?? '').toString(),
-    currency: sub?.currency ?? 'EUR',
+    amount: String((wasForeign ? sub?.origAmount || sub?.amount : sub?.amount) ?? ''),
+    currency: wasForeign ? normalizeCurrency(sub?.currency) : normalizeCurrency(fx.base) || 'EUR',
+    fxRate: wasForeign && sub?.fxRate ? String(sub.fxRate) : '',
     billingCycle: sub?.billingCycle ?? 'monthly',
     startDate: sub?.startDate ? sub.startDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
     trialEndsAt: sub?.trialEndsAt ? sub.trialEndsAt.slice(0, 10) : '',
-    firstChargeAmount: (sub?.firstChargeAmount ?? '') ? String(sub?.firstChargeAmount) : '',
+    firstChargeAmount: (sub?.firstChargeAmount ?? '') ? String(toPrinted(sub?.firstChargeAmount ?? 0, storedRate)) : '',
     paymentMethod: sub?.paymentMethod ?? '',
     url: sub?.url ?? '',
     notes: sub?.notes ?? '',
@@ -520,6 +544,7 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm((p) => ({ ...p, [k]: e.target.value }));
 
+  const foreign = fx.enabled && isForeignCurrency(form.currency, fx.base);
   const [aiPending, startAi] = useTransition();
   const [aiMsg, setAiMsg] = useState<string | null>(null);
 
@@ -538,7 +563,9 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
         provider: d.provider || p.provider,
         category: d.category || p.category,
         amount: d.amount ? String(d.amount) : p.amount,
-        currency: d.currency || p.currency,
+        // A currency guessed by the AI is only honoured when multi-currency is switched on;
+        // otherwise it would silently mark the entry foreign on a single-currency deployment.
+        currency: (fx.enabled && d.currency) || p.currency,
         billingCycle: d.billingCycle || p.billingCycle,
         url: d.url || p.url,
         notes: d.notes || p.notes,
@@ -609,10 +636,19 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
           </select>
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label={t('sub.fAmount', { cur: cur() })}>
+      <div className={cn('grid grid-cols-2 gap-3', fx.enabled && 'sm:grid-cols-3')}>
+        <Field label={t('sub.fAmount', { cur: fx.enabled ? currencySymbol(form.currency).trim() : cur() })}>
           <Input type="number" step="0.01" min="0" value={form.amount} onChange={set('amount')} required placeholder="9.99" />
         </Field>
+        {fx.enabled && (
+          <Field label={t('ex.fCurrency')}>
+            <select value={form.currency} onChange={set('currency')} className={selectClass}>
+              {currencyCodes(fx.base).map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label={t('sub.fBillingCycle')}>
           <select value={form.billingCycle} onChange={set('billingCycle')} className={selectClass}>
             {CYCLES.map((c) => (
@@ -621,6 +657,7 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
           </select>
         </Field>
       </div>
+      {foreign && <SubFxFields form={form} setRate={(v) => setForm((p) => ({ ...p, fxRate: v }))} base={fx.base} />}
       <div className="grid grid-cols-2 gap-3">
         <Field label={t('sub.fStartDate')}>
           <Input type="date" value={form.startDate} onChange={set('startDate')} />
@@ -633,7 +670,7 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
         <Field label={t('sub.fTrialEnds')}>
           <Input type="date" value={form.trialEndsAt} onChange={set('trialEndsAt')} />
         </Field>
-        <Field label={t('sub.fFirstCharge', { cur: cur() })}>
+        <Field label={t('sub.fFirstCharge', { cur: fx.enabled ? currencySymbol(form.currency).trim() : cur() })}>
           <Input type="number" step="0.01" min="0" value={form.firstChargeAmount} onChange={set('firstChargeAmount')} placeholder={form.amount || '9.99'} />
         </Field>
       </div>
@@ -664,6 +701,63 @@ function SubForm({ sub, cards, onSuccess, onDeleted }: { sub?: SerializedSubscri
         )}
       </div>
     </form>
+  );
+}
+
+/** Multi-currency (P9): shown only when the subscription's currency differs from the base one.
+ *  Two ways in, because someone reading a card statement knows what was charged but not the
+ *  rate: type the rate, or type the amount actually debited and let deriveFxRate() back it out.
+ *  The preview is the number that will be stored (and summed in the monthly total). */
+function SubFxFields({
+  form,
+  setRate,
+  base,
+}: {
+  form: { amount: string; currency: string; fxRate: string };
+  /** Only the rate is editable here, so the parent's full form type stays out of this component. */
+  setRate: (v: string) => void;
+  base: string;
+}) {
+  const t = useT();
+  const [charged, setCharged] = useState('');
+  const printed = Number(form.amount) || 0;
+  const rate = Number(form.fxRate) || 0;
+  const code = normalizeCurrency(form.currency);
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end rounded-lg border border-[color:var(--color-purple)]/30 bg-[color:var(--color-surface-2)] p-3">
+      <Field label={t('ex.fFxRate', { code, base })}>
+        <Input
+          type="number"
+          step="0.000001"
+          value={form.fxRate}
+          onChange={(e) => {
+            setCharged('');
+            setRate(e.target.value);
+          }}
+          placeholder="0.92"
+        />
+      </Field>
+      <Field label={t('ex.fFxCharged', { cur: currencySymbol(base).trim() })}>
+        <Input
+          type="number"
+          step="0.01"
+          value={charged}
+          onChange={(e) => {
+            const v = e.target.value;
+            setCharged(v);
+            const derived = deriveFxRate(printed, Number(v) || 0);
+            setRate(derived ? String(derived) : '');
+          }}
+        />
+      </Field>
+      <p className="text-[11px] pb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+        {rate > 0 ? (
+          <span className="text-[color:var(--color-purple)]">= {formatMoney(convertToBase(printed, rate), base)}</span>
+        ) : (
+          <span className="text-[color:var(--color-gold)]">⚠ {t('ex.fxNoRate', { base })}</span>
+        )}
+      </p>
+    </div>
   );
 }
 
