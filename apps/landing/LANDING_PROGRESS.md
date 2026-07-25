@@ -3496,3 +3496,62 @@ screenshots οταν υπαρξουν assets (blocked).
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενο entry (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-25 (15) — P9 Receipts multi-currency: fix stale FAQ claim + roadmap wording
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε (8 OPEN
+entries πλεον, ολα bakecore + το pharos-daily-dev mobile-camera question, τιποτα για landing/pharos-landing,
+τιποτα ANSWERED προς αυτη τη routine).
+
+`git log --oneline d3bae99..HEAD | grep "feat("` (d3bae99 = τελευταιο commit που αγγιξε το apps/landing,
+προηγουμενο entry) εβγαλε ενα φρεσκο: `25cb2c2 feat(money): multi-currency for Receipts (P9 slice 2)`.
+
+Αυτο ΔΕΝ ηταν μονο νεο feature προς προσθηκη· βρηκα οτι η ΗΔΗ-υπαρχουσα FAQ εγγραφη για multi-currency
+(απο το προηγουμενο entry, #14 σημερα) εχει τωρα **λανθασμενο ισχυρισμο**: "It currently covers expenses
+and income; receipts, statements, and subscriptions are still base-currency only for now" — το receipts
+κομματι ειναι πλεον ψευδες.
+
+Espesta agent-less read-only research (Read directly, το read-only ηταν αμεσο χωρις να χρειαστει Explore
+subagent): διαβασα `apps/web/src/lib/fx.ts` (το ιδιο pure FX module που ηδη τεκμηριωνεται, INVARIANT: amount
+παντα base-currency, resolveFx/toPrinted/deriveFxRate) και `apps/web/src/app/receipts/actions.ts` (4 write
+paths: upload/updateReceipt/quickVerifyReceipt/rescanReceipt, ολα περνανε απο resolveFx). Η διαφορα απο το
+Expenses μοντελο: μια αποδειξη εχει ΠΟΛΛΑ ποσα οχι ενα (total/net/vatAmount/line prices), και **ΟΛΑ**
+converts με το ΙΔΙΟ rate (οχι μονο το total) — γιατι τα Reports αθροιζουν vatAmount και η item library
+αντιγραφει line prices στο Item.purchasedPrice, αρα ενα μισο-converted receipt θα δηλητηριαζε και τα δυο.
+Το total κρατα το printed value verbatim (origAmount), τα υπολοιπα recovered για editing μεσω fx.toPrinted().
+Επιβεβαιωσα και στο `ReceiptsClient.tsx` (form.currency/form.fxRate, ιδιο `fx.enabled` toggle απο
+Settings, ιδιο UI pattern με Expenses: currency picker + rate field στη φορμα).
+
+Αλλαγες (`apps/landing/app/page.tsx`, 2 σημεια, ιδιο αρχειο με παντα):
+1. FAQ fix: το ιδιο question "Can it handle an expense in a currency other than my main one?" (anchor id
+   αμεταβλητο, δεν αλλαξε το question text) — νεο answer: "the expense, income, and receipt forms" (πριν
+   μονο expense/income), νεα προταση "On a receipt every amount converts with that same rate, not just
+   the total, since reports sum VAT and the item library copies line prices into your inventory, so a
+   half-converted receipt would throw both off.", και το τελευταιο προταση εγινε "It currently covers
+   expenses, income, and receipts; statements and subscriptions are still base-currency only for now."
+   (αντι "expenses and income ... receipts, statements, and subscriptions").
+2. Roadmap fix: "Opt-in multi-currency for expenses & income" -> "Opt-in multi-currency for expenses,
+   income & receipts" στο Shipped block.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη).
+- Πορτες 3100-3130: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build.
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` επιβεβαιωσε: `found:true`, σωστο πληρες `textContent` (περιεχει "the expense, income,
+  and receipt forms" και "On a receipt every amount converts..."), roadmap string check: νεο wording
+  "Opt-in multi-currency for expenses, income & receipts" παρον, παλιο "expenses & income" wording
+  απουσιαζει. Hero screenshot καθαρο (lighthouse mark, gradient τιτλος, nav, τριπλο badge row).
+  `pkill -f "next start -p 3110"` -> επιβεβαιωθηκε οτι κανενα `next-server` process δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx.
+- Δεν αγγιξα Docker/:3000/web/mobile. Η μονη agent-χρηση ηταν read-only Read (χωρις subagent, το scope
+  ηταν μικρο, 2 αρχεια), μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: 2 candidates παραμενουν απο τη λιστα προτεραιοτητας (P22 receipt line-item global
+search, P21 document/manual vault). Αλλιως: νεος `git log --oneline 25cb2c2..HEAD | grep "feat("` ελεγχος
+στην αρχη του επομενου run, ή polish συνεχεια / real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
