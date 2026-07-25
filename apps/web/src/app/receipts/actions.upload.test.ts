@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Second slice of app/receipts/actions.ts (756 lines) — the shared OCR-first parse
-// pipeline (private `runReceiptParse`) exercised through its two callers: `uploadReceipt`
-// (save-a-file draft) and `rescanReceipt`/`rescanReceiptOne` (re-run AI on the already-
-// stored file). Same idiom as expenses/actions.scan.test.ts: text-PDF -> embedded text,
+// pipeline (private `runReceiptParse`) exercised through its three callers: `uploadReceipt`
+// (save-a-file draft), `rescanReceipt`/`rescanReceiptOne` (re-run AI on the already-
+// stored file), and `rescanReceiptsBulk` (explicit-id batch wrapper around
+// `rescanReceiptOne`, reusing every mock in this file 1-to-1 — see its own describe
+// block at the bottom). Same idiom as expenses/actions.scan.test.ts: text-PDF -> embedded text,
 // scanned-PDF -> rasterize+OCR -> text model (or vision fallback when OCR is unusable),
 // image -> OCR-first -> text model (or vision fallback), plus an .html/.htm branch unique
 // to receipts (email order-confirmation bodies -> htmlReceiptToText -> text model).
@@ -40,6 +42,7 @@ const {
   connectDBMock,
   receiptCreate,
   receiptFindById,
+  receiptFindByIdAndUpdate,
   getAppSettingsMock,
   isFeatureEnabledMock,
   parseReceiptMock,
@@ -61,6 +64,7 @@ const {
   // webhook dispatch reads store/total/date off the *returned* doc, not the input object.
   receiptCreate: vi.fn(async (doc: Record<string, any>) => ({ ...doc, _id: 'r1' })),
   receiptFindById: vi.fn(async (_id: string) => null as Record<string, any> | null),
+  receiptFindByIdAndUpdate: vi.fn(async (_id: string, _update: Record<string, any>) => ({})),
   getAppSettingsMock: vi.fn(async () => ({ defaultWarrantyMonths: 24, defaultVatRate: 24 })),
   isFeatureEnabledMock: vi.fn(async () => true),
   parseReceiptMock: vi.fn(async (_b64: string) => ({ parsed: null as any, raw: '', model: 'vision-model' })),
@@ -81,6 +85,7 @@ const {
 const receiptModel = {
   create: receiptCreate,
   findById: receiptFindById,
+  findByIdAndUpdate: receiptFindByIdAndUpdate,
 };
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
@@ -101,7 +106,7 @@ vi.mock('@/lib/webhooks', () => ({ dispatchEventWebhooks: dispatchEventWebhooksM
 vi.mock('@/lib/htmlReceipt', () => ({ htmlReceiptToText: htmlReceiptToTextMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
-import { uploadReceipt, rescanReceipt } from './actions';
+import { uploadReceipt, rescanReceipt, rescanReceiptsBulk } from './actions';
 
 function makeFile(name: string, bytes: string, type: string, size?: number): File {
   const blob = new Blob([bytes], { type });
@@ -539,5 +544,87 @@ describe('rescanReceipt', () => {
     receiptFindById.mockResolvedValue(doc);
     const res = await rescanReceipt('r1', false);
     expect(res).toEqual({ ok: false, aiUsed: false, error: 'Save failed: validation failed: total is required' });
+  });
+});
+
+describe('rescanReceiptsBulk', () => {
+  it('is a no-op on an empty id list, still revalidates', async () => {
+    const res = await rescanReceiptsBulk([]);
+    expect(res).toEqual({ ok: true, recovered: 0, processed: 0 });
+    expect(receiptFindById).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith('/receipts');
+  });
+
+  it('caps the batch to the first 6 ids, ignoring the rest', async () => {
+    receiptFindById.mockResolvedValue(makeReceiptDoc({ filePath: 'receipts/r.jpg', fileType: 'image/jpeg', store: 'X' }));
+    ocrImageMock.mockResolvedValue('legible');
+    looksLikeUsableOcrMock.mockReturnValue(true);
+    parseReceiptTextMock.mockResolvedValue({ parsed: { store: 'X', total: 10 }, raw: 'r', model: 'm' });
+    const ids = Array.from({ length: 9 }, (_, i) => `id${i}`);
+    const res = await rescanReceiptsBulk(ids);
+    expect(res.processed).toBe(6);
+    expect(receiptFindById).toHaveBeenCalledTimes(6);
+  });
+
+  it('counts a receipt as recovered when the re-parse yields total>0', async () => {
+    receiptFindById.mockResolvedValue(makeReceiptDoc({ filePath: 'receipts/r.jpg', fileType: 'image/jpeg', store: 'X' }));
+    ocrImageMock.mockResolvedValue('legible');
+    looksLikeUsableOcrMock.mockReturnValue(true);
+    parseReceiptTextMock.mockResolvedValue({ parsed: { store: 'X', total: 10 }, raw: 'r', model: 'm' });
+    const res = await rescanReceiptsBulk(['id1']);
+    expect(res).toEqual({ ok: true, recovered: 1, processed: 1 });
+  });
+
+  it('counts a receipt as recovered when total is 0 but line items came back', async () => {
+    receiptFindById.mockResolvedValue(makeReceiptDoc({ filePath: 'receipts/r.jpg', fileType: 'image/jpeg', store: 'X' }));
+    ocrImageMock.mockResolvedValue('legible');
+    looksLikeUsableOcrMock.mockReturnValue(true);
+    parseReceiptTextMock.mockResolvedValue({ parsed: { store: 'X', total: 0, lineItems: [{ name: 'Cable', price: 5 }] }, raw: 'r', model: 'm' });
+    const res = await rescanReceiptsBulk(['id1']);
+    expect(res).toEqual({ ok: true, recovered: 1, processed: 1 });
+  });
+
+  it('does not count a receipt as recovered when the re-parse stays empty (total 0, no items)', async () => {
+    receiptFindById.mockResolvedValue(makeReceiptDoc({ filePath: 'receipts/r.jpg', fileType: 'image/jpeg', store: 'X' }));
+    ocrImageMock.mockResolvedValue('');
+    looksLikeUsableOcrMock.mockReturnValue(false);
+    parseReceiptMock.mockResolvedValue({ parsed: null, raw: '', model: 'qwen-vl' }); // nothing parsed
+    const res = await rescanReceiptsBulk(['id1']);
+    expect(res).toEqual({ ok: true, recovered: 0, processed: 1 });
+  });
+
+  it('does not count a receipt as recovered when rescanReceiptOne returns ok:false', async () => {
+    receiptFindById.mockResolvedValue(null); // "Receipt or file not found"
+    const res = await rescanReceiptsBulk(['missing']);
+    expect(res).toEqual({ ok: true, recovered: 0, processed: 1 });
+  });
+
+  it('one bad receipt (throws) does not abort the batch: caught, flagged aiModel:"ocr-error", rest still processes', async () => {
+    receiptFindById
+      .mockRejectedValueOnce(new Error('DB blew up'))
+      .mockResolvedValue(makeReceiptDoc({ filePath: 'receipts/r.jpg', fileType: 'image/jpeg', store: 'X' }));
+    ocrImageMock.mockResolvedValue('legible');
+    looksLikeUsableOcrMock.mockReturnValue(true);
+    parseReceiptTextMock.mockResolvedValue({ parsed: { store: 'X', total: 10 }, raw: 'r', model: 'm' });
+    const res = await rescanReceiptsBulk(['bad', 'good']);
+    expect(res).toEqual({ ok: true, recovered: 1, processed: 2 });
+    expect(receiptFindByIdAndUpdate).toHaveBeenCalledWith('bad', { aiModel: 'ocr-error' });
+  });
+
+  it('swallows a failure in the catch-recovery findByIdAndUpdate itself', async () => {
+    receiptFindById.mockRejectedValueOnce(new Error('boom'));
+    receiptFindByIdAndUpdate.mockRejectedValueOnce(new Error('also boom'));
+    const res = await rescanReceiptsBulk(['bad']);
+    expect(res).toEqual({ ok: true, recovered: 0, processed: 1 });
+  });
+
+  it('always revalidates "/receipts" via its own revalidatePath call once, on top of each item\'s own safeRevalidate', async () => {
+    // rescanReceiptOne (invoked per item) already calls safeRevalidate itself — the
+    // bulk wrapper adds one more revalidatePath call of its own, after the whole batch.
+    receiptFindById.mockResolvedValue(makeReceiptDoc({ filePath: 'receipts/r.jpg', fileType: 'image/jpeg', store: 'X' }));
+    await rescanReceiptsBulk(['id1']);
+    expect(revalidatePathMock).toHaveBeenCalledTimes(1);
+    expect(revalidatePathMock).toHaveBeenCalledWith('/receipts');
+    expect(safeRevalidateMock).toHaveBeenCalledWith('/receipts');
   });
 });
