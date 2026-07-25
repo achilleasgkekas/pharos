@@ -181,9 +181,9 @@ These are flagged **(AI)** below with the feature name.
 | Method | Path                              | Description |
 |--------|-----------------------------------|-------------|
 | GET    | `/items?status=shopping\|inventory\|all` | List items (+ `limit`/`offset`/`updatedSince`). |
-| POST   | `/items`                          | Create. Body `{ title, status?, category?, currentPrice? }` → `{ item }`. |
+| POST   | `/items`                          | Create. Body `{ title, status?, category?, currentPrice?, currency?, origAmount?, fxRate? }` → `{ item }`. P9: currency/fxRate/origAmount for multi-currency items. |
 | GET    | `/items/:id`                      | Full detail (links, price history, photos, warranty, purchase) + a computed `price` block (best-now, lowest/highest, trend, verdict, where-to-buy) for the mobile price panel. **Note:** Attachments (manuals, warranty certificates, serial-number photos) are stored per item but not yet exposed via the REST API; use the web UI to manage them. |
-| PATCH  | `/items/:id`                      | Update `{ title?, status?, category?, currentPrice?, targetPrice?, specs?, tags? }`. |
+| PATCH  | `/items/:id`                      | Update `{ title?, status?, category?, currentPrice?, targetPrice?, specs?, tags?, currency?, origAmount?, fxRate? }`. P9: touching any price field re-resolves all currency fields together. |
 | DELETE | `/items/:id`                      | Soft-delete. |
 | POST   | `/items/import`                   | **(AI: itemsImport)** Fetch a product page, AI-parse, add or merge. Body `{ url, view? }` (`view` = `shopping` default \| `inventory`) → `{ ok, id, title, price, store, updated }`. |
 | POST   | `/items/:id/ai-fill`              | **(AI: itemsImport)** Fill specs/category/tags from the item's links or web search. Body `{ mode: 'specs' \| 'info' }`. |
@@ -192,6 +192,8 @@ These are flagged **(AI)** below with the feature name.
 | GET    | `/items/:id/plans`                | Installment plans across all statements, each flagged `linked` for this item. Linked first, then active, then by soonest payoff. |
 | POST   | `/items/:id/link-plan`            | Attach this item to a plan (additive). Body `{ signature }`. |
 | DELETE | `/items/:id/link-plan`            | Detach this item from a plan, keeping other products. Body `{ signature }`. |
+
+**Multi-currency fields (P9):** `currency` is the code of the foreign currency (e.g., "USD", "GBP"). `origAmount` is the printed price in that currency (the "anchor" the user sees on the receipt or product page); `fxRate` is the exchange rate applied (origAmount × fxRate = the price in base currency stored for aggregations). Unlike receipts (multiple line items) or expenses (single amount), items carry THREE price fields (`purchasedPrice`, `currentPrice`, `targetPrice`) from the same source (receipt or shop page), so all three convert together with the same `fxRate`. The converted prices are always stored in the deployment's base currency for consistent aggregations (net worth, insurance export, shopping budgets). When multi-currency is disabled in settings, these fields are ignored and always empty.
 
 ### Shopping list (lightweight)
 

@@ -84,6 +84,15 @@ Highlights:
   sign for your claim), (3) all item photos, (4) linked receipt PDFs (proof of
   purchase). Perfect for filing an insurance claim after damage, theft, or
   disaster — give the ZIP to your insurer.
+- **Multi-currency support (P9).** When you buy an item abroad (or from a foreign
+  shop), record what the receipt or product page actually said, and PHAROS
+  converts it to your base currency for net worth and reports. The form shows
+  Currency and FX rate fields; when you add from a URL, prices are extracted in
+  their original currency. All three item prices (purchased, current, target)
+  convert together with the same rate. A gold badge appears if the rate is
+  unknown, storing the printed amount as-is rather than guessing 1:1. The stored
+  amount is always in base currency, so insurance exports, net worth, and
+  shopping budgets keep working without re-migration.
 
 ## Shopping list
 
