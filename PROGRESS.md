@@ -6,6 +6,76 @@
 <!-- docker-validated: 4523f4a -->
 <!-- ui-audited: 0bc5e14 -->
 
+## 2026-07-26 (P9 slice 7: «ποιες εγγραφές θέλουν ακόμα ισοτιμία;» — audit στα Reports)
+
+**Approved queue check (βήμα a)**: αμετάβλητη εικόνα, τίποτα αυτόνομα-χτίσιμο. **P36** (Open Banking, θέλει
+provider decision + credentials), **P31** (household, θέλει supervised session με 3 ρόλους live), **P17**/**P23**
+(μπλοκαρισμένα στην έγκριση `expo-camera`· το ερώτημα `pharos-daily-dev-20260725-1425` είναι **3ο συνεχόμενο run
+OPEN**). Άρα συνέχισα με το προηγούμενο log, το οποίο έδινε δύο επιλογές και χαρακτήριζε ρητά τη δεύτερη «πιο
+χρήσιμη»: διάλεξα αυτήν.
+
+**Το πρόβλημα (γιατί άξιζε πριν από τα Vouchers/gift cards)**: το `resolveFx` **σκόπιμα δεν μαντεύει ποτέ 1:1**,
+οπότε μια ξένη εγγραφή που σώθηκε χωρίς rate κρατά το **τυπωμένο** νούμερο μέσα στο `amount` — και το `amount` το
+αθροίζει **κάθε** roll-up της εφαρμογής (reports, budgets, net worth, cash flow). Σωστή απόφαση ανά εγγραφή, αλλά
+μέχρι τώρα το μόνο ίχνος ήταν το **χρυσό FxBadge πάνω στην ίδια την εγγραφή**: έπρεπε να ξέρεις ήδη ποια να
+ανοίξεις. Χειρότερα, το CSV import του slice 6 μπορεί να γεννήσει **δεκάδες** τέτοιες μονομιάς (τις μετράει στο
+`needsRate` του result, και μετά ο αριθμός χάνεται με το κλείσιμο του dialog). Δηλαδή το slice 6 έκλεισε το τελευταίο
+write path, αλλά άφησε ανοιχτό το **read** path: πώς τις βρίσκεις μετά.
+
+**Απόφαση σχεδίασης (την πήρα μόνος)**: το προηγούμενο log πρότεινε «φίλτρο/badge στα money views». Το έκανα
+**κεντρικό panel στα `/reports`, ΟΧΙ φίλτρο ανά view**, για τρεις λόγους: (α) το πρόβλημα είναι cross-module (5
+μοντέλα) και ένα per-view φίλτρο θα έγραφε την ίδια λογική 5 φορές σε 5 sidebars· (β) οι εγγραφές αυτές χαλάνε
+**συγκεντρωτικά νούμερα**, και τα συγκεντρωτικά νούμερα ζουν στα Reports, οπότε η προειδοποίηση κάθεται ακριβώς
+πάνω από ό,τι νοθεύει· (γ) κάθε γραμμή κάνει deep-link **μέσα** στη φόρμα της εγγραφής (`?open=`), που είναι όπου
+μπαίνει το rate ούτως ή άλλως. Το per-view φίλτρο μένει ως follow-up αν φανεί ότι χρειάζεται.
+
+**Τι χτίστηκε**:
+- **`lib/fx.ts` → νέα pure `needsFxRate(doc, base)`**: ο κανόνας («foreign ΚΑΙ έχει τυπωμένο ποσό ΚΑΙ δεν έχει
+  rate») γραμμένος **μία φορά**. Το `FxBadge` τον διαβάζει τώρα κι αυτό αντί για δικό του inline `fxRate > 0`
+  (ισοδύναμο μετά το early-return του, απλώς παύει να είναι δεύτερη αντιγραφή του ίδιου κανόνα).
+- **Νέο `lib/fxAudit.ts`**: `fxNeedsRateFilter(base)` (Mongo filter — `origAmount > 0` είναι αυτό που κρατά έξω τις
+  κανονικές εγγραφές, αφού **όλα** τα μοντέλα κάνουν default το `currency` σε 'EUR' και οι pre-P9 γραμμές έχουν
+  κωδικό αλλά ποτέ τυπωμένο ποσό· το `fxRate: null` πιάνει και τα docs όπου το πεδίο **λείπει**, που το `$lte: 0`
+  από μόνο του θα έχανε), `fxIssueHref`, `itemFxKindRoute`, `sortFxIssues` + το DB μισό `listEntriesNeedingRate`
+  (5 collections, `currentModel` για tenant-scoping, never-throws → degrade σε κενή λίστα ώστε να μη ρίξει ποτέ τα
+  Reports).
+- **Το routing ΔΕΝ είναι καλλωπισμός, γι' αυτό είναι pure + tested**: expenses και income είναι **το ίδιο μοντέλο
+  σε δύο routes** (`kind`), και ένα item ανοίγει σε `/items` ή `/shopping` ανάλογα με το αν είναι owned. Ένα
+  αφελές single-route link θα προσγειωνόταν σε σελίδα που **φιλτράρει έξω** την εγγραφή και θα άνοιγε σιωπηλά
+  τίποτα — ακριβώς το bug που το panel υπάρχει για να λύσει.
+- **UI**: χρυσή κάρτα «N entries need an exchange rate» **πάνω από** το net-worth hero, μία γραμμή ανά εγγραφή
+  (τίτλος, τύπος + ημερομηνία/period, τυπωμένο ποσό), **μεγαλύτερο τυπωμένο ποσό πρώτο** (ένα $900 statement
+  μετράει περισσότερο από έναν $4 καφέ), cap 40. **Renders ΜΟΝΟ** όταν `multiCurrency` on ΚΑΙ υπάρχει κάτι προς
+  διόρθωση: single-currency deployment γλιτώνει και τα 5 queries και δεν βλέπει ποτέ την κάρτα.
+
+**Verify**: `npm run type-check` **EXIT 0**· full `npx vitest run` **3748 passed / 274 files** (+23: 6 για το
+`needsFxRate` [συμπεριλαμβανομένου ενός που το δένει με το `resolveFx.needsRate`, ώστε stored-doc και form-input να
+μη μπορούν να αποκλίνουν] + 11 στο νέο `fxAudit.test.ts` + 6 edge cases· μηδέν regression, καμία υπάρχουσα προσδοκία
+δεν χρειάστηκε αλλαγή). Docker κάτω από το mutex: `build web` → mongo **healthy** → `up -d web` → `/login` **200 με
+την πρώτη**, `/reports` **307** (auth-gated, άρα compiled), **0 restarts**, mongo healthy → `docker builder prune -f`
+(197MB) → lock **released**. Browser: `/login` renders, **μηδέν console errors**· το authed `/reports` δεν
+επαληθεύεται unattended (credentials boundary), όπως πάντα.
+
+**Git hygiene**: explicit `git add` 9 αρχείων (όχι `-A`) → commit `84f7b7f` → pushed. ΣΗΜ: στο tree κάθεται ξένο
+uncommitted `apps/web/src/app/items/actions.photos.test.ts` (άλλης routine) — δεν το άγγιξα.
+
+**Επόμενο task (πρόταση)**: **P9 slice 8 — Bills** (`Bill.amount`, P28) είναι πλέον **το μόνο μοντέλο με χρηματικό
+πεδίο χωρίς fx triple**· ίδιο ακριβώς pattern με τα 5 προηγούμενα slices, μικρό, και μετά η σάρωση κλείνει
+πραγματικά (τα Vouchers δεν έχουν αριθμητικό ποσό — το `discount` είναι ελεύθερο string «10%»/«€5» — και τα gift
+cards του P32 είναι store credit σε base currency· κανένα από τα δύο δεν δικαιολογεί fx πριν τα Bills). Εναλλακτικά,
+αν φανεί χρήσιμο στη χρήση: **inline «set rate» απευθείας μέσα στο νέο panel** (τώρα κάνει deep-link· ένα inline fix
+θέλει per-type conversion των δευτερευόντων πεδίων, γι' αυτό το άφησα έξω από αυτό το run). Πρώτα πάντα ο έλεγχος
+του Approved queue (βήμα a).
+
+## Needs Achilleas
+
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο, **3ο** συνεχόμενο run. Το P17 server half
+  είναι shipped+tested και του P23 υπάρχει ήδη (`POST /api/v1/scan/receipt`). Ερώτημα:
+  `~/.claude/ASK_ACHILLEAS.md` → `pharos-daily-dev-20260725-1425` (ακόμα OPEN).
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
+  household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
+  ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
 ## 2026-07-26 (P9 slice 6: multi-currency στο bank-CSV import)
 
 **Approved queue check (βήμα a)**: αμετάβλητη εικόνα. **P36** (Open Banking, θέλει provider decision +
