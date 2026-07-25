@@ -880,10 +880,35 @@
   «orphaned/dead code» **ήταν ήδη σωστά wired** στο `ExpensesClient.tsx` από το ίδιο commit `bed7f73` (PA1) —
   stale note, διορθώθηκε εδώ. Καμία ενέργεια χρειάστηκε.
 
-### P17. Mobile barcode/QR scan → γρήγορη προσθήκη στο inventory — M — both (mobile-native)
+### P17. Mobile barcode/QR scan → γρήγορη προσθήκη στο inventory — 🟡 SERVER HALF SHIPPED 2026-07-25 (pharos-daily-dev), camera UI εκκρεμεί
 - **Αξία:** barcode/QR scan (EAN/UPC) → lookup → prefill τίτλου/κατηγορίας/specs → one-tap add σε inventory/shopping.
 - **Module:** Mobile (camera-scan) + Items/Inventory (+ `/api/v1` §5, product-lookup helper).
 - **Εξάρτηση:** mobile MVP (§6). **Builder default:** lookup = δωρεάν Open Food Facts / UPC DB, AI fallback.
+- **Γιατί χωρίστηκε στα δύο:** το item ήταν 4 συνεχόμενα runs μπλοκαρισμένο ως «mobile native-dep approval» (η camera
+  θέλει `expo-camera`/`expo-barcode-scanner`, δηλαδή έγκριση του Αχιλλέα + EAS dev build, μη testable unattended). Αλλά
+  το **server μισό δεν χρειάζεται καμία native dep** και είναι ρητά μέρος του spec («+ `/api/v1` product-lookup
+  helper»), οπότε χτίστηκε τώρα ώστε το mobile κομμάτι να είναι σκέτο UI όταν έρθει η έγκριση.
+- **Υλοποίηση (server):** νέο pure **`lib/barcode.ts`** (GTIN mod-10 check digit, `normalizeBarcode` που δέχεται
+  EAN-8/UPC-A/EAN-13/GTIN-14 και ανέχεται κενά/παύλες, `barcodeCandidates` για τις zero-padding παραλλαγές που
+  διαφορετικοί κατάλογοι αποθηκεύουν αλλιώς, `pickCategory`, `mapOpenFactsProduct`· **+21 unit tests**) +
+  **`lib/barcodeLookup.ts`** (network· **+12 tests** με mocked fetch) + route **`GET /api/v1/lookup/barcode?code=`**
+  (**+8 tests**). Το `product` έχει **ακριβώς το ίδιο σχήμα** με το `POST /api/v1/scan/product`
+  (name/brand/category/quantity/notes) → η ίδια confirm-then-add οθόνη εξυπηρετεί και τα δύο, και πέφτει κατευθείαν
+  σε `POST /api/v1/shopping-list`. Τεκμηριωμένο στο `API.md`.
+- **Builder decisions:** (α) πηγές = **Open Food / Products / Beauty Facts** (δωρεάν, χωρίς key, χωρίς quota, μηδέν
+  κόστος)· (β) **ΟΧΙ AI fallback στο v1** — κάθε AI κλήση είναι metered και κοστίζει, ενώ το lookup είναι ντετερμινιστικό
+  και δωρεάν· ο χρήστης έχει ήδη το AI product-photo scan ως ρητή, δική του κλιμάκωση όταν το barcode αστοχήσει·
+  (γ) οι 3 πηγές ρωτιούνται **παράλληλα** ανά μορφή barcode (bounded wall clock, κάποιος στέκεται σε ράφι)· (δ) το
+  check digit επικυρώνεται **πριν** ξοδευτεί request· (ε) διάκριση 400 (άκυρο barcode) / `product:null` (κανείς δεν το
+  ξέρει) / 502 (βάσεις άφταστες) — τρεις διαφορετικές απαντήσεις που το UI πρέπει να δείχνει αλλιώς.
+- **Verify:** `npm run type-check` EXIT 0· full `npx vitest run` **3465 passed / 261 files** (+41 νέα, μηδέν regression).
+  Επιπλέον **live curl** στο πραγματικό Open Food Facts API, που αποκάλυψε δύο πράγματα που τα mocks δεν θα έπιαναν:
+  ένα miss γυρίζει **HTTP 200 με `status:0`** (όχι πάντα 404 — καλύπτονται και τα δύο), και τα `categories_tags`
+  **αναμειγνύουν** canonical αγγλικά tags με ξενόγλωσσο κείμενο κάτω από το ίδιο `en:` prefix (το πραγματικό record
+  της Nutella τελειώνει σε «en:Pâtes à tartiner») → το `pickCategory` προτιμά πλέον canonical taxonomy entries, αλλιώς
+  θα έδινε γαλλική κατηγορία σε αγγλικό lookup.
+- **Εκκρεμεί (χρειάζεται Αχιλλέα):** το mobile camera UI — έγκριση για `expo-camera` (native dep) + EAS dev build σε
+  φυσική συσκευή. Ο server είναι έτοιμος και tested· μένει η οθόνη scan → `GET /api/v1/lookup/barcode` → confirm → add.
 
 ### P20. Loyalty / membership card wallet (barcode display στο checkout) — ✅ SHIPPED 2026-07-18 (pharos-daily-dev, commit `536a3d8`)
 - **Υλοποίηση:** νέο `models/LoyaltyCard.ts` (title/store/cardNumber/barcodeFormat/notes/archived, soft-delete, ίδιο

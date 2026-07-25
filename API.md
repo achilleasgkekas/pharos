@@ -79,6 +79,20 @@ Creating a receipt is file-based (upload + AI scan); a multipart `scan/receipt` 
   → `201 { receipt: { …, lineItems, aiUsed, aiError } }`
   **Saves + parses + creates** the receipt (mirrors the web dropzone). The user can fix fields later via `PATCH` on the web, or just keep it.
 
+### Barcode lookup (mobile scanner)
+- `GET /api/v1/lookup/barcode?code=<gtin>` → `{ product: { name, brand, category, quantity, notes, code, image, source } | null, code }`
+
+  Turns a scanned EAN-8 / UPC-A / EAN-13 / GTIN-14 into a prefilled suggestion. **Nothing is saved** — the `product` shape is deliberately identical to `POST /api/v1/scan/product`, so the same confirm-then-add screen serves both, and it drops straight into `POST /api/v1/shopping-list`.
+
+  Sources are the free, key-less Open Food / Products / Beauty Facts databases (no AI, no cost, no quota). Separators in `code` are tolerated; the check digit is validated before any request is spent.
+
+  | Response | Meaning |
+  |---|---|
+  | `200 { product: {…} }` | Found. |
+  | `200 { product: null }` | Valid barcode, but no database knows it. Let the user type it in, or fall back to `POST /api/v1/scan/product` (AI photo). |
+  | `400` | `code` missing, or not a valid GTIN (failed check digit / wrong length). |
+  | `502` | No product database could be reached. Retryable. |
+
 ### Shopping list (quick to-buy)
 - `GET /api/v1/shopping-list` → `{ items: [{ id, name, quantity, category, brand, note, checked, aiScanned, createdAt }] }`
 - `POST /api/v1/shopping-list` `{ name, quantity?, category?, brand?, note? }` → `{ items }`
