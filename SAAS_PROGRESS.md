@@ -4952,3 +4952,50 @@ management, μεγαλύτερο surface: role assign/remove + το ίδιο `wo
 `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`,
 `account/{reset/*,verify/*}`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
 για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-26 (cont. — increment 105, route-level test coverage για το account/export endpoint)
+
+Πριν από νέο increment: ask-inbox re-checked (`~/.claude/ASK_ACHILLEAS.md`, 7 OPEN entries — 5×
+bakecore [finance ×2, redesigner, reviewer ×2, ui-rebuild], bakecore-tests macOS-TCC flag,
+pharos-daily-dev P17/P23 mobile-camera approval· τίποτα addressed σε saas-core). `WEB_DEBT.md`
+re-checked (ενεργή ουρά 0 items στο territory). UI-first backlog παραμένει εξαντλημένο (admin
+console + auth/workspace panels όλα ήδη χτισμένα, βλ. `find admin "(saas)"` → 16 pages). Πριν το
+staging, `git status --short` έδειξε ΗΔΗ σταθμένα (staged) αρχεία άσχετα με saas-core
+(`apps/web/src/app/expenses/*`, `csvImport.ts`, `ynabImport.ts`) — collision guard σεβάστηκε,
+ΔΕΝ έγινε καμία git ενέργεια μέχρι να ξεκαθαρίσει (επόμενος έλεγχος έδειξε ότι είχαν ήδη
+committed από άλλη routine, tree clean πλην PROGRESS.md [όχι δικό μου] + το νέο μου test file).
+Ακολούθησα το leftover next-task από το increment-104 log.
+
+**Νέο `account/export/route.test.ts`** (6 tests), μηδέν production code αλλαγή. Route = GET-only
+GDPR Art.15/20 self-export (caller's Account profile + Memberships[any status] joined σε Tenant
+display fields → assembled JSON attachment). `buildAccountExport`/`accountExportFilename`
+(lib/tenancy/accountExport) είναι ήδη πλήρως pure+unit-tested στο δικό τους
+`accountExport.test.ts` → mocked εδώ, το route test καλύπτει αποκλειστικά: gate/401
+short-circuits, `Account.findById().select().lean()` → 404 όταν λείπει (μηδέν
+Membership/Tenant reads μετά), `Membership.find({account})` + `Tenant.find({_id:{$in:...}})`
+scoped στα σωστά ids, το membership→tenant join (tenant που δεν βρέθηκε στο Tenant result →
+`tenant:null`, όχι dropped — αυτό είναι δουλειά του `buildAccountExport`, όχι του route),
+`buildAccountExport` καλείται με (account, joined[], Date), κενές memberships → `$in: []` +
+κενό joined array, το response = το payload του assembler verbatim + attachment
+Content-Disposition/Content-Type/Cache-Control headers, mid-handler throw → καθαρό 500 μέσω
+πραγματικού saasGuard.
+
+**Verified**: νέο test file **6/6 green** μόνο του· πλήρες `npx vitest run` → **273 files / 3731
+tests green** (αυξήθηκε από 272/3708 του increment-104 log, +23 tests — κάποιες προήλθαν από
+άλλες ταυτόχρονες routines στο μεταξύ, όχι μόνο τα 6 δικά μου). `npm run type-check` → **EXIT 0**
+καθαρά (χρειάστηκε μικρό tuple-cast fix στο mock signature του `buildAccountExportMock`, τυπικό
+vitest-mock-arity θέμα, καμία production επίπτωση). **Docker: ΔΕΝ έγινε rebuild** (test-only
+αρχείο, μηδέν production code/runtime wiring αλλαγή). **Browser-verify: skipped** (test file,
+μηδέν UI/observable behavior αλλαγή). Collision guard: `git status --short` πριν το staging
+έδειξε ΜΟΝΟ το δικό μου 1 νέο αρχείο (τα άσχετα staged files μιας άλλης routine είχαν ήδη γίνει
+commit στο μεταξύ)· `git diff --cached --name-only` μετά το staging επιβεβαίωσε exact 1-file
+match πριν το commit/push.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** επόμενοι υποψήφιοι χωρίς route-level coverage: **`members`** (owner/admin member-
+management, μεγαλύτερο surface: role assign/remove + το ίδιο `wouldOrphanOwners` guard από την
+άλλη πλευρά), `usage`+`usage/sample`, `workspace/{ai-key,export/files,reactivate}`,
+`invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`,
+`account/{reset/*,verify/*}`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
+για item στο territory (αν βρεθεί, πάει πρώτο).
