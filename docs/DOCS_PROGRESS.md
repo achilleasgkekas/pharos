@@ -2427,3 +2427,26 @@ Collision guard: git status --short = κανένα modified docs file, κανέ�
 
 Επόμενο run: (α) αν νέα features shipped (π.χ. nέα P phases), update docs · (β) αν αλλαγές στα existing routes, refresh api.md · (γ) monitoring για ενδεχόμενη stale-forward αν configuration options αλλάξουν.
 
+## 2026-07-25 (twentieth run — continuation monitoring, all features documented)
+
+Σάρωση git log από το τελευταίο 19ο run (2026-07-25 10:10). Ανακάλυψη: τα τελευταία commits μετά τις 10:10 είναι μόνο test() (saas/receipts/expenses/statements/webhooks route coverage), fix() (saas sample-data, security gate), i18n() (126 Greek translation keys), content() (landing FAQ), και docs() (progress logging) — κανένα feat() commit που να φέρει νέα features.
+
+Τι έγραψα:
+- Καμιά αλλαγή σε documentation — δεν υπάρχουν νέα features προς αποτίμηση.
+
+Comprehensive verification (markdown only, κανενα build/Docker/AI call):
+- feat() commits scan: τελευταίο είναι 823b05e (2026-07-24 14:08, P35 Balances modal) — ήδη documented ✓.
+- Recent commits (2026-07-25 10:20–10:44 after 19th run): 7618b3b/a730436/77094ce/be74e13 (test), 2cd33fb (i18n), 315cd26 (fix), 13e1bd3 (docs) — καμίες API/feature αλλαγές ✓.
+- Code endpoint spot-checks: GET /overview, POST /items, GET /expenses = all exist at documented paths ✓.
+- Mobile screens: 18 documented screens in mobile.md, 18 actual screens in code (DashboardScreen→HomeScreen, ExpensesScreen→MoneyScreen — user-facing names correct) ✓.
+- api.md coverage: 59 route files in code, documented in table format with method/path/description — all major endpoints present ✓.
+- Internal links: docs/README.md, docs/self-hosting.md, docs/features.md — όλες υπάρχουν, valid ✓.
+- Code fences: api.md=22 balanced pairs, mobile.md=8 balanced pairs, features.md=all balanced ✓.
+- Secret scan: κανένα literal credential (password/Bearer/token) ✓.
+
+Collision guard: git status --short = κανένα modified docs file, κανένα staged foreign.
+
+Συμπέρασμα: continuation run — όλα τα features παραμένουν documented + in sync. Κανένα νέο work. Status quo.
+
+Επόμενο run: (α) αν νέα features shipped, update documentation · (β) αν αλλαγές στα API routes, refresh api.md · (γ) monitoring για νέα configuration options.
+
