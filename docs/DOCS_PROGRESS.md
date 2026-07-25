@@ -2521,3 +2521,26 @@ Commit: `3c9d170 docs(P9): document multi-currency support for Subscriptions` (p
 Συμπέρασμα: P9 multi-currency feature είναι πλέον fully documented across all three modules (Receipts, Expenses, Subscriptions) — API endpoints, feature descriptions, και user-facing behavior. Όλα σε sync.
 
 Επόμενο run: (α) continue scanning για νέα feat() commits · (β) αν αλλαγές στα existing routes, refresh api.md · (γ) monitoring για νέα configuration options που χρειάζονται configuration.md update.
+
+## 2026-07-25 (twenty-second run — P9 slice 4: Items multi-currency documentation)
+
+Σάρωση git log για νέα feat() commits μετά τις 18:19:30 (τελευταίο run). Ανακάλυψη: τα τελευταία feat() commits είναι b2e72ce (P9 slice 3, subscriptions, ήδη documented) + **8e13724 (2026-07-25 20:18:28, P9 slice 4: multi-currency for Items)** — νέο feature που χρειάζεται documentation.
+
+Τι έγραψα:
+- **features.md**: προσθέθηκε bullet point στη Items section για P9 multi-currency support, εξηγώντας ότι items αποθηκεύουν ξένα νομίσματα με origAmount + fxRate, μετατρέπονται σε base currency ✓.
+- **api.md**: updated POST /items και PATCH /items/:id με τα νέα fields (currency, origAmount, fxRate) + εξηγητική ενότητα που περιγράφει πώς τα 3 price fields (purchased, current, target) μετατρέπονται μαζί ✓.
+
+Comprehensive verification (markdown only, κανενα build/Docker/AI call):
+- Backticks: api.md 11 pairs (balanced) ✓, features.md 0 (καμία κωδική φράγματα) ✓.
+- Code samples: κανένα literal credential, όλα placeholders (phk_EXAMPLE κλπ) ✓.
+- P9 completeness: multi-currency τώρα documented για Receipts + Expenses + Subscriptions + **Items** (ολοκλήρωση P9 slice 4) ✓.
+- Internal links: api.md table structure valid, references σε /items endpoints correct ✓.
+- Secret scan: κανένα literal credential ✓.
+
+Collision guard: git status --short = μόνο docs/api.md + docs/features.md (τα δύο αρχεία που edit-αρα), κανένα staged foreign file.
+
+Commit: `c8e3f56 docs(P9): document multi-currency support for Items (slice 4)` (pushed to origin/main ✓).
+
+Συμπέρασμα: P9 multi-currency feature είναι πλέον fully documented across all four modules (Receipts, Expenses, Subscriptions, Items) — API endpoints, feature descriptions, user-facing behavior. Όλα σε sync.
+
+Επόμενο run: (α) continue scanning για νέα feat() commits ή αν κάποια από τις P9 slices χρειάζεται refinement · (β) αν αλλαγές στα existing routes, refresh api.md · (γ) monitoring για νέα configuration options που χρειάζονται configuration.md update.
