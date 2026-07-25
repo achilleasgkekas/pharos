@@ -4734,3 +4734,45 @@ superadmin console surfaces, ακόμα untested), ή **`account/{workspaces,exp
 route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`, `account/{reset/*,verify/*}`,
 `admin/tenants/[slug]/dbstats`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
 για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-25 (cont. — increment 100, route-level test coverage για το account/mfa/confirm endpoint)
+
+Πριν από νέο increment: ask-inbox re-checked (5 OPEN entries, όλα bakecore· τίποτα addressed σε
+saas-core). `WEB_DEBT.md` re-checked (58η σάρωση παραμένει το latest, ενεργή ουρά άδεια). UI-first
+backlog παραμένει εξαντλημένο. Ακολούθησα το leftover next-task από το increment-99 log.
+
+**Νέο `account/mfa/confirm/route.test.ts`** (11 tests), μηδέν production code αλλαγή. Route =
+step 2 του TOTP enrollment (verify code από το pending secret του POST /account/mfa → activate
+MFA + επιστρέφει recovery codes ONCE). Mocks: `@/lib/db`, `@/lib/tenancy/accountSession`
+(getCurrentAccount), `@/lib/tenancy/mfaStore` (confirmMfaEnrollment — ήδη unit-tested στο δικό του
+αρχείο), `@/lib/tenancy/saasApi` (vi.importActual για το πραγματικό saasGuard, mock μόνο
+saasAuthGate — ίδιο precedent με τα προηγούμενα route tests). Simpler route από το sibling
+mfa/route.ts (μηδέν password re-auth εδώ — αυτό ζει στο parent enroll-begin route).
+
+Καλύπτει: gate short-circuit περνάει αναλλοίωτο, μηδέν DB/confirmMfaEnrollment call· no session
+→401 "Not authenticated", μηδέν DB touch· missing code→400 "code is required" ΠΡΙΝ το connectDB
+(validated πριν το DB round-trip, ίδιο idiom με τα password checks του sibling route)·
+whitespace-only code→το ΙΔΙΟ 400 (trim collapses σε empty)· το code περνάει trimmed στο
+confirmMfaEnrollment (`'  123456  '`→`'123456'`)· confirmMfaEnrollment ok:false reasons→404
+(not_found)/503 (crypto_unavailable)/400 (no_pending, invalid_code — και τα δύο μαζί καλύπτουν το
+`else 400` branch)· success→200 `{enabled:true, recoveryCodes}` verbatim· mid-handler throw
+(confirmMfaEnrollment rejects)→καθαρό 500 μέσω πραγματικού saasGuard.
+
+**Verified**: νέο test file **11/11 green** μόνο του· πλήρες `npx vitest run` → **265 files /
+3543 tests green**. `npm run type-check` → **EXIT 0** καθαρά. **Docker: ΔΕΝ έγινε rebuild**
+(test-only αρχείο, μηδέν production code/runtime wiring αλλαγή). **Browser-verify: skipped**
+(test file, μηδέν UI/observable behavior αλλαγή). Collision guard: `git status --short` πριν το
+staging έδειξε ΜΟΝΟ 1 ξένο **modified** αρχείο (`docs/DOCS_PROGRESS.md`, ξένη routine's WIP, ΔΕΝ
+staged) + το δικό μου 1 νέο αρχείο· staged μόνο το δικό μου· `git diff --cached --name-only` +
+`git show --stat HEAD` μετά το commit επιβεβαίωσαν exact 1-file match πριν το push. Pushed
+`eb29926`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο στα υπόλοιπα route-clusters χωρίς coverage — καλύτεροι επόμενοι
+υποψήφιοι: **`admin/overview`**/**`admin/tenants`** (read-only superadmin console surfaces, ακόμα
+untested, μεγαλύτερη λίστα surface), ή **`account/{workspaces,export}`**. Μετά: `members`,
+`usage`+`usage/sample`, `workspace/{ai-key,export,export/files,reactivate}`, `invites/{resend,
+route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`, `account/{reset/*,verify/*}`,
+`admin/tenants/[slug]/dbstats`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
+για item στο territory (αν βρεθεί, πάει πρώτο).
