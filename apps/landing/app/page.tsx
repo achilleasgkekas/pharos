@@ -514,6 +514,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. Settings → Money lets you define rules that map a vendor name, or any bit of text, to a category, and optionally mark it recurring with a cycle. New expenses run through your rules automatically whether they arrived from a scanned bill, a manual entry, or a CSV import, so a recognised vendor is already categorized when it lands. A one-click "Apply to existing" backfills every already-uncategorized expense retroactively, so turning this on later still cleans up your history.',
   },
   {
+    q: 'Can it suggest a budget for me instead of me guessing numbers?',
+    a: 'Yes. Settings → Money has a "Suggest from history" button next to your monthly budgets: it buckets your last three complete months of expenses by category, takes the median monthly total for each, rounds it to the nearest €5, and pre-fills the input fields, skipping any category with fewer than two months of history so one unusual purchase does not skew things. Nothing is saved automatically, you review the pre-filled numbers and click "Save budgets" yourself. No AI involved, just your own numbers median-averaged back at you.',
+  },
+  {
     q: 'Can I bulk-import expenses from a bank export?',
     a: 'Yes. Expenses → Import CSV takes any bank or card export: it auto-detects the delimiter (comma, semicolon, or tab), guesses which column is the date, amount, vendor, category, and notes from common English and Greek header names, and shows a live preview table so you can fix the mapping before anything is saved. Dates and amounts parse in both EU (day-first, comma-decimal) and US formats. If your export mixes money in and out in one signed amount column, a "split by sign" option sorts negative rows into expenses and positive rows into income automatically; otherwise every row lands in whichever tab you opened it from. Rows that match one you already imported (same vendor, day, and amount) are skipped, and your category rules run on the new ones automatically.',
   },

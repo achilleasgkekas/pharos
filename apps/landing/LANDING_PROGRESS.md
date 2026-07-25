@@ -3391,3 +3391,44 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-25 (cont.)
+
+Task: επομενο increment απο τη λιστα προτεραιοτητας του προηγουμενου entry: (1) P27 suggest-monthly-
+budgets-from-history.
+
+Espesta agent (Explore, read-only) διαβασε το πραγματικο κωδικα πριν γραψω copy: `lib/budgetSuggest.ts`
+(`suggestBudgetsFromExpenses`, deterministic χωρις AI), server action `settings/actions.ts` `suggestBudgets`
+(hardcoded `months=3`), UI `SettingsClient.tsx` `BudgetsManager` component. Επιβεβαιωθηκε: buckets non-income
+expenses ανα category × μηνα, παιρνει το **median** (οχι average) μηνιαιο συνολο ανα category πανω απο
+trailing 3 ΟΛΟΚΛΗΡΩΜΕΝΟΥΣ μηνες (εξαιρει τον τρεχοντα), rounds στο κοντινοτερο €5, skip categories με
+λιγοτερους απο 2 distinct μηνες ιστορικου. UI = κουμπι "Suggest from history" δικα στο Settings -> Money,
+pre-fills τα input fields μονο (ΔΕΝ αυτο-αποθηκευει, ο χρηστης πρεπει να πατησει "Save budgets").
+
+Αλλαγη (`apps/landing/app/page.tsx`, `FAQS` array μονο): νεα εγγραφη «Can it suggest a budget for me
+instead of me guessing numbers?» αμεσως μετα το «Can it learn to auto-categorize my expenses?» (ιδιο
+Settings->Money cluster) και πριν το «Can I bulk-import expenses from a bank export?».
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB).
+- Πορτες 3100-3130: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build.
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` επιβεβαιωσε: `found:true`, σωστο anchor id
+  `faq-can-it-suggest-a-budget-for-me-instead-of-me-guessing-numbers`, σωστη σειρα γειτονων στο DOM
+  (["faq-can-it-learn-to-auto-categorize-my-expenses", **αυτο**, "faq-can-i-bulk-import-expenses-from-a-bank-export"]).
+  Hero screenshot καθαρο. `pkill -f "next start -p 3110"` -> επιβεβαιωθηκε οτι κανενα `next-server` process
+  δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx.
+- Δεν αγγιξα Docker/:3000/web/mobile. Η μονη agent-χρηση ηταν read-only research, μηδεν AI call για copy
+  generation (η ιδια η routine εγραψε το copy απο τα read-only findings).
+- Collision guard: `git status --short` πριν το add εδειξε `apps/landing/app/page.tsx` modified απο εμενα
+  + ενα ΞΕΝΟ `docs/DOCS_PROGRESS.md` (προϋπαρχον απο αλλη routine, οχι δικο μου) -> το αφησα εντελως αθικτο,
+  staged ΜΟΝΟ τα δικα μου 2 αρχεια.
+
+Επομενο increment: 2 fresh candidates απο τη λιστα προτεραιοτητας: (1) P22 receipt line-item global search,
+(2) P21 document/manual vault. Αλλιως: νεα `feat(` commits απο το κυριο repo, ή polish συνεχεια / real app
+screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενο entry (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
