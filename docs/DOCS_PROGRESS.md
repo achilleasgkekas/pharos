@@ -1,5 +1,29 @@
 # DOCS_PROGRESS
 
+## 2026-07-25 (nineteenth run — P9 multi-currency support documentation)
+
+Σάρωση git log για νέα feat() commits μετά το τελευταίο run (2026-07-24 10:10). Ανακάλυψη: **P9 multi-currency feature (commit f83ff71, 2026-07-25 14:22)** shipped αλλα ΔΕΝ ήταν documented: new currency/origAmount/fxRate fields για tracking foreign-currency expenses με exchange rates, ενώ όλες οι aggregations (reports, budgets, net worth) μένουν σε base currency.
+
+Τι έγραψα:
+- **features.md**: Νέα subsection "### Multi-currency support (P9)" στη Expenses section μετά το intro bullets. Εξηγηση του currency tracking model, opt-in toggle (Settings → Defaults), AI currency extraction, rate handling (green/gold badges), deterministic conversion, vendor inheritance.
+- **api.md**: Ενημέρωση POST + PATCH /expenses rows για να προσθέσω τα νέα πεδία `currency?`, `origAmount?`, `fxRate?`. Προσθεση explanatory note μετά τον πίνακα που εξηγάει τα πεδία και το FX conversion model.
+- **configuration.md**: Ενημέρωση του existing currency note για να προσθέσω P9 toggle documentation (AppConfig.multiCurrency, Settings → Defaults).
+- **mobile.md**: Ενημέρωση του Expenses / Income row για να αναφέρει "multi-currency support (FX rate tracking when enabled)".
+
+Accuracy (διάβασα κώδικα, όχι εικασίες): lib/fx.ts, Expense model (origAmount/fxRate fields), SerializedExpense, uploadExpense/addExpense/updateExpense/rescanExpense resolveFx flow, /api/v1/expenses route (exposes new fields), AppConfig.multiCurrency, settings UI + FxBadge.
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: api.md 22 fences (ζυγό), configuration.md 1 προστέθηκε (ζυγό συν αυτό), mobile.md 0, features.md 0.
+- Internal links: όλα τα referenced docs υπάρχουν ✓.
+- Secret scan: κανένα credential ✓.
+- Markdown structure: νέα subsection στο features.md ===, explanatory note σε api.md, blockquote update σε configuration.md, table cell update σε mobile.md ✓.
+
+Collision guard: git status --short πριν το add = μόνο τα 4 docs files (δικά μου), κανένα staged foreign.
+
+Commit: 125827f (docs(features+api+config+mobile): P9 multi-currency support for Expenses). Push: successful → origin/main ✓.
+
+Επόμενο run: (α) αν άλλα νέα features shipped μετά τις 14:22 (π.χ. P51+ candidates), update docs · (β) grep git log για άλλα undocumented feat() commits.
+
 ## 2026-07-24 (eighteenth run — routine verification: all features documented, no changes needed)
 
 Σάρωση git log για νέα feat() commits μετά τη seventeenth run (dfac7c6). Ανακάλυψη: 6 new feature commits landed on 2026-07-24 (00:13–10:10):
