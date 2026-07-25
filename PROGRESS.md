@@ -8938,3 +8938,74 @@ camera UI προηγείται.
 - Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
   household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
   ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
+## 2026-07-25 (cont.² — P9 slice 5: multi-currency για Statements)
+
+**Guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md`: 8 OPEN entries, μόνο ένα δικό μου
+(`pharos-daily-dev-20260725-1425`, έγκριση `expo-camera`) και είναι **ακόμα OPEN χωρίς Answer**, οπότε τα P17/P23
+μένουν μπλοκαρισμένα και δεν πιάστηκαν. Working tree καθαρό στην αρχή.
+
+**Επιλογή (βήμα a — Approved queue)**: ίδια εικόνα με το προηγούμενο run (P36 θέλει provider/credentials, P31
+supervised session, P16 πραγματικό sample file, P17/P23 μπλοκαρισμένα) → το μόνο buildable είναι το **P9
+multi-currency**, και το προηγούμενο run πρότεινε ρητά **Statements** ως επόμενο slice. Χτίστηκε.
+
+**Απόφαση σχεδίασης (την πήρα μόνος, όπως προτάθηκε στο προηγούμενο log)**: **ΕΝΑ rate ανά statement**, όχι ανά
+transaction. Μια κάρτα εκδίδει το statement σε ΕΝΑ νόμισμα, οπότε το ίδιο rate μετατρέπει total + minimum + paid
+**ΚΑΙ κάθε χρέωση**. Οι χρεώσεις ΔΕΝ ήταν προαιρετικές: το `computeInstallmentPlans` τις αθροίζει σε per-plan payoff
+που δείχνουν homepage («total owed»), `/calendar` και `/reports` σε base currency, άρα μισο-μετατρεπμένο statement θα
+άφηνε τις γραμμές του να μη βγάζουν το δικό του total. Νέο pure **`fx.resolveStatementAmounts()`** (+9 unit tests)
+κρατά τον κανόνα σε ΕΝΑ μέρος, μοιρασμένο από action + API.
+
+**Άλλες αποφάσεις που πήρα μόνος**:
+- **Ο parser δεν διαβάζει νόμισμα** (το `ParsedStatementSchema` δεν έχει τέτοιο πεδίο) και **δεν άλλαξα το prompt** —
+  θα ήταν άλλο, AI-shaped ρίσκο μέσα σε ένα deterministic slice. Το foreign το μαρκάρει ο χρήστης μία φορά στη φόρμα,
+  και το **re-import του ίδιου μήνα ΞΑΝΑΧΡΗΣΙΜΟΠΟΙΕΙ** currency/fxRate από το υπάρχον doc (ίδιος κανόνας με το re-scan
+  που κρατά το rate του χρήστη), αλλιώς κάθε re-import θα γύριζε σιωπηλά τον μήνα σε base currency.
+- **Un-convert πριν το re-resolve** στο `updateStatement`: οι χρεώσεις δεν είναι μέρος της φόρμας, κάθονται ήδη
+  μετατρεπμένες στη DB· διαβάζονται, περνάνε από `toPrinted()` με το ΠΑΛΙΟ rate, και μόνο μετά εφαρμόζεται το νέο (ίδιο
+  rate = no-op, pinned με 3 τεστ). Χωρίς αυτό, μια διόρθωση rate θα στοίβαζε μετατροπή πάνω σε μετατροπή.
+- **`addTransaction`** μετατρέπει με το rate του ίδιου του statement (μια χρέωση που πληκτρολογείς πάνω σε foreign
+  statement την πληκτρολογείς στο νόμισμα που το statement τυπώνει).
+
+**Bug που βρήκα και έκλεισα στην πορεία**: το `rescanStatement` διατηρεί installment edits + product links με key
+`description|amount`, αλλά το fresh parse δίνει **printed** ποσά ενώ τα αποθηκευμένα είναι **converted** → σε foreign
+statement ΚΑΝΕΝΑ key δεν θα ταίριαζε και **κάθε manual δόση + κάθε product link θα χανόταν** σε ένα re-scan. Τα παλιά
+lines keyάρονται πλέον σε printed ποσά.
+
+**UI**: currency select δίπλα στο total (μόνο όταν `multiCurrency` on) + η ίδια FX γραμμή των άλλων modules (rate ή
+«or charged» με back-out μέσω `deriveFxRate`) + live preview + `FxBadge` στη λίστα statements. Η φόρμα σείρνεται
+ΠΑΝΤΑ με printed figures (headline από `origAmount`, τα υπόλοιπα από `toPrinted`), ώστε re-save χωρίς αλλαγή να μην
+ξανα-μετατρέπει. Single-currency deployment: μηδέν επιπλέον πεδίο.
+
+**API**: `/api/v1/statements` + `/statements/:id` shape += origAmount/fxRate (**mobile parity μαζί**) + νέα παράγραφος
+«Multi-currency fields (P9)» στο `docs/api.md` (το root `API.md` δεν καλύπτει καθόλου statements — είναι το mobile
+subset· δεν χρειάστηκε αλλαγή εκεί).
+
+**Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` → **3677 passed / 270 files** (+18: 9 unit για το
+`resolveStatementAmounts`, 9 wiring σε create/update/addTransaction· μηδέν regression). 4 exact-shape API assertions
+ενημερώθηκαν για τα 2 νέα πεδία (και έγιναν πιο δυνατά: ο «full doc» πλέον είναι foreign USD, όχι EUR, οπότε τα πεδία
+δοκιμάζονται με μη-μηδενικές τιμές). Docker κάτω από το mutex: `build web` → mongo healthy → `up -d web` → `/login`
+**200 με την πρώτη**, **0 restarts**, `/statements` 307 (auth-gated, άρα compiled) → `docker builder prune -f`
+(197MB) → lock released. Browser: `/login` renders, **μηδέν console errors** (το authed `/statements` δεν
+επαληθεύεται unattended, credentials boundary).
+
+**Git hygiene**: explicit `git add` 14 αρχείων (όχι `-A`) → commit `2e408ff` → pushed.
+
+**Γνωστό μικρό follow-up**: το `fxBadgeLabel` έχει guard `origAmount <= 0`, οπότε σε **credit balance** (αρνητικό
+τυπωμένο total) το chip δεν renders — τα ποσά μετατρέπονται σωστά, λείπει μόνο η ένδειξη. Δεν το άγγιξα γιατί το
+`FxBadge` είναι πλέον κοινό σε 5 modules και η αλλαγή θέλει δικό της πέρασμα στα υπάρχοντα τεστ.
+
+**Επόμενο task (πρόταση)**: **P9 slice 6 — `resolveFx` στα imports**, δηλαδή το CSV bank-import (PA1) και το email-in.
+Είναι τα τελευταία write paths που μπορούν ακόμα να γεννήσουν εγγραφή με ξένο ποσό γραμμένο σαν base (το UI/API
+μονοπάτι έχει καλυφθεί πλήρως σε 5 modules). Μικρότερο από τα προηγούμενα slices: μηδέν νέο schema, μόνο routing των
+parsed ποσών μέσα από τον υπάρχοντα resolver + στήλη currency στο CSV mapping. Ως συνήθως τρέξε **πρώτα** τον έλεγχο
+του Approved queue (βήμα a): αν έχει απαντηθεί το `expo-camera` ερώτημα, το P17 camera UI προηγείται.
+
+## Needs Achilleas
+
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο, 2ο συνεχόμενο run. Το P17 server half είναι
+  shipped+tested και του P23 υπάρχει ήδη (`POST /api/v1/scan/receipt`). Ερώτημα: `~/.claude/ASK_ACHILLEAS.md` →
+  `pharos-daily-dev-20260725-1425` (ακόμα OPEN).
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
+  household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
+  ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
