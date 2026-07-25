@@ -4776,3 +4776,43 @@ untested, μεγαλύτερη λίστα surface), ή **`account/{workspaces,ex
 route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`, `account/{reset/*,verify/*}`,
 `admin/tenants/[slug]/dbstats`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
 για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-25 (cont. — increment 101, route-level test coverage για το admin/overview endpoint)
+
+Πριν από νέο increment: ask-inbox re-checked (7 OPEN entries — 4× bakecore-finance/redesigner/
+reviewer×2/ui-rebuild, bakecore-tests macOS-TCC flag, pharos-daily-dev P17/P23 mobile-camera
+approval· τίποτα addressed σε saas-core, ίδιο κενό). `WEB_DEBT.md` re-checked (58η σάρωση
+παραμένει το latest, ενεργή ουρά ίδια 3 items — Notifications requireAdmin/Voucher-GiftCard-
+LoyaltyCard tenancy/sampleDataActions.ts tenancy — κανένα εκ των τριών στο saas-core territory,
+όπως και τα προηγούμενα runs). UI-first backlog παραμένει εξαντλημένο. Ακολούθησα το leftover
+next-task από το increment-100 log.
+
+**Νέο `admin/overview/route.test.ts`** (4 tests), μηδέν production code αλλαγή. Route = superadmin
+fleet-overview GET (μοναδικό verb, read-only aggregate πάνω στο central registry). Mocks: `@/lib/
+tenancy/superadmin` (requireSuperadmin), `@/lib/tenancy/adminOverview` (readFleetOverviewForAdmin)
+— και τα δύο ήδη πλήρως unit-tested στα δικά τους αρχεία (`superadmin.test.ts`, `adminOverview.
+test.ts`), άρα το route test καλύπτει αποκλειστικά το wrapper behavior. Πιο απλό route από το ήδη-
+tested sibling `admin/tenants/[slug]` (ένα verb, μηδέν body/params, μηδέν write path).
+
+Καλύπτει: requireSuperadmin 403-forbidden short-circuit περνάει αναλλοίωτο, μηδέν aggregate call·
+401-not-authenticated short-circuit ίδιο· happy path → το πραγματικό `readFleetOverviewForAdmin`
+αποτέλεσμα verbatim + `Cache-Control: no-store`· mid-handler throw (readFleetOverviewForAdmin
+rejects) → καθαρό 500 μέσω πραγματικού saasGuard (route δεν κάνει manual try/catch, το saasGuard
+wrapper το χειρίζεται).
+
+**Verified**: νέο test file **4/4 green** μόνο του· πλήρες `npx vitest run` → **266 files / 3565
+tests green**. `npm run type-check` → **EXIT 0** καθαρά. **Docker: ΔΕΝ έγινε rebuild** (test-only
+αρχείο, μηδέν production code/runtime wiring αλλαγή). **Browser-verify: skipped** (test file,
+μηδέν UI/observable behavior αλλαγή). Collision guard: `git status --short` πριν το staging
+έδειξε ΜΟΝΟ το δικό μου 1 νέο αρχείο (clean tree)· `git diff --cached --name-only` + `git show
+--stat HEAD` μετά το commit επιβεβαίωσαν exact 1-file match πριν το push. Pushed `2be1e10`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο στα υπόλοιπα route-clusters χωρίς coverage — καλύτεροι επόμενοι
+υποψήφιοι: **`admin/tenants`** (list route, το sibling `[slug]` detail έχει ήδη coverage, το list
+ακόμα όχι), **`account/{workspaces,export}`**, ή **`admin/tenants/[slug]/dbstats`**. Μετά:
+`members`, `usage`+`usage/sample`, `workspace/{ai-key,export,export/files,reactivate}`,
+`invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`,
+`account/{reset/*,verify/*}`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για
+item στο territory (αν βρεθεί, πάει πρώτο).
