@@ -6,6 +6,59 @@
 <!-- docker-validated: 4523f4a -->
 <!-- ui-audited: 0bc5e14 -->
 
+## 2026-07-25 (P9 slice 2: multi-currency για Receipts)
+
+**Approved queue check (βήμα a)**: ίδια εικόνα με χθες. **P36** (Open Banking, θέλει provider decision +
+credentials), **P31** (household, supervised session), **P17**/**P23** (native dep, περιμένουν την έγκριση
+`expo-camera` που είναι ήδη στο `~/.claude/ASK_ACHILLEAS.md`), και **P9** (multi-currency, 🟡 σε εξέλιξη). Το P9
+είναι πάλι το μόνο που δεν θέλει απόφαση, credentials, native dep ούτε supervised session, οπότε πήρα το slice που
+πρότεινε το προηγούμενο run: **Receipts**.
+
+**Το ίδιο latent bug, ένα module πιο πέρα**: το `Receipt.currency` αποθηκευόταν ήδη (το AI το parse-άρει) και
+**κανένα path δεν το τιμούσε** — μια απόδειξη $88 έμπαινε στα ευρώ σύνολα ως 88, ακριβώς όπως τα expenses πριν το
+slice 1.
+
+**Η μία πραγματική διαφορά από τα expenses (και η απόφαση του run)**: ένα expense έχει **ένα** ποσό, μια απόδειξη
+έχει **πολλά** (total, net, ΦΠΑ, τιμή ανά γραμμή). Έλεγξα πού καταλήγουν πριν αποφασίσω: το `vatAmount` **αθροίζεται
+στα reports** (`receiptsVat`) και οι τιμές γραμμών **αντιγράφονται στο `Item.purchasedPrice`** από το
+`addReceiptItemsToLibrary`. Άρα μια μισο-μετατρεπμένη απόδειξη θα δηλητηρίαζε δύο ακόμα aggregates. Απόφαση:
+**ΟΛΟ το money side μετατρέπεται με ΤΟ ΙΔΙΟ rate**. Μόνο το total κρατά την τυπωμένη τιμή του verbatim
+(`origAmount`, ώστε να κάνει exact round-trip)· τα υπόλοιπα επιστρέφουν για edit μέσω νέου pure **`fx.toPrinted()`**
+(η αντίστροφη πράξη, +4 tests), με τεστ που καρφώνει ότι **ένα re-save χωρίς αλλαγή ΔΕΝ ξανα-μετατρέπει**.
+
+**Τι χτίστηκε**: `Receipt.origAmount`/`fxRate` + `SerializedReceipt` + **και τα 4 write paths** (uploadReceipt/
+updateReceipt/quickVerifyReceipt/rescanReceipt) μέσα από `resolveFx`. Δύο λεπτομέρειες που προέκυψαν χτίζοντας:
+(α) το **re-scan** κρατά ένα rate που είχε βάλει ο χρήστης όταν το νέο parse δίνει **το ίδιο** νόμισμα (τίποτα στη
+μετατροπή δεν άλλαξε) και το πετά όταν αλλάζει· (β) το **quick-verify** δείχνει και υποβάλλει **τυπωμένα** ποσά,
+οπότε χρειάστηκε να διαβάζει το currency/rate της ίδιας της απόδειξης πριν το $set (νέο findById, mock στα tests).
+UI: currency select δίπλα στο total + η ίδια FX γραμμή («rate» ή «or charged» με back-out μέσω `deriveFxRate`) +
+live preview. Το **`FxBadge` βγήκε σε κοινό `components/FxBadge.tsx`** (structural typing) και το μοιράζονται πλέον
+expenses και receipts (card, row, quick-verify) αντί να υπάρχει δεύτερο αντίγραφο. `/api/v1/receipts` shape +=
+origAmount/fxRate (**mobile parity μέσα στο ίδιο run**) + τεκμηρίωση στο `API.md` για το τι σημαίνει `fxRate: 0` και
+πώς βγαίνουν τα τυπωμένα δευτερεύοντα ποσά (διαίρεση με το rate).
+
+**Verify**: `npm run type-check` **EXIT 0**· full `npx vitest run` **3553 passed / 265 files** (+9, **μηδέν
+regression**· ένα exact-shape API assertion ενημερώθηκε για τα 2 νέα πεδία). Docker: mutex acquired →
+`docker compose build web` → mongo **healthy** → `up -d web` → `/login` **200** (2ο poll), **0 restarts**,
+`/receipts` **307** (auth-gated, άρα compiled) → `docker builder prune -f` (197MB) → lock **released**.
+Browser-verify: renders, **μηδέν console errors**. Το authed `/receipts` δεν είναι επαληθεύσιμο unattended
+(credentials boundary) — καλύπτεται από τα tests + το ότι ένα λάθος στο client component θα είχε ρίξει το
+`next build` μέσα στο image.
+
+**Suggested next task**: συνέχισε το P9 με το **ίδιο μοτίβο, μηδέν νέα απόφαση**: **Subscriptions** (ένα ποσό, άρα
+είναι ακριβώς το εύκολο expenses-style slice) και μετά **Items** (`currentPrice`/`purchasedPrice` + `priceHistory`,
+προσοχή: το price history έχει πολλές εγγραφές ανά item) και **Statements**. Μετά μένουν `resolveFx` στο CSV import
+(PA1) και στο email-in. Ως συνήθως τρέξε πρώτα το Approved queue check (βήμα a).
+
+## Needs Achilleas
+
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο από χθες — P17 server half shipped+tested, P23
+  server half υπάρχει ήδη (`POST /api/v1/scan/receipt`), και τα δύο μένουν πίσω από native dep + EAS dev build σε
+  φυσική συσκευή. Ερώτηση ήδη στο `~/.claude/ASK_ACHILLEAS.md` (`pharos-daily-dev-20260725-1425`), ακόμα OPEN.
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
+  household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
+  ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
 ## 2026-07-25 (ui-auditor — mobile UI consistency audit)
 
 **Σκοπός**: 55η read-only σάρωση του mobile UI κατά διαστάσεις token parity + reusable adoption vs web design system.
