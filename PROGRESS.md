@@ -6,6 +6,62 @@
 <!-- docker-validated: 4523f4a -->
 <!-- ui-audited: 0bc5e14 -->
 
+## 2026-07-26 (P9 slice 6: multi-currency στο bank-CSV import)
+
+**Approved queue check (βήμα a)**: αμετάβλητη εικόνα. **P36** (Open Banking, θέλει provider decision +
+credentials), **P31** (household, θέλει supervised session), **P17**/**P23** (μπλοκαρισμένα στην έγκριση
+`expo-camera`, ερώτημα `pharos-daily-dev-20260725-1425` ακόμα OPEN στο `~/.claude/ASK_ACHILLEAS.md`), **P16**
+(Firefly III/Grocy, θέλει πραγματικό sample file). Κανένα αυτόνομα-χτίσιμο, οπότε συνέχισα με το task που πρότεινε
+το προηγούμενο run: **P9 slice 6, τα imports**.
+
+**Τι βρήκα πρώτα (και άλλαξε το scope)**: το **email-in ΔΕΝ χρειάζεται δουλειά**. Το `fetchNewEmails`
+(`lib/imapImport.ts`) απλά ρίχνει αρχεία στο email-inbox· το `importEmailInbox` φτιάχνει receipt drafts και το ποσό
+μπαίνει μόνο μέσω του **receipt AI parse path**, που πέρασε από `resolveFx` στο slice 2. Άρα το μόνο write path που
+έμενε να μπορεί να γεννήσει ξένο ποσό γραμμένο σαν base ήταν το **CSV bank-import (PA1)**.
+
+**Το κενό**: το `lib/csvImport.ts` δεν είχε **καθόλου** έννοια νομίσματος. Μια γραμμή Revolut/Wise/PayPal `88.00 USD`
+είτε (α) απορριπτόταν ως `bad-amount` (το `parseCsvAmount` έσβηνε μόνο EUR/USD/GBP και το σκέτο `CHF` έσπαγε το
+`^[\d.,]+$`), είτε (β) περνούσε με το νόμισμα **πεταμένο** και τα 88 δολάρια προσθέτονταν στα ευρώ σύνολα.
+
+**Απόφαση σχεδίασης (την πήρα μόνος)**: **ένα rate ανά νόμισμα ανά αρχείο**, ΟΧΙ ανά γραμμή. Ένα bank export τυπώνει
+κωδικό ανά κίνηση αλλά **ποτέ rate**, οπότε per-row rate column θα ήταν κενή στήλη· ο χρήστης δίνει μία τιμή ανά
+νόμισμα που εμφανίζεται στο αρχείο, μέσα στο import dialog. Γραμμή με νόμισμα **χωρίς** rate **μπαίνει** κανονικά
+(κρατά τυπωμένο ποσό + κωδικό + `origAmount`, ίδιος κανόνας με το AI-scan path) και μετριέται στο νέο `needsRate` του
+result, ώστε να διορθωθεί per record — καλύτερα από το να χαθεί το αρχείο ή να μαντέψουμε 1:1.
+
+**Τι χτίστηκε**: `CsvField` += `currency` + header hints (en/el/de/fr/es· **σκόπιμα ΟΧΙ** `curr`, θα άρπαζε ένα
+«Current balance») + `CsvParsedRow.currency` + νέα pure **`parseCsvCurrency`** (ISO code ή σύμβολο) και
+**`currencyFromAmountCell`** (fallback sniff όταν δεν υπάρχει στήλη νομίσματος: `88.00 USD`, `$88`, `CHF 88`). Το
+`parseCsvAmount` πετά πλέον **οποιονδήποτε** 3-γράμματο κωδικό γύρω από τον αριθμό, αλλά ο **trailing θέλει κενό**
+πριν, ώστε το καρφωμένο `'12abc' → null` να μείνει null. Στο `importExpensesCsv`: `fxRates` opt (case-insensitive
+normalize, μη-θετικά αγνοούνται) → `resolveFx` ανά γραμμή → `amount/currency/origAmount/fxRate` στο doc + `needsRate`
+στο result. **Bug που έκλεισα στην πορεία**: το existing-record dedupe συνέκρινε το τυπωμένο ποσό του CSV με το
+**μετατρεπμένο** `amount` της DB → ένα re-import του ίδιου ξένου αρχείου θα έγραφε διπλότυπα· τώρα και οι δύο πλευρές
+keyάρουν σε **τυπωμένο** ποσό (`origAmount` όταν >0· `select` επεκτάθηκε). UI (`CsvImportModal`): η στήλη currency +
+τα rate inputs εμφανίζονται **μόνο** όταν το `multiCurrency` είναι on (single-currency deployment: μηδέν επιπλέον
+πεδίο), preview δείχνει `τυπωμένο → base`, και το τελικό panel λέει πόσες γραμμές μπήκαν χωρίς rate. Το YNAB import
+δηλώνει ρητά `currency: ''` (ένα register export είναι στο νόμισμα του budget) και το `docs/features.md` διορθώθηκε:
+ισχυριζόταν ήδη ότι ο YNAB importer «handles multi-currency», που δεν ήταν αλήθεια.
+
+**Verify**: `npm run type-check` **EXIT 0**· full `npx vitest run` **3725 passed / 272 files** (+17: 10 pure στο
+`csvImport.test.ts`, 7 wiring στο `actions.csv.test.ts`· μηδέν regression, 11 drifted expectations ενημερώθηκαν για
+το νέο `currency` πεδίο και το `needsRate`). Docker κάτω από το mutex: `docker compose build web` **OK** → mongo
+**healthy** → `up -d web` → «Container homepage-web Started».
+
+Το serve-check ολοκληρώθηκε τελικά: `/login` **200**, `/expenses` **307** (auth-gated, άρα compiled), **0 restarts**,
+mongo healthy → `docker builder prune -f` (**197MB**) → lock **released**.
+
+**ΣΗΜ infra (όχι κώδικας)**: για ~20 λεπτά μεσολάβησε outage του command-safety classifier («claude-sonnet-5[1m] is
+temporarily unavailable») που μπλόκαρε κάθε non-read-only Bash — το commit πέρασε με τη 16η προσπάθεια και το
+serve-check/prune/lock-release έγιναν μετά την ανάκαμψη. Καμία μόνιμη συνέπεια, το καταγράφω μόνο γιατί, αν
+επαναληφθεί, ένα run μπορεί να τερματίσει με **staged-αλλά-αδέσμευτα** αρχεία και **κρατημένο** `/tmp/claude-docker.lock`
+(τον καθαρίζει ο 30-λεπτος staleness κανόνας).
+
+**Επόμενο task (πρόταση)**: **P9 slice 7 — Vouchers/Gift cards** (`Voucher.value` και τα gift-card υπόλοιπα του P32
+είναι τα τελευταία money πεδία χωρίς fx· μικρό, ίδιο pattern) ή, πιο χρήσιμο, **ένα «needs rate» φίλτρο/badge στα
+money views** ώστε οι γραμμές που μπήκαν από CSV χωρίς rate να βρίσκονται με ένα κλικ (τώρα φαίνονται μόνο ως gold
+FxBadge όταν τις ανοίξεις). Πρώτα πάντα ο έλεγχος του Approved queue (βήμα a).
+
 ## 2026-07-25 (P9 slice 2: multi-currency για Receipts)
 
 **Approved queue check (βήμα a)**: ίδια εικόνα με χθες. **P36** (Open Banking, θέλει provider decision +
