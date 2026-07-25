@@ -4816,3 +4816,45 @@ tests green**. `npm run type-check` → **EXIT 0** καθαρά. **Docker: ΔΕ�
 `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`,
 `account/{reset/*,verify/*}`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για
 item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-25 (cont. — increment 102, route-level test coverage για το admin/tenants list endpoint)
+
+Πριν από νέο increment: ask-inbox re-checked (7 OPEN entries — 5× bakecore [finance ×2, redesigner,
+reviewer ×2, ui-rebuild], bakecore-tests macOS-TCC flag, pharos-daily-dev P17/P23 mobile-camera
+approval· τίποτα addressed σε saas-core, ίδιο κενό όπως τα προηγούμενα runs). `WEB_DEBT.md`
+re-checked (58η σάρωση παραμένει το latest, ενεργή ουρά ίδια 3 items — Notifications requireAdmin/
+Voucher-GiftCard-LoyaltyCard tenancy/sampleDataActions.ts tenancy — κανένα εκ των τριών στο
+saas-core territory). UI-first backlog παραμένει εξαντλημένο (admin console + auth/workspace
+panels όλα ήδη χτισμένα). Ακολούθησα το leftover next-task από το increment-101 log.
+
+**Νέο `admin/tenants/route.test.ts`** (5 tests), μηδέν production code αλλαγή. Route = superadmin
+cross-tenant LISTING GET (paginated, optional status/search filter) — το sibling `[slug]` detail
+route είχε ήδη coverage, η list route όχι. Mocks: `@/lib/tenancy/superadmin` (requireSuperadmin),
+`@/lib/tenancy/adminTenants` (parseAdminTenantQuery/listTenantsForAdmin/buildTenantListing — και
+τα τρία ήδη πλήρως unit-tested στο δικό τους `adminTenants.test.ts`, άρα το route test καλύπτει
+αποκλειστικά το wrapper behavior: query-string → parser → DB call → envelope threading).
+
+Καλύπτει: requireSuperadmin 403/401 short-circuit περνάει αναλλοίωτο, μηδέν parse/query/list
+call· το πραγματικό `URLSearchParams` από το request URL περνάει στο `parseAdminTenantQuery`
+(status/q/limit/offset όλα σωστά διαβασμένα από ένα multi-param URL)· το parsed query object
+threading στο `listTenantsForAdmin` verbatim· happy path → `buildTenantListing` καλείται με τα
+summaries/total/query/generatedAt (Date) και το αποτέλεσμά του επιστρέφεται verbatim με
+`Cache-Control: no-store`· mid-handler throw (listTenantsForAdmin rejects) → καθαρό 500 μέσω
+πραγματικού saasGuard, `buildTenantListing` ΠΟΤΕ δεν καλείται μετά από failed read.
+
+**Verified**: νέο test file **5/5 green** μόνο του· πλήρες `npx vitest run` → **268 files / 3613
+tests green** (αυξήθηκε από 266/3565 του increment-101 log). `npm run type-check` → **EXIT 0**
+καθαρά. **Docker: ΔΕΝ έγινε rebuild** (test-only αρχείο, μηδέν production code/runtime wiring
+αλλαγή). **Browser-verify: skipped** (test file, μηδέν UI/observable behavior αλλαγή).
+Collision guard: `git status --short` πριν το staging έδειξε ΜΟΝΟ το δικό μου 1 νέο αρχείο
+(clean tree)· `git diff --cached --name-only` μετά το staging επιβεβαίωσε exact 1-file match
+πριν το commit/push.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο στα υπόλοιπα route-clusters χωρίς coverage — καλύτεροι επόμενοι
+υποψήφιοι: **`admin/tenants/[slug]/dbstats`** (superadmin per-tenant DB-size read, ακόμα
+untested), **`account/{workspaces,export}`**, ή **`members`**. Μετά: `usage`+`usage/sample`,
+`workspace/{ai-key,export,export/files,reactivate}`, `invites/{resend,route}`, `audit`,
+`trials/sweep`, `billing/route.ts`, `auth/logout`, `account/{reset/*,verify/*}`. Πριν ξεκινήσεις:
+ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
