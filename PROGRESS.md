@@ -8241,3 +8241,80 @@ dep adoption (P2/M, νέο native dependency — ίδιο tier με P17/P23 appr
   provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file
   need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
   power tool· P5 bookmarklet MV3-extension phase 2.
+
+## 2026-07-25 (pharos-daily-dev — Web Debt: Settings→Notifications requireAdmin gap [P1/S])
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε 3 OPEN items, όλα από
+`bakecore-*` (άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή. Docker mutex
+lock (`/tmp/claude-docker.lock`) αποκτήθηκε καθαρά (κανένα άλλο build σε εξέλιξη) → released στο τέλος.
+
+**Approved queue check (βήμα a)**: σάρωσα `PRODUCT_BACKLOG.md → ## Approved` γραμμή-γραμμή. Ίδιο standing
+αποτέλεσμα με τα προηγούμενα runs: **P36** Open Banking (needs-Achilleas provider decision, L)· **P31**
+household enforcement (4ο+ deferral, χρειάζεται supervised live-login session)· **P16** Firefly III/Grocy
+(χρειάζεται πραγματικό sample file)· **P17**/**P23** (mobile-native dep approvals, attended-preferred)· **P5**
+MV3 extension phase 2 (deferred, product-decision-if-wanted-at-all)· **P9** multi-currency (L, ρητά τελευταίο
+σε σειρά, cross-cutting schema risk). Μηδέν νέο buildable Approved item → βήμα (b).
+
+**Fallback (βήμα b)**: `MOBILE_PARITY.md` Build Queue + UI Debt Queue και τα δύο γνήσια άδεια — η 54η
+mobile-parity-auditor σάρωση (2026-07-24) βρήκε ένα μοναδικό buildable item (notifications body-humanization),
+ήδη `✅ DONE` (commit `ee894a3`)· τα 2 UI Debt items (Shopping Spinner/Empty, Receipts cell inputs) ήδη
+`✅ DONE` το ίδιο 24ωρο (commits `42f1356`/`0bce960`). Οι μόνες εναπομείνασες UI Debt entries χρειάζονται
+decision (light-theme P3/L) ή νέο native dep (safe-area-context P2/M, attended-preferred). `git log --since
+"2026-07-24 23:40" -- apps/web/src apps/mobile/src` = **μηδέν commits** → καμία νέα mobile-parity gap άνοιξε
+από χθες. Κατέβηκα στο **`WEB_DEBT.md → Web Debt Queue`** (established fallback pattern, ο builder routine
+έχει καταναλώσει δεκάδες τέτοια items σε προηγούμενα runs). Η πιο πρόσφατη σύνοψη (58η σάρωση, 2026-07-24)
+έδειχνε **3 ενεργά auto-buildable items**: top **P1/S** Settings→Notifications `requireAdmin` gap· **P2/M**
+Voucher/GiftCard/LoyaltyCard tenancy-parity· **P2/S** sampleDataActions.ts tenancy-parity· + 1 P3/M i18n gap
+(126 missing keys, μεγαλύτερο scope). Πήρα το **top P1/S item** (μικρότερο + υψηλότερη σοβαρότητα πρώτα, όπως
+ζητά ο κανόνας του αρχείου). Verified πρώτα ότι ήταν όντως ακόμα ανοιχτό (`grep -n "requireAdmin"
+apps/web/src/app/settings/actions.ts` έδειξε τα 8 exports `saveNtfy`/`sendTestNtfy`/`getNotifierChannels`/
+`saveNotifierChannels`/`testNotifierChannel`/`getWebhookSubscriptions`/`saveWebhookSubscriptions`/
+`testWebhookSubscription` χωρίς `requireAdmin()`, γρ.339-446, ίδιο live gap με το doc).
+
+**Το πρόβλημα (από το ήδη-πλήρες spec του item, 55η σάρωση web-code-quality auditor)**: η εφαρμογή έχει ήδη
+πλήρες multi-user households σήμερα (`User.role` admin|member, Settings→Users CRUD, self-hosted). Το
+«Notifications» Settings tab **δεν ήταν** `adminOnly` (σε αντίθεση με το «Users» tab) → ένας logged-in
+non-admin member έβλεπε κανονικά το tab, και τα 8 server actions πίσω από αυτό (ntfy URL, notifier channels
+[Discord/Slack/**Telegram bot token**], outbound event webhooks [**HMAC signing secret**]) δεν είχαν κανένα
+role-check — `getNotifierChannels`/`getWebhookSubscriptions` επέστρεφαν τα secrets σε **plaintext** σε
+οποιονδήποτε καλούσε, και `save*`/`test*` επέτρεπαν σε κάθε member να αλλάξει πού πηγαίνουν τα alerts ή να
+κάνει exfiltrate ένα ήδη-αποθηκευμένο admin secret.
+
+**Τι έγινε** (`apps/web/src/app/settings/actions.ts`, `apps/web/src/app/settings/SettingsClient.tsx`):
+- `await requireAdmin();` προστέθηκε ως πρώτη γραμμή στα 8 exports (ίδιο 1-liner idiom με τα υπόλοιπα 21 στο
+  ίδιο αρχείο, ήδη imported).
+- `SettingsClient.tsx`: το `{ id: 'notifications', ... }` entry του `TABS` array πήρε `adminOnly: true` (ίδιο
+  pattern με το ήδη-υπάρχον `users` tab) — UX-consistency, ΟΧΙ το security boundary (αυτό είναι το server-side
+  gate).
+
+**Verify**: `grep -n "requireAdmin" apps/web/src/app/settings/actions.ts | wc -l` → **29** (21→29, ακριβώς
++8)· `sed -n '339,446p' ... | grep -c requireAdmin` → **8**. `npm run type-check` EXIT 0. Full `npx vitest run`
+→ **3364/3364 passed (255 files)** — καμία test σε αυτά τα 8 actions προϋπήρχε, καμία regression αλλού. **Safe
+Docker rebuild** (mongo ήδη healthy πριν, `docker compose build web` → `up -d web`): `/login` **200**,
+`/settings` **307** (auth-gated route compiled OK), `RestartCount 0`, build cache pruned μετά (213MB). Browser
+MCP tools δεν απάντησαν αυτό το run (host client unreachable, session hiccup — Bash/Edit λειτούργησαν κανονικά
+μετά τις πρώτες αποτυχίες, απλά χρησιμοποίησα Bash/python3 για τα doc writes αντί του Edit tool σε μερικά
+σημεία) → η browser-verify στήλη παραλείφθηκε (best-effort, tsc+vitest+Docker serve-check ήδη επαρκές
+proof για αυτό το backend-only auth-gate change). Μηδέν αλλαγή σε συμπεριφορά για τον σημερινό single-admin
+self-hosted χρήστη (μόνο happy path)· η αλλαγή αφορά αποκλειστικά multi-user households με non-admin member.
+
+**Docs**: `WEB_DEBT.md` → το item marked `Status: DONE (fixed 2026-07-25, pharos-daily-dev)` στη θέση του
+(ίδιο convention με τα προηγούμενα builder closures στο ίδιο αρχείο· η auditor summary παράγραφος στην κορυφή
+θα ενημερωθεί stale→accurate στην επόμενη σάρωση, ίδιο pattern).
+
+**Suggested next task**: το queue έμεινε με **P2/M** Voucher/GiftCard/LoyaltyCard tenancy-parity (mirror
+recipe ήδη speced, 3 sibling αρχεία, dead-until-SaaS αλλά μηχανικό) και **P2/S** sampleDataActions.ts
+tenancy-parity (ίδιο recipe, 1 αρχείο, μικρότερο) — και τα δύο immediately buildable χωρίς decision. Αν
+προτιμηθεί κάτι άλλο, το **P3/M** i18n gap (126 missing el.ts keys) είναι το μεγαλύτερο ανοιχτό item στο ίδιο
+αρχείο. Mobile-parity/PRODUCT_BACKLOG παραμένουν standing-blocked (βλ. Needs Achilleas).
+
+**Git hygiene**: `git add` explicit (μόνο `apps/web/src/app/settings/actions.ts` +
+`apps/web/src/app/settings/SettingsClient.tsx` + `WEB_DEBT.md` + `PROGRESS.md`, όχι `-A`) → commit → push.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: SaaS multi-tenancy/billing rollout env boundary·
+  mobile native-dep approvals (P17 camera, P23 share-sheet, safe-area-context UI-debt dep)· P36 Open Banking
+  provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file
+  need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
+  power tool· P5 bookmarklet MV3-extension phase 2· light-theme parity mobile decision.

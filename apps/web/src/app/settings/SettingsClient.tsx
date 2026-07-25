@@ -99,7 +99,7 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boole
   { id: 'ai', label: 'AI', icon: <Sparkles size={15} /> },
   { id: 'storage', label: 'Storage & backup', icon: <HardDrive size={15} /> },
   { id: 'data', label: 'Stores & lists', icon: <StoreIcon size={15} /> },
-  { id: 'notifications', label: 'Notifications', icon: <Bell size={15} /> },
+  { id: 'notifications', label: 'Notifications', icon: <Bell size={15} />, adminOnly: true },
   { id: 'users', label: 'Users', icon: <Users size={15} />, adminOnly: true },
 ];
 

@@ -337,6 +337,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
 }
 
 export async function saveNtfy(formData: FormData): Promise<{ ok: boolean }> {
+  await requireAdmin();
   await connectDB();
   const url = String(formData.get('ntfyUrl') || '').trim();
   const enabled = formData.get('ntfyEnabled') === 'true';
@@ -348,6 +349,7 @@ export async function saveNtfy(formData: FormData): Promise<{ ok: boolean }> {
 
 /** Send a one-off test notification to the configured ntfy topic. */
 export async function sendTestNtfy(): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
   const s = await getAppSettings();
   if (!s.ntfyUrl) return { ok: false, error: 'Set an ntfy URL first' };
   const ok = await sendNtfyTo(s.ntfyUrl, 'Pharos test', 'Notifications are working — alerts will arrive here.', { tags: ['white_check_mark'] });
@@ -358,6 +360,7 @@ export async function sendTestNtfy(): Promise<{ ok: boolean; error?: string }> {
 
 /** Channels for the Settings editor (ntfy/Discord/Slack/Telegram/webhook). */
 export async function getNotifierChannels(): Promise<NotifierConfig[]> {
+  await requireAdmin();
   return getNotifiers();
 }
 
@@ -365,6 +368,7 @@ export async function getNotifierChannels(): Promise<NotifierConfig[]> {
  *  Keeps the legacy ntfy fields in sync with the first ntfy channel for any code
  *  still reading them. */
 export async function saveNotifierChannels(channels: NotifierConfig[]): Promise<{ ok: boolean }> {
+  await requireAdmin();
   await connectDB();
   const clean = (Array.isArray(channels) ? channels : []).map((c, i) => ({
     id: String(c.id || `n${i}`),
@@ -388,6 +392,7 @@ export async function saveNotifierChannels(channels: NotifierConfig[]): Promise<
 
 /** Send a one-off test to a single (possibly unsaved) channel config. */
 export async function testNotifierChannel(channel: NotifierConfig): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
   const ok = await testNotifier(channel);
   return ok ? { ok: true } : { ok: false, error: 'Delivery failed — check the URL/token' };
 }
@@ -402,6 +407,7 @@ export async function testNotifierChannel(channel: NotifierConfig): Promise<{ ok
 
 /** Subscriptions for the Settings editor. */
 export async function getWebhookSubscriptions(): Promise<WebhookSubscription[]> {
+  await requireAdmin();
   return getEventWebhooks();
 }
 
@@ -410,6 +416,7 @@ export async function getWebhookSubscriptions(): Promise<WebhookSubscription[]> 
  *  so a bad entry can't silently sit there failing every delivery. Generates a
  *  secret for any new/blank entry so HMAC signing is on by default. */
 export async function saveWebhookSubscriptions(subs: WebhookSubscription[]): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
   await connectDB();
   const clean: WebhookSubscription[] = [];
   for (const [i, s] of (Array.isArray(subs) ? subs : []).entries()) {
@@ -436,6 +443,7 @@ export async function saveWebhookSubscriptions(subs: WebhookSubscription[]): Pro
 
 /** Send a one-off test payload to a single (possibly unsaved) subscription. */
 export async function testWebhookSubscription(sub: WebhookSubscription): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
   try {
     await assertPublicUrl(sub.url || '');
   } catch (err) {
