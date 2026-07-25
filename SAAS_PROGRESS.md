@@ -4858,3 +4858,47 @@ untested), **`account/{workspaces,export}`**, ή **`members`**. Μετά: `usage
 `workspace/{ai-key,export,export/files,reactivate}`, `invites/{resend,route}`, `audit`,
 `trials/sweep`, `billing/route.ts`, `auth/logout`, `account/{reset/*,verify/*}`. Πριν ξεκινήσεις:
 ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-25 (cont. — increment 103, route-level test coverage για το admin/tenants/[slug]/dbstats endpoint)
+
+Πριν από νέο increment: ask-inbox re-checked (7 OPEN entries — 5× bakecore [finance ×2,
+redesigner, reviewer ×2, ui-rebuild], bakecore-tests macOS-TCC flag, pharos-daily-dev P17/P23
+mobile-camera approval· τίποτα addressed σε saas-core, ίδιο κενό όπως τα προηγούμενα runs).
+`WEB_DEBT.md` re-checked (59η σάρωση παραμένει το latest· η ΜΟΝΗ ενεργή ουρά είναι πλέον ΕΝΑ
+P2/S item, `vouchers/page.tsx` tenant-scoping gap — αλλά τα files του (`app/vouchers/page.tsx`)
+είναι υπάρχον feature page, ΕΚΤΟΣ του saas-core territory [lib/tenancy, lib/billing, api/saas,
+admin/(saas) UI]· ανήκει στον feature-builder routine, όχι εδώ). UI-first backlog παραμένει
+εξαντλημένο. Ακολούθησα το leftover next-task από το increment-102 log.
+
+**Νέο `admin/tenants/[slug]/dbstats/route.test.ts`** (6 tests), μηδέν production code αλλαγή.
+Route = superadmin LIVE on-demand `db.stats()` reader για ένα tenant (μοναδικό verb, read-only,
+ΠΟΤΕ δεν γράφει καμία Usage δειγματοληψία). Mock: `@/lib/tenancy/superadmin`
+(requireSuperadmin) + `@/lib/tenancy/adminTenantDbStats` (readLiveDbStatsForAdmin — ήδη πλήρως
+unit-tested στο δικό του `adminTenantDbStats.test.ts`, μαζί με τα pure `summarizeLiveDbStats`/
+`buildLiveDbStats`), άρα το route test καλύπτει αποκλειστικά το wrapper behavior. Αυτό ήταν το
+τελευταίο route χωρίς coverage στο `admin/tenants` cluster (list + `[slug]` detail/PATCH ήδη
+καλυμμένα από τα increments 101-102).
+
+Καλύπτει: requireSuperadmin 403/401 short-circuit περνάει αναλλοίωτο, μηδέν live read· unknown
+slug (`readLiveDbStatsForAdmin` → null) → 404· happy path → το πραγματικό envelope verbatim +
+`Cache-Control: no-store`· το slug param περνάει verbatim στο reader (καμία trim/lowercase σε
+επίπεδο route — matched το πραγματικό route code, το trim/lowercase ζει ήδη στο
+`readLiveDbStatsForAdmin`'s Tenant.findOne query semantics, όχι εδώ)· mid-handler throw (live
+db.stats read αποτυγχάνει) → καθαρό 500 μέσω πραγματικού saasGuard.
+
+**Verified**: νέο test file **6/6 green** μόνο του· πλήρες `npx vitest run` → **270 files / 3659
+tests green** (αυξήθηκε από 268/3613 του increment-102 log). `npm run type-check` → **EXIT 0**
+καθαρά. **Docker: ΔΕΝ έγινε rebuild** (test-only αρχείο, μηδέν production code/runtime wiring
+αλλαγή). **Browser-verify: skipped** (test file, μηδέν UI/observable behavior αλλαγή).
+Collision guard: `git status --short` πριν το staging έδειξε ΜΟΝΟ το δικό μου 1 νέο αρχείο
+(clean tree)· `git diff --cached --name-only` μετά το staging επιβεβαίωσε exact 1-file match
+πριν το commit/push. Pushed `20c6edc`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** το `admin/tenants` cluster έκλεισε πλήρως (list + `[slug]` + `[slug]/dbstats`,
+όλα route-tested). Επόμενοι υποψήφιοι χωρίς coverage: **`account/{workspaces,export}`**,
+**`members`**, `usage`+`usage/sample`, `workspace/{ai-key,export,export/files,reactivate}`,
+`invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`,
+`account/{reset/*,verify/*}`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
+για item στο territory (αν βρεθεί, πάει πρώτο).
