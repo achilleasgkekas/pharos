@@ -8439,3 +8439,79 @@ parity loop πολύ γρήγορα πλέον· τα επόμενα διαθέ�
   provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file
   need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
   power tool· P5 bookmarklet MV3-extension phase 2· light-theme parity mobile decision.
+
+## 2026-07-25 (pharos-daily-dev, cont. — Web Debt: sampleDataActions.ts tenancy-parity [P2/S])
+
+**Coordination guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` είχε 3 OPEN items, όλα από
+`bakecore-*` (άσχετο project) → τίποτα να εφαρμόσω πρώτα. Working tree καθαρό στην αρχή (ελέγχθηκε ότι
+είχε ήδη τρέξει ένα προηγούμενο pharos-daily-dev run νωρίτερα σήμερα, commit `0bc5e14` στις 04:43, χωρίς
+conflict με αυτό το run). Docker mutex lock (`/tmp/claude-docker.lock`) αποκτήθηκε καθαρά, χρησιμοποιήθηκε
+για build+up, μετά βρέθηκε ήδη απούσα (πιθανό tmp-cleanup ή race με άλλη routine) — μηδέν πρόβλημα, το
+Docker work είχε ήδη ολοκληρωθεί πριν το ελέγξω.
+
+**Approved queue check (βήμα a)**: σάρωσα `PRODUCT_BACKLOG.md → ## Approved` γραμμή-γραμμή (grep όλων των
+`### ` headings + status). Ίδιο standing αποτέλεσμα με τα προηγούμενα runs: **P36** Open Banking (needs-
+Achilleas provider decision, L)· **P31** household enforcement (χρειάζεται supervised live-login session)·
+**P23** mobile share-sheet + **P17** mobile barcode (mobile-native, attended-preferred approvals)· **P16**
+Firefly III/Grocy (χρειάζεται πραγματικό sample file, YNAB μέρος ήδη shipped)· **P5** MV3 extension phase 2
+(deferred). Μηδέν νέο buildable Approved item → βήμα (b).
+
+**Fallback (βήμα b)**: `MOBILE_PARITY.md` δεν ελέγχθηκε ξανά αφού το προηγούμενο run σήμερα (04:43) το είχε
+ήδη επιβεβαιώσει άδειο και μηδέν νέο mobile commit από τότε (`git log --since "2026-07-25 04:44" -- apps/mobile`
+= 0 commits). `WEB_DEBT.md → Web Debt Queue`: 2 ενεργά auto-buildable TODO items έμειναν μετά το requireAdmin
+fix του πρωινού run — **P2/S** `sampleDataActions.ts` tenancy-parity (1 αρχείο) και **P2/M** Voucher/GiftCard/
+LoyaltyCard tenancy-parity (3 αρχεία, ίδιο recipe). Ίδιο Priority (P2), αλλά το doc's κανόνας είναι «μικρότερο
++ υψηλότερη προτεραιότητα πρώτα» → πήρα το **S** πρώτα (sampleDataActions.ts), το M μένει για επόμενο run.
+Verified πρώτα ότι ήταν όντως ακόμα ανοιχτό (`grep -n "withRequestTenant|currentModel" sampleDataActions.ts`
+= 0 hits, μόνο direct model imports).
+
+**Το πρόβλημα**: το `sampleDataActions.ts` (P1 demo/sample-data mode, Settings → «Load/Clear sample data»)
+έκανε direct `import { Item } from '@/models/Item'` κ.λπ. και δούλευε πάντα πάνω στο **DEFAULT** Mongoose
+connection, ενώ το sibling `items/actions.ts`/`receipts/actions.ts`/`expenses/actions.ts` ήδη χρησιμοποιούν
+το established `withRequestTenant`/`currentModel` tenant-scoping pattern για 3 από τα 4 ίδια models. Σε
+SaaS multi-tenant mode, «Load sample data» θα έγραφε πάντα στο DEFAULT tenant DB (όχι στο δικό του tenant),
+και «Clear sample data» θα διέγραφε sample-tagged records από το DEFAULT DB ανεξάρτητα ποιος το πάτησε.
+Σε self-hosted (SAAS_MODE off, ο τρόπος του Αχιλλέα σήμερα) μηδέν συμπεριφορική αλλαγή — το `currentModel()`
+no-op στο ίδιο DEFAULT connection.
+
+**Τι έγινε** (μόνο `apps/web/src/app/settings/sampleDataActions.ts`):
+- Imports: `withRequestTenant` (`@/lib/tenancy/request`) + `currentModel` (`@/lib/tenancy/connection`)·
+  τα 4 model imports μετονομάστηκαν σε `ItemModel`/`ReceiptModel`/`ExpenseModel`/`SubscriptionModel`.
+- `sampleCounts()` (private helper, καλείται και standalone από `getSampleDataStatus` και εσωτερικά από
+  `loadSampleData`/`clearSampleData`): resolve τα 4 μοντέλα μέσω `currentModel()` πριν τα `.countDocuments`
+  — βασίζεται στο ambient tenant context που έχει ήδη ανοίξει ο caller (`currentModel()` διαβάζει απλά
+  `currentTenant()`, δεν χρειάζεται δικό του `withRequestTenant` wrapper· ίδιο idiom με τα helper functions
+  του `items/actions.ts`).
+- Τα 3 exported functions (`getSampleDataStatus`/`loadSampleData`/`clearSampleData`) τυλίχτηκαν σε
+  `return withRequestTenant(async () => { ... })`, byte-ίδιο pattern με το `items/actions.ts`. Το
+  `requireAdmin()` έμεινε **πριν** το wrap (auth gate πρώτα, όπως και πριν).
+
+**Verify**: `grep -c "withRequestTenant|currentModel" sampleDataActions.ts` → **18** (≥8 του acceptance
+criterion). `npm run type-check` EXIT 0. Full `npx vitest run` → **3364/3364 passed (255 files)** — μηδέν
+regression, το `sampleData.test.ts` (pure lib logic, DB-free) αμετάβλητο πράσινο. **Safe Docker rebuild**:
+mongo ήδη healthy πριν → `docker compose build web` (μόνο image) → `docker compose up -d web` → `/login`
+**200**, `/settings` **307** (auth-gated route compiled OK), container state `running`/`ExitCode:0` (μηδέν
+restart-loop) → `docker builder prune -f` μετά. **Browser-verify** (best-effort, τα `mcp__Claude_Browser__*`
+tools ήταν διαθέσιμα): `/login` renders, `read_console_messages(onlyErrors)` = μηδέν errors — αυτή η αλλαγή
+είναι backend-only server actions πίσω από ένα admin-only toggle (χρειάζεται live admin login για να
+ασκηθεί το actual «Load sample data» click, εκτός scope για unattended run) → login-page sanity check
+αρκετό proof, καμία deeper interaction δοκιμάστηκε.
+
+**Docs**: `WEB_DEBT.md` → το item marked `Status: DONE (fixed 2026-07-25, pharos-daily-dev)` στη θέση του.
+
+**Suggested next task**: το queue έμεινε με **P2/M** Voucher/GiftCard/LoyaltyCard tenancy-parity (ίδιο recipe,
+3 sibling αρχεία `vouchers/actions.ts`+`giftcardActions.ts`+`loyaltyActions.ts`, dead-until-SaaS αλλά
+μηχανικό, μηδέν decision) — φυσικό επόμενο βήμα, ίδιο μοτίβο με σήμερα. Μετά από αυτό μένει μόνο το
+**P3/M** i18n gap (84 missing el.ts keys) στο ίδιο αρχείο. Mobile-parity/PRODUCT_BACKLOG παραμένουν
+standing-blocked (βλ. Needs Achilleas).
+
+**Git hygiene**: `git add` explicit (μόνο `apps/web/src/app/settings/sampleDataActions.ts` + `WEB_DEBT.md`
++ `PROGRESS.md`, όχι `-A`) → commit → push.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run. Standing items αμετάβλητα: SaaS multi-tenancy/billing rollout env boundary·
+  mobile native-dep approvals (P17 camera, P23 share-sheet, safe-area-context UI-debt dep)· P36 Open Banking
+  provider decision· P31 household enforcement supervised session· P16 Firefly III/Grocy real sample-file
+  need· Settings theme/language/AI-engine/storage/OneDrive credentials boundary· P8 tax-export ZIP desktop
+  power tool· P5 bookmarklet MV3-extension phase 2· light-theme parity mobile decision.
