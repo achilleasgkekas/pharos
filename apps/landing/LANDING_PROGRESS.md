@@ -3260,3 +3260,60 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-25 (12) — FAQ += bank/generic CSV import (PA1 Expenses feature)
+
+Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος
+`~/.claude/ASK_ACHILLEAS.md` (3 OPEN entries, ολα bakecore finance/redesigner, τιποτα για landing/pharos).
+`git log --oneline cbd0e4b..HEAD | grep "feat("` -> κενο (μονο tests/docs/fix commits μετα το τελευταιο
+landing commit), αρα συνεχισα με το candidate που ειχε μεινει απο το προηγουμενο entry (11): bank/generic
+CSV import (PA1), ηδη research-αρισμενο τοτε απο ενα background agent read-only pass.
+
+Διαβασα ο ιδιος τον πραγματικο κωδικα πριν γραψω copy (`lib/csvImport.ts`, `expenses/CsvImportModal.tsx`,
+`expenses/actions.ts importExpensesCsv`) για να επιβεβαιωσω τις λεπτομερειες: auto-delimiter-detect
+(comma/semicolon/tab, μετρα candidates εκτος quotes), `guessMapping` απο header keywords Αγγλικα+Ελληνικα
+(date/amount/vendor/category/notes), live preview table πριν το save, `parseCsvAmount` δεχεται EU
+(1.234,56) και US (1,234.56) format με σωστο tie-break στο τελευταιο separator, `parseCsvDate` day-first
+by default με swap μονο οταν day-first ειναι αδυνατο. Το "sign-split" checkbox (`signSplit` state,
+ενεργο μονο `hasNegatives`) χωριζει αρνητικα/θετικα ποσα σε expense/income αυτοματα οταν το export εχει
+ενα signed column· χωρις αυτο ολες οι γραμμες παιρνουν το kind του tab που ανοιξες (Expenses ή Income).
+Server-side dedup (`csvDedupeKey`, kind+vendorKey+ημερα+|amount|) εναντια σε ηδη-υπαρχοντα Expense records
+στο ιδιο date range, και category rules (απο το προηγουμενο entry 11) τρεχουν αυτοματα στις νεες γραμμες
+μεσω `inheritFromSeries`.
+
+Αλλαγη (`apps/landing/app/page.tsx`, `FAQS` array μονο, μηδεν αλλο UI/CSS/dependency change): νεα εγγραφη
+«Can I bulk-import expenses from a bank export?» αμεσως μετα το «Can it learn to auto-categorize my
+expenses?» (η νεα CSV εγγραφη αναφερει explicit τα category rules) και πριν το «Can I see all my
+renewals, installments, and bills in one calendar?» (ιδιο expenses-organization cluster, οπως ειχε
+σχεδιαστει στο entry 11).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (ιδιο μεγεθος, build-time
+  data μονο).
+- Browser preview: κανενα port 3100-3190 κατειλημμενο εκτος του 3100 (Docker), `next start -p 3110` πανω
+  στο production build. `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No
+  console logs." καθαρο. `javascript_tool` επιβεβαιωσε: deterministic anchor id
+  `faq-can-i-bulk-import-expenses-from-a-bank-export`, σωστο πληρες `textContent`, σωστη σειρα γειτονων
+  στο DOM (["faq-can-it-learn-to-auto-categorize-my-expenses", **αυτο**,
+  "faq-can-i-see-all-my-renewals-installments-and-bills-in-one-calendar"]). Hero screenshot καθαρο
+  (lighthouse mark, gradient τιτλος, CTAs, τριπλο badge row). `pkill -f "next start -p 3110"` +
+  επιβεβαιωση οτι το πραγματικο `next-server` process εφυγε (`ps aux | grep next-server`, κενο) — το
+  γνωστο false-positive Claude-app TCP CLOSE_WAIT match στο `lsof -i :3110` παραμενει (σημειωμενο ηδη σε
+  προηγουμενα entries, δεν ειναι το server process).
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: το `feat(` sweep εξαντληθηκε προς το παρον (ολα τα candidates απο το τελευταιο ευρυ
+σαρωμα καλυφθηκαν: net-worth, auto-rules, CSV import). Επομενο run: νεος `git log --oneline cbd0e4b..HEAD
+| grep "feat("` ελεγχος για φρεσκα modules/commits απο το κυριο repo· αν κενο παλι, ξανα-σαρωμα ολοκληρου
+του `feat(` ιστορικου για candidates που μπορει να ξεφυγαν απο τα πρωτα keyword-passes, ή (e) polish
+συνεχεια / real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).

@@ -514,6 +514,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. Settings → Money lets you define rules that map a vendor name, or any bit of text, to a category, and optionally mark it recurring with a cycle. New expenses run through your rules automatically whether they arrived from a scanned bill, a manual entry, or a CSV import, so a recognised vendor is already categorized when it lands. A one-click "Apply to existing" backfills every already-uncategorized expense retroactively, so turning this on later still cleans up your history.',
   },
   {
+    q: 'Can I bulk-import expenses from a bank export?',
+    a: 'Yes. Expenses → Import CSV takes any bank or card export: it auto-detects the delimiter (comma, semicolon, or tab), guesses which column is the date, amount, vendor, category, and notes from common English and Greek header names, and shows a live preview table so you can fix the mapping before anything is saved. Dates and amounts parse in both EU (day-first, comma-decimal) and US formats. If your export mixes money in and out in one signed amount column, a "split by sign" option sorts negative rows into expenses and positive rows into income automatically; otherwise every row lands in whichever tab you opened it from. Rows that match one you already imported (same vendor, day, and amount) are skipped, and your category rules run on the new ones automatically.',
+  },
+  {
     q: 'Can I see all my renewals, installments, and bills in one calendar?',
     a: 'Yes. A three-month agenda unifies subscription renewals, credit-card installments aggregated per month, projected recurring bills and income, and warranty or voucher expiries, with a money-in / money-out total for each month, so "what is due this month" is a glance. The same agenda also publishes as a read-only iCal feed you can subscribe to from Google, Apple, or Outlook Calendar, authed by its own low-scope token so a leaked subscribe link never grants API access; generate, copy, or rotate it in Settings → AI.',
   },
