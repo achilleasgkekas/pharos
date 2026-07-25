@@ -534,6 +534,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. Settings → Storage & backup has a one-click "Insurance export (ZIP)" that bundles a CSV manifest and a standalone printable HTML report of every owned item, its value, serial number, and warranty, together with its photos, manuals, and linked receipts, exactly what an insurer asks for after a claim. Values use the same depreciation-adjusted estimate as Reports, so aging gear is not overstated.',
   },
   {
+    q: 'How does it estimate what my stuff is still worth?',
+    a: 'Reports and the insurance export both value your inventory with a declining-balance depreciation model: each item’s purchase price shrinks by a per-category annual rate (network 15%, storage 20%, compute 25%, and so on) compounding from its purchase date, never dropping below a salvage floor, 10% of the price by default. Settings → Depreciation lets you tune the default rate, the floor, and override any category, or switch it off entirely to value everything at face price instead. Log a manual current price that actually differs from what you paid and that number wins over the estimate.',
+  },
+  {
     q: 'Can it help with tax filing at year-end?',
     a: 'Yes. Mark any expense "tax-deductible" and give it a tax category (office supplies, travel, professional fees, or a custom one for your jurisdiction); a recurring bill inherits the flag so you only set it once. A "Tax-deductible only" filter and a gold badge make deductible spend easy to spot all year. At year-end, Settings → Backup has a "Tax export (ZIP)" button that bundles a CSV grouped by category, a printable HTML report, and every linked receipt or bill, ready to hand to an accountant or enter into tax software.',
   },
