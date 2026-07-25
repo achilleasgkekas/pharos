@@ -8766,3 +8766,65 @@ lock **released**. Browser-verify: η εφαρμογή renders, **μηδέν con
 - Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
   household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
   ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
+## 2026-07-25 (P9 slice 3: multi-currency για Subscriptions)
+
+**Approved queue check (βήμα a) πρώτα**: το `OWNER_DECISIONS.md` δεν έχει approved-but-unbuilt items, και στο
+`PRODUCT_BACKLOG.md → Approved` τα εναπομείναντα είναι όλα μπλοκαρισμένα σε εσένα, όχι σε δουλειά: **P36** (Open
+Banking, θέλει provider απόφαση + credentials), **P31** (household, θέλει supervised session), **P17/P23** (native
+`expo-camera` + EAS dev build σε φυσική συσκευή, ήδη OPEN στο `~/.claude/ASK_ACHILLEAS.md` ως
+`pharos-daily-dev-20260725-1425`, καμία απάντηση ακόμα), **P16** (Firefly III/Grocy, θέλει πραγματικό sample file),
+**P5** (MV3 extension phase 2). Άρα ξανά **P9**, το μόνο Approved 🟡 που δεν θέλει τίποτα δικό σου, στο επόμενο
+αυτοτελές slice.
+
+**Το slice**: **Subscriptions**, ακριβώς το μοτίβο των Expenses (slice 1) και Receipts (slice 2), μηδέν νέα
+αρχιτεκτονική απόφαση. Το `Subscription.currency` **αποθηκευόταν ήδη** (το AI autofill το parse-άρει) αλλά **κανένα
+path δεν το τιμούσε**: μια συνδρομή $10/μήνα μετριόταν σιωπηλά ως €10 στο monthly/yearly total, στο `/calendar`
+agenda και στο trial-charge digest του P33. Ίδιο υπαρκτό σφάλμα ορθότητας, όχι «νέο feature».
+
+**Τι αλλάζει σε σχέση με τα δύο προηγούμενα slices**: μια συνδρομή έχει **ΔΥΟ** money fields, το recurring `amount`
+και το post-trial `firstChargeAmount`. Μετατρέπονται **μαζί, με ΤΟ ΙΔΙΟ rate**, γιατί και τα δύο εμφανίζονται και
+αθροίζονται σε base currency αλλού· μετατροπή μόνο του ενός θα άφηνε δύο νομίσματα μέσα στην ίδια εγγραφή. Και τα 4
+write paths περνούν από `resolveFx` (create/update server actions + `POST`/`PATCH` του v1). Το **`PATCH`
+ξαναδιαβάζει το τρέχον doc** όποτε το body αγγίζει money field και συγχωνεύει ό,τι δεν έστειλε ο caller (printed
+amount / currency / rate), ώστε ένα partial update (μόνο rate, μόνο currency, μόνο amount) να **μην** αφήνει ποτέ
+μισο-μετατρεπμένη γραμμή· bodies χωρίς money field δεν πληρώνουν καθόλου το extra read.
+
+**Δύο πραγματικά bugs που βρήκα χτίζοντας** (και τα δύο hardcoded `'EUR'`): το `trackDiscoveredSubscription` (το
+κουμπί «Track this» του P7 auto-discovery) και το AI tool `add_subscription`. Το ποσό τους προέρχεται από
+`Expense.amount`, που είναι **ήδη** base currency, οπότε σε non-EUR deployment κάθε τέτοια εγγραφή γεννιόταν
+«foreign» χωρίς λόγο. Τώρα παίρνουν τη base currency του deployment.
+
+**UI**: currency select δίπλα στο amount + η ίδια FX γραμμή («rate», ή «or charged» που κάνει back-out του rate μέσω
+`deriveFxRate`) + live preview του ποσού που θα αποθηκευτεί + το κοινό **`FxBadge`** στην κάρτα (purple όταν το rate
+είναι γνωστό, gold ⚠ όταν λείπει). Λεπτομέρεια που έπιασα: το **AI-suggested currency** τιμάται πλέον **μόνο** όταν
+το multi-currency είναι on, αλλιώς μια πρόταση «USD» θα μάρκαρε foreign μια εγγραφή σε single-currency deployment.
+
+**Mobile parity μέσα στο ίδιο run** (όχι follow-up): `/api/v1/subscriptions` εκθέτει origAmount/fxRate και τα
+POST/PATCH δέχονται currency/fxRate, τεκμηριωμένα στο `API.md`. Καθάρισα και μια **stale γραμμή roadmap** εκεί που
+έλεγε ότι «PATCH/DELETE for expenses & subscriptions» εκκρεμούν, ενώ και τα δύο έχουν ήδη γίνει ship (η ίδια η
+ενότητα από πάνω τα τεκμηριώνει τώρα ρητά).
+
+**Verify**: `npm run type-check` **EXIT 0**· full `npx vitest run` **3589 passed / 266 files** (+36 νέα, **μηδέν
+regression**). Ένα exact-shape assertion στο PATCH route έσπασε σωστά (ένα money-touching PATCH ξαναγράφει πλέον και
+τα 4 currency πεδία, idempotent σε base-currency γραμμή) και ενημερώθηκε με σχόλιο για το γιατί. Docker με το
+mutex: `build web` → mongo **healthy** → `up -d web` → `/login` **200 στο 2ο poll**, **0 restarts**, `/subscriptions`
++ `/settings` 307 (auth-gated, άρα compiled) → `docker builder prune -f` (197MB) → lock **released**. Browser-verify:
+η εφαρμογή renders, **μηδέν console errors**. Το authed `/subscriptions` δεν είναι επαληθεύσιμο unattended
+(credentials boundary), καλύπτεται από τα tests + το ότι ένα λάθος σε client component θα είχε ρίξει το `next build`
+μέσα στο image.
+
+**Suggested next task**: το P9 μένει 🟡 με **δύο modules ακόμα, ίδιο μοτίβο, μηδέν νέα απόφαση**: **Items**
+(`purchasedPrice`/`currentPrice`/`priceHistory`/link prices, το πιο μπερδεμένο γιατί έχει πολλαπλά ποσά ανά
+κατάστημα) και **Statements** (ποσά ανά transaction). Θα πρότεινα **Items** πρώτα (τροφοδοτεί net worth + insurance
+export). Μετά: `resolveFx` στο CSV import (PA1) και στο email-in. Ως συνήθως τρέξε **πρώτα** το Approved queue check
+(βήμα a) — αν έχεις απαντήσει στο `expo-camera` ερώτημα, το P17 camera UI προηγείται.
+
+## Needs Achilleas
+
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο από το προηγούμενο run. Το P17 server half
+  είναι shipped+tested και του P23 **υπάρχει ήδη** (`POST /api/v1/scan/receipt`). Και τα δύο θέλουν native dep +
+  EAS dev build σε φυσική συσκευή. Ερώτημα: `~/.claude/ASK_ACHILLEAS.md` → `pharos-daily-dev-20260725-1425` (OPEN).
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
+  household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
+  ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
