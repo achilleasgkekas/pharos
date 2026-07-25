@@ -2,7 +2,7 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: cdc6a03 -->
+<!-- reviewed: 64a6ead -->
 <!-- docker-validated: 4523f4a -->
 <!-- ui-audited: 0bc5e14 -->
 
@@ -8828,3 +8828,51 @@ export). Μετά: `resolveFx` στο CSV import (PA1) και στο email-in. �
 - Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
   household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
   ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
+## 2026-07-25 (reviewer routine — σάρωση 71 commits, 2 binary-encoding bugs βρέθηκαν+διορθώθηκαν, 1 νέο queue item)
+
+**Guard**: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md` σαρώθηκε — 6 OPEN entries, ΟΛΑ `bakecore-*`
+(άσχετο project) εκτός ενός `pharos-daily-dev` item (P17/P23 native-dep approval, δεν απευθύνεται σε `reviewer`,
+αγνοήθηκε). Working tree καθαρό στην αρχή, up to date με origin.
+
+**Εύρος review**: `cdc6a03..HEAD` = **71 commits** (marker από την προηγούμενη σάρωση, `1df2326`). Κυρίως
+docs/tests από τα pharos-daily-dev + saas-core routines. Ουσιαστικοί code-touching commits: security fix
+(Settings→Notifications requireAdmin — ήδη DONE, καθαρό)· 2× tenancy-parity fixes (sampleDataActions.ts,
+Voucher/GiftCard/LoyaltyCard — mechanical mirror του established recipe, καθαρά)· P9 multi-currency 3 slices
+(Expenses/Receipts/Subscriptions — καθαρό, νέο `lib/fx.ts` με 25 unit tests, opt-in flag, base-currency
+αναλλοίωτο)· P17 barcode-lookup endpoint server half (καθαρό, explicit SSRF-check: hardcoded hosts, GTIN-only
+validated input)· i18n el.ts +126 keys· mobile borderRadius→RADIUS token refactor (54 sites, mechanical).
+
+**type-check**: `cd apps/web && npm run type-check` EXIT 0· `cd apps/mobile && npx tsc --noEmit` EXIT 0.
+**Full test suite**: `npx vitest run` (web) → **3613/3613 green (268 files)**.
+
+**Νέο εύρημα (live, εκτός diff-review — light standing scan σε αρχεία που το review άγγιξε)**: δύο web αρχεία
+είχαν **raw NUL/control bytes literal μέσα στο source** αντί για escaped `\x00`/`\x1f` — `file` τα ταξινομούσε
+ως `data` (binary), `git diff`/GitHub PR view τα δείχνει σαν binary diff (**μηδέν ορατότητα σε review** για
+μελλοντικές αλλαγές σε αυτά τα αρχεία), και `grep` (χωρίς `-a`) τα προσπερνάει σιωπηλά — live confirmed:
+`grep -n "sanitizeSegment" apps/web/src/lib/storagePath.ts` → 0 αποτελέσματα ενώ το symbol υπάρχει στη γρ.30.
+Functionally μηδέν runtime διαφορά, αλλά μόνιμος κίνδυνος για μελλοντικά reviews/routines που κάνουν `grep -r`
+να καταλήξουν λάθος "δεν υπάρχει". **Fixed και τα δύο** (small+safe, byte-identical semantics):
+- `lib/storagePath.ts:32` (`sanitizeSegment` regex, προϋπήρχε από το initial commit `fc806db`) → bytes σε
+  `\x00`/`\x1f` escapes. `file` πλέον «UTF-8 text»· `vitest storagePath.test.ts` 15/15 green.
+- `expenses/ExpensesClient.tsx:31` (`NO_SPACE` filter sentinel, εισήχθη `6b1de5c4` στις 2026-07-10, ανακαλύφθηκε
+  τώρα επειδή το P9 multi-currency commit άγγιξε το ίδιο αρχείο) → `'\x00none'` escape, ίδια runtime τιμή.
+  `vitest src/app/expenses/` 130/130 green.
+- Repo-wide byte-level sweep (`apps/**/*.{ts,tsx,js,jsx}`) μετά το fix → **0 αρχεία** με embedded NUL.
+- `npm run type-check` EXIT 0 μετά· full `npx vitest run` ξανα-**3613/3613 green** (μηδέν regression).
+
+**Νέο WEB_DEBT.md item (P2/S)**: `vouchers/page.tsx` read path ακόμα κάνει direct model import (`Voucher`/
+`GiftCard`/`LoyaltyCard`, χωρίς `withRequestTenant`/`currentModel`) ενώ τα sibling action αρχεία μόλις έγιναν
+tenant-scoped (`315cd26`) — ασύμμετρο read/write σε SaaS mode, dead-until-SaaS στο self-hosted. Ο ίδιος ο
+auditor το είχε ήδη προαναγγείλει ως follow-up στο postscript του `315cd26` item· τώρα ανοίγεται επίσημα σαν
+ξεχωριστό queue entry (ίδιο recipe, 1 αρχείο, S, auto-buildable).
+
+**Monitor note**: τίποτα ασυνήθιστο — pharos-daily-dev + saas-core routines ενεργά και προχωράνε κανονικά
+(71 commits σε αυτό το διάστημα), μηδέν stuck queue, μηδέν OPEN ASK_ACHILLEAS item για `reviewer`.
+
+**Git hygiene**: `git add` explicit (`WEB_DEBT.md`, `PROGRESS.md`, `apps/web/src/lib/storagePath.ts`,
+`apps/web/src/app/expenses/ExpensesClient.tsx`, όχι `-A`) → commit → push. Marker `cdc6a03` → `64a6ead`.
+
+## Needs Achilleas
+
+- Τίποτα νέο από αυτό το run.
