@@ -8575,3 +8575,67 @@ i18n χάσμα **ξαναμεγαλώνει ανά feature** (38→42→75→84
 **Git hygiene**: `git add` explicit (μόνο `apps/web/src/lib/i18n/locales/el.ts` + `WEB_DEBT.md` +
 `PROGRESS.md`, όχι `-A`) → commit → push. Το untracked `receipts/actions.upload.test.ts` και το commit
 `315cd26` της άλλης routine **δεν αγγίχτηκαν**.
+
+## 2026-07-25 (P17 server half: barcode product-lookup endpoint)
+
+**Approved queue check (βήμα a)**: σάρωσα `PRODUCT_BACKLOG.md → ## Approved` + `OWNER_DECISIONS.md`. Τα unshipped
+items ήταν **P36** (Open Banking, needs-Achilleas provider decision), **P31** (household, supervised session),
+**P23** (mobile share-sheet, native-dep approval), **P17** (mobile barcode, native-dep approval), **P9**
+(multi-currency, L, ρητά «τελευταίο»). Δηλαδή το ίδιο standing μπλόκο με τα προηγούμενα runs.
+
+**Αλλά**: αντί για ένα ακόμα fallback run, ξανακοίταξα το **P17** πιο προσεκτικά. Ήταν 4 συνεχόμενα runs
+κατατεταγμένο ως «mobile native-dep approval» και άρα άθικτο, **όμως το spec του λέει ρητά «Module: Mobile
+(camera-scan) + Items/Inventory (+ `/api/v1` §5, product-lookup helper)»**. Το **server μισό δεν χρειάζεται
+καμία native dep**, δεν χρειάζεται καμία απόφαση, και είναι πλήρως testable unattended. Το έχτισα, ώστε όταν
+έρθει η έγκριση για `expo-camera` το mobile κομμάτι να είναι **σκέτο UI** πάνω σε έτοιμο, tested endpoint.
+Αυτό είναι πραγματικό Approved-queue progress, όχι self-picked roadmap item.
+
+**Τι χτίστηκε**: **`GET /api/v1/lookup/barcode?code=<gtin>`**
+- Νέο pure **`lib/barcode.ts`** (+21 unit tests): GTIN mod-10 check digit (κοινή ρουτίνα για
+  EAN-8/UPC-A/EAN-13/GTIN-14), `normalizeBarcode` που ανέχεται κενά/παύλες όπως τα πληκτρολογεί άνθρωπος και
+  απορρίπτει το mis-scan **πριν** ξοδευτεί request, `barcodeCandidates` (οι κατάλογοι διαφωνούν αν ένα UPC-A
+  αποθηκεύεται ως 12 ή ως zero-padded 13ψήφιο, οπότε δοκιμάζονται και οι δύο μορφές αντί για ψευδές «not found»),
+  `pickCategory`, `mapOpenFactsProduct`.
+- Νέο **`lib/barcodeLookup.ts`** (+12 tests, mocked fetch): οι 3 πηγές ρωτιούνται **παράλληλα** ανά μορφή barcode
+  (bounded wall clock, κάποιος στέκεται μπροστά σε ράφι), zero-padding παραλλαγές σειριακά με early exit.
+- Νέο **route + 8 tests**. Τεκμηρίωση στο `API.md` (πίνακας με τις 4 απαντήσεις).
+
+**Builder decisions (καταγραφή, όλες reversible)**: (α) πηγές = **Open Food / Products / Beauty Facts** (δωρεάν,
+χωρίς key, χωρίς quota, μηδέν κόστος· ακριβώς το builder default του backlog)· (β) **ΟΧΙ AI fallback στο v1** —
+το lookup είναι ντετερμινιστικό και δωρεάν, ενώ κάθε AI κλήση είναι metered και κοστίζει· ο χρήστης έχει ήδη το
+AI product-photo scan ως **δική του** ρητή κλιμάκωση όταν αστοχήσει το barcode (και ο κανόνας «μηδέν unattended
+AI κόστος» τηρείται)· (γ) το `product` έχει **ακριβώς το σχήμα** του `POST /api/v1/scan/product`, ώστε μία οθόνη
+confirm-then-add να εξυπηρετεί και τα δύο και να πέφτει κατευθείαν σε `POST /api/v1/shopping-list` — μηδέν νέο
+client plumbing· (δ) τρεις **διακριτές** απαντήσεις που το UI πρέπει να δείχνει αλλιώς: 400 άκυρο barcode,
+200 `product:null` (κανείς δεν το ξέρει, γράψ' το με το χέρι), 502 βάσεις άφταστες (retryable).
+
+**Verify**: `npm run type-check` **EXIT 0**· full `npx vitest run` **3465 passed / 261 files** (+41 νέα, μηδέν
+regression). Επιπλέον **live curl στο πραγματικό Open Food Facts API**, που αποκάλυψε **δύο πράγματα που τα
+mocks δεν θα έπιαναν ποτέ** και διόρθωσα πριν το commit: (1) ένα miss γυρίζει **HTTP 200 με `status:0`**, όχι
+πάντα 404 (καλύπτονται πλέον και τα δύο)· (2) τα `categories_tags` **αναμειγνύουν** canonical αγγλικά tags με
+ξενόγλωσσο κείμενο κάτω από το **ίδιο** `en:` prefix (το πραγματικό record της Nutella τελειώνει σε
+«en:Pâtes à tartiner») → το naive «πάρε το τελευταίο en: tag» θα έδινε **γαλλική** κατηγορία σε αγγλικό lookup,
+οπότε το `pickCategory` προτιμά πλέον canonical taxonomy entries. Δίδαγμα: για third-party API, ένα live probe
+αξίζει όσο μια ντουζίνα mocks.
+
+**Docker**: κανονικό mutex (`mkdir /tmp/claude-docker.lock` → acquired), `docker compose build web` → mongo
+**healthy** → `up -d web` → `/login` **200 σε 2s**, **0 restarts**, το νέο route **live και auth-gated**
+(401 χωρίς bearer token σε 3 παραλλαγές). `docker builder prune -f` (196.9MB), lock released. Browser-verify
+**skipped σκόπιμα**: η αλλαγή είναι API-only, καμία rendered σελίδα δεν άλλαξε, οπότε ένα screenshot του
+`/login` θα ήταν ψευδο-απόδειξη· το curl-probe του ίδιου του endpoint είναι ισχυρότερο. Το authed happy-path
+**δεν** δοκιμάστηκε live γιατί θα απαιτούσε να διαβάσω το `apiToken` χρήστη από τη Mongo (credentials
+boundary) — καλύπτεται πλήρως από τα 41 tests + το live probe του upstream API.
+
+**Suggested next task**: το `PRODUCT_BACKLOG.md` P17 είναι πλέον 🟡 (server done, camera UI εκκρεμεί). Επόμενο
+run: Approved queue check ως συνήθως· αν είναι πάλι άδειο, το **ίδιο μοτίβο αξίζει να εφαρμοστεί στο P23**
+(mobile share-sheet) — έχει κι αυτό server-side μισό (upload endpoint που δέχεται shared αρχείο) που δεν
+χρειάζεται native dep, ενώ το share-extension κομμάτι μένει για supervised session. Εναλλακτικά
+`MOBILE_PARITY.md` follow-ups (P28/P32/P34/P35 v1 shapes στο `/api/v1`).
+
+## Needs Achilleas
+
+- **P17 camera UI**: ο server είναι έτοιμος και tested. Μένει έγκριση για **`expo-camera`** (native dep) +
+  EAS dev build σε φυσική συσκευή, ώστε να μπει η οθόνη scan → `GET /api/v1/lookup/barcode` → confirm → add.
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P23 share-sheet native dep· P36 Open
+  Banking provider decision· P31 household supervised session· P16 Firefly III/Grocy real sample-file·
+  Settings credentials boundary· P8 tax-export ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
