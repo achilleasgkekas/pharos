@@ -1,6 +1,8 @@
 'use server';
 import { connectDB } from '@/lib/db';
-import { Voucher } from '@/models/Voucher';
+import { Voucher as VoucherModel } from '@/models/Voucher';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { safeDateOrNull } from '@/lib/dates';
 import { parseVoucherText, parseVoucherImage, type ParsedVoucher } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
@@ -52,27 +54,39 @@ const VoucherFormSchema = z.object({
 
 export async function createVoucher(formData: FormData) {
   const raw = VoucherFormSchema.parse(Object.fromEntries(formData));
-  await connectDB();
-  await Voucher.create({ ...raw, expiresAt: safeDateOrNull(raw.expiresAt), used: false });
-  revalidatePath('/vouchers');
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Voucher = await currentModel(VoucherModel);
+    await Voucher.create({ ...raw, expiresAt: safeDateOrNull(raw.expiresAt), used: false });
+    revalidatePath('/vouchers');
+  });
 }
 
 export async function updateVoucher(id: string, formData: FormData) {
   const raw = VoucherFormSchema.parse(Object.fromEntries(formData));
-  await connectDB();
-  await Voucher.findByIdAndUpdate(id, { ...raw, expiresAt: safeDateOrNull(raw.expiresAt) });
-  revalidatePath('/vouchers');
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Voucher = await currentModel(VoucherModel);
+    await Voucher.findByIdAndUpdate(id, { ...raw, expiresAt: safeDateOrNull(raw.expiresAt) });
+    revalidatePath('/vouchers');
+  });
 }
 
 export async function toggleVoucherUsed(id: string, used: boolean) {
-  await connectDB();
-  await Voucher.findByIdAndUpdate(id, { used });
-  revalidatePath('/vouchers');
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Voucher = await currentModel(VoucherModel);
+    await Voucher.findByIdAndUpdate(id, { used });
+    revalidatePath('/vouchers');
+  });
 }
 
 export async function deleteVoucher(id: string) {
-  await connectDB();
-  // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
-  await Voucher.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
-  revalidatePath('/vouchers');
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Voucher = await currentModel(VoucherModel);
+    // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
+    await Voucher.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+    revalidatePath('/vouchers');
+  });
 }

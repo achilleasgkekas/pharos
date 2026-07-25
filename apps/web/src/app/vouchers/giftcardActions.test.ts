@@ -30,14 +30,20 @@ const { connectDBMock, giftCardCreate, giftCardFindByIdAndUpdate, giftCardUpdate
   revalidatePathMock: vi.fn(),
 }));
 
+// Tenancy seam mocked the same way as the sibling tenancy-wrapped action modules
+// (receipts/actions.crud.test.ts, expenses/actions.crud.test.ts): withRequestTenant runs the
+// body inline and currentModel hands back the mocked model, so these tests pin the CRUD
+// behaviour, not tenant isolation (already covered by lib/tenancy/*.tenant.test.ts).
+const giftCardModel = {
+  create: giftCardCreate,
+  findByIdAndUpdate: giftCardFindByIdAndUpdate,
+  updateOne: giftCardUpdateOne,
+};
+
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
-vi.mock('@/models/GiftCard', () => ({
-  GiftCard: {
-    create: giftCardCreate,
-    findByIdAndUpdate: giftCardFindByIdAndUpdate,
-    updateOne: giftCardUpdateOne,
-  },
-}));
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async () => giftCardModel }));
+vi.mock('@/models/GiftCard', () => ({ GiftCard: {} }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
 import {

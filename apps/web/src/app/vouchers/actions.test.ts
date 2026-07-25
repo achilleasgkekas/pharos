@@ -49,14 +49,20 @@ const {
   revalidatePathMock: vi.fn(),
 }));
 
+// Tenancy seam mocked the same way as the sibling tenancy-wrapped action modules
+// (receipts/actions.crud.test.ts, expenses/actions.crud.test.ts): withRequestTenant runs the
+// body inline and currentModel hands back the mocked model, so these tests pin the CRUD
+// behaviour, not tenant isolation (already covered by lib/tenancy/*.tenant.test.ts).
+const voucherModel = {
+  create: voucherCreate,
+  findByIdAndUpdate: voucherFindByIdAndUpdate,
+  updateOne: voucherUpdateOne,
+};
+
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
-vi.mock('@/models/Voucher', () => ({
-  Voucher: {
-    create: voucherCreate,
-    findByIdAndUpdate: voucherFindByIdAndUpdate,
-    updateOne: voucherUpdateOne,
-  },
-}));
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async () => voucherModel }));
+vi.mock('@/models/Voucher', () => ({ Voucher: {} }));
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: isFeatureEnabledMock }));
 vi.mock('@/lib/ollama', () => ({
   parseVoucherText: parseVoucherTextMock,
