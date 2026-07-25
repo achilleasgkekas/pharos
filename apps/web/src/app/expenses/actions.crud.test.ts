@@ -161,6 +161,59 @@ describe('updateExpense', () => {
   });
 });
 
+// Multi-currency (P9). The conversion rule itself is pinned in lib/fx.test.ts; what matters
+// here is that BOTH write paths actually run the submitted amount through resolveFx against
+// the deployment's base currency, so `amount` in the DB is always base-denominated.
+describe('multi-currency (resolveFx wiring)', () => {
+  it('converts a foreign amount to the base currency on update, keeping the printed side', async () => {
+    getAppSettingsMock.mockResolvedValueOnce({ categoryRules: [], currency: 'EUR' } as any);
+    await updateExpense('e1', { date: '2026-06-15', amount: 88, currency: 'USD', fxRate: 0.92 } as any);
+    const set = expenseUpdateOne.mock.calls[0][1].$set;
+    expect(set.amount).toBe(80.96); // 88 x 0.92, what every aggregation will sum
+    expect(set.currency).toBe('USD');
+    expect(set.origAmount).toBe(88);
+    expect(set.fxRate).toBe(0.92);
+  });
+
+  it('leaves a foreign amount alone (no silent 1:1) when no rate was given', async () => {
+    getAppSettingsMock.mockResolvedValueOnce({ categoryRules: [], currency: 'EUR' } as any);
+    await updateExpense('e1', { date: '2026-06-15', amount: 88, currency: 'USD' } as any);
+    const set = expenseUpdateOne.mock.calls[0][1].$set;
+    expect(set.amount).toBe(88);
+    expect(set.origAmount).toBe(88);
+    expect(set.fxRate).toBe(0);
+  });
+
+  it('treats an entry in the base currency as plain, whatever base that is', async () => {
+    getAppSettingsMock.mockResolvedValueOnce({ categoryRules: [], currency: 'USD' } as any);
+    await updateExpense('e1', { date: '2026-06-15', amount: 88, currency: 'USD', fxRate: 0.92 } as any);
+    const set = expenseUpdateOne.mock.calls[0][1].$set;
+    expect(set.amount).toBe(88); // the stray rate is ignored, not applied
+    expect(set.origAmount).toBe(0);
+    expect(set.fxRate).toBe(0);
+  });
+
+  it('converts on create too', async () => {
+    getAppSettingsMock.mockResolvedValueOnce({ categoryRules: [], currency: 'EUR' } as any);
+    await addExpense({ date: '2026-06-15', amount: 200, currency: 'GBP', fxRate: 1.15 } as any);
+    const doc = expenseCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(230);
+    expect(doc.currency).toBe('GBP');
+    expect(doc.origAmount).toBe(200);
+    expect(doc.fxRate).toBe(1.15);
+  });
+
+  it('stores nothing FX-related for an ordinary single-currency entry', async () => {
+    getAppSettingsMock.mockResolvedValueOnce({ categoryRules: [], currency: 'EUR' } as any);
+    await addExpense({ date: '2026-06-15', amount: 42.5 } as any);
+    const doc = expenseCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(42.5);
+    expect(doc.currency).toBe('EUR');
+    expect(doc.origAmount).toBe(0);
+    expect(doc.fxRate).toBe(0);
+  });
+});
+
 describe('addExpense', () => {
   it('rejects a missing date before touching the DB', async () => {
     const res = await addExpense({ vendor: 'ΔΕΗ' } as any);

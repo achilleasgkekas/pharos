@@ -53,6 +53,7 @@ describe('normalizeSettings', () => {
       ntfyUrl: '',
       ntfyEnabled: false,
       currency: 'EUR',
+      multiCurrency: false,
       defaultVatRate: 24,
       defaultReturnWindowDays: 14,
       expenseCategories: DEFAULT_EXPENSE_CATEGORIES,

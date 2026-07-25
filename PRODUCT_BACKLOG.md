@@ -1087,8 +1087,35 @@
   enable notifications) με progress ticks → activation. **Διακριτό** από P1 (demo data) — εδώ τα *δικά του* δεδομένα.
 - **Module:** Homepage / Dashboard (dismissable card) + Settings state reads.
 
-### P9. Multi-currency (per-transaction currency + FX conversion) — L — both
-- **Αξία:** ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency. Πραγματικό κενό
+### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + EXPENSES SHIPPED 2026-07-25 (pharos-daily-dev), υπόλοιπα modules εκκρεμούν
+- **Τι χτίστηκε (slice 1 από L item):** νέο pure **`lib/fx.ts`** (+25 unit tests, client-safe, DB-free) που κρατά
+  **ΤΟΝ ΕΝΑΝ κανόνα** σε ένα μέρος: `normalizeCurrency`, `isForeignCurrency`, `convertToBase`, `deriveFxRate`,
+  `resolveFx`, `formatMoney`, `fxBadgeLabel`. **Κλειδωμένη αρχιτεκτονική απόφαση (builder default, μηδέν migration):
+  το `amount` είναι ΠΑΝΤΑ σε base currency**, οπότε ΚΑΘΕ existing aggregation (reports, budgets, cash flow, anomaly
+  medians, split shares, net worth) συνεχίζει να αθροίζει `amount` χωρίς μία γραμμή αλλαγής· ένα foreign έγγραφο
+  κρατά ΕΠΙΠΛΕΟΝ το τυπωμένο σκέλος (`currency` + νέα `origAmount` + νέο `fxRate`, `amount = origAmount * fxRate`).
+  Όταν το rate είναι άγνωστο **ΔΕΝ εφευρίσκεται 1:1**: το `amount` μένει ο τυπωμένος αριθμός (byte-for-byte η παλιά
+  συμπεριφορά, μηδέν σιωπηλή μετακίνηση συνόλου) και σημαίνεται ώστε το UI να ζητήσει rate.
+  **Πραγματικό bug που κλείνει**: το `Expense.currency` αποθηκευόταν ήδη (το AI το parse-άρει) αλλά **ΚΑΝΕΝΑ path δεν
+  το τιμούσε** → μια απόδειξη $88 προσθέτονταν σιωπηλά ως €88 στα σύνολα. Τώρα φαίνεται.
+  **Opt-in ανά deployment** (όπως ζητούσε το spec): `AppConfig.multiCurrency` (default **false**) + appSettings +
+  Settings → Defaults switch· off = μηδέν επιπλέον πεδίο, single-currency χρήστης δεν βλέπει τίποτα.
+  Wiring: `Expense.origAmount`/`fxRate` + serialize + `SerializedExpense` + **και τα 4 write paths** (uploadExpense/
+  addExpense/updateExpense/rescanExpense) περνούν από `resolveFx` (+5 integration tests)· `generateDueRecurring`
+  στάμπαρε base currency (projection είναι base by definition)· `/api/v1/expenses` shape += origAmount/fxRate
+  (**mobile parity μαζί, όχι follow-up**) + τεκμηρίωση στο `API.md`. UI: currency select + FX row («rate» ή «or
+  charged», το δεύτερο κάνει back-out του rate μέσω `deriveFxRate` για όποιον διαβάζει statement) + live preview του
+  ποσού που θα αποθηκευτεί + **`FxBadge`** σε card/row (purple όταν το rate είναι γνωστό, **gold ⚠ όταν λείπει** —
+  γιατί τότε το ποσό στα σύνολα είναι ακόμα ξένο νόμισμα).
+- **Verify:** `npm run type-check` EXIT 0· full `npx vitest run` **3523 passed / 264 files** (+30, μηδέν regression·
+  7 exact-shape assertions ενημερώθηκαν για τα 2 νέα πεδία). Docker: mutex → `build web` → mongo healthy →
+  `up -d web` → `/login` **200 με την πρώτη**, **0 restarts**, `/expenses`+`/settings` 307 (auth-gated, compiled) →
+  `docker builder prune -f` (197MB) → lock released. Browser: app renders, **μηδέν console errors** (το authed
+  `/expenses` δεν είναι επαληθεύσιμο unattended, credentials boundary).
+- **Εκκρεμούν (επόμενα slices):** Receipts/Statements/Subscriptions/Items ίδια 3 πεδία (το `currency` τους
+  αποθηκεύεται ήδη αγνοημένο, ίδιο latent bug)· `resolveFx` στο CSV import (PA1) και στο email-in· προαιρετικό
+  δωρεάν rate-feed (phase 2, τώρα το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία.
+- **Αξία (αρχικό):** ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency. Πραγματικό κενό
   (CLAUDE.md). Μεγάλο: αγγίζει schema (amount+currency+rate), aggregations, imports, όλα τα money views.
 - **Module:** cross-cutting (Expenses/Receipts/Statements/Reports + `lib/money.ts`).
 - **Ανοιχτή απόφαση (builder default):** **opt-in ανά deployment** (μη βαρύνει single-currency χρήστες)· FX =

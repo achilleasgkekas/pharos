@@ -29,6 +29,7 @@ export type AppSettings = {
   ntfyUrl: string;
   ntfyEnabled: boolean;
   currency: string;
+  multiCurrency: boolean; // P9: allow per-entry foreign currency + FX rate; off = single-currency UI
   defaultVatRate: number;
   defaultReturnWindowDays: number; // return window (days) unless a store overrides it; 0 = off
   expenseCategories: string[];
@@ -55,6 +56,7 @@ export type RawAppConfigDoc = {
   ntfyUrl?: string;
   ntfyEnabled?: boolean;
   currency?: string;
+  multiCurrency?: boolean;
   defaultVatRate?: number;
   defaultReturnWindowDays?: number;
   lists?: Record<string, unknown>;
@@ -90,6 +92,7 @@ const DEFAULTS: AppSettings = {
   ntfyUrl: '',
   ntfyEnabled: false,
   currency: 'EUR',
+  multiCurrency: false,
   defaultVatRate: 24,
   defaultReturnWindowDays: 14, // EU distance-selling default
   expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
@@ -129,6 +132,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     ntfyUrl: doc?.ntfyUrl || '',
     ntfyEnabled: !!doc?.ntfyEnabled,
     currency: doc?.currency || DEFAULTS.currency,
+    multiCurrency: !!doc?.multiCurrency,
     defaultVatRate: typeof doc?.defaultVatRate === 'number' ? doc.defaultVatRate : DEFAULTS.defaultVatRate,
     defaultReturnWindowDays:
       typeof doc?.defaultReturnWindowDays === 'number' && doc.defaultReturnWindowDays >= 0
@@ -159,7 +163,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     // untouched, same query as before).
     const Config = await currentModel(AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays autoAddStores ntfyUrl ntfyEnabled currency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed')
       .lean();
   } catch {
     /* DB down → hard defaults */

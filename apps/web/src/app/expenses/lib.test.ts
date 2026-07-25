@@ -65,6 +65,8 @@ describe('vendorKey', () => {
 
 describe('serializeExpense', () => {
   it('maps a fully-populated document field-for-field', () => {
+    // Multi-currency (P9): `amount` holds the base-currency value while origAmount/fxRate
+    // describe the printed USD side of the same document (1543.20 x 0.8 = 1234.56).
     const doc = {
       _id: '507f1f77bcf86cd799439011',
       kind: 'income',
@@ -76,6 +78,8 @@ describe('serializeExpense', () => {
       taxCategory: 'Ιατρικά έξοδα',
       amount: 1234.56,
       currency: 'USD',
+      origAmount: 1543.2,
+      fxRate: 0.8,
       date: '2026-01-15',
       period: '2026-01',
       recurring: true,
@@ -104,6 +108,8 @@ describe('serializeExpense', () => {
       taxCategory: 'Ιατρικά έξοδα',
       amount: 1234.56,
       currency: 'USD',
+      origAmount: 1543.2,
+      fxRate: 0.8,
       date: '2026-01-15',
       period: '2026-01',
       recurring: true,
@@ -136,6 +142,8 @@ describe('serializeExpense', () => {
       taxCategory: '',
       amount: 0,
       currency: 'EUR',
+      origAmount: 0,
+      fxRate: 0,
       date: '',
       period: '',
       recurring: false,

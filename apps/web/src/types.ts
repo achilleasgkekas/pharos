@@ -115,8 +115,12 @@ export type SerializedExpense = {
   // taxCategory is a free-form (optionally preset) label used to group that export.
   taxDeductible: boolean;
   taxCategory: string;
+  // Multi-currency (P9, see lib/fx.ts): `amount` is ALWAYS in the deployment's base
+  // currency; a foreign entry also keeps the printed amount + the rate used.
   amount: number;
   currency: string;
+  origAmount: number; // amount as printed on the document; 0 when not foreign
+  fxRate: number; // base units per 1 `currency` unit; 0 = unknown / not foreign
   date: string;
   period: string;
   recurring: boolean;

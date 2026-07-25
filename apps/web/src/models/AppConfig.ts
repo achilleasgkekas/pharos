@@ -41,6 +41,10 @@ const AppConfigSchema = new Schema(
     billAlertDays: { type: Number, default: 5 }, // "bill due / overdue" lead time (P28)
     autoAddStores: { type: Boolean, default: true }, // auto-add unknown receipt stores to the list
     currency: { type: String, default: 'EUR' }, // display currency symbol (ISO 4217 code)
+    // Multi-currency (P9), opt-in per deployment so single-currency users see no extra
+    // fields. When on, an expense/income entry may record the currency it was printed in
+    // plus an FX rate; `amount` stays in the base `currency` above (see lib/fx.ts).
+    multiCurrency: { type: Boolean, default: false },
     defaultVatRate: { type: Number, default: 24 }, // fallback VAT/sales-tax % when a receipt doesn't show one
     defaultReturnWindowDays: { type: Number, default: 14 }, // return window (days) unless a store overrides it; 0 = off
     // User-editable dropdown lists (category taxonomies). Map taxonomyKey → string[].

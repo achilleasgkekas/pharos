@@ -4,6 +4,7 @@ import { cleanSplit, type SplitEntry } from '@/lib/split';
 /** Lean Expense doc shape as read from Mongo (fields the v1 surface exposes). */
 export type ExpenseLean = {
   _id: unknown; kind?: string; vendor?: string; vendorKey?: string; category?: string; space?: string; amount?: number; currency?: string;
+  origAmount?: number; fxRate?: number;
   date?: Date; period?: string; recurring?: boolean; recurringCycle?: string; paymentMethod?: string;
   notes?: string; filePath?: string; thumbPath?: string; verified?: boolean; updatedAt?: Date; deletedAt?: Date | null;
   split?: SplitEntry[]; taxDeductible?: boolean; taxCategory?: string;
@@ -23,8 +24,12 @@ export function trimExpense(e: ExpenseLean, anomaly?: number) {
     vendor: e.vendor ?? '',
     category: e.category ?? 'other',
     space: e.space ?? '',
+    // `amount` is always base currency (P9, lib/fx.ts); these two describe what was
+    // printed on a foreign-currency document (both 0 for a normal entry).
     amount: e.amount ?? 0,
     currency: e.currency ?? 'EUR',
+    origAmount: e.origAmount ?? 0,
+    fxRate: e.fxRate ?? 0,
     date: iso(e.date),
     period: e.period ?? '',
     recurring: !!e.recurring,

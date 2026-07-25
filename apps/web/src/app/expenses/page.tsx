@@ -59,6 +59,8 @@ export async function getExpenseData(kind: 'income' | 'expense') {
     ollamaUp,
     categories: settings.expenseCategories,
     spaces: settings.spaces,
+    baseCurrency: settings.currency,
+    multiCurrency: settings.multiCurrency, // P9: off = no per-entry currency controls at all
   };
   });
 }

@@ -309,6 +309,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   const billAlertDays = Number.isFinite(billRaw) ? Math.max(0, Math.min(90, Math.round(billRaw))) : 5;
   const autoAdd = formData.get('autoAddStores') === 'true';
   const currency = (String(formData.get('currency') || 'EUR').trim().toUpperCase()) || 'EUR';
+  const multiCurrency = formData.get('multiCurrency') === 'true'; // P9 opt-in
   const vatRate = Math.max(0, Math.min(100, Number(formData.get('defaultVatRate')) || 24));
   // 0 is meaningful here (return tracking off), so parse explicitly instead of `|| 14`.
   const returnRaw = Number(formData.get('defaultReturnWindowDays'));
@@ -325,6 +326,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
         billAlertDays,
         autoAddStores: autoAdd,
         currency,
+        multiCurrency,
         defaultVatRate: vatRate,
         defaultReturnWindowDays: returnDays,
       },

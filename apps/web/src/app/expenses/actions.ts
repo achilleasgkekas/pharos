@@ -14,6 +14,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { matchCategoryRule } from '@/lib/categoryRules';
 import { mirrorFileToRemote } from '@/lib/mirror';
 import { cleanSplit } from '@/lib/split';
+import { resolveFx } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { SerializedExpense } from '@/types';
@@ -154,6 +155,7 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
   }
 
   const now = Date.now();
+  const base = (await getAppSettings()).currency;
   let created = 0;
   for (const seed of seeds) {
     const cycle = String(seed.recurringCycle);
@@ -166,7 +168,10 @@ export async function generateDueRecurring(): Promise<{ created: number }> {
         vendor: seed.vendor,
         vendorKey: seed.vendorKey,
         category: seed.category,
+        // `amount` is base-denominated (lib/fx.ts), so a projection is base currency by
+        // definition; don't inherit the seed's printed foreign code/rate.
         amount: seed.amount,
+        currency: base,
         date: next,
         period: `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`,
         recurring: true,
@@ -231,7 +236,13 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
     const inherited = await inheritFromSeries(kind, vKey);
     // Deterministic vendor→category auto-rule (P15). A user-defined rule is an explicit
     // instruction, so it wins over the AI guess and any inherited series category.
-    const rule = matchCategoryRule((await getAppSettings()).categoryRules, { vendor });
+    const settings = await getAppSettings();
+    const rule = matchCategoryRule(settings.categoryRules, { vendor });
+    // The AI reports the currency printed on the bill. When that is NOT the base currency
+    // we have no rate yet, so resolveFx keeps the printed number in `amount` (exactly the
+    // old behaviour) and records origAmount/currency so the UI can ask for a rate instead
+    // of silently folding e.g. $88 into a euro total.
+    const fx = resolveFx({ amount: parsed?.amount ?? 0, currency: parsed?.currency }, settings.currency);
     const exp = await Expense.create({
       kind: parsed?.kind || kind,
       vendor,
@@ -240,8 +251,10 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
       space: inherited?.space || '', // inherit the ledger tag from the vendor's last entry (P34)
       taxDeductible: inherited?.taxDeductible || false, // inherit tax flag (P8) — e.g. a doctor's bill vendor stays tax-deductible
       taxCategory: inherited?.taxCategory || '',
-      amount: parsed?.amount ?? 0,
-      currency: parsed?.currency || 'EUR',
+      amount: fx.amount,
+      currency: fx.currency,
+      origAmount: fx.origAmount,
+      fxRate: fx.fxRate,
       date,
       period: periodFrom(date, parsed?.period),
       recurring: rule?.recurring || inherited?.recurring || false,
@@ -274,8 +287,11 @@ const UpdateSchema = z.object({
   space: z.string().max(40).default(''),
   taxDeductible: z.boolean().default(false),
   taxCategory: z.string().max(60).default(''),
+  // Multi-currency (P9): `amount` is what the user typed — the PRINTED amount when
+  // `currency` is foreign. resolveFx() turns it into the base-currency value to store.
   amount: z.coerce.number().default(0),
-  currency: z.string().default('EUR'),
+  currency: z.string().default(''),
+  fxRate: z.coerce.number().min(0).default(0),
   date: z.string(),
   period: z.string().default(''),
   recurring: z.boolean().default(false),
@@ -305,6 +321,7 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
     await connectDB();
     const Expense = await currentModel(ExpenseModel);
     const date = safeDate(d.date);
+    const fx = resolveFx({ amount: d.amount, currency: d.currency, fxRate: d.fxRate }, (await getAppSettings()).currency);
     await Expense.updateOne(
       { _id: id },
       {
@@ -316,8 +333,10 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
           space: d.space.trim(),
           taxDeductible: d.taxDeductible,
           taxCategory: d.taxCategory.trim(),
-          amount: d.amount,
-          currency: d.currency,
+          amount: fx.amount,
+          currency: fx.currency,
+          origAmount: fx.origAmount,
+          fxRate: fx.fxRate,
           date,
           period: d.period || periodFrom(date),
           recurring: d.recurring,
@@ -352,7 +371,9 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
     // Apply a vendor→category auto-rule (P15) only when the user did NOT pick a category
     // (the form defaults to 'other'); an explicit choice always wins.
     const explicit = d.category && d.category !== 'other' ? d.category : '';
-    const rule = explicit ? null : matchCategoryRule((await getAppSettings()).categoryRules, { vendor: d.vendor, description: d.notes });
+    const settings = await getAppSettings();
+    const rule = explicit ? null : matchCategoryRule(settings.categoryRules, { vendor: d.vendor, description: d.notes });
+    const fx = resolveFx({ amount: d.amount, currency: d.currency, fxRate: d.fxRate }, settings.currency);
     const exp = await Expense.create({
       kind: d.kind,
       vendor: d.vendor,
@@ -361,8 +382,10 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
       space: d.space.trim() || inherited?.space || '',
       taxDeductible: d.taxDeductible || inherited?.taxDeductible || false,
       taxCategory: d.taxCategory.trim() || inherited?.taxCategory || '',
-      amount: d.amount,
-      currency: d.currency,
+      amount: fx.amount,
+      currency: fx.currency,
+      origAmount: fx.origAmount,
+      fxRate: fx.fxRate,
       date,
       period: d.period || periodFrom(date),
       recurring: d.recurring || rule?.recurring || inherited?.recurring || false,
@@ -562,8 +585,17 @@ export async function rescanExpense(id: string, useOcr: boolean): Promise<{ ok: 
     exp.vendor = parsed.vendor || exp.vendor;
     exp.vendorKey = vendorKey(exp.vendor);
     exp.category = parsed.category || exp.category;
-    exp.amount = parsed.amount ?? exp.amount;
-    exp.currency = parsed.currency || exp.currency;
+    // Re-parse may change both the amount and the printed currency; a rate the user had
+    // already entered for this document stays valid, so it is fed back in (resolveFx drops
+    // it by itself if the new currency turns out to be the base one).
+    const fx = resolveFx(
+      { amount: parsed.amount ?? exp.origAmount ?? exp.amount, currency: parsed.currency || exp.currency, fxRate: exp.fxRate },
+      (await getAppSettings()).currency
+    );
+    exp.amount = fx.amount;
+    exp.currency = fx.currency;
+    exp.origAmount = fx.origAmount;
+    exp.fxRate = fx.fxRate;
     exp.date = date;
     exp.period = periodFrom(date, parsed.period);
     if (parsed.recurringCycle) exp.recurringCycle = parsed.recurringCycle;

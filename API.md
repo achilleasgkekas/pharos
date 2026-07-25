@@ -58,7 +58,8 @@ List responses are wrapped: `{ "data": [ … ], "total": N, "limit": L, "offset"
 - `DELETE /api/v1/tasks/:id` → `{ ok }`
 
 ### Expenses & income
-- `GET /api/v1/expenses?kind=expense|income` (+ list params) → `{ data: [{ id, kind, vendor, category, amount, currency, date, period, recurring, recurringCycle, paymentMethod, notes, file, thumb, verified, updatedAt, deleted }], total, limit, offset }`
+- `GET /api/v1/expenses?kind=expense|income` (+ list params) → `{ data: [{ id, kind, vendor, category, amount, currency, origAmount, fxRate, date, period, recurring, recurringCycle, paymentMethod, notes, file, thumb, verified, updatedAt, deleted }], total, limit, offset }`
+  - `amount` is ALWAYS in the deployment's base currency (Settings → Currency), so a client can sum it without conversion. On a foreign-currency document, `origAmount` is the amount as printed and `fxRate` is base units per 1 unit of `currency` (`amount = origAmount * fxRate`). Both are `0` for an ordinary entry. `fxRate: 0` with a foreign `currency` means no rate is known yet, so `amount` is still the printed number: show it as unconverted rather than mixing it into a base-currency total.
 - `POST /api/v1/expenses` `{ vendor, amount, kind?, date?, category?, period?, recurring?, recurringCycle?, notes? }` → `{ expense }` (groups into the vendor's recurring series automatically)
 
 ### Subscriptions

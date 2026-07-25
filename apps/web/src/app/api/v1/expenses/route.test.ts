@@ -285,12 +285,14 @@ describe('GET listing', () => {
     expect(json).toMatchObject({ total: 2, limit: 50, offset: 0 });
     expect(json.data[0]).toEqual({
       id: 'e1', kind: 'income', vendor: 'Acme', category: 'salary', space: '', amount: 1500, currency: 'USD',
+      origAmount: 0, fxRate: 0,
       date: '2026-06-01T00:00:00.000Z', period: '2026-06', recurring: true, recurringCycle: 'monthly',
       paymentMethod: 'bank', notes: 'pay', file: '/f.pdf', thumb: '/t.jpg', verified: true,
       updatedAt: '2026-07-01T00:00:00.000Z', deleted: false, split: [], taxDeductible: false, taxCategory: '',
     });
     expect(json.data[1]).toEqual({
       id: 'e2', kind: 'expense', vendor: 'Bare', category: 'other', space: '', amount: 0, currency: 'EUR',
+      origAmount: 0, fxRate: 0,
       date: null, period: '', recurring: false, recurringCycle: '', paymentMethod: '', notes: '',
       file: null, thumb: null, verified: false, updatedAt: null, deleted: false, split: [], taxDeductible: false, taxCategory: '',
     });

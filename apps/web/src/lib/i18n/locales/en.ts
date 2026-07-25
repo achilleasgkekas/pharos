@@ -470,6 +470,11 @@ export const en = {
   'ex.fVendor': 'Vendor / payer',
   'ex.fVendorPlaceholder': 'e.g. utility, landlord…',
   'ex.fAmount': 'Amount ({cur})',
+  // Multi-currency (P9) — only rendered when Settings → multi-currency is on.
+  'ex.fCurrency': 'Currency',
+  'ex.fFxRate': 'Rate ({base} per 1 {code})',
+  'ex.fFxCharged': 'or charged ({cur})',
+  'ex.fxNoRate': 'no rate yet, kept as printed (not converted to {base})',
   'ex.fDate': 'Date',
   'ex.fCycle': 'Cycle',
   'ex.fPeriod': 'Period (YYYY-MM)',
@@ -769,6 +774,8 @@ export const en = {
   'set.billAlert': 'Bill due alert · days ahead',
   'set.autoAddStores': 'Auto-add unknown stores',
   'set.autoAddStoresDesc': 'New receipt store names join the list automatically.',
+  'set.multiCurrency': 'Multi-currency',
+  'set.multiCurrencyDesc': 'Record foreign-currency bills with an FX rate. Totals stay in {code}.',
   'set.saveDefaults': 'Save defaults',
   'set.savedReloading': 'Saved ✓ — reloading…',
   // Money: budgets + cards

@@ -20,8 +20,14 @@ const ExpenseSchema = new Schema(
     // export includes at all.
     taxDeductible: { type: Boolean, default: false, index: true },
     taxCategory: { type: String, default: '' },
-    amount: { type: Number, default: 0 }, // gross amount (income positive, expense positive)
+    // Multi-currency (P9). INVARIANT: `amount` is always in the deployment's BASE currency,
+    // so every aggregation can keep summing it directly. A foreign document also keeps what
+    // was printed on it: `currency` = printed ISO code, `origAmount` = printed number,
+    // `fxRate` = base per 1 unit of `currency`. All of it derives from lib/fx.ts resolveFx().
+    amount: { type: Number, default: 0 }, // gross amount in BASE currency (income/expense both positive)
     currency: { type: String, default: 'EUR' },
+    origAmount: { type: Number, default: 0 }, // amount as printed; 0 when not foreign
+    fxRate: { type: Number, default: 0 }, // base units per 1 `currency` unit; 0 = unknown/not foreign
     date: { type: Date, required: true, index: true },
     period: { type: String, default: '' }, // YYYY-MM the document covers (for recurring tracking)
 

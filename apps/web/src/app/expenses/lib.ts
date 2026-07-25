@@ -36,6 +36,8 @@ export function serializeExpense(e: Record<string, unknown>): SerializedExpense 
     taxCategory: s.taxCategory ?? '',
     amount: s.amount ?? 0,
     currency: s.currency ?? 'EUR',
+    origAmount: s.origAmount ?? 0,
+    fxRate: s.fxRate ?? 0,
     date: s.date ?? '',
     period: s.period ?? '',
     recurring: !!s.recurring,

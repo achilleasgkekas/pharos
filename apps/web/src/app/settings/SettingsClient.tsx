@@ -1874,6 +1874,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   const [billDays, setBillDays] = useState(String(settings.billAlertDays));
   const [autoAdd, setAutoAdd] = useState(settings.autoAddStores);
   const [currency, setCurrency] = useState(settings.currency);
+  const [multiCurrency, setMultiCurrency] = useState(settings.multiCurrency);
   const [vatRate, setVatRate] = useState(String(settings.defaultVatRate));
   const [returnDays, setReturnDays] = useState(String(settings.defaultReturnWindowDays));
   const [msg, setMsg] = useState<string | null>(null);
@@ -1888,6 +1889,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     fd.set('billAlertDays', billDays);
     fd.set('autoAddStores', String(autoAdd));
     fd.set('currency', currency);
+    fd.set('multiCurrency', String(multiCurrency));
     fd.set('defaultVatRate', vatRate);
     fd.set('defaultReturnWindowDays', returnDays);
     setMsg(null);
@@ -1953,6 +1955,15 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
             <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.autoAddStoresDesc')}</span>
           </span>
           <Switch checked={autoAdd} onChange={setAutoAdd} />
+        </div>
+        {/* P9 opt-in: keeps the currency + FX-rate fields out of the way for the
+            single-currency majority. Totals always stay in the base currency above. */}
+        <div className="flex items-center justify-between gap-3 self-end pb-1">
+          <span className="min-w-0">
+            <span className="text-xs font-medium block">{t('set.multiCurrency')}</span>
+            <span className="text-[10px] text-[color:var(--color-text-faint)] block">{t('set.multiCurrencyDesc', { code: currency })}</span>
+          </span>
+          <Switch checked={multiCurrency} onChange={setMultiCurrency} />
         </div>
       </div>
       <div className="flex items-center gap-3 pt-3 border-t border-[color:var(--color-border)] mt-1">
