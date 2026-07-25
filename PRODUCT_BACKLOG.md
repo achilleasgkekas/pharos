@@ -6,27 +6,75 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-24 (15η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-25 (16η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
-> **Standing κατάσταση (15η σάρωση, 2026-07-24):** το «Approved» queue έχει μείνει ουσιαστικά χωρίς αυτόνομα-
+> **Standing κατάσταση (16η σάρωση, 2026-07-25):** το «Approved» queue παραμένει ουσιαστικά χωρίς αυτόνομα-
 > buildable items — μόνο P36 (Open Banking, blocked σε provider decision), P31 (household multi-user, χρειάζεται
 > supervised session), P16 remainder (Firefly III/Grocy importers, χρειάζεται πραγματικό sample file), P9
 > (multi-currency, ρητά τελευταίο, L), P17/P23 (mobile native-dep approvals) μένουν τεχνικά ανοιχτά αλλά κανένα
-> δεν είναι «απλώς χτίσ' το» unattended. **Καμία ρητή έγκριση Proposed→Approved σε >10 διαδοχικές σαρώσεις** —
-> ο Αχιλλέας ίσως αξίζει να ξανακοιτάξει το Proposed queue (P37-P57, 21 items) ή να ξανα-εξετάσει τα P9/P17/P23
+> δεν είναι «απλώς χτίσ' το» unattended. **Καμία ρητή έγκριση Proposed→Approved σε >11 διαδοχικές σαρώσεις** —
+> το Proposed queue έχει φτάσει **23 items (P37-P62)**, αρκετά μεγάλο ώστε μια batch-review να αξίζει τον κόπο
+> (ίδιο idiom με το μαζικό 2026-07-09/10 approval)· ο Αχιλλέας ίσως αξίζει επίσης να ξανα-εξετάσει τα P9/P17/P23
 > τώρα που mobile MVP + Expo push υπάρχουν ήδη (ίδιο re-examination που ξεμπλόκαρε το P5 phase-1/phase-2).
+> **Σημείωση (16η σάρωση):** επιβεβαιώθηκε empirically ότι το `/network` (UniFi) module αφαιρέθηκε ρητά από το
+> codebase (commit `5eb912d "...remove the Network/UniFi module"`, μέρος του "Strip personal info from the repo"
+> pivot προς γενικό-χρήσης προϊόν) — `grep -ri unifi apps/web/src` = 0 hits. Το `docs/features.md` έχει ακόμα
+> stale «## Network (UniFi)» section (docs-debt, όχι κάτι για το product backlog να διορθώσει). Αυτό απέτρεψε
+> candidate ιδέες γύρω από δικτυακό/hardware monitoring αυτή τη σάρωση (πλέον εκτός προϊοντικής κατεύθυνσης) —
+> βάζω τη σημείωση εδώ ώστε μελλοντικές σαρώσεις να μην ξαναπροτείνουν το ίδιο.
 > Ζωντανό grep σε κάθε σάρωση επιβεβαιώνει ότι κανένα Proposed item δεν έχει χτιστεί εν τω μεταξύ χωρίς ρητή
-> έγκριση. Προστέθηκαν **3 νέοι candidates P58-P60** αυτή τη σάρωση (verified distinct: μηδέν `nodemailer`/SMTP
-> notifier channel type, μηδέν widget/Siri/shortcut config πουθενά στο `apps/mobile`, μηδέν alias-learning
-> write-path πάνω στο ήδη-υπάρχον `Store.aliases[]` — μόνο manual seed edits σήμερα).
+> έγκριση (re-verified 16η σάρωση: `maintenanceIntervalDays`/`bundleId`/`soldPrice`/`repeatEveryDays`/
+> `lastSuccessfulSyncAt`/alias-write-path = 0 hits, όλα ακόμα genuinely unbuilt). Προστέθηκαν **2 νέοι candidates
+> P61-P62** αυτή τη σάρωση (verified distinct: το `Bill` model έχει μόνο δυαδικό `paidAt`/binary status, καμία
+> partial-amount έννοια· το `Expense.paymentMethod` είναι ένα single free-string πεδίο, καμία σύνδεση με το ήδη-
+> υπάρχον `GiftCard.uses[]` spend-log όταν μια αγορά πληρώνεται με παραπάνω από μία μέθοδο).
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P62. Split a purchase across multiple payment methods (κάρτα + gift card / cash) — S/M — OSS (κυρίως), βοηθά και SaaS
+- **Αξία:** το `Expense.paymentMethod` (και το αντίστοιχο πεδίο στα Receipts) είναι σήμερα **ένα** free-string —
+  αλλά μια πραγματική αγορά συχνά πληρώνεται με **περισσότερες από μία μεθόδους** (π.χ. €30 από δωροκάρτα IKEA
+  + €45 με κάρτα). Σήμερα αυτό είτε καταγράφεται σε ΜΙΑ μέθοδο (ανακριβές), είτε ο χρήστης πρέπει να ανοίξει
+  ξεχωριστά το gift card (P32, ήδη-shipped `GiftCard.uses[]` spend-log) και να καταχωρήσει το spend εκεί
+  **χειροκίνητα, δεύτερη φορά** — καμία σύνδεση σήμερα μεταξύ ενός Expense/Receipt record και ενός GiftCard use
+  (verified: το `GiftCardUseSchema` δεν έχει κανένα reference field προς Expense/Receipt). Νέο optional
+  `paymentSplits: [{method, amount, giftCardId?}]` πάνω στο ήδη-υπάρχον single-`paymentMethod` πεδίο (κενό array
+  = σημερινή συμπεριφορά αμετάβλητη, ΟΧΙ breaking) → όταν μια γραμμή δείχνει σε ένα linked gift card, η
+  αποθήκευση προσθέτει **αυτόματα** το ισόποσο use στο `GiftCard.uses[]` (reuse του ήδη-shipped balance
+  mechanism, μηδέν νέος υπολογισμός). **Διακριτό** από P35 (expense splitting = μεταξύ **ΑΤΟΜΩΝ** ποιος χρωστάει
+  τι· εδώ = μεταξύ **ΜΕΘΟΔΩΝ ΠΛΗΡΩΜΗΣ** της ίδιας αγοράς, ίδιου ατόμου) — τα δύο θα μπορούσαν θεωρητικά να
+  συνυπάρχουν αργότερα αλλά είναι ανεξάρτητα MVPs.
+- **Module:** Expenses/Receipts (νέο optional πεδίο στη φόρμα, ίδιο pattern με το SplitEditor του P35) +
+  Vouchers/GiftCard tab (auto-append use, reuse).
+- **Ανοιχτή απόφαση (builder default):** UI μόνο όταν ο χρήστης πατήσει ρητά «split payment» (κενό = single
+  method, καμία default-on αλλαγή στη φόρμα)· το άθροισμα των splits πρέπει να ισούται με το total (validation,
+  ίδιο idiom με το P35 equal-split guard)· `giftCardId` optional ανά γραμμή (μπορεί να είναι split χωρίς κανένα
+  gift card, π.χ. μισό μετρητά/μισό κάρτα — απλά δύο free-string μέθοδοι χωρίς αυτόματο side-effect).
+
+### P61. Partial payments για Bills/payables (όχι μόνο δυαδικό paid/unpaid) — S — OSS (κυρίως), βοηθά και SaaS
+- **Αξία:** το `Bill` model (P28, ήδη-shipped) έχει **δυαδικό** status μόνο — `paidAt: Date|null`, καμία έννοια
+  μερικής πληρωμής (verified: `models/Bill.ts` δεν έχει κανένα `paidAmount`/payments-array πεδίο, μόνο
+  `amount`+`paidAt`). Πραγματικό σενάριο: ένας μεγάλος λογαριασμός (κοινόχρηστα με έκτακτη εισφορά, ΔΕΗ με
+  ρύθμιση οφειλής σε δόσεις εκτός statement/κάρτας) πληρώνεται **σταδιακά** — σήμερα ο χρήστης είτε το αφήνει
+  «unpaid» μέχρι να το κλείσει εντελώς (χάνει την ορατότητα του τι έχει ήδη πληρώσει), είτε το σημειώνει «paid»
+  πρόωρα (ψέμα στο status, χαλάει το overdue tracking αν μείνει υπόλοιπο). Optional `Bill.payments: [{amount,
+  date, note}]` (νέο subdoc array, mirror του ήδη-shipped `GiftCardUseSchema` pattern) → derived status
+  επεκτείνεται σε **partially-paid** (Σpayments < amount, ΔΕΝ αλλάζει τα ήδη-υπάρχοντα paid/overdue/due-soon/
+  upcoming states, απλά προσθέτει ένα ενδιάμεσο) + remaining-balance εμφανίζεται στην κάρτα. **Διακριτό** από τα
+  credit-card installments (Statements module — εκείνο είναι για χρεώσεις ΠΑΝΩ σε κάρτα, εδώ = λογαριασμοί που
+  πληρώνονται με το χέρι, ίδιο distinction με το ήδη-τεκμηριωμένο Bill-vs-Statement στο `docs/features.md`).
+- **Module:** Bills/payables (νέο optional subdoc array + derived-status επέκταση, `lib/bill.ts`).
+- **Ανοιχτή απόφαση (builder default):** «mark paid» παραμένει η γρήγορη one-click ενέργεια για απλά bills (κενό
+  `payments[]` = ίδια συμπεριφορά με σήμερα, no breaking change)· «log a partial payment» = νέα δεύτερη ενέργεια
+  δίπλα (όχι αντικατάσταση)· το bill γίνεται πλήρως `paid` αυτόματα μόλις Σpayments ≥ amount (καμία χειροκίνητη
+  δεύτερη ενέργεια χρειάζεται)· το «log an expense on payment» opt-in (ήδη-shipped) καταγράφει ανά partial
+  payment, όχι μόνο στο τελικό κλείσιμο.
 
 ### P60. Store/vendor auto-detection correction feedback loop (μάθε από τις διορθώσεις) — S — OSS (dogfooding-heavy)
 - **Αξία:** το AI receipt/expense parsing μαντεύει store/vendor από ελεύθερο κείμενο, και όταν κάνει λάθος η μόνη
