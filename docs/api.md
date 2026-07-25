@@ -284,8 +284,8 @@ Each plan in the `GET /statements/plans` response is:
 | Method | Path                      | Description |
 |--------|---------------------------|-------------|
 | GET    | `/subscriptions?active=1` | List (+ `limit`/`offset`/`updatedSince`). |
-| POST   | `/subscriptions`          | Create `{ name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url? }`. |
-| PATCH  | `/subscriptions/:id`      | Update `{ name?, amount?, billingCycle?, nextRenewal?, category?, active? }`. |
+| POST   | `/subscriptions`          | Create `{ name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url?, trialEndsAt?, currency?, fxRate?, firstChargeAmount? }`. P9: currency/fxRate control multi-currency conversion; firstChargeAmount sets the first billing cycle's amount separately. |
+| PATCH  | `/subscriptions/:id`      | Update `{ name?, amount?, billingCycle?, nextRenewal?, category?, active?, trialEndsAt?, currency?, fxRate?, firstChargeAmount? }`. P9: touching any money field re-resolves all currency fields together. |
 | DELETE | `/subscriptions/:id`      | Soft-delete. |
 | POST   | `/ai/subscription`        | **(AI: subscriptions)** AI-fill details from a name. Body `{ name }` → `{ data: { provider, amount, billingCycle, category, … } }`. |
 

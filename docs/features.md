@@ -290,6 +290,12 @@ Highlights:
   untracked subscriptions" panel). One-click Track converts the candidate into a
   Subscription; Dismiss hides it (session-only). The detection is deterministic
   (no AI) and excludes any vendor already covered by an existing subscription.
+- **Multi-currency subscriptions (P9):** Track subscriptions billed in foreign currencies
+  (e.g., USD for a US cloud service, EUR for a European SaaS). When you create or update a
+  subscription with a non-base currency, the app stores both the original amount and the
+  exchange rate, then converts to your base currency for reports and budgets. The rate can
+  be entered manually or left unknown (defaulting to the printed amount). This ensures all
+  subscription totals in dashboards and forecasts stay consistent regardless of billing currency.
 - **Notifications:** Renewal alerts are configurable (1, 3, 7, or 14 days before;
   or none). Trial-end and over-due alerts also trigger.
 - **Calendar integration:** Subscriptions appear on the Calendar view with their
