@@ -21,7 +21,7 @@ The mobile app mirrors most of the web modules, backed by the same API client
 | Shopping list | add/check/delete + **camera product scan** |
 | Receipts | list, detail, camera scan + AI parse, re-scan, add to library |
 | Inventory (Items) | list, detail, price status, log a price, link installment plans |
-| Expenses / Income | list, add, edit, bill/payslip AI scan, **mark as tax-deductible + category**, **split (who owes what)** + **Balances modal (cross-expense aggregation, settle-up per person)** |
+| Expenses / Income | list, add, edit, bill/payslip AI scan, **mark as tax-deductible + category**, **split (who owes what)** + **Balances modal (cross-expense aggregation, settle-up per person)**; **multi-currency support** (FX rate tracking when enabled) |
 | Subscriptions | list, add, edit, **auto-discover untracked recurring charges** |
 | Statements | list + transactions, installment-plan overview |
 | Vouchers | list, add, edit, AI fill (text/photo); **Coupons / Gift cards / Loyalty cards** tabs |

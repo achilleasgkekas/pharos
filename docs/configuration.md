@@ -239,6 +239,12 @@ browser/session.
 > (`currency`, ISO 4217, default `EUR`) and the fallback VAT/sales-tax rate
 > (`defaultVatRate`, default `24`) under Settings → General. Currency changes the
 > displayed symbol only; it does not convert stored amounts.
+>
+> **Multi-currency support (P9):** Enable `multiCurrency` in Settings → Defaults to
+> track foreign-currency expenses (bills in USD, GBP, etc.) with exchange rates. When
+> enabled, each expense can have a `currency` code and `fxRate` to convert into your
+> base currency; `amount` is always stored in base currency so reports and budgets
+> remain consistent. Disable it to keep the form simple for single-currency users.
 
 ---
 

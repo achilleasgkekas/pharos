@@ -232,10 +232,12 @@ These are flagged **(AI)** below with the feature name.
 | Method | Path                                | Description |
 |--------|-------------------------------------|-------------|
 | GET    | `/expenses?kind=income\|expense`    | List (+ `limit`/`offset`/`updatedSince`). |
-| POST   | `/expenses`                         | Create `{ kind?, vendor, amount, date?, category?, period?, recurring?, recurringCycle?, notes?, split?, taxDeductible?, taxCategory? }`. |
-| PATCH  | `/expenses/:id`                     | Update `{ vendor?, amount?, category?, kind?, notes?, date?, period?, recurring?, recurringCycle?, paymentMethod?, split?, taxDeductible?, taxCategory? }`. |
+| POST   | `/expenses`                         | Create `{ kind?, vendor, amount, date?, category?, period?, recurring?, recurringCycle?, notes?, split?, taxDeductible?, taxCategory?, currency?, origAmount?, fxRate? }`. |
+| PATCH  | `/expenses/:id`                     | Update `{ vendor?, amount?, category?, kind?, notes?, date?, period?, recurring?, recurringCycle?, paymentMethod?, split?, taxDeductible?, taxCategory?, currency?, origAmount?, fxRate? }`. |
 | POST   | `/expenses/:id/rescan`              | **(AI: expenses)** Re-run the parse on the stored bill/payslip. Body `{ ocr?: boolean }` (`true` forces OCR). Returns `{ expense }` (same shape as the list) so the client can re-prefill in place; the record is left unverified. |
 | DELETE | `/expenses/:id`                     | Soft-delete. |
+
+**Multi-currency fields (P9):** `currency` is the code of the foreign currency (e.g., "USD", "GBP"). `origAmount` is the original amount in that currency; `fxRate` is the exchange rate applied (origAmount × fxRate = amount in base currency). `amount` is always stored in the deployment's base currency for consistent aggregations (reports, budgets, net worth). When multi-currency is disabled in settings, these fields are ignored and always empty.
 
 ### Statements & installment plans
 

@@ -170,6 +170,16 @@ Receipts: dropzone scan, manual add, grid / list, and a filter sidebar.
   multi-currency, and runs each imported entry through category auto-rules so you get
   consistent tagging. Available in Settings → Storage & backup → **Migrate data**.
 
+### Multi-currency support (P9)
+
+Handle expenses in multiple currencies while keeping reports and budgets in your base currency (configurable per deployment). When you import or manually enter an expense in a foreign currency, the system tracks both the **original amount** and the **exchange rate applied**, then stores the **base-currency equivalent** for aggregations (reports, budgets, net worth, anomaly detection). This ensures all your financial summaries remain consistent even when spending in EUR, USD, GBP, and other currencies.
+
+- **Opt-in per deployment.** Multi-currency is disabled by default. When enabled via **Settings → Defaults**, the expense form gains a **Currency** field, FX rate input, and a live preview of what amount will be stored in the reports.
+- **AI extracts currency.** When you upload a foreign bill (for example a GBP receipt from a UK shop), the OCR/AI parser reads the currency symbol or code and sets the currency field automatically; you only need to confirm or correct the rate.
+- **Rate handling.** If the exchange rate is known (entered manually or looked up), a green FxBadge shows the stored amount and the applied rate. If the rate is unknown, a gold warning badge appears — the amount stored defaults to the printed number (same as the old behaviour when multi-currency was unsupported), so no existing totals shift.
+- **Deterministic conversion.** `amount` (what you see in reports and budgets) is always in base currency. `origAmount` and `fxRate` are kept for audit trail and future rate lookup / correction. All existing aggregations (cash flow, anomaly medians, split shares, net worth) keep summing `amount` unchanged, so you can enable multi-currency mid-year without migrating historical data.
+- **Inherited per vendor.** A new entry inherits the currency from that vendor's last entry, so repeat bills keep landing in the same foreign currency without re-selecting it each time.
+
 ### Expense splitting ("who owes what")
 
 A Splitwise-lite tracker built into the expense form for shared costs (a dinner,
