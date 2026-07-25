@@ -4,7 +4,38 @@
 
 <!-- reviewed: cdc6a03 -->
 <!-- docker-validated: 7698ef1 -->
-<!-- ui-audited: c5b45dc -->
+<!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-25 (ui-auditor — mobile UI consistency audit)
+
+**Σκοπός**: 55η read-only σάρωση του mobile UI κατά διαστάσεις token parity + reusable adoption vs web design system.
+
+**Αρχικό state**: git HEAD `0bc5e14` (security gate fix), working tree clean, `apps/mobile npx tsc --noEmit` EXIT 0.
+
+**Audit scope**: 19 screens + ui.tsx + theme.ts + nav.tsx (18 TSX files, ~15κ LOC).
+
+**Αυτοματοποιημένη grep (ίδιο pattern με scan 54):**
+
+| Διάσταση | Εύρημα | Σχόλιο |
+|----------|--------|--------|
+| Hardcoded hex/rgba χρώματα | 0 violations | Foundation rock-solid |
+| Hardcoded spacing (gap/padding/margin) | ~151 sites | Persistent TODO, no regression |
+| Hardcoded borderRadius values | ~96 sites | No new unique values, cleanup deferred |
+| Raw TextInput (χωρίς Input primitive) | 0 violations | ✅ Clean (ShoppingScreen/ReceiptsScreen fixes merged 2026-07-24) |
+| ActivityIndicator raw (χωρίς Spinner) | ~42 uses | P2/M, documented in queue |
+| Light theme context (data-theme support) | 0 uses | P3/L TODO, explicit out-of-scope |
+| Safe-area-context adoption | 0 imports | P2/M TODO, explicit in queue |
+| Font scale adoption (SIZE token) | ✓ consistent | Web ref SIZE values used correctly |
+
+**Ανάλυση**: Μηδέν regression. Το UI Debt Queue είναι **accurately scoped + priorities correct**. Top 3 builders next items: (1) **Spacing tokens** (P2/L, 151 sites), (2) **Radius tokens** (P2/M, 96 sites), (3) **ActivityIndicator→Spinner** (P2/M, 42 uses). **Σημείωση**: light-theme + safe-area είναι explicitly Needs-Achilleas decision (flag βρίσκεται στο MOBILE_PARITY.md §Suggested next tasks).
+
+**Εξήγηση ανάλυσης "universal UI"**: Ενώ το 151 hardcoded spacing + 96 radius magic-number sites φαίνεται σαν τεράστιο, **οι τιμές ΕΙΝΑΙ σε narrow clusters** (gap: 6,8,10,12; borderRadius: 3,8,10,12,14,16 κλπ) και τα περισσότερα ΚΑΝ tokenize-άρουν εύκολα. Ο builder θα μπορούσε να mass-replace τα common ones (gap 8-12, radius 10-14) σε ~1h χρόνο. Δεν είναι architectural gap.
+
+**Δεν γράφτηκε κώδικας** (read-only audit, μηδέν writes). MOBILE_PARITY.md ήδη πλήρως τεκμηριωμένο — αυτή η καταχώρηση είναι μόνο επιβεβαίωση + context για τον builder.
+
+**Next**: task 55 ολοκλήρωθη. Περιμένω Achilleas decision στις 2 explicit Needs-Achilleas items (light-theme design, safe-area bottom-inset scope).
+
+---
 
 ## 2026-07-24 (pharos-daily-dev, cont.¹⁰ — pure-lib test coverage: `webhooks.shared.ts`)
 
