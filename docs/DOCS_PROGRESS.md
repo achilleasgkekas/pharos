@@ -1,5 +1,29 @@
 # DOCS_PROGRESS
 
+## 2026-07-25 (twentieth run — P9 Receipts multi-currency slice 2)
+
+Σάρωση git log για νέα feat() commits μετά τα τελευταίο run (commit 125827f, 2026-07-25 14:22). Ανακάλυψη: **P9 Receipts multi-currency (commit 25cb2c2, 2026-07-25 16:17)** ήταν shipped αλλά ΔΕΝ ήταν documented: Receipt.currency, Receipt.origAmount, Receipt.fxRate fields για tracking foreign-currency receipts με exchange rates, ενώ όλες τις receipt amounts (total, net, VAT, line prices) μετατρέπονται με τον ίδιο ρυθμό.
+
+Τι έγραψα:
+- **features.md**: Νέα bullet point "Multi-currency support (P9)" στο τέλος της Receipts section. Εξήγηση ότι όλα τα receipt amounts (total, net, VAT, line prices) μετατρέπονται together με τον ίδιο fxRate, σε αντίθεση με τα expenses που έχουν ένα ποσό.
+- **api.md**: Προσθήκη `currency?`, `origAmount?`, `fxRate?` πεδίων στο PATCH /receipts/:id payload. Νέα explanatory note μετά τον Receipts πίνακα που εξηγάει τη διαφορά από τα expenses (multi-amount conversion).
+- **mobile.md**: Ενημέρωση Receipts row με "multi-currency support (currency + FX rate fields when enabled)".
+
+Accuracy (διάβασα κώδικα, όχι εικασίες): commit 25cb2c2 message, Receipt model fields, /api/v1/receipts route (accepts + returns νέα πεδία).
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: api.md 22 (ζυγό), mobile.md 8 (ζυγό), features.md 0 (αθικτο).
+- Internal links: 5 references (api/config/self-hosting), όλα ✓.
+- Secret scan: κανένα sk_/AUTH_ ✓.
+
+Collision guard: git status = μόνο 3 docs files (δικά μου), κανένα staged foreign.
+
+Commit: 7221361. Push: successful → origin/main ✓.
+
+Σημ: Landing FAQ (d3bae99) είναι self-contained στο apps/landing/, έξω από docs territory.
+
+Επόμενο run: (α) αν άλλα νέα features shipped, update docs · (β) grep git log για άλλα undocumented feat().
+
 ## 2026-07-25 (nineteenth run — P9 multi-currency support documentation)
 
 Σάρωση git log για νέα feat() commits μετά το τελευταίο run (2026-07-24 10:10). Ανακάλυψη: **P9 multi-currency feature (commit f83ff71, 2026-07-25 14:22)** shipped αλλα ΔΕΝ ήταν documented: new currency/origAmount/fxRate fields για tracking foreign-currency expenses με exchange rates, ενώ όλες οι aggregations (reports, budgets, net worth) μένουν σε base currency.
