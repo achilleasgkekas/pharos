@@ -214,9 +214,11 @@ These are flagged **(AI)** below with the feature name.
 |--------|-----------------------------------|-------------|
 | GET    | `/receipts?store=&archived=1`     | List receipts (+ `limit`/`offset`/`updatedSince`). |
 | GET    | `/receipts/:id`                   | Receipt + its line items. |
-| PATCH  | `/receipts/:id`                   | Update `{ store?, date?, total?, subtotal?, vatAmount?, paymentMethod?, notes?, verified?, archived?, lineItems? }`. |
+| PATCH  | `/receipts/:id`                   | Update `{ store?, date?, total?, subtotal?, vatAmount?, currency?, origAmount?, fxRate?, paymentMethod?, notes?, verified?, archived?, lineItems? }`. |
 | POST   | `/receipts/:id/rescan`            | **(AI)** Re-run the parse on the stored file. Body `{ ocr?: boolean }` (`true` forces OCR). Returns the same shape as `GET /receipts/:id` plus `aiUsed`/`model`/`aiError`. |
 | POST   | `/receipts/:id/add-to-library`    | Turn line items into inventory Items (find-or-create by title, link the receipt) → `{ ok, created, linked }`. |
+
+**Multi-currency fields (P9):** `currency` is the code of the foreign currency (e.g., "USD", "GBP"). `origAmount` is the original receipt total in that currency; `fxRate` is the exchange rate applied (origAmount × fxRate = total in base currency). Unlike expenses (single amount), receipts carry multiple money fields (total, subtotal, VAT, line item prices) that all convert together with the same `fxRate`. The converted `total`, `subtotal`, and `vatAmount` are always stored in the deployment's base currency for consistent aggregations (reports, budgets, net worth). When multi-currency is disabled in settings, these fields are ignored and always empty.
 
 ### Scan (AI capture, mostly no-save)
 
