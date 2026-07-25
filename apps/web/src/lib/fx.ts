@@ -55,6 +55,23 @@ export function isForeignCurrency(code: string | null | undefined, base: string)
   return c !== '' && c !== b;
 }
 
+/**
+ * Is this a STORED document whose `amount` is not really base currency? A foreign entry
+ * that never got a rate keeps its printed number in `amount` (resolveFx refuses to guess
+ * 1:1), so it silently joins base-currency sums. This is the predicate behind both the
+ * gold FxBadge and the "missing exchange rates" audit — same rule, one definition.
+ *
+ * Mirrors `FxResolved.needsRate`, but reads a document that is already saved (where the
+ * printed figure lives in `origAmount`), not a form input.
+ */
+export function needsFxRate(
+  e: { currency?: string | null; origAmount?: number | null; fxRate?: number | null },
+  base: string
+): boolean {
+  if (!isForeignCurrency(e.currency, base)) return false;
+  return (Number(e.origAmount) || 0) > 0 && (Number(e.fxRate) || 0) <= 0;
+}
+
 /** Printed amount x rate, rounded to cents (money is stored to 2dp everywhere). */
 export function convertToBase(origAmount: number, fxRate: number): number {
   const a = Number(origAmount);

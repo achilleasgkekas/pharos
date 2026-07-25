@@ -7,6 +7,7 @@ import {
   resolveFx,
   formatMoney,
   fxBadgeLabel,
+  needsFxRate,
   toPrinted,
   resolveItemPrices,
   resolveStatementAmounts,
@@ -174,6 +175,42 @@ describe('formatMoney', () => {
 
   it('treats junk amounts as zero', () => {
     expect(formatMoney(NaN, 'USD')).toBe('$0.00');
+  });
+});
+
+describe('needsFxRate', () => {
+  it('flags a foreign record whose rate was never filled in', () => {
+    expect(needsFxRate({ currency: 'USD', origAmount: 88, fxRate: 0 }, 'EUR')).toBe(true);
+    expect(needsFxRate({ currency: 'USD', origAmount: 88 }, 'EUR')).toBe(true);
+    expect(needsFxRate({ currency: 'USD', origAmount: 88, fxRate: null }, 'EUR')).toBe(true);
+  });
+
+  it('is false once a rate exists', () => {
+    expect(needsFxRate({ currency: 'USD', origAmount: 88, fxRate: 0.92 }, 'EUR')).toBe(false);
+  });
+
+  it('is false for base-currency records, including pre-P9 rows with a defaulted code', () => {
+    expect(needsFxRate({ currency: 'EUR', origAmount: 0, fxRate: 0 }, 'EUR')).toBe(false);
+    expect(needsFxRate({}, 'EUR')).toBe(false);
+  });
+
+  it('is false for a foreign code with no printed amount recorded', () => {
+    // Nothing to convert and nothing to show — same carve-out as fxBadgeLabel.
+    expect(needsFxRate({ currency: 'USD', origAmount: 0, fxRate: 0 }, 'EUR')).toBe(false);
+  });
+
+  it('follows the deployment base, not EUR', () => {
+    expect(needsFxRate({ currency: 'EUR', origAmount: 88, fxRate: 0 }, 'USD')).toBe(true);
+    expect(needsFxRate({ currency: 'USD', origAmount: 88, fxRate: 0 }, 'USD')).toBe(false);
+  });
+
+  it('agrees with resolveFx: what resolveFx flags is what a stored doc reports', () => {
+    const stored = resolveFx({ amount: 88, currency: 'USD', fxRate: 0 }, 'EUR');
+    expect(stored.needsRate).toBe(true);
+    expect(needsFxRate(stored, 'EUR')).toBe(true);
+    const fixed = resolveFx({ amount: 88, currency: 'USD', fxRate: 0.92 }, 'EUR');
+    expect(fixed.needsRate).toBe(false);
+    expect(needsFxRate(fixed, 'EUR')).toBe(false);
   });
 });
 

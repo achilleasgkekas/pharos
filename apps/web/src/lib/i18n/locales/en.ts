@@ -1363,6 +1363,16 @@ export const en = {
   'it.noDocuments': 'No manuals, warranty certs, or photos on file yet.',
   'it.deleteDocument': 'Delete document',
   'reports.payoffTitle': 'Installment payoff',
+  // P9 slice 7 — missing exchange rates audit
+  'reports.fxMissing': '{n} entries need an exchange rate',
+  'reports.fxMissingNote':
+    'These were saved in a foreign currency without a rate, so their printed amount is still counted as {base} in every total below. Open one to add its rate.',
+  'reports.fxKind.expense': 'Expense',
+  'reports.fxKind.income': 'Income',
+  'reports.fxKind.receipt': 'Receipt',
+  'reports.fxKind.item': 'Item',
+  'reports.fxKind.subscription': 'Subscription',
+  'reports.fxKind.statement': 'Statement',
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

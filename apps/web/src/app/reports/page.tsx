@@ -15,6 +15,7 @@ import { computeMoneyAgenda } from '@/lib/moneyAgenda';
 import { computeSafeToSpend } from '@/lib/safeToSpend';
 import { goalProgress } from '@/lib/goals';
 import { buildMonthReview } from '@/lib/monthReview';
+import { listEntriesNeedingRate } from '@/lib/fxAudit';
 import type { SerializedStatement } from '@/types';
 import { ReportsClient } from './ReportsClient';
 
@@ -342,7 +343,15 @@ async function getReports(monthsBack = 12) {
     monthLabel: monthLabel(now),
   };
 
+  // ── Missing exchange rates (P9 slice 7) — records whose stored amount is still a
+  // foreign number, so they are quietly distorting every total on this page. Only
+  // queried when the deployment actually allows foreign entries; a single-currency
+  // install skips five queries and never sees the card.
+  const fxIssues = appSettings.multiCurrency ? await listEntriesNeedingRate(appSettings.currency) : [];
+
   return {
+    fxIssues,
+    baseCurrency: appSettings.currency,
     netWorth: { accountsTotal: Math.round(accountsTotal), series: netWorthSeries },
     safeToSpend,
     monthReview,

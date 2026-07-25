@@ -18,7 +18,8 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts';
-import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles } from 'lucide-react';
+import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle } from 'lucide-react';
+import { formatMoney } from '@/lib/fx';
 import { createGoal, addGoalContribution, deleteGoal } from './goalsActions';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
@@ -33,6 +34,16 @@ type InstallmentPlanRow = {
   remainingAmount: number;
   totalAmount: number;
   done: boolean;
+};
+
+type FxIssueRow = {
+  kind: 'expense' | 'income' | 'receipt' | 'item' | 'subscription' | 'statement';
+  id: string;
+  title: string;
+  subtitle: string;
+  currency: string;
+  origAmount: number;
+  href: string;
 };
 
 type NetWorthPoint = {
@@ -99,6 +110,9 @@ type Data = {
   budgetVsActual: { name: string; budget: number; actual: number; carried?: number; effective?: number }[];
   budgetRollover?: boolean;
   goals: GoalRow[];
+  /** P9 slice 7: records still holding a foreign amount with no rate (empty when single-currency). */
+  fxIssues?: FxIssueRow[];
+  baseCurrency?: string;
   summary: {
     receiptsTotal: number;
     receiptsVat: number;
@@ -115,6 +129,16 @@ type Data = {
     expenseMonth: number;
   };
 };
+
+// Literal keys (not a template string) so the translate function stays type-checked.
+const FX_KIND_KEY = {
+  expense: 'reports.fxKind.expense',
+  income: 'reports.fxKind.income',
+  receipt: 'reports.fxKind.receipt',
+  item: 'reports.fxKind.item',
+  subscription: 'reports.fxKind.subscription',
+  statement: 'reports.fxKind.statement',
+} as const;
 
 const tooltipStyle = {
   background: 'var(--color-surface-2)',
@@ -136,6 +160,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
   const spend12 = data.monthlySpend.reduce((a, m) => a + m.total, 0);
   const netWorthNow = s.ownedValue + data.netWorth.accountsTotal - s.installmentsRemaining - s.outstanding;
   const avgMonth = Math.round(spend12 / Math.max(1, data.monthlySpend.filter((m) => m.total > 0).length || 1));
+  const fxIssues = data.fxIssues ?? [];
+  const fxBase = data.baseCurrency || 'EUR';
 
   return (
     <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
@@ -155,6 +181,39 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           ))}
         </div>
       </div>
+
+      {/* Missing exchange rates (P9 slice 7) — foreign records saved without a rate keep
+          their PRINTED amount, so they are silently mixed into every figure below. Shown
+          above the numbers they distort, and only when there is something to fix. */}
+      {fxIssues.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-[color:var(--color-gold)]/40 bg-[color:var(--color-gold)]/5 p-5">
+          <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-gold)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+            <AlertTriangle size={12} /> {t('reports.fxMissing', { n: fxIssues.length })}
+          </p>
+          <p className="text-[11px] text-[color:var(--color-text-dim)] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
+            {t('reports.fxMissingNote', { base: fxBase })}
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {fxIssues.map((f) => (
+              <a
+                key={`${f.kind}-${f.id}`}
+                href={f.href}
+                className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 hover:border-[color:var(--color-gold)]/50 transition-colors"
+              >
+                <span className="min-w-0">
+                  <span className="block text-sm text-[color:var(--color-text)] truncate">{f.title}</span>
+                  <span className="block text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {t(FX_KIND_KEY[f.kind])}{f.subtitle ? ` · ${f.subtitle}` : ''}
+                  </span>
+                </span>
+                <span className="text-sm font-semibold text-[color:var(--color-gold)] whitespace-nowrap" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {formatMoney(f.origAmount, f.currency)}
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Net worth (PA2) — assets (inventory + manual accounts) minus liabilities
           (remaining installments + card balances), with the monthly snapshot trend */}
