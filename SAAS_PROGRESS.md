@@ -4625,3 +4625,55 @@ security setting) ή **`account/route.ts`** (GET+PATCH profile, το πιο βα
 ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί,
 πάει πρώτο). **Νέο lesson να θυμάσαι:** `git show --stat HEAD` μετά από κάθε commit, πριν το
 push, ως τελικό collision-guard check.
+
+## 2026-07-25 (cont. — increment 98, route-level test coverage για το account/mfa endpoint)
+
+Πριν από νέο increment: ask-inbox re-checked (μηδέν entries addressed σε saas-core, ίδιο κενό).
+`WEB_DEBT.md` re-checked (58η σάρωση, 2026-07-24) — και τα 3 auto-buildable items (Notifications
+requireAdmin P1/S, Voucher/GiftCard/LoyaltyCard tenancy P2/M, sampleDataActions.ts tenancy P2/S)
+είναι πλέον **DONE** στο git log (`0bc5e14`, `315cd26`, `36430e5`)· το i18n gap P3/M επίσης DONE
+(`2cd33fb`, 126→0). Η ενεργή Web Debt Queue είναι **άδεια**. UI-first backlog παραμένει
+εξαντλημένο (admin console + όλα τα account/workspace/billing/MFA panels ήδη χτισμένα, βλ.
+`components/saas/*` list — 50+ αρχεία). Ακολούθησα το leftover next-task από το προηγούμενο log.
+
+**Νέο `account/mfa/route.test.ts`** (20 tests), μηδέν production code αλλαγή. Route = TOTP
+enrollment self-service (GET status / POST begin-or-restart / DELETE disable) πάνω στο ήδη-tested
+`mfaStore.ts`. Mocks: `@/lib/db`, `@/models/Account` (findById().select() chain), `@/lib/auth`
+(verifyPassword), `@/lib/tenancy/accountSession` (getCurrentAccount), `@/lib/tenancy/
+secretCrypto` (secretCryptoReady), `@/lib/tenancy/mfaStore` (beginMfaEnrollment/disableMfa/
+describeMfaStatus/mfaEnrollRequiresReauth), `@/lib/tenancy/saasApi` (vi.importActual για το
+πραγματικό saasGuard, mocks μόνο saasAuthGate — ίδιο precedent με τα προηγούμενα route tests).
+
+Καλύπτει: **GET** — gate/401/describeMfaStatus→null 404/success spreads status+cryptoReady.
+**POST** — gate/401/account-not-found 404 (mfaEnrollRequiresReauth ΠΟΤΕ δεν καλείται)/
+**first-time enroll (mfaEnabled=false) skips το password check εντελώς** (verifyPassword ποτέ
+δεν καλείται)/re-enroll (mfaEnabled=true) missing password→400 (beginMfaEnrollment ποτέ)/
+re-enroll wrong password→401 "Invalid credentials" (beginMfaEnrollment ποτέ)/re-enroll σωστό
+password→beginMfaEnrollment τρέχει/beginMfaEnrollment ok:false reason 'not_found'→404,
+'crypto_unavailable'→503. **DELETE** — gate/401/**missing password→400 ΠΡΙΝ το connectDB**
+(validated πριν το DB round-trip, exact ίδιο pattern με το password-change route)/dangling
+cookie (account row λείπει) και wrong password **collapse στο ΙΔΙΟ** 401 "Invalid credentials"
+(disableMfa ποτέ σε καμία από τις δύο)/success→disableMfa('acc1')+{enabled:false}/mid-handler
+throw (disableMfa rejects)→καθαρό 500 μέσω πραγματικού saasGuard.
+
+**Verified**: νέο test file **20/20 green** μόνο του· πλήρες `npx vitest run` → **258 files /
+3424 tests green**. `npm run type-check` → **EXIT 0** καθαρά. **Docker: ΔΕΝ έγινε rebuild**
+(test-only αρχείο, μηδέν production code/runtime wiring αλλαγή). **Browser-verify: skipped**
+(test file, μηδέν UI/observable behavior αλλαγή — ο PostToolUse hook το επιβεβαίωσε επίσης).
+Collision guard: `git status --short` πριν το staging έδειξε ΜΟΝΟ το δικό μου 1 νέο αρχείο
+(clean tree, μηδέν ξένο WIP αυτή τη φορά)· `git diff --cached --name-only` + `git show --stat
+HEAD` μετά το commit επιβεβαίωσαν exact 1-file match πριν το push. Pushed `a730436`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** ίδιο πρότυπο στα υπόλοιπα route-clusters χωρίς coverage (23 απομένουν) — καλύτεροι
+επόμενοι υποψήφιοι: **`account/route.ts`** (GET+PATCH profile, το πιο βασικό account CRUD ακόμα
+χωρίς test, μεγαλύτερη λίστα surface), **`account/mfa/confirm`** (φυσική συνέχεια του mfa
+enrollment flow που μόλις καλύφθηκε — confirmMfaEnrollment ήδη unit-tested, το route wrapping
+όχι), ή **`admin/overview`**/**`admin/tenants`** (read-only superadmin console surfaces, ακόμα
+untested). Μετά: `members`, `usage`+`usage/sample`, `workspace/{ai-key,export,export/files,
+reactivate}`, `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`,
+`auth/logout`, `account/{workspaces,export,reset/*,verify/*}`, `admin/tenants/[slug]/dbstats`.
+Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν
+βρεθεί, πάει πρώτο — η ουρά ήταν άδεια σε αυτό το run αλλά μπορεί να ανοίξει νέο item η επόμενη
+σάρωση του auditor).
