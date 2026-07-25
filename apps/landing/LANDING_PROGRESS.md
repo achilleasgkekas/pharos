@@ -3317,3 +3317,77 @@ Needs-Achilleas (open, αμεταβλητα):
 - Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
 - Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
 - Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
+
+## 2026-07-25 (13) — FAQ += inventory depreciation model (P29), πληρες ξανα-σαρωμα του feat( ιστορικου
+
+Πριν το ξεκινημα: coordination guard (`~/.claude/ROUTINES_PAUSED` δεν υπαρχει), ελεγχος
+`~/.claude/ASK_ACHILLEAS.md` (5 OPEN entries πλεον, ολα bakecore finance/redesigner/tests/reviewer, τιποτα
+για landing/pharos). `git log --oneline bbddf1c..HEAD | grep "feat("` -> κενο, οπως προβλεφθηκε στο
+προηγουμενο entry (12): μονο tests/docs/fix commits εχουν μπει μετα το τελευταιο landing commit.
+
+Ακολουθησα το προγραμματισμενο fallback: `git log --oneline --all | grep "feat("` πανω σε ολοκληρο το
+repo (οχι μονο μετα απο ενα cutoff commit), ~110 αποτελεσματα. Συγκρινα με τα υπαρχοντα FAQS entries
+(grep FAQ q: στο page.tsx, 33 εγγραφες συνολικα πλεον) και με το Features section (σειρα 439-571 + το
+grid των module καρτων ~σειρα 40-90). Βρηκα αρκετα consumer-facing P-numbered features που ΔΕΝ εχουν
+dedicated FAQ (καποια μονο ακουμπανε επιφανειακα σε αλλη εγγραφη ή στο Features blurb):
+- P29 asset depreciation model: αναφερεται ΜΟΝΟ ως "depreciation-adjusted estimate" μεσα στην insurance-
+  export FAQ, καμια εξηγηση τι κανει -> **διαλεχτηκε για αυτο το run**.
+- P27 suggest monthly budgets απο spending history: καμια αναφορα πουθενα.
+- P22 receipt line-item search απο global search: καμια αναφορα πουθενα.
+- P21 document/manual vault: καμια αναφορα πουθενα.
+- P16 YNAB CSV register migration importer (διαφορετικο απο το ηδη-καλυμμενο bank/generic CSV import PA1):
+  καμια αναφορα.
+- P26 in-app onboarding checklist: internal UX, οχι πολυ landing-worthy, χαμηλη προτεραιοτητα.
+- P20/P32 loyalty cards + gift-card/store-credit, P33 free-trial cancel reminder, P19 safe-to-spend,
+  P25 budget envelope/rollover, P3 Month in Review, P11 IMAP email-in: ΟΛΑ ηδη αναφερονται (εστω συνοπτικα)
+  στο Features section blurbs (σειρες 56/68/73-74/80/409-413) -> ΔΕΝ θεωρουνται κενα, ηδη "καλυμμενα".
+
+Espesta agent (sonnet, read-only, Explore) διαβασε το πραγματικο κωδικα του depreciation feature πριν
+γραψω copy: `lib/depreciation.ts` (declining-balance formula, οχι straight-line· `value = price *
+(1-rate)^years`, floor στο salvage %, per-category default rates network 15/storage 20/compute 25/audio
+12/video 20/mobile 25/peripheral 18/consumable 50/other 15/), `resolveDepreciation()` (AppConfig.depreciation,
+Settings -> Depreciation UI: master toggle, default rate, floor, per-category overrides), `estimatedItemValue()`
+(manual currentPrice override wins μονο αν διαφερει >0.005 απο purchasedPrice, αλλιως depreciates). Επιβεβαιωσα
+οτι η ιδια συναρτηση τροφοδοτει ΚΑΙ το Reports (owned net-worth + inventory pie) ΚΑΙ το insurance export
+(`settings/actions.ts:1343-1346`), οπως ηδη ισχυριζοταν η υπαρχουσα FAQ εγγραφη· η depreciated value ΔΕΝ
+εμφανιζεται πουθενα στο item-detail page, μονο σε Reports+export.
+
+Αλλαγη (`apps/landing/app/page.tsx`, `FAQS` array μονο, μηδεν αλλο UI/CSS/dependency change): νεα εγγραφη
+«How does it estimate what my stuff is still worth?» αμεσως μετα το «Can it produce an export for an
+insurance claim?» (η υπαρχουσα εγγραφη αναφερει explicit τη λεξη depreciation, φυσικο follow-up) και πριν
+το «Can it help with tax filing at year-end?».
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο)· `/` route 5.35 kB (build-time data μονο,
+  μηδεν rendered bundle αλλαγη).
+- Ελεγχος πορτων 3100-3190: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production
+  build (γνωστο harmless "next start does not work with output:standalone" warning). `mcp__Claude_Browser__*`
+  διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο. `javascript_tool`
+  επιβεβαιωσε: `found:true`, deterministic anchor id
+  `faq-how-does-it-estimate-what-my-stuff-is-still-worth`, σωστο πληρες `textContent`, σωστη σειρα
+  γειτονων στο DOM (["faq-can-it-produce-an-export-for-an-insurance-claim", **αυτο**,
+  "faq-can-it-help-with-tax-filing-at-year-end"]). Hero screenshot καθαρο (lighthouse mark, gradient
+  τιτλος, CTAs, τριπλο badge row). `pkill -f "next start -p 3110"` -> επιβεβαιωθηκε οτι κανενα
+  `next-server` process δεν εμεινε (`ps aux | grep next-server`, κενο)· το γνωστο false-positive
+  Claude-app CLOSE_WAIT match στο `lsof -i :3110` παραμενει (ιδιο σημειο με προηγουμενα entries).
+- em-dash: 0 σε ολο το page.tsx (comma-list style, ιδιο με ολα τα προηγουμενα increments). Δεν αγγιξα
+  Docker/:3000/web/mobile, μηδεν AI call (η μονη agent-χρηση ηταν read-only research, οχι write).
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Commit `57a58bb`, pushed στο `origin/main` (25ff5a7..57a58bb).
+
+Επομενο increment: 3 fresh candidates απο το πληρες ξανα-σαρωμα, με σειρα προτεραιοτητας: (1) P27
+suggest-monthly-budgets-from-history (αμεσα χρησιμο, ταιριαζει με το ηδη-υπαρχον budgets FAQ cluster),
+(2) P22 receipt line-item global search (μικρο discoverability feature, ταιριαζει με το search command-bar
+FAQ), (3) P21 document/manual vault (item warranties/manuals, ταιριαζει με το insurance-export cluster).
+P16 YNAB migration importer μενει σε χαμηλοτερη προτεραιοτητα (niche, migration-only χρηση). Αλλιως: νεα
+`feat(` commits απο το κυριο repo, ή (e) polish συνεχεια / real app screenshots οταν υπαρξουν assets
+(blocked).
+
+Needs-Achilleas (open, αμεταβλητα):
+- Legal entity name + payment processor (Stripe): confirm ΠΡΙΝ hosted launch.
+- Terms + Privacy: full legal review ΠΡΙΝ launch· μετα flip robots -> indexable + add στο sitemap.
+- Contact inbox hello@ph-aros.com, hosted τιμες (€4/€8/€15 + annual ×10): confirm ΠΡΙΝ launch.
+- Repo public: κρατιεται private προς το παρον (οταν ανοιξει, το free-tier Offer γινεται InStock αυτοματα).
