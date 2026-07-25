@@ -2498,3 +2498,26 @@ Collision guard: git status --short = κανένα modified docs file, κανέ�
 
 Επόμενο run: (α) αν νέα features shipped, update documentation · (β) αν αλλαγές στα API routes, refresh api.md · (γ) monitoring για νέα configuration options.
 
+
+## 2026-07-25 (twenty-first run — P9 Subscriptions multi-currency documentation)
+
+Σάρωση git log για νέα feat() commits μετά τις 18:20 (τελευταίο run). Ανακάλυψη: το τελευταίο feat() commit είναι b2e72ce (2026-07-25 18:19:30, P9 slice 3: multi-currency for Subscriptions), ήδη logged αλλά **η API/features documentation ήταν incomplete**.
+
+Τι έγραψα:
+- **api.md**: updated Subscriptions endpoints (POST + PATCH) με P9 fields (currency, fxRate, firstChargeAmount, trialEndsAt) + clarification ότι money fields re-resolve together ✓.
+- **features.md**: προσθέθηκε bullet point για multi-currency subscriptions, εξηγώντας rate handling + conversion to base currency ✓.
+
+Comprehensive verification (markdown only, κανενα build/Docker/AI call):
+- Backticks: both files balanced ✓.
+- Code samples in api.md: validating Bearer token / password fields = documentation examples (όχι literal credentials) ✓.
+- P9 completeness: multi-currency πλέον documented για Receipts (features.md) + Expenses (features.md) + Subscriptions (features.md + api.md) ✓.
+- Internal links: /subscriptions endpoints in api.md table reference the correct path ✓.
+- Secret scan: κανένα literal credential (password=••••••••, Bearer=phk_EXAMPLE, όλα placeholders) ✓.
+
+Collision guard: git status --short = μόνο docs/api.md + docs/features.md (τα δύο αρχεία που edit-αρα), κανένα staged foreign file.
+
+Commit: `3c9d170 docs(P9): document multi-currency support for Subscriptions` (pushed to origin/main ✓).
+
+Συμπέρασμα: P9 multi-currency feature είναι πλέον fully documented across all three modules (Receipts, Expenses, Subscriptions) — API endpoints, feature descriptions, και user-facing behavior. Όλα σε sync.
+
+Επόμενο run: (α) continue scanning για νέα feat() commits · (β) αν αλλαγές στα existing routes, refresh api.md · (γ) monitoring για νέα configuration options που χρειάζονται configuration.md update.
