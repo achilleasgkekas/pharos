@@ -3,6 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, iso, listEnvelope } from '@/lib/apiList';
 import { readBody, strField, numField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
+import { getAppSettings } from '@/lib/appSettings';
+import { resolveFx } from '@/lib/fx';
 import { Item, ITEM_STATUSES } from '@/models/Item';
 
 export const runtime = 'nodejs';
@@ -11,6 +13,7 @@ export const dynamic = 'force-dynamic';
 type ItemLean = {
   _id: unknown; num?: string; title: string; status?: string; category?: string;
   currentPrice?: number; purchasedPrice?: number | null; targetPrice?: number | null;
+  currency?: string; origAmount?: number; fxRate?: number;
   specs?: string; warrantyUntil?: Date | string | null; tags?: string[]; photos?: string[];
   updatedAt?: Date; deletedAt?: Date | null;
 };
@@ -25,6 +28,12 @@ function trim(i: ItemLean) {
     currentPrice: i.currentPrice ?? 0,
     purchasedPrice: i.purchasedPrice ?? null,
     targetPrice: i.targetPrice ?? null,
+    // P9: the price fields above are always base currency. On an item bought abroad these
+    // carry the printed anchor price and the rate used (fxRate 0 = not foreign, or the rate
+    // is still unknown, in which case the prices are the printed ones and NOT yet converted).
+    currency: i.currency ?? '',
+    origAmount: i.origAmount ?? 0,
+    fxRate: i.fxRate ?? 0,
     specs: i.specs ?? '',
     warrantyUntil: i.warrantyUntil ? new Date(i.warrantyUntil).toISOString() : null,
     tags: i.tags ?? [],
@@ -54,7 +63,10 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** POST /api/v1/items  { title, status?, category?, currentPrice? } → { item } */
+/** POST /api/v1/items  { title, status?, category?, currentPrice?, currency?, fxRate? } → { item }
+ *  P9: `currentPrice` is read as a PRINTED figure; when `currency` differs from the deployment's
+ *  base one it is converted with `fxRate` before storage, so what lands in the DB is always base
+ *  currency. Omitting both keeps the previous single-currency behaviour exactly. */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const b = await readBody(req);
@@ -64,12 +76,19 @@ export async function POST(req: NextRequest) {
     // an unknown value falls back to 'researching' rather than being stored verbatim.
     const status = enumField(b, 'status', ITEM_STATUSES, 'researching');
     await connectDB();
+    const fx = resolveFx(
+      { amount: numField(b, 'currentPrice') ?? 0, currency: strField(b, 'currency'), fxRate: numField(b, 'fxRate') ?? 0 },
+      (await getAppSettings()).currency
+    );
     const doc = await Item.create({
       title,
       status,
       // category stays a free string by design (relaxed enum → custom categories from Settings → Lists).
       category: strField(b, 'category', 'other'),
-      currentPrice: numField(b, 'currentPrice') ?? 0,
+      currentPrice: fx.amount,
+      currency: fx.currency,
+      origAmount: fx.origAmount,
+      fxRate: fx.fxRate,
     });
     return NextResponse.json({ item: trim(doc.toObject() as ItemLean) }, { status: 201 });
   });

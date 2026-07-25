@@ -111,6 +111,55 @@ export function resolveFx(input: FxInput, base: string): FxResolved {
   return { amount: convertToBase(amount, rate), currency, origAmount: amount, fxRate: rate, needsRate: false };
 }
 
+/** The three prices an inventory/shopping item carries, as PRINTED (pre-conversion). */
+export type ItemPricesInput = {
+  currentPrice: number;
+  purchasedPrice: number | null;
+  targetPrice: number | null;
+  currency?: string | null;
+  fxRate?: number | null;
+};
+
+export type ItemPricesResolved = {
+  currency: string;
+  origAmount: number;
+  fxRate: number;
+  /** All three ALWAYS base currency (see resolveFx for the unknown-rate carve-out). */
+  currentPrice: number;
+  purchasedPrice: number | null;
+  targetPrice: number | null;
+};
+
+/**
+ * P9 for Items. An item carries THREE money fields quoted on the same receipt / shop page
+ * (`purchasedPrice`, `currentPrice`, `targetPrice`) and everything downstream (net worth, the
+ * insurance export, inventory value by category, the shopping budget) sums them as base
+ * currency, so ONE rate converts all three: a single item must never mix two currencies.
+ *
+ * `origAmount` remembers the printed ANCHOR — what you actually paid when the item is owned,
+ * otherwise its asking price. That is the figure a person recognises from the paper, and the
+ * one FxBadge shows.
+ *
+ * Base-currency input passes straight through with fxRate 0, so a single-currency deployment
+ * stores exactly what it stored before this existed; an unknown rate is never guessed as 1:1.
+ */
+export function resolveItemPrices(input: ItemPricesInput, base: string): ItemPricesResolved {
+  const anchor =
+    input.purchasedPrice != null && input.purchasedPrice > 0 ? input.purchasedPrice : Number(input.currentPrice) || 0;
+  const fx = resolveFx({ amount: anchor, currency: input.currency, fxRate: input.fxRate }, base);
+  // fxRate 0 = not foreign, or foreign with no rate yet; either way nothing is converted.
+  const conv = (v: number | null): number | null =>
+    v == null ? null : fx.fxRate > 0 ? convertToBase(v, fx.fxRate) : Number(v) || 0;
+  return {
+    currency: fx.currency,
+    origAmount: fx.origAmount,
+    fxRate: fx.fxRate,
+    currentPrice: conv(Number(input.currentPrice) || 0) ?? 0,
+    purchasedPrice: conv(input.purchasedPrice),
+    targetPrice: conv(input.targetPrice),
+  };
+}
+
 /** `$88.00` — symbol + 2dp, for showing the printed amount next to the base one. */
 export function formatMoney(amount: number, code: string): string {
   const n = Number(amount);

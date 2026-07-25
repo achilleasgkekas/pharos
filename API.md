@@ -46,9 +46,12 @@ List responses are wrapped: `{ "data": [ … ], "total": N, "limit": L, "offset"
 
 ### Items (product tracker / inventory)
 - `GET /api/v1/items?status=shopping|inventory|all` (+ list params)
-  → `{ items: [{ id, num, title, status, category, currentPrice, purchasedPrice, targetPrice, specs, warrantyUntil, tags, photo, updatedAt, deleted }], total, limit, offset }`
-- `POST /api/v1/items` `{ title, status?, category?, currentPrice? }` → `{ item }`
-- `PATCH /api/v1/items/:id` `{ title?, status?, category?, currentPrice?, targetPrice?, specs?, tags? }` → `{ item }`
+  → `{ items: [{ id, num, title, status, category, currentPrice, purchasedPrice, targetPrice, currency, origAmount, fxRate, specs, warrantyUntil, tags, photo, updatedAt, deleted }], total, limit, offset }`
+  - `currentPrice`, `purchasedPrice` and `targetPrice` are ALWAYS in the deployment's base currency (Settings → Currency), so a client can sum them without conversion. On an item bought abroad, `origAmount` is the ANCHOR price as printed (what was paid when the item is owned, otherwise its asking price) and `fxRate` is base units per 1 unit of `currency`; divide any of the three price fields by `fxRate` to get its printed value, since one rate converts all of them. Both are `0` for an ordinary item. `fxRate: 0` with a foreign `currency` means no rate is known yet, so the prices are still the printed numbers: show them as unconverted rather than mixing them into a base-currency total. Note `priceHistory[].currency` is a separate, older per-store field and is not part of this.
+- `POST /api/v1/items` `{ title, status?, category?, currentPrice?, currency?, fxRate? }` → `{ item }`
+  - `currentPrice` is read as the PRINTED figure and converted with `fxRate` when `currency` differs from the base one. Omit both for single-currency behaviour.
+- `PATCH /api/v1/items/:id` `{ title?, status?, category?, currentPrice?, targetPrice?, specs?, tags?, currency?, fxRate? }` → `{ item }`
+  - Sending ANY money field (`currentPrice`, `targetPrice`, `currency`, `fxRate`) re-resolves the whole price set against the base currency, so a partial update can never leave a record half-converted. A new `fxRate` is applied to the PRINTED figures, not on top of an earlier conversion, so re-sending the same rate is a no-op.
 - `DELETE /api/v1/items/:id` → `{ ok }` (soft-delete → Trash)
 
 ### Tasks

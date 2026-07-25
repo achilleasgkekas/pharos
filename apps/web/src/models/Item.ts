@@ -69,6 +69,19 @@ const ItemSchema = new Schema(
     // Price-tracker target (shopping): alert when the best known price drops to/below this.
     targetPrice: { type: Number, default: null },
 
+    // Multi-currency (P9): every price field above is ALWAYS denominated in the deployment's
+    // base currency, so net worth, the insurance export, inventory value by category and the
+    // shopping budget keep summing them untouched and no migration is needed. An item bought
+    // abroad additionally remembers what its receipt actually said: `origAmount` is the printed
+    // ANCHOR price (what you paid when the item is owned, otherwise its asking price) and
+    // `fxRate` the base units per 1 unit of `currency`. That one rate converts every price field
+    // on the record, so a single item never mixes two currencies. See lib/fx.ts.
+    // NOTE: priceHistory[].currency is a different, older thing (per-store scraped quotes) and is
+    // deliberately untouched here.
+    currency: { type: String, default: '' },
+    origAmount: { type: Number, default: 0 },
+    fxRate: { type: Number, default: 0 },
+
     priceHistory: { type: [PriceEntrySchema], default: [] },
     links: { type: [LinkSchema], default: [] },
 

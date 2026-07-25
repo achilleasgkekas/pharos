@@ -42,5 +42,17 @@ async function getData(): Promise<{
 
 export default async function ItemsPage() {
   const [{ items, plans, unlinkedPlans, receipts }, settings] = await Promise.all([getData(), getAppSettings()]);
-  return <ItemsClient items={items} view="inventory" plans={plans} unlinkedPlans={unlinkedPlans} receipts={receipts} defaultView={settings.defaultItemView} categoryList={settings.itemCategories} />;
+  return (
+    <ItemsClient
+      items={items}
+      view="inventory"
+      plans={plans}
+      unlinkedPlans={unlinkedPlans}
+      receipts={receipts}
+      defaultView={settings.defaultItemView}
+      categoryList={settings.itemCategories}
+      baseCurrency={settings.currency}
+      multiCurrency={settings.multiCurrency} // P9: off = no per-item currency controls at all
+    />
+  );
 }

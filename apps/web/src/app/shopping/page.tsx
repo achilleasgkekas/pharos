@@ -22,5 +22,14 @@ async function getItems(): Promise<SerializedItem[]> {
 
 export default async function ShoppingPage() {
   const [items, settings] = await Promise.all([getItems(), getAppSettings()]);
-  return <ItemsClient items={items} view="shopping" defaultView={settings.defaultItemView} categoryList={settings.itemCategories} />;
+  return (
+    <ItemsClient
+      items={items}
+      view="shopping"
+      defaultView={settings.defaultItemView}
+      categoryList={settings.itemCategories}
+      baseCurrency={settings.currency}
+      multiCurrency={settings.multiCurrency} // P9: off = no per-item currency controls at all
+    />
+  );
 }

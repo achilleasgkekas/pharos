@@ -1087,7 +1087,7 @@
   enable notifications) με progress ticks → activation. **Διακριτό** από P1 (demo data) — εδώ τα *δικά του* δεδομένα.
 - **Module:** Homepage / Dashboard (dismissable card) + Settings state reads.
 
-### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + EXPENSES + RECEIPTS + SUBSCRIPTIONS SHIPPED 2026-07-25 (pharos-daily-dev), υπόλοιπα modules εκκρεμούν
+### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + EXPENSES + RECEIPTS + SUBSCRIPTIONS + ITEMS SHIPPED 2026-07-25 (pharos-daily-dev), υπόλοιπα modules εκκρεμούν
 - **Τι χτίστηκε (slice 1 από L item):** νέο pure **`lib/fx.ts`** (+25 unit tests, client-safe, DB-free) που κρατά
   **ΤΟΝ ΕΝΑΝ κανόνα** σε ένα μέρος: `normalizeCurrency`, `isForeignCurrency`, `convertToBase`, `deriveFxRate`,
   `resolveFx`, `formatMoney`, `fxBadgeLabel`. **Κλειδωμένη αρχιτεκτονική απόφαση (builder default, μηδέν migration):
@@ -1137,9 +1137,24 @@
   currency τιμάται **μόνο** όταν το multi-currency είναι on (αλλιώς θα μάρκαρε foreign μια single-currency εγγραφή).
   `/api/v1/subscriptions` shape += origAmount/fxRate + POST/PATCH δέχονται currency/fxRate + τεκμηρίωση στο `API.md`
   (μαζί καθαρίστηκε stale roadmap γραμμή που έλεγε ότι PATCH/DELETE εκκρεμούν ενώ ήδη υπάρχουν). **+36 tests** (3589).
-- **Εκκρεμούν (επόμενα slices):** Statements/Items ίδια 3 πεδία (το `currency` τους αποθηκεύεται ήδη αγνοημένο,
-  ίδιο latent bug)· `resolveFx` στο CSV import (PA1) και στο email-in· προαιρετικό δωρεάν rate-feed (phase 2, τώρα
-  το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία (το API τα εκθέτει ήδη σε 3 modules).
+- **Τι χτίστηκε (slice 4 — Items, 2026-07-25):** ίδια 3 πεδία στο `Item` (`currency`/`origAmount`/`fxRate`) και **και
+  τα 4 write paths** (createItem/updateItem/`POST` v1/`PATCH` v1). **Διαφορά από τα προηγούμενα**: ένα item έχει
+  **ΤΡΙΑ** ποσά (`purchasedPrice`, `currentPrice`, `targetPrice`) γραμμένα στο ΙΔΙΟ χαρτί/shop page, οπότε
+  μετατρέπονται **όλα με ΤΟ ΙΔΙΟ rate** (τα αθροίζουν net worth, το insurance export του P13, το inventory value ανά
+  κατηγορία και το shopping budget· μισο-μετατρεπμένο item θα δηλητηρίαζε και τα τέσσερα). Νέο pure
+  **`fx.resolveItemPrices()`** (+11 unit tests) κρατά αυτόν τον κανόνα σε ΕΝΑ μέρος και το μοιράζονται action + API
+  route. Το `origAmount` κρατά την τυπωμένη **ANCHOR** τιμή: ό,τι **πλήρωσες** όταν το item είναι owned, αλλιώς την
+  τιμή ζήτησης (αυτό αναγνωρίζει κανείς από την απόδειξη, αυτό δείχνει το `FxBadge`). **Δεν μετατρέπονται** οι τιμές
+  των store links (`links[].price`, ό,τι quote-άρει ο scraper/το shop) ούτε το παλιό `priceHistory[].currency`, οπότε
+  το derived «cheapest link» currentPrice μένει ακριβώς όπως ήταν. Το `PATCH` ξαναδιαβάζει το doc σε κάθε money field
+  και **ξε-μετατρέπει πρώτα** (μέσω `toPrinted`) ώστε ένα νέο rate να εφαρμόζεται στα ΤΥΠΩΜΕΝΑ νούμερα και όχι πάνω σε
+  προηγούμενη μετατροπή (re-sending του ίδιου rate = no-op, pinned με τεστ). Ίδιο και στη φόρμα: ένα foreign item
+  σείρνεται στο form ως printed, ώστε re-save χωρίς αλλαγή να μην ξανα-μετατρέπει. UI: currency select + η ίδια FX
+  γραμμή (rate ή «or charged») + `FxBadge` σε card/row/detail. `/api/v1/items` shape += currency/origAmount/fxRate +
+  POST/PATCH δέχονται currency/fxRate (**mobile parity μαζί**) + τεκμηρίωση στο `API.md`. **+23 tests** (3636).
+- **Εκκρεμούν (επόμενα slices):** Statements ίδια 3 πεδία (το `currency` του αποθηκεύεται ήδη αγνοημένο, ίδιο latent
+  bug)· `resolveFx` στο CSV import (PA1) και στο email-in· προαιρετικό δωρεάν rate-feed (phase 2, τώρα
+  το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία (το API τα εκθέτει ήδη σε 4 modules).
 - **Αξία (αρχικό):** ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency. Πραγματικό κενό
   (CLAUDE.md). Μεγάλο: αγγίζει schema (amount+currency+rate), aggregations, imports, όλα τα money views.
 - **Module:** cross-cutting (Expenses/Receipts/Statements/Reports + `lib/money.ts`).

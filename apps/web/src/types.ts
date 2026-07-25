@@ -30,6 +30,12 @@ export type SerializedItem = {
   purchasedAt: string | null;
   purchasedFrom: string;
   targetPrice: number | null;
+  /** P9: ISO code printed on the receipt; '' (or the base code) when the item is not foreign. */
+  currency: string;
+  /** P9: printed anchor price (paid, else asking); 0 when the item is in base currency. */
+  origAmount: number;
+  /** P9: base units per 1 unit of `currency`; 0 when not foreign or the rate is still unknown. */
+  fxRate: number;
   priceHistory: SerializedPriceEntry[];
   links: { label: string; url: string; price?: number | null }[];
   receiptIds: string[];

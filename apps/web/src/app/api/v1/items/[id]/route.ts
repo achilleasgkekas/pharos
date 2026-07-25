@@ -3,6 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
+import { getAppSettings } from '@/lib/appSettings';
+import { resolveItemPrices, isForeignCurrency, toPrinted } from '@/lib/fx';
 import { Item, ITEM_STATUSES } from '@/models/Item';
 
 export const runtime = 'nodejs';
@@ -56,6 +58,7 @@ function priceStatus(item: { currentPrice: number; targetPrice?: number | null; 
 type ItemDetailLean = {
   _id: unknown; num?: string; title: string; status?: string; category?: string;
   currentPrice?: number; purchasedPrice?: number | null; targetPrice?: number | null;
+  currency?: string; origAmount?: number; fxRate?: number;
   specs?: string; notes?: string; warrantyUntil?: Date | string | null;
   purchasedFrom?: string; purchasedAt?: Date | string | null; location?: string; serialNumber?: string;
   tags?: string[]; photos?: string[]; attachments?: AttachmentLean[]; links?: LinkLean[]; priceHistory?: HistLean[]; updatedAt?: Date;
@@ -92,6 +95,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         currentPrice: doc.currentPrice ?? 0,
         purchasedPrice: doc.purchasedPrice ?? null,
         targetPrice: doc.targetPrice ?? null,
+        // P9: prices above are base currency; these say what the receipt printed (see lib/fx.ts).
+        currency: doc.currency ?? '',
+        origAmount: doc.origAmount ?? 0,
+        fxRate: doc.fxRate ?? 0,
         specs: doc.specs ?? '',
         notes: doc.notes ?? '',
         warrantyUntil: doc.warrantyUntil ? new Date(doc.warrantyUntil).toISOString() : null,
@@ -112,7 +119,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   });
 }
 
-/** PATCH /api/v1/items/:id  { title?, status?, category?, currentPrice?, targetPrice?, specs?, tags? } */
+/** PATCH /api/v1/items/:id  { title?, status?, category?, currentPrice?, targetPrice?, specs?, tags?, currency?, fxRate? }
+ *  currency/fxRate (P9): sending any money field re-resolves the WHOLE price set against the
+ *  base currency, so the stored prices are always base-denominated and consistent with each other. */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
@@ -126,13 +135,53 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof b.currentPrice === 'number') set.currentPrice = b.currentPrice;
     if ('targetPrice' in b) set.targetPrice = b.targetPrice == null ? null : Number(b.targetPrice);
     if (Array.isArray(b.tags)) set.tags = b.tags.map(String);
-    if (!Object.keys(set).length) return apiError('no valid fields');
+    // P9: money fields arrive as PRINTED figures. Because the stored prices are base currency,
+    // touching the price, the target, the currency OR the rate means the whole set has to be
+    // recomputed together from the current doc — a partial PATCH must never leave a record
+    // half-converted (e.g. a new rate applied to currentPrice but not to purchasedPrice).
+    // Bodies without any of these skip the extra read entirely.
+    const touchesFx =
+      typeof b.currentPrice === 'number' || 'targetPrice' in b || typeof b.currency === 'string' || b.fxRate != null;
+    if (!Object.keys(set).length && !touchesFx) return apiError('no valid fields');
     await connectDB();
+    if (touchesFx) {
+      const existing = (await Item.findById(id).lean()) as ItemDetailLean | null;
+      if (!existing) return apiError('not found', 404);
+      const base = (await getAppSettings()).currency;
+      // Un-convert what is stored back to PRINTED figures first, so a newly supplied rate
+      // applies to the paper amounts instead of compounding on top of an earlier conversion.
+      const oldRate = isForeignCurrency(existing.currency, base) ? existing.fxRate ?? 0 : 0;
+      const printed = (v: number | null | undefined): number | null =>
+        v == null ? null : oldRate > 0 ? toPrinted(v, oldRate) : v;
+      const money = resolveItemPrices(
+        {
+          currentPrice:
+            typeof set.currentPrice === 'number' ? set.currentPrice : printed(existing.currentPrice) ?? 0,
+          purchasedPrice: printed(existing.purchasedPrice),
+          targetPrice: 'targetPrice' in set ? (set.targetPrice as number | null) : printed(existing.targetPrice),
+          currency: typeof b.currency === 'string' ? b.currency : existing.currency ?? '',
+          fxRate: b.fxRate != null && Number.isFinite(Number(b.fxRate)) ? Number(b.fxRate) : existing.fxRate ?? 0,
+        },
+        base
+      );
+      Object.assign(set, money);
+    }
     const doc = await Item.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
-    const i = doc as { _id: unknown; title: string; status?: string; category?: string; currentPrice?: number; targetPrice?: number | null; updatedAt?: Date };
+    const i = doc as { _id: unknown; title: string; status?: string; category?: string; currentPrice?: number; targetPrice?: number | null; currency?: string; origAmount?: number; fxRate?: number; updatedAt?: Date };
     return NextResponse.json({
-      item: { id: String(i._id), title: i.title, status: i.status ?? 'researching', category: i.category ?? '', currentPrice: i.currentPrice ?? 0, targetPrice: i.targetPrice ?? null, updatedAt: iso(i.updatedAt) },
+      item: {
+        id: String(i._id),
+        title: i.title,
+        status: i.status ?? 'researching',
+        category: i.category ?? '',
+        currentPrice: i.currentPrice ?? 0,
+        targetPrice: i.targetPrice ?? null,
+        currency: i.currency ?? '',
+        origAmount: i.origAmount ?? 0,
+        fxRate: i.fxRate ?? 0,
+        updatedAt: iso(i.updatedAt),
+      },
     });
   });
 }

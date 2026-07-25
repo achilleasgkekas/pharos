@@ -8,6 +8,7 @@ import {
   formatMoney,
   fxBadgeLabel,
   toPrinted,
+  resolveItemPrices,
 } from './fx';
 
 describe('normalizeCurrency', () => {
@@ -194,5 +195,92 @@ describe('fxBadgeLabel', () => {
 
   it('omits the rate when it is still unknown', () => {
     expect(fxBadgeLabel({ currency: 'USD', origAmount: 88, fxRate: 0 }, 'EUR')).toBe('$88.00');
+  });
+});
+
+describe('resolveItemPrices (P9 — Items)', () => {
+  const eur = (i: Parameters<typeof resolveItemPrices>[0]) => resolveItemPrices(i, 'EUR');
+
+  it('passes a base-currency item straight through, storing no FX metadata', () => {
+    const r = eur({ currentPrice: 475, purchasedPrice: null, targetPrice: 400, currency: 'EUR', fxRate: 0 });
+    expect(r).toEqual({
+      currency: 'EUR', origAmount: 0, fxRate: 0,
+      currentPrice: 475, purchasedPrice: null, targetPrice: 400,
+    });
+  });
+
+  it('treats a blank currency as base currency (single-currency form submits nothing)', () => {
+    const r = eur({ currentPrice: 99, purchasedPrice: null, targetPrice: null });
+    expect(r.currency).toBe('EUR');
+    expect(r.fxRate).toBe(0);
+    expect(r.currentPrice).toBe(99);
+  });
+
+  it('converts ALL THREE price fields with the one rate', () => {
+    const r = eur({ currentPrice: 100, purchasedPrice: 88, targetPrice: 80, currency: 'USD', fxRate: 0.92 });
+    expect(r.purchasedPrice).toBe(80.96); // 88 * 0.92
+    expect(r.currentPrice).toBe(92);      // 100 * 0.92
+    expect(r.targetPrice).toBe(73.6);     // 80 * 0.92
+    expect(r.currency).toBe('USD');
+    expect(r.fxRate).toBe(0.92);
+  });
+
+  it('anchors origAmount on what was PAID when the item is owned', () => {
+    const r = eur({ currentPrice: 100, purchasedPrice: 88, targetPrice: null, currency: 'USD', fxRate: 0.92 });
+    expect(r.origAmount).toBe(88);
+  });
+
+  it('anchors origAmount on the asking price when nothing was paid (wishlist)', () => {
+    const r = eur({ currentPrice: 100, purchasedPrice: null, targetPrice: null, currency: 'USD', fxRate: 0.92 });
+    expect(r.origAmount).toBe(100);
+  });
+
+  it('ignores a zero purchasedPrice as an anchor (never anchors on 0)', () => {
+    const r = eur({ currentPrice: 100, purchasedPrice: 0, targetPrice: null, currency: 'USD', fxRate: 0.92 });
+    expect(r.origAmount).toBe(100);
+  });
+
+  it('never guesses 1:1 — an unknown rate keeps the printed numbers and flags them', () => {
+    const r = eur({ currentPrice: 100, purchasedPrice: 88, targetPrice: 80, currency: 'USD', fxRate: 0 });
+    // Nothing converted: exactly today's behaviour, so no stored total silently shifts.
+    expect(r.currentPrice).toBe(100);
+    expect(r.purchasedPrice).toBe(88);
+    expect(r.targetPrice).toBe(80);
+    expect(r.fxRate).toBe(0);
+    expect(r.origAmount).toBe(88); // still remembered, so the UI can ask for a rate
+  });
+
+  it('keeps nulls null rather than turning them into 0', () => {
+    const r = eur({ currentPrice: 100, purchasedPrice: null, targetPrice: null, currency: 'USD', fxRate: 0.92 });
+    expect(r.purchasedPrice).toBeNull();
+    expect(r.targetPrice).toBeNull();
+  });
+
+  it('rounds every converted field to cents', () => {
+    const r = eur({ currentPrice: 33.33, purchasedPrice: null, targetPrice: null, currency: 'USD', fxRate: 0.923456 });
+    expect(r.currentPrice).toBe(30.78);
+  });
+
+  it('honours a non-EUR base currency', () => {
+    const r = resolveItemPrices({ currentPrice: 50, purchasedPrice: null, targetPrice: null, currency: 'USD', fxRate: 1.1 }, 'USD');
+    // Same code as base = not foreign, whatever the rate says.
+    expect(r.fxRate).toBe(0);
+    expect(r.currentPrice).toBe(50);
+    expect(r.currency).toBe('USD');
+  });
+
+  it('round-trips with toPrinted, so re-saving an unchanged item is stable', () => {
+    const stored = eur({ currentPrice: 100, purchasedPrice: 88, targetPrice: null, currency: 'USD', fxRate: 0.92 });
+    // What the edit form seeds itself with, then submits unchanged.
+    const again = eur({
+      currentPrice: toPrinted(stored.currentPrice, stored.fxRate),
+      purchasedPrice: toPrinted(stored.purchasedPrice as number, stored.fxRate),
+      targetPrice: null,
+      currency: stored.currency,
+      fxRate: stored.fxRate,
+    });
+    expect(again.currentPrice).toBe(stored.currentPrice);
+    expect(again.purchasedPrice).toBe(stored.purchasedPrice);
+    expect(again.origAmount).toBe(88);
   });
 });

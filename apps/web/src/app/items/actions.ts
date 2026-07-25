@@ -18,6 +18,8 @@ import { revalidatePath } from 'next/cache';
 import { safeRevalidate } from '@/lib/revalidate';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import { getAppSettings } from '@/lib/appSettings';
+import { resolveItemPrices, type ItemPricesInput } from '@/lib/fx';
 import type { SerializedItem, SerializedAttachment } from '@/types';
 
 const CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'] as const;
@@ -37,6 +39,10 @@ const ItemFormSchema = z.object({
     (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
     z.number().nullable().default(null)
   ),
+  // P9 multi-currency: the ISO code the prices above are PRINTED in, and the rate to the
+  // deployment's base currency. Absent (single-currency form) = nothing to convert.
+  currency: z.string().default(''),
+  fxRate: z.coerce.number().min(0).default(0),
   purchasedFrom: z.string().default(''),
   specs: z.string().default(''),
   notes: z.string().default(''),
@@ -70,19 +76,30 @@ function parseLinks(raw: string): { label: string; url: string; price: number | 
   }
 }
 
+/** P9: resolve the form's PRINTED prices against the deployment's base currency.
+ *  All the thinking lives in lib/fx.ts resolveItemPrices (pure + unit-tested); this only
+ *  supplies the base code. */
+async function resolveItemFx(parsed: ItemPricesInput) {
+  return resolveItemPrices(parsed, (await getAppSettings()).currency);
+}
+
 export async function createItem(formData: FormData) {
   return withRequestTenant(async () => {
   const raw = Object.fromEntries(formData);
-  const { links, tags, ...rest } = ItemFormSchema.parse(raw);
+  const parsed = ItemFormSchema.parse(raw);
+  const { links, tags, ...rest } = parsed;
+  const money = await resolveItemFx(parsed);
   await connectDB();
   const Item = await currentModel(ItemModel);
   const parsedLinks = parseLinks(links);
   // When store links carry prices, the headline price is DERIVED (cheapest link) —
-  // the manual price field is only a fallback for link-less items.
+  // the manual price field is only a fallback for link-less items. A link price is
+  // whatever the shop/scraper quoted, so it is stored as-is and NOT FX-converted.
   const cl = lowestKnownPrice({ links: parsedLinks });
   await Item.create({
     ...rest,
-    currentPrice: cl ?? rest.currentPrice,
+    ...money,
+    currentPrice: cl ?? money.currentPrice,
     tags: parseTags(tags),
     links: parsedLinks,
   });
@@ -93,14 +110,17 @@ export async function createItem(formData: FormData) {
 export async function updateItem(id: string, formData: FormData) {
   return withRequestTenant(async () => {
   const raw = Object.fromEntries(formData);
-  const { links, tags, ...rest } = ItemFormSchema.parse(raw);
+  const parsed = ItemFormSchema.parse(raw);
+  const { links, tags, ...rest } = parsed;
+  const money = await resolveItemFx(parsed);
   await connectDB();
   const Item = await currentModel(ItemModel);
   const parsedLinks = parseLinks(links);
   const cl = lowestKnownPrice({ links: parsedLinks });
   await Item.findByIdAndUpdate(id, {
     ...rest,
-    currentPrice: cl ?? rest.currentPrice,
+    ...money,
+    currentPrice: cl ?? money.currentPrice,
     tags: parseTags(tags),
     links: parsedLinks,
   });

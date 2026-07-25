@@ -21,7 +21,7 @@ import type { NextRequest } from 'next/server';
 //
 // We run the REAL apiAuth/apiBody/apiList helpers and mock only the DB seam.
 
-const { connectDBMock, userFindOne, userState, itemFindById, findByIdState, itemUpdate, updateState } = vi.hoisted(() => {
+const { connectDBMock, userFindOne, userState, itemFindById, findByIdState, itemUpdate, updateState, settingsState, getAppSettingsMock } = vi.hoisted(() => {
   const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
   const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
   // Item.findById(id).lean() → GET detail doc
@@ -36,10 +36,17 @@ const { connectDBMock, userFindOne, userState, itemFindById, findByIdState, item
     updateState.calls.push({ id, update, opts });
     return { lean: async () => updateState.doc };
   });
-  return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, itemFindById, findByIdState, itemUpdate, updateState };
+  // P9: a PATCH that touches a money field re-reads the doc and resolves against this.
+  const settingsState = { currency: 'EUR' } as { currency: string };
+  const getAppSettingsMock = vi.fn(async () => settingsState);
+  return {
+    connectDBMock: vi.fn(async () => {}), userFindOne, userState, itemFindById, findByIdState,
+    itemUpdate, updateState, settingsState, getAppSettingsMock,
+  };
 });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/models/Item', () => ({
   Item: { findById: itemFindById, findByIdAndUpdate: itemUpdate },
@@ -77,7 +84,9 @@ beforeEach(() => {
   findByIdState.doc = null;
   updateState.calls = [];
   updateState.doc = { _id: 'i1', title: 'X' };
+  settingsState.currency = 'EUR';
   vi.clearAllMocks();
+  getAppSettingsMock.mockImplementation(async () => settingsState);
   userFindOne.mockImplementation(() => ({ select: () => ({ lean: async () => userState.doc }) }));
   itemFindById.mockImplementation((id: string) => {
     findByIdState.calls.push(id);
@@ -291,40 +300,58 @@ describe('PATCH', () => {
     expect(itemUpdate).not.toHaveBeenCalled();
   });
 
+  // NOTE (P9): a body touching ANY money field re-reads the doc so the whole price set can be
+  // re-resolved together, and the $set therefore also carries the resolved currency/origAmount/
+  // fxRate. On a base-currency deployment those are the inert values (base code, 0, 0) and the
+  // prices themselves are written unchanged, so the pre-P9 contract still holds.
   it('builds a whitelisted $set: title trim, status enum, category/specs, numeric price, tags stringified', async () => {
+    findByIdState.doc = itemDoc({ currentPrice: 200, purchasedPrice: null, targetPrice: 250 });
     updateState.doc = { _id: 'i1', title: 'Ubiquiti U7 Pro', status: 'ordered', category: 'network', currentPrice: 284, targetPrice: 250 };
     const res = await PATCH(makeReq({ body: { title: '  Ubiquiti U7 Pro  ', status: 'ordered', category: 'network', specs: 'WiFi 7', currentPrice: 284, tags: [1, 'wifi', true] } }), ctx(OID));
     expect(res.status).toBe(200);
     const { id, update, opts } = updateState.calls[0];
     expect(id).toBe(OID);
-    expect(update).toEqual({ $set: { title: 'Ubiquiti U7 Pro', status: 'ordered', category: 'network', specs: 'WiFi 7', currentPrice: 284, tags: ['1', 'wifi', 'true'] } });
+    expect(update).toEqual({
+      $set: {
+        title: 'Ubiquiti U7 Pro', status: 'ordered', category: 'network', specs: 'WiFi 7',
+        tags: ['1', 'wifi', 'true'],
+        currentPrice: 284, purchasedPrice: null, targetPrice: 250,
+        currency: 'EUR', origAmount: 0, fxRate: 0,
+      },
+    });
     expect(opts).toEqual({ new: true });
     const { item } = await res.json();
-    expect(item).toEqual({ id: 'i1', title: 'Ubiquiti U7 Pro', status: 'ordered', category: 'network', currentPrice: 284, targetPrice: 250, updatedAt: null });
+    expect(item).toEqual({ id: 'i1', title: 'Ubiquiti U7 Pro', status: 'ordered', category: 'network', currentPrice: 284, targetPrice: 250, currency: '', origAmount: 0, fxRate: 0, updatedAt: null });
   });
 
   it('ignores currentPrice when it is a numeric STRING (only real numbers are written)', async () => {
+    findByIdState.doc = itemDoc({ currentPrice: 111, targetPrice: null });
     const res = await PATCH(makeReq({ body: { title: 'Keep', currentPrice: '999' } }), ctx(OID));
     expect(res.status).toBe(200);
+    // A non-number currentPrice is not a money touch at all, so no re-read and no FX fields.
     expect(updateState.calls[0].update).toEqual({ $set: { title: 'Keep' } });
+    expect(findByIdState.calls).toEqual([]);
   });
 
   it('clears the target: { targetPrice: null } is a legitimate lone write (key-presence, not truthiness)', async () => {
+    findByIdState.doc = itemDoc({ currentPrice: 100, purchasedPrice: null, targetPrice: 80 });
     const res = await PATCH(makeReq({ body: { targetPrice: null } }), ctx(OID));
     expect(res.status).toBe(200);
-    expect(updateState.calls[0].update).toEqual({ $set: { targetPrice: null } });
+    expect(updateState.calls[0].update).toMatchObject({ $set: { targetPrice: null } });
   });
 
   it('keeps a target of 0 (falsy but not null) rather than dropping it', async () => {
+    findByIdState.doc = itemDoc({ currentPrice: 100, purchasedPrice: null, targetPrice: null });
     const res = await PATCH(makeReq({ body: { targetPrice: 0 } }), ctx(OID));
     expect(res.status).toBe(200);
-    expect(updateState.calls[0].update).toEqual({ $set: { targetPrice: 0 } });
+    expect(updateState.calls[0].update).toMatchObject({ $set: { targetPrice: 0 } });
   });
 
   it('coerces a numeric-string target via Number()', async () => {
+    findByIdState.doc = itemDoc({ currentPrice: 100, purchasedPrice: null, targetPrice: null });
     const res = await PATCH(makeReq({ body: { targetPrice: '199.5' } }), ctx(OID));
     expect(res.status).toBe(200);
-    expect(updateState.calls[0].update).toEqual({ $set: { targetPrice: 199.5 } });
+    expect(updateState.calls[0].update).toMatchObject({ $set: { targetPrice: 199.5 } });
   });
 
   it('returns 404 when the item does not exist (write still attempted)', async () => {
@@ -353,5 +380,74 @@ describe('DELETE', () => {
     const res = await DELETE(makeReq(), ctx(OID));
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: 'not found' });
+  });
+});
+
+// P9 multi-currency. The stored prices are ALWAYS base currency, so a PATCH that touches any
+// money field must re-resolve the WHOLE set from the current doc — otherwise a partial update
+// (rate-only, currency-only, price-only) leaves the record half-converted, which is exactly the
+// silent-corruption class this feature exists to prevent.
+describe('PATCH multi-currency (P9)', () => {
+  it('converts a printed price with the supplied rate and records both halves', async () => {
+    findByIdState.doc = itemDoc({ currentPrice: 110, purchasedPrice: null, targetPrice: null });
+    const res = await PATCH(makeReq({ body: { currentPrice: 110, currency: 'USD', fxRate: 0.92 } }), ctx(OID));
+    expect(res.status).toBe(200);
+    expect(updateState.calls[0].update).toMatchObject({
+      $set: { currentPrice: 101.2, currency: 'USD', origAmount: 110, fxRate: 0.92 },
+    });
+  });
+
+  it('re-converts the OTHER price fields too, so a record never mixes two currencies', async () => {
+    // Item already stored at 0.9: printed 100/88/80 → stored 90/79.2/72.
+    findByIdState.doc = itemDoc({ currentPrice: 90, purchasedPrice: 79.2, targetPrice: 72, currency: 'USD', fxRate: 0.9 });
+    const res = await PATCH(makeReq({ body: { fxRate: 0.5 } }), ctx(OID));
+    expect(res.status).toBe(200);
+    // The new rate applies to the PRINTED figures, not on top of the old conversion.
+    expect(updateState.calls[0].update).toMatchObject({
+      $set: { currentPrice: 50, purchasedPrice: 44, targetPrice: 40, currency: 'USD', origAmount: 88, fxRate: 0.5 },
+    });
+  });
+
+  it('a rate-only PATCH does not compound onto an already-converted amount', async () => {
+    findByIdState.doc = itemDoc({ currentPrice: 92, purchasedPrice: null, targetPrice: null, currency: 'USD', fxRate: 0.92 });
+    await PATCH(makeReq({ body: { fxRate: 0.92 } }), ctx(OID));
+    // Re-sending the SAME rate must be a no-op, not 92 * 0.92.
+    expect(updateState.calls[0].update).toMatchObject({ $set: { currentPrice: 92, origAmount: 100, fxRate: 0.92 } });
+  });
+
+  it('switching a foreign item back to base currency restores the printed figures', async () => {
+    findByIdState.doc = itemDoc({ currentPrice: 92, purchasedPrice: null, targetPrice: null, currency: 'USD', fxRate: 0.92 });
+    await PATCH(makeReq({ body: { currency: 'EUR' } }), ctx(OID));
+    expect(updateState.calls[0].update).toMatchObject({
+      $set: { currentPrice: 100, currency: 'EUR', origAmount: 0, fxRate: 0 },
+    });
+  });
+
+  it('never guesses a rate: currency without one keeps the printed price and flags it', async () => {
+    findByIdState.doc = itemDoc({ currentPrice: 64, purchasedPrice: null, targetPrice: null });
+    await PATCH(makeReq({ body: { currency: 'USD' } }), ctx(OID));
+    expect(updateState.calls[0].update).toMatchObject({
+      $set: { currentPrice: 64, currency: 'USD', origAmount: 64, fxRate: 0 },
+    });
+  });
+
+  it('404s when a money PATCH targets a missing item, without writing', async () => {
+    findByIdState.doc = null;
+    const res = await PATCH(makeReq({ body: { currentPrice: 10 } }), ctx(OID));
+    expect(res.status).toBe(404);
+    expect(itemUpdate).not.toHaveBeenCalled();
+  });
+
+  it('accepts currency/fxRate as the ONLY fields (they alone are a valid PATCH)', async () => {
+    findByIdState.doc = itemDoc({ currentPrice: 100, purchasedPrice: null, targetPrice: null });
+    const res = await PATCH(makeReq({ body: { currency: 'USD', fxRate: 0.92 } }), ctx(OID));
+    expect(res.status).toBe(200);
+  });
+
+  it('skips the extra read entirely for a body with no money fields', async () => {
+    const res = await PATCH(makeReq({ body: { title: 'Renamed' } }), ctx(OID));
+    expect(res.status).toBe(200);
+    expect(findByIdState.calls).toEqual([]);
+    expect(updateState.calls[0].update).toEqual({ $set: { title: 'Renamed' } });
   });
 });

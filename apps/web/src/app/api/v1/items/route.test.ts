@@ -15,7 +15,7 @@ import type { NextRequest } from 'next/server';
 // We exercise the REAL apiAuth/apiBody/apiList helpers and only mock the DB seam
 // (connectDB + the User/Item models), so validation + serialization run for real.
 
-const { connectDBMock, userFindOne, userState, itemFind, itemCount, itemCreate, findQuery, countQuery, state } =
+const { connectDBMock, userFindOne, userState, itemFind, itemCount, itemCreate, findQuery, countQuery, state, settingsState, getAppSettingsMock } =
   vi.hoisted(() => {
     const state: { docs: unknown[]; total: number; lastCreate: Record<string, unknown> | null } = {
       docs: [],
@@ -38,10 +38,17 @@ const { connectDBMock, userFindOne, userState, itemFind, itemCount, itemCreate, 
       state.lastCreate = arg;
       return { toObject: () => ({ _id: 'newid', updatedAt: new Date('2026-07-04T00:00:00Z'), ...arg }) };
     });
-    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, itemFind, itemCount, itemCreate, findQuery, countQuery, state };
+    // P9: the POST route resolves the deployment's base currency before storing prices.
+    const settingsState = { currency: 'EUR' } as { currency: string };
+    const getAppSettingsMock = vi.fn(async () => settingsState);
+    return {
+      connectDBMock: vi.fn(async () => {}), userFindOne, userState, itemFind, itemCount, itemCreate,
+      findQuery, countQuery, state, settingsState, getAppSettingsMock,
+    };
   });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/models/Item', () => ({
   Item: { find: itemFind, countDocuments: itemCount, create: itemCreate },
@@ -66,7 +73,9 @@ beforeEach(() => {
   state.total = 0;
   state.lastCreate = null;
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
+  settingsState.currency = 'EUR';
   vi.clearAllMocks();
+  getAppSettingsMock.mockImplementation(async () => settingsState);
   for (const m of ['sort', 'skip', 'limit', 'setOptions']) (findQuery[m] as ReturnType<typeof vi.fn>).mockImplementation(() => findQuery);
   (findQuery.lean as ReturnType<typeof vi.fn>).mockImplementation(async () => state.docs);
   (countQuery.setOptions as ReturnType<typeof vi.fn>).mockImplementation(() => countQuery);
@@ -199,5 +208,37 @@ describe('GET listing', () => {
     const json = (await res.json()) as { data: Array<{ deleted: boolean; photo: unknown }> };
     expect(json.data[0].deleted).toBe(true);
     expect(json.data[0].photo).toBe(null); // no photos → null
+  });
+});
+
+// P9 multi-currency. The route reads `currentPrice` as a PRINTED figure and stores it in the
+// deployment's base currency, so every roll-up downstream (net worth, insurance export,
+// inventory value) can keep summing the stored number directly.
+describe('POST multi-currency (P9)', () => {
+  it('stores a foreign price converted, and remembers what was printed', async () => {
+    const res = await POST(makeReq({ body: { title: 'Sabrent NT-P10G', currentPrice: 110, currency: 'USD', fxRate: 0.92 } }));
+    expect(res.status).toBe(201);
+    expect(state.lastCreate).toMatchObject({ currentPrice: 101.2, currency: 'USD', origAmount: 110, fxRate: 0.92 });
+    // The mobile client needs both halves back to render the FX badge.
+    expect((await res.json()).item).toMatchObject({ currentPrice: 101.2, currency: 'USD', origAmount: 110, fxRate: 0.92 });
+  });
+
+  it('never guesses a rate: a foreign price without one is stored as printed and flagged', async () => {
+    const res = await POST(makeReq({ body: { title: 'Fenvi AQC113', currentPrice: 64, currency: 'USD' } }));
+    expect(res.status).toBe(201);
+    expect(state.lastCreate).toMatchObject({ currentPrice: 64, currency: 'USD', origAmount: 64, fxRate: 0 });
+  });
+
+  it('leaves a base-currency body byte-identical to the old single-currency behaviour', async () => {
+    const res = await POST(makeReq({ body: { title: 'U7 Pro', currentPrice: 284, currency: 'EUR' } }));
+    expect(res.status).toBe(201);
+    expect(state.lastCreate).toMatchObject({ currentPrice: 284, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+
+  it('resolves against the deployment currency, not a hardcoded EUR', async () => {
+    settingsState.currency = 'USD';
+    await POST(makeReq({ body: { title: 'Rack shelf', currentPrice: 38, currency: 'USD', fxRate: 0.92 } }));
+    // Same code as base → not foreign, so the rate is ignored and nothing is converted.
+    expect(state.lastCreate).toMatchObject({ currentPrice: 38, currency: 'USD', origAmount: 0, fxRate: 0 });
   });
 });
