@@ -1,5 +1,30 @@
 # DOCS_PROGRESS
 
+## 2026-07-25 (twenty-first run — P9 multi-currency slices 3-5: Subscriptions, Items, Statements)
+
+Σάρωση git log για νέα feat() commits μετά την twentieth run (commit 7221361, 2026-07-25 16:17). Ανακάλυψη: **3 νέα P9 slices shipped αλλα ΔΕΝ ήταν documented** στο features.md:
+- **Slice 3 (Subscriptions)** — commit b2e72ce, 2026-07-25 18:19 — `Subscription.currency` field ήδη αποθηκευμένο αλλα ΔΕΝ ήταν honored στο monthly total/calendar/trial-digest
+- **Slice 4 (Items)** — commit 8e13724, 2026-07-25 20:18 — ήδη documented στο features.md (P9 bullet ήδη υπήρχε)
+- **Slice 5 (Statements)** — commit 2e408ff, 2026-07-25 22:17 — per-statement FX rate converts όλα τα amounts
+
+Τι έγραψα:
+- **features.md**: Προσθεση νέας bullet point στη Statements section για P9 multi-currency (per-statement currency + origAmount + fxRate, converts totalAmount/minimumPayment/paidAmount + κάθε transaction).
+- **mobile.md**: Ενημέρωση τριών rows (Items + Subscriptions + Statements) για να αναφέρουν "multi-currency support" (Items: foreign purchases · Subscriptions: foreign-billed · Statements: whole-statement conversion).
+
+Accuracy (διάβασα κώδικα, όχι εικασίες): git commit messages σαφώς περιγράφουν τι έκλεισαν τα slices. api.md ήδη ειχε P9 documentation για Statements (line 256, multi-currency fields section). features.md Items section ήδη εχει P9. mobile.md Expenses ήδη εχει P9 mention.
+
+Validation (markdown only, κανενα build/Docker/AI call):
+- Code fences: features.md 0 (αθικτο), mobile.md 8 (ζυγο), api.md 22 (ζυγο).
+- Internal links: καμια νέα αναφορά (inline edits μόνο).
+- Secret scan: κανενα sk_/phk_/STRIPE_ literal ✓.
+- Markdown structure: ✓.
+
+Collision guard: git status --short = ΜΟΝΟ docs/features.md + docs/mobile.md modified (δικά μου), κανενα staged foreign.
+
+Commit: 629baca (docs(features+mobile): P9 multi-currency for Statements, Items, Subscriptions). Push: successful → origin/main ✓.
+
+Επόμενο run: (α) grep για άλλα νέα features που shipped (π.χ. P51+ candidates ή άλλα undocumented) ή (β) features.md stale-forward check για άλλα modules που ίσως χρειάζονται update.
+
 ## 2026-07-25 (twentieth run — P9 Receipts multi-currency slice 2)
 
 Σάρωση git log για νέα feat() commits μετά τα τελευταίο run (commit 125827f, 2026-07-25 14:22). Ανακάλυψη: **P9 Receipts multi-currency (commit 25cb2c2, 2026-07-25 16:17)** ήταν shipped αλλά ΔΕΝ ήταν documented: Receipt.currency, Receipt.origAmount, Receipt.fxRate fields για tracking foreign-currency receipts με exchange rates, ενώ όλες τις receipt amounts (total, net, VAT, line prices) μετατρέπονται με τον ίδιο ρυθμό.
