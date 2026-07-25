@@ -276,6 +276,15 @@ date.
 - **Link a plan to products** (one plan can cover several items from the same
   purchase), so an installment charge points back at what it bought.
 - **Re-scan** (text or OCR) preserves your manual edits and product links.
+- **Multi-currency support (P9).** Credit card statements issued in foreign
+  currencies (e.g., USD card with a EUR billing option, or a foreign bank account)
+  can now be tracked accurately. When you upload a statement, specify the currency
+  and exchange rate to your base currency, and PHAROS converts the entire document:
+  the statement total, minimum payment, paid amounts, and every transaction amount.
+  This ensures installment payoff calculations, net position, and reports stay
+  consistent. A gold badge on the statement warns if the rate is unknown. The
+  conversion is applied uniformly across the whole statement, just as the card
+  itself reports it.
 
 ## Subscriptions
 

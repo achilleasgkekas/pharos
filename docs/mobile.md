@@ -20,10 +20,10 @@ The mobile app mirrors most of the web modules, backed by the same API client
 | AI assistant | conversational command bar (`POST /api/v1/ai`) |
 | Shopping list | add/check/delete + **camera product scan** |
 | Receipts | list, detail, camera scan + AI parse, re-scan, add to library; **multi-currency support** (currency + FX rate fields when enabled) |
-| Inventory (Items) | list, detail, price status, log a price, link installment plans |
+| Inventory (Items) | list, detail, price status, log a price, link installment plans; **multi-currency support** (currency + FX rate when buying abroad) |
 | Expenses / Income | list, add, edit, bill/payslip AI scan, **mark as tax-deductible + category**, **split (who owes what)** + **Balances modal (cross-expense aggregation, settle-up per person)**; **multi-currency support** (FX rate tracking when enabled) |
-| Subscriptions | list, add, edit, **auto-discover untracked recurring charges** |
-| Statements | list + transactions, installment-plan overview |
+| Subscriptions | list, add, edit, **auto-discover untracked recurring charges**; **multi-currency support** (track subscriptions billed in foreign currencies) |
+| Statements | list + transactions, installment-plan overview; **multi-currency support** (convert whole statement to base currency) |
 | Vouchers | list, add, edit, AI fill (text/photo); **Coupons / Gift cards / Loyalty cards** tabs |
 | Bills | list, add, edit, mark paid (spawns next recurring), due-soon/overdue status |
 | Goals / Savings | list, add, edit, log contribution, progress tracking |
