@@ -1,5 +1,28 @@
 # DOCS_PROGRESS
 
+## 2026-07-26 (twenty-second run — P9 slice 6 verification: bank CSV import already documented)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-first run (commit d5c3a0c, 2026-07-25 22:20). Ανακάλυψη: **P9 slice 6 shipped με ήδη-ενσωματωμένη documentation**:
+- **Slice 6 (Bank CSV Import)** — commit 901d7d0, 2026-07-26 00:34 — multi-currency support για bank CSV importer (Revolut, Wise κλπ), Currency column + per-file FX rate input
+
+Τι βρέθηκε:
+- **features.md**: Ήδη updated από το commit μέσω νέας bullet point "Bank CSV imports too" στη P9 section. Εξήγηση ότι ο importer διαβάζει Currency column και amount-cell currency codes, με one rate per currency στο dialog, και dedup comparison σε printed amounts.
+- **api.md**: Κανένα νέο endpoint (CSV import είναι web UI only, όχι exposed API).
+- **mobile.md**: Κανένα νέο content (CSV import δεν υποστηρίζεται σε mobile).
+
+Accuracy (διάβασα κώδικα): commit message, lib/csvImport.ts (parseCsvCurrency, currencyFromAmountCell, importExpensesCsv with fxRates option), CsvImportModal.tsx (currency column + rate inputs).
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: features.md 0 (αθικτο), api.md 22 (ζυγό), mobile.md 0.
+- Internal links: όλα ✓.
+- Secret scan: κανένα credential ✓.
+
+Collision guard: git status --short = καμία modified file (η dokumentasi ήταν ήδη complete από τον commit 901d7d0).
+
+Καμία commit/push χρειάζεται (docs ήδη current). Σημειώνω μόνο: commit 6536035 (docs(landing)) είναι apps/landing/ scope, όχι docs/ territory.
+
+Επόμενο run: (α) grep git log για όλα τα feat() commits από 2026-07-26 00:34 + μετά, ή (β) drift check σε άλλα docs modules.
+
 ## 2026-07-25 (twenty-first run — P9 multi-currency slices 3-5: Subscriptions, Items, Statements)
 
 Σάρωση git log για νέα feat() commits μετά την twentieth run (commit 7221361, 2026-07-25 16:17). Ανακάλυψη: **3 νέα P9 slices shipped αλλα ΔΕΝ ήταν documented** στο features.md:
