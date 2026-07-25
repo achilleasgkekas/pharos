@@ -64,6 +64,22 @@ export function convertToBase(origAmount: number, fxRate: number): number {
 }
 
 /**
+ * Inverse of convertToBase: the printed figure behind a stored base-currency one.
+ * Used for the SECONDARY money fields of a document (a receipt's net / VAT / line
+ * prices), which are stored converted so the reports that sum them stay in base
+ * currency, but must be edited in the currency the paper is actually printed in.
+ * The headline total does not need this: it keeps its exact printed value in
+ * `origAmount`. rate <= 0 (unknown) means nothing was converted, so pass through.
+ */
+export function toPrinted(baseAmount: number, fxRate: number): number {
+  const a = Number(baseAmount);
+  const r = Number(fxRate);
+  if (!Number.isFinite(a)) return 0;
+  if (!Number.isFinite(r) || r <= 0) return a;
+  return Math.round((a / r) * 100) / 100;
+}
+
+/**
  * Back out the rate from a pair of amounts, for the (common) case where the user knows
  * what the bank actually charged them: "$88 hit my card as EUR 81.20" -> 0.922727.
  * 6dp keeps cent-accuracy on amounts up to ~10k without storing float noise.

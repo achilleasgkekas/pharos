@@ -2,7 +2,9 @@
 import { useState, useEffect, useMemo, useTransition, useCallback } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import { cur } from '@/lib/money';
+import { cur, currencySymbol } from '@/lib/money';
+import { isForeignCurrency, normalizeCurrency } from '@/lib/fx';
+import { FxBadge } from '@/components/FxBadge';
 import { Check, ArrowRight, Pencil, Archive, FileText, Loader2, Zap } from 'lucide-react';
 import type { SerializedReceipt } from '@/types';
 import { quickVerifyReceipt, archiveReceipt } from './actions';
@@ -20,12 +22,15 @@ const money = (n: number) => `${cur()}${Math.round(n * 100) / 100}`;
 export function QuickVerify({
   receipts,
   stores,
+  base,
   onClose,
   onOpenFull,
   onChanged,
 }: {
   receipts: SerializedReceipt[];
   stores: string[];
+  /** Deployment base currency (P9) — a foreign receipt is reviewed in its printed one. */
+  base: string;
   onClose: () => void;
   onOpenFull: (r: SerializedReceipt) => void;
   onChanged: () => void;
@@ -47,8 +52,11 @@ export function QuickVerify({
     if (!r) return;
     setStore(r.store || '');
     setDate(r.date ? new Date(r.date).toISOString().slice(0, 10) : '');
-    setTotal(r.total ? String(r.total) : '');
-  }, [r]);
+    // A foreign receipt is reviewed (and submitted) in the currency it is printed in;
+    // quickVerifyReceipt converts it back with the receipt's stored rate.
+    const printed = isForeignCurrency(r.currency, base) ? r.origAmount || r.total : r.total;
+    setTotal(printed ? String(printed) : '');
+  }, [r, base]);
 
   const next = useCallback(() => setI((n) => n + 1), []);
 
@@ -140,7 +148,10 @@ export function QuickVerify({
                     <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full text-sm px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" />
                   </label>
                   <label className="block">
-                    <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('qv.total', { cur: cur() })}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)] flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                      {t('qv.total', { cur: isForeignCurrency(r.currency, base) ? currencySymbol(normalizeCurrency(r.currency)).trim() : cur() })}
+                      <FxBadge doc={r} base={base} />
+                    </span>
                     <input type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} className="w-full text-base font-semibold px-3 py-2 rounded-lg bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] focus:border-[color:var(--color-accent)] outline-none" style={{ fontFamily: 'var(--font-mono)' }} />
                   </label>
                 </div>

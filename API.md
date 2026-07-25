@@ -67,7 +67,8 @@ List responses are wrapped: `{ "data": [ … ], "total": N, "limit": L, "offset"
 - `POST /api/v1/subscriptions` `{ name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url? }` → `{ subscription }`
 
 ### Receipts (read)
-- `GET /api/v1/receipts?store=&archived=1` (+ list params) → `{ data: [{ id, store, date, total, subtotal, vatAmount, currency, paymentMethod, warrantyMonths, itemCount, verified, archived, file, thumb, updatedAt, deleted }], total, limit, offset }`
+- `GET /api/v1/receipts?store=&archived=1` (+ list params) → `{ data: [{ id, store, date, total, subtotal, vatAmount, currency, origAmount, fxRate, paymentMethod, warrantyMonths, itemCount, verified, archived, file, thumb, updatedAt, deleted }], total, limit, offset }`
+  - `total`, `subtotal`, `vatAmount` and the line prices are ALWAYS in the deployment's base currency (Settings → Currency), so a client can sum them without conversion. On a foreign-currency receipt, `origAmount` is the TOTAL as printed and `fxRate` is base units per 1 unit of `currency` (`total = origAmount * fxRate`); divide the other money fields by `fxRate` to get their printed values. Both are `0` for an ordinary receipt. `fxRate: 0` with a foreign `currency` means no rate is known yet, so the amounts are still the printed numbers: show them as unconverted rather than mixing them into a base-currency total.
 - `GET /api/v1/receipts/:id` → `{ receipt: { …, notes, lineItems: [{ name, qty, price, vatRate }] } }`
 
 Creating a receipt is file-based (upload + AI scan); a multipart `scan/receipt` endpoint is the next addition (mirrors `scan/product`).

@@ -1087,7 +1087,7 @@
   enable notifications) με progress ticks → activation. **Διακριτό** από P1 (demo data) — εδώ τα *δικά του* δεδομένα.
 - **Module:** Homepage / Dashboard (dismissable card) + Settings state reads.
 
-### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + EXPENSES SHIPPED 2026-07-25 (pharos-daily-dev), υπόλοιπα modules εκκρεμούν
+### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + EXPENSES + RECEIPTS SHIPPED 2026-07-25 (pharos-daily-dev), υπόλοιπα modules εκκρεμούν
 - **Τι χτίστηκε (slice 1 από L item):** νέο pure **`lib/fx.ts`** (+25 unit tests, client-safe, DB-free) που κρατά
   **ΤΟΝ ΕΝΑΝ κανόνα** σε ένα μέρος: `normalizeCurrency`, `isForeignCurrency`, `convertToBase`, `deriveFxRate`,
   `resolveFx`, `formatMoney`, `fxBadgeLabel`. **Κλειδωμένη αρχιτεκτονική απόφαση (builder default, μηδέν migration):
@@ -1112,9 +1112,21 @@
   `up -d web` → `/login` **200 με την πρώτη**, **0 restarts**, `/expenses`+`/settings` 307 (auth-gated, compiled) →
   `docker builder prune -f` (197MB) → lock released. Browser: app renders, **μηδέν console errors** (το authed
   `/expenses` δεν είναι επαληθεύσιμο unattended, credentials boundary).
-- **Εκκρεμούν (επόμενα slices):** Receipts/Statements/Subscriptions/Items ίδια 3 πεδία (το `currency` τους
-  αποθηκεύεται ήδη αγνοημένο, ίδιο latent bug)· `resolveFx` στο CSV import (PA1) και στο email-in· προαιρετικό
-  δωρεάν rate-feed (phase 2, τώρα το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία.
+- **Τι χτίστηκε (slice 2 — Receipts, 2026-07-25):** ίδια 3 πεδία στο `Receipt` (`currency` υπήρχε ήδη αγνοημένο,
+  + `origAmount`/`fxRate`) και **και τα 4 write paths** (uploadReceipt/updateReceipt/quickVerifyReceipt/rescanReceipt)
+  περνούν από `resolveFx`. **Διαφορά από τα expenses**: μια απόδειξη έχει ΠΟΛΛΑ ποσά, όχι ένα — γι' αυτό μετατρέπεται
+  **ΟΛΟ το money side με ΤΟ ΙΔΙΟ rate** (total + net + ΦΠΑ + τιμές γραμμών), αφού το `vatAmount` το αθροίζουν τα
+  reports και οι τιμές γραμμών αντιγράφονται στο `Item.purchasedPrice` (μισο-μετατρεπμένη απόδειξη θα δηλητηρίαζε και
+  τα δύο). Μόνο το total κρατά την τυπωμένη τιμή του verbatim (`origAmount`)· τα υπόλοιπα επιστρέφουν για edit μέσω
+  νέου pure **`fx.toPrinted()`** (+4 tests), ώστε ένα re-save χωρίς αλλαγή να μην ξανα-μετατρέπει (pinned με τεστ).
+  Το re-scan **κρατά** ένα rate που έβαλε ο χρήστης όταν το νέο parse δίνει ΤΟ ΙΔΙΟ νόμισμα, το πετά αλλιώς. Το
+  quick-verify δείχνει/υποβάλλει τυπωμένα ποσά και μετατρέπει με το ήδη αποθηκευμένο rate. UI: currency select δίπλα
+  στο total + η ίδια FX γραμμή (rate ή «or charged») + το `FxBadge` **εξήχθη σε κοινό `components/FxBadge.tsx`**
+  (structural typing) και χρησιμοποιείται πλέον από expenses ΚΑΙ receipts (card/row/quick-verify).
+  `/api/v1/receipts` shape += origAmount/fxRate + τεκμηρίωση στο `API.md`. **+9 tests** (3553 total).
+- **Εκκρεμούν (επόμενα slices):** Statements/Subscriptions/Items ίδια 3 πεδία (το `currency` τους αποθηκεύεται ήδη
+  αγνοημένο, ίδιο latent bug)· `resolveFx` στο CSV import (PA1) και στο email-in· προαιρετικό δωρεάν rate-feed
+  (phase 2, τώρα το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία.
 - **Αξία (αρχικό):** ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency. Πραγματικό κενό
   (CLAUDE.md). Μεγάλο: αγγίζει schema (amount+currency+rate), aggregations, imports, όλα τα money views.
 - **Module:** cross-cutting (Expenses/Receipts/Statements/Reports + `lib/money.ts`).

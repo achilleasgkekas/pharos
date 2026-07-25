@@ -1,5 +1,7 @@
 'use client';
-import { cur } from "@/lib/money";
+import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
+import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
+import { FxBadge } from '@/components/FxBadge';
 import { useState, useTransition, useRef, useMemo } from 'react';
 import {
   Upload,
@@ -51,19 +53,29 @@ function fileUrl(filePath: string) {
 
 // ─── Main component ────────────────────────────────────────────────────────
 
+/** Multi-currency context (P9): the deployment's base currency code + whether the
+ *  per-receipt currency/FX controls are switched on at all. One object so the already
+ *  long prop lists below grow by a single entry. */
+type FxCtx = { base: string; enabled: boolean };
+
 export function ReceiptsClient({
   receipts,
   cards,
   ollamaUp,
   storeNames,
   emailInboxCount,
+  baseCurrency,
+  multiCurrency,
 }: {
   receipts: SerializedReceipt[];
   cards: SerializedCard[];
   ollamaUp: boolean;
   storeNames: string[];
   emailInboxCount: number;
+  baseCurrency: string;
+  multiCurrency: boolean;
 }) {
+  const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const t = useT();
   const [selected, setSelected] = useState<SerializedReceipt | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -490,13 +502,13 @@ export function ReceiptsClient({
           ) : layout === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {visible.map((r) => (
-                <ReceiptCard key={r._id} receipt={r} onClick={() => setSelected(r)} />
+                <ReceiptCard key={r._id} receipt={r} base={fx.base} onClick={() => setSelected(r)} />
               ))}
             </div>
           ) : (
             <div className="flex flex-col gap-2">
               {visible.map((r) => (
-                <ReceiptRow key={r._id} receipt={r} onClick={() => setSelected(r)} />
+                <ReceiptRow key={r._id} receipt={r} base={fx.base} onClick={() => setSelected(r)} />
               ))}
             </div>
           )}
@@ -505,7 +517,7 @@ export function ReceiptsClient({
 
       {/* Detail modal */}
       {selected && (
-        <ReceiptDetailModal receipt={selected} cards={cards} storeNames={storeNames} onClose={() => setSelected(null)} />
+        <ReceiptDetailModal receipt={selected} cards={cards} storeNames={storeNames} fx={fx} onClose={() => setSelected(null)} />
       )}
 
       {/* Duplicate finder + merge */}
@@ -516,6 +528,7 @@ export function ReceiptsClient({
         <QuickVerify
           receipts={toVerify}
           stores={storeNames}
+          base={fx.base}
           onClose={() => setQuickVerify(false)}
           onOpenFull={(r) => { setQuickVerify(false); setSelected(r); }}
           onChanged={() => router.refresh()}
@@ -528,7 +541,7 @@ export function ReceiptsClient({
 // ─── Receipt Card ──────────────────────────────────────────────────────────
 
 // Compact horizontal row for the receipts list layout
-function ReceiptRow({ receipt, onClick }: { receipt: SerializedReceipt; onClick: () => void }) {
+function ReceiptRow({ receipt, base, onClick }: { receipt: SerializedReceipt; base: string; onClick: () => void }) {
   const t = useT();
   const isImage = receipt.fileType.startsWith('image/');
   const isHtml = receipt.fileType.includes('html');
@@ -570,6 +583,7 @@ function ReceiptRow({ receipt, onClick }: { receipt: SerializedReceipt; onClick:
         </span>
       </div>
       <div className="flex items-center gap-3 shrink-0">
+        <FxBadge doc={receipt} base={base} />
         {receipt.total > 0 && (
           <span className="font-extrabold text-[color:var(--color-accent)] text-base leading-none" style={{ fontFamily: 'var(--font-display)' }}>
             {cur()}{receipt.total}
@@ -591,9 +605,11 @@ function ReceiptRow({ receipt, onClick }: { receipt: SerializedReceipt; onClick:
 
 function ReceiptCard({
   receipt,
+  base,
   onClick,
 }: {
   receipt: SerializedReceipt;
+  base: string;
   onClick: () => void;
 }) {
   const t = useT();
@@ -668,6 +684,7 @@ function ReceiptCard({
             {cur()}{receipt.total}
           </span>
         </div>
+        <div className="mt-1"><FxBadge doc={receipt} base={base} /></div>
         <div
           className="text-[10px] text-[color:var(--color-text-faint)] mt-1 flex items-center gap-1.5 flex-wrap"
           style={{ fontFamily: 'var(--font-mono)' }}
@@ -714,7 +731,10 @@ type EditState = {
   subtotal: string;
   vatAmount: string;
   warrantyMonths: string;
+  // Multi-currency (P9): `currency` is what the receipt is PRINTED in and every amount
+  // in this form is a printed one; the server converts them with `fxRate` on save.
   currency: string;
+  fxRate: string;
   paymentMethod: string;
   notes: string;
   // `price` = unit NET (excl. VAT, the stored value). `grossStr` = the line GROSS
@@ -723,21 +743,85 @@ type EditState = {
   lineItems: { name: string; refinedName: string; qty: string; price: string; vatRate: string; grossStr: string }[];
 };
 
+/** Currency codes for the picker, with the deployment's base one always first even
+ *  if it is not one of the built-ins. */
+function currencyCodes(base: string): string[] {
+  return [...new Set([normalizeCurrency(base) || 'EUR', ...CURRENCIES.map((c) => c.code)])];
+}
+
 /** Line gross (with VAT) from the net-side fields, as a 2-decimal string. */
 function lineGross(unitNet: string, qty: string, vatRate: string): string {
   const net = (Number(unitNet) || 0) * (Number(qty) || 1);
   return (net * (1 + (Number(vatRate) || 0) / 100)).toFixed(2);
 }
 
+/**
+ * Multi-currency (P9): shown only while the receipt's currency differs from the base one.
+ * Two ways in, because someone reading a card statement knows the charged total but not
+ * the rate: type the rate, or type what the account was actually debited and let
+ * deriveFxRate() back it out. The preview is the total that will be stored (the net, VAT
+ * and line prices convert with the very same rate).
+ */
+function ReceiptFxFields({
+  form,
+  setForm,
+  base,
+}: {
+  form: EditState;
+  setForm: React.Dispatch<React.SetStateAction<EditState>>;
+  base: string;
+}) {
+  const t = useT();
+  const [charged, setCharged] = useState('');
+  const printed = Number(form.total) || 0;
+  const rate = Number(form.fxRate) || 0;
+  const code = normalizeCurrency(form.currency);
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end rounded-lg border border-[color:var(--color-purple)]/30 bg-[color:var(--color-surface-2)] p-3">
+      <Field label={t('ex.fFxRate', { code, base })}>
+        <Input
+          type="number"
+          step="0.000001"
+          value={form.fxRate}
+          onChange={(e) => { setCharged(''); setForm((p) => ({ ...p, fxRate: e.target.value })); }}
+          placeholder="0.92"
+        />
+      </Field>
+      <Field label={t('ex.fFxCharged', { cur: currencySymbol(base).trim() })}>
+        <Input
+          type="number"
+          step="0.01"
+          value={charged}
+          onChange={(e) => {
+            const v = e.target.value;
+            setCharged(v);
+            const derived = deriveFxRate(printed, Number(v) || 0);
+            setForm((p) => ({ ...p, fxRate: derived ? String(derived) : '' }));
+          }}
+        />
+      </Field>
+      <p className="text-[11px] pb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+        {rate > 0 ? (
+          <span className="text-[color:var(--color-purple)]">= {formatMoney(convertToBase(printed, rate), base)}</span>
+        ) : (
+          <span className="text-[color:var(--color-gold)]">⚠ {t('ex.fxNoRate', { base })}</span>
+        )}
+      </p>
+    </div>
+  );
+}
+
 function ReceiptDetailModal({
   receipt,
   cards,
   storeNames,
+  fx,
   onClose,
 }: {
   receipt: SerializedReceipt;
   cards: SerializedCard[];
   storeNames: string[];
+  fx: FxCtx;
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -748,26 +832,41 @@ function ReceiptDetailModal({
   const [addMsg, setAddMsg] = useState<string | null>(null);
   const [rescanMsg, setRescanMsg] = useState<string | null>(null);
 
-  const buildForm = (r: SerializedReceipt): EditState => ({
-    store: r.store,
-    date: r.date.slice(0, 10),
-    total: r.total.toString(),
-    subtotal: (r.subtotal || 0).toString(),
-    vatAmount: (r.vatAmount || 0).toString(),
-    warrantyMonths: (r.warrantyMonths ?? 24).toString(),
-    currency: r.currency,
-    paymentMethod: r.paymentMethod,
-    notes: r.notes,
-    lineItems: r.lineItems.map((li) => ({
-      name: li.name,
-      refinedName: li.refinedName || '',
-      qty: li.qty.toString(),
-      price: li.price.toString(),
-      vatRate: (li.vatRate ?? 24).toString(),
-      grossStr: lineGross(li.price.toString(), li.qty.toString(), (li.vatRate ?? 24).toString()),
-    })),
-  });
+  // The form always edits what is PRINTED on the receipt: stored values as-is for an
+  // ordinary one, and for a foreign one the exact printed total (`origAmount`) plus the
+  // secondary amounts divided back out of base currency. Saving re-converts with the same
+  // rate, so re-saving an unchanged receipt cannot double-convert it.
+  const buildForm = (r: SerializedReceipt): EditState => {
+    const foreign = isForeignCurrency(r.currency, fx.base);
+    const rate = foreign ? r.fxRate || 0 : 0;
+    const printed = (n: number) => toPrinted(n, rate).toString();
+    return {
+      store: r.store,
+      date: r.date.slice(0, 10),
+      total: (foreign ? r.origAmount || r.total : r.total).toString(),
+      subtotal: printed(r.subtotal || 0),
+      vatAmount: printed(r.vatAmount || 0),
+      warrantyMonths: (r.warrantyMonths ?? 24).toString(),
+      currency: foreign ? normalizeCurrency(r.currency) : fx.base,
+      fxRate: foreign && r.fxRate ? String(r.fxRate) : '',
+      paymentMethod: r.paymentMethod,
+      notes: r.notes,
+      lineItems: r.lineItems.map((li) => {
+        const price = printed(li.price);
+        return {
+          name: li.name,
+          refinedName: li.refinedName || '',
+          qty: li.qty.toString(),
+          price,
+          vatRate: (li.vatRate ?? 24).toString(),
+          grossStr: lineGross(price, li.qty.toString(), (li.vatRate ?? 24).toString()),
+        };
+      }),
+    };
+  };
   const [form, setForm] = useState<EditState>(() => buildForm(receipt));
+  // Live from the select, so picking a foreign code immediately reveals the FX row.
+  const foreign = fx.enabled && isForeignCurrency(form.currency, fx.base);
 
   // Re-run the AI scan on the stored file. The action returns the updated receipt,
   // so we re-sync the form (store/total/items) in place — no reopening needed.
@@ -812,6 +911,7 @@ function ReceiptDetailModal({
         vatAmount: Number(form.vatAmount) || 0,
         warrantyMonths: Number(form.warrantyMonths) || 24,
         currency: form.currency,
+        fxRate: Number(form.fxRate) || 0,
         paymentMethod: form.paymentMethod,
         notes: form.notes,
         verified,
@@ -1013,9 +1113,20 @@ function ReceiptDetailModal({
             </Field>
           </div>
           {/* Total — the key number, on its own wide row so it's never cramped */}
-          <Field label={t('rc.fTotal', { cur: cur() })}>
+          <Field label={t('rc.fTotal', { cur: fx.enabled ? currencySymbol(form.currency).trim() : cur() })}>
             <div className="flex items-center gap-2">
               <Input type="number" step="0.01" value={form.total} onChange={(e) => setForm((p) => ({ ...p, total: e.target.value }))} className="flex-1 min-w-0 text-base font-semibold" />
+              {fx.enabled && (
+                <select
+                  value={form.currency}
+                  onChange={(e) => setForm((p) => ({ ...p, currency: e.target.value }))}
+                  aria-label={t('ex.fCurrency')}
+                  className="shrink-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2 py-2 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                  style={{ fontFamily: 'var(--font-mono)' }}
+                >
+                  {currencyCodes(fx.base).map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              )}
               <button
                 type="button"
                 onClick={fillTotalsFromItems}
@@ -1028,6 +1139,7 @@ function ReceiptDetailModal({
               </button>
             </div>
           </Field>
+          {foreign && <ReceiptFxFields form={form} setForm={setForm} base={fx.base} />}
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('sub.fPayment')}>
               <CardSelect cards={cards} value={form.paymentMethod} onChange={(v) => setForm((p) => ({ ...p, paymentMethod: v }))} />
@@ -1042,7 +1154,7 @@ function ReceiptDetailModal({
             <Field label={t('rc.fNet')}>
               <Input type="number" step="0.01" value={form.subtotal} onChange={(e) => setForm((p) => ({ ...p, subtotal: e.target.value }))} placeholder="net" />
             </Field>
-            <Field label={t('rc.fVat', { cur: cur() })}>
+            <Field label={t('rc.fVat', { cur: fx.enabled ? currencySymbol(form.currency).trim() : cur() })}>
               <Input type="number" step="0.01" value={form.vatAmount} onChange={(e) => setForm((p) => ({ ...p, vatAmount: e.target.value }))} placeholder="VAT" />
             </Field>
           </div>

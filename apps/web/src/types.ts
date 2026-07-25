@@ -83,7 +83,12 @@ export type SerializedReceipt = {
   subtotal: number;
   vatAmount: number;
   warrantyMonths: number;
+  // Multi-currency (P9, see lib/fx.ts): `total`/`subtotal`/`vatAmount` and the line
+  // prices are ALWAYS in the deployment's base currency; a foreign receipt also keeps
+  // the printed total + the rate used to convert it.
   currency: string;
+  origAmount: number; // total as printed on the receipt; 0 when not foreign
+  fxRate: number; // base units per 1 `currency` unit; 0 = unknown / not foreign
   paymentMethod: string;
   lineItems: SerializedLineItem[];
   itemIds: string[];

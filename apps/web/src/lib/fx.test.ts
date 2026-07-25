@@ -7,6 +7,7 @@ import {
   resolveFx,
   formatMoney,
   fxBadgeLabel,
+  toPrinted,
 } from './fx';
 
 describe('normalizeCurrency', () => {
@@ -61,6 +62,32 @@ describe('convertToBase', () => {
 
   it('handles a zero amount', () => {
     expect(convertToBase(0, 0.92)).toBe(0);
+  });
+});
+
+describe('toPrinted', () => {
+  it('divides a stored base amount back to the printed one', () => {
+    expect(toPrinted(80.96, 0.92)).toBe(88);
+    expect(toPrinted(73.6, 0.92)).toBe(80);
+  });
+
+  it('passes the amount through untouched when no rate converted it', () => {
+    // rate 0 = not foreign, or foreign-with-no-rate: nothing was converted, so nothing
+    // is un-converted either. Returning 0 here would blank out real amounts in the form.
+    expect(toPrinted(88, 0)).toBe(88);
+    expect(toPrinted(88, -1)).toBe(88);
+    expect(toPrinted(88, NaN)).toBe(88);
+  });
+
+  it('round-trips with convertToBase to the cent', () => {
+    for (const [amount, rate] of [[80.96, 0.92], [123.45, 1.17], [10, 0.008512]] as const) {
+      expect(convertToBase(toPrinted(amount, rate), rate)).toBeCloseTo(amount, 2);
+    }
+  });
+
+  it('handles a zero amount and junk input', () => {
+    expect(toPrinted(0, 0.92)).toBe(0);
+    expect(toPrinted(NaN, 0.92)).toBe(0);
   });
 });
 

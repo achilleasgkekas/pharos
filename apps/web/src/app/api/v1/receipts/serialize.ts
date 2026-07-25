@@ -4,7 +4,8 @@ import { iso } from '@/lib/apiList';
 // allows route-handler exports (GET/POST/…) from a route.ts.
 export type ReceiptLean = {
   _id: unknown; store: string; date?: Date; total?: number; subtotal?: number; vatAmount?: number;
-  currency?: string; paymentMethod?: string; warrantyMonths?: number; verified?: boolean; archived?: boolean;
+  currency?: string; origAmount?: number; fxRate?: number;
+  paymentMethod?: string; warrantyMonths?: number; verified?: boolean; archived?: boolean;
   lineItems?: unknown[]; filePath?: string; thumbPath?: string; updatedAt?: Date; deletedAt?: Date | null;
 };
 
@@ -39,6 +40,10 @@ export function trimReceipt(r: ReceiptLean, returnDaysLeft?: number) {
     subtotal: r.subtotal ?? 0,
     vatAmount: r.vatAmount ?? 0,
     currency: r.currency ?? 'EUR',
+    // Multi-currency (P9): `total` is always base currency; these describe the printed
+    // side of a foreign receipt (0/0 for an ordinary one). See API.md.
+    origAmount: r.origAmount ?? 0,
+    fxRate: r.fxRate ?? 0,
     paymentMethod: r.paymentMethod ?? '',
     warrantyMonths: r.warrantyMonths ?? 0,
     itemCount: r.lineItems?.length ?? 0,

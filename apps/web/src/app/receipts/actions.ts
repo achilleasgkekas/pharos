@@ -16,6 +16,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { mirrorFileToRemote } from '@/lib/mirror';
 import { dispatchEventWebhooks } from '@/lib/webhooks';
 import { htmlReceiptToText } from '@/lib/htmlReceipt';
+import { resolveFx, convertToBase, normalizeCurrency } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
 import { Types } from 'mongoose';
 import { z } from 'zod';
@@ -38,7 +39,10 @@ const UpdateReceiptSchema = z.object({
   subtotal: z.coerce.number().default(0),
   vatAmount: z.coerce.number().default(0),
   warrantyMonths: z.coerce.number().default(24),
+  // Multi-currency (P9): the amounts above are what is PRINTED on the receipt when
+  // `currency` is foreign; resolveFx() + this rate turn them into base-currency values.
   currency: z.string().default('EUR'),
+  fxRate: z.coerce.number().min(0).default(0),
   paymentMethod: z.string().default(''),
   lineItems: z.array(LineItemSchema).default([]),
   notes: z.string().default(''),
@@ -184,16 +188,24 @@ export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
   try {
     await connectDB();
     const Receipt = await currentModel(ReceiptModel);
+    const settings = await getAppSettings();
+    // The AI reports the currency printed on the receipt. There is no rate at scan
+    // time, so resolveFx keeps the printed total in `total` (byte-for-byte the old
+    // behaviour) and records the printed side, letting the UI ask for a rate instead
+    // of quietly folding e.g. $88 into a euro total.
+    const fx = resolveFx({ amount: parsed?.total ?? 0, currency: parsed?.currency }, settings.currency);
     const receipt = await Receipt.create({
       store: parsed?.store || 'Unknown store',
       date: safeDate(parsed?.date),
-      total: parsed?.total ?? 0,
+      total: fx.amount,
       subtotal: parsed?.subtotal ?? 0,
       vatAmount: parsed?.vatAmount ?? 0,
-      warrantyMonths: parsed?.warrantyMonths || (await getAppSettings()).defaultWarrantyMonths,
-      currency: parsed?.currency || 'EUR',
+      warrantyMonths: parsed?.warrantyMonths || settings.defaultWarrantyMonths,
+      currency: fx.currency,
+      origAmount: fx.origAmount,
+      fxRate: fx.fxRate,
       paymentMethod: parsed?.paymentMethod || '',
-      lineItems: cleanLineItems(parsed?.lineItems, (await getAppSettings()).defaultVatRate),
+      lineItems: cleanLineItems(parsed?.lineItems, settings.defaultVatRate),
       filePath: relativePath,
       fileType: file.type || (isPdf ? 'application/pdf' : `image/${ext}`),
       thumbPath,
@@ -220,6 +232,29 @@ export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
   });
 }
 
+/**
+ * Multi-currency (P9): the money fields to store, given what the form submitted (which
+ * is the PRINTED side for a foreign receipt) and the resolved FX decision.
+ *
+ * The WHOLE money side converts with the SAME rate, not just the headline total: reports
+ * sum `vatAmount` and the item library copies line prices into `Item.purchasedPrice`, so
+ * a half-converted receipt would poison both. Only the total needs its printed value kept
+ * verbatim (`origAmount`) — the rest is recovered for editing via fx.toPrinted().
+ * A rate of 0 (not foreign, or foreign with no rate yet) converts nothing.
+ */
+function fxFields(p: z.infer<typeof UpdateReceiptSchema>, fx: ReturnType<typeof resolveFx>) {
+  const r = fx.fxRate > 0 ? fx.fxRate : 1;
+  return {
+    total: fx.amount,
+    currency: fx.currency,
+    origAmount: fx.origAmount,
+    fxRate: fx.fxRate,
+    subtotal: convertToBase(p.subtotal, r),
+    vatAmount: convertToBase(p.vatAmount, r),
+    lineItems: p.lineItems.map((li) => ({ ...li, price: convertToBase(li.price, r) })),
+  };
+}
+
 export async function updateReceipt(
   id: string,
   data: z.input<typeof UpdateReceiptSchema>
@@ -228,9 +263,11 @@ export async function updateReceipt(
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
+  const { currency: base } = await getAppSettings();
+  const fx = resolveFx({ amount: parsed.total, currency: parsed.currency, fxRate: parsed.fxRate }, base);
   const doc = await Receipt.findByIdAndUpdate(
     id,
-    { ...parsed, date: safeDate(parsed.date) },
+    { ...parsed, date: safeDate(parsed.date), ...fxFields(parsed, fx) },
     { new: true, select: 'store date total filePath verified' }
   ).lean();
   // Mirror-on-verify: once a receipt is confirmed, push its file to the remote
@@ -251,15 +288,28 @@ export async function quickVerifyReceipt(
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
+  // Quick-verify shows (and therefore submits) the PRINTED amounts, so a foreign
+  // receipt has to go back through the same conversion as the full form. The currency
+  // and rate are not editable here, so they come from the stored document.
+  const { currency: base } = await getAppSettings();
+  const prev = await Receipt.findById(id).select('currency fxRate').lean();
+  const fx = resolveFx(
+    { amount: Number(fields.total) || 0, currency: prev?.currency, fxRate: prev?.fxRate },
+    base
+  );
+  const rate = fx.fxRate > 0 ? fx.fxRate : 1;
   const doc = await Receipt.findByIdAndUpdate(
     id,
     {
       $set: {
         store: fields.store.trim() || 'Unknown store',
         date: safeDate(fields.date),
-        total: Number(fields.total) || 0,
-        subtotal: Number(fields.subtotal) || 0,
-        vatAmount: Number(fields.vatAmount) || 0,
+        total: fx.amount,
+        currency: fx.currency,
+        origAmount: fx.origAmount,
+        fxRate: fx.fxRate,
+        subtotal: convertToBase(Number(fields.subtotal) || 0, rate),
+        vatAmount: convertToBase(Number(fields.vatAmount) || 0, rate),
         verified: true,
       },
     },
@@ -312,16 +362,31 @@ async function rescanReceiptOne(id: string, useOcr: boolean): Promise<RescanResu
   const { parsed, raw, model, aiError } = await runReceiptParse(bytes, ext, isPdf, useOcr ? 'ocr' : 'no-ocr');
 
   if (parsed) {
+    const settings = await getAppSettings();
+    // Multi-currency (P9): a re-scan re-reads the printed amounts, so they convert
+    // again. Keep a rate the user already entered when the re-parse lands on the SAME
+    // currency (nothing about the conversion changed), drop it when it does not.
+    const sameCode = normalizeCurrency(parsed.currency) === normalizeCurrency(receipt.currency);
+    const fx = resolveFx(
+      { amount: parsed.total ?? 0, currency: parsed.currency, fxRate: sameCode ? receipt.fxRate : 0 },
+      settings.currency
+    );
+    const rate = fx.fxRate > 0 ? fx.fxRate : 1;
     // `store` is required — never blank it out if the parse came back empty.
     receipt.store = parsed.store?.trim() || receipt.store || 'Unknown store';
     receipt.date = safeDate(parsed.date);
-    receipt.total = parsed.total ?? 0;
-    receipt.subtotal = parsed.subtotal ?? 0;
-    receipt.vatAmount = parsed.vatAmount ?? 0;
-    receipt.warrantyMonths = parsed.warrantyMonths || (await getAppSettings()).defaultWarrantyMonths;
-    receipt.currency = parsed.currency || 'EUR';
+    receipt.total = fx.amount;
+    receipt.subtotal = convertToBase(parsed.subtotal ?? 0, rate);
+    receipt.vatAmount = convertToBase(parsed.vatAmount ?? 0, rate);
+    receipt.warrantyMonths = parsed.warrantyMonths || settings.defaultWarrantyMonths;
+    receipt.currency = fx.currency;
+    receipt.origAmount = fx.origAmount;
+    receipt.fxRate = fx.fxRate;
     receipt.paymentMethod = parsed.paymentMethod || '';
-    receipt.lineItems = cleanLineItems(parsed.lineItems, (await getAppSettings()).defaultVatRate) as typeof receipt.lineItems;
+    receipt.lineItems = cleanLineItems(parsed.lineItems, settings.defaultVatRate).map((li) => ({
+      ...li,
+      price: convertToBase(li.price, rate),
+    })) as typeof receipt.lineItems;
     receipt.verified = false;
     receipt.aiParsedAt = new Date();
   }

@@ -38,11 +38,19 @@ const {
   connectDBMock,
   receiptFindByIdAndUpdate,
   receiptFindByIdAndUpdateLean,
+  receiptFindById,
+  receiptFindByIdLean,
   receiptUpdateOne,
   mirrorFileToRemoteMock,
+  getAppSettingsMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
+  // quickVerifyReceipt reads the stored currency/rate first (P9) — it submits PRINTED
+  // amounts, so it needs the receipt's own FX context to convert them back to base.
+  receiptFindById: vi.fn((_id: string) => ({ select: () => ({ lean: receiptFindByIdLean }) })),
+  receiptFindByIdLean: vi.fn(async () => null as Record<string, any> | null),
+  getAppSettingsMock: vi.fn(async () => ({ defaultWarrantyMonths: 24, defaultVatRate: 24, currency: 'EUR' })),
   receiptFindByIdAndUpdate: vi.fn((_id: string, _update: Record<string, any>, _opts: Record<string, any>) => ({
     lean: receiptFindByIdAndUpdateLean,
   })),
@@ -54,6 +62,7 @@ const {
 
 const receiptModel = {
   findByIdAndUpdate: receiptFindByIdAndUpdate,
+  findById: receiptFindById,
   updateOne: receiptUpdateOne,
 };
 
@@ -69,7 +78,7 @@ vi.mock('@/lib/pdf', () => ({ extractPdfText: vi.fn(), looksLikeScannedPdf: vi.f
 vi.mock('@/lib/ocr', () => ({ ocrImage: vi.fn(), looksLikeUsableOcr: vi.fn() }));
 vi.mock('@/lib/pdfThumb', () => ({ pdfFirstPageJpeg: vi.fn() }));
 vi.mock('@/lib/revalidate', () => ({ safeRevalidate: vi.fn() }));
-vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(async () => ({ defaultWarrantyMonths: 24, defaultVatRate: 24 })) }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/lib/mirror', () => ({ mirrorFileToRemote: mirrorFileToRemoteMock }));
 vi.mock('@/lib/webhooks', () => ({ dispatchEventWebhooks: vi.fn(async () => ({ sent: 0, total: 0 })) }));
 vi.mock('@/lib/htmlReceipt', () => ({ htmlReceiptToText: vi.fn() }));
@@ -84,6 +93,8 @@ function localYmd(d: Date): string {
 beforeEach(() => {
   vi.clearAllMocks();
   receiptFindByIdAndUpdateLean.mockResolvedValue(null);
+  receiptFindByIdLean.mockResolvedValue(null);
+  getAppSettingsMock.mockResolvedValue({ defaultWarrantyMonths: 24, defaultVatRate: 24, currency: 'EUR' });
 });
 
 describe('updateReceipt', () => {
@@ -200,6 +211,87 @@ describe('quickVerifyReceipt', () => {
       throw new Error('connection lost');
     });
     await expect(quickVerifyReceipt('r1', { store: 'X', date: '2026-06-15', total: 1 })).rejects.toThrow('connection lost');
+  });
+});
+
+// Multi-currency (P9). The conversion rule itself is pinned in lib/fx.test.ts; what
+// matters here is that the receipt write paths actually run the SUBMITTED (printed)
+// amounts through it against the deployment's base currency, so what lands in the DB is
+// base-denominated — for the whole money side, not just the headline total, since reports
+// sum `vatAmount` and the item library copies line prices into Item.purchasedPrice.
+describe('multi-currency (resolveFx wiring)', () => {
+  it('converts the whole money side with one rate on update, keeping the printed total', async () => {
+    await updateReceipt('r1', {
+      store: 'Amazon', date: '2026-06-15', total: 88, subtotal: 80, vatAmount: 8,
+      currency: 'USD', fxRate: 0.92,
+      lineItems: [{ name: 'Cable', qty: 2, price: 10 }],
+    } as any);
+    const [, update] = receiptFindByIdAndUpdate.mock.calls[0];
+    expect(update.total).toBe(80.96); // 88 x 0.92 — what every aggregation sums
+    expect(update.subtotal).toBe(73.6);
+    expect(update.vatAmount).toBe(7.36);
+    expect(update.lineItems[0].price).toBe(9.2);
+    expect(update.currency).toBe('USD');
+    expect(update.origAmount).toBe(88); // printed total kept verbatim for round-tripping
+    expect(update.fxRate).toBe(0.92);
+  });
+
+  it('leaves a foreign receipt alone (no silent 1:1) when no rate was given', async () => {
+    await updateReceipt('r1', {
+      store: 'Amazon', date: '2026-06-15', total: 88, subtotal: 80, vatAmount: 8, currency: 'USD',
+      lineItems: [{ name: 'Cable', qty: 1, price: 10 }],
+    } as any);
+    const [, update] = receiptFindByIdAndUpdate.mock.calls[0];
+    expect(update.total).toBe(88);
+    expect(update.subtotal).toBe(80);
+    expect(update.vatAmount).toBe(8);
+    expect(update.lineItems[0].price).toBe(10);
+    expect(update.origAmount).toBe(88);
+    expect(update.fxRate).toBe(0); // flagged for the UI, not guessed
+  });
+
+  it('treats a receipt in the base currency as plain, whatever base that is', async () => {
+    getAppSettingsMock.mockResolvedValue({ defaultWarrantyMonths: 24, defaultVatRate: 24, currency: 'USD' });
+    await updateReceipt('r1', { store: 'Amazon', date: '2026-06-15', total: 88, subtotal: 80, currency: 'USD' } as any);
+    const [, update] = receiptFindByIdAndUpdate.mock.calls[0];
+    expect(update.total).toBe(88);
+    expect(update.subtotal).toBe(80);
+    expect(update.origAmount).toBe(0);
+    expect(update.fxRate).toBe(0);
+  });
+
+  it('re-saving an unchanged foreign receipt does not double-convert it', async () => {
+    // The form submits the PRINTED amounts back (origAmount for the total), so one
+    // round-trip through the same rate must land on the same stored values.
+    const submit = { store: 'Amazon', date: '2026-06-15', total: 88, subtotal: 80, vatAmount: 8, currency: 'USD', fxRate: 0.92 };
+    await updateReceipt('r1', submit as any);
+    const first = receiptFindByIdAndUpdate.mock.calls[0][1];
+    await updateReceipt('r1', submit as any);
+    const second = receiptFindByIdAndUpdate.mock.calls[1][1];
+    expect(second.total).toBe(first.total);
+    expect(second.subtotal).toBe(first.subtotal);
+    expect(second.origAmount).toBe(88);
+  });
+
+  it('quick-verify converts its printed total with the rate already on the receipt', async () => {
+    receiptFindByIdLean.mockResolvedValueOnce({ currency: 'USD', fxRate: 0.92 });
+    await quickVerifyReceipt('r1', { store: 'Amazon', date: '2026-06-15', total: 88, vatAmount: 8 });
+    const [, update] = receiptFindByIdAndUpdate.mock.calls[0];
+    expect(update.$set.total).toBe(80.96);
+    expect(update.$set.vatAmount).toBe(7.36);
+    expect(update.$set.currency).toBe('USD');
+    expect(update.$set.origAmount).toBe(88);
+    expect(update.$set.fxRate).toBe(0.92);
+    expect(update.$set.verified).toBe(true);
+  });
+
+  it('quick-verify on an ordinary receipt stores the total untouched', async () => {
+    receiptFindByIdLean.mockResolvedValueOnce({ currency: 'EUR', fxRate: 0 });
+    await quickVerifyReceipt('r1', { store: 'Skroutz', date: '2026-06-15', total: 42 });
+    const [, update] = receiptFindByIdAndUpdate.mock.calls[0];
+    expect(update.$set.total).toBe(42);
+    expect(update.$set.origAmount).toBe(0);
+    expect(update.$set.fxRate).toBe(0);
   });
 });
 

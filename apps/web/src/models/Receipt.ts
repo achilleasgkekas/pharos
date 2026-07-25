@@ -24,7 +24,14 @@ const ReceiptSchema = new Schema(
     subtotal: { type: Number, default: 0 }, // net, without VAT
     vatAmount: { type: Number, default: 0 }, // VAT / ΦΠΑ amount
     warrantyMonths: { type: Number, default: 24 }, // GR default 2 years
+    // Multi-currency (P9, see lib/fx.ts). INVARIANT: `total` (and with it `subtotal`,
+    // `vatAmount` and the line-item prices, which reports and the item library read)
+    // is always in the deployment's BASE currency. A foreign receipt additionally
+    // remembers the printed side: `currency` = printed ISO code, `origAmount` = the
+    // printed total, `fxRate` = base units per 1 unit of `currency`.
     currency: { type: String, default: 'EUR' },
+    origAmount: { type: Number, default: 0 }, // total as printed; 0 when not foreign
+    fxRate: { type: Number, default: 0 }, // base per 1 `currency` unit; 0 = unknown/not foreign
     paymentMethod: { type: String, default: '' },
     lineItems: { type: [LineItemSchema], default: [] },
 

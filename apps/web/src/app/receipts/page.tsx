@@ -13,7 +13,7 @@ import type { SerializedReceipt, SerializedCard } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-async function getData(): Promise<{ receipts: SerializedReceipt[]; cards: SerializedCard[]; ollamaUp: boolean; storeNames: string[]; emailInboxCount: number }> {
+async function getData(): Promise<{ receipts: SerializedReceipt[]; cards: SerializedCard[]; ollamaUp: boolean; storeNames: string[]; emailInboxCount: number; baseCurrency: string; multiCurrency: boolean }> {
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
@@ -48,11 +48,23 @@ async function getData(): Promise<{ receipts: SerializedReceipt[]; cards: Serial
     ollamaUp,
     storeNames: stores.map((s) => s.name),
     emailInboxCount,
+    baseCurrency: settings.currency,
+    multiCurrency: settings.multiCurrency, // P9: off = no per-receipt currency controls at all
   };
   });
 }
 
 export default async function ReceiptsPage() {
-  const { receipts, cards, ollamaUp, storeNames, emailInboxCount } = await getData();
-  return <ReceiptsClient receipts={receipts} cards={cards} ollamaUp={ollamaUp} storeNames={storeNames} emailInboxCount={emailInboxCount} />;
+  const { receipts, cards, ollamaUp, storeNames, emailInboxCount, baseCurrency, multiCurrency } = await getData();
+  return (
+    <ReceiptsClient
+      receipts={receipts}
+      cards={cards}
+      ollamaUp={ollamaUp}
+      storeNames={storeNames}
+      emailInboxCount={emailInboxCount}
+      baseCurrency={baseCurrency}
+      multiCurrency={multiCurrency}
+    />
+  );
 }
