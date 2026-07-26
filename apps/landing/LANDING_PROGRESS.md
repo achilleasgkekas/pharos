@@ -4033,3 +4033,63 @@ bar/global-search FAQ, γραμμη ~458, οτι ενα query που ταιρι�
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-26 (7) — plain search mode reaches into receipt line items (P22)
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε (τωρα
+πολυ μεγαλυτερο, ολο bakecore ui-rebuild/finance/reviewer + ενα pharos-daily-dev mobile-camera item), καμια
+καταχωρηση αφορα τη landing routine, τιποτα ANSWERED προς αυτη τη routine.
+
+`git log --oneline 8be7040..HEAD | grep "feat("` (8be7040 = τελευταιο commit που αντικατοπτριστηκε στο
+landing, βλ. προηγουμενο entry) εβγαλε δυο: `57a0a35 feat(landing): document the item document/manual
+vault...` (το ιδιο το προηγουμενο commit αυτης της routine, ηδη reflected) και `9c782be feat(mobile):
+multi-currency for Bills and Subscriptions (P9)`.
+
+Read-only research (commit message, χωρις subagent): το `9c782be` φερνει τις mobile Bills/Subscriptions
+οθονες σε parity με το ηδη-shipped web multi-currency (FxFields/FxBadge, base-currency read απο GET /api/
+v1/settings, printedAmount ωστε re-save να μη διπλο-μετατρεπει, plus ενα display-bug fix). Η υπαρχουσα
+multi-currency FAQ (γραμμη 525) ηδη καλυπτει "expenses, income, receipts, subscriptions, items, statements,
+and bills" χωρις platform διακριση, ιδιο pattern με το `8be7040` mobile expenses/income parity απο το
+προηγουμενο entry· δεν βρηκα νεο user-facing ισχυρισμο εκει, θα ηταν αναδιατυπωση χωρις νεο περιεχομενο.
+
+Αντ' αυτου διαλεξα το candidate που το ιδιο το προηγουμενο entry ειχε ηδη εντοπισει: **P22, line-item
+global search**. Διαβασα το `apps/web/src/app/search-actions.ts` (γραμμη 94, ρητο σχολιο "(P22)"): το
+`searchAll` ηδη έψαχνε `lineItems.name`/`lineItems.refinedName` στο receipt query (γραμμη 50), αλλα το νεο
+κομματι ειναι η `matchedLineItemName(r, rc.lineItems)` klisi που, οταν το query ΔΕΝ ταιριαζει στο ονομα του
+καταστηματος, βρισκει ΠΟΙΟ line item ταιριαξε και το προσθετει στο subtitle του hit ("Receipt · date ·
+total · <matched line>"), ωστε ο χρηστης να βλεπει *γιατι* εμφανιστηκε αυτη η αποδειξη αντι να μαντευει.
+Η ηδη-υπαρχουσα FAQ "Can I talk to it in plain English instead of clicking through menus?" (γραμμη 457-458)
+μιλουσε μονο για το conversational AI command bar (add/update/delete/log/ask) και ανεφερε "it doubles as
+global search" χωρις να εξηγει τι κανει το plain-search mode (το toggle Search/AI στο navbar bar, βλ.
+CLAUDE.md session 2026-06-08 cont.²) — καμια FAQ δεν εξηγουσε το line-item matching πριν.
+
+Αλλαγη (`apps/landing/app/page.tsx`, 1 σημειο, ιδια FAQ οπως παντα): στο τελος της υπαρχουσας απαντησης,
+μετα το "It needs an Anthropic-capable AI provider to run." (αμεταβλητο), νεα προταση: "A toggle right next
+to it switches to plain search with no AI involved: it matches items, receipts, statements, tasks,
+subscriptions, expenses, and vouchers by name, and a receipt match reaches past the store name into its
+own line items, so searching for a product you bought shows which receipt it came from and which line
+matched, even when the store itself never appears in the query." Το υπολοιπο της FAQ (AI command examples,
+follow-up question behaviour, AI history) δεν αλλαξε.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη).
+- Πορτες 3100-3110: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build.
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` (μεσω `document.body.textContent`) επιβεβαιωσε ολα τα 4 checks true: νεο "A toggle
+  right next to it switches to plain search with no AI involved" παρον, "a receipt match reaches past the
+  store name into its own line items" παρον, γειτονικο "every conversation is kept under AI history"
+  αμεταβλητο και παρον, επομενη FAQ "What do I need to run it?" αμεταβλητη και παρουσα. Hero screenshot
+  καθαρο (lighthouse mark, gradient τιτλος, nav, τριπλο badge row). Server τερματιστηκε (`pkill -f "next
+  start -p 3110"`), κανενα `next-server` process δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx (`grep -c` UTF-8 byte pattern).
+- Δεν αγγιξα Docker/:3000/web/mobile. Μηδεν subagent, μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: νεος `git log --oneline 9c782be..HEAD | grep "feat("` ελεγχος στην αρχη του επομενου
+run. Αλλιως candidates: polish συνεχεια / real app screenshots οταν υπαρξουν assets (blocked), ή νεο
+sweep για οποιοδηποτε αλλο πρωτοτυπο ηδη-shipped feature χωρις δικη του FAQ.
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
