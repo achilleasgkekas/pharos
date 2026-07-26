@@ -3735,3 +3735,58 @@ real app screenshots οταν υπαρξουν assets (blocked).
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-26 (2) — P9 slice 7: FX audit panel (missing-rate finder)
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε (ιδιο
+συνολο OPEN entries με το προηγουμενο run, ολα bakecore + το pharos-daily-dev mobile-camera question,
+τιποτα ANSWERED προς αυτη τη routine).
+
+`git log --oneline 901d7d0..HEAD | grep "feat("` (901d7d0 = τελευταιο commit που αντικατοπτριστηκε στο
+landing, βλ. προηγουμενο entry) εβγαλε ενα φρεσκο: `84f7b7f feat(money): find the foreign entries still
+missing an FX rate (P9 slice 7)`.
+
+Read-only research (commit message, χωρις subagent, μικρο scope): το `resolveFx` ηδη δεν μαντευει ποτε
+1:1 rate, οποτε ενα foreign record χωρις rate κραταει το τυπωμενο νουμερο στο `amount` και μπαινει σιωπηλα
+σε καθε base-currency αθροισμα· μεχρι τωρα το μονο ιχνος ηταν το gold FxBadge πανω στο ιδιο το record, αρα
+επρεπε να ξερεις ηδη ποιο να ανοιξεις, και ενα CSV import μπορει να δημιουργησει δεκαδες μαζι (ο importer
+τα μετραει, αλλα ο αριθμος χανεται μετα). Νεο `needsFxRate()` (lib/fx.ts, το ιδιο FxBadge το διαβαζει τωρα
+κι αυτο) + νεο `lib/fxAudit.ts` που λισταρει καθε τετοιο record σε 6 μοντελα (expenses/income/receipts/
+items/subscriptions/statements)· expenses+income ειναι ενα μοντελο σε δυο routes, ενα item ανοιγει σε
+/items ή /shopping αναλογα αν ειναι owned, αρα χρειαστηκε routing logic, οχι σκετο link. Το `/reports`
+δειχνει τη λιστα ΠΑΝΩ απο τα νουμερα που στρεβλωνει (μεγαλυτερο τυπωμενο ποσο πρωτο), καθε γραμμη
+deep-link στη φορμα του record· queried ΜΟΝΟ οταν το multi-currency ειναι on, αρα μηδεν κοστος σε
+single-currency deployment.
+
+Αλλαγες (`apps/landing/app/page.tsx`, 1 σημειο, ιδιο αρχειο με παντα): στην ηδη-υπαρχουσα multi-currency
+FAQ (`"Can it handle an expense in a currency other than my main one?"`, anchor αμεταβλητο), προσθηκη μιας
+προτασης αμεσως μετα το ηδη-υπαρχον "gold badge" wording: "...and Reports keeps a running list of every
+record still missing one, largest printed amount first, each row linking straight to that record so a CSV
+import that left a dozen unrated rows behind does not send you hunting for gold badges one page at a
+time." Το roadmap Shipped item ΔΕΝ αλλαξε (ηδη λεει "Opt-in multi-currency for expenses, income, receipts,
+subscriptions, items, statements & CSV imports" — το audit panel ειναι refinement πανω στο ιδιο feature,
+οχι νεος τυπος record ή write path).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη).
+- Πορτες 3100-3130: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build.
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` (μεσω `document.body.textContent`, οχι `innerText` γιατι το FAQ answer ειναι
+  collapsed/hidden by default) επιβεβαιωσε `found:true` για το νεο "keeps a running list of every record
+  still missing one" ΚΑΙ `hasCsv:true` για το ηδη-υπαρχον "foreign-currency rows in a bank CSV import"
+  (γειτονικο, δεν κοπηκε κατα λαθος). Hero screenshot καθαρο (lighthouse mark, gradient τιτλος, nav,
+  τριπλο badge row). `pkill -f "next start -p 3110"` -> επιβεβαιωθηκε οτι κανενα `next-server` process δεν
+  εμεινε.
+- em-dash: 0 σε ολο το page.tsx (`grep -c` UTF-8 byte pattern).
+- Δεν αγγιξα Docker/:3000/web/mobile. Η μονη agent-χρηση ηταν read-only `git show --stat`/commit-message
+  read (χωρις subagent, μικρο scope), μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: νεος `git log --oneline 84f7b7f..HEAD | grep "feat("` ελεγχος στην αρχη του επομενου
+run. Αλλιως candidates απο τη λιστα προτεραιοτητας: P22 receipt line-item global search, P21 document/
+manual vault, ή polish συνεχεια / real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
