@@ -5059,3 +5059,73 @@ routine στο μεταξύ, `0721c49`/`adfa76e`)· `git diff --cached --name-on
 `trials/sweep`, `billing/route.ts`, `auth/logout`, `account/{reset/*,verify/*}`. Πριν
 ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί,
 πάει πρώτο).
+
+## 2026-07-26 (cont. — increment 107, route-level test coverage για το usage + usage/sample endpoints)
+
+Πριν από νέο increment: ask-inbox re-checked (`~/.claude/ASK_ACHILLEAS.md`, 8 OPEN entries — 5×
+bakecore [finance ×2, redesigner, reviewer ×2, ui-rebuild], bakecore-tests macOS-TCC flag,
+pharos-daily-dev P17/P23 mobile-camera approval· τίποτα addressed σε saas-core). `WEB_DEBT.md`
+re-checked (59η σάρωση παραμένει το latest· η μοναδική ενεργή ουρά είναι το `vouchers/page.tsx`
+tenant-scoping item, ρητά feature-builder territory `app/vouchers/page.tsx` — εκτός saas-core,
+ίδιο συμπέρασμα με increments 103/106). UI-first backlog παραμένει εξαντλημένο (admin console +
+auth/workspace panels όλα ήδη χτισμένα). Ακολούθησα το leftover next-task από το increment-106
+log: **`usage`+`usage/sample`**.
+
+Πριν το staging, `git status --short` έδειξε **9 modified αρχεία εκτός territory** (bills/reports/
+fxAudit — άλλη routine mid-work πάνω σε Bill multi-currency, `apps/web/src/app/bills/*`,
+`api/v1/bills/*`, `models/Bill.ts`, `reports/ReportsClient.tsx`, `lib/fxAudit.ts`, `types.ts`) —
+collision guard σεβάστηκε, ΔΕΝ αγγίχτηκαν, staged ΜΟΝΟ τα 2 δικά μου νέα αρχεία (επαληθεύτηκε με
+`git diff --cached --name-only` = exact 2-file match πριν το commit). ΣΗΜ: `npm run type-check`
+έδειξε 1 προϋπάρχον error στο `reports/page.tsx`/`fxAudit.ts` (FxIssueKind narrowing, νέο `'bill'`
+kind δεν είναι ακόμα στο page-level union) — καθαρά συνέπεια αυτού του ξένου in-progress WIP, όχι
+δικό μου· δεν το άγγιξα (εκτός territory + risk να χαλάσω δουλειά άλλης routine μέσα σε commit).
+
+**Νέο `usage/route.test.ts`** (9 tests) + **`usage/sample/route.test.ts`** (9 tests), μηδέν
+production code αλλαγή.
+
+`usage/route.ts` (GET) = billing/usage-dashboard read surface — ολόκληρο το metering stack
+session→membership→tenant-context→ledger→quota-math. Η pure quota/cost μαθηματική
+(`aiQuotaStatus`/`storageQuotaStatus`/`buildCostSummary`) είναι ήδη πλήρως unit-tested αλλού →
+mocked εδώ στο module boundary, το route test καλύπτει αποκλειστικά τη δική του δουλειά: `gate`
+short-circuit (SAAS_MODE off) περνάει ανέγγιχτο μηδέν DB/session· χωρίς session → 401 "not
+authenticated" μηδέν connectDB· authenticated αλλά μηδέν active-membership tenants → 404 "no
+workspace for this account"· χωρίς `?tenant=` → επιλέγει το ΠΡΩΤΟ tenant από το `accountTenants`·
+`?tenant=` επιλέγει by slug (case-insensitive + trimmed) και απορρίπτει slug που ο λογαριασμός
+δεν είναι member με 403, ΠΟΤΕ δεν καλεί `getTenantContext`· `getTenantContext` → null (tenant
+διαγράφηκε mid-flight) → 404 "workspace not found"· success path επαληθεύει ότι
+`currentUsage`/`aiQuotaStatus`/`storageQuotaStatus`/`buildCostSummary` καλούνται με τα σωστά
+arguments (plan/used/period/tokens) και το response envelope συναρμολογεί τα outputs τους
+verbatim (tenant{slug,name,plan,status,role}/period/usage/quotas/cost)· mid-handler throw →
+καθαρό 500 μέσω πραγματικού `saasGuard`.
+
+`usage/sample/route.ts` (POST) = scheduler-driven storage-sampling cron — ίδιο CRON_SECRET-bearer
+idiom με το ήδη-tested `workspace/erasure/purge` (saasMode gate → CRON_SECRET presence →
+constant-time bearer compare → saasGuard-wrapped body), το test file κυριολεκτικά mirror του
+recipe εκείνου: SAAS_MODE off → 404 μηδέν CRON_SECRET read/sampleAllTenants call· CRON_SECRET
+unset → 500 fail-closed· missing/non-Bearer/wrong-same-length/wrong-different-length token → 401
+(η constant-time compare δεν κάνει throw σε διαφορετικό μήκος)· σωστό token (με trim
+whitespace) → καλεί `sampleAllTenants` + `{ok:true, ...result}`· mid-handler throw
+(`sampleAllTenants` rejecting) → καθαρό 500 μέσω saasGuard.
+
+**Verified**: και τα δύο νέα test files **18/18 green** μόνα τους (`npx vitest run
+src/app/api/saas/usage` → 2 files, 18 tests). Χρειάστηκε 1 μικρό type-only fix στην πορεία
+(`aiQuotaStatusMock`/`storageQuotaStatusMock` default return value είχε inferred `limit: null`
+literal type από το `vi.hoisted` init, έσπαγε όταν το `beforeEach` έγραφε πραγματικό number →
+explicit `null as number | null` cast, μηδέν runtime αλλαγή). Πλήρες `npx vitest run` → **279
+files / 3849 tests green** (αυξήθηκε από 276/3803 του increment-106 log). `npm run type-check` →
+**2 pre-existing errors σε `reports/page.tsx`** (βλ. παραπάνω, ξένο WIP, αμετάβλητο πριν/μετά τα
+δικά μου αρχεία). **Docker: ΔΕΝ έγινε rebuild** (test-only αρχεία, μηδέν production code/runtime
+wiring αλλαγή). **Browser-verify: skipped** (test files, μηδέν UI/observable behavior αλλαγή).
+Collision guard: `git status --short` πριν το staging έδειξε 9 ξένα modified αρχεία (δεν
+αγγίχτηκαν)· `git diff --cached --name-only` μετά το staging επιβεβαίωσε exact 2-file match πριν
+το commit/push. Pushed `111036f`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** επόμενοι υποψήφιοι χωρίς route-level coverage: `workspace/{ai-key,export/files,
+reactivate}`, `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`,
+`auth/logout`, `account/{reset/*,verify/*}`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση
+`WEB_DEBT.md` για item στο territory (αν βρεθεί, πάει πρώτο). Σημείωσε επίσης αν το ξένο
+`reports/page.tsx` FxIssueKind type-check error (bills multi-currency WIP) έχει κλείσει από την
+άλλη routine μέχρι το επόμενο run — αν παραμένει ανοιχτό πολλά runs, ίσως αξίζει flag στο
+ask-inbox (όχι τώρα, πολύ πρόσφατο/πιθανώς ενεργό mid-edit).
