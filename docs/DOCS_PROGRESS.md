@@ -2740,3 +2740,27 @@ Collision guard: `git status --short` = κανένα modified docs files (καν
 Συμπέρασμα: δεν υπάρχουν undocumented features. Όλα τα P9 features είναι fully documented. Κανένα νέο work χρειάζεται αυτό το run.
 
 Επόμενο run: (α) grep git log για άλλα undocumented feat() commits (P51-P80 candidates ή νέες features) · (β) drift check αν κάποιο endpoint ή configuration option έχει αλλάξει · (γ) monitoring για ενδεχόμενη stale-forward documentation.
+
+## 2026-07-26 (twenty-seventh run — continuous verification, all documented + no new features)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-sixth run (commit 218d95a, 2026-07-26 20:50). Ανακάλυψη: κανένα νέο feat() commit που δεν είναι ήδη documented. Όλα τα recent work είναι:
+- Test coverage (test() commits: email-verify routes, file-storage-backends, password-reset routes, settings, subscriptions, audit trail, password-reset pair)
+- Landing documentation (feat(landing) commits): P22, P21, P9 slices 8-10, FX audit
+- Mobile multi-currency (feat(mobile) commits): Items, Bills/Subscriptions, Expenses — ήδη όλα documented
+
+Comprehensive verification (markdown only, κανένα build/Docker/AI call):
+- **Latest feat() commit**: 5df604e (2026-07-26, P9 slice: multi-currency for Items mobile)
+- **Documentation status**: mobile.md line 21 (Items): "multi-currency support (foreign purchases track original currency + FX rate)" ✓, fully documented
+- **features.md**: P9 complete across all 10 slices + web + mobile ✓
+- **api.md**: κανένα νέο endpoint (όλα τα P9 είναι UI-only) ✓
+- **configuration.md**: multi-currency ήδη documented ✓
+- **Code fences**: api.md = 22 (ζυγό), features.md = 0 (αθικτο), mobile.md = 8 (ζυγό) ✓
+- **Internal links**: όλες valid ✓
+- **Secret scan**: κανένα literal credential ✓
+
+Collision guard: `git status --short` = κανένα modified docs files (κανένα work αυτό το run).
+
+Συμπέρασμα: Δεν υπάρχουν undocumented features. Όλα τα shipped features παραμένουν fully documented. Κανένα νέο work χρειάζεται αυτό το run.
+
+Επόμενο run: (α) grep git log για άλλα undocumented feat() commits (P51-P80 candidates ή νέες features) · (β) drift check αν κάποιο endpoint ή configuration option έχει αλλάξει · (γ) monitoring για ενδεχόμενη stale-forward documentation.
+
