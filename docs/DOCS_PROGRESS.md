@@ -2592,3 +2592,32 @@ Commit: `c8e3f56 docs(P9): document multi-currency support for Items (slice 4)` 
 Συμπέρασμα: P9 multi-currency feature είναι πλέον fully documented across all four modules (Receipts, Expenses, Subscriptions, Items) — API endpoints, feature descriptions, user-facing behavior. Όλα σε sync.
 
 Επόμενο run: (α) continue scanning για νέα feat() commits ή αν κάποια από τις P9 slices χρειάζεται refinement · (β) αν αλλαγές στα existing routes, refresh api.md · (γ) monitoring για νέα configuration options που χρειάζονται configuration.md update.
+
+## 2026-07-26 (twenty-third run — P9 slice 7: FX audit feature documentation)
+
+Σάρωση git log για νέα feat() commits μετά τη twenty-second run (commit 901d7d0, 2026-07-26 00:34). Ανακάλυψη: **P9 slice 7 shipped με ατελή documentation** (commit 84f7b7f, 2026-07-26 02:28):
+- **Slice 7 (FX Audit)** — lib/fxAudit.ts query lists all records missing FX rates, rendered in Reports as a panel above the figures it affects (largest printed amount first), with deep links to edit records and add rates. Query is multi-currency-aware (no-op when disabled).
+
+Τι βρέθηκε:
+- **features.md**: Already had detailed explanation at line 193 in Expenses & Income section ("Find the entries still missing a rate…"), but the main Reports section list was incomplete — δεν αναφέρονταν το FX audit feature στη Reports list.
+- **api.md**: Κανένα νέο endpoint (FX audit είναι UI-only query, όχι API).
+- **mobile.md**: Κανένα νέο content (mobile δεν έχει Reports view ακόμα).
+
+Τι έγραψα:
+- **features.md**: Προσθεση νέας bullet point στη Reports list (μετά Safe-to-spend cashflow, πριν "warranties expiring"): **"Foreign currency audit (P9)"** — συνοπτική περιγραφή του feature με άνθρωπο-ορατή λειτουργία (lists records missing rates, sorted by amount, deep link to edit).
+
+Accuracy (διάβασα κώδικα): git commit 84f7b7f, /apps/web/src/lib/fxAudit.ts (query logic), /apps/web/src/app/reports/ReportsClient.tsx (rendering). FxBadge updated to use needsFxRate() utility.
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: features.md 0 (ανθιστέκω), api.md 22 (ζυγό), mobile.md 0.
+- Internal links: καμία νέα αναφορά (inline section edit μόνο).
+- Secret scan: κανένα credential ✓.
+- Markdown structure (wrapping, indentation): ✓.
+
+Collision guard: git status --short = 11 modified (non-docs) + 1 staged (docs/features.md = δικό μου). Προσοχή: 11 uncommitted files είναι probably από άλλα features ή unpublished branches (Bills feature κλπ) — δεν με αγγίζουν. Staged = ΜΕ features.md μόνο.
+
+Commit: a834ef0 (docs(P9): document foreign currency audit feature in Reports) → origin/main ✓.
+
+Συμπέρασμα: P9 slice 7 FX audit πλέον fully documented στη features.md, με summary bullet στη Reports list + detailed explanation στη P9 subsection. Όλα σε sync.
+
+Επόμενο run: (α) grep git log για νέα feat() commits (ίδιες σαρώσεις για Bills feature κλπ) · (β) αν νέα configuration options, refresh configuration.md · (γ) drift check αν κάποιος endpoint διαγράφηκε.
