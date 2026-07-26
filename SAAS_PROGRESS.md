@@ -5193,3 +5193,75 @@ status --short` πριν το staging καθαρό (μόνο τα δικά μο�
 `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`,
 `account/{reset/*,verify/*}`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
 για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-26 (cont. — increment 109, route-level test coverage για invites list/revoke + invites/resend)
+
+Πριν από νέο increment: ask-inbox re-checked (`~/.claude/ASK_ACHILLEAS.md`, 8 OPEN entries — 5×
+bakecore [finance ×2, redesigner, reviewer ×2, ui-rebuild], bakecore-tests macOS-TCC flag,
+pharos-daily-dev P17/P23 mobile-camera approval· **τίποτα addressed σε saas-core**, μηδέν
+ANSWERED). `WEB_DEBT.md` grep re-checked: όλα τα saas/tenancy/billing items της τελευταίας
+σάρωσης είναι ήδη DONE (rate-limit, 3× guardless routes, getTenantConnection readyState)· τα 3
+εναπομείναντα auto-buildable (Notifications requireAdmin, Voucher/GiftCard/LoyaltyCard
+`vouchers/page.tsx` tenancy-parity, sampleDataActions.ts) είναι **εκτός territory** (feature
+pages/actions, όχι saas/**) → δεν τα άγγιξα. UI-first backlog παραμένει εξαντλημένο. Ακολούθησα
+το leftover next-task από το increment-108 log, παίρνοντας τα δύο **invites** routes μαζί (ίδιο
+lifecycle surface: list/revoke + resend, ίδιο `resolveWorkspaceSession`-gated pattern).
+
+Πριν το staging, `git status --short` ήταν **καθαρό** πλην των δύο δικών μου νέων αρχείων —
+collision guard δεν χρειάστηκε να παραλείψει τίποτα.
+
+**Νέο `invites/route.test.ts`** (20 tests), μηδέν production code αλλαγή. GET/DELETE =
+outstanding-invite lifecycle (η επιφάνεια πίσω από το Invitations panel). Τα pure κομμάτια
+τρέχουν **ΠΡΑΓΜΑΤΙΚΑ** εδώ (`parseInviteStatusFilter`/`inviteStatusQuery`/`inviteView`/
+`collectInviteAccountIds` + `readBody`/`isObjectId`, ήδη unit-tested αλλού)· mocked seams:
+`resolveWorkspaceSession`, `Invite`/`Account` models, `recordAudit`. Καλύπτει: gate
+short-circuit περνάει αναλλοίωτο **πριν από οποιοδήποτε query**· και τα δύο verbs resolve με
+`requireManage=true` (και το listing είναι management action)· `?status` default pending,
+fallback σε pending σε garbage (**ποτέ unfiltered listing**), `'all'` ρίχνει εντελώς το status
+constraint, `'accepted'` στενεύει· κάθε query scoped στο **δικό του tenant**· sort
+`{createdAt:-1}`· μηδέν invites → **παραλείπει εντελώς το Account lookup** (όχι κενό `$in`)·
+inviter+accepter identities σε **ΕΝΑ batched `$in`** (assert `toHaveBeenCalledTimes(1)` +
+distinct ids across invitedBy/acceptedBy — anti-N+1) με deleted account → null αντί crash· blank
+Account name → null (UI πέφτει στο email)· `expired` flag σωστά για past-TTL vs fresh pending·
+**ο tokenHash ούτε projected ούτε serialized** (explicit assertion και στο projection string και
+στο response body)· revoke scoped σε `{_id, tenant, status:'pending'}` (ένα workspace δεν
+αγγίζει τα invites άλλου, accepted/revoked row μένει ανέγγιχτο → 404 + **μηδέν audit**)· missing
+inviteId → 400 και malformed inviteId → 400 **πριν το Mongoose** (CastError guard), μηδέν write
+και στα δύο· success audits `invite.revoked` με email target + role meta· mid-throw → καθαρό 500.
+
+**Νέο `invites/resend/route.test.ts`** (17 tests), μηδέν production code αλλαγή. POST =
+re-mint + re-send σε ένα βήμα (το «το link μπαγιάτεψε πριν το πατήσουν» κουμπί). Εδώ το
+`mintInviteToken`/`hashInviteToken` + `pickBaseUrl` + `inviteEmail`/`inviteLinkUrl` τρέχουν
+**ΠΡΑΓΜΑΤΙΚΑ** (mocked μόνο τα side-effecting `sendEmail`/`mailerCanDeliver`). Πέρα από τα ίδια
+gating/guards, καλύπτει τις property-ες που κάνουν το resend σωστό: re-mint scoped σε
+`{_id, tenant, pending}` με `{new:true}`· **αποθηκεύεται ΜΟΝΟ το hash** και αυτό το hash
+**ταιριάζει πραγματικά** με το token που παίρνει πίσω ο caller (`hashInviteToken(devToken)` ===
+persisted `$set.tokenHash`, + explicit assertion ότι το plaintext δεν εμφανίζεται πουθενά στο
+update payload) — αυτό είναι το ίδιο το invariant που κάνει το νέο link redeemable· expiry
+σπρώχνεται στο μέλλον· **δύο resends δίνουν δύο διαφορετικά tokens/hashes** (το προηγούμενο link
+αποσύρεται, «newest link wins»)· audits `invite.resent`· mailer wired → mail στον invitee με link
+που φέρνει το **φρέσκο** token (extract-άρεται από το html και ξανα-hash-άρεται για επαλήθευση)
+και **μηδέν devToken** στο response· unwired + non-production → devToken echoed (local-testability
+scaffold)· unwired + **production → σιωπηλά dropped, μηδέν leak**, αλλά το resend παραμένει
+success· `SAAS_PUBLIC_URL` νικάει το request origin (fallback στο origin όταν λείπει).
+
+**Verified**: και τα δύο νέα files **37/37 green** μαζί, ολόκληρο το invites tree **51/51**
+(μαζί με το προϋπάρχον `accept/route.test.ts`, μηδέν regression). Ένα type-only fix στην πορεία
+(`sendEmailMock` χωρίς explicit param type → `mock.calls[0][0]` type-άριζε ως empty tuple, tsc
+TS2493 ×3 → typed param στο `vi.hoisted`, μηδέν runtime αλλαγή). Πλήρες `npx vitest run` →
+**287 files / 4032 tests green** (από 283/3938 του increment-108 log: +4 files/+94 tests — τα 2
+δικά μου + κάποια από άλλες ταυτόχρονες routines στο μεταξύ). `npm run type-check` → **EXIT 0
+καθαρό**. **Docker: ΔΕΝ έγινε rebuild** (test-only, μηδέν production/runtime wiring αλλαγή —
+άρα ούτε ο docker mutex χρειάστηκε). **Browser-verify: skipped** (test files, μηδέν UI/
+observable behavior αλλαγή). Collision guard: `git status --short` πριν το staging έδειξε μόνο
+τα 2 δικά μου untracked files· `git diff --cached --name-only` μετά επιβεβαίωσε exact 2-file
+match πριν το commit/push. Pushed `a5d1499`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** επόμενοι υποψήφιοι χωρίς route-level coverage: `workspace/export/files`, `audit`,
+`trials/sweep`, `billing/route.ts`, `auth/logout`, `account/{reset/*,verify/*}`. Το
+`trials/sweep` (49 γρ.) + `auth/logout` (17 γρ.) είναι τα μικρότερα και πάνε άνετα μαζί σε ένα
+increment· το `audit/route.ts` (110 γρ., cursor pagination + batched actor resolution) αξίζει
+δικό του. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο
+territory** (η τελευταία σάρωση δεν είχε κανένα — τα 3 ανοιχτά items είναι feature-side).
