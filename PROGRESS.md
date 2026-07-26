@@ -6,6 +6,36 @@
 <!-- docker-validated: 7b46912 -->
 <!-- ui-audited: 0bc5e14 -->
 
+## 2026-07-26 (cont.⁵ — P9 mobile: ξένο νόμισμα από το κινητό, και το endpoint που δεν το δεχόταν καν)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση `expo-camera`) παραμένει **OPEN χωρίς Answer** (8ο συνεχόμενο run), άρα P17/P23 μένουν μπλοκαρισμένα. Working tree καθαρό στην αρχή. Docker mutex acquired/released.
+
+**Approved queue check (βήμα a)**: αμετάβλητη εικόνα για **8ο** run (P36 provider decision δική σου, P31 supervised session, P17/P23 native dep). Πήρα την πρώτη πρόταση του προηγούμενου log: **mobile UI για τα 2 FX πεδία**.
+
+**Το μισό του task δεν ήταν UI**: διαβάζοντας τα v1 routes βρήκα ότι το `/api/v1/expenses` (POST **και** PATCH) ήταν το **τελευταίο money endpoint που αγνοούσε εντελώς τα currency/fxRate**, ενώ το `docs/api.md` **τα περιέγραφε ήδη ως υποστηριζόμενα** (και μάλιστα με `origAmount` ως writable πεδίο, που δεν είναι — το παράγει ο server). Η GET μεριά του έδειχνε κανονικά το triple (`trimExpense`), οπότε το κενό ήταν αόρατο: μια εγγραφή που φτιάχνεις από κινητό δεν μπορούσε να μαρκαριστεί foreign με κανέναν τρόπο, και το τυπωμένο ποσό έμπαινε στα reports/budgets/anomaly medians ως base currency.
+
+**Αποφάσεις που πήρα μόνος**:
+- **Μηδέν νέος κανόνας**: ο resolver των bills/subscriptions αντιγράφηκε αυτούσιος (`resolveFx` στο POST, «recompute και τα 4 πεδία μαζί» στο PATCH). Ένα δεύτερο ιδίωμα για το ίδιο πράγμα θα ήταν το πραγματικό ρίσκο.
+- **Το `{ currency }` ή το `{ fxRate }` μόνο τους είναι έγκυρο changeset**: το FX block τρέχει **πριν** το `no valid fields` guard, αλλιώς η πιο συχνή διόρθωση («η ισοτιμία ήρθε αργότερα», ακριβώς αυτό που λίσταρει το audit του slice 7) θα γύριζε 400.
+- **`multiCurrency` read-only στο `/api/v1/settings`**: είναι απόφαση για όλο το install (τι νόημα έχει να το ανάβει μια συσκευή για όλους;), οπότε το mobile το διαβάζει για να κρύβει τα controls, δεν το γράφει.
+- **Τα FX controls μπήκαν στα δύο modal forms, ΟΧΙ στο one-line quick add** (vendor + ποσό + scan + «+»): το quick add είναι για την καθημερινή εγγραφή, και μια κάρτα νομισμάτων εκεί θα το έπνιγε για την σπάνια περίπτωση (μετά το add, το ανοίγεις και το μαρκάρεις). Στο **scanned-bill draft** μπήκαν σίγουρα: εκεί είναι η πιο πιθανή foreign εγγραφή (λογαριασμός στο εξωτερικό) και το `ParsedExpenseData` **έφερνε ήδη** `currency` από το AI — μόνο η ισοτιμία θέλει άνθρωπο.
+- **Μικρό τοπικό `src/fx.ts` αντί για shared package**: ίδια απόφαση με το ήδη-υπάρχον `splitTotals`/`computeBalances` μέσα στο MoneyScreen. Η αυθεντία μένει στο server (το mobile στέλνει το τυπωμένο ποσό, δεν μετατρέπει μόνο του). Το `FxControls.tsx` όμως είναι shared από την αρχή, γιατί τα επόμενα money screens (bills/subs/statements) θέλουν ακριβώς τα ίδια δύο κομμάτια.
+
+**Bug που βρήκα στην πορεία (προϋπήρχε των FX πεδίων)**: το MoneyScreen τύπωνε κάθε ποσό με `money(item.amount, item.currency)` και το σύνολο με `rows[0]?.currency`. Επειδή το `amount` είναι **πάντα** base currency, μία foreign γραμμή θα τύπωνε λάθος σύμβολο πάνω σε base νούμερο (και αν ήταν η πρώτη της λίστας, το κάνει σε ολόκληρο το άθροισμα). Τώρα όλα τα νούμερα φέρουν το base σύμβολο (από `GET /settings`, όχι μαντεμένο από γραμμή) και το τυπωμένο φαίνεται ξεχωριστά στο badge.
+
+**Verify**: `npm run type-check` (web) **EXIT 0** και `apps/mobile npx tsc --noEmit` **EXIT 0**. Full `npx vitest run` → **4150 passed / 291 files** (+16 δικά μου: 9 PATCH, 6 POST, 1 settings· μηδέν regression). Το υπάρχον `[id]/route.test.ts` χρειάστηκε νέο `findById` mock με default «ίδιο doc με το update», ώστε **κανένα προών τεστ να μην αλλάξει**. Docker κάτω από το mutex: `build web` → mongo **healthy** → `up -d web` → `/login` **200 στο πρώτο poll (2s)**, `/api/v1/expenses` **401** (auth gate, άρα compiled), `/expenses` **307** → `docker builder prune -f` → lock released. Browser: `/login` renders, **μηδέν console errors**. Το mobile UI δεν ελέγχεται unattended (χρειάζεται simulator), οπότε στηρίζεται σε `tsc` + στο ότι ο κανόνας ζει στο server, που είναι tested.
+
+**Docs**: διορθώθηκε το `docs/api.md` (έλεγε ότι το `origAmount` είναι writable και ότι τα FX πεδία γίνονται δεκτά — μέχρι σήμερα κανένα από τα δύο) + `API.md` (mobile subset: POST/PATCH contract) + νέα γραμμή στο `MOBILE_PARITY.md`.
+
+**Git hygiene**: explicit `git add` 14 αρχείων (όχι `-A`) → commit `8be7040` → pushed.
+
+**Επόμενο task (πρόταση)**: **το ίδιο FX πέρασμα στα υπόλοιπα mobile money screens** — `BillsScreen` και `SubscriptionsScreen` πρώτα, γιατί τα routes τους δέχονται **ήδη** currency/fxRate (μηδέν δουλειά στο server), οπότε είναι καθαρό wiring του νέου `FxControls` + ο ίδιος έλεγχος για το ίδιο `rows[0].currency` μοτίβο. Δεύτερο υποψήφιο: το `fxBadgeLabel` σε **credit balance** (αρνητικό τυπωμένο total, guard `origAmount <= 0`) που κρέμεται από το slice 5. Ως συνήθως πρώτα ο έλεγχος του Approved queue (βήμα a).
+
+## Needs Achilleas
+
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο, **8ο** συνεχόμενο run. Και τα δύο server halves είναι έτοιμα (P17 `GET /api/v1/lookup/barcode` με 41 tests, P23 `POST /api/v1/scan/receipt` υπήρχε ήδη) — λείπει μόνο η έγκριση για το native dep. Ερώτημα: `~/.claude/ASK_ACHILLEAS.md` → `pharos-daily-dev-20260725-1425` (ακόμα OPEN).
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31 household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
 ## 2026-07-26 (cont.⁴ — P9 slice 10: το νόμισμα της σελίδας φτάνει στο item)
 
 **Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση
