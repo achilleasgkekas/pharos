@@ -5655,3 +5655,67 @@ session → membership → status) θα περνούσε σιωπηλά όλη �
 resolution, ίδια κλάση κινδύνου) και `saasApi.ts` (`saasAuthGate`/`accountTenants`). Πριν
 ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο territory** (οι
 τελευταίες 6 σαρώσεις δεν είχαν κανένα).
+
+## 2026-07-27 — increment 117: route-level coverage για το billing summary (κλείνει τη σειρά)
+
+**Ask-inbox**: κανένα ANSWERED item για αυτή τη routine (τα OPEN είναι όλα bakecore + ένα
+pharos-daily-dev για expo-camera) → μηδέν pre-work. **Territory scan**: πήρα το next-task του
+increment-116 log. Σάρωσα ξανά όλα τα `app/api/saas/**/route.ts` απέναντι στα αδελφά
+`route.test.ts` → **έμενε ακριβώς ένα** χωρίς κάλυψη, το `billing/route.ts`. Έλεγξα πρώτα αν
+υπάρχει διαθέσιμο UI item (η δηλωμένη προτεραιότητα): το SaaS UI είναι πλέον 4 admin pages +
+14 (saas) pages + 24 components + 22 pure view-modules **όλα με tests** — δεν υπήρχε ανοιχτό
+UI unit, οπότε προχώρησα με το τελευταίο route test.
+
+**Νέο `app/api/saas/billing/route.test.ts`** (31 tests), **μηδέν production code αλλαγή**. Είναι
+το read surface που τρέφει το BillingPanel: plan metadata + lifecycle status + Stripe linkage +
+το ΕΝΑ call-to-action που renderάρει το UI. Mock **μόνο** στα node-only seams
+(`getCurrentAccount`, `getTenantContext`, `Tenant.findById().lean()`, `stripeConfigured()`,
+`connectDB`, `saasAuthGate`, `accountTenants`)· **τρέχουν πραγματικά** `planDef`,
+`canManageBilling`, `evaluateTrial`, `buildBillingSummary` και ο `saasGuard` — δηλαδή τα
+assertions καρφώνουν το πραγματικό wiring, όχι το echo ενός mock.
+
+Καλύπτει: **short-circuits** — gate pass-through **by identity** (`toBe`) με μηδέν session/DB/
+model work· χωρίς session → 401 χωρίς `connectDB`· μηδέν memberships → 404 χωρίς context resolve
+και χωρίς DB read. **Tenant selection** — default = πρώτο membership· `?tenant=` trimmed +
+lower-cased· **blank/whitespace `?tenant=` κάνει fallback στο πρώτο αντί για 403** (η
+`|| null` γραμμή, εύκολο να σπάσει σε refactor)· ο resolver παίρνει τον slug του **membership**
+όχι το raw query string· μη-μέλος → 403 **χωρίς** context resolve και **χωρίς** DB read.
+**Not-found trio** — context null / context **χωρίς `tenantId`** (το self-hosted default ctx
+shape) / tenant doc missing → και τα τρία 404 «workspace not found», τα δύο πρώτα χωρίς DB read.
+**Authority split (το πιο ουσιαστικό)** — το fixture δίνει σκόπιμα **αποκλίνουσες** τιμές:
+plan/status/Stripe ids διαβάζονται από το **tenant doc**, role + slug/name από το **membership**,
+και το `findById` κλειδώνει στο `tenantId` του **resolved context** (t99), όχι του membership row
+(t1)· αν κάποιος τα μπερδέψει, σκάει. **Summary shaping** — άγνωστο/legacy plan → fallback στο
+`free`· κενό status → `'trialing'`· `trialEndsAt` → ISO + derived trial state (3 μέρες → daysLeft
+3, περασμένο → `{onTrial:false, expired:true, daysLeft:0}`, unparseable → null αντί «Invalid
+Date»)· Stripe ids trimmed, blank subscription → `active:false`. **Leak guard** — assert σε
+`Object.keys` (ακριβώς 9 whitelisted πεδία) + το **raw body** δεν περιέχει `aiKeyCipher`/`dbName`/
+internal notes που βάζω επίτηδες στο doc. **CTA ladder** — owner+subscription → `manage`, owner
+χωρίς → `subscribe`, admin = manager, **plain member → 200 read-only `view`** (το route είναι
+σκόπιμα ανοιχτό σε κάθε μέλος, ο ρόλος υποβαθμίζει μόνο το CTA), άγνωστος ρόλος → fail closed,
+και το CTA είναι **ανεξάρτητο** του `billingConfigured`. **Failure** — connectDB throw και
+tenant-read throw → 500 (όχι παραπλανητικό 404), message-less → `'Server error'`, 5000 chars →
+truncated στα 200.
+
+**Verified**: **31/31 green από την πρώτη εκτέλεση**. Πλήρες `npx vitest run` → **304 files /
+4523 tests green** (από 299/4370: +2 files/+49 tests — 1 δικό μου + 1 από άλλη ταυτόχρονη
+routine). `npm run type-check` → **EXIT 0 χωρίς κανένα fix** — το idiom «typed params στα hoisted
+mocks» (TS2493) εφαρμόστηκε προληπτικά από την αρχή σε όλα τα mocks. **Docker: ΔΕΝ έγινε rebuild**
+(test-only, μηδέν production/runtime/env/deps αλλαγή → ούτε ο docker mutex χρειάστηκε).
+**Browser-verify: skipped** (test file, μηδέν observable UI αλλαγή). Collision guard:
+`git status --short` πριν το staging = μόνο το δικό μου untracked αρχείο, μηδέν staged από άλλη
+routine· `git diff --cached --name-only` μετά = exact 1-file match. Pushed `2599087`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** το `app/api/saas/**` route coverage είναι πλέον **100%** (κάθε route έχει
+route.test.ts). Η σειρά μετακινείται στα **8 untested modules του territory**:
+`lib/tenancy/workspaceSession.ts` (91γρ.), `context.ts` (140), `provision.ts` (103),
+`saasApi.ts` (85), `saasPage.ts` (40), `superadminPage.ts` (48)· `lib/billing/billingSession.ts`
+(71), `stripe.ts` (145). **Ξεκίνα από `workspaceSession.ts`**: είναι ο κοινός authz resolver που
+mock-άρουν ΟΛΑ τα workspace route tests (8 αρχεία), δηλαδή το μόνο κομμάτι που κανένα route test
+δεν εκτελεί ποτέ πραγματικά — ένα bug στη σειρά gate → session → membership → status θα περνούσε
+σιωπηλά όλη τη σουίτα των 4523. Μετά `context.ts` (tenant resolution, ίδια κλάση κινδύνου) και
+`saasApi.ts` (`saasAuthGate`/`accountTenants` — το `saasGuard` έχει ήδη κάλυψη μέσω
+`saasGuard.test.ts`). Πριν ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI** item
+(προτεραιότητα) και για `WEB_DEBT.md` item μέσα στο territory.
