@@ -467,10 +467,12 @@ months):
 - **Foreign currency audit (P9)** — when multi-currency is enabled, a panel lists all
   records (expenses, income, receipts, items, subscriptions, statements, bills) that are
   missing an FX rate. This helps you catch incomplete foreign transactions (especially
-  after bulk CSV imports) before they silently distort your reports. Sorted by largest
-  printed amount first; click any row to open the record's edit form and add the missing
-  rate. Only visible when multi-currency is enabled, so single-currency deployments
-  incur zero cost.
+  after bulk CSV imports) before they silently distort your reports. Records are grouped by
+  printed currency (USD, EUR, GBP, etc.), sorted by largest total exposure first; enter an
+  exchange rate once and press **"Apply to all N"** to fix every record of that currency
+  at once (the common case after a CSV import). Individual rows can override with their own
+  rate if needed, and a live preview shows the converted base-currency amount before saving.
+  Only visible when multi-currency is enabled, so single-currency deployments incur zero cost.
 - warranties expiring soon, biggest purchases, and installment payoff.
 
 **Asset depreciation.** Owned gear is valued from its purchase price using a

@@ -25,7 +25,7 @@ The mobile app mirrors most of the web modules, backed by the same API client
 | Subscriptions | list, add, edit, **auto-discover untracked recurring charges**; **multi-currency support** (track subscriptions billed in foreign currencies) |
 | Statements | list + transactions, installment-plan overview; **multi-currency support** (convert whole statement to base currency) |
 | Vouchers | list, add, edit, AI fill (text/photo); **Coupons / Gift cards / Loyalty cards** tabs |
-| Bills | list, add, edit, mark paid (spawns next recurring), due-soon/overdue status |
+| Bills | list, add, edit, mark paid (spawns next recurring), due-soon/overdue status; **multi-currency support** (foreign bills track printed figure, rate, and converted base amount) |
 | Goals / Savings | list, add, edit, log contribution, progress tracking |
 | Calendar | 3-month agenda of renewals, installments, bills, expiries |
 | Reports | net position, this month/year, by-category, budgets |
