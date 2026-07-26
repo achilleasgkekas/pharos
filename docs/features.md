@@ -552,6 +552,31 @@ specific events: `receipt.parsed` (when a receipt is AI-scanned), `budget.exceed
 call includes a Stripe-style HMAC signature (using a shared secret) to prove it came
 from your Pharos instance. Configure these in **Settings → Notifications → Webhooks**.
 
+## Backup & restore (JSON)
+
+**Settings → Storage & backup → Export JSON** downloads every record as one JSON
+file; **Restore** reads it back, upserting each document by its id (so restoring
+into a populated instance merges rather than duplicating). Binary files (receipt
+scans, item photos, statement PDFs) are not in the JSON, they stay on disk (or on
+your configured remote), and the JSON keeps the paths that point at them.
+
+What the file carries: items, receipts, statements, subscriptions, vouchers,
+payment cards, tasks, stores, expenses / income, bills, goals, gift cards, loyalty
+cards, net-worth snapshots, and the shopping list.
+
+What it deliberately leaves out:
+
+- **Settings and credentials** (`AppConfig`): the export lands in your Downloads
+  folder, and this record holds live secrets (AI provider keys, SMB/FTP password,
+  OneDrive refresh token). Budgets, prompts and taxonomies live here too, so they
+  are not restored by the JSON either.
+- **Logins** (users, and the SaaS account/tenant records), which hold password
+  hashes.
+- **Transient state**: background jobs, notification instances, and AI chat history.
+
+For a genuine full-instance copy including settings and logins, use a database
+dump (`scripts/backup.sh` runs `mongodump`) rather than the JSON export.
+
 ## Trash (soft delete)
 
 Most deletes are reversible. Items, receipts, expenses, subscriptions, vouchers,

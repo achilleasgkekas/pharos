@@ -89,7 +89,14 @@
   category-normalization prompt idiom, `CATEGORY_PROMPT`)· η ενσωμάτωση στο Reports chart μπαίνει σε ξεχωριστό
   δεύτερο βήμα ώστε το πρώτο shippable slice να μείνει S.
 
-### P63. Backup/export λείπει 7 μοντέλα — data-loss ρίσκο σε restore, όχι απλά νέο feature — S — OSS, ΥΨΗΛΗ προτεραιότητα (mechanical fix)
+### P63. Backup/export λείπει 7 μοντέλα — data-loss ρίσκο σε restore, όχι απλά νέο feature — ✅ SHIPPED 2026-07-26 (pharos-daily-dev)
+> **Χτίστηκε χωρίς να περάσει από «Approved» σκόπιμα**, γιατί δεν είναι προϊοντική απόφαση: είναι defect fix σε
+> ήδη-shipped feature (το backup υποσχόταν πλήρες restore και σιωπηλά δεν το έκανε), και το ίδιο το item το
+> χαρακτηρίζει «μηχανικό fix, μηδέν νέος σχεδιασμός, καμία ανοιχτή απόφαση». Τα 7 μοντέλα μπήκαν, και επιπλέον
+> το map βγήκε από το `settings/actions.ts` σε **`lib/backupModels.ts`** με guard test που απαιτεί κάθε μοντέλο
+> στο `src/models` να είναι είτε στο backup είτε ρητά excluded με αιτιολογία, ώστε να μην ξανα-συσσωρευτεί το ίδιο
+> κενό σιωπηλά. Τα secrets (`AppConfig`/`User`/`Account`) μένουν σκόπιμα εκτός (το JSON κατεβαίνει στον δίσκο του
+> χρήστη), τεκμηριωμένο σε νέα ενότητα «Backup & restore (JSON)» στο `docs/features.md`.
 - **Αξία:** live-verified: `ls apps/web/src/models/*.ts` = **27 models**, αλλά το `BACKUP_MODELS` map
   (`settings/actions.ts:1228-1237`, τροφοδοτεί ΚΑΙ το `exportData()` ΚΑΙ το `importData()` — συμμετρικό, ίδιο
   key-loop και στα δύο) έχει μόνο **8 keys** (items/receipts/statements/subscriptions/vouchers/cards/tasks/stores).

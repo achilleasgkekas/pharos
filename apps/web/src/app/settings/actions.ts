@@ -58,6 +58,7 @@ import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel, type AiProviderId } from '@/lib/aiModels';
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
 import { sendNtfyTo } from '@/lib/notify';
+import { BACKUP_MODELS } from '@/lib/backupModels';
 import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '@/lib/notifiers';
 import { pushAllDevices } from '@/lib/expoPush';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -1225,16 +1226,9 @@ export async function mergeStores(
 
 // ─── Backup / restore (JSON of all metadata; binary files live on disk) ───────
 
-const BACKUP_MODELS = {
-  items: Item,
-  receipts: Receipt,
-  statements: Statement,
-  subscriptions: Subscription,
-  vouchers: Voucher,
-  cards: Card,
-  tasks: Task,
-  stores: Store,
-} as const;
+// The registry itself lives in lib/backupModels.ts so a guard test can check it against
+// src/models — it had already drifted seven models behind (the whole Expense/Income
+// module included), which silently dropped them from every backup taken.
 
 /** Export every collection's documents as a single JSON string (for download). */
 export async function exportData(): Promise<string> {
