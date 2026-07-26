@@ -2720,3 +2720,23 @@ Collision guard: git status --short = 0 modified docs files (κανένα work �
 Συμπέρασμα: Όλα τα P9 features (slices 1-10, web + mobile) παραμένουν fully documented + in sync. Κανένα νέο work χρειάζεται αυτό το run.
 
 Επόμενο run: (α) grep git log για άλλα undocumented feat() commits (P51-P80 candidates ή νέες features) · (β) drift check αν κάποιο endpoint ή configuration option έχει αλλάξει · (γ) monitoring για ενδεχόμενη stale-forward documentation αν χρήστης πειράζει ή υπάρχουν breaking changes.
+
+## 2026-07-26 (twenty-sixth run — comprehensive verification, all P9 complete + documented)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-fifth run (commit 7e4e62b, 2026-07-26 14:21). Ανακάλυψη: κανένα νέο feat() commit που δεν είναι ήδη documented. Όλα τα P9 slices (1-10 + web + mobile) πλέον fully documented + in sync.
+
+Comprehensive verification (markdown only, κανένα build/Docker/AI call):
+- **Latest feat() commit**: 9c782be (2026-07-26, P9 slice 10 mobile: multi-currency for Bills and Subscriptions).
+- **Documentation status**: (α) mobile.md line 28 (Bills): "multi-currency support (foreign bills track printed figure, rate, and converted base amount)" ✓, (β) mobile.md line 25 (Subscriptions): "multi-currency support (track subscriptions billed in foreign currencies)" ✓.
+- **features.md**: P9 complete across all 10 slices + web (Receipts/Expenses/Items/Subscriptions/Statements/Bills) ✓.
+- **api.md**: κανένα νέο endpoint (όλα τα P9 είναι UI-only) ✓.
+- **configuration.md**: multi-currency ήδη documented ✓.
+- **Code fences**: api.md = 22 (ζυγό), features.md = 0 (αθικτο), mobile.md = 8 (ζυγό) ✓.
+- **Internal links**: όλες valid ✓.
+- **Secret scan**: κανένα literal credential ✓.
+
+Collision guard: `git status --short` = κανένα modified docs files (κανένα work αυτό το run).
+
+Συμπέρασμα: δεν υπάρχουν undocumented features. Όλα τα P9 features είναι fully documented. Κανένα νέο work χρειάζεται αυτό το run.
+
+Επόμενο run: (α) grep git log για άλλα undocumented feat() commits (P51-P80 candidates ή νέες features) · (β) drift check αν κάποιο endpoint ή configuration option έχει αλλάξει · (γ) monitoring για ενδεχόμενη stale-forward documentation.
