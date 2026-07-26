@@ -1,6 +1,31 @@
 # DOCS_PROGRESS
 
-## 2026-07-26 (twenty-third run — P9 slice 8+9: Bills multi-currency + FX audit inline rate setting)
+## 2026-07-26 (twenty-fourth run — P9 slice 10 verification: product page currency reaching items already documented)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-third run (commit d33a78d, 2026-07-26 12:46). Ανακάλυψη: **P9 slice 10 shipped με ήδη-ενσωματωμένη documentation**:
+- **Slice 10 (Product Page Currency)** — commit 7e4e62b, 2026-07-26 14:21 — product URL import reads the page's declared currency (schema.org, og: metadata, itemprop markup), and new items are created in that currency instead of guessing EUR/USD. Imported new items surface in Reports "needs an exchange rate" panel; existing items skip mismatched currency prices (one item carries one rate).
+
+Τι βρέθηκε:
+- **features.md**: Ήδη updated από το commit με extended bullet point "Importing from a foreign shop page (P9)" (lines 95-106). Εξηγεί την ανάγνωση νομίσματος από σχήμα + fallback, νέα items σε εκείνο το νόμισμα, υπάρχοντα items σε ίδιο νόμισμα μόνο. Πλήρη κάλυψη του feature.
+- **api.md**: Κανένα νέο endpoint (URL import είναι web UI only, όχι exposed API).
+- **mobile.md**: Κανένα νέο content (URL import δεν υποστηρίζεται σε mobile).
+
+Accuracy (διάβασα κώδικα): git commit 7e4e62b message, lib/scrape.ts (extractPriceCurrency, schema.org/og/itemprop parsers), apps/web/src/app/items/actions.ts (resolveItemPrices enforces currency + fxRate 0 για new items, skips mismatched currency σε existing), confirmImportItem logic.
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: features.md 0 (αθικτο), api.md 22 (ζυγό), mobile.md 0.
+- Internal links: όλα ✓.
+- Secret scan: κανένα credential ✓.
+
+Collision guard: git status --short = καμία modified file (η dokumentasi ήταν ήδη complete από τον commit 7e4e62b).
+
+Καμία commit/push χρειάζεται (docs ήδη current).
+
+Συμπέρασμα: Όλα τα P9 slices (1-10) πλέον fully documented across features.md + api.md + mobile.md.
+
+Επόμενο run: (α) grep git log για άλλα νέα undocumented feat() commits (P51-P80 candidates ή άλλα modules), ή (β) drift check αν κάποιο endpoint documentation έχει γίνει stale.
+
+## 2026-07-26 (twenty-three run — P9 slice 8+9: Bills multi-currency + FX audit inline rate setting)
 
 Σάρωση git log για νέα feat() commits μετά την twenty-second run (commit 901d7d0, 2026-07-26 00:34). Ανακάλυψη: **2 νέα P9 slices shipped με ελλιπή documentation**:
 - **Slice 8 (Bills)** — commit 1ce991f, 2026-07-26 09:49 — multi-currency support για Bills (currency, origAmount, fxRate fields)
