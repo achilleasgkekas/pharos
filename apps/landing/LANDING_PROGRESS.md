@@ -3910,3 +3910,65 @@ manual vault, ή polish συνεχεια / real app screenshots οταν υπα�
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-26 (5) — P9 slice 10: product URL import honours the page's own currency
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` (81 γραμμες)
+ελεγχθηκε, καμια καταχωρηση αφορα τη landing routine (ολα bakecore + pharos-daily-dev mobile-camera),
+τιποτα ANSWERED προς αυτη τη routine.
+
+`git log --oneline cbde1a8..HEAD | grep "feat("` (cbde1a8 = τελευταιο commit που αντικατοπτριστηκε στο
+landing, βλ. προηγουμενο entry) εβγαλε δυο: `039e093 feat(landing): document the FX audit panel's...`
+(το ιδιο το προηγουμενο commit αυτης της routine, ηδη reflected) και ενα φρεσκο: `7e4e62b feat(items): a
+product page's own currency reaches the imported item (P9 slice 10)`.
+
+Read-only research (commit message + `git show --stat`, χωρις subagent, μικρο scope): το προϊον URL import
+ητανε το τελευταιο write path που μπορουσε ακομα να μετατρεψει μια ξενη τιμη σε βασικο νομισμα σιωπηλα.
+Το `ParsedProductSchema` ειχε ηδη `currency` πεδιο αλλα κανενα call site δεν το διαβαζε, αρα ενα προϊον
+$1,299 αποθηκευονταν σαν να ηταν 1,299 του νομισματος του deployment. Η νεα `extractPriceCurrency()`
+διαβαζει schema.org `priceCurrency`, `og:`/`product:price:currency` και `itemprop` markup απο την ιδια
+τη σελιδα, και μονο πεφτει πισω στο ο,τι ειδε τυπωμενο το μοντελο σαν τελευταια λυση· ενα γυμνο "$" ΔΕΝ
+resolve-εται μονο του (USD σε ενα shop, CAD/AUD σε αλλο) — το P9 δεν επινοει δεδομενα νομισματος, αρα μια
+σελιδα που δεν δηλωνει τιποτα συμπεριφερεται ακριβως οπως πριν. Ενα ΝΕΟ item υιοθετει αυτο το νομισμα (μεσω
+`resolveItemPrices`), η τυπωμενη τιμη αποθηκευεται με `fxRate 0` και εμφανιζεται στο ηδη-existing Reports
+"needs an exchange rate" panel. Ενα ΗΔΗ-υπαρχον item κρατα το δικο του νομισμα: το store link καταγραφεται
+αλλα μια ασυμβατη τιμη μενει εξω (ενα item κραταει ενα rate για ολες τις τιμες του) και το αποτελεσμα
+αναφερει ποιο νομισμα παραλειφθηκε. Ιδιος κανονας σε `importItemFromUrl`, `confirmImportItem` και το price
+refresh του `aiFillItem`.
+
+Αλλαγη (`apps/landing/app/page.tsx`, 1 σημειο, ιδιο αρχειο με παντα): στην ηδη-υπαρχουσα multi-currency FAQ
+(`Can it handle an expense in a currency other than my main one?`), νεα προταση μπηκε αμεσως μετα το ηδη-
+υπαρχον item wording ("...net worth and the insurance export see one consistent figure instead of a euro
+number quietly standing in for dollars.") και πριν το statement closing ("A card statement converts as a
+whole document too:"), που περιγραφει το νεο page-sourced currency detection για product URL import: πως
+διαβαζεται πρωτα το schema.org/OG markup (οχι μαντεψια απο γυμνο "$"), πως ενα νεο item υιοθετει τη σελιδας
+νομισμα και μπαινει στο ιδιο missing-rate list, και πως ενα ηδη-υπαρχον item κρατα το δικο του (ασυμβατη
+τιμη καταγραφεται σαν link αλλα μενει εξω απο το price history μεχρι να ρυθμιστει, με το αποτελεσμα να λεει
+ποιο νομισμα παραλειφθηκε). Το κλεισιμο της FAQ και το roadmap Shipped block ΔΕΝ αλλαξαν (refinement πανω
+στο ηδη-documented item multi-currency behaviour, οχι νεος τυπος record ή write path, ιδιο pattern με τα
+slices 7 και 9).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη).
+- Πορτες 3100-3130: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build.
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` (μεσω `document.body.textContent`) επιβεβαιωσε και τα 5 checks true: το νεο "Paste a
+  product link to import or price-check an item..." wording, "only what the model saw printed is used as
+  a fallback", "the result tells you which currency it skipped", plus τα δυο γειτονικα προτασεις (item
+  abroad + card statement) αμεταβλητα και παρoντα εκατερωθεν. Hero screenshot καθαρο (lighthouse mark,
+  gradient τιτλος, nav, τριπλο badge row). Server τερματιστηκε (`pkill -f "next start -p 3110"`), κανενα
+  `next-server` process δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx (`grep -c` UTF-8 byte pattern).
+- Δεν αγγιξα Docker/:3000/web/mobile. Η μονη agent-χρηση ηταν read-only `git show --stat`/commit-message
+  read (χωρις subagent, μικρο scope), μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: P9 (record types + write paths) πλεον πληρως καλυμμενο (10/10 slices, ολα 7 μοντελα +
+CSV import + URL import) στο landing wording. Candidates: νεος `git log --oneline 7e4e62b..HEAD | grep
+"feat("` ελεγχος στην αρχη του επομενου run, P22 receipt line-item global search, P21 document/manual
+vault, ή polish συνεχεια / real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
