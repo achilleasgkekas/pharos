@@ -1,5 +1,27 @@
 # DOCS_PROGRESS
 
+## 2026-07-26 (twenty-third run — P9 slice 8+9: Bills multi-currency + FX audit inline rate setting)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-second run (commit 901d7d0, 2026-07-26 00:34). Ανακάλυψη: **2 νέα P9 slices shipped με ελλιπή documentation**:
+- **Slice 8 (Bills)** — commit 1ce991f, 2026-07-26 09:49 — multi-currency support για Bills (currency, origAmount, fxRate fields)
+- **Slice 9 (Reports FX audit)** — commit cbde1a8, 2026-07-26 12:15 — FX audit panel UI redesigned για inline bulk rate-setting ("Apply to all N")
+
+Τι έγραψα:
+- **features.md**: Ενημέρωση Reports section FX audit bullet (lines 467-473) για να αναφέρει: grouping by printed currency, "Apply to all N" bulk action, individual row overrides, live preview. Αντί του παλιού "click to edit form", το νέο UI είναι πολύ πιο γρήγορο για post-CSV-import workflows.
+- **mobile.md**: Ενημέρωση Bills row (line 28) να αναφέρει "multi-currency support" όπως κάνουν Statements, Items, Subscriptions. Consistency check.
+
+Accuracy (διάβασα κώδικα, όχι εικασίες): commit messages, ReportsClient.tsx diff (groupFxByCurrency, FxCurrencyGroup component με rate input + "Apply to all" button, per-record overrides), fxActions.ts (applyFxRate, applyFxRateToCurrency server actions), lib/fxApply.ts (pure logic για να ξέρει ποια fields μετατρέπονται ανά module — receipt lines/net/VAT, item 3 prices, statement min/paid/txns, subscription first charge, bill amount).
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: features.md 0 (αθικτο), mobile.md 0 (αθικτο).
+- Internal links: καμία νέα αναφορά ✓.
+- Secret scan: κανένα credential ✓.
+- Markdown structure: ίδια hierarchy ✓.
+
+Collision guard: git status --short = ΜΟΝΟ 2 modified docs files (δικά μου), κανένα staged foreign. Commit 3135e3f (docs(features+mobile): P9 slice 8+9). Push: origin/main successful ✓.
+
+Επόμενο run: (α) grep git log για οποιαδήποτε άλλα νέα feat() commits που ίσως landed μετά τις 12:15, ή (β) features.md/api.md drift check για άλλα undocumented P* modules.
+
 ## 2026-07-26 (twenty-second run — P9 slice 6 verification: bank CSV import already documented)
 
 Σάρωση git log για νέα feat() commits μετά την twenty-first run (commit d5c3a0c, 2026-07-25 22:20). Ανακάλυψη: **P9 slice 6 shipped με ήδη-ενσωματωμένη documentation**:
