@@ -6,6 +6,68 @@
 <!-- docker-validated: 7b46912 -->
 <!-- ui-audited: 0bc5e14 -->
 
+## 2026-07-26 (cont.⁶ — P9 mobile: Bills + Subscriptions, και ένα σύμβολο που έλεγε ψέματα)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση
+`expo-camera`) παραμένει **OPEN χωρίς Answer** (9ο συνεχόμενο run), άρα P17/P23 μένουν μπλοκαρισμένα. Working tree
+καθαρό στην αρχή. **Docker mutex δεν χρειάστηκε**: μηδέν web runtime αρχείο πειράχτηκε αυτό το run.
+
+**Approved queue check (βήμα a)**: αμετάβλητη εικόνα για **9ο** run (P36 provider decision δική σου, P31 supervised
+session, P17/P23 native dep). Πήρα την πρώτη πρόταση του προηγούμενου log: **το ίδιο FX πέρασμα στα υπόλοιπα mobile
+money screens**, δηλαδή `BillsScreen` + `SubscriptionsScreen`.
+
+**Το πρόβλεψα σωστά ότι είναι σκέτο wiring, και το επιβεβαίωσα πριν γράψω**: και τα τέσσερα routes (`/api/v1/bills`
+POST/PATCH, `/api/v1/subscriptions` POST/PATCH) **δέχονται ήδη** `currency`/`fxRate` και τα GET **επιστρέφουν ήδη**
+το τριπλό `currency`/`origAmount`/`fxRate`. Το κενό ήταν αποκλειστικά στο mobile: τα types του `api.ts` δεν είχαν καν
+τα πεδία, οπότε μια συνδρομή ή ένας λογαριασμός σε ξένο νόμισμα ήταν **αδύνατο να μαρκαριστεί από το κινητό** (και
+στα bills το `money()` έπεφτε σε σκέτο EUR fallback, ανεξάρτητα από το base currency του install).
+
+**Bug που βρήκα και έκλεισα (προϋπήρχε των FX πεδίων, ίδιο μοτίβο με το `rows[0].currency` του προηγούμενου run)**:
+η λίστα συνδρομών τύπωνε `money(item.amount, item.currency)`. Επειδή το `amount` είναι **πάντα** base currency, μια
+συνδρομή σε δολάρια εμφάνιζε **«$» πάνω σε ευρώ** — λάθος σύμβολο σε σωστό νούμερο, δηλαδή το χειρότερο είδος
+σφάλματος γιατί δείχνει απολύτως φυσιολογικό. Τώρα όλα τα ποσά φέρουν το base σύμβολο (από `GET /settings`) και το
+τυπωμένο ζει στο `<FxBadge>`. Ίδια λογική και στο discovery box (`money(c.avgAmount)` χωρίς κωδικό → base): οι
+υποψήφιες συνδρομές βγαίνουν από μέσους όρους αποθηκευμένων expense ποσών, που είναι base currency εξ ορισμού.
+
+**Αποφάσεις που πήρα μόνος**:
+- **Μηδέν νέο ιδίωμα**: αντέγραψα ατόφιο το μοτίβο του MoneyScreen (base + `multiCurrency` από `getSettings()` σε
+  ξεχωριστό, **μη-μπλοκαριστικό** effect· `printedAmount()` στο prefill· `...(multiCurrency ? {currency, fxRate} : {})`
+  στο payload). Έτσι σε single-currency install το request είναι byte-for-byte αυτό που ήταν πριν το P9.
+- **Το form κρατά το ΤΥΠΩΜΕΝΟ ποσό**: χωρίς αυτό, ένα re-save μιας foreign εγγραφής θα έστελνε το ήδη μετατρεπμένο
+  νούμερο σαν να ήταν τυπωμένο, και ο resolver θα το μετέτρεπε δεύτερη φορά. Είναι ο ίδιος κίνδυνος που έκλεισε το
+  slice 5 στα statements.
+- **Το subscription modal έγινε scrollable** (ήταν το μόνο money sheet χωρίς `ScrollView`): το FX block μπορεί να
+  προσθέσει γραμμή ισοτιμίας + preview, και σε μικρή οθόνη τα κουμπιά θα έβγαιναν εκτός. Τα κουμπιά έμειναν έξω από
+  το scroll, όπως στο Bills sheet.
+- **Δεν άγγιξα το `firstChargeAmount`** των συνδρομών: το mobile form δεν το επεξεργάζεται καθόλου σήμερα, και το
+  PATCH το ξανα-resolve-άρει σωστά μόνο του όταν αλλάξει η ισοτιμία.
+- **Μικρό συνοδό fix**: το ποσό του bill γινόταν `parseFloat(form.amount)` χωρίς normalization κόμματος, ενώ το FX
+  preview δίπλα του χρησιμοποιεί `replace(',', '.')` — σε ελληνικό πληκτρολόγιο («12,50») το preview θα έδειχνε άλλο
+  νούμερο από αυτό που θα αποθηκευόταν. Ευθυγραμμίστηκε με τα υπόλοιπα money screens.
+
+**Verify**: `apps/mobile npx tsc --noEmit` **EXIT 0**. **Μηδέν web runtime αρχείο** πειράχτηκε (μόνο `apps/mobile/src`
++ `MOBILE_PARITY.md`), οπότε ούτε Docker rebuild ούτε browser check είχαν νόημα αυτό το run, και δεν πείραξα το
+mutex. Το mobile UI δεν ελέγχεται unattended (χρειάζεται simulator) — στηρίζεται σε `tsc` + στο ότι ο κανόνας
+μετατροπής ζει στο server, όπου είναι ήδη tested (τα bills/subscriptions routes έχουν route-level coverage).
+
+**Git hygiene**: explicit `git add` 4 αρχείων (όχι `-A`) → commit `9c782be` → pushed.
+
+**Επόμενο task (πρόταση)**: **`StatementsScreen` FX read-side** — είναι πλέον το τελευταίο mobile money screen χωρίς
+FX ένδειξη, και το `/api/v1/statements` **στέλνει ήδη** `origAmount`/`fxRate` (μπήκαν στο slice 5), οπότε είναι
+badge + base symbol χωρίς καμία αλλαγή στο server· το write μισό (νόημα να μαρκάρεις ένα statement foreign από το
+κινητό) είναι πιο αμφίβολο, το import γίνεται από desktop. Δεύτερο υποψήφιο, αν προτιμηθεί κάτι web-side: το
+`fxBadgeLabel` σε **credit balance** (αρνητικό τυπωμένο total, guard `origAmount <= 0`) που κρέμεται από το slice 5
+και αγγίζει 5 modules, άρα θέλει δικό του πέρασμα στα υπάρχοντα τεστ. Ως συνήθως πρώτα ο έλεγχος του Approved queue.
+
+## Needs Achilleas
+
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο, **9ο** συνεχόμενο run. Και τα δύο server halves
+  είναι έτοιμα (P17 `GET /api/v1/lookup/barcode` με 41 tests, P23 `POST /api/v1/scan/receipt` υπήρχε ήδη) — λείπει
+  μόνο η έγκριση για το native dep. Ερώτημα: `~/.claude/ASK_ACHILLEAS.md` → `pharos-daily-dev-20260725-1425`.
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
+  household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
+  ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
 ## 2026-07-26 (cont.⁵ — P9 mobile: ξένο νόμισμα από το κινητό, και το endpoint που δεν το δεχόταν καν)
 
 **Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση `expo-camera`) παραμένει **OPEN χωρίς Answer** (8ο συνεχόμενο run), άρα P17/P23 μένουν μπλοκαρισμένα. Working tree καθαρό στην αρχή. Docker mutex acquired/released.
