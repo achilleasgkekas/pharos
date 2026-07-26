@@ -6,6 +6,74 @@
 <!-- docker-validated: 7b46912 -->
 <!-- ui-audited: 0bc5e14 -->
 
+## 2026-07-27 (P9 mobile: Statements, και το σύμβολο της τράπεζας πάνω σε ευρώ — το mobile P9 κλείνει 6/6)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση
+`expo-camera` για P17/P23) παραμένει **OPEN χωρίς Answer** (4ο συνεχόμενο run), οπότε τα δύο items μένουν
+μπλοκαρισμένα και δεν τα άγγιξα. Μηδέν ANSWERED entry για μένα. Working tree **καθαρό** στην αρχή. Μηδέν Docker
+(η αλλαγή είναι αποκλειστικά mobile, δεν χρειάστηκε το mutex).
+
+**Approved queue (βήμα a)**: ίδια εικόνα με τα προηγούμενα runs (P36 θέλει την απόφαση provider, P31 supervised
+session, P16 πραγματικό sample αρχείο, P17/P23 μπλοκαρισμένα) → **P9**, και συγκεκριμένα το **mobile Statements**
+που πρότεινε ρητά το προηγούμενο run: το τελευταίο money screen χωρίς FX.
+
+**Τι βρήκα**: αντίθετα με τα Receipts/Expenses, εδώ ο server ήταν **ήδη έτοιμος** — τα `/api/v1/statements` και
+`/statements/:id` επέστρεφαν `origAmount`/`fxRate` από το slice 5, απλά το `Statement` type του mobile `api.ts` δεν
+τα δήλωνε. Άρα μηδέν γραμμή server.
+
+**Το πραγματικό bug**: **κάθε** ποσό της οθόνης (η λίστα, και τα 3 total boxes, κάθε χρέωση) τυπωνόταν ως
+`money(x, item.currency)`, δηλαδή με το σύμβολο **που τύπωσε η τράπεζα** πάνω σε νούμερο που είναι ήδη **base
+currency**: ένα statement $500 με rate 0.92 αποθηκεύεται ως 460 EUR και εμφανιζόταν ως «**$460**» — λάθος και στο
+σύμβολο και στο μέγεθος που διαβάζει ο χρήστης. Ίδια κλάση με τα bugs που έκλεισαν στα Subscriptions/Bills/Items/
+Receipts, εδώ όμως σε **όλα** τα σημεία της οθόνης ταυτόχρονα.
+
+**Αποφάσεις που πήρα μόνος μου**:
+- **Μηδέν `<FxFields>`**: στο κινητό η οθόνη είναι **read-only** (το statement γεννιέται από PDF import στο web),
+  οπότε δεν υπάρχει submit path να δεχτεί ισοτιμία. Μπήκε μόνο το `<FxBadge>`. Αν κάποτε αποκτήσει edit, ο resolver
+  του server είναι ήδη εκεί.
+- **Το chip μία φορά ανά έγγραφο, όχι ανά χρέωση**: μια κάρτα εκδίδει το statement σε ΕΝΑ νόμισμα και **ένα** rate
+  μετατρέπει ΟΛΟ το έγγραφο (total + minimum + paid + κάθε transaction), ακριβώς όπως το `resolveStatementAmounts()`
+  του server. Chip ανά γραμμή θα υπονοούσε per-charge rate που δεν υπάρχει· αντ' αυτού μια γραμμή στο sheet λέει
+  «printed total · every amount below is converted».
+- **Μηδέν επιπλέον request**: η base currency έρχεται από το ήδη-ζητούμενο plans payload (το `/statements/plans`
+  επιστρέφει `settings.currency`), οπότε δεν χρειάστηκε το `getSettings()` που κάνουν τα άλλα screens. Και το
+  `multiCurrency` flag δεν χρειάζεται εδώ: χωρίς φόρμα, το `FxBadge` δεν renders ούτως ή άλλως σε μη-foreign εγγραφή.
+
+**Verify**: `npx tsc --noEmit` (mobile) **EXIT 0**. Δεν υπάρχει mobile test runner και ο simulator δεν τρέχει
+unattended, οπότε το υπόλοιπο είναι code review: σε single-currency deployment το `FxBadge` επιστρέφει `null` και η
+οθόνη renders **ακριβώς** όπως πριν (η μόνη διαφορά είναι ότι το σύμβολο έγινε σωστό), και κανένα write path δεν
+αγγίχτηκε. Web: **μηδέν αρχείο**, άρα κανένα type-check/vitest/Docker βήμα δεν είχε τι να επαληθεύσει (και το browser
+verify δεν εφαρμόζεται σε React Native).
+
+**Git hygiene**: explicit `git add` 4 αρχείων (όχι `-A`) → commit `d44c792` → pushed.
+
+**Κατάσταση P9**: το **mobile κλείνει 6/6** (Expenses, Bills, Subscriptions, Items, Receipts, Statements) και το web
+είναι πλήρες εδώ και μέρες (7 modules + όλα τα imports + audit/inline-fix). Απομένει **μόνο** το προαιρετικό
+rate-feed, που είναι phase 2 **by design** (το rate είναι χειροκίνητο σκόπιμα).
+
+**Παρατήρηση για επόμενο πέρασμα (δεν το έκανα, εκτός scope)**: η ίδια κλάση «hardcoded € fallback» επιβιώνει σε
+**GoalsScreen**, **VouchersScreen** (gift-card υπόλοιπα) και στα split totals του **MoneyScreen** — καλούν `money()`
+χωρίς currency. Δεν είναι P9 (αυτά τα ποσά είναι πάντα base), αλλά σε non-EUR deployment δείχνουν λάθος σύμβολο.
+Μικρό, μηχανικό, ιδανικό για ένα σύντομο run.
+
+**Επόμενο task (πρόταση)**: το P9 δεν έχει άλλο buildable κομμάτι, οπότε το επόμενο run πρέπει να **ξαναπεράσει το
+Approved queue** (αν έχει απαντηθεί το `expo-camera` ερώτημα, το **P17 camera UI** προηγείται όλων). Αν είναι πάλι
+κενό, δύο καθαρές επιλογές: (α) το `money()`-χωρίς-currency sweep παραπάνω (μικρό, ντετερμινιστικό, κλείνει την
+τελευταία ουρά αυτής της κλάσης bugs), ή (β) το **MOBILE_PARITY roadmap #6 — mobile Settings** (theme/budgets/
+notifications), το επόμενο ανοιχτό roadmap item.
+
+## Needs Achilleas
+
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο, 4ο συνεχόμενο run. Το P17 server half είναι
+  shipped+tested και του P23 υπάρχει ήδη (`POST /api/v1/scan/receipt`). Ερώτημα: `~/.claude/ASK_ACHILLEAS.md` →
+  `pharos-daily-dev-20260725-1425` (ακόμα OPEN). **ΣΗΜ**: με το P9 κλειστό, αυτό είναι πλέον ο **μοναδικός** φραγμός
+  ανάμεσα στο queue και σε νέα Approved δουλειά.
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
+  household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
+  ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
+---
+
 ## 2026-07-26 (cont.⁸ — P9 mobile: Receipts, και το endpoint που έγραφε δολάρια σαν ευρώ)
 
 **Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση
