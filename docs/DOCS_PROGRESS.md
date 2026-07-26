@@ -2764,3 +2764,24 @@ Collision guard: `git status --short` = κανένα modified docs files (καν
 
 Επόμενο run: (α) grep git log για άλλα undocumented feat() commits (P51-P80 candidates ή νέες features) · (β) drift check αν κάποιο endpoint ή configuration option έχει αλλάξει · (γ) monitoring για ενδεχόμενη stale-forward documentation.
 
+## 2026-07-26 (twenty-eighth run — post-P9 continuous verification, all features remain documented)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-seventh run (commit 218d95a, 2026-07-26 20:50). Ανακάλυψη: κανένα νέο undocumented feat() commit. Ο μόνος νέος feat() commit που εμφανίστηκε `056f21c` (2026-07-26 22:24, P9 mobile slice 5: multi-currency receipts from phone) ήταν ολίσθιας ήδη documented στο προηγούμενο status check (features.md line 164, mobile.md line 22).
+
+Comprehensive verification (markdown only, κανένα build/Docker/AI call):
+- **Latest feat() commit**: 056f21c (2026-07-26 22:24:25, P9 mobile slice 5 — receipts multi-currency from phone)
+- **Documentation status**: features.md line 164 (P9 receipts multi-currency full description ✓) + mobile.md line 22 (Receipts multi-currency support documented ✓)
+- **features.md**: P9 complete across all 10 slices + web + mobile ✓
+- **mobile.md**: Receipts + all money modules show multi-currency support badges ✓
+- **api.md**: κανένα νέο endpoint (όλα τα P9 είναι UI-only) ✓
+- **configuration.md**: multi-currency ήδή documented ✓
+- **Code fences**: api.md = 22 (ζυγό), features.md = 0 (αθικτο), mobile.md = 8 (ζυγό) ✓
+- **Internal links**: όλες valid ✓
+- **Secret scan**: κανένα literal credential ✓
+
+Collision guard: `git status --short -- docs/` = κανένα modified docs files (κανένα work αυτό το run).
+
+Συμπέρασμα: Ολα τα features παραμένουν fully documented + synchronized. Κανένα νέο work χρειάζεται αυτό το run.
+
+Επόμενο run: (α) αν νέα features shipped μετά τις 22:24 (P51-P80 candidates ή άλλα modules), update docs · (β) configuration.md drift check αν νέα env vars προστέθηκαν · (γ) api.md endpoint schema verification αν αλλαγές στο OpenAPI.
+
