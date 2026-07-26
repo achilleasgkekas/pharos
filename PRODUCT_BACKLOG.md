@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-25 (16η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-26 (17η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
@@ -30,12 +30,87 @@
 > P61-P62** αυτή τη σάρωση (verified distinct: το `Bill` model έχει μόνο δυαδικό `paidAt`/binary status, καμία
 > partial-amount έννοια· το `Expense.paymentMethod` είναι ένα single free-string πεδίο, καμία σύνδεση με το ήδη-
 > υπάρχον `GiftCard.uses[]` spend-log όταν μια αγορά πληρώνεται με παραπάνω από μία μέθοδο).
+> **17η σάρωση (2026-07-26):** ΑΚΟΜΑ καμία ρητή έγκριση σε **12 διαδοχικές σαρώσεις** — το batch-review πρόταση
+> της 16ης παραμένει σε ισχύ, το queue μεγάλωσε σε **25 items (P37-P65)**. Προστέθηκαν **3 νέοι candidates
+> P63-P65**, ο ένας (P63) με ξεχωριστά υψηλή προτεραιότητα γιατί είναι **πραγματικό data-loss ρίσκο, όχι απλά νέο
+> feature**: live-verified με `ls apps/web/src/models/*.ts` (27 models) vs το `BACKUP_MODELS` map στο
+> `settings/actions.ts:1228-1237` (8 keys) → **7 models λείπουν εντελώς από το JSON backup/restore**, ανάμεσά τους
+> το **`Expense`** (ολόκληρο το Income/Expenses module — μισθός, λογαριασμοί, όλο το ιστορικό εξόδων) + `Bill`
+> (P28) + `Goal` (P12) + `GiftCard` (P32) + `LoyaltyCard` (P20) + `NetWorthSnapshot` (PA2) + `ShoppingListItem`.
+> Το ίδιο κενό ήταν ήδη καταγεγραμμένο ως follow-up-note κάτω από ένα **`## Done`** item (PA2, γρ.1198) αλλά ΠΟΤΕ
+> δεν έγινε δικό του actionable item — ξεχωριστό P63 τώρα ώστε να μην ξαναχαθεί. Οι άλλοι δύο νέοι candidates
+> (P64/P65) προέκυψαν από ζωντανό grep επιβεβαιώνοντας ότι δεν υπάρχει καμία receipt-line-item category
+> ταξινόμηση σήμερα (`LineItemSchema` στο `models/Receipt.ts` = name/refinedName/qty/price/vatRate/matchedItemId,
+> **μηδέν category πεδίο**, και τα Reports category breakdowns διαβάζουν αποκλειστικά `Expense.category` — τα
+> Receipts δεν τροφοδοτούν ΚΑΘΟΛΟΥ τα category charts σήμερα) και ότι δεν υπάρχει καμία φωνητική είσοδος πουθενά
+> (`grep -rn "SpeechRecognition" apps/web/src apps/mobile/src` = 0 hits).
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P65. Voice quick-capture στο AI command bar (Web Speech API, μηδέν νέο backend) — S — both, quick-capture friction
+- **Αξία:** το app έχει ήδη ένα ενιαίο conversational AI command bar (text-based, `runAiCommand`) που καταλαβαίνει
+  φυσική γλώσσα («πρόσθεσε έξοδο ΔΕΗ 84€») και ήδη 4 quick-capture κανάλια (P5 bookmarklet, P23 mobile
+  share-sheet, P11 email-in, P59 proposed widget) — αλλά **καμία φωνητική είσοδος πουθενά** (verified:
+  `grep -rn "SpeechRecognition" apps/web/src apps/mobile/src` = 0 hits). Ένα μικρό 🎤 κουμπί δίπλα στο input του
+  `AiCommandBar` που χρησιμοποιεί το **browser-native Web Speech API** (`webkitSpeechRecognition`, υποστηρίζεται
+  ήδη σε Chrome/Edge/Safari, μηδέν νέο dependency/κόστος) → transcribe → γεμίζει το ίδιο text input → ο χρήστης
+  βλέπει/διορθώνει πριν στείλει (όχι auto-submit, αποφυγή λάθος καταχωρήσεων από κακή αναγνώριση). Μηδέν αλλαγή
+  στο ήδη-existing `runAiCommand` pipeline (reuse ατόφιο) — μόνο νέος τρόπος να γεμίσει το ίδιο κουτί κειμένου.
+  Ιδανικό όταν έχεις τα χέρια γεμάτα (π.χ. μόλις βγήκες από κατάστημα, κρατάς σακούλες) — καθαρά διαφορετικό
+  modality από το P59 (widget = surface, αυτό = input method). Στο mobile app, αντίστοιχο μέσω `expo-speech`
+  ή του native platform speech-to-text ως follow-up (το Expo managed workflow το υποστηρίζει).
+- **Module:** `components/AiCommandBar.tsx` (νέο mic button + state) — web πρώτα, μηδέν server αλλαγή.
+- **Ανοιχτή απόφαση (builder default):** web browser-native API πρώτα (Chrome/Edge/Safari· Firefox δεν υποστηρίζει
+  ακόμα → κουμπί απλά δεν εμφανίζεται όταν `!('webkitSpeechRecognition' in window)`, graceful no-op, όχι error)·
+  transcribed κείμενο ΠΑΝΤΑ περνά πρώτα από review του χρήστη (γεμίζει το input, δεν κάνει auto-send)· μηδέν
+  server-side speech processing (browser κάνει όλη τη δουλειά, καμία ανησυχία privacy/κόστους πέρα από το ήδη
+  υπάρχον AI-command call όταν πατηθεί send).
+
+### P64. Receipt line-item category tagging (τα Reports σήμερα «βλέπουν» μόνο Expenses, καθόλου Receipts) — S/M — OSS (κυρίως), dogfooding-heavy
+- **Αξία:** live-verified διπλό κενό: (α) το `LineItemSchema` (`models/Receipt.ts`) έχει
+  `name/refinedName/qty/price/vatRate/matchedItemId` — **μηδέν category πεδίο**, ούτε καν σε επίπεδο ολόκληρης
+  απόδειξης· (β) το `reports/page.tsx` category breakdown (spend-by-category chart, budgets-vs-actual) διαβάζει
+  **αποκλειστικά `Expense.category`** — τα Receipts δεν τροφοδοτούν καθόλου αυτά τα charts σήμερα. Πρακτικό
+  αποτέλεσμα: μια απόδειξη σούπερ μάρκετ με 20 γραμμές (τρόφιμα + είδη σπιτιού + ηλεκτρονικά μπλεγμένα) είναι
+  **αόρατη** στα category reports — μόνο τα χειροκίνητα καταχωρημένα Expenses (λογαριασμοί/μισθός) μετράνε.
+  Optional `category` πεδίο ανά line item (AI-suggested στο parse, editable, όχι required) → φάση 2 (follow-up,
+  όχι απαραίτητα σε αυτό το MVP): τα Reports προσθέτουν τα line-item categorized ποσά στο ήδη-υπάρχον breakdown
+  δίπλα στα Expenses. **Διακριτό** από το `Item.category` (matched inventory items — καλύπτει μόνο τα λίγα line
+  items που έγιναν tracked inventory, όχι όλη την απόδειξη) και από το Expense.category (single tag για ΟΛΟΚΛΗΡΗ
+  την εγγραφή, όχι per-line).
+- **Module:** Receipts (`LineItemSchema` + `ReceiptsClient` line-item editor, νέο optional πεδίο) + Reports
+  (follow-up: συνυπολογισμός στο category breakdown).
+- **Ανοιχτή απόφαση (builder default):** MVP = μόνο το πεδίο + manual tagging στο ήδη-υπάρχον line-item editor
+  (κενό = καμία αλλαγή συμπεριφοράς)· AI auto-suggest στο parse-time ως γρήγορο follow-up (reuse το ήδη-υπάρχον
+  category-normalization prompt idiom, `CATEGORY_PROMPT`)· η ενσωμάτωση στο Reports chart μπαίνει σε ξεχωριστό
+  δεύτερο βήμα ώστε το πρώτο shippable slice να μείνει S.
+
+### P63. Backup/export λείπει 7 μοντέλα — data-loss ρίσκο σε restore, όχι απλά νέο feature — S — OSS, ΥΨΗΛΗ προτεραιότητα (mechanical fix)
+- **Αξία:** live-verified: `ls apps/web/src/models/*.ts` = **27 models**, αλλά το `BACKUP_MODELS` map
+  (`settings/actions.ts:1228-1237`, τροφοδοτεί ΚΑΙ το `exportData()` ΚΑΙ το `importData()` — συμμετρικό, ίδιο
+  key-loop και στα δύο) έχει μόνο **8 keys** (items/receipts/statements/subscriptions/vouchers/cards/tasks/stores).
+  **Λείπουν εντελώς 7 μοντέλα**: **`Expense`** (ολόκληρο το Income/Expenses module — μισθός, λογαριασμοί,
+  ιστορικό εξόδων, ήδη γνωστό κενό βλ. PA2 follow-up note παρακάτω στο `## Done`), **`Bill`** (P28 payables),
+  **`Goal`** (P12 savings goals + contributions), **`GiftCard`** (P32 balances + uses log), **`LoyaltyCard`**
+  (P20), **`NetWorthSnapshot`** (PA2 trend history), **`ShoppingListItem`**. Ένας self-host χρήστης που κάνει
+  «Export JSON» ή τρέχει το nightly `backup.sh` (CLAUDE.md) και μετά χρειάζεται πραγματικό restore (disk failure,
+  κακό migration) **χάνει σιωπηλά όλα αυτά τα δεδομένα** χωρίς καμία προειδοποίηση — το backup «φαίνεται» πλήρες
+  (κατεβαίνει κανονικά ένα JSON αρχείο) αλλά δεν είναι. Το ίδιο κενό είχε ήδη σημειωθεί ως follow-up-note κάτω
+  από ένα `## Done` item (PA2, «τα snapshots [και τα expenses, προϋπάρχον κενό] ΔΕΝ μπαίνουν στο backup export»)
+  αλλά ΠΟΤΕ δεν έγινε δικό του actionable queue item — ξεχωρίζεται εδώ ρητά ώστε να μη χαθεί ξανά σε prose.
+  **Μηχανικό fix, μηδέν νέος σχεδιασμός**: το `importData()` ήδη κάνει generic loop πάνω στα `BACKUP_MODELS`
+  keys (upsert by `_id`, ίδιο sanitization για `filePath`/`thumbPath`/`photos`/`attachments` ανεξαρτήτως model) —
+  προσθήκη 7 γραμμών στο map αρκεί, export ΚΑΙ import και τα δύο δουλεύουν αυτόματα συμμετρικά.
+- **Module:** Settings → Storage & backup (`settings/actions.ts`, `BACKUP_MODELS` map — 1 τοπική αλλαγή).
+- **Ανοιχτή απόφαση (builder default):** καμία — απλή προσθήκη 7 entries στο ήδη-υπάρχον map, ίδιο pattern με
+  τα υπόλοιπα 8 (`expenses: Expense, bills: Bill, goals: Goal, giftcards: GiftCard, loyaltycards: LoyaltyCard,
+  netWorthSnapshots: NetWorthSnapshot, shoppingListItems: ShoppingListItem`)· verify ότι παλιά backup αρχεία
+  (χωρίς αυτά τα keys) συνεχίζουν να restore-άρονται καθαρά (τα νέα keys απλά λείπουν από το παλιό JSON,
+  `Array.isArray(docs)` guard ήδη το χειρίζεται ως no-op).
 
 ### P62. Split a purchase across multiple payment methods (κάρτα + gift card / cash) — S/M — OSS (κυρίως), βοηθά και SaaS
 - **Αξία:** το `Expense.paymentMethod` (και το αντίστοιχο πεδίο στα Receipts) είναι σήμερα **ένα** free-string —
