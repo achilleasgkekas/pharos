@@ -6,6 +6,69 @@
 <!-- docker-validated: 7b46912 -->
 <!-- ui-audited: 0bc5e14 -->
 
+## 2026-07-26 (cont.² — P63: το backup ξαναγίνεται πλήρες, και μένει πλήρες)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: 8 OPEN entries, ένα δικό μου
+(`pharos-daily-dev-20260725-1425`, έγκριση `expo-camera`) **ακόμα OPEN χωρίς Answer** (5ο συνεχόμενο run), άρα
+P17/P23 μένουν μπλοκαρισμένα. Working tree καθαρό στην αρχή. Docker mutex acquired/released.
+
+**Approved queue check (βήμα a)**: αμετάβλητη εικόνα για **5ο** συνεχόμενο run (P36 provider decision, P31
+supervised session, P16 sample file, P17/P23 native-dep approval). Το προηγούμενο log πρότεινε P9 inline «set rate»
+στο panel των Reports.
+
+**Γιατί έκανα κάτι άλλο**: η 17η σάρωση του planner κατέγραψε το **P63** και είναι **data-loss ρίσκο, όχι feature**.
+Το `BACKUP_MODELS` map καθόταν ως local const μέσα στο `settings/actions.ts` και είχε μείνει **7 μοντέλα πίσω** από
+το schema: **`Expense` (ολόκληρο το Income/Expenses module)**, `Bill`, `Goal`, `GiftCard`, `LoyaltyCard`,
+`NetWorthSnapshot`, `ShoppingListItem`. Export και restore κάνουν loop πάνω στο ίδιο map, οπότε ένα backup
+**φαινόταν πλήρες** (κατέβαινε κανονικά JSON) ενώ τα πετούσε όλα, και η απώλεια εμφανίζεται μόνο τη στιγμή που
+κάποιος πραγματικά χρειάζεται το backup. Ένα ελάττωμα σε ήδη-shipped feature που χάνει δεδομένα σιωπηλά προηγείται
+ενός UX βελτιωτικού στο FX panel.
+
+**Απόφαση ουράς (δική μου, καταγεγραμμένη)**: το P63 κάθεται τυπικά στο «Proposed», αλλά **δεν είναι προϊοντική
+απόφαση** — το ίδιο το item λέει «μηχανικό fix, μηδέν νέος σχεδιασμός, καμία ανοιχτή απόφαση», και το backup είναι
+εδώ και καιρό shipped feature που απλώς δεν τηρεί την υπόσχεσή του. Το χτίσιμό του δεν διαλέγει κατεύθυνση προϊόντος,
+οπότε το πήρα ως maintenance και το μαρκάρισα SHIPPED με ρητή σημείωση γιατί παρακάμφθηκε το «Approved».
+
+**Το ουσιαστικό μέρος δεν ήταν τα 7 entries**: αυτά είναι 7 γραμμές. Το πρόβλημα είναι ο **τρόπος** που
+συσσωρεύτηκαν, δηλαδή ότι κανείς δεν το πρόσεξε επί μήνες. Ο registry βγήκε σε **`lib/backupModels.ts`** μαζί με
+**`BACKUP_EXCLUDED`**, όπου κάθε μοντέλο που μένει έξω γράφει **γιατί**, και ένα **guard test** απαιτεί κάθε αρχείο
+στο `src/models` να εμφανίζεται στο ένα ή στο άλλο. Νέο μοντέλο χωρίς απόφαση **σπάει το suite** αντί να χαθεί
+σιωπηλά (11 τεστ: completeness, stale entries, ίδιο μοντέλο σε δύο λίστες, frozen keys, secrets, control-plane).
+
+**Τι μένει σκόπιμα έξω** (τεκμηριωμένο και στα δύο σημεία): **`AppConfig`** (κρατά ζωντανά credentials — AI keys,
+SMB/FTP password, OneDrive refresh token· το JSON κατεβαίνει στα Downloads του χρήστη, οπότε δεν γράφεται εκεί·
+κόστος: budgets/prompts/taxonomies δεν επαναφέρονται από το JSON, ήδη ίσχυε), **`User`/`Account`** (scrypt hashes),
+τα SaaS control-plane (`Tenant`/`Membership`/`Invite`/`Usage`/`AuditEvent`, ζουν σε άλλη DB), και transient
+(`Job`/`Notification`/`Conversation`/`Phase`). Πλήρες αντίγραφο instance = `scripts/backup.sh` (mongodump), όχι το
+JSON.
+
+**Backwards compatibility**: παλιά backup αρχεία restore-άρουν καθαρά (το `importData` έχει ήδη
+`if (!Array.isArray(docs)) continue` για key που λείπει), και τα αρχικά 8 keys **δεν άλλαξαν** — pinned με τεστ,
+γιατί μετονομασία ενός key θα ορφάνευε τη συλλογή σε **κάθε backup που έχει ποτέ παρθεί**.
+
+**Verify**: `npm run type-check` **EXIT 0**· full `npx vitest run` **3883 passed / 280 files** (+11 δικά μου, μηδέν
+regression, καμία υπάρχουσα προσδοκία δεν χρειάστηκε αλλαγή). Docker κάτω από το mutex: `build web` → mongo
+**healthy** → `up -d web` → `/login` **200**, **0 restarts**, `/settings` **307** (auth-gated, άρα compiled) →
+`docker builder prune -f` (2.3GB) → lock **released**. Browser: `/login` renders (title «Sign in · Pharos»),
+**μηδέν console errors**· το authed `/settings` δεν επαληθεύεται unattended (credentials boundary), οπότε το
+export/restore δοκιμάστηκε στο επίπεδο του registry, όχι με πραγματικό κλικ.
+
+**Docs**: νέα ενότητα «Backup & restore (JSON)» στο `docs/features.md` (τι περιλαμβάνεται, τι όχι και γιατί,
+mongodump για πλήρες αντίγραφο) + P63 μαρκαρισμένο SHIPPED στο `PRODUCT_BACKLOG.md`.
+
+**Git hygiene**: explicit `git add` 5 αρχείων (όχι `-A`) → commit `7791400` → pushed.
+
+**Γνωστό follow-up**: το i18n `set.backupNote` λέει ακόμα «JSON backup = full restore» σε 8 γλώσσες, ενώ τα settings
+(`AppConfig`) δεν επαναφέρονται. Δεν το άγγιξα γιατί θα ήμουν εγώ ο μεταφραστής σε 7 γλώσσες μέσα σε ένα fix run —
+η ακρίβεια μπήκε στα docs όπου γράφω σωστά αγγλικά. Μια πιο φιλόδοξη εκδοχή θα ήταν **redacted AppConfig export**
+(allowlist μόνο budgets/prompts/taxonomies/lists, μηδέν credential πεδίο), που θα έκανε το JSON πραγματικά «full».
+
+**Επόμενο task (πρόταση)**: επιστροφή στο **P9 inline «set rate» μέσα στο FX audit panel των Reports** (η πρόταση
+του προηγούμενου run, αμετάβλητα η πιο χρήσιμη υπόλοιπη δουλειά του P9: το audit βρίσκει τις εγγραφές χωρίς
+ισοτιμία αλλά ακόμα σε στέλνει σε 6 διαφορετικές φόρμες). Εναλλακτικά, αν θέλεις να κλείσει το backup θέμα
+ολοκληρωτικά, το redacted `AppConfig` export παραπάνω. Ως συνήθως πρώτα ο έλεγχος του Approved queue (βήμα a): αν
+απαντηθεί το `expo-camera` ερώτημα, το P17 camera UI προηγείται.
+
 ## 2026-07-26 docker-health (automated)
 
 **Coordination**: ROUTINES_PAUSED absent (active), docker lock acquired/released cleanly.
