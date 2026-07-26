@@ -4093,3 +4093,62 @@ sweep για οποιοδηποτε αλλο πρωτοτυπο ηδη-shipped f
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-26 (8) — Trash / soft-delete safety net gets its own FAQ
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε (πολυ
+μεγαλο πλεον, δεκα OPEN entries, ολα bakecore ui-rebuild/finance/reviewer/tests + το pharos-daily-dev
+mobile-camera item), καμια καταχωρηση αφορα τη landing routine, τιποτα ANSWERED προς αυτη τη routine.
+
+`git log --oneline 9c782be..HEAD | grep "feat("` (9c782be = τελευταιο commit που αντικατοπτριστηκε στο
+landing, βλ. προηγουμενο entry) εβγαλε δυο: `cc65fb5 feat(landing): document line-item global search...`
+(το ιδιο το προηγουμενο commit αυτης της routine, ηδη reflected) και `5df604e feat(mobile): multi-currency
+for Items (P9)`.
+
+Read-only research (commit message, χωρις subagent): το `5df604e` φερνει την mobile ItemsScreen σε parity
+με το ηδη-shipped web multi-currency (FxControls, toPrinted() νεα helper για να ξε-μετατρεψει τις 3 τιμες
+ενος item πριν τη φορμα, ωστε re-save να μη διπλο-μετατρεπει). Ιδιο pattern με τα `8be7040`/`9c782be` απο
+τα δυο προηγουμενα entries: η υπαρχουσα multi-currency FAQ ηδη καλυπτει "items" γενικα χωρις platform
+διακριση, αρα κανενα νεο user-facing wording δεν προεκυψε εκει, θα ηταν αναδιατυπωση χωρις περιεχομενο.
+
+Εκανα το προτεινομενο sweep του προηγουμενου entry: διαβασα ολο το `docs/FEATURES.md` (§ headers) και το
+συνεκρινα με τις υπαρχουσες FAQ/roadmap/features cards του landing. Ολα τα per-feature § (bookmarklet,
+barcode lookup [σωστα στο Exploring roadmap, οχι shipped], multi-currency, expense splitting, per-space
+tag, tax export, coupons/gift-cards/loyalty, calendar/iCal feed, alert summaries, event webhooks) ειχαν ηδη
+δικη τους FAQ. Το ΕΝΑ που ελειπε: **§ Trash (soft delete)** (γραμμη 593-599 στο FEATURES.md) αναφερονταν
+μονο μεσα στην tech-stack λιστα ("soft-delete trash", γραμμη 123, αγγλικο one-liner) αλλα καμια FAQ δεν
+εξηγουσε στον χρηστη τι σημαινει αυτο πρακτικα: οτι τα deletes ειναι αναστρεψιμα, τι ειναι soft-deleted,
+που παει (Settings → Storage & backup → Trash), ποσο κραταει (30 μερες auto-purge), και η μια εξαιρεση
+(statements = hard-delete, για να μην μπλοκαρει re-import).
+
+Αλλαγη (`apps/landing/app/page.tsx`, νεα FAQ εγγραφη, εισηχθηκε αμεσως ΜΕΤΑ το "How do backups work?" και
+ΠΡΙΝ το "Is my financial data secure?", ιδιο data-safety cluster): "What happens if I delete something by
+mistake?" / "Most deletes are reversible. Items, receipts, expenses, subscriptions, vouchers, bills, and
+tasks are soft-deleted, hidden from the app but their files and links kept, and land in Trash (Settings →
+Storage & backup) where you can restore them with one click or delete them forever. Anything left in Trash
+auto-purges after 30 days, so it is a safety net, not permanent storage. Card statements are the one
+exception: they are removed for good straight away, so re-importing the same month never gets blocked by
+a trashed copy still holding its slot." Οι γειτονικες FAQ (backups, security) δεν αλλαξαν.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη).
+- Πορτες 3100-3120: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build.
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` (μεσω `document.body.textContent`) επιβεβαιωσε ολα τα 5 checks true: νεα ερωτηση
+  παρουσα, νεο σωμα ("land in Trash (Settings → Storage & backup) where you can restore them with one
+  click") παρον, η statements-εξαιρεση ("re-importing the same month never gets blocked by a trashed copy
+  still holding its slot") παρουσα, γειτονικες FAQ (backups, security) αμεταβλητες και παρουσες. Hero
+  screenshot καθαρο (lighthouse mark, gradient τιτλος, nav, τριπλο badge row). Server τερματιστηκε (`pkill
+  -f "next start -p 3110"`), κανενα `next-server` process δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx (python3 UTF-8 count).
+- Δεν αγγιξα Docker/:3000/web/mobile. Μηδεν subagent, μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file. Commit `a919c03`, pushed καθαρα (fast-forward, καμια σύγκρουση).
+
+Επομενο increment: νεος `git log --oneline 5df604e..HEAD | grep "feat("` ελεγχος στην αρχη του επομενου
+run. Αλλιως candidates: polish συνεχεια / real app screenshots οταν υπαρξουν assets (blocked), ή αλλο νεο
+sweep του docs/FEATURES.md για κατι που ξεφυγε.
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
