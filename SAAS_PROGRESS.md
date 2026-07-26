@@ -5334,3 +5334,74 @@ throw από το cookie store → καθαρό 500 JSON (αυτό ακριβώ�
 ίδιο idiom με το ήδη-tested `invites/resend`) πάνε άνετα μαζί σε ένα επόμενο. Πριν ξεκινήσεις:
 ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο territory** (οι τελευταίες 2
 σαρώσεις δεν είχαν κανένα — τα 3 ανοιχτά items είναι feature-side).
+
+## 2026-07-26 (cont. — increment 111, route-level tests για audit/route.ts, το activity-trail read surface)
+
+Πριν από νέο increment: ask-inbox re-checked (`~/.claude/ASK_ACHILLEAS.md`, 9 OPEN entries — 7×
+bakecore [finance ×2, redesigner, reviewer ×2, ui-rebuild ×2], bakecore-tests macOS-TCC flag,
+pharos-daily-dev P17/P23 mobile-camera approval· **τίποτα addressed σε saas-core**, μηδέν
+ANSWERED). `WEB_DEBT.md` grep re-checked: τα 3 εναπομείναντα auto-buildable items (Notifications
+requireAdmin, Voucher/GiftCard/LoyaltyCard `vouchers/page.tsx` tenancy-parity, sampleDataActions.ts)
+είναι **εκτός territory** (feature pages/actions) → αμετάβλητα, δεν τα άγγιξα. UI-first backlog
+παραμένει εξαντλημένο. Πήρα το leftover next-task του increment-110 log: το `audit/route.ts`
+(110 γρ.), το πιο ουσιαστικό untested route που απομένει.
+
+Πριν το staging, `git status --short` έδειξε **μόνο το ένα δικό μου νέο αρχείο** — collision
+guard δεν χρειάστηκε να παραλείψει τίποτα.
+
+**Νέο `audit/route.test.ts`** (37 tests), **μηδέν production code αλλαγή**. GET = το read
+surface πίσω από το Activity panel, και το **μόνο SaaS route με keyset pagination**. Οι pure
+helpers (`parseAuditAction`/`collectActorIds`/`auditView`/`redactMeta`) τρέχουν **ΠΡΑΓΜΑΤΙΚΑ**
+εδώ, άρα τα projection/redaction assertions χτυπάνε τον production serializer, όχι stub· mocked
+seams μόνο `resolveWorkspaceSession` + τα δύο models (`AuditEvent`, `Account`). ΣΗΜ: αυτό το
+route δεν είναι `saasGuard`-wrapped αλλά έχει **δικό του inline try/catch** — σκόπιμο, είναι το
+accepted idiom των 3 routes που έκλεισε το commit `6f3de54` (invites/accept, audit,
+erasure/purge· το gate πρέπει να τρέξει πριν το try γιατί επιστρέφει responses) → μηδέν νέα
+production αλλαγή χρειάστηκε, σε αντίθεση με το logout του increment-110.
+
+Καλύπτει: **gating** — το gate short-circuit περνάει αναλλοίωτο **πριν από οποιοδήποτε query**·
+`requireManage=true` (η ανάγνωση του trail είναι management action)· forward του `?tenant`, `null`
+όταν λείπει. **Scoping (το isolation invariant)** — το query χρησιμοποιεί ΠΑΝΤΑ το tenantId του
+**session**, ποτέ το slug που ζητήθηκε (test με `?tenant=someone-elses-workspace` → query στο
+δικό του tenant). **`?action`** — γνωστό verb στενεύει· trim + lowercase (` INVITE.SENT ` →
+`invite.sent`)· άγνωστο verb **ρίχνει το filter και απαντά 'all' με 200**, δεν 400άρει ένα read·
+κενό = no filter. **`?limit`** — default 50· floor σε fractional (ποτέ non-integer `.limit()`)·
+clamp στο 200 ceiling (ceiling δεκτό exactly)· fallback σε 50 για garbage/zero/negative/empty/
+`Infinity` (parametrized ×5)· και **ο αριθμός που γυρνά στον caller είναι αυτός που πράγματι
+πέρασε στο `.limit()`**. **`?before` cursor** — parseable ISO → `{ $lt: Date }` στο `createdAt`·
+**unparseable → ΑΓΝΟΕΙΤΑΙ** (ένα stale/mangled cursor από παλιό client πρέπει να πέφτει σε «first
+page», όχι σε σφάλμα)· κενό ignored· cursor + action + limit **σε ΕΝΑ query** (page 2 φιλτραρισμένου
+trail). **Actor resolution** — μηδέν events → **παραλείπει εντελώς το Account lookup** (όχι κενό
+`$in`)· όλα system-originated (null actor) → επίσης καθόλου lookup· **ΕΝΑ batched `$in`** με
+distinct ids μόνο (`toHaveBeenCalledTimes(1)`, το null actor δεν συνεισφέρει — anti-N+1)·
+deleted account → nulls αντί crash· blank name → null (UI πέφτει στο email)· account χωρίς email
+→ null email αλλά κρατά το name· **ObjectId-like ids stringify-άρονται και στις δύο πλευρές** ώστε
+να ταιριάζουν ακόμα. **Leakage** — η projection είναι **ακριβώς** `'action actor target meta
+createdAt'` (assertion και στο string και στο body: `tokenHash` σε row **δεν** φτάνει στον client)·
+secret-looking meta keys (`resetToken`/`passwordHash`) **re-redacted στην έξοδο** (defence in depth
+για legacy rows). **Failure** — throw στο event query ΚΑΙ throw στο Account lookup → uniform
+`{error}` 500· message-less throw → `'Server error'`· 5000-char message → **truncated στα 200**
+(κανένα internal dump δεν φεύγει στο body).
+
+**Verified**: το νέο file **37/37 green** (πέρασε από την πρώτη). Πλήρες `npx vitest run` →
+**293 files / 4198 tests green** (από 291/4133 του increment-110 log: +2 files/+65 tests — το ένα
+δικό μου + ένα από άλλη ταυτόχρονη routine). `npm run type-check` → **EXIT 0 καθαρό** μετά από
+ένα type-only fix: το `eventSelect` ως zero-arg `vi.fn(() => …)` έκανε το `mock.calls[0][0]` να
+type-άρει ως empty tuple (**TS2493, το ίδιο σφάλμα που είχε βγει και στο increment 109**) → typed
+param `(_projection: string)` στο `vi.hoisted`, μηδέν runtime αλλαγή (και έφυγε ένα περιττό
+`as unknown as string` cast). **Docker: ΔΕΝ έγινε rebuild** (test-only, μηδέν production/runtime
+wiring αλλαγή → ούτε ο docker mutex χρειάστηκε). **Browser-verify: skipped** (test file, μηδέν
+UI/observable behavior αλλαγή). Collision guard: `git status --short` πριν το staging = μόνο το 1
+δικό μου untracked file, μηδέν staged από άλλη routine· `git diff --cached --name-only` μετά
+επιβεβαίωσε exact 1-file match πριν το commit/push. Pushed `29cddf2`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** επόμενοι υποψήφιοι χωρίς route-level coverage — απομένουν **6**:
+`account/reset/{request,confirm}` (80+54 γρ.) και `account/verify/{request,confirm}` (56+42 γρ.)
+είναι δύο φυσικά ζευγάρια token-lifecycle (ίδιο mint/hash/consume idiom με το ήδη-tested
+`invites/resend` — το reset ζευγάρι πρώτο, είναι το security-sensitive: single-use consumption,
+hash-only at rest, no user-enumeration στο request path)· μετά `workspace/export/{route,files}`
+(77+82 γρ., τα δύο GDPR export surfaces, πάνε μαζί)· και `billing/route.ts` (69 γρ., plan/quota
+read). Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο
+territory** (οι τελευταίες 3 σαρώσεις δεν είχαν κανένα — τα 3 ανοιχτά items είναι feature-side).
