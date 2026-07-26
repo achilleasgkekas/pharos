@@ -3,8 +3,22 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 64a6ead -->
-<!-- docker-validated: 4523f4a -->
+<!-- docker-validated: 7b46912 -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-26 docker-health (automated)
+
+**Coordination**: ROUTINES_PAUSED absent (active), docker lock acquired/released cleanly.
+
+**Health check**: homepage-mongo healthy, homepage-web 0 restarts, all 10 containers running.
+
+**Changes since 4523f4a**: extensive diff in web runtime (>100 files: API routes, test coverage, client components, new FX audit lib, i18n updates, models, serializers). Rebuild warranted.
+
+**Rebuild**: tsc clean → docker compose build web 36s → /login 200 at 5s → no restarts → docker builder prune -f freed 8.051GB.
+
+**Status**: ✓ stack healthy, ✓ rebuild succeeded, ✓ 8GB cache reclaimed. No issues.
+
+---
 
 ## 2026-07-26 (P9 slice 7: «ποιες εγγραφές θέλουν ακόμα ισοτιμία;» — audit στα Reports)
 
