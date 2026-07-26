@@ -453,6 +453,13 @@ months):
   is shown alongside the forward windows, all zero-AI and zero-cost (uses the money
   agenda computed server-side). Actionable for quick "is this a good time to buy?"
   decisions.
+- **Foreign currency audit (P9)** — when multi-currency is enabled, a panel lists all
+  records (expenses, income, receipts, items, subscriptions, statements) that are
+  missing an FX rate. This helps you catch incomplete foreign transactions (especially
+  after bulk CSV imports) before they silently distort your reports. Sorted by largest
+  printed amount first; click any row to open the record's edit form and add the missing
+  rate. Only visible when multi-currency is enabled, so single-currency deployments
+  incur zero cost.
 - warranties expiring soon, biggest purchases, and installment payoff.
 
 **Asset depreciation.** Owned gear is valued from its purchase price using a
