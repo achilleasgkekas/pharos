@@ -2785,3 +2785,29 @@ Collision guard: `git status --short -- docs/` = κανένα modified docs file
 
 Επόμενο run: (α) αν νέα features shipped μετά τις 22:24 (P51-P80 candidates ή άλλα modules), update docs · (β) configuration.md drift check αν νέα env vars προστέθηκαν · (γ) api.md endpoint schema verification αν αλλαγές στο OpenAPI.
 
+
+## 2026-07-27 (twenty-fifth run — P9 mobile Statements verification: multi-currency already documented)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-fourth run (completed 2026-07-26). Ανακάλυψη: **1 νέο feat() commit από 2026-07-27**:
+- **P9 mobile Statements (commit d44c792, 2026-07-27)** — `feat(mobile): multi-currency for Statements (P9, last money screen)` — το τελικό κομμάτι του P9 multi-currency (mobile side).
+
+Τι βρέθηκε:
+- **features.md**: Ήδη documented (lines 293-301). Section "Statements & installments" περιγράφει "Multi-currency support (P9)" με λεπτομέρειες για currency/origAmount/fxRate fields, whole-statement conversion, gold badge για unknown rates.
+- **api.md**: Ήδη documented (line 258). Πίνακας "/statements" endpoints + explanatory note "Multi-currency fields (P9)" που εξηγάει τη σχήμα (currency, origAmount, fxRate) και ότι όλα τα amounts είναι ήδη converted σε base currency.
+- **mobile.md**: Ήδη documented (line 26). Table row "Statements | ... **multi-currency support** (convert whole statement to base currency)".
+
+Accuracy (διάβασα κώδικα + cross-checked με 3 docs): commit d44c792 message, features.md lines 293-301 match, api.md line 258 match, mobile.md line 26 match.
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: features.md 0, api.md 22, mobile.md 0 (όλα ζυγά, αθικτα).
+- Internal links: όλα ✓.
+- Secret scan: κανένα credential ✓.
+
+Collision guard: git status --short = κανένα modified file εκτός αυτού του DOCS_PROGRESS.md (δικό μου), κανένα staged foreign.
+
+Ενέργεια: Καμία. Όλα τα shipped features (P9 complete, d44c792) είναι ήδη documented.
+
+Συμπέρασμα: P9 multi-currency feature set (web + mobile, slices 1-10) είναι πλήρως documented across features.md + api.md + mobile.md. Ο latest d44c792 commit δεν χρειάζεται νέα documentation.
+
+Επόμενο run: (α) αν νέα features ship (π.χ. P51+ candidates ή άλλα modules), update docs ανάλογα, ή (β) drift check — verify αν κάποιο endpoint ή feature description έχει γίνει stale σε σχέση με τον κώδικα.
+
