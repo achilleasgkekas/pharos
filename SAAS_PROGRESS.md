@@ -5486,3 +5486,86 @@ timing assertions τυφλά. Μετά: `workspace/export/{route,files}` (77+82 
 surfaces, πάνε μαζί) και `billing/route.ts` (69 γρ., plan/quota read). Πριν ξεκινήσεις: ask-inbox
 πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο territory** (οι τελευταίες 4 σαρώσεις δεν
 είχαν κανένα — τα 3 ανοιχτά items είναι feature-side).
+
+## 2026-07-26 (cont. — increment 114, route-level tests για το verify ζευγάρι request+confirm)
+
+Πριν από νέο increment: ask-inbox re-checked (`~/.claude/ASK_ACHILLEAS.md`, **τίποτα addressed σε
+saas-core**, μηδέν ANSWERED — `grep saas-core` = μηδέν hits). `WEB_DEBT.md` re-scanned: τα 3
+εναπομείναντα auto-buildable items (Notifications requireAdmin, Voucher/GiftCard/LoyaltyCard
+tenancy-parity, sampleDataActions.ts) παραμένουν **εκτός territory** (feature pages/actions) →
+μηδέν αλλαγή, δεν τα άγγιξα. UI-first backlog παραμένει εξαντλημένο. Πήρα το next-task του
+increment-112 log: το ζευγάρι `account/verify/{request,confirm}`.
+
+Πριν το staging, `git status --short` έδειξε **μόνο τα 2 δικά μου νέα αρχεία**, μηδέν staged από
+άλλη routine.
+
+**Νέο `verify/request/route.test.ts`** (27 tests), **μηδέν production code αλλαγή**. Είναι ο
+**AUTHENTICATED** αδερφός του reset/request, και αυτή ακριβώς η διαφορά ορίζει το συμβόλαιο: αφού
+η διεύθυνση-στόχος έρχεται από το session (ποτέ από το body), δεν υπάρχει enumeration surface →
+**σκόπιμα ΔΕΝ έχει timing floor** και **επιτρέπεται** να απαντά διαφορετικά για ήδη-verified
+λογαριασμό. Το ίδιο το test το κατοχυρώνει (`verified !== unverified` byte-wise) ώστε να μην
+αντιγραφούν τυφλά τα anti-enumeration assertions του reset. Πραγματικά τρέχουν:
+`mintVerifyToken`/`hashVerifyToken`/`VERIFY_TTL_MS`, `verifyEmail`/`verifyLinkUrl`, `pickBaseUrl`,
+`saasGuard`· mocked seams: `saasAuthGate`, `getCurrentAccount`, `connectDB`, `Account`,
+`sendEmail`+`mailerCanDeliver`.
+Καλύπτει: **gating** — και τα δύο short-circuits περνάνε **πριν καν διαβαστεί το session** (μηδέν
+`getCurrentAccount`, μηδέν DB)· gate consulted ακριβώς μία φορά. **Ταυτότητα** — μηδέν session →
+401 χωρίς DB· lookup **αποκλειστικά** με το `claims.sub` (τίποτα caller-supplied)· dangling cookie
+(session ok, row σβησμένο) → 404 χωρίς mint· projection ακριβώς `'_id email emailVerified'`.
+**Already-verified** — `{ok, alreadyVerified}` με **μηδέν** `.set()`, μηδέν `.save()`, μηδέν email,
+και **μηδέν devToken leak** ακόμα και σε dev με unwired mailer. **Minting** — persist μόνο hash και
+`hashVerifyToken(devToken)` === ό,τι γράφτηκε (η property που κάνει το link redeemable)· το
+plaintext ΔΕΝ μπαίνει στο row (`JSON.stringify` assertion)· **ένα** `.set()` με ακριβώς τα 2 verify
+πεδία· expiry ακριβώς ένα `VERIFY_TTL_MS` (**24h, τετραπλάσιο του reset TTL** — assert-άρεται και η
+ίδια η σταθερά)· διαφορετικό token σε κάθε κλήση. **Dev-token scaffold** — unwired+non-production
+echo· unwired+**production** → σιωπηλό drop **αλλά το token παραμένει persisted** (fail closed,
+ώστε ένα μελλοντικό mailer wiring να μπορεί να ξαναστείλει)· wired → ποτέ devToken. **Email** —
+πάει στο **session** account address, subject/link πραγματικά χτισμένα, το token του link
+hash-άρει σε ό,τι αποθηκεύτηκε, percent-encoding του base64url ελέγχεται με round-trip decode·
+`SAAS_PUBLIC_URL` > `APP_URL` > request origin (και τα 3 ξεχωριστά). **Ασυμμετρία που καρφώθηκε
+ρητά**: αυτό το route κάνει **`await sendEmail(...)`** ενώ το reset/request κάνει `void
+sendEmail(...).catch()` → rejecting mailer εδώ βγάζει **500** (με το token ήδη persisted). Το
+τεστ το τεκμηριώνει ως συνειδητή διαφορά, ώστε μια μελλοντική αλλαγή σε οποιοδήποτε από τα δύο
+routes να είναι απόφαση, όχι σιωπηλό drift. **Failure** — lookup throw / save throw → uniform
+`{error}` 500· message-less → `'Server error'`· 5000-char → truncated στα 200.
+
+**Νέο `verify/confirm/route.test.ts`** (28 tests), **μηδέν production code αλλαγή**. Το redemption
+half — UNAUTHENTICATED, το token από το inbox ΕΙΝΑΙ όλη η απόδειξη ιδιοκτησίας της διεύθυνσης.
+Πραγματικά τρέχουν `hashVerifyToken`/`isVerifyTokenValid`, `readBody`/`strField`, `saasGuard`·
+mocked μόνο gate/`connectDB`/`Account`.
+Καλύπτει: **validation** — 6 παραλλαγές κακού token (missing/empty/whitespace/null/false/
+unparseable-body, το τελευταίο περνά από το `readBody` swallow) → 400 με **μηδέν** `connectDB`·
+trim πριν το hashing (copy-paste με whitespace εξαργυρώνεται κανονικά). **Lookup** — filter =
+**ΜΟΝΟ** `{verifyTokenHash: sha256}` (assert και σε `Object.keys` και σε `JSON.stringify` ότι το
+plaintext δεν φτάνει ποτέ στη Mongo)· projection ακριβώς `'_id verifyTokenHash verifyTokenExpires
+emailVerified'` (μηδέν email/passwordHash). **Generic failure** — unknown / expired πριν μία ώρα /
+expired πριν 1ms / null expiry / undefined / unparseable Date → **όλα το ΙΔΙΟ**
+`'This verification link is invalid or has expired'` με μηδέν write· επιπλέον byte-identical body
+σύγκριση unknown vs expired (`.text()`)· expiry αποθηκευμένο ως ISO string γίνεται δεκτό.
+**Consumption** — **ένα** `.set()` που θέτει `emailVerified:true` και μηδενίζει **και τα δύο**
+verify πεδία μαζί (single-use)· `save` ακριβώς μία φορά· **replay test** (δεύτερο κλικ του ίδιου
+link → ο καθαρισμένος hash δεν ματσάρει → generic 400)· already-verified με ζωντανό token είναι
+ακίνδυνο· body ακριβώς `{"ok":true}`, μηδέν account info. **Failure** — ίδιο 500 shaping quartet.
+
+**Verified**: τα δύο νέα files **55/55 green** (πέρασαν από την πρώτη, μηδέν fix). Πλήρες
+`npx vitest run` → **299 files / 4370 tests green** (από 296/4269 του increment-112 log: +3 files/
++101 tests — τα 2 δικά μου + 1 από άλλη ταυτόχρονη routine). `npm run type-check` → **EXIT 0
+καθαρό από την πρώτη** (τα δύο TS παγιδάκια των προηγούμενων increments αποφεύχθηκαν προληπτικά:
+typed `_projection: string` param στα `vi.hoisted` select mocks ώστε το `mock.calls[0][0]` να μην
+type-άρει ως empty tuple [TS2493], και `vi.stubEnv('NODE_ENV', …)` αντί για direct assignment
+[TS2540]). **Docker: ΔΕΝ έγινε rebuild** (test-only, μηδέν production/runtime wiring/env/deps
+αλλαγή → ούτε ο docker mutex χρειάστηκε). **Browser-verify: skipped** (test files, μηδέν
+UI/observable behavior αλλαγή). Collision guard: `git status --short` πριν το staging = μόνο τα 2
+δικά μου untracked, μηδέν staged από άλλη routine· `git diff --cached --name-only` μετά
+επιβεβαίωσε exact 2-file match πριν το commit/push. Pushed `07d7ea1`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** απομένουν **2** routes χωρίς route-level coverage: `workspace/export/{route,files}`
+(77+82 γρ., τα δύο GDPR export surfaces — πάνε μαζί σε ένα increment, μοιράζονται το ίδιο
+serialization/scope idiom) και `billing/route.ts` (69 γρ., plan/quota read). Με το `export` ζευγάρι
+το route-level coverage του SaaS surface κλείνει σχεδόν εντελώς — αξίζει μετά μια σάρωση για το τι
+ΑΛΛΟ μέσα στο territory δεν έχει coverage (π.χ. `lib/tenancy/**` helpers χωρίς unit tests, ή
+`components/saas/**` pure helpers) αντί να θεωρηθεί το backlog εξαντλημένο. Πριν ξεκινήσεις:
+ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο territory** (οι τελευταίες 5
+σαρώσεις δεν είχαν κανένα — τα 3 ανοιχτά items είναι feature-side).
