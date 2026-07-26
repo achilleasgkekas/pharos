@@ -5265,3 +5265,72 @@ match πριν το commit/push. Pushed `a5d1499`.
 increment· το `audit/route.ts` (110 γρ., cursor pagination + batched actor resolution) αξίζει
 δικό του. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο
 territory** (η τελευταία σάρωση δεν είχε κανένα — τα 3 ανοιχτά items είναι feature-side).
+
+## 2026-07-26 (cont. — increment 110, route-level tests για trials/sweep + auth/logout, + saasGuard wrap στο logout)
+
+Πριν από νέο increment: ask-inbox re-checked (`~/.claude/ASK_ACHILLEAS.md`, 8 OPEN entries — 6×
+bakecore [finance ×2, redesigner, reviewer ×2, ui-rebuild], bakecore-tests macOS-TCC flag,
+pharos-daily-dev P17/P23 mobile-camera approval· **τίποτα addressed σε saas-core**, μηδέν
+ANSWERED). `WEB_DEBT.md` grep re-checked: τα 3 εναπομείναντα auto-buildable items
+(Notifications requireAdmin, Voucher/GiftCard/LoyaltyCard tenancy-parity, sampleDataActions.ts)
+είναι **εκτός territory** (feature pages/actions) → δεν τα άγγιξα, αμετάβλητα. UI-first backlog
+παραμένει εξαντλημένο. Ακολούθησα το leftover next-task από το increment-109 log, παίρνοντας τα
+δύο μικρά routes μαζί όπως προγραμματίστηκε (`trials/sweep` 49 γρ. + `auth/logout` 17 γρ.).
+
+Πριν το staging, `git status --short` έδειξε **μόνο τα 3 δικά μου αρχεία** (2 νέα test files +
+το τροποποιημένο logout route) — collision guard δεν χρειάστηκε να παραλείψει τίποτα.
+
+**Νέο `trials/sweep/route.test.ts`** (18 tests), μηδέν production code αλλαγή. POST = ο
+on-demand/external trigger του D4 trial-lapse sweep (warn 3 μέρες πριν, suspend όσα έληξαν). Ο
+decision core του sweep (`shouldWarnTrial`/`planTrialWarnings`/`trialWarningFilter`/
+`dunningEmail` + οι lapse planners) είναι ήδη πλήρως unit-tested αλλού → mocked εδώ μόνο το
+`runTrialLapseSweep` στο module boundary (μαζί με `saasMode`)· ο **`saasGuard` τρέχει
+ΠΡΑΓΜΑΤΙΚΑ** (pure), άρα το mid-throw test χτυπάει το production error shaping. Το βάρος πέφτει
+στο **CRON_SECRET bearer gate**, που είναι ολόκληρη η ασφάλεια αυτού του endpoint (καλείται από
+scheduler, όχι από session): missing header / non-Bearer scheme / lowercase `bearer` (η σύγκριση
+προθέματος είναι case-sensitive) / κενό token μετά το `Bearer ` / λάθος token **ίδιου** μήκους /
+λάθος token **διαφορετικού** μήκους (το length-guard πρέπει να short-circuit-άρει **πριν** το
+`timingSafeEqual`, αλλιώς ένα one-char probe θα γύριζε 500 αντί 401 και θα διέρρεε πληροφορία
+μήκους) / σωστό prefix με extra trailing χαρακτήρες → **όλα 401 χωρίς ποτέ να τρέξει το sweep**.
+Επιπλέον property-ες: **η σειρά των gates** — `SAAS_MODE` off νικάει το missing `CRON_SECRET`
+(→404, ώστε ένας self-hoster να ακούει «δεν υπάρχει» και ποτέ «κακορυθμισμένο»)· κενό string
+`CRON_SECRET` = unset → 500 fail-closed· whitespace trim μέσα στο header· case-insensitive
+header lookup· ο runner καλείται **χωρίς explicit clock** (`toHaveBeenCalledWith()` — η route
+δεν επιτρέπεται να καρφώσει `now`, κερδίζει το default του runner)· και οι 5 counters
+(`swept`/`warned`/`warnFailed`/`suspended`/`suspendFailed`) περνάνε αυτούσιοι· το **δικό του
+no-op του runner (`swept:false`) βγαίνει ως τίμιο 200 ok:true**, όχι σαν σφάλμα· mid-throw →
+καθαρό `{error}` 500.
+
+**Νέο `auth/logout/route.test.ts`** (7 tests) **+ μία production αλλαγή**. Το logout ήταν το ένα
+SaaS route που **δεν** ήταν τυλιγμένο σε `saasGuard` — ένα throw από το cookie store θα έβγαζε
+την HTML 500 σελίδα του Next στη μέση του sign-out αντί για το uniform `{error}` JSON. Το
+τύλιξα, **ακριβώς το ίδιο fix που είχε ήδη γίνει δεκτό** στα `invites/accept`, `audit`,
+`workspace/erasure/purge` (commit `6f3de54`, P2 εύρημα της 57ης σάρωσης) → ίδια κλάση, μηδέν
+νέα απόφαση. Το gate παραμένει **πρώτο**, άρα το 404 (SAAS_MODE off) και το 500 (AUTH_SECRET
+unset) είναι byte-for-byte αμετάβλητα, και στο self-hosted (SAAS_MODE off) η route δεν φτάνει
+ποτέ στο σώμα της. Tests: και τα δύο gate short-circuits περνάνε **αναλλοίωτα** με το cookie να
+**μην αγγίζεται καθόλου** πριν αποφασίσει το gate· gate consulted ακριβώς μία φορά· success
+καθαρίζει το cookie **ακριβώς μία φορά, χωρίς ορίσματα** → `{ok:true}`· **idempotent** (δεύτερο
+logout χωρίς session → πάλι 200, το UI δεν πρέπει ποτέ να δει σφάλμα για «ήδη αποσυνδεδεμένος»)·
+throw από το cookie store → καθαρό 500 JSON (αυτό ακριβώς που ξεκλείδωσε το wrap).
+
+**Verified**: τα δύο νέα files **25/25 green** μαζί. Πλήρες `npx vitest run` → **291 files /
+4133 tests green** (από 287/4032 του increment-109 log: +4 files/+101 tests — τα 2 δικά μου +
+κάποια από άλλες ταυτόχρονες routines στο μεταξύ). `npm run type-check` → **EXIT 0 καθαρό**
+(μηδέν type fix χρειάστηκε αυτή τη φορά). **Docker: ΔΕΝ έγινε rebuild** — η μόνη production
+αλλαγή είναι ένα wrapper σε SaaS route που στο τρέχον self-hosted deployment (SAAS_MODE off)
+είναι ούτως ή άλλως 404, μηδέν runtime wiring/env/deps αλλαγή → ούτε ο docker mutex χρειάστηκε.
+**Browser-verify: skipped** (μηδέν UI/observable αλλαγή). Collision guard: `git status --short`
+πριν το staging = μόνο τα 3 δικά μου· `git diff --cached --name-only` μετά επιβεβαίωσε exact
+3-file match πριν το commit/push. Pushed `05da7eb`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** επόμενοι υποψήφιοι χωρίς route-level coverage: `workspace/export/files`,
+`audit/route.ts`, `billing/route.ts`, `account/{reset/*,verify/*}`. Το **`audit/route.ts`**
+(110 γρ., cursor pagination + batched actor resolution) είναι το πιο ουσιαστικό που απομένει και
+αξίζει δικό του increment — το cursor encoding/decoding και το anti-N+1 batching είναι ακριβώς
+οι property-ες που σπάνε σιωπηλά. Τα `account/reset/*` + `account/verify/*` (token lifecycle,
+ίδιο idiom με το ήδη-tested `invites/resend`) πάνε άνετα μαζί σε ένα επόμενο. Πριν ξεκινήσεις:
+ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο territory** (οι τελευταίες 2
+σαρώσεις δεν είχαν κανένα — τα 3 ανοιχτά items είναι feature-side).
