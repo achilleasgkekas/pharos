@@ -2,10 +2,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet, Alert } from 'react-native';
 import { C, RADIUS } from '../theme';
 import { shortDate, money, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, Card, Badge, Chip, ModalSheet, contentWidth } from '../ui';
-import { getBills, addBill, updateBill, deleteBill, setBillPaid, type Bill, type BillStatus } from '../api';
+import { getBills, addBill, updateBill, deleteBill, setBillPaid, getSettings, type Bill, type BillStatus } from '../api';
+import { FxBadge, FxFields } from '../FxControls';
+import { normalizeCurrency, printedAmount } from '../fx';
 
-type Draft = { title: string; vendor: string; amount: string; dueDate: string; category: string; cycle: '' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'; notes: string };
-const EMPTY: Draft = { title: '', vendor: '', amount: '', dueDate: '', category: '', cycle: '', notes: '' };
+type Draft = { title: string; vendor: string; amount: string; dueDate: string; category: string; cycle: '' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'; notes: string; currency: string; fxRate: string };
+const EMPTY: Draft = { title: '', vendor: '', amount: '', dueDate: '', category: '', cycle: '', notes: '', currency: '', fxRate: '' };
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ymd = (iso: string | null) => (iso ? iso.slice(0, 10) : '');
 const CYCLES: { key: Draft['cycle']; label: string }[] = [
@@ -27,17 +29,41 @@ export function BillsScreen() {
   const [editing, setEditing] = useState<Bill | 'new' | null>(null);
   const [form, setForm] = useState<Draft>(EMPTY);
   const setF = (k: keyof Draft, v: string) => setForm((p) => ({ ...p, [k]: v }));
+  // P9: the base currency every stored `amount` is denominated in, plus the switch that
+  // decides whether the FX controls exist at all. Read from the server, never guessed from a
+  // row — a foreign bill's `currency` is what the PAPER says, not what the number below is.
+  const [base, setBase] = useState('EUR');
+  const [multiCurrency, setMultiCurrency] = useState(false);
 
   const load = useCallback(async () => {
     setErr(null);
     try { setRows(await getBills()); } catch (e) { setErr((e as Error).message); }
   }, []);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
+  // Separate, non-blocking read: a failure here (older server, offline) must leave the screen
+  // working exactly as it did before multi-currency existed.
+  useEffect(() => {
+    (async () => {
+      try {
+        const st = await getSettings();
+        setBase(normalizeCurrency(st.currency) || 'EUR');
+        setMultiCurrency(!!st.multiCurrency);
+      } catch { /* keep the EUR / single-currency defaults */ }
+    })();
+  }, []);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
-  function openNew() { setForm(EMPTY); setEditing('new'); }
+  function openNew() { setForm({ ...EMPTY, currency: base }); setEditing('new'); }
   function openEdit(it: Bill) {
-    setForm({ title: it.title, vendor: it.vendor, amount: it.amount ? String(it.amount) : '', dueDate: ymd(it.dueDate), category: it.category, cycle: it.cycle, notes: it.notes });
+    // P9: the form always holds the PRINTED figure (a foreign bill stores the converted one in
+    // `amount`), so re-saving an untouched bill can never convert it a second time.
+    const printed = printedAmount(it, base);
+    setForm({
+      title: it.title, vendor: it.vendor, amount: printed ? String(printed) : '', dueDate: ymd(it.dueDate),
+      category: it.category, cycle: it.cycle, notes: it.notes,
+      currency: normalizeCurrency(it.currency) || base,
+      fxRate: it.fxRate > 0 ? String(it.fxRate) : '',
+    });
     setEditing(it);
   }
 
@@ -52,8 +78,13 @@ export function BillsScreen() {
     if (!editing || !form.title.trim() || !DATE_RE.test(form.dueDate.trim())) return;
     const target = editing;
     const payload = {
-      title: form.title.trim(), vendor: form.vendor.trim(), amount: parseFloat(form.amount) || 0,
+      // Comma decimals like the rest of the money screens, so what the FX preview converts is
+      // exactly what gets sent (a phone keyboard on a Greek locale types "12,50").
+      title: form.title.trim(), vendor: form.vendor.trim(), amount: parseFloat(form.amount.replace(',', '.')) || 0,
       dueDate: form.dueDate.trim(), category: form.category.trim() || 'other', cycle: form.cycle, notes: form.notes.trim(),
+      // Only ever sent when the deployment has multi-currency on; otherwise the request is
+      // byte-for-byte the one this screen sent before P9 existed.
+      ...(multiCurrency ? { currency: form.currency || base, fxRate: Number(form.fxRate) || 0 } : {}),
     };
     setEditing(null);
     try {
@@ -101,7 +132,12 @@ export function BillsScreen() {
               <Text style={s.meta}>
                 {[item.vendor, item.dueDate ? `due ${shortDate(item.dueDate)}` : '', item.cycle].filter(Boolean).join('  ·  ')}
               </Text>
-              <Text style={s.amount}>{money(item.amount)}</Text>
+              <View style={s.amountRow}>
+                {/* `amount` is base currency even on a foreign bill, so it carries the base
+                    symbol; what the paper printed shows up in the badge next to it. */}
+                <Text style={s.amount}>{money(item.amount, base)}</Text>
+                <FxBadge doc={item} base={base} />
+              </View>
             </Pressable>
             <Pressable onPress={() => togglePaid(item)} style={s.payBtn} hitSlop={8}>
               <Text style={[s.payText, item.status === 'paid' && s.payTextUndo]}>{item.status === 'paid' ? 'Mark unpaid' : 'Mark paid'}</Text>
@@ -127,6 +163,15 @@ export function BillsScreen() {
               <Input variant="modal" value={form.dueDate} onChangeText={(v) => setF('dueDate', v)} placeholder="2026-08-01" autoCapitalize="none" />
             </View>
           </View>
+          {multiCurrency && (
+            <FxFields
+              amount={parseFloat(form.amount.replace(',', '.')) || 0}
+              currency={form.currency || base}
+              fxRate={form.fxRate}
+              base={base}
+              onChange={(p) => setForm((prev) => ({ ...prev, ...p }))}
+            />
+          )}
           <Text style={s.mlabel}>CATEGORY</Text>
           <Input variant="modal" value={form.category} onChangeText={(v) => setF('category', v)} placeholder="other" />
           <Text style={s.mlabel}>REPEAT</Text>
@@ -156,7 +201,8 @@ const s = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   title: { color: C.text, fontSize: 15, fontWeight: '600', flex: 1 },
   meta: { color: C.faint, fontSize: 12, marginTop: 4 },
-  amount: { color: C.text, fontSize: 16, fontWeight: '800', marginTop: 8 },
+  amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  amount: { color: C.text, fontSize: 16, fontWeight: '800' },
   payBtn: { marginTop: 12, alignSelf: 'flex-start', borderWidth: 1, borderColor: C.borderLight, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 6 },
   payText: { color: C.accent, fontSize: 12, fontWeight: '700' },
   payTextUndo: { color: C.faint },

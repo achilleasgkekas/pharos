@@ -50,6 +50,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 | Web | Mobile |
 |-----|--------|
 | e-shop layout, **AI fill from name**, add/edit, cycle, next renewal | ✅ list + add (name+amount, ✦ AI fill) + tap-to-edit (name, amount, **billing cycle picker**, **next renewal date**, active) + delete |
+| **Multi-currency (P9)**: currency select + FX rate / "charged" back-out + live preview, gold badge for a missing rate | ✅ **(2026-07-26)** Μηδέν δουλειά στο server (τα `/api/v1/subscriptions` POST/PATCH δέχονταν ήδη `currency`/`fxRate` και το GET τα επέστρεφε): καθαρό wiring του κοινού `FxControls` στο edit modal + `<FxBadge>` στη λίστα, base currency + `multiCurrency` από `GET /api/v1/settings`. Το form κρατά πλέον το ΤΥΠΩΜΕΝΟ ποσό (`printedAmount`), αλλιώς ένα re-save θα έστελνε το ήδη μετατρεπμένο σαν τυπωμένο και θα το μετέτρεπε δεύτερη φορά. Το `Subscription` type του `api.ts` απέκτησε τα `origAmount`/`fxRate` που το route ήδη έστελνε. **Bug που έκλεισε μαζί**: η λίστα τύπωνε `money(item.amount, item.currency)`, δηλαδή το σύμβολο του ΞΕΝΟΥ νομίσματος πάνω σε base-currency νούμερο (μια συνδρομή σε δολάρια εμφανιζόταν ως «$» ενώ το ποσό ήταν ευρώ). |
 
 ## Vouchers (`/vouchers`)
 | Web | Mobile |
@@ -407,7 +408,12 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   Wired: `HomeScreen.tsx` `ScreenKey`+tile (κόκκινο, χωρίς overview count — το `/api/v1/overview` δεν έχει bills
   count ακόμα, follow-up μικρό), `nav.tsx` Money group, `App.tsx` import+TITLES+case. **Δεν** έχει per-bill
   currency (το Bill model δεν αποθηκεύει `currency`, ίδιο με το web· `money()` fallback EUR, follow-up αν
-  χρειαστεί multi-currency parity). **Verify**: `npm run type-check` (web) EXIT 0· `apps/mobile npx tsc --noEmit`
+  χρειαστεί multi-currency parity). **[Follow-up κλεισμένο 2026-07-26 — multi-currency (P9) στο BillsScreen]**: το
+  `Bill` model ΑΠΕΚΤΗΣΕ έκτοτε `currency`/`origAmount`/`fxRate` και το v1 route τα δέχεται/επιστρέφει, αλλά το
+  mobile ούτε τα διάβαζε ούτε τα έστελνε. Τώρα: `Bill` type + `addBill`/`updateBill` payloads επεκτάθηκαν, το
+  edit form κρατά το ΤΥΠΩΜΕΝΟ ποσό (`printedAmount`, αλλιώς ένα re-save θα ξαναμετέτρεπε), `<FxFields>` στο modal
+  και `<FxBadge>` + base symbol (`money(amount, base)` αντί για το fallback EUR) στην κάρτα, base currency +
+  `multiCurrency` από `GET /api/v1/settings` με μη-μπλοκαριστικό read. **Verify**: `npm run type-check` (web) EXIT 0· `apps/mobile npx tsc --noEmit`
   EXIT 0. Full `npx vitest run` **2835 passed / 218 files** (+27 νέα route tests: GET filters/sort/status-compute,
   POST validation/defaults/cycle-gate, PATCH plain-field/paid-transition/recurring-spawn-once/paidDate/unpaid,
   DELETE soft-delete, 404s παντού, auth gate). Docker: lock acquired καθαρά, mongo ήδη healthy, `docker compose

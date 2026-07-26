@@ -119,7 +119,9 @@ export type SplitEntry = { name: string; share: number; settled: boolean };
 // total sums). `currency`/`origAmount`/`fxRate` describe what the paper actually said; both
 // numbers are 0 on an ordinary base-currency entry. See apps/web/src/lib/fx.ts.
 export type Expense = { id: string; kind: string; vendor: string; category: string; space: string; amount: number; currency: string; origAmount: number; fxRate: number; date: string | null; period: string; recurring: boolean; recurringCycle: string; paymentMethod: string; notes: string; file: string | null; thumb: string | null; verified: boolean; split: SplitEntry[]; taxDeductible: boolean; taxCategory: string; anomaly?: number };
-export type Subscription = { id: string; name: string; provider: string; category: string; amount: number; currency: string; billingCycle: string; nextRenewal: string | null; active: boolean; trialEndsAt?: string | null; firstChargeAmount?: number };
+/** `amount` is ALWAYS the deployment's base currency (P9); `currency`/`origAmount`/`fxRate`
+ *  only describe what the provider actually bills in (both numbers are 0 on a normal one). */
+export type Subscription = { id: string; name: string; provider: string; category: string; amount: number; currency: string; origAmount: number; fxRate: number; billingCycle: string; nextRenewal: string | null; active: boolean; trialEndsAt?: string | null; firstChargeAmount?: number };
 /** Auto-discovered untracked recurring charge (P7), mirrors apps/web/src/lib/recurringDiscovery.ts. */
 export type RecurringCandidate = { vendorKey: string; vendor: string; category: string; occurrences: number; avgAmount: number; lastAmount: number; lastDate: string; firstDate: string; avgIntervalDays: number; cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly' };
 export type ReceiptSummary = { id: string; store: string; date: string | null; total: number; currency: string; itemCount: number; verified: boolean; archived: boolean; file: string | null; thumb: string | null; returnDaysLeft?: number };
@@ -198,7 +200,9 @@ export async function getSubscriptions(): Promise<{ subscriptions: Subscription[
   const json = await request<{ data: Subscription[]; suggestions?: RecurringCandidate[] }>('/api/v1/subscriptions?limit=200');
   return { subscriptions: json.data ?? [], suggestions: json.suggestions ?? [] };
 }
-export function addSubscription(data: { name: string; amount: number; billingCycle?: string; trialEndsAt?: string; firstChargeAmount?: number }) {
+/** `amount`/`firstChargeAmount` are sent as PRINTED figures; with `currency` + `fxRate` the
+ *  server converts them to base currency before storing (P9). Omit both = single-currency. */
+export function addSubscription(data: { name: string; amount: number; billingCycle?: string; trialEndsAt?: string; firstChargeAmount?: number; currency?: string; fxRate?: number }) {
   return request<{ subscription: Subscription }>('/api/v1/subscriptions', { method: 'POST', body: JSON.stringify(data) });
 }
 
@@ -362,18 +366,25 @@ export const deleteLoyaltyCard = (id: string) => del(`/api/v1/loyaltycards/${id}
 
 // ---- Bills (P28 mobile parity) ----
 export type BillStatus = 'paid' | 'overdue' | 'due-soon' | 'upcoming';
+/** `amount` is ALWAYS the deployment's base currency (P9); `currency`/`origAmount`/`fxRate`
+ *  only describe what the bill is printed in (both numbers are 0 on a normal one). */
 export type Bill = {
-  id: string; title: string; vendor: string; amount: number; dueDate: string | null; paidAt: string | null;
+  id: string; title: string; vendor: string; amount: number; currency: string; origAmount: number; fxRate: number;
+  dueDate: string | null; paidAt: string | null;
   category: string; cycle: '' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'; notes: string; archived: boolean;
   status: BillStatus;
 };
 export async function getBills(): Promise<Bill[]> {
   return (await request<{ data: Bill[] }>('/api/v1/bills?limit=200')).data ?? [];
 }
-export function addBill(data: { title: string; vendor?: string; amount?: number; dueDate: string; category?: string; cycle?: string; notes?: string }) {
+/** `amount` is sent as the PRINTED figure; with `currency` + `fxRate` the server converts it
+ *  to base currency before storing (P9). Omit both = previous single-currency behaviour. */
+export function addBill(data: { title: string; vendor?: string; amount?: number; dueDate: string; category?: string; cycle?: string; notes?: string; currency?: string; fxRate?: number }) {
   return request<{ bill: Bill }>('/api/v1/bills', { method: 'POST', body: JSON.stringify(data) });
 }
-export const updateBill = (id: string, data: { title?: string; vendor?: string; amount?: number; dueDate?: string; category?: string; cycle?: string; notes?: string; archived?: boolean }) =>
+/** Sending amount, currency OR fxRate re-resolves all four money fields server-side, so
+ *  `amount` must always be the PRINTED figure here, never the stored (converted) one. */
+export const updateBill = (id: string, data: { title?: string; vendor?: string; amount?: number; dueDate?: string; category?: string; cycle?: string; notes?: string; archived?: boolean; currency?: string; fxRate?: number }) =>
   patch(`/api/v1/bills/${id}`, data);
 export const deleteBill = (id: string) => del(`/api/v1/bills/${id}`);
 /** Mark paid (spawns the next instance one cycle ahead for a recurring bill, server-side)
@@ -614,7 +625,9 @@ const patch = (path: string, data: object) => request<{ ok: boolean }>(path, { m
 // P9: `amount` here is the PRINTED figure too, and currency/fxRate/amount are resolved
 // together server-side, so an edit can never leave the entry half-converted.
 export const updateExpense = (id: string, data: { vendor?: string; amount?: number; category?: string; space?: string; kind?: string; date?: string; period?: string; recurring?: boolean; recurringCycle?: string; paymentMethod?: string; notes?: string; split?: SplitEntry[]; taxDeductible?: boolean; taxCategory?: string; currency?: string; fxRate?: number }) => patch(`/api/v1/expenses/${id}`, data);
-export const updateSubscription = (id: string, data: { name?: string; amount?: number; billingCycle?: string; nextRenewal?: string | null; category?: string; active?: boolean; trialEndsAt?: string | null; firstChargeAmount?: number }) => patch(`/api/v1/subscriptions/${id}`, data);
+/** Sending any money field (amount/currency/fxRate/firstChargeAmount) re-resolves the whole
+ *  set server-side, so `amount` must always be the PRINTED figure, never the stored one (P9). */
+export const updateSubscription = (id: string, data: { name?: string; amount?: number; billingCycle?: string; nextRenewal?: string | null; category?: string; active?: boolean; trialEndsAt?: string | null; firstChargeAmount?: number; currency?: string; fxRate?: number }) => patch(`/api/v1/subscriptions/${id}`, data);
 export const updateVoucher = (id: string, data: { title?: string; code?: string; store?: string; discount?: string; expiresAt?: string | null; url?: string; used?: boolean }) => patch(`/api/v1/vouchers/${id}`, data);
 export const updateReceipt = (id: string, data: { store?: string; total?: number; subtotal?: number; vatAmount?: number; date?: string; verified?: boolean; archived?: boolean; paymentMethod?: string; notes?: string; lineItems?: ReceiptLine[] }) => patch(`/api/v1/receipts/${id}`, data);
 export async function addReceiptToLibrary(id: string): Promise<{ created: number; linked: number }> {

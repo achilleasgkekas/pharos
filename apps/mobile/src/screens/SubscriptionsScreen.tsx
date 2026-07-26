@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, ScrollView, StyleSheet, Alert } from 'react-native';
 import { C, RADIUS } from '../theme';
-import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Chip, Badge, ListItem, ModalSheet, contentWidth } from '../ui';
-import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, type Subscription, type RecurringCandidate } from '../api';
+import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Chip, Badge, ListItem, ModalSheet, contentWidth, CUR } from '../ui';
+import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, getSettings, type Subscription, type RecurringCandidate } from '../api';
+import { FxBadge, FxFields } from '../FxControls';
+import { normalizeCurrency, printedAmount } from '../fx';
 
 const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
 
@@ -25,6 +27,13 @@ export function SubscriptionsScreen() {
   const [eRenewal, setERenewal] = useState('');
   const [eActive, setEActive] = useState(true);
   const [eTrialEndsAt, setETrialEndsAt] = useState('');
+  const [eCurrency, setECurrency] = useState('');
+  const [eFxRate, setEFxRate] = useState('');
+  // P9: the base currency every stored `amount` is denominated in, plus the switch that decides
+  // whether the FX controls exist at all. Read from the server, never guessed from a row — a
+  // foreign subscription's `currency` is what the provider bills in, not what `amount` holds.
+  const [base, setBase] = useState('EUR');
+  const [multiCurrency, setMultiCurrency] = useState(false);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -35,6 +44,17 @@ export function SubscriptionsScreen() {
     } catch (e) { setErr((e as Error).message); }
   }, []);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
+  // Separate, non-blocking read: a failure here (older server, offline) must leave the screen
+  // working exactly as it did before multi-currency existed.
+  useEffect(() => {
+    (async () => {
+      try {
+        const st = await getSettings();
+        setBase(normalizeCurrency(st.currency) || 'EUR');
+        setMultiCurrency(!!st.multiCurrency);
+      } catch { /* keep the EUR / single-currency defaults */ }
+    })();
+  }, []);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   const [aiBusy, setAiBusy] = useState(false);
@@ -61,7 +81,11 @@ export function SubscriptionsScreen() {
     ]);
   }
   function openEdit(it: Subscription) {
-    setEditing(it); setEName(it.name); setEAmount(String(it.amount));
+    // P9: the form always holds the PRINTED figure (a foreign subscription stores the converted
+    // one in `amount`), so re-saving an untouched one can never convert it a second time.
+    setEditing(it); setEName(it.name); setEAmount(String(printedAmount(it, base)));
+    setECurrency(normalizeCurrency(it.currency) || base);
+    setEFxRate(it.fxRate > 0 ? String(it.fxRate) : '');
     setECycle(it.billingCycle || 'monthly');
     setERenewal(it.nextRenewal ? it.nextRenewal.slice(0, 10) : '');
     setEActive(it.active);
@@ -86,6 +110,9 @@ export function SubscriptionsScreen() {
         nextRenewal: renewal,
         active: eActive,
         trialEndsAt,
+        // Only ever sent when the deployment has multi-currency on; otherwise the request is
+        // byte-for-byte the one this screen sent before P9 existed.
+        ...(multiCurrency ? { currency: eCurrency || base, fxRate: Number(eFxRate) || 0 } : {}),
       });
       await load();
     } catch (e) { setErr((e as Error).message); }
@@ -117,7 +144,8 @@ export function SubscriptionsScreen() {
             <View key={c.vendorKey} style={s.discoverRow}>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={s.discoverVendor} numberOfLines={1}>{c.vendor || c.vendorKey}</Text>
-                <Text style={s.discoverMeta}>~{money(c.avgAmount)} · {c.cycle} · {c.occurrences}×</Text>
+                {/* Candidates are averaged over stored expense amounts, which are base currency. */}
+                <Text style={s.discoverMeta}>~{money(c.avgAmount, base)} · {c.cycle} · {c.occurrences}×</Text>
               </View>
               <Button
                 label="Track"
@@ -135,7 +163,7 @@ export function SubscriptionsScreen() {
       )}
       <View style={s.addRow}>
         <Input value={name} onChangeText={setName} placeholder="name" style={{ flex: 2 }} />
-        <Input value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="€/mo" style={{ flex: 1 }} />
+        <Input value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder={`${(CUR[base] || base).trim()}/mo`} style={{ flex: 1 }} />
         <Pressable onPress={aiFill} disabled={!name.trim() || aiBusy} style={[s.aiBtn, (!name.trim() || aiBusy) && s.dim]}>
           {aiBusy ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.aiText}>✦</Text>}
         </Pressable>
@@ -158,17 +186,35 @@ export function SubscriptionsScreen() {
             {!!item.trialEndsAt && new Date(item.trialEndsAt).getTime() > Date.now() && (
               <Badge label="Trial" color={C.gold} style={{ marginRight: 8 }} />
             )}
-            <Text style={s.amount}>{money(item.amount, item.currency)}</Text>
+            <View style={{ alignItems: 'flex-end', gap: 4 }}>
+              {/* `amount` is base currency even on a foreign subscription (labelling it with
+                  item.currency printed the wrong symbol on a converted number), so what the
+                  provider actually bills shows up in the badge instead. */}
+              <Text style={s.amount}>{money(item.amount, base)}</Text>
+              <FxBadge doc={item} base={base} />
+            </View>
           </ListItem>
         )}
       />
 
       <ModalSheet visible={!!editing} onClose={() => setEditing(null)}>
             <Text style={s.modalTitle}>Edit subscription</Text>
+            {/* Scrolls because the FX block can add a rate row + preview on a small screen
+                (same idiom as the Bills sheet); the buttons stay pinned below it. */}
+            <ScrollView style={{ maxHeight: 440 }} keyboardShouldPersistTaps="handled">
             <Text style={s.mlabel}>NAME</Text>
             <Input variant="modal" value={eName} onChangeText={setEName} />
             <Text style={s.mlabel}>AMOUNT</Text>
             <Input variant="modal" value={eAmount} onChangeText={setEAmount} keyboardType="decimal-pad" />
+            {multiCurrency && (
+              <FxFields
+                amount={parseFloat(eAmount.replace(',', '.')) || 0}
+                currency={eCurrency || base}
+                fxRate={eFxRate}
+                base={base}
+                onChange={(p) => { if (p.currency !== undefined) setECurrency(p.currency); if (p.fxRate !== undefined) setEFxRate(p.fxRate); }}
+              />
+            )}
             <Text style={s.mlabel}>BILLING CYCLE</Text>
             <View style={s.chipRow}>
               {CYCLES.map((cy) => (
@@ -183,6 +229,7 @@ export function SubscriptionsScreen() {
               <Check checked={!!eActive} />
               <Text style={s.tlabel}>Active</Text>
             </Pressable>
+            </ScrollView>
             <View style={s.mbtns}>
               <Button label="Save" onPress={saveEdit} />
               <Button label="Delete" onPress={() => { const e = editing; setEditing(null); if (e) remove(e); }} variant="danger" />
