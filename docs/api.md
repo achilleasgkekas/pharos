@@ -216,7 +216,7 @@ These are flagged **(AI)** below with the feature name.
 |--------|-----------------------------------|-------------|
 | GET    | `/receipts?store=&archived=1`     | List receipts (+ `limit`/`offset`/`updatedSince`). |
 | GET    | `/receipts/:id`                   | Receipt + its line items. |
-| PATCH  | `/receipts/:id`                   | Update `{ store?, date?, total?, subtotal?, vatAmount?, currency?, origAmount?, fxRate?, paymentMethod?, notes?, verified?, archived?, lineItems? }`. |
+| PATCH  | `/receipts/:id`                   | Update `{ store?, date?, total?, subtotal?, vatAmount?, currency?, fxRate?, paymentMethod?, notes?, verified?, archived?, lineItems? }`. Money fields are read as PRINTED figures; sending any of them re-resolves the whole receipt with one rate. `origAmount` is derived, not accepted. |
 | POST   | `/receipts/:id/rescan`            | **(AI)** Re-run the parse on the stored file. Body `{ ocr?: boolean }` (`true` forces OCR). Returns the same shape as `GET /receipts/:id` plus `aiUsed`/`model`/`aiError`. |
 | POST   | `/receipts/:id/add-to-library`    | Turn line items into inventory Items (find-or-create by title, link the receipt) → `{ ok, created, linked }`. |
 

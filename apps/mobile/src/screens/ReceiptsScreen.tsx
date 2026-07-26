@@ -3,7 +3,9 @@ import { View, Text, Image, Pressable, FlatList, RefreshControl, ActivityIndicat
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim, RADIUS, SIZE } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Check, Button, Input, TextArea, Badge, contentWidth } from '../ui';
-import { getReceipts, getReceipt, scanReceipt, rescanReceipt, updateReceipt, addReceiptToLibrary, fileSource, type ReceiptSummary, type ReceiptDetail } from '../api';
+import { getReceipts, getReceipt, scanReceipt, rescanReceipt, updateReceipt, addReceiptToLibrary, fileSource, getSettings, type ReceiptSummary, type ReceiptDetail } from '../api';
+import { FxBadge, FxFields } from '../FxControls';
+import { isForeign, normalizeCurrency, printedAmount, toPrinted } from '../fx';
 
 type LineEdit = { name: string; qty: string; price: string; vatRate: string };
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -27,23 +29,50 @@ export function ReceiptsScreen() {
   const [eNotes, setENotes] = useState('');
   const [eVerified, setEVerified] = useState(false);
   const [eLines, setELines] = useState<LineEdit[]>([]);
+  const [eCurrency, setECurrency] = useState('');
+  const [eFxRate, setEFxRate] = useState('');
+  // P9: the base currency every stored amount is denominated in, plus the switch that decides
+  // whether the FX controls exist at all. A receipt's own `currency` says what the SHOP
+  // printed, so it can never stand in for this.
+  const [base, setBase] = useState('EUR');
+  const [multiCurrency, setMultiCurrency] = useState(false);
 
   const load = useCallback(async () => {
     setErr(null);
     try { setRows(await getReceipts()); } catch (e) { setErr((e as Error).message); }
   }, []);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
+  // Separate, non-blocking read: a failure here (older server, offline) must leave the screen
+  // working exactly as it did before multi-currency existed.
+  useEffect(() => {
+    (async () => {
+      try {
+        const st = await getSettings();
+        setBase(normalizeCurrency(st.currency) || 'EUR');
+        setMultiCurrency(!!st.multiCurrency);
+      } catch { /* keep the EUR / single-currency defaults */ }
+    })();
+  }, []);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   // Prefill editable fields whenever a detail opens (tap or after a scan).
+  // P9: the form edits PRINTED figures. The stored total keeps its printed value in
+  // origAmount; net/VAT/line prices are stored CONVERTED, so they are un-converted with the
+  // receipt's own rate first — otherwise an unchanged re-save would send already-converted
+  // numbers as if the paper had said them and convert them a second time.
   useEffect(() => {
     if (detail) {
-      setEStore(detail.store); setETotal(String(detail.total ?? 0));
+      const rate = isForeign(detail.currency, base) ? detail.fxRate || 0 : 0;
+      setEStore(detail.store); setETotal(String(printedAmount({ ...detail, amount: detail.total }, base)));
       setEDate(detail.date ? detail.date.slice(0, 10) : ''); setEPay(detail.paymentMethod ?? '');
       setENotes(detail.notes ?? ''); setEVerified(detail.verified);
-      setELines(detail.lineItems.map((l) => ({ name: l.name, qty: String(l.qty ?? 1), price: String(l.price ?? 0), vatRate: String(l.vatRate ?? 0) })));
+      setELines(detail.lineItems.map((l) => ({ name: l.name, qty: String(l.qty ?? 1), price: String(toPrinted(l.price ?? 0, rate)), vatRate: String(l.vatRate ?? 0) })));
+      setECurrency(isForeign(detail.currency, base) ? normalizeCurrency(detail.currency) : base);
+      setEFxRate(rate > 0 ? String(rate) : '');
     }
-  }, [detail]);
+  }, [detail, base]);
+  // The code the form's amounts are printed in (base unless the receipt is foreign).
+  const eCode = normalizeCurrency(eCurrency) || base;
 
   async function open(id: string) {
     setDetailLoading(true);
@@ -80,6 +109,11 @@ export function ReceiptsScreen() {
         verified: eVerified,
         lineItems: lines,
         ...(lines.length ? { subtotal: round2(net), vatAmount: round2(vat) } : {}),
+        // Only ever sent when the deployment has multi-currency on; otherwise the request is
+        // byte-for-byte the one this screen sent before P9 existed. Sending them makes the
+        // server re-resolve total + net + VAT + every line price together, from the printed
+        // figures above.
+        ...(multiCurrency ? { currency: eCode, fxRate: Number(eFxRate) || 0 } : {}),
       });
       await load();
     } catch (e) { setErr((e as Error).message); }
@@ -119,9 +153,11 @@ export function ReceiptsScreen() {
     if (qvCur) {
       setQvStore(qvCur.store);
       setQvDate(qvCur.date ? qvCur.date.slice(0, 10) : '');
-      setQvTotal(String(qvCur.total ?? 0));
+      // The PRINTED total, like the full form: quick verify submits it back and the server
+      // re-converts it with the receipt's stored rate (currency/rate are not editable here).
+      setQvTotal(String(printedAmount({ ...qvCur, amount: qvCur.total }, base)));
     }
-  }, [qvCur]);
+  }, [qvCur, base]);
 
   function openQuickVerify() {
     // Snapshot the queue at open so verifying does not reshuffle it mid-pass.
@@ -223,9 +259,13 @@ export function ReceiptsScreen() {
                   {item.returnDaysLeft != null && (
                     <Badge label={`↩ ${item.returnDaysLeft}d return`} color={item.returnDaysLeft <= 3 ? C.gold : C.cyan} />
                   )}
+                  {/* What the paper said, next to the base-currency total (P9). */}
+                  <FxBadge doc={item} base={base} />
                 </View>
               </View>
-              <Text style={s.total}>{money(item.total, item.currency)}</Text>
+              {/* `total` is base currency even on a foreign receipt, so it carries the BASE
+                  code — `item.currency` is what the shop printed, not what this number is. */}
+              <Text style={s.total}>{money(item.total, base)}</Text>
             </Pressable>
           );
         }}
@@ -267,11 +307,20 @@ export function ReceiptsScreen() {
                 </View>
                 <View style={s.totalRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.elabel}>TOTAL ({detail.currency})</Text>
+                    <Text style={s.elabel}>TOTAL ({eCode})</Text>
                     <Input value={eTotal} onChangeText={setETotal} keyboardType="decimal-pad" />
                   </View>
                   <Pressable onPress={fillTotal} disabled={!eLines.length} style={[s.sumBtn, !eLines.length && s.dim]}><Text style={s.sumText}>∑ items</Text></Pressable>
                 </View>
+                {multiCurrency && (
+                  <FxFields
+                    amount={num(eTotal)}
+                    currency={eCode}
+                    fxRate={eFxRate}
+                    base={base}
+                    onChange={(p) => { if (p.currency !== undefined) setECurrency(p.currency); if (p.fxRate !== undefined) setEFxRate(p.fxRate); }}
+                  />
+                )}
 
                 <View style={s.linesHead}>
                   <Text style={s.elabel}>LINE ITEMS</Text>
@@ -285,9 +334,11 @@ export function ReceiptsScreen() {
                     </View>
                     <View style={s.lineSub}>
                       <View style={s.lineCell}><Text style={s.cellLab}>QTY</Text><Input variant="cell" value={l.qty} onChangeText={(v) => setLine(i, 'qty', v)} keyboardType="decimal-pad" /></View>
-                      <View style={s.lineCell}><Text style={s.cellLab}>NET {detail.currency}</Text><Input variant="cell" value={l.price} onChangeText={(v) => setLine(i, 'price', v)} keyboardType="decimal-pad" /></View>
+                      <View style={s.lineCell}><Text style={s.cellLab}>NET {eCode}</Text><Input variant="cell" value={l.price} onChangeText={(v) => setLine(i, 'price', v)} keyboardType="decimal-pad" /></View>
                       <View style={s.lineCell}><Text style={s.cellLab}>VAT %</Text><Input variant="cell" value={l.vatRate} onChangeText={(v) => setLine(i, 'vatRate', v)} keyboardType="decimal-pad" /></View>
-                      <Text style={s.lineGross}>{money(lineGross(l), detail.currency)}</Text>
+                      {/* The line fields are edited in the PRINTED currency, so the gross next
+                          to them carries that code, not the base one. */}
+                      <Text style={s.lineGross}>{money(lineGross(l), eCode)}</Text>
                     </View>
                   </View>
                 ))}
@@ -335,10 +386,13 @@ export function ReceiptsScreen() {
                     <Input value={qvDate} onChangeText={setQvDate} placeholder="2026-06-30" autoCapitalize="none" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.elabel}>TOTAL ({qvCur.currency})</Text>
+                    <Text style={s.elabel}>TOTAL ({isForeign(qvCur.currency, base) ? normalizeCurrency(qvCur.currency) : base})</Text>
                     <Input value={qvTotal} onChangeText={setQvTotal} keyboardType="decimal-pad" />
                   </View>
                 </View>
+                {isForeign(qvCur.currency, base) && (
+                  <Text style={s.qvMeta}>Foreign receipt · edit it fully to change the currency or rate</Text>
+                )}
                 <Text style={s.qvMeta}>{qvCur.itemCount} line item{qvCur.itemCount === 1 ? '' : 's'} · use “Edit fully” to change them</Text>
                 <View style={s.mbtns}>
                   <Button label="Verify & next" onPress={qvVerify} busy={qvBusy} style={{ flex: 1 }} />

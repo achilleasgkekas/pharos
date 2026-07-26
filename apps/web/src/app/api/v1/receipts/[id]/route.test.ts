@@ -42,8 +42,11 @@ const { connectDBMock, userFindOne, userState, receiptFindById, findByIdState, r
   });
   const storesState: { rows: { name: string; returnWindowDays?: number | null }[] } = { rows: [] };
   const getStoresMock = vi.fn(async () => storesState.rows);
-  const settingsState: { defaultReturnWindowDays: number } = { defaultReturnWindowDays: 0 };
-  const getAppSettingsMock = vi.fn(async () => ({ defaultReturnWindowDays: settingsState.defaultReturnWindowDays }));
+  const settingsState: { defaultReturnWindowDays: number; currency: string } = { defaultReturnWindowDays: 0, currency: 'EUR' };
+  const getAppSettingsMock = vi.fn(async () => ({
+    defaultReturnWindowDays: settingsState.defaultReturnWindowDays,
+    currency: settingsState.currency,
+  }));
   return {
     connectDBMock: vi.fn(async () => {}), userFindOne, userState, receiptFindById, findByIdState, receiptUpdate, updateState,
     getStoresMock, storesState, getAppSettingsMock, settingsState,
@@ -87,11 +90,14 @@ beforeEach(() => {
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
   findByIdState.calls = [];
   findByIdState.select = [];
-  findByIdState.doc = null;
+  // A plain base-currency doc: PATCH re-reads the receipt whenever the body touches money
+  // (P9), so every money-bearing PATCH test needs one to exist. GET tests set their own.
+  findByIdState.doc = receiptDoc();
   updateState.calls = [];
   updateState.doc = { _id: 'r1', store: 'X' };
   storesState.rows = [];
   settingsState.defaultReturnWindowDays = 0;
+  settingsState.currency = 'EUR';
   connectDBMock.mockClear();
   receiptFindById.mockClear();
   receiptUpdate.mockClear();
@@ -306,6 +312,129 @@ describe('PATCH /api/v1/receipts/:id — scalar coercion', () => {
     const res = await PATCH(makeReq({ body: { store: 'S' } }), ctx(OID));
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: 'not found' });
+  });
+});
+
+// P9 multi-currency. The money fields arrive as the figures PRINTED on the receipt, so any
+// money-bearing PATCH re-reads the doc and re-resolves the WHOLE receipt with one rate
+// (fx.resolveReceiptAmounts, shared with the web form). The failure this guards against is a
+// half-converted receipt: a new rate landing on `total` but not on `vatAmount` or the line
+// prices, which /reports and "add items to inventory" would then read as base currency.
+describe('PATCH /api/v1/receipts/:id — multi-currency (P9)', () => {
+  const setOf = () => (updateState.calls[0].update as { $set: Record<string, unknown> }).$set;
+  const line = (name: string, price: number) => ({ name, refinedName: '', qty: 1, price, vatRate: 24 });
+
+  it('converts total, net, VAT and every line price with the submitted rate', async () => {
+    findByIdState.doc = receiptDoc({ currency: 'EUR', fxRate: 0 });
+    const res = await PATCH(makeReq({ body: {
+      total: 200, subtotal: 160, vatAmount: 40,
+      lineItems: [{ name: 'A', price: 100, vatRate: 24 }, { name: 'B', price: 60, vatRate: 24 }],
+      currency: 'USD', fxRate: 0.9,
+    } }), ctx(OID));
+    expect(res.status).toBe(200);
+    const set = setOf();
+    expect(set).toMatchObject({ total: 180, subtotal: 144, vatAmount: 36, currency: 'USD', origAmount: 200, fxRate: 0.9 });
+    expect(set.lineItems).toEqual([
+      { name: 'A', refinedName: '', qty: 1, price: 90, vatRate: 24 },
+      { name: 'B', refinedName: '', qty: 1, price: 54, vatRate: 24 },
+    ]);
+  });
+
+  it('never guesses 1:1 — a foreign receipt with no rate keeps its printed numbers', async () => {
+    const res = await PATCH(makeReq({ body: { total: 88, currency: 'USD' } }), ctx(OID));
+    expect(res.status).toBe(200);
+    expect(setOf()).toMatchObject({ total: 88, currency: 'USD', origAmount: 88, fxRate: 0 });
+  });
+
+  it('inherits the stored currency/rate when the body omits them (the quick-verify path)', async () => {
+    findByIdState.doc = receiptDoc({ currency: 'USD', fxRate: 0.9, total: 90, origAmount: 100 });
+    // Quick verify submits store/date/total/verified only — the total it shows is PRINTED.
+    const res = await PATCH(makeReq({ body: { store: 'Steam', total: 120, verified: true } }), ctx(OID));
+    expect(res.status).toBe(200);
+    expect(setOf()).toMatchObject({ store: 'Steam', verified: true, total: 108, currency: 'USD', origAmount: 120, fxRate: 0.9 });
+  });
+
+  it('a rate correction re-converts the secondary fields the body did NOT send', async () => {
+    findByIdState.doc = receiptDoc({
+      currency: 'USD', fxRate: 0.9, total: 180, origAmount: 200, subtotal: 144, vatAmount: 36,
+      lineItems: [line('A', 90), line('B', 54)],
+    });
+    const res = await PATCH(makeReq({ body: { fxRate: 0.8 } }), ctx(OID));
+    expect(res.status).toBe(200);
+    // Everything is un-converted with the OLD rate first, so the new one applies to the
+    // PAPER amounts (200/160/40/100/60) instead of compounding on the stored ones.
+    const set = setOf();
+    expect(set).toMatchObject({ total: 160, subtotal: 128, vatAmount: 32, fxRate: 0.8, origAmount: 200 });
+    expect(set.lineItems).toEqual([line('A', 80), line('B', 48)]);
+  });
+
+  it('switching back to the base currency clears the printed side and un-converts the amounts', async () => {
+    findByIdState.doc = receiptDoc({ currency: 'USD', fxRate: 0.9, total: 180, origAmount: 200, subtotal: 144, vatAmount: 36 });
+    const res = await PATCH(makeReq({ body: { currency: 'EUR', fxRate: 0 } }), ctx(OID));
+    expect(res.status).toBe(200);
+    // The paper figures become the stored ones (there is nothing foreign left to remember).
+    expect(setOf()).toMatchObject({ total: 200, subtotal: 160, vatAmount: 40, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+
+  it('re-saving an unchanged foreign receipt is a no-op, not a second conversion', async () => {
+    const stored = { currency: 'USD', fxRate: 0.9, total: 180, origAmount: 200, subtotal: 144, vatAmount: 36, lineItems: [line('A', 90)] };
+    findByIdState.doc = receiptDoc(stored);
+    // What an edit form sends back untouched: the PRINTED figures it was seeded with.
+    const res = await PATCH(makeReq({ body: {
+      total: 200, subtotal: 160, vatAmount: 40,
+      lineItems: [{ name: 'A', price: 100, vatRate: 24 }],
+      currency: 'USD', fxRate: 0.9,
+    } }), ctx(OID));
+    expect(res.status).toBe(200);
+    const set = setOf();
+    expect(set).toMatchObject({ total: 180, subtotal: 144, vatAmount: 36, origAmount: 200, fxRate: 0.9 });
+    expect(set.lineItems).toEqual([line('A', 90)]);
+  });
+
+  it('leaves the untouched secondary fields alone when nothing about the conversion changed', async () => {
+    findByIdState.doc = receiptDoc({ currency: 'USD', fxRate: 0.9, total: 180, origAmount: 200, subtotal: 144, vatAmount: 36, lineItems: [line('A', 90)] });
+    const res = await PATCH(makeReq({ body: { total: 200 } }), ctx(OID));
+    expect(res.status).toBe(200);
+    const set = setOf();
+    expect(set.subtotal).toBeUndefined();
+    expect(set.vatAmount).toBeUndefined();
+    expect(set.lineItems).toBeUndefined();
+  });
+
+  it('skips the extra read entirely for a body with no money field', async () => {
+    const res = await PATCH(makeReq({ body: { verified: true } }), ctx(OID));
+    expect(res.status).toBe(200);
+    expect(receiptFindById).not.toHaveBeenCalled();
+    expect(getAppSettingsMock).not.toHaveBeenCalled();
+    expect(setOf()).toEqual({ verified: true });
+  });
+
+  it('404s (without writing) when a money PATCH targets a missing receipt', async () => {
+    findByIdState.doc = null;
+    const res = await PATCH(makeReq({ body: { total: 10 } }), ctx(OID));
+    expect(res.status).toBe(404);
+    expect(receiptUpdate).not.toHaveBeenCalled();
+  });
+
+  it('a currency/fxRate-only body is a valid changeset, not "no valid fields"', async () => {
+    const res = await PATCH(makeReq({ body: { currency: 'GBP', fxRate: 1.15 } }), ctx(OID));
+    expect(res.status).toBe(200);
+    expect(setOf()).toMatchObject({ currency: 'GBP', fxRate: 1.15 });
+  });
+
+  it('ignores a junk currency code (falls back to base) and a non-numeric rate', async () => {
+    findByIdState.doc = receiptDoc({ currency: 'USD', fxRate: 0.9, total: 90, origAmount: 100 });
+    const res = await PATCH(makeReq({ body: { total: 100, currency: 'dollars', fxRate: 'abc' } }), ctx(OID));
+    expect(res.status).toBe(200);
+    // 'dollars' normalizes to '' → not foreign → stored as base with nothing remembered.
+    expect(setOf()).toMatchObject({ total: 100, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+
+  it('honours a non-EUR base currency: the same code as base is not foreign', async () => {
+    settingsState.currency = 'USD';
+    const res = await PATCH(makeReq({ body: { total: 50, currency: 'USD', fxRate: 1.1 } }), ctx(OID));
+    expect(res.status).toBe(200);
+    expect(setOf()).toMatchObject({ total: 50, currency: 'USD', origAmount: 0, fxRate: 0 });
   });
 });
 

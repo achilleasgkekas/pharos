@@ -7,10 +7,19 @@ import { Receipt } from '@/models/Receipt';
 import { getStores } from '@/lib/storeService';
 import { getAppSettings } from '@/lib/appSettings';
 import { effectiveReturnWindow, returnDaysLeft as computeReturnDays } from '@/lib/returnWindow';
+import { isForeignCurrency, resolveReceiptAmounts, toPrinted } from '@/lib/fx';
 import { trimReceipt, serializeLineItems } from '../serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+/** Stored line-item shape, as PATCH writes it back (price is the unit NET). */
+type StoredLine = { name: string; refinedName: string; qty: number; price: number; vatRate: number };
+/** The money side of the stored receipt, read only when a PATCH touches it (P9). */
+type ReceiptFxLean = {
+  currency?: string; fxRate?: number; total?: number; origAmount?: number;
+  subtotal?: number; vatAmount?: number; lineItems?: unknown[];
+};
 
 /** GET /api/v1/receipts/:id → the receipt plus its line items. */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -38,7 +47,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   });
 }
 
-/** PATCH /api/v1/receipts/:id  { store?, date?, total?, subtotal?, vatAmount?, paymentMethod?, notes?, verified?, archived?, lineItems? } */
+/**
+ * PATCH /api/v1/receipts/:id  { store?, date?, total?, subtotal?, vatAmount?, paymentMethod?,
+ *                               notes?, verified?, archived?, lineItems?, currency?, fxRate? }
+ *
+ * Multi-currency (P9): every money field arrives as the figure PRINTED on the receipt, and the
+ * route converts the whole document with one rate (fx.resolveReceiptAmounts, the same helper the
+ * web form uses). A body with no money field skips the extra read and behaves exactly as before.
+ */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
@@ -63,8 +79,58 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         .map((l) => ({ name: String(l.name ?? '').trim(), refinedName: '', qty: numOr(l.qty, 1, 0.0001), price: numOr(l.price, 0), vatRate: numOr(l.vatRate, 0) }))
         .filter((l) => l.name || l.price > 0);
     }
-    if (!Object.keys(set).length) return apiError('no valid fields');
+    // P9: touching ANY money field (or the currency/rate themselves) means the receipt has to
+    // be re-resolved as a whole — a partial update must never leave it half-converted, with a
+    // new rate applied to the total but not to its VAT or its line prices.
+    const touchesFx =
+      set.total !== undefined || set.subtotal !== undefined || set.vatAmount !== undefined ||
+      set.lineItems !== undefined || typeof b.currency === 'string' || b.fxRate != null;
+    if (!Object.keys(set).length && !touchesFx) return apiError('no valid fields');
     await connectDB();
+    if (touchesFx) {
+      const existing = (await Receipt.findById(id)
+        .select('currency fxRate total origAmount subtotal vatAmount lineItems')
+        .lean()) as ReceiptFxLean | null;
+      if (!existing) return apiError('not found', 404);
+      const base = (await getAppSettings()).currency;
+      // Un-convert what is stored back to PRINTED figures first, so a newly supplied rate
+      // applies to the paper amounts instead of compounding on an earlier conversion. The
+      // headline total keeps its printed value verbatim in origAmount; the rest is recovered.
+      const oldRate = isForeignCurrency(existing.currency, base) ? existing.fxRate ?? 0 : 0;
+      const storedLines = (existing.lineItems ?? []) as StoredLine[];
+      const printedLines =
+        (set.lineItems as StoredLine[] | undefined) ??
+        storedLines.map((l) => ({ ...l, price: toPrinted(Number(l.price) || 0, oldRate) }));
+      const money = resolveReceiptAmounts(
+        {
+          total:
+            set.total !== undefined
+              ? (set.total as number)
+              : oldRate > 0 && (existing.origAmount ?? 0) > 0
+                ? (existing.origAmount as number)
+                : existing.total ?? 0,
+          subtotal: set.subtotal !== undefined ? (set.subtotal as number) : toPrinted(existing.subtotal ?? 0, oldRate),
+          vatAmount: set.vatAmount !== undefined ? (set.vatAmount as number) : toPrinted(existing.vatAmount ?? 0, oldRate),
+          linePrices: printedLines.map((l) => Number(l.price) || 0),
+          currency: typeof b.currency === 'string' ? b.currency : existing.currency ?? '',
+          fxRate: b.fxRate != null && Number.isFinite(Number(b.fxRate)) ? Number(b.fxRate) : existing.fxRate ?? 0,
+        },
+        base
+      );
+      set.total = money.total;
+      set.currency = money.currency;
+      set.origAmount = money.origAmount;
+      set.fxRate = money.fxRate;
+      // The secondary fields are only rewritten when the caller sent them or when the
+      // conversion itself changed; otherwise a plain `{ verified }`-style edit would push
+      // every stored cent through an un-convert/re-convert round trip for nothing.
+      const conversionChanged = money.fxRate !== oldRate || money.currency !== (existing.currency || base);
+      if (set.subtotal !== undefined || conversionChanged) set.subtotal = money.subtotal;
+      if (set.vatAmount !== undefined || conversionChanged) set.vatAmount = money.vatAmount;
+      if (set.lineItems !== undefined || conversionChanged) {
+        set.lineItems = printedLines.map((l, i) => ({ ...l, price: money.linePrices[i] }));
+      }
+    }
     const doc = await Receipt.findByIdAndUpdate(id, { $set: set }, { new: true }).select('-rawAiResponse').lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, receipt: trimReceipt(doc as Parameters<typeof trimReceipt>[0]) });

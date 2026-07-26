@@ -249,6 +249,58 @@ export function resolveStatementAmounts(input: StatementAmountsInput, base: stri
   };
 }
 
+/** Every money figure printed on a receipt, as PRINTED (pre-conversion). */
+export type ReceiptAmountsInput = {
+  total: number;
+  subtotal?: number | null;
+  vatAmount?: number | null;
+  /** Unit NET price of each line, in receipt order (the array shape is preserved). */
+  linePrices?: number[];
+  currency?: string | null;
+  fxRate?: number | null;
+};
+
+export type ReceiptAmountsResolved = {
+  currency: string;
+  origAmount: number;
+  fxRate: number;
+  /** All ALWAYS base currency (see resolveFx for the unknown-rate carve-out). */
+  total: number;
+  subtotal: number;
+  vatAmount: number;
+  linePrices: number[];
+};
+
+/**
+ * P9 for Receipts. A receipt is printed in ONE currency, so ONE rate converts the WHOLE
+ * document: the headline `total`, the `subtotal`/`vatAmount` pair, and every line's unit
+ * NET price. The lines are not optional extras: /reports sums `vatAmount`, and "add items
+ * to inventory" copies line prices straight into `Item.purchasedPrice`, so a half-converted
+ * receipt would poison both the VAT report and the inventory value.
+ *
+ * `origAmount` remembers the printed HEADLINE total, the figure a person recognises off the
+ * paper. The secondary fields are stored converted and come back for editing through
+ * toPrinted(), so re-saving an unchanged receipt can never double-convert it.
+ *
+ * NOTE the deliberate asymmetry with the item/statement resolvers: the secondary fields go
+ * through convertToBase even at rate 1, because that is what the receipt form has always
+ * done (it rounds to cents). Base-currency input therefore stores exactly what it stored
+ * before this existed; an unknown rate is never guessed as 1:1.
+ */
+export function resolveReceiptAmounts(input: ReceiptAmountsInput, base: string): ReceiptAmountsResolved {
+  const fx = resolveFx({ amount: Number(input.total) || 0, currency: input.currency, fxRate: input.fxRate }, base);
+  const r = fx.fxRate > 0 ? fx.fxRate : 1;
+  return {
+    currency: fx.currency,
+    origAmount: fx.origAmount,
+    fxRate: fx.fxRate,
+    total: fx.amount,
+    subtotal: convertToBase(Number(input.subtotal) || 0, r),
+    vatAmount: convertToBase(Number(input.vatAmount) || 0, r),
+    linePrices: (input.linePrices ?? []).map((v) => convertToBase(Number(v) || 0, r)),
+  };
+}
+
 /** `$88.00` — symbol + 2dp, for showing the printed amount next to the base one. */
 export function formatMoney(amount: number, code: string): string {
   const n = Number(amount);

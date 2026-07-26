@@ -124,7 +124,11 @@ export type Expense = { id: string; kind: string; vendor: string; category: stri
 export type Subscription = { id: string; name: string; provider: string; category: string; amount: number; currency: string; origAmount: number; fxRate: number; billingCycle: string; nextRenewal: string | null; active: boolean; trialEndsAt?: string | null; firstChargeAmount?: number };
 /** Auto-discovered untracked recurring charge (P7), mirrors apps/web/src/lib/recurringDiscovery.ts. */
 export type RecurringCandidate = { vendorKey: string; vendor: string; category: string; occurrences: number; avgAmount: number; lastAmount: number; lastDate: string; firstDate: string; avgIntervalDays: number; cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly' };
-export type ReceiptSummary = { id: string; store: string; date: string | null; total: number; currency: string; itemCount: number; verified: boolean; archived: boolean; file: string | null; thumb: string | null; returnDaysLeft?: number };
+/** `total` (and with it subtotal/vatAmount/line prices) is ALWAYS the deployment's base
+ *  currency (P9); `currency`/`origAmount`/`fxRate` describe what the paper printed, and both
+ *  numbers are 0 on an ordinary receipt. `origAmount` holds the printed TOTAL only — the
+ *  other figures are recovered for editing with fx.toPrinted(). */
+export type ReceiptSummary = { id: string; store: string; date: string | null; total: number; currency: string; origAmount: number; fxRate: number; itemCount: number; verified: boolean; archived: boolean; file: string | null; thumb: string | null; returnDaysLeft?: number };
 export type ReceiptLine = { name: string; qty: number; price: number; vatRate: number };
 export type ReceiptDetail = ReceiptSummary & { subtotal: number; vatAmount: number; paymentMethod: string; warrantyMonths: number; notes: string; lineItems: ReceiptLine[] };
 /** All three prices are ALWAYS the deployment's base currency (P9); `currency`/`origAmount`/
@@ -636,7 +640,11 @@ export const updateExpense = (id: string, data: { vendor?: string; amount?: numb
  *  set server-side, so `amount` must always be the PRINTED figure, never the stored one (P9). */
 export const updateSubscription = (id: string, data: { name?: string; amount?: number; billingCycle?: string; nextRenewal?: string | null; category?: string; active?: boolean; trialEndsAt?: string | null; firstChargeAmount?: number; currency?: string; fxRate?: number }) => patch(`/api/v1/subscriptions/${id}`, data);
 export const updateVoucher = (id: string, data: { title?: string; code?: string; store?: string; discount?: string; expiresAt?: string | null; url?: string; used?: boolean }) => patch(`/api/v1/vouchers/${id}`, data);
-export const updateReceipt = (id: string, data: { store?: string; total?: number; subtotal?: number; vatAmount?: number; date?: string; verified?: boolean; archived?: boolean; paymentMethod?: string; notes?: string; lineItems?: ReceiptLine[] }) => patch(`/api/v1/receipts/${id}`, data);
+/** P9: every money field is sent as the PRINTED figure (total, subtotal, vatAmount and each
+ *  line price). Sending any of them makes the server re-resolve the WHOLE receipt with one
+ *  rate; omitting currency/fxRate keeps the ones already stored, which is what quick-verify
+ *  (store/date/total/verified) relies on. */
+export const updateReceipt = (id: string, data: { store?: string; total?: number; subtotal?: number; vatAmount?: number; date?: string; verified?: boolean; archived?: boolean; paymentMethod?: string; notes?: string; lineItems?: ReceiptLine[]; currency?: string; fxRate?: number }) => patch(`/api/v1/receipts/${id}`, data);
 export async function addReceiptToLibrary(id: string): Promise<{ created: number; linked: number }> {
   const r = await request<{ created: number; linked: number }>(`/api/v1/receipts/${id}/add-to-library`, { method: 'POST' });
   return { created: r.created, linked: r.linked };

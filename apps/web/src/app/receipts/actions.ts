@@ -16,7 +16,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { mirrorFileToRemote } from '@/lib/mirror';
 import { dispatchEventWebhooks } from '@/lib/webhooks';
 import { htmlReceiptToText } from '@/lib/htmlReceipt';
-import { resolveFx, convertToBase, normalizeCurrency } from '@/lib/fx';
+import { resolveFx, resolveReceiptAmounts, convertToBase, normalizeCurrency } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
 import { Types } from 'mongoose';
 import { z } from 'zod';
@@ -234,24 +234,32 @@ export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
 
 /**
  * Multi-currency (P9): the money fields to store, given what the form submitted (which
- * is the PRINTED side for a foreign receipt) and the resolved FX decision.
+ * is the PRINTED side for a foreign receipt).
  *
- * The WHOLE money side converts with the SAME rate, not just the headline total: reports
- * sum `vatAmount` and the item library copies line prices into `Item.purchasedPrice`, so
- * a half-converted receipt would poison both. Only the total needs its printed value kept
- * verbatim (`origAmount`) — the rest is recovered for editing via fx.toPrinted().
- * A rate of 0 (not foreign, or foreign with no rate yet) converts nothing.
+ * The rule itself lives in fx.resolveReceiptAmounts() so that the mobile API route
+ * (PATCH /api/v1/receipts/:id) converts a foreign receipt exactly the same way; this
+ * wrapper only maps the resolved line prices back onto the submitted line objects.
  */
-function fxFields(p: z.infer<typeof UpdateReceiptSchema>, fx: ReturnType<typeof resolveFx>) {
-  const r = fx.fxRate > 0 ? fx.fxRate : 1;
+function fxFields(p: z.infer<typeof UpdateReceiptSchema>, base: string) {
+  const money = resolveReceiptAmounts(
+    {
+      total: p.total,
+      subtotal: p.subtotal,
+      vatAmount: p.vatAmount,
+      linePrices: p.lineItems.map((li) => li.price),
+      currency: p.currency,
+      fxRate: p.fxRate,
+    },
+    base
+  );
   return {
-    total: fx.amount,
-    currency: fx.currency,
-    origAmount: fx.origAmount,
-    fxRate: fx.fxRate,
-    subtotal: convertToBase(p.subtotal, r),
-    vatAmount: convertToBase(p.vatAmount, r),
-    lineItems: p.lineItems.map((li) => ({ ...li, price: convertToBase(li.price, r) })),
+    total: money.total,
+    currency: money.currency,
+    origAmount: money.origAmount,
+    fxRate: money.fxRate,
+    subtotal: money.subtotal,
+    vatAmount: money.vatAmount,
+    lineItems: p.lineItems.map((li, i) => ({ ...li, price: money.linePrices[i] })),
   };
 }
 
@@ -264,10 +272,9 @@ export async function updateReceipt(
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
   const { currency: base } = await getAppSettings();
-  const fx = resolveFx({ amount: parsed.total, currency: parsed.currency, fxRate: parsed.fxRate }, base);
   const doc = await Receipt.findByIdAndUpdate(
     id,
-    { ...parsed, date: safeDate(parsed.date), ...fxFields(parsed, fx) },
+    { ...parsed, date: safeDate(parsed.date), ...fxFields(parsed, base) },
     { new: true, select: 'store date total filePath verified' }
   ).lean();
   // Mirror-on-verify: once a receipt is confirmed, push its file to the remote

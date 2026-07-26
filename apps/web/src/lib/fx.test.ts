@@ -11,6 +11,7 @@ import {
   toPrinted,
   resolveItemPrices,
   resolveStatementAmounts,
+  resolveReceiptAmounts,
   effectiveCurrency,
   sameCurrency,
 } from './fx';
@@ -407,6 +408,85 @@ describe('resolveStatementAmounts', () => {
       minimumPayment: toPrinted(stored.minimumPayment, stored.fxRate),
       paidAmount: toPrinted(stored.paidAmount, stored.fxRate),
       txAmounts: stored.txAmounts.map((v) => toPrinted(v, stored.fxRate)),
+      currency: stored.currency,
+      fxRate: stored.fxRate,
+    });
+    expect(again).toEqual(stored);
+  });
+});
+
+describe('resolveReceiptAmounts', () => {
+  const eur = (i: Parameters<typeof resolveReceiptAmounts>[0]) => resolveReceiptAmounts(i, 'EUR');
+
+  it('passes a base-currency receipt straight through, untouched', () => {
+    const r = eur({ total: 193.39, subtotal: 155.96, vatAmount: 37.43, linePrices: [40, 115.96] });
+    expect(r).toEqual({
+      currency: 'EUR',
+      origAmount: 0,
+      fxRate: 0,
+      total: 193.39,
+      subtotal: 155.96,
+      vatAmount: 37.43,
+      linePrices: [40, 115.96],
+    });
+  });
+
+  it('converts the WHOLE receipt with one rate — total, net, VAT and every line price', () => {
+    const r = eur({ total: 200, subtotal: 160, vatAmount: 40, linePrices: [100, 60], currency: 'USD', fxRate: 0.9 });
+    expect(r.total).toBe(180);
+    // /reports sums vatAmount and "add items to inventory" copies line prices into
+    // Item.purchasedPrice, so leaving either printed would poison a base-currency figure.
+    expect(r.subtotal).toBe(144);
+    expect(r.vatAmount).toBe(36);
+    expect(r.linePrices).toEqual([90, 54]);
+    expect(r.subtotal + r.vatAmount).toBe(r.total);
+  });
+
+  it('remembers the printed HEADLINE total in origAmount', () => {
+    const r = eur({ total: 200, currency: 'USD', fxRate: 0.9 });
+    expect(r).toMatchObject({ origAmount: 200, currency: 'USD', fxRate: 0.9 });
+  });
+
+  it('never guesses 1:1 — an unknown rate keeps every printed number', () => {
+    const r = eur({ total: 200, subtotal: 160, vatAmount: 40, linePrices: [100, 60], currency: 'USD', fxRate: 0 });
+    expect(r.total).toBe(200);
+    expect(r.subtotal).toBe(160);
+    expect(r.vatAmount).toBe(40);
+    expect(r.linePrices).toEqual([100, 60]);
+    expect(r.fxRate).toBe(0);
+    expect(r.origAmount).toBe(200); // still remembered, so the UI can ask for a rate
+  });
+
+  it('treats missing secondary figures as 0 and an absent line list as empty', () => {
+    const r = eur({ total: 100, currency: 'USD', fxRate: 0.9 });
+    expect(r.subtotal).toBe(0);
+    expect(r.vatAmount).toBe(0);
+    expect(r.linePrices).toEqual([]);
+  });
+
+  it('rounds every converted field to cents', () => {
+    const r = eur({ total: 33.33, subtotal: 26.88, vatAmount: 6.45, linePrices: [11.11], currency: 'USD', fxRate: 0.923456 });
+    expect(r.total).toBe(30.78);
+    expect(r.subtotal).toBe(24.82);
+    expect(r.vatAmount).toBe(5.96);
+    expect(r.linePrices).toEqual([10.26]);
+  });
+
+  it('honours a non-EUR base currency', () => {
+    const r = resolveReceiptAmounts({ total: 50, subtotal: 50, linePrices: [50], currency: 'USD', fxRate: 1.1 }, 'USD');
+    // Same code as base = not foreign, whatever the rate says.
+    expect(r).toMatchObject({ currency: 'USD', fxRate: 0, total: 50, subtotal: 50 });
+    expect(r.linePrices).toEqual([50]);
+  });
+
+  it('round-trips with toPrinted, so re-saving an unchanged receipt is stable', () => {
+    const stored = eur({ total: 200, subtotal: 160, vatAmount: 40, linePrices: [100, 60], currency: 'USD', fxRate: 0.9 });
+    // What an edit form seeds itself with (origAmount for the headline, toPrinted for the rest).
+    const again = eur({
+      total: stored.origAmount,
+      subtotal: toPrinted(stored.subtotal, stored.fxRate),
+      vatAmount: toPrinted(stored.vatAmount, stored.fxRate),
+      linePrices: stored.linePrices.map((v) => toPrinted(v, stored.fxRate)),
       currency: stored.currency,
       fxRate: stored.fxRate,
     });
