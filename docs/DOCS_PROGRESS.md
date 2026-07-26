@@ -2621,3 +2621,26 @@ Commit: a834ef0 (docs(P9): document foreign currency audit feature in Reports) �
 Συμπέρασμα: P9 slice 7 FX audit πλέον fully documented στη features.md, με summary bullet στη Reports list + detailed explanation στη P9 subsection. Όλα σε sync.
 
 Επόμενο run: (α) grep git log για νέα feat() commits (ίδιες σαρώσεις για Bills feature κλπ) · (β) αν νέα configuration options, refresh configuration.md · (γ) drift check αν κάποιος endpoint διαγράφηκε.
+
+## 2026-07-26 (twenty-fourth run — P9 slice 8 verification: multi-currency bills already documented)
+
+Σάρωση git log για νέα feat() commits μετά τη twenty-third run (commit 43c9c38, 2026-07-26 02:XX). Ανακάλυψη: **P9 slice 8 shipped με ήδη-ενσωματωμένη documentation**:
+- **Slice 8 (Multi-currency bills)** — commit 1ce991f, 2026-07-26 09:49 — Bill.amount αποκτά P9 currency triple (amount + origAmount + fxRate), ακριβώς όπως τα άλλα 5 modules (Receipts, Expenses, Items, Subscriptions, Statements). Marking paid με expense logging περνά PRINTED figure + currency/rate. Recurring bills inherit triple με last known rate.
+
+Τι βρέθηκε:
+- **features.md**: Ήδη έχει πλήρη documentation για Multi-currency bills (P9) στη Bills & payables section (lines 356-365). Καλύπτει: currency triple, rate entry, expense logging με printed figure, recurring inheritance, gold badge για unknown rates. Κανένα gap.
+- **api.md**: Κανένα νέο endpoint (P9 είναι UI-only, όχι API).
+- **mobile.md**: Κανένα νέο content (mobile δεν έχει Bills view ακόμα).
+
+Accuracy (διάβασα commit 1ce991f message, cross-checked με existing documentation στο features.md). Πλήρης ταύτιση.
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: features.md 0 (αθικτο), api.md 22 (ζυγό), mobile.md 0.
+- Internal links: καμία αλλαγή.
+- Secret scan: κανένα credential ✓.
+
+Collision guard: git status --short = 0 modified docs files (κανένα work). 9721d4c είναι apps/landing/ scope (out-of-scope). Δεν υπάρχουν staged files.
+
+Συμπέρασμα: Όλα τα P9 slices (1-8) πλέον fully documented. Κανένα work χρειάζεται αυτό το run.
+
+Επόμενο run: (α) grep git log για άλλα undocumented feat() commits (P51-P80 candidates ή άλλα modules), ή (β) drift check αν κάποιο endpoint documentation έχει γίνει stale.
