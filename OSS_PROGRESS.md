@@ -2786,3 +2786,27 @@ Coordination πριν ξεκινήσω: `ROUTINES_PAUSED` δεν υπήρχε. `
 - Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου (τα ξένα FX-routine αρχεία άθικτα). Καθαρό fast-forward push.
 
 Suggested next task: **scraper AI concern** (γραμμές 721-746: `getScraperAi`/`saveScraperAi`, ακόμα πιο μικρό+καθαρό, ίδιο module ήδη clean). Μετά μεγαλύτερα concerns κατά σειρά: file storage backends (SMB/FTP/OneDrive sync, 748-907), IMAP email-in (909-995), dropdown lists+spaces (997-1042), stores (1044+, γραμμές 1065-1793 ακόμα αδιάβαστες), notifiers/webhooks/alerts, backup/export (JSZip-based). Πάντα `git status` collision-guard πρώτα + διάβασε ολόκληρο το target concern πριν γράψεις τίποτα.
+
+## 2026-07-26 (cont. — settings/actions.scraperAi.test.ts, τρίτο slice: scraper AI concern)
+
+**Task**: το suggested next-task του προηγούμενου run, το **scraper AI concern** (γραμμές 721-746: `getScraperAi`/`saveScraperAi`, ξεχωριστό provider/model ζεύγος για τον price-scraper service, ανεξάρτητο από το main app AI config). Νέο ξεχωριστό αρχείο `actions.scraperAi.test.ts`, ίδιο module με τα δύο προηγούμενα slices.
+
+Coordination πριν ξεκινήσω: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md`: καμία εγγραφή για pharos-oss-prep. Collision guard: `git status --short` έδειξε **καθαρό tree** (καμία ξένη routine mid-edit), fetch/log επιβεβαίωσαν local == origin/main.
+
+Διάβασα το target τμήμα (γραμμές 721-746) πριν γράψω τίποτα. Ξαναχρησιμοποίησα το ίδιο πλήρες mock-set (35 modules) από τα δύο προηγούμενα slices, με μία προσαρμογή: το `AppConfig.findOne` mock χρειάστηκε να υποστηρίξει chainable `.select(...).lean()` (όχι μόνο `.lean()` απευθείας όπως στο aiPrompts slice), αφού το `getScraperAi` καλεί `AppConfig.findOne({key:'singleton'}).select('scraperProvider scraperModel').lean()`.
+
+**11 tests** σε δύο describe blocks:
+- `getScraperAi` (5): ΚΑΝΕΝΑ admin gate (read-only)· default `{provider:'ollama', model:''}` όταν τίποτα δεν είναι αποθηκευμένο· `'anthropic'` επιστρέφεται ΜΟΝΟ σε exact stored match· οποιαδήποτε άλλη stored τιμή (π.χ. `'openai'`) → fallback 'ollama'· διαβάζει μέσω `findOne({key:'singleton'})`.
+- `saveScraperAi` (6): requireAdmin πριν οποιαδήποτε DB κλήση· `'anthropic'` αποθηκεύεται ΜΟΝΟ σε exact field match από FormData· οτιδήποτε άλλο/missing provider field → fallback 'ollama'· το model field trims· default model σε `''` όταν λείπει· πάντα upsert (`{upsert:true}`) + revalidate('/settings') σε success.
+
+Δεν χρειάστηκε κανένα tsc fix.
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/settings/actions.scraperAi.test.ts"` → **11/11 passed** στο πρώτο πέρασμα.
+- `npm run type-check` → exit 0, μηδέν errors σε όλο το repo.
+- `npx vitest run` (όλο το suite) → **294 files, 4209/4209 passed**.
+- Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου. Καθαρό fast-forward push (`bd40479..ae324b2`).
+
+ΣΗΜ ξεχωριστό: κατά το orient διαπίστωσα ότι το **URL-import concern του `items/actions.ts`** (`importItemFromUrl`/`previewItemFromUrl`/`confirmImportItem`, το τελευταίο suggested next-task για εκείνο το module από 2 runs πριν) **έχει ήδη ολοκληρωθεί** από μια ταυτόχρονη routine (`src/app/items/actions.urlImport.test.ts` υπάρχει, committed) — το `items/actions.ts` module κλείνει πλήρως τώρα, καμία ενέργεια χρειάζεται εκεί.
+
+Suggested next task: **file storage backends concern** (γραμμές 748-907: `getStorageInfo`/`saveStorageConfig`/`testRemoteConnection`/`buildSyncManifest` [internal, όχι exported]/`getSyncManifest`/`syncOnedriveBatch`/`syncToRemote` — SMB/FTP/OneDrive mirror config + sync, ~160 γραμμές, το μεγαλύτερο concern μέχρι τώρα σε αυτό το module, ίσως χρειαστεί να χωριστεί σε config-vs-sync αν γίνει πολύ μεγάλο ένα αρχείο). Μετά κατά σειρά: IMAP email-in (909-995, `getImapInfo`/`saveImapConfigAction`/`testImapConnectionAction`/`checkImapInboxNow`)· dropdown lists+spaces (997-1042)· stores (1044+, γραμμές 1065-1793 ακόμα αδιάβαστες, θα χρειαστεί να διαβαστούν πριν αποφασιστεί το split)· notifiers/webhooks/alerts· backup/export (JSZip-based). Πάντα `git status` collision-guard πρώτα + διάβασε ολόκληρο το target concern πριν γράψεις τίποτα.
