@@ -3790,3 +3790,63 @@ manual vault, ή polish συνεχεια / real app screenshots οταν υπα�
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-26 (3) — P9 slice 8: bills / payables multi-currency
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε (ιδιο
+συνολο OPEN entries, ολα bakecore + το pharos-daily-dev mobile-camera question, τιποτα ANSWERED προς αυτη
+τη routine).
+
+`git log --oneline 84f7b7f..HEAD | grep "feat("` (84f7b7f = τελευταιο commit που αντικατοπτριστηκε στο
+landing, βλ. προηγουμενο entry) εβγαλε δυο: `9721d4c feat(landing): document FX audit panel...` (το ιδιο
+το προηγουμενο commit αυτης της routine, ηδη reflected) και ενα φρεσκο:
+`1ce991f feat(bills): multi-currency for bills / payables (P9 slice 8)`.
+
+Read-only research (commit message + `git show --stat`, χωρις subagent, μικρο scope): το `Bill.amount` ηταν
+το τελευταιο money field στην εφαρμογη χωρις το P9 currency triple (amount/origAmount/fxRate), αρα ενα
+λογαριασμο τυπωμενο σε USD επρεπε να μπει σαν να ηταν ευρω. Τωρα ακολουθει τον ιδιο κανονα με τα αλλα εξι
+μοντελα. Δυο σημεια δεν ηταν cosmetic: (1) mark-as-paid με expense logging περναει στο `addExpense` το
+ΤΥΠΩΜΕΝΟ ποσο + νομισμα + rate (οχι το ηδη-converted), γιατι το addExpense κανει το δικο του resolveFx, αρα
+περναγε το converted θα διπλασιαζε το rate· (2) ενα recurring bill's spawned next instance κληρονομει ολο
+το triple, σκοπιμα κραταει το τελευταιο γνωστο rate (base-denominated projection αντι για rate-less foreign
+row στο audit καθε κυκλο). Τα bills μπηκαν επισης στο FX audit (/reports) → το /bills χρειαστηκε το `?open=`
+convention που εχουν ηδη ολα τα αλλα money views.
+
+Αλλαγες (`apps/landing/app/page.tsx`, 2 σημεια, ιδιο αρχειο με παντα):
+1. Multi-currency FAQ (`faq-can-it-handle-an-expense-in-a-currency-other-than-my-main-one`, anchor
+   αμεταβλητο): νεα προταση μετα το statement wording, πριν το "Reports, budgets, and net worth" κλεισιμο,
+   που περιγραφει το bill-specific wiring (mark-paid → expense περναει το printed figure ωστε να μη
+   converts δυο φορες· recurring bill's next instance κραταει το τελευταιο rate). Το τελικο κλεισιμο
+   `"...expenses, income, receipts, subscriptions, items, and statements typed in or scanned..."` →
+   `"...expenses, income, receipts, subscriptions, items, statements, and bills typed in or scanned..."`.
+2. Roadmap Shipped block: `"...items, statements & CSV imports"` → `"...items, statements, bills & CSV
+   imports"`.
+
+Δεν αγγιξα το ηδη-υπαρχον bills FAQ ("Does it track bills I pay by hand, like utilities?", γραμμη 509) γιατι
+αφορα το tracking-mechanism (due-soon/overdue/paid triage), οχι νομισμα· το multi-currency wording ανηκει
+στο dedicated multi-currency FAQ οπου ζουν ηδη ολα τα αλλα per-record-type sentences, ιδιο pattern με τα
+προηγουμενα 7 slices.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη).
+- Πορτες 3100-3130: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build.
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` (μεσω `document.body.textContent`) επιβεβαιωσε και τα 3 checks true: το νεο bill
+  wiring sentence, το νεο κλεισιμο με "statements, and bills typed in or scanned", και το roadmap
+  "items, statements, bills & CSV imports". Hero screenshot καθαρο (lighthouse mark, gradient τιτλος, nav,
+  τριπλο badge row). Server τερματιστηκε (`pkill -f "next start -p 3110"`), κανενα `next-server` process
+  δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx (`grep -c` UTF-8 byte pattern).
+- Δεν αγγιξα Docker/:3000/web/mobile. Η μονη agent-χρηση ηταν read-only `git show --stat`/commit-message
+  read (χωρις subagent, μικρο scope), μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: P9 (record types + write paths, ολα 7 μοντελα + CSV import) πλεον πληρως καλυμμενο στο
+landing wording. Candidates: νεος `git log --oneline 1ce991f..HEAD | grep "feat("` ελεγχος στην αρχη του
+επομενου run, P22 receipt line-item global search, P21 document/manual vault, ή polish συνεχεια / real app
+screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
