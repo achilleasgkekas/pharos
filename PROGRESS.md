@@ -70,6 +70,16 @@ Docker κάτω από το mutex: `build web` → mongo **healthy** → `up -d 
 από κινητό δεν μπορεί να μαρκαριστεί foreign· (β) το `fxBadgeLabel` σε **credit balance** (αρνητικό τυπωμένο total,
 guard `origAmount <= 0`) που κρέμεται από το slice 5. Ως συνήθως πρώτα ο έλεγχος του Approved queue (βήμα a).
 
+## Needs Achilleas
+
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο, **7ο** συνεχόμενο run. Και τα δύο server halves
+  είναι έτοιμα (P17 `GET /api/v1/lookup/barcode` με 41 tests, P23 `POST /api/v1/scan/receipt` υπήρχε ήδη) — λείπει
+  μόνο η έγκριση για το native dep. Ερώτημα: `~/.claude/ASK_ACHILLEAS.md` → `pharos-daily-dev-20260725-1425`
+  (ακόμα OPEN).
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
+  household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
+  ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
 ## 2026-07-26 (cont.³ — P9 slice 9: η ισοτιμία μπαίνει εκεί που φαίνεται το πρόβλημα)
 
 **Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση
