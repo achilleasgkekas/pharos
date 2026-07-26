@@ -6,6 +6,74 @@
 <!-- docker-validated: 7b46912 -->
 <!-- ui-audited: 0bc5e14 -->
 
+## 2026-07-26 (cont.³ — P9 slice 9: η ισοτιμία μπαίνει εκεί που φαίνεται το πρόβλημα)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση
+`expo-camera`) παραμένει **OPEN χωρίς Answer** (6ο συνεχόμενο run), άρα P17/P23 μένουν μπλοκαρισμένα. Working tree
+καθαρό στην αρχή. Docker mutex acquired/released.
+
+**Approved queue check (βήμα a)**: αμετάβλητη εικόνα για **6ο** run (P36 provider decision, P31 supervised session,
+P16 sample file, P17/P23 native-dep approval). Το **P9** είναι Approved και ακόμα 🟡, οπότε πήρα την πρόταση του
+προηγούμενου log: το **inline «set rate» μέσα στο FX audit panel**.
+
+**Το πρόβλημα δεν ήταν ότι έλειπε πληροφορία, ήταν η απόσταση**: το panel του slice 7 έλεγε ήδη ακριβώς ποιες
+εγγραφές κρατούν ξένο ποσό χωρίς ισοτιμία, αλλά κάθε μία έπρεπε να διορθωθεί στη **δική της** φόρμα, σε **έξι
+διαφορετικά modules**. Ένα bank CSV μπορεί να γεννήσει δεκάδες τέτοιες μονομιάς, δηλαδή ακριβώς όταν το κυνήγι
+φόρμα-φόρμα είναι αδύνατο. Γι' αυτό έμεναν αδιόρθωτες, και όσο μένουν, κάθε σύνολο της εφαρμογής έχει μέσα του ένα
+`$88` που μετριέται σαν €88.
+
+**Η παρατήρηση που κάνει το feature ασφαλές**: το `resolveFx` **αρνείται να εφεύρει ισοτιμία**, άρα μια εγγραφή με
+`fxRate <= 0` **δεν έχει μετατραπεί ποτέ** — κάθε χρηματικό της πεδίο είναι ακόμα το τυπωμένο νούμερο. Οπότε η
+εφαρμογή ισοτιμίας είναι **σκέτος πολλαπλασιασμός**, χωρίς un-convert βήμα (σε αντίθεση με τα edit paths των
+προηγούμενων slices, που έπρεπε να ξεκάνουν την παλιά μετατροπή πριν εφαρμόσουν τη νέα). Το `needsFxRate` είναι ο
+φύλακας που το κρατά αληθές: εγγραφή που **έχει ήδη** rate γυρίζει `null` αντί να πολλαπλασιαστεί δεύτερη φορά, οπότε
+ένα Apply πάνω σε ξεπερασμένο panel (άλλο tab το διόρθωσε ήδη) είναι **αβλαβές**, όχι καταστροφικό. Pinned με τεστ.
+
+**Τι χτίστηκε**: νέο pure **`lib/fxApply.ts`** (+23 unit tests, DB-free) που κρατά σε ΕΝΑ μέρος **ποια πεδία
+μετατρέπονται ανά module**, καθρεφτίζοντας τον resolver του καθενός: expense/income/bill ένα ποσό, subscription +
+first charge (P33), receipt **net + ΦΠΑ + κάθε γραμμή** (τα reports αθροίζουν το `vatAmount` και οι τιμές γραμμών
+αντιγράφονται στο `Item.purchasedPrice`), item **και τις τρεις** τιμές, statement **minimum + paid + κάθε χρέωση** (το
+`computeInstallmentPlans` τις αθροίζει σε payoff που δείχνει η homepage). Λάθος σε αυτή τη λίστα είναι ο **ένας**
+τρόπος που το feature μπορεί να χαλάσει δεδομένα, γι' αυτό είναι pure και unit-tested αντί για inline λογική στο action.
++ νέες `applyFxRate` / `applyFxRateToCurrency` (`app/reports/fxActions.ts`).
+
+**Απόφαση που πήρα μόνος (dotted paths)**: τα array πεδία γράφονται ως `transactions.3.amount` /
+`lineItems.0.price`, **όχι** με αντικατάσταση ολόκληρου του array. Η αντικατάσταση θα ήταν λιγότερος κώδικας αλλά θα
+έβαζε σε κίνδυνο ό,τι άλλο ζει μέσα στα subdocs (installment info, `matchedItemIds` product links, ονόματα και ΦΠΑ
+γραμμών) σε κάθε μελλοντική αλλαγή σχήματος. Δύο τεστ επιβεβαιώνουν ρητά ότι το patch **δεν** περιέχει το array.
+
+**UI**: οι γραμμές ομαδοποιούνται **ανά τυπωμένο νόμισμα** (μεγαλύτερη έκθεση πρώτη — μια ισοτιμία είναι ιδιότητα
+**νομίσματος**, όχι εγγραφής), κάθε ομάδα έχει κουτί `1 USD = ? EUR` + **«Apply to all N»**. Το group rate είναι
+ταυτόχρονα το **default κάθε γραμμής**, οπότε η κανονική διαδρομή είναι «γράψε 0.92 μία φορά». Γραμμή που θέλει δικό
+της rate (αγορά άλλου μήνα) το παρακάμπτει και εφαρμόζεται μόνη της, με **live preview `printed → stored`** ώστε ένα
+λάθος πληκτρολόγιο να φαίνεται **πριν** γραφτεί. Το deep link στην εγγραφή διατηρήθηκε.
+
+**Verify**: `npm run type-check` **EXIT 0**· full `npx vitest run` **3961 passed / 284 files** (+23 δικά μου, μηδέν
+regression, καμία υπάρχουσα προσδοκία δεν χρειάστηκε αλλαγή). Docker κάτω από το mutex: `build web` → mongo
+**healthy** → `up -d web` → `/login` **200**, **0 restarts**, `/reports` **307** (auth-gated, άρα compiled) →
+`docker builder prune -f` (2.3GB) → lock **released**. Browser: `/login` renders, **μηδέν console errors**. Το authed
+`/reports` δεν επαληθεύεται unattended (credentials boundary), οπότε το panel δοκιμάστηκε στο επίπεδο του pure patch,
+όχι με πραγματικό κλικ. (Στα logs φάνηκε ένα «Failed to find Server Action» — ανοιχτό tab με παλιό bundle μετά το
+rebuild, το ήδη τεκμηριωμένο hard-refresh θέμα, όχι δικό μου.)
+
+**Docs**: νέα κουκκίδα στο `docs/features.md` (ομαδοποίηση, apply-to-all, per-record override, τι ακριβώς μετατρέπεται
+ανά module, «δεύτερη μετατροπή δεν γίνεται») + slice 9 στο `PRODUCT_BACKLOG.md` (και ο τίτλος του P9 διορθώθηκε: έλεγε
+ακόμα «imports (PA1/email-in) εκκρεμούν» ενώ το CSV import έκλεισε στο slice 6).
+
+**Git hygiene**: explicit `git add` 7 αρχείων (όχι `-A`) → commit `cbde1a8` → pushed.
+
+**Γνωστά follow-ups**: (α) το `applyFxRateToCurrency` έχει cap **500 εγγραφές ανά κλήση** ανά μοντέλο· ένα τερατώδες
+import θα χρειαζόταν δεύτερο πάτημα (το panel ούτως ή άλλως δείχνει 40). (β) Τα i18n keys μπήκαν **μόνο στο en.ts**
+(fallback στις άλλες 7 γλώσσες), όπως όλα τα προηγούμενα slices. (γ) Το `fxBadgeLabel` σε credit balance παραμένει
+ανοιχτό από το slice 5.
+
+**Επόμενο task (πρόταση)**: **P9 slice 10 — `resolveFx` στο email-in** (`lib/imapImport.ts`), το **τελευταίο** write
+path που μπορεί ακόμα να γεννήσει εγγραφή με ξένο ποσό γραμμένο σαν base. Μικρό: το receipt pipeline περνά ήδη από
+`resolveFx` στο slice 2, οπότε το ζητούμενο είναι να επιβεβαιωθεί ότι το IMAP μονοπάτι πράγματι καταλήγει εκεί και όχι
+σε παρακαμπτήριο create. Αν αποδειχθεί ότι ήδη καλύπτεται (πιθανό), το P9 κλείνει και μένει μόνο το προαιρετικό
+rate-feed. Ως συνήθως πρώτα ο έλεγχος του Approved queue (βήμα a): αν απαντηθεί το `expo-camera` ερώτημα, το P17
+camera UI προηγείται.
+
 ## 2026-07-26 (cont.² — P63: το backup ξαναγίνεται πλήρες, και μένει πλήρες)
 
 **Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: 8 OPEN entries, ένα δικό μου
