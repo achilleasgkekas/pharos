@@ -570,6 +570,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Self-hosted ships with a nightly backup you can point at a NAS, plus one-click JSON and CSV exports any time. You can also mirror your files to SMB, FTP, or OneDrive for a proper 3-2-1 setup. On hosted, nightly backups are handled for you.',
   },
   {
+    q: 'What happens if I delete something by mistake?',
+    a: 'Most deletes are reversible. Items, receipts, expenses, subscriptions, vouchers, bills, and tasks are soft-deleted, hidden from the app but their files and links kept, and land in Trash (Settings → Storage & backup) where you can restore them with one click or delete them forever. Anything left in Trash auto-purges after 30 days, so it is a safety net, not permanent storage. Card statements are the one exception: they are removed for good straight away, so re-importing the same month never gets blocked by a trashed copy still holding its slot.',
+  },
+  {
     q: 'Is my financial data secure?',
     a: 'PHAROS is built for private access, not the open internet: reach it over your LAN or your own VPN, behind a login. There is no public sign-up and no telemetry, so your receipts, statements, and balances stay yours.',
   },
