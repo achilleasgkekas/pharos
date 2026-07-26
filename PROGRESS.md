@@ -6,6 +6,70 @@
 <!-- docker-validated: 7b46912 -->
 <!-- ui-audited: 0bc5e14 -->
 
+## 2026-07-26 (cont.⁴ — P9 slice 10: το νόμισμα της σελίδας φτάνει στο item)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση
+`expo-camera`) παραμένει **OPEN χωρίς Answer** (7ο συνεχόμενο run), άρα P17/P23 μένουν μπλοκαρισμένα. Working tree
+καθαρό στην αρχή. Docker mutex acquired/released.
+
+**Approved queue check (βήμα a)**: αμετάβλητη εικόνα για **7ο** run — τα μόνα unshipped Approved items είναι P36
+(provider decision δική σου), P31 (θέλει supervised session, ήδη scoped) και P23 (native dep). Πήρα την πρόταση του
+προηγούμενου log, το **P9 slice 10**.
+
+**Το μισό του task ήταν ήδη έτοιμο, και το βρήκα διαβάζοντας αντί να χτίζω**: το email-in **περνά ήδη** από τον
+resolver. Το `checkImapInbox` δεν δημιουργεί εγγραφές μόνο του — φτιάχνει `FormData` ανά συνημμένο (ή ανά HTML σώμα)
+και καλεί το **`uploadReceipt`**, δηλαδή ακριβώς το μονοπάτι που πέρασε από `resolveFx` στο slice 2. Καμία
+παρακαμπτήριος `Receipt.create`, άρα μηδέν αλλαγή εκεί.
+
+**Το πραγματικό κενό ήταν αλλού**: το **URL import προϊόντος**. Το `ParsedProductSchema` είχε **ήδη** πεδίο `currency`
+και το PRODUCT prompt το ζητούσε **ήδη** — αλλά **κανένα call site δεν το διάβαζε**. Μια σελίδα σε δολάρια έμπαινε
+σαν να ήταν base currency, σιωπηλά, και μετά αθροιζόταν σε net worth / shopping budget / inventory value.
+
+**Η επιλογή που κρατά το feature ειλικρινές**: ο κωδικός βγαίνει **πρώτα ντετερμινιστικά από το ίδιο το markup** της
+σελίδας (νέο `extractPriceCurrency` στο `lib/scrape.ts`: schema.org `priceCurrency` → `og:/product:price:currency` →
+`itemprop`), και μόνο μετά από το τι διάβασε το μοντέλο. **Σκέτο σύμβολο δεν αναλύεται ποτέ**: το «$» είναι USD σε ένα
+μαγαζί και CAD/AUD σε άλλο, οπότε μια σελίδα που δεν δηλώνει τίποτα γυρίζει `''` και συμπεριφέρεται **byte-for-byte**
+όπως πριν. Για τον ίδιο λόγο το **default του schema έγινε `''` αντί `'EUR'`**: όσο το πεδίο ήταν αδιάβαστο το `'EUR'`
+ήταν αβλαβές, αλλά τη στιγμή που αρχίζεις να το διαβάζεις λέει σε ένα dollar-based deployment ότι **κάθε** import του
+είναι foreign.
+
+**Ο κανόνας για υπάρχον item (η μη-προφανής απόφαση)**: ένα item κρατά **ΕΝΑ** rate για **όλες** τις τιμές του
+(slice 4), άρα μια τιμή σε άλλο νόμισμα δεν έχει πού να καθίσει πάνω του. Νέο item → **υιοθετεί** το νόμισμα μέσω
+`resolveItemPrices` (τυπωμένο ποσό, `fxRate 0`, εμφανίζεται στο audit του slice 7, διορθώνεται inline με το slice 9).
+Υπάρχον item σε άλλο νόμισμα → **το link μπαίνει** (χρήσιμο: πού να το αγοράσεις) αλλά **η τιμή μένει έξω**, και το
+αποτέλεσμα λέει **ποιο** νόμισμα παραλείφθηκε ώστε να μη μοιάζει με «δεν βρέθηκε τιμή». Το εναλλακτικό (να γραφτεί η
+τιμή) είναι ακριβώς το bug· το να σβηστεί σιωπηλά είναι μπερδεμένο. Ίδιος κανόνας και στα τρία σημεία:
+`importItemFromUrl`, `confirmImportItem`, και το refresh τιμών του `aiFillItem`.
+
+**Νέα pure**: `effectiveCurrency` / `sameCurrency` (`lib/fx.ts`) — ο κανόνας «κενό = base» σε ΕΝΑ μέρος αντί να τον
+ξαναγράφει κάθε call site. **UI**: το preview δείχνει την τιμή με το σύμβολο της σελίδας (`formatMoney`) + γραμμή που
+εξηγεί τι θα γίνει (διαφορετικό κείμενο για νέο vs matched item), και μετά το save ένα gold μήνυμα όταν η τιμή
+παραλείφθηκε — και στο `/items` URL import και στο `/capture` popup του bookmarklet.
+
+**Verify**: `npm run type-check` **EXIT 0**· full `npx vitest run` **4072 passed / 288 files** (+45 δικά μου: 9 για τον
+markup extractor, 7 για τις νέες pure, **21 σε νέο `items/actions.urlImport.test.ts`** — το URL-import concern που το
+ίδιο το header του `actions.aiFill.test.ts` άφηνε ρητά ανοιχτό — 2 στο aiFill, 1 schema default· μηδέν regression).
+Docker κάτω από το mutex: `build web` → mongo **healthy** → `up -d web` → `/login` **200 στο πρώτο poll (2s)**,
+**0 restarts**, `/items` + `/capture` **307** (auth-gated, άρα compiled) → `docker builder prune -f` (2.3GB) → lock
+**released**. Browser: `/login` renders («Sign in · Pharos»), **μηδέν console errors**· το authed import UI δεν
+επαληθεύεται unattended (credentials boundary), οπότε ο κανόνας δοκιμάστηκε στο επίπεδο των actions, όχι με κλικ.
+
+**Docs**: νέα κουκκίδα «Importing from a foreign shop page» στο `docs/features.md` (και **διορθώθηκε** η προηγούμενη
+που ισχυριζόταν ήδη ότι «prices are extracted in their original currency» — μέχρι σήμερα δεν ίσχυε) + slice 10 στο
+`PRODUCT_BACKLOG.md` (ο τίτλος του P9 λέει πλέον «ΟΛΑ ΤΑ IMPORTS», εκκρεμεί μόνο το rate-feed).
+
+**Git hygiene**: explicit `git add` 14 αρχείων (όχι `-A`) → commit `7e4e62b` → pushed.
+
+**Γνωστό όριο που κατέγραψα αντί να το κρύψω**: τα `links[].price` και `priceHistory[].price` ενός item μένουν
+**τυπωμένα** και δεν μετατρέπονται μαζί με τις 3 headline τιμές — προϋπάρχον όριο του μοντέλου του slice 4 (ένα item,
+πολλά καταστήματα, ένα rate), όχι κάτι που εισάγει αυτό το slice. Φαίνεται μόνο αφού μπει rate σε foreign item.
+
+**Επόμενο task (πρόταση)**: το P9 έκλεισε πρακτικά (μένει μόνο το προαιρετικό rate-feed, που είναι phase-2 by design
+αφού το rate είναι χειροκίνητο σκόπιμα). Δύο υποψήφια, με σειρά προτίμησης: (α) **mobile UI για τα 2 FX πεδία** — το
+`/api/v1` τα εκθέτει ήδη σε 6 modules αλλά το Expo app δεν τα δείχνει ούτε τα γράφει, άρα μια εγγραφή που φτιάχνεις
+από κινητό δεν μπορεί να μαρκαριστεί foreign· (β) το `fxBadgeLabel` σε **credit balance** (αρνητικό τυπωμένο total,
+guard `origAmount <= 0`) που κρέμεται από το slice 5. Ως συνήθως πρώτα ο έλεγχος του Approved queue (βήμα a).
+
 ## 2026-07-26 (cont.³ — P9 slice 9: η ισοτιμία μπαίνει εκεί που φαίνεται το πρόβλημα)
 
 **Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση
