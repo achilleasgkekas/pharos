@@ -9,24 +9,34 @@ import type { NextRequest } from 'next/server';
 //     an empty changeset returns 400,
 //   - PATCH returns the SPEC shape { expense: Expense } (the full trimmed doc), NOT a bare
 //     { ok, id } — the mobile detail re-prefills in place from the response,
-//   - DELETE is a SOFT delete ($set deletedAt, recoverable from Trash), and a missing row 404s.
-// We exercise the REAL apiAuth/apiBody/apiList helpers + the real trimExpense serializer,
-// and only mock the DB seam.
+//   - DELETE is a SOFT delete ($set deletedAt, recoverable from Trash), and a missing row 404s,
+//   - P9 multi-currency: `amount` arrives PRINTED, so touching amount/currency/fxRate re-resolves
+//     all four fields together against the CURRENT doc (never half-converted), and `{ currency }`
+//     or `{ fxRate }` alone is a valid changeset even though neither writes into $set by itself.
+// We exercise the REAL apiAuth/apiBody/apiList helpers + the real trimExpense serializer and the
+// real resolveFx, and only mock the DB seam.
 
-const { connectDBMock, userFindOne, userState, expenseUpdate, updateState } = vi.hoisted(() => {
+const { connectDBMock, userFindOne, userState, expenseUpdate, expenseFindById, updateState, existingState, settingsState } = vi.hoisted(() => {
   const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
   const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
   const updateState: { doc: unknown; calls: Array<{ id: unknown; update: unknown; opts: unknown }> } = { doc: null, calls: [] };
+  // The pre-update read the FX path does. `undefined` (the default) means "same doc the update
+  // returns", so every pre-P9 test keeps working untouched; a test that cares about the stored
+  // triple sets it explicitly.
+  const existingState: { doc: unknown } = { doc: undefined };
+  const settingsState = { currency: 'EUR' };
   const expenseUpdate = vi.fn((id: unknown, update: unknown, opts: unknown) => {
     updateState.calls.push({ id, update, opts });
     return { lean: async () => updateState.doc };
   });
-  return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, expenseUpdate, updateState };
+  const expenseFindById = vi.fn(() => ({ lean: async () => (existingState.doc === undefined ? updateState.doc : existingState.doc) }));
+  return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, expenseUpdate, expenseFindById, updateState, existingState, settingsState };
 });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
-vi.mock('@/models/Expense', () => ({ Expense: { findByIdAndUpdate: expenseUpdate } }));
+vi.mock('@/models/Expense', () => ({ Expense: { findByIdAndUpdate: expenseUpdate, findById: expenseFindById } }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: async () => ({ currency: settingsState.currency }) }));
 
 import { PATCH, DELETE } from './route';
 
@@ -52,6 +62,8 @@ function lastSet(): Record<string, unknown> {
 beforeEach(() => {
   updateState.doc = null;
   updateState.calls = [];
+  existingState.doc = undefined;
+  settingsState.currency = 'EUR';
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
   vi.clearAllMocks();
   userFindOne.mockImplementation(() => ({ select: () => ({ lean: async () => userState.doc }) }));
@@ -59,6 +71,9 @@ beforeEach(() => {
     updateState.calls.push({ id, update, opts });
     return { lean: async () => updateState.doc };
   });
+  // vi.clearAllMocks() wipes the hoisted implementation too — restore it, or the FX path
+  // would read `undefined` from findById and 404 every amount edit.
+  expenseFindById.mockImplementation(() => ({ lean: async () => (existingState.doc === undefined ? updateState.doc : existingState.doc) }));
 });
 
 describe('auth + id guards', () => {
@@ -167,6 +182,83 @@ describe('PATCH partial-update', () => {
     const set = lastSet();
     expect(set).not.toHaveProperty('taxDeductible');
     expect(set).not.toHaveProperty('taxCategory');
+  });
+});
+
+// P9 — the mobile app edits an expense in the currency the bill is PRINTED in, while the DB
+// stores base currency. These pin the "recompute the four fields together" rule: a partial edit
+// must never leave a row half-converted, and re-saving an unchanged foreign row must not
+// convert it twice.
+describe('PATCH multi-currency (P9)', () => {
+  it('a body without currency/fxRate stores the amount untouched, with the triple at base/0/0', async () => {
+    updateState.doc = { _id: OID, vendor: 'ΔΕΗ', amount: 84 };
+    await PATCH(makeReq({ body: { amount: 84 } }), ctx(OID));
+    expect(lastSet()).toMatchObject({ amount: 84, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+
+  it('a foreign amount + rate is converted before storage (printed stays in origAmount)', async () => {
+    updateState.doc = { _id: OID, vendor: 'AWS', amount: 80.96 };
+    await PATCH(makeReq({ body: { amount: 88, currency: 'USD', fxRate: 0.92 } }), ctx(OID));
+    expect(lastSet()).toMatchObject({ amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 });
+  });
+
+  it('a foreign amount with NO rate is stored as printed and flagged, never guessed at 1:1', async () => {
+    updateState.doc = { _id: OID, vendor: 'AWS', amount: 88 };
+    await PATCH(makeReq({ body: { amount: 88, currency: 'USD' } }), ctx(OID));
+    expect(lastSet()).toMatchObject({ amount: 88, currency: 'USD', origAmount: 88, fxRate: 0 });
+  });
+
+  it('{ fxRate } alone re-converts the stored printed amount (no `no valid fields` 400)', async () => {
+    // The common correction: the entry was saved foreign with no rate, the rate arrives later.
+    existingState.doc = { _id: OID, vendor: 'AWS', amount: 88, currency: 'USD', origAmount: 88, fxRate: 0 };
+    updateState.doc = { _id: OID, vendor: 'AWS', amount: 80.96 };
+    const res = await PATCH(makeReq({ body: { fxRate: 0.92 } }), ctx(OID));
+    expect(res.status).toBe(200);
+    expect(lastSet()).toMatchObject({ amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 });
+  });
+
+  it('{ currency } back to base un-converts: printed amount becomes the stored one, triple resets', async () => {
+    existingState.doc = { _id: OID, vendor: 'AWS', amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 };
+    updateState.doc = { _id: OID, vendor: 'AWS', amount: 88 };
+    await PATCH(makeReq({ body: { currency: 'EUR' } }), ctx(OID));
+    expect(lastSet()).toMatchObject({ amount: 88, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+
+  it('editing a NON-money field on a foreign expense leaves its amount alone (no extra read)', async () => {
+    existingState.doc = { _id: OID, vendor: 'AWS', amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 };
+    updateState.doc = { _id: OID, vendor: 'AWS' };
+    await PATCH(makeReq({ body: { category: 'software' } }), ctx(OID));
+    const set = lastSet();
+    expect(set).not.toHaveProperty('amount');
+    expect(set).not.toHaveProperty('fxRate');
+    expect(expenseFindById).not.toHaveBeenCalled();
+  });
+
+  it('re-sending the same printed amount on a foreign expense does not convert it twice', async () => {
+    existingState.doc = { _id: OID, vendor: 'AWS', amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 };
+    updateState.doc = { _id: OID, vendor: 'AWS', amount: 80.96 };
+    await PATCH(makeReq({ body: { amount: 88, currency: 'USD', fxRate: 0.92 } }), ctx(OID));
+    expect(lastSet()).toMatchObject({ amount: 80.96, origAmount: 88 });
+  });
+
+  it('the base currency comes from settings: on a USD deployment, USD is not foreign', async () => {
+    settingsState.currency = 'USD';
+    updateState.doc = { _id: OID, vendor: 'AWS', amount: 88 };
+    await PATCH(makeReq({ body: { amount: 88, currency: 'USD', fxRate: 0.92 } }), ctx(OID));
+    expect(lastSet()).toMatchObject({ amount: 88, currency: 'USD', origAmount: 0, fxRate: 0 });
+  });
+
+  it('an empty body still 400s (the FX path must not invent a changeset)', async () => {
+    const res = await PATCH(makeReq({ body: {} }), ctx(OID));
+    expect(res.status).toBe(400);
+    expect(expenseUpdate).not.toHaveBeenCalled();
+  });
+
+  it('404s when the row an FX edit targets is gone', async () => {
+    existingState.doc = null;
+    const res = await PATCH(makeReq({ body: { fxRate: 0.92 } }), ctx(OID));
+    expect(res.status).toBe(404);
+    expect(expenseUpdate).not.toHaveBeenCalled();
   });
 });
 

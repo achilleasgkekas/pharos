@@ -236,12 +236,14 @@ These are flagged **(AI)** below with the feature name.
 | Method | Path                                | Description |
 |--------|-------------------------------------|-------------|
 | GET    | `/expenses?kind=income\|expense`    | List (+ `limit`/`offset`/`updatedSince`). |
-| POST   | `/expenses`                         | Create `{ kind?, vendor, amount, date?, category?, period?, recurring?, recurringCycle?, notes?, split?, taxDeductible?, taxCategory?, currency?, origAmount?, fxRate? }`. |
-| PATCH  | `/expenses/:id`                     | Update `{ vendor?, amount?, category?, kind?, notes?, date?, period?, recurring?, recurringCycle?, paymentMethod?, split?, taxDeductible?, taxCategory?, currency?, origAmount?, fxRate? }`. |
+| POST   | `/expenses`                         | Create `{ kind?, vendor, amount, date?, category?, space?, period?, recurring?, recurringCycle?, notes?, split?, taxDeductible?, taxCategory?, currency?, fxRate? }`. |
+| PATCH  | `/expenses/:id`                     | Update `{ vendor?, amount?, category?, space?, kind?, notes?, date?, period?, recurring?, recurringCycle?, paymentMethod?, split?, taxDeductible?, taxCategory?, currency?, fxRate? }`. |
 | POST   | `/expenses/:id/rescan`              | **(AI: expenses)** Re-run the parse on the stored bill/payslip. Body `{ ocr?: boolean }` (`true` forces OCR). Returns `{ expense }` (same shape as the list) so the client can re-prefill in place; the record is left unverified. |
 | DELETE | `/expenses/:id`                     | Soft-delete. |
 
-**Multi-currency fields (P9):** `currency` is the code of the foreign currency (e.g., "USD", "GBP"). `origAmount` is the original amount in that currency; `fxRate` is the exchange rate applied (origAmount × fxRate = amount in base currency). `amount` is always stored in the deployment's base currency for consistent aggregations (reports, budgets, net worth). When multi-currency is disabled in settings, these fields are ignored and always empty.
+**Multi-currency fields (P9):** `currency` is the code of the foreign currency (e.g., "USD", "GBP"). `origAmount` is the original amount in that currency; `fxRate` is the exchange rate applied (origAmount × fxRate = amount in base currency). `amount` is always stored in the deployment's base currency for consistent aggregations (reports, budgets, net worth), so a client can sum it without conversion.
+
+On WRITE, send only `currency` and `fxRate`: `amount` is read as the PRINTED figure and `origAmount` is derived from it, never accepted from the client. A foreign amount sent without a rate is stored as printed and flagged (`fxRate: 0`) rather than guessed at 1:1, so it shows up in the `/reports` "needs an exchange rate" audit. On PATCH, sending any of `amount`/`currency`/`fxRate` re-resolves all four fields together against the current row, so a partial update can never leave an expense half-converted; edit a foreign expense from its `origAmount` (the printed figure), not from `amount`.
 
 ### Statements & installment plans
 
@@ -388,7 +390,7 @@ Each plan in the `GET /statements/plans` response is:
 
 | Method | Path                       | Description |
 |--------|----------------------------|-------------|
-| GET    | `/settings`                | App preferences + this-month budget usage. |
+| GET    | `/settings`                | App preferences + this-month budget usage. Includes `multiCurrency` (P9, read-only): when `false`, a client should not offer per-entry currency/FX controls. |
 | PATCH  | `/settings`                | Update preferences/defaults, ntfy config, and/or budgets. |
 | POST   | `/settings/test-notify`    | Send a one-off test to the configured ntfy topic. |
 | GET    | `/lists`                   | Editable category taxonomies (current values + defaults). |

@@ -7,6 +7,7 @@ import { Expense } from '@/models/Expense';
 import { vendorKey } from '@/app/expenses/lib';
 import { getAppSettings } from '@/lib/appSettings';
 import { matchCategoryRule } from '@/lib/categoryRules';
+import { resolveFx } from '@/lib/fx';
 import { trimExpense, computeAnomalies, parseSplitField, type ExpenseLean } from './serialize';
 
 export const runtime = 'nodejs';
@@ -31,7 +32,14 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** POST /api/v1/expenses  { kind?, vendor, amount, date?, category?, space?, period?, recurring?, recurringCycle?, notes?, split?, taxDeductible?, taxCategory? } */
+/** POST /api/v1/expenses  { kind?, vendor, amount, date?, category?, space?, period?, recurring?, recurringCycle?, notes?, split?, taxDeductible?, taxCategory?, currency?, fxRate? }
+ *
+ *  P9: `amount` is read as the PRINTED figure. When `currency` differs from the deployment's
+ *  base one it is converted with `fxRate` before storage, so what lands in `amount` is always
+ *  base currency (every report/budget/anomaly sum reads it directly). Omitting both keeps the
+ *  previous single-currency behaviour byte-for-byte, and a foreign amount with no rate is
+ *  stored as printed and flagged (fxRate 0) rather than guessed at 1:1 — same rule as the web
+ *  addExpense action and the bills/subscriptions routes. */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const b = await readBody(req);
@@ -47,17 +55,23 @@ export async function POST(req: NextRequest) {
     // one gap, so the same vendor got a different category depending on whether the
     // expense was entered from web or mobile. An explicit category from the client
     // still always wins; the rule only fills in the default 'other'.
+    const settings = await getAppSettings();
     const explicitCategory = strField(b, 'category', '');
     const category = explicitCategory
       ? explicitCategory
-      : matchCategoryRule((await getAppSettings()).categoryRules, { vendor, description: strField(b, 'notes', '') })?.category || 'other';
+      : matchCategoryRule(settings.categoryRules, { vendor, description: strField(b, 'notes', '') })?.category || 'other';
+    // P9: `amount` above is the printed figure; this is where it becomes base currency.
+    const fx = resolveFx({ amount, currency: strField(b, 'currency'), fxRate: numField(b, 'fxRate') ?? 0 }, settings.currency);
     const doc = await Expense.create({
       kind: enumField(b, 'kind', ['income', 'expense'], 'expense'),
       vendor,
       vendorKey: vendorKey(vendor),
       category,
       space: strField(b, 'space').trim().slice(0, 40),
-      amount,
+      amount: fx.amount,
+      currency: fx.currency,
+      origAmount: fx.origAmount,
+      fxRate: fx.fxRate,
       date,
       period: strField(b, 'period'),
       recurring: boolField(b, 'recurring'),

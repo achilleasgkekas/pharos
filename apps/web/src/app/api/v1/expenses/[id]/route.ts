@@ -4,12 +4,19 @@ import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Expense } from '@/models/Expense';
 import { vendorKey } from '@/app/expenses/lib';
+import { getAppSettings } from '@/lib/appSettings';
+import { resolveFx, isForeignCurrency } from '@/lib/fx';
 import { trimExpense, parseSplitField, type ExpenseLean } from '../serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** PATCH /api/v1/expenses/:id  { vendor?, amount?, category?, space?, kind?, notes?, date?, period?, recurring?, recurringCycle?, paymentMethod?, split?, taxDeductible?, taxCategory? } */
+/** PATCH /api/v1/expenses/:id  { vendor?, amount?, category?, space?, kind?, notes?, date?, period?, recurring?, recurringCycle?, paymentMethod?, split?, taxDeductible?, taxCategory?, currency?, fxRate? }
+ *
+ *  P9: `amount` arrives as the PRINTED figure (what the bill says), while the stored one is
+ *  base currency, so touching the amount, the currency OR the rate recomputes all four fields
+ *  together from the current doc — a partial PATCH must never leave an expense half-converted.
+ *  Bodies with none of the three skip the extra read entirely. */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;
@@ -31,8 +38,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (Array.isArray(b.split)) set.split = parseSplitField(b.split);
     if (typeof b.taxDeductible === 'boolean') set.taxDeductible = b.taxDeductible;
     if (typeof b.taxCategory === 'string') set.taxCategory = b.taxCategory.trim().slice(0, 60);
-    if (!Object.keys(set).length) return apiError('no valid fields');
     await connectDB();
+
+    // Runs BEFORE the "no valid fields" guard: `{ currency }` or `{ fxRate }` alone is a
+    // legitimate edit (correcting the rate of an already-saved foreign expense) even though
+    // neither writes into `set` by itself.
+    const touchesFx = set.amount != null || typeof b.currency === 'string' || b.fxRate != null;
+    if (touchesFx) {
+      const existing = (await Expense.findById(id).lean()) as ExpenseLean | null;
+      if (!existing) return apiError('not found', 404);
+      const base = (await getAppSettings()).currency;
+      // The printed amount of a foreign expense lives in origAmount; of a base-currency one, in amount.
+      const wasForeign = isForeignCurrency(existing.currency, base);
+      const printed =
+        typeof set.amount === 'number'
+          ? set.amount
+          : ((wasForeign ? existing.origAmount || existing.amount : existing.amount) ?? 0);
+      const currency = typeof b.currency === 'string' ? b.currency : (existing.currency ?? base);
+      const rate = b.fxRate != null && Number.isFinite(Number(b.fxRate)) ? Number(b.fxRate) : (existing.fxRate ?? 0);
+      const fx = resolveFx({ amount: printed, currency, fxRate: rate }, base);
+      set.amount = fx.amount;
+      set.currency = fx.currency;
+      set.origAmount = fx.origAmount;
+      set.fxRate = fx.fxRate;
+    }
+
+    if (!Object.keys(set).length) return apiError('no valid fields');
     const doc = await Expense.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     // Spec: PATCH returns { expense: Expense } (the updated doc), same shape as the list/rescan trim.

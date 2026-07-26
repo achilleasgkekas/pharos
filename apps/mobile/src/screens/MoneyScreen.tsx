@@ -3,7 +3,9 @@ import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet
 import * as ImagePicker from 'expo-image-picker';
 import { C, RADIUS } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem, Chip, ModalSheet, contentWidth } from '../ui';
-import { getExpenses, addExpense, deleteExpense, updateExpense, rescanExpense, scanExpenseImage, fileSource, type Expense, type ParsedExpenseData, type SplitEntry } from '../api';
+import { getExpenses, addExpense, deleteExpense, updateExpense, rescanExpense, scanExpenseImage, getSettings, fileSource, type Expense, type ParsedExpenseData, type SplitEntry } from '../api';
+import { FxBadge, FxFields } from '../FxControls';
+import { normalizeCurrency, printedAmount } from '../fx';
 
 const CYCLES = ['monthly', 'quarterly', 'yearly', 'weekly'] as const;
 // Same GR presets as the web tax-category picker (lib/taxonomies.ts TAX_CATEGORY_PRESETS) — free-form field, these are just suggestion chips.
@@ -80,11 +82,21 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   const [eTaxDeductible, setETaxDeductible] = useState(false);
   const [eTaxCategory, setETaxCategory] = useState('');
   const [eSplit, setESplit] = useState<SplitEntry[]>([]);
+  const [eCurrency, setECurrency] = useState('');
+  const [eFxRate, setEFxRate] = useState('');
   const [scanning, setScanning] = useState(false);
   const [draft, setDraft] = useState<ParsedExpenseData | null>(null);
   const [dVendor, setDVendor] = useState('');
   const [dAmount, setDAmount] = useState('');
   const [dCategory, setDCategory] = useState('');
+  const [dCurrency, setDCurrency] = useState('');
+  const [dFxRate, setDFxRate] = useState('');
+  // P9: the deployment's base currency (what every stored `amount` and every total below is
+  // denominated in) plus the switch that decides whether the FX controls exist at all. Read
+  // once from the server, never guessed from a row — a foreign row's `currency` is what the
+  // PAPER said, so labelling totals with it would print the wrong symbol on a base figure.
+  const [base, setBase] = useState('EUR');
+  const [multiCurrency, setMultiCurrency] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showBalances, setShowBalances] = useState(false);
   const [settling, setSettling] = useState<string | null>(null);
@@ -94,6 +106,17 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
     try { setRows(await getExpenses(kind)); } catch (e) { setErr((e as Error).message); }
   }, [kind]);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
+  // Settings are a separate, non-blocking read: a failure here (older server, offline) must
+  // leave the screen working exactly as it did before multi-currency existed.
+  useEffect(() => {
+    (async () => {
+      try {
+        const s = await getSettings();
+        setBase(normalizeCurrency(s.currency) || 'EUR');
+        setMultiCurrency(!!s.multiCurrency);
+      } catch { /* keep the EUR / single-currency defaults */ }
+    })();
+  }, []);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   // Distinct vendors already seen (case-insensitive dedup, keeps first casing), for add-form autocomplete.
@@ -150,6 +173,9 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
       setDVendor(d.vendor);
       setDAmount(d.amount ? String(d.amount) : '');
       setDCategory(d.category);
+      // The AI already reads the code printed on the bill; the rate it cannot know.
+      setDCurrency(normalizeCurrency(d.currency) || base);
+      setDFxRate('');
     } catch (e) { setErr((e as Error).message); }
     finally { setScanning(false); }
   }
@@ -167,6 +193,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         period: draft.period || undefined,
         recurringCycle: draft.recurringCycle || undefined,
         paymentMethod: draft.paymentMethod || undefined,
+        ...(multiCurrency ? { currency: dCurrency || base, fxRate: Number(dFxRate) || 0 } : {}),
       });
       setDraft(null);
       await load();
@@ -182,7 +209,11 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
   }
   // Fill the edit-form fields from an Expense (shared by open + re-scan re-prefill).
   function prefill(it: Expense) {
-    setEVendor(it.vendor); setEAmount(String(it.amount)); setECategory(it.category);
+    // P9: the form always holds the PRINTED figure (a foreign entry stores the converted one
+    // in `amount`), so re-saving an untouched entry can never convert it a second time.
+    setEVendor(it.vendor); setEAmount(String(printedAmount(it, base))); setECategory(it.category);
+    setECurrency(normalizeCurrency(it.currency) || base);
+    setEFxRate(it.fxRate > 0 ? String(it.fxRate) : '');
     setEDate(it.date ? it.date.slice(0, 10) : ''); setEPeriod(it.period || '');
     setERecurring(!!it.recurring); setECycle(it.recurringCycle || '');
     setEPayment(it.paymentMethod || ''); setENotes(it.notes || '');
@@ -223,6 +254,9 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         taxDeductible: eTaxDeductible,
         taxCategory: eTaxCategory.trim(),
         split: eSplit,
+        // Sent only on a multi-currency deployment, so a single-currency install keeps
+        // posting exactly the body it posted before.
+        ...(multiCurrency ? { currency: eCurrency || base, fxRate: Number(eFxRate) || 0 } : {}),
       });
       await load();
     } catch (e) { setErr((e as Error).message); }
@@ -230,7 +264,10 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
 
   if (loading) return <Spinner />;
   const total = rows.reduce((sum, r) => sum + (r.amount || 0), 0);
-  const cur = rows[0]?.currency || 'EUR';
+  // Every stored `amount` is base currency (P9) — including a foreign entry's converted one —
+  // so the totals and the per-row figures below are labelled with the base symbol, and what
+  // the paper said shows up separately in <FxBadge>.
+  const cur = base;
   const label = kind === 'income' ? 'source' : 'vendor';
 
   return (
@@ -274,10 +311,11 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
               <Text style={s.meta}>{[item.category, shortDate(item.date), item.recurring ? 'recurring' : ''].filter(Boolean).join('  ·  ')}</Text>
             </View>
             <View style={{ alignItems: 'flex-end', gap: 4 }}>
-              <Text style={[s.amount, { color: kind === 'income' ? C.accent : C.text }]}>{money(item.amount, item.currency)}</Text>
+              <Text style={[s.amount, { color: kind === 'income' ? C.accent : C.text }]}>{money(item.amount, cur)}</Text>
+              <FxBadge doc={item} base={cur} />
               {item.split && item.split.length > 0 && (
                 <Text style={s.splitBadge}>
-                  {splitTotals(item.split).owed > 0.009 ? `⇄ ${money(splitTotals(item.split).owed, item.currency)}` : '⇄ ✓'}
+                  {splitTotals(item.split).owed > 0.009 ? `⇄ ${money(splitTotals(item.split).owed, cur)}` : '⇄ ✓'}
                 </Text>
               )}
               {item.taxDeductible && <Text style={s.taxBadge}>🏛 tax</Text>}
@@ -298,6 +336,15 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
               <View style={{ flex: 1 }}><Text style={s.mlabel}>AMOUNT</Text><Input variant="modal" value={dAmount} onChangeText={setDAmount} keyboardType="decimal-pad" /></View>
               <View style={{ flex: 1 }}><Text style={s.mlabel}>CATEGORY</Text><Input variant="modal" value={dCategory} onChangeText={setDCategory} /></View>
             </View>
+            {multiCurrency && (
+              <FxFields
+                amount={parseFloat(dAmount.replace(',', '.')) || 0}
+                currency={dCurrency}
+                fxRate={dFxRate}
+                base={base}
+                onChange={(p) => { if (p.currency !== undefined) setDCurrency(p.currency); if (p.fxRate !== undefined) setDFxRate(p.fxRate); }}
+              />
+            )}
             {!!(draft?.date || draft?.recurringCycle) && (
               <Text style={s.scanMeta}>{[draft?.date ? shortDate(draft.date) : '', draft?.recurringCycle ? `recurring ${draft.recurringCycle}` : ''].filter(Boolean).join('  ·  ')}</Text>
             )}
@@ -328,6 +375,15 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
                 <View style={{ flex: 1 }}><Text style={s.mlabel}>AMOUNT</Text><Input variant="modal" value={eAmount} onChangeText={setEAmount} keyboardType="decimal-pad" /></View>
                 <View style={{ flex: 1 }}><Text style={s.mlabel}>CATEGORY</Text><Input variant="modal" value={eCategory} onChangeText={setECategory} /></View>
               </View>
+              {multiCurrency && (
+                <FxFields
+                  amount={parseFloat(eAmount.replace(',', '.')) || 0}
+                  currency={eCurrency}
+                  fxRate={eFxRate}
+                  base={base}
+                  onChange={(p) => { if (p.currency !== undefined) setECurrency(p.currency); if (p.fxRate !== undefined) setEFxRate(p.fxRate); }}
+                />
+              )}
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <View style={{ flex: 1 }}><Text style={s.mlabel}>DATE</Text><Input variant="modal" value={eDate} onChangeText={setEDate} placeholder="YYYY-MM-DD" autoCapitalize="none" /></View>
                 <View style={{ flex: 1 }}><Text style={s.mlabel}>PERIOD</Text><Input variant="modal" value={ePeriod} onChangeText={setEPeriod} placeholder="YYYY-MM" autoCapitalize="none" /></View>

@@ -10,7 +10,13 @@ import { C, SIZE, RADIUS, SPACE, scrim } from './theme';
  */
 export const contentWidth: ViewStyle = { width: '100%', maxWidth: 640, alignSelf: 'center' };
 
-export const CUR: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' };
+// Symbols for the codes the web offers in Settings → Currency (apps/web/src/lib/money.ts
+// CURRENCIES). Unknown codes fall back to "CODE " in money(), so this list only has to cover
+// what a user can actually pick, not all of ISO 4217.
+export const CUR: Record<string, string> = {
+  EUR: '€', USD: '$', GBP: '£', CHF: 'CHF ', SEK: 'kr ', NOK: 'kr ', DKK: 'kr ',
+  PLN: 'zł ', CZK: 'Kč ', CAD: 'C$', AUD: 'A$', JPY: '¥', INR: '₹',
+};
 export const money = (n: number | undefined, cur = 'EUR') => `${CUR[cur] || cur + ' '}${(n ?? 0).toLocaleString()}`;
 export const shortDate = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString() : '');
 

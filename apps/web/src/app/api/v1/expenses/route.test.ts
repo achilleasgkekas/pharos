@@ -24,9 +24,10 @@ const { connectDBMock, userFindOne, userState, expenseFind, expenseCount, expens
       total: 0,
       lastCreate: null,
     };
-    // getAppSettings() — the route only reads .categoryRules (P15 vendor→category auto-rule).
-    const appSettingsState: { categoryRules: unknown[] } = { categoryRules: [] };
-    const getAppSettingsMock = vi.fn(async () => ({ categoryRules: appSettingsState.categoryRules }));
+    // getAppSettings() — the route reads .categoryRules (P15 vendor→category auto-rule) and
+    // .currency (P9: the base currency the posted amount is resolved against).
+    const appSettingsState: { categoryRules: unknown[]; currency: string } = { categoryRules: [], currency: 'EUR' };
+    const getAppSettingsMock = vi.fn(async () => ({ categoryRules: appSettingsState.categoryRules, currency: appSettingsState.currency }));
     // User model — bearerUser does User.findOne(...).select(...).lean()
     const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
     const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
@@ -82,6 +83,7 @@ beforeEach(() => {
   state.lastCreate = null;
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
   appSettingsState.categoryRules = [];
+  appSettingsState.currency = 'EUR';
   vi.clearAllMocks();
   // clearAllMocks resets return values on the chain stubs → re-point them.
   for (const m of ['sort', 'skip', 'limit', 'setOptions']) (findQuery[m] as ReturnType<typeof vi.fn>).mockImplementation(() => findQuery);
@@ -94,7 +96,7 @@ beforeEach(() => {
     state.lastCreate = arg;
     return { toObject: () => ({ _id: 'newid', updatedAt: new Date('2026-07-06T00:00:00Z'), ...arg }) };
   });
-  getAppSettingsMock.mockImplementation(async () => ({ categoryRules: appSettingsState.categoryRules }));
+  getAppSettingsMock.mockImplementation(async () => ({ categoryRules: appSettingsState.categoryRules, currency: appSettingsState.currency }));
 });
 
 describe('auth gate', () => {
@@ -269,6 +271,44 @@ describe('POST validation', () => {
     const c2 = state.lastCreate as Record<string, unknown>;
     expect(c2.taxDeductible).toBe(false);
     expect(c2.taxCategory).toBe('');
+  });
+});
+
+// P9 — a bill photographed abroad is entered from the phone in the currency it PRINTS. The
+// route reads `amount` as that printed figure and stores base currency, so every report/budget
+// sum stays comparable. A client that omits currency/fxRate must behave byte-identically to
+// the single-currency route this replaced.
+describe('POST multi-currency (P9)', () => {
+  it('a body without currency/fxRate stores the amount untouched, with the triple at base/0/0', async () => {
+    await POST(makeReq({ body: { vendor: 'ΔΕΗ', amount: 62 } }));
+    expect(state.lastCreate).toMatchObject({ amount: 62, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+
+  it('a foreign amount + rate is converted before storage (printed stays in origAmount)', async () => {
+    await POST(makeReq({ body: { vendor: 'AWS', amount: 88, currency: 'USD', fxRate: 0.92 } }));
+    expect(state.lastCreate).toMatchObject({ amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 });
+  });
+
+  it('a foreign amount with NO rate is stored as printed and flagged (fxRate 0), never guessed at 1:1', async () => {
+    await POST(makeReq({ body: { vendor: 'AWS', amount: 88, currency: 'USD' } }));
+    expect(state.lastCreate).toMatchObject({ amount: 88, currency: 'USD', origAmount: 88, fxRate: 0 });
+  });
+
+  it('the base currency comes from settings: on a USD deployment, USD is not foreign', async () => {
+    appSettingsState.currency = 'USD';
+    await POST(makeReq({ body: { vendor: 'AWS', amount: 88, currency: 'USD', fxRate: 0.92 } }));
+    expect(state.lastCreate).toMatchObject({ amount: 88, currency: 'USD', origAmount: 0, fxRate: 0 });
+  });
+
+  it('junk in `currency` is ignored rather than stored (not a 3-letter ISO code)', async () => {
+    await POST(makeReq({ body: { vendor: 'AWS', amount: 88, currency: 'dollars', fxRate: 0.92 } }));
+    expect(state.lastCreate).toMatchObject({ amount: 88, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+
+  it('the response carries the triple back, so the mobile detail can show the FX badge', async () => {
+    const res = await POST(makeReq({ body: { vendor: 'AWS', amount: 88, currency: 'USD', fxRate: 0.92 } }));
+    const json = (await res.json()) as { expense: { amount: number; currency: string; origAmount: number; fxRate: number } };
+    expect(json.expense).toMatchObject({ amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 });
   });
 });
 

@@ -38,6 +38,7 @@ const {
   const settingsState: { doc: Record<string, unknown> } = {
     doc: {
       currency: 'EUR',
+      multiCurrency: false,
       defaultVatRate: 24,
       defaultItemView: 'grid',
       defaultWarrantyMonths: 24,
@@ -107,6 +108,7 @@ beforeEach(() => {
   expenseState.rows = [];
   settingsState.doc = {
     currency: 'EUR',
+    multiCurrency: false,
     defaultVatRate: 24,
     defaultItemView: 'grid',
     defaultWarrantyMonths: 24,
@@ -158,6 +160,7 @@ describe('GET — preferences envelope', () => {
     const json = await res.json();
     expect(json).toMatchObject({
       currency: 'EUR',
+      multiCurrency: false,
       defaultVatRate: 24,
       defaultItemView: 'grid',
       defaultWarrantyMonths: 24,
@@ -171,6 +174,14 @@ describe('GET — preferences envelope', () => {
       period: '2026-07',
       budgets: [],
     });
+  });
+
+  // P9: read-only here on purpose (it is an install-wide Money decision), but the mobile app
+  // needs it to decide whether to offer per-entry currency controls at all.
+  it('carries multiCurrency through so a client knows whether to offer FX controls', async () => {
+    settingsState.doc.multiCurrency = true;
+    const json = await (await GET(makeReq())).json();
+    expect(json.multiCurrency).toBe(true);
   });
 });
 

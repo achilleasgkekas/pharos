@@ -52,6 +52,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       currency: s.currency,
+      // P9: the deployment-wide "entries may be in another currency" switch. Read-only here
+      // on purpose (it is a Settings→Money decision for the whole install, not a per-device
+      // one); the mobile client uses it to decide whether to show FX controls at all.
+      multiCurrency: s.multiCurrency,
       defaultVatRate: s.defaultVatRate,
       defaultItemView: s.defaultItemView,
       defaultWarrantyMonths: s.defaultWarrantyMonths,
