@@ -3850,3 +3850,63 @@ screenshots οταν υπαρξουν assets (blocked).
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-26 (4) — P9 slice 9: FX audit panel goes in-place (bulk apply by currency)
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε (ιδιο
+συνολο OPEN entries με τα προηγουμενα runs, ολα bakecore + το pharos-daily-dev mobile-camera question,
+τιποτα ANSWERED προς αυτη τη routine).
+
+`git log --oneline 1ce991f..HEAD | grep "feat("` (1ce991f = τελευταιο commit που αντικατοπτριστηκε στο
+landing, βλ. προηγουμενο entry) εβγαλε δυο: `c22c144 feat(landing): document bills multi-currency...` (το
+ιδιο το προηγουμενο commit αυτης της routine, ηδη reflected) και ενα φρεσκο: `cbde1a8 feat(reports): set a
+missing FX rate in place, per currency or per record (P9 slice 9)`. (Το `3135e3f docs(features+mobile)...`
+και το `d33a78d docs(progress)...` ειναι απο αλλη routine, docs/FEATURES.md + docs/DOCS_PROGRESS.md, οχι
+landing, δεν μετρανε.)
+
+Read-only research (commit message + `git show --stat`, χωρις subagent, μικρο scope): το audit panel του
+slice 7 (ηδη documented στο landing) εβρισκε καθε ξενη εγγραφη χωρις ισοτιμια αλλα εστελνε τον χρηστη σε
+εξι διαφορετικες φορμες για να τη διορθωσει, ενα row-link ανα φορα, που ηταν και ο λογος που εμεναν
+αδιορθωτες σε πρακτικη χρηση. Το slice 9 βαζει το fix επι τοπου μεσα στο ιδιο το Reports panel: ομαδοποιηση
+ανα τυπωμενο νομισμα (USD/EUR/GBP/...) με ενα "Apply to all N" bulk κουμπι ανα ομαδα, plus per-record
+override για εξαιρεσεις, plus live preview του converted ποσου πριν αποθηκευτει τιποτα. Νεο pure
+`lib/fxApply.ts` κρατα σε ενα μερος ποια πεδια μετατρεπονται ανα module (καθρεφτιζοντας τον resolver
+του καθενος: receipt net/VAT/γραμμες, item και τις 3 τιμες, statement minimum/paid/χρεωσεις, subscription
+first charge), γραφοντας με dotted paths ωστε να μη χαθουν installment info/product links/ονοματα γραμμων.
+
+Αλλαγη (`apps/landing/app/page.tsx`, 1 σημειο, ιδιο αρχειο με παντα): στην ηδη-υπαρχουσα multi-currency
+FAQ (`faq-can-it-handle-an-expense-in-a-currency-other-than-my-main-one`, anchor αμεταβλητο), η προταση
+απο το slice-7 entry ("...largest printed amount first, each row linking straight to that record so a CSV
+import that left a dozen unrated rows behind does not send you hunting for gold badges one page at a
+time.") αντικατασταθηκε πληρως ωστε να περιγραφει το νεο in-place mechanism: "...grouped by the currency
+printed on it: set a rate once and \"Apply to all\" fills every record in that group, or override a single
+one, with a live preview of the converted amount before anything is stored. That turns a CSV import that
+left a dozen unrated rows behind into one fix in Reports instead of hunting down gold badges page by
+page." Το κλεισιμο της FAQ ("It now covers every money-holding record...") και το roadmap Shipped block
+δεν αλλαξαν (το slice 9 ειναι refinement πανω στο ηδη-documented audit feature, οχι νεος τυπος record ή
+write path).
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη).
+- Πορτες 3100-3130: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build
+  (το standalone-output warning ειναι γνωστο/αβλαβες, ο server σερβιρει κανονικα).
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` (μεσω `document.body.textContent`) επιβεβαιωσε και τα 3 checks: νεο wording ("grouped
+  by the currency printed on it" + "\"Apply to all\" fills every record" + "one fix in Reports instead of
+  hunting down gold badges page by page") παρον, παλιο wording ("does not send you hunting for gold badges
+  one page at a time") απουσιαζει, γειτονικο CSV wording αμεταβλητο και παρον. Hero screenshot καθαρο
+  (lighthouse mark, gradient τιτλος, nav, τριπλο badge row). Server τερματιστηκε (`pkill -f "next start -p
+  3110"`), κανενα `next-server` process δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx (`grep -c` UTF-8 byte pattern).
+- Δεν αγγιξα Docker/:3000/web/mobile. Η μονη agent-χρηση ηταν read-only `git show --stat`/commit-message
+  read (χωρις subagent, μικρο scope), μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: νεος `git log --oneline cbde1a8..HEAD | grep "feat("` ελεγχος στην αρχη του επομενου
+run. Αλλιως candidates απο τη λιστα προτεραιοτητας: P22 receipt line-item global search, P21 document/
+manual vault, ή polish συνεχεια / real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
