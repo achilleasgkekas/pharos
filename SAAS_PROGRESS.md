@@ -4999,3 +4999,63 @@ management, μεγαλύτερο surface: role assign/remove + το ίδιο `wo
 `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`,
 `account/{reset/*,verify/*}`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
 για item στο territory (αν βρεθεί, πάει πρώτο).
+
+## 2026-07-26 (cont. — increment 106, route-level test coverage για το members endpoint)
+
+Πριν από νέο increment: ask-inbox re-checked (`~/.claude/ASK_ACHILLEAS.md`, 8 OPEN entries —
+5× bakecore [finance ×2, redesigner, reviewer ×2, ui-rebuild], bakecore-tests macOS-TCC flag,
+pharos-daily-dev P17/P23 mobile-camera approval· τίποτα addressed σε saas-core). `WEB_DEBT.md`
+re-checked (59η σάρωση παραμένει το latest· η μοναδική ενεργή ουρά είναι το `vouchers/page.tsx`
+tenant-scoping item, ρητά feature-builder territory — `app/vouchers/page.tsx`, όχι lib/tenancy/
+lib/billing/api/saas/admin-(saas)-UI — άρα εκτός saas-core, ίδιο συμπέρασμα με το increment 103
+log). UI-first backlog παραμένει εξαντλημένο. Ακολούθησα το leftover next-task από το
+increment-105 log: **`members`** (μεγαλύτερο surface, owner/admin management + role-assign/
+remove + το ίδιο `wouldOrphanOwners` guard).
+
+**Νέο `members/route.test.ts`** (31 tests), μηδέν production code αλλαγή. Route = 4-verb
+workspace member-management (GET list, POST add-or-invite, PATCH role-change, DELETE remove).
+Το auth/authz seam (`resolveWorkspaceSession`) είναι ήδη πλήρως καλυμμένο έμμεσα μέσω του
+`workspace/route.test.ts` idiom — mocked εδώ απευθείας (ίδιο recipe), όχι τα βαθύτερα seams του
+(saasAuthGate/getCurrentAccount/κλπ). Η pure guard-logic (`parseRole`/`canAssignRole`/
+`wouldOrphanOwners`/`normalizeEmail`/`looksLikeEmail`, `lib/tenancy/members.ts`) είναι ήδη
+πλήρως unit-tested στο `members.test.ts` → τρέχει ΠΡΑΓΜΑΤΙΚΑ εδώ (plain import, no mock), μαζί
+με `readBody`/`strField` (lib/apiBody), `withinSeatLimit`/`entitlementsFor` (lib/billing/
+entitlements), `pickBaseUrl` (lib/billing/billingRoutes) και `mintInviteToken` (lib/tenancy/
+invites) — όλα pure, μηδέν λόγος να ξαναγραφτούν ως mocks. Mocked seams: `resolveWorkspaceSession`,
+`Membership`/`Account`/`Invite` models, `sendEmail`+`mailerCanDeliver` (lib/tenancy/mailer —
+`invitedEmail`/`inviteEmail`/`inviteLinkUrl` έμειναν real, καθαροί message builders), `recordAudit`
+(auditCtx έμεινε real).
+
+Καλύπτει: **GET** — gate/requireManage=false passthrough, `?tenant=` forward, join Membership+
+Account → `{workspace, members}`, mid-throw→500. **POST** — gate/requireManage=true· invalid
+email/role → 400 πριν από Account lookup· admin προσπαθεί να μαρτήσει owner → 403 πριν από
+Account lookup· email ΧΩΡΙΣ account → mint Invite (seat-limit-aware στο ίδιο cap με το active-
+member path, supersede prior pending, audit `invite.sent`, 201 με `devToken` αφού κανένας mailer
+δεν είναι configured στα tests)· ήδη active member → 409, μηδέν write· seat limit για νέο μέλος →
+409, μηδέν create· νέο μέλος → `Membership.create` + audit `member.added` + notify + 201·
+removed member re-added → `updateOne` (reactivate in place, ΟΧΙ re-create) + audit
+`reactivated:true`· mid-throw→500. **PATCH** — gate/requireManage=true· missing accountId/invalid
+role → 400· admin→owner promotion → 403· unknown/already-removed target → 404· demote sole
+owner → 409 `last_owner`, μηδέν write/audit· real role change → `updateOne` + audit
+`member.role_changed` με from/to· mid-throw→500. **DELETE** — gate/requireManage=true· missing
+accountId → 400· unknown target → 404· remove sole owner → 409 `last_owner`, μηδέν write/audit·
+real removal → `updateOne(status:removed)` + audit `member.removed`· mid-throw→500.
+
+**Verified**: νέο test file **31/31 green** μόνο του (ένα μικρό μη-ουσιαστικό fix στην πορεία:
+το invite-response assertion χρειάστηκε `objectContaining` αφού το `invite` payload περιλαμβάνει
+και `expires`, όχι μόνο email/role/status). Πλήρες `npx vitest run` → **276 files / 3803 tests
+green** (αυξήθηκε από 273/3731 του increment-105 log). `npm run type-check` → **EXIT 0** καθαρά.
+**Docker: ΔΕΝ έγινε rebuild** (test-only αρχείο, μηδέν production code/runtime wiring αλλαγή).
+**Browser-verify: skipped** (test file, μηδέν UI/observable behavior αλλαγή). Collision guard:
+`git status --short` πριν το staging έδειξε ΜΟΝΟ το δικό μου 1 νέο αρχείο (clean tree — το
+προηγούμενο ξένο `items/actions.photos.test.ts` untracked αρχείο είχε ήδη committed από άλλη
+routine στο μεταξύ, `0721c49`/`adfa76e`)· `git diff --cached --name-only` μετά το staging
+επιβεβαίωσε exact 1-file match πριν το commit/push. Pushed `5cd863c`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** επόμενοι υποψήφιοι χωρίς route-level coverage: `usage`+`usage/sample`,
+`workspace/{ai-key,export/files,reactivate}`, `invites/{resend,route}`, `audit`,
+`trials/sweep`, `billing/route.ts`, `auth/logout`, `account/{reset/*,verify/*}`. Πριν
+ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item στο territory (αν βρεθεί,
+πάει πρώτο).
