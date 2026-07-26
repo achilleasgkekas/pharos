@@ -1169,7 +1169,7 @@
   enable notifications) με progress ticks → activation. **Διακριτό** από P1 (demo data) — εδώ τα *δικά του* δεδομένα.
 - **Module:** Homepage / Dashboard (dismissable card) + Settings state reads.
 
-### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + EXPENSES + RECEIPTS + SUBSCRIPTIONS + ITEMS + STATEMENTS SHIPPED 2026-07-25 (pharos-daily-dev), imports (PA1/email-in) + rate-feed εκκρεμούν
+### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + 7 MODULES + CSV IMPORT + AUDIT/INLINE-FIX SHIPPED (τελευταίο 2026-07-26, pharos-daily-dev), email-in + rate-feed εκκρεμούν
 - **Τι χτίστηκε (slice 1 από L item):** νέο pure **`lib/fx.ts`** (+25 unit tests, client-safe, DB-free) που κρατά
   **ΤΟΝ ΕΝΑΝ κανόνα** σε ένα μέρος: `normalizeCurrency`, `isForeignCurrency`, `convertToBase`, `deriveFxRate`,
   `resolveFx`, `formatMoney`, `fxBadgeLabel`. **Κλειδωμένη αρχιτεκτονική απόφαση (builder default, μηδέν migration):
@@ -1253,9 +1253,23 @@
   `/statements/:id` shape += origAmount/fxRate (**mobile parity μαζί**) + τεκμηρίωση στο `docs/api.md`. **+18 tests**
   (3677). **Follow-up**: `fxBadgeLabel` δεν renders σε credit balance (αρνητικό printed total, guard `orig <= 0`) —
   τα ποσά μετατρέπονται σωστά, απλά λείπει το chip.
-- **Εκκρεμούν (επόμενα slices):** `resolveFx` στο CSV import (PA1) και στο email-in· προαιρετικό δωρεάν rate-feed
-  (phase 2, τώρα το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία (το API τα εκθέτει ήδη σε 5
-  modules).
+- **Τι χτίστηκε (slice 9 — inline «set rate» μέσα στο audit panel, 2026-07-26):** το panel του slice 7 έβρισκε τις
+  εγγραφές χωρίς ισοτιμία αλλά σε έστελνε σε **έξι διαφορετικές φόρμες** για να τις διορθώσεις, που είναι ακριβώς ο
+  λόγος που έμεναν αδιόρθωτες. Πλέον ο ρυθμός μπαίνει **επί τόπου**: οι γραμμές ομαδοποιούνται **ανά τυπωμένο νόμισμα**
+  (μεγαλύτερη έκθεση πρώτη), κάθε ομάδα έχει ένα κουτί `1 USD = ? EUR` + **«Apply to all N»** (η συνηθισμένη περίπτωση
+  μετά από bank import που γέννησε δεκάδες), και κάθε γραμμή μπορεί να **παρακάμψει** την ομάδα με δικό της rate + δικό
+  της Apply, με live preview `printed → stored` πριν το γράψιμο. Νέο pure **`lib/fxApply.ts`** (+23 unit tests, DB-free)
+  κρατά σε ΕΝΑ μέρος **ποια πεδία μετατρέπονται ανά module** (καθρεφτίζει τον resolver του καθενός: receipt net/ΦΠΑ/κάθε
+  γραμμή, item και τις 3 τιμές, statement minimum/paid/κάθε χρέωση, subscription first charge) + νέα
+  `applyFxRate`/`applyFxRateToCurrency` server actions (`app/reports/fxActions.ts`).
+  **Γιατί είναι ασφαλές**: το `resolveFx` δεν εφευρίσκει ποτέ rate, άρα εγγραφή με `fxRate<=0` **δεν έχει μετατραπεί
+  ποτέ** — κάθε ποσό της είναι ακόμα το τυπωμένο, οπότε η εφαρμογή rate είναι σκέτος πολλαπλασιασμός χωρίς un-convert
+  βήμα, και το `needsFxRate` guard γυρίζει `null` σε ό,τι έχει ήδη rate (**ποτέ δεύτερη μετατροπή**, pinned με τεστ).
+  Τα arrays γράφονται με **dotted paths** (`transactions.3.amount`, `lineItems.0.price`) ώστε να μη χαθεί τίποτα άλλο
+  μέσα στα subdocs (installment info, product links, ονόματα γραμμών).
+- **Εκκρεμούν (επόμενα slices):** `resolveFx` στο email-in (το CSV import έκλεισε στο slice 6)· προαιρετικό δωρεάν
+  rate-feed (phase 2, τώρα το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία (το API τα εκθέτει ήδη σε
+  6 modules).
 - **Αξία (αρχικό):** ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency. Πραγματικό κενό
   (CLAUDE.md). Μεγάλο: αγγίζει schema (amount+currency+rate), aggregations, imports, όλα τα money views.
 - **Module:** cross-cutting (Expenses/Receipts/Statements/Reports + `lib/money.ts`).

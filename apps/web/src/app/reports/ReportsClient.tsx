@@ -18,8 +18,9 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts';
-import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle } from 'lucide-react';
-import { formatMoney } from '@/lib/fx';
+import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check } from 'lucide-react';
+import { formatMoney, convertToBase } from '@/lib/fx';
+import { applyFxRate, applyFxRateToCurrency } from './fxActions';
 import { createGoal, addGoalContribution, deleteGoal } from './goalsActions';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
@@ -143,6 +144,24 @@ const FX_KIND_KEY = {
   bill: 'reports.fxKind.bill',
 } as const;
 
+/**
+ * Group the audit rows by printed currency, biggest exposure first. A rate is a property of
+ * a CURRENCY, not of a record, so this is the unit the user actually fills in: one number
+ * clears every USD row at once, which is the whole point when a bank import made thirty of
+ * them. Rows keep the order the server sorted them in (largest amount first).
+ */
+function groupFxByCurrency(rows: FxIssueRow[]): Array<{ currency: string; rows: FxIssueRow[]; total: number }> {
+  const by = new Map<string, FxIssueRow[]>();
+  for (const r of rows) {
+    const list = by.get(r.currency);
+    if (list) list.push(r);
+    else by.set(r.currency, [r]);
+  }
+  return [...by.entries()]
+    .map(([currency, list]) => ({ currency, rows: list, total: list.reduce((a, r) => a + r.origAmount, 0) }))
+    .sort((a, b) => b.total - a.total);
+}
+
 const tooltipStyle = {
   background: 'var(--color-surface-2)',
   border: '1px solid var(--color-border)',
@@ -155,6 +174,142 @@ function fmtDate(s: string): string {
   if (!s) return '';
   const d = new Date(s);
   return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+/**
+ * One printed currency's worth of rate-less records, with the rate entry that fixes them.
+ * The group rate doubles as the default for every row, so the normal path is "type 0.92
+ * once, press Apply to all"; a row that needs its own rate (a purchase from a different
+ * month) can override it without leaving the panel.
+ */
+function FxCurrencyGroup({ currency, rows, base }: { currency: string; rows: FxIssueRow[]; base: string }) {
+  const t = useT();
+  const [rate, setRate] = useState('');
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const total = rows.reduce((a, r) => a + r.origAmount, 0);
+  const groupRate = Number(rate);
+  const groupRateOk = Number.isFinite(groupRate) && groupRate > 0;
+
+  function applyAll() {
+    if (!groupRateOk) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await applyFxRateToCurrency(currency, groupRate);
+      if (!res.ok) setError(res.error);
+      else setRate('');
+    });
+  }
+
+  return (
+    <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]/60 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <p className="text-[11px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className="text-[color:var(--color-gold)] font-semibold">{currency}</span>
+          {' · '}
+          {rows.length}
+          {' · '}
+          {formatMoney(total, currency)}
+        </p>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {t('reports.fxRateHint', { code: currency, base })}
+          </span>
+          <input
+            type="number"
+            min="0"
+            step="any"
+            inputMode="decimal"
+            value={rate}
+            onChange={(e) => setRate(e.target.value)}
+            placeholder={t('reports.fxRate')}
+            aria-label={t('reports.fxRateHint', { code: currency, base })}
+            className="w-24 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2 py-1 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-gold)]"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          />
+          <button
+            onClick={applyAll}
+            disabled={pending || !groupRateOk}
+            className="text-[11px] px-2.5 py-1 rounded-lg bg-[color:var(--color-gold)] text-black font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {t('reports.fxApplyAll', { n: rows.length })}
+          </button>
+        </div>
+      </div>
+      {error && <p className="text-[11px] text-[color:var(--color-red)] mb-2">{error}</p>}
+      <div className="flex flex-col gap-1.5">
+        {rows.map((f) => (
+          <FxIssueLine key={`${f.kind}-${f.id}`} row={f} base={base} fallbackRate={groupRateOk ? groupRate : 0} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A single rate-less record: what it is, what it printed, and the rate that converts it. */
+function FxIssueLine({ row, base, fallbackRate }: { row: FxIssueRow; base: string; fallbackRate: number }) {
+  const t = useT();
+  const [rate, setRate] = useState('');
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const typed = Number(rate);
+  // An empty row input means "use the group's rate", so the common case needs one number.
+  const effective = Number.isFinite(typed) && typed > 0 ? typed : fallbackRate;
+  const ok = effective > 0;
+
+  function apply() {
+    if (!ok) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await applyFxRate(row.kind, row.id, effective);
+      if (!res.ok) setError(res.error);
+    });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2">
+      <a href={row.href} title={t('reports.fxOpenRecord')} className="min-w-0 flex-1 group">
+        <span className="block text-sm text-[color:var(--color-text)] truncate group-hover:text-[color:var(--color-gold)] transition-colors">{row.title}</span>
+        <span className="block text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
+          {t(FX_KIND_KEY[row.kind])}{row.subtitle ? ` · ${row.subtitle}` : ''}
+        </span>
+      </a>
+      <span className="text-sm font-semibold text-[color:var(--color-gold)] whitespace-nowrap" style={{ fontFamily: 'var(--font-mono)' }}>
+        {formatMoney(row.origAmount, row.currency)}
+      </span>
+      <div className="flex items-center gap-1.5">
+        {/* Live preview of what will actually be stored, so a mistyped rate is visible
+            before it is written rather than after. */}
+        {ok && (
+          <span className="text-[11px] text-[color:var(--color-text-dim)] whitespace-nowrap" style={{ fontFamily: 'var(--font-mono)' }}>
+            → {formatMoney(convertToBase(row.origAmount, effective), base)}
+          </span>
+        )}
+        <input
+          type="number"
+          min="0"
+          step="any"
+          inputMode="decimal"
+          value={rate}
+          onChange={(e) => setRate(e.target.value)}
+          placeholder={fallbackRate > 0 ? String(fallbackRate) : t('reports.fxRate')}
+          aria-label={t('reports.fxRateHint', { code: row.currency, base })}
+          className="w-20 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2 py-1 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-gold)]"
+          style={{ fontFamily: 'var(--font-mono)' }}
+        />
+        <button
+          onClick={apply}
+          disabled={pending || !ok}
+          className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          title={t('reports.fxApplyOne')}
+          aria-label={t('reports.fxApplyOne')}
+        >
+          <Check size={15} />
+        </button>
+      </div>
+      {error && <p className="w-full text-[11px] text-[color:var(--color-red)]">{error}</p>}
+    </div>
+  );
 }
 
 export function ReportsClient({ data, months = 12 }: { data: Data; months?: number }) {
@@ -187,7 +342,10 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
 
       {/* Missing exchange rates (P9 slice 7) — foreign records saved without a rate keep
           their PRINTED amount, so they are silently mixed into every figure below. Shown
-          above the numbers they distort, and only when there is something to fix. */}
+          above the numbers they distort, and only when there is something to fix.
+          Slice 9: the rate can be filled in HERE, per record or per currency, because the
+          records are spread over six modules and chasing them one form at a time is the
+          reason they stay unfixed. */}
       {fxIssues.length > 0 && (
         <div className="mb-6 rounded-2xl border border-[color:var(--color-gold)]/40 bg-[color:var(--color-gold)]/5 p-5">
           <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-[color:var(--color-gold)] mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -196,27 +354,14 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           <p className="text-[11px] text-[color:var(--color-text-dim)] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
             {t('reports.fxMissingNote', { base: fxBase })}
           </p>
-          <div className="flex flex-col gap-1.5">
-            {fxIssues.map((f) => (
-              <a
-                key={`${f.kind}-${f.id}`}
-                href={f.href}
-                className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2 hover:border-[color:var(--color-gold)]/50 transition-colors"
-              >
-                <span className="min-w-0">
-                  <span className="block text-sm text-[color:var(--color-text)] truncate">{f.title}</span>
-                  <span className="block text-[10px] text-[color:var(--color-text-faint)] truncate" style={{ fontFamily: 'var(--font-mono)' }}>
-                    {t(FX_KIND_KEY[f.kind])}{f.subtitle ? ` · ${f.subtitle}` : ''}
-                  </span>
-                </span>
-                <span className="text-sm font-semibold text-[color:var(--color-gold)] whitespace-nowrap" style={{ fontFamily: 'var(--font-mono)' }}>
-                  {formatMoney(f.origAmount, f.currency)}
-                </span>
-              </a>
+          <div className="flex flex-col gap-4">
+            {groupFxByCurrency(fxIssues).map((g) => (
+              <FxCurrencyGroup key={g.currency} currency={g.currency} rows={g.rows} base={fxBase} />
             ))}
           </div>
         </div>
       )}
+
 
       {/* Net worth (PA2) — assets (inventory + manual accounts) minus liabilities
           (remaining installments + card balances), with the monthly snapshot trend */}

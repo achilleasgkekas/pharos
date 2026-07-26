@@ -1366,7 +1366,14 @@ export const en = {
   // P9 slice 7 — missing exchange rates audit
   'reports.fxMissing': '{n} entries need an exchange rate',
   'reports.fxMissingNote':
-    'These were saved in a foreign currency without a rate, so their printed amount is still counted as {base} in every total below. Open one to add its rate.',
+    'These were saved in a foreign currency without a rate, so their printed amount is still counted as {base} in every total below. Enter a rate to convert them.',
+  // P9 slice 9 — set the rate in place, per currency or per record
+  'reports.fxRate': 'Rate',
+  'reports.fxRateHint': '1 {code} = ? {base}',
+  'reports.fxApplyAll': 'Apply to all {n}',
+  'reports.fxApplyOne': 'Apply',
+  'reports.fxOpenRecord': 'Open record',
+  'reports.fxNoneApplied': 'Nothing left to convert',
   'reports.fxKind.expense': 'Expense',
   'reports.fxKind.income': 'Income',
   'reports.fxKind.receipt': 'Receipt',
