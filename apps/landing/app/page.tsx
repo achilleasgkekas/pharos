@@ -538,6 +538,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. On any expense you paid, a built-in Splitwise-lite editor lets you add people by name (no account needed for them) and set each share, or press "Split equally" with an optional slice for yourself. Cards show a small badge with what is still owed on that expense, and a "Balances, who owes you" view rolls every split into a per-person total. When someone pays you back you settle them up in one click across all their shares at once. It stays dormant until you split something, so nothing changes for expenses you keep to yourself.',
   },
   {
+    q: 'Can I keep a manual or warranty PDF with an item?',
+    a: 'Yes. Every item has a document vault, separate from its photo gallery, for anything you would otherwise lose in a downloads folder: a manual, a warranty certificate, a scanned serial-number sticker, in any file type. Upload, rename, and delete as the pile grows. It shows up read-only on the mobile app too, so you can pull up a manual standing in front of the thing it belongs to. The insurance export below bundles this vault straight into its ZIP.',
+  },
+  {
     q: 'Can it produce an export for an insurance claim?',
     a: 'Yes. Settings → Storage & backup has a one-click "Insurance export (ZIP)" that bundles a CSV manifest and a standalone printable HTML report of every owned item, its value, serial number, and warranty, together with its photos, manuals, and linked receipts, exactly what an insurer asks for after a claim. Values use the same depreciation-adjusted estimate as Reports, so aging gear is not overstated.',
   },

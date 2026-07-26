@@ -3972,3 +3972,64 @@ vault, ή polish συνεχεια / real app screenshots οταν υπαρξου
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-26 (6) — P21 item document/manual vault gets its own FAQ
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` (146 γραμμες)
+ελεγχθηκε, καμια καταχωρηση αφορα τη landing routine (ολα bakecore + pharos-daily-dev mobile-camera),
+τιποτα ANSWERED προς αυτη τη routine.
+
+`git log --oneline 7e4e62b..HEAD | grep "feat("` (7e4e62b = τελευταιο commit που αντικατοπτριστηκε στο
+landing, βλ. προηγουμενο entry) εβγαλε δυο: `cd594d9 feat(landing): document product URL import's...`
+(το ιδιο το προηγουμενο commit αυτης της routine, ηδη reflected) και `8be7040 feat(mobile): foreign-currency
+expenses from the phone (P9)`.
+
+Read-only research (commit message, χωρις subagent): το `8be7040` φερνει το mobile API v1 expenses/income
+route σε parity με το ηδη-documented web multi-currency behaviour (η landing FAQ ηδη ελεγε "the expense,
+income, receipt, subscription, item, and statement forms grow a currency picker" γενικα, χωρις να διακρινει
+web απο mobile) plus ενα display-bug fix (list/header χρησιμοποιουσαν `rows[0].currency` αντι για base
+currency). Δεδομενου οτι η υπαρχουσα multi-currency FAQ ηδη καλυπτει expenses/income χωρις platform
+διακριση, δεν βρηκα νεο user-facing ισχυρισμο που να αξιζει νεα προταση εκει· θα ηταν αναδιατυπωση χωρις
+νεο περιεχομενο.
+
+Αντ' αυτου διαλεξα ενα ηδη-shipped αλλα ΑΤΕΚΜΗΡΙΩΤΟ feature απο τη λιστα υποψηφιων του προηγουμενου entry:
+**P21, το per-item document/manual vault** (`ab2687e feat(mobile): item document/manual vault, read-only
+(P21 mobile parity)`, mobile πλευρα· η ιδια η web λειτουργια ηταν ηδη shipped νωριτερα, `apps/web/src/app/
+items/ItemDocuments.tsx`). Διαβασα το `ItemDocuments.tsx` (upload/rename via re-upload/delete, οποιοδηποτε
+file type, ξεχωριστο απο το photo gallery) + το commit του mobile parity (read-only Documents section στο
+item detail, mirroring Photos/Links, non-image files → explanatory alert αντι για broken tap-open). Η
+landing FAQ ανεφερε ηδη εμμεσα τα "photos, manuals, and linked receipts" μεσα στο insurance-export bundle
+(γραμμη 541-542, αμεταβλητη) αλλα ΔΕΝ υπηρχε καμια FAQ που να εξηγει το ιδιο το vault feature (upload
+manual/warranty PDF σε ενα item) πριν φτασει στο export.
+
+Αλλαγη (`apps/landing/app/page.tsx`, νεα FAQ εγγραφη, εισηχθηκε αμεσως ΠΡΙΝ την ηδη-υπαρχουσα "Can it
+produce an export for an insurance claim?" ωστε η σειρα να ακολουθει τη φυσικη ροη, vault πρωτα, export
+που το χρησιμοποιει μετα): "Can I keep a manual or warranty PDF with an item?" / "Yes. Every item has a
+document vault, separate from its photo gallery, for anything you would otherwise lose in a downloads
+folder: a manual, a warranty certificate, a scanned serial-number sticker, in any file type. Upload,
+rename, and delete as the pile grows. It shows up read-only on the mobile app too, so you can pull up a
+manual standing in front of the thing it belongs to. The insurance export below bundles this vault
+straight into its ZIP." Η υπαρχουσα insurance-export FAQ δεν αλλαξε.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη).
+- Πορτες 3100-3130: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build.
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `javascript_tool` (μεσω `document.body.textContent`) επιβεβαιωσε ολα τα checks true: νεα ερωτηση παρουσα,
+  νεο σωμα ("a manual, a warranty certificate, a scanned serial-number sticker") παρον, το mobile-mention
+  ("It shows up read-only on the mobile app too") παρον, η γειτονικη insurance-export FAQ αμεταβλητη και
+  παρουσα. Hero screenshot καθαρο (lighthouse mark, gradient τιτλος, nav, τριπλο badge row). Server
+  τερματιστηκε (`pkill -f "next start -p 3110"`), κανενα `next-server` process δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx (`grep -c` UTF-8 byte pattern).
+- Δεν αγγιξα Docker/:3000/web/mobile. Μηδεν subagent, μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: νεος `git log --oneline 8be7040..HEAD | grep "feat("` ελεγχος στην αρχη του επομενου
+run. Αλλιως candidates: P22 receipt line-item search subtitle (μικρη προσθηκη στην ηδη-υπαρχουσα AI-command-
+bar/global-search FAQ, γραμμη ~458, οτι ενα query που ταιριαζει σε line-item αντι για store δειχνει ποιο
+προϊον ταιριαξε), ή polish συνεχεια / real app screenshots οταν υπαρξουν assets (blocked).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
