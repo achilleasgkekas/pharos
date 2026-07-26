@@ -2,7 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C, RADIUS } from '../theme';
 import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button, Chip, ListItem, ModalSheet, contentWidth } from '../ui';
-import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
+import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, getSettings, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
+import { FxBadge, FxFields } from '../FxControls';
+import { isForeign, normalizeCurrency, toPrinted } from '../fx';
 
 function verdictMeta(v: Verdict): { label: string; color: string } | null {
   switch (v) {
@@ -28,8 +30,10 @@ function fmtSize(bytes: number): string {
 }
 
 /** Read-only price picture mirroring the web PricePanel: best-now + verdict, position bar,
- *  where-to-buy (tap → open store), log-a-price, full history, photos, warranty, links. */
-function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () => void }) {
+ *  where-to-buy (tap → open store), log-a-price, full history, photos, warranty, links.
+ *  `base` is the deployment's base currency: every figure here is denominated in it (the
+ *  store-link and history prices are the web's known exception, left exactly as quoted). */
+function PriceBlock({ detail, base, onChanged }: { detail: ItemDetail; base: string; onChanged: () => void }) {
   const p = detail.price;
   const [logging, setLogging] = useState(false);
   const [lprice, setLprice] = useState('');
@@ -54,12 +58,12 @@ function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () =
       {/* Hero best-now + verdict */}
       <View style={pb.heroRow}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-          <Text style={pb.hero}>{p.bestNow ? money(p.bestNow.price) : '—'}</Text>
+          <Text style={pb.hero}>{p.bestNow ? money(p.bestNow.price, base) : '—'}</Text>
           {!!p.bestNow?.store && <Text style={pb.heroAt}>at {p.bestNow.store}</Text>}
         </View>
         {p.trend !== 0 && (
           <Text style={[pb.trend, { color: p.trend < 0 ? C.accent : C.gold }]}>
-            {p.trend < 0 ? '↓' : '↑'} {money(Math.abs(p.trend))}
+            {p.trend < 0 ? '↓' : '↑'} {money(Math.abs(p.trend), base)}
           </Text>
         )}
       </View>
@@ -75,9 +79,9 @@ function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () =
             <View style={[pb.dot, { left: clampPct(((p.bestNow!.price - p.lo!) / (p.hi! - p.lo!)) * 100) }]} />
           </View>
           <View style={pb.scaleRow}>
-            <Text style={[pb.scale, { color: C.accent }]}>low {money(p.lo!)}</Text>
-            {p.target != null && <Text style={[pb.scale, { color: C.cyan }]}>target {money(p.target)}</Text>}
-            <Text style={pb.scale}>high {money(p.hi!)}</Text>
+            <Text style={[pb.scale, { color: C.accent }]}>low {money(p.lo!, base)}</Text>
+            {p.target != null && <Text style={[pb.scale, { color: C.cyan }]}>target {money(p.target, base)}</Text>}
+            <Text style={pb.scale}>high {money(p.hi!, base)}</Text>
           </View>
         </View>
       )}
@@ -91,7 +95,7 @@ function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () =
               <View style={[pb.storeDot, { backgroundColor: i === 0 ? C.accent : C.faint }]} />
               <Text style={pb.storeName} numberOfLines={1}>{st.store}</Text>
               {i === 0 && p.stores.length > 1 && <Text style={pb.cheapest}>CHEAPEST</Text>}
-              <Text style={pb.storePrice}>{money(st.price)}</Text>
+              <Text style={pb.storePrice}>{money(st.price, base)}</Text>
               <Text style={pb.openIcon}>↗</Text>
             </Pressable>
           ))}
@@ -101,7 +105,7 @@ function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () =
       {/* Target + Log a price */}
       <View style={pb.actionRow}>
         {p.target != null ? (
-          <Text style={pb.targetTxt}>🎯 {money(p.target)}{toGo != null && (toGo <= 0 ? ' · reached' : ` · ${money(toGo)} to go`)}</Text>
+          <Text style={pb.targetTxt}>🎯 {money(p.target, base)}{toGo != null && (toGo <= 0 ? ' · reached' : ` · ${money(toGo, base)} to go`)}</Text>
         ) : <View />}
         {!logging && <Pressable onPress={() => setLogging(true)}><Text style={pb.logBtn}>＋ Log a price</Text></Pressable>}
       </View>
@@ -121,7 +125,7 @@ function PriceBlock({ detail, onChanged }: { detail: ItemDetail; onChanged: () =
           <Pressable onPress={() => setShowHist((h) => !h)}><Text style={pb.histToggle}>{showHist ? '▾' : '▸'} Full history · {detail.priceHistory.length}</Text></Pressable>
           {showHist && detail.priceHistory.slice(0, 30).map((e, i) => (
             <View key={i} style={pb.histRow}>
-              <Text style={pb.histPrice}>{money(e.price)}</Text>
+              <Text style={pb.histPrice}>{money(e.price, base)}</Text>
               <Text style={pb.histStore} numberOfLines={1}>{e.store}</Text>
               <Text style={pb.histDate}>{new Date(e.date).toLocaleDateString('en-GB')}</Text>
             </View>
@@ -195,7 +199,7 @@ function monthLabel(iso: string): string {
 /** Link this item to a credit-card installment plan (δόσεις). A purchase paid monthly
  *  shows up as one plan; attaching it surfaces payoff on the product. Mirror of the web
  *  "Link a δόσεις plan" picker. Loads lazily on first expand. */
-function PlansBlock({ itemId }: { itemId: string }) {
+function PlansBlock({ itemId, base }: { itemId: string; base: string }) {
   const [open, setOpen] = useState(false);
   const [plans, setPlans] = useState<InstallmentPlanRow[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -232,8 +236,8 @@ function PlansBlock({ itemId }: { itemId: string }) {
           <View style={{ flex: 1 }}>
             <Text style={pl.linkedLabel} numberOfLines={1}>💳 {p.label}</Text>
             <Text style={pl.linkedMeta}>
-              {money(p.perAmount)}/mo · {p.paidInstallments}/{p.totalInstallments}
-              {p.done ? ' · paid off' : ` · ${money(p.remainingAmount)} left`}
+              {money(p.perAmount, base)}/mo · {p.paidInstallments}/{p.totalInstallments}
+              {p.done ? ' · paid off' : ` · ${money(p.remainingAmount, base)} left`}
             </Text>
           </View>
           <Pressable onPress={() => unlink(p.signature)} disabled={busy === p.signature} hitSlop={8}>
@@ -255,7 +259,7 @@ function PlansBlock({ itemId }: { itemId: string }) {
               <View style={{ flex: 1 }}>
                 <Text style={pl.availLabel} numberOfLines={1}>{p.label}</Text>
                 <Text style={pl.availMeta}>
-                  {p.card} · {money(p.perAmount)}/mo · {p.paidInstallments}/{p.totalInstallments}
+                  {p.card} · {money(p.perAmount, base)}/mo · {p.paidInstallments}/{p.totalInstallments}
                   {p.done ? ' · done' : ` · ends ${monthLabel(p.projectedEndDate)}`}
                   {p.itemCount > 0 ? ` · ${p.itemCount} linked` : ''}
                 </Text>
@@ -284,12 +288,28 @@ export function ItemsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // P9: the base currency every stored price is denominated in, plus the switch that decides
+  // whether the FX controls exist at all. Read from the server, never guessed from a row — an
+  // item's `currency` says what the SHOP printed, not what the numbers below are.
+  const [base, setBase] = useState('EUR');
+  const [multiCurrency, setMultiCurrency] = useState(false);
 
   const load = useCallback(async () => {
     setErr(null);
     try { setRows(await getItems(filter)); } catch (e) { setErr((e as Error).message); }
   }, [filter]);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
+  // Separate, non-blocking read: a failure here (older server, offline) must leave the screen
+  // working exactly as it did before multi-currency existed.
+  useEffect(() => {
+    (async () => {
+      try {
+        const st = await getSettings();
+        setBase(normalizeCurrency(st.currency) || 'EUR');
+        setMultiCurrency(!!st.multiCurrency);
+      } catch { /* keep the EUR / single-currency defaults */ }
+    })();
+  }, []);
   const onRefresh = useCallback(async () => { setRefreshing(true); await load(); setRefreshing(false); }, [load]);
 
   const [importing, setImporting] = useState(false);
@@ -308,7 +328,7 @@ export function ItemsScreen() {
     try {
       const r = await importItemUrl(url, 'shopping');
       setTitle(''); setFilter('shopping'); await load();
-      Alert.alert(r.updated ? 'Updated existing' : 'Added to shopping', `${r.title}${r.price ? `  ·  ${money(r.price)}` : ''}  ·  ${r.store}`);
+      Alert.alert(r.updated ? 'Updated existing' : 'Added to shopping', `${r.title}${r.price ? `  ·  ${money(r.price, base)}` : ''}  ·  ${r.store}`);
     } catch (e) { setErr((e as Error).message); }
     finally { setImporting(false); }
   }
@@ -327,6 +347,8 @@ export function ItemsScreen() {
   const [ePrice, setEPrice] = useState('');
   const [eTarget, setETarget] = useState('');
   const [eSpecs, setESpecs] = useState('');
+  const [eCurrency, setECurrency] = useState('');
+  const [eFxRate, setEFxRate] = useState('');
   const [saving, setSaving] = useState(false);
   const [converting, setConverting] = useState(false);
   const [aiFilling, setAiFilling] = useState<null | 'specs' | 'info'>(null);
@@ -340,13 +362,22 @@ export function ItemsScreen() {
   }, []);
 
   function openEdit(it: Item) {
+    // P9: the stored prices are base currency, but the form edits PRINTED figures — otherwise
+    // re-saving an untouched foreign item would convert an already-converted number. Only the
+    // anchor keeps its printed value in `origAmount`, so the rest is un-converted with the
+    // stored rate (mirrors the web ItemForm; base-currency items pass straight through).
+    const storedRate = isForeign(it.currency, base) ? it.fxRate || 0 : 0;
+    const printed = (v: number | null | undefined): number | null =>
+      v == null ? null : storedRate > 0 ? toPrinted(v, storedRate) : v;
     setEditing(it);
     setETitle(it.title);
     setEStatus(it.status || 'researching');
     setECategory(it.category || '');
-    setEPrice(it.currentPrice ? String(it.currentPrice) : '');
-    setETarget(it.targetPrice != null ? String(it.targetPrice) : '');
+    setEPrice(it.currentPrice ? String(printed(it.currentPrice)) : '');
+    setETarget(it.targetPrice != null ? String(printed(it.targetPrice)) : '');
     setESpecs(it.specs || '');
+    setECurrency(isForeign(it.currency, base) ? normalizeCurrency(it.currency) : base);
+    setEFxRate(storedRate > 0 ? String(it.fxRate) : '');
     setDetail(null);
     loadDetail(it.id);
   }
@@ -364,6 +395,10 @@ export function ItemsScreen() {
         currentPrice: Number.isFinite(price) ? price : undefined,
         targetPrice: target != null && Number.isFinite(target) ? target : null,
         specs: eSpecs.trim(),
+        // Only ever sent when the deployment has multi-currency on; otherwise the request is
+        // byte-for-byte the one this screen sent before P9 existed. Sending them makes the
+        // server re-resolve ALL prices together from the printed figures above.
+        ...(multiCurrency ? { currency: eCurrency || base, fxRate: Number(eFxRate) || 0 } : {}),
       });
       setEditing(null);
       await load();
@@ -397,6 +432,16 @@ export function ItemsScreen() {
     finally { setAiFilling(null); }
   }
 
+  // P9: the figure the conversion preview (and the "charged" back-out) works on — what was
+  // PAID when the item is owned, otherwise the asking price, exactly like resolveItemPrices()
+  // server-side. The stored paid price is base currency, so it is un-converted first.
+  const editStoredRate = editing && isForeign(editing.currency, base) ? editing.fxRate || 0 : 0;
+  const paidPrinted =
+    editing?.purchasedPrice != null && editing.purchasedPrice > 0
+      ? editStoredRate > 0 ? toPrinted(editing.purchasedPrice, editStoredRate) : editing.purchasedPrice
+      : 0;
+  const anchorPrice = paidPrinted > 0 ? paidPrinted : parseFloat(ePrice.replace(',', '.')) || 0;
+
   return (
     <View style={s.wrap}>
       <View style={s.filters}>
@@ -426,7 +471,12 @@ export function ItemsScreen() {
                   <Text style={s.title}>{item.title}</Text>
                   <Text style={s.meta}>{item.status}</Text>
                 </View>
-                {price > 0 && <Text style={s.price}>{money(price)}</Text>}
+                {/* The price is base currency even on a foreign item, so it carries the base
+                    symbol; the badge next to it is what the shop actually printed. */}
+                <View style={{ alignItems: 'flex-end' }}>
+                  {price > 0 && <Text style={s.price}>{money(price, base)}</Text>}
+                  <FxBadge doc={item} base={base} />
+                </View>
               </ListItem>
             );
           }}
@@ -437,8 +487,8 @@ export function ItemsScreen() {
             <ScrollView keyboardShouldPersistTaps="handled">
               <Text style={s.modalTitle}>Edit item</Text>
               {detailLoading && <ActivityIndicator color={C.accent} style={{ marginVertical: 14 }} />}
-              {detail && <PriceBlock detail={detail} onChanged={async () => { if (editing) await loadDetail(editing.id); await load(); }} />}
-              {editing && <PlansBlock itemId={editing.id} />}
+              {detail && <PriceBlock detail={detail} base={base} onChanged={async () => { if (editing) await loadDetail(editing.id); await load(); }} />}
+              {editing && <PlansBlock itemId={editing.id} base={base} />}
               <Text style={s.mlabel}>TITLE</Text>
               <Input variant="modal" value={eTitle} onChangeText={setETitle} />
               <Text style={s.mlabel}>STATUS</Text>
@@ -459,6 +509,21 @@ export function ItemsScreen() {
                   <Input variant="modal" value={eTarget} onChangeText={setETarget} keyboardType="decimal-pad" placeholder="—" />
                 </View>
               </View>
+              {/* P9: the currency the two prices above are printed in. The preview converts the
+                  ANCHOR price (what was paid when the item is owned, else the asking price),
+                  which is the same figure the server stores in `origAmount`. */}
+              {multiCurrency && (
+                <FxFields
+                  amount={anchorPrice}
+                  currency={eCurrency || base}
+                  fxRate={eFxRate}
+                  base={base}
+                  onChange={(p) => {
+                    if (p.currency !== undefined) setECurrency(p.currency);
+                    if (p.fxRate !== undefined) setEFxRate(p.fxRate);
+                  }}
+                />
+              )}
               <Text style={s.mlabel}>SPECS</Text>
               <TextArea variant="modal" value={eSpecs} onChangeText={setESpecs} style={s.specs} placeholder="notes / specs" />
               <View style={s.aiBar}>

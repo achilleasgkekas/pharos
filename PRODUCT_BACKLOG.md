@@ -1169,7 +1169,7 @@
   enable notifications) με progress ticks → activation. **Διακριτό** από P1 (demo data) — εδώ τα *δικά του* δεδομένα.
 - **Module:** Homepage / Dashboard (dismissable card) + Settings state reads.
 
-### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + 7 MODULES + ΟΛΑ ΤΑ IMPORTS (CSV, email-in, URL) + AUDIT/INLINE-FIX SHIPPED (τελευταίο 2026-07-26, pharos-daily-dev), μόνο το rate-feed εκκρεμεί
+### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + 7 MODULES + ΟΛΑ ΤΑ IMPORTS (CSV, email-in, URL) + AUDIT/INLINE-FIX + MOBILE UI 4/6 (Expenses, Bills, Subscriptions, Items) SHIPPED (τελευταίο 2026-07-26, pharos-daily-dev), εκκρεμούν rate-feed + mobile Receipts/Statements
 - **Τι χτίστηκε (slice 1 από L item):** νέο pure **`lib/fx.ts`** (+25 unit tests, client-safe, DB-free) που κρατά
   **ΤΟΝ ΕΝΑΝ κανόνα** σε ένα μέρος: `normalizeCurrency`, `isForeignCurrency`, `convertToBase`, `deriveFxRate`,
   `resolveFx`, `formatMoney`, `fxBadgeLabel`. **Κλειδωμένη αρχιτεκτονική απόφαση (builder default, μηδέν migration):
@@ -1281,8 +1281,16 @@
   νόμισμα παραλείφθηκε — ίδιος κανόνας σε `importItemFromUrl`, `confirmImportItem` και το refresh τιμών του
   `aiFillItem`. Νέα pure `effectiveCurrency`/`sameCurrency` (`lib/fx.ts`) + νέο test file
   `items/actions.urlImport.test.ts` (21 tests, το URL-import concern που είχε μείνει ανοιχτό).
+- **Τι χτίστηκε (mobile slice — Items, 2026-07-26):** το `FxControls` (badge + currency/rate/«charged» πεδία) καλωδιώθηκε
+  στο `ItemsScreen`, μετά τα Expenses/Bills/Subscriptions. Μηδέν αλλαγή στο server. **Διαφορά**: ένα item έχει ΤΡΕΙΣ τιμές
+  και μόνο η anchor (paid αν owned, αλλιώς asking) κρατά την τυπωμένη τιμή στο `origAmount`, οπότε η φόρμα ξε-μετατρέπει
+  price/target με νέο `toPrinted()` (mobile mirror του web) πριν τα δείξει· χωρίς αυτό ένα re-save χωρίς αλλαγή θα τα
+  μετέτρεπε δεύτερη φορά. Το preview/back-out δουλεύει πάνω στην anchor, ίδιος κανόνας με το `resolveItemPrices()`.
+  Μαζί: κάθε ποσό της οθόνης (λίστα, PricePanel, installment plans, URL-import alert) τύπωνε το hardcoded EUR fallback
+  του `money()` → τώρα περνά τη base currency.
 - **Εκκρεμούν (επόμενα slices):** προαιρετικό δωρεάν rate-feed (phase 2, τώρα το rate είναι χειροκίνητο by design)·
-  mobile UI για τα 2 νέα πεδία (το API τα εκθέτει ήδη σε 6 modules)· τα `links[].price`/`priceHistory[].price` ενός item
+  mobile UI στα εναπομείναντα modules (Receipts, Statements· Expenses/Bills/Subscriptions/Items έγιναν)·
+  τα `links[].price`/`priceHistory[].price` ενός item
   μένουν **τυπωμένα** (δεν μετατρέπονται μαζί με τις 3 headline τιμές) — γνωστό όριο του μοντέλου του slice 4.
 - **Αξία (αρχικό):** ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency. Πραγματικό κενό
   (CLAUDE.md). Μεγάλο: αγγίζει schema (amount+currency+rate), aggregations, imports, όλα τα money views.

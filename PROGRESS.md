@@ -6,6 +6,54 @@
 <!-- docker-validated: 7b46912 -->
 <!-- ui-audited: 0bc5e14 -->
 
+## 2026-07-26 (cont.⁷ — P9 mobile: Items, και τρεις τιμές που δεν είναι όλες anchor)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση
+`expo-camera` για P17/P23) παραμένει **OPEN χωρίς Answer**, οπότε τα δύο items μένουν μπλοκαρισμένα και δεν τα άγγιξα.
+Working tree καθαρό στην αρχή. Μηδέν Docker (η αλλαγή είναι αποκλειστικά mobile, το mutex δεν χρειάστηκε).
+
+**Approved queue (βήμα a)**: τα εναπομείναντα unbuilt Approved είναι P36 (θέλει την απόφαση provider σου), P31
+(θέλει supervised session), P23/P17 (μπλοκαρισμένα στο `expo-camera`), P16 Firefly/Grocy (θέλει πραγματικό δείγμα
+αρχείου) και **P9**, που έχει ακόμα δύο buildable κομμάτια: το προαιρετικό rate-feed (phase 2 by design) και το
+**mobile UI**. Διάλεξα το mobile UI, το **Items**, δηλαδή το μεγαλύτερο module που έμενε μετά τα Expenses/Bills/
+Subscriptions.
+
+**Τι έγινε**: μηδέν δουλειά στο server — τα `/api/v1/items` POST/PATCH δέχονταν ήδη `currency`/`fxRate` και το
+GET/detail τα επέστρεφε από το slice 4. Καθαρό wiring του κοινού `FxControls` στο edit modal + `<FxBadge>` στη λίστα +
+base currency/`multiCurrency` από `GET /api/v1/settings` (ίδιο non-blocking read με τα άλλα screens: αποτυχία εκεί
+αφήνει την οθόνη ακριβώς όπως ήταν πριν το P9).
+
+**Η διαφορά από τα προηγούμενα mobile slices** (και ο λόγος που δεν ήταν copy-paste): ένα item έχει **ΤΡΕΙΣ** τιμές
+(paid / current / target) και **μόνο η anchor** (τι πλήρωσες αν είναι owned, αλλιώς η τιμή ζήτησης) κρατά την τυπωμένη
+τιμή της στο `origAmount` — οι υπόλοιπες αποθηκεύονται **μετατρεπμένες**. Το `printedAmount()` που χρησιμοποιούν τα
+bills/subscriptions κοιτά μόνο το `origAmount`, άρα εδώ δεν φτάνει: πρόσθεσα **`toPrinted()`** στο mobile `fx.ts`
+(mirror του web) και η φόρμα ξε-μετατρέπει price+target με το αποθηκευμένο rate πριν τα δείξει. Χωρίς αυτό, ένα
+re-save χωρίς καμία αλλαγή θα έστελνε ήδη-μετατρεπμένους αριθμούς σαν τυπωμένους και θα τους μετέτρεπε **δεύτερη
+φορά**. Για τον ίδιο λόγο το preview και το «charged» back-out δουλεύουν πάνω στην **anchor** (paid printed αν >0,
+αλλιώς το πεδίο price), ακριβώς όπως το `resolveItemPrices()` του server, όχι πάνω στο πεδίο που τυχαίνει να πληκτρολογεί
+ο χρήστης.
+
+**Bug που έκλεισε στην πορεία**: **κάθε** ποσό αυτής της οθόνης (λίστα, PricePanel hero/low-target-high/where-to-buy/
+history, τα linked+available installment plans, το alert του URL-import) καλούσε `money()` **χωρίς currency**, δηλαδή
+τύπωνε το hardcoded `€` fallback. Σε οποιοδήποτε non-EUR deployment ήταν λάθος σύμβολο πάνω σε σωστό ποσό — ίδια κλάση
+με το bug που είχε βρεθεί στα Subscriptions/Bills. Πλέον όλα περνούν τη base currency (τα store-link και history ποσά
+μένουν όπως τα quote-άρει το κατάστημα, γνωστό όριο του web μοντέλου, ίδιο και εδώ).
+
+**Verify**: `npx tsc --noEmit` (mobile) **EXIT 0**. Δεν υπάρχει mobile test runner και ο simulator δεν τρέχει
+unattended, οπότε το υπόλοιπο είναι code review: επιβεβαίωσα ότι σε single-currency deployment (`multiCurrency` off) το
+request είναι **byte-for-byte** το ίδιο με πριν (τα currency/fxRate μπαίνουν μόνο μέσα σε `...(multiCurrency ? … : {})`)
+και ότι το round-trip open→save χωρίς αλλαγή είναι no-op (printed in → printed out, ίδιο rate). Web: **μηδέν αρχείο**
+δεν άγγιξα, άρα κανένα type-check/test/Docker βήμα δεν είχε τι να επαληθεύσει.
+
+**Git hygiene**: explicit `git add` 5 αρχείων (όχι `-A`).
+
+**Επόμενο task (πρόταση)**: **P9 mobile slice 5 — Receipts**. Είναι το επόμενο μεγαλύτερο money screen και έχει την
+ίδια «πολλά ποσά, ένα rate» δομή με τα items (total + net + ΦΠΑ + τιμές γραμμών), οπότε το `toPrinted()` που μόλις
+μπήκε καλύπτει ήδη το δύσκολο κομμάτι· μένουν τα Statements (read-mostly, μικρότερο) μετά. Ως συνήθως τρέξε **πρώτα**
+τον έλεγχο του Approved queue: αν έχει απαντηθεί το `expo-camera` ερώτημα, το P17 camera UI προηγείται.
+
+---
+
 ## 2026-07-26 (reviewer routine — 60η σάρωση, P9 multi-currency batch review)
 
 **Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: μηδέν entry addressed στο `reviewer` routine (τα OPEN entries είναι όλα bakecore/pharos-daily-dev). Working tree καθαρό στην αρχή.

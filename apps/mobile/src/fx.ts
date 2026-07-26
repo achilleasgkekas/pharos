@@ -43,6 +43,20 @@ export function convertToBase(origAmount: number, fxRate: number): number {
   return Math.round(a * r * 100) / 100;
 }
 
+/**
+ * Inverse of convertToBase: the printed figure behind a stored base-currency one. Needed by
+ * records that carry MORE than one amount (an item's price/target/paid trio), where only the
+ * anchor keeps its printed value in `origAmount` and the rest are stored converted. Rate <= 0
+ * (unknown) means nothing was converted, so pass through.
+ */
+export function toPrinted(baseAmount: number, fxRate: number): number {
+  const a = Number(baseAmount);
+  const r = Number(fxRate);
+  if (!Number.isFinite(a)) return 0;
+  if (!Number.isFinite(r) || r <= 0) return a;
+  return Math.round((a / r) * 100) / 100;
+}
+
 /** Back out the rate from "$88 hit my card as EUR 81.20" -> 0.922727. 6dp, like the web. */
 export function deriveFxRate(origAmount: number, baseAmount: number): number {
   const a = Number(origAmount);

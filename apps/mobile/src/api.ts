@@ -127,7 +127,12 @@ export type RecurringCandidate = { vendorKey: string; vendor: string; category: 
 export type ReceiptSummary = { id: string; store: string; date: string | null; total: number; currency: string; itemCount: number; verified: boolean; archived: boolean; file: string | null; thumb: string | null; returnDaysLeft?: number };
 export type ReceiptLine = { name: string; qty: number; price: number; vatRate: number };
 export type ReceiptDetail = ReceiptSummary & { subtotal: number; vatAmount: number; paymentMethod: string; warrantyMonths: number; notes: string; lineItems: ReceiptLine[] };
-export type Item = { id: string; num: string; title: string; status: string; category: string; currentPrice: number; purchasedPrice: number | null; targetPrice: number | null; specs: string; warrantyUntil: string | null; tags: string[]; photo: string | null };
+/** All three prices are ALWAYS the deployment's base currency (P9); `currency`/`origAmount`/
+ *  `fxRate` describe what the shop/receipt printed. `origAmount` holds the printed ANCHOR
+ *  price: what was PAID when the item is owned, otherwise the asking price, which is the
+ *  figure a person recognises off the paper (server rule: lib/fx.ts resolveItemPrices). Note
+ *  that `links[].price` and `priceHistory[].price` stay printed and are NOT converted. */
+export type Item = { id: string; num: string; title: string; status: string; category: string; currentPrice: number; purchasedPrice: number | null; targetPrice: number | null; currency: string; origAmount: number; fxRate: number; specs: string; warrantyUntil: string | null; tags: string[]; photo: string | null };
 export type ItemLink = { label: string; url: string; price: number | null };
 export type Attachment = { path: string; name: string; mimeType: string; size: number; uploadedAt: string };
 export type PriceEntry = { price: number; store: string; date: string };
@@ -239,7 +244,9 @@ export async function rescanReceipt(id: string, ocr: boolean): Promise<{ receipt
 export async function getItems(status: 'shopping' | 'inventory' | 'all' = 'all'): Promise<Item[]> {
   return (await request<{ data: Item[] }>(`/api/v1/items?status=${status}&limit=300`)).data ?? [];
 }
-export function createItem(data: { title: string; status?: string; category?: string; currentPrice?: number }) {
+/** `currentPrice` is sent as the PRINTED figure; with `currency` + `fxRate` the server
+ *  converts it to base currency before storing (P9). Omit both = single-currency behaviour. */
+export function createItem(data: { title: string; status?: string; category?: string; currentPrice?: number; currency?: string; fxRate?: number }) {
   return request<{ item: Item }>('/api/v1/items', { method: 'POST', body: JSON.stringify(data) });
 }
 export async function getItem(id: string): Promise<ItemDetail> {
@@ -634,7 +641,10 @@ export async function addReceiptToLibrary(id: string): Promise<{ created: number
   const r = await request<{ created: number; linked: number }>(`/api/v1/receipts/${id}/add-to-library`, { method: 'POST' });
   return { created: r.created, linked: r.linked };
 }
-export const updateItem = (id: string, data: { title?: string; status?: string; category?: string; currentPrice?: number; targetPrice?: number | null; specs?: string }) => patch(`/api/v1/items/${id}`, data);
+/** P9: prices are sent as PRINTED figures. Touching ANY money field (currentPrice/targetPrice/
+ *  currency/fxRate) makes the server re-resolve the whole price set together, so a partial
+ *  update can never leave an item half-converted. */
+export const updateItem = (id: string, data: { title?: string; status?: string; category?: string; currentPrice?: number; targetPrice?: number | null; specs?: string; currency?: string; fxRate?: number }) => patch(`/api/v1/items/${id}`, data);
 
 // ---- Stores (Settings → store list management) ----
 export type StoreRow = { id: string; name: string; url: string; aliases: string[]; auto: boolean };
