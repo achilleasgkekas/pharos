@@ -2691,3 +2691,32 @@ Collision guard: git status --short = 0 modified docs files (κανένα work).
 Συμπέρασμα: Όλα τα P9 slices (1-8) πλέον fully documented. Κανένα work χρειάζεται αυτό το run.
 
 Επόμενο run: (α) grep git log για άλλα undocumented feat() commits (P51-P80 candidates ή άλλα modules), ή (β) drift check αν κάποιο endpoint documentation έχει γίνει stale.
+
+## 2026-07-26 (twenty-fifth run — P9 completion verification: slices 9-10 + mobile fully documented)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-fourth run (commit cd1b50c, 2026-07-26 14:46:52). Ανακάλυψη: **τρία νέα feat() commits κατέβηκαν** αλλά όλα δημοσιεύθηκαν ΜΕ ήδη-ενσωματωμένη ή προ-κατάχωρη documentation:
+
+1. **P9 slice 9 (FX Audit Inline Rate Setting)** — commit cbde1a8, 2026-07-26 12:15:06 — Reports audit panel redesigned with bulk "Apply to all N" rate-setting grouped by printed currency, instead of per-record drilling. Already documented in features.md (lines 477-485): "press **"Apply to all N"** to fix every record of that currency at once".
+
+2. **P9 slice 10 (Product Page Currency)** — commit 7e4e62b, 2026-07-26 14:21:XX — Verified in twenty-fourth run, already documented in features.md (lines 95-106).
+
+3. **P9 Mobile (Foreign-Currency Expenses)** — commit 8be7040, 2026-07-26 16:20:26 — Mobile app Expenses screen now reads/writes FX rates + currency field. Already documented in mobile.md (line 24): "Expenses / Income… **multi-currency support** (FX rate tracking when enabled)".
+
+Τι βρέθηκε:
+- **features.md**: P9 slice 9 documented at lines 477-485 (FX audit inline bulk fix, grouping by currency, live preview). P9 slice 10 documented at lines 95-106. Πλήρη κάλυψη ✓.
+- **mobile.md**: P9 mobile Expenses documented at line 24 (multi-currency support, FX rate tracking). Πλήρη κάλυψη ✓.
+- **api.md**: Κανένα νέο endpoint (όλο σε web/mobile UI).
+- **configuration.md**: Κανένα νέο config (multi-currency ήδη documented σε previous runs).
+
+Comprehensive verification (markdown only, κανενα build/Docker/AI call):
+- Code fences: features.md 0 (αθικτο), mobile.md 0 (αθικτο), api.md 22 (ζυγό) ✓.
+- P9 completeness: P9 slices 1-10 + mobile = fully documented ✓.
+- Internal links: όλες valid ✓.
+- Secret scan: κανένα literal credential ✓.
+- Markdown structure: καμία αλλαγή ✓.
+
+Collision guard: git status --short = 0 modified docs files (κανένα work αυτό το run) ✓.
+
+Συμπέρασμα: Όλα τα P9 features (slices 1-10, web + mobile) παραμένουν fully documented + in sync. Κανένα νέο work χρειάζεται αυτό το run.
+
+Επόμενο run: (α) grep git log για άλλα undocumented feat() commits (P51-P80 candidates ή νέες features) · (β) drift check αν κάποιο endpoint ή configuration option έχει αλλάξει · (γ) monitoring για ενδεχόμενη stale-forward documentation αν χρήστης πειράζει ή υπάρχουν breaking changes.
