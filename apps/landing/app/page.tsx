@@ -85,12 +85,6 @@ const FEATURES: {
     title: 'Tasks & planning',
     desc: 'A Kanban board (Todo, In-Progress, Blocked, Done) plus a list view. Quick-add with #tag parsing, drag-and-drop or arrow-key moves between columns, and a per-project progress bar when you filter by tag. Turn any inventory or shopping item straight into a task.',
   },
-  {
-    icon: 'wifi',
-    color: 'var(--gold)',
-    title: 'Network',
-    desc: 'Live UniFi dashboard: WAN status, devices, clients, speedtests, and alerts when something goes offline.',
-  },
 ];
 
 const DEPLOY_TARGETS: string[] = [
@@ -175,7 +169,7 @@ const PERSONAS: { icon: string; color: string; title: string; desc: string }[] =
     icon: 'server',
     color: 'var(--accent)',
     title: 'Homelabbers',
-    desc: 'You already run Proxmox, a NAS, and a UniFi rack. Pharos is the one dashboard that ties your gear, your spend, and your network together, sitting self-hosted right beside everything else you own.',
+    desc: 'You already run Proxmox, a NAS, and a UniFi rack. Pharos is the one dashboard that ties your gear and your spend together, sitting self-hosted right beside everything else you own.',
   },
   {
     icon: 'receipt',
@@ -289,7 +283,7 @@ const SHOWCASE_MODS: { icon: string; color: string; title: string; count: string
   { icon: 'wallet', color: 'var(--red)', title: 'Expenses', count: '3 recurring' },
   { icon: 'ticket', color: 'var(--accent)', title: 'Vouchers', count: '2 expiring' },
   { icon: 'chart', color: 'var(--cyan)', title: 'Reports', count: '12-mo trend' },
-  { icon: 'wifi', color: 'var(--gold)', title: 'Network', count: '31 clients' },
+  { icon: 'kanban', color: 'var(--gold)', title: 'Tasks', count: '9 open' },
 ];
 
 // By-the-numbers proof band, every figure is factual and derivable from the app
@@ -340,10 +334,10 @@ const INTEGRATIONS: { group: string; icon: string; color: string; items: string[
     items: ['Gmail export', 'PDF & image OCR', 'CSV export', 'JSON backup'],
   },
   {
-    group: 'Network & alerts',
-    icon: 'wifi',
+    group: 'Alerts & automation',
+    icon: 'bell',
     color: 'var(--gold)',
-    items: ['UniFi monitoring', 'Speedtest', 'ntfy push', 'Price-drop alerts'],
+    items: ['ntfy push', 'Price-drop alerts', 'Budget alerts', 'Webhook automation'],
   },
 ];
 
@@ -408,7 +402,7 @@ const ROADMAP: {
       'Inventory, shopping & multi-store price tracking',
       'AI receipt, expense & voucher scanning',
       'Card statements with installment plans',
-      'Subscriptions, reports & UniFi network dashboard',
+      'Subscriptions, reports & a 3-month calendar with iCal feed',
       'Mobile app plus SMB, FTP & OneDrive backups',
       'IMAP email-in, savings goals & insurance export bundle',
       'Eight-language interface localisation',
@@ -628,7 +622,7 @@ const JSON_LD = {
       applicationCategory: 'BusinessApplication',
       operatingSystem: 'Docker, Linux, macOS',
       description:
-        'A self-hosted personal hub: inventory, receipts read by AI, expenses, credit-card installments, subscriptions, vouchers, reports, and your network, in one private dashboard you control.',
+        'A self-hosted personal hub: inventory, receipts read by AI, expenses, credit-card installments, subscriptions, vouchers, and reports, in one private dashboard you control.',
       url: SITE_URL,
       author: { '@type': 'Person', name: 'Achilleas' },
       publisher: { '@id': `${SITE_URL}/#organization` },
@@ -809,7 +803,7 @@ export default function Home() {
           >
             A self-hosted personal hub for oversight on everything you own.
             Inventory, receipts read by AI, expenses, credit-card installments,
-            subscriptions, and your network, in one private dashboard you control.
+            subscriptions, and vouchers, in one private dashboard you control.
           </p>
 
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>

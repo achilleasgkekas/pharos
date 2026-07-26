@@ -4152,3 +4152,91 @@ sweep του docs/FEATURES.md για κατι που ξεφυγε.
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-26 (9) — Διορθωση: το landing διαφημιζε το Network/UniFi module, που εχει αφαιρεθει απο τον Ιουνιο
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε, καμια
+καταχωρηση αφορα τη landing routine.
+
+`git log --oneline 5df604e..HEAD | grep "feat("` εβγαλε δυο: `a919c03` (το ιδιο το προηγουμενο commit αυτης
+της routine) και `5df604e871b9...` οχι, αντιθετα `056f21c feat(receipts): multi-currency from the phone (P9
+mobile slice 5)`. Διαβασα το commit body: mobile parity ωστε η φορμα του receipt στο κινητο να μη γραφει
+ξενο νομισμα σαν base currency (νεο shared `fx.resolveReceiptAmounts()`, FxFields/FxBadge στο mobile). Ιδια
+κατασταση με τα δυο προηγουμενα mobile-parity entries: η υπαρχουσα multi-currency FAQ (γραμμη ~525) ηδη
+καλυπτει ρητα "receipts" γενικα χωρις web/mobile διακριση ("On a receipt every amount converts with that
+same rate, not just the total..."), αρα κανενα νεο user-facing wording δεν προεκυψε. Δεν εγινε αλλαγη εκει.
+
+Συνεχισα το sweep του docs/FEATURES.md απ' το προηγουμενο entry, και βρηκα κατι σοβαροτερο απο συνηθως:
+το section **"Network (UniFi)"** (FEATURES.md γραμμη 514-522) περιγραφει ενα live UniFi dashboard, και το
+landing ΗΔΗ το διαφημιζε σε 6 διαφορετικα σημεια (feature card με ψευτικο "31 clients" demo stat, showcase
+mod-grid tile, integrations group "UniFi monitoring / Speedtest", Homelabbers persona copy, το "Shipped"
+roadmap wording, και δυο φορες στην κυρια hero παραγραφο + JSON-LD SEO description). Πριν γραψω οτιδηποτε,
+εστειλα Explore agent να επιβεβαιωσει τι υπαρχει στον πραγματικο κωδικα του apps/web (οχι μονο docs) — το
+αποτελεσμα: **καμια υλοποιηση δεν υπαρχει πουθενα**. Κανενα `lib/unifi.ts`, κανενα `/network` route, κανενα
+UniFi config field στο appSettings, το `runAlertChecks` δεν ελεγχει τιποτα UniFi-σχετικο, κανενα speedtest
+trigger. Το επιβεβαιωσα κι εγω ο ιδιος με `find`/`grep` στο apps/web/src (μηδεν αποτελεσματα).
+
+`git log --diff-filter=D --all -- "**/unifi*"` εδειξε γιατι: commit **`5eb912d`** (2026-06-12, "Restore
+price to product hero; remove the Network/UniFi module") αφαιρεσε το module **σκοπιμα και πληρως** — /network
+page, lib/unifi.ts, navbar link, homepage card, Settings tab, setup-wizard step, server actions, alert
+check, AppConfig fields, ΚΑΙ τα README/SECURITY mentions. Αρα αυτη ηταν μια ηδη-παρμενη, ρητη αποφαση του
+χρηστη πριν απο πανω απο εναν μηνα, οχι κατι αμφισβητησιμο που χρειαζεται νεα εγκριση: απλα το landing (και
+το docs/FEATURES.md, εκτος του δικου μου territory) δεν ενημερωθηκαν ποτε μετα. Δεν εγραψα ερωτηση στο
+ASK_ACHILLEAS.md, γιατι δεν ειναι ασαφης/προιοντικη αποφαση, ειναι στειρα διορθωση ψευδους διαφημισης μιας
+ηδη-αποφασισμενης αφαιρεσης, μεσα στο δικο μου territory (apps/landing).
+
+Αλλαγες (`apps/landing/app/page.tsx`, ολες αφαιρεσεις/αντικαταστασεις, μηδεν νεα ψευδη ισχυριζομενα):
+1. **FEATURES card** (icon wifi/"Network"/"Live UniFi dashboard...") αφαιρεθηκε εντελως. Αυτο διορθωσε και
+   ενα προυπαρχον, απαρατηρητο mismatch: το STATS "8 Modules in one hub" μετρουσε ηδη 8 (χωρις το Network,
+   που ητανε το 9ο card) — τωρα το FEATURES array εχει κυριολεκτικα 8 entries, συμφωνο με το stat.
+2. **SHOWCASE_MODS** (mock dashboard grid): το tile "Network / 31 clients" (ψευτικα δεδομενα για ανυπαρκτο
+   feature) αντικατασταθηκε με "Tasks / 9 open" (kanban icon) — αληθινο module που ελειπε απ' αυτο το
+   συγκεκριμενο showcase, κραταει το grid στα 8 tiles.
+3. **INTEGRATIONS group** "Network & alerts" (icon wifi, items UniFi monitoring/Speedtest/ntfy push/
+   Price-drop alerts) μετονομαστηκε σε **"Alerts & automation"** (icon bell), τα δυο πραγματικα items
+   (ntfy push, Price-drop alerts) κρατηθηκαν, τα δυο ανυπαρκτα αφαιρεθηκαν και αντικατασταθηκαν με δυο
+   αληθινα: "Budget alerts" (runAlertChecks το κανει ηδη) και "Webhook automation" (event webhooks, FAQ
+   γραμμη 566, επιβεβαιωμενο real feature).
+4. **Homelabbers persona**: "ties your gear, your spend, and your network together" -> "ties your gear and
+   your spend together". Η αναφορα "a UniFi rack" στην ιδια προταση ΚΡΑΤΗΘΗΚΕ, ειναι νομιμη περιγραφη του
+   δικου του homelab hardware, οχι ισχυρισμος οτι το Pharos το παρακολουθει.
+5. **Roadmap "Shipped"**: "Subscriptions, reports & UniFi network dashboard" -> "Subscriptions, reports &
+   a 3-month calendar with iCal feed" (αληθινο, ηδη επιβεβαιωμενο shipped feature απο προηγουμενο entry,
+   οχι ακομα στη Shipped λιστα).
+6. **JSON-LD SoftwareApplication description**: "...vouchers, reports, and your network, in one private
+   dashboard..." -> "...vouchers, and reports, in one private dashboard..." (SEO metadata, την διαβαζουν
+   search engines, σοβαροτερο να ειναι ακριβες).
+7. **Hero παραγραφος** (το πιο ορατο κειμενο στη σελιδα): "...subscriptions, and your network, in one
+   private dashboard..." -> "...subscriptions, and vouchers, in one private dashboard...".
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη). Το
+  build ηταν ασυνηθιστα αργο αυτη τη φορα (~7-8 λεπτα αντι τα συνηθισμενα δευτερολεπτα, ελεγχθηκε με `ps`
+  οτι η CPU-time του `next build` process συνεχεια ανεβαινε, οχι κρεμασμα), πιθανον στιγμιαιο system load,
+  δεν επαναλαμβανεται καποιο προβλημα στο ιδιο το build output.
+- Πορτες 3100-3120: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build.
+  `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) -> "No console logs." καθαρο.
+  `get_page_text` επιβεβαιωσε: "8 Modules in one hub" με ακριβως 8 features cards απαριθμημενα (Inventory,
+  Receipts, Expenses, Statements, Subscriptions, Vouchers, Reports, Tasks), showcase mod-grid δειχνει
+  "Tasks / 9 open" αντι "Network / 31 clients", hero παραγραφος δειχνει "...subscriptions, and vouchers...".
+  `javascript_tool` επιβεβαιωσε: μηδεν "Network & alerts"/"UniFi monitoring"/"Speedtest" strings, "Alerts &
+  automation" + "Webhook automation" παρoντα, νεο Shipped calendar wording παρον, Homelabbers fix παρον, και
+  η μοναδικη εναπομεινασα εμφανιση της λεξης "UniFi" σε ολη τη σελιδα ειναι η νομιμη "a UniFi rack" στο
+  Homelabbers persona (2 φορες, hero copy + JSON-LD schema αντιγραφο του ιδιου persona block). Hero
+  screenshot καθαρο (lighthouse mark, gradient τιτλος, nav, τριπλο badge row). Server τερματιστηκε (`pkill
+  -f "next start -p 3110"`), κανενα `next-server` process δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx (python3 UTF-8 count).
+- Δεν αγγιξα Docker/:3000/web/mobile, ουτε το docs/FEATURES.md (εκτος territory· η ασυμφωνια εκει μενει
+  για αλλη routine/session να τη διορθωσει, δεν ειναι apps/landing).
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file (τα δυο untracked test αρχεια απο αλλη routine που υπηρχαν στην αρχη του run
+  ειχαν ηδη committed απο αλλου μεχρι να τσεκαρω, δεν τα αγγιξα).
+
+Επομενο increment: νεος `git log --oneline 056f21c..HEAD | grep "feat("` ελεγχος στην αρχη του επομενου
+run. Αλλιως candidates: polish συνεχεια / real app screenshots οταν υπαρξουν assets (blocked), ή αλλο νεο
+sweep του docs/FEATURES.md (καλο θα ηταν καποια αλλη routine να διορθωσει και το ιδιο το FEATURES.md ωστε
+να μην ξαναφανει η ιδια ασυμφωνια).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
