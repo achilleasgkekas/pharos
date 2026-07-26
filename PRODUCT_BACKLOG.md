@@ -1169,7 +1169,7 @@
   enable notifications) με progress ticks → activation. **Διακριτό** από P1 (demo data) — εδώ τα *δικά του* δεδομένα.
 - **Module:** Homepage / Dashboard (dismissable card) + Settings state reads.
 
-### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + 7 MODULES + ΟΛΑ ΤΑ IMPORTS (CSV, email-in, URL) + AUDIT/INLINE-FIX + MOBILE UI 4/6 (Expenses, Bills, Subscriptions, Items) SHIPPED (τελευταίο 2026-07-26, pharos-daily-dev), εκκρεμούν rate-feed + mobile Receipts/Statements
+### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + 7 MODULES + ΟΛΑ ΤΑ IMPORTS (CSV, email-in, URL) + AUDIT/INLINE-FIX + **ΟΛΟ ΤΟ MOBILE UI 6/6** (Expenses, Bills, Subscriptions, Items, Receipts, Statements) SHIPPED (τελευταίο 2026-07-27, pharos-daily-dev), εκκρεμεί μόνο το προαιρετικό rate-feed (phase 2 by design)
 - **Τι χτίστηκε (slice 1 από L item):** νέο pure **`lib/fx.ts`** (+25 unit tests, client-safe, DB-free) που κρατά
   **ΤΟΝ ΕΝΑΝ κανόνα** σε ένα μέρος: `normalizeCurrency`, `isForeignCurrency`, `convertToBase`, `deriveFxRate`,
   `resolveFx`, `formatMoney`, `fxBadgeLabel`. **Κλειδωμένη αρχιτεκτονική απόφαση (builder default, μηδέν migration):
@@ -1288,8 +1288,14 @@
   μετέτρεπε δεύτερη φορά. Το preview/back-out δουλεύει πάνω στην anchor, ίδιος κανόνας με το `resolveItemPrices()`.
   Μαζί: κάθε ποσό της οθόνης (λίστα, PricePanel, installment plans, URL-import alert) τύπωνε το hardcoded EUR fallback
   του `money()` → τώρα περνά τη base currency.
+- **Τι χτίστηκε (mobile slice — Statements, 2026-07-27):** το τελευταίο money screen. **Μηδέν δουλειά στο server**
+  (τα δύο routes επέστρεφαν ήδη `origAmount`/`fxRate` από το slice 5) και **μηδέν `<FxFields>`**: η οθόνη είναι
+  read-only στο κινητό (το statement γεννιέται από PDF import στο web), οπότε μπήκε `<FxBadge>` στη λίστα + **μία**
+  φορά στο detail sheet — ένα rate μετατρέπει ΟΛΟ το έγγραφο, άρα το chip ανήκει στο έγγραφο και όχι σε κάθε χρέωση.
+  **Bug που έκλεισε μαζί** (ίδια κλάση με Subscriptions/Bills/Items/Receipts): κάθε ποσό της οθόνης τυπωνόταν με
+  `currency`, δηλαδή το σύμβολο **της τράπεζας** πάνω σε **base-currency** νούμερο. Η base currency έρχεται από το
+  ήδη-ζητούμενο plans payload, οπότε μηδέν επιπλέον request. **Το mobile P9 κλείνει 6/6.**
 - **Εκκρεμούν (επόμενα slices):** προαιρετικό δωρεάν rate-feed (phase 2, τώρα το rate είναι χειροκίνητο by design)·
-  mobile UI στα εναπομείναντα modules (Receipts, Statements· Expenses/Bills/Subscriptions/Items έγιναν)·
   τα `links[].price`/`priceHistory[].price` ενός item
   μένουν **τυπωμένα** (δεν μετατρέπονται μαζί με τις 3 headline τιμές) — γνωστό όριο του μοντέλου του slice 4.
 - **Αξία (αρχικό):** ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency. Πραγματικό κενό

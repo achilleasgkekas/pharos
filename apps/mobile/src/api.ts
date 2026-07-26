@@ -404,10 +404,17 @@ export const setBillPaid = (id: string, paid: boolean, paidDate?: string) =>
   patch(`/api/v1/bills/${id}`, { paid, ...(paidDate ? { paidDate } : {}) });
 
 // ---- Statements ----
-export type Statement = { id: string; card: string; last4: string; period: string; statementDate: string | null; dueDate: string | null; totalAmount: number; minimumPayment: number; paidAmount: number; currency: string; txnCount: number };
+/** `totalAmount`/`minimumPayment`/`paidAmount` (and every transaction amount below) are
+ *  ALWAYS the deployment's base currency (P9) — a card issues its statement in ONE currency,
+ *  so ONE rate converts the whole document. `currency`/`origAmount`/`fxRate` describe what
+ *  the paper printed, `origAmount` holding the printed headline TOTAL only; both numbers are
+ *  0 on an ordinary statement. Never print an amount with `currency`: that is the symbol the
+ *  issuer used, not the one the number is in. */
+export type Statement = { id: string; card: string; last4: string; period: string; statementDate: string | null; dueDate: string | null; totalAmount: number; minimumPayment: number; paidAmount: number; currency: string; origAmount: number; fxRate: number; txnCount: number };
 export async function getStatements(): Promise<Statement[]> {
   return (await request<{ data: Statement[] }>('/api/v1/statements?limit=100')).data ?? [];
 }
+/** `amount` is base currency, converted with the parent statement's rate (P9). */
 export type StatementTxn = { id: string; date: string | null; description: string; amount: number; category: string; installment: { current: number; total: number } | null };
 export async function getStatementTxns(id: string): Promise<StatementTxn[]> {
   return (await request<{ transactions: StatementTxn[] }>(`/api/v1/statements/${id}`)).transactions ?? [];

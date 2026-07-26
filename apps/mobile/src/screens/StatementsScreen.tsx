@@ -3,6 +3,8 @@ import { View, Text, FlatList, Pressable, Modal, RefreshControl, ActivityIndicat
 import { C, RADIUS, scrim } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Card, Badge, Input, contentWidth } from '../ui';
 import { getStatements, getStatementTxns, getInstallmentPlans, mergePlans, unmergePlan, type Statement, type StatementTxn, type InstallmentPlan } from '../api';
+import { FxBadge } from '../FxControls';
+import { fxBadgeLabel, normalizeCurrency } from '../fx';
 
 // "2028-10-01" → "Oct 2028" for payoff dates.
 const payoff = (iso: string) => {
@@ -86,7 +88,11 @@ function PlanRow({ plan, allPlans, cur, onChanged }: {
 export function StatementsScreen() {
   const [rows, setRows] = useState<Statement[]>([]);
   const [plans, setPlans] = useState<InstallmentPlan[]>([]);
-  const [planCur, setPlanCur] = useState('EUR');
+  // P9: the deployment's base currency, which EVERY amount on this screen is denominated in
+  // (statement totals, charges, installment plans). It arrives with the plans payload, so no
+  // extra settings request is needed here — and it must never be read off a row: a foreign
+  // statement's `currency` is what the issuer printed, not what the stored number is in.
+  const [base, setBase] = useState('EUR');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -102,7 +108,7 @@ export function StatementsScreen() {
       const [st, pl] = await Promise.all([getStatements(), getInstallmentPlans()]);
       setRows(st);
       setPlans(pl.plans);
-      setPlanCur(pl.currency);
+      setBase(normalizeCurrency(pl.currency) || 'EUR');
     } catch (e) { setErr((e as Error).message); }
   }, []);
   useEffect(() => { (async () => { await load(); setLoading(false); })(); }, [load]);
@@ -128,7 +134,7 @@ export function StatementsScreen() {
           <View style={s.plansBox}>
             <Text style={s.plansHead}>INSTALLMENT PLANS · {plans.filter((p) => !p.done).length} active</Text>
             {plans.map((p) => (
-              <PlanRow key={p.key} plan={p} allPlans={plans} cur={planCur} onChanged={load} />
+              <PlanRow key={p.key} plan={p} allPlans={plans} cur={base} onChanged={load} />
             ))}
           </View>
         ) : null}
@@ -137,7 +143,11 @@ export function StatementsScreen() {
           <Card onPress={() => openDetail(item)}>
             <View style={s.top}>
               <Text style={s.card_}>{item.card}{item.last4 ? ` ··${item.last4}` : ''}</Text>
-              <Text style={s.total}>{money(item.totalAmount, item.currency)}</Text>
+              <View style={s.totalCol}>
+                {/* Base-currency total, with what the statement printed underneath it. */}
+                <Text style={s.total}>{money(item.totalAmount, base)}</Text>
+                <FxBadge doc={item} base={base} />
+              </View>
             </View>
             <Text style={s.meta}>{[item.period, item.dueDate ? `due ${shortDate(item.dueDate)}` : '', `${item.txnCount} txn`].filter(Boolean).join('  ·  ')}</Text>
           </Card>
@@ -156,11 +166,21 @@ export function StatementsScreen() {
             </View>
 
             {!!detail && (
-              <View style={s.totals}>
-                <View style={s.totBox}><Text style={s.totLabel}>TOTAL</Text><Text style={s.totVal}>{money(detail.totalAmount, detail.currency)}</Text></View>
-                <View style={s.totBox}><Text style={s.totLabel}>MIN</Text><Text style={s.totValDim}>{money(detail.minimumPayment, detail.currency)}</Text></View>
-                <View style={s.totBox}><Text style={s.totLabel}>PAID</Text><Text style={s.totValDim}>{money(detail.paidAmount, detail.currency)}</Text></View>
-              </View>
+              <>
+                <View style={s.totals}>
+                  <View style={s.totBox}><Text style={s.totLabel}>TOTAL</Text><Text style={s.totVal}>{money(detail.totalAmount, base)}</Text></View>
+                  <View style={s.totBox}><Text style={s.totLabel}>MIN</Text><Text style={s.totValDim}>{money(detail.minimumPayment, base)}</Text></View>
+                  <View style={s.totBox}><Text style={s.totLabel}>PAID</Text><Text style={s.totValDim}>{money(detail.paidAmount, base)}</Text></View>
+                </View>
+                {/* One rate converts the whole document, so the chip belongs to the sheet, not
+                    to each charge: every amount below is already this statement's rate applied. */}
+                {!!fxBadgeLabel(detail, base) && (
+                  <View style={s.fxRow}>
+                    <FxBadge doc={detail} base={base} />
+                    <Text style={s.fxNote}>printed total · every amount below is converted</Text>
+                  </View>
+                )}
+              </>
             )}
 
             <ErrorText>{txErr}</ErrorText>
@@ -180,7 +200,7 @@ export function StatementsScreen() {
                         {!!item.installment && <Badge label={`${item.installment.current}/${item.installment.total}`} color={C.cyan} />}
                       </View>
                     </View>
-                    <Text style={[s.txAmount, item.amount < 0 && s.credit]}>{money(item.amount, detail?.currency)}</Text>
+                    <Text style={[s.txAmount, item.amount < 0 && s.credit]}>{money(item.amount, base)}</Text>
                   </View>
                 )}
               />
@@ -216,8 +236,11 @@ const s = StyleSheet.create({
   mergeEmpty: { color: C.faint, fontSize: 12, fontStyle: 'italic', paddingVertical: 4 },
   mergeCancel: { color: C.dim, fontSize: 12, paddingVertical: 2 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  card_: { color: C.text, fontSize: 15, fontWeight: '700' },
+  card_: { color: C.text, fontSize: 15, fontWeight: '700', flex: 1 },
+  totalCol: { alignItems: 'flex-end', gap: 3 },
   total: { color: C.text, fontSize: 16, fontWeight: '800' },
+  fxRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  fxNote: { color: C.faint, fontSize: 11, flex: 1 },
   meta: { color: C.faint, fontSize: 12, marginTop: 4 },
   sheetWrap: { flex: 1, backgroundColor: scrim, justifyContent: 'flex-end' },
   sheet: { backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: C.border, padding: 18, maxHeight: '88%' },
