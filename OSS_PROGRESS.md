@@ -2763,3 +2763,26 @@ Coordination πριν ξεκινήσω: `ROUTINES_PAUSED` δεν υπήρχε. `
 - Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου (τα 11 ξένα modified + το ξένο νέο `items/actions.urlImport.test.ts` άθικτα, δεν τα stage-άρισα). `git fetch origin main` → ahead 1, καθαρό fast-forward, push επιτυχές (`039e093..114a6b1`).
 
 Suggested next task: **`settings/actions.ts`** συνεχίζεται με το **επόμενο πιο απομονωμένο concern**: είτε **editable AI prompts** (γραμμές 653-719: `getPromptsForEditor`/`savePrompt`/`resetPrompt`, μικρό+καθαρό, ίδιο module ήδη clean μετά από αυτό το run) είτε **scraper AI** (γραμμές 721-746, ακόμα πιο μικρό). Μετά μεγαλύτερα concerns: file storage backends (SMB/FTP/OneDrive sync, γραμμές 748-907), IMAP email-in (909-995), dropdown lists+spaces (997-1042), stores (1044+, δεν διάβασα ακόμα το τέλος του module — γραμμές 1065-1793 μένουν αδιάβαστες, θα χρειαστεί να τις διαβάσεις πριν αποφασίσεις το επόμενο split όταν φτάσεις εκεί), notifiers/webhooks/alerts (ήδη διαβασμένα εδώ, `runAlertChecks` είναι μεγάλο+πολύπλοκο δικό του concern), backup/export (JSZip-based, αδιάβαστο ακόμα). ΣΗΜ items/actions.ts: αν το URL-import concern έχει κλείσει (committed) όταν διαβάσεις αυτό, το module είναι πλήρως καλυμμένο — καμία ενέργεια εκεί. Πάντα `git status` collision-guard πρώτα + διάβασε ολόκληρο το target concern πριν γράψεις τίποτα (το mock-άρισμα ΟΛΩΝ των top-level imports είναι απαραίτητο κάθε φορά, ίδιο κόστος ανεξαρτήτως πόσο μικρό το concern).
+
+## 2026-07-26 (cont. — settings/actions.aiPrompts.test.ts, δεύτερο slice: editable AI prompts)
+
+**Task**: το πρώτο από τα δύο suggested next-tasks του προηγούμενου run: το **editable AI prompts concern** (γραμμές 653-719: `getPromptsForEditor`/`savePrompt`/`resetPrompt`). Νέο ξεχωριστό αρχείο `actions.aiPrompts.test.ts`, ίδιο module με το `actions.aiEngine.test.ts`.
+
+Coordination πριν ξεκινήσω: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md`: καμία εγγραφή για pharos-oss-prep. Collision guard: `git status --short` έδειξε μια ξένη routine mid-edit σε FX/currency δουλειά (`apps/mobile/src/api.ts`/`MoneyScreen.tsx`/`ui.tsx` + νέα `FxControls.tsx`/`fx.ts`, plus 3 `api/v1/*` routes+tests) — άσχετο με το `settings/actions.ts`, δεν το άγγιξα.
+
+Διάβασα το target τμήμα (γραμμές 653-719) plus το `lib/prompts.ts` (PROMPT_META shape, `getAllPromptOverrides`/`invalidatePromptsCache`) πριν γράψω τίποτα. Ξαναχρησιμοποίησα το πλήρες mock-set του `actions.aiEngine.test.ts` (η import του module τραβάει όλα τα top-level imports των 1793 γραμμών ασχέτως concern) με ένα customization: το `@/lib/prompts` mock αυτή τη φορά έχει **πραγματικά PROMPT_META entries** (2 κλειδιά, `receipt`+`voucher`) αντί για κενό array, ώστε το `getPromptsForEditor` mapping να είναι ελέγξιμο. Σημειώνεται ένα δομικό detail στο top-of-file comment: το `PROMPT_DEFAULTS` (module-scope const στο actions.ts) χτίζεται απευθείας από τα imported prompt constants + `DEFAULT_SCRAPER_PRICE_PROMPT`, **ανεξάρτητα** από το τι περιέχει το `PROMPT_META` array — άρα mock-άροντας ένα μικρό PROMPT_META δεν επηρεάζει τα defaults.
+
+**11 tests** σε τρία describe blocks:
+- `getPromptsForEditor` (2): πλήρες mapping (key/label/where/defaultText/override) με ένα override + ένα χωρίς· default `''` σε όλα όταν `getAllPromptOverrides` επιστρέφει `{}`.
+- `savePrompt` (6): requireAdmin ΠΡΙΝ το key-validation (καμία connectDB/updateOne κλήση αν admin reject)· άκυρο key → `{ok:false}` χωρίς DB· κενό/whitespace text → `$unset`· text που trims ίσο με το built-in default → **επίσης** `$unset` (future-default-improvements-flow-through behaviour)· γνήσιο override → `$set` με το trimmed text· success → invalidatePromptsCache + revalidatePath('/settings').
+- `resetPrompt` (3): ίδιο admin-πριν-key-validation· άκυρο key → `{ok:false}` χωρίς DB· valid key → unconditional `$unset` + cache invalidate + revalidate.
+
+Δεν χρειάστηκε κανένα tsc fix αυτή τη φορά (ο mock idiom ήταν ήδη σωστός από το προηγούμενο slice).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/settings/actions.aiPrompts.test.ts"` → **11/11 passed** στο πρώτο πέρασμα.
+- `npm run type-check` → exit 0, μηδέν errors σε όλο το repo.
+- `npx vitest run` (όλο το suite) → **292 files, 4161/4161 passed**.
+- Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου (τα ξένα FX-routine αρχεία άθικτα). Καθαρό fast-forward push.
+
+Suggested next task: **scraper AI concern** (γραμμές 721-746: `getScraperAi`/`saveScraperAi`, ακόμα πιο μικρό+καθαρό, ίδιο module ήδη clean). Μετά μεγαλύτερα concerns κατά σειρά: file storage backends (SMB/FTP/OneDrive sync, 748-907), IMAP email-in (909-995), dropdown lists+spaces (997-1042), stores (1044+, γραμμές 1065-1793 ακόμα αδιάβαστες), notifiers/webhooks/alerts, backup/export (JSZip-based). Πάντα `git status` collision-guard πρώτα + διάβασε ολόκληρο το target concern πριν γράψεις τίποτα.
