@@ -496,6 +496,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes. Drag in a PDF or a photo and PHAROS parses the store, date, total, and line items automatically. Card statements are read the same way, including installment plans split across months. You can also bulk-import receipts straight from a Gmail export.',
   },
   {
+    q: 'Can it pull receipts straight from my inbox without me exporting anything?',
+    a: 'Yes, on self-hosted. Settings → Storage & backup → Email-in (IMAP) connects your mailbox (host, port, username, and an app-specific password if your provider needs one, which Gmail, Outlook, and iCloud usually do) and a "Check inbox now" button polls it on demand, no background cron running in the app. Each check fetches up to 25 new messages, PDF and image attachments as well as HTML bodies, through the exact same parse pipeline as a manual upload, one AI read per message. The first ever check only looks back 7 days so it does not flood your receipts with years of old mail; every check after that remembers the last message it saw and only fetches what is new since. It is a standing companion to the one-time Gmail export bulk-import above, not a replacement for it.',
+  },
+  {
     q: 'Does it match my receipts to card charges?',
     a: 'Yes. When you import a statement, PHAROS suggests which of your receipts each charge belongs to, matching on amount (within a couple of cents) and date (within a few days). You confirm the ones it gets right, so reconciling a month of spending is a few clicks instead of a spreadsheet.',
   },

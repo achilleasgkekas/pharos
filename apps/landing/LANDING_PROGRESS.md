@@ -4240,3 +4240,78 @@ sweep του docs/FEATURES.md (καλο θα ηταν καποια αλλη rout
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-27 (10) — IMAP email-in auto-import (P11) παιρνει δικη του FAQ
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε (grep
+για "landing"), καμια καταχωρηση αφορα τη landing routine, τιποτα ANSWERED προς αυτη τη routine.
+
+`git log --oneline 056f21c..HEAD | grep "feat("` εβγαλε ενα: `d44c792 feat(mobile): multi-currency for
+Statements (P9, last money screen)`. Read-only research (commit message + diff, χωρις subagent): κλεινει
+το mobile μισο του P9 στο **6/6** (Expenses, Bills, Subscriptions, Items, Receipts, Statements) — η οθονη
+ειναι read-only στο κινητο (το statement γεννιεται απο PDF import στο web), αρα μονο `<FxBadge>`, μηδεν
+`<FxFields>`, μηδεν server work (τα routes επεστρεφαν ηδη origAmount/fxRate). Ιδιο pattern με τα 4
+προηγουμενα mobile-parity entries: η υπαρχουσα multi-currency FAQ (γραμμη ~520) ηδη καλυπτει "statements"
+γενικα χωρις web/mobile διακριση ("A card statement converts as a whole document too..."), αρα κανενα νεο
+user-facing wording δεν προεκυψε εκει. Ελεγξα και τη "Is there a mobile app?" FAQ (γραμμη 484) — ηδη γενικη
+("reach every module from your phone"), δεν χρειαζεται per-module λιστα. Δεν εγραψα τιποτα γι' αυτο το
+commit.
+
+Αντ' αυτου συνεχισα το sweep του roadmap "Shipped" list για κατι που δεν εχει ακομα δικη του FAQ: η γραμμη
+"IMAP email-in, savings goals & insurance export bundle" ανεφερε "IMAP email-in" αλλα `grep -in "imap"
+app/page.tsx` εδειξε **καμια** αλλη εμφανιση, μονο αυτη η μια λεξη στο roadmap chip — κανενα FAQ δεν εξηγει
+τι κανει το feature. (Το savings goals + insurance export στην ιδια γραμμη εχουν ηδη τις δικες τους FAQ,
+γραμμες 552/540 — το IMAP ηταν το μονο κενο.)
+
+Διαβασα την πραγματικη υλοποιηση (οχι μονο docs, μαθημα απο το UniFi εύρημα του προηγουμενου run):
+`apps/web/src/lib/imapImport.ts` (ImapFlow connect/search/fetch, `mailparser` extract, cap **MAX_FETCH=25**
+μηνυματα/check, **FIRST_RUN_LOOKBACK_DAYS=7** στο πρωτο ποτε check, μετα θυμαται το τελευταιο UID) +
+`apps/web/src/lib/imapConfig.ts` (tenant-scoped, δεν βρηκα gating που να μπλοκαρει hosted tenants στον
+κωδικα) + `apps/web/src/app/settings/actions.ts` (`checkImapInboxNow` περναει καθε atttachment/body απο το
+`uploadReceipt`, ιδιο pipeline με manual upload) + `apps/web/src/app/settings/SettingsClient.tsx`
+(`ImapImportManager`, ρενταρεται χωρις καμια οριακη συνθηκη). Ελεγξα και το **επισημο in-app copy**
+(`set.imapDesc` στο `lib/i18n/locales/en.ts`): *"Self-hosted only, manual check for now (no background
+cron)."* — ιδιο με το `docs/FEATURES.md` γραμμη 162 ("Self-hosted only (no background cron in this app)").
+Παρολο που δεν βρηκα ρητο tenant-gate στον κωδικα, το επισημο UI-copy + docs + το ιδιο το commit title
+("P11. Email-in auto-import — self-hosted IMAP receipt inbox") συμφωνουν ολα στο "self-hosted only", αρα
+εγραψα τη FAQ ετσι (συντηρητικο, μηδεν ρισκο υπερ-διαφημισης).
+
+Αλλαγη (`apps/landing/app/page.tsx`, νεα FAQ εγγραφη, εισηχθηκε αμεσως ΜΕΤΑ την υπαρχουσα "Can it read
+receipts and statements I already have?" — η οποια ηδη αναφερει το one-time Gmail export bulk-import — ωστε
+οι δυο import-μηχανισμοι να ειναι δασκι-δασκι): **"Can it pull receipts straight from my inbox without me
+exporting anything?"** / "Yes, on self-hosted. Settings → Storage & backup → Email-in (IMAP) connects your
+mailbox (host, port, username, and an app-specific password if your provider needs one, which Gmail,
+Outlook, and iCloud usually do) and a "Check inbox now" button polls it on demand, no background cron
+running in the app. Each check fetches up to 25 new messages, PDF and image attachments as well as HTML
+bodies, through the exact same parse pipeline as a manual upload, one AI read per message. The first ever
+check only looks back 7 days so it does not flood your receipts with years of old mail; every check after
+that remembers the last message it saw and only fetches what is new since. It is a standing companion to
+the one-time Gmail export bulk-import above, not a replacement for it." Η γειτονικη FAQ δεν αλλαξε.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success (13 static routes, αμεταβλητο, `/` route 5.35 kB, μηδεν bundle αλλαγη· αυτη τη
+  φορα αργησε αρκετα, `next build` process χρειαστηκε πανω απο ενα λεπτο μεχρι να τυπωσει το πρωτο σημειο
+  προοδου, ελεγχθηκε με `ps` οτι δεν κρεμασε, απλα αργο compile, ιδιο φαινομενο με προηγουμενο entry).
+- Πορτες 3100-3111: μονο το 3100 κατειλημμενο (Docker). `next start -p 3110` πανω στο production build —
+  τυπωσε προειδοποιηση `"next start" does not work with "output: standalone" configuration` (το
+  `next.config.ts` εχει `output:'standalone'` για το Docker runner stage), αλλα τρεξε κανονικα και
+  απαντησε 200 (η standalone εξοδος υπαρχει παραλληλα με το κανονικο `.next`, το `next start` τη
+  χρησιμοποιει ως fallback). `mcp__Claude_Browser__*` διαθεσιμο· `read_console_messages` (onlyErrors) ->
+  "No console logs." καθαρο. `javascript_tool` (μεσω `document.body.textContent`) επιβεβαιωσε ολα τα 5
+  checks true: νεα ερωτηση παρουσα, νεο σωμα ("Each check fetches up to 25 new messages") παρον, "Email-in
+  (IMAP)" παρον, γειτονικη FAQ (Gmail export) αμεταβλητη και παρουσα, επομενη FAQ (statement matching)
+  αμεταβλητη και παρουσα. Hero screenshot καθαρο (lighthouse mark, gradient τιτλος, nav, τριπλο badge
+  row). Server τερματιστηκε (`pkill -f "next start -p 3110"`), κανενα `next-server` process δεν εμεινε.
+- em-dash: 0 σε ολο το page.tsx (python3 UTF-8 count).
+- Δεν αγγιξα Docker/:3000/web/mobile. Μηδεν subagent, μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το add εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` modified,
+  κανενα ξενο staged file.
+
+Επομενο increment: νεος `git log --oneline d44c792..HEAD | grep "feat("` ελεγχος στην αρχη του επομενου
+run. Αλλιως candidates: polish συνεχεια / real app screenshots οταν υπαρξουν assets (blocked), ή αλλο νεο
+sweep του docs/FEATURES.md § λιστας για κατι που ξεφυγε ακομα (ο τελευταιος πληρης sweep ητανε 2 runs
+πριν, μπορει να υπαρχουν νεοτερα § απο τοτε).
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
