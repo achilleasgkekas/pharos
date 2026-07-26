@@ -5129,3 +5129,67 @@ reactivate}`, `invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.
 `reports/page.tsx` FxIssueKind type-check error (bills multi-currency WIP) έχει κλείσει από την
 άλλη routine μέχρι το επόμενο run — αν παραμένει ανοιχτό πολλά runs, ίσως αξίζει flag στο
 ask-inbox (όχι τώρα, πολύ πρόσφατο/πιθανώς ενεργό mid-edit).
+
+## 2026-07-26 (cont. — increment 108, route-level test coverage για workspace/ai-key + workspace/reactivate)
+
+Πριν από νέο increment: ask-inbox re-checked (`~/.claude/ASK_ACHILLEAS.md`, 8 OPEN entries — 5×
+bakecore [finance ×2, redesigner, reviewer ×2, ui-rebuild], bakecore-tests macOS-TCC flag,
+pharos-daily-dev P17/P23 mobile-camera approval· τίποτα addressed σε saas-core). `WEB_DEBT.md`
+grep re-checked (μηδέν ενεργό item στο saas/tenancy/billing/admin-UI territory, ίδιο συμπέρασμα
+με increments 103/106/107). UI-first backlog παραμένει εξαντλημένο. Ακολούθησα το leftover
+next-task από το increment-107 log: πρώτα δύο του καταλόγου, **`workspace/ai-key`**
+(BYO-key settings panel, D5, 3 verbs) + **`workspace/reactivate`** (soft-cancel complement, 1
+verb) — και τα δύο πάνω στο ίδιο `resolveWorkspaceSession`-gated pattern με το ήδη-tested
+`workspace/route.test.ts`, καθαρό recipe reuse.
+
+Πριν το staging, `git status --short` ήταν **καθαρό** (το ξένο 9-file bills/reports/fxAudit WIP
+από το increment-107 log είχε ήδη committed από την άλλη routine στο μεταξύ) — collision guard
+δεν χρειάστηκε να παραλείψει τίποτα.
+
+**Νέο `workspace/ai-key/route.test.ts`** (20 tests), μηδέν production code αλλαγή. GET/PUT/DELETE
+= BYO-key settings panel: αποθηκεύει/διαβάζει/σβήνει το δικό-του encrypted AI provider key ενός
+tenant (unmetered στο platform key). Η plaintext-handling λογική (encode/decode/maskAiKey,
+planAiKeyUpdate/planAiKeyClear) είναι ήδη πλήρως unit-tested αλλού → mocked εδώ στο
+`lib/billing/byoKeyStore` module boundary (`setTenantAiKey`/`clearTenantAiKey`/
+`describeTenantAiKey`) + `lib/billing/byoKey` (`byoKeyReady`/`BYO_PROVIDERS`). Καλύπτει: gate
+short-circuit περνάει αναλλοίωτο και στα 3 verbs (πριν από οποιοδήποτε write)· και τα 3
+resolve με `requireManage=true` (owner/admin only, security setting)· PUT/DELETE forward-άρουν
+το trimmed `?tenant` body field (κενό→null)· τα 3 typed failure reasons του `setTenantAiKey`
+(`crypto_unavailable`/`not_found`/`invalid`) map-άρουν στα δικά τους status codes (503/404/400),
+μηδέν audit σε καθένα· success PUT audits `ai_key.set` με **provider only, ΠΟΤΕ το key**
+(explicit assertion ότι το plaintext δεν εμφανίζεται πουθενά στο audit meta)· non-string `key`
+body field coerce σε `''` πριν το `setTenantAiKey`· success DELETE audits `ai_key.cleared`·
+`clearTenantAiKey` false (tenant vanished mid-flight) → 404 πριν το audit· GET δείχνει
+`configured`/masked `key`/`cryptoReady`/`providers`, ΠΟΤΕ plaintext· mid-throw→500 και στα 3.
+
+**Νέο `workspace/reactivate/route.test.ts`** (12 tests), μηδέν production code αλλαγή. POST =
+συμπλήρωμα του ήδη-tested DELETE /api/saas/workspace (soft-cancel) — owner reverses το δικό του
+cancel. Οι pure guards (`canReactivateWorkspace`/`reactivateStatusError`/`workspaceView`) τρέχουν
+ΠΡΑΓΜΑΤΙΚΑ εδώ (ήδη πλήρως unit-tested στο `workspace.test.ts`). Καλύπτει: gate short-circuit
+πριν από τον role-check· resolve με `(slug, false, true)` — `allowInactive` ώστε ο canceled
+tenant να είναι reachable, μετά η route επιβάλλει το ΔΙΚΟ της αυστηρότερο owner-only gate·
+admin/member → 403 πριν από οποιονδήποτε status-check/write· `it.each` πάνω σε 5 μη-canceled
+statuses (active/trialing/suspended/pending/άγνωστο) → κάθε ένα το δικό του 409 μήνυμα, μηδέν
+write/audit· owner+canceled → `$set status:'active'`, audit `workspace.reactivated` με
+from/to, live member count στο response· mid-throw→500.
+
+**Verified**: και τα δύο νέα test files **32/32 green** μαζί (`npx vitest run
+src/app/api/saas/workspace/ai-key src/app/api/saas/workspace/reactivate`). Ενα μικρό
+type-only fix στην πορεία (`recordAuditMock.mock.calls[0][1]` — tsc δεν μπορούσε να κάνει infer
+το tuple index σε plain `vi.fn()` χωρίς generic type args → explicit cast, μηδέν runtime
+αλλαγή). Πλήρες `npx vitest run` → **283 files / 3938 tests green** (αυξήθηκε από 279/3849 του
+increment-107 log, +4 files/+89 tests — τα 2 δικά μου + κάποια από άλλες ταυτόχρονες routines στο
+μεταξύ). `npm run type-check` → **EXIT 0 καθαρό** (το ξένο `reports/page.tsx` FxIssueKind error
+από το increment-107 log έχει κλείσει από την άλλη routine, επιβεβαιώνεται εδώ). **Docker: ΔΕΝ
+έγινε rebuild** (test-only αρχεία, μηδέν production code/runtime wiring αλλαγή). **Browser-
+verify: skipped** (test files, μηδέν UI/observable behavior αλλαγή). Collision guard: `git
+status --short` πριν το staging καθαρό (μόνο τα δικά μου 2 νέα αρχεία)· `git diff --cached
+--name-only` μετά το staging επιβεβαίωσε exact 2-file match πριν το commit/push. Pushed
+`badd548`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** επόμενοι υποψήφιοι χωρίς route-level coverage: `workspace/export/files`,
+`invites/{resend,route}`, `audit`, `trials/sweep`, `billing/route.ts`, `auth/logout`,
+`account/{reset/*,verify/*}`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md`
+για item στο territory (αν βρεθεί, πάει πρώτο).
