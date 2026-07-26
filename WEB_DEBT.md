@@ -3,7 +3,13 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
-## Σύνοψη audit (2026-07-25 59η σάρωση [reviewer routine]· type-check web+mobile EXIT 0· 71 commits ελέγχθηκαν [`cdc6a03..HEAD`]· 2 embedded-NUL-byte tooling bugs βρέθηκαν+διορθώθηκαν live· 1 νέο P2/S queue item [ο ίδιος ο auditor το είχε προαναγγείλει σαν follow-up στην προηγούμενη σάρωση]· el.ts i18n gap 126→6 [ήδη κλεισμένο από τον builder, `2cd33fb`])
+## Σύνοψη audit (2026-07-26 60η σάρωση [reviewer routine]· type-check web+mobile EXIT 0· 81 commits ελέγχθηκαν [`64a6ead..HEAD`]· 2 νέα P2/M queue items [tenancy-parity gap, ίδια κλάση με τα ήδη-κλεισμένα vouchers/giftcards/loyaltycards]· μηδέν P1· el.ts i18n gap 6→30 [νέα en keys από FX-audit UI, μικρό, δεν αξίζει ξεχωριστό item ακόμα])
+
+> **Έλεγχος διαφοράς**: `git log 64a6ead..HEAD` = 81 commits, κυρίως το **P9 multi-currency rollout** (Bills/Subscriptions/Items/Statements/Expenses/Receipts, web+mobile, ολοκληρώθηκε σε αυτό το διάστημα) + SaaS route-test coverage (password-reset, audit trail, invites, members, usage, account/export/reset/workspaces) + P63 backup-model completeness fix (`lib/backupModels.ts`, 7 models που το JSON backup σιωπηλά έριχνε). Production-code diff (χωρίς tests/docs) ελέγχθηκε γραμμή-γραμμή από sub-agent review: **FX conversion math** (`lib/fx.ts`, `lib/fxApply.ts`, `lib/fxAudit.ts`, mobile `fx.ts`) traced σε κάθε write path (Bills/Items/Statements/Expenses/Subscriptions, mobile+web, CSV import rate-map, reports FX-audit apply-in-place) → σωστή κατεύθυνση παντού (`amount = origAmount * fxRate`, `toPrinted` σωστά inverts, χωρίς sign/base-vs-printed confusion). **v1 API↔mobile shape parity** ελέγχθηκε σε κάθε touched route (bills/expenses/items/statements) έναντι `apps/mobile/src/api.ts` → όλα τα νέα πεδία (`currency`/`origAmount`/`fxRate`) additive και mirrored σωστά και στις δύο πλευρές· το προϋπάρχον "λάθος symbol πάνω σε σωστό ποσό" bug pattern (list badge δείχνει `item.currency` αντί για `base`) διορθώθηκε σωστά παντού σε αυτό το batch. **Mobile hardcoded-token sweep** (μετά το πρόσφατο borderRadius→RADIUS refactor): `FxControls.tsx`/`BillsScreen.tsx`/`MoneyScreen.tsx`/`SubscriptionsScreen.tsx` χρησιμοποιούν αποκλειστικά `C`/`RADIUS`/`SPACE`/`SIZE` tokens, μηδέν νέο magic hex/radius. **Secrets sweep** (grep για key/token/password/PEM patterns στο πλήρες diff) → μηδέν committed secret (μόνο prose στα PROGRESS.md entries που περιγράφουν token-lifecycle testing). `npm run type-check` (web) EXIT 0· `npx tsc --noEmit` (mobile) EXIT 0.
+> **Νέο εύρημα (και τα δύο ίδιας κλάσης με το ήδη-ανοιχτό `vouchers/page.tsx` item παρακάτω, δεν είναι single-edit auto-fixable — πολυ-function αρχεία, θέλουν το ίδιο recipe με το ήδη-κλεισμένο vouchers/giftcards/loyaltycards fix)**:
+>   - `apps/web/src/app/bills/actions.ts` — ολόκληρο το αρχείο (incl. `createBill`/`updateBill`/`markBillPaid`, όλα touched σε αυτό το diff για τα νέα currency πεδία) κάνει ακόμα direct `Bill.create`/`Bill.findByIdAndUpdate`/`Bill.findById`, χωρίς `withRequestTenant`/`currentModel` — σε αντίθεση με τα ήδη-διορθωμένα sibling money modules (items/receipts/expenses/vouchers/giftcards/loyaltycards). Μηδέν επίδραση self-hosted· σε SaaS mode θα διάβαζε/έγραφε πάντα στο DEFAULT tenant DB.
+>   - `apps/web/src/app/statements/actions.ts` — ίδιο gap (`Statement.create`/`findById`/`find`/`findByIdAndUpdate`/`findByIdAndDelete` direct, μηδέν tenancy wrap σε ολόκληρο το αρχείο). Αξιοσημείωτο: το νέο `lib/fxAudit.ts`/`reports/fxActions.ts` (μέσα σε αυτό το ίδιο diff) **ήδη** διαβάζει/γράφει Statements μέσω `currentModel(Statement)`/`withRequestTenant` → εσωτερική read/write ασυμμετρία μόλις ενεργοποιηθεί SaaS mode.
+>   - Και τα δύο μπήκαν ως νέα items στο queue παρακάτω (P2/M, ίδιο recipe με το ήδη-κλεισμένο `vouchers`/`giftcards`/`loyaltycards` fix: wrap κάθε DB-touching export σε `withRequestTenant(async () => { const X = await currentModel(XModel); ... })`).
 
 > **Έλεγχος διαφοράς**: `git log cdc6a03..HEAD` = 71 commits (κυρίως docs/tests από pharos-daily-dev + saas-core). Οι ουσιαστικοί code-touching: security fix (Settings→Notifications requireAdmin, ήδη DONE στο queue), 2× tenancy-parity fixes (sampleDataActions.ts, Voucher/GiftCard/LoyaltyCard — και τα δύο ήδη DONE), P9 multi-currency (Expenses/Receipts/Subscriptions, 3 slices), P17 barcode-lookup endpoint (server half), i18n el.ts +126 keys, mobile borderRadius→RADIUS token refactor (54 sites). `npm run type-check` (web) EXIT 0· `npx tsc --noEmit` (mobile) EXIT 0· `npx vitest run` (web) → **3613/3613 green (268 files)** πριν τα δύο fixes παρακάτω, ξανα-verified **3613 green** μετά. Ο P17 barcode endpoint ελέγχθηκε explicit για SSRF (host hardcoded στα 3 Open*Facts domains, `code` validated ως GTIN-digits-only πριν μπει σε URL, `encodeURIComponent` επιπλέον) → καθαρό.
 > **Νέο εύρημα + fix (live, εκτός του normal diff-review — light standing scan σε binary/encoding ανωμαλίες)**: δύο web αρχεία περιείχαν **raw NUL/control bytes literal μέσα στο source** αντί για escaped `\x00`/`\x1f` sequences → `file` τα ταξινομούσε ως `data` (όχι text), `git diff`/`git show`/GitHub PR view τα δείχνουν σαν **binary diff** (μηδέν ορατότητα σε μελλοντικές αλλαγές, code review τυφλό σε αυτά τα αρχεία), και `grep` (χωρίς `-a`) τα προσπερνάει σιωπηλά (confirmed live: `grep -n "sanitizeSegment" apps/web/src/lib/storagePath.ts` επέστρεφε 0 αποτελέσματα ενώ το symbol υπάρχει). Functionally μηδέν runtime διαφορά (JS χειρίζεται σωστά literal control chars σε regex character classes/string literals), αλλά είναι μόνιμος κίνδυνος για μελλοντικά reviews (ανθρώπινα ή AI) να χάσουν αλλαγές σε αυτά τα αρχεία, και για routines που κάνουν `grep -r` να καταλήξουν σε λάθος "δεν υπάρχει" συμπέρασμα.
@@ -13,7 +19,35 @@
 >   - `npm run type-check` EXIT 0 μετά τα δύο fixes· full `npx vitest run` **3613/3613 green** (ίδιο count με πριν, μηδέν regression).
 > **el.ts i18n gap**: **6** (όχι πια 126 — ο builder το έκλεισε ήδη στο `2cd33fb`, `en=1277, el=1271`). Πολύ μικρό υπόλοιπο πλέον, δεν αξίζει ξεχωριστό P3 item· θα μαζευτεί στο επόμενο batch αν μεγαλώσει.
 
-## Web Debt Queue — ενεργά items (59η σάρωση 2026-07-25)
+## Web Debt Queue — ενεργά items (60η σάρωση 2026-07-26)
+
+### `bills/actions.ts` παρακάμπτει το tenant-scoping (ίδια κλάση με τα ήδη-κλεισμένα vouchers/giftcards/loyaltycards)
+- Priority: P2
+- Size: M
+- Area: db
+- Files: apps/web/src/app/bills/actions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα**: το P9 multi-currency commit (`1ce991f`, αυτό το review range) πρόσθεσε νέα currency πεδία σε `createBill`/`updateBill`/`markBillPaid` κλπ, αλλά ολόκληρο το αρχείο κάνει ακόμα direct `Bill.create(...)`/`Bill.findByIdAndUpdate(...)`/`Bill.findById(...)` — δεν υπάρχει κανένα `withRequestTenant`/`currentModel` import ή χρήση σε αυτό το αρχείο.
+  - **Γιατί έχει σημασία**: σε SaaS mode (`SAAS_MODE=on`) όλα τα Bills reads/writes θα πήγαιναν πάντα στο DEFAULT tenant DB, ανεξάρτητα από το ποιος tenant είναι logged in — ίδιο risk class με τα ήδη-διορθωμένα `items/actions.ts`/`receipts/actions.ts`/`expenses/actions.ts`/`vouchers`/`giftcardActions.ts`/`loyaltyActions.ts`. Μηδέν επίδραση σε self-hosted mode (σημερινό mode του Αχιλλέα) — `currentModel()`/`withRequestTenant()` no-op στο ίδιο DEFAULT connection.
+  - **Fix**: mirror το recipe των ήδη-κλεισμένων siblings: import `withRequestTenant` (`@/lib/tenancy/request`) + `currentModel` (`@/lib/tenancy/connection`)· rename το `Bill` import σε `BillModel`· τύλιξε κάθε exported action function σε `return withRequestTenant(async () => { const Bill = await currentModel(BillModel); ... });`. Πρόσεξε το `markBillPaid` που καλεί `addExpense` (cross-module) — έλεγξε αν χρειάζεται να περάσει tenant context ή αν το `addExpense` ήδη κάνει το δικό του wrap.
+  - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/bills/actions.ts` ≥ όσα exported functions κάνουν DB access· npm run type-check exits 0· `apps/web/src/app/bills/actions.test.ts` παραμένει green.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-26, 60η σάρωση reviewer routine)
+
+### `statements/actions.ts` παρακάμπτει το tenant-scoping — και δημιουργεί read/write ασυμμετρία με το νέο fxAudit
+- Priority: P2
+- Size: M
+- Area: db
+- Files: apps/web/src/app/statements/actions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα**: ολόκληρο το αρχείο (import, upload, rescan, installment-linking, transaction editing — δεκάδες exported functions) κάνει direct `Statement.find()`/`findById()`/`create()`/`findByIdAndUpdate()`/`findByIdAndDelete()`, χωρίς κανένα `withRequestTenant`/`currentModel`.
+  - **Γιατί έχει σημασία**: το ίδιο διάστημα προστέθηκε `lib/fxAudit.ts`/`reports/fxActions.ts` (P9 FX-audit feature) που **ήδη** διαβάζει/γράφει Statements μέσω `currentModel(Statement)` σωστά. Σε SaaS mode: το FX-audit panel θα έβλεπε/διόρθωνε το σωστό tenant's statements, αλλά το ίδιο statement ανοιγμένο από το κανονικό `/statements` UI θα διάβαζε/έγραφε στο DEFAULT tenant DB — εσωτερική ασυμμετρία μέσα στο ίδιο feature set. Μηδέν επίδραση self-hosted.
+  - **Fix**: ίδιο recipe, μεγαλύτερο αρχείο (πολλαπλές exported functions: import/upload/rescan/link/unlink/delete/setTransactionInstallment κλπ) — wrap το καθένα ξεχωριστά σε `withRequestTenant(async () => { const Statement = await currentModel(StatementModel); ... })`. Δες `lib/fxAudit.ts`/`reports/fxActions.ts` (ίδιο review range) ή `items/actions.ts` σαν ήδη-σωστό reference pattern για αρχείο με πολλά exports.
+  - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/statements/actions.ts` ≥ όσα exported functions κάνουν DB access· npm run type-check exits 0· `apps/web/src/app/statements/actions.crud.test.ts` (και τα υπόλοιπα statements test files) παραμένουν green.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-26, 60η σάρωση reviewer routine)
 
 ### `vouchers/page.tsx` read path παρακάμπτει το tenant-scoping που μόλις μπήκε στα sibling actions (ίδιας κλάσης gap, ήδη προαναγγελθέν follow-up)
 - Priority: P2

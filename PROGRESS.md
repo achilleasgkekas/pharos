@@ -2,9 +2,32 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 64a6ead -->
+<!-- reviewed: cc65fb5 -->
 <!-- docker-validated: 7b46912 -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-26 (reviewer routine — 60η σάρωση, P9 multi-currency batch review)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: μηδέν entry addressed στο `reviewer` routine (τα OPEN entries είναι όλα bakecore/pharos-daily-dev). Working tree καθαρό στην αρχή.
+
+**Range**: `64a6ead..cc65fb5`, **81 commits** — μεγάλο διάστημα (το P9 multi-currency rollout ολοκληρώθηκε σε αυτό, Bills/Subscriptions/Items/Statements/Expenses/Receipts, web+mobile, μαζί με SaaS route-test coverage και το P63 backup-model fix).
+
+**Type-check**: web `npm run type-check` EXIT 0· mobile `npx tsc --noEmit` EXIT 0. Καθαρά.
+
+**Review**: sub-agent line-by-line πέρασμα στο production-code diff (χωρίς tests/docs, ~4900 γραμμές) εστιασμένο σε regressions/FX-math correctness/hardcoded values/secrets/API-mobile shape parity/tenancy consistency. Εγώ επιβεβαίωσα τα ευρήματα με δικό μου grep πριν τα καταγράψω. Αποτέλεσμα:
+- **FX conversion math** (`lib/fx.ts`, `lib/fxApply.ts`, `lib/fxAudit.ts`, mobile `fx.ts`) traced σε κάθε write path → σωστή κατεύθυνση παντού, μηδέν sign/base-vs-printed confusion.
+- **v1 API ↔ mobile shape parity**: όλα τα νέα πεδία (`currency`/`origAmount`/`fxRate`) additive και mirrored σωστά και στις δύο πλευρές· το προϋπάρχον "λάθος symbol πάνω σε σωστό ποσό" pattern διορθώθηκε σωστά παντού.
+- **Secrets sweep**: μηδέν committed secret.
+- **2 νέα P2/M queue items** (καταγράφηκαν στο WEB_DEBT.md, 60η σάρωση): `bills/actions.ts` και `statements/actions.ts` παρακάμπτουν το tenant-scoping (`withRequestTenant`/`currentModel`) — ίδια κλάση με τα ήδη-κλεισμένα vouchers/giftcards/loyaltycards. Μηδέν επίδραση self-hosted, θα έσπαγε SaaS multi-tenant reads. Δεν είναι single-edit auto-fixable (πολυ-function αρχεία) → flagged, όχι fixed live.
+- Μηδέν P1, μηδέν regression, μηδέν hardcoded-token slip στα mobile screens που πέρασαν το πρόσφατο RADIUS-token refactor.
+
+**el.ts i18n gap**: 6→30 (νέα en keys από το FX-audit UI). Μικρό ακόμα, δεν αξίζει ξεχωριστό item.
+
+**Monitor (βήμα 5)**: OSS_PROGRESS.md / SAAS_PROGRESS.md / LANDING_PROGRESS.md / docs/DOCS_PROGRESS.md / MOBILE_PARITY.md όλα ενημερωμένα σήμερα (2026-07-26) — καμία routine φαίνεται stuck. Μοναδικό standing flag: το `pharos-daily-dev-20260725-1425` ερώτημα (έγκριση `expo-camera` για P17/P23 mobile) παραμένει **OPEN χωρίς Answer** πολλά runs τώρα — ήδη καταγεγραμμένο στο ASK_ACHILLEAS.md από το daily-dev routine, απλά το επιβεβαιώνω εδώ σαν monitor note, δεν το ξαναγράφω.
+
+**Fixes**: κανένα code fix αυτό το run (τα δύο ευρήματα είναι multi-function file-wide αλλαγές, όχι μικρά/ασφαλή για live fix). Commit μόνο WEB_DEBT.md + PROGRESS.md.
+
+---
 
 ## 2026-07-26 (cont.⁶ — P9 mobile: Bills + Subscriptions, και ένα σύμβολο που έλεγε ψέματα)
 
