@@ -5,6 +5,8 @@ import { readBody, strField, numField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Bill } from '@/models/Bill';
 import { billStatus, type BillStatus } from '@/lib/bill';
+import { getAppSettings } from '@/lib/appSettings';
+import { resolveFx } from '@/lib/fx';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,7 +14,8 @@ export const dynamic = 'force-dynamic';
 const CYCLES = ['', 'weekly', 'monthly', 'quarterly', 'yearly'] as const;
 
 export type BillLean = {
-  _id: unknown; title: string; vendor?: string; amount?: number; dueDate: Date;
+  _id: unknown; title: string; vendor?: string; amount?: number; currency?: string;
+  origAmount?: number; fxRate?: number; dueDate: Date;
   paidAt?: Date | null; category?: string; cycle?: string; notes?: string;
   archived?: boolean; linkedExpenseId?: string; updatedAt?: Date; deletedAt?: Date | null;
 };
@@ -21,12 +24,17 @@ export type BillLean = {
  *  the same derived paid/overdue/due-soon/upcoming used by the web BillsClient —
  *  computed here so the mobile client never has to reimplement `billStatus`. */
 export function trim(b: BillLean): {
-  id: string; title: string; vendor: string; amount: number; dueDate: string | null;
+  id: string; title: string; vendor: string; amount: number; currency: string;
+  origAmount: number; fxRate: number; dueDate: string | null;
   paidAt: string | null; category: string; cycle: string; notes: string; archived: boolean;
   status: BillStatus; updatedAt: string | null; deleted: boolean;
 } {
   return {
     id: String(b._id), title: b.title, vendor: b.vendor ?? '', amount: b.amount ?? 0,
+    // P9: `amount` is always base currency. On a foreign-currency bill these two carry the
+    // printed figure and the rate used (fxRate 0 = not foreign, or rate still unknown, in
+    // which case `amount` is still the printed number and must not be summed as base).
+    currency: b.currency ?? 'EUR', origAmount: b.origAmount ?? 0, fxRate: b.fxRate ?? 0,
     dueDate: iso(b.dueDate), paidAt: iso(b.paidAt ?? null), category: b.category ?? 'other',
     cycle: b.cycle ?? '', notes: b.notes ?? '', archived: !!b.archived,
     status: billStatus(b.dueDate, b.paidAt ?? null),
@@ -52,7 +60,10 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** POST /api/v1/bills  { title, vendor?, amount?, dueDate, category?, cycle?, notes? } */
+/** POST /api/v1/bills  { title, vendor?, amount?, dueDate, category?, cycle?, notes?, currency?, fxRate? }
+ *  P9: `amount` is read as the PRINTED figure; when `currency` differs from the deployment's
+ *  base one it is converted with `fxRate` before storage, so what lands in the DB is always
+ *  base currency. Omitting both keeps the previous single-currency behaviour exactly. */
 export async function POST(req: NextRequest) {
   return withAuth(req, async () => {
     const b = await readBody(req);
@@ -62,10 +73,17 @@ export async function POST(req: NextRequest) {
     const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
     if (!dueDate || Number.isNaN(dueDate.getTime())) return apiError('valid dueDate required');
     await connectDB();
+    const fx = resolveFx(
+      { amount: numField(b, 'amount') ?? 0, currency: strField(b, 'currency'), fxRate: numField(b, 'fxRate') ?? 0 },
+      (await getAppSettings()).currency
+    );
     const doc = await Bill.create({
       title,
       vendor: strField(b, 'vendor', '', true),
-      amount: numField(b, 'amount') ?? 0,
+      amount: fx.amount,
+      currency: fx.currency,
+      origAmount: fx.origAmount,
+      fxRate: fx.fxRate,
       dueDate,
       category: strField(b, 'category', 'other', true) || 'other',
       cycle: enumField(b, 'cycle', CYCLES, ''),

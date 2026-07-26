@@ -19,11 +19,12 @@ import { Receipt } from '@/models/Receipt';
 import { Item } from '@/models/Item';
 import { Subscription } from '@/models/Subscription';
 import { Statement } from '@/models/Statement';
+import { Bill } from '@/models/Bill';
 import { currentModel } from '@/lib/tenancy/connection';
 import { normalizeCurrency } from '@/lib/fx';
 import { OWNED_STATUSES } from '@/lib/itemStatus';
 
-export type FxIssueKind = 'expense' | 'income' | 'receipt' | 'item' | 'subscription' | 'statement';
+export type FxIssueKind = 'expense' | 'income' | 'receipt' | 'item' | 'subscription' | 'statement' | 'bill';
 
 export type FxIssueRow = {
   kind: FxIssueKind;
@@ -71,6 +72,7 @@ export function fxIssueHref(kind: FxIssueKind, id: string): string {
     item: '/items',
     subscription: '/subscriptions',
     statement: '/statements',
+    bill: '/bills',
   };
   return `${route[kind]}?open=${id}`;
 }
@@ -100,20 +102,24 @@ type Lean = Record<string, unknown>;
 export async function listEntriesNeedingRate(base: string, limit = 40): Promise<FxIssueRow[]> {
   try {
     const filter = fxNeedsRateFilter(base);
-    const [E, R, I, S, St] = await Promise.all([
+    const [E, R, I, S, St, B] = await Promise.all([
       currentModel(Expense),
       currentModel(Receipt),
       currentModel(Item),
       currentModel(Subscription),
       currentModel(Statement),
+      currentModel(Bill),
     ]);
 
-    const [expenses, receipts, items, subs, statements] = await Promise.all([
+    const [expenses, receipts, items, subs, statements, bills] = await Promise.all([
       E.find(filter).select('kind vendor date period currency origAmount').limit(limit).lean(),
       R.find({ ...filter, archived: { $ne: true } }).select('store date currency origAmount').limit(limit).lean(),
       I.find(filter).select('title status currency origAmount').limit(limit).lean(),
       S.find(filter).select('name provider currency origAmount').limit(limit).lean(),
       St.find(filter).select('card period currency origAmount').limit(limit).lean(),
+      // An archived bill is out of the way and no longer worth chasing a rate for, the same
+      // exclusion the receipts query makes.
+      B.find({ ...filter, archived: { $ne: true } }).select('title vendor dueDate currency origAmount').limit(limit).lean(),
     ]);
 
     const rows: FxIssueRow[] = [];
@@ -177,6 +183,18 @@ export async function listEntriesNeedingRate(base: string, limit = 40): Promise<
         currency: normalizeCurrency(st.currency as string),
         origAmount: Number(st.origAmount) || 0,
         href: fxIssueHref('statement', String(st._id)),
+      });
+    }
+
+    for (const bl of bills as Lean[]) {
+      rows.push({
+        kind: 'bill',
+        id: String(bl._id),
+        title: String(bl.title || bl.vendor || '—'),
+        subtitle: isoDay(bl.dueDate),
+        currency: normalizeCurrency(bl.currency as string),
+        origAmount: Number(bl.origAmount) || 0,
+        href: fxIssueHref('bill', String(bl._id)),
       });
     }
 

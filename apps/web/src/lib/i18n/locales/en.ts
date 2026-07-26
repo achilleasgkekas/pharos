@@ -1373,6 +1373,7 @@ export const en = {
   'reports.fxKind.item': 'Item',
   'reports.fxKind.subscription': 'Subscription',
   'reports.fxKind.statement': 'Statement',
+  'reports.fxKind.bill': 'Bill',
 } as const;
 
 export type Dict = Record<keyof typeof en, string>;

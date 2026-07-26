@@ -5,14 +5,23 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { useOpenParam } from '@/components/useOpenParam';
 import { cn } from '@/components/ui/cn';
-import { cur } from '@/lib/money';
+import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
+import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency } from '@/lib/fx';
+import { FxBadge } from '@/components/FxBadge';
 import { billStatus, billDaysUntilDue, type BillStatus } from '@/lib/bill';
 import type { SerializedBill } from '@/types';
 import { createBill, updateBill, deleteBill, setBillArchived, markBillPaid, markBillUnpaid } from './actions';
 
 const money = (n: number) => `${cur()}${n.toFixed(2)}`;
 type Filter = 'open' | 'overdue' | 'paid' | 'all';
+/** P9 context: the deployment's base currency + whether multi-currency is switched on at all. */
+type FxCtx = { base: string; enabled: boolean };
+
+function currencyCodes(base: string): string[] {
+  return [...new Set([normalizeCurrency(base) || 'EUR', ...CURRENCIES.map((c) => c.code)])];
+}
 
 const STATUS_META: Record<BillStatus, { label: string; cls: string }> = {
   overdue: { label: 'overdue', cls: 'bg-[color:var(--color-red)]/15 text-[color:var(--color-red)]' },
@@ -31,11 +40,29 @@ function dueLabel(bill: SerializedBill): string {
   return `${date} · in ${days}d`;
 }
 
-export function BillsClient({ bills, categories }: { bills: SerializedBill[]; categories: string[] }) {
+export function BillsClient({
+  bills,
+  categories,
+  baseCurrency = 'EUR',
+  multiCurrency = false,
+}: {
+  bills: SerializedBill[];
+  categories: string[];
+  baseCurrency?: string;
+  multiCurrency?: boolean;
+}) {
+  const fx: FxCtx = { base: baseCurrency, enabled: multiCurrency };
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<SerializedBill | null>(null);
   const [filter, setFilter] = useState<Filter>('open');
   const [pending, startTransition] = useTransition();
+
+  // `/bills?open=<id>` opens that bill's edit modal — the convention every other money view
+  // already follows, and what the /reports "needs an exchange rate" audit links to.
+  useOpenParam((id) => {
+    const found = bills.find((b) => b._id === id);
+    if (found) setEditing(found);
+  });
 
   const withStatus = useMemo(
     () => bills.map((b) => ({ b, status: billStatus(b.dueDate, b.paidAt) })),
@@ -134,6 +161,7 @@ export function BillsClient({ bills, categories }: { bills: SerializedBill[]; ca
               key={b._id}
               bill={b}
               status={status}
+              fx={fx}
               pending={pending}
               onOpen={() => setEditing(b)}
               onPay={() => markPaid(b._id, false)}
@@ -143,11 +171,11 @@ export function BillsClient({ bills, categories }: { bills: SerializedBill[]; ca
       )}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New bill" size="lg">
-        <BillForm categories={categories} onSuccess={() => setShowCreate(false)} />
+        <BillForm categories={categories} fx={fx} onSuccess={() => setShowCreate(false)} />
       </Modal>
       {editing && (
         <Modal open onClose={() => setEditing(null)} title={editing.title} size="lg">
-          <BillForm bill={editing} categories={categories} onSuccess={() => setEditing(null)} onDeleted={() => setEditing(null)} />
+          <BillForm bill={editing} categories={categories} fx={fx} onSuccess={() => setEditing(null)} onDeleted={() => setEditing(null)} />
         </Modal>
       )}
     </main>
@@ -157,12 +185,14 @@ export function BillsClient({ bills, categories }: { bills: SerializedBill[]; ca
 function BillRow({
   bill,
   status,
+  fx,
   pending,
   onOpen,
   onPay,
 }: {
   bill: SerializedBill;
   status: BillStatus;
+  fx: FxCtx;
   pending: boolean;
   onOpen: () => void;
   onPay: () => void;
@@ -195,6 +225,12 @@ function BillRow({
         <p className={cn('font-bold', status === 'paid' ? 'text-[color:var(--color-text-faint)]' : 'text-[color:var(--color-text)]')} style={{ fontFamily: 'var(--font-display)' }}>
           {money(bill.amount || 0)}
         </p>
+        {/* P9: what the paper actually says, when it is not the base currency. */}
+        {fx.enabled && (
+          <div className="mt-1 flex justify-end">
+            <FxBadge doc={bill} base={fx.base} />
+          </div>
+        )}
         <span className={cn('inline-block text-[10px] px-1.5 py-0.5 rounded font-semibold mt-1', meta.cls)} style={{ fontFamily: 'var(--font-mono)' }}>
           {meta.label}
         </span>
@@ -216,11 +252,13 @@ function BillRow({
 function BillForm({
   bill,
   categories,
+  fx,
   onSuccess,
   onDeleted,
 }: {
   bill?: SerializedBill;
   categories: string[];
+  fx: FxCtx;
   onSuccess: () => void;
   onDeleted?: () => void;
 }) {
@@ -228,6 +266,14 @@ function BillForm({
   const confirm = useConfirm();
   const [error, setError] = useState('');
   const [logExpense, setLogExpense] = useState(false);
+  // P9: the form is edited in the currency the bill is PRINTED in — `amount` for an ordinary
+  // bill, `origAmount` for a foreign one — so re-saving it unchanged re-resolves to the same
+  // stored figure instead of converting it a second time.
+  const wasForeign = isForeignCurrency(bill?.currency, fx.base);
+  const [currency, setCurrency] = useState(normalizeCurrency(bill?.currency) || normalizeCurrency(fx.base) || 'EUR');
+  const [fxRate, setFxRate] = useState(String(bill?.fxRate || ''));
+  const [amount, setAmount] = useState(String((wasForeign ? bill?.origAmount || bill?.amount : bill?.amount) || ''));
+  const foreign = fx.enabled && isForeignCurrency(currency, fx.base);
 
   const submit = (formData: FormData) => {
     setError('');
@@ -253,9 +299,41 @@ function BillForm({
           <Input name="vendor" defaultValue={bill?.vendor} placeholder="ΔΕΗ" />
         </div>
         <div>
-          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Amount ({cur()})</label>
-          <Input name="amount" type="number" step="0.01" min="0" defaultValue={bill?.amount || ''} placeholder="0.00" />
+          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>
+            Amount ({fx.enabled ? currencySymbol(currency).trim() : cur()})
+          </label>
+          <Input
+            name="amount"
+            type="number"
+            step="0.01"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+          />
         </div>
+        {fx.enabled && (
+          <div>
+            <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Currency</label>
+            <select
+              name="currency"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="w-full rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 text-sm"
+            >
+              {currencyCodes(fx.base).map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {foreign && (
+          <div className="md:col-span-2">
+            <BillFxFields amount={amount} currency={currency} fxRate={fxRate} setRate={setFxRate} base={fx.base} />
+          </div>
+        )}
+        {/* Always submitted so the server can clear a rate that no longer applies. */}
+        {fx.enabled && <input type="hidden" name="fxRate" value={foreign ? fxRate : ''} />}
         <div>
           <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Due date</label>
           <Input name="dueDate" type="date" defaultValue={bill?.dueDate ? bill.dueDate.slice(0, 10) : ''} required />
@@ -357,6 +435,72 @@ function BillForm({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Multi-currency (P9): shown only when the bill's currency differs from the base one.
+ *  Two ways in, because someone holding a foreign invoice often knows what their bank
+ *  actually debited but not the rate: type the rate, or type the debited amount and let
+ *  deriveFxRate() back it out. The preview is the figure that will be stored, i.e. the one
+ *  the "to pay" total and any logged expense will sum. */
+function BillFxFields({
+  amount,
+  currency,
+  fxRate,
+  setRate,
+  base,
+}: {
+  amount: string;
+  currency: string;
+  fxRate: string;
+  setRate: (v: string) => void;
+  base: string;
+}) {
+  const [charged, setCharged] = useState('');
+  const printed = Number(amount) || 0;
+  const rate = Number(fxRate) || 0;
+  const label = 'block text-[11px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] mb-1';
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end rounded-lg border border-[color:var(--color-purple)]/30 bg-[color:var(--color-surface-2)] p-3">
+      <div>
+        <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>
+          Rate ({normalizeCurrency(currency)}→{base})
+        </label>
+        <Input
+          type="number"
+          step="0.000001"
+          value={fxRate}
+          onChange={(e) => {
+            setCharged('');
+            setRate(e.target.value);
+          }}
+          placeholder="0.92"
+        />
+      </div>
+      <div>
+        <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>
+          or charged ({currencySymbol(base).trim()})
+        </label>
+        <Input
+          type="number"
+          step="0.01"
+          value={charged}
+          onChange={(e) => {
+            const v = e.target.value;
+            setCharged(v);
+            const derived = deriveFxRate(printed, Number(v) || 0);
+            setRate(derived ? String(derived) : '');
+          }}
+        />
+      </div>
+      <p className="text-[11px] pb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+        {rate > 0 ? (
+          <span className="text-[color:var(--color-purple)]">= {formatMoney(convertToBase(printed, rate), base)}</span>
+        ) : (
+          <span className="text-[color:var(--color-gold)]">⚠ no rate yet — stored as-is, not in {base}</span>
+        )}
+      </p>
     </div>
   );
 }

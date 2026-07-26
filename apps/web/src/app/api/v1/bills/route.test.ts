@@ -13,7 +13,7 @@ import type { NextRequest } from 'next/server';
 //   - trim() computes `status` from billStatus(dueDate, paidAt), never stored.
 // We exercise the REAL apiAuth/apiBody/apiList/lib/bill helpers and only mock the DB seam.
 
-const { connectDBMock, userFindOne, userState, billFind, billCount, billCreate, findQuery, countQuery, state } =
+const { connectDBMock, userFindOne, userState, billFind, billCount, billCreate, findQuery, countQuery, state, settingsState, getAppSettingsMock } =
   vi.hoisted(() => {
     const state: { docs: unknown[]; total: number; lastCreate: Record<string, unknown> | null } = {
       docs: [],
@@ -36,10 +36,14 @@ const { connectDBMock, userFindOne, userState, billFind, billCount, billCreate, 
       state.lastCreate = arg;
       return { toObject: () => ({ _id: 'newid', updatedAt: new Date('2026-07-20T00:00:00Z'), ...arg }) };
     });
-    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, billFind, billCount, billCreate, findQuery, countQuery, state };
+    // P9: POST resolves foreign amounts against the deployment's base currency.
+    const settingsState = { currency: 'EUR' };
+    const getAppSettingsMock = vi.fn(async () => settingsState);
+    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, billFind, billCount, billCreate, findQuery, countQuery, state, settingsState, getAppSettingsMock };
   });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/models/Bill', () => ({ Bill: { find: billFind, countDocuments: billCount, create: billCreate } }));
 
@@ -65,7 +69,9 @@ beforeEach(() => {
   state.total = 0;
   state.lastCreate = null;
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
+  settingsState.currency = 'EUR';
   vi.clearAllMocks();
+  getAppSettingsMock.mockImplementation(async () => settingsState);
   for (const m of ['sort', 'skip', 'limit', 'setOptions']) (findQuery[m] as ReturnType<typeof vi.fn>).mockImplementation(() => findQuery);
   (findQuery.lean as ReturnType<typeof vi.fn>).mockImplementation(async () => state.docs);
   (countQuery.setOptions as ReturnType<typeof vi.fn>).mockImplementation(() => countQuery);
@@ -153,5 +159,43 @@ describe('POST', () => {
   it('accepts a valid recurring cycle', async () => {
     await POST(makeReq({ body: { title: 'X', dueDate: '2026-08-01', cycle: 'monthly', amount: 62 } }));
     expect(state.lastCreate).toMatchObject({ cycle: 'monthly', amount: 62 });
+  });
+});
+
+// P9 — the v1 Bill contract carries the currency triple, and POST reads `amount` as the
+// PRINTED figure. A client that omits currency/fxRate must see byte-identical behaviour to
+// the single-currency route this replaced.
+describe('POST multi-currency (P9)', () => {
+  it('a body without currency/fxRate stores the amount untouched, with the triple at base/0/0', async () => {
+    await POST(makeReq({ body: { title: 'ΔΕΗ', dueDate: '2026-08-01', amount: 62 } }));
+    expect(state.lastCreate).toMatchObject({ amount: 62, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+
+  it('a foreign amount with a rate is converted before storage; origAmount keeps the printed figure', async () => {
+    await POST(makeReq({ body: { title: 'AWS', dueDate: '2026-08-01', amount: 88, currency: 'USD', fxRate: 0.92 } }));
+    expect(state.lastCreate).toMatchObject({ amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 });
+  });
+
+  it('a foreign amount with NO rate is stored as-is and flagged (fxRate 0), never guessed at 1:1', async () => {
+    await POST(makeReq({ body: { title: 'AWS', dueDate: '2026-08-01', amount: 88, currency: 'USD' } }));
+    expect(state.lastCreate).toMatchObject({ amount: 88, currency: 'USD', origAmount: 88, fxRate: 0 });
+  });
+
+  it('the base currency comes from settings: on a USD deployment, USD is not foreign', async () => {
+    settingsState.currency = 'USD';
+    await POST(makeReq({ body: { title: 'AWS', dueDate: '2026-08-01', amount: 88, currency: 'USD', fxRate: 0.92 } }));
+    expect(state.lastCreate).toMatchObject({ amount: 88, currency: 'USD', origAmount: 0, fxRate: 0 });
+  });
+
+  it('GET exposes the triple on every row, defaulting a pre-P9 document to EUR/0/0', async () => {
+    state.docs = [
+      { _id: 'b1', title: 'AWS', dueDate: new Date('2026-08-01'), amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 },
+      { _id: 'b2', title: 'ΔΕΗ', dueDate: new Date('2026-08-05'), amount: 62 },
+    ];
+    state.total = 2;
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { data: { currency: string; origAmount: number; fxRate: number }[] };
+    expect(json.data[0]).toMatchObject({ currency: 'USD', origAmount: 88, fxRate: 0.92 });
+    expect(json.data[1]).toMatchObject({ currency: 'EUR', origAmount: 0, fxRate: 0 });
   });
 });

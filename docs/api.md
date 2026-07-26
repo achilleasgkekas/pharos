@@ -316,9 +316,11 @@ Each plan in the `GET /statements/plans` response is:
 | Method | Path                        | Description |
 |--------|-----------------------------|----|
 | GET    | `/bills?archived=0&paid=0`  | List (+ `limit`/`offset`/`updatedSince`). Default excludes archived bills. Filter `paid=0` to show unpaid only. Each bill has a computed `status` field (paid/overdue/due-soon/upcoming) derived from `dueDate` and `paidAt`. |
-| POST   | `/bills`                    | Create `{ title, vendor?, amount?, dueDate, category?, cycle?, notes? }` (cycles: empty/'weekly'/'monthly'/'quarterly'/'yearly'). |
-| PATCH  | `/bills/:id`                | Update `{ title?, vendor?, amount?, dueDate?, category?, cycle?, notes?, archived?, paid?, paidDate? }`. Special: `paid: true` marks paid and (for recurring bills on first mark) spawns the next due instance one cycle ahead. Response includes `{ bill: …, spawnedNext: boolean }`. |
+| POST   | `/bills`                    | Create `{ title, vendor?, amount?, dueDate, category?, cycle?, notes?, currency?, fxRate? }` (cycles: empty/'weekly'/'monthly'/'quarterly'/'yearly'). P9: `amount` is read as the printed figure and converted with `fxRate`. |
+| PATCH  | `/bills/:id`                | Update `{ title?, vendor?, amount?, dueDate?, category?, cycle?, notes?, archived?, paid?, paidDate?, currency?, fxRate? }`. Special: `paid: true` marks paid and (for recurring bills on first mark) spawns the next due instance one cycle ahead. Response includes `{ bill: …, spawnedNext: boolean }`. P9: touching any money field re-resolves all currency fields together. |
 | DELETE | `/bills/:id`                | Soft-delete. |
+
+**Multi-currency fields (P9):** every bill carries `currency` (the code printed on the invoice), `origAmount` (the printed figure) and `fxRate` (base units per 1 unit of `currency`). `amount` is always the deployment's base currency, converted with that rate, so a client can sum bills without conversion; divide by `fxRate` for the printed figure. Both extra fields are `0` on an ordinary bill. `fxRate: 0` with a foreign `currency` means no rate has been entered yet, so `amount` is still the printed number: show it as unconverted rather than mixing it into a base-currency total (`/reports` lists exactly these). Marking a bill paid with expense logging carries the same currency and rate onto the expense, and a recurring bill's spawned next instance inherits the currency plus the last known rate.
 
 ### Gift cards
 

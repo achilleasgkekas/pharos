@@ -22,6 +22,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //    `nextBillDue`.
 //  - markBillUnpaid: clears paidAt only, never touches a linked expense.
 
+//  - P9 multi-currency: the form hands over the PRINTED amount, so `amount` is stored in base
+//    currency (origAmount/fxRate remember the paper); an unknown rate is never guessed as 1:1;
+//    a logged expense receives the PRINTED figure plus currency + rate (addExpense runs its own
+//    resolveFx, so handing it the converted amount would convert twice); and a recurring spawn
+//    inherits the whole fx triple.
 const {
   connectDBMock,
   billCreate,
@@ -30,6 +35,7 @@ const {
   billUpdateOne,
   addExpenseMock,
   revalidatePathMock,
+  getAppSettingsMock,
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
   billCreate: vi.fn(async (_doc: Record<string, unknown>) => ({})),
@@ -38,6 +44,8 @@ const {
   billUpdateOne: vi.fn(async (_filter: Record<string, unknown>, _update: Record<string, any>) => ({})),
   addExpenseMock: vi.fn(async (_data: Record<string, unknown>) => ({ ok: true, id: 'exp1' } as { ok: boolean; id?: string; error?: string })),
   revalidatePathMock: vi.fn(),
+  // P9: only the base currency matters here; lib/fx.ts itself runs un-mocked (it is pure).
+  getAppSettingsMock: vi.fn(async () => ({ currency: 'EUR' }) as { currency: string }),
 }));
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
@@ -50,6 +58,7 @@ vi.mock('@/models/Bill', () => ({
   },
 }));
 vi.mock('@/app/expenses/actions', () => ({ addExpense: addExpenseMock }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
 import { createBill, updateBill, setBillArchived, deleteBill, markBillPaid, markBillUnpaid } from './actions';
@@ -76,6 +85,7 @@ beforeEach(() => {
   billUpdateOne.mockImplementation(async () => ({}));
   addExpenseMock.mockImplementation(async () => ({ ok: true, id: 'exp1' }));
   revalidatePathMock.mockImplementation(() => undefined);
+  getAppSettingsMock.mockImplementation(async () => ({ currency: 'EUR' }));
 });
 
 describe('createBill', () => {
@@ -332,5 +342,118 @@ describe('markBillUnpaid', () => {
     expect(res).toEqual({ ok: true });
     expect(billFindByIdAndUpdate).toHaveBeenCalledWith('b1', { paidAt: null });
     expect(revalidatePathMock).toHaveBeenCalledWith('/bills');
+  });
+});
+
+describe('P9 multi-currency', () => {
+  it('a base-currency bill stores the amount untouched, with origAmount/fxRate at 0', async () => {
+    await createBill(formData({ title: 'ΔΕΗ', dueDate: '15/07/2026', amount: '84.50', currency: 'EUR' }));
+    const doc = billCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(84.5);
+    expect(doc.currency).toBe('EUR');
+    expect(doc.origAmount).toBe(0);
+    expect(doc.fxRate).toBe(0);
+  });
+
+  it('a form with no currency field at all behaves exactly like a single-currency deployment', async () => {
+    await createBill(formData({ title: 'X', dueDate: '15/07/2026', amount: '20' }));
+    const doc = billCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(20);
+    expect(doc.origAmount).toBe(0);
+    expect(doc.fxRate).toBe(0);
+  });
+
+  it('a foreign bill with a rate stores base currency in amount and the printed figure in origAmount', async () => {
+    await createBill(formData({ title: 'AWS', dueDate: '15/07/2026', amount: '88', currency: 'USD', fxRate: '0.92' }));
+    const doc = billCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(80.96); // 88 * 0.92
+    expect(doc.currency).toBe('USD');
+    expect(doc.origAmount).toBe(88);
+    expect(doc.fxRate).toBe(0.92);
+  });
+
+  it('a foreign bill with NO rate keeps the printed number (never guesses 1:1) and flags itself via fxRate 0', async () => {
+    await createBill(formData({ title: 'AWS', dueDate: '15/07/2026', amount: '88', currency: 'USD' }));
+    const doc = billCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(88);
+    expect(doc.origAmount).toBe(88);
+    expect(doc.fxRate).toBe(0);
+  });
+
+  it('the base currency comes from settings, so a USD deployment treats USD as ordinary and EUR as foreign', async () => {
+    getAppSettingsMock.mockResolvedValue({ currency: 'USD' });
+    await createBill(formData({ title: 'X', dueDate: '15/07/2026', amount: '88', currency: 'USD', fxRate: '0.92' }));
+    const doc = billCreate.mock.calls[0][0];
+    expect(doc.amount).toBe(88); // same currency: the rate is irrelevant, nothing is converted
+    expect(doc.origAmount).toBe(0);
+    expect(doc.fxRate).toBe(0);
+  });
+
+  it('updateBill re-resolves: the form always sends the PRINTED amount, so an unchanged re-save is idempotent', async () => {
+    await updateBill('b1', formData({ title: 'AWS', dueDate: '15/07/2026', amount: '88', currency: 'USD', fxRate: '0.92' }));
+    const first = billFindByIdAndUpdate.mock.calls[0][1];
+    expect(first.amount).toBe(80.96);
+    expect(first.origAmount).toBe(88);
+    // Re-saving the same form (printed 88 again) must land on the same stored figure, not 74.48.
+    await updateBill('b1', formData({ title: 'AWS', dueDate: '15/07/2026', amount: '88', currency: 'USD', fxRate: '0.92' }));
+    expect(billFindByIdAndUpdate.mock.calls[1][1].amount).toBe(80.96);
+  });
+
+  it('clearing the currency back to base wipes origAmount/fxRate instead of leaving stale fx fields', async () => {
+    await updateBill('b1', formData({ title: 'AWS', dueDate: '15/07/2026', amount: '80.96', currency: 'EUR', fxRate: '' }));
+    const update = billFindByIdAndUpdate.mock.calls[0][1];
+    expect(update.amount).toBe(80.96);
+    expect(update.currency).toBe('EUR');
+    expect(update.origAmount).toBe(0);
+    expect(update.fxRate).toBe(0);
+  });
+
+  it('logExpense hands addExpense the PRINTED amount + currency + rate, so it is not converted twice', async () => {
+    billFindById.mockResolvedValueOnce({
+      _id: 'b1', title: 'AWS', vendor: 'AWS', category: 'other', amount: 80.96,
+      currency: 'USD', origAmount: 88, fxRate: 0.92, paidAt: null, cycle: '', linkedExpenseId: '',
+    });
+    await markBillPaid('b1', { logExpense: true });
+    const call = addExpenseMock.mock.calls[0][0];
+    expect(call.amount).toBe(88); // NOT 80.96 — addExpense runs its own resolveFx
+    expect(call.currency).toBe('USD');
+    expect(call.fxRate).toBe(0.92);
+  });
+
+  it('logExpense on an ordinary bill still passes its plain amount, with no currency override', async () => {
+    billFindById.mockResolvedValueOnce({
+      _id: 'b1', title: 'ΔΕΗ', vendor: 'ΔΕΗ', amount: 84.5, currency: 'EUR', origAmount: 0, fxRate: 0,
+      paidAt: null, cycle: '', linkedExpenseId: '',
+    });
+    await markBillPaid('b1', { logExpense: true });
+    const call = addExpenseMock.mock.calls[0][0];
+    expect(call.amount).toBe(84.5);
+    expect(call.fxRate).toBe(0);
+  });
+
+  it('a foreign bill with no rate yet logs its printed amount and passes the missing rate straight through', async () => {
+    billFindById.mockResolvedValueOnce({
+      _id: 'b1', title: 'AWS', vendor: 'AWS', amount: 88, currency: 'USD', origAmount: 88, fxRate: 0,
+      paidAt: null, cycle: '', linkedExpenseId: '',
+    });
+    await markBillPaid('b1', { logExpense: true });
+    const call = addExpenseMock.mock.calls[0][0];
+    expect(call.amount).toBe(88);
+    expect(call.currency).toBe('USD');
+    expect(call.fxRate).toBe(0); // stays flagged as "needs a rate" downstream too
+  });
+
+  it('a recurring spawn inherits the whole fx triple, so the projection stays base-denominated', async () => {
+    billFindById.mockResolvedValueOnce({
+      _id: 'b1', title: 'AWS', vendor: 'AWS', amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92,
+      category: 'other', cycle: 'monthly', notes: '', paidAt: null, linkedExpenseId: '',
+      dueDate: new Date('2026-06-15'),
+    });
+    await markBillPaid('b1');
+    const spawned = billCreate.mock.calls[0][0];
+    expect(spawned.amount).toBe(80.96);
+    expect(spawned.currency).toBe('USD');
+    expect(spawned.origAmount).toBe(88);
+    expect(spawned.fxRate).toBe(0.92);
   });
 });

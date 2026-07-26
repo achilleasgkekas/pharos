@@ -11,6 +11,14 @@ const BillSchema = new Schema(
     title: { type: String, required: true }, // "ΔΕΗ ρεύμα", "Κοινόχρηστα Ιουλίου"
     vendor: { type: String, default: '', index: true }, // payee
     amount: { type: Number, required: true, default: 0 },
+    // Multi-currency (P9): `amount` is ALWAYS denominated in the deployment's base currency,
+    // so every roll-up that already sums it (the "to pay" header, /calendar's projected bills,
+    // the expense a payment logs) keeps working untouched. A bill printed in another currency
+    // additionally remembers what the paper says: `origAmount` is the printed figure and
+    // `fxRate` the base units per 1 unit of `currency`. See lib/fx.ts.
+    currency: { type: String, default: 'EUR' },
+    origAmount: { type: Number, default: 0 },
+    fxRate: { type: Number, default: 0 },
     dueDate: { type: Date, required: true, index: true },
     paidAt: { type: Date, default: null }, // null = still unpaid
     category: { type: String, default: 'other' }, // reused when a payment logs an expense

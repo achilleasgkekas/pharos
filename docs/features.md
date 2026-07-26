@@ -190,7 +190,7 @@ Handle expenses in multiple currencies while keeping reports and budgets in your
 - **Rate handling.** If the exchange rate is known (entered manually or looked up), a green FxBadge shows the stored amount and the applied rate. If the rate is unknown, a gold warning badge appears — the amount stored defaults to the printed number (same as the old behaviour when multi-currency was unsupported), so no existing totals shift.
 - **Deterministic conversion.** `amount` (what you see in reports and budgets) is always in base currency. `origAmount` and `fxRate` are kept for audit trail and future rate lookup / correction. All existing aggregations (cash flow, anomaly medians, split shares, net worth) keep summing `amount` unchanged, so you can enable multi-currency mid-year without migrating historical data.
 - **Inherited per vendor.** A new entry inherits the currency from that vendor's last entry, so repeat bills keep landing in the same foreign currency without re-selecting it each time.
-- **Find the entries still missing a rate.** Because a rate is never guessed, a foreign record saved without one keeps its printed number in the stored amount, which quietly joins your base-currency totals. **Reports** shows a **"N entries need an exchange rate"** panel above the figures it affects, listing every such record across expenses, income, receipts, items, subscriptions and statements (largest printed amount first) with a link straight into the record so you can fill the rate in. The panel only appears when multi-currency is on and something actually needs fixing.
+- **Find the entries still missing a rate.** Because a rate is never guessed, a foreign record saved without one keeps its printed number in the stored amount, which quietly joins your base-currency totals. **Reports** shows a **"N entries need an exchange rate"** panel above the figures it affects, listing every such record across expenses, income, receipts, items, subscriptions, statements and bills (largest printed amount first) with a link straight into the record so you can fill the rate in. The panel only appears when multi-currency is on and something actually needs fixing.
 - **Bank CSV imports too.** The CSV importer maps an optional **Currency** column (and, when the file has none, reads a code or symbol straight off the amount cell, so `88.00 USD` is no longer rejected as unreadable). Because a bank export prints a code per line but never a rate, you enter **one rate per currency** found in the file, right in the import dialog; the preview then shows each foreign row as `printed → stored`. Rows whose currency you leave without a rate are still imported, keeping their printed amount and code, and the dialog reports how many need a rate so you can fix them per record. Re-importing the same file is still deduplicated, because both sides compare the printed figure.
 
 ### Expense splitting ("who owes what")
@@ -353,6 +353,16 @@ Highlights:
   and paying it once spawns the **next pending instance** one cycle ahead, so the
   series keeps rolling without a background job. The spawn happens exactly once, on
   the first payment.
+- **Multi-currency bills (P9).** When multi-currency is enabled, a bill printed in a
+  foreign currency keeps its printed figure and rate next to the base-currency amount
+  that the "to pay" total sums, exactly like expenses and subscriptions. Enter the rate
+  directly, or type what your bank actually debited and let it be backed out; a live
+  preview shows what will be stored. If no rate is known, the printed number is kept
+  rather than guessed at 1:1, a gold badge marks the row, and the bill appears in the
+  Reports "needs an exchange rate" panel. Logging an expense on payment carries the same
+  currency and rate across (never converting twice), and a recurring bill's next instance
+  inherits the currency plus the last known rate, since it is only a projection until the
+  real invoice arrives.
 - **Notifications.** An unpaid bill that is overdue or due within the alert window
   triggers a notification; the alert auto-expires once the bill is paid.
 - **Archive** a one-off you no longer care about, or delete it (soft delete → Trash).
@@ -454,7 +464,7 @@ months):
   agenda computed server-side). Actionable for quick "is this a good time to buy?"
   decisions.
 - **Foreign currency audit (P9)** — when multi-currency is enabled, a panel lists all
-  records (expenses, income, receipts, items, subscriptions, statements) that are
+  records (expenses, income, receipts, items, subscriptions, statements, bills) that are
   missing an FX rate. This helps you catch incomplete foreign transactions (especially
   after bulk CSV imports) before they silently distort your reports. Sorted by largest
   printed amount first; click any row to open the record's edit form and add the missing

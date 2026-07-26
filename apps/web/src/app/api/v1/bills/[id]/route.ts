@@ -4,6 +4,8 @@ import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Bill } from '@/models/Bill';
 import { nextBillDue } from '@/lib/bill';
+import { getAppSettings } from '@/lib/appSettings';
+import { resolveFx, isForeignCurrency } from '@/lib/fx';
 import { trim, type BillLean } from '../route';
 
 export const runtime = 'nodejs';
@@ -41,6 +43,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     await connectDB();
 
+    // P9: `amount` arrives as the PRINTED figure but is stored in base currency, so touching
+    // the amount, the currency OR the rate means all four fields have to be recomputed together
+    // from the current doc — a partial PATCH must never leave a bill half-converted. Bodies
+    // without any of these skip the extra read entirely.
+    const touchesFx = set.amount != null || typeof b.currency === 'string' || b.fxRate != null;
+    if (touchesFx) {
+      const existing = (await Bill.findById(id).lean()) as BillLean | null;
+      if (!existing) return apiError('not found', 404);
+      const base = (await getAppSettings()).currency;
+      // The printed amount of a foreign bill lives in origAmount; of a base-currency one, in amount.
+      const wasForeign = isForeignCurrency(existing.currency, base);
+      const printed =
+        typeof set.amount === 'number'
+          ? set.amount
+          : ((wasForeign ? existing.origAmount || existing.amount : existing.amount) ?? 0);
+      const currency = typeof b.currency === 'string' ? b.currency : (existing.currency ?? base);
+      const rate = b.fxRate != null && Number.isFinite(Number(b.fxRate)) ? Number(b.fxRate) : (existing.fxRate ?? 0);
+      const fx = resolveFx({ amount: printed, currency, fxRate: rate }, base);
+      set.amount = fx.amount;
+      set.currency = fx.currency;
+      set.origAmount = fx.origAmount;
+      set.fxRate = fx.fxRate;
+    }
+
     let spawnedNext = false;
     if (typeof b.paid === 'boolean') {
       const existing = await Bill.findById(id).lean();
@@ -54,6 +80,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             title: existing.title,
             vendor: existing.vendor,
             amount: existing.amount,
+            // P9: the projection inherits currency AND last known rate, so `amount` stays
+            // base-denominated instead of spawning a rate-less foreign row every cycle
+            // (same rule as the web markBillPaid action).
+            currency: existing.currency,
+            origAmount: existing.origAmount,
+            fxRate: existing.fxRate,
             dueDate: nextBillDue(existing.dueDate, existing.cycle),
             paidAt: null,
             category: existing.category,

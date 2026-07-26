@@ -13,7 +13,7 @@ import type { NextRequest } from 'next/server';
 //   - `paid: false` clears paidAt without touching anything else,
 //   - DELETE is a soft delete, a missing row 404s.
 
-const { connectDBMock, userFindOne, userState, billUpdate, billFindById, billCreate, updateState, findByIdState } =
+const { connectDBMock, userFindOne, userState, billUpdate, billFindById, billCreate, updateState, findByIdState, settingsState, getAppSettingsMock } =
   vi.hoisted(() => {
     const userState: { doc: unknown } = { doc: { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' } };
     const userFindOne = vi.fn(() => ({ select: () => ({ lean: async () => userState.doc }) }));
@@ -25,10 +25,14 @@ const { connectDBMock, userFindOne, userState, billUpdate, billFindById, billCre
     const findByIdState: { doc: unknown } = { doc: null };
     const billFindById = vi.fn(() => ({ lean: async () => findByIdState.doc }));
     const billCreate = vi.fn(async (arg: Record<string, unknown>) => ({ toObject: () => arg }));
-    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, billUpdate, billFindById, billCreate, updateState, findByIdState };
+    // P9: a money-touching PATCH re-resolves against the deployment's base currency.
+    const settingsState = { currency: 'EUR' };
+    const getAppSettingsMock = vi.fn(async () => settingsState);
+    return { connectDBMock: vi.fn(async () => {}), userFindOne, userState, billUpdate, billFindById, billCreate, updateState, findByIdState, settingsState, getAppSettingsMock };
   });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/models/Bill', () => ({ Bill: { findByIdAndUpdate: billUpdate, findById: billFindById, create: billCreate } }));
 
@@ -58,7 +62,9 @@ beforeEach(() => {
   updateState.calls = [];
   findByIdState.doc = null;
   userState.doc = { _id: 'u1', name: 'Achilleas', username: 'ach', role: 'admin' };
+  settingsState.currency = 'EUR';
   vi.clearAllMocks();
+  getAppSettingsMock.mockImplementation(async () => settingsState);
   userFindOne.mockImplementation(() => ({ select: () => ({ lean: async () => userState.doc }) }));
   billUpdate.mockImplementation((id: unknown, update: unknown, opts: unknown) => {
     updateState.calls.push({ id, update, opts });
@@ -177,6 +183,65 @@ describe('PATCH paid transition', () => {
     const res = await PATCH(makeReq({ body: { paid: true } }), ctx(OID));
     expect(res.status).toBe(404);
     expect(billUpdate).not.toHaveBeenCalled();
+  });
+});
+
+// P9 — `amount` arrives as the PRINTED figure but is stored in base currency, so any money
+// field in the body forces all four to be recomputed together from the current doc. A body
+// with none of them must not pay for the extra read.
+describe('PATCH multi-currency (P9)', () => {
+  it('an amount-only PATCH on a base-currency bill stores it untouched and zeroes the triple', async () => {
+    findByIdState.doc = { _id: OID, title: 'ΔΕΗ', amount: 62, currency: 'EUR', origAmount: 0, fxRate: 0 };
+    updateState.doc = { _id: OID, title: 'ΔΕΗ', amount: 70 };
+    await PATCH(makeReq({ body: { amount: 70 } }), ctx(OID));
+    expect(lastSet()).toMatchObject({ amount: 70, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+
+  it('an amount + currency + rate PATCH converts before storing and keeps the printed figure', async () => {
+    findByIdState.doc = { _id: OID, title: 'AWS', amount: 62, currency: 'EUR', origAmount: 0, fxRate: 0 };
+    updateState.doc = { _id: OID, title: 'AWS', amount: 80.96 };
+    await PATCH(makeReq({ body: { amount: 88, currency: 'USD', fxRate: 0.92 } }), ctx(OID));
+    expect(lastSet()).toMatchObject({ amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 });
+  });
+
+  it('a rate-only PATCH converts the PRINTED amount already on the doc (origAmount), not the stored one', async () => {
+    findByIdState.doc = { _id: OID, title: 'AWS', amount: 88, currency: 'USD', origAmount: 88, fxRate: 0 };
+    updateState.doc = { _id: OID, title: 'AWS', amount: 80.96 };
+    await PATCH(makeReq({ body: { fxRate: 0.92 } }), ctx(OID));
+    expect(lastSet()).toMatchObject({ amount: 80.96, origAmount: 88, fxRate: 0.92 });
+  });
+
+  it('a currency-only PATCH back to base wipes the fx fields instead of leaving them stale', async () => {
+    findByIdState.doc = { _id: OID, title: 'AWS', amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 };
+    updateState.doc = { _id: OID, title: 'AWS', amount: 88 };
+    await PATCH(makeReq({ body: { currency: 'EUR' } }), ctx(OID));
+    // The printed 88 is what the doc claims it costs, so that is what stays.
+    expect(lastSet()).toMatchObject({ amount: 88, currency: 'EUR', origAmount: 0, fxRate: 0 });
+  });
+
+  it('a PATCH with no money field never reads the doc for fx purposes', async () => {
+    updateState.doc = { _id: OID, title: 'Renamed' };
+    await PATCH(makeReq({ body: { title: 'Renamed' } }), ctx(OID));
+    expect(billFindById).not.toHaveBeenCalled();
+    expect(lastSet()).toEqual({ title: 'Renamed' });
+  });
+
+  it('a money PATCH against a missing bill 404s before any write', async () => {
+    findByIdState.doc = null;
+    const res = await PATCH(makeReq({ body: { amount: 70 } }), ctx(OID));
+    expect(res.status).toBe(404);
+    expect(billUpdate).not.toHaveBeenCalled();
+  });
+
+  it('a recurring spawn inherits the fx triple, so the projection stays base-denominated', async () => {
+    findByIdState.doc = {
+      _id: OID, title: 'AWS', vendor: 'AWS', amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92,
+      cycle: 'monthly', paidAt: null, dueDate: new Date('2026-06-15'), category: 'other', notes: '',
+    };
+    updateState.doc = { _id: OID, title: 'AWS', amount: 80.96 };
+    await PATCH(makeReq({ body: { paid: true } }), ctx(OID));
+    expect(billCreate).toHaveBeenCalledTimes(1);
+    expect(billCreate.mock.calls[0][0]).toMatchObject({ amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 });
   });
 });
 

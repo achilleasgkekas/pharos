@@ -209,6 +209,10 @@ export type SerializedBill = {
   title: string;
   vendor: string;
   amount: number;
+  /** P9: `amount` is always base currency; these carry the printed figure + rate (0 = not foreign). */
+  currency?: string;
+  origAmount?: number;
+  fxRate?: number;
   dueDate: string | null;
   paidAt: string | null;
   category: string;

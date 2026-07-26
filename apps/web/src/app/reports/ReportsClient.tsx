@@ -36,8 +36,10 @@ type InstallmentPlanRow = {
   done: boolean;
 };
 
+// Mirrors lib/fxAudit.ts (that module imports Mongoose models, so it cannot be imported
+// from a client component). Keep the `kind` union in step with FxIssueKind there.
 type FxIssueRow = {
-  kind: 'expense' | 'income' | 'receipt' | 'item' | 'subscription' | 'statement';
+  kind: 'expense' | 'income' | 'receipt' | 'item' | 'subscription' | 'statement' | 'bill';
   id: string;
   title: string;
   subtitle: string;
@@ -138,6 +140,7 @@ const FX_KIND_KEY = {
   item: 'reports.fxKind.item',
   subscription: 'reports.fxKind.subscription',
   statement: 'reports.fxKind.statement',
+  bill: 'reports.fxKind.bill',
 } as const;
 
 const tooltipStyle = {
