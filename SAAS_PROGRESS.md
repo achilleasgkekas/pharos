@@ -5569,3 +5569,89 @@ serialization/scope idiom) και `billing/route.ts` (69 γρ., plan/quota read)
 `components/saas/**` pure helpers) αντί να θεωρηθεί το backlog εξαντλημένο. Πριν ξεκινήσεις:
 ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο territory** (οι τελευταίες 5
 σαρώσεις δεν είχαν κανένα — τα 3 ανοιχτά items είναι feature-side).
+
+## 2026-07-26 (cont. — increment 116, route-level tests για το export ζευγάρι content+files)
+
+Πριν από νέο increment: ask-inbox re-checked (`~/.claude/ASK_ACHILLEAS.md`, **μηδέν entry addressed
+σε saas-core**, μηδέν ANSWERED — `grep saas-core` = 0 hits). `WEB_DEBT.md` re-scanned (60ή σάρωση):
+τα 3 ενεργά items (`bills/actions.ts`, `statements/actions.ts`, `vouchers/page.tsx` tenancy-parity)
+είναι **και τα 3 feature-side**, εκτός territory → μηδέν αλλαγή, δεν τα άγγιξα. Πήρα το next-task
+του increment-114 log: το ζευγάρι `workspace/export/{route,files}`.
+
+Πριν το staging, `git status --short` έδειξε **μόνο τα 2 δικά μου νέα αρχεία**, μηδέν staged από
+άλλη routine.
+
+**Νέο `workspace/export/route.test.ts`** (30 tests), **μηδέν production code αλλαγή**. Είναι το
+workspace-level GDPR Art. 20 surface (dump ολόκληρου του tenant data db ως JSON). Mock ΜΟΝΟ στο
+`collectWorkspaceData` (ο node-only tenant-db reader) + session/audit seams· **πραγματικά τρέχουν**
+`buildWorkspaceExport`, `workspaceExportFilename`, `resolveMaxDocs`, `saasGuard`.
+Καλύπτει: **session contract** — assert-άρεται ρητά `(slug, requireManage=true, allowInactive=true)`,
+δηλαδή owner/admin ΑΛΛΑ **σκόπιμα όχι gated στο billing status** (η φορητότητα δεδομένων δεν
+επιτρέπεται να κόβεται σε suspended/canceled workspace· αν κάποιος γυρίσει το `allowInactive` σε
+false, το τεστ σκάει)· `?tenant=` προωθείται **verbatim** (η κανονικοποίηση είναι δουλειά του
+resolver)· και τα 3 short-circuits (gate 404 / 401 / no-workspace 404) περνάνε **by identity**
+(`toBe`) με **μηδέν** db read και **μηδέν** audit. **Scoping** — ο reader παίρνει το ctx object
+**του session** (assert με `toBe`, όχι deep-equal: τίποτα caller-supplied). **Cap** — το
+`WORKSPACE_EXPORT_MAX_DOCS` περνά από τον πραγματικό `resolveMaxDocs`: blank → default 10000,
+αριθμός → εφαρμόζεται **και** echo-άρεται στο envelope, non-numeric/0/negative → default (δηλαδή
+ποτέ «διάβασε τίποτα»), δεκαδικό → floor. **Envelope** — versioned format, parseable `generatedAt`,
+workspace block **ακριβώς 4 whitelisted πεδία** από το **tenant doc** + ρητό assertion ότι
+`stripeCustomerId`/`aiKeyCipher` **δεν εμφανίζονται στο body** (τα βάζω επίτηδες στο fixture)· τα
+docs περνάνε verbatim (είναι τα δεδομένα του χρήστη)· άδειο workspace → 200 με `collections: []`·
+pretty-print 2 κενών. **Audit** — action/actor σωστά και **`target` = ο slug του MEMBERSHIP**, ενώ
+το payload/filename διαβάζουν τον slug του **tenant doc**: το fixture δίνει σκόπιμα διαφορετικές
+τιμές στα δύο ώστε η διάκριση να είναι καρφωμένη· meta = collections/docs/truncated υπολογισμένα
+από το dump (truncated true όταν **οποιαδήποτε** συλλογή κόπηκε). **Headers** — attachment +
+`no-store` + filename από τον slug, και **hostile slug** (`ac me"; rm -rf /`) → το
+Content-Disposition παραμένει καθαρό (regex σε όλη τη γραμμή, κανένα ξεκάρφωτο quote), slug χωρίς
+safe χαρακτήρες → fallback `workspace`. **Failure** — reader throw → 500 χωρίς audit· **audit
+throw → 500** (κατοχυρώνει ότι το audit row είναι awaited ΠΡΙΝ φύγει το σώμα, δηλαδή ένα
+αποτυχημένο audit χάνει το export· συμπεριφορικό pin του ordering)· message-less → `'Server error'`·
+5000 chars → 200.
+
+**Νέο `workspace/export/files/route.test.ts`** (28 tests), **μηδέν production code αλλαγή**. Το
+binary μισό (manifest των PDF/photos κάτω από το STORAGE_ROOT). Mock και οι **δύο** node-only
+readers (`collectWorkspaceFileRefs` = tenant db, `statWorkspaceFiles` = filesystem) + session/audit·
+πραγματικά τρέχουν `buildFileManifest` + `workspaceFilesManifestFilename`.
+Καλύπτει: **ίδιο session contract** (assert ρητά `(slug, true, true)`) και short-circuit
+pass-through **χωρίς db, χωρίς disk, χωρίς audit**. **Pipeline wiring** — refs από το ctx του
+session, και το stat δέχεται **ακριβώς** το array που γύρισε ο db reader (`toBe`: τίποτα δεν
+προστίθεται, τίποτα δεν χάνεται ενδιάμεσα). **Report-only συμβόλαιο** — κάθε entry έχει **ακριβώς**
+`path/bucket/exists/bytes` (assert σε `Object.keys`, ώστε μια μελλοντική προσθήκη περιεχομένου
+αρχείου να σπάει το τεστ) + το notice λέει ρητά «report only / no file contents». **Totals** —
+υπολογίζονται από τα entries, άρα `present + missing === files` πάντα, και ένα παράλογο **αρνητικό
+μέγεθος** δεν μπορεί να ρίξει το byte total κάτω από το πραγματικό άθροισμα. **Audit** — το meta
+είναι **τα ίδια τα totals του manifest** (assert `toEqual(json.totals)`: header και audit δεν
+μπορούν να διαφωνήσουν). **Headers** — filename `-files.json`, ρητά **διαφορετικό** από του content
+export ώστε τα δύο downloads να μη συγκρούονται, ίδια hostile-slug + fallback κάλυψη. **Failure** —
+db throw → 500 **χωρίς stat και χωρίς audit**, filesystem throw → 500 χωρίς audit, audit throw →
+500, plus το ίδιο 500 shaping quartet.
+
+**Verified**: τα δύο νέα files **58/58 green από την πρώτη εκτέλεση** (30+28). Πλήρες
+`npx vitest run` → **302 files / 4474 tests green** (από 299/4370 του increment-114 log: +3 files/
++104 tests — τα 2 δικά μου + 1 από άλλη ταυτόχρονη routine). `npm run type-check` → **EXIT 0** μετά
+από ένα test-only fix: το γνωστό **TS2493** ξαναχτύπησε από άλλη γωνία — ο `recordAuditMock` ήταν
+`vi.fn(async () => true)` (argless) οπότε το `mock.calls[0]` type-άρει ως **empty tuple** και τα
+`calls[0][0]`/`[1]` έσκαγαν (12 errors). Fix: typed params `(_ctx: unknown, _entry: unknown)` στο
+`vi.hoisted` mock. ΣΗΜ για επόμενα increments: το idiom «typed params στα hoisted mocks» χρειάζεται
+**σε κάθε mock του οποίου τα calls γίνονται index**, όχι μόνο στα select mocks. **Docker: ΔΕΝ έγινε
+rebuild** (test-only, μηδέν production/runtime wiring/env/deps αλλαγή → ούτε ο docker mutex
+χρειάστηκε). **Browser-verify: skipped** (test files, μηδέν UI/observable behavior αλλαγή).
+Collision guard: `git status --short` πριν το staging = μόνο τα 2 δικά μου untracked, μηδέν staged
+από άλλη routine· `git diff --cached --name-only` μετά επιβεβαίωσε exact 2-file match πριν το
+commit/push. Pushed `8bbbd14`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** το route-level coverage του SaaS surface είναι πλέον **σχεδόν πλήρες** — απομένει
+**ένα** route, το `billing/route.ts` (69 γρ., plan/quota read· μικρό, φυσικό κλείσιμο της σειράς).
+Μετά ΜΗΝ θεωρήσεις το backlog εξαντλημένο: σάρωσα τι άλλο **μέσα στο territory** δεν έχει unit
+tests και βρήκα **8 modules** (`lib/tenancy/`: `context.ts` 140γρ., `provision.ts` 103, `saasApi.ts`
+85, `saasPage.ts` 40, `superadminPage.ts` 48, `workspaceSession.ts` 91· `lib/billing/`:
+`billingSession.ts` 71, `stripe.ts` 145). Προτεραιότητα: **`workspaceSession.ts` πρώτο** — είναι ο
+κοινός authz resolver που mock-άρουν ΟΛΑ τα workspace route tests (8 αρχεία), δηλαδή το μόνο
+κομμάτι που κανένα route test δεν εκτελεί ποτέ πραγματικά· ένα bug εκεί (π.χ. λάθος σειρά gate →
+session → membership → status) θα περνούσε σιωπηλά όλη τη σουίτα. Μετά `context.ts` (tenant
+resolution, ίδια κλάση κινδύνου) και `saasApi.ts` (`saasAuthGate`/`accountTenants`). Πριν
+ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο territory** (οι
+τελευταίες 6 σαρώσεις δεν είχαν κανένα).
