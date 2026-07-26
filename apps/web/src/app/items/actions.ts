@@ -19,7 +19,14 @@ import { safeRevalidate } from '@/lib/revalidate';
 import { Types } from 'mongoose';
 import { z } from 'zod';
 import { getAppSettings } from '@/lib/appSettings';
-import { resolveItemPrices, type ItemPricesInput } from '@/lib/fx';
+import {
+  resolveItemPrices,
+  sameCurrency,
+  normalizeCurrency,
+  effectiveCurrency,
+  isForeignCurrency,
+  type ItemPricesInput,
+} from '@/lib/fx';
 import type { SerializedItem, SerializedAttachment } from '@/types';
 
 const CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'] as const;
@@ -503,6 +510,8 @@ export async function aiFillItem(itemId: string): Promise<{
   checked: number;
   filled: string[];
   lowest: number | null;
+  /** P9: currencies whose prices were skipped (page quotes ≠ the item's currency). */
+  priceSkippedCurrencies?: string[];
   item?: SerializedItem;
   error?: string;
 }> {
@@ -540,15 +549,22 @@ export async function aiFillItem(itemId: string): Promise<{
   }
 
   const filled = new Set<string>();
+  // P9: codes of pages whose price was left out because they quote another currency than
+  // this item's — reported back so a skipped price never looks like "no price found".
+  const skippedCurrencies = new Set<string>();
   let lowest = Infinity;
   let fieldsDone = false;
   let okCount = 0;
 
+  const base = (await getAppSettings()).currency;
+
   for (const t of targets) {
     let parsed;
+    let pageCurrency = '';
     try {
       const page = await fetchPageText(t.url);
       parsed = (await parseProductFromPage(page)).parsed;
+      pageCurrency = pageCurrencyOf(page, parsed);
     } catch {
       continue; // skip pages that fail (bot-protection, 404, AI hiccup)
     }
@@ -559,7 +575,12 @@ export async function aiFillItem(itemId: string): Promise<{
     const store = parsed.store || hostOf(t.url);
     const alreadyLinked = (item.links ?? []).some((l) => normUrl(l.url) === normUrl(t.url));
 
-    if (parsed.price > 0) {
+    // P9: a shop quoting in another currency than this item's still gives us specs, tags and
+    // a link — but not a price, because every price on an item shares its one FX rate.
+    const priceUsable = parsed.price > 0 && sameCurrency(pageCurrency, item.currency, base);
+    if (!priceUsable && parsed.price > 0) skippedCurrencies.add(effectiveCurrency(pageCurrency, base));
+
+    if (priceUsable) {
       if (t.existing) {
         t.existing.price = parsed.price;
       } else if (!alreadyLinked) {
@@ -630,6 +651,7 @@ export async function aiFillItem(itemId: string): Promise<{
     checked: targets.length,
     filled: [...filled],
     lowest: lowest < Infinity ? lowest : null,
+    priceSkippedCurrencies: [...skippedCurrencies],
     item: fresh ? (JSON.parse(JSON.stringify(fresh)) as SerializedItem) : undefined,
     error: found
       ? undefined
@@ -825,8 +847,30 @@ export async function convertItemToTask(itemId: string): Promise<{ ok: boolean; 
 }
 
 export type ImportItemResult =
-  | { ok: true; id: string; title: string; price: number; store: string; updated: boolean }
+  | {
+      ok: true;
+      id: string;
+      title: string;
+      price: number;
+      store: string;
+      updated: boolean;
+      /** P9: the page's ISO code when its price could NOT be recorded because the existing
+       *  item keeps its money in another currency. The link is still added; the price is
+       *  left out rather than silently counted as the item's currency. */
+      priceSkippedCurrency?: string;
+    }
   | { ok: false; error: string };
+
+/**
+ * Multi-currency (P9) for scraped product pages. The code a shop page quotes in, preferring
+ * the page's own structured markup (schema.org priceCurrency / og:price:currency) over the
+ * model's reading of it, and falling back to '' — which every caller reads as "base
+ * currency", i.e. exactly the behaviour that existed before this. Never a guess: a page
+ * that declares nothing and a model that saw nothing both mean "assume base".
+ */
+function pageCurrencyOf(page: { currency?: string }, parsed: { currency?: string }): string {
+  return normalizeCurrency(page.currency) || normalizeCurrency(parsed.currency);
+}
 
 /** Normalize a URL (host + path, no www/query/trailing slash) for matching. */
 function normUrl(u: string): string {
@@ -904,6 +948,8 @@ export async function importItemFromUrl(url: string, view: ItemView): Promise<Im
   const title = (parsed.title || page.title || url).slice(0, 200);
   const status = view === 'inventory' ? 'received' : 'researching';
   const store = parsed.store || (() => { try { return new URL(url).hostname; } catch { return 'Source'; } })();
+  const base = (await getAppSettings()).currency;
+  const pageCurrency = pageCurrencyOf(page, parsed);
 
   try {
     await connectDB();
@@ -925,15 +971,19 @@ export async function importItemFromUrl(url: string, view: ItemView): Promise<Im
       // Fill only missing fields — never clobber what the user already set
       if (!match.specs && parsed.specs) match.specs = parsed.specs;
       if (match.category === 'other' && parsed.category && parsed.category !== 'other') match.category = parsed.category;
+      // P9: a price quoted in another currency than the item's own must not be written onto
+      // it — the item carries ONE rate for all its prices, so a USD quote stored next to EUR
+      // figures would be summed as EUR everywhere. Keep the link, leave the price out, say so.
+      const priceUsable = parsed.price > 0 && sameCurrency(pageCurrency, match.currency, base);
       const existingLink = (match.links ?? []).find((l) => l.url && normUrl(l.url) === targetUrl);
       if (existingLink) {
-        if (parsed.price > 0) existingLink.price = parsed.price;
+        if (priceUsable) existingLink.price = parsed.price;
       } else {
-        match.links.push({ label: store, url, price: parsed.price > 0 ? parsed.price : null });
+        match.links.push({ label: store, url, price: priceUsable ? parsed.price : null });
       }
       match.markModified('links');
       // Keep tracking the price: append to history + refresh the current price
-      if (parsed.price > 0) {
+      if (priceUsable) {
         match.priceHistory.push({ price: parsed.price, store, url, date: new Date() } as (typeof match.priceHistory)[number]);
         match.currentPrice = parsed.price;
       }
@@ -942,14 +992,31 @@ export async function importItemFromUrl(url: string, view: ItemView): Promise<Im
       await match.save();
       revalidatePath('/items');
       revalidatePath('/shopping');
-      return { ok: true, id: String(match._id), title: match.title, price: parsed.price, store, updated: true };
+      return {
+        ok: true,
+        id: String(match._id),
+        title: match.title,
+        price: priceUsable ? parsed.price : 0,
+        store,
+        updated: true,
+        ...(parsed.price > 0 && !priceUsable ? { priceSkippedCurrency: effectiveCurrency(pageCurrency, base) } : {}),
+      };
     }
 
+    // P9: a NEW item can adopt the page's currency, so a foreign price is stored as printed
+    // and flagged for a rate (Reports → missing exchange rates) instead of counting as base.
+    const fx = resolveItemPrices(
+      { currentPrice: parsed.price, purchasedPrice: null, targetPrice: null, currency: pageCurrency },
+      base
+    );
     const item = await Item.create({
       title,
       category: parsed.category,
       status,
-      currentPrice: parsed.price,
+      currentPrice: fx.currentPrice,
+      currency: fx.currency,
+      origAmount: fx.origAmount,
+      fxRate: fx.fxRate,
       specs: parsed.specs,
       links: [{ label: store, url, price: parsed.price > 0 ? parsed.price : null }],
       priceHistory: parsed.price > 0 ? [{ price: parsed.price, store, url, date: new Date() }] : [],
@@ -978,6 +1045,9 @@ export type ItemPreview =
       store: string;
       specs: string;
       category: string;
+      /** P9: ISO code the page quoted in, ONLY when it is foreign to the deployment's base
+       *  currency; '' means "nothing to convert" (no code shown, or the base one). */
+      currency: string;
       existing: { id: string; title: string } | null;
     }
   | { ok: false; error: string };
@@ -1013,6 +1083,9 @@ export async function previewItemFromUrl(url: string): Promise<ItemPreview> {
       }
     })();
 
+  const base = (await getAppSettings()).currency;
+  const pageCurrency = pageCurrencyOf(page, parsed);
+
   await connectDB();
   const Item = await currentModel(ItemModel);
   const targetUrl = normUrl(url);
@@ -1032,6 +1105,9 @@ export async function previewItemFromUrl(url: string): Promise<ItemPreview> {
     store,
     specs: parsed.specs || '',
     category: parsed.category || 'other',
+    // Only report a FOREIGN code: a page quoting the base currency needs no conversion, so
+    // '' keeps the approve step byte-for-byte what it was in a single-currency deployment.
+    currency: isForeignCurrency(pageCurrency, base) ? pageCurrency : '',
     existing: match ? { id: String(match._id), title: match.title } : null,
   };
   });
@@ -1039,7 +1115,7 @@ export async function previewItemFromUrl(url: string): Promise<ItemPreview> {
 
 /** Save a previewed product (no AI re-parse). Mirrors importItemFromUrl's save path. */
 export async function confirmImportItem(
-  data: { url: string; title: string; price: number; store: string; specs: string; category: string },
+  data: { url: string; title: string; price: number; store: string; specs: string; category: string; currency?: string },
   view: ItemView
 ): Promise<ImportItemResult> {
   return withRequestTenant(async () => {
@@ -1052,6 +1128,9 @@ export async function confirmImportItem(
     const price = data.price > 0 ? data.price : 0;
     const status = view === 'inventory' ? 'received' : 'researching';
     const category = (CATEGORIES as readonly string[]).includes(data.category) ? data.category : 'other';
+    // P9: the currency the preview read off the page (blank = none shown = base currency).
+    const base = (await getAppSettings()).currency;
+    const pageCurrency = normalizeCurrency(data.currency);
 
     const targetUrl = normUrl(url);
     const targetTitle = normTitle(title);
@@ -1067,14 +1146,17 @@ export async function confirmImportItem(
     if (match) {
       if (!match.specs && data.specs) match.specs = data.specs;
       if (match.category === 'other' && category !== 'other') match.category = category as typeof match.category;
+      // Same rule as importItemFromUrl: a quote in another currency than the item's own is
+      // not written onto it (one item, one rate), only reported back.
+      const priceUsable = price > 0 && sameCurrency(pageCurrency, match.currency, base);
       const existingLink = (match.links ?? []).find((l) => l.url && normUrl(l.url) === targetUrl);
       if (existingLink) {
-        if (price > 0) existingLink.price = price;
+        if (priceUsable) existingLink.price = price;
       } else {
-        match.links.push({ label: store, url, price: price > 0 ? price : null });
+        match.links.push({ label: store, url, price: priceUsable ? price : null });
       }
       match.markModified('links');
-      if (price > 0) {
+      if (priceUsable) {
         match.priceHistory.push({ price, store, url, date: new Date() } as (typeof match.priceHistory)[number]);
         match.currentPrice = price;
       }
@@ -1082,14 +1164,29 @@ export async function confirmImportItem(
       await match.save();
       revalidatePath('/items');
       revalidatePath('/shopping');
-      return { ok: true, id: String(match._id), title: match.title, price, store, updated: true };
+      return {
+        ok: true,
+        id: String(match._id),
+        title: match.title,
+        price: priceUsable ? price : 0,
+        store,
+        updated: true,
+        ...(price > 0 && !priceUsable ? { priceSkippedCurrency: effectiveCurrency(pageCurrency, base) } : {}),
+      };
     }
 
+    const fx = resolveItemPrices(
+      { currentPrice: price, purchasedPrice: null, targetPrice: null, currency: pageCurrency },
+      base
+    );
     const item = await Item.create({
       title,
       category,
       status,
-      currentPrice: price,
+      currentPrice: fx.currentPrice,
+      currency: fx.currency,
+      origAmount: fx.origAmount,
+      fxRate: fx.fxRate,
       specs: data.specs,
       links: [{ label: store, url, price: price > 0 ? price : null }],
       priceHistory: price > 0 ? [{ price, store, url, date: new Date() }] : [],

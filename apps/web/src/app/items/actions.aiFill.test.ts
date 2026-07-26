@@ -221,6 +221,31 @@ describe('aiFillItem', () => {
     expect(item.aiFilledAt).toBeInstanceOf(Date);
   });
 
+  it('leaves out a price quoted in another currency than the item, and reports which (P9)', async () => {
+    const item = makeItem({ links: [{ label: 'Amazon', url: 'https://amazon.com/x', price: 240 }] });
+    queueItemFind(item);
+    fetchPageTextMock.mockResolvedValueOnce({ url: '', title: '', jsonLd: '', text: '', currency: 'USD' });
+    parseProductFromPageMock.mockResolvedValueOnce({ parsed: { ...DEFAULT_PARSED, title: 'Ubiquiti U7 Pro', price: 250 } });
+    const r = await aiFillItem('i1');
+    // The item's prices all share ONE rate, so a dollar quote cannot join them: the existing
+    // link price stays as it was and nothing lands in the history or currentPrice.
+    expect(item.links[0].price).toBe(240);
+    expect(item.priceHistory).toHaveLength(0);
+    expect(item.currentPrice).toBe(0);
+    expect(r.filled).not.toContain('prices');
+    expect(r.priceSkippedCurrencies).toEqual(['USD']);
+  });
+
+  it('records the price when the item is itself in the page currency', async () => {
+    const item = makeItem({ currency: 'USD', links: [{ label: 'Amazon', url: 'https://amazon.com/x', price: null }] });
+    queueItemFind(item);
+    fetchPageTextMock.mockResolvedValueOnce({ url: '', title: '', jsonLd: '', text: '', currency: 'USD' });
+    parseProductFromPageMock.mockResolvedValueOnce({ parsed: { ...DEFAULT_PARSED, title: 'Ubiquiti U7 Pro', price: 250 } });
+    const r = await aiFillItem('i1');
+    expect(item.links[0].price).toBe(250);
+    expect(r.priceSkippedCurrencies).toEqual([]);
+  });
+
   it('pushes a new priced link for a web-discovered target not already linked, falling store back to the host', async () => {
     const item = makeItem({ links: [] });
     queueItemFind(item);

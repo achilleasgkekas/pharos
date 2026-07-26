@@ -139,7 +139,14 @@ describe('ParsedStatementSchema', () => {
 describe('ParsedProductSchema', () => {
   it('defaults everything for an empty object', () => {
     const p = ParsedProductSchema.parse({});
-    expect(p).toEqual({ title: '', price: 0, currency: 'EUR', store: '', category: 'other', specs: '', tags: [] });
+    // currency defaults to '' (not 'EUR'): a missing code means "assume the deployment's
+    // base currency", and guessing EUR would mark every import of a non-EUR deployment
+    // as foreign (P9).
+    expect(p).toEqual({ title: '', price: 0, currency: '', store: '', category: 'other', specs: '', tags: [] });
+  });
+
+  it('keeps a currency code the page actually declared', () => {
+    expect(ParsedProductSchema.parse({ currency: 'USD' }).currency).toBe('USD');
   });
 
   it('keeps a valid category and falls back to "other" for an invalid one', () => {

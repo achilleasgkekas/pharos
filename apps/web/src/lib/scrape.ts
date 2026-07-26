@@ -10,6 +10,8 @@ export type ScrapedPage = {
   title: string;
   jsonLd: string; // any Product JSON-LD found, stringified
   text: string; // cleaned visible text (cropped)
+  /** ISO 4217 code read from the page's own price markup; '' when it declares none (P9). */
+  currency: string;
 };
 
 /** Cloudflare / DataDome / PerimeterX interstitials look nothing like a product
@@ -112,6 +114,29 @@ export function extractPrimaryPrice(html: string): string {
   return primary.t;
 }
 
+/** The ISO 4217 code the page DECLARES its price in, read from structured markup only
+ *  (schema.org priceCurrency, og:/product: price meta, itemprop). Deliberately no symbol
+ *  sniffing: "$" is USD on one shop and CAD/AUD on another, and P9's rule is to never
+ *  invent currency information — a page that declares nothing returns '' and is then
+ *  treated as the deployment's base currency, exactly as before. */
+export function extractPriceCurrency(html: string): string {
+  const iso = (raw: string | undefined): string => {
+    const c = (raw || '').trim().toUpperCase();
+    return /^[A-Z]{3}$/.test(c) ? c : '';
+  };
+  // JSON-LD offers (and any other embedded schema.org JSON) — the most reliable signal.
+  const ld = html.match(/"priceCurrency"\s*:\s*"([A-Za-z]{3})"/i);
+  if (iso(ld?.[1])) return iso(ld?.[1]);
+  const meta = html.match(
+    /<meta[^>]+(?:property|name)=["'](?:og:price:currency|product:price:currency)["'][^>]*content=["']([^"']+)["']/i
+  );
+  if (iso(meta?.[1])) return iso(meta?.[1]);
+  const ip = html.match(/itemprop=["']priceCurrency["'][^>]*content=["']([^"']+)["']/i);
+  if (iso(ip?.[1])) return iso(ip?.[1]);
+  const ipText = html.match(/itemprop=["']priceCurrency["'][^>]*>\s*([A-Za-z]{3})\s*</i);
+  return iso(ipText?.[1]);
+}
+
 export async function fetchPageText(url: string): Promise<ScrapedPage> {
   // SSRF guard: reject non-http(s) and any private/loopback/internal target
   // (also covers the FlareSolverr retry path below, which fetches the same URL).
@@ -203,5 +228,6 @@ export async function fetchPageText(url: string): Promise<ScrapedPage> {
     title,
     jsonLd: jsonLdBlocks.join('\n').slice(0, 4000),
     text: hintLine + body,
+    currency: extractPriceCurrency(html),
   };
 }

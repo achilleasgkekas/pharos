@@ -303,7 +303,10 @@ export async function parseStatementText(text: string): Promise<{
 export const ParsedProductSchema = z.object({
   title: z.string().default(''),
   price: z.coerce.number().default(0),
-  currency: z.string().default('EUR'),
+  // Multi-currency (P9): blank = the page showed no code, which the importer reads as the
+  // deployment's base currency. Deliberately NOT defaulted to 'EUR': that would tell a
+  // dollar-based deployment every product it imports is foreign.
+  currency: z.string().default(''),
   store: z.string().default(''),
   category: z
     .enum(['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'])
@@ -325,7 +328,7 @@ export const PRODUCT_PROMPT = `You extract structured product data from an e-com
 {
   "title": "full canonical product name (brand + model + key spec), WITHOUT the store/site suffix",
   "price": <current selling price as a number, no currency symbol>,
-  "currency": "EUR" | "USD" | "GBP",
+  "currency": "the ISO 4217 code the price is PRINTED in (EUR, USD, GBP, CHF, ...), or "" if the page shows none",
   "store": "the shop/site name",
   "category": one of: network, storage, compute, audio, video, mobile, peripheral, consumable, other,
   "specs": "the most important specs in 1-2 short lines",
@@ -338,6 +341,7 @@ Price priority (use the first that applies):
 Rules:
 - Always the price the customer actually PAYS, VAT/sales-tax included. Prefer the tax-included figure ("incl. VAT", "με ΦΠΑ"/"Περιλαμβάνει ΦΠΑ", "inkl. MwSt", "TTC"); do NOT use the net/ex-tax price ("excl. VAT", "χωρίς ΦΠΑ", "HT", "Netto"). Never the list/strikethrough price.
 - Decimals: a comma may be the decimal separator (EU: "1.234,56" = 1234.56) or a dot (US/UK). Always output a dot decimal.
+- currency: report ONLY a code you can actually see next to the price (a symbol counts: "$" on a US shop = USD, "CA$"/"C$" = CAD, "A$" = AUD, "£" = GBP, "€" = EUR, "CHF" = CHF). Never guess it from the site's country or language. Output "" when the page shows no currency at all.
 - title: clean product name only (brand + model + key spec). Strip store suffixes like " - Ubiquiti Store", " | Amazon", " - Newegg".
 - category: output EXACTLY ONE word from the list (not a list). Pick the closest for a home-lab / networking / computing context.`;
 

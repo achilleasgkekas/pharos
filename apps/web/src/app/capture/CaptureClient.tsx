@@ -5,10 +5,20 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { PharosMark } from '@/components/PharosMark';
 import { previewItemFromUrl, confirmImportItem } from '@/app/items/actions';
+import { formatMoney } from '@/lib/fx';
 import { useT } from '@/components/LocaleProvider';
 import type { ItemView } from '@/lib/itemStatus';
 
-type PreviewData = { title: string; price: number; store: string; specs: string; category: string; existing: { id: string; title: string } | null };
+type PreviewData = {
+  title: string;
+  price: number;
+  store: string;
+  specs: string;
+  category: string;
+  /** P9: set only when the page quotes a currency foreign to this deployment. */
+  currency: string;
+  existing: { id: string; title: string } | null;
+};
 
 /** Compact "Add to Pharos" popup — the bookmarklet's landing page. Reuses the exact
  *  same preview→approve pipeline as the Items page URL import (previewItemFromUrl /
@@ -20,7 +30,7 @@ export function CaptureClient({ initialUrl }: { initialUrl: string }) {
   const [saving, startSave] = useTransition();
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState<{ title: string; updated: boolean } | null>(null);
+  const [saved, setSaved] = useState<{ title: string; updated: boolean; priceSkippedCurrency?: string } | null>(null);
 
   function runPreview(u: string) {
     if (!u.trim()) return;
@@ -33,7 +43,15 @@ export function CaptureClient({ initialUrl }: { initialUrl: string }) {
         setError(r.error);
         return;
       }
-      setPreview({ title: r.title, price: r.price, store: r.store, specs: r.specs, category: r.category, existing: r.existing });
+      setPreview({
+        title: r.title,
+        price: r.price,
+        store: r.store,
+        specs: r.specs,
+        category: r.category,
+        currency: r.currency,
+        existing: r.existing,
+      });
     });
   }
 
@@ -48,14 +66,22 @@ export function CaptureClient({ initialUrl }: { initialUrl: string }) {
     setError(null);
     startSave(async () => {
       const r = await confirmImportItem(
-        { url: url.trim(), title: preview.title, price: preview.price, store: preview.store, specs: preview.specs, category: preview.category },
+        {
+          url: url.trim(),
+          title: preview.title,
+          price: preview.price,
+          store: preview.store,
+          specs: preview.specs,
+          category: preview.category,
+          currency: preview.currency,
+        },
         view
       );
       if (!r.ok) {
         setError(r.error);
         return;
       }
-      setSaved({ title: r.title, updated: r.updated });
+      setSaved({ title: r.title, updated: r.updated, priceSkippedCurrency: r.priceSkippedCurrency });
       setPreview(null);
     });
   }
@@ -71,6 +97,9 @@ export function CaptureClient({ initialUrl }: { initialUrl: string }) {
         {saved ? (
           <div className="text-center py-4">
             <p className="text-sm text-[color:var(--color-accent)] mb-1">{saved.updated ? t('cap.updatedExisting', { title: saved.title }) : t('cap.added', { title: saved.title })}</p>
+            {saved.priceSkippedCurrency && (
+              <p className="text-[11px] text-[color:var(--color-gold)] mb-1">{t('cap.priceSkippedCurrency', { code: saved.priceSkippedCurrency })}</p>
+            )}
             <p className="text-xs text-[color:var(--color-text-faint)] mb-4">{t('cap.closeHint')}</p>
             <Button variant="ghost" onClick={() => window.close()} className="mx-auto">
               <X size={14} /> {t('cap.close')}
@@ -109,7 +138,10 @@ export function CaptureClient({ initialUrl }: { initialUrl: string }) {
                   {preview.category} · {preview.store}
                 </p>
                 {preview.price > 0 && (
-                  <p className="text-sm font-semibold text-[color:var(--color-accent)] mt-1.5">{preview.price.toFixed(2)}</p>
+                  <p className="text-sm font-semibold text-[color:var(--color-accent)] mt-1.5">
+                    {/* P9: a foreign page shows its own symbol, so the figure is not read as base. */}
+                    {preview.currency ? formatMoney(preview.price, preview.currency) : preview.price.toFixed(2)}
+                  </p>
                 )}
                 <div className="flex gap-2 mt-3">
                   <Button variant="primary" onClick={() => save('shopping')} disabled={saving} className="flex-1 justify-center">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeEntities, extractPrimaryPrice, isBotChallenge, parsePriceNum } from './scrape';
+import { decodeEntities, extractPriceCurrency, extractPrimaryPrice, isBotChallenge, parsePriceNum } from './scrape';
 
 // scrape.ts turns a fetched shop page into text the LLM can parse. These tests exercise
 // the pure parsing helpers only (no network, no FlareSolverr, no SSRF fetch): the price
@@ -148,5 +148,49 @@ describe('isBotChallenge — Cloudflare / DataDome interstitial detection', () =
     expect(isBotChallenge(200, '<html><body><h1>RTX 5080</h1><span class="price">1443</span></body></html>', 'nginx')).toBe(
       false
     );
+  });
+});
+
+describe('extractPriceCurrency — the code the page itself declares (P9)', () => {
+  it('reads priceCurrency out of schema.org JSON-LD offers', () => {
+    const html = `<script type="application/ld+json">{"@type":"Product","offers":{"price":"1299.00","priceCurrency":"USD"}}</script>`;
+    expect(extractPriceCurrency(html)).toBe('USD');
+  });
+
+  it('reads an og:price:currency meta tag', () => {
+    expect(extractPriceCurrency('<meta property="og:price:currency" content="GBP">')).toBe('GBP');
+  });
+
+  it('reads a product:price:currency meta tag', () => {
+    expect(extractPriceCurrency('<meta property="product:price:currency" content="chf">')).toBe('CHF');
+  });
+
+  it('reads an itemprop="priceCurrency" content attribute', () => {
+    expect(extractPriceCurrency('<meta itemprop="priceCurrency" content="AUD">')).toBe('AUD');
+  });
+
+  it('reads an itemprop="priceCurrency" element body', () => {
+    expect(extractPriceCurrency('<span itemprop="priceCurrency">CAD</span>')).toBe('CAD');
+  });
+
+  it('prefers JSON-LD over a meta tag when both are present', () => {
+    const html =
+      '<meta property="og:price:currency" content="EUR">' +
+      '<script type="application/ld+json">{"offers":{"priceCurrency":"USD"}}</script>';
+    expect(extractPriceCurrency(html)).toBe('USD');
+  });
+
+  it('returns "" for a page that declares no currency (read as base currency)', () => {
+    expect(extractPriceCurrency('<span class="price">1.443,72 €</span>')).toBe('');
+  });
+
+  it('never guesses from a bare symbol — "$" alone stays unknown', () => {
+    // "$" is USD on one shop and CAD/AUD on another; P9 does not invent currency data.
+    expect(extractPriceCurrency('<span class="price">$1,299.00</span>')).toBe('');
+  });
+
+  it('ignores a junk / wrong-length code', () => {
+    expect(extractPriceCurrency('<meta property="og:price:currency" content="EURO">')).toBe('');
+    expect(extractPriceCurrency('<meta property="og:price:currency" content="">')).toBe('');
   });
 });

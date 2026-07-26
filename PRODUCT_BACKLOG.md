@@ -1169,7 +1169,7 @@
   enable notifications) με progress ticks → activation. **Διακριτό** από P1 (demo data) — εδώ τα *δικά του* δεδομένα.
 - **Module:** Homepage / Dashboard (dismissable card) + Settings state reads.
 
-### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + 7 MODULES + CSV IMPORT + AUDIT/INLINE-FIX SHIPPED (τελευταίο 2026-07-26, pharos-daily-dev), email-in + rate-feed εκκρεμούν
+### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + 7 MODULES + ΟΛΑ ΤΑ IMPORTS (CSV, email-in, URL) + AUDIT/INLINE-FIX SHIPPED (τελευταίο 2026-07-26, pharos-daily-dev), μόνο το rate-feed εκκρεμεί
 - **Τι χτίστηκε (slice 1 από L item):** νέο pure **`lib/fx.ts`** (+25 unit tests, client-safe, DB-free) που κρατά
   **ΤΟΝ ΕΝΑΝ κανόνα** σε ένα μέρος: `normalizeCurrency`, `isForeignCurrency`, `convertToBase`, `deriveFxRate`,
   `resolveFx`, `formatMoney`, `fxBadgeLabel`. **Κλειδωμένη αρχιτεκτονική απόφαση (builder default, μηδέν migration):
@@ -1267,9 +1267,23 @@
   βήμα, και το `needsFxRate` guard γυρίζει `null` σε ό,τι έχει ήδη rate (**ποτέ δεύτερη μετατροπή**, pinned με τεστ).
   Τα arrays γράφονται με **dotted paths** (`transactions.3.amount`, `lineItems.0.price`) ώστε να μη χαθεί τίποτα άλλο
   μέσα στα subdocs (installment info, product links, ονόματα γραμμών).
-- **Εκκρεμούν (επόμενα slices):** `resolveFx` στο email-in (το CSV import έκλεισε στο slice 6)· προαιρετικό δωρεάν
-  rate-feed (phase 2, τώρα το rate είναι χειροκίνητο by design)· mobile UI για τα 2 νέα πεδία (το API τα εκθέτει ήδη σε
-  6 modules).
+- **Τι χτίστηκε (slice 10 — product URL import, 2026-07-26):** το **email-in ελέγχθηκε και ήταν ΗΔΗ καλυμμένο** (το
+  `checkImapInbox` περνά κάθε συνημμένο/σώμα από το `uploadReceipt`, δηλαδή τον resolver του slice 2 — καμία
+  παρακαμπτήριος create). Το πραγματικό εναπομείναν write path ήταν το **URL import προϊόντος**: το
+  `ParsedProductSchema` είχε πεδίο `currency` αλλά **κανένα call site δεν το διάβαζε**, οπότε μια σελίδα σε δολάρια
+  αποθηκευόταν σαν να ήταν base. Πλέον: νέο **`extractPriceCurrency`** (`lib/scrape.ts`, +9 tests) διαβάζει
+  **ντετερμινιστικά** τον κωδικό από το markup της σελίδας (schema.org `priceCurrency` → `og:/product:price:currency`
+  → `itemprop`), με fallback στο τι διάβασε το μοντέλο· **σκέτο σύμβολο δεν μαντεύεται ποτέ** («$» = USD αλλού, CAD/AUD
+  αλλού). Το default του schema έγινε `''` αντί `'EUR'` (το `'EUR'` θα έλεγε σε dollar-based deployment ότι **κάθε**
+  import είναι foreign). **Νέο item** υιοθετεί το νόμισμα μέσω `resolveItemPrices` (τυπωμένο ποσό + `fxRate 0` →
+  εμφανίζεται στο audit του slice 7 → διορθώνεται inline με το slice 9). **Υπάρχον item**: το link μπαίνει αλλά η τιμή
+  **ΔΕΝ** γράφεται όταν το νόμισμα διαφέρει (ένα item, ένα rate για όλες τις τιμές του) και το αποτέλεσμα λέει ποιο
+  νόμισμα παραλείφθηκε — ίδιος κανόνας σε `importItemFromUrl`, `confirmImportItem` και το refresh τιμών του
+  `aiFillItem`. Νέα pure `effectiveCurrency`/`sameCurrency` (`lib/fx.ts`) + νέο test file
+  `items/actions.urlImport.test.ts` (21 tests, το URL-import concern που είχε μείνει ανοιχτό).
+- **Εκκρεμούν (επόμενα slices):** προαιρετικό δωρεάν rate-feed (phase 2, τώρα το rate είναι χειροκίνητο by design)·
+  mobile UI για τα 2 νέα πεδία (το API τα εκθέτει ήδη σε 6 modules)· τα `links[].price`/`priceHistory[].price` ενός item
+  μένουν **τυπωμένα** (δεν μετατρέπονται μαζί με τις 3 headline τιμές) — γνωστό όριο του μοντέλου του slice 4.
 - **Αξία (αρχικό):** ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency. Πραγματικό κενό
   (CLAUDE.md). Μεγάλο: αγγίζει schema (amount+currency+rate), aggregations, imports, όλα τα money views.
 - **Module:** cross-cutting (Expenses/Receipts/Statements/Reports + `lib/money.ts`).

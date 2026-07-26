@@ -87,12 +87,22 @@ Highlights:
 - **Multi-currency support (P9).** When you buy an item abroad (or from a foreign
   shop), record what the receipt or product page actually said, and PHAROS
   converts it to your base currency for net worth and reports. The form shows
-  Currency and FX rate fields; when you add from a URL, prices are extracted in
-  their original currency. All three item prices (purchased, current, target)
+  Currency and FX rate fields. All three item prices (purchased, current, target)
   convert together with the same rate. A gold badge appears if the rate is
   unknown, storing the printed amount as-is rather than guessing 1:1. The stored
   amount is always in base currency, so insurance exports, net worth, and
   shopping budgets keep working without re-migration.
+- **Importing from a foreign shop page (P9).** Adding an item from a URL reads the
+  currency the page itself declares (schema.org `priceCurrency`, `og:price:currency`),
+  falling back to what the AI can see printed next to the price; a bare "$" is never
+  guessed at, since it means different money on different shops. A **new** item is
+  created in that currency, so a $1,299 card is stored as $1,299 awaiting a rate (it
+  shows up in the Reports "needs an exchange rate" panel) instead of quietly counting
+  as €1,299. When the URL matches an item you **already** have, the store link is
+  still added but its price is left out unless the item is in the same currency —
+  one item carries one rate for all its prices — and the import tells you which
+  currency it skipped so you can enter the figure yourself. Pages that quote your own
+  base currency behave exactly as before.
 
 ## Shopping list
 

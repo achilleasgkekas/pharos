@@ -56,6 +56,25 @@ export function isForeignCurrency(code: string | null | undefined, base: string)
 }
 
 /**
+ * The code a record's money is REALLY denominated in: its own when it declares one,
+ * otherwise the deployment's base currency (a blank `currency` means "not foreign").
+ * Lets two things be compared without each caller re-implementing the blank rule.
+ */
+export function effectiveCurrency(code: string | null | undefined, base: string): string {
+  return normalizeCurrency(code) || normalizeCurrency(base) || 'EUR';
+}
+
+/**
+ * Are these two currency codes the same money, once blanks are read as base? The guard
+ * behind "can this scraped price be written onto this record?": a price quoted in USD
+ * must not land in a record whose figures are EUR, because every sum downstream would
+ * add the two together (P9).
+ */
+export function sameCurrency(a: string | null | undefined, b: string | null | undefined, base: string): boolean {
+  return effectiveCurrency(a, base) === effectiveCurrency(b, base);
+}
+
+/**
  * Is this a STORED document whose `amount` is not really base currency? A foreign entry
  * that never got a rate keeps its printed number in `amount` (resolveFx refuses to guess
  * 1:1), so it silently joins base-currency sums. This is the predicate behind both the

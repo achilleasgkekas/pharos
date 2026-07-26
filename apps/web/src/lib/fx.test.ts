@@ -11,6 +11,8 @@ import {
   toPrinted,
   resolveItemPrices,
   resolveStatementAmounts,
+  effectiveCurrency,
+  sameCurrency,
 } from './fx';
 
 describe('normalizeCurrency', () => {
@@ -409,5 +411,42 @@ describe('resolveStatementAmounts', () => {
       fxRate: stored.fxRate,
     });
     expect(again).toEqual(stored);
+  });
+});
+
+describe('effectiveCurrency / sameCurrency (P9 — comparing a quote to a record)', () => {
+  it('reads a blank/junk code as the base currency', () => {
+    expect(effectiveCurrency('', 'EUR')).toBe('EUR');
+    expect(effectiveCurrency(null, 'USD')).toBe('USD');
+    expect(effectiveCurrency('EURO', 'GBP')).toBe('GBP');
+  });
+
+  it('keeps a declared code, whatever its casing', () => {
+    expect(effectiveCurrency('usd', 'EUR')).toBe('USD');
+  });
+
+  it('falls back to EUR when the deployment itself has no valid base', () => {
+    expect(effectiveCurrency('', '')).toBe('EUR');
+  });
+
+  it('treats "blank" and "the base code" as the same money', () => {
+    expect(sameCurrency('', 'EUR', 'EUR')).toBe(true);
+    expect(sameCurrency('EUR', '', 'EUR')).toBe(true);
+    expect(sameCurrency('', '', 'EUR')).toBe(true);
+  });
+
+  it('separates a foreign quote from a base-currency record', () => {
+    expect(sameCurrency('USD', '', 'EUR')).toBe(false);
+    expect(sameCurrency('USD', 'EUR', 'EUR')).toBe(false);
+  });
+
+  it('matches two records in the same foreign currency', () => {
+    expect(sameCurrency('USD', 'usd', 'EUR')).toBe(true);
+  });
+
+  it('is base-relative: the same pair flips when the deployment currency does', () => {
+    // A dollar quote is foreign to a EUR deployment and native to a USD one.
+    expect(sameCurrency('USD', '', 'EUR')).toBe(false);
+    expect(sameCurrency('USD', '', 'USD')).toBe(true);
   });
 });

@@ -459,6 +459,7 @@ export const en = {
   'cap.addInventory': 'Add to Inventory',
   'cap.added': 'Added "{title}"',
   'cap.updatedExisting': 'Updated "{title}" with this store link',
+  'cap.priceSkippedCurrency': 'Price not recorded: this page quotes in {code}, the item is not.',
   'cap.closeHint': 'You can close this window now.',
   'cap.close': 'Close window',
 
@@ -619,6 +620,10 @@ export const en = {
   'it.preview': 'Preview',
   'it.updatedExisting': '✓ Updated existing: {title}',
   'it.added': '✓ Added: {title}',
+  // Multi-currency (P9) — a shop page quoting in another currency than the item's own.
+  'it.foreignPagePriceNew': 'Page quotes in {code} — the item is created in {code}; set its rate in Reports → missing exchange rates.',
+  'it.foreignPagePriceExisting': 'Page quotes in {code} — the price is only recorded if the matched item is in {code} too.',
+  'it.priceSkippedCurrency': 'Price not recorded: this page quotes in {code}, the item does not. Link added; enter the price yourself.',
   'it.adding': 'Adding…',
   'it.approveUpdate': 'Approve & update',
   'it.approveAdd': 'Approve & add',

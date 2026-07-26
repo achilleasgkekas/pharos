@@ -687,7 +687,16 @@ export function ItemsClient({
 
 // ─── Import from URL (AI autofill) ─────────────────────────────────────────
 
-type PreviewData = { title: string; price: number; store: string; specs: string; category: string; existing: { id: string; title: string } | null };
+type PreviewData = {
+  title: string;
+  price: number;
+  store: string;
+  specs: string;
+  category: string;
+  /** P9: set only when the page quotes a currency foreign to this deployment. */
+  currency: string;
+  existing: { id: string; title: string } | null;
+};
 
 function UrlImport({ view, onImported }: { view: ItemView; onImported: () => void }) {
   const t = useT();
@@ -696,6 +705,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
   const [approving, startApprove] = useTransition(); // save
   const [msg, setMsg] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [warnMsg, setWarnMsg] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewData | null>(null);
 
   function handlePreview() {
@@ -703,6 +713,7 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
     if (!u) return;
     setMsg(null);
     setOkMsg(null);
+    setWarnMsg(null);
     setPreview(null);
     startTransition(async () => {
       const r = await previewItemFromUrl(u);
@@ -710,7 +721,15 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
         setMsg(r.error);
         return;
       }
-      setPreview({ title: r.title, price: r.price, store: r.store, specs: r.specs, category: r.category, existing: r.existing });
+      setPreview({
+        title: r.title,
+        price: r.price,
+        store: r.store,
+        specs: r.specs,
+        category: r.category,
+        currency: r.currency,
+        existing: r.existing,
+      });
     });
   }
 
@@ -719,7 +738,15 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
     setMsg(null);
     startApprove(async () => {
       const r = await confirmImportItem(
-        { url: url.trim(), title: preview.title, price: preview.price, store: preview.store, specs: preview.specs, category: preview.category },
+        {
+          url: url.trim(),
+          title: preview.title,
+          price: preview.price,
+          store: preview.store,
+          specs: preview.specs,
+          category: preview.category,
+          currency: preview.currency,
+        },
         view
       );
       if (!r.ok) {
@@ -727,6 +754,8 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
         return;
       }
       setOkMsg(r.updated ? t('it.updatedExisting', { title: r.title }) : t('it.added', { title: r.title }));
+      // P9: the price was left out because the page quotes another currency than the item.
+      setWarnMsg(r.priceSkippedCurrency ? t('it.priceSkippedCurrency', { code: r.priceSkippedCurrency }) : null);
       setPreview(null);
       setUrl('');
       setTimeout(() => onImported(), 1200);
@@ -769,6 +798,11 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
           {okMsg}
         </p>
       )}
+      {warnMsg && (
+        <p className="text-[10px] text-[color:var(--color-gold)] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+          {warnMsg}
+        </p>
+      )}
 
       {/* Preview card — approve to save */}
       {preview && (
@@ -790,10 +824,16 @@ function UrlImport({ view, onImported }: { view: ItemView; onImported: () => voi
             </div>
             {preview.price > 0 && (
               <span className="text-[color:var(--color-accent)] font-extrabold text-xl leading-none shrink-0" style={{ fontFamily: 'var(--font-display)' }}>
-                {cur()}{preview.price}
+                {/* P9: show the price in the currency the page actually prints it in. */}
+                {preview.currency ? formatMoney(preview.price, preview.currency) : `${cur()}${preview.price}`}
               </span>
             )}
           </div>
+          {preview.currency && (
+            <p className="text-[10px] text-[color:var(--color-gold)] mt-2" style={{ fontFamily: 'var(--font-mono)' }}>
+              {t(preview.existing ? 'it.foreignPagePriceExisting' : 'it.foreignPagePriceNew', { code: preview.currency })}
+            </p>
+          )}
           <div className="flex items-center gap-2 mt-3">
             <Button variant="primary" onClick={handleApprove} disabled={approving} className="shrink-0">
               {approving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
