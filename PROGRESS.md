@@ -20,6 +20,68 @@
 
 ---
 
+## 2026-07-26 (cont. — P9 slice 8: multi-currency για Bills, η σάρωση κλείνει)
+
+**Approved queue check (βήμα a)**: αμετάβλητη εικόνα για **4ο** συνεχόμενο run. **P36** (Open Banking, θέλει
+provider decision + credentials), **P31** (household, θέλει supervised session), **P17**/**P23** (μπλοκαρισμένα στην
+έγκριση `expo-camera`, το ερώτημα `pharos-daily-dev-20260725-1425` παραμένει **OPEN χωρίς Answer**). Άρα το
+προτεινόμενο από το προηγούμενο log: **P9 slice 8, τα Bills**.
+
+**Γιατί αυτό έκλεινε τη σάρωση**: το `Bill.amount` ήταν **το τελευταίο χρηματικό πεδίο χωρίς fx triple** σε όλη την
+εφαρμογή (τα Vouchers έχουν `discount` ως ελεύθερο string «10%»/«€5», τα gift cards του P32 είναι store credit σε base
+currency, κανένα δεν έχει αριθμητικό ποσό να μετατραπεί). Ένας λογαριασμός τυπωμένος σε USD έπρεπε μέχρι τώρα να
+πληκτρολογηθεί σαν να ήταν ευρώ.
+
+**Δύο σημεία που ΔΕΝ ήταν καλλωπισμός** (γι' αυτά έγιναν τα περισσότερα τεστ):
+- **Το logExpense θα μετέτρεπε ΔΥΟ φορές**: το `markBillPaid` περνούσε `bill.amount` στο `addExpense`, αλλά το
+  `addExpense` τρέχει **δικό του `resolveFx`** — δηλαδή ένα foreign bill θα καταγραφόταν ως έξοδο σε **rate²**. Πλέον
+  του δίνεται το **τυπωμένο** ποσό (`origAmount`) μαζί με currency + rate. Pinned με 3 τεστ (foreign με rate, ordinary,
+  foreign χωρίς rate).
+- **Το recurring spawn**: η επόμενη δόση της σειράς **κληρονομεί ολόκληρο το triple, σκόπιμα μαζί με το τελευταίο
+  γνωστό rate**. Η εναλλακτική (καθάρισμα του rate) θα ήταν «πιο τίμια» ανά εγγραφή, αλλά θα πετούσε ένα rate-less
+  foreign row στο audit του slice 7 **κάθε κύκλο**, για λογαριασμό που δεν έχει καν έρθει. Το spawned row είναι
+  **πρόβλεψη**, οπότε προτιμώ να μένει base-denominated (εκτίμηση που τα totals μπορούν να αθροίσουν) και ο χρήστης
+  διορθώνει και τα δύο νούμερα όταν φτάσει το πραγματικό τιμολόγιο. Η απόφαση είναι δική μου, καταγεγραμμένη στον
+  κώδικα και στα δύο σημεία (action + API).
+
+**Τι χτίστηκε**: `Bill` model += currency/origAmount/fxRate· `SerializedBill` += τα τρία (optional, ώστε να μη σπάσει
+κανένα υπάρχον call site)· νέα `resolveBillFx()` + `printedAmount()` στο `bills/actions.ts` (create/update)· η φόρμα
+σέρνεται **πάντα** με το printed ποσό ώστε re-save χωρίς αλλαγή να μην ξανα-μετατρέπει· currency select + `BillFxFields`
+(rate ή «or charged» με back-out μέσω `deriveFxRate` + live preview) + `FxBadge` στη λίστα· `/api/v1/bills` shape += τα
+τρία (**mobile parity μαζί**) + POST/PATCH δέχονται currency/fxRate με τον ίδιο κανόνα «κάθε money field ξανα-λύνει όλα
+μαζί» των subscriptions.
+
+**Τα Bills μπήκαν και στο audit του slice 7** (`lib/fxAudit.ts`, 6ο μοντέλο, archived εξαιρούνται όπως τα receipts).
+Αυτό ανέδειξε ότι το **`/bills` δεν τιμούσε το `?open=`** — δηλαδή το deep link του panel θα προσγειωνόταν στη λίστα και
+θα άνοιγε **σιωπηλά τίποτα**, ακριβώς το bug που το routing του slice 7 υπάρχει για να αποφύγει. Προστέθηκε
+`useOpenParam` στο `BillsClient` (η σύμβαση που όλα τα άλλα money views ήδη ακολουθούν).
+
+**Verify**: `npm run type-check` **EXIT 0**· full `npx vitest run` **3872 passed / 279 files** (+25 δικά μου: 12 στο
+`bills/actions.test.ts` [+ νέο `getAppSettings` mock], 5 στο list route, 7 στο PATCH route, 1 routing στο
+`fxAudit.test.ts`· μηδέν regression, καμία υπάρχουσα προσδοκία δεν χρειάστηκε αλλαγή). Docker κάτω από το mutex:
+`build web` → mongo **healthy** → `up -d web` → `/login` **200 με την πρώτη**, `/bills` **307** + `/reports` **307**
+(auth-gated, άρα και τα δύο compiled), **0 restarts**, mongo healthy → `docker builder prune -f` → lock **released**.
+Browser: `/login` renders, **μηδέν console errors**· το authed `/bills` δεν επαληθεύεται unattended (credentials
+boundary).
+
+**Docs**: `docs/api.md` (bills POST/PATCH rows + νέα παράγραφος «Multi-currency fields (P9)») + `docs/features.md`
+(bullet στα Bills & payables + οι δύο λίστες του audit λένε πλέον και «bills»).
+
+**Git hygiene**: explicit `git add` 16 αρχείων (όχι `-A`) → commit `1ce991f` → pushed. Working tree ήταν καθαρό στην
+αρχή και στο τέλος (μόνο τα δικά μου).
+
+**Γνωστό μικρό follow-up**: το `currencyCodes(base)` είναι πλέον **6η αντιγραφή** του ίδιου τριών γραμμών helper
+(receipts/expenses/subscriptions/statements/items/bills), και το `FxIssueRow` type είναι χειροκίνητα καθρεφτισμένο στο
+`ReportsClient` (το `fxAudit.ts` importάρει Mongoose models, δεν πάει client). Και τα δύο θέλουν δικό τους μικρό
+consolidation pass, όχι μέσα σε feature slice.
+
+**Επόμενο task (πρόταση)**: η P9 σάρωση **έκλεισε** (6 μοντέλα + imports + audit), οπότε δύο επιλογές: (α) **inline
+«set rate» μέσα στο panel των Reports** — τώρα κάνει deep-link, ένα inline fix θέλει per-type conversion των
+δευτερευόντων πεδίων (receipt net/VAT/lines, statement charges), δηλαδή είναι το πραγματικά χρήσιμο υπόλοιπο του P9·
+(β) το **consolidation pass** των δύο duplications παραπάνω (μικρό, καθαρά τεχνικό χρέος). Προτείνω το **(α)**: το
+audit βρίσκει το πρόβλημα αλλά ακόμα σε στέλνει σε 6 διαφορετικές φόρμες για να το λύσεις. Ως συνήθως, πρώτα ο έλεγχος
+του Approved queue (βήμα a): αν απαντηθεί το `expo-camera` ερώτημα, το P17 camera UI προηγείται.
+
 ## 2026-07-26 (P9 slice 7: «ποιες εγγραφές θέλουν ακόμα ισοτιμία;» — audit στα Reports)
 
 **Approved queue check (βήμα a)**: αμετάβλητη εικόνα, τίποτα αυτόνομα-χτίσιμο. **P36** (Open Banking, θέλει
