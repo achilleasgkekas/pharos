@@ -6,6 +6,76 @@
 <!-- docker-validated: 7b46912 -->
 <!-- ui-audited: 0bc5e14 -->
 
+## 2026-07-26 (cont.⁸ — P9 mobile: Receipts, και το endpoint που έγραφε δολάρια σαν ευρώ)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση
+`expo-camera` για P17/P23) παραμένει **OPEN χωρίς Answer** (3ο συνεχόμενο run), οπότε τα δύο items μένουν
+μπλοκαρισμένα και δεν τα άγγιξα. Working tree: καθαρό εκτός από ένα untracked `settings/actions.imap.test.ts` άλλης
+routine, το οποίο ΔΕΝ πείραξα.
+
+**Approved queue (βήμα a)**: ίδια εικόνα (P36 provider decision, P31 supervised session, P16 πραγματικό sample
+αρχείο, P17/P23 μπλοκαρισμένα) → **P9**, και συγκεκριμένα το **mobile Receipts** που πρότεινε ρητά το προηγούμενο run.
+
+**Τι βρήκα**: σε αντίθεση με το Items slice, εδώ ο server **δεν** ήταν έτοιμος. Το `PATCH /api/v1/receipts/:id`
+έγραφε `total`/`subtotal`/`vatAmount`/τιμές γραμμών **ωμά**, χωρίς να δέχεται καν `currency`/`fxRate`: μια απόδειξη
+$88 αποθηκευμένη από το κινητό προσγειωνόταν αυτούσια μέσα σε ευρώ σύνολα. Άρα το slice έχει και τα δύο μισά (ίδιο
+μοτίβο με το cont.⁵ των Expenses).
+
+**Server**: ο κανόνας μετακόμισε σε ένα κοινό pure **`fx.resolveReceiptAmounts()`** (+9 unit tests) που μοιράζονται
+πλέον το web action και το API route (μηδέν διπλό αντίγραφο· το παλιό inline `fxFields` του action τώρα απλώς
+ξαναχαρτογραφεί τις τιμές γραμμών). **ΕΝΑ rate για όλο το χαρτί**: total + net + ΦΠΑ + κάθε unit NET γραμμής. Οι
+γραμμές δεν ήταν προαιρετικές: το «add items to inventory» αντιγράφει τις τιμές γραμμών κατευθείαν στο
+`Item.purchasedPrice` και τα /reports αθροίζουν το `vatAmount`, οπότε μισο-μετατρεπμένη απόδειξη θα δηλητηρίαζε
+ταυτόχρονα το VAT report και την αξία του inventory.
+
+**Αποφάσεις που πήρα μόνος μου**:
+- **Un-convert πριν το re-resolve** στο PATCH (ίδιο με το Statements slice): διαβάζεται το doc, το headline παίρνεται
+  από το `origAmount` και τα υπόλοιπα από `toPrinted()` με το **ΠΑΛΙΟ** rate, και μόνο μετά εφαρμόζεται το νέο. Έτσι
+  μια **διόρθωση ισοτιμίας** πέφτει πάνω στα τυπωμένα ποσά αντί να στοιβάζεται πάνω σε προηγούμενη μετατροπή.
+- **Τα δευτερεύοντα πεδία ξαναγράφονται ΜΟΝΟ** όταν τα έστειλε ο caller ή όταν άλλαξε η ίδια η μετατροπή· αλλιώς ένα
+  σκέτο `{ verified }` θα περνούσε κάθε αποθηκευμένο λεπτό από round trip un-convert/re-convert χωρίς λόγο.
+- **Σώμα χωρίς money field ΔΕΝ κάνει καθόλου το extra read** (pinned με τεστ), οπότε το κόστος του P9 σε ένα
+  single-currency deployment είναι κυριολεκτικά μηδέν.
+- Το `origAmount` **δεν γίνεται δεκτό** ως input (είναι derived)· το `docs/api.md` το έλεγε λάθος και διορθώθηκε.
+
+**Mobile**: `FxFields` στο edit modal + `FxBadge` στη λίστα + base currency/`multiCurrency` από το
+`GET /api/v1/settings` (ίδιο non-blocking read με τα άλλα screens). Η φόρμα σέρνεται με **τυπωμένα** ποσά (total από
+`origAmount`, τιμές γραμμών από `toPrinted`) και το **quick verify** επίσης, αφού υποβάλλει το total πίσω και ο
+server το ξαναμετατρέπει με το αποθηκευμένο rate (το currency/rate δεν είναι editable εκεί, οπότε δείχνει μια γραμμή
+«edit it fully»). Σε single-currency deployment το request είναι **byte-for-byte** το ίδιο με πριν.
+
+**Bug που έκλεισε στην πορεία**: η λίστα τύπωνε `money(item.total, item.currency)`, δηλαδή το σύμβολο του
+**καταστήματος** πάνω σε **base-currency** ποσό (μια απόδειξη $88 με rate 0.92 εμφανιζόταν ως «$80.96»). Ίδια κλάση
+με τα bugs των Subscriptions/Bills/Items. Πλέον το ποσό φέρει τη base currency και το τυπωμένο ζει στο `FxBadge`.
+
+**Verify**: web `npm run type-check` EXIT 0, mobile `npx tsc --noEmit` EXIT 0. Full `npx vitest run` → **4390 passed
+/ 299 files** (+20: 9 unit για το `resolveReceiptAmounts`, 12 route· μηδέν regression, κανένα υπάρχον assertion δεν
+χρειάστηκε αλλαγή — μόνο ένα default doc στο `beforeEach`, αφού ένα money PATCH κάνει πλέον re-read). Docker κάτω από
+το mutex: `build web` → mongo healthy → `up -d web` → `/login` **200 με την πρώτη**, **0 restarts**, `/receipts` 307
+(auth-gated, άρα compiled), PATCH χωρίς token → **401** → `docker builder prune -f` (2.35GB) → lock released.
+Browser: `/login` renders, **μηδέν console errors**.
+
+**Git hygiene**: explicit `git add` 9 αρχείων (όχι `-A`· το untracked `actions.imap.test.ts` άλλης routine έμεινε
+άθικτο) → commit `056f21c` → pushed.
+
+**Επόμενο task (πρόταση)**: **P9 mobile slice 6 — Statements**, το τελευταίο money screen χωρίς FX UI. Είναι
+read-mostly στο κινητό, οπότε πιθανότατα αρκεί `FxBadge` στη λίστα + base currency στα ποσά (και εκεί αξίζει έλεγχος
+για το ίδιο λάθος-σύμβολο bug). Μετά το P9 μένει μόνο το προαιρετικό rate-feed (phase 2 by design), οπότε το επόμενο
+run μετά από αυτό θα χρειαστεί νέο Approved item ή fallback στο MOBILE_PARITY roadmap (#6 Settings, #7 Activity).
+Ως συνήθως τρέξε **πρώτα** τον έλεγχο του Approved queue: αν έχει απαντηθεί το `expo-camera` ερώτημα, το P17 camera
+UI προηγείται.
+
+## Needs Achilleas
+
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο, 3ο συνεχόμενο run. Το P17 server half είναι
+  shipped+tested και του P23 υπάρχει ήδη (`POST /api/v1/scan/receipt`). Ερώτημα: `~/.claude/ASK_ACHILLEAS.md` →
+  `pharos-daily-dev-20260725-1425` (ακόμα OPEN).
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
+  household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
+  ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
+---
+
 ## 2026-07-26 (cont.⁷ — P9 mobile: Items, και τρεις τιμές που δεν είναι όλες anchor)
 
 **Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `pharos-daily-dev-20260725-1425` (έγκριση
