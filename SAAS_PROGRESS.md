@@ -5405,3 +5405,84 @@ hash-only at rest, no user-enumeration στο request path)· μετά `workspac
 (77+82 γρ., τα δύο GDPR export surfaces, πάνε μαζί)· και `billing/route.ts` (69 γρ., plan/quota
 read). Πριν ξεκινήσεις: ask-inbox πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο
 territory** (οι τελευταίες 3 σαρώσεις δεν είχαν κανένα — τα 3 ανοιχτά items είναι feature-side).
+
+## 2026-07-26 (cont. — increment 112, route-level tests για το reset ζευγάρι request+confirm)
+
+Πριν από νέο increment: ask-inbox re-checked (`~/.claude/ASK_ACHILLEAS.md`, **τίποτα addressed σε
+saas-core**, μηδέν ANSWERED — `grep saas-core` = μηδέν hits). `WEB_DEBT.md` grep re-checked: τα 3
+εναπομείναντα auto-buildable items (Notifications requireAdmin, Voucher/GiftCard/LoyaltyCard
+tenancy-parity, sampleDataActions.ts) είναι **εκτός territory** (feature pages/actions) → μηδέν
+αλλαγή, δεν τα άγγιξα. UI-first backlog παραμένει εξαντλημένο. Πήρα το leftover next-task του
+increment-111 log: το **security-sensitive** `account/reset/{request,confirm}` ζευγάρι.
+
+Πριν το staging, `git status --short` έδειξε **μόνο τα 2 δικά μου νέα αρχεία**, μηδέν staged από
+άλλη routine — collision guard δεν χρειάστηκε να παραλείψει τίποτα.
+
+**Νέο `reset/request/route.test.ts`** (31 tests), **μηδέν production code αλλαγή**. Είναι το
+UNAUTHENTICATED forgot-password entry point, και όλο του το συμβόλαιο είναι τι **δεν** πρέπει να
+αποκαλύψει. Πραγματικά τρέχουν: `mintResetToken`/`hashResetToken`, `normalizeEmail`/`looksLikeEmail`,
+`pickBaseUrl`, `resetEmail`/`resetLinkUrl`, `readBody`/`strField`, `saasGuard`· mocked seams:
+`saasAuthGate`, `connectDB`, `Account`, `sendEmail`+`mailerCanDeliver`, και το
+`settleMinResponseTime` (mocked ώστε το suite να μην κοιμάται 500ms/case — η αριθμητική του είναι
+ήδη unit-tested στο `resetTiming.test.ts`).
+Καλύπτει: **gating** — και τα δύο short-circuits περνάνε αναλλοίωτα **πριν καν διαβαστεί το body**
+(`req.json` spy = μηδέν κλήσεις), μηδέν DB, μηδέν floor· gate consulted ακριβώς μία φορά.
+**Validation** — 8 παραλλαγές κακού email (missing/blank/no-@/no-dot/spaces/numeric/object/null) →
+400 χωρίς DB· και το κρίσιμο: το malformed-400 **ΔΕΝ** παίρνει floor (input-only, δεν διαρρέει
+ύπαρξη — η τεκμηριωμένη εξαίρεση)· normalization (trim+lowercase) **πριν** φτάσει στη Mongo.
+**Anti-enumeration (το invariant)** — registered vs unregistered με wired mailer επιστρέφουν
+**byte-identical body** (σύγκριση `.text()`, όχι deep-equal) και **και τα δύο** παίρνουν το floor,
+με το `startedAt` να είναι πραγματικός timestamp μέσα στο παράθυρο του handler (D6). **Minting** —
+persist **μόνο hash**, και `hashResetToken(devToken)` === ό,τι γράφτηκε (η property που κάνει το
+link redeemable), το plaintext ΔΕΝ μπαίνει στο row, expiry ακριβώς ένα `RESET_TTL_MS` μπροστά,
+διαφορετικό token σε κάθε κλήση. **Dev-token scaffold** — unwired+non-production echo· unwired+
+**production** → σιωπηλό drop **αλλά το token παραμένει persisted** (fail closed, όχι μισό flow)·
+wired → email στο σωστό address με link του οποίου το token hash-άρει σε ό,τι αποθηκεύτηκε, μηδέν
+devToken. **Fire-and-forget** — sendEmail που **κάνει reject** ΚΑΙ sendEmail που **δεν settle-άρει
+ποτέ** αφήνουν και τα δύο το response να γυρίσει 200 (αυτό ακριβώς κρατά το mail latency έξω από το
+timed path)· `SAAS_PUBLIC_URL` νικά το request origin, fallback στο origin. **Failure** — lookup
+throw / save throw → uniform `{error}` 500· message-less → `'Server error'`· 5000-char → truncated
+στα 200.
+
+**Νέο `reset/confirm/route.test.ts`** (29 tests), **μηδέν production code αλλαγή**. Το redemption
+half — το μόνο unauthenticated route που **γράφει password**, άρα το token είναι όλη η απόδειξη
+ιδιοκτησίας. Πραγματικά τρέχουν `hashResetToken`/`isResetTokenValid`/`resetPasswordError` (η
+policy ελέγχεται στην production της μορφή)· mocked μόνο gate/`connectDB`/`Account`/`hashPassword`.
+Καλύπτει: **σειρά validation** — missing token νικάει την password policy όταν είναι και τα δύο
+κακά, και **και τα δύο** πέφτουν πριν από οποιοδήποτε DB touch (`connectDB` μηδέν κλήσεις)·
+whitespace-only token → 400· trim πριν το hashing· password ακριβώς στο minimum περνάει.
+**Lookup** — filter = **ΜΟΝΟ** `{resetTokenHash: sha256}`, το plaintext token δεν φτάνει ποτέ στη
+Mongo (assert και με `JSON.stringify(filter)`)· projection ακριβώς `'_id resetTokenHash
+resetTokenExpires'` (μηδέν passwordHash/email). **Generic failure** — unknown token / expired πριν
+μία ώρα / expired πριν 1ms / null expiry (ήδη consumed) / undefined / unparseable Date → **όλα το
+ΙΔΙΟ** `'This reset link is invalid or has expired'` με μηδέν write και μηδέν `hashPassword` κλήση
+(τίποτα δεν ξεχωρίζει «άγνωστο» από «ληγμένο»)· expiry αποθηκευμένο ως ISO string γίνεται δεκτό.
+**Consumption** — αποθηκεύεται η έξοδος του `hashPassword`, ποτέ το plaintext· **ένα** `.set()` που
+μηδενίζει **και τα δύο** reset πεδία μαζί με το νέο hash (single-use· ένα replay δεν βρίσκει τίποτα
+να εξαργυρώσει)· `save` ακριβώς μία φορά· body ακριβώς `{"ok":true}`, μηδέν account info.
+**Failure** — ίδιο 500 shaping quartet.
+
+**Verified**: τα δύο νέα files **60/60 green** μαζί (πέρασαν από την πρώτη — 59 αρχικά, +1 μετά το
+split ενός parametrized case). Πλήρες `npx vitest run` → **296 files / 4269 tests green** (από
+293/4198 του increment-111 log: +3 files/+71 tests — τα 2 δικά μου + 1 από άλλη ταυτόχρονη routine).
+`npm run type-check` → **EXIT 0** μετά από δύο test-only fixes: (α) `process.env.NODE_ENV = …` είναι
+read-only στο TS (TS2540 ×3) → `vi.stubEnv` + `vi.unstubAllEnvs`, το idiom που ήδη χρησιμοποιεί το
+`invites/resend` test· (β) ένα `{ toString: () => 'x' }` fixture έβγαζε TS7023 (implicit any) →
+αντικαταστάθηκε με δύο πιο τίμια non-string cases (numeric + plain object). **Docker: ΔΕΝ έγινε
+rebuild** (test-only, μηδέν production/runtime wiring/env/deps αλλαγή → ούτε ο docker mutex
+χρειάστηκε). **Browser-verify: skipped** (test files, μηδέν UI/observable behavior αλλαγή).
+Collision guard: `git status --short` πριν το staging = μόνο τα 2 δικά μου untracked, μηδέν staged
+από άλλη routine· `git diff --cached --name-only` μετά επιβεβαίωσε exact 2-file match πριν το
+commit/push. Pushed `b2639ec`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** απομένουν **4** routes χωρίς route-level coverage. Το ζευγάρι
+`account/verify/{request,confirm}` (56+42 γρ.) είναι το φυσικό επόμενο — **ίδιο ακριβώς token
+lifecycle idiom** με το reset που μόλις καλύφθηκε (mint → hash-at-rest → single-use consume), άρα
+τα δύο test files γράφονται γρήγορα ως παραλλαγή αυτού του increment· προσοχή στη διαφορά: το
+verify **δεν** έχει anti-enumeration floor (δεν είναι forgot-password), οπότε μην αντιγράψεις τα
+timing assertions τυφλά. Μετά: `workspace/export/{route,files}` (77+82 γρ., τα δύο GDPR export
+surfaces, πάνε μαζί) και `billing/route.ts` (69 γρ., plan/quota read). Πριν ξεκινήσεις: ask-inbox
+πρώτα, μετά νέα σάρωση `WEB_DEBT.md` για item **μέσα στο territory** (οι τελευταίες 4 σαρώσεις δεν
+είχαν κανένα — τα 3 ανοιχτά items είναι feature-side).
