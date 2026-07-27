@@ -409,6 +409,7 @@ const ROADMAP: {
       'Return-window reminders for recent purchases',
       'Bring-your-own-key AI billing for hosted workspaces',
       'Opt-in multi-currency for expenses, income, receipts, subscriptions, items, statements, bills & CSV imports',
+      'Barcode scan-to-add for shopping list & inventory, plus a browser bookmarklet and Chrome extension',
     ],
   },
   {
@@ -425,7 +426,7 @@ const ROADMAP: {
     note: 'On the backlog, not yet scheduled',
     items: [
       'Open Banking bank-transaction sync (EU)',
-      'Mobile share-sheet & barcode quick capture',
+      'Mobile share-sheet quick capture',
     ],
   },
 ];
@@ -489,7 +490,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Can I add something to my list straight from a store’s page?',
-    a: 'Yes. Paste a product URL into a new item and PHAROS fetches the page, then AI fills in the price, specs, category, and a photo. For a one-click path, drag a "Save to PHAROS" bookmarklet to your bookmarks bar from Settings → Storage & backup (a copy-code fallback covers browsers where dragging a link is awkward): click it on any product page and a small same-origin popup opens, riding your existing signed-in session, no API token exposed and nothing to install, then runs the same preview-before-you-confirm import.',
+    a: 'Yes. Paste a product URL into a new item and PHAROS fetches the page, then AI fills in the price, specs, category, and a photo. For a one-click path, drag a "Save to PHAROS" bookmarklet to your bookmarks bar from Settings → Storage & backup (a copy-code fallback covers browsers where dragging a link is awkward): click it on any product page and a small same-origin popup opens, riding your existing signed-in session, no API token exposed and nothing to install, then runs the same preview-before-you-confirm import. On Chrome there is also a native extension with a toolbar button and a right-click menu, no page-content permissions requested, so it can only ever read the URL of the tab you act on.',
   },
   {
     q: 'Can it read receipts and statements I already have?',

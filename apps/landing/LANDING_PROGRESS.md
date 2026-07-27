@@ -4434,3 +4434,49 @@ content-script permissions). Αν κανενα νεο feat commit δεν εμφ�
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-27 (run 29)
+
+Εκανα ακριβως τα δυο candidates που αφησε το run 28: κανενα νεο feat commit δεν εμφανιστηκε πρωτα (μονο
+δουλεια αλλων routines σε mobile/saas/tests, βλ. `git log --oneline dcd67da..HEAD`, τιποτα που αγγιζει
+landing copy).
+
+**1. ROADMAP split (γραμμη ~410-429)**: το "Mobile share-sheet & barcode quick capture" στη φαση "Exploring"
+χωριστηκε στα δυο μισα του. Το barcode κομματι ΗΔΗ shipped (P17, `docs/features.md:143-145`, μαγαζι/inventory
+scan μεσω OpenFoodFacts/OpenProductsFacts/OpenBeautyfacts) -> προστεθηκε νεα γραμμη στο "Shipped" items list:
+"Barcode scan-to-add for shopping list & inventory, plus a browser bookmarklet and Chrome extension" (το
+δευτερο μισο της προτασης καλυπτει και το P5/P5-phase-2 bookmarklet+extension που ηταν ηδη shipped αλλα δεν
+ειχε δικια του γραμμη στο roadmap block, μονο στο FAQ). Το "Exploring" εμεινε με ΜΟΝΟ "Mobile share-sheet
+quick capture" (επιβεβαιωσα `grep -ri share-sheet apps/web apps/mobile docs` -> μηδεν hits, οντως ανυλοποιητο).
+
+**2. FAQ bookmarklet -> +extension mention**: η ερωτηση "Can I import a product just by pasting a link?"
+(γραμμη ~492) περιεγραφε μονο το phase-1 bookmarklet (drag to bookmarks bar). Προστεθηκε τελευταια προταση:
+"On Chrome there is also a native extension with a toolbar button and a right-click menu, no page-content
+permissions requested, so it can only ever read the URL of the tab you act on." (ακριβες wording απο
+`docs/features.md:133-141` — `apps/extension/`, τρια capture triggers, `storage`+`contextMenus`+`activeTab`
+μονο, οχι `content_scripts`/`host_permissions`). Δεν προσθεσα νεα FAQ ερωτηση, μονο επεκτεινα την υπαρχουσα
+(ιδιο pattern με το run 28 fix).
+
+Verify:
+- `npm run type-check` -> exit 0 (καθαρο, τιποτα νεο).
+- `npm run build` -> success, 13 static routes, `/` 5.35 kB (αμεταβλητο bundle, το roadmap/FAQ ειναι data
+  arrays οχι νεο component βαρος).
+- em-dash: 0 (python3 UTF-8 count στο `app/page.tsx`).
+- Θυρα 3100/3000 κατειλημμενα (Docker), `next start -p 3102` πανω στο production build -> curl 200.
+  Browser pane: `read_console_messages` (onlyErrors) -> "No console logs." `get_page_text` επιβεβαιωσε το
+  νεο "Barcode scan-to-add..." μεσα στο Shipped list και το μονο-πλεον "Mobile share-sheet quick capture"
+  (χωρις "& barcode") στο Exploring. Το FAQ extension-προταση δεν φαινοταν στο plain-text tree (η απαντηση
+  ειναι μεσα σε collapsed accordion) αλλα το `document.body.innerHTML` (JSON-LD FAQPage schema, πανω απο το
+  visible accordion) το επιβεβαιωσε λεξη-προς-λεξη present. Server τερματισμενος (`pkill -f "next start -p
+  3102"` + `lsof` επιβεβαιωσε την θυρα ελευθερη).
+- Δεν αγγιξα Docker/:3000/web/mobile. Μηδεν subagent, μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το commit εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` (το
+  `LANDING_PROGRESS.md` προστεθηκε στο ιδιο commit μεσω pathspec), κανενα ξενο staged αρχειο.
+
+Επομενο increment: δεν βρηκα αλλο σαφες gap/αντιφαση αυτο το run. Υποψηφια για το επομενο περασμα: (α) το
+COMPARE table (γραμμη ~380-389) εχει "Support: Community & docs" vs "Priority email" για hosted — αξιζει
+ελεγχος αν υπαρχει ηδη κατι σαν in-app support widget/contact form που να αλλαζει το wording· (β) γενικο
+sweep για οποιοδηποτε νεο feat commit που θα προκυψει απο αλλες routines μεχρι το επομενο run.
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
