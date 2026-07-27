@@ -620,7 +620,11 @@ Configuration is grouped into tabs:
   manual asset accounts, asset depreciation, and payment cards.
 - **AI** — provider (Ollama / Anthropic / OpenAI / Gemini / OpenRouter / Custom),
   a separate scraper AI, editable AI prompts, and the calendar feed token
-  (generate / copy / rotate / revoke).
+  (generate / copy / rotate / revoke). **Mobile parity (roadmap #6)**: master AI
+  toggle + per-feature toggles (scan, parse, fill, search, summarize, translate,
+  categorize, etc.) with status indicators (disabled / no-provider / ready); only
+  admins may edit toggles, but all users see their status (to understand why a
+  feature is unavailable).
 - **Network** — UniFi host / user / connection test.
 - **Storage & backup** — file storage backend (local / SMB / FTP / OneDrive),
   folder / filename templates, mirror-on-verify, sync, backup / restore, CSV

@@ -32,7 +32,7 @@ The mobile app mirrors most of the web modules, backed by the same API client
 | Tasks | list, add, status, steps |
 | Search | global search across records |
 | Activity | background AI jobs, saved AI conversations, **alerts (humanized formatted notifications — deals, installments, warranties)** |
-| Settings | preferences, budgets, cards, stores, lists, sign-out |
+| Settings | preferences, budgets, cards, stores, lists, **AI master switch + per-feature toggles (roadmap #6)**, sign-out |
 
 Navigation is a top app bar (menu, search, notification bell with unread badge)
 plus a slide-out drawer. There are no native tabs; screens switch from the drawer.
