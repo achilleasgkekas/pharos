@@ -2811,3 +2811,28 @@ Collision guard: git status --short = κανένα modified file εκτός αυ
 
 Επόμενο run: (α) αν νέα features ship (π.χ. P51+ candidates ή άλλα modules), update docs ανάλογα, ή (β) drift check — verify αν κάποιο endpoint ή feature description έχει γίνει stale σε σχέση με τον κώδικα.
 
+
+## 2026-07-27 (twenty-sixth run — FX rate lookup feature documentation added)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-fifth run (commit d44c792, 2026-07-27 01:39). Ανακάλυψη: **1 νέο feat() commit από 2026-07-27**:
+- **P11 IMAP email-in (commit 6716846, 2026-07-27 01:39)** — feat(landing): document IMAP email-in auto-import (P11) — αλλά αυτό άγγιξε μόνο landing pages (apps/landing/), όχι core docs.
+- **FX rate lookup phase 2** — uncommitted changes σε features.md + configuration.md που document την Frankfurter API integration για ECB reference rate lookup.
+
+Τι έγιναν:
+- **features.md**: Προστέθηκε bullet point (line 205) "Optional 'market rate' lookup (phase 2)". Εξηγεί: κάθε rate field έχει Market rate button που φέρνει ECB reference rate ως πρότασή (ποτέ δεν εφαρμόζεται αυτόματα), χρησιμοποιεί Frankfurter API (free, no key), ημερομηνία-aware lookup, self-hosted option via FX_RATE_API_URL.
+- **configuration.md**: Προστέθηκε section "Rate lookup" (μετά το multi-currency note) που document-άρει την FX_RATE_API_URL config option για self-hosters που δεν θέλουν third-party API calls. Εξηγεί τι δεδομένα στέλνονται (2 currency codes + date, ποτέ δεν στέλνονται records).
+
+Accuracy (διάβασα κώδικα): lib/fxRates.ts (getFxRate endpoint calls Frankfurter), apps/web/src/app/settings/actions.ts (FX_RATE_API_URL config), ReportsClient.tsx (FxCurrencyGroup rate input με Market rate button), forms (all 6 edit forms που έχουν rate field).
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: features.md 0 (αθικτο), configuration.md 8 (ζυγό, balanced ✓).
+- Internal links: [Reports] resolves to line 447 features.md ✓.
+- Secret scan: κανένα literal credential (FX_RATE_API_URL είναι config option, όχι secret).
+- Markdown structure: όλα καθαρά ✓.
+
+Collision guard: git status --short πριν commit = ΜΟΝΟ 2 modified docs files (features.md, configuration.md), κανένα staged foreign. Commit 1961571 (docs(fx-rates): document market rate lookup via Frankfurter API). Push: origin/main successful ✓.
+
+Συμπέρασμα: FX rate lookup feature (phase 2) πλέον fully documented across features.md + configuration.md. Όλα τα P9 slices + phase 2 features παραμένουν synchronized.
+
+Επόμενο run: (α) grep git log για άλλα νέα undocumented feat() commits (P51+ candidates ή νέα modules), ή (β) API drift check αν endpoints αλλάξανε στο schema.
+
