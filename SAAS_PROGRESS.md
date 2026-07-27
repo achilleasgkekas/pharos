@@ -5936,3 +5936,75 @@ creation — slug minting, owner membership, db naming), δηλαδή η μεγ�
 guards (`saasPage`/`superadminPage`, μικρά αλλά είναι ο SSR αντίστοιχος του `saasAuthGate`)
 και τέλος `stripe.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI**
 item (προτεραιότητα) και για `WEB_DEBT.md` item μέσα στο territory.
+
+## 2026-07-28 — increment 122: unit coverage για το tenant provisioning (provision.ts)
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine· το δικό μου
+(`pharos-saas-core-20260727-1930`, pathspec commit) είναι **APPLIED**. **UI-first scan**:
+ξανά-σάρωσα `app/admin/**`, `app/(saas)/**`, `components/saas/**` — κάθε view-module έχει ήδη
+δικό του `.test.ts`, μηδέν ανοιχτό UI unit· δεν υπάρχει `WEB_DEBT.md` στο repo. Οπότε
+συνέχισα με τη σειρά των untested modules.
+
+**`lib/tenancy/provision.test.ts` (39 tests, μηδέν production αλλαγή)** — το `provision.ts`
+ήταν το **τελευταίο write-path module** του control plane χωρίς εκτέλεση: και τα δύο signup
+routes mockάρουν το `provisionTenant`, άρα κανένα από τα ~4900 tests δεν έτρεξε ποτέ το slug
+minting, τον collision loop, το db naming ή τα δύο inserts. Η κλάση κινδύνου εδώ δεν είναι
+«failing request» αλλά **workspace που δημιουργείται με λάθος slug / λάθος database / χωρίς
+owner** — δηλαδή σιωπηλή ζημιά που φαίνεται εβδομάδες μετά.
+
+Mock **μόνο** στα node-only seams (connectDB + τα δύο Mongoose models)· τα δύο pure
+collaborators **τρέχουν πραγματικά** (`RESERVED_SLUGS` από το `./host`, `trialEndFrom` από το
+`@/lib/billing/trial`), άρα ο reserved-label guard και το trial stamp καρφώνονται ως wired.
+Το `Tenant.create` fixture **αποκλίνει επίτηδες** (γυρίζει άλλο slug/name/plan/status από ό,τι
+του δόθηκε) ώστε κάθε «τι διαβάζει το return value» assertion να είναι load-bearing.
+
+Το πιο σημαντικό test: **`dbName` παράγεται από το DE-DUPLICATED slug**, όχι από το
+ζητούμενο όνομα. Δύο workspaces με όνομα «Acme» που θα έδειχναν και τα δύο στο `tenant_acme`
+θα μοιράζονταν **κάθε collection** — cross-tenant data leak στην πιο χοντρή του μορφή.
+Καλύπτει επίσης: reserved root (`admin`/`www`) → random label αντί να σερβιριστεί· empty root
+→ random label· counter ξεκινά στο **-2** (ποτέ -1/-0)· **οποιοδήποτε truthy** `exists()`
+μετράει ως taken (το Mongoose γυρίζει `{_id}`, όχι boolean — ένα `=== true` θα έδινε το ίδιο
+subdomain σε δύο workspaces)· bounded στα **50 probes** με random tail (ένα pathological loop
+δεν κρεμάει signup request)· η random fallback ελέγχεται κι αυτή για collision· owner
+membership **μετά** το tenant, keyed στο **ObjectId** όχι στο slug, role πάντα `owner` +
+status `active`· trial end bounded (open-ended trial = free workspace με paid capacity για
+πάντα)· return = ακριβώς **6 κλειδιά** με leak guard (`aiKeyCipher`/`stripeCustomerId` που
+βάζω επίτηδες στο doc δεν βγαίνουν)· και **failure propagation** και στα δύο inserts.
+
+**Δύο συμπεριφορές που βρήκα γράφοντάς το** (τεκμηριωμένες στο test, ώστε μια μελλοντική
+διόρθωση να είναι σκόπιμη και όχι τυχαία):
+1. **Μη-λατινικό όνομα → κενό slug.** `slugify('Καλημέρα')` → `''` (το NFKD δεν δίνει ASCII),
+   άρα ένα **ελληνικό** workspace name παίρνει random `w-xxxxxx` subdomain αντί για κάτι
+   αναγνωρίσιμο. Δεδομένου ότι ο πρώτος πελάτης είναι ελληνικός, αυτό είναι product decision
+   (βλ. Needs Achilleas).
+2. **Mid-word τόνος σπάει τη λέξη**: `Müller` → `mu-ller` (το combining mark μένει μέσα στη
+   λέξη και γίνεται hyphen)· ένας τόνος στο ΤΕΛΟΣ κόβεται κανονικά (`Café` → `cafe`).
+   Cosmetic, valid DNS, σταθερό.
+Επίσης πινάρισα ρητά ότι **δεν υπάρχει rollback**: αν σκάσει το `Membership.create`, το Tenant
+έχει ήδη γραφτεί → μένει **ownerless workspace** (καμία transaction).
+
+**Verified**: **39/39 green** (ένα assertion λάθος στην πρώτη εκτέλεση, δικό μου: περίμενα
+`muller-gmbh` ενώ ο κώδικας βγάζει `mu-ller-gmbh` — διορθώθηκε το assertion **και** προστέθηκε
+ξεχωριστό test που τεκμηριώνει το split, όχι «fix» του production). Πλήρες `npx vitest run` →
+**320 files / 4980 tests green** (από 317/4903: +3 files/+77 tests — 1 δικό μου, τα υπόλοιπα
+από ταυτόχρονες routines). `npm run type-check` → **EXIT 0 χωρίς κανένα fix**. **Docker:
+κανένα rebuild** (test-only, μηδέν production/runtime/env/deps αλλαγή → ούτε ο mutex
+χρειάστηκε). **Browser-verify: skipped** (test file, μηδέν observable UI). Collision guard:
+`git status --short` πριν το staging = μόνο το δικό μου untracked αρχείο, μηδέν staged από
+άλλη routine· pathspec commit. Pushed `4db033e`.
+
+**## Needs Achilleas:**
+- **Slug για μη-λατινικά ονόματα**: ένα workspace «Πλαίσιο» γίνεται `w-k3j9x1.ph-aros.com`.
+  Επιλογές: (α) μένει ως έχει (ο χρήστης το αλλάζει από Workspace settings)· (β)
+  transliteration ελληνικά→λατινικά (υπάρχει ήδη `GREEK_MAP` στο `lib/stores.ts` για store
+  dedup, επαναχρησιμοποιήσιμο)· (γ) υποχρεωτικό «choose your subdomain» βήμα στο signup.
+  Προτείνω **(β)** — μηδέν επιπλέον UI, και ο πρώτος πελάτης είναι ελληνικός. ΔΕΝ το έκανα
+  γιατί αλλάζει το slug που παίρνουν πραγματικοί λογαριασμοί.
+- Παραμένουν τα προϋπάρχοντα: Stripe keys, τελικό plan pricing, SMTP.
+
+**Next task:** μένουν **2 untested modules** στο territory: `saasPage.ts` (40γρ.) και
+`superadminPage.ts` (48γρ.) — τα SSR αντίστοιχα του `saasAuthGate`, δηλαδή ο guard που κρύβει
+ολόκληρο το SaaS UI από ένα self-hosted deployment· μικρά αλλά υψηλού ρίσκου (αν σπάσουν,
+το `/admin` γίνεται ορατό εκεί που δεν πρέπει). Μετά `lib/billing/stripe.ts` (145γρ., το
+τελευταίο). **Ξεκίνα από `superadminPage.ts`** (πιο επικίνδυνο από τα δύο: superadmin gate).
+Πριν ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI** item (προτεραιότητα).
