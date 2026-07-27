@@ -28,6 +28,7 @@ import {
   type ItemPricesInput,
 } from '@/lib/fx';
 import type { SerializedItem, SerializedAttachment } from '@/types';
+import { assertCanWrite } from '@/lib/auth';
 
 const CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'] as const;
 const STATUSES = ['researching', 'decided', 'ordered', 'received', 'installed', 'deferred', 'sold', 'broken'] as const;
@@ -91,6 +92,7 @@ async function resolveItemFx(parsed: ItemPricesInput) {
 }
 
 export async function createItem(formData: FormData) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   const raw = Object.fromEntries(formData);
   const parsed = ItemFormSchema.parse(raw);
@@ -115,6 +117,7 @@ export async function createItem(formData: FormData) {
 }
 
 export async function updateItem(id: string, formData: FormData) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   const raw = Object.fromEntries(formData);
   const parsed = ItemFormSchema.parse(raw);
@@ -136,6 +139,7 @@ export async function updateItem(id: string, formData: FormData) {
 }
 
 export async function deleteItem(id: string) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -159,6 +163,7 @@ export async function uploadItemPhotos(
   itemId: string,
   formData: FormData
 ): Promise<{ ok: boolean; added: number; photos: string[]; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   const files = formData.getAll('files').filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) return { ok: false, added: 0, photos: [], error: 'No image found' };
@@ -187,6 +192,7 @@ export async function uploadItemPhotos(
 
 /** Remove a product photo (and delete the underlying file). */
 export async function deleteItemPhoto(itemId: string, relativePath: string): Promise<{ ok: boolean; photos: string[] }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -209,6 +215,7 @@ export async function deleteItemPhoto(itemId: string, relativePath: string): Pro
 
 /** Make a photo the cover (move it to the front of the gallery). */
 export async function setItemCover(itemId: string, relativePath: string): Promise<{ ok: boolean; photos: string[] }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -245,6 +252,7 @@ export async function uploadItemAttachments(
   itemId: string,
   formData: FormData
 ): Promise<{ ok: boolean; added: number; attachments: SerializedAttachment[]; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   const files = formData.getAll('files').filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) return { ok: false, added: 0, attachments: [], error: 'No file selected' };
@@ -290,6 +298,7 @@ export async function deleteItemAttachment(
   itemId: string,
   path: string
 ): Promise<{ ok: boolean; attachments: SerializedAttachment[] }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -456,6 +465,7 @@ async function fillPhotos(item: WithPhotos & { title: string }, targetUrls: stri
 export async function fetchItemPhotos(
   itemId: string
 ): Promise<{ ok: boolean; added: number; photos: string[]; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -515,6 +525,7 @@ export async function aiFillItem(itemId: string): Promise<{
   item?: SerializedItem;
   error?: string;
 }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, checked: 0, filled: [], lowest: null, error: 'Product AI-fill is turned off.' };
   await connectDB();
@@ -671,6 +682,7 @@ export async function aiFillItem(itemId: string): Promise<{
 export async function aiFillItemsBulk(
   itemIds: string[]
 ): Promise<{ ok: boolean; results: { id: string; ok: boolean; filled: string[]; error?: string }[] }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, results: [] };
   const ids = itemIds.slice(0, 5); // bound wall-time per call (~5 × up-to-30s)
@@ -694,6 +706,7 @@ export async function aiFillItemsBulk(
 export async function aiFillSpecs(
   itemId: string
 ): Promise<{ ok: boolean; specs?: string; item?: SerializedItem; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, error: 'AI specs is turned off.' };
   await connectDB();
@@ -735,6 +748,7 @@ export async function aiFillSpecs(
 export async function aiFillInfo(
   itemId: string
 ): Promise<{ ok: boolean; filled: string[]; item?: SerializedItem; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, filled: [], error: 'Product AI is turned off.' };
   await connectDB();
@@ -814,6 +828,7 @@ function escapeHtml(s: string): string {
  * into the task's notes — no link back to the item, no mutation of the item.
  */
 export async function convertItemToTask(itemId: string): Promise<{ ok: boolean; taskId?: string; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -925,6 +940,7 @@ function lowestKnownPrice(item: { links?: { price?: number | null }[] }): number
  * record the price instead of creating a duplicate.
  */
 export async function importItemFromUrl(url: string, view: ItemView): Promise<ImportItemResult> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, error: 'Product import (AI) is turned off.' };
   let page;
@@ -1118,6 +1134,7 @@ export async function confirmImportItem(
   data: { url: string; title: string; price: number; store: string; specs: string; category: string; currency?: string },
   view: ItemView
 ): Promise<ImportItemResult> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   try {
     await connectDB();
@@ -1206,6 +1223,7 @@ export async function addPriceEntry(
   id: string,
   entry: { price: number; store: string; url?: string }
 ) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -1219,6 +1237,7 @@ export async function addPriceEntry(
 
 /** Set (or clear) the target price from the price panel, without opening the form. */
 export async function setItemTarget(id: string, target: number | null): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -1236,6 +1255,7 @@ export async function logItemPrice(
   price: number,
   store: string
 ): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   if (!(price > 0)) return { ok: false, error: 'Price must be greater than 0' };
   await connectDB();
@@ -1333,6 +1353,7 @@ export async function mergeItems(
   keepId: string,
   dropIds: string[]
 ): Promise<{ ok: boolean; merged: number; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -1541,6 +1562,7 @@ export async function addPriceLinks(
   itemId: string,
   picks: { store: string; url: string; price: number; currency?: string }[]
 ): Promise<{ ok: boolean; item?: SerializedItem; added: number; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -1596,6 +1618,7 @@ export type PriceRefresh = {
 export async function refreshItemPrices(
   itemId: string
 ): Promise<{ ok: boolean; results: PriceRefresh[]; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false, results: [], error: 'Product AI is turned off.' };
   await connectDB();
@@ -1666,6 +1689,7 @@ export async function refreshItemPrices(
  * store behind it) so the big number always reflects real, tracked prices.
  */
 export async function recomputeAllItemPrices(): Promise<{ ok: boolean; updated: number }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Item = await currentModel(ItemModel);

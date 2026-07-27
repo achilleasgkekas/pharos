@@ -5,6 +5,7 @@ import { connectDB } from '@/lib/db';
 import { ShoppingListItem } from '@/models/ShoppingListItem';
 import { parseProductPhoto, type ParsedProductPhoto } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
+import { assertCanWrite } from '@/lib/auth';
 
 export type SerializedListItem = {
   _id: string;
@@ -75,6 +76,7 @@ export async function scanProductPhoto(formData: FormData): Promise<ScanProductR
 type NewItem = { name: string; quantity?: string; category?: string; brand?: string; note?: string; aiScanned?: boolean };
 
 export async function addListItem(data: NewItem): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   const name = (data.name || '').trim();
   if (!name) return { ok: false, error: 'Name required' };
   await connectDB();
@@ -94,6 +96,7 @@ export async function addListItem(data: NewItem): Promise<{ ok: boolean; error?:
 // `found` reports whether a live (non-trashed) doc matched — lets the REST layer
 // return 404 instead of a silent success. The web UI ignores the return value.
 export async function updateListItem(id: string, data: Partial<NewItem>): Promise<{ ok: boolean; found: boolean }> {
+  await assertCanWrite();
   await connectDB();
   const set: Record<string, string> = {};
   for (const k of ['name', 'quantity', 'category', 'brand', 'note'] as const) {
@@ -105,6 +108,7 @@ export async function updateListItem(id: string, data: Partial<NewItem>): Promis
 }
 
 export async function toggleListItem(id: string, checked: boolean): Promise<{ ok: boolean; found: boolean }> {
+  await assertCanWrite();
   await connectDB();
   const r = await ShoppingListItem.updateOne({ _id: id }, { $set: { checked } });
   revalidatePath('/shopping-list');
@@ -112,6 +116,7 @@ export async function toggleListItem(id: string, checked: boolean): Promise<{ ok
 }
 
 export async function deleteListItem(id: string): Promise<{ ok: boolean; found: boolean }> {
+  await assertCanWrite();
   await connectDB();
   const r = await ShoppingListItem.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
   revalidatePath('/shopping-list');
@@ -120,6 +125,7 @@ export async function deleteListItem(id: string): Promise<{ ok: boolean; found: 
 
 /** Remove everything already ticked off (soft-delete → recoverable from Trash). */
 export async function clearChecked(): Promise<{ ok: boolean; cleared: number }> {
+  await assertCanWrite();
   await connectDB();
   const r = await ShoppingListItem.updateMany({ checked: true }, { $set: { deletedAt: new Date() } });
   revalidatePath('/shopping-list');

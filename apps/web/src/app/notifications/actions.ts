@@ -15,6 +15,7 @@ import { billDaysUntilDue } from '@/lib/bill';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
+import { assertCanWrite } from '@/lib/auth';
 
 export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'bill' | 'system';
 
@@ -224,24 +225,28 @@ export async function getNotifications(): Promise<{ items: SerializedNotificatio
 }
 
 export async function markNotificationRead(id: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Notification.updateOne({ _id: id }, { $set: { read: true } });
   return { ok: true };
 }
 
 export async function markAllNotificationsRead(): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Notification.updateMany({ read: false }, { $set: { read: true } });
   return { ok: true };
 }
 
 export async function dismissNotification(id: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Notification.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
   return { ok: true };
 }
 
 export async function clearAllNotifications(): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Notification.updateMany({}, { $set: { deletedAt: new Date() } });
   return { ok: true };

@@ -91,7 +91,9 @@ const isVisionName = (name: string) => /vl|vision|llava|minicpm-v|moondream|bakl
 
 type TabId = 'general' | 'money' | 'ai' | 'storage' | 'data' | 'notifications' | 'users';
 
-type CurrentUser = { id: string; name: string; role: 'admin' | 'member' };
+import type { Role } from '@/lib/roles';
+
+type CurrentUser = { id: string; name: string; role: Role };
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
   { id: 'general', label: 'General', icon: <SlidersHorizontal size={15} /> },
@@ -3134,8 +3136,9 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
     if (!ok) return;
     startTransition(async () => { const r = await deleteUser(u.id); if (!r.ok) setError(r.error || t('common.failed')); reload(); });
   }
-  function toggleRole(u: UserRow) {
-    startTransition(async () => { const r = await setUserRole(u.id, u.role === 'admin' ? 'member' : 'admin'); if (!r.ok) setError(r.error || t('common.failed')); reload(); });
+  function changeRole(u: UserRow, role: Role) {
+    if (role === u.role) return;
+    startTransition(async () => { const r = await setUserRole(u.id, role); if (!r.ok) setError(r.error || t('common.failed')); reload(); });
   }
   function resetPwd(u: UserRow) {
     const pwd = window.prompt(t('set.resetPwdPrompt', { name: u.username }));
@@ -3154,16 +3157,23 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
         <div className="space-y-1.5">
           {users.map((u) => (
             <div key={u.id} className="flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2">
-              <span className={cn('w-2 h-2 rounded-full shrink-0', u.role === 'admin' ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]')} />
+              <span className={cn('w-2 h-2 rounded-full shrink-0', u.role === 'admin' ? 'bg-[color:var(--color-accent)]' : u.role === 'viewer' ? 'bg-[color:var(--color-cyan)]' : 'bg-[color:var(--color-text-faint)]')} />
               <div className="min-w-0 flex-1">
                 <span className="text-sm font-medium">{u.username}</span>
                 {u.name && <span className="text-xs text-[color:var(--color-text-dim)] ml-2">{u.name}</span>}
                 {u.id === currentUserId && <span className="text-[10px] text-[color:var(--color-accent)] ml-2" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.you')}</span>}
               </div>
-              <button onClick={() => toggleRole(u)} title={t('set.toggleRole')} style={{ fontFamily: 'var(--font-mono)' }}
-                className={cn('text-[10px] px-2 py-0.5 rounded-full border uppercase', u.role === 'admin' ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] text-[color:var(--color-text-dim)]')}>
-                {u.role === 'admin' ? t('set.admin') : t('set.member')}
-              </button>
+              {/* P31: three roles do not fit a two-way toggle, so the chip became a select. */}
+              <select value={u.role} onChange={(e) => changeRole(u, e.target.value as Role)} title={t('set.toggleRole')}
+                style={{ fontFamily: 'var(--font-mono)' }}
+                className={cn('text-[10px] px-2 py-0.5 rounded-full border uppercase bg-transparent cursor-pointer',
+                  u.role === 'admin' ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
+                    : u.role === 'viewer' ? 'border-[color:var(--color-cyan)] text-[color:var(--color-cyan)]'
+                    : 'border-[color:var(--color-border)] text-[color:var(--color-text-dim)]')}>
+                <option value="viewer">{t('set.viewer')}</option>
+                <option value="member">{t('set.member')}</option>
+                <option value="admin">{t('set.admin')}</option>
+              </select>
               <button onClick={() => resetPwd(u)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] p-1" title={t('set.resetPassword')}><KeyRound size={13} /></button>
               {u.id !== currentUserId && <button onClick={() => remove(u)} className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] p-1" title={t('common.delete')}><Trash2 size={13} /></button>}
             </div>
@@ -3180,6 +3190,7 @@ function UsersManager({ currentUserId }: { currentUserId: string }) {
             <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={t('set.displayNamePlaceholder')} className={inputClass} />
             <input value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} type="password" placeholder={t('set.passwordPlaceholder')} className={inputClass} />
             <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} className={selectClass}>
+              <option value="viewer">{t('set.viewer')}</option>
               <option value="member">{t('set.member')}</option>
               <option value="admin">{t('set.admin')}</option>
             </select>

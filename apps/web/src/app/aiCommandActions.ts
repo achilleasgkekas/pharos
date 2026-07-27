@@ -5,7 +5,7 @@ import { anthropicRaw, type AnthropicMessage, type AnthropicBlock } from '@/lib/
 import { revalidatePath } from 'next/cache';
 import { TOOLS, execute, SYSTEM, today } from './aiTools';
 import { connectDB } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { assertCanWrite, getCurrentUser } from '@/lib/auth';
 import { Conversation } from '@/models/Conversation';
 
 export type AiCommandResult = {
@@ -22,6 +22,7 @@ export type ChatTurn = { role: 'user' | 'assistant'; content: string };
  *  history (text turns) and sends it whole each call. Needs the Anthropic provider.
  *  The tool registry + executor live in `./aiTools` (shared with the MCP route). */
 export async function runAiCommand(history: ChatTurn[], conversationId?: string): Promise<AiCommandResult> {
+  await assertCanWrite();
   if (!(await isFeatureEnabled('commandBar'))) return { ok: false, reply: '', actions: [], error: 'The AI command bar is turned off in Settings → AI.' };
   const turns = (history || []).filter((t) => t && typeof t.content === 'string' && t.content.trim());
   if (!turns.length) return { ok: false, reply: '', actions: [], error: 'Empty command' };

@@ -66,7 +66,7 @@ vi.mock('@/models/Membership', () => ({
   Membership: { findOne: membershipFindOne, updateOne: membershipUpdateOneMock, create: membershipCreateMock },
 }));
 vi.mock('@/models/Invite', () => ({ Invite: { findOne: inviteFindOne, updateOne: inviteUpdateOneMock } }));
-vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock }));
+vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
 vi.mock('@/lib/tenancy/saasApi', () => ({ saasAuthGate: saasAuthGateMock, accountTenants: accountTenantsMock }));
 vi.mock('@/lib/tenancy/accountSession', () => ({ setAccountCookie: setAccountCookieMock }));
 vi.mock('@/lib/tenancy/audit', async () => {

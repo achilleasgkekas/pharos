@@ -120,7 +120,10 @@ vi.mock('@/lib/categoryRules', () => ({ resolveCategoryRules: vi.fn() }));
 vi.mock('@/lib/priceHike', () => ({ detectPriceHikes: vi.fn() }));
 vi.mock('@/lib/anthropic', () => ({ anthropicTest: vi.fn() }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(async () => ({})), invalidateAppSettings: vi.fn() }));
-vi.mock('@/lib/auth', () => ({ requireAdmin: vi.fn(async () => ({ id: 'admin1', role: 'admin' as const, name: 'Admin' })) }));
+vi.mock('@/lib/auth', () => ({
+  requireAdmin: vi.fn(async () => ({ id: 'admin1', role: 'admin' as const, name: 'Admin' })),
+  assertCanWrite: vi.fn(async () => {}),
+}));
 vi.mock('@/lib/aiFeatures', () => ({ AI_FEATURE_KEYS: [] }));
 vi.mock('@/lib/aiModels', () => ({ PROVIDER_RECOMMEND: {}, priceForModel: vi.fn(), looksVisionModel: vi.fn() }));
 vi.mock('@/lib/onedrive', () => ({

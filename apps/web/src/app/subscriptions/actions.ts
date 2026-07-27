@@ -11,6 +11,7 @@ import { vendorKey } from '@/app/expenses/lib';
 import { discoverRecurringCandidates, type RecurringCandidate } from '@/lib/recurringDiscovery';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx, convertToBase, normalizeCurrency } from '@/lib/fx';
+import { assertCanWrite } from '@/lib/auth';
 
 export type SuggestResult =
   | { ok: true; data: ParsedSubscription }
@@ -106,6 +107,7 @@ async function resolveSubFx(parsed: { amount: number; currency: string; fxRate: 
 }
 
 export async function createSubscription(formData: FormData) {
+  await assertCanWrite();
   const parsed = SubFormSchema.parse(Object.fromEntries(formData));
   const startDate = new Date(parsed.startDate);
   const money = await resolveSubFx(parsed);
@@ -122,6 +124,7 @@ export async function createSubscription(formData: FormData) {
 }
 
 export async function updateSubscription(id: string, formData: FormData) {
+  await assertCanWrite();
   const parsed = SubFormSchema.parse(Object.fromEntries(formData));
   const startDate = new Date(parsed.startDate);
   const money = await resolveSubFx(parsed);
@@ -137,6 +140,7 @@ export async function updateSubscription(id: string, formData: FormData) {
 }
 
 export async function toggleSubscriptionActive(id: string, active: boolean) {
+  await assertCanWrite();
   await connectDB();
   await Subscription.findByIdAndUpdate(id, {
     active,
@@ -146,6 +150,7 @@ export async function toggleSubscriptionActive(id: string, active: boolean) {
 }
 
 export async function deleteSubscription(id: string) {
+  await assertCanWrite();
   await connectDB();
   // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
   await Subscription.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
@@ -203,3 +208,4 @@ export async function trackDiscoveredSubscription(candidate: {
   });
   revalidatePath('/subscriptions');
 }
+  await assertCanWrite();

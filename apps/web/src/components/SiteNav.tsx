@@ -17,7 +17,9 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationBell } from './NotificationBell';
 import type { TKey } from '@/lib/i18n';
 
-type SessionUser = { name: string; role: 'admin' | 'member' };
+import type { Role } from '@/lib/roles';
+
+type SessionUser = { name: string; role: Role };
 
 type NavLink = { href: string; key: TKey; icon: typeof Package };
 

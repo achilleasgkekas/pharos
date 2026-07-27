@@ -12,7 +12,7 @@ const UserSchema = new Schema(
     username: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, default: '' }, // display name
     passwordHash: { type: String, required: true }, // scrypt string — NEVER sent to the client
-    role: { type: String, enum: ['admin', 'member'], default: 'member' },
+    role: { type: String, enum: ['admin', 'member', 'viewer'], default: 'member' },
     // Personal API token (bearer) for the remote MCP endpoint. Null = no token.
     // NEVER sent to the client except once, right after generation.
     apiToken: { type: String, default: null, index: true },

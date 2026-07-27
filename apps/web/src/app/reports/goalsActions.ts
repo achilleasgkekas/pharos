@@ -4,6 +4,7 @@ import { Goal } from '@/models/Goal';
 import { safeDateOrNull } from '@/lib/dates';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { assertCanWrite } from '@/lib/auth';
 
 // P12 — CRUD + per-contribution add/remove for savings / financial goals.
 // Deterministic, no AI. `current` is derived (Σ contributions), never stored.
@@ -17,6 +18,7 @@ const GoalFormSchema = z.object({
 });
 
 export async function createGoal(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   const parsed = GoalFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid data' };
   const raw = parsed.data;
@@ -28,6 +30,7 @@ export async function createGoal(formData: FormData): Promise<{ ok: boolean; err
 }
 
 export async function updateGoal(id: string, formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   const parsed = GoalFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid data' };
   const raw = parsed.data;
@@ -40,6 +43,7 @@ export async function updateGoal(id: string, formData: FormData): Promise<{ ok: 
 
 /** Manually close a goal (reached / abandoned) without deleting its history. */
 export async function setGoalArchived(id: string, archived: boolean): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Goal.findByIdAndUpdate(id, { archived });
   revalidatePath('/reports');
@@ -48,6 +52,7 @@ export async function setGoalArchived(id: string, archived: boolean): Promise<{ 
 }
 
 export async function deleteGoal(id: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
   await Goal.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
@@ -58,6 +63,7 @@ export async function deleteGoal(id: string): Promise<{ ok: boolean }> {
 
 /** Record a manual contribution toward the goal. */
 export async function addGoalContribution(id: string, amount: number, note = '', dateStr = ''): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   const amt = Number(amount);
   if (!Number.isFinite(amt) || amt <= 0) return { ok: false, error: 'Enter a positive amount' };
   await connectDB();
@@ -71,6 +77,7 @@ export async function addGoalContribution(id: string, amount: number, note = '',
 
 /** Remove a single (mistaken) contribution entry. */
 export async function removeGoalContribution(id: string, contributionId: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Goal.findByIdAndUpdate(id, { $pull: { contributions: { _id: contributionId } } });
   revalidatePath('/reports');

@@ -1,7 +1,7 @@
 'use server';
 import { connectDB } from '@/lib/db';
 import { User } from '@/models/User';
-import { getCurrentUser } from '@/lib/auth';
+import { assertCanWrite, getCurrentUser } from '@/lib/auth';
 import { randomBytes } from 'node:crypto';
 
 export type McpStatus = { hasToken: boolean };
@@ -18,6 +18,7 @@ export async function getMcpStatus(): Promise<McpStatus> {
 /** Generate (or rotate) the signed-in user's MCP bearer token. Returned ONCE — it is
  *  never readable again, so the UI must copy it now. */
 export async function generateApiToken(): Promise<{ ok: boolean; token?: string; error?: string }> {
+  await assertCanWrite();
   const u = await getCurrentUser();
   if (!u) return { ok: false, error: 'Not signed in' };
   await connectDB();
@@ -28,6 +29,7 @@ export async function generateApiToken(): Promise<{ ok: boolean; token?: string;
 
 /** Revoke the signed-in user's MCP token (the connector stops working immediately). */
 export async function revokeApiToken(): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   const u = await getCurrentUser();
   if (!u) return { ok: false };
   await connectDB();

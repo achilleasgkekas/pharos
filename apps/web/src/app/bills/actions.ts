@@ -8,6 +8,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { assertCanWrite } from '@/lib/auth';
 
 // P28 — CRUD + lifecycle (mark paid / unpaid) for bills / payables. Deterministic,
 // no AI. Status (paid/overdue/due-soon) is derived on read, never stored.
@@ -45,6 +46,7 @@ function printedAmount(bill: { amount?: number | null; origAmount?: number | nul
 }
 
 export async function createBill(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   const parsed = BillFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid data' };
   const raw = parsed.data;
@@ -57,6 +59,7 @@ export async function createBill(formData: FormData): Promise<{ ok: boolean; err
 }
 
 export async function updateBill(id: string, formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   const parsed = BillFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message || 'Invalid data' };
   const raw = parsed.data;
@@ -71,6 +74,7 @@ export async function updateBill(id: string, formData: FormData): Promise<{ ok: 
 }
 
 export async function setBillArchived(id: string, archived: boolean): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Bill.findByIdAndUpdate(id, { archived });
   revalidatePath('/bills');
@@ -78,6 +82,7 @@ export async function setBillArchived(id: string, archived: boolean): Promise<{ 
 }
 
 export async function deleteBill(id: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
   await Bill.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
@@ -96,6 +101,7 @@ export async function markBillPaid(
   id: string,
   opts?: { logExpense?: boolean; paidDate?: string }
 ): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   await connectDB();
   const bill = await Bill.findById(id).lean();
   if (!bill) return { ok: false, error: 'Bill not found' };
@@ -152,6 +158,7 @@ export async function markBillPaid(
 
 /** Undo a payment (does not touch any expense that was logged). */
 export async function markBillUnpaid(id: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Bill.findByIdAndUpdate(id, { paidAt: null });
   revalidatePath('/bills');

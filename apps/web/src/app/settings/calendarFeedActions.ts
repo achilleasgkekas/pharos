@@ -1,7 +1,7 @@
 'use server';
 import { connectDB } from '@/lib/db';
 import { User } from '@/models/User';
-import { getCurrentUser } from '@/lib/auth';
+import { assertCanWrite, getCurrentUser } from '@/lib/auth';
 import { randomBytes } from 'node:crypto';
 
 // The calendar feed token is a LOW-SCOPE, read-only secret: it only exposes the
@@ -21,6 +21,7 @@ export async function getCalendarFeed(): Promise<{ token: string | null }> {
 /** Generate (or rotate) the current user's calendar feed token. Rotating invalidates
  *  any previously-subscribed URL. */
 export async function generateCalendarFeed(): Promise<{ ok: boolean; token?: string; error?: string }> {
+  await assertCanWrite();
   const u = await getCurrentUser();
   if (!u) return { ok: false, error: 'Not signed in' };
   await connectDB();
@@ -31,6 +32,7 @@ export async function generateCalendarFeed(): Promise<{ ok: boolean; token?: str
 
 /** Revoke the current user's calendar feed token (subscribed URLs stop working). */
 export async function revokeCalendarFeed(): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   const u = await getCurrentUser();
   if (!u) return { ok: false };
   await connectDB();

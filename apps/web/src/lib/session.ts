@@ -3,7 +3,10 @@
 // node:crypto and Mongoose are unavailable). No next/headers, no DB.
 import { SignJWT, jwtVerify } from 'jose';
 
-export type Role = 'admin' | 'member';
+// One role table for the whole app (lib/roles.ts is pure, so importing it keeps this
+// module edge-safe). Re-exported because middleware and auth already import Role here.
+export type { Role } from './roles';
+import type { Role } from './roles';
 export type SessionClaims = { sub: string; role: Role; name: string; exp?: number };
 
 // Cookie shared by middleware (read/refresh) + auth.ts (set/clear).

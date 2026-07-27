@@ -34,7 +34,7 @@ const { connectDBMock, userFindOne, userState, verifyPasswordMock } = vi.hoisted
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
-vi.mock('@/lib/auth', () => ({ verifyPassword: verifyPasswordMock }));
+vi.mock('@/lib/auth', () => ({ verifyPassword: verifyPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
 
 import { POST } from './route';
 // Real store so we can exercise (and reset) the actual fixed-window rate limiter.

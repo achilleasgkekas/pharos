@@ -6,6 +6,7 @@ import { currentModel } from '@/lib/tenancy/connection';
 import { safeDateOrNull } from '@/lib/dates';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { assertCanWrite } from '@/lib/auth';
 
 // P32 — CRUD + per-use spend/reload for gift cards / store credit. Deterministic,
 // no AI. Balance is derived (initialAmount − Σ uses), never stored.
@@ -23,6 +24,7 @@ const GiftCardFormSchema = z.object({
 });
 
 export async function createGiftCard(formData: FormData) {
+  await assertCanWrite();
   const raw = GiftCardFormSchema.parse(Object.fromEntries(formData));
   return withRequestTenant(async () => {
     await connectDB();
@@ -33,6 +35,7 @@ export async function createGiftCard(formData: FormData) {
 }
 
 export async function updateGiftCard(id: string, formData: FormData) {
+  await assertCanWrite();
   const raw = GiftCardFormSchema.parse(Object.fromEntries(formData));
   return withRequestTenant(async () => {
     await connectDB();
@@ -44,6 +47,7 @@ export async function updateGiftCard(id: string, formData: FormData) {
 
 /** Manually close a card (fully spent / voided) without deleting its history. */
 export async function setGiftCardArchived(id: string, archived: boolean) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
     const GiftCard = await currentModel(GiftCardModel);
@@ -53,6 +57,7 @@ export async function setGiftCardArchived(id: string, archived: boolean) {
 }
 
 export async function deleteGiftCard(id: string) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
     const GiftCard = await currentModel(GiftCardModel);
@@ -64,6 +69,7 @@ export async function deleteGiftCard(id: string) {
 
 /** Record a spend (positive) or reload (negative) against the card's balance. */
 export async function addGiftCardUse(id: string, amount: number, note = '', dateStr = ''): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   const amt = Number(amount);
   if (!Number.isFinite(amt) || amt === 0) return { ok: false, error: 'Enter a non-zero amount' };
   return withRequestTenant(async () => {
@@ -79,6 +85,7 @@ export async function addGiftCardUse(id: string, amount: number, note = '', date
 
 /** Remove a single spend/reload entry from a card. */
 export async function removeGiftCardUse(id: string, useId: string) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
     const GiftCard = await currentModel(GiftCardModel);

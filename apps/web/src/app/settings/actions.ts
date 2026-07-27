@@ -53,7 +53,7 @@ import { resolveCategoryRules } from '@/lib/categoryRules';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import { anthropicTest } from '@/lib/anthropic';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
-import { requireAdmin } from '@/lib/auth';
+import { assertCanWrite, requireAdmin } from '@/lib/auth';
 import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel, type AiProviderId } from '@/lib/aiModels';
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
@@ -276,6 +276,7 @@ export async function setAiFeature(key: string, value: boolean): Promise<{ ok: b
 
 /** Permanently hide the "set up AI" onboarding banner (any signed-in user). */
 export async function dismissAiOnboarding(): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await AppConfig.updateOne({ key: 'singleton' }, { $set: { aiOnboardingDismissed: true } }, { upsert: true });
   invalidateAiConfigCache();
@@ -285,6 +286,7 @@ export async function dismissAiOnboarding(): Promise<{ ok: boolean }> {
 
 /** Permanently hide the homepage "getting started" checklist (P26, any signed-in user). */
 export async function dismissOnboarding(): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await AppConfig.updateOne({ key: 'singleton' }, { $set: { onboardingDismissed: true } }, { upsert: true });
   invalidateAppSettings();
@@ -295,6 +297,7 @@ export async function dismissOnboarding(): Promise<{ ok: boolean }> {
 // ─── Defaults & alerts + Notifications ───────────────────────────────────────
 
 export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   const view = String(formData.get('defaultItemView') || 'grid') === 'list' ? 'list' : 'grid';
   const warrantyMonths = Math.max(0, Math.min(120, Number(formData.get('defaultWarrantyMonths')) || 24));
@@ -634,6 +637,7 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
 
 /** Toggle the bulk-AI cost guard (confirm before a paid bulk job). */
 export async function setAiConfirmBulk(value: boolean): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await AppConfig.updateOne({ key: 'singleton' }, { $set: { aiConfirmBulk: value } }, { upsert: true });
   revalidatePath('/settings');
@@ -1010,6 +1014,7 @@ export async function getListsForEditor(): Promise<ListEditorEntry[]> {
 
 /** Save one taxonomy list. Empty / identical-to-default → clears the override. */
 export async function saveList(key: string, values: string[]): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   const meta = TAXONOMY_META.find((m) => m.key === key);
   if (!meta) return { ok: false };
   await connectDB();
@@ -1029,6 +1034,7 @@ export async function saveList(key: string, values: string[]): Promise<{ ok: boo
 /** Save the per-property / per-context ledger tags (P34). Empty list clears them
  *  (the feature goes dormant). Deterministic, no AI. */
 export async function saveSpaces(values: string[]): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   const cleaned = normalizeSpaces(Array.isArray(values) ? values : []);
   if (cleaned.length === 0) {
@@ -1049,6 +1055,7 @@ export async function listStores(): Promise<StoreLite[]> {
 
 /** Create or update a store. id empty = create. */
 export async function saveStore(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   const id = String(formData.get('id') || '');
   const name = String(formData.get('name') || '').trim();
   const url = String(formData.get('url') || '').trim();
@@ -1080,6 +1087,7 @@ export async function saveStore(formData: FormData): Promise<{ ok: boolean; erro
 }
 
 export async function deleteStore(id: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Store.findByIdAndDelete(id);
   invalidateStoreCache();
@@ -1190,6 +1198,7 @@ export async function mergeStores(
   canonical: string,
   variants: string[]
 ): Promise<{ ok: boolean; updated: number; error?: string }> {
+  await assertCanWrite();
   const canon = (canonical || '').trim();
   if (!canon) return { ok: false, updated: 0, error: 'No canonical name' };
   const drops = variants.filter((v) => v && v !== canon);
@@ -1479,6 +1488,7 @@ export async function exportTaxBundle(year: number): Promise<{ base64: string; i
 
 /** Save monthly budgets (expense category → € amount). Empty/0 values are dropped. */
 export async function saveBudgets(budgets: Record<string, number>): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   const clean: Record<string, number> = {};
   for (const [k, v] of Object.entries(budgets || {})) {
@@ -1495,6 +1505,7 @@ export async function saveBudgets(budgets: Record<string, number>): Promise<{ ok
 /** Toggle envelope / rollover budgeting (P25). When on, Reports carries the net
  *  unspent balance from recent complete months into this month's budget. */
 export async function saveBudgetRollover(enabled: boolean): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await AppConfig.updateOne({ key: 'singleton' }, { $set: { budgetRollover: !!enabled } }, { upsert: true });
   invalidateAppSettings();
@@ -1506,6 +1517,7 @@ export async function saveBudgetRollover(enabled: boolean): Promise<{ ok: boolea
 /** Save the vendor→category auto-rules (P15). Cleaned/validated via resolveCategoryRules
  *  (drops entries missing a match or category). Applied on create by the expense actions. */
 export async function saveCategoryRules(rules: unknown): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   const clean = resolveCategoryRules(rules);
   await AppConfig.updateOne({ key: 'singleton' }, { $set: { categoryRules: clean } }, { upsert: true });
@@ -1531,6 +1543,7 @@ export async function suggestBudgets(): Promise<{ suggestions: Record<string, nu
 /** Save manual asset accounts for net worth (account name → balance). Zero/empty
  *  balances are dropped — an account with no balance contributes nothing (PA2). */
 export async function saveAssetAccounts(accounts: Record<string, number>): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   const clean: Record<string, number> = {};
   for (const [k, v] of Object.entries(accounts || {})) {
@@ -1555,6 +1568,7 @@ export async function saveDepreciation(cfg: {
   defaultRate: number;
   rates: Record<string, number>;
 }): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   const clampPct = (n: unknown) => Math.min(100, Math.max(0, Number(n) || 0));
   const rates: Record<string, number> = {};
@@ -1692,6 +1706,7 @@ export async function getTrash(): Promise<TrashRow[]> {
 
 /** Bring a trashed record back exactly as it was (files + links were never touched). */
 export async function restoreFromTrash(type: TrashType, id: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   const Model = TRASH_MODELS[type];
   if (!Model) return { ok: false };
   await connectDB();
@@ -1710,6 +1725,7 @@ export async function purgeFromTrash(type: TrashType, id: string): Promise<{ ok:
 /** Core purge logic WITHOUT an auth guard. Callers (server action or bearer API
  *  route) must authorize first; the API route enforces admin via the bearer user. */
 export async function purgeTrashEntry(type: TrashType, id: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   const Model = TRASH_MODELS[type];
   if (!Model) return { ok: false };
   await connectDB();
@@ -1767,6 +1783,7 @@ export async function startOnedriveAuth(clientId: string): Promise<DeviceCode> {
 
 /** Step 2: poll until the user finishes signing in (returns 'pending' meanwhile). */
 export async function pollOnedriveAuth(clientId: string, deviceCode: string): Promise<{ status: 'ok' | 'pending' | 'error'; error?: string; account?: string }> {
+  await assertCanWrite();
   const r = await pollDeviceToken(clientId.trim(), deviceCode);
   if (r.status === 'ok') {
     invalidateStorageConfig();

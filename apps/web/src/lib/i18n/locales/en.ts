@@ -1059,6 +1059,8 @@ export const en = {
   'set.usernamePlaceholder': 'username *',
   'set.displayNamePlaceholder': 'display name',
   'set.passwordPlaceholder': 'password (min 8) *',
+  'set.viewer': 'Viewer',
+  'set.viewerDesc': 'Can see everything, cannot change anything',
   'set.member': 'member',
   'set.admin': 'admin',
   'set.createUser': 'Create user',

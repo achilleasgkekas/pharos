@@ -43,7 +43,7 @@ const {
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Account', () => ({ Account: { findById: accountFindById } }));
-vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, verifyPassword: verifyPasswordMock }));
+vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, verifyPassword: verifyPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
 vi.mock('@/lib/tenancy/accountProfile', () => ({ passwordChangeError: passwordChangeErrorMock }));
 vi.mock('@/lib/tenancy/accountSession', () => ({ getCurrentAccount: getCurrentAccountMock }));
 vi.mock('@/lib/tenancy/saasApi', async () => {

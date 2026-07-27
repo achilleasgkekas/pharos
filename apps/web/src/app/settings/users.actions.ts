@@ -1,10 +1,11 @@
 'use server';
 import { revalidatePath } from 'next/cache';
+import { parseRole, type Role } from '@/lib/roles';
 import { connectDB } from '@/lib/db';
 import { User } from '@/models/User';
 import { hashPassword, verifyPassword, requireAdmin, requireUser } from '@/lib/auth';
 
-export type UserRow = { id: string; username: string; name: string; role: 'admin' | 'member' };
+export type UserRow = { id: string; username: string; name: string; role: Role };
 
 export async function listUsers(): Promise<UserRow[]> {
   await requireAdmin();
@@ -47,13 +48,20 @@ export async function deleteUser(id: string): Promise<{ ok: boolean; error?: str
   return { ok: true };
 }
 
-export async function setUserRole(id: string, role: 'admin' | 'member'): Promise<{ ok: boolean; error?: string }> {
+export async function setUserRole(id: string, role: Role): Promise<{ ok: boolean; error?: string }> {
   await requireAdmin();
-  const next = role === 'admin' ? 'admin' : 'member';
+  // Parse rather than coerce: the old `role === 'admin' ? 'admin' : 'member'` silently
+  // turned any unknown value into a writer, which with a third role would quietly promote
+  // a viewer. An unrecognised role is rejected instead.
+  const next = parseRole(role);
+  if (!next) return { ok: false, error: 'Unknown role.' };
   await connectDB();
   const target = await User.findById(id).lean();
   if (!target) return { ok: false, error: 'User not found.' };
-  if (target.role === 'admin' && next === 'member' && (await User.countDocuments({ role: 'admin' })) <= 1) {
+  // Any move OFF admin counts as a demotion, not just admin→member. With a third role in
+  // play, checking only for 'member' would let the last admin become a viewer and lock
+  // every writer out of the instance.
+  if (target.role === 'admin' && next !== 'admin' && (await User.countDocuments({ role: 'admin' })) <= 1) {
     return { ok: false, error: 'Cannot demote the last admin.' };
   }
   await User.updateOne({ _id: id }, { $set: { role: next } });

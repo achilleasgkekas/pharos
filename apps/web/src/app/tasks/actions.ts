@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Task } from '@/models/Task';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { assertCanWrite } from '@/lib/auth';
 
 const CreateTaskSchema = z.object({
   title: z.string().min(1),
@@ -21,6 +22,7 @@ function parseTags(raw: string): string[] {
 }
 
 export async function createTask(formData: FormData): Promise<string> {
+  await assertCanWrite();
   const raw = Object.fromEntries(formData);
   const parsed = CreateTaskSchema.parse(raw);
   await connectDB();
@@ -38,6 +40,7 @@ export async function createTask(formData: FormData): Promise<string> {
 }
 
 export async function updateTaskStatus(id: string, status: string) {
+  await assertCanWrite();
   await connectDB();
   const update: Record<string, unknown> = { status };
   if (status === 'done') update.completedAt = new Date();
@@ -47,6 +50,7 @@ export async function updateTaskStatus(id: string, status: string) {
 }
 
 export async function deleteTask(id: string) {
+  await assertCanWrite();
   await connectDB();
   // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
   await Task.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
@@ -63,6 +67,7 @@ const UpdateTaskSchema = z.object({
 });
 
 export async function updateTaskDetails(id: string, formData: FormData) {
+  await assertCanWrite();
   const parsed = UpdateTaskSchema.parse(Object.fromEntries(formData));
   await connectDB();
   const update: Record<string, unknown> = {
@@ -79,6 +84,7 @@ export async function updateTaskDetails(id: string, formData: FormData) {
 }
 
 export async function addStep(taskId: string, text: string) {
+  await assertCanWrite();
   if (!text.trim()) return;
   await connectDB();
   await Task.findByIdAndUpdate(taskId, { $push: { steps: { text: text.trim(), done: false } } });
@@ -86,12 +92,14 @@ export async function addStep(taskId: string, text: string) {
 }
 
 export async function toggleStep(taskId: string, stepId: string, done: boolean) {
+  await assertCanWrite();
   await connectDB();
   await Task.updateOne({ _id: taskId, 'steps._id': stepId }, { $set: { 'steps.$.done': done } });
   revalidatePath('/tasks');
 }
 
 export async function deleteStep(taskId: string, stepId: string) {
+  await assertCanWrite();
   await connectDB();
   await Task.findByIdAndUpdate(taskId, { $pull: { steps: { _id: stepId } } });
   revalidatePath('/tasks');

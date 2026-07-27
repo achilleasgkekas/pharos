@@ -2,6 +2,7 @@
 import { connectDB } from '@/lib/db';
 import { Conversation } from '@/models/Conversation';
 import { revalidatePath } from 'next/cache';
+import { assertCanWrite } from '@/lib/auth';
 
 export type ConversationMsg = { role: 'user' | 'assistant'; content: string; actions?: { name: string; summary: string }[] };
 export type ConversationRow = {
@@ -36,6 +37,7 @@ export async function getConversations(): Promise<ConversationRow[]> {
 }
 
 export async function deleteConversation(id: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Conversation.deleteOne({ _id: id });
   revalidatePath('/history');
@@ -43,6 +45,7 @@ export async function deleteConversation(id: string): Promise<{ ok: boolean }> {
 }
 
 export async function clearConversations(): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Conversation.deleteMany({});
   revalidatePath('/history');

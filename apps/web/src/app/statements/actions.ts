@@ -19,6 +19,7 @@ import type { SerializedTransaction, SerializedStatement } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { Types } from 'mongoose';
 import { z } from 'zod';
+import { assertCanWrite } from '@/lib/auth';
 
 /** Stable installment signature for a freshly-parsed or stored transaction. */
 function sigOf(
@@ -51,6 +52,7 @@ export async function setTransactionInstallment(
   current: number,
   total: number
 ): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   await connectDB();
   const stmt = await Statement.findById(statementId);
   if (!stmt) return { ok: false, error: 'Statement not found' };
@@ -87,6 +89,7 @@ export async function bindInstallmentGroup(
   sourceKey: string,
   targetKey: string
 ): Promise<{ ok: boolean; moved?: number; error?: string }> {
+  await assertCanWrite();
   if (!sourceKey || !targetKey || sourceKey === targetKey) {
     return { ok: false, error: 'Pick two different plans' };
   }
@@ -119,6 +122,7 @@ export async function bindInstallmentGroup(
 export async function unbindInstallmentGroup(
   boundKey: string
 ): Promise<{ ok: boolean; moved?: number }> {
+  await assertCanWrite();
   await connectDB();
   const statements = await Statement.find();
   let moved = 0;
@@ -209,6 +213,7 @@ const TransactionSchema = z.object({
 });
 
 export async function createStatement(formData: FormData) {
+  await assertCanWrite();
   const raw = StatementFormSchema.parse(Object.fromEntries(formData));
   const money = await resolveStmtFx(raw);
   await connectDB();
@@ -229,6 +234,7 @@ export async function createStatement(formData: FormData) {
 }
 
 export async function updateStatement(id: string, formData: FormData) {
+  await assertCanWrite();
   const raw = StatementFormSchema.parse(Object.fromEntries(formData));
   await connectDB();
   // P9: the form submits PRINTED figures, but the transactions are not part of it — they
@@ -263,6 +269,7 @@ export async function updateStatement(id: string, formData: FormData) {
 }
 
 export async function deleteStatement(id: string) {
+  await assertCanWrite();
   await connectDB();
   const stmt = await Statement.findById(id);
   if (stmt?.filePath) {
@@ -277,6 +284,7 @@ export async function deleteStatement(id: string) {
 }
 
 export async function addTransaction(statementId: string, formData: FormData) {
+  await assertCanWrite();
   const raw = TransactionSchema.parse(Object.fromEntries(formData));
   const installmentInfo =
     raw.currentInstallment && raw.totalInstallments
@@ -307,6 +315,7 @@ export async function addTransaction(statementId: string, formData: FormData) {
 }
 
 export async function deleteTransaction(statementId: string, transactionId: string) {
+  await assertCanWrite();
   await connectDB();
   await Statement.findByIdAndUpdate(statementId, {
     $pull: { transactions: { _id: transactionId } },
@@ -316,6 +325,7 @@ export async function deleteTransaction(statementId: string, transactionId: stri
 
 /** AI auto-categorize all transactions of a statement (groceries, electronics, ...). */
 export async function categorizeStatement(statementId: string): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   if (!(await isFeatureEnabled('statementCategorize'))) return { ok: false, error: 'Auto-categorize (AI) is turned off.' };
   await connectDB();
   const stmt = await Statement.findById(statementId);
@@ -516,6 +526,7 @@ export async function linkTransactionReceipt(
   transactionId: string,
   receiptId: string
 ): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   if (!Types.ObjectId.isValid(receiptId)) return { ok: false, error: 'Invalid receipt id' };
   await connectDB();
   const stmt = await Statement.findById(statementId);
@@ -532,6 +543,7 @@ export async function unlinkTransactionReceipt(
   statementId: string,
   transactionId: string
 ): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   await connectDB();
   const stmt = await Statement.findById(statementId);
   const tx = stmt?.transactions.id(transactionId);
@@ -601,6 +613,7 @@ async function clearLinkBySignature(sig: string): Promise<void> {
 }
 
 export async function attachStatementPdf(statementId: string, formData: FormData) {
+  await assertCanWrite();
   const file = formData.get('file');
   if (!file || !(file instanceof File) || file.size === 0) {
     return { ok: false, error: 'No file found' };
@@ -635,6 +648,7 @@ export type ImportResult =
  * into structured transactions (incl. δόσεις), and upsert by card+period.
  */
 export async function importStatementPdf(formData: FormData): Promise<ImportResult> {
+  await assertCanWrite();
   const file = formData.get('file');
   if (!file || !(file instanceof File) || file.size === 0) {
     return { ok: false, error: 'No file found' };
@@ -843,6 +857,7 @@ export type StatementRescanResult = {
  * so a re-scan never moves the statement to another month.
  */
 export async function rescanStatement(id: string, useOcr: boolean): Promise<StatementRescanResult> {
+  await assertCanWrite();
   await connectDB();
   const stmt = await Statement.findById(id);
   if (!stmt?.filePath) return { ok: false, aiUsed: false, error: 'Statement or file not found' };

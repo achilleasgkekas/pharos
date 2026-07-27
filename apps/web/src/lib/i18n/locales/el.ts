@@ -1003,6 +1003,8 @@ export const el: Partial<Dict> = {
   'set.usernamePlaceholder': 'όνομα χρήστη *',
   'set.displayNamePlaceholder': 'εμφανιζόμενο όνομα',
   'set.passwordPlaceholder': 'κωδικός (ελάχ. 8) *',
+  'set.viewer': 'Θεατής',
+  'set.viewerDesc': 'Βλέπει τα πάντα, δεν αλλάζει τίποτα',
   'set.member': 'μέλος',
   'set.admin': 'admin',
   'set.createUser': 'Δημιουργία χρήστη',

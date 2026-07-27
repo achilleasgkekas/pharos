@@ -5,6 +5,7 @@ import { parseCardImage, type ParsedCard } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { assertCanWrite } from '@/lib/auth';
 
 export type ScanCardResult = { ok: true; data: ParsedCard } | { ok: false; error: string };
 
@@ -40,12 +41,14 @@ const CardFormSchema = z.object({
 });
 
 export async function toggleCardActive(id: string, active: boolean) {
+  await assertCanWrite();
   await connectDB();
   await Card.findByIdAndUpdate(id, { active });
   revalidatePath('/statements');
 }
 
 export async function createCard(formData: FormData) {
+  await assertCanWrite();
   const parsed = CardFormSchema.parse(Object.fromEntries(formData));
   await connectDB();
   await Card.create({ ...parsed, active: true });
@@ -53,6 +56,7 @@ export async function createCard(formData: FormData) {
 }
 
 export async function updateCard(id: string, formData: FormData) {
+  await assertCanWrite();
   const parsed = CardFormSchema.parse(Object.fromEntries(formData));
   await connectDB();
   await Card.findByIdAndUpdate(id, parsed);
@@ -60,6 +64,7 @@ export async function updateCard(id: string, formData: FormData) {
 }
 
 export async function deleteCard(id: string) {
+  await assertCanWrite();
   await connectDB();
   await Card.findByIdAndDelete(id);
   revalidatePath('/statements');

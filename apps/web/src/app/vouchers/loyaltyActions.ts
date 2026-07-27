@@ -6,6 +6,7 @@ import { currentModel } from '@/lib/tenancy/connection';
 import { resolveBarcodeFormat } from '@/lib/loyaltyCard';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { assertCanWrite } from '@/lib/auth';
 
 // P20 — CRUD for the loyalty/membership card wallet. No balance to track (unlike
 // GiftCard/P32) — just an identity card the checkout scanner reads.
@@ -22,6 +23,7 @@ const LoyaltyCardFormSchema = z.object({
 });
 
 export async function createLoyaltyCard(formData: FormData) {
+  await assertCanWrite();
   const raw = LoyaltyCardFormSchema.parse(Object.fromEntries(formData));
   return withRequestTenant(async () => {
     await connectDB();
@@ -32,6 +34,7 @@ export async function createLoyaltyCard(formData: FormData) {
 }
 
 export async function updateLoyaltyCard(id: string, formData: FormData) {
+  await assertCanWrite();
   const raw = LoyaltyCardFormSchema.parse(Object.fromEntries(formData));
   return withRequestTenant(async () => {
     await connectDB();
@@ -43,6 +46,7 @@ export async function updateLoyaltyCard(id: string, formData: FormData) {
 
 /** Manually hide a card (e.g. account closed) without deleting its history. */
 export async function setLoyaltyCardArchived(id: string, archived: boolean) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
     const LoyaltyCard = await currentModel(LoyaltyCardModel);
@@ -52,6 +56,7 @@ export async function setLoyaltyCardArchived(id: string, archived: boolean) {
 }
 
 export async function deleteLoyaltyCard(id: string) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
     const LoyaltyCard = await currentModel(LoyaltyCardModel);

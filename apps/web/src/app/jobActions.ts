@@ -6,6 +6,7 @@ import { getAiConfig } from '@/lib/aiConfig';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { AppConfig } from '@/models/AppConfig';
 import { getSyncManifest } from './settings/actions';
+import { assertCanWrite } from '@/lib/auth';
 
 /** Cost-guard info for a bulk AI run: whether to confirm + the active provider/model
  *  (so the client can show a rough cost estimate before starting a paid job). */
@@ -43,6 +44,7 @@ export async function enqueueRescanReceipts(
   labels: string[],
   useOcr = true
 ): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   if (!itemIds.length) return { ok: false };
   if (!(await isFeatureEnabled('receipts'))) return { ok: false };
   await connectDB();
@@ -66,6 +68,7 @@ export async function enqueueAiFillItems(
   href: string,
   title: string
 ): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   if (!itemIds.length) return { ok: false };
   if (!(await isFeatureEnabled('itemsImport'))) return { ok: false };
   await connectDB();
@@ -85,6 +88,7 @@ export async function enqueueAiFillItems(
 /** Queue a OneDrive sync as a background job — one file per work item, with live
  *  progress. Runs through the same worker as the AI jobs (lib/jobRunner). */
 export async function enqueueOnedriveSync(): Promise<{ ok: boolean; error?: string; count?: number }> {
+  await assertCanWrite();
   await connectDB();
   if (await Job.countDocuments({ kind: 'sync-onedrive', status: 'running' })) {
     return { ok: false, error: 'A sync is already running.' };
@@ -194,6 +198,7 @@ export async function getActiveJobs(): Promise<SerializedJob[]> {
 /** Stop (if running) or dismiss (if finished) a job. The worker loop re-checks the
  *  job's status before each item, so deleting a running job halts it within one item. */
 export async function dismissJob(id: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   await connectDB();
   await Job.deleteOne({ _id: id });
   return { ok: true };

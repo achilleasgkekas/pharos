@@ -12,6 +12,7 @@ import {
   type Role,
   type SessionClaims,
 } from './session';
+import { canWrite, READ_ONLY_MESSAGE } from './roles';
 
 export type SessionUser = { id: string; role: Role; name: string };
 
@@ -59,6 +60,34 @@ export async function requireUser(): Promise<SessionUser> {
   const u = await getCurrentUser();
   if (!u) redirect('/login');
   return u;
+}
+
+/**
+ * P31 write guard for server actions. Throws for a read-only (viewer) session, otherwise
+ * returns silently.
+ *
+ * Two deliberate pass-throughs, both about NOT breaking paths that were never a user
+ * pressing a button:
+ *
+ *  - **Outside a request** (`cookies()` throws in the background job runner and in cron
+ *    work), there is no session to judge, and the work was authorised when it was
+ *    enqueued. Same reason `safeRevalidate` exists.
+ *  - **No session at all** is already handled upstream by the middleware, which sends the
+ *    request to /login. Redirecting again from deep inside an action would only turn a
+ *    clean 302 into a confusing thrown digest.
+ *
+ * So the one thing this adds is: a logged-in viewer cannot write. Everything else behaves
+ * exactly as before.
+ */
+export async function assertCanWrite(): Promise<void> {
+  let user: SessionUser | null;
+  try {
+    user = await getCurrentUser();
+  } catch {
+    return; // background job / cron: no request scope, nothing to authorise against
+  }
+  if (!user) return;
+  if (!canWrite(user.role)) throw new Error(READ_ONLY_MESSAGE);
 }
 
 /** Admin-only guard. Redirects to /login when logged out, throws when a non-admin calls. */

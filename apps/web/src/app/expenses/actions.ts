@@ -21,6 +21,7 @@ import type { SerializedExpense } from '@/types';
 import type { ParsedExpense } from '@/lib/ollama';
 import { vendorKey, serializeExpense } from './lib';
 import { csvDedupeKey } from '@/lib/csvImport';
+import { assertCanWrite } from '@/lib/auth';
 
 type Kind = 'income' | 'expense';
 function asKind(v: unknown): Kind {
@@ -133,6 +134,7 @@ function addCycle(d: Date, cycle: string): Date {
  * latest, so it never duplicates. Called (awaited) on the expenses/income page load.
  */
 export async function generateDueRecurring(): Promise<{ created: number }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Expense = await currentModel(ExpenseModel);
@@ -200,6 +202,7 @@ export type UploadExpenseResult = { ok: true; id: string; aiUsed: boolean; aiErr
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 
 export async function uploadExpense(formData: FormData): Promise<UploadExpenseResult> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   const file = formData.get('file');
   const kind = asKind(formData.get('kind'));
@@ -313,6 +316,7 @@ const UpdateSchema = z.object({
 });
 
 export async function updateExpense(id: string, data: z.input<typeof UpdateSchema>): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
   const p = UpdateSchema.safeParse(data);
   if (!p.success) return { ok: false, error: 'Invalid data' };
   const d = p.data;
@@ -359,6 +363,7 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
 
 /** Manual entry (no file) — e.g. type in a salary or a cash expense. */
 export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ ok: boolean; id?: string; error?: string }> {
+  await assertCanWrite();
   const p = UpdateSchema.safeParse(data);
   if (!p.success) return { ok: false, error: 'Invalid data' };
   const d = p.data;
@@ -410,6 +415,7 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
  * confirmation — deterministic, zero AI. Returns how many entries were settled.
  */
 export async function settlePerson(name: string): Promise<{ ok: boolean; settled: number; error?: string }> {
+  await assertCanWrite();
   const target = (name || '').trim().toLowerCase();
   if (!target) return { ok: false, settled: 0, error: 'No name' };
   return withRequestTenant(async () => {
@@ -445,6 +451,7 @@ export async function settlePerson(name: string): Promise<{ ok: boolean; settled
 }
 
 export async function deleteExpense(id: string): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   try {
     await connectDB();
@@ -497,6 +504,7 @@ export async function importExpensesCsv(
   rows: Array<z.input<typeof CsvRowSchema>>,
   opts: { kind: Kind; signSplit: boolean; fxRates?: Record<string, number> }
 ): Promise<CsvImportResult> {
+  await assertCanWrite();
   if (!Array.isArray(rows) || rows.length === 0) return { ok: false, error: 'No rows to import' };
   if (rows.length > MAX_CSV_ROWS_PER_CALL) return { ok: false, error: `Too many rows (max ${MAX_CSV_ROWS_PER_CALL} per batch)` };
   const parsed = z.array(CsvRowSchema).safeParse(rows);
@@ -602,6 +610,7 @@ export async function importExpensesCsv(
 
 /** Re-run the AI on the stored file (text or forced OCR). Returns the updated record. */
 export async function rescanExpense(id: string, useOcr: boolean): Promise<{ ok: boolean; expense?: SerializedExpense; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   try {
     await connectDB();
@@ -655,6 +664,7 @@ export async function rescanExpense(id: string, useOcr: boolean): Promise<{ ok: 
  * zero AI. Returns how many records were recategorised.
  */
 export async function applyCategoryRulesToExisting(): Promise<{ ok: boolean; updated: number; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     try {
       await connectDB();

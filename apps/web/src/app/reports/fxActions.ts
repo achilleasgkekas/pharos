@@ -18,6 +18,7 @@ import { fxApplyPatch, isValidFxRate, FX_APPLY_SELECT } from '@/lib/fxApply';
 import { normalizeCurrency } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
 import type { Model } from 'mongoose';
+import { assertCanWrite } from '@/lib/auth';
 
 export type FxApplyResult = { ok: true; applied: number } | { ok: false; error: string };
 
@@ -60,6 +61,7 @@ function revalidateMoneyRoutes() {
 
 /** Set the rate on ONE record found by the audit, converting all of its money fields. */
 export async function applyFxRate(kind: string, id: string, rate: number): Promise<FxApplyResult> {
+  await assertCanWrite();
   if (!isKind(kind)) return { ok: false, error: 'Unknown record type' };
   if (!/^[a-f0-9]{24}$/i.test(String(id || ''))) return { ok: false, error: 'Invalid id' };
   if (!isValidFxRate(rate)) return { ok: false, error: 'Enter a positive exchange rate' };
@@ -92,6 +94,7 @@ export async function applyFxRate(kind: string, id: string, rate: number): Promi
  * which is precisely when fixing them one form at a time is unbearable.
  */
 export async function applyFxRateToCurrency(currency: string, rate: number): Promise<FxApplyResult> {
+  await assertCanWrite();
   const code = normalizeCurrency(currency);
   if (!code) return { ok: false, error: 'Invalid currency code' };
   if (!isValidFxRate(rate)) return { ok: false, error: 'Enter a positive exchange rate' };

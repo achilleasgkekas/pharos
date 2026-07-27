@@ -57,7 +57,7 @@ vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Account', () => ({
   Account: { exists: accountExistsMock, create: accountCreateMock },
 }));
-vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock }));
+vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
 vi.mock('@/lib/tenancy/provision', () => ({ provisionTenant: provisionTenantMock }));
 vi.mock('@/lib/tenancy/saasApi', async () => {
   // saasGuard is pure (try/catch + NextResponse.json, no DB/env reads) — run it for real so

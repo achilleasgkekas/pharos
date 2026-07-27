@@ -23,6 +23,7 @@ import { z } from 'zod';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { SerializedReceipt } from '@/types';
+import { assertCanWrite } from '@/lib/auth';
 
 const LineItemSchema = z.object({
   name: z.string(),
@@ -145,6 +146,7 @@ async function runReceiptParse(bytes: Buffer, ext: string, isPdf: boolean, mode:
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 
 export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   const file = formData.get('file');
   if (!file || !(file instanceof File) || file.size === 0) {
@@ -267,6 +269,7 @@ export async function updateReceipt(
   id: string,
   data: z.input<typeof UpdateReceiptSchema>
 ) {
+  await assertCanWrite();
   const parsed = UpdateReceiptSchema.parse(data);
   return withRequestTenant(async () => {
   await connectDB();
@@ -292,6 +295,7 @@ export async function quickVerifyReceipt(
   id: string,
   fields: { store: string; date: string; total: number; subtotal?: number; vatAmount?: number }
 ): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
@@ -346,6 +350,7 @@ export type RescanResult = {
  * user re-checks the fresh result. Used from the receipt detail + bulk re-scan.
  */
 export async function rescanReceipt(id: string, useOcr: boolean): Promise<RescanResult> {
+  await assertCanWrite();
   return withRequestTenant(() => rescanReceiptOne(id, useOcr));
 }
 
@@ -428,6 +433,7 @@ export async function rescanReceiptsBulk(
   ids: string[],
   useOcr = true
 ): Promise<{ ok: boolean; recovered: number; processed: number }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
@@ -456,6 +462,7 @@ export async function rescanReceiptsBulk(
 export async function addReceiptItemsToLibrary(
   receiptId: string
 ): Promise<{ ok: boolean; created: number; linked: number; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
@@ -553,6 +560,7 @@ export async function backfillReceiptThumbs(limit = 12): Promise<number> {
 }
 
 export async function deleteReceipt(id: string) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
@@ -568,6 +576,7 @@ export async function deleteReceipt(id: string) {
 /** Mark a receipt as "not a real receipt" (or restore it). Archived ones are
  *  hidden from the list and never counted as failed / re-scan candidates. */
 export async function archiveReceipt(id: string, value: boolean): Promise<{ ok: boolean }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
@@ -671,6 +680,7 @@ export async function mergeReceipts(
   keepId: string,
   dropIds: string[]
 ): Promise<{ ok: boolean; merged: number; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);
@@ -758,6 +768,7 @@ export async function getEmailInboxCount(): Promise<number> {
 
 /** Ingest every staged email attachment as a draft receipt, then move it to done/. */
 export async function importEmailInbox(): Promise<{ ok: boolean; imported: number; skipped: number; error?: string }> {
+  await assertCanWrite();
   return withRequestTenant(async () => {
   await connectDB();
   const Receipt = await currentModel(ReceiptModel);

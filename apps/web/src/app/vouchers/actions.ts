@@ -8,6 +8,7 @@ import { parseVoucherText, parseVoucherImage, type ParsedVoucher } from '@/lib/o
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { assertCanWrite } from '@/lib/auth';
 
 export type ScanVoucherResult = { ok: true; data: ParsedVoucher } | { ok: false; error: string };
 
@@ -53,6 +54,7 @@ const VoucherFormSchema = z.object({
 });
 
 export async function createVoucher(formData: FormData) {
+  await assertCanWrite();
   const raw = VoucherFormSchema.parse(Object.fromEntries(formData));
   return withRequestTenant(async () => {
     await connectDB();
@@ -63,6 +65,7 @@ export async function createVoucher(formData: FormData) {
 }
 
 export async function updateVoucher(id: string, formData: FormData) {
+  await assertCanWrite();
   const raw = VoucherFormSchema.parse(Object.fromEntries(formData));
   return withRequestTenant(async () => {
     await connectDB();
@@ -73,6 +76,7 @@ export async function updateVoucher(id: string, formData: FormData) {
 }
 
 export async function toggleVoucherUsed(id: string, used: boolean) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
     const Voucher = await currentModel(VoucherModel);
@@ -82,6 +86,7 @@ export async function toggleVoucherUsed(id: string, used: boolean) {
 }
 
 export async function deleteVoucher(id: string) {
+  await assertCanWrite();
   return withRequestTenant(async () => {
     await connectDB();
     const Voucher = await currentModel(VoucherModel);
