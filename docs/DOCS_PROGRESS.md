@@ -2836,3 +2836,28 @@ Collision guard: git status --short πριν commit = ΜΟΝΟ 2 modified docs f
 
 Επόμενο run: (α) grep git log για άλλα νέα undocumented feat() commits (P51+ candidates ή νέα modules), ή (β) API drift check αν endpoints αλλάξανε στο schema.
 
+## 2026-07-27 (twenty-seventh run — P5 phase 2 + P31 viewer role documentation)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-sixth run (commit 1961571, 2026-07-27). Ανακάλυψη: **2 νέα feat() commits που χρειάζονται documentation**:
+- **P5 phase 2** (commit 0264ccf, 2026-07-27) — MV3 Chrome extension με toolbar button, context menus, zero dependencies
+- **P31** (commit 1346b4d, 2026-07-27) — viewer role που είναι enforced σε API + server actions
+
+Τι έγιναν:
+- **features.md**: Αντικαταστάθηκε "Phase 2 (MV3 Chrome extension) is planned" με πλήρη τεχνική περιγραφή της MV3 extension (lines 131-143). Νέο subsection "### Phase 2: MV3 Chrome extension (P5 phase 2)" που εξηγάει: zero external dependencies, 3 triggers (toolbar + page context menu + link context menu), same-origin /capture page, no content_scripts/host_permissions (cannot read page content).
+- **security.md**: Ενημερώθηκε η περιγραφή ρόλων (line 45) από "admin / member roles" σε "admin (full read-write), member (read-write), viewer (read-only)". Προστέθηκε enforcement detail (lines 54-58) ότι όλες οι mutating actions καλούν assertCanWrite() και deny viewers (403), και ότι το REST API enforce-άρει την ίδια restriction.
+- **api.md**: Ενημερώθηκε η role definition (lines 56-58) με bullet-point list των 3 roles: admin (full read-write, manage users), member (full read-write), viewer (read-only, POST/PATCH/DELETE rejected 403).
+
+Accuracy (διάβασα κώδικα): (α) commit 0264ccf: MV3 extension ships in apps/extension/, 3 triggers (toolbar, page context, link context), no content_scripts + no host_permissions, stores instance address in chrome.storage.sync. (β) commit 1346b4d: assertCanWrite() check σε mutating actions, viewer tokens return 403 σε POST/PATCH/DELETE routes μέσω withAuth wrapper.
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: features.md 0 (αθικτο), api.md 22 (ζυγό), security.md 0 (αθικτο) ✓.
+- Internal links: όλες valid (no new headings created, no link breaks) ✓.
+- Secret scan: κανένα credential ✓.
+- Markdown structure: όλα clean ✓.
+
+Collision guard: `git status --short` πριν commit = 0 (κανένα staged foreign), `git diff --cached --name-only` = ΜΟΝΟ docs/api.md, docs/features.md, docs/security.md. Pathspec commit 45c6c74 (docs: P5 phase 2 + P31 viewer role). Push: origin/main successful ✓.
+
+Συμπέρασμα: P5 phase 2 (MV3 extension) + P31 (viewer role enforcement) πλέον fully documented across features.md + security.md + api.md. Τα 2 features είναι synchronized με την τρέχουσα κατάσταση του κώδικα.
+
+Επόμενο run: (α) grep git log για άλλα νέα undocumented feat() commits (P51-P80 candidates ή άλλα modules) · (β) drift check σε api.md αν endpoints schema αλλάξανε · (γ) monitoring για νέα P31-related endpoints αν προστέθηκαν (π.χ. PATCH /api/v1/users/:id/role).
+
