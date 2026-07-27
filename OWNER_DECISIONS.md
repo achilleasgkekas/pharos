@@ -50,6 +50,22 @@
    return-window 14 μέρες (EU), per-store editable, + badge «N μέρες για επιστροφή» στην κάρτα
    απόδειξης. Owner: **pharos-daily-dev**.
 
+9. **`expo-camera` = ΕΓΚΕΚΡΙΜΕΝΟ** (interactive session 2026-07-27, «προχώρα όλα για το Pharos»). Ξεκλείδωσε το
+   **P17** camera UI, που **shipped την ίδια μέρα** (commit `6b52023`, `apps/mobile/src/BarcodeScanner.tsx` +
+   shopping-list wiring). Το ίδιο dep καλύπτει και ό,τι μελλοντικό χρειαστεί κάμερα (inventory scan, price logging).
+   ΣΗΜ: το **P23** (share-sheet capture) παραμένει ξεχωριστό, γιατί δεν το μπλόκαρε η κάμερα αλλά το iOS Share
+   Extension / Android intent filter, δηλαδή native config plugin + EAS dev build. **Εκκρεμεί ένα supervised πέρασμα
+   σε φυσική συσκευή** για το P17: ο simulator δεν έχει κάμερα, το σκανάρισμα δεν επαληθεύεται unattended.
+
+10. **Git: PATHSPEC COMMIT, όχι index** (interactive session 2026-07-27). Το `git add` **δεν είναι atomic** με το
+   `git commit`, και ~11 routines μοιράζονται το index αυτού του repo, οπότε στο παράθυρο ανάμεσά τους το commit
+   άλλης routine καταπίνει τα αρχεία σου. Συνέβη **δύο φορές την ίδια μέρα** (`0d5890c` πήρε ολόκληρο feature,
+   `a6e39b8` πήρε το log entry άλλης routine). Ο documented collision guard ΔΕΝ το πιάνει αυτό, γιατί ελέγχει πριν
+   ξεκινήσει η κούρσα. Λύση, εφαρμοσμένη ήδη και στα 12 Pharos task files: **`git commit -- <paths>`**, που παίρνει
+   ΜΟΝΟ τα paths που ονομάζεις και αφήνει ό,τι άλλο είναι staged άθικτο, χωρίς lock και χωρίς αναμονή. Το `git add`
+   επιτρέπεται ΜΟΝΟ για να εισαχθεί νέο (untracked) αρχείο, και μετά ξανά commit με τη μορφή `-- <paths>`.
+   Επαληθεύτηκε εμπειρικά πριν γραφτεί. Owner: όλες οι routines.
+
 ## Later (χρειάζεται στοιχεία/ενέργεια Achilleas — ΟΧΙ τώρα, αλλά πριν hosted launch)
 
 - **Terms + Privacy finalize**: επωνυμία/νομική οντότητα, governing-law jurisdiction, ονόματα

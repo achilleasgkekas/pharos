@@ -998,7 +998,7 @@
   «orphaned/dead code» **ήταν ήδη σωστά wired** στο `ExpensesClient.tsx` από το ίδιο commit `bed7f73` (PA1) —
   stale note, διορθώθηκε εδώ. Καμία ενέργεια χρειάστηκε.
 
-### P17. Mobile barcode/QR scan → γρήγορη προσθήκη στο inventory — 🟡 SERVER HALF SHIPPED 2026-07-25 (pharos-daily-dev), camera UI εκκρεμεί
+### P17. Mobile barcode/QR scan → γρήγορη προσθήκη στο inventory — ✅ SHIPPED 2026-07-27 (camera UI, commit 6b52023)
 - **Αξία:** barcode/QR scan (EAN/UPC) → lookup → prefill τίτλου/κατηγορίας/specs → one-tap add σε inventory/shopping.
 - **Module:** Mobile (camera-scan) + Items/Inventory (+ `/api/v1` §5, product-lookup helper).
 - **Εξάρτηση:** mobile MVP (§6). **Builder default:** lookup = δωρεάν Open Food Facts / UPC DB, AI fallback.
@@ -1027,6 +1027,17 @@
   θα έδινε γαλλική κατηγορία σε αγγλικό lookup.
 - **Εκκρεμεί (χρειάζεται Αχιλλέα):** το mobile camera UI — έγκριση για `expo-camera` (native dep) + EAS dev build σε
   φυσική συσκευή. Ο server είναι έτοιμος και tested· μένει η οθόνη scan → `GET /api/v1/lookup/barcode` → confirm → add.
+- **Camera UI shipped 2026-07-27** (ο Αχιλλέας ενέκρινε ρητά το `expo-camera` σε interactive session): νέο
+  `apps/mobile/src/BarcodeScanner.tsx` (δικό του component, γιατί η ίδια χειρονομία θα χρειαστεί και σε inventory /
+  price-logging, και γιατί τα εύκολα-να-τα-κάνεις-λάθος κομμάτια πρέπει να υπάρχουν μία φορά: τα 3 permission states,
+  **ένα scan ανά άνοιγμα** (αλλιώς η κάμερα πυροδοτεί συνεχώς όσο το barcode μένει στο κάδρο και σπαμάρει το lookup),
+  και η λίστα symbologies). **Retail formats μόνο** (EAN-13/8, UPC-A/E), όχι QR: ένα QR δεν είναι ποτέ προϊόν σε
+  product database. Η κάμερα mountάρεται ΜΟΝΟ όσο το sheet είναι ανοιχτό. Το scanned barcode καταλήγει στο **ίδιο
+  draft** που παράγει ήδη το AI photo scan, οπότε υπάρχει ένα confirm sheet και όχι δύο σχεδόν ίδια. Άγνωστο barcode
+  = **απάντηση, όχι σφάλμα** (οι βάσεις είναι ελλιπείς): ο κωδικός μένει στην οθόνη και ο χρήστης ξανασκανάρει ή
+  προσθέτει με το όνομα. `app.json` += `expo-camera` plugin με permission string. **Verify:** `npx tsc --noEmit`
+  EXIT 0. **Μένει ένα supervised πέρασμα σε φυσική συσκευή** (EAS dev build): ο simulator δεν έχει κάμερα, άρα το
+  ίδιο το σκανάρισμα δεν επαληθεύεται unattended.
 
 ### P20. Loyalty / membership card wallet (barcode display στο checkout) — ✅ SHIPPED 2026-07-18 (pharos-daily-dev, commit `536a3d8`)
 - **Υλοποίηση:** νέο `models/LoyaltyCard.ts` (title/store/cardNumber/barcodeFormat/notes/archived, soft-delete, ίδιο

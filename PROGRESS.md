@@ -2,7 +2,7 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: cc65fb5 -->
+<!-- reviewed: 6b52023 -->
 <!-- docker-validated: 6716846 -->
 <!-- ui-audited: 0bc5e14 -->
 
@@ -9793,3 +9793,44 @@ Approved queue.
 - Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary, P36 Open Banking provider decision, P31
   household supervised session, P16 Firefly III/Grocy real sample-file, Settings credentials boundary, P8 tax-export
   ZIP, P5 MV3-extension phase 2, light-theme parity mobile.
+
+## 2026-07-27 (cont. — interactive: «προχώρα όλα για το Pharos»)
+
+Τρία πράγματα, όλα με τον Αχιλλέα παρόντα, οπότε οι εγκρίσεις είναι ρητές και μπήκαν στο `OWNER_DECISIONS.md` (#9, #10).
+
+**1. Git: pathspec commit αντί για index (λύνει τα σημερινά 2 collisions)**. Ο documented collision guard ελέγχει
+**πριν** ξεκινήσει η κούρσα, άρα δεν πιάνει το πραγματικό παράθυρο ανάμεσα στο δικό σου `git add` και το δικό σου
+`git commit`. Επαλήθευσα **εμπειρικά** σε throwaway repo ότι το `git commit -- <paths>` (α) commit-άρει μόνο τα paths
+που ονομάζεις, (β) αφήνει ξένο staged αρχείο staged και **εκτός** commit, (γ) αποτυγχάνει σε untracked path («did not
+match any file(s) known to git»), άρα το `git add` παραμένει απαραίτητο **μόνο** για νέα αρχεία. Με αυτά γραμμένα σωστά,
+πέρασα τον κανόνα και στα **12 Pharos task files** (script, με έλεγχο ότι το μπλοκ δεν κόβει τη σχέση «ending with:» →
+`Co-Authored-By` trailer, το οποίο διόρθωσα σε 6 αρχεία). Το `projects-digest` δεν έχει καθόλου git βήμα, το άφησα.
+
+**2. P17 camera UI — SHIPPED** (commit `6b52023`), μετά από ρητή έγκριση `expo-camera` (`~17.0.10`, η έκδοση που
+αντιστοιχεί σε SDK 54 κατά το `bundledNativeModules.json`, όχι μαντεμένη). Νέο `apps/mobile/src/BarcodeScanner.tsx`
+ως **δικό του component**, γιατί η ίδια χειρονομία θα χρειαστεί σε inventory/price-logging και γιατί τα εύκολα-να-τα-
+κάνεις-λάθος κομμάτια πρέπει να ζουν μία φορά: τα 3 permission states, **ένα scan ανά άνοιγμα** (χωρίς αυτό η κάμερα
+πυροδοτεί συνεχώς όσο το barcode μένει στο κάδρο και σπαμάρει το lookup ξανα-ανοίγοντας το confirm sheet κάτω από τα
+δάχτυλα του χρήστη), και η λίστα symbologies. **Retail formats μόνο** (EAN-13/8, UPC-A/E): ένα QR δεν είναι ποτέ
+προϊόν σε product database. Η κάμερα mountάρεται μόνο όσο το sheet είναι ανοιχτό. Το scanned barcode καταλήγει στο
+**ίδιο draft** που παράγει ήδη το AI photo scan, οπότε υπάρχει ένα confirm sheet και όχι δύο σχεδόν ίδια. Άγνωστο
+barcode = **απάντηση, όχι σφάλμα**. `app.json` += `expo-camera` plugin με permission string. Verify: `npx tsc --noEmit`
+EXIT 0, app.json έγκυρο JSON. **Εκκρεμεί supervised πέρασμα σε συσκευή** (EAS dev build), ο simulator δεν έχει κάμερα.
+
+**3. P9 slice 6: ΔΕΝ υπήρχε δουλειά, ήταν ήδη κλειστό.** Το είχα προτείνει ως «επόμενο task» στο προηγούμενο log,
+αλλά ο έλεγχος πριν χτίσω έδειξε ότι και τα τρία import paths είναι ήδη καλυμμένα: το **CSV** περνά από `resolveFx`
+(19 currency/fxRate σημεία + `actions.csv.test.ts`), το **YNAB** είναι **σκόπιμα** base-currency με γραπτή αιτιολογία
+στον κώδικα (ένα YNAB register export είναι στο νόμισμα του budget και δεν τυπώνει ποτέ κωδικό ανά γραμμή), και το
+**IMAP email-in** δεν αγγίζει καθόλου ποσά (κατεβάζει μηνύματα/attachments και τα δίνει στο receipt pipeline, που έχει
+ήδη fx). Άρα **το P9 είναι πλήρως κλειστό**, καμία γραμμή δεν χρειάστηκε. Διόρθωσα την stale πρόταση αντί να χτίσω κάτι
+περιττό.
+
+**Εκκρεμεί (χρειάζεται permission ή τον Αχιλλέα)**: το flip των δύο Pharos entries σε `~/.claude/ASK_ACHILLEAS.md`
+(`pharos-daily-dev-20260725-1425` expo-camera, `pharos-saas-core-20260727-1930` git idiom) σε ANSWERED **μπλοκαρίστηκε
+από τον classifier**. Οι αποφάσεις είναι καταγεγραμμένες στο `OWNER_DECISIONS.md` #9/#10, που ούτως ή άλλως διαβάζουν
+οι routines πρώτο, οπότε δεν χάνεται τίποτα, αλλά τα entries θα φαίνονται OPEN μέχρι να τα γυρίσει κάποιος.
+
+**Επόμενο task (πρόταση)**: το **P23** είναι πλέον το μόνο mobile-native item που μένει, και δεν το μπλοκάρει η κάμερα
+αλλά το iOS Share Extension / Android intent filter (config plugin + EAS dev build). Το Android μισό (intent filters
+στο `app.json` + handling του shared URI) είναι εφικτό αυτόνομα, το iOS θέλει config plugin και δικό του πέρασμα.
+Εναλλακτικά, MOBILE_PARITY #6 (Settings) / #7 (Activity), που δεν χρειάζονται τίποτα native.
