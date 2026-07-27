@@ -1,5 +1,30 @@
 # DOCS_PROGRESS
 
+## 2026-07-28 (twenty-ninth run — OpenAPI spec sync: 11 missing paths + drift guard)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-eighth run (commit a21e18a, 2026-07-27 22:12). Ανακάλυψη: **ΔΕΝ υπάρχουν νέα feat() commits**, αλλά ένα σημαντικό **docs() commit που χρειάζεται καταγραφή**:
+- **OpenAPI spec sync (commit 83dfe10, 2026-07-28 00:13)** — sync με όλα τα 61 endpoints: 11 missing paths documented, 8 νέα component schemas, drift guard test added, field name correction
+
+Τι έγιναν:
+- **openapi.yaml**: Προσθήκη 11 ελλείποντων paths (π.χ. bills, gift cards, goals, loyalty cards full CRUD, barcode lookup, settings/ai GET/PATCH, installment plan merge/unmerge). 8 νέα component schemas (Bill, GiftCard+Use, Goal+Contribution, LoyaltyCard, BarcodeFormat, BillCycle) με τα derived-never-stored fields marked. Trash enum corrected (6→10 types). 721 γραμμές προστέθηκαν.
+- **openapi.coverage.test.ts**: Νέο test file που derives paths+methods από route files και checks drift σε ΔΥΟ κατευθύνσεις (path in spec but not in routes, και αντίστροφα). Guard confirmed failing on an injected drift. Verified: 61 spec paths == 61 route files.
+- **api.md**: Μικρή διόρθωση (line 401): settings/ai PATCH body field `enabled` → `aiEnabled` (ακρίβεια schema).
+
+Accuracy (διάβασα κώδικα): commit message details 11 missing paths με request bodies/status codes/exclusivity rules (addUse/removeUseId etc), bill paid→spawnedNext behavior, admin-only PATCH/ai. Verified πραγματικά endpoints στο `apps/web/src/app/api/v1/` κάτω απο bills/, giftcards/, goals/, loyaltycards/, barcode-lookup/, settings/. Features.md δείχνει όλα τα features (gift cards, goals, loyalty cards, bills, vouchers/payments section).
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: openapi.yaml (YAML δεν τα χρειάζεται), api.md 22 (ζυγό ✓), YAML spec parses OpenAPI 3.1 με 0 broken $refs.
+- Internal links: api.md → openapi.yaml είναι external reference (δεν εμφανίζεται ως link στο markdown, semantic only).
+- Drift guard: Commit message λέει "guard confirmed failing on an injected drift" + type-check EXIT 0 + "full vitest 4908 passed / 318 files" → specs validated ✓.
+- Secret scan: κανένα credential σε openapi.yaml (κανένα API key example) ✓.
+- Markdown structure (api.md): νέα row για settings/ai PATCH ακολουθεί pattern ✓, κανένα ρήγμα στο table.
+
+Collision guard: `git status --short` = 0 (κανένα modified file δικό μου). Τα docs files ήταν ήδη committed στο 83dfe10 (ΔΕΝ κάνω σκόπιμα re-edit ήδη-merged commits). Απλή καταγραφή σε DOCS_PROGRESS.md.
+
+Συμπέρασμα: OpenAPI spec sync (83dfe10) πλέον fully logged. Όλες οι 61 v1 routes documented, drift guard test in place, no σκόπιμα επιστρέφει σε features.md (bills/gift-cards/goals/loyalty-cards ήδη κεφάλαια του features.md). Spec ↔️ routes ↔️ features είναι synchronized.
+
+Επόμενο run: (α) grep git log για άλλα νέα undocumented feat() commits (P51-P80 candidates, mobile features) · (β) monitoring αν νέα endpoints shipped χωρίς spec update (ίδιο pattern με τα 11 που κρύφτηκαν) · (γ) api.md section consistency check (settings/ai docs accuracy after the patch-body fix).
+
 ## 2026-07-27 (twenty-eighth run — roadmap #6 mobile AI settings)
 
 Σάρωση git log για νέα feat() commits μετά την twenty-seventh run (commit 45c6c74, 2026-07-27). Ανακάλυψη: **1 νέα feat() commit που χρειάζεται documentation**:
