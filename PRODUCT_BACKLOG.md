@@ -6,50 +6,86 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-26 (17η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-27 (18η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
-> **Standing κατάσταση (16η σάρωση, 2026-07-25):** το «Approved» queue παραμένει ουσιαστικά χωρίς αυτόνομα-
+> **Standing κατάσταση (18η σάρωση, 2026-07-27):** το «Approved» queue παραμένει ουσιαστικά χωρίς αυτόνομα-
 > buildable items — μόνο P36 (Open Banking, blocked σε provider decision), P31 (household multi-user, χρειάζεται
-> supervised session), P16 remainder (Firefly III/Grocy importers, χρειάζεται πραγματικό sample file), P9
-> (multi-currency, ρητά τελευταίο, L), P17/P23 (mobile native-dep approvals) μένουν τεχνικά ανοιχτά αλλά κανένα
-> δεν είναι «απλώς χτίσ' το» unattended. **Καμία ρητή έγκριση Proposed→Approved σε >11 διαδοχικές σαρώσεις** —
-> το Proposed queue έχει φτάσει **23 items (P37-P62)**, αρκετά μεγάλο ώστε μια batch-review να αξίζει τον κόπο
-> (ίδιο idiom με το μαζικό 2026-07-09/10 approval)· ο Αχιλλέας ίσως αξίζει επίσης να ξανα-εξετάσει τα P9/P17/P23
-> τώρα που mobile MVP + Expo push υπάρχουν ήδη (ίδιο re-examination που ξεμπλόκαρε το P5 phase-1/phase-2).
-> **Σημείωση (16η σάρωση):** επιβεβαιώθηκε empirically ότι το `/network` (UniFi) module αφαιρέθηκε ρητά από το
-> codebase (commit `5eb912d "...remove the Network/UniFi module"`, μέρος του "Strip personal info from the repo"
-> pivot προς γενικό-χρήσης προϊόν) — `grep -ri unifi apps/web/src` = 0 hits. Το `docs/features.md` έχει ακόμα
-> stale «## Network (UniFi)» section (docs-debt, όχι κάτι για το product backlog να διορθώσει). Αυτό απέτρεψε
-> candidate ιδέες γύρω από δικτυακό/hardware monitoring αυτή τη σάρωση (πλέον εκτός προϊοντικής κατεύθυνσης) —
-> βάζω τη σημείωση εδώ ώστε μελλοντικές σαρώσεις να μην ξαναπροτείνουν το ίδιο.
+> supervised session), P16 remainder (Firefly III/Grocy importers, χρειάζεται πραγματικό sample file), **P9**
+> (multi-currency — πλέον σχεδόν πλήρες, μόνο ο προαιρετικός rate-feed/`resolveFx` στα imports απομένει), P17/P23
+> (mobile native-dep, μπλοκαρισμένα στο ανοιχτό ερώτημα `pharos-daily-dev-20260725-1425` στο ASK_ACHILLEAS.md —
+> ΑΚΟΜΑ χωρίς Answer, 2ο+ συνεχόμενο) μένουν τεχνικά ανοιχτά αλλά κανένα δεν είναι «απλώς χτίσ' το» unattended.
+> **Καμία ρητή έγκριση Proposed→Approved σε 13 διαδοχικές σαρώσεις** — το batch-review πρόταση της 16ης σάρωσης
+> παραμένει σε ισχύ και ενισχύεται· το Proposed queue έφτασε **28 items (P37-P68)**.
 > Ζωντανό grep σε κάθε σάρωση επιβεβαιώνει ότι κανένα Proposed item δεν έχει χτιστεί εν τω μεταξύ χωρίς ρητή
-> έγκριση (re-verified 16η σάρωση: `maintenanceIntervalDays`/`bundleId`/`soldPrice`/`repeatEveryDays`/
-> `lastSuccessfulSyncAt`/alias-write-path = 0 hits, όλα ακόμα genuinely unbuilt). Προστέθηκαν **2 νέοι candidates
-> P61-P62** αυτή τη σάρωση (verified distinct: το `Bill` model έχει μόνο δυαδικό `paidAt`/binary status, καμία
-> partial-amount έννοια· το `Expense.paymentMethod` είναι ένα single free-string πεδίο, καμία σύνδεση με το ήδη-
-> υπάρχον `GiftCard.uses[]` spend-log όταν μια αγορά πληρώνεται με παραπάνω από μία μέθοδο).
-> **17η σάρωση (2026-07-26):** ΑΚΟΜΑ καμία ρητή έγκριση σε **12 διαδοχικές σαρώσεις** — το batch-review πρόταση
-> της 16ης παραμένει σε ισχύ, το queue μεγάλωσε σε **25 items (P37-P65)**. Προστέθηκαν **3 νέοι candidates
-> P63-P65**, ο ένας (P63) με ξεχωριστά υψηλή προτεραιότητα γιατί είναι **πραγματικό data-loss ρίσκο, όχι απλά νέο
-> feature**: live-verified με `ls apps/web/src/models/*.ts` (27 models) vs το `BACKUP_MODELS` map στο
-> `settings/actions.ts:1228-1237` (8 keys) → **7 models λείπουν εντελώς από το JSON backup/restore**, ανάμεσά τους
-> το **`Expense`** (ολόκληρο το Income/Expenses module — μισθός, λογαριασμοί, όλο το ιστορικό εξόδων) + `Bill`
-> (P28) + `Goal` (P12) + `GiftCard` (P32) + `LoyaltyCard` (P20) + `NetWorthSnapshot` (PA2) + `ShoppingListItem`.
-> Το ίδιο κενό ήταν ήδη καταγεγραμμένο ως follow-up-note κάτω από ένα **`## Done`** item (PA2, γρ.1198) αλλά ΠΟΤΕ
-> δεν έγινε δικό του actionable item — ξεχωριστό P63 τώρα ώστε να μην ξαναχαθεί. Οι άλλοι δύο νέοι candidates
-> (P64/P65) προέκυψαν από ζωντανό grep επιβεβαιώνοντας ότι δεν υπάρχει καμία receipt-line-item category
-> ταξινόμηση σήμερα (`LineItemSchema` στο `models/Receipt.ts` = name/refinedName/qty/price/vatRate/matchedItemId,
-> **μηδέν category πεδίο**, και τα Reports category breakdowns διαβάζουν αποκλειστικά `Expense.category` — τα
-> Receipts δεν τροφοδοτούν ΚΑΘΟΛΟΥ τα category charts σήμερα) και ότι δεν υπάρχει καμία φωνητική είσοδος πουθενά
-> (`grep -rn "SpeechRecognition" apps/web/src apps/mobile/src` = 0 hits).
+> έγκριση (re-verified 18η σάρωση: `Bill.payments`/`paymentSplits`/`space` σε Receipt/Subscription μοντέλα =
+> 0 hits, όλα ακόμα genuinely unbuilt). Σημ. (16η σάρωση, ισχύει ακόμα): το `/network` (UniFi) module αφαιρέθηκε
+> ρητά από το codebase (commit `5eb912d`, "Strip personal info" pivot) — μην ξαναπροταθεί δικτυακό/hardware
+> monitoring, `docs/features.md` έχει ακόμα stale αναφορά (docs-debt, όχι product backlog item).
+> **18η σάρωση (2026-07-27) — 3 νέοι candidates P66-P68**, και οι τρεις live-verified με grep/read κώδικα:
+> (1) **P66** — το AI command-bar `search_data`/`update_record`/`delete_record` (`app/aiTools.ts`, `modelFor()`)
+> και το navbar global search (`app/search-actions.ts`, `searchAll()`) καλύπτουν μόνο item/task/subscription
+> (edit/delete) ή έως 7 τύπους (search) — **5 ολόκληρα μοντέλα** (`Bill`/`Goal`/`GiftCard`/`LoyaltyCard`/
+> `ShoppingListItem`) είναι αόρατα στον AI assistant. (2) **P67** — το `lib/moneyAgenda.ts` (shared από `/calendar`
+> ΚΑΙ το `.ics` feed, verified `import`-block) δεν εισάγει καθόλου `Bill`/`Goal`· λογαριασμοί με προθεσμία και
+> στόχοι αποταμίευσης λείπουν από το ενιαίο 3-μηνο agenda. (3) **P68** — το P34 per-space tag (follow-up note κάτω
+> από το shipped item, ποτέ actionable) υπάρχει ΜΟΝΟ στο `Expense` model (verified: μηδέν `space` field σε
+> Receipt/Subscription/Bill) — το per-property P&L (2 σπίτια) είναι ημιτελές. Ίδιο idiom με το P63
+> promotion-of-a-buried-follow-up-note.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P68. Επέκτασε το per-space tag (P34) σε Receipts/Subscriptions/Bills — S — OSS, dogfooding-heavy
+- **Αξία:** το P34 (per-space ledger tag, shipped 2026-07-14) έμεινε ρητά **Expenses-only ως MVP**, με follow-up
+  note «space σε Receipts/Subscriptions... global space-filter σε όλα τα money views (τώρα μόνο Expenses/Income)»
+  που ποτέ δεν έγινε δικό του actionable item (ίδιο μοτίβο με το P63 πριν προωθηθεί). Live-verified: `grep -rn
+  "space" apps/web/src/models/Receipt.ts apps/web/src/models/Subscription.ts apps/web/src/models/Bill.ts` = 0 hits.
+  Πρακτικό αποτέλεσμα: ο Αχιλλέας έχει 2 σπίτια (κεντρικό + Kalamos, CLAUDE.md) και το «πόσο κοστίζει το εξοχικό»
+  απαντιέται σήμερα **μόνο** για τα χειροκίνητα Expenses — μια απόδειξη σούπερ μάρκετ ή μια συνδρομή streaming
+  δεμένη στο εξοχικό δεν προσμετράται στο per-space breakdown στα Reports, άρα το P&L ανά σπίτι είναι συστηματικά
+  ημιτελές, όχι απλά λείπει ένα μικρό feature.
+- **Module:** Receipts + Subscriptions + Bills (ίδιο optional `space` string πεδίο, ίδιο taxonomy/`AppConfig.spaces`
+  reuse) + Reports (επέκταση του ήδη-υπάρχοντος «Expenses by space» card).
+- **Ανοιχτή απόφαση (builder default):** ίδιο pattern με το P34 MVP (κενό = «όλα», κληρονομείται από την τελευταία
+  εγγραφή ίδιου store/vendor όπου εφαρμόζεται)· ξεκίνα από Receipts (μεγαλύτερος όγκος εγγραφών, μεγαλύτερη αξία
+  στο P&L) πριν Subscriptions/Bills.
+
+### P67. Bills + Goals λείπουν από το ενιαίο money agenda (`/calendar` + `.ics` feed) — S — OSS (κυρίως)
+- **Αξία:** live-verified `import`-block του `lib/moneyAgenda.ts` (shared και από `/calendar` ΚΑΙ από το
+  token-scoped `.ics` feed του P6): φέρνει `Subscription`/`Voucher`/`Item`/`Statement`/`Expense` αλλά **ΟΧΙ**
+  `Bill` ούτε `Goal`. Το ίδιο επιβεβαιώνεται στο `app/calendar/page.tsx` (ίδιο import-set). Πρακτικό αποτέλεσμα:
+  ένα ανοιχτό `Bill` (P28, «due → paid → overdue» payable) με πλησιάζουσα προθεσμία **δεν εμφανίζεται πουθενά**
+  στο 3-μηνο agenda ή στο Google/Apple Calendar feed — μόνο στο δικό του `/bills` triage list και στο notification
+  bell· ένας `Goal` (P12) με target date εξίσου αόρατος εκεί. Αυτό ήταν ήδη γνωστό ως «skipped for focus» follow-up
+  κάτω από το P28 shipped note («Calendar paid-vs-pending coloring [...] τα recurring bills δεν διπλο-προβάλλονται
+  εκεί ακόμα») αλλά ποτέ δεν προωθήθηκε σε actionable item.
+- **Module:** `lib/moneyAgenda.ts` (νέο import + entry-mapping, reused αυτόματα από `/calendar` + `.ics`).
+- **Ανοιχτή απόφαση (builder default):** Bills πρώτα (μεγαλύτερη αξία, ίδιο «amount + due date» σχήμα με τα ήδη
+  wired Subscriptions/Statements) — μόνο unpaid/pending bills (τα paid δεν χρειάζονται πια θέση στο forward
+  agenda)· Goals ως δεύτερο βήμα (target date, όχι recurring, απλούστερο mapping)· χρωματισμός/label ίδιο idiom
+  με τα υπόλοιπα entry types.
+
+### P66. Ο AI assistant «βλέπει» μόνο 3-7 από τα 12+ μοντέλα (search/edit/delete coverage gap) — S — both, dogfooding-heavy
+- **Αξία:** live-verified: το `app/search-actions.ts` `searchAll()` (τροφοδοτεί ΚΑΙ το navbar global search ΚΑΙ το
+  AI command-bar `search_data` tool) ψάχνει μόνο **7** μοντέλα (item/receipt/statement/task/subscription/expense/
+  voucher). Χειρότερο ακόμα: το `app/aiTools.ts` `modelFor()` (πίσω από `update_record`/`delete_record`) δέχεται
+  **μόνο 3** τύπους (`item`/`task`/`subscription`) — δηλαδή ο AI assistant μπορεί να **βρει** ένα expense/receipt/
+  voucher αλλά όχι να το επεξεργαστεί/σβήσει μέσω φυσικής γλώσσας, και είναι εντελώς **τυφλός** σε **5 ολόκληρα
+  μοντέλα** που έχουν προστεθεί έκτοτε: `Bill` (P28), `Goal` (P12), `GiftCard` (P32), `LoyaltyCard` (P20),
+  `ShoppingListItem`. Ένα «πρόσθεσε στη λίστα ψώνια γάλα» ή «σημείωσε το ΔΕΗ bill ως πληρωμένο» μέσω του AI command
+  bar σήμερα αποτυγχάνει σιωπηλά ή γυρνάει λάθος απάντηση, ενώ το ίδιο ερώτημα λειτουργεί άψογα για ένα task/item/
+  subscription. Καθαρό consistency/completeness gap σε ένα ήδη-δουλεμένο pipeline, όχι νέα αρχιτεκτονική.
+- **Module:** `app/search-actions.ts` (searchAll — προσθήκη 5 μοντέλων) + `app/aiTools.ts` (modelFor + tool
+  descriptions/system prompt — επέκταση σε όλα τα searchable types).
+- **Ανοιχτή απόφαση (builder default):** επέκτεινε και τα δύο σε **όλα** τα user-facing μοντέλα με ένα search
+  index (ίδιο `$or`/regex pattern με τα υπάρχοντα 7)· `modelFor` επεκτείνεται συμμετρικά με searchAll (ό,τι είναι
+  searchable πρέπει να είναι edit/delete-able, ίδιο soft-delete pattern με τα ήδη-υπάρχοντα)· `GiftCard.uses[]`
+  spend-log μένει εκτός update/delete μέσω AI (πιο ασφαλές να μένει UI-only, αποφυγή λάθος αλλαγής υπολοίπου).
 
 ### P65. Voice quick-capture στο AI command bar (Web Speech API, μηδέν νέο backend) — S — both, quick-capture friction
 - **Αξία:** το app έχει ήδη ένα ενιαίο conversational AI command bar (text-based, `runAiCommand`) που καταλαβαίνει
