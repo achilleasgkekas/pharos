@@ -570,7 +570,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'What happens if I delete something by mistake?',
-    a: 'Most deletes are reversible. Items, receipts, expenses, subscriptions, vouchers, bills, and tasks are soft-deleted, hidden from the app but their files and links kept, and land in Trash (Settings → Storage & backup) where you can restore them with one click or delete them forever. Anything left in Trash auto-purges after 30 days, so it is a safety net, not permanent storage. Card statements are the one exception: they are removed for good straight away, so re-importing the same month never gets blocked by a trashed copy still holding its slot.',
+    a: 'Most deletes are reversible. Items, receipts, expenses, subscriptions, vouchers, gift cards, loyalty cards, bills, goals, and tasks are soft-deleted, hidden from the app but their files and links kept, and land in Trash (Settings → Storage & backup) where you can restore them with one click or delete them forever. Anything left in Trash auto-purges after 30 days, so it is a safety net, not permanent storage. Card statements are the one exception: they are removed for good straight away, so re-importing the same month never gets blocked by a trashed copy still holding its slot.',
   },
   {
     q: 'Is my financial data secure?',

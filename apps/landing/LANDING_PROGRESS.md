@@ -4480,3 +4480,47 @@ sweep για οποιοδηποτε νεο feat commit που θα προκυψ�
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-28 (run 31)
+
+Ελεγχος στην αρχη: `git log --oneline fc14dc1..HEAD` (fc14dc1 = το τελευταιο δικο μου commit, run 29) εδειξε
+μονο test/docs(progress) commits + ενα OpenAPI sync (`83dfe10`), κανενα νεο feat commit που να αγγιζει
+user-facing behaviour. Διαβασα το `83dfe10` (sync openapi.yaml σε ολα τα 61 v1 routes + drift guard) γιατι
+ανεφερε ρητα οτι το Trash type enum "ειχε ακομα εξι τυπους ενω το route δεχεται δεκα" και ηθελα να δω αν
+αυτο σημαινει gap στο landing copy.
+
+Επιβεβαιωσα τον πραγματικο καταλογο διαβαζοντας `apps/web/src/app/api/v1/trash/[type]/[id]/route.ts`
+(`TYPES: TrashType[] = ['item','receipt','expense','subscription','voucher','giftcard','loyaltycard',
+'bill','goal','task']`, 10 τυποι) + `apps/web/src/app/trash/TrashClient.tsx` (`TYPE_META` record, ιδιοι
+10 τυποι με δικο τους icon/label) + επιβεβαιωσα οτι ολα τα 4 "λειπαν" μοντελα (GiftCard, LoyaltyCard, Goal,
+Bill) εχουν πραγματικα `softDeletePlugin` (`grep -n softDeletePlugin apps/web/src/models/*.ts`), οχι απλα
+listed στο route χωρις functionality.
+
+Βρηκα gap: η landing FAQ "What happens if I delete something by mistake?" (γραμμη ~572) ελεγε "Items,
+receipts, expenses, subscriptions, vouchers, bills, and tasks are soft-deleted" — 7 απο τα 10, λειπαν
+gift cards, loyalty cards, και goals (και τα τρια εχουν trash UI, icon, i18n label στο `TrashClient.tsx`
+οπως ολα τα αλλα, δεν ειναι partial/beta functionality).
+
+Αλλαγη (`apps/landing/app/page.tsx`, μια προταση, δεν προσθεσα νεα FAQ ερωτηση): "Items, receipts, expenses,
+subscriptions, vouchers, bills, and tasks" -> "Items, receipts, expenses, subscriptions, vouchers, gift
+cards, loyalty cards, bills, goals, and tasks".
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13 static routes, `/` 5.35 kB (αμεταβλητο bundle, μια προταση strings δεν
+  αλλαζει το μεγεθος).
+- em-dash: 0 (python3 UTF-8 count).
+- Θυρες 3000/3100 κατειλημμενες (Docker), `next start -p 3102` πανω στο production build -> curl 200.
+  Browser pane: `read_console_messages` (onlyErrors) -> "No console logs." `javascript_tool` επιβεβαιωσε
+  τη νεα προταση present στο `document.body.innerHTML` (JSON-LD FAQPage schema, η απαντηση ειναι μεσα σε
+  collapsed accordion οποτε δεν φαινεται στο plain `get_page_text`) και την παλια, ελλειπη προταση απουσα.
+  Hero screenshot καθαρο. Server τερματισμενος (`pkill -f "next start -p 3102"` + `lsof` επιβεβαιωσε την
+  θυρα ελευθερη).
+- Δεν αγγιξα Docker/:3000/web/mobile. Μηδεν subagent, μηδεν AI call για copy generation.
+
+Επομενο increment: δεν βρηκα αλλο σαφες gap αυτο το run περαν του Trash fix. Υποψηφια για το επομενο περασμα:
+(α) γενικο sweep για νεα feat commits μεχρι τοτε, (β) το COMPARE table "Support: Community & docs" vs
+"Priority email" ειναι policy-language οχι κατι που επαληθευεται απο κωδικα, το αφησα ως εχει.
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
