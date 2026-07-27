@@ -661,7 +661,13 @@
   stale, έλεγε ακόμα ότι χρειάζεται να χτιστεί).
 - **Module:** Mobile (Expo Notifications + token registration) + `/api/v1` (register device) + `runAlertChecks` (push fan-out).
 
-### P31. Household / shared access — multi-user σε ένα self-host instance — M — OSS (adoption) / SaaS seed
+### P31. Household / shared access — multi-user σε ένα self-host instance — ✅ SHIPPED 2026-07-27 (pharos-daily-dev, commit 1346b4d)
+- **Υλοποίηση (βλ. PROGRESS.md 2026-07-27 cont.²)**: τρίτος ρόλος `viewer` **μαζί με πραγματικό enforcement** σε δύο
+  chokepoints (το ένα `withAuth` wrapper του `/api/v1` → 403 σε κάθε μη-read method· `assertCanWrite()` στην κορυφή
+  136 mutating server actions) + `writeGuard.coverage.test.ts` που ρίχνει το build αν μια νέα mutating action μείνει
+  αφύλακτη. Δύο bugs διορθώθηκαν στην πορεία (ο τελευταίος admin μπορούσε να γίνει viewer και να κλειδώσει το
+  instance· το `setUserRole` προήγαγε σιωπηλά viewer σε member). Verify: type-check EXIT 0, vitest 4717 passed.
+  **Εκκρεμεί μόνο** live login με τους 3 ρόλους (χρειάζεται τον Αχιλλέα στο πληκτρολόγιο).
 - **Αξία:** μια οικογένεια/νοικοκυριό θέλει **πολλαπλά logins πάνω στα ίδια δεδομένα** (κοινό inventory/έξοδα) με
   ρόλους (admin/member/viewer) + «ποιος καταχώρησε τι» attribution. Ισχυρό OSS self-host lever και σπόρος για το
   SaaS team-plan. **Διακριτό από §8** (multi-tenancy = ξεχωριστές βάσεις) και **§9** (SaaS-grade email verify/MFA/OAuth).
@@ -1092,7 +1098,7 @@
   `/api/v1/items` serializer + ItemsScreen UI, ίδιο pattern με τα Bill/GiftCard entities (P28/P32) πριν πάρουν mobile.
 - **Module:** Items/Inventory (`attachments[]`, reuse storage backends + `/api/files`).
 
-### P5. Browser extension / bookmarklet — quick capture — 🟡 Bookmarklet phase SHIPPED 2026-07-22 (pharos-daily-dev), MV3 extension εκκρεμεί
+### P5. Browser extension / bookmarklet — quick capture — ✅ SHIPPED (bookmarklet 2026-07-22, MV3 extension 2026-07-27, pharos-daily-dev)
 - **Αξία:** από e-shop, ένα κλικ → «add to Pharos shopping» (reuse `importItemFromUrl`). Καταναλώνει `/api/v1`.
 - **Module:** Items / Shopping (+ REST API).
 - **Εξάρτηση:** `/api/v1` (§5). **Builder default:** απλό bookmarklet πρώτα, MV3 extension phase 2.
@@ -1127,8 +1133,23 @@
   (χρειάζεται login με τα credentials του Αχιλλέα + πραγματική AI item-import call) — verified πλήρως μέσω
   unit tests στο pure `buildBookmarklet` + type-check + το ήδη-proven `previewItemFromUrl`/`confirmImportItem`
   pipeline (reused ατόφιο, καμία νέα λογική εκεί).
-- **Follow-up**: MV3 browser extension (phase 2, ξεχωριστό packaging/deliverable εκτός monorepo build — γι' αυτό
-  παραμένει phase 2, ίδιο σκεπτικό με τα προηγούμενα deferrals)· mobile share-sheet (P23) είναι το ισοδύναμο
+- **Υλοποίηση (MV3 extension phase — 2026-07-27)**: νέο **`apps/extension/`**, μηδέν dependencies και **μηδέν build
+  step** (ό,τι υπάρχει στο `src/` είναι ακριβώς αυτό που τρέχει ο browser, οπότε το «ξεχωριστό packaging» που κρατούσε
+  το phase 2 πίσω αποδείχθηκε ότι δεν χρειάζεται καθόλου pipeline). Το extension **δεν προσθέτει νέο μονοπάτι auth**:
+  κρατά μόνο τη διεύθυνση του instance σε `chrome.storage.sync` και ανοίγει το ίδιο **same-origin** `/capture?url=…`
+  που έφτιαξε το phase 1, άρα ταξιδεύει πάνω στο υπάρχον session cookie. **Μηδέν `host_permissions`, μηδέν content
+  script** (δεν μπορεί να διαβάσει το περιεχόμενο καμίας σελίδας), permissions μόνο `storage` + `contextMenus` +
+  `activeTab` (το URL του tab γίνεται ορατό μόνο τη στιγμή του κλικ). Τρία triggers → μία διαδρομή: toolbar button,
+  δεξί κλικ σε σελίδα, δεξί κλικ σε link (το link context menu στέλνει τον προορισμό, όχι τη σελίδα). Άκυρη σελίδα
+  (`chrome://`, `file:`, `about:`) απαντιέται με badge αντί για κενό preview· μη ρυθμισμένο instance ανοίγει το
+  options page αντί για σιωπηλό no-op. Icons rendered από το ίδιο `app/icon.svg` (sharp, 16/32/48/128). **Verify:**
+  `npm test` στο `apps/extension` = **21 tests pass** με `node --test` και **μηδέν dependency** (12 pure helpers +
+  **9 wiring tests πάνω σε fake `chrome` namespace**: ποιο trigger ανοίγει τι, trailing slash, missing origin,
+  chrome:// refusal, first-install vs update). Νέο **CI job «Browser extension»** τρέχει αυτά + επικυρώνει ότι το
+  manifest είναι έγκυρο JSON και δείχνει σε αρχεία που υπάρχουν. Web-side: μία γραμμή `bm.extHint` (en+el) στο
+  Settings → Quick capture ώστε να το ανακαλύψει ο χρήστης, `README.md` structure += `apps/extension/`.
+- **Follow-up**: Firefox (φορτώνει MV3 αλλά δεν έχει δοκιμαστεί)· δημοσίευση σε Chrome Web Store (θέλει developer
+  account + fee, δηλαδή απόφαση/credentials του Αχιλλέα, όχι δουλειά)· mobile share-sheet (P23) είναι το ισοδύναμο
   quick-capture flow για mobile, ξεχωριστό item.
 
 ### P3. AI «Month in Review» digest — ✅ SHIPPED 2026-07-20 (pharos-daily-dev, commit `029d7ae`) — v1 ΧΩΡΙΣ AI

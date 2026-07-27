@@ -422,6 +422,8 @@ export const el: Partial<Dict> = {
   'bm.dragHint': 'Σύρε με στη γραμμή σελιδοδεικτών',
   'bm.copyCode': 'Αντιγραφή κώδικα',
   'bm.hint': 'Δεν μπορείς να το σύρεις; Αντίγραψε τον κώδικα, φτιάξε σελιδοδείκτη χειροκίνητα και επικόλλησέ τον ως URL. Ανοίγει ένα μικρό popup του Pharos για τη σελίδα που βλέπεις, χωρίς extension και χωρίς στοιχεία λογαριασμού μέσα στον ίδιο τον σύνδεσμο.',
+  'bm.extHint':
+    'Προτιμάς κουμπί στη γραμμή εργαλείων και δεξί κλικ; Το repository έχει και extension για Chrome/Edge στο apps/extension: φόρτωσέ το unpacked από το chrome://extensions (Developer mode, Load unpacked) και δώσε του αυτή τη διεύθυνση. Δουλεύει το ίδιο, χωρίς API token και χωρίς πρόσβαση στο περιεχόμενο των σελίδων.',
   'cap.title': 'Προσθήκη στο Pharos',
   'cap.urlPlaceholder': 'URL σελίδας προϊόντος',
   'cap.fetching': 'Διαβάζω τη σελίδα του προϊόντος…',

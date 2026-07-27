@@ -28,3 +28,27 @@ jobs:
           # consumed at runtime, not during `next build`.
           AUTH_SECRET: ci-placeholder-secret-do-not-use-in-production
           NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-placeholder-encryption-key-000000
+
+  extension:
+    name: Browser extension
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # No dependencies and no build step: the source is what the browser runs.
+      # `node --test` covers the pure helpers plus the service-worker wiring.
+      - run: npm test
+      - name: Manifest is valid JSON and points at files that exist
+        run: |
+          node -e "
+            const fs = require('fs');
+            const m = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+            const refs = [m.background.service_worker, m.options_ui.page, ...Object.values(m.icons)];
+            for (const r of refs) if (!fs.existsSync(r)) throw new Error('missing file: ' + r);
+            if (m.manifest_version !== 3) throw new Error('expected MV3');
+          "

@@ -170,6 +170,7 @@ pharos/
 │   ├── lib/                    # db, auth/session, ai providers, aiFeatures, ocr, …
 │   ├── models/                 # Mongoose schemas (User, Item, Receipt, …)
 │   └── middleware.ts           # the auth gate
+├── apps/extension/             # MV3 quick-capture browser extension (no build step)
 └── services/scraper/           # standalone price-scraper worker (cron)
 ```
 

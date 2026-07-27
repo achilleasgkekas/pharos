@@ -451,6 +451,8 @@ export const en = {
   'bm.dragHint': 'Drag me to your bookmarks bar',
   'bm.copyCode': 'Copy code',
   'bm.hint': "Can't drag it? Copy the code and create a bookmark manually, then paste it as the URL. It opens a small Pharos popup for the page you're on — no extension to install, no account details in the link itself.",
+  'bm.extHint':
+    'Prefer a toolbar button and a right-click menu? The repository also ships a Chrome/Edge extension in apps/extension — load it unpacked from chrome://extensions (Developer mode → Load unpacked) and point it at this address. It works the same way: no API token, no access to page content.',
   'cap.title': 'Add to Pharos',
   'cap.urlPlaceholder': 'Product page URL',
   'cap.fetching': 'Reading the product page…',

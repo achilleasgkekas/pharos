@@ -53,6 +53,9 @@ export function BookmarkletManager() {
         </button>
       </div>
       <p className="text-[11px] text-[color:var(--color-text-faint)]">{t('bm.hint')}</p>
+      <p className="text-[11px] text-[color:var(--color-text-faint)] border-t border-[color:var(--color-border)] pt-3">
+        {t('bm.extHint')}
+      </p>
     </div>
   );
 }
