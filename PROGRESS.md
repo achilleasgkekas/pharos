@@ -9779,11 +9779,15 @@ Approved queue.
 
 ## Needs Achilleas
 
-- **Fleet hygiene, νέο**: το `docker-health` routine κάνει **broad staging** (`git add -A` ή ισοδύναμο). Απόδειξη:
-  το commit `0d5890c` περιέχει 15 αρχεία που δεν του ανήκουν (όλο το P9 phase 2 feature) μαζί με το δικό του
-  PROGRESS.md. Δύο πραγματικοί κίνδυνοι: (α) η δουλειά χάνει το μήνυμα και την ιστορία της, (β) αν έχεις **δικές σου
-  ημιτελείς αλλαγές** στο tree όταν τρέξει, θα τις commit-άρει κι αυτές χωρίς να το ζητήσεις. Πρόταση: να μπει στο task
-  file του ο ίδιος ρητός κανόνας explicit `git add <path>` που έχουν τα υπόλοιπα routines.
+- **Fleet hygiene (διορθωμένη διάγνωση + ΗΔΗ ΛΥΜΕΝΟ, δεν χρειάζεται ενέργεια δική σου)**: το commit `0d5890c` του
+  `docker-health` περιέχει 15 αρχεία που δεν του ανήκουν (όλο το P9 phase 2 feature) μαζί με το δικό του PROGRESS.md.
+  Η πρώτη μου καταγραφή έλεγε ότι λείπει ο κανόνας explicit `git add` από το task file του, **λάθος**: ο έλεγχος και των
+  25 task files έδειξε ότι ο κανόνας υπάρχει ήδη (`docker-health/SKILL.md` βήμα 7, «Stage ONLY PROGRESS.md … NEVER git
+  add -A»), απλά **παραβιάστηκε** σε εκείνο το run. Το πραγματικό κενό ήταν αλλού: το βήμα 7 δεν είχε τον **collision
+  guard** που έχουν τα υπόλοιπα routines, δηλαδή «αν βρεις ήδη staged αρχεία που δεν άγγιξες, ΜΗΝ κάνεις commit». Ο
+  δικός μου φάκελος ήταν ήδη staged όταν έτρεξε, άρα ένα σκέτο `commit -a` τα ρούφηξε όλα. **Το πρόσθεσα** στο
+  `~/.claude/scheduled-tasks/docker-health/SKILL.md` (guard + ρητή απαγόρευση των `-a`/`-am`, με αναφορά στο συμβάν ως
+  παράδειγμα), οπότε το επόμενο run του θα σταματήσει αντί να ξανασυμβεί.
 - **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο, 3ο συνεχόμενο run. Ερώτημα:
   `~/.claude/ASK_ACHILLEAS.md` → `pharos-daily-dev-20260725-1425` (ακόμα OPEN).
 - Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary, P36 Open Banking provider decision, P31
