@@ -1,5 +1,29 @@
 # DOCS_PROGRESS
 
+## 2026-07-27 (twenty-eighth run — roadmap #6 mobile AI settings)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-seventh run (commit 45c6c74, 2026-07-27). Ανακάλυψη: **1 νέα feat() commit που χρειάζεται documentation**:
+- **roadmap #6 (commit 98e4ba7, 2026-07-27 22:12)** — Mobile AI settings: master toggle + 10 per-feature toggles (scan, parse, fill, search, summarize, translate, categorize, κλπ.) με derived status (disabled / no-provider / ready)
+
+Τι έγραψα:
+- **api.md**: Προσθήκη 2 νέων γραμμών στη Settings section για GET/PATCH /api/v1/settings/ai. GET endpoint επιστρέφει master toggle, resolved provider/model, readiness probe, και 10 per-feature toggles με status. PATCH είναι admin-only (403 για viewers/members); unknown keys silently dropped; credentials ποτέ δεν expose-άρονται.
+- **mobile.md**: Ενημέρωση Settings row από "preferences, budgets, cards, stores, lists, sign-out" σε "...AI master switch + per-feature toggles (roadmap #6)...". Consistency check με web Settings.
+- **features.md**: Επέκταση Settings → AI section από "provider, scraper AI, editable prompts, calendar token" σε πλέον + "Mobile parity (roadmap #6): master toggle + per-feature toggles + status indicators; only admins edit; all users see status". Εξηγηση ότι viewers βλέπουν γιατί feature είναι unavailable χωρίς να αποκαλύψουμε API credentials.
+
+Accuracy (διάβασα κώδικα): commit 98e4ba7 message + route.ts (GET/PATCH handlers, admin-only assertCanEdit check, 10 feature keys + derived status logic), SettingsScreen.tsx (AiSection με toggles + status badges), MOBILE_PARITY.md (roadmap #6 marked complete).
+
+Validation (markdown only, κανένα build/Docker/AI call):
+- Code fences: api.md table rows balanced pipes ✓, καμία νέα code fence.
+- Internal links: κανένα νέο hyperlink (inline text edits μόνο) ✓.
+- Secret scan: grep -r "sk_/phk_/AUTH_" = 7 hits, όλα legitimate examples (phk_xxxxxxxx placeholders) κ.λπ. ✓.
+- Markdown structure: νέες γραμμές ακολουθούν υπάρχον pattern (table cells, bullet list) ✓.
+
+Collision guard: `git status --short` πριν commit = 0 staged foreign (3 modified docs files δικά μου). `git diff --cached --name-only` = ΜΟΝΟ docs/api.md, docs/features.md, docs/mobile.md. Pathspec commit a21e18a (docs(features+api+mobile): AI settings). Push: origin/main successful ✓.
+
+Συμπέρασμα: roadmap #6 (mobile AI settings) πλέον fully documented across features.md + api.md + mobile.md. Το feature είναι synchronized με την τρέχουσα κατάσταση του κώδικα.
+
+Επόμενο run: (α) grep git log για άλλα νέα undocumented feat() commits (π.χ. P51-P80 candidates) · (β) drift check σε api.md αν endpoints ή response schemas αλλάξανε · (γ) monitoring για άλλα mobile parity items.
+
 ## 2026-07-26 (twenty-fourth run — P9 slice 10 verification: product page currency reaching items already documented)
 
 Σάρωση git log για νέα feat() commits μετά την twenty-third run (commit d33a78d, 2026-07-26 12:46). Ανακάλυψη: **P9 slice 10 shipped με ήδη-ενσωματωμένη documentation**:
