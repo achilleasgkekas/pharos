@@ -6008,3 +6008,60 @@ status `active`· trial end bounded (open-ended trial = free workspace με paid
 το `/admin` γίνεται ορατό εκεί που δεν πρέπει). Μετά `lib/billing/stripe.ts` (145γρ., το
 τελευταίο). **Ξεκίνα από `superadminPage.ts`** (πιο επικίνδυνο από τα δύο: superadmin gate).
 Πριν ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI** item (προτεραιότητα).
+
+## 2026-07-28 — increment 123: unit coverage για τον /admin SSR superadmin gate
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine. **UI-first scan**: ξανά-σάρωσα το
+territory — `app/(saas)/**` έχει 13 pages, `app/admin/**` 4, και κάθε view-module στο
+`components/saas/**` έχει ήδη δικό του `.test.ts`· μηδέν ανοιχτό UI item, δεν υπάρχει
+`WEB_DEBT.md`. Οπότε συνέχισα με τη σειρά των untested modules, από το πιο επικίνδυνο.
+
+**`lib/tenancy/superadminPage.test.ts` (27 tests, μηδέν production αλλαγή)** — το
+`requireSuperadminPage()` είναι ο **μοναδικός** guard μπροστά από ΟΛΟ το `/admin` console
+(κάθε page κάτω από `app/admin/**` το καλεί πρώτο), και **κανένα** από τα ~5000 tests δεν το
+είχε εκτελέσει ποτέ: τα admin view-modules δοκιμάζονται ως pure functions, και το API-side
+`requireSuperadmin()` είναι **άλλη** συνάρτηση (γυρίζει NextResponse· αυτή πετάει `notFound()`).
+Άρα ένα regression εδώ (branch που σταματά να πυροδοτεί, ordering slip που χτυπά τη DB πριν
+εξουσιοδοτήσει, stale cookie που δουλεύει μετά τη διαγραφή του λογαριασμού) θα περνούσε όλο το
+suite green **ενώ** έκανε το `/admin` προσβάσιμο — και σε self-hosted install, όπου το console
+δεν πρέπει να υπάρχει καθόλου.
+
+Mock **μόνο** στα node-only seams (`next/navigation`, `connectDB`, οι δύο accountSession
+readers, το Account model)· το **`saasMode()` και το allowlist matching τρέχουν πραγματικά**
+off `process.env`, άρα ο flag ladder και το case-insensitive email match καρφώνονται ως wired.
+Το `notFound` mock **πετάει** (ο πραγματικός του συμβόλαιο) — κάθε «και μηδέν δουλειά πίσω από
+το gate» assertion εξαρτάται από αυτό.
+
+Τα πιο load-bearing tests: **SAAS_MODE off/unset → 404 με μηδέν δουλειά** (ούτε env probe,
+ούτε cookie parse, ούτε DB round-trip: ένα self-hosted deployment δεν πληρώνει τίποτα για
+route που δεν υπάρχει για αυτό)· **κενό allowlist → 404 ΧΩΡΙΣ να διαβαστεί το cookie** (αλλιώς
+κάθε signed-in χρήστης θα μπορούσε να ψαρέψει τη διαφορά 401-vs-404 και να μάθει ότι το console
+υπάρχει)· **μηδέν login redirect** για anonymous viewer (ένα login form θα αποκάλυπτε το
+console — το `redirect` mockάρεται μόνο για να επιβεβαιωθεί ότι ΠΟΤΕ δεν καλείται)·
+**stale-cookie defence in depth** (διαγραμμένος operator με έγκυρο ακόμα cookie χάνει την
+πρόσβαση· **οποιοδήποτε truthy** `lean()` μετράει ως existing, αφού το Mongoose γυρίζει doc όχι
+boolean — ένα `=== true` θα κλείδωνε έξω κάθε νόμιμο operator)· **lookup keyed στο session
+subject** και **projected σε `_id` μόνο** (ένα existence probe δεν φορτώνει το password hash)·
+allowlist **re-read ανά call** (revoke από env ισχύει στο επόμενο render, μηδέν caching)·
+fail-closed σε malformed session email + lookalike addresses (`op@pharos.dev.attacker.com`,
+`xop@pharos.dev`, `op@pharos.de`)· connect-before-query ordering· claims returned **verbatim
+by reference** χωρίς mutation· και **failure propagation** (registry down / mongo timeout →
+throw, όχι παραπλανητικό 404 που λέει στον operator ότι το δικό του console δεν υπάρχει).
+
+**Verified**: **27/27 green από την πρώτη εκτέλεση**. Πλήρες `npx vitest run` → **323 files /
+5048 tests green** (από 320/4980: +3 files/+68 tests — 1 δικό μου, τα υπόλοιπα από ταυτόχρονες
+routines). `npm run type-check` → **EXIT 0 χωρίς κανένα fix**. **Docker: κανένα rebuild**
+(test-only, μηδέν production/runtime/env/deps αλλαγή → ούτε ο mutex χρειάστηκε).
+**Browser-verify: skipped** (test file, μηδέν observable UI). Collision guard: `git status
+--short` πριν το staging = μόνο το δικό μου untracked αρχείο, μηδέν staged από άλλη routine·
+pathspec commit. Pushed `73c445b`.
+
+**## Needs Achilleas:** τίποτα νέο. Παραμένουν: **slug για μη-λατινικά ονόματα** (workspace
+«Πλαίσιο» → `w-k3j9x1`· προτείνω transliteration με το υπάρχον `GREEK_MAP`), Stripe keys,
+τελικό plan pricing, SMTP.
+
+**Next task:** μένει **1 untested module** στο SaaS UI-guard επίπεδο: `saasPage.ts` (40γρ.,
+`requireSaasUiEnabled` + `getSaasViewer` — ο ίδιος gate για το tenant-facing `(saas)` segment,
+χωρίς allowlist· δύο exports, το ένα async). Μετά **`lib/billing/stripe.ts`** (145γρ., το
+τελευταίο untested module του territory: plans/prices config + checkout/portal stubs). Πριν
+ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI** item (προτεραιότητα).
