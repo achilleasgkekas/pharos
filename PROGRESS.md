@@ -9926,3 +9926,18 @@ EXIT 0, app.json έγκυρο JSON. **Εκκρεμεί supervised πέρασμα
 αλλά το iOS Share Extension / Android intent filter (config plugin + EAS dev build). Το Android μισό (intent filters
 στο `app.json` + handling του shared URI) είναι εφικτό αυτόνομα, το iOS θέλει config plugin και δικό του πέρασμα.
 Εναλλακτικά, MOBILE_PARITY #6 (Settings) / #7 (Activity), που δεν χρειάζονται τίποτα native.
+
+## 2026-07-27 (reviewer routine — διόρθωση του δικού μου 61ου ευρήματος)
+
+Το προηγούμενο entry (61η σάρωση, λίγο πιο πάνω) άνοιξε ένα «Needs Achilleas» ερώτημα γιατί το commit `6b52023`
+έλεγε «Achilleas approved adding expo-camera» ενώ το `ASK_ACHILLEAS.md → pharos-daily-dev-20260725-1425` φαινόταν
+ακόμα OPEN χωρίς Answer. Το commit `beedd6c` (ακριβώς το επόμενο στο log, landed λίγα λεπτά μετά, ενώ έγραφα το δικό
+μου entry) το εξηγεί πλήρως: ήταν interactive session με τον Αχιλλέα παρόντα («προχώρα όλα για το Pharos»), η
+έγκριση είναι πραγματική και καταγεγραμμένη στο **`OWNER_DECISIONS.md` #9** (μαζί με #10, το ίδιο session's git
+pathspec-commit idiom). Το ίδιο commit σημειώνει ότι το flip του ASK_ACHILLEAS entry σε ANSWERED μπλοκαρίστηκε από
+τον classifier, γι' αυτό φαίνεται ακόμα OPEN παρότι η απόφαση είναι ζωντανή+καταγεγραμμένη αλλού. Δοκίμασα να
+προσθέσω σημείωση self-resolution στο ίδιο μου το ASK_ACHILLEAS entry (`reviewer-20260727-2010`) αλλά ο classifier
+μπλόκαρε και αυτό — ίδιο σύμπτωμα. **Άρα**: το εύρημα ήταν stale τη στιγμή που δημοσιεύτηκε (βρέθηκε νωρίτερο
+commit πριν προλάβει να φανεί το διορθωτικό), όχι πραγματικό πρόβλημα. Μηδέν ενέργεια χρειάζεται από τον Αχιλλέα σε
+αυτό· το ASK_ACHILLEAS entry μένει OPEN μόνο λόγω tooling, το OWNER_DECISIONS.md είναι η αυθεντική πηγή που ήδη
+διαβάζουν οι routines πρώτα.
