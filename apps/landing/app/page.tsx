@@ -473,7 +473,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'How do I invite people to a hosted workspace, and what can they do?',
-    a: 'Send an email invite from Settings → Members and pick a role: owner, admin, or member. The invitee gets a signup link, and owners or admins can change roles, resend an expired invite, revoke a pending one, or remove someone later, with every change landing in an append-only activity log. Only an owner can promote someone else to owner, and a workspace can never end up with zero owners. Self-hosted skips all of this in favor of one shared login behind your LAN or VPN.',
+    a: 'Send an email invite from Settings → Members and pick a role: owner, admin, or member. The invitee gets a signup link, and owners or admins can change roles, resend an expired invite, revoke a pending one, or remove someone later, with every change landing in an append-only activity log. Only an owner can promote someone else to owner, and a workspace can never end up with zero owners. Self-hosted has its own accounts system instead of email invites: an admin adds people from Settings → Users and assigns each one admin, member, or a read-only viewer role (viewers can browse everything but every create, edit, and delete is blocked, both in the app and over the API), no activity log, just accounts behind your own LAN or VPN.',
   },
   {
     q: 'How do updates work?',
@@ -577,7 +577,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Does it support two-factor authentication?',
-    a: 'On hosted, yes: turn on TOTP-based two-factor authentication from account settings with any authenticator app (Google Authenticator, 1Password, and so on), confirm it with a 6-digit code, and save the one-time recovery codes it gives you. Once enabled, every login asks for that second factor, not just this browser or device. Self-hosted sits behind your own LAN or VPN with a single shared login rather than per-person accounts, so this extra layer is a hosted feature.',
+    a: 'On hosted, yes: turn on TOTP-based two-factor authentication from account settings with any authenticator app (Google Authenticator, 1Password, and so on), confirm it with a 6-digit code, and save the one-time recovery codes it gives you. Once enabled, every login asks for that second factor, not just this browser or device. Self-hosted already has per-person accounts (admin, member, viewer, managed from Settings → Users) but no TOTP step on top of them yet, so this extra layer is a hosted-only feature for now.',
   },
   {
     q: 'Can I download a copy of everything you have on me?',

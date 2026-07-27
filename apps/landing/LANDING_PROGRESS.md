@@ -4373,3 +4373,64 @@ continuation.
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-27 (run 28)
+
+Ελεγχος στην αρχη: `git log --oneline a6e39b8..HEAD | grep "feat("` βρηκε 3 νεα feat commits απο αλλες
+routines μετα το τελευταιο landing commit μου: `0264ccf` (MV3 Chrome extension, P5 phase 2), `1346b4d`
+(enforced viewer role, P31), `6b52023` (mobile barcode scan στη λιστα αγορων, P17). Διαβασα τα docs
+(`docs/features.md`, `docs/security.md`, `docs/api.md`) που τα συνοδευουν πριν αποφασισω τι να αλλαξω
+στο landing (ιδιο μαθημα με τα προηγουμενα runs: διαβασε την πραγματικη υλοποιηση πριν γραψεις copy).
+
+Βρηκα κατι πιο σοβαρο απο ενα απλο gap: **αντιφαση μεσα στο ιδιο FAQ block**. Η ερωτηση "Can my household
+or team share one instance?" (γραμμη ~471) λεει ηδη σωστα οτι το self-hosted δεχεται πολλαπλους λογαριασμους
+("you can add accounts for the people you share with"), αλλα δυο αλλες γειτονικες FAQ ερωτησεις ελεγαν το
+ΑΝΤΙΘΕΤΟ: "How do I invite people to a hosted workspace" εκλεινε με "Self-hosted skips all of this in favor
+of one shared login behind your LAN or VPN", και "Does it support two-factor authentication?" εκλεινε με
+"Self-hosted sits behind your own LAN or VPN with a single shared login rather than per-person accounts".
+Και τα δυο ηταν ηδη λαθος **πριν** το σημερινο P31 (το `docs/security.md` diff του P31 commit δειχνει οτι η
+γραμμη "Additional accounts (admin / member roles) are managed in Settings → Users" υπηρχε ηδη απο πριν, το
+P31 απλα προσθεσε τον τριτο ρολο "viewer" και το enforcement) — αρα δεν ητανε staleness απο νεο feature,
+ητανε προϋπαρχον copy bug που το P31 μου εδωσε την αφορμη να το εντοπισω διαβαζοντας το security.md.
+
+Επιβεβαιωσα με `grep -rli totp apps/web/src`: το TOTP/MFA ζει αποκλειστικα κατω απο το `(saas)` route group
+και `saas/`-namespaced αρχεια (`account/settings`, `api/saas/auth/mfa`, `lib/tenancy/totp.ts` κλπ) — το
+self-hosted login (`security.md` §1, session cookie) δεν εχει TOTP καθολου. Αρα το "2FA = hosted-only" παραμενει
+αληθεια, μονο η αιτιολογια ("single shared login rather than per-person accounts") ητανε λαθος.
+
+Αλλαγη (`apps/landing/app/page.tsx`, 2 FAQ answers, δεν προσθεσα νεα ερωτηση):
+- "How do I invite people to a hosted workspace...": η τελευταια προταση αντικατασταθηκε απο "Self-hosted
+  skips all of this..." σε "Self-hosted has its own accounts system instead of email invites: an admin adds
+  people from Settings → Users and assigns each one admin, member, or a read-only viewer role (viewers can
+  browse everything but every create, edit, and delete is blocked, both in the app and over the API), no
+  activity log, just accounts behind your own LAN or VPN." (νεο viewer role απο το P31 ενσωματωμενο εδω.)
+- "Does it support two-factor authentication?": η τελευταια προταση απο "Self-hosted sits behind your own
+  LAN or VPN with a single shared login rather than per-person accounts..." σε "Self-hosted already has
+  per-person accounts (admin, member, viewer, managed from Settings → Users) but no TOTP step on top of
+  them yet, so this extra layer is a hosted-only feature for now." (ιδιο συμπερασμα, σωστη αιτιολογια.)
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13 static routes, `/` 5.35 kB (αμεταβλητο bundle).
+- em-dash: 0 (python3 UTF-8 count).
+- Θυρα 3100 κατειλημμενο (Docker), `next start -p 3102` πανω στο production build -> 200. Browser pane:
+  `read_console_messages` (onlyErrors) -> "No console logs." `javascript_tool` επιβεβαιωσε 6 checks: και οι
+  δυο νεες προτασεις παρουσες, και οι δυο παλιες αντιφατικες προτασεις ΕΞΑΦΑΝΙΣΜΕΝΕΣ, και η προϋπαρχουσα
+  σωστη γραμμη ~471 ("Each instance sits behind a login and you can add accounts") αμεταβλητη και παρουσα.
+  Hero screenshot καθαρο. Server τερματισμενος (`pkill -9 -f "next start -p 3102"` + επιβεβαιωση οτι το
+  next-server process εφυγε απο τη λιστα `lsof`, τα CLOSE_WAIT sockets που εμειναν ηταν απο την client
+  πλευρα του browser tool, οχι απο ζωντανο server).
+- Δεν αγγιξα Docker/:3000/web/mobile. Μηδεν subagent, μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το commit εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` +
+  `apps/landing/LANDING_PROGRESS.md`, κανενα ξενο staged file.
+
+Επομενο increment: το ROADMAP block (γραμμη ~426) εχει ακομα "Mobile share-sheet & barcode quick capture"
+στη φαση "Exploring", αλλα το barcode-μισο ηδη shipped (P17, mobile camera scan -> shopping list/inventory,
+βλ. `docs/features.md` γραμμη 143). Πρεπει να χωριστει: το barcode κομματι μεταφερεται στο "Shipped", μενει
+μονο το "Mobile share-sheet" (που δεν βρηκα πουθενα υλοποιημενο, `grep -ri share-sheet` μηδεν hits) στο
+"Exploring". Επισης το FAQ bookmarklet (γραμμη ~492) αναφερει μονο το phase-1 bookmarklet, θα μπορουσε να
+προστεθει μια προταση για το νεο MV3 Chrome extension (P5 phase 2, toolbar button + right-click, μηδεν
+content-script permissions). Αν κανενα νεο feat commit δεν εμφανιστει πρωτα, αυτα τα δυο ειναι οι candidates.
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
