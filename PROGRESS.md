@@ -10034,3 +10034,50 @@ Trash, Jobs, History)**, κανένα από τα δύο δεν χρειάζετ
 - **P31 live check**: εκκρεμεί ακόμα πραγματικό login με τους τρεις ρόλους (από το προηγούμενο run).
 - **P36 / P16 / P23**: τα τρία εναπομείναντα Approved μπλοκάρονται σε GoCardless credentials, πραγματικό sample export
   αρχείο, και EAS dev build αντίστοιχα.
+
+## 2026-07-27 (cont.⁴ — mobile Settings → AI: ο διακόπτης, όχι τα κλειδιά)
+
+Το Approved queue είναι πλέον **άδειο από αυτόνομα χτίσιμα** (P36 θέλει GoCardless credentials, P16 πραγματικό
+sample export, P23 EAS dev build), οπότε fallback στο **MOBILE_PARITY #6**. Από ό,τι έμενε εκεί (theme, language,
+AI engine, storage) διάλεξα το **AI engine**, γιατί είναι το μόνο με πραγματική λειτουργική αξία: το theme/language
+θέλουν theme-context και i18n υποδομή που δεν υπάρχουν καθόλου στο mobile (L items στο UI Debt Queue), ενώ η
+δυνατότητα «σβήσε το AI από το κινητό» αφορά χρήματα ανά κλήση.
+
+**Η σχεδιαστική γραμμή ήταν πού κόβεται το feature.** Το web Settings → AI έχει τρία πράγματα μαζί: credentials
+(key/host/base URL), επιλογή μοντέλου, και τους διακόπτες. Μετέφερα **μόνο τους διακόπτες**. Ένα API token κινητού
+που θα μπορούσε να διαβάσει ένα Anthropic key θα ήταν χειρότερο από το να μην υπάρχει η οθόνη, και ένα κλεμμένο
+τηλέφωνο δεν πρέπει να είναι δρόμος προς το κλειδί. Το GET στέλνει provider/μοντέλο/readiness ώστε το «AI is on» να
+είναι επαληθεύσιμο, και υπάρχει test που αποτυγχάνει αν ποτέ διαρρεύσει `apiKey`/`baseUrl`/`ollamaHost` στο σώμα.
+
+**Ποιος επιτρέπεται να γράφει**: το PATCH είναι **admin-only** (403 και σε member, όχι μόνο σε viewer), καθρέφτης
+των web `setAiEnabled`/`setAiFeature`. Το AI ξοδεύει χρήματα ανά κλήση και η ρύθμιση είναι instance-wide, οπότε ένας
+συγκάτοικος που καταχωρεί έξοδα δεν πρέπει να μπορεί να ανάψει metered provider από το κινητό. Το **GET μένει ανοιχτό
+σε όλους**: ένας viewer πρέπει να μπορεί να δει *γιατί* ένα κουμπί scan δεν έκανε τίποτα. Το `canEdit` το λέει ο
+server, δεν το μαντεύει το app από cached role.
+
+Δύο λεπτομέρειες που συνήθως ξεχνιούνται και τις χειρίστηκα ρητά: **absent feature key = ON** (αλλιώς κάθε feature που
+προσθέτει μελλοντική έκδοση θα εμφανιζόταν σβηστό σε παλιά εγκατάσταση), και **master switch off → ο readiness probe
+δεν τρέχει καθόλου** (μια εγκατάσταση με σβηστό AI δεν πρέπει να χτυπάει τοπικό Ollama σε κάθε άνοιγμα των Settings).
+Επίσης: παλιότερος server χωρίς το route (404) απλά **δεν δείχνει το section** αντί για κόκκινο σφάλμα.
+
+**Verify**: +15 route tests (auth gates ×4, GET shape ×5 συμπεριλαμβανομένου του no-credential-leak, PATCH writes ×6).
+web `type-check` EXIT 0, mobile `npx tsc --noEmit` EXIT 0, full `npx vitest run` **4805 passed / 315 files** (μηδέν
+regression). Safe Docker rebuild υπό το mutex: build → mongo `healthy` → up → **/login 200 στο 1ο poll**,
+RestartCount 0, και `GET /api/v1/settings/ai` χωρίς token → **401** (το route είναι ζωντανό και gated).
+`builder prune -f` (2.35GB), lock released. Το ίδιο το mobile UI δεν είναι unattended verifiable (χρειάζεται
+simulator), οπότε στηρίχτηκε σε tsc + code review, όπως κάθε mobile run.
+
+**Επόμενο task (πρόταση)**: **MOBILE_PARITY #6 storage/OneDrive** δεν γίνεται χωρίς τα credentials του Αχιλλέα, οπότε
+το πιο χρήσιμο επόμενο είναι το **Build Queue P2/M «Safe-area insets» (`react-native-safe-area-context`)** — αγγίζει
+κάθε οθόνη σε συσκευές με notch/home indicator, είναι νέο dep αλλά mainstream Expo, tsc-verifiable. Εναλλακτικά,
+αν προτιμηθεί μηδέν νέο dep: **ActivityIndicator raw → shared `<Spinner>` (42 uses)**, καθαρά μηχανικό.
+
+## Needs Achilleas
+
+- **Παρατήρηση ασφαλείας εν παρόδω (δεν την πείραξα, δεν είναι δική μου κλήση)**: το commit `0bc5e14` έβαλε
+  `requireAdmin()` στις 8 web Settings→Notifications actions, αλλά το **`PATCH /api/v1/settings` επιτρέπει ακόμα σε
+  απλό member να αλλάξει `ntfyUrl`/`ntfyEnabled`** από το κινητό. Δηλαδή ο ίδιος περιορισμός ισχύει στο web και όχι
+  στο API. Το ευθυγράμμισμα είναι μια γραμμή (`canAdmin(user.role)` guard στα ntfy πεδία), αλλά **αλλάζει σιωπηλά
+  συμπεριφορά** για όποιον member σήμερα επεξεργάζεται ntfy από το mobile, οπότε δεν το έκανα χωρίς να το πεις.
+- Τα προηγούμενα ανοιχτά μένουν: **P36 / P16 / P23** (credentials, sample export, EAS dev build), **P17 live check**
+  σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
