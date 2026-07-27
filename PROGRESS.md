@@ -10081,3 +10081,61 @@ simulator), οπότε στηρίχτηκε σε tsc + code review, όπως κ�
   συμπεριφορά** για όποιον member σήμερα επεξεργάζεται ntfy από το mobile, οπότε δεν το έκανα χωρίς να το πεις.
 - Τα προηγούμενα ανοιχτά μένουν: **P36 / P16 / P23** (credentials, sample export, EAS dev build), **P17 live check**
   σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
+
+## 2026-07-28 (OpenAPI: η προδιαγραφή ξαναγίνεται αλήθεια, και μένει)
+
+Το Approved queue είναι άδειο από αυτόνομα χτίσιμα (P36 θέλει GoCardless credentials, P16 πραγματικό sample
+export, P23 EAS dev build) και το MOBILE_PARITY roadmap #7 έκλεισε, οπότε fallback. Αντί για ένα ακόμα
+cosmetic UI-debt item, μέτρησα πρώτα τι λείπει πραγματικά: **61 route files κάτω από `app/api/v1`, 50
+τεκμηριωμένα paths στο `docs/openapi.yaml`**. Έντεκα endpoints είχαν shipped μετά τη δημιουργία της
+προδιαγραφής χωρίς να τη γράψει κανείς: bills, gift cards, goals, loyalty cards (πλήρες CRUD ×2 paths το
+καθένα), `/lookup/barcode`, `GET|PATCH /settings/ai`, `POST|DELETE /statements/plans/merge`.
+
+**Γιατί αυτό και όχι mobile polish**: το `openapi.yaml` δεν είναι διακοσμητικό, είναι το συμβόλαιο που
+διαβάζουν code generators και τρίτοι clients. Ένας client φτιαγμένος από αυτό απλά **δεν ήξερε ότι
+υπάρχουν** τέσσερα ολόκληρα entities. Είναι χειρότερο από απούσα τεκμηρίωση, γιατί διαβάζεται ως πλήρης.
+Το ίδιο το docs routine το είχε γράψει «πιθανό επόμενο task» σε ~10 runs χωρίς να το πιάσει ποτέ (ένα και
+μοναδικό commit στο αρχείο, αυτό που το δημιούργησε).
+
+**Τι μπήκε**: τα 11 paths γραμμένα από τα route files, όχι από τα docs, με τις λεπτομέρειες που κρύβουν τα
+bugs: το `addUse`/`removeUseId` και `addContribution`/`removeContributionId` είναι αμοιβαία αποκλειόμενα
+(400 αν σταλούν μαζί), το `addContribution.amount` πρέπει να είναι αυστηρά θετικό ενώ το `addUse.amount`
+δέχεται και αρνητικό (reload), το `paid: true` σε recurring bill γεννά την επόμενη δόση και το λέει μέσω
+`spawnedNext`, το PATCH στο `/settings/ai` είναι admin-only (403). +8 component schemas (Bill, GiftCard(+Use),
+Goal(+Contribution), LoyaltyCard, BarcodeFormat, BillCycle) με τα derived πεδία (`balance`, `current`,
+`perMonth`, `status`) ρητά σημειωμένα ως «ποτέ stored». +4 tags. Διορθώθηκε και το **stale Trash enum** (έλεγε
+6 τύπους, το route δέχεται 10).
+
+**Το κομμάτι που έχει σημασία μακροπρόθεσμα**: νέο `openapi.coverage.test.ts` που **παράγει την αλήθεια από
+το filesystem** (κάθε `route.ts` = ένα path, κάθε exported GET/POST/PATCH/DELETE = μία operation) και σπάει
+το build σε drift **και προς τις δύο κατευθύνσεις**: undocumented route ΚΑΙ documented path που δεν υπάρχει
+πια. Χωρίς αυτό, το σημερινό sync θα ξανασάπιζε στο επόμενο entity. Το YAML διαβάζεται ως κείμενο, όχι με
+parser: κανένας YAML parser δεν είναι direct dependency του app, και τα δύο πράγματα που ελέγχονται (top-level
+path keys, operation keys ένα επίπεδο μέσα) είναι μονοσήμαντα σε σταθερό indentation.
+
+**Εν παρόδω, ένα πραγματικό λάθος στο `docs/api.md`**: το PATCH `/settings/ai` τεκμηριωνόταν με body
+`{ enabled?: boolean }` ενώ το route διαβάζει **`aiEnabled`** (επιβεβαιωμένο σε route + tests + mobile client).
+Όποιος έγραφε client από τα docs θα έστελνε πεδίο που το route πετάει σιωπηλά. Μονόγραμμη διόρθωση.
+
+**Verify**: το spec parse-άρει ως OpenAPI 3.1 με **0 broken `$ref`** και μηδέν unknown tag (node + js-yaml),
+**61 spec paths == 61 route files**, και ο guard **επιβεβαιώθηκε ότι αποτυγχάνει** σε τεχνητό drift (μετονόμασα
+`/goals` → `/goalsX`: 2 tests έσπασαν, ένα ανά κατεύθυνση· το αρχείο επαναφέρθηκε). `npm run type-check`
+EXIT 0, full `npx vitest run` **4908 passed / 318 files** (+5 δικά μου, μηδέν regression). **Κανένα Docker
+step**: άλλαξαν μόνο docs + ένα test file, μηδέν runtime κώδικας, άρα ούτε mutex χρειάστηκε ούτε rebuild.
+Commit `83dfe10`, pushed.
+
+**Επόμενο task (πρόταση)**: το ίδιο guard-thinking σε ένα επίπεδο πιο κάτω — η προδιαγραφή τεκμηριώνει τώρα
+ΟΛΑ τα paths, αλλά τα **response schemas των παλιών paths** έχουν κι αυτά drift (π.χ. `Expense` schema χωρίς
+`space`/`split`/`taxDeductible`/`anomaly`, `Receipt` χωρίς `returnDaysLeft`, `Subscription` χωρίς
+`trialEndsAt`/`firstChargeAmount` — όλα shipped μετά τη δημιουργία του spec). Μικρό, ντετερμινιστικό, ίδιο
+verify pattern. Εναλλακτικά, αν προτιμηθεί mobile: **Build Queue P2/M «Safe-area insets»**
+(`react-native-safe-area-context`, νέο dep αλλά mainstream Expo).
+
+## Needs Achilleas
+
+- Τα προηγούμενα ανοιχτά μένουν αμετάβλητα: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample
+  export, EAS dev build), **P17 live check** σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους,
+  Chrome Web Store (προαιρετικό).
+- **`PATCH /api/v1/settings` ntfy authz** (από το προηγούμενο run, δεν το άγγιξα): οι web Notifications actions
+  είναι `requireAdmin()` αλλά το API επιτρέπει ακόμα σε member να αλλάξει `ntfyUrl`/`ntfyEnabled` από το κινητό.
+  Μια γραμμή, αλλά αλλάζει σιωπηλά συμπεριφορά, οπότε θέλει το ΟΚ σου.
