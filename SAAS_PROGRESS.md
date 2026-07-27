@@ -5797,3 +5797,72 @@ Pushed `2d343fa` + `0fcbe2d`.
 ήδη δικό του test). Μετά `billingSession.ts` (αδελφός resolver του workspaceSession, ίδια κλάση
 κινδύνου) και `provision.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI**
 item (προτεραιότητα) και για `WEB_DEBT.md` item μέσα στο territory.
+
+## 2026-07-27 — increment 120: unit coverage για το shared route plumbing (saasApi)
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine (τα OPEN είναι bakecore ×5 +
+pharos-daily-dev expo-camera) → μηδέν pre-work. **UI-first scan**: ξανά-σάρωσα ολόκληρο
+το UI territory (`app/admin/**` = 4 pages, `app/(saas)/**` = 14 pages,
+`components/saas/**` = 24 components + 26 pure view-modules) — **κάθε** view-module έχει
+ήδη δικό του `.test.ts`, μηδέν ανοιχτό UI unit, οπότε συνέχισα με τη σειρά των untested
+modules όπως την είχε αφήσει το increment 118. **WEB_DEBT scan**: τα ανοιχτά items του
+territory (SaaS rate-limit, guardless routes) είναι ήδη DONE από παλιότερα increments·
+τα υπόλοιπα ανοιχτά είναι tenancy-parity σε feature server-actions = εκτός territory.
+
+**`lib/tenancy/saasApi.test.ts` (31 tests, μηδέν production αλλαγή)** — το `saasApi` είναι
+το plumbing κάτω από **κάθε** `/api/saas/*` route: το `saasAuthGate` αποφασίζει αν το
+control plane υπάρχει καθόλου σε αυτό το deployment, και το `accountTenants` είναι η λίστα
+workspaces πάνω στην οποία χτίζουν authz το login, το session, ΚΑΙ οι δύο resolvers
+(`workspaceSession`, `billingSession`). Κάθε route test τα mockάρει, και τα δύο resolver
+tests που έγραψα στα increments 118 τα mockάρουν επίσης — δηλαδή κανένα από τα ~4700 tests
+δεν τα εκτελούσε ποτέ. Mock **μόνο** στα node-only seams (`accountAuthConfigured`,
+Membership/Tenant models)· το **`saasMode()` τρέχει πραγματικά** από process.env, άρα ο flag
+ladder καρφώνεται ως wired.
+
+Καλύπτει — **`saasAuthGate`**: SAAS_MODE off (unset/κενό/whitespace/off/false/0/no/`onn`/`2`)
+→ 404 με ακριβές body· **το 404 προηγείται του AUTH_SECRET check** και το
+`accountAuthConfigured` δεν καλείται καν (ένα self-hosted deployment δεν πρέπει ποτέ να
+πάρει 500 που υπονοεί μισο-καλωδιωμένο control plane)· on-ish τιμές (on/1/true/yes + casing
++ padding) → null· AUTH_SECRET missing → fail-closed 500· **re-read σε κάθε κλήση** και για
+τα δύο (μηδέν module-load caching, αλλιώς ένα env change δεν θα έπιανε)· body ακριβώς 1
+κλειδί· και ότι ένας throwing config reader **propagates** (το `saasGuard` του route είναι
+που το κάνει JSON 500, όχι το gate).
+
+**`accountTenants`**: query `{account, status:'active'}` — τα invited/removed κόβονται στο
+**filter**, όχι μετά· projection `tenant role` + lean· μηδέν memberships → `[]` με **μηδέν
+tenant read**· ένα `$in` query με τα refs **αυτούσια** (ObjectId δεν stringify-άρεται πριν
+μπει στο filter, αλλιώς δεν θα matchάριζε ποτέ) και matching by `String()` και στις δύο
+πλευρές· **authority split** με σκόπιμα αποκλίνοντα fixtures (το membership row κουβαλάει
+λάθος slug/plan/status επίτηδες): role από το **membership**, slug/name/plan/status από το
+**tenant doc**, και ένα `role` γραμμένο πάνω στο tenant doc **δεν κάνει escalate**· **leak
+guard** (ακριβώς 6 whitelisted κλειδιά + το serialized output δεν περιέχει
+`dbName`/`aiKeyCipher`/`stripeCustomerId` που βάζω επίτηδες στο doc)· coercion **as-is**
+(role/plan/status περνούν από `String()`, slug/name όχι → plan που λείπει βγαίνει ως το
+literal `'undefined'`, τεκμηριωμένο ρητά στο test πριν το renderάρει κανείς raw)· orphan
+membership (διαγραμμένο workspace) **πέφτει** αντί να σκάσει το login response, όλα orphan →
+`[]`· **σειρά membership** όχι σειρά tenant query· ένα row ανά membership (iterate
+memberships, όχι tenants)· tenant doc που δεν το δείχνει κανένα membership αγνοείται· μηδέν
+mutation των rows· και **failure propagation** και στα δύο reads (registry down → throw, όχι
+παραπλανητικό «no workspaces»).
+
+**Verified**: **31/31 green** (ένα fixture λάθος στην πρώτη εκτέλεση, δικό μου: το membership
+έδειχνε `t1` ενώ το doc stringify-αρε σε `abc123` → δεν matchάριζαν· διορθώθηκε το fixture,
+όχι το assertion). Πλήρες `npx vitest run` → **314 files / 4790 tests green** (από
+309/4697: +5 files/+93 tests — 1 δικό μου, τα υπόλοιπα από ταυτόχρονες routines).
+`npm run type-check` → **EXIT 0 χωρίς κανένα fix** (το idiom «typed params στα hoisted
+mocks» εφαρμόστηκε προληπτικά). **Docker: κανένα rebuild** (test-only, μηδέν
+production/runtime/env/deps αλλαγή → ούτε ο mutex χρειάστηκε). **Browser-verify: skipped**
+(test file, μηδέν observable UI αλλαγή). Collision guard: `git status --short` πριν το
+staging = μόνο το δικό μου untracked αρχείο, μηδέν staged από άλλη routine· pathspec commit.
+Pushed `ad6f445`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** μένουν **4 untested modules** στο territory: `lib/billing/billingSession.ts`
+(71γρ.), `lib/tenancy/provision.ts` (103), `saasPage.ts` (40), `superadminPage.ts` (48)·
++ `lib/billing/stripe.ts` (145). **Ξεκίνα από `billingSession.ts`**: είναι ο αδελφός
+resolver του `workspaceSession` (ίδια κλάση κινδύνου — authz gate που κάθε billing route
+mockάρει) και είναι πλέον το τελευταίο κομμάτι της auth αλυσίδας χωρίς πραγματική εκτέλεση.
+Μετά `provision.ts` (tenant creation, το μόνο write-path module χωρίς κάλυψη) και
+`stripe.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI** item
+(προτεραιότητα) και για `WEB_DEBT.md` item μέσα στο territory.
