@@ -5866,3 +5866,73 @@ mockάρει) και είναι πλέον το τελευταίο κομμάτ�
 Μετά `provision.ts` (tenant creation, το μόνο write-path module χωρίς κάλυψη) και
 `stripe.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI** item
 (προτεραιότητα) και για `WEB_DEBT.md` item μέσα στο territory.
+
+## 2026-07-27 — increment 121: unit coverage για τον billing authz resolver (billingSession)
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine. Το δικό μου OPEN
+(`pharos-saas-core-20260727-1930`, git-index race) παραμένει αναπάντητο, αλλά το task file
+έχει ήδη υιοθετήσει την πρόταση (b) — **pathspec commit υποχρεωτικό** — οπότε αυτό το run
+commit-άρισε με `git commit -F msg.txt -- <path>` και το index έπαψε να είναι κοινός πόρος.
+**UI-first scan**: ξανά-σάρωσα το UI territory (`app/admin/**` 4 pages, `app/(saas)/**`
+14 pages, `components/saas/**` 24 components + 26 pure view-modules) — **κάθε** view-module
+έχει ήδη δικό του `.test.ts`, μηδέν ανοιχτό UI unit, οπότε συνέχισα με τη σειρά των
+untested modules.
+
+**`lib/billing/billingSession.test.ts` (52 tests, μηδέν production αλλαγή)** — ο
+`resolveBillingSession` είναι το authz gate κάτω από **κάθε** billing route (checkout,
+portal). Και τα δύο route test files τον mockάρουν, όπως και το `saasApi.test.ts` — δηλαδή
+κανένα από τα ~4900 tests δεν τον εκτελούσε ποτέ. Είναι **χειρόγραφος mirror** του
+`workspaceSession` (σκόπιμα όχι shared code, βλ. header του module), οπότε η αξία του file
+είναι να καρφώσει πού ο mirror είναι **ίδιος** και, κυρίως, πού πρέπει να **αποκλίνει**:
+
+1. **Μηδέν `requireManage` switch** — το billing είναι owner/admin ΠΑΝΤΑ. Ένας `member` που
+   διαβάζει κανονικά κάθε workspace route πρέπει να απορρίπτεται εδώ. Αν αυτό το test
+   αρχίσει να περνά ανάποδα, ένα απλό μέλος ανοίγει checkout / Stripe portal για workspace
+   που δεν του ανήκει.
+2. **Μηδέν lifecycle gate** — suspended / canceled / pending workspace **εξακολουθεί** να
+   resolve-άρει. Αυτό είναι το πιο εύκολο λάθος να «διορθώσει» κάποιος αντιγράφοντας το
+   status gate του `workspaceSession`: το Stripe portal είναι ακριβώς ο τρόπος με τον οποίο
+   ένας lapsed πελάτης αλλάζει νεκρή κάρτα ή κάνει οριστικό cancel, και το checkout είναι ο
+   τρόπος που ένα canceled workspace επιστρέφει. Κλείδωμα στο status θα εγκλώβιζε ακριβώς
+   τους λογαριασμούς που θέλουν να πληρώσουν.
+3. **Billing-specific 403 wording** (`billing requires an owner or admin role`).
+
+Mock **μόνο** στα node-only seams (gate/env, session cookie, connectDB, membership read,
+tenant resolution, Tenant model)· το **`canManageBilling` τρέχει πραγματικά** (pure module),
+άρα ο role ladder καρφώνεται ως wired, όχι ως echoed. Τα fixtures **αποκλίνουν επίτηδες**
+(membership tenantId/plan vs context tenantId vs tenant-doc plan/status) ώστε κάθε
+«ποια είναι η πηγή αλήθειας» assertion να είναι load-bearing.
+
+Καλύπτει επιπλέον: gate **by identity** + μηδέν δουλειά πίσω του (ούτε connectDB — ένα
+self-hosted deployment δεν πληρώνει DB round-trip για route που δεν υπάρχει)· throwing gate
+**propagates**· 401 χωρίς connect· membership read keyed στο **session subject** (ποτέ σε
+caller-supplied τιμή)· slug ladder (trim+lower-case, blank → πρώτο membership όχι 403, exact
+match σε lower-case slug, σωστό membership όχι απλώς το πρώτο)· role gate **πριν** από κάθε
+context/tenant read + fail-closed σε unrecognised/non-string roles + «not a member» υπερισχύει
+(δεν διαρρέει billing wording)· context resolve με το **membership slug** όχι το raw string·
+tenant read με το **context tenantId** όχι του membership· failure propagation και στα δύο
+reads (registry down / mongo timeout → throw, όχι παραπλανητικό 404 «workspace not found» σε
+πληρώνοντα πελάτη)· resolved session με ακριβώς 4 κλειδιά, **identical objects** by reference,
+ctx και doc που διαφωνούν να επιστρέφονται **verbatim** (ο resolver δεν τα συμβιβάζει), και
+μηδέν mutation του membership row.
+
+**Verified**: **52/52 green από την πρώτη εκτέλεση**. Πλήρες `npx vitest run` → **317 files /
+4903 tests green** (από 314/4790: +3 files/+113 tests — 1 δικό μου, τα υπόλοιπα από
+ταυτόχρονες routines). `npm run type-check` → **EXIT 0 χωρίς κανένα fix**. **Docker: κανένα
+rebuild** (test-only, μηδέν production/runtime/env/deps αλλαγή → ούτε ο mutex χρειάστηκε).
+**Browser-verify: skipped** (test file, μηδέν observable UI). Collision guard: `git status
+--short` πριν το staging = μόνο το δικό μου untracked αρχείο· pathspec commit. Pushed
+`e680733`.
+
+**## Needs Achilleas:** τίποτα νέο. (Παραμένει ανοιχτό το `pharos-saas-core-20260727-1930`
+για το αν ο pathspec κανόνας θα περάσει σε **όλα** τα task files και των δύο projects — εδώ
+εφαρμόζεται ήδη.)
+
+**Next task:** μένουν **3 untested modules** στο territory: `lib/tenancy/provision.ts`
+(103γρ.), `saasPage.ts` (40), `superadminPage.ts` (48)· + `lib/billing/stripe.ts` (145).
+**Ξεκίνα από `provision.ts`**: είναι το μόνο **write-path** module χωρίς κάλυψη (tenant
+creation — slug minting, owner membership, db naming), δηλαδή η μεγαλύτερη κλάση κινδύνου
+που απομένει τώρα που όλη η auth αλυσίδα εκτελείται πραγματικά από tests. Μετά τα δύο page
+guards (`saasPage`/`superadminPage`, μικρά αλλά είναι ο SSR αντίστοιχος του `saasAuthGate`)
+και τέλος `stripe.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI**
+item (προτεραιότητα) και για `WEB_DEBT.md` item μέσα στο territory.
