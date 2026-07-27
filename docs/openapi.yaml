@@ -2425,98 +2425,156 @@ components:
       description: Item summary. The detail endpoint returns additional fields (links, price history, photos, warranty, purchase, computed price block).
       additionalProperties: true
       properties:
-        _id: { type: string }
+        id: { type: string }
+        num: { type: string }
         title: { type: string }
         status: { type: string }
         category: { type: string }
-        currentPrice: { type: number }
-        targetPrice: { type: number }
+        currentPrice: { type: number, description: Always the deployment's base currency. }
+        purchasedPrice: { type: number, nullable: true }
+        targetPrice: { type: number, nullable: true }
+        currency: { type: string, description: Code the item was priced in abroad; empty on an ordinary item. }
+        origAmount: { type: number, description: 'Printed anchor price on a foreign purchase; 0 otherwise.' }
+        fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet (then the price fields are still the printed ones and must not be summed as base).' }
+        specs: { type: string }
+        warrantyUntil: { type: string, format: date-time, nullable: true }
         tags:
           type: array
           items: { type: string }
-        updatedAt: { type: string, format: date-time }
+        photo: { type: string, nullable: true, description: 'First photo path; fetch via GET /api/files/<photo> with the same Bearer token.' }
+        updatedAt: { type: string, format: date-time, nullable: true }
         deleted: { type: boolean, description: Present and true only in an updatedSince sync when the record was soft-deleted. }
     ShoppingListItem:
       type: object
+      description: 'Shared shape with the web shopping list, which is why the id field is `_id` here and `id` on the REST-native resources.'
       additionalProperties: true
       properties:
         _id: { type: string }
         name: { type: string }
-        quantity: { type: number }
+        quantity: { type: string, description: 'Free text, not a number (e.g. "2", "500g", "2 packs").' }
         category: { type: string }
         brand: { type: string }
         note: { type: string }
         checked: { type: boolean }
+        aiScanned: { type: boolean, description: True when the entry came from a product-photo scan. }
+        createdAt: { type: string, format: date-time }
     LineItem:
       type: object
       additionalProperties: true
       properties:
-        name: { type: string }
-        price: { type: number }
-        quantity: { type: number }
+        name: { type: string, description: The AI-refined name when there is one, else the raw printed name. }
+        qty: { type: number }
+        price: { type: number, description: Unit price NET of VAT, as stored. }
         vatRate: { type: number }
     Receipt:
       type: object
       additionalProperties: true
       properties:
-        _id: { type: string }
+        id: { type: string }
         store: { type: string }
-        date: { type: string }
-        total: { type: number }
+        date: { type: string, format: date-time, nullable: true }
+        total: { type: number, description: Gross incl. VAT, always the deployment's base currency. }
         subtotal: { type: number }
         vatAmount: { type: number }
+        currency: { type: string, description: Code printed on the receipt. }
+        origAmount: { type: number, description: 'Printed total on a foreign receipt; 0 otherwise.' }
+        fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet (then `total` is still the printed number and must not be summed as base).' }
         paymentMethod: { type: string }
+        warrantyMonths: { type: number }
+        itemCount: { type: integer, description: Derived — number of stored line items. The list endpoint does not inline them; the detail endpoint returns `lineItems`. }
         verified: { type: boolean }
         archived: { type: boolean }
-        updatedAt: { type: string, format: date-time }
+        file: { type: string, nullable: true, description: 'Stored scan path; fetch via GET /api/files/<file> with the same Bearer token.' }
+        thumb: { type: string, nullable: true }
+        returnDaysLeft: { type: integer, description: 'Derived (PA3) — days left in the store return window. Omitted entirely on an archived receipt and on an updatedSince sync (the cross-doc lookups are skipped there); never stored.' }
+        updatedAt: { type: string, format: date-time, nullable: true }
         deleted: { type: boolean }
+    SplitEntry:
+      type: object
+      description: 'One other person who owes you part of the expense (P35). Your own portion is implicit: amount − Σ share.'
+      properties:
+        name: { type: string, description: Free-form name, not an app account. }
+        share: { type: number }
+        settled: { type: boolean, description: True once they have paid you back. }
     Expense:
       type: object
       additionalProperties: true
       properties:
-        _id: { type: string }
+        id: { type: string }
         kind: { type: string, enum: [income, expense] }
         vendor: { type: string }
-        amount: { type: number }
         category: { type: string }
-        date: { type: string }
+        space: { type: string, description: 'Per-space/per-property ledger tag (P34), e.g. a second home; empty when unassigned.' }
+        amount: { type: number, description: Always the deployment's base currency. }
+        currency: { type: string, description: Code printed on the document. }
+        origAmount: { type: number, description: 'Printed figure on a foreign document; 0 otherwise.' }
+        fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet (then `amount` is still the printed number and must not be summed as base).' }
+        date: { type: string, format: date-time, nullable: true }
         period: { type: string }
         recurring: { type: boolean }
         recurringCycle: { type: string }
         paymentMethod: { type: string }
         notes: { type: string }
-        updatedAt: { type: string, format: date-time }
+        file: { type: string, nullable: true, description: 'Stored scan path; fetch via GET /api/files/<file> with the same Bearer token.' }
+        thumb: { type: string, nullable: true }
+        verified: { type: boolean }
+        split:
+          type: array
+          items: { $ref: '#/components/schemas/SplitEntry' }
+        taxDeductible: { type: boolean }
+        taxCategory: { type: string }
+        anomaly:
+          type: integer
+          description: 'Derived ±% deviation from this vendor''s median (>30% only, series of ≥3 priced entries). Present only on a full list read — omitted on an updatedSince sync, where the partial slice would skew the median. Never stored.'
+        updatedAt: { type: string, format: date-time, nullable: true }
         deleted: { type: boolean }
     Statement:
       type: object
       additionalProperties: true
       properties:
-        _id: { type: string }
+        id: { type: string }
         card: { type: string }
+        last4: { type: string }
         period: { type: string }
-        total: { type: number }
-        updatedAt: { type: string, format: date-time }
+        statementDate: { type: string, format: date-time, nullable: true }
+        dueDate: { type: string, format: date-time, nullable: true }
+        totalAmount: { type: number, description: Always the deployment's base currency. }
+        minimumPayment: { type: number }
+        paidAmount: { type: number }
+        currency: { type: string, description: Code printed on the statement. }
+        origAmount: { type: number, description: 'Printed total on a foreign statement; 0 otherwise.' }
+        fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet.' }
+        txnCount: { type: integer, description: Derived — number of stored transactions. The list endpoint does not inline them; the detail endpoint returns `transactions`. }
+        updatedAt: { type: string, format: date-time, nullable: true }
         deleted: { type: boolean }
     Subscription:
       type: object
       additionalProperties: true
       properties:
-        _id: { type: string }
+        id: { type: string }
         name: { type: string }
-        amount: { type: number }
-        billingCycle: { type: string }
-        nextRenewal: { type: string }
-        category: { type: string }
         provider: { type: string }
-        url: { type: string }
+        category: { type: string }
+        amount: { type: number, description: Always the deployment's base currency. }
+        currency: { type: string }
+        origAmount: { type: number, description: 'Printed figure on a foreign-billed subscription; 0 otherwise.' }
+        fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet.' }
+        billingCycle: { type: string, enum: [monthly, yearly, quarterly, weekly, lifetime] }
+        startDate: { type: string, format: date-time, nullable: true }
+        nextRenewal: { type: string, format: date-time, nullable: true }
         active: { type: boolean }
-        updatedAt: { type: string, format: date-time }
+        paymentMethod: { type: string }
+        url: { type: string }
+        notes: { type: string }
+        trialEndsAt: { type: string, format: date-time, nullable: true, description: 'Free-trial end (P33); the cancel-before-charge alert fires `trialAlertDays` before it.' }
+        firstChargeAmount: { type: number, description: 'What the first real charge will be when it differs from `amount`; 0 when it does not.' }
+        updatedAt: { type: string, format: date-time, nullable: true }
         deleted: { type: boolean }
     Voucher:
       type: object
       additionalProperties: true
       properties:
-        _id: { type: string }
+        id: { type: string }
         title: { type: string }
         code: { type: string }
         store: { type: string }
@@ -2626,11 +2684,17 @@ components:
           items: { $ref: '#/components/schemas/GoalContribution' }
         updatedAt: { type: string, format: date-time, nullable: true }
         deleted: { type: boolean }
+    TaskStep:
+      type: object
+      properties:
+        id: { type: string }
+        text: { type: string }
+        done: { type: boolean }
     Task:
       type: object
       additionalProperties: true
       properties:
-        _id: { type: string }
+        id: { type: string }
         title: { type: string }
         status: { type: string, enum: [todo, in-progress, done, blocked] }
         priority: { type: string }
@@ -2638,11 +2702,16 @@ components:
           type: array
           items: { type: string }
         content: { type: string }
-        dueDate: { type: string }
-        updatedAt: { type: string, format: date-time }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/TaskStep' }
+        dueDate: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
         deleted: { type: boolean }
     Notification:
       type: object
+      description: 'Shared shape with the web notification feed, which is why the id field is `_id` here and `id` on the REST-native resources.'
       additionalProperties: true
       properties:
         _id: { type: string }
