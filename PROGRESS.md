@@ -9794,6 +9794,98 @@ Approved queue.
   household supervised session, P16 Firefly III/Grocy real sample-file, Settings credentials boundary, P8 tax-export
   ZIP, P5 MV3-extension phase 2, light-theme parity mobile.
 
+## 2026-07-27 (reviewer routine — 61η σάρωση, P9 phase 2 market-rate lookup + P17 barcode UI review)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: μηδέν entry addressed στο `reviewer` routine (τα OPEN entries
+είναι όλα bakecore ή `pharos-daily-dev`, βλ. εύρημα παρακάτω). Working tree καθαρό στην αρχή (μόνο ένα ήσυχο
+`git status` diff σε `apps/mobile/package.json`/`package-lock.json` που ένα ταυτόχρονο daily-dev run commit-άρισε
+μόνο του πριν προλάβω να το αγγίξω, δες παρακάτω).
+
+**Range**: `cc65fb5..HEAD`, **37 commits** — αρχικά 36 (`cc65fb5..27f662e`, P9 phase 2 recovery: το «Market rate»
+lookup feature μπήκε στο repo + fleet-hygiene correction), και ένα 37ο (`6b52023`, P17 mobile barcode-scan UI) που
+προστέθηκε από ένα άλλο daily-dev run **ενώ** αυτή η σάρωση έτρεχε ήδη (το `git status` ήταν clean στην αρχή,
+committed ahead-by-1 στη μέση) — το συμπεριέλαβα στο review αντί να το αφήσω στην επόμενη σάρωση, ώστε να μη
+μείνει άτσεκαρο πίσω από τον marker.
+
+**Type-check**: web `npm run type-check` EXIT 0 · mobile `npx tsc --noEmit` EXIT 0. **Full `npx vitest run`**
+(απαιτητικό confirmation pass λόγω μεγέθους): **4697 passed / 309 files**, μηδέν regression.
+
+**Review — P9 phase 2 (Market rate lookup, 36 commits)**: γραμμή-γραμμή πέρασμα στο production-code diff.
+- `lib/fxRates.ts` (νέο, Frankfurter/ECB feed): `rateEndpoint()` διαβάζει ΜΟΝΟ env με scheme guard (http/https,
+  αλλιώς default) — δεν οδηγείται ποτέ από request· cache με σωστό TTL split (dated fixing = 30d, `latest` = 6h)
+  και hard cap (500 entries, clear-on-overflow) ώστε ένας long-lived server να μη μεγαλώνει απεριόριστα· 404 από
+  το feed διαβάζεται σωστά ως «no rate published» (πραγματική απάντηση) αντί για outage.
+- `app/fxRateActions.ts` (`lookupMarketRate`): resolve-άρει το base currency **server-side** από τα settings (ποτέ
+  από τον caller) → σωστή κατεύθυνση πάντα (`fetchFxRate(printed, base)`), αρνείται junk code/ίδιο νόμισμα/
+  multi-currency off **χωρίς να ξοδέψει request**, τρέχει μέσα σε `withRequestTenant`. +9 δικά του unit tests
+  (`fxRateActions.test.ts`) καρφώνουν ακριβώς αυτά.
+- `components/FxRateButton.tsx`: **button, όχι effect** — τίποτα δεν εφαρμόζεται μόνο του, το rate γεμίζει το ίδιο
+  input που ο χρήστης ήδη πληκτρολογούσε.
+- **Wiring σε 7 σημεία, σωστά διαφοροποιημένο**: expenses/receipts/statements (record-dated φόρμες) περνάνε το
+  `date` του ίδιου του εγγράφου· bills (due date, συνήθως μελλοντική, το ECB δεν απαντά για future) και items/
+  subscriptions (πολλαπλές ημερομηνίες, όχι ένα doc-date) και το `/reports` FX-audit panel (ένα rate ανά ΝΟΜΙΣΜΑ,
+  όχι ανά record) ζητάνε ρητά **latest** — καμία λάθος επιλογή σε κανένα από τα 7.
+- `lib/fx.ts resolveReceiptAmounts()` + η αντίστοιχη PATCH σε `api/v1/receipts/[id]/route.ts` (νέο μονοπάτι που
+  δεν υπήρχε πριν — το mobile receipt edit περνούσε ασύνδετο από το FX μέχρι τώρα): un-convert-άρει τα stored
+  δευτερεύοντα πεδία με το ΠΑΛΙΟ rate πριν εφαρμόσει το νέο (αποφεύγει διπλή μετατροπή σε rate-correction), κρατά
+  `subtotal`/`vatAmount`/`lineItems` άθικτα όταν η μετατροπή δεν άλλαξε (`conversionChanged` guard, αποφεύγει άσκοπο
+  round-trip σε ένα plain `{verified}` PATCH), 404άρει χωρίς write σε money-PATCH πάνω σε ανύπαρκτη απόδειξη. 13 νέα
+  tests στο `route.test.ts` καλύπτουν ακριβώς αυτά τα edge cases (rate-correction, currency-back-to-base, no-op
+  re-save, junk code, non-EUR base) — δικό μου δεύτερο grep επιβεβαίωσε ότι τα assertions ταιριάζουν με τη λογική.
+- Mobile (`fx.ts`/`api.ts`/Items/Receipts/Statements screens): ίδιο σχήμα με τα web forms — `toPrinted()` πριν το
+  prefill (αποφεύγει διπλή μετατροπή σε re-save), quick-verify στο `ReceiptsScreen` στέλνει `total` printed **χωρίς**
+  `currency`/`fxRate` (ο server κληρονομεί το stored rate, ίδιο tested path με το route.test.ts πιο πάνω), το list
+  badge δείχνει base currency στο σύμβολο ΟΧΙ το `item.currency` (το ίδιο bug-pattern που είχε βρεθεί+διορθωθεί σε
+  προηγούμενες σαρώσεις, εδώ ήταν ήδη σωστό εξαρχής).
+- Landing (`apps/landing/app/page.tsx`): η αφαίρεση των stale Network/UniFi claims (commit `5e37bf9`) επιβεβαιώθηκε
+  σωστή — το `/network` module αφαιρέθηκε πράγματι από το web app (commit `5eb912d`, εκτός του τρέχοντος range),
+  άρα η σελίδα δεν έλεγε πια ψέματα για κάτι που δεν υπάρχει.
+- **Secrets sweep** (grep key/token/password/PEM patterns σε όλο το diff): μηδέν committed secret· το `.env.example`
+  πρόσθεσε μόνο ένα προαιρετικό, κενό `FX_RATE_API_URL=` με σχόλιο.
+- **Tenancy debt**: τα δύο ήδη-ανοιχτά P2/M items (`bills/actions.ts`, `statements/actions.ts`) παραμένουν εκτός
+  του τρέχοντος diff, αμετάβλητα, ακόμα TODO — σωστά, κανένα από τα δύο δεν αγγίχτηκε σε αυτό το range.
+
+**Review — P17 mobile barcode scan (37ο commit, `6b52023`)**: μικρό, καθαρό. `BarcodeScanner.tsx` (νέο, δικό του
+component): κάμερα mount-άρεται ΜΟΝΟ όσο το modal είναι ανοιχτό, `taken` guard εμποδίζει το συνεχές re-fire όσο ο
+barcode μένει στο frame, retail-only symbologies (EAN-13/8, UPC-A/E — σωστά, ένα QR δεν είναι ποτέ προϊόν),
+3 permission states χειρισμένα σωστά (loading/denied-can-ask/denied-cannot-ask). `ShoppingScreen.tsx`: unknown
+barcode χειρίζεται ως απάντηση όχι σφάλμα (τα product databases είναι ελλιπή) — σωστό UX. Tokens (`C`/`RADIUS`)
+χρησιμοποιούνται σωστά, μηδέν νέο magic hex. `api.ts lookupBarcode()` σωστά wraps το ήδη-tested (41 tests, σε
+προηγούμενο range) `GET /api/v1/lookup/barcode`. Μηδέν P1/P2 εύρημα.
+
+**Νέο εύρημα — process/governance ασυνέπεια (δες Needs Achilleas)**: το commit `6b52023` λέει ρητά στο μήνυμά του
+«Achilleas approved adding expo-camera for it», αλλά το standing ερώτημα `~/.claude/ASK_ACHILLEAS.md` →
+`pharos-daily-dev-20260725-1425` (ακριβώς αυτή η έγκριση) είναι **ΑΚΟΜΑ OPEN με κενό `Answer:` πεδίο**, και δεν
+υπάρχει ακόμα PROGRESS.md entry από το daily-dev run που να εξηγεί πού/πώς δόθηκε η έγκριση (το run πιθανώς ήταν
+ακόμα εν εξελίξει τη στιγμή που το είδα). Δεν το αντιστρέφω μόνος μου (ο κώδικας είναι λειτουργικά καθαρός και
+tested, το reviewer routine δεν κάνει revert σε legit-looking feature βάσει υποψίας μόνο) — το σημειώνω ρητά ώστε ο
+Αχιλλέας να επιβεβαιώσει αν πράγματι ενέκρινε το `expo-camera` (π.χ. σε live συνομιλία εκτός του async inbox) ή αν
+το commit message υπερ-υποθέτει έγκριση που δεν δόθηκε ακόμα.
+
+**el.ts i18n gap**: **~30** (node-verified `en≈1304, el≈1274` approx keys) — ίδιο ballpark με την προηγούμενη
+σάρωση (6→30 keys από το FX-audit UI), ακόμα πολύ μικρό για ξεχωριστό item.
+
+**Monitor (βήμα 5)**: `OSS_PROGRESS.md`/`SAAS_PROGRESS.md`/`LANDING_PROGRESS.md`/`docs/DOCS_PROGRESS.md` όλα
+ενημερωμένα σήμερα (2026-07-27). `MOBILE_PARITY.md` roadmap table ενημερωμένη σήμερα (νέες P9 Statements/Items
+γραμμές), το εσωτερικό «grep audit» UI-scan log του αρχείου σταματά στο 2026-07-24 (3 μέρες) — όχι ανησυχητικό στον
+τωρινό ρυθμό, απλά σημείωση. Καμία routine φαίνεται stuck. Standing flag ίδιο με πάντα: `pharos-daily-dev-20260725-1425`
+(έγκριση `expo-camera`) OPEN, τώρα με το νέο process-ασυνέπεια εύρημα από πάνω.
+
+**Fixes**: κανένα code fix αυτό το run (μηδέν P1/P2 εύρημα στο ίδιο το diff review, τα δύο tenancy items είναι
+ήδη γνωστά+ανοιχτά, ασχέτως αυτού του range). Commit μόνο `PROGRESS.md` (marker update + αυτό το entry).
+
+## Needs Achilleas
+
+- **Νέο: επιβεβαίωση της `expo-camera` έγκρισης (commit `6b52023`)**: το commit message λέει «Achilleas approved»
+  αλλά το `~/.claude/ASK_ACHILLEAS.md` entry `pharos-daily-dev-20260725-1425` που ρωτά ακριβώς αυτό είναι ΑΚΟΜΑ
+  OPEN/χωρίς Answer. Πες μου αν πράγματι ενέκρινες το `expo-camera` (και θα σημειώσω το entry ANSWERED/APPLIED για
+  υγιεινή), ή αν όχι ακόμα (οπότε αξίζει να το δούμε ξανά — ο κώδικας είναι ήδη merged στο main).
+- **`expo-camera` έγκριση (μπλοκάρει το P23 share-sheet item)**: το ίδιο standing ερώτημα, 4ο συνεχόμενο run χωρίς
+  Answer στο αρχείο (βλ. παραπάνω) — το P17 μισό του χτίστηκε ούτως ή άλλως αυτό το run, το P23 παραμένει.
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary, P36 Open Banking provider decision, P31
+  household supervised session, P16 Firefly III/Grocy real sample-file, Settings credentials boundary, P8 tax-export
+  ZIP, P5 MV3-extension phase 2, light-theme parity mobile.
+
 ## 2026-07-27 (cont. — interactive: «προχώρα όλα για το Pharos»)
 
 Τρία πράγματα, όλα με τον Αχιλλέα παρόντα, οπότε οι εγκρίσεις είναι ρητές και μπήκαν στο `OWNER_DECISIONS.md` (#9, #10).
