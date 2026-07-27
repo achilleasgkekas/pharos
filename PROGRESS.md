@@ -10139,3 +10139,62 @@ verify pattern. Εναλλακτικά, αν προτιμηθεί mobile: **Buil
 - **`PATCH /api/v1/settings` ntfy authz** (από το προηγούμενο run, δεν το άγγιξα): οι web Notifications actions
   είναι `requireAdmin()` αλλά το API επιτρέπει ακόμα σε member να αλλάξει `ntfyUrl`/`ntfyEnabled` από το κινητό.
   Μια γραμμή, αλλά αλλάζει σιωπηλά συμπεριφορά, οπότε θέλει το ΟΚ σου.
+
+## 2026-07-28 (OpenAPI, δεύτερο επίπεδο: τα response schemas λένε τώρα την αλήθεια, με guard)
+
+Approved queue άδειο από αυτόνομα χτίσιμα (P36 θέλει GoCardless credentials, P16 πραγματικό sample export, P23 EAS
+dev build), MOBILE_PARITY Build Queue γνήσια άδειο, οπότε πήρα το ρητό «επόμενο task» του προηγούμενου run: η
+προδιαγραφή τεκμηριώνει πλέον και τα 61 paths, αλλά **τα ίδια τα σχήματα των απαντήσεων ήταν λάθος**.
+
+**Τι βρήκα (χειρότερο απ' όσο έγραφε η πρόταση)**: δεν ήταν μόνο «λείπουν νέα πεδία». **Εννιά σχήματα δήλωναν `_id`
+ενώ κάθε REST-native v1 resource επιστρέφει `id`** από την πρώτη μέρα (`trim()` → `id: String(x._id)` σε items,
+receipts, expenses, statements, subscriptions, vouchers, tasks). Δηλαδή ένας client φτιαγμένος από το spec διάβαζε το
+**identifier ως `undefined`** — δεν είναι έλλειψη τεκμηρίωσης, είναι τεκμηρίωση που σπάει τον client. Επιπλέον:
+`Statement.total` **δεν υπάρχει καν** ως πεδίο (λέγεται `totalAmount`), `LineItem.quantity` λέγεται `qty`,
+`ShoppingListItem.quantity` είναι **ελεύθερο κείμενο** («500g», «2 packs») και τεκμηριωνόταν ως `number`. Και από
+πάνω έλειπαν όλα τα πεδία που shipped μετά: multi-currency (P9 `currency`/`origAmount`/`fxRate` σε 6 σχήματα), split
+(P35), space (P34), trial (P33), tax tagging, `itemCount`, `txnCount`, `anomaly`, `returnDaysLeft`, task `steps`,
+item `photo`/`specs`/`warrantyUntil`/`num`/`purchasedPrice`. Το **`additionalProperties: true` τα έκρυβε όλα**: το
+spec έμενε έγκυρο ενώ περιέγραφε άλλο API.
+
+**Τι μπήκε**: τα 9 σχήματα ξαναγράφτηκαν από τους ίδιους τους serializers (τη μοναδική πηγή αλήθειας που καλούν τα
+routes), με τα derived πεδία ρητά σημειωμένα ως «ποτέ stored» και με τους περιορισμούς που κρύβουν bugs γραμμένους:
+το `anomaly` **παραλείπεται σε updatedSince sync** (το μερικό slice θα χάλαγε τη διάμεσο), το `returnDaysLeft`
+παραλείπεται σε archived απόδειξη και σε sync, το `fxRate: 0` σε ξένο νόμισμα σημαίνει «δεν έχει μπει ισοτιμία, μην
+το αθροίσεις ως base». +2 νέα σχήματα για τα nested (`SplitEntry`, `TaskStep`). Τα `ShoppingListItem`/`Notification`
+**κρατάνε σκόπιμα `_id`** (μοιράζονται serializer με το web) και τώρα το λέει ρητά η περιγραφή τους, ώστε να μη
+«διορθωθεί» λάθος στο μέλλον.
+
+**Το κομμάτι που κρατάει την αλήθεια**: νέο `openapi.schema.test.ts`. Διαβάζει τον serializer **ως πηγαίο κείμενο**
+(οι περισσότεροι ζουν μέσα σε `route.ts`, όπου το Next θέλει μόνο HTTP handlers exported, και δύο είναι
+`'use server'` modules), βγάζει τα κλειδιά του πρώτου returned object literal σε βάθος 1 (μαζί με το conditional
+spread `...(x !== undefined ? { key } : {})` των derived πεδίων) και συγκρίνει **και προς τις δύο κατευθύνσεις**:
+πεδίο που επιστρέφει ο κώδικας και δεν το λέει το spec, ΚΑΙ πεδίο που υπόσχεται το spec και δεν επιστρέφεται πια.
+Μηδέν module graph, μηδέν mocks, μηδέν DB. +ένας κανόνας για την ακριβή κλάση λάθους που διόρθωσα: `id` στα
+REST-native, `_id` μόνο στα δύο web-shared.
+
+**Verify**: το spec parse-άρει ως OpenAPI 3.1 (js-yaml) με **61 paths, 24 schemas, 308 `$ref`, 0 broken**. Ο guard
+**επιβεβαιώθηκε ότι αποτυγχάνει** σε τεχνητό drift, ξεχωριστά ανά κατεύθυνση: μετονομασία `itemCount`→`itemCountX`
+(undocumented), προσθήκη `ghostField` στο Statement (phantom), και γύρισμα του Voucher `id`→`_id` (έσπασε και ο
+id-κανόνας) — το αρχείο επαναφέρθηκε κάθε φορά από backup. `npm run type-check` **EXIT 0**, πλήρες `npx vitest run`
+**4996 passed / 321 files** (+16 δικά μου, μηδέν regression). **Κανένα Docker step**: άλλαξαν μόνο docs + ένα test
+file, μηδέν runtime κώδικας, άρα ούτε mutex χρειάστηκε ούτε rebuild ούτε browser verify (τίποτα δεν renders).
+Το `docs/api.md` ελέγχθηκε επίσης, το βρήκα **σωστό** (η πρόζα του περιγράφει τα πραγματικά πεδία), δεν το άγγιξα.
+Commit `d88ff82`, pushed.
+
+**Επόμενο task (πρόταση)**: το τρίτο και τελευταίο επίπεδο του ίδιου contract, τα **request bodies**. Τα paths και
+τα response schemas είναι πια δεμένα με guard, αλλά τα `requestBody` του spec γράφτηκαν κι αυτά με το χέρι και δεν
+τα ελέγχει τίποτα (π.χ. τα POST/PATCH δέχονται `currency`/`fxRate`/`split`/`taxDeductible`/`space` που το spec
+πιθανότατα δεν αναφέρει). Ίδιο μέγεθος, ίδιο verify pattern, και ο έλεγχος μπορεί να παραχθεί από τα
+`strField`/`numField`/`boolField`/`enumField` calls του κάθε route, που είναι εξίσου μηχανικά αναγνώσιμα με τους
+serializers. Εναλλακτικά, αν προτιμηθεί mobile: **UI Debt `ActivityIndicator`→`<Spinner>`** (42 sites, μηχανικό,
+tsc-verifiable, μηδέν νέο dep) — το safe-area item παραμένει σκόπιμα εκτός, θέλει νέο dependency και την έγκρισή σου.
+
+## Needs Achilleas
+
+- Αμετάβλητα από το προηγούμενο run: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample export, EAS dev
+  build), **P17 live check** σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store
+  (προαιρετικό).
+- **`PATCH /api/v1/settings` ntfy authz** (τρίτο run στη σειρά που το αναφέρω, δεν το αγγίζω): οι web
+  Notifications actions είναι `requireAdmin()`, το API όχι, οπότε member μπορεί ακόμα να αλλάξει
+  `ntfyUrl`/`ntfyEnabled` από το κινητό. Μια γραμμή, αλλά αλλάζει σιωπηλά συμπεριφορά, θέλει το ΟΚ σου.
