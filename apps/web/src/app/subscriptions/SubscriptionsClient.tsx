@@ -2,6 +2,7 @@
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
+import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useMemo } from 'react';
 import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Radar, X } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -736,6 +737,11 @@ function SubFxFields({
           }}
           placeholder="0.92"
         />
+        {/* P9 phase 2: latest fixing — a subscription is a standing charge, it has no
+            single document date the way an expense or a receipt does. */}
+        <div className="mt-1">
+          <FxRateButton currency={code} onRate={(r) => { setCharged(''); setRate(String(r)); }} />
+        </div>
       </Field>
       <Field label={t('ex.fFxCharged', { cur: currencySymbol(base).trim() })}>
         <Input

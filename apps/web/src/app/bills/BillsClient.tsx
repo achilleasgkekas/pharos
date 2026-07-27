@@ -10,6 +10,7 @@ import { cn } from '@/components/ui/cn';
 import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
 import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
+import { FxRateButton } from '@/components/FxRateButton';
 import { billStatus, billDaysUntilDue, type BillStatus } from '@/lib/bill';
 import type { SerializedBill } from '@/types';
 import { createBill, updateBill, deleteBill, setBillArchived, markBillPaid, markBillUnpaid } from './actions';
@@ -477,6 +478,11 @@ function BillFxFields({
           }}
           placeholder="0.92"
         />
+        {/* P9 phase 2: latest fixing — a bill's date is its DUE date, usually in the
+            future, and the ECB only publishes up to today. */}
+        <div className="mt-1">
+          <FxRateButton currency={currency} onRate={(r) => { setCharged(''); setRate(String(r)); }} />
+        </div>
       </div>
       <div>
         <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>

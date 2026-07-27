@@ -34,6 +34,7 @@ import { cn } from '@/components/ui/cn';
 import { Layers, Receipt as ReceiptIcon, CreditCard } from 'lucide-react';
 import { CURRENCIES, currencySymbol } from '@/lib/money';
 import { FxBadge } from '@/components/FxBadge';
+import { FxRateButton } from '@/components/FxRateButton';
 import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency, toPrinted } from '@/lib/fx';
 import type { SerializedItem } from '@/types';
 import { VIEW_CONFIG, type ItemView } from '@/lib/itemStatus';
@@ -2040,6 +2041,11 @@ function ItemFxFields({
           }}
           placeholder="0.92"
         />
+        {/* P9 phase 2: latest fixing — an item carries no single document date (the
+            purchase, the asking price and the target are not all from the same day). */}
+        <div className="mt-1">
+          <FxRateButton currency={code} onRate={(r) => { setCharged(''); setRate(String(r)); }} />
+        </div>
       </Field>
       <Field label={t('ex.fFxCharged', { cur: currencySymbol(base).trim() })}>
         <Input

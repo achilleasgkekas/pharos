@@ -2,6 +2,7 @@
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
+import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
 import {
   Upload,
@@ -786,6 +787,10 @@ function ReceiptFxFields({
           onChange={(e) => { setCharged(''); setForm((p) => ({ ...p, fxRate: e.target.value })); }}
           placeholder="0.92"
         />
+        {/* P9 phase 2: the fixing for the receipt's own date, still the user's to accept. */}
+        <div className="mt-1">
+          <FxRateButton currency={code} date={form.date} onRate={(r) => { setCharged(''); setForm((p) => ({ ...p, fxRate: String(r) })); }} />
+        </div>
       </Field>
       <Field label={t('ex.fFxCharged', { cur: currencySymbol(base).trim() })}>
         <Input

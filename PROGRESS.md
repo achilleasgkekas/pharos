@@ -3,8 +3,20 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: cc65fb5 -->
-<!-- docker-validated: 7b46912 -->
+<!-- docker-validated: 6716846 -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-27 (docker-health: rebuild #66 web files, cache −2.347GB, all healthy)
+
+**Guard**: `ROUTINES_PAUSED` απών. Scheduled docker-health task. Mutex acquired, safe rebuild completed.
+
+**Health snapshot**: mongo healthy, web up+serving 200, flaresolverr stopped, build cache 1.2GB → pruned to 0 (−2.347GB freed).
+
+**Rebuild**: 66 runtime files changed (SaaS APIs, Bills/Expenses/Receipts routes, fx logic, tests) since docker-validated 7b46912. Safe build: `docker compose build web` ✓, mongo healthy ✓, `docker compose up -d web` ✓, poll /login 200 ✓ (8sec startup).
+
+**Outcome**: All green. Pushed docker-validated marker to HEAD 6716846.
+
+---
 
 ## 2026-07-27 (P9 mobile: Statements, και το σύμβολο της τράπεζας πάνω σε ευρώ — το mobile P9 κλείνει 6/6)
 

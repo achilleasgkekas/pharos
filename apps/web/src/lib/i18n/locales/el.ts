@@ -445,6 +445,10 @@ export const el: Partial<Dict> = {
   'ex.fVendorPlaceholder': 'π.χ. ΔΕΗ, ιδιοκτήτης…',
   'ex.fAmount': 'Ποσό ({cur})',
   'ex.fDate': 'Ημερομηνία',
+  // Προαιρετικό rate feed (P9 phase 2)
+  'fx.marketRate': 'Τιμή αγοράς',
+  'fx.marketRateHint': 'Φέρε την ισοτιμία αναφοράς της ΕΚΤ (πρόταση, όχι η χρέωση της κάρτας σου)',
+  'fx.rateAsOf': 'ΕΚΤ {date}',
   'ex.fCycle': 'Κύκλος',
   'ex.fPeriod': 'Περίοδος (ΕΕΕΕ-ΜΜ)',
   'ex.recurring': 'Επαναλαμβανόμενο',

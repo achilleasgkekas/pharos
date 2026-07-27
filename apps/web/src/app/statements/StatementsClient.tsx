@@ -52,6 +52,7 @@ import { shrinkImage } from '@/lib/clientImage';
 import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useT } from '@/components/LocaleProvider';
 import { FxBadge } from '@/components/FxBadge';
+import { FxRateButton } from '@/components/FxRateButton';
 import {
   isForeignCurrency,
   normalizeCurrency,
@@ -1339,7 +1340,7 @@ function StatementFxFields({
   setRate,
   base,
 }: {
-  form: { totalAmount: string; currency: string; fxRate: string };
+  form: { totalAmount: string; currency: string; fxRate: string; statementDate: string };
   /** Only the rate is editable here, so the parent's full form type stays out of this component. */
   setRate: (v: string) => void;
   base: string;
@@ -1362,6 +1363,10 @@ function StatementFxFields({
           }}
           placeholder="0.92"
         />
+        {/* P9 phase 2: the fixing on the statement's own date — one rate for the whole document. */}
+        <div className="mt-1">
+          <FxRateButton currency={code} date={form.statementDate} onRate={(r) => { setCharged(''); setRate(String(r)); }} />
+        </div>
       </Field>
       <Field label={t('ex.fFxCharged', { cur: currencySymbol(base).trim() })}>
         <Input

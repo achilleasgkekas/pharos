@@ -2,6 +2,7 @@
 import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
+import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
 import {
   Upload, Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Repeat, Wallet, Search, Plus, X, Camera, Sparkles,
@@ -603,6 +604,10 @@ function FxFields({ form, set, base }: { form: FormState; set: (p: Partial<FormS
           onChange={(e) => { setCharged(''); set({ fxRate: e.target.value }); }}
           placeholder="0.92"
         />
+        {/* P9 phase 2: offer the fixing for this entry's own day; still the user's to accept. */}
+        <div className="mt-1">
+          <FxRateButton currency={code} date={form.date} onRate={(r) => { setCharged(''); set({ fxRate: String(r) }); }} />
+        </div>
       </Field>
       <Field label={t('ex.fFxCharged', { cur: currencySymbol(base).trim() })}>
         <Input

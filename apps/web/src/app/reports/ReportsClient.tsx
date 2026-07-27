@@ -21,6 +21,7 @@ import {
 import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check } from 'lucide-react';
 import { formatMoney, convertToBase } from '@/lib/fx';
 import { applyFxRate, applyFxRateToCurrency } from './fxActions';
+import { FxRateButton } from '@/components/FxRateButton';
 import { createGoal, addGoalContribution, deleteGoal } from './goalsActions';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
@@ -227,6 +228,9 @@ function FxCurrencyGroup({ currency, rows, base }: { currency: string; rows: FxI
             className="w-24 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-2 py-1 text-xs text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-gold)]"
             style={{ fontFamily: 'var(--font-mono)' }}
           />
+          {/* P9 phase 2: fill the group's rate from the ECB feed. Latest fixing, not a
+              per-record date — one rate is being applied to a whole currency here. */}
+          <FxRateButton currency={currency} onRate={(r) => setRate(String(r))} compact />
           <button
             onClick={applyAll}
             disabled={pending || !groupRateOk}
