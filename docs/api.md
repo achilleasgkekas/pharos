@@ -53,8 +53,10 @@ Response `200`:
 
 The token is the user's `apiToken`. It is created on first login and stays
 stable afterward, so a client can store it and reuse it. You can also copy it
-from the web app under **Settings** (Mobile/MCP access). `role` is `admin` or
-`member`; a few destructive endpoints require `admin` (noted below).
+from the web app under **Settings** (Mobile/MCP access). `role` is one of:
+- **`admin`** — full read-write access, can manage other users.
+- **`member`** — full read-write access.
+- **`viewer`** — read-only; all POST/PATCH/DELETE requests are rejected with `403 Forbidden`.
 
 Errors: `400` (missing/invalid body), `401` (bad credentials).
 

@@ -128,8 +128,17 @@ required (it uses your existing browser session cookie).
 **Technical note:** The bookmarklet is a self-contained `javascript:` URI (no
 external dependencies or tokens), and the popup is same-origin (`/capture?url=...`)
 so it avoids CORS and API-token exposure. If the product already exists in your
-library, it merges the new store link and price instead of duplicating it. Phase 2
-(MV3 Chrome extension) is planned.
+library, it merges the new store link and price instead of duplicating it.
+
+### Phase 2: MV3 Chrome extension (P5 phase 2)
+
+The native Chrome extension ships in the repo as `apps/extension/` with zero external
+dependencies. Three capture triggers (toolbar button, page context menu, link context
+menu) funnel into the same `/capture?url=...` page, riding your existing session
+cookie. No `content_scripts` and no `host_permissions`: the extension cannot read
+page content, and asks only for `storage`, `contextMenus`, and `activeTab` (the tab
+URL becomes readable only on the click itself). A badge shows feedback and an unconfigured
+instance opens the options page instead of silently failing.
 
 ### Barcode product lookup (P17)
 

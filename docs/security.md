@@ -42,14 +42,20 @@ Used by every browser page and server action.
   Unauthenticated page requests redirect to `/login`; API and file requests get a
   `401`.
 - **First-run wizard** (`/setup`) creates the first admin when zero users exist.
-  Additional accounts (admin / member roles) are managed in **Settings → Users**.
+  Additional accounts are managed in **Settings → Users** and can be assigned one
+  of three roles: **admin** (full read-write), **member** (read-write), or **viewer**
+  (read-only, cannot modify any data).
 - **Passwords** are hashed with `scrypt` (via `node:crypto`, no native deps),
   stored as a self-describing hash, and compared with `timingSafeEqual`.
 - **Sessions** are `jose` HS256 JWTs in an `httpOnly`, `sameSite=lax` cookie signed
   with `AUTH_SECRET`. Set `AUTH_COOKIE_SECURE=true` when serving over HTTPS.
   Rotating `AUTH_SECRET` invalidates every session (everyone re-logs-in).
 - **Server actions**: middleware blocks unauthenticated calls; system-settings and
-  user-management actions additionally enforce an admin-role check.
+  user-management actions additionally enforce an admin-role check. All mutating
+  actions (create, update, delete) check the user role at the top with `assertCanWrite()`
+  and deny viewers (returning 403) — this enforcement is built-in to every current
+  and future server action. The **REST API** (see below) enforces the same restriction:
+  viewer tokens cannot make POST/PATCH/DELETE requests.
 
 ### 2. Bearer token (the REST API + mobile app)
 
