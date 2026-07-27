@@ -4315,3 +4315,61 @@ sweep του docs/FEATURES.md § λιστας για κατι που ξεφυγ�
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-27 (run 27)
+
+Ελεγχος στην αρχη: `git log --oneline d44c792..HEAD | grep "feat("` βρηκε μονο το δικο μου προηγουμενο
+commit (IMAP), κανενα νεο feat απο αλλες routines. `origin/main` ιδιο με το local HEAD, μηδεν rebase
+χρειαστηκε. Αρα sweep του `docs/features.md`/`docs/configuration.md` (working tree, ασχετα αν ηταν ήδη
+uncommitted απο αλλη routine τη στιγμη εκεινη) αντι για candidate list.
+
+Βρηκα καθαρο gap: νεο section στο `docs/features.md` (multi-currency, phase 2) + αντιστοιχο
+`docs/configuration.md` παραγραφος για **"Market rate" κουμπι** (ECB reference rate μεσω Frankfurter,
+προαιρετικο, ποτε αυτοματο) — δεν υπηρχε καθολου στο landing FAQ, το υπαρχον multi-currency FAQ σταματουσε
+στο "It now covers every money-holding record...". Διαβασα την πραγματικη υλοποιηση πριν γραψω copy (ιδιο
+μαθημα με το IMAP προηγουμενο run): `apps/web/src/lib/fxRates.ts` (Frankfurter `/latest` ή `/YYYY-MM-DD`,
+`FX_RATE_API_URL` env override με scheme-guard, `normalizeRateDate` day-bound 1999-01-04..σημερα, cache
+6ω/`latest` 30μ/dated, error paths 404="no published rate"≠unreachable) + `grep -rl FxRateButton`
+επιβεβαιωσε και τα **6 φορμες** (receipts/expenses/subscriptions/bills/statements/items) + το Reports
+panel, χωρις tenant/hosted gating στον κωδικα (σε αντιθεση με το IMAP που ητανε ρητα self-hosted-only) —
+αρα το εγραψα ως διαθεσιμο σε ΟΛΑ τα deployments, οχι μονο self-host.
+
+Αλλαγη (`apps/landing/app/page.tsx`, επεκταση της υπαρχουσας FAQ "Can it handle an expense in a currency
+other than my main one?", οχι νεα εγγραφη — ειναι phase-2 συνεχεια του ιδιου feature, οπως και τα docs το
+εγραψαν ως προσθηκη bullet στο ιδιο section): προστεθηκε παραγραφος για το προαιρετικο "Market rate"
+κουμπι σε καθε rate πεδιο + Reports panel, ECB reference rate as-of-the-record's-own-date, ποτε αυτοματο/
+scheduled, Frankfurter (δωρεαν, χωρις key) με `FX_RATE_API_URL` self-host override, μονο 2 currency codes +
+ημερομηνια στο request.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13 static routes, `/` 5.35 kB (αμεταβλητο bundle).
+- em-dash: 0 (python3 UTF-8 count).
+- Θυρες 3100 κατειλημμενο (Docker), `next start -p 3101` πανω στο production build -> 200. Browser pane:
+  `read_console_messages` (onlyErrors) -> "No console logs." `javascript_tool` επιβεβαιωσε "Market rate"/
+  "Frankfurter"/"FX_RATE_API_URL" παροντα + η παλια ουρα του κειμενου αμεταβλητη. Hero screenshot καθαρο.
+  Server τερματισμενος (`pkill -9 -f "next start -p 3101"`), θυρα 3101 ελευθερη, επιβεβαιωμενο με `lsof`.
+- Δεν αγγιξα Docker/:3000/web/mobile. Μηδεν subagent, μηδεν AI call για copy generation.
+
+**Collision (σημαντικο, καταγραφεται για διαφανεια)**: το repo αυτη τη στιγμη εχει **πολλαπλες ταυτοχρονες
+routines να γραφουν στο ιδιο working directory/branch χωρις worktree isolation** (οχι μονο τη landing,
+ολοκληρο το fleet). Πριν το commit, `git status --short` εδειξε καθαρο (μονο το δικο μου αρχειο), αλλα
+**στο διαστημα μεταξυ `git add` και `git commit` μια αλλη routine (saas-core) εκανε stage το δικο της
+`SAAS_PROGRESS.md`**, και το commit μου το πηρε μαζι (2 files changed αντι 1). Το περιεχομενο του
+`SAAS_PROGRESS.md` διαβαστηκε (`git show HEAD:SAAS_PROGRESS.md`) και ειναι γνησιο, συνεκτικο περιεχομενο
+της saas-core routine (μαλιστα περιγραφει το ΙΔΙΟ φαινομενο να της συνεβη νωριτερα στο δικο της run: "ο
+guard επιασε πραγματικο conflict... περιμενα μεχρι να αδειασει το index"). Δοκιμασα `git ls-remote origin
+main` για να επιβεβαιωσω το state, και βρηκα οτι το commit μου (`a6e39b8`) ητανε **ηδη pushed στο
+origin/main** τη στιγμη που το ελεγξα (καποια αλλη routine εκανε `git push` ενω το δικο μου commit ητανε
+ηδη το local tip, και το πηρε μαζι). Δεδομενου οτι ητανε ηδη pushed, **δεν εκανα reset/rebase/force-push**
+(θα ρισκαρε αληθινη απωλεια δεδομενων με τοσες ταυτοχρονες routines να γραφουν live) — το περιεχομενο ειναι
+ακεραιο και σωστο και στα δυο repos, μονο η attribution/commit-message ειναι mixed (δικο μου μηνυμα καλυπτει
+και το δικο τους αρχειο). Καμια απωλεια δεδομενων, μονο cosmetic git-log θεμα. Pushed `a6e39b8`.
+
+Επομενο increment: νεος `git log --oneline` check στην αρχη του επομενου run για νεα feat commits.
+Αλλιως: νεο sweep του `docs/features.md`/`docs/configuration.md` (πολλες ταυτοχρονες routines προσθετουν
+features/config, οποτε πιθανον να υπαρχει κατι νεοτερο απο το phase-2 FX μεχρι το επομενο run) ή polish
+continuation.
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
