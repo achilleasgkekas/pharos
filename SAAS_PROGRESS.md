@@ -5719,3 +5719,81 @@ mock-άρουν ΟΛΑ τα workspace route tests (8 αρχεία), δηλαδή
 `saasApi.ts` (`saasAuthGate`/`accountTenants` — το `saasGuard` έχει ήδη κάλυψη μέσω
 `saasGuard.test.ts`). Πριν ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI** item
 (προτεραιότητα) και για `WEB_DEBT.md` item μέσα στο territory.
+
+## 2026-07-27 — increment 118: unit coverage για τους δύο resolvers (workspaceSession + context)
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine (τα OPEN είναι bakecore + το
+pharos-daily-dev expo-camera) → μηδέν pre-work. **Territory scan**: το προηγούμενο run
+(02:39) είχε ήδη γράψει το `lib/tenancy/workspaceSession.test.ts` αλλά **κόπηκε πριν το
+validate/commit** — έμεινε untracked 17 ώρες. Κανόνας «finish in-progress before new» →
+πρώτα το τελείωσα, μετά πήρα το επόμενο. UI item: ξανά-σάρωσα το territory, κάθε
+`app/admin/**`, `app/(saas)/**` και `components/saas/**` έχει ήδη κάλυψη μέσω των pure
+view-modules → μηδέν ανοιχτό UI unit, οπότε συνέχισα με τη σειρά των untested modules.
+
+**1) `lib/tenancy/workspaceSession.test.ts` (56 tests, μηδέν production αλλαγή)** — ο
+`resolveWorkspaceSession` είναι ο κοινός authz resolver ΚΑΘΕ workspace-scoped route
+(members/settings/export/erasure/ai-key/lifecycle), και **και τα 8 route test files τον
+mockάρουν**, δηλαδή κανένα από τα ~4500 tests δεν τον εκτελούσε ποτέ. Mock μόνο στα node-only
+seams (gate, session cookie, connectDB, membership read, context, Tenant model)· **τρέχουν
+πραγματικά** τα `canManageMembers` + `workspaceStatusError`, άρα ο role ladder και ο lifecycle
+ladder καρφώνονται ως wired. Τα fixtures **αποκλίνουν σκόπιμα** (membership tenantId/plan/status
+vs context tenantId vs tenant-doc plan/status) ώστε κάθε «ποια είναι η πηγή αλήθειας» assertion
+να είναι load-bearing. Καλύπτει: gate short-circuit **by identity** με μηδέν work από πίσω (και
+ότι δεν παρακάμπτεται από `requireManage`/`allowInactive`)· 401 χωρίς connectDB· membership
+lookup by session subject **με σειρά** connectDB→query· μηδέν memberships → 404 χωρίς context
+resolve· selection (default = πρώτο, trim+lower-case, **blank slug → fallback στο πρώτο, όχι
+403**, exact match στο lower-cased slug)· role gate (member περνά by default, owner/admin
+περνούν σε requireManage, **fail closed** σε άγνωστο/κενό/`OWNER` role, ο ρόλος διαβάζεται από
+το **membership** και ένα `role` πάνω στο tenant doc δεν κάνει escalate, το «not a member» 403
+προηγείται και δεν διαρρέει role wording)· tenant resolution (context by **membership slug**,
+`Tenant.findById` στο **context tenantId** και ποτέ στου membership, null ctx / ctx χωρίς
+tenantId / missing doc → 404 χωρίς περιττό read)· lifecycle gate (active+trialing περνούν,
+pending/suspended/canceled/bogus/κενό → 403 με το σωστό μήνυμα, non-string status fail closed,
+casing+padding ανεκτά, διαβάζει το **doc** status όχι του membership, stale membership status
+δεν μπλοκάρει live workspace, `allowInactive` περνά inactive αλλά **δεν** χαλαρώνει τον role
+gate, και ο role gate short-circuit-άρει πριν καν διαβαστεί το tenant)· resolved session
+(ακριβώς 4 κλειδιά, **identical objects** by reference, μηδέν `response` key)· και ότι κάθε
+rejection **propagates** αντί να γίνει authorization decision.
+
+**2) `lib/tenancy/context.test.ts` (56 tests, μηδέν production αλλαγή)** — ο `getTenantContext`
+είναι η διχάλα ανάμεσα στα δύο shapes του codebase. Πρώτα καρφώνει το **backward-compat
+συμβόλαιο**: SAAS_MODE off (undefined/''/off/false/0) → `DEFAULT_TENANT` **by identity** με
+**μηδέν** connectDB και **μηδέν** query, ακόμα κι όταν δίνονται host ΚΑΙ explicit slug που θα
+έλυναν πραγματικό tenant· + το DEFAULT_TENANT είναι frozen με το ακριβές single-user shape
+(`dbName:''` ⇒ default connection). Mock **μόνο** connectDB + Tenant model· τα `saasMode`,
+`parseTenantSlug`, `normalizeHost`, `baseDomain` **τρέχουν πραγματικά** από process.env.
+Καλύπτει: nothing-to-resolve (κενός/whitespace host, whitespace-only slug) → null χωρίς
+connect· **ο apex host κάνει connect αλλά μηδέν query** (τεκμηριώθηκε ως έχει: το early return
+θέλει ΚΑΙ τα δύο κενά)· slug ladder (explicit outranks host, trim+lower-case, blank explicit →
+fallback στο host, port/casing normalized, `SAAS_BASE_DOMAIN` override, reserved labels
+www/app/api/admin/cdn και nested subdomain ποτέ slug)· custom-domain fallback (off-base host,
+normalized case/port/trailing dot, **fall-through μετά από missed slug με σωστή σειρά**, slug
+hit κάνει short-circuit, explicit slug χωρίς host δεν έχει fallback, και **το base domain δεν
+γίνεται ποτέ matchable ως customDomain** — guard κατά hijack του marketing site)· mapping
+(ObjectId → string, nullish plan/status → `free`/`trialing` least-privilege, κενό string μένει
+verbatim, `aiByoKey` → Boolean coercion, resolved tenant ποτέ `isDefault`)· connect/query
+failure **propagates** αντί να διαβαστεί ως «no tenant»· `dbNameFor` (isDefault outranks
+populated dbName)· `scoped` (δεν mutate-άρει το caller filter, **identity** return για default
+tenant, το ctx tenant **υπερισχύει** ενός caller-supplied `tenant` key)· re-exports.
+
+**Verified**: **56/56 + 56/56 green από την πρώτη εκτέλεση**. Πλήρες `npx vitest run` →
+**309 files / 4697 tests green** (από 304/4523: +5 files/+174 tests — 2 δικά μου, τα υπόλοιπα
+από ταυτόχρονες routines). `npm run type-check` → **EXIT 0** (ένα TS2345 στο hoisted findOne
+mock, το declared return type ήταν `Promise<null>` και δεν δεχόταν doc — διορθώθηκε με explicit
+`Record<string, unknown> | null`· ίδια οικογένεια με το γνωστό TS2493 idiom). **Docker: κανένα
+rebuild** (test-only, μηδέν production/runtime/env/deps αλλαγή → ούτε ο mutex χρειάστηκε).
+**Browser-verify: skipped** (test files, μηδέν observable UI). Collision guard: το πρώτο commit
+πέρασε καθαρό· στο δεύτερο ο guard **έπιασε πραγματικό conflict** (`PRODUCT_BACKLOG.md` ήδη
+staged από ταυτόχρονη routine) → περίμενα μέχρι να αδειάσει το index και μετά commit-άρισα.
+Pushed `2d343fa` + `0fcbe2d`.
+
+**## Needs Achilleas:** τίποτα νέο.
+
+**Next task:** μένουν **5 untested modules** στο territory: `lib/tenancy/saasApi.ts` (85γρ.),
+`provision.ts` (103), `saasPage.ts` (40), `superadminPage.ts` (48)· `lib/billing/billingSession.ts`
+(71), `stripe.ts` (145). **Ξεκίνα από `saasApi.ts`**: το `saasAuthGate` + `accountTenants` είναι
+ό,τι mockάρει ΚΑΘΕ route test και ό,τι μόλις mockάρισα και στους δύο resolvers — δηλαδή το
+τελευταίο κομμάτι της αλυσίδας auth που κανένα test δεν εκτελεί πραγματικά (το `saasGuard` έχει
+ήδη δικό του test). Μετά `billingSession.ts` (αδελφός resolver του workspaceSession, ίδια κλάση
+κινδύνου) και `provision.ts`. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI**
+item (προτεραιότητα) και για `WEB_DEBT.md` item μέσα στο territory.
