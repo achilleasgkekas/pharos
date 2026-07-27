@@ -77,7 +77,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 ## Settings (`/settings`)
 | Web | Mobile |
 |-----|--------|
-| 7 tabs: appearance/defaults, budgets/cards, **AI engine/features/prompts**, storage/backup/CSV/trash/OneDrive, stores/lists, **ntfy notifications** | 🟡 account + **editable preferences** (currency, VAT, warranty months/alert, auto-add stores) + **editable budgets** + **payment cards CRUD** + **stores CRUD** (search/add/edit/delete, name/url/aliases, needs-review badge) + **dropdown lists editor** (3 category taxonomies, add/remove chips, reset-to-default) + **ntfy URL/enable/test** + server/version. No theme/language, AI engine, storage |
+| 7 tabs: appearance/defaults, budgets/cards, **AI engine/features/prompts**, storage/backup/CSV/trash/OneDrive, stores/lists, **ntfy notifications** | 🟡 account + **editable preferences** (currency, VAT, warranty months/alert, auto-add stores) + **editable budgets** + **payment cards CRUD** + **stores CRUD** (search/add/edit/delete, name/url/aliases, needs-review badge) + **dropdown lists editor** (3 category taxonomies, add/remove chips, reset-to-default) + **ntfy URL/enable/test** + **AI section** (master switch + 10 per-feature toggles + provider/model/readiness, admin-gated writes, credentials read-only-by-omission) + server/version. No theme/language, AI credentials/model picker, storage |
 
 ## Activity
 | Web | Mobile |
@@ -102,7 +102,7 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
 3. ✅ **Receipt verify/edit** — edit fields + line items + ∑-items + verify + archive + add-to-library + **re-scan text/OCR** (2026-07-01).
 4. ✅ **AI fill** — subscription-from-name, voucher scan (paste+image), item URL import, expenses scan-a-bill.
 5. ✅ **Statement transactions** — per-statement detail με transactions + per-charge installment badges + **aggregated installment-plan overview** (cross-statement payoff, active-first) + **link plans to products** (item PlansBlock) + **merge/bind plans** (overview «⑂ Merge into…» picker + «Unmerge», 2026-07-05). *Complete — closes the last #5 write-op gap.*
-6. 🟡 **Settings** — editable preferences (currency/VAT/warranty/auto-add), editable budgets, payment cards CRUD, stores CRUD, dropdown-lists editor, ntfy URL/enable/test ✅. *Remaining: theme toggle, language, AI engine, storage/OneDrive (βλ. Needs Achilleas).*
+6. 🟡 **Settings** — editable preferences (currency/VAT/warranty/auto-add), editable budgets, payment cards CRUD, stores CRUD, dropdown-lists editor, ntfy URL/enable/test, **AI master switch + per-feature toggles** (2026-07-27) ✅. *Remaining: theme toggle, language, AI credentials/model picker (σκόπιμα web-only, βλ. παρακάτω), storage/OneDrive (βλ. Needs Achilleas).*
 7. ✅ **Activity** — Alerts (notification feed) + Trash (restore/purge) + Jobs + History.
 8. 🟡 **Push notifications** — in-app feed ✅· remote push pipeline **ΗΔΗ ΧΤΙΣΜΕΝΟ** (commit `2156a83`, 2026-06-29 — token
    registry, `sendExpoPush`/`pushAllDevices`, `/api/v1/push/register`, mobile `registerForPush`/`unregisterForPush` wired

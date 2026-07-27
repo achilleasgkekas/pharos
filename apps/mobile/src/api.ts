@@ -2,7 +2,8 @@ import * as SecureStore from 'expo-secure-store';
 import { DEFAULT_API_BASE, STORE_KEYS } from './config';
 
 // ---- Types (mirror the Pharos /api/v1 responses) ----
-export type SessionUser = { id: string; name: string; username: string; role: 'admin' | 'member' };
+// P31 added the enforced read-only `viewer` role; an older server only ever sends the first two.
+export type SessionUser = { id: string; name: string; username: string; role: 'admin' | 'member' | 'viewer' };
 export type ListItem = {
   _id: string; name: string; quantity: string; category: string; brand: string;
   note: string; checked: boolean; aiScanned: boolean; createdAt: string;
@@ -501,6 +502,25 @@ export function updateSettings(patch: SettingsPatch) {
 }
 export function testNotify() {
   return request<{ ok: boolean }>('/api/v1/settings/test-notify', { method: 'POST' });
+}
+
+// ---- AI settings (master switch + per-feature toggles) ----
+// Read-only on purpose for everything credential-shaped: the server sends provider/model/
+// readiness so the phone can explain WHY a scan did nothing, but keys are entered on the web
+// Settings → AI tab only, and `canEdit` is false for anyone who is not an admin.
+export type AiFeatureRow = {
+  key: string; label: string; description: string; area: string;
+  enabled: boolean; status: 'disabled' | 'no-provider' | 'ready';
+};
+export type AiSettings = {
+  aiEnabled: boolean; provider: string; model: string; visionModel?: string;
+  ready: boolean; canEdit: boolean; features: AiFeatureRow[];
+};
+export function getAiSettings(): Promise<AiSettings> {
+  return request<AiSettings>('/api/v1/settings/ai');
+}
+export function updateAiSettings(patch: { aiEnabled?: boolean; features?: Record<string, boolean> }) {
+  return request<{ ok: boolean }>('/api/v1/settings/ai', { method: 'PATCH', body: JSON.stringify(patch) });
 }
 
 // ---- Payment cards (Settings → cards CRUD) ----

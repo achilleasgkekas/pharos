@@ -9,6 +9,7 @@ import {
   getCards, createCard, updateCard, deleteCard, type Card, type CardInput,
   getStores, createStore, updateStore, deleteStore, type StoreRow, type StoreInput,
   getLists, saveList, type ListEntry,
+  getAiSettings, updateAiSettings, type AiSettings,
 } from '../api';
 
 const CURRENCIES = ['EUR', 'USD', 'GBP'];
@@ -176,6 +177,7 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
       </Pressable>
 
       <CardsSection currency={currency} />
+      <AiSection />
       <StoresSection />
       <ListsSection />
 
@@ -571,6 +573,114 @@ function ListEditor({ entry, last, onSaved }: { entry: ListEntry; last: boolean;
   );
 }
 
+// ---- AI (master switch + per-feature toggles) ----
+// Self-contained like the other sections. Everything credential-shaped stays on the web
+// Settings → AI tab: this screen can turn features on and off, and can explain why nothing
+// happened, but it never sees or sets a key/host. Non-admins get the same information in a
+// read-only form (`canEdit` from the server, not a guess from the cached session role).
+function AiSection() {
+  const [cfg, setCfg] = useState<AiSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function load() {
+    try { setCfg(await getAiSettings()); setErr(null); setMissing(false); }
+    catch (e) {
+      const msg = (e as Error).message;
+      // An older Pharos server has no /settings/ai at all — that is not an error worth shouting about.
+      if (/404/.test(msg)) setMissing(true); else setErr(msg);
+    }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  // Optimistic: the switch moves now and snaps back if the server refuses, so a slow VPN
+  // link does not feel broken.
+  async function setMaster(next: boolean) {
+    if (!cfg) return;
+    setBusy('master'); setErr(null);
+    setCfg({ ...cfg, aiEnabled: next });
+    try { await updateAiSettings({ aiEnabled: next }); await load(); }
+    catch (e) { setErr((e as Error).message); setCfg(cfg); }
+    finally { setBusy(null); }
+  }
+
+  async function setFeature(key: string, next: boolean) {
+    if (!cfg) return;
+    setBusy(key); setErr(null);
+    const prev = cfg;
+    setCfg({ ...cfg, features: cfg.features.map((f) => (f.key === key ? { ...f, enabled: next } : f)) });
+    try { await updateAiSettings({ features: { [key]: next } }); await load(); }
+    catch (e) { setErr((e as Error).message); setCfg(prev); }
+    finally { setBusy(null); }
+  }
+
+  if (missing) return null;
+
+  const areas = cfg ? Array.from(new Set(cfg.features.map((f) => f.area))) : [];
+  const editable = !!cfg?.canEdit;
+  const off = !!cfg && !cfg.aiEnabled;
+
+  return (
+    <>
+      <Text style={s.section}>AI</Text>
+      <View style={s.cardPad}>
+        <ErrorText>{err}</ErrorText>
+        {loading || !cfg ? (
+          <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />
+        ) : (
+          <>
+            <View style={s.aiStatusRow}>
+              <View style={[s.aiDot, { backgroundColor: cfg.ready ? C.accent : off ? C.faint : C.gold }]} />
+              <Text style={s.aiStatusText}>
+                {off ? 'AI is off' : cfg.ready ? 'Ready' : 'No working provider'}
+              </Text>
+              <Text style={s.aiProvider} numberOfLines={1}>{cfg.provider} · {cfg.model || '—'}</Text>
+            </View>
+            {!off && !cfg.ready && (
+              <Text style={s.hint}>The provider is configured but not answering. Keys, host and model live on the web Settings → AI tab.</Text>
+            )}
+
+            <Pressable
+              onPress={() => editable && setMaster(!cfg.aiEnabled)}
+              disabled={!editable || busy === 'master'}
+              style={[s.toggle, (!editable || busy === 'master') && s.dim]}
+            >
+              <Check checked={cfg.aiEnabled} />
+              <Text style={s.tlabel}>AI enabled</Text>
+            </Pressable>
+            <Text style={s.hint}>Off means the whole app runs AI-free: no scanning, no autofill, no assistant.</Text>
+
+            {areas.map((area) => (
+              <View key={area} style={s.aiArea}>
+                <Text style={s.flabel}>{area.toUpperCase()}</Text>
+                {cfg.features.filter((f) => f.area === area).map((f) => (
+                  <Pressable
+                    key={f.key}
+                    onPress={() => editable && setFeature(f.key, !f.enabled)}
+                    disabled={!editable || off || busy === f.key}
+                    style={[s.aiFeature, (!editable || off || busy === f.key) && s.dim]}
+                  >
+                    <Check checked={f.enabled} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.tlabel}>{f.label}</Text>
+                      <Text style={s.aiFeatureDesc}>{f.description}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            ))}
+
+            {!editable && <Text style={s.hint}>Only an admin can change AI settings.</Text>}
+          </>
+        )}
+      </View>
+    </>
+  );
+}
+
 function Row({ label, value, last }: { label: string; value: string; last?: boolean }) {
   return (
     <View style={[s.row, last && s.noBorder]}>
@@ -651,6 +761,14 @@ const s = StyleSheet.create({
   addCardText: { color: C.cyan, fontSize: 14, fontWeight: '700' },
   swatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
   swatchOn: { borderColor: C.text },
+  // ai
+  aiStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  aiDot: { width: 8, height: 8, borderRadius: 4 },
+  aiStatusText: { color: C.text, fontSize: 14, fontWeight: '700' },
+  aiProvider: { color: C.faint, fontSize: 11, flex: 1, textAlign: 'right' },
+  aiArea: { marginTop: 18 },
+  aiFeature: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 9 },
+  aiFeatureDesc: { color: C.faint, fontSize: 11, marginTop: 2 },
   // stores
   storeNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   autoBadge: { color: C.gold, fontSize: 9, fontWeight: '800', letterSpacing: 0.8, borderWidth: 1, borderColor: alpha(C.gold, 0.31), borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1, textTransform: 'uppercase' },
