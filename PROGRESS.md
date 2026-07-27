@@ -9729,3 +9729,63 @@ parsed ποσών μέσα από τον υπάρχοντα resolver + στήλ�
 - Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary· P36 Open Banking provider decision· P31
   household supervised session· P16 Firefly III/Grocy real sample-file· Settings credentials boundary· P8 tax-export
   ZIP· P5 MV3-extension phase 2· light-theme parity mobile.
+
+## 2026-07-27 (P9 phase 2 recovery: το «Market rate» lookup μπήκε επιτέλους στο repo)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το μόνο δικό μου entry
+(`pharos-daily-dev-20260725-1425`, έγκριση `expo-camera`) είναι **ακόμα OPEN χωρίς Answer**, 3ο συνεχόμενο run, οπότε
+P17/P23 μένουν μπλοκαρισμένα. **Docker mutex: ΚΑΤΕΙΛΗΜΜΕΝΟ** (fresh, όχι stale) από το `docker-health` routine που
+έτρεχε παράλληλα, άρα κάθε βήμα Docker παραλείφθηκε σκόπιμα, όπως ορίζει το coordination.
+
+**Τι βρήκα (και γιατί άλλαξε το task αυτού του run)**: το tree είχε ένα **πλήρες αλλά uncommitted** feature από τις
+02:18-02:21 σήμερα (`lib/fxRates.ts`, `lib/fxRates.test.ts`, `app/fxRateActions.ts`, `components/FxRateButton.tsx` +
+wiring σε 6 φόρμες και στο `/reports` panel + i18n el/en + `.env.example`). Δεν είναι ξένο WIP του Αχιλλέα: P9
+comment idiom, backlog ids, pure-helper+vitest pattern, δηλαδή routine artifact από διακοπείσα εκτέλεση, ακριβώς το
+σενάριο του **P22** που είχε μείνει αδικαιολόγητα άθικτο για μέρες. Επιπλέον, **δέκα λεπτά πριν από αυτό το run** το
+docs routine είχε ήδη κάνει commit την **τεκμηρίωσή** του (`1961571`), οπότε το repo περιέγραφε δημόσια ένα feature
+που δεν υπήρχε στον κώδικα. Άρα η υψηλότερη αξία δεν ήταν νέο slice, ήταν να κλείσει αυτό το κενό.
+
+**Έλεγχος πριν το υιοθετήσω** (δεν το πέρασα «τυφλά»): `rateEndpoint` διαβάζει ΜΟΝΟ env (δεν οδηγείται από request,
+scheme guard σε http/https), το server action δεν γράφει πουθενά, resolve-άρει το base currency **server-side** αντί
+να το εμπιστεύεται από τον client (ώστε το rate να είναι πάντα στη φορά που εννοεί το υπόλοιπο P9), αρνείται εντελώς
+όσο το multi-currency είναι off (single-currency deployment δεν βγαίνει ποτέ προς τα έξω), και το κουμπί είναι
+**button, όχι effect** (τίποτα δεν εφαρμόζεται μόνο του). Το wiring είναι συνεπές και στα 7 σημεία: record-dated
+φόρμες (expenses/receipts/statements) ζητούν την ημέρα του ίδιου του εγγράφου, ενώ bills (due date, συνήθως μελλοντική)
+και το reports panel (ένα rate σε ολόκληρο νόμισμα) ζητούν το τελευταίο fixing.
+
+**Η δική μου προσθήκη**: το `lib/fxRates.ts` είχε 19 tests, αλλά το **server action ήταν ακάλυπτο** παρότι εκεί ζουν
+οι αποφάσεις που δεν μπορεί να πάρει το feed. Νέο `app/fxRateActions.test.ts` (**+9 tests**) που καρφώνει: base από
+settings και όχι από τον caller, fallback σε EUR όταν λείπει, άρνηση σε junk code / base currency / multi-currency off
+**χωρίς να ξοδευτεί request**, pass-through του σφάλματος αντί για επινοημένο νούμερο, και ότι η αναζήτηση τρέχει μέσα
+σε `withRequestTenant`.
+
+**Verify**: `npm run type-check` EXIT 0. Full `npx vitest run` → **4632 passed / 307 files** (μηδέν regression), και τα
+28 fx-specific πέρασαν ξεχωριστά. Browser: το `/login` (η μόνη μη-authed σελίδα) renders, **μηδέν console errors**, σε
+container που το `docker-health` είχε μόλις ξαναχτίσει **μαζί με αυτά ακριβώς τα αρχεία** (66 runtime files, /login 200,
+mongo healthy), οπότε το serve-check υπάρχει έμμεσα χωρίς να αγγίξω το mutex. Οι ίδιες οι φόρμες είναι πίσω από auth,
+δεν επαληθεύονται unattended (credentials boundary), όπως σε όλα τα προηγούμενα P9 runs.
+
+**Σύγκρουση routines (σημαντικό, δες Needs Achilleas)**: ενώ ετοίμαζα το commit, το `docker-health` routine έκανε
+**broad staging** και τράβηξε τα δεκαπέντε staged αρχεία μου (μαζί με το νέο μου test) μέσα στο δικό του commit
+**`0d5890c`**, 15 δευτερόλεπτα πριν το δικό μου `git commit`. Ο κώδικας είναι ακέραιος και ήδη pushed, απλά κάθεται
+κάτω από άσχετο μήνυμα («docker-health: rebuild complete»). **Δεν έκανα rewrite ιστορικού** (θα απαιτούσε force-push,
+απαγορευμένο) και δεν ξανα-commit-άρισα τα ίδια αρχεία.
+
+**Επόμενο task (πρόταση)**: αμετάβλητο από το προηγούμενο run, **P9 slice 6, ο `resolveFx` στα imports** (CSV
+bank-import PA1 και email-in), τα τελευταία write paths που μπορούν ακόμα να γεννήσουν εγγραφή με ξένο ποσό γραμμένο
+σαν base. Τώρα που υπάρχει το feed, ένα εύλογο μικρό follow-up είναι το import dialog να μπορεί να **προτείνει** rate
+ανά νόμισμα του αρχείου με το ίδιο κουμπί (πάντα ως πρόταση, ποτέ auto-applied). Ως συνήθως, **πρώτα** ο έλεγχος του
+Approved queue.
+
+## Needs Achilleas
+
+- **Fleet hygiene, νέο**: το `docker-health` routine κάνει **broad staging** (`git add -A` ή ισοδύναμο). Απόδειξη:
+  το commit `0d5890c` περιέχει 15 αρχεία που δεν του ανήκουν (όλο το P9 phase 2 feature) μαζί με το δικό του
+  PROGRESS.md. Δύο πραγματικοί κίνδυνοι: (α) η δουλειά χάνει το μήνυμα και την ιστορία της, (β) αν έχεις **δικές σου
+  ημιτελείς αλλαγές** στο tree όταν τρέξει, θα τις commit-άρει κι αυτές χωρίς να το ζητήσεις. Πρόταση: να μπει στο task
+  file του ο ίδιος ρητός κανόνας explicit `git add <path>` που έχουν τα υπόλοιπα routines.
+- **`expo-camera` έγκριση (μπλοκάρει 2 Approved items)**: αμετάβλητο, 3ο συνεχόμενο run. Ερώτημα:
+  `~/.claude/ASK_ACHILLEAS.md` → `pharos-daily-dev-20260725-1425` (ακόμα OPEN).
+- Standing items αμετάβλητα: SaaS multi-tenancy/billing env boundary, P36 Open Banking provider decision, P31
+  household supervised session, P16 Firefly III/Grocy real sample-file, Settings credentials boundary, P8 tax-export
+  ZIP, P5 MV3-extension phase 2, light-theme parity mobile.
