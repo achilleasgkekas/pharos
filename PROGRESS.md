@@ -9983,3 +9983,54 @@ lock released.
 **Επόμενο task (πρόταση)**: το **P23** (share-sheet) είναι πλέον το τελευταίο mobile-native item, με το Android μισό
 (intent filters) εφικτό αυτόνομα και το iOS να θέλει config plugin. Εναλλακτικά MOBILE_PARITY #6/#7 (Settings,
 Activity), που δεν χρειάζονται τίποτα native.
+
+## 2026-07-27 (cont.³ — P5 phase 2: το MV3 extension, το τελευταίο κομμάτι του quick capture)
+
+Το Approved queue είχε πλέον **μηδέν item με πραγματική δουλειά που να μην μπλοκάρεται** (P36 θέλει GoCardless
+credentials, P16 θέλει πραγματικό sample export, P23 θέλει EAS dev build και native config, P31 έκλεισε το
+προηγούμενο run), **εκτός από ένα**: το P5 ήταν 🟡 με το phase 2 «deferred λόγω ξεχωριστού packaging/deliverable
+εκτός monorepo build». **Αυτή η αιτιολογία ήταν λάθος** και το επιβεβαίωσα πριν χτίσω: ένα MV3 extension δεν έχει
+build step, είναι στατικά αρχεία που τα φορτώνει ο browser όπως είναι. Οπότε το «packaging pipeline» που το κρατούσε
+πίσω τρεις φορές δεν υπήρχε ποτέ.
+
+**Το σημαντικό σχεδιαστικά ήταν να ΜΗΝ προσθέσω δεύτερο μονοπάτι auth.** Το προφανές («extension → `/api/v1` με
+token») θα ζητούσε καινούριο CORS layer και θα έβαζε προσωπικό API token μέσα σε extension storage που συγχρονίζεται
+στο cloud προφίλ του browser. Αντ' αυτού το extension κάνει **ακριβώς ό,τι το bookmarklet του phase 1**: ανοίγει το
+same-origin `/capture?url=…` του instance, οπότε ταξιδεύει πάνω στο session cookie που ήδη υπάρχει. Αποτέλεσμα:
+**μηδέν `host_permissions`, μηδέν content script** (το extension δεν μπορεί να δει το περιεχόμενο καμίας σελίδας που
+βλέπει ο χρήστης, ούτε καν κατά λάθος), permissions μόνο `storage` + `contextMenus` + `activeTab`, και τίποτα μυστικό
+αποθηκευμένο πουθενά. Για ένα OSS extension που ζητάει από κόσμο να το εμπιστευτεί, αυτό το permission set είναι το
+μισό προϊόν.
+
+**Τρία triggers, μία διαδρομή**: κουμπί στη γραμμή εργαλείων, δεξί κλικ σε σελίδα, δεξί κλικ σε link (το link menu
+στέλνει τον **προορισμό**, όχι τη σελίδα όπου στέκεσαι, που είναι και η πιο χρήσιμη περίπτωση: λίστα προσφορών με
+δέκα links). Δύο περιπτώσεις που συνήθως ξεχνιούνται και τις χειρίστηκα ρητά: **σελίδα του browser** (`chrome://`,
+`file:`, `about:`) απαντιέται με badge αντί να ανοίξει κενό preview, και **μη ρυθμισμένο instance** ανοίγει το
+options page αντί για σιωπηλό no-op στο πρώτο κλικ.
+
+**Verify**: το `apps/extension` έχει **δικό του test suite χωρίς καμία dependency** (`node --test`, built-in στο Node):
+**21 tests pass**, 12 στους pure helpers (normalize διεύθυνσης, encoding, άρνηση μη-http σχημάτων) και **9 wiring tests
+που οδηγούν τον ίδιο τον service worker πάνω σε ψεύτικο `chrome` namespace** (ποιο trigger ανοίγει τι URL, trailing
+slash, missing origin, chrome:// refusal, first-install vs update). Αυτά τα 9 είναι που έπιασαν πραγματικό λάθος:
+οι listeners πετούσαν το promise με `void`, άρα το capture γινόταν μετά το assert, και το διόρθωσα επιστρέφοντάς το
+(ο browser το αγνοεί ούτως ή άλλως). Νέο **CI job «Browser extension»** τρέχει αυτά και επικυρώνει ότι το manifest
+είναι έγκυρο JSON και δείχνει σε αρχεία που υπάρχουν. Web-side: `type-check` EXIT 0, full `npx vitest run`
+**4717 passed / 312 files**, Docker κάτω από το mutex (build → mongo healthy → up → **/login 200 στο 1ο poll**,
+`RestartCount=0`, `/capture` 307 σωστά auth-gated), `builder prune -f` (2.35GB), lock released. Browser pane: `/login`
+μηδέν console errors, και το options page rendered+screenshotted (δείχνει σωστά το error path όταν λείπει το `chrome`
+API, γιατί εκτός extension δεν υπάρχει).
+
+**Επίσης**: σήμανα το **P31 SHIPPED** στο `PRODUCT_BACKLOG.md` (χτίστηκε το προηγούμενο run, ο τίτλος είχε μείνει
+stale), και μια γραμμή στο Settings → Quick capture (en+el) ώστε το extension να είναι ανακαλύψιμο από την εφαρμογή.
+
+**Επόμενο task (πρόταση)**: το Approved queue είναι πλέον **πλήρως άδειο από αυτόνομα χτίσιμα**. Άρα η επόμενη
+δουλειά είναι fallback: **MOBILE_PARITY #6 (mobile Settings: theme, budgets, notifications)** ή **#7 (Activity:
+Trash, Jobs, History)**, κανένα από τα δύο δεν χρειάζεται τίποτα native.
+
+## Needs Achilleas
+
+- **Chrome Web Store** (προαιρετικό): το extension φορτώνεται τώρα unpacked. Δημοσίευση θέλει developer account +
+  εφάπαξ fee, δηλαδή δικά σου credentials, όχι δουλειά. Το unpacked install τεκμηριώνεται στο `apps/extension/README.md`.
+- **P31 live check**: εκκρεμεί ακόμα πραγματικό login με τους τρεις ρόλους (από το προηγούμενο run).
+- **P36 / P16 / P23**: τα τρία εναπομείναντα Approved μπλοκάρονται σε GoCardless credentials, πραγματικό sample export
+  αρχείο, και EAS dev build αντίστοιχα.
