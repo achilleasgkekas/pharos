@@ -245,6 +245,14 @@ browser/session.
 > enabled, each expense can have a `currency` code and `fxRate` to convert into your
 > base currency; `amount` is always stored in base currency so reports and budgets
 > remain consistent. Disable it to keep the form simple for single-currency users.
+>
+> **Rate lookup:** rates are entered by you. The **Market rate** button next to any rate
+> field can fetch the European Central Bank's reference rate as a suggestion (never applied
+> on its own, never on a schedule); it calls [Frankfurter](https://frankfurter.dev), which
+> needs no API key or account. Set `FX_RATE_API_URL` to your own Frankfurter instance
+> (e.g. `http://nas.local:8080/v1`) to keep the lookup on your network. The request contains
+> only two currency codes and a date, never any of your records, and nothing is fetched at
+> all while multi-currency is off.
 
 ---
 
