@@ -98,6 +98,21 @@ export function deleteListItem(id: string) {
   return request<{ ok: boolean }>(`/api/v1/shopping-list/${id}`, { method: 'DELETE' });
 }
 
+// ---- Barcode lookup (P17) ----
+/**
+ * Turn a scanned EAN/UPC into a prefilled product suggestion.
+ *
+ * `product: null` with a 200 is a real answer, not a failure: the databases simply do not
+ * know this barcode, so the caller should offer to type it in (or use the AI photo scan)
+ * rather than show an error. A thrown error means the code was not a valid GTIN, or no
+ * product database could be reached.
+ */
+export async function lookupBarcode(code: string): Promise<{ product: ScannedProduct | null; code: string }> {
+  return request<{ product: ScannedProduct | null; code: string }>(
+    `/api/v1/lookup/barcode?code=${encodeURIComponent(code.trim())}`,
+  );
+}
+
 // ---- AI product scan (multipart) ----
 export async function scanProduct(uri: string): Promise<ScannedProduct> {
   const fd = new FormData();

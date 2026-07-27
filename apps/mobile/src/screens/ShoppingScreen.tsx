@@ -5,9 +5,11 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { C, RADIUS } from '../theme';
 import {
-  getShoppingList, addListItem, toggleListItem, deleteListItem, scanProduct, type ListItem, type ScannedProduct,
+  getShoppingList, addListItem, toggleListItem, deleteListItem, scanProduct, lookupBarcode,
+  type ListItem, type ScannedProduct,
 } from '../api';
 import { Button, Check, Empty, IconButton, Input, ModalSheet, Spinner, contentWidth } from '../ui';
+import { BarcodeScanner } from '../BarcodeScanner';
 
 export function ShoppingScreen() {
   const [items, setItems] = useState<ListItem[]>([]);
@@ -17,6 +19,9 @@ export function ShoppingScreen() {
   const [scanning, setScanning] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [draft, setDraft] = useState<ScannedProduct | null>(null);
+  const [barcodeOpen, setBarcodeOpen] = useState(false);
+  const [looking, setLooking] = useState(false);
+  const [scanHint, setScanHint] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -66,6 +71,32 @@ export function ShoppingScreen() {
     finally { setScanning(false); }
   }
 
+  /**
+   * A scanned barcode resolves to the same draft the AI photo scan produces, so both paths
+   * end at the same confirm sheet. An unknown barcode is not an error: the databases are
+   * incomplete, so the code stays on screen as a hint and the user can keep scanning or
+   * fall back to typing (and the code goes in the note, which is what makes it findable
+   * later).
+   */
+  async function onBarcode(code: string) {
+    setLooking(true);
+    setScanHint(null);
+    setErr(null);
+    try {
+      const r = await lookupBarcode(code);
+      if (!r.product) {
+        setScanHint(`No product found for ${code}. Scan another, or add it by name.`);
+        return;
+      }
+      setBarcodeOpen(false);
+      setDraft(r.product);
+    } catch (e) {
+      setScanHint((e as Error).message);
+    } finally {
+      setLooking(false);
+    }
+  }
+
   if (loading) return <Spinner />;
 
   const sorted = [...items].sort((a, b) => (a.checked ? 1 : 0) - (b.checked ? 1 : 0) || b.createdAt.localeCompare(a.createdAt));
@@ -83,9 +114,17 @@ export function ShoppingScreen() {
         <IconButton glyph="＋" onPress={() => add(name)} disabled={!name.trim()} textStyle={{ lineHeight: 26 }} />
       </View>
 
-      <Pressable onPress={scan} disabled={scanning} style={s.scanBtn}>
-        {scanning ? <ActivityIndicator color={C.cyan} /> : <Text style={s.scanText}>📷  Scan a product</Text>}
-      </Pressable>
+      <View style={s.scanRow}>
+        <Pressable
+          onPress={() => { setScanHint(null); setBarcodeOpen(true); }}
+          style={[s.scanBtn, { flex: 1 }]}
+        >
+          <Text style={s.scanText}>▥  Scan a barcode</Text>
+        </Pressable>
+        <Pressable onPress={scan} disabled={scanning} style={[s.scanBtn, { flex: 1 }]}>
+          {scanning ? <ActivityIndicator color={C.cyan} /> : <Text style={s.scanText}>📷  Photo scan</Text>}
+        </Pressable>
+      </View>
 
       {err && <Text style={s.error}>{err}</Text>}
 
@@ -137,6 +176,14 @@ export function ShoppingScreen() {
           </>
         )}
       </ModalSheet>
+
+      <BarcodeScanner
+        visible={barcodeOpen}
+        busy={looking}
+        hint={scanHint}
+        onScanned={onBarcode}
+        onClose={() => { setBarcodeOpen(false); setScanHint(null); }}
+      />
     </View>
   );
 }
@@ -145,6 +192,7 @@ const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: C.bg, padding: 16 },
   h1: { color: C.text, fontSize: 26, fontWeight: '800', marginBottom: 14 },
   addRow: { flexDirection: 'row', gap: 8 },
+  scanRow: { flexDirection: 'row', gap: 8 },
   scanBtn: { marginTop: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface2, paddingVertical: 12, alignItems: 'center' },
   scanText: { color: C.cyan, fontSize: 15, fontWeight: '600' },
   error: { color: C.red, fontSize: 13, marginTop: 10 },
