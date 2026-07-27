@@ -398,7 +398,7 @@ Each plan in the `GET /statements/plans` response is:
 | GET    | `/lists`                   | Editable category taxonomies (current values + defaults). |
 | PATCH  | `/lists`                   | Overwrite one taxonomy. Body `{ key, values[] }`. Empty/identical-to-default clears the override. |
 | GET    | `/settings/ai`             | AI configuration: master toggle, resolved provider + model, readiness, and 10 per-feature toggles (each with `enabled` boolean and derived `status`: `disabled` / `no-provider` / `ready`). Never returns key, host, or base URL. Readable by all (viewers can see why features are unavailable); credentials are never exposed. |
-| PATCH  | `/settings/ai`             | Update master toggle or per-feature toggles. Body `{ enabled?: boolean, features?: { [key]: boolean } }`. **Admin only** (403 for member/viewer); unknown feature keys are silently dropped. |
+| PATCH  | `/settings/ai`             | Update master toggle or per-feature toggles. Body `{ aiEnabled?: boolean, features?: { [key]: boolean } }`. **Admin only** (403 for member/viewer); unknown feature keys are silently dropped. |
 
 ### Trash
 

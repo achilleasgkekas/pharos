@@ -73,6 +73,14 @@ tags:
     description: Recurring subscriptions.
   - name: Vouchers
     description: Discount vouchers and coupons.
+  - name: Loyalty cards
+    description: Membership / loyalty cards and their barcodes.
+  - name: Bills
+    description: Manually paid bills — due, paid, overdue.
+  - name: Gift cards
+    description: Gift cards and store credit with a decreasing balance.
+  - name: Goals
+    description: Savings goals and their contributions.
   - name: Tasks
     description: Planner tasks.
   - name: Cards
@@ -540,6 +548,57 @@ paths:
         '200': { $ref: '#/components/responses/OkDeleted' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /lookup/barcode:
+    get:
+      tags: [Shopping list]
+      summary: Look up a product by barcode
+      description: |
+        Resolves an EAN/UPC (8..14 digits) against OpenFoodFacts, OpenProductsFacts and
+        OpenBeautyfacts (free, no API key). Nothing is saved: the mobile camera scan uses
+        this to prefill a suggestion the user confirms before it becomes a shopping-list
+        entry or an item. The `product` shape matches `POST /scan/product`, so one
+        confirm-then-add screen serves both. `product: null` with `200` means the databases
+        simply do not know the code.
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: GTIN / EAN / UPC, 8..14 digits.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Lookup result (product may be null).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  product:
+                    oneOf:
+                      - type: 'null'
+                      - type: object
+                        additionalProperties: true
+                        properties:
+                          name: { type: string }
+                          brand: { type: string }
+                          category: { type: string }
+                          quantity: { type: string }
+                          images:
+                            type: array
+                            items: { type: string }
+        '400':
+          description: Missing `code`, or not a valid GTIN.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '502':
+          description: No product database could be reached.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /receipts:
     get:
       tags: [Receipts]
@@ -970,6 +1029,63 @@ paths:
               schema: { type: object, additionalProperties: true }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /statements/plans/merge:
+    post:
+      tags: [Statements]
+      summary: Merge two installment plans
+      description: |
+        Binds every charge of `sourceKey` into `targetKey`, collapsing two differently-worded
+        plans for the same purchase (for example `QUEST ONLINE` vs `QUEST ONLINE KALLITHEA`)
+        into one payoff. Keys are the `plan.key` values returned by `GET /statements/plans`.
+        Future statements follow the binding.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sourceKey, targetKey]
+              properties:
+                sourceKey: { type: string }
+                targetKey: { type: string }
+      responses:
+        '200':
+          description: Merged.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  moved: { type: integer, description: Charges re-keyed. }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Statements]
+      summary: Undo a plan merge
+      description: Clears the manual `planKey` on every charge bound to `key`, splitting them back into their own plans.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key: { type: string }
+      responses:
+        '200':
+          description: Unmerged.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  moved: { type: integer }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /subscriptions:
     get:
       tags: [Subscriptions]
@@ -1183,6 +1299,440 @@ paths:
     delete:
       tags: [Vouchers]
       summary: Soft-delete a voucher
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /loyaltycards:
+    get:
+      tags: [Loyalty cards]
+      summary: List loyalty cards
+      description: Archived cards are excluded unless `archived=1`.
+      parameters:
+        - name: archived
+          in: query
+          schema: { type: string, enum: ['0', '1'] }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/UpdatedSince'
+      responses:
+        '200':
+          description: Paginated loyalty cards.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/LoyaltyCard' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Loyalty cards]
+      summary: Create a loyalty card
+      description: When `barcodeFormat` is missing or unsupported it is guessed from the shape of `cardNumber`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, cardNumber]
+              properties:
+                title: { type: string }
+                cardNumber: { type: string }
+                store: { type: string }
+                barcodeFormat: { $ref: '#/components/schemas/BarcodeFormat' }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Created card.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  loyaltyCard: { $ref: '#/components/schemas/LoyaltyCard' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /loyaltycards/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Loyalty cards]
+      summary: Update a loyalty card
+      description: |
+        `barcodeFormat` is only touched when an explicit supported format is sent (used
+        verbatim), or when `cardNumber` changes without one, in which case it is re-guessed
+        from the new number. An unchanged `cardNumber` never has its stored format
+        overwritten by a guess.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                store: { type: string }
+                cardNumber: { type: string }
+                barcodeFormat: { $ref: '#/components/schemas/BarcodeFormat' }
+                notes: { type: string }
+                archived: { type: boolean }
+      responses:
+        '200':
+          description: Updated card.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  loyaltyCard: { $ref: '#/components/schemas/LoyaltyCard' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Loyalty cards]
+      summary: Soft-delete a loyalty card
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /bills:
+    get:
+      tags: [Bills]
+      summary: List bills
+      description: Soonest due first. Archived bills are excluded unless `archived=1`; `paid=0` returns only unpaid ones.
+      parameters:
+        - name: archived
+          in: query
+          schema: { type: string, enum: ['0', '1'] }
+        - name: paid
+          in: query
+          description: '`0` = unpaid only.'
+          schema: { type: string, enum: ['0'] }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/UpdatedSince'
+      responses:
+        '200':
+          description: Paginated bills.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Bill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Bills]
+      summary: Create a bill
+      description: |
+        `amount` is read as the figure printed on the invoice. When `currency` differs from
+        the deployment's base currency it is converted with `fxRate` before storage, so the
+        stored `amount` is always base currency. Omit both to keep plain single-currency
+        behaviour.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, dueDate]
+              properties:
+                title: { type: string }
+                dueDate: { type: string, description: Any parseable date. }
+                vendor: { type: string }
+                amount: { type: number }
+                category: { type: string }
+                cycle: { $ref: '#/components/schemas/BillCycle' }
+                notes: { type: string }
+                currency: { type: string, description: Currency code printed on the invoice. }
+                fxRate: { type: number, description: Base units per 1 unit of `currency`. }
+      responses:
+        '201':
+          description: Created bill.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bill: { $ref: '#/components/schemas/Bill' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /bills/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Bills]
+      summary: Update a bill, or mark it paid/unpaid
+      description: |
+        Plain field edits and the paid/unpaid transition can be sent in the same request.
+        `paid: true` sets `paidAt` (to `paidDate` or now) and, the first time a recurring
+        bill (`cycle` set) is paid, spawns the next pending instance one cycle ahead —
+        `spawnedNext` says whether that happened. `paid: false` undoes the payment.
+        Touching any money field re-resolves `amount`/`currency`/`origAmount`/`fxRate`
+        together so a bill is never left half-converted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                vendor: { type: string }
+                amount: { type: number }
+                dueDate: { type: string }
+                category: { type: string }
+                cycle: { $ref: '#/components/schemas/BillCycle' }
+                notes: { type: string }
+                archived: { type: boolean }
+                paid: { type: boolean }
+                paidDate: { type: string }
+                currency: { type: string }
+                fxRate: { type: number }
+      responses:
+        '200':
+          description: Updated bill.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bill: { $ref: '#/components/schemas/Bill' }
+                  spawnedNext: { type: boolean }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Bills]
+      summary: Soft-delete a bill
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /giftcards:
+    get:
+      tags: [Gift cards]
+      summary: List gift cards
+      description: Archived cards are excluded unless `archived=1`. `balance`, `spentPct` and `daysLeft` are derived server-side.
+      parameters:
+        - name: archived
+          in: query
+          schema: { type: string, enum: ['0', '1'] }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/UpdatedSince'
+      responses:
+        '200':
+          description: Paginated gift cards.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/GiftCard' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Gift cards]
+      summary: Create a gift card
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                store: { type: string }
+                code: { type: string }
+                initialAmount: { type: number, description: Face value; negatives are clamped to 0. }
+                expiresAt: { type: string }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Created gift card.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  giftCard: { $ref: '#/components/schemas/GiftCard' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /giftcards/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Gift cards]
+      summary: Update a gift card, or record/undo a use
+      description: |
+        Field edits, archiving and one balance movement can travel in the same request.
+        `addUse` records a spend (positive amount) or a reload (negative amount);
+        `removeUseId` undoes a single entry. The two are mutually exclusive (`400` if both
+        are sent) because they mutate the same `uses` array.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                store: { type: string }
+                code: { type: string }
+                initialAmount: { type: number }
+                expiresAt: { type: string }
+                notes: { type: string }
+                archived: { type: boolean }
+                addUse:
+                  type: object
+                  required: [amount]
+                  properties:
+                    amount: { type: number, description: Non-zero. Positive = spend, negative = reload. }
+                    note: { type: string }
+                    date: { type: string }
+                removeUseId: { type: string }
+      responses:
+        '200':
+          description: Updated gift card.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  giftCard: { $ref: '#/components/schemas/GiftCard' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Gift cards]
+      summary: Soft-delete a gift card
+      responses:
+        '200': { $ref: '#/components/responses/OkDeleted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /goals:
+    get:
+      tags: [Goals]
+      summary: List savings goals
+      description: Archived goals are excluded unless `archived=1`. Progress fields are derived from contributions and never stored.
+      parameters:
+        - name: archived
+          in: query
+          schema: { type: string, enum: ['0', '1'] }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/UpdatedSince'
+      responses:
+        '200':
+          description: Paginated goals.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ListMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Goal' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Goals]
+      summary: Create a savings goal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                targetAmount: { type: number, description: Negatives are clamped to 0. }
+                targetDate: { type: string }
+                category: { type: string }
+                notes: { type: string }
+      responses:
+        '201':
+          description: Created goal.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  goal: { $ref: '#/components/schemas/Goal' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /goals/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Goals]
+      summary: Update a goal, or add/remove a contribution
+      description: |
+        Field edits, archiving and one contribution change can travel in the same request.
+        `addContribution.amount` must be positive: a goal only ever gains money through
+        contributions, and a mistaken entry is undone with `removeContributionId` rather
+        than cancelled out by a negative one. The two are mutually exclusive (`400` if both
+        are sent).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                targetAmount: { type: number }
+                targetDate: { type: string }
+                category: { type: string }
+                notes: { type: string }
+                archived: { type: boolean }
+                addContribution:
+                  type: object
+                  required: [amount]
+                  properties:
+                    amount: { type: number, description: Must be greater than 0. }
+                    note: { type: string }
+                    date: { type: string }
+                removeContributionId: { type: string }
+      responses:
+        '200':
+          description: Updated goal.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  goal: { $ref: '#/components/schemas/Goal' }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Goals]
+      summary: Soft-delete a goal
       responses:
         '200': { $ref: '#/components/responses/OkDeleted' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1619,6 +2169,74 @@ paths:
         '400': { $ref: '#/components/responses/BadInput' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /settings/ai:
+    get:
+      tags: [Settings]
+      summary: Get AI configuration
+      description: |
+        Master switch, resolved provider and model, readiness and the per-feature toggles.
+        Readable by any signed-in user (a viewer should be able to see WHY a scan button
+        did nothing). Credentials are deliberately never returned: no key, host or base URL
+        appears in this response, and they cannot be written through this route either.
+        A feature key that is absent from the stored map counts as ON, so a feature added
+        by a later release is not silently off on an older install.
+      responses:
+        '200':
+          description: AI configuration.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  aiEnabled: { type: boolean }
+                  provider: { type: string, enum: [ollama, anthropic, openai, gemini, openrouter, custom] }
+                  model: { type: string, description: Model in play for the resolved provider. }
+                  visionModel: { type: string, description: Only meaningful on Ollama, sent unconditionally. }
+                  ready: { type: boolean, description: 'false when the master switch is off (no probe is run).' }
+                  canEdit: { type: boolean, description: Whether this user may PATCH (admin). }
+                  features:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key: { type: string }
+                        label: { type: string }
+                        description: { type: string }
+                        area: { type: string }
+                        enabled: { type: boolean }
+                        status: { type: string, enum: [disabled, no-provider, ready] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Settings]
+      summary: Flip the AI master switch or per-feature toggles
+      description: |
+        **Admin only** (`403` for member and viewer): AI spends money per call and the
+        setting is instance-wide. Unknown feature keys are dropped rather than stored.
+        Credentials are not writable here.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                aiEnabled: { type: boolean }
+                features:
+                  type: object
+                  additionalProperties: { type: boolean }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        '400': { $ref: '#/components/responses/BadInput' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /settings/test-notify:
     post:
       tags: [Settings]
@@ -1673,7 +2291,7 @@ paths:
     get:
       tags: [Trash]
       summary: List soft-deleted records
-      description: Most-recently-deleted first (item/receipt/expense/subscription/voucher/task). Auto-purges entries older than 30 days as a side effect.
+      description: Most-recently-deleted first (item/receipt/expense/subscription/voucher/giftcard/loyaltycard/bill/goal/task). Auto-purges entries older than 30 days as a side effect.
       responses:
         '200':
           description: Trash entries.
@@ -1687,7 +2305,7 @@ paths:
       - name: type
         in: path
         required: true
-        schema: { type: string, enum: [item, receipt, expense, subscription, voucher, task] }
+        schema: { type: string, enum: [item, receipt, expense, subscription, voucher, giftcard, loyaltycard, bill, goal, task] }
       - $ref: '#/components/parameters/Id'
     patch:
       tags: [Trash]
@@ -1908,6 +2526,105 @@ components:
         used: { type: boolean }
         notes: { type: string }
         updatedAt: { type: string, format: date-time }
+        deleted: { type: boolean }
+    BarcodeFormat:
+      type: string
+      enum: [CODE128, EAN13, UPC, CODE39]
+    LoyaltyCard:
+      type: object
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        title: { type: string }
+        store: { type: string }
+        cardNumber: { type: string }
+        barcodeFormat: { $ref: '#/components/schemas/BarcodeFormat' }
+        notes: { type: string }
+        archived: { type: boolean }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        deleted: { type: boolean }
+    BillCycle:
+      type: string
+      description: Empty string = one-off.
+      enum: ['', weekly, monthly, quarterly, yearly]
+    Bill:
+      type: object
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        title: { type: string }
+        vendor: { type: string }
+        amount: { type: number, description: Always the deployment's base currency. }
+        currency: { type: string, description: Code printed on the invoice. }
+        origAmount: { type: number, description: 'Printed figure on a foreign bill; 0 otherwise.' }
+        fxRate: { type: number, description: 'Base units per 1 unit of `currency`; 0 = not foreign, or no rate entered yet (then `amount` is still the printed number and must not be summed as base).' }
+        dueDate: { type: string, format: date-time, nullable: true }
+        paidAt: { type: string, format: date-time, nullable: true }
+        category: { type: string }
+        cycle: { $ref: '#/components/schemas/BillCycle' }
+        notes: { type: string }
+        archived: { type: boolean }
+        status:
+          type: string
+          description: Derived from `dueDate` and `paidAt` — never stored.
+          enum: [paid, overdue, due-soon, upcoming]
+        updatedAt: { type: string, format: date-time, nullable: true }
+        deleted: { type: boolean }
+    GiftCardUse:
+      type: object
+      properties:
+        id: { type: string }
+        amount: { type: number, description: Positive = spend, negative = reload. }
+        date: { type: string, format: date-time, nullable: true }
+        note: { type: string }
+    GiftCard:
+      type: object
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        title: { type: string }
+        store: { type: string }
+        code: { type: string }
+        initialAmount: { type: number, description: Face value. }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        archived: { type: boolean }
+        notes: { type: string }
+        balance: { type: number, description: Derived — face value minus uses. Never stored. }
+        spentPct: { type: number, description: Derived. }
+        daysLeft: { type: integer, nullable: true, description: 'Derived from `expiresAt`; null when it never expires.' }
+        uses:
+          type: array
+          items: { $ref: '#/components/schemas/GiftCardUse' }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        deleted: { type: boolean }
+    GoalContribution:
+      type: object
+      properties:
+        id: { type: string }
+        amount: { type: number }
+        date: { type: string, format: date-time, nullable: true }
+        note: { type: string }
+    Goal:
+      type: object
+      additionalProperties: true
+      properties:
+        id: { type: string }
+        title: { type: string }
+        targetAmount: { type: number }
+        targetDate: { type: string, format: date-time, nullable: true }
+        category: { type: string }
+        notes: { type: string }
+        archived: { type: boolean }
+        current: { type: number, description: Derived — sum of contributions. Never stored. }
+        remaining: { type: number, description: Derived. }
+        pct: { type: number, description: Derived. }
+        done: { type: boolean, description: Derived. }
+        monthsLeft: { type: integer, nullable: true, description: 'Derived from `targetDate`; null without a deadline.' }
+        perMonth: { type: number, nullable: true, description: Derived — what still has to be saved each month to land on time. }
+        contributions:
+          type: array
+          items: { $ref: '#/components/schemas/GoalContribution' }
+        updatedAt: { type: string, format: date-time, nullable: true }
         deleted: { type: boolean }
     Task:
       type: object
