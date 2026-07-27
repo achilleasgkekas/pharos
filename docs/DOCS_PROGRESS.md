@@ -1,5 +1,33 @@
 # DOCS_PROGRESS
 
+## 2026-07-28 (thirtieth run — comprehensive drift verification, all features documented + in sync)
+
+Σάρωση git log για νέα feat() commits μετά την twenty-ninth run (commit 83dfe10, 2026-07-28 00:13). Ανακάλυψη: **ΔΕΝ υπάρχουν νέα feat() commits** μετά τις 00:13. Όλες τις features (P9 multi-currency web+mobile, P31 viewer role, P5 MV3 extension, P17 barcode scan, roadmap #6 mobile AI settings, FX rate lookup phase 2, OpenAPI spec sync) είναι fully documented και synchronized.
+
+Comprehensive verification (markdown only, κανένα build/Docker/AI call):
+- **Latest feat() commit**: 98e4ba7 (2026-07-27 22:12, P9 mobile AI master switch + per-feature toggles) — documented στο run 28 ✓
+- **Drift guard test**: openapi.coverage.test.ts επιβεβαιώνει 61 spec paths == 61 route files (ζευγάρι: every route documented, zero orphaned paths, every HTTP method of every route documented, zero extra operations) ✓
+- **Code fences balance check**: features.md 0 (✓), api.md 22 (✓), mobile.md 8 (✓), configuration.md 8 (✓), security.md 0 (✓) — όλα ζυγά.
+- **Τι τεκμηριώθηκε σε προηγούμενα runs**:
+  - Run 27: P5 phase 2 (MV3 extension) + P31 (viewer role enforcement)
+  - Run 28: roadmap #6 (mobile AI master switch + per-feature toggles)
+  - Run 29: OpenAPI spec sync (11 missing paths + drift guard test)
+  - Runs 22-26: P9 multi-currency foundation + 10 slices (web + mobile) + FX rate lookup
+  - Earlier: P17 barcode scan, P21 mobile vault, P32 gift cards, P35 expense splitting, P8 tax-deductible, P12 savings goals, P20 loyalty cards, MFA, P22 email verifications, P41 subscriptions, task management, calendar integration, ntfy alerts, settings management.
+- **Configuration accuracy**: Settings AI section (features.md + api.md + mobile.md) εξακολουθεί να είναι accurate post-patch-body correction ✓
+- **Validation (markdown only)**:
+  - Internal links: δεν έγιναν νέες αγγίξεις που θα μπορούσαν να σπάσουν links ✓
+  - Secret scan: κανένα literal credential ✓
+  - Markdown structure: όλα καθαρά ✓
+
+Collision guard: `git status --short -- docs/` = κανένα modified file. Κανένα staged foreign. Απλή καταγραφή σε DOCS_PROGRESS.md.
+
+Συμπέρασμα: Όλες οι ενεργά shipped features (P9 complete, P31, P5 phase 2, P17, roadmap #6, phase 2 FX rates, OpenAPI sync) είναι πλήρως documented cross-sectionally (features.md + api.md + mobile.md + configuration.md + security.md). Δεν υπάρχουν undocumented branches ή drift. Το repo είναι synchronized.
+
+Minor TODOs (δεν χρειάζονται άμεση δράση): (1) SaaS env vars block στο .env.example (DOCS_PROGRESS notes), (2) CHANGELOG documentation link (updating.md), (3) legacy-tracker import migration doc (mentioned in run notes, μόνο text cleanup).
+
+Επόμενο run (run 31): (α) αν νέα features ship μετά τις 02:43 (χαμηλή πιθανότητα, περισσότερα tests/infrastructure commits), update docs accordingly · (β) monitor αν νέα settings/configuration options προστεθούν χωρίς configuration.md update (drift check) · (γ) αν κανένα νέο endpoint μπει χωρίς OpenAPI entry (drift guard test θα ακούσει).
+
 ## 2026-07-28 (twenty-ninth run — OpenAPI spec sync: 11 missing paths + drift guard)
 
 Σάρωση git log για νέα feat() commits μετά την twenty-eighth run (commit a21e18a, 2026-07-27 22:12). Ανακάλυψη: **ΔΕΝ υπάρχουν νέα feat() commits**, αλλά ένα σημαντικό **docs() commit που χρειάζεται καταγραφή**:
