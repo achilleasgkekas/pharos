@@ -2988,3 +2988,29 @@ Coordination πριν ξεκινήσω: `ROUTINES_PAUSED` δεν υπήρχε. `
 - Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου. `git fetch origin main` → local ένα commit μπροστά από origin (`dd5e2f7`), καθαρό fast-forward push (`dd5e2f7..a402903`).
 
 Suggested next task: **budgets/depreciation/category-rules concern** (γραμμές 1490-1591 του `settings/actions.ts`: `saveBudgets`/`saveBudgetRollover`/`saveCategoryRules`/`suggestBudgets`/`saveAssetAccounts`/`saveDepreciation` — το block που παρεμβάλλεται μέσα στο backup/export section, σκόπιμα αφέθηκε έξω σήμερα). Μετά: **Trash** (γραμμές 1651-1778, soft-delete restore/purge)· **OneDrive wizard** (1779+, device-code auth, θα χρειαστεί mock του Graph fetch flow). Πάντα `git status` collision-guard πρώτα + διάβασε ολόκληρο το target concern πριν γράψεις τίποτα.
+
+## 2026-07-28 (cont.² — settings/actions.budgets.test.ts, ενδέκατο slice: budgets/depreciation/category-rules concern)
+
+**Task**: το suggested next-task του προηγούμενου run, το **budgets/depreciation/category-rules concern**: `saveBudgets`/`saveBudgetRollover`/`saveCategoryRules`/`suggestBudgets`/`saveAssetAccounts`/`saveDepreciation` (γραμμές 1490-1591 του `settings/actions.ts`) — το block που παρεμβάλλεται μέσα στο backup/export section (ανάμεσα σε `exportTaxBundle` και `importData`), σκόπιμα αφημένο έξω από το προηγούμενο slice. Νέο ξεχωριστό αρχείο `actions.budgets.test.ts`, ενδέκατο slice του ίδιου module.
+
+Coordination πριν ξεκινήσω: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md`: καμία εγγραφή για pharos-oss-prep. Collision guard: `git status --short` καθαρό, local==origin (`972dd96`) πριν ξεκινήσω.
+
+Διάβασα ολόκληρο το target (γραμμές 1490-1591) πριν γράψω τίποτα, plus τα signatures των δύο pure helpers που καλεί (`resolveCategoryRules` στο `lib/categoryRules.ts`, `suggestBudgetsFromExpenses` στο `lib/budgetSuggest.ts`) — και τα δύο έχουν ΗΔΗ δικά τους dedicated test files (`lib/categoryRules.test.ts`, `lib/budgetSuggest.test.ts`), άρα εδώ mockάρονται πλήρως σαν opaque `vi.fn()`s (ίδια σύμβαση με το `estimatedItemValue`/`detectPriceHikes`/`detectBudgetExceeded` στα προηγούμενα slices) — το αρχείο πιστώνει ΜΟΝΟ το δικό του wiring.
+
+**Ευρήματα στο ίδιο το production code (τεκμηριωμένα στα tests, ΟΧΙ αλλαγμένα)**:
+- `saveBudgets`/`saveBudgetRollover`/`saveCategoryRules`/`saveAssetAccounts`/`saveDepreciation` gate με **`assertCanWrite`** (ΟΧΙ `requireAdmin` — ένας απλός write-capable χρήστης μπορεί να θέσει το δικό του budget), ενώ το `suggestBudgets` **δεν έχει ΚΑΝΕΝΑ gate** (read-only helper).
+- `saveDepreciation`: το `enabled` default σε `true` **εκτός αν το input είναι ΚΥΡΙΟΛΕΚΤΙΚΑ `false`** (`cfg?.enabled !== false`) — οποιαδήποτε άλλη falsy τιμή (undefined/0/'') μένει enabled.
+- Ασυμμετρία στο clamping μέσα στο ίδιο `saveDepreciation`: το `floorPct`/`defaultRate` clamp-άρονται συμμετρικά σε [0,100] (helper `clampPct`, NaN→0), αλλά τα per-category `rates` clamp-άρονται **ΜΟΝΟ πάνω** (`Math.min(100, n)`) και ένα αρνητικό rate **απορρίπτεται εντελώς** (guard `n >= 0`) αντί να γίνει clamp στο 0.
+- `saveCategoryRules` δεν κάνει ΚΑΜΙΑ δική του validation — μεταβιβάζει ολόκληρη τη δουλειά στο `resolveCategoryRules(rules)` και αποθηκεύει το αποτέλεσμα αυτούσιο· revalidates **ΜΟΝΟ** `/settings` (όχι `/reports`, σε αντίθεση με τα υπόλοιπα δύο budget functions).
+
+**25 tests** σε έξι describe blocks: `saveBudgets` (4: gate· drop non-finite/zero/negative + trim key + round 2dp· invalidate+revalidate· null/undefined arg→{})· `saveBudgetRollover` (3: gate· `!!` coercion truthy/falsy)· `saveCategoryRules` (4: gate· περνάει raw στο resolveCategoryRules, αποθηκεύει το cleaned αποτέλεσμα αυτούσιο· revalidate ΜΟΝΟ /settings· invalidateAppSettings)· `suggestBudgets` (3: no gate· query shape `{kind:{$ne:'income'}}` + windowMonths=3 fixed + return shape· ποτέ δεν αγγίζει AppConfig)· `saveAssetAccounts` (3: gate· ίδιος καθαρισμός με saveBudgets· key cap 60 chars)· `saveDepreciation` (7: gate· enabled-unless-false· clamp floorPct/defaultRate [0,100] + NaN fallback· per-category rate cap-only-πάνω + drop αρνητικού + trim+cap key· invalidate+revalidate· undefined cfg→defaults `{enabled:true,floorPct:0,defaultRate:0,rates:{}}`).
+
+Ένα tsc issue: το `expenseFindMock` return στο `beforeEach` και σε ένα test χρησιμοποιούσε raw object `{select:()=>({lean:...})}` που δεν ταίριαζε στο inferred nested chain type του hoisted `chain()` helper (λείπε `sort` στο nested return) → fix: τοπικό `chainData()` helper (ίδιο pattern με το `actions.backup.test.ts`) αντί για raw literals.
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/settings/actions.budgets.test.ts"` → **25/25 passed** από την πρώτη προσπάθεια (μετά το tsc fix).
+- `npm run type-check` → 2 αρχικά σφάλματα (missing select/sort στο nested mock return) → διορθώθηκε με `chainData()` → exit 0, μηδέν errors σε όλο το repo.
+- `npx vitest run` (όλο το suite) → **322 files, 5021/5021 passed** (~13.3s wall).
+- Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου. `git fetch origin main` → local ένα commit μπροστά (`972dd96`), καθαρό fast-forward push (`972dd96..4b2e555`).
+
+Suggested next task: **Trash concern** (γραμμές 1651-1778 του `settings/actions.ts`: `getTrash`/`restoreFromTrash`/`purgeFromTrash`/`purgeTrashEntry`/`emptyTrash` — soft-delete restore/purge πάνω από τα 10 record types). Μετά: **OneDrive wizard** (γραμμές 1779+, device-code auth: `startOnedriveAuth`/`pollOnedriveAuth`/`getOnedriveStatus`/`disconnectOnedriveAccount`/`testOnedriveConnection` — θα χρειαστεί mock του Graph fetch flow μέσω `lib/onedrive.ts`). Με αυτά τα δύο ολοκληρώνεται η πλήρης κάλυψη του `settings/actions.ts` (όλα τα concerns πλέον). Πάντα `git status` collision-guard πρώτα + διάβασε ολόκληρο το target concern πριν γράψεις τίποτα.
