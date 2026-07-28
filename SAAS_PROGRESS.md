@@ -6126,3 +6126,70 @@ territory: plans/prices config + checkout-session/portal stubs). ΣΗΜ: είν�
 πραγματικά keys, οπότε τα tests πρέπει να πινάρουν το **config shape + τα guards** (τι κάνει
 όταν λείπει key, τι entitlements αντιστοιχούν σε ποιο plan), όχι network calls. Πριν ξεκινήσεις:
 ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI** item (προτεραιότητα).
+
+## 2026-07-28 — increment 125: unit coverage για τον Stripe client (τελευταίο untested module)
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine (το δικό μου
+`pharos-saas-core-20260728-0038` για το slug μη-λατινικών ονομάτων παραμένει OPEN, δεν το
+προσπερνώ μόνος μου). **UI-first scan**: ξανά-σάρωσα το territory — 13 pages στο
+`app/(saas)/**`, 4 στο `app/admin/**`, 24 components + 32 view-modules στο `components/saas/**`
+(καθένα με δικό του `.test.ts`), και **και τα 4 admin endpoints** (`overview`, `tenants`,
+`tenants/[slug]`, `.../dbstats`) έχουν ήδη αντίστοιχη console page. Μηδέν ανοιχτό UI item.
+
+**`lib/billing/stripe.test.ts` (46 tests, μηδέν production αλλαγή)** — το `stripe.ts` ήταν το
+**τελευταίο untested module ολόκληρου του territory** και ταυτόχρονα το μόνο που αγγίζει
+χρήματα. Δύο ξεχωριστά συμβόλαια, το καθένα με διαφορετικό τρόπο αποτυχίας:
+
+**(1) «καμία χρέωση χωρίς keys».** Το `fetch` stub-άρεται και ελέγχεται ότι **δεν καλείται
+καθόλου** όταν λείπει το `STRIPE_SECRET_KEY` (η προεπιλογή κάθε self-hosted install), όταν το
+plan δεν έχει configured price id, και για το `free` plan που εξ ορισμού δεν έχει τιμή. Χωρίς
+αυτά τα tests, ένα regression στη σειρά των guards θα έκανε ένα AGPL deployment να χτυπά το
+`api.stripe.com` σε κάθε click. Πινάρεται επίσης ότι κενό/whitespace-only key μετράει ως
+**unconfigured** (αλλιώς θα στέλναμε `Bearer ` και θα δείχναμε 401 αντί για καθαρό
+not-configured) και ότι το env **ξαναδιαβάζεται ανά call**.
+
+**(2) `verifyStripeSignature` — ο μοναδικός φύλακας του webhook.** Ό,τι περνά από εδώ
+αναβαθμίζει plan και ξεκλειδώνει entitlements, οπότε κάθε χαλαρό branch = δωρεάν αναβαθμίσεις
+με ένα curl. Fail-closed σε: απόν secret (**το πιο load-bearing**: χωρίς αυτό ένα deployment
+χωρίς `STRIPE_WEBHOOK_SECRET` θα δεχόταν κάθε POST ως αυθεντικό γεγονός), απόν/κενό header,
+πειραγμένο body κατά ένα byte, υπογραφή με άλλο secret, timestamp αλλαγμένο μετά την υπογραφή
+(το `t` είναι μέρος του MAC), μη-αριθμητικό `t`, **λάθος μήκος v1** (ο length έλεγχος πριν το
+`timingSafeEqual` είναι ο λόγος που ένα κομμένο v1 γυρίζει `false` αντί για 500), και
+uppercase hex. Δέχεται: **πολλαπλά v1** (secret rotation), unknown scheme fields, whitespace,
+και **ακριβώς** το tolerance boundary — ενώ απορρίπτει replay πέρα από αυτό **και** timestamp
+πολύ στο μέλλον (clock-skew abuse). Το πιο χρήσιμο για μελλοντικό debugging: **raw-body
+byte-fidelity** (ένα `JSON.parse→stringify` round-trip σε handler σκοτώνει κάθε νόμιμο webhook
+και μοιάζει με «λάθος secret» — τώρα εμφανίζεται ως test failure), μαζί με multi-byte UTF-8
+body (ελληνικό workspace name σε event metadata).
+
+Πινάρεται ακόμα το **σχήμα του checkout form**: το tenant id ταξιδεύει σε **τρία** σημεία
+(`metadata`, `subscription_data[metadata]`, `client_reference_id`) γιατί ο webhook handler
+μπορεί να το ψάξει είτε στο session είτε στο subscription object — αν ένα λείψει, μια πληρωμή
+φτάνει χωρίς να ξέρουμε ποιο workspace να αναβαθμίσουμε. Επίσης **customer id πάνω από email**
+(αλλιώς διπλοί Stripe customers ανά tenant), bearer auth + form encoding, error-message
+passthrough με fallback στο status code, και ότι network failure γυρίζει tagged result αντί να
+πετάξει (ο caller είναι route handler: ένα throw θα γινόταν 500 στον πελάτη αντί για «δοκίμασε
+ξανά» στο billing panel).
+
+**Verified**: **46/46 green από την πρώτη εκτέλεση**. Πλήρες `npx vitest run` → **328 files /
+5211 tests green** (από 326/5147: +2 files/+64 tests — 1 δικό μου, τα υπόλοιπα από ταυτόχρονες
+routines). `npm run type-check` → **EXIT 0 χωρίς κανένα fix**. **Docker: κανένα rebuild**
+(test-only, μηδέν production/runtime/env/deps αλλαγή → ούτε ο mutex χρειάστηκε).
+**Browser-verify: skipped** (test file, μηδέν observable UI). Collision guard: `git status
+--short` πριν το staging = μόνο το δικό μου untracked αρχείο, μηδέν staged από άλλη routine·
+pathspec commit. Pushed `4b13749`.
+
+**## Needs Achilleas:** τίποτα νέο. Παραμένουν: **slug για μη-λατινικά ονόματα** (workspace
+«Πλαίσιο» → `w-k3j9x1`· προτείνω transliteration με το υπάρχον `GREEK_MAP` — OPEN στο ask-inbox
+ως `pharos-saas-core-20260728-0038`), **Stripe keys** (`STRIPE_SECRET_KEY` /
+`STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_SHARED` / `STRIPE_PRICE_DEDICATED` — ο client είναι
+πλέον πλήρως testαρισμένος και περιμένει μόνο keys), **τελικό plan pricing** (τα €0/€9/€29 +
+seats/quotas στο `plans.ts` είναι placeholders), **SMTP**.
+
+**Next task:** **ολόκληρο το territory είναι πλέον covered** — μηδέν untested module σε
+`lib/tenancy/**`, `lib/billing/**`, `components/saas/**`. Οπότε το επόμενο run πρέπει να
+γυρίσει σε **νέα δουλειά**, όχι σε tests. Προτεινόμενη σειρά: (α) ξανά-σάρωση για UI item
+(προτεραιότητα — π.χ. λείπει superadmin view για το **audit log** ενώ το `api/saas/audit`
+endpoint + το `audit.ts` υπάρχουν και είναι testαρισμένα· θα ήταν μια `/admin/audit` page πάνω
+σε έτοιμο backend, καθαρά μέσα στο territory)· (β) αλλιώς το επόμενο backend increment από το
+TODO.md #5-#12. Πριν ξεκινήσεις: ask-inbox πρώτα.
