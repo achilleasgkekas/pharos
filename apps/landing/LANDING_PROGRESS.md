@@ -4733,3 +4733,69 @@ comparison-framing FAQ στο μελλον, (2) γενικο sweep για νεα
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες PLUS το ανοιχτο pricing-drift ερωτημα `pharos-landing-20260728-0706`, repo
 public timing).
+
+## 2026-07-28 (run 36)
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε: το μοναδικο
+entry για αυτη τη routine ειναι το `pharos-landing-20260728-0706` (pricing drift, run 34), ακομα **OPEN** χωρις
+Answer, αρα τιποτα ANSWERED να εφαρμοσω. Δεν το ξαναρωτησα (καμια διπλοεγγραφη).
+
+Ελεγχος στην αρχη: `git log --oneline 31c6f8a..HEAD` (31c6f8a = το commit μου του run 35) εδειξε 4 commits,
+κανενα `feat(`/`fix(` user-facing (test(reports) goalsActions + docs(saas)/docs(progress) απο αλλες routines).
+Μηδεν νεο feature να συγχρονισω στο copy, οποτε αντι για αλλο ενα copy sweep (τα runs 31-35 τα εξαντλησαν)
+επιασα το μεγαλυτερο εναπομειναν UX προβλημα της σελιδας.
+
+**Το προβλημα**: το FAQ ειχε φτασει τις **40 ερωτησεις σε μια ενιαια, αδιαφοροποιητη λιστα** accordion. Ενας
+επισκεπτης που ψαχνει «πως δουλευουν τα backups» επρεπε να σκαναρει 40 κλειστες γραμμες χωρις καμια δομη. Αυτο
+ηταν συσσωρευμενο κοστος απο πολλα runs που προσθεταν μια-μια ερωτηση (η καθε μια σωστη μονη της, το συνολο
+ομως αδιαβαστο).
+
+**Αλλαγη — ομαδοποιηση FAQ σε 6 θεματικες ενοτητες** (`apps/landing/app/page.tsx`): το flat `FAQS` array εγινε
+`FAQ_GROUPS` (title + note + items), και το `FAQS` παραμενει ως `FAQ_GROUPS.flatMap(g => g.items)` ωστε το
+**FAQPage JSON-LD να μεινει ακριβως ιδιο** (και οι 40 ερωτησεις εξακολουθουν να εκπεμπονται flat στα search
+engines, μηδεν αλλαγη στο structured data). Οι ομαδες, με τη σειρα που εμφανιζονται:
+1. Getting started (5) · 2. Hosted or self-hosted (5) · 3. AI features (4) · 4. Getting your data in (9) ·
+5. Tracking and reports (10) · 6. Data, privacy and security (7). Συνολο 40, καμια ερωτηση δεν χαθηκε ουτε
+προστεθηκε, κανενα κειμενο απαντησης δεν αλλαξε (καθαρα αναδιαταξη).
+
+**Τα deep links εμειναν ΟΛΑ εγκυρα**: τα anchors παραγονται απο το κειμενο της ερωτησης (`faqId(q)`), οχι απο
+τη θεση της, οποτε η αναδιαταξη δεν σπαει κανενα υπαρχον `#faq-...` link.
+
+**Συνοδο fix που ηταν απαραιτητο** (`app/components/FaqDeepLink.tsx`): ο handler εκανε
+`document.querySelector('.faq-list')` (**ενικος**, μονο το ΠΡΩΤΟ list) και μετα εψαχνε details μεσα του. Με 6
+πλεον `.faq-list` containers, αυτο θα ειχε σπασει σιωπηλα τα deep links **34 απο τις 40 ερωτησεις** (ολες εκτος
+της πρωτης ομαδας). Αλλαξε σε scope στο `#faq` section (`getElementById('faq').querySelectorAll('details[id^="faq-"]')`),
+οποτε πιανει και τις 6 ομαδες. Το verify παρακατω το δοκιμασε ρητα σε ερωτηση της **τελευταιας** ομαδας.
+
+**CSS** (`app/globals.css`): νεα `.faq-groups` (flex column, gap 40px), `.faq-group-head` (baseline flex με
+`flex-wrap: wrap` ωστε σε στενη οθονη το note να πεφτει κατω απο τον τιτλο), `.faq-group-title` (IBM Plex Mono,
+uppercase, letter-spacing 0.12em, χρωμα `var(--accent)`, ιδιο idiom με τα υπαρχοντα `.mono` eyebrows της σελιδας)
+και `.faq-group-note` (text-faint, 0.82rem), με λεπτη `border-bottom` διαχωριστικη γραμμη ανα ομαδα. Μηδεν νεο
+client JS, καθαρα server-rendered ομαδοποιηση.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13 static routes, `/` **5.35 kB** (αμεταβλητο, η ομαδοποιηση δεν προσθεσε bundle).
+- Browser pane (production build σε `next start -p 3103`, θυρα 3100 κατειλημμενη απο Docker): `read_console_messages`
+  (onlyErrors) -> "No console logs". DOM checks μεσω `javascript_tool`: **6 `.faq-group-title`** με τα σωστα ονοματα
+  και σειρα, **6 `.faq-list`** containers, **40 `details[id^="faq-"]`** μεσα στο `#faq` (καμια απωλεια).
+- Deep-link regression test (το κρισιμο): `navigate` σε `/#faq-does-it-support-two-factor-authentication` (ερωτηση
+  της **6ης** ομαδας, ακριβως η περιπτωση που ο παλιος `querySelector` ενικος θα αστοχουσε) -> `found:true`,
+  `open:true`, `group:"Data, privacy and security"`. Επιβεβαιωμενο computed style στο heading: `rgb(0,255,136)`
+  (accent), IBM Plex Mono, 12.16px, letter-spacing 1.46px (=0.12em).
+- Screenshot: **δεν εγινε** αυτο το run. Το Browser pane ηταν hidden (το `computer scroll` γυρισε ρητα "The Browser
+  pane is currently hidden" μετα απο 30s timeout, και τα screenshots επεστρεφαν stale/μαυρα frames ενω το DOM
+  επιβεβαιωνε σωστο render). Το browser verify ειναι best-effort per task file, οποτε στηριχτηκα στους DOM +
+  computed-style ελεγχους που ειναι ουτως ή αλλως πιο αξιοπιστοι για αυτη την αλλαγη. Ο server τερματιστηκε
+  (`pkill -9`, επιβεβαιωση οτι η θυρα 3103 ειναι κλειστη).
+- em-dash στα δικα μου νεα κομματια: 0 (τα 4 του `globals.css` ειναι προϋπαρχοντα σχολια σε αλλα sections,
+  γραμμες 1573/1599/1622/1657, δεν τα αγγιξα).
+- Δεν αγγιξα Docker/:3000/web/mobile/docs. Μηδεν subagent, μηδεν AI call.
+
+Επομενο increment: (1) περιμενει ακομα την απαντηση Αχιλλεα στο `pharos-landing-20260728-0706` (pricing drift
+landing 4 tiers €4/€8/€15 vs backend 3 tiers €9/€29, option a/b/c), (2) τωρα που το FAQ εχει δομη, το «Local or
+cloud AI, which is better?» (υποψηφιο απο το run 35 sweep) εχει προφανη θεση στην ομαδα «AI features» αν χρειαστει,
+(3) γενικο sweep για νεα feat commits.
+
+Needs-Achilleas (open, αμεταβλητα): legal entity/Stripe, Terms+Privacy review, contact inbox, hosted τιμες
+(+ το ανοιχτο pricing-drift ερωτημα), repo public timing.

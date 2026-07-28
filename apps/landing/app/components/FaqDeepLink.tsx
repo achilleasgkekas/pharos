@@ -18,11 +18,13 @@ import { useEffect } from 'react';
  */
 export function FaqDeepLink() {
   useEffect(() => {
-    const list = document.querySelector<HTMLElement>('.faq-list');
-    if (!list) return;
+    // Scoped to the FAQ section, which holds one .faq-list per topic group,
+    // so an item in any group stays reachable by hash.
+    const section = document.getElementById('faq');
+    if (!section) return;
 
     const items = Array.from(
-      list.querySelectorAll<HTMLDetailsElement>('details[id^="faq-"]'),
+      section.querySelectorAll<HTMLDetailsElement>('details[id^="faq-"]'),
     );
     if (items.length === 0) return;
 

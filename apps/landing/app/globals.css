@@ -1014,6 +1014,32 @@ h1, h2, h3 {
 }
 
 /* FAQ */
+.faq-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+.faq-group-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.faq-group-title {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.faq-group-note {
+  color: var(--text-faint);
+  font-size: 0.82rem;
+}
 .faq-list {
   display: flex;
   flex-direction: column;

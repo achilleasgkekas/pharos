@@ -431,168 +431,215 @@ const ROADMAP: {
   },
 ];
 
-const FAQS: { q: string; a: string }[] = [
+// Grouped so a reader can scan by topic instead of down a single 40-row list.
+// Anchors are derived from the question text (see faqId), so regrouping or
+// reordering never invalidates an existing deep link.
+const FAQ_GROUPS: {
+  title: string;
+  note: string;
+  items: { q: string; a: string }[];
+}[] = [
   {
-    q: 'Is self-hosting really free?',
-    a: 'Yes. The self-hosted edition is open source under AGPL-3.0 with every module and no seat limits. Run it on your own hardware for as long as you like. The only paid option is the managed hosting, where we run and maintain it for you.',
+    title: 'Getting started',
+    note: 'What PHAROS is, and what it takes to run',
+    items: [
+      {
+        q: 'Is self-hosting really free?',
+        a: 'Yes. The self-hosted edition is open source under AGPL-3.0 with every module and no seat limits. Run it on your own hardware for as long as you like. The only paid option is the managed hosting, where we run and maintain it for you.',
+      },
+      {
+        q: 'What do I need to run it?',
+        a: 'Docker and a machine that stays on: a Mac mini, a NAS, a Proxmox LXC, or a spare mini PC all work. One docker compose up brings up the web app, MongoDB, and search. Reach it over your LAN or your own VPN.',
+      },
+      {
+        q: 'Can I see what it looks like before adding my own data?',
+        a: 'Yes. Settings has a one-click "Load sample data" that fills items, receipts, expenses, and subscriptions with a small realistic set, dates spread over the last few months, so a brand-new install already looks lived-in. Every sample record is tagged behind the scenes, so "Clear sample data" removes exactly those and nothing you added yourself. Available on both self-hosted and hosted.',
+      },
+      {
+        q: 'How do updates work?',
+        a: 'Self-hosted updates are a git pull and one docker compose up, so you upgrade on your own schedule and can pin to a version you trust. On hosted we roll out updates for you, so you are always on the latest release with nothing to maintain.',
+      },
+      {
+        q: 'Is there a mobile app?',
+        a: 'Yes. A native iOS and Android app, built with Expo, signs into your own server, self-hosted or hosted. Scan receipts and products on the go, get push alerts, and reach every module from your phone. The responsive web app also works well in any mobile browser.',
+      },
+    ],
   },
   {
-    q: 'What data leaves my machine?',
-    a: 'Nothing by default. PHAROS stores everything locally and has zero telemetry. The one exception is AI: if you point it at a cloud provider, the document being parsed is sent to that provider. Run a local Ollama instead and it stays fully offline.',
+    title: 'Hosted or self-hosted',
+    note: 'Choosing a path, and moving between them later',
+    items: [
+      {
+        q: 'How is hosted different from self-hosted?',
+        a: 'It is the same app. With hosted we handle the server, updates, and nightly backups, and AI parsing is included so there is nothing to configure. Self-hosted gives you full control and keeps every byte on your own hardware.',
+      },
+      {
+        q: 'What happens when my free trial ends?',
+        a: 'Every new hosted workspace starts on a 14-day free trial with full access, no card required to start. Three days before it ends you get one reminder email. If it lapses without adding billing, the workspace is suspended rather than deleted, a recoverable hold with nothing lost: add a payment method whenever you are ready and it reactivates instantly.',
+      },
+      {
+        q: 'Can my household or team share one instance?',
+        a: 'Yes. Each instance sits behind a login and you can add accounts for the people you share with, so everyone signs into the same hub. Self-hosting has no seat limits at all; hosted plans scale from a single person up to a shared family or team workspace.',
+      },
+      {
+        q: 'How do I invite people to a hosted workspace, and what can they do?',
+        a: 'Send an email invite from Settings → Members and pick a role: owner, admin, or member. The invitee gets a signup link, and owners or admins can change roles, resend an expired invite, revoke a pending one, or remove someone later, with every change landing in an append-only activity log. Only an owner can promote someone else to owner, and a workspace can never end up with zero owners. Self-hosted has its own accounts system instead of email invites: an admin adds people from Settings → Users and assigns each one admin, member, or a read-only viewer role (viewers can browse everything but every create, edit, and delete is blocked, both in the app and over the API), no activity log, just accounts behind your own LAN or VPN.',
+      },
+      {
+        q: 'Can I move between self-hosted and hosted?',
+        a: 'Yes. PHAROS exports your whole dataset to JSON and imports it back by merging on record id, so you can start self-hosted and move to hosted later, or the other way round, without losing anything.',
+      },
+    ],
   },
   {
-    q: 'Do I need an AI API key?',
-    a: 'No. AI is optional and can be toggled off per feature. Bring your own key (Anthropic, OpenAI, Gemini, OpenRouter, or any OpenAI-compatible custom endpoint) or run a local model with Ollama. The manual entry, tracking, and reporting work without any AI at all.',
+    title: 'AI features',
+    note: 'Optional throughout, and always under your control',
+    items: [
+      {
+        q: 'Do I need an AI API key?',
+        a: 'No. AI is optional and can be toggled off per feature. Bring your own key (Anthropic, OpenAI, Gemini, OpenRouter, or any OpenAI-compatible custom endpoint) or run a local model with Ollama. The manual entry, tracking, and reporting work without any AI at all.',
+      },
+      {
+        q: 'Does AI cost me money?',
+        a: 'Only with a cloud provider, and only per request; a local Ollama model is free. A "confirm before bulk AI" guard in Settings shows a rough cost estimate before running AI over many records at once, so a large re-scan never surprises you with a bill.',
+      },
+      {
+        q: 'Can I plug my own AI key into a hosted workspace too?',
+        a: 'Yes. Workspace settings let you store your own Anthropic, OpenAI, Gemini, OpenRouter, or custom OpenAI-compatible key, and from then on that workspace runs its AI calls on it instead of the shared platform quota, so they stop counting against your plan’s monthly AI limit. The key is encrypted at rest (AES-256-GCM, a fresh encryption each time) and only ever shown back masked, last four characters, never in full; clear it any time to fall back to the included platform key. Self-hosted always brings its own key or a local Ollama model, so this only matters if you are on hosted.',
+      },
+      {
+        q: 'Can I talk to it in plain English instead of clicking through menus?',
+        a: 'Yes. A conversational AI command bar lives in the navbar (it doubles as global search) where you can type things like "add a YouTube subscription, 15 euros a month" or "log expense OTE 84 euros" and it acts directly on your data: adding expenses, income, subscriptions, tasks, or items, updating or deleting a record, logging a price, or just answering "what did I spend this month?". If a request is ambiguous it asks a short follow-up before doing anything, and every conversation is kept under AI history so you can look back at what it did. It needs an Anthropic-capable AI provider to run. A toggle right next to it switches to plain search with no AI involved: it matches items, receipts, statements, tasks, subscriptions, expenses, and vouchers by name, and a receipt match reaches past the store name into its own line items, so searching for a product you bought shows which receipt it came from and which line matched, even when the store itself never appears in the query.',
+      },
+    ],
   },
   {
-    q: 'Does AI cost me money?',
-    a: 'Only with a cloud provider, and only per request; a local Ollama model is free. A "confirm before bulk AI" guard in Settings shows a rough cost estimate before running AI over many records at once, so a large re-scan never surprises you with a bill.',
+    title: 'Getting your data in',
+    note: 'Receipts, statements, bills and bulk imports',
+    items: [
+      {
+        q: 'Can I add something to my list straight from a store’s page?',
+        a: 'Yes. Paste a product URL into a new item and PHAROS fetches the page, then AI fills in the price, specs, category, and a photo. For a one-click path, drag a "Save to PHAROS" bookmarklet to your bookmarks bar from Settings → Storage & backup (a copy-code fallback covers browsers where dragging a link is awkward): click it on any product page and a small same-origin popup opens, riding your existing signed-in session, no API token exposed and nothing to install, then runs the same preview-before-you-confirm import. On Chrome there is also a native extension with a toolbar button and a right-click menu, no page-content permissions requested, so it can only ever read the URL of the tab you act on.',
+      },
+      {
+        q: 'Can it read receipts and statements I already have?',
+        a: 'Yes. Drag in a PDF or a photo and PHAROS parses the store, date, total, and line items automatically. Card statements are read the same way, including installment plans split across months. You can also bulk-import receipts straight from a Gmail export.',
+      },
+      {
+        q: 'Can it pull receipts straight from my inbox without me exporting anything?',
+        a: 'Yes, on self-hosted. Settings → Storage & backup → Email-in (IMAP) connects your mailbox (host, port, username, and an app-specific password if your provider needs one, which Gmail, Outlook, and iCloud usually do) and a "Check inbox now" button polls it on demand, no background cron running in the app. Each check fetches up to 25 new messages, PDF and image attachments as well as HTML bodies, through the exact same parse pipeline as a manual upload, one AI read per message. The first ever check only looks back 7 days so it does not flood your receipts with years of old mail; every check after that remembers the last message it saw and only fetches what is new since. It is a standing companion to the one-time Gmail export bulk-import above, not a replacement for it.',
+      },
+      {
+        q: 'Does it match my receipts to card charges?',
+        a: 'Yes. When you import a statement, PHAROS suggests which of your receipts each charge belongs to, matching on amount (within a couple of cents) and date (within a few days). You confirm the ones it gets right, so reconciling a month of spending is a few clicks instead of a spreadsheet.',
+      },
+      {
+        q: 'Does it track bills I pay by hand, like utilities?',
+        a: 'Yes. Bills you pay manually (power, phone, shared building costs) get their own tracker, separate from subscriptions that charge a card automatically. Each bill moves through due-soon, overdue, and paid on its own, worked out from the due date, so a triage list always shows what needs paying first. Mark one paid in a click, optionally log the matching expense, and a recurring bill queues up the next one. Reminders ping you a few days before anything falls due.',
+      },
+      {
+        q: 'Can it learn to auto-categorize my expenses?',
+        a: 'Yes. Settings → Money lets you define rules that map a vendor name, or any bit of text, to a category, and optionally mark it recurring with a cycle. New expenses run through your rules automatically whether they arrived from a scanned bill, a manual entry, or a CSV import, so a recognised vendor is already categorized when it lands. A one-click "Apply to existing" backfills every already-uncategorized expense retroactively, so turning this on later still cleans up your history.',
+      },
+      {
+        q: 'Can it suggest a budget for me instead of me guessing numbers?',
+        a: 'Yes. Settings → Money has a "Suggest from history" button next to your monthly budgets: it buckets your last three complete months of expenses by category, takes the median monthly total for each, rounds it to the nearest €5, and pre-fills the input fields, skipping any category with fewer than two months of history so one unusual purchase does not skew things. Nothing is saved automatically, you review the pre-filled numbers and click "Save budgets" yourself. No AI involved, just your own numbers median-averaged back at you.',
+      },
+      {
+        q: 'Can I bulk-import expenses from a bank export?',
+        a: 'Yes. Expenses → Import CSV takes any bank or card export: it auto-detects the delimiter (comma, semicolon, or tab), guesses which column is the date, amount, vendor, category, and notes from common English and Greek header names, and shows a live preview table so you can fix the mapping before anything is saved. Dates and amounts parse in both EU (day-first, comma-decimal) and US formats. If your export mixes money in and out in one signed amount column, a "split by sign" option sorts negative rows into expenses and positive rows into income automatically; otherwise every row lands in whichever tab you opened it from. Rows that match one you already imported (same vendor, day, and amount) are skipped, and your category rules run on the new ones automatically. With multi-currency on, a Revolut or Wise export mixing EUR and USD rows is read correctly too: the importer picks up the currency from its own column or sniffs the code straight off the amount cell, and the preview lets you set one exchange rate per currency for the whole file instead of typing a rate on every row. A row in a currency you have not rated yet still imports with its printed amount and code intact, and the result panel tells you how many rows still need one, instead of quietly folding foreign money into your base-currency totals.',
+      },
+      {
+        q: 'Can it handle an expense in a currency other than my main one?',
+        a: 'Yes, opt-in. Turn on multi-currency in Settings and the expense, income, receipt, subscription, item, and statement forms grow a currency picker plus an exchange-rate field: enter the printed foreign amount and either the rate or what your card actually got charged, and PHAROS backs the rate out for you. On a receipt every amount converts with that same rate, not just the total, since reports sum VAT and the item library copies line prices into your inventory, so a half-converted receipt would throw both off. A foreign-currency subscription converts its recurring charge and its post-trial first-charge amount with that same rate too, so a "cancel before you get charged" reminder and the monthly/yearly totals never mix currencies inside one record. An item bought abroad converts its purchased, current, and target prices together, so net worth and the insurance export see one consistent figure instead of a euro number quietly standing in for dollars. Paste a product link to import or price-check an item and the currency comes from the shop’s own page, not a guessed dollar sign: schema.org and Open Graph price markup are read first, and only what the model saw printed is used as a fallback, so a bare "$" is never assumed to mean US dollars over Canadian or Australian ones. A brand-new item adopts whatever currency the page declared and lands in that same missing-rate list; matching the price to an item you already own keeps that item’s own currency instead, so a differently-priced store link is still recorded but left out of that item’s price history until rated, and the result tells you which currency it skipped. A card statement converts as a whole document too: the total, minimum payment, and every individual charge, since installment payoff figures are summed from those same charges. A bill you pay by hand carries the same rate through both places it can end up: mark it paid with expense logging on and the printed foreign figure travels to that expense so it converts once, not twice, and a recurring bill’s next projected instance keeps the last known rate rather than showing up rate-less every cycle. Reports, budgets, and net worth keep summing everything in your base currency underneath, so nothing else changes. Leave a rate unset and a gold badge flags it rather than silently guessing a 1:1 conversion, and Reports keeps a running list of every record still missing one, grouped by the currency printed on it: set a rate once and "Apply to all" fills every record in that group, or override a single one, with a live preview of the converted amount before anything is stored. That turns a CSV import that left a dozen unrated rows behind into one fix in Reports instead of hunting down gold badges page by page. It now covers every money-holding record in the app and every way it gets in: expenses, income, receipts, subscriptions, items, statements, and bills typed in or scanned, plus foreign-currency rows in a bank CSV import. Do not want to type the rate yourself either? Every one of those rate fields, plus the Reports panel, also carries an optional "Market rate" button that fills in the European Central Bank’s daily reference rate for that currency pair, looked up as of the record’s own date when it has one so a March receipt is not priced off today’s rate. It is always a suggestion you can overwrite before saving, never applied on its own or on a schedule, since a card issuer’s actual rate carries a spread the ECB fixing does not. The lookup calls Frankfurter, a free key-less service, and a self-host that would rather not talk to a third party can point the FX_RATE_API_URL setting at their own instance instead; either way, only two currency codes and a date are ever sent, never any of your records.',
+      },
+    ],
   },
   {
-    q: 'Can I plug my own AI key into a hosted workspace too?',
-    a: 'Yes. Workspace settings let you store your own Anthropic, OpenAI, Gemini, OpenRouter, or custom OpenAI-compatible key, and from then on that workspace runs its AI calls on it instead of the shared platform quota, so they stop counting against your plan’s monthly AI limit. The key is encrypted at rest (AES-256-GCM, a fresh encryption each time) and only ever shown back masked, last four characters, never in full; clear it any time to fall back to the included platform key. Self-hosted always brings its own key or a local Ollama model, so this only matters if you are on hosted.',
+    title: 'Tracking and reports',
+    note: 'What it does with everything once it is in',
+    items: [
+      {
+        q: 'Can I see all my renewals, installments, and bills in one calendar?',
+        a: 'Yes. A three-month agenda unifies subscription renewals, credit-card installments aggregated per month, projected recurring bills and income, and warranty or voucher expiries, with a money-in / money-out total for each month, so "what is due this month" is a glance. The same agenda also publishes as a read-only iCal feed you can subscribe to from Google, Apple, or Outlook Calendar, authed by its own low-scope token so a leaked subscribe link never grants API access; generate, copy, or rotate it in Settings → AI.',
+      },
+      {
+        q: 'Can I split spending across more than one home or property?',
+        a: 'Yes. If you run more than one place, a main home and a cottage for example, you can tag each expense or income to a space and see exactly what each one costs. Add your spaces once and PHAROS filters spending by them and breaks it down in a per-space Reports view, so "how much does the cottage cost" is a glance. A recurring bill keeps its space when scanned, so a power bill for the cottage stays tagged. Leave it off and nothing changes; the feature only appears once you add a space.',
+      },
+      {
+        q: 'Can it split a shared cost and track who owes me?',
+        a: 'Yes. On any expense you paid, a built-in Splitwise-lite editor lets you add people by name (no account needed for them) and set each share, or press "Split equally" with an optional slice for yourself. Cards show a small badge with what is still owed on that expense, and a "Balances, who owes you" view rolls every split into a per-person total. When someone pays you back you settle them up in one click across all their shares at once. It stays dormant until you split something, so nothing changes for expenses you keep to yourself.',
+      },
+      {
+        q: 'Can I keep a manual or warranty PDF with an item?',
+        a: 'Yes. Every item has a document vault, separate from its photo gallery, for anything you would otherwise lose in a downloads folder: a manual, a warranty certificate, a scanned serial-number sticker, in any file type. Upload, rename, and delete as the pile grows. It shows up read-only on the mobile app too, so you can pull up a manual standing in front of the thing it belongs to. The insurance export below bundles this vault straight into its ZIP.',
+      },
+      {
+        q: 'Can it produce an export for an insurance claim?',
+        a: 'Yes. Settings → Storage & backup has a one-click "Insurance export (ZIP)" that bundles a CSV manifest and a standalone printable HTML report of every owned item, its value, serial number, and warranty, together with its photos, manuals, and linked receipts, exactly what an insurer asks for after a claim. Values use the same depreciation-adjusted estimate as Reports, so aging gear is not overstated.',
+      },
+      {
+        q: 'How does it estimate what my stuff is still worth?',
+        a: 'Reports and the insurance export both value your inventory with a declining-balance depreciation model: each item’s purchase price shrinks by a per-category annual rate (network 15%, storage 20%, compute 25%, and so on) compounding from its purchase date, never dropping below a salvage floor, 10% of the price by default. Settings → Depreciation lets you tune the default rate, the floor, and override any category, or switch it off entirely to value everything at face price instead. Log a manual current price that actually differs from what you paid and that number wins over the estimate.',
+      },
+      {
+        q: 'Can it help with tax filing at year-end?',
+        a: 'Yes. Mark any expense "tax-deductible" and give it a tax category (office supplies, travel, professional fees, or a custom one for your jurisdiction); a recurring bill inherits the flag so you only set it once. A "Tax-deductible only" filter and a gold badge make deductible spend easy to spot all year. At year-end, Settings → Backup has a "Tax export (ZIP)" button that bundles a CSV grouped by category, a printable HTML report, and every linked receipt or bill, ready to hand to an accountant or enter into tax software.',
+      },
+      {
+        q: 'Can it help me save toward a goal?',
+        a: 'Yes. Reports has savings goals: set a target amount and an optional deadline (e.g. "€5000 for new laptop by 2026-12-31"), then log contributions as you set money aside. A progress bar and a computed monthly contribution rate show whether you are on track to hit the deadline. Run as many goals in parallel as you like.',
+      },
+      {
+        q: 'Does it track my net worth over time?',
+        a: 'Yes. Reports keeps a monthly net-worth snapshot: everything you own (your inventory’s current value, plus any manual accounts you add for cash or bank balances) minus everything you owe (remaining installments and card balances). Opening Reports quietly upserts the current month, past months stay frozen, and once you have a couple of months of history a trend chart shows whether it is climbing or slipping, not just today’s number.',
+      },
+      {
+        q: 'Can it notify me or plug into home automation?',
+        a: 'Yes. Alert checks watch for deals hitting your target price, installments due this month, budgets going over, warranties expiring soon, bills due or overdue, price hikes, and expiring gift cards, then push a plain-language summary to ntfy, Discord, Slack, Telegram, or a generic webhook (Settings → Notifications). For automation platforms like Home Assistant, n8n, Node-RED, or Zapier, event webhooks send a signed JSON POST (Stripe-style HMAC signature) on specific triggers, receipt scanned, budget exceeded, installment due, price drop, so you can wire PHAROS into your own workflows.',
+      },
+    ],
   },
   {
-    q: 'Can I talk to it in plain English instead of clicking through menus?',
-    a: 'Yes. A conversational AI command bar lives in the navbar (it doubles as global search) where you can type things like "add a YouTube subscription, 15 euros a month" or "log expense OTE 84 euros" and it acts directly on your data: adding expenses, income, subscriptions, tasks, or items, updating or deleting a record, logging a price, or just answering "what did I spend this month?". If a request is ambiguous it asks a short follow-up before doing anything, and every conversation is kept under AI history so you can look back at what it did. It needs an Anthropic-capable AI provider to run. A toggle right next to it switches to plain search with no AI involved: it matches items, receipts, statements, tasks, subscriptions, expenses, and vouchers by name, and a receipt match reaches past the store name into its own line items, so searching for a product you bought shows which receipt it came from and which line matched, even when the store itself never appears in the query.',
-  },
-  {
-    q: 'What do I need to run it?',
-    a: 'Docker and a machine that stays on: a Mac mini, a NAS, a Proxmox LXC, or a spare mini PC all work. One docker compose up brings up the web app, MongoDB, and search. Reach it over your LAN or your own VPN.',
-  },
-  {
-    q: 'Can I see what it looks like before adding my own data?',
-    a: 'Yes. Settings has a one-click "Load sample data" that fills items, receipts, expenses, and subscriptions with a small realistic set, dates spread over the last few months, so a brand-new install already looks lived-in. Every sample record is tagged behind the scenes, so "Clear sample data" removes exactly those and nothing you added yourself. Available on both self-hosted and hosted.',
-  },
-  {
-    q: 'How is hosted different from self-hosted?',
-    a: 'It is the same app. With hosted we handle the server, updates, and nightly backups, and AI parsing is included so there is nothing to configure. Self-hosted gives you full control and keeps every byte on your own hardware.',
-  },
-  {
-    q: 'What happens when my free trial ends?',
-    a: 'Every new hosted workspace starts on a 14-day free trial with full access, no card required to start. Three days before it ends you get one reminder email. If it lapses without adding billing, the workspace is suspended rather than deleted, a recoverable hold with nothing lost: add a payment method whenever you are ready and it reactivates instantly.',
-  },
-  {
-    q: 'Can my household or team share one instance?',
-    a: 'Yes. Each instance sits behind a login and you can add accounts for the people you share with, so everyone signs into the same hub. Self-hosting has no seat limits at all; hosted plans scale from a single person up to a shared family or team workspace.',
-  },
-  {
-    q: 'How do I invite people to a hosted workspace, and what can they do?',
-    a: 'Send an email invite from Settings → Members and pick a role: owner, admin, or member. The invitee gets a signup link, and owners or admins can change roles, resend an expired invite, revoke a pending one, or remove someone later, with every change landing in an append-only activity log. Only an owner can promote someone else to owner, and a workspace can never end up with zero owners. Self-hosted has its own accounts system instead of email invites: an admin adds people from Settings → Users and assigns each one admin, member, or a read-only viewer role (viewers can browse everything but every create, edit, and delete is blocked, both in the app and over the API), no activity log, just accounts behind your own LAN or VPN.',
-  },
-  {
-    q: 'How do updates work?',
-    a: 'Self-hosted updates are a git pull and one docker compose up, so you upgrade on your own schedule and can pin to a version you trust. On hosted we roll out updates for you, so you are always on the latest release with nothing to maintain.',
-  },
-  {
-    q: 'Is there a mobile app?',
-    a: 'Yes. A native iOS and Android app, built with Expo, signs into your own server, self-hosted or hosted. Scan receipts and products on the go, get push alerts, and reach every module from your phone. The responsive web app also works well in any mobile browser.',
-  },
-  {
-    q: 'Can I move between self-hosted and hosted?',
-    a: 'Yes. PHAROS exports your whole dataset to JSON and imports it back by merging on record id, so you can start self-hosted and move to hosted later, or the other way round, without losing anything.',
-  },
-  {
-    q: 'Can I add something to my list straight from a store’s page?',
-    a: 'Yes. Paste a product URL into a new item and PHAROS fetches the page, then AI fills in the price, specs, category, and a photo. For a one-click path, drag a "Save to PHAROS" bookmarklet to your bookmarks bar from Settings → Storage & backup (a copy-code fallback covers browsers where dragging a link is awkward): click it on any product page and a small same-origin popup opens, riding your existing signed-in session, no API token exposed and nothing to install, then runs the same preview-before-you-confirm import. On Chrome there is also a native extension with a toolbar button and a right-click menu, no page-content permissions requested, so it can only ever read the URL of the tab you act on.',
-  },
-  {
-    q: 'Can it read receipts and statements I already have?',
-    a: 'Yes. Drag in a PDF or a photo and PHAROS parses the store, date, total, and line items automatically. Card statements are read the same way, including installment plans split across months. You can also bulk-import receipts straight from a Gmail export.',
-  },
-  {
-    q: 'Can it pull receipts straight from my inbox without me exporting anything?',
-    a: 'Yes, on self-hosted. Settings → Storage & backup → Email-in (IMAP) connects your mailbox (host, port, username, and an app-specific password if your provider needs one, which Gmail, Outlook, and iCloud usually do) and a "Check inbox now" button polls it on demand, no background cron running in the app. Each check fetches up to 25 new messages, PDF and image attachments as well as HTML bodies, through the exact same parse pipeline as a manual upload, one AI read per message. The first ever check only looks back 7 days so it does not flood your receipts with years of old mail; every check after that remembers the last message it saw and only fetches what is new since. It is a standing companion to the one-time Gmail export bulk-import above, not a replacement for it.',
-  },
-  {
-    q: 'Does it match my receipts to card charges?',
-    a: 'Yes. When you import a statement, PHAROS suggests which of your receipts each charge belongs to, matching on amount (within a couple of cents) and date (within a few days). You confirm the ones it gets right, so reconciling a month of spending is a few clicks instead of a spreadsheet.',
-  },
-  {
-    q: 'Does it track bills I pay by hand, like utilities?',
-    a: 'Yes. Bills you pay manually (power, phone, shared building costs) get their own tracker, separate from subscriptions that charge a card automatically. Each bill moves through due-soon, overdue, and paid on its own, worked out from the due date, so a triage list always shows what needs paying first. Mark one paid in a click, optionally log the matching expense, and a recurring bill queues up the next one. Reminders ping you a few days before anything falls due.',
-  },
-  {
-    q: 'Can it learn to auto-categorize my expenses?',
-    a: 'Yes. Settings → Money lets you define rules that map a vendor name, or any bit of text, to a category, and optionally mark it recurring with a cycle. New expenses run through your rules automatically whether they arrived from a scanned bill, a manual entry, or a CSV import, so a recognised vendor is already categorized when it lands. A one-click "Apply to existing" backfills every already-uncategorized expense retroactively, so turning this on later still cleans up your history.',
-  },
-  {
-    q: 'Can it suggest a budget for me instead of me guessing numbers?',
-    a: 'Yes. Settings → Money has a "Suggest from history" button next to your monthly budgets: it buckets your last three complete months of expenses by category, takes the median monthly total for each, rounds it to the nearest €5, and pre-fills the input fields, skipping any category with fewer than two months of history so one unusual purchase does not skew things. Nothing is saved automatically, you review the pre-filled numbers and click "Save budgets" yourself. No AI involved, just your own numbers median-averaged back at you.',
-  },
-  {
-    q: 'Can I bulk-import expenses from a bank export?',
-    a: 'Yes. Expenses → Import CSV takes any bank or card export: it auto-detects the delimiter (comma, semicolon, or tab), guesses which column is the date, amount, vendor, category, and notes from common English and Greek header names, and shows a live preview table so you can fix the mapping before anything is saved. Dates and amounts parse in both EU (day-first, comma-decimal) and US formats. If your export mixes money in and out in one signed amount column, a "split by sign" option sorts negative rows into expenses and positive rows into income automatically; otherwise every row lands in whichever tab you opened it from. Rows that match one you already imported (same vendor, day, and amount) are skipped, and your category rules run on the new ones automatically. With multi-currency on, a Revolut or Wise export mixing EUR and USD rows is read correctly too: the importer picks up the currency from its own column or sniffs the code straight off the amount cell, and the preview lets you set one exchange rate per currency for the whole file instead of typing a rate on every row. A row in a currency you have not rated yet still imports with its printed amount and code intact, and the result panel tells you how many rows still need one, instead of quietly folding foreign money into your base-currency totals.',
-  },
-  {
-    q: 'Can it handle an expense in a currency other than my main one?',
-    a: 'Yes, opt-in. Turn on multi-currency in Settings and the expense, income, receipt, subscription, item, and statement forms grow a currency picker plus an exchange-rate field: enter the printed foreign amount and either the rate or what your card actually got charged, and PHAROS backs the rate out for you. On a receipt every amount converts with that same rate, not just the total, since reports sum VAT and the item library copies line prices into your inventory, so a half-converted receipt would throw both off. A foreign-currency subscription converts its recurring charge and its post-trial first-charge amount with that same rate too, so a "cancel before you get charged" reminder and the monthly/yearly totals never mix currencies inside one record. An item bought abroad converts its purchased, current, and target prices together, so net worth and the insurance export see one consistent figure instead of a euro number quietly standing in for dollars. Paste a product link to import or price-check an item and the currency comes from the shop’s own page, not a guessed dollar sign: schema.org and Open Graph price markup are read first, and only what the model saw printed is used as a fallback, so a bare "$" is never assumed to mean US dollars over Canadian or Australian ones. A brand-new item adopts whatever currency the page declared and lands in that same missing-rate list; matching the price to an item you already own keeps that item’s own currency instead, so a differently-priced store link is still recorded but left out of that item’s price history until rated, and the result tells you which currency it skipped. A card statement converts as a whole document too: the total, minimum payment, and every individual charge, since installment payoff figures are summed from those same charges. A bill you pay by hand carries the same rate through both places it can end up: mark it paid with expense logging on and the printed foreign figure travels to that expense so it converts once, not twice, and a recurring bill’s next projected instance keeps the last known rate rather than showing up rate-less every cycle. Reports, budgets, and net worth keep summing everything in your base currency underneath, so nothing else changes. Leave a rate unset and a gold badge flags it rather than silently guessing a 1:1 conversion, and Reports keeps a running list of every record still missing one, grouped by the currency printed on it: set a rate once and "Apply to all" fills every record in that group, or override a single one, with a live preview of the converted amount before anything is stored. That turns a CSV import that left a dozen unrated rows behind into one fix in Reports instead of hunting down gold badges page by page. It now covers every money-holding record in the app and every way it gets in: expenses, income, receipts, subscriptions, items, statements, and bills typed in or scanned, plus foreign-currency rows in a bank CSV import. Do not want to type the rate yourself either? Every one of those rate fields, plus the Reports panel, also carries an optional "Market rate" button that fills in the European Central Bank’s daily reference rate for that currency pair, looked up as of the record’s own date when it has one so a March receipt is not priced off today’s rate. It is always a suggestion you can overwrite before saving, never applied on its own or on a schedule, since a card issuer’s actual rate carries a spread the ECB fixing does not. The lookup calls Frankfurter, a free key-less service, and a self-host that would rather not talk to a third party can point the FX_RATE_API_URL setting at their own instance instead; either way, only two currency codes and a date are ever sent, never any of your records.',
-  },
-  {
-    q: 'Can I see all my renewals, installments, and bills in one calendar?',
-    a: 'Yes. A three-month agenda unifies subscription renewals, credit-card installments aggregated per month, projected recurring bills and income, and warranty or voucher expiries, with a money-in / money-out total for each month, so "what is due this month" is a glance. The same agenda also publishes as a read-only iCal feed you can subscribe to from Google, Apple, or Outlook Calendar, authed by its own low-scope token so a leaked subscribe link never grants API access; generate, copy, or rotate it in Settings → AI.',
-  },
-  {
-    q: 'Can I split spending across more than one home or property?',
-    a: 'Yes. If you run more than one place, a main home and a cottage for example, you can tag each expense or income to a space and see exactly what each one costs. Add your spaces once and PHAROS filters spending by them and breaks it down in a per-space Reports view, so "how much does the cottage cost" is a glance. A recurring bill keeps its space when scanned, so a power bill for the cottage stays tagged. Leave it off and nothing changes; the feature only appears once you add a space.',
-  },
-  {
-    q: 'Can it split a shared cost and track who owes me?',
-    a: 'Yes. On any expense you paid, a built-in Splitwise-lite editor lets you add people by name (no account needed for them) and set each share, or press "Split equally" with an optional slice for yourself. Cards show a small badge with what is still owed on that expense, and a "Balances, who owes you" view rolls every split into a per-person total. When someone pays you back you settle them up in one click across all their shares at once. It stays dormant until you split something, so nothing changes for expenses you keep to yourself.',
-  },
-  {
-    q: 'Can I keep a manual or warranty PDF with an item?',
-    a: 'Yes. Every item has a document vault, separate from its photo gallery, for anything you would otherwise lose in a downloads folder: a manual, a warranty certificate, a scanned serial-number sticker, in any file type. Upload, rename, and delete as the pile grows. It shows up read-only on the mobile app too, so you can pull up a manual standing in front of the thing it belongs to. The insurance export below bundles this vault straight into its ZIP.',
-  },
-  {
-    q: 'Can it produce an export for an insurance claim?',
-    a: 'Yes. Settings → Storage & backup has a one-click "Insurance export (ZIP)" that bundles a CSV manifest and a standalone printable HTML report of every owned item, its value, serial number, and warranty, together with its photos, manuals, and linked receipts, exactly what an insurer asks for after a claim. Values use the same depreciation-adjusted estimate as Reports, so aging gear is not overstated.',
-  },
-  {
-    q: 'How does it estimate what my stuff is still worth?',
-    a: 'Reports and the insurance export both value your inventory with a declining-balance depreciation model: each item’s purchase price shrinks by a per-category annual rate (network 15%, storage 20%, compute 25%, and so on) compounding from its purchase date, never dropping below a salvage floor, 10% of the price by default. Settings → Depreciation lets you tune the default rate, the floor, and override any category, or switch it off entirely to value everything at face price instead. Log a manual current price that actually differs from what you paid and that number wins over the estimate.',
-  },
-  {
-    q: 'Can it help with tax filing at year-end?',
-    a: 'Yes. Mark any expense "tax-deductible" and give it a tax category (office supplies, travel, professional fees, or a custom one for your jurisdiction); a recurring bill inherits the flag so you only set it once. A "Tax-deductible only" filter and a gold badge make deductible spend easy to spot all year. At year-end, Settings → Backup has a "Tax export (ZIP)" button that bundles a CSV grouped by category, a printable HTML report, and every linked receipt or bill, ready to hand to an accountant or enter into tax software.',
-  },
-  {
-    q: 'Can it help me save toward a goal?',
-    a: 'Yes. Reports has savings goals: set a target amount and an optional deadline (e.g. "€5000 for new laptop by 2026-12-31"), then log contributions as you set money aside. A progress bar and a computed monthly contribution rate show whether you are on track to hit the deadline. Run as many goals in parallel as you like.',
-  },
-  {
-    q: 'Does it track my net worth over time?',
-    a: 'Yes. Reports keeps a monthly net-worth snapshot: everything you own (your inventory’s current value, plus any manual accounts you add for cash or bank balances) minus everything you owe (remaining installments and card balances). Opening Reports quietly upserts the current month, past months stay frozen, and once you have a couple of months of history a trend chart shows whether it is climbing or slipping, not just today’s number.',
-  },
-  {
-    q: 'Can it notify me or plug into home automation?',
-    a: 'Yes. Alert checks watch for deals hitting your target price, installments due this month, budgets going over, warranties expiring soon, bills due or overdue, price hikes, and expiring gift cards, then push a plain-language summary to ntfy, Discord, Slack, Telegram, or a generic webhook (Settings → Notifications). For automation platforms like Home Assistant, n8n, Node-RED, or Zapier, event webhooks send a signed JSON POST (Stripe-style HMAC signature) on specific triggers, receipt scanned, budget exceeded, installment due, price drop, so you can wire PHAROS into your own workflows.',
-  },
-  {
-    q: 'How do backups work?',
-    a: 'Self-hosted ships with a nightly backup you can point at a NAS, plus one-click JSON and CSV exports any time. You can also mirror your files to SMB, FTP, or OneDrive for a proper 3-2-1 setup. On hosted, nightly backups are handled for you.',
-  },
-  {
-    q: 'What happens if I delete something by mistake?',
-    a: 'Most deletes are reversible. Items, receipts, expenses, subscriptions, vouchers, gift cards, loyalty cards, bills, goals, and tasks are soft-deleted, hidden from the app but their files and links kept, and land in Trash (Settings → Storage & backup) where you can restore them with one click or delete them forever. Anything left in Trash auto-purges after 30 days, so it is a safety net, not permanent storage. Card statements are the one exception: they are removed for good straight away, so re-importing the same month never gets blocked by a trashed copy still holding its slot.',
-  },
-  {
-    q: 'Is my financial data secure?',
-    a: 'PHAROS is built for private access, not the open internet: reach it over your LAN or your own VPN, behind a login. There is no public sign-up and no telemetry, so your receipts, statements, and balances stay yours.',
-  },
-  {
-    q: 'Does it support two-factor authentication?',
-    a: 'On hosted, yes: turn on TOTP-based two-factor authentication from account settings with any authenticator app (Google Authenticator, 1Password, and so on), confirm it with a 6-digit code, and save the one-time recovery codes it gives you. Once enabled, every login asks for that second factor, not just this browser or device. Self-hosted already has per-person accounts (admin, member, viewer, managed from Settings → Users) but no TOTP step on top of them yet, so this extra layer is a hosted-only feature for now.',
-  },
-  {
-    q: 'Can I download a copy of everything you have on me?',
-    a: 'Yes. On hosted, account settings has a one-click download of your personal data (profile and workspace memberships) for GDPR portability, and a workspace owner or admin gets two more from workspace settings: the full workspace content as JSON (items, receipts, expenses, and the rest, for every member) and a manifest of stored file paths for receipts, statements, and photos. These are quick, on-demand downloads for a rights request, separate from the whole-dataset export used to migrate between self-hosted and hosted. Self-hosted already keeps everything on your own disk, so there is nothing to request.',
-  },
-  {
-    q: 'Can I permanently delete my account and all its data?',
-    a: 'Yes. On hosted, the workspace owner has a "Delete workspace" control in settings: request it and every member loses access with all data erased after a 30-day grace window, plenty of time to change your mind, and you can cancel any time before then. Self-hosted has no server-side account at all, so deleting your data just means removing the Docker volumes on your own hardware.',
+    title: 'Data, privacy and security',
+    note: 'Where your data lives, and how you get it back',
+    items: [
+      {
+        q: 'What data leaves my machine?',
+        a: 'Nothing by default. PHAROS stores everything locally and has zero telemetry. The one exception is AI: if you point it at a cloud provider, the document being parsed is sent to that provider. Run a local Ollama instead and it stays fully offline.',
+      },
+      {
+        q: 'How do backups work?',
+        a: 'Self-hosted ships with a nightly backup you can point at a NAS, plus one-click JSON and CSV exports any time. You can also mirror your files to SMB, FTP, or OneDrive for a proper 3-2-1 setup. On hosted, nightly backups are handled for you.',
+      },
+      {
+        q: 'What happens if I delete something by mistake?',
+        a: 'Most deletes are reversible. Items, receipts, expenses, subscriptions, vouchers, gift cards, loyalty cards, bills, goals, and tasks are soft-deleted, hidden from the app but their files and links kept, and land in Trash (Settings → Storage & backup) where you can restore them with one click or delete them forever. Anything left in Trash auto-purges after 30 days, so it is a safety net, not permanent storage. Card statements are the one exception: they are removed for good straight away, so re-importing the same month never gets blocked by a trashed copy still holding its slot.',
+      },
+      {
+        q: 'Is my financial data secure?',
+        a: 'PHAROS is built for private access, not the open internet: reach it over your LAN or your own VPN, behind a login. There is no public sign-up and no telemetry, so your receipts, statements, and balances stay yours.',
+      },
+      {
+        q: 'Does it support two-factor authentication?',
+        a: 'On hosted, yes: turn on TOTP-based two-factor authentication from account settings with any authenticator app (Google Authenticator, 1Password, and so on), confirm it with a 6-digit code, and save the one-time recovery codes it gives you. Once enabled, every login asks for that second factor, not just this browser or device. Self-hosted already has per-person accounts (admin, member, viewer, managed from Settings → Users) but no TOTP step on top of them yet, so this extra layer is a hosted-only feature for now.',
+      },
+      {
+        q: 'Can I download a copy of everything you have on me?',
+        a: 'Yes. On hosted, account settings has a one-click download of your personal data (profile and workspace memberships) for GDPR portability, and a workspace owner or admin gets two more from workspace settings: the full workspace content as JSON (items, receipts, expenses, and the rest, for every member) and a manifest of stored file paths for receipts, statements, and photos. These are quick, on-demand downloads for a rights request, separate from the whole-dataset export used to migrate between self-hosted and hosted. Self-hosted already keeps everything on your own disk, so there is nothing to request.',
+      },
+      {
+        q: 'Can I permanently delete my account and all its data?',
+        a: 'Yes. On hosted, the workspace owner has a "Delete workspace" control in settings: request it and every member loses access with all data erased after a 30-day grace window, plenty of time to change your mind, and you can cancel any time before then. Self-hosted has no server-side account at all, so deleting your data just means removing the Docker volumes on your own hardware.',
+      },
+    ],
   },
 ];
+
+// Flat view of every question, used for the FAQPage structured data.
+const FAQS: { q: string; a: string }[] = FAQ_GROUPS.flatMap((g) => g.items);
+
 
 // Stable, human-readable anchor id for each FAQ item, e.g. "faq-how-do-backups-work".
 // Deterministic from the question so deep links stay valid across builds.
@@ -1382,20 +1429,36 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="faq-list">
-            {FAQS.map((f) => (
-              <details key={f.q} id={faqId(f.q)} className="faq-item">
-                <summary className="faq-q">
-                  <span>{f.q}</span>
-                  <span className="faq-chevron" aria-hidden="true">
-                    <Icon name="chevron" size={18} />
-                  </span>
-                </summary>
-                <div className="faq-a">
-                  <p>{f.a}</p>
-                  <FaqCopyLink id={faqId(f.q)} />
+          <div className="faq-groups">
+            {FAQ_GROUPS.map((g) => (
+              <section
+                key={g.title}
+                className="faq-group"
+                aria-labelledby={`faq-group-${faqId(g.title)}`}
+              >
+                <div className="faq-group-head">
+                  <h3 id={`faq-group-${faqId(g.title)}`} className="faq-group-title">
+                    {g.title}
+                  </h3>
+                  <p className="faq-group-note">{g.note}</p>
                 </div>
-              </details>
+                <div className="faq-list">
+                  {g.items.map((f) => (
+                    <details key={f.q} id={faqId(f.q)} className="faq-item">
+                      <summary className="faq-q">
+                        <span>{f.q}</span>
+                        <span className="faq-chevron" aria-hidden="true">
+                          <Icon name="chevron" size={18} />
+                        </span>
+                      </summary>
+                      <div className="faq-a">
+                        <p>{f.a}</p>
+                        <FaqCopyLink id={faqId(f.q)} />
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
           <FaqDeepLink />
