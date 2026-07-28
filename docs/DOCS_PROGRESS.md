@@ -2938,3 +2938,23 @@ Collision guard: `git status --short` πριν commit = 0 (κανένα staged f
 
 Επόμενο run: (α) grep git log για άλλα νέα undocumented feat() commits (P51-P80 candidates ή άλλα modules) · (β) drift check σε api.md αν endpoints schema αλλάξανε · (γ) monitoring για νέα P31-related endpoints αν προστέθηκαν (π.χ. PATCH /api/v1/users/:id/role).
 
+
+## 2026-07-28 (thirty-first run — zero-change verification run, all features documented + in sync)
+
+Σάρωση git log για νέα feat() commits μετά την thirtieth run (commit 1237670, 2026-07-28 04:34:50). Ανακάλυψη: **ΔΕΝ υπάρχουν νέα feat() commits**. Όλες οι recent commits είναι test() / docs() / fix() (test coverage, infrastructure). Η documentation παραμένει synchronized.
+
+Comprehensive drift verification (markdown only, κανένα build/Docker/AI call):
+- **Latest feat() commit**: 98e4ba7 (2026-07-27 22:12, P9 mobile AI master switch) — documented στο run 28 ✓
+- **Recent work**: c098135 (test saas SSR), 32d15f9 (test settings/trash), 958d5cc (docs progress), 765f167 (docs OpenAPI) — όλα test/docs/fix, κανένα νέο feature
+- **Code fences balance check**: docs/*.md 0 unbalanced ✓
+- **Secrets scan**: 30 pattern references (sk_live, AUTH_SECRET, etc.), όλα legitimate examples ή placeholder comments, κανένα literal credential ✓
+- **README link**: "Full documentation lives in [docs/](docs/README.md)" ✓
+- **Internal links validation**: όλα τα referenced .md files exist ✓
+- **Markdown structure**: καμία αλλαγή, καθαρά ✓
+
+Collision guard: `git status --short -- docs/` = κανένα modified file. Κανένα staged foreign. Απλή καταγραφή σε DOCS_PROGRESS.md.
+
+Συμπέρασμα: Όλες οι ενεργά shipped features (P9 complete, P31, P5 phase 2, P17, roadmap #6, phase 2 FX rates, OpenAPI sync) παραμένουν πλήρως documented cross-sectionally. Δεν υπάρχουν νέα features, undocumented branches, ή drift. Το repo παραμένει synchronized.
+
+Επόμενο run (run 32): (α) αν νέα features ship (λιγότερο πιθανό αν το team focused στο testing/infrastructure), update docs accordingly · (β) αν κανένα νέο endpoint μπει χωρίς OpenAPI entry (drift guard test θα ακούσει) · (γ) audit αν κάποιες configuration sections έχουν become stale (π.χ. πρώτη φορά refactor για mobile AI settings).
+
