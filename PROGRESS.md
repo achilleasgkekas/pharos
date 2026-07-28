@@ -10260,3 +10260,47 @@ browser verify (τίποτα δεν renders). Commit `33c7d17`, pushed.
   σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
 - **`PATCH /api/v1/settings` ntfy authz**: καταγράφηκε πλέον σωστά ως OPEN ερώτημα στο `~/.claude/ASK_ACHILLEAS.md`
   (`pharos-daily-dev-20260728-0215`), δεν το ξαναγράφω εδώ ως νέο. Περιμένει το ΟΚ σου.
+
+## 2026-07-28 (cont.² — mobile: ένα Spinner primitive, τέλος οι 42 raw ActivityIndicator)
+
+Approved ουρά ξανά χωρίς αυτόνομα-χτίσιμα item (P36 θέλει GoCardless credentials, P16 πραγματικό sample export,
+P23 EAS dev build), MOBILE_PARITY Build Queue άδειο, ASK inbox χωρίς ANSWERED entry για αυτό το routine, οπότε πήρα
+το ρητό «επόμενο task» του προηγούμενου run: το UI Debt item **ActivityIndicator → `<Spinner>`**.
+
+**Γιατί έμενε ανοιχτό τόσο καιρό**: το item ήταν γραμμένο σαν μηχανικό find-replace, αλλά δεν ήταν. Το `<Spinner>`
+κάλυπτε **μόνο** το full-screen loading state (`<Centered><ActivityIndicator color={C.accent}/></Centered>`, μηδέν
+props), ενώ **~35 από τις 42** raw χρήσεις είναι **in-button busy spinners** που θέλουν δικό τους χρώμα (`C.onAccent`
+πάνω σε γεμάτο accent κουμπί, `C.cyan` στα scan/re-scan, `C.red` στο unlink) και καμιά φορά margin. Γι' αυτό παλιότερες
+σαρώσεις είχαν σημειώσει «τα inline button-busy ΜΕΝΟΥΝ ως έχουν, διαφορετικό pattern» — σωστά, με το τότε API.
+Ένα τυφλό `<Spinner/>` σε αυτά τα σημεία θα έβαζε flex:1 wrapper μέσα σε κουμπί (σπασμένο layout) και λάθος τιντ.
+
+**Τι μπήκε**: το `Spinner` δέχεται πλέον `{ inline?, color?, size?, style? }`. Το `inline` επιστρέφει τον **γυμνό**
+indicator χωρίς το centering wrapper· το `color` κάνει default στο accent token. **Το `<Spinner />` χωρίς props μένει
+byte-identical** με πριν, άρα καμία από τις 19 υπάρχουσες χρήσεις δεν άλλαξε συμπεριφορά. Μετατράπηκαν και οι 42 raw
+χρήσεις σε **12 αρχεία** (App.tsx, BarcodeScanner.tsx + 10 screens). Όπου ο raw indicator καθόταν ήδη **μέσα σε
+wrapper** (App splash `s.splash`, BarcodeScanner permission gate `s.center`, Settings `s.loadWrap`) κράτησα το wrapper
+και άλλαξα μόνο τον indicator, ώστε **τίποτα να μη μετακινηθεί στην οθόνη**. Τα εσωτερικά `ActivityIndicator` του
+`Button`/`IconButton` πέρασαν κι αυτά από το `Spinner`, οπότε **το `ui.tsx` είναι πλέον το μοναδικό αρχείο που
+εισάγει `ActivityIndicator` από το react-native** (το import αφαιρέθηκε από τα 10 screens). Αυτό είναι και το
+πραγματικό όφελος: ένα light-theme pass ή μια αλλαγή σε custom indicator αγγίζει ΕΝΑ σημείο.
+
+**Verify**: raw `ActivityIndicator` εκτός `ui.tsx` **42 → 0**, `Spinner` refs στα screens **68 σε 18 screens**,
+`apps/mobile npx tsc --noEmit` **EXIT 0**. Μηδέν αλλαγή σε web runtime κώδικα → **κανένα Docker step** (ούτε mutex,
+ούτε rebuild, ούτε browser verify· το React Native δεν renders σε browser ούτως ή άλλως, και το task file λέει ρητά
+να βασίζομαι σε `tsc` + code review για mobile). Οπτικό verify σε simulator δεν είναι δυνατό unattended· η επιλογή
+«κράτα τα υπάρχοντα wrappers» υπάρχει ακριβώς για να μην εξαρτάται η ορθότητα από αυτό. Commit `b88c6e5`, pushed.
+Το item σημειώθηκε ✅ DONE στο `MOBILE_PARITY.md` με τα μετρημένα counts.
+
+**Επόμενο task (πρόταση)**: μένοντας στο ίδιο UI Debt tier, το **RADIUS/SPACE token adoption** (~51 hardcoded
+`borderRadius: N` που ταιριάζουν με υπάρχουσα τιμή του `RADIUS` scale, γραμμένα ως raw αριθμοί) — καθαρά μηχανικό,
+`tsc`-verifiable, μηδέν οπτική αλλαγή αφού τα literals ταυτίζονται με τα tokens, μηδέν νέο dependency. Το safe-area
+item (`react-native-safe-area-context`) και το light-theme item μένουν σκόπιμα εκτός: θέλουν νέο dependency /
+palette απόφαση και την έγκρισή σου.
+
+## Needs Achilleas
+
+- Αμετάβλητα: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample export, EAS dev build), **P17 live check**
+  σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
+- **`PATCH /api/v1/settings` ntfy authz**: παραμένει OPEN στο `~/.claude/ASK_ACHILLEAS.md`
+  (`pharos-daily-dev-20260728-0215`), δεν το αγγίζω μέχρι να απαντηθεί.
+- **`expo-camera` / share-extension έγκριση**: επίσης OPEN (`pharos-daily-dev-20260725-1425`).
