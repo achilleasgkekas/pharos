@@ -1077,6 +1077,41 @@ sampler uses — and `totalBytes` = `dbBytes + fileBytes`, the figure a storage
 quota is checked against. `fileBytes` is the tenant's binary-file footprint (`0`
 until the storage layer is tenant-aware). SaaS-only: `404` when SaaS mode is off.
 
+#### Platform activity feed (`/admin/audit`)
+
+The audit trail was already readable in two places, both scoped to **one**
+workspace: the tenant's own Activity tab
+([`/account/workspace/activity`](#activity-audit)) and the per-tenant
+[workspace detail](#single-tenant-detail) page. Neither answers the question an
+operator actually starts an incident with, "what happened across the whole
+platform in the last hour", because both require already knowing which
+workspace to look at. `/admin/audit` is that missing read: every `AuditEvent`
+row, newest first, **regardless of tenant**, each one attributed back to its
+workspace.
+
+Same platform-operator gate (`requireSuperadminPage`) and authorization order as
+the rest of the console. There is no separate `/api/saas/admin/*` endpoint for
+this feed; the page reads `lib/tenancy/adminAudit.ts` directly server-side, the
+same way `/admin/tenants` consumes its registry reader.
+
+Filter by workspace slug (exact match) and/or action via a plain **GET** form,
+so the URL is the source of truth and a filtered view is shareable and
+bookmarkable with no client state; paginate with the same keyset cursor
+("Load more") the tenant-scoped Activity views use. An unknown slug reports
+itself as "no workspace with slug `<x>`" rather than the misleading "no
+activity yet", because a typo'd slug and a genuinely quiet workspace are
+different answers when chasing an incident. Each row shows the action, actor
+(email/name when resolvable), target, timestamp, and a **Workspace** column
+linking to that tenant's `/admin/tenants/[slug]` detail page; if the tenant row
+has since been deleted, the workspace column reads "deleted workspace" as plain
+text (no dead link) rather than a blank cell, since the audit trail is
+append-only and outlives the workspaces it describes.
+
+Read-only: only the central `AuditEvent` collection plus batched `Account`/
+`Tenant` identity lookups (never N+1, never a per-tenant data database, never a
+write). `SAAS_MODE` off leaves the self-hosted app untouched (the whole `/admin`
+segment self-gates via `requireSuperadminPage`).
+
 #### Console UI (`/admin`)
 
 The endpoints above are the read-only data plane; this is the **browser console**
@@ -1090,11 +1125,12 @@ app's tenant-facing navigation, so no shared layout or component is touched.
 | `/admin` | **Fleet overview** — the same aggregate as [`GET /api/saas/admin/overview`](#fleet-overview), rendered as stat tiles (workspaces, accounts, active members, billing-linked / BYO-key, this month's AI calls / tokens / cost, storage + reporting count) and breakdown lists (by plan, status, tier) plus custom-domain and erasure-scheduled counts. Shows an empty-state line until the first tenants sign up and metering runs. |
 | `/admin/tenants` | **Workspaces listing** — the same registry reader as [`GET /api/saas/admin/tenants`](#superadmin-console-8), rendered as a paginated table (workspace name + slug + custom domain, plan, status badge, tier, billing / BYO-key pills, created). Filter by status and free-text search (slug, name or domain) via a plain **GET** form, so the URL is the source of truth and every filtered view is shareable and bookmarkable with no client state. Prev / next links preserve the active filter. Each row links to the detail page. |
 | `/admin/tenants/[slug]` | **Workspace detail** — the same detail reader as the [single-tenant](#single-tenant-detail) API: a registry summary (slug, plan, tier, custom domain, billing / BYO-key, trial-ends, erasure-scheduled, created / updated), a member tally (total, active, owners — flagged red **ownerless!** at zero, invited, removed), a usage roll-up (total AI calls / tokens / cost across periods, latest storage footprint), and the full member roster (email, role badge, status badge, joined). An unknown slug is `notFound()` (`404`). |
+| `/admin/audit` | **Platform activity** — see [above](#platform-activity-feed-adminaudit): every audit event across every tenant, filterable by workspace slug and/or action, newest first. |
 
-The nav (`AdminNav`) lists Overview and Workspaces; more console pages are
-additive entries as they land. Section links match their sub-paths (so
-`/admin/tenants/<slug>` keeps **Workspaces** highlighted), while Overview matches
-`/admin` exactly.
+The nav (`AdminNav`) lists Overview, Workspaces, and Activity; more console
+pages are additive entries as they land. Section links match their sub-paths
+(so `/admin/tenants/<slug>` keeps **Workspaces** highlighted), while Overview
+matches `/admin` exactly.
 
 **Self-gating (the console does not exist for non-operators).** A page cannot
 return a status code, so instead of the API's `requireSuperadmin()` (which returns

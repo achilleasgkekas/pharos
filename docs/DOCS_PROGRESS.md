@@ -2994,3 +2994,22 @@ Collision guard: `git status --short -- docs/` = κανένα modified file. Κ�
 
 Επόμενο run (run 32): (α) αν νέα features ship (λιγότερο πιθανό αν το team focused στο testing/infrastructure), update docs accordingly · (β) αν κανένα νέο endpoint μπει χωρίς OpenAPI entry (drift guard test θα ακούσει) · (γ) audit αν κάποιες configuration sections έχουν become stale (π.χ. πρώτη φορά refactor για mobile AI settings).
 
+
+## 2026-07-28 (thirty-second run — platform-wide audit feed /admin/audit documented)
+
+Σάρωση git log για νέα feat() commits μετά την thirty-first run (commit 5d792c9, 2026-07-28). Ανακάλυψη: **1 νέο feat() commit**:
+- **e165549** (2026-07-28 09:05, `feat(saas): platform-wide audit feed for the superadmin console`) — νέα σελίδα `/admin/audit` στο superadmin console: κάθε `AuditEvent` σε όλους τους tenants, newest-first, attributed στο workspace του, filter by action/slug, keyset pagination. Backed από νέο `lib/tenancy/adminAudit.ts` (read-only, χωρίς ξεχωριστό `/api/saas/admin/*` endpoint· η σελίδα διαβάζει τον reader απευθείας server-side).
+
+Τι έγινε:
+- **docs/saas.md**: Διάβασα τον κώδικα (`adminAudit.ts`, `app/admin/audit/page.tsx`, `components/saas/platformActivity.ts`, `AdminNav.tsx` diff) πριν γράψω. Πρόσθεσα νέο subsection **"Platform activity feed (`/admin/audit`)"** πριν το "Console UI" (γιατί το section pattern εδώ είναι reader-doc πρώτα, UI-table μετά): εξηγεί το gap που καλύπτει (τα 2 υπάρχοντα audit views είναι tenant-scoped, αυτό είναι cross-tenant), gate (`requireSuperadminPage`), ότι ΔΕΝ υπάρχει ξεχωριστό REST endpoint (η σελίδα καταναλώνει τον lib reader απευθείας, όπως το `/admin/tenants`), filter/pagination mechanics (GET form, keyset cursor, unknown-slug vs empty-feed distinction), τι δείχνει κάθε row (action/actor/target/timestamp/Workspace column με link στο tenant detail, "deleted workspace" plain-text όταν ο tenant έχει σβηστεί), και το read-only contract. Ενημέρωσα το "Console UI" table (+1 row `/admin/audit`) + το nav sentence ("Overview, Workspaces, and Activity").
+
+Accuracy: verified με code read (όχι απλή αντιγραφή commit message) — anchors (`#single-tenant-detail`, `#activity-audit`, `#fleet-overview`, `#superadmin-console-8`) υπάρχουν όλα ήδη ως headings· ο νέος anchor slug `#platform-activity-feed-adminaudit` υπολογίστηκε χειροκίνητα (GitHub slugify: strip backticks/parens/slash, lowercase, spaces→hyphens) και επαληθεύτηκε ότι το «above» link στο console-UI table row ταιριάζει.
+
+Validation (markdown only, κανένα build/Docker/AI call): code fences docs/saas.md = 18 (ζυγό, άθικτο)· internal anchors resolve· κανένα credential· `git status --short -- docs/` πριν το edit είχε 0 modified (clean territory).
+
+Collision guard: `git status --short` πριν commit = μόνο `docs/saas.md` modified (δικό μου) + αυτό το `docs/DOCS_PROGRESS.md`, κανένα foreign staged. Pathspec commit μόνο αυτά τα 2 paths.
+
+Συμπέρασμα: Το τελευταίο shipped feature (e165549, platform-wide audit feed) είναι πλέον fully documented στο docs/saas.md.
+
+Επόμενο run: (α) grep git log για νέα feat() commits μετά το e165549 · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml · (γ) αν όχι νέο feature, comprehensive drift verification pass.
+
