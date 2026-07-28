@@ -10304,3 +10304,63 @@ palette απόφαση και την έγκρισή σου.
 - **`PATCH /api/v1/settings` ntfy authz**: παραμένει OPEN στο `~/.claude/ASK_ACHILLEAS.md`
   (`pharos-daily-dev-20260728-0215`), δεν το αγγίζω μέχρι να απαντηθεί.
 - **`expo-camera` / share-extension έγκριση**: επίσης OPEN (`pharos-daily-dev-20260725-1425`).
+
+## 2026-07-28 (cont.³ — tenant-scoping: Bills actions+page, Vouchers page read path)
+
+**Γιατί αυτό**: η Approved ουρά ξανά χωρίς αυτόνομα-χτίσιμο item (P36 GoCardless credentials, P16 πραγματικό sample
+export, P23 EAS dev build), ASK inbox χωρίς ANSWERED entry για αυτό το routine (τα δύο δικά μου, `...20260725-1425`
+expo-camera και `...20260728-0215` ntfy authz, μένουν OPEN). Αντί για το μηχανικό RADIUS-token item που είχε προτείνει
+το προηγούμενο run, πήρα τα **ανοιχτά P2 items του `WEB_DEBT.md`** (60ή σάρωση): πραγματικά correctness gaps, όχι
+cosmetic. Έκλεισα **2 από τα 3**.
+
+**Το πρόβλημα**: `bills/actions.ts` και `vouchers/page.tsx` έκαναν direct import του Mongoose model, άρα σε SaaS mode
+(`SAAS_MODE=on`) κάθε read/write πήγαινε **πάντα στο DEFAULT tenant DB**, ανεξάρτητα από ποιος tenant είναι logged in.
+Στο vouchers ήταν χειρότερο γιατί το commit `315cd26` είχε ήδη διορθώσει τα **write** paths (τα 3 action αρχεία), οπότε
+η σελίδα **έγραφε σωστά per-tenant αλλά διάβαζε από το default** (δεν θα έδειχνε ποτέ αυτό που μόλις δημιουργήθηκε).
+Self-hosted (το σημερινό mode) = **μηδέν συμπεριφορική αλλαγή**: τα `withRequestTenant`/`currentModel` είναι no-op στο
+ίδιο default connection.
+
+**Τι μπήκε**: και τα 6 exported actions των bills (`createBill`/`updateBill`/`setBillArchived`/`deleteBill`/
+`markBillPaid`/`markBillUnpaid`) τυλίχτηκαν σε `withRequestTenant` με `const Bill = await currentModel(BillModel)` μέσα.
+Το `assertCanWrite()` + το Zod parse έμειναν **έξω** από το wrap (ίδιο με τα sibling vouchers/expenses: authz και
+validation δεν θέλουν tenant context, και ένα invalid form δεν πρέπει να πληρώνει tenant resolution). Το ερώτημα που
+έθετε ρητά το debt item, αν το `markBillPaid` → `addExpense` χρειάζεται threading, **δεν χρειάζεται**: το `addExpense`
+ανοίγει το δικό του `withRequestTenant`, που είναι host-derived και re-entrant, οπότε ξαναβγάζει το ίδιο context και το
+logged expense πέφτει στο ίδιο tenant DB. Το τεκμηρίωσα inline ώστε να μην ξαναελεγχθεί.
+
+**Απόκλιση από το `Files:` του item (σκόπιμη)**: πρόσθεσα και το `bills/page.tsx` `getData()`. Το item όριζε μόνο το
+actions αρχείο, αλλά διορθώνοντας μόνο τα writes θα **αναπαρήγαγα ακριβώς** την read/write ασυμμετρία που περιγράφει
+το τρίτο item για τα vouchers, δηλαδή θα έφτιαχνα το επόμενο debt item την ώρα που κλείνω το τωρινό.
+
+**Νέο test**: `bills/actions.tenant.test.ts` (+5), το **πρώτο tenant-routing test σε επίπεδο action** (μέχρι τώρα
+υπήρχαν μόνο `lib/*.tenant.test.ts`). Per-tenant fake model που καταγράφει σε **ποιο** DB πήγε κάθε write: δύο tenants
+γράφουν ο καθένας στο δικό του, το `markBillPaid` διαβάζει ΚΑΙ γράφει (μαζί με το recurring spawn) στο ίδιο, και χωρίς
+tenant όλα πέφτουν στο default (self-hosted path). Με το `@/models/Bill` mocked ως `{}`, ο παλιός direct-import κώδικας
+σκάει, άρα το test είναι πραγματικό regression guard, όχι διακοσμητικό.
+
+**Verify**: `npm run type-check` **EXIT 0**· full `npx vitest run` **5216 passed / 329 files** (+5 δικά μου, μηδέν
+regression). Docker: mutex ελήφθη → `build web` → mongo `healthy` → `up -d web` → `/login` **200 σε 2s**, **0 restarts**,
+`/bills` + `/vouchers` + `/expenses` **307** (auth-gated, compiled), logs καθαρά (μόνο το προϋπάρχον άσχετο
+`@napi-rs/canvas` warning) → `docker builder prune -f` (2.35GB) → lock released. Browser (Claude Browser pane):
+`/login` renders «Sign in · Pharos», **μηδέν console errors**. Commit `1826876`.
+
+**Εύρημα εν παρόδω (δεν το άγγιξα, εκτός scope)**: το `src/app/page.tsx` (homepage) διαβάζει **10 μοντέλα** (Item, Task,
+Receipt, Subscription, Statement, ShoppingListItem, Bill, Goal, Card) με direct import, χωρίς tenancy seam, ίδια κλάση
+με ό,τι μόλις έκλεισε. Επίσης **κανένα** από τα 59 `/api/v1` routes δεν χρησιμοποιεί `currentModel` — αυτό όμως το
+καλύπτει ήδη ρητά η απόφαση **OWNER_DECISIONS #7** (token→tenant resolver, owner: **saas-core** routine), οπότε δεν το
+πειράζω. Το homepage αξίζει δικό του debt item από τη reviewer routine.
+
+**Επόμενο task (πρόταση)**: το τρίτο και τελευταίο ανοιχτό P2 του `WEB_DEBT.md`, **`statements/actions.ts`
+tenant-scoping** (1026 γραμμές, δεκάδες exported functions, ίδιο recipe αλλά αρκετά μεγαλύτερο, με το επιπλέον κίνητρο
+ότι το ήδη-σωστό `lib/fxAudit.ts` δημιουργεί σήμερα ασυμμετρία μέσα στο ίδιο feature set). Εναλλακτικά, αν προτιμηθεί
+μικρότερο run, το mobile RADIUS/SPACE token adoption μένει διαθέσιμο αμετάβλητο.
+
+## Needs Achilleas
+
+- Αμετάβλητα: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample export, EAS dev build), **P17 live check**
+  σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
+- **`PATCH /api/v1/settings` ntfy authz**: παραμένει OPEN στο `~/.claude/ASK_ACHILLEAS.md`
+  (`pharos-daily-dev-20260728-0215`).
+- **`expo-camera` / share-extension έγκριση**: επίσης OPEN (`pharos-daily-dev-20260725-1425`) — σημειώνω ότι το
+  `OWNER_DECISIONS.md` #9 λέει ήδη ότι το `expo-camera` **εγκρίθηκε** live, οπότε το inbox entry είναι απλώς stale·
+  δεν το αλλάζω μόνος μου, το status flip το κάνει ο Achilleas μέσω chat.
