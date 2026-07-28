@@ -445,6 +445,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'No. AI is optional and can be toggled off per feature. Bring your own key (Anthropic, OpenAI, Gemini, OpenRouter, or any OpenAI-compatible custom endpoint) or run a local model with Ollama. The manual entry, tracking, and reporting work without any AI at all.',
   },
   {
+    q: 'Does AI cost me money?',
+    a: 'Only with a cloud provider, and only per request; a local Ollama model is free. A "confirm before bulk AI" guard in Settings shows a rough cost estimate before running AI over many records at once, so a large re-scan never surprises you with a bill.',
+  },
+  {
     q: 'Can I plug my own AI key into a hosted workspace too?',
     a: 'Yes. Workspace settings let you store your own Anthropic, OpenAI, Gemini, OpenRouter, or custom OpenAI-compatible key, and from then on that workspace runs its AI calls on it instead of the shared platform quota, so they stop counting against your plan’s monthly AI limit. The key is encrypted at rest (AES-256-GCM, a fresh encryption each time) and only ever shown back masked, last four characters, never in full; clear it any time to fall back to the included platform key. Self-hosted always brings its own key or a local Ollama model, so this only matters if you are on hosted.',
   },

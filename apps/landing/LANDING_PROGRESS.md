@@ -4674,3 +4674,62 @@ billing κωδικα) για να δουμε αν υπαρχουν αλλα τε
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες PLUS νεο συγκεκριμενο pricing-drift ερωτημα, βλ. πανω, repo public timing).
+
+## 2026-07-28 (run 35)
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε (grep
+"pharos-landing"): το μοναδικο entry ειναι `pharos-landing-20260728-0706` (run 34, pricing drift), ακομα
+**OPEN** (χωρις Answer), αρα δεν υπαρχει τιποτα ANSWERED να εφαρμοσω αυτο το run.
+
+Ελεγχος στην αρχη: `git log --oneline 7d7201d..HEAD` (7d7201d = το τελευταιο δικο μου commit, run 34) εδειξε
+3 commits, κανενα `feat(` (ενα `fix(tenancy)` για Bills/Vouchers tenant-scoping στο backend + docs(progress)/
+docs(backlog) απο αλλες routines). Μηδεν νεο user-facing feature να συγχρονισω.
+
+Δοκιμασα ενα νεο ειδος sweep, "docs/faq.md vs landing FAQS parity" (διαφορετικο απο το commit-driven [runs
+31,34] και το features.md-contents [run 33] που εγιναν ηδη): περασα τις 24 ερωτησεις του `docs/faq.md`
+κοντρα στις ~36 του `apps/landing/app/page.tsx` `FAQS`. Οι περισσοτερες docs/faq.md ερωτησεις ειναι ηδη
+καλυμμενες (καποτε με διαφορετικη διατυπωση) ή σκοπιμα εκτος landing (troubleshooting section, π.χ. "AI
+says offline even though my cloud key works" ειναι support-doc υλη, οχι marketing copy). Δυο υποψηφιοι:
+(1) "Can I turn AI off entirely?" -> ηδη πληρως καλυμμενο μεσα στην υπαρχουσα "Do I need an AI API key?"
+απαντηση ("AI is optional and can be toggled off per feature... manual entry, tracking, and reporting work
+without any AI at all") -> δεν προσθεσα τιποτα, θα ηταν διπλοτυπο. (2) **"Does AI cost me money?"** -> ΔΕΝ
+υπηρχε πουθενα στο landing, και περιγραφει ενα συγκεκριμενο, επαληθευσιμο feature (το "confirm before bulk
+AI" cost-guard). Επιβεβαιωσα στον πραγματικο κωδικα πριν γραψω: `apps/web/src/app/jobActions.ts`
+`getBulkAiGuard()` διαβαζει `AppConfig.aiConfirmBulk` (default ON) και επιστρεφει `{confirm, provider,
+model}` στον client "so the client can show a rough cost estimate before starting a paid job" (σχολιο στον
+κωδικα, γραμμη ~12), το ιδιο pattern που περιγραφεται στο CLAUDE.md ιστορικο ("AI cost guard... rough cost
+~$0.02/item"). Πραγματικο, ηδη-υπαρχον feature, οχι υποθεση.
+
+Αλλαγη (`apps/landing/app/page.tsx`, `FAQS` array): νεα εγγραφη «Does AI cost me money?» αμεσως μετα το
+«Do I need an AI API key?» και πριν το «Can I plug my own AI key into a hosted workspace too?» (ιδιο AI-
+cluster, φυσικη συνεχεια της ερωτησης για το κλειδι). Απαντηση: "Only with a cloud provider, and only per
+request; a local Ollama model is free. A "confirm before bulk AI" guard in Settings shows a rough cost
+estimate before running AI over many records at once, so a large re-scan never surprises you with a bill."
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13 static routes, `/` 5.35 kB (αμεταβλητο, string-only αλλαγη).
+- em-dash: 0 (python3 UTF-8 count στο `app/page.tsx`).
+- Θυρα 3100 κατειλημμενη (Docker), `next start -p 3102` πανω στο production build -> curl 200. Browser
+  pane: `read_console_messages` (onlyErrors) -> "No console logs" (δυο φορες, πριν και μετα). `javascript_tool`
+  επιβεβαιωσε `found:true` + σωστο κειμενο στο νεο anchor `faq-does-ai-cost-me-money` (auto-generated απο
+  το `faqId()` helper, καμια manual σφαλμα-επιδεκτικη id χρειαστηκε). Hero screenshot καθαρο πριν και μετα
+  (ενα ενδιαμεσο `scroll` call απετυχε με "scroll_amount too big" tool-input error, αβλαβες, δεν επηρεασε
+  τη σελιδα, επιβεβαιωθηκε με fresh navigate+screenshot). Server τερματισμενος (`pkill -f "next start -p
+  3102"` + `ps aux` επιβεβαιωσε μηδεν εναπομειναν next-server process).
+- Δεν αγγιξα Docker/:3000/web/mobile/docs. Μηδεν subagent, μηδεν AI call για copy generation (verified απο
+  πραγματικο κωδικα, οπως παντα).
+- Collision guard: `git status --short` πριν το commit εδειξε **ξενα uncommitted αρχεια απο αλλη routine**
+  (`apps/web/src/components/saas/AdminNav.tsx` modified + 4 νεα untracked κατω απο `apps/web/src/app/admin/
+  audit/` και `apps/web/src/components/saas/PlatformActivityPanel.tsx` κλπ, admin-audit feature, οχι δικο
+  μου) -> αφεθηκαν ΕΝΤΕΛΩΣ αθικτα, commit εγινε με pathspec (`git commit -- apps/landing/app/page.tsx
+  apps/landing/LANDING_PROGRESS.md`), οχι `git add -A`.
+
+Επομενο increment: περιμενει ακομα την απαντηση Αχιλλεα στο `pharos-landing-20260728-0706` (pricing drift,
+option a/b/c). Μεχρι τοτε: (1) "Local or cloud AI, which is better?" (docs/faq.md) ειναι ενας δευτερος
+υποψηφιος απο το ιδιο sweep που ΔΕΝ προστεθηκε αυτο το run (κρατηθηκε ενα-θεμα-ανα-run pattern) αν χρειαστει
+comparison-framing FAQ στο μελλον, (2) γενικο sweep για νεα feat commits.
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες PLUS το ανοιχτο pricing-drift ερωτημα `pharos-landing-20260728-0706`, repo
+public timing).
