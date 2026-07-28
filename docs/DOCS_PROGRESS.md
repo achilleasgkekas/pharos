@@ -1,5 +1,23 @@
 # DOCS_PROGRESS
 
+## 2026-07-28 (thirty-first run — zero-change continuation, all features remain synchronized)
+
+Σάρωση git log για νέα feat() commits από την τελευταία docs update (commit 33c7d17, 2026-07-28 04:19). Ανακάλυψη: **ΔΕΝ υπάρχουν νέα feat() commits** σε όλο το repo (τελευταίο feat() commit είναι 98e4ba7 από 2026-07-27 22:12:47, ήδη documented στο run 28). Μόνο test() και docs(progress) commits.
+
+Comprehensive zero-change verification (markdown only, κανένα build/Docker/AI call):
+- **Latest feat() commit**: 98e4ba7 (2026-07-27 22:12:47, P9 mobile AI master switch + per-feature toggles) — documented στο run 28 ✓
+- **Drift guard test**: `npm test -- openapi.coverage.test` — ✓ 5/5 pass (61 spec paths == 61 route files, all methods documented, zero orphaned operations)
+- **Code fences**: api.md 22✓, features.md 0✓, mobile.md 8✓, configuration.md 8✓, security.md 0✓
+- **env.example**: last modified 2026-07-27 19:18:15, no new vars to document
+- **AppConfig.ts**: last modified 2026-07-25 (P9 multi-currency), no new settings since then
+- **All guide links**: README.md references 13 guides, all 13 files exist + are linked correctly
+
+Collision guard: `git status --short -- docs/` = κανένα modified file. Κανένα staged foreign. Απλή καταγραφή σε DOCS_PROGRESS.md.
+
+Συμπέρασμα: Όλες οι shipped features (P9, P31, P5, P17, roadmap #6, FX rates, OpenAPI sync) είναι πλήρως documented. Δεν υπάρχουν νέα commits, νέα endpoints, νέα settings, νέα environment vars, ή drift από το codebase στη documentation. Το repo παραμένει synchronized.
+
+Επόμενο run (run 32): (α) αν νέα features ship, update docs accordingly · (β) drift guard test ως usual checkpoint · (γ) continue monitoring.
+
 ## 2026-07-28 (thirtieth run — comprehensive drift verification, all features documented + in sync)
 
 Σάρωση git log για νέα feat() commits μετά την twenty-ninth run (commit 83dfe10, 2026-07-28 00:13). Ανακάλυψη: **ΔΕΝ υπάρχουν νέα feat() commits** μετά τις 00:13. Όλες τις features (P9 multi-currency web+mobile, P31 viewer role, P5 MV3 extension, P17 barcode scan, roadmap #6 mobile AI settings, FX rate lookup phase 2, OpenAPI spec sync) είναι fully documented και synchronized.
