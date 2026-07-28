@@ -3,8 +3,20 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 6b52023 -->
-<!-- docker-validated: 6716846 -->
+<!-- docker-validated: de8507e -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-28 (docker-health: rebuild 75 web files, cache −2.352GB, all healthy)
+
+**Guard**: `ROUTINES_PAUSED` απών. Scheduled docker-health task. Mutex acquired, safe rebuild completed.
+
+**Health snapshot**: mongo healthy, web up+serving 200, flaresolverr stopped, build cache 1.742GB → pruned (−2.352GB freed).
+
+**Rebuild**: 75 runtime files changed (mobile P9 Statements FX, Bills/Expenses/Receipts routes, aiCommandActions, tests, fx logic) since docker-validated 6716846. Safe build: `docker compose build web` ✓, mongo healthy ✓, `docker compose up -d web` ✓, poll /login 200 ✓ (5sec startup).
+
+**Outcome**: All green. Pushed docker-validated marker to HEAD de8507e.
+
+---
 
 ## 2026-07-27 (docker-health: rebuild #66 web files, cache −2.347GB, all healthy)
 
