@@ -185,7 +185,7 @@ These are flagged **(AI)** below with the feature name.
 | GET    | `/items?status=shopping\|inventory\|all` | List items (+ `limit`/`offset`/`updatedSince`). |
 | POST   | `/items`                          | Create. Body `{ title, status?, category?, currentPrice?, currency?, origAmount?, fxRate? }` → `{ item }`. P9: currency/fxRate/origAmount for multi-currency items. |
 | GET    | `/items/:id`                      | Full detail (links, price history, photos, warranty, purchase) + a computed `price` block (best-now, lowest/highest, trend, verdict, where-to-buy) for the mobile price panel. **Note:** Attachments (manuals, warranty certificates, serial-number photos) are stored per item but not yet exposed via the REST API; use the web UI to manage them. |
-| PATCH  | `/items/:id`                      | Update `{ title?, status?, category?, currentPrice?, targetPrice?, specs?, tags?, currency?, origAmount?, fxRate? }`. P9: touching any price field re-resolves all currency fields together. |
+| PATCH  | `/items/:id`                      | Update `{ title?, status?, category?, currentPrice?, targetPrice?, specs?, tags?, currency?, fxRate? }`. P9: touching any price field re-resolves all currency fields together. `origAmount` is derived, not accepted. |
 | DELETE | `/items/:id`                      | Soft-delete. |
 | POST   | `/items/import`                   | **(AI: itemsImport)** Fetch a product page, AI-parse, add or merge. Body `{ url, view? }` (`view` = `shopping` default \| `inventory`) → `{ ok, id, title, price, store, updated }`. |
 | POST   | `/items/:id/ai-fill`              | **(AI: itemsImport)** Fill specs/category/tags from the item's links or web search. Body `{ mode: 'specs' \| 'info' }`. |
@@ -292,7 +292,7 @@ Each plan in the `GET /statements/plans` response is:
 | Method | Path                      | Description |
 |--------|---------------------------|-------------|
 | GET    | `/subscriptions?active=1` | List (+ `limit`/`offset`/`updatedSince`). |
-| POST   | `/subscriptions`          | Create `{ name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url?, trialEndsAt?, currency?, fxRate?, firstChargeAmount? }`. P9: currency/fxRate control multi-currency conversion; firstChargeAmount sets the first billing cycle's amount separately. |
+| POST   | `/subscriptions`          | Create `{ name, amount, billingCycle?, startDate?, nextRenewal?, category?, provider?, url?, paymentMethod?, notes?, trialEndsAt?, currency?, fxRate?, firstChargeAmount? }`. P9: currency/fxRate control multi-currency conversion; firstChargeAmount sets the first billing cycle's amount separately. |
 | PATCH  | `/subscriptions/:id`      | Update `{ name?, amount?, billingCycle?, nextRenewal?, category?, active?, trialEndsAt?, currency?, fxRate?, firstChargeAmount? }`. P9: touching any money field re-resolves all currency fields together. |
 | DELETE | `/subscriptions/:id`      | Soft-delete. |
 | POST   | `/ai/subscription`        | **(AI: subscriptions)** AI-fill details from a name. Body `{ name }` → `{ data: { provider, amount, billingCycle, category, … } }`. |
@@ -350,7 +350,7 @@ Each plan in the `GET /statements/plans` response is:
 |--------|---------------------------------------------|-------------|
 | GET    | `/tasks?status=todo\|in-progress\|done\|blocked` | List (+ `limit`/`offset`/`updatedSince`). |
 | POST   | `/tasks`                                    | Create `{ title, status?, priority?, tags?, content?, dueDate? }`. |
-| PATCH  | `/tasks/:id`                                | Update `{ title?, status?, priority?, tags?, content?, dueDate? }`. |
+| PATCH  | `/tasks/:id`                                | Update `{ title?, status?, priority?, tags?, content?, dueDate?, steps? }`. `steps` replaces the whole checklist (add, toggle and remove all resolve here); only `text` and `done` are read, empty-text steps are dropped and ids are re-minted. |
 | DELETE | `/tasks/:id`                                | Soft-delete. |
 
 ### Payment cards
@@ -393,7 +393,7 @@ Each plan in the `GET /statements/plans` response is:
 | Method | Path                       | Description |
 |--------|----------------------------|-------------|
 | GET    | `/settings`                | App preferences + this-month budget usage. Includes `multiCurrency` (P9, read-only): when `false`, a client should not offer per-entry currency/FX controls. |
-| PATCH  | `/settings`                | Update preferences/defaults, ntfy config, and/or budgets. |
+| PATCH  | `/settings`                | Update `{ currency?, defaultVatRate?, defaultItemView?, defaultWarrantyMonths?, warrantyAlertDays?, trialAlertDays?, autoAddStores?, ntfyUrl?, ntfyEnabled?, budgetRollover?, budgets? }`. Every field is optional and applied only if present and valid; numbers are clamped, not rejected; a body with no recognised field is a 400. `budgets` replaces the whole category→limit map. `multiCurrency` is deliberately not writable here, and neither are AI credentials (see `/settings/ai`). |
 | POST   | `/settings/test-notify`    | Send a one-off test to the configured ntfy topic. |
 | GET    | `/lists`                   | Editable category taxonomies (current values + defaults). |
 | PATCH  | `/lists`                   | Overwrite one taxonomy. Body `{ key, values[] }`. Empty/identical-to-default clears the override. |

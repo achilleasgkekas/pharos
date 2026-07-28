@@ -236,7 +236,9 @@ paths:
                 title: { type: string }
                 status: { type: string }
                 category: { type: string }
-                currentPrice: { type: number }
+                currentPrice: { type: number, description: 'The PRINTED price. With `currency` set it is converted by `fxRate` before storage (P9).' }
+                currency: { type: string, description: Currency of the printed price. Omit for base currency. }
+                fxRate: { type: number, description: Units of base currency per unit of `currency`. }
       responses:
         '201':
           description: Created item.
@@ -280,12 +282,14 @@ paths:
                 title: { type: string }
                 status: { type: string }
                 category: { type: string }
-                currentPrice: { type: number }
+                currentPrice: { type: number, description: The PRINTED price, as on create. }
                 targetPrice: { type: number }
                 specs: { type: string }
                 tags:
                   type: array
                   items: { type: string }
+                currency: { type: string, description: 'P9. Sending any money field (price, target, currency or rate) re-resolves the whole price set against the base currency.' }
+                fxRate: { type: number, description: Units of base currency per unit of `currency`. }
       responses:
         '200':
           description: Updated item.
@@ -666,6 +670,8 @@ paths:
                 lineItems:
                   type: array
                   items: { $ref: '#/components/schemas/LineItem' }
+                currency: { type: string, description: 'P9. Touching any money field (total, subtotal, VAT, line items, currency or rate) re-resolves the receipt as a whole, so it is never left half-converted.' }
+                fxRate: { type: number, description: Units of base currency per unit of `currency`. }
       responses:
         '200':
           description: Updated receipt.
@@ -885,13 +891,23 @@ paths:
               properties:
                 kind: { type: string, enum: [income, expense] }
                 vendor: { type: string }
-                amount: { type: number }
+                amount: { type: number, description: 'The PRINTED figure. With `currency` set it is converted by `fxRate` before storage, so what is stored is always base currency.' }
                 date: { type: string }
-                category: { type: string }
+                category: { type: string, description: 'Omit to let the vendor→category auto-rules decide (P15); an explicit value always wins.' }
+                space: { type: string, description: 'Per-property ledger tag (P34), capped at 40 chars. Must be one of the configured spaces to be useful.' }
                 period: { type: string }
                 recurring: { type: boolean }
-                recurringCycle: { type: string }
+                recurringCycle: { type: string, enum: ['', weekly, monthly, quarterly, yearly] }
+                paymentMethod: { type: string }
                 notes: { type: string }
+                split:
+                  type: array
+                  description: 'Who owes you part of this expense (P35). Income is never split.'
+                  items: { $ref: '#/components/schemas/SplitEntry' }
+                taxDeductible: { type: boolean }
+                taxCategory: { type: string, description: Free-form tax bucket, capped at 60 chars. }
+                currency: { type: string, description: 'Currency of the printed `amount` (P9). Omit for base currency.' }
+                fxRate: { type: number, description: 'Units of base currency per unit of `currency`. Required for a foreign amount to be counted in any total; 0 means unconverted.' }
       responses:
         '201':
           description: Created expense.
@@ -918,15 +934,24 @@ paths:
               type: object
               properties:
                 vendor: { type: string }
-                amount: { type: number }
+                amount: { type: number, description: 'The PRINTED figure, as on create.' }
                 category: { type: string }
+                space: { type: string, description: 'Per-property ledger tag (P34), capped at 40 chars.' }
                 kind: { type: string, enum: [income, expense] }
                 notes: { type: string }
                 date: { type: string }
                 period: { type: string }
                 recurring: { type: boolean }
-                recurringCycle: { type: string }
+                recurringCycle: { type: string, enum: ['', weekly, monthly, quarterly, yearly] }
                 paymentMethod: { type: string }
+                split:
+                  type: array
+                  description: 'Full replacement of the split list (P35), not a merge.'
+                  items: { $ref: '#/components/schemas/SplitEntry' }
+                taxDeductible: { type: boolean }
+                taxCategory: { type: string, description: Capped at 60 chars. }
+                currency: { type: string, description: 'P9. Sending `amount`, `currency` or `fxRate` re-resolves the whole money set, so it is never left half-converted.' }
+                fxRate: { type: number, description: Units of base currency per unit of `currency`. }
       responses:
         '200':
           description: Updated expense.
@@ -1123,13 +1148,19 @@ paths:
               required: [name, amount]
               properties:
                 name: { type: string }
-                amount: { type: number }
-                billingCycle: { type: string }
+                amount: { type: number, description: 'The PRINTED figure. With `currency` set it is converted by `fxRate` before storage (P9).' }
+                billingCycle: { type: string, enum: [weekly, monthly, quarterly, yearly] }
                 startDate: { type: string }
-                nextRenewal: { type: string }
+                nextRenewal: { type: string, description: Defaults to `startDate`. }
                 category: { type: string }
                 provider: { type: string }
                 url: { type: string }
+                paymentMethod: { type: string }
+                notes: { type: string }
+                trialEndsAt: { type: string, description: 'Free-trial end date (P33). Drives the cancel-before-charge reminder; 400 if unparseable.' }
+                firstChargeAmount: { type: number, description: 'What is charged when the trial ends, if it differs from the recurring amount. Converted like `amount`.' }
+                currency: { type: string, description: Currency of the printed amounts. Omit for base currency. }
+                fxRate: { type: number, description: Units of base currency per unit of `currency`. }
       responses:
         '201':
           description: Created subscription.
@@ -1156,11 +1187,15 @@ paths:
               type: object
               properties:
                 name: { type: string }
-                amount: { type: number }
-                billingCycle: { type: string }
+                amount: { type: number, description: The PRINTED figure, as on create. }
+                billingCycle: { type: string, enum: [weekly, monthly, quarterly, yearly] }
                 nextRenewal: { type: string }
                 category: { type: string }
                 active: { type: boolean }
+                trialEndsAt: { type: string, nullable: true, description: 'Explicit null clears the free trial (P33).' }
+                firstChargeAmount: { type: number }
+                currency: { type: string, description: 'P9. Sending `amount`, `firstChargeAmount`, `currency` or `fxRate` re-resolves the whole money set.' }
+                fxRate: { type: number, description: Units of base currency per unit of `currency`. }
       responses:
         '200':
           description: Updated subscription.
@@ -1815,6 +1850,17 @@ paths:
                   items: { type: string }
                 content: { type: string }
                 dueDate: { type: string }
+                steps:
+                  type: array
+                  description: >-
+                    Full replacement of the checklist, not a merge: send the complete list
+                    (add, toggle and remove all resolve here). Only `text` and `done` are
+                    read; a step with empty text is dropped and ids are re-minted.
+                  items:
+                    type: object
+                    properties:
+                      text: { type: string }
+                      done: { type: boolean }
       responses:
         '200':
           description: Updated task.
@@ -2154,12 +2200,35 @@ paths:
     patch:
       tags: [Settings]
       summary: Update app settings
-      description: Update preferences/defaults, ntfy config and/or budgets.
+      description: >-
+        Update preferences/defaults, ntfy config and/or budgets. Every field is optional and
+        applied only when present and valid; a body with no recognised field is a 400. Numeric
+        fields are clamped rather than rejected. `multiCurrency` is deliberately NOT writable
+        here (it is an install-wide Settings→Money decision), and neither are AI credentials
+        (see /settings/ai).
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, additionalProperties: true }
+            schema:
+              type: object
+              properties:
+                currency: { type: string, description: 'Base currency code, upper-cased and capped at 4 chars. Changes what every stored amount means, it does not convert anything.' }
+                defaultVatRate: { type: number, description: Clamped to 0–100. }
+                defaultItemView: { type: string, enum: [grid, list], description: Anything other than `list` is read as `grid`. }
+                defaultWarrantyMonths: { type: number, description: Clamped to 0–120. }
+                warrantyAlertDays: { type: number, description: 'Clamped to 0–730; 0 turns the warranty alert off.' }
+                trialAlertDays: { type: number, description: 'Clamped to 0–60; 0 turns the free-trial reminder off (P33).' }
+                autoAddStores: { type: boolean }
+                ntfyUrl: { type: string }
+                ntfyEnabled: { type: boolean }
+                budgetRollover: { type: boolean, description: Envelope mode, carries an unspent balance forward (P25). }
+                budgets:
+                  type: object
+                  description: >-
+                    Full replacement of the category→limit map, not a merge: a category left
+                    out is dropped. Non-numeric and non-positive limits are discarded.
+                  additionalProperties: { type: number }
       responses:
         '200':
           description: Updated settings.
