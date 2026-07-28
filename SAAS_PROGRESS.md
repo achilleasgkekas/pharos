@@ -6065,3 +6065,64 @@ pathspec commit. Pushed `73c445b`.
 χωρίς allowlist· δύο exports, το ένα async). Μετά **`lib/billing/stripe.ts`** (145γρ., το
 τελευταίο untested module του territory: plans/prices config + checkout/portal stubs). Πριν
 ξεκινήσεις: ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI** item (προτεραιότητα).
+
+## 2026-07-28 — increment 124: unit coverage για τον (saas) segment SSR gate
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine (το δικό μου
+`pharos-saas-core-20260728-0038` για το slug μη-λατινικών ονομάτων παραμένει OPEN, δεν το
+προσπερνώ μόνος μου). **UI-first scan**: ξανά-σάρωσα το territory — 13 pages στο
+`app/(saas)/**`, 4 στο `app/admin/**`, και κάθε view-module στο `components/saas/**` έχει ήδη
+δικό του `.test.ts`· μηδέν ανοιχτό UI item. Οπότε το τελευταίο untested guard module.
+
+**`lib/tenancy/saasPage.test.ts` (18 tests, μηδέν production αλλαγή)** — το `saasPage.ts` ήταν
+το **τελευταίο untested module του tenancy layer** και ταυτόχρονα αυτό που κάνει αληθινή την
+υπόσχεση «SAAS_MODE off → το open-source build είναι byte-for-byte αμετάβλητο» **σε επίπεδο
+routing**: το ίδιο το `(saas)/layout.tsx` καλεί `requireSaasUiEnabled()` και **10 από τις 13**
+pages κάτω από αυτό καλούν `getSaasViewer()`. Κανένα από τα ~5100 tests δεν το είχε εκτελέσει
+ποτέ — τα `(saas)` view-modules δοκιμάζονται ως pure functions, και το API-side `saasAuthGate()`
+είναι **άλλη** συνάρτηση (γυρίζει NextResponse· αυτή πετάει `notFound()`). Άρα ένα regression
+εδώ θα περνούσε όλο το suite green **ενώ** έβγαζε signup/login forms σε self-hosted install —
+ή, προς την αντίθετη κατεύθυνση, θα 404-άριζε τη login σελίδα πληρωμένου πελάτη.
+
+Mock **μόνο** στα node-only seams (`next/navigation` + οι δύο accountSession readers)· το
+**`saasMode()` τρέχει πραγματικά** off `process.env`, άρα ο flag ladder καρφώνεται ως wired.
+Το `notFound` mock **πετάει** (ο πραγματικός του συμβόλαιο)· το `redirect` mockάρεται μόνο για
+να επιβεβαιωθεί ότι **ΠΟΤΕ** δεν καλείται.
+
+Τα πιο load-bearing tests: **unset SAAS_MODE → 404** (η προεπιλογή κάθε self-hosted install,
+το ένα branch που κρατά το OSS build αμετάβλητο)· **AUTH_SECRET απόν → fail closed** αντί για
+login form που δεν μπορεί ποτέ να συνδέσει κανέναν· **μηδέν env probe πίσω από κλειστό flag**
+(short-circuit ordering — αν κάποιος αντέστρεφε τους δύο ελέγχους ο gate θα 404-αρε ακόμα, οπότε
+μόνο αυτό το test θα το έπιανε)· **μηδέν cookie parse πριν τον gate** και στις δύο αιτίες
+απόρριψης· **anonymous viewer → `null`, ΟΧΙ throw ή redirect** (αυτό ακριβώς επιτρέπει στις
+`/account/login` + `/account/signup` να renderάρουν — αν αυτό το branch άρχιζε να πετάει, το
+προϊόν δεν θα είχε καμία προσβάσιμη είσοδο)· **claims verbatim by reference** χωρίς mutation ή
+field stripping (οι pages διαβάζουν `viewer.sub` για να scope-άρουν κάθε workspace query· ένα
+αντίγραφο που έκοβε πεδίο θα mis-scope-άριζε σιωπηλά δεδομένα — το optional `exp` επιβεβαιώνεται
+ότι επιβιώνει)· **token-only, μηδέν DB confirmation** (πινάρισμα του τεκμηριωμένου συμβολαίου,
+ώστε ένα μελλοντικό DB round-trip μέσα στον gate να είναι σκόπιμο και όχι κατά λάθος query σε
+κάθε render κάθε σελίδας)· **flag re-read ανά call** (και στα δύο exports)· **ταυτότητα των δύο
+exports σε όλο τον ladder** (μια page που καλεί `getSaasViewer()` πρέπει να είναι εξίσου κρυμμένη
+με μια που καλεί `requireSaasUiEnabled()` απευθείας — τα δύο δεν επιτρέπεται να αποκλίνουν)· και
+**failure propagation και στα δύο** (secret store κάτω → throw, όχι παραπλανητικό 404 που λέει
+στον operator ότι το deployment του δεν υπάρχει· jwt verify exploded → throw, όχι σιωπηλό
+«logged-out» που θα έμοιαζε με session bug αντί για την υποδομική βλάβη που είναι).
+
+**Verified**: **18/18 green από την πρώτη εκτέλεση**. Πλήρες `npx vitest run` → **326 files /
+5147 tests green** (από 323/5048: +3 files/+99 tests — 1 δικό μου, τα υπόλοιπα από ταυτόχρονες
+routines). `npm run type-check` → **EXIT 0 χωρίς κανένα fix**. **Docker: κανένα rebuild**
+(test-only, μηδέν production/runtime/env/deps αλλαγή → ούτε ο mutex χρειάστηκε).
+**Browser-verify: skipped** (test file, μηδέν observable UI). Collision guard: `git status
+--short` πριν το staging = μόνο το δικό μου untracked αρχείο, μηδέν staged από άλλη routine·
+pathspec commit. Pushed `c098135`.
+
+**## Needs Achilleas:** τίποτα νέο. Παραμένουν: **slug για μη-λατινικά ονόματα** (workspace
+«Πλαίσιο» → `w-k3j9x1`· προτείνω transliteration με το υπάρχον `GREEK_MAP` — OPEN στο ask-inbox
+ως `pharos-saas-core-20260728-0038`), Stripe keys, τελικό plan pricing, SMTP.
+
+**Next task:** το `lib/tenancy/**` είναι πλέον **πλήρως covered** — μηδέν untested module εκεί.
+Μένει **`lib/billing/stripe.ts`** (145γρ., το τελευταίο untested module ολόκληρου του
+territory: plans/prices config + checkout-session/portal stubs). ΣΗΜ: είναι scaffold χωρίς
+πραγματικά keys, οπότε τα tests πρέπει να πινάρουν το **config shape + τα guards** (τι κάνει
+όταν λείπει key, τι entitlements αντιστοιχούν σε ποιο plan), όχι network calls. Πριν ξεκινήσεις:
+ask-inbox πρώτα, μετά σάρωση για διαθέσιμο **UI** item (προτεραιότητα).
