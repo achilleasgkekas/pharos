@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet, Alert, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, RADIUS } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Input, TextArea, Button, IconButton, ListItem, Chip, ModalSheet, contentWidth } from '../ui';
@@ -285,7 +285,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
         <Input value={vendor} onChangeText={setVendor} placeholder={label} style={{ flex: 2 }} />
         <Input value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0.00" style={{ flex: 1 }} />
         <Pressable onPress={scan} disabled={scanning} style={[s.scanBtn, scanning && s.dim]}>
-          {scanning ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.scanText}>✦</Text>}
+          {scanning ? <Spinner inline color={C.cyan} size="small" /> : <Text style={s.scanText}>✦</Text>}
         </Pressable>
         <IconButton glyph="＋" onPress={add} disabled={!vendor.trim() || !amount.trim()} />
       </View>
@@ -362,10 +362,10 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
                 <View style={s.rescanBar}>
                   <Text style={s.rescanLabel}>Re-scan</Text>
                   <Pressable onPress={() => rescan(false)} disabled={!!rescanning} style={[s.rescanBtn, !!rescanning && s.dim]}>
-                    {rescanning === 'text' ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.rescanText}>text</Text>}
+                    {rescanning === 'text' ? <Spinner inline color={C.cyan} size="small" /> : <Text style={s.rescanText}>text</Text>}
                   </Pressable>
                   <Pressable onPress={() => rescan(true)} disabled={!!rescanning} style={[s.rescanBtn, !!rescanning && s.dim]}>
-                    {rescanning === 'ocr' ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.rescanText}>OCR</Text>}
+                    {rescanning === 'ocr' ? <Spinner inline color={C.cyan} size="small" /> : <Text style={s.rescanText}>OCR</Text>}
                   </Pressable>
                 </View>
               )}
@@ -451,7 +451,7 @@ export function MoneyScreen({ kind }: { kind: 'expense' | 'income' }) {
                     disabled={settling === b.name}
                     style={[s.settleBtn, settling === b.name && s.dim]}
                   >
-                    {settling === b.name ? <ActivityIndicator color={C.accent} size="small" /> : <Text style={s.settleBtnText}>settle</Text>}
+                    {settling === b.name ? <Spinner inline size="small" /> : <Text style={s.settleBtnText}>settle</Text>}
                   </Pressable>
                 </View>
               ))}

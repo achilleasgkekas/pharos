@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Image, Pressable, FlatList, RefreshControl, ActivityIndicator, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, Image, Pressable, FlatList, RefreshControl, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, scrim, RADIUS, SIZE } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Check, Button, Input, TextArea, Badge, contentWidth } from '../ui';
@@ -232,7 +232,7 @@ export function ReceiptsScreen() {
   return (
     <View style={s.wrap}>
       <Pressable onPress={scan} disabled={scanning} style={s.scan}>
-        {scanning ? <ActivityIndicator color={C.cyan} /> : <Text style={s.scanText}>📷  Scan a receipt</Text>}
+        {scanning ? <Spinner inline color={C.cyan} /> : <Text style={s.scanText}>📷  Scan a receipt</Text>}
       </Pressable>
       {qvCount > 0 && (
         <Pressable onPress={openQuickVerify} style={s.qvOpen}>
@@ -281,16 +281,16 @@ export function ReceiptsScreen() {
               )}
               <Pressable onPress={() => setDetail(null)} hitSlop={10}><Text style={s.close}>✕</Text></Pressable>
             </View>
-            {detailLoading && !detail ? <ActivityIndicator color={C.accent} style={{ margin: 30 }} /> : detail ? (
+            {detailLoading && !detail ? <Spinner inline style={{ margin: 30 }} /> : detail ? (
               <ScrollView contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
                 {fileSource(detail.file) && <Image source={fileSource(detail.file)} style={s.bigImg} resizeMode="contain" />}
                 <View style={s.rescanBar}>
                   <Text style={s.rescanLabel}>Re-scan</Text>
                   <Pressable onPress={() => rescan(false)} disabled={!!rescanning} style={[s.rescanBtn, !!rescanning && s.dim]}>
-                    {rescanning === 'text' ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.rescanText}>text</Text>}
+                    {rescanning === 'text' ? <Spinner inline color={C.cyan} size="small" /> : <Text style={s.rescanText}>text</Text>}
                   </Pressable>
                   <Pressable onPress={() => rescan(true)} disabled={!!rescanning} style={[s.rescanBtn, !!rescanning && s.dim]}>
-                    {rescanning === 'ocr' ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.rescanText}>OCR</Text>}
+                    {rescanning === 'ocr' ? <Spinner inline color={C.cyan} size="small" /> : <Text style={s.rescanText}>OCR</Text>}
                   </Pressable>
                 </View>
                 <Text style={s.elabel}>STORE</Text>
@@ -353,7 +353,7 @@ export function ReceiptsScreen() {
 
                 {detail.lineItems.length > 0 && (
                   <Pressable onPress={addToLibrary} disabled={addingLib} style={[s.libBtn, addingLib && s.dim]}>
-                    {addingLib ? <ActivityIndicator color={C.accent} size="small" /> : <Text style={s.libText}>＋ Add items to inventory</Text>}
+                    {addingLib ? <Spinner inline size="small" /> : <Text style={s.libText}>＋ Add items to inventory</Text>}
                   </Pressable>
                 )}
                 <View style={s.mbtns}>

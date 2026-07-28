@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { C } from '../theme';
-import { Empty, Badge, Input, ListItem, contentWidth } from '../ui';
+import { Empty, Badge, Input, ListItem, Spinner, contentWidth } from '../ui';
 import { search, type SearchHit } from '../api';
 import type { ScreenKey } from './HomeScreen';
 
@@ -50,7 +50,7 @@ export function SearchScreen({ onOpen }: { onOpen: (k: ScreenKey) => void }) {
           placeholder="Search everything…"
           style={{ flex: 1 }}
         />
-        {busy && <ActivityIndicator color={C.accent} style={{ marginRight: 6 }} />}
+        {busy && <Spinner inline style={{ marginRight: 6 }} />}
       </View>
       {err && <Text style={s.err}>{err}</Text>}
       <FlatList

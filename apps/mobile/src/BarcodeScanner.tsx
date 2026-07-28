@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { View, Text, Pressable, Modal, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Modal, StyleSheet } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { C, RADIUS, scrim } from './theme';
+import { Spinner } from './ui';
 
 /**
  * Full-screen barcode scanner (P17).
@@ -58,7 +59,7 @@ export function BarcodeScanner({
     <Modal visible={visible} animationType="slide" onRequestClose={close} onShow={() => setTaken(false)}>
       <View style={s.wrap}>
         {!permission ? (
-          <View style={s.center}><ActivityIndicator color={C.cyan} /></View>
+          <View style={s.center}><Spinner inline color={C.cyan} /></View>
         ) : !permission.granted ? (
           <View style={s.center}>
             <Text style={s.title}>Camera access needed</Text>
@@ -87,7 +88,7 @@ export function BarcodeScanner({
             <Text style={s.caption}>
               {busy ? 'Looking it up…' : taken ? '' : 'Point at the barcode on the package'}
             </Text>
-            {busy && <ActivityIndicator color={C.cyan} style={{ marginTop: 10 }} />}
+            {busy && <Spinner inline color={C.cyan} style={{ marginTop: 10 }} />}
             {!!hint && !busy && <Text style={s.hint}>{hint}</Text>}
             {taken && !busy && (
               <Pressable onPress={() => setTaken(false)} style={s.again}>

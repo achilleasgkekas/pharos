@@ -1233,7 +1233,19 @@ Legend: ✅ done · 🟡 partial · ❌ missing. This is the mobile roadmap — 
   - `grep -c "ActivityIndicator" screens/*.tsx` (remove imports) = 33 → 0.
   - `grep "Spinner" screens/*.tsx` = 33+ occurrences (adoption check).
   - `npx tsc --noEmit` → EXIT 0.
-- Status: TODO
+- Status: ✅ DONE 2026-07-28 (pharos-daily-dev) — το `<Spinner>` απέκτησε props ώστε να καλύπτει και το **in-button /
+  inline** pattern, που ήταν ο λόγος που το item έμενε ανοιχτό (οι 42 raw χρήσεις δεν ήταν full-screen loaders· οι
+  περισσότερες κάθονται μέσα σε save/scan/AI κουμπιά με `C.onAccent`/`C.cyan`/`C.red` και `size="small"`, και το παλιό
+  `Spinner()` ήταν σκέτο `<Centered><ActivityIndicator color={C.accent}/></Centered>` χωρίς παραμέτρους). Νέο API:
+  `Spinner({ inline?, color?, size?, style? })` — `inline` επιστρέφει τον γυμνό indicator (χωρίς το flex:1 wrapper),
+  `color` default `C.accent`. **Το `<Spinner />` χωρίς props μένει byte-identical** με πριν, άρα καμία από τις 19
+  υπάρχουσες χρήσεις δεν άλλαξε. Μετατράπηκαν και οι 42 raw χρήσεις σε **12 αρχεία** (App.tsx, BarcodeScanner.tsx +
+  10 screens)· εκεί που το raw indicator καθόταν μέσα σε υπάρχον wrapper (App splash, BarcodeScanner permission gate,
+  Settings loadWrap) κρατήθηκε το wrapper και μπήκε `<Spinner inline />` → **μηδέν οπτική αλλαγή**. Τα εσωτερικά
+  `ActivityIndicator` του `Button`/`IconButton` πέρασαν κι αυτά από το `Spinner`, οπότε **το `ui.tsx` είναι πλέον το
+  μοναδικό αρχείο που εισάγει `ActivityIndicator`**· το import αφαιρέθηκε από τα 10 screens. Verify: raw
+  `ActivityIndicator` εκτός `ui.tsx` = **0** (ήταν 42), `Spinner` refs στα screens = **68** σε 18 screens,
+  `apps/mobile npx tsc --noEmit` **EXIT 0**. Μηδέν web runtime αλλαγή → κανένα Docker step.
 
 ### ShoppingScreen + ReceiptsScreen inline loading/empty (existing item — re-anchor to new queue position)
 - Priority: P2

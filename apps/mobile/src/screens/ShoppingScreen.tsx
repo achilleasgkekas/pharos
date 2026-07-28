@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, Pressable, FlatList, ActivityIndicator, RefreshControl, StyleSheet, Alert,
+  View, Text, Pressable, FlatList, RefreshControl, StyleSheet, Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { C, RADIUS } from '../theme';
@@ -122,7 +122,7 @@ export function ShoppingScreen() {
           <Text style={s.scanText}>▥  Scan a barcode</Text>
         </Pressable>
         <Pressable onPress={scan} disabled={scanning} style={[s.scanBtn, { flex: 1 }]}>
-          {scanning ? <ActivityIndicator color={C.cyan} /> : <Text style={s.scanText}>📷  Photo scan</Text>}
+          {scanning ? <Spinner inline color={C.cyan} /> : <Text style={s.scanText}>📷  Photo scan</Text>}
         </Pressable>
       </View>
 

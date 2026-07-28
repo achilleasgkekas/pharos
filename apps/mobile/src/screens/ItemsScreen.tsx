@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
+import { View, Text, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Alert, Linking, Image, type DimensionValue } from 'react-native';
 import { C, RADIUS } from '../theme';
 import { money, Spinner, ErrorText, Empty, Input, TextArea, IconButton, Button, Chip, ListItem, ModalSheet, contentWidth } from '../ui';
 import { getItems, createItem, deleteItemRecord, importItemUrl, updateItem, getItem, logItemPrice, getItemPlans, linkItemPlan, unlinkItemPlan, convertItemToTask, aiFillItem, fileSource, getSettings, type Item, type ItemDetail, type Verdict, type InstallmentPlanRow } from '../api';
@@ -114,7 +114,7 @@ function PriceBlock({ detail, base, onChanged }: { detail: ItemDetail; base: str
           <Input value={lprice} onChangeText={setLprice} keyboardType="decimal-pad" placeholder="price" style={{ width: 80 }} />
           <Input value={lstore} onChangeText={setLstore} placeholder="store" style={{ flex: 1 }} />
           <Pressable onPress={submit} disabled={busy || !(parseFloat(lprice.replace(',', '.')) > 0)} style={[pb.logSave, (busy || !(parseFloat(lprice.replace(',', '.')) > 0)) && { opacity: 0.4 }]}>
-            {busy ? <ActivityIndicator color={C.onAccent} /> : <Text style={pb.logSaveText}>Save</Text>}
+            {busy ? <Spinner inline color={C.onAccent} /> : <Text style={pb.logSaveText}>Save</Text>}
           </Pressable>
         </View>
       )}
@@ -241,7 +241,7 @@ function PlansBlock({ itemId, base }: { itemId: string; base: string }) {
             </Text>
           </View>
           <Pressable onPress={() => unlink(p.signature)} disabled={busy === p.signature} hitSlop={8}>
-            {busy === p.signature ? <ActivityIndicator color={C.red} size="small" /> : <Text style={pl.unlink}>✕</Text>}
+            {busy === p.signature ? <Spinner inline color={C.red} size="small" /> : <Text style={pl.unlink}>✕</Text>}
           </Pressable>
         </View>
       ))}
@@ -252,7 +252,7 @@ function PlansBlock({ itemId, base }: { itemId: string; base: string }) {
 
       {open && (
         <View style={{ marginTop: 8 }}>
-          {loading && <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />}
+          {loading && <Spinner inline style={{ marginVertical: 8 }} />}
           {!loading && available.length === 0 && <Text style={pl.empty}>No unlinked plans. Import a statement first.</Text>}
           {available.map((p) => (
             <Pressable key={p.signature} onPress={() => link(p.signature)} disabled={busy === p.signature} style={pl.availRow}>
@@ -264,7 +264,7 @@ function PlansBlock({ itemId, base }: { itemId: string; base: string }) {
                   {p.itemCount > 0 ? ` · ${p.itemCount} linked` : ''}
                 </Text>
               </View>
-              {busy === p.signature ? <ActivityIndicator color={C.accent} size="small" /> : <Text style={pl.plus}>＋</Text>}
+              {busy === p.signature ? <Spinner inline size="small" /> : <Text style={pl.plus}>＋</Text>}
             </Pressable>
           ))}
         </View>
@@ -486,7 +486,7 @@ export function ItemsScreen() {
       <ModalSheet visible={!!editing} onClose={() => setEditing(null)} wrapStyle={s.modalPad} cardStyle={s.modalMax}>
             <ScrollView keyboardShouldPersistTaps="handled">
               <Text style={s.modalTitle}>Edit item</Text>
-              {detailLoading && <ActivityIndicator color={C.accent} style={{ marginVertical: 14 }} />}
+              {detailLoading && <Spinner inline style={{ marginVertical: 14 }} />}
               {detail && <PriceBlock detail={detail} base={base} onChanged={async () => { if (editing) await loadDetail(editing.id); await load(); }} />}
               {editing && <PlansBlock itemId={editing.id} base={base} />}
               <Text style={s.mlabel}>TITLE</Text>
@@ -528,14 +528,14 @@ export function ItemsScreen() {
               <TextArea variant="modal" value={eSpecs} onChangeText={setESpecs} style={s.specs} placeholder="notes / specs" />
               <View style={s.aiBar}>
                 <Pressable onPress={() => runAiFill('specs')} disabled={!!aiFilling} style={[s.aiBtn, !!aiFilling && s.dim]}>
-                  {aiFilling === 'specs' ? <ActivityIndicator color={C.accent} /> : <Text style={s.aiBtnText}>✦ AI specs</Text>}
+                  {aiFilling === 'specs' ? <Spinner inline /> : <Text style={s.aiBtnText}>✦ AI specs</Text>}
                 </Pressable>
                 <Pressable onPress={() => runAiFill('info')} disabled={!!aiFilling} style={[s.aiBtn, !!aiFilling && s.dim]}>
-                  {aiFilling === 'info' ? <ActivityIndicator color={C.accent} /> : <Text style={s.aiBtnText}>✦ AI info</Text>}
+                  {aiFilling === 'info' ? <Spinner inline /> : <Text style={s.aiBtnText}>✦ AI info</Text>}
                 </Pressable>
               </View>
               <Pressable onPress={convertToTask} disabled={converting} style={[s.convertBtn, converting && s.dim]}>
-                {converting ? <ActivityIndicator color={C.cyan} /> : <Text style={s.convertBtnText}>＋ Convert to task</Text>}
+                {converting ? <Spinner inline color={C.cyan} /> : <Text style={s.convertBtnText}>＋ Convert to task</Text>}
               </Pressable>
               <View style={s.mbtns}>
                 <Button label="Save" onPress={saveEdit} disabled={!eTitle.trim()} busy={saving} style={{ paddingHorizontal: 26, minWidth: 96, alignItems: 'center' }} />

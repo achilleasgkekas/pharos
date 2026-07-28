@@ -34,8 +34,25 @@ export function Header({ title, onBack, right }: { title: string; onBack: () => 
 export function Centered({ children }: { children: React.ReactNode }) {
   return <View style={s.center}>{children}</View>;
 }
-export function Spinner() {
-  return <Centered><ActivityIndicator color={C.accent} /></Centered>;
+type SpinnerProps = {
+  /**
+   * Render the bare indicator, without the flex:1 centering wrapper — for spinners that
+   * sit inside a button, a toolbar row, or next to a label. The default (`false`) is the
+   * screen/section loading block: a centered indicator filling the available space.
+   */
+  inline?: boolean;
+  /** Tint (defaults to the accent token; use `C.onAccent` on a filled accent button). */
+  color?: string;
+  /** RN indicator size; omitted means RN's default (`small`). */
+  size?: 'small' | 'large';
+  /** Layout override for the `inline` form (e.g. the margin next to a label). */
+  style?: StyleProp<ViewStyle>;
+};
+
+/** The one loading indicator. Every screen goes through this instead of raw `ActivityIndicator`. */
+export function Spinner({ inline, color = C.accent, size, style }: SpinnerProps = {}) {
+  const dot = <ActivityIndicator color={color} size={size} style={style} />;
+  return inline ? dot : <Centered>{dot}</Centered>;
 }
 export function ErrorText({ children }: { children: React.ReactNode }) {
   return children ? <Text style={s.error}>{children}</Text> : null;
@@ -150,7 +167,7 @@ export function Button({ label, onPress, disabled, busy, variant = 'primary', st
   const spinner = variant === 'danger' ? C.red : variant === 'ghost' ? C.dim : C.onAccent;
   return (
     <Pressable onPress={onPress} disabled={off} style={[btnStyle, off && s.btnDim, style]}>
-      {busy ? <ActivityIndicator color={spinner} /> : <Text style={[txtStyle, textStyle]}>{label}</Text>}
+      {busy ? <Spinner inline color={spinner} /> : <Text style={[txtStyle, textStyle]}>{label}</Text>}
     </Pressable>
   );
 }
@@ -180,7 +197,7 @@ export function IconButton({ glyph, onPress, disabled, busy, busyColor = C.onAcc
   const off = !!(disabled || busy);
   return (
     <Pressable onPress={onPress} disabled={off} style={[s.iconBtn, off && s.btnDim, style]}>
-      {busy ? <ActivityIndicator color={busyColor} /> : <Text style={[s.iconBtnText, textStyle]}>{glyph}</Text>}
+      {busy ? <Spinner inline color={busyColor} /> : <Text style={[s.iconBtnText, textStyle]}>{glyph}</Text>}
     </Pressable>
   );
 }

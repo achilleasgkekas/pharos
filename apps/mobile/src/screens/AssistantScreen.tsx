@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { C, RADIUS } from '../theme';
-import { Input } from '../ui';
+import { Input, Spinner } from '../ui';
 import { aiCommand, type AiTurn } from '../api';
 
 type Msg = AiTurn & { actions?: { name: string; summary: string }[] };
@@ -48,7 +48,7 @@ export function AssistantScreen() {
             {m.actions?.map((a, j) => <Text key={j} style={s.action}>✓ {a.summary || a.name}</Text>)}
           </View>
         ))}
-        {busy && <ActivityIndicator color={C.accent} style={{ marginTop: 12 }} />}
+        {busy && <Spinner inline style={{ marginTop: 12 }} />}
         {err && <Text style={s.err}>{err}</Text>}
       </ScrollView>
       <View style={s.inputRow}>

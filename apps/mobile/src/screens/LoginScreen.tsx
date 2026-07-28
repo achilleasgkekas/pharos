@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { C, RADIUS } from '../theme';
-import { Input } from '../ui';
+import { Input, Spinner } from '../ui';
 import { DEFAULT_API_BASE } from '../config';
 import { login, type SessionUser } from '../api';
 import { PharosMark } from '../PharosMark';
@@ -61,7 +61,7 @@ export function LoginScreen({ onLogin }: { onLogin: (u: SessionUser) => void }) 
         {error && <Text style={s.error}>{error}</Text>}
 
         <Pressable onPress={submit} disabled={busy || !username.trim() || !password} style={[s.btn, (busy || !username.trim() || !password) && s.btnDisabled]}>
-          {busy ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.btnText}>Sign in</Text>}
+          {busy ? <Spinner inline color={C.onAccent} /> : <Text style={s.btnText}>Sign in</Text>}
         </Pressable>
       </View>
     </KeyboardAvoidingView>

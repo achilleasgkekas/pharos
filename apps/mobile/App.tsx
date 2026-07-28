@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, ActivityIndicator, SafeAreaView, Platform, StatusBar as RNStatusBar, StyleSheet } from 'react-native';
+import { View, SafeAreaView, Platform, StatusBar as RNStatusBar, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { C } from './src/theme';
+import { Spinner } from './src/ui';
 import { loadSession, logout, getNotifications } from './src/api';
 import { registerForPush, unregisterForPush } from './src/push';
 import { AppBar, Drawer } from './src/nav';
@@ -56,7 +57,7 @@ export default function App() {
   useEffect(() => { if (authed) refreshUnread(); }, [screen, authed, refreshUnread]);
 
   if (!ready) {
-    return <View style={s.splash}><StatusBar style="light" /><ActivityIndicator color={C.accent} /></View>;
+    return <View style={s.splash}><StatusBar style="light" /><Spinner inline /></View>;
   }
   if (!authed) {
     return <View style={{ flex: 1 }}><StatusBar style="light" /><LoginScreen onLogin={() => setAuthed(true)} /></View>;

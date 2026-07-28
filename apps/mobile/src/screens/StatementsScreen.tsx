@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, Pressable, Modal, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, FlatList, Pressable, Modal, RefreshControl, StyleSheet } from 'react-native';
 import { C, RADIUS, scrim } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Card, Badge, Input, contentWidth } from '../ui';
 import { getStatements, getStatementTxns, getInstallmentPlans, mergePlans, unmergePlan, type Statement, type StatementTxn, type InstallmentPlan } from '../api';
@@ -184,7 +184,7 @@ export function StatementsScreen() {
             )}
 
             <ErrorText>{txErr}</ErrorText>
-            {txLoading ? <ActivityIndicator color={C.accent} style={{ marginTop: 24 }} /> : (
+            {txLoading ? <Spinner inline style={{ marginTop: 24 }} /> : (
               <FlatList
                 data={txns}
                 keyExtractor={(t) => t.id}

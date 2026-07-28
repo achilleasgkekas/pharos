@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, Pressable, FlatList, RefreshControl, ActivityIndicator, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, FlatList, RefreshControl, ScrollView, StyleSheet, Alert } from 'react-native';
 import { C, RADIUS } from '../theme';
 import { money, shortDate, Spinner, ErrorText, Empty, Check, Input, Button, IconButton, Chip, Badge, ListItem, ModalSheet, contentWidth, CUR } from '../ui';
 import { getSubscriptions, addSubscription, deleteSubscription, updateSubscription, suggestSub, getSettings, type Subscription, type RecurringCandidate } from '../api';
@@ -165,7 +165,7 @@ export function SubscriptionsScreen() {
         <Input value={name} onChangeText={setName} placeholder="name" style={{ flex: 2 }} />
         <Input value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder={`${(CUR[base] || base).trim()}/mo`} style={{ flex: 1 }} />
         <Pressable onPress={aiFill} disabled={!name.trim() || aiBusy} style={[s.aiBtn, (!name.trim() || aiBusy) && s.dim]}>
-          {aiBusy ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.aiText}>✦</Text>}
+          {aiBusy ? <Spinner inline color={C.cyan} size="small" /> : <Text style={s.aiText}>✦</Text>}
         </Pressable>
         <IconButton glyph="＋" onPress={add} disabled={!name.trim() || !amount.trim()} />
       </View>

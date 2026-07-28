@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet, Alert, Modal } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Modal } from 'react-native';
 import { C, RADIUS, alpha, scrim } from '../theme';
-import { money, ErrorText, Check, Input, TextArea, Chip, contentWidth } from '../ui';
+import { money, ErrorText, Check, Input, TextArea, Chip, Spinner, contentWidth } from '../ui';
 import { PharosMark } from '../PharosMark';
 import { APP_VERSION } from '../config';
 import {
@@ -92,7 +92,7 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
 
   const addableCats = (cfg?.expenseCategories || []).filter((c) => !(c in budgets));
 
-  if (loading) return <View style={s.loadWrap}><ActivityIndicator color={C.accent} /></View>;
+  if (loading) return <View style={s.loadWrap}><Spinner inline /></View>;
 
   return (
     <ScrollView style={s.wrap} contentContainerStyle={[{ padding: 16, paddingBottom: 40 }, contentWidth]} keyboardShouldPersistTaps="handled">
@@ -168,12 +168,12 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
         <Input variant="modal" value={ntfyUrl} onChangeText={setNtfyUrl} autoCapitalize="none" autoCorrect={false} placeholder="https://ntfy.sh/your-topic" />
         <Toggle label="Enable alerts" on={ntfyOn} onToggle={() => setNtfyOn((v) => !v)} />
         <Pressable onPress={test} disabled={testing || !ntfyUrl.trim()} style={[s.testBtn, (testing || !ntfyUrl.trim()) && s.dim]}>
-          {testing ? <ActivityIndicator color={C.cyan} size="small" /> : <Text style={s.testText}>Send test notification</Text>}
+          {testing ? <Spinner inline color={C.cyan} size="small" /> : <Text style={s.testText}>Send test notification</Text>}
         </Pressable>
       </View>
 
       <Pressable onPress={save} disabled={saving} style={[s.saveBtn, saving && s.dim]}>
-        {saving ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.saveText}>Save settings</Text>}
+        {saving ? <Spinner inline color={C.onAccent} /> : <Text style={s.saveText}>Save settings</Text>}
       </Pressable>
 
       <CardsSection currency={currency} />
@@ -234,7 +234,7 @@ function CardsSection({ currency }: { currency: string }) {
       <View style={s.cardPad}>
         <ErrorText>{err}</ErrorText>
         {loading ? (
-          <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />
+          <Spinner inline style={{ marginVertical: 8 }} />
         ) : cards.length === 0 ? (
           <Text style={s.hint}>No cards yet. Add one below.</Text>
         ) : (
@@ -353,7 +353,7 @@ function CardEditor({ card, currency, onClose, onSaved }: { card: Card | null; c
             <View style={s.modalBtns}>
               <Pressable onPress={onClose} style={s.cancelBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
               <Pressable onPress={save} disabled={saving} style={[s.saveBtn, { flex: 1, marginTop: 0 }, saving && s.dim]}>
-                {saving ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.saveText}>{card ? 'Save card' : 'Add card'}</Text>}
+                {saving ? <Spinner inline color={C.onAccent} /> : <Text style={s.saveText}>{card ? 'Save card' : 'Add card'}</Text>}
               </Pressable>
             </View>
           </ScrollView>
@@ -403,7 +403,7 @@ function StoresSection() {
         <ErrorText>{err}</ErrorText>
         <Input variant="modal" value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} placeholder="Search stores…" style={{ marginBottom: 8 }} />
         {loading ? (
-          <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />
+          <Spinner inline style={{ marginVertical: 8 }} />
         ) : shown.length === 0 ? (
           <Text style={s.hint}>{q ? 'No matches.' : 'No stores yet.'}</Text>
         ) : (
@@ -481,7 +481,7 @@ function StoreEditor({ store, onClose, onSaved }: { store: StoreRow | null; onCl
             <View style={s.modalBtns}>
               <Pressable onPress={onClose} style={s.cancelBtn}><Text style={s.cancelText}>Cancel</Text></Pressable>
               <Pressable onPress={save} disabled={saving} style={[s.saveBtn, { flex: 1, marginTop: 0 }, saving && s.dim]}>
-                {saving ? <ActivityIndicator color={C.onAccent} /> : <Text style={s.saveText}>{store ? 'Save store' : 'Add store'}</Text>}
+                {saving ? <Spinner inline color={C.onAccent} /> : <Text style={s.saveText}>{store ? 'Save store' : 'Add store'}</Text>}
               </Pressable>
             </View>
           </ScrollView>
@@ -511,7 +511,7 @@ function ListsSection() {
       <View style={s.cardPad}>
         <ErrorText>{err}</ErrorText>
         {loading ? (
-          <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />
+          <Spinner inline style={{ marginVertical: 8 }} />
         ) : (
           lists.map((l, i) => <ListEditor key={`${l.key}-${rev}`} entry={l} last={i === lists.length - 1} onSaved={load} />)
         )}
@@ -561,7 +561,7 @@ function ListEditor({ entry, last, onSaved }: { entry: ListEntry; last: boolean;
       </View>
       <View style={s.listBtns}>
         <Pressable onPress={() => save()} disabled={saving || !dirty} style={[s.listSaveBtn, (saving || !dirty) && s.dim]}>
-          {saving ? <ActivityIndicator color={C.onAccent} size="small" /> : <Text style={s.listSaveText}>Save</Text>}
+          {saving ? <Spinner inline color={C.onAccent} size="small" /> : <Text style={s.listSaveText}>Save</Text>}
         </Pressable>
         {!isDefault && (
           <Pressable onPress={() => save(entry.default)} disabled={saving} style={s.listResetBtn}>
@@ -629,7 +629,7 @@ function AiSection() {
       <View style={s.cardPad}>
         <ErrorText>{err}</ErrorText>
         {loading || !cfg ? (
-          <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />
+          <Spinner inline style={{ marginVertical: 8 }} />
         ) : (
           <>
             <View style={s.aiStatusRow}>
