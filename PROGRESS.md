@@ -2,9 +2,57 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 6b52023 -->
+<!-- reviewed: 0c63c62 -->
 <!-- docker-validated: de8507e -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-28 (reviewer — έλεγχος 6b52023..0c63c62, 66 commits)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: το δικό μου `reviewer-20260727-2010` ήταν ANSWERED
+(«ναι, εγκρίθηκε το expo-camera») χωρίς άλλη ενέργεια να χρειάζεται → σημειώθηκε APPLIED. Μηδέν άλλο entry
+addressed στο `reviewer` (τα OPEN entries είναι όλα bakecore). Working tree καθαρό στην αρχή.
+
+**Εύρος**: `6b52023..0c63c62`, 66 commits. Η πλειονότητα ήταν test-coverage (settings/actions.ts concern
+slices, tenancy SSR gates, Stripe/billingSession clients, OpenAPI request/response drift guards) + docs/backlog
+housekeeping· τα ουσιαστικά production-code commits ήταν: **P31 viewer role enforcement** (`1346b4d`, δύο
+chokepoints: `withAuth` 403 σε non-read methods από viewer + `assertCanWrite()` σε κάθε mutating server action,
+με `writeGuard.coverage.test.ts` να διαβάζει το ίδιο το source και να αποτυγχάνει το build αν κάτι μείνει
+unguarded), **MV3 quick-capture extension** (`0264ccf`, P5 phase 2 — μηδέν host_permissions/content script,
+μόνο storage+contextMenus+activeTab, ίδιο same-origin `/capture` cookie-ride με το bookmarklet), **mobile AI
+toggles** (`98e4ba7`/`a21e18a`, roadmap #6 — GET ανοιχτό σε κάθε logged-in ρόλο αλλά ποτέ δεν επιστρέφει
+key/host, PATCH admin-only), **tenancy fix για Bills+Vouchers** (`1826876`, κλείνει 2/3 ανοιχτά WEB_DEBT P2
+items), **platform-wide audit feed** (`e165549`, read-only cross-tenant `/admin/audit`, gated πίσω από
+`requireSuperadminPage()`), **Spinner primitive mobile refactor** (`b88c6e5`, μηχανικό, byte-identical
+existing call sites), **FAQ 6-group regroup** (`0c63c62`, landing — verified ότι το `FaqDeepLink` scope fix
+πραγματικά διορθώνει το claim του commit message, το `#faq`/`.faq-list`×6/`FAQ_GROUPS` όλα live στο page.tsx).
+
+**Έλεγχος**: `npm run type-check` (web) **EXIT 0**· `npx tsc --noEmit` (mobile) **EXIT 0**. Targeted vitest στα
+security-sensitive νέα (`writeGuard.behaviour.test.ts`/`writeGuard.coverage.test.ts`/`roles.test.ts`/
+`bills/actions.tenant.test.ts`/`tenancy/adminAudit.test.ts`/`platformActivity.test.ts`/`goalsActions.test.ts`)
+→ **134/134 πέρασαν**. Line-by-line review του `lib/roles.ts`/`lib/auth.ts`/`apiAuth.ts`/`users.actions.ts` diff:
+το `atLeast()` fail-closed σε άγνωστο role (rank -1), ο `setUserRole` bug-fix είναι πραγματικός (η παλιά
+`role==='admin'?'admin':'member'` θα προήγαγε σιωπηλά έναν viewer σε writer, τώρα `parseRole` + reject αντί
+coerce), και το last-admin guard πλέον πιάνει ΚΑΘΕ demotion εκτός admin (πριν έλεγχε μόνο `next==='member'`).
+Bills/Vouchers tenancy fix: mirror του ήδη-established `withRequestTenant`/`currentModel` pattern, το
+`markBillPaid`→`addExpense` re-entrancy σωστά τεκμηριωμένο. Μηδέν secret στο diff (grep key/token/password/PEM).
+
+**Fixes**: κανένα — μηδέν type error, μηδέν test failure, μηδέν regression βρέθηκε σε αυτό το εύρος.
+
+**Stale housekeeping (χωρίς code change)**: το standing `## Needs Achilleas` block του προηγούμενου entry
+(2026-07-27, «P9 mobile: Statements») λέει ακόμα ανοιχτά το `expo-camera` approval blocker και standing items
+«P31 household supervised session»/«P5 MV3-extension phase 2» — και τα τρία **έχουν πλέον λυθεί/shippαριστεί**
+(expo-camera: `ASK_ACHILLEAS.md` `reviewer-20260727-2010`/`pharos-daily-dev-20260725-1425` και τα δύο APPLIED·
+P31: `PRODUCT_BACKLOG.md` ήδη ✅ SHIPPED 2026-07-27· P5 phase 2: shipped αυτό το εύρος, `0264ccf`). Δεν ξαναγράφω
+το παλιό entry (θα αλλοίωνε το ιστορικό)· ο επόμενος builder run μπορεί να αγνοήσει εκείνο το block, είναι stale.
+
+**WEB_DEBT.md**: confirmed ότι το `bills/actions.ts` + `vouchers/page.tsx` P2 items (60η σάρωση) είναι σωστά
+μαρκαρισμένα DONE στη θέση τους από το `1826876`. Το `statements/actions.ts` P2/M item παραμένει TODO αμετάβλητο
+(δεν αγγίχτηκε σε αυτό το εύρος) — σωστά ακόμα στην ουρά, ίδιο recipe με τα ήδη-κλεισμένα siblings.
+
+**Routine health**: κανένα OPEN entry addressed στο `pharos/*` στο `ASK_ACHILLEAS.md`· κανένα σημάδι stuck
+routine (PROGRESS.md, MOBILE_PARITY.md, PRODUCT_BACKLOG.md, WEB_DEBT.md όλα ενημερωμένα σήμερα/χθες).
+
+---
 
 ## 2026-07-28 (docker-health: rebuild 75 web files, cache −2.352GB, all healthy)
 
