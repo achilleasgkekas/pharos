@@ -4624,3 +4624,53 @@ merge.
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-28 (run 34)
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε
+(`grep -n "pharos-landing"`), καμια ANSWERED καταχωρηση αφορα αυτη τη routine.
+
+Ελεγχος στην αρχη: `git log --oneline 872572e..HEAD` (872572e = το τελευταιο commit πριν αυτη τη routine
+δουλεψει, run 33) εδειξε 8 commits, μηδεν `feat(`/`fix(` (μονο test(saas)/test(settings) unit coverage,
+refactor(mobile) Spinner primitive, και docs(progress) απο αλλες routines). Κανενα νεο user-facing feature
+commit να συγχρονισω στο landing copy.
+
+Αντι για ακομα ενα "commit-driven" ή "docs.md-driven" sweep (τα δυο patterns που καλυφθηκαν εξαντλητικα στα
+runs 31-33), δοκιμασα κατι διαφορετικο: **σταυρωσα τα δυο ηδη-γνωστα open "hosted τιμες" Needs-Achilleas
+σημεια** (ενα στο δικο μου log, ενα στο SAAS_PROGRESS.md) που ποτε δεν ειχαν συγκριθει μεταξυ τους.
+
+Ευρημα: το landing `TIERS` (`app/page.tsx` γραμμη ~201) δειχνει **4 tiers· Self-hosted (free) + Solo €4 /
+Family €8 / Pro €15** ανα μηνα, ολα με CTA "Join the waitlist" (χωρις πραγματικο checkout). Ο backend SaaS
+κωδικας (`apps/web/src/lib/billing/plans.ts`) εχει ηδη **3 πραγματικα plan keys, με λειτουργικο Stripe
+checkout/portal/webhook route (route.ts υπαρχει, απλα χωρις live keys ακομα): Free / Pro(shared) €9 /
+Dedicated €29**, με δικα τους quotas (storageGB 5/50/500, aiCallsPerMonth 50/1000/null, maxMembers 1/5/null,
+customDomain false/false/true) που δεν εμφανιζονται πουθενα στη landing. Διαβασα το `SAAS_PROGRESS.md`
+γραμμη 557 ("τα €9/€29 + οι quotas ειναι placeholders μεχρι ο Αχιλλεας [επιβεβαιωσει τελικη τιμολογηση]")
+για να επιβεβαιωσω οτι και τα δυο συνολα ειναι ηδη γνωστα ως μη-τελικα, απλα ποτε δεν ειχαν συγκριθει: 4
+tiers vs 3, διαφορετικα ονοματα (Solo/Family/Pro vs Free/Pro/Dedicated), διαφορετικες τιμες (4/8/15 vs 0/9/29).
+
+Δεν αλλαξα τιποτα στο `page.tsx` αυτο το run, το θεμα ειναι καθαρα ενα product/pricing decision που δεν
+επιτρεπεται να μαντεψω (βλ. task instructions §Coordination Guard). Αντ' αυτου εγραψα νεα ANSWERED-pending
+καταχωρηση στο `~/.claude/ASK_ACHILLEAS.md`: `pharos-landing-20260728-0706`, με τα ακριβη ευρηματα + 3
+options ((a) landing pricing κερδιζει, backend ευθυγραμμιζεται· (b) backend pricing/quotas κερδιζουν, landing
+ευθυγραμμιζεται· (c) κανενα τελικο ακομα, περιμενουμε τριτο σετ) + leaning (b) με το σκεπτικο οτι ο backend
+εχει ηδη πραγματικα λειτουργικα quotas δεμενα στα δικα του tiers ενω το landing ειναι καθαρα διακοσμητικο
+("Join the waitlist" χωρις συνδεση με κωδικα). Η προηγουμενη γενικη Needs-Achilleas γραμμη ("hosted τιμες
+€4/€8/€15 + annual x10: confirm ΠΡΙΝ launch") παραμενει στο log οπως ηταν, δεν την εσβησα, απλα προσθεσα
+το πιο συγκεκριμενο cross-project ευρημα στο inbox.
+
+Verify:
+- `npm run type-check` -> exit 0 (μηδεν αλλαγη κωδικα).
+- `npm run build` -> success, 13 static routes, `/` 5.35 kB (αμεταβλητο).
+- Δεν χρειαστηκε browser preview (μηδεν αλλαγη σε ορατο περιεχομενο αυτο το run).
+- Δεν αγγιξα Docker/:3000/web/mobile/SAAS_PROGRESS.md. Μηδεν subagent, μηδεν AI call.
+- Δεν εγινε αλλαγη στο `apps/landing/app/page.tsx` αυτο το run, το inbox entry ζει εκτος git (οπως ολο το
+  `~/.claude/ASK_ACHILLEAS.md`, βλ. header του αρχειου: "NOT in any git repo").
+
+Επομενο increment: περιμενει την απαντηση Αχιλλεα στο `pharos-landing-20260728-0706` (option a/b/c). Μεχρι
+τοτε, υποψηφια: γενικο sweep για νεα feat commits, ή αν δεν βρεθει κατι νεο, επεκταση του "cross-reference"
+patterns σε αλλα ζευγαρια open Needs-Achilleas items (π.χ. legal entity/Stripe processor vs το ηδη-γραμμενο
+billing κωδικα) για να δουμε αν υπαρχουν αλλα τετοια drifted placeholders.
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες PLUS νεο συγκεκριμενο pricing-drift ερωτημα, βλ. πανω, repo public timing).
