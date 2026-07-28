@@ -9,6 +9,7 @@ import { usePathname } from 'next/navigation';
 const LINKS: Array<{ href: string; label: string }> = [
   { href: '/admin', label: 'Overview' },
   { href: '/admin/tenants', label: 'Workspaces' },
+  { href: '/admin/audit', label: 'Activity' },
 ];
 
 /** Overview matches exactly; section links (e.g. /admin/tenants) also match their sub-paths. */
