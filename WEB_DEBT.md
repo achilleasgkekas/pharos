@@ -33,7 +33,19 @@
   - **Fix**: mirror το recipe των ήδη-κλεισμένων siblings: import `withRequestTenant` (`@/lib/tenancy/request`) + `currentModel` (`@/lib/tenancy/connection`)· rename το `Bill` import σε `BillModel`· τύλιξε κάθε exported action function σε `return withRequestTenant(async () => { const Bill = await currentModel(BillModel); ... });`. Πρόσεξε το `markBillPaid` που καλεί `addExpense` (cross-module) — έλεγξε αν χρειάζεται να περάσει tenant context ή αν το `addExpense` ήδη κάνει το δικό του wrap.
   - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/bills/actions.ts` ≥ όσα exported functions κάνουν DB access· npm run type-check exits 0· `apps/web/src/app/bills/actions.test.ts` παραμένει green.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-26, 60η σάρωση reviewer routine)
+- Status: ✅ DONE 2026-07-28 (pharos-daily-dev) — και τα 6 exported actions (createBill/updateBill/setBillArchived/
+  deleteBill/markBillPaid/markBillUnpaid) τυλίχτηκαν σε `withRequestTenant` με `const Bill = await currentModel(BillModel)`
+  μέσα (grep count **15**). Το `assertCanWrite()` + το Zod parse μένουν ΕΞΩ από το wrap (ίδιο με τα sibling vouchers/
+  expenses actions: authz + validation δεν χρειάζονται tenant context, και ένα invalid form δεν πρέπει να πληρώνει
+  tenant resolution). Το `markBillPaid` → `addExpense` **δεν** χρειάστηκε threading: το `addExpense` ανοίγει το δικό του
+  `withRequestTenant`, που re-resolve-άρει στο ΙΔΙΟ host-derived context (re-entrant), οπότε το logged expense πέφτει
+  στο ίδιο tenant DB· τεκμηριώθηκε inline ώστε να μην ξαναελεγχθεί. **Επιπλέον, εκτός του αρχικού `Files:`** (αλλιώς
+  θα αναπαραγόταν ακριβώς η read/write ασυμμετρία του vouchers item παρακάτω): το `bills/page.tsx` `getData()` τυλίχτηκε
+  κι αυτό (grep 4). **Νέο `bills/actions.tenant.test.ts` (+5 tests, πρώτο tenant-routing test σε επίπεδο action)**:
+  per-tenant fake model που καταγράφει σε ποιο DB πήγε κάθε write → πιάνει regression αν κάποιος ξαναβάλει direct
+  `Bill.create` (με το `@/models/Bill` mocked ως `{}`, ο παλιός κώδικας σκάει). Verify: type-check EXIT 0, full vitest
+  **5216 passed / 329 files** (μηδέν regression), Docker rebuild clean (0 restarts, /login 200, /bills 307), browser
+  `/login` renders χωρίς console errors.
 
 ### `statements/actions.ts` παρακάμπτει το tenant-scoping — και δημιουργεί read/write ασυμμετρία με το νέο fxAudit
 - Priority: P2
@@ -61,7 +73,10 @@
   - **Fix**: mirror το ίδιο recipe με `receipts/page.tsx`/`expenses/page.tsx`: import `withRequestTenant` (`@/lib/tenancy/request`) + `currentModel` (`@/lib/tenancy/connection`)· rename τα 3 model imports σε `VoucherModel`/`GiftCardModel`/`LoyaltyCardModel`· τύλιξε το σώμα του `getData()` σε `return withRequestTenant(async () => { await connectDB(); const Voucher = await currentModel(VoucherModel); ... });`.
   - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/vouchers/page.tsx` ≥ 4 (1 wrap + 3 currentModel calls)· npm run type-check exits 0· υπάρχον vouchers/giftcards/loyalty tests παραμένουν green.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-25, 59η σάρωση reviewer routine· ίδιο auto-buildable μέγεθος με τα ήδη-κλεισμένα sibling items, ο ίδιος ο auditor το είχε ήδη σημειώσει ως follow-up στο postscript του `315cd26` item)
+- Status: ✅ DONE 2026-07-28 (pharos-daily-dev) — `getData()` τυλίχτηκε σε `withRequestTenant`, τα 3 model imports έγιναν
+  `VoucherModel`/`GiftCardModel`/`LoyaltyCardModel` και τα 3 `currentModel()` calls τρέχουν σε ένα `Promise.all`
+  (grep count **6**, ≥4 όπως ζητούσε το acceptance). Verify: type-check EXIT 0, vouchers/giftcards tests green
+  (42 tests), full vitest 5216 passed, `/vouchers` 307 μετά από clean Docker rebuild.
 
 ## Σύνοψη audit (2026-07-24 58η σάρωση· type-check EXIT 0· CONFIRMATION run, μηδέν νέο P1/P2 εύρημα· 4 items ΕΚΛΕΙΣΑΝ από την 57η [rate-limit + 3× guardless SaaS routes + getTenantConnection decision-flag, όλα ήδη marked DONE στη θέση τους]· 3 auto-buildable items παραμένουν ανοιχτά αμετάβλητα· el.ts gap 126 σταθερό· ~65 commits ελέγχθηκαν, νέος P12/P32/P20 mobile-parity v1 κώδικας exemplary)
 

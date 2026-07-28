@@ -48,15 +48,21 @@ const {
   getAppSettingsMock: vi.fn(async () => ({ currency: 'EUR' }) as { currency: string }),
 }));
 
+// Tenancy seam mocked the same way as the sibling tenancy-wrapped action modules
+// (vouchers/actions.test.ts, expenses/actions.crud.test.ts): withRequestTenant runs the body
+// inline and currentModel hands back the mocked model, so these tests pin the CRUD/lifecycle
+// behaviour, not tenant isolation (already covered by lib/tenancy/*.tenant.test.ts).
+const billModel = {
+  create: billCreate,
+  findById: (id: string) => ({ lean: () => billFindById(id) }),
+  findByIdAndUpdate: billFindByIdAndUpdate,
+  updateOne: billUpdateOne,
+};
+
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
-vi.mock('@/models/Bill', () => ({
-  Bill: {
-    create: billCreate,
-    findById: (id: string) => ({ lean: () => billFindById(id) }),
-    findByIdAndUpdate: billFindByIdAndUpdate,
-    updateOne: billUpdateOne,
-  },
-}));
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async () => billModel }));
+vi.mock('@/models/Bill', () => ({ Bill: {} }));
 vi.mock('@/app/expenses/actions', () => ({ addExpense: addExpenseMock }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));

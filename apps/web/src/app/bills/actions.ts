@@ -1,6 +1,8 @@
 'use server';
 import { connectDB } from '@/lib/db';
-import { Bill } from '@/models/Bill';
+import { Bill as BillModel } from '@/models/Bill';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { nextBillDue } from '@/lib/bill';
 import { safeDateOrNull } from '@/lib/dates';
 import { addExpense } from '@/app/expenses/actions';
@@ -52,10 +54,13 @@ export async function createBill(formData: FormData): Promise<{ ok: boolean; err
   const raw = parsed.data;
   const due = safeDateOrNull(raw.dueDate);
   if (!due) return { ok: false, error: 'Invalid due date' };
-  await connectDB();
-  await Bill.create({ ...raw, ...(await resolveBillFx(raw)), dueDate: due, paidAt: null, archived: false });
-  revalidatePath('/bills');
-  return { ok: true };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Bill = await currentModel(BillModel);
+    await Bill.create({ ...raw, ...(await resolveBillFx(raw)), dueDate: due, paidAt: null, archived: false });
+    revalidatePath('/bills');
+    return { ok: true };
+  });
 }
 
 export async function updateBill(id: string, formData: FormData): Promise<{ ok: boolean; error?: string }> {
@@ -65,29 +70,38 @@ export async function updateBill(id: string, formData: FormData): Promise<{ ok: 
   const raw = parsed.data;
   const due = safeDateOrNull(raw.dueDate);
   if (!due) return { ok: false, error: 'Invalid due date' };
-  await connectDB();
-  // The form always shows the PRINTED amount (see BillsClient), so re-saving an unchanged
-  // foreign bill re-resolves to the same stored figure instead of converting it twice.
-  await Bill.findByIdAndUpdate(id, { ...raw, ...(await resolveBillFx(raw)), dueDate: due });
-  revalidatePath('/bills');
-  return { ok: true };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Bill = await currentModel(BillModel);
+    // The form always shows the PRINTED amount (see BillsClient), so re-saving an unchanged
+    // foreign bill re-resolves to the same stored figure instead of converting it twice.
+    await Bill.findByIdAndUpdate(id, { ...raw, ...(await resolveBillFx(raw)), dueDate: due });
+    revalidatePath('/bills');
+    return { ok: true };
+  });
 }
 
 export async function setBillArchived(id: string, archived: boolean): Promise<{ ok: boolean }> {
   await assertCanWrite();
-  await connectDB();
-  await Bill.findByIdAndUpdate(id, { archived });
-  revalidatePath('/bills');
-  return { ok: true };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Bill = await currentModel(BillModel);
+    await Bill.findByIdAndUpdate(id, { archived });
+    revalidatePath('/bills');
+    return { ok: true };
+  });
 }
 
 export async function deleteBill(id: string): Promise<{ ok: boolean }> {
   await assertCanWrite();
-  await connectDB();
-  // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
-  await Bill.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
-  revalidatePath('/bills');
-  return { ok: true };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Bill = await currentModel(BillModel);
+    // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
+    await Bill.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+    revalidatePath('/bills');
+    return { ok: true };
+  });
 }
 
 /**
@@ -102,7 +116,9 @@ export async function markBillPaid(
   opts?: { logExpense?: boolean; paidDate?: string }
 ): Promise<{ ok: boolean; error?: string }> {
   await assertCanWrite();
+  return withRequestTenant(async () => {
   await connectDB();
+  const Bill = await currentModel(BillModel);
   const bill = await Bill.findById(id).lean();
   if (!bill) return { ok: false, error: 'Bill not found' };
   const wasPaid = !!bill.paidAt;
@@ -110,6 +126,9 @@ export async function markBillPaid(
 
   let linkedExpenseId = bill.linkedExpenseId || '';
   if (opts?.logExpense && !wasPaid && !linkedExpenseId && (bill.amount ?? 0) > 0) {
+    // addExpense opens its OWN withRequestTenant, which re-resolves to the same context we are
+    // already inside (the wrapper is re-entrant and host-derived), so the logged expense lands
+    // in the same tenant DB as the bill. Nothing extra needs threading through.
     const res = await addExpense({
       kind: 'expense',
       vendor: bill.vendor || bill.title,
@@ -154,13 +173,17 @@ export async function markBillPaid(
 
   revalidatePath('/bills');
   return { ok: true };
+  });
 }
 
 /** Undo a payment (does not touch any expense that was logged). */
 export async function markBillUnpaid(id: string): Promise<{ ok: boolean }> {
   await assertCanWrite();
-  await connectDB();
-  await Bill.findByIdAndUpdate(id, { paidAt: null });
-  revalidatePath('/bills');
-  return { ok: true };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Bill = await currentModel(BillModel);
+    await Bill.findByIdAndUpdate(id, { paidAt: null });
+    revalidatePath('/bills');
+    return { ok: true };
+  });
 }
