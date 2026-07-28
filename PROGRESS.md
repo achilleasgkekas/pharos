@@ -10210,3 +10210,53 @@ tsc-verifiable, μηδέν νέο dep) — το safe-area item παραμένε�
 - **`PATCH /api/v1/settings` ntfy authz** (τρίτο run στη σειρά που το αναφέρω, δεν το αγγίζω): οι web
   Notifications actions είναι `requireAdmin()`, το API όχι, οπότε member μπορεί ακόμα να αλλάξει
   `ntfyUrl`/`ntfyEnabled` από το κινητό. Μια γραμμή, αλλά αλλάζει σιωπηλά συμπεριφορά, θέλει το ΟΚ σου.
+
+## 2026-07-28 (cont. — OpenAPI, τρίτο και τελευταίο επίπεδο: τα request bodies)
+
+Approved ουρά ξανά άδεια από αυτόνομα χτίσιμα (P36 credentials, P16 sample export, P23 EAS build), MOBILE_PARITY
+Build Queue γνήσια άδειο (τα 3 items χωρίς Status line ελέγχθηκαν ένα-ένα, όλα shipped 2026-07-24), οπότε πήρα το
+ρητό «επόμενο task» του προηγούμενου run: το τελευταίο κομμάτι του contract που δεν το κρατούσε τίποτα.
+
+**Τι βρήκα**: ίδια κλάση με τα response schemas, σε 9 operations. **`POST /expenses` δέχεται `currency`, `fxRate`,
+`split`, `space`, `taxDeductible`, `taxCategory`, `paymentMethod` και το spec δεν ανέφερε ΚΑΝΕΝΑ** από αυτά.
+Το **`PATCH /settings` δήλωνε `additionalProperties: true` και μηδέν properties**, δηλαδή έντεκα ρυθμίσεις που
+γράφονται ήταν αόρατες (currency, VAT, warranty/trial lead-times, ntfy, envelope mode, budgets). Το multi-currency
+(P9) έλειπε από κάθε money route, τα free-trial πεδία (P33) από τα subscriptions, τα `steps` ενός task από τη μόνη
+route που τα επεξεργάζεται. **Ένα λειψό request field είναι χειρότερο από ένα λειψό response field**: ο client που
+χτίστηκε από το spec απλά δεν το στέλνει ποτέ, οπότε το feature δεν υπάρχει γι' αυτόν και τίποτα δεν σκάει.
+
+**Τι μπήκε**: τα 9 requestBody ξαναγράφτηκαν από τους ίδιους τους handlers, με τους περιορισμούς που κρύβουν bugs
+γραμμένους ρητά: ποια πεδία είναι **πλήρης αντικατάσταση και όχι merge** (`budgets`, `steps`, `split`), ποια νούμερα
+**clamp-άρονται αντί να απορρίπτονται** (0-100 VAT, 0-730 warranty days, 0-60 trial days), και ποιο πεδίο **ξανα-λύνει
+ΟΛΟ το money set** (μια απόδειξη/είδος/συνδρομή δεν μένει ποτέ μισο-μετατρεμμένη). Το `docs/api.md` ήταν σε μεγάλο
+βαθμό ήδη σωστό (η πρόζα ήξερε ό,τι δεν ήξερε το μηχαναγνώσιμο spec), αλλά **υποσχόταν `origAmount` ως input στο
+`PATCH /items/:id`** ενώ είναι derived-only (η ίδια η γραμμή των receipts το λέει σωστά), και του έλειπαν
+`steps` / `paymentMethod` / `notes`· η αόριστη γραμμή του `PATCH /settings` απαριθμεί πλέον τα πεδία της.
+
+**Το κομμάτι που κρατάει την αλήθεια**: νέο `openapi.request.test.ts`. Βγάζει τα δεκτά keys από τον **πηγαίο κώδικα
+του handler** (το κοινό idiom `const b = await readBody(req)` + `strField(b,'x')`/`b.x`), και ακολουθεί τις δύο
+παραλλαγές που κρύβουν πραγματικά πεδία: τον βρόχο `for (const k of ['total','subtotal']) … b[k]` και έναν helper
+που παίρνει ολόκληρο το body (`cardFieldsFromBody`, import-resolved). Σύγκριση **και προς τις δύο κατευθύνσεις** +
+ένας τρίτος έλεγχος ότι κανένα `required:` δεν ονομάζει πεδίο που η route δεν διαβάζει καν (το nested `required` ενός
+gift-card use δεν μπερδεύεται με το top-level, επιλέγεται by indent). Multipart uploads skipped (μεταφέρουν αρχεία,
+όχι JSON). **Μία ρητή εξαίρεση**, τεκμηριωμένη επί τόπου: το `POST /cards` διαβάζει `active` μέσω του κοινού helper
+αλλά μετά καρφώνει `active: true`, οπότε το spec σωστά δεν το υπόσχεται.
+
+**Verify**: ο guard **επιβεβαιώθηκε ότι αποτυγχάνει** σε τεχνητό drift και στις 4 κατευθύνσεις, με επαναφορά από
+backup κάθε φορά: αφαίρεση documented πεδίου (`taxDeductible`/`taxCategory`), phantom πεδίο στο spec, ψεύτικο
+`required` entry, και **νέο πεδίο που αρχίζει να διαβάζει μια route** (`b.ghostInput` στο tasks PATCH). Το spec
+parse-άρει ως OpenAPI 3.1 (js-yaml) με **61 paths, 24 schemas, 310 `$ref`, 0 broken**. `npm run type-check` **EXIT 0**,
+πλήρες `npx vitest run` **5094 passed / 324 files** (+46 δικά μου + 4 skipped multipart, μηδέν regression).
+**Κανένα Docker step**: άλλαξαν μόνο docs + ένα test file, μηδέν runtime κώδικας, άρα ούτε mutex ούτε rebuild ούτε
+browser verify (τίποτα δεν renders). Commit `33c7d17`, pushed.
+
+**Επόμενο task (πρόταση)**: το contract είναι πλέον δεμένο και στα τρία επίπεδα (paths, responses, requests), οπότε
+γυρίζω στο mobile: **UI Debt `ActivityIndicator` → `<Spinner>`** (42 sites, καθαρά μηχανικό, `tsc`-verifiable, μηδέν
+νέο dependency, μηδέν αλλαγή συμπεριφοράς). Το safe-area item μένει σκόπιμα εκτός, θέλει νέο dependency και έγκριση.
+
+## Needs Achilleas
+
+- Αμετάβλητα: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample export, EAS dev build), **P17 live check**
+  σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
+- **`PATCH /api/v1/settings` ntfy authz**: καταγράφηκε πλέον σωστά ως OPEN ερώτημα στο `~/.claude/ASK_ACHILLEAS.md`
+  (`pharos-daily-dev-20260728-0215`), δεν το ξαναγράφω εδώ ως νέο. Περιμένει το ΟΚ σου.
