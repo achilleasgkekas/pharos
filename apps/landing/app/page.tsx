@@ -119,7 +119,7 @@ const STACK: { name: string; detail: string; color: string }[] = [
   { name: 'Tailwind CSS v4', detail: 'Dark-first design system, mobile-first, tuned for use over VPN.', color: 'var(--gold)' },
   { name: 'Zod', detail: 'One schema validates the same data on the server and the client.', color: 'var(--red)' },
   { name: 'SearXNG', detail: 'A self-hosted metasearch node powers price and product enrichment.', color: 'var(--accent)' },
-  { name: 'Your AI, your call', detail: 'Local Ollama for full privacy, or Anthropic, OpenAI, Gemini, OpenRouter.', color: 'var(--cyan)' },
+  { name: 'Your AI, your call', detail: 'Local Ollama for full privacy, or Anthropic, OpenAI, Gemini, OpenRouter, or any OpenAI-compatible custom endpoint.', color: 'var(--cyan)' },
   { name: 'No public auth', detail: 'Login-gated, reached over your LAN or VPN. No sign-up, no telemetry.', color: 'var(--purple)' },
 ];
 
@@ -325,7 +325,7 @@ const INTEGRATIONS: { group: string; icon: string; color: string; items: string[
     group: 'Bring your own AI',
     icon: 'code',
     color: 'var(--cyan)',
-    items: ['Ollama (local)', 'Anthropic', 'OpenAI', 'Gemini', 'OpenRouter'],
+    items: ['Ollama (local)', 'Anthropic', 'OpenAI', 'Gemini', 'OpenRouter', 'Custom endpoint'],
   },
   {
     group: 'Import & export',
@@ -442,11 +442,11 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Do I need an AI API key?',
-    a: 'No. AI is optional and can be toggled off per feature. Bring your own key (Anthropic, OpenAI, Gemini, OpenRouter) or run a local model with Ollama. The manual entry, tracking, and reporting work without any AI at all.',
+    a: 'No. AI is optional and can be toggled off per feature. Bring your own key (Anthropic, OpenAI, Gemini, OpenRouter, or any OpenAI-compatible custom endpoint) or run a local model with Ollama. The manual entry, tracking, and reporting work without any AI at all.',
   },
   {
     q: 'Can I plug my own AI key into a hosted workspace too?',
-    a: 'Yes. Workspace settings let you store your own Anthropic, OpenAI, Gemini, or OpenRouter key, and from then on that workspace runs its AI calls on it instead of the shared platform quota, so they stop counting against your plan’s monthly AI limit. The key is encrypted at rest (AES-256-GCM, a fresh encryption each time) and only ever shown back masked, last four characters, never in full; clear it any time to fall back to the included platform key. Self-hosted always brings its own key or a local Ollama model, so this only matters if you are on hosted.',
+    a: 'Yes. Workspace settings let you store your own Anthropic, OpenAI, Gemini, OpenRouter, or custom OpenAI-compatible key, and from then on that workspace runs its AI calls on it instead of the shared platform quota, so they stop counting against your plan’s monthly AI limit. The key is encrypted at rest (AES-256-GCM, a fresh encryption each time) and only ever shown back masked, last four characters, never in full; clear it any time to fall back to the included platform key. Self-hosted always brings its own key or a local Ollama model, so this only matters if you are on hosted.',
   },
   {
     q: 'Can I talk to it in plain English instead of clicking through menus?',

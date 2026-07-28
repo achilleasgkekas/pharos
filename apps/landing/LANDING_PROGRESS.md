@@ -4524,3 +4524,56 @@ Verify:
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-28 (run 32)
+
+Ελεγχος στην αρχη: `git log --oneline fe25f51..HEAD` (fe25f51 = το τελευταιο δικο μου commit, run 31,
+Trash FAQ fix) εδειξε 7 commits, μηδεν `feat(` (μονο test(saas), test(settings), fix(api) OpenAPI schema
+sync, και docs(progress) απο αλλες routines). Δηλαδη κανενα νεο user-facing feature να ελεγξω απο commit
+message. Το `git show --stat 5d2544c` (φαινοταν σαν "run 30 comprehensive drift verification" στο log αλλα
+ανηκει στην docs routine, αγγιζει μονο `docs/DOCS_PROGRESS.md`, οχι landing) το επιβεβαιωσε.
+
+Αντι για commit-driven ελεγχο, εκανα καθαρο "STATS claim vs υπολοιπο copy" sweep: το proof-band `STATS`
+(γραμμη ~290) λεει **"6 AI providers, your pick"**, αλλα καθε αλλο σημειο που απαριθμει providers (STACK
+γραμμη 122, INTEGRATIONS γραμμη 328, δυο FAQ απαντησεις γραμμες 445+449) εγραφε μονο **5**: Ollama,
+Anthropic, OpenAI, Gemini, OpenRouter. Επιβεβαιωσα στον πραγματικο κωδικα οτι υπαρχει πραγματικα 6ος
+provider: `apps/web/src/lib/aiConfig.ts:6` `export type AiProvider = 'ollama' | 'anthropic' | 'openai' |
+'gemini' | 'openrouter' | 'custom'` + `apps/web/src/components/saas/aiKeySettings.ts:13`
+`AI_KEY_PROVIDERS = ['anthropic', 'openai', 'gemini', 'openrouter', 'custom']` (το ιδιο 'custom' ειναι
+διαθεσιμο ΚΑΙ στο self-hosted config ΚΑΙ στο hosted-workspace BYOK) + τεκμηριωμενο σε `docs/configuration.md:39`
+("Any OpenAI-compatible base URL + model") και `docs/faq.md:116-117` ("any OpenAI-compatible custom endpoint
+(LM Studio, Groq, Mistral, DeepSeek, vLLM, and similar)"). Δεν ειναι internal-only implementation detail,
+ειναι πληρως τεκμηριωμενο user-facing feature που απλα δεν ειχε γραμμη πουθενα στο landing copy.
+
+Αλλαγες (`apps/landing/app/page.tsx`, 4 σημεια, ιδιο θεμα/γεγονος σε ολα, δεν προσθεσα νεα FAQ ερωτηση):
+- STACK "Your AI, your call": "...Anthropic, OpenAI, Gemini, OpenRouter." -> "...Anthropic, OpenAI, Gemini,
+  OpenRouter, or any OpenAI-compatible custom endpoint."
+- INTEGRATIONS "Bring your own AI" items list: πεντε στοιχεια -> εξι, προστεθηκε `'Custom endpoint'`.
+- FAQ "Do I need an AI API key?": "Bring your own key (Anthropic, OpenAI, Gemini, OpenRouter)..." ->
+  "...(Anthropic, OpenAI, Gemini, OpenRouter, or any OpenAI-compatible custom endpoint)..."
+- FAQ "Can I plug my own AI key into a hosted workspace too?": "...store your own Anthropic, OpenAI, Gemini,
+  or OpenRouter key..." -> "...Anthropic, OpenAI, Gemini, OpenRouter, or custom OpenAI-compatible key...".
+  (Το `custom` BYOK support επιβεβαιωθηκε στο `aiKeySettings.ts` οπως παραπανω, οχι υποθεση.)
+Το `TIERS` self-hosted feature bullet (γραμμη 215, "Bring your own AI (Ollama, Anthropic, OpenAI, Gemini…)")
+το αφησα ως εχει, εχει ηδη ellipsis "…" που καλυπτει σιωπηλα τα υπολοιπα, δεν ειναι λιστα-με-count οπως
+τα αλλα τεσσερα.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13 static routes, `/` 5.35 kB (αμεταβλητο bundle, string-only αλλαγες).
+- em-dash: 0 (python3 UTF-8 count στο `app/page.tsx`).
+- Θυρες 3000/3100 κατειλημμενες (Docker), `next start -p 3102` πανω στο production build -> curl 200.
+  Browser pane: `read_console_messages` (onlyErrors) -> "No console logs." `javascript_tool` επιβεβαιωσε
+  5 checks: και τα 4 νεα strings present στο `document.body.innerHTML` (STACK/INTEGRATIONS/2×FAQ) + το
+  προϋπαρχον "6 AI providers, your pick" stat αμεταβλητο και παρον. Hero screenshot καθαρο. Server
+  τερματισμενος (`pkill -f "next start -p 3102"` + `lsof` επιβεβαιωσε την θυρα ελευθερη).
+- Δεν αγγιξα Docker/:3000/web/mobile. Μηδεν subagent, μηδεν AI call για copy generation.
+- Collision guard: `git status --short` πριν το commit εδειξε ΜΟΝΟ `apps/landing/app/page.tsx` +
+  `apps/landing/LANDING_PROGRESS.md`, κανενα ξενο staged αρχειο.
+
+Επομενο increment: δεν βρηκα αλλο σαφες gap αυτο το run περαν του AI-providers-count fix. Υποψηφια για το
+επομενο περασμα: (α) γενικο sweep για νεα feat commits μεχρι τοτε, (β) αν καποτε προκυψει νεο 7ο provider
+η αντιστοιχη μεταβολη θα φανει αμεσως απο το ιδιο "count vs λιστα" pattern.
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
