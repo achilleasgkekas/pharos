@@ -4577,3 +4577,50 @@ Verify:
 
 Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
 contact inbox + hosted τιμες, repo public timing).
+
+## 2026-07-28 (run 33)
+
+Coordination guard: `~/.claude/ROUTINES_PAUSED` δεν υπαρχει. `~/.claude/ASK_ACHILLEAS.md` ελεγχθηκε
+(`grep -n "pharos-landing"`), καμια καταχωρηση αφορα αυτη τη routine.
+
+Ελεγχος στην αρχη: `git log --oneline de8507e..HEAD` (de8507e = το τελευταιο δικο μου commit, run 32,
+AI-providers-count fix) εδειξε 8 commits, μηδεν `feat(` (μονο test(saas)/test(settings) unit coverage,
+docker-health rebuild, fix(api) OpenAPI request-body sync, και docs(progress) απο αλλες routines). Κανενα
+νεο user-facing feature commit απο το τελευταιο περασμα.
+
+Αντι για commit-driven ελεγχο, εκανα ενα "docs/features.md Contents vs landing copy" sweep, περνωντας τους
+17 τιτλους της λιστας contents (γραμμες 26-42) εναν-εναν κοντρα στο τι ηδη καλυπτει το `apps/landing/app/page.tsx`.
+16 απο τους 17 ειναι ηδη πληρως καλυμμενοι (Inventory/Shopping, Receipts, Expenses/Income, Statements,
+Subscriptions, Bills, Vouchers, Calendar, Reports, Tasks, AI command bar/history, Search, Notifications,
+Trash, Settings, plus ολα τα P-numbered sub-features μεσα σε αυτα οπως multi-currency/splitting/spaces/
+tax/depreciation/goals/webhooks που ηδη εχουν δικες τους FAQ γραμμες).
+
+Ο 17ος, **"Network (UniFi)"** (features.md γραμμη 37 στο Contents, section γραμμη 524-532, περιγραφει ενα
+live UniFi controller dashboard στο `/network`), ΔΕΝ υπαρχει στο landing, και για καλο λογο: επιβεβαιωσα
+με `grep -rln "unifi" apps/web/src -i` (μηδεν αποτελεσματα, κανενα `/network` route, κανενα `lib/unifi.ts`)
+οτι το module εχει αφαιρεθει απο τον κωδικα. Πριν γραψω οτιδηποτε διαβασα το LANDING_PROGRESS.md ιστορικο
+και βρηκα οτι αυτο ειναι ηδη γνωστο και διορθωμενο θεμα: entry **"2026-07-26 (9)"** (γραμμη 4156) ηδη
+εντοπισε και εσβησε 6 σημεια landing copy που διαφημιζαν το module, με βαση το commit `5eb912d` (2026-06-12,
+"Restore price to product hero; remove the Network/UniFi module") που το αφαιρεσε σκοπιμα. Το docs/features.md
+παραμενει stale (αναφερει module που δεν υπαρχει) αλλα αυτο ειναι εκτος του `apps/landing/**` territory
+αυτης της routine, οχι κατι που διορθωνω εγω. Καμια αλλαγη χρειαστηκε στο landing, το `git blame`-type
+ελεγχος απλα επιβεβαιωσε οτι η προηγουμενη διορθωση κρατησε.
+
+Verify:
+- `npm run type-check` -> exit 0.
+- `npm run build` -> success, 13 static routes, `/` 5.35 kB (αμεταβλητο, μηδεν αλλαγες κωδικα αυτο το run).
+- em-dash: 0 (python3 UTF-8 count στο `app/page.tsx`).
+- Θυρες 3000/3100 κατειλημμενες (Docker), `next start -p 3102` πανω στο production build -> curl 200.
+  Browser pane: `read_console_messages` (onlyErrors) -> "No console logs." Τιτλος tab "PHAROS · Personal
+  Hub" σωστος. Server τερματισμενος (`pkill -f "next start -p 3102"` + `lsof` επιβεβαιωσε την θυρα ελευθερη).
+- Δεν αγγιξα Docker/:3000/web/mobile/docs. Μηδεν subagent, μηδεν AI call για copy generation.
+- Δεν εγινε commit αυτο το run (μηδεν αλλαγες στο page.tsx), μονο αυτο το log entry.
+
+Επομενο increment: δεν βρηκα κανενα gap αυτο το run, το πληρες 17-section sweep του features.md contents
+ηρθε καθαρο. Υποψηφια για το επομενο περασμα: (α) γενικο sweep για νεα feat commits μεχρι τοτε, (β) αν
+καποτε το docs/features.md Network section διορθωθει (αφαιρεθει) απο την docs routine, τιποτα δεν αλλαζει
+εδω (ηδη σωστο), αλλα αξιζει επιβεβαιωση οτι δεν επανεμφανιστηκε καπου στο landing απο λαθος μελλοντικο
+merge.
+
+Needs-Achilleas (open, αμεταβλητα): ιδια με προηγουμενα entries (legal entity/Stripe, Terms+Privacy review,
+contact inbox + hosted τιμες, repo public timing).
