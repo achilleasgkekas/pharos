@@ -6,39 +6,85 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-27 (18η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-28 (19η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
-> **Standing κατάσταση (18η σάρωση, 2026-07-27):** το «Approved» queue παραμένει ουσιαστικά χωρίς αυτόνομα-
-> buildable items — μόνο P36 (Open Banking, blocked σε provider decision), P31 (household multi-user, χρειάζεται
-> supervised session), P16 remainder (Firefly III/Grocy importers, χρειάζεται πραγματικό sample file), **P9**
-> (multi-currency — πλέον σχεδόν πλήρες, μόνο ο προαιρετικός rate-feed/`resolveFx` στα imports απομένει), P17/P23
-> (mobile native-dep, μπλοκαρισμένα στο ανοιχτό ερώτημα `pharos-daily-dev-20260725-1425` στο ASK_ACHILLEAS.md —
-> ΑΚΟΜΑ χωρίς Answer, 2ο+ συνεχόμενο) μένουν τεχνικά ανοιχτά αλλά κανένα δεν είναι «απλώς χτίσ' το» unattended.
-> **Καμία ρητή έγκριση Proposed→Approved σε 13 διαδοχικές σαρώσεις** — το batch-review πρόταση της 16ης σάρωσης
-> παραμένει σε ισχύ και ενισχύεται· το Proposed queue έφτασε **28 items (P37-P68)**.
+> **Standing κατάσταση (19η σάρωση, 2026-07-28):** το «Approved» queue παραμένει ουσιαστικά χωρίς αυτόνομα-
+> buildable items — μόνο P36 (Open Banking, blocked σε provider decision), P31 (household multi-user — ήδη
+> SHIPPED 2026-07-27, βλ. `## Approved`, live check με τρεις ρόλους ακόμα εκκρεμεί), P16 remainder (Firefly
+> III/Grocy importers, χρειάζεται πραγματικό sample file), **P9** (multi-currency — πλέον σχεδόν πλήρες, μόνο ο
+> προαιρετικός rate-feed/`resolveFx` στα imports απομένει), P17/P23 (mobile native-dep, μπλοκαρισμένα στο ανοιχτό
+> ερώτημα `pharos-daily-dev-20260725-1425` στο ASK_ACHILLEAS.md — ΑΚΟΜΑ χωρίς Answer, 3ο+ συνεχόμενο) μένουν
+> τεχνικά ανοιχτά αλλά κανένα δεν είναι «απλώς χτίσ' το» unattended.
+> **Καμία ρητή έγκριση Proposed→Approved σε 14 διαδοχικές σαρώσεις** — το batch-review πρόταση της 16ης σάρωσης
+> παραμένει σε ισχύ και ενισχύεται· το Proposed queue έφτασε **30 items (P37-P71, εξαιρουμένου του P63 που
+> μετακινήθηκε στο `## Done` αυτή τη σάρωση — ήταν ήδη SHIPPED αλλά είχε μείνει σωματικά στο Proposed section)**.
 > Ζωντανό grep σε κάθε σάρωση επιβεβαιώνει ότι κανένα Proposed item δεν έχει χτιστεί εν τω μεταξύ χωρίς ρητή
-> έγκριση (re-verified 18η σάρωση: `Bill.payments`/`paymentSplits`/`space` σε Receipt/Subscription μοντέλα =
+> έγκριση (re-verified 19η σάρωση: `Bill.payments`/`paymentSplits`/`space` σε Receipt/Subscription μοντέλα =
 > 0 hits, όλα ακόμα genuinely unbuilt). Σημ. (16η σάρωση, ισχύει ακόμα): το `/network` (UniFi) module αφαιρέθηκε
 > ρητά από το codebase (commit `5eb912d`, "Strip personal info" pivot) — μην ξαναπροταθεί δικτυακό/hardware
 > monitoring, `docs/features.md` έχει ακόμα stale αναφορά (docs-debt, όχι product backlog item).
-> **18η σάρωση (2026-07-27) — 3 νέοι candidates P66-P68**, και οι τρεις live-verified με grep/read κώδικα:
-> (1) **P66** — το AI command-bar `search_data`/`update_record`/`delete_record` (`app/aiTools.ts`, `modelFor()`)
-> και το navbar global search (`app/search-actions.ts`, `searchAll()`) καλύπτουν μόνο item/task/subscription
-> (edit/delete) ή έως 7 τύπους (search) — **5 ολόκληρα μοντέλα** (`Bill`/`Goal`/`GiftCard`/`LoyaltyCard`/
-> `ShoppingListItem`) είναι αόρατα στον AI assistant. (2) **P67** — το `lib/moneyAgenda.ts` (shared από `/calendar`
-> ΚΑΙ το `.ics` feed, verified `import`-block) δεν εισάγει καθόλου `Bill`/`Goal`· λογαριασμοί με προθεσμία και
-> στόχοι αποταμίευσης λείπουν από το ενιαίο 3-μηνο agenda. (3) **P68** — το P34 per-space tag (follow-up note κάτω
-> από το shipped item, ποτέ actionable) υπάρχει ΜΟΝΟ στο `Expense` model (verified: μηδέν `space` field σε
-> Receipt/Subscription/Bill) — το per-property P&L (2 σπίτια) είναι ημιτελές. Ίδιο idiom με το P63
-> promotion-of-a-buried-follow-up-note.
+> **19η σάρωση (2026-07-28) — 3 νέοι candidates P69-P71**, και οι τρεις live-verified με grep/read κώδικα:
+> (1) **P71** — υπάρχει ήδη ένα έτοιμο AES-256-GCM primitive (`lib/tenancy/secretCrypto.ts`, σήμερα μόνο για το
+> SaaS BYO-key) αλλά **κανένα** module για μικρά προσωπικά text-secrets (WiFi/router/NAS admin logins, license
+> keys) — μόνο το P21 file-vault υπάρχει, verified `grep -rn "vault\|SecretNote" apps/web/src/models`. (2) **P70**
+> — το `Item.specs` είναι ένα ενιαίο free-text blob, **μηδέν structured key-value πεδίο** (verified grep), οπότε
+> ένα hardware-heavy inventory (δίκτυο/Battle Station, CLAUDE.md) δεν μπορεί να φιλτράρει by συγκεκριμένο attribute
+> (MAC/serial/rack-unit). (3) **P69** — το Reports monthly-spend chart είναι μόνο rolling window (6/12/24 μήνες),
+> **καμία** year-over-year σύγκριση ίδιου μήνα (verified `grep -rn "yoy\|previousYear\|lastYear"` = 0 hits) — με
+> δύο σπίτια εποχιακά διαφορετικά (P34), «είναι αυτό φυσιολογικό για την εποχή;» δεν απαντιέται σήμερα.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P71. Personal secrets vault (WiFi/router/NAS admin logins, license keys, recovery codes) — S/M — OSS (κυρίως), «Personal Hub» fit
+- **Αξία:** live-verified `grep -rn "vault\|SecretNote" apps/web/src/models` = μόνο το P21 document/manual vault
+  (`AttachmentSchema` στο `models/Item.ts`, αρχεία όπως manuals/warranty certs) — **κανένα μέρος για μικρά
+  text-secrets**. Το CLAUDE.md δείχνει έναν χρήστη με σοβαρό δικτυακό/hardware setup (UniFi controller admin,
+  NAS admin, router credentials, software license keys) που σήμερα ζουν έξω από το app (χαρτί/άλλο εργαλείο) ενώ
+  θα ταίριαζαν φυσικά στο «Personal Hub» backronym. **Ήδη υπάρχει το κρυπτογραφικό primitive**: `lib/tenancy/
+  secretCrypto.ts` (AES-256-GCM, key scrypt-derived από το ήδη-υπάρχον `AUTH_SECRET`, `node:crypto`, μηδέν νέο
+  dependency), σήμερα χρησιμοποιείται **μόνο** για το SaaS BYO-key AI provider key. Reuse του ίδιου primitive
+  για νέο μικρό module: τίτλος + value (πάντα encrypted-at-rest, decrypt μόνο on-demand στο detail view) +
+  category (wifi/router/nas/license/other, free string) + notes. Μηδέν UX friction — καμία δεύτερη passphrase
+  να θυμάται ο χρήστης (σε αντίθεση με το P54 backup-export passphrase) — το threat model είναι «διέρρευσε ένα DB
+  dump/Mongo Express port χωρίς το `.env`», όχι «διέρρευσε ολόκληρο το deployment». **Διακριτό** από P21 (αρχεία,
+  όχι πάντα encrypted) και P54 (one-time export passphrase, όχι ongoing module).
+- **Module:** νέο μικρό model (`SecretNote`) + CRUD σελίδα, ίδιο μέγεθος με Bill/Goal/GiftCard.
+- **Ανοιχτή απόφαση (builder default):** OSS/self-host πρώτα (SaaS θα χρειαζόταν per-tenant key derivation,
+  follow-up)· **δεν** μπαίνει στο navbar search ούτε στο AI command bar (ευαίσθητο περιεχόμενο, ίδιο σκεπτικό
+  με το γιατί το `GiftCard.uses[]` μένει εκτός AI στο P66)· τιμή ποτέ σε plaintext state πέρα από το ανοιχτό
+  detail view.
+
+### P70. Custom user-defined πεδία σε Items (structured key-value metadata) — S/M — OSS (κυρίως, dogfooding-heavy)
+- **Αξία:** live-verified `models/Item.ts` έχει μόνο ένα ελεύθερο `specs` string (ενιαίο text blob) + `tags[]`,
+  **κανένα structured key-value πεδίο** (`grep -n "customField" apps/web/src/models/Item.ts apps/web/src/app/items`
+  = 0 hits). Για hardware-heavy inventory (Battle Station parts, δίκτυο εξοπλισμός, CLAUDE.md) ο χρήστης θα
+  ήθελε να βρίσκει με **συγκεκριμένο attribute** (π.χ. «όλα τα items με MAC address X», «serial number Y»,
+  «rack unit Z») — σήμερα αυτό θάβεται μέσα στο ελεύθερο `specs` text, μόνο full-text search, όχι filter by
+  attribute name/value. Optional `customFields: [{key, value}]` array ανά item (κενό = καμία αλλαγή) → editable
+  στη φόρμα, μικρός πίνακας στο detail, προαιρετικά filterable by key σε δεύτερο βήμα.
+- **Module:** Items (`models/Item.ts` νέο optional subdoc array + `ItemsClient` form/detail + φίλτρο follow-up).
+- **Ανοιχτή απόφαση (builder default):** MVP = μόνο πεδίο + εμφάνιση/edit (κενό = σημερινή συμπεριφορά αμετάβλητη)·
+  filter-by-custom-field ως follow-up ώστε το πρώτο slice να μείνει S· free-form key strings, όχι fixed schema
+  (ίδιο idiom με το ήδη-υπάρχον relaxed-enum category/taxonomy pattern).
+
+### P69. Year-over-year ίδιου μήνα σύγκριση δαπανών (εποχιακό κόστος) στα Reports — S — OSS
+- **Αξία:** live-verified `apps/web/src/app/reports/page.tsx` — το monthly-spend chart είναι **μόνο rolling
+  window** (6/12/24 μήνες, `getReports(monthsBack)`, `sp.months` selector), **καμία** σύγκριση «αυτός ο μήνας
+  vs τον ίδιο μήνα πέρσι» (`grep -rn "yoy\|year.over.year\|previousYear\|lastYear" apps/web/src/app/reports` =
+  0 hits). Με δύο σπίτια διαφορετικού εποχιακού προφίλ (κεντρικό vs εξοχικό Kalamos, P34 per-space ήδη shipped)
+  και λογαριασμούς (ΔΕΗ/θέρμανση) που αυξομειώνονται εποχιακά, ένα rolling 12-24μηνο δείχνει trend αλλά όχι
+  «είναι αυτό φυσιολογικό για την εποχή ή πραγματική αύξηση;». Νέο μικρό card: επιλεγμένος μήνας φέτος vs ίδιος
+  μήνας πέρσι (±%), reuse του ήδη-υπολογισμένου monthly aggregation, **μηδέν νέο data model**.
+- **Module:** Reports (`getReports` + `ReportsClient`, νέο μικρό card).
+- **Ανοιχτή απόφαση (builder default):** reuse τα ήδη-computed monthly buckets (χρειάζεται μόνο δεδομένα ≥13
+  μήνες πίσω, αλλιώς κρυμμένο card — όχι misleading σύγκριση με μηδενικά)· MVP = μόνο total spend, per-category
+  breakdown ως follow-up.
 
 ### P68. Επέκτασε το per-space tag (P34) σε Receipts/Subscriptions/Bills — S — OSS, dogfooding-heavy
 - **Αξία:** το P34 (per-space ledger tag, shipped 2026-07-14) έμεινε ρητά **Expenses-only ως MVP**, με follow-up
@@ -124,36 +170,6 @@
   (κενό = καμία αλλαγή συμπεριφοράς)· AI auto-suggest στο parse-time ως γρήγορο follow-up (reuse το ήδη-υπάρχον
   category-normalization prompt idiom, `CATEGORY_PROMPT`)· η ενσωμάτωση στο Reports chart μπαίνει σε ξεχωριστό
   δεύτερο βήμα ώστε το πρώτο shippable slice να μείνει S.
-
-### P63. Backup/export λείπει 7 μοντέλα — data-loss ρίσκο σε restore, όχι απλά νέο feature — ✅ SHIPPED 2026-07-26 (pharos-daily-dev)
-> **Χτίστηκε χωρίς να περάσει από «Approved» σκόπιμα**, γιατί δεν είναι προϊοντική απόφαση: είναι defect fix σε
-> ήδη-shipped feature (το backup υποσχόταν πλήρες restore και σιωπηλά δεν το έκανε), και το ίδιο το item το
-> χαρακτηρίζει «μηχανικό fix, μηδέν νέος σχεδιασμός, καμία ανοιχτή απόφαση». Τα 7 μοντέλα μπήκαν, και επιπλέον
-> το map βγήκε από το `settings/actions.ts` σε **`lib/backupModels.ts`** με guard test που απαιτεί κάθε μοντέλο
-> στο `src/models` να είναι είτε στο backup είτε ρητά excluded με αιτιολογία, ώστε να μην ξανα-συσσωρευτεί το ίδιο
-> κενό σιωπηλά. Τα secrets (`AppConfig`/`User`/`Account`) μένουν σκόπιμα εκτός (το JSON κατεβαίνει στον δίσκο του
-> χρήστη), τεκμηριωμένο σε νέα ενότητα «Backup & restore (JSON)» στο `docs/features.md`.
-- **Αξία:** live-verified: `ls apps/web/src/models/*.ts` = **27 models**, αλλά το `BACKUP_MODELS` map
-  (`settings/actions.ts:1228-1237`, τροφοδοτεί ΚΑΙ το `exportData()` ΚΑΙ το `importData()` — συμμετρικό, ίδιο
-  key-loop και στα δύο) έχει μόνο **8 keys** (items/receipts/statements/subscriptions/vouchers/cards/tasks/stores).
-  **Λείπουν εντελώς 7 μοντέλα**: **`Expense`** (ολόκληρο το Income/Expenses module — μισθός, λογαριασμοί,
-  ιστορικό εξόδων, ήδη γνωστό κενό βλ. PA2 follow-up note παρακάτω στο `## Done`), **`Bill`** (P28 payables),
-  **`Goal`** (P12 savings goals + contributions), **`GiftCard`** (P32 balances + uses log), **`LoyaltyCard`**
-  (P20), **`NetWorthSnapshot`** (PA2 trend history), **`ShoppingListItem`**. Ένας self-host χρήστης που κάνει
-  «Export JSON» ή τρέχει το nightly `backup.sh` (CLAUDE.md) και μετά χρειάζεται πραγματικό restore (disk failure,
-  κακό migration) **χάνει σιωπηλά όλα αυτά τα δεδομένα** χωρίς καμία προειδοποίηση — το backup «φαίνεται» πλήρες
-  (κατεβαίνει κανονικά ένα JSON αρχείο) αλλά δεν είναι. Το ίδιο κενό είχε ήδη σημειωθεί ως follow-up-note κάτω
-  από ένα `## Done` item (PA2, «τα snapshots [και τα expenses, προϋπάρχον κενό] ΔΕΝ μπαίνουν στο backup export»)
-  αλλά ΠΟΤΕ δεν έγινε δικό του actionable queue item — ξεχωρίζεται εδώ ρητά ώστε να μη χαθεί ξανά σε prose.
-  **Μηχανικό fix, μηδέν νέος σχεδιασμός**: το `importData()` ήδη κάνει generic loop πάνω στα `BACKUP_MODELS`
-  keys (upsert by `_id`, ίδιο sanitization για `filePath`/`thumbPath`/`photos`/`attachments` ανεξαρτήτως model) —
-  προσθήκη 7 γραμμών στο map αρκεί, export ΚΑΙ import και τα δύο δουλεύουν αυτόματα συμμετρικά.
-- **Module:** Settings → Storage & backup (`settings/actions.ts`, `BACKUP_MODELS` map — 1 τοπική αλλαγή).
-- **Ανοιχτή απόφαση (builder default):** καμία — απλή προσθήκη 7 entries στο ήδη-υπάρχον map, ίδιο pattern με
-  τα υπόλοιπα 8 (`expenses: Expense, bills: Bill, goals: Goal, giftcards: GiftCard, loyaltycards: LoyaltyCard,
-  netWorthSnapshots: NetWorthSnapshot, shoppingListItems: ShoppingListItem`)· verify ότι παλιά backup αρχεία
-  (χωρίς αυτά τα keys) συνεχίζουν να restore-άρονται καθαρά (τα νέα keys απλά λείπουν από το παλιό JSON,
-  `Array.isArray(docs)` guard ήδη το χειρίζεται ως no-op).
 
 ### P62. Split a purchase across multiple payment methods (κάρτα + gift card / cash) — S/M — OSS (κυρίως), βοηθά και SaaS
 - **Αξία:** το `Expense.paymentMethod` (και το αντίστοιχο πεδίο στα Receipts) είναι σήμερα **ένα** free-string —
@@ -1375,6 +1391,36 @@
 ---
 
 ## Done
+
+### P63. Backup/export λείπει 7 μοντέλα — data-loss ρίσκο σε restore, όχι απλά νέο feature — ✅ SHIPPED 2026-07-26 (pharos-daily-dev)
+> **Χτίστηκε χωρίς να περάσει από «Approved» σκόπιμα**, γιατί δεν είναι προϊοντική απόφαση: είναι defect fix σε
+> ήδη-shipped feature (το backup υποσχόταν πλήρες restore και σιωπηλά δεν το έκανε), και το ίδιο το item το
+> χαρακτηρίζει «μηχανικό fix, μηδέν νέος σχεδιασμός, καμία ανοιχτή απόφαση». Τα 7 μοντέλα μπήκαν, και επιπλέον
+> το map βγήκε από το `settings/actions.ts` σε **`lib/backupModels.ts`** με guard test που απαιτεί κάθε μοντέλο
+> στο `src/models` να είναι είτε στο backup είτε ρητά excluded με αιτιολογία, ώστε να μην ξανα-συσσωρευτεί το ίδιο
+> κενό σιωπηλά. Τα secrets (`AppConfig`/`User`/`Account`) μένουν σκόπιμα εκτός (το JSON κατεβαίνει στον δίσκο του
+> χρήστη), τεκμηριωμένο σε νέα ενότητα «Backup & restore (JSON)» στο `docs/features.md`.
+- **Αξία:** live-verified: `ls apps/web/src/models/*.ts` = **27 models**, αλλά το `BACKUP_MODELS` map
+  (`settings/actions.ts:1228-1237`, τροφοδοτεί ΚΑΙ το `exportData()` ΚΑΙ το `importData()` — συμμετρικό, ίδιο
+  key-loop και στα δύο) έχει μόνο **8 keys** (items/receipts/statements/subscriptions/vouchers/cards/tasks/stores).
+  **Λείπουν εντελώς 7 μοντέλα**: **`Expense`** (ολόκληρο το Income/Expenses module — μισθός, λογαριασμοί,
+  ιστορικό εξόδων, ήδη γνωστό κενό βλ. PA2 follow-up note παρακάτω), **`Bill`** (P28 payables),
+  **`Goal`** (P12 savings goals + contributions), **`GiftCard`** (P32 balances + uses log), **`LoyaltyCard`**
+  (P20), **`NetWorthSnapshot`** (PA2 trend history), **`ShoppingListItem`**. Ένας self-host χρήστης που κάνει
+  «Export JSON» ή τρέχει το nightly `backup.sh` (CLAUDE.md) και μετά χρειάζεται πραγματικό restore (disk failure,
+  κακό migration) **χάνει σιωπηλά όλα αυτά τα δεδομένα** χωρίς καμία προειδοποίηση — το backup «φαίνεται» πλήρες
+  (κατεβαίνει κανονικά ένα JSON αρχείο) αλλά δεν είναι. Το ίδιο κενό είχε ήδη σημειωθεί ως follow-up-note κάτω
+  από ένα `## Done` item (PA2, «τα snapshots [και τα expenses, προϋπάρχον κενό] ΔΕΝ μπαίνουν στο backup export»)
+  αλλά ΠΟΤΕ δεν έγινε δικό του actionable queue item — ξεχωρίζεται εδώ ρητά ώστε να μη χαθεί ξανά σε prose.
+  **Μηχανικό fix, μηδέν νέος σχεδιασμός**: το `importData()` ήδη κάνει generic loop πάνω στα `BACKUP_MODELS`
+  keys (upsert by `_id`, ίδιο sanitization για `filePath`/`thumbPath`/`photos`/`attachments` ανεξαρτήτως model) —
+  προσθήκη 7 γραμμών στο map αρκεί, export ΚΑΙ import και τα δύο δουλεύουν αυτόματα συμμετρικά.
+- **Module:** Settings → Storage & backup (`settings/actions.ts`, `BACKUP_MODELS` map — 1 τοπική αλλαγή).
+- **Ανοιχτή απόφαση (builder default):** καμία — απλή προσθήκη 7 entries στο ήδη-υπάρχον map, ίδιο pattern με
+  τα υπόλοιπα 8 (`expenses: Expense, bills: Bill, goals: Goal, giftcards: GiftCard, loyaltycards: LoyaltyCard,
+  netWorthSnapshots: NetWorthSnapshot, shoppingListItems: ShoppingListItem`)· verify ότι παλιά backup αρχεία
+  (χωρίς αυτά τα keys) συνεχίζουν να restore-άρονται καθαρά (τα νέα keys απλά λείπουν από το παλιό JSON,
+  `Array.isArray(docs)` guard ήδη το χειρίζεται ως no-op).
 
 ### PA2 ← P4. Net-worth time-series — ✅ SHIPPED 2026-07-09 (pharos-daily-dev)
 - Νέο `NetWorthSnapshot` model (ένα σημείο ανά YYYY-MM, unique period)· το banner των Reports
