@@ -6193,3 +6193,77 @@ seats/quotas στο `plans.ts` είναι placeholders), **SMTP**.
 endpoint + το `audit.ts` υπάρχουν και είναι testαρισμένα· θα ήταν μια `/admin/audit` page πάνω
 σε έτοιμο backend, καθαρά μέσα στο territory)· (β) αλλιώς το επόμενο backend increment από το
 TODO.md #5-#12. Πριν ξεκινήσεις: ask-inbox πρώτα.
+
+## 2026-07-28 — increment 126: platform-wide audit feed (/admin/audit)
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine (το δικό μου
+`pharos-saas-core-20260728-0038` για το slug μη-λατινικών ονομάτων παραμένει OPEN). **UI-first
+scan**: το προηγούμενο run πρότεινε `/admin/audit` ως το τελευταίο ορατό κενό UI — επιβεβαιώθηκε
+διαβάζοντας τον κώδικα, με μία διόρθωση: το `api/saas/audit` **δεν** είναι superadmin endpoint,
+είναι tenant-scoped (θέλει workspace session + owner/admin). Άρα το κενό δεν ήταν «page πάνω σε
+έτοιμο endpoint» αλλά ένα ολόκληρο **cross-tenant read** που δεν υπήρχε πουθενά.
+
+**Το πραγματικό κενό.** Το audit trail διαβαζόταν ήδη σε **δύο** σημεία, και τα δύο scoped σε
+**ΕΝΑ** workspace: το Activity tab του ίδιου του tenant (`(saas)/account/workspace/activity`) και
+η per-tenant όψη του operator (`/admin/tenants/[slug]`, που κάνει το query inline μέσα στην page).
+Κανένα από τα δύο δεν απαντά στο «τι έγινε σε ΟΛΗ την πλατφόρμα την τελευταία ώρα» — την ερώτηση
+με την οποία **ξεκινά** ένα incident — γιατί και τα δύο απαιτούν να ξέρεις ήδη πού να κοιτάξεις.
+
+**`lib/tenancy/adminAudit.ts` (νέο reader)** — ίδιο split με το `adminTenants.ts`: όλα pure εκτός
+από το `listPlatformAudit`. `parseAdminAuditQuery` (limit clamp 1..200, action μέσω
+`parseAuditAction`, tenant slug lowercase+trim, cursor μέσω του shared decoder),
+`buildPlatformAuditFilter`, `collectTenantIds` (ο cross-tenant καθρέφτης του `collectActorIds`),
+`platformAuditEvent`. Ο reader: slug→id resolve πρώτα (άγνωστο slug → short-circuit **χωρίς
+καθόλου query** + `unknownTenant:true`), `limit+1` fetch (κανένα `countDocuments` πάνω σε
+unbounded append-only collection), και **δύο batched lookups** — Account για ταυτότητα actor,
+Tenant για attribution workspace — ποτέ N+1. Ο keyset cursor (`cursorFilter`/`splitPage`) γίνεται
+**import** από το `components/saas/activityCursor` αντί να ξαναγραφτεί: είναι pure leaf module
+(μηδέν React/next/lib imports), και μια δεύτερη αντιγραφή correctness-sensitive pagination logic
+θα ήταν χειρότερη από το ασυνήθιστο import direction. Τεκμηριώθηκε στο header γιατί.
+
+**UI**: `components/saas/platformActivity.ts` (pure view mapping, προσθέτει **μόνο** την
+workspace attribution πάνω στο υπάρχον `activityView`), `PlatformActivityPanel.tsx` (table με
+στήλη Workspace — σε cross-tenant feed το «ποιο workspace» είναι ο κύριος τρόπος που σαρώνεις τη
+λίστα, γι' αυτό table και όχι το list idiom του tenant-scoped `ActivityPanel`), και
+`app/admin/audit/page.tsx` (GET-form filter action+slug, keyset «Load more», gate μέσω
+`requireSuperadminPage()`). Link «Activity» στο `AdminNav`. Δύο σκόπιμες λεπτομέρειες: **purged
+tenant → `deleted workspace` σε plain text**, όχι link (το trail επιζεί των workspaces που
+περιγράφει — αναμενόμενο, όχι bug, και ένα dead link προς 404 θα ήταν χειρότερο από ένα label)·
+και **άγνωστο slug ≠ άδειο feed** (ξεχωριστό μήνυμα, γιατί «δεν υπάρχει τέτοιο workspace» και
+«αυτό το workspace είναι ήσυχο» είναι διαφορετικές απαντήσεις όταν κυνηγάς incident).
+
+**Tests (42, δύο αρχεία)**. Το πιο load-bearing: **`buildPlatformAuditFilter({})` πρέπει να είναι
+ΑΔΕΙΟ** — αυτό ΕΙΝΑΙ το cross-tenant read, και ένα κατά λάθος default tenant clause θα μετέτρεπε
+σιωπηλά το platform feed σε one-workspace feed **ενώ θα συνέχιζε να δείχνει σαν λειτουργική
+σελίδα**. Μετά: limit clamp (ο φραγμός που εμποδίζει ένα hand-edited `?limit=` να τραβήξει όλη τη
+συλλογή), **μη-ObjectId cursor δεν φτάνει ποτέ στη DB**, και ότι το `platformAuditEvent`
+**delegate-άρει** στο `auditView` — pinned με key-set assertion + έλεγχο ότι ούτε το raw tenant id
+ούτε ένα stray `tokenHash` διαρρέει, ώστε **το operator console να μην γίνει ποτέ ευρύτερο leak
+από το tenant-facing surface**. Στο view layer: το Workspace column **δεν μπορεί να renderάρει
+κενό** για καμία combination από blanks (κενό κελί σε operator console διαβάζεται ως rendering
+fault και στέλνει κάποιον να debug-άρει λάθος πράγμα).
+
+**Verified**: **42/42 green από την πρώτη εκτέλεση**. Πλήρες `npx vitest run` → **331 files /
+5258 tests green** (από 328/5211). `npm run type-check` → **EXIT 0 χωρίς κανένα fix**. **Docker:
+κανένα rebuild** (μηδέν runtime wiring/env/deps αλλαγή → ούτε ο mutex χρειάστηκε).
+**Browser-verify: ΔΕΝ ήταν εφικτό unattended** και το λέω ρητά αντί να το περάσω για επιτυχία: η
+σελίδα απαιτεί `SAAS_MODE=1` + `SAAS_SUPERADMIN_EMAILS` + signed-in operator account· το τοπικό
+stack τρέχει self-hosted με SAAS_MODE off, και **δεν γυρίζω το flag σε running app του χρήστη
+χωρίς εντολή**. Το μόνο που επιβεβαιώθηκε live (curl): `/admin`, `/admin/tenants`, `/admin/audit`
+γυρίζουν **και τα τρία 307** στο τρέχον self-hosted deployment, δηλαδή το νέο route δεν άνοιξε
+καμία νέα επιφάνεια στο OSS build. Collision guard: το `apps/landing/**` είχε uncommitted δουλειά
+άλλης routine — **μηδέν staged ξένο αρχείο**, pathspec commit, επιβεβαιώθηκε μετά το push ότι
+έμεινε ανέγγιχτο. Pushed `e165549`.
+
+**## Needs Achilleas:** τίποτα νέο. Παραμένουν: **slug για μη-λατινικά ονόματα** (OPEN ως
+`pharos-saas-core-20260728-0038`), **Stripe keys**, **τελικό plan pricing**, **SMTP**. Προστίθεται
+μια πρακτική σημείωση, όχι ερώτηση: όσο το τοπικό stack τρέχει με SAAS_MODE off, **καμία SaaS UI
+σελίδα δεν είναι browser-verifiable από αυτή τη routine** — αν θέλεις οπτική επιβεβαίωση, χρειάζεται
+ένα ξεχωριστό SAAS_MODE deployment (ή ένα supervised πέρασμα με το flag on).
+
+**Next task:** το `/admin/audit` ήταν το τελευταίο γνωστό κενό UI item. Προτεινόμενη σειρά για το
+επόμενο run: (α) **audit CSV export** (`/admin/audit?format=csv` ή κουμπί — compliance-χρήσιμο,
+καθαρά μέσα στο territory, ο reader υπάρχει ήδη)· (β) **actor filter** στο platform feed (φιλτράρισμα
+ανά email operator — χρειάζεται ένα Account lookup email→id πριν το query, σκόπιμα το άφησα έξω
+από αυτό το increment)· (γ) αλλιώς επόμενο backend increment από TODO.md #5-#12. Πριν ξεκινήσεις:
+ask-inbox πρώτα, μετά UI scan.
