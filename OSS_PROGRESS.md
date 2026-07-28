@@ -3069,3 +3069,30 @@ Coordination πριν ξεκινήσω: `ROUTINES_PAUSED` δεν υπήρχε. `
 - Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου. `git fetch origin main` → καθαρό, καμία foreign αλλαγή.
 
 **Milestone**: με αυτό το slice ολοκληρώνεται η πλήρης test-κάλυψη ΟΛΩΝ των concerns του `settings/actions.ts` (13 αρχεία: aiEngine, aiPrompts, alertChecks, backup, budgets, imap, lists, notifiers, onedrive, scraperAi, storage, stores, trash). Έλεγξα και τα υπόλοιπα action-modules του repo (`find src/app -name "actions*.ts" ! -name "*.test.ts"` έναντι των αντίστοιχων `.test.ts`): items/receipts/expenses/vouchers/statements/subscriptions/tasks/bills/notifications/history/login/setup/shopping-list ΟΛΑ έχουν ήδη τουλάχιστον ένα test file. Βρέθηκαν όμως **δύο μικρά action-αρχεία ΧΩΡΙΣ ΚΑΝΕΝΑ test**: `src/app/reports/fxActions.ts` (140 γραμμές, 2 exported functions) και `src/app/reports/goalsActions.ts` (86 γραμμές, 6 exported functions) — κανένα από τα δύο δεν έχει `reports/*.test.ts`. Suggested next task: **`reports/goalsActions.ts`** πρώτα (μεγαλύτερη επιφάνεια, 6 functions· πιθανό goal-progress/contribution CRUD)· μετά **`reports/fxActions.ts`** (2 functions, πιθανό FX-rate fetch/convert). Διάβασε ολόκληρο το κάθε αρχείο πριν γράψεις τίποτα (και οποιοδήποτε lib helper καλούν) για να καταλάβεις τι ήδη testάρεται αλλού (π.χ. αν καλούν ήδη-testαρισμένα pure helpers, mockάρισέ τα σαν opaque, όπως στα προηγούμενα 13 settings slices). Πάντα `git status` collision-guard πρώτα.
+
+## 2026-07-28 (cont.⁵ — reports/goalsActions.test.ts, νέο module: goals CRUD + contributions)
+
+**Task**: το suggested next-task του προηγούμενου run: `reports/goalsActions.ts` (P12, savings/financial goals CRUD + per-contribution add/remove) — 6 exported functions, 86 γραμμές, καθόλου tests πριν. Coordination: `ROUTINES_PAUSED` δεν υπήρχε, καμία εγγραφή pharos-oss-prep στο `ASK_ACHILLEAS.md`, `git status --short` καθαρό, local==origin (`354e456`) πριν ξεκινήσω.
+
+Διάβασα ολόκληρο το target file plus το `models/Goal.ts` (schema: `contributions` array με δικό του `_id`, `targetDate`/`archived` indexed, softDeletePlugin) πριν γράψω τίποτα. Το αρχείο ΔΕΝ περνάει από το tenancy seam (καλεί `connectDB()`+`Goal` απευθείας, όχι `withRequestTenant`/`currentModel`) — ακολούθησα το πιο κοντινό πρότυπο, `bills/actions.test.ts` (ίδιο σχήμα: connectDB+Model άμεσα mocked, `safeDateOrNull` πραγματικό αφού έχει ήδη δικά του tests στο `lib/dates.test.ts`).
+
+**Τι επαληθεύτηκε (production behaviour, τεκμηριωμένο στα tests, τίποτα δεν άλλαξε στο ίδιο το action file)**:
+- `createGoal` **πάντα** επιβάλλει `contributions:[]`/`archived:false` ανεξαρτήτως form input (το schema δεν τα δέχεται καν ως πεδία).
+- Missing title-key → zod default "Required" (invalid_type, πριν προλάβει το custom min-message)· άδειο string title → το custom "Title required".
+- `targetDate` είναι **optional** στο schema (σε αντίθεση με το `dueDate` του Bill που είναι required): ένα unparseable string περνάει κανονικά το validation και απλά αποθηκεύεται ως `null` μέσω `safeDateOrNull` — ΔΕΝ απορρίπτεται σαν error (διαφορετική συμπεριφορά από το αντίστοιχο bills πεδίο, σωστά τεκμηριωμένη με ξεχωριστό test).
+- `deleteGoal` = soft delete (`$set deletedAt` via `updateOne`), όχι πραγματική διαγραφή.
+- `addGoalContribution`: rejects amount μη-θετικό/μη-finite (0, αρνητικό, NaN) ΠΡΙΝ αγγίξει DB· valid amount → `Math.round(amt*100)/100` (π.χ. 12.345→12.35)· note capped στα 200 chars· date falls back σε "now" όταν το dateStr είναι κενό/unparseable (`safeDateOrNull(dateStr) ?? new Date()`).
+- `removeGoalContribution` = `$pull` by contribution `_id`.
+- ΟΛΕΣ οι 6 functions καλούν `assertCanWrite()` (κανένα asymmetric gate σε αυτό το module, σε αντίθεση με τα settings slices) και revalidate ΚΑΙ `/reports` ΚΑΙ `/` σε κάθε επιτυχία.
+
+**23 tests** σε έξι describe blocks: `createGoal` (7)· `updateGoal` (3)· `setGoalArchived` (2)· `deleteGoal` (1)· `addGoalContribution` (8)· `removeGoalContribution` (1).
+
+Ένα τυπικό tsc issue (ίδια class με προηγούμενα slices): τα hoisted mock params (`goalCreate`/`goalFindByIdAndUpdate`/`goalUpdateOne`) χρειάστηκαν `Record<string, any>` (όχι `unknown`) ώστε τα `update.$set.deletedAt`/`update.$push.contributions.amount` παρακάτω στα tests να μη σκάσουν σε TS2571/TS18046 — το ίδιο πρότυπο typing που ήδη χρησιμοποιεί το `bills/actions.test.ts`.
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/reports/goalsActions.test.ts"` → **23/23 passed** από την πρώτη προσπάθεια (πριν το tsc fix).
+- `npm run type-check` → 8 αρχικά TS2345/TS18046/TS2571 errors (βλ. παραπάνω) → διορθώθηκε με `Record<string, any>` στα hoisted mocks → exit 0, μηδέν errors σε όλο το repo.
+- `npx vitest run` (όλο το suite) → **332 files, 5281/5285 passed (4 skipped)** (~12.1s wall).
+- Collision guard: `git status --short` πριν το commit έδειξε ΜΟΝΟ το νέο αρχείο μου· `git fetch origin main` καθαρό, καμία foreign αλλαγή.
+
+Suggested next task: **`reports/fxActions.ts`** (140 γραμμές, 2 exported functions, πιθανό FX-rate fetch/convert) — το δεύτερο και τελευταίο από τα δύο test-less action modules που εντοπίστηκαν στο προηγούμενο slice. Διάβασε ολόκληρο το αρχείο plus οποιοδήποτε lib helper καλεί (π.χ. `lib/fx.ts` αν υπάρχει ήδη testαρισμένο αλλού) πριν γράψεις τίποτα. Πάντα `git status` collision-guard πρώτα.
