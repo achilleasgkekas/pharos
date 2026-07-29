@@ -2,9 +2,52 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 0c63c62 -->
+<!-- reviewed: 9ae1b1b -->
 <!-- docker-validated: 459dbb3 -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-29 (reviewer — έλεγχος 0c63c62..9ae1b1b, 14 commits)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: μηδέν OPEN entry addressed στο `pharos/reviewer` (το
+μόνο δικό μου entry, `reviewer-20260727-2010`, είναι ήδη APPLIED). Working tree καθαρό στην αρχή.
+
+**Εύρος**: `0c63c62..9ae1b1b`, 14 commits — κυρίως test-coverage (`fxActions.test.ts` 32 tests, `sessionGuard.
+coverage.test.ts`) + docs/backlog housekeeping (20ή σάρωση planner, P72-P74)· τα ουσιαστικά production-code
+commits ήταν: **ntfy admin-only gate στο v1 API** (`27be2b7`) — το `GET/PATCH /api/v1/settings` και το `POST
+/api/v1/settings/test-notify` δεν είχαν κανένα role guard στα ntfy πεδία, ενώ το ισοδύναμο web action
+(`saveNtfy`/`sendTestNtfy`) ήδη έκανε `requireAdmin()`· ο mobile client μπορούσε να αλλάξει το ntfy topic
+ολόκληρου του instance χωρίς να είναι admin. Fix: νέο `canEditNtfy` στο GET response (read-only για όλους,
+write admin-only)· το PATCH σιωπηλά ρίχνει τα ntfy πεδία από non-admin εκτός αν είναι το ΜΟΝΟ περιεχόμενο του
+request (τότε 403, όχι ψευδές `ok:true`)· το test-notify route μοιράζεται νέο `runNtfyTest()` (lib/notify.ts)
+με το web action, κάθε caller εφαρμόζει το guard που ο δικός του transport μπορεί να κρίνει (cookie session
+vs Bearer role) — σωστό fix, το session-only `requireAdmin()` θα έσπαγε το endpoint για ΟΛΟΥΣ πάνω από Bearer,
+όχι μόνο τους non-admin. Mobile (`SettingsScreen.tsx`) σέβεται το flag (readonly UI + hint, ntfy fields
+omitted από το save payload όταν όχι editable — όχι απλά disabled visually). **Greek→Latin subdomain
+transliteration** (`5ab349f`) — νέο pure `lib/tenancy/translit.ts`, `slugify()` το καλεί πριν το a-z0-9 collapse
+ώστε «Πλαίσιο» → `plaisio` αντί κενό→random `w-xxxxxx` (εγκεκριμένο στο ASK_ACHILLEAS.md `pharos-saas-core-
+20260728-0038`). **Landing pricing ευθυγράμμιση** (`e1e722d`) — Free/Pro/Dedicated tiers + τιμές/quotas
+ταιριάζουν byte-for-byte με `lib/billing/plans.ts` (το backend source of truth)· το `selfHost` flag διορθώνει
+και ένα λανθάνον JSON-LD availability bug (πριν `amount==='0'` θα μπέρδευε το νέο δωρεάν hosted tier με το
+self-host tier).
+
+**Έλεγχος**: `npm run type-check` (web) **EXIT 0**· `npx tsc --noEmit` (mobile) **EXIT 0**. Targeted vitest στα
+8 νέα/αλλαγμένα test files (`fxActions`/`sessionGuard.coverage`/`translit`/`provision`/`api/v1/settings/route`/
+`test-notify/route`/`actions.notifiers`/`notify`) → **187/187 πέρασαν**. Full `npx vitest run` → **335 test
+files, 5344 passed / 4 skipped** (μηδέν regression). Secrets sweep (grep key/token/password/PEM στο diff) →
+μηδέν committed secret, μόνο prose references σε env var ΟΝΟΜΑΤΑ (STRIPE_SECRET_KEY κλπ), όχι values.
+
+**Fixes**: κανένα — μηδέν type error, μηδέν test failure, μηδέν regression βρέθηκε σε αυτό το εύρος.
+
+**WEB_DEBT.md**: αμετάβλητο, ένα standing TODO item (`statements/actions.ts` tenant-scoping παράκαμψη, P2/M,
+flagged 2026-07-26) — εκτός του τρέχοντος review range, δεν αγγίχθηκε από αυτά τα 14 commits.
+
+**Monitor**: το standing `pharos-daily-dev-20260725-1425` (expo-camera έγκριση) που παλαιότερα PROGRESS entries
+ανέφεραν ως blocking είναι πλέον **APPLIED** (εγκρίθηκε 2026-07-28, «approve all» + confirmed ξανά σε
+`reviewer-20260727-2010`)· ο planner (20ή σάρωση, `7b15810`) ήδη διόρθωσε το stale reference στο
+`PRODUCT_BACKLOG.md`. Κανένα άλλο routine φαίνεται stuck σε αυτό το run (`pharos-daily-dev`/`pharos-saas-core`/
+`pharos-landing`/planner όλα με πρόσφατα committed progress εντός του τελευταίου 24ωρου).
+
+---
 
 ## 2026-07-29 (docker-health — rebuild + validate)
 
