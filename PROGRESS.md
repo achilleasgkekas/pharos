@@ -10422,6 +10422,62 @@ tenant-scoping** (1026 γραμμές, δεκάδες exported functions, ίδι
 ότι το ήδη-σωστό `lib/fxAudit.ts` δημιουργεί σήμερα ασυμμετρία μέσα στο ίδιο feature set). Εναλλακτικά, αν προτιμηθεί
 μικρότερο run, το mobile RADIUS/SPACE token adoption μένει διαθέσιμο αμετάβλητο.
 
+## 2026-07-29 (ntfy authz: admin-only στο API, + ένα σπασμένο endpoint που βρέθηκε στην πορεία)
+
+**Γιατί αυτό**: το ASK inbox είχε επιτέλους **ANSWERED** entry για αυτό το routine
+(`pharos-daily-dev-20260728-0215`), οπότε πήγε πρώτο κατά το STEP 0, πριν καν κοιτάξω την Approved ουρά. Η απάντηση:
+**(a) admin-only, με τη συμπεριφορά του (c)**, δηλαδή σιωπηλή παράλειψη των δύο πεδίων αντί για 403 σε ολόκληρο το
+PATCH. Το entry σημειώθηκε **APPLIED** με το commit hash.
+
+**Το ζητούμενο**: οι 8 web Settings→Notifications actions είναι admin-gated από το `0bc5e14`, αλλά το
+`PATCH /api/v1/settings` δεν ήταν, οπότε ένας απλός member άλλαζε το `ntfyUrl` από το κινητό και ξαναδρομολογούσε τις
+ειδοποιήσεις όλου του instance σε δικό του topic. Ένα gate που το mobile το προσπερνά είναι διακοσμητικό.
+
+**Τι μπήκε**: τα `ntfyUrl`/`ntfyEnabled` πέφτουν **σιωπηλά** για non-admin (το mobile Settings σώζει
+currency/VAT/budgets/ntfy σε ΕΝΑ PATCH, ένα 403 θα διαβαζόταν ως «δεν σώθηκε τίποτα» ενώ τα υπόλοιπα επιτρέπονται
+κανονικά). **Μία εξαίρεση**: αίτηση που δεν κουβαλά τίποτα ΕΚΤΟΣ από ntfy πεδία παίρνει τίμιο **403** — δεν υπάρχει
+άλλη δουλειά να προστατευτεί και ένα `ok:true` θα ήταν ψέμα. Το GET επιστρέφει πλέον **`canEditNtfy`** (ίδιο idiom με
+το `canEdit` του `/settings/ai`) ώστε ο client να δείχνει το section read-only αντί να αφήνει κάποιον να πληκτρολογήσει
+URL που θα πεταχτεί στο save. Το mobile το χρησιμοποιεί: input `editable={false}`, toggle + test button disabled, hint
+«Only an admin can change where alerts are sent», και **παραλείπει τα δύο πεδία** από το patch (absent = παλιότερος
+server, μένει permissive).
+
+**Το εύρημα (πραγματικό bug, όχι το ζητούμενο)**: το **`POST /api/v1/settings/test-notify` ήταν σπασμένο για
+ΟΛΟΥΣ**, όχι μόνο για non-admins. Καλούσε το `sendTestNtfy` server action, που φυλάει με `requireAdmin()` →
+`getCurrentUser()` → **session cookie**. Ένα bearer request από το κινητό δεν έχει cookie, άρα `getCurrentUser()`
+επέστρεφε null και το `redirect('/login')` πετούσε NEXT_REDIRECT μέσα από route handler → 500. Δηλαδή ένα
+session-only guard πάνω σε path χωρίς session δεν αρνείται τον caller, **σπάει το endpoint**. Το παλιό test έκανε
+mock το action, οπότε έμενε πράσινο πάνω από νεκρό μονοπάτι — καλή υπενθύμιση ότι το mock όριο πρέπει να είναι κάτω
+από το σημείο που σπάει. **Fix**: το σώμα μετακόμισε σε `lib/notify.ts runNtfyTest()` **χωρίς δικό του authorisation**,
+και κάθε caller βάζει το guard που το transport του μπορεί όντως να αξιολογήσει (cookie session για το web action,
+`canAdmin(user.role)` για το API route).
+
+**Tests**: +6 στο settings route (admin γράφει, member mixed-save κρατά τα υπόλοιπα, member ntfy-only 403, junk-only
+παραμένει 400 και όχι admin μήνυμα, `canEditNtfy` και στις δύο κατευθύνσεις)· το test-notify ξαναγράφτηκε πάνω στο
+**πραγματικό** μονοπάτι με role cases (member 403, viewer 403 από τον read-only guard του `withAuth` πριν καν φτάσει
+στο admin check, admin περνά)· το `runNtfyTest` καλύφθηκε στο `lib/notify.test.ts` όπου ζει πλέον το σώμα· το
+`actions.notifiers.test.ts` ξαναστοχεύτηκε σε ό,τι κρατά ακόμα το action (gate + delegation).
+
+**Verify**: `npm run type-check` **EXIT 0** (web ΚΑΙ mobile `npx tsc --noEmit`)· full `npx vitest run` **5292 passed /
+332 files**, μηδέν regression. Docker υπό mutex: `build web` → mongo `healthy` → `up -d web` → `/login` **200 σε 2s**,
+**0 restarts**, `/api/v1/settings` **401** χωρίς token, logs καθαρά (μόνο το προϋπάρχον `@napi-rs/canvas` warning) →
+`docker builder prune -f` (2.36GB) → lock released. Browser: `/login` renders «Sign in · Pharos», **μηδέν console
+errors**. Commit `27be2b7`, pushed.
+
+**ΣΗΜ (δεν επαληθεύτηκε ζωντανά)**: το role gate δοκιμάστηκε με unit tests πάνω στον πραγματικό `withAuth` + τον
+πραγματικό πίνακα ρόλων, όχι με πραγματικό bearer token — αυτό θα απαιτούσε να διαβάσω το `apiToken` ενός χρήστη από
+τη Mongo, δηλαδή χειρισμό credential, που το αποφεύγω unattended.
+
+**Εύρημα εν παρόδω (δεν το άγγιξα)**: το `requireAdmin()`/`assertCanWrite()` pattern είναι session-only παντού. Αν
+οποιοδήποτε άλλο `/api/v1` route καλεί server action που φυλάει με `requireAdmin()`, έχει **ακριβώς το ίδιο** silent
+breakage. Αξίζει μια σάρωση (`grep` για imports από `@/app/*/actions` μέσα στο `api/v1`) — προτείνεται ως ξεχωριστό
+debt item για τη reviewer routine.
+
+**Επόμενο task (πρόταση)**: αυτή ακριβώς η σάρωση, δηλαδή **audit των `/api/v1` routes που delegate σε
+cookie-gated server actions** (μικρό, μηχανικό, με άμεσο payoff αφού μόλις βρέθηκε ένα πραγματικό σπασμένο endpoint
+αυτής της κλάσης). Εναλλακτικά μένει αμετάβλητο το τρίτο ανοιχτό P2 του `WEB_DEBT.md`, `statements/actions.ts`
+tenant-scoping.
+
 ## Needs Achilleas
 
 - Αμετάβλητα: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample export, EAS dev build), **P17 live check**
