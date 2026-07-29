@@ -196,9 +196,15 @@ type Tier = {
   ctaHref: string;
   highlight?: boolean;
   badge?: string;
+  // True only for the free self-hosted row. Its availability tracks REPO_PUBLIC,
+  // while every hosted plan stays waitlist-gated until the managed edition opens.
+  selfHost?: boolean;
   features: string[];
 };
 
+// Hosted tiers mirror apps/web/src/lib/billing/plans.ts, the single source of truth
+// for plan names, monthly EUR prices and quotas (storage, AI calls, seats, custom
+// domain). Keep the two in sync: the backend is authoritative, this is its shop window.
 const TIERS: Tier[] = [
   {
     name: 'Self-hosted',
@@ -209,8 +215,9 @@ const TIERS: Tier[] = [
     cta: 'Get the Docker image',
     ctaHref: GITHUB_URL,
     badge: 'AGPL-3.0',
+    selfHost: true,
     features: [
-      'Every module, no limits',
+      'Every module, no seat limits',
       'Your data stays on your machine',
       'Bring your own AI (Ollama, Anthropic, OpenAI, Gemini…)',
       'SMB / FTP / OneDrive backups',
@@ -218,53 +225,53 @@ const TIERS: Tier[] = [
     ],
   },
   {
-    name: 'Solo',
-    price: '€4',
-    cadence: 'per month',
-    amount: '4',
-    tagline: 'Managed for you. The whole hub, one user, nothing to install.',
+    name: 'Free',
+    price: '€0',
+    cadence: 'to start',
+    amount: '0',
+    tagline: 'Try the managed hub with no card. One person, the whole app.',
     cta: 'Join the waitlist',
     ctaHref: '#waitlist',
     features: [
       '1 user',
-      'Every module, no limits',
-      'AI receipt & document parsing included',
-      'Automatic nightly backups',
-      'We handle updates & hosting',
+      '5 GB storage',
+      '50 AI document reads per month',
+      'Every module, no feature gates',
+      'Nightly backups handled for you',
     ],
   },
   {
-    name: 'Family',
-    price: '€8',
+    name: 'Pro',
+    price: '€9',
     cadence: 'per month',
-    amount: '8',
-    tagline: 'Share one hub across the household, up to 5 members.',
+    amount: '9',
+    tagline: 'The whole hub, managed for you, shared with up to 5 people.',
     cta: 'Join the waitlist',
     ctaHref: '#waitlist',
     highlight: true,
     badge: 'Most popular',
     features: [
-      'Everything in Solo',
       'Up to 5 members',
-      'Shared household workspace',
-      'Higher AI limits',
+      '50 GB storage',
+      '1,000 AI document reads per month',
+      'Shared workspace with roles and invites',
       'Priority email support',
     ],
   },
   {
-    name: 'Pro',
-    price: '€15',
+    name: 'Dedicated',
+    price: '€29',
     cadence: 'per month',
-    amount: '15',
-    tagline: 'For power users who want to build on top of their hub.',
+    amount: '29',
+    tagline: 'Your own isolated instance, unlimited seats, your own domain.',
     cta: 'Join the waitlist',
     ctaHref: '#waitlist',
     features: [
-      'Everything in Family',
-      'REST API access',
-      'Priority support',
-      'Highest AI limits',
-      'Early access to new modules',
+      'Everything in Pro',
+      'Unlimited members',
+      '500 GB storage',
+      'Unlimited AI with your own key',
+      'Custom domain on your instance',
     ],
   },
 ];
@@ -384,7 +391,7 @@ const COMPARE: { label: string; self: string; hosted: string }[] = [
   { label: 'Updates & backups', self: 'You run them', hosted: 'Automatic, nightly' },
   { label: 'AI parsing', self: 'Bring your own key or Ollama', hosted: 'Included, ready to go' },
   { label: 'Offline use', self: 'Full, no internet needed', hosted: 'Needs a connection' },
-  { label: 'Cost', self: 'Free, AGPL-3.0', hosted: 'From €4/mo' },
+  { label: 'Cost', self: 'Free, AGPL-3.0', hosted: 'Free tier, then €9/mo' },
   { label: 'Support', self: 'Community & docs', hosted: 'Priority email' },
 ];
 
@@ -684,12 +691,13 @@ const JSON_LD = {
       publisher: { '@id': `${SITE_URL}/#organization` },
       license: 'https://www.gnu.org/licenses/agpl-3.0.html',
       softwareHelp: `${GITHUB_URL}/blob/main/README.md`,
-      // Per-plan Offers, one per priced tier (Free self-host + Solo/Family/Pro hosted).
-      // Hosted tiers expose BOTH billing options: monthly, and annual (monthly x10 = 2 months free).
+      // Per-plan Offers, one per priced tier (free self-host + the Free/Pro/Dedicated
+      // hosted plans defined in apps/web/src/lib/billing/plans.ts).
+      // Paid tiers expose BOTH billing options: monthly, and annual (monthly x10 = 2 months free).
       // Availability reflects the real pre-launch state so search engines are not told
-      // an item is buyable when it is not: the free self-host tier tracks REPO_PUBLIC
-      // (PreOrder while the repo is private, InStock the moment it opens), and the paid
-      // hosted tiers stay PreOrder for as long as they are waitlist-gated.
+      // an item is buyable when it is not: the self-host tier tracks REPO_PUBLIC
+      // (PreOrder while the repo is private, InStock the moment it opens), and every
+      // hosted plan (including the free one) stays PreOrder while waitlist-gated.
       offers: TIERS.filter((t) => t.amount !== undefined).map((t) => ({
         '@type': 'Offer',
         name: `PHAROS ${t.name}`,
@@ -697,7 +705,7 @@ const JSON_LD = {
         priceCurrency: 'EUR',
         description: t.tagline,
         availability:
-          t.amount === '0' && REPO_PUBLIC
+          t.selfHost && REPO_PUBLIC
             ? 'https://schema.org/InStock'
             : 'https://schema.org/PreOrder',
         ...(t.amount !== '0' && {
