@@ -3013,3 +3013,22 @@ Collision guard: `git status --short` πριν commit = μόνο `docs/saas.md` 
 
 Επόμενο run: (α) grep git log για νέα feat() commits μετά το e165549 · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml · (γ) αν όχι νέο feature, comprehensive drift verification pass.
 
+
+
+## 2026-07-29 (thirty-third run — Greek subdomain transliteration documented)
+
+Σάρωση git log για νέα feat() commits μετά την thirty-second run (commit e165549, 2026-07-28). Ανακάλυψη: **2 νέα feat() commits**:
+- **5ab349f** (2026-07-29, `feat(saas): transliterate Greek workspace names into readable subdomains`) — core-territory, χρειάζεται documentation.
+- **0c63c62** (2026-07-28, `feat(landing): group the 40-question FAQ into six topic sections`) — καθαρά apps/landing/ presentation reorg (ήδη flat-accordion→6 groups, ίδιες 40 ερωτήσεις, ίδια anchors), logged στο δικό του `apps/landing/LANDING_PROGRESS.md`. Δεν αγγίζει feature semantics/API/config, οπότε καμία αλλαγή στο docs/ territory.
+
+Τι έγινε (5ab349f): Διάβασα τον κώδικα πριν γράψω — `lib/tenancy/translit.ts` (νέο, pure/isomorphic: lowercase → NFKD → drop combining marks → Greek→Latin map, 24 γράμματα ίδια με το store-dedup GREEK_MAP) + `lib/tenancy/provision.ts` (`slugify()` καλεί `transliterate()` πρώτα, μετά το a-z0-9 collapse· `uniqueTenantSlug` κάνει `-2/-3/…` σε collision, fallback σε random `w-xxxxxx` όταν το transliterated root είναι κενό ή reserved). Πρόσθεσα νέο subsection **"Subdomain slug generation"** στο `docs/saas.md` (μετά το "Workspace creation" table, πριν το "Email verification & password") που εξηγεί: το workspace name γίνεται το permanent `<slug>.ph-aros.com` (= και `tenant_<slug>` database name, άρα fixed at creation), τον μηχανισμό `slugify()`, το Greek→Latin παράδειγμα (Πλαίσιο ΑΕ → plaisio-ae, Κωτσόβολος → kotsovolos), το mid-word accent fix (Müller → muller, όχι πια mu-ller), και ότι Cyrillic/CJK παραμένουν χωρίς table (ίδιο random-label fallback όπως πριν).
+
+Accuracy: verified με code read (translit.ts + provision.ts), όχι απλή αντιγραφή commit message· η περιγραφή του collision-suffix ("-2, -3, …") επιβεβαιώθηκε από το `uniqueTenantSlug` loop.
+
+Validation (markdown only, κανένα build/Docker/AI call): code fences docs/saas.md = 18 πριν και μετά (ζυγό, άθικτο)· κανένα νέο internal link/anchor δημιουργήθηκε (subsection δεν αναφέρεται αλλού)· κανένα credential.
+
+Collision guard: `git status --short` πριν commit = μόνο `docs/saas.md` modified (δικό μου), κανένα foreign staged.
+
+Συμπέρασμα: Το νέο shipped feature (5ab349f, Greek subdomain transliteration) είναι πλέον documented στο docs/saas.md. Το FAQ-grouping commit (0c63c62) δεν χρειαζόταν καμία αλλαγή εδώ.
+
+Επόμενο run: (α) grep git log για νέα feat() commits μετά το 5ab349f · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml · (γ) αν όχι νέο feature, comprehensive drift verification pass.

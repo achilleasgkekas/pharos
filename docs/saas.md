@@ -245,6 +245,23 @@ Gating: 404 when SaaS off, 401 when not authenticated, 400 if name is invalid/mi
 
 The POST response mirrors `/api/saas/auth/signup`, and the audit trail records `workspace.created` with `actor` = the Account id and `meta.selfServe = true`. The DELETE operation records `membership.removed` with `actor` = the leaving Account and `target` = the workspace slug.
 
+#### Subdomain slug generation
+
+Both provisioning paths (signup and "create another workspace") turn the workspace
+**name** into its permanent `<slug>.ph-aros.com` subdomain — and that slug also becomes
+the tenant's database name (`tenant_<slug>`), so it is fixed at creation time, not
+editable afterwards. `slugify()` lowercases the name, transliterates it to ASCII, then
+collapses any remaining non-alphanumeric run into a single hyphen (trimmed, capped at
+40 chars).
+
+The transliteration step runs a **Greek → Latin** table before the ASCII filter, since a
+Greek workspace name is the expected first-customer case: `Πλαίσιο ΑΕ` → `plaisio-ae`,
+`Κωτσόβολος` → `kotsovolos`. It also folds accent marks that land *inside* a Latin word
+instead of splitting it (`Müller` → `muller`, not the old `mu-ller`). Scripts with no
+transliteration table (Cyrillic, CJK, …) still normalize to an empty string, and
+`uniqueTenantSlug` falls back to a random `w-xxxxxx` label in that case — unchanged from
+before. A colliding slug (Latin or transliterated) gets a `-2`, `-3`, … suffix.
+
 ### Email verification & password
 
 All of these live under `/api/saas/account/**`. The confirm and reset-request
