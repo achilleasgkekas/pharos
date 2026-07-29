@@ -623,3 +623,73 @@ routine) ΔΕΝ αγγίχτηκαν· isolated pathspec commit μόνο των 
 (name/email/password change — `account/profile` + `account/password` routes έτοιμα), είτε (γ)
 **root-app landing** μετά το login (πώς φαίνεται το `/` για signed-in Account χωρίς per-tenant User
 session — παραμένει ανοιχτό από increment 56).
+
+## 2026-07-29 — increment 127: Greek transliteration για τα subdomains (ask-inbox APPLIED)
+
+**Ask-inbox πρώτα, όπως ορίζει το skill**: το `pharos-saas-core-20260728-0038` είχε γυρίσει σε
+**ANSWERED** («approve all», 2026-07-28) με επιλογή **(b) transliteration μέσω του υπάρχοντος
+`GREEK_MAP`**. Άρα αυτό το run ΔΕΝ διάλεξε νέο increment: εκτέλεσε την εγκεκριμένη απόφαση και
+γύρισε το entry σε **APPLIED**. Οι τρεις προτάσεις του προηγούμενου run (audit CSV export, actor
+filter, επόμενο backend item) μετατίθενται.
+
+**Το πρόβλημα.** Το `slugify` κρατούσε **μόνο** ASCII `a-z0-9`, οπότε ένα ελληνικό workspace name
+δεν άφηνε τίποτα πίσω του: `slugify('Πλαίσιο')` → `''` → `uniqueTenantSlug` έπεφτε στο random
+label → **`w-k3j9x1.ph-aros.com`**. Δεν ήταν bug (ο fallback δούλευε σωστά, το DNS label ήταν
+έγκυρο) αλλά το **πρώτο πράγμα που βλέπει ο πρώτος πελάτης** ήταν ένα subdomain που δεν
+αναγνωρίζει και δεν μπορεί να υπαγορεύσει στο τηλέφωνο. Και επειδή το slug γίνεται **και** το
+`dbName` του tenant (`tenant_<slug>`), δεν είναι reversible μετά τα πρώτα signups — γι' αυτό είχε
+πάει στο inbox αντί να το αποφασίσω μόνος μου.
+
+**`lib/tenancy/translit.ts` (νέο, pure + isomorphic)**: `transliterate()` = lowercase → NFKD →
+**drop combining marks** (`̀-ͯ`) → Greek→Latin map. Τρέχει **πριν** το a-z0-9 filter
+μέσα στο `slugify`, το οποίο μένει ο μόνος υπεύθυνος για παύλες/trim/40-char cap (καθαρός
+διαχωρισμός: το ένα αλλάζει **αλφάβητο**, το άλλο **μορφή**). Αποτελέσματα: «Πλαίσιο ΑΕ» →
+`plaisio-ae`, «Κωτσόβολος» → `kotsovolos`, «Θεσσαλονίκη» → `thessaloniki`, «ΨΥΞΗ» → `psyxi`.
+
+Δύο σκόπιμες λεπτομέρειες. (1) Το **drop των combining marks** διορθώνει παράπλευρα το mid-word
+accent split που ήταν pinned ως «documented cosmetic flaw»: `Müller` → **`muller`** αντί
+`mu-ller`, `Renée` → `renee`. Ήταν προβλεπόμενο στο leaning του entry, οπότε μπήκε μαζί. (2) Ο
+πίνακας **αντιγράφηκε αντί να γίνει import**: το `GREEK_MAP` ζει στο `app/settings/actions.ts`,
+που είναι **`'use server'` module** — κάθε export του πρέπει να είναι async server action, άρα
+ένα plain const δεν βγαίνει από εκεί, και το να αναδιαμορφώσω feature file από αυτή τη routine
+είναι εκτός territory. 24 γράμματα διπλά είναι το μικρότερο κακό· ο λόγος γράφτηκε στο header
+του νέου αρχείου ώστε να μη διορθωθεί «κατά λάθος» αργότερα σε import που δεν compileάρει.
+
+**Τι ΔΕΝ άλλαξε**: Κυριλλικά και CJK δεν έχουν table, περνούν ανέπαφα και κόβονται από το a-z0-9
+filter όπως πριν → random `w-xxxxxx` fallback, αμετάβλητο. Το ήδη-ASCII path («acme-corp») είναι
+byte-for-byte ίδιο. Και τα **δύο** σημεία που δημιουργούν workspace (`api/saas/auth/signup` και
+`api/saas/account/workspaces`) περνούν από το ίδιο `provisionTenant`, άρα η συμπεριφορά είναι
+ενιαία — επιβεβαιώθηκε με grep ότι δεν υπάρχει τρίτος καταναλωτής του `slugify`.
+
+**Tests (14 νέα + 4 pinned γυρισμένα)**. Το πιο load-bearing δεν είναι τα ελληνικά mappings αλλά:
+(α) ότι ο πίνακας **δεν περιέχει τίποτα εκτός `[a-z]+`** — ένα stray κεφαλαίο ή τονισμένο value θα
+επιβίωνε μέσα σε subdomain label και θα έσπαγε το DNS με τρόπο πολύ δύσκολο να εντοπιστεί πίσω σε
+αυτό το αρχείο· (β) ότι το `transliterate` **δεν αγγίζει σημεία στίξης/κενά** (αν τα μάζευε, το
+`slugify` θα εφάρμοζε τους κανόνες παύλας πάνω σε μισο-επεξεργασμένο string)· (γ) **idempotency**
+(φύλακας για μελλοντικό mapping που το Latin output του θα ξανα-mapαριζόταν)· (δ) ότι το **final
+sigma `ς` δίνει το ίδιο με το `σ`** (αλλιώς το ίδιο όνομα θα έβγαζε δύο διαφορετικά slug ανάλογα
+με το πού σπάει η λέξη). Στο `provision.test.ts` τα 4 tests που **τεκμηρίωναν** την παλιά
+συμπεριφορά έγιναν **regression guards** της νέας, και το `uniqueTenantSlug` random-fallback test
+άλλαξε input από «Καλημέρα» (που πλέον transliterate-άρεται) σε `日本語` + pure punctuation.
+
+**Verified**: `npx vitest run src/lib/tenancy/translit.test.ts src/lib/tenancy/provision.test.ts`
+→ **55/55 green με την πρώτη**. Πλήρες `npx vitest run` → **334 files / 5312 tests green** (από
+331/5258· +1 file δικό μου, τα υπόλοιπα από ταυτόχρονες routines). `npm run type-check` → **EXIT 0
+χωρίς κανένα fix**. **Docker: κανένα rebuild** — μηδέν runtime wiring/env/deps αλλαγή, και με
+`SAAS_MODE` off τοπικά το `slugify` δεν καλείται καθόλου (το self-hosted build δεν provision-άρει
+tenants), οπότε ούτε ο mutex χρειάστηκε. **Browser-verify: μη εφαρμόσιμο** (μηδέν UI surface· και
+όπως σημειώθηκε στο προηγούμενο entry, καμία SaaS σελίδα δεν είναι verifiable όσο το τοπικό stack
+τρέχει με SAAS_MODE off). Collision guard: `git status --short` πριν το staging = **μόνο τα 4 δικά
+μου αρχεία**, μηδέν staged από άλλη routine· pathspec commit. Pushed `5ab349f`.
+
+**## Needs Achilleas:** το slug item **έκλεισε**. Παραμένουν: **Stripe keys** (`STRIPE_SECRET_KEY`
+/ `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_SHARED` / `STRIPE_PRICE_DEDICATED` — ο client είναι
+πλήρως testαρισμένος και περιμένει μόνο keys), **τελικό plan pricing** (τα €0/€9/€29 + quotas στο
+`plans.ts` έχουν πλέον εγκριθεί ως η **πηγή αλήθειας** έναντι της landing — βλ.
+`pharos-landing-20260728-0706` — αλλά τα ίδια τα νούμερα μένουν placeholders), **SMTP**.
+
+**Next task:** επιστροφή στη σειρά που είχε προταθεί πριν μπει το inbox item: (α) **audit CSV
+export** (`/admin/audit?format=csv` — compliance-χρήσιμο, ο reader `adminAudit.ts` υπάρχει ήδη και
+είναι testαρισμένος, καθαρά μέσα στο territory)· (β) **actor filter** στο platform feed (email
+operator → Account lookup πριν το query)· (γ) αλλιώς επόμενο backend increment από TODO.md #5-#12.
+Πριν ξεκινήσεις: ask-inbox πρώτα, μετά UI scan.
