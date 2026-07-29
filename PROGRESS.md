@@ -10478,6 +10478,46 @@ cookie-gated server actions** (μικρό, μηχανικό, με άμεσο pay
 αυτής της κλάσης). Εναλλακτικά μένει αμετάβλητο το τρίτο ανοιχτό P2 του `WEB_DEBT.md`, `statements/actions.ts`
 tenant-scoping.
 
+## 2026-07-29 (cont. — ο audit που πρότεινε το προηγούμενο run, + scan αντί για σημείωμα)
+
+**Γιατί αυτό**: το ίδιο το προηγούμενο entry πρότεινε να σαρωθούν τα υπόλοιπα `/api/v1` routes για την ίδια κλάση
+σφάλματος (cookie-gated action πάνω σε bearer path). Έγινε.
+
+**Αποτέλεσμα του audit: καθαρό.** 22 routes κάνουν import server actions. Από αυτά, το **μόνο** module με
+`requireAdmin` που αγγίζει το `/api/v1` είναι το `settings/actions.ts`, και οι πέντε συναρτήσεις που παίρνουν τα routes
+από εκεί (`getListsForEditor`, `saveList`, `getTrash`, `restoreFromTrash`, `purgeTrashEntry`) χρησιμοποιούν
+`assertCanWrite`, που **by design** επιστρέφει σιωπηλά όταν δεν υπάρχει session (και οι viewers μπλοκάρονται ήδη από το
+`withAuth` βάσει HTTP method). Τα υπόλοιπα 9 action modules (receipts/expenses/items/shopping-list/statements/vouchers/
+subscriptions/notifications/history + search-actions) έχουν **μηδέν** αναφορές σε `requireAdmin`/`getCurrentUser`. Άρα
+το `test-notify` ήταν όντως η μοναδική περίπτωση.
+
+**Τι μπήκε παρόλα αυτά**: ένα audit που γράφεται σε σημείωμα δεν σταματά το επόμενο περιστατικό, οπότε κωδικοποιήθηκε
+ως **scan**: νέο `lib/sessionGuard.coverage.test.ts`, αδελφάκι του υπάρχοντος `writeGuard.coverage.test.ts`. Διαβάζει
+κάθε `/api/v1/**/route.ts`, ακολουθεί τα imports **ένα άλμα** μέσα στα actions, και κόβει το build αν οτιδήποτε σε
+αυτό το μονοπάτι καλεί `requireAdmin`/`requireUser` (οι δύο μόνες auth helpers που κάνουν `redirect()`, δηλαδή
+πετάνε· το `getCurrentUser` επιστρέφει null και δεν σπάει τίποτα, το `assertCanWrite` το χειρίζεται ρητά, οπότε
+κανένα από τα δύο δεν flagάρεται).
+
+**Δύο λεπτομέρειες που άξιζαν**: (α) το πρώτο τρέξιμο **βρήκε false positive τον εαυτό του** — το σχόλιο του
+διορθωμένου route εξηγεί τη λέξη `requireAdmin`, οπότε χωρίς αφαίρεση σχολίων ο guard καταγγέλλει ακριβώς τα αρχεία
+που έκαναν το σωστό· προστέθηκε `stripComments` σε κάθε σημείο σάρωσης. (β) δύο **anti-vacuity** tests συνοδεύουν τον
+guard (ότι το walk βρίσκει >40 routes και ότι όντως resolve-άρονται >15 route→action edges), γιατί ένα scan που
+σιωπηλά δεν ταιριάζει τίποτα είναι χειρότερο από καθόλου scan — ακριβώς το πρόβλημα του παλιού test-notify test.
+
+**Verify**: **negative control** — ξαναγύρισα προσωρινά το route στην παλιά delegating μορφή και ο guard απέτυχε
+ονομάζοντας `app/api/v1/settings/test-notify/route.ts → sendTestNtfy() in app/settings/actions` μαζί με το τι να
+διορθωθεί· το αρχείο επαναφέρθηκε αμέσως (καθαρό diff vs HEAD, επιβεβαιωμένο). `npm run type-check` **EXIT 0**, full
+`npx vitest run` **5296 passed / 333 files**. Καμία αλλαγή runtime κώδικα σε αυτό το commit, άρα **δεν** χρειάστηκε
+Docker rebuild (και δεν πάρθηκε το mutex). Commit `512dd29`.
+
+**Γνωστό όριο (σκόπιμο, γραμμένο στο ίδιο το αρχείο)**: ο scan κοιτά **ένα** επίπεδο έμμεσης κλήσης. Guard κρυμμένο δύο
+άλματα βαθιά θα περάσει. Το αντάλλαγμα είναι μηδέν false positives, και όλες οι πραγματικές περιπτώσεις μέχρι τώρα
+ήταν στο πρώτο άλμα.
+
+**Επόμενο task (πρόταση)**: το τρίτο και τελευταίο ανοιχτό P2 του `WEB_DEBT.md`, **`statements/actions.ts`
+tenant-scoping** (1026 γραμμές, δεκάδες exported functions, ίδιο recipe με τα bills/vouchers του `1826876` αλλά
+μεγαλύτερο). Παραμένει το μεγαλύτερο εναπομείναν correctness gap που είναι χτίσιμο χωρίς credentials.
+
 ## Needs Achilleas
 
 - Αμετάβλητα: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample export, EAS dev build), **P17 live check**
