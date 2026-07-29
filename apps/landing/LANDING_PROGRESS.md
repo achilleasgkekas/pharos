@@ -4799,3 +4799,65 @@ cloud AI, which is better?» (υποψηφιο απο το run 35 sweep) εχε�
 
 Needs-Achilleas (open, αμεταβλητα): legal entity/Stripe, Terms+Privacy review, contact inbox, hosted τιμες
 (+ το ανοιχτο pricing-drift ερωτημα), repo public timing.
+
+## 2026-07-29
+
+**Increment: εφαρμογή της εγκεκριμένης απόφασης pricing** (`ASK_ACHILLEAS.md` → `pharos-landing-20260728-0706`,
+option **(b)**: ο backend `plans.ts` γίνεται source of truth, η landing τον ακολουθεί). Το προηγούμενο run περίμενε
+ακόμα απάντηση, η απάντηση δόθηκε στις 2026-07-28 («approve all»), οπότε αυτό το run την υλοποίησε πρώτα, πριν
+από οτιδήποτε άλλο.
+
+**Τι άλλαξε** (`apps/landing/app/page.tsx` `TIERS`): τα 4 placeholder tiers (Self-hosted + **Solo €4 / Family €8 /
+Pro €15**, καθαρά διακοσμητικά, χωρίς καμία σύνδεση με κώδικα) αντικαταστάθηκαν από τα **πραγματικά πλάνα του
+`apps/web/src/lib/billing/plans.ts`**, μαζί με τη δωρεάν self-host γραμμή. Νέο σύνολο, 4 κάρτες:
+1. **Self-hosted** (δωρεάν για πάντα, AGPL-3.0, CTA «Get the Docker image») — αμετάβλητο ως concept.
+2. **Free** (€0, «to start») — 1 χρήστης, 5 GB storage, 50 AI document reads/μήνα, όλα τα modules, nightly backups.
+3. **Pro** (€9/μήνα, highlighted, «Most popular») — έως 5 μέλη, 50 GB, 1.000 AI reads/μήνα, shared workspace με
+   ρόλους/προσκλήσεις, priority email support.
+4. **Dedicated** (€29/μήνα) — τα πάντα του Pro, απεριόριστα μέλη, 500 GB, απεριόριστο AI με δικό σου key, custom domain.
+
+Τα **quotas είναι πλέον ορατά πάνω στις κάρτες** (storage GB, AI calls/μήνα, seats, custom domain), δηλαδή ό,τι
+ήδη επιβάλλει ο backend, αντί για αόριστα «Higher AI limits». Προστέθηκε σχόλιο πάνω από το `TIERS` που δηλώνει
+ρητά ποιο αρχείο είναι το source of truth, ώστε το επόμενο run να μην ξανα-αποκλίνει.
+
+**Ένα λεπτό σημείο που έπρεπε να πιαστεί** (`Tier.selfHost`, νέο optional flag): το Offer JSON-LD διάλεγε
+`InStock` με τον έλεγχο `t.amount === '0' && REPO_PUBLIC`. Με **δύο** πλέον γραμμές στα €0 (self-host και hosted
+Free), αυτός ο έλεγχος θα δήλωνε σιωπηλά και το hosted Free ως «διαθέσιμο προς αγορά» τη στιγμή που ανοίξει το
+repo, ενώ είναι waitlist-gated. Ο έλεγχος έγινε `t.selfHost && REPO_PUBLIC`, οπότε μόνο η self-host γραμμή
+παρακολουθεί το `REPO_PUBLIC` και κάθε hosted πλάνο μένει `PreOrder` όσο υπάρχει waitlist.
+
+Συνοδά, στο ίδιο πνεύμα: compare table γραμμή κόστους `From €4/mo` → **`Free tier, then €9/mo`**, και οι Όροι
+(`app/terms/page.tsx` §6) λένε πλέον «Free, Pro, and Dedicated hosted tiers» αντί για «Solo, Family, and Pro».
+Καμία άλλη αναφορά τιμής δεν υπήρχε στο site (grep σε όλο το `app/`), οπότε δεν έμεινε stale νούμερο πουθενά.
+
+Verify:
+- `npm run type-check` -> exit 0. `npm run build` -> success, 13 static routes, `/` **5.35 kB** (αμετάβλητο).
+- Browser pane σε production build (`next start -p 3103`, η 3100 κατειλημμένη από Docker), DOM checks μέσω
+  `javascript_tool`: 4 κάρτες με σωστά ονόματα/cadence/badges και **ακριβώς τα quota bullets** παραπάνω·
+  `read_console_messages` (onlyErrors) -> «No console logs».
+- **Annual toggle regression** (το κρίσιμο μετά την αλλαγή): monthly -> `€9 per month / billed monthly` και
+  `€29 per month`· annual -> **`€90 per year, €7.50/mo`** και **`€290 per year, €24.17/mo`**, ενώ **και οι δύο
+  δωρεάν γραμμές μένουν αμετάβλητες** (`Free forever`, `€0 to start`), δηλαδή το `isHosted` guard κρατάει σωστά.
+- **JSON-LD**: 4 Offers, `PHAROS Self-hosted 0 / PreOrder`, `PHAROS Free 0 / PreOrder`, `PHAROS Pro 9 / PreOrder`
+  (Monthly:9, Annual:90), `PHAROS Dedicated 29 / PreOrder` (Monthly:29, Annual:290). Επιβεβαιώθηκε ότι το hosted
+  Free ΔΕΝ παίρνει priceSpecification και ΔΕΝ θα γίνει InStock.
+- Screenshot: **δεν έγινε ξανά** (δεύτερο συνεχόμενο run). Το Browser pane είναι hidden, τα screenshots γυρνάνε
+  stale frames (έδειχναν το hero ενώ το DOM ήταν scrolled στο pricing) και το `computer scroll` γύρισε ρητά «The
+  Browser pane is currently hidden» μετά από 30s. Best-effort per task file, στηρίχτηκα στους DOM ελέγχους.
+  Ο server τερματίστηκε, η θύρα 3103 κλειστή.
+- Μηδέν άγγιγμα σε Docker/:3000/web/mobile/docs, μηδέν subagent, μηδέν AI call. em-dashes στα δικά μου κείμενα: 0.
+
+Επόμενο increment: (1) περιμένει απάντηση στη **νέα** `pharos-landing-20260729-1000` (μόνιμο Free tier vs
+14ήμερο trial που καταλήγει σε suspend, βλ. Needs-Achilleas), (2) αν απαντηθεί (a), προσθήκη μιας ερώτησης
+«What happens when my trial ends?» στην ομάδα FAQ «Hosted or self-hosted» ώστε να λέει ρητά το downgrade,
+(3) γενικό sweep για νέα feat commits που δεν έχουν εκπροσώπηση στη landing.
+
+Needs-Achilleas (open): **νέο** — μόνιμο hosted Free tier ή μόνο trial (`pharos-landing-20260729-1000`, βλ.
+παρακάτω)· legal entity/Stripe, Terms+Privacy review, contact inbox, repo public timing.
+Το παλιό «hosted τιμές» άνοιγμα **έκλεισε**: οι τιμές είναι πλέον €0 / €9 / €29 όπως εγκρίθηκε.
+
+**ΣΗΜ ασυμφωνία που εντοπίστηκε και επισημάνθηκε (δεν διορθώθηκε μονομερώς)**: το `provision.ts` δίνει
+`plan:'free'` **και** `status:'trialing'` (14 μέρες), και ο κύκλος ζωής (`statusAudit.ts`) πάει «trial λήγει
+χωρίς κάρτα → suspended». Δεν υπάρχει διαδρομή «λήγει το trial, μένω στο free». Άρα η κάρτα «Free» της landing
+και η FAQ απάντηση για το trial αντιφάσκουν μέχρι ο Αχιλλέας να πει ποιο ισχύει. Και τα δύο κείμενα έμειναν ως
+έχουν, το ερώτημα κατατέθηκε στο ASK inbox.
