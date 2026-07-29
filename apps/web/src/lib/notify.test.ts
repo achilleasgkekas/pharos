@@ -10,9 +10,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // tests mock global fetch so we can assert both the headers we send and the
 // return value, with no real I/O.
 //
-// The module imports getAppSettings at the top (which pulls in the DB layer),
-// but that is import-time only and never runs here — sendNtfyTo takes an explicit
-// URL and does not touch settings, so no mock is needed.
+// The module imports getAppSettings at the top (which pulls in the DB layer).
+// sendNtfyTo takes an explicit URL and never touches settings, but `runNtfyTest`
+// below reads the configured topic from there, so it is mocked.
 //
 // It also calls assertPublicUrl() (lib/ssrf.ts) before every POST, which resolves
 // the hostname via node:dns — mock that so tests never hit a real resolver, same
@@ -20,8 +20,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // tests (all using https://ntfy.sh/topic) keep passing unchanged.
 vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
 
+const { getAppSettingsMock } = vi.hoisted(() => ({
+  getAppSettingsMock: vi.fn(async () => ({ ntfyUrl: '' }) as Record<string, unknown>),
+}));
+vi.mock('./appSettings', () => ({ getAppSettings: getAppSettingsMock }));
+
 import { lookup } from 'node:dns/promises';
-import { sendNtfyTo } from './notify';
+import { sendNtfyTo, runNtfyTest } from './notify';
 
 const mockLookup = vi.mocked(lookup);
 
@@ -150,5 +155,48 @@ describe('sendNtfyTo', () => {
     const fn = mockFetch(() => ok());
     await expect(sendNtfyTo('ftp://ntfy.sh/topic', 'Alert', 'body')).resolves.toBe(false);
     expect(fn).not.toHaveBeenCalled();
+  });
+});
+
+// `runNtfyTest` is the body of the "Send test notification" button, deliberately with NO
+// authorisation of its own: the web action guards it with the cookie session and the API
+// route with the Bearer role, because a session-only guard on a Bearer path does not deny
+// the caller, it breaks the endpoint. So the behaviour asserted here is only: read the
+// configured topic, refuse early when there is none, and turn the boolean send result into
+// the friendly envelope both callers hand back to the UI.
+describe('runNtfyTest', () => {
+  beforeEach(() => {
+    mockLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
+  });
+
+  it('refuses without sending when no topic is configured', async () => {
+    getAppSettingsMock.mockResolvedValueOnce({ ntfyUrl: '' });
+    const fn = mockFetch(() => ok());
+    await expect(runNtfyTest()).resolves.toEqual({ ok: false, error: 'Set an ntfy URL first' });
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('posts to the configured topic and reports ok', async () => {
+    getAppSettingsMock.mockResolvedValueOnce({ ntfyUrl: 'https://ntfy.sh/mytopic' });
+    const fn = mockFetch(() => ok());
+    await expect(runNtfyTest()).resolves.toEqual({ ok: true });
+    expect(fn.mock.calls[0][0]).toBe('https://ntfy.sh/mytopic');
+    expect(headersOf(fn).Title).toBe('Pharos test');
+    expect(String((fn.mock.calls[0][1] as RequestInit).body)).toContain('working');
+  });
+
+  // Sends even when alerts are disabled: the point of the button is to prove the topic works
+  // before you switch them on.
+  it('sends regardless of the ntfyEnabled flag', async () => {
+    getAppSettingsMock.mockResolvedValueOnce({ ntfyUrl: 'https://ntfy.sh/mytopic', ntfyEnabled: false });
+    const fn = mockFetch(() => ok());
+    await expect(runNtfyTest()).resolves.toEqual({ ok: true });
+    expect(fn).toHaveBeenCalledOnce();
+  });
+
+  it('turns a failed POST into a friendly error', async () => {
+    getAppSettingsMock.mockResolvedValueOnce({ ntfyUrl: 'https://ntfy.sh/mytopic' });
+    mockFetch(() => new Response('nope', { status: 500 }));
+    await expect(runNtfyTest()).resolves.toEqual({ ok: false, error: 'ntfy POST failed — check the URL' });
   });
 });

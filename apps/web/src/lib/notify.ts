@@ -35,3 +35,23 @@ export async function sendNtfy(title: string, message: string, opts?: NtfyOpts):
   if (!s.ntfyEnabled || !s.ntfyUrl) return false;
   return sendNtfyTo(s.ntfyUrl, title, message, opts);
 }
+
+/**
+ * Fire the one-off "Send test notification" push, with NO authorisation of its own.
+ *
+ * It lives here rather than only inside the `sendTestNtfy` server action because the action
+ * gates on `requireAdmin()`, which reads the **session cookie** — and the mobile app reaches
+ * this feature over `POST /api/v1/settings/test-notify` with a Bearer token and no cookie at
+ * all. A session-only guard on a path that has no session does not deny the caller, it
+ * *breaks* the endpoint. So each caller applies the guard its own transport can actually
+ * evaluate (cookie session for the web action, `canAdmin(user.role)` for the API route) and
+ * both then run this shared body.
+ */
+export async function runNtfyTest(): Promise<{ ok: boolean; error?: string }> {
+  const s = await getAppSettings();
+  if (!s.ntfyUrl) return { ok: false, error: 'Set an ntfy URL first' };
+  const ok = await sendNtfyTo(s.ntfyUrl, 'Pharos test', 'Notifications are working — alerts will arrive here.', {
+    tags: ['white_check_mark'],
+  });
+  return ok ? { ok: true } : { ok: false, error: 'ntfy POST failed — check the URL' };
+}

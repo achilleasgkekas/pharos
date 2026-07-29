@@ -73,8 +73,9 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
         warrantyAlertDays: parseInt(alertDays, 10) || 0,
         autoAddStores: autoAdd,
         budgetRollover: rollover,
-        ntfyUrl: ntfyUrl.trim(),
-        ntfyEnabled: ntfyOn,
+        // Omitted entirely for a non-admin: the server drops them anyway, and sending them
+        // would make a save that only touched ntfy come back as a 403 for no reason.
+        ...(ntfyEditable ? { ntfyUrl: ntfyUrl.trim(), ntfyEnabled: ntfyOn } : {}),
         budgets: budgetMap,
       });
       hydrate(await getSettings());
@@ -91,6 +92,10 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
   }
 
   const addableCats = (cfg?.expenseCategories || []).filter((c) => !(c in budgets));
+  // The ntfy topic is admin-only (it re-routes every alert of the instance). Trust the
+  // server's flag over the cached session role; absent = an older server that let anyone
+  // edit, so stay permissive there rather than locking a field that still works.
+  const ntfyEditable = cfg?.canEditNtfy !== false;
 
   if (loading) return <View style={s.loadWrap}><Spinner inline /></View>;
 
@@ -165,11 +170,12 @@ export function SettingsScreen({ onSignOut }: { onSignOut: () => void }) {
       <Text style={s.section}>NOTIFICATIONS (ntfy)</Text>
       <View style={s.cardPad}>
         <Text style={s.flabel}>NTFY URL</Text>
-        <Input variant="modal" value={ntfyUrl} onChangeText={setNtfyUrl} autoCapitalize="none" autoCorrect={false} placeholder="https://ntfy.sh/your-topic" />
-        <Toggle label="Enable alerts" on={ntfyOn} onToggle={() => setNtfyOn((v) => !v)} />
-        <Pressable onPress={test} disabled={testing || !ntfyUrl.trim()} style={[s.testBtn, (testing || !ntfyUrl.trim()) && s.dim]}>
+        <Input variant="modal" value={ntfyUrl} onChangeText={setNtfyUrl} editable={ntfyEditable} autoCapitalize="none" autoCorrect={false} placeholder="https://ntfy.sh/your-topic" />
+        <Toggle label="Enable alerts" on={ntfyOn} onToggle={() => setNtfyOn((v) => !v)} disabled={!ntfyEditable} />
+        <Pressable onPress={test} disabled={!ntfyEditable || testing || !ntfyUrl.trim()} style={[s.testBtn, (!ntfyEditable || testing || !ntfyUrl.trim()) && s.dim]}>
           {testing ? <Spinner inline color={C.cyan} size="small" /> : <Text style={s.testText}>Send test notification</Text>}
         </Pressable>
+        {!ntfyEditable && <Text style={s.hint}>Only an admin can change where alerts are sent.</Text>}
       </View>
 
       <Pressable onPress={save} disabled={saving} style={[s.saveBtn, saving && s.dim]}>
@@ -699,9 +705,9 @@ function Field({ label, value, onChange, keyboard }: { label: string; value: str
   );
 }
 
-function Toggle({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
+function Toggle({ label, on, onToggle, disabled }: { label: string; on: boolean; onToggle: () => void; disabled?: boolean }) {
   return (
-    <Pressable onPress={onToggle} style={s.toggle}>
+    <Pressable onPress={() => !disabled && onToggle()} disabled={disabled} style={[s.toggle, disabled && s.dim]}>
       <Check checked={!!on} />
       <Text style={s.tlabel}>{label}</Text>
     </Pressable>

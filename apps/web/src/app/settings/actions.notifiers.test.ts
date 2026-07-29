@@ -54,6 +54,7 @@ const {
   getAppSettingsMock,
   invalidateAppSettingsMock,
   sendNtfyToMock,
+  runNtfyTestMock,
   getNotifiersMock,
   testNotifierMock,
   getEventWebhooksMock,
@@ -69,6 +70,7 @@ const {
   getAppSettingsMock: vi.fn(async () => ({} as Record<string, unknown>)),
   invalidateAppSettingsMock: vi.fn(),
   sendNtfyToMock: vi.fn(async () => true),
+  runNtfyTestMock: vi.fn(async () => ({ ok: true }) as { ok: boolean; error?: string }),
   getNotifiersMock: vi.fn(async () => [] as unknown[]),
   testNotifierMock: vi.fn(async () => true),
   getEventWebhooksMock: vi.fn(async () => [] as unknown[]),
@@ -145,7 +147,7 @@ vi.mock('@/lib/onedrive', () => ({
   testOnedrive: vi.fn(),
   uploadToOnedrive: vi.fn(),
 }));
-vi.mock('@/lib/notify', () => ({ sendNtfyTo: sendNtfyToMock }));
+vi.mock('@/lib/notify', () => ({ sendNtfyTo: sendNtfyToMock, runNtfyTest: runNtfyTestMock }));
 vi.mock('@/lib/backupModels', () => ({ BACKUP_MODELS: [] }));
 vi.mock('@/lib/notifiers', () => ({
   dispatchAlert: vi.fn(),
@@ -205,6 +207,7 @@ beforeEach(() => {
   getAppSettingsMock.mockImplementation(async () => ({ ntfyUrl: '' }));
   invalidateAppSettingsMock.mockImplementation(() => undefined);
   sendNtfyToMock.mockImplementation(async () => true);
+  runNtfyTestMock.mockImplementation(async () => ({ ok: true }));
   getNotifiersMock.mockImplementation(async () => []);
   testNotifierMock.mockImplementation(async () => true);
   getEventWebhooksMock.mockImplementation(async () => []);
@@ -372,37 +375,29 @@ describe('saveNtfy', () => {
   });
 });
 
+// The action is now a guard plus a delegation: the send itself lives in `lib/notify`'s
+// `runNtfyTest`, shared with POST /api/v1/settings/test-notify (which cannot use
+// requireAdmin, since it authenticates with a Bearer token and has no cookie session).
+// What this action still owns, and what is asserted here, is the admin gate BEFORE anything
+// is sent, and passing the result back untouched. The send behaviour itself is covered in
+// lib/notify.test.ts.
 describe('sendTestNtfy', () => {
-  it('requires admin', async () => {
+  it('requires admin, and refuses before sending anything', async () => {
     requireAdminMock.mockRejectedValueOnce(new Error('Forbidden'));
     await expect(sendTestNtfy()).rejects.toThrow('Forbidden');
+    expect(runNtfyTestMock).not.toHaveBeenCalled();
   });
 
-  it('refuses when no ntfy URL is configured, without calling sendNtfyTo', async () => {
-    getAppSettingsMock.mockResolvedValueOnce({ ntfyUrl: '' });
-    const res = await sendTestNtfy();
-    expect(res).toEqual({ ok: false, error: 'Set an ntfy URL first' });
-    expect(sendNtfyToMock).not.toHaveBeenCalled();
+  it('delegates to runNtfyTest and returns its result verbatim', async () => {
+    runNtfyTestMock.mockResolvedValueOnce({ ok: true });
+    await expect(sendTestNtfy()).resolves.toEqual({ ok: true });
+    expect(requireAdminMock).toHaveBeenCalled();
+    expect(runNtfyTestMock).toHaveBeenCalledOnce();
   });
 
-  it('sends to the configured URL and reports ok on success', async () => {
-    getAppSettingsMock.mockResolvedValueOnce({ ntfyUrl: 'https://ntfy.sh/mytopic' });
-    sendNtfyToMock.mockResolvedValueOnce(true);
-    const res = await sendTestNtfy();
-    expect(res).toEqual({ ok: true });
-    expect(sendNtfyToMock).toHaveBeenCalledWith(
-      'https://ntfy.sh/mytopic',
-      'Pharos test',
-      expect.stringContaining('working'),
-      { tags: ['white_check_mark'] }
-    );
-  });
-
-  it('reports a friendly error when the POST fails', async () => {
-    getAppSettingsMock.mockResolvedValueOnce({ ntfyUrl: 'https://ntfy.sh/mytopic' });
-    sendNtfyToMock.mockResolvedValueOnce(false);
-    const res = await sendTestNtfy();
-    expect(res).toEqual({ ok: false, error: 'ntfy POST failed — check the URL' });
+  it('passes a failure envelope through unchanged', async () => {
+    runNtfyTestMock.mockResolvedValueOnce({ ok: false, error: 'Set an ntfy URL first' });
+    await expect(sendTestNtfy()).resolves.toEqual({ ok: false, error: 'Set an ntfy URL first' });
   });
 });
 

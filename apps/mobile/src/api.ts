@@ -477,6 +477,9 @@ export type AppSettings = {
   autoAddStores: boolean;
   ntfyUrl: string;
   ntfyEnabled: boolean;
+  /** Admin-only write gate for the two ntfy fields above (readable by everyone). Optional
+   *  because an older server omits it — absent means "no gate", the pre-P31 behaviour. */
+  canEditNtfy?: boolean;
   budgetRollover: boolean;
   expenseCategories: string[];
   period: string;

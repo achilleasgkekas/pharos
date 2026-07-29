@@ -57,7 +57,7 @@ import { assertCanWrite, requireAdmin } from '@/lib/auth';
 import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel, type AiProviderId } from '@/lib/aiModels';
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
-import { sendNtfyTo } from '@/lib/notify';
+import { runNtfyTest } from '@/lib/notify';
 import { BACKUP_MODELS } from '@/lib/backupModels';
 import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '@/lib/notifiers';
 import { pushAllDevices } from '@/lib/expoPush';
@@ -353,13 +353,12 @@ export async function saveNtfy(formData: FormData): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-/** Send a one-off test notification to the configured ntfy topic. */
+/** Send a one-off test notification to the configured ntfy topic (web, cookie session).
+ *  The API route for the same button guards with the Bearer role instead and calls the
+ *  shared `runNtfyTest` body directly, since it has no session to check. */
 export async function sendTestNtfy(): Promise<{ ok: boolean; error?: string }> {
   await requireAdmin();
-  const s = await getAppSettings();
-  if (!s.ntfyUrl) return { ok: false, error: 'Set an ntfy URL first' };
-  const ok = await sendNtfyTo(s.ntfyUrl, 'Pharos test', 'Notifications are working — alerts will arrive here.', { tags: ['white_check_mark'] });
-  return ok ? { ok: true } : { ok: false, error: 'ntfy POST failed — check the URL' };
+  return runNtfyTest();
 }
 
 // ─── Pluggable notification channels ─────────────────────────────────────────

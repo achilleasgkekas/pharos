@@ -322,6 +322,55 @@ describe('PATCH — no-op guard', () => {
   });
 });
 
+// The ntfy topic is an OUTPUT channel: whoever sets it re-routes every alert of the whole
+// instance. The web actions have been admin-gated since 0bc5e14, so the API must agree or the
+// web guard is decorative (a member just opens the phone instead). The shape of the denial
+// matters as much as the denial: the mobile Settings screen saves currency/VAT/budgets/ntfy in
+// ONE PATCH, so a 403 for the whole request would read as "nothing saved" while the allowed
+// fields were perfectly writable. Hence: silently drop the two fields, keep the rest — except
+// when they are ALL the request carried, where 200 { ok: true } would be a lie.
+describe('PATCH — ntfy is admin-only', () => {
+  it('an admin writes both ntfy fields (unchanged behaviour)', async () => {
+    await PATCH(makeReq({ body: { ntfyEnabled: true, ntfyUrl: 'https://ntfy.sh/x' } }));
+    expect(lastSet()).toEqual({ ntfyEnabled: true, ntfyUrl: 'https://ntfy.sh/x' });
+  });
+
+  it('a member keeps the rest of a mixed save; only the ntfy fields are dropped', async () => {
+    userState.doc = { _id: 'u2', name: 'Member', username: 'mem', role: 'member' };
+    const res = await PATCH(
+      makeReq({ body: { currency: 'usd', defaultVatRate: 19, ntfyUrl: 'https://evil.example/t', ntfyEnabled: true } })
+    );
+    expect(res.status).toBe(200);
+    expect(lastSet()).toEqual({ currency: 'USD', defaultVatRate: 19 });
+  });
+
+  it('a member sending ONLY ntfy fields gets 403 and nothing is written', async () => {
+    userState.doc = { _id: 'u2', name: 'Member', username: 'mem', role: 'member' };
+    const res = await PATCH(makeReq({ body: { ntfyUrl: 'https://evil.example/t', ntfyEnabled: true } }));
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toMatch(/admin only/i);
+    expect(appConfigUpdateOne).not.toHaveBeenCalled();
+  });
+
+  // Distinguishing the two 400/403 paths: a junk-only body is still "no valid fields", not a
+  // permission problem, so the member does not get told to go find an admin for a typo.
+  it('a member sending only junk still gets the plain 400, not the admin message', async () => {
+    userState.doc = { _id: 'u2', name: 'Member', username: 'mem', role: 'member' };
+    const res = await PATCH(makeReq({ body: { currency: '   ' } }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'no valid fields' });
+  });
+
+  it('GET tells the client whether it may edit, so it can render read-only', async () => {
+    expect((await (await GET(makeReq())).json()).canEditNtfy).toBe(true);
+    userState.doc = { _id: 'u2', name: 'Member', username: 'mem', role: 'member' };
+    const json = await (await GET(makeReq())).json();
+    expect(json.canEditNtfy).toBe(false);
+    // Still readable: a member should be able to see WHERE alerts go, just not change it.
+    expect(json).toHaveProperty('ntfyUrl');
+  });
+});
+
 describe('PATCH — persistence shape', () => {
   it('upserts the singleton AppConfig with $set', async () => {
     await PATCH(makeReq({ body: { currency: 'eur' } }));
