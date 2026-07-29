@@ -92,28 +92,32 @@ describe('slugify', () => {
   });
 
   it('decomposes accented Latin down to ASCII rather than dropping the word', () => {
-    // NFKD splits é into e + combining acute; the acute is then a non-alnum run.
-    // A TRAILING accent is trimmed away, so the word survives intact.
     expect(slugify('Café')).toBe('cafe');
     expect(slugify('Zoé')).toBe('zoe');
   });
 
-  it('SPLITS a word at a mid-word accent (documented cosmetic flaw)', () => {
-    // The combining mark left by NFKD sits INSIDE the word, so it becomes a hyphen:
-    // 'Müller' → 'mu-ller', not 'muller'. Ugly but valid and stable; fixing it means
-    // stripping ̀-ͯ before the alnum filter. Pinned so a later fix is a
-    // deliberate change, not an accident.
-    expect(slugify('Müller GmbH')).toBe('mu-ller-gmbh');
-    expect(slugify('Renée')).toBe('rene-e');
+  it('folds a MID-word accent away instead of splitting the word', () => {
+    // Regression guard for the old behaviour: NFKD used to leave a combining mark inside the
+    // word, which the alnum filter turned into a hyphen ('Müller' → 'mu-ller'). `transliterate`
+    // now strips those marks first, so the word stays one token.
+    expect(slugify('Müller GmbH')).toBe('muller-gmbh');
+    expect(slugify('Renée')).toBe('renee');
   });
 
-  it('returns EMPTY for a purely non-Latin name (documented, drives the random fallback)', () => {
-    // KNOWN LIMITATION, pinned on purpose: a Greek (or Cyrillic/CJK) workspace name has no
-    // ASCII left after normalisation, so `uniqueTenantSlug` falls back to a random `w-xxxxxx`
-    // label. See SAAS_PROGRESS.md → Needs Achilleas (transliteration vs random).
-    expect(slugify('Καλημέρα')).toBe('');
-    expect(slugify('Πλαίσιο ΑΕ')).toBe('');
+  it('transliterates a Greek name instead of falling back to a random label', () => {
+    // Approved 2026-07-28 (ask-inbox pharos-saas-core-20260728-0038, option b). A Greek
+    // workspace name is the EXPECTED first-customer case here, and it used to slug to '',
+    // which sent the owner to a meaningless `w-k3j9x1.ph-aros.com`.
+    expect(slugify('Πλαίσιο ΑΕ')).toBe('plaisio-ae');
+    expect(slugify('Καλημέρα')).toBe('kalimera');
+    expect(slugify('Κωτσόβολος')).toBe('kotsovolos');
+  });
+
+  it('still returns EMPTY for scripts with no transliteration table (drives the random fallback)', () => {
+    // Only Greek is mapped. Cyrillic/CJK have no ASCII left after normalisation, so
+    // `uniqueTenantSlug` still falls back to a random `w-xxxxxx` label — unchanged behaviour.
     expect(slugify('日本語')).toBe('');
+    expect(slugify('Привет')).toBe('');
   });
 
   it('tolerates empty and nullish input without throwing', () => {
@@ -171,11 +175,23 @@ describe('uniqueTenantSlug', () => {
     expect(out.startsWith('w-')).toBe(true);
   });
 
-  it('replaces an EMPTY root with a random label (non-Latin / punctuation-only names)', async () => {
+  it('replaces an EMPTY root with a random label (untransliterable / punctuation-only names)', async () => {
+    // NOT a Greek name any more — those now transliterate (see slugify tests). This path is
+    // reached by scripts with no table and by names that are pure punctuation.
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    const out = await uniqueTenantSlug('Καλημέρα');
+    const out = await uniqueTenantSlug('日本語');
     expect(out.startsWith('w-')).toBe(true);
     expect(out.length).toBeGreaterThan(2);
+
+    const punctuation = await uniqueTenantSlug('!!! ---');
+    expect(punctuation.startsWith('w-')).toBe(true);
+  });
+
+  it('provisions a Greek workspace name onto a readable slug end-to-end', async () => {
+    // The reason the transliteration was approved: the owner of «Πλαίσιο» must land on
+    // plaisio.ph-aros.com, not on a random label they cannot recognise or dictate.
+    const out = await uniqueTenantSlug('Πλαίσιο');
+    expect(out).toBe('plaisio');
   });
 
   it('checks the random fallback label for collisions too', async () => {

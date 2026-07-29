@@ -7,17 +7,20 @@ import { connectDB } from '@/lib/db';
 import { Tenant } from '@/models/Tenant';
 import { Membership } from '@/models/Membership';
 import { RESERVED_SLUGS } from './host';
+import { transliterate } from './translit';
 import { trialEndFrom } from '@/lib/billing/trial';
 
 /**
  * Normalise arbitrary text into a valid subdomain label: lowercase, ASCII a-z0-9 and single
  * hyphens, no leading/trailing hyphen, max 40 chars. Returns '' when nothing usable remains
  * (caller falls back, e.g. to a random label).
+ *
+ * `transliterate` runs FIRST so a Greek name keeps its identity ('Πλαίσιο' → 'plaisio' rather
+ * than '' → a random `w-xxxxxx` label) and an accent inside a word folds away instead of
+ * splitting it ('Müller' → 'muller').
  */
 export function slugify(input: string): string {
-  return (input || '')
-    .toLowerCase()
-    .normalize('NFKD')
+  return transliterate(input)
     .replace(/[^a-z0-9]+/g, '-') // any run of non-alnum → single hyphen
     .replace(/^-+|-+$/g, '') // trim hyphens
     .slice(0, 40)
