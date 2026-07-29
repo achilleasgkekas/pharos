@@ -3,8 +3,27 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 0c63c62 -->
-<!-- docker-validated: de8507e -->
+<!-- docker-validated: 459dbb3 -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-29 (docker-health — rebuild + validate)
+
+**Guard**: `ROUTINES_PAUSED` απών. Docker mutex ελεύθερο → `mkdir` πέτυχε στην πρώτη προσπάθεια.
+
+**Ευρήματα**: όλα τα containers (web/mongo/searxng/landing/flaresolverr) ήταν **σταματημένα** (exit code 0,
+14 ώρες πριν) — καθαρό shutdown, ΟΧΙ restart-loop/OOM (το mongo health έδειχνε stale `unhealthy` από τη στιγμή
+του shutdown, με τα τελευταία 5 log entries όλα `{ ok: 1 }`). Το προηγούμενο marker (`de8507e`) ήταν πίσω από
+18 αλλαγμένα αρχεία στο `apps/web` (bills actions+page, vouchers/page.tsx read-path tenant fix, admin/audit,
+tenancy libs κλπ) → rebuild δικαιολογημένο.
+
+**Rebuild**: `docker builder prune -f` (1.85GB reclaimed) → `docker compose build web` (καθαρό, 42s) → `up -d mongo`
+→ healthy σε 2 polls (~4s) → `up -d web` (μαζί ξεκίνησε και το `searxng` dependency) → `/login` **200 στην πρώτη
+προσπάθεια**. Restart count **0**. Logs καθαρά (μόνο το προϋπάρχον αβλαβές `@napi-rs/canvas` warning). Smoke test
+`/`, `/bills`, `/vouchers` → **307** (auth-redirect, όπως αναμενόταν, σελίδες compile OK). `flaresolverr` ήταν ήδη
+σταματημένο (καμία ενέργεια χρειάστηκε). Post-build `docker builder prune -f` (2.36GB reclaimed) → total build
+cache 1.09GB, μηδέν reclaimable υπόλοιπο.
+
+**Marker**: `docker-validated` → `459dbb3` (HEAD).
 
 ## 2026-07-28 (reviewer — έλεγχος 6b52023..0c63c62, 66 commits)
 
