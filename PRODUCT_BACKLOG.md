@@ -6,25 +6,33 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-28 (19η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-29 (20ή σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
-> **Standing κατάσταση (19η σάρωση, 2026-07-28):** το «Approved» queue παραμένει ουσιαστικά χωρίς αυτόνομα-
+> **Standing κατάσταση (20ή σάρωση, 2026-07-29):** το «Approved» queue παραμένει ουσιαστικά χωρίς αυτόνομα-
 > buildable items — μόνο P36 (Open Banking, blocked σε provider decision), P31 (household multi-user — ήδη
 > SHIPPED 2026-07-27, βλ. `## Approved`, live check με τρεις ρόλους ακόμα εκκρεμεί), P16 remainder (Firefly
 > III/Grocy importers, χρειάζεται πραγματικό sample file), **P9** (multi-currency — πλέον σχεδόν πλήρες, μόνο ο
-> προαιρετικός rate-feed/`resolveFx` στα imports απομένει), P17/P23 (mobile native-dep, μπλοκαρισμένα στο ανοιχτό
-> ερώτημα `pharos-daily-dev-20260725-1425` στο ASK_ACHILLEAS.md — ΑΚΟΜΑ χωρίς Answer, 3ο+ συνεχόμενο) μένουν
-> τεχνικά ανοιχτά αλλά κανένα δεν είναι «απλώς χτίσ' το» unattended.
-> **Καμία ρητή έγκριση Proposed→Approved σε 14 διαδοχικές σαρώσεις** — το batch-review πρόταση της 16ης σάρωσης
-> παραμένει σε ισχύ και ενισχύεται· το Proposed queue έφτασε **30 items (P37-P71, εξαιρουμένου του P63 που
-> μετακινήθηκε στο `## Done` αυτή τη σάρωση — ήταν ήδη SHIPPED αλλά είχε μείνει σωματικά στο Proposed section)**.
+> προαιρετικός rate-feed/`resolveFx` στα imports απομένει), **P17** (camera UI ήδη SHIPPED 2026-07-27, βλ.
+> `## Approved` — εκκρεμεί μόνο ένα supervised πέρασμα σε φυσική συσκευή, ο simulator δεν έχει κάμερα, βλ.
+> `OWNER_DECISIONS.md` #9), P23 (share-sheet capture, χρειάζεται native config plugin + EAS dev build, ξεχωριστό
+> από το P17 blocker) μένουν τεχνικά ανοιχτά αλλά κανένα δεν είναι «απλώς χτίσ' το» unattended. Σημ.: το
+> `ASK_ACHILLEAS.md` που ανέφεραν προηγούμενες σαρώσεις **δεν υπάρχει πια στο repo** (verified `find` — 0 hits),
+> η απάντησή του μάλλον απορροφήθηκε στο `OWNER_DECISIONS.md` (#9, interactive session 2026-07-27)· διόρθωσα το
+> stale reference εδώ, καμία άλλη ενέργεια χρειάζεται.
+> **Καμία ρητή έγκριση Proposed→Approved σε 15 διαδοχικές σαρώσεις** — το batch-review πρόταση της 16ης σάρωσης
+> παραμένει σε ισχύ και ενισχύεται· το Proposed queue έφτασε **33 items (P37-P74, εξαιρουμένου του P63 που
+> μετακινήθηκε στο `## Done` σε προηγούμενη σάρωση — ήταν ήδη SHIPPED αλλά είχε μείνει σωματικά στο Proposed section)**.
 > Ζωντανό grep σε κάθε σάρωση επιβεβαιώνει ότι κανένα Proposed item δεν έχει χτιστεί εν τω μεταξύ χωρίς ρητή
-> έγκριση (re-verified 19η σάρωση: `Bill.payments`/`paymentSplits`/`space` σε Receipt/Subscription μοντέλα =
-> 0 hits, όλα ακόμα genuinely unbuilt). Σημ. (16η σάρωση, ισχύει ακόμα): το `/network` (UniFi) module αφαιρέθηκε
-> ρητά από το codebase (commit `5eb912d`, "Strip personal info" pivot) — μην ξαναπροταθεί δικτυακό/hardware
-> monitoring, `docs/features.md` έχει ακόμα stale αναφορά (docs-debt, όχι product backlog item).
+> έγκριση (re-verified 20ή σάρωση: `verifyBackup`/`trackingNumber`/split σε Subscription μοντέλο = 0 hits, όλα
+> ακόμα genuinely unbuilt — δες παρακάτω τα 3 νέα P72-P74). Σημ. (16η σάρωση, ισχύει ακόμα): το `/network` (UniFi)
+> module αφαιρέθηκε ρητά από το codebase (commit `5eb912d`, "Strip personal info" pivot) — μην ξαναπροταθεί
+> δικτυακό/hardware monitoring, `docs/features.md` έχει ακόμα stale αναφορά (docs-debt, όχι product backlog item).
+> Δεδομένου του μεγέθους της ουράς (33 proposed, μηδέν έγκριση σε 15 σαρώσεις), το πιο χρήσιμο επόμενο βήμα είναι
+> πλέον ένα **interactive batch-review με τον Αχιλλέα** (ίδιο idiom με το batch approval 2026-07-09/10 των P1/P3/
+> P5-P36) παρά νέα προτεινόμενα items — ο planner θα συνεχίσει να προσθέτει μικρό αριθμό (≤3-5) νέων candidates
+> ανά σάρωση όπως ζητά το task file, αλλά ο ρυθμός εύρεσης πλέον ξεπερνά κατά πολύ τον ρυθμό απόφασης.
 > **19η σάρωση (2026-07-28) — 3 νέοι candidates P69-P71**, και οι τρεις live-verified με grep/read κώδικα:
 > (1) **P71** — υπάρχει ήδη ένα έτοιμο AES-256-GCM primitive (`lib/tenancy/secretCrypto.ts`, σήμερα μόνο για το
 > SaaS BYO-key) αλλά **κανένα** module για μικρά προσωπικά text-secrets (WiFi/router/NAS admin logins, license
@@ -34,12 +42,76 @@
 > (MAC/serial/rack-unit). (3) **P69** — το Reports monthly-spend chart είναι μόνο rolling window (6/12/24 μήνες),
 > **καμία** year-over-year σύγκριση ίδιου μήνα (verified `grep -rn "yoy\|previousYear\|lastYear"` = 0 hits) — με
 > δύο σπίτια εποχιακά διαφορετικά (P34), «είναι αυτό φυσιολογικό για την εποχή;» δεν απαντιέται σήμερα.
+> **20ή σάρωση (2026-07-29) — 3 νέοι candidates P72-P74**, και οι τρεις live-verified με grep (μηδέν hits πριν
+> την πρόταση, όχι απλά «νομίζω ότι λείπει»): (1) **P74** — καμία μεταφορά δεν επαληθεύει ότι ένα backup αρχείο
+> είναι όντως restorable (`grep -rn "verifyBackup\|backupHealth\|restoreTest\|integrityCheck"` = 0 hits)· το ήδη-
+> shipped `exportData`/`backup.sh` γράφει το αρχείο αλλά ποτέ δεν το ξανα-διαβάζει για να επιβεβαιώσει ότι είναι
+> έγκυρο, διακριτό από P54 (encryption-at-rest) και P48 (mirror-sync staleness — αυτό είναι για το ίδιο το
+> περιεχόμενο, όχι για το αν έφτασε στο remote). (2) **P73** — το `Subscription` model έχει μηδέν split πεδίο
+> (`grep -n "split\|Split" models/Subscription.ts` = 0 hits) ενώ το `lib/split.ts` (P35, ήδη-shipped, pure/DB-free)
+> καλύπτει ήδη ακριβώς αυτό το σχήμα για Expenses — μια οικογενειακή συνδρομή (Netflix/Spotify family plan) που
+> μοιράζεται με σπίτι/φίλους δεν έχει σήμερα κανέναν τρόπο να δείξει «ποιος χρωστάει τι ανά κύκλο» χωρίς να
+> περνά χειροκίνητα από Expenses κάθε φορά. (3) **P72** — το `Item.status` έχει ήδη `'ordered'` state (verified
+> `ITEM_STATUSES` στο `models/Item.ts`) αλλά **κανένα** πεδίο tracking number/carrier/delivery-status
+> (`grep -rn "trackingNumber\|carrier\|shipment\|deliveryStatus"` = 0 hits, web + mobile) — ένα shopping item σε
+> "ordered" είναι σήμερα ένα μαύρο κουτί μέχρι να φτάσει, καμία σύνδεση με το πραγματικό courier tracking.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P74. Backup restore verification (αυτόματο integrity self-test, όχι μόνο export) — S — OSS (self-host trust lever)
+- **Αξία:** live-verified `grep -rn "verifyBackup|backupHealth|restoreTest|integrityCheck" apps/web/src` = 0 hits.
+  Το ήδη-shipped `exportData()` (Settings → Backup/Restore) + το nightly `backup.sh` (CLAUDE.md) **γράφουν** το
+  backup αρχείο αλλά ποτέ δεν το ξανα-διαβάζουν για να επιβεβαιώσουν ότι είναι έγκυρο JSON με τα αναμενόμενα
+  collections/counts — ένα σιωπηλά κομμένο/corrupted backup (δίσκος γέμισε στη μέση της εγγραφής, bad JSON) δεν
+  γίνεται αντιληπτό μέχρι την πραγματική στιγμή ανάγκης restore, δηλαδή τη χειρότερη δυνατή στιγμή. Νέο μικρό
+  **«Verify last backup»** action (Settings → Storage & backup): διαβάζει το πιο πρόσφατο export/backup αρχείο,
+  ελέγχει valid JSON + αναμενόμενα top-level keys/collection counts > 0 (χωρίς πραγματικό restore/side-effect) →
+  «✓ Verified 2026-07-29, 240 receipts, 66 items, ...» ή ξεκάθαρο error αν κάτι λείπει/είναι corrupted. **Διακριτό**
+  από P54 (encryption-at-rest, δεν αγγίζει το plaintext backup flow) και P48 (mirror-sync staleness = έφτασε στο
+  remote ή όχι, όχι αν το ίδιο το περιεχόμενο είναι έγκυρο).
+- **Module:** Settings → Storage & backup (νέο read-only action πάνω στο ήδη-υπάρχον export/backup path).
+- **Ανοιχτή απόφαση (builder default):** MVP = structural validation μόνο (valid JSON + non-zero collection
+  counts + βασικό schema-shape check), ΟΧΙ πλήρες test-restore σε sandbox DB (πολύ πιο ακριβό/ρίσκο για S item)·
+  ελέγχει το τελευταίο τοπικό backup αρχείο (`~/Backups/pharos/` ή το configured backup dir), δεν κατεβάζει από
+  remote mirror (out of scope εδώ, αυτό είναι το P48).
+
+### P73. Recurring subscription cost-split among household members (family-plan «ποιος χρωστάει τι» ανά κύκλο) — S — OSS (κυρίως), βοηθά dogfooding
+- **Αξία:** live-verified `grep -n "split\|Split" apps/web/src/models/Subscription.ts` = 0 hits — το ήδη-shipped
+  P35 expense-splitting (`lib/split.ts`, pure/DB-free `SplitEntry`/`equalSplit`/`computeBalances`) καλύπτει μόνο
+  **Expenses**, όχι **Subscriptions**. Πραγματικό σενάριο: μια οικογενειακή συνδρομή (Netflix/Spotify/iCloud
+  family plan, YouTube Premium family) χρεώνεται αυτόματα κάθε μήνα στην κάρτα του Αχιλλέα αλλά μοιράζεται με
+  σπίτι/φίλους — σήμερα το «ποιος μου χρωστάει πόσο αυτόν τον μήνα» χρειάζεται είτε χειροκίνητη δημιουργία ενός
+  ξεχωριστού Expense κάθε κύκλο (διπλή καταχώρηση, εύκολο να ξεχαστεί), είτε καθόλου tracking. Reuse ατόφιο του
+  `lib/split.ts` (μηδέν νέος υπολογισμός) πάνω σε νέο optional `Subscription.split: SplitEntry[]` → κάθε φορά που
+  το `generateDueRecurring`-style μηχανισμό περνά έναν νέο κύκλο, το split εμφανίζεται στην κάρτα της συνδρομής
+  (ίδιο «⇄ €X owed» badge idiom με το ήδη-shipped Expenses UI). **Διακριτό** από P62 (split ΜΕΘΟΔΩΝ πληρωμής της
+  ίδιας αγοράς) — εδώ είναι split ΑΤΟΜΩΝ πάνω σε ΕΠΑΝΑΛΑΜΒΑΝΟΜΕΝΗ χρέωση, ίδιο μοτίβο με P35 αλλά σε άλλο μοντέλο.
+- **Module:** Subscriptions (νέο optional πεδίο + `SplitEditor` reuse από Expenses UI, ίδιο component/pattern).
+- **Ανοιχτή απόφαση (builder default):** το split ζει στο ίδιο το Subscription doc (static, ίδιο ποσό/μερίδιο κάθε
+  κύκλο) — ΟΧΙ per-cycle history αρχικά (MVP απλούστερο, «ισχύει μέχρι να το αλλάξεις»)· «settle»/balances tracking
+  reuse το ήδη-shipped `computeBalances` pattern των Expenses χωρίς νέο υπολογισμό· κενό `split[]` = σημερινή
+  συμπεριφορά αμετάβλητη.
+
+### P72. Shipment/delivery tracking για items σε «ordered» status (tracking number + carrier + status) — S — OSS (κυρίως), dogfooding-heavy
+- **Αξία:** live-verified: το `Item.status` έχει ήδη `'ordered'` (`ITEM_STATUSES` στο `models/Item.ts`) αλλά
+  `grep -rn "trackingNumber|carrier|shipment|deliveryStatus" apps/web/src apps/mobile/src` = 0 hits παντού. Ο
+  Αχιλλέας παραγγέλνει τακτικά από πολλαπλά κανάλια με πολύ διαφορετικούς χρόνους παράδοσης (AliExpress 2-3
+  εβδομάδες, Amazon.de 2-4 μέρες, GR same-day, βλ. CLAUDE.md shipping-notes preference) — σήμερα ένα item σε
+  «ordered» δεν λέει τίποτα για το πού βρίσκεται το πακέτο, ο χρήστης πρέπει να θυμάται/ψάχνει ξεχωριστά σε κάθε
+  courier site. Optional `Item.trackingNumber` + `Item.carrier` (free-string, όχι fixed carrier list — reuse του
+  ήδη-υπάρχοντος relaxed-enum idiom) + `Item.trackingUrl` (auto-suggested link pattern ανά γνωστό courier, όπως
+  το ήδη-υπάρχον store-alias resolution) εμφανίζεται **μόνο** όταν `status==='ordered'` στο item detail — απλό
+  quick-link «Track package» ανοίγει το courier site, **όχι** live carrier API polling (out of scope, θα χρειαζόταν
+  ανά-courier integration/κόστος). Optional follow-up: auto-flip σε «received» όταν ο χρήστης πατήσει «arrived»
+  δίπλα στο tracking widget (μία λιγότερη χειροκίνητη ενέργεια).
+- **Module:** Items/Shopping (2-3 νέα optional πεδία στη φόρμα, ορατά μόνο σε status=ordered).
+- **Ανοιχτή απόφαση (builder default):** MVP = πεδία + manual «open tracking link» (κενό = σημερινή συμπεριφορά
+  αμετάβλητη)· carrier ως free string με λίγα auto-suggest chips (Cosmote/ELTA/ACS/Speedex/DHL/UPS τα πιο κοινά GR)
+  ώστε το tracking-URL template να δουλεύει χωρίς fixed enum· καμία live API polling σε αυτό το MVP.
 
 ### P71. Personal secrets vault (WiFi/router/NAS admin logins, license keys, recovery codes) — S/M — OSS (κυρίως), «Personal Hub» fit
 - **Αξία:** live-verified `grep -rn "vault\|SecretNote" apps/web/src/models` = μόνο το P21 document/manual vault
