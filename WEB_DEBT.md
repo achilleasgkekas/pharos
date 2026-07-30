@@ -3,7 +3,11 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
-## Σύνοψη audit (2026-07-26 60η σάρωση [reviewer routine]· type-check web+mobile EXIT 0· 81 commits ελέγχθηκαν [`64a6ead..HEAD`]· 2 νέα P2/M queue items [tenancy-parity gap, ίδια κλάση με τα ήδη-κλεισμένα vouchers/giftcards/loyaltycards]· μηδέν P1· el.ts i18n gap 6→30 [νέα en keys από FX-audit UI, μικρό, δεν αξίζει ξεχωριστό item ακόμα])
+## Σύνοψη audit (2026-07-30 61η σάρωση [reviewer routine]· type-check web+mobile EXIT 0· 11 commits ελέγχθηκαν [`9ae1b1b..74a0f12`]· και τα 3 προηγούμενα P2 items (bills/statements/vouchers) confirmed DONE στον κώδικα → ουρά άδειασε· 6 νέα P2 queue items από standing scan [ίδια κλάση tenancy-parity gap, επόμενο batch αφού άδειασε η ουρά]· μηδέν P1· el.ts i18n gap σταθερό ~30)
+
+> **Έλεγχος διαφοράς**: `git log 9ae1b1b..HEAD` = 11 commits. Κύριο: **`a33fd34`** ολοκλήρωσε το `statements/actions.ts` tenant-scoping (14 exported functions + Card + Receipt, νέο `actions.tenant.test.ts` 8 tests με negative control) — διαβάστηκε το πλήρες diff γραμμή-γραμμή, mechanical wrap ίδιο recipe με τα ήδη-κλεισμένα siblings, `assertCanWrite()`/Zod parse σωστά μένουν έξω από το `withRequestTenant` wrap (ίδιο με bills/vouchers), οι 3 internal signature-mutators + `findOrCreateCard` σωστά resolve-άρουν από ambient tenant (μόνο callers τους είναι ήδη-wrapped exports). **`a17243a`** πρόσθεσε `/api/saas/admin/audit/export` (CSV του platform audit feed): read-only, πίσω από `requireSuperadmin`, RFC 4180 quoting + CSV-injection guard (`=+-@\t\r` prefix escape) + UTF-8 BOM για ελληνικά ονόματα, ξεχωριστό 5000-row ceiling από το 200-row page cap, άγνωστο tenant slug → 404 (όχι header-only CSV που δείχνει "τίποτα δεν έγινε") — καθαρό. **`a98f2b2`** test-only (12 tests, calendar feed CRUD). Τα υπόλοιπα 6 commits είναι docs/progress-log (μηδέν κώδικας). `npm run type-check` (web) EXIT 0· `npx tsc --noEmit` (mobile) EXIT 0.
+> **Ουρά άδειασε**: και οι 3 προηγούμενες P2 εγγραφές (`bills/actions.ts`, `statements/actions.ts`, `vouchers/page.tsx`) είναι πλέον `Status: DONE` με βάση επιβεβαιωμένο κώδικα (`grep -c "withRequestTenant\|currentModel"` θετικό και στα 3 αρχεία). Καμία ενεργή queue εγγραφή δεν έμεινε πριν από αυτό το scan.
+> **Νέο standing-scan εύρημα (ίδιας κλάσης με τα μόλις-κλεισμένα bills/statements/vouchers)**: grep για action-αρχεία που κάνουν `import { X } from '@/models/...'` αλλά ΠΟΤΕ δεν αναφέρουν `currentModel`/`withRequestTenant` εντόπισε **6 ακόμα** αρχεία εκτός του ήδη-γνωστού κύκλου (items/receipts/expenses/vouchers/giftcards/loyaltycards/bills/statements, όλα ήδη DONE). Επιβεβαιώθηκε ότι **δεν** είναι false positive: το `Task` model καλείται ήδη μέσω `currentModel(TaskModel)` από το `items/actions.ts:835`, και το `Subscription` model ήδη μέσω `currentModel(Subscription)` από το `lib/fxAudit.ts:109` και `settings/sampleDataActions.ts` (×3) — δηλαδή άλλα σημεία του κώδικα ήδη αντιμετωπίζουν αυτά τα δύο models ως tenant-scoped, αλλά τα ΚΥΡΙΑ CRUD action-αρχεία τους όχι. `login/actions.ts` και `setup/actions.ts` εξαιρέθηκαν σκόπιμα (νόμιμα pre-tenant/global: auth identifies the tenant, initial setup wizard προηγείται οποιουδήποτε tenant). Προστέθηκαν 6 νέα P2 items παρακάτω (ίδιο recipe, wrap κάθε exported DB-touching function σε `withRequestTenant(async () => { const X = await currentModel(XModel); ... })`).
 
 > **Έλεγχος διαφοράς**: `git log 64a6ead..HEAD` = 81 commits, κυρίως το **P9 multi-currency rollout** (Bills/Subscriptions/Items/Statements/Expenses/Receipts, web+mobile, ολοκληρώθηκε σε αυτό το διάστημα) + SaaS route-test coverage (password-reset, audit trail, invites, members, usage, account/export/reset/workspaces) + P63 backup-model completeness fix (`lib/backupModels.ts`, 7 models που το JSON backup σιωπηλά έριχνε). Production-code diff (χωρίς tests/docs) ελέγχθηκε γραμμή-γραμμή από sub-agent review: **FX conversion math** (`lib/fx.ts`, `lib/fxApply.ts`, `lib/fxAudit.ts`, mobile `fx.ts`) traced σε κάθε write path (Bills/Items/Statements/Expenses/Subscriptions, mobile+web, CSV import rate-map, reports FX-audit apply-in-place) → σωστή κατεύθυνση παντού (`amount = origAmount * fxRate`, `toPrinted` σωστά inverts, χωρίς sign/base-vs-printed confusion). **v1 API↔mobile shape parity** ελέγχθηκε σε κάθε touched route (bills/expenses/items/statements) έναντι `apps/mobile/src/api.ts` → όλα τα νέα πεδία (`currency`/`origAmount`/`fxRate`) additive και mirrored σωστά και στις δύο πλευρές· το προϋπάρχον "λάθος symbol πάνω σε σωστό ποσό" bug pattern (list badge δείχνει `item.currency` αντί για `base`) διορθώθηκε σωστά παντού σε αυτό το batch. **Mobile hardcoded-token sweep** (μετά το πρόσφατο borderRadius→RADIUS refactor): `FxControls.tsx`/`BillsScreen.tsx`/`MoneyScreen.tsx`/`SubscriptionsScreen.tsx` χρησιμοποιούν αποκλειστικά `C`/`RADIUS`/`SPACE`/`SIZE` tokens, μηδέν νέο magic hex/radius. **Secrets sweep** (grep για key/token/password/PEM patterns στο πλήρες diff) → μηδέν committed secret (μόνο prose στα PROGRESS.md entries που περιγράφουν token-lifecycle testing). `npm run type-check` (web) EXIT 0· `npx tsc --noEmit` (mobile) EXIT 0.
 > **Νέο εύρημα (και τα δύο ίδιας κλάσης με το ήδη-ανοιχτό `vouchers/page.tsx` item παρακάτω, δεν είναι single-edit auto-fixable — πολυ-function αρχεία, θέλουν το ίδιο recipe με το ήδη-κλεισμένο vouchers/giftcards/loyaltycards fix)**:
@@ -19,7 +23,91 @@
 >   - `npm run type-check` EXIT 0 μετά τα δύο fixes· full `npx vitest run` **3613/3613 green** (ίδιο count με πριν, μηδέν regression).
 > **el.ts i18n gap**: **6** (όχι πια 126 — ο builder το έκλεισε ήδη στο `2cd33fb`, `en=1277, el=1271`). Πολύ μικρό υπόλοιπο πλέον, δεν αξίζει ξεχωριστό P3 item· θα μαζευτεί στο επόμενο batch αν μεγαλώσει.
 
-## Web Debt Queue — ενεργά items (60η σάρωση 2026-07-26)
+## Web Debt Queue — ενεργά items (61η σάρωση 2026-07-30)
+
+### `subscriptions/actions.ts` παρακάμπτει το tenant-scoping (Subscription ήδη αντιμετωπίζεται ως tenant-scoped αλλού)
+- Priority: P2
+- Size: M
+- Area: db
+- Files: apps/web/src/app/subscriptions/actions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα**: `createSubscription`/`updateSubscription`/`toggleSubscriptionActive`/`deleteSubscription`/`discoverUntrackedRecurring`/`trackDiscoveredSubscription` κάνουν direct `Subscription.create`/`findByIdAndUpdate`/`find` (+ `Expense.find` στο discovery), χωρίς `withRequestTenant`/`currentModel`. Ασυμμετρία: το `lib/fxAudit.ts` και το `settings/sampleDataActions.ts` ΗΔΗ διαβάζουν/γράφουν το ίδιο `Subscription` model μέσω `currentModel(Subscription)`.
+  - **Γιατί έχει σημασία**: σε SaaS mode το FX-audit panel θα δούλευε per-tenant σωστά, αλλά η κανονική `/subscriptions` σελίδα θα διάβαζε/έγραφε πάντα στο DEFAULT tenant DB — ίδιο internal-asymmetry risk με το statements/fxAudit gap που μόλις έκλεισε. Μηδέν επίδραση self-hosted.
+  - **Fix**: ίδιο recipe: `import { Subscription as SubscriptionModel }` + `currentModel`/`withRequestTenant`, wrap κάθε exported function. Το `discoverUntrackedRecurring` διαβάζει ΚΑΙ `Expense` — scope και τα δύο models μέσα στο ίδιο wrap.
+  - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/subscriptions/actions.ts` ≥ όσα exported functions κάνουν DB access· npm run type-check exits 0· υπάρχον subscriptions test file παραμένει green.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-30, 61η σάρωση reviewer routine)
+
+### `tasks/actions.ts` παρακάμπτει το tenant-scoping (Task ήδη αντιμετωπίζεται ως tenant-scoped αλλού)
+- Priority: P2
+- Size: S
+- Area: db
+- Files: apps/web/src/app/tasks/actions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα**: `createTask`/`updateTaskStatus`/`deleteTask`/`updateTaskDetails`/`addStep`/`toggleStep`/`deleteStep` κάνουν direct `Task.create`/`findByIdAndUpdate`, χωρίς wrap. Το `items/actions.ts:835` ΗΔΗ καλεί `currentModel(TaskModel)` για το ίδιο model (cross-module «convert to task» flow) — ίδια ασυμμετρία κλάση.
+  - **Γιατί έχει σημασία**: σε SaaS mode το task που δημιουργείται από ένα item θα πήγαινε στο σωστό tenant DB, αλλά όλα τα tasks που δημιουργούνται/επεξεργάζονται απευθείας από `/tasks` θα πήγαιναν πάντα στο DEFAULT. Μηδέν επίδραση self-hosted.
+  - **Fix**: ίδιο recipe, μικρό αρχείο (7 exports).
+  - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/tasks/actions.ts` ≥ 7· npm run type-check exits 0.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-30, 61η σάρωση reviewer routine)
+
+### `shopping-list/actions.ts` παρακάμπτει το tenant-scoping
+- Priority: P2
+- Size: S
+- Area: db
+- Files: apps/web/src/app/shopping-list/actions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα**: `getListItems`/`addListItem`/`updateListItem`/`toggleListItem`/`deleteListItem`/`clearChecked` κάνουν direct `ShoppingListItem.find`/`create`/κλπ, χωρίς wrap.
+  - **Γιατί έχει σημασία**: ίδια κλάση με τα ήδη-κλεισμένα money modules — σε SaaS mode η λίστα ψωνιών ενός tenant θα πήγαινε στο DEFAULT DB αντί στο δικό του. Μηδέν επίδραση self-hosted.
+  - **Fix**: ίδιο recipe.
+  - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/shopping-list/actions.ts` ≥ 6· npm run type-check exits 0.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-30, 61η σάρωση reviewer routine)
+
+### `history/actions.ts` παρακάμπτει το tenant-scoping (AI conversation history)
+- Priority: P2
+- Size: S
+- Area: db
+- Files: apps/web/src/app/history/actions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα**: `getConversations`/`deleteConversation`/`clearConversations` κάνουν direct `Conversation.find`/κλπ, χωρίς wrap.
+  - **Γιατί έχει σημασία**: το AI command-bar chat history ενός tenant θα ήταν ορατό/διαγράψιμο μόνο μέσω του DEFAULT DB σε SaaS mode (πιθανώς μπερδεύοντας tenants μεταξύ τους ή δείχνοντας άδειο ιστορικό). Μηδέν επίδραση self-hosted.
+  - **Fix**: ίδιο recipe, μικρό αρχείο (3 exports).
+  - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/history/actions.ts` ≥ 3· npm run type-check exits 0.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-30, 61η σάρωση reviewer routine)
+
+### `notifications/actions.ts` παρακάμπτει το tenant-scoping (διαβάζει 6 models, γράφει Notification)
+- Priority: P2
+- Size: M
+- Area: db
+- Files: apps/web/src/app/notifications/actions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα**: `generateNotifications`/`getNotifications`/`markNotificationRead`/`markAllNotificationsRead`/`dismissNotification`/`clearAllNotifications` + ο εσωτερικός scan διαβάζουν `Item`/`Statement`/`Expense`/`Subscription`/`GiftCard`/`Bill` και γράφουν `Notification`, όλα direct import χωρίς wrap.
+  - **Γιατί έχει σημασία**: μεγαλύτερο blast radius από τα προηγούμενα (6 models σε ένα function) — σε SaaS mode τα deal/warranty/trial/price-hike alerts ενός tenant θα σαρωνόντουσαν πάντα το DEFAULT tenant's δεδομένα. Μηδέν επίδραση self-hosted.
+  - **Fix**: ίδιο recipe· scope και τα 7 models (6 read + Notification write) μέσα στο ίδιο `withRequestTenant` block ανά exported function.
+  - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/notifications/actions.ts` ≥ 6· npm run type-check exits 0.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-30, 61η σάρωση reviewer routine)
+
+### `settings/actions.ts` — μερικά exports (alerts/backup/CSV export/store-dedup) παρακάμπτουν το tenant-scoping
+- Priority: P2
+- Size: L
+- Area: db
+- Files: apps/web/src/app/settings/actions.ts
+- Depends on: none
+- Acceptance:
+  - **Το πρόβλημα**: μεγάλο, πολυδιάστατο αρχείο (30+ exports: AI config, ntfy, webhooks, prompts, storage/OneDrive, IMAP, lists, stores, backup/export, budgets). Τα καθαρά `AppConfig`-only exports (AI toggles, defaults, ntfy config) είναι νόμιμα instance-level και ΔΕΝ χρειάζονται tenant-scoping. Αλλά αρκετά exports διαβάζουν/γράφουν per-tenant collections direct: `runAlertChecks` (Item/Receipt/Statement/Expense/Subscription/GiftCard/Bill), `syncToRemote`/backup helpers (Receipt/Statement/Expense), `listStores`/`saveStore`/`deleteStore`/`findDuplicateStores`/`mergeStores` (Store/Receipt/Item), `exportData`/`exportCSV`/`exportInsuranceBundle`/`exportTaxBundle` (Receipt/Item/Statement/Expense).
+  - **Γιατί έχει σημασία**: ίδια κλάση — σε SaaS mode ένα tenant's "Export CSV"/"Backup"/"Alerts" θα διάβαζε πάντα το DEFAULT tenant's δεδομένα αντί για τα δικά του. Μηδέν επίδραση self-hosted.
+  - **Fix**: ΔΙΑΦΟΡΕΤΙΚΟ από τα προηγούμενα — αυτό το αρχείο χρειάζεται επιλεκτικό wrap (μόνο τα exports που αγγίζουν per-tenant models, ΟΧΙ τα AppConfig-only), οπότε είναι μεγαλύτερο (L) και θέλει προσεκτικό διάβασμα πριν το edit. Καλή αρχή: μια πρώτη περνιά μόνο στα 4 export/backup functions (μικρότερο blast radius, ξεκάθαρα per-tenant data), μετά ξεχωριστό follow-up για `runAlertChecks`/stores.
+  - Επαλήθευση: npm run type-check exits 0· υπάρχον settings test files παραμένουν green· κάθε αλλαγμένο export να έχει αντίστοιχο `currentModel` call.
+  - npm run type-check exits 0
+- Status: TODO (flagged 2026-07-30, 61η σάρωση reviewer routine· μεγαλύτερο απ' τα υπόλοιπα 5, ίσως θέλει να σπάσει σε sub-items όταν αναλάβει builder)
 
 ### `bills/actions.ts` παρακάμπτει το tenant-scoping (ίδια κλάση με τα ήδη-κλεισμένα vouchers/giftcards/loyaltycards)
 - Priority: P2

@@ -2,9 +2,38 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 9ae1b1b -->
+<!-- reviewed: 74a0f12 -->
 <!-- docker-validated: ee08552 -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-30 (reviewer — έλεγχος 9ae1b1b..74a0f12, 11 commits)
+
+Σάρωση 61 (reviewer routine). `git log 9ae1b1b..HEAD` = 11 commits, το κύριο `a33fd34` (statements/actions.ts
+tenant-scoping, το τελευταίο ανοιχτό P2 του WEB_DEBT — 14 exported functions + Card + Receipt, νέο
+`actions.tenant.test.ts` 8 tests με negative control). Πλήρες line-by-line review του diff: mechanical wrap ίδιο
+recipe με τα ήδη-κλεισμένα bills/vouchers, `assertCanWrite()`/Zod parse σωστά εκτός wrap, internal signature-mutators
++ `findOrCreateCard` σωστά resolve-άρουν από ambient tenant. Δεύτερο ουσιαστικό commit `a17243a` (CSV export για το
+platform audit feed, `/api/saas/admin/audit/export`): read-only, `requireSuperadmin`-gated, RFC 4180 + injection-guard
++ UTF-8 BOM, ξεχωριστό 5000-row ceiling, unknown-tenant→404 — καθαρό. `a98f2b2` test-only. Τα υπόλοιπα 6 commits
+docs/progress-log, μηδέν κώδικας.
+
+**Validate**: `npm run type-check` (web) EXIT 0· `npx tsc --noEmit` (mobile) EXIT 0 (και τα δύο καθαρά, μηδέν fix
+χρειάστηκε). Καμία μικρή/ασφαλής διόρθωση απαιτήθηκε σε αυτό το run.
+
+**WEB_DEBT.md**: και τα 3 προηγούμενα ενεργά P2 (bills/statements/vouchers tenant-scoping) confirmed DONE στον
+κώδικα → η ουρά άδειασε. Standing scan (grep για action-αρχεία που import μοντέλα αλλά ποτέ `currentModel`/
+`withRequestTenant`) βρήκε **6 νέα P2 items** ίδιας κλάσης: `subscriptions/actions.ts` και `tasks/actions.ts` (και
+τα δύο confirmed ασύμμετρα — το `Subscription`/`Task` model ήδη αντιμετωπίζεται ως tenant-scoped από
+`lib/fxAudit.ts`/`settings/sampleDataActions.ts`/`items/actions.ts` αντίστοιχα, αλλά όχι από τα ίδια τα CRUD action
+αρχεία τους), `shopping-list/actions.ts`, `history/actions.ts` (AI conversation history), `notifications/actions.ts`
+(διαβάζει 6 models), και `settings/actions.ts` (P2/L, μεγάλο πολυδιάστατο αρχείο — μόνο τα exports που αγγίζουν
+per-tenant collections όπως backup/CSV export/store-dedup/alerts χρειάζονται wrap, όχι τα AppConfig-only). Όλα
+Files/Acceptance/Fix γραμμένα στο WEB_DEBT.md, ίδιο recipe με τα ήδη-κλεισμένα. `login/actions.ts`/`setup/actions.ts`
+εξαιρέθηκαν σκόπιμα (νόμιμα pre-tenant). el.ts i18n gap σταθερό ~30, δεν αξίζει ξεχωριστό item.
+
+**Routine health**: PROGRESS.md/OSS_PROGRESS.md/SAAS_PROGRESS.md/apps/landing/LANDING_PROGRESS.md όλα προχωράνε
+κανονικά, μηδέν σημάδι κολλήματος. Κανένα νέο OPEN item σε `~/.claude/ASK_ACHILLEAS.md` addressed σε `reviewer`
+(το `reviewer-20260727-2010` είναι ήδη APPLIED).
 
 ## 2026-07-30 (docker-health)
 
