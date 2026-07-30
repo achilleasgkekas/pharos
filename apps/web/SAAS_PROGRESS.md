@@ -693,3 +693,9 @@ export** (`/admin/audit?format=csv` — compliance-χρήσιμο, ο reader `ad
 είναι testαρισμένος, καθαρά μέσα στο territory)· (β) **actor filter** στο platform feed (email
 operator → Account lookup πριν το query)· (γ) αλλιώς επόμενο backend increment από TODO.md #5-#12.
 Πριν ξεκινήσεις: ask-inbox πρώτα, μετά UI scan.
+
+---
+
+> **ΤΟ LOG ΣΥΝΕΧΙΖΕΤΑΙ ΣΤΟ REPO-ROOT `SAAS_PROGRESS.md`.** Αυτό το αρχείο κρατά τα increments
+> 1-59 (έως 2026-07-10) και το increment 127 (2026-07-29), που γράφτηκε εδώ κατά λάθος — τα
+> increments 60+ ζουν στο root αρχείο. Νέες εγγραφές **μόνο** εκεί.

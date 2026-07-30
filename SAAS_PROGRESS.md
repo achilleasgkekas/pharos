@@ -6267,3 +6267,109 @@ stack τρέχει self-hosted με SAAS_MODE off, και **δεν γυρίζω 
 ανά email operator — χρειάζεται ένα Account lookup email→id πριν το query, σκόπιμα το άφησα έξω
 από αυτό το increment)· (γ) αλλιώς επόμενο backend increment από TODO.md #5-#12. Πριν ξεκινήσεις:
 ask-inbox πρώτα, μετά UI scan.
+
+## 2026-07-30 — increment 128: CSV export του platform audit feed (/api/saas/admin/audit/export)
+
+**Housekeeping πρώτα, γιατί αλλιώς το log σπάει στη μέση.** Υπάρχουν **δύο** αρχεία
+`SAAS_PROGRESS.md`: αυτό (repo root, increments 60-126) και το `apps/web/SAAS_PROGRESS.md`
+(increments 1-59, το αρχικό). Το προηγούμενο run έγραψε το **increment 127** (Greek
+transliteration για τα subdomains, commit `5ab349f`) στο **παλιό** αρχείο, οπότε η χρονολογική
+συνέχεια εδώ είχε μια τρύπα. Δεν αντιγράφω το κείμενο (ζει πλήρες εκεί, ~70 γραμμές), βάζω
+δείκτη: **increment 127 = `lib/tenancy/translit.ts`**, ελληνικά→λατινικά πριν το `a-z0-9` filter
+του `slugify` («Πλαίσιο ΑΕ» → `plaisio-ae`), εκτέλεση του εγκεκριμένου
+`pharos-saas-core-20260728-0038` (τώρα APPLIED), 14 νέα tests + 4 pinned γυρισμένα. Στο τέλος
+του παλιού αρχείου προστέθηκε γραμμή που παραπέμπει εδώ, ώστε να μη ξανασυμβεί.
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine. **UI-first scan**: πήρα το (α) της
+προτεινόμενης σειράς — **audit CSV export**, το πρώτο πράγμα που λείπει από το `/admin/audit` που
+έφτιαξε το increment 126.
+
+**Γιατί υπάρχει.** Ο feed στην οθόνη απαντά «τι γίνεται τώρα», αλλά τα δύο πράγματα που **δεν**
+γίνονται σε ένα paginated HTML table είναι (α) να δώσεις σε ελεγκτή ένα αρχείο που καλύπτει
+ολόκληρο ένα incident window και (β) να κάνεις pivot/grep το trail offline. Και τα δύο θέλουν
+**ΕΝΑ** flat file με όλες τις στήλες, όχι 50 γραμμές τη φορά πίσω από keyset cursor.
+
+**`lib/tenancy/adminAuditCsv.ts` (νέο, PURE)** — μηδέν DB/next/React, όλη η impure δουλειά μένει
+στο ήδη υπάρχον `listPlatformAudit`. Περιεχόμενο: `csvCell` (RFC 4180 quoting + **CSV-injection
+guard** για leading `= + - @ TAB CR`, η ίδια σύμβαση με `settings/actions.ts toCSV` /
+`taxExport.ts` / `insuranceExport.ts`), `PLATFORM_AUDIT_CSV_HEADERS` (10 στήλες),
+`platformAuditCsvRow`, `buildPlatformAuditCsv`, `parseAuditExportQuery`,
+`platformAuditCsvFilename`.
+
+Τέσσερις αποφάσεις που αξίζουν να είναι γραμμένες:
+
+1. **Ξεχωριστό export ceiling.** Το `parseAdminAuditQuery` κλαμπάρει το `limit` στο **200**
+   (`MAX_PLATFORM_AUDIT_PAGE`), σωστό για σελίδα, **άχρηστο για αρχείο**. Το
+   `parseAuditExportQuery` delegate-άρει action/tenant/cursor στον parser της σελίδας (ίδια
+   σημασιολογία → το «Download CSV» link κουβαλά τα φίλτρα αυτούσια) και **ξανα-υπολογίζει** το
+   limit από το raw param με ceiling **5000** / default **1000**. Αν το ξεχνούσα, κάθε export θα
+   κοβόταν στα 200 **ενώ θα έμοιαζε με πλήρες αρχείο** — pinned με test.
+2. **UTF-8 BOM μέσα στον builder**, όχι στο route. Το πιο πιθανό περιεχόμενο της στήλης
+   Workspace είναι **ελληνικό όνομα**, και το Excel σε Windows διαβάζει BOM-less UTF-8 CSV ως
+   legacy codepage → «Πλαίσιο» γίνεται mojibake και το export μοιάζει σπασμένο. Ένα σημείο που
+   μπορεί να πάει λάθος, με test.
+3. **Και raw verb ΚΑΙ human label** (`member.added` + «Member added») ως δύο στήλες. Οι δύο
+   αναγνώστες του αρχείου θέλουν διαφορετικά πράγματα: ο operator grep-άρει το verb, ο ελεγκτής
+   διαβάζει το label. Ό,τι κοπεί χαλάει το αρχείο για τον ένα από τους δύο.
+4. **Άγνωστο slug → 404 JSON, ΟΧΙ header-only CSV.** Ένα λάθος-γραμμένο slug δεν πρέπει να
+   κατεβαίνει σαν αρχείο που διαβάζεται «αυτό το workspace δεν έκανε τίποτα» — είναι ακριβώς το
+   λάθος συμπέρασμα για να κολλήσει σε ticket. Το `listPlatformAudit` ήδη ξεχωρίζει
+   `unknownTenant`, το route το τιμά.
+
+Οι display helpers (`actionLabel`/`actorLabel`/`metaSummary`/`workspaceLabel`) **επαναχρησιμοποιούνται**
+από τα pure view modules, ώστε το αρχείο και ο πίνακας να μην μπορούν να διαφωνήσουν για το τι
+λέει ένα event. Το `csvCell` **αντιγράφηκε** αντί να γίνει import: το `settings/actions.ts` είναι
+`'use server'` module (κάθε export πρέπει να είναι async action, άρα plain helper δεν βγαίνει από
+εκεί) και τα άλλα δύο είναι feature-owned αρχεία που το control plane δεν πρέπει να εξαρτάται από
+αυτά — ίδιο trade-off και **ίδιος λόγος** με το `GREEK_MAP` copy του `translit.ts`, γραμμένο στο
+header.
+
+**Route** `api/saas/admin/audit/export/route.ts`: `saasGuard` + `requireSuperadmin` (ίδια σειρά
+gates με τα άλλα admin routes: SAAS_MODE off → 404/500, κενό allowlist → 404, μη
+συνδεδεμένος → 401, μη-operator → 403), `text/csv; charset=utf-8` + `attachment` filename +
+`no-store`. **UI**: «↓ Download CSV» στο filter form του `/admin/audit`, με τα **τρέχοντα φίλτρα
++ το resume point** (`before`) — ό,τι κοιτάς είναι ό,τι κατεβάζεις. Σκόπιμα plain `<a>` και όχι
+`<Link>`: είναι download, ο router θα προσπαθούσε να χειριστεί το CSV ως σελίδα. Κρύβεται στην
+`unknownTenant` περίπτωση (θα κατέβαζε 404). Το filename κωδικοποιεί τα φίλτρα
+(`pharos-audit-acme-member-added-2026-07-30.csv`) γιατί όποιος το επισυνάπτει σε ticket δεν
+πρέπει να θυμάται ποιο slice ήταν.
+
+**Tests (37, δύο αρχεία)**. Τα πιο load-bearing δεν είναι τα mappings αλλά: **row width ==
+header width** ακόμα και με comma/newline μέσα σε τιμές (ένα κόμμα σε workspace name που
+μετακινεί κάθε επόμενη στήλη μια θέση αριστερά διαβάζεται σαν κατεστραμμένα δεδομένα, όχι σαν
+escaping bug), **formula injection** για τα 5 leaders (τα audit targets είναι user-supplied
+emails/slugs → πραγματική επιφάνεια), **filename δεν βγάζει ποτέ χαρακτήρα εκτός `[a-z0-9.-]`**
+(το slug έρχεται από query string, αλλιώς quotes/CRLF θα κατέληγαν μέσα στο Content-Disposition),
+**export clamp ≠ page clamp**, και ότι ο **superadmin short-circuit φτάνει ΠΡΙΝ** από κάθε
+query parse ή DB read. Επίσης: άδειο feed → header line (μηδενικού μεγέθους αρχείο διαβάζεται
+σαν αποτυχία), CRLF, και ότι το export **δεν** προσθέτει πεδία που δεν έχει το on-screen surface
+(το operator console δεν πρέπει να γίνει ποτέ ευρύτερο leak από το tenant-facing).
+
+**Verified**: **37/37 green** (δύο test-expectation λάθη δικά μου στην πρώτη εκτέλεση: το
+injection guard είναι anchored στην **αρχή** της τιμής, άρα ένα mid-value CR μόνο quote-άρει, και
+η σύγκριση header line χρειαζόταν strip του BOM· ο κώδικας δεν άλλαξε). Πλήρες `npx vitest run` →
+**338 files / 5389 tests green** (από 334/5312: +2 files δικά μου, τα υπόλοιπα από ταυτόχρονες
+routines). `npm run type-check` → **EXIT 0 χωρίς κανένα fix**. **Docker: κανένα rebuild** (μηδέν
+env/deps/runtime-wiring αλλαγή → ούτε ο mutex χρειάστηκε). **Browser-verify: μη εφαρμόσιμο
+unattended**, το λέω ρητά αντί να το περάσω για επιτυχία — η σελίδα θέλει `SAAS_MODE=1` +
+`SAAS_SUPERADMIN_EMAILS` + signed-in operator, και το τοπικό stack τρέχει self-hosted με SAAS_MODE
+off (δεν γυρίζω το flag σε running app του χρήστη χωρίς εντολή). Το μόνο που επιβεβαιώθηκε live
+(curl, πάνω στο **παλιό** image): `/api/saas/admin/audit/export` γυρίζει **401 Unauthorized**,
+**ίδιο byte-for-byte** με τα υπάρχοντα `/api/saas/admin/tenants` και `/api/saas/admin/overview` —
+δηλαδή το app-level auth middleware απαντά πρώτο και το νέο path δεν άνοιξε καμία νέα επιφάνεια
+στο OSS build. Collision guard: `git status --short` πριν το staging = **μόνο τα 4 δικά μου
+αρχεία**, μηδέν staged από άλλη routine· pathspec commit.
+
+**## Needs Achilleas:** τίποτα νέο. Παραμένουν: **Stripe keys** (`STRIPE_SECRET_KEY` /
+`STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_SHARED` / `STRIPE_PRICE_DEDICATED` — ο client είναι
+πλήρως testαρισμένος και περιμένει μόνο keys), **τελικό plan pricing** (τα €0/€9/€29 + quotas στο
+`plans.ts` έχουν εγκριθεί ως η **πηγή αλήθειας** έναντι της landing, αλλά τα νούμερα μένουν
+placeholders), **SMTP**. Πρακτική σημείωση που επαναλαμβάνεται: όσο το τοπικό stack τρέχει με
+SAAS_MODE off, **καμία SaaS UI σελίδα δεν είναι browser-verifiable** από αυτή τη routine — αν
+θέλεις οπτική επιβεβαίωση, χρειάζεται ξεχωριστό SAAS_MODE deployment ή ένα supervised πέρασμα.
+
+**Next task:** (α) **actor filter** στο platform feed (φιλτράρισμα ανά email operator — χρειάζεται
+ένα Account lookup email→id πριν το query· σκόπιμα έμεινε έξω από τα increments 126/128)·
+(β) **date-range filter** στο ίδιο feed + export (`from`/`to` πάνω στο `createdAt` — το πιο
+προφανές επόμενο βήμα για incident review, ο cursor keyset το κάνει εύκολο)· (γ) αλλιώς επόμενο
+backend increment από TODO.md #5-#12. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά UI scan.
