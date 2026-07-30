@@ -4861,3 +4861,52 @@ Needs-Achilleas (open): **νέο** — μόνιμο hosted Free tier ή μόνο
 χωρίς κάρτα → suspended». Δεν υπάρχει διαδρομή «λήγει το trial, μένω στο free». Άρα η κάρτα «Free» της landing
 και η FAQ απάντηση για το trial αντιφάσκουν μέχρι ο Αχιλλέας να πει ποιο ισχύει. Και τα δύο κείμενα έμειναν ως
 έχουν, το ερώτημα κατατέθηκε στο ASK inbox.
+
+## 2026-07-30
+
+**Increment: μία νέα ερώτηση FAQ, «What web address does my hosted workspace get?»** (ομάδα «Hosted or
+self-hosted», αμέσως μετά το «How is hosted different from self-hosted?»). Sweep των feat commits που δεν είχαν
+εκπροσώπηση στη landing: η λέξη `subdomain` έβγαζε **0 hits** σε όλο το `app/page.tsx`, ενώ ο κώδικας έχει
+ολόκληρο tenancy layer γύρω από αυτό (`lib/tenancy/host.ts`, `provision.ts`, `translit.ts`, `context.ts`) και το
+πρόσφατο `5ab349f feat(saas): transliterate Greek workspace names into readable subdomains` ακουμπάει ακριβώς
+αυτό. Ο επισκέπτης δηλαδή δεν μάθαινε πουθενά ποια είναι η διεύθυνσή του, ούτε ότι το ελληνικό όνομα workspace
+δίνει διαβάσιμο subdomain.
+
+**Τι λέει η απάντηση** (όλα διασταυρωμένα με τον κώδικα, μηδέν υπόσχεση που δεν στέκει):
+1. Δικό του subdomain ανά workspace, `<slug>.ph-aros.com` (`baseDomain()`, default `ph-aros.com`).
+2. Transliteration αντί για πέταμα: «Πλαίσιο» -> `plaisio`, «Müller» -> `muller` (τα combining marks πέφτουν στο
+   NFKD βήμα, δεν γίνονται παύλα). Generated label μόνο όταν δεν μένει τίποτα χρησιμοποιήσιμο (`w-xxxxxx`).
+3. Collision -> `-2`, `-3` κοκ (`uniqueTenantSlug`).
+4. Reserved labels (`www`, `app`, `api`, `admin`, ...) δεν γίνονται ποτέ workspace (`RESERVED_SLUGS`).
+5. **Database-per-tenant** (`dbNameForSlug` -> `tenant_<slug>`), όχι shared table με στήλη workspace. Αυτό είναι
+   και το δυνατότερο trust σημείο της απάντησης, και μέχρι σήμερα το έλεγε μόνο ένα κελί του compare table
+   («Isolated per tenant»).
+6. Dedicated -> δικό σου domain, με τη σημείωση ότι το στήνουμε μαζί (DNS + certificate), γιατί ο
+   `customDomain` γράφεται από admin flow, ΔΕΝ υπάρχει self-serve UI. Το subdomain συνεχίζει να δουλεύει, όπως
+   πράγματι κάνει το `resolveTenant` (πρώτα slug, μετά customDomain).
+
+Verify:
+- `npm run type-check` -> exit 0. `npm run build` -> success, 13 static routes, `/` **5.35 kB** (αμετάβλητο, μία
+  string σε server component).
+- Browser pane μέσω `preview_start` του υπάρχοντος `landing-dev` config (θύρα 3100, ΟΧΙ χειροκίνητο dev server).
+  `read_console_messages` (onlyErrors) -> «No console logs».
+- Deep link: `navigate` σε `/#faq-what-web-address-does-my-hosted-workspace-get` -> `found:true`, `open:true`,
+  `groupOf:"Hosted or self-hosted"`, σύνολο **41** `details[id^="faq-"]` μέσα στο `#faq`, **6** ομάδες
+  (καμία απώλεια, ο `FaqDeepLink` πιάνει τη νέα ερώτηση).
+- JSON-LD: ένα block, `FAQPage.mainEntity` **41** εγγραφές, η νέα μέσα (`hasNew:true`).
+- Mobile (`resize_window` 375x812): `document.scrollWidth === innerWidth` (375), μηδέν οριζόντιο overflow, το
+  item πιάνει 339px.
+- Screenshot: **τρίτο συνεχόμενο run που δεν βγαίνει**. Το Browser pane είναι hidden, τα frames γυρνάνε είτε
+  stale (hero ενώ το DOM ήταν στο FAQ) είτε τελείως μαύρα, και το `scrollIntoView` δεν κουνούσε το window μέχρι
+  να παρακάμψω το smooth scrolling με `window.scrollTo`. Best-effort per task file, στηρίχτηκα στους DOM +
+  JSON-LD ελέγχους. Ο dev server σταμάτησε με `preview_stop`.
+- Μηδέν άγγιγμα σε Docker/:3000/web/mobile/docs, μηδέν subagent, μηδέν AI call. em-dashes στα δικά μου κείμενα: 0.
+
+Επόμενο increment: (1) περιμένει ακόμα απάντηση στη `pharos-landing-20260729-1000` (μόνιμο hosted Free tier vs
+14ήμερο trial που καταλήγει σε suspend, οι δύο ενότητες της σελίδας αντιφάσκουν μέχρι τότε), (2) συνέχεια του
+sweep: επόμενα υποψήφια κενά που εντόπισα είναι το superadmin audit feed (εσωτερικό, μάλλον δεν αξίζει landing
+αναφορά) και το αν το ICS feed αξίζει ρητή αναφορά «subscribe από Google/Apple Calendar» μέσα στην υπάρχουσα
+ερώτηση ημερολογίου.
+
+Needs-Achilleas (open, αμετάβλητα): μόνιμο Free tier ή μόνο trial (`pharos-landing-20260729-1000`), legal
+entity/Stripe, Terms+Privacy review, contact inbox, repo public timing.

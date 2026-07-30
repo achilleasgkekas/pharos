@@ -481,6 +481,10 @@ const FAQ_GROUPS: {
         a: 'It is the same app. With hosted we handle the server, updates, and nightly backups, and AI parsing is included so there is nothing to configure. Self-hosted gives you full control and keeps every byte on your own hardware.',
       },
       {
+        q: 'What web address does my hosted workspace get?',
+        a: 'Its own subdomain, taken from the workspace name you pick at signup: call it Acme and you land on acme.ph-aros.com. A name written in another script is transliterated rather than thrown away, so «Πλαίσιο» becomes plaisio.ph-aros.com, and an accent folds into the letter it sits on (Müller reads as muller) instead of splitting the word in two; only a name with nothing usable left in it falls back to a generated label. If the address you would get is already in use, the next free one (-2, -3, and so on) is taken instead, and a short list of infrastructure labels (www, app, api, admin and friends) is reserved so no workspace can ever claim them. That subdomain is more than routing: each workspace also gets its own separate database rather than a shared table with a workspace column, so there is no query that can reach out of one workspace into another’s records. On the Dedicated plan you can point a domain of your own at your workspace instead, with the DNS and certificate set up together with us, and the original subdomain keeps resolving to the same place so links you have already saved do not break.',
+      },
+      {
         q: 'What happens when my free trial ends?',
         a: 'Every new hosted workspace starts on a 14-day free trial with full access, no card required to start. Three days before it ends you get one reminder email. If it lapses without adding billing, the workspace is suspended rather than deleted, a recoverable hold with nothing lost: add a payment method whenever you are ready and it reactivates instantly.',
       },
