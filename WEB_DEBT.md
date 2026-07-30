@@ -59,7 +59,16 @@
   - **Fix**: ίδιο recipe, μεγαλύτερο αρχείο (πολλαπλές exported functions: import/upload/rescan/link/unlink/delete/setTransactionInstallment κλπ) — wrap το καθένα ξεχωριστά σε `withRequestTenant(async () => { const Statement = await currentModel(StatementModel); ... })`. Δες `lib/fxAudit.ts`/`reports/fxActions.ts` (ίδιο review range) ή `items/actions.ts` σαν ήδη-σωστό reference pattern για αρχείο με πολλά exports.
   - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/statements/actions.ts` ≥ όσα exported functions κάνουν DB access· npm run type-check exits 0· `apps/web/src/app/statements/actions.crud.test.ts` (και τα υπόλοιπα statements test files) παραμένουν green.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-26, 60η σάρωση reviewer routine)
+- Status: **DONE 2026-07-30** (pharos-daily-dev). Και τα **14 exported** DB-touching functions τυλίχτηκαν
+  ξεχωριστά σε `withRequestTenant` με `currentModel()` μέσα (Statement + **Card** + **Receipt**, γιατί το
+  `findOrCreateCard` έγραφε κάρτες και το `getReconciliation` διάβαζε αποδείξεις από το default db)· οι 3 internal
+  signature mutators (`addItemBySignature`/`removeItemBySignature`/`clearLinkBySignature`) + το `findOrCreateCard`
+  resolve-άρουν μόνα τους από το ambient tenant (καλούνται πάντα μέσα από wrapped body). Οι δύο no-AI draft paths του
+  `importStatementPdf` ενοποιήθηκαν σε ένα `saveDraft()` helper. Νέο `actions.tenant.test.ts` (8 tests, per-tenant fake
+  model set με tagged op-log ανά μοντέλο) + tenancy seam mocks στα 3 υπάρχοντα statements test files. **Negative
+  control**: ένα `currentModel` πίσω σε direct `StatementModel` έριξε 3 tests (τα models mocked ως `{modelName}`),
+  μετά επαναφορά. Verify: type-check EXIT 0, full vitest **5352 passed / 336 files**, Docker rebuild clean
+  (0 restarts, /login 200, /statements 307), browser `/login` renders χωρίς console errors.
 
 ### `vouchers/page.tsx` read path παρακάμπτει το tenant-scoping που μόλις μπήκε στα sibling actions (ίδιας κλάσης gap, ήδη προαναγγελθέν follow-up)
 - Priority: P2

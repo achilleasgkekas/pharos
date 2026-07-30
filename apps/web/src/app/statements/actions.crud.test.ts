@@ -43,6 +43,11 @@ const {
   getAppSettingsMock: vi.fn(async () => ({ currency: 'EUR' })),
 }));
 
+// Tenancy seam mocked flat: the actions now reach every collection through
+// `currentModel()` inside `withRequestTenant`, so hand each call the very model this file
+// already mocks. Tenant ROUTING itself is pinned separately in actions.tenant.test.ts.
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: any) => m }));
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Statement', () => ({
   Statement: {
