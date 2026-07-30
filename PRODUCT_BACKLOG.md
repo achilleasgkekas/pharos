@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-29 (20ή σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-30 (21η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
@@ -55,12 +55,62 @@
 > `ITEM_STATUSES` στο `models/Item.ts`) αλλά **κανένα** πεδίο tracking number/carrier/delivery-status
 > (`grep -rn "trackingNumber\|carrier\|shipment\|deliveryStatus"` = 0 hits, web + mobile) — ένα shopping item σε
 > "ordered" είναι σήμερα ένα μαύρο κουτί μέχρι να φτάσει, καμία σύνδεση με το πραγματικό courier tracking.
+> **21η σάρωση (2026-07-30) — μόνο 2 νέοι candidates αυτή τη φορά (P75-P76), σκόπιμα λιγότεροι από το συνηθισμένο
+> 3-5**: η ουρά έφτασε 35 items χωρίς καμία έγκριση σε 16 σαρώσεις, οπότε προτιμήθηκαν δύο **στενά-scoped
+> follow-ups πάνω σε ήδη-shipped δουλειά** (χαμηλότερο ρίσκο decision-fatigue από νέα ανεξάρτητα features).
+> Και οι δύο live-verified με grep, μηδέν hits πριν την πρόταση: (1) **P75** — το P31 (household multi-user,
+> shipped 2026-07-27) έγραφε ρητά στο δικό του value prop «...+ ρόλους + "ποιος καταχώρησε τι" attribution»,
+> αλλά το πραγματικά-shipped slice κάλυψε μόνο τον 3ο ρόλο (`viewer`) + write-guard enforcement — το attribution
+> κομμάτι έμεινε 0% (`grep -rln "createdBy" apps/web/src/models` = 0 hits, ΚΑΙ μετά το ship). Δεν είναι νέο
+> feature, είναι το μισό ενός ήδη-εγκεκριμένου item που δεν έφτασε ποτέ σε νέο backlog entry. (2) **P76** —
+> κανένα mechanism «δώσε πρόσβαση σε έμπιστο άτομο αν μου συμβεί κάτι» (`grep -rln "emergencyAccess\|
+> legacyContact\|trustedContact\|deadManSwitch"` apps/web apps/mobile = 0 hits) — καθιερωμένο pattern σε
+> password managers (1Password Emergency Kit, Bitwarden Emergency Access) που ταιριάζει φυσικά στο ήδη-
+> προτεινόμενο P71 (secrets vault) + P42 (document expiry) και στο ίδιο το "Personal Hub" backronym, αλλά
+> ανεξάρτητο feature ό,τι κι αν αποφασιστεί για το P71.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P76. Emergency / legacy access — time-delayed data access για έμπιστο άτομο (dead-man's-switch lite) — S/M — OSS (κυρίως), «Personal Hub» fit
+- **Αξία:** live-verified `grep -rln "emergencyAccess|legacyContact|trustedContact|deadManSwitch" apps/web/src
+  apps/mobile/src` = 0 hits. Καθιερωμένο pattern σε password managers (1Password «Emergency Kit», Bitwarden
+  «Emergency Access» — request access → owner notified → auto-grant μετά από wait period αν δεν απορριφθεί) που
+  απουσιάζει εντελώς εδώ, ενώ το Pharos κρατά ήδη εξίσου ευαίσθητα δεδομένα (οικονομικά, και αν εγκριθεί το P71,
+  admin logins/license keys). Σενάριο: κάτι συμβαίνει στον Αχιλλέα, ένα έμπιστο άτομο (σύζυγος/αδερφός) χρειάζεται
+  πρόσβαση στα βασικά (πού είναι οι λογαριασμοί, ποιες συνδρομές τρέχουν, τι εγγυήσεις υπάρχουν) — σήμερα το μόνο
+  fallback είναι μοιρασμένο admin password (no accountability, no time-delay, no revoke). Νέο μικρό μηχανισμό: ο
+  admin ορίζει έναν «legacy contact» (email/username αν έχει ήδη λογαριασμό στο ίδιο instance μέσω P31) + wait-period
+  (π.χ. 7 μέρες) → ο contact μπορεί να «request access» → owner ειδοποιείται (reuse `dispatchAlert`) με δυνατότητα
+  **deny** μέσα στο wait window → αν δεν απαντηθεί, αυτόματο grant (νέο ρόλο ή temp viewer session). **Διακριτό**
+  από P31 (κανονικό multi-user login, ενεργό ήδη σήμερα) — εδώ η πρόσβαση είναι **ανενεργή by default**, ενεργοποιείται
+  μόνο μέσω του delayed-request flow.
+- **Module:** νέο μικρό module πάνω στο ήδη-shipped Auth/Users (P31) — `EmergencyContact` model + request/deny/grant
+  flow + notification wiring.
+- **Ανοιχτή απόφαση (builder default):** requires P31 να είναι ήδη ενεργό (χρειάζεται δεύτερο λογαριασμό να υπάρχει)·
+  wait-period ρυθμιζόμενο, default 7 μέρες (ίδιο lead-time idiom με τα υπόλοιπα alert-days settings)· grant = **viewer**
+  ρόλο by default (ασφαλέστερο MVP), όχι admin· owner μπορεί να ανακαλέσει access ανά πάσα στιγμή, όχι one-way.
+
+### P75. `createdBy` attribution σε shared/household instances — το μισό του P31 που δεν προωθήθηκε ποτέ σε νέο item — S — OSS (κυρίως), household follow-up
+- **Αξία:** live-verified `grep -rln "createdBy" apps/web/src/models` = 0 hits, ΑΚΟΜΑ ΚΑΙ μετά το P31 ship
+  (2026-07-27, commit `1346b4d`). Το ίδιο το P31 entry έγραφε στο δικό του «Αξία» section: «...ρόλους (admin/member/
+  viewer) **+ "ποιος καταχώρησε τι" attribution**» — αλλά το πραγματικά-shipped slice (βλ. `## Approved` P31
+  «Υλοποίηση») κάλυψε αποκλειστικά τον 3ο ρόλο + write-guard enforcement· το attribution κομμάτι έμεινε στα χαρτιά,
+  και καμία σάρωση δεν το ξαναπρότεινε ως δικό του item έκτοτε — φαίνεται να χάθηκε ανάμεσα στο «ήδη εγκεκριμένο
+  ως μέρος του P31» και στο «δεν χτίστηκε ποτέ». Σε ένα household instance (πολλαπλά logins πάνω στα ίδια
+  δεδομένα, ήδη ενεργό μηχανισμός) το «ποιος πρόσθεσε αυτό το έξοδο/αγόρασε αυτό το item» είναι βασική διαφάνεια,
+  όχι πολυτέλεια — σήμερα ΟΛΑ τα records είναι ανώνυμα ακόμα κι αν 3 άνθρωποι γράφουν στο ίδιο instance. Χαμηλού
+  ρίσκου follow-up (καθαρά additive display field, **καμία** permission λογική πάνω του — σε αντίθεση με το
+  role-enforcement κομμάτι του P31 που χρειάστηκε 4 deferrals ακριβώς επειδή άγγιζε write-paths).
+- **Module:** cross-cutting (κάθε μοντέλο που ήδη έχει `assertCanWrite()` create-path — reuse του ήδη-χαρτογραφημένου
+  write-guard inventory από το P31 `writeGuard.coverage.test.ts`) + μικρό display badge στα cards/rows.
+- **Ανοιχτή απόφαση (builder default):** νέο optional `createdBy: ObjectId ref User` σε κάθε create-path (populate
+  on write, backfill = `null`/«unknown» για ήδη-υπάρχοντα records, ΟΧΙ migration που μαντεύει)· εμφανίζεται μόνο
+  όταν υπάρχουν ≥2 users στο instance (single-user deployments δεν βλέπουν κανένα νέο UI, μηδέν clutter)· single-user
+  self-host = μηδέν αλλαγή συμπεριφοράς.
 
 ### P74. Backup restore verification (αυτόματο integrity self-test, όχι μόνο export) — S — OSS (self-host trust lever)
 - **Αξία:** live-verified `grep -rn "verifyBackup|backupHealth|restoreTest|integrityCheck" apps/web/src` = 0 hits.
