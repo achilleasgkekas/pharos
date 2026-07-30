@@ -34,9 +34,9 @@ function toSearchParams(raw: RawParams): URLSearchParams {
   return sp;
 }
 
-/** Build a /admin/audit href preserving the active filters. Empty params are dropped so the
- *  "no filter, newest page" URL stays clean. */
-function auditHref(params: {
+/** Query string for the active filters. Empty params are dropped so the "no filter, newest page"
+ *  URL stays clean. */
+function auditParams(params: {
   action?: string | null;
   tenant?: string | null;
   before?: string | null;
@@ -45,8 +45,20 @@ function auditHref(params: {
   if (params.action) sp.set('action', params.action);
   if (params.tenant) sp.set('tenant', params.tenant);
   if (params.before) sp.set('before', params.before);
-  const s = sp.toString();
+  return sp.toString();
+}
+
+/** Build a /admin/audit href preserving the active filters. */
+function auditHref(params: Parameters<typeof auditParams>[0]): string {
+  const s = auditParams(params);
   return s ? `/admin/audit?${s}` : '/admin/audit';
+}
+
+/** CSV download href for the SAME slice currently on screen (filters + resume point), so what an
+ *  operator attaches to a ticket is what they were just looking at, not the unfiltered firehose. */
+function auditExportHref(params: Parameters<typeof auditParams>[0]): string {
+  const s = auditParams(params);
+  return s ? `/api/saas/admin/audit/export?${s}` : '/api/saas/admin/audit/export';
 }
 
 export default async function AdminAuditPage({
@@ -56,7 +68,8 @@ export default async function AdminAuditPage({
 }) {
   await requireSuperadminPage();
   const raw = await searchParams;
-  const query = parseAdminAuditQuery(toSearchParams(raw));
+  const sp = toSearchParams(raw);
+  const query = parseAdminAuditQuery(sp);
   const { events, hasMore, unknownTenant } = await listPlatformAudit(query);
 
   const rows = toPlatformActivityRows(events);
@@ -119,6 +132,20 @@ export default async function AdminAuditPage({
           >
             Reset
           </Link>
+        )}
+        {!unknownTenant && (
+          // Plain <a>, not <Link>: this is a file download, not a client-side navigation, and the
+          // router would otherwise try to treat the CSV response as a page.
+          <a
+            href={auditExportHref({
+              action: query.action,
+              tenant: query.tenant,
+              before: sp.get('before'),
+            })}
+            className="ml-auto rounded-lg border border-[color:var(--color-border-light)] px-3 py-1.5 text-sm text-[color:var(--color-text-dim)] transition-colors hover:border-[color:var(--color-cyan)] hover:text-[color:var(--color-cyan)]"
+          >
+            ↓ Download CSV
+          </a>
         )}
       </form>
 
