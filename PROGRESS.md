@@ -3,8 +3,16 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 9ae1b1b -->
-<!-- docker-validated: 459dbb3 -->
+<!-- docker-validated: ee08552 -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-30 (docker-health)
+
+**Health check**: mongo `healthy`, web `running` (no `RestartCount` field στο local docker inspect JSON σε αυτή την έκδοση, καμία evidence restart-loop σε κανένα container). `homepage-flaresolverr` ήταν ήδη σταματημένο (Exited 143, 38h). Disk πριν: build cache 2.399GB (1.305GB reclaimable) → `docker builder prune -f`.
+
+**Rebuild**: 15 runtime files changed (notify.ts, v1 settings/test-notify routes, settings/actions.ts, tenancy provision.ts/translit.ts + tests) από docker-validated `459dbb3`. Safe build μέσα από lock (`/tmp/claude-docker.lock`, ελεύθερο, acquired καθαρά): `docker compose build web` ✓ (62s), mongo healthy ✓, `docker compose up -d web` ✓, poll `/login` 200 ✓ (1η προσπάθεια), restart-count αμετάβλητο ✓. `docker builder prune -f` μετά (2.356GB→1.094GB reclaimed).
+
+**Outcome**: Όλα πράσινα. Marker `docker-validated` → `ee08552` (HEAD). Lock released. Τίποτα κάτω από Needs Achilleas.
 
 ## 2026-07-29 (reviewer — έλεγχος 0c63c62..9ae1b1b, 14 commits)
 
