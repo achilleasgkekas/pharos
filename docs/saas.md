@@ -1107,9 +1107,10 @@ row, newest first, **regardless of tenant**, each one attributed back to its
 workspace.
 
 Same platform-operator gate (`requireSuperadminPage`) and authorization order as
-the rest of the console. There is no separate `/api/saas/admin/*` endpoint for
-this feed; the page reads `lib/tenancy/adminAudit.ts` directly server-side, the
-same way `/admin/tenants` consumes its registry reader.
+the rest of the console. The on-screen table itself has no separate
+`/api/saas/admin/*` endpoint; the page reads `lib/tenancy/adminAudit.ts`
+directly server-side, the same way `/admin/tenants` consumes its registry
+reader.
 
 Filter by workspace slug (exact match) and/or action via a plain **GET** form,
 so the URL is the source of truth and a filtered view is shareable and
@@ -1129,6 +1130,39 @@ Read-only: only the central `AuditEvent` collection plus batched `Account`/
 write). `SAAS_MODE` off leaves the self-hosted app untouched (the whole `/admin`
 segment self-gates via `requireSuperadminPage`).
 
+**CSV export.** A paginated HTML table cannot be handed to an auditor or
+grepped/pivoted offline, which is what an incident review needs, so the page's
+"↓ Download CSV" link (a plain `<a>`, not client-side navigation, since the
+response is a file, not a page) hits a dedicated export route carrying the
+**same** active filters and resume cursor as the on-screen slice:
+
+| Method | Path | Query | Result |
+| --- | --- | --- | --- |
+| `GET` | `/api/saas/admin/audit/export` | `?tenant=<slug>&action=<verb>&limit=<n>&before=<iso>` | The same filtered slice as `/admin/audit`, as one flat `text/csv` download (`Content-Disposition: attachment`). Same `requireSuperadmin` gate and status ladder as the page. An unknown `tenant` slug is `404` JSON (`{ "error": "unknown workspace", "tenant": "<slug>" }`), never a header-only CSV that would misread as "this workspace did nothing". |
+
+Differences from the on-screen feed, all in `lib/tenancy/adminAuditCsv.ts`
+(pure, unit-tested, no DB/React import):
+
+- **Ceiling is 5000, not 200.** Reusing the page's row cap would silently
+  truncate every export at 200 rows while still looking complete; `limit`
+  defaults to 1000 and is re-clamped against 5000, not the page's smaller max.
+- **UTF-8 BOM prefix** so Excel does not mangle Greek workspace names (`Πλαίσιο`
+  would otherwise arrive as mojibake on Windows).
+- **RFC 4180 quoting plus a formula-injection guard**: a cell starting with
+  `= + - @` or a tab/CR is prefixed with `'` before quoting, because audit
+  targets are user-supplied emails and slugs that a spreadsheet would otherwise
+  evaluate as a formula.
+- **10 columns**, including both the raw verb and its human label as separate
+  fields (`Action` for grepping, `Action label` for a non-engineer auditor):
+  `Timestamp, Workspace, Workspace slug, Action, Action label, Actor, Actor
+  email, Target, Details, Event id`.
+- **Filename encodes the filters and export day**, e.g.
+  `pharos-audit-acme-member-added-2026-07-30.csv`, so an operator attaching the
+  file to a ticket does not have to remember which slice it was.
+
+Same read-only contract as the page: only `AuditEvent` plus batched identity
+lookups, never a write, `Cache-Control: no-store`.
+
 #### Console UI (`/admin`)
 
 The endpoints above are the read-only data plane; this is the **browser console**
@@ -1142,7 +1176,7 @@ app's tenant-facing navigation, so no shared layout or component is touched.
 | `/admin` | **Fleet overview** — the same aggregate as [`GET /api/saas/admin/overview`](#fleet-overview), rendered as stat tiles (workspaces, accounts, active members, billing-linked / BYO-key, this month's AI calls / tokens / cost, storage + reporting count) and breakdown lists (by plan, status, tier) plus custom-domain and erasure-scheduled counts. Shows an empty-state line until the first tenants sign up and metering runs. |
 | `/admin/tenants` | **Workspaces listing** — the same registry reader as [`GET /api/saas/admin/tenants`](#superadmin-console-8), rendered as a paginated table (workspace name + slug + custom domain, plan, status badge, tier, billing / BYO-key pills, created). Filter by status and free-text search (slug, name or domain) via a plain **GET** form, so the URL is the source of truth and every filtered view is shareable and bookmarkable with no client state. Prev / next links preserve the active filter. Each row links to the detail page. |
 | `/admin/tenants/[slug]` | **Workspace detail** — the same detail reader as the [single-tenant](#single-tenant-detail) API: a registry summary (slug, plan, tier, custom domain, billing / BYO-key, trial-ends, erasure-scheduled, created / updated), a member tally (total, active, owners — flagged red **ownerless!** at zero, invited, removed), a usage roll-up (total AI calls / tokens / cost across periods, latest storage footprint), and the full member roster (email, role badge, status badge, joined). An unknown slug is `notFound()` (`404`). |
-| `/admin/audit` | **Platform activity** — see [above](#platform-activity-feed-adminaudit): every audit event across every tenant, filterable by workspace slug and/or action, newest first. |
+| `/admin/audit` | **Platform activity** — see [above](#platform-activity-feed-adminaudit): every audit event across every tenant, filterable by workspace slug and/or action, newest first, with a "↓ Download CSV" link for the same filtered slice. |
 
 The nav (`AdminNav`) lists Overview, Workspaces, and Activity; more console
 pages are additive entries as they land. Section links match their sub-paths

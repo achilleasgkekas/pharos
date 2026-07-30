@@ -3032,3 +3032,24 @@ Collision guard: `git status --short` πριν commit = μόνο `docs/saas.md` 
 Συμπέρασμα: Το νέο shipped feature (5ab349f, Greek subdomain transliteration) είναι πλέον documented στο docs/saas.md. Το FAQ-grouping commit (0c63c62) δεν χρειαζόταν καμία αλλαγή εδώ.
 
 Επόμενο run: (α) grep git log για νέα feat() commits μετά το 5ab349f · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml · (γ) αν όχι νέο feature, comprehensive drift verification pass.
+
+
+## 2026-07-30 (thirty-fourth run — platform audit CSV export documented)
+
+Σάρωση git log για νέα feat() commits μετά την thirty-third run (5ab349f, 2026-07-29). Ανακάλυψη: **2 νέα feat() commits**:
+- **a17243a** (2026-07-30, `feat(saas): CSV export for the platform audit feed`) — core-territory, χρειάζεται documentation. Ήδη έχει δικό του log entry στο root `SAAS_PROGRESS.md` (commit 8a9e2b2), αλλά αυτό είναι η routine-log του saas-core routine, όχι το `docs/` τεκμηρίωση· έλεγξα και το `docs/saas.md` ήταν πράγματι stale σε ένα σημείο (βλ. παρακάτω).
+- **e1e722d** (2026-07-29, `feat(landing): align hosted pricing with the backend plan ladder`) — καθαρά `apps/landing/` presentation, με δικό του log (`apps/landing/LANDING_PROGRESS.md`, commit 9ae1b1b). Έλεγξα αν το `docs/` αναφέρει hardcoded τιμές (EUR4/8/15 κλπ) που θα γίνονταν stale· `docs/saas.md:69` λέει ήδη ρητά "the plan ladder [plans.ts] is the single source of truth for pricing tiers and quotas" χωρίς hardcoded νούμερα, άρα καμία αλλαγή χρειάζεται εδώ.
+
+Τι έγινε (a17243a): Διάβασα τον κώδικα πριν γράψω — `apps/web/src/app/api/saas/admin/audit/export/route.ts` (νέο GET route, `requireSuperadmin` gate, `saasGuard` wrapper, 404 σε unknown tenant slug) + `lib/tenancy/adminAuditCsv.ts` (pure CSV builder: `MAX_PLATFORM_AUDIT_EXPORT=5000` vs page's 200-row cap, UTF-8 BOM για ελληνικά ονόματα, RFC 4180 quoting + formula-injection guard, 10 columns με raw action ΚΑΙ human label ξεχωριστά, filename encoding filters+date) + το page diff (`admin/audit/page.tsx`: νέο "↓ Download CSV" `<a>` plain link, όχι `<Link>`, carrying τα ίδια filters+cursor).
+
+**Βρέθηκε stale claim**: το `docs/saas.md` (γραμμή 1109-1112, από το run 32) έλεγε ρητά "There is no separate `/api/saas/admin/*` endpoint for this feed" — αυτό έγινε **λάθος** με το νέο export route. Fix: reworded σε "The on-screen table itself has no separate endpoint" (ακόμα αληθές — μόνο το CSV download έχει δικό του route) + νέο subsection **"CSV export"** μέσα στο `#platform-activity-feed-adminaudit` section που τεκμηριώνει το endpoint (query params, auth ladder, 404 semantics), τις διαφορές από το on-screen feed (5000 vs 200 cap, BOM, injection guard, 10 στήλες, filename pattern), και το read-only contract. Ενημέρωσα και το Console UI table row (`/admin/audit`) να αναφέρει το "↓ Download CSV" link.
+
+Accuracy: verified με code read (route.ts + adminAuditCsv.ts + adminAuditCsv.test.ts + page.tsx diff), όχι απλή αντιγραφή commit message.
+
+Validation (markdown only, κανένα build/Docker/AI call): code fences docs/saas.md = 18 πριν και μετά (ζυγό, άθικτο, η προσθήκη δεν είχε κανένα code block)· νέο anchor δεν δημιουργήθηκε (το subsection είναι μέσα στο ήδη-υπάρχον `#platform-activity-feed-adminaudit`)· το ήδη υπάρχον link σε αυτό το anchor (Console UI table) παραμένει valid· κανένα credential· `docs/openapi.yaml` δεν αγγίχτηκε σκόπιμα (μόνο η self-hosted bearer-token API ζει εκεί, το SaaS control-plane API είναι ρητά ξεχωριστό per `docs/saas.md:160-165`).
+
+Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/saas.md` modified (δικό μου), κανένα foreign staged.
+
+Συμπέρασμα: Το shipped feature a17243a (audit CSV export) είναι πλέον fully + accurately documented στο `docs/saas.md`, και το προηγούμενο stale "no separate endpoint" claim διορθώθηκε. Το e1e722d (landing pricing) δεν χρειαζόταν καμία αλλαγή στο `docs/` territory.
+
+Επόμενο run: (α) grep git log για νέα feat() commits μετά το a17243a · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml · (γ) αν όχι νέο feature, comprehensive drift verification pass.
