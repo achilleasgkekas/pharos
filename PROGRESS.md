@@ -10578,3 +10578,58 @@ tenant-scoping** (1026 γραμμές, δεκάδες exported functions, ίδι
 - **`expo-camera` / share-extension έγκριση**: επίσης OPEN (`pharos-daily-dev-20260725-1425`) — σημειώνω ότι το
   `OWNER_DECISIONS.md` #9 λέει ήδη ότι το `expo-camera` **εγκρίθηκε** live, οπότε το inbox entry είναι απλώς stale·
   δεν το αλλάζω μόνος μου, το status flip το κάνει ο Achilleas μέσω chat.
+
+## 2026-07-30 (statements/actions.ts tenant-scoping: το τελευταίο ανοιχτό P2 του WEB_DEBT)
+
+**Γιατί αυτό**: η Approved ουρά (`PRODUCT_BACKLOG.md`) είναι πλήρως μπλοκαρισμένη (P36 θέλει GoCardless credentials,
+P16 πραγματικό sample export, P23 EAS dev build), οπότε πέρασα στο fallback: την πρόταση του προηγούμενου entry, που
+ήταν και το μεγαλύτερο εναπομείναν correctness gap χτίσιμο χωρίς credentials.
+
+**Το gap**: ολόκληρο το `statements/actions.ts` (1026 γραμμές) έκανε direct `Statement.find/findById/create/...`, άρα
+σε SaaS mode και τα **14** exported DB-touching actions (import, upload, rescan, installment linking, reconciliation,
+transaction editing) διάβαζαν κι έγραφαν στο DEFAULT tenant db όποιος κι αν ήταν συνδεδεμένος. Το άσχημο κομμάτι δεν
+ήταν καν αυτό, αλλά η **εσωτερική ασυμμετρία**: το `lib/fxAudit.ts`/`reports/fxActions.ts` (ίδιο feature set, P9)
+αγγίζει την ΙΔΙΑ collection σωστά μέσω `currentModel()`, οπότε το FX panel και το `/statements` UI θα διαφωνούσαν για
+το ποιο database κρατά ένα statement. Self-hosted: μηδέν αλλαγή (το DEFAULT_TENANT γυρίζει το default connection ατόφιο).
+
+**Τι μπήκε**: κάθε exported action τυλίχτηκε ξεχωριστά σε `withRequestTenant` με `currentModel()` μέσα (το
+`assertCanWrite()` μένει έξω, όπως στα bills). Δύο πράγματα που εύκολα θα ξεχνιόντουσαν και τα έπιασα διαβάζοντας
+γραμμή-γραμμή: (α) το **`findOrCreateCard`** δημιουργεί `Card` docs, άρα χωρίς scoping ένα tenant statement θα
+έδειχνε σε `cardId` που δεν υπάρχει στο δικό του db· (β) το **`getReconciliation`** διαβάζει `Receipt`, άρα θα
+πρότεινε matches από τις αποδείξεις άλλου. Και τα δύο μοντέλα scoped τώρα. Οι 3 internal signature mutators
+(`addItemBySignature`/`removeItemBySignature`/`clearLinkBySignature`) + το `findOrCreateCard` resolve-άρουν μόνα τους
+από το ambient tenant, γιατί οι μόνοι καλούντες τους είναι ήδη wrapped bodies (γραμμένο ως σχόλιο πάνω τους ώστε να
+μη «διορθωθεί» λάθος αργότερα). Εν παρόδω: οι δύο no-AI draft paths του `importStatementPdf` (scanned PDF / AI off)
+ήταν ο ίδιος κώδικας δύο φορές, ενοποιήθηκαν σε ένα `saveDraft(notes, aiError)` helper.
+
+**Το scan, όχι σημείωμα**: νέο **`actions.tenant.test.ts`** (8 tests), αδελφάκι του `bills/actions.tenant.test.ts`:
+per-tenant fake model set (Statement/Card/Receipt) με **tagged op-log ανά μοντέλο**, ώστε μια διαρροή σε λάθος db να
+είναι άμεσα ορατή ως op καταγεγραμμένο στο `default` αντί στο `acme`. Καλύπτει create/update/delete/addTransaction/
+deleteTransaction/attachPdf/setTransactionInstallment, το ambient-tenant inheritance των helpers (μέσω `linkPlanToItem`),
+το `getReconciliation` (Statement **και** Receipt στο ίδιο db), το `importStatementPdf` (statement **και** auto-created
+card), και το self-hosted no-tenant path. Τα 3 υπάρχοντα statements test files πήραν τα flat tenancy seam mocks
+(`currentModel: async (m) => m`).
+
+**Verify**: **negative control** — γύρισα ένα `currentModel` πίσω σε direct `StatementModel` και έπεσαν 3 tests (τα
+models είναι mocked ως bare `{modelName}`, οπότε ο παλιός κώδικας σκάει), μετά επαναφορά (καθαρό diff έναντι του backup).
+`npm run type-check` **EXIT 0**, full `npx vitest run` **5352 passed / 336 files** (μηδέν regression). Docker mutex
+πάρθηκε: `docker compose build web` → mongo healthy → `up -d web` → `/login` **200**, `/statements` **307** (auth-gated
+route compiled), `RestartCount=0`, logs καθαρά (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning), build cache pruned
+(2.36GB), lock released. Browser pane `/login` → «Sign in · Pharos», **μηδέν console errors**. Commit `a33fd34`.
+
+**Τι μένει από αυτή την κλάση**: το `WEB_DEBT.md` έχει ακόμα ανοιχτό το `vouchers/page.tsx` read path (S) — μικρότερο,
+ίδιο recipe. Πέρα από αυτό, το tenant-scoping effort έχει καλύψει bills/vouchers actions + statements.
+
+**Επόμενο task (πρόταση)**: το `vouchers/page.tsx` read-path tenant-scoping (S, το τελευταίο δηλωμένο P2), και μετά
+ένας νέος coverage scan στο ίδιο πνεύμα με τα `writeGuard`/`sessionGuard` — ένα test που κόβει το build αν ένα
+mutating action module κάνει direct model import χωρίς `currentModel`, ώστε η κλάση αυτή να μη χρειάζεται χειροκίνητη
+σάρωση ξανά.
+
+## Needs Achilleas
+
+- Αμετάβλητα: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample export, EAS dev build), **P17 live check**
+  σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
+- **`PATCH /api/v1/settings` ntfy authz**: παραμένει OPEN στο `~/.claude/ASK_ACHILLEAS.md`
+  (`pharos-daily-dev-20260728-0215`).
+- **`expo-camera` / share-extension έγκριση**: επίσης OPEN (`pharos-daily-dev-20260725-1425`), stale πλέον αφού το
+  `OWNER_DECISIONS.md` #9 λέει ότι το `expo-camera` εγκρίθηκε live· το status flip το κάνει ο Achilleas μέσω chat.
