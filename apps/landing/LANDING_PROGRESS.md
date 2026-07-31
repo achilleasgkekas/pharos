@@ -4910,3 +4910,49 @@ sweep: επόμενα υποψήφια κενά που εντόπισα είνα
 
 Needs-Achilleas (open, αμετάβλητα): μόνιμο Free tier ή μόνο trial (`pharos-landing-20260729-1000`), legal
 entity/Stripe, Terms+Privacy review, contact inbox, repo public timing.
+
+## 2026-07-31
+
+**Increment: διόρθωση stale τιμολόγησης στο `public/llms.txt`.** Το sweep για κενά στο FAQ δεν βρήκε νέο
+feature χωρίς εκπροσώπηση (το ICS feed, που ήταν το υποψήφιο του προηγούμενου run, αποδείχθηκε ήδη
+καλυμμένο μέσα στην ερώτηση ημερολογίου, και τα μόνα νέα feat commits από τότε είναι το superadmin audit
+CSV + date filter, καθαρά εσωτερικά). Αντί για νέο κείμενο βρέθηκε **πραγματικό λάθος**: το `llms.txt`
+διαφήμιζε ακόμα την **παλιά κλίμακα Solo €4 / Family €8 / Pro €15**, ενώ η σελίδα και το backend
+(`apps/web/src/lib/billing/plans.ts`) έχουν εδώ και καιρό **Free €0 / Pro €9 / Dedicated €29** (commit
+`e1e722d`). Το αρχείο αυτό είναι ακριβώς ό,τι διαβάζουν τα AI answer engines, οπότε μέχρι τώρα θα έλεγαν
+λάθος τιμές, λάθος ονόματα πλάνων και λάθος ετήσια ποσά.
+
+**Τι διορθώθηκε / ενημερώθηκε**:
+1. Και τα 4 rows τιμολόγησης ευθυγραμμίστηκαν με τα `TIERS` (ονόματα, τιμές, quotas: 1 user/5 GB/50 reads,
+   5 members/50 GB/1.000 reads, unlimited members/500 GB/BYO key/custom domain).
+2. Ετήσια μαθηματικά: **Pro €90/χρόνο, Dedicated €290/χρόνο** (x10, δύο μήνες δώρο), με ρητή σημείωση ότι
+   το Free δεν έχει ετήσια επιλογή αφού δεν υπάρχει τι να χρεωθεί.
+3. Η γραμμή «κάθε πλάνο περιλαμβάνει AI parsing» ήταν ανακριβής, τώρα λέει σωστά ότι τα AI reads είναι
+   quota ανά πλάνο ενώ το Dedicated τρέχει unlimited με δικό σου key.
+4. Modules: προστέθηκαν Tasks & planning και Mobile app (barcode scan), εμπλουτίστηκαν Subscriptions και
+   Reports, και μπήκε μία γραμμή «Also shipped» (bills, multi-currency, iCal feed, 8 γλώσσες, Trash).
+
+Verify:
+- `grep` για `Solo|Family|€4|€15` σε όλο το `app/` + `public/`: **μηδέν** πραγματικό hit (μόνο
+  `fontFamily` false positives), άρα το `llms.txt` ήταν το μοναδικό σημείο drift.
+- `npm run type-check` -> exit 0. `npm run build` -> success, 11 static routes, `/` **5.35 kB**
+  (αμετάβλητο, δεν άγγιξα κώδικα).
+- Browser pane μέσω `preview_start` του `landing-dev` (θύρα 3100): `/llms.txt` -> **200**,
+  `text/plain; charset=UTF-8`, το νέο κείμενο σερβίρεται σωστά.
+- Cross-check DOM vs αρχείο: τα `h3` του `#pricing` = `Self-hosted, Free, Pro, Dedicated`, το section
+  περιέχει €0/€9/€29 και **κανένα** Solo/Family. Κλικ στο Annual toggle -> €90 + €290, Free μένει €0,
+  ακριβώς όπως το λέει πλέον το `llms.txt`.
+- `read_console_messages` (onlyErrors) -> «No console logs». Mobile (375x812):
+  `scrollWidth === innerWidth` (375), μηδέν οριζόντιο overflow.
+- **Screenshot βγήκε** αυτή τη φορά (πρώτη σε τέσσερα runs): hero σε mobile, lighthouse mark + gradient
+  τίτλος + τα δύο CTA, όλα σωστά. Ο dev server σταμάτησε με `preview_stop`.
+- Μηδέν άγγιγμα σε Docker/:3000/web/mobile, μηδέν subagent, μηδέν AI call. em-dashes στα δικά μου: 0.
+
+Επόμενο increment: (1) περιμένει ακόμα η `pharos-landing-20260729-1000` (μόνιμο hosted Free tier vs 14ήμερο
+trial που καταλήγει σε suspend, οι δύο ενότητες της σελίδας αντιφάσκουν μέχρι τότε), (2) ίδιου τύπου έλεγχος
+συνέπειας στα υπόλοιπα static αρχεία (`humans.txt` λέει «Last update: 2026-07-05», το `security.txt` λήγει
+2027-07-04, κανένα λάθος αλλά αξίζει περιοδικό πέρασμα), (3) συνέχεια του sweep όταν εμφανιστεί νέο
+user-facing feature.
+
+Needs-Achilleas (open, αμετάβλητα): μόνιμο Free tier ή μόνο trial (`pharos-landing-20260729-1000`), legal
+entity/Stripe, Terms+Privacy review, contact inbox, repo public timing.
