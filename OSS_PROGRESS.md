@@ -3143,3 +3143,27 @@ Suggested next task: **`reports/fxActions.ts`** (140 γραμμές, 2 exported 
 - Collision guard: `git status --short` πριν το commit έδειξε ΜΟΝΟ το νέο αρχείο μου· `git fetch origin main` καθαρό, local==origin.
 
 Suggested next task: **`vouchers/loyaltyActions.ts`** (67 γραμμές) — το επόμενο από τα εναπομείναντα test-less action modules που εντοπίστηκαν στο 2026-07-29 slice (μαζί με `app/storage-actions.ts`, `app/i18nActions.ts`, `settings/users.actions.ts`, `settings/mcpActions.ts`· τα μεγαλύτερα `jobActions.ts`/`aiCommandActions.ts`/`sampleDataActions.ts` παραμένουν για μεταγενέστερα runs, θέλουν πιο προσεκτικό διάβασμα). Διάβασε ολόκληρο το target file plus το `models/LoyaltyCard.ts` πριν γράψεις τίποτα. Πάντα `git status` collision-guard πρώτα.
+
+## 2026-07-31 (cont.⁸ — vouchers/loyaltyActions.test.ts, νέο module: loyalty/membership card CRUD)
+
+**Task**: το suggested next-task του προηγούμενου run: `vouchers/loyaltyActions.ts` (67 γραμμές, 4 exported functions) — CRUD για το loyalty/membership card wallet (P20), tab μέσα στο `/vouchers` δίπλα στα Vouchers/GiftCards. Coordination: `ROUTINES_PAUSED` δεν υπήρχε, καμία εγγραφή pharos-oss-prep στο `ASK_ACHILLEAS.md`, `git status --short` καθαρό, local==origin (`b6ef82e`) πριν ξεκινήσω.
+
+Διάβασα ολόκληρο το target file plus το `models/LoyaltyCard.ts` και το `lib/loyaltyCard.ts` (pure barcode-format helpers, ήδη δικό του `lib/loyaltyCard.test.ts`) πριν γράψω τίποτα. Ακολούθησα πιστά το πιο κοντινό αδερφό αρχείο, `vouchers/giftcardActions.test.ts` (ίδιο tenancy seam, ίδιο soft-delete σχήμα, ίδιο `formData()` helper) — η μόνη ουσιαστική διαφορά είναι ότι το LoyaltyCard δεν έχει monetary balance/uses array, αλλά έχει ένα `barcodeFormat` resolution βήμα μέσω του πραγματικού (μη-mocked) `resolveBarcodeFormat`, αφού είναι ήδη pure+testαρισμένο αλλού (ίδια λογική με το `safeDateOrNull` στο giftcard slice).
+
+**Ευρήματα στο ίδιο το production code (τεκμηριωμένα στα tests, ΟΧΙ αλλαγμένα)**:
+- Σε αντίθεση με το GiftCard's προαιρετικό `code`, το LoyaltyCard schema απαιτεί **και** `title` **και** `cardNumber` (και τα δύο `min(1)`) — μια κάρτα χωρίς αριθμό δεν έχει νόημα να αποθηκευτεί (δεν υπάρχει τι να σκανάρει το barcode).
+- `resolveBarcodeFormat(raw, cardNumber)`: ένα **explicit valid** format string (π.χ. `CODE39`) κερδίζει ΠΑΝΤΑ, ανεξαρτήτως του σχήματος του cardNumber (ακόμα κι αν ο αριθμός θα είχε γίνει guess ως EAN13) — ο χρήστης/import μπορεί να επιβάλει format. Ένα **άγνωστο/κενό** string πέφτει σε shape-based guess (13 ψηφία→EAN13, 12 ψηφία→UPC, αλλιώς CODE128) — ίδιο conditional και στα δύο `create`/`update`.
+- `createLoyaltyCard` επιβάλλει πάντα `archived:false` (το schema δεν το δέχεται καν ως form field), ίδιο pattern με το GiftCard.
+- `deleteLoyaltyCard` = soft delete (`$set deletedAt` via `updateOne`), όχι πραγματική διαγραφή.
+
+**16 tests** σε τέσσερα describe blocks: `createLoyaltyCard` (9: minimal-form defaults· 13-digit guess EAN13· 12-digit guess UPC· explicit valid format νικά το guess· explicit άγνωστο format πέφτει σε guess· missing title throws· empty title throws· missing cardNumber throws· empty cardNumber throws)· `updateLoyaltyCard` (3: forward με resolved format· invalid form throws πριν το DB· revalidate)· `setLoyaltyCardArchived` (2)· `deleteLoyaltyCard` (1: soft-delete shape).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/vouchers/loyaltyActions.test.ts"` → **16/16 passed** από την πρώτη προσπάθεια (κανένα tsc/hoisting fix χρειάστηκε — απλό αρχείο, ίδιο mock-typing pattern με το giftcard sibling).
+- `npm run type-check` → exit 0, μηδέν errors σε όλο το repo.
+- `npx vitest run` (όλο το suite) → **341 files, 5452 passed | 2 failed | 4 skipped (5458)** (~280s wall· transform/collect πολύ πιο αργά αυτή τη φορά, run σε background). **Τα 2 failures είναι ΑΣΧΕΤΑ με αυτό το slice**: `src/app/notifications/actions.tenant.test.ts:144` (δύο tests) — reproduced ξεχωριστά (`npx vitest run` μόνο σε αυτό το αρχείο, ίδια αποτυχία, deterministic όχι flaky). Το αρχείο τελευταία άλλαξε στο `daeea7e` («fix(notifications): route the alert bell through the tenant connection», ήδη στο HEAD πριν ξεκινήσω, όχι δικό μου commit) — pre-existing regression από άλλη routine (tenant-scoping δουλειά), εκτός territory του oss-prep να το διορθώσει (δεν αγγίζω feature-code στο `notifications/`). Καταγράφεται εδώ μόνο ως παρατήρηση.
+- Collision guard: `git status --short` πριν το commit έδειξε ΜΟΝΟ το νέο αρχείο μου· κανένα foreign staged file.
+
+**Needs Achilleas / other routine**: `src/app/notifications/actions.tenant.test.ts` έχει 2 failing tests μετά το `daeea7e` (alert-bell tenant routing) — φαίνεται σαν auto-expire sweep να τρέχει πλέον στο `default` connection αντί μόνο στο tenant connection, ή το test expectation να έμεινε πίσω από το routing fix. Η routine που κάνει tenant-scoping (`saas-core` ή όποια έκανε το `daeea7e`) θα πρέπει να το δει στο επόμενο run της.
+
+Suggested next task: **`app/i18nActions.ts`** (16 γραμμές, το μικρότερο εναπομείναν test-less action module) — μετά **`app/storage-actions.ts`** (19 γρ.)· μετά **`settings/mcpActions.ts`** (38 γρ.)· μετά **`settings/users.actions.ts`** (91 γρ.). Τα μεγαλύτερα (`app/jobActions.ts` 210 γρ., `app/aiCommandActions.ts` 93 γρ. AI tool-loop, `settings/sampleDataActions.ts` 103 γρ.) παραμένουν για μεταγενέστερα runs, θέλουν πιο προσεκτικό διάβασμα (side-effects/external calls). Διάβασε ολόκληρο το κάθε target file πριν γράψεις τίποτα. Πάντα `git status` collision-guard πρώτα.
