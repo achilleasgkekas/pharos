@@ -2,9 +2,46 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 74a0f12 -->
+<!-- reviewed: 997837f -->
 <!-- docker-validated: 5d3acb7 -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-31 (reviewer — έλεγχος 74a0f12..997837f, 11 commits)
+
+Guard: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md`: μόνο ένα `## reviewer-` entry (20260727-2010),
+ήδη APPLIED, τίποτα ANSWERED να εφαρμοστεί, καμία νέα OPEN απόφαση χρειάστηκε αυτό το run.
+
+`npm run type-check` (web) EXIT 0· `npx tsc --noEmit` (mobile) EXIT 0· `npx vitest run` πλήρης →
+**5454/5454 passed, 4 skipped, 341 files**.
+
+11 commits ελέγχθηκαν γραμμή-γραμμή: **`daeea7e`** (notifications tenant-scoping, 6 exports σε
+`withRequestTenant`, per-tenant throttle Map αντί module-scalar, writes σκόπιμα inline ώστε το
+writeGuard coverage test να μη χάσει το action) — καθαρό, ήδη κλείνει το standing WEB_DEBT item.
+**`a7bb89c`** (UTC date-range filter στο platform audit feed + CSV export) — `parseAuditDate`/
+`parseAuditRange` day-boundary expansion + inverted-range correction + round-trip overflow guard
+όλα σωστά, `page.tsx` filterLinkParams σωστά περνάνε το ΔΙΟΡΘΩΜΕΝΟ window σε CSV/pagination links,
+`buildPlatformAuditFilter` κρατά το `createdAt` range top-level ξεχωριστό από το keyset `$or` (Load
+more δεν διαρρέει έξω από το window). **`997837f`** (llms.txt pricing fix) — 4 αριθμοί cross-checked
+έναντι `lib/billing/plans.ts` PLANS object, byte-for-byte match, annual math σωστό. Τα υπόλοιπα 8
+commits test-only/docs (loyaltyActions.test.ts 16 tests, κλπ). Μηδέν committed secret (grep για
+key/token/password/PEM patterns στο πλήρες diff, μόνο prose references σε env var names).
+
+**OSS routine's flagged regression, ελέγχθηκε, ΔΕΝ αναπαράγεται**: το `OSS_PROGRESS.md` (2026-07-31
+cont.⁸) ανέφερε 2 deterministic failures στο `notifications/actions.tenant.test.ts` μετά το
+`daeea7e`. Ξανα-έτρεξα μεμονωμένα (7/7), με τα sibling notification test files (34/34), και όλη τη
+σουίτα (5454/5454, 0 failed) — καμία αποτυχία σε κανένα πέρασμα, το αρχείο αμετάβλητο από τότε.
+Πιθανό transient flake στο δικό τους πολύ-πιο-αργό run, όχι πραγματικό regression. Καταγράφηκε στο
+`WEB_DEBT.md` ώστε να μην ξαναχαθεί χρόνος.
+
+WEB_DEBT.md: νέα σύνοψη (62η σάρωση) πάνω από την προηγούμενη. 5 standing P2 tenancy-parity items
+(`subscriptions`/`tasks`/`shopping-list`/`history`/`settings` actions.ts) re-verified live ακόμα
+ανοιχτά, αμετάβλητα (grep count 0 σε όλα). el.ts i18n gap: 30 missing keys (en=1307, el=1277),
+σταθερό. Μηδέν small-safe fix χρειάστηκε αυτό το run (όλος ο ελεγμένος κώδικας καθαρός).
+
+Routine health: κανένα stuck routine εντοπίστηκε. `pharos-landing` έχει ένα OPEN
+`ASK_ACHILLEAS.md` entry (`pharos-landing-20260729-1000`, pricing/legal αποφάσεις) που περιμένει
+ακόμα, αμετάβλητο από προηγούμενο run· `PRODUCT_BACKLOG.md` σημειώνει 17 διαδοχικές σαρώσεις χωρίς
+καμία έγκριση (35 Proposed) — decision-fatigue σημείο, όχι routine malfunction.
 
 ## 2026-07-31 (docker-health — rebuild + prune)
 
