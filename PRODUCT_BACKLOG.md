@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-30 (21η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-07-31 (22η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
@@ -68,12 +68,53 @@
 > password managers (1Password Emergency Kit, Bitwarden Emergency Access) που ταιριάζει φυσικά στο ήδη-
 > προτεινόμενο P71 (secrets vault) + P42 (document expiry) και στο ίδιο το "Personal Hub" backronym, αλλά
 > ανεξάρτητο feature ό,τι κι αν αποφασιστεί για το P71.
+>
+> **22η σάρωση (2026-07-31)** — έλεγξα `git log --since` από την 21η σάρωση (marker `4c8268b`): μηδέν νέο shipped
+> feature να συμφιλιωθεί εδώ, η δουλειά του builder ήταν αποκλειστικά **SaaS multi-tenancy plumbing** (tenant-
+> scoped connections σε notifications/statements) + test coverage, όχι backlog items — καμία μετακίνηση σε Done
+> χρειάζεται. Η ουρά παραμένει στα **35 Proposed, μηδέν έγκριση σε 17 διαδοχικές σαρώσεις** — το ίδιο decision-
+> fatigue σημείο που σημείωσε η 20ή/21η σάρωση παραμένει το πραγματικό bottleneck, όχι έλλειψη candidates. Αντί
+> να προσθέσω ξανά 3-5 ανεξάρτητα νέα items πάνω σε μια ήδη-υπερφορτωμένη λίστα, **μόνο 1 νέο item αυτή τη φορά**
+> (P77, live-verified gap) + ένα μικρό **quick-start shortlist** πιο κάτω με τα 5 χαμηλότερου-ρίσκου items της
+> ουράς (καθαρά additive, καμία νέα εξάρτηση, ίδιο "άδειο = καμία αλλαγή" idiom με όλα τα ήδη-shipped batches) —
+> ΟΧΙ μετακίνηση σε Approved (αυτό παραμένει αποκλειστικά δικό του call), απλά μια πρόταση σειράς αν θελήσει να
+> ξανακάνει ένα batch-review σαν το 2026-07-09/10. **P77** — verified `grep -rln "healthcheck\|health-check\|
+> diagnostics\|/system-health" apps/web/src` = 0 hits (το ένα false-positive hit σε `expenses/actions.ts` είναι
+> άσχετο, unrelated string match): το Settings έχει ήδη ξεχωριστά «Test connection» κουμπιά ανά integration
+> (UniFi ήδη αφαιρέθηκε, SMB/FTP/OneDrive/AI provider όμως ναι) αλλά **καμία ενιαία σελίδα** που να δείχνει «είναι
+> το deployment μου υγιές» με μια ματιά — καθαρό self-host adoption/troubleshooting lever, διακριτό από το ήδη-
+> proposed P40 (update-available banner, μόνο version check).
+>
+> **🗂 Quick-start shortlist (πρόταση σειράς, ΟΧΙ approval)** — αν ο Αχιλλέας θέλει να σπάσει το μπλοκάρισμα με
+> ένα μικρό batch αντί να διαβάσει όλα τα 36, αυτά τα 5 είναι τα πιο «χαμηλού ρίσκου, καθαρά additive, μηδέν νέα
+> απόφαση αρχιτεκτονικής» της ουράς (όλα S, όλα «κενό = καμία αλλαγή συμπεριφοράς»): **P74** (backup verify),
+> **P40** (update-available banner), **P46** (expense duplicate detection, mirror ήδη-shipped receipts pattern),
+> **P66** (AI assistant model-coverage gap, καθαρό consistency fix σε ήδη-δουλεμένο pipeline), **P48** (mirror
+> sync-staleness alert). Δεν είναι «οι πιο value-πυκνές» υποχρεωτικά, είναι οι πιο **εύκολες να εγκριθούν χωρίς
+> σκέψη** — ό,τι μπορεί να ξεμπλοκάρει τη ροή.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P77. Ενιαίο self-host system-health / diagnostics dashboard — S — OSS (adoption/troubleshooting lever)
+- **Αξία:** live-verified `grep -rln "healthcheck|health-check|diagnostics|/system-health" apps/web/src` = 0 hits
+  (το μόνο match, `expenses/actions.ts`, είναι άσχετο string). Το Settings έχει ήδη **σκόρπια** per-integration
+  «Test connection» κουμπιά (storage backend SMB/FTP/OneDrive, AI provider) αλλά ο χρήστης πρέπει να ανοίξει κάθε
+  tab ξεχωριστά για να μάθει «είναι το deployment μου υγιές;». Για ένα self-hosted project (η ίδια κατηγορία
+  χρηστών με UniFi/Proxmox/NAS, βλ. CLAUDE.md background), ένα βασικό troubleshooting συνήθως ξεκινά με «τι δεν
+  δουλεύει» πριν καν ανοίξει τα container logs. Νέα μικρή σελίδα/section (Settings → «System status» ή αυτόνομο
+  `/system-health`): DB connection ok/latency, storage backend reachable (reuse ήδη-shipped `testRemoteConnection`),
+  AI provider reachable (reuse `isAiReady`), disk/storage usage (`dbStats()` ήδη υπάρχει για tenant metering στο
+  SaaS side — reuse εδώ για local), job-queue backlog (ήδη-shipped `Job` model), τελευταίο επιτυχές backup
+  timestamp (συμπληρώνει το ήδη-proposed P74). **Καθαρή σύνθεση ήδη-υπαρχόντων ελέγχων σε ΜΙΑ οθόνη**, μηδέν νέος
+  μηχανισμός ελέγχου εκτός του optional backup-verify (P74) αν εγκριθεί μαζί.
+- **Module:** νέα Settings σελίδα/tab, καλεί ήδη-υπάρχοντα test/status actions (storage/AI/DB/jobs), read-only.
+- **Ανοιχτή απόφαση (builder default):** MVP = read-only status grid (πράσινο/κόκκινο/γκρι ανά subsystem, ίδιο
+  idiom με το ήδη-υπάρχον «AI online» dot στο navbar) — καμία auto-fix ενέργεια σε αυτό το slice· ζει σαν νέο
+  Settings tab, όχι public/unauthenticated route (θα διέρρεε deployment topology σε multi-tenant SaaS context).
 
 ### P76. Emergency / legacy access — time-delayed data access για έμπιστο άτομο (dead-man's-switch lite) — S/M — OSS (κυρίως), «Personal Hub» fit
 - **Αξία:** live-verified `grep -rln "emergencyAccess|legacyContact|trustedContact|deadManSwitch" apps/web/src
