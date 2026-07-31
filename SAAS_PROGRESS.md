@@ -6373,3 +6373,78 @@ SAAS_MODE off, **καμία SaaS UI σελίδα δεν είναι browser-verif
 (β) **date-range filter** στο ίδιο feed + export (`from`/`to` πάνω στο `createdAt` — το πιο
 προφανές επόμενο βήμα για incident review, ο cursor keyset το κάνει εύκολο)· (γ) αλλιώς επόμενο
 backend increment από TODO.md #5-#12. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά UI scan.
+
+## 2026-07-31 — increment 129: date-range φίλτρο στο platform audit feed (+ export)
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine (τα τρία `pharos-saas-core-*` είναι APPLIED).
+**UI-first scan**: πήρα το **(β)** της προτεινόμενης σειράς του προηγούμενου run, το **date-range
+filter**, όχι το (α) actor filter. Λόγος: το actor filter θέλει ένα Account lookup email→id **πριν**
+το query (δηλαδή αλλάζει το `listPlatformAudit`, το impure κομμάτι), ενώ το date range είναι καθαρά
+parsing + ένα clause — μικρότερο, και το πιο συχνά ζητούμενο σε incident review. Το (α) μένει
+πρώτο για το επόμενο run.
+
+**Γιατί υπάρχει.** Το `/admin/audit` φιλτράριζε ανά workspace και ανά action, αλλά **όχι ανά χρόνο**
+— που είναι το πρώτο πράγμα που στενεύει ένας operator («τι έγινε μεταξύ 14:00 και 16:00 χθες»).
+Χωρίς αυτό, ο μόνος τρόπος να φτάσεις σε παλιό συμβάν ήταν να πατάς «Load more» μέχρι να τον βρεις,
+και το CSV export κατέβαζε πάντα από την κορυφή.
+
+**Τρεις αποφάσεις που αξίζει να είναι γραμμένες:**
+
+1. **Bare day → ΤΟ ΔΙΚΟ ΤΟΥ άκρο της μέρας.** `from=2026-07-01` → `00:00:00.000Z`,
+   `to=2026-07-15` → **`23:59:59.999Z`**. Το naive parse του `to` ως midnight θα έκοβε **ολόκληρη
+   τη μέρα που ζήτησε ρητά ο operator** και ο feed θα διάβαζε «δεν έγινε τίποτα» — ακριβώς το ίδιο
+   επικίνδυνο λάθος συμπέρασμα με το `unknownTenant` του increment 126/128. Pinned με test.
+2. **UTC, όχι local.** Το `createdAt` αποθηκεύεται UTC και κάθε timestamp που δείχνει/εξάγει το
+   console είναι ISO — ένα locally-interpreted όριο θα διαφωνούσε με τις ίδιες τις γραμμές μέσα του
+   κατά το offset Αθήνας (2-3 ώρες). Τα labels της φόρμας λένε ρητά «From (UTC)» / «To (UTC)».
+3. **Inverted window → διόρθωση με re-parse των RAW inputs**, όχι swap των parsed Dates. Το swap
+   των Dates θα έδινε `07-01T23:59:59.999 .. 07-15T00:00:00`, δηλαδή θα έχανε σιωπηλά σχεδόν μια
+   μέρα σε **κάθε** άκρο. Διόρθωση αντί για απόρριψη, με το ίδιο σκεπτικό: άδειος feed κατά λάθος
+   είναι η μία απάντηση που δεν επιτρέπεται σε incident.
+
+**Bug που βρήκε το ίδιο μου το test.** Έγραψα ότι το `2026-02-30` πρέπει να γίνει null, και η πρώτη
+εκτέλεση επέστρεψε **2 Μαρτίου**: ο V8 **ΔΕΝ απορρίπτει** out-of-range calendar day στο ISO parse,
+κάνει **rollover**. Δηλαδή ένα typo στη μέρα θα μετακινούσε σιωπηλά το παράθυρο στον επόμενο μήνα
+ενώ η φόρμα θα συνέχιζε να δείχνει τη μέρα που πληκτρολογήθηκε. **Διόρθωσα τον parser, όχι το test**:
+round-trip check (`d.toISOString().slice(0,10) === s`).
+
+**Composition με το keyset cursor** (το πιο εύκολο σημείο για σιωπηλό regression): το window είναι
+top-level `createdAt` clause και ο cursor είναι `$or` πάνω στο **ίδιο** πεδίο. Η Mongo κάνει AND τα
+distinct top-level keys, οπότε συνθέτουν σωστά και το «Load more» **μένει μέσα στο παράθυρο**.
+Επίτηδες ΔΕΝ τα ένωσα σε ένα clause: το keyset `$or` κουβαλά και `_id` tiebreak, και το fold ενός
+range μέσα του είναι ακριβώς εκεί που το pagination αρχίζει να χάνει γραμμές. Pinned με test.
+
+**UI** (`/admin/audit`): δύο `<input type="date">` στο υπάρχον GET form (η URL μένει source of truth,
+μηδέν client state), και το window περνά σε **και τα τρία** links — «Download CSV», «Load more»,
+«Back to latest» — ώστε ό,τι κοιτάς να είναι ό,τι κατεβάζεις και ό,τι σελιδοποιείς. Η φόρμα κάνει
+echo το **εφαρμοσμένο** window (`dateInputValue(query.from)`), όχι το raw query string: αλλιώς ένα
+διορθωμένο inverted range θα έδειχνε φίλτρα που δεν ταιριάζουν με τις γραμμές από κάτω. Το
+`filtered` βγήκε σε κοινό `auditFiltersActive` ώστε το «Reset» να εμφανίζεται και για σκέτο window.
+**Filename**: `pharos-audit-platform-all-from-2026-07-01-to-2026-07-15-2026-07-31.csv` — χωρίς το
+window, δύο export διαφορετικών incident windows καταλήγουν σε ticket με **πανομοιότυπο όνομα**.
+Η ημέρα παραγωγής μένει ξεχωριστά στο τέλος (άλλο γεγονός από το window που καλύπτει).
+
+**Verified**: **94/94** στα 3 σχετικά αρχεία (+25 νέα tests), πλήρες `npx vitest run` →
+**340 files / 5438 tests green** (0 fail), `npm run type-check` → **EXIT 0 χωρίς κανένα fix**.
+**Docker: κανένα rebuild** (μηδέν env/deps/runtime-wiring αλλαγή → ο mutex δεν χρειάστηκε).
+**Browser-verify: μη εφαρμόσιμο unattended** — το λέω ρητά αντί να το περάσω για επιτυχία: το
+`/admin/audit` στο τρέχον stack γυρίζει **307** (redirect στο login, SAAS_MODE off + καθόλου
+operator session), οπότε δεν υπάρχει τίποτα να renderαριστεί, και δεν γυρίζω το flag σε running app
+του χρήστη χωρίς εντολή. Το μόνο live σημάδι (curl, πάνω στο **παλιό** image): το export **με τα νέα
+params** γυρίζει **401**, ίδιο με πριν — τα νέα query params δεν άνοιξαν καμία επιφάνεια στο OSS
+build. Collision guard: `git status --short` πριν το staging = **μόνο τα 6 δικά μου αρχεία**, μηδέν
+staged από άλλη routine· pathspec commit `a7bb89c`.
+
+**## Needs Achilleas:** τίποτα νέο. Παραμένουν: **Stripe keys** (`STRIPE_SECRET_KEY` /
+`STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_SHARED` / `STRIPE_PRICE_DEDICATED` — ο client είναι πλήρως
+testαρισμένος και περιμένει μόνο keys), **τελικό plan pricing** (τα €0/€9/€29 + quotas στο
+`plans.ts` παραμένουν placeholders, εγκεκριμένα ως πηγή αλήθειας έναντι της landing), **SMTP**.
+Επαναλαμβανόμενη πρακτική σημείωση: όσο το τοπικό stack τρέχει με SAAS_MODE off, **καμία SaaS UI
+σελίδα δεν είναι browser-verifiable** από αυτή τη routine.
+
+**Next task:** (α) **actor filter** στο platform feed — τώρα το πιο προφανές κενό, αλλά αγγίζει το
+impure `listPlatformAudit` (χρειάζεται Account lookup email→id πριν το query, και απόφαση για το τι
+γίνεται σε άγνωστο email: πιθανότατα ένα `unknownActor` flag, ίδιο pattern με το `unknownTenant`)·
+(β) quick-range chips («last 24h / 7d / 30d») πάνω από το window, τώρα που το backend τα σηκώνει —
+καθαρά UI, μηδέν νέο query surface· (γ) αλλιώς επόμενο backend increment από TODO.md #5-#12. Πριν
+ξεκινήσεις: ask-inbox πρώτα, μετά UI scan.
