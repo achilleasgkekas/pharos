@@ -5,16 +5,22 @@
 //
 // Why this exists alongside the two per-workspace Activity views: those answer "what happened in
 // THIS workspace", which requires already knowing where to look. This one answers "what happened
-// on the platform", the question an operator actually starts an incident with. Filter by action
-// and/or workspace slug via a plain GET form (the URL is the source of truth, so a view is
-// shareable/bookmarkable and needs no client state); paginate with the shared keyset cursor.
+// on the platform", the question an operator actually starts an incident with. Filter by action,
+// workspace slug and/or a UTC date window via a plain GET form (the URL is the source of truth, so
+// a view is shareable/bookmarkable and needs no client state); paginate with the shared keyset
+// cursor, which composes with the window so "Load more" never escapes it.
 //
 // READ-ONLY: only the central registry AuditEvent collection plus batched Account/Tenant identity
 // lookups; never a per-tenant data database, never a write. Self-gates to notFound() for the
 // self-hosted app (SAAS_MODE off / not an operator) so the OSS build is byte-for-byte unchanged.
 import Link from 'next/link';
 import { requireSuperadminPage } from '@/lib/tenancy/superadminPage';
-import { parseAdminAuditQuery, listPlatformAudit } from '@/lib/tenancy/adminAudit';
+import {
+  parseAdminAuditQuery,
+  listPlatformAudit,
+  auditFiltersActive,
+  dateInputValue,
+} from '@/lib/tenancy/adminAudit';
 import { toPlatformActivityRows } from '@/components/saas/platformActivity';
 import { PlatformActivityPanel } from '@/components/saas/PlatformActivityPanel';
 import { ACTIVITY_FILTER_OPTIONS } from '@/components/saas/activityFilter';
@@ -39,11 +45,15 @@ function toSearchParams(raw: RawParams): URLSearchParams {
 function auditParams(params: {
   action?: string | null;
   tenant?: string | null;
+  from?: string | null;
+  to?: string | null;
   before?: string | null;
 }): string {
   const sp = new URLSearchParams();
   if (params.action) sp.set('action', params.action);
   if (params.tenant) sp.set('tenant', params.tenant);
+  if (params.from) sp.set('from', params.from);
+  if (params.to) sp.set('to', params.to);
   if (params.before) sp.set('before', params.before);
   return sp.toString();
 }
@@ -73,8 +83,20 @@ export default async function AdminAuditPage({
   const { events, hasMore, unknownTenant } = await listPlatformAudit(query);
 
   const rows = toPlatformActivityRows(events);
-  const filtered = Boolean(query.action || query.tenant);
+  const filtered = auditFiltersActive(query);
   const nextCursor = hasMore && rows.length ? cursorAfterRow(rows[rows.length - 1]) : null;
+
+  // Echo the window that was actually APPLIED, not the raw query string: an inverted or sloppy
+  // `?from=/?to=` is corrected during parsing, and the form must show the corrected window,
+  // otherwise the operator reads filters that do not match the rows underneath them.
+  const fromValue = dateInputValue(query.from);
+  const toValue = dateInputValue(query.to);
+  const filterLinkParams = {
+    action: query.action,
+    tenant: query.tenant,
+    from: fromValue,
+    to: toValue,
+  };
 
   return (
     <div className="space-y-6">
@@ -119,6 +141,31 @@ export default async function AdminAuditPage({
             ))}
           </select>
         </label>
+        {/* Window bounds. Both are INCLUSIVE whole days in UTC (a bare `to` day covers that day to
+            23:59:59.999Z) — labelled UTC because the rows and the CSV are ISO/UTC too, and an
+            operator reading them as Athens time would misjudge an incident window by 2-3 hours. */}
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
+            From (UTC)
+          </span>
+          <input
+            type="date"
+            name="from"
+            defaultValue={fromValue}
+            className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] px-3 py-1.5 text-sm text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
+            To (UTC)
+          </span>
+          <input
+            type="date"
+            name="to"
+            defaultValue={toValue}
+            className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] px-3 py-1.5 text-sm text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+          />
+        </label>
         <button
           type="submit"
           className="rounded-lg border border-[color:var(--color-accent)]/50 bg-[color:var(--color-accent)]/10 px-4 py-1.5 text-sm font-medium text-[color:var(--color-accent)] transition-colors hover:bg-[color:var(--color-accent)]/20"
@@ -137,11 +184,7 @@ export default async function AdminAuditPage({
           // Plain <a>, not <Link>: this is a file download, not a client-side navigation, and the
           // router would otherwise try to treat the CSV response as a page.
           <a
-            href={auditExportHref({
-              action: query.action,
-              tenant: query.tenant,
-              before: sp.get('before'),
-            })}
+            href={auditExportHref({ ...filterLinkParams, before: sp.get('before') })}
             className="ml-auto rounded-lg border border-[color:var(--color-border-light)] px-3 py-1.5 text-sm text-[color:var(--color-text-dim)] transition-colors hover:border-[color:var(--color-cyan)] hover:text-[color:var(--color-cyan)]"
           >
             ↓ Download CSV
@@ -169,7 +212,7 @@ export default async function AdminAuditPage({
         <div className="flex items-center justify-between gap-2">
           {query.cursor ? (
             <Link
-              href={auditHref({ action: query.action, tenant: query.tenant })}
+              href={auditHref(filterLinkParams)}
               className="rounded-lg border border-[color:var(--color-border)] px-3 py-1.5 text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]"
             >
               ← Back to latest
@@ -180,8 +223,7 @@ export default async function AdminAuditPage({
           {nextCursor && (
             <Link
               href={auditHref({
-                action: query.action,
-                tenant: query.tenant,
+                ...filterLinkParams,
                 before: encodeActivityCursor(nextCursor),
               })}
               className="rounded-lg border border-[color:var(--color-border-light)] px-3 py-1.5 text-sm font-medium text-[color:var(--color-text)] hover:border-[color:var(--color-cyan)] hover:text-[color:var(--color-cyan)]"

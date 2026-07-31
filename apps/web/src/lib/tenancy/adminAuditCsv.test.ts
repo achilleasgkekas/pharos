@@ -264,3 +264,67 @@ describe('platformAuditCsvFilename', () => {
     );
   });
 });
+
+describe('platformAuditCsvFilename · date window', () => {
+  const at = new Date('2026-07-31T08:00:00.000Z');
+  const from = new Date('2026-07-01T00:00:00.000Z');
+  const to = new Date('2026-07-15T23:59:59.999Z');
+
+  it('encodes the window, keeping the generation day as a separate trailing fact', () => {
+    // Without this, two exports of the same workspace+verb over different incident windows land
+    // in a ticket with byte-identical names.
+    expect(platformAuditCsvFilename({ tenant: null, action: null, from, to }, at)).toBe(
+      'pharos-audit-platform-all-from-2026-07-01-to-2026-07-15-2026-07-31.csv'
+    );
+  });
+
+  it('encodes a one-sided window', () => {
+    expect(platformAuditCsvFilename({ tenant: null, action: null, from }, at)).toBe(
+      'pharos-audit-platform-all-from-2026-07-01-2026-07-31.csv'
+    );
+    expect(platformAuditCsvFilename({ tenant: null, action: null, to }, at)).toBe(
+      'pharos-audit-platform-all-to-2026-07-15-2026-07-31.csv'
+    );
+  });
+
+  it('names an end-of-day bound after its OWN day (no UTC rollover)', () => {
+    expect(platformAuditCsvFilename({ tenant: null, action: null, to }, at)).toContain(
+      'to-2026-07-15'
+    );
+  });
+
+  it('is unchanged when no window is set (back-compatible with existing links)', () => {
+    expect(platformAuditCsvFilename({ tenant: 'acme', action: 'member.added' }, at)).toBe(
+      'pharos-audit-acme-member-added-2026-07-31.csv'
+    );
+  });
+
+  it('ignores an invalid Date bound rather than emitting "invalid-date" in the name', () => {
+    expect(platformAuditCsvFilename({ tenant: null, action: null, from: new Date('x') }, at)).toBe(
+      'pharos-audit-platform-all-2026-07-31.csv'
+    );
+  });
+
+  it('still yields only filename-safe characters with a window set', () => {
+    const name = platformAuditCsvFilename({ tenant: 'ACME Co!', action: null, from, to }, at);
+    expect(name).toMatch(/^[a-z0-9.-]+$/);
+  });
+});
+
+describe('parseAuditExportQuery · date window', () => {
+  it('carries the window over so a Download link exports the slice on screen', () => {
+    const q = parseAuditExportQuery(sp('from=2026-07-01&to=2026-07-15'));
+    expect(q.from?.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+    expect(q.to?.toISOString()).toBe('2026-07-15T23:59:59.999Z');
+  });
+
+  it('applies the same inversion correction as the page', () => {
+    const q = parseAuditExportQuery(sp('from=2026-07-15&to=2026-07-01'));
+    expect(q.from?.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+    expect(q.to?.toISOString()).toBe('2026-07-15T23:59:59.999Z');
+  });
+
+  it('ignores an unparseable bound instead of failing the download', () => {
+    expect(parseAuditExportQuery(sp('from=nope')).from).toBeNull();
+  });
+});

@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/saas/admin/audit/export[?tenant=&action=&limit=&before=] → the platform audit trail as
+ * GET /api/saas/admin/audit/export[?tenant=&action=&from=&to=&limit=&before=] → the audit trail as
  * a CSV download (TODO §8 "Superadmin console"). Same query semantics as the /admin/audit page, so
  * the page's "Download CSV" link just carries the active filters over; `limit` is re-clamped
  * against the much larger export ceiling (see adminAuditCsv).

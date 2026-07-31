@@ -49,9 +49,83 @@ export type AdminAuditQuery = {
   action: AuditAction | null;
   /** Optional workspace slug filter; null = every tenant. Normalized lowercase/trimmed. */
   tenant: string | null;
+  /** Inclusive start of the time window (UTC); null = no lower bound. */
+  from: Date | null;
+  /** Inclusive end of the time window (UTC); null = no upper bound. */
+  to: Date | null;
   /** Keyset resume point for "Load more"; null = newest page. */
   cursor: ActivityCursor | null;
 };
+
+/** A bare calendar day, the only shape an `<input type="date">` can produce. */
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Parse one end of the audit time window.
+ *
+ * A bare `YYYY-MM-DD` is expanded to the requested EDGE of that day **in UTC**: `start` →
+ * 00:00:00.000Z, `end` → 23:59:59.999Z. Expanding the end edge is the whole point — a naive
+ * `to = 2026-07-30` would parse to midnight and silently exclude every event of the day the
+ * operator explicitly asked for, which reads as "nothing happened that day". A full ISO timestamp
+ * is honoured verbatim (an operator narrowing to an exact incident minute means it literally).
+ *
+ * UTC, not local time, on purpose: `createdAt` is stored in UTC and every timestamp this console
+ * renders/exports is an ISO string, so a locally-interpreted boundary would make the window
+ * disagree with the rows inside it by the Athens offset. The form labels the fields UTC.
+ *
+ * Unparseable input → null (= no bound), the same leniency as parseAuditAction/decodeActivityCursor:
+ * a stray query param shows more, never 400. PURE.
+ */
+export function parseAuditDate(raw: unknown, edge: 'start' | 'end'): Date | null {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (!s) return null;
+  if (DAY_RE.test(s)) {
+    const d = new Date(`${s}T${edge === 'end' ? '23:59:59.999' : '00:00:00.000'}Z`);
+    if (Number.isNaN(d.getTime())) return null;
+    // Round-trip check, because V8 does NOT reject an out-of-range calendar day here: it ROLLS
+    // OVER (`2026-02-30` → 2 March). Without this, a typo'd day would silently move the window
+    // into the following month while the form kept showing the day that was typed.
+    return d.toISOString().slice(0, 10) === s ? d : null;
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Both ends of the window from `?from=`/`?to=`. An INVERTED range (from later than to) is
+ * corrected by swapping the RAW inputs and re-parsing, not by swapping the parsed Dates: the two
+ * edges carry different day-boundary semantics, so swapping Dates would quietly shrink the window
+ * by nearly a day at each end. Correcting rather than rejecting follows the same reasoning as the
+ * `unknownTenant` split — an empty feed is the one answer an operator must never get by accident
+ * while chasing an incident. PURE.
+ */
+export function parseAuditRange(params: URLSearchParams): { from: Date | null; to: Date | null } {
+  const rawFrom = params.get('from');
+  const rawTo = params.get('to');
+  const from = parseAuditDate(rawFrom, 'start');
+  const to = parseAuditDate(rawTo, 'end');
+  if (from && to && from.getTime() > to.getTime()) {
+    return { from: parseAuditDate(rawTo, 'start'), to: parseAuditDate(rawFrom, 'end') };
+  }
+  return { from, to };
+}
+
+/**
+ * Render a window bound back into the `YYYY-MM-DD` an `<input type="date">` accepts, so the form
+ * round-trips the active filter. UTC slice, matching how the bound was parsed. PURE.
+ */
+export function dateInputValue(d: Date | null | undefined): string {
+  if (!d || Number.isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+}
+
+/** True when any narrowing filter is active — drives the "Reset" affordance and the empty-state
+ *  wording ("no match for these filters" vs "no activity yet"). PURE. */
+export function auditFiltersActive(
+  query: Pick<AdminAuditQuery, 'action' | 'tenant' | 'from' | 'to'>
+): boolean {
+  return Boolean(query.action || query.tenant || query.from || query.to);
+}
 
 /**
  * Clamp/validate raw query-string params into a well-formed `AdminAuditQuery`.
@@ -60,6 +134,7 @@ export type AdminAuditQuery = {
  *   - action: only a known audit verb survives, else null (no filter) — same leniency as
  *             parseAuditAction, because a stray query param should show everything, not 400.
  *   - tenant: trimmed + lowercased slug (the Tenant.slug field is stored lowercase), blank → null.
+ *   - from/to: inclusive UTC window bounds (see parseAuditRange); invalid → null (= unbounded).
  *   - cursor: decoded via the shared helper; malformed/tampered → null (= first page).
  * PURE.
  */
@@ -71,11 +146,14 @@ export function parseAdminAuditQuery(params: URLSearchParams): AdminAuditQuery {
       : DEFAULT_PLATFORM_AUDIT_PAGE;
 
   const tenant = (params.get('tenant') || '').trim().toLowerCase() || null;
+  const { from, to } = parseAuditRange(params);
 
   return {
     limit,
     action: parseAuditAction(params.get('action')),
     tenant,
+    from,
+    to,
     cursor: decodeActivityCursor(params.get('before')),
   };
 }
@@ -89,11 +167,23 @@ export function parseAdminAuditQuery(params: URLSearchParams): AdminAuditQuery {
 export function buildPlatformAuditFilter(input: {
   tenantId?: string | null;
   action?: AuditAction | null;
+  from?: Date | null;
+  to?: Date | null;
   cursor?: ActivityCursor | null;
 }): Record<string, unknown> {
   const filter: Record<string, unknown> = {};
   if (input.tenantId) filter.tenant = input.tenantId;
   if (input.action) filter.action = input.action;
+  // The window is a top-level `createdAt` clause and the cursor is a `$or` on the same field.
+  // Mongo ANDs distinct top-level keys, so the two compose correctly and "Load more" stays inside
+  // the window. They are deliberately NOT merged into one clause: the keyset `$or` also carries an
+  // `_id` tiebreak, and folding a range into it is where pagination quietly starts skipping rows.
+  if (input.from || input.to) {
+    const range: Record<string, Date> = {};
+    if (input.from) range.$gte = input.from;
+    if (input.to) range.$lte = input.to;
+    filter.createdAt = range;
+  }
   if (input.cursor) Object.assign(filter, cursorFilter(input.cursor));
   return filter;
 }
@@ -169,7 +259,13 @@ export async function listPlatformAudit(query: AdminAuditQuery): Promise<Platfor
     tenantId = String(t._id);
   }
 
-  const filter = buildPlatformAuditFilter({ tenantId, action: query.action, cursor: query.cursor });
+  const filter = buildPlatformAuditFilter({
+    tenantId,
+    action: query.action,
+    from: query.from,
+    to: query.to,
+    cursor: query.cursor,
+  });
 
   // limit + 1 so "Load more" is decided without a second countDocuments over an unbounded,
   // append-only collection.

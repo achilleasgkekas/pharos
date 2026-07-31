@@ -16,6 +16,10 @@ import {
   buildPlatformAuditFilter,
   collectTenantIds,
   platformAuditEvent,
+  parseAuditDate,
+  parseAuditRange,
+  dateInputValue,
+  auditFiltersActive,
   MAX_PLATFORM_AUDIT_PAGE,
   DEFAULT_PLATFORM_AUDIT_PAGE,
 } from './adminAudit';
@@ -29,6 +33,8 @@ describe('parseAdminAuditQuery', () => {
       limit: DEFAULT_PLATFORM_AUDIT_PAGE,
       action: null,
       tenant: null,
+      from: null,
+      to: null,
       cursor: null,
     });
   });
@@ -244,5 +250,159 @@ describe('platformAuditEvent', () => {
     expect(row.actor).toBeNull();
     expect(row.actorEmail).toBeNull();
     expect(row.actorName).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Date window (`?from=`/`?to=`). The load-bearing behaviours, in order of how badly a regression
+// would hurt an incident review:
+//   1. A bare `to` day is INCLUSIVE of that whole day. Parsing it as midnight would drop every
+//      event of the day the operator explicitly asked for, and the feed would read "nothing
+//      happened" — the single most dangerous wrong answer this console can give.
+//   2. Boundaries are UTC. Interpreting them locally would put the window out of step with the
+//      ISO timestamps rendered in the very same table by the Athens offset.
+//   3. The window and the keyset cursor are separate top-level clauses, so "Load more" stays
+//      inside the window instead of paginating out of it.
+// ---------------------------------------------------------------------------------------------
+
+describe('parseAuditDate', () => {
+  it('expands a bare day to the START of that day in UTC for the from edge', () => {
+    expect(parseAuditDate('2026-07-01', 'start')?.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+  });
+
+  it('expands a bare day to the END of that day in UTC for the to edge', () => {
+    // The bug this pins: `to=2026-07-15` parsed as midnight silently excludes the whole of the
+    // 15th, i.e. exactly the day the operator asked to see.
+    expect(parseAuditDate('2026-07-15', 'end')?.toISOString()).toBe('2026-07-15T23:59:59.999Z');
+  });
+
+  it('honours a full ISO timestamp verbatim on both edges', () => {
+    const iso = '2026-07-15T13:45:12.000Z';
+    expect(parseAuditDate(iso, 'start')?.toISOString()).toBe(iso);
+    expect(parseAuditDate(iso, 'end')?.toISOString()).toBe(iso);
+  });
+
+  it('treats blank, whitespace, and non-string input as no bound', () => {
+    for (const raw of ['', '   ', null, undefined, 42, {}]) {
+      expect(parseAuditDate(raw, 'start')).toBeNull();
+    }
+  });
+
+  it('rejects impossible and unparseable dates instead of throwing', () => {
+    // Same leniency as parseAuditAction/decodeActivityCursor: a stray query param widens the
+    // view, it never 400s.
+    for (const raw of ['2026-02-30', '2026-13-01', 'yesterday', '15/07/2026']) {
+      expect(parseAuditDate(raw, 'start')).toBeNull();
+      expect(parseAuditDate(raw, 'end')).toBeNull();
+    }
+  });
+
+  it('trims surrounding whitespace before parsing', () => {
+    expect(parseAuditDate('  2026-07-01  ', 'start')?.toISOString()).toBe(
+      '2026-07-01T00:00:00.000Z'
+    );
+  });
+});
+
+describe('parseAuditRange', () => {
+  const sp2 = (init: string) => new URLSearchParams(init);
+
+  it('returns both bounds, each at its own edge of the day', () => {
+    const { from, to } = parseAuditRange(sp2('from=2026-07-01&to=2026-07-15'));
+    expect(from?.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+    expect(to?.toISOString()).toBe('2026-07-15T23:59:59.999Z');
+  });
+
+  it('allows a one-sided window', () => {
+    expect(parseAuditRange(sp2('from=2026-07-01')).to).toBeNull();
+    expect(parseAuditRange(sp2('to=2026-07-01')).from).toBeNull();
+  });
+
+  it('covers a single day fully when from and to are the same day', () => {
+    const { from, to } = parseAuditRange(sp2('from=2026-07-09&to=2026-07-09'));
+    expect(from?.toISOString()).toBe('2026-07-09T00:00:00.000Z');
+    expect(to?.toISOString()).toBe('2026-07-09T23:59:59.999Z');
+    expect(to!.getTime()).toBeGreaterThan(from!.getTime());
+  });
+
+  it('corrects an inverted window by re-parsing the RAW inputs, not by swapping Dates', () => {
+    // Swapping the parsed Dates would give 07-01T23:59:59.999 .. 07-15T00:00:00 and quietly lose
+    // nearly a day at each end; re-parsing keeps each edge's day-boundary meaning.
+    const { from, to } = parseAuditRange(sp2('from=2026-07-15&to=2026-07-01'));
+    expect(from?.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+    expect(to?.toISOString()).toBe('2026-07-15T23:59:59.999Z');
+  });
+
+  it('drops only the invalid side of a half-broken window', () => {
+    const { from, to } = parseAuditRange(sp2('from=nonsense&to=2026-07-15'));
+    expect(from).toBeNull();
+    expect(to?.toISOString()).toBe('2026-07-15T23:59:59.999Z');
+  });
+
+  it('is reachable through parseAdminAuditQuery', () => {
+    const q = parseAdminAuditQuery(new URLSearchParams('from=2026-07-01&to=2026-07-15'));
+    expect(q.from?.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+    expect(q.to?.toISOString()).toBe('2026-07-15T23:59:59.999Z');
+  });
+});
+
+describe('buildPlatformAuditFilter · date window', () => {
+  const from = new Date('2026-07-01T00:00:00.000Z');
+  const to = new Date('2026-07-15T23:59:59.999Z');
+
+  it('adds no createdAt clause when the window is unbounded', () => {
+    expect(buildPlatformAuditFilter({ from: null, to: null })).toEqual({});
+  });
+
+  it('emits a one-sided range for a one-sided window', () => {
+    expect(buildPlatformAuditFilter({ from })).toEqual({ createdAt: { $gte: from } });
+    expect(buildPlatformAuditFilter({ to })).toEqual({ createdAt: { $lte: to } });
+  });
+
+  it('emits an inclusive two-sided range', () => {
+    expect(buildPlatformAuditFilter({ from, to })).toEqual({ createdAt: { $gte: from, $lte: to } });
+  });
+
+  it('keeps the window and the keyset cursor as separate top-level clauses (ANDed by Mongo)', () => {
+    // If the range were folded into the cursor's $or, "Load more" would paginate straight out of
+    // the window; keeping them apart is what makes page 2 of a filtered feed still filtered.
+    const cursor = { createdAt: '2026-07-10T10:00:00.000Z', id: 'c'.repeat(24) };
+    const filter = buildPlatformAuditFilter({ from, to, cursor, tenantId: 't1' });
+    expect(filter.createdAt).toEqual({ $gte: from, $lte: to });
+    expect(Array.isArray(filter.$or)).toBe(true);
+    expect(filter.tenant).toBe('t1');
+  });
+});
+
+describe('dateInputValue', () => {
+  it('round-trips a parsed bound back to the YYYY-MM-DD an <input type="date"> accepts', () => {
+    expect(dateInputValue(parseAuditDate('2026-07-01', 'start'))).toBe('2026-07-01');
+  });
+
+  it('keeps an end-of-day bound on its OWN day (no UTC rollover into the next)', () => {
+    // 23:59:59.999Z must render as that day, otherwise the form would show a window one day wider
+    // than the one actually applied every time the operator re-submits.
+    expect(dateInputValue(parseAuditDate('2026-07-15', 'end'))).toBe('2026-07-15');
+  });
+
+  it('renders an absent or invalid bound as an empty field', () => {
+    expect(dateInputValue(null)).toBe('');
+    expect(dateInputValue(undefined)).toBe('');
+    expect(dateInputValue(new Date('nope'))).toBe('');
+  });
+});
+
+describe('auditFiltersActive', () => {
+  const none = { action: null, tenant: null, from: null, to: null };
+
+  it('is false when nothing narrows the feed', () => {
+    expect(auditFiltersActive(none)).toBe(false);
+  });
+
+  it('is true for any single active filter, including each window edge alone', () => {
+    expect(auditFiltersActive({ ...none, action: 'member.added' })).toBe(true);
+    expect(auditFiltersActive({ ...none, tenant: 'acme' })).toBe(true);
+    expect(auditFiltersActive({ ...none, from: new Date('2026-07-01') })).toBe(true);
+    expect(auditFiltersActive({ ...none, to: new Date('2026-07-15') })).toBe(true);
   });
 });
