@@ -93,7 +93,16 @@
   - **Fix**: ίδιο recipe· scope και τα 7 models (6 read + Notification write) μέσα στο ίδιο `withRequestTenant` block ανά exported function.
   - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/notifications/actions.ts` ≥ 6· npm run type-check exits 0.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-30, 61η σάρωση reviewer routine)
+- Status: **DONE 2026-07-31** (pharos-daily-dev, commit `daeea7e`). Και τα 6 exported actions τυλίχτηκαν σε
+  `withRequestTenant` με `currentModel()` μέσα (grep count 16)· το `computeAlerts()` resolve-άρει και τα 6 source
+  models από το ambient tenant (μόνος του caller = wrapped body). **Επιπλέον εύρημα εκτός του item**: ο generation
+  throttle ήταν module-level scalar (`let lastGen`), δηλαδή ένα bell poll ενός workspace σώπαινε το reconcile ΚΑΘΕ
+  άλλου workspace για 10 λεπτά → έγινε per-tenant `Map` (capped στα 500 keys). Το `generateNotifications` κρατά τα
+  writes **inline** επίτηδες (ΟΧΙ σε private helper): το `lib/writeGuard.coverage.test.ts` σκανάρει exported action
+  bodies για Mongoose writes, οπότε ένας helper θα το έκρυβε από το guard (πιάστηκε από το ίδιο το test, όχι με το μάτι).
+  Νέο `actions.tenant.test.ts` (7 tests, per-tenant fake models tagged ανά tenant ΚΑΙ ανά model)· negative control:
+  ένα `currentModel` πίσω σε direct model έριξε 4 tests, μετά επαναφορά. Verify: type-check EXIT 0, full vitest
+  **5408 passed / 340 files**, Docker rebuild clean (0 restarts, /login 200, /notifications 307), browser χωρίς console errors.
 
 ### `settings/actions.ts` — μερικά exports (alerts/backup/CSV export/store-dedup) παρακάμπτουν το tenant-scoping
 - Priority: P2

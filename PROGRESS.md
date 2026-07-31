@@ -10672,3 +10672,69 @@ mutating action module κάνει direct model import χωρίς `currentModel`,
   (`pharos-daily-dev-20260728-0215`).
 - **`expo-camera` / share-extension έγκριση**: επίσης OPEN (`pharos-daily-dev-20260725-1425`), stale πλέον αφού το
   `OWNER_DECISIONS.md` #9 λέει ότι το `expo-camera` εγκρίθηκε live· το status flip το κάνει ο Achilleas μέσω chat.
+
+## 2026-07-31 (notifications/actions.ts tenant-scoping: το μεγαλύτερο εναπομείναν blast radius)
+
+**Γιατί αυτό**: η Approved ουρά (`PRODUCT_BACKLOG.md`) παραμένει πλήρως μπλοκαρισμένη (P36 GoCardless credentials,
+P16 πραγματικό sample export, P23 EAS dev build), οπότε πάλι fallback. Η πρόταση του προηγούμενου entry
+(`vouchers/page.tsx`) ήταν **ήδη κλεισμένη** στο μεταξύ, οπότε πέρασα στην ουρά του `WEB_DEBT.md`: 6 νέα P2 items
+ίδιας κλάσης, και διάλεξα αυτό με το μεγαλύτερο blast radius — ένα function που διαβάζει **έξι** collections.
+
+**Το gap**: το `notifications/actions.ts` έκανε direct import και στα 7 models του, άρα σε SaaS mode το bell σάρωνε
+πάντα τα items/statements/expenses/subscriptions/giftcards/bills του DEFAULT tenant και έγραφε τα alerts στο DEFAULT
+`Notification` collection, όποιος κι αν ήταν συνδεδεμένος. Self-hosted: μηδέν αλλαγή.
+
+**Τι μπήκε**: και τα 6 exported actions τυλιγμένα σε `withRequestTenant` με `currentModel()` μέσα (το `assertCanWrite()`
+μένει έξω, όπως στα bills/statements)· το `computeAlerts()` resolve-άρει τα 6 source models από το **ambient** tenant,
+γιατί ο μόνος caller του είναι ήδη wrapped body (γραμμένο inline ώστε να μη «διορθωθεί» λάθος αργότερα).
+
+**Δύο πράγματα που δεν ήταν στο item και βγήκαν διαβάζοντας το αρχείο**:
+- **Ο throttle ήταν cross-tenant leak**, όχι απλώς un-scoped read: `let lastGen = 0` σε module scope σημαίνει ότι ένα
+  bell poll ενός workspace σώπαινε το reconcile **κάθε άλλου** workspace για 10 λεπτά. Έγινε per-tenant `Map`
+  (key = tenantId, ή `'default'`), capped στα 500 keys ώστε ένα long-lived SaaS process να μη μαζεύει key ανά tenant
+  για πάντα (το drop κοστίζει ένα επιπλέον reconcile, τίποτα άλλο). Self-hosted έχει ακριβώς ένα key, άρα ίδια
+  συμπεριφορά με πριν.
+- **Ένα «καθαρό» refactor θα άνοιγε τρύπα στο security guard**: πρώτα έβγαλα το reconcile body σε private helper
+  ώστε τα δύο entry points να μην ξανακάνουν tenant resolution. Το `lib/writeGuard.coverage.test.ts` **έπεσε** — σκανάρει
+  exported action bodies για Mongoose writes, οπότε ο helper θα έκρυβε το `generateNotifications` από το P31 read-only
+  guard εντελώς. Επαναφορά σε inline writes (με σχόλιο γιατί), και το `getNotifications` ξαναμπαίνει στο
+  `withRequestTenant` — re-entrant, ίδιο request context, και throttled μια φορά ανά 10 λεπτά ανά tenant ούτως ή άλλως.
+  Το guard έπιασε δηλαδή κάτι που δεν είχα δει με το μάτι.
+
+**Το scan, όχι σημείωμα**: νέο **`actions.tenant.test.ts`** (7 tests), αδελφάκι των bills/statements: per-tenant fake
+model set tagged **και ανά tenant και ανά model**, ώστε μια διαρροή να φαίνεται άμεσα ως op καταγεγραμμένο στο
+`default` αντί στο `acme`. Καλύπτει το six-model scan, τα reconcile writes, δύο tenants ταυτόχρονα, **τον per-tenant
+throttle** (acme polls 2×, δεύτερο δεν ξανασαρώνει· το πρώτο poll του globex ΠΡΕΠΕΙ να σαρώσει), τα 4 bell mutations,
+και το self-hosted no-tenant path. ΣΗΜ για το επόμενο run: επειδή το `lastGen` είναι module state, κάθε test κάνει
+`vi.resetModules()` — και το `withTenant` πρέπει να έρθει από το **ίδιο fresh graph**, αλλιώς το AsyncLocalStorage
+είναι άλλο instance, όλα πέφτουν σιωπηλά στο default tenant και τα tests περνάνε ενώ το bug υπάρχει (το έφαγα, είναι
+γραμμένο σχόλιο στο αρχείο).
+
+**Drive-by, άσχετο**: το `settings/actions.trash.test.ts` («sorts rows newest-deleted-first») είχε **hardcoded** ημερομηνίες
+Ιουλίου, και το `getTrash` auto-purge-άρει ό,τι περνά το 30-ήμερο window → το test άρχισε να πέφτει **σήμερα**, όταν η
+γραμμή `2026-07-01` βγήκε εκτός window. Οι ημερομηνίες έγιναν relative (`daysAgo(20/10/1)`). Ήταν pre-existing (μηδέν
+σχέση με το commit), αλλά θα κοκκίνιζε κάθε επόμενο run.
+
+**Verify**: **negative control** — ένα `currentModel` πίσω σε direct model έριξε **4** από τα 7 νέα tests, μετά επαναφορά.
+`npm run type-check` **EXIT 0**, full `npx vitest run` **5408 passed / 340 files** (μηδέν regression, +7 νέα +1 fixed).
+Docker mutex πάρθηκε και επιστράφηκε: `docker compose build web` → mongo `healthy` → `up -d web` → `/login` **200**,
+`/notifications` **307** (auth-gated route compiled), `RestartCount=0`, logs καθαρά (μόνο το προϋπάρχον άσχετο
+`@napi-rs/canvas` warning), build cache pruned (2.36GB). Browser pane `/login` → «Sign in · Pharos», **μηδέν console
+errors**. Commit `daeea7e`.
+
+**Τι μένει από αυτή την κλάση**: 5 ακόμα P2 items στο `WEB_DEBT.md`, ίδιο recipe:
+`subscriptions/actions.ts` (M), `tasks/actions.ts` (S), `shopping-list/actions.ts` (S), `history/actions.ts` (S),
+`settings/actions.ts` (L, θέλει **επιλεκτικό** wrap — τα AppConfig-only exports είναι νόμιμα instance-level).
+
+**Επόμενο task (πρόταση)**: `subscriptions/actions.ts` (το μεγαλύτερο εναπομείναν, και έχει ήδη ασυμμετρία με το
+`lib/fxAudit.ts` που διαβάζει το ίδιο model σωστά). Αφού αδειάσει η ουρά, το standing follow-up του προηγούμενου entry
+παραμένει ανοιχτό και γίνεται πλέον εφικτό: ένα coverage test στο πνεύμα του `writeGuard.coverage.test.ts` που κόβει
+το build αν ένα action module κάνει direct model import χωρίς `currentModel` — δεν μπορούσε να μπει τώρα, θα κοκκίνιζε
+για τα 5 ανοιχτά αρχεία.
+
+## Needs Achilleas
+
+- Αμετάβλητα: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample export, EAS dev build), **P17 live check**
+  σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
+- **`PATCH /api/v1/settings` ntfy authz**: παραμένει OPEN στο `~/.claude/ASK_ACHILLEAS.md`
+  (`pharos-daily-dev-20260728-0215`).
