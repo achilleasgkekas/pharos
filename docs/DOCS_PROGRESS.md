@@ -3053,3 +3053,23 @@ Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/
 Συμπέρασμα: Το shipped feature a17243a (audit CSV export) είναι πλέον fully + accurately documented στο `docs/saas.md`, και το προηγούμενο stale "no separate endpoint" claim διορθώθηκε. Το e1e722d (landing pricing) δεν χρειαζόταν καμία αλλαγή στο `docs/` territory.
 
 Επόμενο run: (α) grep git log για νέα feat() commits μετά το a17243a · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml · (γ) αν όχι νέο feature, comprehensive drift verification pass.
+
+
+## 2026-07-31 (thirty-fifth run — platform audit UTC date-range filter documented)
+
+Σάρωση git log για νέα feat() commits μετά την thirty-fourth run (a17243a, 2026-07-30). Ανακάλυψη: **1 νέο feat() commit που χρειάζεται documentation**:
+- **a7bb89c** (2026-07-31, `feat(saas): UTC date-range filter for the platform audit feed and its CSV export`) — προσθέτει inclusive `?from=`/`?to=` bounds στο `/admin/audit` feed + στο CSV export, thread-αρισμένα μέσα από τη φόρμα, τα pagination links, και το filename. Ήδη logged στο root `SAAS_PROGRESS.md` (increment 129, commit b6ef82e) αλλά αυτό είναι η routine-log του saas-core routine, όχι τεκμηρίωση χρήστη· το `docs/saas.md` ήταν πράγματι stale (δεν ανέφερε κανένα date-range filter).
+
+Τι έγινε: Διάβασα τον κώδικα πριν γράψω, όχι το commit message — `lib/tenancy/adminAudit.ts` (`parseAuditDate`: bare `YYYY-MM-DD` expands στο UTC edge της ημέρας, `to=` → 23:59:59.999Z ώστε να καλύπτει όλη τη μέρα· round-trip check γιατί το V8 rolls over `2026-02-30`→Μάρτιο αντί να το απορρίψει· `parseAuditRange`: inverted window διορθώνεται με re-parse των raw inputs, όχι swap των Dates, γιατί τα δύο edges έχουν διαφορετικά day-boundary semantics) + `apps/web/src/app/admin/audit/page.tsx` diff (η φόρμα echo-άρει το APPLIED window, όχι το raw query string) + `lib/tenancy/adminAuditCsv.ts` (`platformAuditCsvFilename` προσθέτει `from-YYYY-MM-DD-to-YYYY-MM-DD` στο filename όταν το window είναι active).
+
+Ενημερώθηκε το section **"Platform activity feed (`/admin/audit`)"** στο `docs/saas.md`: (α) η παράγραφος του filter form επεκτάθηκε με το UTC date-range mechanism (day-edge expansion, inverted-range correction, form echoes applied window)· (β) ο πίνακας του CSV export endpoint πήρε `from=`/`to=` στα query params + νότα για το ίδιο day-edge/inversion handling· (γ) το filename bullet ενημερώθηκε με το δεύτερο παράδειγμα (`pharos-audit-platform-all-from-2026-07-01-to-2026-07-15-2026-07-30.csv`) + διευκρίνιση ότι η trailing date είναι η ημέρα generation, όχι το window.
+
+Accuracy: verified με code read (adminAudit.ts πλήρες PURE-function set + adminAuditCsv.ts filename builder + page.tsx form diff), όχι απλή αντιγραφή commit message.
+
+Validation (markdown only, κανένα build/Docker/AI call): code fences docs/saas.md = 18 πριν και μετά (ζυγό, άθικτο, καμία προσθήκη code block)· κανένα νέο anchor δημιουργήθηκε (edits μέσα στο ήδη-υπάρχον `#platform-activity-feed-adminaudit` section, existing links παραμένουν valid)· κανένα credential.
+
+Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/saas.md` modified (δικό μου), κανένα foreign staged.
+
+Συμπέρασμα: Το shipped feature a7bb89c (audit feed UTC date-range filter) είναι πλέον fully + accurately documented στο `docs/saas.md`.
+
+Επόμενο run: (α) grep git log για νέα feat() commits μετά το a7bb89c · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml · (γ) αν όχι νέο feature, comprehensive drift verification pass.

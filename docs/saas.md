@@ -1112,18 +1112,26 @@ the rest of the console. The on-screen table itself has no separate
 directly server-side, the same way `/admin/tenants` consumes its registry
 reader.
 
-Filter by workspace slug (exact match) and/or action via a plain **GET** form,
-so the URL is the source of truth and a filtered view is shareable and
-bookmarkable with no client state; paginate with the same keyset cursor
-("Load more") the tenant-scoped Activity views use. An unknown slug reports
-itself as "no workspace with slug `<x>`" rather than the misleading "no
-activity yet", because a typo'd slug and a genuinely quiet workspace are
-different answers when chasing an incident. Each row shows the action, actor
-(email/name when resolvable), target, timestamp, and a **Workspace** column
-linking to that tenant's `/admin/tenants/[slug]` detail page; if the tenant row
-has since been deleted, the workspace column reads "deleted workspace" as plain
-text (no dead link) rather than a blank cell, since the audit trail is
-append-only and outlives the workspaces it describes.
+Filter by workspace slug (exact match), action, and/or a **UTC date range**
+(`?from=`/`?to=`) via a plain **GET** form, so the URL is the source of truth
+and a filtered view is shareable and bookmarkable with no client state;
+paginate with the same keyset cursor ("Load more") the tenant-scoped Activity
+views use, which composes with the window so "Load more" never escapes it. A
+bare day (what a date-picker produces) expands to that day's own UTC edges, so
+`to=2026-07-15` covers the whole day rather than stopping at midnight and
+reading as "nothing happened that day"; an inverted range (`from` later than
+`to`) is corrected rather than rejected, since an empty feed is the one answer
+an operator must never get by accident while chasing an incident. The form
+echoes the window that was actually **applied** (after that correction), not
+the raw query string, so the fields never disagree with the rows underneath
+them. An unknown slug reports itself as "no workspace with slug `<x>`" rather
+than the misleading "no activity yet", because a typo'd slug and a genuinely
+quiet workspace are different answers when chasing an incident. Each row shows
+the action, actor (email/name when resolvable), target, timestamp, and a
+**Workspace** column linking to that tenant's `/admin/tenants/[slug]` detail
+page; if the tenant row has since been deleted, the workspace column reads
+"deleted workspace" as plain text (no dead link) rather than a blank cell,
+since the audit trail is append-only and outlives the workspaces it describes.
 
 Read-only: only the central `AuditEvent` collection plus batched `Account`/
 `Tenant` identity lookups (never N+1, never a per-tenant data database, never a
@@ -1138,7 +1146,7 @@ response is a file, not a page) hits a dedicated export route carrying the
 
 | Method | Path | Query | Result |
 | --- | --- | --- | --- |
-| `GET` | `/api/saas/admin/audit/export` | `?tenant=<slug>&action=<verb>&limit=<n>&before=<iso>` | The same filtered slice as `/admin/audit`, as one flat `text/csv` download (`Content-Disposition: attachment`). Same `requireSuperadmin` gate and status ladder as the page. An unknown `tenant` slug is `404` JSON (`{ "error": "unknown workspace", "tenant": "<slug>" }`), never a header-only CSV that would misread as "this workspace did nothing". |
+| `GET` | `/api/saas/admin/audit/export` | `?tenant=<slug>&action=<verb>&from=<YYYY-MM-DD>&to=<YYYY-MM-DD>&limit=<n>&before=<iso>` | The same filtered slice as `/admin/audit`, as one flat `text/csv` download (`Content-Disposition: attachment`). Same `requireSuperadmin` gate and status ladder as the page, same UTC day-edge expansion and inverted-range correction for `from`/`to`. An unknown `tenant` slug is `404` JSON (`{ "error": "unknown workspace", "tenant": "<slug>" }`), never a header-only CSV that would misread as "this workspace did nothing". |
 
 Differences from the on-screen feed, all in `lib/tenancy/adminAuditCsv.ts`
 (pure, unit-tested, no DB/React import):
@@ -1156,9 +1164,12 @@ Differences from the on-screen feed, all in `lib/tenancy/adminAuditCsv.ts`
   fields (`Action` for grepping, `Action label` for a non-engineer auditor):
   `Timestamp, Workspace, Workspace slug, Action, Action label, Actor, Actor
   email, Target, Details, Event id`.
-- **Filename encodes the filters and export day**, e.g.
-  `pharos-audit-acme-member-added-2026-07-30.csv`, so an operator attaching the
-  file to a ticket does not have to remember which slice it was.
+- **Filename encodes the filters, date window, and export day**, e.g.
+  `pharos-audit-acme-member-added-2026-07-30.csv`, or with a window active
+  `pharos-audit-platform-all-from-2026-07-01-to-2026-07-15-2026-07-30.csv`, so
+  an operator attaching the file to a ticket does not have to remember which
+  slice it was (the trailing date is the day the file was *generated*, a
+  different fact from the window it *covers*).
 
 Same read-only contract as the page: only `AuditEvent` plus batched identity
 lookups, never a write, `Cache-Control: no-store`.
