@@ -3,8 +3,18 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 74a0f12 -->
-<!-- docker-validated: ee08552 -->
+<!-- docker-validated: 5d3acb7 -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-07-31 (docker-health — rebuild + prune)
+
+Health πριν: mongo healthy, web 23h uptime, 0 restarts και στα δύο, flaresolverr ήδη σταματημένο.
+Diff `ee08552..HEAD` άγγιξε runtime κώδικα (`statements/actions.ts`, νέο `adminAuditCsv.ts` +
+`api/saas/admin/audit/export/route.ts`, `admin/audit/page.tsx`) → rebuild δικαιολογημένο.
+`docker builder prune -f` πριν (1.45GB reclaimed) → `docker compose build web` (258s, καθαρό) →
+mongo healthy → `docker compose up -d web` → `/login` 200 στην 1η προσπάθεια → RestartCount=0.
+Δεύτερο `builder prune -f` μετά (2.36GB reclaimed, build cache 2.5GB→1.1GB/0 reclaimable). Marker
+ενημερώθηκε σε `5d3acb7` (= HEAD, δεν υπήρχαν νεότερα commits στο μεταξύ).
 
 ## 2026-07-30 (reviewer — έλεγχος 9ae1b1b..74a0f12, 11 commits)
 
