@@ -80,6 +80,11 @@ const {
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
+// Flat tenancy seam: the actions now reach their models through `currentModel` inside
+// `withRequestTenant`, so hand the mocked model straight back. Tenant ROUTING itself is
+// pinned separately in ./actions.tenant.test.ts.
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<unknown>) => fn() }));
 vi.mock('@/models/Item', () => ({ Item: { find: itemFind } }));
 vi.mock('@/models/Statement', () => ({ Statement: { find: statementFind } }));
 vi.mock('@/models/Expense', () => ({ Expense: { find: expenseFind } }));

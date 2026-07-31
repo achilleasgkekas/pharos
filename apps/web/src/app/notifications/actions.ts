@@ -3,13 +3,16 @@
 import { connectDB } from '@/lib/db';
 import { getAppSettings } from '@/lib/appSettings';
 import { cur } from '@/lib/money';
-import { Item } from '@/models/Item';
-import { Statement } from '@/models/Statement';
-import { Expense } from '@/models/Expense';
-import { Subscription } from '@/models/Subscription';
-import { GiftCard } from '@/models/GiftCard';
-import { Bill } from '@/models/Bill';
-import { Notification } from '@/models/Notification';
+import { Item as ItemModel } from '@/models/Item';
+import { Statement as StatementModel } from '@/models/Statement';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { GiftCard as GiftCardModel } from '@/models/GiftCard';
+import { Bill as BillModel } from '@/models/Bill';
+import { Notification as NotificationModel } from '@/models/Notification';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
+import { currentTenant } from '@/lib/tenancy/current';
 import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { billDaysUntilDue } from '@/lib/bill';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -33,11 +36,24 @@ type Alert = { dedupeKey: string; kind: NotifKind; title: string; body: string; 
 const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill'] as const;
 
 /** Recompute the live alerts (deals / warranties / installments-due) — the same
- *  three the ntfy check uses, but as structured payloads the bell can localize. */
+ *  three the ntfy check uses, but as structured payloads the bell can localize.
+ *
+ *  Resolves its 6 source models from the AMBIENT tenant rather than taking them as
+ *  arguments: the only callers are `reconcile()` bodies that already run inside
+ *  `withRequestTenant`, so `currentModel` returns that tenant's models. Self-hosted
+ *  (no tenant established) resolves to the default connection, unchanged. */
 async function computeAlerts(): Promise<Alert[]> {
   const s = await getAppSettings(); // also sets the currency symbol for cur()
   const now = Date.now();
   const alerts: Alert[] = [];
+  const [Item, Statement, Expense, Subscription, GiftCard, Bill] = await Promise.all([
+    currentModel(ItemModel),
+    currentModel(StatementModel),
+    currentModel(ExpenseModel),
+    currentModel(SubscriptionModel),
+    currentModel(GiftCardModel),
+    currentModel(BillModel),
+  ]);
 
   // Deals — a tracked item whose best price reached its target.
   const dealItems = (await Item.find({ targetPrice: { $gt: 0 } }).select('title targetPrice currentPrice links').lean()) as Array<{
@@ -158,35 +174,45 @@ async function computeAlerts(): Promise<Alert[]> {
 
 /** Reconcile the Notification collection with the live alerts: insert new ones
  *  (unread), refresh still-active ones, soft-delete resolved ones, and never
- *  recreate a dismissed alert. Safe to call repeatedly. */
+ *  recreate a dismissed alert. Safe to call repeatedly.
+ *
+ *  Kept as ONE exported function with the writes inline (rather than a private
+ *  helper both entry points call): `lib/writeGuard.coverage.test.ts` scans exported
+ *  action bodies for Mongoose writes, so moving them into a helper would hide this
+ *  action from that guard. `getNotifications` therefore re-enters `withRequestTenant`
+ *  here, which re-resolves the SAME request context — cheap, and throttled to once
+ *  per 10 minutes per tenant anyway. */
 export async function generateNotifications(): Promise<void> {
-  await connectDB();
-  const alerts = await computeAlerts();
-  const currentKeys = alerts.map((a) => a.dedupeKey);
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Notification = await currentModel(NotificationModel);
+    const alerts = await computeAlerts();
+    const currentKeys = alerts.map((a) => a.dedupeKey);
 
-  // Existing auto-generated notifications, INCLUDING dismissed (soft-deleted) — so a
-  // dismissed alert isn't recreated and an active one isn't duplicated.
-  const existing = (await Notification.find({ kind: { $in: AUTO_KINDS } })
-    .setOptions({ withDeleted: true })
-    .select('dedupeKey')
-    .lean()) as Array<{ dedupeKey: string }>;
-  const existingKeys = new Set(existing.map((e) => e.dedupeKey));
+    // Existing auto-generated notifications, INCLUDING dismissed (soft-deleted) — so a
+    // dismissed alert isn't recreated and an active one isn't duplicated.
+    const existing = (await Notification.find({ kind: { $in: AUTO_KINDS } })
+      .setOptions({ withDeleted: true })
+      .select('dedupeKey')
+      .lean()) as Array<{ dedupeKey: string }>;
+    const existingKeys = new Set(existing.map((e) => e.dedupeKey));
 
-  const fresh = alerts.filter((a) => !existingKeys.has(a.dedupeKey));
-  if (fresh.length) await Notification.insertMany(fresh.map((a) => ({ ...a, read: false })));
+    const fresh = alerts.filter((a) => !existingKeys.has(a.dedupeKey));
+    if (fresh.length) await Notification.insertMany(fresh.map((a) => ({ ...a, read: false })));
 
-  // Refresh title/body of still-active (non-dismissed) ones — e.g. the warranty day count.
-  for (const a of alerts) {
-    if (existingKeys.has(a.dedupeKey)) {
-      await Notification.updateOne({ dedupeKey: a.dedupeKey }, { $set: { title: a.title, body: a.body, href: a.href } });
+    // Refresh title/body of still-active (non-dismissed) ones — e.g. the warranty day count.
+    for (const a of alerts) {
+      if (existingKeys.has(a.dedupeKey)) {
+        await Notification.updateOne({ dedupeKey: a.dedupeKey }, { $set: { title: a.title, body: a.body, href: a.href } });
+      }
     }
-  }
 
-  // Auto-expire resolved alerts (price rose, warranty passed, month rolled over).
-  await Notification.updateMany(
-    { kind: { $in: AUTO_KINDS }, dedupeKey: { $nin: currentKeys } },
-    { $set: { deletedAt: new Date() } }
-  );
+    // Auto-expire resolved alerts (price rose, warranty passed, month rolled over).
+    await Notification.updateMany(
+      { kind: { $in: AUTO_KINDS }, dedupeKey: { $nin: currentKeys } },
+      { $set: { deletedAt: new Date() } }
+    );
+  });
 }
 
 function serialize(d: { _id: unknown; kind: NotifKind; title: string; body: string; href: string; read?: boolean; createdAt: Date }): SerializedNotification {
@@ -202,52 +228,79 @@ function serialize(d: { _id: unknown; kind: NotifKind; title: string; body: stri
 }
 
 // Throttle background generation so a bell poll every 60s doesn't re-scan the DB
-// each time; alerts aren't time-critical to the minute.
-let lastGen = 0;
+// each time; alerts aren't time-critical to the minute. Keyed PER TENANT: a single
+// counter would let one workspace's poll silence every other workspace's reconcile
+// for ten minutes. Self-hosted has exactly one key ('default'), so it behaves as
+// the old scalar did.
+const lastGen = new Map<string, number>();
 const GEN_THROTTLE_MS = 10 * 60 * 1000;
+// Bound the map so a long-lived SaaS process can't accumulate a key per tenant
+// forever; dropping entries only costs one extra reconcile.
+const GEN_KEYS_MAX = 500;
+
+function genKey(): string {
+  return currentTenant().tenantId ?? 'default';
+}
 
 export async function getNotifications(): Promise<{ items: SerializedNotification[]; unread: number }> {
-  await connectDB();
-  const now = Date.now();
-  if (now - lastGen > GEN_THROTTLE_MS) {
-    lastGen = now;
-    try {
-      await generateNotifications();
-    } catch (e) {
-      // Don't break the bell, but make failures visible (this caught a silent
-      // insertMany validation error during development).
-      console.error('[notifications] generation failed:', e);
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Notification = await currentModel(NotificationModel);
+    const now = Date.now();
+    const key = genKey();
+    if (now - (lastGen.get(key) ?? 0) > GEN_THROTTLE_MS) {
+      if (lastGen.size >= GEN_KEYS_MAX) lastGen.clear();
+      lastGen.set(key, now);
+      try {
+        await generateNotifications();
+      } catch (e) {
+        // Don't break the bell, but make failures visible (this caught a silent
+        // insertMany validation error during development).
+        console.error('[notifications] generation failed:', e);
+      }
     }
-  }
-  const docs = (await Notification.find().sort({ read: 1, createdAt: -1 }).limit(40).lean()) as Array<Parameters<typeof serialize>[0]>;
-  const unread = await Notification.countDocuments({ read: false });
-  return { items: docs.map(serialize), unread };
+    const docs = (await Notification.find().sort({ read: 1, createdAt: -1 }).limit(40).lean()) as Array<Parameters<typeof serialize>[0]>;
+    const unread = await Notification.countDocuments({ read: false });
+    return { items: docs.map(serialize), unread };
+  });
 }
 
 export async function markNotificationRead(id: string): Promise<{ ok: boolean }> {
   await assertCanWrite();
-  await connectDB();
-  await Notification.updateOne({ _id: id }, { $set: { read: true } });
-  return { ok: true };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Notification = await currentModel(NotificationModel);
+    await Notification.updateOne({ _id: id }, { $set: { read: true } });
+    return { ok: true };
+  });
 }
 
 export async function markAllNotificationsRead(): Promise<{ ok: boolean }> {
   await assertCanWrite();
-  await connectDB();
-  await Notification.updateMany({ read: false }, { $set: { read: true } });
-  return { ok: true };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Notification = await currentModel(NotificationModel);
+    await Notification.updateMany({ read: false }, { $set: { read: true } });
+    return { ok: true };
+  });
 }
 
 export async function dismissNotification(id: string): Promise<{ ok: boolean }> {
   await assertCanWrite();
-  await connectDB();
-  await Notification.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
-  return { ok: true };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Notification = await currentModel(NotificationModel);
+    await Notification.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+    return { ok: true };
+  });
 }
 
 export async function clearAllNotifications(): Promise<{ ok: boolean }> {
   await assertCanWrite();
-  await connectDB();
-  await Notification.updateMany({}, { $set: { deletedAt: new Date() } });
-  return { ok: true };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Notification = await currentModel(NotificationModel);
+    await Notification.updateMany({}, { $set: { deletedAt: new Date() } });
+    return { ok: true };
+  });
 }

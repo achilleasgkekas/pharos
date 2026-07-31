@@ -338,9 +338,14 @@ describe('getTrash', () => {
   });
 
   it('sorts rows newest-deleted-first across mixed types', async () => {
-    itemModel.findMock.mockReturnValueOnce(chainList([{ _id: ID1, title: 'Older', category: '', deletedAt: '2026-07-01T00:00:00.000Z' }]));
-    taskModel.findMock.mockReturnValueOnce(chainList([{ _id: ID2, title: 'Newest', status: 'todo', deletedAt: '2026-07-20T00:00:00.000Z' }]));
-    voucherModel.findMock.mockReturnValueOnce(chainList([{ _id: ID3, title: 'Middle', store: '', deletedAt: '2026-07-10T00:00:00.000Z' }]));
+    // Relative to now, NOT hardcoded: getTrash auto-purges anything past the 30-day
+    // retention window, so fixed dates quietly start dropping rows once the calendar
+    // passes them (this test began failing on 2026-07-31, when its '2026-07-01' row
+    // aged out and the assertion lost 'Older').
+    const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
+    itemModel.findMock.mockReturnValueOnce(chainList([{ _id: ID1, title: 'Older', category: '', deletedAt: daysAgo(20) }]));
+    taskModel.findMock.mockReturnValueOnce(chainList([{ _id: ID2, title: 'Newest', status: 'todo', deletedAt: daysAgo(1) }]));
+    voucherModel.findMock.mockReturnValueOnce(chainList([{ _id: ID3, title: 'Middle', store: '', deletedAt: daysAgo(10) }]));
 
     const rows = await getTrash();
     expect(rows.map((r) => r.title)).toEqual(['Newest', 'Middle', 'Older']);

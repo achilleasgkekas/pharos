@@ -53,6 +53,9 @@ vi.mock('@/models/Notification', () => ({
   },
 }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
+// Flat tenancy seam (see ./actions.tenant.test.ts for the routing assertions themselves).
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<unknown>) => fn() }));
 
 import { markNotificationRead, markAllNotificationsRead, dismissNotification, clearAllNotifications } from './actions';
 
