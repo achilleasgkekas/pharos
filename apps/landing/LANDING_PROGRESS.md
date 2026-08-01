@@ -4956,3 +4956,63 @@ user-facing feature.
 
 Needs-Achilleas (open, αμετάβλητα): μόνιμο Free tier ή μόνο trial (`pharos-landing-20260729-1000`), legal
 entity/Stripe, Terms+Privacy review, contact inbox, repo public timing.
+
+## 2026-08-01
+
+**Increment: συνέπεια στο `public/humans.txt`** (το βήμα (2) που είχε προγραμματίσει το προηγούμενο run).
+Πρώτα έγινε το sweep για features χωρίς εκπροσώπηση: τα δύο υποψήφια, το **MV3 browser extension**
+(`0264ccf`) και ο **viewer role** (`1346b4d`), αποδείχθηκαν **ήδη καλυμμένα** στο FAQ (η ερώτηση για το
+product URL import περιγράφει και το bookmarklet και το native Chrome extension με τα permissions του, και η
+ερώτηση για τα μέλη περιγράφει τον read-only viewer του self-hosted). Τα υπόλοιπα νέα feat commits είναι
+superadmin audit filters, καθαρά εσωτερικά. Οπότε, όπως και το προηγούμενο run, η αξία ήταν σε **πραγματικό
+λάθος** και όχι σε νέο κείμενο.
+
+**Γιατί μετράει**: το `humans.txt` δεν είναι ξεχασμένο αρχείο. Είναι linked από το footer ως «Credits»
+(`page.tsx:1552`) και εκπέμπεται ως `<link rel="author">` από το `layout.tsx`, άρα το βλέπουν και επισκέπτες
+και crawlers.
+
+**Τι διορθώθηκε** (4 από τα 5 ήταν ανακρίβειες, όχι απλώς παλιό κείμενο):
+1. **Positioning**: έλεγε «A self-hosted personal hub», δηλαδή μόνο τη μισή ιστορία, ενώ η ίδια σελίδα δείχνει
+   4 κάρτες τιμολόγησης με hosted πλάνα. Τώρα λέει ρητά και τους δύο δρόμους, με μία γραμμή `Hosted:` δίπλα
+   στην υπάρχουσα γραμμή AGPL-3.0.
+2. **«static export»**: **λάθος**. Το `next.config.ts` είναι `output: 'standalone'` (υπάρχει και Dockerfile
+   runner). Έγινε «standalone output».
+3. **Privacy**: το «no public sign-up» ίσχυε μόνο για το self-hosted. Οριοθετήθηκε: self-hosted μηδέν public
+   sign-up, hosted sign-up waitlist-gated μέχρι το launch.
+4. **THANKS**: προστέθηκαν Expo, React Native (υπάρχει `apps/mobile`) και Poppler (`pdftoppm`, PDF
+   thumbnails). Επαληθεύτηκαν στα `package.json` / `Dockerfile` **πριν** γραφτούν. Το Stripe **δεν** μπήκε:
+   είναι REST μέσω `fetch` χωρίς npm dependency, και η ενότητα λέει «Built on open source».
+5. **Last update**: 2026-07-05 -> 2026-08-01.
+
+Το `.well-known/security.txt` ελέγχθηκε επίσης: `Expires: 2027-07-04`, δεν έχει λήξει, καμία αλλαγή.
+
+Verify:
+- `npm run type-check` -> exit 0. `npm run build` -> success, **13 static routes**, `/` **5.35 kB**
+  (αμετάβλητο, άγγιξα μόνο static αρχείο).
+- Browser pane μέσω `preview_start` του `landing-dev` (η 3100 ήταν πιασμένη, πήρε 63515 με autoPort).
+  `/humans.txt` -> **200**, `text/plain; charset=UTF-8`, `hasStaticExport:false`, `hasStandalone:true`,
+  `hasHostedLine:true`, `saysSelfHostedOnly:false`, `lastUpdate:"2026-08-01"`, το ASCII φάρος ανέπαφος.
+- **Cross-check κάθε ισχυρισμού με το ζωντανό DOM** (για να μη γράψω κάτι που δεν στέκει): palette
+  `#0a0a0a/#00ff88/#00d4ff/#a55eea` και fonts `Outfit/Manrope/IBM Plex Mono` ταιριάζουν με τα computed
+  values, `#waitlist` υπάρχει (άρα η γραμμή «waitlist open before launch» στέκει), AGPL-3.0 στη σελίδα,
+  «Credits» και `rel=author` δείχνουν και τα δύο στο `/humans.txt`.
+- `read_console_messages` (onlyErrors) -> «No console logs». Mobile (375x812): `scrollWidth === innerWidth`
+  (375), μηδέν οριζόντιο overflow. **Screenshot βγήκε** (δεύτερο συνεχόμενο run): hero σε mobile, φάρος +
+  gradient τίτλος + τα δύο CTA. Ο dev server σταμάτησε με `preview_stop`.
+- Μηδέν άγγιγμα σε Docker/:3000/web/mobile/extension, μηδέν subagent, μηδέν AI call. em-dashes στα δικά
+  μου κείμενα: 0.
+
+**Εντοπίστηκε, ΔΕΝ άλλαξα μονομερώς**: η **hero παράγραφος** λέει ακόμα «A self-hosted personal hub for
+oversight on everything you own», δηλαδή ακριβώς το ίδιο self-hosted-only framing που μόλις διόρθωσα στο
+`humans.txt`, και είναι η **πιο προβεβλημένη πρόταση όλου του site**. Τα δύο CTA («Get started» ->
+pricing, «Self-host it free») και οι 4 κάρτες καλύπτουν τυπικά την απαίτηση «και τα δύο ξεκάθαρα», αλλά η
+πρώτη πρόταση που διαβάζει ο επισκέπτης δεν αναφέρει καθόλου το hosted. Το άφησα ως έχει γιατί το lead
+positioning είναι απόφαση προϊόντος, όχι καθαρισμός. Πρόταση για το επόμενο increment, αν συμφωνεί ο
+Αχιλλέας: «A personal hub for oversight on everything you own. Run it yourself, or let us host it.»
+
+Επόμενο increment: (1) περιμένει ακόμα η `pharos-landing-20260729-1000` (μόνιμο hosted Free tier vs 14ήμερο
+trial που καταλήγει σε suspend, οι δύο ενότητες της σελίδας αντιφάσκουν μέχρι τότε), (2) η hero παράγραφος
+παραπάνω, (3) συνέχεια του sweep όταν εμφανιστεί νέο user-facing feature.
+
+Needs-Achilleas (open, αμετάβλητα): μόνιμο Free tier ή μόνο trial (`pharos-landing-20260729-1000`), legal
+entity/Stripe, Terms+Privacy review, contact inbox, repo public timing.
