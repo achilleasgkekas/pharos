@@ -10783,3 +10783,66 @@ errors**. Commit `daeea7e`.
 **Rebuild**: marker `5d3acb7` → HEAD είχε runtime αλλαγές (`notifications/actions.ts`, `lib/tenancy/adminAudit*.ts`, admin audit page/route, +tests) από τα notifications tenant-scoping και audit-CSV commits του reviewer/pharos-daily runs. `docker compose build web` OK (41.8s, χωρίς errors) → mongo παρέμεινε healthy → `up -d web` → `/login` **200** στην 1η προσπάθεια, `RestartCount=0`, logs καθαρά (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning). Build cache pruned μετά (2.358GB → 672MB).
 
 **Marker**: docker-validated `5d3acb7` → **`6208f24`** (HEAD). Docker mutex πάρθηκε πριν το build/up και επιστράφηκε αμέσως μετά. Staged ΜΟΝΟ PROGRESS.md.
+
+## 2026-08-01 (subscriptions tenant-scoping + ένα write guard που είχε ξεφύγει)
+
+**Guard**: `ROUTINES_PAUSED` απών. `ASK_ACHILLEAS.md`: μηδέν ANSWERED entry addressed σε αυτό το routine (τα δύο
+`pharos-daily-dev` entries είναι ήδη APPLIED). **Approved queue (βήμα a) ελέγχθηκε πρώτο και είναι ακόμα χωρίς
+autonomously-buildable item**: P36 (GoCardless credentials), P23 (iOS Share Extension + EAS dev build), P16 remainder
+(χρειάζεται πραγματικό sample export). Το P9 «εκκρεμεί μόνο ο rate-feed» του `PRODUCT_BACKLOG.md` είναι **stale
+τίτλος**: το `lib/fxRates.ts` (Frankfurter/ECB) + `lookupMarketRate` + `FxRateButton` έχουν ήδη shippάρει και
+review-αριστεί (βλ. εγγραφή reviewer, phase 2 recovery) — docs debt, όχι ανοιχτή δουλειά. Άρα fallback (b): το
+standing P2 item του `WEB_DEBT.md`, `subscriptions/actions.ts`.
+
+**Το item**: και τα 6 exported actions τυλίχτηκαν σε `withRequestTenant` + `currentModel` (ίδιο recipe με
+bills/statements/vouchers). Η μία ουσιαστική διαφορά από τα προηγούμενα: το `discoverUntrackedRecurring` διαβάζει
+**δύο** models, οπότε το `Expense` και το `Subscription` resolve-άρονται μέσα στο **ΙΔΙΟ** wrap — το exclude set
+(vendorKeys των ήδη tracked συνδρομών) φιλτράρει τα expenses, οπότε δύο διαφορετικά tenant DBs στις δύο πλευρές θα
+έκρυβαν σιωπηλά suggestions του ενός tenant με βάση τα δεδομένα του άλλου. Self-hosted αμετάβλητο (ένα default
+connection).
+
+**Το εύρημα που δεν ήταν στο item, και είναι σοβαρότερο από αυτό**: το `trackDiscoveredSubscription` **δεν είχε
+καθόλου write guard**. Το `await assertCanWrite()` που πρόσθεσε το `1346b4d` (P31 viewer role) είχε προσγειωθεί
+**μετά** το closing brace της συνάρτησης, δηλαδή ως top-level statement του module: έτρεχε **μία φορά στο import**
+(και μάλιστα `getCurrentUser()` εκτός request scope → catch → return, άρα σιωπηλά no-op), και το «Track this» έμενε
+γραπτό μονοπάτι **ανοιχτό σε viewer** από τις 27 Ιουλίου. Μηδέν επίδραση self-hosted single-user, πραγματική τρύπα σε
+household/SaaS instance με read-only ρόλο.
+
+**Γιατί δεν το έπιασε ο ίδιος ο P31 scanner**: το `writeGuard.coverage.test.ts` κόβει το body κάθε exported action
+**μέχρι το επόμενο export**, δηλαδή για την **τελευταία** συνάρτηση του αρχείου μέχρι το τέλος του αρχείου — οπότε το
+αδέσποτο trailing statement μετρούσε ως «μέσα στη συνάρτηση» και η action διαβαζόταν guarded. Τώρα το body τελειώνει
+στο **δικό της** closing brace (brace matching, clamped στο επόμενο export ώστε ένα naive overshoot να μην καταπιεί
+sibling action). Χρειάστηκε και σωστή ανίχνευση του body-open brace: το πρώτο `{` μετά το όνομα είναι συχνά το
+`Promise<{ ok: boolean }>` του return type, που έκοβε το body στο signature — αυτό ακριβώς φάνηκε αμέσως, γιατί ο
+έλεγχος «keeps the allowlist honest» έπεσε στο `i18nActions.ts:setLocale` (γνωστά mutating, ξαφνικά «δεν mutates»).
+Το allowlist-honesty test λειτούργησε δηλαδή σαν canary του ίδιου του scanner.
+
+**Verify**: **δύο negative controls**, όχι ισχυρισμοί. (α) Ξαναέβαλα το αδέσποτο statement όπως ήταν → ο σκληρυμένος
+scanner **πέφτει ονομάζοντας** `app/subscriptions/actions.ts → trackDiscoveredSubscription()`, μετά restore. (β) Ένα
+`currentModel` πίσω σε direct model έριξε **3 από τα 6** νέα tenant tests, μετά restore. Νέο
+**`actions.tenant.test.ts`** (6 tests): per-tenant fake models tagged **και ανά tenant και ανά model** (ώστε λάθος
+model resolution να μη γλιστράει), δύο tenants ταυτόχρονα, «Track this» ανά tenant, το two-model discovery (expenses
+ΚΑΙ exclude set από το ίδιο DB), self-hosted no-tenant path. Ο flat `actions.test.ts` πήρε το γνωστό flat tenancy
+mock. `npm run type-check` **EXIT 0**, full `npx vitest run` **5460 passed / 342 files** (+6, μηδέν regression).
+Docker mutex πάρθηκε και επιστράφηκε: `docker compose build web` → mongo `healthy` → `up -d web` → `/login` **200 με
+την πρώτη**, `/subscriptions` **307** (auth-gated route compiled), **0 restarts**, logs καθαρά (μόνο το προϋπάρχον
+άσχετο `@napi-rs/canvas` warning), build cache pruned (2.36GB). Browser pane `/login` → «Sign in · Pharos», **μηδέν
+console errors**. Commit `2b203b7`.
+
+**Τι μένει από αυτή την κλάση**: 4 ακόμα P2 items στο `WEB_DEBT.md` — `tasks/actions.ts` (S), `shopping-list/actions.ts`
+(S), `history/actions.ts` (S), `settings/actions.ts` (L, θέλει **επιλεκτικό** wrap: τα AppConfig-only exports είναι
+νόμιμα instance-level).
+
+**Επόμενο task (πρόταση)**: `tasks/actions.ts` (S, ίδιο recipe· το `Task` model το διαβάζει ήδη σωστά το
+`items/actions.ts:835` μέσω `currentModel`, οπότε υπάρχει η ίδια εσωτερική ασυμμετρία που μόλις έκλεισε εδώ). Αφού
+αδειάσει η ουρά, το standing follow-up παραμένει: coverage test που κόβει το build αν action module κάνει direct
+model import χωρίς `currentModel` (δεν μπαίνει τώρα, θα κοκκίνιζε για τα 4 ανοιχτά αρχεία).
+
+## Needs Achilleas
+
+- Αμετάβλητα: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample export, EAS dev build), **P17 live check**
+  σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
+- **`PATCH /api/v1/settings` ntfy authz**: παραμένει OPEN στο `~/.claude/ASK_ACHILLEAS.md`
+  (`pharos-daily-dev-20260728-0215`).
+- **ΣΗΜ ασφαλείας (ήδη διορθωμένο, μόνο για ενημέρωση)**: αν κάποιος έτρεχε instance με viewer ρόλο μεταξύ 27 Ιουλίου
+  και σήμερα, το «Track this» των Subscriptions ήταν το ένα write μονοπάτι που δεν φραζόταν. Έκλεισε σε αυτό το run.
