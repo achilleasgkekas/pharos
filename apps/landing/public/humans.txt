@@ -1,7 +1,7 @@
 /* PHAROS */
    Φάρος. One light over everything you run.
-   A self-hosted personal hub: oversight on everything you own,
-   from a single private dashboard you control.
+   A personal hub: oversight on everything you own, from a single
+   dashboard you control. Run it yourself, or let us host it.
 
 
 /* TEAM */
@@ -10,21 +10,24 @@
    Site: https://ph-aros.com
    Code: https://github.com/achilleasgkekas/pharos
    License: AGPL-3.0 (self-hosted edition, free forever)
+   Hosted: managed workspaces, waitlist open before launch
 
 
 /* THANKS */
    Built on open source: Next.js, React, MongoDB, Mongoose,
-   Tailwind CSS, Zod, Recharts, Ollama, Tesseract, SearXNG,
-   and the wider self-hosting and homelab community.
+   Tailwind CSS, Zod, Recharts, Expo, React Native, Ollama,
+   Tesseract, Poppler, SearXNG, and the wider self-hosting
+   and homelab community.
 
 
 /* SITE */
-   Standards: HTML5, TypeScript, responsive, dark by default
-   Components: Next.js 15 (App Router), React, static export
+   Standards: HTML5, TypeScript, responsive, dark, print stylesheet
+   Components: Next.js 15 (App Router), React, standalone output
    Fonts: Outfit (display), Manrope (body), IBM Plex Mono (mono)
    Palette: #0a0a0a bg, #00ff88 accent, #00d4ff cyan, #a55eea purple
-   Privacy: no telemetry, no trackers, no public sign-up
-   Last update: 2026-07-05
+   Privacy: no telemetry, no trackers. Self-hosted has no public
+   sign-up at all; hosted sign-up is waitlist-gated until launch.
+   Last update: 2026-08-01
 
 
                         .
