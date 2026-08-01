@@ -3,7 +3,7 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: 997837f -->
-<!-- docker-validated: 5d3acb7 -->
+<!-- docker-validated: 6208f24 -->
 <!-- ui-audited: 0bc5e14 -->
 
 ## 2026-07-31 (reviewer — έλεγχος 74a0f12..997837f, 11 commits)
@@ -10775,3 +10775,11 @@ errors**. Commit `daeea7e`.
   σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
 - **`PATCH /api/v1/settings` ntfy authz**: παραμένει OPEN στο `~/.claude/ASK_ACHILLEAS.md`
   (`pharos-daily-dev-20260728-0215`).
+
+## 2026-08-01 (docker-health guard)
+
+**Health πριν**: mongo `healthy`, `homepage-web`/`homepage-mongo` restarts=0. `homepage-flaresolverr` έτρεχε 11h (idle, scraper profile) → σταμάτησε (μειώνει memory pressure στο μικρό VM). Build cache 2.544GB (1.872GB reclaimable) → prune.
+
+**Rebuild**: marker `5d3acb7` → HEAD είχε runtime αλλαγές (`notifications/actions.ts`, `lib/tenancy/adminAudit*.ts`, admin audit page/route, +tests) από τα notifications tenant-scoping και audit-CSV commits του reviewer/pharos-daily runs. `docker compose build web` OK (41.8s, χωρίς errors) → mongo παρέμεινε healthy → `up -d web` → `/login` **200** στην 1η προσπάθεια, `RestartCount=0`, logs καθαρά (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning). Build cache pruned μετά (2.358GB → 672MB).
+
+**Marker**: docker-validated `5d3acb7` → **`6208f24`** (HEAD). Docker mutex πάρθηκε πριν το build/up και επιστράφηκε αμέσως μετά. Staged ΜΟΝΟ PROGRESS.md.
