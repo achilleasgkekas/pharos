@@ -3073,3 +3073,23 @@ Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/
 Συμπέρασμα: Το shipped feature a7bb89c (audit feed UTC date-range filter) είναι πλέον fully + accurately documented στο `docs/saas.md`.
 
 Επόμενο run: (α) grep git log για νέα feat() commits μετά το a7bb89c · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml · (γ) αν όχι νέο feature, comprehensive drift verification pass.
+
+
+## 2026-08-01 (thirty-sixth run — platform audit actor-email filter documented)
+
+Σάρωση git log για νέα feat() commits μετά την thirty-fifth run (a7bb89c, 2026-07-31). Ανακάλυψη: **1 νέο feat() commit που χρειάζεται documentation**:
+- **81b150e** (2026-08-01, `feat(saas): filter the platform audit feed by actor email (+ CSV export)`) — προσθέτει actor-email filter στο `/admin/audit` feed + στο CSV export· ήδη logged στο root `SAAS_PROGRESS.md` (increment 130, commit db11f64) αλλά αυτό είναι η routine-log του saas-core routine, όχι τεκμηρίωση χρήστη. Δύο ενδιάμεσα commits (2b203b7 fix subscriptions tenant-scoping, 997837f fix landing pricing) ήταν fixes/reorg, όχι νέα user-facing features· δεν χρειάζονταν αλλαγή στο docs/ territory.
+
+Τι έγινε: Διάβασα τον κώδικα πριν γράψω, όχι το commit message — `lib/tenancy/adminAudit.ts` (`parseAdminAuditQuery` προσθέτει `actor` = trimmed+lowercased email· `listPlatformAudit` κάνει `Account.findOne({email: query.actor})` για να πάρει το account id πριν φιλτράρει, γιατί το `AuditEvent.actor` αποθηκεύει id όχι email· άγνωστο email → `unknownActor:true`, ίδιο short-circuit pattern με το `unknownTenant`) + `apps/web/src/app/api/saas/admin/audit/export/route.ts` diff (νέο `unknownActor` check → 404 JSON πριν το CSV) + `lib/tenancy/adminAuditCsv.ts` diff (`platformAuditCsvFilename` προσθέτει `by-<email>` segment, prefixed ώστε ένα mangled email να διαβάζεται σαν άνθρωπος όχι σαν άλλο slug) + `admin/audit/page.tsx` diff (νέο plain `<input type="text" name="actor">` στη φόρμα, ίδιο GET-form pattern με τα υπόλοιπα filters).
+
+Ενημερώθηκε το section **"Platform activity feed (`/admin/audit`)"** στο `docs/saas.md`: (α) η εισαγωγική παράγραφος του filter form επεκτάθηκε με το actor email filter + νέα παράγραφος που εξηγεί το email→account-id resolution mechanism και το unknownActor short-circuit (ίδιο reasoning με unknownTenant)· (β) ο πίνακας του CSV export endpoint πήρε `actor=<email>` στα query params + το 404 JSON shape για unknown actor· (γ) το filename bullet ενημερώθηκε με το `by-<email>` παράδειγμα + εξήγηση του `by-` prefix· (δ) το Console UI table row για `/admin/audit` ενημερώθηκε ("filterable by workspace slug, action and/or actor email").
+
+Accuracy: verified με code read (adminAudit.ts πλήρες actor-resolution flow + adminAuditCsv.ts filename builder diff + route.ts unknownActor branch + page.tsx form input), όχι απλή αντιγραφή commit message.
+
+Validation (markdown only, κανένα build/Docker/AI call): code fences docs/saas.md = 18 πριν και μετά (ζυγό, άθικτο, καμία προσθήκη code block)· κανένα νέο anchor δημιουργήθηκε (edits μέσα στο ήδη-υπάρχον `#platform-activity-feed-adminaudit` section, το Console UI link σε αυτό παραμένει valid)· κανένα credential.
+
+Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/saas.md` modified (δικό μου), κανένα foreign staged.
+
+Συμπέρασμα: Το shipped feature 81b150e (audit feed actor-email filter) είναι πλέον fully + accurately documented στο `docs/saas.md`.
+
+Επόμενο run: (α) grep git log για νέα feat() commits μετά το 81b150e · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml (ΣΗΜ: το SaaS control-plane API δεν ζει στο openapi.yaml, μόνο η self-hosted bearer-token API — βλ. `docs/saas.md:160-165`) · (γ) αν όχι νέο feature, comprehensive drift verification pass.
