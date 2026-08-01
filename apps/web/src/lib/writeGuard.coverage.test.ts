@@ -55,7 +55,56 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** Split a 'use server' file into its exported async functions (name + body text). */
+/**
+ * Split a 'use server' file into its exported async functions (name + body text).
+ *
+ * The body ENDS at the function's own closing brace, not at the next export. Slicing to the
+ * next export (or to end-of-file for the last one) let anything trailing count as part of the
+ * function: `subscriptions/actions.ts` carried a stray top-level `await assertCanWrite()` after
+ * the final `}` for weeks, and this scan read the last action as guarded while at runtime that
+ * action had no guard at all and the module ran the check once at import time instead.
+ */
+/**
+ * Index of the `{` that opens the function BODY, skipping the parameter list and the return-type
+ * annotation. Naively taking the first `{` lands inside `Promise<{ ok: boolean }>` and cuts the
+ * body off at the signature, which reads as "this action does not mutate" — the exact false
+ * negative this scan exists to prevent.
+ */
+function bodyStart(src: string, from: number): number {
+  let i = src.indexOf('(', from);
+  if (i === -1) return src.indexOf('{', from);
+  // Skip the parameter list (balanced, so destructured/defaulted params carry no weight here).
+  let parens = 0;
+  for (; i < src.length; i++) {
+    if (src[i] === '(') parens++;
+    else if (src[i] === ')' && --parens === 0) { i++; break; }
+  }
+  // Then the return type: braces inside `<...>` belong to it, not to the body.
+  let angle = 0;
+  for (; i < src.length; i++) {
+    const c = src[i];
+    if (c === '<') angle++;
+    else if (c === '>' && src[i - 1] !== '=') angle--; // `=>` is an arrow, not a closing angle
+    else if (c === '{' && angle <= 0) return i;
+  }
+  return -1;
+}
+
+function endOfFunction(src: string, from: number): number {
+  const open = bodyStart(src, from);
+  if (open === -1) return src.length;
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    const c = src[i];
+    if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return src.length;
+}
+
 function exportedActions(src: string): { name: string; body: string }[] {
   const out: { name: string; body: string }[] = [];
   const re = /export\s+async\s+function\s+(\w+)/g;
@@ -63,7 +112,10 @@ function exportedActions(src: string): { name: string; body: string }[] {
   const starts: { name: string; at: number }[] = [];
   while ((m = re.exec(src))) starts.push({ name: m[1], at: m.index });
   for (let i = 0; i < starts.length; i++) {
-    const end = i + 1 < starts.length ? starts[i + 1].at : src.length;
+    const hardEnd = i + 1 < starts.length ? starts[i + 1].at : src.length;
+    // Brace matching is naive about braces inside strings/comments, so it can only ever
+    // OVERSHOOT; clamping to the next export keeps that from swallowing a sibling action.
+    const end = Math.min(endOfFunction(src, starts[i].at), hardEnd);
     out.push({ name: starts[i].name, body: src.slice(starts[i].at, end) });
   }
   return out;

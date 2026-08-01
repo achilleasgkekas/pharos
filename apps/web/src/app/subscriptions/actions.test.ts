@@ -66,6 +66,11 @@ const {
 });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
+// Tenancy seam mocked flat (pass the model straight through, run the body inline): this file
+// pins CRUD/discovery behaviour, while actions.tenant.test.ts mocks the same seam tenant-aware
+// to pin the routing itself.
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: any) => m }));
 vi.mock('@/models/Subscription', () => ({
   Subscription: {
     create: subCreate,

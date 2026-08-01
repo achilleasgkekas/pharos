@@ -1,7 +1,9 @@
 'use server';
 import { connectDB } from '@/lib/db';
-import { Subscription } from '@/models/Subscription';
-import { Expense } from '@/models/Expense';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { suggestSubscription, type ParsedSubscription } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { revalidatePath } from 'next/cache';
@@ -111,16 +113,19 @@ export async function createSubscription(formData: FormData) {
   const parsed = SubFormSchema.parse(Object.fromEntries(formData));
   const startDate = new Date(parsed.startDate);
   const money = await resolveSubFx(parsed);
-  await connectDB();
-  await Subscription.create({
-    ...parsed,
-    ...money,
-    startDate,
-    trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,
-    nextRenewal: computeNextRenewal(startDate, parsed.billingCycle),
-    active: true,
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Subscription = await currentModel(SubscriptionModel);
+    await Subscription.create({
+      ...parsed,
+      ...money,
+      startDate,
+      trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,
+      nextRenewal: computeNextRenewal(startDate, parsed.billingCycle),
+      active: true,
+    });
+    revalidatePath('/subscriptions');
   });
-  revalidatePath('/subscriptions');
 }
 
 export async function updateSubscription(id: string, formData: FormData) {
@@ -128,33 +133,42 @@ export async function updateSubscription(id: string, formData: FormData) {
   const parsed = SubFormSchema.parse(Object.fromEntries(formData));
   const startDate = new Date(parsed.startDate);
   const money = await resolveSubFx(parsed);
-  await connectDB();
-  await Subscription.findByIdAndUpdate(id, {
-    ...parsed,
-    ...money,
-    startDate,
-    trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,
-    nextRenewal: computeNextRenewal(startDate, parsed.billingCycle),
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Subscription = await currentModel(SubscriptionModel);
+    await Subscription.findByIdAndUpdate(id, {
+      ...parsed,
+      ...money,
+      startDate,
+      trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,
+      nextRenewal: computeNextRenewal(startDate, parsed.billingCycle),
+    });
+    revalidatePath('/subscriptions');
   });
-  revalidatePath('/subscriptions');
 }
 
 export async function toggleSubscriptionActive(id: string, active: boolean) {
   await assertCanWrite();
-  await connectDB();
-  await Subscription.findByIdAndUpdate(id, {
-    active,
-    cancelledAt: active ? null : new Date(),
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Subscription = await currentModel(SubscriptionModel);
+    await Subscription.findByIdAndUpdate(id, {
+      active,
+      cancelledAt: active ? null : new Date(),
+    });
+    revalidatePath('/subscriptions');
   });
-  revalidatePath('/subscriptions');
 }
 
 export async function deleteSubscription(id: string) {
   await assertCanWrite();
-  await connectDB();
-  // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
-  await Subscription.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
-  revalidatePath('/subscriptions');
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Subscription = await currentModel(SubscriptionModel);
+    // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
+    await Subscription.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+    revalidatePath('/subscriptions');
+  });
 }
 
 /**
@@ -164,21 +178,29 @@ export async function deleteSubscription(id: string) {
  * normalizes to the same vendorKey.
  */
 export async function discoverUntrackedRecurring(): Promise<RecurringCandidate[]> {
-  await connectDB();
-  const [expenses, subs] = await Promise.all([
-    Expense.find({ kind: 'expense', amount: { $gt: 0 } })
-      .select('vendor vendorKey amount date category kind')
-      .lean(),
-    Subscription.find().select('name provider').lean(),
-  ]);
-  const excludeVendorKeys = new Set<string>();
-  for (const s of subs) {
-    const nk = vendorKey(s.name || '');
-    if (nk) excludeVendorKeys.add(nk);
-    const pk = vendorKey(s.provider || '');
-    if (pk) excludeVendorKeys.add(pk);
-  }
-  return discoverRecurringCandidates(expenses, { excludeVendorKeys });
+  return withRequestTenant(async () => {
+    await connectDB();
+    // Both models are resolved inside the SAME wrap: the exclude set is only meaningful when the
+    // expenses and the subscriptions it filters against come from one tenant's db.
+    const [Expense, Subscription] = await Promise.all([
+      currentModel(ExpenseModel),
+      currentModel(SubscriptionModel),
+    ]);
+    const [expenses, subs] = await Promise.all([
+      Expense.find({ kind: 'expense', amount: { $gt: 0 } })
+        .select('vendor vendorKey amount date category kind')
+        .lean(),
+      Subscription.find().select('name provider').lean(),
+    ]);
+    const excludeVendorKeys = new Set<string>();
+    for (const s of subs) {
+      const nk = vendorKey(s.name || '');
+      if (nk) excludeVendorKeys.add(nk);
+      const pk = vendorKey(s.provider || '');
+      if (pk) excludeVendorKeys.add(pk);
+    }
+    return discoverRecurringCandidates(expenses, { excludeVendorKeys });
+  });
 }
 
 /** Create a Subscription from a discovered candidate (one-click "Track"). */
@@ -188,24 +210,31 @@ export async function trackDiscoveredSubscription(candidate: {
   cycle: 'weekly' | 'monthly' | 'quarterly' | 'yearly';
   firstDate: string;
 }) {
+  // This call used to sit AFTER the closing brace of this function (a stray top-level statement
+  // left by the P31 commit), so "Track this" was the one write path a viewer could still reach,
+  // and the module ran the guard once at import time instead. See writeGuard.coverage.test.ts,
+  // whose scanner was blind to it because the last function's body ran to end-of-file.
+  await assertCanWrite();
   const name = (candidate.vendor || 'Untitled').trim() || 'Untitled';
   const startDate = candidate.firstDate ? new Date(candidate.firstDate) : new Date();
   // The candidate is derived from Expense.amount, which is already base currency (P9), so it is
   // stamped with the deployment's own code rather than a hardcoded 'EUR' — on a non-EUR
   // deployment the old literal made every tracked candidate look foreign.
   const currency = normalizeCurrency((await getAppSettings()).currency) || 'EUR';
-  await connectDB();
-  await Subscription.create({
-    name,
-    provider: name,
-    category: 'other',
-    amount: candidate.amount,
-    currency,
-    billingCycle: candidate.cycle,
-    startDate,
-    nextRenewal: computeNextRenewal(startDate, candidate.cycle),
-    active: true,
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Subscription = await currentModel(SubscriptionModel);
+    await Subscription.create({
+      name,
+      provider: name,
+      category: 'other',
+      amount: candidate.amount,
+      currency,
+      billingCycle: candidate.cycle,
+      startDate,
+      nextRenewal: computeNextRenewal(startDate, candidate.cycle),
+      active: true,
+    });
+    revalidatePath('/subscriptions');
   });
-  revalidatePath('/subscriptions');
 }
-  await assertCanWrite();
