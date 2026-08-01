@@ -2,9 +2,48 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 997837f -->
+<!-- reviewed: eadb959 -->
 <!-- docker-validated: 6208f24 -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-08-01 (reviewer — έλεγχος 997837f..eadb959, 12 commits)
+
+Guard: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md`: μόνο ένα entry addressed σε `pharos/reviewer`
+(`reviewer-20260727-2010`), ήδη APPLIED, μηδέν ANSWERED να εφαρμοστεί, καμία νέα OPEN απόφαση χρειάστηκε.
+
+`npm run type-check` (web) EXIT 0· `npx tsc --noEmit` (mobile) EXIT 0· `npx vitest run` πλήρης →
+**5478/5482 passed, 4 skipped, 343 files** (μηδέν regression έναντι του προηγούμενου sweep).
+
+12 commits ελέγχθηκαν (κανένα mobile-touching, `git diff --stat` μηδέν αρχεία στο `apps/mobile`).
+Κύριος κώδικας: **`2b203b7`** (subscriptions tenant-scoping) — και τα 6 exported actions τυλίχτηκαν σε
+`withRequestTenant`+`currentModel`, το `discoverUntrackedRecurring` σωστά resolve-άρει ΚΑΙ τα δύο models
+(Expense+Subscription) μέσα στο ίδιο wrap ώστε το exclude-set να μη διαρρεύσει cross-tenant· διαβάστηκε
+γραμμή-γραμμή και το side-finding: `trackDiscoveredSubscription` δεν είχε write guard (το `assertCanWrite()`
+του P31 είχε προσγειωθεί ως top-level statement μετά το closing brace, έτρεχε μία φορά στο import) —
+πραγματική τρύπα για viewer role, τώρα σωστά μέσα στη συνάρτηση· ο `writeGuard.coverage.test.ts` scanner
+διορθώθηκε να κόβει το body στο δικό του closing brace (brace matching) αντί στο τέλος αρχείου, με
+negative-control επιβεβαίωση (re-introducing το bug ρίχνει το scan by name). **`81b150e`** (platform audit
+actor-email filter + CSV) — το email→account-id resolve πριν το query, `unknownActor` mirroring
+`unknownTenant`, filename `by-<email>` segment, 13 νέα tests· διαβάστηκε το threading σε `page.tsx`
+(filterLinkParams/CSV link/Reset) και στο export route (404 πριν header-only CSV) — καθαρό. **`2f6cff0`**
+(humans.txt fix) — cross-checked τους 4 pricing/positioning claims έναντι της live landing σελίδας, «static
+export»→«standalone output» διορθώθηκε σωστά (next.config.ts επιβεβαιωμένο `output:'standalone'`). **`62ed9eb`**
+(i18nActions.test.ts, 5 tests) — mocks/coverage σωστά, καμία production-code αλλαγή. Τα υπόλοιπα 6 commits
+είναι docs/progress-log μόνο (μηδέν κώδικας). Μηδέν committed secret (grep key/token/password/PEM στο πλήρες
+diff → μόνο prose env-var references, ήδη γνωστές μεταβλητές).
+
+WEB_DEBT.md: standing queue re-verified live — `subscriptions/actions.ts` P2 item σωστά DONE (grep 22 hits
+withRequestTenant/currentModel)· `tasks`/`shopping-list`/`history`/`settings` actions.ts παραμένουν TODO,
+αμετάβλητα (grep count 0 και στα 4). `PRODUCT_BACKLOG.md`: P9 (multi-currency) ενημερώθηκε από τον planner σε
+πλήρως SHIPPED (rate-feed phase 2 ήδη wired σε 6/6 clients, verified live `grep -rl FxRateButton` = bills/
+expenses/items/receipts/statements/subscriptions). i18n gap: **30 missing keys** (en=1307, el=1277 μοναδικά
+keys, ίδιο μέτρημα με το προηγούμενο sweep) — σταθερό, μηδέν drift. Μηδέν small-safe fix χρειάστηκε αυτό το
+run· όλος ο ελεγμένος κώδικας ήδη καθαρός.
+
+Routine health: κανένα stuck routine εντοπίστηκε — `oss-prep`/`saas-core`/`docs`/`landing`/`daily-dev` έχουν
+όλα φρέσκο commit/log σήμερα (2026-08-01). `pharos-landing` έχει ένα OPEN `ASK_ACHILLEAS.md` entry
+(`pharos-landing-20260729-1000`, pricing/legal) αμετάβλητο· `PRODUCT_BACKLOG.md` 23η σάρωση σημειώνει 36
+Proposed, μηδέν έγκριση σε 18 διαδοχικές σαρώσεις (decision-fatigue, όχι routine malfunction).
 
 ## 2026-07-31 (reviewer — έλεγχος 74a0f12..997837f, 11 commits)
 
