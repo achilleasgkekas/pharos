@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-07-31 (22η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-08-01 (23η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
@@ -92,12 +92,42 @@
 > **P66** (AI assistant model-coverage gap, καθαρό consistency fix σε ήδη-δουλεμένο pipeline), **P48** (mirror
 > sync-staleness alert). Δεν είναι «οι πιο value-πυκνές» υποχρεωτικά, είναι οι πιο **εύκολες να εγκριθούν χωρίς
 > σκέψη** — ό,τι μπορεί να ξεμπλοκάρει τη ροή.
+>
+> **23η σάρωση (2026-08-01)** — `git log --since` από την 22η σάρωση (marker επιβεβαιωμένος `dc51c6f`): η δουλειά
+> του builder παρέμεινε αποκλειστικά **SaaS tenant-scoping plumbing** (notifications/subscriptions actions +
+> ένα write-guard gap που έκλεισε στο `2b203b7`) + test coverage — μηδέν νέο product-facing feature να
+> συμφιλιωθεί σε Done. Μία διόρθωση όμως χρειαζόταν: το **P9** (multi-currency) έγραφε ακόμα «εκκρεμεί το
+> προαιρετικό rate-feed» ενώ το `SAAS_PROGRESS.md` (2026-08-01 entry) σημείωνε ρητά ότι αυτός ο τίτλος είναι stale
+> — live-verified εδώ (`lib/fxRates.ts`/`app/fxRateActions.ts` + `FxRateButton` wired σε **6/6** clients: bills/
+> expenses/items/receipts/statements/subscriptions) → το P9 entry ενημερώθηκε σε πλήρως SHIPPED. **1 νέο
+> candidate (P78)**, live-verified με grep πριν την πρόταση (bulk field-edit λείπει από Items πέρα από AI-fill/
+> merge, και λείπει εντελώς από Expenses — select-mode δεν υπάρχει καν εκεί). Η ουρά παραμένει στα **36 Proposed,
+> μηδέν έγκριση σε 18 διαδοχικές σαρώσεις** — το ίδιο decision-fatigue bottleneck της 20ής-22ης σάρωσης, το quick-
+> start shortlist παραπάνω παραμένει η πιο πρακτική πρόταση αν θελήσει να ξεμπλοκάρει με ένα μικρό batch.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P78. Bulk field-edit για selected Items/Expenses (category/status/tag) — S — OSS (κυρίως), dogfooding-heavy
+- **Αξία:** live-verified: το `ItemsClient.tsx` έχει ήδη select-mode (`selectedIds: Set<string>`) αλλά οι ΜΟΝΕΣ δύο
+  bulk ενέργειες πάνω στην επιλογή είναι **AI fill** (`handleBulkAi`) και **merge** (duplicate-merge, ≥2 items) —
+  **καμία** bulk απλή αλλαγή πεδίου (π.χ. «άλλαξε κατηγορία σε 12 επιλεγμένα items» ή «σημείωσε 5 ως received»)
+  (verified `grep -n "handleBulk|selectedIds|bulk" app/items/ItemsClient.tsx` — μόνο τα 2 παραπάνω). Το
+  `ExpensesClient.tsx` είναι ακόμα πιο πίσω: **μηδέν select-mode καν** (verified `grep -n "checkbox|Set<string>|
+  selectMode"` — τα δύο μόνα checkbox hits είναι άσχετα φίλτρα, tax-only/include-me). Πρακτικό αποτέλεσμα: μια
+  σειρά από 20 receipts που έγιναν expenses με λάθος κατηγορία, ή 8 items που μόλις παραδόθηκαν μαζί (μια
+  παραγγελία), χρειάζονται σήμερα **N ξεχωριστά ανοίγματα** του detail modal για το ίδιο κοινό edit. Νέο μικρό
+  bulk-edit bar (εμφανίζεται όταν `selectedIds.size>0`, ίδιο idiom με το ήδη-υπάρχον «AI fill N»/«merge N»):
+  category dropdown + (Items) status dropdown + tag-add input → `bulkUpdateItems(ids, patch)`/
+  `bulkUpdateExpenses(ids, patch)`, ένα Mongoose `updateMany`, revalidate μία φορά.
+- **Module:** Items (`ItemsClient.tsx`, νέο bulk-edit bar δίπλα στο ήδη-υπάρχον AI-fill/merge bar) + Expenses
+  (`ExpensesClient.tsx`, νέο select-mode from scratch, ίδιο checkbox pattern με το Items).
+- **Ανοιχτή απόφαση (builder default):** MVP = category + tag-add (πιο συχνή διόρθωση μετά από import/scan)· status
+  bulk-change μόνο για Items (Expenses δεν έχει status field)· **καμία** αλλαγή σε μεμονωμένα-required πεδία
+  (τίτλος/ποσό) μέσω bulk — αυτά παραμένουν 1-προς-1 edit (αποφυγή κατά λάθος μαζικής αλλοίωσης).
 
 ### P77. Ενιαίο self-host system-health / diagnostics dashboard — S — OSS (adoption/troubleshooting lever)
 - **Αξία:** live-verified `grep -rln "healthcheck|health-check|diagnostics|/system-health" apps/web/src` = 0 hits
@@ -1416,7 +1446,7 @@
   enable notifications) με progress ticks → activation. **Διακριτό** από P1 (demo data) — εδώ τα *δικά του* δεδομένα.
 - **Module:** Homepage / Dashboard (dismissable card) + Settings state reads.
 
-### P9. Multi-currency (per-transaction currency + FX conversion) — 🟡 FOUNDATION + 7 MODULES + ΟΛΑ ΤΑ IMPORTS (CSV, email-in, URL) + AUDIT/INLINE-FIX + **ΟΛΟ ΤΟ MOBILE UI 6/6** (Expenses, Bills, Subscriptions, Items, Receipts, Statements) SHIPPED (τελευταίο 2026-07-27, pharos-daily-dev), εκκρεμεί μόνο το προαιρετικό rate-feed (phase 2 by design)
+### P9. Multi-currency (per-transaction currency + FX conversion) — ✅ FOUNDATION + 7 MODULES + ΟΛΑ ΤΑ IMPORTS (CSV, email-in, URL) + AUDIT/INLINE-FIX + **ΟΛΟ ΤΟ MOBILE UI 6/6** + **rate-feed (phase 2)** — SHIPPED πλήρως (23η σάρωση: `lib/fxRates.ts`/`fxRateActions.ts` verified wired σε `FxRateButton`, 6/6 clients: bills/expenses/items/receipts/statements/subscriptions)
 - **Τι χτίστηκε (slice 1 από L item):** νέο pure **`lib/fx.ts`** (+25 unit tests, client-safe, DB-free) που κρατά
   **ΤΟΝ ΕΝΑΝ κανόνα** σε ένα μέρος: `normalizeCurrency`, `isForeignCurrency`, `convertToBase`, `deriveFxRate`,
   `resolveFx`, `formatMoney`, `fxBadgeLabel`. **Κλειδωμένη αρχιτεκτονική απόφαση (builder default, μηδέν migration):
@@ -1542,9 +1572,15 @@
   **Bug που έκλεισε μαζί** (ίδια κλάση με Subscriptions/Bills/Items/Receipts): κάθε ποσό της οθόνης τυπωνόταν με
   `currency`, δηλαδή το σύμβολο **της τράπεζας** πάνω σε **base-currency** νούμερο. Η base currency έρχεται από το
   ήδη-ζητούμενο plans payload, οπότε μηδέν επιπλέον request. **Το mobile P9 κλείνει 6/6.**
-- **Εκκρεμούν (επόμενα slices):** προαιρετικό δωρεάν rate-feed (phase 2, τώρα το rate είναι χειροκίνητο by design)·
-  τα `links[].price`/`priceHistory[].price` ενός item
-  μένουν **τυπωμένα** (δεν μετατρέπονται μαζί με τις 3 headline τιμές) — γνωστό όριο του μοντέλου του slice 4.
+- **Τι χτίστηκε (slice — δωρεάν rate-feed, phase 2, ήδη shipped, επιβεβαιώθηκε live 23η σάρωση):** νέο
+  **`lib/fxRates.ts`** (`fetchFxRate`, Frankfurter/ECB daily reference rates — free, key-less, self-hostable via
+  `FX_RATE_API_URL`) + **`app/fxRateActions.ts`** (`lookupMarketRate`, tenant-scoped, off όταν multi-currency off) +
+  **`components/FxRateButton.tsx`** («fetch market rate» δίπλα στο manual rate input, ο χρήστης βλέπει/αποδέχεται/
+  overwrite-άρει πριν αποθηκευτεί — ΠΟΤΕ auto-apply). Wired σε **6/6 clients**: Bills, Expenses, Items, Receipts,
+  Statements, Subscriptions (verified `grep -rl FxRateButton apps/web/src/app`). Ο κανόνας «δεν εφευρίσκεται rate»
+  μένει αμετάβλητος — το feed προσφέρει, δεν επιβάλλει.
+- **Εκκρεμεί (μικρό, γνωστό όριο):** τα `links[].price`/`priceHistory[].price` ενός item μένουν **τυπωμένα** (δεν
+  μετατρέπονται μαζί με τις 3 headline τιμές) — γνωστό όριο του μοντέλου του slice 4, όχι blocking.
 - **Αξία (αρχικό):** ανά-συναλλαγή currency + FX rate (snapshot τη μέρα) + reporting σε base currency. Πραγματικό κενό
   (CLAUDE.md). Μεγάλο: αγγίζει schema (amount+currency+rate), aggregations, imports, όλα τα money views.
 - **Module:** cross-cutting (Expenses/Receipts/Statements/Reports + `lib/money.ts`).
