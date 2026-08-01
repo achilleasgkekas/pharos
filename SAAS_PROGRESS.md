@@ -6448,3 +6448,70 @@ impure `listPlatformAudit` (χρειάζεται Account lookup email→id πρ�
 (β) quick-range chips («last 24h / 7d / 30d») πάνω από το window, τώρα που το backend τα σηκώνει —
 καθαρά UI, μηδέν νέο query surface· (γ) αλλιώς επόμενο backend increment από TODO.md #5-#12. Πριν
 ξεκινήσεις: ask-inbox πρώτα, μετά UI scan.
+
+## 2026-08-01 — increment 130: actor filter στο platform audit feed (+ export)
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine (και τα τέσσερα `pharos-saas-core-*` είναι
+APPLIED). **UI-first scan**: πήρα το **(α)** που το προηγούμενο run άφησε πρώτο στη σειρά, τον
+**actor filter** — όχι το (β) quick-range chips. Λόγος: το (α) είναι το τελευταίο κενό φίλτρο στο
+console (workspace ✓, action ✓, window ✓, **ποιος ✗**), και δεν είναι «άλλο ένα backend read
+endpoint» που η προτεραιότητα λέει να αναβάλω: είναι φίλτρο πάνω σε **υπάρχουσα σελίδα**, δηλαδή
+UI + query μαζί. Τα chips μένουν καθαρά cosmetic και μπορούν να περιμένουν.
+
+**Γιατί υπάρχει.** Ένα incident έχει δύο μισά: «τι έγινε» και «ποιος το έκανε». Το feed απαντούσε
+μόνο το πρώτο — για να δεις τι έκανε ένας συγκεκριμένος λογαριασμός έπρεπε να σκρολάρεις όλο το
+παράθυρο και να διαβάζεις τη στήλη Actor με το μάτι.
+
+**Η μία απόφαση που όντως μετράει: email in, id out.** Ο operator πληκτρολογεί **email**, γιατί
+αυτό είναι το μόνο actor identifier που εμφανίζεται πουθενά (feed + CSV στήλη «Actor email»)· το
+account id δεν renderάρεται ποτέ, οπότε το να το ζητούσα θα ήταν άχρηστο UI. Αλλά το
+`AuditEvent.actor` αποθηκεύει **id**. Άρα το `listPlatformAudit` κάνει resolve email→id **πριν** το
+query, και το `buildPlatformAuditFilter` δέχεται `actorId`, ποτέ email. Αν περνούσε το email string
+στο filter, θα ταίριαζε **μηδέν** γραμμές και η σελίδα θα διάβαζε «αυτός ο άνθρωπος δεν έκανε
+τίποτα» — pinned με test που ελέγχει ότι το filter **δεν περιέχει `@`**. Το `Account.email` είναι
+`lowercase: true, trim: true` στο model, άρα το exact match μετά από normalize είναι ασφαλές (και
+ένα paste από mail client με κεφαλαία/κενά δουλεύει).
+
+**`unknownActor`, ίδιο pattern με το `unknownTenant`.** Email που δεν ανήκει σε κανέναν κάνει
+short-circuit πριν το query και επιστρέφει δικό του flag: η σελίδα λέει «No account with email X»
+και το export γυρίζει **404 JSON**, όχι header-only CSV. Ίδιο σκεπτικό με τα increments 126/128 και
+με το day-boundary του 129: **άδειο αποτέλεσμα σε ticket διαβάζεται σαν εύρημα**, και είναι η μία
+απάντηση που δεν επιτρέπεται να δοθεί κατά λάθος. Στη σελίδα το «Download CSV» κρύβεται και στις
+δύο unknown περιπτώσεις (`unknownFilter`) — θα κατέβαζε 404.
+
+**Composition**: το `actor` είναι **ξεχωριστό top-level key**, οπότε η Mongo το κάνει AND με
+tenant/action/`createdAt` window και με το keyset `$or` του cursor — pinned με test που συγκρίνει
+ολόκληρο το filter object με τα 4 φίλτρα μαζί. Το `auditFiltersActive` δέχεται το `actor` ως
+**optional** (`Partial`) ώστε callers που προϋπήρχαν και δεν το περνούν να συνεχίσουν να διαβάζονται
+ως «κανένα φίλτρο» αντί να σπάσουν — pinned κι αυτό.
+
+**Filename**: νέο segment `by-<email>` (`pharos-audit-platform-all-by-ana-example-com-...csv`). Το
+prefix `by-` υπάρχει επειδή το email μετά το slugify χάνει `@` και τελείες (`ana-example-com`) και
+χωρίς αυτό θα διαβαζόταν σαν άλλο ένα slug. Χωρίς το segment, δύο export διαφορετικών προσώπων
+καταλήγουν σε ticket με **πανομοιότυπο όνομα**. Έλεγξα ότι quotes/CRLF/`..` μέσα στο email δεν
+βγαίνουν ποτέ έξω από το `[a-z0-9.-]` του Content-Disposition.
+
+**Verified**: **107/107** στα 3 σχετικά αρχεία (+13 νέα tests, από 94), πλήρες `npx vitest run` →
+**342 files / 5473 tests green** (0 fail, 4 skipped), `npm run type-check` → **EXIT 0 χωρίς κανένα
+fix**. **Docker: κανένα rebuild** (μηδέν env/deps/runtime-wiring αλλαγή → ο mutex δεν χρειάστηκε).
+**Browser-verify: μη εφαρμόσιμο unattended** — το λέω ρητά αντί να το περάσω για επιτυχία: το
+`/admin/audit` στο τρέχον stack γυρίζει **307** (SAAS_MODE off, redirect στο login), οπότε δεν
+υπάρχει τίποτα να renderαριστεί, και δεν γυρίζω το flag σε running app του χρήστη χωρίς εντολή. Το
+μόνο live σημάδι (curl, πάνω στο **παλιό** image): `/api/saas/admin/audit/export?actor=...` γυρίζει
+**401**, ίδιο με πριν — το νέο param δεν άνοιξε καμία επιφάνεια στο OSS build. `homepage-web`
+running, RestartCount 0. Collision guard: `git status --short` πριν το staging = **μόνο τα 7 δικά
+μου αρχεία**, μηδέν staged από άλλη routine· pathspec commit `81b150e`.
+
+**## Needs Achilleas:** τίποτα νέο. Παραμένουν: **Stripe keys** (`STRIPE_SECRET_KEY` /
+`STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_SHARED` / `STRIPE_PRICE_DEDICATED` — ο client είναι πλήρως
+testαρισμένος και περιμένει μόνο keys), **τελικό plan pricing** (τα €0/€9/€29 + quotas στο
+`plans.ts` παραμένουν placeholders, εγκεκριμένα ως πηγή αλήθειας έναντι της landing), **SMTP**.
+Επαναλαμβανόμενη πρακτική σημείωση: όσο το τοπικό stack τρέχει με SAAS_MODE off, **καμία SaaS UI
+σελίδα δεν είναι browser-verifiable** από αυτή τη routine.
+
+**Next task:** (α) **quick-range chips** («last 24h / 7d / 30d») πάνω από το window — τώρα το πιο
+προφανές, καθαρά UI, μηδέν νέο query surface (το backend τα σηκώνει ήδη)· (β) **actor autocomplete**
+από τα emails που ήδη εμφανίζονται στη σελίδα (`<datalist>` πάνω στο input, μηδέν νέο endpoint) —
+το exact-email matching είναι ακριβές αλλά αμείλικτο, και ένα typo σε email είναι πιο εύκολο από
+ένα typo σε slug· (γ) αλλιώς επόμενο backend increment από TODO.md #5-#12. Πριν ξεκινήσεις:
+ask-inbox πρώτα, μετά UI scan.
