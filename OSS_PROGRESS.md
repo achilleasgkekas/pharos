@@ -3144,6 +3144,27 @@ Suggested next task: **`reports/fxActions.ts`** (140 γραμμές, 2 exported 
 
 Suggested next task: **`vouchers/loyaltyActions.ts`** (67 γραμμές) — το επόμενο από τα εναπομείναντα test-less action modules που εντοπίστηκαν στο 2026-07-29 slice (μαζί με `app/storage-actions.ts`, `app/i18nActions.ts`, `settings/users.actions.ts`, `settings/mcpActions.ts`· τα μεγαλύτερα `jobActions.ts`/`aiCommandActions.ts`/`sampleDataActions.ts` παραμένουν για μεταγενέστερα runs, θέλουν πιο προσεκτικό διάβασμα). Διάβασε ολόκληρο το target file plus το `models/LoyaltyCard.ts` πριν γράψεις τίποτα. Πάντα `git status` collision-guard πρώτα.
 
+## 2026-08-01 (cont.⁹ — app/i18nActions.test.ts, νέο module: cookie-based UI locale switch)
+
+**Task**: το suggested next-task του προηγούμενου run: `app/i18nActions.ts` (16 γραμμές, 1 exported function) — το μικρότερο εναπομείναν test-less action module, το `setLocale` server action πίσω από τον language-switcher (persist σε cookie `pharos_locale`, το layout το διαβάζει στο επόμενο render). Coordination: `ROUTINES_PAUSED` δεν υπήρχε, καμία εγγραφή pharos-oss-prep στο `ASK_ACHILLEAS.md`, `git status --short` καθαρό, local==origin (`db11f64`) πριν ξεκινήσω.
+
+Διάβασα ολόκληρο το target file plus το `lib/i18n/config.ts` (το `LOCALES`/`isLocale`/`LOCALE_COOKIE`, ήδη δικό του `lib/i18n/config.test.ts`) πριν γράψω τίποτα. Δύο πραγματικά I/O seams: `next/headers` `cookies()` (`.set`) και `next/cache` `revalidatePath`. Ακολούθησα το pattern του `lib/writeGuard.behaviour.test.ts` για το `vi.mock('next/headers', () => ({ cookies: cookiesMock }))` (εκεί mockάρεται `.get`, εδώ `.set`) και το pattern του `receipts/actions.crud.test.ts` για το `vi.mock('next/cache', ...)`. Το `isLocale` τρέχει πραγματικό (pure, ήδη testαρισμένο), δεν χρειάστηκε stub.
+
+**Ευρήματα στο ίδιο το production code (τεκμηριωμένα στα tests, ΟΧΙ αλλαγμένα)**:
+- Ένα άκυρο locale κάνει **early return πριν καν κληθεί `cookies()`** — καμία cookie write, κανένα revalidate, για ένα τυχαίο/garbled query param.
+- Το cookie options object είναι **hardcoded fixed shape** (`path:'/'`, `maxAge` 1 έτος, `sameSite:'lax'`) ίδιο ανεξαρτήτως locale· δεν υπάρχει `secure`/`httpOnly` flag (σκόπιμα, αφού το layout πρέπει να το διαβάσει και client-side reads δεν μπλοκάρονται από `isLocale`).
+- `revalidatePath('/', 'layout')` (όχι μεμονωμένο path) τρέχει **μόνο στο happy path**, ώστε ένα failed set να μην προκαλέσει άσκοπο πλήρες re-render.
+
+**5 tests** σε ένα describe block: reject άκυρου locale πριν από cookies()/revalidate· reject κενού string· επιτυχές set με τα ακριβή cookie options· revalidatePath('/','layout') μετά από επιτυχία· round-trip και των 8 υποστηριζόμενων locales (en/el/es/fr/de/it/pt/nl).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/i18nActions.test.ts"` → **5/5 passed** από την πρώτη προσπάθεια (κανένα tsc/hoisting fix χρειάστηκε — μικρό απλό αρχείο).
+- `npm run type-check` → exit 0, μηδέν errors σε όλο το repo.
+- `npx vitest run` (όλο το suite) → **343 files, 5478/5482 passed (4 skipped)** (~11.2s wall). ΣΗΜ: τα 2 failing tests του `notifications/actions.tenant.test.ts` που αναφέρθηκαν στο προηγούμενο slice (2026-07-31) **έχουν πλέον διορθωθεί** από άλλη routine στο μεταξύ, όλο το suite είναι πράσινο.
+- Collision guard: `git status --short` πριν το commit έδειξε ΜΟΝΟ το νέο αρχείο μου· `git diff --cached --name-only` το ίδιο.
+
+Suggested next task: **`app/storage-actions.ts`** (19 γραμμές) — το επόμενο μικρότερο εναπομείναν test-less action module. Μετά **`settings/mcpActions.ts`** (38 γρ.)· μετά **`settings/users.actions.ts`** (91 γρ.). Τα μεγαλύτερα (`app/jobActions.ts` 210 γρ., `app/aiCommandActions.ts` 93 γρ. AI tool-loop, `settings/sampleDataActions.ts` 103 γρ.) παραμένουν για μεταγενέστερα runs, θέλουν πιο προσεκτικό διάβασμα (side-effects/external calls). Διάβασε ολόκληρο το target file πριν γράψεις τίποτα. Πάντα `git status` collision-guard πρώτα.
+
 ## 2026-07-31 (cont.⁸ — vouchers/loyaltyActions.test.ts, νέο module: loyalty/membership card CRUD)
 
 **Task**: το suggested next-task του προηγούμενου run: `vouchers/loyaltyActions.ts` (67 γραμμές, 4 exported functions) — CRUD για το loyalty/membership card wallet (P20), tab μέσα στο `/vouchers` δίπλα στα Vouchers/GiftCards. Coordination: `ROUTINES_PAUSED` δεν υπήρχε, καμία εγγραφή pharos-oss-prep στο `ASK_ACHILLEAS.md`, `git status --short` καθαρό, local==origin (`b6ef82e`) πριν ξεκινήσω.
