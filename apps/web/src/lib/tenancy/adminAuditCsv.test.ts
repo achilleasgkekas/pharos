@@ -311,6 +311,65 @@ describe('platformAuditCsvFilename · date window', () => {
   });
 });
 
+describe('platformAuditCsvFilename · actor', () => {
+  const at = new Date('2026-07-31T08:00:00.000Z');
+
+  it('encodes the actor, prefixed by- so a mangled email still reads as a person', () => {
+    expect(
+      platformAuditCsvFilename({ tenant: null, action: null, actor: 'ana@example.com' }, at)
+    ).toBe('pharos-audit-platform-all-by-ana-example-com-2026-07-31.csv');
+  });
+
+  it('places the actor before the window, in a stable order', () => {
+    // Order matters only in that it must be deterministic: two exports of the same slice have to
+    // produce the same name, or a re-download looks like a different file in a ticket.
+    const from = new Date('2026-07-01T00:00:00.000Z');
+    const to = new Date('2026-07-15T23:59:59.999Z');
+    expect(
+      platformAuditCsvFilename(
+        { tenant: 'acme', action: 'member.added', actor: 'ana@example.com', from, to },
+        at
+      )
+    ).toBe(
+      'pharos-audit-acme-member-added-by-ana-example-com-from-2026-07-01-to-2026-07-15-2026-07-31.csv'
+    );
+  });
+
+  it('is unchanged when no actor is set (back-compatible with existing links)', () => {
+    expect(platformAuditCsvFilename({ tenant: 'acme', action: null, actor: null }, at)).toBe(
+      'pharos-audit-acme-all-2026-07-31.csv'
+    );
+  });
+
+  it('never lets an email escape the filename or the Content-Disposition header', () => {
+    // `actor` arrives from the query string, so `@`, dots, quotes and CRLF all reach here.
+    const name = platformAuditCsvFilename(
+      { tenant: null, action: null, actor: 'a"\r\n@../evil.com' },
+      at
+    );
+    expect(name).toMatch(/^[a-z0-9.-]+$/);
+    expect(name).not.toContain('..');
+  });
+
+  it('does not emit an empty segment for an actor with no usable characters', () => {
+    const name = platformAuditCsvFilename({ tenant: null, action: null, actor: '@@@' }, at);
+    expect(name).toBe('pharos-audit-platform-all-by-actor-2026-07-31.csv');
+    expect(name).not.toContain('--');
+  });
+});
+
+describe('parseAuditExportQuery · actor', () => {
+  it('carries the actor over normalized, so a Download link matches the screen', () => {
+    expect(parseAuditExportQuery(sp('actor=%20Ana%40Example.COM%20')).actor).toBe(
+      'ana@example.com'
+    );
+  });
+
+  it('treats a blank actor as no filter', () => {
+    expect(parseAuditExportQuery(sp('actor=')).actor).toBeNull();
+  });
+});
+
 describe('parseAuditExportQuery · date window', () => {
   it('carries the window over so a Download link exports the slice on screen', () => {
     const q = parseAuditExportQuery(sp('from=2026-07-01&to=2026-07-15'));

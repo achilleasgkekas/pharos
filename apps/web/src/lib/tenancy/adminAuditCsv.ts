@@ -41,7 +41,7 @@ export const DEFAULT_PLATFORM_AUDIT_EXPORT = 1000;
 export const UTF8_BOM = '﻿';
 
 /**
- * Parse the export query string. Delegates action/tenant/from/to/cursor to the page's parser (identical
+ * Parse the export query string. Delegates action/tenant/actor/from/to/cursor to the page's parser (identical
  * semantics, so a "Download CSV" link can carry the on-screen filters verbatim) and re-derives
  * `limit` against the export ceiling — `parseAdminAuditQuery` has already clamped it to the
  * PAGE maximum, which is far too small here. PURE.
@@ -139,27 +139,31 @@ function dayPart(d: Date | null | undefined): string {
 
 /**
  * Download filename encoding the active filters and the export day, e.g.
- * `pharos-audit-acme-member-added-2026-07-30.csv`, or with a window:
- * `pharos-audit-platform-all-from-2026-07-01-to-2026-07-15-2026-07-30.csv`.
+ * `pharos-audit-acme-member-added-2026-07-30.csv`, or with an actor and a window:
+ * `pharos-audit-platform-all-by-a-example-com-from-2026-07-01-to-2026-07-15-2026-07-30.csv`.
  *
  * Filters appear in the name because an operator attaching this to a ticket should not have to
- * remember which slice it was — and that argument is strongest for the TIME window, since two
- * exports of the same workspace and verb are otherwise indistinguishable by name. The trailing
- * date stays the day the file was generated, which is a different fact from the window it covers.
- * PURE.
+ * remember which slice it was — and that argument is strongest for the TIME window and the ACTOR,
+ * since two exports of the same workspace and verb are otherwise indistinguishable by name. The
+ * actor is prefixed `by-` so a mangled email (dots and `@` collapse to dashes) still reads as a
+ * person rather than as another slug. The trailing date stays the day the file was generated,
+ * which is a different fact from the window it covers. PURE.
  */
 export function platformAuditCsvFilename(
-  query: Pick<AdminAuditQuery, 'action' | 'tenant'> & Partial<Pick<AdminAuditQuery, 'from' | 'to'>>,
+  query: Pick<AdminAuditQuery, 'action' | 'tenant'> &
+    Partial<Pick<AdminAuditQuery, 'actor' | 'from' | 'to'>>,
   now: Date = new Date()
 ): string {
   const day = Number.isNaN(now.getTime()) ? 'unknown-date' : now.toISOString().slice(0, 10);
   const from = dayPart(query.from);
   const to = dayPart(query.to);
+  const actor = query.actor ? slugPart(query.actor, 'actor') : '';
   return (
     [
       'pharos-audit',
       slugPart(query.tenant, 'platform'),
       slugPart(query.action, 'all'),
+      ...(actor ? ['by', actor] : []),
       ...(from ? ['from', from] : []),
       ...(to ? ['to', to] : []),
       day,

@@ -33,6 +33,7 @@ describe('parseAdminAuditQuery', () => {
       limit: DEFAULT_PLATFORM_AUDIT_PAGE,
       action: null,
       tenant: null,
+      actor: null,
       from: null,
       to: null,
       cursor: null,
@@ -72,6 +73,19 @@ describe('parseAdminAuditQuery', () => {
   it('treats a blank/whitespace tenant as no filter', () => {
     expect(parseAdminAuditQuery(sp({ tenant: '   ' })).tenant).toBeNull();
     expect(parseAdminAuditQuery(sp({ tenant: '' })).tenant).toBeNull();
+  });
+
+  it('normalizes an actor email to lowercase and trims it', () => {
+    // Account.email is stored lowercase+trimmed, so an operator pasting an address out of a mail
+    // client (capitalised, with a trailing space) must still resolve to that account.
+    expect(parseAdminAuditQuery(sp({ actor: '  Achilleas@Example.COM ' })).actor).toBe(
+      'achilleas@example.com'
+    );
+  });
+
+  it('treats a blank/whitespace actor as no filter', () => {
+    expect(parseAdminAuditQuery(sp({ actor: '   ' })).actor).toBeNull();
+    expect(parseAdminAuditQuery(sp({ actor: '' })).actor).toBeNull();
   });
 
   it('decodes a well-formed before cursor', () => {
@@ -121,6 +135,38 @@ describe('buildPlatformAuditFilter', () => {
   it('adds the action clause only when an action is given', () => {
     expect(buildPlatformAuditFilter({ action: 'invite.sent' })).toEqual({ action: 'invite.sent' });
     expect(buildPlatformAuditFilter({ action: null })).toEqual({});
+  });
+
+  it('scopes to one actor ID when given, and omits the clause otherwise', () => {
+    expect(buildPlatformAuditFilter({ actorId: 'a1' })).toEqual({ actor: 'a1' });
+    expect(buildPlatformAuditFilter({ actorId: null })).toEqual({});
+    expect(buildPlatformAuditFilter({ actorId: undefined })).toEqual({});
+    expect(buildPlatformAuditFilter({ actorId: '' })).toEqual({});
+  });
+
+  it('filters actor by ID, never by the email the operator typed', () => {
+    // The bug this pins: AuditEvent.actor stores an account id. Passing the email through would
+    // match zero rows and render as "this person did nothing" — the worst wrong answer in an
+    // incident review. The email→id resolution belongs to listPlatformAudit, not here.
+    const filter = buildPlatformAuditFilter({ actorId: 'a1' });
+    expect(filter.actor).toBe('a1');
+    expect(JSON.stringify(filter)).not.toContain('@');
+  });
+
+  it('ANDs the actor clause with tenant, action and window as distinct top-level keys', () => {
+    const from = new Date('2026-07-01T00:00:00.000Z');
+    const filter = buildPlatformAuditFilter({
+      tenantId: 't1',
+      actorId: 'a1',
+      action: 'member.added',
+      from,
+    });
+    expect(filter).toEqual({
+      tenant: 't1',
+      actor: 'a1',
+      action: 'member.added',
+      createdAt: { $gte: from },
+    });
   });
 
   it('spreads the keyset cursor fragment alongside the other clauses', () => {
@@ -393,15 +439,19 @@ describe('dateInputValue', () => {
 });
 
 describe('auditFiltersActive', () => {
-  const none = { action: null, tenant: null, from: null, to: null };
+  const none = { action: null, tenant: null, actor: null, from: null, to: null };
 
   it('is false when nothing narrows the feed', () => {
     expect(auditFiltersActive(none)).toBe(false);
+    // Callers predating the actor filter omit the field entirely; that must still read as "no
+    // filters", not throw or count as active.
+    expect(auditFiltersActive({ action: null, tenant: null, from: null, to: null })).toBe(false);
   });
 
   it('is true for any single active filter, including each window edge alone', () => {
     expect(auditFiltersActive({ ...none, action: 'member.added' })).toBe(true);
     expect(auditFiltersActive({ ...none, tenant: 'acme' })).toBe(true);
+    expect(auditFiltersActive({ ...none, actor: 'a@example.com' })).toBe(true);
     expect(auditFiltersActive({ ...none, from: new Date('2026-07-01') })).toBe(true);
     expect(auditFiltersActive({ ...none, to: new Date('2026-07-15') })).toBe(true);
   });

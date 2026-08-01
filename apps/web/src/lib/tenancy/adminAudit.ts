@@ -49,6 +49,9 @@ export type AdminAuditQuery = {
   action: AuditAction | null;
   /** Optional workspace slug filter; null = every tenant. Normalized lowercase/trimmed. */
   tenant: string | null;
+  /** Optional actor filter, by account EMAIL; null = every actor. Normalized lowercase/trimmed —
+   *  Account.email is stored lowercase, so an exact match is safe. */
+  actor: string | null;
   /** Inclusive start of the time window (UTC); null = no lower bound. */
   from: Date | null;
   /** Inclusive end of the time window (UTC); null = no upper bound. */
@@ -122,9 +125,10 @@ export function dateInputValue(d: Date | null | undefined): string {
 /** True when any narrowing filter is active — drives the "Reset" affordance and the empty-state
  *  wording ("no match for these filters" vs "no activity yet"). PURE. */
 export function auditFiltersActive(
-  query: Pick<AdminAuditQuery, 'action' | 'tenant' | 'from' | 'to'>
+  query: Pick<AdminAuditQuery, 'action' | 'tenant' | 'from' | 'to'> &
+    Partial<Pick<AdminAuditQuery, 'actor'>>
 ): boolean {
-  return Boolean(query.action || query.tenant || query.from || query.to);
+  return Boolean(query.action || query.tenant || query.actor || query.from || query.to);
 }
 
 /**
@@ -134,6 +138,7 @@ export function auditFiltersActive(
  *   - action: only a known audit verb survives, else null (no filter) — same leniency as
  *             parseAuditAction, because a stray query param should show everything, not 400.
  *   - tenant: trimmed + lowercased slug (the Tenant.slug field is stored lowercase), blank → null.
+ *   - actor:  trimmed + lowercased email (Account.email is stored lowercase), blank → null.
  *   - from/to: inclusive UTC window bounds (see parseAuditRange); invalid → null (= unbounded).
  *   - cursor: decoded via the shared helper; malformed/tampered → null (= first page).
  * PURE.
@@ -146,12 +151,14 @@ export function parseAdminAuditQuery(params: URLSearchParams): AdminAuditQuery {
       : DEFAULT_PLATFORM_AUDIT_PAGE;
 
   const tenant = (params.get('tenant') || '').trim().toLowerCase() || null;
+  const actor = (params.get('actor') || '').trim().toLowerCase() || null;
   const { from, to } = parseAuditRange(params);
 
   return {
     limit,
     action: parseAuditAction(params.get('action')),
     tenant,
+    actor,
     from,
     to,
     cursor: decodeActivityCursor(params.get('before')),
@@ -166,6 +173,7 @@ export function parseAdminAuditQuery(params: URLSearchParams): AdminAuditQuery {
  */
 export function buildPlatformAuditFilter(input: {
   tenantId?: string | null;
+  actorId?: string | null;
   action?: AuditAction | null;
   from?: Date | null;
   to?: Date | null;
@@ -173,6 +181,10 @@ export function buildPlatformAuditFilter(input: {
 }): Record<string, unknown> {
   const filter: Record<string, unknown> = {};
   if (input.tenantId) filter.tenant = input.tenantId;
+  // The actor filter is by ACCOUNT ID, resolved from the email the operator typed, because that is
+  // what AuditEvent.actor stores. Filtering on the email string would match nothing at all and read
+  // as "this person did nothing", the worst possible answer during an incident.
+  if (input.actorId) filter.actor = input.actorId;
   if (input.action) filter.action = input.action;
   // The window is a top-level `createdAt` clause and the cursor is a `$or` on the same field.
   // Mongo ANDs distinct top-level keys, so the two compose correctly and "Load more" stays inside
@@ -237,6 +249,9 @@ export type PlatformAuditPage = {
   /** True when a `tenant` slug filter was given but matches no workspace — lets the UI say
    *  "no such workspace" instead of the misleading "no activity yet". */
   unknownTenant: boolean;
+  /** True when an `actor` email filter was given but matches no account — same reasoning as
+   *  `unknownTenant`: a typo'd email must not read as "that person did nothing". */
+  unknownActor: boolean;
 };
 
 /**
@@ -255,12 +270,25 @@ export async function listPlatformAudit(query: AdminAuditQuery): Promise<Platfor
     const t = (await Tenant.findOne({ slug: query.tenant })
       .select('_id')
       .lean()) as unknown as { _id: unknown } | null;
-    if (!t) return { events: [], hasMore: false, unknownTenant: true };
+    if (!t) return { events: [], hasMore: false, unknownTenant: true, unknownActor: false };
     tenantId = String(t._id);
+  }
+
+  // Same shape for the actor: the operator types the EMAIL they can see in the feed and the CSV,
+  // but AuditEvent.actor stores an account id, so the email is resolved first. An email nobody owns
+  // short-circuits and is reported distinctly, for the same reason as an unknown slug.
+  let actorId: string | null = null;
+  if (query.actor) {
+    const a = (await Account.findOne({ email: query.actor })
+      .select('_id')
+      .lean()) as unknown as { _id: unknown } | null;
+    if (!a) return { events: [], hasMore: false, unknownTenant: false, unknownActor: true };
+    actorId = String(a._id);
   }
 
   const filter = buildPlatformAuditFilter({
     tenantId,
+    actorId,
     action: query.action,
     from: query.from,
     to: query.to,
@@ -317,5 +345,6 @@ export async function listPlatformAudit(query: AdminAuditQuery): Promise<Platfor
     }),
     hasMore,
     unknownTenant: false,
+    unknownActor: false,
   };
 }

@@ -39,7 +39,7 @@ function makeReq(url = 'https://pharos.test/api/saas/admin/audit/export'): NextR
   return { url } as unknown as NextRequest;
 }
 
-const QUERY = { limit: 1000, action: null, tenant: null, cursor: null };
+const QUERY = { limit: 1000, action: null, tenant: null, actor: null, cursor: null };
 const EVENTS = [{ id: 'e1', action: 'member.added' }];
 
 beforeEach(() => {
@@ -103,8 +103,37 @@ describe('GET /api/saas/admin/audit/export', () => {
     expect(buildPlatformAuditCsvMock).not.toHaveBeenCalled();
   });
 
+  it('404s an unknown actor email instead of serving an empty CSV', async () => {
+    // Same reasoning as the unknown slug: a header-only CSV attached to a ticket reads as "this
+    // person did nothing", when in fact nobody owns that address.
+    parseAuditExportQueryMock.mockReturnValue({ ...QUERY, actor: 'ghost@example.com' });
+    listPlatformAuditMock.mockResolvedValue({
+      events: [],
+      hasMore: false,
+      unknownTenant: false,
+      unknownActor: true,
+    });
+
+    const res = await GET(
+      makeReq('https://pharos.test/api/saas/admin/audit/export?actor=ghost@example.com')
+    );
+
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Content-Type')).toContain('application/json');
+    await expect(res.json()).resolves.toEqual({
+      error: 'unknown actor',
+      actor: 'ghost@example.com',
+    });
+    expect(buildPlatformAuditCsvMock).not.toHaveBeenCalled();
+  });
+
   it('still serves a (header-only) CSV for a genuinely empty feed', async () => {
-    listPlatformAuditMock.mockResolvedValue({ events: [], hasMore: false, unknownTenant: false });
+    listPlatformAuditMock.mockResolvedValue({
+      events: [],
+      hasMore: false,
+      unknownTenant: false,
+      unknownActor: false,
+    });
     buildPlatformAuditCsvMock.mockReturnValue('Timestamp,Action');
 
     const res = await GET(makeReq());

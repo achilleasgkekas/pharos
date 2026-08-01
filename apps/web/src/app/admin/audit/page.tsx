@@ -6,9 +6,9 @@
 // Why this exists alongside the two per-workspace Activity views: those answer "what happened in
 // THIS workspace", which requires already knowing where to look. This one answers "what happened
 // on the platform", the question an operator actually starts an incident with. Filter by action,
-// workspace slug and/or a UTC date window via a plain GET form (the URL is the source of truth, so
-// a view is shareable/bookmarkable and needs no client state); paginate with the shared keyset
-// cursor, which composes with the window so "Load more" never escapes it.
+// workspace slug, actor email and/or a UTC date window via a plain GET form (the URL is the source
+// of truth, so a view is shareable/bookmarkable and needs no client state); paginate with the
+// shared keyset cursor, which composes with the window so "Load more" never escapes it.
 //
 // READ-ONLY: only the central registry AuditEvent collection plus batched Account/Tenant identity
 // lookups; never a per-tenant data database, never a write. Self-gates to notFound() for the
@@ -45,6 +45,7 @@ function toSearchParams(raw: RawParams): URLSearchParams {
 function auditParams(params: {
   action?: string | null;
   tenant?: string | null;
+  actor?: string | null;
   from?: string | null;
   to?: string | null;
   before?: string | null;
@@ -52,6 +53,7 @@ function auditParams(params: {
   const sp = new URLSearchParams();
   if (params.action) sp.set('action', params.action);
   if (params.tenant) sp.set('tenant', params.tenant);
+  if (params.actor) sp.set('actor', params.actor);
   if (params.from) sp.set('from', params.from);
   if (params.to) sp.set('to', params.to);
   if (params.before) sp.set('before', params.before);
@@ -80,7 +82,9 @@ export default async function AdminAuditPage({
   const raw = await searchParams;
   const sp = toSearchParams(raw);
   const query = parseAdminAuditQuery(sp);
-  const { events, hasMore, unknownTenant } = await listPlatformAudit(query);
+  const { events, hasMore, unknownTenant, unknownActor } = await listPlatformAudit(query);
+  // Either miss means there are no rows to page or export, only a correction to show.
+  const unknownFilter = unknownTenant || unknownActor;
 
   const rows = toPlatformActivityRows(events);
   const filtered = auditFiltersActive(query);
@@ -94,6 +98,7 @@ export default async function AdminAuditPage({
   const filterLinkParams = {
     action: query.action,
     tenant: query.tenant,
+    actor: query.actor,
     from: fromValue,
     to: toValue,
   };
@@ -122,6 +127,21 @@ export default async function AdminAuditPage({
             name="tenant"
             defaultValue={query.tenant ?? ''}
             placeholder="slug (exact)"
+            className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] px-3 py-1.5 text-sm text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
+          />
+        </label>
+        {/* Actor by EMAIL, because that is the identifier visible in the feed and the CSV — the
+            account id the events actually carry is never shown anywhere, so asking for it would be
+            unusable. Resolved to an id server-side. */}
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
+            Actor
+          </span>
+          <input
+            type="text"
+            name="actor"
+            defaultValue={query.actor ?? ''}
+            placeholder="email (exact)"
             className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] px-3 py-1.5 text-sm text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
           />
         </label>
@@ -180,7 +200,7 @@ export default async function AdminAuditPage({
             Reset
           </Link>
         )}
-        {!unknownTenant && (
+        {!unknownFilter && (
           // Plain <a>, not <Link>: this is a file download, not a client-side navigation, and the
           // router would otherwise try to treat the CSV response as a page.
           <a
@@ -203,6 +223,14 @@ export default async function AdminAuditPage({
             Workspaces
           </Link>{' '}
           list.
+        </p>
+      ) : unknownActor ? (
+        // Same reasoning as above, one level down: "nobody has that address" and "that person did
+        // nothing" must not render identically.
+        <p className="rounded-2xl border border-[color:var(--color-gold)]/40 bg-[color:var(--color-surface)] p-4 text-sm text-[color:var(--color-text-dim)]">
+          No account with email{' '}
+          <span className="font-mono text-[color:var(--color-text)]">{query.actor}</span>. The
+          filter matches the full address exactly, as shown in the Actor column.
         </p>
       ) : (
         <PlatformActivityPanel rows={rows} filtered={filtered} />
