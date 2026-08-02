@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-08-01 (23η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-08-02 (24η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
@@ -104,12 +104,62 @@
 > merge, και λείπει εντελώς από Expenses — select-mode δεν υπάρχει καν εκεί). Η ουρά παραμένει στα **36 Proposed,
 > μηδέν έγκριση σε 18 διαδοχικές σαρώσεις** — το ίδιο decision-fatigue bottleneck της 20ής-22ης σάρωσης, το quick-
 > start shortlist παραπάνω παραμένει η πιο πρακτική πρόταση αν θελήσει να ξεμπλοκάρει με ένα μικρό batch.
+>
+> **24η σάρωση (2026-08-02)** — `git log --since` από την 23η σάρωση (marker επιβεβαιωμένος `d4b98b5`): η δουλειά
+> του builder παρέμεινε πάλι αποκλειστικά **SaaS tenant-scoping plumbing** (tasks actions + read path, `9513644`)
+> + test coverage (i18nActions) + ένα landing docs-consistency fix (`humans.txt`) — μηδέν νέο product-facing feature
+> να συμφιλιωθεί σε Done. **2 νέοι candidates (P79-P80)**, και οι δύο live-verified με grep πριν την πρόταση: (1)
+> **P79** — υπάρχει ήδη ένα πλήρες TOTP/MFA primitive (`lib/tenancy/totp.ts`, `lib/tenancy/recoveryCodes.ts`,
+> `lib/tenancy/mfaStore.ts`) αλλά χρησιμοποιείται **αποκλειστικά** από το SaaS `Account`/`api/saas/auth/mfa` —
+> το self-host `models/User.ts` (login μέσω `/login` + `api/v1/auth/login`) έχει **μηδέν** MFA πεδίο (verified
+> `grep -n "mfa|totp|MFA" apps/web/src/models/User.ts` = 0 hits). Ένα self-hosted instance εκτεθειμένο μέσω
+> WireGuard/reverse-proxy σήμερα προστατεύεται μόνο από password — καθαρό trust-lever gap, ίδιο primitive ήδη
+> proven στο SaaS side, καμία νέα κρυπτογραφική δουλειά. (2) **P80** — το ήδη-shipped P24 (outbound webhooks,
+> `lib/webhooks.ts`) κάνει **fire-once, καμία retry λογική, κανένα delivery log** (verified `grep -n "retry|
+> attempt|deliveryLog|history" lib/webhooks.ts` = μόνο 1 άσχετο hit, `results.filter(...status===fulfilled)`
+> που είναι απλά το `Promise.allSettled` per-call αποτέλεσμα, όχι persisted ιστορικό) — αν ένα Home Assistant/n8n
+> endpoint είναι προσωρινά down, η ειδοποίηση χάνεται σιωπηλά χωρίς κανένα ίχνος. Η ουρά έφτασε **38 Proposed,
+> μηδέν έγκριση σε 19 διαδοχικές σαρώσεις** — το ίδιο decision-fatigue bottleneck παραμένει, το quick-start
+> shortlist πιο πάνω (P74/P40/P46/P66/P48) συνεχίζει να είναι η πιο πρακτική πρόταση αν θελήσει ένα μικρό batch.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P80. Outbound webhook delivery reliability (retry + failure log) — S — both, foundation-lever για το ήδη-shipped P24
+- **Αξία:** live-verified `lib/webhooks.ts` — το ήδη-shipped P24 (outbound event webhooks) κάνει **fire-and-forget,
+  μία απόπειρα** (`Promise.allSettled` απλά μαζεύει το per-call αποτέλεσμα, `grep -n "retry|attempt|deliveryLog|
+  history" lib/webhooks.ts` = 0 σχετικά hits). Πραγματικό σενάριο: ένα Home Assistant ή n8n endpoint είναι
+  προσωρινά down/restarting τη στιγμή που πυροδοτείται ένα event (π.χ. «bill overdue») — το webhook αποτυγχάνει
+  **σιωπηλά**, κανένα ίχνος πουθενά, ο χρήστης ανακαλύπτει το miss μόνο τυχαία. Νέο μικρό: (α) exponential-backoff
+  retry (2-3 προσπάθειες, ίδιο idiom με το ήδη-shipped Graph-API throttle-retry στο OneDrive uploader, CLAUDE.md),
+  (β) μικρό persisted delivery log ανά channel (τελευταίες N απόπειρες: timestamp/status/http-code) ορατό στο
+  Settings → Notifications `ChannelCard` (ίδιο idiom με το ήδη-υπάρχον per-channel «Test» κουμπί).
+- **Module:** `lib/webhooks.ts` (retry wrapper) + νέο μικρό log (in-memory ring-buffer ή μικρό capped Mongo
+  collection) + `NotificationsManager`/`ChannelCard` UI (Settings → Notifications).
+- **Ανοιχτή απόφαση (builder default):** MVP = 2 retries με backoff (π.χ. 5s/30s) πριν χαρακτηριστεί «failed»·
+  delivery log capped στα τελευταία ~20 events ανά channel (όχι απεριόριστο, αποφυγή unbounded growth)· ισχύει
+  για ΟΛΑ τα ήδη-shipped outbound channels (ntfy/Discord/Slack/Telegram/webhook), όχι μόνο generic webhook.
+
+### P79. TOTP/MFA στο self-host login (reuse του ήδη-shipped SaaS primitive) — S — OSS (κυρίως), security/trust lever
+- **Αξία:** live-verified `grep -n "mfa|totp|MFA" apps/web/src/models/User.ts` = 0 hits — το self-hosted login
+  (`app/login/LoginForm.tsx` + `app/api/v1/auth/login`) προστατεύεται **μόνο** από password, ενώ το **ίδιο
+  ακριβώς primitive υπάρχει ήδη πλήρως δουλεμένο και tested** για το SaaS side: `lib/tenancy/totp.ts` +
+  `lib/tenancy/recoveryCodes.ts` + `lib/tenancy/mfaStore.ts` (secret-at-rest encryption, `api/saas/auth/mfa`,
+  `api/saas/account/mfa`, με tests). Ένα self-hosted instance εκτεθειμένο μέσω reverse-proxy/WireGuard (η
+  προτεινόμενη τοπολογία, CLAUDE.md) έχει σήμερα το ίδιο security posture με «μόνο password» — αν διαρρεύσει το
+  password (weak/reused), μηδέν δεύτερη γραμμή άμυνας. Καθαρό reuse-not-rebuild: το ίδιο primitive που ήδη
+  δούλεψε στο SaaS side μεταφέρεται στο `User` model (enroll TOTP στο profile/Settings → recovery codes →
+  δεύτερο βήμα στο login form όταν ενεργό). **Διακριτό** από §9 στο TODO.md (SaaS-grade auth foundation, email
+  verify/OAuth/org-invites) και από P51 (mobile app-lock = device-local, δεν αγγίζει το server login).
+- **Module:** `models/User.ts` (νέα optional πεδία, reuse `mfaStore.ts` shape) + `app/login/LoginForm.tsx`
+  (δεύτερο βήμα όταν ενεργό) + Settings → account section (enroll/disable + recovery codes).
+- **Ανοιχτή απόφαση (builder default):** **opt-in**, όχι default-on (κενό = σημερινή password-only συμπεριφορά
+  αμετάβλητη, μηδέν friction σε single-user home deployments που ήδη είναι πίσω από VPN)· reuse ατόφιο το
+  crypto/secret-storage pattern του SaaS `mfaStore.ts`, μηδέν νέο dependency· recovery codes εμφανίζονται
+  ΜΙΑ φορά στο enroll (ίδιο one-time-reveal idiom με το SaaS side).
 
 ### P78. Bulk field-edit για selected Items/Expenses (category/status/tag) — S — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified: το `ItemsClient.tsx` έχει ήδη select-mode (`selectedIds: Set<string>`) αλλά οι ΜΟΝΕΣ δύο
