@@ -1129,6 +1129,24 @@ workspace with slug `<x>`" rather than the misleading "no activity yet",
 because a typo'd slug and a genuinely quiet workspace are different answers
 when chasing an incident.
 
+Above the manual date fields, a row of **quick-window chips** (`Today`,
+`Last 7 days`, `Last 30 days`) links straight to the same `?from=`/`?to=`
+window as typing it in by hand, saved as day-granularity presets rather than
+"last 24h": since a bare day always expands to its own UTC edges, a literal
+24-hour window has no `?from=`/`?to=` it could round-trip to, and would read
+as "today so far" or "today plus yesterday" depending on the hour it was
+clicked. Every preset ends **today** and counts back inclusively, so "Last 7
+days" covers 7 calendar days including today. Each chip carries the other
+active filters (workspace, action, actor) forward but **drops the "Load
+more" cursor**, because that cursor is a resume point inside the window being
+replaced and keeping it would land the operator mid-feed of a window they
+just changed. The chip matching the currently applied window (if any) renders
+highlighted, so a preset window is visually distinct from a hand-picked one;
+an **"All time"** link appears next to the chips whenever a window is active,
+clearing only `from`/`to` (unlike "Reset", which drops every filter) since
+widening the time range usually means keeping the workspace or actor already
+being chased.
+
 The **actor** filter takes the account email, the only actor identifier the
 feed and the CSV ever show, and resolves it server-side to the account id
 `AuditEvent.actor` actually stores (filtering on the raw email string would
