@@ -38,6 +38,11 @@ const {
 }));
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
+// Tenancy seam mocked FLAT here (pass-through wrapper, identity model resolution) so this file
+// keeps pinning CRUD/step behaviour, while actions.tenant.test.ts mocks the same seam
+// tenant-aware to pin the routing itself.
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: any) => m }));
 vi.mock('@/models/Task', () => ({
   Task: {
     create: taskCreate,

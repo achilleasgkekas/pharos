@@ -1,22 +1,27 @@
 import { connectDB } from '@/lib/db';
-import { Task } from '@/models/Task';
+import { Task as TaskModel } from '@/models/Task';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { TasksClient } from './TasksClient';
 import type { SerializedTask } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
 async function getTasks(): Promise<SerializedTask[]> {
-  await connectDB();
-  const tasks = await Task.find().sort({ num: 1, status: 1, createdAt: -1 }).lean();
-  const serialized = JSON.parse(JSON.stringify(tasks)) as SerializedTask[];
-  // Older tasks predate the steps/content fields — backfill defaults
-  return serialized.map((t) => ({
-    ...t,
-    content: t.content ?? '',
-    steps: t.steps ?? [],
-    num: t.num ?? '',
-    tags: t.tags ?? [],
-  }));
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Task = await currentModel(TaskModel);
+    const tasks = await Task.find().sort({ num: 1, status: 1, createdAt: -1 }).lean();
+    const serialized = JSON.parse(JSON.stringify(tasks)) as SerializedTask[];
+    // Older tasks predate the steps/content fields — backfill defaults
+    return serialized.map((t) => ({
+      ...t,
+      content: t.content ?? '',
+      steps: t.steps ?? [],
+      num: t.num ?? '',
+      tags: t.tags ?? [],
+    }));
+  });
 }
 
 export default async function TasksPage() {

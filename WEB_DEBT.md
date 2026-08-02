@@ -62,7 +62,19 @@
   - **Fix**: ίδιο recipe, μικρό αρχείο (7 exports).
   - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/tasks/actions.ts` ≥ 7· npm run type-check exits 0.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-30, 61η σάρωση reviewer routine)
+- Status: ✅ DONE 2026-08-02 (pharos-daily-dev) — και τα 7 exports τυλίχτηκαν σε `withRequestTenant` +
+  `currentModel(TaskModel)` (grep count **16**, ≥7 όπως ζητούσε το acceptance). Το `assertCanWrite()` έμεινε ΠΡΙΝ
+  το wrap (ο `writeGuard.coverage.test.ts` scanner το βλέπει κανονικά), όπως και το blank-step short-circuit του
+  `addStep` (μηδέν κόστος tenant resolution σε no-op). **Μαζί κλείστηκε και το read path** (`tasks/page.tsx
+  getTasks()`), σκόπιμα εκτός του αρχικού `Files:` — το να μείνει έξω είναι ακριβώς ό,τι γέννησε το ξεχωριστό
+  `vouchers/page.tsx` item, οπότε προτιμήθηκε να μη δημιουργηθεί ξανά η ίδια ασυμμετρία. Νέο
+  `actions.tenant.test.ts` (7 tests, δύο tenants ταυτόχρονα, tagged create id ώστε λάθος-db read να φαίνεται,
+  self-hosted no-tenant path)· ο flat `actions.test.ts` πήρε το γνωστό flat tenancy mock. Verify:
+  **negative control** (ένα `currentModel` πίσω σε direct model → 3 από τα 7 νέα tests πέφτουν, μετά restore),
+  type-check EXIT 0, full vitest **5485 passed / 344 files** (+7, μηδέν regression), safe Docker rebuild
+  (mongo healthy πριν → `build web` → `up -d web`): `/login` 200 με την πρώτη, `/tasks` 307 (auth-gated route
+  compiled), container running/not-restarting, build cache pruned. Browser pane `/tasks` → redirect σε
+  «Sign in · Pharos», μηδέν console errors.
 
 ### `shopping-list/actions.ts` παρακάμπτει το tenant-scoping
 - Priority: P2
