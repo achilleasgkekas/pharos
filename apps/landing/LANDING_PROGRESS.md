@@ -5016,3 +5016,62 @@ trial που καταλήγει σε suspend, οι δύο ενότητες τη�
 
 Needs-Achilleas (open, αμετάβλητα): μόνιμο Free tier ή μόνο trial (`pharos-landing-20260729-1000`), legal
 entity/Stripe, Terms+Privacy review, contact inbox, repo public timing.
+
+## 2026-08-02
+
+**Increment: dual-positioning pass σε όλες τις first-impression επιφάνειες** (το βήμα (2) που πρότεινε
+το προηγούμενο run, διευρυμένο αφού ο έλεγχος έδειξε ότι το πρόβλημα δεν ήταν μία πρόταση).
+
+**Το εύρημα**: το προηγούμενο run εντόπισε ότι η hero παράγραφος έλεγε «A self-hosted personal hub», δηλαδή
+μόνο τον έναν από τους δύο δρόμους. Ψάχνοντας το ίδιο μοτίβο σε όλο το app, αποδείχθηκε ότι **κάθε**
+επιφάνεια που διαμορφώνει πρώτη εντύπωση έλεγε το ίδιο: meta description, OG description, Twitter
+description, PWA manifest, JSON-LD (Organization + SoftwareApplication), το κείμενο της OG εικόνας, το
+`security.txt`, και η πρώτη γραμμή του `llms.txt`. Δηλαδή ό,τι βλέπει ο επισκέπτης **πριν** φτάσει στις
+κάρτες τιμολόγησης (Google snippet, link preview σε chat, τι λέει ένα LLM για το προϊόν) περιέγραφε ένα
+self-hosted-only προϊόν.
+
+**Γιατί το άλλαξα μονομερώς αν το προηγούμενο run το είχε αφήσει**: δεν είναι νέα απόφαση προϊόντος. Η
+κατεύθυνση («DUAL model, η landing πρέπει να παρουσιάζει ΚΑΙ τους δύο δρόμους ξεκάθαρα») είναι ήδη
+αποφασισμένη από τον Αχιλλέα και γραμμένη στο task file, οπότε αυτό είναι **εφαρμογή** της, όχι επιλογή.
+Είναι κείμενο, αναστρέψιμο με ένα revert. Η ανοιχτή ερώτηση (`pharos-landing-20260729-1000`, μόνιμο Free
+tier ή trial που καταλήγει σε suspend) **δεν** αγγίχτηκε: αφορά τι περιλαμβάνει το hosted πλάνο, όχι το αν
+υπάρχει.
+
+**Τι άλλαξε** (9 σημεία, όλα το ίδιο μοτίβο «self-host it free, or let us host it»):
+1. **hero παράγραφος** (`page.tsx`): «A personal hub for oversight on everything you own. [...] in one
+   private dashboard. **Self-host it free, or let us run it for you.**» Ο τίτλος, τα CTA και τα trust chips
+   έμειναν ανέπαφα.
+2. `layout.tsx` meta description, 3. OG description, 4. Twitter description.
+5. `manifest.ts` description («Self-hosted or managed»).
+6. JSON-LD **Organization**, 7. JSON-LD **SoftwareApplication** (και τα δύο αναφέρουν πλέον AGPL-3.0
+   self-host ΚΑΙ managed service· τα `offers` δεν αγγίχτηκαν, μένουν PreOrder όπως πριν).
+8. `opengraph-image.tsx`: subline + το chip «Self-hosted» -> «Self-hosted or managed».
+9. `public/.well-known/security.txt` (scope: ένας ερευνητής πρέπει να ξέρει ότι υπάρχει και hosted
+   υπηρεσία) + η πρώτη `>` γραμμή του `public/llms.txt` (η δεύτερη παράγραφός του εξηγούσε ήδη σωστά τους
+   δύο δρόμους, απλώς η γραμμή που παραθέτουν τα LLM έλεγε άλλα).
+
+Verify:
+- `npm run type-check` -> exit 0. `npm run build` -> success, **13 static routes**, `/` **5.35 kB**
+  (αμετάβλητο, μόνο κείμενο άλλαξε).
+- Browser pane μέσω `preview_start` (`landing-dev`, η 3100 πιασμένη, πήρε 54252 με autoPort). Έλεγχος στο
+  ζωντανό DOM: `heroSaysSelfHostedOnly:false`, και **και τα τρία** meta descriptions (meta/OG/Twitter)
+  περιέχουν πλέον και τους δύο δρόμους (`allMentionBoth:true`), JSON-LD Organization + SoftwareApplication
+  επιβεβαιωμένα parsed, CTA αμετάβλητα («Get started», «Self-host it free» + soon badge).
+- `/opengraph-image` και `/twitter-image` -> **200 image/png**. **Screenshot της OG κάρτας** (τρίτο
+  συνεχόμενο run με εικόνα): επειδή το chip πλάτυνε, το κοίταξα οπτικά, και τα 3 chips χωράνε άνετα σε μία
+  σειρά, μηδέν overflow.
+- `/manifest.webmanifest` 200 `application/manifest+json`, `/.well-known/security.txt` + `/llms.txt` 200
+  `text/plain`, όλα με το νέο κείμενο.
+- `read_console_messages` (onlyErrors) -> «No console logs». Mobile (375x812): `scrollWidth === innerWidth`
+  (375), μηδέν οριζόντιο overflow, **screenshot** του hero. Ο dev server σταμάτησε με `preview_stop`.
+- Μηδέν άγγιγμα σε Docker/:3000/web/mobile/extension, μηδέν subagent, μηδέν AI call. em-dashes: 0.
+
+Επόμενο increment: (1) περιμένει ακόμα η `pharos-landing-20260729-1000` (μόνιμο hosted Free tier vs 14ήμερο
+trial που καταλήγει σε suspend, οι δύο ενότητες της σελίδας αντιφάσκουν μέχρι τότε), (2) η ενότητα FAQ και
+οι σελίδες `/privacy` + `/terms` δεν ελέγχθηκαν για το ίδιο self-hosted-only μοτίβο, αξίζει ένα πέρασμα,
+(3) συνέχεια του sweep όταν εμφανιστεί νέο user-facing feature.
+
+Needs-Achilleas (open, αμετάβλητα): μόνιμο Free tier ή μόνο trial (`pharos-landing-20260729-1000`), legal
+entity/Stripe, Terms+Privacy review, contact inbox, repo public timing. **Νέο, χαμηλής προτεραιότητας**: αν
+διαφωνείς με το lead positioning παραπάνω (π.χ. θες η πρώτη πρόταση να παραμείνει self-host-first για το
+homelab κοινό), είναι ένα revert σε 9 γραμμές κειμένου, πες το και γυρνάει.
