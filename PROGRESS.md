@@ -10904,3 +10904,50 @@ count **0**, logs καθαρά (μόνο το προϋπάρχον άσχετο 
 build). `docker builder prune -f` μετά (reclaimable 0B μετά, καθαρό).
 
 **Marker**: docker-validated `6208f24` → **`752ce37`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
+
+## 2026-08-02 — tasks tenant-scoping (P2 debt) + read path
+
+**Guard**: `ROUTINES_PAUSED` απών. Docker mutex πάρθηκε πριν το build και επιστράφηκε αμέσως μετά το prune.
+`ASK_ACHILLEAS.md`: και οι δύο εγγραφές αυτού του routine (`20260725-1425`, `20260728-0215`) ήδη APPLIED, καμία
+ANSWERED να εκτελεστεί. **Approved queue**: ελεγμένο, μόνο το P36 (Open Banking) μένει και είναι blocked σε
+credentials/provider decision, οπότε fallback στο επόμενο task του προηγούμενου run (WEB_DEBT P2 ουρά).
+
+**Τι έγινε**: `tasks/actions.ts` έκανε direct `Task.create`/`findByIdAndUpdate` και στα 7 exports, δηλαδή σε SaaS
+mode **κάθε task που γραφόταν από το /tasks kanban πήγαινε πάντα στο DEFAULT tenant db**, ό,τι λογαριασμός κι αν
+ήταν συνδεδεμένος. Η ασυμμετρία ήταν ήδη ορατή μέσα στο ίδιο repo: το `items/actions.ts` («convert to task»)
+φτάνει στο **ίδιο** model μέσω `currentModel()`, οπότε ένα task γεννημένο από item πήγαινε στο σωστό db ενώ ένα
+task γραμμένο κατευθείαν στο kanban όχι. Και τα 7 τυλίχτηκαν σε `withRequestTenant` + `currentModel(TaskModel)`.
+
+Δύο σκόπιμες επιλογές: (α) το `assertCanWrite()` μένει **πριν** το wrap, ώστε ο `writeGuard.coverage.test.ts`
+scanner να συνεχίζει να το βλέπει (το ίδιο σχήμα που πέρσι είχε γλιστρήσει στο `trackDiscoveredSubscription`),
+και το blank-step short-circuit του `addStep` επίσης, ώστε ένα no-op να μην πληρώνει tenant resolution. (β)
+Έκλεισε **μαζί και το read path** (`tasks/page.tsx getTasks()`), αν και το `Files:` του item ανέφερε μόνο το
+actions.ts: το να μείνει έξω το page είναι ακριβώς αυτό που γέννησε το ξεχωριστό `vouchers/page.tsx` item τον
+Ιούλιο, οπότε δεν είχε νόημα να ξαναδημιουργηθεί η ίδια ασυμμετρία για να κλείσει σε επόμενο run. Μηδέν επίδραση
+self-hosted: για το DEFAULT_TENANT το `currentModel` επιστρέφει το αρχικό model αυτούσιο.
+
+**Verify**: **negative control** πρώτα, όχι ισχυρισμός — ένα `currentModel` πίσω σε direct model έριξε **3 από τα
+7** νέα tenant tests, μετά restore (grep count 16, το acceptance ζητούσε ≥7). Νέο **`actions.tenant.test.ts`**
+(7 tests): tagged seam ανά tenant, δύο tenants ταυτόχρονα χωρίς διαρροή, **tagged create id** ώστε ένα create που
+απαντήθηκε από λάθος db να φαίνεται στην ίδια την τιμή επιστροφής, step CRUD, blank-step no-op, self-hosted
+no-tenant path. Ο flat `actions.test.ts` (24 tests, CRUD/steps) πήρε το γνωστό flat tenancy mock και έμεινε
+πράσινος. `npm run type-check` **EXIT 0**, full `npx vitest run` **5485 passed / 344 files** (+7 tests, +1 file,
+μηδέν regression). Safe Docker rebuild: mongo `healthy` πριν → `docker compose build web` → `up -d web` →
+`/login` **200 με την πρώτη**, `/tasks` **307** (auth-gated route compiled), container running/not-restarting,
+logs καθαρά (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` warning), `docker builder prune -f` μετά (2.36GB).
+Browser pane `/tasks` → redirect σε «Sign in · Pharos», **μηδέν console errors**. Commit `9513644`.
+
+**Τι μένει από αυτή την κλάση**: 3 ακόμα P2 items στο `WEB_DEBT.md` — `shopping-list/actions.ts` (S),
+`history/actions.ts` (S), `settings/actions.ts` (L, θέλει **επιλεκτικό** wrap: τα AppConfig-only exports είναι
+νόμιμα instance-level).
+
+**Επόμενο task (πρόταση)**: `shopping-list/actions.ts` (S, ίδιο recipe). Αφού αδειάσει η ουρά, το standing
+follow-up παραμένει: coverage test που κόβει το build αν action module κάνει direct model import χωρίς
+`currentModel` (δεν μπαίνει τώρα, θα κοκκίνιζε για τα 3 ανοιχτά αρχεία).
+
+## Needs Achilleas
+
+- Αμετάβλητα: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample export, EAS dev build), **P17 live
+  check** σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
+- **`PATCH /api/v1/settings` ntfy authz**: παραμένει OPEN στο `~/.claude/ASK_ACHILLEAS.md`
+  (`pharos-daily-dev-20260728-0215`).
