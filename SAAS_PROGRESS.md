@@ -6515,3 +6515,69 @@ testαρισμένος και περιμένει μόνο keys), **τελικό 
 το exact-email matching είναι ακριβές αλλά αμείλικτο, και ένα typo σε email είναι πιο εύκολο από
 ένα typo σε slug· (γ) αλλιώς επόμενο backend increment από TODO.md #5-#12. Πριν ξεκινήσεις:
 ask-inbox πρώτα, μετά UI scan.
+
+## 2026-08-02 — increment 131: quick-window chips στο platform audit feed
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine (και τα δύο `pharos-saas-core-*` entries είναι
+APPLIED). **UI-first scan**: πήρα το **(α)** που το προηγούμενο run άφησε πρώτο στη σειρά, τα
+**quick-range chips** — καθαρά UI πάνω σε backend που τα σηκώνει ήδη (μηδέν νέο query surface, μηδέν
+νέο endpoint), δηλαδή ακριβώς ό,τι η προτεραιότητα λέει να προτιμώ έναντι άλλου read-endpoint.
+
+**Γιατί υπάρχει.** Το window ήταν δύο `<input type="date">`: για το πιο συχνό ερώτημα ενός incident
+(«τι έγινε τις τελευταίες μέρες») ο operator έπρεπε να υπολογίσει ημερομηνίες με το μυαλό και να τις
+πληκτρολογήσει σε δύο πεδία.
+
+**Η μία απόφαση που όντως μετράει: ημέρες, όχι «last 24h».** Το προηγούμενο run είχε προτείνει
+labels «24h / 7d / 30d». Δεν τα υλοποίησα έτσι, και το σημειώνω ρητά ως απόκλιση: το
+`parseAuditDate` επεκτείνει ένα σκέτο `YYYY-MM-DD` σε **ολόκληρες UTC ημέρες**, οπότε ένα κυριολεκτικό
+24ωρο chip **δεν είναι εκφράσιμο από το URL που θα παρήγαγε** — ανάλογα με την ώρα θα σήμαινε
+«σήμερα μέχρι τώρα» ή «σήμερα συν όλο το χθες». Τα labels είναι **Today / Last 7 days / Last 30 days**
+ώστε το chip και το window που εφαρμόζει να ταυτίζονται. Pinned με test ότι τα presets στις 00:05Z
+και στις 23:55Z της ίδιας μέρας είναι **ίδια** — αυτή η σταθερότητα είναι όλο το επιχείρημα.
+
+**Inclusive counting**: «Last 7 days» = `today-6 .. today`, δηλαδή 7 ημερολογιακές μέρες
+συμπεριλαμβανομένης της σημερινής, όπως τα δείχνουν τα πεδία μετά το κλικ. Off-by-one εδώ σημαίνει
+chip που υπόσχεται 7 και εφαρμόζει 8. Test και για τα δύο όρια (μήνας + έτος: 2026-01-03 → 2025-12-28).
+
+**Ο cursor πέφτει, σκόπιμα.** Κάθε chip κουβαλά μπροστά τα ΑΛΛΑ φίλτρα (workspace/actor/action) αλλά
+**ΟΧΙ** το `before`: ο cursor είναι resume point **μέσα στο προηγούμενο** window, και συνθέτει σε
+AND με το καινούριο — θα προσγείωνε τον operator στη μέση ενός feed που μόλις άλλαξε, δηλαδή πιθανό
+άδειο αποτέλεσμα ενώ γραμμές υπάρχουν. Ίδιο σκεπτικό με τα 126/128/129/130: **άδειο αποτέλεσμα σε
+incident διαβάζεται σαν εύρημα**.
+
+**«All time» ≠ «Reset».** Νέο chip που καθαρίζει **μόνο** το window, ενώ το υπάρχον Reset ρίχνει όλα
+τα φίλτρα: όποιος διευρύνει τον χρόνο συνήθως κυνηγά ακόμα το ίδιο workspace/πρόσωπο. Εμφανίζεται
+μόνο όταν υπάρχει ενεργό window.
+
+**Active state μέσω day-strings, όχι Dates.** Το `matchQuickRange` συγκρίνει τα rendered
+`YYYY-MM-DD`, γιατί το εφαρμοσμένο `to` είναι το **23:59:59.999Z edge** της μέρας του ενώ το preset
+κουβαλά σκέτη μέρα — σύγκριση Date δεν θα ταίριαζε **ποτέ** και το chip δεν θα φωτιζόταν μετά το
+κλικ του. Pinned με end-to-end test (chip → `?from=&to=` → `parseAuditRange` → `dateInputValue` →
+ξανά active). Half-open window ταιριάζει σε κανένα preset (κανένα δεν είναι half-open).
+
+**Bug που βρήκε ο ίδιος ο κώδικας**: το πρώτο μου test περίμενε `2025-12-29` για το last7 από τις
+3 Ιαν. Ο κώδικας έβγαλε `2025-12-28` και **είχε δίκιο** (Δεκ 28..Ιαν 3 = 7 μέρες). Διόρθωσα το test,
+όχι τον parser.
+
+**Verified**: **60/60** στο `adminAudit.test.ts` (+13 νέα, από 47), πλήρες `npx vitest run` →
+**344 files / 5492 tests green** (0 fail, 4 skipped), `npm run type-check` → **EXIT 0 χωρίς κανένα
+fix**. **Docker: κανένα rebuild** (μηδέν env/deps/runtime-wiring αλλαγή → ο mutex δεν χρειάστηκε).
+**Browser-verify: μη εφαρμόσιμο unattended** — το λέω ρητά αντί να το περάσω για επιτυχία: το
+`/admin/audit?from=2026-07-01&to=2026-07-15` στο τρέχον stack γυρίζει **307** (SAAS_MODE off,
+redirect στο login), οπότε δεν υπάρχει τίποτα να renderαριστεί, και δεν γυρίζω το flag σε running
+app του χρήστη χωρίς εντολή. `homepage-web` running, RestartCount 0. Collision guard:
+`git status --short` πριν το staging = **μόνο τα 3 δικά μου αρχεία**, μηδέν staged από άλλη routine·
+pathspec commit `cec63e9`.
+
+**## Needs Achilleas:** τίποτα νέο. Παραμένουν: **Stripe keys** (`STRIPE_SECRET_KEY` /
+`STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_SHARED` / `STRIPE_PRICE_DEDICATED` — ο client είναι πλήρως
+testαρισμένος και περιμένει μόνο keys), **τελικό plan pricing** (τα €0/€9/€29 + quotas στο
+`plans.ts` παραμένουν placeholders, εγκεκριμένα ως πηγή αλήθειας έναντι της landing), **SMTP**.
+Επαναλαμβανόμενη πρακτική σημείωση: όσο το τοπικό stack τρέχει με SAAS_MODE off, **καμία SaaS UI
+σελίδα δεν είναι browser-verifiable** από αυτή τη routine.
+
+**Next task:** (α) **actor autocomplete** — `<datalist>` πάνω στο actor input, γεμάτο από τα emails
+που ήδη εμφανίζονται στη σελίδα (μηδέν νέο endpoint, το exact matching είναι ακριβές αλλά αμείλικτο
+και ένα typo σε email είναι πιο εύκολο από ένα typo σε slug)· (β) **workspace autocomplete** με το
+ίδιο pattern πάνω στο slug input· (γ) αλλιώς επόμενο backend increment από TODO.md #5-#12. Πριν
+ξεκινήσεις: ask-inbox πρώτα, μετά UI scan.
