@@ -3188,3 +3188,24 @@ Suggested next task: **`app/storage-actions.ts`** (19 γραμμές) — το �
 **Needs Achilleas / other routine**: `src/app/notifications/actions.tenant.test.ts` έχει 2 failing tests μετά το `daeea7e` (alert-bell tenant routing) — φαίνεται σαν auto-expire sweep να τρέχει πλέον στο `default` connection αντί μόνο στο tenant connection, ή το test expectation να έμεινε πίσω από το routing fix. Η routine που κάνει tenant-scoping (`saas-core` ή όποια έκανε το `daeea7e`) θα πρέπει να το δει στο επόμενο run της.
 
 Suggested next task: **`app/i18nActions.ts`** (16 γραμμές, το μικρότερο εναπομείναν test-less action module) — μετά **`app/storage-actions.ts`** (19 γρ.)· μετά **`settings/mcpActions.ts`** (38 γρ.)· μετά **`settings/users.actions.ts`** (91 γρ.). Τα μεγαλύτερα (`app/jobActions.ts` 210 γρ., `app/aiCommandActions.ts` 93 γρ. AI tool-loop, `settings/sampleDataActions.ts` 103 γρ.) παραμένουν για μεταγενέστερα runs, θέλουν πιο προσεκτικό διάβασμα (side-effects/external calls). Διάβασε ολόκληρο το κάθε target file πριν γράψεις τίποτα. Πάντα `git status` collision-guard πρώτα.
+
+## 2026-08-02 (cont.¹⁰ — app/storage-actions.test.ts, νέο module: OneDrive share-link gating)
+
+**Task**: το suggested next-task του προηγούμενου run: `app/storage-actions.ts` (19 γραμμές, 2 exported functions) — τα δύο thin UI-gating helpers γύρω από το OneDrive mirror: `onedriveEnabled()` (διαβάζει το storage backend, ώστε ένα «Open in OneDrive» button να gate-άρεται χωρίς prop-drilling) και `getOnedriveShareLink(filePath)` (wrapper γύρω από `shareLinkByPath`, reshape null→friendly error). Coordination: `ROUTINES_PAUSED` δεν υπήρχε, καμία εγγραφή pharos-oss-prep στο `ASK_ACHILLEAS.md`, `git status --short` καθαρό, local==origin (`4c81aa4`) πριν ξεκινήσω.
+
+Διάβασα ολόκληρο το target file plus τα δύο πραγματικά dependencies πριν γράψω τίποτα: `lib/storageConfig.ts` (ήδη πλήρως testαρισμένο, `getStorageConfig`/`normalizeStorageConfig` έχουν δικά τους `storageConfig.test.ts`+`storageConfig.tenant.test.ts`) και `lib/mirror.ts` `shareLinkByPath`/`shareLinkFor` (ήδη testαρισμένα pure helpers στο `mirror.test.ts`). Άρα εδώ mockάρονται και τα δύο module-level imports (`getStorageConfig`, `shareLinkByPath`) απευθείας — δεν χρειάζεται κανένα DB/model mock, το action file είναι σκέτο passthrough+reshape πάνω από ήδη-testαρισμένα seams. Ακολούθησα το ίδιο `vi.hoisted()` + `vi.mock('@/...', ...)` pattern του `app/i18nActions.test.ts`.
+
+**Ευρήματα στο ίδιο το production code (τεκμηριωμένα στα tests, ΟΧΙ αλλαγμένα)**:
+- `getOnedriveShareLink('')` κάνει early-return `{error:'No file'}` **πριν** καν κληθεί το `shareLinkByPath` — ένα κενό/undefined path (π.χ. ένα receipt χωρίς αρχείο) δεν κάνει άσκοπο DB lookup.
+- Το `null` return του `shareLinkByPath` (κανένα από τα 3 μοντέλα Receipt/Statement/Expense δεν ταιριάζει το path, ή backend≠onedrive) γίνεται reshape σε ένα **γενικό** `{error:'Could not create a OneDrive link'}` — δεν διαφοροποιεί «δεν βρέθηκε» από «δεν είναι mirrored», by design (απλό UI-facing μήνυμα).
+- `onedriveEnabled()` είναι στενά συνδεδεμένο με το `StorageConfig.backend` enum (`'local'|'ftp'|'smb'|'onedrive'`) — testαρίστηκε και για τα 3 μη-onedrive backends ρητά (`it.each`).
+
+**7 tests** σε δύο describe blocks: `onedriveEnabled` (2: true για onedrive backend· false ×3 για local/ftp/smb via `it.each`)· `getOnedriveShareLink` (3: κενό path→καμία κλήση shareLinkByPath· url passthrough με το ακριβές path argument· null→friendly error).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/storage-actions.test.ts"` → **7/7 passed** από την πρώτη προσπάθεια (κανένα tsc/hoisting fix χρειάστηκε — μικρό passthrough αρχείο).
+- `npm run type-check` → exit 0, μηδέν errors σε όλο το repo.
+- `npx vitest run` (όλο το suite) → **345 files, 5499/5503 passed (4 skipped), 0 failed** (~15s wall). ΣΗΜ: τα 2 failing tests του `notifications/actions.tenant.test.ts` που σημειώθηκαν στο 2026-07-31 slice **έχουν διορθωθεί** από άλλη routine στο μεταξύ (ήδη σημειώθηκε στο 2026-08-01 slice, επιβεβαιώνεται ξανά εδώ) — όλο το suite πράσινο.
+- Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου (`?? apps/web/src/app/storage-actions.test.ts`)· `git diff --cached --name-only` το ίδιο. Pathspec commit + push: `4c81aa4..299fb07`.
+
+Suggested next task: **`settings/mcpActions.ts`** (38 γραμμές) — το επόμενο μικρότερο εναπομείναν test-less action module. Μετά **`settings/users.actions.ts`** (91 γρ.). Τα μεγαλύτερα (`app/jobActions.ts` 210 γρ., `app/aiCommandActions.ts` 93 γρ. AI tool-loop, `settings/sampleDataActions.ts` 103 γρ.) παραμένουν για μεταγενέστερα runs, θέλουν πιο προσεκτικό διάβασμα (side-effects/external calls). Διάβασε ολόκληρο το target file πριν γράψεις τίποτα. Πάντα `git status` collision-guard πρώτα.
