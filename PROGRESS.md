@@ -2,7 +2,7 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: eadb959 -->
+<!-- reviewed: f44e227 -->
 <!-- docker-validated: 6208f24 -->
 <!-- ui-audited: 0bc5e14 -->
 
@@ -10944,6 +10944,39 @@ Browser pane `/tasks` → redirect σε «Sign in · Pharos», **μηδέν cons
 **Επόμενο task (πρόταση)**: `shopping-list/actions.ts` (S, ίδιο recipe). Αφού αδειάσει η ουρά, το standing
 follow-up παραμένει: coverage test που κόβει το build αν action module κάνει direct model import χωρίς
 `currentModel` (δεν μπαίνει τώρα, θα κοκκίνιζε για τα 3 ανοιχτά αρχεία).
+
+## 2026-08-02 — reviewer sweep eadb959..f44e227 (64η σάρωση)
+
+**Guard**: `ROUTINES_PAUSED` απών· κανένα OPEN `ASK_ACHILLEAS.md` entry addressed σε `pharos/reviewer`.
+
+**Έλεγχος**: 14 commits ελέγχθηκαν [`eadb959..f44e227`]. `npm run type-check` (web) **EXIT 0**· `npx tsc --noEmit`
+(mobile) **EXIT 0**· full `npx vitest run` (web) → **5499/5503 passed, 4 skipped, 345 files** (μηδέν regression).
+
+**Κύριο κώδικας διαβασμένο γραμμή-γραμμή**:
+- **`9513644`** (tasks tenant-scoping) — έκλεισε το standing P2 `tasks/actions.ts` item. Και τα 7 exports +
+  το read path (`tasks/page.tsx`) τυλίχτηκαν σε `withRequestTenant`+`currentModel(TaskModel)`. `assertCanWrite()`
+  και το blank-step short-circuit του `addStep` σωστά έμειναν ΠΡΙΝ το wrap. Νέο `actions.tenant.test.ts` (7
+  tests) verified. Ήδη τεκμηριωμένο στο `WEB_DEBT.md` από τον builder· επιβεβαιώθηκε ανεξάρτητα.
+- **`cec63e9`** (quick-window chips στο platform audit feed) — οι 2 νέες pure helpers (`auditQuickRanges`/
+  `matchQuickRange`) διαβάστηκαν: UTC day-granularity σκόπιμη (σταθερό preset σε όλη τη μέρα), inclusive
+  off-by-one σωστό (last7 = today-6), `matchQuickRange` compare day-strings όχι Dates. 8 νέα tests, όλα green.
+  Threading στο `page.tsx` (chip href δροπάρει το `before` cursor, "All time" clear μόνο το window) καθαρό.
+- **`864effe`** (landing dual-positioning copy pass) — καθαρά textual, μηδέν behavioral risk.
+- **`299fb07`** (storage-actions.test.ts) — test-only coverage, μηδέν αλλαγή συμπεριφοράς.
+- Τα υπόλοιπα 8 commits docs/progress-log μόνο.
+
+**Μηδέν νέο P1/P2 εύρημα.** Μηδέν committed secret (grep key/token/password/PEM/BEGIN στο πλήρες diff). Standing
+queue re-verified live: 3 P2 items ακόμα ανοιχτά (`shopping-list/actions.ts`, `history/actions.ts`,
+`settings/actions.ts`), αμετάβλητα.
+
+**Monitor note**: το `docker-health guard` (`8a3ca51`) validated rebuild μόνο μέχρι `752ce37`. Δύο μεταγενέστερα
+runtime commits σε αυτό το range (`9513644`, `cec63e9`) δεν έχουν ακόμα δικό τους Docker rebuild/verify —
+μηδέν επείγον (SAAS_MODE off στο live container, tasks wrap είναι no-op σε DEFAULT_TENANT, quick-window chips
+ζει πίσω από `requireSuperadminPage()`). Reviewer δεν κάνει rebuild (forbidden action)· αφήνεται στο επόμενο
+docker-health-guard/daily-dev run. Όλα τα routine progress logs (PROGRESS/OSS_PROGRESS/SAAS_PROGRESS/
+LANDING_PROGRESS/DOCS_PROGRESS) έχουν φρέσκια 2026-08-02 entry· κανένα routine φαίνεται stuck.
+
+Marker: `<!-- reviewed: f44e227 -->` (top του αρχείου).
 
 ## Needs Achilleas
 
