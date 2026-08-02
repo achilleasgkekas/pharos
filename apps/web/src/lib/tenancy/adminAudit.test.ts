@@ -20,6 +20,8 @@ import {
   parseAuditRange,
   dateInputValue,
   auditFiltersActive,
+  auditQuickRanges,
+  matchQuickRange,
   MAX_PLATFORM_AUDIT_PAGE,
   DEFAULT_PLATFORM_AUDIT_PAGE,
 } from './adminAudit';
@@ -454,5 +456,68 @@ describe('auditFiltersActive', () => {
     expect(auditFiltersActive({ ...none, actor: 'a@example.com' })).toBe(true);
     expect(auditFiltersActive({ ...none, from: new Date('2026-07-01') })).toBe(true);
     expect(auditFiltersActive({ ...none, to: new Date('2026-07-15') })).toBe(true);
+  });
+});
+
+describe('auditQuickRanges', () => {
+  const NOW = new Date('2026-07-15T09:30:00.000Z');
+
+  it('offers presets that all end today (UTC) and count back inclusively', () => {
+    const ranges = auditQuickRanges(NOW);
+    expect(ranges.map((r) => r.key)).toEqual(['today', 'last7', 'last30']);
+    expect(ranges.every((r) => r.to === '2026-07-15')).toBe(true);
+    expect(ranges[0].from).toBe('2026-07-15'); // today = a one-day window
+    // Inclusive: 7 calendar days INCLUDING today is today-6, not today-7. Off by one here means
+    // the chip silently shows 8 days while the label promises 7.
+    expect(ranges[1].from).toBe('2026-07-09');
+    expect(ranges[2].from).toBe('2026-06-16');
+  });
+
+  it('is stable across the whole UTC day, which is what the day-granularity labels promise', () => {
+    // The single reason these are labelled in days rather than "last 24h": a preset must mean the
+    // same window at 00:05Z and at 23:55Z, otherwise the chip and the applied window disagree.
+    const early = auditQuickRanges(new Date('2026-07-15T00:05:00.000Z'));
+    const late = auditQuickRanges(new Date('2026-07-15T23:55:59.999Z'));
+    expect(early).toEqual(late);
+  });
+
+  it('walks back across month and year boundaries', () => {
+    const ranges = auditQuickRanges(new Date('2026-01-03T12:00:00.000Z'));
+    // Dec 28..Jan 3 is 7 inclusive days across both a month and a year boundary.
+    expect(ranges[1].from).toBe('2025-12-28');
+    expect(ranges[2].from).toBe('2025-12-05');
+  });
+
+  it('returns nothing for an unusable clock instead of rendering NaN chips', () => {
+    expect(auditQuickRanges(new Date('nope'))).toEqual([]);
+  });
+});
+
+describe('matchQuickRange', () => {
+  const NOW = new Date('2026-07-15T09:30:00.000Z');
+  const ranges = auditQuickRanges(NOW);
+
+  it('flags the preset the applied window equals', () => {
+    expect(matchQuickRange(ranges, '2026-07-09', '2026-07-15')).toBe('last7');
+    expect(matchQuickRange(ranges, '2026-07-15', '2026-07-15')).toBe('today');
+  });
+
+  it('flags nothing for a hand-picked or half-open window', () => {
+    expect(matchQuickRange(ranges, '2026-07-01', '2026-07-15')).toBeNull();
+    expect(matchQuickRange(ranges, '', '2026-07-15')).toBeNull();
+    expect(matchQuickRange(ranges, '2026-07-09', '')).toBeNull();
+    expect(matchQuickRange(ranges, '', '')).toBeNull();
+  });
+
+  it('still matches after the preset has round-tripped through the URL and the parser', () => {
+    // The end-to-end pin: click a chip -> ?from=&to= -> parseAuditRange -> dateInputValue -> the
+    // same chip must render active. The `to` bound becomes the 23:59:59.999Z EDGE of its day, so
+    // this only holds because the match compares day strings, never Dates.
+    const preset = ranges[1];
+    const parsed = parseAuditRange(new URLSearchParams({ from: preset.from, to: preset.to }));
+    expect(parsed.to?.toISOString()).toBe('2026-07-15T23:59:59.999Z');
+    expect(
+      matchQuickRange(ranges, dateInputValue(parsed.from), dateInputValue(parsed.to))
+    ).toBe('last7');
   });
 });

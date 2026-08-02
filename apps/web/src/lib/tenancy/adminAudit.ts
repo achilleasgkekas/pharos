@@ -122,6 +122,57 @@ export function dateInputValue(d: Date | null | undefined): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** One preset window offered above the date fields, already in the `YYYY-MM-DD` shape both the
+ *  `<input type="date">` and the `?from=`/`?to=` params speak. */
+export type AuditQuickRange = {
+  key: 'today' | 'last7' | 'last30';
+  label: string;
+  /** Inclusive first day of the preset (UTC). */
+  from: string;
+  /** Inclusive last day of the preset (UTC) — always today. */
+  to: string;
+};
+
+/** Milliseconds in a UTC day. Safe as a constant precisely because the window is UTC: no DST. */
+const DAY_MS = 86_400_000;
+
+/**
+ * The preset windows for the audit feed. DAY granularity on purpose, not the "last 24h" an operator
+ * might expect: `parseAuditDate` expands a bare day to whole UTC days, so a literal 24-hour chip
+ * could not be expressed by the URL it would produce — depending on the hour it would silently mean
+ * "today so far" or "today plus all of yesterday". Labelling the presets in days keeps the chip and
+ * the window it actually applies identical, which is the whole reason the window fields say UTC.
+ *
+ * Every range ENDS today and counts back INCLUSIVELY, so "Last 7 days" is 7 calendar days including
+ * today, matching what the date fields show once the chip is applied. PURE (clock passed in).
+ */
+export function auditQuickRanges(now: Date): AuditQuickRange[] {
+  if (!now || Number.isNaN(now.getTime())) return [];
+  const to = dateInputValue(now);
+  const back = (days: number) => dateInputValue(new Date(now.getTime() - days * DAY_MS));
+  return [
+    { key: 'today', label: 'Today', from: to, to },
+    { key: 'last7', label: 'Last 7 days', from: back(6), to },
+    { key: 'last30', label: 'Last 30 days', from: back(29), to },
+  ];
+}
+
+/**
+ * Which preset (if any) the APPLIED window equals, so the matching chip renders as active and the
+ * operator can tell a preset window from a hand-picked one. Compares the rendered day strings rather
+ * than Dates because the applied `to` bound is the 23:59:59.999Z edge of its day while a preset
+ * carries the bare day — comparing Dates would never match. A half-open window (only one bound set)
+ * matches nothing, since no preset is half-open. PURE.
+ */
+export function matchQuickRange(
+  ranges: readonly AuditQuickRange[],
+  from: string,
+  to: string
+): AuditQuickRange['key'] | null {
+  if (!from || !to) return null;
+  return ranges.find((r) => r.from === from && r.to === to)?.key ?? null;
+}
+
 /** True when any narrowing filter is active — drives the "Reset" affordance and the empty-state
  *  wording ("no match for these filters" vs "no activity yet"). PURE. */
 export function auditFiltersActive(

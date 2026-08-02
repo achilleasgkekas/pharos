@@ -19,7 +19,9 @@ import {
   parseAdminAuditQuery,
   listPlatformAudit,
   auditFiltersActive,
+  auditQuickRanges,
   dateInputValue,
+  matchQuickRange,
 } from '@/lib/tenancy/adminAudit';
 import { toPlatformActivityRows } from '@/components/saas/platformActivity';
 import { PlatformActivityPanel } from '@/components/saas/PlatformActivityPanel';
@@ -102,6 +104,12 @@ export default async function AdminAuditPage({
     from: fromValue,
     to: toValue,
   };
+
+  // Preset windows. The clock is read here (the page is force-dynamic) and passed into the pure
+  // helper, so "Last 7 days" is 7 days from THIS request rather than from build time.
+  const quickRanges = auditQuickRanges(new Date());
+  const activeRange = matchQuickRange(quickRanges, fromValue, toValue);
+  const windowActive = Boolean(fromValue || toValue);
 
   return (
     <div className="space-y-6">
@@ -210,6 +218,49 @@ export default async function AdminAuditPage({
             ↓ Download CSV
           </a>
         )}
+
+        {/* Preset windows, on their own row under the manual fields. Each chip carries the OTHER
+            active filters forward but deliberately DROPS the `before` cursor: the cursor is a
+            resume point inside the previous window, and keeping it would land the operator
+            mid-feed of a window they just changed — which reads as "nothing happened then". */}
+        <div className="flex basis-full flex-wrap items-center gap-2 border-t border-[color:var(--color-border)] pt-3">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
+            Quick window
+          </span>
+          {quickRanges.map((r) => (
+            <Link
+              key={r.key}
+              href={auditHref({
+                action: query.action,
+                tenant: query.tenant,
+                actor: query.actor,
+                from: r.from,
+                to: r.to,
+              })}
+              className={
+                activeRange === r.key
+                  ? 'rounded-full border border-[color:var(--color-accent)]/50 bg-[color:var(--color-accent)]/10 px-3 py-1 text-xs font-medium text-[color:var(--color-accent)]'
+                  : 'rounded-full border border-[color:var(--color-border)] px-3 py-1 text-xs text-[color:var(--color-text-dim)] transition-colors hover:border-[color:var(--color-border-light)] hover:text-[color:var(--color-text)]'
+              }
+            >
+              {r.label}
+            </Link>
+          ))}
+          {windowActive && (
+            // Clears ONLY the window, unlike "Reset" which drops every filter — an operator
+            // widening the time range usually wants to keep the workspace/actor they are chasing.
+            <Link
+              href={auditHref({
+                action: query.action,
+                tenant: query.tenant,
+                actor: query.actor,
+              })}
+              className="rounded-full px-3 py-1 text-xs text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]"
+            >
+              All time
+            </Link>
+          )}
+        </div>
       </form>
 
       {unknownTenant ? (
