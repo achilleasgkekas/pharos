@@ -10885,3 +10885,22 @@ model import χωρίς `currentModel` (δεν μπαίνει τώρα, θα κ�
   (`pharos-daily-dev-20260728-0215`).
 - **ΣΗΜ ασφαλείας (ήδη διορθωμένο, μόνο για ενημέρωση)**: αν κάποιος έτρεχε instance με viewer ρόλο μεταξύ 27 Ιουλίου
   και σήμερα, το «Track this» των Subscriptions ήταν το ένα write μονοπάτι που δεν φραζόταν. Έκλεισε σε αυτό το run.
+
+## 2026-08-02 — docker-health guard
+
+**Guard**: `ROUTINES_PAUSED` απών. Docker mutex ελεύθερο, πάρθηκε πριν το build/up και επιστράφηκε αμέσως μετά.
+
+**Health πριν**: mongo `healthy`, web/mongo restart count 0, `homepage-flaresolverr` δεν έτρεχε (opt-in profile,
+παραμένει σταματημένο). Build cache 1.96GB (όχι κρίσιμο, αλλά prune-άρεται ούτως ή άλλως μετά από κάθε rebuild).
+
+**Rebuild decision**: recorded marker ήταν `6208f24`, HEAD `752ce37`. Το diff στο `apps/web` ανάμεσά τους αγγίζει
+runtime code (`subscriptions/actions.ts`, νέο `subscriptions/actions.tenant.test.ts`, admin audit export route +
+page, `lib/tenancy/adminAudit*`, `lib/writeGuard.coverage.test.ts`) → rebuild δικαιολογημένο, όχι μόνο docs.
+
+**Rebuild**: `docker compose build web` (καθαρό build, ~52s compile+lint+typecheck μέσα στο multi-stage, cached
+layers για tesseract/poppler/samba-client) → mongo επιβεβαιώθηκε `healthy` πριν το swap → `docker compose up -d web`
+(recreate, mongo waited healthy πρώτα από το compose graph) → `/login` **200 με την πρώτη προσπάθεια**, restart
+count **0**, logs καθαρά (μόνο το προϋπάρχον άσχετο `@napi-rs/canvas` polyfill warning από το pdfjs-dist legacy
+build). `docker builder prune -f` μετά (reclaimable 0B μετά, καθαρό).
+
+**Marker**: docker-validated `6208f24` → **`752ce37`** (HEAD). Staged ΜΟΝΟ PROGRESS.md.
