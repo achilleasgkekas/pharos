@@ -1,6 +1,6 @@
 # PHAROS
 
-> PHAROS (Greek "Φάρος", lighthouse) is a self-hosted personal hub: one private dashboard for the things you own and pay for. It reads your receipts and statements with AI, tracks inventory, expenses, credit-card installments, subscriptions and vouchers, gives you reports, and can watch your home network. Tagline: "One light over everything you run." Backronym: PH (Personal Hub) + AROS (Asset & Resource Oversight System).
+> PHAROS (Greek "Φάρος", lighthouse) is a personal hub, free to self-host or available managed: one private dashboard for the things you own and pay for. It reads your receipts and statements with AI, tracks inventory, expenses, credit-card installments, subscriptions and vouchers, gives you reports, and can watch your home network. Tagline: "One light over everything you run." Backronym: PH (Personal Hub) + AROS (Asset & Resource Oversight System).
 
 PHAROS ships two ways. Self-hosted is free and open source under AGPL-3.0: run it on your own hardware with Docker, and your data never leaves your machine. A managed hosted service (currently in private beta / waitlist) runs the same hub for you, with automatic backups, updates and included AI parsing.
 

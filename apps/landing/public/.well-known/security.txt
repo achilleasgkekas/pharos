@@ -1,5 +1,6 @@
 # Security policy for PHAROS (ph-aros.com)
-# PHAROS is a self-hosted personal hub, open source under AGPL-3.0.
+# PHAROS is a personal hub, open source under AGPL-3.0, offered both
+# self-hosted and as a managed hosted service on ph-aros.com.
 # If you find a vulnerability, please report it privately first.
 
 Contact: mailto:hello@ph-aros.com

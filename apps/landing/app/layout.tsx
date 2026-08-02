@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: 'PHAROS · Personal Hub',
   description:
-    'One light over everything you run. PHAROS is a self-hosted personal hub: inventory, receipts with AI, expenses, credit-card installments, subscriptions, and your network, in one private dashboard.',
+    'One light over everything you run. PHAROS is a personal hub: inventory, receipts with AI, expenses, credit-card installments, subscriptions, and your network. Self-host it free, or let us host it.',
   keywords: [
     'self-hosted',
     'personal hub',
@@ -28,13 +28,14 @@ export const metadata: Metadata = {
     url: SITE_URL,
     title: 'PHAROS · Personal Hub',
     description:
-      'One light over everything you run. Self-hosted, private, AI-assisted oversight on everything you own.',
+      'One light over everything you run. Private, AI-assisted oversight on everything you own. Self-host it free, or let us host it.',
     siteName: 'PHAROS',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'PHAROS · Personal Hub',
-    description: 'One light over everything you run. Self-hosted personal hub.',
+    description:
+      'One light over everything you run. A personal hub you can self-host free, or let us host.',
   },
   icons: {
     // SVG favicon for modern browser tabs; generated PNG for platforms that

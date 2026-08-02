@@ -672,7 +672,7 @@ const JSON_LD = {
       url: SITE_URL,
       logo: `${SITE_URL}/favicon.svg`,
       description:
-        'PHAROS is a self-hosted personal hub for overseeing everything you own, from a single private dashboard you control.',
+        'PHAROS is a personal hub for overseeing everything you own, from a single private dashboard. Self-host it free under AGPL-3.0, or use the managed hosted service.',
       sameAs: [GITHUB_URL],
     },
     {
@@ -689,7 +689,7 @@ const JSON_LD = {
       applicationCategory: 'BusinessApplication',
       operatingSystem: 'Docker, Linux, macOS',
       description:
-        'A self-hosted personal hub: inventory, receipts read by AI, expenses, credit-card installments, subscriptions, vouchers, and reports, in one private dashboard you control.',
+        'A personal hub: inventory, receipts read by AI, expenses, credit-card installments, subscriptions, vouchers, and reports, in one private dashboard you control. Available self-hosted under AGPL-3.0, or as a managed hosted service.',
       url: SITE_URL,
       author: { '@type': 'Person', name: 'Achilleas' },
       publisher: { '@id': `${SITE_URL}/#organization` },
@@ -869,9 +869,10 @@ export default function Home() {
               margin: '0 auto 40px',
             }}
           >
-            A self-hosted personal hub for oversight on everything you own.
-            Inventory, receipts read by AI, expenses, credit-card installments,
-            subscriptions, and vouchers, in one private dashboard you control.
+            A personal hub for oversight on everything you own. Inventory,
+            receipts read by AI, expenses, credit-card installments,
+            subscriptions, and vouchers, in one private dashboard.
+            Self-host it free, or let us run it for you.
           </p>
 
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>

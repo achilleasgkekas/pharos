@@ -98,14 +98,14 @@ export default function OpengraphImage() {
             One light over everything you run.
           </div>
           <div style={{ fontSize: 34, color: DIM, maxWidth: 900 }}>
-            Self-hosted personal hub: inventory, receipts with AI, expenses,
+            A personal hub: inventory, receipts with AI, expenses,
             installments, subscriptions, and your network.
           </div>
         </div>
 
         {/* Footer row: chips */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {['Self-hosted', 'Open-source · AGPL-3.0', 'Privacy-first'].map(
+          {['Self-hosted or managed', 'Open-source · AGPL-3.0', 'Privacy-first'].map(
             (chip) => (
               <div
                 key={chip}
