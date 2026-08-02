@@ -3093,3 +3093,22 @@ Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/
 Συμπέρασμα: Το shipped feature 81b150e (audit feed actor-email filter) είναι πλέον fully + accurately documented στο `docs/saas.md`.
 
 Επόμενο run: (α) grep git log για νέα feat() commits μετά το 81b150e · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml (ΣΗΜ: το SaaS control-plane API δεν ζει στο openapi.yaml, μόνο η self-hosted bearer-token API — βλ. `docs/saas.md:160-165`) · (γ) αν όχι νέο feature, comprehensive drift verification pass.
+
+## 2026-08-02 (thirty-seventh run — platform audit quick-window chips documented)
+
+Σάρωση git log για νέα feat() commits μετά την thirty-sixth run (81b150e, 2026-08-01). Ανακάλυψη: **1 νέο feat() commit που χρειάζεται documentation**:
+- **cec63e9** (2026-08-02, `feat(saas): quick-window chips on the platform audit feed`) — προσθέτει preset χρονικά παράθυρα (Today / Last 7 days / Last 30 days) πάνω από τα manual date fields στο `/admin/audit`. Ήδη logged στο root `SAAS_PROGRESS.md` (increment 131, commit 4c81aa4) αλλά αυτό είναι η routine-log του saas-core routine, όχι τεκμηρίωση χρήστη. Ο επόμενος commit στο log (299fb07 test(storage), 16fa49b docs(oss-prep)) ήταν άσχετο test/log increment της oss-prep routine, όχι νέο feature· δεν χρειαζόταν αλλαγή στο docs/ territory.
+
+Τι έγινε: Διάβασα τον κώδικα πριν γράψω, όχι το commit message — `lib/tenancy/adminAudit.ts:125-174` (νέος τύπος `AuditQuickRange` + `auditQuickRanges(now)` παράγει 3 presets από ένα περασμένο clock, DAY granularity σκόπιμα όχι "last 24h" γιατί το `parseAuditDate` επεκτείνει bare day σε πλήρεις UTC μέρες άρα ένα literal 24ωρο δεν έχει URL να round-trip-άρει· κάθε preset τελειώνει σήμερα, μετράει πίσω inclusive· `matchQuickRange` συγκρίνει rendered day strings όχι Dates γιατί το applied `to` κουβαλάει το 23:59:59.999Z edge ενώ το preset το bare day) + `git show cec63e9 -- page.tsx` diff (νέα σειρά chips κάτω από τα manual fields, κάθε chip Link με `auditHref` που κουβαλάει tenant/action/actor forward αλλά ΡΗΤΑ αφήνει έξω το cursor· highlighted class όταν `activeRange === r.key`· "All time" link όταν `windowActive`, καθαρίζει ΜΟΝΟ from/to όχι όλα τα filters).
+
+Ενημερώθηκε το section **"Platform activity feed (`/admin/audit`)"** στο `docs/saas.md`: νέα παράγραφος ανάμεσα στο UTC date-range paragraph και το actor-filter paragraph — εξηγεί τα 3 quick-window chips, το day-granularity reasoning (γιατί όχι "last 24h"), το inclusive-back-from-today κάθε preset, το cursor-drop-on-chip-click mechanism, το active-chip highlighting, και το ξεχωριστό "All time" link (clears μόνο window, όχι σαν το "Reset").
+
+Accuracy: verified με code read (adminAudit.ts πλήρες auditQuickRanges/matchQuickRange σώμα + page.tsx diff πλήρες chips markup), όχι απλή αντιγραφή commit message.
+
+Validation (markdown only, κανένα build/Docker/AI call): code fences docs/saas.md = 18 πριν και μετά (ζυγό, άθικτο, καμία προσθήκη code block)· κανένα νέο anchor δημιουργήθηκε (edit μέσα στο ήδη-υπάρχον `#platform-activity-feed-adminaudit` section, existing links παραμένουν valid)· κανένα credential.
+
+Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/saas.md` modified (δικό μου), κανένα foreign staged.
+
+Συμπέρασμα: Το shipped feature cec63e9 (audit feed quick-window chips) είναι πλέον fully + accurately documented στο `docs/saas.md`.
+
+Επόμενο run: (α) grep git log για νέα feat() commits μετά το cec63e9 · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml (ΣΗΜ: το SaaS control-plane API δεν ζει στο openapi.yaml, μόνο η self-hosted bearer-token API — βλ. `docs/saas.md:160-165`) · (γ) αν όχι νέο feature, comprehensive drift verification pass.
