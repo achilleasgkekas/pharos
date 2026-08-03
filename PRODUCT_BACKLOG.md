@@ -1071,6 +1071,14 @@
 - **Module:** Mobile (share extension/intent) + Receipts/Expenses (reuse upload+parse μέσω `/api/v1`).
 - **Εξάρτηση:** mobile MVP (§6) + `/api/v1` upload endpoint. **Builder default:** shared αρχείο → receipts,
   με optional picker αργότερα.
+- **ΕΝΕΡΓΟ ξανά 2026-08-03** (interactive, βλ. `OWNER_DECISIONS.md` #13): σταματά να μετράει ως «blocked σε
+  Αχιλλέα». Ο builder **χτίζει όσο πάει unattended** — config plugin (iOS Share Extension / Android intent
+  filter), receiving screen, wiring στο ήδη-υπάρχον `/api/v1` upload path — και τερματίζει το item ως «code
+  complete, awaiting EAS build», ΟΧΙ «δεν ξεκίνησε». Το όριο είναι το **EAS dev build + φυσική συσκευή** (Expo
+  Go δεν φορτώνει share extensions, ο simulator δεν δέχεται share intents), που το κάνει ο Αχιλλέας. Verify
+  unattended = `npx tsc --noEmit` + code review, όπως κάθε mobile αλλαγή. **Σειρά:** μετά τα έξι S items της
+  2026-08-03 (είναι M, τα άλλα S)· αν το Apple Developer account λείπει, **πρώτα το Android intent filter**,
+  το iOS μισό μένει στο ράφι μέχρι να υπάρχει.
 
 ### P14. Subscription / bill price-hike watch (ανατιμήσεις επαναλαμβανόμενων) — ✅ SHIPPED 2026-07-11 (pharos-daily-dev)
 - **Υλοποίηση:** νέο pure `lib/priceHike.ts` (`detectPriceHikes`, DB-free, 11 unit tests) ομαδοποιεί priced Expense

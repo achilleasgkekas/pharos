@@ -87,12 +87,22 @@
    άρα καμία ανοιχτή απόφαση δεν μένει σε αυτά τα έξι: ο builder υλοποιεί το «Ανοιχτή απόφαση (builder default)»
    πεδίο τους αυτούσιο χωρίς να ξαναρωτήσει. Owner: **pharos-daily-dev**.
 
-13. **P36 / P16 / P23 = παγωμένα, όχι εγκεκριμένα-και-blocked** (interactive session 2026-08-03). Ο Αχιλλέας
-   δήλωσε ρητά ότι **δεν ξέρει τι είναι** και τα τρία, δηλαδή η αρχική τους έγκριση (2026-07-10) δεν ήταν
-   informed. Μέχρι να τα ξανα-δει με εξήγηση, **κανένα routine δεν τα ξεκινά και κανένα δεν τα ξαναφέρνει ως
-   «blocked σε εσένα»** σε κάθε run: P36 (Open Banking auto-sync, θέλει GoCardless λογαριασμό), P16 remainder
-   (Firefly III/Grocy importers, θέλει πραγματικό sample export), P23 (mobile share-sheet, θέλει EAS dev build).
-   Owner: **pharos-daily-dev** (να μην τα ξανα-προτείνει μέχρι νέα εντολή).
+13. **P36 / P16 = παγωμένα· P23 = ενεργό** (interactive session 2026-08-03, μετά από εξήγηση του τι είναι το
+   καθένα — ο Αχιλλέας είχε πει ρητά ότι δεν τα ήξερε, άρα η αρχική έγκριση της 2026-07-10 δεν ήταν informed).
+   - **P36** (Open Banking auto-sync μέσω GoCardless): «**θα γίνει πολύ αργότερα**». Παγωμένο. Κανένα routine
+     δεν το ξεκινά, **και κανένα δεν το ξαναφέρνει ως «blocked σε εσένα» σε κάθε run** (ήταν μόνιμος θόρυβος
+     στα Needs-Achilleas headings). Θα ξαναμπεί σε συζήτηση μόνο με δική του πρωτοβουλία.
+   - **P16 remainder** (Firefly III / Grocy importers): «**αργότερα**». Ίδιο πάγωμα, ίδιος κανόνας σιωπής.
+     ΣΗΜ: το YNAB κομμάτι είναι ήδη SHIPPED (2026-07-19), δεν το αγγίζει αυτό.
+   - **P23** (mobile share-sheet quick capture): **ΕΝΕΡΓΟ, μένει στο Approved μαζί με τα έξι νέα.** Ο builder
+     **προχωρά όσο πάει χωρίς τον Αχιλλέα**: config plugin (iOS Share Extension / Android intent filter), το
+     receiving screen, και το wiring στο ήδη-υπάρχον `/api/v1` upload path. Το όριο είναι το **EAS dev build +
+     δοκιμή σε φυσική συσκευή** (το Expo Go δεν φορτώνει share extensions, ο simulator δεν δέχεται share intents),
+     που τα κάνει ο Αχιλλέας. Άρα το item τερματίζει ως «code complete, awaiting EAS build», ΟΧΙ ως «δεν ξεκίνησε».
+     Builder default (ήδη στο item): shared αρχείο → Receipts, χωρίς picker στην πρώτη έκδοση. **Ανοιχτό**: το iOS
+     μισό θέλει Apple Developer account (€99/χρόνο) για build σε συσκευή· το Android μισό όχι. Αν δεν υπάρχει
+     account, χτίζεται πρώτα το Android intent filter και το iOS μένει στο ράφι.
+   Owner: **pharos-daily-dev**.
 
 ## Later (χρειάζεται στοιχεία/ενέργεια Achilleas — ΟΧΙ τώρα, αλλά πριν hosted launch)
 
