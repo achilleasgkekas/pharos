@@ -5191,3 +5191,52 @@ Verify (πραγματικο, οχι θεωρητικο):
 
 Επομενο increment: αμεταβλητο απο το προηγουμενο entry, (1) FAQ + `/privacy` + `/terms` sweep για το
 self-hosted-only μοτιβο, (2) πιθανο section «what free really means», (3) sweep οταν εμφανιστει νεο feature.
+
+## 2026-08-03 (γ, ζητηθηκε απο τον Αχιλλεα: «κανε να τραβαει πολλαπλα shots σε ενα launch»)
+
+**Το `scripts/shot.mjs` τραβαει πλεον οσες εικονες θελεις με ενα Chrome.** Το ακριβο ηταν παντα το setup
+(cold start + compile + load), οχι η ιδια η ληψη. **Μετρημενο τωρα: 4 εικονες σε 122s συνολικα**, απο τα
+οποια ~65s ειναι εφαπαξ setup και οι ληψεις κοστισαν **2.8s / 0.34s / 1.7s / 0.85s**. Πριν: ~80s ανα
+εικονα, δηλαδη ~320s για τις ιδιες τεσσερις.
+
+**Το interface**: καθε `--out` κλεινει ενα shot. Οτι δωθηκε ΠΡΙΝ το πρωτο `--out` ειναι το baseline που
+κληρονομουν ολα, οτι μπαινει αναμεσα σε δυο `--out` ανηκει μονο σε εκεινο το shot.
+```
+node scripts/shot.mjs --url http://localhost:PORT \
+  --selector "#pricing" --out pricing-desktop.png \
+  --mobile --scale 1 --out pricing-mobile.png \
+  --selector "#compare" --out compare-desktop.png \
+  --selector "#faq" --mobile --scale 1 --out faq-mobile.png
+```
+Μεταξυ shots δεν πληρωνεται τιποτα δυο φορες: αν το viewport και το URL δεν αλλαξαν, γινεται μονο η ληψη.
+Guard για δυο shots με το ιδιο `--out` (θα εγραφαν το ενα πανω στο αλλο σιωπηλα).
+
+**Τεσσερα πραγματικα bugs που βρεθηκαν επειδη το εβαλα να τρεξει, οχι επειδη το σκεφτηκα**:
+1. **Το priming walk ηταν περιττο ΚΑΙ επικινδυνο.** Το ειχα βαλει για reveal-on-scroll ενοτητες, αλλα
+   **το site δεν εχει καθολου τετοιο μηχανισμο**: ο μοναδικος `IntersectionObserver` ειναι το `ScrollSpy`
+   που φωτιζει τα nav links (το επαληθευσα με grep). Και το `captureBeyondViewport` ζωγραφιζει ουτως ή αλλως
+   περιεχομενο εκτος viewport. Σε mobile ομως, οπου η σελιδα ειναι τεραστια, το walk **κρεμουσε το run**
+   (καθε βημα = forced layout+paint ολοκληρης σελιδας). Εγινε **opt-in `--prime`**, για την περιπτωση που
+   καποτε μπει reveal effect. Επισης το βημα απεκτησε **κατωτατο οριο και οριο επαναληψεων**, γιατι σε
+   headless context το `innerHeight` γυρισε **0** μια φορα, δηλαδη `y += 0` = ατερμονο loop.
+2. **Ο watchdog δεν πυροδοτουσε.** Ηταν `unref()`-αρισμενος, οποτε το run κρεμοταν επ' αοριστον αντι να
+   πεθανει στα 150s. Τωρα ειναι κανονικος timer (καθαριζεται στο τελος), σκοτωνει και το Chrome, και το
+   budget κλιμακωνεται με το πληθος των shots.
+3. **Καθε CDP εντολη ειναι πλεον χρονικα φραγμενη** (40s, με 120s ειδικα για το navigate). Ετσι ενα page
+   script που δεν καθεται βγαζει καθαρο μηνυμα («Runtime.evaluate did not answer within 40000ms») αντι
+   για σιωπηλο κολλημα, που ειναι ακριβως πως εντοπισα το (1).
+4. **Ο dev server ειναι πιο αργος απ' οσο υπεθετα**: μετρημενο **50s** για να σερβιρει το `/` σε φορτωμενο
+   μηχανημα (on-demand compile, με τα αλλα routines να τρεχουν παραλληλα). Δυο συνεπειες: το script κανει
+   τωρα **HTTP warm-up** πριν πει στο Chrome να πλοηγηθει (ο compile πληρωνεται εκει, οχι μεσα στο
+   navigate timeout), και το οριο readiness πηγε **30s -> 90s**. Αν καποτε θελεις γρηγορες ληψεις, τραβα
+   τες πανω σε `npm run build && npm run start` αντι για dev.
+
+Verify: 4 εικονες σε ενα launch, ολες κοιταγμενες μια-μια. `pricing-desktop` 2560x2168 (3 καρτες σε μια
+σειρα), `pricing-mobile` 375x2195 (stacked), `compare-desktop` 2560x1540 (φαινεται η γραμμη Cost
+«14-day free trial, then €9/mo»), `faq-mobile` 375x4907. Το τελευταιο ειναι και η καλυτερη αποδειξη:
+**4907px υψος clip**, δηλαδη το capture περναει ανετα εκτος viewport, και η εναλλαγη
+desktop -> mobile -> desktop -> mobile μεσα στην ιδια συνεδρια δεν χαλασε τιποτα.
+`npm run type-check` -> exit 0. Ο dev server σταματησε. Μηδεν AI call.
+
+Επομενο increment: αμεταβλητο, (1) FAQ + `/privacy` + `/terms` sweep για το self-hosted-only μοτιβο,
+(2) πιθανο section «what free really means», (3) sweep οταν εμφανιστει νεο feature.

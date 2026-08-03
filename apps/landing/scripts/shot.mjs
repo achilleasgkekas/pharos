@@ -12,13 +12,19 @@
 // Zero dependencies: Node 22+ ships a global WebSocket, and Chrome is already on
 // the machine. Nothing here is imported by the site, it is a dev-time tool.
 //
-// Usage:
+// Usage, one image:
 //   node scripts/shot.mjs --url http://localhost:3100 --selector "#pricing" --out pricing.png
-//   node scripts/shot.mjs --url http://localhost:3100 --mobile --out hero-mobile.png
-//   node scripts/shot.mjs --url http://localhost:3100 --full --out whole-page.png
 //
-// Options:
-//   --url <u>        page to open (required)
+// Usage, several images in ONE Chrome (each --out closes a shot; flags before the
+// first --out are the baseline the rest inherit, flags after it are that shot's own):
+//   node scripts/shot.mjs --url http://localhost:3100 \
+//     --selector "#pricing" --out pricing-desktop.png \
+//     --mobile --scale 1 --out pricing-mobile.png \
+//     --selector "#hero" --out hero.png \
+//     --full --out whole-page.png
+//
+// Options (any of them can be per-shot except --wait/--prime/--debug):
+//   --url <u>        page to open (required; may differ per shot)
 //   --selector <s>   CSS selector to clip to; omit for the viewport
 //   --out <file>     output name, written into .shots/ (default: shot.png)
 //   --width <n>      viewport width (default 1280, or 375 with --mobile)
@@ -27,7 +33,9 @@
 //   --full           capture the whole scrollable page
 //   --scale <n>      device pixel ratio (default 2)
 //   --wait <ms>      extra settle time after load (default 700)
-//   --debug          print CDP milestones to stderr
+//   --prime          walk the page before capturing (only needed if a section
+//                    hides until scrolled into view; slow, see PRIME_PAGE)
+//   --debug          print CDP milestones and per-shot timings to stderr
 
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
@@ -38,29 +46,60 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = path.join(HERE, '..', '.shots');
-const OVERALL_TIMEOUT_MS = 150_000; // Chrome's cold start alone measured ~13s here
+// Chrome's cold start alone measured ~12s here, and each extra capture is cheap,
+// so the budget is mostly a fixed launch cost plus a generous slice per shot.
+const BUDGET_BASE_MS = 240_000;
+const BUDGET_PER_SHOT_MS = 30_000;
+// A Next dev server compiles the route on the first request, measured at 50s on a
+// loaded machine, so navigation gets a much longer leash than any other command.
+const NAVIGATE_TIMEOUT_MS = 120_000;
 
+// Each --out closes one shot. Whatever was set BEFORE the first --out is the
+// baseline every shot inherits; anything between two --out flags belongs to that
+// shot alone. So "--selector #pricing --out a.png --mobile --out b.png" means the
+// pricing section twice, desktop then mobile, and a third shot would be desktop
+// again. One Chrome serves them all, which is the whole point: the launch costs
+// ~12s and each extra capture costs about a second.
 function parseArgs(argv) {
-  const args = { scale: 2, wait: 700, out: 'shot.png' };
+  const global = { scale: 2, wait: 700 };
+  const shots = [];
+  let current = {};
+  let baseline = null;
+
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const val = () => argv[++i];
-    if (a === '--url') args.url = val();
-    else if (a === '--selector') args.selector = val();
-    else if (a === '--out') args.out = val();
-    else if (a === '--width') args.width = Number(val());
-    else if (a === '--height') args.height = Number(val());
-    else if (a === '--scale') args.scale = Number(val());
-    else if (a === '--wait') args.wait = Number(val());
-    else if (a === '--mobile') args.mobile = true;
-    else if (a === '--full') args.full = true;
-    else if (a === '--debug') args.debug = true;
-    else throw new Error(`Unknown option: ${a}`);
+    if (a === '--url') current.url = val();
+    else if (a === '--selector') current.selector = val();
+    else if (a === '--width') current.width = Number(val());
+    else if (a === '--height') current.height = Number(val());
+    else if (a === '--scale') current.scale = Number(val());
+    else if (a === '--mobile') current.mobile = true;
+    else if (a === '--full') current.full = true;
+    else if (a === '--wait') global.wait = Number(val());
+    else if (a === '--debug') global.debug = true;
+    else if (a === '--prime') global.prime = true;
+    else if (a === '--out') {
+      const out = val();
+      // The prefix, i.e. the first shot's own flags, becomes the baseline.
+      baseline ??= { ...current };
+      shots.push({ ...global, ...baseline, ...current, out });
+      current = {};
+    } else throw new Error(`Unknown option: ${a}`);
   }
-  if (!args.url) throw new Error('--url is required');
-  args.width ??= args.mobile ? 375 : 1280;
-  args.height ??= args.mobile ? 812 : 800;
-  return args;
+  // No --out at all: still one shot, from whatever was given.
+  if (!shots.length) shots.push({ ...global, ...current, out: 'shot.png' });
+
+  for (const s of shots) {
+    s.url ??= global.url;
+    if (!s.url) throw new Error('--url is required');
+    s.width ??= s.mobile ? 375 : 1280;
+    s.height ??= s.mobile ? 812 : 800;
+  }
+  const names = shots.map((s) => s.out);
+  const dupe = names.find((n, i) => names.indexOf(n) !== i);
+  if (dupe) throw new Error(`Two shots would both write ${dupe}; give them different --out names`);
+  return { ...global, shots };
 }
 
 // Chrome, or the Chromium that Playwright already cached for this machine.
@@ -143,10 +182,19 @@ function connectCdp(wsUrl) {
 
   return {
     ready,
-    send(method, params = {}, sessionId) {
+    // Every command is time-bounded. A page script that never settles (see the
+    // note on PRIME_PAGE) must fail loudly instead of hanging the whole run.
+    send(method, params = {}, sessionId, timeoutMs = 40_000) {
       const id = nextId++;
       return new Promise((resolve, reject) => {
-        pending.set(id, { resolve, reject });
+        const timer = setTimeout(() => {
+          pending.delete(id);
+          reject(new Error(`${method} did not answer within ${timeoutMs}ms`));
+        }, timeoutMs);
+        pending.set(id, {
+          resolve: (v) => { clearTimeout(timer); resolve(v); },
+          reject: (e) => { clearTimeout(timer); reject(e); },
+        });
         ws.send(JSON.stringify({ id, method, params, ...(sessionId && { sessionId }) }));
       });
     },
@@ -163,6 +211,20 @@ function connectCdp(wsUrl) {
     },
     close: () => ws.close(),
   };
+}
+
+// Ask the server for the page over plain HTTP before Chrome does. On a dev server
+// this is what pays for the on-demand compile, and paying it here means a slow
+// first build shows up as a warm-up wait rather than as a navigation timeout.
+async function warmUp(url, debug) {
+  const at = Date.now();
+  try {
+    await fetch(url, { signal: AbortSignal.timeout(NAVIGATE_TIMEOUT_MS) });
+    if (debug) console.error(`shot.mjs: server warm after ${Date.now() - at}ms`);
+  } catch (err) {
+    // Not fatal: the navigation below will produce the real error if it matters.
+    console.error(`shot.mjs: warm-up request failed (${err.message}), navigating anyway`);
+  }
 }
 
 async function evaluate(cdp, sessionId, expression) {
@@ -182,7 +244,9 @@ async function evaluate(cdp, sessionId, expression) {
 // 'complete' when it comes, and accept 'interactive' once the grace period is up,
 // which means a stalled font request costs a fallback typeface, not the shot.
 const READY_GRACE_MS = 8_000;
-const READY_CAP_MS = 30_000;
+// 90s, not 30s: a cold Next dev route on a loaded machine kept the document in
+// "loading" for more than half a minute (measured 2026-08-03).
+const READY_CAP_MS = 90_000;
 
 async function waitForDocument(cdp, sessionId, debug) {
   const started = Date.now();
@@ -202,19 +266,31 @@ async function waitForDocument(cdp, sessionId, debug) {
   }
 }
 
-// Reveal-on-scroll sections stay invisible until they have been in view once, so
-// walk the whole page before measuring anything. Smooth scrolling is turned off
-// first, otherwise each step lands somewhere between the two positions.
+// Measuring the page is all that is normally needed. captureBeyondViewport paints
+// content that was never scrolled into view, and this site reveals nothing on
+// scroll: its only IntersectionObserver is ScrollSpy, which highlights nav links
+// (checked 2026-08-03). So no walk, no forced relayout, no waiting.
+const MEASURE_PAGE = 'document.documentElement.scrollHeight';
+
+// --prime walks the page first, for the day a section does hide until seen. It is
+// opt-in because it is expensive: at mobile width this page is tall enough that
+// the walk cost minutes and blew past a 40s command timeout. The step has a floor
+// and the walk an iteration cap because innerHeight came back as 0 in a headless
+// context once, which made `y += step` advance by nothing and hang the run.
 const PRIME_PAGE = `(async () => {
-  document.documentElement.style.scrollBehavior = 'auto';
-  const step = Math.round(innerHeight * 0.8);
-  for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
-    document.documentElement.scrollTop = y;
-    await new Promise((r) => setTimeout(r, 60));
+  const doc = document.documentElement;
+  doc.style.scrollBehavior = 'auto';
+  const maxSteps = 40;
+  const step = Math.max(400, Math.round((innerHeight || 800) * 0.9), Math.ceil(doc.scrollHeight / maxSteps));
+  for (let i = 0; i <= maxSteps; i++) {
+    const y = i * step;
+    if (y > doc.scrollHeight) break;
+    doc.scrollTop = y;
+    await new Promise((r) => setTimeout(r, 40));
   }
-  document.documentElement.scrollTop = 0;
-  await new Promise((r) => setTimeout(r, 120));
-  return document.documentElement.scrollHeight;
+  doc.scrollTop = 0;
+  await new Promise((r) => setTimeout(r, 100));
+  return doc.scrollHeight;
 })()`;
 
 const measure = (selector) => `(() => {
@@ -224,62 +300,94 @@ const measure = (selector) => `(() => {
   return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height };
 })()`;
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+async function capture(cdp, sessionId, shot, pageHeight) {
+  let clip;
+  if (shot.selector) {
+    const box = await evaluate(cdp, sessionId, measure(shot.selector));
+    if (!box) throw new Error(`Selector not found on the page: ${shot.selector}`);
+    // A little air around the section so the shot does not look cropped.
+    const pad = 16;
+    clip = {
+      x: Math.max(0, box.x - pad),
+      y: Math.max(0, box.y - pad),
+      width: Math.min(shot.width, box.width + pad * 2),
+      height: box.height + pad * 2,
+      scale: 1,
+    };
+  } else if (shot.full) {
+    clip = { x: 0, y: 0, width: shot.width, height: pageHeight, scale: 1 };
+  }
+
+  const { data } = await cdp.send('Page.captureScreenshot', {
+    format: 'png',
+    captureBeyondViewport: true,
+    ...(clip && { clip }),
+  }, sessionId);
+
+  await mkdir(OUT_DIR, { recursive: true });
+  const outPath = path.join(OUT_DIR, shot.out);
+  await writeFile(outPath, Buffer.from(data, 'base64'));
+  return outPath;
+}
+
+// Held at module scope so the watchdog below can take Chrome down with it.
+let chrome = null;
+
+async function main(args) {
   const profileDir = path.join(tmpdir(), `pharos-shot-${process.pid}`);
   const t0 = Date.now();
   const { proc, wsUrl } = await launchChrome(findChrome(), profileDir);
+  chrome = proc;
   if (args.debug) console.error(`shot.mjs: chrome ready after ${Date.now() - t0}ms`);
   const cdp = connectCdp(wsUrl);
-  let outPath;
+  const written = [];
 
   try {
     await cdp.ready;
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
-
     await cdp.send('Page.enable', {}, sessionId);
-    await cdp.send('Emulation.setDeviceMetricsOverride', {
-      width: args.width,
-      height: args.height,
-      deviceScaleFactor: args.scale,
-      mobile: Boolean(args.mobile),
-      screenWidth: args.width,
-      screenHeight: args.height,
-    }, sessionId);
 
-    await cdp.send('Page.navigate', { url: args.url }, sessionId);
-    await waitForDocument(cdp, sessionId, args.debug);
-    await new Promise((r) => setTimeout(r, args.wait));
+    // State carried between shots, so an unchanged viewport or URL is not paid for
+    // twice: re-navigating and re-priming is most of the per-shot cost.
+    let loadedUrl = null;
+    let metrics = null;
+    let pageHeight = 0;
 
-    const pageHeight = await evaluate(cdp, sessionId, PRIME_PAGE);
+    for (const shot of args.shots) {
+      const wantMetrics = `${shot.width}x${shot.height}@${shot.scale}${shot.mobile ? 'm' : ''}`;
+      const viewportChanged = wantMetrics !== metrics;
+      if (viewportChanged) {
+        await cdp.send('Emulation.setDeviceMetricsOverride', {
+          width: shot.width,
+          height: shot.height,
+          deviceScaleFactor: shot.scale,
+          mobile: Boolean(shot.mobile),
+          screenWidth: shot.width,
+          screenHeight: shot.height,
+        }, sessionId);
+        metrics = wantMetrics;
+      }
 
-    let clip;
-    if (args.selector) {
-      const box = await evaluate(cdp, sessionId, measure(args.selector));
-      if (!box) throw new Error(`Selector not found on the page: ${args.selector}`);
-      // A little air around the section so the shot does not look cropped.
-      const pad = 16;
-      clip = {
-        x: Math.max(0, box.x - pad),
-        y: Math.max(0, box.y - pad),
-        width: Math.min(args.width, box.width + pad * 2),
-        height: box.height + pad * 2,
-        scale: 1,
-      };
-    } else if (args.full) {
-      clip = { x: 0, y: 0, width: args.width, height: pageHeight, scale: 1 };
+      const navigated = shot.url !== loadedUrl;
+      if (navigated) {
+        await warmUp(shot.url, args.debug);
+        await cdp.send('Page.navigate', { url: shot.url }, sessionId, NAVIGATE_TIMEOUT_MS);
+        await waitForDocument(cdp, sessionId, args.debug);
+        await new Promise((r) => setTimeout(r, args.wait));
+        loadedUrl = shot.url;
+      }
+
+      // Re-measure whenever the document or the viewport changed; only walk the
+      // page when asked to, since that is the expensive part.
+      if (navigated || viewportChanged) {
+        pageHeight = await evaluate(cdp, sessionId, args.prime ? PRIME_PAGE : MEASURE_PAGE);
+      }
+
+      const at = Date.now();
+      written.push(await capture(cdp, sessionId, shot, pageHeight));
+      if (args.debug) console.error(`shot.mjs: ${shot.out} in ${Date.now() - at}ms (${wantMetrics})`);
     }
-
-    const { data } = await cdp.send('Page.captureScreenshot', {
-      format: 'png',
-      captureBeyondViewport: true,
-      ...(clip && { clip }),
-    }, sessionId);
-
-    await mkdir(OUT_DIR, { recursive: true });
-    outPath = path.join(OUT_DIR, args.out);
-    await writeFile(outPath, Buffer.from(data, 'base64'));
   } finally {
     try { await cdp.send('Browser.close'); } catch {}
     cdp.close();
@@ -287,16 +395,31 @@ async function main() {
     await rm(profileDir, { recursive: true, force: true }).catch(() => {});
   }
 
-  console.log(outPath);
+  for (const p of written) console.log(p);
+  if (args.debug) console.error(`shot.mjs: ${written.length} image(s) in ${Date.now() - t0}ms total`);
 }
 
-const guard = setTimeout(() => {
-  console.error(`shot.mjs: gave up after ${OVERALL_TIMEOUT_MS / 1000}s`);
-  process.exit(1);
-}, OVERALL_TIMEOUT_MS);
-guard.unref();
-
-main().catch((err) => {
+let parsed;
+try {
+  parsed = parseArgs(process.argv.slice(2));
+} catch (err) {
   console.error(`shot.mjs: ${err.message}`);
   process.exit(1);
-});
+}
+
+// Deliberately NOT unref'd: this is the last line of defence against a run that
+// hangs, so it has to keep the process alive long enough to fire and say why.
+const budgetMs = BUDGET_BASE_MS + BUDGET_PER_SHOT_MS * parsed.shots.length;
+const guard = setTimeout(() => {
+  console.error(`shot.mjs: gave up after ${Math.round(budgetMs / 1000)}s, killing chrome`);
+  chrome?.kill();
+  process.exit(1);
+}, budgetMs);
+
+main(parsed)
+  .then(() => clearTimeout(guard))
+  .catch((err) => {
+    clearTimeout(guard);
+    console.error(`shot.mjs: ${err.message}`);
+    process.exit(1);
+  });
