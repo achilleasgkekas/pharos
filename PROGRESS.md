@@ -10996,3 +10996,52 @@ Marker: `<!-- reviewed: f44e227 -->` (top του αρχείου).
   check** σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους, Chrome Web Store (προαιρετικό).
 - **`PATCH /api/v1/settings` ntfy authz**: παραμένει OPEN στο `~/.claude/ASK_ACHILLEAS.md`
   (`pharos-daily-dev-20260728-0215`).
+
+## 2026-08-03 — shopping-list tenant-scoping (P2 debt) + read path
+
+**Guard**: `ROUTINES_PAUSED` απών· κανένα ANSWERED entry στο `~/.claude/ASK_ACHILLEAS.md` addressed σε
+`pharos/pharos-daily-dev` (το `pharos-daily-dev-20260728-0215` μένει OPEN). Docker mutex acquired/released
+κανονικά.
+
+**Approved queue πρώτα (βήμα a)**: ελέγχθηκε, **όλα τα εναπομείναντα items είναι blocked** στον Αχιλλέα, όχι
+buildable: P36 (GoCardless credentials), P16 remainder (Firefly III/Grocy, θέλει πραγματικό sample export),
+P23 (mobile share extension, θέλει EAS dev build). Άρα fallback στο βήμα (b), το «επόμενο task» του
+προηγούμενου run.
+
+**Τι έγινε**: `shopping-list/actions.ts` — το τρίτο-τελευταίο P2 tenant-scoping item του `WEB_DEBT.md`. Και τα
+6 exports (`getListItems`/`addListItem`/`updateListItem`/`toggleListItem`/`deleteListItem`/`clearChecked`)
+έκαναν direct `ShoppingListItem.find/create/updateOne/updateMany`, οπότε σε SaaS mode η λίστα ψωνιών κάθε
+tenant πήγαινε στο DEFAULT db. **Το REST layer κληρονομούσε το ίδιο bug**: το `/api/v1/shopping-list`
+(GET/POST) καλεί ακριβώς αυτές τις actions, άρα και το mobile χτύπαγε λάθος db. Πλέον όλα τρέχουν μέσα σε
+`withRequestTenant` με `currentModel(ShoppingListItemModel)`, ίδιο recipe με το `tasks/actions.ts` (`9513644`).
+Το `assertCanWrite()` και το blank-name short-circuit του `addListItem` έμειναν **ΠΡΙΝ** το wrap (ο writeGuard
+coverage scanner τα βλέπει, και ένα no-op δεν κοστίζει tenant resolution). Ξεχωριστό fix για το read path δεν
+χρειάστηκε: το `page.tsx` απλώς καλεί το `getListItems`, που είναι τώρα scoped.
+
+**Verify**: **negative control πρώτα**, όχι ισχυρισμός — ένα `currentModel` πίσω σε direct model έριξε **3 από
+τα 7** νέα tests στο create path και **1 από τα 7** στο read path, μετά restore (grep count 14, το acceptance
+ζητούσε ≥6). Νέο **`actions.tenant.test.ts`** (7 tests): tagged seam ανά tenant, δύο tenants ταυτόχρονα χωρίς
+διαρροή, **tagged read rows** ώστε ένα read που απαντήθηκε από λάθος db να φαίνεται στην ίδια την τιμή
+επιστροφής, update/toggle, soft-delete + clearChecked, blank-name no-op, self-hosted no-tenant path. Ο flat
+`actions.test.ts` (19 tests) πήρε το γνωστό flat tenancy mock και έμεινε πράσινος. `npm run type-check`
+**EXIT 0**, full `npx vitest run` **5506 passed / 346 files** (+7 tests, +1 file, μηδέν regression). Safe
+Docker rebuild: mongo `healthy` πριν → `docker compose build web` → `up -d web` → `/login` **200 με την πρώτη**,
+`/shopping-list` **307** (auth-gated route compiled), RestartCount **0**, logs καθαρά (μόνο το προϋπάρχον
+άσχετο `@napi-rs/canvas` warning), `docker builder prune -f` μετά (2.36GB). Browser pane `/shopping-list` →
+redirect σε «Sign in · Pharos», **μηδέν console errors**. Commit `83d0271`.
+
+**Τι μένει από αυτή την κλάση**: 2 ακόμα P2 items στο `WEB_DEBT.md` — `history/actions.ts` (S, AI conversation
+history) και `settings/actions.ts` (L, θέλει **επιλεκτικό** wrap: τα AppConfig-only exports είναι νόμιμα
+instance-level).
+
+**Επόμενο task (πρόταση)**: `history/actions.ts` (S, ίδιο recipe, το τελευταίο εύκολο της ουράς). Αφού αδειάσει
+η ουρά, το standing follow-up παραμένει: coverage test που κόβει το build αν action module κάνει direct model
+import χωρίς `currentModel` (δεν μπαίνει τώρα, θα κοκκίνιζε για τα 2 ανοιχτά αρχεία).
+
+## Needs Achilleas
+
+- Αμετάβλητα: **P36 / P16 / P23** (GoCardless credentials, πραγματικό sample export, EAS dev build), **P17 live
+  check** σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους. Ολόκληρο το Approved queue είναι πλέον
+  blocked σε εσένα, δεν υπάρχει buildable item εκεί.
+- **`PATCH /api/v1/settings` ntfy authz**: παραμένει OPEN στο `~/.claude/ASK_ACHILLEAS.md`
+  (`pharos-daily-dev-20260728-0215`).
