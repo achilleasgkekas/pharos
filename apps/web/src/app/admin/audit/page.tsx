@@ -23,7 +23,7 @@ import {
   dateInputValue,
   matchQuickRange,
 } from '@/lib/tenancy/adminAudit';
-import { toPlatformActivityRows } from '@/components/saas/platformActivity';
+import { toPlatformActivityRows, actorEmailSuggestions } from '@/components/saas/platformActivity';
 import { PlatformActivityPanel } from '@/components/saas/PlatformActivityPanel';
 import { ACTIVITY_FILTER_OPTIONS } from '@/components/saas/activityFilter';
 import { cursorAfterRow, encodeActivityCursor } from '@/components/saas/activityCursor';
@@ -89,6 +89,8 @@ export default async function AdminAuditPage({
   const unknownFilter = unknownTenant || unknownActor;
 
   const rows = toPlatformActivityRows(events);
+  // Autocomplete for the Actor box, taken from the page itself rather than a new roster endpoint.
+  const actorOptions = actorEmailSuggestions(events);
   const filtered = auditFiltersActive(query);
   const nextCursor = hasMore && rows.length ? cursorAfterRow(rows[rows.length - 1]) : null;
 
@@ -148,10 +150,21 @@ export default async function AdminAuditPage({
           <input
             type="text"
             name="actor"
+            list="audit-actor-emails"
             defaultValue={query.actor ?? ''}
             placeholder="email (exact)"
             className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] px-3 py-1.5 text-sm text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
           />
+          {/* Suggestions only, never a whitelist: a <datalist> still accepts free text, which
+              matters because these are the addresses on THIS page, not every account on the
+              platform. Rendered only when non-empty so the browser shows no empty dropdown. */}
+          {actorOptions.length > 0 && (
+            <datalist id="audit-actor-emails">
+              {actorOptions.map((email) => (
+                <option key={email} value={email} />
+              ))}
+            </datalist>
+          )}
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">

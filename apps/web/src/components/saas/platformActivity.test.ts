@@ -8,6 +8,7 @@ import {
   workspaceLabel,
   toPlatformActivityRow,
   toPlatformActivityRows,
+  actorEmailSuggestions,
   DELETED_WORKSPACE_LABEL,
   type PlatformActivityInput,
 } from './platformActivity';
@@ -131,5 +132,83 @@ describe('toPlatformActivityRows', () => {
       row({ id: 'c', workspaceSlug: 'beta', workspaceName: null }),
     ]);
     expect(rows.map((r) => r.workspaceLabel)).toEqual(['Acme Co', DELETED_WORKSPACE_LABEL, 'beta']);
+  });
+});
+
+describe('actorEmailSuggestions', () => {
+  it('collects the distinct actor emails of a page', () => {
+    expect(
+      actorEmailSuggestions([
+        row({ actorEmail: 'ana@example.com' }),
+        row({ actorEmail: 'bo@example.com' }),
+        row({ actorEmail: 'ana@example.com' }),
+      ])
+    ).toEqual(['ana@example.com', 'bo@example.com']);
+  });
+
+  it('sorts alphabetically rather than by feed order', () => {
+    // Newest-first order would otherwise reshuffle the dropdown on every request.
+    expect(
+      actorEmailSuggestions([
+        row({ actorEmail: 'zoe@example.com' }),
+        row({ actorEmail: 'ana@example.com' }),
+        row({ actorEmail: 'mia@example.com' }),
+      ])
+    ).toEqual(['ana@example.com', 'mia@example.com', 'zoe@example.com']);
+  });
+
+  it('lowercases and trims, so a suggestion matches the way the server resolves it', () => {
+    // Account.email is declared `lowercase: true`; a suggestion that differs in case would look
+    // right and still be resolved through the same normalisation, so normalise here too.
+    expect(actorEmailSuggestions([row({ actorEmail: '  Ana@Example.COM ' })])).toEqual([
+      'ana@example.com',
+    ]);
+  });
+
+  it('deduplicates across case and whitespace variants', () => {
+    expect(
+      actorEmailSuggestions([
+        row({ actorEmail: 'ana@example.com' }),
+        row({ actorEmail: 'ANA@example.com' }),
+        row({ actorEmail: ' ana@example.com ' }),
+      ])
+    ).toEqual(['ana@example.com']);
+  });
+
+  it('skips actor-less (system) events', () => {
+    expect(
+      actorEmailSuggestions([
+        row({ actorEmail: null }),
+        row({ actorEmail: '   ' }),
+        row({ actorEmail: 'ana@example.com' }),
+      ])
+    ).toEqual(['ana@example.com']);
+  });
+
+  it('drops values that are not addresses — they could never resolve to an account', () => {
+    // A suggestion that guarantees "No account with email ..." is worse than no suggestion.
+    expect(
+      actorEmailSuggestions([row({ actorEmail: 'system' }), row({ actorEmail: 'ana@example.com' })])
+    ).toEqual(['ana@example.com']);
+  });
+
+  it('returns an empty list for an empty page', () => {
+    expect(actorEmailSuggestions([])).toEqual([]);
+  });
+
+  it('does not cap the list — every address on screen stays suggestable', () => {
+    // The page is already bounded by MAX_PLATFORM_AUDIT_PAGE; truncating here would hide an
+    // address the operator can literally see in the Actor column.
+    const many = Array.from({ length: 200 }, (_, i) =>
+      row({ actorEmail: `user${String(i).padStart(3, '0')}@example.com` })
+    );
+    expect(actorEmailSuggestions(many)).toHaveLength(200);
+  });
+
+  it('does not mutate its input', () => {
+    const input = [row({ actorEmail: '  Ana@Example.com ' })];
+    const snapshot = structuredClone(input);
+    actorEmailSuggestions(input);
+    expect(input).toEqual(snapshot);
   });
 });

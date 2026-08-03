@@ -58,3 +58,34 @@ export function toPlatformActivityRows(
 ): PlatformActivityRow[] {
   return rows.map(toPlatformActivityRow);
 }
+
+/**
+ * Distinct actor emails present in a page of platform events, normalised and sorted, for the
+ * Actor filter's autocomplete.
+ *
+ * The Actor filter matches the FULL address exactly (it resolves email -> account id server-side),
+ * which is precise but unforgiving: one typo renders "No account with email ..." rather than the
+ * rows the operator just saw. Offering the addresses already on screen removes the retyping.
+ *
+ * Deliberately a SAMPLE, not a directory: this is what the current page shows, not the platform
+ * roster, so it is derived from the rows instead of a new lookup endpoint. For the same reason it
+ * is NOT capped — the feed page is already bounded (<= MAX_PLATFORM_AUDIT_PAGE), and truncating
+ * would drop an address that is visibly on screen, which is the one failure this is meant to fix.
+ *
+ * Lowercased to match Account.email (declared `lowercase: true`), so a suggestion always resolves
+ * the same way the server will match it. Entries without an "@" are dropped: they could never
+ * resolve to an account, and a suggestion that guarantees an empty result is worse than none.
+ * PURE.
+ */
+export function actorEmailSuggestions(
+  rows: readonly Pick<PlatformActivityInput, 'actorEmail'>[]
+): string[] {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const email = row.actorEmail?.trim().toLowerCase();
+    if (!email || !email.includes('@')) continue;
+    seen.add(email);
+  }
+  // Alphabetical, so the dropdown order does not shuffle with the feed order between requests.
+  return [...seen].sort();
+}
