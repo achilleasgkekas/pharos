@@ -5075,3 +5075,67 @@ Needs-Achilleas (open, αμετάβλητα): μόνιμο Free tier ή μόνο
 entity/Stripe, Terms+Privacy review, contact inbox, repo public timing. **Νέο, χαμηλής προτεραιότητας**: αν
 διαφωνείς με το lead positioning παραπάνω (π.χ. θες η πρώτη πρόταση να παραμείνει self-host-first για το
 homelab κοινό), είναι ένα revert σε 9 γραμμές κειμένου, πες το και γυρνάει.
+
+## 2026-08-03
+
+**Increment: εφαρμογη της απαντησης `pharos-landing-20260729-1000` (option β), τελος το μονιμο hosted
+δωρεαν επιπεδο.** Η εγγραφη ηταν ANSWERED στο `~/.claude/ASK_ACHILLEAS.md`, οποτε αυτο το run ξεκινησε
+απο εκει (κανονας «ANSWERED πρωτα»), οχι απο το επομενο increment της προηγουμενης λιστας.
+
+**Η αποφαση (Αχιλλεας, 2026-08-03)**: «αν επιλεξει self-host ειναι free, αλλιως free trial 14 μερες».
+Δηλαδη το «δωρεαν για παντα» ειναι **μονο** το self-host (AGPL, δικο σου hardware). Το hosted ξεκινα με
+14ημερο δωρεαν trial και μετα ειναι πληρωμενο (€9 / €29). Το backend lifecycle (`provision.ts`
+plan:free + status:trialing 14d, μετα suspended) ειναι **σωστο ως εχει**, δεν χρειαζεται downgrade path,
+και το `plan:'free'` του `plans.ts` παραμενει «το πλανο κατα τη διαρκεια του trial», οχι προϊον. Ετσι
+κλεινει η αντιφαση που ειχε επισημανθει: το FAQ περιεγραφε ηδη σωστα το suspend, ενω οι καρτες τιμων
+υποσχονταν μονιμο δωρεαν.
+
+**Τι αλλαξε** (7 σημεια, ολα στη δικη μου territory):
+1. `page.tsx` **TIERS**: αφαιρεθηκε ολοκληρη η καρτα «Free · €0» (1 user / 5 GB / 50 AI reads). Μενουν
+   **3 καρτες**: Self-hosted (Free forever) + Pro (€9) + Dedicated (€29). Πανω απο τον πινακα μπηκε
+   σχολιο που καταγραφει την αποφαση + την ημερομηνια, ωστε να μην «επιστρεψει» η καρτα σε μελλοντικο run.
+2. `Pricing.tsx`: νεα γραμμη δεσμευσης κατω απο την τιμη, μια ανα καρτα, **«14-day free trial, no card to
+   start»** (accent χρωμα) στα hosted, **«No account, no billing, ever»** στο self-host. Renders σε ολες τις
+   καρτες ωστε να μεινουν στοιχισμενες καθετα.
+3. `page.tsx` **compare table**, γραμμη Cost: `Free tier, then €9/mo` -> **`14-day free trial, then €9/mo`**,
+   και self: `Free, AGPL-3.0` -> `Free forever, AGPL-3.0`.
+4. `page.tsx` **pricing copy**: η εισαγωγη λεει πλεον ρητα «Every hosted plan starts with a 14-day free
+   trial, no card to begin», και το footnote ξεχωριζει τα δυο («hosted opens with a trial, then bills» vs
+   «self-hosting stays free forever, with no plan and no account at all»).
+5. `page.tsx` **JSON-LD**: τα `offers` ειναι πλεον 3 (εφυγε το δευτερο `price:'0'` που περιεγραφε hosted
+   δωρεαν προϊον). Το schema.org δεν εχει property για trial, οποτε το trial μπηκε στο `description`
+   των δυο πληρωμενων offers («Starts with a 14-day free trial.») ωστε ενα rich result να μη διαβασει
+   το €9 ως χρεωση της πρωτης μερας.
+6. `globals.css`: `.pricing-grid` 4 -> **3 στηλες**· στο <=900px γινεται **1 στηλη** (με 3 καρτες, το
+   2-across θα αφηνε μια να κρεμεται)· νεο `.commit-note` / `.commit-note-trial`.
+7. `public/llms.txt` (τι διαβαζουν τα LLM) + `app/terms/page.tsx` §6: εφυγε το bullet «Free · €0», τα
+   plans ειναι «self-hosted + Pro + Dedicated», και **και τα δυο** αρχεια λενε πλεον ρητα οτι δεν υπαρχει
+   μονιμο δωρεαν hosted πλανο και οτι το trial ληγει σε suspend (ανακτησιμο), οχι σε διαγραφη.
+
+Verify:
+- `npm run type-check` -> exit 0. `npm run build` -> success, **13 static routes**, `/` **5.41 kB**.
+- Browser pane (`preview_start landing-dev`, η 3100 πιασμενη, πηρε 61900). Στο ζωντανο DOM: **3 καρτες**
+  (Self-hosted «Free forever» / Pro «€9 per month» / Dedicated «€29 per month»), η commit-note σωστη και
+  με το accent styling μονο στα δυο hosted, μηδεν ιχνος του παλιου Free tagline. Annual toggle: **μονο**
+  τα δυο πληρωμενα γυρνανε (€90/ετος = €7.50/mo, €290/ετος = €24.17/mo), το self-host μενει «Free forever».
+  JSON-LD parsed live: 3 offers, τα δυο πληρωμενα με το trial στο description, availability PreOrder παντου
+  (σωστο, waitlist-gated ακομα). Compare row: «14-day free trial, then €9/mo».
+- Layout: desktop 1280 -> **3 ισες στηλες σε μια σειρα** (345px x3), μηδεν οριζοντιο overflow. Mobile
+  375x812 -> **stacked**, ολες οι καρτες ιδιο left, overflow 0, η commit-note χωραει σε καθε καρτα.
+  `read_console_messages` (onlyErrors) -> «No console logs». `/llms.txt` 200 χωρις το «Free · €0», `/terms`
+  σερβιρει το νεο κειμενο. Ο dev server σταματησε με `preview_stop`.
+- **ΣΗΜ (best-effort που δεν βγηκε)**: το `computer screenshot` γυρισε μαυρη εικονα και μετα timeout
+  («Browser pane is currently hidden»), η επιφανεια screenshot δεν ακολουθουσε το scroll του JS context.
+  Ολος ο ελεγχος εγινε με μετρησεις στο ζωντανο DOM αντι για εικονα. Πρωτο run χωρις screenshot μετα απο
+  τρια συνεχομενα με εικονα, δεν οφειλεται σε αλλαγη του site.
+- Μηδεν αγγιγμα σε Docker/:3000/web/mobile, μηδεν subagent, μηδεν AI call. em-dashes: 0.
+
+Επομενο increment: (1) η ενοτητα FAQ + οι σελιδες `/privacy` και `/terms` δεν εχουν ελεγχθει ακομα
+συνολικα για το self-hosted-only μοτιβο (το §6 των Ορων διορθωθηκε τωρα, το υπολοιπο κειμενο οχι),
+(2) το «Free» ισως αξιζει να επανελθει ως **ξεχωριστο section** «what free really means» (self-host vs
+trial), αν φανει οτι η αφαιρεση της καρτας αδυνατισε το acquisition message, (3) συνεχεια του sweep οταν
+εμφανιστει νεο user-facing feature.
+
+Needs-Achilleas (open): legal entity/Stripe (ποιος χρεωνει, ποιο VAT), Terms+Privacy review απο ανθρωπο
+πριν το launch, contact inbox, χρονισμος για να γινει public το repo (το CTA «Get the Docker image» δειχνει
+ακομα «soon»). **Εκλεισε** η `pharos-landing-20260729-1000` (μονιμο free tier), εφαρμοστηκε ολοκληρη εδω.

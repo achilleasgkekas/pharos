@@ -76,8 +76,8 @@ export function Pricing({
           const priceText = showAnnual ? `€${annualPrice}` : t.price;
           const cadenceText = showAnnual ? 'per year' : t.cadence;
           // Per-month equivalent shown under an annual price, or the billing
-          // note under a monthly price. Kept for every card (blank on the free
-          // row) so all four cards align vertically.
+          // note under a monthly price. Kept for every card (blank on the
+          // self-host row) so the cards align vertically.
           const subText = !hosted
             ? ''
             : showAnnual
@@ -104,6 +104,12 @@ export function Pricing({
                 )}
               </div>
               <p className="billing-sub">{subText || ' '}</p>
+              {/* What you commit to, said once per card. Hosted opens on a 14-day trial
+                  (there is no permanent free hosted plan); self-hosting asks for nothing
+                  at all. Rendered on every card so the cards stay vertically aligned. */}
+              <p className={`commit-note${hosted ? ' commit-note-trial' : ''}`}>
+                {hosted ? '14-day free trial, no card to start' : 'No account, no billing, ever'}
+              </p>
               <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', minHeight: 44, marginBottom: 18 }}>
                 {t.tagline}
               </p>

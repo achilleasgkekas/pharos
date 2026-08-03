@@ -205,6 +205,11 @@ type Tier = {
 // Hosted tiers mirror apps/web/src/lib/billing/plans.ts, the single source of truth
 // for plan names, monthly EUR prices and quotas (storage, AI calls, seats, custom
 // domain). Keep the two in sync: the backend is authoritative, this is its shop window.
+// Decided 2026-08-03 (ASK_ACHILLEAS pharos-landing-20260729-1000, option b): there is
+// NO permanent free hosted tier. "Free forever" is the self-hosted edition; hosted opens
+// with a 14-day trial and is paid after it (matching provision.ts trialing -> suspended).
+// The backend `free` plan is the plan a workspace sits on during that trial, not a
+// product on this page, so it gets no pricing card of its own.
 const TIERS: Tier[] = [
   {
     name: 'Self-hosted',
@@ -222,22 +227,6 @@ const TIERS: Tier[] = [
       'Bring your own AI (Ollama, Anthropic, OpenAI, Gemini…)',
       'SMB / FTP / OneDrive backups',
       'Community support',
-    ],
-  },
-  {
-    name: 'Free',
-    price: '€0',
-    cadence: 'to start',
-    amount: '0',
-    tagline: 'Try the managed hub with no card. One person, the whole app.',
-    cta: 'Join the waitlist',
-    ctaHref: '#waitlist',
-    features: [
-      '1 user',
-      '5 GB storage',
-      '50 AI document reads per month',
-      'Every module, no feature gates',
-      'Nightly backups handled for you',
     ],
   },
   {
@@ -391,7 +380,7 @@ const COMPARE: { label: string; self: string; hosted: string }[] = [
   { label: 'Updates & backups', self: 'You run them', hosted: 'Automatic, nightly' },
   { label: 'AI parsing', self: 'Bring your own key or Ollama', hosted: 'Included, ready to go' },
   { label: 'Offline use', self: 'Full, no internet needed', hosted: 'Needs a connection' },
-  { label: 'Cost', self: 'Free, AGPL-3.0', hosted: 'Free tier, then €9/mo' },
+  { label: 'Cost', self: 'Free forever, AGPL-3.0', hosted: '14-day free trial, then €9/mo' },
   { label: 'Support', self: 'Community & docs', hosted: 'Priority email' },
 ];
 
@@ -695,19 +684,22 @@ const JSON_LD = {
       publisher: { '@id': `${SITE_URL}/#organization` },
       license: 'https://www.gnu.org/licenses/agpl-3.0.html',
       softwareHelp: `${GITHUB_URL}/blob/main/README.md`,
-      // Per-plan Offers, one per priced tier (free self-host + the Free/Pro/Dedicated
-      // hosted plans defined in apps/web/src/lib/billing/plans.ts).
-      // Paid tiers expose BOTH billing options: monthly, and annual (monthly x10 = 2 months free).
+      // Per-plan Offers, one per priced tier (free self-host + the Pro/Dedicated hosted
+      // plans defined in apps/web/src/lib/billing/plans.ts). There is no free hosted
+      // offer: hosted starts on a 14-day trial and is paid after it.
+      // Paid tiers expose BOTH billing options: monthly, and annual (monthly x10 = 2 months free),
+      // and say the trial in their description (schema.org has no trial property) so a
+      // rich result never reads €9 as due on day one.
       // Availability reflects the real pre-launch state so search engines are not told
       // an item is buyable when it is not: the self-host tier tracks REPO_PUBLIC
       // (PreOrder while the repo is private, InStock the moment it opens), and every
-      // hosted plan (including the free one) stays PreOrder while waitlist-gated.
+      // hosted plan stays PreOrder while waitlist-gated.
       offers: TIERS.filter((t) => t.amount !== undefined).map((t) => ({
         '@type': 'Offer',
         name: `PHAROS ${t.name}`,
         price: t.amount,
         priceCurrency: 'EUR',
-        description: t.tagline,
+        description: t.selfHost ? t.tagline : `${t.tagline} Starts with a 14-day free trial.`,
         availability:
           t.selfHost && REPO_PUBLIC
             ? 'https://schema.org/InStock'
@@ -1308,16 +1300,18 @@ export default function Home() {
               Own it, or let us host it
             </h2>
             <p style={{ color: 'var(--text-dim)', maxWidth: 560, margin: '0 auto' }}>
-              Self-host the whole thing for free under AGPL-3.0, or pick a managed
-              plan and skip the setup. Every hosted plan includes AI parsing and nightly backups.
+              Self-host the whole thing free under AGPL-3.0, forever, or pick a managed
+              plan and skip the setup. Every hosted plan starts with a 14-day free trial,
+              no card to begin, and includes AI parsing and nightly backups.
             </p>
           </div>
 
           <Pricing tiers={TIERS} repoPublic={REPO_PUBLIC} githubUrl={GITHUB_URL} />
 
           <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 36 }}>
-            Prices in EUR, cancel anytime. Annual plans bill once a year (2 months free).
-            Self-hosting stays free forever under AGPL-3.0.
+            Prices in EUR, cancel anytime. Hosted plans open with a 14-day free trial, then
+            bill monthly, or once a year on annual (2 months free). Self-hosting stays free
+            forever under AGPL-3.0, with no plan and no account at all.
           </p>
         </div>
       </section>

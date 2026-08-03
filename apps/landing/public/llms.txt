@@ -23,14 +23,13 @@ Also shipped: bills you pay by hand tracked separately from card subscriptions, 
 
 ## Pricing
 
-Two tracks: self-host it yourself for free, or let the hosted service run it for you. The hosted plans below mirror the backend plan ladder exactly.
+Two tracks: self-host it yourself for free, forever, or let the hosted service run it for you. Free forever means the self-hosted edition; there is no permanent free hosted plan. Every hosted workspace opens with a 14-day free trial (no card to start) and is paid after it. The hosted plans below mirror the backend plan ladder exactly.
 
-- [Self-hosted · Free forever](https://ph-aros.com/#pricing): Every module, no seat limits, AGPL-3.0, community support. Bring your own AI provider. Run it yourself with Docker.
-- [Free · €0](https://ph-aros.com/#pricing): The managed hub with no card. 1 user, 5 GB storage, 50 AI document reads per month, every module with no feature gates, nightly backups. (Hosted beta, waitlist.)
+- [Self-hosted · Free forever](https://ph-aros.com/#pricing): Every module, no seat limits, AGPL-3.0, community support. Bring your own AI provider. Run it yourself with Docker. No account and no billing at all.
 - [Pro · €9/month](https://ph-aros.com/#pricing): Up to 5 members, 50 GB storage, 1,000 AI document reads per month, shared workspace with roles and invites, priority email support. (Hosted beta, waitlist.)
 - [Dedicated · €29/month](https://ph-aros.com/#pricing): Everything in Pro, plus an isolated instance, unlimited members, 500 GB storage, unlimited AI with your own key, and a custom domain. (Hosted beta, waitlist.)
 
-The paid hosted plans can be billed monthly or annually. Annual billing charges ten months up front, so two months are free per year (Pro €90/year, Dedicated €290/year). The Free plan has no annual option, since there is nothing to bill. Every hosted plan includes nightly backups and can be cancelled anytime. AI document reads are included up to each plan's monthly quota; Dedicated instead runs unlimited reads against an AI key you supply.
+The hosted plans can be billed monthly or annually. Annual billing charges ten months up front, so two months are free per year (Pro €90/year, Dedicated €290/year). Both start with the same 14-day free trial; if the trial lapses without billing, the workspace is suspended rather than deleted and reactivates the moment a payment method is added. Every hosted plan includes nightly backups and can be cancelled anytime. AI document reads are included up to each plan's monthly quota; Dedicated instead runs unlimited reads against an AI key you supply.
 
 Hosted prices are indicative during the beta and may change before general availability.
 

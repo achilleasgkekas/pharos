@@ -182,9 +182,10 @@ export default function TermsOfService() {
         <Section id="billing" title="6. Plans and billing">
           <p>
             Paid hosted plans are billed in advance through {PROCESSOR}, our third-party
-            payment processor. Plans are the free self-hosted edition and the Free, Pro,
-            and Dedicated hosted tiers; the exact fees, billing cycle, and any trial
-            terms are shown at checkout before you are charged. Annual billing is offered
+            payment processor. Plans are the free self-hosted edition and the Pro and
+            Dedicated hosted tiers. Each hosted workspace starts with a 14-day free trial
+            and is paid after it; there is no permanent free hosted plan. The exact fees,
+            billing cycle, and trial terms are shown at checkout before you are charged. Annual billing is offered
             at a discount to paying monthly (two months free). You can cancel to stop
             future renewals; unless stated otherwise, cancellation takes effect at the
             end of the current billing period and is not prorated.
