@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { connectDB } from '@/lib/db';
-import { ShoppingListItem } from '@/models/ShoppingListItem';
+import { ShoppingListItem as ShoppingListItemModel } from '@/models/ShoppingListItem';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { parseProductPhoto, type ParsedProductPhoto } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { assertCanWrite } from '@/lib/auth';
@@ -53,10 +55,13 @@ function aiError(err: unknown): string {
 }
 
 export async function getListItems(): Promise<SerializedListItem[]> {
-  await connectDB();
-  // Unchecked first, then newest. Checked items sink to the bottom.
-  const docs = (await ShoppingListItem.find().sort({ checked: 1, createdAt: -1 }).lean()) as ListItemLean[];
-  return docs.map(serialize);
+  return withRequestTenant(async () => {
+    await connectDB();
+    const ShoppingListItem = await currentModel(ShoppingListItemModel);
+    // Unchecked first, then newest. Checked items sink to the bottom.
+    const docs = (await ShoppingListItem.find().sort({ checked: 1, createdAt: -1 }).lean()) as ListItemLean[];
+    return docs.map(serialize);
+  });
 }
 
 /** Vision-parse a product photo → suggested list entry (no save; the user verifies). */
@@ -79,55 +84,70 @@ export async function addListItem(data: NewItem): Promise<{ ok: boolean; error?:
   await assertCanWrite();
   const name = (data.name || '').trim();
   if (!name) return { ok: false, error: 'Name required' };
-  await connectDB();
-  await ShoppingListItem.create({
-    name,
-    quantity: (data.quantity || '').trim(),
-    category: (data.category || '').trim(),
-    brand: (data.brand || '').trim(),
-    note: (data.note || '').trim(),
-    aiScanned: !!data.aiScanned,
-    checked: false,
+  return withRequestTenant(async () => {
+    await connectDB();
+    const ShoppingListItem = await currentModel(ShoppingListItemModel);
+    await ShoppingListItem.create({
+      name,
+      quantity: (data.quantity || '').trim(),
+      category: (data.category || '').trim(),
+      brand: (data.brand || '').trim(),
+      note: (data.note || '').trim(),
+      aiScanned: !!data.aiScanned,
+      checked: false,
+    });
+    revalidatePath('/shopping-list');
+    return { ok: true };
   });
-  revalidatePath('/shopping-list');
-  return { ok: true };
 }
 
 // `found` reports whether a live (non-trashed) doc matched — lets the REST layer
 // return 404 instead of a silent success. The web UI ignores the return value.
 export async function updateListItem(id: string, data: Partial<NewItem>): Promise<{ ok: boolean; found: boolean }> {
   await assertCanWrite();
-  await connectDB();
   const set: Record<string, string> = {};
   for (const k of ['name', 'quantity', 'category', 'brand', 'note'] as const) {
     if (data[k] !== undefined) set[k] = String(data[k]).trim();
   }
-  const r = await ShoppingListItem.updateOne({ _id: id }, { $set: set });
-  revalidatePath('/shopping-list');
-  return { ok: true, found: (r.matchedCount ?? 0) > 0 };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const ShoppingListItem = await currentModel(ShoppingListItemModel);
+    const r = await ShoppingListItem.updateOne({ _id: id }, { $set: set });
+    revalidatePath('/shopping-list');
+    return { ok: true, found: (r.matchedCount ?? 0) > 0 };
+  });
 }
 
 export async function toggleListItem(id: string, checked: boolean): Promise<{ ok: boolean; found: boolean }> {
   await assertCanWrite();
-  await connectDB();
-  const r = await ShoppingListItem.updateOne({ _id: id }, { $set: { checked } });
-  revalidatePath('/shopping-list');
-  return { ok: true, found: (r.matchedCount ?? 0) > 0 };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const ShoppingListItem = await currentModel(ShoppingListItemModel);
+    const r = await ShoppingListItem.updateOne({ _id: id }, { $set: { checked } });
+    revalidatePath('/shopping-list');
+    return { ok: true, found: (r.matchedCount ?? 0) > 0 };
+  });
 }
 
 export async function deleteListItem(id: string): Promise<{ ok: boolean; found: boolean }> {
   await assertCanWrite();
-  await connectDB();
-  const r = await ShoppingListItem.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
-  revalidatePath('/shopping-list');
-  return { ok: true, found: (r.matchedCount ?? 0) > 0 };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const ShoppingListItem = await currentModel(ShoppingListItemModel);
+    const r = await ShoppingListItem.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+    revalidatePath('/shopping-list');
+    return { ok: true, found: (r.matchedCount ?? 0) > 0 };
+  });
 }
 
 /** Remove everything already ticked off (soft-delete → recoverable from Trash). */
 export async function clearChecked(): Promise<{ ok: boolean; cleared: number }> {
   await assertCanWrite();
-  await connectDB();
-  const r = await ShoppingListItem.updateMany({ checked: true }, { $set: { deletedAt: new Date() } });
-  revalidatePath('/shopping-list');
-  return { ok: true, cleared: r.modifiedCount ?? 0 };
+  return withRequestTenant(async () => {
+    await connectDB();
+    const ShoppingListItem = await currentModel(ShoppingListItemModel);
+    const r = await ShoppingListItem.updateMany({ checked: true }, { $set: { deletedAt: new Date() } });
+    revalidatePath('/shopping-list');
+    return { ok: true, cleared: r.modifiedCount ?? 0 };
+  });
 }

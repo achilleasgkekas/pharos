@@ -95,7 +95,7 @@
   - **Fix**: ίδιο recipe.
   - Επαλήθευση: `grep -c "withRequestTenant\|currentModel" apps/web/src/app/shopping-list/actions.ts` ≥ 6· npm run type-check exits 0.
   - npm run type-check exits 0
-- Status: TODO (flagged 2026-07-30, 61η σάρωση reviewer routine)
+- Status: DONE (fixed 2026-08-03, pharos-daily-dev) — και τα 6 exports (`getListItems`/`addListItem`/`updateListItem`/`toggleListItem`/`deleteListItem`/`clearChecked`) τρέχουν πλέον μέσα σε `withRequestTenant` με `currentModel(ShoppingListItemModel)`. Το `assertCanWrite()` και το blank-name short-circuit του `addListItem` έμειναν ΠΡΙΝ το wrap (ο writeGuard scanner τα βλέπει, και ένα no-op δεν κοστίζει tenant resolution). Το read path καλύπτεται από το ίδιο το `getListItems` (το `page.tsx` απλά το καλεί), όπως και το `/api/v1/shopping-list` (GET/POST καλούν τις ίδιες actions). Επαλήθευση: `grep -c "withRequestTenant\|currentModel"` → **14** (≥6)· **negative control** πρώτα, όχι ισχυρισμός — ένα `currentModel` πίσω σε direct model έριξε **3/7** νέα tests στο create path και **1/7** στο read path, μετά restore. Νέο `actions.tenant.test.ts` (7 tests, tagged seam ανά tenant + tagged rows στο read). `npm run type-check` EXIT 0· full `npx vitest run` **5506 passed / 346 files** (+7 tests, +1 file, μηδέν regression). Safe Docker rebuild: mongo healthy πριν, `/login` 200 με την πρώτη, `/shopping-list` 307 (auth-gated route compiled), RestartCount 0, browser pane → «Sign in · Pharos» χωρίς console errors, build cache pruned.
 
 ### `history/actions.ts` παρακάμπτει το tenant-scoping (AI conversation history)
 - Priority: P2

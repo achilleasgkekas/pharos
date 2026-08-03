@@ -43,6 +43,10 @@ const {
 }));
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
+// Flat tenancy seam: this file pins the CRUD behaviour itself. The tenant ROUTING is pinned
+// tenant-aware in the sibling actions.tenant.test.ts.
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: any) => m }));
 vi.mock('@/models/ShoppingListItem', () => ({
   ShoppingListItem: {
     find: () => ({ sort: () => ({ lean: itemFind }) }),
