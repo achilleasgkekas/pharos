@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
+import { useOpenParam } from '@/components/useOpenParam';
 import { BarcodeDisplay } from '@/components/BarcodeDisplay';
 import { BARCODE_FORMATS, guessBarcodeFormat, type BarcodeFormat } from '@/lib/loyaltyCard';
 import type { SerializedLoyaltyCard } from '@/types';
@@ -16,6 +17,17 @@ export function LoyaltyCardsClient({ cards }: { cards: SerializedLoyaltyCard[] }
   const [editing, setEditing] = useState<SerializedLoyaltyCard | null>(null);
   const [viewing, setViewing] = useState<SerializedLoyaltyCard | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+
+  // Deep-link from global search: /vouchers?tab=loyalty&open=<id> (the shell picks the tab).
+  // Opens the BARCODE view, not the edit form: searching for a loyalty card at the till means
+  // "show me the thing the scanner reads".
+  useOpenParam((id) => {
+    const c = cards.find((x) => x._id === id);
+    if (c) {
+      if (c.archived) setShowArchived(true);
+      setViewing(c);
+    }
+  });
 
   const visible = useMemo(() => cards.filter((c) => showArchived || !c.archived), [cards, showArchived]);
   const activeCount = useMemo(() => cards.filter((c) => !c.archived).length, [cards]);

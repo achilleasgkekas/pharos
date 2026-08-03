@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
+import { useOpenParam } from '@/components/useOpenParam';
 import { cur } from '@/lib/money';
 import { giftCardBalance, giftCardSpentPct, giftCardDaysLeft } from '@/lib/giftcard';
 import type { SerializedGiftCard } from '@/types';
@@ -39,6 +40,17 @@ export function GiftCardsClient({ giftCards }: { giftCards: SerializedGiftCard[]
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<SerializedGiftCard | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+
+  // Deep-link from global search: /vouchers?tab=giftcards&open=<id> (the shell picks the tab).
+  useOpenParam((id) => {
+    const g = giftCards.find((x) => x._id === id);
+    // An archived / fully-spent card is hidden behind the "show archived" toggle, so reveal it
+    // too — otherwise the search hit opens a modal over a list that appears not to contain it.
+    if (g) {
+      if (g.archived) setShowArchived(true);
+      setEditing(g);
+    }
+  });
 
   const live = useMemo(() => giftCards.filter((g) => !g.archived && giftCardBalance(g.initialAmount, g.uses) > 0.009), [giftCards]);
   const totalUnspent = useMemo(() => live.reduce((s, g) => s + giftCardBalance(g.initialAmount, g.uses), 0), [live]);

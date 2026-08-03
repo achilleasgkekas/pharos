@@ -24,6 +24,11 @@ const {
   subscriptionFind,
   expenseFind,
   voucherFind,
+  billFind,
+  goalFind,
+  giftCardFind,
+  loyaltyCardFind,
+  shoppingListFind,
 } = vi.hoisted(() => {
   function chain(rows: unknown[]) {
     return { limit: () => ({ select: () => ({ lean: async () => rows }) }) };
@@ -37,6 +42,11 @@ const {
     subscriptionFind: vi.fn(() => chain([])),
     expenseFind: vi.fn(() => chain([])),
     voucherFind: vi.fn(() => chain([])),
+    billFind: vi.fn(() => chain([])),
+    goalFind: vi.fn(() => chain([])),
+    giftCardFind: vi.fn(() => chain([])),
+    loyaltyCardFind: vi.fn(() => chain([])),
+    shoppingListFind: vi.fn(() => chain([])),
   };
 });
 
@@ -48,6 +58,11 @@ vi.mock('@/models/Task', () => ({ Task: { find: taskFind } }));
 vi.mock('@/models/Subscription', () => ({ Subscription: { find: subscriptionFind } }));
 vi.mock('@/models/Expense', () => ({ Expense: { find: expenseFind } }));
 vi.mock('@/models/Voucher', () => ({ Voucher: { find: voucherFind } }));
+vi.mock('@/models/Bill', () => ({ Bill: { find: billFind } }));
+vi.mock('@/models/Goal', () => ({ Goal: { find: goalFind } }));
+vi.mock('@/models/GiftCard', () => ({ GiftCard: { find: giftCardFind } }));
+vi.mock('@/models/LoyaltyCard', () => ({ LoyaltyCard: { find: loyaltyCardFind } }));
+vi.mock('@/models/ShoppingListItem', () => ({ ShoppingListItem: { find: shoppingListFind } }));
 
 import { searchAll } from './search-actions';
 
@@ -64,6 +79,11 @@ beforeEach(() => {
   subscriptionFind.mockReturnValue(chainOf([]));
   expenseFind.mockReturnValue(chainOf([]));
   voucherFind.mockReturnValue(chainOf([]));
+  billFind.mockReturnValue(chainOf([]));
+  goalFind.mockReturnValue(chainOf([]));
+  giftCardFind.mockReturnValue(chainOf([]));
+  loyaltyCardFind.mockReturnValue(chainOf([]));
+  shoppingListFind.mockReturnValue(chainOf([]));
 });
 
 describe('searchAll — min-length guard', () => {
@@ -173,5 +193,88 @@ describe('searchAll — this is exactly what GET /api/v1/search forwards to mobi
       title: 'i-system.gr',
       subtitle: 'Receipt · 04/07/2025 · €89 · Crucial 16GB DDR4',
     });
+  });
+});
+
+// P66 — the five modules that shipped after this file was written (Bills, Goals, Gift cards,
+// Loyalty cards, Shopping list) were invisible to BOTH the navbar search and the AI assistant's
+// search_data tool. These pin that they are queried at all, and that each hit carries a href a
+// human can actually follow, which is where the interesting per-type differences live: three of
+// them have no `?open=` detail to open, and two need the /vouchers shell to switch tab first.
+describe('searchAll — the five late-arriving modules (P66)', () => {
+  it('queries all twelve collections, not just the original seven', async () => {
+    await searchAll('milk');
+
+    for (const find of [itemFind, receiptFind, statementFind, taskFind, subscriptionFind, expenseFind, voucherFind, billFind, goalFind, giftCardFind, loyaltyCardFind, shoppingListFind]) {
+      expect(find).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('a bill hit deep-links to /bills and says whether it is still due', async () => {
+    billFind.mockReturnValue(
+      chainOf([{ _id: 'b1', title: 'ΔΕΗ ρεύμα', vendor: 'ΔΕΗ', amount: 84, dueDate: new Date('2026-08-10T00:00:00Z'), paidAt: null }])
+    );
+    const [hit] = await searchAll('ΔΕΗ');
+
+    expect(hit).toMatchObject({ type: 'bill', id: 'b1', title: 'ΔΕΗ ρεύμα', href: '/bills?open=b1' });
+    expect(hit.subtitle).toContain('due 10/08/2026');
+    expect(hit.subtitle).toContain('ΔΕΗ');
+  });
+
+  it('a paid bill says "paid" rather than a due date', async () => {
+    billFind.mockReturnValue(
+      chainOf([{ _id: 'b2', title: 'ΟΤΕ', amount: 29, dueDate: new Date('2026-07-01T00:00:00Z'), paidAt: new Date('2026-07-02T00:00:00Z') }])
+    );
+    const [hit] = await searchAll('ΟΤΕ');
+
+    expect(hit.subtitle).toContain('paid');
+    expect(hit.subtitle).not.toContain('due');
+  });
+
+  it('a goal links to the /reports section, since goals have no detail modal to open', async () => {
+    goalFind.mockReturnValue(chainOf([{ _id: 'g1', title: 'Sailing trip', targetAmount: 3000, category: 'travel' }]));
+    const [hit] = await searchAll('sailing');
+
+    expect(hit).toMatchObject({ type: 'goal', id: 'g1', href: '/reports#goals' });
+    expect(hit.href).not.toContain('open=');
+  });
+
+  it('a gift card reports the REMAINING balance, not its face value', async () => {
+    giftCardFind.mockReturnValue(
+      chainOf([{ _id: 'gc1', title: 'IKEA gift card', store: 'IKEA', initialAmount: 100, uses: [{ amount: 30 }, { amount: 12.5 }] }])
+    );
+    const [hit] = await searchAll('ikea');
+
+    expect(hit).toMatchObject({ type: 'giftcard', href: '/vouchers?tab=giftcards&open=gc1' });
+    // 100 − 42.50 spent. Showing the face value would be actively misleading at a till.
+    expect(hit.subtitle).toContain('57.50 left');
+  });
+
+  it('a loyalty card deep-links to its own tab', async () => {
+    loyaltyCardFind.mockReturnValue(chainOf([{ _id: 'lc1', title: 'AB Card', store: 'AB', cardNumber: '12345' }]));
+    const [hit] = await searchAll('AB');
+
+    expect(hit).toMatchObject({ type: 'loyaltycard', href: '/vouchers?tab=loyalty&open=lc1' });
+    expect(hit.subtitle).toContain('AB');
+  });
+
+  it('a shopping-list line links to the flat list and marks bought lines', async () => {
+    shoppingListFind.mockReturnValue(
+      chainOf([{ _id: 'sl1', name: 'Milk', quantity: '2L', brand: 'Farma', checked: true }])
+    );
+    const [hit] = await searchAll('milk');
+
+    expect(hit).toMatchObject({ type: 'shoppinglist', title: 'Milk', href: '/shopping-list' });
+    expect(hit.subtitle).toContain('2L');
+    expect(hit.subtitle).toContain('bought');
+  });
+
+  it('searches a loyalty card by the number printed under its barcode, not just the name', async () => {
+    await searchAll('7622300');
+
+    // The hoisted stub is declared with no parameters, so its recorded args are an empty
+    // tuple as far as TS is concerned — go through `unknown` to read the real filter.
+    const filter = loyaltyCardFind.mock.calls[0] as unknown as [{ $or: Record<string, unknown>[] }];
+    expect(filter[0].$or.some((c) => 'cardNumber' in c)).toBe(true);
   });
 });

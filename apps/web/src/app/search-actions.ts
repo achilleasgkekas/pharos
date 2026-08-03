@@ -8,11 +8,33 @@ import { Task } from '@/models/Task';
 import { Subscription } from '@/models/Subscription';
 import { Expense } from '@/models/Expense';
 import { Voucher } from '@/models/Voucher';
+import { Bill } from '@/models/Bill';
+import { Goal } from '@/models/Goal';
+import { GiftCard } from '@/models/GiftCard';
+import { LoyaltyCard } from '@/models/LoyaltyCard';
+import { ShoppingListItem } from '@/models/ShoppingListItem';
 import { OWNED_STATUSES } from '@/lib/itemStatus';
 import { matchedLineItemName } from '@/lib/receiptSearch';
+import { giftCardBalance } from '@/lib/giftcard';
 
+// P66: five modules shipped after this file was written (Bills, Goals, Gift cards, Loyalty
+// cards, Shopping list) were never added here, so both the navbar search AND the AI assistant's
+// search_data tool were blind to them — "where did I put the AB card" returned nothing while the
+// same question about a voucher worked.
 export type SearchHit = {
-  type: 'item' | 'receipt' | 'statement' | 'task' | 'subscription' | 'expense' | 'voucher';
+  type:
+    | 'item'
+    | 'receipt'
+    | 'statement'
+    | 'task'
+    | 'subscription'
+    | 'expense'
+    | 'voucher'
+    | 'bill'
+    | 'goal'
+    | 'giftcard'
+    | 'loyaltycard'
+    | 'shoppinglist';
   id: string;
   title: string;
   subtitle: string;
@@ -29,6 +51,11 @@ type TaskLean = { _id: unknown; title: string; status: string };
 type SubscriptionLean = { _id: unknown; name: string; amount?: number; billingCycle?: string };
 type ExpenseLean = { _id: unknown; vendor?: string; kind?: string; amount?: number | null; date?: string | Date; category?: string };
 type VoucherLean = { _id: unknown; title: string; store?: string; discount?: string; used?: boolean };
+type BillLean = { _id: unknown; title: string; vendor?: string; amount?: number; dueDate?: string | Date; paidAt?: string | Date | null };
+type GoalLean = { _id: unknown; title: string; targetAmount?: number; category?: string; archived?: boolean };
+type GiftCardLean = { _id: unknown; title: string; store?: string; initialAmount?: number; uses?: { amount: number }[]; archived?: boolean };
+type LoyaltyCardLean = { _id: unknown; title: string; store?: string; cardNumber?: string; archived?: boolean };
+type ShoppingListLean = { _id: unknown; name: string; quantity?: string; category?: string; brand?: string; checked?: boolean };
 
 function rx(query: string): RegExp {
   return new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -41,7 +68,7 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
   const r = rx(q);
   await connectDB();
 
-  const [items, receipts, statements, tasks, subs, expenses, vouchers] = await Promise.all([
+  const [items, receipts, statements, tasks, subs, expenses, vouchers, bills, goals, giftCards, loyaltyCards, listItems] = await Promise.all([
     Item.find({ $or: [{ title: r }, { specs: r }, { notes: r }, { tags: r }, { serialNumber: r }] })
       .limit(8)
       .select('title status currentPrice purchasedPrice')
@@ -72,6 +99,26 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
       .limit(6)
       .select('title store discount used')
       .lean<VoucherLean[]>(),
+    Bill.find({ $or: [{ title: r }, { vendor: r }, { category: r }, { notes: r }] })
+      .limit(6)
+      .select('title vendor amount dueDate paidAt')
+      .lean<BillLean[]>(),
+    Goal.find({ $or: [{ title: r }, { category: r }, { notes: r }] })
+      .limit(6)
+      .select('title targetAmount category archived')
+      .lean<GoalLean[]>(),
+    GiftCard.find({ $or: [{ title: r }, { store: r }, { code: r }, { notes: r }] })
+      .limit(6)
+      .select('title store initialAmount uses archived')
+      .lean<GiftCardLean[]>(),
+    LoyaltyCard.find({ $or: [{ title: r }, { store: r }, { cardNumber: r }, { notes: r }] })
+      .limit(6)
+      .select('title store cardNumber archived')
+      .lean<LoyaltyCardLean[]>(),
+    ShoppingListItem.find({ $or: [{ name: r }, { category: r }, { brand: r }, { note: r }] })
+      .limit(6)
+      .select('name quantity category brand checked')
+      .lean<ShoppingListLean[]>(),
   ]);
 
   const hits: SearchHit[] = [];
@@ -149,6 +196,63 @@ export async function searchAll(query: string): Promise<SearchHit[]> {
       title: v.title,
       subtitle: `Voucher · ${v.store || '—'} · ${v.discount || ''}${v.used ? ' · used' : ''}`,
       href: `/vouchers?open=${id}`,
+    });
+  }
+  for (const b of bills) {
+    const id = String(b._id);
+    const due = b.dueDate ? new Date(b.dueDate).toLocaleDateString('en-GB') : '';
+    hits.push({
+      type: 'bill',
+      id,
+      title: b.title,
+      subtitle: `Bill · ${b.paidAt ? 'paid' : `due ${due}`} · ${cur()}${b.amount ?? 0}${b.vendor ? ` · ${b.vendor}` : ''}`,
+      href: `/bills?open=${id}`,
+    });
+  }
+  for (const g of goals) {
+    const id = String(g._id);
+    hits.push({
+      type: 'goal',
+      id,
+      // Goals live as a section inside /reports, not a page with a detail modal, so the
+      // deep link is the anchor rather than ?open= (which nothing there would consume).
+      title: g.title,
+      subtitle: `Goal · ${cur()}${g.targetAmount ?? 0} target${g.category ? ` · ${g.category}` : ''}${g.archived ? ' · closed' : ''}`,
+      href: '/reports#goals',
+    });
+  }
+  for (const gc of giftCards) {
+    const id = String(gc._id);
+    const left = giftCardBalance(gc.initialAmount ?? 0, gc.uses ?? []);
+    hits.push({
+      type: 'giftcard',
+      id,
+      title: gc.title,
+      subtitle: `Gift card · ${cur()}${left.toFixed(2)} left${gc.store ? ` · ${gc.store}` : ''}${gc.archived ? ' · closed' : ''}`,
+      href: `/vouchers?tab=giftcards&open=${id}`,
+    });
+  }
+  for (const lc of loyaltyCards) {
+    const id = String(lc._id);
+    hits.push({
+      type: 'loyaltycard',
+      id,
+      title: lc.title,
+      subtitle: `Loyalty card · ${lc.store || '—'}${lc.archived ? ' · archived' : ''}`,
+      href: `/vouchers?tab=loyalty&open=${id}`,
+    });
+  }
+  for (const li of listItems) {
+    const id = String(li._id);
+    const bits = [li.quantity, li.brand, li.category].filter(Boolean).join(' · ');
+    hits.push({
+      type: 'shoppinglist',
+      id,
+      // The shopping list is a flat checklist with no per-row detail modal, so there is
+      // nothing for ?open= to open — the link just lands on the list.
+      title: li.name,
+      subtitle: `Shopping list${bits ? ` · ${bits}` : ''}${li.checked ? ' · bought' : ''}`,
+      href: '/shopping-list',
     });
   }
 

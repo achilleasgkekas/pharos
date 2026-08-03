@@ -13,6 +13,11 @@ import { Expense } from '@/models/Expense';
 import { Receipt } from '@/models/Receipt';
 import { Statement } from '@/models/Statement';
 import { ShoppingListItem } from '@/models/ShoppingListItem';
+import { Voucher } from '@/models/Voucher';
+import { Bill } from '@/models/Bill';
+import { Goal } from '@/models/Goal';
+import { GiftCard } from '@/models/GiftCard';
+import { LoyaltyCard } from '@/models/LoyaltyCard';
 import { addExpense } from './expenses/actions';
 import { importItemFromUrl, logItemPrice } from './items/actions';
 import { getAppSettings } from '@/lib/appSettings';
@@ -22,6 +27,75 @@ import { safeDate } from '@/lib/dates';
 import { revalidatePath } from 'next/cache';
 import type { AnthropicTool } from '@/lib/anthropic';
 import type { SerializedStatement } from '@/types';
+
+// P66 — what the assistant may edit or delete. This used to be three types while search_data
+// could FIND twelve, so "mark the ΔΕΗ bill as paid" or "add milk to the shopping list" found the
+// record and then failed, while the identical sentence about a task worked.
+//
+// Two deliberate exclusions from the otherwise symmetric "findable ⇒ actionable" rule:
+//   - `statement`: the ONLY searchable model without the soft-delete plugin (its unique
+//     {card, period} index would block re-importing a month while a trashed copy held the slot).
+//     A delete here could not be undone, so delete_record's own promise — "recoverable from
+//     Trash for 30 days" — would be a lie. Statements are parsed documents anyway: they are
+//     re-imported from the PDF, not hand-edited.
+//   - `receipt`: same reasoning about being a scanned document with a file, line items and
+//     installment links behind it. Findable (that is the point of P22), but not AI-editable.
+const EDITABLE_MODELS = {
+  item: Item,
+  task: Task,
+  subscription: Subscription,
+  expense: Expense,
+  voucher: Voucher,
+  bill: Bill,
+  goal: Goal,
+  giftcard: GiftCard,
+  loyaltycard: LoyaltyCard,
+  shoppinglist: ShoppingListItem,
+} as const;
+
+export type EditableType = keyof typeof EDITABLE_MODELS;
+export const EDITABLE_TYPES = Object.keys(EDITABLE_MODELS) as EditableType[];
+
+// Pages to refresh after a write, per type — beats revalidating every route on every edit.
+const REVALIDATE: Record<EditableType, string[]> = {
+  item: ['/items', '/shopping'],
+  task: ['/tasks'],
+  subscription: ['/subscriptions'],
+  expense: ['/expenses', '/income'],
+  voucher: ['/vouchers'],
+  bill: ['/bills'],
+  goal: ['/reports'],
+  giftcard: ['/vouchers'],
+  loyaltycard: ['/vouchers'],
+  shoppinglist: ['/shopping-list'],
+};
+
+// Fields the assistant must never $set. `_id`/`deletedAt`/`__v` are structural; the two arrays
+// are money ledgers (a gift card's spend log, a goal's contributions) whose running balance is
+// derived from them — a language model rewriting one wholesale would silently restate a balance.
+// Those stay UI-only, exactly as the approved spec asked.
+const ALWAYS_BLOCKED = ['_id', '__v', 'deletedAt'];
+const BLOCKED_FIELDS: Partial<Record<EditableType, string[]>> = {
+  giftcard: ['uses'],
+  goal: ['contributions'],
+};
+
+function modelFor(type: string): (typeof EDITABLE_MODELS)[EditableType] | null {
+  return Object.prototype.hasOwnProperty.call(EDITABLE_MODELS, type) ? EDITABLE_MODELS[type as EditableType] : null;
+}
+
+/** Split an update into what may be written and what must be refused (never silently dropped). */
+function screenFields(type: EditableType, fields: Record<string, unknown>): { allowed: Record<string, unknown>; blocked: string[] } {
+  const deny = [...ALWAYS_BLOCKED, ...(BLOCKED_FIELDS[type] ?? [])];
+  const allowed: Record<string, unknown> = {};
+  const blocked: string[] = [];
+  for (const [k, v] of Object.entries(fields)) {
+    // Compare on the root key so a dotted path (`uses.0.amount`) cannot smuggle a blocked field.
+    if (deny.includes(k.split('.')[0])) blocked.push(k);
+    else allowed[k] = v;
+  }
+  return { allowed, blocked };
+}
 
 export const TOOLS: AnthropicTool[] = [
   {
@@ -109,29 +183,36 @@ export const TOOLS: AnthropicTool[] = [
   },
   {
     name: 'search_data',
-    description: 'Search everything (items, receipts, statements, subscriptions, tasks) for a keyword. Returns each result with its [type id] so you can edit/delete it.',
+    description:
+      'Search everything (items, receipts, statements, subscriptions, tasks, expenses, vouchers, bills, goals, gift cards, loyalty cards, the shopping list) for a keyword. Returns each result with its [type id] so you can edit/delete it.',
     input_schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
   },
   {
     name: 'update_record',
-    description: 'Edit an existing item/task/subscription. First search_data to find its type + id, confirm the change with the user, THEN call this. fields = the properties to set.',
+    description:
+      'Edit an existing record. First search_data to find its type + id, confirm the change with the user, THEN call this. fields = the properties to set. Receipts and statements are searchable but NOT editable here (they are parsed from a scanned document — re-import instead).',
     input_schema: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['item', 'task', 'subscription'] },
+        type: { type: 'string', enum: [...EDITABLE_TYPES] },
         id: { type: 'string', description: 'the 24-char id from search_data' },
-        fields: { type: 'object', description: 'properties to set, e.g. {"status":"done"} or {"amount":12.99,"category":"streaming"}' },
+        fields: {
+          type: 'object',
+          description:
+            'properties to set, e.g. {"status":"done"}, {"amount":12.99,"category":"streaming"}, {"paidAt":"2026-08-03"} to mark a bill paid, or {"checked":true} for a shopping-list line. A gift card\'s spend log and a goal\'s contributions cannot be set here.',
+        },
       },
       required: ['type', 'id', 'fields'],
     },
   },
   {
     name: 'delete_record',
-    description: 'Delete an item/task/subscription. First search_data to find its type + id, then CONFIRM with the user before calling — deletion is permanent.',
+    description:
+      'Delete a record. First search_data to find its type + id, then CONFIRM with the user before calling. The record goes to the Trash and is recoverable for 30 days. Receipts and statements cannot be deleted here.',
     input_schema: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['item', 'task', 'subscription'] },
+        type: { type: 'string', enum: [...EDITABLE_TYPES] },
         id: { type: 'string', description: 'the 24-char id from search_data' },
       },
       required: ['type', 'id'],
@@ -148,9 +229,6 @@ function n(input: Record<string, unknown>, key: string): number {
   return typeof v === 'number' ? v : Number(v) || 0;
 }
 export const today = () => new Date().toISOString().slice(0, 10);
-function modelFor(type: string): typeof Item | typeof Task | typeof Subscription | null {
-  return type === 'item' ? Item : type === 'task' ? Task : type === 'subscription' ? Subscription : null;
-}
 
 export async function execute(name: string, input: Record<string, unknown>): Promise<{ summary: string; content: string }> {
   try {
@@ -296,20 +374,31 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
       const id = s(input, 'id');
       const fields = input.fields && typeof input.fields === 'object' && !Array.isArray(input.fields) ? (input.fields as Record<string, unknown>) : {};
       const Model = modelFor(type);
-      if (!Model || !/^[a-f\d]{24}$/i.test(id)) return { summary: 'update failed', content: 'Need a valid type + id (use search_data first).' };
+      if (!Model || !/^[a-f\d]{24}$/i.test(id)) return { summary: 'update failed', content: `Need a valid type + id (use search_data first). Editable types: ${EDITABLE_TYPES.join(', ')}.` };
       if (!Object.keys(fields).length) return { summary: 'update failed', content: 'No fields given to change.' };
-      await (Model as typeof Item).updateOne({ _id: id }, { $set: fields });
-      revalidatePath('/items'); revalidatePath('/shopping'); revalidatePath('/tasks'); revalidatePath('/subscriptions');
-      return { summary: `updated ${type}`, content: `Updated the ${type}.` };
+      const { allowed, blocked } = screenFields(type as EditableType, fields);
+      // Refuse rather than quietly drop: an assistant told "done" would report a balance
+      // change to the user that never happened.
+      if (!Object.keys(allowed).length) {
+        return { summary: 'update failed', content: `Cannot change ${blocked.join(', ')} on a ${type} — edit that in the app.` };
+      }
+      const r = await (Model as typeof Item).updateOne({ _id: id }, { $set: allowed });
+      if (!(r.matchedCount ?? 0)) return { summary: 'update failed', content: `No ${type} with that id (search_data again — it may have been deleted).` };
+      for (const p of REVALIDATE[type as EditableType]) revalidatePath(p);
+      const note = blocked.length ? ` (ignored ${blocked.join(', ')} — not editable here)` : '';
+      return { summary: `updated ${type}`, content: `Updated the ${type}.${note}` };
     }
     case 'delete_record': {
       const type = s(input, 'type');
       const id = s(input, 'id');
       const Model = modelFor(type);
-      if (!Model || !/^[a-f\d]{24}$/i.test(id)) return { summary: 'delete failed', content: 'Need a valid type + id (use search_data first).' };
-      // Soft delete → recoverable from the Trash (Settings → Storage & data).
-      await (Model as typeof Item).updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
-      revalidatePath('/items'); revalidatePath('/shopping'); revalidatePath('/tasks'); revalidatePath('/subscriptions');
+      if (!Model || !/^[a-f\d]{24}$/i.test(id)) return { summary: 'delete failed', content: `Need a valid type + id (use search_data first). Deletable types: ${EDITABLE_TYPES.join(', ')}.` };
+      // Soft delete → recoverable from the Trash (Settings → Storage & data). Every model
+      // reachable here carries the soft-delete plugin; that is exactly why `statement` is not
+      // reachable here (see EDITABLE_MODELS).
+      const r = await (Model as typeof Item).updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+      if (!(r.matchedCount ?? 0)) return { summary: 'delete failed', content: `No ${type} with that id (search_data again — it may already be gone).` };
+      for (const p of REVALIDATE[type as EditableType]) revalidatePath(p);
       return { summary: `deleted ${type}`, content: `Deleted the ${type} (recoverable from Settings → Trash for 30 days).` };
     }
     default:

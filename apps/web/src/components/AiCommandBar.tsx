@@ -3,6 +3,7 @@ import { useState, useRef, useTransition, useEffect } from 'react';
 import {
   Sparkles, ArrowUp, Loader2, Check, X, RotateCcw, Search,
   Package, Receipt as ReceiptIcon, CreditCard, CheckSquare, CalendarClock, Wallet, Ticket,
+  FileText, Target, Barcode, ShoppingCart,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { runAiCommand, type ChatTurn } from '@/app/aiCommandActions';
@@ -41,6 +42,11 @@ const TYPE_ICON: Record<SearchHit['type'], React.ComponentType<{ size?: number; 
   subscription: CalendarClock,
   expense: Wallet,
   voucher: Ticket,
+  bill: FileText,
+  goal: Target,
+  giftcard: CreditCard,
+  loyaltycard: Barcode,
+  shoppinglist: ShoppingCart,
 };
 
 export function AiCommandBar() {

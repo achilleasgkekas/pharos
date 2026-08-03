@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Ticket, CreditCard, Barcode } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { VouchersClient } from './VouchersClient';
@@ -22,7 +23,11 @@ export function VouchersShell({
   giftCards: SerializedGiftCard[];
   loyaltyCards: SerializedLoyaltyCard[];
 }) {
-  const [tab, setTab] = useState<Tab>('coupons');
+  // Global search deep-links a gift/loyalty card as ?tab=<id>&open=<id> (P66). Read the tab
+  // ONCE into state rather than deriving it every render: the child's useOpenParam strips the
+  // query string after opening the detail, which would otherwise snap the tab back to coupons.
+  const initialTab = useSearchParams().get('tab');
+  const [tab, setTab] = useState<Tab>(initialTab === 'giftcards' || initialTab === 'loyalty' ? initialTab : 'coupons');
   const liveCards = giftCards.filter((g) => !g.archived && giftCardBalance(g.initialAmount, g.uses) > 0.009).length;
   const activeVouchers = vouchers.filter((v) => !v.used).length;
   const activeLoyalty = loyaltyCards.filter((c) => !c.archived).length;
