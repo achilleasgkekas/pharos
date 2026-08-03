@@ -147,6 +147,28 @@
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
 
+---
+
+## Approved
+
+> Οι builder/daily-dev routines χτίζουν ΜΟΝΟ από εδώ — **ένα item ανά run**, verify-pre-build πρώτα,
+> με τη σειρά value/effort (τα «πολύ ψηλό value/effort» πρώτα). **Κανόνας ανοιχτών αποφάσεων:** όπου
+> ένα item έχει «Απόφαση που χρειάζεται» και ο Αχιλλέας ΔΕΝ την έλυσε ρητά (μόνο τα PA1/PA2/PA3 έχουν
+> locked defaults), ο builder παίρνει **sensible default**: (α) free-tier behaviour **non-metered**,
+> heavy/AI/SaaS-touching κομμάτια **opt-in**· (β) reuse υπάρχοντος pipeline/pattern· (γ) ξεκίνα από το
+> πιο απλό MVP (heuristic/deterministic πριν AI, single πριν multi). Κατέγραψε την επιλογή στο progress log.
+> Εξαρτήσεις: P5/P17/P23 δένουν με `/api/v1` (§5) + mobile MVP (§6)· P6 feed βοηθά το PA3/P20.
+> **Νεοεγκεκριμένα 2026-07-10 (interactive):** P33, P32, P34, P35, P36 (ranked value/effort· P36 τελευταίο, L).
+
+> **Νεοεγκεκριμένα 2026-08-03 (interactive, «approve all ως έχουν, προχώρα τα»):** P81, P66, P74, P48, P46, P40 — όλα S, με τη σειρά που παρατίθενται. Ο Αχιλλέας ενέκρινε ρητά τα builder defaults του κάθε item ως έχουν, οπότε **καμία «ανοιχτή απόφαση» δεν μένει ανοιχτή σε αυτά τα έξι**: ο builder υλοποιεί ό,τι γράφει το «Ανοιχτή απόφαση (builder default)» πεδίο τους αυτούσιο, χωρίς να ξαναρωτήσει.
+
+> **Νεοεγκεκριμένα 2026-08-03 (interactive, «Approve all»):** P80, P79, P78, P77, P76, P75, P73, P72, P71, P70, P69, P68, P67, P65, P64, P62, P61, P60, P59, P58, P57, P56, P55, P54, P53, P52, P51, P50, P49, P47, P45, P44, P43, P42, P41, P39, P37, P38 — ολόκληρη η υπόλοιπη ουρά του Proposed section, 38 items, «approve all» χωρίς εξαίρεση. Για τα 32 από αυτά ο Αχιλλέας δεν χρειάστηκε να πει τίποτα άλλο, το builder default του κάθε item ισχύει αυτούσιο. **Έξι items είχαν ξεχωριστές ανοιχτές ερωτήσεις στη σάρωση πριν το «approve all» — απαντήθηκαν με το δικό τους δηλωμένο fallback, ΟΧΙ με ρητή απάντηση του Αχιλλέα, μπορεί να χρειαστούν διόρθωση αν ο builder φτάσει σε αυτά πρώτα:**
+> - **P37** — reuse το Subscription model (όχι νέο dedicated Contract model), το ίδιο το item το δηλώνει ως fallback αν δεν λυθεί ρητά.
+> - **P43** (public wishlist link) — εγκρίθηκε ως έχει (token-scoped, ίδιο μοτίβο με το ήδη-shipped calendar `.ics` feed)· ο Αχιλλέας δεν επιβεβαίωσε ρητά ότι θέλει δημόσιο route, απλά δεν το εξαίρεσε.
+> - **P59** (mobile widget) — εγκρίθηκε, αλλά ο builder θα πρέπει να το σειριοποιήσει ΜΕΤΑ το P23 (share-sheet, ήδη blocked σε EAS dev build + φυσική συσκευή) ώστε να μη στοιβάζεται άλλο άτεστο mobile-native κομμάτι.
+> - **P65** (voice quick-capture) — χαμηλής αξίας κατά την αξιολόγηση, εγκρίθηκε ούτως ή άλλως, χτίσου το τελευταίο στη σειρά value/effort.
+> - **P73** (subscription cost-split) / **P76** (emergency access) — και τα δύο χρειάζονται ουσιαστικά δεύτερο ενεργό χρήστη (P31) για να έχουν πρακτική αξία· ο Αχιλλέας δεν επιβεβαίωσε ρητά ότι τα χρησιμοποιεί, χτίσου τα με χαμηλή προτεραιότητα.
+
 ### P80. Outbound webhook delivery reliability (retry + failure log) — S — both, foundation-lever για το ήδη-shipped P24
 - **Αξία:** live-verified `lib/webhooks.ts` — το ήδη-shipped P24 (outbound event webhooks) κάνει **fire-and-forget,
   μία απόπειρα** (`Promise.allSettled` απλά μαζεύει το per-call αποτέλεσμα, `grep -n "retry|attempt|deliveryLog|
@@ -729,21 +751,6 @@
 - **Ανοιχτή απόφαση (builder default):** simple standalone module (όχι tab σε Vouchers — διαφορετικό lifecycle,
   μεγαλύτερα ποσά/μεγαλύτερος κύκλος)· optional linked Items (π.χ. ασφάλεια σπιτιού → κανένα linked item,
   ασφάλεια gadget → linked)· renewal reminder = ίδιο pattern με P33/P28 lead-time.
-
----
-
-## Approved
-
-> Οι builder/daily-dev routines χτίζουν ΜΟΝΟ από εδώ — **ένα item ανά run**, verify-pre-build πρώτα,
-> με τη σειρά value/effort (τα «πολύ ψηλό value/effort» πρώτα). **Κανόνας ανοιχτών αποφάσεων:** όπου
-> ένα item έχει «Απόφαση που χρειάζεται» και ο Αχιλλέας ΔΕΝ την έλυσε ρητά (μόνο τα PA1/PA2/PA3 έχουν
-> locked defaults), ο builder παίρνει **sensible default**: (α) free-tier behaviour **non-metered**,
-> heavy/AI/SaaS-touching κομμάτια **opt-in**· (β) reuse υπάρχοντος pipeline/pattern· (γ) ξεκίνα από το
-> πιο απλό MVP (heuristic/deterministic πριν AI, single πριν multi). Κατέγραψε την επιλογή στο progress log.
-> Εξαρτήσεις: P5/P17/P23 δένουν με `/api/v1` (§5) + mobile MVP (§6)· P6 feed βοηθά το PA3/P20.
-> **Νεοεγκεκριμένα 2026-07-10 (interactive):** P33, P32, P34, P35, P36 (ranked value/effort· P36 τελευταίο, L).
-
-> **Νεοεγκεκριμένα 2026-08-03 (interactive, «approve all ως έχουν, προχώρα τα»):** P81, P66, P74, P48, P46, P40 — όλα S, με τη σειρά που παρατίθενται. Ο Αχιλλέας ενέκρινε ρητά τα builder defaults του κάθε item ως έχουν, οπότε **καμία «ανοιχτή απόφαση» δεν μένει ανοιχτή σε αυτά τα έξι**: ο builder υλοποιεί ό,τι γράφει το «Ανοιχτή απόφαση (builder default)» πεδίο τους αυτούσιο, χωρίς να ξαναρωτήσει.
 
 ### P81. Αυτόματο (scheduled) trigger του notification/alert engine — ✅ SHIPPED 2026-08-03 (pharos-daily-dev, commit `fda8c96`)
 - **Υλοποίηση:** νέο **`app/api/cron/alerts/route.ts`** (POST) που καλεί το ήδη-υπάρχον `runAlertChecks()` **χωρίς
