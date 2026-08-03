@@ -803,8 +803,42 @@
   (παραμένει, απλά παύει να είναι το ΜΟΝΟ trigger)· documentation-only default cadence πρόταση (π.χ. `0 9 * * *`,
   μία φορά το πρωί) — όχι hardcoded στο ίδιο το app, ο χρήστης ελέγχει τη συχνότητα μέσω του δικού του cron.
 
-### P66. Ο AI assistant «βλέπει» μόνο 3-7 από τα 12+ μοντέλα (search/edit/delete coverage gap) — S — both, dogfooding-heavy
-- **Αξία:** live-verified: το `app/search-actions.ts` `searchAll()` (τροφοδοτεί ΚΑΙ το navbar global search ΚΑΙ το
+### P66. Ο AI assistant «βλέπει» μόνο 3-7 από τα 12+ μοντέλα — ✅ SHIPPED 2026-08-03 (pharos-daily-dev, commit `d774dd4`)
+- **Υλοποίηση:** `searchAll` → **12 συλλογές** (+Bill/Goal/GiftCard/LoyaltyCard/ShoppingListItem, ίδιο
+  `$or`/regex pattern· `SearchHit['type']` union +5, οπότε ο compiler ανάγκασε και το `TYPE_ICON` του
+  `AiCommandBar` να συμπληρωθεί). `modelFor` → **10 τύποι** μέσω `EDITABLE_MODELS` map + `EDITABLE_TYPES`
+  (τροφοδοτεί ΚΑΙ τα enum των tool schemas, ώστε registry και dispatcher να μη μπορούν να ξεσυγχρονιστούν).
+- **⚠ Δύο carve-outs ασφάλειας, απόκλιση από το «ό,τι είναι searchable πρέπει να είναι editable»:**
+  (α) **`statement` ΕΞΑΙΡΕΙΤΑΙ** — είναι το **μοναδικό** searchable μοντέλο **χωρίς `softDeletePlugin`** (το
+  unique `{card, period}` index θα μπλόκαρε re-import μήνα όσο trashed αντίγραφο κρατά τη θέση, τεκμηριωμένο
+  στο CLAUDE.md). Ένα delete δεν θα αναιρούνταν, άρα η ίδια η υπόσχεση του `delete_record` («recoverable from
+  Trash for 30 days») θα ήταν **ψέμα**. Το `receipt` εξαιρείται με το ίδιο σκεπτικό (σαρωμένο έγγραφο με
+  αρχείο/line items/installment links). Και τα δύο παραμένουν **searchable** (αυτό ήταν το νόημα του P22).
+  (β) **`GiftCard.uses` / `Goal.contributions`** = ledgers χρημάτων από τα οποία **παράγεται** το υπόλοιπο →
+  blocked, και **με ρητή άρνηση, ΟΧΙ σιωπηλό drop** (ένας assistant που ακούει «done» θα ανέφερε στον χρήστη
+  αλλαγή υπολοίπου που δεν συνέβη). Dotted paths (`uses.0.amount`) ελέγχονται στο root key.
+- **Correctness fix εν παρόδω:** το `update_record` επέστρεφε «Updated the item.» **ακόμα και για id που δεν
+  ταίριαζε με τίποτα** → πλέον και τα δύο tools ελέγχουν `matchedCount`. Το revalidate έγινε **per-type** map
+  αντί για blanket refresh 4 routes σε κάθε edit.
+- **Deep links ανά σελίδα, όχι ομοιόμορφο `?open=`:** gift/loyalty cards ζουν σε **tabs** μέσα στο `/vouchers`,
+  οπότε το `VouchersShell` διαβάζει `?tab=` (**μία φορά σε state** — το `useOpenParam` του παιδιού σβήνει το
+  query string και θα επανέφερε το tab στα coupons αν το διάβαζα reactively) + `useOpenParam` στα δύο clients
+  (archived → ανοίγει και το «show archived», αλλιώς το modal θα άνοιγε πάνω σε λίστα που δεν το περιέχει).
+  Το loyalty hit ανοίγει το **barcode view**, όχι τη φόρμα (ψάχνεις κάρτα στο ταμείο). Goals → `/reports#goals`
+  και shopping-list → `/shopping-list` **χωρίς** `?open=`: δεν έχουν detail modal, μια υπόσχεση ανοίγματος θα
+  ήταν κενή.
+- **Verify:** negative control ΠΡΙΝ — επαναφορά statement/receipt στο map → **4 κόκκινα**· σιωπηλό drop των
+  blocked fields → **5 κόκκινα**. 29 νέα tests (νέο `aiTools.records.test.ts` με 15 που τρέχει τον ΠΡΑΓΜΑΤΙΚΟ
+  `execute()` dispatcher με mocked boundaries — το `aiTools.test.ts` κάλυπτε σκόπιμα μόνο το pure registry, άρα
+  το μοναδικό μονοπάτι όπου ένα LLM γράφει στη βάση ήταν **ακάλυπτο**· +14 στο `search-actions.test.ts`). Το
+  υπάρχον contract assertion (`enum === ['item','task','subscription']`) **σωστά κοκκίνισε** και ενημερώθηκε
+  ρητά. `npm run type-check` EXIT 0· full `npx vitest run` **5590 passed / 4 skipped**. Docker rebuild + serve
+  check: `/login` 200, `/vouchers?tab=giftcards` & `/shopping-list` 307 (auth-gated, compiled), RestartCount 0,
+  browser pane μηδέν console errors, build cache pruned.
+- **ΣΗΜ (όχι δικό μας regression):** το `notifications/actions*.test.ts` κοκκίνισε 2-5 tests σε δύο full runs
+  **λόγω 5s timeout υπό φόρτο** (πολλά routines + Docker builds μαζί)· με `--testTimeout=30000` περνούν και τα
+  34. Μηδέν import από τα αρχεία που άγγιξα (grep-verified). Αξίζει timeout bump από όποιον έχει το territory.
+- **Αξία (αρχικό):** live-verified: το `app/search-actions.ts` `searchAll()` (τροφοδοτεί ΚΑΙ το navbar global search ΚΑΙ το
   AI command-bar `search_data` tool) ψάχνει μόνο **7** μοντέλα (item/receipt/statement/task/subscription/expense/
   voucher). Χειρότερο ακόμα: το `app/aiTools.ts` `modelFor()` (πίσω από `update_record`/`delete_record`) δέχεται
   **μόνο 3** τύπους (`item`/`task`/`subscription`) — δηλαδή ο AI assistant μπορεί να **βρει** ένα expense/receipt/

@@ -11090,3 +11090,42 @@ Goals/GiftCards/LoyaltyCards/ShoppingList εντελώς αόρατα σε updat
   **P23 = ΕΝΕΡΓΟ** πλέον (χτίζεται μέχρι «code complete, awaiting EAS build»)· ανοιχτό μόνο αν υπάρχει Apple
   Developer account, αλλιώς πρώτα το Android μισό.
 - Αμετάβλητα: **P17 live check** σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους.
+
+## 2026-08-03 (cont.²) — P66: ο AI assistant βλέπει και πιάνει όλα τα modules
+
+**Πλαίσιο**: interactive session, δεύτερο item της εγκεκριμένης ουράς (μετά το P81), με ρητό «ναι συνέχισε».
+
+**Το κενό**: το `searchAll` κάλυπτε 7 συλλογές, το `modelFor` (πίσω από `update_record`/`delete_record`) **3**.
+Πέντε modules που shipped αργότερα (Bills, Goals, Gift cards, Loyalty cards, Shopping list) ήταν **αόρατα** και
+στο navbar search και στο AI. «Σημείωσε το ΔΕΗ bill ως πληρωμένο» απλά αποτύγχανε, ενώ η ίδια πρόταση για task
+δούλευε. Τώρα: search σε **12 συλλογές**, edit/delete σε **10 τύπους**.
+
+**Δύο carve-outs που ΔΕΝ ήταν στο spec** (το spec έλεγε «ό,τι είναι searchable να είναι editable»):
+1. **`statement` έξω** — είναι το **μοναδικό** searchable μοντέλο **χωρίς soft-delete** (unique `{card,period}`
+   index). Ένα delete δεν θα αναιρούνταν, άρα το ίδιο το μήνυμα του tool («recoverable from Trash for 30 days»)
+   θα ήταν ψέμα προς τον χρήστη. `receipt` έξω με το ίδιο σκεπτικό. Και τα δύο μένουν **searchable** (P22).
+2. **`GiftCard.uses` / `Goal.contributions` blocked** — ledgers από τα οποία παράγεται υπόλοιπο. **Άρνηση ρητή,
+   όχι σιωπηλό drop**: assistant που ακούει «done» θα ανέφερε αλλαγή υπολοίπου που δεν έγινε. Dotted paths
+   (`uses.0.amount`) ελέγχονται στο root key.
+
+**Correctness fix εν παρόδω**: το `update_record` έλεγε «Updated the item.» **και για ανύπαρκτο id** → πλέον
+`matchedCount` check. Revalidate per-type αντί για blanket 4 routes.
+
+**Deep links ανά σελίδα**: gift/loyalty κάρτες ζουν σε tabs → το shell διαβάζει `?tab=` **μία φορά σε state**
+(το `useOpenParam` σβήνει το query string, reactive read θα επανέφερε το tab)· loyalty hit ανοίγει **barcode**,
+όχι φόρμα. Goals/shopping-list **χωρίς** `?open=` (δεν έχουν detail modal, θα ήταν κενή υπόσχεση).
+
+**Verify**: negative control ΠΡΙΝ — statement/receipt πίσω στο map → **4 κόκκινα**· σιωπηλό drop blocked fields
+→ **5 κόκκινα**. 29 νέα tests· νέο `aiTools.records.test.ts` τρέχει τον **πραγματικό** `execute()` dispatcher
+(το `aiTools.test.ts` κάλυπτε σκόπιμα μόνο το pure registry, άρα το μοναδικό μονοπάτι όπου LLM γράφει στη βάση
+ήταν ακάλυπτο). Το υπάρχον contract assertion κοκκίνισε σωστά και ενημερώθηκε ρητά. `type-check` EXIT 0, full
+`vitest` **5590 passed / 4 skipped**. Docker: ο daemon **κατέρρευσε** στη μέση ενός build (`rpc error: EOF`),
+restart → mongo healthy → rebuild OK, `/login` 200, `/vouchers?tab=giftcards` + `/shopping-list` 307
+(auth-gated, compiled), RestartCount 0, browser pane μηδέν console errors, cache pruned. Commit `d774dd4`.
+
+**ΣΗΜ διαφάνειας (όχι δικό μας regression)**: το `notifications/actions*.test.ts` κοκκίνισε 2-5 tests σε δύο
+full runs **λόγω 5s timeout υπό φόρτο**· με `--testTimeout=30000` περνούν και τα 34. Μηδέν import από τα αρχεία
+που άγγιξα (grep-verified). Το πρώτο ανώνυμο «2 failed» του P81 run ήταν κατά πάσα πιθανότητα το ίδιο πράγμα.
+
+**Επόμενο task**: **P74** (backup restore verification — το `exportData()` γράφει backup που κανείς δεν
+ξαναδιαβάζει· corrupted αρχείο το μαθαίνεις τη στιγμή που το χρειάζεσαι).
