@@ -35,6 +35,11 @@
    pricing UI. Owner: **saas-core** (plan config/entitlements) + **landing** (pricing UI). Το
    `DEFAULT_AI_RATE` (κόστος ανά AI call για metering) μένει internal tuning — βάλε συντηρητικό
    default, δεν είναι user-facing.
+   > **⚠ SUPERSEDED εν μέρει από #11**: το «Free €0/μήνα» tier εδώ αφορούσε μόνιμο hosted δωρεάν
+   > επίπεδο· η #11 (2026-08-03) το ακύρωσε ρητά («ΔΕΝ υπάρχει μόνιμο hosted δωρεάν επίπεδο»). Τα
+   > €9/€29 tiers + entitlements μένουν όπως εδώ, ΑΠΛΑ χωρίς μόνιμο free hosted plan — μόνο 14ήμερο
+   > trial πριν το €9/€29. Achilleas το επιβεβαίωσε ξανά interactive session 2026-08-03: «14 μέρες
+   > trial. 9 και μετά 29 τα πακέτα ανά μήνα».
 
 7. **SaaS mobile app = SUPPORTED (map token→tenant).** Το `/api/v1` (Bearer/per-user API token)
    πρέπει να δουλεύει και για SaaS tenants: resolve το tenant ΑΠΟ το API token (ο token ανήκει σε
@@ -103,6 +108,21 @@
      μισό θέλει Apple Developer account (€99/χρόνο) για build σε συσκευή· το Android μισό όχι. Αν δεν υπάρχει
      account, χτίζεται πρώτα το Android intent filter και το iOS μένει στο ράφι.
    Owner: **pharos-daily-dev**.
+
+14. **Suspended-workspace retention window = 30 μέρες** (interactive session 2026-08-03, digest
+   follow-up). Ερώτημα ήταν στο `LANDING_PROGRESS.md`/`OWNER_DECISIONS.md → Later` ως «Needs
+   Achilleas» χωρίς αριθμό. Ο Αχιλλέας απάντησε «30». Σημασία: μια `suspended` (dunning hold,
+   `trialSweep.ts`/`trialLapse.ts`) tenant μένει σήμερα suspended **επ' αόριστον** χωρίς κανένα
+   auto-purge — καμία sweep δεν διαγράφει ποτέ tenant data. Η απόφαση εδώ: **30 μέρες μετά το
+   `workspace.suspended` audit event, αν η tenant ΔΕΝ έχει επανέλθει σε active/trialing, σβήσε
+   (ή τουλάχιστον flag για hard-delete) το tenant data.** Δεν υλοποιώ εγώ το ίδιο το sweep σε αυτό
+   το session (destructive cascade πάνω σε tenant DBs, θέλει το κανονικό test/verify discipline
+   μιας routine, όχι ad-hoc edit)· καταγράφω μόνο την απόφαση ώστε η **saas-core** routine να την
+   πάρει ως δεδομένη στο επόμενο σχετικό run: νέο scheduled sweep (μαζί με το ήδη-shipped
+   `trials/sweep`) που μετράει μέρες από `workspace.suspended` audit row, με **audit trail πριν
+   κάθε delete** και προτιμότερο soft-delete/archive πρώτα (matching το ήδη-υπάρχον `TRASH_RETENTION_DAYS`
+   pattern στο `settings/actions.ts`, ΑΝ εφαρμόζεται σε tenant-level granularity) αντί για hard
+   DB drop χωρίς recovery window. Owner: **saas-core**.
 
 ## Later (χρειάζεται στοιχεία/ενέργεια Achilleas — ΟΧΙ τώρα, αλλά πριν hosted launch)
 
