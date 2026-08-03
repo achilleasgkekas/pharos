@@ -31,14 +31,48 @@ export function accountAuthConfigured(): boolean {
   return getSecret() !== null;
 }
 
-export function accountCookieOptions() {
+/**
+ * Optional cookie `Domain`, from `SAAS_COOKIE_DOMAIN` (e.g. `.ph-aros.com`).
+ *
+ * Why this exists: tenants live on subdomains (`acme.ph-aros.com`) and the feature pages
+ * resolve their tenant from the HOST, but a cookie set without a Domain is host-only. A
+ * session established while signing up on the apex would therefore not be sent to the
+ * workspace subdomain, and the product pages would answer "not authenticated" to a user who
+ * just logged in. Setting the parent domain once makes the session span every subdomain.
+ *
+ * Empty/unset (ALWAYS, for self-hosted) → no Domain attribute → today's exact behaviour.
+ * A leading dot is optional; browsers treat `ph-aros.com` and `.ph-aros.com` identically.
+ * PURE (env injectable for tests).
+ */
+export function accountCookieDomain(env: Env = process.env): string | undefined {
+  const d = (env.SAAS_COOKIE_DOMAIN || '').trim().toLowerCase();
+  return d || undefined;
+}
+
+type Env = Record<string, string | undefined>;
+
+export function accountCookieOptions(env: Env = process.env) {
+  const domain = accountCookieDomain(env);
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
-    secure: process.env.AUTH_COOKIE_SECURE === 'true',
+    secure: env.AUTH_COOKIE_SECURE === 'true',
     path: '/',
     maxAge: ACCOUNT_MAX_AGE,
+    // Spread rather than `domain: undefined`, so the emitted cookie is byte-identical to the
+    // pre-SaaS one when unset.
+    ...(domain ? { domain } : {}),
   };
+}
+
+/**
+ * Attributes identifying a cookie for DELETION. A cookie set with a Domain can only be
+ * cleared by an expiry carrying the SAME Domain: `cookies().delete(name)` alone would leave a
+ * domain-scoped session alive in the browser, i.e. a logout that silently does nothing.
+ */
+export function accountCookieDeleteOptions(name: string, env: Env = process.env) {
+  const domain = accountCookieDomain(env);
+  return { name, path: '/', ...(domain ? { domain } : {}) };
 }
 
 export async function signAccountSession(claims: AccountClaims): Promise<string> {
@@ -82,7 +116,7 @@ export async function setAccountCookie(claims: AccountClaims): Promise<void> {
 
 export async function clearAccountCookie(): Promise<void> {
   const store = await cookies();
-  store.delete(ACCOUNT_COOKIE);
+  store.delete(accountCookieDeleteOptions(ACCOUNT_COOKIE));
 }
 
 // --- MFA login-step-2 pending state (increment 83, TODO §9 "wiring MFA into login") ---------
@@ -102,13 +136,16 @@ export const MFA_PENDING_COOKIE = 'pharos_account_mfa_pending';
 const MFA_PENDING_MINUTES = Math.min(60, Math.max(1, Number(process.env.SAAS_MFA_PENDING_MINUTES) || 5));
 export const MFA_PENDING_MAX_AGE = Math.round(MFA_PENDING_MINUTES * 60); // seconds
 
-export function mfaPendingCookieOptions() {
+export function mfaPendingCookieOptions(env: Env = process.env) {
+  const domain = accountCookieDomain(env);
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
-    secure: process.env.AUTH_COOKIE_SECURE === 'true',
+    secure: env.AUTH_COOKIE_SECURE === 'true',
     path: '/',
     maxAge: MFA_PENDING_MAX_AGE,
+    // Same reasoning as the session cookie: login can start on one host and finish on another.
+    ...(domain ? { domain } : {}),
   };
 }
 
@@ -149,7 +186,7 @@ export async function setMfaPendingCookie(accountId: string): Promise<void> {
 
 export async function clearMfaPendingCookie(): Promise<void> {
   const store = await cookies();
-  store.delete(MFA_PENDING_COOKIE);
+  store.delete(accountCookieDeleteOptions(MFA_PENDING_COOKIE));
 }
 
 /** Read + verify the pending-MFA cookie → the account id it names, or null when absent/invalid. */

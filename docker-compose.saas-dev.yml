@@ -1,0 +1,108 @@
+# PHAROS — LOCAL SaaS (multi-tenant) TEST STACK.
+#
+# A second, fully separate copy of the app with SAAS_MODE ON, so the managed-SaaS flows
+# (signup → workspace → per-tenant subdomain) can actually be clicked through before any
+# server is rented. The self-hosted stack in docker-compose.yml is NOT touched by this file:
+#
+#   different compose project (pharos-saas-dev)   → no container name collisions
+#   different image tag (pharos-web-saasdev)      → `docker compose build` at home is unaffected
+#   different MongoDB + volume (saas-mongo-data)  → your real receipts/items are never read
+#   different storage dir (./data/saas-dev-storage)
+#   different ports (3001 / 27018)                → 3000 + 27017 stay yours
+#   different AUTH_SECRET                         → sessions do not cross over
+#
+# USAGE
+#   1. cp .env.saas-dev.example .env.saas-dev.local   (then fill the two generated secrets)
+#   2. docker compose -f docker-compose.saas-dev.yml up -d --build
+#   3. http://lvh.me:3001/account/signup     → create an account + a workspace, e.g. "acme"
+#   4. http://acme.lvh.me:3001/receipts      → the product, scoped to that workspace
+#      (*.lvh.me is public DNS pointing at 127.0.0.1; no /etc/hosts entry needed)
+#   5. http://lvh.me:3001/admin              → superadmin console (needs your email in
+#                                               SAAS_SUPERADMIN_EMAILS)
+#   Stop with: docker compose -f docker-compose.saas-dev.yml down
+#
+# EMAIL: nothing to configure. With no provider set the mailer logs the message to the
+# container output instead of sending, so verification/invite links are readable with
+# `docker logs pharos-saas-web`. See lib/tenancy/mailer.ts.
+name: pharos-saas-dev
+
+services:
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    # Own tag: rebuilding this stack must never replace the image your daily app runs.
+    image: pharos-web-saasdev:latest
+    container_name: pharos-saas-web
+    restart: unless-stopped
+    ports:
+      # Loopback only. This is a scratch instance with test data, not something to expose
+      # to the LAN or the VPN.
+      - "127.0.0.1:3001:3000"
+    # Secrets (AUTH_SECRET, the Server Actions key, later Stripe/Resend) live here, outside
+    # git. `.env*.local` is already gitignored.
+    env_file:
+      - .env.saas-dev.local
+    environment:
+      # Registry (control-plane) database: Tenant / Account / Membership / Invite / Usage /
+      # AuditEvent. Each workspace's actual DATA goes to its own database (dbName on the
+      # Tenant doc), created on the same mongod. Note the db name is NOT "homepage".
+      MONGO_URI: mongodb://admin:devlocal@mongo:27017/pharos_registry?authSource=admin
+      NODE_ENV: production
+      STORAGE_ROOT: /storage
+      # ─ the whole point of this stack ─
+      SAAS_MODE: "on"
+      # Tenant subdomains hang off this. `acme.lvh.me` → slug "acme", the same parsing that
+      # will read `acme.ph-aros.com` in production.
+      #
+      # Why lvh.me and not localhost: browsers REFUSE a cookie whose Domain is `localhost`
+      # (it is effectively a TLD, and Domain may not be a public suffix), so the session
+      # could never span localhost → acme.localhost and every product page answered
+      # "not authenticated". lvh.me is a public domain whose wildcard resolves to 127.0.0.1,
+      # so `.lvh.me` is a legal cookie domain and the flow matches production exactly.
+      # Requires working DNS; offline, put `127.0.0.1 pharos.test acme.pharos.test` in
+      # /etc/hosts and set these to pharos.test / .pharos.test instead.
+      SAAS_BASE_DOMAIN: lvh.me
+      # Lets one session span lvh.me + acme.lvh.me, mirroring `.ph-aros.com` in production.
+      # Without it the cookie is host-only: you would sign up on the apex and arrive at the
+      # workspace subdomain logged out.
+      SAAS_COOKIE_DOMAIN: .lvh.me
+      SAAS_PUBLIC_URL: http://lvh.me:3001
+      APP_URL: http://lvh.me:3001
+      # Plain HTTP locally, so a Secure cookie would never be stored.
+      AUTH_COOKIE_SECURE: "false"
+    volumes:
+      # Separate from ./data/storage — this stack must not write into your real files.
+      - ./data/saas-dev-storage:/storage
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:7
+    container_name: pharos-saas-mongo
+    restart: unless-stopped
+    ports:
+      # 27018 so it cannot collide with the real Mongo on 27017. Loopback only.
+      - "127.0.0.1:27018:27017"
+    environment:
+      # Throwaway credentials for a loopback-only scratch database holding test data. The
+      # real secrets are in .env.saas-dev.local; these are fixtures, deliberately inline so
+      # the stack starts with one command.
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: devlocal
+      MONGO_INITDB_DATABASE: pharos_registry
+    volumes:
+      - saas-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  # Its own named volume, so `down -v` on this stack could never reach your real data.
+  saas-mongo-data:
+    driver: local

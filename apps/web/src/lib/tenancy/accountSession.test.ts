@@ -4,6 +4,8 @@ import {
   ACCOUNT_COOKIE,
   ACCOUNT_MAX_AGE,
   accountCookieOptions,
+  accountCookieDomain,
+  accountCookieDeleteOptions,
   accountAuthConfigured,
   signAccountSession,
   verifyAccountSession,
@@ -170,5 +172,73 @@ describe('signMfaPendingToken → verifyMfaPendingToken roundtrip', () => {
       .setExpirationTime('5m')
       .sign(secret);
     expect(await verifyMfaPendingToken(token)).toBeNull();
+  });
+});
+
+describe('accountCookieDomain', () => {
+  it('is undefined when unset — the self-hosted app emits a host-only cookie, unchanged', () => {
+    expect(accountCookieDomain({})).toBeUndefined();
+    expect(accountCookieDomain({ SAAS_COOKIE_DOMAIN: '   ' })).toBeUndefined();
+  });
+
+  it('returns the configured parent domain, normalised', () => {
+    expect(accountCookieDomain({ SAAS_COOKIE_DOMAIN: ' .PH-Aros.com ' })).toBe('.ph-aros.com');
+  });
+});
+
+describe('accountCookieOptions', () => {
+  it('omits the domain key entirely when unset, not domain:undefined', () => {
+    // The emitted cookie must be byte-identical to the pre-SaaS one for self-hosters.
+    expect('domain' in accountCookieOptions({})).toBe(false);
+  });
+
+  it('carries the domain so the session spans tenant subdomains', () => {
+    // Without this, a session started on the apex is never sent to acme.ph-aros.com and the
+    // product pages answer "not authenticated" to a user who just logged in.
+    expect(accountCookieOptions({ SAAS_COOKIE_DOMAIN: '.ph-aros.com' })).toMatchObject({
+      domain: '.ph-aros.com',
+      httpOnly: true,
+      path: '/',
+    });
+  });
+
+  it('keeps secure driven by AUTH_COOKIE_SECURE, independently of the domain', () => {
+    expect(accountCookieOptions({ AUTH_COOKIE_SECURE: 'true' }).secure).toBe(true);
+    expect(accountCookieOptions({ SAAS_COOKIE_DOMAIN: '.ph-aros.com' }).secure).toBe(false);
+  });
+});
+
+describe('mfaPendingCookieOptions', () => {
+  it('follows the same domain rule — login can start on one host and finish on another', () => {
+    expect('domain' in mfaPendingCookieOptions({})).toBe(false);
+    expect(mfaPendingCookieOptions({ SAAS_COOKIE_DOMAIN: '.ph-aros.com' })).toMatchObject({
+      domain: '.ph-aros.com',
+    });
+  });
+});
+
+describe('accountCookieDeleteOptions', () => {
+  it('names the cookie and path when there is no domain', () => {
+    expect(accountCookieDeleteOptions(ACCOUNT_COOKIE, {})).toEqual({
+      name: ACCOUNT_COOKIE,
+      path: '/',
+    });
+  });
+
+  it('repeats the domain, or the browser keeps the cookie and logout does nothing', () => {
+    // A domain-scoped cookie can only be expired by a Set-Cookie carrying the SAME domain.
+    expect(accountCookieDeleteOptions(ACCOUNT_COOKIE, { SAAS_COOKIE_DOMAIN: '.ph-aros.com' })).toEqual(
+      { name: ACCOUNT_COOKIE, path: '/', domain: '.ph-aros.com' }
+    );
+  });
+
+  it('matches what the setter emitted, for both cookies', () => {
+    const env = { SAAS_COOKIE_DOMAIN: '.ph-aros.com' };
+    expect(accountCookieDeleteOptions(ACCOUNT_COOKIE, env).domain).toBe(
+      accountCookieOptions(env).domain
+    );
+    expect(accountCookieDeleteOptions(MFA_PENDING_COOKIE, env).domain).toBe(
+      mfaPendingCookieOptions(env).domain
+    );
   });
 });
