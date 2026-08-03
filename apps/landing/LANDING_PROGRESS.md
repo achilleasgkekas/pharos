@@ -5139,3 +5139,55 @@ trial), αν φανει οτι η αφαιρεση της καρτας αδυν�
 Needs-Achilleas (open): legal entity/Stripe (ποιος χρεωνει, ποιο VAT), Terms+Privacy review απο ανθρωπο
 πριν το launch, contact inbox, χρονισμος για να γινει public το repo (το CTA «Get the Docker image» δειχνει
 ακομα «soon»). **Εκλεισε** η `pharos-landing-20260729-1000` (μονιμο free tier), εφαρμοστηκε ολοκληρη εδω.
+
+## 2026-08-03 (β, ζητηθηκε απο τον Αχιλλεα: «φτιαξε το screenshot verify στο επομενο run»)
+
+**Το προβλημα**: στο προηγουμενο run το `computer screenshot` του Browser pane γυρισε **μαυρη εικονα** και
+μετα timeout («Browser pane is currently hidden»). Αιτια: η επιφανεια που φωτογραφιζει το pane **δεν
+ακολουθει** το scroll που κανω απο το JS context, και σε unattended run δεν υπαρχει τροπος να «ξεκρυψω»
+το pane. Δηλαδη ολο το visual proof εξαρτιοταν απο κατι που το routine δεν ελεγχει.
+
+**Η λυση: `scripts/shot.mjs`**, screenshot path που **δεν περναει καθολου απο το pane**. Μιλαει σε
+headless Chrome μεσω DevTools protocol και **κοβει το section κατευθειαν απο τη σελιδα**
+(`captureBeyondViewport` + `clip`), οποτε τιποτα δεν εξαρταται απο scroll position ή απο ορατο παραθυρο.
+**Μηδεν dependencies**: ο Node 24 εχει global `WebSocket`, το Chrome ειναι ηδη στο μηχανημα (fallback σε
+`CHROME_BIN` / Chromium). Δεν το κανει import ο ιστοτοπος, ειναι dev-time εργαλειο.
+
+```
+node scripts/shot.mjs --url http://localhost:PORT --selector "#pricing" --out pricing-desktop.png
+node scripts/shot.mjs --url http://localhost:PORT --selector "#pricing" --mobile --scale 1 --out pricing-mobile.png
+node scripts/shot.mjs --url http://localhost:PORT --full --out whole-page.png
+```
+Flags: `--selector` (clip σε section, αλλιως viewport), `--mobile` (375x812 + touch), `--full` (ολη η
+σελιδα), `--width/--height/--scale/--wait`, `--debug` (milestones στο stderr). Οι εικονες πανε στο
+**`.shots/`**, που ειναι **gitignored** (verification artifacts, οχι source). Υπαρχει και
+`npm run shot -- --url ...`.
+
+**Δυο πραγματα που μετρηθηκαν φτιαχνοντας το** (γι' αυτο δουλευει τωρα και δεν δουλευε αφελως):
+1. **ΜΗΝ περιμενεις `Page.loadEventFired`**. Η σελιδα φερνει τις 3 γραμματοσειρες απο Google Fonts, οποτε σε
+   μηχανημα offline ή rate-limited το `load` **δεν ερχεται ποτε** και το script πεθαινε στα 30s. Τωρα
+   κανει poll το `readyState`: δεχεται `complete` αμεσως, και μετα απο 8s grace δεχεται και `interactive`,
+   δηλαδη μια κολλημενη γραμματοσειρα κοστιζει fallback typeface, οχι χαμενο screenshot.
+2. **Priming pass**: οι reveal-on-scroll ενοτητες μενουν αορατες μεχρι να μπουν μια φορα στο viewport, οποτε
+   το script διατρεχει ολη τη σελιδα (με `scroll-behavior:auto`, αλλιως καθε βημα προσγειωνεται στη μεση)
+   πριν μετρησει το element rect.
+
+Verify (πραγματικο, οχι θεωρητικο):
+- Τρεξε ζωντανα πανω στο `landing-dev` (πορτα 63554) και **βγηκαν δυο εικονες**: `pricing-desktop.png`
+  (1280, scale 2) και `pricing-mobile.png` (375, scale 1). Τις κοιταξα: desktop = **3 καρτες σε μια σειρα**
+  με το «14-day free trial, no card to start» σε accent στα δυο hosted και «No account, no billing, ever»
+  στο self-host, mobile = **stacked**, μηδεν κοψιμο. Δηλαδη το screenshot δειχνει ακριβως την αλλαγη του
+  προηγουμενου run, που ειναι και ο λογος υπαρξης του.
+- Χρονισμος: ~80s ανα εικονα σε dev server (cold start Chrome ~12s + on-demand compile ~9s + priming).
+  Καθε κληση σηκωνει δικο της Chrome, οποτε 2 εικονες ~2.5 λεπτα. Αποδεκτο για ωριαιο run.
+- `npm run type-check` -> exit 0 (το script ειναι εκτος του tsconfig include, δεν αγγιζει το build).
+
+**Διαδικασια για τα επομενα runs** (αντικαθιστα το «screenshot απο το pane» ως primary):
+1. `preview_start landing-dev` (κρατα την πορτα που τυπωνει, η 3100 συνηθως ειναι πιασμενη).
+2. Ελεγχος περιεχομενου οπως παντα: DOM measurements + `read_console_messages`.
+3. **Screenshot με `scripts/shot.mjs`**, οχι με `computer screenshot`. Το pane μενει χρησιμο για DOM/console,
+   απλα δεν ειναι πια η πηγη της εικονας.
+4. `preview_stop`. Τα `.shots/` δεν γινονται commit ποτε (gitignored).
+
+Επομενο increment: αμεταβλητο απο το προηγουμενο entry, (1) FAQ + `/privacy` + `/terms` sweep για το
+self-hosted-only μοτιβο, (2) πιθανο section «what free really means», (3) sweep οταν εμφανιστει νεο feature.

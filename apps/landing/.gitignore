@@ -11,3 +11,6 @@ next-env.d.ts
 # misc
 .DS_Store
 npm-debug.log*
+
+# screenshots from scripts/shot.mjs (verification artifacts, not source)
+.shots/
