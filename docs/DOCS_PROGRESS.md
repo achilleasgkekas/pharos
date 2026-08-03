@@ -3112,3 +3112,22 @@ Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/
 Συμπέρασμα: Το shipped feature cec63e9 (audit feed quick-window chips) είναι πλέον fully + accurately documented στο `docs/saas.md`.
 
 Επόμενο run: (α) grep git log για νέα feat() commits μετά το cec63e9 · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml (ΣΗΜ: το SaaS control-plane API δεν ζει στο openapi.yaml, μόνο η self-hosted bearer-token API — βλ. `docs/saas.md:160-165`) · (γ) αν όχι νέο feature, comprehensive drift verification pass.
+
+## 2026-08-03 (thirty-eighth run — platform audit actor autocomplete documented)
+
+Σάρωση git log για νέα feat() commits μετά την thirty-seventh run (cec63e9, 2026-08-02). Ανακάλυψη: **1 νέο feat() commit που χρειάζεται documentation**:
+- **64943cf** (2026-08-03, `feat(saas): actor autocomplete on the platform audit filter`) — προσθέτει `<datalist>` suggestions στο Actor πεδίο του `/admin/audit`. Ήδη logged στο root `SAAS_PROGRESS.md` (increment 132, commit 80529e7) αλλά αυτό είναι η routine-log του saas-core routine, όχι τεκμηρίωση χρήστη· το `docs/saas.md` δεν ανέφερε κανένα autocomplete mechanism. Οι υπόλοιποι commits μέχρι HEAD (5b7eec8/9a14ded/83d0271/3c5281d/f5b6287/f44e227/864effe/c6368ad/fdef1b9/16fa49b/299fb07/a62482b/6fc43d1/0627eee/79f0491/960c668) είναι backlog planning notes, reviewer sweeps, docker-health markers, landing-page reorg (δικό του log στο `apps/landing/LANDING_PROGRESS.md`), oss-prep test-slice logs, και ένα tenant-scoping fix (`83d0271`, δικό του log `9a14ded`) — κανένα δεν είναι νέο user-facing feature εκτός territory ή δεν χρειαζόταν αλλαγή στο docs/.
+
+Τι έγινε: Διάβασα τον κώδικα πριν γράψω, όχι το commit message — `apps/web/src/components/saas/platformActivity.ts` (`actorEmailSuggestions(rows)`: trim+lowercase κάθε `actorEmail`, skip null/empty/όσα δεν περιέχουν `@` [system events όπως `'system'`], `Set` για dedup, `[...seen].sort()` alphabetical) + `apps/web/src/app/admin/audit/page.tsx` diff (νέο `actorOptions = actorEmailSuggestions(events)` από τα ήδη-φερμένα events της σελίδας, όχι νέο roster endpoint· input παίρνει `list="audit-actor-emails"`· το `<datalist>` renders μόνο όταν `actorOptions.length > 0`) + `platformActivity.test.ts` (8 νέα tests: dedup/sort/lowercase-trim/skip-actor-less/skip-non-email/empty-page/uncapped-at-200).
+
+Ενημερώθηκε το section **"Platform activity feed (`/admin/audit`)"** στο `docs/saas.md`: νέα παράγραφος αμέσως μετά το υπάρχον actor-filter paragraph — εξηγεί το πρόβλημα (exact-match typo → misleading "no account" αντί για τις γραμμές που μόλις είδε ο operator), το page-derived datalist mechanism (lowercased/deduped/alphabetical/uncapped) και ότι είναι σκόπιμα suggestions-only ΟΧΙ whitelist (free text δουλεύει ακόμα, η λίστα δείχνει τι φαίνεται σε αυτή τη σελίδα όχι όλο το platform roster).
+
+Accuracy: verified με code read (πλήρες `actorEmailSuggestions` σώμα από το αρχείο, όχι μόνο το diff· page.tsx diff πλήρες datalist markup), όχι απλή αντιγραφή commit message.
+
+Validation (markdown only, κανένα build/Docker/AI call): code fences docs/saas.md = 18 πριν και μετά (ζυγό, άθικτο, καμία προσθήκη code block)· κανένα νέο anchor δημιουργήθηκε (edit μέσα στο ήδη-υπάρχον `#platform-activity-feed-adminaudit` section, existing links παραμένουν valid)· κανένα credential.
+
+Collision guard: `git status --short -- docs/` πριν το commit έδειξε `docs/saas.md` (δικό μου) + `docs/self-hosting.md` (pre-existing uncommitted modification, ΟΧΙ δικό μου — αφέθηκε άθικτο, δεν staged ούτε committed).
+
+Συμπέρασμα: Το shipped feature 64943cf (audit feed actor autocomplete) είναι πλέον fully + accurately documented στο `docs/saas.md`.
+
+Επόμενο run: (α) grep git log για νέα feat() commits μετά το 64943cf · (β) αν κανένα νέο endpoint προστέθηκε χωρίς OpenAPI entry, sync openapi.yaml (ΣΗΜ: το SaaS control-plane API δεν ζει στο openapi.yaml, μόνο η self-hosted bearer-token API — βλ. `docs/saas.md:160-165`) · (γ) αν όχι νέο feature, comprehensive drift verification pass.
