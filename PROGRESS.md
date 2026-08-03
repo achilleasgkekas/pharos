@@ -3,8 +3,20 @@
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
 <!-- reviewed: f44e227 -->
-<!-- docker-validated: 6208f24 -->
+<!-- docker-validated: f5b6287 -->
 <!-- ui-audited: 0bc5e14 -->
+
+## 2026-08-03 (docker-health)
+
+Guard: `ROUTINES_PAUSED` δεν υπήρχε. Health πριν: mongo `healthy`, web/mongo restart count 0 και τα δύο, flaresolverr ήδη σταματημένο. Disk: build cache μόνο 1.96GB (δεν χρειαζόταν prune πριν το build).
+
+Marker ήταν stale (`6208f24`, πολλά commits πίσω) — `git diff --name-only 6208f24..HEAD -- apps/web` έδειξε runtime αλλαγές (tasks/actions.ts, tasks/page.tsx, subscriptions/actions.ts, adminAudit.ts/adminAuditCsv.ts, admin audit routes, writeGuard) → rebuild δικαιολογημένο.
+
+Docker mutex πάρθηκε πριν το `docker compose build web` (99s, καθαρό, prerendered pages χωρίς σφάλματα). Mongo παρέμεινε healthy → `docker compose up -d web` (recreate) → `/login` **200 στην 1η προσπάθεια**. Restart count μετά: 0 (καμία crash-loop). `docker builder prune -f` μετά (routine hygiene). Mutex released αμέσως.
+
+**Marker**: docker-validated `6208f24` → **`f5b6287`** (HEAD). Καμία ανάγκη recovery, τίποτα κάτω από Needs Achilleas. Staged ΜΟΝΟ PROGRESS.md.
+
+---
 
 ## 2026-08-01 (reviewer — έλεγχος 997837f..eadb959, 12 commits)
 
