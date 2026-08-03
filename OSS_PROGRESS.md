@@ -3209,3 +3209,25 @@ Suggested next task: **`app/i18nActions.ts`** (16 γραμμές, το μικρ�
 - Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου (`?? apps/web/src/app/storage-actions.test.ts`)· `git diff --cached --name-only` το ίδιο. Pathspec commit + push: `4c81aa4..299fb07`.
 
 Suggested next task: **`settings/mcpActions.ts`** (38 γραμμές) — το επόμενο μικρότερο εναπομείναν test-less action module. Μετά **`settings/users.actions.ts`** (91 γρ.). Τα μεγαλύτερα (`app/jobActions.ts` 210 γρ., `app/aiCommandActions.ts` 93 γρ. AI tool-loop, `settings/sampleDataActions.ts` 103 γρ.) παραμένουν για μεταγενέστερα runs, θέλουν πιο προσεκτικό διάβασμα (side-effects/external calls). Διάβασε ολόκληρο το target file πριν γράψεις τίποτα. Πάντα `git status` collision-guard πρώτα.
+
+## 2026-08-03 (cont.¹¹ — settings/mcpActions.test.ts, νέο module: MCP bearer-token gating)
+
+**Task**: το suggested next-task του προηγούμενου run: `settings/mcpActions.ts` (38 γραμμές, 3 exported functions) — το per-user MCP bearer token (το `phk_...` credential που χρησιμοποιεί ο external MCP connector). Coordination: `ROUTINES_PAUSED` δεν υπήρχε, καμία εγγραφή pharos-oss-prep στο `ASK_ACHILLEAS.md`, `git status --short` καθαρό, local==origin (`80529e7`) πριν ξεκινήσω.
+
+Διάβασα ολόκληρο το target file πριν γράψω τίποτα. Είναι σχεδόν δομικά πανομοιότυπο με το `settings/calendarFeedActions.ts` (ίδιο seam σχήμα: `connectDB`, `User.findById/updateOne`, `assertCanWrite`/`getCurrentUser`, `randomBytes` token) → ακολούθησα πιστά το `calendarFeedActions.test.ts` ως template, με δύο ουσιαστικές διαφορές τεκμηριωμένες στα tests: (α) το `getMcpStatus` **ποτέ δεν επιστρέφει το ίδιο το token**, μόνο `{hasToken: boolean}` (`!!doc?.apiToken`) — σε αντίθεση με το `getCalendarFeed` που επιστρέφει το token ρητά (re-readable «secret address» μοντέλο)· το MCP token είναι write-once-visible, σαν API key σε GitHub/Stripe. (β) prefix `phk_` αντί `phcal_`.
+
+**Ευρήματα στο ίδιο το production code (τεκμηριωμένα στα tests, ΟΧΙ αλλαγμένα)**:
+- `getMcpStatus` είναι read-only χωρίς κανένα gate, ΚΑΙ short-circuits σε `{hasToken:false}` χωρίς καν `connectDB()` όταν δεν υπάρχει session (ίδιο pattern με `getCalendarFeed`).
+- `generateApiToken`/`revokeApiToken`: το `assertCanWrite()` τρέχει πριν τον session έλεγχο (gate rejection = uncaught throw).
+- Ίδια ασυμμετρία no-session return shape με το calendar sibling: `generateApiToken` → `{ok:false, error:'Not signed in'}`, `revokeApiToken` → σκέτο `{ok:false}` (κανένα error field).
+- Rotation = silent invalidation (κανένα ιστορικό παλιών tokens, ίδιο μοντέλο).
+
+**12 tests** σε τρία describe blocks: `getMcpStatus` (5: no-gate· no-session short-circuit χωρίς connectDB· true+ποτέ δεν εκθέτει το raw token key· missing-doc→false· falsy-token→false)· `generateApiToken` (4: gate-πρώτα· no-session→error χωρίς connectDB/updateOne· `phk_`-prefixed persist+return· rotation δύο διαφορετικά tokens)· `revokeApiToken` (3: gate-πρώτα· no-session→σκέτο `{ok:false}`· clear+`{ok:true}`).
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/settings/mcpActions.test.ts"` → **12/12 passed** από την πρώτη προσπάθεια (κανένα tsc/hoisting fix χρειάστηκε).
+- `npm run type-check` → exit 0, μηδέν errors σε όλο το repo.
+- `npx vitest run` (όλο το suite) → **347 files, 5527/5531 passed (4 skipped), 0 failed** (~25s wall).
+- Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου· `git diff --cached --name-only` το ίδιο. Pathspec commit + push: `80529e7..960c668`.
+
+Suggested next task: **`settings/users.actions.ts`** (91 γραμμές) — το επόμενο εναπομείναν test-less action module (user CRUD/roles, admin-only). Τα μεγαλύτερα (`app/jobActions.ts` 210 γρ., `app/aiCommandActions.ts` 93 γρ. AI tool-loop, `settings/sampleDataActions.ts` 103 γρ.) παραμένουν για μεταγενέστερα runs, θέλουν πιο προσεκτικό διάβασμα (side-effects/external calls). Διάβασε ολόκληρο το target file πριν γράψεις τίποτα. Πάντα `git status` collision-guard πρώτα.
