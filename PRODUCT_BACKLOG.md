@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-08-02 (24η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-08-03 (25η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
@@ -121,12 +121,57 @@
 > endpoint είναι προσωρινά down, η ειδοποίηση χάνεται σιωπηλά χωρίς κανένα ίχνος. Η ουρά έφτασε **38 Proposed,
 > μηδέν έγκριση σε 19 διαδοχικές σαρώσεις** — το ίδιο decision-fatigue bottleneck παραμένει, το quick-start
 > shortlist πιο πάνω (P74/P40/P46/P66/P48) συνεχίζει να είναι η πιο πρακτική πρόταση αν θελήσει ένα μικρό batch.
+>
+> **25η σάρωση (2026-08-03)** — `git log --since` από την 24η σάρωση (marker `a62482b`): η δουλειά του builder
+> παρέμεινε πάλι αποκλειστικά **SaaS tenant-scoping plumbing** (shopping-list actions + read path, `83d0271`) +
+> ένα docker-health rebuild-validation log + ένα landing dual-positioning fix + saas platform-audit UI (quick-window
+> chips) + ένα storage test slice — μηδέν νέο product-facing feature να συμφιλιωθεί σε Done. **1 νέος candidate
+> (P81)**, live-verified πριν την πρόταση και το πιο σημαντικό εύρημα εδώ αρκετών σαρώσεων: το πλήρες, ήδη-shipped
+> notification framework (§3 στο TODO.md· 8 alert kinds: deal/installment/warranty/pricehike/trialend/giftcard/bill
+> + budget, `runAlertChecks` στο `app/settings/actions.ts`) **δεν πυροδοτείται ΠΟΤΕ αυτόματα** — `grep -rn
+> "runAlertChecks" apps/web/src/app/api` = 0 hits, το μόνο call-site είναι το χειροκίνητο κουμπί «Check & notify
+> now» στο `SettingsClient.tsx`. Ταυτόχρονα υπάρχει ήδη ένα δουλεμένο, tested pattern για ακριβώς αυτή τη δουλειά
+> στο SaaS side: `CRON_SECRET`-gated routes (`app/api/saas/usage/sample/route.ts`, `app/api/saas/trials/sweep/
+> route.ts`) που περιμένουν εξωτερικό cron να τα χτυπήσει με bearer token — απλά δεν έχει επεκταθεί ποτέ στο
+> self-host alert engine, παρόλο που το ίδιο το CLAUDE.md το σημείωνε ήδη ως «μελλοντικό» στο Session 2026-06-07
+> («δόσεις/warranty alerts δουλεύουν manual ή με cron [μελλοντικό]») και έμεινε ανοιχτό έκτοτε χωρίς να γίνει ποτέ
+> δικό του backlog item. Η ουρά έφτασε **39 Proposed, μηδέν έγκριση σε 20 διαδοχικές σαρώσεις** — το ίδιο
+> decision-fatigue bottleneck παραμένει, το quick-start shortlist πιο πάνω (P74/P40/P46/P66/P48) συνεχίζει να είναι
+> η πιο πρακτική πρόταση αν θελήσει ένα μικρό batch. Σημείωση: το P81 θα άξιζε να μπει ΚΑΙ στο shortlist (ίδιο
+> «χαμηλού ρίσκου, καθαρά additive» προφίλ, reuse ατόφιου pattern) αλλά δεν το πρόσθεσα εκεί μόνος μου — το
+> shortlist είναι ήδη μια πρόταση σειράς, η επέκτασή του μένει στον Αχιλλέα.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P81. Αυτόματο (scheduled) trigger του notification/alert engine — S — OSS (κυρίως), ολοκληρώνει το ήδη-shipped §3
+- **Αξία:** live-verified `grep -rn "runAlertChecks" apps/web/src/app/api` = 0 hits — το πλήρες, ήδη-shipped
+  notification framework (§3 στο `TODO.md`, 8 alert kinds: deal/installment/warranty/pricehike/trialend/giftcard/
+  bill + budget-exceeded, `runAlertChecks()` στο `app/settings/actions.ts`) έχει **μηδέν** αυτόματο μηχανισμό να
+  τρέξει· το μοναδικό call-site είναι το χειροκίνητο κουμπί «Check & notify now» (`SettingsClient.tsx`). Πρακτικό
+  αποτέλεσμα: ένα self-hosted instance που τρέχει μήνες χωρίς ο χρήστης να ανοίξει Settings και να πατήσει το
+  κουμπί **δεν στέλνει ΠΟΤΕ** κανένα από τα 8 alerts, ό,τι κι αν έχει ρυθμιστεί (ntfy/Discord/Slack/Telegram/
+  webhook, §3 ήδη-shipped). Αυτό ήταν ήδη γνωστό ως «μελλοντικό» από το πολύ παλιό CLAUDE.md session log
+  (2026-06-07: «δόσεις/warranty alerts δουλεύουν manual ή με cron [μελλοντικό]») αλλά ποτέ δεν έγινε δικό του
+  backlog item έκτοτε — ξεχάστηκε ανάμεσα σε άλλα shipped features. **Υπάρχει ήδη ατόφιο το pattern** που χρειάζεται:
+  `CRON_SECRET`-gated bearer-token routes για ακριβώς αυτόν τον σκοπό, ήδη proven στο SaaS side
+  (`app/api/saas/usage/sample/route.ts`, `app/api/saas/trials/sweep/route.ts` — `timingSafeEqual` constant-time
+  compare, fail-closed 500 αν λείπει το secret) — απλά κανένα ισοδύναμο route δεν υπάρχει για το self-host
+  `runAlertChecks`. `docs/self-hosting.md` ήδη τεκμηριώνει το `CRON_SECRET` env var και δείχνει το idiom
+  («Point BACKUP_DIR at your NAS mount and schedule it via cron») — ένα δεύτερο cron entry για τα alerts θα
+  ταίριαζε φυσικά στο ίδιο README section.
+- **Module:** νέο `app/api/cron/alerts/route.ts` (ή `app/api/v1/cron/alerts`, ίδιο naming idiom με τα SaaS
+  `api/saas/*/sweep|sample` routes) — POST, `CRON_SECRET` bearer guard, καλεί το ήδη-υπάρχον `runAlertChecks()`
+  χωρίς καμία αλλαγή στο ίδιο το alert-scanning· `docs/self-hosting.md` νέα γραμμή στο crontab example.
+- **Ανοιχτή απόφαση (builder default):** self-host-only (SaaS side έχει ήδη το δικό του ξεχωριστό
+  `trials/sweep`/`usage/sample` sweep-cadence, δεν χρειάζεται migration)· route επιστρέφει 404 όταν SAAS_MODE
+  ενεργό (ίδιο gating idiom με το `usage/sample`, ίδιο rationale: «δεν υπάρχει» σε multi-tenant context όπου κάθε
+  tenant έχει τα δικά του notification settings)· καμία αλλαγή στο ήδη-shipped manual «Check & notify now» κουμπί
+  (παραμένει, απλά παύει να είναι το ΜΟΝΟ trigger)· documentation-only default cadence πρόταση (π.χ. `0 9 * * *`,
+  μία φορά το πρωί) — όχι hardcoded στο ίδιο το app, ο χρήστης ελέγχει τη συχνότητα μέσω του δικού του cron.
 
 ### P80. Outbound webhook delivery reliability (retry + failure log) — S — both, foundation-lever για το ήδη-shipped P24
 - **Αξία:** live-verified `lib/webhooks.ts` — το ήδη-shipped P24 (outbound event webhooks) κάνει **fire-and-forget,
