@@ -1156,6 +1156,17 @@ email", the same distinct-empty-state treatment as an unknown workspace slug.
 The actor clause is a separate top-level filter, so it ANDs cleanly with the
 workspace, action and window filters and the "Load more" cursor.
 
+The Actor box matches the full address exactly, so a typo would otherwise
+render "no account with that email" instead of the rows the operator just
+saw. A `<datalist>` suggests the distinct actor emails already visible on the
+current page (lowercased and deduplicated to match how the server resolves
+`Account.email`, sorted alphabetically so the dropdown doesn't reshuffle with
+feed order, and deliberately uncapped since truncating would hide an address
+visible on screen). It's built from the page's own rows rather than a new
+roster endpoint, so it's suggestions only, never a whitelist: free text still
+applies, because the list reflects what this page shows, not the full
+platform roster.
+
 Each row shows the action, actor (email/name when resolvable), target,
 timestamp, and a **Workspace** column linking to that tenant's
 `/admin/tenants/[slug]` detail page; if the tenant row has since been deleted,
