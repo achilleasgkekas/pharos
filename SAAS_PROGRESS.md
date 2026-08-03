@@ -6640,3 +6640,67 @@ testαρισμένος και περιμένει μόνο keys), **τελικό 
 feed (κλικ σε γραμμή → φιλτράρει σε εκείνο το πρόσωπο/workspace), που καταργεί εντελώς την
 πληκτρολόγηση αλλά αγγίζει το `PlatformActivityPanel`· (γ) αλλιώς επόμενο backend increment από
 TODO.md #5-#12. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά UI scan.
+
+## 2026-08-03 (β) — το SaaS τρέχει επιτέλους τοπικά (interactive run με τον Achilleas)
+
+Ο Achilleas αγόρασε το **ph-aros.com** και ρώτησε πού δοκιμάζεται το SaaS. Η απάντηση ήταν
+δυσάρεστη: **πουθενά**. Το `SAAS_MODE` ήταν τεκμηριωμένο στο `.env.example` αλλά **δεν περνούσε
+ποτέ σε container** (το `docker-compose.yml` δεν το forwardάρει), γι' αυτό 132 increments έγραφαν
+«307, μη επαληθεύσιμο». Αυτό το run το έκανε runnable, και βρήκε **δύο πραγματικά bugs** που κανένα
+unit test δεν μπορούσε να πιάσει.
+
+**Bug 1 — το self-hosted login gate κλείδωνε την πόρτα εισόδου του SaaS.** Το `middleware.ts`
+redirectάρει κάθε request χωρίς `pharos_session` στο `/login`. Σε hosted deployment **δεν υπάρχει
+self-hosted User και κανείς δεν κρατά τέτοιο cookie**, άρα το `/account/signup` (η μία σελίδα που
+χρειάζεται ένας νέος πελάτης) γύριζε `307 → /login`. Fix: `if (saasMode()) return pass()` πριν το
+gate. Το authorization ΔΕΝ παρακάμπτεται, μετακινείται εκεί όπου το SaaS το υλοποιεί ήδη
+(`requireAccountPage`, `requireSuperadminPage`, `withRequestTenant`), δηλαδή σε Node όπου υπάρχει
+Mongo, ενώ το middleware τρέχει σε Edge και δεν μπορεί να αποφασίσει. **Επιβεβαιώθηκε εμπειρικά και
+κάτι αβέβαιο**: το `process.env.SAAS_MODE` ΔΙΑΒΑΖΕΤΑΙ σε runtime μέσα σε edge middleware (φοβόμουν
+build-time inlining, που θα έκανε το gate μόνιμα false στο image).
+
+**Bug 2 — το session cookie δεν ταξίδευε στα subdomains.** Το `accountCookieOptions()` δεν έθετε
+`domain`, ενώ οι σελίδες του προϊόντος resolveάρουν tenant από τον **host**. Δηλαδή: signup στο
+apex, κλικ στο workspace, `not_authenticated`. Νέο `SAAS_COOKIE_DOMAIN` (κενό = σημερινή
+συμπεριφορά, byte-identical για self-host, το `domain` key ΛΕΙΠΕΙ εντελώς αντί `undefined`).
+**Το μισό που θα περνούσε απαρατήρητο**: το `cookies().delete(name)` σβήνει μόνο host-only cookie —
+domain-scoped cookie θέλει expiry με το ΙΔΙΟ domain, αλλιώς το **logout δεν θα έκανε τίποτα** ενώ
+θα φαινόταν επιτυχές. Νέο `accountCookieDeleteOptions` και στα δύο cookies (session + mfa_pending).
+
+**Η μία απόφαση που όντως μετράει: `lvh.me`, όχι `localhost`.** Ο browser **απορρίπτει** cookie με
+`Domain=localhost` (το `localhost` είναι public suffix / TLD-like). Το ανακάλυψα ζωντανά: tenant
+resolveαρίστηκε σωστά από το `acme.localhost` αλλά το cookie δεν έφτασε ποτέ. Το `*.lvh.me` είναι
+δημόσιο DNS που δείχνει στο 127.0.0.1, άρα το `.lvh.me` είναι **νόμιμο** cookie domain και το flow
+είναι πανομοιότυπο με το production `.ph-aros.com`. Offline εναλλακτική τεκμηριωμένη στο compose
+(`/etc/hosts` + `pharos.test`).
+
+**`docker-compose.saas-dev.yml`**: δεύτερο stack με **δικό του** compose project, image tag
+(`pharos-web-saasdev`, ώστε το build να ΜΗΝ αντικαθιστά το image του καθημερινού app), MongoDB,
+volume, storage dir, ports (3001/27018) και `AUTH_SECRET`. Secrets σε `.env.saas-dev.local`
+(gitignored μέσω `.env*.local`), committed μόνο το `.example`.
+
+**Verified live** (curl, όχι μόνο tsc): signup → `accounts=1 tenants=1 memberships=1`, **η Mongo
+δείχνει `tenant_acme` ΞΕΧΩΡΙΣΤΗ από την `pharos_registry`** (database-per-tenant, πρώτη φορά
+αποδεδειγμένο σε πραγματική βάση), cookie jar `#HttpOnly_.lvh.me ... pharos_account`,
+`acme.lvh.me/{receipts,items,tasks,expenses}` **200 με το cookie**, **fail-closed χωρίς αυτό**,
+`/admin`, `/admin/tenants`, `/admin/audit` **200** (το console renderάρει πρώτη φορά).
+`homepage-web` ανέγγιχτο, RestartCount 0. `npm run type-check` EXIT 0, **350 files / 5567 tests
+green**. Screenshot workspace overview: Acme, FREE/TRIALING/OWNER, slug acme, trial 14 μέρες,
+quotas 0/50 AI calls, 0/5GB.
+
+**Collision**: το middleware fix το κατάπιε concurrent commit άλλης routine (`fda8c96`,
+«feat(alerts): …and unblock it in middleware») ενώ ήταν uncommitted — ακριβώς το documented
+failure mode. Τίποτα δεν χάθηκε, είναι στο main με ξένο μήνυμα. Τα δικά μου: `6c5b021`.
+
+**Γνωστά ΑΣΧΗΜΑ, όχι blockers**: anonymous σε tenant subdomain → **500** (θα έπρεπε redirect στο
+login), ανύπαρκτο workspace → **500** (θα έπρεπε 404). Fail-closed άρα ασφαλές, αλλά απαράδεκτο ως
+UX για πελάτη.
+
+**Next task:** (α) `TenantResolutionError` → σωστές αποκρίσεις (`not_authenticated` → redirect
+`/account/login?next=`, `no_tenant` → 404 σελίδα «no such workspace»), το πιο ορατό πρόβλημα τώρα·
+(β) τα 2 εναπομείναντα non-scoped `actions.ts` (`history`, `settings`)· (γ) multi-arch build
+(`buildx linux/amd64,linux/arm64` → ghcr.io) όταν έρθει ο server.
+
+**## Needs Achilleas:** αμετάβλητα (**Stripe keys**, **plan pricing**, **email provider**: Resend
+key ή `MAIL_WEBHOOK_URL` — τοπικά ΔΕΝ χρειάζεται, ο mailer τυπώνει στο log). Νέο: **DNS του
+ph-aros.com σε provider με API** (Cloudflare) για wildcard TLS μέσω DNS-01, όταν στηθεί ο host.
