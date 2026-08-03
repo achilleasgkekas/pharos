@@ -6581,3 +6581,62 @@ testαρισμένος και περιμένει μόνο keys), **τελικό 
 και ένα typo σε email είναι πιο εύκολο από ένα typo σε slug)· (β) **workspace autocomplete** με το
 ίδιο pattern πάνω στο slug input· (γ) αλλιώς επόμενο backend increment από TODO.md #5-#12. Πριν
 ξεκινήσεις: ask-inbox πρώτα, μετά UI scan.
+
+## 2026-08-03 — increment 132: actor autocomplete στο platform audit filter
+
+**Ask-inbox**: μηδέν ANSWERED item για αυτή τη routine (και τα δύο `pharos-saas-core-*` entries είναι
+APPLIED). **UI-first scan**: πήρα το **(α)** που άφησε πρώτο το προηγούμενο run, το **actor
+autocomplete** — καθαρά UI, μηδέν νέο endpoint, μηδέν νέο query surface.
+
+**Γιατί υπάρχει.** Το Actor φίλτρο κάνει match **ολόκληρη τη διεύθυνση ακριβώς** (resolve email→id
+server-side). Ακριβές, αλλά αμείλικτο: ένα typo δεν δίνει «κοντινό αποτέλεσμα», δίνει «No account
+with email X» — δηλαδή ο operator πληκτρολογεί ξανά μια διεύθυνση που έχει **μπροστά του** στη
+στήλη Actor. Νέα pure `actorEmailSuggestions(events)` στο `components/saas/platformActivity.ts` +
+`<datalist>` πάνω στο input.
+
+**Η μία απόφαση που όντως μετράει: sample, όχι directory.** Οι προτάσεις βγαίνουν από τα events
+**της τρέχουσας σελίδας**, όχι από κάποιο roster endpoint πάνω στο `Account`. Δύο λόγοι: (α) το
+ζητούμενο δεν είναι «βρες μου κάποιον», είναι «μη με βάλεις να ξαναγράψω αυτό που βλέπω», και (β)
+ένα endpoint που λιστάρει διευθύνσεις ολόκληρης της πλατφόρμας είναι νέα επιφάνεια δεδομένων για
+μηδέν επιπλέον όφελος σε αυτό το ticket. Συνέπεια που την αποδέχομαι ρητά: **με ενεργό actor φίλτρο
+η λίστα μαζεύεται σε ένα στοιχείο** (όλες οι γραμμές έχουν τον ίδιο actor) — για να δεις άλλους
+καθαρίζεις το φίλτρο. Το `<datalist>` **δεν περιορίζει** το input, οπότε το free text μένει
+πάντα δυνατό: αυτό είναι το σωστό συμβόλαιο για λίστα-δείγμα, όχι για whitelist.
+
+**Χωρίς cap, σκόπιμα.** Η σελίδα είναι ήδη φραγμένη (`MAX_PLATFORM_AUDIT_PAGE` = 200), άρα η λίστα
+είναι bounded by construction. Ένα «top 50» θα έκρυβε διεύθυνση που είναι **κυριολεκτικά ορατή**
+στη στήλη Actor — δηλαδή ακριβώς το failure που το feature υποτίθεται ότι διορθώνει. Pinned με test
+(200 rows → 200 προτάσεις).
+
+**Lowercase + `@` guard.** Το `Account.email` είναι `lowercase: true, trim: true`, οπότε η πρόταση
+κανονικοποιείται όπως θα την κάνει match ο server (αλλιώς μια πρόταση θα φαινόταν σωστή και θα
+περνούσε από διαφορετικό μονοπάτι). Τιμές χωρίς `@` πέφτουν: δεν θα resolve-άρουν **ποτέ** σε
+account, και μια πρόταση που εγγυάται άδειο αποτέλεσμα είναι χειρότερη από καμία πρόταση — ίδιο
+σκεπτικό με τα increments 126/128/129/130/131 (**άδειο αποτέλεσμα σε incident διαβάζεται σαν
+εύρημα**).
+
+**Sort αλφαβητικά**, όχι feed order: το feed είναι newest-first, οπότε χωρίς sort το dropdown θα
+ανακατευόταν σε κάθε request πάνω στα ίδια πρόσωπα.
+
+**Verified**: **24/24** στο `platformActivity.test.ts` (+8 νέα, από 16), πλήρες `npx vitest run` →
+**346 files / 5515 tests green** (0 fail, 4 skipped), `npm run type-check` → **EXIT 0 χωρίς κανένα
+fix**. **Docker: κανένα rebuild** (μηδέν env/deps/runtime-wiring αλλαγή → ο mutex δεν χρειάστηκε).
+**Browser-verify: μη εφαρμόσιμο unattended** — το λέω ρητά αντί να το περάσω για επιτυχία: το
+`/admin/audit` στο τρέχον stack γυρίζει **307** (SAAS_MODE off, redirect στο login), οπότε δεν
+υπάρχει τίποτα να renderαριστεί, και δεν γυρίζω το flag σε running app του χρήστη χωρίς εντολή.
+`homepage-web` running, RestartCount 0. Collision guard: `git status --short` πριν το staging =
+**μόνο τα 3 δικά μου αρχεία**, μηδέν staged από άλλη routine· pathspec commit `64943cf`.
+
+**## Needs Achilleas:** τίποτα νέο. Παραμένουν: **Stripe keys** (`STRIPE_SECRET_KEY` /
+`STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_SHARED` / `STRIPE_PRICE_DEDICATED` — ο client είναι πλήρως
+testαρισμένος και περιμένει μόνο keys), **τελικό plan pricing** (τα €0/€9/€29 + quotas στο
+`plans.ts` παραμένουν placeholders, εγκεκριμένα ως πηγή αλήθειας έναντι της landing), **SMTP**.
+Επαναλαμβανόμενη πρακτική σημείωση: όσο το τοπικό stack τρέχει με SAAS_MODE off, **καμία SaaS UI
+σελίδα δεν είναι browser-verifiable** από αυτή τη routine.
+
+**Next task:** (α) **workspace autocomplete** με το ίδιο pattern πάνω στο slug input (`<datalist>`
+από τα `workspaceSlug` της σελίδας, μηδέν νέο endpoint) — ίδιο exact-match πρόβλημα, ίδια λύση, και
+το `actorEmailSuggestions` δίνει έτοιμο το σχήμα· (β) **clickable actor/workspace cells** στο ίδιο
+feed (κλικ σε γραμμή → φιλτράρει σε εκείνο το πρόσωπο/workspace), που καταργεί εντελώς την
+πληκτρολόγηση αλλά αγγίζει το `PlatformActivityPanel`· (γ) αλλιώς επόμενο backend increment από
+TODO.md #5-#12. Πριν ξεκινήσεις: ask-inbox πρώτα, μετά UI scan.
