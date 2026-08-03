@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/terms' },
 };
 
-const LAST_UPDATED = 'July 2026';
+const LAST_UPDATED = 'August 2026';
 
 // Small presentational helper so the document reads consistently with /privacy.
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
@@ -218,6 +218,13 @@ export default function TermsOfService() {
             workspace data within a reasonable window, except limited records we must
             keep for legal or billing reasons, as set out in the{' '}
             <a href="/privacy" className="inline-link">Privacy Policy</a>.
+          </p>
+          <p style={{ marginTop: 14 }}>
+            Suspension is not termination. If your trial ends, or a payment fails,
+            without billing in place, the workspace is suspended rather than deleted:
+            access pauses, your content is kept, and adding a payment method reactivates
+            it. The retention window for a suspended workspace before it is deleted is
+            one of the placeholders being confirmed before launch.
           </p>
         </Section>
 

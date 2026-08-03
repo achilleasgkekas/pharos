@@ -5275,3 +5275,56 @@ routines παραλληλα), και τοτε ενα σκετο `curl` στη σ
 Τα timeouts του script (navigate 120s, readiness 90s, budget 240s + 30s/shot) **μενουν ως εχουν**: ειναι
 φτιαγμενα για το χειροτερο σεναριο (load 56), οχι για το μεσο. Προστεθηκε config `landing-prod` στο
 `.claude/launch.json` (gitignored, εκτος repo) για μελλοντικες prod μετρησεις.
+
+## 2026-08-03 (ε, το εκκρεμες sweep: FAQ + /privacy + /terms)
+
+Το increment που περιμενε απο τρια entries: ελεγχος του FAQ και των δυο νομικων σελιδων για το
+self-hosted-only μοτιβο (κειμενο που περιγραφει το προϊον σαν να υπαρχει μονο ο ενας δρομος).
+
+**Τι βρεθηκε**: οι δυο νομικες σελιδες ηταν ηδη γραμμενες σωστα διπολικα (ξεχωριστες ενοτητες
+«1. Self-hosted» / «2. Hosted» και στις δυο), και το μεγαλυτερο μερος του FAQ αναφερει ρητα και τους δυο
+δρομους. Ομως **τρια σημεια εμειναν self-hosted-only, και τα δυο απο αυτα ειναι πλεον ΨΕΥΔΗ για hosted
+χρηστη**, δηλαδη δεν ειναι θεμα τονου αλλα ακριβειας, και βρισκονται ακριβως στην ενοτητα οπου το λαθος
+μετραει περισσοτερο («Data, privacy and security»):
+1. **«What data leaves my machine?»** ελεγε «Nothing by default. PHAROS stores everything locally». Για
+   καποιον στο hosted αυτο ειναι απλως αναληθες. Τωρα: self-host = τιποτα by default (με εξαιρεση το cloud
+   AI), **hosted = το ακριβως αντιθετο και ειναι το ζητουμενο**, τα δεδομενα ζουν στους servers μας για να
+   τα κραταμε και να τα διαβαζουμε, σε ξεχωριστη βαση ανα workspace, με ολους τους sub-processors
+   ονομαστικα στο Privacy. Μηδεν telemetry και στα δυο, και «αν δεν σου αρεσει η συναλλαγη, self-host το,
+   ειναι η ιδια εφαρμογη και μεταφερεις το dataset οποτε θες».
+2. **«Is my financial data secure?»** ελεγε «built for private access, not the open internet [...] **There
+   is no public sign-up**». Το hosted ειναι εξ ορισμου internet-facing και **εχει** public sign-up. Τωρα
+   διαχωριζει: self-host = LAN/VPN, καμια δημοσια εγγραφη· hosted = encryption in transit, secrets
+   encrypted at rest, προαιρετικο 2FA, **ξεχωριστη βαση ανα workspace**.
+3. **Trust card «Local-first»** («Files are served straight from your machine. Works fully offline») πηρε
+   scope «Self-hosted, files are served...», οπως ειχε ηδη η διπλανη καρτα «Zero telemetry» («the
+   self-host build talks to nobody»).
+
+**Και ενα πραγματικο κενο, οχι διατυπωση**: ο κυκλος ζωης **«trial ληγει χωρις καρτα -> suspended»** (που
+ειναι πλεον το κεντρο του pricing μετα την αποφαση της 3ης Αυγ) **δεν υπηρχε πουθενα στα νομικα**. Το FAQ
+τον περιεγραφε, οι Οροι μιλουσαν μονο για «κλεισιμο λογαριασμου» και «suspend λογω παραβασης», και το
+Privacy μονο για «οσο ειναι ενεργο το workspace». Προστεθηκαν: **Οροι §9** «Suspension is not termination»
+(access παγωνει, το περιεχομενο κρατιεται, μπαινει καρτα και ξαναζωντανευει) και **Privacy §5** (ενα
+suspended workspace ΔΕΝ διαγραφεται τη στιγμη που παγωνει). `LAST_UPDATED` -> August 2026 και στα δυο.
+
+**ΔΕΝ εφευρα το νουμερο**: ποσο κρατιεται ενα suspended workspace πριν διαγραφει ειναι δεσμευση, οχι
+διατυπωση, οποτε γραφτηκε ρητα ως «placeholder being confirmed before launch» (ιδιο μοτιβο με το
+[Operating entity] και το Stripe, που ηδη δηλωνονται placeholders στο ιδιο draft banner). **Χρειαζεται
+απαντηση απο τον Αχιλλεα** πριν το launch, μαζι με τα υπολοιπα legal placeholders.
+
+Verify: `npm run type-check` -> exit 0, `npm run build` -> success. Ζωντανα στο DOM: το FAQPage JSON-LD
+(41 ερωτησεις) δινει τις δυο νεες απαντησεις με τα hosted σκελη παρωντα και τους παλιους απολυτους
+ισχυρισμους απωντες, η καρτα Local-first scoped. `/privacy` και `/terms` σερβιρουν «last updated August
+2026» + τις νεες παραγραφους (probe ανα σελιδα, καθε MISS ηταν σωστα cross-page). **Screenshot** των Ορων
+§9 (η νεα παραγραφος διαβαζεται καθαρα). `read_console_messages` -> κανενα error. Ο dev server σταματησε.
+
+ΣΗΜ: οι ερωτησεις του FAQ **δεν μετονομαστηκαν** επιτηδες. Τα anchor ids παραγονται απο το κειμενο της
+ερωτησης (`faqId`), αρα καθε μετονομασια θα εσπαγε τα deep links που ηδη μοιραζονται. Οι απαντησεις
+επεκταθηκαν αντ' αυτου.
+
+Επομενο increment: (1) πιθανο section «what free really means» (self-host vs trial), αν φανει οτι η
+αφαιρεση της καρτας Free αδυνατισε το acquisition message, (2) sweep οταν εμφανιστει νεο user-facing
+feature, (3) τιποτα αλλο δεν εκκρεμει απο τα προηγουμενα entries.
+
+Needs-Achilleas (open): legal entity/Stripe, **retention window για suspended workspace (νεο)**,
+Terms+Privacy review απο ανθρωπο, contact inbox, χρονισμος για public repo.

@@ -154,7 +154,7 @@ const TRUST: { icon: string; color: string; title: string; desc: string }[] = [
     icon: 'server',
     color: 'var(--gold)',
     title: 'Local-first',
-    desc: 'Files are served straight from your machine. Works fully offline, no cloud dependency.',
+    desc: 'Self-hosted, files are served straight from your machine. Works fully offline, no cloud dependency.',
   },
   {
     icon: 'unlock',
@@ -607,7 +607,7 @@ const FAQ_GROUPS: {
     items: [
       {
         q: 'What data leaves my machine?',
-        a: 'Nothing by default. PHAROS stores everything locally and has zero telemetry. The one exception is AI: if you point it at a cloud provider, the document being parsed is sent to that provider. Run a local Ollama instead and it stays fully offline.',
+        a: 'Self-hosted, nothing by default: PHAROS stores everything locally and has zero telemetry. The one exception is AI, since pointing it at a cloud provider sends the document being parsed to that provider, while a local Ollama keeps it fully offline. Hosted is the deliberate opposite, because that is the point of us running it: your content lives on our servers so we can back it up and parse it for you, in a database of your workspace’s own rather than a shared table, and the AI parsing your documents is named in the Privacy Policy along with every other sub-processor. There is still no telemetry and nothing is ever sold. If that trade is not one you want to make, self-host: it is the same app, free, and you can move your whole dataset between the two at any time.',
       },
       {
         q: 'How do backups work?',
@@ -619,7 +619,7 @@ const FAQ_GROUPS: {
       },
       {
         q: 'Is my financial data secure?',
-        a: 'PHAROS is built for private access, not the open internet: reach it over your LAN or your own VPN, behind a login. There is no public sign-up and no telemetry, so your receipts, statements, and balances stay yours.',
+        a: 'Self-hosted, PHAROS is built for private access rather than the open internet: reach it over your LAN or your own VPN, behind a login, with no public sign-up and no telemetry. Hosted has to face the internet to be useful, so it is protected differently: encryption in transit, secrets encrypted at rest, optional two-factor authentication, and a separate database per workspace, so there is no query that can reach out of one workspace into another’s records. Either way there is no telemetry and your receipts, statements, and balances are never sold or shared for anyone else’s purposes.',
       },
       {
         q: 'Does it support two-factor authentication?',

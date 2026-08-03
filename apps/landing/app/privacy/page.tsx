@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   alternates: { canonical: '/privacy' },
 };
 
-const LAST_UPDATED = 'July 2026';
+const LAST_UPDATED = 'August 2026';
 
 // Small presentational helpers so the document reads consistently.
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
@@ -246,6 +246,13 @@ export default function PrivacyPolicy() {
             you close your account we delete your workspace data within a reasonable
             window, except where we must keep limited records for legal or billing
             reasons.
+          </p>
+          <p style={{ marginTop: 14 }}>
+            A suspended workspace, one whose trial ended or whose payment failed without
+            billing in place, still holds your content so it can be reactivated: we do
+            not delete it at the moment access pauses. How long we keep a suspended
+            workspace before deleting it is one of the placeholders being confirmed
+            before launch, and it will be stated here.
           </p>
         </Section>
 
