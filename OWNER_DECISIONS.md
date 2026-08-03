@@ -66,6 +66,34 @@
    επιτρέπεται ΜΟΝΟ για να εισαχθεί νέο (untracked) αρχείο, και μετά ξανά commit με τη μορφή `-- <paths>`.
    Επαληθεύτηκε εμπειρικά πριν γραφτεί. Owner: όλες οι routines.
 
+11. **Pricing: ΔΕΝ υπάρχει μόνιμο hosted δωρεάν επίπεδο** (interactive session 2026-08-03). «Αν επιλέξει
+   self-host είναι free, αλλιώς free trial 14 μέρες». Δηλαδή το «δωρεάν για πάντα» ΕΙΝΑΙ το **self-host**
+   (AGPL, δικό του hardware, μηδέν όριο από εμάς)· το **hosted** ξεκινά με 14ήμερο trial και μετά είναι
+   πληρωμένο (€9 ή €29). Κλείνει την `pharos-landing-20260729-1000` ως **(β)**: η landing σταματά να δείχνει
+   κάρτα «Free» ως hosted tier και γίνεται δίπολο «Self-hosted €0 για πάντα» vs «Hosted: 14 μέρες δοκιμή,
+   μετά €9/€29»· το FAQ που ήδη περιγράφει το suspend ήταν εξαρχής σωστό. **Το backend μένει ΑΜΕΤΑΒΛΗΤΟ**:
+   το σημερινό `provision.ts` (plan:free + status:trialing 14d → suspended χωρίς κάρτα) είναι το επιθυμητό
+   lifecycle, ΔΕΝ χρειάζεται downgrade path «trial → μόνιμο free» (ήταν η επιλογή (α), απορρίφθηκε). Το
+   `plan:'free'` του `plans.ts` σημαίνει «το πλάνο κατά τη διάρκεια του trial». Owner: **pharos-landing**
+   (copy), **pharos-saas-core** (μόνο αν κάπου το UI λέει «free forever» για hosted).
+
+12. **Έξι product features APPROVED** (interactive session 2026-08-03, «approve all όπως είναι, τα προχωράς»):
+   **P81** auto-trigger του alert engine (`CRON_SECRET` route· το ήδη-shipped notification framework με 8 alert
+   kinds δεν τρέχει ΠΟΤΕ μόνο του σήμερα, μόνο από το χειροκίνητο κουμπί), **P66** AI assistant coverage gap
+   (searchAll 7 μοντέλα, `modelFor` μόλις 3 — Bills/Goals/GiftCards/LoyaltyCards/ShoppingList αόρατα),
+   **P74** backup restore verification, **P48** storage mirror sync-staleness alert, **P46** expense duplicate
+   detection & merge, **P40** self-host update-available banner. Όλα S, με αυτή τη σειρά, προάχθηκαν στο
+   `PRODUCT_BACKLOG.md → ## Approved`. **Τα builder defaults του κάθε item εγκρίθηκαν ως έχουν** («όπως είναι»),
+   άρα καμία ανοιχτή απόφαση δεν μένει σε αυτά τα έξι: ο builder υλοποιεί το «Ανοιχτή απόφαση (builder default)»
+   πεδίο τους αυτούσιο χωρίς να ξαναρωτήσει. Owner: **pharos-daily-dev**.
+
+13. **P36 / P16 / P23 = παγωμένα, όχι εγκεκριμένα-και-blocked** (interactive session 2026-08-03). Ο Αχιλλέας
+   δήλωσε ρητά ότι **δεν ξέρει τι είναι** και τα τρία, δηλαδή η αρχική τους έγκριση (2026-07-10) δεν ήταν
+   informed. Μέχρι να τα ξανα-δει με εξήγηση, **κανένα routine δεν τα ξεκινά και κανένα δεν τα ξαναφέρνει ως
+   «blocked σε εσένα»** σε κάθε run: P36 (Open Banking auto-sync, θέλει GoCardless λογαριασμό), P16 remainder
+   (Firefly III/Grocy importers, θέλει πραγματικό sample export), P23 (mobile share-sheet, θέλει EAS dev build).
+   Owner: **pharos-daily-dev** (να μην τα ξανα-προτείνει μέχρι νέα εντολή).
+
 ## Later (χρειάζεται στοιχεία/ενέργεια Achilleas — ΟΧΙ τώρα, αλλά πριν hosted launch)
 
 - **Terms + Privacy finalize**: επωνυμία/νομική οντότητα, governing-law jurisdiction, ονόματα

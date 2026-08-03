@@ -147,32 +147,6 @@
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
 
-### P81. Αυτόματο (scheduled) trigger του notification/alert engine — S — OSS (κυρίως), ολοκληρώνει το ήδη-shipped §3
-- **Αξία:** live-verified `grep -rn "runAlertChecks" apps/web/src/app/api` = 0 hits — το πλήρες, ήδη-shipped
-  notification framework (§3 στο `TODO.md`, 8 alert kinds: deal/installment/warranty/pricehike/trialend/giftcard/
-  bill + budget-exceeded, `runAlertChecks()` στο `app/settings/actions.ts`) έχει **μηδέν** αυτόματο μηχανισμό να
-  τρέξει· το μοναδικό call-site είναι το χειροκίνητο κουμπί «Check & notify now» (`SettingsClient.tsx`). Πρακτικό
-  αποτέλεσμα: ένα self-hosted instance που τρέχει μήνες χωρίς ο χρήστης να ανοίξει Settings και να πατήσει το
-  κουμπί **δεν στέλνει ΠΟΤΕ** κανένα από τα 8 alerts, ό,τι κι αν έχει ρυθμιστεί (ntfy/Discord/Slack/Telegram/
-  webhook, §3 ήδη-shipped). Αυτό ήταν ήδη γνωστό ως «μελλοντικό» από το πολύ παλιό CLAUDE.md session log
-  (2026-06-07: «δόσεις/warranty alerts δουλεύουν manual ή με cron [μελλοντικό]») αλλά ποτέ δεν έγινε δικό του
-  backlog item έκτοτε — ξεχάστηκε ανάμεσα σε άλλα shipped features. **Υπάρχει ήδη ατόφιο το pattern** που χρειάζεται:
-  `CRON_SECRET`-gated bearer-token routes για ακριβώς αυτόν τον σκοπό, ήδη proven στο SaaS side
-  (`app/api/saas/usage/sample/route.ts`, `app/api/saas/trials/sweep/route.ts` — `timingSafeEqual` constant-time
-  compare, fail-closed 500 αν λείπει το secret) — απλά κανένα ισοδύναμο route δεν υπάρχει για το self-host
-  `runAlertChecks`. `docs/self-hosting.md` ήδη τεκμηριώνει το `CRON_SECRET` env var και δείχνει το idiom
-  («Point BACKUP_DIR at your NAS mount and schedule it via cron») — ένα δεύτερο cron entry για τα alerts θα
-  ταίριαζε φυσικά στο ίδιο README section.
-- **Module:** νέο `app/api/cron/alerts/route.ts` (ή `app/api/v1/cron/alerts`, ίδιο naming idiom με τα SaaS
-  `api/saas/*/sweep|sample` routes) — POST, `CRON_SECRET` bearer guard, καλεί το ήδη-υπάρχον `runAlertChecks()`
-  χωρίς καμία αλλαγή στο ίδιο το alert-scanning· `docs/self-hosting.md` νέα γραμμή στο crontab example.
-- **Ανοιχτή απόφαση (builder default):** self-host-only (SaaS side έχει ήδη το δικό του ξεχωριστό
-  `trials/sweep`/`usage/sample` sweep-cadence, δεν χρειάζεται migration)· route επιστρέφει 404 όταν SAAS_MODE
-  ενεργό (ίδιο gating idiom με το `usage/sample`, ίδιο rationale: «δεν υπάρχει» σε multi-tenant context όπου κάθε
-  tenant έχει τα δικά του notification settings)· καμία αλλαγή στο ήδη-shipped manual «Check & notify now» κουμπί
-  (παραμένει, απλά παύει να είναι το ΜΟΝΟ trigger)· documentation-only default cadence πρόταση (π.χ. `0 9 * * *`,
-  μία φορά το πρωί) — όχι hardcoded στο ίδιο το app, ο χρήστης ελέγχει τη συχνότητα μέσω του δικού του cron.
-
 ### P80. Outbound webhook delivery reliability (retry + failure log) — S — both, foundation-lever για το ήδη-shipped P24
 - **Αξία:** live-verified `lib/webhooks.ts` — το ήδη-shipped P24 (outbound event webhooks) κάνει **fire-and-forget,
   μία απόπειρα** (`Promise.allSettled` απλά μαζεύει το per-call αποτέλεσμα, `grep -n "retry|attempt|deliveryLog|
@@ -277,23 +251,6 @@
   on write, backfill = `null`/«unknown» για ήδη-υπάρχοντα records, ΟΧΙ migration που μαντεύει)· εμφανίζεται μόνο
   όταν υπάρχουν ≥2 users στο instance (single-user deployments δεν βλέπουν κανένα νέο UI, μηδέν clutter)· single-user
   self-host = μηδέν αλλαγή συμπεριφοράς.
-
-### P74. Backup restore verification (αυτόματο integrity self-test, όχι μόνο export) — S — OSS (self-host trust lever)
-- **Αξία:** live-verified `grep -rn "verifyBackup|backupHealth|restoreTest|integrityCheck" apps/web/src` = 0 hits.
-  Το ήδη-shipped `exportData()` (Settings → Backup/Restore) + το nightly `backup.sh` (CLAUDE.md) **γράφουν** το
-  backup αρχείο αλλά ποτέ δεν το ξανα-διαβάζουν για να επιβεβαιώσουν ότι είναι έγκυρο JSON με τα αναμενόμενα
-  collections/counts — ένα σιωπηλά κομμένο/corrupted backup (δίσκος γέμισε στη μέση της εγγραφής, bad JSON) δεν
-  γίνεται αντιληπτό μέχρι την πραγματική στιγμή ανάγκης restore, δηλαδή τη χειρότερη δυνατή στιγμή. Νέο μικρό
-  **«Verify last backup»** action (Settings → Storage & backup): διαβάζει το πιο πρόσφατο export/backup αρχείο,
-  ελέγχει valid JSON + αναμενόμενα top-level keys/collection counts > 0 (χωρίς πραγματικό restore/side-effect) →
-  «✓ Verified 2026-07-29, 240 receipts, 66 items, ...» ή ξεκάθαρο error αν κάτι λείπει/είναι corrupted. **Διακριτό**
-  από P54 (encryption-at-rest, δεν αγγίζει το plaintext backup flow) και P48 (mirror-sync staleness = έφτασε στο
-  remote ή όχι, όχι αν το ίδιο το περιεχόμενο είναι έγκυρο).
-- **Module:** Settings → Storage & backup (νέο read-only action πάνω στο ήδη-υπάρχον export/backup path).
-- **Ανοιχτή απόφαση (builder default):** MVP = structural validation μόνο (valid JSON + non-zero collection
-  counts + βασικό schema-shape check), ΟΧΙ πλήρες test-restore σε sandbox DB (πολύ πιο ακριβό/ρίσκο για S item)·
-  ελέγχει το τελευταίο τοπικό backup αρχείο (`~/Backups/pharos/` ή το configured backup dir), δεν κατεβάζει από
-  remote mirror (out of scope εδώ, αυτό είναι το P48).
 
 ### P73. Recurring subscription cost-split among household members (family-plan «ποιος χρωστάει τι» ανά κύκλο) — S — OSS (κυρίως), βοηθά dogfooding
 - **Αξία:** live-verified `grep -n "split\|Split" apps/web/src/models/Subscription.ts` = 0 hits — το ήδη-shipped
@@ -403,23 +360,6 @@
   wired Subscriptions/Statements) — μόνο unpaid/pending bills (τα paid δεν χρειάζονται πια θέση στο forward
   agenda)· Goals ως δεύτερο βήμα (target date, όχι recurring, απλούστερο mapping)· χρωματισμός/label ίδιο idiom
   με τα υπόλοιπα entry types.
-
-### P66. Ο AI assistant «βλέπει» μόνο 3-7 από τα 12+ μοντέλα (search/edit/delete coverage gap) — S — both, dogfooding-heavy
-- **Αξία:** live-verified: το `app/search-actions.ts` `searchAll()` (τροφοδοτεί ΚΑΙ το navbar global search ΚΑΙ το
-  AI command-bar `search_data` tool) ψάχνει μόνο **7** μοντέλα (item/receipt/statement/task/subscription/expense/
-  voucher). Χειρότερο ακόμα: το `app/aiTools.ts` `modelFor()` (πίσω από `update_record`/`delete_record`) δέχεται
-  **μόνο 3** τύπους (`item`/`task`/`subscription`) — δηλαδή ο AI assistant μπορεί να **βρει** ένα expense/receipt/
-  voucher αλλά όχι να το επεξεργαστεί/σβήσει μέσω φυσικής γλώσσας, και είναι εντελώς **τυφλός** σε **5 ολόκληρα
-  μοντέλα** που έχουν προστεθεί έκτοτε: `Bill` (P28), `Goal` (P12), `GiftCard` (P32), `LoyaltyCard` (P20),
-  `ShoppingListItem`. Ένα «πρόσθεσε στη λίστα ψώνια γάλα» ή «σημείωσε το ΔΕΗ bill ως πληρωμένο» μέσω του AI command
-  bar σήμερα αποτυγχάνει σιωπηλά ή γυρνάει λάθος απάντηση, ενώ το ίδιο ερώτημα λειτουργεί άψογα για ένα task/item/
-  subscription. Καθαρό consistency/completeness gap σε ένα ήδη-δουλεμένο pipeline, όχι νέα αρχιτεκτονική.
-- **Module:** `app/search-actions.ts` (searchAll — προσθήκη 5 μοντέλων) + `app/aiTools.ts` (modelFor + tool
-  descriptions/system prompt — επέκταση σε όλα τα searchable types).
-- **Ανοιχτή απόφαση (builder default):** επέκτεινε και τα δύο σε **όλα** τα user-facing μοντέλα με ένα search
-  index (ίδιο `$or`/regex pattern με τα υπάρχοντα 7)· `modelFor` επεκτείνεται συμμετρικά με searchAll (ό,τι είναι
-  searchable πρέπει να είναι edit/delete-able, ίδιο soft-delete pattern με τα ήδη-υπάρχοντα)· `GiftCard.uses[]`
-  spend-log μένει εκτός update/delete μέσω AI (πιο ασφαλές να μένει UI-only, αποφυγή λάθος αλλαγής υπολοίπου).
 
 ### P65. Voice quick-capture στο AI command bar (Web Speech API, μηδέν νέο backend) — S — both, quick-capture friction
 - **Αξία:** το app έχει ήδη ένα ενιαίο conversational AI command bar (text-based, `runAiCommand`) που καταλαβαίνει
@@ -676,19 +616,6 @@
   φάση)· utility type free-form string (όχι hardcoded enum, ίδιο pattern με P42 document type)· καμία alert αρχικά
   εκτός αν ζητηθεί ρητά (MVP = tracking + chart, όχι notification).
 
-### P48. Storage mirror sync-staleness alert (backup peace-of-mind) — S — both
-- **Αξία:** ο χρήστης έχει ήδη remote mirror (OneDrive/SMB/FTP, βλ. CLAUDE.md) αλλά το sync είναι **μόνο
-  χειροκίνητο** («Sync now» στο Settings → File storage) — αν ξεχαστεί για βδομάδες, το remote αντίγραφο μένει
-  σιωπηλά πίσω από τα τοπικά αρχεία, ενώ ο χρήστης νομίζει ότι έχει ενεργό 3-2-1 backup. Κανένα σημείο σήμερα
-  δεν κρατά «πότε ολοκληρώθηκε το τελευταίο επιτυχές sync» ούτε ειδοποιεί αν περάσει πολύς καιρός χωρίς ένα.
-  Νέο: αποθήκευσε `lastSuccessfulSyncAt` (ήδη υπάρχει το ίδιο το sync action, μόνο λείπει το timestamp-write) →
-  alert (reuse `dispatchAlert`) όταν περάσουν >N μέρες από το τελευταίο επιτυχές sync ΚΑΙ backend≠local ΚΑΙ
-  mirror ενεργό. Ντετερμινιστικό, μηδέν AI. **Διακριτό** από P40 (update-available = νέα έκδοση app, όχι backup
-  freshness) — εδώ ο κίνδυνος είναι δεδομένα, όχι λογισμικό.
-- **Module:** Settings → File storage (νέο timestamp πεδίο στο AppConfig) + Notifications.
-- **Ανοιχτή απόφαση (builder default):** default threshold 7 μέρες (ρυθμιζόμενο, ίδιο lead-time pattern με τα
-  υπόλοιπα alert-days)· no-op όταν backend=local ή mirror off (δεν έχει νόημα το alert).
-
 ### P47. Item lending tracker (δανεικά σε φίλους/οικογένεια) — S/M — OSS
 - **Αξία:** πραγματικό «Personal Hub» κενό (βλ. CLAUDE.md backronym) — ο χρήστης έχει ακριβό εξοπλισμό (Battle
   Station parts, δίκτυο, εργαλεία, gadgets) που μπορεί να δανείζει σε φίλους/οικογένεια. Σήμερα κανένα module δεν
@@ -700,17 +627,6 @@
 - **Ανοιχτή απόφαση (builder default):** free-form όνομα δανειζόμενου (καμία σύνδεση με λογαριασμό χρήστη/P31)·
   `expectedReturnAt` optional (κενό = «out on loan» χωρίς προθεσμία, χωρίς alert)· διαθέσιμο μόνο σε
   owned items (received/installed), όχι shopping.
-
-### P46. Expense duplicate detection & merge (mirror του ήδη-υπάρχοντος pattern) — S — OSS
-- **Αξία:** τα Receipts, Stores, και Items έχουν ήδη ένα δουλεμένο «find duplicates» modal (group κατά κλειδί +
-  review + merge, βλ. `findDuplicateReceipts`/`findDuplicateStores`/`findDuplicateItems`) — τα **Expenses δεν
-  έχουν το ίδιο**, παρόλο που ο κίνδυνος υπάρχει εξίσου (διπλό import ενός λογαριασμού, ίδια recurring εγγραφή
-  δύο φορές λόγω race στο auto-mirror-on-verify ή διπλό CSV/YNAB import). Ίδιο group-by (vendorKey+ημέρα+ποσό,
-  ίδιο κλειδί με το recurring-detection/anomaly) + merge, ελάχιστο νέο effort αφού το UI pattern
-  (`DuplicatesModal`-style) υπάρχει ήδη τρεις φορές ως πρότυπο να αντιγραφεί.
-- **Module:** Expenses (+ Income, ίδιο μοντέλο/kind πεδίο).
-- **Ανοιχτή απόφαση (builder default):** group by `vendorKey` (ήδη υπάρχει η normalize function) + ίδια ημέρα +
-  ποσό· reuse UI pattern από το `ReceiptsClient` DuplicatesModal ατόφιο (ίδιο review-before-merge flow).
 
 ### P45. Subscription pause/skip χωρίς πλήρη ακύρωση — S — both
 - **Αξία:** σήμερα το `Subscription.active` είναι δυαδικό on/off. Αν κάποιος παγώσει προσωρινά μια συνδρομή
@@ -777,18 +693,6 @@
   «mark done» απλά προωθεί το `lastMaintenanceAt` σε σήμερα (χωρίς ιστορικό log αρχικά, MVP)· κανένα preset
   interval ανά κατηγορία (ο χρήστης βάζει το δικό του αριθμό).
 
-### P40. Self-host update-available banner (GHCR version check) — S — OSS (adoption/retention lever)
-- **Αξία:** το TODO §4 δημοσιεύει ήδη versioned images στο GHCR (`vX.Y.Z`/`latest`), αλλά ένας self-host χρήστης
-  δεν έχει **κανέναν** τρόπο μέσα στο app να μάθει ότι υπάρχει νεότερη έκδοση εκτός αν παρακολουθεί χειροκίνητα
-  το repo. Ένα απλό check (τρέχον `APP_VERSION` env/build-arg vs GHCR `/latest` tag μέσω public registry API,
-  cached 24ωρο) → «Update available: vX.Y.Z» banner στο Settings → About, με link στο changelog/release notes.
-  Μηδέν auth χρειάζεται (public package), μηδέν telemetry προς τα έξω (μόνο GET προς GHCR). **Διακριτό** από
-  §4 (publish pipeline) — εδώ το **consumption-side** signal στον χρήστη.
-- **Module:** Settings → General/About (+ μικρό `lib/versionCheck.ts`).
-- **Ανοιχτή απόφαση (builder default):** best-effort, no-op αν το network call αποτύχει (self-host πίσω από
-  firewall)· opt-out toggle (κάποιοι δεν θέλουν το app να κάνει outbound calls)· off by default στο SaaS
-  (irrelevant, always latest).
-
 ### P39. Item bundles / builds — group inventory items σε ένα named project με cost roll-up — S/M — OSS (κυρίως, dogfooding-heavy)
 - **Αξία:** πραγματικό κενό που ο ίδιος ο Αχιλλέας θα χρησιμοποιούσε άμεσα (βλ. CLAUDE.md: «Battle Station» PC
   build, «10G upgrade list», rack build) — σήμερα τα items έχουν μόνο free-form tags, χωρίς δομημένο **parent
@@ -838,6 +742,104 @@
 > πιο απλό MVP (heuristic/deterministic πριν AI, single πριν multi). Κατέγραψε την επιλογή στο progress log.
 > Εξαρτήσεις: P5/P17/P23 δένουν με `/api/v1` (§5) + mobile MVP (§6)· P6 feed βοηθά το PA3/P20.
 > **Νεοεγκεκριμένα 2026-07-10 (interactive):** P33, P32, P34, P35, P36 (ranked value/effort· P36 τελευταίο, L).
+
+> **Νεοεγκεκριμένα 2026-08-03 (interactive, «approve all ως έχουν, προχώρα τα»):** P81, P66, P74, P48, P46, P40 — όλα S, με τη σειρά που παρατίθενται. Ο Αχιλλέας ενέκρινε ρητά τα builder defaults του κάθε item ως έχουν, οπότε **καμία «ανοιχτή απόφαση» δεν μένει ανοιχτή σε αυτά τα έξι**: ο builder υλοποιεί ό,τι γράφει το «Ανοιχτή απόφαση (builder default)» πεδίο τους αυτούσιο, χωρίς να ξαναρωτήσει.
+
+### P81. Αυτόματο (scheduled) trigger του notification/alert engine — S — OSS (κυρίως), ολοκληρώνει το ήδη-shipped §3
+- **Αξία:** live-verified `grep -rn "runAlertChecks" apps/web/src/app/api` = 0 hits — το πλήρες, ήδη-shipped
+  notification framework (§3 στο `TODO.md`, 8 alert kinds: deal/installment/warranty/pricehike/trialend/giftcard/
+  bill + budget-exceeded, `runAlertChecks()` στο `app/settings/actions.ts`) έχει **μηδέν** αυτόματο μηχανισμό να
+  τρέξει· το μοναδικό call-site είναι το χειροκίνητο κουμπί «Check & notify now» (`SettingsClient.tsx`). Πρακτικό
+  αποτέλεσμα: ένα self-hosted instance που τρέχει μήνες χωρίς ο χρήστης να ανοίξει Settings και να πατήσει το
+  κουμπί **δεν στέλνει ΠΟΤΕ** κανένα από τα 8 alerts, ό,τι κι αν έχει ρυθμιστεί (ntfy/Discord/Slack/Telegram/
+  webhook, §3 ήδη-shipped). Αυτό ήταν ήδη γνωστό ως «μελλοντικό» από το πολύ παλιό CLAUDE.md session log
+  (2026-06-07: «δόσεις/warranty alerts δουλεύουν manual ή με cron [μελλοντικό]») αλλά ποτέ δεν έγινε δικό του
+  backlog item έκτοτε — ξεχάστηκε ανάμεσα σε άλλα shipped features. **Υπάρχει ήδη ατόφιο το pattern** που χρειάζεται:
+  `CRON_SECRET`-gated bearer-token routes για ακριβώς αυτόν τον σκοπό, ήδη proven στο SaaS side
+  (`app/api/saas/usage/sample/route.ts`, `app/api/saas/trials/sweep/route.ts` — `timingSafeEqual` constant-time
+  compare, fail-closed 500 αν λείπει το secret) — απλά κανένα ισοδύναμο route δεν υπάρχει για το self-host
+  `runAlertChecks`. `docs/self-hosting.md` ήδη τεκμηριώνει το `CRON_SECRET` env var και δείχνει το idiom
+  («Point BACKUP_DIR at your NAS mount and schedule it via cron») — ένα δεύτερο cron entry για τα alerts θα
+  ταίριαζε φυσικά στο ίδιο README section.
+- **Module:** νέο `app/api/cron/alerts/route.ts` (ή `app/api/v1/cron/alerts`, ίδιο naming idiom με τα SaaS
+  `api/saas/*/sweep|sample` routes) — POST, `CRON_SECRET` bearer guard, καλεί το ήδη-υπάρχον `runAlertChecks()`
+  χωρίς καμία αλλαγή στο ίδιο το alert-scanning· `docs/self-hosting.md` νέα γραμμή στο crontab example.
+- **Ανοιχτή απόφαση (builder default):** self-host-only (SaaS side έχει ήδη το δικό του ξεχωριστό
+  `trials/sweep`/`usage/sample` sweep-cadence, δεν χρειάζεται migration)· route επιστρέφει 404 όταν SAAS_MODE
+  ενεργό (ίδιο gating idiom με το `usage/sample`, ίδιο rationale: «δεν υπάρχει» σε multi-tenant context όπου κάθε
+  tenant έχει τα δικά του notification settings)· καμία αλλαγή στο ήδη-shipped manual «Check & notify now» κουμπί
+  (παραμένει, απλά παύει να είναι το ΜΟΝΟ trigger)· documentation-only default cadence πρόταση (π.χ. `0 9 * * *`,
+  μία φορά το πρωί) — όχι hardcoded στο ίδιο το app, ο χρήστης ελέγχει τη συχνότητα μέσω του δικού του cron.
+
+### P66. Ο AI assistant «βλέπει» μόνο 3-7 από τα 12+ μοντέλα (search/edit/delete coverage gap) — S — both, dogfooding-heavy
+- **Αξία:** live-verified: το `app/search-actions.ts` `searchAll()` (τροφοδοτεί ΚΑΙ το navbar global search ΚΑΙ το
+  AI command-bar `search_data` tool) ψάχνει μόνο **7** μοντέλα (item/receipt/statement/task/subscription/expense/
+  voucher). Χειρότερο ακόμα: το `app/aiTools.ts` `modelFor()` (πίσω από `update_record`/`delete_record`) δέχεται
+  **μόνο 3** τύπους (`item`/`task`/`subscription`) — δηλαδή ο AI assistant μπορεί να **βρει** ένα expense/receipt/
+  voucher αλλά όχι να το επεξεργαστεί/σβήσει μέσω φυσικής γλώσσας, και είναι εντελώς **τυφλός** σε **5 ολόκληρα
+  μοντέλα** που έχουν προστεθεί έκτοτε: `Bill` (P28), `Goal` (P12), `GiftCard` (P32), `LoyaltyCard` (P20),
+  `ShoppingListItem`. Ένα «πρόσθεσε στη λίστα ψώνια γάλα» ή «σημείωσε το ΔΕΗ bill ως πληρωμένο» μέσω του AI command
+  bar σήμερα αποτυγχάνει σιωπηλά ή γυρνάει λάθος απάντηση, ενώ το ίδιο ερώτημα λειτουργεί άψογα για ένα task/item/
+  subscription. Καθαρό consistency/completeness gap σε ένα ήδη-δουλεμένο pipeline, όχι νέα αρχιτεκτονική.
+- **Module:** `app/search-actions.ts` (searchAll — προσθήκη 5 μοντέλων) + `app/aiTools.ts` (modelFor + tool
+  descriptions/system prompt — επέκταση σε όλα τα searchable types).
+- **Ανοιχτή απόφαση (builder default):** επέκτεινε και τα δύο σε **όλα** τα user-facing μοντέλα με ένα search
+  index (ίδιο `$or`/regex pattern με τα υπάρχοντα 7)· `modelFor` επεκτείνεται συμμετρικά με searchAll (ό,τι είναι
+  searchable πρέπει να είναι edit/delete-able, ίδιο soft-delete pattern με τα ήδη-υπάρχοντα)· `GiftCard.uses[]`
+  spend-log μένει εκτός update/delete μέσω AI (πιο ασφαλές να μένει UI-only, αποφυγή λάθος αλλαγής υπολοίπου).
+
+### P74. Backup restore verification (αυτόματο integrity self-test, όχι μόνο export) — S — OSS (self-host trust lever)
+- **Αξία:** live-verified `grep -rn "verifyBackup|backupHealth|restoreTest|integrityCheck" apps/web/src` = 0 hits.
+  Το ήδη-shipped `exportData()` (Settings → Backup/Restore) + το nightly `backup.sh` (CLAUDE.md) **γράφουν** το
+  backup αρχείο αλλά ποτέ δεν το ξανα-διαβάζουν για να επιβεβαιώσουν ότι είναι έγκυρο JSON με τα αναμενόμενα
+  collections/counts — ένα σιωπηλά κομμένο/corrupted backup (δίσκος γέμισε στη μέση της εγγραφής, bad JSON) δεν
+  γίνεται αντιληπτό μέχρι την πραγματική στιγμή ανάγκης restore, δηλαδή τη χειρότερη δυνατή στιγμή. Νέο μικρό
+  **«Verify last backup»** action (Settings → Storage & backup): διαβάζει το πιο πρόσφατο export/backup αρχείο,
+  ελέγχει valid JSON + αναμενόμενα top-level keys/collection counts > 0 (χωρίς πραγματικό restore/side-effect) →
+  «✓ Verified 2026-07-29, 240 receipts, 66 items, ...» ή ξεκάθαρο error αν κάτι λείπει/είναι corrupted. **Διακριτό**
+  από P54 (encryption-at-rest, δεν αγγίζει το plaintext backup flow) και P48 (mirror-sync staleness = έφτασε στο
+  remote ή όχι, όχι αν το ίδιο το περιεχόμενο είναι έγκυρο).
+- **Module:** Settings → Storage & backup (νέο read-only action πάνω στο ήδη-υπάρχον export/backup path).
+- **Ανοιχτή απόφαση (builder default):** MVP = structural validation μόνο (valid JSON + non-zero collection
+  counts + βασικό schema-shape check), ΟΧΙ πλήρες test-restore σε sandbox DB (πολύ πιο ακριβό/ρίσκο για S item)·
+  ελέγχει το τελευταίο τοπικό backup αρχείο (`~/Backups/pharos/` ή το configured backup dir), δεν κατεβάζει από
+  remote mirror (out of scope εδώ, αυτό είναι το P48).
+
+### P48. Storage mirror sync-staleness alert (backup peace-of-mind) — S — both
+- **Αξία:** ο χρήστης έχει ήδη remote mirror (OneDrive/SMB/FTP, βλ. CLAUDE.md) αλλά το sync είναι **μόνο
+  χειροκίνητο** («Sync now» στο Settings → File storage) — αν ξεχαστεί για βδομάδες, το remote αντίγραφο μένει
+  σιωπηλά πίσω από τα τοπικά αρχεία, ενώ ο χρήστης νομίζει ότι έχει ενεργό 3-2-1 backup. Κανένα σημείο σήμερα
+  δεν κρατά «πότε ολοκληρώθηκε το τελευταίο επιτυχές sync» ούτε ειδοποιεί αν περάσει πολύς καιρός χωρίς ένα.
+  Νέο: αποθήκευσε `lastSuccessfulSyncAt` (ήδη υπάρχει το ίδιο το sync action, μόνο λείπει το timestamp-write) →
+  alert (reuse `dispatchAlert`) όταν περάσουν >N μέρες από το τελευταίο επιτυχές sync ΚΑΙ backend≠local ΚΑΙ
+  mirror ενεργό. Ντετερμινιστικό, μηδέν AI. **Διακριτό** από P40 (update-available = νέα έκδοση app, όχι backup
+  freshness) — εδώ ο κίνδυνος είναι δεδομένα, όχι λογισμικό.
+- **Module:** Settings → File storage (νέο timestamp πεδίο στο AppConfig) + Notifications.
+- **Ανοιχτή απόφαση (builder default):** default threshold 7 μέρες (ρυθμιζόμενο, ίδιο lead-time pattern με τα
+  υπόλοιπα alert-days)· no-op όταν backend=local ή mirror off (δεν έχει νόημα το alert).
+
+### P46. Expense duplicate detection & merge (mirror του ήδη-υπάρχοντος pattern) — S — OSS
+- **Αξία:** τα Receipts, Stores, και Items έχουν ήδη ένα δουλεμένο «find duplicates» modal (group κατά κλειδί +
+  review + merge, βλ. `findDuplicateReceipts`/`findDuplicateStores`/`findDuplicateItems`) — τα **Expenses δεν
+  έχουν το ίδιο**, παρόλο που ο κίνδυνος υπάρχει εξίσου (διπλό import ενός λογαριασμού, ίδια recurring εγγραφή
+  δύο φορές λόγω race στο auto-mirror-on-verify ή διπλό CSV/YNAB import). Ίδιο group-by (vendorKey+ημέρα+ποσό,
+  ίδιο κλειδί με το recurring-detection/anomaly) + merge, ελάχιστο νέο effort αφού το UI pattern
+  (`DuplicatesModal`-style) υπάρχει ήδη τρεις φορές ως πρότυπο να αντιγραφεί.
+- **Module:** Expenses (+ Income, ίδιο μοντέλο/kind πεδίο).
+- **Ανοιχτή απόφαση (builder default):** group by `vendorKey` (ήδη υπάρχει η normalize function) + ίδια ημέρα +
+  ποσό· reuse UI pattern από το `ReceiptsClient` DuplicatesModal ατόφιο (ίδιο review-before-merge flow).
+
+### P40. Self-host update-available banner (GHCR version check) — S — OSS (adoption/retention lever)
+- **Αξία:** το TODO §4 δημοσιεύει ήδη versioned images στο GHCR (`vX.Y.Z`/`latest`), αλλά ένας self-host χρήστης
+  δεν έχει **κανέναν** τρόπο μέσα στο app να μάθει ότι υπάρχει νεότερη έκδοση εκτός αν παρακολουθεί χειροκίνητα
+  το repo. Ένα απλό check (τρέχον `APP_VERSION` env/build-arg vs GHCR `/latest` tag μέσω public registry API,
+  cached 24ωρο) → «Update available: vX.Y.Z» banner στο Settings → About, με link στο changelog/release notes.
+  Μηδέν auth χρειάζεται (public package), μηδέν telemetry προς τα έξω (μόνο GET προς GHCR). **Διακριτό** από
+  §4 (publish pipeline) — εδώ το **consumption-side** signal στον χρήστη.
+- **Module:** Settings → General/About (+ μικρό `lib/versionCheck.ts`).
+- **Ανοιχτή απόφαση (builder default):** best-effort, no-op αν το network call αποτύχει (self-host πίσω από
+  firewall)· opt-out toggle (κάποιοι δεν θέλουν το app να κάνει outbound calls)· off by default στο SaaS
+  (irrelevant, always latest).
 
 ### P33. Free-trial / cancel-before-charge reminder — ✅ SHIPPED 2026-07-12 (pharos-daily-dev, commit bfd96ba)
 - **Υλοποίηση:** `Subscription.trialEndsAt` (Date|null) + optional `firstChargeAmount` (auto-serialized). Νέο **`trialend`
