@@ -745,8 +745,40 @@
 
 > **Νεοεγκεκριμένα 2026-08-03 (interactive, «approve all ως έχουν, προχώρα τα»):** P81, P66, P74, P48, P46, P40 — όλα S, με τη σειρά που παρατίθενται. Ο Αχιλλέας ενέκρινε ρητά τα builder defaults του κάθε item ως έχουν, οπότε **καμία «ανοιχτή απόφαση» δεν μένει ανοιχτή σε αυτά τα έξι**: ο builder υλοποιεί ό,τι γράφει το «Ανοιχτή απόφαση (builder default)» πεδίο τους αυτούσιο, χωρίς να ξαναρωτήσει.
 
-### P81. Αυτόματο (scheduled) trigger του notification/alert engine — S — OSS (κυρίως), ολοκληρώνει το ήδη-shipped §3
-- **Αξία:** live-verified `grep -rn "runAlertChecks" apps/web/src/app/api` = 0 hits — το πλήρες, ήδη-shipped
+### P81. Αυτόματο (scheduled) trigger του notification/alert engine — ✅ SHIPPED 2026-08-03 (pharos-daily-dev, commit `fda8c96`)
+- **Υλοποίηση:** νέο **`app/api/cron/alerts/route.ts`** (POST) που καλεί το ήδη-υπάρχον `runAlertChecks()` **χωρίς
+  καμία αλλαγή στο ίδιο το scanning**. Self-host only (404 όταν SAAS_MODE on, ο builder default τηρήθηκε: το
+  `runAlertChecks` διαβάζει την κοινή βάση χωρίς tenant scoping, οπότε σε multi-tenant θα έστελνε τα νούμερα
+  λάθος tenant σε όποιον κρατά το secret). `CRON_SECRET` bearer, fail-closed 500 όταν λείπει. Το χειροκίνητο
+  κουμπί «Check & notify now» έμεινε ατόφιο, απλά έπαψε να είναι το μοναδικό trigger. Νέο **`lib/cronAuth.ts`**
+  (`cronTokenMatches`/`checkCronAuth`): το constant-time compare υπήρχε ήδη σε **τρία** ιδιωτικά αντίγραφα στα
+  SaaS cron routes, οπότε μπήκε σε κοινό helper αντί για τέταρτο αντίγραφο (τα υπάρχοντα ΔΕΝ αγγίχτηκαν, είναι
+  territory του saas-core). `docs/self-hosting.md`: νέα ενότητα «Scheduling the alert sweep» (crontab recipe +
+  τι σημαίνει κάθε status code) **+ πραγματική διόρθωση doc bug**: το `CRON_SECRET` καθόταν στον πίνακα
+  «SaaS-only — self-hosted deployments should leave all of these blank», δηλαδή τα docs έλεγαν στον self-hoster
+  να αφήσει κενή ακριβώς τη μεταβλητή που ανάβει τα alerts.
+- **⚠ Το κρίσιμο εύρημα (middleware, όχι το route):** το `src/middleware.ts` matcher εξαιρούσε `api/auth|api/mcp|
+  api/v1` αλλά **ΟΧΙ** `api/cron`, οπότε το session gate απαντούσε σε ένα σωστά υπογεγραμμένο cron request με
+  σκέτο text `401 Unauthorized` **πριν τρέξει καν ο handler** — δηλαδή το feature θα ήταν διακοσμητικό. Βρέθηκε
+  **μόνο με live probe**: τα route unit tests καλούν το `POST()` απευθείας και **παρακάμπτουν εντελώς το
+  middleware**, άρα δομικά δεν μπορούν να το δουν. Fix: `api/cron` στο exclusion + νέο **`middleware.matcher.test.ts`**
+  που κλειδώνει **και τις δύο** κατευθύνσεις (bearer endpoints εκτός gate, `/api/files` μέσα — too-loose εδώ θα
+  σέρβιρε κάθε απόδειξη/PDF σε όποιον ξέρει URL).
+- **Verify:** negative control ΠΡΙΝ, σε 4 gates: drop του length guard στο timingSafeEqual → 4 κόκκινα, fail-open
+  στο απόν CRON_SECRET → 4 κόκκινα, drop του SAAS_MODE gate → 1 κόκκινο, drop του `api/cron` από το matcher → 1
+  κόκκινο. 31 νέα tests (11 cronAuth + 10 route + 10 matcher). `npm run type-check` EXIT 0· full `npx vitest run`
+  **5567 passed / 350 files**. **Live στο container**: πριν το middleware fix → plain `401 Unauthorized`· μετά →
+  JSON `500 {"error":"CRON_SECRET is not configured"}` (fail-closed, ο handler τρέχει), ενώ το `/api/files`
+  παραμένει σωστά `401`. Build cache pruned.
+- **Εκκρεμεί (χρειάζεται τον Αχιλλέα):** (α) `CRON_SECRET` στο δικό του `.env` + restart (δεν αγγίζω `.env`)·
+  (β) ένα πραγματικό happy-path run ΔΕΝ έγινε σκόπιμα, γιατί θα έστελνε **αληθινές** ειδοποιήσεις στα δικά του
+  κανάλια (ntfy/Discord/push) — το ίδιο το scanning καλύπτεται ήδη από το `actions.alertChecks.test.ts` και από
+  το κουμπί που χρησιμοποιεί ήδη.
+- **Παράπλευρο εύρημα (flagged, ΟΧΙ διορθωμένο):** τα **δύο προϋπάρχοντα SaaS cron routes έχουν το ΙΔΙΟ bug** —
+  `POST /api/saas/usage/sample` και `/api/saas/trials/sweep` live-verified να επιστρέφουν plain `401` από το
+  middleware, άρα είναι απροσπέλαστα από εξωτερικό scheduler. Territory του saas-core → καταγράφηκε στο
+  `~/.claude/ASK_ACHILLEAS.md` (`pharos-daily-dev-20260803-1145`) με πρόταση να μετακομίσουν κάτω από `/api/cron/`.
+- **Αξία (αρχικό):** live-verified `grep -rn "runAlertChecks" apps/web/src/app/api` = 0 hits — το πλήρες, ήδη-shipped
   notification framework (§3 στο `TODO.md`, 8 alert kinds: deal/installment/warranty/pricehike/trialend/giftcard/
   bill + budget-exceeded, `runAlertChecks()` στο `app/settings/actions.ts`) έχει **μηδέν** αυτόματο μηχανισμό να
   τρέξει· το μοναδικό call-site είναι το χειροκίνητο κουμπί «Check & notify now» (`SettingsClient.tsx`). Πρακτικό

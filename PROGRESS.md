@@ -11045,3 +11045,48 @@ import χωρίς `currentModel` (δεν μπαίνει τώρα, θα κοκκ�
   blocked σε εσένα, δεν υπάρχει buildable item εκεί.
 - **`PATCH /api/v1/settings` ntfy authz**: παραμένει OPEN στο `~/.claude/ASK_ACHILLEAS.md`
   (`pharos-daily-dev-20260728-0215`).
+
+## 2026-08-03 (cont.) — P81: το alert engine αποκτά αυτόματο trigger (+ middleware bug)
+
+**Πλαίσιο**: interactive session. Ο Αχιλλέας πέρασε το Approved queue μαζί μου, ενέκρινε 6 items
+(P81/P66/P74/P48/P46/P40, βλ. `OWNER_DECISIONS.md` #12) και είπε «ξεκίνα να φτιάχνεις». Πρώτο της ουράς: P81.
+
+**Τι έγινε**: νέο `app/api/cron/alerts/route.ts` (POST) που καλεί το ήδη-υπάρχον `runAlertChecks()` **χωρίς
+αλλαγή στο scanning**. Self-host only (404 σε SAAS_MODE), `CRON_SECRET` bearer, fail-closed 500 όταν λείπει.
+Νέο `lib/cronAuth.ts` γιατί το constant-time compare υπήρχε ήδη σε **τρία** ιδιωτικά αντίγραφα στα SaaS routes
+(δεν έφτιαξα τέταρτο· τα υπάρχοντα δεν αγγίχτηκαν, saas-core territory). `docs/self-hosting.md`: ενότητα
+«Scheduling the alert sweep» + **doc bug fix** — το `CRON_SECRET` καθόταν στον πίνακα «SaaS-only, αφήστε το
+κενό», δηλαδή τα docs έλεγαν στον self-hoster να αφήσει κενή τη μεταβλητή που ανάβει τα alerts.
+
+**Το κρίσιμο εύρημα, και γιατί το live probe δεν είναι διακοσμητικό**: το route επέστρεφε σκέτο text `401
+Unauthorized`. Δεν έφταιγε ο νέος κώδικας — **το `src/middleware.ts` matcher δεν εξαιρούσε το `api/cron`**, οπότε
+το session gate έκοβε το request πριν τρέξει ο handler· ένα cron με σωστό token θα έπαιρνε κι αυτό 401 και το
+feature θα ήταν διακοσμητικό. Τα route unit tests **δομικά δεν μπορούν** να το πιάσουν (καλούν το `POST()`
+απευθείας, παρακάμπτουν το middleware) → νέο `middleware.matcher.test.ts` που κλειδώνει **και τις δύο**
+κατευθύνσεις: bearer endpoints εκτός gate, `/api/files` μέσα (too-loose εκεί = κάθε απόδειξη/PDF δημόσια).
+
+**Verify**: negative control ΠΡΙΝ σε 4 gates (length guard → 4 κόκκινα, fail-open secret → 4, SAAS_MODE gate → 1,
+`api/cron` exclusion → 1). 31 νέα tests. `npm run type-check` EXIT 0. Full `npx vitest run` → **5567 passed /
+350 files**. ΣΗΜ διαφάνειας: ένα πρώτο πλήρες πέρασμα είχε **2 κόκκινα που ΔΕΝ κατάφερα να ονοματίσω** (το log
+είχε γίνει tail, τα έχασα)· δεύτερο πλήρες πέρασμα βγήκε καθαρό, τα 4 δικά μου αρχεία + το `accountSession.test.ts`
+περνούν και μεμονωμένα. Πιθανότερη εξήγηση: άλλο routine έγραφε **uncommitted** στο `lib/tenancy/accountSession.ts`
+ΤΗΝ ΩΡΑ του πρώτου run (φαίνεται ακόμα modified στο tree, μαζί με `docker-compose.saas-dev.yml`). Δεν το
+επιβεβαίωσα, το καταγράφω ως αβεβαιότητα αντί να το βαφτίσω flake. Live στο container: πριν το fix plain `401`,
+μετά JSON `500 {"error":"CRON_SECRET is not configured"}` ενώ το `/api/files` μένει `401`. Commit `fda8c96`.
+
+**Παράπλευρο εύρημα (flagged, ΟΧΙ διορθωμένο)**: τα **δύο προϋπάρχοντα SaaS cron routes** (`usage/sample`,
+`trials/sweep`) έχουν το ίδιο ακριβώς bug — live-verified plain `401` από το middleware, άρα απροσπέλαστα από
+εξωτερικό scheduler. Territory του saas-core → `~/.claude/ASK_ACHILLEAS.md` (`pharos-daily-dev-20260803-1145`),
+πρόταση να μετακομίσουν κάτω από `/api/cron/`.
+
+**Επόμενο task**: **P66** (ο AI assistant βλέπει 7 μοντέλα στο `searchAll` και μόλις 3 στο `modelFor` — Bills/
+Goals/GiftCards/LoyaltyCards/ShoppingList εντελώς αόρατα σε update/delete).
+
+## Needs Achilleas
+
+- **P81 last mile**: (α) `CRON_SECRET` στο `.env` + restart web (δεν αγγίζω `.env`)· (β) ένα πραγματικό happy-path
+  run ΔΕΝ έγινε σκόπιμα — θα έστελνε **αληθινές** ειδοποιήσεις στα κανάλια του. Ρωτήθηκε, αναπάντητο μέχρι τώρα.
+- **P36 / P16 = ΠΑΓΩΜΕΝΑ** με ρητό κανόνα σιωπής (`OWNER_DECISIONS.md` #13): να ΜΗΝ ξαναεμφανίζονται εδώ κάθε run.
+  **P23 = ΕΝΕΡΓΟ** πλέον (χτίζεται μέχρι «code complete, awaiting EAS build»)· ανοιχτό μόνο αν υπάρχει Apple
+  Developer account, αλλιώς πρώτα το Android μισό.
+- Αμετάβλητα: **P17 live check** σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους.
