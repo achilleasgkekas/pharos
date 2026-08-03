@@ -121,6 +121,7 @@ The app defaults to **local Ollama** (private, zero-cost). Cloud AI providers ar
 | `PRICE_DROP_ALERT_PCT` | Alert threshold for price drops (default `10` = 10% drop triggers alert). |
 | `NTFY_URL` | ntfy server URL (default `https://ntfy.sh`). |
 | `NTFY_TOPIC` | Topic name for push alerts. Empty disables alerts. |
+| `CRON_SECRET` | Shared secret (generate with `openssl rand -base64 32`) required to call `POST /api/cron/alerts`. Needed only if you schedule the alert sweep; see [Scheduling the alert sweep](#scheduling-the-alert-sweep). |
 
 ### Optional — rate limiting
 
@@ -143,7 +144,7 @@ On a shared or public deployment, rate limit API calls to prevent brute-force lo
 | `APP_URL` | Fallback app origin. |
 | `SAAS_SESSION_IDLE_HOURS` | Session timeout for hosted accounts (default `12`). Clamped 0.25–8760 hours. |
 | `SAAS_SUPERADMIN_EMAILS` | Comma/semicolon-separated allowlist of operator emails for the superadmin console. Empty disables the console. |
-| `CRON_SECRET` | Shared secret (generate with `openssl rand -base64 32`) required to call internal cron endpoints (e.g. usage sampling). |
+| `CRON_SECRET` | Shared secret for the SaaS cron endpoints (usage sampling, trial sweep). Also used self-hosted by the alert sweep, so it is listed under "integration & scraping" too. |
 | `STRIPE_SECRET_KEY` | Stripe secret API key from the Stripe dashboard. |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret. |
 | `STRIPE_PRICE_SHARED` | Stripe price ID for the shared-account tier (price_...). |
@@ -265,6 +266,47 @@ replace, the offline dump above (3-2-1 backups).
 For the full picture — automating the nightly dump, restoring, the JSON/CSV
 exports, the storage mirror, and Trash — see the dedicated
 [Backup & restore](backup-and-restore.md) guide.
+
+---
+
+## Scheduling the alert sweep
+
+PHAROS can warn you about price targets being hit, installments due this month,
+warranties and gift cards about to expire, return windows closing, recurring
+charges that went up, free trials about to convert, unpaid bills, and budgets
+you have blown through. It sends that summary to whatever you configured in
+Settings → Notifications (ntfy, Discord, Slack, Telegram, outgoing webhooks),
+plus the in-app bell and any signed-in mobile devices.
+
+**Nothing runs this scan on its own.** Out of the box the only trigger is the
+"Check & notify now" button in Settings, so an instance you never open never
+alerts you. To make it automatic, point a scheduler at the sweep endpoint:
+
+1. Set `CRON_SECRET` in your `.env` (`openssl rand -base64 32`) and restart the
+   web container. Without it the endpoint refuses every call, including yours.
+2. Add a cron entry. Once each morning is usually enough — the alerts are
+   day-granular, so running it more often mostly re-sends the same summary:
+
+   ```bash
+   # every day at 09:00
+   0 9 * * * curl -fsS -X POST http://localhost:3000/api/cron/alerts \
+     -H "Authorization: Bearer $CRON_SECRET" >> /tmp/pharos-alerts.log 2>&1
+   ```
+
+The response tells you what happened, so the log is worth keeping:
+
+```json
+{ "ok": true, "sent": true, "summary": "🛡 2 warranty expiring ≤90d: ..." }
+```
+
+`"sent": false` with an all-clear summary is a healthy run that simply found
+nothing to report, not a failure. A `401` means the token does not match, a
+`500` with `CRON_SECRET is not configured` means the variable never reached the
+container, and a `404` means the instance is running in SaaS mode (hosted
+workspaces get their own per-tenant sweep instead).
+
+The button in Settings keeps working exactly as before; it just stops being the
+only way the scan ever runs.
 
 ---
 
