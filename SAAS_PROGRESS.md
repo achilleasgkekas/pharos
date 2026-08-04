@@ -7295,3 +7295,46 @@ URL δίνει δύο `@` και ο parser σπάει σε λάθος σημεί
 
 **Next task:** (α) πραγματικό email test· (β) crontab (backup + 3 cron endpoints)· (γ)
 `pharos-deploy` routine με rollback· (δ) `settings/actions.ts` scoping.
+
+## 2026-08-04 (ια) — increment 143: γιατί δεν ερχόταν email, γιατί «έβλεπε μόνο settings», deploy pipeline
+
+Ο Achilleas: «στο saas register δεν μπορώ να μπω με τίποτα στο Pharos, βλέπω μόνο settings, δεν
+ήρθε κάτι από email». **Δύο πραγματικά bugs, κανένα δεν ήταν αυτό που φαινόταν.**
+
+**1. Email: δεν έφταιγε ο κωδικός, ο Hetzner μπλοκάρει τη θύρα.** Το log έδειξε
+`[mailer] SMTP send failed: Connection timeout`. Μετρημένο από τον server: **465 και 25
+μπλοκαρισμένα** (πολιτική κατά του spam), **587 ανοιχτό**. Ο κώδικας ήδη χειριζόταν σωστά το 587
+(`secure:false, requireTLS:true`), οπότε ήταν αλλαγή μιας μεταβλητής. **Η γραμμή log που το έδειξε
+προστέθηκε πριν λίγες ώρες, στο ίδιο increment που καλωδίωσε το SMTP**, ακριβώς επειδή ο mailer
+καταπίνει τα σφάλματά του — χωρίς αυτήν θα ψάχναμε στα τυφλά τον κωδικό.
+
+**2. «Βλέπω μόνο settings»: δεν υπήρχε ΚΑΝΕΝΑΣ σύνδεσμος προς το προϊόν.** `grep` σε όλο το SaaS UI
+για το workspace subdomain → **μηδέν**. Ο πελάτης τελείωνε το signup, προσγειωνόταν στις ρυθμίσεις
+του workspace, και δεν υπήρχε πόρτα προς το Pharos. Νέο `workspaceUrl()` + κουμπί «Open workspace»
+και στις 6 σελίδες. Το URL προκύπτει από το `SAAS_PUBLIC_URL` **αλλάζοντας το πρώτο label**, όχι με
+συναρμολόγηση: έτσι η θύρα έρχεται μαζί (αλλιώς μη τυπική θύρα δίνει link που 404άρει), και σε host
+με δύο labels **προσθέτει** αντί να αντικαταστήσει (αλλιώς `lvh.me` → `acme.me`, ξένο domain).
+
+**3. `deploy/deploy-update.sh` + routine `pharos-deploy`** (χωρίς cron, κατά τον κανόνα «πρώτα
+τοπικά»). Σειρά: health **πρώτα** (ποτέ deploy πάνω σε ήδη χαλασμένο, αλλιώς δεν ξεχωρίζεις ποια
+αλλαγή έφταιξε) → backup με **άρνηση αν αποτύχει** → καταγραφή commit → pull → rebuild **μόνο** των
+services που άλλαξαν → verify με retries → **αυτόματο rollback**. Ο health check ψάχνει
+**περιεχόμενο landing** στο apex, όχι σκέτο 200: τα δύο upstreams απαντούν και τα δύο 200 και
+μοιράζονται `<title>`, οπότε ένα routing regression είναι αόρατο σε status code.
+
+**Το pipeline βρήκε λάθος μου στην ΠΡΩΤΗ του εκτέλεση**: είχα κάνει `git merge` χειροκίνητα, οπότε
+συνέκρινε HEAD με origin/main, τα βρήκε ίσα, είπε «τίποτα να ανεβάσω» και βγήκε **exit 0** ενώ τα
+containers έτρεχαν το προηγούμενο build. Το να αναφέρει επιτυχία χωρίς να αλλάξει τίποτα είναι η
+χειρότερη απάντηση εργαλείου deploy. Προστέθηκε `FORCE=1` και γράφτηκε ρητά στις οδηγίες.
+
+**Verified**: deploy exit 0, `Open workspace` **μέσα στο χτισμένο bundle**, apex 200 με landing
+markers, app 200, 4/4 containers up, **μηδέν** σφάλματα mailer μετά την αλλαγή θύρας.
+
+**Ξένο κόκκινο test**: `settings/actions.alertChecks.test.ts` («21 days ago» vs «20») είναι flake
+στα όρια ημέρας από σημερινή δουλειά άλλης routine. Δεν το άγγιξα.
+
+**Next task:** (α) `settings/actions.ts` scoping — το τελευταίο data-isolation κενό, χτυπάει μόλις
+μπει **δεύτερο** workspace· (β) σελίδα `/status` στη landing· (γ) sending domain με SPF+DKIM αντί
+για προσωπικό Gmail, πριν από πραγματικούς πελάτες.
+
+**## Needs Achilleas:** **Stripe keys**, **plan pricing**. Το email και τα backups **έκλεισαν**.
