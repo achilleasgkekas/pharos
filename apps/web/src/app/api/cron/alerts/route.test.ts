@@ -93,6 +93,12 @@ describe('bearer token gate', () => {
     expect(res.status).toBe(200);
     expect(runAlertChecksMock).toHaveBeenCalledTimes(1);
   });
+
+  it('runs with dedupe on (P82) — an unattended cron must not resend the same alert every tick', async () => {
+    await POST(makeReq({ authorization: 'Bearer cron-secret-123' }));
+
+    expect(runAlertChecksMock).toHaveBeenCalledWith({ dedupe: true });
+  });
 });
 
 describe('scan result', () => {

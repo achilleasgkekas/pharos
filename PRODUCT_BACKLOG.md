@@ -200,27 +200,6 @@
   μηνιαίο sweep ως follow-up μόνο αν το manual flow αποδειχτεί χρήσιμο (αποφυγή σιωπηλής μετακίνησης χρημάτων
   μεταξύ «κουτιών» χωρίς να το δει πρώτα ο χρήστης)· κενό/άδειο leftover = καμία αλλαγή συμπεριφοράς.
 
-### P82. Outbound alert notifications δεν έχουν per-item dedup (το bell έχει, τα ntfy/Discord/κλπ όχι) — S — OSS (κυρίως), άμεσο follow-up του P81
-- **Αξία:** live-verified `app/settings/actions.ts` `runAlertChecks()`: το in-app bell περνά από `generateNotifications()`
-  (`app/notifications/actions.ts`), που έχει ήδη πλήρες `dedupeKey`-based σύστημα (`deal:<id>`, `warranty:<id>`,
-  `bill:<id>:<date>` κλπ — γραμμή 190-212, μόνο **νέα** ή **αλλαγμένη** κατάσταση δημιουργεί entry). Αλλά η
-  **outbound** ειδοποίηση (`dispatchAlert('Pharos alerts', summary)`, γραμμή 630) είναι εντελώς ξεχωριστός κώδικας
-  που φτιάχνει ένα text summary και το στέλνει σε ntfy/Discord/Slack/Telegram/webhook + push **unconditionally**
-  όποτε `lines.length > 0` — **μηδέν** σχέση με το dedupeKey σύστημα του bell (verified: η κλήση `dispatchAlert`
-  δεν περνά κανένα dedup state, καμία αναφορά dedupeKey σε αυτό το block). Αυτό ήταν αβλαβές όσο η μόνη πυροδότηση
-  ήταν το χειροκίνητο κουμπί «Check & notify now» (ο χρήστης το πατά όποτε θέλει), αλλά **το ίδιο το P81** (shipped
-  χθες, 2026-08-03) έγραψε ρητά «cadence is the operator's — point any cron at it». Αν ο Αχιλλέας βάλει ένα daily/
-  hourly cron (η προφανής χρήση του P81), θα παίρνει το **ίδιο ακριβώς** «🛡 3 warranty expiring ≤90d: X (45d)»
-  ntfy push σε κάθε πυροδότηση μέχρι να λήξει η εγγύηση ή να πληρωθεί το bill — notification fatigue που οδηγεί
-  σε mute του καναλιού, ακυρώνοντας το ίδιο το feature που μόλις χτίστηκε. Reuse ατόφιο του ήδη-υπάρχοντος
-  `dedupeKey` schema/κατώφλια logic (ήδη σχεδιασμένο ανά alert kind), απλά εφαρμοσμένο και στο outbound path.
-- **Module:** `app/settings/actions.ts` (`runAlertChecks`, το `dispatchAlert` call site) + reuse
-  `app/notifications/actions.ts` dedupeKey helpers/computation (ίδια alerts array, δεύτερο consumer).
-- **Ανοιχτή απόφαση (builder default):** MVP = φιλτράρισμα των γραμμών του summary ώστε να στέλνονται outbound
-  **μόνο** τα alert που είναι νέα ή άλλαξαν κατάσταση από την τελευταία επιτυχή αποστολή (ίδιο dedupeKey concept
-  με το bell, χωρίς διπλό μηχανισμό)· «κενό» (μηδέν νέο/αλλαγμένο) = **καμία** αποστολή αντί άδειο «All clear»
-  spam· υπάρχοντα κανάλια/behaviour αμετάβλητα όταν δεν υπάρχει τίποτα νέο να αναφερθεί.
-
 ---
 
 ## Approved
@@ -235,6 +214,32 @@
 > **Νεοεγκεκριμένα 2026-07-10 (interactive):** P33, P32, P34, P35, P36 (ranked value/effort· P36 τελευταίο, L).
 
 > **Νεοεγκεκριμένα 2026-08-03 (interactive, «approve all ως έχουν, προχώρα τα»):** P81, P66, P74, P48, P46, P40 — όλα S, με τη σειρά που παρατίθενται. Ο Αχιλλέας ενέκρινε ρητά τα builder defaults του κάθε item ως έχουν, οπότε **καμία «ανοιχτή απόφαση» δεν μένει ανοιχτή σε αυτά τα έξι**: ο builder υλοποιεί ό,τι γράφει το «Ανοιχτή απόφαση (builder default)» πεδίο τους αυτούσιο, χωρίς να ξαναρωτήσει.
+
+> **Νεοεγκεκριμένο 2026-08-04 (interactive, «review the approved queue and start building P82»):** P82, ίδια συνεδρία, χτίστηκε αμέσως.
+
+### P82. Outbound alert dedup — ✅ SHIPPED 2026-08-04 (interactive session, commit `2e293ca` + follow-up)
+- **Τι έγινε:** νέο pure `lib/alertDedup.ts` (`splitFreshAlerts`) + `runAlertChecks(opts?: { dedupe?: boolean })`
+  στο `app/settings/actions.ts`. Κάθε μία από τις 8 κατηγορίες (deals/warranty/returns/price-hikes/trials/
+  gift-cards/bills/budgets) + installments + sync-staleness παίρνει ένα dedupeKey ίδιου σχήματος με το bell
+  (`deal:<id>`, `warranty:<id>`, `bill:<id>:<iso>`, νέα `return:<id>`/`budget:<cat>:<month>`/`syncstale:<lastSyncAt>`)
+  και φιλτράρεται έναντι του `AppConfig.alertDispatchKeys` (νέο πεδίο) πριν χτιστεί το outbound summary. Η βάση
+  ενημερώνεται **μόνο** όταν το `dispatchAlert` όντως παραδώσει σε ≥1 κανάλι (`sent:true`) — ένα misconfigured
+  notifier δεν «καταπίνει» ποτέ ένα alert σιωπηλά. Νέο μήνυμα «No new alerts (already reported)» ξεχωριστό από
+  το γνήσιο «All clear» όταν υπάρχουν live alerts αλλά όλα ήδη αναφέρθηκαν. Το `app/api/cron/alerts/route.ts`
+  καλεί πλέον `runAlertChecks({ dedupe: true })`· το χειροκίνητο «Check & notify now» μένει `dedupe: false`
+  (default) — **byte-identical** συμπεριφορά, μηδέν νέο AppConfig read/write, verified έναντι του
+  προϋπάρχοντος 53-test pinned suite αμετάβλητο. Το bell (`generateNotifications`) και τα P24 event webhooks
+  ΔΕΝ επηρεάζονται (διαφορετικό audience, ίδια σχεδιαστική απόφαση με το item description).
+- **Πλευρικό εύρημα**: η νέα `AppConfig.updateOne` έκανε το `runAlertChecks` το πρώτο πραγματικό Mongoose write
+  του — το P31 write-guard coverage test το έπιασε σωστά· fix = `assertCanWrite()` στην κορυφή (no-op σε cron
+  χωρίς session, μπλοκάρει μόνο logged-in viewer).
+- **Collision με ταυτόχρονη δουλειά**: το P48 (sync-staleness) χτιζόταν στο **ίδιο ακριβώς** `runAlertChecks`
+  παράλληλα σε άλλο routine· τα δύο diffs interleaved καθαρά (verified: type-check + πλήρες test suite green
+  και μετά τα δύο commits). Η interactive session τερματίστηκε πριν προλάβει να κάνει commit το δικό της κομμάτι
+  (config timeout)· ένα άλλο routine το βρήκε ορφανό στο working tree ~6 ώρες μετά και το commit-άρισε ρητά ως
+  «Not my change» (`2e293ca`) αντί να το χάσει ή να το απορροφήσει σιωπηλά σε άσχετο commit — το `app/api/cron/
+  alerts/route.ts`+`route.test.ts` (η κλήση `{dedupe:true}`) έμεινε πίσω σε αυτό το commit, ολοκληρώθηκε
+  ξεχωριστά στο follow-up. Tests: 9 νέα σε `actions.alertChecksDedupe.test.ts` + 1 στο cron route test.
 
 > **Νεοεγκεκριμένα 2026-08-03 (interactive, «Approve all»):** P80, P79, P78, P77, P76, P75, P73, P72, P71, P70, P69, P68, P67, P65, P64, P62, P61, P60, P59, P58, P57, P56, P55, P54, P53, P52, P51, P50, P49, P47, P45, P44, P43, P42, P41, P39, P37, P38 — ολόκληρη η υπόλοιπη ουρά του Proposed section, 38 items, «approve all» χωρίς εξαίρεση. Για τα 32 από αυτά ο Αχιλλέας δεν χρειάστηκε να πει τίποτα άλλο, το builder default του κάθε item ισχύει αυτούσιο. **Έξι items είχαν ξεχωριστές ανοιχτές ερωτήσεις στη σάρωση πριν το «approve all» — απαντήθηκαν με το δικό τους δηλωμένο fallback, ΟΧΙ με ρητή απάντηση του Αχιλλέα, μπορεί να χρειαστούν διόρθωση αν ο builder φτάσει σε αυτά πρώτα:**
 > - **P37** — reuse το Subscription model (όχι νέο dedicated Contract model), το ίδιο το item το δηλώνει ως fallback αν δεν λυθεί ρητά.

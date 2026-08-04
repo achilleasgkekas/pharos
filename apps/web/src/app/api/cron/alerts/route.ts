@@ -27,6 +27,12 @@ export const dynamic = 'force-dynamic';
  *
  * Protected by the shared CRON_SECRET bearer (fail-closed 500 when unset), not a session,
  * since a scheduler calls it. Cadence is the operator's, not ours: point any cron at it.
+ *
+ * Calls `runAlertChecks({ dedupe: true })` (P82): "point any cron at it" means an unresolved
+ * warranty/bill/deal would otherwise repeat the identical outbound push on every tick — dedupe
+ * filters the outbound message down to what's new/changed since the last successful send. The
+ * in-app bell and the "Check & notify now" button are unaffected (the bell has its own separate
+ * per-item memory; the button always calls runAlertChecks() with no args, i.e. dedupe off).
  */
 export async function POST(req: Request) {
   if (saasMode()) {
@@ -39,7 +45,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { sent, summary } = await runAlertChecks();
+    const { sent, summary } = await runAlertChecks({ dedupe: true });
     // `sent: false` with an "All clear" summary is a healthy run, not a failure — the cron
     // log should be able to tell "nothing to report" apart from "the scan blew up".
     return NextResponse.json({ ok: true, sent, summary });
