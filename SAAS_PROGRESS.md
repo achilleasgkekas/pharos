@@ -7375,3 +7375,50 @@ membership. Γραμμένο στον κώδικα ώστε να μη γίνει
 
 **Next task:** (α) `settings/actions.ts` scoping — το τελευταίο data-isolation κενό· (β) σελίδα
 `/status` στη landing· (γ) sending domain με SPF+DKIM.
+
+## 2026-08-04 (ιγ) — increment 145: η γέφυρα ταυτότητας που έλειπε
+
+Ο Achilleas: «είμαι logged in στο SaaS, πατάω settings και μου βγάζει create your admin account
+σαν το selfhosted, και η navigation δεν φαίνεται πάντα».
+
+**Μία ρίζα, πολλά συμπτώματα.** Η εφαρμογή αναγνωρίζει ανθρώπους με `User` + `pharos_session`. Ο
+hosted πελάτης είναι `Account` + `pharos_account` + `Membership`, και **δεν έχει καθόλου `User`**.
+Τίποτα δεν ένωνε τα δύο, οπότε ο `getCurrentUser()` επέστρεφε **null για απολύτως έγκυρο πελάτη**:
+
+```
+Settings → requireAdmin → null → redirect /login
+/login   → User.countDocuments() === 0 → redirect /setup
+/setup   → «create your admin account»
+```
+
+Μια βάση tenant έχει **εξ ορισμού** μηδέν `User`, άρα κάθε workspace είναι μόνιμα «first run» για
+εκείνον τον έλεγχο. Η navbar εξαφανιζόταν στο **ίδιο null**.
+
+**Νέο `lib/tenancy/saasIdentity.ts` + `getSessionUser()`** που απαντά και για τα δύο σχήματα· τα
+gates (`requireUser`, `requireAdmin`, `assertCanWrite`) ρωτάνε πλέον αυτό. Το tenancy μισό
+φορτώνεται **δυναμικά**: το `recoveryCodes` κάνει import πίσω στο `lib/auth`, οπότε στατικό import
+θα έκλεινε κύκλο, και το self-hosted δεν πρέπει να φορτώνει καθόλου το tenancy graph.
+
+**Έσβησα το προηγούμενο patch** που έφτιαχνε μόνο τη navbar (`navUser.ts`). Δύο απαντήσεις στο
+«ποιος είναι συνδεδεμένος» είναι ακριβώς ο μηχανισμός που γέννησε το bug· τώρα υπάρχει μία.
+
+**Και οι δύο πόρτες έκλεισαν ρητά**, χωρίς να βασιστούν στη γέφυρα: `/setup` → **notFound()** σε
+SaaS mode, `/login` → redirect `/account/login`. Ο wizard **μπορεί να φτιάξει self-hosted admin**,
+οπότε το να μένει προσβάσιμος σε hosted deployment δεν είναι καλλωπιστικό.
+
+**Το `navRole` κρίνει πλέον δικαιώματα** (το διαβάζει το `requireAdmin`), άρα είναι συντηρητικό:
+owner/admin → admin, member → member, **οτιδήποτε άγνωστο → viewer**. Το `'OWNER '` με κενό στα
+tests δεν είναι σχολαστικότητα: η τιμή έρχεται από αποθηκευμένα δεδομένα και ένα typo δεν
+επιτρέπεται να ανοίξει πόρτα. Σε σφάλμα control plane επιστρέφει **null**, όχι ρόλο που δεν
+επιβεβαιώθηκε.
+
+**Verified live μετά το deploy** (exit 0, rebuild μόνο του web, health OK): `/setup` → **404** και
+στα δύο hosts, `/login` → **307 → /account/login**, `/settings` χωρίς session → **2 hops →
+/account/login 200** (πριν κατέληγε στον wizard). 5841 tests green.
+
+**Μικρή ασυνέπεια που ΔΕΝ διόρθωσα**: `nosuch.ph-aros.com/settings` καταλήγει σε login αντί για
+404, ενώ το `/receipts` δίνει σωστά 404. Πηγάζει από το ότι το `settings/actions.ts` **δεν είναι
+tenant-scoped** — το ήδη γνωστό ανοιχτό κενό. Μηδέν έκθεση δεδομένων, αλλά είναι ακόμα ένας λόγος
+να κλείσει.
+
+**Next task:** (α) `settings/actions.ts` scoping· (β) σελίδα `/status` στη landing.
