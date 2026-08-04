@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// POST /api/saas/workspace/erasure/purge is the scheduler-driven GDPR Art. 17 purge SCAN —
-// it never has route-level coverage today (grep of api/saas/**/*.test.ts before this file:
-// zero). The scan's own reporting logic (`planErasurePurge`/`daysOverdue`/`purgeTarget`) is
+// POST /api/cron/saas/erasure-purge (moved from /api/saas/workspace/erasure/purge) is the
+// scheduler-driven GDPR Art. 17 purge SCAN. The scan's own reporting logic (`planErasurePurge`/`daysOverdue`/`purgeTarget`) is
 // already fully unit-tested in `erasurePurge.test.ts` and runs for REAL here (only
 // `runErasurePurgeScan` is mocked at the module boundary, alongside `saasMode`). This closes
 // the gap for what the ROUTE itself is responsible for:
@@ -24,7 +23,7 @@ vi.mock('@/lib/tenancy/erasurePurge', () => ({ runErasurePurgeScan: runErasurePu
 import { POST } from './route';
 
 function makeReq(headers: Record<string, string> = {}): Request {
-  return new Request('https://app.example.com/api/saas/workspace/erasure/purge', {
+  return new Request('https://app.example.com/api/cron/saas/erasure-purge', {
     method: 'POST',
     headers,
   });

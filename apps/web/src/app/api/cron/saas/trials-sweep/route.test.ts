@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// POST /api/saas/trials/sweep is the on-demand / external trigger for the D4 trial-lapse sweep
+// POST /api/cron/saas/trials-sweep (moved from /api/saas/trials/sweep) is the on-demand /
+// external trigger for the D4 trial-lapse sweep
 // (warn tenants 3 days out, suspend tenants whose trial already lapsed). Zero route-level
 // coverage before this file. The sweep's own decision core (`shouldWarnTrial`/`planTrialWarnings`/
 // `trialWarningFilter`/`dunningEmail` + the lapse planners) is already fully unit-tested in
@@ -47,7 +48,7 @@ vi.mock('@/lib/billing/trialSweep', () => ({ runTrialLapseSweep: runTrialLapseSw
 import { POST } from './route';
 
 function makeReq(headers: Record<string, string> = {}): Request {
-  return new Request('https://app.example.com/api/saas/trials/sweep', { method: 'POST', headers });
+  return new Request('https://app.example.com/api/cron/saas/trials-sweep', { method: 'POST', headers });
 }
 
 const ORIGINAL_ENV = { ...process.env };

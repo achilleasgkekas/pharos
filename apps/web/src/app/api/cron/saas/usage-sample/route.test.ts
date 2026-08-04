@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// POST /api/saas/usage/sample is the scheduler-driven storage-sampling cron: it measures every
-// live tenant's Mongo footprint and writes the billed bytes into the Usage ledger. Zero
-// route-level coverage today (grep of api/saas/usage/**/*.test.ts before this file: none). The
-// route is the same CRON_SECRET-bearer idiom already proven at
-// workspace/erasure/purge/route.test.ts (saasMode gate → CRON_SECRET presence → constant-time
-// bearer compare → saasGuard-wrapped body) — this file mirrors that recipe for this route, only
-// `sampleAllTenants` (lib/billing/dbStats) is mocked at the module boundary:
+// POST /api/cron/saas/usage-sample (moved from /api/saas/usage/sample) is the scheduler-driven
+// storage-sampling cron: it measures every live tenant's Mongo footprint and writes the billed
+// bytes into the Usage ledger. The route is the same CRON_SECRET-bearer idiom as its two
+// siblings under /api/cron/saas/ (saasMode gate → shared checkCronAuth → saasGuard-wrapped
+// body); the auth ladder now comes from lib/cronAuth.ts instead of a private copy, so these
+// cases also pin that the shared helper did not change any answer. Only `sampleAllTenants`
+// (lib/billing/dbStats) is mocked at the module boundary:
 //   - SAAS_MODE off → 404, never reads CRON_SECRET or calls sampleAllTenants,
 //   - CRON_SECRET unset → 500 (fail closed), never calls sampleAllTenants,
 //   - missing/wrong/different-length bearer token → 401, never calls sampleAllTenants (the
@@ -26,7 +26,7 @@ vi.mock('@/lib/billing/dbStats', () => ({ sampleAllTenants: sampleAllTenantsMock
 import { POST } from './route';
 
 function makeReq(headers: Record<string, string> = {}): Request {
-  return new Request('https://app.example.com/api/saas/usage/sample', {
+  return new Request('https://app.example.com/api/cron/saas/usage-sample', {
     method: 'POST',
     headers,
   });

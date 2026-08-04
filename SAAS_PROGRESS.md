@@ -6704,3 +6704,82 @@ UX για πελάτη.
 **## Needs Achilleas:** αμετάβλητα (**Stripe keys**, **plan pricing**, **email provider**: Resend
 key ή `MAIL_WEBHOOK_URL` — τοπικά ΔΕΝ χρειάζεται, ο mailer τυπώνει στο log). Νέο: **DNS του
 ph-aros.com σε provider με API** (Cloudflare) για wildcard TLS μέσω DNS-01, όταν στηθεί ο host.
+
+## 2026-08-04 — increment 133: τα scheduler endpoints φεύγουν από το `/api/saas/`, ένα auth helper για όλα
+
+**Ask-inbox πρώτα**: υπήρχε ANSWERED item για αυτή τη routine (`pharos-daily-dev-20260803-1145`),
+οπότε το κανονικό UI-first queue περίμενε. Εγκεκριμένη επιλογή: **(β) μετακίνηση κάτω από
+`/api/cron/`**, με το `lib/cronAuth.ts` ως το ΜΟΝΟ auth helper για scheduler endpoints, και **live
+probe** (όχι μόνο direct `POST()` unit test) γιατί αυτή η κλάση bug είναι αόρατη στα unit tests. Το
+(α) «πρόσθεσε `api/saas` στο matcher exclusion» απορρίφθηκε ρητά από τον Achilleas: θα ξεκλείδωνε
+ολόκληρο το SaaS API surface (account/admin/billing/members) για να λυθούν δύο endpoints.
+
+**Πρώτα η διόρθωση στο ίδιο το εύρημα, γιατί αλλάζει το γιατί.** Το ticket έλεγε ότι τα δύο cron
+routes γυρίζουν ζωντανά plain-text `401` από το middleware, «και ισχύει και με SAAS_MODE on». Όταν
+το διάβασα **δεν ίσχυε πια**: το `if (saasMode()) return pass()` (fix του ίδιου βράδυ, δικό μου, για
+να φτάνει ένας ανώνυμος πελάτης στο `/account/signup`) τα είχε ήδη κάνει προσβάσιμα. Δηλαδή δεν
+έφτιαξα σπασμένο endpoint. Το έκανα ούτως ή άλλως, και ο λόγος είναι ακριβώς αυτό που μόλις
+περιέγραψα: **η προσβασιμότητα ενός cron endpoint κρεμόταν από branch γραμμένο για εντελώς άλλο
+σκοπό**. Την ημέρα που το SaaS gate σφίξει — και πρέπει, τα anonymous requests σε tenant subdomain
+βγάζουν σήμερα 500 αντί redirect — μια άσχετη αλλαγή θα ξανα-απαντούσε σωστά υπογεγραμμένο cron
+request με γυμνό 401 πριν τρέξει ο handler. Στο crontab log αυτό είναι **δυσδιάκριτο από λάθος
+token**. Ένα σπίτι για τα scheduler endpoints, ένα exclusion, ένα auth helper.
+
+**Τρία, όχι δύο.** Το `workspace/erasure/purge` δεν ήταν στο ticket αλλά είχε **την ίδια ακριβώς
+παθολογία** (session-gated prefix, CRON_SECRET auth) και **τρίτο ιδιωτικό αντίγραφο** του
+constant-time compare. Το να διορθώσω δύο από τα τρία θα ήταν συνειδητή αποστολή του ίδιου bug.
+
+- `api/saas/usage/sample` → **`api/cron/saas/usage-sample`**
+- `api/saas/trials/sweep` → **`api/cron/saas/trials-sweep`**
+- `api/saas/workspace/erasure/purge` → **`api/cron/saas/erasure-purge`**
+
+`git mv` (ιστορικό διατηρημένο), τα 3 route.test.ts μαζί τους. **ΜΕΝΕΙ** στη θέση του το
+session-authenticated `api/saas/workspace/erasure` (schedule/cancel) — αυτό το καλεί άνθρωπος
+συνδεδεμένος, σωστά gated. Τα 3 αντίγραφα του `timingSafeEqual` έφυγαν υπέρ του `checkCronAuth`.
+Επιβεβαίωσα γραμμή-γραμμή ότι το helper δίνει **ταυτόσημες** απαντήσεις με τα αντίγραφα, γιατί τα
+tests κωδικοποιούν λεπτομέρειες που είναι εύκολο να χαθούν σε refactor: κενό `CRON_SECRET` = unset
+(500), `bearer` πεζό → 401 (case-sensitive prefix), `Bearer    ` → 401, whitespace γύρω από το
+token trimmed → 200. Και τα 36 route tests πέρασαν **χωρίς καμία αλλαγή assertion** — μόνο τα
+comments/URLs ενημερώθηκαν.
+
+**Νέο `api/cron/saas/matcher.test.ts` (8 tests)**, δίπλα στα routes: τα 3 paths ΔΕΝ είναι gated, το
+prefix ολόκληρο δεν είναι gated (ένα τέταρτο endpoint εδώ είναι safe by default), και τα 3 παλιά
+`/api/saas/` paths **ΕΙΝΑΙ** gated — ζωντανή υπενθύμιση του γιατί μετακόμισαν. Δεν άγγιξα το
+top-level `middleware.matcher.test.ts` (ξένη territory)· η επικάλυψη είναι σκόπιμη, ένα κενό εδώ
+είναι αόρατο μέχρι ένα scheduler run να σταματήσει σιωπηλά να κάνει οτιδήποτε.
+
+**Verified — ΖΩΝΤΑΝΑ, με πραγματική Mongo, όχι μόνο tsc** (πρώτη φορά για αυτά τα endpoints, χάρη
+στο `docker-compose.saas-dev.yml` του προηγούμενου run· docker mutex ελήφθη και ελευθερώθηκε):
+| probe | αποτέλεσμα |
+|---|---|
+| `POST /api/cron/saas/trials-sweep` χωρίς auth | **401 JSON** `{"error":"unauthorized"}` (ο handler απάντησε — το middleware θα έδινε plain text) |
+| ίδιο, λάθος token | **401 JSON** |
+| ίδιο, σωστό token | **200** `{"ok":true,"swept":true,...}` |
+| `POST /api/cron/saas/usage-sample` σωστό token | **200** `sampled:1`, tenant `acme`, 258.048 bytes γραμμένα στο Usage ledger |
+| `POST /api/cron/saas/erasure-purge` σωστό token | **200** `{"scanned":true,"dryRun":true,"due":0}` |
+| `POST /api/saas/trials/sweep` (παλιό) | **404** |
+| `POST /api/saas/usage/sample` (παλιό) | **404** |
+
+`npm run type-check` **EXIT 0** (χρειάστηκε `rm -rf .next/types` — stale generated route types από
+προηγούμενο build δείχνουν σε αρχεία που μόλις μετακινήθηκαν· δεν είναι source), πλήρες
+`npx vitest run` → **353 files / 5621 tests green** (0 fail, 4 skipped). `pharos-saas-web`
+RestartCount 0· **`homepage-web` ανέγγιχτο** (up 4h, δεν rebuildαρίστηκε: το SAAS_MODE-off 404 το
+καλύπτουν τα unit tests, δεν πειράζω το καθημερινό app του χρήστη για μια επιβεβαίωση).
+`docker builder prune -f` μετά. Browser screenshot: **δεν υπάρχει UI** σε αυτό το increment (API
+only) — το λέω αντί να παρουσιάσω κάτι άσχετο ως visual proof.
+
+**`.env.saas-dev.example`**: το commented-out `CRON_SECRET` τεκμηριώθηκε σωστά — και τα 3 νέα
+paths, το fail-closed συμβόλαιο (unset → 500, ώστε μισο-ρυθμισμένο deployment να μην σκουπίζεται
+από όποιον απλώς παραλείπει το header) και έτοιμο curl. Η τιμή μπήκε τοπικά στο
+`.env.saas-dev.local` (gitignored, throwaway).
+
+**## Needs Achilleas:** αμετάβλητα — **Stripe keys**, **τελικό plan pricing**, **email provider**.
+Μία σημείωση καθαρότητας: τα `PRODUCT_BACKLOG.md` / `WEB_DEBT.md` αναφέρουν ακόμα τα παλιά paths
+(ξένη territory, δεν τα επεξεργάστηκα)· όποια routine τα σαρώνει θα δει drift μέχρι να τα
+ανανεώσει.
+
+**Next task:** (α) `TenantResolutionError` → σωστές αποκρίσεις (`not_authenticated` → redirect
+`/account/login?next=`, `no_tenant` → 404 «no such workspace») αντί για 500 — το πιο ορατό
+πρόβλημα του stack τώρα, και πλέον **live-verifiable** στο `lvh.me:3001`· (β) workspace autocomplete
+στο platform audit filter (`<datalist>` από τα `workspaceSlug` της σελίδας)· (γ) τα 2 non-scoped
+`actions.ts` (`history`, `settings`). Πριν ξεκινήσεις: ask-inbox πρώτα.
