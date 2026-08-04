@@ -9,6 +9,7 @@ import {
   resetLinkUrl,
   resetEmail,
   invitedEmail,
+  smtpOptions,
 } from './mailer';
 
 describe('resolveProvider', () => {
@@ -184,5 +185,54 @@ describe('sendEmail over SMTP', () => {
     expect(res.provider).toBe('webhook');
     expect(createTransport).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
+  });
+});
+
+// ── SMTP configuration ──────────────────────────────────────────────────────────────────────
+describe('smtpOptions', () => {
+  it('prefers discrete vars over SMTP_URL, because an email username breaks a URL', () => {
+    // `achilleas@gmail.com:pass@smtp.gmail.com` has TWO '@' and parsers split on the wrong one.
+    // The failure surfaces as an auth error, which sends you hunting for a wrong password.
+    const opts = smtpOptions({
+      SMTP_HOST: 'smtp.gmail.com',
+      SMTP_USER: 'someone@gmail.com',
+      SMTP_PASS: 'app-password',
+      SMTP_URL: 'smtps://ignored@example.com:x@other:465',
+    }) as Record<string, unknown>;
+
+    expect(opts.host).toBe('smtp.gmail.com');
+    expect(opts.auth).toEqual({ user: 'someone@gmail.com', pass: 'app-password' });
+  });
+
+  it('VERIFIES the server certificate and floors TLS at 1.2', () => {
+    // Accepting any certificate would hand both the credentials and the contents of every email
+    // to anyone sitting in the middle, and password-reset links travel this path.
+    const opts = smtpOptions({ SMTP_HOST: 'smtp.gmail.com', SMTP_USER: 'u', SMTP_PASS: 'p' }) as {
+      tls: { rejectUnauthorized: boolean; minVersion: string };
+    };
+
+    expect(opts.tls.rejectUnauthorized).toBe(true);
+    expect(opts.tls.minVersion).toBe('TLSv1.2');
+  });
+
+  it('465 is implicit TLS; 587 must still REQUIRE the upgrade rather than fall back to plaintext', () => {
+    const implicit = smtpOptions({ SMTP_HOST: 'h', SMTP_PORT: '465' }) as Record<string, unknown>;
+    const starttls = smtpOptions({ SMTP_HOST: 'h', SMTP_PORT: '587' }) as Record<string, unknown>;
+
+    expect(implicit.secure).toBe(true);
+    expect(starttls.secure).toBe(false);
+    // Without requireTLS, a server that simply does not offer STARTTLS gets the password in clear.
+    expect(starttls.requireTLS).toBe(true);
+  });
+
+  it('defaults to port 465 and drops auth entirely when no user is set', () => {
+    const opts = smtpOptions({ SMTP_HOST: 'relay.internal' }) as Record<string, unknown>;
+    expect(opts.port).toBe(465);
+    expect(opts.auth).toBeUndefined();
+  });
+
+  it('falls back to the URL form when only SMTP_URL is given, and to null when nothing is', () => {
+    expect(smtpOptions({ SMTP_URL: '  smtps://u:p@h:465  ' })).toBe('smtps://u:p@h:465');
+    expect(smtpOptions({})).toBeNull();
   });
 });

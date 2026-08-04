@@ -32,8 +32,44 @@ type Env = Record<string, string | undefined>;
 export function resolveProvider(env: Env = process.env): MailProvider {
   if (env.RESEND_API_KEY) return 'resend';
   if (env.MAIL_WEBHOOK_URL) return 'webhook';
-  if (env.SMTP_URL) return 'smtp';
+  if (env.SMTP_HOST || env.SMTP_URL) return 'smtp';
   return 'none';
+}
+
+/** SMTP connection options assembled from the environment. PURE (env injectable), so the whole
+ *  config decision is testable without a socket.
+ *
+ *  DISCRETE VARS ARE PREFERRED over SMTP_URL, and not by taste: the username here is an EMAIL
+ *  ADDRESS, which contains an `@`. Inside a URL that produces `smtps://user@gmail.com:pass@host`
+ *  with two `@` signs, and the parser splits on the wrong one — you get an authentication failure
+ *  that looks like a wrong password and sends you hunting in the wrong place. Percent-encoding
+ *  works but nobody remembers to do it. Separate fields cannot be encoded wrong.
+ */
+export function smtpOptions(env: Env = process.env): Record<string, unknown> | string | null {
+  const host = (env.SMTP_HOST || '').trim();
+  if (!host) {
+    const url = (env.SMTP_URL || '').trim();
+    return url || null;
+  }
+  const port = Number(env.SMTP_PORT) || 465;
+  return {
+    host,
+    port,
+    // 465 is implicit TLS; 587 starts plaintext and upgrades, so demand the upgrade rather than
+    // silently continuing in the clear if the server does not offer STARTTLS.
+    secure: port === 465,
+    requireTLS: port !== 465,
+    auth: env.SMTP_USER ? { user: (env.SMTP_USER || '').trim(), pass: env.SMTP_PASS || '' } : undefined,
+    tls: {
+      // Explicit, even though this is nodemailer's default. Accepting any certificate would mean
+      // anyone able to sit between us and the mail server could take both the credentials and the
+      // contents of every email we send, and password-reset links go through here. Stated in code
+      // so a stray `?rejectUnauthorized=false` in a URL, or a future refactor, cannot quietly
+      // relax it.
+      rejectUnauthorized: true,
+      minVersion: 'TLSv1.2',
+    },
+  };
 }
 
 /**
@@ -219,10 +255,11 @@ async function sendViaWebhook(msg: EmailMessage, url: string, token: string): Pr
  * The free-account ceiling is around 500 messages a day, which is a beta-sized limit, not a
  * product-sized one.
  */
-async function sendViaSmtp(msg: EmailMessage, url: string): Promise<SendResult> {
+async function sendViaSmtp(msg: EmailMessage, config: Record<string, unknown> | string): Promise<SendResult> {
   try {
     const { createTransport } = await import('nodemailer');
-    const transport = createTransport(url);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const transport = createTransport(config as any);
     const info = (await transport.sendMail({
       from: fromAddress(),
       to: msg.to,
@@ -255,7 +292,9 @@ export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
   }
 
   if (provider === 'smtp') {
-    return sendViaSmtp(msg, (process.env.SMTP_URL as string).trim());
+    const config = smtpOptions();
+    if (!config) return { delivered: false, provider: 'smtp', error: 'smtp_not_configured' };
+    return sendViaSmtp(msg, config);
   }
 
   // No provider configured. Log in non-production so local flows are observable, then report
