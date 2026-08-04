@@ -2,7 +2,7 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 75ee08d -->
+<!-- reviewed: c568a3b -->
 <!-- docker-validated: 7e28354 -->
 <!-- ui-audited: 0bc5e14 -->
 
@@ -11341,3 +11341,61 @@ someone else's data, φαινομενικά no-op για τον ίδιο τον 
 
 Marker ενημερώθηκε: `<!-- reviewed: 75ee08d -->`. Routine health: όλα τα progress logs φρέσκια σήμερα, κανένα
 routine φαίνεται stuck.
+
+---
+
+## 2026-08-04 (reviewer, 66η σάρωση)
+
+Guard: `ROUTINES_PAUSED` δεν υπήρχε. `git log 75ee08d..HEAD` = 11 commits (`4dfed55..c568a3b`), working tree
+clean στην αρχή. `npm run type-check` (web) EXIT 0· `npx tsc --noEmit` (mobile) EXIT 0· full `npx vitest run`
+(web) → **5943 passed / 4 skipped / 371 files** (ίδιο count με αυτό που ισχυρίζεται το commit message, verified
+independently).
+
+**Κύριο review**: `2f10b8f` (fix(api): scope every /api/v1 route to the caller's workspace) — μεγάλο commit,
+103 αρχεία, ο P1 tenancy gap που το προηγούμενο sweep (65η σάρωση) βρήκε στο `settings/actions.ts` Trash section
+είναι διαφορετικός: αυτό εδώ είναι το `/api/v1` REST surface (mobile-facing), εντελώς ξεχωριστό gap, ήδη
+προγραμματισμένο εκτός reviewer routine (`dc292d1` το τεκμηριώνει ρητά ως εξαίρεση). Διάβασα το `apiAuth.ts`
+diff γραμμή-γραμμή: νέο `apiTenant()` λύνει tenant από HOST header ΠΡΙΝ το bearer-token lookup (η σειρά είναι
+το κρίσιμο σημείο — resolve μετά το lookup θα αυθεντικοποιούσε σωστά αλλά θα σέρβιρε shared DB, δηλαδή θα
+μετέτρεπε το σημερινό fail-closed 401 σε πραγματική διαρροή), `withRequestTenant` σκόπιμα ΔΕΝ ξαναχρησιμοποιήθηκε
+(θα έκανε redirect() σε κάθε mobile API call). Επαλήθευσα μηχανικά ότι ο codemod είναι πλήρης: κάθε
+`X as XModel` import κάτω από `api/v1/**/route.ts` έχει αντίστοιχο `currentModel(XModel)` call (script grep,
+0 misses) — τα δύο module-scope helpers που ο ίδιος ο codemod ομολογεί ότι δεν έφτασε (`settings/route.ts`
+`spentThisMonth`, `subscriptions/route.ts` `discoverSuggestions`) διορθώθηκαν χειροκίνητα σωστά. Διάβασα το νέο
+`apiAuth.tenancy.test.ts`: καλύπτει ακριβώς το isolation property (workspace-A token → 401 σε workspace-B host,
+handler ΔΕΝ καλείται καθόλου) + 404 σε άγνωστο workspace + 403 σε suspended + SAAS_MODE off = self-hosted path
+αμετάβλητο. Route response shapes ελέγχθηκαν (μόνο internal model-resolution άλλαξε, JSON output identical) →
+μηδέν mobile-parity break. `2dbab73` (next 15.5.19→15.5.22 + forced postcss/sharp overrides, κλείνει 8 CVE +
+2 residual) verified ξεχωριστά σε isolated worktree κατά το commit message· `93a4046` (flock lock στο
+deploy-update.sh, exit 4, ίδιο pattern με BakeCore) μικρό και καθαρό. `c568a3b`/`dc292d1`/`ef10669` docs-only
+(deploy log entries) — cross-checked: `c568a3b` καταγράφει ότι το tenancy fix ΤΕΛΙΚΑ deployed χειροκίνητα
+(`89d49c8→dc292d17`, exit 0, health OK, ανεξάρτητη επαλήθευση 200/401 σε production endpoints) παρά το ότι το
+`dc292d1` λίγο πριν έλεγε «δεν έγινε deploy» — συνεπές, το deploy έγινε ΜΕΤΑ το docs commit, σωστή σειρά.
+
+**Standing queue re-verified live**: το P1 `settings/actions.ts` Trash gap (`getTrash`/`restoreFromTrash`/
+`purgeTrashEntry`/`emptyTrash`) ΑΚΟΜΑ TODO, αμετάβλητο (`grep` confirmed 0 `scoped()`/`currentModel` στις 4
+συναρτήσεις) — σωστά, κανένα commit σε αυτό το range το αγγίζει. Δεν το άγγιξα (ίδιος λόγος με την προηγούμενη
+σάρωση: irreversible-delete paths).
+
+**el.ts i18n gap**: 30 σταθερό (en=1331, el=1301), ίδιο με την προηγούμενη σάρωση, δεν μεγάλωσε.
+
+Secrets sweep (grep key/token/password/PEM/BEGIN στο πλήρες diff) → μηδέν committed secret. Μηδέν small-safe fix
+χρειάστηκε αυτή τη φορά (tsc/tests ήδη πράσινα, diff καθαρός).
+
+Marker ενημερώθηκε: `<!-- reviewed: c568a3b -->`. Routine health: PROGRESS/SAAS_PROGRESS/OSS_PROGRESS/
+CLOUD_GUARD όλα με φρέσκια 2026-08-04 activity· LANDING_PROGRESS/DOCS_PROGRESS δεν υπάρχουν πια (συνεπές με το
+fleet reorg, 25→15 routines). Ένα ανοιχτό `ASK_ACHILLEAS.md` item (`bakecore-finance-20260728-1030`, ~μία
+εβδομάδα OPEN μέρος του, περιμένει λογιστική απάντηση για πίνακα ΕΦΚΑ) — εκτός Pharos, εκτός scope αυτού του
+routine, απλά σημειώνεται.
+
+**Live collision παρατηρήθηκε (όχι stuck, ενεργό)**: στο τέλος του run το working tree δεν ήταν πια clean —
+staged deletion ολόκληρου του `apps/mobile` (~45 αρχεία: App.tsx, όλα τα screens, package.json κλπ), μαζί με
+`docs/mobile.md`, `MOBILE_PARITY.md`, και τα web-side `api/v1/lookup/barcode`+`api/v1/push/register` routes +
+`lib/barcode*.ts`+`lib/expoPush.ts` + tests τους. Επιπλέον unstaged surgical edits σε `settings/actions.ts`
+(αφαίρεση `pushAllDevices` call) και `models/User.ts` (αφαίρεση `pushTokens` field) — mtime 22:15, δηλ. **live,
+όχι κολλημένο**: κάποιο άλλο routine αφαιρεί μεθοδικά ολόκληρο το mobile app + το push/barcode surface του, εν
+ώρα του δικού μου run. Συνεπές diff σε πολλαπλά αρχεία (όχι half-corrupted state) → φαίνεται σκόπιμη δουλειά, όχι
+crash. Δεν το άγγιξα καθόλου (ούτε `git add`, ούτε ανάγνωση πέρα από `git diff` για επιβεβαίωση πρόθεσης) — το
+δικό μου commit παρακάτω είναι pathspec-only (`PROGRESS.md`/`WEB_DEBT.md`), μηδέν επίδραση σε αυτό το WIP.
+Σημειώνεται εδώ ώστε το επόμενο routine που θα δει `apps/mobile` λείπον να μην το θεωρήσει bug — απλά επιβεβαίωσε
+ότι committed σωστά πριν βασιστείς πάνω του (η δική μου σάρωση σταματά εδώ, δεν έχει committed ακόμα).
