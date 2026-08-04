@@ -11307,3 +11307,37 @@ fire-and-forget μία απόπειρα, οπότε ένα endpoint που κά�
   (στέλνει **αληθινές** ειδοποιήσεις, γι' αυτό δεν το τρέχω μόνος μου).
 - Αμετάβλητα: **P17 live check** σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους. **P36 / P16**
   παραμένουν παγωμένα με ρητό κανόνα σιωπής (`OWNER_DECISIONS.md` #13).
+
+## 2026-08-04 (reviewer, 65η σάρωση)
+
+Guard: `ROUTINES_PAUSED` δεν υπήρχε. `git log f44e227..HEAD` = 74 commits (μεγάλο batch, SaaS/tenancy/backup
+δουλειά ~2 ημερών). `npm run type-check` (web) EXIT 0· `npx tsc --noEmit` (mobile) EXIT 0· full `npx vitest run`
+(web) → **5937 passed / 4 skipped / 370 files**.
+
+**Πρώτο εύρημα, εκτός diff review**: το working tree είχε 4 ασύνδετες uncommitted αλλαγές στην αρχή του run
+(πιθανώς routines που δεν πρόλαβαν commit): 30-day retention copy σε 3 landing pages (matches το ήδη-εγκεκριμένο
+backlog #14), P82 cron-alerts dedupe wiring, ένα ορφανό staged-for-deletion `deploy/Caddyfile` (superseded από
+`deploy/caddy/Caddyfile`), ένα trivial `.claude/launch.json` dev-tooling entry. Verified (type-check + vitest
+target file) πριν committed ξεχωριστά, pathspec ανά group: `0430b29`/`13583d7`/`f975897`. Το cron-alerts commit
+βρέθηκε ΗΔΗ γίνει από άλλο routine ανάμεσα στο δικό μου `git add` και `git commit` (live collision, real-time
+απόδειξη ότι ο κανόνας του `_shared/COORDINATION.md` §5 δουλεύει: το pathspec commit δεν πήρε τίποτα ξένο, απλά
+δεν βρήκε τίποτα να κάνει commit για εκείνα τα paths).
+
+**Review**: `settings/actions.ts` tenancy fix (`b800fc3`, εκτός reviewer routine) διαβάστηκε γραμμή-γραμμή —
+`scoped(Model) = withRequestTenant(() => currentModel(Model))` idiom, 64 call sites σε 9 models, `grep`-confirmed
+0 direct model calls στο κύριο σώμα. **Αλλά η Trash ενότητα (`getTrash`/`restoreFromTrash`/`purgeTrashEntry`/
+`emptyTrash`, τροφοδοτούμενη από `TRASH_MODELS` raw-model map, 10 τύποι) ξέμεινε έξω** — live-verified, μηδέν
+`scoped()`/`currentModel` στις 4 αυτές συναρτήσεις. Σε SaaS mode: cross-tenant read leak στο Trash tab + το
+χειρότερο, restore/purge/empty θα ενεργούσαν στο DEFAULT tenant's DB αντί στου καλούντος (permanent delete of
+someone else's data, φαινομενικά no-op για τον ίδιο τον tenant). Καταγράφηκε ως **νέο P1** στο WEB_DEBT.md (ίδιο
+`scoped()` recipe, μηχανικό fix, ΔΕΝ το έκανα ο ίδιος γιατί αγγίζει irreversible-delete paths, εκτός «μικρό &
+ασφαλές» ορίου). Το standing queue επαληθεύτηκε live: `history/actions.ts` ΑΚΟΜΑ TODO (αμετάβλητο)· τα υπόλοιπα
+6 standing items (tasks/shopping-list/subscriptions/notifications/bills/statements/vouchers) confirmed DONE.
+
+Άλλα σημεία που ελέγχθηκαν: το `middleware.ts` `saasMode()` bypass + `/api/cron` matcher exclusion (ζευγάρι με
+τα `f1e1ccb`/`dd7fdeb` commits — καλή προνοητικότητα, το δεύτερο μετακίνησε τα cron routes ΠΡΙΝ σπάσει η ίδια η
+ασφάλεια που έφτιαξε το πρώτο), το P46 expense-dedupe feature (`f1f1cde`, `withRequestTenant`/`currentModel`
+σωστά, καλά tested με negative controls). Secrets sweep καθαρό. Πλήρες write-up στο WEB_DEBT.md.
+
+Marker ενημερώθηκε: `<!-- reviewed: 75ee08d -->`. Routine health: όλα τα progress logs φρέσκια σήμερα, κανένα
+routine φαίνεται stuck.
