@@ -7,6 +7,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { currencySymbol } from '@/lib/money';
 import { isAiReady } from '@/lib/ollama';
 import { getSessionUser } from '@/lib/auth';
+import { saasMode } from '@/lib/tenancy/saasMode';
 import { getAiConfig } from '@/lib/aiConfig';
 import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
 import { headers } from 'next/headers';
@@ -84,7 +85,7 @@ export default async function RootLayout({
               (those stay chrome-less even mid-wizard, once step 1 signs you in).
               Keep `children` in a STABLE sibling position so flipping auth state
               doesn't remount the page subtree and reset client state. */}
-          {user && !chromeless && <SiteNav aiReady={aiReady} user={{ name: user.name || 'account', role: user.role }} />}
+          {user && !chromeless && <SiteNav aiReady={aiReady} saas={saasMode()} user={{ name: user.name || 'account', role: user.role }} />}
           {user && !chromeless && banner && <AiOnboardingBanner reason={banner} />}
           {children}
         </Providers>

@@ -22,6 +22,8 @@ export const en = {
   'nav.history': 'AI history',
   'nav.trash': 'Trash',
   'nav.settings': 'Settings',
+  'nav.workspaces': 'Workspaces & account',
+  'nav.billing': 'Billing & plan',
   'nav.account': 'Account',
   'nav.signOut': 'Sign out',
 

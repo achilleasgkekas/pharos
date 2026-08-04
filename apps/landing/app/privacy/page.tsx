@@ -217,12 +217,13 @@ export default function PrivacyPolicy() {
           </p>
         </Section>
 
-        <Section id="waitlist" title="3. The hosted waitlist">
+        <Section id="signup" title="3. Creating an account">
           <p>
-            If you join the hosted-beta waitlist, we store the email address you submit
-            for the single purpose of telling you when hosted PHAROS opens. We do not
-            add you to unrelated marketing, and you can ask us to delete your address at
-            any time by emailing{' '}
+            To use hosted PHAROS you create an account with an email address and a
+            password. We use the address to sign you in, to send the emails the service
+            itself needs (verification, password reset, workspace invitations) and to
+            reach you about your account. We do not add you to unrelated marketing. You
+            can ask us to delete your account and its data at any time by emailing{' '}
             <a href={`mailto:${CONTACT}`} className="inline-link">{CONTACT}</a>.
           </p>
         </Section>

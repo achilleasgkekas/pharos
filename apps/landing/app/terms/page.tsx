@@ -135,7 +135,7 @@ export default function TermsOfService() {
         <Section id="hosted" title="2. Hosted PHAROS (the SaaS)">
           <p>
             The hosted service is the optional managed version operated by {ENTITY}. By
-            creating an account or joining the waitlist you agree to these terms. You
+            creating an account you agree to these terms. You
             must be able to form a binding contract and use the service in line with
             applicable law.
           </p>

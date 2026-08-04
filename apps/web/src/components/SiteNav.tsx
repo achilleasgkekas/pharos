@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
   Package, ShoppingCart, ShoppingBasket, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
   Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, CalendarDays,
-  LogOut, UserRound, Activity, MessageSquare, Trash2, FileText,
+  LogOut, UserRound, Activity, MessageSquare, Trash2, FileText, Building2,
 } from 'lucide-react';
 import { cn } from './ui/cn';
 import { useTheme } from './ThemeProvider';
@@ -112,7 +112,7 @@ function NavGroup({ groupKey, links }: { groupKey: TKey; links: NavLink[] }) {
   );
 }
 
-function UserMenu({ user }: { user: SessionUser }) {
+function UserMenu({ user, saas }: { user: SessionUser; saas: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -140,6 +140,33 @@ function UserMenu({ user }: { user: SessionUser }) {
               {user.role}
             </p>
           </div>
+          {/* The way back out of a workspace.
+              A hosted customer lands straight inside their workspace after login (one
+              membership skips the chooser), and from there the product had no route to the
+              account area at all: no billing, no members, no other workspace, nothing.
+              Reported as "once I pick another page I do not know how to get back". The
+              account menu is where a user already looks for it. */}
+          {saas && (
+            <>
+              <Link
+                href="/account"
+                prefetch={false}
+                onClick={() => setOpen(false)}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors"
+              >
+                <Building2 size={15} /> {t('nav.workspaces')}
+              </Link>
+              <Link
+                href="/account/workspace/billing"
+                prefetch={false}
+                onClick={() => setOpen(false)}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors"
+              >
+                <CreditCard size={15} /> {t('nav.billing')}
+              </Link>
+              <div className="my-1 border-t border-[color:var(--color-border)]" />
+            </>
+          )}
           <form action={logoutAction}>
             <button
               type="submit"
@@ -154,7 +181,7 @@ function UserMenu({ user }: { user: SessionUser }) {
   );
 }
 
-export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: SessionUser }) {
+export function SiteNav({ aiReady = false, user, saas = false }: { aiReady?: boolean; user?: SessionUser; saas?: boolean }) {
   const t = useT();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -209,7 +236,7 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
           >
             <Settings size={17} />
           </Link>
-          {user && <UserMenu user={user} />}
+          {user && <UserMenu user={user} saas={saas} />}
           <button onClick={() => setMobileOpen((v) => !v)} className="lg:hidden p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Menu">
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>

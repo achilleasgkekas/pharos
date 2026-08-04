@@ -1,6 +1,5 @@
 import { PharosMark } from './components/PharosMark';
 import { Icon } from './components/Icon';
-import { Waitlist } from './components/Waitlist';
 import { MobileNav } from './components/MobileNav';
 import { ScrollSpy } from './components/ScrollSpy';
 import { ScrollProgress } from './components/ScrollProgress';
@@ -18,7 +17,7 @@ const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.ph-aros.com';
 const SITE_URL = 'https://ph-aros.com';
 
-// The repository is private during the waitlist phase and goes public right
+// The repository is private during the private-beta phase and goes public right
 // before launch. While false, self-host CTAs carry a "coming soon" signal so
 // visitors are not surprised by a 404. Flip to true the moment the repo is
 // public and every badge/note below disappears automatically.
@@ -201,8 +200,9 @@ type Tier = {
   ctaHref: string;
   highlight?: boolean;
   badge?: string;
-  // True only for the free self-hosted row. Its availability tracks REPO_PUBLIC,
-  // while every hosted plan stays waitlist-gated until the managed edition opens.
+  // True only for the free self-hosted row. Its availability tracks REPO_PUBLIC, while a
+  // hosted plan is sign-up-then-activate: the account is free to create, and the plan itself
+  // is switched on with an activation code (see the billing panel).
   selfHost?: boolean;
   features: string[];
 };
@@ -240,8 +240,8 @@ const TIERS: Tier[] = [
     cadence: 'per month',
     amount: '9',
     tagline: 'The whole hub, managed for you, shared with up to 5 people.',
-    cta: 'Join the waitlist',
-    ctaHref: '#waitlist',
+    cta: 'Get started',
+    ctaHref: `${APP_URL}/account/signup?plan=shared`,
     highlight: true,
     badge: 'Most popular',
     features: [
@@ -258,8 +258,8 @@ const TIERS: Tier[] = [
     cadence: 'per month',
     amount: '29',
     tagline: 'Your own isolated instance, unlimited seats, your own domain.',
-    cta: 'Join the waitlist',
-    ctaHref: '#waitlist',
+    cta: 'Get started',
+    ctaHref: `${APP_URL}/account/signup?plan=dedicated`,
     features: [
       'Everything in Pro',
       'Unlimited members',
@@ -660,8 +660,8 @@ const JSON_LD = {
       // rich result never reads €9 as due on day one.
       // Availability reflects the real pre-launch state so search engines are not told
       // an item is buyable when it is not: the self-host tier tracks REPO_PUBLIC
-      // (PreOrder while the repo is private, InStock the moment it opens), and every
-      // hosted plan stays PreOrder while waitlist-gated.
+      // (PreOrder while the repo is private, InStock the moment it opens), and a hosted plan
+      // stays PreOrder while self-serve payment is closed (activation is by code today).
       offers: TIERS.filter((t) => t.amount !== undefined).map((t) => ({
         '@type': 'Offer',
         name: `PHAROS ${t.name}`,
@@ -1130,7 +1130,7 @@ export default function Home() {
             <p className="repo-soon">
               <span className="repo-soon-dot" aria-hidden="true" />
               The public repo opens right before launch.{' '}
-              <a href="#waitlist">Join the waitlist</a> and we&apos;ll send the
+              <a href={`${APP_URL}/account/signup`}>Create an account</a> and we&apos;ll send the
               clone link the moment it goes live.
             </p>
           )}
@@ -1371,30 +1371,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Waitlist ──────────────────────────────────────── */}
-      <section id="waitlist" style={{ padding: '48px 0 96px' }}>
-        <div className="container" style={{ maxWidth: 640 }}>
-          <div className="card" style={{ textAlign: 'center', padding: '40px 28px', overflow: 'hidden' }}>
-            <p className="mono" style={{ marginBottom: 12 }}>Hosted beta</p>
-            <h2 style={{ fontSize: 'clamp(1.6rem, 4vw, 2.2rem)', fontWeight: 700, marginBottom: 12 }}>
-              Be first on the managed version
-            </h2>
-            <p style={{ color: 'var(--text-dim)', maxWidth: 460, margin: '0 auto 28px' }}>
-              Prefer not to run your own server? Leave your email and we&apos;ll
-              tell you when hosted PHAROS opens up. No spam, just the launch.
-            </p>
-            <Waitlist />
-            <p style={{ color: 'var(--text-faint)', fontSize: '0.82rem', marginTop: 20 }}>
-              Rather self-host?{' '}
-              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
-                It stays free under AGPL-3.0
-              </a>
-              .
-            </p>
-          </div>
-        </div>
-      </section>
-
       {/* ── Footer ────────────────────────────────────────── */}
       <footer style={{ borderTop: '1px solid var(--border)', padding: '56px 0 32px' }}>
         <div className="container">
@@ -1434,7 +1410,7 @@ export default function Home() {
               <a href={GITHUB_URL} className="navlink" target="_blank" rel="noopener noreferrer">GitHub</a>
               <a href={`${GITHUB_URL}/blob/main/README.md`} className="navlink" target="_blank" rel="noopener noreferrer">Docs</a>
               <a href={`${GITHUB_URL}/issues`} className="navlink" target="_blank" rel="noopener noreferrer">Report an issue</a>
-              <a href="#waitlist" className="navlink">Hosted beta</a>
+              <a href={`${APP_URL}/account/signup`} className="navlink">Get started</a>
             </div>
 
             <div className="footer-col">

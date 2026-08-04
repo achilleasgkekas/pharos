@@ -24,6 +24,11 @@ export const AUDIT_ACTIONS = [
   'plan.changed',
   'billing.checkout_started',
   'billing.portal_opened',
+  // Activation by code (the only route to a paid plan while self-serve payment is closed).
+  // The rejection is recorded too: this is the one door in, so a burst of failed attempts is
+  // exactly the thing worth being able to see. Never carries the submitted code.
+  'billing.activated_by_code',
+  'billing.activation_rejected',
   'workspace.created',
   'workspace.updated',
   'workspace.canceled',
