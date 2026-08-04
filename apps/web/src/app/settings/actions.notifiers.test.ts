@@ -248,6 +248,7 @@ describe('saveDefaults', () => {
       trialAlertDays: 0,
       giftCardAlertDays: 0,
       billAlertDays: 0,
+      syncStaleDays: 0,
       autoAddStores: false,
       currency: 'EUR',
       multiCurrency: false,

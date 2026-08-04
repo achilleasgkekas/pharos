@@ -47,6 +47,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //    when days !== null && days <= s.billAlertDays — NO lower bound, so an overdue
 //    bill (negative days) always qualifies regardless of s.billAlertDays ("overdue nag
 //    until paid"); sorted most-overdue-first (ascending, negatives first).
+//  - remote-mirror staleness (P48): getStorageConfig().backend + the stored
+//    lastRemoteSync timestamp -> detectSyncStaleness (the real helper, not mocked).
+//    Silent for backend 'local' and for syncStaleDays 0; fires for a remote that has
+//    NEVER synced; reads a stored timestamp ONLY (no network call, so an unreachable
+//    NAS cannot hang or fail the sweep); no dedicated webhook event.
 //  - generateNotifications() (the in-app bell) is ALWAYS attempted, wrapped in its own
 //    try/catch that swallows any rejection — a bell failure never fails the ntfy check.
 //  - Outbound event webhooks are fire-and-forget (`void dispatchEventWebhooks(...)`),
@@ -83,6 +88,8 @@ const {
   dispatchEventWebhooksMock,
   dispatchAlertMock,
   pushAllDevicesMock,
+  getStorageConfigMock,
+  getLastRemoteSyncMock,
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
   getAppSettingsMock: vi.fn(async () => ({} as Record<string, unknown>)),
@@ -106,6 +113,8 @@ const {
   dispatchEventWebhooksMock: vi.fn(async () => ({ sent: 0, total: 0 })),
   dispatchAlertMock: vi.fn(async () => ({ sent: 0, total: 0 })),
   pushAllDevicesMock: vi.fn(async () => 0),
+  getStorageConfigMock: vi.fn(async () => ({ backend: 'local' }) as { backend: string }),
+  getLastRemoteSyncMock: vi.fn(async () => null as Date | null),
 }));
 
 vi.mock('@/lib/money', () => ({ cur: () => '€' }));
@@ -146,7 +155,11 @@ vi.mock('@/lib/prompts', () => ({
   invalidatePromptsCache: vi.fn(),
 }));
 vi.mock('@/lib/taxonomies', () => ({ TAXONOMY_META: [], normalizeList: vi.fn(), normalizeSpaces: vi.fn() }));
-vi.mock('@/lib/storageConfig', () => ({ getStorageConfig: vi.fn(), invalidateStorageConfig: vi.fn() }));
+vi.mock('@/lib/storageConfig', () => ({ getStorageConfig: getStorageConfigMock, invalidateStorageConfig: vi.fn() }));
+// NOT mocked: lib/syncStaleness — it is a pure helper with its own suite
+// (lib/syncStaleness.test.ts), and stubbing it would hide the wiring this file exists
+// to pin. Only the stored timestamp it reads is faked.
+vi.mock('@/lib/syncState', () => ({ markRemoteSync: vi.fn(async () => {}), getLastRemoteSync: getLastRemoteSyncMock }));
 vi.mock('@/lib/remoteStorage', () => ({ pushBatchToRemote: vi.fn(), testRemote: vi.fn() }));
 vi.mock('@/lib/storagePath', () => ({ renderStoragePath: vi.fn(), DEFAULT_FOLDER_TEMPLATE: '', DEFAULT_NAME_TEMPLATE: '' }));
 vi.mock('@/lib/storage', () => ({ readFile: vi.fn(), deleteFile: vi.fn() }));
@@ -216,6 +229,7 @@ const DEFAULT_SETTINGS = {
   trialAlertDays: 2,
   giftCardAlertDays: 30,
   billAlertDays: 5,
+  syncStaleDays: 7,
   budgets: {} as Record<string, number>,
 };
 
@@ -245,6 +259,10 @@ beforeEach(() => {
   dispatchEventWebhooksMock.mockImplementation(async () => ({ sent: 0, total: 0 }));
   dispatchAlertMock.mockImplementation(async () => ({ sent: 0, total: 0 }));
   pushAllDevicesMock.mockImplementation(async () => 0);
+  // Baseline is the local backend, i.e. no remote that could fall behind. The
+  // staleness describe-block below opts each case into a remote backend explicitly.
+  getStorageConfigMock.mockImplementation(async () => ({ backend: 'local' }));
+  getLastRemoteSyncMock.mockImplementation(async () => null);
 });
 
 describe('runAlertChecks · all-clear baseline', () => {
@@ -475,6 +493,71 @@ describe('runAlertChecks · recurring price hikes', () => {
     detectPriceHikesMock.mockImplementation(() => [{ vendor: 'Netflix', prev: 13, curr: 15, deltaPct: 15 }]);
     await runAlertChecks();
     expect(dispatchEventWebhooksMock).not.toHaveBeenCalledWith('price.hike', expect.anything());
+  });
+});
+
+describe('runAlertChecks · remote mirror staleness (P48)', () => {
+  const daysAgo = (n: number) => new Date(Date.now() - n * 86400000);
+
+  it('says nothing when the backend is local, and does not even read the timestamp', async () => {
+    // No remote can fall behind, so the extra query would never change the outcome —
+    // and local-only is the common setup, so it runs on every sweep.
+    getStorageConfigMock.mockImplementation(async () => ({ backend: 'local' }));
+    getLastRemoteSyncMock.mockImplementation(async () => daysAgo(400));
+    const r = await runAlertChecks();
+    expect(r.summary).toBe('All clear — nothing to report.');
+    expect(getLastRemoteSyncMock).not.toHaveBeenCalled();
+  });
+
+  it('warns when a remote backend has never synced at all', async () => {
+    // The case worth the whole feature: a mirror configured once and never actually
+    // used is indistinguishable from a working one everywhere else in the UI.
+    getStorageConfigMock.mockImplementation(async () => ({ backend: 'onedrive' }));
+    getLastRemoteSyncMock.mockImplementation(async () => null);
+    const r = await runAlertChecks();
+    expect(r.summary).toContain('has never completed a sync');
+    expect(r.summary).toContain('onedrive');
+    expect(r.summary).toContain('Sync now');
+  });
+
+  it('warns once the last successful push is older than the configured window', async () => {
+    getStorageConfigMock.mockImplementation(async () => ({ backend: 'smb' }));
+    getLastRemoteSyncMock.mockImplementation(async () => daysAgo(21));
+    const r = await runAlertChecks();
+    expect(r.summary).toMatch(/last synced 21 days ago/);
+  });
+
+  it('stays quiet when a push happened inside the window', async () => {
+    getStorageConfigMock.mockImplementation(async () => ({ backend: 'smb' }));
+    getLastRemoteSyncMock.mockImplementation(async () => daysAgo(2));
+    const r = await runAlertChecks();
+    expect(r.summary).toBe('All clear — nothing to report.');
+  });
+
+  it('is switched off by syncStaleDays = 0, even with a remote that never synced', async () => {
+    getAppSettingsMock.mockImplementation(async () => ({ ...DEFAULT_SETTINGS, syncStaleDays: 0 }));
+    getStorageConfigMock.mockImplementation(async () => ({ backend: 'ftp' }));
+    getLastRemoteSyncMock.mockImplementation(async () => null);
+    const r = await runAlertChecks();
+    expect(r.summary).toBe('All clear — nothing to report.');
+  });
+
+  it('reads a stored timestamp only — no network call to the remote', async () => {
+    // A NAS that is powered off must not make the whole alert sweep hang or fail.
+    getStorageConfigMock.mockImplementation(async () => ({ backend: 'smb' }));
+    getLastRemoteSyncMock.mockImplementation(async () => daysAgo(30));
+    await expect(runAlertChecks()).resolves.toMatchObject({ ok: true });
+    expect(getLastRemoteSyncMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches the summary like any other signal, and has no dedicated webhook event', async () => {
+    getStorageConfigMock.mockImplementation(async () => ({ backend: 'onedrive' }));
+    getLastRemoteSyncMock.mockImplementation(async () => daysAgo(60));
+    dispatchAlertMock.mockImplementation(async () => ({ sent: 1, total: 1 }));
+    const r = await runAlertChecks();
+    expect(r.sent).toBe(true);
+    expect(dispatchAlertMock).toHaveBeenCalledWith('Pharos alerts', expect.stringContaining('last synced 60 days ago'));
+    expect(dispatchEventWebhooksMock).not.toHaveBeenCalled();
   });
 });
 

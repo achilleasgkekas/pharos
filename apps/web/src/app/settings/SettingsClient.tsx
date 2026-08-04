@@ -1257,6 +1257,9 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
   const [msg, setMsg] = useState<string | null>(null);
   const [test, setTest] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  // The panel is server-rendered, so a sync that just succeeded would still show the
+  // OLD "last synced" date until a reload. Flip it locally instead of forcing a refetch.
+  const [syncedNow, setSyncedNow] = useState(false);
 
   const preview = (() => {
     try {
@@ -1329,6 +1332,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
         setMsg(`Syncing ${Math.min(i + CHUNK, total)}/${total}… (${pushed} ok${failed ? `, ${failed} failed` : ''})`);
       }
       setMsg(`Synced ${pushed}/${total} ✓${skipped ? ` · ${skipped} skipped (missing locally)` : ''}${failed ? ` · ${failed} failed${errs[0] ? ` — ${errs[0]}` : ''}` : ''}`);
+      if (pushed > 0) setSyncedNow(true); // matches the server rule: only a real push counts
       setSyncing(false);
       return;
     }
@@ -1336,6 +1340,7 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
     setMsg('Syncing… (this can take a while)');
     startTransition(async () => {
       const r = await syncToRemote();
+      if (r.pushed > 0) setSyncedNow(true);
       if (r.ok) setMsg(`Synced ${r.pushed} file(s)${r.skipped ? ` · ${r.skipped} skipped` : ''} ✓`);
       else setMsg(`Synced ${r.pushed}, ${r.failed} failed${r.error ? `: ${r.error}` : ''}${r.errors[0] ? ` — ${r.errors[0]}` : ''}`);
     });
@@ -1467,6 +1472,25 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
           </span>
         )}
       </div>
+
+      {/* When the remote copy was last actually written (P48). Without this the panel
+          shows a configured mirror that may not have run in months as if it were fine. */}
+      {backend !== 'local' && (
+        <p
+          className={cn(
+            'text-[10px] mt-1.5',
+            syncedNow ? 'text-[color:var(--color-accent)]' : storage.syncIsStale ? 'text-[color:var(--color-gold)]' : 'text-[color:var(--color-text-faint)]'
+          )}
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          {syncedNow
+            ? t('set.lastSyncJustNow')
+            : storage.lastSyncAt
+              ? t('set.lastSync', { date: new Date(storage.lastSyncAt).toLocaleString('en-GB') })
+              : t('set.lastSyncNever')}
+          {!syncedNow && storage.syncIsStale && ` · ${t('set.lastSyncStale', { n: storage.syncStaleDays })}`}
+        </p>
+      )}
     </Section>
   );
 }
@@ -1874,6 +1898,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   const [trialDays, setTrialDays] = useState(String(settings.trialAlertDays));
   const [giftDays, setGiftDays] = useState(String(settings.giftCardAlertDays));
   const [billDays, setBillDays] = useState(String(settings.billAlertDays));
+  const [syncStaleDays, setSyncStaleDays] = useState(String(settings.syncStaleDays));
   const [autoAdd, setAutoAdd] = useState(settings.autoAddStores);
   const [currency, setCurrency] = useState(settings.currency);
   const [multiCurrency, setMultiCurrency] = useState(settings.multiCurrency);
@@ -1889,6 +1914,7 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
     fd.set('trialAlertDays', trialDays);
     fd.set('giftCardAlertDays', giftDays);
     fd.set('billAlertDays', billDays);
+    fd.set('syncStaleDays', syncStaleDays);
     fd.set('autoAddStores', String(autoAdd));
     fd.set('currency', currency);
     fd.set('multiCurrency', String(multiCurrency));
@@ -1950,6 +1976,10 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
         <label className="block">
           <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.billAlert')}</span>
           <input type="number" min="0" max="90" value={billDays} onChange={(e) => setBillDays(e.target.value)} className={inputClass} />
+        </label>
+        <label className="block">
+          <span className={fieldLabel} style={{ fontFamily: 'var(--font-mono)' }}>{t('set.syncStaleAlert')}</span>
+          <input type="number" min="0" max="365" value={syncStaleDays} onChange={(e) => setSyncStaleDays(e.target.value)} className={inputClass} />
         </label>
         <div className="flex items-center justify-between gap-3 self-end pb-1">
           <span className="min-w-0">

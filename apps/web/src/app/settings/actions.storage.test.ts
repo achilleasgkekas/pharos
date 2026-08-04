@@ -64,7 +64,13 @@ const {
   receiptFindLean,
   statementFindLean,
   expenseFindLean,
+  getAppSettingsMock,
+  getLastRemoteSyncMock,
+  markRemoteSyncMock,
 } = vi.hoisted(() => ({
+  getAppSettingsMock: vi.fn(async () => ({ syncStaleDays: 7 }) as Record<string, unknown>),
+  getLastRemoteSyncMock: vi.fn(async () => null as Date | null),
+  markRemoteSyncMock: vi.fn(async () => {}),
   connectDBMock: vi.fn(async () => {}),
   appConfigUpdateOne: vi.fn(async (_filter: Record<string, unknown>, _update: Record<string, unknown>, _opts?: Record<string, unknown>) => ({})),
   requireAdminMock: vi.fn(async () => ({ id: 'admin1', role: 'admin' as const, name: 'Admin' })),
@@ -179,7 +185,11 @@ vi.mock('@/lib/budgetSuggest', () => ({ suggestBudgetsFromExpenses: vi.fn() }));
 vi.mock('@/lib/categoryRules', () => ({ resolveCategoryRules: vi.fn() }));
 vi.mock('@/lib/priceHike', () => ({ detectPriceHikes: vi.fn() }));
 vi.mock('@/lib/anthropic', () => ({ anthropicTest: vi.fn() }));
-vi.mock('@/lib/appSettings', () => ({ getAppSettings: vi.fn(), invalidateAppSettings: vi.fn() }));
+vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock, invalidateAppSettings: vi.fn() }));
+// lib/syncStaleness is NOT mocked (pure, own suite). lib/syncState IS: it is the
+// AppConfig read/write that records when a push last landed, and these tests assert
+// exactly WHEN that stamp is written.
+vi.mock('@/lib/syncState', () => ({ markRemoteSync: markRemoteSyncMock, getLastRemoteSync: getLastRemoteSyncMock }));
 vi.mock('@/lib/auth', () => ({ requireAdmin: requireAdminMock, assertCanWrite: vi.fn(async () => {}) }));
 vi.mock('@/lib/aiFeatures', () => ({ AI_FEATURE_KEYS: [] }));
 vi.mock('@/lib/aiModels', () => ({ PROVIDER_RECOMMEND: {}, priceForModel: vi.fn(), looksVisionModel: vi.fn() }));
@@ -257,6 +267,9 @@ describe('getStorageInfo', () => {
       remoteSecure: false,
       onedriveConnected: false,
       onedriveAccount: '',
+      lastSyncAt: '',
+      syncStaleDays: 7,
+      syncIsStale: false, // local backend can never be stale
     });
   });
 
@@ -613,5 +626,103 @@ describe('syncToRemote', () => {
     expect(res.pushed).toBe(2);
     expect(res.failed).toBe(1);
     expect(res.errors).toEqual(['x.pdf: boom']);
+  });
+});
+
+// ── P48: WHEN the "last successful sync" stamp is written ────────────────────
+// This is the whole staleness feature in one rule, and both directions are traps:
+// stamping on a run that pushed nothing would let a click against a dead NAS keep
+// resetting the very warning it should raise, while not stamping at all leaves a
+// healthy mirror looking abandoned.
+describe('recording the last successful sync (P48)', () => {
+  const ftp = { backend: 'ftp' as const, host: 'ftp.local', user: 'u', pass: 'p' };
+
+  it('syncToRemote stamps the clock when at least one file landed', async () => {
+    getStorageConfigMock.mockResolvedValueOnce(makeStorageConfig({ backend: 'ftp', remote: ftp }));
+    pushBatchToRemoteMock.mockResolvedValueOnce({ pushed: 3, failed: 0, errors: [] });
+    await syncToRemote();
+    expect(markRemoteSyncMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('syncToRemote stamps it even on a partly failed run — some files DID reach the remote', async () => {
+    getStorageConfigMock.mockResolvedValueOnce(makeStorageConfig({ backend: 'ftp', remote: ftp }));
+    pushBatchToRemoteMock.mockResolvedValueOnce({ pushed: 1, failed: 4, errors: ['boom'] });
+    await syncToRemote();
+    expect(markRemoteSyncMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('syncToRemote does NOT stamp it when nothing was pushed', async () => {
+    // The dead-NAS case: every file failed, so the remote copy is exactly as old as
+    // before. Stamping here would silence the alert forever with zero files uploaded.
+    getStorageConfigMock.mockResolvedValueOnce(makeStorageConfig({ backend: 'ftp', remote: ftp }));
+    pushBatchToRemoteMock.mockResolvedValueOnce({ pushed: 0, failed: 5, errors: ['boom'] });
+    await syncToRemote();
+    expect(markRemoteSyncMock).not.toHaveBeenCalled();
+  });
+
+  it('syncToRemote does not stamp it when it refused to run at all', async () => {
+    getStorageConfigMock.mockResolvedValueOnce(makeStorageConfig({ backend: 'local' }));
+    await syncToRemote();
+    expect(markRemoteSyncMock).not.toHaveBeenCalled();
+  });
+
+  it('syncOnedriveBatch stamps it once per batch that pushed something', async () => {
+    uploadToOnedriveMock.mockResolvedValue({ ok: true });
+    await syncOnedriveBatch([{ filePath: 'a.pdf', rel: 'r/a.pdf' }, { filePath: 'b.pdf', rel: 'r/b.pdf' }]);
+    expect(markRemoteSyncMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('syncOnedriveBatch does NOT stamp it for a batch where every upload failed', async () => {
+    uploadToOnedriveMock.mockResolvedValue({ ok: false, error: 'throttled' });
+    await syncOnedriveBatch([{ filePath: 'a.pdf', rel: 'r/a.pdf' }]);
+    expect(markRemoteSyncMock).not.toHaveBeenCalled();
+  });
+
+  it('syncOnedriveBatch does NOT stamp it when the only files were missing locally', async () => {
+    // Skipped != pushed: nothing new reached the remote, so its age is unchanged.
+    readFileMock.mockImplementationOnce(async () => { throw new Error('ENOENT: no such file'); });
+    await syncOnedriveBatch([{ filePath: 'gone.pdf', rel: 'r/gone.pdf' }]);
+    expect(markRemoteSyncMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('getStorageInfo · mirror staleness surface (P48)', () => {
+  it('reports the stored timestamp and agrees with the alert sweep that it is stale', async () => {
+    getStorageConfigMock.mockResolvedValueOnce(makeStorageConfig({ backend: 'smb', remote: { backend: 'smb', host: 'nas.local', user: 'u', pass: 'p' } }));
+    const last = new Date(Date.now() - 30 * 86400000);
+    getLastRemoteSyncMock.mockResolvedValueOnce(last);
+    const info = await getStorageInfo();
+    expect(info.lastSyncAt).toBe(last.toISOString());
+    expect(info.syncIsStale).toBe(true);
+  });
+
+  it('is not stale when the last push is inside the window', async () => {
+    getStorageConfigMock.mockResolvedValueOnce(makeStorageConfig({ backend: 'smb', remote: { backend: 'smb', host: 'nas.local', user: 'u', pass: 'p' } }));
+    getLastRemoteSyncMock.mockResolvedValueOnce(new Date(Date.now() - 2 * 86400000));
+    const info = await getStorageInfo();
+    expect(info.syncIsStale).toBe(false);
+  });
+
+  it('flags a remote that has never synced, and reports no timestamp', async () => {
+    getStorageConfigMock.mockResolvedValueOnce(makeStorageConfig({ backend: 'onedrive' }));
+    getLastRemoteSyncMock.mockResolvedValueOnce(null);
+    const info = await getStorageInfo();
+    expect(info.lastSyncAt).toBe('');
+    expect(info.syncIsStale).toBe(true);
+  });
+
+  it('never flags the local backend, even with no sync ever recorded', async () => {
+    getStorageConfigMock.mockResolvedValueOnce(makeStorageConfig({ backend: 'local' }));
+    getLastRemoteSyncMock.mockResolvedValueOnce(null);
+    expect((await getStorageInfo()).syncIsStale).toBe(false);
+  });
+
+  it('echoes the configured threshold so the panel and the alert cannot disagree', async () => {
+    getAppSettingsMock.mockResolvedValueOnce({ syncStaleDays: 30 });
+    getStorageConfigMock.mockResolvedValueOnce(makeStorageConfig({ backend: 'smb', remote: { backend: 'smb', host: 'nas.local', user: 'u', pass: 'p' } }));
+    getLastRemoteSyncMock.mockResolvedValueOnce(new Date(Date.now() - 20 * 86400000));
+    const info = await getStorageInfo();
+    expect(info.syncStaleDays).toBe(30);
+    expect(info.syncIsStale).toBe(false); // 20 days < the widened 30-day window
   });
 });

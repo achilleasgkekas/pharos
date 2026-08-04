@@ -60,6 +60,9 @@ import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive,
 import { runNtfyTest } from '@/lib/notify';
 import { BACKUP_MODELS, BACKUP_KEYS } from '@/lib/backupModels';
 import { verifyBackupJson, formatBackupCounts, type BackupVerifyResult } from '@/lib/backupVerify';
+import { detectSyncStaleness, formatSyncStaleness } from '@/lib/syncStaleness';
+import { markRemoteSync, getLastRemoteSync } from '@/lib/syncState';
+import { splitFreshAlerts } from '@/lib/alertDedup';
 import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '@/lib/notifiers';
 import { pushAllDevices } from '@/lib/expoPush';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -312,6 +315,9 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   // 0 is meaningful (bill due/overdue alerts off), so parse explicitly instead of `|| 5`.
   const billRaw = Number(formData.get('billAlertDays'));
   const billAlertDays = Number.isFinite(billRaw) ? Math.max(0, Math.min(90, Math.round(billRaw))) : 5;
+  // 0 is meaningful (remote-mirror staleness alerts off), so parse explicitly (P48).
+  const syncRaw = Number(formData.get('syncStaleDays'));
+  const syncStaleDays = Number.isFinite(syncRaw) ? Math.max(0, Math.min(365, Math.round(syncRaw))) : 7;
   const autoAdd = formData.get('autoAddStores') === 'true';
   const currency = (String(formData.get('currency') || 'EUR').trim().toUpperCase()) || 'EUR';
   const multiCurrency = formData.get('multiCurrency') === 'true'; // P9 opt-in
@@ -329,6 +335,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
         trialAlertDays,
         giftCardAlertDays,
         billAlertDays,
+        syncStaleDays,
         autoAddStores: autoAdd,
         currency,
         multiCurrency,
@@ -460,12 +467,18 @@ export async function testWebhookSubscription(sub: WebhookSubscription): Promise
 }
 
 /** Scan for deals, δόσεις due this month, and expiring warranties; ntfy a summary. */
-export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; summary: string }> {
+export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{ ok: boolean; sent: boolean; summary: string }> {
+  // P82 gave this action its first real Mongoose write (the dedup baseline, dedupe mode
+  // only) — assertCanWrite() no-ops with no request scope (the cron path, no session to
+  // check) and only throws for a logged-in viewer, so this costs the scheduler nothing
+  // and closes what would otherwise be an unguarded write per the P31 coverage scan.
+  await assertCanWrite();
   const s = await getAppSettings();
   await connectDB();
   const now = Date.now();
 
   const dealItems = (await Item.find({ targetPrice: { $gt: 0 } }).select('title targetPrice currentPrice links').lean()) as Array<{
+    _id: unknown;
     title: string;
     targetPrice?: number;
     currentPrice?: number;
@@ -478,11 +491,12 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   });
 
   const warrantyItems = (await Item.find({ warrantyUntil: { $ne: null } }).select('title warrantyUntil').lean()) as Array<{
+    _id: unknown;
     title: string;
     warrantyUntil?: string | Date | null;
   }>;
   const expiring = warrantyItems
-    .map((i) => ({ title: i.title, days: Math.ceil((new Date(i.warrantyUntil as string).getTime() - now) / 86400000) }))
+    .map((i) => ({ _id: i._id, title: i.title, days: Math.ceil((new Date(i.warrantyUntil as string).getTime() - now) / 86400000) }))
     .filter((w) => !isNaN(w.days) && w.days >= 0 && w.days <= s.warrantyAlertDays)
     .sort((a, b) => a.days - b.days);
 
@@ -490,16 +504,16 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   // Only recent receipts can still be inside a window, so bound the scan.
   const stores = await getStores();
   const maxWindow = Math.max(s.defaultReturnWindowDays, ...stores.map((st) => st.returnWindowDays ?? 0));
-  const returnsClosing: { store: string; total: number; days: number }[] = [];
+  const returnsClosing: { _id: unknown; store: string; total: number; days: number }[] = [];
   if (maxWindow > 0) {
     const since = new Date(now - (maxWindow + 1) * 86400000);
     const recent = (await Receipt.find({ archived: { $ne: true }, date: { $gte: since } })
       .select('store date total')
-      .lean()) as Array<{ store?: string; date?: string | Date; total?: number }>;
+      .lean()) as Array<{ _id: unknown; store?: string; date?: string | Date; total?: number }>;
     for (const r of recent) {
       const win = effectiveReturnWindow(r.store ?? '', stores, s.defaultReturnWindowDays);
       const days = returnDaysLeft(r.date, win, now);
-      if (days !== null && days <= 3) returnsClosing.push({ store: r.store || 'Unknown', total: r.total ?? 0, days });
+      if (days !== null && days <= 3) returnsClosing.push({ _id: r._id, store: r.store || 'Unknown', total: r.total ?? 0, days });
     }
     returnsClosing.sort((a, b) => a.days - b.days);
   }
@@ -532,12 +546,14 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   // the lead-time window, soonest first.
   const trialSubs = (await Subscription.find({ active: true, trialEndsAt: { $ne: null } })
     .select('name amount trialEndsAt firstChargeAmount')
-    .lean()) as Array<{ name: string; amount?: number; trialEndsAt?: string | Date | null; firstChargeAmount?: number }>;
+    .lean()) as Array<{ _id: unknown; name: string; amount?: number; trialEndsAt?: string | Date | null; firstChargeAmount?: number }>;
   const trialsEnding = trialSubs
     .map((sub) => ({
+      _id: sub._id,
       name: sub.name,
       days: Math.ceil((new Date(sub.trialEndsAt as string).getTime() - now) / 86400000),
       charge: (sub.firstChargeAmount ?? 0) > 0 ? (sub.firstChargeAmount as number) : sub.amount ?? 0,
+      iso: new Date(sub.trialEndsAt as string).toISOString().slice(0, 10),
     }))
     .filter((tr) => !isNaN(tr.days) && tr.days >= 0 && tr.days <= s.trialAlertDays)
     .sort((a, b) => a.days - b.days);
@@ -545,9 +561,15 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   // Gift-card / store-credit expiring with money still on it (P32): soonest first.
   const giftRows = (await GiftCard.find({ archived: { $ne: true }, expiresAt: { $ne: null } })
     .select('title initialAmount uses expiresAt')
-    .lean()) as Array<{ title: string; initialAmount?: number; uses?: { amount?: number }[]; expiresAt?: string | Date | null }>;
+    .lean()) as Array<{ _id: unknown; title: string; initialAmount?: number; uses?: { amount?: number }[]; expiresAt?: string | Date | null }>;
   const giftsExpiring = giftRows
-    .map((g) => ({ title: g.title, balance: giftCardBalance(g.initialAmount ?? 0, g.uses ?? []), days: giftCardDaysLeft(g.expiresAt ?? null, now) }))
+    .map((g) => ({
+      _id: g._id,
+      title: g.title,
+      balance: giftCardBalance(g.initialAmount ?? 0, g.uses ?? []),
+      days: giftCardDaysLeft(g.expiresAt ?? null, now),
+      iso: g.expiresAt ? new Date(g.expiresAt as string).toISOString().slice(0, 10) : '',
+    }))
     .filter((g) => g.balance > 0.009 && g.days !== null && g.days >= 0 && g.days <= s.giftCardAlertDays)
     .sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
 
@@ -555,61 +577,140 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   // lead-time window (overdue nag until paid), most-overdue first.
   const billRows = (await Bill.find({ paidAt: null, archived: { $ne: true } })
     .select('title amount dueDate')
-    .lean()) as Array<{ title: string; amount?: number; dueDate?: string | Date | null }>;
+    .lean()) as Array<{ _id: unknown; title: string; amount?: number; dueDate?: string | Date | null }>;
   const billsDue = billRows
-    .map((b) => ({ title: b.title, amount: b.amount ?? 0, days: billDaysUntilDue(b.dueDate ?? null, now) }))
+    .map((b) => ({
+      _id: b._id,
+      title: b.title,
+      amount: b.amount ?? 0,
+      days: billDaysUntilDue(b.dueDate ?? null, now),
+      iso: b.dueDate ? new Date(b.dueDate as string).toISOString().slice(0, 10) : '',
+    }))
     .filter((b) => b.days !== null && (b.days as number) <= s.billAlertDays)
     .sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
 
+  // Remote-mirror staleness (P48): the only alert here about the backup itself rather
+  // than about money or things. Reads a stored timestamp, no network call — a NAS being
+  // unreachable must not make the whole alert sweep slow or fail.
+  const storage = await getStorageConfig();
+  // Skip the timestamp read entirely for a local-only setup (the common case): there is
+  // no remote that could fall behind, so the query would never change the outcome.
+  const syncStale =
+    storage.backend === 'local'
+      ? null
+      : detectSyncStaleness({ backend: storage.backend, lastSyncAt: await getLastRemoteSync(), thresholdDays: s.syncStaleDays, now });
+
+  // Outbound dedup (P82), opt-in via opts.dedupe — used only by the scheduled cron path
+  // (app/api/cron/alerts/route.ts). The in-app bell already has its own per-item memory
+  // (dedupeKey, see computeAlerts() in app/notifications/actions.ts): a warranty alert
+  // fires once when it enters the window and stays quiet as the day count ticks down.
+  // The outbound channels (ntfy/Discord/Slack/Telegram/webhook + push) never had that
+  // memory — harmless while the only trigger was a human pressing the button below, but
+  // P81 wired an unattended cron to this same scan, so without this an unresolved alert
+  // repeats the identical push on every tick. `previouslySent` stays empty unless dedupe
+  // is requested, which makes every splitFreshAlerts() call below a no-op pass-through
+  // (fresh === everything) for the manual "Check & notify now" button — same output as
+  // before this change, byte for byte.
+  let previouslySent = new Set<string>();
+  if (opts.dedupe) {
+    const cfgDoc = (await AppConfig.findOne({ key: 'singleton' }).select('alertDispatchKeys').lean()) as { alertDispatchKeys?: string[] } | null;
+    previouslySent = new Set(cfgDoc?.alertDispatchKeys ?? []);
+  }
+
+  const period = new Date(now).toISOString().slice(0, 7); // YYYY-MM, same bucket the bell uses for installments
+  const dealsSplit = splitFreshAlerts(deals, (d) => `deal:${String(d._id)}`, previouslySent);
+  const expiringSplit = splitFreshAlerts(expiring, (w) => `warranty:${String(w._id)}`, previouslySent);
+  const returnsSplit = splitFreshAlerts(returnsClosing, (r) => `return:${String(r._id)}`, previouslySent);
+  const hikesSplit = splitFreshAlerts(hikes, (h) => `pricehike:${h.vendorKey}:${h.curr}`, previouslySent);
+  const trialsSplit = splitFreshAlerts(trialsEnding, (tr) => `trialend:${String(tr._id)}:${tr.iso}`, previouslySent);
+  const giftsSplit = splitFreshAlerts(giftsExpiring, (g) => `giftcard:${String(g._id)}:${g.iso}`, previouslySent);
+  const billsSplit = splitFreshAlerts(billsDue, (b) => `bill:${String(b._id)}:${b.iso}`, previouslySent);
+  const budgetsSplit = splitFreshAlerts(budgetsExceeded, (b) => `budget:${b.category}:${budgetMonthKey}`, previouslySent);
+  const installmentItems = dueThisMonth > 0 ? [{ key: `installments:${period}` }] : [];
+  const installmentsSplit = splitFreshAlerts(installmentItems, (i) => i.key, previouslySent);
+  const syncStaleItems = syncStale ? [syncStale] : [];
+  const syncStaleSplit = splitFreshAlerts(syncStaleItems, (x) => `syncstale:${x.lastSyncAt ?? 'never'}`, previouslySent);
+
+  // The full current live key set, across every category — persisted as the next
+  // baseline after a successful send, and used to tell "genuinely nothing pending"
+  // apart from "something's pending but already reported" below.
+  const liveDispatchKeys = [
+    ...dealsSplit.keys,
+    ...expiringSplit.keys,
+    ...returnsSplit.keys,
+    ...hikesSplit.keys,
+    ...trialsSplit.keys,
+    ...giftsSplit.keys,
+    ...billsSplit.keys,
+    ...budgetsSplit.keys,
+    ...installmentsSplit.keys,
+    ...syncStaleSplit.keys,
+  ];
+  const hadAnyLiveAlert = liveDispatchKeys.length > 0;
+
+  const freshDeals = dealsSplit.fresh;
+  const freshExpiring = expiringSplit.fresh;
+  const freshReturnsClosing = returnsSplit.fresh;
+  const freshHikes = hikesSplit.fresh;
+  const freshTrialsEnding = trialsSplit.fresh;
+  const freshGiftsExpiring = giftsSplit.fresh;
+  const freshBillsDue = billsSplit.fresh;
+  const freshBudgetsExceeded = budgetsSplit.fresh;
+  const dueThisMonthFresh = installmentsSplit.fresh.length > 0 ? dueThisMonth : 0;
+  const freshSyncStale = syncStaleSplit.fresh.length > 0 ? syncStale : null;
+
   const lines: string[] = [];
-  if (deals.length) lines.push(`🎯 ${deals.length} deal(s): ${deals.slice(0, 5).map((d) => d.title).join(', ')}`);
-  if (dueThisMonth > 0) lines.push(`💳 installments this month: ${cur()}${dueThisMonth.toFixed(0)} (${plans.length} plans)`);
-  if (expiring.length)
-    lines.push(`🛡 ${expiring.length} warranty expiring ≤${s.warrantyAlertDays}d: ${expiring.slice(0, 5).map((w) => `${w.title} (${w.days}d)`).join(', ')}`);
-  if (returnsClosing.length)
+  if (freshDeals.length) lines.push(`🎯 ${freshDeals.length} deal(s): ${freshDeals.slice(0, 5).map((d) => d.title).join(', ')}`);
+  if (dueThisMonthFresh > 0) lines.push(`💳 installments this month: ${cur()}${dueThisMonthFresh.toFixed(0)} (${plans.length} plans)`);
+  if (freshExpiring.length)
+    lines.push(`🛡 ${freshExpiring.length} warranty expiring ≤${s.warrantyAlertDays}d: ${freshExpiring.slice(0, 5).map((w) => `${w.title} (${w.days}d)`).join(', ')}`);
+  if (freshReturnsClosing.length)
     lines.push(
-      `↩ ${returnsClosing.length} return window(s) closing ≤3d: ${returnsClosing
+      `↩ ${freshReturnsClosing.length} return window(s) closing ≤3d: ${freshReturnsClosing
         .slice(0, 5)
         .map((r) => `${r.store}${r.total > 0 ? ` ${cur()}${r.total}` : ''} (${r.days}d)`)
         .join(', ')}`
     );
-  if (hikes.length)
+  if (freshHikes.length)
     lines.push(
-      `📈 ${hikes.length} recurring price change(s): ${hikes
+      `📈 ${freshHikes.length} recurring price change(s): ${freshHikes
         .slice(0, 5)
         .map((h) => `${h.vendor} ${cur()}${h.prev}→${cur()}${h.curr} (${h.deltaPct > 0 ? '+' : ''}${h.deltaPct}%)`)
         .join(', ')}`
     );
-  if (trialsEnding.length)
+  if (freshTrialsEnding.length)
     lines.push(
-      `⏳ ${trialsEnding.length} free trial(s) ending ≤${s.trialAlertDays}d: ${trialsEnding
+      `⏳ ${freshTrialsEnding.length} free trial(s) ending ≤${s.trialAlertDays}d: ${freshTrialsEnding
         .slice(0, 5)
         .map((tr) => `${tr.name} (${tr.days}d${tr.charge > 0 ? `, ${cur()}${tr.charge}` : ''})`)
         .join(', ')}`
     );
-  if (giftsExpiring.length)
+  if (freshGiftsExpiring.length)
     lines.push(
-      `💳 ${giftsExpiring.length} gift card(s) expiring ≤${s.giftCardAlertDays}d: ${giftsExpiring
+      `💳 ${freshGiftsExpiring.length} gift card(s) expiring ≤${s.giftCardAlertDays}d: ${freshGiftsExpiring
         .slice(0, 5)
         .map((g) => `${g.title} (${cur()}${g.balance.toFixed(0)}, ${g.days}d)`)
         .join(', ')}`
     );
-  if (billsDue.length)
+  if (freshBillsDue.length)
     lines.push(
-      `🧾 ${billsDue.length} bill(s) due/overdue: ${billsDue
+      `🧾 ${freshBillsDue.length} bill(s) due/overdue: ${freshBillsDue
         .slice(0, 5)
         .map((b) => `${b.title}${b.amount > 0 ? ` ${cur()}${b.amount.toFixed(0)}` : ''} (${(b.days ?? 0) < 0 ? `${-(b.days ?? 0)}d overdue` : `${b.days}d`})`)
         .join(', ')}`
     );
-  if (budgetsExceeded.length)
+  if (freshBudgetsExceeded.length)
     lines.push(
-      `💰 ${budgetsExceeded.length} budget(s) exceeded: ${budgetsExceeded
+      `💰 ${freshBudgetsExceeded.length} budget(s) exceeded: ${freshBudgetsExceeded
         .slice(0, 5)
         .map((b) => `${b.category} ${cur()}${b.actual}/${cur()}${b.budget} (${b.pct}%)`)
         .join(', ')}`
     );
+  if (freshSyncStale) lines.push(`🗄 ${formatSyncStaleness(freshSyncStale)} — run "Sync now" in Settings → File storage`);
 
-  // Also surface these alerts in the in-app notification bell.
+  // Also surface these alerts in the in-app notification bell. Always the FULL live
+  // picture (never filtered) — the bell has its own separate dedupeKey memory already,
+  // unaffected by opts.dedupe above.
   try {
     await generateNotifications();
   } catch {
@@ -617,20 +718,31 @@ export async function runAlertChecks(): Promise<{ ok: boolean; sent: boolean; su
   }
 
   // Outbound event webhooks (P24) — independent of the notifier channels above; a
-  // Home Assistant/n8n listener wants raw structured events, not the human summary.
-  // Fire-and-forget: dispatchEventWebhooks never throws and no-ops with zero
-  // configured/matching subscriptions.
+  // Home Assistant/n8n listener wants raw structured events, not the human summary, and
+  // is a different audience than P82 (deliberately NOT deduped here — see lib/webhooks.ts
+  // / P80 for that channel's own reliability story). Fire-and-forget: dispatchEventWebhooks
+  // never throws and no-ops with zero configured/matching subscriptions.
   if (dueThisMonth > 0) void dispatchEventWebhooks('installment.due', { amount: Math.round(dueThisMonth), plans: plans.length });
   if (deals.length) void dispatchEventWebhooks('price.drop', { items: deals.map((d) => ({ title: d.title, target: d.targetPrice ?? 0 })) });
   if (budgetsExceeded.length) void dispatchEventWebhooks('budget.exceeded', { categories: budgetsExceeded });
 
-  const summary = lines.length ? lines.join('\n') : 'All clear — nothing to report.';
+  const summary = lines.length
+    ? lines.join('\n')
+    : opts.dedupe && hadAnyLiveAlert
+      ? 'No new alerts (already reported).'
+      : 'All clear — nothing to report.';
   let sent = false;
   if (lines.length) {
     const r = await dispatchAlert('Pharos alerts', summary);
     sent = r.sent > 0;
     // Also push to registered mobile devices (best-effort; no-op if none / no creds).
     void pushAllDevices('Pharos alerts', summary);
+    // Persist the new baseline ONLY once a channel actually accepted the message — a
+    // misconfigured/disabled notifier must never mark live alerts as "already sent" when
+    // nothing was ever delivered (they'd silently vanish from every future run).
+    if (opts.dedupe && sent) {
+      await AppConfig.updateOne({ key: 'singleton' }, { $set: { alertDispatchKeys: liveDispatchKeys } }, { upsert: true });
+    }
   }
   return { ok: true, sent, summary };
 }
@@ -765,12 +877,20 @@ export type StorageInfo = {
   remoteSecure: boolean;
   onedriveConnected: boolean; // a refresh token is stored (status, independent of name)
   onedriveAccount: string; // display name/email, '' if we couldn't capture it
+  lastSyncAt: string; // ISO of the last successful remote push; '' = never (P48)
+  syncStaleDays: number; // alert threshold in days; 0 = the staleness check is off
+  syncIsStale: boolean; // true when the alert sweep would warn about this right now
 };
 
 /** Storage config for the Settings editor — never includes the password. */
 export async function getStorageInfo(): Promise<StorageInfo> {
   const s = await getStorageConfig();
   const creds = await getOnedriveCreds();
+  // Same verdict the alert sweep computes, so the panel and the notification can never
+  // disagree about whether the mirror has fallen behind.
+  const settings = await getAppSettings();
+  const lastSync = await getLastRemoteSync();
+  const stale = detectSyncStaleness({ backend: s.backend, lastSyncAt: lastSync, thresholdDays: settings.syncStaleDays, now: Date.now() });
   return {
     backend: s.backend,
     mirror: s.mirror,
@@ -785,6 +905,9 @@ export async function getStorageInfo(): Promise<StorageInfo> {
     remoteSecure: !!s.remote.secure,
     onedriveConnected: !!creds,
     onedriveAccount: creds?.account || '',
+    lastSyncAt: lastSync ? lastSync.toISOString() : '',
+    syncStaleDays: settings.syncStaleDays,
+    syncIsStale: !!stale,
   };
 }
 
@@ -886,6 +1009,10 @@ export async function syncOnedriveBatch(items: { filePath: string; rel: string }
       else { failed++; if (errors.length < 5) errors.push(`${it.rel}: ${msg}`); }
     }
   }
+  // Any file that actually landed counts as a successful sync for the staleness alert
+  // (P48). A batch that pushed nothing does NOT refresh the clock — otherwise clicking
+  // "Sync now" against a dead NAS would keep resetting the very warning it should raise.
+  if (pushed > 0) await markRemoteSync();
   return { pushed, failed, skipped, errors };
 }
 
@@ -907,6 +1034,7 @@ export async function syncToRemote(): Promise<SyncResult> {
     }
   }
   const res = await pushBatchToRemote(s.remote, files);
+  if (res.pushed > 0) await markRemoteSync(); // see syncOnedriveBatch for why pushed > 0
   return { ok: res.failed === 0, pushed: res.pushed, failed: res.failed, skipped, errors: res.errors };
 }
 
