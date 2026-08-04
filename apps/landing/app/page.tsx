@@ -377,7 +377,7 @@ const COMPARE: { label: string; self: string; hosted: string }[] = [
   { label: 'Where it runs', self: 'Your own hardware', hosted: 'Our managed servers' },
   { label: 'Your data', self: 'Stays on your disk', hosted: 'Isolated per tenant' },
   { label: 'Setup', self: 'One docker compose up', hosted: 'Nothing to install' },
-  { label: 'Updates & backups', self: 'You run them', hosted: 'Automatic, nightly' },
+  { label: 'Updates & backups', self: 'You run them', hosted: 'Nightly, restore-tested' },
   { label: 'AI parsing', self: 'Bring your own key or Ollama', hosted: 'Included, ready to go' },
   { label: 'Offline use', self: 'Full, no internet needed', hosted: 'Needs a connection' },
   { label: 'Cost', self: 'Free forever, AGPL-3.0', hosted: '14-day free trial, then €9/mo' },
@@ -454,6 +454,10 @@ const FAQ_GROUPS: {
       {
         q: 'How do updates work?',
         a: 'Self-hosted updates are a git pull and one docker compose up, so you upgrade on your own schedule and can pin to a version you trust. On hosted we roll out updates for you, so you are always on the latest release with nothing to maintain.',
+      },
+      {
+        q: 'Does it run on ARM, like a Raspberry Pi or an ARM instance?',
+        a: 'Yes, and both architectures are built on purpose. Development happens on Apple Silicon, where a plain docker build produces an arm64-only image that would refuse to start, or crawl under emulation, on an x86 server, so the release image is built for linux/amd64 and linux/arm64 under one tag. The same tag runs on an x86 VPS, on an ARM cloud instance (often cheaper per core), and on a Raspberry Pi with 64-bit Linux, with no variant for you to pick. One thing worth planning for: AI parsing is the heavy part, so on a small board keep the app local and point AI at a cloud provider or at an Ollama running on a beefier machine on your LAN, which is a setting rather than a rebuild.',
       },
       {
         q: 'Is there a mobile app?',
@@ -611,7 +615,7 @@ const FAQ_GROUPS: {
       },
       {
         q: 'How do backups work?',
-        a: 'Self-hosted ships with a nightly backup you can point at a NAS, plus one-click JSON and CSV exports any time. You can also mirror your files to SMB, FTP, or OneDrive for a proper 3-2-1 setup. On hosted, nightly backups are handled for you.',
+        a: 'Self-hosted ships with a nightly backup you can point at a NAS, plus one-click JSON and CSV exports any time, and you can mirror your files to SMB, FTP, or OneDrive for a proper 3-2-1 setup. On hosted we run it for you, and "backup" here means something specific rather than a checkbox. Every database is dumped, the control plane and each workspace, together with the files under /storage, because a database restored without its receipts and statements is a catalogue of documents nobody can open. Each archive is then copied off the server, since a copy sitting on the same disk as the data it protects is not a backup. And it is not called done until it passes three checks: the archive is non-empty, it is a valid gzip, and a dry-run restore proves it would actually load, which catches a truncated dump that looks perfectly fine on disk. Restoring is a script we have run end to end into a scratch stack rather than a hypothesis, and it verifies the indexes came back afterwards, since a restore that reports success but silently drops your unique indexes is the kind of failure you only discover much later. Both scripts live in the repo, so a self-hoster gets exactly the same drill.',
       },
       {
         q: 'What happens if I delete something by mistake?',

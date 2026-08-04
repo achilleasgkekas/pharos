@@ -5328,3 +5328,55 @@ feature, (3) τιποτα αλλο δεν εκκρεμει απο τα προη�
 
 Needs-Achilleas (open): legal entity/Stripe, **retention window για suspended workspace (νεο)**,
 Terms+Privacy review απο ανθρωπο, contact inbox, χρονισμος για public repo.
+
+## 2026-08-04 (backups: απο «γινονται» σε «να τι σημαινει», + ARM ερωτηση)
+
+Το increment δεν βγηκε απο τη λιστα του προηγουμενου entry αλλα απο τα **commits της ιδιας μερας στο
+κυριο repo**: `aa44276` (production stack για Hetzner με backups που εχουν οντως γινει restore) και
+`ed20de3` (multi-arch image script). Και τα δυο κανουν συγκεκριμενο κατι που η landing ελεγε **αοριστα**,
+δηλαδη ειναι ακριβως το «sweep οταν εμφανιστει νεο user-facing feature» που εκκρεμουσε.
+
+**1. FAQ «How do backups work?»** ελεγε για hosted μονο «nightly backups are handled for you». Αυτο ειναι
+η πιο ευκολη υποσχεση σε landing page και η λιγοτερο ελεγξιμη, ενω τωρα υπαρχει κωδικας που τη στηριζει.
+Η απαντηση λεει πλεον τι ακριβως γινεται, με **ολα τα λεγομενα διασταυρωμενα στα ιδια τα scripts**, οχι
+απο το commit message: dump ολων των βασεων (control plane + καθε workspace) **μαζι με τα αρχεια του
+/storage** (`deploy/backup.sh` σχολιο + `tar -czf` γραμμη 63), αντιγραφο **εκτος server** (`BACKUP_REMOTE`
+via rclone, γραμμες 66-77, με ρητο «!! ειναι στον ΙΔΙΟ δισκο» οταν λειπει), και **τρεις ελεγχοι πριν
+θεωρηθει εγκυρο**: non-empty, valid gzip (`gzip -t`, γρ. 48), και **dry-run restore** (`--dryRun`, γρ. 57)
+που πιανει truncated dump που φαινεται μια χαρα στον δισκο. Το restore ειναι script που εχει τρεξει
+end-to-end σε scratch stack και **επαληθευει οτι γυρισαν τα indexes** (`restore.sh` γρ. 50-55, με το
+σκεπτικο στα σχολια: restore που λεει «63 documents restored» και αφηνει τη βαση χωρις unique indexes).
+Κλεινει με «και τα δυο scripts ειναι στο repo», ωστε ο self-hoster να μη νιωθει οτι περιγραφεται κατι που
+δεν παιρνει.
+
+**2. Νεα ερωτηση «Does it run on ARM, like a Raspberry Pi or an ARM instance?»** (Getting started). Η
+σελιδα ειχε **ηδη** pill «Raspberry Pi (ARM64)» στο deploy strip, δηλαδη εκανε τον ισχυρισμο χωρις να τον
+στηριζει πουθενα. Τωρα υπαρχει: image για `linux/amd64` **και** `linux/arm64` κατω απο ενα tag
+(`scripts/build-image.sh`, `PLATFORMS` default), οποτε το ιδιο tag τρεχει σε x86 VPS, σε ARM instance, και
+σε Pi με 64-bit Linux. Προστεθηκε και η μονη πρακτικη προειδοποιηση που αξιζει: το βαρυ κομματι ειναι το
+AI parsing, αρα σε μικρη πλακετα το AI παει σε cloud provider η σε Ollama αλλου στο LAN (**ρυθμιση, οχι
+rebuild**, το υποστηριζει το configurable Ollama URL).
+
+**ΔΕΝ ειπα οτι υπαρχει δημοσιο image** σε registry. Το `REPO_PUBLIC` ειναι ακομα `false` και το script
+απαιτει `docker login` για push, οποτε «pull our published image» θα ηταν ψεμα σημερα. Η διατυπωση μενει
+στο «χτιζεται για τις δυο αρχιτεκτονικες», που ειναι αληθες ανεξαρτητα απο το ποτε ανοιγει το repo.
+
+**3. Πινακας συγκρισης**, γραμμη «Updates & backups»: hosted `Automatic, nightly` -> **`Nightly,
+restore-tested`**. Το «automatic» δεν ελεγε τιποτα (ολα τα SaaS το λενε), το «restore-tested» ειναι το
+μονο κομματι που ξεχωριζει και τωρα τεκμηριωνεται στο FAQ ακριβως απο κατω.
+
+Verify: `npm run type-check` exit 0, `npm run build` success. Ζωντανα στο DOM **και** στο FAQPage JSON-LD
+και οι εξι φρασεις-δειγματα (dry-run restore, «catalogue of documents nobody can open», «verifies the
+indexes came back», linux/amd64+arm64, «is not a backup», Ollama-στο-LAN)· ερωτησεις JSON-LD **41 -> 42**.
+`read_console_messages` κανενα error, ο dev server σταματησε. **Screenshots** (`.shots/`, gitignored):
+`backups-faq.png` (η νεα απαντηση ανοιχτη μεσω deep-link `#faq-how-do-backups-work`, διαβαζεται καθαρα,
+Copy link παρων), `arm-faq-open.png` (η νεα ερωτηση ανοιχτη), `compare.png` (η γραμμη δειχνει «Nightly,
+restore-tested»). ΣΗΜ: το `--selector` σε κλειστο `<details>` τραβαει μονο τον τιτλο, οποτε για screenshot
+απαντησης χρειαζεται το hash της ερωτησης στο `--url` (ο `FaqDeepLink` το ανοιγει).
+
+Επομενο increment: (1) το εκκρεμες «what free really means» section (self-host vs trial) αν φανει οτι
+χρειαζεται, (2) sweep οταν εμφανιστει το επομενο user-facing feature, (3) οταν ανοιξει το public repo,
+προσθηκη του πραγματικου `docker pull` path στο quick start (τωρα ειναι git clone + build).
+
+Needs-Achilleas (open, αμεταβλητο): legal entity/Stripe, **retention window για suspended workspace**,
+Terms+Privacy review απο ανθρωπο, contact inbox, χρονισμος για public repo.
