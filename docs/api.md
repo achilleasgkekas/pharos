@@ -413,8 +413,10 @@ Each plan in the `GET /statements/plans` response is:
 ## Other endpoints (outside `/api/v1`)
 
 A few endpoints live outside the versioned `/api/v1` tree because they speak a
-different protocol (JSON-RPC over Streamable-HTTP) or because their callers cannot
-send a normal `Authorization: Bearer` header (calendar clients).
+different protocol (JSON-RPC over Streamable-HTTP), because their callers cannot
+send a normal `Authorization: Bearer` header (calendar clients), or because the
+caller is a scheduler rather than a signed-in user (the cron sweep, authenticated
+by a shared secret instead of a per-user token).
 
 ### Calendar feed (iCal)
 
@@ -490,6 +492,41 @@ curl -s http://localhost:3000/api/mcp \
 
 To connect Claude Code, add it as a remote MCP server pointing at
 `https://your-pharos-host/api/mcp` with the bearer token above.
+
+### Cron: alert sweep
+
+| Method | Path                 | Description |
+|--------|----------------------|-------------|
+| POST   | `/api/cron/alerts`   | Runs the same alert scan as the "Check & notify now" button in Settings (deals, installments due, warranties, return windows, price hikes, trials, gift cards, bills, exceeded budgets) and fans the summary out to every configured notifier. Intended to be called by an external scheduler (cron, systemd timer, etc.) so alerts fire without a human opening the app. |
+
+Note the path is `/api/cron`, not under `/api/v1`.
+
+**Self-hosted only** — returns `404` when the instance runs in `SAAS_MODE`. The
+scan reads the single shared database with no tenant scoping, so in a
+multi-tenant deployment it would mix (or leak) one tenant's numbers into
+another's notification channel; hosted workspaces get their own per-tenant
+sweep instead.
+
+Authentication is a **shared `CRON_SECRET` bearer**, not a user session
+(`Authorization: Bearer <CRON_SECRET>`), constant-time compared. Like `/api/mcp`
+it is exempt from the cookie session middleware and performs its own check.
+Unset `CRON_SECRET` fails **closed**: `500 { "error": "CRON_SECRET is not
+configured" }`, never an open endpoint. A missing or wrong token returns `401 {
+"error": "unauthorized" }`.
+
+- **Response `200`:** `{ "ok": true, "sent": boolean, "summary": string }`.
+  `sent: false` with an "All clear" summary is a healthy run that found nothing
+  to report, not a failure.
+- **Response `500`:** `{ "ok": false, "error": string }` when the scan itself
+  throws (message truncated to 300 chars).
+
+```bash
+curl -fsS -X POST http://localhost:3000/api/cron/alerts \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+See [Self-hosting → Scheduling the alert sweep](self-hosting.md#scheduling-the-alert-sweep)
+for a crontab recipe and env var setup.
 
 ---
 
