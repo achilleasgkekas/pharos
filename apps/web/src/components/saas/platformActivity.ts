@@ -77,6 +77,47 @@ export function toPlatformActivityRows(
  * resolve to an account, and a suggestion that guarantees an empty result is worse than none.
  * PURE.
  */
+/** One workspace suggestion: the slug the filter actually matches, plus the human label the
+ *  operator recognises. Kept as a pair because those are two different strings and the filter
+ *  only accepts one of them. */
+export type WorkspaceSuggestion = { slug: string; label: string };
+
+/**
+ * Distinct workspaces present in a page of platform events, for the Workspace filter's
+ * autocomplete. Same problem and same shape as `actorEmailSuggestions`: the filter matches the
+ * slug EXACTLY, so a typo answers "No workspace with slug ..." instead of the rows the operator
+ * is looking straight at.
+ *
+ * The pair matters. The Workspace column shows the display NAME ("Acme Corp"), while the filter
+ * takes the SLUG ("acme") — so an operator reading the column has, by construction, the wrong
+ * string to type. The suggestion carries the slug as the value and the name as the label, which
+ * is exactly what a <datalist> option is for.
+ *
+ * Rows whose workspace is gone (purged tenant → null slug) are dropped: the audit trail outlives
+ * its workspaces, but filtering by a slug that no longer resolves is guaranteed to return
+ * nothing, and a suggestion that guarantees an empty result is worse than no suggestion — an
+ * empty result during an incident reads as a finding.
+ *
+ * A SAMPLE of the current page, not a directory: no new endpoint, no listing of every workspace
+ * on the platform. Not capped, because the page is already bounded and truncating would hide a
+ * workspace that is visibly on screen. Sorted by slug so the dropdown does not reshuffle with
+ * the newest-first feed order between requests. PURE.
+ */
+export function workspaceSuggestions(
+  rows: readonly Pick<PlatformActivityInput, 'workspaceSlug' | 'workspaceName'>[]
+): WorkspaceSuggestion[] {
+  const bySlug = new Map<string, WorkspaceSuggestion>();
+  for (const row of rows) {
+    const slug = row.workspaceSlug?.trim().toLowerCase();
+    if (!slug) continue;
+    // First occurrence wins. The feed is newest-first, so if a workspace was ever renamed the
+    // most recent label is the one an operator will recognise.
+    if (bySlug.has(slug)) continue;
+    bySlug.set(slug, { slug, label: workspaceLabel(row) });
+  }
+  return [...bySlug.values()].sort((a, b) => a.slug.localeCompare(b.slug));
+}
+
 export function actorEmailSuggestions(
   rows: readonly Pick<PlatformActivityInput, 'actorEmail'>[]
 ): string[] {

@@ -23,7 +23,11 @@ import {
   dateInputValue,
   matchQuickRange,
 } from '@/lib/tenancy/adminAudit';
-import { toPlatformActivityRows, actorEmailSuggestions } from '@/components/saas/platformActivity';
+import {
+  toPlatformActivityRows,
+  actorEmailSuggestions,
+  workspaceSuggestions,
+} from '@/components/saas/platformActivity';
 import { PlatformActivityPanel } from '@/components/saas/PlatformActivityPanel';
 import { ACTIVITY_FILTER_OPTIONS } from '@/components/saas/activityFilter';
 import { cursorAfterRow, encodeActivityCursor } from '@/components/saas/activityCursor';
@@ -91,6 +95,9 @@ export default async function AdminAuditPage({
   const rows = toPlatformActivityRows(events);
   // Autocomplete for the Actor box, taken from the page itself rather than a new roster endpoint.
   const actorOptions = actorEmailSuggestions(events);
+  // Same for the Workspace box. Note this collapses to one entry while a workspace filter is
+  // active (every row is then that workspace) — clear the filter to see the others again.
+  const workspaceOptions = workspaceSuggestions(events);
   const filtered = auditFiltersActive(query);
   const nextCursor = hasMore && rows.length ? cursorAfterRow(rows[rows.length - 1]) : null;
 
@@ -135,10 +142,22 @@ export default async function AdminAuditPage({
           <input
             type="text"
             name="tenant"
+            list="audit-workspace-slugs"
             defaultValue={query.tenant ?? ''}
             placeholder="slug (exact)"
             className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] px-3 py-1.5 text-sm text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
           />
+          {/* Same contract as the Actor list below: suggestions, never a whitelist. The option
+              VALUE is the slug (what the filter matches) and the LABEL is the display name (what
+              the Workspace column shows), because an operator reading that column otherwise has
+              the wrong string to type. */}
+          {workspaceOptions.length > 0 && (
+            <datalist id="audit-workspace-slugs">
+              {workspaceOptions.map((w) => (
+                <option key={w.slug} value={w.slug} label={w.label} />
+              ))}
+            </datalist>
+          )}
         </label>
         {/* Actor by EMAIL, because that is the identifier visible in the feed and the CSV — the
             account id the events actually carry is never shown anywhere, so asking for it would be

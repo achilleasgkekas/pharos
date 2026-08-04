@@ -6949,3 +6949,47 @@ fixtures.
 `actions.ts` (`history`, `settings`)· (γ) multi-arch build όταν έρθει ο server.
 
 **## Needs Achilleas:** αμετάβλητα — **Stripe keys**, **τελικό plan pricing**, **email provider**.
+
+## 2026-08-04 (δ) — increment 136: workspace autocomplete στο platform audit filter
+
+Το (α) της ουράς, ζητήθηκε από τον Achilleas. Ίδιο πρόβλημα με το actor autocomplete του
+increment 132, ίδια λύση, **αλλά με μια διαφορά που αλλάζει το σχήμα**.
+
+**Γιατί δεν είναι απλή αντιγραφή**: η στήλη Workspace δείχνει το **display name** («Acme Corp»),
+ενώ το φίλτρο δέχεται το **slug** («acme»). Δηλαδή ο operator που διαβάζει τη στήλη έχει
+**εξ ορισμού λάθος string** να πληκτρολογήσει — δεν είναι θέμα typo, είναι θέμα ότι το σωστό
+string δεν φαίνεται πουθενά. Γι' αυτό το `workspaceSuggestions` επιστρέφει **ζεύγος**
+`{slug, label}` και το `<option value={slug} label={name}>` βάζει το slug στο input δείχνοντας το
+όνομα. Το πιο καθαρό ζωντανό παράδειγμα βγήκε από το ίδιο το probe: workspace **«Θεσσαλονίκη
+Bakery»** → slug **`thessaloniki-bakery`**. Κανείς δεν το μαντεύει αυτό διαβάζοντας τη στήλη.
+
+**Purged workspaces πέφτουν** (null slug): το audit trail επιβιώνει των workspaces που περιγράφει,
+αλλά φιλτράρισμα σε slug που δεν resolve-άρει επιστρέφει **σίγουρα** τίποτα — και πρόταση που
+εγγυάται άδειο αποτέλεσμα είναι χειρότερη από καμία πρόταση (άδειο αποτέλεσμα σε incident
+διαβάζεται σαν εύρημα· ίδιο σκεπτικό με το `@` guard του 132).
+
+**First-occurrence wins σε rename**: το feed είναι newest-first, οπότε κρατιέται το πιο πρόσφατο
+label — αλλιώς ένα μετονομασμένο workspace θα προσφερόταν με όνομα που δεν αναγνωρίζει κανείς.
+Sort ανά slug (σταθερή σειρά), **χωρίς cap** (η σελίδα είναι ήδη bounded· truncation θα έκρυβε
+workspace **κυριολεκτικά ορατό** στην οθόνη). Suggestions, **ΟΧΙ whitelist** — το `<datalist>`
+δέχεται πάντα free text.
+
+**Verified ΖΩΝΤΑΝΑ** στο `/admin/audit` (χρειάστηκε: 2 πραγματικά `workspace.created` events +
+προσωρινή προσθήκη του probe email στο `SAAS_SUPERADMIN_EMAILS` του **gitignored** local env —
+**επαναφέρθηκε αμέσως μετά**, επιβεβαιωμένο με 404 στο `/admin/audit` για τον probe):
+- rendered: `<option value="second-workspace" label="Second Workspace">` +
+  `<option value="thessaloniki-bakery" label="Θεσσαλονίκη Bakery">`
+- `?tenant=thessaloniki-bakery` → **200 με rows**, μηδέν «No workspace with slug»
+- `?tenant=thessaloniki-bakry` (typo) → το μήνυμα εμφανίζεται κανονικά, άρα το input παρέμεινε
+  ελεύθερο κείμενο και δεν έγινε whitelist
+
+`npm run type-check` **EXIT 0**, `platformActivity.test.ts` **33 tests** (+9), πλήρες
+`npx vitest run` → **361 files / 5797 tests green**. `homepage-web` ανέγγιχτο.
+
+**Next task:** (α) τα 2 non-scoped `actions.ts` (`history`, `settings`)· (β) multi-arch build
+(`buildx linux/amd64,linux/arm64` → ghcr.io) — **γίνεται επίκαιρο**: ο Achilleas εξετάζει Contabo
+για hosting, οπότε το image θα πρέπει να τρέχει σε **amd64** ενώ χτίζεται σε Apple Silicon.
+
+**## Needs Achilleas:** αμετάβλητα (**Stripe keys**, **plan pricing**, **email provider**). Νέο,
+συζητήθηκε interactive: **επιλογή cloud provider** (Contabo υπό εξέταση) — δες την απάντηση της
+συνομιλίας· απόφαση ανοιχτή, δεν προχώρησε τίποτα σε infrastructure.

@@ -9,6 +9,7 @@ import {
   toPlatformActivityRow,
   toPlatformActivityRows,
   actorEmailSuggestions,
+  workspaceSuggestions,
   DELETED_WORKSPACE_LABEL,
   type PlatformActivityInput,
 } from './platformActivity';
@@ -210,5 +211,64 @@ describe('actorEmailSuggestions', () => {
     const snapshot = structuredClone(input);
     actorEmailSuggestions(input);
     expect(input).toEqual(snapshot);
+  });
+});
+
+describe('workspaceSuggestions', () => {
+  const row = (slug: string | null, name: string | null) =>
+    ({ workspaceSlug: slug, workspaceName: name }) as PlatformActivityInput;
+
+  it('pairs the slug the filter matches with the name the column shows', () => {
+    // The whole point: the operator reads "Acme Corp" and has to type "acme".
+    expect(workspaceSuggestions([row('acme', 'Acme Corp')])).toEqual([
+      { slug: 'acme', label: 'Acme Corp' },
+    ]);
+  });
+
+  it('deduplicates a workspace that appears on many rows', () => {
+    const out = workspaceSuggestions([
+      row('acme', 'Acme Corp'),
+      row('acme', 'Acme Corp'),
+      row('beta', 'Beta'),
+    ]);
+    expect(out.map((w) => w.slug)).toEqual(['acme', 'beta']);
+  });
+
+  it('keeps the FIRST label seen, which is the most recent one (the feed is newest-first)', () => {
+    // A renamed workspace would otherwise be offered under a name nobody recognises any more.
+    const out = workspaceSuggestions([row('acme', 'Acme Renamed'), row('acme', 'Acme Old')]);
+    expect(out).toEqual([{ slug: 'acme', label: 'Acme Renamed' }]);
+  });
+
+  it('drops purged workspaces — filtering by them is guaranteed to return nothing', () => {
+    // The audit trail outlives its workspaces; a null slug has no value to put in the box.
+    expect(workspaceSuggestions([row(null, null), row(null, 'Gone')])).toEqual([]);
+  });
+
+  it('falls back to the slug when the workspace has no display name', () => {
+    expect(workspaceSuggestions([row('acme', null)])).toEqual([{ slug: 'acme', label: 'acme' }]);
+  });
+
+  it('normalises case and whitespace the way the server will match it', () => {
+    expect(workspaceSuggestions([row('  ACME  ', 'Acme')])).toEqual([
+      { slug: 'acme', label: 'Acme' },
+    ]);
+  });
+
+  it('sorts by slug, so the dropdown does not reshuffle with the feed order', () => {
+    const out = workspaceSuggestions([row('zulu', 'Z'), row('alpha', 'A'), row('mike', 'M')]);
+    expect(out.map((w) => w.slug)).toEqual(['alpha', 'mike', 'zulu']);
+  });
+
+  it('is not capped: a full page offers every workspace visible on it', () => {
+    // Truncating would hide a workspace that is literally on screen — the failure this fixes.
+    const rows = Array.from({ length: 200 }, (_, i) =>
+      row(`ws-${String(i).padStart(3, '0')}`, `WS ${i}`),
+    );
+    expect(workspaceSuggestions(rows)).toHaveLength(200);
+  });
+
+  it('returns nothing for an empty feed, so the page can skip the datalist entirely', () => {
+    expect(workspaceSuggestions([])).toEqual([]);
   });
 });
