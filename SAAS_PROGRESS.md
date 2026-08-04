@@ -7152,3 +7152,53 @@ repo. Προστέθηκαν `deploy/.env.prod`, `deploy/backups/`, `deploy/stor
 **## Needs Achilleas:** **Stripe keys**, **plan pricing**, **Resend key** (χωρίς αυτό verification/
 invite/dunning emails δεν φεύγουν πουθενά), **GHCR PAT** αν θέλει published images, **άδεια για
 scripted refactor** του `settings/actions.ts`.
+
+## 2026-08-04 (η) — increment 140: το ph-aros.com είναι ΖΩΝΤΑΝΟ, και το τρίτο host split
+
+Ο Achilleas αγόρασε server, μετακίνησε DNS, έφτιαξε Cloudflare token. **Το SaaS τρέχει σε
+παραγωγή.**
+
+**Deploy**: `git clone` με deploy key → `.env.prod` → `up -d --build`. Certificates **apex +
+wildcard** εκδόθηκαν μέσω DNS-01 σε ~11 δευτερόλεπτα. Επαληθευμένο από το δημόσιο internet:
+`/account/login` 200, `/receipts` χωρίς login **307 → login?next=**, άγνωστο subdomain **404**,
+HTTP **308 → HTTPS**, και τα **3 cron endpoints** 401 χωρίς token / 200 JSON με token. Οι δύο
+μεσαίες γραμμές είναι το increment 134 και τα cron endpoints το 133, **ζωντανά σε παραγωγή**.
+
+**Τρία hosts** (απόφαση Achilleas): `ph-aros.com` + `www.` → **landing**, `app.ph-aros.com` →
+εφαρμογή, `<slug>.ph-aros.com` → προϊόν. Τα `app`/`www` είναι **ήδη** στα `RESERVED_SLUGS`, γι'
+αυτό είναι split και όχι κούρσα με όποιον κάνει signup πρώτος. Μηδέν νέα DNS records, μηδέν νέο
+certificate. `SAAS_PUBLIC_URL`/`APP_URL` → `app.`, αλλιώς ένα verification link θα προσγείωνε τον
+πελάτη σε σελίδα τιμολόγησης αντί για τη φόρμα.
+
+### Τρία bugs που φάνηκαν ΜΟΝΟ επειδή έγινε πραγματικό deploy
+
+**1. `next build` πέθανε με «JavaScript heap out of memory» ενώ το swap ήταν ΑΧΡΗΣΙΜΟΠΟΙΗΤΟ.**
+Αυτός ο συνδυασμός είναι το σήμα: το πλαφόν ήταν του **V8** (το υπολογίζει από τη RAM), όχι του
+πυρήνα. Το swap κρατά το μηχάνημα ζωντανό και δεν κάνει τίποτα γι' αυτό. Νέο `NODE_BUILD_MEMORY`
+build arg, **κενό by default** ώστε κανένα build που δουλεύει σήμερα να μην αλλάξει (σταθερή τιμή
+θα μπορούσε μόνο να **χαμηλώσει** το πλαφόν σε μεγάλο μηχάνημα).
+
+**2. Το single-file bind mount του Caddyfile πάγωσε σε παλιό inode.** Το `git pull` αντικαθιστά
+αρχείο με rename → νέο inode → το container κρατούσε **για πάντα** το παλιό. Το `caddy reload`
+διάβασε το μπαγιάτικο αρχείο και **ανέφερε επιτυχία**, ενώ το routing δεν άλλαξε. Το εντόπισα
+μόνο επειδή σύγκρινα byte-για-byte: apex και `app.` επέστρεφαν **ταυτόσημο sha**. Fix: mount
+**φακέλου** (`./caddy:/etc/caddy`), όπου τα renames φαίνονται κανονικά.
+
+**3. Ο τίτλος δεν ήταν διαχωριστής.** Η landing έχει **τον ίδιο** `<title>` με την εφαρμογή, οπότε
+το πρώτο μου «επαληθεύτηκε» ήταν άκυρο. Το σωστό ήταν σύγκριση upstream-προς-upstream μέσα από το
+δίκτυο του Docker.
+
+**Ένα δικό μου λάθος που κόστισε στον χρήστη**: τον έβαλα να κάνει Roll το Cloudflare token **δύο
+φορές** επειδή επαλήθευα με `/user/tokens/verify`, που **δεν** ισχύει για account-owned tokens. Το
+token ήταν σωστό από την αρχή. Το σωστό είναι `/accounts/<id>/tokens/verify`.
+
+**Τοπικά**: το `docker-compose.saas-dev.yml` stack κατέβηκε (volume διατηρήθηκε) και το
+`homepage-landing` αφαιρέθηκε. Τοπικά μένει **μόνο** το self-hosted Pharos με τα δεδομένα του
+χρήστη. Routines `pharos-saas-core` και `pharos-landing` δείχνουν πλέον στο cloud.
+
+**Next task:** (α) crontab + `BACKUP_REMOTE` στον server (τα backups είναι τώρα στον ίδιο δίσκο με
+τα δεδομένα, δηλαδή δεν προστατεύουν από τίποτα)· (β) `settings/actions.ts` scoping· (γ) email +
+Stripe όταν έρθουν keys.
+
+**## Needs Achilleas:** **Resend key**, **Stripe keys**, **plan pricing**, **Storage Box** για
+offsite backups.
