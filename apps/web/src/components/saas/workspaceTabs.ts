@@ -6,7 +6,7 @@
 import { normalizeSlug } from './chooseWorkspace';
 
 /** Which settings panel is currently shown (drives the `active` flag). */
-export type WorkspaceTabKey = 'overview' | 'settings' | 'members' | 'usage' | 'activity' | 'billing';
+export type WorkspaceTabKey = 'overview' | 'settings' | 'members' | 'usage' | 'activity' | 'billing' | 'account';
 
 /** Structurally identical to WorkspaceShell's WorkspaceTab; declared locally so this pure
  *  helper (and its test) never pull the component module graph. */
@@ -19,6 +19,12 @@ const TABS: readonly { key: WorkspaceTabKey; label: string; path: string }[] = [
   { key: 'usage', label: 'Usage', path: '/account/workspace/usage' },
   { key: 'activity', label: 'Activity', path: '/account/workspace/activity' },
   { key: 'billing', label: 'Billing', path: '/account/workspace/billing' },
+  // Account settings is a TAB, not a link floating above the page. It is about the person
+  // rather than the workspace, but it is reached from the same place and belongs in the same
+  // list — having it live in a separate mono-caps row above the title was the reason nobody
+  // could find their way back to it. `?w=` is deliberately not carried: the account is not
+  // per-workspace, and a stale slug on it would be noise.
+  { key: 'account', label: 'Account', path: '/account/settings' },
 ] as const;
 
 /**
@@ -32,7 +38,7 @@ export function workspaceTabs(active: WorkspaceTabKey, wParam: unknown): Workspa
   const slug = normalizeSlug(wParam);
   const q = slug ? `?w=${encodeURIComponent(slug)}` : '';
   return TABS.map((t) => ({
-    href: `${t.path}${q}`,
+    href: `${t.path}${t.key === 'account' ? '' : q}`,
     label: t.label,
     active: t.key === active,
   }));

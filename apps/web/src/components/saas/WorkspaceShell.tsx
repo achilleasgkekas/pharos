@@ -35,93 +35,112 @@ export function WorkspaceShell({
   children: ReactNode;
 }) {
   const others = switchTargets ?? [];
+  const tabList = tabs ?? [];
   return (
     <div className="min-h-screen bg-[color:var(--color-bg)] text-[color:var(--color-text)]">
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <header className="flex flex-col gap-4 border-b border-[color:var(--color-border)] pb-5">
-          <div className="flex items-center justify-between gap-3">
-            <Link
-              href="/"
-              className="text-xs font-mono uppercase tracking-widest text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]"
+      <div className="mx-auto max-w-[1080px] px-4 py-6 sm:px-6">
+        {/* Header. What used to sit here was a row of mono-caps links (← PHAROS / ACCOUNT
+            SETTINGS / SIGN OUT) above the title and a full-size green "Open workspace" CTA
+            beside it — three ways out of the page competing with the page itself. Account
+            settings is a tab now, sign out lives at the foot of the nav with the other
+            account-level action, and the way into the product is a normal button rather than
+            the loudest thing on screen. */}
+        <header className="mb-6 flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
+            {workspaceName || 'Workspace'}
+          </h1>
+          <Pill tone="neutral">{plan}</Pill>
+          <TenantStatusBadge status={status} />
+          <MemberRoleBadge role={role} />
+          {appUrl && (
+            <a
+              href={appUrl}
+              className="ml-auto rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-1.5 text-sm font-medium text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
             >
-              ← Pharos
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link
-                href="/account/settings"
-                className="text-xs font-mono uppercase tracking-widest text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]"
-              >
-                Account settings
-              </Link>
-              <SignOutButton />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold">{workspaceName || 'Workspace'}</h1>
-            <Pill tone="neutral">{plan}</Pill>
-            <TenantStatusBadge status={status} />
-            <MemberRoleBadge role={role} />
-            {/* The way INTO the product. This whole area is settings about a workspace; the
-                workspace itself lives on its own subdomain, and until this existed there was no
-                link to it anywhere, so a new customer finished signup and could not get in at
-                all. Prominent on purpose: it is the thing they came for, not an afterthought. */}
-            {appUrl && (
-              <a
-                href={appUrl}
-                className="ml-auto rounded-lg bg-[color:var(--color-accent)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
-              >
-                Open workspace →
-              </a>
-            )}
-          </div>
-
-          {others.length > 1 && (
-            <nav
-              aria-label="Switch workspace"
-              className="flex flex-wrap items-center gap-2 text-xs"
-            >
-              <span className="font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
-                Workspace
-              </span>
-              {others.map((w) => (
-                <Link
-                  key={w.slug}
-                  href={`/account/workspace${workspaceQuery(w.slug, false)}`}
-                  aria-current={w.active ? 'true' : undefined}
-                  className={
-                    w.active
-                      ? 'rounded-full border border-[color:var(--color-accent)] px-3 py-1 text-[color:var(--color-accent)]'
-                      : 'rounded-full border border-[color:var(--color-border)] px-3 py-1 text-[color:var(--color-text-dim)] hover:border-[color:var(--color-border-light)] hover:text-[color:var(--color-text)]'
-                  }
-                >
-                  {w.name || w.slug}
-                </Link>
-              ))}
-            </nav>
-          )}
-
-          {tabs && tabs.length > 0 && (
-            <nav aria-label="Workspace settings" className="flex flex-wrap gap-1">
-              {tabs.map((t) => (
-                <Link
-                  key={t.href}
-                  href={t.href}
-                  aria-current={t.active ? 'page' : undefined}
-                  className={
-                    t.active
-                      ? 'rounded-lg bg-[color:var(--color-surface-2)] px-3 py-1.5 text-sm font-medium text-[color:var(--color-text)]'
-                      : 'rounded-lg px-3 py-1.5 text-sm text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface)] hover:text-[color:var(--color-text)]'
-                  }
-                >
-                  {t.label}
-                </Link>
-              ))}
-            </nav>
+              Open workspace →
+            </a>
           )}
         </header>
 
-        <main className="pt-6">{children}</main>
+        {others.length > 1 && (
+          <nav aria-label="Switch workspace" className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
+              Workspace
+            </span>
+            {others.map((w) => (
+              <Link
+                key={w.slug}
+                href={`/account/workspace${workspaceQuery(w.slug, false)}`}
+                aria-current={w.active ? 'true' : undefined}
+                className={
+                  w.active
+                    ? 'rounded-full border border-[color:var(--color-accent)] px-3 py-1 text-[color:var(--color-accent)]'
+                    : 'rounded-full border border-[color:var(--color-border)] px-3 py-1 text-[color:var(--color-text-dim)] hover:border-[color:var(--color-border-light)] hover:text-[color:var(--color-text)]'
+                }
+              >
+                {w.name || w.slug}
+              </Link>
+            ))}
+          </nav>
+        )}
+
+        {/* Same shape as Settings: a sticky rail on desktop, a scrollable pill strip on
+            mobile. The old bar wrapped onto two ragged rows on a phone. */}
+        <div className="flex gap-6 items-start">
+          {tabList.length > 0 && (
+            <aside className="hidden md:block w-52 shrink-0 sticky top-4 self-start">
+              <nav aria-label="Workspace" className="flex flex-col gap-0.5">
+                {tabList.map((t) => (
+                  <Link
+                    key={t.href}
+                    href={t.href}
+                    aria-current={t.active ? 'page' : undefined}
+                    className={
+                      t.active
+                        ? 'rounded-lg bg-[color:var(--color-surface-2)] px-3 py-2 text-sm font-semibold text-[color:var(--color-accent)]'
+                        : 'rounded-lg px-3 py-2 text-sm text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface)] hover:text-[color:var(--color-text)]'
+                    }
+                  >
+                    {t.label}
+                  </Link>
+                ))}
+              </nav>
+              <div className="mt-3 border-t border-[color:var(--color-border)] pt-3">
+                <SignOutButton />
+              </div>
+            </aside>
+          )}
+
+          <div className="min-w-0 flex-1">
+            {tabList.length > 0 && (
+              <nav
+                aria-label="Workspace"
+                className="md:hidden -mx-4 mb-4 flex gap-1 overflow-x-auto px-4 pb-1"
+              >
+                {tabList.map((t) => (
+                  <Link
+                    key={t.href}
+                    href={t.href}
+                    aria-current={t.active ? 'page' : undefined}
+                    className={
+                      t.active
+                        ? 'shrink-0 rounded-lg bg-[color:var(--color-accent)] px-3 py-1.5 text-sm font-semibold text-black'
+                        : 'shrink-0 rounded-lg bg-[color:var(--color-surface-2)] px-3 py-1.5 text-sm text-[color:var(--color-text-dim)]'
+                    }
+                  >
+                    {t.label}
+                  </Link>
+                ))}
+              </nav>
+            )}
+            <main>{children}</main>
+            {tabList.length > 0 && (
+              <div className="md:hidden mt-8 border-t border-[color:var(--color-border)] pt-4">
+                <SignOutButton />
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

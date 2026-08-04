@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { workspaceTabs } from './workspaceTabs';
 
 describe('workspaceTabs', () => {
-  it('returns Overview + Settings + Members + Usage + Activity + Billing in order', () => {
+  it('returns the six workspace panels plus Account, in order', () => {
     const tabs = workspaceTabs('overview', undefined);
     expect(tabs.map((t) => t.label)).toEqual([
       'Overview',
@@ -11,6 +11,7 @@ describe('workspaceTabs', () => {
       'Usage',
       'Activity',
       'Billing',
+      'Account',
     ]);
     expect(tabs.map((t) => t.href)).toEqual([
       '/account/workspace',
@@ -19,6 +20,7 @@ describe('workspaceTabs', () => {
       '/account/workspace/usage',
       '/account/workspace/activity',
       '/account/workspace/billing',
+      '/account/settings',
     ]);
   });
 
@@ -63,9 +65,12 @@ describe('workspaceTabs', () => {
 
   it('carries the ?w= selection through, lowercased + encoded', () => {
     const tabs = workspaceTabs('members', 'Acme Corp');
-    for (const t of tabs) {
+    // Every WORKSPACE panel carries it. Account is deliberately excluded: it is about the
+    // person, not the workspace, so a workspace slug on it would be noise the page ignores.
+    for (const t of tabs.filter((x) => x.label !== 'Account')) {
       expect(t.href).toContain('?w=acme%20corp');
     }
+    expect(tabs[6].href).toBe('/account/settings');
     expect(tabs[0].href).toBe('/account/workspace?w=acme%20corp');
     expect(tabs[1].href).toBe('/account/workspace/settings?w=acme%20corp');
     expect(tabs[2].href).toBe('/account/workspace/members?w=acme%20corp');

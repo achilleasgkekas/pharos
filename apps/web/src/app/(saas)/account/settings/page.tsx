@@ -47,11 +47,14 @@ export default async function AccountSettingsPage() {
     <div className="min-h-screen bg-[color:var(--color-bg)] px-4 py-12 text-[color:var(--color-text)]">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8 flex items-center justify-between gap-3">
+          {/* Reached from the workspace nav's Account tab, so it needs a way back into that
+              nav. It keeps its own shell rather than WorkspaceShell on purpose: a viewer here
+              may have zero workspaces, and the shell's header assumes one. */}
           <Link
-            href="/account"
+            href="/account/workspace"
             className="text-xs font-mono uppercase tracking-widest text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)]"
           >
-            ← Your workspaces
+            ← Back to workspace
           </Link>
           <SignOutButton />
         </div>
