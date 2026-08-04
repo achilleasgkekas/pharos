@@ -83,6 +83,31 @@ import {
 import { assertPublicUrl } from '@/lib/ssrf';
 import type { SerializedStatement } from '@/types';
 import { revalidatePath } from 'next/cache';
+import type { Model } from 'mongoose';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
+
+/**
+ * Every model this file touches, routed to the CALLER'S workspace database.
+ *
+ * Settings used the imported models directly, so in SaaS mode a workspace's Settings page read
+ * and wrote the DEFAULT database: currency, budgets, AI prompts and keys, notifiers, stores and
+ * payment cards were SHARED across every customer. With one workspace that is invisible; the day
+ * a second one exists their settings are each other's.
+ *
+ * `withRequestTenant` does double duty here and that is the point of putting it at the model
+ * boundary rather than around each of the 65 exported actions: it picks the right database AND
+ * enforces the membership/status check, so an account that is not a member of the workspace named
+ * in the host cannot read or write its settings either. Self-hosted resolves to the default tenant
+ * with zero work, so `scoped(X)` is exactly `X` there.
+ *
+ * Resolution is memoised per request (lib/tenancy/request), so calling this once per model inside
+ * one action costs one lookup, not one each.
+ */
+function scoped<T>(model: Model<T>): Promise<Model<T>> {
+  return withRequestTenant(() => currentModel(model));
+}
+
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST ?? 'http://localhost:11434';
 
@@ -159,7 +184,7 @@ export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean }>
     if (v) update[k] = v;
   }
 
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
   invalidateAiConfigCache();
   invalidateOllamaHealth(); // model/provider changed → re-probe on next render
   revalidatePath('/settings');
@@ -260,7 +285,7 @@ export async function fetchProviderModels(
 export async function setAiEnabled(value: boolean): Promise<{ ok: boolean }> {
   await requireAdmin();
   await connectDB();
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { aiEnabled: !!value } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { aiEnabled: !!value } }, { upsert: true });
   invalidateAiConfigCache();
   invalidateOllamaHealth();
   revalidatePath('/', 'layout'); // navbar dot + onboarding banner update app-wide
@@ -272,7 +297,7 @@ export async function setAiFeature(key: string, value: boolean): Promise<{ ok: b
   await requireAdmin();
   if (!AI_FEATURE_KEYS.includes(key as AiFeatureKey)) return { ok: false };
   await connectDB();
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { [`aiFeatures.${key}`]: !!value } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { [`aiFeatures.${key}`]: !!value } }, { upsert: true });
   invalidateAiConfigCache();
   revalidatePath('/settings');
   return { ok: true };
@@ -282,7 +307,7 @@ export async function setAiFeature(key: string, value: boolean): Promise<{ ok: b
 export async function dismissAiOnboarding(): Promise<{ ok: boolean }> {
   await assertCanWrite();
   await connectDB();
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { aiOnboardingDismissed: true } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { aiOnboardingDismissed: true } }, { upsert: true });
   invalidateAiConfigCache();
   revalidatePath('/', 'layout');
   return { ok: true };
@@ -292,7 +317,7 @@ export async function dismissAiOnboarding(): Promise<{ ok: boolean }> {
 export async function dismissOnboarding(): Promise<{ ok: boolean }> {
   await assertCanWrite();
   await connectDB();
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { onboardingDismissed: true } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { onboardingDismissed: true } }, { upsert: true });
   invalidateAppSettings();
   revalidatePath('/', 'layout');
   return { ok: true };
@@ -325,7 +350,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   // 0 is meaningful here (return tracking off), so parse explicitly instead of `|| 14`.
   const returnRaw = Number(formData.get('defaultReturnWindowDays'));
   const returnDays = Number.isFinite(returnRaw) ? Math.max(0, Math.min(365, Math.round(returnRaw))) : 14;
-  await AppConfig.updateOne(
+  await (await scoped(AppConfig)).updateOne(
     { key: 'singleton' },
     {
       $set: {
@@ -355,7 +380,7 @@ export async function saveNtfy(formData: FormData): Promise<{ ok: boolean }> {
   await connectDB();
   const url = String(formData.get('ntfyUrl') || '').trim();
   const enabled = formData.get('ntfyEnabled') === 'true';
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { ntfyUrl: url, ntfyEnabled: enabled } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { ntfyUrl: url, ntfyEnabled: enabled } }, { upsert: true });
   invalidateAppSettings();
   revalidatePath('/settings');
   return { ok: true };
@@ -393,7 +418,7 @@ export async function saveNotifierChannels(channels: NotifierConfig[]): Promise<
     target: (c.target || '').trim(),
   }));
   const firstNtfy = clean.find((c) => c.type === 'ntfy');
-  await AppConfig.updateOne(
+  await (await scoped(AppConfig)).updateOne(
     { key: 'singleton' },
     { $set: { notifiers: clean, ntfyUrl: firstNtfy?.url || '', ntfyEnabled: !!firstNtfy?.enabled } },
     { upsert: true }
@@ -449,7 +474,7 @@ export async function saveWebhookSubscriptions(subs: WebhookSubscription[]): Pro
       events: Array.isArray(s.events) ? s.events.filter((e) => WEBHOOK_EVENTS.some((w) => w.type === e)) : [],
     });
   }
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { eventWebhooks: clean } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { eventWebhooks: clean } }, { upsert: true });
   revalidatePath('/settings');
   return { ok: true };
 }
@@ -477,7 +502,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   await connectDB();
   const now = Date.now();
 
-  const dealItems = (await Item.find({ targetPrice: { $gt: 0 } }).select('title targetPrice currentPrice links').lean()) as Array<{
+  const dealItems = (await (await scoped(Item)).find({ targetPrice: { $gt: 0 } }).select('title targetPrice currentPrice links').lean()) as Array<{
     _id: unknown;
     title: string;
     targetPrice?: number;
@@ -490,7 +515,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     return lo < Infinity && lo <= (i.targetPrice ?? 0);
   });
 
-  const warrantyItems = (await Item.find({ warrantyUntil: { $ne: null } }).select('title warrantyUntil').lean()) as Array<{
+  const warrantyItems = (await (await scoped(Item)).find({ warrantyUntil: { $ne: null } }).select('title warrantyUntil').lean()) as Array<{
     _id: unknown;
     title: string;
     warrantyUntil?: string | Date | null;
@@ -507,7 +532,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const returnsClosing: { _id: unknown; store: string; total: number; days: number }[] = [];
   if (maxWindow > 0) {
     const since = new Date(now - (maxWindow + 1) * 86400000);
-    const recent = (await Receipt.find({ archived: { $ne: true }, date: { $gte: since } })
+    const recent = (await (await scoped(Receipt)).find({ archived: { $ne: true }, date: { $gte: since } })
       .select('store date total')
       .lean()) as Array<{ _id: unknown; store?: string; date?: string | Date; total?: number }>;
     for (const r of recent) {
@@ -518,7 +543,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     returnsClosing.sort((a, b) => a.days - b.days);
   }
 
-  const statements = await Statement.find().lean();
+  const statements = await (await scoped(Statement)).find().lean();
   const plans = computeInstallmentPlans(JSON.parse(JSON.stringify(statements)) as SerializedStatement[]).filter(
     (p) => !p.done && p.remainingInstallments >= 1
   );
@@ -527,7 +552,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   // Price-hike watch (P14): a recurring bill/subscription that moved vs its previous
   // charge (Netflix €13→€15, ΔΕΗ +18%). Deterministic, no AI — same vendorKey series
   // the anomaly/recurring logic uses.
-  const hikeRows = (await Expense.find({ amount: { $gt: 0 } })
+  const hikeRows = (await (await scoped(Expense)).find({ amount: { $gt: 0 } })
     .select('vendor vendorKey amount date recurring kind')
     .lean()) as HikeEntry[];
   const hikes = detectPriceHikes(hikeRows);
@@ -536,7 +561,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   // category vs the flat budgets configured in Settings → Money. Deterministic,
   // no AI/rollover math (see lib/budgetAlert.ts).
   const monthStart = new Date(new Date(now).getFullYear(), new Date(now).getMonth(), 1);
-  const budgetRows = (await Expense.find({ amount: { $gt: 0 }, date: { $gte: monthStart } })
+  const budgetRows = (await (await scoped(Expense)).find({ amount: { $gt: 0 }, date: { $gte: monthStart } })
     .select('category amount date kind')
     .lean()) as BudgetAlertRow[];
   const budgetMonthKey = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`;
@@ -544,7 +569,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
 
   // Free-trial "cancel before charge" (P33): active subs whose trial ends within
   // the lead-time window, soonest first.
-  const trialSubs = (await Subscription.find({ active: true, trialEndsAt: { $ne: null } })
+  const trialSubs = (await (await scoped(Subscription)).find({ active: true, trialEndsAt: { $ne: null } })
     .select('name amount trialEndsAt firstChargeAmount')
     .lean()) as Array<{ _id: unknown; name: string; amount?: number; trialEndsAt?: string | Date | null; firstChargeAmount?: number }>;
   const trialsEnding = trialSubs
@@ -559,7 +584,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     .sort((a, b) => a.days - b.days);
 
   // Gift-card / store-credit expiring with money still on it (P32): soonest first.
-  const giftRows = (await GiftCard.find({ archived: { $ne: true }, expiresAt: { $ne: null } })
+  const giftRows = (await (await scoped(GiftCard)).find({ archived: { $ne: true }, expiresAt: { $ne: null } })
     .select('title initialAmount uses expiresAt')
     .lean()) as Array<{ _id: unknown; title: string; initialAmount?: number; uses?: { amount?: number }[]; expiresAt?: string | Date | null }>;
   const giftsExpiring = giftRows
@@ -575,7 +600,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
 
   // Bills / payables (P28): unpaid bills that are overdue or due within the
   // lead-time window (overdue nag until paid), most-overdue first.
-  const billRows = (await Bill.find({ paidAt: null, archived: { $ne: true } })
+  const billRows = (await (await scoped(Bill)).find({ paidAt: null, archived: { $ne: true } })
     .select('title amount dueDate')
     .lean()) as Array<{ _id: unknown; title: string; amount?: number; dueDate?: string | Date | null }>;
   const billsDue = billRows
@@ -613,7 +638,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   // before this change, byte for byte.
   let previouslySent = new Set<string>();
   if (opts.dedupe) {
-    const cfgDoc = (await AppConfig.findOne({ key: 'singleton' }).select('alertDispatchKeys').lean()) as { alertDispatchKeys?: string[] } | null;
+    const cfgDoc = (await (await scoped(AppConfig)).findOne({ key: 'singleton' }).select('alertDispatchKeys').lean()) as { alertDispatchKeys?: string[] } | null;
     previouslySent = new Set(cfgDoc?.alertDispatchKeys ?? []);
   }
 
@@ -741,7 +766,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     // misconfigured/disabled notifier must never mark live alerts as "already sent" when
     // nothing was ever delivered (they'd silently vanish from every future run).
     if (opts.dedupe && sent) {
-      await AppConfig.updateOne({ key: 'singleton' }, { $set: { alertDispatchKeys: liveDispatchKeys } }, { upsert: true });
+      await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { alertDispatchKeys: liveDispatchKeys } }, { upsert: true });
     }
   }
   return { ok: true, sent, summary };
@@ -751,7 +776,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
 export async function setAiConfirmBulk(value: boolean): Promise<{ ok: boolean }> {
   await assertCanWrite();
   await connectDB();
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { aiConfirmBulk: value } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { aiConfirmBulk: value } }, { upsert: true });
   revalidatePath('/settings');
   return { ok: true };
 }
@@ -759,7 +784,7 @@ export async function setAiConfirmBulk(value: boolean): Promise<{ ok: boolean }>
 /** Verify the saved Anthropic key + model with a tiny ping. */
 export async function testAnthropic(): Promise<{ ok: boolean; error?: string }> {
   await connectDB();
-  const doc = await AppConfig.findOne({ key: 'singleton' }).lean();
+  const doc = await (await scoped(AppConfig)).findOne({ key: 'singleton' }).lean();
   const key = doc?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '';
   const model = doc?.anthropicModel || 'claude-sonnet-4-5-20250929';
   if (!key) return { ok: false, error: 'No API key saved yet' };
@@ -813,9 +838,9 @@ export async function savePrompt(key: string, text: string): Promise<{ ok: boole
   const path = `prompts.${k}`;
   if (!trimmed || trimmed === PROMPT_DEFAULTS[k].trim()) {
     // Store nothing → future improvements to the default keep flowing through.
-    await AppConfig.updateOne({ key: 'singleton' }, { $unset: { [path]: '' } }, { upsert: true });
+    await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $unset: { [path]: '' } }, { upsert: true });
   } else {
-    await AppConfig.updateOne({ key: 'singleton' }, { $set: { [path]: trimmed } }, { upsert: true });
+    await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { [path]: trimmed } }, { upsert: true });
   }
   invalidatePromptsCache();
   revalidatePath('/settings');
@@ -828,7 +853,7 @@ export async function resetPrompt(key: string): Promise<{ ok: boolean }> {
   const k = key as PromptKey;
   if (!PROMPT_META.some((m) => m.key === k)) return { ok: false };
   await connectDB();
-  await AppConfig.updateOne({ key: 'singleton' }, { $unset: { [`prompts.${k}`]: '' } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $unset: { [`prompts.${k}`]: '' } }, { upsert: true });
   invalidatePromptsCache();
   revalidatePath('/settings');
   return { ok: true };
@@ -840,7 +865,7 @@ export type ScraperAiConfig = { provider: 'ollama' | 'anthropic'; model: string 
 
 export async function getScraperAi(): Promise<ScraperAiConfig> {
   await connectDB();
-  const doc = await AppConfig.findOne({ key: 'singleton' }).select('scraperProvider scraperModel').lean();
+  const doc = await (await scoped(AppConfig)).findOne({ key: 'singleton' }).select('scraperProvider scraperModel').lean();
   return {
     provider: doc?.scraperProvider === 'anthropic' ? 'anthropic' : 'ollama',
     model: doc?.scraperModel || '',
@@ -852,7 +877,7 @@ export async function saveScraperAi(formData: FormData): Promise<{ ok: boolean }
   await connectDB();
   const provider = String(formData.get('scraperProvider') || 'ollama') === 'anthropic' ? 'anthropic' : 'ollama';
   const model = String(formData.get('scraperModel') || '').trim();
-  await AppConfig.updateOne(
+  await (await scoped(AppConfig)).updateOne(
     { key: 'singleton' },
     { $set: { scraperProvider: provider, scraperModel: model } },
     { upsert: true }
@@ -929,7 +954,7 @@ export async function saveStorageConfig(formData: FormData): Promise<{ ok: boole
   };
   const pass = String(formData.get('remotePass') || '');
   if (pass) update.remotePass = pass; // blank → keep the existing one
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
   invalidateStorageConfig();
   revalidatePath('/settings');
   return { ok: true };
@@ -971,13 +996,13 @@ async function buildSyncManifest(s: Awaited<ReturnType<typeof getStorageConfig>>
       ext: extOf(fp),
     });
 
-  const receipts = (await Receipt.find({ archived: { $ne: true }, filePath: { $nin: ['', null] } }).select('store date total filePath').lean()) as Array<Record<string, unknown>>;
+  const receipts = (await (await scoped(Receipt)).find({ archived: { $ne: true }, filePath: { $nin: ['', null] } }).select('store date total filePath').lean()) as Array<Record<string, unknown>>;
   for (const r of receipts) out.push({ filePath: String(r.filePath), rel: rel('receipts', String(r.store || ''), r.date as string, Number(r.total || 0), r._id, String(r.filePath)) });
 
-  const statements = (await Statement.find({ filePath: { $nin: ['', null] } }).select('card period totalAmount statementDate filePath').lean()) as Array<Record<string, unknown>>;
+  const statements = (await (await scoped(Statement)).find({ filePath: { $nin: ['', null] } }).select('card period totalAmount statementDate filePath').lean()) as Array<Record<string, unknown>>;
   for (const st of statements) out.push({ filePath: String(st.filePath), rel: rel('statements', String(st.card || ''), (st.statementDate as string) || `${st.period || ''}-01`, Number(st.totalAmount || 0), st._id, String(st.filePath)) });
 
-  const exps = (await Expense.find({ filePath: { $nin: ['', null] } }).select('kind vendor amount date filePath').lean()) as Array<Record<string, unknown>>;
+  const exps = (await (await scoped(Expense)).find({ filePath: { $nin: ['', null] } }).select('kind vendor amount date filePath').lean()) as Array<Record<string, unknown>>;
   for (const e of exps) out.push({ filePath: String(e.filePath), rel: rel('expenses', String(e.vendor || e.kind || ''), e.date as string, Number(e.amount || 0), e._id, String(e.filePath)) });
 
   return out;
@@ -1070,7 +1095,7 @@ export async function saveImapConfigAction(formData: FormData): Promise<{ ok: bo
   };
   const pass = String(formData.get('imapPass') || '');
   if (pass) update.imapPass = pass; // blank → keep the existing one
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: update }, { upsert: true });
   invalidateImapConfig();
   revalidatePath('/settings');
   return { ok: true };
@@ -1115,7 +1140,7 @@ export async function checkImapInboxNow(): Promise<{ ok: boolean; imported: numb
   }
 
   await connectDB();
-  await AppConfig.updateOne(
+  await (await scoped(AppConfig)).updateOne(
     { key: 'singleton' },
     { $set: { imapLastUid: r.maxUid, imapLastCheckedAt: new Date(), ...(imported > 0 ? { imapLastImportedAt: new Date() } : {}) } },
     { upsert: true }
@@ -1150,9 +1175,9 @@ export async function saveList(key: string, values: string[]): Promise<{ ok: boo
   const path = `lists.${key}`;
   const isDefault = cleaned.length === meta.default.length && cleaned.every((v, i) => v === meta.default[i]);
   if (cleaned.length <= 1 || isDefault) {
-    await AppConfig.updateOne({ key: 'singleton' }, { $unset: { [path]: '' } }, { upsert: true });
+    await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $unset: { [path]: '' } }, { upsert: true });
   } else {
-    await AppConfig.updateOne({ key: 'singleton' }, { $set: { [path]: cleaned } }, { upsert: true });
+    await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { [path]: cleaned } }, { upsert: true });
   }
   invalidateAppSettings();
   revalidatePath('/', 'layout');
@@ -1166,9 +1191,9 @@ export async function saveSpaces(values: string[]): Promise<{ ok: boolean }> {
   await connectDB();
   const cleaned = normalizeSpaces(Array.isArray(values) ? values : []);
   if (cleaned.length === 0) {
-    await AppConfig.updateOne({ key: 'singleton' }, { $unset: { spaces: '' } }, { upsert: true });
+    await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $unset: { spaces: '' } }, { upsert: true });
   } else {
-    await AppConfig.updateOne({ key: 'singleton' }, { $set: { spaces: cleaned } }, { upsert: true });
+    await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { spaces: cleaned } }, { upsert: true });
   }
   invalidateAppSettings();
   revalidatePath('/', 'layout');
@@ -1201,9 +1226,9 @@ export async function saveStore(formData: FormData): Promise<{ ok: boolean; erro
   await connectDB();
   try {
     if (id) {
-      await Store.findByIdAndUpdate(id, { $set: { name, url, aliases, auto: false, returnWindowDays } });
+      await (await scoped(Store)).findByIdAndUpdate(id, { $set: { name, url, aliases, auto: false, returnWindowDays } });
     } else {
-      await Store.create({ name, url, aliases: aliases.length ? aliases : [name.toLowerCase()], auto: false, returnWindowDays });
+      await (await scoped(Store)).create({ name, url, aliases: aliases.length ? aliases : [name.toLowerCase()], auto: false, returnWindowDays });
     }
   } catch {
     return { ok: false, error: 'A store with that name already exists' };
@@ -1217,7 +1242,7 @@ export async function saveStore(formData: FormData): Promise<{ ok: boolean; erro
 export async function deleteStore(id: string): Promise<{ ok: boolean }> {
   await assertCanWrite();
   await connectDB();
-  await Store.findByIdAndDelete(id);
+  await (await scoped(Store)).findByIdAndDelete(id);
   invalidateStoreCache();
   revalidatePath('/settings');
   revalidatePath('/receipts');
@@ -1255,9 +1280,9 @@ function storeKey(raw: string): string {
 export async function findDuplicateStores(): Promise<StoreDupGroup[]> {
   await connectDB();
   const [rAgg, iAgg, storeDocs] = await Promise.all([
-    Receipt.aggregate([{ $match: { deletedAt: null } }, { $group: { _id: '$store', n: { $sum: 1 } } }]),
-    Item.aggregate([{ $match: { purchasedFrom: { $nin: ['', null] }, deletedAt: null } }, { $group: { _id: '$purchasedFrom', n: { $sum: 1 } } }]),
-    Store.find().select('name').lean(),
+    (await scoped(Receipt)).aggregate([{ $match: { deletedAt: null } }, { $group: { _id: '$store', n: { $sum: 1 } } }]),
+    (await scoped(Item)).aggregate([{ $match: { purchasedFrom: { $nin: ['', null] }, deletedAt: null } }, { $group: { _id: '$purchasedFrom', n: { $sum: 1 } } }]),
+    (await scoped(Store)).find().select('name').lean(),
   ]);
 
   const usage = new Map<string, StoreVariant>();
@@ -1335,24 +1360,24 @@ export async function mergeStores(
 
   let updated = 0;
   for (const v of drops) {
-    const r = await Receipt.updateMany({ store: v }, { $set: { store: canon } });
-    const it = await Item.updateMany({ purchasedFrom: v }, { $set: { purchasedFrom: canon } });
+    const r = await (await scoped(Receipt)).updateMany({ store: v }, { $set: { store: canon } });
+    const it = await (await scoped(Item)).updateMany({ purchasedFrom: v }, { $set: { purchasedFrom: canon } });
     updated += (r.modifiedCount ?? 0) + (it.modifiedCount ?? 0);
   }
 
   // Consolidate the store list: fold variant names into the canonical doc as aliases,
   // delete the variant docs.
   const aliasSet = new Set(drops.map((d) => d.toLowerCase()).filter(Boolean));
-  const canonDoc = await Store.findOne({ name: canon });
+  const canonDoc = await (await scoped(Store)).findOne({ name: canon });
   if (canonDoc) {
     const merged = new Set([...(canonDoc.aliases ?? []), ...aliasSet, canon.toLowerCase()]);
     canonDoc.aliases = [...merged];
     canonDoc.auto = false;
     await canonDoc.save();
   } else {
-    await Store.create({ name: canon, aliases: [...aliasSet, canon.toLowerCase()], auto: false });
+    await (await scoped(Store)).create({ name: canon, aliases: [...aliasSet, canon.toLowerCase()], auto: false });
   }
-  await Store.deleteMany({ name: { $in: drops } });
+  await (await scoped(Store)).deleteMany({ name: { $in: drops } });
 
   invalidateStoreCache();
   revalidatePath('/settings');
@@ -1409,20 +1434,20 @@ const isoDay = (d: unknown) => (d ? new Date(d as string).toISOString().slice(0,
 export async function exportCSV(kind: 'receipts' | 'expenses' | 'items'): Promise<string> {
   await connectDB();
   if (kind === 'receipts') {
-    const rows = (await Receipt.find().select('store date total netAmount vatAmount paymentMethod verified').sort({ date: -1 }).lean()) as Record<string, unknown>[];
+    const rows = (await (await scoped(Receipt)).find().select('store date total netAmount vatAmount paymentMethod verified').sort({ date: -1 }).lean()) as Record<string, unknown>[];
     return toCSV(
       ['Store', 'Date', 'Total', 'Net', 'VAT', 'Payment', 'Verified'],
       rows.map((r) => [String(r.store ?? ''), isoDay(r.date), Number(r.total ?? 0), Number(r.netAmount ?? 0), Number(r.vatAmount ?? 0), String(r.paymentMethod ?? ''), r.verified ? 'yes' : 'no'])
     );
   }
   if (kind === 'expenses') {
-    const rows = (await Expense.find().select('kind vendor category amount date period recurring verified').sort({ date: -1 }).lean()) as Record<string, unknown>[];
+    const rows = (await (await scoped(Expense)).find().select('kind vendor category amount date period recurring verified').sort({ date: -1 }).lean()) as Record<string, unknown>[];
     return toCSV(
       ['Kind', 'Vendor', 'Category', 'Amount', 'Date', 'Period', 'Recurring', 'Verified'],
       rows.map((r) => [String(r.kind ?? ''), String(r.vendor ?? ''), String(r.category ?? ''), Number(r.amount ?? 0), isoDay(r.date), String(r.period ?? ''), r.recurring ? 'yes' : 'no', r.verified ? 'yes' : 'no'])
     );
   }
-  const rows = (await Item.find().select('title category status currentPrice purchasedPrice purchasedFrom serialNumber location warrantyUntil').sort({ title: 1 }).lean()) as Record<string, unknown>[];
+  const rows = (await (await scoped(Item)).find().select('title category status currentPrice purchasedPrice purchasedFrom serialNumber location warrantyUntil').sort({ title: 1 }).lean()) as Record<string, unknown>[];
   return toCSV(
     ['Title', 'Category', 'Status', 'Current price', 'Paid', 'Bought from', 'Serial', 'Location', 'Warranty until'],
     rows.map((r) => [String(r.title ?? ''), String(r.category ?? ''), String(r.status ?? ''), Number(r.currentPrice ?? 0), r.purchasedPrice == null ? '' : Number(r.purchasedPrice), String(r.purchasedFrom ?? ''), String(r.serialNumber ?? ''), String(r.location ?? ''), isoDay(r.warrantyUntil)])
@@ -1468,7 +1493,7 @@ export async function exportInsuranceBundle(): Promise<{ base64: string; itemCou
   await connectDB();
   const [settings, items] = await Promise.all([
     getAppSettings(),
-    Item.find({ status: { $in: ['received', 'installed'] } })
+    (await scoped(Item)).find({ status: { $in: ['received', 'installed'] } })
       .select('title category serialNumber location purchasedAt purchasedFrom warrantyUntil currentPrice purchasedPrice photos attachments receiptIds')
       .sort({ title: 1 })
       .lean<InsuranceItemDoc[]>(),
@@ -1476,7 +1501,7 @@ export async function exportInsuranceBundle(): Promise<{ base64: string; itemCou
 
   const receiptIds = [...new Set(items.flatMap((i) => (i.receiptIds || []).map((id) => String(id))))];
   const receipts = receiptIds.length
-    ? await Receipt.find({ _id: { $in: receiptIds } }).select('store date filePath').lean<{ _id: Types.ObjectId; store: string; date: Date; filePath: string }[]>()
+    ? await (await scoped(Receipt)).find({ _id: { $in: receiptIds } }).select('store date filePath').lean<{ _id: Types.ObjectId; store: string; date: Date; filePath: string }[]>()
     : [];
   const receiptById = new Map(receipts.map((r) => [String(r._id), r]));
 
@@ -1582,7 +1607,7 @@ export async function exportTaxBundle(year: number): Promise<{ base64: string; i
   const to = new Date(Date.UTC(y + 1, 0, 1));
   const [settings, rows] = await Promise.all([
     getAppSettings(),
-    Expense.find({ kind: 'expense', taxDeductible: true, date: { $gte: from, $lt: to } })
+    (await scoped(Expense)).find({ kind: 'expense', taxDeductible: true, date: { $gte: from, $lt: to } })
       .select('vendor category taxCategory amount date notes filePath')
       .sort({ date: 1 })
       .lean<TaxExpenseDoc[]>(),
@@ -1636,7 +1661,7 @@ export async function saveBudgets(budgets: Record<string, number>): Promise<{ ok
     const n = Number(v);
     if (k && Number.isFinite(n) && n > 0) clean[k.trim()] = Math.round(n * 100) / 100;
   }
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { budgets: clean } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { budgets: clean } }, { upsert: true });
   invalidateAppSettings();
   revalidatePath('/reports');
   revalidatePath('/settings');
@@ -1648,7 +1673,7 @@ export async function saveBudgets(budgets: Record<string, number>): Promise<{ ok
 export async function saveBudgetRollover(enabled: boolean): Promise<{ ok: boolean }> {
   await assertCanWrite();
   await connectDB();
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { budgetRollover: !!enabled } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { budgetRollover: !!enabled } }, { upsert: true });
   invalidateAppSettings();
   revalidatePath('/reports');
   revalidatePath('/settings');
@@ -1661,7 +1686,7 @@ export async function saveCategoryRules(rules: unknown): Promise<{ ok: boolean }
   await assertCanWrite();
   await connectDB();
   const clean = resolveCategoryRules(rules);
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { categoryRules: clean } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { categoryRules: clean } }, { upsert: true });
   invalidateAppSettings();
   revalidatePath('/settings');
   return { ok: true };
@@ -1674,7 +1699,7 @@ export async function saveCategoryRules(rules: unknown): Promise<{ ok: boolean }
 export async function suggestBudgets(): Promise<{ suggestions: Record<string, number>; months: number }> {
   await connectDB();
   const months = 3;
-  const rows = (await Expense.find({ kind: { $ne: 'income' } })
+  const rows = (await (await scoped(Expense)).find({ kind: { $ne: 'income' } })
     .select('kind amount category period date')
     .lean()) as BudgetExpenseRow[];
   const suggestions = suggestBudgetsFromExpenses(rows, { windowMonths: months });
@@ -1691,7 +1716,7 @@ export async function saveAssetAccounts(accounts: Record<string, number>): Promi
     const n = Number(v);
     if (k.trim() && Number.isFinite(n) && n > 0) clean[k.trim().slice(0, 60)] = Math.round(n * 100) / 100;
   }
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { assetAccounts: clean } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { assetAccounts: clean } }, { upsert: true });
   invalidateAppSettings();
   revalidatePath('/reports');
   revalidatePath('/settings');
@@ -1724,7 +1749,7 @@ export async function saveDepreciation(cfg: {
     defaultRate: clampPct(cfg?.defaultRate),
     rates,
   };
-  await AppConfig.updateOne({ key: 'singleton' }, { $set: { depreciation: clean } }, { upsert: true });
+  await (await scoped(AppConfig)).updateOne({ key: 'singleton' }, { $set: { depreciation: clean } }, { upsert: true });
   invalidateAppSettings();
   revalidatePath('/reports');
   revalidatePath('/settings');
@@ -1882,18 +1907,18 @@ export async function purgeTrashEntry(type: TrashType, id: string): Promise<{ ok
     for (const fp of [doc.filePath, doc.thumbPath]) if (fp) await deleteFile(String(fp)).catch(() => {});
   }
   if (type === 'receipt') {
-    await Item.updateMany({ receiptIds: oid }, { $pull: { receiptIds: oid } });
+    await (await scoped(Item)).updateMany({ receiptIds: oid }, { $pull: { receiptIds: oid } });
   }
   if (type === 'item') {
     for (const p of (doc.photos as string[] | undefined) ?? []) await deleteFile(p).catch(() => {});
     for (const a of (doc.attachments as { path?: string }[] | undefined) ?? []) if (a.path) await deleteFile(a.path).catch(() => {});
-    await Receipt.updateMany({ itemIds: oid }, { $pull: { itemIds: oid } });
-    await Receipt.updateMany(
+    await (await scoped(Receipt)).updateMany({ itemIds: oid }, { $pull: { itemIds: oid } });
+    await (await scoped(Receipt)).updateMany(
       { 'lineItems.matchedItemId': oid },
       { $set: { 'lineItems.$[el].matchedItemId': null } },
       { arrayFilters: [{ 'el.matchedItemId': oid }] }
     );
-    await Statement.updateMany(
+    await (await scoped(Statement)).updateMany(
       { 'transactions.matchedItemIds': oid },
       { $pull: { 'transactions.$[].matchedItemIds': oid } }
     );

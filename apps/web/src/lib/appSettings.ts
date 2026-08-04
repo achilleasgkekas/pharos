@@ -1,6 +1,7 @@
 import { connectDB } from './db';
 import { AppConfig } from '@/models/AppConfig';
-import { currentModel } from './tenancy/connection';
+import { tenantDb, tenantModel } from './tenancy/connection';
+import { softRequestTenant } from './tenancy/request';
 import { currentTenant } from './tenancy/current';
 import { setCurrencySymbol, currencySymbol } from './money';
 // Side-effect import: registers the tenant-aware currency-symbol resolver into money.ts.
@@ -116,10 +117,14 @@ const DEFAULTS: AppSettings = {
 const cache = new Map<string, { v: AppSettings; t: number }>();
 const TTL = 5000;
 
-/** Stable cache key for the current tenant ('' = default/self-hosted). */
-function tenantKey(): string {
-  const ctx = currentTenant();
+/** Stable cache key for a tenant ('' = default/self-hosted). */
+function keyFor(ctx: { isDefault: boolean; tenantId: string | null }): string {
   return ctx.isDefault || !ctx.tenantId ? '' : ctx.tenantId;
+}
+
+/** Stable cache key for the AMBIENT tenant. Only used by the invalidation path. */
+function tenantKey(): string {
+  return keyFor(currentTenant());
 }
 
 /** Pure coercion of a raw AppConfig doc into effective AppSettings (DB-free, testable). */
@@ -157,15 +162,19 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
 
 /** Effective defaults/alerts/notification settings (DB singleton over hard defaults). */
 export async function getAppSettings(): Promise<AppSettings> {
-  const key = tenantKey();
+  // Resolve the workspace even when no ambient context was established. Settings server actions
+  // reach their models through a helper that opens and closes the context per call, so by the
+  // time they call this there is no ambient tenant — and `currentTenant()` would then answer
+  // "default", reading the WRONG database and, worse, caching that answer under the default key
+  // where every other workspace would pick it up.
+  const ctx = await softRequestTenant();
+  const key = keyFor(ctx);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.t < TTL) return hit.v;
   let doc: RawAppConfigDoc | null = null;
   try {
     await connectDB();
-    // Route to the current tenant's database (default tenant → the AppConfig model
-    // untouched, same query as before).
-    const Config = await currentModel(AppConfig);
+    const Config = tenantModel(await tenantDb(ctx), AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
       .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays syncStaleDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed')
       .lean();

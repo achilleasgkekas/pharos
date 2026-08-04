@@ -11,12 +11,13 @@
 // frozen DEFAULT_TENANT with ZERO DB access and ZERO header/cookie reads that matter, and
 // `withTenant(DEFAULT_TENANT, fn)` is a no-op wrapper (currentTenant already defaults to it).
 // So the self-hosted app is byte-for-byte unchanged: same default connection, no metering.
+import { cache } from 'react';
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { getTenantContext, DEFAULT_TENANT, type TenantContext } from './context';
 import { parseTenantSlug } from './host';
 import { saasMode } from './saasMode';
-import { withTenant } from './current';
+import { withTenant, currentTenant, hasTenantContext } from './current';
 import { getCurrentAccount } from './accountSession';
 import { accountTenants } from './saasApi';
 import { workspaceStatusError } from './workspace';
@@ -64,10 +65,14 @@ async function requestHost(): Promise<string | null> {
  *     enforce the tenant's lifecycle status. Throws `TenantResolutionError` otherwise so the
  *     caller can surface a clean error instead of silently reading the wrong database.
  *
+ * MEMOISED per request (React cache): a server action may now resolve the tenant several times —
+ * once per model it touches — and each resolution is two control-plane queries. Same request,
+ * same host, same cookie, so the answer cannot differ within one render.
+ *
  * Authz mirrors `resolveWorkspaceSession` (the /api/saas/* control-plane flow): the host
  * decides the tenant, the account's membership decides access.
  */
-export async function resolveRequestTenant(): Promise<TenantContext> {
+export const resolveRequestTenant = cache(async function resolveRequestTenant(): Promise<TenantContext> {
   if (!saasMode()) return DEFAULT_TENANT;
 
   const host = await requestHost();
@@ -101,7 +106,32 @@ export async function resolveRequestTenant(): Promise<TenantContext> {
   }
 
   return ctx;
-}
+});
+
+
+/**
+ * Best-effort tenant for READ-ONLY paths that must never redirect or 404.
+ *
+ * `withRequestTenant` is the right gate for anything that acts on data: it denies. But the root
+ * layout reads app settings on EVERY page, including /account/login and the apex, where there is
+ * no workspace and denying would take the whole site down. This answers "which workspace, if any"
+ * and falls back to the default rather than throwing.
+ *
+ * Uses the ambient tenant when one is already established, so inside `withRequestTenant` it costs
+ * nothing and cannot disagree with the gate that already ran. Deliberately does NOT check
+ * membership: it is only ever used to pick which database to READ display settings from, and the
+ * data plane's own gate still denies a non-member everything that matters.
+ */
+export const softRequestTenant = cache(async function softRequestTenant(): Promise<TenantContext> {
+  if (!saasMode()) return DEFAULT_TENANT;
+  if (hasTenantContext()) return currentTenant();
+  try {
+    const ctx = await getTenantContext({ host: await requestHost() });
+    return ctx && !ctx.isDefault && ctx.tenantId ? ctx : DEFAULT_TENANT;
+  } catch {
+    return DEFAULT_TENANT;
+  }
+});
 
 /**
  * Run a feature action/handler body inside the resolved tenant context. This is the ONE

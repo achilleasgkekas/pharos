@@ -19,16 +19,27 @@ const CURRENCY_BY_TENANT: Record<string, string> = {
   globex: 'GBP',
 };
 
+// The read now goes through tenantDb(ctx) + tenantModel, and the CONTEXT comes from
+// softRequestTenant rather than the ambient store — because settings server actions open and
+// close the tenant context per model call, so by the time getAppSettings runs there is no ambient
+// tenant to read. The fake is keyed off the ctx it is handed, so a wrong context is observable as
+// a wrong currency exactly as before.
 vi.mock('./tenancy/connection', () => ({
-  currentModel: async () => {
+  tenantDb: async (ctx: { isDefault: boolean; tenantId: string | null; slug: string }) => ({
+    __tag: ctx.isDefault || !ctx.tenantId ? 'default' : ctx.slug,
+  }),
+  tenantModel: (conn: { __tag: string }) => ({
+    findOne: () => ({
+      select: () => ({ lean: async () => ({ currency: CURRENCY_BY_TENANT[conn.__tag] }) }),
+    }),
+  }),
+}));
+
+// Honours the ambient tenant, which is what the real implementation does via hasTenantContext().
+vi.mock('./tenancy/request', () => ({
+  softRequestTenant: async () => {
     const { currentTenant } = await import('./tenancy/current');
-    const ctx = currentTenant();
-    const tag = ctx.isDefault || !ctx.tenantId ? 'default' : ctx.slug;
-    return {
-      findOne: () => ({
-        select: () => ({ lean: async () => ({ currency: CURRENCY_BY_TENANT[tag] }) }),
-      }),
-    };
+    return currentTenant();
   },
 }));
 

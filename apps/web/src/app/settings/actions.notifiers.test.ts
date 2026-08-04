@@ -176,6 +176,18 @@ vi.mock('@/lib/webhooks', () => ({
 }));
 vi.mock('@/lib/ssrf', () => ({ assertPublicUrl: assertPublicUrlMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (...args: unknown[]) => revalidatePathMock(...args) }));
+// Tenancy seam mocked FLAT: settings actions now reach every model through `scoped()`, which is
+// withRequestTenant + currentModel. These tests are about what the actions DO, so the seam is a
+// pass-through here; the tenant ROUTING itself is pinned separately in actions.tenant.test.ts.
+vi.mock('@/lib/tenancy/request', () => ({
+  withRequestTenant: async (fn: () => Promise<any>) => fn(),
+  softRequestTenant: async () => ({ tenantId: null, slug: 'default', dbName: '', plan: 'dedicated', status: 'active', isDefault: true }),
+}));
+vi.mock('@/lib/tenancy/connection', () => ({
+  currentModel: async (model: unknown) => model,
+  tenantDb: async () => ({}),
+  tenantModel: (_conn: unknown, model: unknown) => model,
+}));
 
 import {
   saveDefaults,
