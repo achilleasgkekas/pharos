@@ -3231,3 +3231,23 @@ Suggested next task: **`settings/mcpActions.ts`** (38 γραμμές) — το �
 - Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου· `git diff --cached --name-only` το ίδιο. Pathspec commit + push: `80529e7..960c668`.
 
 Suggested next task: **`settings/users.actions.ts`** (91 γραμμές) — το επόμενο εναπομείναν test-less action module (user CRUD/roles, admin-only). Τα μεγαλύτερα (`app/jobActions.ts` 210 γρ., `app/aiCommandActions.ts` 93 γρ. AI tool-loop, `settings/sampleDataActions.ts` 103 γρ.) παραμένουν για μεταγενέστερα runs, θέλουν πιο προσεκτικό διάβασμα (side-effects/external calls). Διάβασε ολόκληρο το target file πριν γράψεις τίποτα. Πάντα `git status` collision-guard πρώτα.
+
+## 2026-08-04 (cont.¹² — settings/users.actions.test.ts, νέο module: admin user CRUD + self password change)
+
+**Task**: το suggested next-task του προηγούμενου run: `settings/users.actions.ts` (91 γραμμές, 6 exported functions) — admin-only user management (list/create/delete/role/reset-password) + το ένα self-service action (change own password). Coordination: `ROUTINES_PAUSED` δεν υπήρχε, καμία εγγραφή pharos-oss-prep στο `ASK_ACHILLEAS.md`, `git status --short` καθαρό (μόνο ένα ασύνδετο `.claude/launch.json` M που δεν άγγιξα, εκτός territory), local==origin (`dd7fdeb`) πριν ξεκινήσω.
+
+Διάβασα ολόκληρο το target file πριν γράψω τίποτα. Ίδιο σχήμα με τα προηγούμενα standalone-concern modules (`connectDB`, `User` model, `requireAdmin`/`requireUser` από `@/lib/auth`), με μία επιπλέον πραγματική εξάρτηση: το `@/lib/roles` (`parseRole`) που άφησα **πραγματικό, όχι mocked** (είναι pure/DB-free by design, βλ. το δικό του header comment) ώστε το `setUserRole` να δοκιμάζεται με τα πραγματικά include/reject rules αντί για stub.
+
+**Εύρημα στο ίδιο το production code (τεκμηριωμένο στο test, ΟΧΙ αλλαγμένο)**: το `listUsers` προβάλλει τον ρόλο με `u.role === 'admin' ? 'admin' : 'member'` — ένας αποθηκευμένος `viewer` εμφανίζεται σιωπηλά ως `member` σε αυτή τη λίστα, ενώ το `setUserRole` (μέσω `parseRole`) υποστηρίζει πλήρως τον viewer ρόλο. Καταγράφηκε με test + σχόλιο, δεν διορθώθηκε (out of territory, feature code).
+
+Άλλα behaviors που επαληθεύτηκαν στα tests: validation (username regex/length, password min 8) τρέχει **πριν** το `connectDB` σε κάθε γράφουσα ενέργεια· το self-delete guard στο `deleteUser` τρέχει πριν το DB· το «last admin» guard στο `setUserRole` ελέγχει `next !== 'admin'` (όχι μόνο `=== 'member'`) οπότε μπλοκάρει demotion σε **οποιονδήποτε** μη-admin ρόλο, viewer συμπεριλαμβανομένου· το `changeUserPassword`/`changeOwnPassword` **δεν** καλούν `revalidatePath` (σε αντίθεση με τα άλλα 3), αφού reset password δεν αλλάζει καμία προβαλλόμενη λίστα· το `changeOwnPassword` χρησιμοποιεί `requireUser` όχι `requireAdmin` (οποιοσδήποτε signed-in ρόλος αλλάζει τον δικό του κωδικό).
+
+**33 tests** σε έξι describe blocks: `listUsers` (4, incl. το known-gap test)· `createUser` (7)· `deleteUser` (5)· `setUserRole` (6)· `changeUserPassword` (4)· `changeOwnPassword` (5). Ένα μικρό tsc fix: το hoisted `sort` mock χρειάστηκε optional param type (`(_arg?: Record<string, unknown>)`) ώστε η per-test override (που καταγράφει το sort arg) να ταιριάζει με το inferred signature.
+
+Τι επαληθεύτηκε:
+- `npx vitest run "src/app/settings/users.actions.test.ts"` → **33/33 passed** (ένα μικρό tsc-type fix πριν το πλήρες πράσινο).
+- `npm run type-check` → exit 0, μηδέν errors σε όλο το repo.
+- `npx vitest run` (όλο το suite) → **354 files, 5654/5658 passed (4 skipped), 0 failed** (~11.5s wall).
+- Collision guard: `git status --short` πριν το `git add` έδειξε ΜΟΝΟ το νέο αρχείο μου (+ το ασύνδετο launch.json που άφησα)· `git diff --cached --name-only` = ένα αρχείο. Pathspec commit + push: `dd7fdeb..84f8d03`.
+
+Suggested next task: **`settings/sampleDataActions.ts`** (103 γραμμές) — "Load/clear sample data" demo mode, tenant-scoped μέσω `withRequestTenant`/`currentModel` (ίδιο μοτίβο tenancy με items/receipts/expenses actions). Τα μεγαλύτερα με side-effects (`app/jobActions.ts` 210 γρ. background job runner, `app/aiCommandActions.ts` 93 γρ. AI tool-loop) παραμένουν για μεταγενέστερα runs. Διάβασε ολόκληρο το target file πριν γράψεις τίποτα. Πάντα `git status` collision-guard πρώτα.
