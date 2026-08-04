@@ -52,6 +52,22 @@ export function dbNameForSlug(slug: string): string {
   return `tenant_${slug}`;
 }
 
+/**
+ * Run a compensating delete for a half-finished provision, and NEVER throw.
+ *
+ * Two rules, both learned the hard way: a rollback failure must not replace the error that
+ * triggered it (that one is what the caller and the customer need to see), and it must not
+ * vanish either — it leaves a real orphan in the control plane, so it is logged loudly enough
+ * to find by hand.
+ */
+export async function compensate(what: string, undo: () => Promise<unknown>): Promise<void> {
+  try {
+    await undo();
+  } catch (err) {
+    console.error(`[provision] rollback FAILED for ${what} — manual cleanup needed:`, err);
+  }
+}
+
 export type ProvisionedTenant = {
   tenantId: string;
   slug: string;
@@ -88,12 +104,28 @@ export async function provisionTenant(opts: {
     trialEndsAt: trialEndFrom(new Date()),
   });
 
-  await Membership.create({
-    account: opts.accountId,
-    tenant: tenant._id,
-    role: 'owner',
-    status: 'active',
-  });
+  try {
+    await Membership.create({
+      account: opts.accountId,
+      tenant: tenant._id,
+      role: 'owner',
+      status: 'active',
+    });
+  } catch (err) {
+    // A tenant with no members is worse than no tenant at all: nobody can ever reach it, yet it
+    // holds its slug and dbName forever, counts in the operator console, and gets picked up by
+    // the trial-lapse sweep, which will dutifully suspend a workspace that never existed for
+    // anyone. So undo the tenant and let the caller see the original failure.
+    //
+    // A Mongo transaction is deliberately NOT used: transactions require a replica set, while
+    // the local SaaS stack and any modest self-host run a standalone mongod, where a
+    // transactional signup would fail 100% of the time. The id to undo is known exactly, so a
+    // compensating delete is both simpler and portable.
+    await compensate(`tenant ${tenant.slug} (${tenant._id})`, () =>
+      Tenant.deleteOne({ _id: tenant._id }),
+    );
+    throw err;
+  }
 
   return {
     tenantId: String(tenant._id),

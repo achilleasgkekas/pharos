@@ -6887,3 +6887,65 @@ WIP άλλης routine** που δουλεύει αυτή τη στιγμή στ
 filter· (γ) τα 2 non-scoped `actions.ts` (`history`, `settings`).
 
 **## Needs Achilleas:** αμετάβλητα — **Stripe keys**, **τελικό plan pricing**, **email provider**.
+
+## 2026-08-04 (γ) — increment 135: atomic signup (το ορφανό account δεν ξαναγίνεται)
+
+Ζητήθηκε από τον Achilleas (interactive) αμέσως μετά το increment 134, όπου το bug βρέθηκε ζωντανά.
+
+**Το πρόβλημα**: το signup είναι **δύο writes** (Account, μετά workspace) και **δεν ήταν atomic
+προς καμία κατεύθυνση**. Όταν αποτύγχανε το provisioning, το Account **επιβίωνε**. Ο πελάτης
+έβλεπε «κάτι πήγε στραβά», ξαναδοκίμαζε, και έπαιρνε **«An account with this email already
+exists»** — για λογαριασμό που δεν ήξερε ότι δημιούργησε και που δεν έχει κανένα workspace. Η μόνη
+διέξοδος ήταν άλλη διεύθυνση email. Δηλαδή ο πελάτης τιμωρούνταν επειδή έκανε **ακριβώς το σωστό
+πράγμα δύο φορές**.
+
+Και μία στάθμη πιο κάτω, το ίδιο μοτίβο με χειρότερη κατάληξη: μέσα στο `provisionTenant`, αν
+περνούσε το `Tenant.create` και έσκαγε το `Membership.create`, έμενε **tenant χωρίς μέλη**. Δεν
+είναι απλώς σκουπίδι: είναι απροσπέλαστο για πάντα, **κρατάει το slug και το dbName**, μετράει στο
+operator console, και το πιάνει το trial-lapse sweep — που θα suspend-άρει ευσυνείδητα ένα
+workspace που δεν υπήρξε ποτέ για κανέναν.
+
+**Η απόφαση που μετράει: compensating deletes, ΟΧΙ Mongo transactions.** Τα transactions
+απαιτούν **replica set**. Το τοπικό SaaS stack και κάθε μέτριο self-host τρέχουν **standalone
+mongod**, όπου ένα transactional signup θα αποτύγχανε **100% των φορών**. Ένα fix που δουλεύει μόνο
+σε Atlas δεν είναι fix για αυτό το προϊόν. Τα ids προς αναίρεση τα ξέρουμε ακριβώς, οπότε το undo
+είναι ρητό και portable.
+
+- **`lib/tenancy/provision.ts`**: `Membership.create` failure → διαγραφή του tenant που μόλις
+  φτιάχτηκε (**by `_id`, ποτέ by slug** — το slug θα μπορούσε θεωρητικά να το κρατά ταυτόχρονο
+  signup) → rethrow του **αρχικού** error. Ωφελεί **και τους δύο** callers (signup +
+  «create another workspace»).
+- **`api/saas/auth/signup`**: `provisionTenant` failure → διαγραφή του Account που μόλις
+  φτιάχτηκε → **500 με ειλικρινές μήνυμα** «Nothing was saved, please try again» (τώρα το «try
+  again» είναι αλήθεια, όχι ευγενικό ψέμα). Κανένα cookie δεν δίνεται σε μισοφτιαγμένο account.
+- **`compensate(what, undo)`**: δύο κανόνες. Η αποτυχία του rollback **δεν αντικαθιστά** το error
+  που το προκάλεσε (αυτό χρειάζεται ο caller), αλλά **ούτε εξαφανίζεται** — αφήνει πραγματικό
+  ορφανό, οπότε λογάρεται με αρκετή λεπτομέρεια για χειροκίνητο καθάρισμα.
+
+**Το security detail που εύκολα ξεφεύγει**: το 409 path (email ήδη υπάρχει) **δεν αγγίζει ποτέ**
+τον υπάρχοντα λογαριασμό. Αλλιώς θα ήταν τρόπος να **σβήσεις τον λογαριασμό κάποιου άλλου** απλώς
+δοκιμάζοντας signup με τη διεύθυνσή του. Pinned με test.
+
+**Verified ΖΩΝΤΑΝΑ, με εξαναγκασμένη πραγματική αποτυχία** (όχι mock): φύτεψα decoy tenant που
+καταλαμβάνει το `dbName` που θα ζητούσε το επόμενο signup (`tenant_rollbackprobe`), ώστε το
+`Tenant.create` να σκάσει με E11000 σε πραγματική Mongo.
+- signup → **500** «Could not create your workspace. Nothing was saved, please try again.»
+- επιβίωσαν: **accounts 0, tenants 0, memberships αμετάβλητα**. Πριν το fix εδώ έμενε ορφανό
+  account και το email ήταν **μόνιμα** καμένο.
+- αφαίρεσα το decoy → **retry με το ΙΔΙΟ email** → **201**, tenant `rollbackprobe` + owner
+  membership. Αυτό ακριβώς ήταν αδύνατο πριν.
+
+`npm run type-check` **EXIT 0**. Πλήρες `npx vitest run` → **361 files / 5788 tests green**
+(+12 νέα: 5 στο signup route, 4 στο provisionTenant rollback, 2 στο `compensate`, +1 fixture
+assertion). Το ξένο WIP που έσπαγε το suite στα δύο προηγούμενα increments **έχει ολοκληρωθεί από
+την άλλη routine**, οπότε το πράσινο είναι καθαρό. `pharos-saas-web` RestartCount 0, `homepage-web`
+ανέγγιχτο από εμένα.
+
+**Test data**: καθάρισα το ορφανό `gatetest@example.com` (δικό μου probe, τεκμήριο του παλιού bug —
+τώρα άχρηστο και μπερδευτικό). Έμειναν `acme`, `gate-two`, `rollbackprobe` ως multi-workspace
+fixtures.
+
+**Next task:** (α) workspace autocomplete στο platform audit filter· (β) τα 2 non-scoped
+`actions.ts` (`history`, `settings`)· (γ) multi-arch build όταν έρθει ο server.
+
+**## Needs Achilleas:** αμετάβλητα — **Stripe keys**, **τελικό plan pricing**, **email provider**.

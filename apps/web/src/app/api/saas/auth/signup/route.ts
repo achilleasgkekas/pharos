@@ -5,7 +5,7 @@ import { hashPassword } from '@/lib/auth';
 import { readBody, strField } from '@/lib/apiBody';
 import { saasAuthGate, saasGuard, accountTenants } from '@/lib/tenancy/saasApi';
 import { setAccountCookie } from '@/lib/tenancy/accountSession';
-import { provisionTenant } from '@/lib/tenancy/provision';
+import { provisionTenant, compensate } from '@/lib/tenancy/provision';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,10 +54,30 @@ export async function POST(req: NextRequest) {
     }
 
     const accountId = String(account._id);
-    await provisionTenant({
-      accountId,
-      workspaceName: workspace || name || email.split('@')[0],
-    });
+    try {
+      await provisionTenant({
+        accountId,
+        workspaceName: workspace || name || email.split('@')[0],
+      });
+    } catch (err) {
+      // Signup is two writes (Account, then workspace) and used to be atomic in neither
+      // direction. When provisioning failed the Account survived, so the customer was told
+      // "something went wrong", tried again, and was told their email ALREADY EXISTS — for an
+      // account they never knowingly created and that owns no workspace. A dead end reached by
+      // doing exactly the right thing twice.
+      //
+      // Undo our own half instead. `provisionTenant` already rolls its own tenant back, so after
+      // this the request leaves nothing behind and "please try again" is true rather than a
+      // polite lie.
+      await compensate(`account ${email} (${accountId})`, () =>
+        Account.deleteOne({ _id: account._id }),
+      );
+      console.error('[signup] provisioning failed, account rolled back:', err);
+      return NextResponse.json(
+        { error: 'Could not create your workspace. Nothing was saved, please try again.' },
+        { status: 500 }
+      );
+    }
 
     await setAccountCookie({ sub: accountId, email });
 

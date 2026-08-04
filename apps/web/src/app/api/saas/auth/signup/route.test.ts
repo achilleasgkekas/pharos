@@ -26,15 +26,18 @@ const {
   saasAuthGateMock,
   connectDBMock,
   accountExistsMock,
+  accountDeleteOneMock,
   accountCreateMock,
   hashPasswordMock,
   provisionTenantMock,
   accountTenantsMock,
+  compensateMock,
   setAccountCookieMock,
 } = vi.hoisted(() => ({
   saasAuthGateMock: vi.fn(() => null as NextResponse | null),
   connectDBMock: vi.fn(async () => {}),
   accountExistsMock: vi.fn(async () => false as unknown),
+  accountDeleteOneMock: vi.fn(async (_f: Record<string, unknown>) => ({ deletedCount: 1 })),
   accountCreateMock: vi.fn(async (doc: Record<string, unknown>) => ({
     _id: 'acc1',
     name: doc.name,
@@ -50,15 +53,27 @@ const {
     status: 'active',
   })),
   accountTenantsMock: vi.fn(async () => [] as unknown[]),
+  // Real behaviour, not a stub: compensate() must actually invoke the undo it is handed, and
+  // must swallow a failing undo rather than replacing the original error.
+  compensateMock: vi.fn(async (_what: string, undo: () => Promise<unknown>) => {
+    try {
+      await undo();
+    } catch {
+      /* logged in production; irrelevant to the assertions here */
+    }
+  }),
   setAccountCookieMock: vi.fn(async () => {}),
 }));
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Account', () => ({
-  Account: { exists: accountExistsMock, create: accountCreateMock },
+  Account: { exists: accountExistsMock, create: accountCreateMock, deleteOne: accountDeleteOneMock },
 }));
 vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
-vi.mock('@/lib/tenancy/provision', () => ({ provisionTenant: provisionTenantMock }));
+vi.mock('@/lib/tenancy/provision', () => ({
+  provisionTenant: provisionTenantMock,
+  compensate: compensateMock,
+}));
 vi.mock('@/lib/tenancy/saasApi', async () => {
   // saasGuard is pure (try/catch + NextResponse.json, no DB/env reads) — run it for real so
   // the mid-handler-throw test exercises the actual production error-shaping logic.
@@ -78,6 +93,14 @@ beforeEach(() => {
   saasAuthGateMock.mockReturnValue(null);
   connectDBMock.mockImplementation(async () => {});
   accountExistsMock.mockImplementation(async () => false);
+  accountDeleteOneMock.mockImplementation(async () => ({ deletedCount: 1 }));
+  compensateMock.mockImplementation(async (_what: string, undo: () => Promise<unknown>) => {
+    try {
+      await undo();
+    } catch {
+      /* see above */
+    }
+  });
   accountCreateMock.mockImplementation(async (doc: Record<string, unknown>) => ({
     _id: 'acc1',
     name: doc.name,
@@ -240,5 +263,64 @@ describe('success path', () => {
     const res = await POST(makeReq({ email: 'jo@example.com', password: 'secret123' }));
     const json = (await res.json()) as { account: { name: string } };
     expect(json.account.name).toBe('');
+  });
+});
+
+// ── atomicity ───────────────────────────────────────────────────────────────────────────────
+//
+// Signup is two writes and used to be atomic in neither direction: when provisioning failed the
+// Account survived, so the customer was told "something went wrong", retried, and was told their
+// email ALREADY EXISTS — for an account they never knowingly created, owning no workspace. The
+// only way out was a different email address. Reproduced for real on the local SaaS stack.
+describe('signup is all-or-nothing', () => {
+  it('rolls the Account back when provisioning fails, so a retry is actually possible', async () => {
+    provisionTenantMock.mockRejectedValueOnce(new Error('E11000 duplicate key error: dbName'));
+
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+
+    expect(res.status).toBe(500);
+    expect(accountDeleteOneMock).toHaveBeenCalledWith({ _id: 'acc1' });
+    // The half-made account must not be handed a session either.
+    expect(setAccountCookieMock).not.toHaveBeenCalled();
+  });
+
+  it('does not leak the internal failure to the caller, but does say nothing was saved', async () => {
+    provisionTenantMock.mockRejectedValueOnce(new Error('mongod connection refused at 10.0.0.4'));
+
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+    const json = (await res.json()) as { error: string };
+
+    expect(json.error).not.toContain('10.0.0.4');
+    expect(json.error.toLowerCase()).toContain('nothing was saved');
+  });
+
+  it('still returns 500 if the rollback ITSELF fails — the original failure is what matters', async () => {
+    // A failed rollback leaves an orphan and is logged, but it must never turn into a different
+    // status code or a success: the workspace was not created either way.
+    provisionTenantMock.mockRejectedValueOnce(new Error('boom'));
+    accountDeleteOneMock.mockRejectedValueOnce(new Error('delete failed too'));
+
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+
+    expect(res.status).toBe(500);
+  });
+
+  it('does not delete anything on a successful signup', async () => {
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+
+    expect(res.status).toBe(201);
+    expect(accountDeleteOneMock).not.toHaveBeenCalled();
+    expect(setAccountCookieMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not delete the account when the email was already taken (it is not ours to delete)', async () => {
+    // The 409 path must never touch the pre-existing account — that would be a way to delete
+    // somebody else's account by trying to sign up with their address.
+    accountExistsMock.mockResolvedValueOnce(true);
+
+    const res = await POST(makeReq({ email: 'taken@x.com', password: 'password123' }));
+
+    expect(res.status).toBe(409);
+    expect(accountDeleteOneMock).not.toHaveBeenCalled();
   });
 });

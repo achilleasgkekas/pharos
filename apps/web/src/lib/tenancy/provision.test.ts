@@ -15,11 +15,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // different slug/name/plan/status) so that every "what does the return value read from"
 // assertion is load-bearing: the result must echo the PERSISTED doc, not the local vars.
 
-const { connectDBMock, tenantExistsMock, tenantCreateMock, membershipCreateMock } = vi.hoisted(
+const {
+  connectDBMock,
+  tenantExistsMock,
+  tenantCreateMock,
+  tenantDeleteOneMock,
+  membershipCreateMock,
+} = vi.hoisted(
   () => ({
     connectDBMock: vi.fn(async () => {}),
     tenantExistsMock: vi.fn(async (_filter: Record<string, unknown>) => null as unknown),
     tenantCreateMock: vi.fn(async (_doc: Record<string, unknown>) => ({}) as Record<string, unknown>),
+    tenantDeleteOneMock: vi.fn(async (_f: Record<string, unknown>) => ({ deletedCount: 1 })),
     membershipCreateMock: vi.fn(
       async (_doc: Record<string, unknown>) => ({}) as Record<string, unknown>,
     ),
@@ -27,10 +34,12 @@ const { connectDBMock, tenantExistsMock, tenantCreateMock, membershipCreateMock 
 );
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
-vi.mock('@/models/Tenant', () => ({ Tenant: { exists: tenantExistsMock, create: tenantCreateMock } }));
+vi.mock('@/models/Tenant', () => ({
+  Tenant: { exists: tenantExistsMock, create: tenantCreateMock, deleteOne: tenantDeleteOneMock },
+}));
 vi.mock('@/models/Membership', () => ({ Membership: { create: membershipCreateMock } }));
 
-import { slugify, uniqueTenantSlug, dbNameForSlug, provisionTenant } from './provision';
+import { slugify, uniqueTenantSlug, dbNameForSlug, provisionTenant, compensate } from './provision';
 import { DEFAULT_TRIAL_DAYS } from '@/lib/billing/trial';
 
 /** Tenant doc as Mongoose returns it — deliberately NOT the values handed to create(). */
@@ -51,6 +60,7 @@ beforeEach(() => {
   tenantExistsMock.mockResolvedValue(null); // nothing taken by default
   tenantCreateMock.mockResolvedValue(createdTenant());
   membershipCreateMock.mockResolvedValue({});
+  tenantDeleteOneMock.mockResolvedValue({ deletedCount: 1 });
 });
 
 afterEach(() => {
@@ -390,5 +400,73 @@ describe('provisionTenant', () => {
     membershipCreateMock.mockRejectedValueOnce(new Error('write conflict'));
     await expect(provisionTenant(OPTS)).rejects.toThrow('write conflict');
     expect(tenantCreateMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── rollback ────────────────────────────────────────────────────────────────────────────────
+//
+// provisionTenant does two inserts. If the second one fails, the first must not survive: a
+// tenant with no members is unreachable forever, yet it keeps its slug and dbName, counts in the
+// operator console, and gets picked up by the trial-lapse sweep, which will happily suspend a
+// workspace nobody ever had. Mongo transactions are not an option here (they need a replica set;
+// the local stack and any modest self-host run standalone), so the undo is explicit.
+describe('provisionTenant — the two inserts are all-or-nothing', () => {
+  it('deletes the just-created tenant when the owner Membership fails', async () => {
+    membershipCreateMock.mockRejectedValueOnce(new Error('E11000 account+tenant'));
+
+    await expect(provisionTenant({ accountId: 'acc1', workspaceName: 'Acme' })).rejects.toThrow(
+      'E11000 account+tenant',
+    );
+
+    expect(tenantDeleteOneMock).toHaveBeenCalledTimes(1);
+    // Exactly the doc we made, addressed by id — never by slug, which a concurrent signup could
+    // in principle be holding.
+    const filter = tenantDeleteOneMock.mock.calls[0][0] as { _id: unknown };
+    expect(Object.keys(filter)).toEqual(['_id']);
+    expect(String(filter._id)).toBe('tenant-oid');
+  });
+
+  it('rethrows the ORIGINAL membership error, not whatever the rollback did', async () => {
+    membershipCreateMock.mockRejectedValueOnce(new Error('the real cause'));
+    tenantDeleteOneMock.mockRejectedValueOnce(new Error('rollback also broke'));
+
+    await expect(provisionTenant({ accountId: 'acc1', workspaceName: 'Acme' })).rejects.toThrow(
+      'the real cause',
+    );
+  });
+
+  it('does not delete anything on the happy path', async () => {
+    await provisionTenant({ accountId: 'acc1', workspaceName: 'Acme' });
+    expect(tenantDeleteOneMock).not.toHaveBeenCalled();
+  });
+
+  it('never rolls back a tenant it did not create (Tenant.create itself failing)', async () => {
+    tenantCreateMock.mockRejectedValueOnce(new Error('E11000 dbName'));
+
+    await expect(provisionTenant({ accountId: 'acc1', workspaceName: 'Acme' })).rejects.toThrow(
+      'E11000 dbName',
+    );
+
+    expect(membershipCreateMock).not.toHaveBeenCalled();
+    expect(tenantDeleteOneMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('compensate', () => {
+  it('runs the undo', async () => {
+    const undo = vi.fn(async () => {});
+    await compensate('thing', undo);
+    expect(undo).toHaveBeenCalledTimes(1);
+  });
+
+  it('swallows a failing undo, so it can never replace the error that caused the rollback', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(compensate('tenant acme', async () => {
+      throw new Error('delete failed');
+    })).resolves.toBeUndefined();
+    // Swallowed, but not silent: a failed rollback leaves a real orphan to clean up by hand.
+    expect(spy).toHaveBeenCalled();
+    expect(String(spy.mock.calls[0][0])).toContain('tenant acme');
+    spy.mockRestore();
   });
 });
