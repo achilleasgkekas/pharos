@@ -63,7 +63,24 @@ echo "[3/4] archiving /storage"
 tar -czf "$FILES" -C "$HERE" storage
 
 echo "[4/4] copying offsite"
-if [ -n "${BACKUP_REMOTE:-}" ]; then
+if [ -n "${BACKUP_SSH:-}" ]; then
+  # rsync over SSH — the dependency-free path, and the one a Hetzner Storage Box wants (port 23,
+  # key auth). Preferred over rclone precisely because it needs nothing installed and nothing
+  # configured beyond a key that is already there.
+  SSH_OPTS="ssh -p ${BACKUP_SSH_PORT:-23} -o BatchMode=yes"
+  [ -n "${BACKUP_SSH_KEY:-}" ] && SSH_OPTS="$SSH_OPTS -i ${BACKUP_SSH_KEY}"
+  # The destination directory has to exist; Storage Box gives you a plain SFTP home.
+  $SSH_OPTS "${BACKUP_SSH%%:*}" "mkdir -p ${BACKUP_SSH#*:}" 2>/dev/null || true
+  rsync -e "$SSH_OPTS" "$DUMP" "$FILES" "$BACKUP_SSH/" || {
+    echo "FATAL: offsite copy FAILED — the local copy exists but is not protected" >&2; exit 1
+  }
+  # Prune the remote as well. A retention policy that only runs locally quietly fills the remote
+  # until it starts refusing writes, and the first refused upload is the one you needed.
+  $SSH_OPTS "${BACKUP_SSH%%:*}" \
+    "find ${BACKUP_SSH#*:} -name 'mongo-*.archive.gz' -mtime +${KEEP_DAYS} -delete 2>/dev/null;
+     find ${BACKUP_SSH#*:} -name 'storage-*.tar.gz' -mtime +${KEEP_DAYS} -delete 2>/dev/null" || true
+  echo "  -> $BACKUP_SSH"
+elif [ -n "${BACKUP_REMOTE:-}" ]; then
   if ! command -v rclone >/dev/null 2>&1; then
     echo "FATAL: BACKUP_REMOTE is set but rclone is not installed" >&2; exit 1
   fi
@@ -74,8 +91,9 @@ if [ -n "${BACKUP_REMOTE:-}" ]; then
   rclone delete "$BACKUP_REMOTE/" --min-age "${KEEP_DAYS}d" || true
   echo "  -> $BACKUP_REMOTE"
 else
-  echo "  !! BACKUP_REMOTE is empty: these files are on the SAME DISK as the data they protect."
-  echo "  !! A disk failure or a wrong 'docker volume rm' takes both. Set BACKUP_REMOTE."
+  echo "  !! No offsite target: these files are on the SAME DISK as the data they protect."
+  echo "  !! A disk failure or a wrong 'docker volume rm' takes both. Set BACKUP_SSH (rsync, no"
+  echo "  !! dependencies) or BACKUP_REMOTE (rclone)."
 fi
 
 find "$OUT" -name 'mongo-*.archive.gz' -mtime "+$KEEP_DAYS" -delete
