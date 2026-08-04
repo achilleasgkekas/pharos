@@ -26,9 +26,8 @@ export type MailProvider = 'resend' | 'webhook' | 'smtp' | 'none';
 type Env = Record<string, string | undefined>;
 
 /**
- * Which provider the environment selects. Resend takes precedence (managed, wired), then the
- * generic MAIL_WEBHOOK_URL (also wired, dependency-free), then SMTP (recognised as intent but
- * not yet deliverable, see mailerCanDeliver). Pure: env is injectable for tests.
+ * Which provider the environment selects. Resend takes precedence (managed), then the generic
+ * MAIL_WEBHOOK_URL (dependency-free), then SMTP. All three deliver. Pure: env is injectable.
  */
 export function resolveProvider(env: Env = process.env): MailProvider {
   if (env.RESEND_API_KEY) return 'resend';
@@ -38,14 +37,18 @@ export function resolveProvider(env: Env = process.env): MailProvider {
 }
 
 /**
- * Whether a working delivery channel actually exists. Resend and the generic webhook are
- * both wired; an SMTP_URL alone counts as "configured intent" but NOT deliverable, which is
- * exactly what lets the reset-request route keep echoing the dev token until SMTP is wired.
- * This is the single source of truth behind resetDeliveryConfigured().
+ * Whether a working delivery channel actually exists. All three providers are now wired, so this
+ * is simply "something is configured".
+ *
+ * SMTP used to be excluded here, on purpose: it was recognised but unimplemented, and that
+ * exclusion is what kept the reset-request route echoing its dev token instead of pretending an
+ * email had gone out. Now that SMTP delivers, leaving it excluded would be the more dangerous
+ * mistake — the route would keep returning a live password-reset token in its response body on a
+ * deployment that can perfectly well email it. This is the single source of truth behind
+ * resetDeliveryConfigured(), so it has to move in lockstep with what sendEmail can actually do.
  */
 export function mailerCanDeliver(env: Env = process.env): boolean {
-  const p = resolveProvider(env);
-  return p === 'resend' || p === 'webhook';
+  return resolveProvider(env) !== 'none';
 }
 
 /** The generic outbound-email webhook endpoint (Zapier / n8n / self-hosted relay). Empty
@@ -203,6 +206,39 @@ async function sendViaWebhook(msg: EmailMessage, url: string, token: string): Pr
 }
 
 /**
+ * Send a message over SMTP. Network-touching; caller guarantees the URL exists.
+ *
+ * nodemailer is imported DYNAMICALLY so the module only loads when SMTP is actually the
+ * configured provider. A self-hoster on Resend, on a webhook, or on nothing at all never pays
+ * for it, and the Next standalone trace keeps it out of the runtime path it is not used on.
+ *
+ * GMAIL, which is what this is set up for: use an App Password (needs 2-Step Verification on
+ * the account), strip the spaces Google displays it with, and note that Gmail REWRITES the From
+ * header to the authenticated mailbox unless the address is a verified "send mail as" alias. So
+ * MAIL_FROM must carry that same mailbox or the recipient sees a different sender than intended.
+ * The free-account ceiling is around 500 messages a day, which is a beta-sized limit, not a
+ * product-sized one.
+ */
+async function sendViaSmtp(msg: EmailMessage, url: string): Promise<SendResult> {
+  try {
+    const { createTransport } = await import('nodemailer');
+    const transport = createTransport(url);
+    const info = (await transport.sendMail({
+      from: fromAddress(),
+      to: msg.to,
+      subject: msg.subject,
+      html: msg.html,
+      text: msg.text ?? htmlToText(msg.html),
+    })) as { messageId?: string };
+    return { delivered: true, provider: 'smtp', id: info?.messageId };
+  } catch (err) {
+    // Never throw: a mail failure must not take down the request that triggered it (signup,
+    // invite, password reset all send fire-and-forget).
+    return { delivered: false, provider: 'smtp', error: err instanceof Error ? err.message : 'send_failed' };
+  }
+}
+
+/**
  * Send a transactional email through the configured provider. Never throws — returns a
  * SendResult so callers can decide (e.g. the reset route echoes a dev token when nothing
  * was delivered). Best-effort by design.
@@ -219,11 +255,7 @@ export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
   }
 
   if (provider === 'smtp') {
-    // TODO(Needs-Achilleas): wire nodemailer once a provider is chosen. Until then SMTP_URL
-    // is recognised but cannot deliver (mailerCanDeliver stays false), so no silent drop in
-    // dev — the reset route still echoes the token.
-    console.warn('[mailer] SMTP_URL is set but SMTP delivery is not wired yet; email not sent');
-    return { delivered: false, provider: 'smtp', error: 'smtp_not_wired' };
+    return sendViaSmtp(msg, (process.env.SMTP_URL as string).trim());
   }
 
   // No provider configured. Log in non-production so local flows are observable, then report
