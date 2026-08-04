@@ -250,9 +250,12 @@ export default function PrivacyPolicy() {
           <p style={{ marginTop: 14 }}>
             A suspended workspace, one whose trial ended or whose payment failed without
             billing in place, still holds your content so it can be reactivated: we do
-            not delete it at the moment access pauses. How long we keep a suspended
-            workspace before deleting it is one of the placeholders being confirmed
-            before launch, and it will be stated here.
+            not delete it at the moment access pauses. We keep a suspended workspace for
+            30 days from the day it is suspended. Reactivate within that window and
+            nothing has been lost; after it passes, the workspace, its database, and its
+            uploaded files are deleted, except limited billing records we must keep. This
+            is the same 30-day window as Trash and as an account-deletion request, so
+            there is one retention number across the service rather than three.
           </p>
         </Section>
 

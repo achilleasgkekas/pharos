@@ -479,7 +479,7 @@ const FAQ_GROUPS: {
       },
       {
         q: 'What happens when my free trial ends?',
-        a: 'Every new hosted workspace starts on a 14-day free trial with full access, no card required to start. Three days before it ends you get one reminder email. If it lapses without adding billing, the workspace is suspended rather than deleted, a recoverable hold with nothing lost: add a payment method whenever you are ready and it reactivates instantly.',
+        a: 'Every new hosted workspace starts on a 14-day free trial with full access, no card required to start. Three days before it ends you get one reminder email. If it lapses without adding billing, the workspace is suspended rather than deleted, a recoverable hold with nothing lost: add a payment method whenever you are ready and it reactivates instantly. That hold is kept for 30 days, the same window as Trash and as an account-deletion request, and after it passes the workspace and its files are deleted, so decide inside a month rather than whenever. Not sure yet? Export everything to JSON before the trial ends and self-host it free, since it is the same app.',
       },
       {
         q: 'Can my household or team share one instance?',

@@ -223,8 +223,12 @@ export default function TermsOfService() {
             Suspension is not termination. If your trial ends, or a payment fails,
             without billing in place, the workspace is suspended rather than deleted:
             access pauses, your content is kept, and adding a payment method reactivates
-            it. The retention window for a suspended workspace before it is deleted is
-            one of the placeholders being confirmed before launch.
+            it. A suspended workspace is kept for 30 days, the same window as Trash and
+            as an account-deletion request, so there is one number to remember.
+            Reactivate within those 30 days and everything is exactly as you left it;
+            after that the workspace and its files are deleted. Access is paused while a
+            workspace is suspended, so export your data before the trial ends, or
+            reactivate first and export then.
           </p>
         </Section>
 
