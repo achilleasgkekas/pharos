@@ -534,12 +534,21 @@ a local (non-SSO) user configured in Settings.
 ## AI command bar & history
 
 A conversational command bar (in the navbar) lets you type natural-language
-requests such as "add a YouTube subscription", "log expense OTE 84 euros", or
-"show me this month's stats". It is a tool-using agent over the app's actions: it
-can add expenses / income / subscriptions / tasks / items, log a price, update or
-delete records, and answer overview questions. If a request is ambiguous it asks a
-short follow-up before acting. Past conversations are kept under **AI history**
-(`/history`).
+requests such as "add a YouTube subscription", "log expense OTE 84 euros", "mark
+the ΔΕΗ bill as paid", or "show me this month's stats". It is a tool-using agent
+over the app's actions: it can add expenses / income / subscriptions / tasks /
+items / shopping-list lines, log a price, search everything, edit or delete
+existing records, and answer overview questions. If a request is ambiguous it
+asks a short follow-up before acting. Past conversations are kept under **AI
+history** (`/history`).
+
+Search and edit/delete cover almost the same ground, with two deliberate gaps:
+receipts and statements are findable (so "find my Kotsovolos receipt" works) but
+not editable through the assistant, since both are parsed from a scanned
+document and statements can't be soft-deleted (re-import instead of asking the
+assistant to fix or remove one). A gift card's usage log and a goal's
+contributions are also off-limits as a raw edit, since their balance is derived
+from that log; the assistant reports this instead of silently skipping it.
 
 The command bar has a **Search / AI toggle**: in Search mode it is the global
 search below; in AI mode it is the assistant. The AI command bar requires an
@@ -547,9 +556,12 @@ Anthropic-capable provider (see [Configuration → AI providers](configuration.m
 
 ## Search
 
-Global search across items, receipts, statements, tasks, subscriptions, expenses,
-income, and vouchers. Results deep-link straight to the matching record (for
-example `/items?open=<id>`).
+Global search across items, receipts, statements, tasks, subscriptions,
+expenses, income, vouchers, bills, goals, gift cards, loyalty cards, and the
+shopping list. Results deep-link to the matching record where the page supports
+it (for example `/items?open=<id>`), or to the section that holds it when there
+is no per-row detail view (goals link to `/reports#goals`, shopping-list lines
+to `/shopping-list`).
 
 ## Notifications
 
