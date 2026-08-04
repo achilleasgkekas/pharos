@@ -69,16 +69,38 @@ if [ -n "${BACKUP_SSH:-}" ]; then
   # configured beyond a key that is already there.
   SSH_OPTS="ssh -p ${BACKUP_SSH_PORT:-23} -o BatchMode=yes"
   [ -n "${BACKUP_SSH_KEY:-}" ] && SSH_OPTS="$SSH_OPTS -i ${BACKUP_SSH_KEY}"
-  # The destination directory has to exist; Storage Box gives you a plain SFTP home.
-  $SSH_OPTS "${BACKUP_SSH%%:*}" "mkdir -p ${BACKUP_SSH#*:}" 2>/dev/null || true
+  REMOTE_HOST="${BACKUP_SSH%%:*}"
+  REMOTE_DIR="${BACKUP_SSH#*:}"
+  # A Hetzner Storage Box is a RESTRICTED shell, not a Linux login: it answers `ls`, `mkdir`, `rm`
+  # and rsync, and replies "Command not found" to anything else. `mkdir` has no -p there.
+  $SSH_OPTS "$REMOTE_HOST" "mkdir $REMOTE_DIR" >/dev/null 2>&1 || true
   rsync -e "$SSH_OPTS" "$DUMP" "$FILES" "$BACKUP_SSH/" || {
     echo "FATAL: offsite copy FAILED — the local copy exists but is not protected" >&2; exit 1
   }
-  # Prune the remote as well. A retention policy that only runs locally quietly fills the remote
-  # until it starts refusing writes, and the first refused upload is the one you needed.
-  $SSH_OPTS "${BACKUP_SSH%%:*}" \
-    "find ${BACKUP_SSH#*:} -name 'mongo-*.archive.gz' -mtime +${KEEP_DAYS} -delete 2>/dev/null;
-     find ${BACKUP_SSH#*:} -name 'storage-*.tar.gz' -mtime +${KEEP_DAYS} -delete 2>/dev/null" || true
+
+  # Remote retention. `find -mtime -delete` does NOT exist on that shell — it printed "Command not
+  # found" and the prune silently never ran, which would have filled the box while every run kept
+  # reporting success. So: list the remote, work out which files are past the window FROM THEIR
+  # NAMES (they carry a UTC timestamp), and remove exactly those.
+  #
+  # Deliberately NOT `rsync --delete` to mirror local retention: that couples the remote copy to
+  # the local one, so a wiped or mis-mounted local backups directory would delete the offsite
+  # copies too — the backup script destroying the backups is precisely the disaster this exists to
+  # prevent. Explicit removal of named files can only ever remove files we recognise.
+  CUTOFF="$(date -u -d "${KEEP_DAYS} days ago" +%Y%m%d 2>/dev/null || date -u -v-"${KEEP_DAYS}"d +%Y%m%d)"
+  OLD="$($SSH_OPTS "$REMOTE_HOST" "ls $REMOTE_DIR" 2>/dev/null \
+        | tr -d '\r' \
+        | awk -v c="$CUTOFF" '
+            /^(mongo|storage)-[0-9]{8}-[0-9]{6}\./ {
+              d = $0; sub(/^[a-z]+-/, "", d); sub(/-.*/, "", d);
+              if (d < c) print
+            }')"
+  if [ -n "$OLD" ]; then
+    # One session, one rm per file, quoted paths.
+    CMD=""; for f in $OLD; do CMD="$CMD rm $REMOTE_DIR/$f;"; done
+    $SSH_OPTS "$REMOTE_HOST" "$CMD" >/dev/null 2>&1 || echo "  (remote prune failed, not fatal)"
+    echo "  pruned $(echo "$OLD" | wc -w | tr -d ' ') old file(s) offsite"
+  fi
   echo "  -> $BACKUP_SSH"
 elif [ -n "${BACKUP_REMOTE:-}" ]; then
   if ! command -v rclone >/dev/null 2>&1; then
