@@ -19,9 +19,12 @@ const TenantSchema = new Schema(
     // Name of this tenant's isolated data database, e.g. "tenant_<slug>". Set at
     // provisioning; never reused across tenants (GDPR delete = drop this db).
     dbName: { type: String, required: true, unique: true },
-    // Optional custom domain (dedicated/top tier). Unique when set; sparse so many
-    // tenants can leave it null.
-    customDomain: { type: String, default: null, unique: true, sparse: true, lowercase: true, trim: true },
+    // Optional custom domain (dedicated/top tier). Unique when SET — see the partial index
+    // below, which is what actually makes that true. NOT declared unique/sparse here: a sparse
+    // index skips documents where the field is MISSING, but `default: null` writes an explicit
+    // null on every tenant, so the sparse index indexed them all and the second workspace ever
+    // created died on `E11000 ... customDomain: null`. Found by signing up a second account.
+    customDomain: { type: String, default: null, lowercase: true, trim: true },
     // Current plan key — resolved to entitlements in lib/billing/entitlements.ts.
     plan: { type: String, enum: ['free', 'shared', 'dedicated'], default: 'free' },
     // Lifecycle: trialing/active use the app; suspended/canceled block access (dunning,
@@ -74,6 +77,19 @@ const TenantSchema = new Schema(
     erasureRequestedBy: { type: String, default: null },
   },
   { timestamps: true }
+);
+
+// Unique custom domain, but ONLY across tenants that actually have one. A partial index is used
+// instead of `sparse: true` because sparse keys on "field absent" while this field is always
+// present (default null) — so sparse would enforce global uniqueness of null and allow exactly
+// ONE tenant to exist in the whole platform.
+//
+// NOTE for any database that already ran the old schema: Mongoose will not rewrite an existing
+// index, so the broken `customDomain_1` must be dropped once
+// (`db.tenants.dropIndex('customDomain_1')`) before this one can be built.
+TenantSchema.index(
+  { customDomain: 1 },
+  { unique: true, partialFilterExpression: { customDomain: { $type: 'string' } } }
 );
 
 export type TenantDoc = InferSchemaType<typeof TenantSchema> & { _id: string };

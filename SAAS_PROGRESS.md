@@ -6783,3 +6783,107 @@ paths, το fail-closed συμβόλαιο (unset → 500, ώστε μισο-ρ�
 πρόβλημα του stack τώρα, και πλέον **live-verifiable** στο `lvh.me:3001`· (β) workspace autocomplete
 στο platform audit filter (`<datalist>` από τα `workspaceSlug` της σελίδας)· (γ) τα 2 non-scoped
 `actions.ts` (`history`, `settings`). Πριν ξεκινήσεις: ask-inbox πρώτα.
+
+## 2026-08-04 (β) — increment 134: καμία αποτυχία tenant-resolution δεν βγάζει πια 500
+
+Ζητήθηκε ρητά από τον Achilleas (interactive): «φτιάξε το TenantResolutionError να μη βγάζει 500».
+Ήταν και το (α) του προηγούμενου run.
+
+**Το πρόβλημα**: το `resolveRequestTenant` πετούσε 4 διαφορετικά codes και **κανένα δεν πιανόταν**
+πουθενά, οπότε το Next τα renderαρε όλα ως το 500 error boundary. Δηλαδή ο logged-out επισκέπτης σε
+workspace subdomain, αυτός που πληκτρολόγησε λάθος subdomain, και ο suspended πελάτης έπαιρναν ΤΟ
+ΙΔΙΟ «Something went wrong» από server που δούλευε μια χαρά. Επιπλέον το 500 λέει σε έναν επιτιθέμενο
+ότι κάτι υπάρχει πίσω από τον τοίχο.
+
+**Νέο `lib/tenancy/requestGate.ts`** (pure, **μηδέν imports** — ούτε `next/navigation`, ώστε να
+είναι testable χωρίς request context) + conversion μέσα στο `withRequestTenant`, δηλαδή σε **ΕΝΑ**
+σημείο για **62 call sites**:
+
+| κατάσταση | πριν | τώρα |
+|---|---|---|
+| logged out σε workspace host | 500 | **307** `/account/login?next=<path>` |
+| host με slug που δεν υπάρχει | 500 | **404** |
+| signed-in μη-μέλος | 500 | **404** (ίδιο, σκόπιμα) |
+| signed in στο apex | 500 | **307** `/account` (η λίστα workspaces του) |
+| logged out στο apex | 500 | **307** login |
+| suspended / canceled workspace | 500 | **307** `/account/workspace?blocked=<status>` |
+
+**Νέο error code `unknown_workspace`**: το `no_tenant` κάλυπτε δύο εντελώς διαφορετικές
+καταστάσεις. Host που **ΟΝΟΜΑΖΕΙ** workspace που δεν υπάρχει = 404. Host που δεν ονομάζει κανένα
+(apex, `www`, unpointed custom domain) = «δεν είσαι σε workspace ακόμα» → account. Ο διαχωρισμός
+γίνεται με το ήδη υπάρχον pure `parseTenantSlug`.
+
+**Η μία απόφαση που είναι security, όχι UX**: `not_a_member` επιστρέφει **byte-identical** απάντηση
+με το `unknown_workspace`. Το να πεις σε signed-in άγνωστο «αυτό το workspace υπάρχει, απλά δεν το
+βλέπεις» μετατρέπει τον subdomain χώρο σε **membership oracle**. Και δεν αρκεί να συμφωνούν τα δύο
+outcomes: πρόσθεσα `needsAuthState(code)` ώστε το 404 branch **να μη διαβάζει καν το session** —
+δεν μπορεί να διαφοροποιηθεί κάτι που δεν το κοιτάς ποτέ. Το test το πιάνει και από τις δύο μεριές
+(ίδιο outcome για authenticated true/false, ΚΑΙ `getCurrentAccount` ποτέ δεν καλείται). Αυτό ήρθε
+από **αποτυχία test που είχα γράψει**: το πρώτο implementation διάβαζε το session σε κάθε failure —
+διόρθωσα τον κώδικα, όχι το test.
+
+**Open-redirect guard**: το `next=` περνά από `safeReturnPath` — δέχεται μόνο same-origin absolute
+paths, κόβει `//evil.com`, `/\evil.com` (ο browser κάνει το backslash slash), absolute URLs,
+control characters. Το `blocked=<status>` δέχεται μόνο γνωστά statuses, αλλιώς δεν μπαίνει καθόλου
+στο URL (δεν αντανακλάται ξένο κείμενο).
+
+**Ένα πραγματικό fault ΠΑΡΑΜΕΝΕΙ 500** (πεσμένη Mongo κ.λπ.) — pinned με test. Το αντίθετο θα ήταν
+χειρότερο από το αρχικό bug: outage κρυμμένο πίσω από ατέρμονο «sign in → bounce → sign in».
+
+**`components/saas/blockedNotice.ts`** + banner στο `/account/workspace`: ο suspended/canceled
+πελάτης διαβάζει τι έγινε, **ότι τα δεδομένα του είναι εκεί** (η πρώτη σκέψη σε κλειδωμένη εφαρμογή
+είναι «τα έχασα;») και τι να κάνει. Άγνωστο status → κανένα banner.
+
+---
+
+### ΣΟΒΑΡΟ BUG που βρέθηκε ΤΥΧΑΙΑ κατά το live probe: μόνο ΕΝΑ workspace μπορούσε να υπάρξει
+
+Προσπάθησα να φτιάξω δεύτερο λογαριασμό για να δοκιμάσω το `not_a_member` και πήρα:
+`E11000 duplicate key error ... index: customDomain_1 dup key: { customDomain: null }`.
+
+**Αιτία**: `customDomain: { default: null, unique: true, sparse: true }`. Το **sparse αγνοεί
+documents όπου το πεδίο ΛΕΙΠΕΙ**, αλλά το `default: null` γράφει ρητό null σε κάθε tenant — άρα ο
+index τα έπιανε όλα και επέβαλλε μοναδικότητα του **null**. Πρακτικά: **ο δεύτερος πελάτης της
+πλατφόρμας δεν μπορούσε ποτέ να κάνει signup.** Κανένα unit test δεν μπορούσε να το δει (θέλει
+πραγματική Mongo με δύο tenants).
+
+**Fix**: field-level unique/sparse αφαιρέθηκε· ρητό partial index
+`{ customDomain: 1 }, { unique: true, partialFilterExpression: { customDomain: { $type: 'string' } } }`
+— σωστό ανεξαρτήτως null. ⚠ **Ο Mongoose ΔΕΝ ξαναγράφει υπάρχοντα index**: σε βάση που έτρεξε το
+παλιό schema πρέπει `db.tenants.dropIndex('customDomain_1')` μία φορά (το έκανα στο scratch DB· σε
+production δεν υπάρχει ακόμα βάση).
+
+**Αποδεδειγμένο**: μετά το fix, δεύτερο signup → tenant `gate-two` provisionαρίστηκε κανονικά.
+
+**Δεύτερο εύρημα, ΔΕΝ διορθώθηκε** (το γράφω αντί να το αποσιωπήσω): το signup **δεν είναι
+atomic**. Το πρώτο αποτυχημένο signup άφησε ορφανό `Account` χωρίς workspace (το Account
+δημιουργείται πριν το provisioning) — το δεύτερο attempt με το ίδιο email πήρε «already exists».
+Θέλει είτε transaction είτε compensating delete. Αξίζει δικό του increment.
+
+---
+
+**Verified ΖΩΝΤΑΝΑ** (`lvh.me:3001`, SAAS_MODE on, πραγματική Mongo, curl με cookie jar) — και τα 6
+σενάρια του πίνακα, **plus** το healthy path `gate-two.lvh.me/receipts` → **200** πριν και μετά
+(μηδέν regression), suspended → 307 blocked=suspended, canceled → 307 blocked=canceled, restore →
+**200** ξανά. Το banner renderαρει («This workspace is suspended», «Your data is intact…»), χωρίς
+flag δεν εμφανίζεται, και `?blocked=<script>` **δεν** αντανακλάται. `pharos-saas-web` RestartCount 0,
+`homepage-web` ανέγγιχτο. Screenshot: **δεν έγινε** — το Browser pane ζητά per-action approval για
+το `lvh.me` και δεν το φόρτωσα unattended· τα HTTP codes + το rendered markup είναι ούτως ή άλλως
+ισχυρότερη απόδειξη για redirects από μια εικόνα.
+
+`npm run type-check` **EXIT 0**. Δικό μου scope (`lib/tenancy` + `components/saas`): **67 files /
+1037 tests green**. Πλήρες suite: **358/359 files** — η μία αποτυχία
+(`writeGuard.coverage.test.ts` → `settings/actions.ts runAlertChecks()`) είναι **ξένο uncommitted
+WIP άλλης routine** που δουλεύει αυτή τη στιγμή στο ίδιο tree (`alertDedup.ts`, `appSettings.ts`,
+`settings/actions.ts` όλα modified/untracked, όχι δικά μου). Νωρίτερα στο ίδιο run ήταν 53
+αποτυχίες από το ίδιο WIP και έπεσαν σε 1 καθώς προχωρούσαν. **Δεν άγγιξα τίποτα δικό τους.**
+
+**Test data στο scratch stack**: έμειναν `gatetest@example.com` (ορφανός, χωρίς workspace — το
+τεκμήριο του non-atomic signup) και `gate2@example.com` + workspace `gate-two`. Χρήσιμα ως fixture
+για multi-workspace tests· τα άφησα επίτηδες.
+
+**Next task:** (α) **atomic signup** (transaction ή compensating delete· το ορφανό account είναι
+πραγματικό dead-end για πελάτη που κάνει retry)· (β) workspace autocomplete στο platform audit
+filter· (γ) τα 2 non-scoped `actions.ts` (`history`, `settings`).
+
+**## Needs Achilleas:** αμετάβλητα — **Stripe keys**, **τελικό plan pricing**, **email provider**.

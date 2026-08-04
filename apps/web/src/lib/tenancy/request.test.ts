@@ -33,6 +33,19 @@ vi.mock('./accountSession', () => ({ getCurrentAccount: () => getCurrentAccountM
 const accountTenantsMock = vi.fn<(accountId: string) => Promise<Array<{ tenantId: string; slug: string; name: string; role: string; plan: string; status: string }>>>();
 vi.mock('./saasApi', () => ({ accountTenants: (id: string) => accountTenantsMock(id) }));
 
+// redirect()/notFound() throw Next control-flow signals in production; the mocks throw too, so
+// the "never returns" contract of the gate is exercised rather than assumed.
+const redirectMock = vi.fn<(to: string) => never>((to) => {
+  throw new Error(`NEXT_REDIRECT:${to}`);
+});
+const notFoundMock = vi.fn<() => never>(() => {
+  throw new Error('NEXT_NOT_FOUND');
+});
+vi.mock('next/navigation', () => ({
+  redirect: (to: string) => redirectMock(to),
+  notFound: () => notFoundMock(),
+}));
+
 import { resolveRequestTenant, withRequestTenant, TenantResolutionError } from './request';
 import { currentTenant } from './current';
 
@@ -55,6 +68,8 @@ beforeEach(() => {
   getTenantContextMock.mockReset();
   getCurrentAccountMock.mockReset();
   accountTenantsMock.mockReset();
+  redirectMock.mockClear();
+  notFoundMock.mockClear();
 });
 
 describe('resolveRequestTenant — OSS / self-hosted (SAAS_MODE off)', () => {
@@ -177,5 +192,109 @@ describe('resolveRequestTenant — SaaS routing (SAAS_MODE on)', () => {
     const ctx = await resolveRequestTenant();
     expect(ctx).toBe(acme);
     expect(getTenantContextMock).toHaveBeenCalledWith({ host: 'acme.ph-aros.com' });
+  });
+});
+
+// ── withRequestTenant: no failure mode may reach the 500 error boundary ──────────────────────
+//
+// Every case below used to throw straight past the caller, so a logged-out visitor, a mistyped
+// subdomain and a suspended customer all got the same "Something went wrong" page from a server
+// that was working perfectly. These pin the replacement, including the one property that is a
+// security property rather than a UX one (unknown workspace and not-a-member must be
+// indistinguishable).
+describe('withRequestTenant — failures become responses, never a 500', () => {
+  const onTenantHost = (host = 'acme.ph-aros.com', path: string | null = '/receipts') => {
+    saasModeMock.mockReturnValue(true);
+    headersGet.mockImplementation((k) => (k === 'x-pathname' ? path : host));
+  };
+  const body = vi.fn(async () => 'ran');
+
+  beforeEach(() => body.mockClear());
+
+  it('logged out on a workspace host → login, carrying the path back', async () => {
+    onTenantHost();
+    getTenantContextMock.mockResolvedValue(acme);
+    getCurrentAccountMock.mockResolvedValue(null);
+
+    await expect(withRequestTenant(body)).rejects.toThrow('NEXT_REDIRECT:/account/login?next=%2Freceipts');
+    expect(redirectMock).toHaveBeenCalledWith('/account/login?next=%2Freceipts');
+    expect(body).not.toHaveBeenCalled();
+  });
+
+  it('unknown workspace subdomain → 404, not a crash', async () => {
+    onTenantHost('nosuch.ph-aros.com');
+    getTenantContextMock.mockResolvedValue(null);
+
+    await expect(withRequestTenant(body)).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(notFoundMock).toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+    // It must not go looking for a session first: there is no workspace to be a member of.
+    expect(getCurrentAccountMock).not.toHaveBeenCalled();
+  });
+
+  it('signed-in stranger on someone else’s workspace → the SAME 404 as a nonexistent one', async () => {
+    onTenantHost();
+    getTenantContextMock.mockResolvedValue(acme);
+    getCurrentAccountMock.mockResolvedValue({ sub: 'acc1', email: 'a@a.com' });
+    accountTenantsMock.mockResolvedValue(membership({ tenantId: 'someOtherTenantId' }));
+
+    await expect(withRequestTenant(body)).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(body).not.toHaveBeenCalled();
+  });
+
+  it('signed in on the apex (no workspace in the host) → their workspace list', async () => {
+    onTenantHost('ph-aros.com', '/items');
+    getTenantContextMock.mockResolvedValue(null);
+    getCurrentAccountMock.mockResolvedValue({ sub: 'acc1', email: 'a@a.com' });
+
+    await expect(withRequestTenant(body)).rejects.toThrow('NEXT_REDIRECT:/account');
+    expect(notFoundMock).not.toHaveBeenCalled();
+  });
+
+  it('logged out on the apex → login, not the workspace list', async () => {
+    onTenantHost('ph-aros.com', '/items');
+    getTenantContextMock.mockResolvedValue(null);
+    getCurrentAccountMock.mockResolvedValue(null);
+
+    await expect(withRequestTenant(body)).rejects.toThrow('NEXT_REDIRECT:/account/login?next=%2Fitems');
+  });
+
+  it('suspended workspace → the workspace page, flagged with the reason', async () => {
+    onTenantHost();
+    getTenantContextMock.mockResolvedValue({ ...acme, status: 'suspended' });
+    getCurrentAccountMock.mockResolvedValue({ sub: 'acc1', email: 'a@a.com' });
+    accountTenantsMock.mockResolvedValue(membership());
+
+    await expect(withRequestTenant(body)).rejects.toThrow('NEXT_REDIRECT:/account/workspace?blocked=suspended');
+    expect(body).not.toHaveBeenCalled();
+  });
+
+  it('a genuine fault still reaches the error boundary — it is not dressed up as a redirect', async () => {
+    // The gate must not turn a dead database into a login page: that would hide real outages
+    // behind an infinite "sign in, get bounced, sign in" loop.
+    onTenantHost();
+    getTenantContextMock.mockRejectedValue(new Error('mongo down'));
+
+    await expect(withRequestTenant(body)).rejects.toThrow('mongo down');
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(notFoundMock).not.toHaveBeenCalled();
+  });
+
+  it('a missing x-pathname just drops the next param, it does not break the redirect', async () => {
+    onTenantHost('acme.ph-aros.com', null);
+    getTenantContextMock.mockResolvedValue(acme);
+    getCurrentAccountMock.mockResolvedValue(null);
+
+    await expect(withRequestTenant(body)).rejects.toThrow('NEXT_REDIRECT:/account/login');
+  });
+
+  it('SELF-HOSTED PARITY: with SAAS_MODE off nothing in the gate can fire', async () => {
+    saasModeMock.mockReturnValue(false);
+
+    await expect(withRequestTenant(body)).resolves.toBe('ran');
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(notFoundMock).not.toHaveBeenCalled();
+    expect(headersGet).not.toHaveBeenCalled();
   });
 });

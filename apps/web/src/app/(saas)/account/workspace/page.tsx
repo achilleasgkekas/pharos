@@ -22,6 +22,7 @@ import { pickWorkspace } from '@/components/saas/chooseWorkspace';
 import { workspaceTabs } from '@/components/saas/workspaceTabs';
 import { WorkspaceShell, Panel, DefRow } from '@/components/saas/WorkspaceShell';
 import { StatTile } from '@/components/saas/StatTile';
+import { blockedNotice } from '@/components/saas/blockedNotice';
 import { formatInt, formatBytes, formatCostMicros, formatWhen } from '@/components/saas/format';
 
 export const dynamic = 'force-dynamic';
@@ -39,9 +40,12 @@ function quotaLabel(used: string, limit: number | null, fmt: (n: number) => stri
 export default async function WorkspaceOverviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ w?: string }>;
+  searchParams: Promise<{ w?: string; blocked?: string }>;
 }) {
-  const { w } = await searchParams;
+  const { w, blocked } = await searchParams;
+  // Set by the data-plane gate when it turns someone away from the product because their
+  // workspace is not active (lib/tenancy/requestGate). Unrecognised values render nothing.
+  const notice = blockedNotice(blocked);
 
   // Gate (throws notFound when SaaS off) + current viewer claims.
   const viewer = await getSaasViewer();
@@ -126,6 +130,19 @@ export default async function WorkspaceOverviewPage({
       }))}
     >
       <div className="space-y-6">
+        {notice && (
+          <div
+            role="status"
+            className="rounded-xl border border-[color:var(--color-gold)]/40 bg-[color:var(--color-gold)]/10 px-4 py-3"
+          >
+            <p className="text-sm font-semibold text-[color:var(--color-gold)]">{notice.title}</p>
+            <p className="mt-1 text-sm text-[color:var(--color-text-dim)]">{notice.body}</p>
+            {notice.action && (
+              <p className="mt-1 text-sm text-[color:var(--color-text-dim)]">{notice.action}</p>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatTile label="Members" value={formatInt(memberCount)} accent="cyan" />
           <StatTile
