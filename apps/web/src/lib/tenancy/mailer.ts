@@ -126,7 +126,11 @@ export function htmlToText(html: string): string {
  *  token and posts it to /api/saas/account/reset/confirm). `base` should be normalized. */
 export function resetLinkUrl(base: string, token: string): string {
   const b = (base || '').replace(/\/+$/, '');
-  return `${b}/reset?token=${encodeURIComponent(token)}`;
+  // MUST match the real route: app/(saas)/account/reset/confirm/page.tsx. It said `/reset` for a
+  // long time and nobody noticed, because until SMTP was wired no reset email had ever been
+  // delivered to a human — the first one that arrived led straight to a 404. The token was fine;
+  // the address was not.
+  return `${b}/account/reset/confirm?token=${encodeURIComponent(token)}`;
 }
 
 /** Build the password-reset email body. Pure — no send. */

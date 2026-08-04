@@ -88,13 +88,16 @@ describe('htmlToText', () => {
 });
 
 describe('resetLinkUrl', () => {
-  it('joins base + token and url-encodes the token', () => {
+  it('points at the route that actually exists', () => {
+    // It pointed at /reset until 2026-08-04, which is a 404: the page is at
+    // /account/reset/confirm. Undetected for as long as no reset email could be delivered, then
+    // the very first real one led straight to "This page could not be found".
     expect(resetLinkUrl('https://app.ph-aros.com', 'a b/c')).toBe(
-      'https://app.ph-aros.com/reset?token=a%20b%2Fc'
+      'https://app.ph-aros.com/account/reset/confirm?token=a%20b%2Fc'
     );
   });
   it('strips a trailing slash from the base', () => {
-    expect(resetLinkUrl('https://x.com/', 'tok')).toBe('https://x.com/reset?token=tok');
+    expect(resetLinkUrl('https://x.com/', 'tok')).toBe('https://x.com/account/reset/confirm?token=tok');
   });
 });
 

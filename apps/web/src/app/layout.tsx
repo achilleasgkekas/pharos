@@ -7,6 +7,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { currencySymbol } from '@/lib/money';
 import { isAiReady } from '@/lib/ollama';
 import { getCurrentUser } from '@/lib/auth';
+import { saasNavUser } from '@/lib/tenancy/navUser';
 import { getAiConfig } from '@/lib/aiConfig';
 import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
 import { headers } from 'next/headers';
@@ -41,6 +42,14 @@ export default async function RootLayout({
   // so /login and /setup are chrome-less. Middleware already blocks unauthenticated
   // navigation; this just keeps the shell consistent.
   const user = await getCurrentUser();
+  // SAAS_MODE: there is no self-hosted `User` at all — a customer is an `Account` with its own
+  // cookie — so `user` is null on every workspace page and the navbar simply never rendered. The
+  // product was reachable and had no navigation whatsoever ("λείπει το μενού πάνω"). Resolve the
+  // signed-in account instead and let the same nav render for it.
+  //
+  // Self-hosted is untouched by construction: saasMode() is false, so nothing below runs and the
+  // extra query does not exist.
+  const navUser = user ? { name: user.name || 'account', role: user.role } : await saasNavUser();
   // UI language for this request (cookie → default), handed to the client provider.
   const { locale, dict } = await getServerT();
   // Keep /login and /setup chrome-less even when signed in — the setup wizard signs
@@ -84,7 +93,7 @@ export default async function RootLayout({
               (those stay chrome-less even mid-wizard, once step 1 signs you in).
               Keep `children` in a STABLE sibling position so flipping auth state
               doesn't remount the page subtree and reset client state. */}
-          {user && !chromeless && <SiteNav aiReady={aiReady} user={{ name: user.name || 'account', role: user.role }} />}
+          {navUser && !chromeless && <SiteNav aiReady={aiReady} user={navUser} />}
           {user && !chromeless && banner && <AiOnboardingBanner reason={banner} />}
           {children}
         </Providers>

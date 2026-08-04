@@ -318,7 +318,7 @@ describe('POST /api/saas/account/reset/request — delivery and the dev-token sc
     expect(msg.to).toBe('user@example.com');
     expect(msg.subject).toBe('Reset your Pharos password');
     // The link carries a token whose hash is exactly what was persisted.
-    const token = decodeURIComponent(/\/reset\?token=([^"]+)/.exec(msg.html)![1]);
+    const token = decodeURIComponent(/\/account\/reset\/confirm\?token=([^"]+)/.exec(msg.html)![1]);
     expect((doc.set.mock.calls[0][0] as { resetTokenHash: string }).resetTokenHash).toBe(hashResetToken(token));
   });
 
@@ -329,7 +329,7 @@ describe('POST /api/saas/account/reset/request — delivery and the dev-token sc
 
     await POST(makeReq({ email: 'user@example.com' }, 'https://internal.local/api/saas/account/reset/request'));
 
-    expect(sendEmailMock.mock.calls[0][0].html).toContain('https://pharos.example.io/reset?token=');
+    expect(sendEmailMock.mock.calls[0][0].html).toContain('https://pharos.example.io/account/reset/confirm?token=');
   });
 
   it('falls back to the request origin when no public URL env is set', async () => {
@@ -338,7 +338,7 @@ describe('POST /api/saas/account/reset/request — delivery and the dev-token sc
 
     await POST(makeReq({ email: 'user@example.com' }, 'https://app.example.com/api/saas/account/reset/request'));
 
-    expect(sendEmailMock.mock.calls[0][0].html).toContain('https://app.example.com/reset?token=');
+    expect(sendEmailMock.mock.calls[0][0].html).toContain('https://app.example.com/account/reset/confirm?token=');
   });
 
   it('a REJECTING sendEmail does not fail the response (fire-and-forget)', async () => {
