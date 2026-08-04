@@ -17,7 +17,6 @@ Design principles: local-first, privacy-first (financial data stays under your c
 - [Reports](https://ph-aros.com/#features): Net position, cash flow, budgets, spend by category and store, depreciated inventory value, and savings goals.
 - [Tasks & planning](https://ph-aros.com/#features): A kanban planner for the projects behind the things you buy and install.
 - [Network](https://ph-aros.com/#features): Optional UniFi dashboard for devices, clients, WAN health and speed tests.
-- [Mobile app](https://ph-aros.com/#mobile): An Expo app for iOS and Android, including barcode scan-to-add for the shopping list and inventory.
 
 Also shipped: bills you pay by hand tracked separately from card subscriptions, opt-in multi-currency across every money record, a three-month calendar that publishes as a read-only iCal feed, an eight-language interface, and a Trash with soft-delete so nothing is lost by accident.
 

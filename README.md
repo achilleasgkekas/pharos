@@ -119,7 +119,7 @@ HTTP) so an external Claude — the mobile/desktop app, Claude Code, or MCP
 Inspector — can run the same commands as the in-app AI bar (add expense / income
 / subscription / item / task, log a price, search, overview).
 
-1. **Settings → AI → Mobile / MCP → Generate token** (a per-user bearer token,
+1. **Settings → AI → API / MCP → Generate token** (a per-user bearer token,
    shown once).
 2. The endpoint is LAN/HTTP, so to reach it from your phone put it on **public
    HTTPS** with a tunnel (Cloudflare Tunnel or Tailscale Funnel).

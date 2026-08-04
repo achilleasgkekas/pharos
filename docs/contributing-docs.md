@@ -39,7 +39,7 @@ Practical consequences:
 | `features.md` | What each module does, from a user's perspective. |
 | `api.md` | REST API v1 reference (see the sync rule below). |
 | `openapi.yaml` | Machine-readable mirror of `api.md`. |
-| `security.md`, `backup-and-restore.md`, `updating.md`, `mobile.md`, `troubleshooting.md`, `saas.md`, `faq.md`, `glossary.md` | Focused guides, each linked from `README.md`. |
+| `security.md`, `backup-and-restore.md`, `updating.md`, `troubleshooting.md`, `saas.md`, `faq.md`, `glossary.md` | Focused guides, each linked from `README.md`. |
 | `DOCS_PROGRESS.md` | The running log of what was written and what is next. |
 
 When you add a new guide, also add a one-line entry to `README.md` under
@@ -69,9 +69,9 @@ When you add a new guide, also add a one-line entry to `README.md` under
 
 ## Keeping `api.md` in sync with the routes
 
-`api.md` and `openapi.yaml` describe the REST API that the mobile app depends
-on. The **route files are the source of truth**; the docs mirror them. When API
-routes change, update both docs in the same change:
+`api.md` and `openapi.yaml` describe the REST API that external clients and
+scripts depend on. The **route files are the source of truth**; the docs mirror
+them. When API routes change, update both docs in the same change:
 
 1. List the routes: everything under `apps/web/src/app/api/v1/**/route.ts`.
 2. For each, confirm the method(s), path, query params, and request/response

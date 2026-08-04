@@ -10,7 +10,7 @@ covers the areas most people ask about:
 - [Notifications](#notifications) (ntfy / Discord / Slack / Telegram / webhook)
 - [Language (i18n)](#language-i18n)
 - [Calendar feed](#calendar-feed) (subscribe from Google / Apple / Outlook)
-- [Remote access (MCP / mobile app)](#remote-access-mcp--mobile-app)
+- [Remote access (MCP)](#remote-access-mcp)
 
 For the full list of boot-time environment variables, see
 [self-hosting.md](self-hosting.md).
@@ -315,16 +315,16 @@ The endpoint itself is documented in [api.md](api.md#calendar-feed-ical).
 
 ---
 
-## Remote access (MCP / mobile app)
+## Remote access (MCP)
 
 Pharos exposes a remote [Model Context Protocol](https://modelcontextprotocol.io)
-server so an external Claude client (the companion mobile app, Claude Code, or the
-MCP Inspector) can drive it with the same tools as the in-app AI command bar (add /
+server so an external Claude client (Claude's mobile or desktop app, Claude Code, or
+the MCP Inspector) can drive it with the same tools as the in-app AI command bar (add /
 update / search records, get an overview, and so on).
 
 ### Generate an API token
 
-1. Open **Settings → AI** in the web app and find the mobile / remote-access
+1. Open **Settings → AI** in the web app and find the API / remote-access
    section.
 2. Click **Generate** to mint a personal API token (`phk_…`). It is shown **once**,
    right after generation, so copy it immediately; you can **Revoke** and generate
@@ -336,13 +336,11 @@ update / search records, get an overview, and so on).
    ```
 
 Unlike the calendar feed token, this **is** the full API bearer: it is the same
-token the [REST API](api.md) and the [mobile app](mobile.md) use, sent as
+token the [REST API](api.md) uses, sent as
 `Authorization: Bearer phk_…`. Treat it like a password.
 
 ### Connect a client
 
-- **Mobile app** — enter the server URL and paste the token; see
-  [mobile.md](mobile.md).
 - **Claude Code** — add it as a remote MCP server pointing at
   `https://your-pharos-host/api/mcp` with the bearer token above.
 - **Anything MCP-aware** — the transport is JSON-RPC 2.0 over Streamable-HTTP
@@ -361,4 +359,4 @@ curl -s https://your-pharos-host/api/mcp \
 ---
 
 See also: [self-hosting.md](self-hosting.md) · [features.md](features.md) ·
-[api.md](api.md) · [mobile.md](mobile.md)
+[api.md](api.md)

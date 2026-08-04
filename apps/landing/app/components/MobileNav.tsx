@@ -8,7 +8,6 @@ type NavItem = { href: string; label: string; external?: boolean };
 const ITEMS: NavItem[] = [
   { href: '#features', label: 'Features' },
   { href: '#ai', label: 'AI' },
-  { href: '#mobile', label: 'Mobile' },
   { href: '#who', label: 'Who' },
   { href: '#self-host', label: 'Self-host' },
   { href: '#pricing', label: 'Pricing' },

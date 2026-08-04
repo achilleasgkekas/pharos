@@ -48,12 +48,7 @@
 - Reuse server actions / `aiTools.ts` `execute()` όπου ταιριάζει.
 - Middleware exception (όπως το `/api/mcp`).
 
-### 6. Mobile app MVP ⬜ (καταναλώνει το /api/v1)
-- Receipt photo capture → upload → AI parse (το pipeline υπάρχει server-side).
-- List/detail views (receipts, expenses, items), quick-add.
-- Token-based login.
-
-### 7. Storage extensions 🔄
+### 6. Storage extensions 🔄
 - ✅ `downloadFromOnedrive` (GET `/content`) + `createShareLink` (`lib/onedrive.ts`). `lib/mirror.ts`: `recacheFromRemote`/`shareLinkFor` (templated-path aware) + `recacheByPath` (reverse-lookup owner doc). **On-demand cache wired** στο `/api/files/[...path]`: local miss + OneDrive backend → pull-back + write local + serve (Session 2026-06-29).
 - ✅ «Open in OneDrive» UI button (Session 2026-06-29): `lib/mirror.ts` `shareLinkByPath` (reverse-lookup owner) + `app/storage-actions.ts` (`onedriveEnabled`/`getOnedriveShareLink`) + **self-gating** `components/OpenInOneDriveButton.tsx` (renders μόνο όταν backend=onedrive — χωρίς prop-drilling) wired στα detail modals Receipts/Statements/Expenses. i18n key `common.openInOnedrive` (en+el).
 - ⬜ Νέοι backends στο storage abstraction: **Amazon S3, Azure Blob, Cloudflare R2** (tenant-selectable drivers).
@@ -61,6 +56,10 @@
 ---
 
 ## LATER — SaaS foundation (μόνο μετά από validation ζήτησης)
+
+> Σημ.: το #7 έλειπε ήδη (ήταν «Mobile app MVP», αφαιρέθηκε 2026-08-04 — mobile discontinued, βλ.
+> `OWNER_DECISIONS.md` #15). Δεν ξαναρίθμησα τα #8-19 παρακάτω για να μη σπάσω cross-references
+> αλλού (π.χ. `PRODUCT_BACKLOG.md` P79 λέει «§9 web MFA») — το κενό είναι σκόπιμο, όχι σφάλμα.
 
 ### 8. Multi-tenancy — database-per-tenant ⬜ (το μεγάλο άλμα)
 - `lib/db.ts` → per-tenant connection layer: μία cluster σύνδεση + `conn.useDb('tenant_<id>')` ανά request, models registered per-connection.
@@ -130,6 +129,6 @@
 
 ## Πρόταση σειράς εκτέλεσης
 1. **NOW** (1→2→3): τελείωσε i18n, AI-search, notification framework. = πουλήσιμο, γυαλισμένο προϊόν.
-2. **NEXT** (4→5→6→7): image publish + REST API + mobile MVP + storage drivers. = distribution + leverage, χρήσιμα παντού.
+2. **NEXT** (4→5→6): image publish + REST API + storage drivers. = distribution + leverage, χρήσιμα παντού.
 3. **Validate** με self-hosted/managed πελάτες.
 4. **LATER/LAUNCH** (8→19): μόνο αν τραβήξει η αγορά.

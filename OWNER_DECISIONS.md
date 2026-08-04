@@ -124,6 +124,42 @@
    pattern στο `settings/actions.ts`, ΑΝ εφαρμόζεται σε tenant-level granularity) αντί για hard
    DB drop χωρίς recovery window. Owner: **saas-core**.
 
+15. **⛔ Mobile app DISCONTINUED — μόνο web πλέον** (interactive session 2026-08-04, ρητό: «διαγράφεται
+   πλήρως το mobile, μένουμε μόνο web, να σβηστούν όλα, να μην υπάρχει πουθενά dev σχετικά με αυτό, ακόμη
+   και στο landing αν αναφέρεται»). **Μη αναστρέψιμη standing απόφαση, ΟΧΙ πρόσκαιρο πάγωμα σαν το P36/P16
+   (#13)** — καμία routine δεν ξαναφέρνει mobile-related δουλειά, δεν προτείνει mobile items, δεν αναφέρεται
+   σε mobile parity/roadmap πουθενά. Έγινε αυτό το session:
+   - `git rm -r apps/mobile/` (ολόκληρο το Expo/React Native app, 47 tracked αρχεία), `MOBILE_PARITY.md`,
+     `docs/mobile.md`.
+   - Backend code που υπήρχε **αποκλειστικά** για να σερβίρει το mobile: `lib/expoPush.ts` (+test),
+     `api/v1/push/register` route (+test), `User.pushTokens`, το `pushAllDevices()` call site μέσα στο
+     `runAlertChecks` (P82), ολόκληρο το barcode-scan cluster (`lib/barcode.ts`, `lib/barcodeLookup.ts`,
+     `api/v1/lookup/barcode` route, ήταν αποκλειστικά για το mobile camera scan, μηδέν web caller) — verified
+     grep πριν το delete σε κάθε περίπτωση, όχι απλά «νομίζω ότι είναι mobile-only».
+   - `docs/openapi.yaml`: αφαιρέθηκαν τα `/push/register` και `/lookup/barcode` path entries (ο
+     `openapi.coverage.test.ts` guard έπιασε σωστά τα orphaned paths).
+   - **Το `/api/v1` REST API ΠΑΡΑΜΕΝΕΙ** — δεν είναι mobile-only, εξυπηρετεί ήδη το ήδη-shipped browser
+     extension (P5) και είναι γενικό distribution API (`TODO.md` §5). Comments/docstrings σε route
+     files που έλεγαν «mobile-parity» ή αναφέρονταν στο (πλέον διαγραμμένο) `MOBILE_PARITY.md`
+     ξαναδιατυπώθηκαν, ΧΩΡΙΣ αλλαγή στη λογική/behavior των endpoints.
+   - `PRODUCT_BACKLOG.md`: mobile-only items (P17 camera barcode scan, P23 share-sheet, P51 app-lock,
+     P59 widget, κλπ) αφαιρέθηκαν/rejected από το Approved/Proposed queue· ήδη-shipped ιστορικές
+     καταχωρήσεις (πχ P30 mobile push, ήδη SHIPPED) ΔΕΝ ξαναγράφονται (ιστορικό), αλλά annotated ως
+     discontinued ώστε κανείς να μην τις ξαναχτίσει/επεκτείνει.
+   - `TODO.md`/`ROADMAP.md`/`STATUS.md`/`API.md`/`WEB_DEBT.md`: αφαιρέθηκαν forward-looking mobile
+     roadmap items (πχ «§6 Mobile app MVP»).
+   - `PROGRESS.md`/`SAAS_PROGRESS.md`/`OSS_PROGRESS.md`/`CLOUD_GUARD.md`: **ιστορικά logs, ΔΕΝ
+     ξαναγράφτηκαν** — προστέθηκε μόνο νέα closing entry που καταγράφει την απόφαση, standard practice.
+   - `CLAUDE.md`: νέα top session entry + ενημερώθηκε το current-state framing (was «Next.js web + Expo
+     mobile» dual codebase → web-only). Ιστορικές session αναφορές στο mobile ΔΕΝ διαγράφηκαν (project
+     memory, όχι active roadmap).
+   - `apps/landing/*`: αφαιρέθηκαν marketing claims/roadmap για mobile app. **Ρητά ΔΕΝ αγγίχτηκαν**:
+     mobile-*responsive web design* (viewport breakpoints, hamburger nav, κλπ) — άσχετο με το
+     discontinued native app, παραμένει απαραίτητο για το ίδιο το website. Μπερδεύεται εύκολα το «mobile»
+     ως λέξη-κλειδί, ελέγχθηκε context ανά hit πριν οποιαδήποτε αλλαγή.
+   Owner: κανένα routine πλέον — αν κάποιο βρει mobile-tagged item ή αναφορά, το αγνοεί/αφαιρεί σιωπηλά,
+   δεν ρωτάει ξανά (η απόφαση είναι κλειδωμένη, όχι ανοιχτή προς επανεξέταση).
+
 ## Later (χρειάζεται στοιχεία/ενέργεια Achilleas — ΟΧΙ τώρα, αλλά πριν hosted launch)
 
 - **Terms + Privacy finalize**: επωνυμία/νομική οντότητα, governing-law jurisdiction, ονόματα

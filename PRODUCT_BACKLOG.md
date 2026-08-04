@@ -2,7 +2,8 @@
 
 > Ρόλος: ο **product-planner** ΠΡΟΤΕΙΝΕΙ candidate features, ο Αχιλλέας ΑΠΟΦΑΣΙΖΕΙ.
 > Αυτό συμπληρώνει (δεν αντικαθιστά) το `TODO.md` (distribution/SaaS roadmap) και τις
-> ουρές τεχνικού χρέους (`WEB_DEBT.md`, `MOBILE_PARITY.md`), που καλύπτουν code debt, όχι νέα features.
+> ουρά τεχνικού χρέους (`WEB_DEBT.md`), που καλύπτει code debt, όχι νέα features. (Το `MOBILE_PARITY.md`
+> διαγράφηκε 2026-08-04 — το mobile app καταργήθηκε, βλ. `OWNER_DECISIONS.md` #15.)
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
@@ -210,12 +211,19 @@
 > locked defaults), ο builder παίρνει **sensible default**: (α) free-tier behaviour **non-metered**,
 > heavy/AI/SaaS-touching κομμάτια **opt-in**· (β) reuse υπάρχοντος pipeline/pattern· (γ) ξεκίνα από το
 > πιο απλό MVP (heuristic/deterministic πριν AI, single πριν multi). Κατέγραψε την επιλογή στο progress log.
-> Εξαρτήσεις: P5/P17/P23 δένουν με `/api/v1` (§5) + mobile MVP (§6)· P6 feed βοηθά το PA3/P20.
+> Εξαρτήσεις: P6 feed βοηθά το PA3/P20.
 > **Νεοεγκεκριμένα 2026-07-10 (interactive):** P33, P32, P34, P35, P36 (ranked value/effort· P36 τελευταίο, L).
 
 > **Νεοεγκεκριμένα 2026-08-03 (interactive, «approve all ως έχουν, προχώρα τα»):** P81, P66, P74, P48, P46, P40 — όλα S, με τη σειρά που παρατίθενται. Ο Αχιλλέας ενέκρινε ρητά τα builder defaults του κάθε item ως έχουν, οπότε **καμία «ανοιχτή απόφαση» δεν μένει ανοιχτή σε αυτά τα έξι**: ο builder υλοποιεί ό,τι γράφει το «Ανοιχτή απόφαση (builder default)» πεδίο τους αυτούσιο, χωρίς να ξαναρωτήσει.
 
 > **Νεοεγκεκριμένο 2026-08-04 (interactive, «review the approved queue and start building P82»):** P82, ίδια συνεδρία, χτίστηκε αμέσως.
+
+> **⛔ Mobile discontinued 2026-08-04** (interactive, βλ. `OWNER_DECISIONS.md` #15): το mobile app
+> καταργήθηκε πλήρως, `apps/mobile` διαγράφηκε. **P59/P51/P23 μετακινήθηκαν σε `## Rejected`**. Κάθε
+> «mobile parity» follow-up σημείωση που εμφανίζεται μέσα σε ήδη-shipped ιστορικά items παρακάτω
+> (π.χ. «`/api/v1` δεν εκθέτει ακόμα X for mobile parity») είναι πλέον **void/n/a** — δεν χρειάζεται
+> πλέον καμία mobile-parity δουλειά, ΟΥΤΕ ξαναγράφτηκε κάθε τέτοια μεμονωμένη σημείωση (θα ήταν πάνω
+> από 15 σκόρπιες αλλαγές σε ήδη-shipped ιστορικό)· αυτό το ένα σημείωμα εδώ τις καλύπτει όλες.
 
 ### P82. Outbound alert dedup — ✅ SHIPPED 2026-08-04 (interactive session, commit `2e293ca` + follow-up)
 - **Τι έγινε:** νέο pure `lib/alertDedup.ts` (`splitFreshAlerts`) + `runAlertChecks(opts?: { dedupe?: boolean })`
@@ -554,19 +562,6 @@
   κατάσταση πριν το review)· dedupe case-insensitive πριν το append· ΔΕΝ πειράζει τα ήδη-υπάρχοντα seed aliases,
   μόνο προσθέτει νέα.
 
-### P59. Mobile home-screen widget (quick-glance / quick-add) — S/M — both (mobile-native, quick-capture friction)
-- **Αξία:** το app έχει ήδη 3 quick-capture κανάλια (P5 bookmarklet, P23 mobile share-sheet approved-pending,
-  P11 email-in) αλλά **καμία native home-screen widget** στο κινητό — για ένα personal-finance app, ένα widget
-  «safe-to-spend αυτόν τον μήνα» (reuse P19, ήδη-shipped) ή «+ Add expense» deep-link θα ήταν πιο σύντομος δρόμος
-  από open-app→tap→type. Το Expo SDK managed workflow υποστηρίζει iOS/Android home-screen widgets μέσω config
-  plugins (React Native community packages), χωρίς bare eject. **Χρησιμοποιεί το ήδη-υπάρχον `/api/v1` + token
-  auth** — μηδέν νέα backend δουλειά. **Διακριτό** από P17/P23 (αυτά είναι in-app capture flows, το widget ζει
-  εκτός app, στο home screen).
-- **Module:** Mobile (`apps/mobile`) — νέο native config plugin + μικρό widget UI.
-- **Ανοιχτή απόφαση (builder default):** MVP = **read-only «safe-to-spend» snapshot widget** πρώτα (απλούστερο,
-  καμία write-path/auth-in-widget complexity)· quick-add-expense deep-link widget ως follow-up· iOS πρώτα
-  (μεγαλύτερο platform-widget ecosystem support σε Expo σήμερα), Android follow-up.
-
 ### P58. Native SMTP email notifier channel (χωρίς Zapier/n8n μεσάζοντα) — S/M — both, foundation-lever
 - **Αξία:** το ήδη-shipped notifier framework (ntfy/Discord/Slack/Telegram/webhook) καλύπτει email **μόνο έμμεσα**
   μέσω generic webhook→Zapier/n8n (βλ. `lib/notifiers.shared.ts` hint: «Routes to email via Zapier/n8n»). Αυτό
@@ -673,20 +668,6 @@
 - **Ανοιχτή απόφαση (builder default):** spawn-on-complete (ΟΧΙ background generator, ίδιο ντετερμινιστικό
   MVP-first pattern με P28/P45)· κενό `repeatEveryDays` = σημερινή one-off συμπεριφορά αμετάβλητη· optional
   linked item παραμένει, δεν αφαιρείται.
-
-### P51. Mobile app-lock (Face ID / Touch ID / device PIN) — S — both (mobile-native, trust lever)
-- **Αξία:** το Expo app σήμερα ανοίγει κατευθείαν στα δεδομένα μόλις είναι logged-in (token-based session,
-  βλ. `MOBILE_PARITY.md`) — αν κάποιος βρει το ξεκλείδωτο κινητό, βλέπει receipts/expenses/inventory χωρίς άλλο
-  εμπόδιο. Ένα **local app-lock** (biometric ή device PIN πριν εμφανιστεί οτιδήποτε μετά το cold-start/resume από
-  background) είναι καθαρά mobile-native προστασία, ΔΕΝ αγγίζει το server-side auth (§9 web MFA είναι διαφορετικό
-  πράγμα: λογαριασμός vs φυσική συσκευή). Μικρό effort (`expo-local-authentication`, ήδη στο Expo SDK managed
-  workflow) με πραγματική αξία εμπιστοσύνης για ένα app που κρατά οικονομικά δεδομένα σπιτιού.
-  **Διακριτό** από §9 (TODO, web account MFA/TOTP) και από P31 (household roles — αυτό είναι per-device, όχι
-  per-user permission).
-- **Module:** Mobile (`apps/mobile`) — νέο lock-screen gate στο app entry/resume + Settings toggle.
-- **Ανοιχτή απόφαση (builder default):** opt-in toggle (default off, ώστε να μη σπάσει κανέναν existing χρήστη
-  απροειδοποίητα)· fallback σε device passcode όταν βιομετρικά μη διαθέσιμα/αποτύχουν (όχι δικό του PIN, reuse
-  του OS)· lock on background→foreground resume, όχι μόνο cold start.
 
 ### P50. Special dates & gift reminders (γενέθλια/επέτειοι) — S — OSS, «Personal Hub» fit
 - **Αξία:** το PHAROS backronym (CLAUDE.md) είναι ρητά «Personal Hub», αλλά κανένα module σήμερα δεν κρατά τις πιο
@@ -1176,7 +1157,12 @@
 - **Ανοιχτή απόφαση (builder default):** default rates ανά κατηγορία (editable Settings), floor στο ~10% salvage·
   computed on-read (όπως το expense `anomaly`)· manual override ανά item κερδίζει πάντα.
 
-### P30. Mobile push notifications (Expo) για alerts & reminders — ✅ ΗΔΗ SHIPPED πριν την έγκριση (commit `2156a83`, 2026-06-29)
+### P30. Mobile push notifications (Expo) για alerts & reminders — ✅ shipped 2026-06-29, ⛔ ΚΩΔΙΚΑΣ ΑΦΑΙΡΕΘΗΚΕ 2026-08-04 (mobile discontinued)
+- **Ενημέρωση 2026-08-04:** το mobile app καταργήθηκε (`OWNER_DECISIONS.md` #15). Ο κώδικας που περιγράφεται
+  παρακάτω **διαγράφηκε στο ίδιο commit-set**: `User.pushTokens`, `lib/expoPush.ts`, το `push/register` route,
+  φυσικά και το `apps/mobile/src/push.ts`/`App.tsx` wiring (μαζί με όλο το `apps/mobile`), και το
+  `pushAllDevices()` call site μέσα στο `runAlertChecks`. Ιστορική περιγραφή παρακάτω, δεν αντιστοιχεί πλέον
+  σε live κώδικα.
 - **Εύρημα (9η σάρωση planner, 2026-07-14, verified by daily-dev πριν χτίσει κάτι νέο):** αυτό το item ήταν ΗΔΗ πλήρως
   υλοποιημένο μήνες πριν μπει στο backlog ως candidate — προφανώς μια παλιότερη σάρωση δεν το έπιασε ως done. Πλήρες
   pipeline: `User.pushTokens` (model) + `apps/web/src/lib/expoPush.ts` (`isExpoPushToken`, `sendExpoPush`, `pushAllDevices`,
@@ -1285,22 +1271,6 @@
   `runAlertChecks` σήμερα (pre-existing gap, ΟΧΙ κάτι που εισήγαγε το P24)· ένα webhook receiver πρέπει να
   διαβάσει το header `X-Pharos-Signature` (`t=…,v1=…`) και να επαληθεύσει HMAC-SHA256 πάνω σε `${t}.${rawBody}`
   με το secret του, ίδιο σχήμα με το Stripe.
-
-### P23. Mobile share-sheet quick capture (share-to-Pharos) — M — both (mobile-native, ψηλό value/effort)
-- **Αξία:** από ΟΠΟΙΑΔΗΠΟΤΕ app (Photos, Files, browser, email PDF) → «Share → Pharos» → η φωτο/PDF μπαίνει
-  κατευθείαν στο υπάρχον receipt/expense AI pipeline. Μηδενίζει την τριβή του capture. **Διακριτό** από
-  P5 (desktop browser ext) και P17 (barcode). OS-level share target (iOS Share Extension / Android intent).
-- **Module:** Mobile (share extension/intent) + Receipts/Expenses (reuse upload+parse μέσω `/api/v1`).
-- **Εξάρτηση:** mobile MVP (§6) + `/api/v1` upload endpoint. **Builder default:** shared αρχείο → receipts,
-  με optional picker αργότερα.
-- **ΕΝΕΡΓΟ ξανά 2026-08-03** (interactive, βλ. `OWNER_DECISIONS.md` #13): σταματά να μετράει ως «blocked σε
-  Αχιλλέα». Ο builder **χτίζει όσο πάει unattended** — config plugin (iOS Share Extension / Android intent
-  filter), receiving screen, wiring στο ήδη-υπάρχον `/api/v1` upload path — και τερματίζει το item ως «code
-  complete, awaiting EAS build», ΟΧΙ «δεν ξεκίνησε». Το όριο είναι το **EAS dev build + φυσική συσκευή** (Expo
-  Go δεν φορτώνει share extensions, ο simulator δεν δέχεται share intents), που το κάνει ο Αχιλλέας. Verify
-  unattended = `npx tsc --noEmit` + code review, όπως κάθε mobile αλλαγή. **Σειρά:** μετά τα έξι S items της
-  2026-08-03 (είναι M, τα άλλα S)· αν το Apple Developer account λείπει, **πρώτα το Android intent filter**,
-  το iOS μισό μένει στο ράφι μέχρι να υπάρχει.
 
 ### P14. Subscription / bill price-hike watch (ανατιμήσεις επαναλαμβανόμενων) — ✅ SHIPPED 2026-07-11 (pharos-daily-dev)
 - **Υλοποίηση:** νέο pure `lib/priceHike.ts` (`detectPriceHikes`, DB-free, 11 unit tests) ομαδοποιεί priced Expense
@@ -1540,7 +1510,12 @@
   «orphaned/dead code» **ήταν ήδη σωστά wired** στο `ExpensesClient.tsx` από το ίδιο commit `bed7f73` (PA1) —
   stale note, διορθώθηκε εδώ. Καμία ενέργεια χρειάστηκε.
 
-### P17. Mobile barcode/QR scan → γρήγορη προσθήκη στο inventory — ✅ SHIPPED 2026-07-27 (camera UI, commit 6b52023)
+### P17. Mobile barcode/QR scan → γρήγορη προσθήκη στο inventory — ✅ shipped 2026-07-27, ⛔ ΚΩΔΙΚΑΣ ΑΦΑΙΡΕΘΗΚΕ 2026-08-04 (mobile discontinued)
+- **Ενημέρωση 2026-08-04:** το mobile app καταργήθηκε (`OWNER_DECISIONS.md` #15). Το server-side product-lookup
+  μισό διαγράφηκε επίσης — `lib/barcode.ts`, `lib/barcodeLookup.ts`, το `GET /api/v1/lookup/barcode` route —
+  γιατί verified (grep) μηδέν web caller το χρησιμοποιούσε, ήταν αποκλειστικά για το mobile camera scan.
+  `apps/mobile/src/BarcodeScanner.tsx` έφυγε μαζί με ολόκληρο το `apps/mobile`. Ιστορική περιγραφή παρακάτω,
+  δεν αντιστοιχεί πλέον σε live κώδικα.
 - **Αξία:** barcode/QR scan (EAN/UPC) → lookup → prefill τίτλου/κατηγορίας/specs → one-tap add σε inventory/shopping.
 - **Module:** Mobile (camera-scan) + Items/Inventory (+ `/api/v1` §5, product-lookup helper).
 - **Εξάρτηση:** mobile MVP (§6). **Builder default:** lookup = δωρεάν Open Food Facts / UPC DB, AI fallback.
@@ -1984,4 +1959,14 @@
 
 ## Rejected
 
-_(κενό)_
+### P59, P51, P23 — όλα τα mobile-native items, ⛔ REJECTED 2026-08-04 (mobile discontinued)
+Το mobile app (`apps/mobile`, Expo/React Native) καταργήθηκε πλήρως — απόφαση Αχιλλέα, βλ.
+`OWNER_DECISIONS.md` #15. Τα τρία αυτά items ήταν στο `## Approved`, ενεργά/buildable, και τα τρία
+mobile-native (widget/app-lock/share-sheet) — αφαιρέθηκαν εντελώς αντί να μείνουν ως «approved αλλά
+ποτέ δεν χτίζεται», ώστε καμία routine να μην τα ξαναδεί ως ουρά προς εκτέλεση.
+- **P59** — Mobile home-screen widget (quick-glance/quick-add).
+- **P51** — Mobile app-lock (Face ID/Touch ID/device PIN).
+- **P23** — Mobile share-sheet quick capture. Ήταν το πιο προχωρημένο (`OWNER_DECISIONS.md` #13 το είχε
+  ξανά-ενεργό, «code complete awaiting EAS build» ήταν ο στόχος) — ό,τι κώδικας είχε γραφτεί γι' αυτό
+  ζούσε μέσα στο ήδη-διαγραμμένο `apps/mobile`, άρα δεν μένει τίποτα μετέωρο.
+Καμία από τις τρεις δεν προτείνεται ξανά, ούτε ξαναγράφεται ως νέο item με άλλη διατύπωση.

@@ -37,7 +37,7 @@ in Settings so only stores you add by hand are kept.
 **Backronym.** PHAROS = **PH** (Personal Hub) + **AROS** (Asset & Resource
 Oversight System). A branding device; not a technical term.
 
-**Bearer token.** The API token the mobile app and any API client send in the
+**Bearer token.** The API token any API client sends in the
 `Authorization: Bearer <token>` header. Obtained by signing in at
 `POST /api/v1/auth/login`. See [API → Authentication](api.md#authentication).
 

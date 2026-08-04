@@ -11,7 +11,6 @@ guide, the guide is authoritative — this page is a fast index.
 - [Storage & backups](#storage--backups)
 - [Notifications](#notifications)
 - [Import & price scraping](#import--price-scraping)
-- [Mobile app](#mobile-app)
 - [Performance](#performance)
 
 ---
@@ -49,11 +48,10 @@ without it the app fails closed. See [Self-hosting](self-hosting.md).
 The first visit runs an admin setup wizard. Create the initial admin there, then
 sign in. Details in [Self-hosting → First-run setup](self-hosting.md).
 
-**API / mobile requests return 401.**
-The REST API and mobile app use a bearer token (`phk_…`) issued on login and
-shown in **Settings**. A regenerated token invalidates the old one — sign out and
-back in on any client using it. See [API reference](api.md) and
-[Mobile app](mobile.md).
+**API requests return 401.**
+The REST API uses a bearer token (`phk_…`) issued on login and shown in
+**Settings**. A regenerated token invalidates the old one — sign out and back
+in on any client using it. See [API reference](api.md).
 
 ---
 
@@ -123,23 +121,6 @@ Increase the model context window (`OLLAMA_NUM_CTX`). See
 
 ---
 
-## Mobile app
-
-- **Can't connect / network error.** Confirm the server is reachable from the
-  phone (same Wi-Fi or a working tunnel) and the **Server** URL includes the
-  scheme and port (`http://…:3000`). `localhost` never resolves from a device.
-- **Login fails.** Use your Pharos username (lowercased server-side) and
-  password. No account yet? Complete the first-run admin setup in the web app.
-- **Images don't load.** They are bearer-protected; make sure you are signed in.
-  A stale token (after regenerating it in Settings) means signing out and back in.
-- **AI scans return an error.** AI must be configured and enabled on the server.
-- **No push notifications.** Expected in Expo Go / simulators. Follow
-  `apps/mobile/PUSH_SETUP.md` and make a development build.
-
-Full detail in [Mobile app](mobile.md).
-
----
-
 ## Performance
 
 **Everything is slow on the first AI call.**
@@ -159,4 +140,3 @@ one-time delay after a restart or config change.
 - [Configuration](configuration.md)
 - [Features](features.md)
 - [API reference](api.md)
-- [Mobile app](mobile.md)

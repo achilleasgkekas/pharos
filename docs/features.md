@@ -10,7 +10,7 @@ it, see [Self-hosting](self-hosting.md). For how to wire up AI providers,
 storage, and notifications, see the [Configuration guide](configuration.md).
 
 Everything below is available both in the web app and, for most modules, through
-the REST API (`/api/v1`) that the mobile companion app uses; see the
+the REST API (`/api/v1`) for external clients and scripts; see the
 [API reference](api.md).
 
 **Getting started.** On first launch, the homepage displays an **onboarding
@@ -139,10 +139,6 @@ cookie. No `content_scripts` and no `host_permissions`: the extension cannot rea
 page content, and asks only for `storage`, `contextMenus`, and `activeTab` (the tab
 URL becomes readable only on the click itself). A badge shows feedback and an unconfigured
 instance opens the options page instead of silently failing.
-
-### Barcode product lookup (P17)
-
-Scan a product barcode with the mobile camera and instantly look it up. **How it works:** Point your phone at a barcode (EAN/UPC) on any product — the mobile camera captures it, and the app queries a **free, zero-config product database** (the Open*Facts family: OpenFoodFacts, OpenProductsFacts, OpenBeautyfacts) across three sources in parallel. If a match is found, you see the product details (name, brand, category, quantity, image) in a preview card. You confirm or edit, then add to your shopping list or inventory. If no match is found, you can type the name by hand or use the AI photo scan as an alternative. **Why free and deterministic:** barcode lookup is intentionally NOT an AI fallback — a lookup is zero-cost (no per-call charge), instant (<6s latency, crucial for a shopper standing in an aisle), and deterministic (the same barcode always gives the same answer).
 
 ## Receipts
 
@@ -575,8 +571,7 @@ price hikes, trials ending, expiring gift cards, and network issues, then send a
 human-readable summary through your configured channel (ntfy, Discord, Slack, Telegram,
 or a generic webhook; see
 [Configuration → Notifications](configuration.md#notifications)). You can trigger
-a check on demand or send a test message from
-Settings. The mobile app can also register for push notifications.
+a check on demand or send a test message from Settings.
 
 ### Event webhooks for automation (P24)
 
@@ -632,11 +627,10 @@ Configuration is grouped into tabs:
   manual asset accounts, asset depreciation, and payment cards.
 - **AI** — provider (Ollama / Anthropic / OpenAI / Gemini / OpenRouter / Custom),
   a separate scraper AI, editable AI prompts, and the calendar feed token
-  (generate / copy / rotate / revoke). **Mobile parity (roadmap #6)**: master AI
-  toggle + per-feature toggles (scan, parse, fill, search, summarize, translate,
-  categorize, etc.) with status indicators (disabled / no-provider / ready); only
-  admins may edit toggles, but all users see their status (to understand why a
-  feature is unavailable).
+  (generate / copy / rotate / revoke). Master AI toggle + per-feature toggles
+  (scan, parse, fill, search, summarize, translate, categorize, etc.) with status
+  indicators (disabled / no-provider / ready); only admins may edit toggles, but
+  all users see their status (to understand why a feature is unavailable).
 - **Network** — UniFi host / user / connection test.
 - **Storage & backup** — file storage backend (local / SMB / FTP / OneDrive),
   folder / filename templates, mirror-on-verify, sync, backup / restore, CSV

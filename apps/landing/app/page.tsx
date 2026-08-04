@@ -337,42 +337,6 @@ const INTEGRATIONS: { group: string; icon: string; color: string; items: string[
   },
 ];
 
-const MOBILE_HIGHLIGHTS: { icon: string; color: string; title: string; desc: string }[] = [
-  {
-    icon: 'camera',
-    color: 'var(--accent)',
-    title: 'Scan on the spot',
-    desc: 'Point the camera at a product or receipt and AI files it before you even leave the shop.',
-  },
-  {
-    icon: 'bell',
-    color: 'var(--cyan)',
-    title: 'Push notifications',
-    desc: 'Price drops, renewals, and warranty expiries arrive as native alerts, no need to open the app.',
-  },
-  {
-    icon: 'server',
-    color: 'var(--purple)',
-    title: 'Talks to your server',
-    desc: 'Point it at your own Pharos host over the LAN or your VPN. The session token lives in the secure enclave.',
-  },
-  {
-    icon: 'package',
-    color: 'var(--gold)',
-    title: 'The whole hub',
-    desc: 'Dashboard, shopping, receipts, money, subscriptions, reports, and the AI assistant, all in your pocket.',
-  },
-];
-
-const MOBILE_NAV: { icon: string; color: string }[] = [
-  { icon: 'package', color: 'var(--accent)' },
-  { icon: 'receipt', color: 'var(--cyan)' },
-  { icon: 'wallet', color: 'var(--gold)' },
-  { icon: 'calendar', color: 'var(--purple)' },
-  { icon: 'chart', color: 'var(--cyan)' },
-  { icon: 'ticket', color: 'var(--red)' },
-];
-
 const COMPARE: { label: string; self: string; hosted: string }[] = [
   { label: 'Where it runs', self: 'Your own hardware', hosted: 'Our managed servers' },
   { label: 'Your data', self: 'Stays on your disk', hosted: 'Isolated per tenant' },
@@ -399,13 +363,13 @@ const ROADMAP: {
       'AI receipt, expense & voucher scanning',
       'Card statements with installment plans',
       'Subscriptions, reports & a 3-month calendar with iCal feed',
-      'Mobile app plus SMB, FTP & OneDrive backups',
+      'SMB, FTP & OneDrive backups',
       'IMAP email-in, savings goals & insurance export bundle',
       'Eight-language interface localisation',
       'Return-window reminders for recent purchases',
       'Bring-your-own-key AI billing for hosted workspaces',
       'Opt-in multi-currency for expenses, income, receipts, subscriptions, items, statements, bills & CSV imports',
-      'Barcode scan-to-add for shopping list & inventory, plus a browser bookmarklet and Chrome extension',
+      'A browser bookmarklet and Chrome extension for one-click capture',
     ],
   },
   {
@@ -422,7 +386,6 @@ const ROADMAP: {
     note: 'On the backlog, not yet scheduled',
     items: [
       'Open Banking bank-transaction sync (EU)',
-      'Mobile share-sheet quick capture',
     ],
   },
 ];
@@ -458,10 +421,6 @@ const FAQ_GROUPS: {
       {
         q: 'Does it run on ARM, like a Raspberry Pi or an ARM instance?',
         a: 'Yes, and both architectures are built on purpose. Development happens on Apple Silicon, where a plain docker build produces an arm64-only image that would refuse to start, or crawl under emulation, on an x86 server, so the release image is built for linux/amd64 and linux/arm64 under one tag. The same tag runs on an x86 VPS, on an ARM cloud instance (often cheaper per core), and on a Raspberry Pi with 64-bit Linux, with no variant for you to pick. One thing worth planning for: AI parsing is the heavy part, so on a small board keep the app local and point AI at a cloud provider or at an Ollama running on a beefier machine on your LAN, which is a setting rather than a rebuild.',
-      },
-      {
-        q: 'Is there a mobile app?',
-        a: 'Yes. A native iOS and Android app, built with Expo, signs into your own server, self-hosted or hosted. Scan receipts and products on the go, get push alerts, and reach every module from your phone. The responsive web app also works well in any mobile browser.',
       },
     ],
   },
@@ -577,7 +536,7 @@ const FAQ_GROUPS: {
       },
       {
         q: 'Can I keep a manual or warranty PDF with an item?',
-        a: 'Yes. Every item has a document vault, separate from its photo gallery, for anything you would otherwise lose in a downloads folder: a manual, a warranty certificate, a scanned serial-number sticker, in any file type. Upload, rename, and delete as the pile grows. It shows up read-only on the mobile app too, so you can pull up a manual standing in front of the thing it belongs to. The insurance export below bundles this vault straight into its ZIP.',
+        a: 'Yes. Every item has a document vault, separate from its photo gallery, for anything you would otherwise lose in a downloads folder: a manual, a warranty certificate, a scanned serial-number sticker, in any file type. Upload, rename, and delete as the pile grows. The responsive web app makes it easy to pull up a manual on your phone standing in front of the thing it belongs to. The insurance export below bundles this vault straight into its ZIP.',
       },
       {
         q: 'Can it produce an export for an insurance claim?',
@@ -808,7 +767,6 @@ export default function Home() {
           <nav className="site-nav">
             <a href="#features" className="navlink nav-anchor">Features</a>
             <a href="#ai" className="navlink nav-anchor">AI</a>
-            <a href="#mobile" className="navlink nav-anchor">Mobile</a>
             <a href="#who" className="navlink nav-anchor">Who</a>
             <a href="#self-host" className="navlink nav-anchor">Self-host</a>
             <a href="#pricing" className="navlink">Pricing</a>
@@ -1079,77 +1037,6 @@ export default function Home() {
               </li>
             ))}
           </ul>
-        </div>
-      </section>
-
-      {/* ── Mobile app ────────────────────────────────────── */}
-      <section id="mobile" style={{ padding: '56px 0' }}>
-        <div className="container">
-          <div style={{ textAlign: 'center', marginBottom: 44 }}>
-            <p className="mono" style={{ marginBottom: 12 }}>Take it with you</p>
-            <h2 style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)', fontWeight: 700, marginBottom: 14 }}>
-              The hub, in your pocket
-            </h2>
-            <p style={{ color: 'var(--text-dim)', maxWidth: 560, margin: '0 auto' }}>
-              A native iOS and Android app, built with Expo, that signs in to your
-              own server. Scan on the go, get push alerts, and reach every module
-              from the phone.
-            </p>
-          </div>
-
-          <div className="mobile-flow">
-            <div className="phone" aria-hidden="true">
-              <span className="phone-notch" />
-              <div className="phone-screen">
-                <div className="phone-status">
-                  <span>9:41</span>
-                  <span className="phone-online">Pharos</span>
-                </div>
-                <div className="phone-greet">
-                  <strong>Good evening</strong>
-                  <span>3 alerts</span>
-                </div>
-                <div className="phone-stats">
-                  <div className="phone-tile">
-                    <span className="k">Owed</span>
-                    <span className="v" style={{ color: 'var(--gold)' }}>€1,149</span>
-                  </div>
-                  <div className="phone-tile">
-                    <span className="k">This month</span>
-                    <span className="v" style={{ color: 'var(--accent)' }}>€612</span>
-                  </div>
-                </div>
-                <div className="phone-nav">
-                  {MOBILE_NAV.map((n, i) => (
-                    <span key={i} className="phone-nav-ico" style={{ color: n.color }}>
-                      <Icon name={n.icon} size={16} />
-                    </span>
-                  ))}
-                </div>
-                <div className="phone-cta">
-                  <Icon name="camera" size={15} />
-                  Scan a product
-                </div>
-              </div>
-            </div>
-
-            <ul className="mobile-highlights">
-              {MOBILE_HIGHLIGHTS.map((m) => (
-                <li key={m.title} className="card mobile-highlight">
-                  <span className="feature-icon" style={{ color: m.color }}>
-                    <span className="feature-glow" style={{ background: m.color }} />
-                    <Icon name={m.icon} size={20} />
-                  </span>
-                  <div>
-                    <h3 style={{ fontSize: '1.05rem', margin: '0 0 6px' }}>{m.title}</h3>
-                    <p style={{ color: 'var(--text-dim)', fontSize: '0.92rem', lineHeight: 1.5 }}>
-                      {m.desc}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
       </section>
 

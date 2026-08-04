@@ -5,7 +5,7 @@ info:
   summary: Token-authenticated JSON API for the Pharos personal hub.
   description: |
     Pharos exposes a versioned REST API under `/api/v1`. It is the same API the
-    Expo mobile app consumes, and it is stable enough to build your own clients
+    browser extension consumes, and it is stable enough to build your own clients
     or scripts against. Every route runs on the Node.js runtime and talks to the
     same MongoDB as the web app, so anything you change through the API shows up
     in the web UI (and vice versa).
@@ -126,7 +126,7 @@ paths:
     get:
       tags: [Dashboard]
       summary: Headline dashboard counts
-      description: Counts (items, shopping list, receipts, expenses, subscriptions, open tasks) plus installments owed, active plan count and currency. For a mobile dashboard.
+      description: Counts (items, shopping list, receipts, expenses, subscriptions, open tasks) plus installments owed, active plan count and currency. For a dashboard view.
       responses:
         '200':
           description: Overview object.
@@ -257,7 +257,7 @@ paths:
     get:
       tags: [Items]
       summary: Item detail
-      description: Full detail (links, price history, photos, warranty, purchase) plus a computed `price` block (best-now, lowest/highest, trend, verdict, where-to-buy) for the mobile price panel.
+      description: Full detail (links, price history, photos, warranty, purchase) plus a computed `price` block (best-now, lowest/highest, trend, verdict, where-to-buy) for a price panel.
       responses:
         '200':
           description: Item detail.
@@ -551,57 +551,6 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/OkDeleted' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-
-  /lookup/barcode:
-    get:
-      tags: [Shopping list]
-      summary: Look up a product by barcode
-      description: |
-        Resolves an EAN/UPC (8..14 digits) against OpenFoodFacts, OpenProductsFacts and
-        OpenBeautyfacts (free, no API key). Nothing is saved: the mobile camera scan uses
-        this to prefill a suggestion the user confirms before it becomes a shopping-list
-        entry or an item. The `product` shape matches `POST /scan/product`, so one
-        confirm-then-add screen serves both. `product: null` with `200` means the databases
-        simply do not know the code.
-      parameters:
-        - name: code
-          in: query
-          required: true
-          description: GTIN / EAN / UPC, 8..14 digits.
-          schema: { type: string }
-      responses:
-        '200':
-          description: Lookup result (product may be null).
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code: { type: string }
-                  product:
-                    oneOf:
-                      - type: 'null'
-                      - type: object
-                        additionalProperties: true
-                        properties:
-                          name: { type: string }
-                          brand: { type: string }
-                          category: { type: string }
-                          quantity: { type: string }
-                          images:
-                            type: array
-                            items: { type: string }
-        '400':
-          description: Missing `code`, or not a valid GTIN.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '502':
-          description: No product database could be reached.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
 
   /receipts:
     get:
@@ -2141,48 +2090,6 @@ paths:
           content:
             application/json:
               schema: { type: object, additionalProperties: true }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-
-  /push/register:
-    post:
-      tags: [Notifications]
-      summary: Register an Expo push token
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [token]
-              properties:
-                token: { type: string }
-      responses:
-        '200':
-          description: Registered.
-          content:
-            application/json:
-              schema: { type: object, additionalProperties: true }
-        '400': { $ref: '#/components/responses/BadInput' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-    delete:
-      tags: [Notifications]
-      summary: Remove an Expo push token
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [token]
-              properties:
-                token: { type: string }
-      responses:
-        '200':
-          description: Removed.
-          content:
-            application/json:
-              schema: { type: object, additionalProperties: true }
-        '400': { $ref: '#/components/responses/BadInput' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /settings:

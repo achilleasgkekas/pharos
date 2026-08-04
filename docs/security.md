@@ -57,19 +57,19 @@ Used by every browser page and server action.
   and future server action. The **REST API** (see below) enforces the same restriction:
   viewer tokens cannot make POST/PATCH/DELETE requests.
 
-### 2. Bearer token (the REST API + mobile app)
+### 2. Bearer token (the REST API)
 
-Used by the [mobile app](mobile.md) and any [API v1](api.md) client.
+Used by any [API v1](api.md) client.
 
 - **Get a token:** `POST /api/v1/auth/login` with `{ username, password }` returns
   `{ token, user }`. The token is the user's `apiToken` (format `phk_<random>`),
-  created on first login. It is the same token shown in **Settings → Mobile/MCP**.
+  created on first login. It is the same token shown in **Settings → API/MCP**.
 - **Use it:** send `Authorization: Bearer <token>` on every other `/api/v1`
   request. A shared helper resolves the token to a user; a missing or unknown
   token returns `401 Unauthorized — send Authorization: Bearer <token>`.
 - **Scope:** the token carries the user's role, so API access mirrors what that
   account can do in the UI.
-- **Revoke / rotate:** regenerate the token in **Settings → Mobile/MCP**. The old
+- **Revoke / rotate:** regenerate the token in **Settings → API/MCP**. The old
   token stops working immediately; re-sign-in on each device to pick up the new one.
 
 > Treat the bearer token like a password. It is long-lived and grants full API

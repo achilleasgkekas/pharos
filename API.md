@@ -1,10 +1,10 @@
 # Pharos REST API (v1)
 
-A token-authenticated JSON API for building a mobile/external client (Android, iOS, …).
+A token-authenticated JSON API for external clients (browser extension, automation, integrations, …).
 Pharos is a shared-data household app, so the API runs against the same shared data as the web app.
 
 **Base URL:** `https://<your-host>/api/v1`
-To reach it from a phone, expose Pharos over public HTTPS via a tunnel (Cloudflare Tunnel / Tailscale Funnel) — see **Settings → Mobile / MCP**. On the LAN it's `http://<host>:3000/api/v1`.
+To reach it from outside your LAN, expose Pharos over public HTTPS via a tunnel (Cloudflare Tunnel / Tailscale Funnel) — see **Settings → API / MCP** to generate/revoke the bearer token (the label is shared with the MCP connector). On the LAN it's `http://<host>:3000/api/v1`.
 
 All responses are JSON. Errors are `{ "error": "message" }` with an appropriate HTTP status.
 
@@ -25,7 +25,7 @@ Store the token and send it on **every other request**:
 Authorization: Bearer phk_…
 ```
 
-Missing/invalid token → `401`. The same token can be generated or revoked in **Settings → Mobile / MCP** (it's shared with the MCP connector).
+Missing/invalid token → `401`. The same token can be generated or revoked in **Settings → API / MCP** (it's shared with the MCP connector).
 
 ## List params (pagination & sync)
 
@@ -85,18 +85,13 @@ List responses are wrapped: `{ "data": [ … ], "total": N, "limit": L, "offset"
 
 Creating a receipt is file-based (upload + AI scan); a multipart `scan/receipt` endpoint is the next addition (mirrors `scan/product`).
 
-### AI scan (mobile camera)
+### AI scan
 - `POST /api/v1/scan/product` — multipart, field **`file`** = product photo
   → `{ data: { name, brand, category, quantity, notes } }`
   *Suggestion only* (no save); have the user confirm, then `POST /api/v1/shopping-list`.
 - `POST /api/v1/scan/receipt` — multipart, field **`file`** = receipt image/PDF
   → `201 { receipt: { …, lineItems, aiUsed, aiError } }`
   **Saves + parses + creates** the receipt (mirrors the web dropzone). The user can fix fields later via `PATCH` on the web, or just keep it.
-
-### Barcode lookup (mobile scanner)
-- `GET /api/v1/lookup/barcode?code=<gtin>` → `{ product: { name, brand, category, quantity, notes, code, image, source } | null, code }`
-
-  Turns a scanned EAN-8 / UPC-A / EAN-13 / GTIN-14 into a prefilled suggestion. **Nothing is saved** — the `product` shape is deliberately identical to `POST /api/v1/scan/product`, so the same confirm-then-add screen serves both, and it drops straight into `POST /api/v1/shopping-list`.
 
   Sources are the free, key-less Open Food / Products / Beauty Facts databases (no AI, no cost, no quota). Separators in `code` are tolerated; the check digit is validated before any request is spent.
 
@@ -117,7 +112,7 @@ Creating a receipt is file-based (upload + AI scan); a multipart `scan/receipt` 
 Paths returned by the API (an item's `photo`, a receipt's `file`/`thumb`) are served from `GET /api/files/<path>`. **Send the same `Authorization: Bearer` token** — the route accepts either the web session cookie or a bearer token. Fetch the bytes and render them (a native `<img src>` can't attach the header).
 
 ## MCP connector (drive Pharos from Claude)
-`POST /api/mcp` — a JSON-RPC 2.0 (Streamable-HTTP) MCP server, same bearer token. Methods: `initialize`, `tools/list`, `tools/call`, `ping`. Add it in Claude as a custom connector (URL `https://<host>/api/mcp`) or test with MCP Inspector / Claude Code. See **Settings → Mobile / MCP**.
+`POST /api/mcp` — a JSON-RPC 2.0 (Streamable-HTTP) MCP server, same bearer token. Methods: `initialize`, `tools/list`, `tools/call`, `ping`. Add it in Claude as a custom connector (URL `https://<host>/api/mcp`) or test with MCP Inspector / Claude Code. See **Settings → API / MCP**.
 
 ## Roadmap (next additions)
 - Optional per-token scopes.

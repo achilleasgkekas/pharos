@@ -37,18 +37,15 @@ GitHub today and can feed a docs site later.
 - **[Updating](updating.md)** — moving an existing instance to a newer version:
   what persists, image tags & version pinning, whether migrations are needed,
   post-upgrade checks, and rolling back.
-- **[Mobile app](mobile.md)** — the Expo iOS/Android companion: install, point it
-  at your Pharos server, sign in for a bearer token, camera AI scans, push, and
-  building installable binaries with EAS.
 - **[Troubleshooting](troubleshooting.md)** — the most common problems in one
   place, grouped by area (startup, login, database, AI, storage, notifications,
-  import, mobile, performance), each linking back to the guide that covers it.
+  import, performance), each linking back to the guide that covers it.
 - **[Managed SaaS mode](saas.md)** — the optional multi-tenant control plane
   (`SAAS_MODE`): accounts, workspaces, memberships & roles, the plan/quota
   ladder, the `/api/saas` control-plane API, Stripe billing, and its env vars.
   Does not apply to the self-hosted app.
 - **[FAQ](faq.md)** — common questions grouped by topic: self-hosting vs managed
-  SaaS, privacy & data ownership, AI, storage & backups, mobile, cost &
+  SaaS, privacy & data ownership, AI, storage & backups, cost &
   licensing, and where to start when something breaks.
 - **[Glossary](glossary.md)** — Pharos-specific terms in plain language: receipt
   status, installment signature/merge, vendorKey series, mirror, local-first,

@@ -25,11 +25,11 @@ The codebase is shared. The **single biggest divider is multi-tenancy** (§C).
 
 ## 2. Workstreams
 
-### A. Public REST API + mobile
-- **Goal:** versioned `/api/v1/...` (token auth) for full CRUD, so a mobile app + Discord/Telegram bots + 3rd parties consume one stable surface.
+### A. Public REST API
+- **Goal:** versioned `/api/v1/...` (token auth) for full CRUD, so a browser extension + Discord/Telegram bots + 3rd parties consume one stable surface. (No mobile app — discontinued 2026-08-04, see `OWNER_DECISIONS.md` #15.)
 - **Have:** MCP tool endpoint (good seed; reuse `aiTools.ts` `execute()`), token auth pattern.
 - **Need:** REST resources (`receipts`, `items`, `expenses`, `statements`, `subscriptions`, `vouchers`, `tasks`), pagination, errors, OpenAPI spec, rate-limit, token scopes.
-- **Size:** Medium. **Useful even if SaaS never happens** (decouples UI/backend, unlocks mobile).
+- **Size:** Medium. **Useful even if SaaS never happens** (decouples UI/backend, unlocks integrations).
 
 ### B. Distribution (no git pull)
 - **Goal:** customers run a **published image**, not source.
@@ -64,7 +64,7 @@ The codebase is shared. The **single biggest divider is multi-tenancy** (§C).
 - **Size:** Medium-Large.
 
 ### G. Integrations — inbound + outbound
-**Key insight:** the MCP **tool registry already is** the substrate. A Discord/Telegram bot = link account → receive message → call the same `execute()` tools. Mobile + bots + API all share it.
+**Key insight:** the MCP **tool registry already is** the substrate. A Discord/Telegram bot = link account → receive message → call the same `execute()` tools. Bots + API + browser extension all share it.
 - **Inbound (add + ask):** Discord bot, Telegram bot, email-in (forward a receipt), maybe WhatsApp. "add expense ΔΕΗ 84€", "show this month" → routes to AI tools. Each AI message **meters + charges** (§H). Needs per-user account linking + a webhook ingest service per platform.
 - **Outbound (notifications):** generalise the single ntfy into a **pluggable notifier**: ntfy, Discord webhook, Telegram, Slack, email, generic webhook. Per-user channel config + event types (price drop, installment due, warranty expiring, renewal).
 - **Size:** Medium per channel; the framework is the work, channels are cheap after.
@@ -98,7 +98,7 @@ The codebase is shared. The **single biggest divider is multi-tenancy** (§C).
 
 - **Phase 0 — useful no matter what (start here):**
   1. **Publish image to a registry via CI** (§B) — unblocks "no git pull" immediately.
-  2. **`/api/v1` REST seed** (§A) — unlocks mobile + bots + decouples UI.
+  2. **`/api/v1` REST seed** (§A) — unlocks bots/integrations + decouples UI.
 - **Phase 1 — self-hosted as a product:** license (§B), docs/KB v1 (§I), "expose storage URLs" toggle (§F), polished prod compose + `.env`.
 - **Phase 2 — SaaS foundation:** multi-tenancy (§C) → accounts+MFA (§D) → managed storage + signed URLs + quota (§F) → AI metering (§H).
 - **Phase 3 — SaaS launch:** billing/plans (§E), inbound+outbound integrations (§G), encryption hardening (§K), legal (§J), ops (§L), marketing (§M).

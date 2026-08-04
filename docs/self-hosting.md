@@ -276,7 +276,7 @@ warranties and gift cards about to expire, return windows closing, recurring
 charges that went up, free trials about to convert, unpaid bills, and budgets
 you have blown through. It sends that summary to whatever you configured in
 Settings → Notifications (ntfy, Discord, Slack, Telegram, outgoing webhooks),
-plus the in-app bell and any signed-in mobile devices.
+plus the in-app bell wherever you're signed in.
 
 **Nothing runs this scan on its own.** Out of the box the only trigger is the
 "Check & notify now" button in Settings, so an instance you never open never

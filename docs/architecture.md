@@ -16,8 +16,8 @@ The web app serves three kinds of clients from one process:
 
 - **The browser UI** — React Server Components + Server Actions, protected by a
   signed session cookie.
-- **The mobile app** — a REST API under `/api/v1`, protected by a per-user bearer
-  token.
+- **API clients** — a REST API under `/api/v1`, protected by a per-user bearer
+  token, for scripts and other tools.
 - **Optionally, other tools** — an MCP endpoint under `/api/mcp` and, in hosted
   mode, a control-plane API under `/api/saas`.
 
@@ -46,7 +46,7 @@ it being present.
   └──────────────────────────────────────────────────────────────────────┘
         ▲                         ▲
         │ :3000                   │ :3000 /api/v1 (+ /api/files) bearer token
-   browser (session cookie)   mobile app (Expo)
+   browser (session cookie)   API clients (scripts, MCP)
 ```
 
 Only **`web`** binds to all interfaces (`0.0.0.0:3000`) so phones can reach it over
@@ -97,7 +97,7 @@ Authentication splits by client, enforced in [`middleware.ts`](../apps/web/src/m
 - **API (bearer token).** Requests to `/api/*` never get an HTML redirect; they get
   a `401`. Each `/api/v1` route validates an `Authorization: Bearer <token>` header
   against a per-user `apiToken` (see [`lib/apiAuth.ts`](../apps/web/src/lib/apiAuth.ts)).
-  The mobile app also fetches `/api/files/*` with the same bearer token.
+  API clients also fetch `/api/files/*` with the same bearer token.
 
 The edge middleware deliberately does **not** touch MongoDB (it cannot at the edge):
 first-run detection and token lookups happen in Node-runtime route handlers instead.
@@ -109,9 +109,9 @@ first-run detection and token lookups happen in Node-runtime route handlers inst
   `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY`, which is pinned so open browser tabs survive
   a rebuild. See [Troubleshooting](troubleshooting.md) for the "hard refresh after a
   rebuild" note.
-- **Mobile app** → the REST API under [`app/api/v1`](../apps/web/src/app/api/v1)
+- **API clients** → the REST API under [`app/api/v1`](../apps/web/src/app/api/v1)
   (items, receipts, expenses, statements, subscriptions, vouchers, tasks, calendar,
-  reports, search, notifications, push, scan, and more). Full list in the
+  reports, search, notifications, and more). Full list in the
   [API reference](api.md).
 - **File serving** → `/api/files/*` streams binary files (receipt scans, statement
   PDFs, item photos) from the storage volume, behind the same auth.
@@ -181,25 +181,16 @@ control-plane API is `/api/saas`. When `SAAS_MODE` is off, none of this is reach
 and the app behaves as a single-tenant self-hosted hub. See
 [Managed SaaS mode](saas.md).
 
-## Mobile app
-
-[`apps/mobile`](../apps/mobile) is an Expo (SDK 54) companion for iOS and Android. It
-is a **client of the same server**: it points at a Pharos base URL, signs in once to
-receive a per-user bearer token, and then talks only to `/api/v1` and `/api/files`.
-It has no database of its own. Camera scans upload to the server's AI pipeline; push
-notifications are delivered through Expo. Setup in [Mobile app](mobile.md).
-
 ## Where things live (quick map)
 
 | Path | What |
 |---|---|
 | `apps/web/src/app` | Pages (RSC), Server Actions, and the `/api` routes. |
-| `apps/web/src/app/api/v1` | The REST API the mobile app consumes. |
+| `apps/web/src/app/api/v1` | The REST API for external clients and scripts. |
 | `apps/web/src/models` | Mongoose schemas (the data model). |
 | `apps/web/src/lib` | DB connection, auth, AI, storage, notifications, tenancy, billing. |
 | `apps/web/src/components` | React UI components. |
 | `apps/web/src/middleware.ts` | Edge auth gate (session cookie / bearer split). |
-| `apps/mobile` | The Expo companion app. |
 | `services/scraper` | The standalone price-tracking worker. |
 | `docker-compose.yml` | The full stack, with `scraper` and `tools` profiles. |
 

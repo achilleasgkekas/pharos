@@ -10,7 +10,6 @@ Common questions about PHAROS, grouped by topic. For step-by-step guides see the
 - [Privacy & data ownership](#privacy--data-ownership)
 - [AI](#ai)
 - [Storage & backups](#storage--backups)
-- [Mobile app](#mobile-app)
 - [Cost & licensing](#cost--licensing)
 - [Troubleshooting](#troubleshooting)
 
@@ -158,22 +157,6 @@ entries, and "delete forever" does the real cleanup.
 
 ---
 
-## Mobile app
-
-### Is there a phone app?
-
-Yes, an Expo (iOS/Android) companion. You point it at your own Pharos server URL,
-sign in to get a bearer token, and it talks to the same REST API (`/api/v1`) the
-web app exposes. It can scan receipts with the phone camera and receive push
-notifications. See [Mobile app](mobile.md).
-
-### Do I need an app-store account?
-
-For day-to-day use you can run it in Expo. To produce an installable binary you
-build with EAS; the mobile guide covers both paths.
-
----
-
 ## Cost & licensing
 
 ### What license is PHAROS under?
@@ -200,7 +183,7 @@ exact limits and billing are documented in [Managed SaaS mode](saas.md).
 ### The app or AI is not working — where do I start?
 
 The [Troubleshooting guide](troubleshooting.md) groups the most common problems
-by area (startup, login, database, AI, storage, notifications, import, mobile,
+by area (startup, login, database, AI, storage, notifications, import,
 performance) and links back to the relevant guide for each.
 
 ### I updated the app and an open tab throws an error.

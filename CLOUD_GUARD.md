@@ -288,7 +288,7 @@ prune, καμία αφαίρεση cron, κανένα refactor. Μηδέν write
 ### Needs Achilleas
 
 - **Tenant scoping στο `/api/v1/*`** (24 routes) και στα `jobActions/search-actions/aiTools`.
-  Σήμερα κλείνει με 401 αντί να διαρρέει, οπότε δεν είναι επείγον, αλλά σημαίνει ότι το mobile
+  Σήμερα κλείνει με 401 αντί να διαρρέει, οπότε δεν είναι επείγον, αλλά σημαίνει ότι το REST
   API **δεν δουλεύει καθόλου για hosted πελάτη**.
 - **`User.create` στη DEFAULT σύνδεση** (`settings/users.actions.ts`, `setup/actions.ts`). Αυτό
   είναι το σημείο που μετατρέπει το παραπάνω από «κλείνει» σε «διαρρέει», μόλις υπάρξουν δύο
