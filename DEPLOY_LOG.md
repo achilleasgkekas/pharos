@@ -13,6 +13,7 @@ Exit codes του `deploy/deploy-update.sh`:
 | 1 | αρνήθηκε να ξεκινήσει (ήδη άρρωστο, απέτυχε το backup, βρώμικο δέντρο). Τίποτα δεν άλλαξε. |
 | 2 | έγινε deploy, απέτυχε το health, **έγινε rollback**. Η παραγωγή είναι εντάξει, τα νέα commits είναι σπασμένα. |
 | 3 | απέτυχε και το rollback. Η παραγωγή είναι κάτω. |
+| 4 | άλλο deploy ήταν ήδη σε εξέλιξη (lock κρατημένο). Τίποτα δεν άλλαξε, ξαναπροσπάθησε. |
 
 ---
 
@@ -79,3 +80,23 @@ docs commits, δεν θα ξανάχτιζε τίποτα και θα ανέφε
   11:18 και δεν έχει ανακατασκευαστεί έκτοτε.
 - Τα χειροκίνητα `git pull` στον server είναι αυτά που δημιουργούν αυτή την κατηγορία προβλήματος
   εξαρχής. Το stamp τα καλύπτει πλέον, αρκεί να μη σβηστεί.
+
+## 2026-08-04: χειροκίνητο deploy (interactive session, κατ' εντολή Αχιλλέα)
+
+Εύρος: `89d49c85 → dc292d17` (4 commits).
+
+    2f10b8f fix(api): scope every /api/v1 route to the caller's workspace   [tenancy/security]
+    2dbab73 fix(deps): bump next σε 15.5.22, patched postcss/sharp           [security]
+    ef10669 docs(deploy): πρώτη εγγραφή στο DEPLOY_LOG
+    dc292d1 docs(ops): record the /api/v1 tenancy fix, and that it was not deployed
+
+`--check` πρώτα: health OK. Μετά `deploy/deploy-update.sh`: exit 0, backup ok, rebuild `web` +
+`landing`, recreate, health OK (attempt 1). Χωρίς rollback.
+
+Ανεξάρτητη επαλήθευση: `ph-aros.com` 200 (landing content self-host/waitlist),
+`app.ph-aros.com/account/login` 200, `POST /api/cron/saas/trials-sweep` χωρίς token → 401
+`{"error":"unauthorized"}`.
+
+Σημασία: ο tenancy/security fix που «δεν είχε deployed» (βλ. dc292d1) είναι πλέον live.
+
+Κατάσταση: παραγωγή στο `dc292d17`, υγιής.
