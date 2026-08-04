@@ -7422,3 +7422,53 @@ tenant-scoped** — το ήδη γνωστό ανοιχτό κενό. Μηδέν
 να κλείσει.
 
 **Next task:** (α) `settings/actions.ts` scoping· (β) σελίδα `/status` στη landing.
+
+## 2026-08-04 (ιδ) — increment 146: ΕΚΛΕΙΣΕ το settings scoping, το τελευταίο data-isolation κενό
+
+Ζητήθηκε ρητά. **64 σημεία πρόσβασης σε 9 models** έγραφαν και διάβαζαν τη **default** βάση: νόμισμα,
+budgets, AI prompts και keys, notifiers, καταστήματα, κάρτες πληρωμής, dropdown lists — **κοινά σε
+κάθε πελάτη**. Αόρατο με ένα workspace· τη μέρα που υπάρχει δεύτερο, οι ρυθμίσεις τους είναι του
+άλλου.
+
+**Η απόφαση: scoping στο MODEL boundary, όχι wrapper γύρω από 65 exported actions.** Το `scoped()`
+είναι `withRequestTenant` + `currentModel`, οπότε κάθε άγγιγμα βάσης κάνει **δύο** δουλειές: διαλέγει
+το σωστό workspace **και** επιβάλλει τον έλεγχο membership/status. Λογαριασμός που δεν είναι μέλος
+του workspace του host δεν διαβάζει ούτε γράφει τις ρυθμίσεις του. Το wrapping θα έδινε το ίδιο
+routing με diff εικοσαπλάσιο, πάνω σε αρχείο που άλλες routines επεξεργάζονται, και **μηδέν**
+επιπλέον ασφάλεια.
+
+**Η παγίδα που παραλίγο να ξεφύγει**: το `getAppSettings` κάνει cache **ανά tenant** διαβάζοντας το
+ambient context, αλλά το `scoped()` ανοίγει και κλείνει εκείνο το context ανά κλήση. Άρα όταν το
+καλούσε settings action δεν υπήρχε ambient tenant, το `currentTenant()` απαντούσε «default», και θα
+διάβαζε λάθος βάση **ΚΑΙ θα cache-αρε την απάντηση κάτω από το default key**, όπου θα την έπαιρνε
+κάθε άλλο workspace. Δηλαδή το scoping των writes χωρίς αυτό θα είχε αφήσει ένα **χειρότερο**
+πρόβλημα από αυτό που έλυνε.
+
+Νέο **`softRequestTenant`**: λύνει workspace **χωρίς ποτέ να πετάει**. Το root layout καλεί
+`getAppSettings` σε ΚΑΘΕ σελίδα, μαζί με `/account/login` και το apex, όπου άρνηση θα έριχνε όλο το
+site. Ρητά ΔΕΝ ελέγχει membership: χρησιμοποιείται μόνο για να διαλέξει από ποια βάση να **διαβάσει**
+ρυθμίσεις εμφάνισης, και το data plane αρνείται ούτως ή άλλως στον μη-μέλος ό,τι έχει σημασία.
+
+**`resolveRequestTenant` memoised** ανά request (React cache): μια action λύνει πλέον μία φορά ανά
+model που αγγίζει, και κάθε resolution είναι δύο control-plane queries.
+
+**Self-hosted αμετάβλητο εκ κατασκευής**: και οι δύο resolvers γυρίζουν αμέσως τον default tenant
+χωρίς δουλειά, άρα `scoped(X)` === `X`.
+
+**Το sweep έπιασε `findByIdAndDelete`**, μέθοδο που η λίστα μου δεν είχε. Γραμμένο στο commit
+επειδή ο επόμενος που θα προσθέσει model call εκεί δεν θα έχει sweep να τον σώσει.
+
+**Ξένο WIP**: βρήκα εγκαταλελειμμένη δουλειά άλλης routine στο ίδιο αρχείο (γραμμένη 12:04,
+ξεχασμένη 6 ώρες, χαλούσε την επαλήθευση κάθε άλλης routine). Την κατοχύρωσα σε **ξεχωριστό**
+commit με ρητή σήμανση ότι δεν είναι δική μου, ΠΡΙΝ αγγίξω το αρχείο. Diff που κρύβει σιωπηλά τη
+δουλειά κάποιου άλλου είναι ο τρόπος που χάνεται η πατρότητα.
+
+**Verified**: νέο `actions.tenant.test.ts` κλειδώνει το routing (γράψιμο σε acme δεν αγγίζει
+default, δύο workspaces back-to-back δεν διαρρέουν, self-hosted parity), 14 test files πήραν το
+seam, **367 files / 5878 tests green**, type-check EXIT 0. Deploy μέσω pipeline exit 0, 5 commits,
+health OK. Live: apex 200, app 200, `/settings` χωρίς session → login, άγνωστο workspace → 404.
+
+**Next task:** (α) σελίδα `/status` στη landing· (β) sending domain με SPF+DKIM· (γ) Stripe όταν
+έρθουν keys.
+
+**## Needs Achilleas:** **Stripe keys**, **plan pricing**.
