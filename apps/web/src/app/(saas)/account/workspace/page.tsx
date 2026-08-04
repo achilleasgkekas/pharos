@@ -20,6 +20,7 @@ import { buildBillingSummary } from '@/lib/billing/billingSummary';
 import { stripeConfigured } from '@/lib/billing/stripe';
 import { pickWorkspace } from '@/components/saas/chooseWorkspace';
 import { workspaceTabs } from '@/components/saas/workspaceTabs';
+import { workspaceUrl } from '@/components/saas/workspaceUrl';
 import { WorkspaceShell, Panel, DefRow } from '@/components/saas/WorkspaceShell';
 import { StatTile } from '@/components/saas/StatTile';
 import { blockedNotice } from '@/components/saas/blockedNotice';
@@ -123,6 +124,7 @@ export default async function WorkspaceOverviewPage({
       status={chosen.status}
       role={chosen.role}
       tabs={workspaceTabs('overview', w)}
+      appUrl={workspaceUrl(chosen.slug, process.env.SAAS_PUBLIC_URL)}
       switchTargets={tenants.map((t) => ({
         slug: t.slug,
         name: t.name,

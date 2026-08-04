@@ -21,6 +21,7 @@ import { AuditEvent, type AuditEventDoc } from '@/models/AuditEvent';
 import { Account } from '@/models/Account';
 import { pickWorkspace } from '@/components/saas/chooseWorkspace';
 import { workspaceTabs } from '@/components/saas/workspaceTabs';
+import { workspaceUrl } from '@/components/saas/workspaceUrl';
 import { WorkspaceShell, Panel } from '@/components/saas/WorkspaceShell';
 import { ActivityPanel } from '@/components/saas/ActivityPanel';
 import { toActivityRows, type ActivityInput } from '@/components/saas/activityView';
@@ -81,6 +82,7 @@ export default async function WorkspaceActivityPage({
       status={chosen.status}
       role={chosen.role}
       tabs={workspaceTabs('activity', w)}
+      appUrl={workspaceUrl(chosen.slug, process.env.SAAS_PUBLIC_URL)}
       switchTargets={tenants.map((t) => ({
         slug: t.slug,
         name: t.name,

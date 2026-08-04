@@ -20,6 +20,7 @@ import { inviteView } from '@/lib/tenancy/invites';
 import { canManageMembers } from '@/lib/tenancy/members';
 import { pickWorkspace } from '@/components/saas/chooseWorkspace';
 import { workspaceTabs } from '@/components/saas/workspaceTabs';
+import { workspaceUrl } from '@/components/saas/workspaceUrl';
 import { WorkspaceShell } from '@/components/saas/WorkspaceShell';
 import { MembersPanel, type MemberRow, type InviteRow } from '@/components/saas/MembersPanel';
 
@@ -106,6 +107,7 @@ export default async function WorkspaceMembersPage({
       status={chosen.status}
       role={chosen.role}
       tabs={workspaceTabs('members', w)}
+      appUrl={workspaceUrl(chosen.slug, process.env.SAAS_PUBLIC_URL)}
       switchTargets={tenants.map((t) => ({
         slug: t.slug,
         name: t.name,

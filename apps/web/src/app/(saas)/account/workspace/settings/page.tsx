@@ -29,6 +29,7 @@ import { workspaceView } from '@/lib/tenancy/workspace';
 import { erasureView, ERASURE_GRACE_DAYS } from '@/lib/tenancy/erasure';
 import { pickWorkspace } from '@/components/saas/chooseWorkspace';
 import { workspaceTabs } from '@/components/saas/workspaceTabs';
+import { workspaceUrl } from '@/components/saas/workspaceUrl';
 import { WorkspaceShell } from '@/components/saas/WorkspaceShell';
 import { WorkspaceSettingsPanel } from '@/components/saas/WorkspaceSettingsPanel';
 import { AiKeyPanel } from '@/components/saas/AiKeyPanel';
@@ -87,6 +88,7 @@ export default async function WorkspaceSettingsPage({
       status={chosen.status}
       role={chosen.role}
       tabs={workspaceTabs('settings', w)}
+      appUrl={workspaceUrl(chosen.slug, process.env.SAAS_PUBLIC_URL)}
       switchTargets={tenants.map((t) => ({
         slug: t.slug,
         name: t.name,

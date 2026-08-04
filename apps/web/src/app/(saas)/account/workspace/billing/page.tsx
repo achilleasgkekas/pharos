@@ -17,6 +17,7 @@ import { buildBillingSummary } from '@/lib/billing/billingSummary';
 import { stripeConfigured } from '@/lib/billing/stripe';
 import { pickWorkspace } from '@/components/saas/chooseWorkspace';
 import { workspaceTabs } from '@/components/saas/workspaceTabs';
+import { workspaceUrl } from '@/components/saas/workspaceUrl';
 import { WorkspaceShell, Panel, DefRow } from '@/components/saas/WorkspaceShell';
 import { BillingPanel } from '@/components/saas/BillingPanel';
 import { formatInt } from '@/components/saas/format';
@@ -81,6 +82,7 @@ export default async function WorkspaceBillingPage({
       status={chosen.status}
       role={chosen.role}
       tabs={workspaceTabs('billing', w)}
+      appUrl={workspaceUrl(chosen.slug, process.env.SAAS_PUBLIC_URL)}
       switchTargets={tenants.map((t) => ({
         slug: t.slug,
         name: t.name,

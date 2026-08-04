@@ -16,6 +16,7 @@ import { currentUsage, aiQuotaStatus, storageQuotaStatus } from '@/lib/billing/u
 import { buildCostSummary } from '@/lib/billing/costSummary';
 import { pickWorkspace } from '@/components/saas/chooseWorkspace';
 import { workspaceTabs } from '@/components/saas/workspaceTabs';
+import { workspaceUrl } from '@/components/saas/workspaceUrl';
 import { WorkspaceShell, Panel, DefRow } from '@/components/saas/WorkspaceShell';
 import { StatTile } from '@/components/saas/StatTile';
 import { QuotaBar } from '@/components/saas/QuotaBar';
@@ -75,6 +76,7 @@ export default async function WorkspaceUsagePage({
       status={chosen.status}
       role={chosen.role}
       tabs={workspaceTabs('usage', w)}
+      appUrl={workspaceUrl(chosen.slug, process.env.SAAS_PUBLIC_URL)}
       switchTargets={tenants.map((t) => ({
         slug: t.slug,
         name: t.name,

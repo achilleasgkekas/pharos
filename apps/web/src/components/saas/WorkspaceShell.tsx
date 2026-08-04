@@ -21,6 +21,7 @@ export function WorkspaceShell({
   role,
   tabs,
   switchTargets,
+  appUrl,
   children,
 }: {
   workspaceName: string;
@@ -29,6 +30,8 @@ export function WorkspaceShell({
   role: string;
   tabs?: WorkspaceTab[];
   switchTargets?: SwitchTarget[];
+  /** Absolute URL of the workspace's own subdomain — the actual app. Omitted ⇒ no button. */
+  appUrl?: string;
   children: ReactNode;
 }) {
   const others = switchTargets ?? [];
@@ -59,6 +62,18 @@ export function WorkspaceShell({
             <Pill tone="neutral">{plan}</Pill>
             <TenantStatusBadge status={status} />
             <MemberRoleBadge role={role} />
+            {/* The way INTO the product. This whole area is settings about a workspace; the
+                workspace itself lives on its own subdomain, and until this existed there was no
+                link to it anywhere, so a new customer finished signup and could not get in at
+                all. Prominent on purpose: it is the thing they came for, not an afterthought. */}
+            {appUrl && (
+              <a
+                href={appUrl}
+                className="ml-auto rounded-lg bg-[color:var(--color-accent)] px-4 py-2 text-sm font-semibold text-black hover:opacity-90"
+              >
+                Open workspace →
+              </a>
+            )}
           </div>
 
           {others.length > 1 && (
