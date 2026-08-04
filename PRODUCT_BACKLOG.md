@@ -6,7 +6,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-08-03 (25η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-08-04 (26η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
@@ -140,12 +140,86 @@
 > η πιο πρακτική πρόταση αν θελήσει ένα μικρό batch. Σημείωση: το P81 θα άξιζε να μπει ΚΑΙ στο shortlist (ίδιο
 > «χαμηλού ρίσκου, καθαρά additive» προφίλ, reuse ατόφιου pattern) αλλά δεν το πρόσθεσα εκεί μόνος μου — το
 > shortlist είναι ήδη μια πρόταση σειράς, η επέκτασή του μένει στον Αχιλλέα.
+>
+> **26η σάρωση (2026-08-04)** — `git log --since` από την 25η σάρωση (marker `a62482b`, μέχρι το σημερινό HEAD
+> `750bb30`): το «approve all» της 3ης Αυγ **δούλεψε** — ο builder κατανάλωσε πλέον ενεργά την ουρά, **P81
+> (αυτόματο cron trigger, `fda8c96`) και P66 (AI βλέπει όλα τα modules, `d774dd4`) και P74 (backup verify, `60d25f4`)
+> shipped** και ήδη συμφιλιωμένα στο `## Approved` παρακάτω (κανένα νέο reconciliation χρειάζεται εδώ). Το
+> decision-fatigue bottleneck των προηγούμενων 20 σαρώσεων έσπασε· η ουρά είναι πλέον ενεργά buildable, οπότε
+> επέστρεψα στο κανονικό ρυθμό προτάσεων (**3 νέα candidates, P82-P84**) αντί του περιορισμένου 1-2 των σαρώσεων
+> 22-25. Και τα τρία live-verified με grep πριν την πρόταση: (1) **P82** — το πλέον-ενεργό (μετά το P81) automatic
+> cron σκανάρει και ξαναστέλνει το **ίδιο** ntfy/Discord/Slack/Telegram/push μήνυμα σε ΚΑΘΕ πυροδότηση όσο μια
+> συνθήκη μένει true (`runAlertChecks` καλεί `dispatchAlert()` unconditionally όποτε `lines.length`, μηδέν
+> σχέση με το ήδη-υπάρχον `dedupeKey` σύστημα του bell) — πρόβλημα που ουσιαστικά δεν υπήρχε πριν το P81 (κανείς
+> δεν έτρεχε το check ξανά και ξανά αυτόματα), τώρα είναι σχεδόν βέβαιο side-effect του «point any cron at it».
+> (2) **P83** — το ίδιο το P12 (savings goals, shipped) καταγράφει ρητά στο δικό του «Builder default»: «auto-feed
+> από κατηγορία = phase 2, δεν χτίστηκε» (βλ. `## Approved` P12 παρακάτω) — ποτέ δεν έγινε δικό του backlog item,
+> ίδιο μοτίβο με το P75 (μισό ενός shipped item που δεν προωθήθηκε). Το ήδη-shipped P25 (budget rollover) υπολογίζει
+> ήδη το αδιάθετο υπόλοιπο ανά κατηγορία/μήνα — φυσικό ζευγάρωμα, καμία νέα λογική υπολογισμού. (3) **P84** —
+> `Card.creditLimit` είναι ήδη πεδίο, ήδη εμφανίζεται στατικά («€3000 limit», `StatementsClient.tsx:1482`), αλλά
+> `grep -n "creditLimit|outstanding|utilization" StatementsClient.tsx` δείχνει **καμία** σύγκριση με το πραγματικό
+> outstanding balance (που υπολογίζεται ήδη αλλού στο ίδιο αρχείο) — μηδέν badge, μηδέν alert-engine entry, παρόλο
+> που το CLAUDE.md δείχνει multi-card installment management ως ενεργό use case του χρήστη.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P84. Credit card utilization warning (creditLimit vs πραγματικό outstanding) — S — OSS (κυρίως), dogfooding-heavy
+- **Αξία:** live-verified: το `Card.creditLimit` (`statements/cards.ts`) αποθηκεύεται και εμφανίζεται ήδη στατικά
+  δίπλα στο όνομα της κάρτας (`StatementsClient.tsx:1482`, π.χ. «€3000 limit»), αλλά ποτέ δεν συγκρίνεται με το
+  πραγματικό outstanding balance που το ίδιο αρχείο ήδη υπολογίζει ανά κάρτα (`balance`/`t('st.outstanding')`,
+  γραμμή 230) — μηδέν utilization %, μηδέν χρωματικό warning, και **καμία** entry στο `runAlertChecks` (8 ήδη
+  υπάρχοντα alert kinds, κανένα card-limit). Ο χρήστης διαχειρίζεται ήδη πολλαπλές κάρτες με ενεργά δωδεκάμηνα
+  installment plans (CLAUDE.md, Εθνική Mastercard 7791 + άλλη) — «πόσο κοντά είμαι στο όριο μιας κάρτας» είναι
+  σήμερα κάτι που πρέπει να υπολογίσει νοερά, βλέποντας δύο ξεχωριστούς αριθμούς. Νέο μικρό: υπολογισμένο
+  `utilizationPct = outstanding / creditLimit` όταν `creditLimit > 0`, χρωματιστό badge (ίδιο idiom με τα ήδη-
+  υπάρχοντα temp/channel-utilization χρωματικά κατώφλια αλλού στο repo) όταν ≥80%/≥95%, + προαιρετική νέα γραμμή
+  στο `runAlertChecks` summary (ίδιο pattern με τα υπόλοιπα 8 alert kinds, dedupeKey-ready αν εγκριθεί μαζί με το P82).
+- **Module:** `app/statements/StatementsClient.tsx` (badge στην κάρτα) + `app/settings/actions.ts` `runAlertChecks`
+  (νέα προαιρετική γραμμή, reuse του ήδη-υπολογισμένου outstanding-per-card).
+- **Ανοιχτή απόφαση (builder default):** MVP = μόνο UI badge (κενό `creditLimit` = καμία αλλαγή, ίδιο idiom με τα
+  υπόλοιπα optional πεδία)· το alert-engine κομμάτι follow-up ώστε το πρώτο slice να μείνει S· κατώφλια 80%/95%
+  σταθερά αρχικά, χωρίς νέο per-card setting (αποφυγή over-engineering ενός S item).
+
+### P83. Goal auto-contribution από αδιάθετο υπόλοιπο budget (P25 rollover → P12 goal) — S/M — OSS, dogfooding-heavy
+- **Αξία:** live-verified: το ίδιο το P12 (savings goals, ήδη shipped) καταγράφει ρητά στο δικό του «Builder
+  default τηρήθηκε»: «πολλά ταυτόχρονα goals· manual contributions μόνο (**auto-feed από κατηγορία = phase 2,
+  δεν χτίστηκε**)» — ποτέ δεν προωθήθηκε σε δικό του backlog item έκτοτε (`grep -n "auto-feed" PRODUCT_BACKLOG.md`
+  = μόνο η ίδια η αρχική σημείωση). Το ήδη-shipped P25 (budget rollover/envelope mode) υπολογίζει ήδη το αδιάθετο
+  υπόλοιπο ανά κατηγορία/μήνα — αν κάποιος έβαλε budget «groceries €400» και ξόδεψε €340, τα €60 σήμερα απλά
+  κάθονται εκεί, χωρίς κανέναν τρόπο να ρέουν αυτόματα σε έναν ενεργό στόχο (π.χ. το sailing-trip fund, CLAUDE.md).
+  Καθαρό ζευγάρωμα δύο ήδη-shipped μηχανισμών, μηδέν νέος υπολογισμός: μηνιαίο (ή manual «sweep now») transfer
+  του leftover-rollover μιας επιλεγμένης κατηγορίας σε μια `GoalContribution` εγγραφή.
+- **Module:** `models/Goal.ts` (καμία αλλαγή σχήματος, reuse `GoalContributionSchema`) + Reports/Budget rollover
+  UI (νέο «sweep to goal» action) + optional monthly auto-run.
+- **Ανοιχτή απόφαση (builder default):** MVP = **manual** «sweep this month's leftover to…» κουμπί (ίδιο idiom
+  με το ήδη-υπάρχον 1-click «∑ items»/«Log a price» pattern) πάνω στο ήδη-υπάρχον rollover UI· πλήρως αυτόματο
+  μηνιαίο sweep ως follow-up μόνο αν το manual flow αποδειχτεί χρήσιμο (αποφυγή σιωπηλής μετακίνησης χρημάτων
+  μεταξύ «κουτιών» χωρίς να το δει πρώτα ο χρήστης)· κενό/άδειο leftover = καμία αλλαγή συμπεριφοράς.
+
+### P82. Outbound alert notifications δεν έχουν per-item dedup (το bell έχει, τα ntfy/Discord/κλπ όχι) — S — OSS (κυρίως), άμεσο follow-up του P81
+- **Αξία:** live-verified `app/settings/actions.ts` `runAlertChecks()`: το in-app bell περνά από `generateNotifications()`
+  (`app/notifications/actions.ts`), που έχει ήδη πλήρες `dedupeKey`-based σύστημα (`deal:<id>`, `warranty:<id>`,
+  `bill:<id>:<date>` κλπ — γραμμή 190-212, μόνο **νέα** ή **αλλαγμένη** κατάσταση δημιουργεί entry). Αλλά η
+  **outbound** ειδοποίηση (`dispatchAlert('Pharos alerts', summary)`, γραμμή 630) είναι εντελώς ξεχωριστός κώδικας
+  που φτιάχνει ένα text summary και το στέλνει σε ntfy/Discord/Slack/Telegram/webhook + push **unconditionally**
+  όποτε `lines.length > 0` — **μηδέν** σχέση με το dedupeKey σύστημα του bell (verified: η κλήση `dispatchAlert`
+  δεν περνά κανένα dedup state, καμία αναφορά dedupeKey σε αυτό το block). Αυτό ήταν αβλαβές όσο η μόνη πυροδότηση
+  ήταν το χειροκίνητο κουμπί «Check & notify now» (ο χρήστης το πατά όποτε θέλει), αλλά **το ίδιο το P81** (shipped
+  χθες, 2026-08-03) έγραψε ρητά «cadence is the operator's — point any cron at it». Αν ο Αχιλλέας βάλει ένα daily/
+  hourly cron (η προφανής χρήση του P81), θα παίρνει το **ίδιο ακριβώς** «🛡 3 warranty expiring ≤90d: X (45d)»
+  ntfy push σε κάθε πυροδότηση μέχρι να λήξει η εγγύηση ή να πληρωθεί το bill — notification fatigue που οδηγεί
+  σε mute του καναλιού, ακυρώνοντας το ίδιο το feature που μόλις χτίστηκε. Reuse ατόφιο του ήδη-υπάρχοντος
+  `dedupeKey` schema/κατώφλια logic (ήδη σχεδιασμένο ανά alert kind), απλά εφαρμοσμένο και στο outbound path.
+- **Module:** `app/settings/actions.ts` (`runAlertChecks`, το `dispatchAlert` call site) + reuse
+  `app/notifications/actions.ts` dedupeKey helpers/computation (ίδια alerts array, δεύτερο consumer).
+- **Ανοιχτή απόφαση (builder default):** MVP = φιλτράρισμα των γραμμών του summary ώστε να στέλνονται outbound
+  **μόνο** τα alert που είναι νέα ή άλλαξαν κατάσταση από την τελευταία επιτυχή αποστολή (ίδιο dedupeKey concept
+  με το bell, χωρίς διπλό μηχανισμό)· «κενό» (μηδέν νέο/αλλαγμένο) = **καμία** αποστολή αντί άδειο «All clear»
+  spam· υπάρχοντα κανάλια/behaviour αμετάβλητα όταν δεν υπάρχει τίποτα νέο να αναφερθεί.
 
 ---
 
