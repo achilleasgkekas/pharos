@@ -713,6 +713,18 @@ export const el: Partial<Dict> = {
   'dup.keep': 'κράτα',
   'dup.itemStats': '{items} είδη · {linked} συνδεδεμένα · {model}',
 
+  // Διπλότυπα εξόδων / εσόδων (P46)
+  'exdup.button': 'διπλότυπα',
+  'exdup.title': 'Εύρεση διπλότυπων εξόδων',
+  'exdup.titleIncome': 'Εύρεση διπλότυπων εσόδων',
+  'exdup.none': 'Δεν βρέθηκαν διπλότυπα. Καθαρό βιβλίο!',
+  'exdup.intro':
+    '{groups} ομάδες · {dupes} διπλότυπα προς συγχώνευση. Διάλεξε ποιο να κρατήσεις σε κάθε ομάδα (προεπιλογή: το πληρέστερο)· τα υπόλοιπα συγχωνεύονται σε αυτό και πάνε στον Κάδο.',
+  'exdup.meta': '{category} · {source}',
+  'exdup.file': 'με αρχείο',
+  'exdup.recurring': 'επαναλαμβανόμενο',
+  'exdup.manual': 'χειροκίνητα',
+
   'set.tabGeneral': 'Γενικά',
   'set.tabMoney': 'Οικονομικά',
   'set.tabAi': 'AI',

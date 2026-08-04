@@ -6,7 +6,7 @@ import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
 import {
   Upload, Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Repeat, Wallet, Search, Plus, X, Camera, Sparkles,
-  LayoutGrid, List as ListIcon, SlidersHorizontal, MapPin, Users, Split as SplitIcon, Landmark,
+  LayoutGrid, List as ListIcon, SlidersHorizontal, MapPin, Users, Split as SplitIcon, Landmark, Copy,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -23,6 +23,7 @@ import { uploadExpense, updateExpense, addExpense, deleteExpense, rescanExpense,
 import { equalSplit, splitTotals, computeBalances, type SplitEntry } from '@/lib/split';
 import { TAX_CATEGORY_PRESETS } from '@/lib/taxonomies';
 import { CsvImportModal } from './CsvImportModal';
+import { ExpenseDuplicatesModal } from './ExpenseDuplicatesModal';
 import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
@@ -66,6 +67,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const [selected, setSelected] = useState<SerializedExpense | null>(null);
   const [creating, setCreating] = useState(false);
   const [importingCsv, setImportingCsv] = useState(false);
+  const [findingDupes, setFindingDupes] = useState(false);
   const [showBalances, setShowBalances] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
@@ -217,6 +219,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
           <div className="flex items-center gap-4 text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
             <button onClick={() => setCreating(true)} className="flex items-center gap-1 text-[color:var(--color-accent)] hover:opacity-80"><Plus size={13} /> {t('common.add')}</button>
             <button onClick={() => setImportingCsv(true)} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)]" title={t('csv.title')}><FileSpreadsheet size={13} /> {t('csv.button')}</button>
+            <button onClick={() => setFindingDupes(true)} className="flex items-center gap-1 text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)]" title={t(isIncome ? 'exdup.titleIncome' : 'exdup.title')}><Copy size={13} /> {t('exdup.button')}</button>
             {!isIncome && balances.length > 0 && (
               <button onClick={() => setShowBalances(true)} className="flex items-center gap-1 text-[color:var(--color-cyan)] hover:opacity-80" title={t('ex.balancesTitle')}>
                 <Users size={13} /> {t('ex.balancesBtn')}{totalOwedToYou > 0.009 ? ` · ${money(totalOwedToYou)}` : ''}
@@ -307,6 +310,7 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
       )}
       {creating && <ExpenseCreate kind={kind} cards={cards} vendors={vendors} categories={categories} spaces={spaces} fx={fx} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); router.refresh(); }} />}
       {importingCsv && <CsvImportModal kind={kind} fx={fx} onClose={() => setImportingCsv(false)} onImported={() => router.refresh()} />}
+      {findingDupes && <ExpenseDuplicatesModal kind={kind} onClose={() => setFindingDupes(false)} />}
       {showBalances && <BalancesModal balances={balances} onClose={() => setShowBalances(false)} onChanged={() => router.refresh()} confirm={confirm} />}
     </main>
   );

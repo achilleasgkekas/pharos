@@ -21,6 +21,7 @@ import type { SerializedExpense } from '@/types';
 import type { ParsedExpense } from '@/lib/ollama';
 import { vendorKey, serializeExpense } from './lib';
 import { csvDedupeKey } from '@/lib/csvImport';
+import { groupExpenseDupes, type ExpenseDupeGroup } from '@/lib/expenseDupes';
 import { assertCanWrite } from '@/lib/auth';
 
 type Kind = 'income' | 'expense';
@@ -692,6 +693,149 @@ export async function applyCategoryRulesToExisting(): Promise<{ ok: boolean; upd
       return { ok: true, updated: ops.length };
     } catch (err) {
       return { ok: false, updated: 0, error: (err as Error).message };
+    }
+  });
+}
+
+// ── Duplicate detection & merge (P46) ────────────────────────────────────────
+// Mirrors the review-before-merge flow Receipts/Stores/Items already have. The
+// grouping rule itself lives in lib/expenseDupes.ts (pure, tested); these two
+// exports are only the database halves of it.
+
+/** Candidate duplicates for one tab (expenses or income), most valuable cluster first. */
+export async function findDuplicateExpenses(kind: Kind): Promise<ExpenseDupeGroup[]> {
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Expense = await currentModel(ExpenseModel);
+    // amount > 0 is enforced in the query AND in expenseDupeKey: empty drafts (an AI
+    // parse that came back with nothing) would otherwise be the biggest "duplicate"
+    // cluster in the library and every one of them a false positive.
+    const rows = await Expense.find({ kind: asKind(kind), amount: { $gt: 0 } })
+      .select(
+        'kind vendor vendorKey category amount currency date verified recurring filePath notes paymentMethod space taxCategory split aiModel'
+      )
+      .lean();
+
+    return groupExpenseDupes(
+      (rows as unknown as Array<Record<string, unknown>>).map((r) => ({
+        _id: String(r._id),
+        kind: asKind(r.kind),
+        vendor: String(r.vendor ?? ''),
+        vendorKey: String(r.vendorKey ?? ''),
+        category: String(r.category ?? ''),
+        amount: Number(r.amount) || 0,
+        currency: String(r.currency ?? ''),
+        date: r.date ? new Date(r.date as string).toISOString() : '',
+        verified: !!r.verified,
+        recurring: !!r.recurring,
+        hasFile: !!r.filePath,
+        notes: String(r.notes ?? ''),
+        paymentMethod: String(r.paymentMethod ?? ''),
+        space: String(r.space ?? ''),
+        taxCategory: String(r.taxCategory ?? ''),
+        splitCount: Array.isArray(r.split) ? r.split.length : 0,
+        aiModel: String(r.aiModel ?? ''),
+      }))
+    );
+  });
+}
+
+/**
+ * Merge duplicates into one survivor: backfill every field the survivor is missing from
+ * the dropped records, then soft-delete the drops.
+ *
+ * Two things this does that the Receipts version does not, both because Expenses are
+ * soft-deleted (Trash) while receipts are not:
+ *  - the drops go to the Trash, so a merge the user regrets is undoable for 30 days;
+ *  - when the survivor adopts a dropped record's FILE, that record's file reference is
+ *    cleared first. `purgeTrashEntry` deletes an expense's filePath/thumbPath
+ *    unconditionally, so leaving the reference on the trashed copy would mean the
+ *    30-day auto-purge silently deleting the surviving record's document.
+ */
+export async function mergeExpenses(
+  keepId: string,
+  dropIds: string[]
+): Promise<{ ok: boolean; merged: number; error?: string }> {
+  await assertCanWrite();
+  return withRequestTenant(async () => {
+    try {
+      await connectDB();
+      const Expense = await currentModel(ExpenseModel);
+      const keep = await Expense.findById(keepId);
+      if (!keep) return { ok: false, merged: 0, error: 'Record to keep not found' };
+
+      const targets = dropIds.filter((id) => id && id !== keepId);
+      if (targets.length === 0) return { ok: false, merged: 0, error: 'No records to merge' };
+      // Same `kind` only: an income can never be merged into an expense, whatever the
+      // client sent. Already-trashed records are excluded by the soft-delete plugin.
+      const drops = await Expense.find({ _id: { $in: targets }, kind: keep.kind });
+      if (drops.length === 0) return { ok: false, merged: 0, error: 'No records to merge' };
+
+      const fileAdopted: string[] = [];
+      for (const d of drops) {
+        if (!keep.vendor && d.vendor) {
+          keep.vendor = d.vendor;
+          keep.vendorKey = d.vendorKey;
+        }
+        if ((!keep.category || keep.category === 'other') && d.category && d.category !== 'other') {
+          keep.category = d.category;
+        }
+        if (!keep.period && d.period) keep.period = d.period;
+        if (!keep.paymentMethod && d.paymentMethod) keep.paymentMethod = d.paymentMethod;
+        if (!keep.notes && d.notes) keep.notes = d.notes;
+        if (!keep.space && d.space) keep.space = d.space;
+        if (!keep.taxCategory && d.taxCategory) keep.taxCategory = d.taxCategory;
+        if (!keep.taxDeductible && d.taxDeductible) keep.taxDeductible = true;
+        if (!keep.recurring && d.recurring) {
+          keep.recurring = true;
+          if (d.recurringCycle) keep.recurringCycle = d.recurringCycle;
+        }
+        if ((!keep.split || keep.split.length === 0) && d.split?.length) {
+          keep.split = d.split;
+          keep.markModified('split');
+        }
+        // Foreign-currency provenance (P9): amount is already base currency and equal
+        // across the group, but only one copy may carry what was printed on the document.
+        if (!keep.fxRate && d.fxRate) {
+          keep.currency = d.currency;
+          keep.origAmount = d.origAmount;
+          keep.fxRate = d.fxRate;
+        }
+        if (!keep.filePath && d.filePath) {
+          keep.filePath = d.filePath;
+          keep.fileType = d.fileType;
+          keep.thumbPath = d.thumbPath;
+          keep.fileSize = d.fileSize;
+          if (!keep.aiModel && d.aiModel) {
+            keep.aiModel = d.aiModel;
+            keep.aiParsedAt = d.aiParsedAt;
+          }
+          fileAdopted.push(String(d._id));
+        }
+        if (!keep.verified && d.verified) keep.verified = true;
+      }
+      await keep.save();
+
+      const now = new Date();
+      for (const d of drops) {
+        const set: Record<string, unknown> = { deletedAt: now };
+        // See the doc comment: the survivor now owns this file, so the trashed copy must
+        // stop pointing at it before purge gets the chance to delete it.
+        if (fileAdopted.includes(String(d._id))) {
+          set.filePath = '';
+          set.thumbPath = '';
+          set.fileType = '';
+          set.fileSize = 0;
+        }
+        await Expense.updateOne({ _id: d._id }, { $set: set });
+      }
+
+      revalidatePath('/expenses');
+      revalidatePath('/income');
+      revalidatePath('/reports');
+      return { ok: true, merged: drops.length };
+    } catch (err) {
+      return { ok: false, merged: 0, error: (err as Error).message };
     }
   });
 }

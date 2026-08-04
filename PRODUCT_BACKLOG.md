@@ -991,7 +991,28 @@
 - **Ανοιχτή απόφαση (builder default):** default threshold 7 μέρες (ρυθμιζόμενο, ίδιο lead-time pattern με τα
   υπόλοιπα alert-days)· no-op όταν backend=local ή mirror off (δεν έχει νόημα το alert).
 
-### P46. Expense duplicate detection & merge (mirror του ήδη-υπάρχοντος pattern) — S — OSS
+### P46. Expense duplicate detection & merge — ✅ SHIPPED 2026-08-04 (pharos-daily-dev)
+- **Τι έγινε:** νέο pure `lib/expenseDupes.ts` (κλειδί `kind|vendorKey|ημέρα|ποσό`), actions
+  `findDuplicateExpenses(kind)`/`mergeExpenses(keep, drops)`, νέο `ExpenseDuplicatesModal` και κουμπί
+  «⧉ duplicates» στο header των Expenses/Income (ίδιο review-before-merge flow με τις αποδείξεις).
+- **Τρεις σκόπιμες επιλογές** (όλες pinned με tests):
+  1. **Το `kind` μπαίνει στο κλειδί** και το merge φορτώνει τα drops με `kind: keep.kind`: μια επιστροφή
+     (income) και μια χρέωση (expense) με ίδιο vendor/ημέρα/ποσό δεν προσφέρονται ΠΟΤΕ ως διπλότυπα.
+  2. **Χωρίς vendorKey ή με ποσό 0 δεν ομαδοποιείται τίποτα.** Χωρίς vendor το μόνο σήμα που μένει είναι
+     «ίδια μέρα, ίδιο ποσό», που περιγράφει και πραγματικά ξεχωριστές εγγραφές (δύο βενζίνες)· τα κενά
+     drafts (amount 0 από αποτυχημένο AI parse) θα έφτιαχναν το μεγαλύτερο ψεύτικο cluster της βιβλιοθήκης.
+  3. **Τα drops πάνε στον Κάδο (soft delete), δεν σβήνονται** (σε αντίθεση με τις αποδείξεις, που δεν έχουν
+     soft delete) — άρα ένα merge που μετάνιωσες γυρίζει πίσω για 30 μέρες.
+- **Η παγίδα που έπιασε ο σχεδιασμός:** όταν ο επιζών υιοθετεί το ΑΡΧΕΙΟ ενός drop, καθαρίζεται πρώτα το
+  `filePath`/`thumbPath` του drop. Το `purgeTrashEntry` σβήνει το αρχείο ενός expense χωρίς να ελέγξει αν
+  κάποιος άλλος δείχνει σε αυτό, οπότε μια αναφορά που έμενε θα σήμαινε ότι το 30-ήμερο auto-purge σβήνει
+  σιωπηλά το έγγραφο του **επιζώντος**.
+- **Η ημέρα διαβάζεται σε ΤΟΠΙΚΑ parts, όχι UTC** (και ένα test το εξηγεί): το `lib/dates.ts` αποθηκεύει
+  ένα day-first «04/06/2026» ως τοπικά μεσάνυχτα αλλά ένα ISO «2026-06-04» ως UTC μεσάνυχτα, άρα ο ίδιος
+  λογαριασμός γραμμένος με το χέρι και εισαγμένος από CSV είναι δύο διαφορετικές στιγμές· με UTC parts το
+  ζευγάρι δεν θα ταίριαζε ποτέ ανατολικά του Γκρίνουιτς.
+
+### P46 (αρχικό spec, για ιστορικό) — S — OSS
 - **Αξία:** τα Receipts, Stores, και Items έχουν ήδη ένα δουλεμένο «find duplicates» modal (group κατά κλειδί +
   review + merge, βλ. `findDuplicateReceipts`/`findDuplicateStores`/`findDuplicateItems`) — τα **Expenses δεν
   έχουν το ίδιο**, παρόλο που ο κίνδυνος υπάρχει εξίσου (διπλό import ενός λογαριασμού, ίδια recurring εγγραφή

@@ -759,6 +759,18 @@ export const en = {
   'dup.keep': 'keep',
   'dup.itemStats': '{items} items · {linked} linked · {model}',
 
+  // Duplicate expenses / income (P46)
+  'exdup.button': 'duplicates',
+  'exdup.title': 'Find duplicate expenses',
+  'exdup.titleIncome': 'Find duplicate income',
+  'exdup.none': 'No duplicates found. Clean ledger!',
+  'exdup.intro':
+    '{groups} groups · {dupes} duplicates to merge. Pick the one to keep in each (defaults to the most complete); the rest merge into it and move to the Trash.',
+  'exdup.meta': '{category} · {source}',
+  'exdup.file': 'has file',
+  'exdup.recurring': 'recurring',
+  'exdup.manual': 'manual',
+
   // Settings
   'set.tabGeneral': 'General',
   'set.tabMoney': 'Money',
