@@ -1,0 +1,71 @@
+# Pharos production reverse proxy.
+#
+# THREE audiences on one domain, and they are not the same site:
+#
+#   ph-aros.com, www.ph-aros.com   → the LANDING site (marketing, pricing, terms)
+#   app.ph-aros.com                → the app shell: signup, login, account, /admin
+#   <workspace>.ph-aros.com        → the product, scoped to one workspace
+#
+# `app` and `www` are already in RESERVED_SLUGS (lib/tenancy/host.ts), so nobody can register a
+# workspace that would collide with either. That is what makes this split safe rather than a
+# race between the marketing site and whoever signs up first.
+#
+# Certificates are wildcard, issued over ACME DNS-01, which is why this runs the Cloudflare-
+# enabled Caddy build (Dockerfile.caddy) and needs CF_API_TOKEN. HTTP-01 would need a fresh
+# certificate for every workspace, i.e. one per signup, straight into a rate limit.
+#
+# The token needs exactly two permissions on this zone: Zone:Read and DNS:Edit. Never a Global
+# API Key — that one can do anything to every zone on the account, from a file on a public box.
+
+{
+	email {$ACME_EMAIL}
+}
+
+# Shared so the two site blocks cannot drift apart on TLS config.
+(pharos_tls) {
+	tls {
+		dns cloudflare {$CF_API_TOKEN}
+	}
+}
+
+(pharos_headers) {
+	header {
+		# Short max-age on purpose. Raise it once you are certain the domain stays on HTTPS
+		# forever: browsers keep honouring HSTS long after you might want to change your mind.
+		Strict-Transport-Security "max-age=604800; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
+# ── marketing ────────────────────────────────────────────────────────────────
+# Exact hostnames, so they win over the wildcard block below (Caddy prefers the most specific
+# site address). Without that precedence, www would be treated as a workspace called "www".
+{$SAAS_BASE_DOMAIN}, www.{$SAAS_BASE_DOMAIN} {
+	import pharos_tls
+	import pharos_headers
+	encode zstd gzip
+	reverse_proxy landing:3000
+}
+
+# ── the app + every workspace ────────────────────────────────────────────────
+# One block for both: they are the same Next application. `app.` resolves to "no workspace",
+# which the tenant gate turns into the account area rather than an error, and any other label
+# resolves to that workspace.
+app.{$SAAS_BASE_DOMAIN}, *.{$SAAS_BASE_DOMAIN} {
+	import pharos_tls
+	import pharos_headers
+	encode zstd gzip
+
+	# The app derives the workspace from the Host header (middleware stamps it as x-tenant-host
+	# for the node-side resolver). Caddy preserves Host by default; this is stated because
+	# losing it would silently route EVERY workspace to "no tenant".
+	reverse_proxy web:3000 {
+		header_up X-Forwarded-Host {host}
+	}
+
+	# Receipts and statements are large and mobile uploads are slow; give the proxy room.
+	request_body {
+		max_size 100MB
+	}
+}

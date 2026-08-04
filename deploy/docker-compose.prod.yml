@@ -28,7 +28,14 @@ services:
       CF_API_TOKEN: ${CF_API_TOKEN:?set CF_API_TOKEN (Zone:Read + DNS:Edit on this zone only)}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # A DIRECTORY, not `./Caddyfile:/etc/caddy/Caddyfile`. Docker bind-mounts a single file by
+      # INODE, and `git pull` replaces a file rather than rewriting it in place (write temp,
+      # rename), so the container keeps serving the old inode forever. This cost a real debugging
+      # round: `caddy reload` read the stale file, reported success, and the routing silently did
+      # not change. Mounting the directory means renames inside it are picked up normally.
+      # The directory holds only the Caddyfile, so nothing else is exposed (and .env.prod, which
+      # lives one level up, is deliberately out of reach).
+      - ./caddy:/etc/caddy:ro
       # Issued certificates + ACME account key. Losing this volume means re-issuing every cert,
       # which Let's Encrypt rate-limits, so it is a named volume and belongs in the backup.
       - caddy-data:/data
