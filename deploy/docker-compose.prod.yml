@@ -35,6 +35,24 @@ services:
       - caddy-config:/config
     depends_on:
       - web
+      - landing
+
+  landing:
+    # The marketing site (apps/landing): apex + www only. Separate from the app on purpose —
+    # different audience, different release cadence, and a marketing page should not be able to
+    # take the product down with it.
+    build:
+      context: ../apps/landing
+      dockerfile: Dockerfile
+      args:
+        NODE_BUILD_MEMORY: "3072"
+    image: pharos-landing:prod
+    container_name: pharos-landing
+    restart: unless-stopped
+    # No ports: only Caddy reaches it.
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
 
   web:
     # Built on the server from this checkout by default (see deploy/README.md). Swap for
@@ -64,8 +82,11 @@ services:
       # Session cookie must span the apex and every workspace subdomain, or signing up on the
       # apex and clicking into a workspace logs you straight back out.
       SAAS_COOKIE_DOMAIN: ".${SAAS_BASE_DOMAIN}"
-      SAAS_PUBLIC_URL: "https://${SAAS_BASE_DOMAIN}"
-      APP_URL: "https://${SAAS_BASE_DOMAIN}"
+      # app., not the apex: the apex is the marketing site now, so a verification or invite link
+      # pointing there would land the customer on a pricing page instead of the form they were
+      # sent to. The cookie domain above still spans app. and every workspace.
+      SAAS_PUBLIC_URL: "https://app.${SAAS_BASE_DOMAIN}"
+      APP_URL: "https://app.${SAAS_BASE_DOMAIN}"
       # Real TLS here, unlike the local stacks.
       AUTH_COOKIE_SECURE: "true"
     volumes:
