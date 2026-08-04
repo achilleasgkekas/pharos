@@ -7251,3 +7251,47 @@ cron** ώστε να τηρείται ο κανόνας «πρώτα τοπικ�
 
 **## Needs Achilleas:** **Resend key**, **Stripe keys**, **plan pricing**, **Storage Box SSH key**
 (δες την απάντηση της συνομιλίας — ο κωδικός που στάλθηκε πρέπει να αλλάξει).
+
+## 2026-08-04 (ι) — increment 142: email + offsite backups, και τέσσερα σιωπηλά σφάλματα
+
+Ο Achilleas έβαλε Storage Box (SSH key) και Gmail app password. Και τα δύο «έγιναν» και **και τα
+δύο ήταν σπασμένα** με τρόπους που δεν φαίνονται χωρίς πραγματική δοκιμή.
+
+**1. Το app password μπήκε με τα κενά** που δείχνει η Google: **19 χαρακτήρες αντί 16**. Το Gmail
+θα το απέρριπτε και θα το κυνηγούσαμε ως λάθος κωδικό.
+
+**2. Το `MAIL_FROM` περιείχε `< >` χωρίς εισαγωγικά.** Το κρίσιμο δεν είναι το email: **το
+`backup.sh` κάνει `source` αυτό το αρχείο**, οπότε το BACKUP έσκαγε με syntax error σε γραμμή που
+δεν έχει καμία σχέση με backup.
+
+**3. Το remote prune δεν έτρεχε ποτέ.** Το πρώτο πραγματικό backup ανέβηκε σωστά και τύπωσε **μία**
+γραμμή που το πρόδιδε: `Command not found`. Το Storage Box είναι **περιορισμένο shell** (μόνο `ls`,
+`mkdir`, `rm`, rsync) και δεν έχει `find`. Κάθε επόμενο run θα ανέφερε επιτυχία ενώ το box θα
+γέμιζε. Ξαναγράφτηκε ώστε να βρίσκει τα παλιά **από τα ονόματα** (φέρουν timestamp). **Απέρριψα
+ρητά** το σύντομο `rsync --delete`: δένει το offsite με το τοπικό, οπότε σβησμένος τοπικός φάκελος
+θα έσβηνε και τα offsite αντίγραφα — το script που καταστρέφει τα backups είναι ακριβώς η
+καταστροφή που υπάρχει για να αποτρέψει.
+
+**4. Το πιο σοβαρό: το `nodemailer` ΔΕΝ ήταν μέσα στο image.** Το `await import('nodemailer')`
+δεν το πιάνει το standalone trace του Next. Το είδα κοιτάζοντας **μέσα στο χτισμένο image**, όχι
+από log. Χωρίς αυτό, κάθε email αποτυγχάνει με «Cannot find module» και, επειδή ο mailer πιάνει τα
+δικά του σφάλματα, **σιωπηλά**: config σωστό, provider resolved, `mailerCanDeliver` true, μηδέν
+παράδοση. Χειρότερα, η ροή reset θα **σταματούσε να επιστρέφει dev token**, βασισμένη σε delivery
+path που δεν φορτώνει. Explicit COPY στο Dockerfile, όπως ήδη γίνεται για `pdfjs-dist` και `sharp`
+για τον ίδιο ακριβώς λόγο. Και ο catch **λογάρει** πλέον: το αποτέλεσμα πάει σε fire-and-forget
+callers που το αγνοούν, άρα χωρίς log η διακοπή είναι αόρατη· το missing module έχει δική του
+γραμμή γιατί είναι **packaging** σφάλμα που διαβάζεται ως mail σφάλμα.
+
+**Επίσης**: SMTP με **ξεχωριστά πεδία** αντί URL, γιατί το username είναι email και το `@` μέσα σε
+URL δίνει δύο `@` και ο parser σπάει σε λάθος σημείο (φαίνεται ως αποτυχία authentication). TLS
+**ρητά** verified + TLS 1.2 minimum: ήταν ήδη το default του nodemailer, αλλά «default» δεν είναι
+εγγύηση, και από εκεί περνάνε links επαναφοράς κωδικού.
+
+**Verified**: Storage Box με κλειδί (1TB, μηδέν κωδικός), πραγματικό backup **ανέβηκε** και
+επιβεβαιώθηκε με `ls` στο ίδιο το box, prune logic δοκιμασμένη σε δείγμα (σβήνει μόνο παλιά με το
+δικό μας μοτίβο, αφήνει σημερινά και ξένα αρχεία), SMTP config **μέσα στο container** (16 χαρακτήρες,
+όχι απλώς στο αρχείο). 5823 tests green, type-check EXIT 0. **ΕΚΚΡΕΜΕΙ**: το αληθινό send test
+μετά το τρέχον rebuild.
+
+**Next task:** (α) πραγματικό email test· (β) crontab (backup + 3 cron endpoints)· (γ)
+`pharos-deploy` routine με rollback· (δ) `settings/actions.ts` scoping.
