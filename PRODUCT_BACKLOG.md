@@ -964,7 +964,21 @@
   ελέγχει το τελευταίο τοπικό backup αρχείο (`~/Backups/pharos/` ή το configured backup dir), δεν κατεβάζει από
   remote mirror (out of scope εδώ, αυτό είναι το P48).
 
-### P48. Storage mirror sync-staleness alert (backup peace-of-mind) — S — both
+### P48. Storage mirror sync-staleness alert (backup peace-of-mind) — ✅ SHIPPED 2026-08-04 (pharos-daily-dev)
+- **Τι έγινε:** νέο `AppConfig.lastRemoteSyncAt` γραμμένο από **ΚΑΘΕ** επιτυχημένο push (`syncToRemote`,
+  `syncOnedriveBatch`, ΚΑΙ το auto-mirror-on-verify), νέο pure `lib/syncStaleness.ts`, γραμμή στο
+  `runAlertChecks`, ρύθμιση «Mirror stale alert (days)» (default 7, 0 = off), και γραμμή «last written …»
+  στο Settings → File storage με προειδοποιητικό χρώμα όταν είναι stale.
+- **Δύο σκόπιμες αποκλίσεις από το spec** (και οι δύο pinned με tests):
+  1. **ΔΕΝ gate-άρει στο auto-mirror toggle.** Το spec έλεγε «AND mirror ενεργό», αλλά auto-mirror OFF
+     σημαίνει ότι κάθε push είναι χειροκίνητο κλικ, δηλαδή ακριβώς ο χρήστης που μπορεί να ξεχάσει: το gate
+     θα έσβηνε την ειδοποίηση για τους μόνους που τη χρειάζονται.
+  2. **Ο χρόνος γράφεται ΜΟΝΟ όταν `pushed > 0`.** Αλλιώς ένα «Sync now» σε νεκρό NAS (0 αρχεία, 5 σφάλματα)
+     θα μηδένιζε για πάντα το ρολόι της ίδιας προειδοποίησης που έπρεπε να σηκώσει.
+- **Επίσης:** ένα remote που **ΔΕΝ συγχρονίστηκε ποτέ** χτυπάει (days: null) — mirror ρυθμισμένο μια φορά και
+  ποτέ χρησιμοποιημένο είναι πανομοιότυπο με ένα υγιές παντού αλλού στο UI.
+
+### P48 (αρχικό spec, για ιστορικό) — S — both
 - **Αξία:** ο χρήστης έχει ήδη remote mirror (OneDrive/SMB/FTP, βλ. CLAUDE.md) αλλά το sync είναι **μόνο
   χειροκίνητο** («Sync now» στο Settings → File storage) — αν ξεχαστεί για βδομάδες, το remote αντίγραφο μένει
   σιωπηλά πίσω από τα τοπικά αρχεία, ενώ ο χρήστης νομίζει ότι έχει ενεργό 3-2-1 backup. Κανένα σημείο σήμερα
