@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/apiAuth';
 import { connectDB } from '@/lib/db';
-import { Expense } from '@/models/Expense';
-import { Item } from '@/models/Item';
-import { Receipt } from '@/models/Receipt';
-import { Statement } from '@/models/Statement';
-import { Subscription } from '@/models/Subscription';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { Item as ItemModel } from '@/models/Item';
+import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { Statement as StatementModel } from '@/models/Statement';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { currentModel } from '@/lib/tenancy/connection';
 import { getAppSettings } from '@/lib/appSettings';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { categoryRollover, ROLLOVER_WINDOW } from '@/lib/budgetRollover';
@@ -46,6 +47,11 @@ export async function GET(req: NextRequest) {
     const spendWindow = selMonths ?? 6;
     const flowWindow = selMonths ?? 12;
     await connectDB();
+    const Expense = await currentModel(ExpenseModel);
+    const Item = await currentModel(ItemModel);
+    const Receipt = await currentModel(ReceiptModel);
+    const Statement = await currentModel(StatementModel);
+    const Subscription = await currentModel(SubscriptionModel);
     const [docs, items, statementsRaw, receipts, subs, settings] = await Promise.all([
       Expense.find({}).select('kind amount category date period vendor vendorKey recurring').lean() as Promise<Lean[]>,
       Item.find().select('status purchasedPrice currentPrice warrantyUntil title category').lean() as Promise<ItemLean[]>,

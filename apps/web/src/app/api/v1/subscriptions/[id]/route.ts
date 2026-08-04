@@ -4,7 +4,8 @@ import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx, convertToBase, isForeignCurrency } from '@/lib/fx';
-import { Subscription } from '@/models/Subscription';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { currentModel } from '@/lib/tenancy/connection';
 import { trim, type SubLean } from '../route';
 
 export const runtime = 'nodejs';
@@ -39,6 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       b.amount != null || typeof b.currency === 'string' || b.fxRate != null || b.firstChargeAmount != null;
     if (!Object.keys(set).length && !touchesFx) return apiError('no valid fields');
     await connectDB();
+    const Subscription = await currentModel(SubscriptionModel);
     if (touchesFx) {
       const existing = (await Subscription.findById(id).lean()) as SubLean | null;
       if (!existing) return apiError('not found', 404);
@@ -74,6 +76,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Subscription = await currentModel(SubscriptionModel);
     const doc = await Subscription.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });

@@ -80,6 +80,10 @@ vi.mock('@/lib/appSettings', () => ({
 
 import { GET, PATCH } from './route';
 
+// withAuth now resolves models through currentModel(). SAAS_MODE is off in tests, so the real
+// helper would hand back the same model anyway; this keeps the DB seam mocked without a connection.
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
+
 const BASE = 'http://pharos.local/api/v1/settings';
 
 /** Minimal NextRequest stand-in — GET reads headers.get (auth); PATCH also reads json() (body). */

@@ -3,7 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { readBody } from '@/lib/apiBody';
 import { cardFieldsFromBody } from '@/lib/cardFields';
 import { connectDB } from '@/lib/db';
-import { Card } from '@/models/Card';
+import { Card as CardModel } from '@/models/Card';
+import { currentModel } from '@/lib/tenancy/connection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,7 @@ function trim(c: CardLean) {
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const Card = await currentModel(CardModel);
     const docs = (await Card.find().sort({ active: -1, name: 1 }).lean()) as CardLean[];
     return NextResponse.json({ cards: docs.map(trim) });
   });
@@ -44,6 +46,7 @@ export async function POST(req: NextRequest) {
     const set = cardFieldsFromBody(b, false);
     if (!set) return apiError('name required');
     await connectDB();
+    const Card = await currentModel(CardModel);
     const doc = await Card.create({ ...set, active: true });
     return NextResponse.json({ card: trim(doc.toObject() as CardLean) }, { status: 201 });
   });

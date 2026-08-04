@@ -5,7 +5,8 @@ import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveItemPrices, isForeignCurrency, toPrinted } from '@/lib/fx';
-import { Item, ITEM_STATUSES } from '@/models/Item';
+import { Item as ItemModel, ITEM_STATUSES } from '@/models/Item';
+import { currentModel } from '@/lib/tenancy/connection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Item = await currentModel(ItemModel);
     const doc = (await Item.findById(id).lean()) as ItemDetailLean | null;
     if (!doc) return apiError('not found', 404);
     const links = (doc.links ?? []).map((l) => ({ label: l.label ?? '', url: l.url, price: l.price ?? null }));
@@ -144,6 +146,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       typeof b.currentPrice === 'number' || 'targetPrice' in b || typeof b.currency === 'string' || b.fxRate != null;
     if (!Object.keys(set).length && !touchesFx) return apiError('no valid fields');
     await connectDB();
+    const Item = await currentModel(ItemModel);
     if (touchesFx) {
       const existing = (await Item.findById(id).lean()) as ItemDetailLean | null;
       if (!existing) return apiError('not found', 404);
@@ -192,6 +195,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Item = await currentModel(ItemModel);
     const doc = await Item.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });

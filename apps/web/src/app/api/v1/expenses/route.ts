@@ -3,7 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope } from '@/lib/apiList';
 import { readBody, strField, numField, enumField, boolField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Expense } from '@/models/Expense';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { currentModel } from '@/lib/tenancy/connection';
 import { vendorKey } from '@/app/expenses/lib';
 import { getAppSettings } from '@/lib/appSettings';
 import { matchCategoryRule } from '@/lib/categoryRules';
@@ -17,6 +18,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const Expense = await currentModel(ExpenseModel);
     const p = listParams(req);
     const kind = p.sp.get('kind');
     const filter = withSince(kind === 'income' || kind === 'expense' ? { kind } : {}, p);
@@ -50,6 +52,7 @@ export async function POST(req: NextRequest) {
     const date = b.date ? new Date(String(b.date)) : new Date();
     if (Number.isNaN(date.getTime())) return apiError('invalid date');
     await connectDB();
+    const Expense = await currentModel(ExpenseModel);
     // Vendor→category auto-rule (P15): the web actions apply this on every creation
     // path (see app/expenses/actions.ts addExpense/uploadExpense) — this route was the
     // one gap, so the same vendor got a different category depending on whether the

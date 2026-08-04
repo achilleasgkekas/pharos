@@ -3,7 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
-import { Task } from '@/models/Task';
+import { Task as TaskModel } from '@/models/Task';
+import { currentModel } from '@/lib/tenancy/connection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if ('dueDate' in b) set.dueDate = b.dueDate ? new Date(String(b.dueDate)) : null;
     if (!Object.keys(set).length) return apiError('no valid fields');
     await connectDB();
+    const Task = await currentModel(TaskModel);
     const doc = await Task.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     const t = doc as { _id: unknown; title: string; status?: string; priority?: string; tags?: string[]; steps?: Array<{ _id?: unknown; text?: string; done?: boolean }>; dueDate?: Date | null; completedAt?: Date | null; updatedAt?: Date };
@@ -45,6 +47,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Task = await currentModel(TaskModel);
     const doc = await Task.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });

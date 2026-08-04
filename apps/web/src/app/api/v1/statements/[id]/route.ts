@@ -3,7 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId } from '@/lib/apiBody';
 import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
-import { Statement } from '@/models/Statement';
+import { Statement as StatementModel } from '@/models/Statement';
+import { currentModel } from '@/lib/tenancy/connection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Statement = await currentModel(StatementModel);
     const s = (await Statement.findById(id).lean()) as StatementLean | null;
     if (!s) return apiError('not found', 404);
 

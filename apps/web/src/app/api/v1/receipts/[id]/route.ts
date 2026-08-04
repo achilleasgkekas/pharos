@@ -3,7 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
-import { Receipt } from '@/models/Receipt';
+import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { currentModel } from '@/lib/tenancy/connection';
 import { getStores } from '@/lib/storeService';
 import { getAppSettings } from '@/lib/appSettings';
 import { effectiveReturnWindow, returnDaysLeft as computeReturnDays } from '@/lib/returnWindow';
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Receipt = await currentModel(ReceiptModel);
     const doc = await Receipt.findById(id).select('-rawAiResponse').lean();
     if (!doc) return apiError('not found', 404);
     const r = doc as Parameters<typeof trimReceipt>[0] & { notes?: string };
@@ -87,6 +89,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       set.lineItems !== undefined || typeof b.currency === 'string' || b.fxRate != null;
     if (!Object.keys(set).length && !touchesFx) return apiError('no valid fields');
     await connectDB();
+    const Receipt = await currentModel(ReceiptModel);
     if (touchesFx) {
       const existing = (await Receipt.findById(id)
         .select('currency fxRate total origAmount subtotal vatAmount lineItems')

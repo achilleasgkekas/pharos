@@ -5,7 +5,8 @@ import { readBody, strField, numField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx } from '@/lib/fx';
-import { Item, ITEM_STATUSES } from '@/models/Item';
+import { Item as ItemModel, ITEM_STATUSES } from '@/models/Item';
+import { currentModel } from '@/lib/tenancy/connection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,6 +51,7 @@ const OWNED = ['received', 'installed'];
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const Item = await currentModel(ItemModel);
     const p = listParams(req);
     const view = p.sp.get('status') || 'all';
     const base = view === 'shopping' ? { status: { $in: SHOPPING } } : view === 'inventory' ? { status: { $in: OWNED } } : {};
@@ -76,6 +78,7 @@ export async function POST(req: NextRequest) {
     // an unknown value falls back to 'researching' rather than being stored verbatim.
     const status = enumField(b, 'status', ITEM_STATUSES, 'researching');
     await connectDB();
+    const Item = await currentModel(ItemModel);
     const fx = resolveFx(
       { amount: numField(b, 'currentPrice') ?? 0, currency: strField(b, 'currency'), fxRate: numField(b, 'fxRate') ?? 0 },
       (await getAppSettings()).currency

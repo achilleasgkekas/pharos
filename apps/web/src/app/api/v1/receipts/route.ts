@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
-import { Receipt } from '@/models/Receipt';
+import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { currentModel } from '@/lib/tenancy/connection';
 import { getStores } from '@/lib/storeService';
 import { getAppSettings } from '@/lib/appSettings';
 import { effectiveReturnWindow, returnDaysLeft as computeReturnDays } from '@/lib/returnWindow';
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const Receipt = await currentModel(ReceiptModel);
     const p = listParams(req);
     const base: Record<string, unknown> = {};
     const store = p.sp.get('store');

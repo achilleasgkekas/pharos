@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { readBody, strField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Store } from '@/models/Store';
+import { Store as StoreModel } from '@/models/Store';
+import { currentModel } from '@/lib/tenancy/connection';
 import { getStores, invalidateStoreCache } from '@/lib/storeService';
 
 export const runtime = 'nodejs';
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
     const url = strField(b, 'url', '', true);
     const aliases = cleanAliases(b.aliases);
     await connectDB();
+    const Store = await currentModel(StoreModel);
     try {
       const doc = await Store.create({ name, url, aliases: aliases.length ? aliases : [name.toLowerCase()], auto: false });
       invalidateStoreCache();

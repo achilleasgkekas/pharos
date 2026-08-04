@@ -58,6 +58,10 @@ vi.mock('@/app/shopping-list/actions', () => ({
 
 import { PATCH, DELETE } from './route';
 
+// withAuth now resolves models through currentModel(). SAAS_MODE is off in tests, so the real
+// helper would hand back the same model anyway; this keeps the DB seam mocked without a connection.
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
+
 const ID = 'a'.repeat(24); // valid 24-hex ObjectId
 const BASE = `http://pharos.local/api/v1/shopping-list/${ID}`;
 

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Expense } from '@/models/Expense';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { currentModel } from '@/lib/tenancy/connection';
 import { rescanExpense } from '@/app/expenses/actions';
 import { trimExpense, type ExpenseLean } from '../../serialize';
 
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Re-read with the exact GET serializer so the mobile re-prefill matches the list shape.
     await connectDB();
+    const Expense = await currentModel(ExpenseModel);
     const doc = await Expense.findById(id).select('-rawAiResponse').lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ expense: trimExpense(doc as ExpenseLean) });

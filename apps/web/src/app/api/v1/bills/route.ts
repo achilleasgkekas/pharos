@@ -3,7 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
 import { readBody, strField, numField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Bill } from '@/models/Bill';
+import { Bill as BillModel } from '@/models/Bill';
+import { currentModel } from '@/lib/tenancy/connection';
 import { billStatus, type BillStatus } from '@/lib/bill';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx } from '@/lib/fx';
@@ -47,6 +48,7 @@ export function trim(b: BillLean): {
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const Bill = await currentModel(BillModel);
     const p = listParams(req);
     const base: Record<string, unknown> = {};
     if (p.sp.get('archived') !== '1') base.archived = { $ne: true };
@@ -73,6 +75,7 @@ export async function POST(req: NextRequest) {
     const dueDate = dueDateRaw ? new Date(dueDateRaw) : null;
     if (!dueDate || Number.isNaN(dueDate.getTime())) return apiError('valid dueDate required');
     await connectDB();
+    const Bill = await currentModel(BillModel);
     const fx = resolveFx(
       { amount: numField(b, 'amount') ?? 0, currency: strField(b, 'currency'), fxRate: numField(b, 'fxRate') ?? 0 },
       (await getAppSettings()).currency

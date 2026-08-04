@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Store } from '@/models/Store';
+import { Store as StoreModel } from '@/models/Store';
+import { currentModel } from '@/lib/tenancy/connection';
 import { invalidateStoreCache } from '@/lib/storeService';
 
 export const runtime = 'nodejs';
@@ -32,6 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof b.url === 'string') set.url = b.url.trim();
     if (b.aliases !== undefined) set.aliases = cleanAliases(b.aliases);
     await connectDB();
+    const Store = await currentModel(StoreModel);
     try {
       const doc = await Store.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
       if (!doc) return apiError('not found', 404);
@@ -49,6 +51,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Store = await currentModel(StoreModel);
     const doc = await Store.findByIdAndDelete(id).lean();
     if (!doc) return apiError('not found', 404);
     invalidateStoreCache();

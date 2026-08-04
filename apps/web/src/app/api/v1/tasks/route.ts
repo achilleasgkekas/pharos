@@ -3,7 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
 import { readBody, strField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Task } from '@/models/Task';
+import { Task as TaskModel } from '@/models/Task';
+import { currentModel } from '@/lib/tenancy/connection';
 
 const TASK_STATUSES = ['todo', 'in-progress', 'done', 'blocked'] as const;
 const TASK_PRIORITIES = ['low', 'normal', 'high'] as const;
@@ -38,6 +39,7 @@ function trim(t: TaskLean) {
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const Task = await currentModel(TaskModel);
     const p = listParams(req);
     const status = p.sp.get('status');
     const filter = withSince(status ? { status } : {}, p);
@@ -58,6 +60,7 @@ export async function POST(req: NextRequest) {
     const tags = Array.isArray(b.tags) ? b.tags.map(String) : typeof b.tags === 'string' ? b.tags.split(',').map((s) => s.trim()).filter(Boolean) : [];
     const status = enumField(b, 'status', TASK_STATUSES, 'todo');
     await connectDB();
+    const Task = await currentModel(TaskModel);
     const doc = await Task.create({
       title,
       status,

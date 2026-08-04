@@ -3,8 +3,9 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { canAdmin } from '@/lib/roles';
 import { readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Expense } from '@/models/Expense';
-import { AppConfig } from '@/models/AppConfig';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { AppConfig as AppConfigModel } from '@/models/AppConfig';
+import { currentModel } from '@/lib/tenancy/connection';
 import { getAppSettings, invalidateAppSettings } from '@/lib/appSettings';
 
 export const runtime = 'nodejs';
@@ -14,6 +15,8 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
 
 /** This-month expense total per category (by period when set, else by date). */
 async function spentThisMonth(period: string, monthStart: Date, monthEnd: Date): Promise<Record<string, number>> {
+  // Called from inside withAuth, so the ambient workspace is already established.
+  const Expense = await currentModel(ExpenseModel);
   const expenses = (await Expense.find({
     kind: 'expense',
     $or: [{ period }, { period: '', date: { $gte: monthStart, $lt: monthEnd } }],
@@ -131,6 +134,7 @@ export async function PATCH(req: NextRequest) {
         : apiError('no valid fields');
     }
     await connectDB();
+    const AppConfig = await currentModel(AppConfigModel);
     await AppConfig.updateOne({ key: 'singleton' }, { $set: set }, { upsert: true });
     invalidateAppSettings();
     return NextResponse.json({ ok: true });

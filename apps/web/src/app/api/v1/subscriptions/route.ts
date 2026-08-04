@@ -5,8 +5,9 @@ import { readBody, strField, numField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx, convertToBase } from '@/lib/fx';
-import { Subscription } from '@/models/Subscription';
-import { Expense } from '@/models/Expense';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { currentModel } from '@/lib/tenancy/connection';
 import { vendorKey } from '@/app/expenses/lib';
 import { discoverRecurringCandidates, type RecurringCandidate } from '@/lib/recurringDiscovery';
 
@@ -57,6 +58,11 @@ export function trim(s: SubLean) {
  * by an existing Subscription (by name or provider), flags regular-cadence series.
  */
 async function discoverSuggestions(): Promise<RecurringCandidate[]> {
+  // Called from inside withAuth, so the ambient workspace is already established.
+  const [Expense, Subscription] = await Promise.all([
+    currentModel(ExpenseModel),
+    currentModel(SubscriptionModel),
+  ]);
   const [expenses, subs] = await Promise.all([
     Expense.find({ kind: 'expense', amount: { $gt: 0 } })
       .select('vendor vendorKey amount date category kind')
@@ -77,6 +83,7 @@ async function discoverSuggestions(): Promise<RecurringCandidate[]> {
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const Subscription = await currentModel(SubscriptionModel);
     const p = listParams(req);
     const base: Record<string, unknown> = {};
     if (p.sp.get('active') === '1') base.active = true;
@@ -116,6 +123,7 @@ export async function POST(req: NextRequest) {
       trialEndsAt = d;
     }
     await connectDB();
+    const Subscription = await currentModel(SubscriptionModel);
     const fx = resolveFx(
       { amount, currency: strField(b, 'currency'), fxRate: numField(b, 'fxRate') ?? 0 },
       (await getAppSettings()).currency

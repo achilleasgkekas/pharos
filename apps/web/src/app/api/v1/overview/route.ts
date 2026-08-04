@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/apiAuth';
 import { connectDB } from '@/lib/db';
-import { Item } from '@/models/Item';
-import { Receipt } from '@/models/Receipt';
-import { Expense } from '@/models/Expense';
-import { Subscription } from '@/models/Subscription';
-import { Task } from '@/models/Task';
-import { Statement } from '@/models/Statement';
-import { ShoppingListItem } from '@/models/ShoppingListItem';
+import { Item as ItemModel } from '@/models/Item';
+import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { Task as TaskModel } from '@/models/Task';
+import { Statement as StatementModel } from '@/models/Statement';
+import { ShoppingListItem as ShoppingListItemModel } from '@/models/ShoppingListItem';
+import { currentModel } from '@/lib/tenancy/connection';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
 import type { SerializedStatement } from '@/types';
@@ -19,6 +20,13 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const Item = await currentModel(ItemModel);
+    const Receipt = await currentModel(ReceiptModel);
+    const Expense = await currentModel(ExpenseModel);
+    const Subscription = await currentModel(SubscriptionModel);
+    const Task = await currentModel(TaskModel);
+    const Statement = await currentModel(StatementModel);
+    const ShoppingListItem = await currentModel(ShoppingListItemModel);
     const s = await getAppSettings();
     const [items, shoppingList, receipts, expenses, subscriptions, openTasks, statements] = await Promise.all([
       Item.countDocuments(),

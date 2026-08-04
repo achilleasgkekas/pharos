@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { connectDB } from '@/lib/db';
-import { User } from '@/models/User';
+import { User as UserModel } from '@/models/User';
+import { currentModel } from '@/lib/tenancy/connection';
 import { verifyPassword } from '@/lib/auth';
 import { rateLimit, apiError, clientIp } from '@/lib/apiAuth';
 
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest) {
   if (!username || !password) return apiError('username and password required');
 
   await connectDB();
+  const User = await currentModel(UserModel);
   const user = await User.findOne({ username }).select('_id name username role passwordHash apiToken');
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return apiError('Invalid credentials', 401);

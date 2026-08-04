@@ -3,7 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { cardFieldsFromBody } from '@/lib/cardFields';
 import { connectDB } from '@/lib/db';
-import { Card } from '@/models/Card';
+import { Card as CardModel } from '@/models/Card';
+import { currentModel } from '@/lib/tenancy/connection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const set = cardFieldsFromBody(b, true) ?? {};
     if (!Object.keys(set).length) return apiError('no valid fields');
     await connectDB();
+    const Card = await currentModel(CardModel);
     const doc = await Card.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });
@@ -30,6 +32,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Card = await currentModel(CardModel);
     const doc = await Card.findByIdAndDelete(id).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });

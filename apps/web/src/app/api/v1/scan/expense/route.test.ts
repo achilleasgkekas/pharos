@@ -29,6 +29,10 @@ vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/app/expenses/actions', () => ({ scanExpenseText: scanText, scanExpenseImage: scanImage }));
 
+// withAuth now resolves models through currentModel(). SAAS_MODE is off in tests, so the real
+// helper would hand back the same model anyway; this keeps the DB seam mocked without a connection.
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
+
 import { POST } from './route';
 
 const BASE = 'http://pharos.local/api/v1/scan/expense';

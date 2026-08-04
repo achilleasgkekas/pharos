@@ -3,7 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
 import { readBody, strField, numField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { GiftCard } from '@/models/GiftCard';
+import { GiftCard as GiftCardModel } from '@/models/GiftCard';
+import { currentModel } from '@/lib/tenancy/connection';
 import { giftCardBalance, giftCardSpentPct, giftCardDaysLeft } from '@/lib/giftcard';
 import { safeDateOrNull } from '@/lib/dates';
 
@@ -46,6 +47,7 @@ export function trim(g: GiftCardLean): {
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const GiftCard = await currentModel(GiftCardModel);
     const p = listParams(req);
     const base: Record<string, unknown> = {};
     if (p.sp.get('archived') !== '1') base.archived = { $ne: true };
@@ -66,6 +68,7 @@ export async function POST(req: NextRequest) {
     if (!title) return apiError('title required');
     const initRaw = numField(b, 'initialAmount');
     await connectDB();
+    const GiftCard = await currentModel(GiftCardModel);
     const doc = await GiftCard.create({
       title,
       store: strField(b, 'store', '', true),

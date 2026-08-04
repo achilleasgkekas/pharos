@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Receipt } from '@/models/Receipt';
+import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { currentModel } from '@/lib/tenancy/connection';
 import { rescanReceipt } from '@/app/receipts/actions';
 import { trimReceipt, serializeLineItems } from '../../serialize';
 
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Re-read with the exact normalization GET uses, so the mobile re-prefill matches the detail GET.
     await connectDB();
+    const Receipt = await currentModel(ReceiptModel);
     const doc = await Receipt.findById(id).select('-rawAiResponse').lean();
     if (!doc) return apiError('not found', 404);
     const r = doc as Parameters<typeof trimReceipt>[0] & { notes?: string };

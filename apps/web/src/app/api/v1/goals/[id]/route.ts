@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Goal } from '@/models/Goal';
+import { Goal as GoalModel } from '@/models/Goal';
+import { currentModel } from '@/lib/tenancy/connection';
 import { safeDateOrNull } from '@/lib/dates';
 import { trim, type GoalLean } from '../route';
 
@@ -58,6 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!Object.keys(update).length) return apiError('no valid fields');
 
     await connectDB();
+    const Goal = await currentModel(GoalModel);
     const doc = await Goal.findByIdAndUpdate(id, update, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ goal: trim(doc as GoalLean) });
@@ -70,6 +72,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Goal = await currentModel(GoalModel);
     const doc = await Goal.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });

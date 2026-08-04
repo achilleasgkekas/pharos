@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { AppConfig } from '@/models/AppConfig';
+import { AppConfig as AppConfigModel } from '@/models/AppConfig';
+import { currentModel } from '@/lib/tenancy/connection';
 import { getAiConfig, invalidateAiConfigCache, type AiConfig } from '@/lib/aiConfig';
 import { isAiReady, invalidateOllamaHealth } from '@/lib/ollama';
 import { AI_FEATURES, AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
@@ -79,6 +80,7 @@ export async function PATCH(req: NextRequest) {
 
     if (!Object.keys(set).length) return apiError('no valid fields');
     await connectDB();
+    const AppConfig = await currentModel(AppConfigModel);
     await AppConfig.updateOne({ key: 'singleton' }, { $set: set }, { upsert: true });
     invalidateAiConfigCache();
     // The health probe is cached for 20s; flipping the master switch should be felt now.

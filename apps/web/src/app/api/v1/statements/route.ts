@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
 import { connectDB } from '@/lib/db';
-import { Statement } from '@/models/Statement';
+import { Statement as StatementModel } from '@/models/Statement';
+import { currentModel } from '@/lib/tenancy/connection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ function trim(s: StatementLean) {
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const Statement = await currentModel(StatementModel);
     const p = listParams(req);
     const card = p.sp.get('card');
     const filter = withSince(card ? { card } : {}, p);

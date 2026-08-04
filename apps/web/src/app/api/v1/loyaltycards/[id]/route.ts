@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { LoyaltyCard } from '@/models/LoyaltyCard';
+import { LoyaltyCard as LoyaltyCardModel } from '@/models/LoyaltyCard';
+import { currentModel } from '@/lib/tenancy/connection';
 import { isBarcodeFormat, guessBarcodeFormat } from '@/lib/loyaltyCard';
 import { trim, type LoyaltyCardLean } from '../route';
 
@@ -32,6 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!Object.keys(set).length) return apiError('no valid fields');
 
     await connectDB();
+    const LoyaltyCard = await currentModel(LoyaltyCardModel);
     const doc = await LoyaltyCard.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ loyaltyCard: trim(doc as LoyaltyCardLean) });
@@ -44,6 +46,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const LoyaltyCard = await currentModel(LoyaltyCardModel);
     const doc = await LoyaltyCard.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });

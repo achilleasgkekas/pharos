@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Voucher } from '@/models/Voucher';
+import { Voucher as VoucherModel } from '@/models/Voucher';
+import { currentModel } from '@/lib/tenancy/connection';
 import { trim, type VoucherLean } from '../route';
 
 export const runtime = 'nodejs';
@@ -24,6 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if ('expiresAt' in b) { const d = b.expiresAt ? new Date(String(b.expiresAt)) : null; set.expiresAt = d && !Number.isNaN(d.getTime()) ? d : null; }
     if (!Object.keys(set).length) return apiError('no valid fields');
     await connectDB();
+    const Voucher = await currentModel(VoucherModel);
     const doc = await Voucher.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     // Spec: PATCH returns { voucher: Voucher } (the updated doc), same trim as the list route.
@@ -37,6 +39,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Voucher = await currentModel(VoucherModel);
     const doc = await Voucher.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });

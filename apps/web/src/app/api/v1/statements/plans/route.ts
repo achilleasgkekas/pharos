@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/apiAuth';
 import { connectDB } from '@/lib/db';
-import { Statement } from '@/models/Statement';
+import { Statement as StatementModel } from '@/models/Statement';
+import { currentModel } from '@/lib/tenancy/connection';
 import { getAppSettings } from '@/lib/appSettings';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
@@ -16,6 +17,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const Statement = await currentModel(StatementModel);
     const [docs, settings] = await Promise.all([
       Statement.find().sort({ period: -1, card: 1 }).lean(),
       getAppSettings(),

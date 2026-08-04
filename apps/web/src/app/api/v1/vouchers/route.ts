@@ -3,7 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
 import { readBody, strField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Voucher } from '@/models/Voucher';
+import { Voucher as VoucherModel } from '@/models/Voucher';
+import { currentModel } from '@/lib/tenancy/connection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,7 @@ export function trim(v: VoucherLean) {
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const Voucher = await currentModel(VoucherModel);
     const p = listParams(req);
     const base: Record<string, unknown> = {};
     if (p.sp.get('used') === '0') base.used = { $ne: true };
@@ -44,6 +46,7 @@ export async function POST(req: NextRequest) {
     const title = strField(b, 'title', '', true);
     if (!title) return apiError('title required');
     await connectDB();
+    const Voucher = await currentModel(VoucherModel);
     const doc = await Voucher.create({
       title,
       code: strField(b, 'code', '', true),

@@ -80,6 +80,10 @@ vi.mock('@/lib/ollama', () => ({
 
 import { GET, PATCH } from './route';
 
+// withAuth now resolves models through currentModel(). SAAS_MODE is off in tests, so the real
+// helper would hand back the same model anyway; this keeps the DB seam mocked without a connection.
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
+
 const BASE = 'http://pharos.local/api/v1/settings/ai';
 
 function makeReq(opts: { auth?: string | null; body?: unknown } = {}): NextRequest {

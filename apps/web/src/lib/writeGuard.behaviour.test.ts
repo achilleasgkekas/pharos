@@ -14,6 +14,10 @@ const { cookiesMock, verifySessionMock, findOneMock } = vi.hoisted(() => ({
 vi.mock('next/headers', () => ({ cookies: cookiesMock }));
 vi.mock('next/navigation', () => ({ redirect: vi.fn(() => { throw new Error('REDIRECT'); }) }));
 vi.mock('@/lib/db', () => ({ connectDB: vi.fn(async () => {}) }));
+// withAuth resolves the User model through currentModel() so the token is looked up in the
+// caller's workspace. SAAS_MODE is off here, where the real helper hands back the same model
+// anyway; this keeps the DB seam mocked without needing a live connection.
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
 vi.mock('@/models/User', () => ({
   User: { findOne: (...a: unknown[]) => findOneMock(...a) },
 }));

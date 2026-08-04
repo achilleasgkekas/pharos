@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Expense } from '@/models/Expense';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { currentModel } from '@/lib/tenancy/connection';
 import { vendorKey } from '@/app/expenses/lib';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx, isForeignCurrency } from '@/lib/fx';
@@ -39,6 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof b.taxDeductible === 'boolean') set.taxDeductible = b.taxDeductible;
     if (typeof b.taxCategory === 'string') set.taxCategory = b.taxCategory.trim().slice(0, 60);
     await connectDB();
+    const Expense = await currentModel(ExpenseModel);
 
     // Runs BEFORE the "no valid fields" guard: `{ currency }` or `{ fxRate }` alone is a
     // legitimate edit (correcting the rate of an already-saved foreign expense) even though
@@ -77,6 +79,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Expense = await currentModel(ExpenseModel);
     const doc = await Expense.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });

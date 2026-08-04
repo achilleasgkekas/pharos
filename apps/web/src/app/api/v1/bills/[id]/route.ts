@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { Bill } from '@/models/Bill';
+import { Bill as BillModel } from '@/models/Bill';
+import { currentModel } from '@/lib/tenancy/connection';
 import { nextBillDue } from '@/lib/bill';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx, isForeignCurrency } from '@/lib/fx';
@@ -42,6 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof b.archived === 'boolean') set.archived = b.archived;
 
     await connectDB();
+    const Bill = await currentModel(BillModel);
 
     // P9: `amount` arrives as the PRINTED figure but is stored in base currency, so touching
     // the amount, the currency OR the rate means all four fields have to be recomputed together
@@ -113,6 +115,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { id } = await params;
     if (!isObjectId(id)) return apiError('bad id');
     await connectDB();
+    const Bill = await currentModel(BillModel);
     const doc = await Bill.findByIdAndUpdate(id, { $set: { deletedAt: new Date() } }, { new: true }).lean();
     if (!doc) return apiError('not found', 404);
     return NextResponse.json({ ok: true, id });

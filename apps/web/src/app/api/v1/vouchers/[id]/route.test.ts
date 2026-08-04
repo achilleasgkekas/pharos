@@ -27,6 +27,10 @@ vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/User', () => ({ User: { findOne: userFindOne } }));
 vi.mock('@/models/Voucher', () => ({ Voucher: { findByIdAndUpdate: voucherUpdate } }));
 
+// withAuth now resolves models through currentModel(). SAAS_MODE is off in tests, so the real
+// helper would hand back the same model anyway; this keeps the DB seam mocked without a connection.
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
+
 import { PATCH, DELETE } from './route';
 
 const OID = 'a1b2c3d4e5f6a1b2c3d4e5f6';

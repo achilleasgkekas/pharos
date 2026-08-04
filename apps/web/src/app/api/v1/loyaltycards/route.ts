@@ -3,7 +3,8 @@ import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
 import { readBody, strField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
-import { LoyaltyCard } from '@/models/LoyaltyCard';
+import { LoyaltyCard as LoyaltyCardModel } from '@/models/LoyaltyCard';
+import { currentModel } from '@/lib/tenancy/connection';
 import { resolveBarcodeFormat } from '@/lib/loyaltyCard';
 
 export const runtime = 'nodejs';
@@ -33,6 +34,7 @@ export function trim(c: LoyaltyCardLean): {
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();
+    const LoyaltyCard = await currentModel(LoyaltyCardModel);
     const p = listParams(req);
     const base: Record<string, unknown> = {};
     if (p.sp.get('archived') !== '1') base.archived = { $ne: true };
@@ -56,6 +58,7 @@ export async function POST(req: NextRequest) {
     const cardNumber = strField(b, 'cardNumber', '', true);
     if (!cardNumber) return apiError('cardNumber required');
     await connectDB();
+    const LoyaltyCard = await currentModel(LoyaltyCardModel);
     const doc = await LoyaltyCard.create({
       title,
       cardNumber,
