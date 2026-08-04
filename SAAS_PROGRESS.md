@@ -6993,3 +6993,52 @@ workspace **κυριολεκτικά ορατό** στην οθόνη). Suggesti
 **## Needs Achilleas:** αμετάβλητα (**Stripe keys**, **plan pricing**, **email provider**). Νέο,
 συζητήθηκε interactive: **επιλογή cloud provider** (Contabo υπό εξέταση) — δες την απάντηση της
 συνομιλίας· απόφαση ανοιχτή, δεν προχώρησε τίποτα σε infrastructure.
+
+## 2026-08-04 (ε) — increment 137: multi-arch image build (Hetzner επιλέχθηκε)
+
+Ο Achilleas διάλεξε **Hetzner** και ζήτησε να ξεκινήσει το multi-arch build. Νέο
+**`scripts/build-image.sh`**.
+
+**Γιατί και οι δύο αρχιτεκτονικές, όχι μόνο amd64**: η Hetzner πουλάει και **ARM (CAX, Ampere)**
+αισθητά φθηνότερα ανά core από τη x86 σειρά (CPX). Ένα multi-arch tag κρατά αυτή την επιλογή
+ανοιχτή και ταυτόχρονα τρέχει στο Mac που το χτίζει. Το `docker compose build` βγάζει
+arm64-only image· αν πάει σε x86 server είτε αρνείται να ξεκινήσει είτε σέρνεται. Η αποτυχία
+έρχεται αργά και μπερδεμένα, γι' αυτό η λίστα platforms ανήκει σε script και όχι στο shell
+history όποιου θυμηθεί.
+
+**Καλά νέα για το Dockerfile: ήταν ΗΔΗ arch-agnostic.** Το `npm install` τρέχει μέσα στο image
+του target platform και το runner αντιγράφει **ολόκληρο** το `node_modules/@img` (όχι hardcoded
+`musl-arm64` path). Άρα μηδέν αλλαγή στο Dockerfile.
+
+**Το bug που βρήκε το ίδιο το verification βήμα (και ήταν ΔΙΚΟ ΜΟΥ)**: το πρώτο reporting
+χρησιμοποιούσε `docker image inspect <tag>`. Αυτό **resolve-άρει σιωπηλά στο HOST platform** και
+γυρίζει `.Manifests: null`, οπότε ένα σωστότατο amd64+arm64 image διαβάστηκε ως «linux/arm64».
+False negative που μου κόστισε παράκαμψη. Το `docker image ls --tree` έδειξε καθαρά **και τα δύο**.
+Η σωστή ερώτηση είναι `docker image inspect --platform <p>`: exit 0 = υπάρχει, non-zero = λείπει.
+Το script πλέον **ASSERT-άρει** κάθε ζητούμενο platform και **αποτυγχάνει** αν λείπει, αντί να
+τυπώνει κάτι που μοιάζει με επαλήθευση. Negative control σε γνωστό single-arch image
+(`pharos-web-saasdev`): `linux/amd64` → ABSENT, δηλαδή το assertion όντως πιάνει την απουσία.
+
+**Verified — το amd64 image ΤΡΕΧΕΙ, δεν χτίστηκε απλώς**:
+- `docker run --platform linux/amd64` → **HTTP 200** στο `/account/login` σε 2s
+- `uname -m` → **x86_64** (πραγματικά amd64, υπό Rosetta)
+- **`sharp` native module φορτώνει** (`format.jpeg.input.buffer` true) — ο ΚΡΙΣΙΜΟΣ έλεγχος, γιατί
+  το sharp κουβαλά platform-specific prebuilt libvips και το cross-build είναι ακριβώς εκεί που
+  σπάει
+- tesseract **5.5.1**, pdftoppm **25.12.0**, smbclient **4.22.10**, tessdata **ell + eng + osd**
+  όλα παρόντα στο x86 image
+
+**Χρόνος**: amd64 από το μηδέν **3:11** στο Apple Silicon (Rosetta, πολύ γρηγορότερο απ' ό,τι
+φοβόμουν για QEMU). Και τα δύο μαζί με warm cache ~δευτερόλεπτα.
+
+**Δεν έγινε push**: το `--push` θέλει `docker login ghcr.io` με PAT (`write:packages`). Το script
+**δεν αγγίζει ποτέ credentials** — ο Achilleas κάνει login και τρέχει `--push`.
+
+**Next task:** (α) **GitHub Actions workflow** για native amd64 (+arm64) build & push σε tag —
+προτάθηκε, ΔΕΝ προστέθηκε αυτόβουλα γιατί δημοσιεύει images και θέλει ρητή έγκριση· (β) τα 2
+non-scoped `actions.ts` (`history`, `settings`)· (γ) production compose + wildcard TLS (DNS-01)
+όταν στηθεί ο server.
+
+**## Needs Achilleas:** **Stripe keys**, **plan pricing**, **email provider**, και νέα:
+**GHCR login/PAT** αν θέλει να δημοσιεύονται images, **DNS του ph-aros.com σε Cloudflare** για το
+wildcard `*.ph-aros.com` μέσω DNS-01. Provider **αποφασίστηκε: Hetzner**.
