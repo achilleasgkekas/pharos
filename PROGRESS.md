@@ -2,7 +2,7 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: f44e227 -->
+<!-- reviewed: 75ee08d -->
 <!-- docker-validated: 7e28354 -->
 <!-- ui-audited: 0bc5e14 -->
 
@@ -11244,13 +11244,66 @@ bytes → 1· «missing collection» ως error → **5**. 24 tests στον ver
 **Επόμενο task**: **P40** (self-host update-available banner, GHCR version check) — το τελευταίο από τα έξι
 approved της 3ης Αυγούστου.
 
+## 2026-08-04 (3ο run) — P40: το τελευταίο approved της 3ης Αυγούστου, ο έλεγχος ενημερώσεων
+
+**Πλαίσιο**: ο Αχιλλέας ζήτησε ρητά «προχώρα και το P40» στην ίδια συνεδρία. Είναι το τελευταίο από τα έξι
+approved της 3ης Αυγούστου (P81, P66, P74, P48, P46, P40) — **η ουρά αδειάζει**.
+
+**Το κενό**: το `release.yml` δημοσιεύει ήδη versioned images στο GHCR, αλλά **κανείς δεν κοιτούσε από την
+άλλη μεριά**. Το container που κατέβασε κάποιος τον Μάρτιο τρέχει ευτυχισμένο για πάντα εκτός αν σκεφτεί να
+ελέγξει το repo με το χέρι. Και η ίδια η σελίδα έλεγε ψέματα: το «Settings → About → Version» ήταν το
+**σκέτο string `v0.1.0 dev` καρφωμένο στο JSX**, ίδιο σε κάθε build εδώ και μήνες.
+
+**Τι έγινε**: pure **`lib/versionCheck.ts`**, **`settings/updateCheckActions.ts`** (νέο αρχείο, ΟΧΙ μέσα στο
+2000-γραμμων `settings/actions.ts` που το ξαναγράφει άλλο routine αυτές τις μέρες), component
+**`UpdateChecker`** στο About, **`ARG APP_VERSION=dev`** στο Dockerfile και `build-args` στο `release.yml`.
+
+**Η πολιτική είναι το feature** (όλα pinned με tests):
+- **1 ανώνυμο GET/24ωρο**, cached στο AppConfig ώστε ένα restart να μη γίνεται νέο request. Ένας
+  **αποτυχημένος** έλεγχος σταμπάρει την προσπάθεια (firewalled instance κάνει back off) αλλά **ΔΕΝ σβήνει
+  την τελευταία πραγματική απάντηση**.
+- Το **opt-out τιμάται ΠΡΙΝ** από οποιοδήποτε outbound call· το «check now» παρακάμπτει το cache ώστε όποιος
+  μόλις άνοιξε το firewall να μην περιμένει 24ωρο.
+- **Μηδέν στο SaaS**: εκεί ο πελάτης είναι πάντα στο deployed build, δεν υπάρχει image να τραβήξει.
+- Ένα build που **δεν είναι release** (`dev`/`edge`/τοπικό) **δεν ειδοποιείται ποτέ**: δεν έχει μείνει πίσω,
+  μπορεί και να είναι μπροστά.
+- **Δεν εμπιστεύεται τη σειρά των tags**: το OCI spec τα δίνει λεξικογραφικά, όπου το `1.9.0` βγαίνει μετά το
+  `1.10.0`. Κάνει parse + max, με bounded pagination (5 σελίδες) ώστε ένα project με 100+ releases να μην
+  παγώνει σιωπηλά στην πρώτη σελίδα.
+
+**Τι έπιασε το ίδιο το repo**: ο **write-guard του P31** (`writeGuard.coverage.test.ts`) κοκκίνισε γιατί το
+`getUpdateStatus` γράφει cache σε page load χωρίς `assertCanWrite`. Σωστή ερώτηση. Το έβαλα στο **allowlist με
+τον λόγο** αντί να το κάνω guarded: το μόνο που αποθηκεύει είναι ένα version string από **δημόσιο** registry,
+μηδέν user input, και ένα guard εκεί θα σήμαινε ότι ένας viewer δεν βλέπει καν ποια έκδοση τρέχει. Ίδιο σχήμα
+με τα ήδη allowlisted `generateNotifications` / `backfillReceiptThumbs`. Το toggle δίπλα του είναι guarded.
+
+**Verify**: negative controls **ΠΡΙΝ** — εμπιστοσύνη στη σειρά των tags → **2** κόκκινα· dev build να
+ειδοποιείται → 1· αποτυχημένος έλεγχος να σβήνει το cache → 1· να αγνοείται το opt-out → 1. Μετά, 37 πράσινα
+(24 στους κανόνες + 13 στην πολιτική). `type-check` EXIT 0, full `vitest` **5937 passed / 4 skipped / 370
+files**. Docker: build → mongo healthy → `up -d web` → `/login` **200**, `/settings` **307** (auth-gated,
+compiled), RestartCount **0**, νέο chunk μέσα στο image, **`APP_VERSION=dev`** στο τοπικό container ΚΑΙ ένα
+throwaway `--build-arg APP_VERSION=1.4.2` build σταμπάρει **1.4.2** (δηλαδή το μισό του pipeline αποδεδειγμένο).
+Browser: `/login` καθαρό, μηδέν console errors. Το ίδιο το About panel **δεν οδηγήθηκε live** (θέλει login).
+Commit `75ee08d`.
+
+**Επόμενο task**: η ουρά των approved της 3ης Αυγούστου **άδειασε**. Επόμενο κατά σειρά value/effort από το
+μεγάλο «approve all» batch: **P80** (outbound webhook delivery reliability — το ήδη-shipped P24 κάνει
+fire-and-forget μία απόπειρα, οπότε ένα endpoint που κάνει restart χάνει το event σιωπηλά).
+
 ## Needs Achilleas
 
-- **P46 last mile (χρειάζεται login)**: Expenses → «⧉ duplicates». Αν βγάλει ομάδες, δες αν ο προεπιλεγμένος
-  επιζών είναι ο σωστός πριν πατήσεις merge. Τα υπόλοιπα πάνε στον Κάδο, δεν χάνονται.
-- **P74 last mile (30 δευτερόλεπτα, χρειάζεται login)**: Settings → Storage & backup → «Verify…» και δώσε ένα
-  παλιό `pharos-backup-*.json`. Αν βγει κόκκινο, το ήξερες πριν το χρειαστείς.
+- **P40 — για να ανάψει στην πράξη**: το `ghcr.io/achilleasgkekas/pharos` **δεν είναι δημόσιο package**
+  (επαληθεύτηκε live: anonymous token → **403 DENIED**· η ίδια ροή σε δημόσιο package δίνει **200**). Μέχρι
+  να γίνει public (ή να δημοσιευτεί το OSS repo), ο έλεγχος αποτυγχάνει **σιωπηλά**, ακριβώς όπως σχεδιάστηκε.
+  Επίσης δεν υπάρχει ακόμα κανένα `v*.*.*` git tag, άρα κανένα release για να συγκριθεί.
+- **Μικρό wart που ΔΕΝ άγγιξα** (δίπλα ακριβώς στο σημείο που επεξεργάστηκα, δική σου απόφαση): το
+  Settings → About → «Host» λέει **«Mac mini M4 · Docker»** καρφωμένο. Στο δικό σου instance είναι σωστό· σε
+  κάθε άλλον self-hoster είναι ψέμα. Το άφησα ως έχει γιατί είναι εκτός scope του P40.
+- **P46 last mile (χρειάζεται login)**: Expenses → «⧉ duplicates», δες αν ο προεπιλεγμένος επιζών είναι ο
+  σωστός πριν πατήσεις merge. Τα υπόλοιπα πάνε στον Κάδο.
+- **P74 last mile (χρειάζεται login)**: Settings → Storage & backup → «Verify…» με ένα παλιό
+  `pharos-backup-*.json`.
 - **P81 last mile**: αμετάβλητο — `CRON_SECRET` στο `.env` + restart web, και ένα πραγματικό happy-path run
-  (θα στείλει **αληθινές** ειδοποιήσεις, γι' αυτό δεν το τρέχω μόνος μου).
+  (στέλνει **αληθινές** ειδοποιήσεις, γι' αυτό δεν το τρέχω μόνος μου).
 - Αμετάβλητα: **P17 live check** σε φυσική συσκευή, **P31 live check** με τους τρεις ρόλους. **P36 / P16**
   παραμένουν παγωμένα με ρητό κανόνα σιωπής (`OWNER_DECISIONS.md` #13).
