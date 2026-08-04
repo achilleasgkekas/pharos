@@ -7338,3 +7338,40 @@ markers, app 200, 4/4 containers up, **μηδέν** σφάλματα mailer με
 για προσωπικό Gmail, πριν από πραγματικούς πελάτες.
 
 **## Needs Achilleas:** **Stripe keys**, **plan pricing**. Το email και τα backups **έκλεισαν**.
+
+## 2026-08-04 (ιβ) — increment 144: ο σύνδεσμος του email πήγαινε σε 404, και οι πελάτες δεν είχαν navbar
+
+Ο Achilleas, λεπτά μετά το πρώτο email που όντως έφτασε: «404» στον σύνδεσμο, «λείπει το μενού
+πάνω». **Δύο πραγματικά bugs.**
+
+**1. Ο σύνδεσμος επαναφοράς έδειχνε σε σελίδα που δεν υπάρχει.** Το `resetLinkUrl` χτίζει
+`${base}/reset?token=`, η σελίδα ζει στο `/account/reset/confirm`. Το token ήταν πάντα σωστό, **η
+διεύθυνση ποτέ**. Πέρασε απαρατήρητο για όλη τη ζωή του κώδικα επειδή **μέχρι χθες κανένα reset
+email δεν είχε παραδοθεί σε άνθρωπο** — το SMTP δεν ήταν καλωδιωμένο. Το πρώτο που έφτασε
+πραγματικά πήγε κατευθείαν στο 404. Τρία tests κωδικοποιούσαν το σπασμένο path και ενημερώθηκαν.
+
+**Το μοτίβο αξίζει να κρατηθεί**: όσο ένα κανάλι παράδοσης δεν λειτουργεί, **κάθε** bug πίσω από
+αυτό είναι αόρατο και συσσωρεύεται. Δύο increments πριν το SMTP δούλεψε· δύο increments μετά
+βγήκαν και τα δύο bugs που έκρυβε.
+
+**2. Η navbar δεν renderαρόταν ΠΟΤΕ σε SaaS mode.** Το root layout είχε
+`{user && !chromeless && <SiteNav/>}`, όπου `user` = ο **self-hosted** `User` document. Σε hosted
+deployment δεν υπάρχει τέτοιο: ο πελάτης είναι `Account` με άλλο cookie. Άρα το προϊόν σηκωνόταν
+στο workspace subdomain **πλήρως λειτουργικό και χωρίς καμία πλοήγηση**.
+
+Νέο `lib/tenancy/navUser.ts`: slug από το **host** (μηδέν query), ρόλος από τη λίστα memberships
+(ένα indexed query, **μόνο** σε SaaS mode με cookie). Επιστρέφει `null` όταν το SAAS_MODE είναι
+off, άρα το self-hosted ούτε αλλάζει ούτε πληρώνει τίποτα. Επιστρέφει `null` **και** όταν ο
+λογαριασμός δεν είναι μέλος του workspace που ονομάζει το host: εκείνο το request το κάνει ήδη 404
+το data-plane gate, και η navbar δεν πρέπει να υπονοεί πρόσβαση που δεν υπάρχει.
+
+`owner`/`admin` → «admin», η πιο κοντινή αληθής δήλωση στο self-hosted λεξιλόγιο. **Ρητά ΟΧΙ
+απόφαση δικαιωμάτων**: η navbar μόνο τυπώνει το string, κάθε έλεγχος μένει server-side πάνω στο
+membership. Γραμμένο στον κώδικα ώστε να μη γίνει ποτέ gate κατά λάθος.
+
+**Verified live μετά το deploy** (μέσω του `deploy-update.sh`, exit 0, health OK, rebuild μόνο του
+`web`): `/account/reset/confirm` → **200**, το παλιό `/reset` → **404** (επιβεβαιώνει ότι δεν
+υπήρχε ποτέ), νέο reset email στάλθηκε με **μηδέν σφάλματα mailer**. 5839 tests green.
+
+**Next task:** (α) `settings/actions.ts` scoping — το τελευταίο data-isolation κενό· (β) σελίδα
+`/status` στη landing· (γ) sending domain με SPF+DKIM.
