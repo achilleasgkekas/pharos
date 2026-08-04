@@ -207,3 +207,28 @@ Ad-hoc, κατόπιν αιτήματος («βάλε εσύ τα env και κ�
 
 ΣΗΜ: ο ίδιος ο κωδικός ενεργοποίησης δεν γράφεται εδώ. Ζει μόνο στο `.env.prod` και δόθηκε
 στον Αχιλλέα στη συνομιλία.
+
+## 2026-08-04 21:31 UTC — `63f2e333 → abd0cdcc`, exit 0
+
+Ad-hoc. Ένα commit: το signup δείχνει πλέον το πλάνο που ήρθε από το `?plan=`, και διορθώθηκε
+το σχόλιο για το build memory μετά το rescale σε **CX23 (2 vCPU, ~3.8 GB RAM + 4 GB swap)**.
+
+**Το `NODE_BUILD_MEMORY` ΔΕΝ ανέβηκε**, παρόλο που το παλιό σχόλιο έλεγε «raise if you resize
+up». web και landing χτίζουν **παράλληλα**, άρα 3072 στο καθένα είναι ήδη 6 GB πιθανή κορυφή
+πάνω σε 3.8 GB πραγματικής μνήμης· ανεβάζοντας και τα δύο, η κορυφή γίνεται χειρότερη, όχι
+ασφαλέστερη. Το 3072 έχει αποδειχθεί αρκετό (όλα τα builds πέτυχαν με αυτό, ακόμα και στο
+μικρότερο μηχάνημα), οπότε η επιπλέον RAM πάει σε λιγότερο paging στο ίδιο ceiling.
+
+**Health**: pre-flight OK με την πρώτη. Post-deploy: **502 στην 1η προσπάθεια, OK στη 2η** —
+ακριβώς ο λόγος που ο έλεγχος κάνει retry· ένα container που μόλις ξαναδημιουργήθηκε θέλει
+λίγα δευτερόλεπτα, και μια μονή δοκιμή θα είχε πυροδοτήσει άσκοπο rollback.
+
+**Ανεξάρτητη επαλήθευση:**
+
+| έλεγχος | αποτέλεσμα |
+|---|---|
+| `/account/signup?plan=shared` | «Get started with Pro», «€9/month», «activate this plan right after» |
+| `?plan=dedicated` | «Get started with Dedicated», «€29/month» |
+| `/account/signup` σκέτο | «Create your workspace» (αμετάβλητο) |
+| `?plan=free` | κανένα notice (σωστά, δεν υπάρχει τι να επιβεβαιωθεί) |
+| `?plan=enterprise<script>` | **δεν renders**· η μόνη εμφάνιση είναι escaped μέσα στο RSC flight payload του Next, `<script>alert` ως HTML = 0 |
