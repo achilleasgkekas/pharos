@@ -48,6 +48,50 @@ function tenantKey(): string {
   return ctx.isDefault || !ctx.tenantId ? '' : ctx.tenantId;
 }
 
+/** How long the control-plane key lookup may take before it is treated as "no key". */
+const BYO_KEY_TIMEOUT_MS = 3000;
+
+/**
+ * Inject a hosted workspace's own provider key (BYO-key) into the resolved config.
+ *
+ * Mutates in place and never throws: a control-plane hiccup must degrade to "no key" (which
+ * the caller's fallback already handles) rather than break every AI call in the app.
+ *
+ * The provider is only switched when the workspace has NOT already chosen a cloud provider
+ * itself: the stored key names its own provider, and honouring it is what makes the panel's
+ * "Anthropic key saved" mean anything. An explicit in-app choice of a DIFFERENT cloud
+ * provider (with its own key in AppConfig) still wins, because that is a deliberate override.
+ *
+ * The import is dynamic for the same two reasons as auth.ts's: it keeps the tenancy/billing
+ * graph (node:crypto, the Tenant model) out of a self-hosted build, which never needs it.
+ */
+async function applyTenantByoKey(v: AiConfig): Promise<void> {
+  const ctx = currentTenant();
+  if (ctx.isDefault || !ctx.tenantId) return; // self-hosted / SAAS_MODE off: nothing to do
+  try {
+    const { resolveTenantAiKey } = await import('./billing/byoKeyStore');
+    // Bounded: getAiConfig sits in front of EVERY AI call, so a control-plane query that
+    // hangs (rather than fails) would stall parsing app-wide instead of degrading it.
+    // Losing the key for one 5s cache window is the cheap failure; a frozen request is not.
+    const resolved = await Promise.race([
+      resolveTenantAiKey(ctx.tenantId),
+      new Promise<null>((r) => setTimeout(() => r(null), BYO_KEY_TIMEOUT_MS)),
+    ]);
+    if (!resolved?.key) return;
+    switch (resolved.provider) {
+      case 'anthropic': v.anthropicApiKey = resolved.key; break;
+      case 'openai': v.openaiApiKey = resolved.key; break;
+      case 'gemini': v.geminiApiKey = resolved.key; break;
+      case 'openrouter': v.openrouterApiKey = resolved.key; break;
+      case 'custom': v.customApiKey = resolved.key; break;
+      default: return; // unknown provider id: leave the config untouched
+    }
+    if (v.provider === 'ollama') v.provider = resolved.provider as AiProvider;
+  } catch {
+    /* control plane unreachable / key tampered / no crypto → behave as if unset */
+  }
+}
+
 /** Effective AI config, merging the DB singleton over env defaults. If the chosen
  *  cloud provider has no key (or custom has no URL/model), it transparently falls
  *  back to Ollama so parsing never hard-fails on a half-configured setup. */
@@ -111,6 +155,15 @@ export async function getAiConfig(): Promise<AiConfig> {
     aiFeatures: (doc?.aiFeatures as Record<string, boolean>) || {},
     aiOnboardingDismissed: !!doc?.aiOnboardingDismissed,
   };
+  // A hosted workspace keeps its provider key encrypted in the CONTROL plane (the BYO-key
+  // panel in workspace settings), not in this tenant's AppConfig. Without this, the key was
+  // write-only: it was stored, masked back to the user, exempted from metering, and then
+  // never handed to a provider. The fallback below would see an empty key, quietly demote
+  // the workspace to Ollama, and every AI call would go to a localhost Ollama that does not
+  // exist on the hosted server — so a customer who had configured everything correctly got
+  // silence from AI and a provider that would not stay on what they picked.
+  await applyTenantByoKey(v);
+
   // Half-configured cloud provider → quiet fallback to Ollama.
   if (
     (v.provider === 'anthropic' && !v.anthropicApiKey) ||

@@ -167,6 +167,36 @@ describe('uploadReceipt — validation', () => {
     expect(res).toEqual({ ok: false, error: 'Failed to save file: disk full' });
     expect(receiptCreate).not.toHaveBeenCalled();
   });
+
+  // Reported as "I get an error importing without knowing what the error is". A server
+  // action that REJECTS reaches the browser as Next's scrubbed generic digest, so any
+  // failure in the work that sat outside the one try block (reading the file, the
+  // thumbnail, resolving the AI feature flag) was untraceable from the UI. Every failure
+  // has to come back as a result with a message on it.
+  it('returns the reason instead of throwing when the AI feature flag lookup fails', async () => {
+    isFeatureEnabledMock.mockRejectedValueOnce(new Error('control plane unreachable'));
+    const fd = new FormData();
+    fd.set('file', makeFile('r.jpg', 'x', 'image/jpeg'));
+    const res = await uploadReceipt(fd);
+    expect(res).toEqual({ ok: false, error: 'control plane unreachable' });
+  });
+
+  it('returns the reason instead of throwing when the file cannot be read', async () => {
+    const fd = new FormData();
+    const bad = makeFile('r.jpg', 'x', 'image/jpeg');
+    Object.defineProperty(bad, 'arrayBuffer', { value: () => Promise.reject(new Error('stream aborted')) });
+    fd.set('file', bad);
+    const res = await uploadReceipt(fd);
+    expect(res).toEqual({ ok: false, error: 'stream aborted' });
+  });
+
+  it('still says something when the failure carries no message', async () => {
+    isFeatureEnabledMock.mockRejectedValueOnce(new Error(''));
+    const fd = new FormData();
+    fd.set('file', makeFile('r.jpg', 'x', 'image/jpeg'));
+    const res = await uploadReceipt(fd);
+    expect(res).toEqual({ ok: false, error: 'Upload failed' });
+  });
 });
 
 describe('uploadReceipt — PDF thumbnail', () => {

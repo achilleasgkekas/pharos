@@ -583,7 +583,16 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
     if (customKey.trim()) fd.set('customApiKey', customKey.trim());
     setMsg(null);
     startTransition(async () => {
-      await saveAiConfig(fd);
+      // A rejected save used to leave this handler on the floor: no "Saved ✓", no error,
+      // nothing at all on screen, which reads as "the button does not work". The most
+      // likely rejection is the admin guard (a member-role session in a shared or hosted
+      // workspace), and that is worth saying out loud.
+      try {
+        await saveAiConfig(fd);
+      } catch (err) {
+        setMsg(`Could not save: ${(err as Error).message || 'unknown error'}`);
+        return;
+      }
       setApiKey('');
       setOpenaiKey('');
       setGeminiKey('');

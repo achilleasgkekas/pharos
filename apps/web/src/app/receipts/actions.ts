@@ -146,6 +146,20 @@ async function runReceiptParse(bytes: Buffer, ext: string, isPdf: boolean, mode:
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 
 export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
+  // Every failure has to come back as a RESULT, never as a thrown action. A server action
+  // that rejects reaches the browser as Next's generic scrubbed digest, so the user is told
+  // "something went wrong" with no way to find out what — which is exactly how an import
+  // that could not write its file was indistinguishable from one that could not reach the
+  // database. Reading the file, rendering the thumbnail and resolving the AI feature flag
+  // all used to sit outside the only try block in here.
+  try {
+    return await uploadReceiptInner(formData);
+  } catch (err) {
+    return { ok: false, error: (err as Error).message || 'Upload failed' };
+  }
+}
+
+async function uploadReceiptInner(formData: FormData): Promise<UploadResult> {
   await assertCanWrite();
   return withRequestTenant(async () => {
   const file = formData.get('file');

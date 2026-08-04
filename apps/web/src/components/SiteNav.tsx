@@ -216,9 +216,16 @@ export function SiteNav({ aiReady = false, user }: { aiReady?: boolean; user?: S
         </div>
       </div>
 
-      {/* Mobile menu — all links */}
+      {/* Mobile menu — all links.
+          It carries its OWN opaque background on purpose. It used to have none at all and
+          relied entirely on the header painting behind it, which is invisible until
+          something breaks that assumption (a stale bundle, a stacking context above it, an
+          ancestor that stops painting) — and then the open menu goes see-through with the
+          page scrolling underneath it. Reported exactly that way on mobile. A panel that
+          covers content should never depend on a parent for its own opacity.
+          `max-h`+scroll keeps all 15 links reachable on a short phone. */}
       {mobileOpen && (
-        <nav className="lg:hidden border-t border-[color:var(--color-border)] px-4 py-2 grid grid-cols-2 sm:grid-cols-3 gap-1">
+        <nav className="lg:hidden border-t border-[color:var(--color-border)] bg-[color:var(--color-bg)] max-h-[70vh] overflow-y-auto overscroll-contain px-4 py-2 grid grid-cols-2 sm:grid-cols-3 gap-1">
           {ALL_LINKS.map((link) => {
             const active = navActive(pathname, link.href);
             const Icon = link.icon;

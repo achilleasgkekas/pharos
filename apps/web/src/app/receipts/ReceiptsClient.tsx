@@ -251,7 +251,10 @@ export function ReceiptsClient({
     const okCount = total - failed;
     setUploadMsg(
       failed
-        ? t('rc.uploadResult', { ok: okCount, total, failed })
+        ? // `lastError` used to be collected here and then thrown away, so a failed import
+          // said "1 failed" and nothing else — there was no way to find out WHY without
+          // reading the server logs. Whatever the server said is the whole point.
+          `${t('rc.uploadResult', { ok: okCount, total, failed })}${lastError ? ` ${lastError}` : ''}`
         : lastAiError
           ? t('rc.savedManual', { err: lastAiError })
           : total > 1
@@ -464,8 +467,9 @@ export function ReceiptsClient({
       </div>
 
       {uploadMsg && !uploading && (
-        <div className="mb-4 text-sm text-[color:var(--color-red)] flex items-center gap-2">
-          <AlertTriangle size={14} /> {uploadMsg}
+        <div className="mb-4 text-sm text-[color:var(--color-red)] flex items-start gap-2">
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+          <span className="break-words">{uploadMsg}</span>
         </div>
       )}
 

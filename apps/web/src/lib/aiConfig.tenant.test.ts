@@ -34,6 +34,11 @@ vi.mock('./tenancy/connection', () => ({
 
 vi.mock('./db', () => ({ connectDB: async () => ({ connection: {} }) }));
 
+// A non-default tenant now also resolves its BYO key from the control plane. Unmocked, the
+// real module reaches for the Tenant collection and these tests hang on a query that never
+// answers. Stubbed to "no stored key", which is the behaviour these cache tests assume.
+vi.mock('./billing/byoKeyStore', () => ({ resolveTenantAiKey: async () => null }));
+
 import { getAiConfig, invalidateAiConfigCache } from './aiConfig';
 
 const acme: TenantContext = {
