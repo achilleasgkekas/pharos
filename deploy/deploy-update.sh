@@ -93,8 +93,16 @@ if ! "$HERE/backup.sh" >/tmp/pharos-deploy-backup.log 2>&1; then
 fi
 say "  backup ok"
 
-OLD="$(git rev-parse HEAD)"
-say "[3/6] current commit recorded: ${OLD:0:8}"
+# What the RUNNING CONTAINERS were built from, which is not the same thing as HEAD. Anyone who
+# pulls by hand — to recover a file, to look at something — moves HEAD forward and leaves the
+# images behind, and comparing HEAD to origin/main then reports "nothing to deploy" while the
+# site serves the old build. That happened twice in one day, once on this script's first run and
+# once while recovering a file the guard routine had written. HEAD is only the fallback, for the
+# very first run on a machine that has no stamp yet.
+STAMP="$HERE/.deployed"
+OLD="$( [ -r "$STAMP" ] && cat "$STAMP" || git rev-parse HEAD )"
+git cat-file -e "${OLD}^{commit}" 2>/dev/null || OLD="$(git rev-parse HEAD)"
+say "[3/6] currently deployed: ${OLD:0:8}"
 
 say "[4/6] pull"
 git fetch origin --quiet
@@ -139,6 +147,7 @@ fi
 
 say "[6/6] verifying"
 if [ -z "${DEPLOY_FAILED:-}" ] && health 12; then
+  echo "$NEW" > "$STAMP"
   say "DEPLOYED: ${OLD:0:8} → ${NEW:0:8}, healthy"
   exit 0
 fi
@@ -148,6 +157,7 @@ git checkout --quiet "$OLD" || { say "ROLLBACK FAILED: cannot check out $OLD"; e
 # shellcheck disable=SC2086
 $COMPOSE up -d --build ${SERVICES:-} >/dev/null 2>&1
 if health 12; then
+  echo "$OLD" > "$STAMP"
   say "ROLLED BACK to ${OLD:0:8} and healthy. The new commits are broken:"
   git log --oneline "$OLD..$NEW" | sed 's/^/    /'
   exit 2

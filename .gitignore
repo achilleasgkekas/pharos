@@ -56,3 +56,6 @@ scripts/seed-10g-v3.js
 services/scraper/_audit.ts
 .claude/settings.local.json
 .claude/settings.json
+
+# What the running containers were built from. Server-side state, never the repo.
+deploy/.deployed
