@@ -100,3 +100,27 @@ docs commits, δεν θα ξανάχτιζε τίποτα και θα ανέφε
 Σημασία: ο tenancy/security fix που «δεν είχε deployed» (βλ. dc292d1) είναι πλέον live.
 
 Κατάσταση: παραγωγή στο `dc292d17`, υγιής.
+
+## 2026-08-04 (cont.): χειροκίνητο deploy — mobile discontinuation (interactive session, κατ' εντολή Αχιλλέα)
+
+Εύρος: `dc292d17 → 2cc7d5ec` (5 commits).
+
+    93a4046 fix(deploy): serialise deploys behind a flock lock (exit 4), like BakeCore
+    c568a3b docs(deploy): log the 2026-08-04 manual deploy 89d49c85 -> dc292d17
+    0a62c12 docs(reviewer): 66th sweep, api/v1 tenancy fix reviewed, exemplary
+    1438867 feat(mobile)!: discontinue the mobile app, web-only from now on
+    2cc7d5e docs+backlog: scrub mobile-app references, record the discontinuation decision
+
+`--check` πρώτα: health OK. Μετά `deploy/deploy-update.sh`: exit 0, backup ok, rebuild
+`caddy`+`landing`+`web`, recreate, health OK (attempt 1). Χωρίς rollback.
+
+Ανεξάρτητη επαλήθευση: `ph-aros.com` 200 (landing content self-host/waitlist), nav πλέον χωρίς
+«Mobile» link· `app.ph-aros.com/account/login` 200· `POST /api/cron/saas/trials-sweep` χωρίς
+token → 401 `{"error":"unauthorized"}`. Έλεγχος επί σκοπού: raw HTML του `ph-aros.com` grep-αρίστηκε
+για "mobile" — μόνο legitimate hits έμειναν (`mobile-drawer`/`MobileNav` = το responsive hamburger
+nav, «mobile-first» tech-stack περιγραφή), το phone-mockup section + το nav link έφυγαν.
+
+Σημασία: το mobile app (apps/mobile) καταργήθηκε αυτό το session (βλ. `OWNER_DECISIONS.md` #15,
+commit `1438867`) — το landing site πλέον δεν διαφημίζει πράγμα που δεν υπάρχει.
+
+Κατάσταση: παραγωγή στο `2cc7d5ec`, υγιής.
