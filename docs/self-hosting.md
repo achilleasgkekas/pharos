@@ -284,8 +284,12 @@ alerts you. To make it automatic, point a scheduler at the sweep endpoint:
 
 1. Set `CRON_SECRET` in your `.env` (`openssl rand -base64 32`) and restart the
    web container. Without it the endpoint refuses every call, including yours.
-2. Add a cron entry. Once each morning is usually enough — the alerts are
-   day-granular, so running it more often mostly re-sends the same summary:
+2. Add a cron entry. Once each morning is a reasonable default — the alerts are
+   day-granular so there is little to gain from checking more often — but unlike
+   most alert loops, running it MORE often is safe too: each call only reports
+   what is new or changed since the last one it actually managed to deliver, so a
+   warranty that has been sitting in the "expiring soon" window for a week does
+   not resend itself on every tick:
 
    ```bash
    # every day at 09:00
@@ -298,6 +302,12 @@ The response tells you what happened, so the log is worth keeping:
 ```json
 { "ok": true, "sent": true, "summary": "🛡 2 warranty expiring ≤90d: ..." }
 ```
+
+A repeat run with nothing new to say returns `"summary": "No new alerts (already
+reported)."` rather than resending the same thing, and a genuinely quiet instance
+returns `"summary": "All clear — nothing to report."` — the two read differently
+in the log on purpose, so you can tell "checked, nothing changed" apart from
+"checked, nothing was ever wrong."
 
 `"sent": false` with an all-clear summary is a healthy run that simply found
 nothing to report, not a failure. A `401` means the token does not match, a

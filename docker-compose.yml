@@ -34,6 +34,9 @@ services:
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       # Session idle timeout (hours) — logs out after this long without activity.
       SESSION_IDLE_HOURS: ${SESSION_IDLE_HOURS:-12}
+      # Bearer token for the scheduled alert sweep (POST /api/cron/alerts, P81/P82).
+      # Optional — unset means the route fails closed (500) rather than running unprotected.
+      CRON_SECRET: ${CRON_SECRET:-}
     volumes:
       # Persist user binary files (receipts, statements) on the host.
       # Later this path becomes the NFS mount from the DS923+ NAS.
