@@ -166,3 +166,44 @@ Rebuild: **και τα δύο** services (`landing` + `web`), σωστά, αφο
 αφαιρεθεί το waitlist (ζητήθηκε), το `self-host` κρατά τον έλεγχο ζωντανό, αλλά αν αλλάξει και αυτό
 το κείμενο πρέπει να ενημερωθεί το `deploy/deploy-update.sh` **στο ίδιο commit**, αλλιώς ο έλεγχος
 θα δει υγιές deploy ως σπασμένο και θα κάνει άσκοπο rollback.
+
+## 2026-08-04 21:12 UTC — `2743d638 → 63f2e333`, exit 0
+
+Ad-hoc, κατόπιν αιτήματος («βάλε εσύ τα env και κάνε deploy»). Στάλθηκαν 2 commits, το ένα με
+κώδικα και στα δύο apps:
+
+```
+63f2e33 feat(saas): a real way in and out — waitlist gone, plans lead to signup, plans
+        activate by code
+310de1d docs(deploy): log the 2026-08-04 deploy 2cc7d5ec -> 2743d638
+```
+
+**Αλλαγές env ΠΡΙΝ το deploy** (στο `deploy/.env.prod`, ώστε το recreate να τις πάρει):
+
+- `SAAS_SUPERADMIN_EMAILS` — **υπήρχε ήδη** και περιλαμβάνει τον λογαριασμό του Αχιλλέα, οπότε
+  το operator console ήταν ήδη ανοιχτό. Δεν χρειάστηκε αλλαγή.
+- `SAAS_ACTIVATION_CODES` — **προστέθηκε**, ένας κωδικός για το `shared` πλάνο. Χωρίς αυτό το
+  `/api/saas/billing/activate` απαντά 503, δηλαδή fails closed.
+
+Το `.env.prod` έχει `env_file` στο web service, άρα **δεν** χρειάστηκε αλλαγή στο compose (σε
+αντίθεση με το `CRON_SECRET`, που έπρεπε να περαστεί ρητά). Το αντίγραφο ασφαλείας του
+`.env.prod` μετακινήθηκε **έξω** από το repo (`/root/pharos-env-backups/`), αλλιώς το untracked
+αρχείο θα έκανε το δέντρο βρώμικο και το script θα αρνιόταν να ξεκινήσει (exit 1).
+
+**Health**: pre-flight OK με την πρώτη, post-deploy OK με την πρώτη. Rebuild: landing + web.
+
+**Ανεξάρτητη επαλήθευση μετά το deploy:**
+
+| έλεγχος | αποτέλεσμα |
+|---|---|
+| αναφορές `waitlist` στο apex | **0** (ήταν ολόκληρο section + mailto) |
+| `self-host` στο apex | 2 — **ο δείκτης του health check επιβιώνει** μετά την αφαίρεση του waitlist |
+| CTA πλάνων | `…/account/signup?plan=shared` και `?plan=dedicated` |
+| Sign in στο landing | `…/account/login` παρόν |
+| `SAAS_ACTIVATION_CODES` μέσα στον container | present |
+| `/`, `/receipts`, `/admin` χωρίς session | 307 → login (το gate κρατά) |
+| `/account/login`, `/account/signup` | 200 |
+| `POST /api/saas/billing/activate` χωρίς session | **401** |
+
+ΣΗΜ: ο ίδιος ο κωδικός ενεργοποίησης δεν γράφεται εδώ. Ζει μόνο στο `.env.prod` και δόθηκε
+στον Αχιλλέα στη συνομιλία.
