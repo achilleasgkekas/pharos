@@ -270,8 +270,18 @@ async function sendViaSmtp(msg: EmailMessage, config: Record<string, unknown> | 
     return { delivered: true, provider: 'smtp', id: info?.messageId };
   } catch (err) {
     // Never throw: a mail failure must not take down the request that triggered it (signup,
-    // invite, password reset all send fire-and-forget).
-    return { delivered: false, provider: 'smtp', error: err instanceof Error ? err.message : 'send_failed' };
+    // invite, password reset all send fire-and-forget). But never swallow it either — this is
+    // returned into fire-and-forget callers that mostly ignore the result, so without a log an
+    // outage is invisible. A MISSING MODULE gets its own line because it is a packaging fault,
+    // not a mail fault, and it reads as "email is broken" while the mail server is perfectly
+    // fine (it happened: the standalone build shipped without nodemailer).
+    const message = err instanceof Error ? err.message : 'send_failed';
+    if (/Cannot find module/i.test(message)) {
+      console.error('[mailer] nodemailer is NOT in this build — no email can be sent:', message);
+    } else {
+      console.error('[mailer] SMTP send failed:', message);
+    }
+    return { delivered: false, provider: 'smtp', error: message };
   }
 }
 

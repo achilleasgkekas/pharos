@@ -60,6 +60,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/pdfjs-dist ./node_mo
 # sharp (auto-rotate sideways receipts before OCR) is a native module; its prebuilt
 # libvips binaries live under @img/*. Copy both so the standalone keeps the .node libs.
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
+# nodemailer is reached through `await import('nodemailer')` (lazy, so a deployment on Resend or a
+# webhook never loads it) and the standalone trace does NOT pick that up — verified by looking in
+# the built image, where it was simply absent. Left out, every email fails at runtime with
+# "Cannot find module", and because the mailer catches its own errors it fails SILENTLY: the
+# config looks right, the provider resolves, nothing is ever delivered.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/nodemailer ./node_modules/nodemailer
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@img ./node_modules/@img
 
 # Storage mount point (bind-mounted in compose)
