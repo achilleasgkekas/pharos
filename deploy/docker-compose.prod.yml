@@ -1,0 +1,91 @@
+# Pharos PRODUCTION stack (hosted SaaS). Runs on the server, never on your Mac.
+#
+# Deliberately separate from the repo-root docker-compose.yml (your single-user home instance)
+# and from docker-compose.saas-dev.yml (the local multi-tenant scratch stack). Different project
+# name, different volumes, SAAS_MODE on, real TLS.
+#
+# THE ONE RULE THIS FILE ENFORCES: only Caddy is reachable from the internet. Mongo publishes NO
+# ports at all, and neither does the app. An exposed 27017 with a guessable password is how
+# self-hosted databases get wiped and ransomed, and it is the single most common way a small
+# deployment loses everything.
+#
+#   cd /opt/pharos && docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d
+name: pharos-prod
+
+services:
+  caddy:
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+    image: pharos-caddy:2.10-cf
+    container_name: pharos-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SAAS_BASE_DOMAIN: ${SAAS_BASE_DOMAIN:?set SAAS_BASE_DOMAIN}
+      CF_API_TOKEN: ${CF_API_TOKEN:?set CF_API_TOKEN (Zone:Read + DNS:Edit on this zone only)}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Issued certificates + ACME account key. Losing this volume means re-issuing every cert,
+      # which Let's Encrypt rate-limits, so it is a named volume and belongs in the backup.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+
+  web:
+    # Built on the server from this checkout by default (see deploy/README.md). Swap for
+    # `image: ghcr.io/achilleasgkekas/pharos-web:<tag>` once images are published, and drop the
+    # build block — a server that does not compile anything has a smaller attack surface and a
+    # much faster deploy.
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    image: pharos-web:prod
+    container_name: pharos-web
+    restart: unless-stopped
+    # No `ports:` on purpose — Caddy reaches it over the compose network.
+    env_file:
+      - .env.prod
+    environment:
+      NODE_ENV: production
+      STORAGE_ROOT: /storage
+      MONGO_URI: mongodb://${MONGO_USER:-pharos}:${MONGO_PASSWORD:?set MONGO_PASSWORD}@mongo:27017/pharos_registry?authSource=admin
+      SAAS_MODE: "on"
+      # Session cookie must span the apex and every workspace subdomain, or signing up on the
+      # apex and clicking into a workspace logs you straight back out.
+      SAAS_COOKIE_DOMAIN: ".${SAAS_BASE_DOMAIN}"
+      SAAS_PUBLIC_URL: "https://${SAAS_BASE_DOMAIN}"
+      APP_URL: "https://${SAAS_BASE_DOMAIN}"
+      # Real TLS here, unlike the local stacks.
+      AUTH_COOKIE_SECURE: "true"
+    volumes:
+      - ./storage:/storage
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:7
+    container_name: pharos-mongo
+    restart: unless-stopped
+    # NO ports. Reachable only from the compose network. If you need a shell, use
+    # `docker exec -it pharos-mongo mongosh -u ... ` from the server itself.
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-pharos}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?set MONGO_PASSWORD}
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongo-data:
+  caddy-data:
+  caddy-config:

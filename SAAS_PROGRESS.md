@@ -7096,3 +7096,59 @@ backups· (γ) CI workflow για build/push (θέλει έγκριση).
 Νέο: **άδεια για scripted refactor** του `settings/actions.ts` (ή απλώς παύση της routine που το
 γράφει) — αλλιώς το κενό μένει ανοιχτό. Server: **Hetzner x86 αγοράστηκε** (CAX μη διαθέσιμο),
 DNS nameservers μετακινήθηκαν, εκκρεμεί propagation.
+
+## 2026-08-04 (ζ) — increment 139: production stack (Hetzner) + backups που έχουν δοκιμαστεί
+
+Ο Achilleas αγόρασε τον server (Hetzner x86, `128.140.126.136`), μετακίνησε τα nameservers και
+ολοκλήρωσε τα βήματα SSH. Νέος φάκελος **`deploy/`** (δικός μου, μηδέν σύγκρουση):
+
+- **`docker-compose.prod.yml`** — Caddy + web + Mongo, δικό του project name/volumes, `SAAS_MODE=on`,
+  `AUTH_COOKIE_SECURE=true`, `SAAS_COOKIE_DOMAIN=.ph-aros.com`. **Ο ένας κανόνας που επιβάλλει:
+  μόνο ο Caddy είναι προσβάσιμος από το internet.** Επαληθευμένο με `compose config`: published
+  ports = **μόνο 80/443 στον caddy**, ο Mongo και το web **μηδέν**. Εκτεθειμένο 27017 με
+  μαντεύσιμο password είναι ο #1 τρόπος που χάνονται self-hosted βάσεις.
+- **`Dockerfile.caddy` + `Caddyfile`** — Caddy με το Cloudflare DNS plugin. Το DNS-01 δεν είναι
+  προτίμηση: τα workspaces ζουν σε `<slug>.ph-aros.com`, άρα χρειάζεται **wildcard**, και wildcard
+  εκδίδεται μόνο μέσω DNS-01. Με HTTP-01 θα χρειαζόταν νέο certificate σε **κάθε signup** και θα
+  χτυπούσε rate limit.
+- **`.env.prod.example`** — κάθε secret, με το γιατί. Ρητή προειδοποίηση για Cloudflare **token με
+  Zone:Read+DNS:Edit μόνο σε αυτό το zone**, ΟΧΙ Global API Key σε μηχάνημα εκτεθειμένο στο δίκτυο.
+- **`backup.sh` / `restore.sh` / `README.md`** (runbook: DNS records, deploy key, cron, update).
+
+### Το backup βρήκε δύο πράγματα που φαίνονται μόνο αν το τρέξεις
+
+**1. `mongodump` ΔΕΝ μπορεί να εξαιρέσει database** (tools 100.17: υπάρχει `--excludeCollection`,
+δεν υπάρχει `--excludeDatabase`/`--nsExclude` στο dump). Άρα το archive περιέχει **πάντα** το
+`admin`, μαζί με το `admin.system.users`. Στο restore αυτό **αντικαθιστά τον κατάλογο χρηστών ενώ
+ο mongorestore είναι authenticated πάνω του** → η session ακυρώνεται στη μέση. Το ορατό
+αποτέλεσμα σε πραγματικό τρέξιμο: **«63 document(s) restored successfully»** και αμέσως μετά κάθε
+`createIndexes` να αποτυγχάνει **Unauthorized**. Δηλαδή restore που δείχνει επιτυχημένο και αφήνει
+τη βάση **χωρίς κανένα index**. Το επικίνδυνο δεν είναι η ταχύτητα: **χωρίς τα unique indexes
+τίποτα δεν εμποδίζει δύο workspaces με το ίδιο slug**. Fix: `--nsExclude 'admin.*' 'config.*'` στο
+restore ΚΑΙ στο dry-run. Μετά τη διόρθωση: **7 indexes στο tenants, 4 στο accounts**,
+συμπεριλαμβανομένου του **partial unique `customDomain_1`** του increment 134.
+
+**2. Το «υπάρχει το αρχείο» δεν είναι επαλήθευση.** Το `backup.sh` απαιτεί (α) μη κενό, (β)
+`gzip -t`, (γ) **dry-run restore**. Negative controls, όλα δοκιμασμένα ζωντανά: truncated archive →
+πιάνεται και από τα δύο· κενό αρχείο → πιάνεται από το size check. Το `restore.sh` επιπλέον
+**επαληθεύει ότι τα indexes επέστρεψαν** και βγάζει warning αν όχι (δοκιμασμένο και στις δύο
+κατευθύνσεις: καθαρό restore → exit 0· `dropIndexes()` → exit 1).
+
+**End-to-end απόδειξη**: dump από το saas-dev → restore σε **ξεχωριστό scratch container** →
+`pharos_registry` + `tenant_acme` + `tenant_gate-two` παρόντα, tenants 6 / accounts 4 /
+memberships 6, indexes πλήρη. Το production δεν αγγίχτηκε ποτέ.
+
+### Ένα footgun που έπιασα πριν προλάβει να συμβεί
+
+Το **`deploy/.env.prod` ΔΕΝ ήταν gitignored** (το `.env*.local` δεν ταιριάζει σε αυτό το όνομα).
+Ένα `git add deploy/` θα είχε ανεβάσει **Cloudflare token, Mongo password και AUTH_SECRET** σε
+repo. Προστέθηκαν `deploy/.env.prod`, `deploy/backups/`, `deploy/storage/` στο `.gitignore`,
+επιβεβαιωμένα με `git check-ignore`.
+
+**Next task:** (α) **`settings/actions.ts` scoping** — παραμένει το τελευταίο data-isolation κενό,
+μπλοκαρισμένο από ξένο WIP· (β) CI workflow build/push (θέλει έγκριση)· (γ) email + Stripe wiring
+όταν έρθουν keys.
+
+**## Needs Achilleas:** **Stripe keys**, **plan pricing**, **Resend key** (χωρίς αυτό verification/
+invite/dunning emails δεν φεύγουν πουθενά), **GHCR PAT** αν θέλει published images, **άδεια για
+scripted refactor** του `settings/actions.ts`.

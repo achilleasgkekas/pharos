@@ -1,0 +1,44 @@
+# Pharos production reverse proxy.
+#
+# ONE certificate covers the apex and every workspace: tenant routing is `<slug>.ph-aros.com`, so
+# a wildcard is the only shape that does not need a new certificate per signup. That requires the
+# ACME DNS-01 challenge, which is why this runs the Cloudflare-enabled Caddy build (Dockerfile.caddy)
+# and needs CF_API_TOKEN.
+#
+# The token needs exactly two permissions on the ph-aros.com zone: Zone:Read and DNS:Edit. Nothing
+# else. Do not use a Global API Key here — that key can do anything to every zone on the account,
+# and it would be sitting in an env file on an internet-facing box.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$SAAS_BASE_DOMAIN}, *.{$SAAS_BASE_DOMAIN} {
+	tls {
+		dns cloudflare {$CF_API_TOKEN}
+		# Both wildcard and apex resolve from the same cert; Caddy manages renewal itself.
+	}
+
+	encode zstd gzip
+
+	# The app derives the tenant from the Host header (lib/tenancy/request.ts reads x-tenant-host,
+	# which the middleware stamps from the incoming host). Caddy preserves Host by default; this
+	# is stated because losing it would silently route EVERY workspace to "no tenant".
+	reverse_proxy web:3000 {
+		header_up X-Forwarded-Host {host}
+	}
+
+	# HSTS. Left at a short max-age deliberately: raise it once you are sure the domain will stay
+	# on HTTPS forever, because browsers honour it long after you might want to change your mind.
+	header {
+		Strict-Transport-Security "max-age=604800; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# Receipts and statements are large; the default 100MB body limit is fine, but uploads are slow
+	# on mobile connections, so give the proxy room before it gives up on a request.
+	request_body {
+		max_size 100MB
+	}
+}

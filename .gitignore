@@ -13,6 +13,14 @@ next-env.d.ts
 # env
 .env
 .env*.local
+# Filled-in production secrets live next to the compose file on the SERVER. `.env*.local` does
+# not match this name, so without this line a `git add deploy/` would commit the Cloudflare token,
+# the Mongo password and AUTH_SECRET. Only the .example is tracked.
+deploy/.env.prod
+
+# Production backup output + bind-mounted uploads (both server-side, never in the repo).
+deploy/backups/
+deploy/storage/
 
 # storage (user binary files: receipts, statements, expenses, photos)
 storage/
