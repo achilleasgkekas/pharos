@@ -60,6 +60,8 @@ type AiInfo = {
 };
 
 type Info = {
+  /** Hosted (SAAS_MODE) — hides the surfaces the account area already owns. */
+  saas?: boolean;
   counts: { items: number; receipts: number; statements: number; subscriptions: number; cards: number };
   ollamaUp: boolean;
   stores: StoreLite[];
@@ -96,14 +98,14 @@ import type { Role } from '@/lib/roles';
 
 type CurrentUser = { id: string; name: string; role: Role };
 
-const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
+const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean; selfHostOnly?: boolean }[] = [
   { id: 'general', label: 'General', icon: <SlidersHorizontal size={15} /> },
   { id: 'money', label: 'Money', icon: <CreditCard size={15} /> },
   { id: 'ai', label: 'AI', icon: <Sparkles size={15} /> },
   { id: 'storage', label: 'Storage & backup', icon: <HardDrive size={15} /> },
   { id: 'data', label: 'Stores & lists', icon: <StoreIcon size={15} /> },
   { id: 'notifications', label: 'Notifications', icon: <Bell size={15} />, adminOnly: true },
-  { id: 'users', label: 'Users', icon: <Users size={15} />, adminOnly: true },
+  { id: 'users', label: 'Users', icon: <Users size={15} />, adminOnly: true, selfHostOnly: true },
 ];
 
 const TAB_KEY: Record<TabId, TKey> = {
@@ -121,7 +123,8 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
   const t = useT();
   const [tab, setTab] = useState<TabId>('general');
   const isAdmin = currentUser.role === 'admin';
-  const visibleTabs = TABS.filter((t) => !t.adminOnly || isAdmin);
+  const saas = !!info.saas;
+  const visibleTabs = TABS.filter((t) => (!t.adminOnly || isAdmin) && (!t.selfHostOnly || !saas));
   const searchParams = useSearchParams();
 
   // A ?tab= deep-link (e.g. from the "Set up AI" banner) wins; otherwise restore the
@@ -212,9 +215,10 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
               <Section title={t('set.about')}>
                 <UpdateChecker canEdit={isAdmin} />
-                <Row label={t('set.host')}>
-                  <span className="text-[color:var(--color-text-dim)]">Mac mini M4 · Docker</span>
-                </Row>
+                {/* The "Host" row used to read "Mac mini M4 · Docker", hardcoded. True on
+                    Achilleas's own machine and a lie on every other install, hosted customers
+                    included, so it said nothing and said it wrongly. The version above it is
+                    real (stamped at build time); this row had no source of truth at all. */}
                 <Row label={t('set.privacy')}>
                   <span className="text-[color:var(--color-text-dim)]">
                     {info.ai.effectiveProvider === 'anthropic' ? t('set.privacyHybrid') : t('set.privacyLocal')}
@@ -289,7 +293,10 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
             </>
           )}
 
-          {tab === 'users' && isAdmin && <UsersManager currentUserId={currentUser.id} />}
+          {/* Hosted: workspace membership lives in the account area (Members + invites), so a
+              SECOND, unrelated user list inside the product is just a way to get the two out
+              of sync. Self-hosted keeps it — it is the only user management there is. */}
+          {tab === 'users' && isAdmin && !saas && <UsersManager currentUserId={currentUser.id} />}
         </div>
       </div>
     </main>

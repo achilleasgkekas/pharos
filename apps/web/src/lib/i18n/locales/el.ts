@@ -21,6 +21,7 @@ export const el: Partial<Dict> = {
   'nav.history': 'Ιστορικό AI',
   'nav.trash': 'Κάδος',
   'nav.settings': 'Ρυθμίσεις',
+  'nav.operator': 'Κονσόλα διαχειριστή',
   'nav.workspaces': 'Χώροι εργασίας & λογαριασμός',
   'nav.billing': 'Χρέωση & πλάνο',
   'nav.account': 'Λογαριασμός',

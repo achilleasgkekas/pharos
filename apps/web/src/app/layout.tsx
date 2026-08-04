@@ -49,12 +49,38 @@ export default async function RootLayout({
   // comes from middleware (x-pathname header). /capture is the bookmarklet's small
   // same-origin popup window — a navbar would waste half its 440x640 real estate.
   const pathname = (await headers()).get('x-pathname') || '';
-  const chromeless = pathname === '/login' || pathname === '/setup' || pathname === '/capture';
+  // Surfaces that must NOT wear the product's own chrome.
+  //
+  // `/admin` and `/account` are separate products living in the same Next app: the operator
+  // console and the SaaS account area each bring their own header. Rendering the app navbar
+  // above them gave a phone TWO stacked top bars, and the "Add an AI provider" onboarding
+  // banner — advice for someone managing their own receipts — appeared over the fleet
+  // overview, where it means nothing and there is no AI to set up.
+  const chromeless =
+    pathname === '/login' ||
+    pathname === '/setup' ||
+    pathname === '/capture' ||
+    pathname === '/admin' ||
+    pathname.startsWith('/admin/') ||
+    pathname === '/account' ||
+    pathname.startsWith('/account/');
   // Read the display currency once per request → set server symbol + hand to the client.
   const { currency } = await getAppSettings();
   const symbol = currencySymbol(currency);
   // Navbar dot = EFFECTIVE AI state (master switch on AND a provider is reachable).
   // Onboarding nudge: show when signed in, AI isn't usable, and not yet dismissed.
+  // Is this an operator (superadmin allowlist)? Decides whether the account menu offers the
+  // console at all. The console re-checks for itself and 404s otherwise, so this is only
+  // about not advertising a door that will not open.
+  let operator = false;
+  if (user && saasMode()) {
+    const [{ getCurrentAccount }, { superadminAllowlist, isSuperadminEmail }] = await Promise.all([
+      import('@/lib/tenancy/accountSession'),
+      import('@/lib/tenancy/superadmin'),
+    ]);
+    const account = await getCurrentAccount().catch(() => null);
+    operator = !!account && isSuperadminEmail(account.email, superadminAllowlist());
+  }
   let aiReady = false;
   let banner: 'off' | 'no-provider' | null = null;
   if (user) {
@@ -85,7 +111,7 @@ export default async function RootLayout({
               (those stay chrome-less even mid-wizard, once step 1 signs you in).
               Keep `children` in a STABLE sibling position so flipping auth state
               doesn't remount the page subtree and reset client state. */}
-          {user && !chromeless && <SiteNav aiReady={aiReady} saas={saasMode()} user={{ name: user.name || 'account', role: user.role }} />}
+          {user && !chromeless && <SiteNav aiReady={aiReady} saas={saasMode()} operator={operator} user={{ name: user.name || 'account', role: user.role }} />}
           {user && !chromeless && banner && <AiOnboardingBanner reason={banner} />}
           {children}
         </Providers>

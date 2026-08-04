@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
   Package, ShoppingCart, ShoppingBasket, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
   Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, CalendarDays,
-  LogOut, UserRound, Activity, MessageSquare, Trash2, FileText, Building2,
+  LogOut, UserRound, Activity, MessageSquare, Trash2, FileText, Building2, ShieldCheck,
 } from 'lucide-react';
 import { cn } from './ui/cn';
 import { useTheme } from './ThemeProvider';
@@ -112,7 +112,7 @@ function NavGroup({ groupKey, links }: { groupKey: TKey; links: NavLink[] }) {
   );
 }
 
-function UserMenu({ user, saas }: { user: SessionUser; saas: boolean }) {
+function UserMenu({ user, saas, operator }: { user: SessionUser; saas: boolean; operator: boolean }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -164,6 +164,19 @@ function UserMenu({ user, saas }: { user: SessionUser; saas: boolean }) {
               >
                 <CreditCard size={15} /> {t('nav.billing')}
               </Link>
+              {/* Operator console. Only rendered for an account on the superadmin allowlist,
+                  and the page re-checks that itself — this link is convenience, not the gate.
+                  Without it the console was reachable only by typing /admin from memory. */}
+              {operator && (
+                <Link
+                  href="/admin"
+                  prefetch={false}
+                  onClick={() => setOpen(false)}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[color:var(--color-purple)] hover:bg-[color:var(--color-surface-2)] transition-colors"
+                >
+                  <ShieldCheck size={15} /> {t('nav.operator')}
+                </Link>
+              )}
               <div className="my-1 border-t border-[color:var(--color-border)]" />
             </>
           )}
@@ -181,7 +194,7 @@ function UserMenu({ user, saas }: { user: SessionUser; saas: boolean }) {
   );
 }
 
-export function SiteNav({ aiReady = false, user, saas = false }: { aiReady?: boolean; user?: SessionUser; saas?: boolean }) {
+export function SiteNav({ aiReady = false, user, saas = false, operator = false }: { aiReady?: boolean; user?: SessionUser; saas?: boolean; operator?: boolean }) {
   const t = useT();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -236,7 +249,7 @@ export function SiteNav({ aiReady = false, user, saas = false }: { aiReady?: boo
           >
             <Settings size={17} />
           </Link>
-          {user && <UserMenu user={user} saas={saas} />}
+          {user && <UserMenu user={user} saas={saas} operator={operator} />}
           <button onClick={() => setMobileOpen((v) => !v)} className="lg:hidden p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Menu">
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
