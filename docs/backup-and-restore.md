@@ -40,27 +40,44 @@ Related: [Self-hosting](self-hosting.md) · [Configuration](configuration.md) ·
 ### Database — `scripts/backup.sh`
 
 The repo ships `scripts/backup.sh`: a gzipped `mongodump` taken straight out of
-the running Mongo container into a single archive, with old archives pruned by
-age. Run it against a running stack:
+the running Mongo container into a single archive, **verified before it is kept**,
+with old archives pruned by age. Run it against a running stack:
 
 ```bash
 ./scripts/backup.sh
 ```
 
 It produces `homepage-<timestamp>.archive.gz` in `BACKUP_DIR` and keeps the last
-`RETENTION_DAYS` archives. Everything is configurable via env (defaults shown):
+`RETENTION_DAYS` archives. Credentials are **not** an env var here on purpose —
+the script reads them out of the running Mongo container's own environment
+(`docker exec`), so there is no second copy on the host to drift out of sync or
+show up in a process list. Everything else is configurable via env (defaults
+shown):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `MONGO_USER` | `admin` | Mongo admin user (match your `.env`). |
-| `MONGO_PASS` | `changeme` | Mongo admin password (match your `.env`). |
 | `MONGO_DB` | `homepage` | Database name. |
 | `MONGO_CONTAINER` | `homepage-mongo` | The Mongo container name. |
 | `BACKUP_DIR` | `./backups` | Where archives are written. Point at a NAS mount. |
-| `RETENTION_DAYS` | `14` | Archives older than this are deleted. |
+| `RETENTION_DAYS` | `14` | Archives older than this are deleted (the newest valid archive is never deleted, even if it is older than this). |
+| `MIN_BYTES` | `1024` | Archive size floor below which a dump is treated as broken. |
+| `NTFY_URL` | *(auto)* | Where to post on failure. Left blank, it reuses whatever ntfy topic is already configured in Settings → Notifications, read live from the running container — nothing to duplicate or let go stale. |
 
-The script fails loudly if the container is not running or the archive comes out
-empty, so a broken backup never silently overwrites a good rotation.
+The dump is written to a `.partial` file first and only renamed into place
+**after it verifies**, so a run that dies partway through never leaves a
+truncated file where a good backup is expected. Verification is real, not a
+size check: the script parses `mongodump`'s own per-collection line count
+(catching a dump that connected but captured nothing), then feeds the archive
+back through `mongorestore --dryRun` inside the container, which reads and
+parses the whole thing without writing to the database. Any of these failing —
+container not running, dump errors, archive under `MIN_BYTES`, zero collections
+or documents, or a `--dryRun` that can't parse the archive — aborts the run,
+deletes the partial file, drops a `LAST_RUN_FAILED.txt` marker in `BACKUP_DIR`
+(cleared by the next success, so a broken night stays visible even if you don't
+read the log), and pings `NTFY_URL` if one is configured. Pruning only ever
+removes archives that are not the current newest valid one, so a stretch of
+failed nights can no longer delete the last good backup along with the empty
+ones.
 
 > Point `BACKUP_DIR` at network storage (e.g. your DS923+ NFS/SMB mount) so the
 > archive already leaves the host the moment it is written.
@@ -110,7 +127,10 @@ Use `scripts/restore.sh` with the archive you want to restore:
 
 It is **destructive**: it runs `mongorestore --drop`, so the target collections
 are dropped and replaced by the archive's contents. It asks for a typed `yes`
-before proceeding. Same `MONGO_*` env vars as `backup.sh`.
+before proceeding. Takes its own `MONGO_USER` / `MONGO_PASS` / `MONGO_DB` /
+`MONGO_CONTAINER` env vars directly (unlike `backup.sh`, which reads credentials
+out of the container itself — `restore.sh` needs them up front to authenticate,
+before there is any archive to introspect).
 
 To restore files, copy your `./data/storage` backup back into place before
 starting (or while stopped), then bring the stack up. Restore both from the same
@@ -126,25 +146,66 @@ The JSON export (`pharos-backup-YYYY-MM-DD.json`) is a portable, human-readable
 snapshot you can download from the browser. It is convenient for moving data
 between instances, but it is **not** a substitute for the full dump above.
 
-What it includes — the documents (metadata) of these eight collections:
+What it includes — the documents (metadata) of every user-owned collection:
+`items`, `receipts`, `statements`, `subscriptions`, `vouchers`, `cards`, `tasks`,
+`stores`, `expenses` (covers income too — income is an `Expense` document with
+`kind: 'income'`), `bills`, `goals`, `giftCards`, `loyaltyCards`,
+`netWorthSnapshots`, `shoppingList`. The registry lives in one place
+(`lib/backupModels.ts`) with a test that fails whenever a new model is added
+without an explicit include/exclude decision, so this list should not drift the
+way it once did.
 
-`items`, `receipts`, `statements`, `subscriptions`, `vouchers`, `cards`,
-`tasks`, `stores`.
+What it deliberately does **not** include:
 
-What it does **not** include:
-
-- **Expenses / income** records.
-- **App settings**, budgets, AI/storage/notification configuration.
+- **App settings and any credentials** (`AppConfig`) — AI provider keys, SMB/FTP
+  password, OneDrive refresh token, ntfy URL, plus budgets/prompts/taxonomies
+  that live on the same document. The export is a file that lands in your
+  Downloads folder and can be copied or mailed around, so nothing holding a
+  secret goes into it; use the mongodump (section 1) for a full copy including
+  settings.
+- **Logins** (`User`, and in SaaS mode `Account`) — password hashes.
 - **Binary files** — only the paths are stored, not the receipt/PDF/photo bytes.
+- **Transient/regenerable state** — background jobs, notification instances, AI
+  chat history (`/history`), and the legacy `Phase` model from the original
+  tracker import.
 
-Restoring a JSON backup (admin only) upserts each document **by `_id`**, so it
-merges into the existing database and never creates duplicates. File-path fields
-in an imported backup are validated and any that try to escape the storage
-directory (absolute paths, `..` traversal) are dropped, so a tampered backup
-cannot aim the file server or purge at arbitrary paths.
+### Verify a backup before you need it
 
-> Use the mongodump (section 1) for disaster recovery; use JSON export for a
-> quick portable copy or an instance-to-instance move.
+**Settings → Storage & backup → Verify…** runs a read-only integrity check on
+any `.json` file you pick, without touching the database, so you can confirm a
+backup is actually usable long before the day you need to restore it (this
+closed the same blind spot the nightly mongodump had — see section 1: a file
+that "exists" is not the same as a file that restores). It checks: valid JSON,
+the backup envelope, and a per-collection document count for every collection
+above, then reports one of two things:
+
+- **Good** — the export date and a human-readable summary ("240 receipts, 66
+  items, 31 expenses +4 more").
+- **Problems**, each flagged at one of two levels:
+  - **Error** — the file is not a usable backup at all (empty, truncated /
+    corrupted JSON, no backup envelope, or zero documents across every
+    collection).
+  - **Warning** — parts of it will be skipped on restore (a collection is
+    missing, a collection's value is not a list, some entries are not
+    documents, or some documents have no `_id`), but the rest is still worth
+    restoring.
+
+**Restore** runs this exact same check first. An **error**-level file is
+**refused outright** rather than silently restoring nothing (the old failure
+mode: a broken backup used to report `{ restored: 0 }`, which reads exactly
+like a clean restore of an empty account). A file with only **warnings**
+restores anyway — you are shown what got skipped instead of it happening
+quietly. Every document restored is upserted **by `_id`**, so a restore merges
+into the existing database and never creates duplicates; a document with no
+`_id` at all is inserted as a new record instead (flagged as a warning, since it
+can't be matched to anything already there). File-path fields in an imported
+backup are validated and any that try to escape the storage directory (absolute
+paths, `..` traversal) are dropped, so a tampered backup cannot aim the file
+server or purge at arbitrary paths.
+
+> Use the mongodump (section 1) for disaster recovery, including settings and
+> logins; use JSON export for a quick portable copy or an instance-to-instance
+> move, and Verify to confirm one is trustworthy before you actually need it.
 
 ---
 
