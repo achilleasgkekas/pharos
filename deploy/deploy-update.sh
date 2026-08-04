@@ -128,7 +128,11 @@ git merge --ff-only origin/main --quiet || { say "REFUSING: cannot fast-forward"
 # Only rebuild what actually changed. A landing tweak should not spend minutes rebuilding the app
 # on a two-core box, and every minute of build is a minute the deploy can be interrupted in.
 CHANGED="$(git diff --name-only "$OLD" "$NEW")"
-[ "${FORCE_ALL:-}" = "1" ] && CHANGED="apps/web/ apps/landing/ deploy/"
+# NEWLINE-separated, because the greps below are anchored to the start of a LINE. As a
+# space-separated string this matched only the first entry, so FORCE=1 announced "rebuilding
+# everything" and rebuilt web alone — leaving the landing site on its old build while reporting a
+# healthy deploy. Same family as the two bugs above: the tool said it had done the work.
+[ "${FORCE_ALL:-}" = "1" ] && CHANGED="$(printf 'apps/web/\napps/landing/\ndeploy/')"
 SERVICES=""
 grep -q '^apps/web/'      <<<"$CHANGED" && SERVICES="$SERVICES web"
 grep -q '^apps/landing/'  <<<"$CHANGED" && SERVICES="$SERVICES landing"
