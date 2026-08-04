@@ -25,6 +25,7 @@ export type AppSettings = {
   trialAlertDays: number; // lead time (days) for free-trial "cancel before charge" alert (P33)
   giftCardAlertDays: number; // window (days) for "gift card expiring with balance" alert (P32); 0 = off
   billAlertDays: number; // lead-time (days) for "bill due / overdue" alert (P28); 0 = off
+  syncStaleDays: number; // days without a successful remote push before alerting (P48); 0 = off
   autoAddStores: boolean;
   ntfyUrl: string;
   ntfyEnabled: boolean;
@@ -52,6 +53,7 @@ export type RawAppConfigDoc = {
   trialAlertDays?: number;
   giftCardAlertDays?: number;
   billAlertDays?: number;
+  syncStaleDays?: number;
   autoAddStores?: boolean;
   ntfyUrl?: string;
   ntfyEnabled?: boolean;
@@ -88,6 +90,7 @@ const DEFAULTS: AppSettings = {
   trialAlertDays: 2,
   giftCardAlertDays: 30,
   billAlertDays: 5,
+  syncStaleDays: 7,
   autoAddStores: true,
   ntfyUrl: '',
   ntfyEnabled: false,
@@ -128,6 +131,7 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     trialAlertDays: typeof doc?.trialAlertDays === 'number' ? doc.trialAlertDays : DEFAULTS.trialAlertDays,
     giftCardAlertDays: typeof doc?.giftCardAlertDays === 'number' ? doc.giftCardAlertDays : DEFAULTS.giftCardAlertDays,
     billAlertDays: typeof doc?.billAlertDays === 'number' ? doc.billAlertDays : DEFAULTS.billAlertDays,
+    syncStaleDays: typeof doc?.syncStaleDays === 'number' ? doc.syncStaleDays : DEFAULTS.syncStaleDays,
     autoAddStores: doc?.autoAddStores !== false,
     ntfyUrl: doc?.ntfyUrl || '',
     ntfyEnabled: !!doc?.ntfyEnabled,
@@ -163,7 +167,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     // untouched, same query as before).
     const Config = await currentModel(AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays syncStaleDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed')
       .lean();
   } catch {
     /* DB down → hard defaults */

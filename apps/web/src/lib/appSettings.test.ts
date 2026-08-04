@@ -49,6 +49,7 @@ describe('normalizeSettings', () => {
       trialAlertDays: 2,
       giftCardAlertDays: 30,
       billAlertDays: 5,
+      syncStaleDays: 7,
       autoAddStores: true,
       ntfyUrl: '',
       ntfyEnabled: false,

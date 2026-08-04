@@ -39,6 +39,7 @@ const AppConfigSchema = new Schema(
     trialAlertDays: { type: Number, default: 2 }, // free-trial "cancel before charge" lead time (P33)
     giftCardAlertDays: { type: Number, default: 30 }, // "gift card expiring with balance" window (P32)
     billAlertDays: { type: Number, default: 5 }, // "bill due / overdue" lead time (P28)
+    syncStaleDays: { type: Number, default: 7 }, // "remote mirror has fallen behind" window (P48); 0 = off
     autoAddStores: { type: Boolean, default: true }, // auto-add unknown receipt stores to the list
     currency: { type: String, default: 'EUR' }, // display currency symbol (ISO 4217 code)
     // Multi-currency (P9), opt-in per deployment so single-currency users see no extra
@@ -121,6 +122,17 @@ const AppConfigSchema = new Schema(
     onedriveRefreshToken: { type: String, default: '' },
     onedriveAccount: { type: String, default: '' }, // display: which account is linked
     storageMirror: { type: Boolean, default: false }, // also push a copy on verify
+    // When a push to the remote last SUCCEEDED — written by every push path (Sync now,
+    // the OneDrive batched path, and auto-mirror-on-verify). Powers the staleness alert
+    // (P48): without it, a mirror that stopped working looks exactly like a fresh one.
+    lastRemoteSyncAt: { type: Date, default: null },
+    // Outbound alert dedup (P82). The dedupeKeys (same scheme as the in-app bell, see
+    // app/notifications/actions.ts) that were part of the last successfully-dispatched
+    // ntfy/Discord/Slack/Telegram/webhook alert. Only touched by runAlertChecks' opt-in
+    // `dedupe` mode (the scheduled cron path) — the manual "Check & notify now" button
+    // always sends the full picture and never reads/writes this. Empty = nothing sent
+    // yet, everything currently live counts as fresh.
+    alertDispatchKeys: { type: [String], default: [] },
     remoteHost: { type: String, default: '' },
     remotePort: { type: Number, default: 0 }, // 0 → backend default (21 ftp / 445 smb)
     remoteUser: { type: String, default: '' },

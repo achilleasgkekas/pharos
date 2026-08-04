@@ -6,6 +6,7 @@ import { pushToRemote } from './remoteStorage';
 import { uploadToOnedrive, downloadFromOnedrive, createShareLink } from './onedrive';
 import { readFile } from './storage';
 import { renderStoragePath } from './storagePath';
+import { markRemoteSync } from './syncState';
 
 export type MirrorMeta = {
   kind: 'receipts' | 'statements' | 'expenses';
@@ -66,6 +67,9 @@ export async function mirrorFileToRemote(meta: MirrorMeta, filePath: string): Pr
     const rel = remoteRelPath(s, meta, filePath);
     const r = s.backend === 'onedrive' ? await uploadToOnedrive(rel, data) : await pushToRemote(s.remote, data, rel);
     if (!r.ok) console.warn(`[mirror] push failed for ${filePath}: ${r.error}`);
+    // A successful auto-mirror IS a successful sync. Without this the staleness alert
+    // (P48) would nag a user whose mirror is working perfectly, just silently.
+    else await markRemoteSync();
   } catch (err) {
     console.warn(`[mirror] ${filePath}: ${(err as Error).message}`);
   }
