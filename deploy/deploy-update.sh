@@ -92,8 +92,18 @@ say "[4/6] pull"
 git fetch origin --quiet
 NEW="$(git rev-parse origin/main)"
 if [ "$OLD" = "$NEW" ]; then
-  say "  already at origin/main — nothing to deploy"
-  exit 0
+  # "git is up to date" is NOT the same as "the running containers match the checkout". Anyone who
+  # pulled by hand before running this leaves the code on disk and the old image serving — which
+  # happened on the very first run of this script. Without --force we would report success and
+  # change nothing, which is the worst possible answer.
+  if [ "${FORCE:-}" != "1" ]; then
+    say "  already at origin/main — nothing to pull."
+    say "  If the containers are behind the checkout (e.g. someone pulled by hand), rerun with:"
+    say "    FORCE=1 $0"
+    exit 0
+  fi
+  say "  already at origin/main, but FORCE=1 — rebuilding everything anyway"
+  FORCE_ALL=1
 fi
 say "  shipping $(git log --oneline "$OLD..$NEW" | wc -l | tr -d ' ') commit(s):"
 git log --oneline "$OLD..$NEW" | sed 's/^/    /'
@@ -102,6 +112,7 @@ git merge --ff-only origin/main --quiet || { say "REFUSING: cannot fast-forward"
 # Only rebuild what actually changed. A landing tweak should not spend minutes rebuilding the app
 # on a two-core box, and every minute of build is a minute the deploy can be interrupted in.
 CHANGED="$(git diff --name-only "$OLD" "$NEW")"
+[ "${FORCE_ALL:-}" = "1" ] && CHANGED="apps/web/ apps/landing/ deploy/"
 SERVICES=""
 grep -q '^apps/web/'      <<<"$CHANGED" && SERVICES="$SERVICES web"
 grep -q '^apps/landing/'  <<<"$CHANGED" && SERVICES="$SERVICES landing"
