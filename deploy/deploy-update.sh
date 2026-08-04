@@ -43,6 +43,14 @@ health() {
     # looks for content only the marketing site has.
     grep -q 'waitlist\|self-host' <<<"$apex_body" || rc=1
     curl -fsS --max-time 15 -o /dev/null "$APP/account/login" || rc=1
+    # The cron endpoints must stay shut to the public internet. A deploy that breaks their token
+    # check leaves an unauthenticated write endpoint exposed while every other probe here still
+    # passes, so this asserts the rejection itself.
+    # POST, not GET: the route exports only POST, so a GET answers 405 and would "pass" a naive
+    # status check while proving nothing. No -f either — 401 IS the expected answer, and -f would
+    # turn the success case into a failure.
+    [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST --max-time 15 \
+      "$APP/api/cron/saas/trials-sweep" 2>/dev/null)" = 401 ] || rc=1
     # Mongo is not public, so ask Docker instead of the network.
     [ "$(docker inspect pharos-mongo --format '{{.State.Health.Status}}' 2>/dev/null)" = healthy ] || rc=1
     for c in pharos-web pharos-landing pharos-caddy; do
