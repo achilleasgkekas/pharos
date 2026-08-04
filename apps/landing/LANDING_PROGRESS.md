@@ -5380,3 +5380,49 @@ restore-tested»). ΣΗΜ: το `--selector` σε κλειστο `<details>` τ�
 
 Needs-Achilleas (open, αμεταβλητο): legal entity/Stripe, **retention window για suspended workspace**,
 Terms+Privacy review απο ανθρωπο, contact inbox, χρονισμος για public repo.
+
+## 2026-08-04 (β, απαντηθηκε: 30 μερες retention για suspended workspace)
+
+Ο Αχιλλεας απαντησε το `pharos-landing-20260803-2010`: **(b) 30 μερες**. Το placeholder που ειχε μεινει
+ρητα ανοιχτο απο το προηγουμενο sweep κλειδωσε, στα τρια σημεια που το χρειαζονταν:
+
+- **Οροι §9**: «kept for 30 days, the same window as Trash and as an account-deletion request»,
+  reactivate μεσα στις 30 και ολα ειναι οπως τα αφησες, μετα διαγραφεται workspace + αρχεια.
+- **Privacy §5**: 30 μερες **απο την ημερα του suspend**, μετα διαγραφονται workspace, βαση και
+  ανεβασμενα αρχεια, εκτος περιορισμενων billing records. «Ενα retention νουμερο σε ολη την υπηρεσια
+  αντι για τρια.»
+- **FAQ «What happens when my free trial ends?»**: το ιδιο παραθυρο, με ρητη εξοδο για οποιον δεν
+  αποφασισει («export JSON πριν ληξει το trial και self-host το δωρεαν, ειναι η ιδια εφαρμογη»).
+
+**Δυο πραγματα επαληθευτηκαν στον κωδικα πριν γραφτουν**, γιατι και τα δυο ειναι δεσμευση σε νομικο
+κειμενο, οχι διατυπωση marketing:
+1. Το «ιδιο παραθυρο με Trash και account deletion» ειναι **αληθες**: `ERASURE_GRACE_DAYS = 30` στο
+   `apps/web/src/lib/tenancy/erasure.ts`, και το Trash auto-purge ειναι ηδη 30 ημερων.
+2. Η πρωτη μου διατυπωση ελεγε «export your data at any point, including while suspended». **Λαθος**:
+   το `lib/tenancy/workspace.ts` αρνειται τα workspace-scoped routes σε suspended tenant. Διορθωθηκε
+   πριν το commit σε «access is paused while suspended, export πριν ληξει το trial η reactivate πρωτα».
+
+**ΕΚΚΡΕΜΕΙ ΣΤΟ BACKEND (οχι δικη μου περιοχη, για τον `pharos-saas`)**: η σελιδα πλεον υποσχεται 30 μερες
+που **κανενα cron δεν επιβαλλει**. Το `statusAudit.ts` περιγραφει τη μεταβαση σε suspended αλλα δεν
+υπαρχει καμια διαδρομη διαγραφης μετα απο αυτην, αρα σημερα ενα εγκαταλελειμμενο workspace θα εμενε για
+παντα. Χρειαζεται job που διαγραφει suspended workspaces στις 30 μερες, με προειδοποιητικο email πριν.
+
+Verify: `npm run type-check` exit 0, `npm run build` success (13/13 static). Στα **σερβιρισμενα** HTML:
+`/terms` και `/privacy` δινουν τις νεες παραγραφους, μηδεν «placeholders being confirmed» πλεον σε
+καμια απο τις δυο (τα placeholders για entity/Stripe μενουν σκοπιμα), και η FAQ απαντηση δινει το
+παραθυρο. **Screenshots**: `terms-30d.png` (§9 Termination) και `privacy-30d.png` (§5 Retention and
+deletion), και τα δυο διαβαζονται καθαρα. Ο dev server σταματησε.
+
+Needs-Achilleas (open, μειον ενα): legal entity/Stripe, Terms+Privacy review απο ανθρωπο, contact inbox,
+χρονισμος για public repo. **Το retention window εκλεισε.**
+
+**ΣΗΜ για το ιστορικο του git**: οι τρεις αλλαγες κωδικα (page/privacy/terms) **δεν εφυγαν με δικο μου
+commit**. Ενω ετοιμαζα το commit, αλλη routine σαρωσε το δεντρο, βρηκε τα uncommitted edits μου, τα
+θεωρησε δικα της ευρεση («found this copy already written and verified in the working tree») και τα
+commit-αρε ως **`0430b29` docs(landing): state the 30-day suspended-workspace retention window**. Το
+περιεχομενο ειναι ακριβως αυτο που εγραψα και επαληθευσα εδω, οποτε δεν ξαναγραφτηκε τιποτα, αλλα το
+authorship στο git δειχνει αλλου. Την ιδια στιγμη το index ειχε ξενο staged `deploy/Caddyfile`
+(deletion, εφυγε ως `13583d7`), οποτε το collision guard σωστα με κρατησε απο το να commit-αρω μεσα σε
+ξενο mid-commit παραθυρο. **Δεν αλλαζω τιποτα**: το reverting/re-committing μονο και μονο για το
+authorship θα εκανε ζημια χωρις οφελος. Το καταγραφω ωστε οποιος ψαξει αυτο το entry στο ιστορικο να
+βρει το commit.
