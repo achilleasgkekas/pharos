@@ -16,7 +16,17 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# V8 sizes its own heap ceiling from the machine's RAM, and on a small server that ceiling is
+# below what `next build` needs — the build dies with "JavaScript heap out of memory" even when
+# there is swap free, because this limit is V8's own, not the kernel's. Swap keeps the machine
+# alive; it does not raise this.
+#
+# Empty by default, so every build that works today is byte-for-byte unchanged: setting a value
+# here can only LOWER the ceiling on a large machine, which would turn a working build into a
+# failing one. Small hosts opt in (deploy/docker-compose.prod.yml passes 3072).
+ARG NODE_BUILD_MEMORY=""
+RUN if [ -n "$NODE_BUILD_MEMORY" ]; then export NODE_OPTIONS="--max-old-space-size=$NODE_BUILD_MEMORY"; fi; \
+    npm run build
 
 # ─── Runner ────────────────────────────────────────────────────────────────
 FROM base AS runner

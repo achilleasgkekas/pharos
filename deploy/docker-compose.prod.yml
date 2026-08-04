@@ -44,6 +44,12 @@ services:
     build:
       context: ../apps/web
       dockerfile: Dockerfile
+      args:
+        # `next build` needs more heap than V8 allows itself on a small server, and it fails with
+        # "JavaScript heap out of memory" no matter how much swap is free — that ceiling is V8's,
+        # not the kernel's. 3 GB against 2 GB RAM + 4 GB swap: the peak is brief, so paging it is
+        # cheaper than not building at all. Raise if you resize the server up.
+        NODE_BUILD_MEMORY: "3072"
     image: pharos-web:prod
     container_name: pharos-web
     restart: unless-stopped
