@@ -18,6 +18,7 @@ import { safeNextPath } from '@/components/saas/authValidation';
 import { AuthShell } from '@/components/saas/AuthShell';
 import { AuthForm } from '@/components/saas/AuthForm';
 import { InviteAcceptForm } from '@/components/saas/InviteAcceptForm';
+import { signupPlanNotice } from '@/components/saas/signupPlan';
 import { Invite, type InviteDoc } from '@/models/Invite';
 import { Tenant, type TenantDoc } from '@/models/Tenant';
 import { hashInviteToken, isInviteValid } from '@/lib/tenancy/invites';
@@ -49,9 +50,9 @@ async function loadInvitePreview(token: string): Promise<InvitePreview | null> {
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; invite?: string }>;
+  searchParams: Promise<{ next?: string; invite?: string; plan?: string }>;
 }) {
-  const { next, invite } = await searchParams;
+  const { next, invite, plan } = await searchParams;
   // Default post-signup destination is the account home (/account) — the new owner lands on the
   // workspace chooser, which redirects into their sole workspace. An explicit safe `next` wins.
   const target = safeNextPath(next, '/account');
@@ -96,14 +97,23 @@ export default async function SignupPage({
 
   if (viewer) redirect(target);
 
+  // The plan the visitor clicked on the pricing page, carried across in the URL. Display
+  // only: signup always creates a FREE workspace and the plan is activated afterwards, so
+  // this confirms the choice without promising a subscription this form does not create.
+  const planNotice = signupPlanNotice(plan);
+
   const loginHref = explicitNext
     ? `/account/login?next=${encodeURIComponent(target)}`
     : '/account/login';
 
   return (
     <AuthShell
-      title="Create your workspace"
-      subtitle="One account, one workspace to start. Invite others later."
+      title={planNotice ? `Get started with ${planNotice.name}` : 'Create your workspace'}
+      subtitle={
+        planNotice
+          ? `${planNotice.name} · ${planNotice.priceLabel}. ${planNotice.nextStep}`
+          : 'One account, one workspace to start. Invite others later.'
+      }
       footer={
         <>
           Already have an account?{' '}
