@@ -124,3 +124,45 @@ nav, «mobile-first» tech-stack περιγραφή), το phone-mockup section 
 commit `1438867`) — το landing site πλέον δεν διαφημίζει πράγμα που δεν υπάρχει.
 
 Κατάσταση: παραγωγή στο `2cc7d5ec`, υγιής.
+
+## 2026-08-04 20:52 UTC — `2cc7d5ec → 2743d638`, exit 0
+
+Ad-hoc, κατόπιν ρητού αιτήματος («deploy it») αμέσως μετά τη διόρθωση.
+
+**Στάλθηκαν 3 commits**, και τα δύο πρώτα είναι κώδικας εφαρμογής:
+
+```
+2743d63 fix(saas): close the front door, and un-clip the landing drawer
+c318aff fix(saas): three reports from the phone — a see-through menu, AI settings that would
+        not stick, and an import error with no error
+e7ec225 docs(deploy): log the 2026-08-04 manual deploy dc292d17 -> 2cc7d5ec
+```
+
+**Γιατί επείγει**: το `2743d63` κλείνει τρύπα ασφαλείας που επιβεβαιώθηκε ζωντανά την ίδια μέρα.
+Με `SAAS_MODE` on το middleware έκανε `return pass()` για τα πάντα, με το σκεπτικό ότι η
+εξουσιοδότηση γίνεται πιο μέσα, στο `withRequestTenant`. Ίσχυε για τις σελίδες λογαριασμού και το
+operator console, **όχι** για τις σελίδες του προϊόντος: το `https://home.ph-aros.com/` σέρβιρε το
+hub, τα 14 module cards και το getting-started checklist χωρίς κανένα session.
+
+Rebuild: **και τα δύο** services (`landing` + `web`), σωστά, αφού άλλαξαν αρχεία και στα δύο.
+Διάρκεια build περίπου 4 λεπτά στα δύο cores (web 230s, landing 113s, παράλληλα).
+
+**Health**: pre-flight OK με την πρώτη προσπάθεια, post-deploy OK με την πρώτη.
+
+**Ανεξάρτητη επαλήθευση μετά το deploy** (όχι μόνο η ετυμηγορία του script):
+
+| έλεγχος | αποτέλεσμα |
+|---|---|
+| `ph-aros.com/` | 200, σερβίρει landing (`self-host`), με ορατό `account/login` |
+| `home.ph-aros.com/` signed out | **307 → `/account/login?next=%2F`** (ήταν 200 με όλο το προϊόν) |
+| `app.ph-aros.com/` signed out | 307 → `/account/login?next=%2F` |
+| `/receipts`, `/settings` signed out | 307 → login με σωστό `next` |
+| `/setup` signed out | 307 → login (δεν προσφέρεται πια ο self-hosted wizard σε άγνωστο) |
+| `/account/login`, `/account/signup`, `/account/reset` | 200, παραμένουν προσβάσιμα |
+| `POST /api/cron/saas/trials-sweep` χωρίς token | 401 |
+| landing drawer σε 375px | panel 812px, `rgb(20,20,20)`, parent `BODY` (ήταν 64px μέσα στο header) |
+
+ΣΗΜ για μελλοντικό deploy: το health check του script ψάχνει `waitlist\|self-host` στο apex. Όταν
+αφαιρεθεί το waitlist (ζητήθηκε), το `self-host` κρατά τον έλεγχο ζωντανό, αλλά αν αλλάξει και αυτό
+το κείμενο πρέπει να ενημερωθεί το `deploy/deploy-update.sh` **στο ίδιο commit**, αλλιώς ο έλεγχος
+θα δει υγιές deploy ως σπασμένο και θα κάνει άσκοπο rollback.
