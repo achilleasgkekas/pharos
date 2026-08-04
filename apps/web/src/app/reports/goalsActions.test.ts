@@ -44,6 +44,11 @@ vi.mock('@/models/Goal', () => ({
   Goal: { create: goalCreate, findByIdAndUpdate: goalFindByIdAndUpdate, updateOne: goalUpdateOne },
 }));
 vi.mock('next/cache', () => ({ revalidatePath: (...args: unknown[]) => revalidatePathMock(...args) }));
+// Tenancy seam mocked FLAT here (pass-through), so these tests keep pinning the CRUD behaviour
+// itself. The tenant ROUTING is pinned separately in goalsActions.tenant.test.ts, which mocks the
+// same seam tenant-aware — the sibling convention used by shopping-list/tasks/bills.
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (model: unknown) => model }));
 
 import {
   createGoal,

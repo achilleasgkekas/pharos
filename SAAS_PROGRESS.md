@@ -7042,3 +7042,57 @@ non-scoped `actions.ts` (`history`, `settings`)· (γ) production compose + wild
 **## Needs Achilleas:** **Stripe keys**, **plan pricing**, **email provider**, και νέα:
 **GHCR login/PAT** αν θέλει να δημοσιεύονται images, **DNS του ph-aros.com σε Cloudflare** για το
 wildcard `*.ph-aros.com` μέσω DNS-01. Provider **αποφασίστηκε: Hetzner**.
+
+## 2026-08-04 (στ) — increment 138: tenant scoping στα goals (και γιατί το settings ΔΕΝ έγινε)
+
+Σάρωσα ποια feature actions δεν περνούν από `withRequestTenant` και βρήκα **δύο** με πραγματικές
+DB εγγραφές: `reports/goalsActions.ts` (6 ops) και `settings/actions.ts` (**45 ops**). Και τα δύο
+γράφουν στη **default βάση** σε SaaS mode, δηλαδή ο πελάτης A βλέπει και επεξεργάζεται τα δεδομένα
+του B. Τα υπόλοιπα μηδενικά (`history`, `login`, `setup`, `calendarFeedActions`, `mcpActions`) δεν
+αγγίζουν καθόλου feature models — η παλιά σημείωση «2 non-scoped actions.ts» ήταν ανακριβής προς τα
+κάτω.
+
+**Έγινε: `goalsActions.ts` πλήρως ✅.** Και οι 6 exported actions μέσα σε `withRequestTenant` +
+`currentModel(Goal)`, ίδιο σχήμα με receipts/items/expenses/tasks. Νέο
+**`goalsActions.tenant.test.ts`** (10 tests) με **tagged seam**: το `currentModel` γυρνά per-tenant
+fake, οπότε action που αγνοεί το ambient tenant εμφανίζεται ως εγγραφή σε **λάθος tag** αντί να
+περάσει σιωπηλά. Καλύπτει: κάθε action γράφει στο σωστό tenant, δύο workspaces back-to-back δεν
+ακουμπάνε το ένα το άλλο (leak ambient state μεταξύ requests), το soft delete είναι κι αυτό scoped
+(αλλιώς θα tombstone-άριζε ξένο goal), **self-hosted parity** (χωρίς tenant → default model), και
+ότι ένα απορριφθέν contribution **δεν αγγίζει καθόλου βάση** (το validation τρέχει πριν resolve-
+αριστεί το model, άρα λάθος ποσό δεν φτάνει καν σε λάθος βάση). Το υπάρχον `goalsActions.test.ts`
+πήρε flat mock του seam (sibling convention των shopping-list/tasks/bills) — **23 tests πράσινα
+χωρίς καμία αλλαγή assertion**.
+
+**ΔΕΝ έγινε: `settings/actions.ts`.** Δύο ανεξάρτητοι λόγοι, ο δεύτερος σοβαρότερος:
+
+1. **Άλλη routine το επεξεργάζεται ΑΥΤΗ ΤΗ ΣΤΙΓΜΗ**: `git diff` = **+159/-31 uncommitted**
+   (syncStaleness, alertDedup, P48), μηδέν `withRequestTenant` μέσα, άρα ξένο WIP. Ένα refactor 65
+   συναρτήσεων πάνω σε αρχείο που γράφει ταυτόχρονα άλλος agent είναι εγγυημένη σύγκρουση και πολύ
+   πιθανή καταστροφή της δουλειάς του. Αυτό είναι το documented failure mode του repo (βλ.
+   `bakecore-finance-20260803-1815`).
+2. Ο μηχανικός μετασχηματισμός των 65 exported actions μέσω script **μπλοκαρίστηκε από τον
+   classifier** (in-place rewrite πηγαίου αρχείου). Χειροκίνητα είναι 130 εισαγωγές σε 1955 γραμμές.
+
+**Τεχνική σημείωση για όποιον το πάρει**: το `getAppSettings` (READ path, `lib/appSettings.ts`)
+είναι **ήδη** tenant-aware μέσω `currentModel`. Λείπει μόνο το WRITE path + το ambient context.
+Δεν πρέπει να γίνει re-indent των bodies: το αρχείο έχει **12 multi-line template literals** (τα
+alert summaries), και αλλαγή εσοχής μέσα σε backticks αλλάζει user-visible κείμενο. Ο ασφαλής
+μετασχηματισμός είναι **2 γραμμές ανά συνάρτηση χωρίς re-indent**.
+
+**ΠΡΟΣΟΧΗ, ζωντανό κενό όσο αυτό μένει ανοιχτό**: σε SaaS mode η σελίδα Settings κάθε workspace
+γράφει **κοινό** AppConfig (currency, budgets, AI prompts/keys, notifiers, stores, lists), και το
+κουμπί «Check & notify now» τρέχει `runAlertChecks` πάνω στη **default** βάση, δηλαδή στέλνει σε
+έναν tenant τα νούμερα κάποιου άλλου. Το cron route `/api/cron/alerts` είναι ήδη σωστά 404 σε SaaS
+mode· το κουμπί δεν είναι.
+
+`npm run type-check` **EXIT 0**, πλήρες `npx vitest run` → **362 files / 5807 tests green**.
+
+**Next task:** (α) **`settings/actions.ts` scoping** μόλις αδειάσει από ξένο WIP — top priority,
+είναι το τελευταίο data-isolation κενό· (β) production compose + wildcard TLS (DNS-01) + offsite
+backups· (γ) CI workflow για build/push (θέλει έγκριση).
+
+**## Needs Achilleas:** **Stripe keys**, **plan pricing**, **email provider**, **GHCR PAT**.
+Νέο: **άδεια για scripted refactor** του `settings/actions.ts` (ή απλώς παύση της routine που το
+γράφει) — αλλιώς το κενό μένει ανοιχτό. Server: **Hetzner x86 αγοράστηκε** (CAX μη διαθέσιμο),
+DNS nameservers μετακινήθηκαν, εκκρεμεί propagation.
