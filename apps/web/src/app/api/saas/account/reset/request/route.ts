@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
 import { Account } from '@/models/Account';
 import { readBody, strField } from '@/lib/apiBody';
+import { rateLimit, clientIp } from '@/lib/apiAuth';
 import { saasAuthGate, saasGuard } from '@/lib/tenancy/saasApi';
 import { normalizeEmail, looksLikeEmail } from '@/lib/tenancy/members';
 import { mintResetToken, resetDeliveryConfigured } from '@/lib/tenancy/passwordReset';
@@ -33,6 +34,18 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: NextRequest) {
   return saasGuard(async () => {
+    // The most abusable endpoint in the app: it sends an email to an address the CALLER chooses.
+    // Unlimited, anyone can use it to bomb a stranger's inbox from our domain, which costs the
+    // victim their attention and costs us our sending reputation. Keyed by IP, before anything
+    // else runs.
+    //
+    // Note the constant-time-ish contract this endpoint already keeps (settleMinResponseTime,
+    // always answering the same way whether or not the account exists) is UNAFFECTED: a 429 is
+    // returned for the caller's rate, never for whether the address is real, so it still leaks
+    // nothing about who has an account.
+    const limited = rateLimit(`saas-reset-request:${clientIp(req)}`);
+    if (limited) return limited;
+
     const gate = saasAuthGate();
     if (gate) return gate;
 

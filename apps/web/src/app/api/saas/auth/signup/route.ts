@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Account } from '@/models/Account';
 import { hashPassword } from '@/lib/auth';
 import { readBody, strField } from '@/lib/apiBody';
+import { rateLimit, clientIp } from '@/lib/apiAuth';
 import { saasAuthGate, saasGuard, accountTenants } from '@/lib/tenancy/saasApi';
 import { setAccountCookie } from '@/lib/tenancy/accountSession';
 import { provisionTenant, compensate } from '@/lib/tenancy/provision';
@@ -22,6 +23,14 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 export async function POST(req: NextRequest) {
   return saasGuard(async () => {
+    // Rate limit BEFORE the mode gate, like login: an unauthenticated stranger can hit this
+    // endpoint, and signup is a write that creates an Account, provisions a Tenant and a
+    // database. Unlimited, it is a way to fill the registry with junk workspaces, burn the slug
+    // namespace, and drive the mail provider's send volume from someone else's browser.
+    // Own key prefix so signup abuse cannot exhaust the login bucket or vice versa.
+    const limited = rateLimit(`saas-signup:${clientIp(req)}`);
+    if (limited) return limited;
+
     const gate = saasAuthGate();
     if (gate) return gate;
 

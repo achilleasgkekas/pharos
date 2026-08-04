@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Account } from '@/models/Account';
 import { hashPassword } from '@/lib/auth';
 import { readBody, strField } from '@/lib/apiBody';
+import { rateLimit, clientIp } from '@/lib/apiAuth';
 import { saasAuthGate, saasGuard } from '@/lib/tenancy/saasApi';
 import { hashResetToken, isResetTokenValid, resetPasswordError } from '@/lib/tenancy/passwordReset';
 
@@ -21,6 +22,14 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: NextRequest) {
   return saasGuard(async () => {
+    // This one takes a reset TOKEN and sets a password. Unlimited, it is an offline-speed guessing
+    // machine against that token, aimed at the one operation that hands over an account outright.
+    // The token is long and hashed, so guessing is already impractical — but "impractical" is a
+    // property of the token, and a limit is a property we control. Cheap to add, and it also caps
+    // the damage if a future token format is ever shortened.
+    const limited = rateLimit(`saas-reset-confirm:${clientIp(req)}`);
+    if (limited) return limited;
+
     const gate = saasAuthGate();
     if (gate) return gate;
 

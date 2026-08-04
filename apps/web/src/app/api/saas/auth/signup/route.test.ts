@@ -65,6 +65,14 @@ const {
   setAccountCookieMock: vi.fn(async () => {}),
 }));
 
+// Rate limiter seam. Declared here rather than in the hoisted block above so the two mocks stay
+// next to the vi.mock that consumes them.
+const rateLimitMock = vi.fn<(key: string) => NextResponse | null>(() => null);
+const clientIpMock = vi.fn(() => '1.2.3.4');
+vi.mock('@/lib/apiAuth', () => ({
+  rateLimit: (k: string) => rateLimitMock(k),
+  clientIp: () => clientIpMock(),
+}));
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Account', () => ({
   Account: { exists: accountExistsMock, create: accountCreateMock, deleteOne: accountDeleteOneMock },
@@ -322,5 +330,31 @@ describe('signup is all-or-nothing', () => {
 
     expect(res.status).toBe(409);
     expect(accountDeleteOneMock).not.toHaveBeenCalled();
+  });
+});
+
+// ── abuse limit ─────────────────────────────────────────────────────────────────────────────
+// Signup creates an Account, a Tenant and a database; unlimited it fills the registry with junk workspaces and burns the slug namespace.
+describe('rate limiting', () => {
+  it('a limited caller gets the limiter response and NOTHING else runs', async () => {
+    const limited = NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    rateLimitMock.mockReturnValueOnce(limited);
+
+    const res = await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+
+    expect(res.status).toBe(429);
+    // Before the mode gate and before any DB work: a blocked request must not cost us a query,
+    // an email, or a row.
+    expect(saasAuthGateMock).not.toHaveBeenCalled();
+    expect(connectDBMock).not.toHaveBeenCalled();
+  });
+
+  it('is keyed per client IP and per endpoint, so one endpoint cannot exhaust another', async () => {
+    await POST(makeReq({ email: 'new@x.com', password: 'password123' }));
+
+    expect(rateLimitMock).toHaveBeenCalledTimes(1);
+    const key = rateLimitMock.mock.calls[0][0];
+    expect(key).toContain('1.2.3.4');
+    expect(key).toMatch(/^saas-signup:/);
   });
 });

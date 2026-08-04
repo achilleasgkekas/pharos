@@ -35,6 +35,12 @@ const { saasAuthGateMock, connectDBMock, accountFindOneSelect, accountFindOneMoc
     };
   });
 
+const rateLimitMock = vi.fn<(key: string) => NextResponse | null>(() => null);
+const clientIpMock = vi.fn(() => '1.2.3.4');
+vi.mock('@/lib/apiAuth', () => ({
+  rateLimit: (k: string) => rateLimitMock(k),
+  clientIp: () => clientIpMock(),
+}));
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Account', () => ({ Account: { findOne: accountFindOneMock } }));
 vi.mock('@/lib/auth', () => ({ hashPassword: hashPasswordMock, assertCanWrite: vi.fn(async () => {}) }));
@@ -305,5 +311,31 @@ describe('POST /api/saas/account/reset/confirm — failures', () => {
     const body = (await res.json()) as { error: string };
 
     expect(body.error).toHaveLength(200);
+  });
+});
+
+// ── abuse limit ─────────────────────────────────────────────────────────────────────────────
+// Takes a reset token and hands over the account; a limit caps guessing regardless of token length.
+describe('rate limiting', () => {
+  it('a limited caller gets the limiter response and NOTHING else runs', async () => {
+    const limited = NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    rateLimitMock.mockReturnValueOnce(limited);
+
+    const res = await POST(makeReq({ token: 'tok', password: 'password123' }));
+
+    expect(res.status).toBe(429);
+    // Before the mode gate and before any DB work: a blocked request must not cost us a query,
+    // an email, or a row.
+    expect(saasAuthGateMock).not.toHaveBeenCalled();
+    expect(connectDBMock).not.toHaveBeenCalled();
+  });
+
+  it('is keyed per client IP and per endpoint, so one endpoint cannot exhaust another', async () => {
+    await POST(makeReq({ token: 'tok', password: 'password123' }));
+
+    expect(rateLimitMock).toHaveBeenCalledTimes(1);
+    const key = rateLimitMock.mock.calls[0][0];
+    expect(key).toContain('1.2.3.4');
+    expect(key).toMatch(/^saas-reset-confirm:/);
   });
 });
