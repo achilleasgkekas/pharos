@@ -1668,3 +1668,35 @@ button:focus-visible,
     page-break-after: avoid;
   }
 }
+
+/* Sign in — the one nav item that is an action, not a jump to a section further down the
+   page. The site previously had no route into the product at all: a returning customer had
+   to already know it lives on another subdomain. Styled as a button so it reads as the way
+   in, in both the desktop nav and the mobile drawer. */
+.nav-signin {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.nav-signin:hover {
+  border-color: var(--accent);
+  background: var(--surface-3);
+}
+.drawer-signin {
+  margin-top: 10px;
+  padding: 13px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 1.02rem;
+  font-weight: 600;
+  text-align: center;
+}

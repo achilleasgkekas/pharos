@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 type NavItem = { href: string; label: string; external?: boolean };
 
@@ -16,11 +17,29 @@ const ITEMS: NavItem[] = [
   { href: '#faq', label: 'FAQ' },
 ];
 
-export function MobileNav({ githubUrl }: { githubUrl: string }) {
+export function MobileNav({ githubUrl, appUrl }: { githubUrl: string; appUrl: string }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const burgerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+
+  // The drawer is rendered into <body>, not where this component sits.
+  //
+  // It lives inside the site header, and the header is a translucent bar with
+  // `backdrop-filter: blur(12px)`. A backdrop-filter makes an element the CONTAINING BLOCK
+  // for `position: fixed` descendants, so the drawer's `inset: 0` resolved against the
+  // 64px-tall header instead of the viewport: the panel and the scrim were both clipped to
+  // 64px, and every link below the drawer head spilled out of the panel with nothing painted
+  // behind it. That is the "menu is transparent on mobile" report — the links appeared to
+  // float over the page because they genuinely were.
+  //
+  // Measured live at 375px on 2026-08-04: drawer rect 375x64, not 375x812.
+  //
+  // A portal to <body> escapes the header's containing block entirely, which keeps the
+  // frosted header AND gives the drawer the viewport it asks for. (The app's own SiteNav
+  // documents this same trap and avoids it by refusing backdrop-filter on the navbar.)
+  useEffect(() => setMounted(true), []);
 
   // Lock body scroll, close on Escape, and trap focus inside the drawer while open.
   useEffect(() => {
@@ -93,11 +112,13 @@ export function MobileNav({ githubUrl }: { githubUrl: string }) {
         </svg>
       </button>
 
-      <div
-        id="mobile-drawer"
-        className={`mobile-drawer${open ? ' is-open' : ''}`}
-        hidden={!open}
-      >
+      {mounted &&
+        createPortal(
+          <div
+            id="mobile-drawer"
+            className={`mobile-drawer${open ? ' is-open' : ''}`}
+            hidden={!open}
+          >
         <button
           type="button"
           className="drawer-scrim"
@@ -148,8 +169,17 @@ export function MobileNav({ githubUrl }: { githubUrl: string }) {
           >
             GitHub ↗
           </a>
+          <a
+            href={`${appUrl}/account/login`}
+            className="drawer-signin"
+            onClick={() => setOpen(false)}
+          >
+            Sign in
+          </a>
         </nav>
-      </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

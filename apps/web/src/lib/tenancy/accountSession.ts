@@ -8,12 +8,12 @@
 // handlers only, never from middleware). Reuses the existing AUTH_SECRET — no new config.
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
+import { ACCOUNT_COOKIE, verifyAccountToken, type AccountClaims } from './accountToken';
 
 // Distinct cookie name so an Account session and a per-tenant User session can coexist in
 // the same browser without clobbering each other.
-export const ACCOUNT_COOKIE = 'pharos_account';
-
-export type AccountClaims = { sub: string; email: string; exp?: number };
+export { ACCOUNT_COOKIE, accountAuthConfigured } from './accountToken';
+export type { AccountClaims } from './accountToken';
 
 // Idle window for the SaaS account session (its own knob, independent of the self-hosted
 // SESSION_IDLE_HOURS). Clamped to a sane range; default 12h.
@@ -24,11 +24,6 @@ function getSecret(): Uint8Array | null {
   const s = process.env.AUTH_SECRET;
   if (!s || s.length < 16) return null; // fail closed without a real secret
   return new TextEncoder().encode(s);
-}
-
-/** True when AUTH_SECRET is configured — lets SaaS routes fail closed with a clear 500. */
-export function accountAuthConfigured(): boolean {
-  return getSecret() !== null;
 }
 
 /**
@@ -86,21 +81,10 @@ export async function signAccountSession(claims: AccountClaims): Promise<string>
     .sign(secret);
 }
 
-/** Verify an account token → claims, or null on any failure. Never throws. */
-export async function verifyAccountSession(token: string | undefined | null): Promise<AccountClaims | null> {
-  if (!token) return null;
-  const secret = getSecret();
-  if (!secret) return null;
-  try {
-    const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] });
-    const sub = typeof payload.sub === 'string' ? payload.sub : '';
-    if (!sub) return null;
-    const email = typeof payload.email === 'string' ? payload.email : '';
-    return { sub, email, exp: typeof payload.exp === 'number' ? payload.exp : undefined };
-  } catch {
-    return null;
-  }
-}
+/** Verify an account token → claims, or null on any failure. Never throws.
+ *  The implementation lives in the edge-safe ./accountToken so the middleware can run the
+ *  SAME check without dragging next/headers onto the Edge runtime. */
+export const verifyAccountSession = verifyAccountToken;
 
 /** Read + verify the account cookie (token-only, no DB hit). Null when logged out. */
 export async function getCurrentAccount(): Promise<AccountClaims | null> {

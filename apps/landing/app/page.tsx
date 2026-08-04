@@ -11,6 +11,11 @@ import { FaqCopyLink } from './components/FaqCopyLink';
 import { Pricing } from './components/Pricing';
 
 const GITHUB_URL = 'https://github.com/achilleasgkekas/pharos';
+
+// Where "Sign in" goes. The marketing site had no way into the product at all: a returning
+// customer landed on ph-aros.com and had to already know the app lives on another
+// subdomain. Env-overridable so a staging landing can point at a staging app.
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.ph-aros.com';
 const SITE_URL = 'https://ph-aros.com';
 
 // The repository is private during the waitlist phase and goes public right
@@ -781,8 +786,11 @@ export default function Home() {
             >
               GitHub
             </a>
+            <a href={`${APP_URL}/account/login`} className="nav-signin">
+              Sign in
+            </a>
           </nav>
-          <MobileNav githubUrl={GITHUB_URL} />
+          <MobileNav githubUrl={GITHUB_URL} appUrl={APP_URL} />
         </div>
       </header>
       <ScrollProgress />
