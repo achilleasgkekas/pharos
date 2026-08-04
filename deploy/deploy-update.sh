@@ -19,7 +19,16 @@
 #   2  deployed, health check failed, ROLLED BACK successfully — production is fine, the new
 #      commits are broken. This is the most important one to report.
 #   3  rollback ALSO failed. Production is down. Say so in plain language.
+#   4  another deploy was already running (lock held). Nothing changed; retry next time.
 set -uo pipefail
+
+# ── single-writer lock ──────────────────────────────────────────────────────────────────────
+# Two concurrent runs (a scheduled or manual deploy plus another) can interleave git reset, build
+# and recreate, and ship an image built from a mixed set of commits. Serialise every invocation
+# (including --check) behind one lock: a second run exits 4 and changes nothing. Mirrors the
+# BakeCore deploy script, which already took this lock.
+exec 200>/var/lock/pharos-deploy.lock
+flock -n 200 || { printf '%s\n' "another deploy is already running (lock held); nothing changed, exit 4"; exit 4; }
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
