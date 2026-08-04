@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/scan/receipt is the endpoint the Expo mobile app (and the web receipts dropzone)
-// hits to snap a receipt photo/PDF, run the AI parse, and PERSIST it as a draft the user can later
+// POST /api/v1/scan/receipt is the endpoint API clients (and the web receipts dropzone)
+// hit to snap a receipt photo/PDF, run the AI parse, and PERSIST it as a draft the user can later
 // verify/fix. Unlike scan/product & scan/voucher this route SAVES: it delegates to uploadReceipt,
 // then reads the fresh doc back and serializes it. Several route-only behaviours live NOWHERE else
-// and a drift silently breaks mobile receipt capture:
+// and a drift silently breaks receipt capture:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, BEFORE any upload),
 //   - multipart-only intake: it always calls uploadReceipt(await req.formData()),
 //   - the uploadReceipt not-ok passthrough → apiError(error || 'Bad request') i.e. 400 { error },

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// PATCH/DELETE /api/v1/cards/:id closes the cards pair the Expo mobile app drives (edit + remove
-// a payment card, plus the active on/off toggle). The body coercion lives in cardFieldsFromBody
+// PATCH/DELETE /api/v1/cards/:id closes the cards pair (edit + remove a payment card, plus the
+// active on/off toggle). The body coercion lives in cardFieldsFromBody
 // (unit-tested separately in cardFields.test.ts); what lives ONLY here, and would silently corrupt
-// the mobile contract on drift, is the route wiring:
+// the API contract on drift, is the route wiring:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, no DB touch),
 //   - the isObjectId id guard (malformed id → 400 'bad id', never issues a write),
 //   - PATCH: partial-mode cardFieldsFromBody (name NOT required, unlike POST); an empty $set →

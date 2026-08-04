@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET /api/v1/receipts is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET /api/v1/receipts is one of the ~50 REST endpoints under /api/v1.
 // The [id] half (and serialize's line-item normalizer) is already covered; this closes the
 // collection route. It is GET-only (receipts are never created via this route — they arrive
 // through upload/scan flows), so there is no POST. Its route-level logic lives NOWHERE else,
-// so a drift here silently corrupts the mobile receipts list:
+// so a drift here silently corrupts the receipts list:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, before any DB touch),
 //   - the store filter ({ store } only when the param is present),
 //   - the archived filter: by DEFAULT hides archived ({ archived: { $ne: true } }); only

@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** GET /api/v1/items/:id/plans → installment plans across all statements, each
- *  flagged `linked` if this item is already attached. Used by the mobile item
+ *  flagged `linked` if this item is already attached. Used by the item
  *  detail to link/unlink a δόσεις plan to a product (mirror of the web overview).
  *  Linked plans first, then active, then by soonest payoff. */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/receipts/:id/add-to-library backs the mobile/web "Add to library" button on a
+// POST /api/v1/receipts/:id/add-to-library backs the "Add to library" button on a
 // receipt's detail screen — it turns the receipt's line items into inventory Items (find-or-create
 // by title, link the receipt back) and reports how many were created vs. matched-and-linked. Thin
 // wrapper around the proven `addReceiptItemsToLibrary` action (receipts/actions.ts) — that action's

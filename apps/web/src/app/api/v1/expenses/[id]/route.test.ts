@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// PATCH/DELETE /api/v1/expenses/:id are two of the ~50 REST endpoints the mobile app drives.
-// Their route-level logic lives NOWHERE else and would silently corrupt the mobile contract:
+// PATCH/DELETE /api/v1/expenses/:id are two of the ~50 REST endpoints under /api/v1.
+// Their route-level logic lives NOWHERE else and would silently corrupt the API contract:
 //   - the shared `isObjectId` guard (a malformed :id must 400 BEFORE any DB touch),
 //   - PATCH partial-update: only whitelisted, well-typed fields land in $set; setting a
 //     vendor also recomputes vendorKey; recurringCycle accepts '' (clear) or the enum;
 //     an empty changeset returns 400,
 //   - PATCH returns the SPEC shape { expense: Expense } (the full trimmed doc), NOT a bare
-//     { ok, id } — the mobile detail re-prefills in place from the response,
+//     { ok, id } — the client's detail view re-prefills in place from the response,
 //   - DELETE is a SOFT delete ($set deletedAt, recoverable from Trash), and a missing row 404s,
 //   - P9 multi-currency: `amount` arrives PRINTED, so touching amount/currency/fxRate re-resolves
 //     all four fields together against the CURRENT doc (never half-converted), and `{ currency }`
@@ -189,7 +189,7 @@ describe('PATCH partial-update', () => {
   });
 });
 
-// P9 — the mobile app edits an expense in the currency the bill is PRINTED in, while the DB
+// P9 — an API client edits an expense in the currency the bill is PRINTED in, while the DB
 // stores base currency. These pin the "recompute the four fields together" rule: a partial edit
 // must never leave a row half-converted, and re-saving an unchanged foreign row must not
 // convert it twice.

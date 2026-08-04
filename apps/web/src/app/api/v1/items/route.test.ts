@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/items is one of the ~50 REST endpoints the Expo mobile app drives.
-// Its route-level logic lives NOWHERE else and would silently corrupt the mobile
+// GET/POST /api/v1/items is one of the ~50 REST endpoints under /api/v1.
+// Its route-level logic lives NOWHERE else and would silently corrupt the API
 // contract if it drifted:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token),
 //   - POST validation: `title` required, status enum-defaulting to 'researching'
@@ -11,7 +11,7 @@ import type { NextRequest } from 'next/server';
 //   - GET: the status=shopping|inventory|all view → $in filter mapping, the updatedSince
 //     cursor flipping withDeleted on BOTH queries (incremental sync must see soft-deleted
 //     rows), the updatedAt-desc sort, and the trim() defaults + the `photo` = photos[0]
-//     projection the mobile client resolves via /api/files.
+//     projection API clients resolve via /api/files.
 // We exercise the REAL apiAuth/apiBody/apiList helpers and only mock the DB seam
 // (connectDB + the User/Item models), so validation + serialization run for real.
 
@@ -223,7 +223,7 @@ describe('POST multi-currency (P9)', () => {
     const res = await POST(makeReq({ body: { title: 'Sabrent NT-P10G', currentPrice: 110, currency: 'USD', fxRate: 0.92 } }));
     expect(res.status).toBe(201);
     expect(state.lastCreate).toMatchObject({ currentPrice: 101.2, currency: 'USD', origAmount: 110, fxRate: 0.92 });
-    // The mobile client needs both halves back to render the FX badge.
+    // The client needs both halves back to render the FX badge.
     expect((await res.json()).item).toMatchObject({ currentPrice: 101.2, currency: 'USD', origAmount: 110, fxRate: 0.92 });
   });
 

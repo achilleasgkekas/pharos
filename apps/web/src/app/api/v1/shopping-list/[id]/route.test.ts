@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// PATCH/DELETE /api/v1/shopping-list/:id is the [id] half of one of the ~50 REST endpoints the
-// Expo mobile app drives (the collection GET/POST half is covered in ../route.test.ts). The route
+// PATCH/DELETE /api/v1/shopping-list/:id is the [id] half of one of the ~50 REST endpoints
+// under /api/v1 (the collection GET/POST half is covered in ../route.test.ts). The route
 // is thin — it delegates to toggleListItem/updateListItem/deleteListItem — but the request-shaping,
 // the id guard, the "no valid fields" rejection, and the found→404 mapping live NOWHERE else, so a
-// drift here silently corrupts the mobile shopping list edit/tick/remove flows:
+// drift here silently corrupts the shopping list edit/tick/remove flows:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, before any action call),
 //   - the isObjectId guard (malformed id → 400 'bad id', before any DB touch),
 //   - PATCH: only the five string fields (name/quantity/category/brand/note) are picked (typeof

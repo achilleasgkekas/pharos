@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /** GET /api/v1/notifications → { currency, items: [{ _id, kind, title, body, href, read, createdAt }], unread }.
  *  Surfaces the live alert feed (deals / installments / warranties / system), newest-unread first.
- *  `currency` lets the mobile app format the pipe-delimited money amounts baked into `body`
+ *  `currency` lets API clients format the pipe-delimited money amounts baked into `body`
  *  (mirrors the same additive field on GET /api/v1/calendar). */
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {

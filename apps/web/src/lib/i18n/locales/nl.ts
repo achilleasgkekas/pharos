@@ -644,7 +644,7 @@ export const nl: Partial<Dict> = {
   'set.scraperAiTitle': 'Scraper-AI',
   'set.scraperIntro': 'De prijs-scraper draait op zijn eigen schema (elke 6 uur). Geef hem een lichter/goedkoper model dan de rest van de app — een prijs extraheren is een eenvoudige teksttaak.',
   'set.aiPromptsTitle': 'AI-prompts',
-  'set.mobileMcpTitle': 'Mobiel / MCP',
+  'set.mobileMcpTitle': 'API / MCP',
   'af.areaDocuments': 'Documenten',
   'af.areaShopping': 'Winkelen & items',
   'af.areaAssistant': 'Assistent',

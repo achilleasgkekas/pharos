@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/ai is the endpoint the Expo mobile app (and the web AI command bar) hits to run a
+// POST /api/v1/ai is the endpoint API clients (and the web AI command bar) hit to run a
 // multi-turn natural-language command against the same tool-use agent (add expenses/items/tasks,
 // search, overview…). The agent loop itself lives in runAiCommand (aiCommandActions.ts) — the route
 // is a thin envelope, but three route-only behaviours live NOWHERE else and a drift here silently
-// breaks mobile chat:
+// breaks API chat:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, BEFORE any body read),
 //   - history sanitation: `messages` must be an array; `.slice(-MAX_TURNS)` keeps only the most
 //     recent 20 raw entries (a cost/DoS lever — unbounded history = unbounded Anthropic input),

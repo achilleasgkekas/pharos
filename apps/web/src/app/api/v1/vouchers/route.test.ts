@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/vouchers is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET/POST /api/v1/vouchers is one of the ~50 REST endpoints under /api/v1.
 // The [id] PATCH/DELETE half is already covered; this closes the pair on the collection route.
-// Its route-level logic lives NOWHERE else, so a drift here silently corrupts the mobile contract:
+// Its route-level logic lives NOWHERE else, so a drift here silently corrupts the API contract:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token),
 //   - POST: `title` required (strField trim → blank/whitespace → 400 'title required'), every
 //     other string field trimmed, `expiresAt` truthiness-gated (falsy → null, else new Date),

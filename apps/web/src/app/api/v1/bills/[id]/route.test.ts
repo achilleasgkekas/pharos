@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// PATCH/DELETE /api/v1/bills/:id — P28 mobile-parity. Mirrors the vouchers [id] route
+// PATCH/DELETE /api/v1/bills/:id — P28. Mirrors the vouchers [id] route
 // tests, plus the `paid`/`paidDate` mark-paid transition which — like the web
 // `markBillPaid` action — spawns the next pending instance one cycle ahead the FIRST
 // time a recurring bill is paid (guarded by the existing paidAt, never on a re-mark).
-// A drift here silently corrupts the mobile Bills contract:
+// A drift here silently corrupts the Bills API contract:
 //   - the shared `isObjectId` guard (400 before any DB touch),
 //   - PATCH partial-update: only whitelisted fields land in $set, blank title dropped,
 //     empty changeset → 400, returns the SPEC { bill, spawnedNext } shape,

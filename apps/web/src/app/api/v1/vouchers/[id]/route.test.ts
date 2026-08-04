@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// PATCH/DELETE /api/v1/vouchers/:id are two of the ~50 REST endpoints the mobile app drives.
-// Their route-level logic lives NOWHERE else and would silently corrupt the mobile contract:
+// PATCH/DELETE /api/v1/vouchers/:id are two of the ~50 REST endpoints under /api/v1.
+// Their route-level logic lives NOWHERE else and would silently corrupt the API contract:
 //   - the shared `isObjectId` guard (a malformed :id must 400 BEFORE any DB touch),
 //   - PATCH partial-update: only whitelisted, well-typed fields land in $set; a blank
 //     title is dropped, an empty changeset returns 400, `expiresAt` uses key-presence
 //     ('expiresAt' in body) so an explicit null clears it,
 //   - PATCH returns the SPEC shape { voucher: Voucher } (the full trimmed doc), NOT a bare
-//     { ok, id } — the mobile detail re-prefills in place from the response,
+//     { ok, id } — the client's detail view re-prefills in place from the response,
 //   - DELETE is a SOFT delete ($set deletedAt, recoverable from Trash), and a missing row 404s.
 // We exercise the REAL apiAuth/apiBody/apiList helpers and only mock the DB seam.
 

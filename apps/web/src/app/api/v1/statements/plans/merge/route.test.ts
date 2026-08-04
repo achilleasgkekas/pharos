@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST/DELETE /api/v1/statements/plans/merge is the mobile app's only path to the installment
+// POST/DELETE /api/v1/statements/plans/merge is the only API path to the installment
 // plan merge/bind write-ops (mirror of the web PlanMergeControl). It carries no serialization,
-// but it does carry the contract that MUST hold or the mobile "⑂ Merge into…" affordance breaks:
+// but it does carry the contract that MUST hold or the "⑂ Merge into…" affordance breaks:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, action never runs),
 //   - POST body validation: BOTH sourceKey and targetKey required (blank → 400 'sourceKey and
 //     targetKey required') before touching the DB, and the action's own error is surfaced,
 //   - DELETE body validation: key required (blank → 400 'key required'),
-//   - the response envelope shape ({ ok, moved }) the mobile client reads, with moved defaulting
+//   - the response envelope shape ({ ok, moved }) API clients read, with moved defaulting
 //     to 0 when the wrapped action omits it.
 // We exercise the REAL apiAuth/apiBody helpers and only mock the DB seam (connectDB + User for the
 // auth gate) plus the two proven server actions, so the route's validation runs for real.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { trimExpense, computeAnomalies, parseSplitField, type ExpenseLean } from './serialize';
 
-// Pure API-shape contract for the mobile expenses endpoints (list GET, rescan POST
+// Pure API-shape contract for the expenses endpoints (list GET, rescan POST
 // both share trimExpense so the detail can re-prefill in place from either). No
 // DB/fs/network/clock — `iso` is a pure Date→ISO wrapper and apiList only imports a
 // type, so importing serialize.ts has zero side effects.
@@ -68,7 +68,7 @@ describe('trimExpense', () => {
     });
   });
 
-  it('passes through taxDeductible/taxCategory (P8 mobile-parity fields)', () => {
+  it('passes through taxDeductible/taxCategory (P8 fields)', () => {
     expect(trimExpense({ _id: 'a', taxDeductible: true, taxCategory: 'Ιατρικά έξοδα' })).toMatchObject({
       taxDeductible: true,
       taxCategory: 'Ιατρικά έξοδα',
@@ -198,7 +198,7 @@ describe('parseSplitField', () => {
     expect(parseSplitField('nope')).toEqual([]);
   });
 
-  it('coerces raw JSON-body rows (as POSTed by the mobile app) into clean SplitEntry[]', () => {
+  it('coerces raw JSON-body rows (as POSTed by an API client) into clean SplitEntry[]', () => {
     expect(
       parseSplitField([
         { name: '  Anna  ', share: '15.5', settled: true },

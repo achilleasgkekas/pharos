@@ -644,7 +644,7 @@ export const fr: Partial<Dict> = {
   'set.scraperAiTitle': 'IA du scraper',
   'set.scraperIntro': "Le scraper de prix s'exécute selon son propre planning (toutes les 6h). Donnez-lui un modèle plus léger/économique que le reste de l'app — extraire un prix est une simple tâche de texte.",
   'set.aiPromptsTitle': 'Prompts IA',
-  'set.mobileMcpTitle': 'Mobile / MCP',
+  'set.mobileMcpTitle': 'API / MCP',
   'af.areaDocuments': 'Documents',
   'af.areaShopping': 'Achats et articles',
   'af.areaAssistant': 'Assistant',

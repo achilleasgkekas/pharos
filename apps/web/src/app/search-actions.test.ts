@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // app/search-actions.ts `searchAll()` — the cross-collection global search that backs both
 // the web navbar search dropdown AND (verbatim, via GET /api/v1/search — see
-// api/v1/search/route.test.ts, which mocks searchAll entirely) the mobile SearchScreen.
+// api/v1/search/route.test.ts, which mocks searchAll entirely) the v1 search endpoint.
 // Never directly unit-tested before; the route test only proves the auth/projection wiring,
 // and lib/receiptSearch.test.ts only proves the pure `matchedLineItemName` helper in
 // isolation. Neither pins the actual behaviour this file adds on top (P22): a receipt hit's
 // `subtitle` gets `· <matched line item>` appended when the query matched a line item rather
-// than the store name — the ONLY signal a mobile client has, since the v1 route drops
+// than the store name — the ONLY signal an API client has, since the v1 route drops
 // everything except { type, id, title, subtitle }. That appended text is what closes the
-// "mobile search doesn't show matched line-item" parity gap (MOBILE_PARITY.md P22 entry) —
+// "API search doesn't show matched line-item" gap (P22) —
 // pin it here so a refactor of search-actions.ts can't silently regress it.
 //
 // Approach: mock connectDB + all 7 model .find().limit().select().lean() chains (identical
@@ -170,7 +170,7 @@ describe('searchAll — receipt matched line-item snippet (P22)', () => {
   });
 });
 
-describe('searchAll — this is exactly what GET /api/v1/search forwards to mobile', () => {
+describe('searchAll — this is exactly what GET /api/v1/search forwards to API clients', () => {
   it('the matched-item text lives in `subtitle`, the only field the v1 route keeps ({ type, id, title, subtitle })', async () => {
     receiptFind.mockReturnValue(
       chainOf([
@@ -185,7 +185,7 @@ describe('searchAll — this is exactly what GET /api/v1/search forwards to mobi
     );
     const hits = await searchAll('crucial');
     const { type, id, title, subtitle } = hits[0];
-    // Same narrowing the route applies (see api/v1/search/route.ts) — proves the mobile
+    // Same narrowing the route applies (see api/v1/search/route.ts) — proves the API
     // payload shape already carries the snippet without any route/type change needed.
     expect({ type, id, title, subtitle }).toEqual({
       type: 'receipt',

@@ -21,7 +21,7 @@ describe('middleware matcher — bearer-authenticated endpoints bypass the sessi
   it.each([
     ['/api/cron/alerts', 'the self-hosted alert sweep, authenticated by CRON_SECRET'],
     ['/api/mcp', 'MCP connector, authenticated by its own bearer'],
-    ['/api/v1/items', 'the mobile REST API, authenticated by its own bearer'],
+    ['/api/v1/items', 'the public REST API, authenticated by its own bearer'],
     ['/api/auth/login', 'the auth actions themselves'],
   ])('%s is NOT gated (%s)', (path) => {
     expect(isGated(path)).toBe(false);

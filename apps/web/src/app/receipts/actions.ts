@@ -238,7 +238,7 @@ export async function uploadReceipt(formData: FormData): Promise<UploadResult> {
  * Multi-currency (P9): the money fields to store, given what the form submitted (which
  * is the PRINTED side for a foreign receipt).
  *
- * The rule itself lives in fx.resolveReceiptAmounts() so that the mobile API route
+ * The rule itself lives in fx.resolveReceiptAmounts() so that the v1 API route
  * (PATCH /api/v1/receipts/:id) converts a foreign receipt exactly the same way; this
  * wrapper only maps the resolved line prices back onto the submitted line objects.
  */

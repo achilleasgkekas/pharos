@@ -10,7 +10,7 @@ import { TOOLS, today } from './aiTools';
 // `execute()` dispatcher needs a live DB and is out of scope for a node unit test.
 
 // Canonical tool-name set (mirrors the source). Adding/removing/renaming a tool must update this
-// list too — that is the point: the registry is a contract the mobile app + MCP clients depend on.
+// list too — that is the point: the registry is a contract the command bar + MCP clients depend on.
 const EXPECTED_NAMES = [
   'add_expense',
   'add_income',

@@ -6,14 +6,14 @@ import { join } from 'node:path';
  * Coverage guard: no /api/v1 route may reach a COOKIE-SESSION guard.
  *
  * The two halves of the app authenticate differently. The web pages and server actions
- * carry a session cookie; the Expo app and any MCP/API client send `Authorization: Bearer
+ * carry a session cookie; any MCP/API client sends `Authorization: Bearer
  * <token>` and no cookie at all. `requireUser()` and `requireAdmin()` resolve the cookie
  * and `redirect('/login')` when there is none.
  *
  * Put one of those on a Bearer path and it does not deny the caller, it BREAKS the
  * endpoint: `redirect()` throws NEXT_REDIRECT, which `withAuth`'s catch turns into a 500,
  * for admins and members alike. That is not a hypothetical. `POST /api/v1/settings/
- * test-notify` shipped that way and was dead for every mobile user until 2026-07-29,
+ * test-notify` shipped that way and was dead for every API caller until 2026-07-29,
  * because it delegated to the `sendTestNtfy` server action, whose `requireAdmin()` had
  * been added for the WEB Settings screen. Its own test mocked the action, so the suite
  * stayed green over a path that could not work.

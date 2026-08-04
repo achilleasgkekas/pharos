@@ -64,7 +64,6 @@ import { detectSyncStaleness, formatSyncStaleness } from '@/lib/syncStaleness';
 import { markRemoteSync, getLastRemoteSync } from '@/lib/syncState';
 import { splitFreshAlerts } from '@/lib/alertDedup';
 import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '@/lib/notifiers';
-import { pushAllDevices } from '@/lib/expoPush';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { generateNotifications } from '@/app/notifications/actions';
 import { detectBudgetExceeded, type BudgetAlertRow } from '@/lib/budgetAlert';
@@ -760,8 +759,6 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   if (lines.length) {
     const r = await dispatchAlert('Pharos alerts', summary);
     sent = r.sent > 0;
-    // Also push to registered mobile devices (best-effort; no-op if none / no creds).
-    void pushAllDevices('Pharos alerts', summary);
     // Persist the new baseline ONLY once a channel actually accepted the message — a
     // misconfigured/disabled notifier must never mark live alerts as "already sent" when
     // nothing was ever delivered (they'd silently vanish from every future run).

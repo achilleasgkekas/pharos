@@ -1,5 +1,5 @@
-// Per-item dedup for the OUTBOUND alert channels (ntfy/Discord/Slack/Telegram/webhook +
-// mobile push) — P82. The in-app notification bell already tracks "has the user been
+// Per-item dedup for the OUTBOUND alert channels (ntfy/Discord/Slack/Telegram/webhook)
+// — P82. The in-app notification bell already tracks "has the user been
 // told about this exact alert before" via a dedupeKey (see computeAlerts() in
 // app/notifications/actions.ts): a warranty item gets `warranty:<id>` with no day-count
 // in the key, so it fires once when it enters the alert window and stays quiet while the

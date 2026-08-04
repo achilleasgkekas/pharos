@@ -23,7 +23,7 @@ export type BillLean = {
 
 /** Single source of truth for the v1 Bill JSON shape (list, POST, PATCH). `status` is
  *  the same derived paid/overdue/due-soon/upcoming used by the web BillsClient —
- *  computed here so the mobile client never has to reimplement `billStatus`. */
+ *  computed here so API clients never have to reimplement `billStatus`. */
 export function trim(b: BillLean): {
   id: string; title: string; vendor: string; amount: number; currency: string;
   origAmount: number; fxRate: number; dueDate: string | null;

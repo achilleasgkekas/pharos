@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET /api/v1/calendar is one of the ~50 REST endpoints the Expo mobile app drives. It backs
-// the mobile 3-month money agenda, mirroring the web /calendar page. Unlike the thin { rows }
+// GET /api/v1/calendar is one of the ~50 REST endpoints under /api/v1. It backs
+// the 3-month money agenda, mirroring the web /calendar page. Unlike the thin { rows }
 // wrappers, this route owns a lot of shaping logic that lives NOWHERE else, so a drift here
-// silently breaks the mobile calendar:
+// silently breaks the calendar API:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, BEFORE any DB read),
 //   - a fixed 3-month window (current month + next 2) with per-month blocks { key,label,entries,out,inc },
 //   - subscription renewals STEPPED forward per billing cycle across the window (only >= windowStart),

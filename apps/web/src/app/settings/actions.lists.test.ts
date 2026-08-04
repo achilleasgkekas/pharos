@@ -115,7 +115,6 @@ vi.mock('@/lib/onedrive', () => ({
 vi.mock('@/lib/notify', () => ({ sendNtfyTo: vi.fn() }));
 vi.mock('@/lib/backupModels', () => ({ BACKUP_MODELS: [] }));
 vi.mock('@/lib/notifiers', () => ({ dispatchAlert: vi.fn(), getNotifiers: vi.fn(), testNotifier: vi.fn() }));
-vi.mock('@/lib/expoPush', () => ({ pushAllDevices: vi.fn() }));
 vi.mock('@/lib/installments', () => ({ computeInstallmentPlans: vi.fn() }));
 vi.mock('@/app/notifications/actions', () => ({ generateNotifications: vi.fn() }));
 vi.mock('@/lib/budgetAlert', () => ({ detectBudgetExceeded: vi.fn() }));

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 // POST /api/v1/settings/test-notify is the "Send test notification" button in Settings →
-// Notifications (web + mobile): it fires a one-off ntfy push using whatever channel config is
+// Notifications (web + API clients): it fires a one-off ntfy push using whatever channel config is
 // already saved, with NO request body at all.
 //
 // Route-only behaviours that live nowhere else, and that a drift here silently breaks:

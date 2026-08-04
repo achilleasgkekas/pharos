@@ -40,7 +40,7 @@ export async function sendNtfy(title: string, message: string, opts?: NtfyOpts):
  * Fire the one-off "Send test notification" push, with NO authorisation of its own.
  *
  * It lives here rather than only inside the `sendTestNtfy` server action because the action
- * gates on `requireAdmin()`, which reads the **session cookie** — and the mobile app reaches
+ * gates on `requireAdmin()`, which reads the **session cookie** — and API clients reach
  * this feature over `POST /api/v1/settings/test-notify` with a Bearer token and no cookie at
  * all. A session-only guard on a path that has no session does not deny the caller, it
  * *breaks* the endpoint. So each caller applies the guard its own transport can actually

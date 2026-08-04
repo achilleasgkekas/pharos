@@ -24,7 +24,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  // Auth: a browser sends the session cookie; the mobile app sends a Bearer token.
+  // Auth: a browser sends the session cookie; an API client sends a Bearer token.
   // The middleware lets bearer /api/files requests through, so the route is the guard.
   const ok = (await verifySession(req.cookies.get(SESSION_COOKIE)?.value)) || (await bearerUser(req));
   if (!ok) return new NextResponse('Unauthorized', { status: 401 });

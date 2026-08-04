@@ -912,7 +912,7 @@ export const en = {
   'set.scraperAiTitle': 'Scraper AI',
   'set.scraperIntro': 'The price scraper runs on its own schedule (every 6h). Give it a lighter/cheaper model than the rest of the app — price extraction is a simple text task.',
   'set.aiPromptsTitle': 'AI prompts',
-  'set.mobileMcpTitle': 'Mobile / MCP',
+  'set.mobileMcpTitle': 'API / MCP',
   'af.areaDocuments': 'Documents',
   'af.areaShopping': 'Shopping & items',
   'af.areaAssistant': 'Assistant',

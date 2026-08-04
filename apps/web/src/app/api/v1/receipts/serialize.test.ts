@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { serializeLineItems, trimReceipt, type ReceiptLean } from './serialize';
 
-// Pure API-shape contract for the mobile receipts endpoints (detail GET, rescan POST,
+// Pure API-shape contract for the receipts endpoints (detail GET, rescan POST,
 // scan POST all share these). No DB/fs/network/clock — `iso` is a pure Date→ISO wrapper
 // and apiList only imports a type, so importing serialize.ts has zero side effects.
 

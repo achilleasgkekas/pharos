@@ -23,7 +23,7 @@ type AttachmentLean = { path: string; name?: string; mimeType?: string; size?: n
 
 /** Mirror of components/PricePanel.tsx priceStatus(): one coherent price picture
  *  (best-now, lowest/highest seen, trend, verdict, where-to-buy) computed server-side
- *  so the mobile detail view stays in sync with the web without re-implementing the logic. */
+ *  so API clients' detail views stay in sync with the web without re-implementing the logic. */
 function priceStatus(item: { currentPrice: number; targetPrice?: number | null; links: LinkLean[]; priceHistory: HistLean[] }) {
   const stores = (item.links ?? [])
     .filter((l) => l.price && l.price > 0)
@@ -66,7 +66,7 @@ type ItemDetailLean = {
 };
 
 /** GET /api/v1/items/:id → full item detail (links, price history, photos, warranty, purchase)
- *  plus a computed `price` block (best-now / where-to-buy / verdict) for the mobile PricePanel. */
+ *  plus a computed `price` block (best-now / where-to-buy / verdict) for the PricePanel. */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
     const { id } = await params;

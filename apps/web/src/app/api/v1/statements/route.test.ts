@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET /api/v1/statements is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET /api/v1/statements is one of the ~50 REST endpoints under /api/v1.
 // The [id] half is separate; this covers the collection LIST route, whose logic lives
-// NOWHERE else, so a drift here silently corrupts the mobile credit-card statements list:
+// NOWHERE else, so a drift here silently corrupts the credit-card statements list:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, before any DB read),
 //   - the optional `card` filter (present → { card } filter on both find + count; absent → {}),
 //   - the newest-period-first sort ({ period: -1 }),
 //   - the updatedSince cursor adding a $gte filter AND flipping withDeleted on BOTH queries
-//     (so a mobile client doing incremental sync sees soft-deleted rows to drop locally),
+//     (so an API client doing incremental sync sees soft-deleted rows to drop locally),
 //   - the trim() projection + defaults: last4 ?? '', totalAmount/minimumPayment/paidAmount ?? 0,
 //     currency ?? 'EUR', txnCount = transactions?.length ?? 0, deleted = !!deletedAt, and the
 //     iso() coercion of statementDate/dueDate/updatedAt (null when the date is missing),

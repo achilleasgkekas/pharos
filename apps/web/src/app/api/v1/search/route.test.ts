@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET /api/v1/search?q=… is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET /api/v1/search?q=… is one of the ~50 REST endpoints under /api/v1.
 // It backs the global search bar: one query string in, a flat list of hits out across every
 // collection (items / receipts / statements / tasks / subscriptions / expenses / vouchers).
 // The route is thin — it delegates the actual cross-collection search to searchAll — but three
-// pieces of route-only logic live NOWHERE else, so a drift here silently breaks mobile search:
+// pieces of route-only logic live NOWHERE else, so a drift here silently breaks search:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, before any searchAll call),
 //   - the query prep + min-length guard: q = (?q ?? '').trim(); only q.length >= 2 hits searchAll,
 //     shorter/blank queries short-circuit to [] WITHOUT touching the DB seam,
 //   - the projection: each SearchHit is narrowed to { type, id, title, subtitle } — the `href`
-//     field is dropped, so a mobile client never sees a web route it can't navigate.
+//     field is dropped, so an API client never sees a web route it can't navigate.
 // We exercise the REAL apiAuth helper (withAuth) and only mock the DB (auth chain) + searchAll.
 
 const { connectDBMock, userFindOne, userState, searchAllMock, state } = vi.hoisted(() => {

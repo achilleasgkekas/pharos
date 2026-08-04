@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/cards is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET/POST /api/v1/cards is one of the ~50 REST endpoints under /api/v1.
 // The body coercion lives in cardFieldsFromBody (unit-tested separately); what lives ONLY
-// here, and would silently corrupt the mobile contract on drift, is the route wiring:
+// here, and would silently corrupt the API contract on drift, is the route wiring:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, no DB touch),
 //   - POST: a null $set (name missing on create) → apiError('name required'); a valid body →
 //     Card.create({ ...set, active: true }) + 201 + trim(doc.toObject()),

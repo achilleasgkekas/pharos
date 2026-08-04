@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/PATCH /api/v1/receipts/:id backs the mobile receipt-detail + edit screen. It is the richest
+// GET/PATCH /api/v1/receipts/:id backs the receipt-detail + edit screen. It is the richest
 // ARRAY partial-update in the v1 surface, and two pieces of logic live ONLY in this route, so a
-// drift here silently corrupts the mobile contract with no other test to catch it:
+// drift here silently corrupts the API contract with no other test to catch it:
 //
 //   1. GET serialization: trimReceipt + notes fallback + serializeLineItems, where the AI-cleaned
 //      `refinedName` WINS over the raw `name` (the edit form shows refinedName||name). itemCount is

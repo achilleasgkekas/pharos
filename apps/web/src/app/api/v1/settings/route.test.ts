@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET+PATCH /api/v1/settings is one of the ~50 REST endpoints the Expo mobile app drives. It backs
-// the mobile Settings screen (preferences + this-month budget usage). Two blocks of route-only
-// behaviour live NOWHERE else, so a drift here silently corrupts the mobile Settings tab:
+// GET+PATCH /api/v1/settings is one of the ~50 REST endpoints under /api/v1. It backs
+// the Settings screen (preferences + this-month budget usage). Two blocks of route-only
+// behaviour live NOWHERE else, so a drift here silently corrupts the Settings tab:
 //   GET  - the Bearer-auth gate (withAuth → 401 without a valid token, BEFORE any DB read),
 //        - the budget-usage rows: one row per category that has a limit>0, each carrying this
 //          month's spent (rounded to cents), ordered most-over-budget first (spent/limit desc),
@@ -180,7 +180,7 @@ describe('GET — preferences envelope', () => {
     });
   });
 
-  // P9: read-only here on purpose (it is an install-wide Money decision), but the mobile app
+  // P9: read-only here on purpose (it is an install-wide Money decision), but an API client
   // needs it to decide whether to offer per-entry currency controls at all.
   it('carries multiCurrency through so a client knows whether to offer FX controls', async () => {
     settingsState.doc.multiCurrency = true;
@@ -328,8 +328,8 @@ describe('PATCH — no-op guard', () => {
 
 // The ntfy topic is an OUTPUT channel: whoever sets it re-routes every alert of the whole
 // instance. The web actions have been admin-gated since 0bc5e14, so the API must agree or the
-// web guard is decorative (a member just opens the phone instead). The shape of the denial
-// matters as much as the denial: the mobile Settings screen saves currency/VAT/budgets/ntfy in
+// web guard is decorative (a member just uses the API instead). The shape of the denial
+// matters as much as the denial: an API client's Settings screen saves currency/VAT/budgets/ntfy in
 // ONE PATCH, so a 403 for the whole request would read as "nothing saved" while the allowed
 // fields were perfectly writable. Hence: silently drop the two fields, keep the rest — except
 // when they are ALL the request carried, where 200 { ok: true } would be a lie.

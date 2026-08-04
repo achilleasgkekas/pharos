@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// PATCH/DELETE /api/v1/stores/:id closes the store-management pair the Expo mobile app drives
+// PATCH/DELETE /api/v1/stores/:id closes the store-management pair
 // (rename a store, retag its aliases, or remove it). What lives ONLY here, and would silently
-// corrupt the mobile store picker / receipt store field on drift, is the route wiring:
+// corrupt the store picker / receipt store field on drift, is the route wiring:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, no DB touch),
 //   - the isObjectId id guard (malformed id → 400 'bad id', never issues a write),
 //   - PATCH: a $set that is ALWAYS seeded with { auto:false } (so, unlike cards, there is no

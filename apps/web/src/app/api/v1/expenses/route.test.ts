@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/expenses is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET/POST /api/v1/expenses is one of the ~50 REST endpoints under /api/v1.
 // The [id] PATCH/DELETE half (and serialize) is already covered; this closes the collection
 // route. Its route-level logic lives NOWHERE else, so a drift here silently corrupts the
-// mobile contract:
+// API contract:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token),
 //   - POST validation ORDER: `vendor` required (strField trim → blank → 400 'vendor required'),
 //     then `amount` must parse (numField → null → 400 'amount must be a number', but 0 is VALID),
@@ -176,10 +176,10 @@ describe('POST validation', () => {
     expect(json.expense).toMatchObject({ id: 'newid', kind: 'expense', vendor: 'Coffee', amount: 3.5, category: 'other', verified: true });
   });
 
-  // P15 vendor→category auto-rule (mobile-parity gap): the web actions apply this on
+  // P15 vendor→category auto-rule (API gap): the web actions apply this on
   // every creation path; this route was the one gap where an omitted category always
   // became the literal 'other', bypassing the rule engine — same vendor, different
-  // category depending on whether the expense came from web or mobile.
+  // category depending on whether the expense came from the web app or the API.
   it('applies a matching vendor→category rule when category is omitted', async () => {
     appSettingsState.categoryRules = [
       { id: 'r1', match: 'Netflix', matchType: 'vendor', category: 'subscription', recurring: false, recurringCycle: '' },
@@ -309,7 +309,7 @@ describe('POST multi-currency (P9)', () => {
     expect(state.lastCreate).toMatchObject({ amount: 88, currency: 'EUR', origAmount: 0, fxRate: 0 });
   });
 
-  it('the response carries the triple back, so the mobile detail can show the FX badge', async () => {
+  it('the response carries the triple back, so the client detail view can show the FX badge', async () => {
     const res = await POST(makeReq({ body: { vendor: 'AWS', amount: 88, currency: 'USD', fxRate: 0.92 } }));
     const json = (await res.json()) as { expense: { amount: number; currency: string; origAmount: number; fxRate: number } };
     expect(json.expense).toMatchObject({ amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92 });

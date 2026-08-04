@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST/DELETE /api/v1/items/:id/link-plan back the mobile "link this product to an installment
+// POST/DELETE /api/v1/items/:id/link-plan back the "link this product to an installment
 // plan" / "unlink" actions on the item-detail screen. Both are thin wrappers around the proven
 // web `linkPlanToItem` / `removeItemFromPlanByKey` actions (statements/actions.ts) — a plan can
 // carry several products, so linking is additive and unlinking only drops this one item.

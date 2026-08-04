@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 // POST /api/v1/ai/subscription is the "AI-fill by name" seam used by the New Subscription form
-// (web + mobile): given just a name like "Netflix", it asks suggestSubscriptionInfo (subscriptions/
+// (web + API clients): given just a name like "Netflix", it asks suggestSubscriptionInfo (subscriptions/
 // actions.ts) to guess provider/amount/billingCycle/category/etc. The route itself is a thin
 // envelope, but two route-only behaviours live nowhere else and a drift here silently breaks the
 // autofill button:

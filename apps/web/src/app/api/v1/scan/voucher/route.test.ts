@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/scan/voucher is the endpoint the Expo mobile app (and the web voucher form) hits to
+// POST /api/v1/scan/voucher is the endpoint API clients (and the web voucher form) hit to
 // turn pasted coupon *text* OR an uploaded coupon photo into a structured, NOT-yet-saved voucher
 // draft (title/code/store/discount/expiresAt/url/notes). The AI work lives in
 // scanVoucherText/scanVoucherImage; three route-only behaviours live NOWHERE else and a drift here
-// silently breaks mobile coupon capture:
+// silently breaks coupon capture:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, BEFORE any scan call),
 //   - the content-type DISPATCH: `multipart/form-data` → scanVoucherImage(formData); anything else
 //     (JSON / none) → scanVoucherText(String(body.text || '')). The text branch reads the body via

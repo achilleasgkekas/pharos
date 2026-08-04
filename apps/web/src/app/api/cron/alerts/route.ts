@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
  * The alert scan itself has been shipped for a long time: `runAlertChecks()` covers deals,
  * installments due, warranties, return windows, price hikes, trials, gift cards, bills and
  * exceeded budgets, and fans the summary out to every configured notifier (ntfy / Discord /
- * Slack / Telegram / webhooks), the in-app bell, and registered mobile devices. What was
+ * Slack / Telegram / webhooks) and the in-app bell. What was
  * missing is a way to RUN it without a human: the only call site was the "Check & notify now"
  * button in Settings, so an instance nobody opens for months never sent a single alert, no
  * matter how it was configured. This route closes that gap; the button stays exactly as it is

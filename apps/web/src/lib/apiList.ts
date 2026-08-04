@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 /** Shared list/pagination params for the /api/v1 read endpoints.
  *  - limit/offset: page window (limit 1..200, default 50).
  *  - updatedSince: ISO date → only docs with updatedAt >= it. When set, soft-deleted
- *    docs are ALSO returned (flagged `deleted:true`) so a mobile client doing
+ *    docs are ALSO returned (flagged `deleted:true`) so an API client doing
  *    incremental sync can drop locally-removed records. */
 export type ListParams = { limit: number; offset: number; updatedSince: Date | null; sp: URLSearchParams };
 

@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET /api/v1/statements/plans is the mobile app's read side of the installment-plan overview
+// GET /api/v1/statements/plans is the API's read side of the installment-plan overview
 // (mirror of the web InstallmentOverview). It has no sibling test, yet it carries the projection
 // contract the merge/bind write-ops depend on, and it lives NOWHERE else, so a drift here silently
-// corrupts the mobile contract:
+// corrupts the API contract:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, DB never queried),
 //   - the field projection: `key` (the stable grouping key the merge/unmerge write-ops key on) and
-//     `merged` (drives the mobile "unmerge" affordance) MUST be exposed; `itemIds` must be collapsed
+//     `merged` (drives the "unmerge" affordance) MUST be exposed; `itemIds` must be collapsed
 //     to `itemCount` (never leaked), `signature` kept for back-compat,
 //   - the active-before-done sort (computeInstallmentPlans already orders active by soonest payoff;
 //     the route only floats done plans to the end, preserving relative order otherwise),

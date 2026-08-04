@@ -20,7 +20,7 @@ export type GoalLean = {
 
 /** Single source of truth for the v1 Goal JSON shape (list, POST, PATCH). `current`/`remaining`/
  *  `pct`/`done`/`monthsLeft`/`perMonth` are the same derived values the web ReportsClient computes
- *  client-side (lib/goals.ts, never stored) — computed here so the mobile client never has to
+ *  client-side (lib/goals.ts, never stored) — computed here so API clients never have to
  *  reimplement the progress math. */
 export function trim(g: GoalLean): {
   id: string; title: string; targetAmount: number; targetDate: string | null; category: string;

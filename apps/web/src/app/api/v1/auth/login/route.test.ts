@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/auth/login is the ONLY unauthenticated /api/v1 route: the Expo mobile app posts
+// POST /api/v1/auth/login is the ONLY unauthenticated /api/v1 route: an API client posts
 // { username, password } here to obtain the per-user bearer `apiToken` it then sends as
 // `Authorization: Bearer <token>` on every other request. Several route-only behaviours live
-// NOWHERE else and a drift silently locks the app out (or worse, opens brute-force):
+// NOWHERE else and a drift silently locks callers out (or worse, opens brute-force):
 //   - the login rate-limit gate (rateLimit(`login:<ip>`) → 429 BEFORE any body parse / DB read,
 //     keyed by x-forwarded-for → x-real-ip → 'unknown'); off unless API_RATE_LIMIT is set,
 //   - body validation: malformed JSON → 400 'Invalid JSON body'; missing username OR password

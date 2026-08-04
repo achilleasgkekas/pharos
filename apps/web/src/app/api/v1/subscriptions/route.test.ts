@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/subscriptions is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET/POST /api/v1/subscriptions is one of the ~50 REST endpoints under /api/v1.
 // This route carries the richest numeric/enum coercion of the collection routes, and it lives
-// NOWHERE else, so a drift here silently corrupts the mobile contract:
+// NOWHERE else, so a drift here silently corrupts the API contract:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token),
 //   - POST validation: `name` required, `amount` must parse to a finite number (numField),
 //     billingCycle enum-defaulting to 'monthly' (enumField), startDate NaN-guard, and
@@ -331,7 +331,7 @@ describe('P7 auto-discovered suggestions (additive, mirrors discoverUntrackedRec
   });
 });
 
-// P9 multi-currency. The mobile client posts what the invoice PRINTS; the route stores base
+// P9 multi-currency. The API client posts what the invoice PRINTS; the route stores base
 // currency, so `amount` stays directly summable everywhere it already is.
 describe('POST multi-currency (P9)', () => {
   it('converts a foreign amount and records the printed figure + rate', async () => {

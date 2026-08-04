@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/shopping-list is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET/POST /api/v1/shopping-list is one of the ~50 REST endpoints under /api/v1.
 // The [id] PATCH/DELETE half is separate; this covers the collection route. The route is thin —
 // it delegates to getListItems/addListItem — but the response SHAPE and error mapping live
-// NOWHERE else, so a drift here silently corrupts the mobile shopping list:
+// NOWHERE else, so a drift here silently corrupts the shopping list:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, before any action call),
 //   - GET: the { items } wrapper (NOT the standard list envelope), mapped straight off
 //     getListItems(),

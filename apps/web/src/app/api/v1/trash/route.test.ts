@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET /api/v1/trash is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET /api/v1/trash is one of the ~50 REST endpoints under /api/v1.
 // It backs the "Trash" view: a flat, most-recently-deleted-first list of soft-deleted records
-// across every collection (item / receipt / expense / subscription / voucher / task), so the
-// mobile client can show + restore them. The route is a thin verbatim wrapper — it delegates
+// across every collection (item / receipt / expense / subscription / voucher / task), so an
+// API client can show + restore them. The route is a thin verbatim wrapper — it delegates
 // the whole gather-and-sort (and the 30-day auto-purge side effect) to getTrash — but two pieces
-// of route-only behaviour live NOWHERE else, so a drift here silently breaks the mobile Trash tab:
+// of route-only behaviour live NOWHERE else, so a drift here silently breaks the Trash tab:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, BEFORE any getTrash call),
 //   - the envelope: the rows come back under a bare { rows } key, verbatim (no projection, no
 //     filtering, no data/total list envelope) — exactly the TrashRow[] getTrash returns.

@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       projectedEndDate: p.projectedEndDate,
       done: p.done,
       itemCount: p.itemIds.length,
-      // true when a charge was manually bound into this plan → mobile shows "unmerge".
+      // true when a charge was manually bound into this plan → client shows "unmerge".
       merged: p.merged,
     }));
     // Active before done; computeInstallmentPlans already sorts active by soonest payoff.

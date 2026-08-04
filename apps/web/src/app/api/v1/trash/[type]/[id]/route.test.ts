@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 // PATCH /api/v1/trash/:type/:id restores a soft-deleted record (clears deletedAt) — backs the
-// mobile/web Trash screen's "Restore" button. DELETE permanently purges it (doc + files +
+// Trash screen's "Restore" button. DELETE permanently purges it (doc + files +
 // cross-refs) — backs the "Delete forever" button, admin-only. Thin wrappers around the shared
 // `restoreFromTrash`/`purgeTrashEntry` actions (settings/actions.ts) — their own DB/file-cleanup
 // logic is NOT re-tested here.
@@ -10,7 +10,7 @@ import type { NextRequest } from 'next/server';
 // Route-only behaviour pinned here:
 //   1. the local `:type` allow-list mirrors the action layer's `TrashType` union. 'goal' was
 //      added alongside the P12 v1 goals route, and 'loyaltycard' alongside the P20 v1
-//      loyaltycards route (both mobile-parity gaps needing trash restore/purge to actually
+//      loyaltycards route (both needed trash restore/purge to actually
 //      work) — both are now in the accept-list below, not the reject-list.
 //   2. PATCH has NO role check — any authenticated user can restore.
 //   3. DELETE's admin-role check runs BEFORE the type/id guards — a non-admin gets 403 without
@@ -187,7 +187,7 @@ describe('DELETE (purge) — admin gate runs BEFORE type/id validation', () => {
 });
 
 describe('DELETE (purge) — type guard (admin)', () => {
-  it('accepts loyaltycard (P20 mobile-parity allow-list entry)', async () => {
+  it('accepts loyaltycard (P20 allow-list entry)', async () => {
     const res = await DELETE(makeReq('loyaltycard', OID), ctx('loyaltycard', OID));
     expect(res.status).toBe(200);
     expect(purgeState.calls).toEqual([{ type: 'loyaltycard', id: OID }]);

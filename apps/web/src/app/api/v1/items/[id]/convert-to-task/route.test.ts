@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/items/:id/convert-to-task backs the mobile/web "Convert to task" button on an
+// POST /api/v1/items/:id/convert-to-task backs the "Convert to task" button on an
 // item's detail screen — it seeds a new Task from the item (title, price, links as HTML) and
 // leaves the item itself untouched. Thin wrapper around the proven `convertItemToTask` action
 // (items/actions.ts) — that action's own DB/HTML-rendering logic is NOT re-tested here.

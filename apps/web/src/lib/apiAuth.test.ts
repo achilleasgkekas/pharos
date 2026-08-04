@@ -5,8 +5,8 @@ import { apiError } from '@/lib/apiAuth';
 // (see withAuth's 401/500 paths and each handler's validation branches). It must
 // always produce a JSON body of exactly { error: <message> } with the given status,
 // defaulting to 400. These tests pin that contract so a change in shape (e.g. a
-// renamed field or a different default) is caught before it reaches the mobile app,
-// which parses `error` off failed responses.
+// renamed field or a different default) is caught before it reaches API clients,
+// which parse `error` off failed responses.
 
 describe('apiError', () => {
   it('defaults to HTTP 400', () => {

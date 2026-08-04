@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/scan/product is the endpoint the Expo mobile app (and the web shopping-list
-// "snap a product" form) hits to turn an uploaded product photo into a structured, NOT-yet-saved
+// POST /api/v1/scan/product is the endpoint API clients (and the web shopping-list
+// "snap a product" form) hit to turn an uploaded product photo into a structured, NOT-yet-saved
 // item draft (name/brand/category/quantity/notes). The route is thin — the AI work lives in
 // scanProductPhoto — but three route-only behaviours live NOWHERE else and a drift silently
-// breaks mobile product capture:
+// breaks product capture:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, BEFORE any scan call),
 //   - multipart-ONLY intake: unlike scan/expense|voucher there is NO content-type dispatch —
 //     the route always calls scanProductPhoto(await req.formData()), so it never touches readBody,

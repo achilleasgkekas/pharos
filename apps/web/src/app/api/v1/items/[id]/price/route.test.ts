@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/items/:id/price backs the mobile "log a price" action on the item-detail /
+// POST /api/v1/items/:id/price backs the "log a price" action on the item-detail /
 // price-panel screen. The route itself is a thin body-validation gate in front of the proven web
 // `logItemPrice` action (which appends to priceHistory + updates currentPrice). Three route-only
-// behaviours live ONLY here and feed the mobile contract, so a drift silently corrupts it:
+// behaviours live ONLY here and feed the API contract, so a drift silently corrupts it:
 //
 //   1. the ObjectId guard (malformed :id → 400 bad id, BEFORE any body read or action call),
 //   2. the price gate: `Number(b.price)` then `!(price > 0)` → 400. This means a numeric STRING
 //      is accepted (Number('250') === 250), but 0, negatives, and non-numeric strings (→ NaN)
-//      are all rejected with the exact message the mobile form surfaces,
+//      are all rejected with the exact message the form surfaces,
 //   3. the store passthrough: `typeof b.store === 'string' ? b.store : ''` — a non-string store
 //      collapses to '' (the action itself trims/defaults to 'manual'); the route does NOT trim.
 //

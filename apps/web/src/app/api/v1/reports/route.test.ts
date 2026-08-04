@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET /api/v1/reports is one of the ~50 REST endpoints the Expo mobile app drives. It backs the
-// mobile Reports/analytics screen, mirroring the web /reports page. It owns a large amount of pure
-// aggregation that lives NOWHERE else, so a drift here silently corrupts the mobile charts:
+// GET /api/v1/reports is one of the ~50 REST endpoints under /api/v1. It backs the
+// Reports/analytics screen, mirroring the web /reports page. It owns a large amount of pure
+// aggregation that lives NOWHERE else, so a drift here silently corrupts the charts:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, BEFORE any DB read),
 //   - net position = owned-inventory value − installments still owed (active plans only),
 //   - inventory value by category (owned items, value>0, rounded, desc),

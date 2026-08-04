@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// PATCH/DELETE /api/v1/goals/:id — P12 mobile-parity. Mirrors the gift-cards [id] route
+// PATCH/DELETE /api/v1/goals/:id — P12. Mirrors the gift-cards [id] route
 // tests, plus the `addContribution`/`removeContributionId` add/undo operations which —
 // like the web `addGoalContribution`/`removeGoalContribution` actions — push/pull a single
 // entry into the `contributions` subarray (current/progress is always derived, never
-// stored). A drift here silently corrupts the mobile Goals contract:
+// stored). A drift here silently corrupts the Goals API contract:
 //   - the shared `isObjectId` guard (400 before any DB touch),
 //   - PATCH partial-update: only whitelisted fields land in $set, blank title dropped,
 //     empty changeset → 400, returns the SPEC { goal } shape,

@@ -195,7 +195,6 @@ vi.mock('@/lib/backupModels', () => ({
 // (lib/backupVerify.test.ts). Stubbing it here would hide the thing these tests exist
 // to pin — that importData now REFUSES an unusable file before touching the database.
 vi.mock('@/lib/notifiers', () => ({ dispatchAlert: vi.fn(), getNotifiers: vi.fn(), testNotifier: vi.fn() }));
-vi.mock('@/lib/expoPush', () => ({ pushAllDevices: vi.fn() }));
 vi.mock('@/lib/installments', () => ({ computeInstallmentPlans: vi.fn() }));
 vi.mock('@/app/notifications/actions', () => ({ generateNotifications: vi.fn() }));
 vi.mock('@/lib/budgetAlert', () => ({ detectBudgetExceeded: vi.fn() }));

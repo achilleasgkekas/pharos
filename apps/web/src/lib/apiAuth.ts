@@ -37,7 +37,7 @@ export function clientIp(req: NextRequest): string {
 }
 
 /** Resolve the Bearer-token user, or null. Shared by every /api/v1 route. The token
- *  is the per-user `apiToken` (generated at first login or in Settings → Mobile/MCP).
+ *  is the per-user `apiToken` (generated at first login or in Settings → API/MCP).
  *
  *  Runs inside the ambient tenant established by `withAuth`, so the lookup hits THAT
  *  workspace's `users` collection. Self-hosted (no ambient tenant) resolves to the default
@@ -63,7 +63,7 @@ type TenantGateFailure = { status: 404 | 403; error: string };
  *
  * `withRequestTenant` — the gate every feature server action uses — is deliberately NOT used
  * here. It requires an authenticated Account cookie and answers failure with
- * `redirect()`/`notFound()`, which is right for a browser and wrong for a mobile client
+ * `redirect()`/`notFound()`, which is right for a browser and wrong for an API client
  * holding a bearer token: every API call would 307 to the login page.
  *
  * So this mirrors `resolveRequestTenant`'s rule and swaps only the credential. The HOST decides

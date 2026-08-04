@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// PATCH/DELETE /api/v1/loyaltycards/:id — P20 mobile-parity. Mirrors the vouchers [id]
+// PATCH/DELETE /api/v1/loyaltycards/:id — P20. Mirrors the vouchers [id]
 // route tests (plain field PATCH, no subarray) plus the barcodeFormat resolution rule
-// unique to this route. A drift here silently corrupts the mobile Loyalty cards contract:
+// unique to this route. A drift here silently corrupts the Loyalty cards API contract:
 //   - the shared `isObjectId` guard (400 before any DB touch),
 //   - PATCH partial-update: only whitelisted fields land in $set, blank title/cardNumber
 //     dropped, empty changeset → 400, returns the SPEC { loyaltyCard } shape,

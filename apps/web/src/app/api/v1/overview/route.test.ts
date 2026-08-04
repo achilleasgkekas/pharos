@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET /api/v1/overview is one of the ~50 REST endpoints the Expo mobile app drives.
-// It backs the mobile dashboard: headline counts across every collection plus the money owed
+// GET /api/v1/overview is one of the ~50 REST endpoints under /api/v1.
+// It backs the dashboard overview: headline counts across every collection plus the money owed
 // on open installment plans. Unlike the thin { rows } wrappers (trash/jobs), this route owns
-// real shaping logic that lives NOWHERE else, so a drift here silently breaks the mobile home:
+// real shaping logic that lives NOWHERE else, so a drift here silently breaks the overview:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, BEFORE any DB read),
 //   - the per-collection countDocuments FILTERS: shoppingList counts only { checked:false },
 //     subscriptions only { active:true }, openTasks only { status:{$ne:'done'} }, the rest raw,

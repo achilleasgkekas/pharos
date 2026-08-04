@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/bills — P28 mobile-parity (MOBILE_PARITY.md "Bills — payable/due
-// tracker στο mobile"). Mirrors the vouchers v1 route shape/tests exactly, plus the
-// derived `status` field (billStatus) and the default archived-exclusion filter that
-// vouchers doesn't need. A drift here silently corrupts the mobile Bills contract:
+// GET/POST /api/v1/bills — P28 (payable/due bills tracker). Mirrors the vouchers v1
+// route shape/tests exactly, plus the derived `status` field (billStatus) and the
+// default archived-exclusion filter that vouchers doesn't need. A drift here silently
+// corrupts the Bills API contract:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token),
 //   - GET default excludes archived bills; `?archived=1` includes them; `?paid=0`
 //     filters to unpaid only; sort is dueDate ascending (soonest-due first),

@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     // Date-range selector (mirrors web /reports ?months=). When a valid value is
     // given, BOTH windowed series (monthly spend + 12-month cash-flow) use it.
     // No/invalid param keeps the legacy defaults (spend=6, flow=12) so an
-    // un-updated mobile client sees exactly the same windows as before.
+    // un-updated API client sees exactly the same windows as before.
     const rawMonths = Number(req.nextUrl.searchParams.get('months'));
     const selMonths = [6, 12, 24].includes(rawMonths) ? rawMonths : null;
     const spendWindow = selMonths ?? 6;
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
     //    liabilities (remaining installments + last-statement-per-card balance).
     //    Mirrors web /reports page.tsx netWorthNow. Chart/snapshot series is
     //    deliberately NOT captured here (would spam NetWorthSnapshot on every
-    //    mobile poll) — headline + breakdown only, chart deferred. ──
+    //    client poll) — headline + breakdown only, chart deferred. ──
     const byCard = new Map<string, SerializedStatement>();
     for (const st of serializedStatements) {
       const k = st.last4 || st.card || st._id;

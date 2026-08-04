@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/items/import backs the mobile/web "paste a product URL" import flow — it
+// POST /api/v1/items/import backs the "paste a product URL" import flow — it
 // fetches the page, AI-parses it, and either creates a new shopping/inventory Item or merges
 // the price/link into an existing matching one. Thin wrapper around the proven
 // `importItemFromUrl` action (items/actions.ts) — its own fetch/AI-parse/dedup-matching logic

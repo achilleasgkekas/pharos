@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof b.priority === 'string' && ['low', 'normal', 'high'].includes(b.priority)) set.priority = b.priority;
     if (Array.isArray(b.tags)) set.tags = b.tags.map(String);
     if (typeof b.content === 'string') set.content = b.content;
-    // Full-array replacement: mobile sends the complete updated steps list (add/toggle/remove all resolve here).
+    // Full-array replacement: the client sends the complete updated steps list (add/toggle/remove all resolve here).
     if (Array.isArray(b.steps)) set.steps = (b.steps as Array<Record<string, unknown>>).map((s) => ({ text: String(s?.text ?? '').trim(), done: !!s?.done })).filter((s) => s.text);
     if ('dueDate' in b) set.dueDate = b.dueDate ? new Date(String(b.dueDate)) : null;
     if (!Object.keys(set).length) return apiError('no valid fields');

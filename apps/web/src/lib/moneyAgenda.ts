@@ -10,7 +10,7 @@ import type { SerializedStatement } from '@/types';
 // Shared 3-month "money agenda" computation: subscription renewals (stepped per
 // cycle), card installments aggregated per month, recurring bills/income projected,
 // warranty + voucher expiries, plus per-month in/out totals. Used by the /api/v1
-// calendar route (mobile) and the iCal (.ics) subscription feed. English labels —
+// calendar route and the iCal (.ics) subscription feed. English labels —
 // the web /calendar page keeps its own i18n copy since it renders per-locale.
 
 export type AgendaKind = 'renewal' | 'installments' | 'bill' | 'income' | 'warranty' | 'voucher';

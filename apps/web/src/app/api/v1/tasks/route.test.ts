@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/tasks is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET/POST /api/v1/tasks is one of the ~50 REST endpoints under /api/v1.
 // This route carries real request-shaping logic that lives NOWHERE else and would
-// silently corrupt the mobile contract if it drifted:
+// silently corrupt the API contract if it drifted:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token),
 //   - POST validation: `title` required, tags coerced from array | comma-string,
 //     status/priority enum-defaulting, and completedAt auto-set only when status==='done',

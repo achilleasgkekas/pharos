@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET+PATCH /api/v1/settings/ai backs the mobile Settings → AI section (master switch,
+// GET+PATCH /api/v1/settings/ai backs the Settings → AI section (master switch,
 // provider/model/readiness, per-feature toggles). Three pieces of behaviour live only in this
-// route, so a drift here is invisible until someone's phone silently turns AI on or off:
+// route, so a drift here is invisible until an API client silently turns AI on or off:
 //   GET  - ABSENT feature key means ON (a feature shipped in a later release must not read as
 //          off on an install whose aiFeatures map predates it),
 //        - the derived per-feature status: master-off OR feature-off → 'disabled', else
 //          'ready'/'no-provider' from the provider probe (which is skipped entirely when the
 //          master switch is off — a disabled install must not poke a local Ollama),
-//        - the response NEVER carries a credential (this is the whole reason the mobile client
+//        - the response NEVER carries a credential (this is the whole reason an API client
 //          may read AI settings at all).
 //   PATCH- admin-only (a member may write expenses but must not turn on a metered provider),
 //        - unknown feature keys are dropped, not stored,

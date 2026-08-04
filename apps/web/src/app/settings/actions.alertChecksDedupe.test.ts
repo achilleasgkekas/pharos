@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //    signal's line is omitted; a genuinely new/changed signal alongside it still shows.
 //  - dedupe:true, EVERY live signal is already-sent: summary is
 //    'No new alerts (already reported).', NOT 'All clear' (there ARE live alerts, just
-//    none of them are new) — and dispatchAlert/pushAllDevices are NOT called.
+//    none of them are new) — and dispatchAlert is NOT called.
 //  - dedupe:true, genuinely nothing live: summary stays 'All clear — nothing to report.'
 //    (same text as the non-dedupe empty case).
 //  - The AppConfig.alertDispatchKeys baseline is written ONLY when dispatchAlert actually
@@ -51,7 +51,6 @@ const {
   generateNotificationsMock,
   dispatchEventWebhooksMock,
   dispatchAlertMock,
-  pushAllDevicesMock,
   getStorageConfigMock,
   getLastRemoteSyncMock,
   appConfigFindOneMock,
@@ -78,7 +77,6 @@ const {
   generateNotificationsMock: vi.fn(async () => {}),
   dispatchEventWebhooksMock: vi.fn(async () => ({ sent: 0, total: 0 })),
   dispatchAlertMock: vi.fn(async () => ({ sent: 0, total: 0 })),
-  pushAllDevicesMock: vi.fn(async () => 0),
   getStorageConfigMock: vi.fn(async () => ({ backend: 'local' }) as { backend: string }),
   getLastRemoteSyncMock: vi.fn(async () => null as Date | null),
   appConfigFindOneMock: vi.fn(),
@@ -156,7 +154,6 @@ vi.mock('@/lib/notifiers', () => ({
   getNotifiers: vi.fn(async () => []),
   testNotifier: vi.fn(async () => true),
 }));
-vi.mock('@/lib/expoPush', () => ({ pushAllDevices: pushAllDevicesMock }));
 vi.mock('@/lib/installments', () => ({ computeInstallmentPlans: computeInstallmentPlansMock }));
 vi.mock('@/app/notifications/actions', () => ({ generateNotifications: generateNotificationsMock }));
 vi.mock('@/lib/budgetAlert', () => ({ detectBudgetExceeded: detectBudgetExceededMock }));
@@ -237,7 +234,6 @@ beforeEach(() => {
   generateNotificationsMock.mockImplementation(async () => {});
   dispatchEventWebhooksMock.mockImplementation(async () => ({ sent: 0, total: 0 }));
   dispatchAlertMock.mockImplementation(async () => ({ sent: 1, total: 1 })); // "delivered" by default in this file
-  pushAllDevicesMock.mockImplementation(async () => 0);
   getStorageConfigMock.mockImplementation(async () => ({ backend: 'local' }));
   getLastRemoteSyncMock.mockImplementation(async () => null);
   mockDispatchKeys([]); // nothing previously sent, unless a test overrides it
@@ -306,7 +302,6 @@ describe('runAlertChecks · dedupe on, a signal was already sent', () => {
     const result = await runAlertChecks({ dedupe: true });
     expect(result).toEqual({ ok: true, sent: false, summary: 'No new alerts (already reported).' });
     expect(dispatchAlertMock).not.toHaveBeenCalled();
-    expect(pushAllDevicesMock).not.toHaveBeenCalled();
     expect(appConfigUpdateOneMock).not.toHaveBeenCalled();
   });
 

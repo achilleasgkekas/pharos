@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/giftcards — P32 mobile-parity (MOBILE_PARITY.md "Gift cards /
-// store-credit tracker στο mobile"). Mirrors the bills v1 route shape/tests exactly,
-// plus the derived `balance`/`spentPct`/`daysLeft` fields (lib/giftcard.ts), never
-// stored. A drift here silently corrupts the mobile Gift cards contract:
+// GET/POST /api/v1/giftcards — P32 (gift cards / store-credit tracker). Mirrors the
+// bills v1 route shape/tests exactly, plus the derived `balance`/`spentPct`/`daysLeft`
+// fields (lib/giftcard.ts), never stored. A drift here silently corrupts the Gift
+// cards API contract:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token),
 //   - GET default excludes archived cards; `?archived=1` includes them,
 //   - sort is archived-first-false, then soonest expiry, then newest created,

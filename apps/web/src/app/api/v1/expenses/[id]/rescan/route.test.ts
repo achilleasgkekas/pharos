@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/expenses/:id/rescan backs the mobile "re-scan" button on the expense
+// POST /api/v1/expenses/:id/rescan backs the "re-scan" button on the expense
 // detail screen. It is a thin wrapper around the shared `rescanExpense` action (its
 // AI-parse/OCR logic is exercised elsewhere), but the ROUTE owns four pieces of logic
 // with no other test coverage, and each one DIFFERS from the `receipts/[id]/rescan`

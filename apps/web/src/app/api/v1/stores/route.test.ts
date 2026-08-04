@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/stores is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET/POST /api/v1/stores is one of the ~50 REST endpoints under /api/v1.
 // The [id] PATCH/DELETE half is separate; this covers the collection route, whose logic
-// lives NOWHERE else, so a drift here silently corrupts the mobile store picker + receipt
+// lives NOWHERE else, so a drift here silently corrupts the store picker + receipt
 // store field:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, before any DB/getStores),
 //   - GET: the { stores: [...] } wrapper (NOT the standard list envelope) with per-store

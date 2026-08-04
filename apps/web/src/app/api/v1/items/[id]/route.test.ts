@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/PATCH/DELETE /api/v1/items/:id backs the mobile item-detail screen (the richest single
-// record in the Expo app). Two pieces of logic live ONLY in this route, so a drift here silently
-// corrupts the mobile contract with no other test to catch it:
+// GET/PATCH/DELETE /api/v1/items/:id backs the item-detail screen (the richest single
+// record in the API). Two pieces of logic live ONLY in this route, so a drift here silently
+// corrupts the API contract with no other test to catch it:
 //
 //   1. GET's priceStatus() — a server-side mirror of components/PricePanel.tsx that turns links +
 //      priceHistory + targetPrice into one price picture: best-now (cheapest priced link, else
 //      currentPrice), lowest/highest seen, trend (last vs previous history point), a where-to-buy
 //      list sorted cheapest-first, and a single verdict (deal / dropping / rising / good / high /
 //      none). The verdict thresholds (target hit → deal; pos<=0.15 → good; pos>=0.7 → high) are
-//      the exact values the mobile badge reads, so we pin each branch.
+//      the exact values the client's badge reads, so we pin each branch.
 //
 //   2. PATCH's partial coercion, where two fields diverge deliberately:
 //        - currentPrice is only written when it is a real `number` (a numeric STRING is ignored),
@@ -198,7 +198,7 @@ describe('GET serialization', () => {
   });
 });
 
-describe('GET priceStatus (the mobile PricePanel picture)', () => {
+describe('GET priceStatus (the PricePanel picture)', () => {
   it('where-to-buy lists only priced links, cheapest first; best-now = cheapest link', async () => {
     findByIdState.doc = itemDoc({
       currentPrice: 500,

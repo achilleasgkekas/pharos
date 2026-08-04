@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/PATCH /api/v1/lists is one of the ~50 REST endpoints the Expo mobile app drives.
-// It exposes the editable category taxonomies (item/expense/subscription category lists) so the
-// mobile settings screen can read and overwrite them. The route is thin — it delegates to
+// GET/PATCH /api/v1/lists is one of the ~50 REST endpoints under /api/v1.
+// It exposes the editable category taxonomies (item/expense/subscription category lists) so an
+// API client's settings screen can read and overwrite them. The route is thin — it delegates to
 // getListsForEditor/saveList — but the response SHAPE and the validation/error mapping live
-// NOWHERE else, so a drift here silently breaks the mobile taxonomy editor:
+// NOWHERE else, so a drift here silently breaks the taxonomy editor:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, before any action call),
 //   - GET: the { lists } wrapper (NOT the standard list envelope), mapped straight off
 //     getListsForEditor(),

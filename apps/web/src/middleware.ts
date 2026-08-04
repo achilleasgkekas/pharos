@@ -53,7 +53,7 @@ export async function middleware(req: NextRequest) {
   // API + file requests (incl. /api/files): 401, never an HTML redirect — a login
   // page rendered into an <img>/<iframe>/fetch would be confusing and leak nothing.
   if (pathname.startsWith('/api/')) {
-    // The mobile app fetches /api/files with a Bearer token (it has no session cookie).
+    // API clients fetch /api/files with a Bearer token (they have no session cookie).
     // Let those through; the route itself validates the token (Node runtime — the edge
     // can't reach Mongo). Everything else without a session stays 401.
     const hasBearer = /^Bearer\s+/i.test(req.headers.get('authorization') || '');

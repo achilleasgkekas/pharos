@@ -154,7 +154,6 @@ vi.mock('@/lib/notifiers', () => ({
   getNotifiers: getNotifiersMock,
   testNotifier: testNotifierMock,
 }));
-vi.mock('@/lib/expoPush', () => ({ pushAllDevices: vi.fn() }));
 vi.mock('@/lib/installments', () => ({ computeInstallmentPlans: vi.fn() }));
 vi.mock('@/app/notifications/actions', () => ({ generateNotifications: vi.fn() }));
 vi.mock('@/lib/budgetAlert', () => ({ detectBudgetExceeded: vi.fn() }));

@@ -12,8 +12,8 @@ import { canAdmin } from '@/lib/roles';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** The model actually in play for the resolved provider. Read-only display value: the
- *  mobile client shows it so "AI is on" is not an unverifiable claim, but it never sees
+/** The model actually in play for the resolved provider. Read-only display value: an
+ *  API client shows it so "AI is on" is not an unverifiable claim, but it never sees
  *  a key, a host or a base URL — those stay in the web Settings → AI tab, which is the
  *  one place credentials are entered. */
 function activeModel(cfg: AiConfig): string {

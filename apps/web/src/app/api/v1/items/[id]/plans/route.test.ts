@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET /api/v1/items/:id/plans backs the mobile item-detail "link a δόσεις plan" picker — it lists
+// GET /api/v1/items/:id/plans backs the item-detail "link a δόσεις plan" picker — it lists
 // every installment plan across all statements (from the same `computeInstallmentPlans` pure lib
 // the web overview and link-plan route use, already covered by installments.test.ts) and flags
 // which ones already carry this item. Route-only logic that lives ONLY here:

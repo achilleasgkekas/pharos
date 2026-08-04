@@ -862,7 +862,7 @@ export const el: Partial<Dict> = {
   'set.scraperAiTitle': 'AI scraper',
   'set.scraperIntro': 'Ο scraper τιμών τρέχει με δικό του πρόγραμμα (κάθε 6 ώρες). Δώσε του ελαφρύτερο/φθηνότερο μοντέλο από την υπόλοιπη εφαρμογή — η εξαγωγή τιμής είναι απλό text task.',
   'set.aiPromptsTitle': 'Prompts AI',
-  'set.mobileMcpTitle': 'Κινητό / MCP',
+  'set.mobileMcpTitle': 'API / MCP',
   'af.areaDocuments': 'Έγγραφα',
   'af.areaShopping': 'Αγορές & είδη',
   'af.areaAssistant': 'Βοηθός',

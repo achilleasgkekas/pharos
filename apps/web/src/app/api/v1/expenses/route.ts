@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     if (p.updatedSince) { find.setOptions({ withDeleted: true }); count.setOptions({ withDeleted: true }); }
     const [docs, total] = await Promise.all([find.lean() as Promise<ExpenseLean[]>, count]);
     // Anomaly ±% needs the vendor series; only meaningful on a full-list read
-    // (the mobile client fetches limit=200/offset=0). Skip on incremental sync
+    // (API clients typically fetch limit=200/offset=0). Skip on incremental sync
     // (updatedSince returns a partial slice → medians would be wrong).
     const anomalies = p.updatedSince ? [] : computeAnomalies(docs);
     return NextResponse.json(listEnvelope(docs.map((d, i) => trimExpense(d, anomalies[i])), total, p));
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     // Vendor→category auto-rule (P15): the web actions apply this on every creation
     // path (see app/expenses/actions.ts addExpense/uploadExpense) — this route was the
     // one gap, so the same vendor got a different category depending on whether the
-    // expense was entered from web or mobile. An explicit category from the client
+    // expense was entered from the web app or the API. An explicit category from the client
     // still always wins; the rule only fills in the default 'other'.
     const settings = await getAppSettings();
     const explicitCategory = strField(b, 'category', '');

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/scan/expense is the endpoint the Expo mobile app (and the web bill-scan form) hits
+// POST /api/v1/scan/expense is the endpoint API clients (and the web bill-scan form) hit
 // to turn a pasted bill/payslip *text* OR an uploaded photo/PDF into a structured, NOT-yet-saved
 // expense draft. The route itself is thin — the AI work lives in scanExpenseText/scanExpenseImage —
-// but three route-only behaviours live NOWHERE else and a drift silently breaks mobile bill capture:
+// but three route-only behaviours live NOWHERE else and a drift silently breaks bill capture:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, BEFORE any scan call),
 //   - the content-type DISPATCH: `multipart/form-data` → scanExpenseImage(formData); anything else
 //     (JSON / none) → scanExpenseText(String(body.text || '')). The text branch reads the body via

@@ -13,7 +13,7 @@ export type ExpenseLean = {
 /**
  * Single source of truth for the v1 Expense JSON shape.
  * Shared by GET /api/v1/expenses (list) and POST /api/v1/expenses/:id/rescan
- * so the mobile detail can re-prefill in place from either.
+ * so the client's detail view can re-prefill in place from either.
  * `anomaly` (optional ±%) is a cross-doc stat computed by the list route only;
  * single-doc callers (rescan) omit it and it recomputes on the next list load.
  */
@@ -50,7 +50,7 @@ export function trimExpense(e: ExpenseLean, anomaly?: number) {
 
 /** Coerce a raw JSON-body value (POST/PATCH `split`) into a clean SplitEntry[].
  *  Defensive against non-array input and malformed rows — mirrors the web form's
- *  `cleanSplit` sanitation so a split submitted from the mobile app matches. */
+ *  `cleanSplit` sanitation so a split submitted by an API client matches. */
 export function parseSplitField(v: unknown): SplitEntry[] {
   if (!Array.isArray(v)) return [];
   return cleanSplit(

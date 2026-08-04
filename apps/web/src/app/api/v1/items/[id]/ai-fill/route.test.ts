@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// POST /api/v1/items/:id/ai-fill backs the mobile/web "AI fill specs" / "AI fill info" buttons
+// POST /api/v1/items/:id/ai-fill backs the "AI fill specs" / "AI fill info" buttons
 // on an item's detail screen. Thin wrapper around the proven web `aiFillSpecs` / `aiFillInfo`
 // actions (items/actions.ts) — their own web-fetch/AI-parse/merge logic is NOT re-tested here.
 //

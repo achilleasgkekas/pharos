@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  * Re-runs the AI parse on the receipt's stored file (mirror of the web `rescanReceipt`).
  * `ocr:true` forces the OCR path; otherwise embedded PDF text / vision model.
  * Returns the SAME shape as GET /api/v1/receipts/:id (receipt + notes + normalized
- * lineItems) so the mobile detail can re-prefill in place, plus aiUsed/model/aiError.
+ * lineItems) so the client's detail view can re-prefill in place, plus aiUsed/model/aiError.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(req, async () => {
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return apiError(msg, /not found|missing/i.test(msg) ? 404 : 500);
     }
 
-    // Re-read with the exact normalization GET uses, so the mobile re-prefill matches the detail GET.
+    // Re-read with the exact normalization GET uses, so the re-prefill matches the detail GET.
     await connectDB();
     const Receipt = await currentModel(ReceiptModel);
     const doc = await Receipt.findById(id).select('-rawAiResponse').lean();

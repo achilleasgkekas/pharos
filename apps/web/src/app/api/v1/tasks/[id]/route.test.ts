@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// PATCH/DELETE /api/v1/tasks/:id are two of the ~50 REST endpoints the Expo mobile
-// app drives. Their route-level logic lives NOWHERE else and would silently corrupt
-// the mobile contract if it drifted:
+// PATCH/DELETE /api/v1/tasks/:id are two of the ~50 REST endpoints under /api/v1.
+// Their route-level logic lives NOWHERE else and would silently corrupt
+// the API contract if it drifted:
 //   - the shared `isObjectId` guard (a malformed :id must 400 BEFORE any DB touch),
 //   - PATCH partial-update: only the whitelisted, well-typed fields land in $set;
 //     a blank title / out-of-enum status / non-array tags are dropped, an empty
 //     changeset returns 400, status==='done' toggles completedAt, and `dueDate` uses
 //     key-presence ('dueDate' in body) so an explicit null clears it,
-//   - the full-array `steps` replacement (trim + drop empty-text, mobile sends the
+//   - the full-array `steps` replacement (trim + drop empty-text, the client sends the
 //     whole list on every add/toggle/remove),
 //   - DELETE is a SOFT delete ($set deletedAt, recoverable from Trash) — never a hard
 //     removeById — and a missing row 404s.

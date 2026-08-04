@@ -87,7 +87,7 @@ export function totalOwed(expenses: Array<{ split?: SplitEntry[] | null }>): num
 
 /** Clean raw split rows: trim names, drop empties/nameless, round shares to cents.
  *  Shared by the web server action and the /api/v1 write routes (POST/PATCH) so
- *  a split submitted from the mobile app is sanitized identically. */
+ *  a split submitted by an API client is sanitized identically. */
 export function cleanSplit(rows: Array<{ name: string; share: number; settled: boolean }>): SplitEntry[] {
   return (rows || [])
     .map((r) => ({ name: (r.name || '').trim(), share: r2(Number(r.share) || 0), settled: !!r.settled }))

@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
       currency: s.currency,
       // P9: the deployment-wide "entries may be in another currency" switch. Read-only here
       // on purpose (it is a Settings→Money decision for the whole install, not a per-device
-      // one); the mobile client uses it to decide whether to show FX controls at all.
+      // one); API clients use it to decide whether to show FX controls at all.
       multiCurrency: s.multiCurrency,
       defaultVatRate: s.defaultVatRate,
       defaultItemView: s.defaultItemView,
@@ -86,11 +86,11 @@ export async function GET(req: NextRequest) {
  *
  *  ntfy is the one admin-gated pair here, matching `saveNtfy`: the topic URL is an OUTPUT
  *  channel, so whoever can change it re-routes every alert of the whole instance to a topic
- *  of their choosing. Enforcing that on the web while leaving the phone open would make the
+ *  of their choosing. Enforcing that on the web while leaving the API open would make the
  *  web guard decorative.
  *
  *  A non-admin's ntfy fields are dropped SILENTLY rather than failing the request, because
- *  the mobile Settings screen saves everything in one PATCH: a 403 there would read as "none
+ *  an API client's Settings screen saves everything in one PATCH: a 403 there would read as "none
  *  of my settings saved" when in fact currency/VAT/budgets are perfectly allowed. The one
  *  exception is a request that carries nothing BUT ntfy fields — there is no other work to
  *  protect, so answering `ok: true` would be a lie and it gets an honest 403 instead. */

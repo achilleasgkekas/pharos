@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/goals — P12 mobile-parity (MOBILE_PARITY.md "Reports — savings/financial
-// goals στο mobile"). Mirrors the gift-cards v1 route shape/tests exactly, plus the derived
+// GET/POST /api/v1/goals — P12 (Reports — savings/financial goals). Mirrors the
+// gift-cards v1 route shape/tests exactly, plus the derived
 // `current`/`remaining`/`pct`/`done`/`monthsLeft`/`perMonth` fields (lib/goals.ts), never
-// stored. A drift here silently corrupts the mobile Goals contract:
+// stored. A drift here silently corrupts the Goals API contract:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token),
 //   - GET default excludes archived goals; `?archived=1` includes them,
 //   - sort is archived-first-false, then soonest target date, then newest created,

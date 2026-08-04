@@ -16,7 +16,7 @@ import type { SerializedStatement } from '@/types';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** GET /api/v1/overview → headline counts + installments owed (for a mobile dashboard). */
+/** GET /api/v1/overview → headline counts + installments owed (for a dashboard overview). */
 export async function GET(req: NextRequest) {
   return withAuth(req, async () => {
     await connectDB();

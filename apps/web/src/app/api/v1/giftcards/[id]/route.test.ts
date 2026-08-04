@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// PATCH/DELETE /api/v1/giftcards/:id — P32 mobile-parity. Mirrors the bills [id] route
+// PATCH/DELETE /api/v1/giftcards/:id — P32. Mirrors the bills [id] route
 // tests, plus the `addUse`/`removeUseId` spend/reload/undo operations which — like the
 // web `addGiftCardUse`/`removeGiftCardUse` actions — push/pull a single entry into the
 // `uses` subarray (balance is always derived, never stored). A drift here silently
-// corrupts the mobile Gift cards contract:
+// corrupts the Gift cards API contract:
 //   - the shared `isObjectId` guard (400 before any DB touch),
 //   - PATCH partial-update: only whitelisted fields land in $set, blank title dropped,
 //     empty changeset → 400, returns the SPEC { giftCard } shape,

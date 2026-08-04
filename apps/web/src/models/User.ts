@@ -20,9 +20,6 @@ const UserSchema = new Schema(
     // only exposes the 3-month money agenda, so unlike apiToken it IS re-readable in
     // Settings (same model as a Google "secret address in iCal format"). Null = off.
     calendarToken: { type: String, default: null, index: true },
-    // Expo push tokens for this user's mobile devices (one per device/install).
-    // Registered by the mobile app; used to deliver alert pushes.
-    pushTokens: { type: [String], default: [] },
   },
   { timestamps: true }
 );

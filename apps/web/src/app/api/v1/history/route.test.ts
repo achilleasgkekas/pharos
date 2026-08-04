@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET /api/v1/history is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET /api/v1/history is one of the ~50 REST endpoints under /api/v1.
 // It backs the "History" view: a newest-first list of saved AI command-bar conversations,
-// so the mobile client can reopen a past exchange. The route is a thin verbatim wrapper — it
+// so an API client can reopen a past exchange. The route is a thin verbatim wrapper — it
 // delegates the whole find-sort-shape to getConversations — but two pieces of route-only
-// behaviour live NOWHERE else, so a drift here silently breaks the mobile History tab:
+// behaviour live NOWHERE else, so a drift here silently breaks the History tab:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, BEFORE any getConversations call),
 //   - the envelope: the rows come back under a bare { rows } key, verbatim (no projection, no
 //     filtering, no data/total list envelope) — exactly the ConversationRow[] getConversations returns.

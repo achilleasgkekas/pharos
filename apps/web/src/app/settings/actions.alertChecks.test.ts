@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // closings / installment-due / recurring price-hikes / budget-exceeded / free-trial
 // endings / gift-card expiries / bills-due from eight different models, composes one
 // human summary, feeds the in-app notification bell, dispatches outbound event
-// webhooks, and pushes a notifier (ntfy) + mobile summary. actions.notifiers.test.ts
+// webhooks, and pushes a notifier (ntfy). actions.notifiers.test.ts
 // deliberately left this concern out; this file is that promised future slice.
 //
 // Strategy: the underlying per-domain math (detectPriceHikes, detectBudgetExceeded,
@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // lib/giftcard.test.ts, lib/bill.test.ts, lib/installments.test.ts) — those are mocked
 // here so this file only pins runAlertChecks' OWN wiring: which query is issued to
 // which model, how each helper's result feeds the deal/warranty/etc. filter + summary
-// line, and how the final dispatch (bell / event webhooks / ntfy / push) is gated.
+// line, and how the final dispatch (bell / event webhooks / ntfy) is gated.
 //
 // Behaviour pinned:
 //  - deals: Item.find({targetPrice:{$gt:0}}) (1st Item.find call) -> "lowest known
@@ -60,9 +60,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //    (only when budgetsExceeded.length, payload is the raw array). Hikes/warranty/
 //    returns/trials/gift-cards/bills do NOT have a dedicated webhook event.
 //  - Final summary: 'All clear — nothing to report.' when every signal is empty; NO
-//    dispatchAlert/pushAllDevices call in that case. When any line exists, dispatchAlert
-//    ('Pharos alerts', summary) is awaited, `sent` = its `.sent > 0`, and
-//    pushAllDevices() is fired (not awaited) with the same title/summary.
+//    dispatchAlert call in that case. When any line exists, dispatchAlert('Pharos
+//    alerts', summary) is awaited and `sent` = its `.sent > 0`.
 //  - Always returns {ok:true, sent, summary}; connectDB is called once up front.
 
 const {
@@ -87,7 +86,6 @@ const {
   generateNotificationsMock,
   dispatchEventWebhooksMock,
   dispatchAlertMock,
-  pushAllDevicesMock,
   getStorageConfigMock,
   getLastRemoteSyncMock,
 } = vi.hoisted(() => ({
@@ -112,7 +110,6 @@ const {
   generateNotificationsMock: vi.fn(async () => {}),
   dispatchEventWebhooksMock: vi.fn(async () => ({ sent: 0, total: 0 })),
   dispatchAlertMock: vi.fn(async () => ({ sent: 0, total: 0 })),
-  pushAllDevicesMock: vi.fn(async () => 0),
   getStorageConfigMock: vi.fn(async () => ({ backend: 'local' }) as { backend: string }),
   getLastRemoteSyncMock: vi.fn(async () => null as Date | null),
 }));
@@ -191,7 +188,6 @@ vi.mock('@/lib/notifiers', () => ({
   getNotifiers: vi.fn(async () => []),
   testNotifier: vi.fn(async () => true),
 }));
-vi.mock('@/lib/expoPush', () => ({ pushAllDevices: pushAllDevicesMock }));
 vi.mock('@/lib/installments', () => ({ computeInstallmentPlans: computeInstallmentPlansMock }));
 vi.mock('@/app/notifications/actions', () => ({ generateNotifications: generateNotificationsMock }));
 vi.mock('@/lib/budgetAlert', () => ({ detectBudgetExceeded: detectBudgetExceededMock }));
@@ -270,7 +266,6 @@ beforeEach(() => {
   generateNotificationsMock.mockImplementation(async () => {});
   dispatchEventWebhooksMock.mockImplementation(async () => ({ sent: 0, total: 0 }));
   dispatchAlertMock.mockImplementation(async () => ({ sent: 0, total: 0 }));
-  pushAllDevicesMock.mockImplementation(async () => 0);
   // Baseline is the local backend, i.e. no remote that could fall behind. The
   // staleness describe-block below opts each case into a remote backend explicitly.
   getStorageConfigMock.mockImplementation(async () => ({ backend: 'local' }));
@@ -282,7 +277,6 @@ describe('runAlertChecks · all-clear baseline', () => {
     const result = await runAlertChecks();
     expect(result).toEqual({ ok: true, sent: false, summary: 'All clear — nothing to report.' });
     expect(dispatchAlertMock).not.toHaveBeenCalled();
-    expect(pushAllDevicesMock).not.toHaveBeenCalled();
     expect(dispatchEventWebhooksMock).not.toHaveBeenCalled();
   });
 
@@ -716,12 +710,6 @@ describe('runAlertChecks · dispatch gating', () => {
     dispatchAlertMock.mockResolvedValueOnce({ sent: 0, total: 0 });
     const result = await runAlertChecks();
     expect(result.sent).toBe(false);
-  });
-
-  it('fires pushAllDevices with the same title/summary alongside dispatchAlert', async () => {
-    detectPriceHikesMock.mockImplementation(() => [{ vendor: 'Netflix', prev: 13, curr: 15, deltaPct: 15 }]);
-    const result = await runAlertChecks();
-    expect(pushAllDevicesMock).toHaveBeenCalledWith('Pharos alerts', result.summary);
   });
 
   it('joins multiple signal lines with newlines, in scan order', async () => {

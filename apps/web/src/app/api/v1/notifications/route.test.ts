@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/PATCH /api/v1/notifications is one of the ~50 REST endpoints the Expo mobile app drives.
+// GET/PATCH /api/v1/notifications is one of the ~50 REST endpoints under /api/v1.
 // It surfaces the live alert feed (deals / installments / warranties / system) and lets the app
 // mark notifications read. The route is thin — it delegates to getNotifications /
 // markNotificationRead / markAllNotificationsRead — but the response SHAPE and the
-// validation/branch mapping live NOWHERE else, so a drift here silently breaks the mobile
+// validation/branch mapping live NOWHERE else, so a drift here silently breaks the
 // notification centre:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token, before any action call),
 //   - GET: returns getNotifications() verbatim ({ items, unread } — NOT a list envelope, no wrapper),

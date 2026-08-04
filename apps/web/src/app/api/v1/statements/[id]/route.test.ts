@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET /api/v1/statements/:id backs the mobile statement-detail screen (one credit-card statement
+// GET /api/v1/statements/:id backs the statement-detail screen (one credit-card statement
 // with its per-charge transactions + installment info). It is GET-only — statements are created by
 // the PDF-import flow, not here. Two pieces of logic live ONLY in this route, so a drift silently
-// corrupts the mobile contract with no other test to catch it:
+// corrupts the API contract with no other test to catch it:
 //
 //   1. The transaction map: each charge → { id, date (iso|null), description||'', amount||0,
 //      category||'uncategorized', installment }. `installment` is an object ONLY when

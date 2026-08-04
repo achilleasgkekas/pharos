@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// GET/POST /api/v1/loyaltycards — P20 mobile-parity (MOBILE_PARITY.md "Loyalty cards —
-// membership card wallet στο mobile"). Mirrors the giftcards v1 route shape/tests (same
-// archived-filter/sort idiom), minus the balance-derivation logic (LoyaltyCard has no
-// balance — it's just an identity card a checkout scanner reads). A drift here silently
-// corrupts the mobile Loyalty cards contract:
+// GET/POST /api/v1/loyaltycards — P20 (loyalty / membership card wallet). Mirrors the
+// giftcards v1 route shape/tests (same archived-filter/sort idiom), minus the
+// balance-derivation logic (LoyaltyCard has no balance — it's just an identity card a
+// checkout scanner reads). A drift here silently corrupts the Loyalty cards API contract:
 //   - the Bearer-auth gate (withAuth → 401 without a valid token),
 //   - GET default excludes archived cards; `?archived=1` includes them,
 //   - sort is archived-first-false, then title A-Z,

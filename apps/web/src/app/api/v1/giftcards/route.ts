@@ -20,8 +20,8 @@ export type GiftCardLean = {
 
 /** Single source of truth for the v1 GiftCard JSON shape (list, POST, PATCH). `balance`/
  *  `spentPct`/`daysLeft` are the same derived values the web GiftCardsClient computes
- *  client-side (lib/giftcard.ts, never stored) — computed here so the mobile client
- *  never has to reimplement them. */
+ *  client-side (lib/giftcard.ts, never stored) — computed here so API clients
+ *  never have to reimplement them. */
 export function trim(g: GiftCardLean): {
   id: string; title: string; store: string; code: string; initialAmount: number;
   expiresAt: string | null; archived: boolean; notes: string; balance: number; spentPct: number;

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// app/login/actions.ts backs the browser login FORM (distinct from the mobile app's
-// api/v1/auth/login route, which mints a bearer token and has its own dedicated test).
+// app/login/actions.ts backs the browser login FORM (distinct from the
+// api/v1/auth/login route, which mints a bearer token for API clients and has its own dedicated test).
 // This one sets an httpOnly session cookie via setSessionCookie and never touches
 // apiToken/rate-limiting. Behaviour pinned:
 //  - loginAction fails closed with a specific message when AUTH_SECRET isn't configured

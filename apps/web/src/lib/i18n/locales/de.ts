@@ -644,7 +644,7 @@ export const de: Partial<Dict> = {
   'set.scraperAiTitle': 'Scraper-KI',
   'set.scraperIntro': 'Der Preis-Scraper läuft nach eigenem Zeitplan (alle 6 Std.). Gib ihm ein leichteres/günstigeres Modell als der Rest der App — Preisextraktion ist eine einfache Textaufgabe.',
   'set.aiPromptsTitle': 'KI-Prompts',
-  'set.mobileMcpTitle': 'Mobil / MCP',
+  'set.mobileMcpTitle': 'API / MCP',
   'af.areaDocuments': 'Dokumente',
   'af.areaShopping': 'Einkauf & Artikel',
   'af.areaAssistant': 'Assistent',

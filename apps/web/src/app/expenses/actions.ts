@@ -72,7 +72,7 @@ function scanError(err: unknown): string {
 }
 
 /** Parse pasted bill/payslip text into a structured income/expense WITHOUT saving.
- *  Mirrors scanVoucherText: the mobile/web client uses the result to prefill a form. */
+ *  Mirrors scanVoucherText: the client uses the result to prefill a form. */
 export async function scanExpenseText(text: string): Promise<ScanExpenseResult> {
   if (!(await isFeatureEnabled('expenses'))) return { ok: false, error: 'Bill scanning (AI) is turned off.' };
   if (!text.trim()) return { ok: false, error: 'Paste some bill text first' };

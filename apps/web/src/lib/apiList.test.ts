@@ -3,8 +3,8 @@ import type { NextRequest } from 'next/server';
 import { listParams, withSince, listEnvelope, iso, type ListParams } from './apiList';
 
 // apiList holds the shared list/pagination contract for EVERY /api/v1 read endpoint
-// (receipts, tasks, expenses, subscriptions, statements, …) that the mobile app polls
-// for incremental sync. A regression here silently corrupts every mobile list fetch:
+// (receipts, tasks, expenses, subscriptions, statements, …) that API clients poll
+// for incremental sync. A regression here silently corrupts every list fetch:
 // wrong page windows, a dropped updatedSince cursor (→ full re-download or missed
 // deletes), or a changed envelope shape the client can't parse. These tests pin the
 // ACTUAL clamp/parse behavior so the sync contract can't drift unnoticed.
