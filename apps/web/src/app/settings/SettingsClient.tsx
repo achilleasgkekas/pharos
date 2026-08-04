@@ -23,6 +23,7 @@ import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/stat
 import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, changeOwnPassword, type UserRow } from './users.actions';
 import { McpManager } from './McpManager';
 import { CalendarFeedManager } from './CalendarFeedManager';
+import { UpdateChecker } from './UpdateChecker';
 import { BookmarkletManager } from './BookmarkletManager';
 import { RecomputePricesButton } from './RecomputePricesButton';
 import { getSampleDataStatus, loadSampleData, clearSampleData } from './sampleDataActions';
@@ -210,9 +211,7 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
               <SelfPasswordCard />
 
               <Section title={t('set.about')}>
-                <Row label={t('set.version')}>
-                  <span style={{ fontFamily: 'var(--font-mono)' }}>v0.1.0 dev</span>
-                </Row>
+                <UpdateChecker canEdit={isAdmin} />
                 <Row label={t('set.host')}>
                   <span className="text-[color:var(--color-text-dim)]">Mac mini M4 · Docker</span>
                 </Row>

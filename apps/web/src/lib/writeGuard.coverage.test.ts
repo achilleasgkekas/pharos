@@ -37,6 +37,11 @@ const ALLOWLIST: Record<string, string> = {
   // page a viewer opens throw. Neither can store user-supplied content.
   'notifications/actions.ts:generateNotifications': 'derived refresh on load, no user input',
   'receipts/actions.ts:backfillReceiptThumbs': 'self-heal on load, no user input',
+  // Same shape (P40): runs when Settings → About renders, and the only thing it stores is
+  // the 24h cache of a version string read from a PUBLIC registry — no user-supplied
+  // content, nothing another user sees. Guarding it would mean a viewer cannot even see
+  // which version the instance is running. The opt-out toggle beside it IS guarded.
+  'settings/updateCheckActions.ts:getUpdateStatus': 'derived refresh on load, no user input',
 };
 
 /** A server action changes stored state if it refreshes the UI after itself, or if it

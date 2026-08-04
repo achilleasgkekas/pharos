@@ -46,6 +46,11 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+# Which release this image is (P40). The release workflow passes the semver tag it is
+# publishing; a plain local `docker compose build` leaves it as `dev`, and a `dev` build
+# deliberately never shows an "update available" banner (see lib/versionCheck.ts).
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs

@@ -53,6 +53,11 @@ jobs:
           file: ./apps/web/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          # Stamp the image with the version it is being published as, so the running
+          # app can tell the user which release they are on and whether a newer one
+          # exists (P40). A manual (edge) run has no semver, so it stays `dev`.
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version || 'dev' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

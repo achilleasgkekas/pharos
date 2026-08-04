@@ -771,6 +771,13 @@ export const en = {
   'exdup.recurring': 'recurring',
   'exdup.manual': 'manual',
 
+  // Self-host update check (P40)
+  'upd.available': 'Update available: v{version} — see the release notes',
+  'upd.upToDate': 'Up to date.',
+  'upd.checkNow': 'Check for updates now',
+  'upd.toggle': 'Check for updates',
+  'upd.toggleHint': 'One anonymous request a day to the public registry. Nothing about this instance is sent.',
+
   // Settings
   'set.tabGeneral': 'General',
   'set.tabMoney': 'Money',

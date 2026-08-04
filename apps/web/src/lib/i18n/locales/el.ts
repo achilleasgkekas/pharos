@@ -725,6 +725,13 @@ export const el: Partial<Dict> = {
   'exdup.recurring': 'επαναλαμβανόμενο',
   'exdup.manual': 'χειροκίνητα',
 
+  // Έλεγχος ενημερώσεων self-host (P40)
+  'upd.available': 'Διαθέσιμη ενημέρωση: v{version} — δες τις σημειώσεις έκδοσης',
+  'upd.upToDate': 'Είσαι στην τελευταία έκδοση.',
+  'upd.checkNow': 'Έλεγχος για ενημερώσεις τώρα',
+  'upd.toggle': 'Έλεγχος για ενημερώσεις',
+  'upd.toggleHint': 'Ένα ανώνυμο αίτημα την ημέρα στο δημόσιο registry. Δεν στέλνεται τίποτα για αυτή την εγκατάσταση.',
+
   'set.tabGeneral': 'Γενικά',
   'set.tabMoney': 'Οικονομικά',
   'set.tabAi': 'AI',

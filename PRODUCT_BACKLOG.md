@@ -1028,7 +1028,30 @@
 - **Ανοιχτή απόφαση (builder default):** group by `vendorKey` (ήδη υπάρχει η normalize function) + ίδια ημέρα +
   ποσό· reuse UI pattern από το `ReceiptsClient` DuplicatesModal ατόφιο (ίδιο review-before-merge flow).
 
-### P40. Self-host update-available banner (GHCR version check) — S — OSS (adoption/retention lever)
+### P40. Self-host update-available banner (GHCR version check) — ✅ SHIPPED 2026-08-04 (pharos-daily-dev)
+- **Τι έγινε:** νέο pure `lib/versionCheck.ts` (parse/compare/pick-latest + ο anonymous GHCR fetch), action file
+  `settings/updateCheckActions.ts` (`getUpdateStatus(force?)` / `setUpdateCheckEnabled`), component
+  `UpdateChecker` στο Settings → About (πραγματική έκδοση, «Update available: vX.Y.Z» με link στα releases,
+  «check now», opt-out toggle), **`ARG APP_VERSION=dev`** στο `apps/web/Dockerfile` και `build-args` στο
+  `release.yml` ώστε το image να ξέρει ποια έκδοση είναι.
+- **Πολιτική (pinned με tests):** 1 ανώνυμο GET/24ωρο· **αποτυχημένος έλεγχος ΣΤΑΜΠΑΡΕΙ την προσπάθεια αλλά
+  ΔΕΝ σβήνει την τελευταία πραγματική απάντηση** (firewalled instance κάνει back off χωρίς να χάνει ό,τι ήξερε)·
+  το «check now» παρακάμπτει το cache· opt-out **πριν** από οποιοδήποτε outbound call· **μηδέν** στο SaaS.
+- **Ένα build που δεν είναι release (`dev`/`edge`) ΔΕΝ ειδοποιείται ποτέ** — δεν έχει «μείνει πίσω», μπορεί
+  και να είναι μπροστά· ένα banner εκεί είναι μόνο θόρυβος. Ούτε τα convenience tags (`latest`, `1`, `1.2`)
+  ούτε τα pre-release (`1.5.0-rc1`) περνάνε για εκδόσεις.
+- **Δεν εμπιστεύεται τη σειρά των tags** του registry (το OCI spec τα δίνει λεξικογραφικά, όπου το `1.9.0`
+  βγαίνει μετά το `1.10.0`): κάνει parse και παίρνει το max, με bounded pagination (5 σελίδες) ώστε ένα project
+  με 100+ releases να μην παγώνει σιωπηλά στην πρώτη σελίδα.
+- **Ο repo-wide write-guard (P31) το έπιασε σωστά**: το `getUpdateStatus` γράφει cache σε page load, οπότε
+  μπήκε στο allowlist του `writeGuard.coverage.test.ts` με τον λόγο (ίδιο σχήμα με τα ήδη υπάρχοντα
+  `generateNotifications` / `backfillReceiptThumbs`: derived refresh, μηδέν user input). Το toggle δίπλα του
+  είναι κανονικά guarded.
+- **⚠ ΕΚΚΡΕΜΕΙ για να ανάψει στην πράξη:** το `ghcr.io/achilleasgkekas/pharos` **δεν είναι δημόσιο** (επαληθεύτηκε
+  live: anonymous token → 403 DENIED, ενώ η ίδια ροή σε δημόσιο package δίνει 200). Μέχρι να γίνει public το
+  package (ή να δημοσιευτεί το OSS repo), ο έλεγχος θα αποτυγχάνει σιωπηλά, ακριβώς όπως σχεδιάστηκε.
+
+### P40 (αρχικό spec, για ιστορικό) — S — OSS (adoption/retention lever)
 - **Αξία:** το TODO §4 δημοσιεύει ήδη versioned images στο GHCR (`vX.Y.Z`/`latest`), αλλά ένας self-host χρήστης
   δεν έχει **κανέναν** τρόπο μέσα στο app να μάθει ότι υπάρχει νεότερη έκδοση εκτός αν παρακολουθεί χειροκίνητα
   το repo. Ένα απλό check (τρέχον `APP_VERSION` env/build-arg vs GHCR `/latest` tag μέσω public registry API,

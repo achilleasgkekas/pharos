@@ -126,6 +126,14 @@ const AppConfigSchema = new Schema(
     // the OneDrive batched path, and auto-mirror-on-verify). Powers the staleness alert
     // (P48): without it, a mirror that stopped working looks exactly like a fresh one.
     lastRemoteSyncAt: { type: Date, default: null },
+    // Self-host update check (P40). `updateCheckEnabled` is the opt-out for anyone who
+    // does not want the instance making ANY outbound call; the other two are the 24h
+    // cache, kept here rather than in memory so a container restart does not turn into
+    // another registry request. `updateCheckAt` stamps every ATTEMPT (a firewalled
+    // instance must back off too), `updateCheckLatest` only ever holds a real answer.
+    updateCheckEnabled: { type: Boolean, default: true },
+    updateCheckAt: { type: Date, default: null },
+    updateCheckLatest: { type: String, default: '' },
     // Outbound alert dedup (P82). The dedupeKeys (same scheme as the in-app bell, see
     // app/notifications/actions.ts) that were part of the last successfully-dispatched
     // ntfy/Discord/Slack/Telegram/webhook alert. Only touched by runAlertChecks' opt-in
