@@ -861,7 +861,19 @@
   searchable πρέπει να είναι edit/delete-able, ίδιο soft-delete pattern με τα ήδη-υπάρχοντα)· `GiftCard.uses[]`
   spend-log μένει εκτός update/delete μέσω AI (πιο ασφαλές να μένει UI-only, αποφυγή λάθος αλλαγής υπολοίπου).
 
-### P74. Backup restore verification (αυτόματο integrity self-test, όχι μόνο export) — S — OSS (self-host trust lever)
+### P74. Backup restore verification (αυτόματο integrity self-test, όχι μόνο export) — ✅ SHIPPED 2026-08-04 (pharos-daily-dev)
+- **Τι έγινε:** νέο pure `lib/backupVerify.ts` (`verifyBackupJson`) + action `verifyBackup` + κουμπί «Verify…»
+  στο Settings → Storage & backup, ΚΑΙ pre-flight μέσα στο `importData`. Δύο επίπεδα: **error** = το αρχείο δεν
+  είναι χρησιμοποιήσιμο backup (κενό, truncated, χωρίς envelope, μηδέν έγγραφα) → η επαναφορά **αρνείται**·
+  **warning** = κάτι θα παραλειφθεί (λείπουσα/μη-λίστα συλλογή, entries που δεν είναι έγγραφα, έγγραφα χωρίς
+  `_id`, άγνωστα keys) → η επαναφορά **προχωρά** αλλά τα αναφέρει. **Απόκλιση από το spec, σκόπιμη**: το
+  «διάβασε το τελευταίο τοπικό backup αρχείο από `~/Backups/pharos/`» είναι αδύνατο, ο web container mount-άρει
+  ΜΟΝΟ το `./data/storage` και δεν βλέπει τον φάκελο του host· ο χρήστης δίνει το αρχείο (file picker), που
+  καλύπτει και ένα αρχείο κατεβασμένο από το remote mirror.
+- **Πλευρικό κέρδος:** το `importData` παλιά έκανε σιωπηλό `continue` σε χαλασμένη συλλογή και επέστρεφε
+  «restored 0» ως επιτυχία· τώρα λέει τι έπεσε έξω.
+
+### P74 (αρχικό spec, για ιστορικό) — S — OSS (self-host trust lever)
 - **Αξία:** live-verified `grep -rn "verifyBackup|backupHealth|restoreTest|integrityCheck" apps/web/src` = 0 hits.
   Το ήδη-shipped `exportData()` (Settings → Backup/Restore) + το nightly `backup.sh` (CLAUDE.md) **γράφουν** το
   backup αρχείο αλλά ποτέ δεν το ξανα-διαβάζουν για να επιβεβαιώσουν ότι είναι έγκυρο JSON με τα αναμενόμενα

@@ -6,7 +6,7 @@ import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
+import { saveAiConfig, pullOllamaModel, testAnthropic, saveStore, deleteStore, setAiConfirmBulk, exportData, importData, verifyBackup, exportCSV, exportInsuranceBundle, exportTaxBundle, saveBudgets, saveBudgetRollover, suggestBudgets, saveAssetAccounts, saveDepreciation, saveCategoryRules, setAiEnabled, setAiFeature, fetchProviderModels } from './actions';
 import { applyCategoryRulesToExisting } from '@/app/expenses/actions';
 import type { CategoryRule } from '@/lib/categoryRules';
 import { AI_FEATURES } from '@/lib/aiFeatures';
@@ -2689,6 +2689,8 @@ function BackupRestore() {
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const verifyRef = useRef<HTMLInputElement>(null);
+  const [report, setReport] = useState<{ ok: boolean; headline: string; issues: { level: string; message: string }[] } | null>(null);
   const confirm = useConfirm();
   const nowYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(nowYear);
@@ -2723,10 +2725,39 @@ function BackupRestore() {
     if (fileRef.current) fileRef.current.value = '';
     if (!ok) return;
     setMsg(t('set.restoring'));
+    setReport(null);
     const text = await file.text();
     startTransition(async () => {
       const r = await importData(text);
       setMsg(r.ok ? t('set.restored', { n: r.restored }) : `${t('common.failed')}: ${r.error}`);
+      // A restore that skipped collections or documents used to look identical to a
+      // clean one; surface what was dropped instead of leaving it silent.
+      if (r.warnings?.length) {
+        setReport({ ok: true, headline: t('set.restoreSkipped'), issues: r.warnings.map((message) => ({ level: 'warning', message })) });
+      }
+    });
+  }
+
+  /** Read-only integrity check — never writes, so no confirmation is needed. */
+  async function handleVerify(file: File) {
+    if (verifyRef.current) verifyRef.current.value = '';
+    setMsg(null);
+    setReport(null);
+    const text = await file.text();
+    startTransition(async () => {
+      try {
+        const r = await verifyBackup(text);
+        const stamp = r.exportedAt ? new Date(r.exportedAt).toLocaleDateString('en-GB') : '—';
+        setReport({
+          ok: r.ok,
+          headline: r.ok
+            ? t('set.verifyOk', { date: stamp, summary: r.summary })
+            : t('set.verifyBad', { name: file.name }),
+          issues: r.issues,
+        });
+      } catch (e) {
+        setReport({ ok: false, headline: `${t('common.failed')}: ${(e as Error).message.slice(0, 120)}`, issues: [] });
+      }
     });
   }
 
@@ -2816,12 +2847,44 @@ function BackupRestore() {
           className="hidden"
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
+        <button type="button" onClick={() => verifyRef.current?.click()} disabled={pending} className={cn(btn, 'text-[color:var(--color-text-dim)]')} title={t('set.verifyBackupDesc')}>
+          <ShieldCheck size={13} /> {t('set.verifyBackup')}
+        </button>
+        <input
+          ref={verifyRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleVerify(e.target.files[0])}
+        />
         {msg && (
           <span className={cn('text-[11px]', msg.startsWith('Failed') || msg.includes('failed') ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-accent)]')} style={{ fontFamily: 'var(--font-mono)' }}>
             {msg}
           </span>
         )}
       </div>
+      {report && (
+        <div
+          className={cn(
+            'mt-2 rounded-lg border px-3 py-2 text-[11px]',
+            report.ok
+              ? 'border-[color:var(--color-border)] bg-[color:var(--color-surface-2)]'
+              : 'border-[color:var(--color-red)] bg-[color:var(--color-surface-2)]'
+          )}
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          <p className={report.ok ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'}>{report.headline}</p>
+          {report.issues.length > 0 && (
+            <ul className="mt-1.5 space-y-1">
+              {report.issues.map((issue, i) => (
+                <li key={i} className={issue.level === 'error' ? 'text-[color:var(--color-red)]' : 'text-[color:var(--color-gold)]'}>
+                  {issue.level === 'error' ? '✕' : '⚠'} {issue.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       <div className="flex items-center gap-2 flex-wrap mt-2">
         <span className="text-[10px] text-[color:var(--color-text-faint)] mr-1" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.spreadsheetCsv')}</span>
         {(['receipts', 'expenses', 'items'] as const).map((k) => (

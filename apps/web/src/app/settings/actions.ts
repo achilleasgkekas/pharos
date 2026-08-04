@@ -58,7 +58,8 @@ import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel, type AiProviderId } from '@/lib/aiModels';
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
 import { runNtfyTest } from '@/lib/notify';
-import { BACKUP_MODELS } from '@/lib/backupModels';
+import { BACKUP_MODELS, BACKUP_KEYS } from '@/lib/backupModels';
+import { verifyBackupJson, formatBackupCounts, type BackupVerifyResult } from '@/lib/backupVerify';
 import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '@/lib/notifiers';
 import { pushAllDevices } from '@/lib/expoPush';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -1250,6 +1251,19 @@ export async function exportData(): Promise<string> {
   return JSON.stringify({ app: 'homepage', version: 1, exportedAt: new Date().toISOString(), collections });
 }
 
+/**
+ * Check a backup file without restoring it (Settings → Storage & backup → Verify).
+ *
+ * Read-only: it never touches the database, so it is safe to run on any file at any
+ * time. This is the answer to "is the backup I have been taking for months actually
+ * restorable?", a question that otherwise only gets asked at the worst possible moment.
+ */
+export async function verifyBackup(json: string): Promise<BackupVerifyResult & { summary: string }> {
+  await requireAdmin();
+  const result = verifyBackupJson(json, BACKUP_KEYS);
+  return { ...result, summary: formatBackupCounts(result) };
+}
+
 /** Build a CSV string (quote fields containing commas/quotes/newlines). */
 function toCSV(headers: string[], rows: (string | number)[][]): string {
   const esc = (v: string | number) => {
@@ -1599,16 +1613,20 @@ function isSafeStoredPath(p: unknown): boolean {
 }
 
 /** Restore from a backup JSON — upserts each document by _id (merges, never duplicates). */
-export async function importData(json: string): Promise<{ ok: boolean; restored: number; error?: string }> {
+export async function importData(json: string): Promise<{ ok: boolean; restored: number; error?: string; warnings?: string[] }> {
   await requireAdmin();
-  let data: { collections?: Record<string, unknown[]> };
-  try {
-    data = JSON.parse(json);
-  } catch {
-    return { ok: false, restored: 0, error: 'File is not valid JSON' };
+  // Pre-flight the same check the Verify button runs. Errors mean the file is not a
+  // usable backup at all (empty, truncated, no envelope, zero documents) — cases that
+  // used to either throw a vague message or, worse, report a successful restore of
+  // nothing. Warnings do NOT block: a backup missing one collection is still worth
+  // restoring, but the user is told what got skipped instead of it happening silently.
+  const check = verifyBackupJson(json, BACKUP_KEYS);
+  if (!check.ok) {
+    return { ok: false, restored: 0, error: check.issues.filter((i) => i.level === 'error').map((i) => i.message).join(' ') };
   }
-  const cols = data?.collections;
-  if (!cols || typeof cols !== 'object') return { ok: false, restored: 0, error: 'Not a homepage backup file' };
+  const warnings = check.issues.filter((i) => i.level === 'warning').map((i) => i.message);
+  const data = JSON.parse(json) as { collections?: Record<string, unknown[]> };
+  const cols = data.collections as Record<string, unknown[]>;
 
   await connectDB();
   let restored = 0;
@@ -1644,7 +1662,7 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
   invalidateStoreCache();
   revalidatePath('/settings');
   revalidatePath('/');
-  return { ok: true, restored };
+  return { ok: true, restored, ...(warnings.length > 0 ? { warnings } : {}) };
 }
 
 // ─── Trash (soft-deleted records) ────────────────────────────────────────────

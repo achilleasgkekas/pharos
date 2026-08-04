@@ -53,6 +53,13 @@ export const BACKUP_MODELS = {
 export type BackupKey = keyof typeof BACKUP_MODELS;
 
 /**
+ * The same registry as a plain key list, for code that must know WHICH collections a
+ * backup should carry without pulling in the Mongoose models (lib/backupVerify.ts is
+ * pure and model-free by design, so it takes this as an argument).
+ */
+export const BACKUP_KEYS: readonly string[] = Object.keys(BACKUP_MODELS);
+
+/**
  * Models deliberately kept OUT of the JSON backup, each with the reason. This is not
  * documentation only: the guard test reads src/models and requires every file to appear
  * either here or in BACKUP_MODELS, so a new model forces an explicit decision.

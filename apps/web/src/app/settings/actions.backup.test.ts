@@ -52,6 +52,12 @@ import JSZip from 'jszip';
 //    WITH an _id upserts via updateOne(...).setOptions({withDeleted:true}), a doc
 //    WITHOUT one calls Model.create; a doc that throws is skipped (not counted,
 //    not fatal to the rest of the restore).
+//  - verifyBackup (P74): admin-gated, and READ-ONLY — it must never reach connectDB,
+//    since the whole point is that checking a backup is free of consequence.
+//  - importData pre-flight (P74): refuses a file with nothing restorable in it rather
+//    than reporting a successful empty restore, and returns `warnings` naming whatever
+//    it skipped (previously silent). The verdict rules themselves live in
+//    lib/backupVerify.test.ts; this file pins how importData ACTS on them.
 
 const {
   connectDBMock,
@@ -181,7 +187,13 @@ vi.mock('@/lib/backupModels', () => ({
     items: { find: itemFindMock, updateOne: itemUpdateOneMock, create: itemCreateMock },
     receipts: { find: receiptFindMock, updateOne: receiptUpdateOneMock, create: receiptCreateMock },
   },
+  // Same two keys as a plain list: importData's pre-flight and the verifyBackup action
+  // take the key registry rather than the models (lib/backupVerify.ts is model-free).
+  BACKUP_KEYS: ['items', 'receipts'],
 }));
+// NOT mocked: lib/backupVerify is a pure function with its own dedicated tests
+// (lib/backupVerify.test.ts). Stubbing it here would hide the thing these tests exist
+// to pin — that importData now REFUSES an unusable file before touching the database.
 vi.mock('@/lib/notifiers', () => ({ dispatchAlert: vi.fn(), getNotifiers: vi.fn(), testNotifier: vi.fn() }));
 vi.mock('@/lib/expoPush', () => ({ pushAllDevices: vi.fn() }));
 vi.mock('@/lib/installments', () => ({ computeInstallmentPlans: vi.fn() }));
@@ -201,7 +213,7 @@ vi.mock('@/lib/webhooks', () => ({
 vi.mock('@/lib/ssrf', () => ({ assertPublicUrl: vi.fn() }));
 vi.mock('next/cache', () => ({ revalidatePath: (...args: unknown[]) => revalidatePathMock(...args) }));
 
-import { exportData, exportCSV, exportInsuranceBundle, exportTaxBundle, importData } from './actions';
+import { exportData, exportCSV, exportInsuranceBundle, exportTaxBundle, importData, verifyBackup } from './actions';
 
 function chainData(data: unknown[]) {
   const obj: { select: () => typeof obj; sort: () => typeof obj; lean: () => Promise<unknown[]> } = {
@@ -505,35 +517,96 @@ describe('exportTaxBundle', () => {
   });
 });
 
+describe('verifyBackup', () => {
+  it('is admin-gated', async () => {
+    requireAdminMock.mockRejectedValueOnce(new Error('not admin'));
+    await expect(verifyBackup('{}')).rejects.toThrow('not admin');
+  });
+
+  it('never touches the database — checking a backup must be free of consequence', async () => {
+    await verifyBackup(JSON.stringify({ collections: { items: [{ _id: 'i1' }] } }));
+    expect(connectDBMock).not.toHaveBeenCalled();
+    expect(itemFindMock).not.toHaveBeenCalled();
+    expect(itemUpdateOneMock).not.toHaveBeenCalled();
+    expect(itemCreateMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('returns the verdict plus a human-readable summary of what the file holds', async () => {
+    const r = await verifyBackup(
+      JSON.stringify({
+        app: 'homepage',
+        version: 1,
+        exportedAt: '2026-08-04T03:30:00.000Z',
+        collections: { items: [{ _id: 'i1' }, { _id: 'i2' }], receipts: [{ _id: 'r1' }] },
+      })
+    );
+    expect(r.ok).toBe(true);
+    expect(r.summary).toBe('2 items, 1 receipts');
+    expect(r.exportedAt).toBe('2026-08-04T03:30:00.000Z');
+    expect(r.totalDocs).toBe(3);
+  });
+
+  it('reports a corrupted file as not ok, with the reason', async () => {
+    const r = await verifyBackup('{"collections":{"items":[');
+    expect(r.ok).toBe(false);
+    expect(r.issues.some((i) => i.level === 'error' && /not valid json/i.test(i.message))).toBe(true);
+  });
+});
+
 describe('importData', () => {
   it('requires admin even before attempting to parse the JSON', async () => {
     requireAdminMock.mockRejectedValueOnce(new Error('not admin'));
     await expect(importData('not json')).rejects.toThrow('not admin');
   });
 
-  it('rejects invalid JSON without ever calling connectDB', async () => {
+  // ── Pre-flight (P74) ──────────────────────────────────────────────────────
+  // importData now runs verifyBackupJson BEFORE connectDB. The three "rejects"
+  // cases below all used to reach a bare `return {ok:false}` (or, for the empty
+  // one, a cheerful `{ok:true, restored:0}`); the value of the change is that the
+  // message now says WHICH way the file is broken. The exact strings come from
+  // lib/backupVerify.ts and are pinned there — matched loosely here on purpose so
+  // rewording the message does not fail two suites at once.
+
+  it('rejects invalid JSON without ever calling connectDB, saying the file is truncated/corrupted', async () => {
     const result = await importData('{not valid json');
-    expect(result).toEqual({ ok: false, restored: 0, error: 'File is not valid JSON' });
+    expect(result.ok).toBe(false);
+    expect(result.restored).toBe(0);
+    expect(result.error).toMatch(/not valid json/i);
     expect(connectDBMock).not.toHaveBeenCalled();
   });
 
   it('rejects a payload without a collections object, without ever calling connectDB', async () => {
     const result = await importData(JSON.stringify({ app: 'homepage' }));
-    expect(result).toEqual({ ok: false, restored: 0, error: 'Not a homepage backup file' });
+    expect(result.ok).toBe(false);
+    expect(result.restored).toBe(0);
+    expect(result.error).toMatch(/no "collections" section/i);
     expect(connectDBMock).not.toHaveBeenCalled();
   });
 
-  it('skips a BACKUP_MODELS key that is missing or not an array in the payload', async () => {
-    const result = await importData(JSON.stringify({ collections: { items: 'not-an-array' } }));
-    expect(result).toEqual({ ok: true, restored: 0 });
+  it('REFUSES a payload with nothing restorable in it instead of reporting a successful empty restore', async () => {
+    // Behaviour change, deliberate: `{items: 'not-an-array'}` (and an array holding
+    // only junk) previously returned {ok:true, restored:0}, which reads as "restore
+    // succeeded" — the exact silent failure P74 exists to end. Nothing was written
+    // then and nothing is written now; only the verdict changed.
+    for (const collections of [{ items: 'not-an-array' }, { items: ['just a string', null, 42] }]) {
+      const result = await importData(JSON.stringify({ collections }));
+      expect(result.ok).toBe(false);
+      expect(result.error).toMatch(/no documents at all/i);
+    }
+    expect(connectDBMock).not.toHaveBeenCalled();
     expect(itemUpdateOneMock).not.toHaveBeenCalled();
     expect(itemCreateMock).not.toHaveBeenCalled();
   });
 
-  it('skips a non-object entry inside a collection array', async () => {
-    const result = await importData(JSON.stringify({ collections: { items: ['just a string', null, 42] } }));
-    expect(result).toEqual({ ok: true, restored: 0 });
-    expect(itemCreateMock).not.toHaveBeenCalled();
+  it('still restores the good part of a file whose other collection is unusable, and REPORTS the skip', async () => {
+    // Warnings must never block: 1 good collection out of 2 is worth restoring at the
+    // moment a user actually needs it. What must not happen is the skip being silent.
+    const result = await importData(JSON.stringify({ collections: { items: [{ title: 'Mouse' }], receipts: 'not-an-array' } }));
+    expect(result.ok).toBe(true);
+    expect(result.restored).toBe(1);
+    expect(result.warnings?.join(' ')).toMatch(/receipts: not a list/i);
+    expect(receiptCreateMock).not.toHaveBeenCalled();
   });
 
   it('upserts a doc WITH an _id via updateOne(...).setOptions({withDeleted:true}), stripping __v/createdAt/updatedAt', async () => {
@@ -541,23 +614,30 @@ describe('importData', () => {
     itemUpdateOneMock.mockReturnValueOnce({ setOptions: setOptionsMock });
     const result = await importData(JSON.stringify({ collections: { items: [{ _id: 'i1', __v: 3, createdAt: 'x', updatedAt: 'y', title: 'Mouse' }] } }));
 
-    expect(result).toEqual({ ok: true, restored: 1 });
+    expect(result.ok).toBe(true);
+    expect(result.restored).toBe(1);
     expect(itemUpdateOneMock).toHaveBeenCalledWith({ _id: 'i1' }, { $set: { title: 'Mouse' } }, { upsert: true });
     expect(setOptionsMock).toHaveBeenCalledWith({ withDeleted: true });
     expect(itemCreateMock).not.toHaveBeenCalled();
+    // The payload carries no `receipts` key, so the restore correctly warns that the
+    // collection will not be touched (an older backup predating a model looks like this).
+    expect(result.warnings?.join(' ')).toMatch(/missing collection.*receipts/i);
   });
 
-  it('creates a doc WITHOUT an _id via Model.create', async () => {
+  it('creates a doc WITHOUT an _id via Model.create, warning that it will not merge', async () => {
     const result = await importData(JSON.stringify({ collections: { items: [{ title: 'New item' }] } }));
-    expect(result).toEqual({ ok: true, restored: 1 });
+    expect(result.ok).toBe(true);
+    expect(result.restored).toBe(1);
     expect(itemCreateMock).toHaveBeenCalledWith({ title: 'New item' });
     expect(itemUpdateOneMock).not.toHaveBeenCalled();
+    expect(result.warnings?.join(' ')).toMatch(/items: 1 document without an _id/i);
   });
 
   it('skips (does not count, does not throw) a doc that fails to save', async () => {
     itemCreateMock.mockRejectedValueOnce(new Error('validation failed'));
     const result = await importData(JSON.stringify({ collections: { items: [{ title: 'Bad' }, { title: 'Good' }] } }));
-    expect(result).toEqual({ ok: true, restored: 1 });
+    expect(result.ok).toBe(true);
+    expect(result.restored).toBe(1);
   });
 
   it('strips an unsafe filePath/thumbPath (absolute or traversal) before saving, keeps a safe one', async () => {
@@ -605,7 +685,12 @@ describe('importData', () => {
         },
       })
     );
-    expect(result).toEqual({ ok: true, restored: 2 });
+    expect(result.ok).toBe(true);
+    expect(result.restored).toBe(2);
+    // Both docs are _id-less (that is what routes them through Model.create above), so
+    // the restore correctly warns that they were inserted as new rather than merged.
+    expect(result.warnings?.join(' ')).toMatch(/items: 1 document without an _id/i);
+    expect(result.warnings?.join(' ')).toMatch(/receipts: 1 document without an _id/i);
     expect(receiptCreateMock).toHaveBeenCalledWith({ store: 'Skroutz' });
     expect(invalidateStoreCacheMock).toHaveBeenCalledTimes(1);
     expect(revalidatePathMock).toHaveBeenCalledWith('/settings');
