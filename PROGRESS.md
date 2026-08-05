@@ -11399,3 +11399,66 @@ crash. Δεν το άγγιξα καθόλου (ούτε `git add`, ούτε α�
 δικό μου commit παρακάτω είναι pathspec-only (`PROGRESS.md`/`WEB_DEBT.md`), μηδέν επίδραση σε αυτό το WIP.
 Σημειώνεται εδώ ώστε το επόμενο routine που θα δει `apps/mobile` λείπον να μην το θεωρήσει bug — απλά επιβεβαίωσε
 ότι committed σωστά πριν βασιστείς πάνω του (η δική μου σάρωση σταματά εδώ, δεν έχει committed ακόμα).
+
+---
+
+## 2026-08-05 — P80: μια ειδοποίηση που δεν έφτασε, ξαναδοκιμάζει, και παύει να εξαφανίζεται σιωπηλά
+
+Guard: `ROUTINES_PAUSED` δεν υπήρχε· `ASK_ACHILLEAS.md` χωρίς ANSWERED entry για αυτό το routine· docker lock
+(`mkdir /tmp/claude-docker.lock`) αποκτήθηκε καθαρά και απελευθερώθηκε μετά το build.
+
+**Γιατί αυτό**: πρώτο αχτίστο item της Approved ουράς (`PRODUCT_BACKLOG.md`, μετά το ήδη-shipped P82). Το
+verify-pre-build επιβεβαίωσε ότι ίσχυε ακόμα: `grep -n "retry|attempt|deliveryLog|history" lib/webhooks.ts` = 0
+hits. Και οι **δύο** outbound επιφάνειες έκαναν fire-and-forget μία απόπειρα: το `dispatchAlert`
+(ntfy/Discord/Slack/Telegram/webhook) και το `dispatchEventWebhooks` (P24 signed events). Ένα n8n ή Home
+Assistant endpoint που τύχαινε να κάνει restart τη στιγμή του alert το έχανε, χωρίς κανένα ίχνος πουθενά.
+
+**Τι χτίστηκε** (commit `dd5b712`):
+- **`lib/deliveryRetry.ts`** (pure, injectable sleep → πλήρως unit-testable): `DeliveryOutcome`/`isRetryable`/
+  `deliverWithRetry`/`parseRetryDelays`. Retry **μόνο** σε ό,τι μπορεί να διορθωθεί: network error/timeout (καθόλου
+  status), 5xx, 429, 408. Κάθε άλλο 4xx (λάθος URL, ανακληθέν webhook, λάθος token), missing config, SSRF-blocked
+  target, local rate limit → `permanent`, μηδέν retry. Αυτό είναι το μισό της αξίας: το να ξαναστέλνεις κάτι που ο
+  παραλήπτης ήδη αρνήθηκε απλά τρώει χρόνο μέσα σε ένα awaited request.
+- **`lib/deliveryLog.ts`** + client-safe **`deliveryLog.shared.ts`**: τελευταίες **20 απόπειρες ανά κανάλι** στο νέο
+  `AppConfig.deliveryLog` (map `notifier:<id>`/`webhook:<id>`), capped και στις δύο διαστάσεις (20 γραμμές/κλειδί,
+  50 κλειδιά με drop των πιο μπαγιάτικων) ώστε ένα μόνιμα χαλασμένο endpoint να μη φουσκώνει το singleton config.
+  **Ένα** read+write για ολόκληρο το fan-out, όχι ένα ανά κανάλι, και ποτέ δεν πετάει: ένα αποτυχημένο log write
+  δεν επιτρέπεται να μετατρέψει μια πετυχημένη παράδοση σε αναφερόμενη αποτυχία.
+- **UI**: νέο `DeliveryHistory` κάτω από κάθε `ChannelCard` **και** `WebhookCard` (τελευταίες 3 + «show all N»):
+  ώρα, πράσινη/κόκκινη κουκίδα, HTTP status ή λόγος, `×N` όταν χρειάστηκαν retries, «last one failed» warning.
+  Νέο read-only action `getDeliveryLogs()` (`requireAdmin`, tenant-scoped όπως κάθε άλλο AppConfig read εκεί).
+
+**Αποφάσεις που πήρα μόνος μου** (καταγραφή, όπως ζητά ο κανόνας ανοιχτών αποφάσεων):
+1. **Backoff 1s/5s αντί του παραδείγματος 5s/30s** του item. Το dispatch είναι **awaited** μέσα σε server action
+   (το κουμπί «Check & notify now») και στο `/api/cron/alerts` — 30s backoff θα έτρωγε το request budget αντί να
+   βοηθήσει. Env-overridable με `NOTIFY_RETRY_DELAYS_MS` (κενή τιμή = retries off), οπότε αλλάζει χωρίς rebuild.
+2. **Τα δύο «Test» κουμπιά μένουν single-attempt** επίτηδες: είναι interactive, ένα λάθος URL πρέπει να απαντήσει
+   αμέσως αντί να περιμένει ο χρήστης το backoff. Bonus: οι 20 προϋπάρχουσες `notifiers.dispatch.test.ts`
+   δοκιμές (που οδηγούν το `testNotifier`) έμειναν **byte-identical** στη συμπεριφορά τους.
+3. **Persisted (AppConfig) αντί in-memory ring buffer** από τις δύο επιλογές του item: ένα ring buffer χάνεται σε
+   κάθε container restart, δηλαδή ακριβώς όταν ψάχνεις γιατί δεν ήρθε το χθεσινό alert.
+4. Το UI κείμενο γράφτηκε **hardcoded αγγλικό**, όπως όλα τα γειτονικά strings αυτού του section («Add channel»,
+   «No outbound channels yet»), αντί να ανοίξω νέα i18n keys μόνο για 4 λέξεις.
+
+**Verified**: `npm run type-check` EXIT 0. Πλήρες `npx vitest run` → **374 files, 5967 passed / 4 skipped**
+(51 νέα tests: 30 policy + 11 log helpers + 10 dispatch-level που οδηγούν το πραγματικό `dispatchAlert` με mocked
+DB/fetch και επαληθεύουν retry-on-503, retry-on-network-error, no-retry-on-404, no-retry-on-private-address,
+ένα update ανά fan-out, append χωρίς να σβήνει το ιστορικό, και ότι μια πεσμένη Mongo δεν αλλάζει το αποτέλεσμα
+της παράδοσης). Docker: `docker compose build web` → mongo `healthy` → `up -d web` → `/login` **200 σε 2s**,
+`RestartCount 0`, `/settings` 307 (redirect στο login, σωστό). `docker builder prune -f` μετά (build cache
+693MB, 2.39GB reclaimed). **Browser verify παραλείφθηκε**: το UI που άλλαξα είναι πίσω από login, δεν μπορώ να
+αυθεντικοποιηθώ unattended.
+
+**Επόμενο task**: **P79** (TOTP/MFA στο self-host login) — το επόμενο αχτίστο της Approved ουράς, καθαρό
+reuse-not-rebuild: τα `lib/tenancy/totp.ts` + `recoveryCodes.ts` + `mfaStore.ts` υπάρχουν ήδη πλήρως tested για το
+SaaS side, μεταφέρονται στο `User` model + δεύτερο βήμα στο `LoginForm`, opt-in (κενό = σημερινή συμπεριφορά).
+
+## Needs Achilleas
+
+- **P80 last mile (χρειάζεται login)**: Settings → Notifications → «Check & notify now» με ένα ενεργό κανάλι, και
+  μετά κοίτα το «Recent deliveries» κάτω από την κάρτα του. Στέλνει **αληθινές** ειδοποιήσεις, γι' αυτό δεν το
+  τρέχω μόνος μου. Αν θέλεις πιο μακρύ ή πιο κοντό backoff: `NOTIFY_RETRY_DELAYS_MS=5000,30000` στο `.env`.
+- Αμετάβλητα από τα προηγούμενα runs: **P40** (το `ghcr.io/achilleasgkekas/pharos` δεν είναι δημόσιο package →
+  ο update check αποτυγχάνει σιωπηλά, και δεν υπάρχει κανένα `v*.*.*` tag), **P46**/**P74** last mile,
+  **P81** (`CRON_SECRET` στο `.env` + restart), **P31** live check με τους τρεις ρόλους. **P36 / P16** παραμένουν
+  παγωμένα με ρητό κανόνα σιωπής (`OWNER_DECISIONS.md` #13).
