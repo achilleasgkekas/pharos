@@ -5,7 +5,7 @@ import { connectDB } from '@/lib/db';
 import { GiftCard as GiftCardModel } from '@/models/GiftCard';
 import { currentModel } from '@/lib/tenancy/connection';
 import { safeDateOrNull } from '@/lib/dates';
-import { trim, type GiftCardLean } from '../route';
+import { trim, type GiftCardLean } from '../serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
