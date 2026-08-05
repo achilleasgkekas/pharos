@@ -839,3 +839,42 @@ export async function mergeExpenses(
     }
   });
 }
+
+export type BulkExpensePatch = { category?: string };
+
+/**
+ * Bulk field-edit (P78): apply a category change to every selected expense/income record in
+ * ONE `updateMany`, instead of opening the detail modal N times for the same edit (e.g. a batch
+ * of bills imported with the wrong category). Category-only, NOT category+tags like the Items
+ * equivalent (`bulkUpdateItems`): the P78 spec called for both, but `Expense` (models/Expense.ts)
+ * has no `tags` field at all — adding one would be a schema change beyond an "S" bulk-edit item,
+ * so this ships the field that already exists rather than growing scope silently. Anything
+ * individually-required (vendor, amount) stays a 1-to-1 edit, same reasoning as Items. Filtered
+ * by `kind` too, same defensive habit as `mergeExpenses`: a bulk edit issued from the Income tab
+ * can never touch an expense row (or vice versa), whatever ids the client sent.
+ */
+export async function bulkUpdateExpenses(
+  ids: string[],
+  patch: BulkExpensePatch,
+  kind: Kind
+): Promise<{ ok: boolean; updated: number; error?: string }> {
+  await assertCanWrite();
+  return withRequestTenant(async () => {
+    try {
+      const targets = [...new Set(ids)].filter(Boolean);
+      if (targets.length === 0) return { ok: false, updated: 0, error: 'No records selected' };
+
+      const category = patch.category?.trim();
+      if (!category) return { ok: false, updated: 0, error: 'Nothing to update' };
+
+      await connectDB();
+      const Expense = await currentModel(ExpenseModel);
+      const res = await Expense.updateMany({ _id: { $in: targets }, kind: asKind(kind) }, { $set: { category } });
+      revalidatePath('/expenses');
+      revalidatePath('/income');
+      return { ok: true, updated: res.modifiedCount ?? targets.length };
+    } catch (err) {
+      return { ok: false, updated: 0, error: (err as Error).message };
+    }
+  });
+}

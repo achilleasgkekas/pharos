@@ -11488,8 +11488,46 @@ SaaS side, μεταφέρονται στο `User` model + δεύτερο βήμ�
 χρήστες, wrong-password error path δουλεύει κανονικά, μηδέν console errors. `docker builder prune -f` μετά.
 **Δεν testable unattended**: το πλήρες enroll→confirm→login-step-2 flow χρειάζεται πραγματικά credentials.
 
+## 2026-08-05 — P78: bulk field-edit για Items/Expenses + ένα P0 build-break βρέθηκε και διορθώθηκε στην πορεία
+
+Ο Αχιλλέας: «review the approved queue and pick the next item to build» (2η φορά ίδιας συνεδρίας). P78 ήταν
+το επόμενο αχτίστο μετά το P79 — verify-pre-build επιβεβαίωσε ότι ίσχυε ακόμα (`ItemsClient.tsx` select-mode
+έχει μόνο AI-fill/merge, `ExpensesClient.tsx` μηδέν select-mode).
+
+**Τι χτίστηκε**:
+- `bulkUpdateItems(ids, patch)` (`items/actions.ts`) — ένα `updateMany`, `$set` category/status (status
+  validated, άγνωστη τιμή αγνοείται όχι reject-άρει όλο το call) + `$addToSet`/`$each` tags. Νέο «Edit N»
+  κουμπί + Modal στο `ItemsClient.tsx`, δίπλα στο ήδη-υπάρχον AI-fill/merge bar.
+- `bulkUpdateExpenses(ids, patch, kind)` (`expenses/actions.ts`) — **category-only**, όχι category+tags: το
+  `Expense` model δεν έχει καν πεδίο `tags` (verified grep πριν το build, το αρχικό P78 spec υπέθετε
+  παραλληλισμό με τα Items χωρίς να το ελέγξει). Νέο select-mode **from scratch** στο `ExpensesClient.tsx`
+  (ίδιο idiom με τα Items), `kind` πάντα στο filter (ίδια άμυνα με το `mergeExpenses`).
+- i18n: 10 νέα κλειδιά en+el. 24 νέα tests (14+10).
+
+**⚠ Παράπλευρο εύρημα (P0, ξεχωριστό commit από το P78)**: το verify-pre-commit `docker compose build web`
+απέτυχε σε **καθαρό `HEAD`** (verified: revert των δικών μου αλλαγών, ξανά-build, ίδιο σφάλμα) —
+`"trim" is not a valid Route export field` στο `api/v1/giftcards/route.ts`. Αιτία: 6 από τα 14 `/api/v1`
+resources (Bills/Goals/GiftCards/LoyaltyCards/Vouchers/Subscriptions) είχαν `export function trim(...)` μέσα
+σε `route.ts` — το Next.js route-export validator το απορρίπτει πλέον ρητά (τα υπόλοιπα 8 resources ήδη
+ακολουθούσαν το σωστό pattern, `trim` σε ξεχωριστό `serialize.ts`, βλ. Receipt/Expense). Οι 6 sibling
+`[id]/route.ts` χρειάζονταν πραγματικά το `trim` (cross-file import) οπότε ένα σκέτο «αφαίρεσε το export»
+έσπαγε αλλού (δοκιμάστηκε πρώτα, `tsc` το έπιασε αμέσως, reverted). Σωστή διόρθωση: `trim`+Lean types → 6 νέα
+`serialize.ts` (ίδιο μοτίβο με το ήδη-σωστό Receipt/Expense), `route.ts`+`[id]/route.ts` το εισάγουν από κει.
+`openapi.schema.test.ts`'s SERIALIZERS table ενημερώθηκε (μόνο `file` path). Αυτό ήταν **γνήσιο production-
+build-breaking bug σε committed main** (12 μέρες παλιό, `bef65fe` 2026-07-24), όχι κάτι από concurrent
+uncommitted δουλειά — reproduced σε clean checkout πριν διορθωθεί, χωρίς καμία δική μου αλλαγή.
+
+**Verified**: `npm run type-check` EXIT 0 (πέρα από 3 pre-existing άσχετα errors σε αρχεία μιας άλλης,
+ταυτόχρονης, uncommitted SaaS routine). Πλήρες `npx vitest run` → **386 files / 6211 passed** (2 pre-existing
+άσχετα timeouts σε `aiConfig.tenant.test.ts`, αρχείο που δεν αγγίχτηκε). `openapi.schema.test.ts` (16/16) +
+όλα τα 64 `/api/v1` test files (983 tests) αμετάβλητα μετά το serialize.ts extraction. Docker rebuild →
+`RestartCount 0`, `/login` 200, `/items`+`/expenses` 307 (αμετάβλητο). Browser: `/login` καθαρό, μηδέν console
+errors. **Δεν testable unattended**: το ίδιο το bulk-edit UI είναι πίσω από login.
+
 ## Needs Achilleas
 
+- **P78 supervised πέρασμα (χρειάζεται login)**: /items ή /expenses → «Select» → επίλεξε 2+ → «Edit N» →
+  δοκίμασε category/(status)/tags → Apply, για να επιβεβαιωθεί το UI end-to-end.
 - **P79 supervised πέρασμα (χρειάζεται login)**: Settings → General → «Two-factor authentication» → Enable →
   σκάναρε το manual-entry key σε authenticator app → confirm με το πρώτο 6-ψήφιο code → αποθήκευσε τα 10
   recovery codes → log out → log back in με password+code, για να επιβεβαιωθεί το πλήρες flow end-to-end (το

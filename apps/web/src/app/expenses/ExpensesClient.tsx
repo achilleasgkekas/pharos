@@ -6,7 +6,7 @@ import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useRef, useMemo } from 'react';
 import {
   Upload, Loader2, Trash2, CheckCircle2, AlertTriangle, FileText, FileSpreadsheet, Repeat, Wallet, Search, Plus, X, Camera, Sparkles,
-  LayoutGrid, List as ListIcon, SlidersHorizontal, MapPin, Users, Split as SplitIcon, Landmark, Copy,
+  LayoutGrid, List as ListIcon, SlidersHorizontal, MapPin, Users, Split as SplitIcon, Landmark, Copy, Check, Pencil,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -19,7 +19,7 @@ import { cn } from '@/components/ui/cn';
 import { shrinkImage } from '@/lib/clientImage';
 import { useRouter } from 'next/navigation';
 import type { SerializedExpense, SerializedCard } from '@/types';
-import { uploadExpense, updateExpense, addExpense, deleteExpense, rescanExpense, settlePerson } from './actions';
+import { uploadExpense, updateExpense, addExpense, deleteExpense, rescanExpense, settlePerson, bulkUpdateExpenses } from './actions';
 import { equalSplit, splitTotals, computeBalances, type SplitEntry } from '@/lib/split';
 import { TAX_CATEGORY_PRESETS } from '@/lib/taxonomies';
 import { CsvImportModal } from './CsvImportModal';
@@ -84,6 +84,23 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
+  // P78: select-mode + bulk field-edit (category only — Expense has no tags field, see
+  // bulkUpdateExpenses' doc comment). Mirrors ItemsClient's selectMode/selectedIds pattern.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const clearSelection = () => setSelectedIds(new Set());
+  const exitSelectMode = () => { setSelectMode(false); clearSelection(); };
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [bulkCategory, setBulkCategory] = useState('');
+  const [applyingBulk, startBulkEdit] = useTransition();
+
   useOpenParam((id) => {
     const found = expenses.find((e) => e._id === id);
     if (found) setSelected(found);
@@ -128,6 +145,25 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
       }
     });
   }, [expenses, search, catFilter, spaceFilter, taxOnly, statusFilter, sortBy]);
+
+  const selectAllFiltered = () => setSelectedIds(new Set(visible.map((e) => e._id)));
+
+  function openBulkEdit() {
+    if (selectedIds.size === 0) return;
+    setBulkCategory('');
+    setShowBulkEdit(true);
+  }
+  function handleBulkEditApply() {
+    if (!bulkCategory) return;
+    startBulkEdit(async () => {
+      const r = await bulkUpdateExpenses([...selectedIds], { category: bulkCategory }, kind);
+      if (r.ok) {
+        setShowBulkEdit(false);
+        exitSelectMode();
+        router.refresh();
+      }
+    });
+  }
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -230,6 +266,27 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
                 <button key={v} onClick={() => setLayout(v)} className={cn('px-2 py-1 rounded-md transition-colors', layout === v ? 'bg-[color:var(--color-accent)] text-black' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}>{icon}</button>
               ))}
             </div>
+            {visible.length > 0 && (
+              selectMode ? (
+                <>
+                  {selectedIds.size > 0 && (
+                    <button onClick={openBulkEdit} title={t('ex.bulkEditTitle')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-cyan)] text-[color:var(--color-cyan)] hover:opacity-80 transition-colors">
+                      <Pencil size={14} /> {t('ex.editN', { n: selectedIds.size })}
+                    </button>
+                  )}
+                  <button onClick={selectedIds.size === visible.length ? clearSelection : selectAllFiltered} className="px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] transition-colors">
+                    {selectedIds.size === visible.length ? t('common.deselectAll') : t('trash.selectAllN', { n: visible.length })}
+                  </button>
+                  <button onClick={exitSelectMode} className="text-xs text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] px-2">
+                    {t('common.cancel')}
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => setSelectMode(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)] hover:border-[color:var(--color-accent)] transition-colors">
+                  <Check size={14} /> {t('ex.select')}
+                </button>
+              )
+            )}
             {failed.length > 0 && (
               <button onClick={rescanAllFailed} disabled={rescanning} className="text-[color:var(--color-cyan)] hover:text-[color:var(--color-accent)] disabled:opacity-60" title="Re-scan empty records (amount 0) with OCR">
                 {rescanning ? t('ex.rescanning') : t('ex.failedRescan', { n: failed.length })}
@@ -295,11 +352,35 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
             </div>
           ) : layout === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {visible.map((e) => <ExpenseCard key={e._id} expense={e} isIncome={isIncome} fx={fx} series={e.vendorKey ? seriesCount[e.vendorKey] || 1 : 1} onClick={() => setSelected(e)} />)}
+              {visible.map((e) => (
+                <ExpenseCard
+                  key={e._id}
+                  expense={e}
+                  isIncome={isIncome}
+                  fx={fx}
+                  series={e.vendorKey ? seriesCount[e.vendorKey] || 1 : 1}
+                  onClick={() => setSelected(e)}
+                  selectMode={selectMode}
+                  selected={selectedIds.has(e._id)}
+                  onToggleSelect={() => toggleSelect(e._id)}
+                />
+              ))}
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {visible.map((e) => <ExpenseRow key={e._id} expense={e} isIncome={isIncome} fx={fx} series={e.vendorKey ? seriesCount[e.vendorKey] || 1 : 1} onClick={() => setSelected(e)} />)}
+              {visible.map((e) => (
+                <ExpenseRow
+                  key={e._id}
+                  expense={e}
+                  isIncome={isIncome}
+                  fx={fx}
+                  series={e.vendorKey ? seriesCount[e.vendorKey] || 1 : 1}
+                  onClick={() => setSelected(e)}
+                  selectMode={selectMode}
+                  selected={selectedIds.has(e._id)}
+                  onToggleSelect={() => toggleSelect(e._id)}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -312,6 +393,28 @@ export function ExpensesClient({ kind, expenses, cards, vendors, ollamaUp, categ
       {importingCsv && <CsvImportModal kind={kind} fx={fx} onClose={() => setImportingCsv(false)} onImported={() => router.refresh()} />}
       {findingDupes && <ExpenseDuplicatesModal kind={kind} onClose={() => setFindingDupes(false)} />}
       {showBalances && <BalancesModal balances={balances} onClose={() => setShowBalances(false)} onChanged={() => router.refresh()} confirm={confirm} />}
+
+      {/* P78: bulk field-edit (category) over the selected records */}
+      <Modal open={showBulkEdit} onClose={() => setShowBulkEdit(false)} title={t('ex.editN', { n: selectedIds.size })} size="sm">
+        <div className="space-y-4">
+          <p className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.bulkEditHint')}</p>
+          <div>
+            <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('common.category')}</p>
+            <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className={selCls}>
+              <option value="">{t('common.noChange')}</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => setShowBulkEdit(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" onClick={handleBulkEditApply} disabled={applyingBulk || !bulkCategory}>
+              {applyingBulk ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />} {t('common.apply')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </main>
   );
 }
@@ -386,17 +489,43 @@ function Thumb({ expense }: { expense: SerializedExpense }) {
   );
 }
 
-function ExpenseRow({ expense, isIncome, series, fx, onClick }: { expense: SerializedExpense; isIncome: boolean; series: number; fx: FxCtx; onClick: () => void }) {
-  const t = useT();
+type SelectProps = { selectMode: boolean; selected: boolean; onToggleSelect: () => void };
+
+/** Checkbox rendered by both ExpenseCard and ExpenseRow — same idiom as ItemsClient's
+ *  select-mode toggle (P78/P31 shared pattern). Only visible in select-mode or once checked. */
+function SelectCheckbox({ selectMode, selected, onToggleSelect }: SelectProps) {
+  if (!selectMode && !selected) return null;
   return (
-    <button onClick={onClick} className="group flex items-center gap-3 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-xl px-3 py-2.5 text-left hover:border-[color:var(--color-border-light)] transition-all">
-      <Thumb expense={expense} />
-      <div className="min-w-0 flex-1">
-        <span className="font-semibold text-sm truncate block" style={{ fontFamily: 'var(--font-display)' }}>{expense.vendor || t('ex.unknown')}</span>
-        <span className="text-[10px] text-[color:var(--color-text-faint)] block mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
-          {fmtDate(expense.date)} · {expense.category}{expense.space ? ` · ${expense.space}` : ''}{expense.recurring ? ` · ${t('ex.recurringTag')}` : ''}{series > 1 ? ` · ×${series}` : ''}
-        </span>
-      </div>
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+      className={cn(
+        'shrink-0 w-5 h-5 rounded-md border flex items-center justify-center transition-colors',
+        selected
+          ? 'bg-[color:var(--color-accent)] border-[color:var(--color-accent)] text-black'
+          : 'border-[color:var(--color-border)] text-transparent hover:text-[color:var(--color-text-faint)] hover:border-[color:var(--color-accent)]'
+      )}
+    >
+      <Check size={13} strokeWidth={3} />
+    </button>
+  );
+}
+
+function ExpenseRow({ expense, isIncome, series, fx, onClick, selectMode, selected, onToggleSelect }: { expense: SerializedExpense; isIncome: boolean; series: number; fx: FxCtx; onClick: () => void } & SelectProps) {
+  const t = useT();
+  const mainClick = selectMode ? onToggleSelect : onClick;
+  return (
+    <div className={cn('group flex items-center gap-3 bg-[color:var(--color-surface)] border rounded-xl px-3 py-2.5 transition-all', selected ? 'border-[color:var(--color-accent)] ring-1 ring-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-border-light)]')}>
+      <SelectCheckbox selectMode={selectMode} selected={selected} onToggleSelect={onToggleSelect} />
+      <button onClick={mainClick} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+        <Thumb expense={expense} />
+        <div className="min-w-0 flex-1">
+          <span className="font-semibold text-sm truncate block" style={{ fontFamily: 'var(--font-display)' }}>{expense.vendor || t('ex.unknown')}</span>
+          <span className="text-[10px] text-[color:var(--color-text-faint)] block mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+            {fmtDate(expense.date)} · {expense.category}{expense.space ? ` · ${expense.space}` : ''}{expense.recurring ? ` · ${t('ex.recurringTag')}` : ''}{series > 1 ? ` · ×${series}` : ''}
+          </span>
+        </div>
+      </button>
       <div className="flex items-center gap-3 shrink-0">
         <FxBadge doc={expense} base={fx.base} />
         <SplitBadge split={expense.split} />
@@ -406,21 +535,25 @@ function ExpenseRow({ expense, isIncome, series, fx, onClick }: { expense: Seria
         <span className={cn('font-extrabold text-base leading-none', isIncome ? 'text-[color:var(--color-accent)]' : '')} style={{ fontFamily: 'var(--font-display)' }}>{money(expense.amount)}</span>
         <StatusIcon status={statusOf(expense)} />
       </div>
-    </button>
+    </div>
   );
 }
 
-function ExpenseCard({ expense, isIncome, series, fx, onClick }: { expense: SerializedExpense; isIncome: boolean; series: number; fx: FxCtx; onClick: () => void }) {
+function ExpenseCard({ expense, isIncome, series, fx, onClick, selectMode, selected, onToggleSelect }: { expense: SerializedExpense; isIncome: boolean; series: number; fx: FxCtx; onClick: () => void } & SelectProps) {
   const t = useT();
+  const mainClick = selectMode ? onToggleSelect : onClick;
   return (
-    <button onClick={onClick} className="text-left rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 hover:border-[color:var(--color-accent)] transition-colors">
+    <div className={cn('rounded-2xl border p-4 transition-colors', selected ? 'border-[color:var(--color-accent)] ring-1 ring-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] hover:border-[color:var(--color-accent)]', 'bg-[color:var(--color-surface)]')}>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <Thumb expense={expense} />
-          <div className="min-w-0">
-            <p className="font-semibold truncate">{expense.vendor || t('ex.unknown')}</p>
-            <p className="text-[11px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>{expense.category}</p>
-          </div>
+        <div className="flex items-center gap-2 min-w-0">
+          <SelectCheckbox selectMode={selectMode} selected={selected} onToggleSelect={onToggleSelect} />
+          <button onClick={mainClick} className="flex items-center gap-2.5 min-w-0 text-left flex-1">
+            <Thumb expense={expense} />
+            <div className="min-w-0">
+              <p className="font-semibold truncate">{expense.vendor || t('ex.unknown')}</p>
+              <p className="text-[11px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>{expense.category}</p>
+            </div>
+          </button>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <SplitBadge split={expense.split} />
@@ -430,18 +563,20 @@ function ExpenseCard({ expense, isIncome, series, fx, onClick }: { expense: Seri
           <StatusIcon status={statusOf(expense)} />
         </div>
       </div>
-      <div className="flex items-baseline gap-2 mt-2 flex-wrap">
-        <p className={cn('text-xl font-bold', isIncome ? 'text-[color:var(--color-accent)]' : '')} style={{ fontFamily: 'var(--font-display)' }}>{money(expense.amount)}</p>
-        <FxBadge doc={expense} base={fx.base} />
-      </div>
-      <div className="flex items-center justify-between mt-1 text-[11px] text-[color:var(--color-text-faint)]">
-        <span className="flex items-center gap-1.5 min-w-0">
-          {fmtDate(expense.date)}
-          {expense.space && <span className="flex items-center gap-0.5 text-[color:var(--color-purple)] truncate" title={t('ex.fSpace')}><MapPin size={10} className="shrink-0" />{expense.space}</span>}
-        </span>
-        <span className="flex items-center gap-2 shrink-0">{series > 1 && <span title={t('ex.recordsFromVendor')}>×{series}</span>}{expense.filePath && <FileText size={12} />}</span>
-      </div>
-    </button>
+      <button onClick={mainClick} className="block w-full text-left">
+        <div className="flex items-baseline gap-2 mt-2 flex-wrap">
+          <p className={cn('text-xl font-bold', isIncome ? 'text-[color:var(--color-accent)]' : '')} style={{ fontFamily: 'var(--font-display)' }}>{money(expense.amount)}</p>
+          <FxBadge doc={expense} base={fx.base} />
+        </div>
+        <div className="flex items-center justify-between mt-1 text-[11px] text-[color:var(--color-text-faint)]">
+          <span className="flex items-center gap-1.5 min-w-0">
+            {fmtDate(expense.date)}
+            {expense.space && <span className="flex items-center gap-0.5 text-[color:var(--color-purple)] truncate" title={t('ex.fSpace')}><MapPin size={10} className="shrink-0" />{expense.space}</span>}
+          </span>
+          <span className="flex items-center gap-2 shrink-0">{series > 1 && <span title={t('ex.recordsFromVendor')}>×{series}</span>}{expense.filePath && <FileText size={12} />}</span>
+        </div>
+      </button>
+    </div>
   );
 }
 

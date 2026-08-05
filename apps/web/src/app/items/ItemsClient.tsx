@@ -23,6 +23,7 @@ import {
   SlidersHorizontal,
   Merge,
   ImagePlus,
+  Pencil,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -50,7 +51,7 @@ import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
 import { ItemDocuments } from './ItemDocuments';
-import { createItem, updateItem, deleteItem, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, convertItemToTask, type DupItem } from './actions';
+import { createItem, updateItem, deleteItem, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -217,6 +218,12 @@ export function ItemsClient({
   const [showMerge, setShowMerge] = useState(false); // manual merge of the selected items
   const [mergeKeep, setMergeKeep] = useState('');
   const [merging, startMerge] = useTransition();
+  // P78: bulk field-edit (category/status/tags) over the selected items
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [bulkCategory, setBulkCategory] = useState('');
+  const [bulkStatus, setBulkStatus] = useState('');
+  const [bulkTags, setBulkTags] = useState('');
+  const [applyingBulk, startBulkEdit] = useTransition();
   const { refresh } = useJobs();
   const confirm = useConfirm();
 
@@ -359,6 +366,31 @@ export function ItemsClient({
         setShowMerge(false);
         exitSelectMode();
         refresh();
+      }
+    });
+  }
+
+  // P78: bulk field-edit (category/status/add-tags) over the selected items.
+  function openBulkEdit() {
+    if (selectedIds.size === 0) return;
+    setBulkCategory('');
+    setBulkStatus('');
+    setBulkTags('');
+    setShowBulkEdit(true);
+  }
+  const bulkEditReady = !!bulkCategory || !!bulkStatus || bulkTags.trim().length > 0;
+  function handleBulkEditApply() {
+    if (!bulkEditReady) return;
+    const addTags = bulkTags.split(',').map((t) => t.trim()).filter(Boolean);
+    startBulkEdit(async () => {
+      const r = await bulkUpdateItems([...selectedIds], {
+        category: bulkCategory || undefined,
+        status: bulkStatus || undefined,
+        addTags,
+      });
+      if (r.ok) {
+        setShowBulkEdit(false);
+        exitSelectMode();
       }
     });
   }
@@ -516,6 +548,15 @@ export function ItemsClient({
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-purple)] text-[color:var(--color-purple)] hover:opacity-80 transition-colors"
                       >
                         <Merge size={14} /> {t('it.mergeN', { n: selectedIds.size })}
+                      </button>
+                    )}
+                    {selectedIds.size > 0 && (
+                      <button
+                        onClick={openBulkEdit}
+                        title={t('it.bulkEditTitle')}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-cyan)] text-[color:var(--color-cyan)] hover:opacity-80 transition-colors"
+                      >
+                        <Pencil size={14} /> {t('it.editN', { n: selectedIds.size })}
                       </button>
                     )}
                     <button
@@ -678,6 +719,46 @@ export function ItemsClient({
             </Button>
             <Button variant="primary" onClick={handleManualMerge} disabled={merging || mergeCandidates.length < 2}>
               {merging ? <Loader2 size={14} className="animate-spin" /> : <Merge size={14} />} Merge {mergeCandidates.length} → 1
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* P78: bulk field-edit (category/status/add-tags) over the selected items */}
+      <Modal open={showBulkEdit} onClose={() => setShowBulkEdit(false)} title={t('it.editN', { n: selectedIds.size })} size="sm">
+        <div className="space-y-4">
+          <p className="text-xs text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {t('it.bulkEditHint')}
+          </p>
+          <Field label={t('common.category')}>
+            <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className={selectClass}>
+              <option value="">{t('common.noChange')}</option>
+              {itemCategoryOptions().map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t('common.status')}>
+            <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className={selectClass}>
+              <option value="">{t('common.noChange')}</option>
+              {STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {IT_STATUS_KEY[s.value] ? t(IT_STATUS_KEY[s.value]) : s.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t('it.bulkAddTags')}>
+            <Input value={bulkTags} onChange={(e) => setBulkTags(e.target.value)} placeholder={t('it.fTagsPlaceholder')} />
+          </Field>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => setShowBulkEdit(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button variant="primary" onClick={handleBulkEditApply} disabled={applyingBulk || !bulkEditReady}>
+              {applyingBulk ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />} {t('common.apply')}
             </Button>
           </div>
         </div>

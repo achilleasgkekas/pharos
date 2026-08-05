@@ -1474,6 +1474,48 @@ export async function mergeItems(
   });
 }
 
+export type BulkItemPatch = { category?: string; status?: string; addTags?: string[] };
+
+/**
+ * Bulk field-edit (P78): apply a category/status change and/or additive tags to every selected
+ * item in ONE `updateMany`, instead of opening the detail modal N times for the same edit (e.g.
+ * a batch of receipts that became items with the wrong category, or a delivery of 8 items that
+ * all just arrived → mark "received"). Deliberately narrow — only fields that are safe to set
+ * identically across many different items at once. Anything individually-required (title,
+ * price) stays a 1-to-1 edit, so a bulk click can never mass-corrupt those. `status` is
+ * validated against the same STATUSES enum the form uses; an unrecognised value is silently
+ * dropped rather than rejecting the whole call, since category/tags may still be worth applying.
+ */
+export async function bulkUpdateItems(
+  ids: string[],
+  patch: BulkItemPatch
+): Promise<{ ok: boolean; updated: number; error?: string }> {
+  await assertCanWrite();
+  return withRequestTenant(async () => {
+    const targets = [...new Set(ids)].filter(Boolean);
+    if (targets.length === 0) return { ok: false, updated: 0, error: 'No items selected' };
+
+    const category = patch.category?.trim();
+    const status = patch.status && (STATUSES as readonly string[]).includes(patch.status) ? patch.status : undefined;
+    const addTags = [...new Set((patch.addTags ?? []).map((t) => t.trim()).filter(Boolean))];
+
+    const set: Record<string, unknown> = {};
+    if (category) set.category = category;
+    if (status) set.status = status;
+    const update: Record<string, unknown> = {};
+    if (Object.keys(set).length) update.$set = set;
+    if (addTags.length) update.$addToSet = { tags: { $each: addTags } };
+    if (Object.keys(update).length === 0) return { ok: false, updated: 0, error: 'Nothing to update' };
+
+    await connectDB();
+    const Item = await currentModel(ItemModel);
+    const res = await Item.updateMany({ _id: { $in: targets } }, update);
+    revalidatePath('/items');
+    revalidatePath('/shopping');
+    return { ok: true, updated: res.modifiedCount ?? targets.length };
+  });
+}
+
 // ─── Interactive online price search (pick a shop to track) ──────────────────
 
 export type PriceCandidate = {

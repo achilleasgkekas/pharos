@@ -412,20 +412,48 @@
   συμπεριφορά αμετάβλητη)· reuse ατόφιο το crypto/secret-storage pattern του SaaS `mfaStore.ts`, μηδέν νέο
   dependency· recovery codes εμφανίζονται ΜΙΑ φορά στο enroll.
 
-### P78. Bulk field-edit για selected Items/Expenses (category/status/tag) — S — OSS (κυρίως), dogfooding-heavy
-- **Αξία:** live-verified: το `ItemsClient.tsx` έχει ήδη select-mode (`selectedIds: Set<string>`) αλλά οι ΜΟΝΕΣ δύο
-  bulk ενέργειες πάνω στην επιλογή είναι **AI fill** (`handleBulkAi`) και **merge** (duplicate-merge, ≥2 items) —
-  **καμία** bulk απλή αλλαγή πεδίου (π.χ. «άλλαξε κατηγορία σε 12 επιλεγμένα items» ή «σημείωσε 5 ως received»)
-  (verified `grep -n "handleBulk|selectedIds|bulk" app/items/ItemsClient.tsx` — μόνο τα 2 παραπάνω). Το
-  `ExpensesClient.tsx` είναι ακόμα πιο πίσω: **μηδέν select-mode καν** (verified `grep -n "checkbox|Set<string>|
-  selectMode"` — τα δύο μόνα checkbox hits είναι άσχετα φίλτρα, tax-only/include-me). Πρακτικό αποτέλεσμα: μια
-  σειρά από 20 receipts που έγιναν expenses με λάθος κατηγορία, ή 8 items που μόλις παραδόθηκαν μαζί (μια
-  παραγγελία), χρειάζονται σήμερα **N ξεχωριστά ανοίγματα** του detail modal για το ίδιο κοινό edit. Νέο μικρό
-  bulk-edit bar (εμφανίζεται όταν `selectedIds.size>0`, ίδιο idiom με το ήδη-υπάρχον «AI fill N»/«merge N»):
-  category dropdown + (Items) status dropdown + tag-add input → `bulkUpdateItems(ids, patch)`/
-  `bulkUpdateExpenses(ids, patch)`, ένα Mongoose `updateMany`, revalidate μία φορά.
-- **Module:** Items (`ItemsClient.tsx`, νέο bulk-edit bar δίπλα στο ήδη-υπάρχον AI-fill/merge bar) + Expenses
-  (`ExpensesClient.tsx`, νέο select-mode from scratch, ίδιο checkbox pattern με το Items).
+### P78. Bulk field-edit για selected Items/Expenses (category/status/tag) — ✅ SHIPPED 2026-08-05 (interactive session, «review the approved queue and pick the next item to build»)
+- **Τι έγινε:** νέο `bulkUpdateItems(ids, patch)` (`app/items/actions.ts`) — ένα `Item.updateMany`, `$set`
+  category/status (validated κατά του ήδη-υπάρχοντος STATUSES enum, άγνωστη τιμή απλά αγνοείται αντί να απορρίπτει
+  όλο το call) + `$addToSet`/`$each` για tags, revalidate `/items`+`/shopping`. Νέο «Edit N» κουμπί στο select-mode
+  bar (δίπλα στο ήδη-υπάρχον AI-fill/merge), μικρό Modal με category/status dropdowns (reusing το ήδη-υπάρχον
+  `itemCategoryOptions()`/`STATUSES`) + tags input, `common.noChange` όταν δεν αλλάζεις ένα πεδίο.
+  - **Expenses διαφοροποιήθηκε από το αρχικό spec**: το `bulkUpdateExpenses(ids, patch, kind)` είναι **category-
+    only, ΟΧΙ category+tags** — verified `grep -n "tags" models/Expense.ts` = 0 hits, το `Expense` model δεν έχει
+    ΚΑΝ πεδίο tags. Το spec υπέθετε παραλληλισμό με τα Items χωρίς να το επιβεβαιώσει· το builder default εδώ
+    ήταν να χτίσει ό,τι πεδίο υπάρχει πραγματικά αντί να προσθέσει νέο schema field για ένα "S" item (θα το
+    μεγάλωνε σε αρχιτεκτονική απόφαση). Νέο select-mode **from scratch** στο `ExpensesClient.tsx` (ίδιο
+    checkbox/`selectMode`/`selectedIds` idiom με το Items), `kind` πάντα μέσα στο Mongo filter (ίδια άμυνα με το
+    `mergeExpenses`· ένα Income-tab bulk edit δεν αγγίζει ποτέ expense rows).
+  - i18n: 10 νέα κλειδιά (`it.editN`/`it.bulkEdit*`/`ex.select`/`ex.editN`/`ex.bulkEdit*`/`common.apply`/
+    `common.noChange`) σε en+el.
+- **⚠ Παράπλευρο εύρημα, διορθώθηκε ξεχωριστά (P0, όχι μέρος του P78 scope)**: το `docker compose build web`
+  (verify-πριν-commit) απέτυχε σε ΚΑΘΑΡΟ `HEAD` — **6 από τα 14 `/api/v1` resources** (Bills/Goals/GiftCards/
+  LoyaltyCards/Vouchers/Subscriptions) είχαν `export function trim(...)` μέσα σε `route.ts`, κάτι που το Next.js
+  route-export validator πλέον απορρίπτει ρητά («"trim" is not a valid Route export field»)· τα υπόλοιπα 8
+  resources ήδη ακολουθούσαν το σωστό pattern (`trim` σε ξεχωριστό `serialize.ts`, βλ. Receipt/Expense). Οι 6
+  `[id]/route.ts` sibling routes χρειάζονταν πραγματικά αυτό το `trim` (cross-file import), οπότε το σκέτο
+  «αφαίρεσε το `export`» έσπαγε αλλού· η σωστή διόρθωση ήταν να μεταφερθεί το `trim`+τα Lean types σε 6 νέα
+  `app/api/v1/<resource>/serialize.ts` (ίδιο μοτίβο με το ήδη-σωστό Receipt/Expense), με τα `route.ts` + `[id]/
+  route.ts` να το εισάγουν από εκεί. `openapi.schema.test.ts`'s SERIALIZERS table ενημερώθηκε (μόνο το `file`
+  path, το `fn` name έμεινε `trim`). Verified: `openapi.schema.test.ts` (16/16) + όλα τα 64 `/api/v1` test files
+  (983 tests) περνάνε αμετάβλητα, μηδέν αλλαγή στο actual JSON shape κάθε endpoint. Αυτό ήταν **γνήσιο production-
+  build-breaking bug σε committed main**, όχι κάτι από concurrent uncommitted work — reproduced σε καθαρό checkout
+  πριν διορθωθεί.
+- **Tests**: 24 νέα (14 `items/actions.bulkUpdate.test.ts` + 10 `expenses/actions.bulkUpdate.test.ts`). Πλήρες
+  suite **386 files / 6211 passed** (2 pre-existing άσχετα timeouts σε `aiConfig.tenant.test.ts`, αρχείο που δεν
+  αγγίχτηκε — real-timer cache-TTL test ευαίσθητο σε system load από concurrent routines, όχι regression).
+  `npm run type-check` EXIT 0 (πέρα από 3 pre-existing άσχετα errors σε αρχεία μιας άλλης, ταυτόχρονης, uncommitted
+  SaaS routine — verified με `git status` πριν/μετά).
+- **Verified**: Docker rebuild (μετά τη σωστή διόρθωση του P0 παραπάνω) → `RestartCount 0`, `/login` 200 σε
+  ~180ms, `/items`+`/expenses` 307 (auth-gated, αμετάβλητο). Browser: `/login` renders καθαρά, μηδέν console
+  errors. **ΔΕΝ testable unattended**: το ίδιο το bulk-edit UI είναι πίσω από login (ίδιος περιορισμός με κάθε
+  Settings-gated feature πριν από αυτό).
+- **Αρχικό spec (για ιστορικό):** live-verified: το `ItemsClient.tsx` έχει ήδη select-mode (`selectedIds:
+  Set<string>`) αλλά οι ΜΟΝΕΣ δύο bulk ενέργειες πάνω στην επιλογή είναι **AI fill** και **merge** — καμία bulk
+  απλή αλλαγή πεδίου. Το `ExpensesClient.tsx` ήταν ακόμα πιο πίσω: μηδέν select-mode καν. **Ανοιχτή απόφαση
+  (builder default) που τηρήθηκε**: MVP = category + tag-add (Items)· status bulk-change μόνο για Items· καμία
+  αλλαγή σε μεμονωμένα-required πεδία (τίτλος/ποσό) μέσω bulk.
 - **Ανοιχτή απόφαση (builder default):** MVP = category + tag-add (πιο συχνή διόρθωση μετά από import/scan)· status
   bulk-change μόνο για Items (Expenses δεν έχει status field)· **καμία** αλλαγή σε μεμονωμένα-required πεδία
   (τίτλος/ποσό) μέσω bulk — αυτά παραμένουν 1-προς-1 edit (αποφυγή κατά λάθος μαζικής αλλοίωσης).
