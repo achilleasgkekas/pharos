@@ -7,7 +7,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-08-04 (26η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-08-05 (27η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
@@ -161,12 +161,82 @@
 > `grep -n "creditLimit|outstanding|utilization" StatementsClient.tsx` δείχνει **καμία** σύγκριση με το πραγματικό
 > outstanding balance (που υπολογίζεται ήδη αλλού στο ίδιο αρχείο) — μηδέν badge, μηδέν alert-engine entry, παρόλο
 > που το CLAUDE.md δείχνει multi-card installment management ως ενεργό use case του χρήστη.
+>
+> **27η σάρωση (2026-08-05)** — `git log --since` από την 26η σάρωση (marker `750bb30`, μέχρι το σημερινό HEAD
+> `f203c58`): πολύ μεγάλο εύρος commits (~90), αλλά σχεδόν όλα **SaaS/infra plumbing** (billing/signup flow,
+> reset-link 404 fix, rate-limiting, SMTP email, deploy pipeline hardening, cloud-guard backup verification,
+> multi-arch image build) — μηδέν νέο product-facing feature που να χρειάζεται reconciliation σε Done πέρα από
+> το **P80** (webhook delivery retry + per-channel log), που ο ίδιος ο builder ήδη το σημείωσε SHIPPED στο
+> `## Approved` παρακάτω (commit `dd5b712`, ίδιο commit που ενημέρωσε και αυτό το αρχείο — καμία ενέργεια
+> χρειάζεται εδώ). **3 νέοι candidates (P85-P87)**, και οι τρεις live-verified με grep πριν την πρόταση (0 hits): (1)
+> **P85** — το ήδη-καθιερωμένο dedup pattern (`findDuplicateReceipts`/`findDuplicateExpenses`/`findDuplicateItems`/
+> `findDuplicateStores`, verified `grep -n "export async function findDuplicate"` = ακριβώς αυτά τα 4) **δεν
+> καλύπτει ποτέ Subscriptions** — μια κατά λάθος διπλή εγγραφή (π.χ. Netflix ξανακαταχωρημένο μετά από cancel+
+> re-signup, ή δύο μέλη του νοικοκυριού που καταχώρησαν το ίδιο family-plan ξεχωριστά, βλ. P73) μένει αόρατη.
+> Καθαρό follow-up πάνω σε ήδη-δουλεμένο μηχανισμό, μηδέν νέα αρχιτεκτονική. (2) **P86** — το P81 (auto cron
+> trigger, shipped) + P80 (retry, shipped σήμερα) + P82 (dedup, shipped) έκαναν το alert engine πλήρως αυτόματο,
+> αλλά **καμία ώρα ησυχίας**: `grep -n "quietHours|doNotDisturb|silenceUntil" models/AppConfig.ts` = 0 hits, το
+> cron μπορεί να χτυπήσει `dispatchAlert()` (push/ntfy/Discord/Telegram) οποιαδήποτε ώρα — π.χ. ένα price-drop
+> alert στις 3π.μ. (ίδια ώρα με το ήδη-υπάρχον nightly backup 03:30, CLAUDE.md). Πριν το P81 αυτό δεν υπήρχε καν
+> ως πρόβλημα (χειροκίνητο κουμπί μόνο)· τώρα είναι πραγματικό gap που δημιούργησε το ίδιο το «αυτοματοποίησέ το».
+> (3) **P87** — `grep -rln "savedFilter|SmartView|savedView" apps/web/src` = 0 hits, ενώ **7+ modules** έχουν ήδη
+> πλούσιο sidebar filtering (search + status + category/store + sort, ίδιο idiom παντού μετά το e-shop-layout
+> rollout) που **επαναφέρεται σε default σε κάθε reload** — κανένας τρόπος να αποθηκεύσεις «Items: shopping +
+> category=networking + sort=price» ως named preset. Dogfooding-heavy δεδομένου του μεγέθους της λίστας του
+> χρήστη (CLAUDE.md 10G upgrade list, Battle Station κλπ). Η ουρά έφτασε **41 items (39 Proposed μετά τα P85-P87
+> + 2 μη-χτισμένα ήδη υπήρχαν όπως πριν, δες σημείωση 26ης σάρωσης) + ~30 μη-χτισμένα «Approved»** — το quick-
+> start shortlist της 22ης σάρωσης (P74/P40/P46/P66/P48) έχει πλέον **shippαριστεί όλο**, το backlog δεν είναι
+> πια μπλοκαρισμένο σε απόφαση, είναι απλά μεγάλο· καμία νέα πρόταση σειράς χρειάζεται, ο builder καταναλώνει ήδη
+> ενεργά με τη σειρά value/effort.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P87. Saved filter presets / «smart views» σε modules με sidebar filtering — S/M — OSS (κυρίως), dogfooding-heavy
+- **Αξία:** live-verified `grep -rln "savedFilter|SmartView|savedView" apps/web/src` = 0 hits. Το e-shop-layout
+  rollout (CLAUDE.md, πολλά sessions) έδωσε ίδιο πλούσιο sidebar filter idiom (search + status + category/store +
+  sort, `SearchableSelect` σε 7+ αρχεία) σε Items/Shopping/Receipts/Expenses/Subscriptions/Vouchers, αλλά καμία
+  εγγραφή τα θυμάται — κάθε φορά που ανοίγεις τη σελίδα ξαναφτιάχνεις τον ίδιο συνδυασμό. Δεδομένου του μεγέθους
+  της λίστας εξοπλισμού του χρήστη (CLAUDE.md: 10G upgrade list, Battle Station, δύο σπίτια), ένα named preset
+  («Items: shopping + category=networking + sort=price») γλιτώνει επαναλαμβανόμενο clicking σε καθημερινή χρήση.
+- **Module:** νέο localStorage-only πεδίο ανά module (π.χ. `pharosSavedViews.items`), μηδέν DB schema· μικρό dropdown
+  «Views ▾» δίπλα στο reset-filters κουμπί σε κάθε client component που ήδη έχει filter sidebar.
+- **Ανοιχτή απόφαση (builder default):** MVP = **local-only** (localStorage, ανά browser/device, όχι server-side
+  DB record) ώστε το πρώτο slice να μείνει S χωρίς νέο model· server-side sync (πολλαπλές συσκευές/household
+  members) follow-up μόνο αν αποδειχτεί χρήσιμο. Κενό = καμία αλλαγή (ίδιο idiom με τα υπόλοιπα S items).
+
+### P86. Notification quiet hours / do-not-disturb window για το alert cron — S — OSS (κυρίως), βοηθά και SaaS
+- **Αξία:** live-verified `grep -n "quietHours|doNotDisturb|silenceUntil" models/AppConfig.ts` = 0 hits. Το ήδη-
+  shipped τρίπτυχο **P81** (auto cron trigger) + **P82** (dedup) + **P80** (retry + delivery log, shipped σήμερα)
+  έκανε το alert engine πλήρως αυτόματο και αξιόπιστο, αλλά κανένα από τα τρία έθεσε ώρα ησυχίας — το cron μπορεί
+  να πυροδοτήσει push/ntfy/Discord/Telegram/webhook σε **οποιαδήποτε** ώρα (π.χ. deal-alert στις 3π.μ., ίδια ζώνη
+  με το ήδη-υπάρχον nightly backup 03:30, CLAUDE.md). Πριν το P81 αυτό δεν υπήρχε καν ως πρόβλημα (χειροκίνητο
+  κουμπί μόνο, ο χρήστης το πάταγε όποτε ήθελε) — καθαρό side-effect του «αυτοματοποίησέ το», ίδιο idiom με το
+  P82 (που εντόπισε ανάλογο νέο πρόβλημα από το ίδιο P81).
+- **Module:** `models/AppConfig.ts` (νέο `quietHours: {start, end}` προαιρετικό πεδίο) + `app/api/cron/alerts/route.ts`
+  / `runAlertChecks` (skip dispatch αν η τρέχουσα ώρα server είναι μέσα στο παράθυρο, log-only όχι πλήρες skip
+  ώστε το επόμενο non-quiet run να μη χάσει τη notification λόγω dedupe) + Settings → Notifications UI (2 time
+  inputs, προαιρετικά).
+- **Ανοιχτή απόφαση (builder default):** MVP = **ένα** παράθυρο ησυχίας ανά ημέρα (όχι per-weekday granularity),
+  server-local time (όχι per-channel timezone, self-host = ένα timezone συνήθως)· κενό/ρυθμισμένο = καμία αλλαγή
+  συμπεριφοράς (ίδιο idiom με τα υπόλοιπα optional AppConfig πεδία).
+
+### P85. Duplicate subscription detection & merge (mirror P46/P22 pattern) — S — OSS (κυρίως), dogfooding-heavy
+- **Αξία:** live-verified `grep -n "export async function findDuplicate" apps/web/src` δείχνει ακριβώς 4 ήδη-
+  shipped dedup μηχανισμούς (`findDuplicateReceipts`, `findDuplicateExpenses`, `findDuplicateItems`,
+  `findDuplicateStores`) — **Subscriptions δεν έχει κανέναν**. Ένα κλασικό ατύχημα (ξανα-εγγραφή μετά από cancel+
+  re-signup με ελαφρώς διαφορετικό όνομα, ή δύο μέλη νοικοκυριού που καταχώρησαν ξεχωριστά το ίδιο family-plan
+  μετά το P31/household multi-user) μένει σήμερα αόρατο — κανένα σήμα εκτός από να το προσέξει κανείς χειροκίνητα
+  στη λίστα. Καθαρό ζευγάρωμα ήδη-δουλεμένου pattern (ίδιο modal/merge idiom με το P46), μηδέν νέα αρχιτεκτονική.
+- **Module:** `app/subscriptions/actions.ts` (νέο `findDuplicateSubscriptions`/`mergeSubscriptions`, ίδιο σχήμα με
+  `expenses/actions.ts findDuplicateExpenses`) + νέο `SubscriptionDuplicatesModal.tsx` (mirror `ExpenseDuplicatesModal`/
+  `ItemDuplicatesModal`) + «find duplicates» κουμπί στο `SubscriptionsClient.tsx` header.
+- **Ανοιχτή απόφαση (builder default):** group-key = normalized name (ίδιο `vendorKey`/normalize idiom με stores/
+  expenses) + amount + billingCycle (ώστε δύο πραγματικά διαφορετικά πλάνα του ίδιου provider να ΜΗΝ merge-αριστούν
+  κατά λάθος)· merge = keep-most-complete + union οποιωνδήποτε linked references, ίδιο idiom με τα υπόλοιπα 4.
 
 ### P84. Credit card utilization warning (creditLimit vs πραγματικό outstanding) — S — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified: το `Card.creditLimit` (`statements/cards.ts`) αποθηκεύεται και εμφανίζεται ήδη στατικά
