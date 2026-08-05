@@ -183,11 +183,14 @@
 > πλούσιο sidebar filtering (search + status + category/store + sort, ίδιο idiom παντού μετά το e-shop-layout
 > rollout) που **επαναφέρεται σε default σε κάθε reload** — κανένας τρόπος να αποθηκεύσεις «Items: shopping +
 > category=networking + sort=price» ως named preset. Dogfooding-heavy δεδομένου του μεγέθους της λίστας του
-> χρήστη (CLAUDE.md 10G upgrade list, Battle Station κλπ). Η ουρά έφτασε **41 items (39 Proposed μετά τα P85-P87
-> + 2 μη-χτισμένα ήδη υπήρχαν όπως πριν, δες σημείωση 26ης σάρωσης) + ~30 μη-χτισμένα «Approved»** — το quick-
-> start shortlist της 22ης σάρωσης (P74/P40/P46/P66/P48) έχει πλέον **shippαριστεί όλο**, το backlog δεν είναι
-> πια μπλοκαρισμένο σε απόφαση, είναι απλά μεγάλο· καμία νέα πρόταση σειράς χρειάζεται, ο builder καταναλώνει ήδη
-> ενεργά με τη σειρά value/effort.
+> χρήστη (CLAUDE.md 10G upgrade list, Battle Station κλπ). **Διόρθωση αρίθμησης (ίδια σάρωση, μετά από
+> ανεξάρτητο recount)**: το προηγούμενο «39 Proposed» ήταν stale carried-over αριθμητικό από παλαιότερη σάρωση
+> που δεν είχε reconciled μετά τις μαζικές εγκρίσεις — άμεση καταμέτρηση των `### P` blocks σε κάθε section
+> δείχνει **5 Proposed (P83-P87, τα μόνα με πλήρες spec στο `## Proposed`) + 34 μη-χτισμένα «Approved»**
+> (39 items συνολικά, όχι 41). Η ουρά δεν είναι πια μπλοκαρισμένη σε απόφαση (το quick-start shortlist της
+> 22ης σάρωσης P74/P40/P46/P66/P48 έχει shippαριστεί όλο) — είναι απλά ρεαλιστικά μεγάλη, με το βάρος στο
+> ήδη-εγκεκριμένο Approved (34) παρά στο άχτιστο Proposed (5)· καμία νέα πρόταση σειράς χρειάζεται, ο builder
+> καταναλώνει ήδη ενεργά με τη σειρά value/effort.
 
 ---
 
