@@ -38,6 +38,18 @@ APP="https://app.ph-aros.com"
 
 say() { printf '%s\n' "$*"; }
 
+# ── storage bind-mount ownership ───────────────────────────────────────────────────────────
+# docker-compose.prod.yml bind-mounts ./storage (relative to $HERE) into the web container's
+# /storage. When that host directory doesn't exist yet, Docker auto-creates it as root:root —
+# the image's own `chown nextjs:nodejs /storage` (Dockerfile) only sets ownership INSIDE the
+# image layer, which a runtime bind mount shadows entirely. Result: the app (uid 1001) gets
+# EACCES on every upload ("Failed to save file: EACCES: permission denied, mkdir
+# '/storage/receipts'") until someone notices and fixes it by hand. Self-heals here on every
+# deploy instead: idempotent, costs nothing once correct, and survives a host rebuild or a
+# fresh volume without needing a manual chown again. 1001 mirrors the image's `nextjs` user.
+mkdir -p "$HERE/storage"
+chown -R 1001:1001 "$HERE/storage" 2>/dev/null || true
+
 # ── health ──────────────────────────────────────────────────────────────────────────────────
 # Retries because a container that has just been recreated needs a moment; a single probe would
 # report a healthy deploy as broken and trigger a pointless rollback.
