@@ -82,7 +82,9 @@ describe('retryDelays', () => {
 });
 
 describe('deliverWithRetry', () => {
-  const sleep = vi.fn(async () => {});
+  // Typed with the `ms` parameter it is actually called with: an argless `vi.fn` infers a
+  // zero-length tuple for `mock.calls`, so the backoff assertion below (`c[0]`) failed to compile.
+  const sleep = vi.fn(async (_ms: number) => {});
 
   it('sends once and reports attempts:1 when the first try works', async () => {
     const send = vi.fn(async () => OK);
