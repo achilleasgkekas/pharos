@@ -40,7 +40,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     name: 'Free',
     tier: 'shared',
     priceMonthlyEUR: 0,
-    storageGB: 5,
+    storageGB: 0.2, // 200 MB — Achilleas' final number (was a 5GB placeholder)
     aiCallsPerMonth: 50,
     customDomain: false,
     maxMembers: 1, // single-seat: the owner only (personal free tier)
@@ -51,7 +51,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     name: 'Pro',
     tier: 'shared',
     priceMonthlyEUR: 9,
-    storageGB: 50,
+    storageGB: 1, // 1 GB — Achilleas' final number (was a 50GB placeholder)
     aiCallsPerMonth: 1000,
     customDomain: false,
     maxMembers: 5, // small household/team on the shared Pro tier
@@ -62,7 +62,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     name: 'Dedicated',
     tier: 'dedicated',
     priceMonthlyEUR: 29,
-    storageGB: 500,
+    storageGB: 5, // 5 GB — Achilleas' final number (was a 500GB placeholder)
     aiCallsPerMonth: null, // unlimited / BYO-key
     customDomain: true,
     maxMembers: null, // unlimited seats on the dedicated tier

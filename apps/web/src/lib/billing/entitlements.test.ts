@@ -14,8 +14,8 @@ describe('entitlementsFor', () => {
   it('resolves the free plan', () => {
     const e = entitlementsFor('free');
     expect(e.plan).toBe('free');
-    expect(e.storageGB).toBe(5);
-    expect(e.storageBytes).toBe(5 * GB);
+    expect(e.storageGB).toBe(0.2); // 200 MB
+    expect(e.storageBytes).toBe(0.2 * GB);
     expect(e.aiCallsPerMonth).toBe(50);
     expect(e.customDomain).toBe(false);
     expect(e.tier).toBe('shared');
@@ -24,8 +24,8 @@ describe('entitlementsFor', () => {
   it('resolves the shared plan', () => {
     const e = entitlementsFor('shared');
     expect(e.plan).toBe('shared');
-    expect(e.storageGB).toBe(50);
-    expect(e.storageBytes).toBe(50 * GB);
+    expect(e.storageGB).toBe(1);
+    expect(e.storageBytes).toBe(1 * GB);
     expect(e.aiCallsPerMonth).toBe(1000);
     expect(e.customDomain).toBe(false);
     expect(e.tier).toBe('shared');
@@ -34,8 +34,8 @@ describe('entitlementsFor', () => {
   it('resolves the dedicated plan (unlimited AI, custom domain, dedicated tier)', () => {
     const e = entitlementsFor('dedicated');
     expect(e.plan).toBe('dedicated');
-    expect(e.storageGB).toBe(500);
-    expect(e.storageBytes).toBe(500 * GB);
+    expect(e.storageGB).toBe(5);
+    expect(e.storageBytes).toBe(5 * GB);
     expect(e.aiCallsPerMonth).toBeNull();
     expect(e.customDomain).toBe(true);
     expect(e.tier).toBe('dedicated');
@@ -87,17 +87,17 @@ describe('canUseAiFeature', () => {
 describe('withinStorage', () => {
   it('allows usage at or below the plan allowance (boundary inclusive)', () => {
     expect(withinStorage('free', 0)).toBe(true);
-    expect(withinStorage('free', 5 * GB)).toBe(true); // exactly at cap → allowed
-    expect(withinStorage('free', 5 * GB - 1)).toBe(true);
+    expect(withinStorage('free', 0.2 * GB)).toBe(true); // exactly at cap (200MB) → allowed
+    expect(withinStorage('free', 0.2 * GB - 1)).toBe(true);
   });
 
   it('rejects usage above the plan allowance', () => {
-    expect(withinStorage('free', 5 * GB + 1)).toBe(false);
-    expect(withinStorage('shared', 51 * GB)).toBe(false);
+    expect(withinStorage('free', 0.2 * GB + 1)).toBe(false);
+    expect(withinStorage('shared', 1 * GB + 1)).toBe(false);
   });
 
   it('scales with the plan (shared allows more than free)', () => {
-    const over = 10 * GB;
+    const over = 0.5 * GB; // over free's 200MB cap, under shared's 1GB cap
     expect(withinStorage('free', over)).toBe(false);
     expect(withinStorage('shared', over)).toBe(true);
   });

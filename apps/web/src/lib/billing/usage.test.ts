@@ -58,18 +58,18 @@ describe('aiQuotaStatus', () => {
 });
 
 describe('storageQuotaStatus', () => {
-  it('free plan: 5 GB allowance', () => {
-    expect(storageQuotaStatus('free', 0)).toMatchObject({ limit: 5 * GB, allowed: true, ratio: 0 });
+  it('free plan: 200 MB allowance', () => {
+    expect(storageQuotaStatus('free', 0)).toMatchObject({ limit: 0.2 * GB, allowed: true, ratio: 0 });
     // Exactly at the cap is still within (withinStorage uses <=).
-    expect(storageQuotaStatus('free', 5 * GB)).toMatchObject({ remaining: 0, allowed: true, ratio: 1 });
+    expect(storageQuotaStatus('free', 0.2 * GB)).toMatchObject({ remaining: 0, allowed: true, ratio: 1 });
     // Over the cap blocks.
-    expect(storageQuotaStatus('free', 5 * GB + 1)).toMatchObject({ allowed: false, remaining: 0 });
+    expect(storageQuotaStatus('free', 0.2 * GB + 1)).toMatchObject({ allowed: false, remaining: 0 });
   });
 
-  it('dedicated plan: 500 GB, half used', () => {
-    expect(storageQuotaStatus('dedicated', 250 * GB)).toMatchObject({
-      limit: 500 * GB,
-      remaining: 250 * GB,
+  it('dedicated plan: 5 GB, half used', () => {
+    expect(storageQuotaStatus('dedicated', 2.5 * GB)).toMatchObject({
+      limit: 5 * GB,
+      remaining: 2.5 * GB,
       allowed: true,
       ratio: 0.5,
     });

@@ -37,12 +37,12 @@ describe('entitlements', () => {
     expect(entitlementsFor('free').customDomain).toBe(false);
     expect(entitlementsFor('dedicated').customDomain).toBe(true);
     expect(entitlementsFor('dedicated').aiCallsPerMonth).toBeNull();
-    expect(entitlementsFor('free').storageBytes).toBe(5 * 1024 ** 3);
+    expect(entitlementsFor('free').storageBytes).toBe(0.2 * 1024 ** 3);
   });
 
   it('enforces storage and AI quotas', () => {
-    expect(withinStorage('free', 4 * 1024 ** 3)).toBe(true);
-    expect(withinStorage('free', 6 * 1024 ** 3)).toBe(false);
+    expect(withinStorage('free', 0.1 * 1024 ** 3)).toBe(true);
+    expect(withinStorage('free', 0.3 * 1024 ** 3)).toBe(false);
     expect(withinAiQuota('free', 49)).toBe(true);
     expect(withinAiQuota('free', 50)).toBe(false);
     expect(withinAiQuota('dedicated', 1_000_000)).toBe(true); // unlimited

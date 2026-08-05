@@ -35,7 +35,7 @@ describe('buildBillingSummary', () => {
       name: 'Pro',
       priceMonthlyEUR: 9,
       tier: 'shared',
-      storageGB: 50,
+      storageGB: 1,
       aiCallsPerMonth: 1000,
       customDomain: false,
     });

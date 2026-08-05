@@ -163,6 +163,26 @@ export async function setStorageBytes(ctx: TenantContext, bytes: number, at: Dat
 }
 
 /**
+ * Adjust the tenant's storage-footprint gauge by `deltaBytes` (positive on a save, negative on
+ * a delete) — the REAL-TIME counterpart to `setStorageBytes`'s periodic (dbStats-sampled)
+ * snapshot. Same atomic `$inc`-upsert shape as `recordAiUsage`, so concurrent uploads don't lose
+ * increments. No-op for the default tenant / SAAS_MODE off. Deliberately does NOT clamp at 0
+ * here (an `$inc` can't see the current value to clamp against) — a rare drift from an
+ * under/over-counted delete self-heals on the next periodic `sampleTenantStorage` pass, which
+ * DOES clamp (`setStorageBytes`'s `Math.max(0, bytes)`) since it re-measures the real directory.
+ */
+export async function incrementStorageBytes(ctx: TenantContext, deltaBytes: number, at: Date = new Date()): Promise<void> {
+  if (!isMetered(ctx) || deltaBytes === 0) return;
+  const period = periodOf(at);
+  await connectDB();
+  await Usage.findOneAndUpdate(
+    { tenant: ctx.tenantId, period },
+    { $inc: { storageBytes: deltaBytes }, $set: { storageMeasuredAt: at } },
+    { upsert: true, setDefaultsOnInsert: true }
+  );
+}
+
+/**
  * AI-quota gate for the CURRENT period: may this tenant make one more AI call? The default
  * tenant / SAAS_MODE off is always allowed (unlimited). Reads the ledger, applies the plan
  * cap. The enforcement wiring (block + "upgrade") calls this before an AI op later.
