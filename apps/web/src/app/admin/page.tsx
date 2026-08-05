@@ -6,6 +6,8 @@ import { requireSuperadminPage } from '@/lib/tenancy/superadminPage';
 import { readFleetOverviewForAdmin } from '@/lib/tenancy/adminOverview';
 import { StatTile, BreakdownList } from '@/components/saas/StatTile';
 import { PlatformAiKeyPanel } from '@/components/saas/PlatformAiKeyPanel';
+import { planValueEur, fleetAiMoney, healthyShare } from '@/lib/tenancy/fleetStats';
+import { formatMicros } from '@/lib/billing/aiBilling';
 import { formatInt, formatBytes, formatCostMicros, formatWhen } from '@/components/saas/format';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +22,10 @@ export default async function AdminOverviewPage() {
   const o = await readFleetOverviewForAdmin();
   const t = o.tenants;
   const u = o.usage;
+  // Derived, not stored: see lib/tenancy/fleetStats.
+  const planValue = planValueEur(t.byPlan);
+  const ai = fleetAiMoney(u.aiCostMicros);
+  const health = healthyShare(t.byStatus);
 
   return (
     <div className="space-y-6">
@@ -32,7 +38,12 @@ export default async function AdminOverviewPage() {
 
       <section>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Workspaces" value={formatInt(t.total)} accent="accent" />
+          <StatTile
+            label="Workspaces"
+            value={formatInt(t.total)}
+            sub={`${formatInt(health.healthy)} active or trialing · ${health.pct}%`}
+            accent="accent"
+          />
           <StatTile label="Accounts" value={formatInt(o.accounts)} accent="cyan" />
           <StatTile label="Active members" value={formatInt(o.activeMembers)} accent="purple" />
           <StatTile
@@ -40,6 +51,37 @@ export default async function AdminOverviewPage() {
             value={formatInt(t.billingLinked)}
             sub={`${formatInt(t.aiByoKey)} BYO-key`}
             accent="gold"
+          />
+        </div>
+      </section>
+
+      {/* The counters above answer "how much is happening". This answers "what is it worth
+          and what does it cost", which is the pair you need before onboarding anyone. */}
+      <section>
+        <h2 className="mb-2 text-[11px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
+          Money · {o.period}
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile
+            label="Plan value / month"
+            value={`€${planValue.toFixed(2)}`}
+            // NOT called MRR: byPlan and byStatus are separate tallies, so a canceled
+            // workspace still carrying a paid plan is counted. List price, not revenue.
+            sub="list price of provisioned plans"
+            accent="accent"
+          />
+          <StatTile label="AI cost" value={formatCostMicros(u.aiCostMicros)} accent="gold" />
+          <StatTile
+            label="AI owed"
+            value={`€${formatMicros(ai.owedMicros)}`}
+            sub={ai.owedMicros > 0 ? 'billable to workspaces' : 'markup not configured'}
+            accent={ai.owedMicros > 0 ? 'accent' : undefined}
+          />
+          <StatTile
+            label="AI margin"
+            value={`€${formatMicros(ai.margin)}`}
+            sub={ai.margin < 0 ? 'unbilled AI is money out' : 'owed minus cost'}
+            accent={ai.margin < 0 ? 'red' : 'cyan'}
           />
         </div>
       </section>
