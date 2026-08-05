@@ -26,6 +26,13 @@ export type Planned = {
 
 export const SHIPPED: Entry[] = [
   {
+    date: '2026-08-05',
+    title: 'Abuse limits on plan activation',
+    detail:
+      'Redeeming an activation code is now rate limited, per address and per account, like sign-in and password reset already were.',
+    kind: 'security',
+  },
+  {
     date: '2026-08-04',
     title: 'Per-workspace settings',
     detail:
