@@ -7584,3 +7584,61 @@ route gate. **type-check exit 0**, **376 files / 6012 tests green**. Κανέν�
 `pharos-saas-core-20260805-0840`): **(1)** οπλίζουμε την αυτόματη διαγραφή πίσω από δεύτερο env flag,
 ή μένει human-confirmed· **(2)** **γραμμή crontab** για το `suspended-sweep` — χωρίς αυτήν δεν τρέχει
 ούτε το warning email.
+
+## 2026-08-05 (β) — increment 149: το status δεν είναι ποτέ σκέτο status
+
+Ο Αχιλλέας ρώτησε αν το `canceled` από το Stripe αφήνει workspace χωρίς erasure markers. **Ναι**, και
+δίπλα του βρέθηκε χειρότερο.
+
+**1. Κανείς δεν καθάριζε το `suspendedAt` όταν ένα workspace ΕΒΓΑΙΝΕ από το suspended.** Οι recovery
+διαδρομές του webhook, το superadmin patch και το reactivate route έγραφαν `status` και προχωρούσαν:
+
+```
+Ιαν 01  past_due → suspended, ρολόι Ιαν 01
+Ιαν 05  πληρώνει → active,    ρολόι ΔΕΝ καθαρίζεται
+Ιουν 01 past_due → suspended, ρολόι ΑΚΟΜΑ Ιαν 01
+Ιουν 01 sweep    → deadline Ιαν 31 → scheduled for deletion ΤΗΝ ΙΔΙΑ ΜΕΡΑ
+```
+
+χωρίς προειδοποιητικό email, γιατί το warn window είχε κλείσει τον Ιανουάριο και το
+`suspendWarnEmailedAt` ήταν ήδη σταμπαρισμένο. **Προσβάσιμο σήμερα** από το superadmin console, και
+μέσω Stripe τη μέρα που θα συνδεθεί.
+
+**2. Το `canceled` δεν σταμπάριζε καμία διαδρομή διαγραφής.** Ούτε το owner-facing DELETE ούτε ο
+subscription-deleted handler έγραφαν erasure marker, και το sweep είναι σκόπιμα `suspended`-only, άρα
+canceled workspace ζούσε για πάντα. **Απόφαση Αχιλλέα: επιλογή (β)** — το cancel προγραμματίζει το
+ίδιο το erasure, 30 μέρες, ώστε ο χρήστης να βλέπει **ρητή ημερομηνία** αντί για σιωπηλό ρολόι.
+
+**Η διόρθωση είναι ΕΝΑ seam, όχι τέσσερα μπαλώματα.** `planStatusChange(prev, next, erasure…)` στο
+`statusAudit.ts` επιστρέφει ό,τι συνεπάγεται μια μετάβαση, και περνούν ΟΛΟΙ οι writers: είσοδος σε
+`suspended` → ξεκίνα το ρολόι + καθάρισε το παλιό warn stamp· έξοδος → σταμάτα το· είσοδος σε
+`canceled` → πρόγραμμάτισε erasure εκτός αν εκκρεμεί ήδη (ποτέ μη σπρώξεις πιο μακριά αίτημα του
+ιδιοκτήτη)· έξοδος από `canceled` → ακύρωσε το erasure που έφερε το cancel. Τέσσερα call sites που το
+καθένα θυμάται τρία side effects είναι τέσσερις ευκαιρίες να ξεχαστεί ένα, και το ξέχασμα φαίνεται
+μόνο όταν έχουν χαθεί δεδομένα.
+
+Το cancel-implied erasure αποδίδεται σε `system:workspace-canceled` **ακόμα κι όταν το πάτησε
+άνθρωπος**. Αυτός ο marker είναι που επιτρέπει στο reactivate να ξεχωρίσει «τη διαγραφή που ήρθε με
+το cancel» (ακύρωσέ την) από «τη διαγραφή που ζήτησε ρητά ο ιδιοκτήτης» (άφησέ την, το erasure είναι
+τεκμηριωμένα ορθογώνιο στο status). Ο άνθρωπος καταγράφεται στο audit row, εκεί που ανήκει η απόδοση.
+
+**Δεύτερη γραμμή άμυνας μέσα στο sweep**: το `suspendedAt` δεν είναι πλέον έμπιστο για απόφαση
+ΔΙΑΓΡΑΦΗΣ. Αν το audit trail δείχνει `workspace.reactivated` νεότερο από το stamp, το stamp ανήκει σε
+suspension από το οποίο το workspace ανέκαμψε → fallback στο νεότερο `workspace.suspended` row, κι αν
+κι εκείνο είναι μπαγιάτικο, skip για αυτό το run. Το skip κοστίζει μια μέρα, η εικασία κοστίζει τα
+δεδομένα κάποιου.
+
+**Verified**: 19 unit tests στο seam, 4 στο stale-stamp guard, τα route tests ενημερωμένα στα νέα
+payloads + δύο νέα που αποδεικνύουν ότι το reactivate ακυρώνει τη διαγραφή του cancel αλλά αφήνει
+όρθιο owner-requested erasure. **90 files / 1459 tests green** σε lib/billing, lib/tenancy, api/saas,
+api/cron· type-check καθαρό για τα αρχεία μου.
+
+**ΣΗΜ για το tree**: την ώρα του run άλλες routines έγραφαν ταυτόχρονα (expenses, items, i18n,
+apiRateLimit, apiAuth, statements). Το full-suite run δείχνει δικά τους failures + type errors σε
+**uncommitted** αρχεία τους· δεν τα άγγιξα και το commit είναι pathspec με τα 12 δικά μου.
+
+**Next task:** (α) το admin console να δείχνει τα due-for-deletion workspaces· (β) sending domain
+SPF+DKIM· (γ) Stripe όταν έρθουν keys.
+
+**## Needs Achilleas:** **Stripe keys**, **plan pricing**, και το **ASK
+`pharos-saas-core-20260805-0840`** (οπλίζουμε το drop; το crontab ΜΠΗΚΕ ήδη, 04:32 UTC).
