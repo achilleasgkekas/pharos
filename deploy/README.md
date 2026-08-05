@@ -80,22 +80,33 @@ curl -sI https://ph-aros.com/account/login | head -3
 
 ## 4. Schedule the background jobs
 
-Three endpoints are driven by cron, not by the app. They authenticate with `CRON_SECRET` and live
+Four endpoints are driven by cron, not by the app. They authenticate with `CRON_SECRET` and live
 under `/api/cron/`, which is the only path excluded from the session gate.
 
-`crontab -e`:
+Call them through `deploy/cron-call.sh`, never with the token inline. `ps` shows every process
+argv to every local user, so a `-H "Authorization: Bearer ..."` in the crontab leaks the secret for
+as long as the request runs, and duplicates a value that already has a `600` home in `.env.prod`.
+The script reads it from there and hands it to curl through a config file on stdin.
+
+`crontab -e` (UTC; backup first, so a bad night still has today's copy):
 
 ```cron
-17 3 * * *  curl -fsS -X POST -H "Authorization: Bearer YOUR_CRON_SECRET" https://ph-aros.com/api/cron/saas/usage-sample  >/dev/null
-27 3 * * *  curl -fsS -X POST -H "Authorization: Bearer YOUR_CRON_SECRET" https://ph-aros.com/api/cron/saas/trials-sweep  >/dev/null
-37 3 * * *  curl -fsS -X POST -H "Authorization: Bearer YOUR_CRON_SECRET" https://ph-aros.com/api/cron/saas/erasure-purge >/dev/null
-0  4 * * *  /opt/pharos/deploy/backup.sh >> /var/log/pharos-backup.log 2>&1
+20 3 * * * /opt/pharos/deploy/backup.sh >> /var/log/pharos-backup.log 2>&1
+17 4 * * * /opt/pharos/deploy/cron-call.sh usage-sample     >> /var/log/pharos-cron.log 2>&1
+27 4 * * * /opt/pharos/deploy/cron-call.sh trials-sweep     >> /var/log/pharos-cron.log 2>&1
+32 4 * * * /opt/pharos/deploy/cron-call.sh suspended-sweep  >> /var/log/pharos-cron.log 2>&1
+37 4 * * * /opt/pharos/deploy/cron-call.sh erasure-purge    >> /var/log/pharos-cron.log 2>&1
 ```
 
-Confirm one works before trusting the schedule. A wrong token answers `401` as JSON:
+The order is load-bearing, not cosmetic: `trials-sweep` creates suspensions, `suspended-sweep`
+warns them and schedules the expired ones for erasure, `erasure-purge` reports what is due. Run
+back to front and each stage acts on yesterday's state.
+
+Confirm one works before trusting the schedule, in the environment cron will actually use (an
+empty env with cron's default `PATH`) rather than your login shell:
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer YOUR_CRON_SECRET" https://ph-aros.com/api/cron/saas/trials-sweep
+env -i PATH=/usr/bin:/bin /opt/pharos/deploy/cron-call.sh trials-sweep
 ```
 
 ## 5. Backups
