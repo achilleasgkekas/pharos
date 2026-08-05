@@ -141,6 +141,12 @@ const AppConfigSchema = new Schema(
     // always sends the full picture and never reads/writes this. Empty = nothing sent
     // yet, everything currently live counts as fresh.
     alertDispatchKeys: { type: [String], default: [] },
+    // Outbound delivery history (P80). Map `notifier:<id>` / `webhook:<id>` → the last
+    // DELIVERY_LOG_CAP attempts (newest last, {at, ok, status, error, attempts}), written
+    // by lib/deliveryLog.ts on every dispatch and shown per channel in Settings →
+    // Notifications. Capped in both dimensions (rows per key, number of keys), so a
+    // permanently-broken endpoint cannot grow this document without bound.
+    deliveryLog: { type: Schema.Types.Mixed, default: {} },
     remoteHost: { type: String, default: '' },
     remotePort: { type: Number, default: 0 }, // 0 → backend default (21 ftp / 445 smb)
     remoteUser: { type: String, default: '' },

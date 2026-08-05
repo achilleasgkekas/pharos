@@ -5,6 +5,9 @@ import { currentModel } from './tenancy/connection';
 import { assertPublicUrl } from './ssrf';
 import { rateHit, type RateConfig } from './apiRateLimit';
 import { WEBHOOK_EVENTS, type WebhookEvent, type WebhookSubscription } from './webhooks.shared';
+import { deliverWithRetry, describeOutcome, type DeliveryOutcome } from './deliveryRetry';
+import { recordDeliveries } from './deliveryLog';
+import { webhookLogKey } from './deliveryLog.shared';
 
 export { WEBHOOK_EVENTS };
 export type { WebhookEvent, WebhookSubscription };
@@ -80,13 +83,18 @@ function webhookRateLimitConfig(): RateConfig {
   return { enabled: true, limit, windowMs };
 }
 
-async function postOne(sub: WebhookSubscription, event: WebhookEvent, data: unknown): Promise<boolean> {
+/** One delivery attempt. Failures that a retry cannot fix (local rate limit, SSRF-blocked
+ *  target) are marked `permanent` so deliverWithRetry gives up immediately. */
+async function attemptOne(sub: WebhookSubscription, event: WebhookEvent, data: unknown): Promise<DeliveryOutcome> {
   const rl = webhookRateLimitConfig();
-  if (rl.enabled && !rateHit(deliveryStore, sub.id, Date.now(), rl.limit, rl.windowMs).allowed) return false;
+  if (rl.enabled && !rateHit(deliveryStore, sub.id, Date.now(), rl.limit, rl.windowMs).allowed) {
+    return { ok: false, error: 'Local rate limit reached', permanent: true };
+  }
   try {
     await assertPublicUrl(sub.url);
-  } catch {
-    return false; // SSRF guard — never POST to a private/loopback/internal address
+  } catch (err) {
+    // SSRF guard — never POST to a private/loopback/internal address
+    return { ok: false, error: (err as Error).message, permanent: true };
   }
   const ts = Math.floor(Date.now() / 1000);
   const body = JSON.stringify({ event, data, ts });
@@ -94,24 +102,49 @@ async function postOne(sub: WebhookSubscription, event: WebhookEvent, data: unkn
   if (sub.secret) headers['X-Pharos-Signature'] = signWebhookPayload(sub.secret, ts, body);
   try {
     const res = await fetch(sub.url, { method: 'POST', headers, body, signal: AbortSignal.timeout(TIMEOUT) });
-    return res.ok;
-  } catch {
-    return false;
+    return res.ok
+      ? { ok: true, ...(res.status ? { status: res.status } : {}) }
+      : { ok: false, status: res.status, error: 'Rejected by receiver' };
+  } catch (err) {
+    return { ok: false, error: (err as Error)?.message || 'Network error' };
   }
 }
 
-/** Fire an event to every enabled subscription that opted into it. Never throws —
- *  callers use this fire-and-forget from feature flows (receipt upload, alert scan). */
+async function postOne(sub: WebhookSubscription, event: WebhookEvent, data: unknown): Promise<boolean> {
+  return (await attemptOne(sub, event, data)).ok;
+}
+
+/**
+ * Fire an event to every enabled subscription that opted into it. Never throws —
+ * callers use this fire-and-forget from feature flows (receipt upload, alert scan).
+ *
+ * Each subscription retries with backoff (P80) and records the outcome in the
+ * persisted delivery log, so an automation endpoint that was down when the event
+ * fired is visible in Settings instead of vanishing.
+ */
 export async function dispatchEventWebhooks(event: WebhookEvent, data: unknown): Promise<{ sent: number; total: number }> {
   const subs = (await getEventWebhooks()).filter((s) => s.enabled && s.events.includes(event));
   if (subs.length === 0) return { sent: 0, total: 0 };
-  const results = await Promise.allSettled(subs.map((s) => postOne(s, event, data)));
-  const sent = results.filter((r) => r.status === 'fulfilled' && r.value).length;
+  const results = await Promise.allSettled(subs.map((s) => deliverWithRetry(() => attemptOne(s, event, data))));
+  const at = new Date().toISOString();
+  const rows: [string, { at: string; ok: boolean; status?: number; error?: string; attempts: number }][] = [];
+  let sent = 0;
+  results.forEach((r, i) => {
+    if (r.status !== 'fulfilled') return; // deliverWithRetry never rejects; defensive only
+    const out = r.value;
+    if (out.ok) sent++;
+    rows.push([
+      webhookLogKey(subs[i].id),
+      { at, ok: out.ok, ...(out.status ? { status: out.status } : {}), ...(out.ok ? {} : { error: describeOutcome(out) }), attempts: out.attempts },
+    ]);
+  });
+  await recordDeliveries(rows);
   return { sent, total: subs.length };
 }
 
 /** Send a one-off test payload to a single (possibly unsaved) subscription, bypassing
- *  its `events` filter (a test should work even before any event is checked). */
+ *  its `events` filter (a test should work even before any event is checked). Single
+ *  attempt: the Test button is interactive and should answer immediately. */
 export async function testEventWebhook(sub: WebhookSubscription): Promise<boolean> {
   return postOne(sub, 'receipt.parsed', { test: true, message: 'Pharos test webhook — delivery is working.' });
 }

@@ -16,8 +16,9 @@ import { YnabImportModal } from './YnabImportModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
 import { rateForCategory } from '@/lib/depreciation';
-import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, testNotifierChannel, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
+import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
+import { notifierLogKey, webhookLogKey, type DeliveryLogEntry } from '@/lib/deliveryLog.shared';
 import { WEBHOOK_EVENTS, type WebhookSubscription, type WebhookEvent } from '@/lib/webhooks.shared';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
 import { listUsers, createUser, deleteUser, setUserRole, changeUserPassword, changeOwnPassword, type UserRow } from './users.actions';
@@ -2023,6 +2024,38 @@ function DefaultsManager({ settings }: { settings: AppSettings }) {
   );
 }
 
+/** Recent outbound delivery attempts for one channel (P80). Until this existed a failed
+ *  delivery left no trace at all, so a broken endpoint looked identical to a quiet week. */
+function DeliveryHistory({ log }: { log?: DeliveryLogEntry[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!log || log.length === 0) return null;
+  const rows = [...log].reverse(); // newest first
+  const shown = expanded ? rows : rows.slice(0, 3);
+  const failing = rows[0] && !rows[0].ok;
+  return (
+    <div className="pt-2 border-t border-[color:var(--color-border)] space-y-1">
+      <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+        Recent deliveries {failing && <span className="text-[color:var(--color-red)]">· last one failed</span>}
+      </p>
+      {shown.map((r, i) => (
+        <div key={`${r.at}-${i}`} className="flex items-center gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
+          <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', r.ok ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-red)]')} />
+          <span className="text-[color:var(--color-text-faint)]">{new Date(r.at).toLocaleString('en-GB')}</span>
+          <span className={cn('truncate', r.ok ? 'text-[color:var(--color-text-dim)]' : 'text-[color:var(--color-red)]')}>
+            {r.ok ? `delivered${r.status ? ` · ${r.status}` : ''}` : r.error || 'failed'}
+          </span>
+          {r.attempts > 1 && <span className="text-[color:var(--color-gold)] shrink-0">×{r.attempts}</span>}
+        </div>
+      ))}
+      {rows.length > 3 && (
+        <button type="button" onClick={() => setExpanded((v) => !v)} className="text-[10px] text-[color:var(--color-cyan)]">
+          {expanded ? 'show less' : `show all ${rows.length}`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function newChannel(type: NotifierType): NotifierConfig {
   const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `n${Date.now()}`;
   return { id, type, enabled: true, label: '', url: '', token: '', target: '' };
@@ -2035,6 +2068,7 @@ function ChannelCard({
   onTest,
   testing,
   testMsg,
+  log,
 }: {
   ch: NotifierConfig;
   onChange: (c: NotifierConfig) => void;
@@ -2042,6 +2076,7 @@ function ChannelCard({
   onTest: () => void;
   testing: boolean;
   testMsg?: string;
+  log?: DeliveryLogEntry[];
 }) {
   const t = useT();
   const meta = NOTIFIER_TYPES.find((nt) => nt.type === ch.type)!;
@@ -2110,6 +2145,7 @@ function ChannelCard({
           {testMsg}
         </p>
       )}
+      <DeliveryHistory log={log} />
     </div>
   );
 }
@@ -2120,9 +2156,13 @@ function NotificationsManager() {
   const [msg, setMsg] = useState<string | null>(null);
   const [testing, setTesting] = useState<string>('');
   const [testMsgs, setTestMsgs] = useState<Record<string, string>>({});
+  const [logs, setLogs] = useState<Record<string, DeliveryLogEntry[]>>({});
 
   useEffect(() => {
-    startTransition(async () => setChannels(await getNotifierChannels()));
+    startTransition(async () => {
+      setChannels(await getNotifierChannels());
+      setLogs(await getDeliveryLogs());
+    });
   }, []);
 
   function update(id: string, c: NotifierConfig) {
@@ -2156,6 +2196,7 @@ function NotificationsManager() {
       await saveNotifierChannels(channels ?? []);
       const r = await runAlertChecks();
       setMsg((r.sent ? '✓ Sent · ' : '(no enabled channels) · ') + r.summary.replace(/\n/g, ' · '));
+      setLogs(await getDeliveryLogs()); // the dispatch just wrote new rows
     });
   }
 
@@ -2184,6 +2225,7 @@ function NotificationsManager() {
               onTest={() => testOne(c)}
               testing={testing === c.id}
               testMsg={testMsgs[c.id]}
+              log={logs[notifierLogKey(c.id)]}
             />
           ))
         )}
@@ -2224,6 +2266,7 @@ function WebhookCard({
   testMsg,
   onCopySecret,
   copied,
+  log,
 }: {
   sub: WebhookSubscription;
   onChange: (s: WebhookSubscription) => void;
@@ -2233,6 +2276,7 @@ function WebhookCard({
   testMsg?: string;
   onCopySecret: () => void;
   copied: boolean;
+  log?: DeliveryLogEntry[];
 }) {
   const set = (patch: Partial<WebhookSubscription>) => onChange({ ...sub, ...patch });
   function toggleEvent(ev: WebhookEvent) {
@@ -2311,6 +2355,7 @@ function WebhookCard({
           {testMsg}
         </p>
       )}
+      <DeliveryHistory log={log} />
     </div>
   );
 }
@@ -2322,9 +2367,13 @@ function WebhookManager() {
   const [testing, setTesting] = useState<string>('');
   const [testMsgs, setTestMsgs] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState('');
+  const [logs, setLogs] = useState<Record<string, DeliveryLogEntry[]>>({});
 
   useEffect(() => {
-    startTransition(async () => setSubs(await getWebhookSubscriptions()));
+    startTransition(async () => {
+      setSubs(await getWebhookSubscriptions());
+      setLogs(await getDeliveryLogs());
+    });
   }, []);
 
   function update(id: string, s: WebhookSubscription) {
@@ -2393,6 +2442,7 @@ function WebhookManager() {
               testMsg={testMsgs[s.id]}
               onCopySecret={() => copySecret(s.secret, s.id)}
               copied={copiedId === s.id}
+              log={logs[webhookLogKey(s.id)]}
             />
           ))
         )}

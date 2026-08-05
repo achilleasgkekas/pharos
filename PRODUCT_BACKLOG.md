@@ -256,8 +256,26 @@
 > - **P65** (voice quick-capture) — χαμηλής αξίας κατά την αξιολόγηση, εγκρίθηκε ούτως ή άλλως, χτίσου το τελευταίο στη σειρά value/effort.
 > - **P73** (subscription cost-split) / **P76** (emergency access) — και τα δύο χρειάζονται ουσιαστικά δεύτερο ενεργό χρήστη (P31) για να έχουν πρακτική αξία· ο Αχιλλέας δεν επιβεβαίωσε ρητά ότι τα χρησιμοποιεί, χτίσου τα με χαμηλή προτεραιότητα.
 
-### P80. Outbound webhook delivery reliability (retry + failure log) — S — both, foundation-lever για το ήδη-shipped P24
-- **Αξία:** live-verified `lib/webhooks.ts` — το ήδη-shipped P24 (outbound event webhooks) κάνει **fire-and-forget,
+### P80. Outbound webhook delivery reliability (retry + failure log) — ✅ SHIPPED 2026-08-05 (pharos-daily-dev)
+- **Τι έγινε:** νέο pure `lib/deliveryRetry.ts` (`DeliveryOutcome`/`isRetryable`/`deliverWithRetry` με injectable
+  sleep + `parseRetryDelays`) και νέο `lib/deliveryLog.ts` (+ client-safe `deliveryLog.shared.ts`) που κρατά τις
+  τελευταίες **20 απόπειρες ανά κανάλι** στο νέο `AppConfig.deliveryLog` (map `notifier:<id>`/`webhook:<id>`,
+  capped και σε γραμμές και σε κλειδιά, 50 max). Και οι **δύο** outbound επιφάνειες περνούν από κει: το
+  `dispatchAlert` (ntfy/Discord/Slack/Telegram/webhook) και το `dispatchEventWebhooks` (P24 signed events) —
+  κάθε κανάλι με δικό του retry, όλα παράλληλα, και **ένα** read+write για ολόκληρο το fan-out.
+- **Πολιτική retry:** 2 retries (3 απόπειρες) μόνο για ό,τι μπορεί να διορθωθεί — network error/timeout, 5xx,
+  429, 408. Κάθε άλλο 4xx (λάθος URL, ανακληθέν webhook, λάθος token), missing config, SSRF-blocked target και
+  local rate limit είναι `permanent` → μηδέν retry, μηδέν χαμένος χρόνος. Τα δύο «Test» κουμπιά μένουν
+  **single-attempt** επίτηδες (interactive, θέλουν άμεση απάντηση).
+- **Απόκλιση από το spec (καταγεγραμμένη):** backoff **1s/5s** αντί του παραδείγματος 5s/30s — το dispatch
+  γίνεται awaited μέσα σε server action («Check & notify now») και στο `/api/cron/alerts`, οπότε 30s backoff θα
+  έτρωγε το request budget αντί να βοηθήσει. Env-overridable με `NOTIFY_RETRY_DELAYS_MS` (κενό = retries off).
+- **UI:** νέο `DeliveryHistory` κάτω από κάθε `ChannelCard` **και** `WebhookCard` (τελευταίες 3 + «show all N»):
+  ώρα, πράσινη/κόκκινη κουκίδα, HTTP status ή λόγος αποτυχίας, `×N` όταν χρειάστηκαν retries, και «last one
+  failed» warning. Νέο read-only action `getDeliveryLogs()` (requireAdmin, tenant-scoped).
+- **Tests:** 51 νέα (30 `deliveryRetry.test.ts` + 11 `deliveryLog.shared.test.ts` + 10 `notifiers.retry.test.ts`
+  που οδηγούν το πραγματικό `dispatchAlert` με mocked DB/fetch). Πλήρες suite **374 files / 5967 passed**.
+- **Αρχικό spec (για ιστορικό):** live-verified `lib/webhooks.ts` — το ήδη-shipped P24 (outbound event webhooks) κάνει **fire-and-forget,
   μία απόπειρα** (`Promise.allSettled` απλά μαζεύει το per-call αποτέλεσμα, `grep -n "retry|attempt|deliveryLog|
   history" lib/webhooks.ts` = 0 σχετικά hits). Πραγματικό σενάριο: ένα Home Assistant ή n8n endpoint είναι
   προσωρινά down/restarting τη στιγμή που πυροδοτείται ένα event (π.χ. «bill overdue») — το webhook αποτυγχάνει

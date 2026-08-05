@@ -64,6 +64,8 @@ import { detectSyncStaleness, formatSyncStaleness } from '@/lib/syncStaleness';
 import { markRemoteSync, getLastRemoteSync } from '@/lib/syncState';
 import { splitFreshAlerts } from '@/lib/alertDedup';
 import { dispatchAlert, getNotifiers, testNotifier, type NotifierConfig } from '@/lib/notifiers';
+import { getDeliveryLog } from '@/lib/deliveryLog';
+import type { DeliveryLogEntry } from '@/lib/deliveryLog.shared';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { generateNotifications } from '@/app/notifications/actions';
 import { detectBudgetExceeded, type BudgetAlertRow } from '@/lib/budgetAlert';
@@ -432,6 +434,14 @@ export async function testNotifierChannel(channel: NotifierConfig): Promise<{ ok
   await requireAdmin();
   const ok = await testNotifier(channel);
   return ok ? { ok: true } : { ok: false, error: 'Delivery failed — check the URL/token' };
+}
+
+/** Recent outbound delivery attempts per channel (P80), keyed `notifier:<id>` /
+ *  `webhook:<id>`. Read-only; feeds the per-channel history in Settings →
+ *  Notifications so a silently failing endpoint is visible. */
+export async function getDeliveryLogs(): Promise<Record<string, DeliveryLogEntry[]>> {
+  await requireAdmin();
+  return getDeliveryLog();
 }
 
 // ─── Outbound event webhooks (P24) ───────────────────────────────────────────
