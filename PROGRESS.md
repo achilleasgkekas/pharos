@@ -2,7 +2,7 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: c568a3b -->
+<!-- reviewed: 7a9d15d -->
 <!-- docker-validated: 7e28354 -->
 <!-- ui-audited: 0bc5e14 -->
 
@@ -11539,3 +11539,32 @@ errors. **Δεν testable unattended**: το ίδιο το bulk-edit UI είνα
   ο update check αποτυγχάνει σιωπηλά, και δεν υπάρχει κανένα `v*.*.*` tag), **P46**/**P74** last mile,
   **P81** (`CRON_SECRET` στο `.env` + restart), **P31** live check με τους τρεις ρόλους. **P36 / P16** παραμένουν
   παγωμένα με ρητό κανόνα σιωπής (`OWNER_DECISIONS.md` #13).
+
+## 2026-08-05 (reviewer routine — 67η σάρωση, c568a3b..7a9d15d, 73 commits)
+
+Guard: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md`: μηδέν OPEN entry προς `reviewer`.
+
+**Review**: `npm run type-check` EXIT 0. Πλήρες `npx vitest run` → 6255 passed / 2 failed / 4 skipped
+(389 files) — τα 2 failed είναι το ήδη-καταγεγραμμένο `aiConfig.tenant.test.ts` timeout flake
+(5s testTimeout σε cache-isolation τεστ, γνωστό από πολλά προηγούμενα runs, όχι νέο). Το range είναι
+μεγάλο (~24 ώρες fleet activity, 359 αρχεία) οπότε δεν διαβάστηκε γραμμή-γραμμή στο σύνολο· εστίασα σε
+6 υψηλού-ρίσκου σημεία: SiteNav-παντού nav-bug fix σειρά (4 commits, όλα με root-cause + live repro +
+verification), account/admin surface unification (`9e9572a`, spot-checked το admin overview count logic
+— σωστό, `Account.email` είναι ήδη lowercase-normalized στο schema άρα καμία case-mismatch με το
+`superadminAllowlist()`), νέο `deploy/f2b-bridge.sh` (host-side fail2ban unban bridge, authoritative
+validation στον host, μηδέν app-side writer ακόμα άρα μηδέν attack surface ανοιχτό), storage-quota
+wiring (`c58a79a`, `lib/storage.ts` gates saveFile στο quota πριν το write· ένα soft TOCTOU race σε
+ταυτόχρονα uploads υπάρχει αλλά είναι ήδη documented best-effort trade-off, όχι νέο εύρημα), το SaaS
+front-door middleware fix (έκλεισε πραγματικό ζωντανό hole, καλά τεστ-καλυμμένο), και το destructive
+`purgeExecute.ts` (ήδη περασμένο από ρητή έγκριση Αχιλλέα, guards φαίνονται σωστές). Secrets sweep στο
+πλήρες diff → μηδέν committed secret. **Μηδέν νέο P1/P2/P3 εύρημα.**
+
+Standing P1 (`settings/actions.ts` Trash tenancy gap, `TRASH_MODELS` raw model map χωρίς `scoped()`)
+live-verified ΑΚΟΜΑ TODO, αμετάβλητο — κανένα commit σε αυτό το range το αγγίζει. Δεν το άγγιξα (irreversible
+delete paths, εκτός «μικρό & ασφαλές» ορίου αυτού του routine· περιμένει builder).
+
+**Routine health**: όλα τα 18 registered scheduled tasks (Pharos+BakeCore) `enabled:true` με `lastRunAt`
+μέσα στις τελευταίες ~24 ώρες, κανένα φαίνεται stuck. `ASK_ACHILLEAS.md`: τα πιο πρόσφατα `reviewer-*`
+entries όλα APPLIED.
+
+Marker ενημερώθηκε: `<!-- reviewed: 7a9d15d -->`. Πλήρες write-up στο `WEB_DEBT.md` (67η σάρωση).
