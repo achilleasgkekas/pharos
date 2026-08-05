@@ -7,10 +7,29 @@
 // 404s otherwise).
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { ArrowUpRight, LayoutDashboard, SlidersHorizontal, Users, BarChart3, Activity, CreditCard, UserRound } from 'lucide-react';
+import { cn } from '@/components/ui/cn';
 import { Pill, TenantStatusBadge, MemberRoleBadge } from './StatusBadge';
 import { workspaceQuery } from './chooseWorkspace';
 
 export type WorkspaceTab = { href: string; label: string; active: boolean };
+
+/** Icon per tab, keyed by the STABLE part of its href (workspaceTabs.ts's `path`, before any
+ *  `?w=` query is appended) — kept local to this component (not workspaceTabs.ts) since that
+ *  module is deliberately pure/icon-free, see its own doc comment. */
+const TAB_ICON: Record<string, typeof LayoutDashboard> = {
+  '/account/workspace': LayoutDashboard,
+  '/account/workspace/settings': SlidersHorizontal,
+  '/account/workspace/members': Users,
+  '/account/workspace/usage': BarChart3,
+  '/account/workspace/activity': Activity,
+  '/account/workspace/billing': CreditCard,
+  '/account/settings': UserRound,
+};
+function tabIcon(href: string): typeof LayoutDashboard {
+  const path = href.split('?')[0];
+  return TAB_ICON[path] ?? LayoutDashboard;
+}
 
 /** A workspace the account can switch to, for the header dropdown-less switcher. */
 export type SwitchTarget = { slug: string; name: string; active: boolean };
@@ -41,11 +60,12 @@ export function WorkspaceShell({
     <div className="min-h-screen bg-[color:var(--color-bg)] text-[color:var(--color-text)]">
       <div className="mx-auto max-w-[1080px] px-4 py-6 sm:px-6">
         {/* Header. What used to sit here was a row of mono-caps links (← PHAROS / ACCOUNT
-            SETTINGS / SIGN OUT) above the title and a full-size green "Open workspace" CTA
-            beside it — three ways out of the page competing with the page itself. Account
-            settings is a tab now, sign out lives at the foot of the nav with the other
-            account-level action, and the way into the product is a normal button rather than
-            the loudest thing on screen. */}
+            SETTINGS / SIGN OUT) above the title, plus a full-size green "Open workspace" CTA
+            boxed on the right — competing exits, on a page that now also carries the global
+            SiteNav whose own logo/nav links already lead back into the product (see the root
+            layout's productBaseUrl). So this reads like a normal Pharos page header now: a
+            plain h1 with its meta pills inline, and "open workspace" demoted to a small
+            secondary link beside the title rather than a boxed button pulling the eye. */}
         <header className="mb-6 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
             {workspaceName || 'Workspace'}
@@ -56,9 +76,9 @@ export function WorkspaceShell({
           {appUrl && (
             <a
               href={appUrl}
-              className="ml-auto rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-1.5 text-sm font-medium text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-accent)]"
+              className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)]"
             >
-              Open workspace →
+              Open workspace <ArrowUpRight size={14} />
             </a>
           )}
         </header>
@@ -85,52 +105,39 @@ export function WorkspaceShell({
           </nav>
         )}
 
-        {/* Same shape as Settings: a sticky rail on desktop, a scrollable pill strip on
-            mobile. The old bar wrapped onto two ragged rows on a phone. */}
-        <div className="flex gap-6 items-start">
+        {/* Same nav, same classes, as Settings' own tab strip (app/settings/SettingsClient.tsx)
+            — one link list, no separate desktop/mobile markup: a sticky rail on desktop
+            (top-20, clearing the global SiteNav), a scrollable pill strip on mobile. This used
+            to be two differently-styled blocks (a muted accent-text rail + a solid-fill pill
+            strip) that didn't match Settings' look or each other. */}
+        <div className="flex flex-col md:flex-row gap-5">
           {tabList.length > 0 && (
-            <aside className="hidden md:block w-52 shrink-0 sticky top-4 self-start">
-              <nav aria-label="Workspace" className="flex flex-col gap-0.5">
-                {tabList.map((t) => (
-                  <Link
-                    key={t.href}
-                    href={t.href}
-                    aria-current={t.active ? 'page' : undefined}
-                    className={
-                      t.active
-                        ? 'rounded-lg bg-[color:var(--color-surface-2)] px-3 py-2 text-sm font-semibold text-[color:var(--color-accent)]'
-                        : 'rounded-lg px-3 py-2 text-sm text-[color:var(--color-text-dim)] hover:bg-[color:var(--color-surface)] hover:text-[color:var(--color-text)]'
-                    }
-                  >
-                    {t.label}
-                  </Link>
-                ))}
-              </nav>
-            </aside>
+            <nav aria-label="Workspace" className="md:w-52 md:shrink-0">
+              <div className="flex md:flex-col gap-1.5 overflow-x-auto md:overflow-visible md:sticky md:top-20 pb-1 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
+                {tabList.map((t) => {
+                  const Icon = tabIcon(t.href);
+                  return (
+                    <Link
+                      key={t.href}
+                      href={t.href}
+                      aria-current={t.active ? 'page' : undefined}
+                      className={cn(
+                        'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all shrink-0 md:w-full',
+                        t.active
+                          ? 'bg-[color:var(--color-accent)] text-black'
+                          : 'bg-[color:var(--color-surface-2)] md:bg-transparent border border-[color:var(--color-border)] md:border-transparent text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)]'
+                      )}
+                    >
+                      <Icon size={15} />
+                      {t.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </nav>
           )}
 
           <div className="min-w-0 flex-1">
-            {tabList.length > 0 && (
-              <nav
-                aria-label="Workspace"
-                className="md:hidden -mx-4 mb-4 flex gap-1 overflow-x-auto px-4 pb-1"
-              >
-                {tabList.map((t) => (
-                  <Link
-                    key={t.href}
-                    href={t.href}
-                    aria-current={t.active ? 'page' : undefined}
-                    className={
-                      t.active
-                        ? 'shrink-0 rounded-lg bg-[color:var(--color-accent)] px-3 py-1.5 text-sm font-semibold text-black'
-                        : 'shrink-0 rounded-lg bg-[color:var(--color-surface-2)] px-3 py-1.5 text-sm text-[color:var(--color-text-dim)]'
-                    }
-                  >
-                    {t.label}
-                  </Link>
-                ))}
-              </nav>
-            )}
             <main>{children}</main>
           </div>
         </div>

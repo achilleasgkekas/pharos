@@ -61,7 +61,16 @@ function navActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + '/');
 }
 
-function NavGroup({ groupKey, links }: { groupKey: TKey; links: NavLink[] }) {
+/** Product-scoped links are plain relative paths ('/items', '/settings', ...) that only
+ *  resolve on a TENANT host. When SiteNav renders somewhere else (app.<domain> — /admin,
+ *  /account/*, `productBaseUrl` set), prefix with the account's home workspace's own
+ *  subdomain instead so the link actually goes somewhere, rather than bouncing through the
+ *  no_tenant gate back to /account/workspace. See the root layout's comment for the story. */
+function productHref(base: string | undefined, path: string): string {
+  return base ? `${base}${path}` : path;
+}
+
+function NavGroup({ groupKey, links, base }: { groupKey: TKey; links: NavLink[]; base?: string }) {
   const t = useT();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -94,7 +103,7 @@ function NavGroup({ groupKey, links }: { groupKey: TKey; links: NavLink[] }) {
             return (
               <Link
                 key={l.href}
-                href={l.href}
+                href={productHref(base, l.href)}
                 prefetch={false}
                 onClick={() => setOpen(false)}
                 className={cn(
@@ -112,7 +121,7 @@ function NavGroup({ groupKey, links }: { groupKey: TKey; links: NavLink[] }) {
   );
 }
 
-function UserMenu({ user, saas, operator }: { user: SessionUser; saas: boolean; operator: boolean }) {
+function UserMenu({ user, saas, operator, base }: { user: SessionUser; saas: boolean; operator: boolean; base?: string }) {
   const t = useT();
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
@@ -148,7 +157,7 @@ function UserMenu({ user, saas, operator }: { user: SessionUser; saas: boolean; 
               moved here so the bar itself stays uncluttered and these read as "about how I use
               Pharos" rather than competing with the product navigation for space. */}
           <Link
-            href="/settings"
+            href={productHref(base, '/settings')}
             prefetch={false}
             onClick={() => setOpen(false)}
             className={cn(menuRow, pathname.startsWith('/settings') && 'text-[color:var(--color-accent)]')}
@@ -208,7 +217,7 @@ function UserMenu({ user, saas, operator }: { user: SessionUser; saas: boolean; 
   );
 }
 
-export function SiteNav({ aiReady = false, user, saas = false, operator = false }: { aiReady?: boolean; user?: SessionUser; saas?: boolean; operator?: boolean }) {
+export function SiteNav({ aiReady = false, user, saas = false, operator = false, productBaseUrl }: { aiReady?: boolean; user?: SessionUser; saas?: boolean; operator?: boolean; productBaseUrl?: string }) {
   const t = useT();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -220,7 +229,7 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false 
     <header className="sticky top-0 z-40 border-b border-[color:var(--color-border)] bg-[color:var(--color-bg)]">
       <div className="max-w-[1400px] mx-auto px-4 py-2.5 flex items-center gap-3">
         {/* Logo */}
-        <Link href="/" prefetch={false} title="PHAROS · Personal Hub · Asset & Resource Oversight System" className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
+        <Link href={productHref(productBaseUrl, '/')} prefetch={false} title="PHAROS · Personal Hub · Asset & Resource Oversight System" className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
           <PharosMark size={22} className="text-[color:var(--color-accent)] shrink-0" />
           <span className="hidden sm:inline tracking-[0.14em] uppercase" style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>
             Pharos
@@ -235,7 +244,7 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false 
         {/* Grouped links (desktop) */}
         <nav className="hidden lg:flex items-center gap-0.5 shrink-0">
           {GROUPS.map((g) => (
-            <NavGroup key={g.key} groupKey={g.key} links={g.links} />
+            <NavGroup key={g.key} groupKey={g.key} links={g.links} base={productBaseUrl} />
           ))}
         </nav>
 
@@ -250,7 +259,7 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false 
             {aiReady ? t('ai.online') : t('ai.offline')}
           </span>
           {user && <NotificationBell />}
-          {user && <UserMenu user={user} saas={saas} operator={operator} />}
+          {user && <UserMenu user={user} saas={saas} operator={operator} base={productBaseUrl} />}
           <button onClick={() => setMobileOpen((v) => !v)} className="lg:hidden p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Menu">
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -273,7 +282,7 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false 
             return (
               <Link
                 key={link.href}
-                href={link.href}
+                href={productHref(productBaseUrl, link.href)}
                 prefetch={false}
                 onClick={() => setMobileOpen(false)}
                 className={cn('flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all', active ? 'bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
