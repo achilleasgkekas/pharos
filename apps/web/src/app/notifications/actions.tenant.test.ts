@@ -62,8 +62,17 @@ vi.mock('@/lib/tenancy/connection', () => ({
   },
 }));
 // The real wrapper resolves the tenant from request headers (none in a unit test), so run
-// the body inside whatever tenant the test established with `withTenant`.
-vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<any>) => fn() }));
+// the body inside whatever tenant the test established with `withTenant`. getNotifications'
+// non-denying seam (resolveRequestTenantOrNull) mirrors that: hand back whatever tenant is
+// CURRENTLY ambient (set by the test's own outer `withTenant(acme, ...)`), so getNotifications'
+// internal re-wrap is a no-op re-affirmation rather than clobbering it with something else.
+vi.mock('@/lib/tenancy/request', () => ({
+  withRequestTenant: async (fn: () => Promise<any>) => fn(),
+  resolveRequestTenantOrNull: async () => {
+    const { currentTenant } = await import('@/lib/tenancy/current');
+    return currentTenant();
+  },
+}));
 vi.mock('@/lib/db', () => ({ connectDB: async () => {} }));
 vi.mock('@/lib/auth', () => ({ assertCanWrite: async () => {} }));
 vi.mock('@/models/Item', () => ({ Item: { modelName: 'Item' } }));

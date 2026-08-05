@@ -10,11 +10,18 @@ export async function notify(opts: {
 }): Promise<void> {
   if (!config.ntfyTopic) return;
   const url = `${config.ntfyUrl.replace(/\/$/, '')}/${config.ntfyTopic}`;
+  // ntfy requires the Title header to be ASCII (HTTP headers are ByteString — a Greek/emoji/€
+  // char throws "Cannot convert argument to a ByteString" from fetch()'s Headers construction,
+  // silently swallowed below). Mirrors apps/web/src/lib/notify.ts's sendNtfyTo, whose own
+  // comment already documents this constraint — this copy never got the fix. Item titles carry
+  // Greek text routinely, so this wasn't a hypothetical: it drops every price-drop/target-hit
+  // alert whose title contains anything outside ASCII, which is most of them.
+  const asciiTitle = (opts.title || '').replace(/[^\x20-\x7e]/g, '').trim();
   try {
     await fetch(url, {
       method: 'POST',
       headers: {
-        Title: opts.title,
+        ...(asciiTitle ? { Title: asciiTitle } : {}),
         ...(opts.tags?.length ? { Tags: opts.tags.join(',') } : {}),
         ...(opts.priority ? { Priority: String(opts.priority) } : {}),
         ...(opts.click ? { Click: opts.click } : {}),

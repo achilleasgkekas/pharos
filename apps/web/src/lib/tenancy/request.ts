@@ -108,6 +108,31 @@ export const resolveRequestTenant = cache(async function resolveRequestTenant():
   return ctx;
 });
 
+/**
+ * `resolveRequestTenant()`, but resolution failure means "nothing to show" rather than "send
+ * them somewhere". For background polls that run unconditionally wherever they're mounted —
+ * `NotificationBell` etc. now render globally via SiteNav, including on hosts with no tenant
+ * at all (app.ph-aros.com, the operator console) — `withRequestTenant`'s deny-by-redirect is
+ * actively harmful: it silently navigates the visitor away from whatever page they're looking
+ * at a few seconds after load, just because a background poll couldn't find a tenant. Confirmed
+ * live (2026-08-05): NotificationBell's 60s poll of getNotifications() bounced /admin and
+ * app.ph-aros.com/ to /account/workspace within moments of any page load.
+ *
+ * Unlike `softRequestTenant`, this DOES still enforce membership/status (real per-tenant data,
+ * not just display settings) — a `not_a_member`/`workspace_inactive` failure here still means
+ * "nothing to show" though, same as `no_tenant`, since the caller has nothing to act on either
+ * way. Only resolveRequestTenant's own throw is caught here (a plain Error, not a Next redirect/
+ * notFound control-flow signal — those only get thrown by `failTenantGate`, which this never
+ * calls), so a genuine fault (DB down, bad config) still propagates.
+ */
+export async function resolveRequestTenantOrNull(): Promise<TenantContext | null> {
+  try {
+    return await resolveRequestTenant();
+  } catch (err) {
+    if (err instanceof TenantResolutionError) return null;
+    throw err;
+  }
+}
 
 /**
  * Best-effort tenant for READ-ONLY paths that must never redirect or 404.

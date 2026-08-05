@@ -10,9 +10,9 @@ import { Subscription as SubscriptionModel } from '@/models/Subscription';
 import { GiftCard as GiftCardModel } from '@/models/GiftCard';
 import { Bill as BillModel } from '@/models/Bill';
 import { Notification as NotificationModel } from '@/models/Notification';
-import { withRequestTenant } from '@/lib/tenancy/request';
+import { withRequestTenant, resolveRequestTenantOrNull } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
-import { currentTenant } from '@/lib/tenancy/current';
+import { currentTenant, withTenant } from '@/lib/tenancy/current';
 import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { billDaysUntilDue } from '@/lib/bill';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -242,8 +242,14 @@ function genKey(): string {
   return currentTenant().tenantId ?? 'default';
 }
 
+/** Polled unconditionally by NotificationBell (60s interval, mounted on every page including
+ *  hosts with no tenant at all — /admin, app.ph-aros.com/). Uses the non-denying resolver: a
+ *  background poll must never redirect the visitor away from whatever they're looking at just
+ *  because there's nothing to show here. See resolveRequestTenantOrNull's doc comment. */
 export async function getNotifications(): Promise<{ items: SerializedNotification[]; unread: number }> {
-  return withRequestTenant(async () => {
+  const ctx = await resolveRequestTenantOrNull();
+  if (!ctx) return { items: [], unread: 0 };
+  return withTenant(ctx, async () => {
     await connectDB();
     const Notification = await currentModel(NotificationModel);
     const now = Date.now();
