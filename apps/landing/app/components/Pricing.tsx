@@ -29,10 +29,13 @@ export function Pricing({
   tiers,
   repoPublic,
   githubUrl,
+  inviteOnly = false,
 }: {
   tiers: PricingTier[];
   repoPublic: boolean;
   githubUrl: string;
+  /** Private beta: hosted signup needs an invite code, so the hosted CTAs say so. */
+  inviteOnly?: boolean;
 }) {
   const [annual, setAnnual] = useState(false);
 
@@ -124,6 +127,9 @@ export function Pricing({
                 {t.cta}
                 {!repoPublic && t.ctaHref === githubUrl && (
                   <span className="soon-badge">soon</span>
+                )}
+                {inviteOnly && hosted && (
+                  <span className="soon-badge">invite only</span>
                 )}
               </a>
 

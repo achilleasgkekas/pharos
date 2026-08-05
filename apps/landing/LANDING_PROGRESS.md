@@ -5426,3 +5426,63 @@ authorship στο git δειχνει αλλου. Την ιδια στιγμη τ
 ξενο mid-commit παραθυρο. **Δεν αλλαζω τιποτα**: το reverting/re-committing μονο και μονο για το
 authorship θα εκανε ζημια χωρις οφελος. Το καταγραφω ωστε οποιος ψαξει αυτο το entry στο ιστορικο να
 βρει το commit.
+
+## 2026-08-05 (η σελιδα ελεγε «Get started», η πορτα ζηταει invite code)
+
+Το increment δεν βγηκε απο τη λιστα του προηγουμενου entry αλλα απο **σημερινο commit στο app**:
+το `ba23248` (feat(saas): close signup behind an invite code for the private beta) εβαλε το
+`SAAS_SIGNUP_CODES` **πριν** απο καθε αλλο ελεγχο στο `/api/saas/auth/signup`. Δεν το πηρα απο το
+commit message: **fetch στο ζωντανο `https://app.ph-aros.com/account/signup`** -> η φορμα σερβιρει
+οντως πεδιο «Invite code» + «Pharos is in private beta. If you were invited by email, open that link
+instead, it needs no code». Αρα ειναι **deployed και ενεργο**, οχι μονο στο repo.
+
+Την ιδια στιγμη, fetch στο ζωντανο `https://ph-aros.com`: **μηδεν εμφανισεις της λεξης «beta»** σε
+359 KB HTML. Δηλαδη καθε «Get started» εστελνε επισκεπτη σε πορτα που δεν ανοιγει, χωρις μια λεξη
+εξηγησης. Αυτο ηταν το πραγματικο κενο, οχι καποιο section που λειπει.
+
+**1. Νεο flag `HOSTED_INVITE_ONLY`** (ιδιο μοτιβο με το υπαρχον `REPO_PUBLIC`): μια γραμμη να
+γυρισει σε `false` οταν φυγουν οι κωδικοι, και ολες οι σημανσεις εξαφανιζονται μονες τους.
+
+**2. Pricing**: badge «invite only» στα CTA **μονο των hosted** καρτων (το `isHosted` υπηρχε ηδη στο
+`Pricing.tsx`, δεν χρειαστηκε νεο κριτηριο), οποτε Self-hosted κραταει το δικο του «soon» και δεν
+μπερδευονται οι δυο διαφορετικοι λογοι. Απο κατω σημειωμα με το **πως ζηταω κωδικο**
+(`hello@ph-aros.com`, η ηδη δημοσιευμενη διευθυνση σε privacy/terms/footer). **ΔΕΝ** εφτιαξα waitlist
+form: το `63f2e33` την αφαιρεσε επιτηδες, θα ηταν επαναφορα αποφασης.
+
+**3. Το χειροτερο σημειο, διορθωθηκε**: το note του self-host ελεγε «The public repo opens right
+before launch. **Create an account** and we'll send the clone link». Δηλαδη εστελνε σε gated φορμα
+για να παρεις... clone link, δυο φορες λαθος (και η φορμα κλειστη, και ο λογαριασμος δεν ηταν ποτε ο
+τροπος να παρεις repo). Τωρα «Email us».
+
+**4. FAQ, νεα ερωτηση** «Can I sign up for the hosted version today?» (πρωτη στο Getting started).
+Καθε ισχυρισμος διασταυρωθηκε στον κωδικα πριν γραφτει, γιατι ολα ειναι ελεγξιμα: (α) το invite
+email **δεν** θελει κωδικο (`signupGate.ts` `hasInvite` carve-out), (β) ο κωδικας **δεν** δινει
+πληρωμενο πλανο, ειναι αλλη λιστα απο τα activation codes, αρα μενεις στο ιδιο 14ημερο trial,
+(γ) ο ελεγχος τρεχει **πριν** απο καθε validation feedback (`route.ts`, πριν το `EMAIL_RE`), αρα
+κανεις δεν μαθαινει ποια emails ειναι δηλωμενα. Τα anchor ids βγαινουν απο το κειμενο της ερωτησης,
+οποτε καμια υπαρχουσα ερωτηση δεν μετονομαστηκε (θα εσπαγαν deep links).
+
+**5. Ενα CSS bug που φανηκε στο screenshot**: το `.repo-soon` ηταν `display:flex`, αρα **καθε inline
+`<a>` γινοταν ξεχωριστο flex item** και εσπαγε τη προταση σε γραμμες («...Ask for one at» /
+«hello@ph-aros.com» / «. Already invited by email?», με ορφανη τελεια). Εγινε `display:block` με
+inline-block κουκιδα: το μονογραμμο note renders ακριβως ιδιο, τα μεγαλυτερα ρεουν σαν κειμενο.
+Διορθωσε **και** το note του self-host, που ειχε το ιδιο θεμα απο πριν.
+
+Verify: `npm run type-check` exit 0, `npm run build` success (13/13 static). Ζωντανα στο DOM: 3
+badges «invite only» (Pro, Dedicated, footer) και **κανενα** στην Self-hosted, το pricing note με
+mailto, το «Email us», η νεα FAQ. **Screenshots** (`.shots/`, gitignored): `pricing-invite-desktop.png`
++ `pricing-invite-mobile.png` (badges χωρανε και στα 375px, το note ρεει σωστα μετα το CSS fix),
+`faq-invite.png` (μεσω deep-link `#faq-can-i-sign-up-for-the-hosted-version-today`),
+`selfhost-note.png`. `read_console_messages` κανενα error. Ο dev server σταματησε.
+
+ΣΗΜ: το flag ειναι hardcoded `true`, **δεν** διαβαζει το `SAAS_SIGNUP_CODES` του app (αλλο deployment,
+αλλο container, το landing ειναι static). Οταν ανοιξει η εγγραφη θελει χειροκινητο γυρισμα σε `false`,
+γι' αυτο το σχολιο πανω απο το flag λεει ρητα πως επαληθευτηκε και ποτε.
+
+Επομενο increment: (1) οταν ανοιξει η εγγραφη, `HOSTED_INVITE_ONLY=false` (και ελεγχος οτι η ζωντανη
+φορμα οντως δεν ζηταει πλεον κωδικο), (2) οταν ανοιξει το public repo, `REPO_PUBLIC=true` + πραγματικο
+`docker pull` path στο quick start, (3) sweep στο επομενο user-facing feature.
+
+Needs-Achilleas (open, αμεταβλητο): legal entity/Stripe, Terms+Privacy review απο ανθρωπο, contact
+inbox, χρονισμος για public repo. **Νεο, μικρο**: αν προτιμας αλλο καναλι για αιτηση invite (π.χ.
+ξεχωριστο `beta@`), πες το, τωρα δειχνει το `hello@ph-aros.com`.

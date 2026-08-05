@@ -23,6 +23,13 @@ const SITE_URL = 'https://ph-aros.com';
 // public and every badge/note below disappears automatically.
 const REPO_PUBLIC = false;
 
+// Hosted signup is closed while the beta is private: `SAAS_SIGNUP_CODES` is set on the
+// production app, so /account/signup asks for an invite code and creates nothing without
+// one (verified on the live form, 2026-08-05). Until this flips, every hosted CTA says so
+// rather than sending a visitor to a door that will not open. Flip to false the day the
+// codes come off and each note below disappears on its own.
+const HOSTED_INVITE_ONLY = true;
+
 /** Where a human writes to. Same address the privacy and terms pages give. */
 const CONTACT_EMAIL = 'hello@ph-aros.com';
 
@@ -410,6 +417,10 @@ const FAQ_GROUPS: {
     title: 'Getting started',
     note: 'What PHAROS is, and what it takes to run',
     items: [
+      {
+        q: 'Can I sign up for the hosted version today?',
+        a: 'Only with an invite. Hosted PHAROS is in a private beta, so the signup form asks for an invite code and creates nothing without one. Ask for a code at hello@ph-aros.com and say a little about what you would track, since the beta is deliberately small. Three things worth knowing. If someone inside a workspace has already invited you by email, open that invitation instead: the invite is itself the authorisation and needs no code, so an owner can always bring in a colleague. The code opens the door and nothing more, it does not put you on a paid plan, so you land on the same 14-day trial as everyone else. And the gate is checked before anything else the form could tell you, so a stranger cannot use signup to find out which email addresses are already registered. Self-hosting has no gate of this kind at all; it is only waiting on the public repo, which opens right before launch.',
+      },
       {
         q: 'Is self-hosting really free?',
         a: 'Yes. The self-hosted edition is open source under AGPL-3.0 with every module and no seat limits. Run it on your own hardware for as long as you like. The only paid option is the managed hosting, where we run and maintain it for you.',
@@ -1133,8 +1144,8 @@ export default function Home() {
             <p className="repo-soon">
               <span className="repo-soon-dot" aria-hidden="true" />
               The public repo opens right before launch.{' '}
-              <a href={`${APP_URL}/account/signup`}>Create an account</a> and we&apos;ll send the
-              clone link the moment it goes live.
+              <a href={`mailto:${CONTACT_EMAIL}`}>Email us</a> and we&apos;ll send the clone
+              link the moment it goes live.
             </p>
           )}
 
@@ -1208,7 +1219,21 @@ export default function Home() {
             </p>
           </div>
 
-          <Pricing tiers={TIERS} repoPublic={REPO_PUBLIC} githubUrl={GITHUB_URL} />
+          <Pricing
+            tiers={TIERS}
+            repoPublic={REPO_PUBLIC}
+            githubUrl={GITHUB_URL}
+            inviteOnly={HOSTED_INVITE_ONLY}
+          />
+
+          {HOSTED_INVITE_ONLY && (
+            <p className="repo-soon" style={{ marginTop: 30, marginBottom: 0 }}>
+              <span className="repo-soon-dot" aria-hidden="true" />
+              Hosted PHAROS is in private beta: creating a workspace needs an invite code.
+              Ask for one at <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. Already
+              invited by email? Open that link instead, it needs no code.
+            </p>
+          )}
 
           <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.85rem', marginTop: 36 }}>
             Prices in EUR, cancel anytime. Hosted plans open with a 14-day free trial, then
@@ -1415,7 +1440,12 @@ export default function Home() {
                 the way in, and a human to write to. */}
             <div className="footer-col">
               <p className="footer-heading mono">Get started</p>
-              <a href={`${APP_URL}/account/signup`} className="navlink">Create an account</a>
+              {/* Kept linked (a beta tester holding a code needs somewhere to go) but
+                  labelled, so nobody clicks through expecting an open door. */}
+              <a href={`${APP_URL}/account/signup`} className="navlink">
+                Create an account
+                {HOSTED_INVITE_ONLY && <span className="soon-badge">invite only</span>}
+              </a>
               <a href={`${APP_URL}/account/login`} className="navlink">Sign in</a>
               <a href="#self-host" className="navlink">Run it yourself</a>
               <a href={`mailto:${CONTACT_EMAIL}`} className="navlink">Contact</a>

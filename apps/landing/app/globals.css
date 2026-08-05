@@ -571,27 +571,31 @@ h1, h2, h3 {
   flex-shrink: 0;
 }
 
-/* Waitlist-phase "public repo coming soon" note + inline CTA badge */
+/* Beta-phase notes ("public repo coming soon", "hosted is invite only") + inline CTA badge.
+   Block, not flex: as a flex row every inline <a> becomes its own flex item, so a sentence
+   with a link in the middle breaks onto a new line and strands the punctuation after it
+   ("...at\nhello@ph-aros.com\n. Already invited?"). Block flow with an inline-block dot
+   renders the one-line note identically and lets longer notes wrap like normal prose. */
 .repo-soon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: block;
   margin: 0 auto 20px;
   max-width: 560px;
   text-align: center;
   color: var(--text-dim);
   font-size: 0.88rem;
+  line-height: 1.6;
 }
 .repo-soon a {
   color: var(--accent);
 }
 .repo-soon-dot {
+  display: inline-block;
   width: 7px;
   height: 7px;
+  margin-right: 8px;
   border-radius: 50%;
   background: var(--gold);
+  vertical-align: middle;
   flex-shrink: 0;
 }
 .soon-badge {
