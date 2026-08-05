@@ -1,13 +1,14 @@
 // Presentational shell for the user-facing workspace-settings pages ((saas)/account/workspace/*).
 // Server-safe (no client hooks): a header with the workspace name, plan/status/role badges, a
-// workspace switcher (only when the account belongs to more than one), and account-level links
-// (sign out, open app). Styled ONLY with the existing Pharos design tokens — never touches
-// shared chrome (SiteNav/globals). Only rendered in SAAS_MODE (the whole segment 404s otherwise).
+// workspace switcher (only when the account belongs to more than one), and the workspace's own
+// sub-nav (Overview/Settings/Members/...). Sign out lives in the global SiteNav's account menu
+// now that SiteNav renders on this segment too, so this shell no longer carries its own copy.
+// Styled with the existing Pharos design tokens. Only rendered in SAAS_MODE (the whole segment
+// 404s otherwise).
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Pill, TenantStatusBadge, MemberRoleBadge } from './StatusBadge';
 import { workspaceQuery } from './chooseWorkspace';
-import { SignOutButton } from './SignOutButton';
 
 export type WorkspaceTab = { href: string; label: string; active: boolean };
 
@@ -105,9 +106,6 @@ export function WorkspaceShell({
                   </Link>
                 ))}
               </nav>
-              <div className="mt-3 border-t border-[color:var(--color-border)] pt-3">
-                <SignOutButton />
-              </div>
             </aside>
           )}
 
@@ -134,11 +132,6 @@ export function WorkspaceShell({
               </nav>
             )}
             <main>{children}</main>
-            {tabList.length > 0 && (
-              <div className="md:hidden mt-8 border-t border-[color:var(--color-border)] pt-4">
-                <SignOutButton />
-              </div>
-            )}
           </div>
         </div>
       </div>

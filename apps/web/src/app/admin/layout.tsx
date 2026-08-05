@@ -3,9 +3,13 @@
 // or for any viewer who is not a configured superadmin — so this segment does not exist for
 // anyone but a platform operator, and the OSS build is byte-for-byte unchanged.
 //
-// The segment carries its OWN chrome (this shell) rather than the app's SiteNav, so nothing
-// in the shared layout/components is touched. force-dynamic + a fresh gate on every request
-// (no caching of the authz decision).
+// The global SiteNav (root layout) now renders here too — brand, account menu (which already
+// shows the signed-in email + a Sign out action), theme/language. This shell used to grow its
+// own parallel logo+account-email bar to compensate for SiteNav being excluded from /admin;
+// that duplication is gone. What's left is genuinely admin-local: the section badge and the
+// Overview/Workspaces/Activity sub-nav, the same relationship Settings' own tab strip has to
+// the page around it. force-dynamic + a fresh gate on every request (no caching of the authz
+// decision).
 import type { ReactNode } from 'react';
 import { requireSuperadminPage } from '@/lib/tenancy/superadminPage';
 import { AdminNav } from '@/components/saas/AdminNav';
@@ -18,29 +22,18 @@ export const metadata = {
 };
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  const account = await requireSuperadminPage();
+  await requireSuperadminPage();
   return (
     <div className="min-h-screen bg-[color:var(--color-bg)] text-[color:var(--color-text)]">
-      <header className="sticky top-0 z-30 border-b border-[color:var(--color-border)] bg-[color:var(--color-surface)]/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="font-display text-sm font-bold uppercase tracking-widest">
-              Pharos
-            </span>
-            <span className="rounded-full border border-[color:var(--color-purple)]/40 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-purple)]">
-              Admin
-            </span>
-            <AdminNav />
-          </div>
-          <span
-            className="max-w-[40vw] truncate text-xs text-[color:var(--color-text-faint)]"
-            title={account.email}
-          >
-            {account.email}
+      <div className="mx-auto max-w-6xl px-4 pt-4">
+        <div className="mb-4 flex items-center gap-3 border-b border-[color:var(--color-border)] pb-3">
+          <span className="rounded-full border border-[color:var(--color-purple)]/40 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-purple)]">
+            Admin
           </span>
+          <AdminNav />
         </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      </div>
+      <main className="mx-auto max-w-6xl px-4 pb-6">{children}</main>
     </div>
   );
 }
