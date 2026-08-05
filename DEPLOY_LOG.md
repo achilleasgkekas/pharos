@@ -232,3 +232,37 @@ up». web και landing χτίζουν **παράλληλα**, άρα 3072 στ
 | `/account/signup` σκέτο | «Create your workspace» (αμετάβλητο) |
 | `?plan=free` | κανένα notice (σωστά, δεν υπάρχει τι να επιβεβαιωθεί) |
 | `?plan=enterprise<script>` | **δεν renders**· η μόνη εμφάνιση είναι escaped μέσα στο RSC flight payload του Next, `<script>alert` ως HTML = 0 |
+
+## 2026-08-05 00:5x UTC — `618ff270 → d04d953d` (FORCE, env-only), exit 0
+
+Ad-hoc («βάλε τα εσύ στο env και κάνε deploy»). **Μηδέν νέα commits** — η αλλαγή ήταν μόνο
+περιβάλλοντος, οπότε χρειάστηκε **`FORCE=1`**: χωρίς αυτό το script βλέπει «already at
+origin/main», δεν ξαναφτιάχνει containers, και το νέο env **δεν φτάνει ποτέ** στην εφαρμογή.
+Αυτή ακριβώς είναι η παγίδα που περιγράφει το `deploy-update.sh` στο σχόλιό του.
+
+**Προστέθηκαν στο `deploy/.env.prod`:**
+
+```
+SAAS_AI_MARKUP="2"
+SAAS_AI_MIN_CHARGE="0.50"
+```
+
+Χωρίς markup, το `aiCharge` επιστρέφει μηδέν χρεώσιμο επίτηδες (μια εγκατάσταση που δεν έχει
+αποφασίσει τιμολόγηση δεν πρέπει να αρχίσει σιωπηλά να χρεώνει). Το `ANTHROPIC_API_KEY`
+**σκόπιμα ΔΕΝ μπήκε στο env**: το platform key ορίζεται πλέον από το `/admin`, κρυπτογραφημένο,
+που ήταν και το ζητούμενο.
+
+Το αντίγραφο του `.env.prod` πήγε ξανά στο `/root/pharos-env-backups/` (εκτός repo), αλλιώς το
+untracked αρχείο βρωμίζει το δέντρο και το script αρνείται να ξεκινήσει.
+
+**Health**: pre-flight OK με την πρώτη· post-deploy 502 στην 1η, OK στη 2η (γνωστό, ο retour
+του retry μετά από recreate).
+
+**Ανεξάρτητη επαλήθευση:**
+
+| έλεγχος | αποτέλεσμα |
+|---|---|
+| env μέσα στον container | `markup=2 min=0.50` |
+| `GET/PUT/DELETE /api/saas/admin/ai-key` χωρίς session | **401** και στα τρία |
+| `/` χωρίς session | 307 → login |
+| `/account/login` | 200 |
