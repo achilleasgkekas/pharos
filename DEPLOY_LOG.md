@@ -294,3 +294,54 @@ Ad-hoc. Κλείδωμα του signup πίσω από κωδικό (private bet
 Ο κωδικός δεν γράφεται εδώ· ζει μόνο στο `.env.prod` και δόθηκε στη συνομιλία. Το happy path
 (σωστός κωδικός → δημιουργία λογαριασμού) **δεν δοκιμάστηκε από εμένα**: θα σήμαινε να φτιάξω
 λογαριασμό, που δεν το κάνω.
+
+---
+
+## 2026-08-05 13:0x UTC — `bbadfda9 → c58a79a1`, exit 0 (interactive session, χειροκίνητο)
+
+Όχι το routine `pharos-deploy` — interactive συνεδρία, ρητό αίτημα Αχιλλέα («yes go on») μετά
+από debugging live EACCES σφάλματος στο receipt import.
+
+**Πλαίσιο**: ο Αχιλλέας ανέφερε `Failed to save file: EACCES: permission denied, mkdir
+'/storage/receipts'` στο live SaaS. Αιτία: το `./storage:/storage` bind mount στο
+`docker-compose.prod.yml` το είχε αυτόματα δημιουργήσει το Docker ως `root:root` (το `chown
+nextjs:nodejs /storage` του image ισχύει μόνο μέσα στο layer, όχι σε runtime bind mount) —
+διορθώθηκε **live** με `chown -R 1001:1001 /opt/pharos/deploy/storage` πριν από αυτό το deploy
+(0 bytes υπήρχαν ακόμα εκεί, μηδέν data loss).
+
+**3 commits, sequential**:
+```
+c58a79a feat(saas): enforce per-plan storage quotas on the actual write path
+9f9ad3a fix(deploy): self-heal the storage bind-mount's ownership on every deploy
+4793dae feat(items,expenses): bulk field-edit for selected records (P78)
+```
+(Το `bbadfda` — nav bug fix + settings-under-user-menu — είχε ήδη γίνει deploy από
+ξεχωριστό, ταυτόχρονο τρέξιμο του `pharos-deploy` routine λίγο πριν, verified με `git log -1`
+στο server πριν ξεκινήσει αυτό.)
+
+- `9f9ad3a`: το ίδιο EACCES fix, μόνιμο πλέον — `mkdir -p && chown 1001:1001` idempotent στην
+  αρχή κάθε deploy, ώστε να επιβιώνει rebuild του host / νέο volume χωρίς χειροκίνητο chown.
+- `c58a79a`: `lib/storage.ts` έγινε tenant-aware (`STORAGE_ROOT/<dbName>/...` αντί για shared
+  bucket) + πραγματική επιβολή quota πριν από κάθε write (`assertStorageQuota`) + real-time
+  ledger (`recordStorageDelta`). Νέα όρια: Free 200MB, Pro 1GB, Dedicated 5GB (ήταν
+  5/50/500GB placeholders). OSS parity αμετάβλητο (verified: 17 προϋπάρχοντα storage tests
+  περνάνε χωρίς αλλαγή).
+- `4793dae`: P78 bulk field-edit (category/status/tags) για Items/Expenses.
+
+**Deploy**: `./deploy-update.sh --check` πρώτα βρήκε lock κρατημένο (exit 4, το ταυτόχρονο
+`pharos-deploy` run παραπάνω) — περιμένοντας ~90s καθαρίστηκε, health OK. Μετά το πραγματικό
+`./deploy-update.sh` (detached, `nohup`): build ~255s, `DEPLOYED: bbadfda9 → c58a79a1, healthy`,
+`health: OK (attempt 1)`.
+
+**Ανεξάρτητη επαλήθευση**:
+
+| έλεγχος | αποτέλεσμα |
+|---|---|
+| `GET https://ph-aros.com/` | 200 |
+| `GET https://app.ph-aros.com/account/login` | 200 |
+| `GET https://app.ph-aros.com/` (χωρίς session) | 307 → login |
+| `docker inspect pharos-web` | RestartCount 0, running |
+
+**Δεν δοκιμάστηκε live από εμένα** (login-gated, δεν πληκτρολογώ password): το bulk-edit UI, το
+relocated user-menu, και ένα πραγματικό upload για να φανεί το νέο quota στο account/usage —
+χρειάζεται ένα πέρασμα του Αχιλλέα.
