@@ -3,6 +3,7 @@ import './globals.css';
 import { SiteNav } from '@/components/SiteNav';
 import { Providers } from '@/components/Providers';
 import { CurrencyInit } from '@/components/CurrencyInit';
+import { ChromeGate } from '@/components/ChromeGate';
 import { getAppSettings } from '@/lib/appSettings';
 import { currencySymbol } from '@/lib/money';
 import { isAiReady } from '@/lib/ollama';
@@ -10,7 +11,6 @@ import { getSessionUser } from '@/lib/auth';
 import { saasMode } from '@/lib/tenancy/saasMode';
 import { getAiConfig } from '@/lib/aiConfig';
 import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
-import { headers } from 'next/headers';
 import { getServerT } from '@/lib/i18n/server';
 import { LocaleProvider } from '@/components/LocaleProvider';
 
@@ -44,26 +44,13 @@ export default async function RootLayout({
   const user = await getSessionUser();
   // UI language for this request (cookie → default), handed to the client provider.
   const { locale, dict } = await getServerT();
-  // Keep /login and /setup chrome-less even when signed in — the setup wizard signs
-  // you in at step 1, so `user` alone would leak the navbar onto steps 2-4. The path
-  // comes from middleware (x-pathname header). /capture is the bookmarklet's small
-  // same-origin popup window — a navbar would waste half its 440x640 real estate.
-  const pathname = (await headers()).get('x-pathname') || '';
-  // Surfaces that must NOT wear the product's own chrome.
-  //
-  // `/admin` and `/account` are separate products living in the same Next app: the operator
-  // console and the SaaS account area each bring their own header. Rendering the app navbar
-  // above them gave a phone TWO stacked top bars, and the "Add an AI provider" onboarding
-  // banner — advice for someone managing their own receipts — appeared over the fleet
-  // overview, where it means nothing and there is no AI to set up.
-  const chromeless =
-    pathname === '/login' ||
-    pathname === '/setup' ||
-    pathname === '/capture' ||
-    pathname === '/admin' ||
-    pathname.startsWith('/admin/') ||
-    pathname === '/account' ||
-    pathname.startsWith('/account/');
+  // Which surfaces must NOT wear the product's own chrome (/login, /setup, /capture, /admin,
+  // (saas)/account) is now decided client-side by <ChromeGate>, not here — see its comment
+  // for why: this layout is shared by every route, so a boolean computed once per request
+  // from a headers()-read pathname stayed frozen across client-side navigation into or out
+  // of those surfaces (confirmed live: the navbar kept rendering on /account/workspace after
+  // clicking into it from a product page). ChromeGate reads next/navigation's usePathname(),
+  // which updates on every navigation, soft or hard, back/forward included.
   // Read the display currency once per request → set server symbol + hand to the client.
   const { currency } = await getAppSettings();
   const symbol = currencySymbol(currency);
@@ -107,12 +94,15 @@ export default async function RootLayout({
         <CurrencyInit symbol={symbol} />
         <LocaleProvider locale={locale} dict={dict}>
         <Providers>
-          {/* SiteNav renders only for signed-in users AND not on /login or /setup
-              (those stay chrome-less even mid-wizard, once step 1 signs you in).
-              Keep `children` in a STABLE sibling position so flipping auth state
-              doesn't remount the page subtree and reset client state. */}
-          {user && !chromeless && <SiteNav aiReady={aiReady} saas={saasMode()} operator={operator} user={{ name: user.name || 'account', role: user.role }} />}
-          {user && !chromeless && banner && <AiOnboardingBanner reason={banner} />}
+          {/* SiteNav renders only for signed-in users AND not on a chrome-less route (see
+              ChromeGate). Keep `children` in a STABLE sibling position so flipping auth
+              state or route doesn't remount the page subtree and reset client state. */}
+          {user && (
+            <ChromeGate>
+              <SiteNav aiReady={aiReady} saas={saasMode()} operator={operator} user={{ name: user.name || 'account', role: user.role }} />
+              {banner && <AiOnboardingBanner reason={banner} />}
+            </ChromeGate>
+          )}
           {children}
         </Providers>
         </LocaleProvider>
