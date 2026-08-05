@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveBillingSession } from '@/lib/billing/billingSession';
 import { readBody, strField } from '@/lib/apiBody';
+import { rateLimit, clientIp } from '@/lib/apiAuth';
 import { saasGuard } from '@/lib/tenancy/saasApi';
 import { recordAudit, auditCtx } from '@/lib/tenancy/audit';
 import { resolveActivation } from '@/lib/billing/activationCode';
@@ -27,14 +28,33 @@ export const dynamic = 'force-dynamic';
  * The rejection message is deliberately identical for "wrong code" and "right code, wrong
  * plan": telling someone which half of their guess landed is how a guess becomes a method.
  * The audit trail records both outcomes and never the code itself.
+ *
+ * RATE LIMITED on two keys, because this is the one door to a paid plan and the codes are
+ * human-shaped (`FRIENDS-2026`), not random bytes — a uniform rejection message stops a guess
+ * becoming a method, but nothing except a limiter stops it becoming a loop:
+ *
+ *   by IP      first, before any body read or DB round trip, so a flood cannot make the
+ *              server do work on its behalf (same placement as the login route).
+ *   by account after the session resolves, because an IP is cheap to rotate and an account
+ *              is not optional here — reaching the code check at all requires being owner or
+ *              admin of a workspace.
+ *
+ * Both use the shared env-gated limiter, so a self-hosted Pharos (which 404s at the SaaS gate
+ * anyway) is unaffected unless it opts in with API_RATE_LIMIT.
  */
 export async function POST(req: NextRequest) {
   return saasGuard(async () => {
+    const limitedByIp = rateLimit(`saas-activate-ip:${clientIp(req)}`);
+    if (limitedByIp) return limitedByIp;
+
     const body = await readBody(req);
 
     const resolved = await resolveBillingSession(strField(body, 'tenant').trim() || null);
     if ('response' in resolved) return resolved.response;
     const { session } = resolved;
+
+    const limitedByAccount = rateLimit(`saas-activate:${session.account.sub}`);
+    if (limitedByAccount) return limitedByAccount;
 
     const outcome = resolveActivation(strField(body, 'code'), strField(body, 'plan'));
 
