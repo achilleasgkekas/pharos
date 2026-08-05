@@ -10,6 +10,7 @@ import {
   workspaceView,
 } from '@/lib/tenancy/workspace';
 import { recordAudit } from '@/lib/tenancy/audit';
+import { planStatusChange } from '@/lib/billing/statusAudit';
 import { saasGuard } from '@/lib/tenancy/saasApi';
 
 export const runtime = 'nodejs';
@@ -128,14 +129,30 @@ export async function DELETE(req: NextRequest) {
       });
     }
 
-    await Tenant.updateOne({ _id: session.ctx.tenantId }, { $set: { status: 'canceled' } });
-    session.tenant.status = 'canceled';
+    // The cancel now carries its own deletion date (30 days, the window the Terms promise) instead
+    // of leaving the workspace in a status with no exit: before this, a canceled workspace was
+    // stamped with nothing and lived forever. An erasure the owner already requested separately is
+    // left untouched — planStatusChange refuses to push a pending schedule later.
+    const fields = planStatusChange({
+      prev: previous,
+      next: 'canceled',
+      erasureScheduledAt: session.tenant.erasureScheduledAt ?? null,
+      erasureRequestedBy: session.tenant.erasureRequestedBy ?? null,
+    });
+    await Tenant.updateOne({ _id: session.ctx.tenantId }, { $set: fields });
+    Object.assign(session.tenant, fields);
 
     await recordAudit(session.ctx, {
       action: 'workspace.canceled',
       actor: session.account.sub,
       target: session.workspace.slug,
-      meta: { field: 'status', from: previous, to: 'canceled' },
+      meta: {
+        field: 'status',
+        from: previous,
+        to: 'canceled',
+        // The date the owner is owed, on the row that records the cancel.
+        erasureScheduledAt: (fields.erasureScheduledAt as Date | undefined)?.toISOString() ?? null,
+      },
     });
 
     const memberCount = await activeMemberCount(session.ctx.tenantId!);

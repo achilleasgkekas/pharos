@@ -13,6 +13,7 @@ import {
   suspendedWarningFilter,
   suspendedPurgeFilter,
   suspendedWarningEmail,
+  isStaleSuspension,
   planSuspendedErasure,
 } from './suspendedSweep';
 
@@ -263,5 +264,30 @@ describe('planSuspendedErasure', () => {
       'erasureRequestedBy',
       'erasureScheduledAt',
     ]);
+  });
+});
+
+describe('isStaleSuspension — the second line of defence', () => {
+  // planStatusChange now clears the stamp on every exit from `suspended`, so this should never
+  // fire. It exists because the write path can be bypassed by the next status writer someone adds,
+  // whereas the audit trail records what actually happened, and the failure mode here is deleting
+  // a live workspace.
+  it('flags a stamp that predates a reactivation', () => {
+    expect(isStaleSuspension(suspendedDaysAgo(200), suspendedDaysAgo(150))).toBe(true);
+  });
+
+  it('accepts a stamp made after the last reactivation', () => {
+    expect(isStaleSuspension(suspendedDaysAgo(5), suspendedDaysAgo(150))).toBe(false);
+  });
+
+  it('is not fooled by a missing side, or by garbage', () => {
+    expect(isStaleSuspension(suspendedDaysAgo(200), null)).toBe(false);
+    expect(isStaleSuspension(null, suspendedDaysAgo(1))).toBe(false);
+    expect(isStaleSuspension('nonsense', suspendedDaysAgo(1))).toBe(false);
+  });
+
+  it('treats an exactly-simultaneous pair as not stale (strictly after, not at)', () => {
+    const t = suspendedDaysAgo(10);
+    expect(isStaleSuspension(t, t)).toBe(false);
   });
 });

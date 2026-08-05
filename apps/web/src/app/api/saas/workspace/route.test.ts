@@ -219,18 +219,40 @@ describe('DELETE — soft-cancel the workspace', () => {
     expect(recordAuditMock).not.toHaveBeenCalled();
   });
 
-  it('owner, active workspace → $set status canceled, audit workspace.canceled with from/to', async () => {
+  it('owner, active workspace → cancels AND schedules the deletion it implies, 30 days out', async () => {
+    // A cancel used to write `status` alone, which left the workspace in a state with no exit:
+    // nothing scheduled its deletion, so it lived forever. It now carries the same 30-day window
+    // the Terms promise, stamped at cancel time so the owner can be shown a date.
+    const before = Date.now();
     const res = await DELETE(makeReq());
     const json = (await res.json()) as { workspace: { status: string } };
 
-    expect(tenantUpdateOneMock).toHaveBeenCalledWith({ _id: 'tenant1' }, { $set: { status: 'canceled' } });
+    expect(tenantUpdateOneMock).toHaveBeenCalledTimes(1);
+    const [filter, update] = tenantUpdateOneMock.mock.calls[0] as [
+      unknown,
+      { $set: Record<string, unknown> },
+    ];
+    expect(filter).toEqual({ _id: 'tenant1' });
+    expect(update.$set.status).toBe('canceled');
+    expect(update.$set.erasureRequestedBy).toBe('system:workspace-canceled');
+    const scheduled = update.$set.erasureScheduledAt as Date;
+    const days = (scheduled.getTime() - before) / (24 * 60 * 60 * 1000);
+    expect(days).toBeGreaterThan(29.9);
+    expect(days).toBeLessThan(30.1);
+
     expect(recordAuditMock).toHaveBeenCalledWith(
       { tenantId: 'tenant1', isDefault: false },
       {
         action: 'workspace.canceled',
         actor: 'acc1',
         target: 'acme',
-        meta: { field: 'status', from: 'active', to: 'canceled' },
+        // The date the owner is owed rides on the row that records the cancel.
+        meta: {
+          field: 'status',
+          from: 'active',
+          to: 'canceled',
+          erasureScheduledAt: scheduled.toISOString(),
+        },
       }
     );
     expect(json.workspace.status).toBe('canceled');

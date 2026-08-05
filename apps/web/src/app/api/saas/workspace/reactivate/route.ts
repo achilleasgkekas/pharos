@@ -9,6 +9,7 @@ import {
   workspaceView,
 } from '@/lib/tenancy/workspace';
 import { recordAudit } from '@/lib/tenancy/audit';
+import { planStatusChange } from '@/lib/billing/statusAudit';
 import { saasGuard } from '@/lib/tenancy/saasApi';
 
 export const runtime = 'nodejs';
@@ -54,14 +55,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: statusErr }, { status: 409 });
     }
 
-    await Tenant.updateOne({ _id: session.ctx.tenantId }, { $set: { status: 'active' } });
-    session.tenant.status = 'active';
+    // Reactivating must CANCEL the deletion the cancel scheduled, or the workspace comes back to
+    // life still queued for erasure and disappears on its original date. planStatusChange clears
+    // only the cancel-implied erasure; one the owner requested in its own right survives, since
+    // erasure is documented as orthogonal to status.
+    const fields = planStatusChange({
+      prev: previous,
+      next: 'active',
+      erasureScheduledAt: session.tenant.erasureScheduledAt ?? null,
+      erasureRequestedBy: session.tenant.erasureRequestedBy ?? null,
+    });
+    await Tenant.updateOne({ _id: session.ctx.tenantId }, { $set: fields });
+    Object.assign(session.tenant, fields);
 
     await recordAudit(session.ctx, {
       action: 'workspace.reactivated',
       actor: session.account.sub,
       target: session.workspace.slug,
-      meta: { field: 'status', from: previous, to: 'active' },
+      meta: {
+        field: 'status',
+        from: previous,
+        to: 'active',
+        // Whether this reactivation called off a scheduled deletion, so the trail says so.
+        erasureCleared: 'erasureScheduledAt' in fields,
+      },
     });
 
     const memberCount = await activeMemberCount(session.ctx.tenantId!);

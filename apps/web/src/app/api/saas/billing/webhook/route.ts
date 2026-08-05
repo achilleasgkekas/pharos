@@ -4,7 +4,7 @@ import { Tenant } from '@/models/Tenant';
 import { saasMode } from '@/lib/tenancy/saasMode';
 import { verifyStripeSignature, webhookSecret } from '@/lib/billing/stripe';
 import { planForPriceId } from '@/lib/billing/plans';
-import { statusAuditAction } from '@/lib/billing/statusAudit';
+import { statusAuditAction, planStatusChange } from '@/lib/billing/statusAudit';
 import { isObjectId } from '@/lib/apiBody';
 import { recordAudit, auditCtx } from '@/lib/tenancy/audit';
 import type { TenantDoc } from '@/models/Tenant';
@@ -33,6 +33,22 @@ async function auditStatusChange(tenant: TenantDoc, prevStatus: string) {
     target: tenant.slug,
     meta: { field: 'status', from: prevStatus, to: nextStatus },
   });
+}
+
+/**
+ * Move a tenant to `next`, writing everything that transition implies (the suspension clock, the
+ * cancel-implied erasure) rather than the status alone. Assigning `tenant.status = x` directly is
+ * what left `suspendedAt` stale across a reactivation and `canceled` with no deletion path; every
+ * status write in this file goes through here. No-op when the status is unchanged.
+ */
+function applyStatus(tenant: TenantDoc, next: string): void {
+  const fields = planStatusChange({
+    prev: String(tenant.status ?? ''),
+    next,
+    erasureScheduledAt: tenant.erasureScheduledAt ?? null,
+    erasureRequestedBy: tenant.erasureRequestedBy ?? null,
+  });
+  Object.assign(tenant, fields);
 }
 
 export const runtime = 'nodejs';
@@ -123,7 +139,7 @@ async function onCheckoutCompleted(obj: Record<string, unknown>) {
   const prevStatus = String(tenant.status);
   if (typeof obj.customer === 'string') tenant.billingCustomerId = obj.customer;
   if (typeof obj.subscription === 'string') tenant.billingSubscriptionId = obj.subscription;
-  tenant.status = 'active';
+  applyStatus(tenant, 'active');
   await tenant.save();
   await auditStatusChange(tenant, prevStatus);
 }
@@ -143,8 +159,8 @@ async function onSubscriptionActive(obj: Record<string, unknown>) {
   }
 
   const stripeStatus = typeof obj.status === 'string' ? obj.status : '';
-  if (stripeStatus === 'active' || stripeStatus === 'trialing') tenant.status = 'active';
-  else if (stripeStatus === 'past_due' || stripeStatus === 'unpaid') tenant.status = 'suspended';
+  if (stripeStatus === 'active' || stripeStatus === 'trialing') applyStatus(tenant, 'active');
+  else if (stripeStatus === 'past_due' || stripeStatus === 'unpaid') applyStatus(tenant, 'suspended');
   await tenant.save();
   await auditPlanChange(tenant, prevPlan);
   await auditStatusChange(tenant, prevStatus);
@@ -155,7 +171,7 @@ async function onSubscriptionCanceled(obj: Record<string, unknown>) {
   if (!tenant) return;
   const prevPlan = String(tenant.plan);
   const prevStatus = String(tenant.status);
-  tenant.status = 'canceled';
+  applyStatus(tenant, 'canceled');
   tenant.plan = 'free';
   await tenant.save();
   await auditPlanChange(tenant, prevPlan);

@@ -144,6 +144,26 @@ export function shouldWarnSuspended(
   return Math.ceil(ms / MS_PER_DAY) <= SUSPEND_WARN_BEFORE_DAYS;
 }
 
+/**
+ * Is this `suspendedAt` stale — i.e. did a REACTIVATION happen after it? A stamp that predates a
+ * reactivation belongs to a suspension the workspace already recovered from, so measuring the
+ * keep-window from it would delete a workspace that was suspended again only yesterday.
+ *
+ * `planStatusChange` now clears the stamp on every exit from `suspended`, so this should never
+ * fire. It stays because it is the cheap half of the defence: the write path can be bypassed by
+ * the next person who adds a status writer, whereas the audit trail records what actually
+ * happened. Belt for the braces, on the one code path whose failure mode is deleting data.
+ */
+export function isStaleSuspension(
+  suspendedAt: Date | string | null | undefined,
+  lastReactivatedAt: Date | string | null | undefined
+): boolean {
+  const s = date(suspendedAt);
+  const r = date(lastReactivatedAt);
+  if (!s || !r) return false;
+  return r.getTime() > s.getTime();
+}
+
 export type SuspendedCandidate = SuspendedInput & { id: string };
 
 /**
@@ -298,9 +318,14 @@ const ZERO_RESULT: SuspendedSweepResult = {
  * `now` — restarting the clock is the safe direction to be wrong in.
  */
 async function suspendedAtFromAudit(tenantId: string): Promise<Date | null> {
+  return newestAuditAt(tenantId, 'workspace.suspended');
+}
+
+/** Timestamp of the newest audit row of `action` for a tenant, or null. Best-effort. */
+async function newestAuditAt(tenantId: string, action: string): Promise<Date | null> {
   try {
     const { AuditEvent } = await import('@/models/AuditEvent');
-    const row = await AuditEvent.findOne({ tenant: tenantId, action: 'workspace.suspended' })
+    const row = await AuditEvent.findOne({ tenant: tenantId, action })
       .sort({ createdAt: -1 })
       .select('createdAt')
       .lean();
@@ -308,6 +333,24 @@ async function suspendedAtFromAudit(tenantId: string): Promise<Date | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * The suspension instant to actually measure from, or null when this workspace must be skipped
+ * this run. Trusts the stored stamp unless the audit trail shows a reactivation AFTER it, in which
+ * case the stamp belongs to a suspension already recovered from: fall back to the newest
+ * `workspace.suspended` row, and if that is somehow also stale, return null rather than guess.
+ * Skipping costs a day; guessing costs someone's data.
+ */
+async function effectiveSuspendedAt(
+  tenantId: string,
+  stored: Date | string | null | undefined
+): Promise<Date | null> {
+  const reactivated = await newestAuditAt(tenantId, 'workspace.reactivated');
+  if (!isStaleSuspension(stored, reactivated)) return date(stored);
+  const fromAudit = await suspendedAtFromAudit(tenantId);
+  if (fromAudit && !isStaleSuspension(fromAudit, reactivated)) return fromAudit;
+  return null;
 }
 
 /**
@@ -360,9 +403,11 @@ export async function runSuspendedSweep(now: Date = new Date()): Promise<Suspend
   for (const t of warnCandidates) {
     try {
       const id = String(t._id);
+      const at = await effectiveSuspendedAt(id, t.suspendedAt);
+      if (!at) continue; // stamp belongs to a recovered-from suspension; re-checked next run
       const emails = await ownerEmails(id);
       if (!emails.length) continue; // nobody to warn; leave un-stamped (an owner may be added)
-      const daysLeft = daysUntilSuspendedPurge(t.suspendedAt, now) ?? SUSPEND_WARN_BEFORE_DAYS;
+      const daysLeft = daysUntilSuspendedPurge(at, now) ?? SUSPEND_WARN_BEFORE_DAYS;
       const body = suspendedWarningEmail(t.name, daysLeft);
       let delivered = false;
       for (const email of emails) {
@@ -396,8 +441,13 @@ export async function runSuspendedSweep(now: Date = new Date()): Promise<Suspend
   for (const t of dueCandidates) {
     try {
       const id = String(t._id);
+      // The stored stamp is not trusted for a DELETION decision: if the audit trail shows a
+      // reactivation after it, this workspace recovered from that suspension and the window must
+      // be measured from the later one (or the run skipped).
+      const at = await effectiveSuspendedAt(id, t.suspendedAt);
+      if (!at) continue;
       // Re-check purely (belt + braces vs the filter) before writing an erasure schedule.
-      if (!isSuspendedPurgeDue({ status: t.status, suspendedAt: t.suspendedAt, erasureScheduledAt: t.erasureScheduledAt }, now)) {
+      if (!isSuspendedPurgeDue({ status: t.status, suspendedAt: at, erasureScheduledAt: t.erasureScheduledAt }, now)) {
         continue;
       }
       // Guards: still suspended AND still without an erasure — an owner-requested erasure or a
@@ -413,7 +463,7 @@ export async function runSuspendedSweep(now: Date = new Date()): Promise<Suspend
           meta: {
             reason: 'suspension-expired',
             graceDays: SUSPENDED_GRACE_DAYS,
-            suspendedAt: date(t.suspendedAt)?.toISOString() ?? null,
+            suspendedAt: at.toISOString(),
             system: true,
           },
         });

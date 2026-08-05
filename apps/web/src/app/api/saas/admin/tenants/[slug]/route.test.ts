@@ -180,10 +180,13 @@ describe('PATCH — status/plan override', () => {
     const res = await PATCH(makeReq({ status: 'suspended' }), makeParams('acme'));
 
     expect(res.status).toBe(200);
-    expect(tenantUpdateOneMock).toHaveBeenCalledWith(
-      { _id: 'tenant1' },
-      { $set: { status: 'suspended' } }
-    );
+    // The console starts the 30-day keep-window exactly like the billing webhook does. It used to
+    // write `status` alone, which is how a hand-flipped workspace kept a stale `suspendedAt` and
+    // could fall due for deletion the day it was suspended again.
+    const [, update] = tenantUpdateOneMock.mock.calls[0] as [unknown, { $set: Record<string, unknown> }];
+    expect(update.$set.status).toBe('suspended');
+    expect(update.$set.suspendedAt).toBeInstanceOf(Date);
+    expect(update.$set.suspendWarnEmailedAt).toBeNull();
     expect(recordAuditMock).toHaveBeenCalledWith(
       expect.objectContaining({ tenantId: 'tenant1' }),
       expect.objectContaining({
@@ -221,10 +224,12 @@ describe('PATCH — status/plan override', () => {
 
     expect(res.status).toBe(200);
     expect(tenantUpdateOneMock).toHaveBeenCalledTimes(1);
-    expect(tenantUpdateOneMock).toHaveBeenCalledWith(
-      { _id: 'tenant1' },
-      { $set: { status: 'canceled', plan: 'free' } }
-    );
+    const [, update] = tenantUpdateOneMock.mock.calls[0] as [unknown, { $set: Record<string, unknown> }];
+    // ONE write, carrying the plan, the status, and the deletion the cancel implies.
+    expect(update.$set.status).toBe('canceled');
+    expect(update.$set.plan).toBe('free');
+    expect(update.$set.erasureScheduledAt).toBeInstanceOf(Date);
+    expect(update.$set.erasureRequestedBy).toBe('system:workspace-canceled');
     expect(recordAuditMock).toHaveBeenCalledTimes(2);
     expect(recordAuditMock).toHaveBeenCalledWith(
       expect.anything(),

@@ -145,12 +145,58 @@ describe('POST /api/saas/workspace/reactivate', () => {
         action: 'workspace.reactivated',
         actor: 'acc1',
         target: 'acme',
-        meta: { field: 'status', from: 'canceled', to: 'active' },
+        meta: { field: 'status', from: 'canceled', to: 'active', erasureCleared: false },
       }
     );
     expect(json.workspace.status).toBe('active');
     expect(json.workspace.memberCount).toBe(5);
     expect(json.workspace.slug).toBe('acme');
+  });
+
+  it('calls off the deletion the cancel scheduled, or the workspace comes back and vanishes anyway', async () => {
+    const s = makeSession();
+    Object.assign(s.session.tenant, {
+      erasureRequestedAt: new Date('2026-08-01T00:00:00.000Z'),
+      erasureScheduledAt: new Date('2026-08-31T00:00:00.000Z'),
+      erasureRequestedBy: 'system:workspace-canceled',
+    });
+    resolveWorkspaceSessionMock.mockResolvedValueOnce(s);
+
+    await POST(makeReq());
+
+    expect(tenantUpdateOneMock).toHaveBeenCalledWith(
+      { _id: 'tenant1' },
+      {
+        $set: {
+          status: 'active',
+          erasureRequestedAt: null,
+          erasureScheduledAt: null,
+          erasureRequestedBy: null,
+        },
+      }
+    );
+    expect(recordAuditMock).toHaveBeenCalledWith(
+      { tenantId: 'tenant1', isDefault: false },
+      expect.objectContaining({
+        meta: expect.objectContaining({ erasureCleared: true }),
+      })
+    );
+  });
+
+  it('leaves an erasure the OWNER requested in its own right alone — erasure is orthogonal to status', async () => {
+    // Reactivating is not "I changed my mind about deleting my data". Only the deletion that CAME
+    // WITH the cancel is implied by the status, and only that one is undone by reversing it.
+    const s = makeSession();
+    Object.assign(s.session.tenant, {
+      erasureRequestedAt: new Date('2026-08-01T00:00:00.000Z'),
+      erasureScheduledAt: new Date('2026-08-31T00:00:00.000Z'),
+      erasureRequestedBy: 'acc1',
+    });
+    resolveWorkspaceSessionMock.mockResolvedValueOnce(s);
+
+    await POST(makeReq());
+
+    expect(tenantUpdateOneMock).toHaveBeenCalledWith({ _id: 'tenant1' }, { $set: { status: 'active' } });
   });
 
   it('mid-handler throw → clean 500 JSON (saasGuard), not an HTML crash', async () => {

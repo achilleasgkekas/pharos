@@ -20,6 +20,7 @@
 // never creates Tenant docs, never trials, never suspends. Zero effect on the single-user path.
 import { evaluateTrial, type TrialInput } from './trial';
 import { evaluateTrialLapse, lapsedTrialFilter } from './trialLapse';
+import { planStatusChange } from './statusAudit';
 import { htmlToText } from '@/lib/tenancy/mailer';
 
 /**
@@ -196,13 +197,12 @@ export async function runTrialLapseSweep(now: Date = new Date()): Promise<TrialS
       if (!decision.shouldLapse || !decision.nextStatus) continue; // belt+braces vs the filter
       const id = String(t._id);
       // status:'trialing' guard makes the transition race-safe (skip if already changed).
-      // `suspendedAt` starts the 30-day keep-window (suspendedSweep.ts) at the instant of the
-      // suspension rather than at whenever that sweep first notices; `suspendWarnEmailedAt` is
-      // cleared so a workspace that was suspended, reactivated and suspended again gets its
-      // deletion warning a second time instead of inheriting a stale "already warned" stamp.
+      // planStatusChange owns what a suspension implies (start the 30-day keep-window at the
+      // instant of the suspension, clear any stale "already warned" stamp), so this path cannot
+      // drift from the webhook's and the admin console's.
       const res = await Tenant.updateOne(
         { _id: id, status: 'trialing' },
-        { $set: { status: decision.nextStatus, suspendedAt: now, suspendWarnEmailedAt: null } }
+        { $set: planStatusChange({ prev: 'trialing', next: decision.nextStatus }, now) }
       );
       if (res.modifiedCount > 0) {
         await recordAudit(auditCtx(id), {

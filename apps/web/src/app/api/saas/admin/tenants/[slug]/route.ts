@@ -4,6 +4,7 @@ import { saasGuard } from '@/lib/tenancy/saasApi';
 import { requireSuperadmin } from '@/lib/tenancy/superadmin';
 import { getTenantDetailForAdmin } from '@/lib/tenancy/adminTenantDetail';
 import { planAdminTenantPatch } from '@/lib/tenancy/adminTenantActions';
+import { planStatusChange } from '@/lib/billing/statusAudit';
 import { recordAudit, auditCtx } from '@/lib/tenancy/audit';
 import { readBody } from '@/lib/apiBody';
 import { Tenant } from '@/models/Tenant';
@@ -86,7 +87,20 @@ export async function PATCH(
     }
 
     if (Object.keys(plan.set).length > 0) {
-      await Tenant.updateOne({ _id: tenant._id }, { $set: plan.set });
+      // A superadmin flipping status by hand owes the same side effects as the billing webhook:
+      // start/stop the suspension clock, schedule or call off the cancel's erasure. Without this
+      // the console was a way to leave a stale `suspendedAt` behind, which is how a workspace
+      // suspended a second time became due for deletion the same day.
+      const set = {
+        ...plan.set,
+        ...planStatusChange({
+          prev: String(tenant.status ?? ''),
+          next: plan.set.status ?? String(tenant.status ?? ''),
+          erasureScheduledAt: tenant.erasureScheduledAt ?? null,
+          erasureRequestedBy: tenant.erasureRequestedBy ?? null,
+        }),
+      };
+      await Tenant.updateOne({ _id: tenant._id }, { $set: set });
 
       const ctx = auditCtx(String(tenant._id));
       if (plan.statusAudit) {
