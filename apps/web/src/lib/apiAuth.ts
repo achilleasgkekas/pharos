@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { connectDB } from '@/lib/db';
 import { User as UserModel } from '@/models/User';
-import { rateHit, rateLimitConfig, rateStore } from '@/lib/apiRateLimit';
+import { rateHit, rateLimitConfig, rateStore, type RateConfig } from '@/lib/apiRateLimit';
 import { canWrite, isReadMethod, READ_ONLY_MESSAGE, type Role } from '@/lib/roles';
 import { DEFAULT_TENANT, getTenantContext, parseTenantSlug, type TenantContext } from '@/lib/tenancy/context';
 import { currentModel } from '@/lib/tenancy/connection';
@@ -14,9 +14,12 @@ import { TENANT_HOST_HEADER } from '@/lib/tenancy/request';
 export type ApiUser = { id: string; name: string; username: string; role: Role };
 
 /** Apply the (optional, env-gated) rate limit for `key`. Returns a 429 response when
- *  the limit is tripped (with `Retry-After` + `X-RateLimit-*` headers), else null. */
-export function rateLimit(key: string): NextResponse | null {
-  const cfg = rateLimitConfig();
+ *  the limit is tripped (with `Retry-After` + `X-RateLimit-*` headers), else null.
+ *
+ *  `cfg` defaults to the general `/api/v1` budget. Pass an explicit config for a route that
+ *  needs its own, e.g. `activationRateConfig()` for the paywall, where the general
+ *  30-per-minute is far too much rope for a guessable code. */
+export function rateLimit(key: string, cfg: RateConfig = rateLimitConfig()): NextResponse | null {
   if (!cfg.enabled) return null;
   const res = rateHit(rateStore, key, Date.now(), cfg.limit, cfg.windowMs);
   const reset = Math.ceil(res.resetAt / 1000);

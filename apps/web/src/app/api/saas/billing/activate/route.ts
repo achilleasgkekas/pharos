@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveBillingSession } from '@/lib/billing/billingSession';
 import { readBody, strField } from '@/lib/apiBody';
 import { rateLimit, clientIp } from '@/lib/apiAuth';
+import { activationRateConfig } from '@/lib/apiRateLimit';
 import { saasGuard } from '@/lib/tenancy/saasApi';
 import { recordAudit, auditCtx } from '@/lib/tenancy/audit';
 import { resolveActivation } from '@/lib/billing/activationCode';
@@ -39,12 +40,14 @@ export const dynamic = 'force-dynamic';
  *              is not optional here — reaching the code check at all requires being owner or
  *              admin of a workspace.
  *
- * Both use the shared env-gated limiter, so a self-hosted Pharos (which 404s at the SaaS gate
- * anyway) is unaffected unless it opts in with API_RATE_LIMIT.
+ * Both use `activationRateConfig()`, NOT the general API budget: this endpoint gets 5 tries
+ * per hour and is ON by default (see the config for why a paywall does not get to be opt-in).
  */
 export async function POST(req: NextRequest) {
   return saasGuard(async () => {
-    const limitedByIp = rateLimit(`saas-activate-ip:${clientIp(req)}`);
+    const rate = activationRateConfig();
+
+    const limitedByIp = rateLimit(`saas-activate-ip:${clientIp(req)}`, rate);
     if (limitedByIp) return limitedByIp;
 
     const body = await readBody(req);
@@ -53,7 +56,7 @@ export async function POST(req: NextRequest) {
     if ('response' in resolved) return resolved.response;
     const { session } = resolved;
 
-    const limitedByAccount = rateLimit(`saas-activate:${session.account.sub}`);
+    const limitedByAccount = rateLimit(`saas-activate:${session.account.sub}`, rate);
     if (limitedByAccount) return limitedByAccount;
 
     const outcome = resolveActivation(strField(body, 'code'), strField(body, 'plan'));

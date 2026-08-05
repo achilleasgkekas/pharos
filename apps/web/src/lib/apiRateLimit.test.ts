@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  ACTIVATION_RATE_DEFAULT,
+  activationRateConfig,
   pruneExpired,
   rateHit,
   rateLimitConfig,
@@ -110,5 +112,64 @@ describe('rateLimitConfig', () => {
     expect(rateLimitConfig().windowMs).toBe(60_000);
     process.env.API_RATE_WINDOW_MS = 'nope';
     expect(rateLimitConfig().windowMs).toBe(60_000);
+  });
+});
+
+describe('activationRateConfig', () => {
+  // The paywall's budget is deliberately NOT the general one. These pin the three ways it
+  // differs, because each was a decision rather than a default falling out of the code.
+  const KEYS = ['SAAS_ACTIVATE_RATE_LIMIT', 'SAAS_ACTIVATE_RATE_WINDOW_MS'] as const;
+  const orig = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
+  afterEach(() => {
+    for (const k of KEYS) {
+      if (orig[k] === undefined) delete process.env[k];
+      else process.env[k] = orig[k];
+    }
+  });
+
+  it('is ON by default, at 5 per hour', () => {
+    for (const k of KEYS) delete process.env[k];
+    expect(activationRateConfig({})).toEqual({
+      enabled: true,
+      limit: ACTIVATION_RATE_DEFAULT.limit,
+      windowMs: ACTIVATION_RATE_DEFAULT.windowMs,
+    });
+  });
+
+  it('is far tighter than the general API budget', () => {
+    // Not a tautology: it is the reason the separate variable exists at all.
+    process.env.API_RATE_LIMIT = '30';
+    process.env.API_RATE_WINDOW_MS = '60000';
+    const general = rateLimitConfig();
+    const activation = activationRateConfig({});
+    const perHour = (c: { limit: number; windowMs: number }) => (c.limit / c.windowMs) * 3_600_000;
+    expect(perHour(activation)).toBeLessThan(perHour(general) / 100);
+  });
+
+  it('honours an explicit override of count and window', () => {
+    const cfg = activationRateConfig({
+      SAAS_ACTIVATE_RATE_LIMIT: '2',
+      SAAS_ACTIVATE_RATE_WINDOW_MS: '900000',
+    });
+    expect(cfg).toEqual({ enabled: true, limit: 2, windowMs: 900_000 });
+  });
+
+  it('turns off ONLY for an explicit zero or negative', () => {
+    for (const v of ['0', '-1']) {
+      expect(activationRateConfig({ SAAS_ACTIVATE_RATE_LIMIT: v
+    }).enabled)
+        .toBe(false);
+    }
+  });
+
+  it('falls back to the default for a typo, never to off', () => {
+    // The failure mode this exists to prevent: a fat-fingered env value silently removing
+    // the only guard on the paid-plan door.
+    for (const v of ['abc', '', '  ', 'five']) {
+      const cfg = activationRateConfig({ SAAS_ACTIVATE_RATE_LIMIT: v
+    });
+      expect(cfg.enabled).toBe(true);
+      expect(cfg.limit).toBe(ACTIVATION_RATE_DEFAULT.limit);
+    }
   });
 });

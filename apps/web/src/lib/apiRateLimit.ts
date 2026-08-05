@@ -86,3 +86,44 @@ export function rateLimitConfig(): RateConfig {
   const windowMs = Number.isFinite(win) && win > 0 ? win : 60_000;
   return { enabled: true, limit, windowMs };
 }
+
+/** Injectable env shape, so the config resolvers stay testable without touching process.env. */
+export type RateEnv = { [k: string]: string | undefined };
+
+/** Activation gets far less rope than the general API: 5 tries per hour, per key. */
+export const ACTIVATION_RATE_DEFAULT = { limit: 5, windowMs: 3_600_000 } as const;
+
+/**
+ * Config for `/api/saas/billing/activate`, which is the ONE door to a paid plan and takes a
+ * human-shaped code (`FRIENDS-2026`), not random bytes. It differs from `rateLimitConfig()`
+ * in the two ways that matter for a guessable secret:
+ *
+ *   - **ON by default.** The general limiter is opt-in because a single-user self-host does
+ *     not need it. That reasoning does not transfer: activation only exists in SaaS mode (the
+ *     route 404s at the gate otherwise), so defaulting it on costs a self-host nothing and
+ *     means a deployment cannot forget the guard on its own paywall.
+ *   - **Tight and slow**: 5 attempts per hour, not 30 per minute. A person redeeming a code
+ *     they were handed needs one try and mistypes it maybe twice; 360x that budget is for
+ *     nobody but a script.
+ *
+ * `SAAS_ACTIVATE_RATE_LIMIT` overrides the count, `SAAS_ACTIVATE_RATE_WINDOW_MS` the window.
+ * An explicit `0` (or negative) disables it, which is the deliberate escape hatch. Anything
+ * unparseable falls back to the default rather than to "off": a typo in the env must not
+ * silently take the lock off the paywall.
+ */
+export function activationRateConfig(env: RateEnv = process.env): RateConfig {
+  const rawLimit = (env.SAAS_ACTIVATE_RATE_LIMIT || '').trim();
+  const parsedLimit = Number.parseInt(rawLimit, 10);
+  // Only an explicit, parseable, non-positive number turns it off.
+  if (rawLimit !== '' && Number.isFinite(parsedLimit) && parsedLimit <= 0) {
+    return { enabled: false, limit: 0, windowMs: 0 };
+  }
+  const limit =
+    Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : ACTIVATION_RATE_DEFAULT.limit;
+
+  const parsedWin = Number.parseInt((env.SAAS_ACTIVATE_RATE_WINDOW_MS || '').trim(), 10);
+  const windowMs =
+    Number.isFinite(parsedWin) && parsedWin > 0 ? parsedWin : ACTIVATION_RATE_DEFAULT.windowMs;
+
+  return { enabled: true, limit, windowMs };
+}

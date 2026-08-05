@@ -81,6 +81,18 @@ Enable it for a shared or public deployment with two environment variables:
 | `API_RATE_LIMIT`     | (unset) | Max requests per window per caller. Unset or `<= 0` = off.  |
 | `API_RATE_WINDOW_MS` | `60000` | Window length in milliseconds.                              |
 
+The SaaS activation endpoint (`POST /api/saas/billing/activate`) is the exception: it
+is the only route to a paid plan and its codes are human-shaped, so it carries its own,
+much tighter budget which is **on by default** rather than opt-in.
+
+| Env var                        | Default   | Meaning                                          |
+|--------------------------------|-----------|--------------------------------------------------|
+| `SAAS_ACTIVATE_RATE_LIMIT`     | `5`       | Attempts per window, per IP **and** per account. |
+| `SAAS_ACTIVATE_RATE_WINDOW_MS` | `3600000` | Window length (1 hour).                          |
+
+An explicit `0` disables it; an unparseable value falls back to the default, so a typo
+cannot quietly remove the guard.
+
 When enabled, authenticated requests are counted **per API token** and the login
 endpoint is counted **per client IP** (to blunt brute-force attempts). Over the
 limit you get:

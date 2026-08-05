@@ -9,12 +9,12 @@ import type { NextRequest } from 'next/server';
 // becoming a loop. Anyone can sign up for free and own a workspace, so reaching the code
 // check is not a privilege worth counting on.
 //
-// So these cover the two properties the limiter exists for:
+// So these cover the properties the limiter exists for:
 //   1. the IP key trips BEFORE resolveBillingSession, i.e. a flood cannot make the server
 //      do database work on its behalf;
-//   2. the account key trips even when the IP changes every request.
-// Plus the one property that must NOT change: with API_RATE_LIMIT unset (the self-hosted
-// default) the limiter is inert.
+//   2. the account key trips even when the IP changes every request;
+//   3. the paywall is guarded even on a deployment that never set the general API_RATE_LIMIT,
+//      because this endpoint has its own budget and its own default.
 
 // `resolveActivation` returns a discriminated union (ok:true + plan | ok:false + reason), so
 // the mock is typed on the union rather than inferred from its first return value.
@@ -61,23 +61,30 @@ const SESSION = {
   },
 };
 
-const origLimit = process.env.API_RATE_LIMIT;
-const origWindow = process.env.API_RATE_WINDOW_MS;
+const ENV_KEYS = [
+  'API_RATE_LIMIT',
+  'API_RATE_WINDOW_MS',
+  'SAAS_ACTIVATE_RATE_LIMIT',
+  'SAAS_ACTIVATE_RATE_WINDOW_MS',
+] as const;
+const orig = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 
 beforeEach(() => {
   rateStore.clear();
   vi.clearAllMocks();
   resolveBillingSessionMock.mockResolvedValue(SESSION);
   resolveActivationMock.mockReturnValue({ ok: false, reason: 'unknown-code' });
-  process.env.API_RATE_LIMIT = '3';
-  process.env.API_RATE_WINDOW_MS = '60000';
+  // The general budget is deliberately left UNSET in most cases: this route must not depend
+  // on it. Where a case needs a specific activation budget it sets it itself.
+  for (const k of ENV_KEYS) delete process.env[k];
+  process.env.SAAS_ACTIVATE_RATE_LIMIT = '3';
 });
 
 afterEach(() => {
-  if (origLimit === undefined) delete process.env.API_RATE_LIMIT;
-  else process.env.API_RATE_LIMIT = origLimit;
-  if (origWindow === undefined) delete process.env.API_RATE_WINDOW_MS;
-  else process.env.API_RATE_WINDOW_MS = origWindow;
+  for (const k of ENV_KEYS) {
+    if (orig[k] === undefined) delete process.env[k];
+    else process.env[k] = orig[k];
+  }
 });
 
 describe('POST /api/saas/billing/activate rate limiting', () => {
@@ -127,13 +134,49 @@ describe('POST /api/saas/billing/activate rate limiting', () => {
     expect(other.status).toBe(400);
   });
 
-  it('is inert when API_RATE_LIMIT is unset (self-hosted default)', async () => {
-    delete process.env.API_RATE_LIMIT;
+  it('guards the paywall even when the general API_RATE_LIMIT was never set', async () => {
+    // The whole point of a dedicated budget: a deployment that forgot the general limiter
+    // still cannot be brute-forced for a paid plan. Default is 5 per hour.
+    delete process.env.SAAS_ACTIVATE_RATE_LIMIT;
+    expect(process.env.API_RATE_LIMIT).toBeUndefined();
+
+    for (let i = 0; i < 5; i++) {
+      const res = await POST(req('9.9.9.9'));
+      expect(res.status).toBe(400);
+    }
+
+    const blocked = await POST(req('9.9.9.9'));
+    expect(blocked.status).toBe(429);
+  });
+
+  it('holds the door shut for a full hour by default, not a minute', async () => {
+    delete process.env.SAAS_ACTIVATE_RATE_LIMIT;
+    for (let i = 0; i < 5; i++) await POST(req('9.9.9.9'));
+
+    const blocked = await POST(req('9.9.9.9'));
+    // 30/min would let a script have ~43k tries a day; 5/hour is the point of the change.
+    expect(Number(blocked.headers.get('Retry-After'))).toBeGreaterThan(60 * 50);
+    expect(blocked.headers.get('X-RateLimit-Limit')).toBe('5');
+  });
+
+  it('can be switched off deliberately, with an explicit 0', async () => {
+    process.env.SAAS_ACTIVATE_RATE_LIMIT = '0';
 
     for (let i = 0; i < 25; i++) {
       const res = await POST(req('9.9.9.9'));
       expect(res.status).toBe(400);
     }
+  });
+
+  it('falls back to the default when the env value is a typo, never to off', async () => {
+    process.env.SAAS_ACTIVATE_RATE_LIMIT = 'ten';
+
+    for (let i = 0; i < 5; i++) {
+      const res = await POST(req('9.9.9.9'));
+      expect(res.status).toBe(400);
+    }
+    const blocked = await POST(req('9.9.9.9'));
+    expect(blocked.status).toBe(429);
   });
 
   it('lets a valid code through and activates the plan', async () => {
