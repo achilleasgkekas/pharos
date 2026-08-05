@@ -183,7 +183,7 @@ describe('PATCH — status/plan override', () => {
     // The console starts the 30-day keep-window exactly like the billing webhook does. It used to
     // write `status` alone, which is how a hand-flipped workspace kept a stale `suspendedAt` and
     // could fall due for deletion the day it was suspended again.
-    const [, update] = tenantUpdateOneMock.mock.calls[0] as [unknown, { $set: Record<string, unknown> }];
+    const [, update] = tenantUpdateOneMock.mock.calls[0] as unknown as [unknown, { $set: Record<string, unknown> }];
     expect(update.$set.status).toBe('suspended');
     expect(update.$set.suspendedAt).toBeInstanceOf(Date);
     expect(update.$set.suspendWarnEmailedAt).toBeNull();
@@ -224,7 +224,7 @@ describe('PATCH — status/plan override', () => {
 
     expect(res.status).toBe(200);
     expect(tenantUpdateOneMock).toHaveBeenCalledTimes(1);
-    const [, update] = tenantUpdateOneMock.mock.calls[0] as [unknown, { $set: Record<string, unknown> }];
+    const [, update] = tenantUpdateOneMock.mock.calls[0] as unknown as [unknown, { $set: Record<string, unknown> }];
     // ONE write, carrying the plan, the status, and the deletion the cancel implies.
     expect(update.$set.status).toBe('canceled');
     expect(update.$set.plan).toBe('free');

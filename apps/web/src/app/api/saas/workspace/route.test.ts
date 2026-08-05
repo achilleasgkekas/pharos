@@ -228,10 +228,7 @@ describe('DELETE — soft-cancel the workspace', () => {
     const json = (await res.json()) as { workspace: { status: string } };
 
     expect(tenantUpdateOneMock).toHaveBeenCalledTimes(1);
-    const [filter, update] = tenantUpdateOneMock.mock.calls[0] as [
-      unknown,
-      { $set: Record<string, unknown> },
-    ];
+    const [filter, update] = tenantUpdateOneMock.mock.calls[0] as unknown as [unknown, { $set: Record<string, unknown> }];
     expect(filter).toEqual({ _id: 'tenant1' });
     expect(update.$set.status).toBe('canceled');
     expect(update.$set.erasureRequestedBy).toBe('system:workspace-canceled');
