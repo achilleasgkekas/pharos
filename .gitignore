@@ -59,3 +59,10 @@ services/scraper/_audit.ts
 
 # What the running containers were built from. Server-side state, never the repo.
 deploy/.deployed
+
+# fail2ban bridge runtime queues (deploy/f2b/): request/done/rejected dirs + state.json,
+# operational data written by a live process on the server, not source code — same idea as
+# deploy/backups/ and deploy/storage/ above. The bridge SCRIPT itself (deploy/f2b-bridge.sh) is
+# real infrastructure code and stays tracked; only this runtime state is ignored, so nothing
+# here ever risks capturing live ban-queue data into git history.
+deploy/f2b/
