@@ -21,6 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const {
   accountAuthConfiguredMock,
+  connectDBMock,
   membershipFind,
   membershipSelect,
   membershipLean,
@@ -38,6 +39,7 @@ const {
   const tenantFind = vi.fn((_filter: Record<string, unknown>) => ({ select: tenantSelect }));
   return {
     accountAuthConfiguredMock: vi.fn(() => true),
+    connectDBMock: vi.fn(async () => {}),
     membershipFind,
     membershipSelect,
     membershipLean,
@@ -50,6 +52,7 @@ const {
 vi.mock('@/lib/tenancy/accountSession', () => ({
   accountAuthConfigured: accountAuthConfiguredMock,
 }));
+vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/Membership', () => ({ Membership: { find: membershipFind } }));
 vi.mock('@/models/Tenant', () => ({ Tenant: { find: tenantFind } }));
 
@@ -95,6 +98,7 @@ function wire(memberships: Array<Record<string, unknown>>, tenants: Array<Record
 beforeEach(() => {
   vi.clearAllMocks();
   accountAuthConfiguredMock.mockReturnValue(true);
+  connectDBMock.mockImplementation(async () => {});
   membershipSelect.mockImplementation(() => ({ lean: membershipLean }));
   membershipFind.mockImplementation(() => ({ select: membershipSelect }));
   tenantSelect.mockImplementation(() => ({ lean: tenantLean }));
@@ -196,6 +200,19 @@ describe('saasAuthGate — SAAS_MODE on', () => {
 // ---------------------------------------------------------------------------
 
 describe('accountTenants — the membership query', () => {
+  // Regression: this function used to query Membership/Tenant directly with no connectDB()
+  // of its own. The connection is opened with bufferCommands:false (lib/db.ts), so a query
+  // issued before it resolves THROWS instead of waiting. Most callers already connect first
+  // themselves (workspaceSession.ts), but the root layout's navbar path (getSessionUser ->
+  // saasSessionUser -> here) does not, and is often the very first DB touch in a request —
+  // right after a restart/redeploy that throw was silently read by saasSessionUser's
+  // fail-closed catch as "not signed in", making the whole navbar disappear on that request.
+  it('connects to the DB before ever touching Membership or Tenant', async () => {
+    await accountTenants('acc1');
+    expect(connectDBMock).toHaveBeenCalled();
+    expect(membershipFind.mock.invocationCallOrder[0]).toBeGreaterThan(connectDBMock.mock.invocationCallOrder[0]);
+  });
+
   it('queries active memberships for the given account only', async () => {
     await accountTenants('acc1');
     expect(membershipFind).toHaveBeenCalledWith({ account: 'acc1', status: 'active' });

@@ -8,6 +8,7 @@ import { saasMode } from './saasMode';
 import { accountAuthConfigured } from './accountSession';
 import { Membership } from '@/models/Membership';
 import { Tenant, type TenantDoc } from '@/models/Tenant';
+import { connectDB } from '@/lib/db';
 
 /**
  * Returns a NextResponse to short-circuit with, or null to proceed:
@@ -57,6 +58,15 @@ export type AccountTenant = {
  * client knows which workspace(s) to route into.
  */
 export async function accountTenants(accountId: string): Promise<AccountTenant[]> {
+  // The connection is opened with bufferCommands:false (lib/db.ts), so a query issued before
+  // it resolves THROWS instead of waiting. Most callers already connect first themselves
+  // (e.g. workspaceSession.ts) but the root layout's navbar path (getSessionUser ->
+  // saasSessionUser -> here) does not and is often the very first DB touch in a request —
+  // right after a restart/redeploy that throw was silently read as "not signed in" by
+  // saasSessionUser's fail-closed catch, making the whole navbar disappear for that one
+  // request. connectDB() is idempotent (cached connection), so calling it again here is free
+  // for callers that already did.
+  await connectDB();
   const memberships = await Membership.find({ account: accountId, status: 'active' })
     .select('tenant role')
     .lean();
