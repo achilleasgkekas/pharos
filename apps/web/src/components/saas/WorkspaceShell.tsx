@@ -7,7 +7,7 @@
 // 404s otherwise).
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, LayoutDashboard, SlidersHorizontal, Users, BarChart3, Activity, CreditCard, UserRound } from 'lucide-react';
+import { LayoutDashboard, SlidersHorizontal, Users, BarChart3, Activity, CreditCard, UserRound } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { Pill, TenantStatusBadge, MemberRoleBadge } from './StatusBadge';
 import { workspaceQuery } from './chooseWorkspace';
@@ -41,16 +41,20 @@ export function WorkspaceShell({
   role,
   tabs,
   switchTargets,
-  appUrl,
   children,
 }: {
-  workspaceName: string;
-  plan: string;
-  status: string;
-  role: string;
+  /** Omit entirely (not just falsy) for a viewer with no workspace context at all — e.g.
+   *  /account/settings for an account that isn't a member of anything. Skips the whole header
+   *  row rather than inventing placeholder badges for a workspace that doesn't exist. */
+  workspaceName?: string;
+  plan?: string;
+  status?: string;
+  role?: string;
   tabs?: WorkspaceTab[];
   switchTargets?: SwitchTarget[];
-  /** Absolute URL of the workspace's own subdomain — the actual app. Omitted ⇒ no button. */
+  /** Absolute URL of the workspace's own subdomain — accepted for callers that still pass it
+   *  (the "open workspace" exit now lives in the global SiteNav's logo/nav, not here) but no
+   *  longer rendered as a link of its own. */
   appUrl?: string;
   children: ReactNode;
 }) {
@@ -58,30 +62,24 @@ export function WorkspaceShell({
   const tabList = tabs ?? [];
   return (
     <div className="min-h-screen bg-[color:var(--color-bg)] text-[color:var(--color-text)]">
-      <div className="mx-auto max-w-[1080px] px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
         {/* Header. What used to sit here was a row of mono-caps links (← PHAROS / ACCOUNT
             SETTINGS / SIGN OUT) above the title, plus a full-size green "Open workspace" CTA
             boxed on the right — competing exits, on a page that now also carries the global
             SiteNav whose own logo/nav links already lead back into the product (see the root
             layout's productBaseUrl). So this reads like a normal Pharos page header now: a
-            plain h1 with its meta pills inline, and "open workspace" demoted to a small
-            secondary link beside the title rather than a boxed button pulling the eye. */}
-        <header className="mb-6 flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
-            {workspaceName || 'Workspace'}
-          </h1>
-          <Pill tone="neutral">{plan}</Pill>
-          <TenantStatusBadge status={status} />
-          <MemberRoleBadge role={role} />
-          {appUrl && (
-            <a
-              href={appUrl}
-              className="ml-auto inline-flex items-center gap-1 text-sm font-medium text-[color:var(--color-text-dim)] hover:text-[color:var(--color-accent)]"
-            >
-              Open workspace <ArrowUpRight size={14} />
-            </a>
-          )}
-        </header>
+            plain h1 with its meta pills inline, nothing competing for the exit anymore.
+            Omitted entirely when there's no workspace context (see the type comment above). */}
+        {workspaceName !== undefined && (
+          <header className="mb-6 flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
+              {workspaceName || 'Workspace'}
+            </h1>
+            {plan && <Pill tone="neutral">{plan}</Pill>}
+            {status && <TenantStatusBadge status={status} />}
+            {role && <MemberRoleBadge role={role} />}
+          </header>
+        )}
 
         {others.length > 1 && (
           <nav aria-label="Switch workspace" className="mb-4 flex flex-wrap items-center gap-2 text-xs">

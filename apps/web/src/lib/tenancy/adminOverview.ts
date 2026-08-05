@@ -21,6 +21,8 @@ import { Membership } from '@/models/Membership';
 import { Usage, type UsageDoc } from '@/models/Usage';
 import { periodOf } from '@/lib/billing/usage';
 import { PLAN_KEYS } from '@/lib/billing/plans';
+import { sampleAllTenants } from '@/lib/billing/dbStats';
+import { superadminAllowlist } from '@/lib/tenancy/superadmin';
 import {
   summarizeTenant,
   TENANT_STATUSES,
@@ -32,7 +34,13 @@ import { summarizeUsagePeriod, type AdminUsagePeriod } from '@/lib/tenancy/admin
 const TENANT_TIERS = ['shared', 'dedicated'] as const;
 
 export type TenantTally = {
+  /** Every Tenant row, canceled included — the raw registry count. */
   total: number;
+  /** `total` minus canceled — "how many workspaces actually exist right now" for the headline
+   *  stat. A canceled tenant is already broken out correctly in `byStatus`; without this, a
+   *  leftover canceled test workspace silently inflates the number a viewer reads as "how many
+   *  customers do I have". */
+  activeTotal: number;
   /** Count per plan key. Known plan keys are pre-seeded to 0; unknown values still counted. */
   byPlan: Record<string, number>;
   /** Count per status. Known statuses pre-seeded to 0; unknown values still counted. */
@@ -78,8 +86,10 @@ export function tallyTenants(summaries: readonly TenantSummary[]): TenantTally {
     if (t.erasureScheduledAt) erasureScheduled += 1;
   }
 
+  const total = (summaries ?? []).length;
   return {
-    total: (summaries ?? []).length,
+    total,
+    activeTotal: total - (byStatus.canceled ?? 0),
     byPlan,
     byStatus,
     byTier,
@@ -184,20 +194,36 @@ export function buildFleetOverview(input: {
 }
 
 /**
- * READ-ONLY fleet overview. The only impure function here. Four cheap registry reads — all
- * Tenant docs (tallied in memory; the control-plane registry is small), the account count,
- * the active-membership count, and this month's Usage rows — then pure rollup. Touches ONLY
- * the central registry; never a per-tenant data database, never db.stats(), never writes.
+ * READ-ONLY fleet overview (mostly). Four cheap registry reads — all Tenant docs (tallied in
+ * memory; the control-plane registry is small), the account count, the active-membership
+ * count, and this month's Usage rows — then pure rollup. Touches ONLY the central registry;
+ * never a per-tenant data database... except storage, which now samples live first (below) so
+ * the fleet-wide storage figure isn't stale between daily cron runs. The operator console is
+ * loaded occasionally, not a hot path, and the fleet is small, so a live `db.stats()` per
+ * tenant here is cheap. The daily cron (`api/cron/saas/usage-sample`) stays in place as the
+ * backstop for customer-facing usage pages, which don't need quite this freshness.
  */
 export async function readFleetOverviewForAdmin(now: Date = new Date()): Promise<AdminFleetOverview> {
   await connectDB();
-  const period = periodOf(now instanceof Date && !Number.isNaN(now.getTime()) ? now : new Date());
+  const at = now instanceof Date && !Number.isNaN(now.getTime()) ? now : new Date();
+  const period = periodOf(at);
+
+  // Must happen BEFORE the Usage read below (it writes the same Usage rows that read then
+  // fetches) — sequential, not part of the Promise.all. A per-tenant sampling failure is
+  // already isolated inside sampleAllTenants (counted, not thrown), so a bad database doesn't
+  // take the whole overview down; it just leaves that tenant's storage figure at its last
+  // sampled value for this call.
+  await sampleAllTenants(at);
 
   const [tenantDocs, accounts, activeMembers, usageDocs] = await Promise.all([
     Tenant.find({})
       .select('slug name plan status tier customDomain trialEndsAt erasureScheduledAt billingCustomerId billingSubscriptionId aiByoKey createdAt updatedAt')
       .lean() as unknown as Promise<TenantDoc[]>,
-    Account.countDocuments({}),
+    // The superadmin operator's own login is real but isn't a customer — excluding it from
+    // the headline "Accounts" count is the same call as excluding canceled tenants from
+    // "Workspaces" above: don't let the one operator inflate a number meant to read as
+    // "how many people signed up".
+    Account.countDocuments({ email: { $nin: superadminAllowlist() } }),
     Membership.countDocuments({ status: 'active' }),
     Usage.find({ period })
       .select('period aiCalls aiInputTokens aiOutputTokens aiCostMicros storageBytes storageMeasuredAt')

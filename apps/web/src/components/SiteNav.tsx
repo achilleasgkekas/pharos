@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Package, ShoppingCart, ShoppingBasket, CheckSquare, Receipt as ReceiptIcon, CalendarClock, CreditCard,
   Menu, X, Sun, Moon, Settings, BarChart3, Ticket, Wallet, Banknote, ChevronDown, CalendarDays,
@@ -220,7 +220,15 @@ function UserMenu({ user, saas, operator, base }: { user: SessionUser; saas: boo
 export function SiteNav({ aiReady = false, user, saas = false, operator = false, productBaseUrl }: { aiReady?: boolean; user?: SessionUser; saas?: boolean; operator?: boolean; productBaseUrl?: string }) {
   const t = useT();
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  // Single source of truth for "which absolute-positioned panel is open" — the mobile hamburger
+  // menu and the notifications dropdown used to each own their own boolean and could both be
+  // open at once, visually colliding on mobile (the notifications panel sitting on top of the
+  // product link grid, screenshotted live 2026-08-05). Opening one now always closes the other.
+  const [activePanel, setActivePanel] = useState<'none' | 'mobile' | 'notifications'>('none');
+  const mobileOpen = activePanel === 'mobile';
+  const notifOpen = activePanel === 'notifications';
+  const toggleMobile = useCallback(() => setActivePanel((p) => (p === 'mobile' ? 'none' : 'mobile')), []);
+  const setNotifOpen = useCallback((open: boolean) => setActivePanel(open ? 'notifications' : 'none'), []);
 
   // Solid bg on the sticky navbar (no backdrop-filter): a backdrop-filter here would
   // become the containing block for the AI spotlight's `fixed inset-0` backdrop and
@@ -258,9 +266,9 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false,
             <span className={cn('h-1.5 w-1.5 rounded-full', aiReady ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]')} />
             {aiReady ? t('ai.online') : t('ai.offline')}
           </span>
-          {user && <NotificationBell />}
+          {user && <NotificationBell open={notifOpen} onOpenChange={setNotifOpen} />}
           {user && <UserMenu user={user} saas={saas} operator={operator} base={productBaseUrl} />}
-          <button onClick={() => setMobileOpen((v) => !v)} className="lg:hidden p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Menu">
+          <button onClick={toggleMobile} className="lg:hidden p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Menu">
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
@@ -284,7 +292,7 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false,
                 key={link.href}
                 href={productHref(productBaseUrl, link.href)}
                 prefetch={false}
-                onClick={() => setMobileOpen(false)}
+                onClick={() => setActivePanel('none')}
                 className={cn('flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all', active ? 'bg-[color:var(--color-surface-2)] text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)]')}
               >
                 <Icon size={16} /> {t(link.key)}

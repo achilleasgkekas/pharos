@@ -209,9 +209,14 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* "· Mac mini M4" used to sit here, hardcoded — true on Achilleas's own dev machine,
+          false for every self-hosted install and every hosted SaaS customer alike. Same call
+          as Settings' own "About" section (SettingsClient.tsx): there's no real source of truth
+          for "what hardware is this" worth stating, so it's just gone rather than replaced with
+          another guess. */}
       <footer className="max-w-[1400px] mx-auto px-4 py-8 border-t border-[color:var(--color-border)] flex items-center justify-center gap-2 text-xs text-[color:var(--color-text-faint)]" style={mono}>
         <PharosMark size={14} className="text-[color:var(--color-text-faint)]" pulse={false} />
-        Pharos <span className="text-[color:var(--color-accent)]">·</span> v0.1.0 <span className="text-[color:var(--color-accent)]">·</span> Mac mini M4
+        Pharos <span className="text-[color:var(--color-accent)]">·</span> v0.1.0
       </footer>
     </main>
   );

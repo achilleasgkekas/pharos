@@ -40,8 +40,8 @@ export default async function AdminOverviewPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatTile
             label="Workspaces"
-            value={formatInt(t.total)}
-            sub={`${formatInt(health.healthy)} active or trialing · ${health.pct}%`}
+            value={formatInt(t.activeTotal)}
+            sub={`${formatInt(health.healthy)} active or trialing · ${t.activeTotal > 0 ? Math.round((health.healthy / t.activeTotal) * 100) : 0}%`}
             accent="accent"
           />
           <StatTile label="Accounts" value={formatInt(o.accounts)} accent="cyan" />

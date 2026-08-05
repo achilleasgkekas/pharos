@@ -15,8 +15,11 @@ export function AiOnboardingBanner({ reason, productBaseUrl }: { reason: 'off' |
   const pathname = usePathname();
   const [hidden, setHidden] = useState(false);
   const [, start] = useTransition();
-  // Don't nag on the settings page (you're already there to fix it).
-  if (hidden || pathname.startsWith('/settings')) return null;
+  // Don't nag on the settings page (you're already there to fix it), or on /admin or /account/*
+  // — the operator console and the SaaS account/workspace area aren't product pages, there's no
+  // AI feature to set up there, and it used to show over the fleet overview and billing panels
+  // where it means nothing (SiteNav renders globally on those now, same as everywhere else).
+  if (hidden || pathname.startsWith('/settings') || pathname.startsWith('/admin') || pathname.startsWith('/account')) return null;
 
   const text =
     reason === 'off'

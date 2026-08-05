@@ -15,6 +15,7 @@ import { getSaasViewer } from '@/lib/tenancy/saasPage';
 import { accountTenants } from '@/lib/tenancy/saasApi';
 import { accountLanding } from '@/components/saas/accountLanding';
 import { workspaceQuery } from '@/components/saas/chooseWorkspace';
+import { workspaceUrl } from '@/components/saas/workspaceUrl';
 import { TenantStatusBadge, MemberRoleBadge, Pill } from '@/components/saas/StatusBadge';
 import { SignOutButton } from '@/components/saas/SignOutButton';
 import { CreateWorkspaceForm } from '@/components/saas/CreateWorkspaceForm';
@@ -63,10 +64,14 @@ export default async function AccountHomePage() {
   const tenants = await accountTenants(viewer.sub);
   const decision = accountLanding(tenants);
 
-  // Exactly one workspace: no reason to make the user pick — go straight into it (the workspace
-  // page resolves the first membership by default, so a clean /account/workspace is correct).
+  // Exactly one workspace: no reason to make the user pick — go straight INTO the product on
+  // its own subdomain, not to /account/workspace (that's the workspace's *settings* overview,
+  // not the app itself — landing there after login read as "I signed in and got a settings
+  // page", reported live 2026-08-05). workspaceUrl falls back to a root-relative '/' when no
+  // public URL is configured, same safety net WorkspaceShell's "open workspace" link already
+  // relied on.
   if (decision.kind === 'single') {
-    redirect('/account/workspace');
+    redirect(workspaceUrl(decision.slug, process.env.SAAS_PUBLIC_URL));
   }
 
   if (decision.kind === 'empty') {

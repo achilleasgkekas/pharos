@@ -29,12 +29,18 @@ const KIND_COLOR: Record<NotifKind, string> = {
 };
 
 /** Navbar bell: in-app alerts (deals, warranties, installments due) with an
- *  unread badge. Polls every 60s; the server generates alerts on a throttle. */
-export function NotificationBell() {
+ *  unread badge. Polls every 60s; the server generates alerts on a throttle.
+ *
+ *  `open`/`onOpenChange` are controlled by SiteNav rather than local state — on mobile this
+ *  dropdown and the hamburger nav menu are both `position: absolute` panels that used to open
+ *  independently and visually collide (screenshotted: the notifications panel sitting on top
+ *  of the product link grid). SiteNav now tracks a single "which panel is open" state and
+ *  closes one when the other opens; this component just reports its own open/close intent up
+ *  instead of owning the boolean itself. */
+export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useT();
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
   const [items, setItems] = useState<SerializedNotification[]>([]);
   const [unread, setUnread] = useState(0);
   const [, start] = useTransition();
@@ -57,10 +63,10 @@ export function NotificationBell() {
 
   useEffect(() => {
     function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) onOpenChange(false);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') onOpenChange(false);
     }
     document.addEventListener('mousedown', onDown);
     window.addEventListener('keydown', onKey);
@@ -68,7 +74,7 @@ export function NotificationBell() {
       document.removeEventListener('mousedown', onDown);
       window.removeEventListener('keydown', onKey);
     };
-  }, []);
+  }, [onOpenChange]);
 
   // The stored `body` is a structured payload; localize it per viewer here.
   function describe(n: SerializedNotification): { heading: string; sub: string } {
@@ -110,7 +116,7 @@ export function NotificationBell() {
   }
 
   function openItem(n: SerializedNotification) {
-    setOpen(false);
+    onOpenChange(false);
     if (!n.read) {
       setItems((p) => p.map((x) => (x._id === n._id ? { ...x, read: true } : x)));
       setUnread((u) => Math.max(0, u - 1));
@@ -139,7 +145,7 @@ export function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={() => {
-          setOpen((o) => !o);
+          onOpenChange(!open);
           if (!open) refresh();
         }}
         className={cn(
