@@ -7,8 +7,20 @@ RUN apk add --no-cache libc6-compat
 # ─── Dependencies ──────────────────────────────────────────────────────────
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+# `npm ci`, not `npm install`: install the lockfile EXACTLY rather than re-resolving it.
+#
+# This is not tidiness. On 2026-08-05 the identical source built clean in the morning and failed
+# the production build in the afternoon: the deps layer happened to be cached the first time and
+# re-ran the second, `npm install` re-resolved the tree, and the floating ranges (typescript
+# ^5.6.3, @types/node ^22.9.0) pulled a newer toolchain that rejected code the older one had
+# tolerated. A build whose result depends on whether a Docker layer was cached is not a build,
+# and the failure lands at deploy time on whoever happens to be shipping.
+#
+# The lockfile is no longer optional (`package-lock.json*` → `package-lock.json`): with `npm ci` a
+# missing lock is fatal anyway, so it should fail loudly at COPY rather than as a confusing npm
+# error. --legacy-peer-deps stays for the pre-existing react RC peer conflict.
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
 
 # ─── Builder ───────────────────────────────────────────────────────────────
 FROM base AS builder

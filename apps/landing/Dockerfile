@@ -9,8 +9,11 @@ RUN apk add --no-cache libc6-compat
 # ─── Dependencies ──────────────────────────────────────────────────────────
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+# `npm ci`, not `npm install` — same reason as apps/web/Dockerfile: install the lockfile exactly,
+# so a cached-vs-cold deps layer can never change what gets built. The landing site has not been
+# bitten by this yet; it has the same floating ranges, so it is the same trap.
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps
 
 # ─── Builder ───────────────────────────────────────────────────────────────
 FROM base AS builder
