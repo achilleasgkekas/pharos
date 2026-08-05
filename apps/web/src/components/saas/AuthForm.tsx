@@ -35,11 +35,24 @@ const INPUT_CLASS =
 
 const LABEL_CLASS = 'mb-1 block text-xs font-medium text-[color:var(--color-text-dim)]';
 
-export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
+export function AuthForm({
+  mode,
+  next,
+  /** Private beta: the server decides, the form only renders what it is told. Resolved once
+   *  on the page (server side) so the field cannot be hidden by editing client state — the
+   *  API re-checks the code regardless. */
+  betaGated = false,
+}: {
+  mode: Mode;
+  next?: string;
+  betaGated?: boolean;
+}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [workspace, setWorkspace] = useState('');
+  // Private beta: only rendered when the server says signup is gated (see signupGate).
+  const [betaCode, setBetaCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<Step>('credentials');
@@ -71,6 +84,7 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
       if (isSignup) {
         if (name.trim()) body.name = name.trim();
         if (workspace.trim()) body.workspace = workspace.trim();
+        if (betaCode.trim()) body.code = betaCode.trim();
       }
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -255,6 +269,29 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
           </p>
         )}
       </div>
+
+      {isSignup && betaGated && (
+        <div>
+          <label className={LABEL_CLASS} htmlFor="auth-beta-code">
+            Invite code
+          </label>
+          <input
+            id="auth-beta-code"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="YOUR-CODE"
+            className={`${INPUT_CLASS} font-mono uppercase tracking-wider`}
+            value={betaCode}
+            onChange={(e) => setBetaCode(e.target.value)}
+            disabled={busy}
+          />
+          <p className="mt-1 text-xs text-[color:var(--color-text-faint)]">
+            Pharos is in private beta. If you were invited by email, open that link instead — it
+            needs no code.
+          </p>
+        </div>
+      )}
 
       {isSignup && (
         <div>

@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/db';
 import { Account } from '@/models/Account';
 import { hashPassword } from '@/lib/auth';
 import { readBody, strField } from '@/lib/apiBody';
+import { signupAllowed } from '@/lib/tenancy/signupGate';
 import { rateLimit, clientIp } from '@/lib/apiAuth';
 import { saasAuthGate, saasGuard, accountTenants } from '@/lib/tenancy/saasApi';
 import { setAccountCookie } from '@/lib/tenancy/accountSession';
@@ -39,6 +40,18 @@ export async function POST(req: NextRequest) {
     const password = strField(b, 'password');
     const name = strField(b, 'name', '', true);
     const workspace = strField(b, 'workspace', '', true);
+
+    // Private beta: the door itself. Checked BEFORE any validation feedback, so a stranger
+    // without a code learns nothing about which emails are taken. An invite token bypasses it
+    // — an invitation is already an authorisation from someone inside the workspace, and
+    // requiring a code on top would make every invite look broken. No-op when
+    // SAAS_SIGNUP_CODES is unset (open signup, the default).
+    if (!signupAllowed(strField(b, 'code'), !!strField(b, 'invite').trim())) {
+      return NextResponse.json(
+        { error: 'Pharos is in private beta — you need an invite code to sign up' },
+        { status: 403 }
+      );
+    }
 
     if (!EMAIL_RE.test(email)) return NextResponse.json({ error: 'A valid email is required' }, { status: 400 });
     if (password.length < MIN_PASSWORD) {

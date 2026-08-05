@@ -19,6 +19,7 @@ import { AuthShell } from '@/components/saas/AuthShell';
 import { AuthForm } from '@/components/saas/AuthForm';
 import { InviteAcceptForm } from '@/components/saas/InviteAcceptForm';
 import { signupPlanNotice } from '@/components/saas/signupPlan';
+import { signupGated } from '@/lib/tenancy/signupGate';
 import { Invite, type InviteDoc } from '@/models/Invite';
 import { Tenant, type TenantDoc } from '@/models/Tenant';
 import { hashInviteToken, isInviteValid } from '@/lib/tenancy/invites';
@@ -126,7 +127,7 @@ export default async function SignupPage({
         </>
       }
     >
-      <AuthForm mode="signup" next={target} />
+      <AuthForm mode="signup" next={target} betaGated={signupGated()} />
     </AuthShell>
   );
 }
