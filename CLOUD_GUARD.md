@@ -1024,3 +1024,52 @@ boot, και το νεότερο backup ήταν των 14:55 με το offsite 
 
 **Έκλεισε επίσης μόνο του το πρωινό P2 #3**: το `e51a17a` (activate 5 ανά ώρα) είναι πρόγονος του
 deployed `b12c4b7`, άρα το σφίξιμο **είναι ζωντανό** και δεν περιμένει επόμενο deploy.
+
+### 15:10-15:20 UTC: μπήκε fail2ban, κατ' εντολή του Αχιλλέα
+
+**Σημείωση εδάφους**: το SKILL μου απαγορεύει ρητά αλλαγές σε firewall. Το έκανα **κατόπιν ρητής
+εντολής** («προγραμμάτισέ το να γίνει»), όχι με δική μου πρωτοβουλία, και το γράφω εδώ ώστε να
+φαίνεται ποιος το ζήτησε.
+
+**Πριν από την εγκατάσταση έλεγξα τον κίνδυνο lockout**, γιατί ένα κακορυθμισμένο fail2ban κλειδώνει
+τον ιδιοκτήτη έξω από τον δικό του server. Οι 461 «Connection closed by authenticating» και οι 42
+«maximum authentication» προέρχονται **αποκλειστικά από σαρωτές** (64.89.163.251, 195.178.110.217,
+220.85.210.200, 118.68.66.195). Η IP του Αχιλλέα `2.85.82.29` παράγει **μηδέν** αποτυχίες. Παρόλα
+αυτά μπήκε ρητά στο `ignoreip`, μαζί με το localhost.
+
+Ρύθμιση: `bantime 1h`, `findtime 10m`, `maxretry 5`, `backend systemd`, jail `sshd` σε
+`mode aggressive`.
+
+**Δύο σφάλματα που έκανα και τα έπιασα μόνο επειδή δεν εμπιστεύτηκα το «φαίνεται εντάξει»:**
+
+1. **Τα ελληνικά σχόλια έσπαγαν το parsing.** Το πρώτο `jail.local` το είχα γράψει με ελληνικά
+   σχόλια και **αγνοήθηκε ολόκληρο**: το `fail2ban-client get sshd ignoreip` απαντούσε «No IP
+   address/network is ignored» και το `bantime` έδειχνε 600, δηλαδή το default του `jail.conf`, όχι
+   το δικό μου 3600. Δηλαδή **η δικλείδα κατά του lockout δεν υπήρχε καν**, ενώ το αρχείο έμοιαζε
+   σωστό. Ξαναγράφτηκε **σε ASCII** και φορτώθηκε κανονικά. Στα αρχεία ρυθμίσεων του συστήματος,
+   μόνο ASCII.
+2. **Το jail έτρεχε χωρίς καμία action, δηλαδή placebo.** Μετά το `fail2ban-client reload`, το
+   `get sshd actions` απαντούσε **«No actions for jail sshd»**: το fail2ban μετρούσε αποτυχίες και
+   κατέγραφε «banned» στη λίστα του, αλλά **δεν έμπαινε κανένας κανόνας στο firewall**. Το
+   `nft list ruleset` δεν είχε ίχνος της μπαναρισμένης IP. Το `reload` είχε κάνει flush το action
+   (`Flush ticket(s) with nftables-multiport`) χωρίς να το ξαναφορτώσει. Λύθηκε με **πλήρες
+   `systemctl restart`**, όχι reload.
+
+**Επαλήθευση ότι όντως επιβάλλεται**, που είναι και το μόνο που μετράει:
+
+```
+table inet f2b-table {
+  set addr-set-sshd { type ipv4_addr; elements = { 101.47.155.9 } }
+  chain f2b-chain {
+    type filter hook input priority filter - 1; policy accept;
+    tcp dport 22 ip saddr @addr-set-sshd reject with icmp port-unreachable
+  }
+}
+```
+
+Ο κανόνας είναι **αποκλειστικά `tcp dport 22`**, οπότε δεν αγγίζει 80/443 ούτε τα chains του Docker.
+Επιβεβαιώθηκε και εμπειρικά: τέσσερα containers up, apex 200, app 200, workspace 307, μόνο ο caddy
+εκθέτει θύρες. Δοκιμάστηκε επίσης ο κύκλος `unbanip` και `banip`, γιατί αυτόν ακριβώς θα χρειαστεί
+το admin UI που ζήτησε ο Αχιλλέας.
+
+Μία IP μπαναρίστηκε μέσα στα πρώτα λεπτά (101.47.155.9), `fail2ban` enabled at boot.
