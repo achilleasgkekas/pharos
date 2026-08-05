@@ -41,6 +41,10 @@ export const AUDIT_ACTIONS = [
   'workspace.erasure_canceled',
   'workspace.data_exported',
   'workspace.files_manifested',
+  // The terminal event: the workspace's files, database and control-plane rows are gone. Written
+  // BEFORE the deletion (nothing survives to attach it to afterwards) and deliberately NOT deleted
+  // with the tenant — it is the only remaining proof the erasure was carried out.
+  'workspace.purged',
   'ai_key.set',
   'ai_key.cleared',
 ] as const;

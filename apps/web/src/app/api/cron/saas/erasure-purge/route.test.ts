@@ -12,13 +12,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //   - correct bearer token → 200 with the scan result,
 //   - a mid-handler throw from the scan surfaces as a clean 500 JSON, not an HTML crash page.
 
-const { saasModeMock, runErasurePurgeScanMock } = vi.hoisted(() => ({
+const { saasModeMock, runErasurePurgeScanMock, runErasurePurgeExecuteMock } = vi.hoisted(() => ({
   saasModeMock: vi.fn(() => true),
   runErasurePurgeScanMock: vi.fn(async () => ({ scanned: true, dryRun: true as const, due: 0, targets: [] as unknown[] })),
+  // Disarmed is the DEFAULT state of the execute pass, so that is what the fixture returns.
+  runErasurePurgeExecuteMock: vi.fn(async () => ({
+    executed: false,
+    reason: 'SAAS_PURGE_EXECUTE is not armed',
+    purged: 0,
+    failed: 0,
+    deferred: 0,
+    outcomes: [] as unknown[],
+  })),
 }));
 
 vi.mock('@/lib/tenancy/saasMode', () => ({ saasMode: saasModeMock }));
 vi.mock('@/lib/tenancy/erasurePurge', () => ({ runErasurePurgeScan: runErasurePurgeScanMock }));
+vi.mock('@/lib/tenancy/purgeExecute', () => ({ runErasurePurgeExecute: runErasurePurgeExecuteMock }));
 
 import { POST } from './route';
 
@@ -90,8 +100,49 @@ describe('bearer token gate', () => {
     runErasurePurgeScanMock.mockResolvedValueOnce({ scanned: true, dryRun: true, due: 1, targets: [target] });
     const res = await POST(makeReq({ authorization: 'Bearer cron-secret-123' }));
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { ok: boolean; scanned: boolean; dryRun: boolean; due: number; targets: unknown[] };
-    expect(json).toEqual({ ok: true, scanned: true, dryRun: true, due: 1, targets: [target] });
+    const json = (await res.json()) as Record<string, unknown>;
+    expect(json).toEqual({
+      ok: true,
+      scanned: true,
+      dryRun: true,
+      due: 1,
+      targets: [target],
+      // The execute pass reports itself separately, so a reader can tell "nothing was due" from
+      // "something was due and we are not allowed to touch it".
+      execute: {
+        executed: false,
+        reason: 'SAAS_PURGE_EXECUTE is not armed',
+        purged: 0,
+        failed: 0,
+        deferred: 0,
+        outcomes: [],
+      },
+    });
+  });
+
+  it('reports what the execute pass actually did when it IS armed', async () => {
+    runErasurePurgeExecuteMock.mockResolvedValueOnce({
+      executed: true,
+      reason: null as unknown as string,
+      purged: 2,
+      failed: 1,
+      deferred: 3,
+      outcomes: [],
+    });
+    const res = await POST(makeReq({ authorization: 'Bearer cron-secret-123' }));
+    const json = (await res.json()) as { execute: { purged: number; failed: number; deferred: number } };
+    expect(json.execute).toMatchObject({ purged: 2, failed: 1, deferred: 3 });
+  });
+
+  it('never runs the execute pass when SAAS_MODE is off', async () => {
+    saasModeMock.mockReturnValue(false);
+    await POST(makeReq({ authorization: 'Bearer cron-secret-123' }));
+    expect(runErasurePurgeExecuteMock).not.toHaveBeenCalled();
+  });
+
+  it('never runs the execute pass without a valid token', async () => {
+    await POST(makeReq({ authorization: 'Bearer wrong-secret-xx' }));
+    expect(runErasurePurgeExecuteMock).not.toHaveBeenCalled();
   });
 
   it('bearer token with surrounding whitespace is trimmed before compare', async () => {

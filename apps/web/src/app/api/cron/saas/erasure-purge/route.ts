@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { saasMode } from '@/lib/tenancy/saasMode';
 import { checkCronAuth } from '@/lib/cronAuth';
 import { runErasurePurgeScan } from '@/lib/tenancy/erasurePurge';
+import { runErasurePurgeExecute } from '@/lib/tenancy/purgeExecute';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,7 +38,12 @@ export async function POST(req: Request) {
 
   try {
     const result = await runErasurePurgeScan();
-    return NextResponse.json({ ok: true, ...result });
+    // The scan always runs and always reports. The DROP only happens when the second flag
+    // (SAAS_PURGE_EXECUTE) is armed — off by default, including on every self-hosted install, so
+    // this endpoint stays report-only unless an operator has explicitly said otherwise. The
+    // execute pass re-reads and re-validates each workspace itself; it does not trust this scan.
+    const execute = await runErasurePurgeExecute();
+    return NextResponse.json({ ok: true, ...result, execute });
   } catch (e) {
     return NextResponse.json(
       { error: (e as Error).message?.slice(0, 200) || 'Server error' },
