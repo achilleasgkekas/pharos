@@ -7519,3 +7519,68 @@ server. Σωστά: το rollback είναι `git checkout` και θα **έσβ
 
 **## Needs Achilleas:** **Stripe keys**, **plan pricing**. Και μικρό: ο σύνδεσμος προς `/status`
 από το μενού και το sitemap ζουν σε αρχεία της landing routine, τα άφησα σε εκείνη.
+
+## 2026-08-05 — increment 148: το suspended workspace απέκτησε ημερομηνία λήξης (και ειδοποίηση πριν)
+
+Το `pharos-landing` κλείδωσε στις 2026-08-04 τις **30 μέρες** σε τρία σημεία (Terms §9, Privacy §5,
+FAQ) και άφησε ρητή προειδοποίηση: «η σελίδα υπόσχεται 30 μέρες που **κανένα cron δεν επιβάλλει**».
+Σωστά. Το `statusAudit.ts` περιέγραφε τη μετάβαση **προς** suspended και **τίποτα** δεν περιέγραφε τι
+γίνεται μετά, οπότε ένα εγκαταλελειμμένο workspace ζούσε για πάντα και το site έλεγε ψέματα.
+
+Νέα `lib/tenancy/suspendedSweep.ts` + `POST /api/cron/saas/suspended-sweep` (ημερήσιο· με παράθυρο 30
+ημερών και warning στις 7, το ωριαίο θα ήταν μόνο φόρτος). Τρία βήματα:
+
+1. **BACKFILL** — suspended tenant χωρίς ρολόι παίρνει `suspendedAt` από το **νεότερο
+   `workspace.suspended` audit row**, αλλιώς `now`. Κάθε workspace που είχε suspend-αριστεί πριν από
+   σήμερα δεν έχει stamp, και η ασφαλής κατεύθυνση λάθους είναι να **ξαναρχίσει** το ρολόι, ποτέ να
+   τελειώσει: χωρίς stamp δεν είναι ποτέ due. Κανείς δεν διαγράφεται με ρολόι που ποτέ δεν είχε.
+2. **WARN** — ένα email, 7 μέρες πριν, idempotent με `suspendWarnEmailedAt`. Επτά και όχι τρία (όσο
+   του trial): το τέλος trial βρίσκει κάποιον που μόλις έκανε onboarding, η προθεσμία suspend βρίσκει
+   κάποιον που **έχει ήδη σταματήσει να προσέχει**, και η συνέπεια είναι διαγραφή, όχι παύση. Το
+   κείμενο λέει τις **δύο** εξόδους που όντως υπάρχουν (reactivate· ή reactivate → export JSON →
+   self-host δωρεάν) γιατί ειδοποίηση που λέει μόνο «θα διαγραφείς» είναι απειλή, όχι ενημέρωση.
+3. **ENROLL** — στη μέρα 30 μπαίνει στο **υπάρχον** erasure lifecycle, με `erasureScheduledAt = now`
+   (**grace 0**: οι 30 μέρες ΗΤΑΝ η χάρη· προσθέτοντας από πάνω και τις 30 του erasure ο μήνας που
+   υποσχέθηκε η σελίδα γινόταν σιωπηλά δύο), attributed σε `system:suspension-expired` και όχι σε
+   ιδιοκτήτη που δεν το ζήτησε, συν audit row με τον λόγο.
+
+**ΔΕΝ κάνει drop βάσης, και αυτό είναι η ουσία, όχι δειλία.** Το `erasurePurge.ts` είναι report-only
+ακριβώς επειδή η διαγραφή tenant είναι μη αναστρέψιμη· ένα **δεύτερο ανεξάρτητο destructive path**
+είναι ακριβώς ο τρόπος με τον οποίο ένα bug στο ένα από τα δύο σβήνει πελάτη που πληρώνει. Με το
+enroll, τη μέρα που θα οπλιστεί το drop, οπλίζεται **μία φορά, για δύο διαδρομές, με ένα audit trail**.
+Η υπόσχεση των 30 ημερών τηρείται ούτως ή άλλως: το workspace **προγραμματίζεται** τη μέρα 30, όχι
+όποτε προλάβει κάποιος άνθρωπος.
+
+**Δύο αρνήσεις που αξίζει να ονομαστούν.** (α) Αν κανένας mail provider δεν παραδίδει, παραλείπεται
+**και** το βήμα 3, όχι μόνο το warning: το να διαγραφούν δεδομένα του οποίου ο ιδιοκτήτης ποτέ δεν
+ειδοποιήθηκε είναι το ένα failure mode που αξίζει να σταματήσει τη δουλειά. (β) Workspace με
+owner-requested erasure ήδη σε εκκρεμότητα μένει άθικτο και στα δύο βήματα — το overwrite εκείνου του
+schedule θα μετακινούσε τη διαγραφή κάποιου.
+
+**`trialSweep`**: σταμπάρει πλέον `suspendedAt` τη στιγμή του suspend (αντί να το αφήνει στο πρώτο
+sweep) και **καθαρίζει** το `suspendWarnEmailedAt`, ώστε workspace που έγινε suspend → reactivate →
+suspend να προειδοποιηθεί **δεύτερη** φορά αντί να κληρονομήσει μπαγιάτικο stamp. Το `ownerEmails`
+έγινε export αντί για αντιγραφή: δύο απαντήσεις στο «ποιον ειδοποιούμε» αποκλίνουν τη μέρα που
+αλλάζουν οι ρόλοι.
+
+**Self-hosted αμετάβλητο**: ο runner γυρίζει `swept:false` πριν αγγίξει model, το route κάνει 404, και
+η single-user εφαρμογή δεν έχει tenants να λήξουν.
+
+**Verified**: 36 unit tests στον pure πυρήνα — όρια παραθύρων, τα δύο Mongo filters αποδεδειγμένα
+**εφάπτονται χωρίς κενό ή επικάλυψη** (ένα κενό θα σήμαινε workspace που ούτε προειδοποιείται ούτε
+λήγει), «ποτέ warn και schedule στο ίδιο run» ελεγμένο σε 60 μέρες, clamped email copy — συν 8 στο
+route gate. **type-check exit 0**, **376 files / 6012 tests green**. Κανένα Docker build (η SaaS τρέχει
+στο cloud· το route φεύγει με το επόμενο deploy).
+
+**Ξένο σπάσιμο που διόρθωσα σε ΞΕΧΩΡΙΣΤΟ commit** (`00b5ef5`): το `deliveryRetry.test.ts` του commit
+`dd5b712` (notify routine) άφηνε το `npm run type-check` **κόκκινο στο main για κάθε routine**
+(`vi.fn(async () => {})` → zero-length tuple στο `mock.calls`, TS2493 στο `c[0]`). Μονόγραμμη διόρθωση
+τύπου, ξεχωριστό commit ώστε η πατρότητα της άλλης routine να μη χαθεί μέσα σε SaaS diff.
+
+**Next task:** (α) κουμπί/όψη στο admin console για τα due-for-deletion workspaces (τώρα υπάρχουν μόνο
+ως JSON του purge scan)· (β) sending domain με SPF+DKIM· (γ) Stripe όταν έρθουν keys.
+
+**## Needs Achilleas:** **Stripe keys**, **plan pricing**, και **δύο νέα** (ASK
+`pharos-saas-core-20260805-0840`): **(1)** οπλίζουμε την αυτόματη διαγραφή πίσω από δεύτερο env flag,
+ή μένει human-confirmed· **(2)** **γραμμή crontab** για το `suspended-sweep` — χωρίς αυτήν δεν τρέχει
+ούτε το warning email.
