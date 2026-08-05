@@ -76,6 +76,15 @@ lives in Stripe. Numbers below are current placeholders and may change.
 | **Pro** (`shared`) | €9 | shared | 50 GB | 1000 | 5 | no |
 | **Dedicated** | €29 | dedicated | 500 GB | unlimited (BYO-key) | unlimited | yes |
 
+`free` is not a standing hosted plan a workspace can stay on indefinitely; it is
+the plan a workspace **provisions with** (`provision.ts`) for the duration of its
+14-day trial (see [Workspace lifecycle](#workspace-lifecycle) below). There is no
+permanent free hosted tier — that positioning is self-hosting only ("free
+forever", no account, no billing). A workspace still on `free` when its trial
+window closes is suspended, not silently kept on a free plan; an owner clears
+that by subscribing to Pro or Dedicated through Stripe checkout, which flips
+`tenant.plan` away from `free`.
+
 Quota enforcement:
 
 - **Seats** — the members route refuses to add a seat past `maxMembers`

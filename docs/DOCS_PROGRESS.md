@@ -3195,3 +3195,34 @@ Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/
 Συμπέρασμα: Τα δύο shipped features 60d25f4 (JSON backup verify) + 56e983e (nightly dump verify) είναι πλέον fully + accurately documented στο `docs/backup-and-restore.md`, μαζί με τη διόρθωση μιας προϋπάρχουσας λανθασμένης claim (8 vs 15 collections, "no income" ενώ υπάρχει income από τον Ιούλιο).
 
 Επόμενο run: (α) `exportInsuranceBundle`/`exportTaxBundle` (insurance/tax ZIP exports) — έλεγξε αν είναι ήδη τεκμηριωμένα κάπου (features.md;) και αν όχι πρόσθεσε section· (β) f123e94 landing pricing claim check στο `docs/saas.md` · (γ) grep git log για νέα feat() commits μετά το πιο πρόσφατο εδώ.
+
+## 2026-08-05 (forty-second run — f123e94 landing pricing claim fixed in saas.md, backlog surveyed)
+
+Ξεκίνησα από την ουρά της forty-first run, item (α) και (β). Έλεγξα πρώτα το inbox (`~/.claude/ASK_ACHILLEAS.md`, `grep pharos-docs`) — κανένα ANSWERED item.
+
+**(α) exportInsuranceBundle/exportTaxBundle**: ήδη πλήρως τεκμηριωμένα. Βρήκα ότι το `docs/features.md` ήδη έχει "**Insurance export (P13)**" section (γραμμή 80) κάτω από Items/Shopping, ΚΑΙ ολόκληρο section "**### Tax-deductible tagging & year-end export**" (γραμμή 259) κάτω από Expenses — και τα δύο ενημερώθηκαν σε προηγούμενο run που δεν το είχε καταγράψει ρητά ως "έγινε" στο queue. Verified με code read: `exportInsuranceBundle`/`exportTaxBundle` (settings/actions.ts) matches το doc text (CSV+HTML+photos+files ZIP, μόνο `requireAdmin()` gate, κανένα SaaS feature-flag check βρέθηκε πουθενά στο grep → η claim "ungated, όχι paid feature" στο doc είναι σωστή). Καμία αλλαγή χρειάστηκε. Η προηγούμενη queue entry ήταν ήδη ξεπερασμένη.
+
+**(β) f123e94 landing pricing claim check — ΒΡΕΘΗΚΕ πραγματικό stale claim, διορθώθηκε**: το `docs/saas.md` section "Plans and quotas" (γραμμή 67) έχει πίνακα με **Free / Pro / Dedicated** σαν τρία ισότιμα, μόνιμα επιλέξιμα πλάνα — ακριβώς η αντίφαση που το f123e94 (2026-08-03) διόρθωσε στο landing page (αφαίρεσε το "Free / €0" hosted card, το hosted ξεκινά πλέον πάντα με 14ήμερο trial, μόνο το self-host είναι "δωρεάν για πάντα"). Verified με code read, όχι μόνο commit message: `apps/web/src/lib/tenancy/provision.ts:100-104` δείχνει κάθε νέο tenant παίρνει `plan:'free', status:'trialing', trialEndsAt:trialEndFrom(now)` αυτόματα (όχι επιλογή χρήστη)· `apps/web/src/app/api/saas/billing/webhook/route.ts:157-158` δείχνει `tenant.plan` αλλάζει σε `shared`/`dedicated` μόνο μετά από πραγματικό Stripe checkout (`planForPriceId`)· η ήδη-υπάρχουσα ενότητα "Workspace lifecycle" ακριβώς από κάτω εξηγεί σωστά trialing→suspended αλλά ο πίνακας Plans δεν το συνέδεε — διάβαζόταν σαν να μπορείς να μείνεις μόνιμα σε `free`.
+
+Fix: προστέθηκε παράγραφος αμέσως μετά τον πίνακα (`docs/saas.md`) που εξηγεί ρητά ότι το `free` δεν είναι μόνιμο hosted πλάνο αλλά το πλάνο-κατά-τη-διάρκεια-του-trial (14 μέρες), ότι η "δωρεάν για πάντα" θέση είναι αποκλειστικά του self-hosting, και ότι μια workspace που μένει σε `free` μετά το trial window αναστέλλεται (όχι σιωπηλή παραμονή σε free) μέχρι να γίνει upgrade μέσω Stripe checkout. Cross-link στο ήδη-υπάρχον `#workspace-lifecycle` anchor (verified ότι υπάρχει heading "## Workspace lifecycle" στη σωστή θέση).
+
+Accuracy: verified πλήρες σώμα `provision.ts` (νέα tenant fields) + `webhook/route.ts` (planForPriceId mapping, γραμμή 150-175, και το `tenant.plan='free'` revert σε cancellation) + `plans.ts` (PLAN_KEYS, καμία "standalone product" σημασιολογία εκεί, απλώς μεταδεδομένα ανά κλειδί). Επιβεβαίωσα ότι δεν υπάρχει άλλο "permanent free"/"free forever" stale claim πουθενά αλλού στο `docs/` (grep σε όλα τα .md, μόνο το δικό μου νέο κείμενο + το ήδη σωστό DOCS_PROGRESS.md ιστορικό του ίδιου commit).
+
+Validation (markdown only, κανένα build/Docker/AI call): code fences `docs/saas.md` = 18 πριν/μετά (ζυγό, η προσθήκη ήταν καθαρό πεζογράφημα χωρίς code block)· το cross-link anchor `#workspace-lifecycle` verified ότι υπάρχει (heading στη γραμμή 98 μετά το insert, το ίδιο heading text ώστε το GitHub auto-anchor να ταιριάζει)· κανένα credential.
+
+Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/saas.md` modified (δικό μου), κανένα foreign staged. Σημείωση: το working tree έχει αρκετά ΑΛΛΑ uncommitted αρχεία εκτός docs/ (bills/goals/loyaltycards/vouchers/subscriptions serialize.ts refactors, i18n locale edits, expenses/items actions) από άλλη ενεργή routine — αφέθηκαν εντελώς άθικτα, καμία στο δικό μου staging.
+
+**Backlog survey (γ)**: `git log --oneline 60d25f4..HEAD` βρήκε **~16 νέα feat() commits** που δεν έχουν καταγραφεί εδώ ως documented. Δεν προλαβαίνει ένα hourly run να τα καλύψει όλα (small increments rule) — γρήγορος έλεγχος έδειξε ότι μερικά είναι ήδη έμμεσα καλυμμένα (π.χ. `e861f26` alert dedupe πιθανόν σχετίζεται με το fda8c96 cron section που ήδη τεκμηριώθηκε, `aba7cd8` audit workspace-suggest πιθανόν είναι incremental στο ήδη-documented actor autocomplete). Έλεγξα ρητά για stray mobile-app αναφορές μετά το `1438867` (discontinue mobile) per CLAUDE.md οδηγία: `grep -rniE "mobile app|native app|ios app|android app|app store|play store" docs/*.md` = **0 hits** (ήδη καθαρό, καμία αλλαγή χρειάστηκε).
+
+Προτεραιότητα για επόμενα runs (πιο user-facing πρώτα):
+1. **`ed68936`** feat(auth) TOTP 2FA login για self-host (P79, reusing SaaS primitive) — πιθανό gap στο `docs/security.md`.
+2. **`63f2e33`** + **`abd0cdc`** feat(saas) waitlist gone, plans→signup, activation-by-code flow — μεγάλη αλλαγή στο onboarding, `docs/saas.md` section "Workspace creation"/"Account profile" χρειάζεται έλεγχο.
+3. **`4b87112`** feat(saas) πραγματικό SMTP email send — `docs/saas.md`/`configuration.md` env vars.
+4. **`75ee08d`** feat(settings) update-available notification για self-hosters (P40) — `docs/self-hosting.md`/`updating.md`.
+5. **`f1f1cde`** feat(expenses) duplicate bill detection/merge (P46) — `docs/features.md` Expenses section.
+6. **`c66d409`** feat(backup) remote mirror last-write timestamp (P48 part 1) — `docs/backup-and-restore.md`.
+7. **`da32091`** feat(saas) suspended workspace end-date + email — `docs/saas.md` Workspace lifecycle.
+8. **`5414dc3`**/**`618ff27`** feat(saas) platform AI key billing per-workspace — `docs/saas.md` "Bring-your-own-key AI" section.
+9. Τα υπόλοιπα (dd5b712 webhook retry, e5062b3 landing status page, a7e7904 admin fleet-value, e861f26/aba7cd8 audit — έλεγξε πρώτα αν ήδη καλύπτονται) μετά τα παραπάνω.
+
+Επόμενο run: ξεκίνα από item 1 (TOTP 2FA) της λίστας παραπάνω, ένα ανά run.
