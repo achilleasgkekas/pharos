@@ -23,6 +23,9 @@ const SITE_URL = 'https://ph-aros.com';
 // public and every badge/note below disappears automatically.
 const REPO_PUBLIC = false;
 
+/** Where a human writes to. Same address the privacy and terms pages give. */
+const CONTACT_EMAIL = 'hello@ph-aros.com';
+
 // Raw quickstart commands, kept in sync with the colour-tokenised <pre> below.
 // Used by the copy-to-clipboard button so the copied text has no markup.
 const QUICKSTART_COMMANDS = [
@@ -1405,23 +1408,41 @@ export default function Home() {
               <a href="#compare" className="navlink">Compare</a>
             </div>
 
+            {/* The repo is PRIVATE until launch, so every link into it (Docs, issues, the
+                LICENSE file) is a 404 for a visitor — verified: the README link returned 404.
+                A footer full of dead links reads as an abandoned project, so they appear only
+                once REPO_PUBLIC flips. Until then this column is the two things that do work:
+                the way in, and a human to write to. */}
             <div className="footer-col">
-              <p className="footer-heading mono">Resources</p>
-              <a href={GITHUB_URL} className="navlink" target="_blank" rel="noopener noreferrer">GitHub</a>
-              <a href={`${GITHUB_URL}/blob/main/README.md`} className="navlink" target="_blank" rel="noopener noreferrer">Docs</a>
-              <a href={`${GITHUB_URL}/issues`} className="navlink" target="_blank" rel="noopener noreferrer">Report an issue</a>
-              <a href={`${APP_URL}/account/signup`} className="navlink">Get started</a>
+              <p className="footer-heading mono">Get started</p>
+              <a href={`${APP_URL}/account/signup`} className="navlink">Create an account</a>
+              <a href={`${APP_URL}/account/login`} className="navlink">Sign in</a>
+              <a href="#self-host" className="navlink">Run it yourself</a>
+              <a href={`mailto:${CONTACT_EMAIL}`} className="navlink">Contact</a>
             </div>
 
             <div className="footer-col">
               <p className="footer-heading mono">Legal</p>
-              <a href={`${GITHUB_URL}/blob/main/LICENSE`} className="navlink" target="_blank" rel="noopener noreferrer">License (AGPL-3.0)</a>
               <a href="/privacy" className="navlink">Privacy</a>
               <a href="/terms" className="navlink">Terms</a>
-              <a href="/.well-known/security.txt" className="navlink" target="_blank" rel="noopener noreferrer">Security</a>
-              <a href="/humans.txt" className="navlink" target="_blank" rel="noopener noreferrer">Credits</a>
-              <a href="/llms.txt" className="navlink" target="_blank" rel="noopener noreferrer">AI (llms.txt)</a>
+              {/* Security used to link to the raw /.well-known/security.txt. That file exists
+                  for scanners and stays served at its well-known path; a person who found a
+                  vulnerability wants an address, not a text file. */}
+              <a
+                href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Security report')}`}
+                className="navlink"
+              >
+                Report a vulnerability
+              </a>
               <a href="#faq" className="navlink">FAQ</a>
+              {REPO_PUBLIC && (
+                <>
+                  <a href={GITHUB_URL} className="navlink" target="_blank" rel="noopener noreferrer">GitHub</a>
+                  <a href={`${GITHUB_URL}/blob/main/LICENSE`} className="navlink" target="_blank" rel="noopener noreferrer">
+                    License (AGPL-3.0)
+                  </a>
+                </>
+              )}
             </div>
           </div>
 
