@@ -10,12 +10,13 @@
 // plaintext never persists. Recovery codes reuse lib/auth.ts's scrypt hashing via
 // recoveryCodes.ts, same as account passwords.
 //
-// SCOPE (increment 80a): storage + enrollment/disable only. NOT wired into the login flow yet —
-// that is a separate, riskier increment (touches shared, security-critical plumbing) done once
-// this layer is proven. Until wired, `mfaEnabled` has no effect on `POST /api/saas/auth/login`.
+// SCOPE (increment 80a): storage + enrollment/disable only. Wired into the SaaS login flow at
+// increment 83 (POST /api/saas/auth/login + /api/saas/auth/mfa).
 //
-// OSS PARITY: only the SaaS Account path uses this. The self-hosted app's `User` model has no
-// MFA fields and never calls this module.
+// OSS PARITY (P79): the self-hosted `User` model has its own MFA fields + its own
+// lib/userMfaStore.ts wrapper (over `User`, not `Account`) — but it imports the four PURE
+// `plan*`/`mfaEnrollRequiresReauth` builders below directly rather than duplicating them, since
+// they only shape a Mongo `$set` and never touch either model.
 import { Account } from '@/models/Account';
 import { encryptSecret, decryptSecret, secretCryptoReady } from './secretCrypto';
 import { generateTotpSecret, totpUri, verifyTotpCode } from './totp';

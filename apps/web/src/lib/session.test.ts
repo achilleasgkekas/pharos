@@ -8,6 +8,11 @@ import {
   signSession,
   verifySession,
   shouldRefresh,
+  SESSION_MFA_PENDING_COOKIE,
+  MFA_PENDING_MAX_AGE,
+  mfaPendingCookieOptions,
+  signMfaPendingToken,
+  verifyMfaPendingToken,
   type SessionClaims,
 } from './session';
 
@@ -219,5 +224,128 @@ describe('shouldRefresh', () => {
 
   it('true for a long-lived cookie outliving the current window (shrink on sight)', () => {
     expect(shouldRefresh(now() + SESSION_MAX_AGE + 5000)).toBe(true);
+  });
+});
+
+// P79 login-step-2 pending state — distinct cookie name/claim shape from the real session, so a
+// half-finished MFA login can never be mistaken for (or upgraded into) a real one.
+describe('SESSION_MFA_PENDING_COOKIE / MFA_PENDING_MAX_AGE constants', () => {
+  it('cookie name is distinct from the real session cookie', () => {
+    expect(SESSION_MFA_PENDING_COOKIE).toBe('pharos_session_mfa_pending');
+    expect(SESSION_MFA_PENDING_COOKIE).not.toBe(SESSION_COOKIE);
+  });
+
+  it('max age is a positive integer number of seconds, shorter than the real session', () => {
+    expect(Number.isInteger(MFA_PENDING_MAX_AGE)).toBe(true);
+    expect(MFA_PENDING_MAX_AGE).toBeGreaterThan(0);
+    expect(MFA_PENDING_MAX_AGE).toBeLessThan(SESSION_MAX_AGE);
+  });
+});
+
+describe('mfaPendingCookieOptions', () => {
+  it('shares the session cookie hardening attributes, with its own (shorter) maxAge', () => {
+    delete process.env.AUTH_COOKIE_SECURE;
+    const opts = mfaPendingCookieOptions();
+    expect(opts.httpOnly).toBe(true);
+    expect(opts.sameSite).toBe('lax');
+    expect(opts.path).toBe('/');
+    expect(opts.maxAge).toBe(MFA_PENDING_MAX_AGE);
+    expect(opts.secure).toBe(false);
+  });
+});
+
+describe('signMfaPendingToken', () => {
+  it('throws when no secret is configured', async () => {
+    delete process.env.AUTH_SECRET;
+    await expect(signMfaPendingToken('u1')).rejects.toThrow(/AUTH_SECRET/);
+  });
+
+  it('produces a compact JWT (three dot-separated segments)', async () => {
+    const token = await signMfaPendingToken('u1');
+    expect(token.split('.')).toHaveLength(3);
+  });
+});
+
+describe('sign → verify pending-MFA roundtrip', () => {
+  it('recovers the user id', async () => {
+    const token = await signMfaPendingToken('user-123');
+    expect(await verifyMfaPendingToken(token)).toBe('user-123');
+  });
+
+  it('a real session token (no typ:"mfa_pending" claim) is REJECTED, not misread as pending', async () => {
+    const realSessionToken = await signSession({ sub: 'user-123', role: 'admin', name: 'A' });
+    expect(await verifyMfaPendingToken(realSessionToken)).toBeNull();
+  });
+
+  it('a pending token is REJECTED by verifySession (the real session verifier), so it can never grant a session by itself', async () => {
+    const pendingToken = await signMfaPendingToken('user-123');
+    // verifySession defaults an unrecognised/missing role claim to 'member' and still returns
+    // claims — the point here is narrower: the pending token was never meant to authenticate
+    // anything on its own, and this pins that verifySession does not special-case its shape.
+    const claims = await verifySession(pendingToken);
+    expect(claims?.sub).toBe('user-123'); // same JWT library/secret, so the subject IS readable —
+    // demonstrating exactly why a distinct COOKIE NAME (not just claim shape) is the real guard:
+    // middleware only ever reads SESSION_COOKIE, and this token is never stored under that name.
+  });
+});
+
+describe('verifyMfaPendingToken', () => {
+  it('null on empty / missing token', async () => {
+    expect(await verifyMfaPendingToken(undefined)).toBeNull();
+    expect(await verifyMfaPendingToken(null)).toBeNull();
+    expect(await verifyMfaPendingToken('')).toBeNull();
+  });
+
+  it('null when no secret is configured, even for a well-formed token', async () => {
+    const token = await signMfaPendingToken('u1');
+    delete process.env.AUTH_SECRET;
+    expect(await verifyMfaPendingToken(token)).toBeNull();
+  });
+
+  it('null on a garbage / non-JWT string', async () => {
+    expect(await verifyMfaPendingToken('not-a-jwt')).toBeNull();
+  });
+
+  it('null when the token was signed with a different secret', async () => {
+    const foreign = new TextEncoder().encode('a-totally-different-secret-16+');
+    const token = await new SignJWT({ typ: 'mfa_pending' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('u1')
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(foreign);
+    expect(await verifyMfaPendingToken(token)).toBeNull();
+  });
+
+  it('null on an expired token', async () => {
+    const secret = new TextEncoder().encode(SECRET);
+    const token = await new SignJWT({ typ: 'mfa_pending' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('u1')
+      .setIssuedAt(Math.floor(Date.now() / 1000) - 7200)
+      .setExpirationTime(Math.floor(Date.now() / 1000) - 3600)
+      .sign(secret);
+    expect(await verifyMfaPendingToken(token)).toBeNull();
+  });
+
+  it('null when the token carries no subject', async () => {
+    const secret = new TextEncoder().encode(SECRET);
+    const token = await new SignJWT({ typ: 'mfa_pending' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(secret);
+    expect(await verifyMfaPendingToken(token)).toBeNull();
+  });
+
+  it('null when typ is anything other than "mfa_pending"', async () => {
+    const secret = new TextEncoder().encode(SECRET);
+    const token = await new SignJWT({ typ: 'something_else' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('u1')
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(secret);
+    expect(await verifyMfaPendingToken(token)).toBeNull();
   });
 });

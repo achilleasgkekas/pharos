@@ -11453,8 +11453,47 @@ DB/fetch και επαληθεύουν retry-on-503, retry-on-network-error, no-
 reuse-not-rebuild: τα `lib/tenancy/totp.ts` + `recoveryCodes.ts` + `mfaStore.ts` υπάρχουν ήδη πλήρως tested για το
 SaaS side, μεταφέρονται στο `User` model + δεύτερο βήμα στο `LoginForm`, opt-in (κενό = σημερινή συμπεριφορά).
 
+## 2026-08-05 — P79: TOTP/MFA στο self-host login (interactive session)
+
+Ο Αχιλλέας: «review the approved queue and pick the next item to build». Επιβεβαιώθηκε: P79 ήταν ήδη το
+επόμενο αχτίστο στη σειρά (ίδιο συμπέρασμα με το «Επόμενο task» σημείωμα του προηγούμενου P80 run, από
+έξω και ανεξάρτητα).
+
+**Τι χτίστηκε** (καθαρό reuse-not-rebuild, bug-for-bug parity με το ήδη-shipped SaaS `Account` MFA):
+- `models/User.ts` +4 πεδία (`mfaEnabled`/`mfaSecretEnc`/`mfaPendingSecretEnc`/`mfaRecoveryHashes`, ίδιο σχήμα
+  με το SaaS `Account`). Νέο **`lib/userMfaStore.ts`** — thin wrapper πάνω στο `User`, **επαναχρησιμοποιεί
+  ατόφιες** τις 4 PURE builders του ήδη-shipped `lib/tenancy/mfaStore.ts` (μηδέν αντιγραφή λογικής) + τα ίδια
+  crypto primitives (`secretCrypto`/`totp`/`recoveryCodes`).
+- **Login flow**: `app/login/actions.ts` `loginAction` → αν `mfaEnabled`, στήνει pending-MFA cookie
+  (`pharos_session_mfa_pending`, δικός του `typ` claim + sign/verify στο edge-safe `lib/session.ts`, cookie
+  plumbing στο node-only `lib/auth.ts` — ίδιος διαχωρισμός με το SaaS `accountToken.ts`/`accountSession.ts`)
+  αντί για πραγματικό session. Νέο `verifyMfaLoginAction`/`cancelMfaLoginAction`. `LoginForm.tsx` έγινε 2-step.
+- **Rate limit ΑΠΟ ΤΗΝ ΠΡΩΤΗ ΜΕΡΑ**: το `WEB_DEBT.md` είχε ήδη βρει+διορθώσει (2026-07-24) ότι το SaaS
+  `POST /api/saas/auth/mfa` ήταν brute-forceable χωρίς throttling — δεν το ξανάφησα ανοιχτό εδώ: το
+  `verifyMfaLoginAction` καλεί `rateHit`/`rateLimitConfig` (ίδιο shared config με `/api/v1`, `API_RATE_LIMIT`)
+  keyed **ανά user id**, όχι IP, από την πρώτη γραφή.
+- **Settings**: `getSelfMfaStatus`/`beginSelfMfaEnrollment`/`confirmSelfMfaEnrollment`/`disableSelfMfa`
+  (`users.actions.ts`, ίδιο idiom με το ήδη-υπάρχον `changeOwnPassword`) + νέο `SelfMfaCard` δίπλα στο
+  `SelfPasswordCard`, reusing τα pure `mfaCodeReady`/`mfaPasswordReady`/`describeMfaError` helpers του SaaS
+  `components/saas/mfaSettings.ts` αντί να ξαναγραφτούν.
+- i18n: 30 νέα κλειδιά (`set.twoFactor*` + `login.mfa*`) σε en+el.
+- `writeGuard.coverage.test.ts`: `confirmSelfMfaEnrollment`/`disableSelfMfa` → ALLOWLIST, ίδιο σκεπτικό με το
+  ήδη-υπάρχον `changeOwnPassword` entry («own credentials only» — ένας read-only viewer προστατεύει το ΔΙΚΟ
+  του login).
+
+**Verified**: `npm run type-check` EXIT 0. Πλήρες `npx vitest run` → **378 files, 6076 passed / 4 skipped**
+(87 νέα: 21 `userMfaStore.test.ts`, 32 νέα σε `session.test.ts`, 20 νέα σε `login/actions.test.ts`, + 14 σε
+`writeGuard.coverage.test.ts` re-runs). Docker: `docker compose build web` → `up -d web` → `RestartCount 0`,
+`/login` 200 σε ~180ms, `/settings` 307 (αμετάβλητο). Browser: `/login` renders byte-identical για μη-MFA
+χρήστες, wrong-password error path δουλεύει κανονικά, μηδέν console errors. `docker builder prune -f` μετά.
+**Δεν testable unattended**: το πλήρες enroll→confirm→login-step-2 flow χρειάζεται πραγματικά credentials.
+
 ## Needs Achilleas
 
+- **P79 supervised πέρασμα (χρειάζεται login)**: Settings → General → «Two-factor authentication» → Enable →
+  σκάναρε το manual-entry key σε authenticator app → confirm με το πρώτο 6-ψήφιο code → αποθήκευσε τα 10
+  recovery codes → log out → log back in με password+code, για να επιβεβαιωθεί το πλήρες flow end-to-end (το
+  unit-test coverage είναι πλήρες, αλλά κανένα automated test δεν οδηγεί το πραγματικό enroll UI).
 - **P80 last mile (χρειάζεται login)**: Settings → Notifications → «Check & notify now» με ένα ενεργό κανάλι, και
   μετά κοίτα το «Recent deliveries» κάτω από την κάρτα του. Στέλνει **αληθινές** ειδοποιήσεις, γι' αυτό δεν το
   τρέχω μόνος μου. Αν θέλεις πιο μακρύ ή πιο κοντό backoff: `NOTIFY_RETRY_DELAYS_MS=5000,30000` στο `.env`.

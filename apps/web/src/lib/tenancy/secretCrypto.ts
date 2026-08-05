@@ -10,8 +10,10 @@
 // AUTH_SECRET we refuse to encrypt/decrypt (mirrors session.ts `authConfigured`). This module
 // only handles bytes — WHERE the ciphertext lives (Tenant doc) is the caller's concern.
 //
-// OSS PARITY: only the SaaS BYO-key path calls this. The self-hosted app stores its provider
-// key in AppConfig as today (unencrypted, single-owner box) → this module is never on its path.
+// OSS PARITY: the self-hosted app's own AI provider key still lives in AppConfig unencrypted
+// (single-owner box, unchanged) — this module reaches it only via lib/userMfaStore.ts (P79),
+// which reuses this same envelope for the self-hosted User's TOTP secret, same as the SaaS
+// BYO-key path.
 import { scryptSync, randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 
 // Fixed application salt for the KDF. NOT a secret (it is in source): its only job is domain

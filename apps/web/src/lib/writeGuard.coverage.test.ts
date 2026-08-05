@@ -32,6 +32,13 @@ const ALLOWLIST: Record<string, string> = {
   // A read-only user must still be able to change their OWN password. It touches only
   // their own user document and nothing shared.
   'settings/users.actions.ts:changeOwnPassword': 'own credentials only',
+  // Same reasoning, P79: a viewer must still be able to set up or turn off two-factor
+  // authentication on their OWN account — it protects only their own login, nothing shared.
+  // (beginSelfMfaEnrollment needs no entry: it neither revalidates nor writes Mongo directly
+  // in this file — the write lives inside lib/userMfaStore.ts — so the scanner does not see it
+  // as mutating here in the first place.)
+  'settings/users.actions.ts:confirmSelfMfaEnrollment': 'own credentials only',
+  'settings/users.actions.ts:disableSelfMfa': 'own credentials only',
   // Not user intent: these run on page load to keep derived state fresh (alerts recomputed
   // from existing data, missing PDF thumbnails rendered). Guarding them would make every
   // page a viewer opens throw. Neither can store user-supplied content.

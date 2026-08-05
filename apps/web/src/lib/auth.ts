@@ -9,6 +9,10 @@ import {
   sessionCookieOptions,
   signSession,
   verifySession,
+  SESSION_MFA_PENDING_COOKIE,
+  mfaPendingCookieOptions,
+  signMfaPendingToken,
+  verifyMfaPendingToken,
   type Role,
   type SessionClaims,
 } from './session';
@@ -130,4 +134,24 @@ export async function setSessionCookie(claims: SessionClaims): Promise<void> {
 export async function clearSessionCookie(): Promise<void> {
   const store = await cookies();
   store.delete(SESSION_COOKIE);
+}
+
+// --- MFA login-step-2 pending state (P79) — cookie plumbing over lib/session.ts's edge-safe
+// token sign/verify. See the doc comment there for why this is a separate cookie/claim shape.
+
+export async function setMfaPendingCookie(userId: string): Promise<void> {
+  const token = await signMfaPendingToken(userId);
+  const store = await cookies();
+  store.set(SESSION_MFA_PENDING_COOKIE, token, mfaPendingCookieOptions());
+}
+
+export async function clearMfaPendingCookie(): Promise<void> {
+  const store = await cookies();
+  store.delete(SESSION_MFA_PENDING_COOKIE);
+}
+
+/** Read + verify the pending-MFA cookie → the user id it names, or null when absent/invalid. */
+export async function getMfaPendingUserId(): Promise<string | null> {
+  const store = await cookies();
+  return verifyMfaPendingToken(store.get(SESSION_MFA_PENDING_COOKIE)?.value);
 }

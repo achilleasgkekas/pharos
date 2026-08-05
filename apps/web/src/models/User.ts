@@ -20,6 +20,15 @@ const UserSchema = new Schema(
     // only exposes the 3-month money agenda, so unlike apiToken it IS re-readable in
     // Settings (same model as a Google "secret address in iCal format"). Null = off.
     calendarToken: { type: String, default: null, index: true },
+    // TOTP/MFA (P79), opt-in — same shape as the SaaS `Account` fields (lib/tenancy/mfaStore.ts),
+    // reused via lib/userMfaStore.ts. mfaSecretEnc/mfaPendingSecretEnc are AES-256-GCM envelopes
+    // (lib/tenancy/secretCrypto.ts) — the plaintext secret never persists. mfaRecoveryHashes are
+    // scrypt hashes (lib/tenancy/recoveryCodes.ts), one spliced out per use. Empty/false = today's
+    // password-only login, unchanged.
+    mfaEnabled: { type: Boolean, default: false },
+    mfaSecretEnc: { type: String, default: null },
+    mfaPendingSecretEnc: { type: String, default: null },
+    mfaRecoveryHashes: { type: [String], default: [] },
   },
   { timestamps: true }
 );

@@ -4,6 +4,14 @@ import { parseRole, type Role } from '@/lib/roles';
 import { connectDB } from '@/lib/db';
 import { User } from '@/models/User';
 import { hashPassword, verifyPassword, requireAdmin, requireUser } from '@/lib/auth';
+import {
+  beginUserMfaEnrollment,
+  confirmUserMfaEnrollment,
+  disableUserMfa,
+  describeUserMfaStatus,
+  mfaEnrollRequiresReauth,
+  type MfaStatus,
+} from '@/lib/userMfaStore';
 
 export type UserRow = { id: string; username: string; name: string; role: Role };
 
@@ -87,5 +95,56 @@ export async function changeOwnPassword(oldPassword: string, newPassword: string
   const user = await User.findById(me.id).lean();
   if (!user || !verifyPassword(oldPassword, user.passwordHash)) return { ok: false, error: 'Current password is wrong.' };
   await User.updateOne({ _id: me.id }, { $set: { passwordHash: hashPassword(newPassword) } });
+  return { ok: true };
+}
+
+// --- Two-factor authentication for the signed-in user's own account (P79) ---------------------
+// Mirrors the SaaS account/mfa(+/confirm) routes' shape and rules (see lib/tenancy/mfaStore.ts's
+// doc comment), as server actions instead of routes — same idiom as changeOwnPassword above.
+
+export async function getSelfMfaStatus(): Promise<MfaStatus> {
+  const me = await requireUser();
+  await connectDB();
+  const status = await describeUserMfaStatus(me.id);
+  return status ?? { enabled: false, pending: false, cryptoReady: false };
+}
+
+/** Start (or restart) TOTP enrollment. Requires the current password ONLY when MFA is already
+ *  enabled (mfaEnrollRequiresReauth) — a hijacked session alone can't silently replace an
+ *  already-enrolled factor with one the attacker controls. Brand-new enrollment needs nothing
+ *  yet to protect, so the password field never even renders for it (see SelfMfaCard). */
+export async function beginSelfMfaEnrollment(password: string): Promise<{ ok: boolean; secret?: string; uri?: string; error?: string }> {
+  const me = await requireUser();
+  await connectDB();
+  const user = await User.findById(me.id).select('username mfaEnabled passwordHash').lean();
+  if (!user) return { ok: false, error: 'not_found' };
+  if (mfaEnrollRequiresReauth(!!user.mfaEnabled) && !verifyPassword(password, user.passwordHash)) {
+    return { ok: false, error: 'Current password is wrong.' };
+  }
+  const res = await beginUserMfaEnrollment(me.id, user.username);
+  if (!res.ok) return { ok: false, error: res.reason };
+  return { ok: true, secret: res.secret, uri: res.uri };
+}
+
+/** Confirm a pending enrollment with the first code from the authenticator app. Success returns
+ *  the recovery codes PLAINTEXT once — the caller must show them immediately, nothing re-reads
+ *  them later. */
+export async function confirmSelfMfaEnrollment(code: string): Promise<{ ok: boolean; recoveryCodes?: string[]; error?: string }> {
+  const me = await requireUser();
+  await connectDB();
+  const res = await confirmUserMfaEnrollment(me.id, code);
+  if (!res.ok) return { ok: false, error: res.reason };
+  revalidatePath('/settings');
+  return { ok: true, recoveryCodes: res.recoveryCodes };
+}
+
+/** Disable MFA — always requires the current password, same as changeOwnPassword. */
+export async function disableSelfMfa(password: string): Promise<{ ok: boolean; error?: string }> {
+  const me = await requireUser();
+  await connectDB();
+  const user = await User.findById(me.id).lean();
+  if (!user || !verifyPassword(password, user.passwordHash)) return { ok: false, error: 'Current password is wrong.' };
+  await disableUserMfa(me.id);
+  revalidatePath('/settings');
   return { ok: true };
 }

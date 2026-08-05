@@ -359,23 +359,55 @@
   delivery log capped στα τελευταία ~20 events ανά channel (όχι απεριόριστο, αποφυγή unbounded growth)· ισχύει
   για ΟΛΑ τα ήδη-shipped outbound channels (ntfy/Discord/Slack/Telegram/webhook), όχι μόνο generic webhook.
 
-### P79. TOTP/MFA στο self-host login (reuse του ήδη-shipped SaaS primitive) — S — OSS (κυρίως), security/trust lever
-- **Αξία:** live-verified `grep -n "mfa|totp|MFA" apps/web/src/models/User.ts` = 0 hits — το self-hosted login
-  (`app/login/LoginForm.tsx` + `app/api/v1/auth/login`) προστατεύεται **μόνο** από password, ενώ το **ίδιο
-  ακριβώς primitive υπάρχει ήδη πλήρως δουλεμένο και tested** για το SaaS side: `lib/tenancy/totp.ts` +
-  `lib/tenancy/recoveryCodes.ts` + `lib/tenancy/mfaStore.ts` (secret-at-rest encryption, `api/saas/auth/mfa`,
-  `api/saas/account/mfa`, με tests). Ένα self-hosted instance εκτεθειμένο μέσω reverse-proxy/WireGuard (η
-  προτεινόμενη τοπολογία, CLAUDE.md) έχει σήμερα το ίδιο security posture με «μόνο password» — αν διαρρεύσει το
-  password (weak/reused), μηδέν δεύτερη γραμμή άμυνας. Καθαρό reuse-not-rebuild: το ίδιο primitive που ήδη
-  δούλεψε στο SaaS side μεταφέρεται στο `User` model (enroll TOTP στο profile/Settings → recovery codes →
-  δεύτερο βήμα στο login form όταν ενεργό). **Διακριτό** από §9 στο TODO.md (SaaS-grade auth foundation, email
-  verify/OAuth/org-invites) και από P51 (mobile app-lock = device-local, δεν αγγίζει το server login).
-- **Module:** `models/User.ts` (νέα optional πεδία, reuse `mfaStore.ts` shape) + `app/login/LoginForm.tsx`
-  (δεύτερο βήμα όταν ενεργό) + Settings → account section (enroll/disable + recovery codes).
-- **Ανοιχτή απόφαση (builder default):** **opt-in**, όχι default-on (κενό = σημερινή password-only συμπεριφορά
-  αμετάβλητη, μηδέν friction σε single-user home deployments που ήδη είναι πίσω από VPN)· reuse ατόφιο το
-  crypto/secret-storage pattern του SaaS `mfaStore.ts`, μηδέν νέο dependency· recovery codes εμφανίζονται
-  ΜΙΑ φορά στο enroll (ίδιο one-time-reveal idiom με το SaaS side).
+### P79. TOTP/MFA στο self-host login (reuse του ήδη-shipped SaaS primitive) — ✅ SHIPPED 2026-08-05 (interactive session, «review the approved queue and pick the next item to build»)
+- **Τι έγινε:** το `User` model (`models/User.ts`) απέκτησε τα ίδια 4 πεδία με το SaaS `Account`
+  (`mfaEnabled`/`mfaSecretEnc`/`mfaPendingSecretEnc`/`mfaRecoveryHashes`) + νέο **`lib/userMfaStore.ts`** — thin
+  DB wrapper πάνω στο `User` που **επαναχρησιμοποιεί ατόφιες τις 4 PURE `plan*`/`mfaEnrollRequiresReauth`
+  builders** του ήδη-shipped `lib/tenancy/mfaStore.ts` (μηδέν αντιγραφή λογικής, μόνο νέο μοντέλο-target) και
+  τα ίδια crypto primitives (`secretCrypto`/`totp`/`recoveryCodes`) — bug-for-bug parity με το δουλεμένο SaaS
+  σχήμα, σκόπιμα, ΟΧΙ ξαναχτισμένο από την αρχή.
+  - **Login flow** (`app/login/actions.ts`): `loginAction` μετά από σωστό password, αν `user.mfaEnabled` → ΔΕΝ
+    στήνει session, στήνει **pending-MFA cookie** (`pharos_session_mfa_pending`, νέο distinct `typ` claim +
+    δικές του sign/verify functions στο edge-safe `lib/session.ts`, cookie plumbing στο node-only `lib/auth.ts`
+    — ίδιος διαχωρισμός με το SaaS `accountToken.ts`/`accountSession.ts`) → `{ok:true, mfaRequired:true}`. Νέο
+    `verifyMfaLoginAction(code)` (login step 2, διαβάζει το user id ΜΟΝΟ από το signed cookie, ποτέ από τον
+    caller) + `cancelMfaLoginAction()` («use a different account»). `LoginForm.tsx` έγινε 2-step (`mfaStep`
+    state), reusing το pure `mfaLoginCodeReady` helper του SaaS `components/saas/mfaSettings.ts`.
+  - **Rate limit από την πρώτη μέρα (όχι follow-up)**: `verifyMfaLoginAction` καλεί `rateHit`/`rateLimitConfig`
+    (ίδιο shared config/store `API_RATE_LIMIT` με το `/api/v1`), keyed **ανά user id** (`self-mfa:<id>`, όχι IP —
+    ίδιο σκεπτικό με το SaaS route). Αυτό διορθώνει *εκ των προτέρων* ένα gap που το `WEB_DEBT.md` είχε βρει και
+    διορθώσει στο SaaS `POST /api/saas/auth/mfa` (2026-07-24, «MFA δεύτερος παράγοντας brute-forceable χωρίς
+    throttling») — verified πριν το build ότι το ίδιο ρίσκο θα αναπαραγόταν αν το self-host login step-2 έμενε
+    unrated, οπότε χτίστηκε closed εξαρχής αντί να χρειαστεί ξεχωριστό follow-up item.
+  - **Settings**: νέες server actions `getSelfMfaStatus`/`beginSelfMfaEnrollment`/`confirmSelfMfaEnrollment`/
+    `disableSelfMfa` (`app/settings/users.actions.ts`, ίδιο idiom με το ήδη-υπάρχον `changeOwnPassword`) + νέο
+    **`SelfMfaCard`** στο General tab, δίπλα στο `SelfPasswordCard` — ίδιο state machine (`MfaStage`
+    idle/need-password-to-start/enrolling/need-password-to-disable/recovery-codes) και ίδιο one-time-reveal
+    idiom για τα recovery codes με το SaaS `AccountSettingsPanel.tsx`, reusing τα pure `mfaCodeReady`/
+    `mfaPasswordReady`/`describeMfaError` helpers του από εκεί αντί να ξαναγραφτούν.
+  - **i18n**: νέα `set.twoFactor*` (24 κλειδιά) + `login.mfa*` (6 κλειδιά) σε en+el (`lib/i18n/locales/`).
+  - **`writeGuard.coverage.test.ts`**: `confirmSelfMfaEnrollment`/`disableSelfMfa` προστέθηκαν στο ALLOWLIST με
+    το ΙΔΙΟ σκεπτικό με το ήδη-υπάρχον `changeOwnPassword` («own credentials only» — ένας read-only viewer
+    πρέπει να μπορεί να προστατέψει το ΔΙΚΟ του login).
+- **Tests**: 87 νέα (21 `lib/userMfaStore.test.ts`, 32 νέα σε `lib/session.test.ts` για το pending-token
+  sign/verify, 20 νέα σε `app/login/actions.test.ts` για το login-flow orchestration, incl. rate-limit). Πλήρες
+  suite **378 files / 6076 passed**. `npm run type-check` EXIT 0.
+- **Verified**: Docker rebuild (`docker compose build web` → `up -d web`), `RestartCount 0`, `/login` 200 σε
+  ~180ms, `/settings` 307 (auth-gated, αμετάβλητο). Browser: `/login` renders byte-identical για μη-MFA χρήστες
+  (η password-only ροή είναι default/κενή-συμπεριφορά-αμετάβλητη), wrong-password error path δουλεύει κανονικά,
+  μηδέν console errors. **ΔΕΝ testable unattended**: το πλήρες enroll→confirm→login-step-2 flow χρειάζεται
+  πραγματικά credentials (πίσω από login, όπως και το P80 πριν από αυτό) — χρειάζεται ένα supervised πέρασμα
+  από τον Αχιλλέα (Settings → General → «Two-factor authentication» → Enable → scan/enter → confirm → log out →
+  log back in με τον κωδικό).
+- **Αρχικό spec (για ιστορικό):** live-verified `grep -n "mfa|totp|MFA" apps/web/src/models/User.ts` = 0 hits —
+  το self-hosted login (`app/login/LoginForm.tsx` + `app/api/v1/auth/login`) προστατεύεται **μόνο** από
+  password, ενώ το **ίδιο ακριβώς primitive υπάρχει ήδη πλήρως δουλεμένο και tested** για το SaaS side:
+  `lib/tenancy/totp.ts` + `lib/tenancy/recoveryCodes.ts` + `lib/tenancy/mfaStore.ts` (secret-at-rest encryption,
+  `api/saas/auth/mfa`, `api/saas/account/mfa`, με tests). Ένα self-hosted instance εκτεθειμένο μέσω reverse-
+  proxy/WireGuard (η προτεινόμενη τοπολογία, CLAUDE.md) έχει σήμερα το ίδιο security posture με «μόνο password».
+  **Ανοιχτή απόφαση (builder default) που τηρήθηκε**: **opt-in**, όχι default-on (κενό = σημερινή password-only
+  συμπεριφορά αμετάβλητη)· reuse ατόφιο το crypto/secret-storage pattern του SaaS `mfaStore.ts`, μηδέν νέο
+  dependency· recovery codes εμφανίζονται ΜΙΑ φορά στο enroll.
 
 ### P78. Bulk field-edit για selected Items/Expenses (category/status/tag) — S — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified: το `ItemsClient.tsx` έχει ήδη select-mode (`selectedIds: Set<string>`) αλλά οι ΜΟΝΕΣ δύο
