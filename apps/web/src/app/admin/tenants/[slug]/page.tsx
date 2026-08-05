@@ -32,6 +32,7 @@ import {
   Pill,
 } from '@/components/saas/StatusBadge';
 import { formatInt, formatBytes, formatCostMicros, formatWhen } from '@/components/saas/format';
+import { aiCharge, formatMicros } from '@/lib/billing/aiBilling';
 
 // One page of the cross-tenant trail at a time; older rows load via the keyset "Load more" link
 // (?before=), same shared cursor helpers as the workspace Activity tab.
@@ -72,6 +73,8 @@ export default async function AdminTenantDetailPage({
   const t = detail.tenant;
   const mc = detail.memberCounts;
   const u = detail.usage;
+  // What this workspace owes for AI on the platform key (see lib/billing/aiBilling).
+  const charge = aiCharge(u.totals.aiCostMicros, !!t.aiByoKey);
   const latest = u.latestPeriod;
 
   // Cross-tenant activity view (superadmin console, TODO §8): the same append-only audit
@@ -213,6 +216,21 @@ export default async function AdminTenantDetailPage({
                 label="AI cost (total)"
                 value={formatCostMicros(u.totals.aiCostMicros)}
                 accent="gold"
+              />
+              {/* What the workspace OWES, as opposed to what it cost us. Off until
+                  SAAS_AI_MARKUP is set, and never charged to a workspace on its own key —
+                  that one never touched the platform key. */}
+              <StatTile
+                label="AI owed (total)"
+                value={charge.billable ? `€${formatMicros(charge.billableMicros)}` : '—'}
+                sub={
+                  t.aiByoKey
+                    ? 'own key · not billable'
+                    : charge.markup
+                      ? `${charge.markup}× cost`
+                      : 'markup not configured'
+                }
+                accent={charge.billable ? 'accent' : undefined}
               />
               <StatTile
                 label="Storage"
