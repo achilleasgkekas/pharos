@@ -73,8 +73,17 @@ async function applyTenantByoKey(v: AiConfig): Promise<void> {
     // Bounded: getAiConfig sits in front of EVERY AI call, so a control-plane query that
     // hangs (rather than fails) would stall parsing app-wide instead of degrading it.
     // Losing the key for one 5s cache window is the cheap failure; a frozen request is not.
+    // PRECEDENCE, and it matters: the workspace's OWN key wins, then the operator's platform
+    // key. Falling back the other way would put a customer who deliberately brought their own
+    // key onto the platform key, i.e. onto the operator's bill — and it would silently make
+    // their calls metered (BYO calls are not), so they would be charged for AI they had
+    // already paid the provider for directly.
     const resolved = await Promise.race([
-      resolveTenantAiKey(ctx.tenantId),
+      resolveTenantAiKey(ctx.tenantId).then(async (own) => {
+        if (own?.key) return own;
+        const { resolvePlatformAiKey } = await import('./billing/platformKeyStore');
+        return resolvePlatformAiKey();
+      }),
       new Promise<null>((r) => setTimeout(() => r(null), BYO_KEY_TIMEOUT_MS)),
     ]);
     if (!resolved?.key) return;

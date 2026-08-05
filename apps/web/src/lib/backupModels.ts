@@ -71,6 +71,8 @@ export const BACKUP_KEYS: readonly string[] = Object.keys(BACKUP_MODELS);
  */
 export const BACKUP_EXCLUDED: Record<string, string> = {
   // — Secrets: never write these to a file the user downloads —
+  PlatformConfig:
+    'Operator-only, control-plane singleton holding the encrypted PLATFORM AI key. It belongs to nobody\'s workspace: putting it in a tenant backup would hand every customer who exports their data the key the whole fleet runs on. Restore it by setting it again in the admin console.',
   AppConfig:
     'Holds live credentials (AI provider keys, SMB/FTP password, OneDrive refresh token, ntfy URL) alongside settings. Budgets/prompts/taxonomies would be nice to restore, but only behind a field-level redaction pass; use mongodump for a full copy.',
   User: 'Login accounts with scrypt password hashes.',

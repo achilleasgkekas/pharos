@@ -29,6 +29,9 @@ export const AUDIT_ACTIONS = [
   // exactly the thing worth being able to see. Never carries the submitted code.
   'billing.activated_by_code',
   'billing.activation_rejected',
+  // The fleet-wide operator key. Records provider + who, never the key.
+  'platform.ai_key_set',
+  'platform.ai_key_cleared',
   'workspace.created',
   'workspace.updated',
   'workspace.canceled',

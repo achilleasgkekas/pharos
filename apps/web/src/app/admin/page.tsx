@@ -5,6 +5,7 @@
 import { requireSuperadminPage } from '@/lib/tenancy/superadminPage';
 import { readFleetOverviewForAdmin } from '@/lib/tenancy/adminOverview';
 import { StatTile, BreakdownList } from '@/components/saas/StatTile';
+import { PlatformAiKeyPanel } from '@/components/saas/PlatformAiKeyPanel';
 import { formatInt, formatBytes, formatCostMicros, formatWhen } from '@/components/saas/format';
 
 export const dynamic = 'force-dynamic';
@@ -75,6 +76,8 @@ export default async function AdminOverviewPage() {
         <StatTile label="Custom domain" value={formatInt(t.customDomain)} />
         <StatTile label="Erasure scheduled" value={formatInt(t.erasureScheduled)} accent="red" />
       </section>
+
+      <PlatformAiKeyPanel />
 
       {t.total === 0 && (
         <p className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 text-sm text-[color:var(--color-text-dim)]">
