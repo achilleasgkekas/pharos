@@ -23,11 +23,12 @@ describe('SaaS cron endpoints bypass the session gate', () => {
     ['/api/cron/saas/usage-sample', 'per-tenant storage sampling for the usage ledger'],
     ['/api/cron/saas/trials-sweep', 'trial warn + lapse suspension sweep'],
     ['/api/cron/saas/erasure-purge', 'GDPR Art. 17 purge scan (report-only)'],
+    ['/api/cron/saas/suspended-sweep', '30-day suspended-workspace expiry (warn + schedule)'],
   ])('%s is NOT gated (%s)', (path) => {
     expect(isGated(path)).toBe(false);
   });
 
-  it('the whole /api/cron/saas/ prefix is excluded, so a fourth endpoint here is safe by default', () => {
+  it('the whole /api/cron/saas/ prefix is excluded, so a fifth endpoint here is safe by default', () => {
     expect(isGated('/api/cron/saas/anything-added-later')).toBe(false);
   });
 });

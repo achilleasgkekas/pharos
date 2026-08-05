@@ -120,8 +120,10 @@ const ZERO_RESULT: TrialSweepResult = {
   suspendFailed: 0,
 };
 
-/** Active-owner email addresses for a tenant, resolved via Membership → Account. Best-effort. */
-async function ownerEmails(tenantId: string): Promise<string[]> {
+/** Active-owner email addresses for a tenant, resolved via Membership → Account. Best-effort.
+ * Exported because the suspended-expiry sweep (lib/tenancy/suspendedSweep.ts) needs exactly the
+ * same "who do we warn" answer; two copies of this would drift the day roles change. */
+export async function ownerEmails(tenantId: string): Promise<string[]> {
   const { Membership } = await import('@/models/Membership');
   const { Account } = await import('@/models/Account');
   const memberships = await Membership.find({ tenant: tenantId, role: 'owner', status: 'active' })
@@ -194,7 +196,14 @@ export async function runTrialLapseSweep(now: Date = new Date()): Promise<TrialS
       if (!decision.shouldLapse || !decision.nextStatus) continue; // belt+braces vs the filter
       const id = String(t._id);
       // status:'trialing' guard makes the transition race-safe (skip if already changed).
-      const res = await Tenant.updateOne({ _id: id, status: 'trialing' }, { $set: { status: decision.nextStatus } });
+      // `suspendedAt` starts the 30-day keep-window (suspendedSweep.ts) at the instant of the
+      // suspension rather than at whenever that sweep first notices; `suspendWarnEmailedAt` is
+      // cleared so a workspace that was suspended, reactivated and suspended again gets its
+      // deletion warning a second time instead of inheriting a stale "already warned" stamp.
+      const res = await Tenant.updateOne(
+        { _id: id, status: 'trialing' },
+        { $set: { status: decision.nextStatus, suspendedAt: now, suspendWarnEmailedAt: null } }
+      );
       if (res.modifiedCount > 0) {
         await recordAudit(auditCtx(id), {
           action: 'workspace.suspended',

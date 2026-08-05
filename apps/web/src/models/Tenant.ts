@@ -41,6 +41,15 @@ const TenantSchema = new Schema(
     // ends in N days" warning was successfully delivered, so the 6-hourly sweep never
     // re-warns a tenant. Null = not warned yet. Only written by the trial-lapse sweep.
     trialWarnEmailedAt: { type: Date, default: null },
+    // When this workspace entered `suspended` — the start of the 30-day keep-window the public
+    // Terms/Privacy promise (Achilleas, 2026-08-04). Read by lib/tenancy/suspendedSweep.ts to warn
+    // and then schedule deletion. Null on a suspended workspace means "clock unknown": the sweep
+    // BACKFILLS it (from the newest workspace.suspended audit row, else now) rather than treating
+    // it as due, so a workspace can never be deleted on a clock it never had.
+    suspendedAt: { type: Date, default: null, index: true },
+    // Idempotency stamp for the pre-DELETION warning email, mirroring trialWarnEmailedAt. Set once
+    // the "will be deleted in N days" notice was delivered. Only written by the suspended sweep.
+    suspendWarnEmailedAt: { type: Date, default: null },
     // Billing provider linkage (Stripe). Stored here so a webhook can resolve tenant.
     billingCustomerId: { type: String, default: null, index: true },
     billingSubscriptionId: { type: String, default: null, index: true },
