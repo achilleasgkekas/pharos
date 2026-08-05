@@ -114,6 +114,8 @@ function NavGroup({ groupKey, links }: { groupKey: TKey; links: NavLink[] }) {
 
 function UserMenu({ user, saas, operator }: { user: SessionUser; saas: boolean; operator: boolean }) {
   const t = useT();
+  const pathname = usePathname();
+  const { theme, toggle } = useTheme();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -123,6 +125,7 @@ function UserMenu({ user, saas, operator }: { user: SessionUser; saas: boolean; 
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, []);
+  const menuRow = 'w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors';
   return (
     <div ref={ref} className="relative">
       <button
@@ -133,13 +136,33 @@ function UserMenu({ user, saas, operator }: { user: SessionUser; saas: boolean; 
         <UserRound size={17} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-44 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 p-1">
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-52 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] shadow-2xl shadow-black/40 p-1">
           <div className="px-2.5 py-2 border-b border-[color:var(--color-border)] mb-1">
             <p className="text-sm font-medium truncate">{user.name}</p>
             <p className="text-[11px] text-[color:var(--color-text-faint)] uppercase" style={{ fontFamily: 'var(--font-mono)' }}>
               {user.role}
             </p>
           </div>
+
+          {/* Settings / language / appearance. Used to live as standalone icons in the top bar —
+              moved here so the bar itself stays uncluttered and these read as "about how I use
+              Pharos" rather than competing with the product navigation for space. */}
+          <Link
+            href="/settings"
+            prefetch={false}
+            onClick={() => setOpen(false)}
+            className={cn(menuRow, pathname.startsWith('/settings') && 'text-[color:var(--color-accent)]')}
+          >
+            <Settings size={15} /> {t('nav.settings')}
+          </Link>
+          <div className="px-1">
+            <LanguageSwitcher variant="row" />
+          </div>
+          <button type="button" onClick={toggle} className={menuRow}>
+            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            {theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
+          </button>
+
           {/* The way back out of a workspace.
               A hosted customer lands straight inside their workspace after login (one
               membership skips the chooser), and from there the product had no route to the
@@ -148,20 +171,11 @@ function UserMenu({ user, saas, operator }: { user: SessionUser; saas: boolean; 
               account menu is where a user already looks for it. */}
           {saas && (
             <>
-              <Link
-                href="/account"
-                prefetch={false}
-                onClick={() => setOpen(false)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors"
-              >
+              <div className="my-1 border-t border-[color:var(--color-border)]" />
+              <Link href="/account" prefetch={false} onClick={() => setOpen(false)} className={menuRow}>
                 <Building2 size={15} /> {t('nav.workspaces')}
               </Link>
-              <Link
-                href="/account/workspace/billing"
-                prefetch={false}
-                onClick={() => setOpen(false)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface-2)] transition-colors"
-              >
+              <Link href="/account/workspace/billing" prefetch={false} onClick={() => setOpen(false)} className={menuRow}>
                 <CreditCard size={15} /> {t('nav.billing')}
               </Link>
               {/* Operator console. Only rendered for an account on the superadmin allowlist,
@@ -177,9 +191,9 @@ function UserMenu({ user, saas, operator }: { user: SessionUser; saas: boolean; 
                   <ShieldCheck size={15} /> {t('nav.operator')}
                 </Link>
               )}
-              <div className="my-1 border-t border-[color:var(--color-border)]" />
             </>
           )}
+          <div className="my-1 border-t border-[color:var(--color-border)]" />
           <form action={logoutAction}>
             <button
               type="submit"
@@ -198,7 +212,6 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false 
   const t = useT();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { theme, toggle } = useTheme();
 
   // Solid bg on the sticky navbar (no backdrop-filter): a backdrop-filter here would
   // become the containing block for the AI spotlight's `fixed inset-0` backdrop and
@@ -236,19 +249,7 @@ export function SiteNav({ aiReady = false, user, saas = false, operator = false 
             <span className={cn('h-1.5 w-1.5 rounded-full', aiReady ? 'bg-[color:var(--color-accent)]' : 'bg-[color:var(--color-text-faint)]')} />
             {aiReady ? t('ai.online') : t('ai.offline')}
           </span>
-          <LanguageSwitcher />
           {user && <NotificationBell />}
-          <button onClick={toggle} className="p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Toggle theme">
-            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-          </button>
-          <Link
-            href="/settings"
-            prefetch={false}
-            className={cn('p-2 rounded-lg transition-colors', pathname.startsWith('/settings') ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)]')}
-            aria-label={t('nav.settings')}
-          >
-            <Settings size={17} />
-          </Link>
           {user && <UserMenu user={user} saas={saas} operator={operator} />}
           <button onClick={() => setMobileOpen((v) => !v)} className="lg:hidden p-2 rounded-lg text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:bg-[color:var(--color-surface)] transition-colors" aria-label="Menu">
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}

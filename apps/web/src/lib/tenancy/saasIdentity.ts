@@ -72,14 +72,33 @@ export const saasSessionUser = cache(async function saasSessionUser(): Promise<S
   // gate closed on a host where those pages do not belong anyway.
   if (!slug) return { id: account.sub, role: 'viewer', name: account.email };
 
-  try {
-    const tenants = await accountTenants(account.sub);
-    const membership = tenants.find((t) => t.slug === slug);
-    if (!membership) return null;
-    return { id: account.sub, role: navRole(membership.role), name: account.email };
-  } catch {
-    // A control-plane hiccup must not silently PROMOTE anyone. Denying is the safe direction:
-    // the page shows a login redirect rather than granting a role we could not verify.
-    return null;
+  // One retry before failing closed: `resolveRequestTenant` (lib/tenancy/request.ts) resolves
+  // the SAME tenant independently for the page's own data fetch, via a separate cache()-wrapped
+  // call to accountTenants() — so a one-off blip here (cold container right after a redeploy,
+  // one slow query) can hit THIS call and not that one, in the same request. That split is what
+  // used to read as "the page renders fine, but the navbar vanished": this call swallowed the
+  // error silently while the other succeeded. A single immediate retry absorbs that class of
+  // transient failure instead of failing closed on the first hiccup.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const tenants = await accountTenants(account.sub);
+      const membership = tenants.find((t) => t.slug === slug);
+      if (!membership) return null;
+      return { id: account.sub, role: navRole(membership.role), name: account.email };
+    } catch (err) {
+      if (attempt === 1) {
+        // A control-plane hiccup must not silently PROMOTE anyone. Denying is the safe
+        // direction: the page shows a login redirect rather than granting a role we could not
+        // verify. Logged (unlike before) so a recurrence is diagnosable from server logs
+        // instead of only reachable via "the nav disappeared" reports.
+        console.error('[saasSessionUser] accountTenants failed twice, denying', {
+          accountId: account.sub,
+          slug,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+      }
+    }
   }
+  return null;
 });
