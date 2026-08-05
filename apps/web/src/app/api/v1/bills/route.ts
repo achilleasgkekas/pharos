@@ -1,47 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
-import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
+import { listParams, withSince, listEnvelope } from '@/lib/apiList';
 import { readBody, strField, numField, enumField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Bill as BillModel } from '@/models/Bill';
 import { currentModel } from '@/lib/tenancy/connection';
-import { billStatus, type BillStatus } from '@/lib/bill';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx } from '@/lib/fx';
+import { trim, type BillLean } from './serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const CYCLES = ['', 'weekly', 'monthly', 'quarterly', 'yearly'] as const;
-
-export type BillLean = {
-  _id: unknown; title: string; vendor?: string; amount?: number; currency?: string;
-  origAmount?: number; fxRate?: number; dueDate: Date;
-  paidAt?: Date | null; category?: string; cycle?: string; notes?: string;
-  archived?: boolean; linkedExpenseId?: string; updatedAt?: Date; deletedAt?: Date | null;
-};
-
-/** Single source of truth for the v1 Bill JSON shape (list, POST, PATCH). `status` is
- *  the same derived paid/overdue/due-soon/upcoming used by the web BillsClient —
- *  computed here so API clients never have to reimplement `billStatus`. */
-export function trim(b: BillLean): {
-  id: string; title: string; vendor: string; amount: number; currency: string;
-  origAmount: number; fxRate: number; dueDate: string | null;
-  paidAt: string | null; category: string; cycle: string; notes: string; archived: boolean;
-  status: BillStatus; updatedAt: string | null; deleted: boolean;
-} {
-  return {
-    id: String(b._id), title: b.title, vendor: b.vendor ?? '', amount: b.amount ?? 0,
-    // P9: `amount` is always base currency. On a foreign-currency bill these two carry the
-    // printed figure and the rate used (fxRate 0 = not foreign, or rate still unknown, in
-    // which case `amount` is still the printed number and must not be summed as base).
-    currency: b.currency ?? 'EUR', origAmount: b.origAmount ?? 0, fxRate: b.fxRate ?? 0,
-    dueDate: iso(b.dueDate), paidAt: iso(b.paidAt ?? null), category: b.category ?? 'other',
-    cycle: b.cycle ?? '', notes: b.notes ?? '', archived: !!b.archived,
-    status: billStatus(b.dueDate, b.paidAt ?? null),
-    updatedAt: iso(b.updatedAt), deleted: !!b.deletedAt,
-  };
-}
 
 /** GET /api/v1/bills?archived=1&paid=0&limit&offset&updatedSince
  *  Default excludes archived bills (mirrors the web BillsClient default view). */

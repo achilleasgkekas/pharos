@@ -4,7 +4,7 @@ import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Voucher as VoucherModel } from '@/models/Voucher';
 import { currentModel } from '@/lib/tenancy/connection';
-import { trim, type VoucherLean } from '../route';
+import { trim, type VoucherLean } from '../serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

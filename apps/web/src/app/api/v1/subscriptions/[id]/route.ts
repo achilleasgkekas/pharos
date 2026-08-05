@@ -6,7 +6,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx, convertToBase, isForeignCurrency } from '@/lib/fx';
 import { Subscription as SubscriptionModel } from '@/models/Subscription';
 import { currentModel } from '@/lib/tenancy/connection';
-import { trim, type SubLean } from '../route';
+import { trim, type SubLean } from '../serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

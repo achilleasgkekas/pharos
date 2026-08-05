@@ -7,7 +7,7 @@ import { currentModel } from '@/lib/tenancy/connection';
 import { nextBillDue } from '@/lib/bill';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx, isForeignCurrency } from '@/lib/fx';
-import { trim, type BillLean } from '../route';
+import { trim, type BillLean } from '../serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

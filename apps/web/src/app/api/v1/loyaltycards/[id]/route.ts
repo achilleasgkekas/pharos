@@ -5,7 +5,7 @@ import { connectDB } from '@/lib/db';
 import { LoyaltyCard as LoyaltyCardModel } from '@/models/LoyaltyCard';
 import { currentModel } from '@/lib/tenancy/connection';
 import { isBarcodeFormat, guessBarcodeFormat } from '@/lib/loyaltyCard';
-import { trim, type LoyaltyCardLean } from '../route';
+import { trim, type LoyaltyCardLean } from '../serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

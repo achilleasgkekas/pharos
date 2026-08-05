@@ -5,7 +5,7 @@ import { connectDB } from '@/lib/db';
 import { Goal as GoalModel } from '@/models/Goal';
 import { currentModel } from '@/lib/tenancy/connection';
 import { safeDateOrNull } from '@/lib/dates';
-import { trim, type GoalLean } from '../route';
+import { trim, type GoalLean } from '../serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

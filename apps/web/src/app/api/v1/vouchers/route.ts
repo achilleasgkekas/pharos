@@ -1,26 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth, apiError } from '@/lib/apiAuth';
-import { listParams, withSince, listEnvelope, iso } from '@/lib/apiList';
+import { listParams, withSince, listEnvelope } from '@/lib/apiList';
 import { readBody, strField } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
 import { Voucher as VoucherModel } from '@/models/Voucher';
 import { currentModel } from '@/lib/tenancy/connection';
+import { trim, type VoucherLean } from './serialize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-export type VoucherLean = {
-  _id: unknown; title: string; code?: string; store?: string; discount?: string;
-  expiresAt?: Date | null; used?: boolean; url?: string; notes?: string; updatedAt?: Date; deletedAt?: Date | null;
-};
-/** Single source of truth for the v1 Voucher JSON shape (list, POST, PATCH). */
-export function trim(v: VoucherLean) {
-  return {
-    id: String(v._id), title: v.title, code: v.code ?? '', store: v.store ?? '', discount: v.discount ?? '',
-    expiresAt: iso(v.expiresAt), used: !!v.used, url: v.url ?? '', notes: v.notes ?? '',
-    updatedAt: iso(v.updatedAt), deleted: !!v.deletedAt,
-  };
-}
 
 /** GET /api/v1/vouchers?used=0&limit&offset&updatedSince */
 export async function GET(req: NextRequest) {
