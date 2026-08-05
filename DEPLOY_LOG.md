@@ -266,3 +266,31 @@ untracked αρχείο βρωμίζει το δέντρο και το script α�
 | `GET/PUT/DELETE /api/saas/admin/ai-key` χωρίς session | **401** και στα τρία |
 | `/` χωρίς session | 307 → login |
 | `/account/login` | 200 |
+
+## 2026-08-05 ~08:5x UTC — `b6c5dc61 → ba23248c`, exit 0
+
+Ad-hoc. Κλείδωμα του signup πίσω από κωδικό (private beta) + `SAAS_SIGNUP_CODES` στο
+`deploy/.env.prod` πριν το deploy, ώστε το recreate να το πάρει.
+
+**Δύο προηγούμενες απόπειρες είχαν κάνει ROLLBACK**, καμία από δικό μου κώδικα, και το script
+κράτησε την παραγωγή όρθια και τις δύο φορές:
+1. build error σε `giftcards/route.ts` (non-route export) — διορθώθηκε από άλλο routine (`57c718d`)
+2. build error σε `goals/route.ts`, ίδια αιτία — διορθώθηκε από άλλο routine (`5e97992`)
+
+**ΣΗΜ διάρκειας**: τα builds πήγαν από ~4 σε **>20 λεπτά** αφότου το Dockerfile πέρασε σε
+`npm ci` με υποχρεωτικό lockfile (σωστή αλλαγή, ακυρώνει όμως το cached deps layer). Το ssh
+από τον client κόβεται στα 10 λεπτά, οπότε το deploy τρέχει πλέον **detached** (`nohup … &`)
+και γίνεται poll, αλλιώς η σύνδεση πεθαίνει ενώ το build συνεχίζει.
+
+**Ανεξάρτητη επαλήθευση:**
+
+| έλεγχος | αποτέλεσμα |
+|---|---|
+| `SAAS_SIGNUP_CODES` μέσα στον container | present |
+| σελίδα signup | δείχνει «Invite code» + «private beta» |
+| `POST /api/saas/auth/signup` χωρίς code | **403** με το μήνυμα private beta |
+| ίδιο με ΛΑΘΟΣ code | **403** |
+
+Ο κωδικός δεν γράφεται εδώ· ζει μόνο στο `.env.prod` και δόθηκε στη συνομιλία. Το happy path
+(σωστός κωδικός → δημιουργία λογαριασμού) **δεν δοκιμάστηκε από εμένα**: θα σήμαινε να φτιάξω
+λογαριασμό, που δεν το κάνω.
