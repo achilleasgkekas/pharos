@@ -28,7 +28,23 @@ ALLOWED_JAILS="sshd"
 MAX_PER_RUN=20
 MAX_AGE_SEC=3600
 
+# The container runs as uid 1001 (nextjs), gid 65533 (nogroup). It has to be able to
+# WRITE a request file without being able to LIST what anyone else queued, hence 730.
+CONTAINER_UID=1001
+CONTAINER_GID=65533
+
 mkdir -p "$REQ" "$DONE" "$REJ"
+
+# Re-assert ownership on EVERY run, not just at creation. A deploy on 2026-08-05 20:17
+# removed these directories and the next cron minute recreated them as root:root 755,
+# silently undoing the permissions set when the bridge was built. Nothing broke only
+# because the compose mount is not live yet: with the mount in place the app would get
+# EACCES on queueing, the unban button would fail after every deploy, and no one would
+# be watching at 20:17 on a Wednesday. Idempotent, so it costs a syscall a minute.
+chown "$CONTAINER_UID:$CONTAINER_GID" "$REQ" 2>/dev/null || true
+chmod 730 "$REQ" 2>/dev/null || true
+chown root:root "$DONE" "$REJ" 2>/dev/null || true
+chmod 750 "$DONE" "$REJ" 2>/dev/null || true
 
 # ---------------------------------------------------------------- 1. export
 # Written atomically (temp + mv) so the app can never read a half-written file.
