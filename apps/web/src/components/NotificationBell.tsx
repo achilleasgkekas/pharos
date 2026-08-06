@@ -61,7 +61,14 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
     return () => clearInterval(id);
   }, [refresh]);
 
+  // Only listen while this panel is actually open. `onOpenChange(false)` is SiteNav's
+  // SHARED panel state ('none'), not a local boolean, so a dismiss fired while the bell is
+  // closed does not close "nothing" — it closes whatever else is open. Unguarded, every
+  // mousedown anywhere tore down the mobile nav menu, and since mousedown precedes click on
+  // a tap, the link unmounted before the tap landed: the menu just blinked shut and never
+  // navigated ("it's like not pressed, it minimizes it"). Reported on mobile, all pages.
   useEffect(() => {
+    if (!open) return;
     function onDown(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) onOpenChange(false);
     }
@@ -74,7 +81,7 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
       document.removeEventListener('mousedown', onDown);
       window.removeEventListener('keydown', onKey);
     };
-  }, [onOpenChange]);
+  }, [open, onOpenChange]);
 
   // The stored `body` is a structured payload; localize it per viewer here.
   function describe(n: SerializedNotification): { heading: string; sub: string } {
