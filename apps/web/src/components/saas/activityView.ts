@@ -62,6 +62,11 @@ const ACTION_LABELS: Record<string, string> = {
   'workspace.erasure_canceled': 'Erasure canceled',
   'workspace.data_exported': 'Data exported',
   'workspace.files_manifested': 'Files manifested',
+  'platform.ai_key_set': 'Platform AI key set',
+  'platform.ai_key_cleared': 'Platform AI key cleared',
+  'platform.firewall_unban_requested': 'Firewall unban requested',
+  'billing.activated_by_code': 'Activated by code',
+  'billing.activation_rejected': 'Activation rejected',
   'ai_key.set': 'AI key set',
   'ai_key.cleared': 'AI key cleared',
 };

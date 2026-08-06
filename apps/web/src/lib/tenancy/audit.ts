@@ -32,6 +32,11 @@ export const AUDIT_ACTIONS = [
   // The fleet-wide operator key. Records provider + who, never the key.
   'platform.ai_key_set',
   'platform.ai_key_cleared',
+  // An operator QUEUED an unban with the host's fail2ban bridge. Recorded as "requested" because
+  // that is all the app can honestly claim: the container never executes anything, it drops a
+  // request file that the host script validates again and acts on within a minute (see
+  // lib/saas/f2b.ts). Carries the address, which is the whole point of the record.
+  'platform.firewall_unban_requested',
   'workspace.created',
   'workspace.updated',
   'workspace.canceled',
