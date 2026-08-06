@@ -7690,3 +7690,54 @@ flag· (β) sending domain SPF+DKIM· (γ) Stripe όταν έρθουν keys.
 
 **## Needs Achilleas:** **Stripe keys**, **plan pricing**, και η απόφαση **πότε** μπαίνει το
 `SAAS_PURGE_EXECUTE=1` (προτείνω: αφού δεις έναν μήνα από warnings και scheduled χωρίς εκπλήξεις).
+
+## 2026-08-06 — increment 151: το admin βλέπει το fail2ban, χωρίς να αποκτά δύναμη στον host
+
+Απάντηση Αχιλλέα στο ASK `pharos-cloud-guard-20260805-1525`: **επιλογή (α)**, ουρά με εκτελεστή στον
+host. Το Κομμάτι 1 (script + cron) είχε ήδη μπει από το `pharos-cloud-guard` (`a2da7ca`). Εδώ έγινε
+το **Κομμάτι 3, ολόκληρο**.
+
+**Η αρχιτεκτονική σε μία γραμμή**: το container **διαβάζει ένα αρχείο** που γράφει ο host και
+**γράφει αρχεία αιτημάτων** που διαβάζει ο host. Ποτέ socket, ποτέ process, ποτέ shell. Ο λόγος δεν
+είναι καθαρότητα: το socket του fail2ban δέχεται ορισμό **actions**, δηλαδή εντολές που τρέχει ο
+server ως **root**, και αυτό εδώ είναι το ίδιο app που σερβίρει ανώνυμα POST σε `/login` και
+`/signup`. Το mount του socket θα μετέτρεπε οποιοδήποτε RCE σε host root.
+
+**Τι μπήκε:**
+- `lib/saas/f2b.ts` — `parseBanState` (pure, δέχεται `now`), `readBanState`, `requestUnban`
+  (ατομικό temp+rename ώστε το drain του cron να μη διαβάσει ποτέ μισογραμμένο αίτημα),
+  `unbanRequestLine` ως **το μοναδικό σημείο** που χτίζεται το wire format `unban <jail> <ip>`.
+- `POST /api/saas/admin/firewall/unban` — superadmin gate → rate limit → validation → queue →
+  audit. Απαντά **202, ποτέ 200**: το αίτημα μπήκε στην ουρά, ο host ενεργεί μέσα σε ένα λεπτό, και
+  «unbanned» θα ήταν ισχυρισμός που αυτή η πλευρά δεν είναι σε θέση να κάνει.
+- `/admin/firewall` + `FirewallPanel` + link στο `AdminNav`· νέο audit verb
+  `platform.firewall_unban_requested` (με label και στο activity feed).
+
+**Το σημείο που θα με έπιανε αν το ξεχνούσα** (το είχε επισημάνει και το σχέδιο): **κενό δεν
+σημαίνει καθαρό**. Το `readBanState` επιστρέφει **union**, όχι λίστα με flag, ώστε ο compiler να μην
+επιτρέπει «άδεια λίστα» για «δεν ξέρω». Λείπει το `state.json`, δεν διαβάζεται, ή δεν έχει έγκυρο
+`generatedAt` → η οθόνη λέει κόκκινο **«The firewall state is unknown»**. Παλιότερο των 5 λεπτών →
+κίτρινο **«ο bridge δεν τρέχει»**, με τη λίστα να δείχνεται ρητά ως το τελευταίο που πρόλαβε να
+γράψει. Άδειος πίνακας που διαβάζεται ως ησυχία είναι ακριβώς το λάθος που ξεγέλασε δύο φορές στις
+2026-08-05.
+
+Δύο ακόμα αποφάσεις: **stale ≠ ανενεργό κουμπί** (ο κλειδωμένος έξω operator χρειάζεται το κουμπί
+**περισσότερο** όταν κουτσαίνει ο bridge· το αίτημα κάθεται στην ουρά μέχρι να γυρίσει το cron), και
+**jail εκτός allowlist εμφανίζεται αλλά δεν είναι requestable** — απόκρυψη ενεργού ban θα ήταν το
+ίδιο ψέμα με την άδεια λίστα.
+
+**Verified**: `npm run type-check` exit 0· **31 νέα tests** (16 adversarial στο validation:
+injection, δεύτερη γραμμή, CIDR, port, zone id, `--flag`, non-strings· 7 στο view model· 8 στο
+route: σειρά gate→rate-limit→queue, 503 vs 400 στο μη mounted directory, audit μόνο μετά το
+επιτυχές γράψιμο)· **140 files / 2152 tests green** σε `lib/tenancy`, `lib/billing`,
+`components/saas`, `api/saas`. Probe: `/admin/firewall` → 307 προς login για ανώνυμο, τοπικά και
+στο `app.ph-aros.com` (η σελίδα δεν έχει γίνει ακόμα deploy· render verification μετά το mount).
+
+**Next task:** (α) το admin console να δείχνει τα due-for-deletion workspaces· (β) sending domain
+SPF+DKIM· (γ) Stripe όταν έρθουν keys.
+
+**## Needs Achilleas:** **Stripe keys**, **plan pricing**, το **πότε** μπαίνει το
+`SAAS_PURGE_EXECUTE=1`, και **ΕΝΑ ΝΕΟ, μικρό**: το `deploy/docker-compose.prod.yml` (service `web`)
+θέλει `- ./f2b:/var/lib/pharos/f2b` δίπλα στο υπάρχον storage mount — δεν είναι δικό μου έδαφος.
+Χωρίς αυτό η σελίδα δείχνει σωστά «unknown» και το κουμπί επιστρέφει 503 «the f2b bridge directory
+is not mounted», δηλαδή αποτυγχάνει θορυβωδώς αντί σιωπηλά.
