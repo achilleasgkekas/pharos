@@ -18,48 +18,18 @@
 // than a reassuring empty list.
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { F2B_JAILS, F2B_STALE_AFTER_MS, type BanRow, type BanState, type F2bJail } from './f2b.shared';
 
-/** Jails the app is allowed to name. Mirrors ALLOWED_JAILS in deploy/f2b-bridge.sh — the script
- *  enforces its own copy, so a drift here can only make this side stricter, never looser. */
-export const F2B_JAILS = ['sshd'] as const;
-export type F2bJail = (typeof F2B_JAILS)[number];
-
-/** How old the bridge's state file may be before the UI must stop presenting it as current.
- *  Cron writes it every minute; 5 minutes means "several runs have been missed". */
-export const F2B_STALE_AFTER_MS = 5 * 60 * 1000;
+// The constants and shapes live in ./f2b.shared so a client component can import the jail
+// list as a value without pulling `node:fs` into the browser bundle (that broke the
+// production build). Re-exported here so every existing importer of this module is unchanged.
+export { F2B_JAILS, F2B_STALE_AFTER_MS };
+export type { BanRow, BanState, F2bJail };
 
 /** Bridge directory inside the container (bind-mounted from ./f2b on the host). */
 export function f2bDir(): string {
   return process.env.SAAS_F2B_DIR || '/var/lib/pharos/f2b';
 }
-
-export type BanRow = {
-  jail: string;
-  ip: string;
-  /** Host-local timestamps as fail2ban prints them ('YYYY-MM-DD HH:MM:SS'), or null when the
-   *  bridge could not parse them. Deliberately kept as strings: they are not ISO/UTC, and
-   *  re-interpreting them as UTC would silently shift an incident window. */
-  bannedAt: string | null;
-  until: string | null;
-};
-
-export type BanState =
-  | {
-      known: true;
-      generatedAt: Date;
-      ageMs: number;
-      /** True when the file is older than F2B_STALE_AFTER_MS: the list below is the last thing
-       *  the bridge managed to write, not the state of the firewall now. */
-      stale: boolean;
-      bans: BanRow[];
-    }
-  | {
-      known: false;
-      /** missing = no bridge deployed here (or never ran); unreadable = permissions/IO;
-       *  malformed = the file exists but is not the shape we expect. */
-      reason: 'missing' | 'unreadable' | 'malformed';
-      detail: string;
-    };
 
 // Strict address shapes. Same intent as the shell's regex: nothing that reaches a command line
 // may contain anything but hex digits, dots and colons.

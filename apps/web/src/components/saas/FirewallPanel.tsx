@@ -11,7 +11,7 @@
 // Only ever mounted inside the SAAS_MODE + superadmin gated /admin segment.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { BanRow } from '@/lib/saas/f2b';
+import type { BanRow } from '@/lib/saas/f2b.shared';
 import { canRequestUnban } from './firewallView';
 
 type Props = {

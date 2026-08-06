@@ -6,8 +6,10 @@
 // never render the same way. A quiet firewall is reassuring; not knowing is not. Twice on
 // 2026-08-05 the host reported "no bans" while the actual nftables set told a different story, and
 // a screen that renders both as an empty table teaches an operator to trust it wrongly.
-import type { BanRow, BanState, F2bJail } from '@/lib/saas/f2b';
-import { F2B_JAILS } from '@/lib/saas/f2b';
+// Imports from f2b.shared, NOT f2b: the jail list is needed as a value, and lib/saas/f2b.ts
+// opens `node:fs`, which a client component may not pull into its bundle.
+import type { BanRow, BanState, F2bJail } from '@/lib/saas/f2b.shared';
+import { F2B_JAILS } from '@/lib/saas/f2b.shared';
 
 export type FirewallHealth = 'live' | 'stale' | 'unknown';
 
