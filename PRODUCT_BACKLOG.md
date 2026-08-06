@@ -7,7 +7,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-08-05 (27η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-08-06 (28η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
@@ -191,12 +191,82 @@
 > 22ης σάρωσης P74/P40/P46/P66/P48 έχει shippαριστεί όλο) — είναι απλά ρεαλιστικά μεγάλη, με το βάρος στο
 > ήδη-εγκεκριμένο Approved (34) παρά στο άχτιστο Proposed (5)· καμία νέα πρόταση σειράς χρειάζεται, ο builder
 > καταναλώνει ήδη ενεργά με τη σειρά value/effort.
+>
+> **28η σάρωση (2026-08-06)** — `git log --since` από την 27η σάρωση (marker `0135db4`, μέχρι το σημερινό HEAD
+> `ff2e7f7`): ~60 commits, αλλά τα δύο μόνα product-facing backlog items που shippαρίστηκαν (**P78** bulk field-
+> edit, `4793dae`, και **P79** TOTP/MFA self-host login, `ed68936`) είναι ήδη συμφιλιωμένα στο `## Approved`
+> παρακάτω με δικό τους «✅ SHIPPED» header (verified read, καμία ενέργεια χρειάζεται εδώ). Όλα τα υπόλοιπα ήταν
+> **SaaS/ops plumbing** εκτός backlog scope: 30ήμερη λήξη suspended-workspace (OWNER_DECISIONS #14, `da32091`),
+> χρέωση AI χρήσης πάνω στο platform key, invite-gated signup, per-plan storage quotas στο write path, fail2ban
+> admin UI (unban από το admin console), nav/deploy hardening. Live-verified με grep πριν από κάθε πρόταση (0 hits
+> πριν) **3 νέοι candidates (P88-P90)**, κανένα δεν είναι νέο ανεξάρτητο module — και τα τρία ζευγαρώνουν με ήδη-
+> shipped ή ήδη-proposed δουλειά ώστε να μείνουν S/χαμηλού ρίσκου: (1) **P88** — το ήδη-shipped P40 (update banner)
+> δείχνει «newer version available» με **εξωτερικό** link στα GitHub releases (`grep -rn "changelog|CHANGELOG|
+> whatsNew|release notes" apps/web/src` = μόνο το ίδιο το link string)· κανένα in-app «τι άλλαξε» — καθαρό self-
+> host trust/adoption lever, ίδιο idiom με το already-shipped UpdateChecker. (2) **P89** — το `AuditEvent` model
+> είναι **tenant-only** (verified: μόνο 4 SaaS admin/account routes το διαβάζουν, `grep -rln "AuditEvent"
+> apps/web/src/app`) — το ήδη-shipped P31 (household multi-user, τρεις ρόλοι) δεν έχει καμία δραστηριότητα ορατή
+> στο ίδιο το self-host UI, φυσικό follow-up πάνω στο ήδη-proposed **P75** (createdBy attribution, ακόμα unbuilt)
+> μόλις εκείνο χτιστεί. (3) **P90** — το `Item.status` έχει ακόμα ενεργό το αρχικό `'researching'` state
+> (verified `ITEM_STATUSES` στο `models/Item.ts`) αλλά **καμία** side-by-side σύγκριση δύο υποψήφιων items
+> (`grep -rln "CompareItems|compareMode|sideBySide" apps/web/src` = 0 hits) — ταιριάζει ρητά με το δικό του
+> documented preference στο `CLAUDE.md` («σύγκρινε τιμές... δείξε και τις δύο τιμές με ξεκάθαρα trade-offs»),
+> εδώ όμως για *διαφορετικά* υποψήφια προϊόντα (π.χ. δύο routers υπό εξέταση), όχι το ίδιο προϊόν σε πολλά
+> καταστήματα (αυτό ήδη καλύπτεται από το multi-store price tracking). Η ουρά: **8 Proposed (P83-P90) + 36
+> unbuilt Approved** (φρέσκια καταμέτρηση `### P` blocks εξαιρουμένων των διπλών «αρχικό spec» headers, όχι
+> carried-over αριθμητικό) — ο builder συνεχίζει να καταναλώνει ενεργά, καμία νέα πρόταση σειράς χρειάζεται.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P90. Side-by-side compare view για items σε status «researching» — S — OSS, dogfooding-heavy
+- **Αξία:** live-verified `grep -rln "CompareItems|compareMode|sideBySide" apps/web/src` = 0 hits. Το
+  `Item.status` έχει ακόμα ενεργό το αρχικό `'researching'` state (`ITEM_STATUSES` στο `models/Item.ts`) — ο
+  χρήστης βάζει εκεί υποψήφια προϊόντα πριν αποφασίσει (π.χ. δύο access points, δύο NAS options). Το ίδιο το
+  `CLAUDE.md` καταγράφει ρητά το preference του: «Πάντα σύγκρινε τιμές EU Store vs ελληνικά καταστήματα... Αν
+  είναι ίδιο προϊόν, δείξε και τις δύο τιμές με ξεκάθαρα trade-offs». Αυτό το item είναι το **άλλο μισό** αυτού
+  του workflow: το ήδη-shipped multi-store price tracking συγκρίνει το ΙΔΙΟ προϊόν σε πολλά καταστήματα, αλλά
+  καμία λειτουργία δεν συγκρίνει **δύο διαφορετικά** υποψήφια items (specs/τιμή/κατάστημα) δίπλα-δίπλα — σήμερα
+  χρειάζεται να ανοίξεις κάθε detail modal ξεχωριστά και να θυμάσαι νοερά τη διαφορά.
+- **Module:** `app/shopping/ShoppingClient.tsx` (ή κοινό με `ItemsClient`) — select 2-3 items σε status
+  `researching`/`decided` (reuse του ήδη-shipped select-mode, CLAUDE.md) → «Compare» button → νέο read-only
+  modal με στήλες ανά item (photo/title/price/specs/store/tags) side-by-side, καμία αλλαγή schema.
+- **Ανοιχτή απόφαση (builder default):** MVP = καθαρά client-side (τα ήδη-φορτωμένα items στη σελίδα, μηδέν νέο
+  server round-trip), cap 3 items ταυτόχρονα (αποφυγή unreadable πλατιού πίνακα)· specs diff highlighting
+  (διαφορετικές γραμμές tokens) follow-up μόνο αν το plain side-by-side αποδειχτεί ανεπαρκές.
+
+### P89. Household activity feed για self-host (OSS mirror του ήδη-shipped SaaS audit log) — S/M — OSS, εξαρτάται από P75
+- **Αξία:** live-verified `grep -rln "AuditEvent" apps/web/src/app` — μόνο 4 SaaS routes το διαβάζουν
+  (`(saas)/account/workspace/activity`, `admin/tenants/[slug]`, `admin/audit`, audit export API)· το self-host
+  `models/AuditEvent.ts` είναι explicitly `tenant`-indexed και ποτέ δεν εμφανίζεται εκτός SaaS admin console. Το
+  ήδη-shipped **P31** (household multi-user, τρεις ρόλοι: owner/editor/viewer) δεν έχει καμία ορατότητα «ποιος
+  έκανε τι» στο ίδιο το self-host UI σήμερα — φυσικό follow-up πάνω στο ήδη-**Proposed P75** (`createdBy`
+  attribution στα records, ακόμα unbuilt), το οποίο θα δώσει ακριβώς το δεδομένο που χρειάζεται αυτό το feed.
+  **Εξάρτηση, όχι διπλότυπο**: το P75 προσθέτει το πεδίο, αυτό το item το κάνει ορατό ως μια απλή λίστα.
+- **Module:** νέα read-only σελίδα/tab (π.χ. `/settings` → «Activity»). ΣΗΜ (verified): το ήδη-υπάρχον
+  `app/history/` route είναι το AI command-bar conversation log (`models/Conversation.ts`) — **άσχετο, όχι
+  reusable** για αυτό το item, χρειάζεται νέο route/tab. Δείχνει τις τελευταίες N ενέργειες (create/verify/
+  delete) ανά household member, reuse του ίδιου server-action query idiom με τα SaaS admin routes.
+- **Ανοιχτή απόφαση (builder default):** MVP = μόνο **μετά** το P75 (καμία αξία χωρίς attribution data)· scope
+  = μόνο households με ≥2 ενεργά μέλη (single-user instance = καμία αλλαγή, μηδέν επιπλέον UI clutter)· capped
+  στα τελευταία ~100 events, χωρίς νέο dedicated model (αν βολεύει, reuse του ήδη-υπάρχοντος Notification-style
+  pattern αντί για full `AuditEvent`, ώστε να μη χρειαστεί tenant-aware SaaS infra σε OSS-only deployment).
+
+### P88. In-app changelog / «τι άλλαξε» panel για το update-available banner — S — OSS (adoption/trust lever)
+- **Αξία:** live-verified `grep -rn "changelog|CHANGELOG|whatsNew|release notes" apps/web/src` = μόνο το ίδιο το
+  UI string («Update available: v{version} — see the release notes», `UpdateChecker.tsx`) που είναι ένα **έξω
+  link** στα GitHub releases. Το ήδη-shipped **P40** λέει ότι υπάρχει νεότερη έκδοση αλλά ο self-hoster πρέπει
+  να φύγει από την εφαρμογή για να μάθει τι άλλαξε πριν αποφασίσει να κάνει `docker pull`. Μικρό αλλά καθαρό
+  trust/adoption lever, ίδιο idiom με το ήδη-δουλεμένο `UpdateChecker.tsx` component.
+- **Module:** `app/settings/updateCheckActions.ts` (fetch το CHANGELOG.md ή τα GitHub release notes body μαζί
+  με το `fetchLatestVersion`, cache ίδιο 24ωρο interval) + `UpdateChecker.tsx` (expandable «What's new» κάτω από
+  το already-shipped banner, plain markdown/text render).
+- **Ανοιχτή απόφαση (builder default):** MVP = δείξε το raw GitHub release body (ήδη public API, μηδέν νέο auth)
+  σε ένα απλό collapsed/expand block· αν το repo δεν έχει δομημένα release notes, fallback στο ήδη-υπάρχον
+  external link (καμία αλλαγή συμπεριφοράς, ίδιο idiom με τα υπόλοιπα best-effort optional features).
 
 ### P87. Saved filter presets / «smart views» σε modules με sidebar filtering — S/M — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified `grep -rln "savedFilter|SmartView|savedView" apps/web/src` = 0 hits. Το e-shop-layout
