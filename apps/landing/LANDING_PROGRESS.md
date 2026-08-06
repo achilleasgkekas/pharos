@@ -5486,3 +5486,49 @@ mailto, το «Email us», η νεα FAQ. **Screenshots** (`.shots/`, gitignored
 Needs-Achilleas (open, αμεταβλητο): legal entity/Stripe, Terms+Privacy review απο ανθρωπο, contact
 inbox, χρονισμος για public repo. **Νεο, μικρο**: αν προτιμας αλλο καναλι για αιτηση invite (π.χ.
 ξεχωριστο `beta@`), πες το, τωρα δειχνει το `hello@ph-aros.com`.
+
+## 2026-08-06 (η σελιδα ελεγε «hosted-only feature for now», το self-host εχει TOTP απο χθες)
+
+Το increment δεν βγηκε απο τη λιστα του προηγουμενου entry (τα δυο πρωτα σημεια της, `HOSTED_INVITE_ONLY`
+και `REPO_PUBLIC`, περιμενουν γεγονοτα που δεν εχουν γινει: fetch στο ζωντανο
+`https://app.ph-aros.com/account/signup` δειχνει οτι το πεδιο «Invite code» ειναι ακομα εκει). Βγηκε απο
+το τριτο, το sweep πανω στο νεο user-facing feature: το `ed68936` (feat(auth): TOTP two-factor login for
+self-host) εφερε δευτερο παραγοντα στο self-hosted login, και η FAQ απαντηση της landing ελεγε ρητα το
+αντιθετο, «Self-hosted ... **no TOTP step on top of them yet**, so this extra layer is a **hosted-only
+feature for now**». Δηλαδη η σελιδα υποβαθμιζε δικο μας shipped feature ασφαλειας.
+
+Καθε ισχυρισμος διασταυρωθηκε στον κωδικα πριν γραφτει, οχι απο το commit message:
+(α) `models/User.ts` + `lib/userMfaStore.ts` εχουν `mfaEnabled`, (β) `SettingsClient.tsx:3538` εχει
+`Section` «Two-factor authentication» με enroll/confirm/disable, (γ) `LoginForm.tsx` εχει δευτερο βημα
+(`mfaStep`, `verifyMfaLoginAction`), (δ) `recoveryCodes.ts` `generateRecoveryCodes(count = 10)`, αρα
+**δεκα** κωδικοι, (ε) το σχολιο στο `login/actions.ts:47` επιβεβαιωνει οτι το βημα δεχεται και 6ψηφιο
+TOTP και 8χαρακτηρο recovery code, (στ) `mfaEnabled` default false, αρα **opt-in**.
+
+**ΔΕΝ** ανεφερα το `AUTH_SECRET` (το `set.twoFactorUnavailable` το ζηταει): το `session.ts` το απαιτει
+ηδη για καθε login, οποτε καθε εγκατασταση που δουλευει το εχει, θα ηταν θορυβος σε marketing κειμενο.
+
+Τρια σημεια:
+1. **FAQ «Does it support two-factor authentication?»**: «Yes, on both now», με τα βηματα του self-host
+   (Settings, password, key, 6ψηφιο, δεκα recovery codes) και το «hosted works the same way». Κρατησα το
+   κομματι για admin/member/viewer, τωρα ως βαση πανω στην οποια καθεται ο δευτερος παραγοντας.
+2. **FAQ «Is my financial data secure?»**: το self-host ελεγε σκετο «behind a login», τωρα «behind a login
+   you can put optional two-factor authentication on top of», και το hosted «that same optional two-factor»
+   αντι για δικο του ξεχωριστο πλεονεκτημα.
+3. **Roadmap → Shipped**: νεο bullet «Optional TOTP two-factor login, self-hosted as well as hosted».
+
+**Το ερωτημα δεν μετονομαστηκε**, αρα το anchor μενει `#faq-does-it-support-two-factor-authentication`
+(επαληθευτηκε στο σερβιρισμενο HTML), κανενα deep link δεν εσπασε.
+
+Verify: `npm run type-check` exit 0, `npm run build` success (13/13 static). Στο σερβιρισμενο HTML: 3
+εμφανισεις του «Yes, on both now» (ορατο κειμενο + FAQPage structured data), **μηδεν** «hosted-only
+feature for now», το νεο roadmap bullet παρον. **Screenshots** (`.shots/`, gitignored): `totp-faq.png`,
+`totp-faq-mobile.png` (375px, ρεει σωστα), `security-faq.png`, `roadmap-shipped.png`, ολα διαβαζονται
+καθαρα. `read_console_messages` κανενα error. Ο dev server σταματησε.
+
+Επομενο increment: (1) οταν ανοιξει η εγγραφη, `HOSTED_INVITE_ONLY=false` (με ελεγχο στη ζωντανη φορμα),
+(2) οταν ανοιξει το public repo, `REPO_PUBLIC=true` + πραγματικο `docker pull` στο quick start, (3) sweep
+στο επομενο user-facing feature (υποψηφια απο το προσφατο ιστορικο: per-plan storage quotas, bulk
+field-edit, gift cards, καμια απο τις οποιες δεν ειδα ακομα να λειπει ή να λεγεται λαθος στη σελιδα).
+
+Needs-Achilleas (open, αμεταβλητο): legal entity/Stripe, Terms+Privacy review απο ανθρωπο, contact inbox,
+χρονισμος για public repo, καναλι για αιτηση invite (τωρα `hello@ph-aros.com`).

@@ -385,6 +385,7 @@ const ROADMAP: {
       'Bring-your-own-key AI billing for hosted workspaces',
       'Opt-in multi-currency for expenses, income, receipts, subscriptions, items, statements, bills & CSV imports',
       'A browser bookmarklet and Chrome extension for one-click capture',
+      'Optional TOTP two-factor login, self-hosted as well as hosted',
     ],
   },
   {
@@ -601,11 +602,11 @@ const FAQ_GROUPS: {
       },
       {
         q: 'Is my financial data secure?',
-        a: 'Self-hosted, PHAROS is built for private access rather than the open internet: reach it over your LAN or your own VPN, behind a login, with no public sign-up and no telemetry. Hosted has to face the internet to be useful, so it is protected differently: encryption in transit, secrets encrypted at rest, optional two-factor authentication, and a separate database per workspace, so there is no query that can reach out of one workspace into another’s records. Either way there is no telemetry and your receipts, statements, and balances are never sold or shared for anyone else’s purposes.',
+        a: 'Self-hosted, PHAROS is built for private access rather than the open internet: reach it over your LAN or your own VPN, behind a login you can put optional two-factor authentication on top of, with no public sign-up and no telemetry. Hosted has to face the internet to be useful, so it is protected differently: encryption in transit, secrets encrypted at rest, that same optional two-factor authentication, and a separate database per workspace, so there is no query that can reach out of one workspace into another’s records. Either way there is no telemetry and your receipts, statements, and balances are never sold or shared for anyone else’s purposes.',
       },
       {
         q: 'Does it support two-factor authentication?',
-        a: 'On hosted, yes: turn on TOTP-based two-factor authentication from account settings with any authenticator app (Google Authenticator, 1Password, and so on), confirm it with a 6-digit code, and save the one-time recovery codes it gives you. Once enabled, every login asks for that second factor, not just this browser or device. Self-hosted already has per-person accounts (admin, member, viewer, managed from Settings → Users) but no TOTP step on top of them yet, so this extra layer is a hosted-only feature for now.',
+        a: 'Yes, on both now, and it is opt-in either way. Self-hosted, open Settings → Two-factor authentication, confirm your password, add the key it shows to any authenticator app (Google Authenticator, 1Password, and so on), and confirm with the 6-digit code; you are then handed ten one-time recovery codes to save. Hosted works the same way from account settings. Once enabled, every login asks for that second factor after the password, not just the first time on a new browser or device, and if you lose the authenticator app one recovery code gets you back in. Turn it off again from the same place, with your password. Self-hosted also keeps its per-person accounts underneath (admin, member, viewer, managed from Settings → Users), so the second factor sits on top of a real account rather than a shared login.',
       },
       {
         q: 'Can I download a copy of everything you have on me?',
