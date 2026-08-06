@@ -345,3 +345,58 @@ c58a79a feat(saas): enforce per-plan storage quotas on the actual write path
 **Δεν δοκιμάστηκε live από εμένα** (login-gated, δεν πληκτρολογώ password): το bulk-edit UI, το
 relocated user-menu, και ένα πραγματικό upload για να φανεί το νέο quota στο account/usage —
 χρειάζεται ένα πέρασμα του Αχιλλέα.
+
+---
+
+## 2026-08-06 22:2x UTC — `fcb868aa → 332e107a`, exit 0 (interactive session, μετά από μία αποτυχία + rollback)
+
+Όχι το routine `pharos-deploy`, interactive συνεδρία, ρητό αίτημα Αχιλλέα («Deploy») αμέσως μετά
+το mobile nav fix. Ακολουθήθηκε το documented flow του `deploy-update.sh` (καμία χειροκίνητη
+docker εντολή).
+
+**Πρώτη απόπειρα: exit 2, ΑΠΕΤΥΧΕ και έκανε αυτόματο rollback.** Το build έσπασε στο webpack:
+
+```
+Module build failed: UnhandledSchemeError: Reading from "node:fs" is not handled by plugins
+./src/lib/saas/f2b.ts -> ./src/components/saas/firewallView.ts -> ./src/components/saas/FirewallPanel.tsx
+```
+
+Αιτία: το `06bf44a` έβαλε το `firewallView.ts` να κάνει import το `F2B_JAILS` ως **VALUE** από το
+`lib/saas/f2b.ts`, που ανοίγει `node:fs`/`node:path`. Το `firewallView` το εισάγει το
+`'use client'` `FirewallPanel`, άρα το client bundle τραβούσε node builtins. **Ο λόγος που δεν το
+έπιασε κανείς νωρίτερα**: τα type-only imports τα σβήνει ο tsc, οπότε το `npm run type-check`
+έμενε πράσινο και ΜΟΝΟ ο bundler το έβλεπε. Το τοπικό Docker build περνούσε επίσης, γιατί το
+working tree είχε ήδη το μισοτελειωμένο fix uncommitted, ενώ ο server χτίζει από το committed main.
+
+Το `deploy-update.sh` έκανε ό,τι έπρεπε: verification failed, **rollback στο `fcb868aa`**, health
+OK. **Η παραγωγή ΠΟΤΕ δεν σέρβιρε το σπασμένο build.**
+
+**Fix (`332e107a`)**: split του contract σε `lib/saas/f2b.shared.ts` (constants + types, μηδέν node
+imports), το `f2b.ts` τα re-exports ώστε κάθε υπάρχων importer να μείνει ανέπαφος, και τα δύο
+client-side αρχεία εισάγουν από το `.shared`. Ίδιο μοτίβο με `notifiers.shared.ts` /
+`deliveryLog.shared.ts` / το παλιό `aiFeatures` split. Επαληθεύτηκε με production-parity
+`next build` σε καθαρό worktree του main + ΜΟΝΟ αυτά τα 4 αρχεία, πριν γίνει commit.
+
+**Δεύτερη απόπειρα: exit 0**, `DEPLOYED: fcb868aa → 332e107a, healthy` (health OK στη 2η
+προσπάθεια, ένα αναμενόμενο 502 όσο σηκωνόταν το container).
+
+**Τι έφυγε (10 commits)**: `2cc1e31` mobile nav fix, `06bf44a`+`ff2e7f7` fail2ban admin console,
+`332e107a` το παραπάνω build fix, `24cd2a1`+`7b711cb` tests/log, υπόλοιπα docs.
+
+**Ανεξάρτητη επαλήθευση**:
+
+| έλεγχος | αποτέλεσμα |
+|---|---|
+| `GET https://ph-aros.com/` | 200 |
+| `GET https://app.ph-aros.com/account/login` | 200 |
+| `GET https://app.ph-aros.com/` (χωρίς session) | 307 → login |
+| `git log -1` στον server | `332e107` |
+| `docker inspect` web / caddy / mongo | running, RestartCount 0 |
+| `docker logs --since 5m` | καθαρά (μόνο το προϋπάρχον `@napi-rs/canvas` optional-dep warning) |
+
+**Δεν δοκιμάστηκε live από εμένα** (login-gated): το ίδιο το mobile nav fix πάνω στο SaaS και το
+`/admin/firewall` panel. Το nav fix επαληθεύτηκε πλήρως τοπικά σε 375px viewport (full
+pointerdown/mousedown/mouseup/click sequence → το link επιβιώνει του mousedown και πλοηγεί).
+
+**Μάθημα**: το `npm run type-check` ΔΕΝ πιάνει client/server boundary violations. Μόνο ένα
+πραγματικό `next build` τα πιάνει. Αξίζει CI check που τρέχει build, όχι μόνο type-check.
