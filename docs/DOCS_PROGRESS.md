@@ -3226,3 +3226,19 @@ Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/
 9. Τα υπόλοιπα (dd5b712 webhook retry, e5062b3 landing status page, a7e7904 admin fleet-value, e861f26/aba7cd8 audit — έλεγξε πρώτα αν ήδη καλύπτονται) μετά τα παραπάνω.
 
 Επόμενο run: ξεκίνα από item 1 (TOTP 2FA) της λίστας παραπάνω, ένα ανά run.
+
+## 2026-08-06 (forty-third run — item 1: TOTP 2FA for self-host documented)
+
+Έλεγξα πρώτα το ask-inbox (`grep pharos-docs ~/.claude/ASK_ACHILLEAS.md`) — καμία εγγραφή, τίποτα προς εφαρμογή. `docs/` καθαρό (`git status --short -- docs/` = 0).
+
+Item 1 της ουράς της forty-second run: **`ed68936`** feat(auth) TOTP two-factor login για self-host (P79). Διάβασα τον κώδικα, όχι μόνο το commit message: `apps/web/src/lib/userMfaStore.ts` (νέο, wraps το ήδη-υπάρχον SaaS `lib/tenancy/mfaStore.ts`'s pure `plan*` builders πάνω στο `User` model αντί για `Account` — enroll/confirm/disable/verify/status, ίδιο σχήμα με το SaaS side), `apps/web/src/app/login/actions.ts` (`loginAction` πλέον, αν `user.mfaEnabled`, δεν βγάζει session αλλά `setMfaPendingCookie` + `mfaRequired:true`· `verifyMfaLoginAction` διαβάζει το user id ΜΟΝΟ από το signed pending cookie, ποτέ από client input· rate-limited per user id μέσω `API_RATE_LIMIT`/`API_RATE_WINDOW_MS`, ίδιο config με το REST API), `apps/web/src/app/settings/users.actions.ts` (γραμμή 101+, `beginSelfMfaEnrollment`/`confirmSelfMfaEnrollment`/`disableSelfMfa`, password re-auth required όταν ήδη enabled), `apps/web/src/models/User.ts` (νέα πεδία `mfaEnabled`/`mfaSecretEnc`/`mfaPendingSecretEnc`/`mfaRecoveryHashes`), και `SettingsClient.tsx` (`SelfMfaCard`, γραμμή 3451+, μέσα στο **General** tab, ακριβώς κάτω από το password-change card).
+
+Τι έγραψα:
+- **`docs/security.md`**: νέα bullet κάτω από το "### 1. Session cookie (the web UI)" section — enroll flow (Settings → Account → Two-factor authentication), τι αλλάζει στο login (pending cookie αντί session, δεύτερο βήμα με code/recovery code), rate-limiting reuse, password re-auth για disable/re-enroll, encryption-at-rest (ίδιο AES-256-GCM primitive με τα άλλα integration secrets), και ρητή αναφορά ότι είναι reuse του ήδη-documented SaaS primitive. + νέο checklist item στο "Exposing to the internet" section (encourage/require admin 2FA πριν public exposure).
+- **`docs/features.md`**: το Settings → General bullet πήρε "your own password change, two-factor authentication (TOTP, opt-in...)" με cross-link στο νέο security.md section (anchor `#1-session-cookie-the-web-ui`, verified ότι matches το GitHub auto-slug του heading `### 1. Session cookie (the web UI)`, όχι μαντεψιά).
+
+Validation (markdown only): code-fence count και στα δύο αρχεία = 0 πριν/μετά (η προσθήκη ήταν καθαρό πεζογράφημα, όχι code block, άρα δεν έσπασε τίποτα)· heading target verified ότι υπάρχει· κανένα credential/secret literal.
+
+Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/security.md` + `docs/features.md` (δικά μου), κανένα foreign staged.
+
+Επόμενο run: item 2 της λίστας (`63f2e33` + `abd0cdc`, waitlist gone / plans→signup / activation-by-code — `docs/saas.md` "Workspace creation"/"Account profile" sections).

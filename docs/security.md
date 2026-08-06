@@ -56,6 +56,21 @@ Used by every browser page and server action.
   and deny viewers (returning 403) — this enforcement is built-in to every current
   and future server action. The **REST API** (see below) enforces the same restriction:
   viewer tokens cannot make POST/PATCH/DELETE requests.
+- **Two-factor authentication (TOTP), opt-in per user.** Turn it on from
+  **Settings → Account → Two-factor authentication**: scan the shown secret in any
+  TOTP app, confirm one code, and Pharos hands you a one-time batch of recovery
+  codes (shown once — store them somewhere safe, each is single-use). Once enabled,
+  a correct password no longer opens a session by itself: the login form asks for a
+  second step (the 6-digit code, or a recovery code) before a real session cookie is
+  issued, backed by a short-lived, separately-cookied pending token rather than the
+  session cookie itself. Code/recovery-code verification is rate-limited per user id
+  using the same `API_RATE_LIMIT` / `API_RATE_WINDOW_MS` config as the REST API (see
+  [Rate limiting](#rate-limiting), disabled by default). Disabling MFA, or
+  re-enrolling a device over an already-enabled factor, requires re-entering the
+  current password. The TOTP secret is encrypted at rest the same way as other
+  integration secrets (AES-256-GCM, keyed off `AUTH_SECRET`) and the plaintext is
+  only ever shown once, at enrollment time. This mirrors the MFA primitive already
+  used on the hosted/SaaS side, reused for the self-hosted `User` model.
 
 ### 2. Bearer token (the REST API)
 
@@ -169,6 +184,9 @@ If you must publish Pharos publicly, do all of the following:
       `0.0.0.0`).
 - [ ] Turn on **`API_RATE_LIMIT`** and add a rate limit at the reverse proxy.
 - [ ] Give each person their own **member/admin account**; do not share one login.
+- [ ] Encourage (or require) admin accounts to enable **two-factor authentication**
+      (Settings → Account) — a second factor matters more once the login form is
+      internet-reachable.
 - [ ] Keep the image **[up to date](updating.md)** so you get security fixes.
 - [ ] Take regular **[backups](backup-and-restore.md)** — a compromise recovery
       needs a known-good copy.

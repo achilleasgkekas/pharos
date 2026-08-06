@@ -621,7 +621,10 @@ Configuration is grouped into tabs:
 
 - **General** — appearance, currency, default VAT, default item view, warranty
   defaults, budgets, **demo / sample data** (Load sample data for a fresh install
-  to see Pharos in action; Clear sample data wipes all sample records), about.
+  to see Pharos in action; Clear sample data wipes all sample records), your own
+  password change, **two-factor authentication** (TOTP, opt-in — enroll with an
+  authenticator app, confirm a code, save the one-time recovery codes; see
+  [Security](security.md#1-session-cookie-the-web-ui)), about.
 - **Money** — budgets (with a **Suggest from history** button that pre-fills
   per-category targets from the median of your last three complete months),
   manual asset accounts, asset depreciation, and payment cards.
