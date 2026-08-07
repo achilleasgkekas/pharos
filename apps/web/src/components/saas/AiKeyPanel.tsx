@@ -188,7 +188,7 @@ export function AiKeyPanel({ tenantSlug, canManage, cryptoReady, initialKey }: P
               <span className="text-[color:var(--color-text-dim)]">API key</span>
               <input
                 type="password"
-                autoComplete="off"
+                autoComplete="new-password" data-1p-ignore data-lpignore="true"
                 value={keyInput}
                 onChange={(e) => setKeyInput(e.target.value)}
                 disabled={busy !== null}

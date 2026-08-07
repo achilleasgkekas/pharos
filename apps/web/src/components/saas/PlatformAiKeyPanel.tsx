@@ -114,7 +114,7 @@ export function PlatformAiKeyPanel() {
           value={key}
           onChange={(e) => setKey(e.target.value)}
           placeholder={info?.masked ? 'Replace the key…' : 'Paste the provider key…'}
-          autoComplete="off"
+          autoComplete="new-password" data-1p-ignore data-lpignore="true"
           spellCheck={false}
           className={`min-w-0 flex-1 font-mono ${input}`}
         />

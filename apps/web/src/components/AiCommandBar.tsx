@@ -268,7 +268,21 @@ export function AiCommandBar() {
             }}
             disabled={pending && isAi}
             placeholder={ph}
-            className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:text-[color:var(--color-text-faint)] disabled:opacity-60"
+            /* Password managers were filling the SAVED PASSWORD into this box on every page
+               load: an unnamed, untyped text input in the top bar is exactly what their
+               heuristics latch onto. type="search" + a neutral name + the two vendor opt-outs
+               (1Password, LastPass/Bitwarden) tell them this is not a credential field.
+               `autoComplete="off"` alone is not enough — managers are documented to ignore it. */
+            type="search"
+            name="pharos-search"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            data-1p-ignore
+            data-lpignore="true"
+            data-form-type="other"
+            className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:text-[color:var(--color-text-faint)] disabled:opacity-60 [&::-webkit-search-cancel-button]:appearance-none"
           />
 
           {/* Trailing actions */}

@@ -9,6 +9,7 @@ import { currencySymbol } from '@/lib/money';
 import { isAiReady } from '@/lib/ollama';
 import { getSessionUser } from '@/lib/auth';
 import { saasUiEnabled } from '@/lib/tenancy/saasPage';
+import { assertKnownWorkspaceHost } from '@/lib/tenancy/request';
 import { getAiConfig } from '@/lib/aiConfig';
 import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
 import { getServerT } from '@/lib/i18n/server';
@@ -42,6 +43,10 @@ export default async function RootLayout({
   // Auth gate at the layout level: chrome (nav) only renders for signed-in users,
   // so /login and /setup are chrome-less. Middleware already blocks unauthenticated
   // navigation; this just keeps the shell consistent.
+  // A host that names a workspace which does not exist is a 404, before anything renders.
+  // The layout is the only place that wraps EVERY route, gated or not, so this is the one
+  // spot where an unmigrated page cannot slip past it.
+  await assertKnownWorkspaceHost();
   const user = await getSessionUser();
   // UI language for this request (cookie → default), handed to the client provider.
   const { locale, dict } = await getServerT();

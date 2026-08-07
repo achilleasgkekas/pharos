@@ -208,3 +208,28 @@ async function failTenantGate(err: TenantResolutionError): Promise<never> {
   if (outcome.kind === 'redirect') redirect(outcome.to);
   notFound();
 }
+
+/**
+ * 404 immediately when the HOST names a workspace that does not exist.
+ *
+ * This is a whole-app guard, called once from the root layout, and it exists because the
+ * per-page gate is not enough on its own: `withRequestTenant` only runs on pages that opted
+ * into it, so any page that has not been migrated yet renders happily on `whatever.<domain>`
+ * against the DEFAULT (registry) database. Reported live 2026-08-07: a random subdomain served
+ * the product, just without its navigation.
+ *
+ * The layout wraps EVERY route, so one check here covers the gated and ungated pages alike,
+ * and it costs a single indexed lookup on hosts that carry a slug (never on the apex or the
+ * app host, which parse to no slug at all).
+ *
+ * Deliberately `notFound()` and not a redirect: a workspace that does not exist and a
+ * workspace you are not a member of must be indistinguishable, or the 404 page becomes an
+ * oracle for enumerating customer names. Same rule `requestGate` already applies.
+ */
+export async function assertKnownWorkspaceHost(): Promise<void> {
+  if (!saasMode()) return;
+  const slug = parseTenantSlug(await requestHost());
+  if (!slug) return; // apex / app host / reserved label: nothing claimed, nothing to verify
+  const ctx = await getTenantContext({ host: await requestHost() });
+  if (!ctx || ctx.isDefault) notFound();
+}

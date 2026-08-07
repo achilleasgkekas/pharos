@@ -574,7 +574,7 @@ function CloudKeyModel({
           value={keyValue}
           onChange={(e) => onKey(e.target.value)}
           placeholder={hasKey ? '••••••••••••  (saved)' : keyPlaceholder}
-          autoComplete="off"
+          autoComplete="new-password" data-1p-ignore data-lpignore="true"
           className={inputClass}
           style={{ fontFamily: 'var(--font-mono)' }}
         />
@@ -832,7 +832,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder={ai.hasKey ? '••••••••••••  (saved)' : 'sk-ant-...'}
-              autoComplete="off"
+              autoComplete="new-password" data-1p-ignore data-lpignore="true"
               className={inputClass}
               style={{ fontFamily: 'var(--font-mono)' }}
             />
@@ -1454,10 +1454,10 @@ function StorageManager({ storage, counts }: { storage: StorageInfo; counts: Inf
             </Field>
           )}
           <Field label={t('set.username')}>
-            <input value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} autoComplete="off" />
+            <input value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
           </Field>
           <Field label={storage.hasPass ? t('set.passwordSaved') : t('set.password')}>
-            <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={storage.hasPass ? '••••••••' : ''} className={inputClass} autoComplete="off" />
+            <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={storage.hasPass ? '••••••••' : ''} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
           </Field>
           <Field label={t('set.baseFolder')}>
             <input value={basePath} onChange={(e) => setBasePath(e.target.value)} placeholder="Pharos" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
@@ -2697,16 +2697,16 @@ function ImapImportManager({ imap }: { imap: ImapInfo }) {
 
       <div className="grid sm:grid-cols-2 gap-3 pt-1">
         <Field label={t('set.imapHost')}>
-          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="imap.gmail.com" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} autoComplete="off" />
+          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="imap.gmail.com" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
         </Field>
         <Field label={t('set.imapPort')}>
           <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="993" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />
         </Field>
         <Field label={t('set.imapUsername')}>
-          <input value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} autoComplete="off" />
+          <input value={user} onChange={(e) => setUser(e.target.value)} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
         </Field>
         <Field label={imap.hasPass ? t('set.imapPasswordSaved') : t('set.imapPassword')}>
-          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={imap.hasPass ? '••••••••' : ''} className={inputClass} autoComplete="off" />
+          <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder={imap.hasPass ? '••••••••' : ''} className={inputClass} autoComplete="new-password" data-1p-ignore data-lpignore="true" />
         </Field>
         <Field label={t('set.imapFolder')}>
           <input value={folder} onChange={(e) => setFolder(e.target.value)} placeholder="INBOX" className={inputClass} style={{ fontFamily: 'var(--font-mono)' }} />

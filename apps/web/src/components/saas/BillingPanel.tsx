@@ -89,7 +89,7 @@ function ActivationCodeCard({ tenantSlug, onActivated }: { tenantSlug?: string; 
           onChange={(e) => setCode(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && redeem()}
           placeholder="YOUR-CODE"
-          autoComplete="off"
+          autoComplete="new-password" data-1p-ignore data-lpignore="true"
           spellCheck={false}
           className="min-w-0 flex-1 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 font-mono text-sm uppercase tracking-wider text-[color:var(--color-text)] outline-none focus:border-[color:var(--color-accent)]"
         />
