@@ -11568,3 +11568,60 @@ delete paths, εκτός «μικρό & ασφαλές» ορίου αυτού �
 entries όλα APPLIED.
 
 Marker ενημερώθηκε: `<!-- reviewed: 7a9d15d -->`. Πλήρες write-up στο `WEB_DEBT.md` (67η σάρωση).
+
+## 2026-08-07 — P77: μία οθόνη που απαντά «είναι υγιής η εγκατάστασή μου;» (ορφανό build της 6ης Αυγ, ολοκληρώθηκε και μπήκε)
+
+**Τι βρήκα πρώτα**: το working tree είχε **ολοκληρωμένο αλλά μη-committed P77** (`lib/systemHealth.ts`,
+`settings/healthActions.ts`, `settings/SystemHealthPanel.tsx`, τα 2 test files, + i18n/SettingsClient wiring),
+με ημερομηνίες αρχείων **06/08 09:01-09:03**, χωρίς commit και χωρίς εγγραφή στο PROGRESS. Το run της 6ης Αυγ
+προφανώς κόπηκε ακριβώς πριν το commit (γύρω του, commits άλλων routines στις 08:35 και 09:04). Έλεγξα τα diffs
+πριν αγγίξω οτιδήποτε: και τα τρία τροποποιημένα αρχεία περιείχαν **αποκλειστικά** P77 αλλαγές (51 `sys.*` κλειδιά
+σε en+el, ένα νέο tab entry + render branch στο `SettingsClient`), μηδέν ξένη δουλειά να παρασυρθεί στο commit.
+Οπότε η υψηλότερης αξίας κίνηση ήταν να το **επικυρώσω και να το κλείσω**, όχι να ξεκινήσω κάτι καινούριο πάνω
+από ένα μισοτελειωμένο top-of-queue Approved item.
+
+**Τι είναι το P77** (πρώτο αχτίστο στην Approved ουρά): νέο Settings tab «System status», admin-only και
+self-host-only. Πέντε read-only πλακίδια με το ήδη-υπάρχον «AI online» idiom: Database (ping, μέγεθος, έγγραφα,
+συλλογές), Storage volume (αρχεία στον δίσκο + ελεύθερος χώρος μέσω `statfs`), AI provider (reuse `isAiReady`),
+Background jobs (running / κολλημένα >30′ / αποτυχίες 24ώρου), Remote mirror (backend, auto-mirror, τελευταία
+επιτυχής συγχρόνιση + staleness). Τα κατώφλια ζουν σε pure, DB-free `lib/systemHealth.ts` (unit-tested αντί για
+θαμμένα σε server action), το IO μισό στο `healthActions.ts`. Μηδέν write, μηδέν auto-fix: μια σελίδα
+διαγνωστικών δεν επιτρέπεται να είναι αυτή που θα χαλάσει το deployment. Το άνοιγμα του tab τρέχει μόνο τους
+γρήγορους ελέγχους· το live FTP/SMB/OneDrive round trip μπαίνει πίσω από ρητό «Test connections», ώστε ένα NAS
+που κοιμάται να μην κρεμάει τη σελίδα. Το `unknown` (AI σβηστό, κανένα remote backend) μένει γκρι και δεν ρίχνει
+το συνολικό verdict, γιατί «δεν το χρησιμοποιώ» δεν είναι βλάβη.
+
+**Verified** (όλα σήμερα, πάνω στον κώδικα ως έχει):
+- `npm run type-check` **EXIT 0**, καθαρό (ούτε τα 3 pre-existing errors της 5ης Αυγ, τα οποία ανήκαν σε
+  uncommitted δουλειά άλλου routine που έκτοτε μπήκε).
+- `npx vitest run` στα δύο νέα αρχεία → **36/36 passed**· ολόκληρος ο φάκελος `src/app/settings` → **514 passed
+  (22 files)**· `src/lib/i18n` (locale parity) → **53 passed**.
+- `docker compose build web` → πέρασε ο production build (άρα καμία παραβίαση client/server ορίου, το θέμα που
+  έσπασε δύο φορές τις προηγούμενες μέρες)· `up -d web` → `RestartCount 0`, `/login` **200** σε 1s. Μετά,
+  `docker builder prune -f` → **6.66GB** cache ελευθερώθηκε (ήταν 7.36GB). Docker mutex πάρθηκε πριν και
+  απελευθερώθηκε αμέσως μετά.
+- **Browser, ζωντανά** (υπήρχε ενεργό session στο in-app browser, οπότε πέρασε και το login-gated κομμάτι):
+  Settings → System status renders πλήρως, και τα 5 πλακίδια **Healthy** με πραγματικά νούμερα (DB 1 ms / 4.1 MB
+  / 383 έγγραφα / 32 συλλογές, αρχεία 227 MB, ουρά άδεια, mirror προς onedrive με τελευταία συγχρόνιση 05/08/2026),
+  **μηδέν console errors**.
+
+**Απόφαση που κατέγραψα**: δεν άγγιξα καθόλου το `.vite/` (untracked build artifact στο root, δεν είναι δικό μου,
+δεν το πρόσθεσα στο `.gitignore` για να μη μπω σε ξένη περιοχή). Επίσης δεν ξεκίνησα το P76 (επόμενο στην ουρά)
+σε αυτό το run: το P77 ήταν το κορυφαίο Approved και ήταν ήδη μισό στον δίσκο.
+
+Commit: `027416b`. `PRODUCT_BACKLOG.md` → P77 σημειώθηκε ✅ SHIPPED 2026-08-07 με «Τι έγινε».
+
+**Επόμενο task**: **P76 — emergency / legacy access (dead-man's-switch lite)**, το επόμενο αχτίστο Approved:
+`EmergencyContact` model πάνω στο ήδη-ενεργό P31 auth, request → owner notified (reuse `dispatchAlert`) → deny
+μέσα στο wait window → αυτόματο grant **viewer** ρόλου μετά (default 7 μέρες, ρυθμιζόμενο), με revoke ανά πάσα
+στιγμή. Είναι S/M και αγγίζει auth, οπότε άξιζε δικό του run αντί για βιαστικό δεύτερο μισό αυτού.
+
+## Needs Achilleas
+
+- **P77 supervised πέρασμα** (προαιρετικό, το UI επιβεβαιώθηκε ήδη ζωντανά σήμερα): Settings → System status →
+  «Test connections», που είναι το ΜΟΝΟ κομμάτι που δεν τρέχει αυτόματα, γιατί χτυπάει πραγματικά το OneDrive.
+- Αμετάβλητα από τα προηγούμενα runs: **P78** και **P79** supervised πεδοσέρματα (χρειάζονται login), **P80**
+  last mile (στέλνει αληθινές ειδοποιήσεις), **P40** (το `ghcr.io/achilleasgkekas/pharos` δεν είναι δημόσιο
+  package και δεν υπάρχει κανένα `v*.*.*` tag → ο update check αποτυγχάνει σιωπηλά), **P46**/**P74** last mile,
+  **P81** (`CRON_SECRET` στο `.env` + restart), **P31** live check με τους τρεις ρόλους. **P36 / P16** παραμένουν
+  παγωμένα με ρητό κανόνα σιωπής (`OWNER_DECISIONS.md` #13).
