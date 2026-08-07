@@ -13,22 +13,22 @@ describe('plan maxMembers table', () => {
     }
   });
 
-  it('free is single-seat, shared is multi-seat, dedicated is unlimited', () => {
+  it('free is single-seat, shared is 5, dedicated is 30', () => {
     expect(PLANS.free.maxMembers).toBe(1);
     expect(PLANS.shared.maxMembers).toBe(5);
-    expect(PLANS.dedicated.maxMembers).toBeNull();
+    expect(PLANS.dedicated.maxMembers).toBe(30); // 2026-08-07: was unlimited
   });
 
-  it('seat allowance is non-decreasing up the ladder (null = unlimited on top)', () => {
-    // free(1) <= shared(5); dedicated is unlimited (null) so it dominates both.
+  it('seat allowance is non-decreasing up the ladder', () => {
+    // free(1) <= shared(5) <= dedicated(30). Every rung is a real number now.
     expect(PLANS.free.maxMembers!).toBeLessThanOrEqual(PLANS.shared.maxMembers!);
-    expect(PLANS.dedicated.maxMembers).toBeNull();
+    expect(PLANS.shared.maxMembers!).toBeLessThanOrEqual(PLANS.dedicated.maxMembers!);
   });
 
   it('entitlementsFor surfaces the plan maxMembers', () => {
     expect(entitlementsFor('free').maxMembers).toBe(1);
     expect(entitlementsFor('shared').maxMembers).toBe(5);
-    expect(entitlementsFor('dedicated').maxMembers).toBeNull();
+    expect(entitlementsFor('dedicated').maxMembers).toBe(30);
   });
 
   it('unknown/legacy plan resolves to free seat allowance', () => {
@@ -51,9 +51,10 @@ describe('withinSeatLimit', () => {
     expect(withinSeatLimit('shared', 6)).toBe(false);
   });
 
-  it('dedicated (unlimited): always true regardless of count', () => {
+  it('dedicated: 30 seats, and the 31st is refused', () => {
     expect(withinSeatLimit('dedicated', 0)).toBe(true);
-    expect(withinSeatLimit('dedicated', 1000)).toBe(true);
+    expect(withinSeatLimit('dedicated', 29)).toBe(true);
+    expect(withinSeatLimit('dedicated', 30)).toBe(false);
   });
 
   it('unknown plan falls back to free semantics', () => {

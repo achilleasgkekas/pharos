@@ -36,7 +36,7 @@ describe('buildBillingSummary', () => {
       priceMonthlyEUR: 9,
       tier: 'shared',
       storageGB: 1,
-      aiCallsPerMonth: 1000,
+      aiCallsPerMonth: 250,
       customDomain: false,
     });
   });

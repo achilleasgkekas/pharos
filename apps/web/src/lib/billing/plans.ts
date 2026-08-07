@@ -52,7 +52,7 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     tier: 'shared',
     priceMonthlyEUR: 9,
     storageGB: 1, // 1 GB — Achilleas' final number (was a 50GB placeholder)
-    aiCallsPerMonth: 1000,
+    aiCallsPerMonth: 250, // 2026-08-07: was 1000. Pro is the volume tier, not the AI tier.
     customDomain: false,
     maxMembers: 5, // small household/team on the shared Pro tier
     stripePriceEnv: 'STRIPE_PRICE_SHARED',
@@ -63,9 +63,16 @@ export const PLANS: Record<PlanKey, PlanDef> = {
     tier: 'dedicated',
     priceMonthlyEUR: 29,
     storageGB: 5, // 5 GB — Achilleas' final number (was a 500GB placeholder)
-    aiCallsPerMonth: null, // unlimited / BYO-key
-    customDomain: true,
-    maxMembers: null, // unlimited seats on the dedicated tier
+    // 2026-08-07: was null (unlimited). Unlimited on the operator's own platform key is an
+    // uncapped bill with someone else's hand on the tap. 1000 included; past that the AI
+    // features stop for the cycle and the workspace is pointed at the custom-AI add-on (its
+    // own provider key), which IS unlimited because the customer pays the provider directly.
+    aiCallsPerMonth: 1000,
+    // 2026-08-07: dropped. Custom domains mean per-tenant TLS, DNS support and a whole class
+    // of "my certificate expired" tickets, for a self-hosted-first product whose users reach
+    // it over a VPN anyway. Not worth carrying at this size.
+    customDomain: false,
+    maxMembers: 30, // 2026-08-07: was unlimited. A real ceiling is billable and supportable.
     stripePriceEnv: 'STRIPE_PRICE_DEDICATED',
   },
 };

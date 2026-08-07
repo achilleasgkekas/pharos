@@ -33,10 +33,13 @@ describe('entitlements', () => {
     expect(canUseAiFeature('free', 'receipts')).toBe(true);
   });
 
-  it('differentiates on quotas and custom domain', () => {
+  it('differentiates on quotas; no plan carries a custom domain any more', () => {
+    // 2026-08-07: custom domains were dropped from the top plan. Pinned at false for EVERY
+    // plan so re-adding one is a deliberate act that trips this test first.
     expect(entitlementsFor('free').customDomain).toBe(false);
-    expect(entitlementsFor('dedicated').customDomain).toBe(true);
-    expect(entitlementsFor('dedicated').aiCallsPerMonth).toBeNull();
+    expect(entitlementsFor('shared').customDomain).toBe(false);
+    expect(entitlementsFor('dedicated').customDomain).toBe(false);
+    expect(entitlementsFor('dedicated').aiCallsPerMonth).toBe(1000);
     expect(entitlementsFor('free').storageBytes).toBe(0.2 * 1024 ** 3);
   });
 
@@ -45,7 +48,8 @@ describe('entitlements', () => {
     expect(withinStorage('free', 0.3 * 1024 ** 3)).toBe(false);
     expect(withinAiQuota('free', 49)).toBe(true);
     expect(withinAiQuota('free', 50)).toBe(false);
-    expect(withinAiQuota('dedicated', 1_000_000)).toBe(true); // unlimited
+    expect(withinAiQuota('dedicated', 999)).toBe(true);
+    expect(withinAiQuota('dedicated', 1000)).toBe(false); // capped since 2026-08-07
   });
 });
 

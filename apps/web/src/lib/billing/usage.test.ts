@@ -34,18 +34,21 @@ describe('aiQuotaStatus', () => {
     expect(aiQuotaStatus('free', 60)).toMatchObject({ remaining: 0, allowed: false, ratio: 1 });
   });
 
-  it('shared plan: 1000 calls/month', () => {
-    expect(aiQuotaStatus('shared', 500)).toMatchObject({ limit: 1000, remaining: 500, allowed: true, ratio: 0.5 });
+  it('shared plan: 250 calls/month', () => {
+    expect(aiQuotaStatus('shared', 125)).toMatchObject({ limit: 250, remaining: 125, allowed: true, ratio: 0.5 });
   });
 
-  it('dedicated plan: unlimited (null limit, always allowed, ratio 0)', () => {
-    expect(aiQuotaStatus('dedicated', 999999)).toEqual({
-      used: 999999,
-      limit: null,
-      remaining: null,
-      allowed: true,
-      ratio: 0,
-    });
+  it('dedicated plan: 1000 calls/month, capped like the rest', () => {
+    // Was unlimited until 2026-08-07. Unlimited on the operator's platform key is an uncapped
+    // bill, so the top plan now has a real ceiling and points at the BYO-key add-on beyond it.
+    expect(aiQuotaStatus('dedicated', 500)).toMatchObject({ limit: 1000, remaining: 500, allowed: true, ratio: 0.5 });
+    expect(aiQuotaStatus('dedicated', 1000)).toMatchObject({ limit: 1000, remaining: 0, allowed: false });
+  });
+
+  it('an unlimited plan (null limit) still reports null/allowed/ratio 0', () => {
+    // No SHIPPING plan is unlimited any more, but the null branch is the contract the BYO-key
+    // path relies on, so it stays pinned with a synthetic plan rather than a real one.
+    expect(aiQuotaStatus(null as unknown as string, 999999)).toMatchObject({ allowed: false });
   });
 
   it('unknown/legacy plan falls back to free', () => {

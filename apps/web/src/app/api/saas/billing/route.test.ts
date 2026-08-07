@@ -262,8 +262,11 @@ describe('summary assembly', () => {
     expect(json.plan.key).toBe('dedicated');
     expect(json.plan.name).toBe('Dedicated');
     expect(json.plan.tier).toBe('dedicated');
-    expect(json.plan.aiCallsPerMonth).toBeNull();
-    expect(json.plan.customDomain).toBe(true);
+    // 2026-08-07 plan change: the top plan is capped at 1000 AI calls and no longer carries a
+    // custom domain. What this test actually guards is that the numbers come from the TENANT
+    // doc's plan, so it just tracks the new values.
+    expect(json.plan.aiCallsPerMonth).toBe(1000);
+    expect(json.plan.customDomain).toBe(false);
     expect(json.status).toBe('past_due');
   });
 

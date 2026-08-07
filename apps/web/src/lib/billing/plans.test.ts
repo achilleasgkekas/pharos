@@ -46,15 +46,17 @@ describe('PLANS / PLAN_KEYS table', () => {
     expect(PLANS.dedicated.stripePriceEnv).toBe('STRIPE_PRICE_DEDICATED');
   });
 
-  it('only the dedicated tier is dedicated-isolation + custom-domain + unlimited AI', () => {
+  it('only the dedicated tier gets dedicated isolation; AI is capped and no plan has a custom domain', () => {
+    // 2026-08-07: what the top plan sells is ISOLATION, not an uncapped AI tap or a vanity
+    // domain. Both of those were removed; the tier is the thing that remains distinctive.
     expect(PLANS.dedicated.tier).toBe('dedicated');
-    expect(PLANS.dedicated.customDomain).toBe(true);
-    expect(PLANS.dedicated.aiCallsPerMonth).toBeNull(); // unlimited / BYO-key
+    expect(PLANS.dedicated.customDomain).toBe(false);
+    expect(PLANS.dedicated.aiCallsPerMonth).toBe(1000);
     // The two shared-isolation tiers keep metered AI + no custom domain.
     expect(PLANS.free.tier).toBe('shared');
     expect(PLANS.shared.tier).toBe('shared');
     expect(PLANS.shared.customDomain).toBe(false);
-    expect(PLANS.shared.aiCallsPerMonth).toBe(1000);
+    expect(PLANS.shared.aiCallsPerMonth).toBe(250);
   });
 
   it('storage quota grows monotonically up the ladder', () => {

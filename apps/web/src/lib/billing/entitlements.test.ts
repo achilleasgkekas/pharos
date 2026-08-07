@@ -26,18 +26,20 @@ describe('entitlementsFor', () => {
     expect(e.plan).toBe('shared');
     expect(e.storageGB).toBe(1);
     expect(e.storageBytes).toBe(1 * GB);
-    expect(e.aiCallsPerMonth).toBe(1000);
+    expect(e.aiCallsPerMonth).toBe(250);
     expect(e.customDomain).toBe(false);
     expect(e.tier).toBe('shared');
   });
 
-  it('resolves the dedicated plan (unlimited AI, custom domain, dedicated tier)', () => {
+  it('resolves the dedicated plan (capped AI, no custom domain, dedicated tier)', () => {
     const e = entitlementsFor('dedicated');
     expect(e.plan).toBe('dedicated');
     expect(e.storageGB).toBe(5);
     expect(e.storageBytes).toBe(5 * GB);
-    expect(e.aiCallsPerMonth).toBeNull();
-    expect(e.customDomain).toBe(true);
+    // 2026-08-07: AI is capped at 1000 (was unlimited) and custom domains were dropped. What
+    // still makes this plan "dedicated" is the ISOLATION tier, not an uncapped tap.
+    expect(e.aiCallsPerMonth).toBe(1000);
+    expect(e.customDomain).toBe(false);
     expect(e.tier).toBe('dedicated');
   });
 
@@ -116,12 +118,15 @@ describe('withinAiQuota', () => {
   it('rejects at or above the cap (exclusive upper bound)', () => {
     expect(withinAiQuota('free', 50)).toBe(false); // == cap → blocked
     expect(withinAiQuota('free', 51)).toBe(false);
-    expect(withinAiQuota('shared', 1000)).toBe(false);
+    expect(withinAiQuota('shared', 250)).toBe(false);
+    expect(withinAiQuota('dedicated', 1000)).toBe(false);
   });
 
-  it('unlimited plans (aiCallsPerMonth === null) always allow', () => {
+  it('every shipping plan is capped — none is unlimited any more', () => {
+    // Kept as a guard rather than deleted: if a future plan sets aiCallsPerMonth back to null,
+    // this fails and forces the "who pays for that?" conversation before it ships.
     expect(withinAiQuota('dedicated', 0)).toBe(true);
-    expect(withinAiQuota('dedicated', 1_000_000)).toBe(true);
+    expect(withinAiQuota('dedicated', 1_000_000)).toBe(false);
   });
 
   it('unknown plan is treated as free for the AI cap', () => {
