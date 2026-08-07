@@ -1,7 +1,9 @@
 import { connectDB } from './db';
 import { AppConfig } from '@/models/AppConfig';
-import { currentModel } from './tenancy/connection';
-import { currentTenant } from './tenancy/current';
+import { tenantDb, tenantModel } from './tenancy/connection';
+import { softRequestTenant } from './tenancy/request';
+import { currentTenant, hasTenantContext } from './tenancy/current';
+import type { TenantContext } from './tenancy/context';
 
 export type AiProvider = 'ollama' | 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'custom';
 
@@ -42,9 +44,8 @@ export function isVisionModel(name: string): boolean {
 const cache = new Map<string, { v: AiConfig; t: number }>();
 const TTL = 5000;
 
-/** Stable cache key for the current tenant ('' = default/self-hosted). */
-function tenantKey(): string {
-  const ctx = currentTenant();
+/** Stable cache key for a tenant ('' = default/self-hosted). */
+function tenantKey(ctx: TenantContext): string {
   return ctx.isDefault || !ctx.tenantId ? '' : ctx.tenantId;
 }
 
@@ -65,8 +66,7 @@ const BYO_KEY_TIMEOUT_MS = 3000;
  * The import is dynamic for the same two reasons as auth.ts's: it keeps the tenancy/billing
  * graph (node:crypto, the Tenant model) out of a self-hosted build, which never needs it.
  */
-async function applyTenantByoKey(v: AiConfig): Promise<void> {
-  const ctx = currentTenant();
+async function applyTenantByoKey(v: AiConfig, ctx: TenantContext): Promise<void> {
   if (ctx.isDefault || !ctx.tenantId) return; // self-hosted / SAAS_MODE off: nothing to do
   try {
     const { resolveTenantAiKey } = await import('./billing/byoKeyStore');
@@ -105,7 +105,22 @@ async function applyTenantByoKey(v: AiConfig): Promise<void> {
  *  cloud provider has no key (or custom has no URL/model), it transparently falls
  *  back to Ollama so parsing never hard-fails on a half-configured setup. */
 export async function getAiConfig(): Promise<AiConfig> {
-  const key = tenantKey();
+  // A gate wins when one is open; otherwise resolve from the HOST rather than silently
+  // accepting the default tenant.
+  //
+  // getAiConfig is called from the ROOT LAYOUT (the navbar's "AI online" dot) and from other
+  // paths that never opened a `withRequestTenant` gate. Reading only the ambient tenant there
+  // yields DEFAULT, so the lookup lands in the registry database instead of the workspace's.
+  // Live symptom 2026-08-07: a saved Anthropic key sat correctly in `tenant_home.appconfigs`
+  // while the navbar read `pharos_registry.appconfigs` (provider ollama, no key) and reported
+  // "AI offline". The key WAS saved; the app was reading the wrong database.
+  //
+  // `hasTenantContext()` first, not `softRequestTenant()` alone: that helper short-circuits to
+  // DEFAULT whenever SAAS_MODE is off, which would ignore an explicitly established context
+  // (self-hosted, and every unit test that wraps a call in `withTenant`). Honouring an open
+  // gate is also cheaper — no header read — and can never disagree with the gate that ran.
+  const ctx = hasTenantContext() ? currentTenant() : await softRequestTenant();
+  const key = tenantKey(ctx);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.t < TTL) return hit.v;
   let doc: {
@@ -132,7 +147,7 @@ export async function getAiConfig(): Promise<AiConfig> {
     await connectDB();
     // Route to the current tenant's database (default tenant → the AppConfig model
     // untouched, same query as before).
-    const Config = await currentModel(AppConfig);
+    const Config = tenantModel(await tenantDb(ctx), AppConfig);
     doc = await Config.findOne({ key: 'singleton' }).lean();
   } catch {
     /* DB down → use env defaults */
@@ -171,7 +186,7 @@ export async function getAiConfig(): Promise<AiConfig> {
   // the workspace to Ollama, and every AI call would go to a localhost Ollama that does not
   // exist on the hosted server — so a customer who had configured everything correctly got
   // silence from AI and a provider that would not stay on what they picked.
-  await applyTenantByoKey(v);
+  await applyTenantByoKey(v, ctx);
 
   // Half-configured cloud provider → quiet fallback to Ollama.
   if (
@@ -188,8 +203,12 @@ export async function getAiConfig(): Promise<AiConfig> {
 }
 
 /** Call after saving settings so the next parse picks up the change immediately.
- *  No arg → only the CURRENT tenant; `all` → every tenant. */
+ *  No arg → only the CURRENT tenant; `all` → every tenant.
+ *
+ *  Uses the AMBIENT tenant deliberately, unlike getAiConfig above: this only ever runs inside a
+ *  save action, which is already wrapped in `withRequestTenant`, so the ambient tenant is the
+ *  right one and staying synchronous keeps every existing call site unchanged. */
 export function invalidateAiConfigCache(all = false): void {
   if (all) cache.clear();
-  else cache.delete(tenantKey());
+  else cache.delete(tenantKey(currentTenant()));
 }

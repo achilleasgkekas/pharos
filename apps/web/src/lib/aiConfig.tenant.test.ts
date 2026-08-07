@@ -5,7 +5,7 @@ import { DEFAULT_TENANT, type TenantContext } from './tenancy/context';
 // getAiConfig caches the AppConfig singleton; before the tenancy fix the cache was a single
 // module slot (and the AppConfig read was not tenant-routed), so tenant A's AI provider +
 // API keys leaked to tenant B. These tests prove the cache is keyed per tenant, the AppConfig
-// read is routed through currentModel, and the self-hosted / default tenant behaves exactly as
+// read is routed per tenant, and the self-hosted / default tenant behaves exactly as
 // before.
 //
 // Own file: it mocks ./tenancy/connection + ./db module-wide; the pure isVisionModel tests in
@@ -19,11 +19,14 @@ const KEY_BY_TENANT: Record<string, string> = {
   globex: 'sk-globex',
 };
 
+// getAiConfig binds the model through `tenantModel(await tenantDb(ctx), AppConfig)` rather than
+// `currentModel`, so that it can honour a tenant resolved from the HOST when no gate is open
+// (the root layout's "AI online" dot). The mock follows that pair: tenantDb just carries the
+// context through, tenantModel turns it into the per-tenant fake.
 vi.mock('./tenancy/connection', () => ({
-  currentModel: async () => {
-    const { currentTenant } = await import('./tenancy/current');
-    const ctx = currentTenant();
-    const tag = ctx.isDefault || !ctx.tenantId ? 'default' : ctx.slug;
+  tenantDb: async (ctx: { isDefault?: boolean; tenantId?: string; slug?: string }) => ctx,
+  tenantModel: (conn: { isDefault?: boolean; tenantId?: string; slug?: string }) => {
+    const tag = conn.isDefault || !conn.tenantId ? 'default' : conn.slug!;
     return {
       findOne: () => ({
         lean: async () => ({ aiProvider: 'anthropic', anthropicApiKey: KEY_BY_TENANT[tag] }),

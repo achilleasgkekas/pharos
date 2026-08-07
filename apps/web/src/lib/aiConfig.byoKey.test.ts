@@ -23,8 +23,19 @@ const { connectDBMock, findOneLean, currentTenantMock, resolveTenantAiKeyMock } 
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/models/AppConfig', () => ({ AppConfig: {} }));
-vi.mock('./tenancy/connection', () => ({ currentModel: async () => ({ findOne: () => ({ lean: findOneLean }) }) }));
-vi.mock('./tenancy/current', () => ({ currentTenant: () => currentTenantMock() }));
+// getAiConfig binds the AppConfig read as `tenantModel(await tenantDb(ctx), AppConfig)` so it can
+// honour a tenant resolved from the host when no gate is open; the mock follows that pair.
+vi.mock('./tenancy/connection', () => ({
+  tenantDb: async () => ({}),
+  tenantModel: () => ({ findOne: () => ({ lean: findOneLean }) }),
+}));
+// `hasTenantContext` must be stubbed too, and to TRUE: these tests drive the tenant through
+// currentTenantMock, i.e. they model a request with an open gate. Left undefined, getAiConfig
+// would fall through to the host-based resolver and never see the mocked tenant at all.
+vi.mock('./tenancy/current', () => ({
+  currentTenant: () => currentTenantMock(),
+  hasTenantContext: () => true,
+}));
 vi.mock('./billing/byoKeyStore', () => ({ resolveTenantAiKey: (id: string) => resolveTenantAiKeyMock(id) }));
 
 import { getAiConfig, invalidateAiConfigCache } from './aiConfig';
