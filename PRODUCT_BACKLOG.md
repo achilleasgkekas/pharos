@@ -7,7 +7,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-08-06 (28η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-08-07 (29η σάρωση planner).
 > **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
 > και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
 > ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
@@ -215,12 +215,82 @@
 > καταστήματα (αυτό ήδη καλύπτεται από το multi-store price tracking). Η ουρά: **8 Proposed (P83-P90) + 36
 > unbuilt Approved** (φρέσκια καταμέτρηση `### P` blocks εξαιρουμένων των διπλών «αρχικό spec» headers, όχι
 > carried-over αριθμητικό) — ο builder συνεχίζει να καταναλώνει ενεργά, καμία νέα πρόταση σειράς χρειάζεται.
+>
+> **29η σάρωση (2026-08-07)** (`git log --since` από την 28η σάρωση, marker `ff2e7f7`, μέχρι το σημερινό HEAD
+> `068ae93`): 13 commits. Το μόνο product-facing item ήταν το **P77** (self-host system-health/diagnostics
+> dashboard, `027416b` + `f3a56e2`), ήδη συμφιλιωμένο στο `## Approved` με «✅ SHIPPED 2026-08-07» (verified read,
+> καμία ενέργεια χρειάζεται εδώ). Τα υπόλοιπα: docs follow-up για το ήδη-reconciled P79 (TOTP/MFA), test coverage
+> στο statements module, ένα nav bug fix (notification bell / mobile menu), ένα SaaS build-break fix + rollback
+> log, και δύο guard σαρώματα (6/8, 7/8, tenancy gaps), όλα εκτός backlog scope. **3 νέοι candidates (P91-P93)**,
+> και οι τρεις live-verified με grep πριν την πρόταση (0 hits πριν): (1) **P91**, το self-host login είναι
+> εντελώς stateless JWT (`lib/session.ts`, μηδέν session store, `grep -rn "sessionEpoch|logoutEverywhere|
+> invalidateSessions|signOutAll|revokeAllSessions" apps/web/src` = 0 hits) — αν διαρρεύσει ένα password ο μόνος
+> τρόπος να ακυρωθούν οι ενεργές συνεδρίες είναι global `AUTH_SECRET` rotation (ρίχνει ΟΛΟΥΣ, όχι per-account),
+> φυσικό follow-up πάνω στο μόλις-shipped P79. (2) **P92**, το `Item.location` πεδίο υπάρχει ήδη («where it
+> physically lives», `models/Item.ts`) αλλά είναι χρήσιμο μόνο μέσα σε ένα item (`grep -rln "byLocation|
+> LocationView|groupByLocation" apps/web/src` = 0 hits) — με δύο ενεργά σπίτια + πλήρες 12U rack layout
+> (CLAUDE.md), «τι έχω στο εξοχικό» απαιτεί σήμερα νοερή αναζήτηση. (3) **P93**, δεν υπάρχει κανένα bank/
+> checking-account statement import (`grep -rln ".ofx|OFX|QIF|bankStatement|BankAccount|bankCsv" apps/web/src`
+> = 0 hits εκτός του άσχετου SaaS `models/Account.ts`), μόνο credit-card `Statement` PDF import· **ρητά
+> διακριτό από το παγωμένο P36** (OWNER_DECISIONS #13, Open Banking auto-sync μέσω API): αυτό είναι χειροκίνητο
+> file-drop CSV/OFX, ίδιο trust model με το ήδη-δουλεμένο Statement PDF import, μηδέν τραπεζικό credential/API.
+> Η ουρά: **11 Proposed (P83-P93) + 37 unbuilt Approved** (φρέσκια καταμέτρηση), ο builder συνεχίζει να
+> καταναλώνει ενεργά με τη σειρά value/effort, καμία νέα πρόταση σειράς χρειάζεται.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P93. Manual bank/checking-account statement import (CSV/OFX, ρητά διακριτό από το παγωμένο P36) — M — OSS (κυρίως)
+- **Αξία:** live-verified `grep -rln ".ofx|OFX|QIF|bankStatement|BankAccount|bankCsv" apps/web/src` (εκτός tests)
+  = 0 hits, το μόνο match είναι το άσχετο SaaS `models/Account.ts` (tenant/org account, όχι τραπεζικός λογαριασμός).
+  Το app σήμερα βλέπει μόνο πιστωτικές κάρτες (`Statement` PDF import) και ό,τι καταχωρηθεί χειροκίνητα σε
+  Expenses/Income. Καμία ορατότητα σε καταθέσεις/αναλήψεις τρεχούμενου λογαριασμού (μισθός, πάγιες εντολές, ATM)
+  εκτός αν ο χρήστης τα ξαναπληκτρολογήσει ένα-ένα. **Ρητά διακριτό από το παγωμένο P36** (OWNER_DECISIONS #13:
+  Open Banking auto-sync μέσω GoCardless API, «θα γίνει πολύ αργότερα», κανένα routine δεν το ξαναφέρνει): αυτό
+  εδώ είναι **χειροκίνητο file import** (ο χρήστης κατεβάζει το CSV/OFX από το e-banking και το ανεβάζει), ίδιο
+  trust model με το ήδη-δουλεμένο Statement PDF import, μηδέν API/OAuth/τραπεζικά credentials.
+- **Module:** νέο `app/statements/bankImportActions.ts` (parse CSV: date/description/amount/balance columns·
+  OFX: standard format, υπάρχουν έτοιμες ελεύθερες parsers) → δημιουργεί Expense/Income drafts (reuse
+  `expenses/lib.ts` vendorKey/serialize) με πηγή flag ώστε να ξεχωρίζουν από AI-scanned. UI: νέο upload button
+  στο `/statements` ή `/expenses` («Import bank CSV»).
+- **Ανοιχτή απόφαση (builder default):** MVP = **γενικός column-mapper** (ο χρήστης δείχνει ποια στήλη είναι
+  date/desc/amount, μία φορά ανά τράπεζα, αποθηκεύεται ως template) αντί για hardcoded ελληνικό bank format
+  (κάθε τράπεζα έχει διαφορετικό export), αποφυγή brittle ad-hoc parsers ανά τράπεζα· OFX parsing follow-up
+  μόνο αν το CSV column-mapper αποδειχτεί ανεπαρκές.
+
+### P92. Location-based filter/browse view για Items (dogfooding: δύο σπίτια + rack layout) — S — OSS, dogfooding-heavy
+- **Αξία:** live-verified: το `Item.location` πεδίο υπάρχει ήδη (`models/Item.ts`: «where it physically lives
+  (room / rack / shelf)», ήδη editable στη φόρμα, `app/items/ItemsClient.tsx`) αλλά είναι **χρήσιμο μόνο μέσα σε
+  ένα item**, `grep -rln "byLocation|LocationView|groupByLocation" apps/web/src` = 0 hits, καμία σειρά φίλτρου/
+  ομαδοποίησης το χρησιμοποιεί. Το `CLAUDE.md` καταγράφει ρητά δύο ενεργά σπίτια (κεντρικό + εξοχικό Kalamos)
+  και ένα πλήρες 12U rack layout (U1-U12, συγκεκριμένη θέση ανά συσκευή), «τι έχω στο εξοχικό;» ή «τι είναι στο
+  U9;» απαιτεί σήμερα να θυμάται κανείς νοερά ή να ανοίγει κάθε κάρτα ξεχωριστά.
+- **Module:** `app/items/ItemsClient.tsx` (ίδιο `FilterGroup`/`SearchableSelect` idiom με Store/Category, νέο
+  πεδίο φίλτρου πάνω σε distinct `item.location` values) + optional grouped-by-location list view (reuse του
+  ήδη-shipped grid/list toggle).
+- **Ανοιχτή απόφαση (builder default):** MVP = **φίλτρο μόνο** (dropdown, ίδιο idiom με τα υπόλοιπα), το
+  grouped/collapsed-by-location view follow-up μόνο αν το απλό φίλτρο αποδειχτεί ανεπαρκές· κενό `location` σε
+  παλιά items = εμφανίζονται πάντα (καμία κρυφή απώλεια δεδομένων).
+
+### P91. «Αποσύνδεση παντού» / session invalidation μετά από ύποπτη πρόσβαση (follow-up στο μόλις-shipped P79) — S — OSS (κυρίως), βοηθά και SaaS self-host parity
+- **Αξία:** live-verified: το self-host login (`lib/session.ts`) είναι **εντελώς stateless JWT** (jose, HS256,
+  μηδέν session store) και `grep -rn "sessionEpoch|logoutEverywhere|invalidateSessions|signOutAll|
+  revokeAllSessions" apps/web/src` = 0 hits. Αν διαρρεύσει ένα password, ή ένα κοινόχρηστο/οικογενειακό tablet
+  μείνει συνδεδεμένο (household multi-user, P31), ο **μόνος** τρόπος να ακυρωθούν όλες οι ενεργές συνεδρίες
+  σήμερα είναι να αλλάξει το `AUTH_SECRET` στο `.env` και να γίνει restart, που ρίχνει ΚΑΘΕ χρήστη ταυτόχρονα
+  (global, όχι per-account). Φυσικό, χαμηλού-ρίσκου follow-up πάνω στο μόλις-shipped **P79** (TOTP/MFA): το ίδιο
+  settings screen που μόλις πρόσθεσε 2FA είναι το φυσικό μέρος για ένα «sign out everywhere» κουμπί.
+- **Module:** `models/User.ts` (νέο `sessionEpoch: number`, default 0) + `lib/session.ts` `signSession`/
+  `verifySession` (embed + έλεγχος του epoch μέσα στο JWT payload, mismatch = invalid) + νέα action
+  `logoutAllSessions(userId)` (bump epoch) + Settings → κουμπί «Sign out of all other devices» (και αυτόματο
+  bump στο password-change flow αν δεν συμβαίνει ήδη).
+- **Ανοιχτή απόφαση (builder default):** MVP = **παραμένει stateless** (κανένα νέο DB session-store, μόνο ένα
+  integer counter στο ήδη-υπάρχον User doc, ίδιο pattern με το `apiToken`/`calendarToken` invalidation), καμία
+  λίστα «ενεργών συσκευών» (θα χρειαζόταν πραγματικό session store, μεγαλύτερη αλλαγή, follow-up μόνο αν
+  ζητηθεί ρητά).
 
 ### P90. Side-by-side compare view για items σε status «researching» — S — OSS, dogfooding-heavy
 - **Αξία:** live-verified `grep -rln "CompareItems|compareMode|sideBySide" apps/web/src` = 0 hits. Το
