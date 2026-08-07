@@ -5593,3 +5593,18 @@ Verify: `npm run type-check` exit 0, `npm run build` success (13/13 static). Σ�
 Needs-Achilleas (open, αμεταβλητο): legal entity/Stripe, Terms+Privacy review απο ανθρωπο, contact inbox,
 χρονισμος για public repo, καναλι για αιτηση invite. **Νεο, χρονισμος οχι αποφαση**: το landing θελει
 deploy στον server για να φυγουν οι δυο ανακριβειες απο τη δημοσια σελιδα.
+
+**DEPLOYED αυθημερόν** (ο Αχιλλέας το έτρεξε χειροκίνητα, το ssh στον production μου το έκοψε ο
+classifier αυτής της συνεδρίας, δεν το παρέκαμψα). `deploy/deploy-update.sh`, όχι το σκέτο
+`up -d --build landing` που είχα προτείνει αρχικά: pre-flight health OK, backup ok,
+`DEPLOYED: 4ecdc683 → e38d8d39, healthy` (health στη 2η προσπάθεια, όσο σηκωνόταν το container).
+Έφυγαν 3 commits, αλλά rebuild πήρε **μόνο το landing**, τα άλλα δύο ήταν docs.
+
+Ανεξάρτητη επαλήθευση στο **ζωντανό** `https://ph-aros.com` (cache-busted fetch, 368 KB HTML):
+μηδέν «unlimited», μηδέν «custom domain», μηδέν «50 GB»/«500 GB», και παρόντα 1 GB / 250 / 30 members
+/ 5 GB / 1.000 / το bullet του BYO key, το καθένα 2 φορές (ορατό κείμενο + structured data). Η νέα
+πρόταση της FAQ 4 φορές, η παλιά μηδέν. Screenshot `live-pricing-after-deploy.png` (`.shots/`,
+gitignored): οι τρεις κάρτες στην παραγωγή με τα σωστά νούμερα, τα badges «invite only» ανέπαφα.
+**Η ασυμφωνία σελίδας-backend έκλεισε, δεν είναι πλέον εκκρεμότητα.**
+
+ΣΗΜ: το `DEPLOY_LOG.md` **δεν** το άγγιξα, ανήκει στο `pharos-deploy` routine.
