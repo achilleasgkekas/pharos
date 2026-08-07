@@ -528,8 +528,24 @@
   bulk-change μόνο για Items (Expenses δεν έχει status field)· **καμία** αλλαγή σε μεμονωμένα-required πεδία
   (τίτλος/ποσό) μέσω bulk — αυτά παραμένουν 1-προς-1 edit (αποφυγή κατά λάθος μαζικής αλλοίωσης).
 
-### P77. Ενιαίο self-host system-health / diagnostics dashboard — S — OSS (adoption/troubleshooting lever)
-- **Αξία:** live-verified `grep -rln "healthcheck|health-check|diagnostics|/system-health" apps/web/src` = 0 hits
+### P77. Ενιαίο self-host system-health / diagnostics dashboard — ✅ SHIPPED 2026-08-07 (pharos-daily-dev)
+- **Τι έγινε:** νέο **Settings → «System status»** tab (admin-only, self-host-only· κρυφό στο managed SaaS και το
+  ίδιο το action αρνείται εκεί, γιατί latency/ελεύθερος χώρος/ουρά job είναι νούμερα του **host**, όχι ενός tenant).
+  Πέντε πλακίδια σε ένα read-only grid, με το ήδη-υπάρχον «AI online» idiom (πράσινο/κίτρινο/κόκκινο/γκρι):
+  **Database** (ping + μέγεθος/έγγραφα/συλλογές), **Storage volume** (μέγεθος αρχείων + ελεύθερος χώρος μέσω
+  `statfs`), **AI provider** (reuse `isAiReady`, πάροχος+μοντέλο), **Background jobs** (running / κολλημένα >30′ /
+  αποτυχίες 24ώρου), **Remote mirror** (backend, auto-mirror, τελευταία επιτυχής συγχρόνιση + staleness).
+- **Διαχωρισμός γρήγορου/αργού:** το άνοιγμα του tab τρέχει ΜΟΝΟ τους γρήγορους ελέγχους, ώστε ένα NAS που κοιμάται
+  να μην κρεμάει τη σελίδα· το live FTP/SMB/OneDrive round trip (έως 15s hard timeout) μπαίνει πίσω από ρητό
+  «Test connections». Κάθε έλεγχος έχει δικό του try/catch: ένα νεκρό subsystem βγαίνει ένα κόκκινο πλακίδιο,
+  δεν ρίχνει τη σελίδα.
+- **Read-only by design:** μηδέν write, μηδέν auto-fix, μηδέν restart — μια σελίδα διαγνωστικών δεν επιτρέπεται να
+  είναι αυτή που θα χαλάσει το deployment. Το `unknown` (AI σβηστό, κανένα remote backend) μένει **γκρι**, δεν
+  μετράει ως αποτυχία και δεν ρίχνει το συνολικό verdict.
+- **Δομή:** pure/DB-free `lib/systemHealth.ts` (κατώφλια + verdicts, unit-tested αντί για θαμμένα σε server action)
+  + `settings/healthActions.ts` (το IO μισό, `requireAdmin` + `saasMode` guard) + `settings/SystemHealthPanel.tsx`.
+  36 νέα tests (26+10), 51 νέα i18n κλειδιά en+el.
+- **Αρχικό spec (για ιστορικό):** live-verified `grep -rln "healthcheck|health-check|diagnostics|/system-health" apps/web/src` = 0 hits
   (το μόνο match, `expenses/actions.ts`, είναι άσχετο string). Το Settings έχει ήδη **σκόρπια** per-integration
   «Test connection» κουμπιά (storage backend SMB/FTP/OneDrive, AI provider) αλλά ο χρήστης πρέπει να ανοίξει κάθε
   tab ξεχωριστά για να μάθει «είναι το deployment μου υγιές;». Για ένα self-hosted project (η ίδια κατηγορία

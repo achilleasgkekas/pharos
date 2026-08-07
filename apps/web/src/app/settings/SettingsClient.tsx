@@ -1,7 +1,7 @@
 'use client';
 import { useState, useTransition, useRef, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark } from 'lucide-react';
+import { Activity, Sun, Moon, Sparkles, Database, CreditCard, ExternalLink, Server, Cloud, Download, Upload, Loader2, Check, Store as StoreIcon, Pencil, Trash2, Plus, X, Copy, ShieldCheck, SlidersHorizontal, Bell, MessageSquareCode, RotateCcw, ChevronDown, Globe, HardDrive, FolderTree, RefreshCw, Plug, Users, UserPlus, KeyRound, Star, Landmark, TrendingUp, TrendingDown, CalendarPlus, Tags, MapPin, FlaskConical, Webhook, Mail, Bookmark } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/ThemeProvider';
 import { cur } from '@/lib/money';
 import { cn } from '@/components/ui/cn';
@@ -40,6 +40,7 @@ import { McpManager } from './McpManager';
 import { CalendarFeedManager } from './CalendarFeedManager';
 import { UpdateChecker } from './UpdateChecker';
 import { BookmarkletManager } from './BookmarkletManager';
+import { SystemHealthPanel } from './SystemHealthPanel';
 import { RecomputePricesButton } from './RecomputePricesButton';
 import { getSampleDataStatus, loadSampleData, clearSampleData } from './sampleDataActions';
 import { renderStoragePath, TEMPLATE_TOKENS } from '@/lib/storagePath';
@@ -107,7 +108,7 @@ const OPENROUTER_SUGGESTIONS = ['openai/gpt-4o-mini', 'anthropic/claude-3.5-sonn
 // Mirror of the server-side vision detection (lib/aiConfig.ts) for inline warnings.
 const isVisionName = (name: string) => /vl|vision|llava|minicpm-v|moondream|bakllava|llama3\.2-vision/i.test(name);
 
-type TabId = 'general' | 'money' | 'ai' | 'storage' | 'data' | 'notifications' | 'users';
+type TabId = 'general' | 'money' | 'ai' | 'storage' | 'data' | 'notifications' | 'users' | 'system';
 
 import type { Role } from '@/lib/roles';
 
@@ -121,6 +122,9 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boole
   { id: 'data', label: 'Stores & lists', icon: <StoreIcon size={15} /> },
   { id: 'notifications', label: 'Notifications', icon: <Bell size={15} />, adminOnly: true },
   { id: 'users', label: 'Users', icon: <Users size={15} />, adminOnly: true, selfHostOnly: true },
+  // P77 — host-level numbers (Mongo latency, volume free space, job queue). Shared
+  // infrastructure on the managed SaaS, so self-host + admin only.
+  { id: 'system', label: 'System status', icon: <Activity size={15} />, adminOnly: true, selfHostOnly: true },
 ];
 
 const TAB_KEY: Record<TabId, TKey> = {
@@ -131,6 +135,7 @@ const TAB_KEY: Record<TabId, TKey> = {
   data: 'set.tabData',
   notifications: 'set.tabNotifications',
   users: 'set.tabUsers',
+  system: 'set.tabSystem',
 };
 
 export function SettingsClient({ info, currentUser }: { info: Info; currentUser: CurrentUser }) {
@@ -314,6 +319,13 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
               SECOND, unrelated user list inside the product is just a way to get the two out
               of sync. Self-hosted keeps it — it is the only user management there is. */}
           {tab === 'users' && isAdmin && !saas && <UsersManager currentUserId={currentUser.id} />}
+
+          {tab === 'system' && isAdmin && !saas && (
+            <Section title={t('sys.title')} icon={<Activity size={15} />}>
+              <p className="text-xs text-[color:var(--color-text-faint)] -mt-1 mb-1">{t('sys.desc')}</p>
+              <SystemHealthPanel />
+            </Section>
+          )}
         </div>
       </div>
     </main>
