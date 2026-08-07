@@ -218,8 +218,15 @@ type Tier = {
 };
 
 // Hosted tiers mirror apps/web/src/lib/billing/plans.ts, the single source of truth
-// for plan names, monthly EUR prices and quotas (storage, AI calls, seats, custom
-// domain). Keep the two in sync: the backend is authoritative, this is its shop window.
+// for plan names, monthly EUR prices and quotas (storage, AI calls, seats). Keep the
+// two in sync: the backend is authoritative, this is its shop window.
+// Re-checked against plans.ts on 2026-08-07, after commit 9fec1b7 re-cut the limits
+// (Achilleas, interactive): Pro 250 AI calls (was 1000) / 1 GB (this page still said the
+// old 50 GB placeholder), Dedicated 1000 AI calls + 30 seats (both were "unlimited") /
+// 5 GB (said 500 GB), and CUSTOM DOMAIN was dropped from every plan, so no card and no
+// FAQ answer may promise one. Past the AI cap the calls stop for the cycle; a workspace
+// that stores its own provider key runs unmetered (verified: aiMeter.assertAiQuota is a
+// no-op for BYO-key tenants), which is why that is the last Dedicated bullet.
 // Decided 2026-08-03 (ASK_ACHILLEAS pharos-landing-20260729-1000, option b): there is
 // NO permanent free hosted tier. "Free forever" is the self-hosted edition; hosted opens
 // with a 14-day trial and is paid after it (matching provision.ts trialing -> suspended).
@@ -256,8 +263,8 @@ const TIERS: Tier[] = [
     badge: 'Most popular',
     features: [
       'Up to 5 members',
-      '50 GB storage',
-      '1,000 AI document reads per month',
+      '1 GB storage',
+      '250 AI document reads per month',
       'Shared workspace with roles and invites',
       'Priority email support',
     ],
@@ -267,15 +274,15 @@ const TIERS: Tier[] = [
     price: '€29',
     cadence: 'per month',
     amount: '29',
-    tagline: 'Your own isolated instance, unlimited seats, your own domain.',
+    tagline: 'Your own isolated instance, room for a team of up to 30.',
     cta: 'Get started',
     ctaHref: `${APP_URL}/account/signup?plan=dedicated`,
     features: [
       'Everything in Pro',
-      'Unlimited members',
-      '500 GB storage',
-      'Unlimited AI with your own key',
-      'Custom domain on your instance',
+      'Up to 30 members',
+      '5 GB storage',
+      '1,000 AI document reads per month',
+      'Bring your own AI key and those reads stop being counted',
     ],
   },
 ];
@@ -454,7 +461,7 @@ const FAQ_GROUPS: {
       },
       {
         q: 'What web address does my hosted workspace get?',
-        a: 'Its own subdomain, taken from the workspace name you pick at signup: call it Acme and you land on acme.ph-aros.com. A name written in another script is transliterated rather than thrown away, so «Πλαίσιο» becomes plaisio.ph-aros.com, and an accent folds into the letter it sits on (Müller reads as muller) instead of splitting the word in two; only a name with nothing usable left in it falls back to a generated label. If the address you would get is already in use, the next free one (-2, -3, and so on) is taken instead, and a short list of infrastructure labels (www, app, api, admin and friends) is reserved so no workspace can ever claim them. That subdomain is more than routing: each workspace also gets its own separate database rather than a shared table with a workspace column, so there is no query that can reach out of one workspace into another’s records. On the Dedicated plan you can point a domain of your own at your workspace instead, with the DNS and certificate set up together with us, and the original subdomain keeps resolving to the same place so links you have already saved do not break.',
+        a: 'Its own subdomain, taken from the workspace name you pick at signup: call it Acme and you land on acme.ph-aros.com. A name written in another script is transliterated rather than thrown away, so «Πλαίσιο» becomes plaisio.ph-aros.com, and an accent folds into the letter it sits on (Müller reads as muller) instead of splitting the word in two; only a name with nothing usable left in it falls back to a generated label. If the address you would get is already in use, the next free one (-2, -3, and so on) is taken instead, and a short list of infrastructure labels (www, app, api, admin and friends) is reserved so no workspace can ever claim them. That subdomain is more than routing: each workspace also gets its own separate database rather than a shared table with a workspace column, so there is no query that can reach out of one workspace into another’s records. Pointing a domain of your own at a hosted workspace is not on offer: a TLS certificate per customer domain, and the DNS support that comes with it, is not a burden worth carrying at this size, so every hosted workspace is reached at its ph-aros.com subdomain. Self-hosted never raises the question, it answers on whatever address you give it.',
       },
       {
         q: 'What happens when my free trial ends?',

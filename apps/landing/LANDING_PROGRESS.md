@@ -5532,3 +5532,64 @@ field-edit, gift cards, καμια απο τις οποιες δεν ειδα α
 
 Needs-Achilleas (open, αμεταβλητο): legal entity/Stripe, Terms+Privacy review απο ανθρωπο, contact inbox,
 χρονισμος για public repo, καναλι για αιτηση invite (τωρα `hello@ph-aros.com`).
+
+## 2026-08-07 (η σελιδα πουλουσε «unlimited» και custom domain, τα ορια ξανακοπηκαν σημερα)
+
+Το increment βγηκε απο σημερινο commit στο app, οχι απο τη λιστα του προηγουμενου entry (τα δυο πρωτα
+σημεια της περιμενουν ακομα γεγονοτα, invite-only και public repo). Το `9fec1b7`
+(feat(billing): νεα ορια πακετων, το top plan παυει να ειναι απεριοριστο), αποφαση Αχιλλεα interactive
+σημερα, ξανακοψε ολο το ladder στο `apps/web/src/lib/billing/plans.ts`. Η landing πουλουσε το παλιο
+μοντελο, και σε δυο σημεια πουλουσε πραγμα που **δεν υπαρχει πλεον καθολου**.
+
+Διασταυρωση καθε νουμερου απευθειας στο `plans.ts` (οχι απο το commit message), σελιδα -> αληθεια:
+
+| | ελεγε | ειναι |
+|---|---|---|
+| Pro storage | 50 GB | **1 GB** (παλιο placeholder, το ειχε χασει και πριν το σημερινο commit) |
+| Pro AI | 1.000 reads | **250** |
+| Dedicated members | Unlimited | **30** |
+| Dedicated storage | 500 GB | **5 GB** (ιδιο, παλιο placeholder) |
+| Dedicated AI | Unlimited με δικο σου κλειδι | **1.000** στο κλειδι της πλατφορμας |
+| Custom domain | «Custom domain on your instance» | **καταργηθηκε απο ολα τα πακετα** |
+
+**1. Pricing cards**: τα εξι νουμερα διορθωθηκαν. Το tagline του Dedicated («unlimited seats, your own
+domain») εγινε «Your own isolated instance, room for a team of up to 30»: το «isolated instance»
+**κρατηθηκε** γιατι ειναι αληθινο, το `models/Tenant.ts:37` οριζει `tier` ως «shared = own db on the
+shared cluster, dedicated = own instance».
+
+**2. Το bullet του BYO key, γραμμενο μετα απο ελεγχο και οχι σαν παρηγορια**: «Bring your own AI key and
+those reads stop being counted». Επαληθευτηκε οτι ισχυει: `aiMeter.assertAiQuota` ειναι no-op για BYO-key
+tenants, το `aiConfig.ts:76-80` δινει **προτεραιοτητα** στο κλειδι του πελατη πανω απο το platform key
+ακριβως ωστε να μη χρεωνονται calls που εχει ηδη πληρωσει στον παροχο, και το `ai-key/route.ts` **δεν**
+κλειδωνει το feature ανα πακετο (μονο owner/admin). Αρα το ceiling των 1.000 ειναι ceiling στο κλειδι του
+operator, οχι στο AI.
+
+**3. Το χειροτερο σημειο, μια FAQ που υποσχοταν υπηρεσια που δεν υπαρχει**: η απαντηση «What web address
+does my hosted workspace get?» ελεγε «On the Dedicated plan you can point a domain of your own at your
+workspace instead, **with the DNS and certificate set up together with us**». Δηλαδη δεσμευση για
+χειροκινητη δουλεια ανα πελατη, σε feature που καταργηθηκε σημερα. Τωρα λεει καθαρα οτι δεν προσφερεται
+και γιατι (TLS ανα domain πελατη + DNS support), με το self-host να μην εχει καν το ερωτημα. **Το κειμενο
+της ερωτησης δεν αγγιχτηκε**, αρα το anchor `#faq-what-web-address-does-my-hosted-workspace-get` μενει και
+κανενα deep link δεν εσπασε (επαληθευτηκε στο σερβιρισμενο HTML).
+
+**4. Το σχολιο πανω απο το `TIERS`** κραταει πλεον ημερομηνια re-check (2026-08-07), το commit hash και τι
+ακριβως αλλαξε, ωστε το επομενο sweep να ξερει απο ποιο σημειο και μετα να συγκρινει.
+
+Verify: `npm run type-check` exit 0, `npm run build` success (13/13 static). Στο ζωντανο DOM: **μηδεν**
+εμφανισεις «unlimited», **μηδεν** «custom domain», μηδεν «50 GB»/«500 GB», και παρουσια των 1 GB / 250 /
+30 members / 5 GB / 1.000. **Screenshots** (`.shots/`, gitignored): `pricing-limits-desktop.png` (και οι
+τρεις καρτες με τα νεα νουμερα, τα badges «invite only» ανεπαφα), `pricing-limits-mobile.png` (375px, το
+διγραμμο bullet του BYO key ρεει σωστα μεσα στην καρτα), `faq-no-custom-domain.png` (μεσω deep-link, η
+απαντηση ανοιγει και διαβαζεται καθαρα). `read_console_messages` κανενα error. Ο dev server σταματησε.
+
+ΣΗΜ: η αλλαγη ειναι **μονο στο repo**. Το ζωντανο `https://ph-aros.com` σερβιρει ακομα τα παλια νουμερα
+μεχρι να τρεξει το deploy στον server, και ειδικα εδω αυτο εχει σημασια: μεχρι τοτε η δημοσια σελιδα
+υποσχεται custom domain και unlimited seats που το backend δεν δινει πλεον.
+
+Επομενο increment: (1) οταν ανοιξει η εγγραφη, `HOSTED_INVITE_ONLY=false` (με ελεγχο στη ζωντανη φορμα),
+(2) οταν ανοιξει το public repo, `REPO_PUBLIC=true` + πραγματικο `docker pull` στο quick start, (3) sweep
+στο επομενο user-facing feature.
+
+Needs-Achilleas (open, αμεταβλητο): legal entity/Stripe, Terms+Privacy review απο ανθρωπο, contact inbox,
+χρονισμος για public repo, καναλι για αιτηση invite. **Νεο, χρονισμος οχι αποφαση**: το landing θελει
+deploy στον server για να φυγουν οι δυο ανακριβειες απο τη δημοσια σελιδα.
