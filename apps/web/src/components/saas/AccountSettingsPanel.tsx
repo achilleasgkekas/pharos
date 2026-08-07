@@ -20,6 +20,7 @@ import {
   describeAccountSettingsError,
 } from './accountSettings';
 import { mfaCodeReady, mfaPasswordReady, describeMfaError } from './mfaSettings';
+import { QrCode } from '@/components/QrCode';
 
 type Props = {
   email: string;
@@ -464,20 +465,16 @@ export function AccountSettingsPanel({ email, name, emailVerified, mfaEnabled, m
           {mfaStage === 'enrolling' && mfaSecret && (
             <div className="space-y-3">
               <p className="text-sm text-[color:var(--color-text-dim)]">
-                Add this key to your authenticator app, then enter the 6-digit code it shows.
+                Scan this with your authenticator app, then enter the 6-digit code it shows.
               </p>
+              {mfaUri && <QrCode value={mfaUri} label="Scan to add this account to your authenticator app" />}
               <div className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3">
                 <p className="text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-text-faint)]">
-                  Manual entry key
+                  Can&rsquo;t scan? Enter this key by hand
                 </p>
                 <p className="mt-1 select-all break-all font-mono text-sm text-[color:var(--color-text)]">
                   {mfaSecret}
                 </p>
-                {mfaUri && (
-                  <p className="mt-2 select-all break-all font-mono text-xs text-[color:var(--color-text-faint)]">
-                    {mfaUri}
-                  </p>
-                )}
               </div>
               <label className="block text-sm">
                 <span className="text-[color:var(--color-text-dim)]">6-digit code</span>

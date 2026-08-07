@@ -36,6 +36,7 @@ import {
 } from './users.actions';
 import type { MfaStatus } from '@/lib/userMfaStore';
 import { mfaCodeReady, mfaPasswordReady, describeMfaError } from '@/components/saas/mfaSettings';
+import { QrCode } from '@/components/QrCode';
 import { McpManager } from './McpManager';
 import { CalendarFeedManager } from './CalendarFeedManager';
 import { UpdateChecker } from './UpdateChecker';
@@ -231,9 +232,25 @@ export function SettingsClient({ info, currentUser }: { info: Info; currentUser:
 
               <DefaultsManager settings={info.settings} />
 
-              <SelfPasswordCard />
+              {/* Password and two-factor belong to the ACCOUNT, not to a workspace. On a hosted
+                  deployment /account/settings already owns both, and rendering them here too
+                  produced two live copies of the same control on the same screen — with the
+                  self-host copy sitting inert next to a working one. Self-hosted (no /account
+                  segment at all) keeps them: it is the only place they exist. */}
+              {!saas && <SelfPasswordCard />}
 
-              <SelfMfaCard />
+              {!saas && <SelfMfaCard />}
+
+              {saas && (
+                <Section title={t('set.security')}>
+                  <p className="text-xs text-[color:var(--color-text-dim)]">
+                    {t('set.securityLivesInAccount')}{' '}
+                    <a href="/account/settings" className="text-[color:var(--color-accent)] hover:underline">
+                      {t('set.accountSettings')}
+                    </a>
+                  </p>
+                </Section>
+              )}
 
               <Section title={t('set.about')}>
                 <UpdateChecker canEdit={isAdmin} />
@@ -3586,10 +3603,10 @@ function SelfMfaCard() {
       {stage === 'enrolling' && (
         <div className="space-y-2.5">
           <p className="text-xs text-[color:var(--color-text-dim)]">{t('set.twoFactorEnrollHint')}</p>
+          {uri && <QrCode value={uri} label={t('set.twoFactorQrAlt')} />}
           <div className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3">
             <p className="text-[10px] uppercase tracking-wider text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('set.twoFactorManualKey')}</p>
             <p className="mt-1 select-all break-all text-sm" style={{ fontFamily: 'var(--font-mono)' }}>{secret}</p>
-            {uri && <p className="mt-2 select-all break-all text-xs text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{uri}</p>}
           </div>
           <label className="block text-xs">
             <span className="text-[color:var(--color-text-dim)]">{t('set.twoFactorCode')}</span>

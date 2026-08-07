@@ -8,7 +8,7 @@ import { getAppSettings } from '@/lib/appSettings';
 import { currencySymbol } from '@/lib/money';
 import { isAiReady } from '@/lib/ollama';
 import { getSessionUser } from '@/lib/auth';
-import { saasMode } from '@/lib/tenancy/saasMode';
+import { saasUiEnabled } from '@/lib/tenancy/saasPage';
 import { getAiConfig } from '@/lib/aiConfig';
 import { AiOnboardingBanner } from '@/components/AiOnboardingBanner';
 import { getServerT } from '@/lib/i18n/server';
@@ -74,7 +74,7 @@ export default async function RootLayout({
   // with it instead of leaving them relative. `undefined` (the tenant-host case) means "stay
   // relative", unchanged from before.
   let productBaseUrl: string | undefined;
-  if (user && saasMode()) {
+  if (user && saasUiEnabled()) {
     const [
       { getCurrentAccount },
       { superadminAllowlist, isSuperadminEmail },
@@ -134,7 +134,7 @@ export default async function RootLayout({
               state or route doesn't remount the page subtree and reset client state. */}
           {user && (
             <ChromeGate>
-              <SiteNav aiReady={aiReady} saas={saasMode()} operator={operator} user={{ name: user.name || 'account', role: user.role }} productBaseUrl={productBaseUrl} />
+              <SiteNav aiReady={aiReady} saas={saasUiEnabled()} operator={operator} user={{ name: user.name || 'account', role: user.role }} productBaseUrl={productBaseUrl} />
               {banner && <AiOnboardingBanner reason={banner} productBaseUrl={productBaseUrl} />}
             </ChromeGate>
           )}

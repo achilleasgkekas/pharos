@@ -20,12 +20,26 @@ import {
 } from '@/lib/tenancy/accountSession';
 
 /**
+ * Is the user-facing SaaS UI actually reachable on this deployment?
+ *
+ * THE ONE PREDICATE. Anything that decides "does /account exist" — the segment gate below, and
+ * equally the navbar that offers to LINK there — must ask this and nothing else. It exists
+ * because the two used to disagree: the account menu rendered on `saasMode()` alone while the
+ * segment 404s on `saasMode() && accountAuthConfigured()`, so a deployment with SAAS_MODE on and
+ * AUTH_SECRET missing showed "Workspaces & account", "Billing & plan" and the operator console
+ * as menu items that ALL dead-ended in 404. Reported as "it does not open".
+ */
+export function saasUiEnabled(): boolean {
+  return saasMode() && accountAuthConfigured();
+}
+
+/**
  * Ensure the SaaS UI is enabled for this deployment, or `notFound()` (throws — never returns).
  * Self-hosted (SAAS_MODE off) and fail-closed misconfig (no AUTH_SECRET) both collapse to a
  * single 404 so the segment simply does not exist for the OSS app.
  */
 export function requireSaasUiEnabled(): void {
-  if (!saasMode() || !accountAuthConfigured()) notFound();
+  if (!saasUiEnabled()) notFound();
 }
 
 /**

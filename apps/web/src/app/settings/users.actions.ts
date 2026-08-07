@@ -12,6 +12,7 @@ import {
   mfaEnrollRequiresReauth,
   type MfaStatus,
 } from '@/lib/userMfaStore';
+import { secretCryptoReady } from '@/lib/tenancy/secretCrypto';
 
 export type UserRow = { id: string; username: string; name: string; role: Role };
 
@@ -106,7 +107,12 @@ export async function getSelfMfaStatus(): Promise<MfaStatus> {
   const me = await requireUser();
   await connectDB();
   const status = await describeUserMfaStatus(me.id);
-  return status ?? { enabled: false, pending: false, cryptoReady: false };
+  // `describeUserMfaStatus` returns null only when the user ROW is missing — which says nothing
+  // about the server's crypto config. The old fallback hardcoded `cryptoReady: false`, and the
+  // card renders that as "not available on this server yet — set AUTH_SECRET". So a missing row
+  // produced a confident, wrong instruction to go change an environment variable that was
+  // already correct (seen live with a 44-char AUTH_SECRET). Report the real thing.
+  return status ?? { enabled: false, pending: false, cryptoReady: secretCryptoReady() };
 }
 
 /** Start (or restart) TOTP enrollment. Requires the current password ONLY when MFA is already
