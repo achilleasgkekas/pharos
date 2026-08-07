@@ -2,7 +2,7 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 7a9d15d -->
+<!-- reviewed: 3751b22 -->
 <!-- docker-validated: 7e28354 -->
 <!-- ui-audited: 0bc5e14 -->
 
@@ -11625,3 +11625,61 @@ Commit: `027416b`. `PRODUCT_BACKLOG.md` → P77 σημειώθηκε ✅ SHIPPED
   package και δεν υπάρχει κανένα `v*.*.*` tag → ο update check αποτυγχάνει σιωπηλά), **P46**/**P74** last mile,
   **P81** (`CRON_SECRET` στο `.env` + restart), **P31** live check με τους τρεις ρόλους. **P36 / P16** παραμένουν
   παγωμένα με ρητό κανόνα σιωπής (`OWNER_DECISIONS.md` #13).
+
+## 2026-08-07 — reviewer (68η σάρωση, έλεγχος 7a9d15d..3751b22, 30 commits)
+
+Guard: `ROUTINES_PAUSED` δεν υπήρχε. `ASK_ACHILLEAS.md`: μόνο ένα entry addressed σε `pharos/reviewer`
+(`reviewer-20260727-2010`), ήδη APPLIED, μηδέν ANSWERED να εφαρμοστεί, καμία νέα OPEN απόφαση χρειάστηκε.
+
+`npm run type-check` (web) **EXIT 0**. `npx vitest run` πλήρης → **6422 passed / 2 failed / 4 skipped, 397 files
+(398 total, 1 file fail)**. Τα 2 fails είναι το ήδη γνωστό `aiConfig.tenant.test.ts` timeout flake (καταγεγραμμένο
+από την 67η σάρωση, 2026-08-05, πριν από αυτό το range) — επιβεβαιώθηκε ξανά ότι ΔΕΝ είναι νέο: τα ίδια 3 test
+names υπήρχαν ήδη στο `git show c318aff:...aiConfig.tenant.test.ts` (commit πριν το σημερινό `b857347` που άγγιξε
+το ίδιο αρχείο), και το timeout pattern (ακριβώς 5000ms σε 2 από τα 5 tests, ασύνδετο με ποιο tenant-context path
+παίρνει το κάθε test) δεν σχετίζεται με το σημερινό `hasTenantContext()`/`softRequestTenant()` dispatch fix. Δεν
+το κυνήγησα παραπέρα, ήδη τεκμηριωμένο ως pre-existing flake σε πολλαπλά προηγούμενα περάσματα.
+
+**Έλεγχος διαφοράς**: `git log 7a9d15d..HEAD` = 30 commits/70 αρχεία (+5784/-125). Διάβασα γραμμή-γραμμή τα
+υψηλού-ρίσκου: **(1) `b857347`** (aiConfig.ts tenant-routing fix — το root layout's "AI online" dot διάβαζε
+πάντα το DEFAULT/registry DB αντί του ambient tenant, `hasTenantContext()` πρώτα αλλιώς `softRequestTenant()` από
+το HOST, ΟΧΙ σκέτο `softRequestTenant()` γιατί εκείνο short-circuit-άρει σε DEFAULT όταν SAAS_MODE off) — reasoning
+σωστό, τα δύο test files ενημερώθηκαν συνεπώς. **(2) `06bf44a`** (fail2ban admin unban UI, νέο `lib/saas/f2b.ts` +
+route) — πλήρες read: ο container ΔΕΝ αγγίζει ποτέ το fail2ban socket, μόνο γράφει request αρχεία, strict IP/jail
+regex validation ΚΑΙ στις δύο πλευρές (app-side courtesy + host-side authoritative στο `deploy/f2b-bridge.sh`,
+που διάβασα ολόκληρο: action allowlist μόνο "unban", jail allowlist, IP regex, multiline/extra-field rejection,
+age cap, reason-logged rejects), atomic temp+rename write, 202 όχι 200 (queued όχι done). Καθαρό. **(3) `910d1af`**
+(deletion queue admin screen) — read-only by design, `requireSuperadminPage()` gate, `loadDeletionQueue` κάνει
+μόνο `Tenant.find` με `.select`/`.limit`, κανένα write path. Καθαρό. **(4) `4ecdc68`** (unknown subdomain → 404,
+branded not-found.tsx, autofill fix) — verified live ότι `/account/verify` και `/account/workspace` routes
+όντως υπάρχουν (`find` στο `app/(saas)`), η νέα `assertKnownWorkspaceHost()` στο root layout σωστά καλύπτει
+ΚΑΘΕ route (layout wraps everything) αντί να βασίζεται σε per-page opt-in. **(5) `9fec1b7`** (billing plan caps,
+Dedicated παύει unlimited AI/seats/custom-domain) + **(6) `e482659`** (landing copy follow-up, ίδια μέρα) — τα
+νέα νούμερα στο `plans.ts` (Pro 250 AI/1GB/5 seats, Dedicated 1000 AI/5GB/30 seats, custom domain false παντού)
+verified byte-for-byte έναντι του landing page μετά το follow-up commit· η αξίωση "BYO-key tenants are metered
+no-op" στο commit message επαληθεύτηκε στο `lib/billing/aiMeter.ts` (`enforceAiQuota` resolves unlimited για
+τον default tenant/SAAS_MODE off, `recordAiUsage` no-op). **(7) `8a7fb77`**/**`8332b12`** (MFA/QR/menu 404 fixes,
+verify-email link fix) — verified live ότι τα δύο "έδειχνε 404" reports ήταν πραγματικά bugs (λάθος route
+`/verify` αντί `/account/verify`, `/account` post-login router αντί για destination) και τα fixes δείχνουν στα
+σωστά, υπαρκτά routes. **(8) `2cc1e31`** (notification bell mobile-menu bug) — μικρό, καθαρό root-cause (shared
+panel state, effect guard σε `open`). **(9) `027416b`** (System status health panel) — read-only, admin-only,
+self-host-only (SAAS_MODE gate), pure threshold logic σε ξεχωριστό `systemHealth.ts` (unit-tested), IO half
+(`healthActions.ts`) requireAdmin-gated, καμία write. **(10) `3751b22`** (cloud-guard scan, docs-only) —
+επιβεβαιώνει production υγιές (4 containers RestartCount 0, backups offsite, certs έως Νοέμβριο), έκλεισε το
+standing "superadmin χωρίς MFA" P2, και επαναβεβαιώνει το ΞΕΧΩΡΙΣΤΟ P1 (13 αρχεία χωρίς `withRequestTenant`,
+owned by `pharos-saas-core`, "ακίνδυνο σήμερα, P0 με τη δεύτερη πρόσκληση") — δεν είναι το ίδιο P1 με το standing
+`settings/actions.ts` Trash gap παρακάτω, δύο ξεχωριστά ανοιχτά items. Τα υπόλοιπα (i18n el/en +59 keys ισόρροπα
+και στις δύο γλώσσες, νέα test-only αρχεία `statements/actions.import.test.ts`+`moneyAgenda.test.ts`, `qrcode`
+νέο dependency για MFA enrollment) spot-checked καθαρά. Secrets sweep (grep key/token/password/PEM/BEGIN στο
+πλήρες diff) → **μηδέν committed secret**.
+
+**Μηδέν νέο P1/P2/P3 εύρημα.** Δεν χρειάστηκε κανένα fix (ούτε μικρό, tsc ήταν ήδη καθαρό).
+
+Standing P1 (`settings/actions.ts` Trash tenancy gap, `TRASH_MODELS` raw model map χωρίς `scoped()`) live-verified
+ΑΚΟΜΑ TODO, αμετάβλητο — κανένα commit σε αυτό το range το αγγίζει (`grep -c "withRequestTenant\|currentModel"`
+= 4 στο αρχείο, όλα εκτός των 4 Trash exports). i18n gap σταθερό (en=1427/el=1397, 30 missing keys).
+
+**Routine health**: PROGRESS/OSS_PROGRESS/SAAS_PROGRESS/CLOUD_GUARD όλα με φρέσκια 2026-08-07 activity, κανένα
+routine φαίνεται stuck. `docs/DOCS_PROGRESS.md` ενεργό (43η run, 2026-08-06). Ένα ανοιχτό `ASK_ACHILLEAS.md` item
+(`bakecore-finance-20260728-1030`, ~10 μέρες OPEN) είναι BakeCore, εκτός scope εδώ, απλά σημειώνεται.
+
+Marker ενημερώθηκε: `<!-- reviewed: 3751b22 -->`. Πλήρες write-up στο `WEB_DEBT.md` (68η σάρωση).

@@ -3,6 +3,38 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-08-07 68η σάρωση [reviewer routine]· type-check web EXIT 0· full vitest 6422/6428 passed (397/398 files, 4 skipped) — 1 file/2 τεστ FAIL, το ήδη γνωστό `aiConfig.tenant.test.ts` timeout flake, επιβεβαιωμένο ξανά ΟΤΙ προϋπήρχε του σημερινού `b857347` (ίδια 3 test names ήδη στο `c318aff`, το commit πριν)· 30 commits ελέγχθηκαν [`7a9d15d..3751b22`]· μηδέν νέο P1/P2/P3 εύρημα· standing P1 [settings Trash tenancy gap] ΑΚΟΜΑ TODO αμετάβλητο· ξεχωριστό cloud-guard P1 [13 αρχεία χωρίς withRequestTenant, owned by pharos-saas-core] ΑΚΟΜΑ ανοιχτό· el.ts i18n gap σταθερό (30, en=1427/el=1397)· μηδέν committed secret)
+
+> **Έλεγχος διαφοράς**: `git log 7a9d15d..HEAD` = 30 commits/70 αρχεία (+5784/-125). Γραμμή-γραμμή στα υψηλού-ρίσκου:
+> **`b857347`** (aiConfig.ts tenant-routing fix — το root layout's "AI online" dot διάβαζε πάντα το DEFAULT/registry
+> DB αντί του ambient tenant· `hasTenantContext()` πρώτα αλλιώς `await softRequestTenant()` από το HOST, ΟΧΙ σκέτο
+> `softRequestTenant()` γιατί short-circuit-άρει σε DEFAULT όταν SAAS_MODE off) — reasoning σωστό, τα δύο σχετικά
+> test files ενημερώθηκαν συνεπώς. **`06bf44a`** (fail2ban admin unban UI, νέο `lib/saas/f2b.ts`) — πλήρες read
+> ΚΑΙ του `deploy/f2b-bridge.sh`: ο container ΔΕΝ αγγίζει ποτέ το fail2ban socket, μόνο γράφει request αρχεία·
+> strict IP/jail validation και στις δύο πλευρές (app-side courtesy, host-side authoritative: action allowlist
+> μόνο "unban", jail allowlist, IP regex, multiline/extra-field rejection, age cap, reason-logged rejects), atomic
+> temp+rename write, 202 όχι 200. Καθαρό. **`910d1af`** (deletion queue admin screen) — read-only by design,
+> `requireSuperadminPage()` gate, `loadDeletionQueue` μόνο `Tenant.find` με `.select`/`.limit`, κανένα write path.
+> **`4ecdc68`** (unknown subdomain → 404, branded not-found.tsx, autofill fix) — verified live ότι `/account/verify`
+> και `/account/workspace` routes όντως υπάρχουν, η νέα `assertKnownWorkspaceHost()` στο root layout σωστά καλύπτει
+> ΚΑΘΕ route (layout wraps everything) αντί per-page opt-in. **`9fec1b7`**+**`e482659`** (billing plan caps +
+> landing follow-up) — νέα νούμερα στο `plans.ts` verified byte-for-byte έναντι landing page· η αξίωση "BYO-key
+> tenants are metered no-op" επαληθεύτηκε στο `lib/billing/aiMeter.ts`. **`8a7fb77`**+**`8332b12`** (MFA/QR/menu
+> 404 fixes) — verified live ότι τα reported 404s ήταν πραγματικά bugs (λάθος route, post-login router used as
+> destination) και τα fixes δείχνουν σε σωστά, υπαρκτά routes. **`2cc1e31`** (notification bell mobile-menu bug)
+> μικρό/καθαρό. **`027416b`** (System status health panel) — read-only, admin-only, self-host-only, pure threshold
+> logic ξεχωριστά unit-tested. **`3751b22`** (cloud-guard scan, docs-only) — production υγιές, έκλεισε standing
+> "superadmin χωρίς MFA" P2, επαναβεβαιώνει ΞΕΧΩΡΙΣΤΟ P1 (13 αρχεία tenant-isolation gap, owned by pharos-saas-core,
+> "ακίνδυνο σήμερα, P0 με τη δεύτερη πρόσκληση"). i18n +59 keys ισόρροπα en/el, νέα test-only αρχεία spot-checked
+> καθαρά, `qrcode` νέο dependency (MFA enrollment). Secrets sweep (grep key/token/password/PEM/BEGIN στο πλήρες
+> diff) → μηδέν committed secret.
+> **Standing queue re-verified live**: το P1 `settings/actions.ts` Trash gap ΑΚΟΜΑ TODO — `grep -c
+> "withRequestTenant\|currentModel"` = 4 στο αρχείο, όλα εκτός των 4 Trash exports, αμετάβλητο (κανένα commit σε
+> αυτό το range το αγγίζει).
+> **Routine health**: PROGRESS/OSS_PROGRESS/SAAS_PROGRESS/CLOUD_GUARD όλα με φρέσκια 2026-08-07 activity, κανένα
+> routine φαίνεται stuck. Ένα ανοιχτό `ASK_ACHILLEAS.md` item (`bakecore-finance-20260728-1030`, ~10 μέρες OPEN)
+> είναι BakeCore, εκτός scope.
+
 ## Σύνοψη audit (2026-08-05 67η σάρωση [reviewer routine]· type-check web EXIT 0· full vitest 6255/6261 passed (389 files, 4 skipped) — 1 file/2 τεστ FAIL, το ήδη γνωστό `aiConfig.tenant.test.ts` timeout flake, αμετάβλητο· 73 commits ελέγχθηκαν [`c568a3b..7a9d15d`]· μηδέν νέο P1/P2/P3 εύρημα· standing P1 [settings Trash tenancy gap] ΑΚΟΜΑ TODO αμετάβλητο· el.ts i18n gap σταθερό (30, en=1374/el=1344)· μηδέν committed secret)
 
 > **Έλεγχος διαφοράς (μεγάλο range, ~24 ώρες fleet activity)**: `git log c568a3b..HEAD` = 73 commits/359 αρχεία (+11620/-20866, κυρίως το mobile-discontinuation cleanup που ήδη ήταν γνωστό). Δεν διαβάστηκε γραμμή-γραμμή το σύνολο· εστίασα στα υψηλού-ρίσκου: **(1) `ffc034d`/`b12c4b7`/`7cc41b5`/`a7ac296`** (SiteNav-παντού nav-bug σειρά, 4 commits) — κάθε ένα έχει σαφή root-cause + live repro + tsc/test/Docker-smoke verification, exemplary iterative fixing· **(2) `9e9572a`** (account/admin surface unification, 8 fixes) — spot-checked το `adminOverview.ts` diff (νέο `activeTotal` excludes canceled, `Account.countDocuments` excludes superadmin emails)· επιβεβαιώθηκε ότι `Account.email` schema έχει `lowercase:true,trim:true` άρα η σύγκριση με το normalized `superadminAllowlist()` είναι συνεπής, όχι case-mismatch bug· **(3) `a2da7ca`** (νέο `deploy/f2b-bridge.sh`, host-side fail2ban unban queue) — πλήρες shell-script read: authoritative validation στον host (action/jail-allowlist/IP-regex/multiline/age/extra-fields όλα rejected με reason-logged), ο container δεν αγγίζει ποτέ το fail2ban socket· "step 1 of 3", ΔΕΝ έχει ακόμα app-side writer (grep `f2b` στο `apps/web/src` = 0 hits) άρα no attack surface ανοιχτό ακόμα· **(4) `c58a79a`** (per-plan storage quota enforcement, το πρώτο πραγματικό wiring του `lib/storage.ts` σε tenant subtree) — `assertStorageQuota` πριν το write, `recordStorageDelta` best-effort μετά save/delete, OSS/self-hosted no-op by construction (`tenantStorageRoot()` null)· 45 νέα/updated τεστ· TOCTOU race ανάμεσα σε δύο ταυτόχρονα uploads του ίδιου tenant θα μπορούσε να ξεπεράσει ελαφρώς το quota (δεν υπάρχει lock), αλλά είναι soft/business limit όχι security boundary, ίδιο risk-level με το ήδη-documented "best-effort" σχόλιο του ίδιου κώδικα — δεν το θεωρώ νέο εύρημα· **(5) `middleware.ts`** (SaaS front-door gate, `isSaasPublicPath` deny-by-default) — έκλεισε πραγματικό ζωντανό hole (SAAS_MODE άφηνε όλο το product ανοιχτό σε signed-out visitor, verified live 2026-08-04 στο commit message), νέο `middleware.saasGate.test.ts` pin-άρει το boundary με negative tests (path traversal, prefix-confusion)· **(6) `purgeExecute.ts`** (destructive tenant-erasure, armed πίσω από `SAAS_PURGE_EXECUTE` δεύτερο flag, off by default) — ήδη περασμένο από ρητή έγκριση Αχιλλέα (`ASK_ACHILLEAS pharos-saas-core-20260805-0840`), `isSafeTenantDbName` predicate αυστηρό (exact-match `tenant_<slug>`, forbidden-name denylist, length cap) — δεν βρήκα gap. Secrets sweep (grep key/token/password/PEM/BEGIN στο πλήρες diff, εξαιρουμένων test/env.example/comment context) → μηδέν committed secret. `npm run type-check` EXIT 0. `npx vitest run` πλήρης → 6255 passed/2 failed (μόνο το γνωστό flake)/4 skipped, 389 files — ίδιος αριθμός με τον ισχυρισμό των commit messages, independently verified.
