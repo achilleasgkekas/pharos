@@ -9,6 +9,7 @@ import { usePathname } from 'next/navigation';
 const LINKS: Array<{ href: string; label: string }> = [
   { href: '/admin', label: 'Overview' },
   { href: '/admin/tenants', label: 'Workspaces' },
+  { href: '/admin/deletions', label: 'Deletions' },
   { href: '/admin/audit', label: 'Activity' },
   { href: '/admin/firewall', label: 'Firewall' },
 ];
