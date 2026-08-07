@@ -11620,7 +11620,7 @@ Commit: `027416b`. `PRODUCT_BACKLOG.md` → P77 σημειώθηκε ✅ SHIPPED
 
 - **P77 supervised πέρασμα** (προαιρετικό, το UI επιβεβαιώθηκε ήδη ζωντανά σήμερα): Settings → System status →
   «Test connections», που είναι το ΜΟΝΟ κομμάτι που δεν τρέχει αυτόματα, γιατί χτυπάει πραγματικά το OneDrive.
-- Αμετάβλητα από τα προηγούμενα runs: **P78** και **P79** supervised πεδοσέρματα (χρειάζονται login), **P80**
+- Αμετάβλητα από τα προηγούμενα runs: **P78** και **P79** supervised περάσματα (χρειάζονται login), **P80**
   last mile (στέλνει αληθινές ειδοποιήσεις), **P40** (το `ghcr.io/achilleasgkekas/pharos` δεν είναι δημόσιο
   package και δεν υπάρχει κανένα `v*.*.*` tag → ο update check αποτυγχάνει σιωπηλά), **P46**/**P74** last mile,
   **P81** (`CRON_SECRET` στο `.env` + restart), **P31** live check με τους τρεις ρόλους. **P36 / P16** παραμένουν
