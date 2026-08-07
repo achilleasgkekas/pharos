@@ -144,11 +144,17 @@ export function resetEmail(link: string): { subject: string; html: string } {
   };
 }
 
-/** The user-facing verification link a request email points at (a future /verify page reads
- *  the token and posts it to /api/saas/account/verify/confirm). `base` should be normalized. */
+/** The user-facing verification link a request email points at: the page reads the token and
+ *  posts it to /api/saas/account/verify/confirm. `base` should be normalized.
+ *
+ *  MUST match the real route: app/(saas)/account/verify/page.tsx. This said `/verify` — written
+ *  while that page was still "a future /verify page" — and the page landed at /account/verify
+ *  instead, so every verification email shipped a link to a route that does not exist (confirmed
+ *  live 2026-08-07: /verify → 307 to login → 404, /account/verify → 200). Exactly the same slip
+ *  that resetConfirmUrl above already had and already fixed; this one just outlived it. */
 export function verifyLinkUrl(base: string, token: string): string {
   const b = (base || '').replace(/\/+$/, '');
-  return `${b}/verify?token=${encodeURIComponent(token)}`;
+  return `${b}/account/verify?token=${encodeURIComponent(token)}`;
 }
 
 /** Build the email-verification email body. Pure — no send. */

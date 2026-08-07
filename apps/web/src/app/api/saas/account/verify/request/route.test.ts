@@ -344,7 +344,7 @@ describe('POST /api/saas/account/verify/request — outbound email', () => {
     await POST(makeReq('https://tenant.pharos.app/api/saas/account/verify/request'));
 
     const link = /href="([^"]+)"/.exec(sendEmailMock.mock.calls[0][0].html)?.[1] as string;
-    expect(link.startsWith('https://tenant.pharos.app/verify?token=')).toBe(true);
+    expect(link.startsWith('https://tenant.pharos.app/account/verify?token=')).toBe(true);
   });
 
   it('prefers SAAS_PUBLIC_URL over both APP_URL and the request origin', async () => {
@@ -356,7 +356,7 @@ describe('POST /api/saas/account/verify/request — outbound email', () => {
     await POST(makeReq('https://origin.example.com/api/saas/account/verify/request'));
 
     const link = /href="([^"]+)"/.exec(sendEmailMock.mock.calls[0][0].html)?.[1] as string;
-    expect(link.startsWith('https://public.example.com/verify?token=')).toBe(true);
+    expect(link.startsWith('https://public.example.com/account/verify?token=')).toBe(true);
   });
 
   it('falls back to APP_URL when SAAS_PUBLIC_URL is unset', async () => {
@@ -368,7 +368,7 @@ describe('POST /api/saas/account/verify/request — outbound email', () => {
     await POST(makeReq('https://origin.example.com/api/saas/account/verify/request'));
 
     const link = /href="([^"]+)"/.exec(sendEmailMock.mock.calls[0][0].html)?.[1] as string;
-    expect(link.startsWith('https://app-url.example.com/verify?token=')).toBe(true);
+    expect(link.startsWith('https://app-url.example.com/account/verify?token=')).toBe(true);
   });
 
   it('percent-encodes the token in the link so base64url stays intact', async () => {

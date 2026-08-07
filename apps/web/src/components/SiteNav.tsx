@@ -181,7 +181,15 @@ function UserMenu({ user, saas, operator, base }: { user: SessionUser; saas: boo
           {saas && (
             <>
               <div className="my-1 border-t border-[color:var(--color-border)]" />
-              <Link href="/account" prefetch={false} onClick={() => setOpen(false)} className={menuRow}>
+              {/* /account/workspace, NOT /account. `/account` is a post-login ROUTER, not a
+                  destination: with exactly one membership it redirects straight into the product
+                  subdomain (see (saas)/account/page.tsx, deliberate). Right after login, wrong
+                  from a menu — pressing "Workspaces & account" from inside the product bounced
+                  you back to the page you were already on, so the item read as dead. Reported
+                  live: "it gets me to the main page". /account/workspace is the real overview,
+                  and it carries its own workspace switcher when there is more than one, so the
+                  chooser is still one click away. */}
+              <Link href="/account/workspace" prefetch={false} onClick={() => setOpen(false)} className={menuRow}>
                 <Building2 size={15} /> {t('nav.workspaces')}
               </Link>
               <Link href="/account/workspace/billing" prefetch={false} onClick={() => setOpen(false)} className={menuRow}>
