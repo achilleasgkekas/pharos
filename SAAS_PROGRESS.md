@@ -7741,3 +7741,62 @@ SPF+DKIM· (γ) Stripe όταν έρθουν keys.
 θέλει `- ./f2b:/var/lib/pharos/f2b` δίπλα στο υπάρχον storage mount — δεν είναι δικό μου έδαφος.
 Χωρίς αυτό η σελίδα δείχνει σωστά «unknown» και το κουμπί επιστρέφει 503 «the f2b bridge directory
 is not mounted», δηλαδή αποτυγχάνει θορυβωδώς αντί σιωπηλά.
+
+## 2026-08-07 — increment 152: η οθόνη που πρέπει να υπάρχει ΠΡΙΝ οπλιστεί το drop
+
+Το `SAAS_PURGE_EXECUTE` είναι σκόπιμα κλειστό στην παραγωγή, και αυτό αφήνει ένα κενό που κανείς δεν
+βλέπει: ένα workspace μπορεί να περάσει την προθεσμία του **σήμερα** και να κάθεται εκεί χωρίς
+τίποτα να το διαγράφει, με μοναδικό ίχνος μια απάντηση cron που δεν διαβάζει άνθρωπος. Το να
+οπλίσεις διακόπτη που ρίχνει βάσεις πελατών χωρίς οθόνη που λέει πού είναι στραμμένος είναι λάθος
+σειρά. Άρα: **πρώτα αυτή η οθόνη**, μετά ένας μήνας παρατήρησης, μετά το flag.
+
+**`/admin/deletions`**, μόνο για ανάγνωση, με πρόθεση. **Κανένα cancel** (ο κύκλος erasure ανήκει
+στον owner, από τα δικά του settings) και **κανένα delete** (ανήκει στον executor, πίσω από το δικό
+του flag). Δεύτερο καταστροφικό μονοπάτι είναι ακριβώς ο τρόπος με τον οποίο το ένα από τα δύο
+αποκτά bug και παίρνει μαζί του τα δεδομένα ενός πελάτη.
+
+**Δύο πράγματα που η οθόνη αρνείται να θολώσει:**
+
+**(α) «τίποτα δεν είναι due» ≠ «η διαγραφή είναι κλειστή».** Άδειος πίνακας τα εμφανίζει
+πανομοιότυπα, όπως ακριβώς στο firewall screen. Η γραμμή κατάστασης δεν είναι ποτέ προαιρετική:
+κλειστό με 3 ληγμένα → κίτρινο «τίποτα δεν τα διαγράφει»· οπλισμένο → «το επόμενο run επιχειρεί N,
+M περιμένουν»· cap 0 → λέει ρητά ότι είναι kill switch.
+
+**(β) Το `refused` bucket, που είναι και το ουσιαστικό εύρημα του increment.** Μια σειρά που ο
+purge θα απορρίψει στο `isSafeTenantDbName` **δεν είναι εκκρεμής διαγραφή, είναι κολλημένη**. Ως
+κανονική «due» γραμμή θα μάζευε days-overdue ενώ ο operator περίμενε κάτι που δεν πρόκειται να
+συμβεί. Χειρότερα, διαβάζοντας τον executor: το `batch = scan.targets.slice(0, cap)` και το
+`purgeTarget` **δεν** ελέγχει το safe-name, άρα η απορριπτέα σειρά **γίνεται target, επιχειρείται,
+αποτυγχάνει, και έχει ήδη ξοδέψει τη θέση της**. Με αρκετές τέτοιες, το cap εξαντλείται πριν φτάσει
+σε πραγματική διαγραφή και η ουρά **σταματά να αδειάζει ενώ φαίνεται απασχολημένη**. Η οθόνη το λέει
+δυνατά, με χωριστό κόκκινο panel και ρητή προειδοποίηση starvation.
+
+Μαζί: ουρά **suspended** (το τροφοδοτικό, με «enrolled in Nd», warned ή όχι) και — ξεχωριστή τιμή —
+**«clock not started»** για suspended χωρίς `suspendedAt`. Κενό κελί θα διαβαζόταν «άγνωστη
+προθεσμία, ίσως αύριο»· η αλήθεια είναι «το sweep θα του δώσει ρολόι και τότε αρχίζουν οι 30 μέρες».
+Επίσης: system-initiated erasure δείχνει **«suspension expired»**, ποτέ πρόσωπο — κανείς δεν το
+ζήτησε, και η απόδοση σε owner θα ήταν ψέμα στο audit trail.
+
+**Αρχεία**: `components/saas/deletionQueueView.ts` (pure view model, client-safe),
+`DeletionQueuePanel.tsx` (4 πίνακες, χωρίς 'use client' — δεν υπάρχει interaction),
+`lib/tenancy/deletionQueue.ts` (read-only loader, 2 filters, cap 200 με ρητό truncation notice),
+`app/admin/deletions/page.tsx`, + link στο `AdminNav`.
+
+**Verified**: `npm run type-check` exit 0· **32 νέα tests**, και επιβεβαιωμένα μη κενά (γυρίζοντας το
+`attemptable` πίσω σε σκέτο `due.length` πέφτει ακριβώς το starvation test)· **142 files / 2184
+tests green** σε `lib/tenancy`, `lib/billing`, `components/saas`, `api/saas`. Probe στο deployed:
+`/admin/deletions` → 307 προς `/account/login?next=%2Fadmin%2Fdeletions`, ίδια με `/admin` και
+`/admin/firewall` — **αυτό αποδεικνύει την πύλη, ΟΧΙ ότι η σελίδα υπάρχει στον server**: το redirect
+το κάνει το middleware πριν καν αναλυθεί το route, και η σελίδα δεν έχει γίνει deploy ακόμα. Render
+verification μετά το deploy, όπως και με το firewall. Μηδέν Docker (καμία αλλαγή σε runtime wiring:
+νέα αρχεία, καμία dependency, κανένα env, κανένα compose).
+
+**Next task:** (α) η πύλη tenant στα 13 αρχεία — **περιμένει την απάντηση** στο ASK
+`pharos-cloud-guard-20260807-0300` (η κλίση του είναι (α), και το gate work είναι κοινό και στις
+τρεις επιλογές, αλλά το αν ανοίγει το beta είναι απόφαση του Αχιλλέα, όχι δική μου)· (β) sending
+domain SPF+DKIM· (γ) Stripe όταν έρθουν keys.
+
+**## Needs Achilleas:** **Stripe keys**, **plan pricing**, το **πότε** μπαίνει το
+`SAAS_PURGE_EXECUTE=1` (τώρα υπάρχει η οθόνη για να το κρίνεις — πρότασή μου: ένας μήνας
+παρατήρησης πρώτα), το `- ./f2b:/var/lib/pharos/f2b` mount στο `deploy/docker-compose.prod.yml`,
+και η απάντηση στο ASK `pharos-cloud-guard-20260807-0300`.
