@@ -7,241 +7,60 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-08-07 (29η σάρωση planner).
-> **⚑ ΜΑΖΙΚΗ ΕΓΚΡΙΣΗ 2026-07-09/10 (Αχιλλέας, interactive):** τα P1/P3/P5-P36 (+ PA1-PA3) εγκρίθηκαν όλα εν μαζώ
-> και έχουν πλέον σχεδόν ολοκληρωτικά shippαριστεί από τον builder (βλ. `PROGRESS.md` για το πλήρες ιστορικό
-> ανά σάρωση — συμπιέστηκε εδώ, git blame αυτού του αρχείου κρατά τις παλιές καταχωρήσεις).
-> **Standing κατάσταση (20ή σάρωση, 2026-07-29):** το «Approved» queue παραμένει ουσιαστικά χωρίς αυτόνομα-
-> buildable items — μόνο P36 (Open Banking, blocked σε provider decision), P31 (household multi-user — ήδη
-> SHIPPED 2026-07-27, βλ. `## Approved`, live check με τρεις ρόλους ακόμα εκκρεμεί), P16 remainder (Firefly
-> III/Grocy importers, χρειάζεται πραγματικό sample file), **P9** (multi-currency — πλέον σχεδόν πλήρες, μόνο ο
-> προαιρετικός rate-feed/`resolveFx` στα imports απομένει), **P17** (camera UI ήδη SHIPPED 2026-07-27, βλ.
-> `## Approved` — εκκρεμεί μόνο ένα supervised πέρασμα σε φυσική συσκευή, ο simulator δεν έχει κάμερα, βλ.
-> `OWNER_DECISIONS.md` #9), P23 (share-sheet capture, χρειάζεται native config plugin + EAS dev build, ξεχωριστό
-> από το P17 blocker) μένουν τεχνικά ανοιχτά αλλά κανένα δεν είναι «απλώς χτίσ' το» unattended. Σημ.: το
-> `ASK_ACHILLEAS.md` που ανέφεραν προηγούμενες σαρώσεις **δεν υπάρχει πια στο repo** (verified `find` — 0 hits),
-> η απάντησή του μάλλον απορροφήθηκε στο `OWNER_DECISIONS.md` (#9, interactive session 2026-07-27)· διόρθωσα το
-> stale reference εδώ, καμία άλλη ενέργεια χρειάζεται.
-> **Καμία ρητή έγκριση Proposed→Approved σε 15 διαδοχικές σαρώσεις** — το batch-review πρόταση της 16ης σάρωσης
-> παραμένει σε ισχύ και ενισχύεται· το Proposed queue έφτασε **33 items (P37-P74, εξαιρουμένου του P63 που
-> μετακινήθηκε στο `## Done` σε προηγούμενη σάρωση — ήταν ήδη SHIPPED αλλά είχε μείνει σωματικά στο Proposed section)**.
-> Ζωντανό grep σε κάθε σάρωση επιβεβαιώνει ότι κανένα Proposed item δεν έχει χτιστεί εν τω μεταξύ χωρίς ρητή
-> έγκριση (re-verified 20ή σάρωση: `verifyBackup`/`trackingNumber`/split σε Subscription μοντέλο = 0 hits, όλα
-> ακόμα genuinely unbuilt — δες παρακάτω τα 3 νέα P72-P74). Σημ. (16η σάρωση, ισχύει ακόμα): το `/network` (UniFi)
-> module αφαιρέθηκε ρητά από το codebase (commit `5eb912d`, "Strip personal info" pivot) — μην ξαναπροταθεί
-> δικτυακό/hardware monitoring, `docs/features.md` έχει ακόμα stale αναφορά (docs-debt, όχι product backlog item).
-> Δεδομένου του μεγέθους της ουράς (33 proposed, μηδέν έγκριση σε 15 σαρώσεις), το πιο χρήσιμο επόμενο βήμα είναι
-> πλέον ένα **interactive batch-review με τον Αχιλλέα** (ίδιο idiom με το batch approval 2026-07-09/10 των P1/P3/
-> P5-P36) παρά νέα προτεινόμενα items — ο planner θα συνεχίσει να προσθέτει μικρό αριθμό (≤3-5) νέων candidates
-> ανά σάρωση όπως ζητά το task file, αλλά ο ρυθμός εύρεσης πλέον ξεπερνά κατά πολύ τον ρυθμό απόφασης.
-> **19η σάρωση (2026-07-28) — 3 νέοι candidates P69-P71**, και οι τρεις live-verified με grep/read κώδικα:
-> (1) **P71** — υπάρχει ήδη ένα έτοιμο AES-256-GCM primitive (`lib/tenancy/secretCrypto.ts`, σήμερα μόνο για το
-> SaaS BYO-key) αλλά **κανένα** module για μικρά προσωπικά text-secrets (WiFi/router/NAS admin logins, license
-> keys) — μόνο το P21 file-vault υπάρχει, verified `grep -rn "vault\|SecretNote" apps/web/src/models`. (2) **P70**
-> — το `Item.specs` είναι ένα ενιαίο free-text blob, **μηδέν structured key-value πεδίο** (verified grep), οπότε
-> ένα hardware-heavy inventory (δίκτυο/Battle Station, CLAUDE.md) δεν μπορεί να φιλτράρει by συγκεκριμένο attribute
-> (MAC/serial/rack-unit). (3) **P69** — το Reports monthly-spend chart είναι μόνο rolling window (6/12/24 μήνες),
-> **καμία** year-over-year σύγκριση ίδιου μήνα (verified `grep -rn "yoy\|previousYear\|lastYear"` = 0 hits) — με
-> δύο σπίτια εποχιακά διαφορετικά (P34), «είναι αυτό φυσιολογικό για την εποχή;» δεν απαντιέται σήμερα.
-> **20ή σάρωση (2026-07-29) — 3 νέοι candidates P72-P74**, και οι τρεις live-verified με grep (μηδέν hits πριν
-> την πρόταση, όχι απλά «νομίζω ότι λείπει»): (1) **P74** — καμία μεταφορά δεν επαληθεύει ότι ένα backup αρχείο
-> είναι όντως restorable (`grep -rn "verifyBackup\|backupHealth\|restoreTest\|integrityCheck"` = 0 hits)· το ήδη-
-> shipped `exportData`/`backup.sh` γράφει το αρχείο αλλά ποτέ δεν το ξανα-διαβάζει για να επιβεβαιώσει ότι είναι
-> έγκυρο, διακριτό από P54 (encryption-at-rest) και P48 (mirror-sync staleness — αυτό είναι για το ίδιο το
-> περιεχόμενο, όχι για το αν έφτασε στο remote). (2) **P73** — το `Subscription` model έχει μηδέν split πεδίο
-> (`grep -n "split\|Split" models/Subscription.ts` = 0 hits) ενώ το `lib/split.ts` (P35, ήδη-shipped, pure/DB-free)
-> καλύπτει ήδη ακριβώς αυτό το σχήμα για Expenses — μια οικογενειακή συνδρομή (Netflix/Spotify family plan) που
-> μοιράζεται με σπίτι/φίλους δεν έχει σήμερα κανέναν τρόπο να δείξει «ποιος χρωστάει τι ανά κύκλο» χωρίς να
-> περνά χειροκίνητα από Expenses κάθε φορά. (3) **P72** — το `Item.status` έχει ήδη `'ordered'` state (verified
-> `ITEM_STATUSES` στο `models/Item.ts`) αλλά **κανένα** πεδίο tracking number/carrier/delivery-status
-> (`grep -rn "trackingNumber\|carrier\|shipment\|deliveryStatus"` = 0 hits, web + mobile) — ένα shopping item σε
-> "ordered" είναι σήμερα ένα μαύρο κουτί μέχρι να φτάσει, καμία σύνδεση με το πραγματικό courier tracking.
-> **21η σάρωση (2026-07-30) — μόνο 2 νέοι candidates αυτή τη φορά (P75-P76), σκόπιμα λιγότεροι από το συνηθισμένο
-> 3-5**: η ουρά έφτασε 35 items χωρίς καμία έγκριση σε 16 σαρώσεις, οπότε προτιμήθηκαν δύο **στενά-scoped
-> follow-ups πάνω σε ήδη-shipped δουλειά** (χαμηλότερο ρίσκο decision-fatigue από νέα ανεξάρτητα features).
-> Και οι δύο live-verified με grep, μηδέν hits πριν την πρόταση: (1) **P75** — το P31 (household multi-user,
-> shipped 2026-07-27) έγραφε ρητά στο δικό του value prop «...+ ρόλους + "ποιος καταχώρησε τι" attribution»,
-> αλλά το πραγματικά-shipped slice κάλυψε μόνο τον 3ο ρόλο (`viewer`) + write-guard enforcement — το attribution
-> κομμάτι έμεινε 0% (`grep -rln "createdBy" apps/web/src/models` = 0 hits, ΚΑΙ μετά το ship). Δεν είναι νέο
-> feature, είναι το μισό ενός ήδη-εγκεκριμένου item που δεν έφτασε ποτέ σε νέο backlog entry. (2) **P76** —
-> κανένα mechanism «δώσε πρόσβαση σε έμπιστο άτομο αν μου συμβεί κάτι» (`grep -rln "emergencyAccess\|
-> legacyContact\|trustedContact\|deadManSwitch"` apps/web apps/mobile = 0 hits) — καθιερωμένο pattern σε
-> password managers (1Password Emergency Kit, Bitwarden Emergency Access) που ταιριάζει φυσικά στο ήδη-
-> προτεινόμενο P71 (secrets vault) + P42 (document expiry) και στο ίδιο το "Personal Hub" backronym, αλλά
-> ανεξάρτητο feature ό,τι κι αν αποφασιστεί για το P71.
+> Τελευταία ενημέρωση: 2026-08-08 (30ή σάρωση planner).
+> **Ιστορικό σαρώσεων (συμπιεσμένο στην 30ή σάρωση, ήταν ~230 γραμμές σκαναρίσματος-προς-σκανάρισμα, τώρα
+> αυτό το block· τίποτα δεν χάθηκε, το αναλυτικό σκεπτικό ανά item μένει μέσα στο ίδιο item παρακάτω και στο
+> `PROGRESS.md`/`git log -p -- PRODUCT_BACKLOG.md` για όποιον θέλει το πλήρες historical trace):**
+> 29 σαρώσεις 2026-06-xx έως 2026-08-07. Τρεις μαζικές εγκρίσεις έσπασαν διαδοχικά decision-fatigue μπλοκαρίσματα:
+> **2026-07-09/10** (P1/P3/P5-P36 + PA1-PA3), **2026-08-03** «approve all» (38 items, P37-P80), **2026-08-07**
+> τρεις θεματικές ομάδες Α (χρήματα/ακρίβεια)/Β (συνδρομές)/Γ (αντικείμενα), 22 items, **με ρητή δεσμευτική
+> σειρά Α→Γ→Β**, + ξεχωριστά P94 (storage add-on, blocked σε Stripe price ids από τον Αχιλλέα)/P95 (BYO-key
+> add-on)/P96 (admin center, 14 items A1-E2, δεσμευτική σειρά A→B1/C1→υπόλοιπα).
 >
-> **22η σάρωση (2026-07-31)** — έλεγξα `git log --since` από την 21η σάρωση (marker `4c8268b`): μηδέν νέο shipped
-> feature να συμφιλιωθεί εδώ, η δουλειά του builder ήταν αποκλειστικά **SaaS multi-tenancy plumbing** (tenant-
-> scoped connections σε notifications/statements) + test coverage, όχι backlog items — καμία μετακίνηση σε Done
-> χρειάζεται. Η ουρά παραμένει στα **35 Proposed, μηδέν έγκριση σε 17 διαδοχικές σαρώσεις** — το ίδιο decision-
-> fatigue σημείο που σημείωσε η 20ή/21η σάρωση παραμένει το πραγματικό bottleneck, όχι έλλειψη candidates. Αντί
-> να προσθέσω ξανά 3-5 ανεξάρτητα νέα items πάνω σε μια ήδη-υπερφορτωμένη λίστα, **μόνο 1 νέο item αυτή τη φορά**
-> (P77, live-verified gap) + ένα μικρό **quick-start shortlist** πιο κάτω με τα 5 χαμηλότερου-ρίσκου items της
-> ουράς (καθαρά additive, καμία νέα εξάρτηση, ίδιο "άδειο = καμία αλλαγή" idiom με όλα τα ήδη-shipped batches) —
-> ΟΧΙ μετακίνηση σε Approved (αυτό παραμένει αποκλειστικά δικό του call), απλά μια πρόταση σειράς αν θελήσει να
-> ξανακάνει ένα batch-review σαν το 2026-07-09/10. **P77** — verified `grep -rln "healthcheck\|health-check\|
-> diagnostics\|/system-health" apps/web/src` = 0 hits (το ένα false-positive hit σε `expenses/actions.ts` είναι
-> άσχετο, unrelated string match): το Settings έχει ήδη ξεχωριστά «Test connection» κουμπιά ανά integration
-> (UniFi ήδη αφαιρέθηκε, SMB/FTP/OneDrive/AI provider όμως ναι) αλλά **καμία ενιαία σελίδα** που να δείχνει «είναι
-> το deployment μου υγιές» με μια ματιά — καθαρό self-host adoption/troubleshooting lever, διακριτό από το ήδη-
-> proposed P40 (update-available banner, μόνο version check).
+> **Κατάσταση ουράς (30ή σάρωση, 2026-08-08):** ενεργά buildable, όχι μπλοκαρισμένη. Ο builder καταναλώνει με
+> τη δεσμευτική σειρά της ομάδας Α: **P61 shipped 2026-08-08** (partial bill payments), **P69 επόμενο**
+> (year-over-year Reports). Η ουρά παραμένει μεγάλη (Proposed + unbuilt Approved, ~45+ items μεταξύ των δύο)
+> οπότε ο ρυθμός νέων προτάσεων μένει χαμηλός (1-2/σάρωση) μέχρι να αδειάσει περισσότερο, αντί του συνηθισμένου
+> 3-5.
 >
-> **🗂 Quick-start shortlist (πρόταση σειράς, ΟΧΙ approval)** — αν ο Αχιλλέας θέλει να σπάσει το μπλοκάρισμα με
-> ένα μικρό batch αντί να διαβάσει όλα τα 36, αυτά τα 5 είναι τα πιο «χαμηλού ρίσκου, καθαρά additive, μηδέν νέα
-> απόφαση αρχιτεκτονικής» της ουράς (όλα S, όλα «κενό = καμία αλλαγή συμπεριφοράς»): **P74** (backup verify),
-> **P40** (update-available banner), **P46** (expense duplicate detection, mirror ήδη-shipped receipts pattern),
-> **P66** (AI assistant model-coverage gap, καθαρό consistency fix σε ήδη-δουλεμένο pipeline), **P48** (mirror
-> sync-staleness alert). Δεν είναι «οι πιο value-πυκνές» υποχρεωτικά, είναι οι πιο **εύκολες να εγκριθούν χωρίς
-> σκέψη** — ό,τι μπορεί να ξεμπλοκάρει τη ροή.
->
-> **23η σάρωση (2026-08-01)** — `git log --since` από την 22η σάρωση (marker επιβεβαιωμένος `dc51c6f`): η δουλειά
-> του builder παρέμεινε αποκλειστικά **SaaS tenant-scoping plumbing** (notifications/subscriptions actions +
-> ένα write-guard gap που έκλεισε στο `2b203b7`) + test coverage — μηδέν νέο product-facing feature να
-> συμφιλιωθεί σε Done. Μία διόρθωση όμως χρειαζόταν: το **P9** (multi-currency) έγραφε ακόμα «εκκρεμεί το
-> προαιρετικό rate-feed» ενώ το `SAAS_PROGRESS.md` (2026-08-01 entry) σημείωνε ρητά ότι αυτός ο τίτλος είναι stale
-> — live-verified εδώ (`lib/fxRates.ts`/`app/fxRateActions.ts` + `FxRateButton` wired σε **6/6** clients: bills/
-> expenses/items/receipts/statements/subscriptions) → το P9 entry ενημερώθηκε σε πλήρως SHIPPED. **1 νέο
-> candidate (P78)**, live-verified με grep πριν την πρόταση (bulk field-edit λείπει από Items πέρα από AI-fill/
-> merge, και λείπει εντελώς από Expenses — select-mode δεν υπάρχει καν εκεί). Η ουρά παραμένει στα **36 Proposed,
-> μηδέν έγκριση σε 18 διαδοχικές σαρώσεις** — το ίδιο decision-fatigue bottleneck της 20ής-22ης σάρωσης, το quick-
-> start shortlist παραπάνω παραμένει η πιο πρακτική πρόταση αν θελήσει να ξεμπλοκάρει με ένα μικρό batch.
->
-> **24η σάρωση (2026-08-02)** — `git log --since` από την 23η σάρωση (marker επιβεβαιωμένος `d4b98b5`): η δουλειά
-> του builder παρέμεινε πάλι αποκλειστικά **SaaS tenant-scoping plumbing** (tasks actions + read path, `9513644`)
-> + test coverage (i18nActions) + ένα landing docs-consistency fix (`humans.txt`) — μηδέν νέο product-facing feature
-> να συμφιλιωθεί σε Done. **2 νέοι candidates (P79-P80)**, και οι δύο live-verified με grep πριν την πρόταση: (1)
-> **P79** — υπάρχει ήδη ένα πλήρες TOTP/MFA primitive (`lib/tenancy/totp.ts`, `lib/tenancy/recoveryCodes.ts`,
-> `lib/tenancy/mfaStore.ts`) αλλά χρησιμοποιείται **αποκλειστικά** από το SaaS `Account`/`api/saas/auth/mfa` —
-> το self-host `models/User.ts` (login μέσω `/login` + `api/v1/auth/login`) έχει **μηδέν** MFA πεδίο (verified
-> `grep -n "mfa|totp|MFA" apps/web/src/models/User.ts` = 0 hits). Ένα self-hosted instance εκτεθειμένο μέσω
-> WireGuard/reverse-proxy σήμερα προστατεύεται μόνο από password — καθαρό trust-lever gap, ίδιο primitive ήδη
-> proven στο SaaS side, καμία νέα κρυπτογραφική δουλειά. (2) **P80** — το ήδη-shipped P24 (outbound webhooks,
-> `lib/webhooks.ts`) κάνει **fire-once, καμία retry λογική, κανένα delivery log** (verified `grep -n "retry|
-> attempt|deliveryLog|history" lib/webhooks.ts` = μόνο 1 άσχετο hit, `results.filter(...status===fulfilled)`
-> που είναι απλά το `Promise.allSettled` per-call αποτέλεσμα, όχι persisted ιστορικό) — αν ένα Home Assistant/n8n
-> endpoint είναι προσωρινά down, η ειδοποίηση χάνεται σιωπηλά χωρίς κανένα ίχνος. Η ουρά έφτασε **38 Proposed,
-> μηδέν έγκριση σε 19 διαδοχικές σαρώσεις** — το ίδιο decision-fatigue bottleneck παραμένει, το quick-start
-> shortlist πιο πάνω (P74/P40/P46/P66/P48) συνεχίζει να είναι η πιο πρακτική πρόταση αν θελήσει ένα μικρό batch.
->
-> **25η σάρωση (2026-08-03)** — `git log --since` από την 24η σάρωση (marker `a62482b`): η δουλειά του builder
-> παρέμεινε πάλι αποκλειστικά **SaaS tenant-scoping plumbing** (shopping-list actions + read path, `83d0271`) +
-> ένα docker-health rebuild-validation log + ένα landing dual-positioning fix + saas platform-audit UI (quick-window
-> chips) + ένα storage test slice — μηδέν νέο product-facing feature να συμφιλιωθεί σε Done. **1 νέος candidate
-> (P81)**, live-verified πριν την πρόταση και το πιο σημαντικό εύρημα εδώ αρκετών σαρώσεων: το πλήρες, ήδη-shipped
-> notification framework (§3 στο TODO.md· 8 alert kinds: deal/installment/warranty/pricehike/trialend/giftcard/bill
-> + budget, `runAlertChecks` στο `app/settings/actions.ts`) **δεν πυροδοτείται ΠΟΤΕ αυτόματα** — `grep -rn
-> "runAlertChecks" apps/web/src/app/api` = 0 hits, το μόνο call-site είναι το χειροκίνητο κουμπί «Check & notify
-> now» στο `SettingsClient.tsx`. Ταυτόχρονα υπάρχει ήδη ένα δουλεμένο, tested pattern για ακριβώς αυτή τη δουλειά
-> στο SaaS side: `CRON_SECRET`-gated routes (`app/api/saas/usage/sample/route.ts`, `app/api/saas/trials/sweep/
-> route.ts`) που περιμένουν εξωτερικό cron να τα χτυπήσει με bearer token — απλά δεν έχει επεκταθεί ποτέ στο
-> self-host alert engine, παρόλο που το ίδιο το CLAUDE.md το σημείωνε ήδη ως «μελλοντικό» στο Session 2026-06-07
-> («δόσεις/warranty alerts δουλεύουν manual ή με cron [μελλοντικό]») και έμεινε ανοιχτό έκτοτε χωρίς να γίνει ποτέ
-> δικό του backlog item. Η ουρά έφτασε **39 Proposed, μηδέν έγκριση σε 20 διαδοχικές σαρώσεις** — το ίδιο
-> decision-fatigue bottleneck παραμένει, το quick-start shortlist πιο πάνω (P74/P40/P46/P66/P48) συνεχίζει να είναι
-> η πιο πρακτική πρόταση αν θελήσει ένα μικρό batch. Σημείωση: το P81 θα άξιζε να μπει ΚΑΙ στο shortlist (ίδιο
-> «χαμηλού ρίσκου, καθαρά additive» προφίλ, reuse ατόφιου pattern) αλλά δεν το πρόσθεσα εκεί μόνος μου — το
-> shortlist είναι ήδη μια πρόταση σειράς, η επέκτασή του μένει στον Αχιλλέα.
->
-> **26η σάρωση (2026-08-04)** — `git log --since` από την 25η σάρωση (marker `a62482b`, μέχρι το σημερινό HEAD
-> `750bb30`): το «approve all» της 3ης Αυγ **δούλεψε** — ο builder κατανάλωσε πλέον ενεργά την ουρά, **P81
-> (αυτόματο cron trigger, `fda8c96`) και P66 (AI βλέπει όλα τα modules, `d774dd4`) και P74 (backup verify, `60d25f4`)
-> shipped** και ήδη συμφιλιωμένα στο `## Approved` παρακάτω (κανένα νέο reconciliation χρειάζεται εδώ). Το
-> decision-fatigue bottleneck των προηγούμενων 20 σαρώσεων έσπασε· η ουρά είναι πλέον ενεργά buildable, οπότε
-> επέστρεψα στο κανονικό ρυθμό προτάσεων (**3 νέα candidates, P82-P84**) αντί του περιορισμένου 1-2 των σαρώσεων
-> 22-25. Και τα τρία live-verified με grep πριν την πρόταση: (1) **P82** — το πλέον-ενεργό (μετά το P81) automatic
-> cron σκανάρει και ξαναστέλνει το **ίδιο** ntfy/Discord/Slack/Telegram/push μήνυμα σε ΚΑΘΕ πυροδότηση όσο μια
-> συνθήκη μένει true (`runAlertChecks` καλεί `dispatchAlert()` unconditionally όποτε `lines.length`, μηδέν
-> σχέση με το ήδη-υπάρχον `dedupeKey` σύστημα του bell) — πρόβλημα που ουσιαστικά δεν υπήρχε πριν το P81 (κανείς
-> δεν έτρεχε το check ξανά και ξανά αυτόματα), τώρα είναι σχεδόν βέβαιο side-effect του «point any cron at it».
-> (2) **P83** — το ίδιο το P12 (savings goals, shipped) καταγράφει ρητά στο δικό του «Builder default»: «auto-feed
-> από κατηγορία = phase 2, δεν χτίστηκε» (βλ. `## Approved` P12 παρακάτω) — ποτέ δεν έγινε δικό του backlog item,
-> ίδιο μοτίβο με το P75 (μισό ενός shipped item που δεν προωθήθηκε). Το ήδη-shipped P25 (budget rollover) υπολογίζει
-> ήδη το αδιάθετο υπόλοιπο ανά κατηγορία/μήνα — φυσικό ζευγάρωμα, καμία νέα λογική υπολογισμού. (3) **P84** —
-> `Card.creditLimit` είναι ήδη πεδίο, ήδη εμφανίζεται στατικά («€3000 limit», `StatementsClient.tsx:1482`), αλλά
-> `grep -n "creditLimit|outstanding|utilization" StatementsClient.tsx` δείχνει **καμία** σύγκριση με το πραγματικό
-> outstanding balance (που υπολογίζεται ήδη αλλού στο ίδιο αρχείο) — μηδέν badge, μηδέν alert-engine entry, παρόλο
-> που το CLAUDE.md δείχνει multi-card installment management ως ενεργό use case του χρήστη.
->
-> **27η σάρωση (2026-08-05)** — `git log --since` από την 26η σάρωση (marker `750bb30`, μέχρι το σημερινό HEAD
-> `f203c58`): πολύ μεγάλο εύρος commits (~90), αλλά σχεδόν όλα **SaaS/infra plumbing** (billing/signup flow,
-> reset-link 404 fix, rate-limiting, SMTP email, deploy pipeline hardening, cloud-guard backup verification,
-> multi-arch image build) — μηδέν νέο product-facing feature που να χρειάζεται reconciliation σε Done πέρα από
-> το **P80** (webhook delivery retry + per-channel log), που ο ίδιος ο builder ήδη το σημείωσε SHIPPED στο
-> `## Approved` παρακάτω (commit `dd5b712`, ίδιο commit που ενημέρωσε και αυτό το αρχείο — καμία ενέργεια
-> χρειάζεται εδώ). **3 νέοι candidates (P85-P87)**, και οι τρεις live-verified με grep πριν την πρόταση (0 hits): (1)
-> **P85** — το ήδη-καθιερωμένο dedup pattern (`findDuplicateReceipts`/`findDuplicateExpenses`/`findDuplicateItems`/
-> `findDuplicateStores`, verified `grep -n "export async function findDuplicate"` = ακριβώς αυτά τα 4) **δεν
-> καλύπτει ποτέ Subscriptions** — μια κατά λάθος διπλή εγγραφή (π.χ. Netflix ξανακαταχωρημένο μετά από cancel+
-> re-signup, ή δύο μέλη του νοικοκυριού που καταχώρησαν το ίδιο family-plan ξεχωριστά, βλ. P73) μένει αόρατη.
-> Καθαρό follow-up πάνω σε ήδη-δουλεμένο μηχανισμό, μηδέν νέα αρχιτεκτονική. (2) **P86** — το P81 (auto cron
-> trigger, shipped) + P80 (retry, shipped σήμερα) + P82 (dedup, shipped) έκαναν το alert engine πλήρως αυτόματο,
-> αλλά **καμία ώρα ησυχίας**: `grep -n "quietHours|doNotDisturb|silenceUntil" models/AppConfig.ts` = 0 hits, το
-> cron μπορεί να χτυπήσει `dispatchAlert()` (push/ntfy/Discord/Telegram) οποιαδήποτε ώρα — π.χ. ένα price-drop
-> alert στις 3π.μ. (ίδια ώρα με το ήδη-υπάρχον nightly backup 03:30, CLAUDE.md). Πριν το P81 αυτό δεν υπήρχε καν
-> ως πρόβλημα (χειροκίνητο κουμπί μόνο)· τώρα είναι πραγματικό gap που δημιούργησε το ίδιο το «αυτοματοποίησέ το».
-> (3) **P87** — `grep -rln "savedFilter|SmartView|savedView" apps/web/src` = 0 hits, ενώ **7+ modules** έχουν ήδη
-> πλούσιο sidebar filtering (search + status + category/store + sort, ίδιο idiom παντού μετά το e-shop-layout
-> rollout) που **επαναφέρεται σε default σε κάθε reload** — κανένας τρόπος να αποθηκεύσεις «Items: shopping +
-> category=networking + sort=price» ως named preset. Dogfooding-heavy δεδομένου του μεγέθους της λίστας του
-> χρήστη (CLAUDE.md 10G upgrade list, Battle Station κλπ). **Διόρθωση αρίθμησης (ίδια σάρωση, μετά από
-> ανεξάρτητο recount)**: το προηγούμενο «39 Proposed» ήταν stale carried-over αριθμητικό από παλαιότερη σάρωση
-> που δεν είχε reconciled μετά τις μαζικές εγκρίσεις — άμεση καταμέτρηση των `### P` blocks σε κάθε section
-> δείχνει **5 Proposed (P83-P87, τα μόνα με πλήρες spec στο `## Proposed`) + 34 μη-χτισμένα «Approved»**
-> (39 items συνολικά, όχι 41). Η ουρά δεν είναι πια μπλοκαρισμένη σε απόφαση (το quick-start shortlist της
-> 22ης σάρωσης P74/P40/P46/P66/P48 έχει shippαριστεί όλο) — είναι απλά ρεαλιστικά μεγάλη, με το βάρος στο
-> ήδη-εγκεκριμένο Approved (34) παρά στο άχτιστο Proposed (5)· καμία νέα πρόταση σειράς χρειάζεται, ο builder
-> καταναλώνει ήδη ενεργά με τη σειρά value/effort.
->
-> **28η σάρωση (2026-08-06)** — `git log --since` από την 27η σάρωση (marker `0135db4`, μέχρι το σημερινό HEAD
-> `ff2e7f7`): ~60 commits, αλλά τα δύο μόνα product-facing backlog items που shippαρίστηκαν (**P78** bulk field-
-> edit, `4793dae`, και **P79** TOTP/MFA self-host login, `ed68936`) είναι ήδη συμφιλιωμένα στο `## Approved`
-> παρακάτω με δικό τους «✅ SHIPPED» header (verified read, καμία ενέργεια χρειάζεται εδώ). Όλα τα υπόλοιπα ήταν
-> **SaaS/ops plumbing** εκτός backlog scope: 30ήμερη λήξη suspended-workspace (OWNER_DECISIONS #14, `da32091`),
-> χρέωση AI χρήσης πάνω στο platform key, invite-gated signup, per-plan storage quotas στο write path, fail2ban
-> admin UI (unban από το admin console), nav/deploy hardening. Live-verified με grep πριν από κάθε πρόταση (0 hits
-> πριν) **3 νέοι candidates (P88-P90)**, κανένα δεν είναι νέο ανεξάρτητο module — και τα τρία ζευγαρώνουν με ήδη-
-> shipped ή ήδη-proposed δουλειά ώστε να μείνουν S/χαμηλού ρίσκου: (1) **P88** — το ήδη-shipped P40 (update banner)
-> δείχνει «newer version available» με **εξωτερικό** link στα GitHub releases (`grep -rn "changelog|CHANGELOG|
-> whatsNew|release notes" apps/web/src` = μόνο το ίδιο το link string)· κανένα in-app «τι άλλαξε» — καθαρό self-
-> host trust/adoption lever, ίδιο idiom με το already-shipped UpdateChecker. (2) **P89** — το `AuditEvent` model
-> είναι **tenant-only** (verified: μόνο 4 SaaS admin/account routes το διαβάζουν, `grep -rln "AuditEvent"
-> apps/web/src/app`) — το ήδη-shipped P31 (household multi-user, τρεις ρόλοι) δεν έχει καμία δραστηριότητα ορατή
-> στο ίδιο το self-host UI, φυσικό follow-up πάνω στο ήδη-proposed **P75** (createdBy attribution, ακόμα unbuilt)
-> μόλις εκείνο χτιστεί. (3) **P90** — το `Item.status` έχει ακόμα ενεργό το αρχικό `'researching'` state
-> (verified `ITEM_STATUSES` στο `models/Item.ts`) αλλά **καμία** side-by-side σύγκριση δύο υποψήφιων items
-> (`grep -rln "CompareItems|compareMode|sideBySide" apps/web/src` = 0 hits) — ταιριάζει ρητά με το δικό του
-> documented preference στο `CLAUDE.md` («σύγκρινε τιμές... δείξε και τις δύο τιμές με ξεκάθαρα trade-offs»),
-> εδώ όμως για *διαφορετικά* υποψήφια προϊόντα (π.χ. δύο routers υπό εξέταση), όχι το ίδιο προϊόν σε πολλά
-> καταστήματα (αυτό ήδη καλύπτεται από το multi-store price tracking). Η ουρά: **8 Proposed (P83-P90) + 36
-> unbuilt Approved** (φρέσκια καταμέτρηση `### P` blocks εξαιρουμένων των διπλών «αρχικό spec» headers, όχι
-> carried-over αριθμητικό) — ο builder συνεχίζει να καταναλώνει ενεργά, καμία νέα πρόταση σειράς χρειάζεται.
->
-> **29η σάρωση (2026-08-07)** (`git log --since` από την 28η σάρωση, marker `ff2e7f7`, μέχρι το σημερινό HEAD
-> `068ae93`): 13 commits. Το μόνο product-facing item ήταν το **P77** (self-host system-health/diagnostics
-> dashboard, `027416b` + `f3a56e2`), ήδη συμφιλιωμένο στο `## Approved` με «✅ SHIPPED 2026-08-07» (verified read,
-> καμία ενέργεια χρειάζεται εδώ). Τα υπόλοιπα: docs follow-up για το ήδη-reconciled P79 (TOTP/MFA), test coverage
-> στο statements module, ένα nav bug fix (notification bell / mobile menu), ένα SaaS build-break fix + rollback
-> log, και δύο guard σαρώματα (6/8, 7/8, tenancy gaps), όλα εκτός backlog scope. **3 νέοι candidates (P91-P93)**,
-> και οι τρεις live-verified με grep πριν την πρόταση (0 hits πριν): (1) **P91**, το self-host login είναι
-> εντελώς stateless JWT (`lib/session.ts`, μηδέν session store, `grep -rn "sessionEpoch|logoutEverywhere|
-> invalidateSessions|signOutAll|revokeAllSessions" apps/web/src` = 0 hits) — αν διαρρεύσει ένα password ο μόνος
-> τρόπος να ακυρωθούν οι ενεργές συνεδρίες είναι global `AUTH_SECRET` rotation (ρίχνει ΟΛΟΥΣ, όχι per-account),
-> φυσικό follow-up πάνω στο μόλις-shipped P79. (2) **P92**, το `Item.location` πεδίο υπάρχει ήδη («where it
-> physically lives», `models/Item.ts`) αλλά είναι χρήσιμο μόνο μέσα σε ένα item (`grep -rln "byLocation|
-> LocationView|groupByLocation" apps/web/src` = 0 hits) — με δύο ενεργά σπίτια + πλήρες 12U rack layout
-> (CLAUDE.md), «τι έχω στο εξοχικό» απαιτεί σήμερα νοερή αναζήτηση. (3) **P93**, δεν υπάρχει κανένα bank/
-> checking-account statement import (`grep -rln ".ofx|OFX|QIF|bankStatement|BankAccount|bankCsv" apps/web/src`
-> = 0 hits εκτός του άσχετου SaaS `models/Account.ts`), μόνο credit-card `Statement` PDF import· **ρητά
-> διακριτό από το παγωμένο P36** (OWNER_DECISIONS #13, Open Banking auto-sync μέσω API): αυτό είναι χειροκίνητο
-> file-drop CSV/OFX, ίδιο trust model με το ήδη-δουλεμένο Statement PDF import, μηδέν τραπεζικό credential/API.
-> Η ουρά: **11 Proposed (P83-P93) + 37 unbuilt Approved** (φρέσκια καταμέτρηση), ο builder συνεχίζει να
-> καταναλώνει ενεργά με τη σειρά value/effort, καμία νέα πρόταση σειράς χρειάζεται.
+> **Γνωστό ανοιχτό housekeeping (δεν είναι έγκριση, απλά σημείωση υγιεινής αρχείου):** αρκετά headers μέσα στο
+> `## Approved` παρακάτω είναι ήδη «✅ SHIPPED» και θα έπρεπε τυπικά να ζουν στο `## Done`, αλλά δεν
+> μετακινήθηκαν ένα-ένα (φυσική θέση δεν σημαίνει «ανοιχτό» σε αυτό το αρχείο, η αυθεντική πηγή έγκρισης είναι
+> οι γραμμές «Νεοεγκεκριμένα» με τα IDs). Bulk-move παραμένει σκόπιμα εκτός scope μιας μεμονωμένης unattended
+> σάρωσης (ρίσκο σύγκρουσης με ~12 routines που γράφουν στο ίδιο repo ταυτόχρονα σε ένα 2400+ γραμμών αρχείο)·
+> θέλει δικό του αφιερωμένο interactive πέρασμα αν ο Αχιλλέας το θελήσει.
 
 ---
 
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P98. Utility usage tracking (kWh/m³) ξεχωριστό από το ποσό του λογαριασμού — S/M — OSS, dogfooding-heavy
+- **Αξία:** live-verified `grep -rln "kwh|kWh|energyUsage|consumptionUnits" apps/web/src` = 0 hits. Τα ΔΕΗ/ΟΤΕ/
+  νερό bills καταγράφονται ήδη στο Expenses module (ποσό/ημερομηνία/κατηγορία utilities) αλλά **μόνο το €**,
+  ποτέ η πραγματική κατανάλωση (kWh/m³) που τυπώνεται πάνω στον ίδιο λογαριασμό. Με δύο ενεργά σπίτια
+  (κεντρικό + εξοχικό Kalamos, CLAUDE.md) το «ποιο σπίτι καταναλώνει περισσότερο, ανεξάρτητα από αυξήσεις
+  τιμολογίου» δεν απαντιέται σήμερα, μόνο το κόστος.
+- **Module:** `models/Expense.ts` (νέο optional `usageValue`/`usageUnit` πεδίο, ίδιο additive pattern με το
+  computed `anomaly` field) + AI parse (`EXPENSE_PROMPT`, νέο optional εξαγόμενο πεδίο) + Reports (μικρό νέο
+  usage-trend chart ανά utility category, ξεχωριστό από το ήδη-υπάρχον €-based chart).
+- **Ανοιχτή απόφαση (builder default):** MVP = **manual πεδίο μόνο** στη φόρμα (κενό = καμία αλλαγή), AI
+  auto-extract follow-up μόνο αν το manual αποδειχτεί χρήσιμο (αποφυγή νέου AI-accuracy ρίσκου σε ήδη-δουλεμένο
+  prompt)· per-house breakdown reuse του ήδη-shipped P34 spaces/multi-property tagging, μηδέν νέο μοντέλο.
+
+### P97. Item lending tracker (δανείστηκε σε φίλο, υπενθύμιση επιστροφής) — S — OSS, dogfooding-heavy
+- **Αξία:** live-verified `grep -rln "lentTo|borrowedBy|LoanRecord|lendItem" apps/web/src` = 0 hits. Το
+  `Item.status` δεν έχει κατάσταση «δανεισμένο», και κανένα πεδίο δεν καταγράφει σε ποιον δόθηκε κάτι ή πότε
+  αναμένεται πίσω. Ο χρήστης έχει ήδη καταγεγραμμένο ακριβό εξοπλισμό στο Items module (Battle Station,
+  δικτυακός εξοπλισμός, εργαλεία)· ό,τι δανείζεται σήμερα φεύγει από την ορατότητα της εφαρμογής μέχρι να το
+  θυμηθεί μόνος του.
+- **Module:** `models/Item.ts` (νέο optional `lentTo: {name, date, dueBack?, notes}` subdoc, μηδέν αλλαγή στο
+  `status` enum) + `ItemsClient.tsx`/detail modal («Mark as lent» action + badge «Lent to X since Y», ίδιο
+  idiom με το warranty badge) + προαιρετική νέα γραμμή στο `runAlertChecks` όταν περάσει το `dueBack`.
+- **Ανοιχτή απόφαση (builder default):** MVP = απλό subdoc πάνω στο υπάρχον item (όχι νέο μοντέλο, όχι σύνδεση
+  με πραγματικά household members/P31)· `dueBack` προαιρετικό (κενό = δανεισμένο επ' αόριστον, καμία
+  ειδοποίηση)· «got it back» = clear το subdoc, το item επιστρέφει στο προηγούμενο status.
 
 ### P93. Manual bank/checking-account statement import (CSV/OFX, ρητά διακριτό από το παγωμένο P36) — M — OSS (κυρίως)
 - **Αξία:** live-verified `grep -rln ".ofx|OFX|QIF|bankStatement|BankAccount|bankCsv" apps/web/src` (εκτός tests)
