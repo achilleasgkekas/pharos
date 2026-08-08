@@ -5608,3 +5608,50 @@ gitignored): οι τρεις κάρτες στην παραγωγή με τα σ
 **Η ασυμφωνία σελίδας-backend έκλεισε, δεν είναι πλέον εκκρεμότητα.**
 
 ΣΗΜ: το `DEPLOY_LOG.md` **δεν** το άγγιξα, ανήκει στο `pharos-deploy` routine.
+
+## 2026-08-08 (ο λογαριασμος επαψε να ειναι «πληρωμενος ή τιποτα», η σελιδα το ελεγε ακομα δυαδικο)
+
+Το increment δεν βγηκε απο τα δυο πρωτα σημεια της προηγουμενης λιστας, που περιμενουν ακομα γεγονοτα
+(`HOSTED_INVITE_ONLY`, `REPO_PUBLIC`). Βγηκε απο το τριτο, το sweep πανω στο νεο user-facing feature:
+το σημερινο `058a465` (feat(bills), P61) εδωσε στους χειροκινητα πληρωμενους λογαριασμους **μερικες
+πληρωμες**, και η FAQ της landing περιεγραφε ακομα τον tracker σαν αυστηρα δυαδικο («Mark one paid in a
+click ... και τελος»). Δεν ελεγε ψεμα, υποβαθμιζε ομως shipped δυνατοτητα που λυνει ακριβως το σεναριο
+που περιγραφει η ιδια η ερωτηση, τα κοινοχρηστα και τον λογαριασμο ρευματος.
+
+Καθε ισχυρισμος διασταυρωθηκε **στον κωδικα**, οχι απο το commit message:
+(α) `lib/bill.ts` εχει `billPayment*`/`billRemaining`/`billIsSettledByPayments` και σχολιο που δηλωνει
+ρητα οτι η προοδος πληρωμης κρατηθηκε **ορθογωνια** στο `billStatus()` (τεσσερις τιμες, αμεταβλητες),
+(β) `bills/actions.ts logBillPayment` κλεινει μονο του τον λογαριασμο μεσω `markBillPaid` με
+`paidDate: settleWith.paidOn`, αρα paidAt = ημερομηνια **της τελευταιας** δοσης, (γ) το
+`removeBillPayment` κανει rollback το auto-settle και **αφηνει ανεπαφο** το expense που καταχωρηθηκε,
+(δ) `BillsClient.tsx:88` `totalDue` αθροιζει `remaining`, οχι `amount`, (ε) `markBillPaid` βιβλιαζει
+`owed = billRemaining(...)`, οχι ολο το ποσο δευτερη φορα, (στ) `notifications/actions.ts:175` στελνει
+`billRemaining(...)` στο body του alert.
+
+Δυο σημεια:
+1. **FAQ «Does it track bills I pay by hand, like utilities?»**: προστεθηκαν οι μερικες πληρωμες με τα δυο
+   πραγματικα σεναρια, το auto-settle με ημερομηνια της τελευταιας δοσης, ο **ορθογωνιος** αξονας (ενας
+   μισοπληρωμενος ληξιπροθεσμος μενει «overdue», δεν κρυβεται πισω απο «partially paid»), το οτι «to pay»
+   και reminders δινουν το **υπολοιπο**, και το οτι η αφαιρεση διπλοκαταχωρημενης δοσης αφηνει το expense.
+2. **Roadmap → Shipped**: νεο bullet «Manually paid bills settled in one click or in part payments, with a
+   running balance».
+
+**Το κειμενο της ερωτησης δεν αγγιχτηκε**, αρα το anchor
+`#faq-does-it-track-bills-i-pay-by-hand-like-utilities` μενει (3 εμφανισεις στο σερβιρισμενο HTML), κανενα
+deep link δεν εσπασε.
+
+Verify: `npm run type-check` exit 0, `npm run build` success (13/13 static). Στο σερβιρισμενο HTML: 3
+εμφανισεις του «Log each part payment» (ορατο κειμενο + FAQPage structured data), 2 του νεου roadmap
+bullet. **Screenshots** (`.shots/`, gitignored): `bills-faq.png` (η απαντηση ανοιχτη, διαβαζεται καθαρα),
+`bills-faq-mobile.png` (375px, ρεει σωστα μεσα στην καρτα), `roadmap-bills.png` (το νεο bullet τελευταιο
+στο Shipped). Στα δυο deep-linked shots το sticky nav πεφτει πανω απο ενα κομματι, artifact του headless
+jump σε anchor, οχι σπασιμο layout. `read_console_messages` κανενα error. Ο dev server σταματησε.
+
+Επομενο increment: (1) οταν ανοιξει η εγγραφη, `HOSTED_INVITE_ONLY=false` (με ελεγχο στη ζωντανη φορμα),
+(2) οταν ανοιξει το public repo, `REPO_PUBLIC=true` + πραγματικο `docker pull` στο quick start, (3) sweep
+στο επομενο user-facing feature (υποψηφια που ειδα στο προσφατο ιστορικο και **δεν** ελεγξα ακομα αν
+λειπουν απο τη σελιδα: `027416b` οθονη «is my deployment healthy?» στα Settings, admin deletion queue).
+
+Needs-Achilleas (open, αμεταβλητο): legal entity/Stripe, Terms+Privacy review απο ανθρωπο, contact inbox,
+χρονισμος για public repo, καναλι για αιτηση invite. **Χρονισμος**: η αλλαγη ειναι μονο στο repo, το
+ζωντανο `https://ph-aros.com` θα τη δειξει μετα το επομενο deploy του landing.

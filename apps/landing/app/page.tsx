@@ -393,6 +393,7 @@ const ROADMAP: {
       'Opt-in multi-currency for expenses, income, receipts, subscriptions, items, statements, bills & CSV imports',
       'A browser bookmarklet and Chrome extension for one-click capture',
       'Optional TOTP two-factor login, self-hosted as well as hosted',
+      'Manually paid bills settled in one click or in part payments, with a running balance',
     ],
   },
   {
@@ -525,7 +526,7 @@ const FAQ_GROUPS: {
       },
       {
         q: 'Does it track bills I pay by hand, like utilities?',
-        a: 'Yes. Bills you pay manually (power, phone, shared building costs) get their own tracker, separate from subscriptions that charge a card automatically. Each bill moves through due-soon, overdue, and paid on its own, worked out from the due date, so a triage list always shows what needs paying first. Mark one paid in a click, optionally log the matching expense, and a recurring bill queues up the next one. Reminders ping you a few days before anything falls due.',
+        a: 'Yes. Bills you pay manually (power, phone, shared building costs) get their own tracker, separate from subscriptions that charge a card automatically. Each bill moves through due-soon, overdue, and paid on its own, worked out from the due date, so a triage list always shows what needs paying first. Mark one paid in a click, optionally log the matching expense, and a recurring bill queues up the next one. Not paying it all at once? Log each part payment as it happens (an extra charge on the building costs, an arrears arrangement with the power company) and the bill shows what you have handed over against what is left, then settles itself the moment the parts cover the total, dated to the last one. Payment progress is tracked separately from urgency on purpose, so a half-paid bill that is late keeps saying overdue instead of hiding behind a "partially paid" label, and both the "to pay" total and the reminders quote the balance still owed rather than the original amount. Remove a part payment you entered twice and any expense it logged stays put. Reminders ping you a few days before anything falls due.',
       },
       {
         q: 'Can it learn to auto-categorize my expenses?',
