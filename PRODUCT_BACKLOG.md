@@ -955,7 +955,7 @@
   pre-existing `aiConfig.tenant.test.ts` timeout flake από 2026-08-05, άσχετο)· +35 νέα tests (26 στο
   `lib/bill.test.ts`, 15 στο `bills/actions.test.ts`)· ο openapi drift guard έπιασε τα νέα πεδία → το
   `docs/openapi.yaml` ενημερώθηκε (`BillPayment` schema + 4 πεδία)· `docker compose build web` πέρασε,
-  `RestartCount 0`, `/login` 200, `/bills` 307 (auth redirect). Commit `<see git log>`.
+  `RestartCount 0`, `/login` 200, `/bills` 307 (auth redirect). Commit `058a465`.
 
 > Αρχικό spec:
 - **Αξία:** το `Bill` model (P28, ήδη-shipped) έχει **δυαδικό** status μόνο — `paidAt: Date|null`, καμία έννοια
