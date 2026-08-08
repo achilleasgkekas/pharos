@@ -2,7 +2,7 @@
 
 Καθημερινό unattended run (03:03). Κάθε run: διάλεξε ΕΝΑ task, validate (tsc + safe Docker rebuild), commit ΜΟΝΟ τα δικά σου αρχεία, push, κατέγραψε εδώ.
 
-<!-- reviewed: 3751b22 -->
+<!-- reviewed: 3147c33 -->
 <!-- docker-validated: 7e28354 -->
 <!-- ui-audited: 0bc5e14 -->
 
@@ -11764,3 +11764,38 @@ UI δείχνει **και τα δύο**, το urgency chip όπως πάντα,
   παγωμένα με ρητό κανόνα σιωπής (`OWNER_DECISIONS.md` #13).
 - **P94** (storage add-on) παραμένει BLOCKED σε δικές σου ενέργειες: χρειάζονται δύο Stripe prices και τα ids
   τους, δεν μπορεί να τα φτιάξει routine.
+
+## 2026-08-08 (reviewer)
+
+**69η σάρωση.** Έλεγξα τα 14 commits από `3751b22` έως `3147c33` (τα μισά docs-only). `npm run type-check`
+EXIT 0, `npx vitest run` πλήρης → **6472/6476 passed, 4 skipped, 399/399 αρχεία, μηδέν fail** (ο γνωστός
+`aiConfig.tenant.test.ts` timeout flake δεν εμφανίστηκε αυτή τη φορά — το `00bfdec` πρόσθεσε mock για
+`resolvePlatformAiKey`, που έκοβε τη BYO-key timeout race που τον προκαλούσε).
+
+- **Standing P1 [settings Trash tenancy gap] ΕΚΛΕΙΣΕ**: το commit `8609dd3` τύλιξε και τα 4 Trash exports
+  (`getTrash`/`restoreFromTrash`/`purgeTrashEntry`/`emptyTrash`) σε `scoped(RawModel)`, με νέο test block
+  στο `settings/actions.tenant.test.ts` (+5 tests, το αιχμηρό «emptyTrash cannot reach another workspace»
+  ρητά καλυμμένο). Ίδιο commit διόρθωσε παράλληλα ένα δεύτερο, ανεξάρτητο bug: `withRequestTenant` έσπαγε 22
+  `/api/v1` routes με 500 σε SaaS mode (bearer-token client re-entered την cookie gate χωρίς cookie) —
+  `hasTenantContext()` short-circuit το λύνει, με εκτενές inline σχόλιο. Πλήρες write-up στο `WEB_DEBT.md`
+  (69η σάρωση). Marker ενημερώθηκε: `<!-- reviewed: 3147c33 -->`.
+- **P61 partial bill payments** (`058a465`, feat) — διάβασα γραμμή-γραμμή. Καλά σχεδιασμένο: `billStatus`
+  (urgency, 4 τιμές) μένει ανεξάρτητο από το νέο `billPaymentState` (progress), και τα δύο axes τεκμηριωμένα
+  γιατί δεν αναμειγνύονται. Έλεγξα το edge case «αφαίρεση του payment που auto-settled το bill» — φαινόταν
+  αρχικά bug (το rollback guard στο `removeBillPayment` απαιτεί `payments.length > 0`, άρα αφαιρώντας το
+  ΤΕΛΕΥΤΑΙΟ payment ΔΕΝ γυρίζει `paidAt` σε null), αλλά είναι σκόπιμο και ρητά test-covered (ένα explicit
+  "mark paid" δεν αναιρείται ποτέ ως side-effect). `logBillPayment`'s settling path σωστά περνάει
+  `logExpense:false` στο εσωτερικό `markBillPaid` ώστε να μην διπλο-καταχωρηθεί το τελευταίο instalment.
+  Νέες actions ήδη σωστά μέσα σε `withRequestTenant` (συνεπές με το ήδη-κλεισμένο bills tenancy item). Μηδέν
+  εύρημα.
+- **`00bfdec`** (test-only, `deliveryLog.test.ts` νέο) — καθαρό, καλύπτει το thin DB-wiring σωστά.
+- **Routine health**: το ξεχωριστό cloud-guard P1 (tenant isolation gap) **δεν έκλεισε όπως νόμιζαν τα
+  προηγούμενα περάσματα του `web-code-quality`/`reviewer`** — μεγάλωσε από 13 σε **19 αρχεία** όταν το
+  `pharos-cloud-guard` έψαξε και για `tenantDb`/`tenantModel` (όχι μόνο `withRequestTenant`/`currentModel`).
+  Ενημέρωσα το `WEB_DEBT.md` ώστε να μη λέει ξανά «13, ΑΚΟΜΑ ανοιχτό». Δύο OPEN entries περιμένουν τον
+  Αχιλλέα στο `ASK_ACHILLEAS.md`: `pharos-cloud-guard-20260808-0310` (reboot kernel + `node:20→22` bump,
+  η εικόνα παραγωγής είναι 4 μήνες χωρίς security patch) και `pharos-cloud-guard-20260808-1515` (η σειρά
+  beta-opening vs. τα 19 αρχεία + ένα live `onedriveRefreshToken` στο κοινό `pharos_registry.appconfigs`).
+  Κανένα routine δεν φαίνεται «κολλημένο» καθαυτό (το `pharos-saas-core` προχωράει καθημερινά, το
+  `pharos-oss-prep` πρότεινε επόμενο task), απλώς δύο αποφάσεις εκκρεμούν σε σένα.
+- Δεν έγινε καμία δική μου αλλαγή κώδικα αυτό το πέρασμα (μηδέν small/safe fix χρειάστηκε — καθαρό diff).
