@@ -1,6 +1,6 @@
 'use client';
 import { useState, useTransition, useMemo } from 'react';
-import { Plus, Trash2, Check, Undo2, Archive, ArchiveRestore, CalendarClock, RotateCw } from 'lucide-react';
+import { Plus, Trash2, Check, Undo2, Archive, ArchiveRestore, CalendarClock, RotateCw, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -11,12 +11,15 @@ import { cur, currencySymbol, CURRENCIES } from '@/lib/money';
 import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
-import { billStatus, billDaysUntilDue, type BillStatus } from '@/lib/bill';
+import { billStatus, billDaysUntilDue, billPaidAmount, billRemaining, billPaymentState, type BillStatus } from '@/lib/bill';
 import type { SerializedBill } from '@/types';
-import { createBill, updateBill, deleteBill, setBillArchived, markBillPaid, markBillUnpaid } from './actions';
+import {
+  createBill, updateBill, deleteBill, setBillArchived, markBillPaid, markBillUnpaid,
+  logBillPayment, removeBillPayment,
+} from './actions';
 
 const money = (n: number) => `${cur()}${n.toFixed(2)}`;
-type Filter = 'open' | 'overdue' | 'paid' | 'all';
+type Filter = 'open' | 'overdue' | 'part-paid' | 'paid' | 'all';
 /** P9 context: the deployment's base currency + whether multi-currency is switched on at all. */
 type FxCtx = { base: string; enabled: boolean };
 
@@ -65,20 +68,31 @@ export function BillsClient({
     if (found) setEditing(found);
   });
 
+  // P61: urgency (billStatus) and payment progress are two separate axes, so a bill that is
+  // half paid AND late still sorts and reads as overdue. `remaining` is what is genuinely
+  // still owed, which is what the "to pay" header should total.
   const withStatus = useMemo(
-    () => bills.map((b) => ({ b, status: billStatus(b.dueDate, b.paidAt) })),
+    () =>
+      bills.map((b) => ({
+        b,
+        status: billStatus(b.dueDate, b.paidAt),
+        partPaid: billPaymentState(b.amount, b.payments, b.paidAt) === 'partially-paid',
+        remaining: billRemaining(b.amount, b.payments, b.paidAt),
+      })),
     [bills]
   );
 
   const openBills = withStatus.filter(({ b, status }) => !b.archived && status !== 'paid');
   const overdueCount = openBills.filter(({ status }) => status === 'overdue').length;
-  const totalDue = openBills.reduce((s, { b }) => s + (b.amount || 0), 0);
+  const partPaidCount = openBills.filter(({ partPaid }) => partPaid).length;
+  const totalDue = openBills.reduce((s, { remaining }) => s + remaining, 0);
 
   const visible = useMemo(() => {
-    const rows = withStatus.filter(({ b, status }) => {
+    const rows = withStatus.filter(({ b, status, partPaid }) => {
       if (b.archived) return filter === 'all';
       if (filter === 'open') return status !== 'paid';
       if (filter === 'overdue') return status === 'overdue';
+      if (filter === 'part-paid') return partPaid;
       if (filter === 'paid') return status === 'paid';
       return true;
     });
@@ -98,6 +112,8 @@ export function BillsClient({
   const FILTERS: { key: Filter; label: string }[] = [
     { key: 'open', label: 'Open' },
     { key: 'overdue', label: 'Overdue' },
+    // Only worth a chip once something is actually part-paid; otherwise it is noise.
+    ...(partPaidCount > 0 ? [{ key: 'part-paid' as Filter, label: `Part-paid (${partPaidCount})` }] : []),
     { key: 'paid', label: 'Paid' },
     { key: 'all', label: 'All' },
   ];
@@ -157,11 +173,13 @@ export function BillsClient({
         </div>
       ) : (
         <div className="space-y-2">
-          {visible.map(({ b, status }) => (
+          {visible.map(({ b, status, partPaid, remaining }) => (
             <BillRow
               key={b._id}
               bill={b}
               status={status}
+              partPaid={partPaid}
+              remaining={remaining}
               fx={fx}
               pending={pending}
               onOpen={() => setEditing(b)}
@@ -186,6 +204,8 @@ export function BillsClient({
 function BillRow({
   bill,
   status,
+  partPaid,
+  remaining,
   fx,
   pending,
   onOpen,
@@ -193,12 +213,17 @@ function BillRow({
 }: {
   bill: SerializedBill;
   status: BillStatus;
+  partPaid: boolean;
+  remaining: number;
   fx: FxCtx;
   pending: boolean;
   onOpen: () => void;
   onPay: () => void;
 }) {
   const meta = STATUS_META[status];
+  const paidSoFar = billPaidAmount(bill.payments);
+  const total = bill.amount || 0;
+  const progress = partPaid && total > 0 ? Math.min(100, Math.round((paidSoFar / total) * 100)) : 0;
   return (
     <div
       className={cn(
@@ -221,11 +246,28 @@ function BillRow({
         <p className="text-[11px] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
           {dueLabel(bill)}
         </p>
+        {/* P61: how far along a part-paid bill is, without stealing the urgency chip. */}
+        {partPaid && (
+          <div className="mt-1.5 flex items-center gap-2">
+            <div className="h-1 w-24 rounded-full bg-[color:var(--color-surface-2)] overflow-hidden">
+              <div className="h-full rounded-full bg-[color:var(--color-cyan)]" style={{ width: `${progress}%` }} />
+            </div>
+            <span className="text-[10px] text-[color:var(--color-cyan)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              {money(paidSoFar)} of {money(total)} paid
+            </span>
+          </div>
+        )}
       </button>
       <div className="text-right shrink-0">
         <p className={cn('font-bold', status === 'paid' ? 'text-[color:var(--color-text-faint)]' : 'text-[color:var(--color-text)]')} style={{ fontFamily: 'var(--font-display)' }}>
-          {money(bill.amount || 0)}
+          {/* The headline figure is what is still owed once instalments exist. */}
+          {money(partPaid ? remaining : bill.amount || 0)}
         </p>
+        {partPaid && (
+          <p className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            left of {money(total)}
+          </p>
+        )}
         {/* P9: what the paper actually says, when it is not the base currency. */}
         {fx.enabled && (
           <div className="mt-1 flex justify-end">
@@ -287,6 +329,10 @@ function BillForm({
 
   const label = 'block text-[11px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] mb-1';
   const isPaid = !!bill?.paidAt;
+  // P61 — instalment state for the payment panel below the form.
+  const [showPartial, setShowPartial] = useState(false);
+  const paidSoFar = billPaidAmount(bill?.payments);
+  const remaining = billRemaining(bill?.amount, bill?.payments, bill?.paidAt);
 
   return (
     <div className="space-y-5">
@@ -414,28 +460,159 @@ function BillForm({
               </Button>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              {/* P61: what has already been handed over, when anything has. */}
+              {paidSoFar > 0 && (
+                <div className="rounded-lg border border-[color:var(--color-cyan)]/30 bg-[color:var(--color-surface-2)] p-3 space-y-2">
+                  <p className="text-sm">
+                    <span className="text-[color:var(--color-cyan)] font-semibold">{money(paidSoFar)}</span>
+                    <span className="text-[color:var(--color-text-dim)]"> paid of {money(bill.amount || 0)} · </span>
+                    <span className="text-[color:var(--color-text)] font-semibold">{money(remaining)} left</span>
+                  </p>
+                  <ul className="space-y-1">
+                    {(bill.payments || []).map((p) => (
+                      <li key={p._id} className="flex items-center gap-2 text-[11px]" style={{ fontFamily: 'var(--font-mono)' }}>
+                        <span className="text-[color:var(--color-text)] w-20">{money(p.amount || 0)}</span>
+                        <span className="text-[color:var(--color-text-dim)]">
+                          {p.date ? new Date(p.date).toLocaleDateString('en-GB') : ''}
+                        </span>
+                        {p.note && <span className="text-[color:var(--color-text-faint)] truncate">· {p.note}</span>}
+                        {p.expenseId && <span className="text-[color:var(--color-text-faint)]">· expensed</span>}
+                        <button
+                          type="button"
+                          title="Remove this payment"
+                          disabled={pending}
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: 'Remove payment',
+                              message: `Remove the ${money(p.amount || 0)} payment? Any expense it logged stays.`,
+                              confirmLabel: 'Remove',
+                              danger: true,
+                            });
+                            if (ok) startTransition(async () => { await removeBillPayment(bill._id, p._id); onDeleted?.(); });
+                          }}
+                          className="ml-auto text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] disabled:opacity-50"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <label className="flex items-center gap-2 text-sm text-[color:var(--color-text-dim)] cursor-pointer">
                 <input type="checkbox" checked={logExpense} onChange={(e) => setLogExpense(e.target.checked)} />
                 Also log this as an expense
               </label>
-              <Button
-                type="button"
-                variant="primary"
-                disabled={pending}
-                onClick={() => startTransition(async () => { await markBillPaid(bill._id, { logExpense }); onDeleted?.(); })}
-              >
-                <Check size={14} /> Mark paid
-              </Button>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={pending}
+                  onClick={() => startTransition(async () => { await markBillPaid(bill._id, { logExpense }); onDeleted?.(); })}
+                >
+                  <Check size={14} /> {paidSoFar > 0 ? `Pay the rest (${money(remaining)})` : 'Mark paid'}
+                </Button>
+                <Button type="button" variant="ghost" disabled={pending} onClick={() => setShowPartial((v) => !v)}>
+                  <Coins size={14} /> {showPartial ? 'Cancel' : 'Log a partial payment'}
+                </Button>
+              </div>
+
+              {showPartial && (
+                <PartialPaymentForm
+                  billId={bill._id}
+                  remaining={remaining}
+                  logExpense={logExpense}
+                  foreignBill={isForeignCurrency(bill.currency, fx.base) && fx.enabled}
+                  base={fx.base}
+                  onDone={() => { setShowPartial(false); onDeleted?.(); }}
+                />
+              )}
+
               {bill.cycle && (
                 <p className="text-[11px] text-[color:var(--color-text-faint)]">
-                  Paying spawns the next {bill.cycle} instance automatically.
+                  Paying it off spawns the next {bill.cycle} instance automatically.
                 </p>
               )}
             </div>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * P61 — log one instalment toward a bill. Deliberately a SECOND action next to "Mark paid",
+ * never a replacement: a bill you settle in one go should still be one click.
+ *
+ * The amount is entered in the deployment's BASE currency, the same denomination as the
+ * stored bill amount, which is what keeps "what is left" plain subtraction. For a foreign
+ * bill that is worth saying out loud, hence the hint.
+ */
+function PartialPaymentForm({
+  billId,
+  remaining,
+  logExpense,
+  foreignBill,
+  base,
+  onDone,
+}: {
+  billId: string;
+  remaining: number;
+  logExpense: boolean;
+  foreignBill: boolean;
+  base: string;
+  onDone: () => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const label = 'block text-[11px] uppercase tracking-[0.1em] text-[color:var(--color-text-faint)] mb-1';
+
+  const submit = () => {
+    setError('');
+    startTransition(async () => {
+      const r = await logBillPayment(billId, { amount: Number(amount) || 0, date, note, logExpense });
+      if (r.ok) onDone();
+      else setError(r.error || 'Could not log the payment');
+    });
+  };
+
+  return (
+    <div className="rounded-lg border border-[color:var(--color-border-light)] bg-[color:var(--color-surface-2)] p-3 space-y-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div>
+          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Amount ({cur()})</label>
+          <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={remaining.toFixed(2)} />
+        </div>
+        <div>
+          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Paid on</label>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="col-span-2 sm:col-span-1">
+          <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Note</label>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="1st instalment" />
+        </div>
+      </div>
+      {foreignBill && (
+        <p className="text-[11px] text-[color:var(--color-gold)]">
+          ⚠ This bill is billed in another currency. Enter what you actually paid in {base}.
+        </p>
+      )}
+      {error && <p className="text-xs text-[color:var(--color-red)]">{error}</p>}
+      <div className="flex items-center gap-2">
+        <Button type="button" variant="primary" disabled={pending || !(Number(amount) > 0)} onClick={submit}>
+          <Coins size={14} /> Log payment
+        </Button>
+        <p className="text-[11px] text-[color:var(--color-text-faint)]">
+          {money(remaining)} left · reaching the total marks the bill paid on its own.
+        </p>
+      </div>
     </div>
   );
 }

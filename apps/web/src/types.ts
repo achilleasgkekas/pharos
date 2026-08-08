@@ -215,6 +215,8 @@ export type SerializedBill = {
   fxRate?: number;
   dueDate: string | null;
   paidAt: string | null;
+  /** P61: optional manual instalments, base-currency. Empty = plain binary bill. */
+  payments?: { _id: string; amount: number; date: string | null; note: string; expenseId: string }[];
   category: string;
   cycle: '' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
   notes: string;

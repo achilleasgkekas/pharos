@@ -6,6 +6,20 @@ import { softDeletePlugin } from '@/lib/softDelete';
 // PROJECTS the future): a Bill is something you pay by HAND (ΔΕΗ, ΟΤΕ, κοινόχρηστα)
 // whose lifecycle we track — "is it due?, did I pay it?, was it forgotten → overdue".
 // Status is DERIVED from dueDate + paidAt (see lib/bill.ts), never stored.
+// P61 — one manual instalment toward a bill (mirrors GiftCardUseSchema). `amount` is
+// ALWAYS in the deployment's base currency, same denomination as `Bill.amount`, so
+// "what is still owed" is plain subtraction even on a foreign-currency bill.
+// `expenseId` is set when the opt-in "also log an expense" was ticked for THIS payment.
+const BillPaymentSchema = new Schema(
+  {
+    amount: { type: Number, required: true },
+    date: { type: Date, default: () => new Date() },
+    note: { type: String, default: '' },
+    expenseId: { type: String, default: '' },
+  },
+  { _id: true }
+);
+
 const BillSchema = new Schema(
   {
     title: { type: String, required: true }, // "ΔΕΗ ρεύμα", "Κοινόχρηστα Ιουλίου"
@@ -20,7 +34,10 @@ const BillSchema = new Schema(
     origAmount: { type: Number, default: 0 },
     fxRate: { type: Number, default: 0 },
     dueDate: { type: Date, required: true, index: true },
-    paidAt: { type: Date, default: null }, // null = still unpaid
+    paidAt: { type: Date, default: null }, // null = still unpaid (or only partly paid, see `payments`)
+    // P61: optional instalments. Empty array = the pre-P61 binary bill, unchanged in
+    // every respect. Once the payments cover `amount`, paidAt is set automatically.
+    payments: { type: [BillPaymentSchema], default: [] },
     category: { type: String, default: 'other' }, // reused when a payment logs an expense
     // '' = one-off. Otherwise a recurring template: paying it spawns the next
     // pending instance one cycle ahead (see markBillPaid).

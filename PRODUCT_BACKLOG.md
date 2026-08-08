@@ -932,7 +932,32 @@
   ίδιο idiom με το P35 equal-split guard)· `giftCardId` optional ανά γραμμή (μπορεί να είναι split χωρίς κανένα
   gift card, π.χ. μισό μετρητά/μισό κάρτα — απλά δύο free-string μέθοδοι χωρίς αυτόματο side-effect).
 
-### P61. Partial payments για Bills/payables (όχι μόνο δυαδικό paid/unpaid) — S — OSS (κυρίως), βοηθά και SaaS
+### P61. Partial payments για Bills/payables (όχι μόνο δυαδικό paid/unpaid) — ✅ SHIPPED 2026-08-08 (pharos-daily-dev)
+
+- **Τι έγινε**: νέο optional `Bill.payments[]` subdoc (amount/date/note/expenseId, mirror του `GiftCardUseSchema`).
+  Κενό array = ακριβώς η προ-P61 συμπεριφορά, μηδέν breaking change. Νέες pure helpers στο `lib/bill.ts`
+  (`billPaidAmount`, `billRemaining`, `billPaymentState`, `billIsSettledByPayments`) + νέα actions
+  `logBillPayment` / `removeBillPayment`. Το «mark paid» έμεινε η one-click ενέργεια, το «log a partial
+  payment» μπήκε **δίπλα** του, όχι στη θέση του· ο λογαριασμός κλείνει **μόνος του** μόλις Σpayments ≥ amount
+  (paidAt με την ημερομηνία ΤΗΣ πληρωμής, recurring spawn μέσω του ίδιου `markBillPaid` path).
+- **Απόφαση που κατέγραψα (απόκλιση από το γράμμα του spec, όχι από τον σκοπό)**: το `billStatus()` ΔΕΝ
+  απέκτησε πέμπτη τιμή `partially-paid`. Η πρόοδος πληρωμής έγινε **ξεχωριστός άξονας** (`billPaymentState`),
+  γιατί (α) ένας μισοπληρωμένος λογαριασμός που έχει ξεπεράσει την προθεσμία πρέπει να συνεχίσει να φωνάζει
+  `overdue` αντί να το κρύβει πίσω από ένα «partially-paid» chip, και (β) το `status` του v1 API θα ήταν
+  breaking change για κάθε client. Το UI δείχνει **και τα δύο**: το urgency chip όπως πάντα, συν progress bar
+  + υπόλοιπο + φίλτρο «Part-paid (N)».
+- **Παράπλευρες διορθώσεις ακρίβειας** (ίδιο scope, «τα νούμερα να λένε αλήθεια»): το «to pay» σύνολο της
+  κεφαλίδας αθροίζει πλέον **υπόλοιπα** όχι αρχικά ποσά· το ntfy/bell alert ενός part-paid λογαριασμού
+  αναφέρει το **υπόλοιπο**· και το «mark paid» με το opt-in expense καταχωρεί **μόνο ό,τι απομένει** αντί να
+  ξαναγράψει ολόκληρο το ποσό. Τα instalments είναι πάντα σε **base currency** (ίδιο denomination με το
+  `Bill.amount`), ώστε το «τι χρωστάω ακόμα» να είναι απλή αφαίρεση και σε ξενόνομισμα λογαριασμό.
+- **Verified**: `type-check` EXIT 0· `vitest` πλήρες **6451 passed / 2 failed** (τα 2 = το γνωστό
+  pre-existing `aiConfig.tenant.test.ts` timeout flake από 2026-08-05, άσχετο)· +35 νέα tests (26 στο
+  `lib/bill.test.ts`, 15 στο `bills/actions.test.ts`)· ο openapi drift guard έπιασε τα νέα πεδία → το
+  `docs/openapi.yaml` ενημερώθηκε (`BillPayment` schema + 4 πεδία)· `docker compose build web` πέρασε,
+  `RestartCount 0`, `/login` 200, `/bills` 307 (auth redirect). Commit `<see git log>`.
+
+> Αρχικό spec:
 - **Αξία:** το `Bill` model (P28, ήδη-shipped) έχει **δυαδικό** status μόνο — `paidAt: Date|null`, καμία έννοια
   μερικής πληρωμής (verified: `models/Bill.ts` δεν έχει κανένα `paidAmount`/payments-array πεδίο, μόνο
   `amount`+`paidAt`). Πραγματικό σενάριο: ένας μεγάλος λογαριασμός (κοινόχρηστα με έκτακτη εισφορά, ΔΕΗ με

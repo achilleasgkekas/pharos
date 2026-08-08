@@ -14,7 +14,7 @@ import { withRequestTenant, resolveRequestTenantOrNull } from '@/lib/tenancy/req
 import { currentModel } from '@/lib/tenancy/connection';
 import { currentTenant, withTenant } from '@/lib/tenancy/current';
 import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
-import { billDaysUntilDue } from '@/lib/bill';
+import { billDaysUntilDue, billRemaining } from '@/lib/bill';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
@@ -158,15 +158,23 @@ async function computeAlerts(): Promise<Alert[]> {
   // re-alerts; it auto-expires once the bill is paid (leaves the query). Overdue
   // ones keep nagging (no lower bound) until paid.
   const openBills = (await Bill.find({ paidAt: null, archived: { $ne: true } })
-    .select('title vendor amount dueDate')
-    .lean()) as Array<{ _id: unknown; title: string; vendor?: string; amount?: number; dueDate?: string | Date | null }>;
+    .select('title vendor amount dueDate payments')
+    .lean()) as Array<{ _id: unknown; title: string; vendor?: string; amount?: number; dueDate?: string | Date | null; payments?: { amount?: number }[] }>;
   for (const b of openBills) {
     const days = billDaysUntilDue(b.dueDate ?? null, now);
     if (days === null || days > s.billAlertDays) continue;
     const id = String(b._id);
     const iso = new Date(b.dueDate as string).toISOString().slice(0, 10);
-    // body = "<days>|<amount>" (raw; days<0 = overdue; the bell formats with the symbol)
-    alerts.push({ dedupeKey: `bill:${id}:${iso}`, kind: 'bill', title: b.title, body: `${days}|${b.amount ?? 0}`, href: '/bills' });
+    // body = "<days>|<amount>" (raw; days<0 = overdue; the bell formats with the symbol).
+    // P61: the figure is what is STILL OWED, so an alert on a part-paid bill quotes the
+    // balance you actually have to hand over, not the original total.
+    alerts.push({
+      dedupeKey: `bill:${id}:${iso}`,
+      kind: 'bill',
+      title: b.title,
+      body: `${days}|${billRemaining(b.amount, b.payments, null)}`,
+      href: '/bills',
+    });
   }
 
   return alerts;

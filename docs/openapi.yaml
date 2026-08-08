@@ -2600,10 +2600,33 @@ components:
         archived: { type: boolean }
         status:
           type: string
-          description: Derived from `dueDate` and `paidAt` — never stored.
+          description: >-
+            Urgency, derived from `dueDate` and `paidAt` — never stored. Deliberately
+            independent of payment progress: a part-paid bill that is late still reports
+            `overdue`. Use `paymentState` for how much of it has been settled.
           enum: [paid, overdue, due-soon, upcoming]
+        paidAmount: { type: number, description: 'Sum of the logged instalments, base currency. 0 for a bill paid in one go.' }
+        remaining: { type: number, description: 'Still owed (`amount` minus `paidAmount`, never negative). 0 once `paidAt` is set.' }
+        paymentState:
+          type: string
+          description: Payment progress, derived from `amount`, `payments` and `paidAt`.
+          enum: [unpaid, partially-paid, paid]
+        payments:
+          type: array
+          description: >-
+            Optional manual instalments toward the bill, always in the deployment's base
+            currency so `remaining` stays plain subtraction on a foreign-currency bill.
+            Empty for an ordinary one-payment bill.
+          items: { $ref: '#/components/schemas/BillPayment' }
         updatedAt: { type: string, format: date-time, nullable: true }
         deleted: { type: boolean }
+    BillPayment:
+      type: object
+      properties:
+        id: { type: string }
+        amount: { type: number, description: Base currency, same denomination as `Bill.amount`. }
+        date: { type: string, format: date-time, nullable: true }
+        note: { type: string }
     GiftCardUse:
       type: object
       properties:

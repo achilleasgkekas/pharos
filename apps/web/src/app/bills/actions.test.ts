@@ -67,7 +67,10 @@ vi.mock('@/app/expenses/actions', () => ({ addExpense: addExpenseMock }));
 vi.mock('@/lib/appSettings', () => ({ getAppSettings: getAppSettingsMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
 
-import { createBill, updateBill, setBillArchived, deleteBill, markBillPaid, markBillUnpaid } from './actions';
+import {
+  createBill, updateBill, setBillArchived, deleteBill, markBillPaid, markBillUnpaid,
+  logBillPayment, removeBillPayment,
+} from './actions';
 
 function formData(fields: Record<string, string>): FormData {
   const fd = new FormData();
@@ -461,5 +464,167 @@ describe('P9 multi-currency', () => {
     expect(spawned.currency).toBe('USD');
     expect(spawned.origAmount).toBe(88);
     expect(spawned.fxRate).toBe(0.92);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P61 — partial payments. What matters here is that the two paths stay separate:
+// an ordinary bill keeps behaving exactly as it did before instalments existed,
+// and an instalment bill settles ITSELF (paidAt + recurring spawn) the moment the
+// payments cover the amount, without a second manual action and without booking
+// the same money twice as an expense.
+// ---------------------------------------------------------------------------
+describe('logBillPayment', () => {
+  it('rejects a zero or negative amount before touching the DB', async () => {
+    const res = await logBillPayment('b1', { amount: 0 });
+    expect(res.ok).toBe(false);
+    expect(billUpdateOne).not.toHaveBeenCalled();
+  });
+
+  it('not-found short-circuits before any write', async () => {
+    billFindById.mockResolvedValueOnce(null);
+    const res = await logBillPayment('nope', { amount: 10 });
+    expect(res).toEqual({ ok: false, error: 'Bill not found' });
+    expect(billUpdateOne).not.toHaveBeenCalled();
+  });
+
+  it('refuses to log against an already-paid bill', async () => {
+    billFindById.mockResolvedValueOnce({ _id: 'b1', title: 'X', amount: 100, paidAt: new Date(), payments: [] });
+    const res = await logBillPayment('b1', { amount: 10 });
+    expect(res).toEqual({ ok: false, error: 'Bill is already paid' });
+    expect(billUpdateOne).not.toHaveBeenCalled();
+  });
+
+  it('pushes the instalment and leaves a still-owing bill unpaid', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', title: 'Κοινόχρηστα', vendor: '', amount: 300, paidAt: null, payments: [] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: null, payments: [{ amount: 100 }] });
+    const res = await logBillPayment('b1', { amount: 100, date: '05/07/2026', note: '1st' });
+    expect(res).toEqual({ ok: true, settled: false });
+    const [, update] = billUpdateOne.mock.calls[0];
+    expect(update.$push.payments.amount).toBe(100);
+    expect(update.$push.payments.note).toBe('1st');
+    expect(localYmd(update.$push.payments.date)).toBe('2026-07-05');
+    // Not settled → no paidAt stamp, no recurring spawn.
+    expect(billFindByIdAndUpdate).not.toHaveBeenCalled();
+    expect(billCreate).not.toHaveBeenCalled();
+  });
+
+  it('settles the bill by itself once the instalments cover the amount', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', title: 'Κοινόχρηστα', amount: 300, paidAt: null, payments: [{ amount: 200 }] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: null, payments: [{ amount: 200 }, { amount: 100 }] })
+      // third read = markBillPaid's own lookup
+      .mockResolvedValueOnce({ _id: 'b1', title: 'Κοινόχρηστα', amount: 300, paidAt: null, cycle: '', linkedExpenseId: '', payments: [{ amount: 200 }, { amount: 100 }] });
+    const res = await logBillPayment('b1', { amount: 100, date: '20/07/2026' });
+    expect(res).toEqual({ ok: true, settled: true });
+    const [, update] = billFindByIdAndUpdate.mock.calls[0];
+    // paidAt is stamped with THIS payment's date, not "now".
+    expect(localYmd(update.paidAt)).toBe('2026-07-20');
+  });
+
+  it('the settling call never double-books an expense for the final instalment', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', title: 'Κοινόχρηστα', vendor: 'ΔΕΗ', amount: 100, category: 'utilities', paidAt: null, payments: [] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 100, paidAt: null, payments: [{ amount: 100 }] })
+      .mockResolvedValueOnce({ _id: 'b1', title: 'Κοινόχρηστα', vendor: 'ΔΕΗ', amount: 100, paidAt: null, cycle: '', linkedExpenseId: '', payments: [{ amount: 100 }] });
+    await logBillPayment('b1', { amount: 100, logExpense: true });
+    // Exactly ONE expense: the payment's own, not a second one from the settling path.
+    expect(addExpenseMock).toHaveBeenCalledTimes(1);
+    expect(addExpenseMock.mock.calls[0][0].amount).toBe(100);
+  });
+
+  it('an opt-in expense books the instalment, base-denominated, with no fx re-conversion', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', title: 'AWS', vendor: 'AWS', amount: 80.96, currency: 'USD', origAmount: 88, fxRate: 0.92, category: 'other', paidAt: null, payments: [] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 80.96, paidAt: null, payments: [{ amount: 40 }] });
+    await logBillPayment('b1', { amount: 40, logExpense: true });
+    const call = addExpenseMock.mock.calls[0][0];
+    expect(call.amount).toBe(40);
+    // Instalments are already base currency, so no currency/rate is handed over at all.
+    expect(call.currency).toBeUndefined();
+    expect(call.fxRate).toBeUndefined();
+  });
+
+  it('logs nothing as an expense when the opt-in is off', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', title: 'X', amount: 300, paidAt: null, payments: [] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: null, payments: [{ amount: 50 }] });
+    await logBillPayment('b1', { amount: 50 });
+    expect(addExpenseMock).not.toHaveBeenCalled();
+  });
+
+  it('a recurring bill spawns its next instance through the settling path, exactly once', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', title: 'ΔΕΗ', amount: 100, paidAt: null, payments: [{ amount: 60 }] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 100, paidAt: null, payments: [{ amount: 60 }, { amount: 40 }] })
+      .mockResolvedValueOnce({
+        _id: 'b1', title: 'ΔΕΗ', vendor: 'ΔΕΗ', amount: 100, category: 'utilities', cycle: 'monthly',
+        notes: '', paidAt: null, linkedExpenseId: '', dueDate: new Date('2026-06-15'),
+        payments: [{ amount: 60 }, { amount: 40 }],
+      });
+    await logBillPayment('b1', { amount: 40 });
+    expect(billCreate).toHaveBeenCalledTimes(1);
+    const spawned = billCreate.mock.calls[0][0];
+    expect(spawned.paidAt).toBeNull();
+    expect(localYmd(spawned.dueDate as Date)).toBe('2026-07-15');
+  });
+});
+
+describe('markBillPaid on a part-paid bill', () => {
+  it('an opt-in expense books only what is LEFT, not the full amount again', async () => {
+    billFindById.mockResolvedValueOnce({
+      _id: 'b1', title: 'Κοινόχρηστα', vendor: 'ΔΕΗ', amount: 300, category: 'utilities',
+      paidAt: null, cycle: '', linkedExpenseId: '', payments: [{ amount: 200 }],
+    });
+    await markBillPaid('b1', { logExpense: true });
+    const call = addExpenseMock.mock.calls[0][0];
+    expect(call.amount).toBe(100);
+    expect(call.currency).toBeUndefined(); // remaining is base-denominated by construction
+  });
+
+  it('a bill with no instalments keeps its original full-amount behaviour', async () => {
+    billFindById.mockResolvedValueOnce({
+      _id: 'b1', title: 'ΔΕΗ', vendor: 'ΔΕΗ', amount: 62, category: 'utilities',
+      paidAt: null, cycle: '', linkedExpenseId: '', payments: [],
+    });
+    await markBillPaid('b1', { logExpense: true });
+    expect(addExpenseMock.mock.calls[0][0].amount).toBe(62);
+  });
+});
+
+describe('removeBillPayment', () => {
+  it('not-found short-circuits before any write', async () => {
+    billFindById.mockResolvedValueOnce(null);
+    const res = await removeBillPayment('nope', 'p1');
+    expect(res).toEqual({ ok: false, error: 'Bill not found' });
+    expect(billUpdateOne).not.toHaveBeenCalled();
+  });
+
+  it('pulls the instalment by id', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: null, payments: [{ amount: 100 }] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: null, payments: [] });
+    const res = await removeBillPayment('b1', 'p1');
+    expect(res).toEqual({ ok: true });
+    expect(billUpdateOne.mock.calls[0][1]).toEqual({ $pull: { payments: { _id: 'p1' } } });
+  });
+
+  it('rolls back an automatic settlement when the remaining instalments no longer cover the bill', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: new Date(), payments: [{ amount: 200 }, { amount: 100 }] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: new Date(), payments: [{ amount: 200 }] });
+    await removeBillPayment('b1', 'p2');
+    expect(billUpdateOne).toHaveBeenCalledTimes(2);
+    expect(billUpdateOne.mock.calls[1][1]).toEqual({ $set: { paidAt: null } });
+  });
+
+  it('leaves a hand-marked paid bill (no instalments left) alone', async () => {
+    billFindById
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: new Date(), payments: [{ amount: 50 }] })
+      .mockResolvedValueOnce({ _id: 'b1', amount: 300, paidAt: new Date(), payments: [] });
+    await removeBillPayment('b1', 'p1');
+    // Only the $pull — an explicit "mark paid" is never undone as a side effect.
+    expect(billUpdateOne).toHaveBeenCalledTimes(1);
   });
 });
