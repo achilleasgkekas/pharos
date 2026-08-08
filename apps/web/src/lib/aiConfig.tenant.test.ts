@@ -41,6 +41,12 @@ vi.mock('./db', () => ({ connectDB: async () => ({ connection: {} }) }));
 // real module reaches for the Tenant collection and these tests hang on a query that never
 // answers. Stubbed to "no stored key", which is the behaviour these cache tests assume.
 vi.mock('./billing/byoKeyStore', () => ({ resolveTenantAiKey: async () => null }));
+// Same reason, and it is not optional: "no BYO key" now falls through to the OPERATOR's
+// platform key, so leaving this one real puts an unanswerable control-plane query on the path.
+// The 3s BYO_KEY_TIMEOUT_MS race then eats a test's whole budget — two tenants per test is 6s
+// against a 5s timeout, which is exactly how these two started failing while the single-tenant
+// one merely got slow (3003ms). A stubbed miss is what the cache tests mean by "no stored key".
+vi.mock('./billing/platformKeyStore', () => ({ resolvePlatformAiKey: async () => null }));
 
 import { getAiConfig, invalidateAiConfigCache } from './aiConfig';
 

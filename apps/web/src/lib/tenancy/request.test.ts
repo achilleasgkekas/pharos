@@ -47,7 +47,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { resolveRequestTenant, withRequestTenant, TenantResolutionError } from './request';
-import { currentTenant } from './current';
+import { currentTenant, withTenant } from './current';
 
 const acme: TenantContext = {
   tenantId: '507f1f77bcf86cd799439011',
@@ -295,6 +295,76 @@ describe('withRequestTenant — failures become responses, never a 500', () => {
     await expect(withRequestTenant(body)).resolves.toBe('ran');
     expect(redirectMock).not.toHaveBeenCalled();
     expect(notFoundMock).not.toHaveBeenCalled();
+    expect(headersGet).not.toHaveBeenCalled();
+  });
+});
+
+// ── An already-established tenant wins over a second gate pass ────────────────────────────────
+//
+// This gate authenticates with the session COOKIE. /api/v1/* authenticates with a BEARER token
+// and `withAuth` establishes the workspace itself before calling into feature actions — and 22
+// API routes call feature server actions that now reach their models through this wrapper. Left
+// to re-resolve, the cookie gate finds no cookie on a perfectly authorised API request,
+// redirects, and `withAuth` reports the control-flow throw as a 500. SaaS mode only, which is
+// exactly the kind of bug that hides until there is a customer.
+describe('withRequestTenant — an ambient tenant short-circuits the gate', () => {
+  it('runs the body in the established tenant and does ZERO resolution work', async () => {
+    saasModeMock.mockReturnValue(true);
+
+    const slug = await withTenant(acme, () => withRequestTenant(async () => currentTenant().slug));
+
+    expect(slug).toBe('acme');
+    expect(headersGet).not.toHaveBeenCalled();
+    expect(getTenantContextMock).not.toHaveBeenCalled();
+    expect(getCurrentAccountMock).not.toHaveBeenCalled();
+    expect(accountTenantsMock).not.toHaveBeenCalled();
+  });
+
+  it('THE BEARER CASE: no session cookie no longer turns an authorised API call into a redirect', async () => {
+    saasModeMock.mockReturnValue(true);
+    headersGet.mockReturnValue('acme.ph-aros.com');
+    getTenantContextMock.mockResolvedValue(acme);
+    getCurrentAccountMock.mockResolvedValue(null); // bearer token, no cookie
+
+    // withAuth resolved the workspace from the host and authorised the token inside it.
+    await expect(withTenant(acme, () => withRequestTenant(async () => 'ok'))).resolves.toBe('ok');
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(notFoundMock).not.toHaveBeenCalled();
+  });
+
+  it('nested calls collapse — settings actions enter this wrapper once per model', async () => {
+    saasModeMock.mockReturnValue(true);
+    headersGet.mockReturnValue('acme.ph-aros.com');
+    getTenantContextMock.mockResolvedValue(acme);
+    getCurrentAccountMock.mockResolvedValue({ sub: 'acc1', email: 'a@a.com' });
+    accountTenantsMock.mockResolvedValue(membership());
+
+    const slugs = await withRequestTenant(async () => {
+      const a = await withRequestTenant(async () => currentTenant().slug);
+      const b = await withRequestTenant(async () => currentTenant().slug);
+      return [a, b];
+    });
+
+    expect(slugs).toEqual(['acme', 'acme']);
+    // The outermost call did the work; the two inner ones re-used it. (resolveRequestTenant is
+    // also React-cached, so this asserts the short-circuit, not the memo.)
+    expect(getTenantContextMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('the short-circuit cannot resurrect a tenant after the body returns', async () => {
+    saasModeMock.mockReturnValue(true);
+
+    await withTenant(acme, () => withRequestTenant(async () => 'ok'));
+
+    expect(currentTenant()).toBe(DEFAULT_TENANT);
+  });
+
+  it('SELF-HOSTED PARITY: withAuth wraps every /api/v1 call in withTenant(DEFAULT) — still the default tenant, still no gate work', async () => {
+    saasModeMock.mockReturnValue(false);
+
+    const seen = await withTenant(DEFAULT_TENANT, () => withRequestTenant(async () => currentTenant()));
+
+    expect(seen).toBe(DEFAULT_TENANT);
     expect(headersGet).not.toHaveBeenCalled();
   });
 });

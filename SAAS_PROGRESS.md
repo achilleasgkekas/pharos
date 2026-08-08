@@ -7800,3 +7800,66 @@ domain SPF+DKIM· (γ) Stripe όταν έρθουν keys.
 `SAAS_PURGE_EXECUTE=1` (τώρα υπάρχει η οθόνη για να το κρίνεις — πρότασή μου: ένας μήνας
 παρατήρησης πρώτα), το `- ./f2b:/var/lib/pharos/f2b` mount στο `deploy/docker-compose.prod.yml`,
 και η απάντηση στο ASK `pharos-cloud-guard-20260807-0300`.
+
+## 2026-08-08 — increment 153: η πύλη tenant, παρτίδα 1 (ο κάδος) και ο λόγος που καμία παρτίδα δεν θα δούλευε χωρίς αυτό
+
+Εγκεκριμένο στο ASK `pharos-saas-core-20260807-1040` («σπάει λειτουργίες σήμερα με έναν πελάτη,
+πριν από κάθε νέο feature»), με ρητή σειρά: **πρώτα το Trash του `settings/actions.ts`**, γιατί
+είναι μη αναστρέψιμη διαγραφή. Παρτίδα 1 από 5.
+
+**Το εμπόδιο που βρέθηκε πριν γραφτεί γραμμή της παρτίδας.** Το `scoped()` του
+`settings/actions.ts` είναι `withRequestTenant(() => currentModel(m))`, και το
+`withRequestTenant` **αυθεντικοποιεί με το session cookie**. Το `/api/v1/*` αυθεντικοποιεί με
+**bearer token**: το `withAuth` βρίσκει το workspace από το host και ψάχνει το token στη **δική
+του** συλλογή `users`, δηλαδή είναι πλήρης πύλη με άλλο διαπιστευτήριο, και τρέχει ήδη το σώμα
+μέσα σε `withTenant`. **22 API routes καλούν feature server actions** (rescan, ai-fill, import,
+trash, lists, …). Χωρίς short-circuit, ένας πελάτης API με απολύτως έγκυρο token ξαναμπαίνει στην
+πύλη του cookie, δεν έχει cookie, `not_authenticated` → `failTenantGate` → `redirect()`, και το
+control-flow throw το πιάνει το `catch` του `withAuth` και το επιστρέφει ως **500**. Σε SaaS mode
+μόνο. Δηλαδή: το να τυλίξω το Trash σε `scoped()` θα **έσπαγε** τα `/api/v1/trash/*` ενώ διόρθωνε
+τη βάση, και το ίδιο ισχύει για κάθε επόμενη παρτίδα.
+
+**Η διόρθωση, μία γραμμή στη ρίζα** (`lib/tenancy/request.ts`): `if (hasTenantContext()) return
+fn();`. Ένας περιβάλλων tenant προκύπτει **μόνο** από πύλη που ήδη έλυσε ΚΑΙ εξουσιοδότησε: το
+`withAuth` (bearer), το ίδιο το `withRequestTenant` (cookie), και το `getNotifications` μέσω
+`resolveRequestTenantOrNull` (cookie + membership). Είναι τα **μόνα τρία** `withTenant` call sites
+στην εφαρμογή, τα μέτρησα· ένα τέταρτο που θα παρέκαμπτε την εξουσιοδότηση θα έσπαγε το invariant,
+και αυτό γράφτηκε στο doc comment ως όρος, όχι ως παρατήρηση. Παράπλευρο κέρδος: τα ένθετα calls
+καταρρέουν (το `settings/actions.ts` μπαίνει στο wrapper 65+ φορές ανά action, μία ανά model).
+
+**Η παρτίδα**: `getTrash`, `restoreFromTrash`, `purgeTrashEntry`, `emptyTrash` περνούν πλέον από
+`scoped()`. Ήταν οι πέντε τελευταίες συναρτήσεις του αρχείου που διάβαζαν `TRASH_MODELS[type]`
+κατευθείαν, ενώ οι άλλες 65 είχαν ήδη μεταφερθεί. Το `purgeTrashEntry` έκανε ήδη `scoped()` στο
+**cross-reference cleanup** του — η **κύρια διαγραφή** ήταν αυτή που πήγαινε σε λάθος βάση, που
+είναι ακριβώς ο τρόπος με τον οποίο μια μισή μετανάστευση διαβάζεται ως ολοκληρωμένη.
+
+**Verified**: `npm run type-check` exit 0. **ΟΛΟ το suite: 398 files / 6463 tests πράσινα**
+(ήταν 2 κόκκινα πριν, βλ. παρακάτω). **9 νέα tests**, και επιβεβαιωμένα μη κενά: σχολιάζοντας τη
+γραμμή του short-circuit πέφτουν 4 από τα 5 tests της (το 5ο είναι το self-hosted parity, που
+οφείλει να περνά και στις δύο εκδοχές)· γυρίζοντας το `emptyTrash` πίσω σε raw model, τα δύο
+tests του κάδου κρεμάνε στο πραγματικό mongoose και πέφτουν σε timeout. Probe στο deployed
+(`4ecdc68`, χωρίς αυτή την αλλαγή): `app.ph-aros.com/api/v1/trash` → 404 «No workspace for this
+host», `home.ph-aros.com/api/v1/trash` → 401 «send Authorization: Bearer» — δηλαδή το subdomain
+φτάνει κανονικά στην πύλη του bearer, άρα σήμερα ένα έγκυρο token εκεί **διαβάζει τον κάδο της
+κοινής `pharos_registry`**, όχι του workspace. Μηδέν Docker (καμία αλλαγή σε runtime wiring: TS
+μόνο, καμία dependency, κανένα env, κανένα compose).
+
+**Παρεμπιπτόντως, ένα κόκκινο suite που δεν ήταν δικό μου και το άφηνε να κρύβει regressions**:
+το `lib/aiConfig.tenant.test.ts` είχε **2 tests σε timeout** πριν αγγίξω οτιδήποτε (το επιβεβαίωσα
+σχολιάζοντας την αλλαγή μου). Από το `618ff27`: το «δεν υπάρχει BYO key» πέφτει πλέον πίσω στο
+**platform key του operator**, και το test mock-άρει μόνο το `byoKeyStore`, οπότε το
+`platformKeyStore` έμενε πραγματικό και έβαζε ένα control-plane query που δεν απαντά ποτέ. Το
+race των 3s (`BYO_KEY_TIMEOUT_MS`) το απορροφά, αλλά δύο tenants ανά test κάνουν 6s σε προθεσμία
+5s — γι' αυτό έπεφταν ακριβώς τα δύο πολυ-tenant και το μονο-tenant απλώς αργούσε (3003ms). Μία
+γραμμή mock· το suite γύρισε από 24s σε 14s.
+
+**Next task:** παρτίδα 2 της πύλης — τα writers: `statements/cards.ts`, `setup/actions.ts`,
+`jobActions.ts` (μετά `aiCommandActions.ts`, `aiTools.ts`, `history/actions.ts`), μετά τα
+read-only pages. Το private beta μένει κλειστό μέχρι να τελειώσουν και οι 5 παρτίδες.
+
+**## Needs Achilleas:** **Stripe keys**, **plan pricing**, το **πότε** μπαίνει το
+`SAAS_PURGE_EXECUTE=1`, το `- ./f2b:/var/lib/pharos/f2b` mount στο
+`deploy/docker-compose.prod.yml` (εγκεκριμένο στο `pharos-deploy-20260807-0312`, ανήκει στο
+deploy routine), και **ΣΗΜ σειράς**: το κείμενο Privacy για το access log
+(`pharos-saas-core-20260807-1042` (β)) μπλοκάρει το `pharos-cloud-guard` εδώ και τέσσερα
+περάσματα — μπαίνει μόλις τελειώσει η πύλη, όπως ορίζει η εγκεκριμένη σειρά (α) → (γ) → (β).

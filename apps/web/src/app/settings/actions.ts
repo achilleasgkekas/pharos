@@ -1828,6 +1828,14 @@ export async function importData(json: string): Promise<{ ok: boolean; restored:
 // ─── Trash (soft-deleted records) ────────────────────────────────────────────
 // Deletes everywhere in the app are now SOFT (deletedAt set); this is the one
 // place that restores or permanently purges them. Auto-purge after 30 days.
+//
+// TENANCY: these five kept reading `TRASH_MODELS[type]` directly while the other 65 actions in
+// this file had already moved to `scoped()`, so in SaaS mode they listed, restored and
+// PERMANENTLY DELETED out of the shared default database. `emptyTrash` is the sharp end: one
+// workspace's "empty the trash" would sweep every workspace's trashed records, and unlike the
+// settings-sharing bug that one is not reversible. They are gated first for that reason.
+// `purgeTrashEntry` already routed its cross-reference cleanup through `scoped()` — the
+// PRIMARY delete was the one going to the wrong database.
 
 export type TrashRow = { type: TrashType; id: string; title: string; subtitle: string; deletedAt: string };
 export type TrashType = 'item' | 'receipt' | 'expense' | 'subscription' | 'voucher' | 'giftcard' | 'loyaltycard' | 'bill' | 'goal' | 'task';
@@ -1866,7 +1874,8 @@ export async function getTrash(): Promise<TrashRow[]> {
   await connectDB();
   const cutoff = new Date(Date.now() - TRASH_RETENTION_DAYS * 86400000);
   const rows: TrashRow[] = [];
-  for (const [type, Model] of Object.entries(TRASH_MODELS) as [TrashType, typeof Item][]) {
+  for (const [type, RawModel] of Object.entries(TRASH_MODELS) as [TrashType, typeof Item][]) {
+    const Model = await scoped(RawModel);
     const docs = await Model.find({ deletedAt: { $ne: null } }).setOptions({ withDeleted: true }).lean();
     for (const d of docs as unknown as Record<string, unknown>[]) {
       const deletedAt = new Date(d.deletedAt as string);
@@ -1884,9 +1893,10 @@ export async function getTrash(): Promise<TrashRow[]> {
 /** Bring a trashed record back exactly as it was (files + links were never touched). */
 export async function restoreFromTrash(type: TrashType, id: string): Promise<{ ok: boolean }> {
   await assertCanWrite();
-  const Model = TRASH_MODELS[type];
-  if (!Model) return { ok: false };
+  const RawModel = TRASH_MODELS[type];
+  if (!RawModel) return { ok: false };
   await connectDB();
+  const Model = await scoped(RawModel);
   await Model.updateOne({ _id: id }, { $set: { deletedAt: null } }).setOptions({ withDeleted: true });
   revalidatePath('/', 'layout');
   return { ok: true };
@@ -1903,9 +1913,10 @@ export async function purgeFromTrash(type: TrashType, id: string): Promise<{ ok:
  *  route) must authorize first; the API route enforces admin via the bearer user. */
 export async function purgeTrashEntry(type: TrashType, id: string): Promise<{ ok: boolean }> {
   await assertCanWrite();
-  const Model = TRASH_MODELS[type];
-  if (!Model) return { ok: false };
+  const RawModel = TRASH_MODELS[type];
+  if (!RawModel) return { ok: false };
   await connectDB();
+  const Model = await scoped(RawModel);
   const doc = (await Model.findById(id).setOptions({ withDeleted: true }).lean()) as Record<string, unknown> | null;
   if (!doc) return { ok: true };
   const oid = new Types.ObjectId(id);
@@ -1940,7 +1951,8 @@ export async function emptyTrash(): Promise<{ ok: boolean; purged: number }> {
   await requireAdmin();
   await connectDB();
   let purged = 0;
-  for (const [type, Model] of Object.entries(TRASH_MODELS) as [TrashType, typeof Item][]) {
+  for (const [type, RawModel] of Object.entries(TRASH_MODELS) as [TrashType, typeof Item][]) {
+    const Model = await scoped(RawModel);
     const docs = await Model.find({ deletedAt: { $ne: null } }).setOptions({ withDeleted: true }).select('_id').lean();
     for (const d of docs as unknown as { _id: unknown }[]) {
       await purgeTrashEntry(type, String(d._id));

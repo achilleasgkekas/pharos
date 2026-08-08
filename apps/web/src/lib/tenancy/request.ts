@@ -169,8 +169,29 @@ export const softRequestTenant = cache(async function softRequestTenant(): Promi
  * In self-hosted mode the wrapper resolves to DEFAULT_TENANT and `withTenant` leaves the
  * ambient store empty-equivalent, so `currentModel` returns the default-connection model and
  * metering stays off — identical to today.
+ *
+ * AN ALREADY-ESTABLISHED TENANT WINS (and this is not an optimisation).
+ * This gate authenticates with the SESSION COOKIE. `/api/v1/*` authenticates with a BEARER
+ * TOKEN: `withAuth` resolves the workspace from the host and then looks the token up in THAT
+ * workspace's own `users` collection, which is a complete gate with a different credential.
+ * 22 API routes call feature server actions (rescan, ai-fill, import, trash, lists, …), and
+ * those actions now reach their models through this wrapper. Without the short-circuit, an
+ * API client with a perfectly valid token re-enters the cookie gate, has no cookie,
+ * `not_authenticated` → `failTenantGate` → `redirect()`, whose control-flow throw `withAuth`
+ * catches and reports as a **500** — every one of those endpoints, in SaaS mode only.
+ *
+ * Skipping the re-check is safe because an ambient tenant only ever comes from a gate that
+ * already resolved AND authorised: `withAuth` (bearer, above), this function (cookie), or
+ * `getNotifications` via `resolveRequestTenantOrNull` (cookie + membership). Those are the
+ * only three `withTenant` call sites in the app; a fourth that skips authorisation would
+ * break this invariant, so it must not be added.
+ *
+ * Nested calls collapse too: `settings/actions.ts` alone enters this wrapper 65+ times per
+ * action (once per model), and only the outermost one now does any work.
  */
 export async function withRequestTenant<T>(fn: () => Promise<T>): Promise<T> {
+  if (hasTenantContext()) return fn();
+
   let ctx: TenantContext;
   try {
     ctx = await resolveRequestTenant();
