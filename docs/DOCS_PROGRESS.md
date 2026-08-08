@@ -3242,3 +3242,29 @@ Validation (markdown only): code-fence count και στα δύο αρχεία =
 Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/security.md` + `docs/features.md` (δικά μου), κανένα foreign staged.
 
 Επόμενο run: item 2 της λίστας (`63f2e33` + `abd0cdc`, waitlist gone / plans→signup / activation-by-code — `docs/saas.md` "Workspace creation"/"Account profile" sections).
+
+## 2026-08-08 (forty-fourth run — item 2: activation-code billing flow documented in saas.md)
+
+Έλεγξα πρώτα το ask-inbox (`grep pharos-docs ~/.claude/ASK_ACHILLEAS.md`) — καμία εγγραφή. `docs/` καθαρό στο αρχικό `git status --short` (μόνο `.vite/` untracked, εκτός territory).
+
+Item 2 της ουράς: **`63f2e33`** (waitlist gone, plans→signup, plans activate by code) + **`abd0cdc`** (signup confirms the clicked plan). Πρώτα επιβεβαίωσα ότι δεν υπάρχει ήδη stale "waitlist" claim πουθενά στο `docs/` (`grep -in waitlist docs/*.md` = 0 hits εκτός από το ίδιο το progress log) — η landing-page αφαίρεση του waitlist δεν χρειαζόταν καμία διόρθωση, το `docs/` δεν το είχε τεκμηριώσει ποτέ.
+
+Διάβασα τον κώδικα πριν γράψω, όχι τα commit messages: `apps/web/src/lib/billing/activationCode.ts` (πλήρες — `parseActivationCodes`/`resolveActivation`, fail-closed σε malformed env entries, ίδιο rejection message για κάθε failure mode ώστε να μη διαρρέει ποιο μισό του guess ήταν σωστό), `apps/web/src/app/api/saas/billing/activate/route.ts` (πλήρες — owner/admin gate μέσω `saasGuard`, 503 όταν κανένας κώδικας δεν είναι configured, audit trail `billing.activation_rejected`/`billing.activated_by_code` χωρίς ποτέ τον ίδιο τον κώδικα), `apps/web/src/components/saas/BillingPanel.tsx` (πλήρες — νέο `ActivationCodeCard`, μόνο για `canManage`, πάνω από τα plan cards· επιβεβαίωσα ότι τα Subscribe/Manage κουμπιά ΕΙΝΑΙ ήδη wired, POST-άρουν σε checkout/portal — όχι "coming soon" placeholder), και `apps/web/src/components/saas/signupPlan.ts` + το `(saas)/account/signup/page.tsx` diff (πλήρες — `signupPlanNotice()`, read-only confirmation όταν `?plan=shared|dedicated`, κανένα notice για `free` ή άγνωστη τιμή).
+
+Τι έγραψα στο `docs/saas.md`:
+1. **Νέα γραμμή στο "Billing (Stripe)" section**: `POST /api/saas/billing/activate` — πλήρης περιγραφή (owner/admin only, code+plan must match, 503 όταν unconfigured, 400 ενιαίο μήνυμα για κάθε rejection, audit trail actions, πού ζει το UI).
+2. **Νέα γραμμή στο "SaaS environment variables" table**: `SAAS_ACTIVATION_CODES` (format, fail-closed σε malformed pairs, link στο endpoint).
+3. **`/account/signup` row στο "Browser sign-in UI" table**: προστέθηκε η περιγραφή του `?plan=` read-only notice flow (τι δείχνει, τι ΔΕΝ κάνει — δεν βάζει σε paid plan, μόνο confirmation).
+4. **⚠ Ξεχωριστό εύρημα, εκτός του immediate commit scope αλλά flat-out stale**: η παράγραφος "Empty and edge states" έλεγε ρητά "Billing / management CTAs that are not yet wired (subscribe / manage subscription) render as 'coming soon' copy rather than dead buttons" — verified με `grep -rn "coming soon" apps/web/src` = **0 hits σε όλο τον κώδικα**. Αυτό το κείμενο προϋπήρχε του `7d56b2a` (το commit που έχτισε το πραγματικό `BillingPanel` με live checkout/portal calls) και ποτέ δεν ενημερώθηκε. Διορθώθηκε: τα κουμπιά είναι live (POST σε checkout/portal), αυτό που λείπει είναι το Stripe self-serve από κάτω τους (502/503 χωρίς keys) — και εξηγεί γιατί τα activation codes υπάρχουν ως ο πραγματικός δρόμος σήμερα.
+
+Accuracy: verified με πλήρη code read (activationCode.ts, activate/route.ts, BillingPanel.tsx, signupPlan.ts+page.tsx diff), όχι commit-message copy. Το "coming soon" fix βασίστηκε σε ρητό grep, όχι υπόθεση.
+
+Validation (markdown only, κανένα build/Docker/AI call): code fences `docs/saas.md` = 18 πριν/μετά (ζυγό, καμία code-block αλλαγή)· anchors verified με script (`billing-stripe`, `workspace-console-ui-accountworkspace`, `saas-environment-variables`, `activity-audit`, `workspace-creation` — όλα FOUND)· κανένα credential (το `SAAS_ACTIVATION_CODES` παράδειγμα είναι το ίδιο placeholder pattern που ήδη υπάρχει μέσα στο πηγαίο docstring του activationCode.ts, όχι πραγματικός κωδικός).
+
+Collision guard: `git status --short -- docs/` πριν commit = μόνο `docs/saas.md` modified (δικό μου), κανένα foreign staged.
+
+Δεν έγινε (out of scope, εκτός του δικού μου item 2): sign-out cookie fix (63f2e33, `pharos_account`/`pharos_session` και τα δύο clear πλέον) — το doc ήδη λέει γενικά "Clears the session cookie", τεχνικά σωστό και για τα δύο cookies, δεν χρειάζεται νέα γραμμή· SiteNav account-menu additions (Workspaces/Billing links) — ήδη έμμεσα καλυμμένο από το ήδη-υπάρχον "Workspace console UI" section.
+
+Συμπέρασμα: Τα shipped features 63f2e33 (activation-code billing door) + abd0cdc (signup plan confirmation) είναι πλέον fully + accurately documented στο `docs/saas.md`, μαζί με τη διόρθωση ενός προϋπάρχοντος stale "coming soon" claim.
+
+Επόμενο run: item 3 της λίστας (`4b87112`, real SMTP email send — `docs/saas.md`/`configuration.md` env vars) · μετά τα υπόλοιπα items 4-9 της forty-second run λίστας · μετά νέο `git log --oneline <last-covered>..HEAD` σάρωμα για πιο πρόσφατα feat() commits.

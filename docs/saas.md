@@ -207,7 +207,7 @@ each renders inside a shared `AuthShell` card.
 | Route | Renders |
 | --- | --- |
 | `/account/login` | Email + password form. Posts to [`POST /api/saas/auth/login`](#authentication); on success does a **full** page navigation (not a client route change) to the sanitized `next` path so the fresh server render picks up the just-set httpOnly session cookie. Links to signup. |
-| `/account/signup` | Dual-mode page serving two flows. **Normal signup:** email + password (≥ 8 chars) plus optional display name and workspace name; posts to [`POST /api/saas/auth/signup`](#authentication), which provisions a first workspace with an owner membership. **Invite acceptance:** if a `?invite=<token>` query param is present, the page server-renders an invite preview (invitee email and workspace name) and shows a lightweight `InviteAcceptForm` (confirm button + optionally set password if no account exists yet) instead. The form posts to [`POST /api/saas/invites/accept`](#invite-management) with the token. Invalid or expired invites show an "Invitation not available" message with fallback links to login/signup. A viewer already signed in to a different email is allowed to accept (the session switches to the invited account). Both flows redirect an already-signed-in viewer to `next` instead of showing a form. Links to login. |
+| `/account/signup` | Dual-mode page serving two flows. **Normal signup:** email + password (≥ 8 chars) plus optional display name and workspace name; posts to [`POST /api/saas/auth/signup`](#authentication), which provisions a first workspace with an owner membership. If the pricing page's CTA carried a `?plan=shared` or `?plan=dedicated` query param, the page swaps its generic title/subtitle for a read-only confirmation naming that plan and its price (`signupPlanNotice()`, `components/saas/signupPlan.ts`) — but signup itself always still creates a `free` workspace; the notice explains the plan is switched on afterwards via [activation](#billing-stripe), never implying this form starts a subscription. `?plan=free` or an unrecognised value shows no notice (nothing to confirm, and an arbitrary string is never echoed back onto the page). **Invite acceptance:** if a `?invite=<token>` query param is present, the page server-renders an invite preview (invitee email and workspace name) and shows a lightweight `InviteAcceptForm` (confirm button + optionally set password if no account exists yet) instead. The form posts to [`POST /api/saas/invites/accept`](#invite-management) with the token. Invalid or expired invites show an "Invitation not available" message with fallback links to login/signup. A viewer already signed in to a different email is allowed to accept (the session switches to the invited account). Both flows redirect an already-signed-in viewer to `next` instead of showing a form. Links to login. |
 
 Both pages redirect an **already-signed-in** viewer straight to `next` instead of
 showing a form (this is also how a superadmin reaches `/admin`: sign in here,
@@ -706,6 +706,7 @@ when signed out, 403 when not a member (GET) or not an owner/admin (write).
 | `POST` | `/api/saas/billing/checkout` | `{ plan }` | Start a Stripe Checkout session for a paid plan (`shared` or `dedicated`). Returns `{ url, id }`. Upstream Stripe errors → `502`. |
 | `POST` | `/api/saas/billing/portal` | — | Open the Stripe customer portal for the workspace. |
 | `POST` | `/api/saas/billing/webhook` | Stripe event | Webhook receiver. Maps `checkout.session.completed` and `customer.subscription.{created,updated,deleted}` onto `Tenant.status`/`plan`. Always returns `200` on handled/ignored events so Stripe stops retrying. |
+| `POST` | `/api/saas/billing/activate` | `{ code, plan?, tenant? }` | **Owner/admin only.** Redeem an activation code to put the workspace directly on a paid plan (sets `tenant.plan` and `status: 'active'`), bypassing Stripe checkout entirely. This is the **only** working route to a paid plan right now: self-serve checkout is deliberately left in place in the UI, but answers `502`/`503` without live Stripe keys, so onboarding runs on codes Achilleas hands out personally instead. Codes are configured via the `SAAS_ACTIVATION_CODES` env var (see [SaaS environment variables](#saas-environment-variables)) as comma-separated `CODE:plan` pairs, checked with `resolveActivation()` (`lib/billing/activationCode.ts`): the code must exist **and** its plan must match the `plan` in the request body (a code minted for `shared` cannot be replayed against `dedicated` by editing the body). `503 { error }` when no codes are configured on this deployment at all. `400` for every rejection case (unknown code, blank code, plan mismatch) with one identical message — the two failure modes are indistinguishable on purpose, so a wrong guess never reveals which half was close. Rejections are written to the [audit trail](#activity-audit) as `billing.activation_rejected` (reason only, never the submitted code); a success is `billing.activated_by_code`. The redeem form (`ActivationCodeCard` in `BillingPanel.tsx`) lives at the top of [`/account/workspace/billing`](#workspace-console-ui-accountworkspace), above the plan cards, and only renders for managers. |
 
 ### Usage
 
@@ -776,10 +777,13 @@ removed from its last workspace) is a real state, not an error: `/account` rende
 "No workspace yet" empty state with a **"Create workspace" form** auto-opened (the `CreateWorkspaceForm`
 component wrapping [`POST /api/saas/account/workspaces`](#workspace-creation)), allowing the account
 to immediately provision a new workspace. Members tab redirects to the same empty state. A `?w=<slug>`
-the account is not a member of is `notFound()` (`404`). Billing / management CTAs that are not yet
-wired (subscribe / manage subscription) render as "coming soon" copy rather than dead buttons. When
-an account has one or more workspaces, the create form is available as a collapsed toggle in the
-workspace chooser header (not auto-opened).
+the account is not a member of is `notFound()` (`404`). The Subscribe / manage-subscription buttons
+themselves are live (they POST to [checkout/portal](#billing-stripe) rather than showing static
+"coming soon" copy); what is not yet open is Stripe self-serve underneath them — without live
+Stripe keys those calls fail with a friendly `502`/`503` message instead of navigating anywhere,
+which is why [activation codes](#billing-stripe) exist as the working path onto a paid plan today.
+When an account has one or more workspaces, the create form is available as a collapsed toggle in
+the workspace chooser header (not auto-opened).
 
 **Gating.** The `(saas)` segment layout `404`s the whole tree when `SAAS_MODE` is off
 or account auth is not configured (`AUTH_SECRET` unset), so the self-hosted app never
@@ -1297,6 +1301,7 @@ secrets. They are not part of the self-hosted `.env.example` yet
 | `CRON_SECRET` | Bearer token guarding scheduler-driven routes (e.g. the trial-lapse sweep). Required for those endpoints; when unset they fail closed with `500`. |
 | `STRIPE_PRICE_SHARED` | Stripe Price ID for the Pro (`shared`) plan. |
 | `STRIPE_PRICE_DEDICATED` | Stripe Price ID for the Dedicated plan. |
+| `SAAS_ACTIVATION_CODES` | Comma-separated `CODE:plan` pairs (e.g. `FRIENDS-2026:shared,ACME-PILOT:dedicated`) redeemable via [`POST /api/saas/billing/activate`](#billing-stripe) — the current stand-in for self-serve checkout while Stripe is unwired. Unset or empty means activation is closed entirely (`503` on every attempt). A malformed pair is dropped, not guessed, so a typo silently disables that one code rather than granting an unintended plan. |
 | `RESEND_API_KEY` | Enables transactional email (invites, verification, reset) via Resend. |
 | `SMTP_URL` | Alternative mailer transport when Resend is not set. |
 | `MAIL_FROM` | From address for outbound email. Defaults to `Pharos <no-reply@ph-aros.com>`. |
