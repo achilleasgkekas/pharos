@@ -7,7 +7,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-08-08 (30ή σάρωση planner).
+> Τελευταία ενημέρωση: 2026-08-09 (31η σάρωση planner).
 > **Ιστορικό σαρώσεων (συμπιεσμένο στην 30ή σάρωση, ήταν ~230 γραμμές σκαναρίσματος-προς-σκανάρισμα, τώρα
 > αυτό το block· τίποτα δεν χάθηκε, το αναλυτικό σκεπτικό ανά item μένει μέσα στο ίδιο item παρακάτω και στο
 > `PROGRESS.md`/`git log -p -- PRODUCT_BACKLOG.md` για όποιον θέλει το πλήρες historical trace):**
@@ -17,11 +17,21 @@
 > σειρά Α→Γ→Β**, + ξεχωριστά P94 (storage add-on, blocked σε Stripe price ids από τον Αχιλλέα)/P95 (BYO-key
 > add-on)/P96 (admin center, 14 items A1-E2, δεσμευτική σειρά A→B1/C1→υπόλοιπα).
 >
-> **Κατάσταση ουράς (30ή σάρωση, 2026-08-08):** ενεργά buildable, όχι μπλοκαρισμένη. Ο builder καταναλώνει με
+> **Κατάσταση ουράς (31η σάρωση, 2026-08-09):** ενεργά buildable, όχι μπλοκαρισμένη. Ο builder καταναλώνει με
 > τη δεσμευτική σειρά της ομάδας Α: **P61 shipped 2026-08-08** (partial bill payments), **P69 shipped
 > 2026-08-09** (year-over-year Reports), **P84 επόμενο** (credit card utilization warning). Η ουρά παραμένει μεγάλη (Proposed + unbuilt Approved, ~45+ items μεταξύ των δύο)
 > οπότε ο ρυθμός νέων προτάσεων μένει χαμηλός (1-2/σάρωση) μέχρι να αδειάσει περισσότερο, αντί του συνηθισμένου
 > 3-5.
+>
+> **Dedupe αυτής της σάρωσης:** τρία Proposed items αφαιρέθηκαν ως redundant πριν προστεθεί οτιδήποτε νέο
+> (live-verified, όχι απλή υποψία) — **P97** («Item lending tracker») ήταν λέξη-προς-λέξη το ίδιο με το ήδη-
+> **Approved P47** (ίδιος τίτλος, ίδιο σχήμα `lentTo`/`expectedReturnAt`)· **P98** («Utility usage kWh/m³») ίδιο
+> με το ήδη-**Approved P49** (ίδιο πεδίο consumption-vs-amount)· **P93** («Manual bank CSV/OFX import») παρέβλεψε
+> ότι το **PA1** (Bank/generic CSV import) έχει ήδη SHIPPED (2026-07-09) ακριβώς αυτό — column-mapper, dedupe,
+> `CsvImportModal.tsx`/`importExpensesCsv` verified στο κώδικα· το μόνο αγνό διαφορετικό (OFX format αντί CSV)
+> είναι πολύ niche για ξεχωριστό item, δεν αξίζει slot στην ουρά. Η αιτία και στα τρία: παλιότερες σαρώσεις
+> έψαξαν με λάθος/στενά keywords (π.χ. `bankStatement|BankAccount` αντί `csvImport|CsvImportModal`) και δεν
+> βρήκαν το ήδη υπάρχον. Καμία απώλεια νοήματος· τα δύο πρώτα παραμένουν ζωντανά ως P47/P49 στο Approved.
 >
 > **Γνωστό ανοιχτό housekeeping (δεν είναι έγκριση, απλά σημείωση υγιεινής αρχείου):** αρκετά headers μέσα στο
 > `## Approved` παρακάτω είναι ήδη «✅ SHIPPED» και θα έπρεπε τυπικά να ζουν στο `## Done`, αλλά δεν
@@ -36,49 +46,38 @@
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
 
-### P98. Utility usage tracking (kWh/m³) ξεχωριστό από το ποσό του λογαριασμού — S/M — OSS, dogfooding-heavy
-- **Αξία:** live-verified `grep -rln "kwh|kWh|energyUsage|consumptionUnits" apps/web/src` = 0 hits. Τα ΔΕΗ/ΟΤΕ/
-  νερό bills καταγράφονται ήδη στο Expenses module (ποσό/ημερομηνία/κατηγορία utilities) αλλά **μόνο το €**,
-  ποτέ η πραγματική κατανάλωση (kWh/m³) που τυπώνεται πάνω στον ίδιο λογαριασμό. Με δύο ενεργά σπίτια
-  (κεντρικό + εξοχικό Kalamos, CLAUDE.md) το «ποιο σπίτι καταναλώνει περισσότερο, ανεξάρτητα από αυξήσεις
-  τιμολογίου» δεν απαντιέται σήμερα, μόνο το κόστος.
-- **Module:** `models/Expense.ts` (νέο optional `usageValue`/`usageUnit` πεδίο, ίδιο additive pattern με το
-  computed `anomaly` field) + AI parse (`EXPENSE_PROMPT`, νέο optional εξαγόμενο πεδίο) + Reports (μικρό νέο
-  usage-trend chart ανά utility category, ξεχωριστό από το ήδη-υπάρχον €-based chart).
-- **Ανοιχτή απόφαση (builder default):** MVP = **manual πεδίο μόνο** στη φόρμα (κενό = καμία αλλαγή), AI
-  auto-extract follow-up μόνο αν το manual αποδειχτεί χρήσιμο (αποφυγή νέου AI-accuracy ρίσκου σε ήδη-δουλεμένο
-  prompt)· per-house breakdown reuse του ήδη-shipped P34 spaces/multi-property tagging, μηδέν νέο μοντέλο.
+### P100. Budget «pace» / προβλεπόμενο μηνιαίο σύνολο ανά κατηγορία (Reports) — S — OSS (κυρίως), dogfooding-heavy
+- **Αξία:** live-verified `grep -rn "projected|pace|onTrack|daysLeft" apps/web/src/app/reports` = 0 hits. Το ήδη-
+  shipped **P27** (suggest budgets) γεμίζει το όριο ανά κατηγορία και το ήδη-shipped **P25** (rollover) δείχνει το
+  used/όριο ΤΩΡΑ, αλλά τίποτα δεν προβάλλει προς τα εμπρός: αν είναι 10 του μήνα και έχεις ήδη ξοδέψει το μισό
+  ενός budget κατηγορίας, το σημερινό UI δείχνει απλά «50%» χωρίς να πει αν αυτό είναι φυσιολογικό pace ή ήδη
+  εκτός πορείας. Απλός υπολογισμός (spend-so-far / days-elapsed × days-in-month) πάνω σε δεδομένα που το Reports
+  ήδη φέρνει, μηδέν νέο μοντέλο, μηδέν AI. Ξεχωριστό από το ήδη-shipped **P19** (safe-to-spend, cashflow-wide,
+  αφαιρεί μόνο γνωστές σταθερές μελλοντικές χρεώσεις) — αυτό εδώ είναι per-category budget projection, όχι
+  cashflow.
+- **Module:** `app/reports/page.tsx` (νέος pure υπολογισμός πάνω στο ήδη-φερμένο `thisMonthCat` per-category
+  aggregation) + `ReportsClient.tsx` «Budget · this month» κάρτα (ήδη υπάρχει, P1 session 2026-06-09) — προσθήκη
+  μιας γραμμής «at this pace: ~€X by month-end» + χρωματιστό chip (on-track/over-pace) ανά κατηγορία με ρυθμισμένο
+  budget.
+- **Ανοιχτή απόφαση (builder default):** MVP = γραμμικό pace (καμία seasonality/day-of-week weighting, ίδιο
+  simple-first idiom με το P27 median)· εμφανίζεται μόνο για κατηγορίες με ρυθμισμένο budget>0 (ίδιο guard με το
+  ήδη-υπάρχον card)· καμία νέα notification/alert σε αυτό το slice (μόνο in-page badge, follow-up αν ζητηθεί).
 
-### P97. Item lending tracker (δανείστηκε σε φίλο, υπενθύμιση επιστροφής) — S — OSS, dogfooding-heavy
-- **Αξία:** live-verified `grep -rln "lentTo|borrowedBy|LoanRecord|lendItem" apps/web/src` = 0 hits. Το
-  `Item.status` δεν έχει κατάσταση «δανεισμένο», και κανένα πεδίο δεν καταγράφει σε ποιον δόθηκε κάτι ή πότε
-  αναμένεται πίσω. Ο χρήστης έχει ήδη καταγεγραμμένο ακριβό εξοπλισμό στο Items module (Battle Station,
-  δικτυακός εξοπλισμός, εργαλεία)· ό,τι δανείζεται σήμερα φεύγει από την ορατότητα της εφαρμογής μέχρι να το
-  θυμηθεί μόνος του.
-- **Module:** `models/Item.ts` (νέο optional `lentTo: {name, date, dueBack?, notes}` subdoc, μηδέν αλλαγή στο
-  `status` enum) + `ItemsClient.tsx`/detail modal («Mark as lent» action + badge «Lent to X since Y», ίδιο
-  idiom με το warranty badge) + προαιρετική νέα γραμμή στο `runAlertChecks` όταν περάσει το `dueBack`.
-- **Ανοιχτή απόφαση (builder default):** MVP = απλό subdoc πάνω στο υπάρχον item (όχι νέο μοντέλο, όχι σύνδεση
-  με πραγματικά household members/P31)· `dueBack` προαιρετικό (κενό = δανεισμένο επ' αόριστον, καμία
-  ειδοποίηση)· «got it back» = clear το subdoc, το item επιστρέφει στο προηγούμενο status.
-
-### P93. Manual bank/checking-account statement import (CSV/OFX, ρητά διακριτό από το παγωμένο P36) — M — OSS (κυρίως)
-- **Αξία:** live-verified `grep -rln ".ofx|OFX|QIF|bankStatement|BankAccount|bankCsv" apps/web/src` (εκτός tests)
-  = 0 hits, το μόνο match είναι το άσχετο SaaS `models/Account.ts` (tenant/org account, όχι τραπεζικός λογαριασμός).
-  Το app σήμερα βλέπει μόνο πιστωτικές κάρτες (`Statement` PDF import) και ό,τι καταχωρηθεί χειροκίνητα σε
-  Expenses/Income. Καμία ορατότητα σε καταθέσεις/αναλήψεις τρεχούμενου λογαριασμού (μισθός, πάγιες εντολές, ATM)
-  εκτός αν ο χρήστης τα ξαναπληκτρολογήσει ένα-ένα. **Ρητά διακριτό από το παγωμένο P36** (OWNER_DECISIONS #13:
-  Open Banking auto-sync μέσω GoCardless API, «θα γίνει πολύ αργότερα», κανένα routine δεν το ξαναφέρνει): αυτό
-  εδώ είναι **χειροκίνητο file import** (ο χρήστης κατεβάζει το CSV/OFX από το e-banking και το ανεβάζει), ίδιο
-  trust model με το ήδη-δουλεμένο Statement PDF import, μηδέν API/OAuth/τραπεζικά credentials.
-- **Module:** νέο `app/statements/bankImportActions.ts` (parse CSV: date/description/amount/balance columns·
-  OFX: standard format, υπάρχουν έτοιμες ελεύθερες parsers) → δημιουργεί Expense/Income drafts (reuse
-  `expenses/lib.ts` vendorKey/serialize) με πηγή flag ώστε να ξεχωρίζουν από AI-scanned. UI: νέο upload button
-  στο `/statements` ή `/expenses` («Import bank CSV»).
-- **Ανοιχτή απόφαση (builder default):** MVP = **γενικός column-mapper** (ο χρήστης δείχνει ποια στήλη είναι
-  date/desc/amount, μία φορά ανά τράπεζα, αποθηκεύεται ως template) αντί για hardcoded ελληνικό bank format
-  (κάθε τράπεζα έχει διαφορετικό export), αποφυγή brittle ad-hoc parsers ανά τράπεζα· OFX parsing follow-up
-  μόνο αν το CSV column-mapper αποδειχτεί ανεπαρκές.
+### P99. Δεύτερος (ταυτόχρονος) remote backup destination — πραγματικό 3-2-1, όχι ένα backend τη φορά — S/M — OSS (κυρίως), self-host trust lever
+- **Αξία:** live-verified `models/AppConfig.ts:118` `storageBackend: enum ['local','ftp','smb','onedrive']` — **ένα
+  και μόνο** backend ενεργό κάθε φορά. Το ίδιο το `CLAUDE.md` έχει ρητό locked design principle «3-2-1 backups: από
+  την αρχή», αλλά η σημερινή αρχιτεκτονική δεν επιτρέπει καν 2 αντίγραφα εκτός τοπικού δίσκου ταυτόχρονα — αλλαγή
+  backend σβήνει/αντικαθιστά το προηγούμενο mirror config, δεν προσθέτει δεύτερο. Ο ήδη-shipped **P48** (mirror
+  sync-staleness alert) προϋποθέτει ένα mirror να υπάρχει, δεν λύνει το «μόνο ένα mirror επιτρέπεται». Πραγματικό
+  3-2-1 (local + 2 διαφορετικά offsite) είναι το φυσικό follow-up.
+- **Module:** `models/AppConfig.ts` (`storageBackend` string → `storageMirrors: [{backend, host, ...}]` array, ίδιο
+  additive-migration idiom με τα υπόλοιπα AppConfig arrays π.χ. `notifiers`) + `lib/mirror.ts` (`mirrorFileToRemote`
+  loop πάνω σε όλα τα ενεργά entries αντί για ένα) + Settings → Storage & backup UI (λίστα mirrors, add/remove,
+  ίδιο idiom με το ήδη-shipped `NotificationsManager` multi-channel list).
+- **Ανοιχτή απόφαση (builder default):** MVP = **cap 2 ταυτόχρονα remote mirrors** (αρκεί για 3-2-1, αποφυγή
+  unbounded UI complexity)· backward-compat: το υπάρχον single `storageBackend`/creds μεταναστεύει αυτόματα σε
+  πρώτο entry του array στο πρώτο read (ίδιο idiom με το ήδη-υπάρχον `notifiers` legacy-ntfy migrate-on-read)·
+  sync παραμένει fire-and-forget/best-effort ανά destination (ένα αποτυχημένο δεν μπλοκάρει το άλλο).
 
 ### P92. Location-based filter/browse view για Items (dogfooding: δύο σπίτια + rack layout) — S — OSS, dogfooding-heavy
 - **Αξία:** live-verified: το `Item.location` πεδίο υπάρχει ήδη (`models/Item.ts`: «where it physically lives
