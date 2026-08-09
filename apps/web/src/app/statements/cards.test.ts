@@ -36,6 +36,11 @@ vi.mock('@/models/Card', () => ({
     create: cardCreate,
   },
 }));
+// Flat tenancy seam: this file pins the ACTIONS' behaviour, so both helpers are pass-throughs and
+// `currentModel` hands back the same mocked Card above. The tenant ROUTING itself is pinned
+// tenant-aware, in its own file (cards.tenant.test.ts), exactly as actions.crud vs actions.tenant.
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<unknown>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
 vi.mock('@/lib/ollama', () => ({ parseCardImage: parseCardImageMock }));
 vi.mock('@/lib/aiFeatures.server', () => ({ isFeatureEnabled: isFeatureEnabledMock }));
 vi.mock('next/cache', () => ({ revalidatePath: (p: string) => revalidatePathMock(p) }));
