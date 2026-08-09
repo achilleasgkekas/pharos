@@ -394,6 +394,7 @@ const ROADMAP: {
       'A browser bookmarklet and Chrome extension for one-click capture',
       'Optional TOTP two-factor login, self-hosted as well as hosted',
       'Manually paid bills settled in one click or in part payments, with a running balance',
+      'A one-screen deployment health check, and a quiet notice when a newer release ships',
     ],
   },
   {
@@ -444,7 +445,11 @@ const FAQ_GROUPS: {
       },
       {
         q: 'How do updates work?',
-        a: 'Self-hosted updates are a git pull and one docker compose up, so you upgrade on your own schedule and can pin to a version you trust. On hosted we roll out updates for you, so you are always on the latest release with nothing to maintain.',
+        a: 'Self-hosted updates are a git pull and one docker compose up, so you upgrade on your own schedule and can pin to a version you trust. You do not have to watch the repo to know an update exists, though: Settings → About shows the version this build actually is, and when a newer release has been published it adds a line linking to the notes. That check is one anonymous request a day to the public image registry, asking only which tags exist, so nothing about your instance, your data, or even that it is yours ever leaves the machine, and the answer is cached so a restart is not another request. It is deliberately quiet in every direction: a firewalled or offline instance fails silently and backs off rather than calling out on every settings load, and keeps the last real answer it had instead of blanking it; a pre-release tag like 1.4.0-rc1 never nags someone on stable; a local or "dev" build is never told it has fallen behind, since it may well be ahead. "Check now" skips the daily cache for the moment you have just opened a firewall, and the whole thing has an off switch that is honoured before the request is made, not after, so an instance that should talk to nobody talks to nobody. Running a fork or your own rebuild? Point the check at your own image instead. On hosted we roll out updates for you, so you are always on the latest release with nothing to maintain and nothing to check.',
+      },
+      {
+        q: 'How do I tell whether my self-hosted instance is healthy?',
+        a: 'Settings → System status answers that on one screen, instead of the usual trip through container logs. It is a read-only grid of five checks: the database (ping time, size, document and collection counts), the storage volume (free space, and how big it is), the AI provider (configured and reachable, with which model), background jobs (how many are running, how many have not moved in over 30 minutes, how many failed in the last 24 hours), and the remote mirror (which backend, and when it last synced successfully). Read-only is the design, not an omission: no writes, no auto-fix, no restart button, so the page you open when something is wrong can never be the thing that breaks it. Opening the tab runs only the fast checks; the one slow probe, a live round trip to your SMB, FTP, or OneDrive backend, sits behind an explicit "Test connections" button with a hard timeout, so a sleeping NAS never hangs the page. Each check owns its own failure, so one dead subsystem shows as one red tile rather than a blank screen, and anything you deliberately do not use (AI switched off, no remote backend configured, a filesystem that does not report free space) stays grey as "not measured" and never drags the headline verdict down. The tab is admin-only, and self-host only: latency, disk and the job queue describe the host machine, which on hosted is shared infrastructure and not a customer’s to see, so there we watch it instead.',
       },
       {
         q: 'Does it run on ARM, like a Raspberry Pi or an ARM instance?',

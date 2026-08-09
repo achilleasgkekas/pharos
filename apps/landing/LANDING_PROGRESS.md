@@ -5655,3 +5655,62 @@ jump σε anchor, οχι σπασιμο layout. `read_console_messages` κανε
 Needs-Achilleas (open, αμεταβλητο): legal entity/Stripe, Terms+Privacy review απο ανθρωπο, contact inbox,
 χρονισμος για public repo, καναλι για αιτηση invite. **Χρονισμος**: η αλλαγη ειναι μονο στο repo, το
 ζωντανο `https://ph-aros.com` θα τη δειξει μετα το επομενο deploy του landing.
+
+## 2026-08-09 (η σελιδα δεν ελεγε πουθενα οτι το self-host λεει μονο του αν ειναι υγιες, ουτε οτι σου λεει για νεα εκδοση)
+
+Το increment βγηκε απο το τριτο σημειο της προηγουμενης λιστας (sweep πανω σε shipped user-facing
+features που λειπουν απο τη σελιδα), και μαλιστα απο τους δυο ακριβως υποψηφιους που ειχα σημειωσει:
+`027416b` (Settings, System status, P77) και `75ee08d` (ενημερωση για νεοτερη εκδοση, P40). Και τα δυο
+απευθυνονται στο **δωρεαν self-host κοινο**, δηλαδη ακριβως στους ανθρωπους που ρωταει η σελιδα να
+τρεξουν κατι μονοι τους, και κανενα απο τα δυο δεν ειχε **ουτε μια** αναφορα σε ολο το page.tsx.
+
+Καθε ισχυρισμος διασταυρωθηκε **στον κωδικα**, οχι απο τα commit messages:
+(α) `lib/systemHealth.ts` ειναι pure/DB-free με τα κατωφλια εξαγμενα (`DB_PING_WARN_MS 250`,
+`DISK_FREE_WARN_BYTES 1 GiB` ή `DISK_FREE_WARN_RATIO 5%`, `JOB_STUCK_MINUTES 30`), και τα πεντε check
+ids ειναι `database | disk | ai | jobs | sync`, (β) `aiLevel` επιστρεφει `unknown` οταν το AI ειναι off
+και `diskLevel` `unknown` οταν το statfs δεν απανταει, αρα το «γκρι δεν ριχνει το headline» ειναι
+πραγματικο, (γ) `syncLevel` δινει `unknown` σε backend `local`, `down` σε unreachable, `warn` σε stale,
+(δ) `SettingsClient.tsx:128` το tab ειναι `adminOnly: true, selfHostOnly: true`, (ε) τα labels που
+χρησιμοποιω («System status», «Test connections») ειναι τα i18n `set.tabSystem` / `sys.testConnections`
+στο `locales/en.ts`, οχι δικη μου ονομασια, (στ) `versionCheck.ts` `UPDATE_CHECK_TTL_MS` = 24h,
+`parseVersion` απορριπτει ρητα pre-release, `isUpdateAvailable` γυρναει false οταν το running build δεν
+ειναι release (`dev`), `UPDATE_CHECK_IMAGE` κανει τον στοχο overridable, (ζ) `fetchLatestVersion`
+ζηταει **μονο** anonymous token + tag list απο το GHCR, μηδεν payload για το instance, (η)
+`updateCheckActions.ts:247` `if (saasMode()) return idle({ supported: false })`, αρα το «στο hosted δεν
+υπαρχει» ισχυει και στα δυο features.
+
+Δυο σημεια:
+1. **FAQ «How do updates work?»**: το κειμενο της ερωτησης **δεν αγγιχτηκε** (το anchor
+   `#faq-how-do-updates-work` ζει, επιβεβαιωμενο στο DOM), η απαντηση απεκτησε το Settings → About με
+   την πραγματικη εκδοση + τη γραμμη «νεοτερη εκδοση», και ρητα τα ορια της: ενα ανωνυμο request τη
+   μερα που ρωταει μονο ποια tags υπαρχουν, cache ωστε το restart να μην ειναι νεο request, σιωπηλη
+   αποτυχια με back-off για firewalled instance που κραταει την τελευταια αληθινη απαντηση, το rc1 δεν
+   ενοχλει οποιον ειναι σε stable, το «dev» build δεν κατηγορειται οτι εμεινε πισω, «Check now» για να
+   μην περιμενεις 24h, off switch **πριν** το request, δικο σου image αν τρεχεις fork.
+2. **Νεα FAQ «How do I tell whether my self-hosted instance is healthy?»** (νεα ερωτηση, νεο anchor,
+   κανενα υπαρχον link δεν αλλαζει): τα πεντε checks με το τι μετρανε, το read-only ως **σχεδιαση**
+   (η σελιδα που ανοιγεις οταν κατι χαλασε δεν γινεται να ειναι αυτη που το χαλαει), το slow probe πισω
+   απο ρητο «Test connections» ωστε ενα κοιμισμενο NAS να μην κρεμαει τη σελιδα, ενα νεκρο subsystem =
+   ενα κοκκινο πλακιδιο οχι λευκη οθονη, το γκρι «not measured», και το γιατι ειναι admin+self-host only
+   (τα νουμερα περιγραφουν τον **host**, που στο hosted ειναι κοινη υποδομη).
+3. **Roadmap → Shipped**: νεο bullet «A one-screen deployment health check, and a quiet notice when a
+   newer release ships».
+
+Verify: `npm run type-check` exit 0, `npm run build` success (13/13 static). Στο ζωντανο DOM: το νεο
+anchor `faq-how-do-i-tell-whether-my-self-hosted-instance-is-healthy` **και** το παλιο
+`faq-how-do-updates-work` παροντα, 4 εμφανισεις «Settings → System status» / «not moved in over 30
+minutes» / «Test connections» / «Settings → About shows the version» / «1.4.0-rc1» (ορατο κειμενο +
+FAQPage structured data), 3 του roadmap bullet. **Screenshots** (`.shots/`, gitignored):
+`health-faq.png` (η νεα απαντηση ανοιχτη), `health-faq-mobile.png` (375px, ρεει σωστα μεσα στην καρτα),
+`updates-faq.png`, `roadmap-health.png` (το νεο bullet τελευταιο στο Shipped). Στα deep-linked shots το
+sticky nav πεφτει πανω απο τον τιτλο, γνωστο artifact του headless jump σε anchor, οχι σπασιμο layout.
+`read_console_messages` κανενα error. Ο dev server σταματησε.
+
+Επομενο increment: (1) οταν ανοιξει η εγγραφη, `HOSTED_INVITE_ONLY=false` (με ελεγχο στη ζωντανη φορμα),
+(2) οταν ανοιξει το public repo, `REPO_PUBLIC=true` + πραγματικο `docker pull` στο quick start, (3) sweep
+στο επομενο user-facing feature (ο υποψηφιος που **δεν** ελεγξα ακομα: `4793dae` bulk field-edit σε
+items/expenses, P78, και το `f1f1cde` merge διπλοεισαγμενου λογαριασμου).
+
+Needs-Achilleas (open, αμεταβλητο): legal entity/Stripe, Terms+Privacy review απο ανθρωπο, contact inbox,
+χρονισμος για public repo, καναλι για αιτηση invite. **Χρονισμος**: η αλλαγη ειναι μονο στο repo, το
+ζωντανο `https://ph-aros.com` θα τη δειξει μετα το επομενο deploy του landing.
