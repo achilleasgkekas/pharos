@@ -178,7 +178,9 @@ signup/login, not a bearer token.
 | Method | Path | Body | Result |
 | --- | --- | --- | --- |
 | `POST` | `/api/saas/auth/signup` | `{ email, password, name?, workspace? }` | Creates a global account (password ≥ 8 chars), provisions a first workspace with an owner membership, sets the session cookie. `201 { account, tenants }`. `409` if the email exists. |
-| `POST` | `/api/saas/auth/login` | `{ email, password }` | Verifies the password, sets the session cookie. `200 { account, tenants }`. Wrong email and wrong password both return the same `401` (no account enumeration). |
+| `POST` | `/api/saas/auth/login` | `{ email, password }` | Verifies the password. If the account does **not** have [MFA](#multi-factor-authentication-mfa) enabled, sets the session cookie immediately and returns `200 { account, tenants }`, same as before. If it **does**, no session is set yet: a short-lived pending-MFA cookie is set instead and the response is `200 { mfaRequired: true }` — the client must then complete the second factor below before it gets a real session. Wrong email and wrong password both return the same `401` (no account enumeration). |
+| `POST` | `/api/saas/auth/mfa` | `{ code }` | Login step 2, only reachable after the call above returned `mfaRequired: true` (the account id comes from the signed pending-MFA cookie, never from the request body). Verifies `code` as either a TOTP code or one of the account's recovery codes. On success, clears the pending cookie, sets the real session cookie, stamps `lastLoginAt`, and returns the same `{ account, tenants }` shape as a no-MFA login, plus `usedRecoveryCode: boolean`. `401 { error }` on a wrong/expired code or no pending login (generic reason, no distinction leaked). Rate limited per pending account (see below). |
+| `DELETE` | `/api/saas/auth/mfa` | — | Cancels an in-progress MFA login (clears the pending cookie) — the "use a different account" escape hatch on the code-entry step. Always `200 { ok: true }`, idempotent. |
 | `POST` | `/api/saas/auth/logout` | — | Clears the session cookie. Idempotent `200 { ok: true }`. |
 | `GET` | `/api/saas/auth/session` | — | `{ account, tenants }` when signed in, or `{ account: null }` when logged out or the account no longer exists. |
 
@@ -206,7 +208,7 @@ each renders inside a shared `AuthShell` card.
 
 | Route | Renders |
 | --- | --- |
-| `/account/login` | Email + password form. Posts to [`POST /api/saas/auth/login`](#authentication); on success does a **full** page navigation (not a client route change) to the sanitized `next` path so the fresh server render picks up the just-set httpOnly session cookie. Links to signup. |
+| `/account/login` | Two-step form (`AuthForm.tsx`, `step` state). **Step 1 — credentials:** email + password, posts to [`POST /api/saas/auth/login`](#authentication). If the response is a normal session, does a **full** page navigation (not a client route change) to the sanitized `next` path so the fresh server render picks up the just-set httpOnly session cookie. If the response is `{ mfaRequired: true }`, no navigation happens yet: the form switches to **step 2 — code entry** instead. **Step 2:** a 6-digit TOTP/recovery-code input posts `{ code }` to [`POST /api/saas/auth/mfa`](#authentication); success navigates to `next` the same way step 1's non-MFA path does. A "use a different account" link calls `DELETE /api/saas/auth/mfa` and returns to step 1. Signup never returns `mfaRequired`, so step 2 only ever triggers from the login form. Links to signup. |
 | `/account/signup` | Dual-mode page serving two flows. **Normal signup:** email + password (≥ 8 chars) plus optional display name and workspace name; posts to [`POST /api/saas/auth/signup`](#authentication), which provisions a first workspace with an owner membership. If the pricing page's CTA carried a `?plan=shared` or `?plan=dedicated` query param, the page swaps its generic title/subtitle for a read-only confirmation naming that plan and its price (`signupPlanNotice()`, `components/saas/signupPlan.ts`) — but signup itself always still creates a `free` workspace; the notice explains the plan is switched on afterwards via [activation](#billing-stripe), never implying this form starts a subscription. `?plan=free` or an unrecognised value shows no notice (nothing to confirm, and an arbitrary string is never echoed back onto the page). **Invite acceptance:** if a `?invite=<token>` query param is present, the page server-renders an invite preview (invitee email and workspace name) and shows a lightweight `InviteAcceptForm` (confirm button + optionally set password if no account exists yet) instead. The form posts to [`POST /api/saas/invites/accept`](#invite-management) with the token. Invalid or expired invites show an "Invitation not available" message with fallback links to login/signup. A viewer already signed in to a different email is allowed to accept (the session switches to the invited account). Both flows redirect an already-signed-in viewer to `next` instead of showing a form. Links to login. |
 
 Both pages redirect an **already-signed-in** viewer straight to `next` instead of
@@ -291,11 +293,14 @@ the same generic `400` (no "unknown vs expired" distinction to leak).
 Neither the reset-confirm nor the password-change route force-expires existing
 sessions; the new hash takes effect on the next login.
 
-> **Dev scaffold:** until a mailer is wired up, the verify- and reset-request
-> routes echo the freshly minted token back as `devToken` **only** outside
-> production. In production an unwired mailer drops the token silently (fail
-> closed), so nothing leaks. See [SaaS environment variables](#saas-environment-variables)
-> for `RESEND_API_KEY` / `SMTP_URL` and the mailer setup.
+> **Dev scaffold:** when no mailer provider is configured at all, the verify- and
+> reset-request routes echo the freshly minted token back as `devToken` **only**
+> outside production, so the flow stays testable locally. In production an
+> unconfigured mailer drops the token silently (fail closed), so nothing leaks.
+> Once a mailer *is* configured (Resend, the generic webhook, or SMTP) the token
+> is emailed instead and never echoed, in any environment. See
+> [SaaS environment variables](#saas-environment-variables) for `RESEND_API_KEY` /
+> `MAIL_WEBHOOK_URL` / `SMTP_HOST` and the mailer setup.
 
 ### Multi-factor authentication (MFA)
 
@@ -310,10 +315,12 @@ setup can never silently activate MFA.
 
 > **Implementation note:** MFA status tracking (pending vs. enabled) and recovery
 > codes are stored in the Account document, encrypted at rest (AES-256-GCM) using
-> the same `AUTH_SECRET`-derived key as BYO-key AI. **Login integration is not
-> yet wired** (increment 80c, separate); enabling MFA here does not yet change
-> what `POST /api/saas/auth/login` requires. Use `GET /api/saas/account/mfa` to
-> query current status during development.
+> the same `AUTH_SECRET`-derived key as BYO-key AI. **Login is fully wired**:
+> once `mfaEnabled` is true, `POST /api/saas/auth/login` no longer hands out a
+> session directly — it returns `{ mfaRequired: true }` and the caller must
+> complete `POST /api/saas/auth/mfa` (see [Authentication](#authentication) and
+> [the login UI](#browser-sign-in-ui-accountlogin-accountsignup)) before a
+> session cookie is set.
 
 | Method | Path | Body | Result |
 | --- | --- | --- | --- |
@@ -393,8 +400,13 @@ consuming the endpoints above:
 - Validation gates are instant: the form disables buttons until code is 6 digits or
   password is non-empty, preventing submit of invalid state.
 
-**SaaS-only.** When `SAAS_MODE` is off, this section does not render (the route is 404).
-Self-hosted app has no account login / multi-tenant features; MFA is out of scope.
+**SaaS-only.** When `SAAS_MODE` is off, this `/account/settings` section does not
+render (the route is 404) — there is no global `Account` to enroll here. This is
+not the same as "self-hosted has no MFA": a separate, later TOTP implementation
+(`userMfaStore.ts`) reuses the same primitives against the single-tenant `User`
+model instead, exposed as a "Two-factor authentication" card in the self-hosted
+app's own Settings → General tab. See [security.md](security.md#1-session-cookie-the-web-ui)
+for that flow; the two are independent (enabling one does not enable the other).
 
 ### Data export (GDPR)
 
@@ -1302,14 +1314,18 @@ secrets. They are not part of the self-hosted `.env.example` yet
 | `STRIPE_PRICE_SHARED` | Stripe Price ID for the Pro (`shared`) plan. |
 | `STRIPE_PRICE_DEDICATED` | Stripe Price ID for the Dedicated plan. |
 | `SAAS_ACTIVATION_CODES` | Comma-separated `CODE:plan` pairs (e.g. `FRIENDS-2026:shared,ACME-PILOT:dedicated`) redeemable via [`POST /api/saas/billing/activate`](#billing-stripe) — the current stand-in for self-serve checkout while Stripe is unwired. Unset or empty means activation is closed entirely (`503` on every attempt). A malformed pair is dropped, not guessed, so a typo silently disables that one code rather than granting an unintended plan. |
-| `RESEND_API_KEY` | Enables transactional email (invites, verification, reset) via Resend. |
-| `SMTP_URL` | Alternative mailer transport when Resend is not set. |
-| `MAIL_FROM` | From address for outbound email. Defaults to `Pharos <no-reply@ph-aros.com>`. |
+| `RESEND_API_KEY` | Enables transactional email (invites, verification, reset) via the Resend HTTP API. Highest precedence of the three mailer options below. |
+| `MAIL_WEBHOOK_URL` | Generic outbound-email webhook (Zapier / n8n / a self-hosted relay): the mailer `POST`s the message as JSON and the endpoint owns actual delivery. Dependency-free, no managed-provider lock-in. Second precedence, used when `RESEND_API_KEY` is unset. |
+| `MAIL_WEBHOOK_TOKEN` | Optional bearer token sent as `Authorization: Bearer …` on the `MAIL_WEBHOOK_URL` POST, so the relay can authenticate the caller. No auth header is added when unset. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | SMTP transport via `nodemailer`, lowest precedence (used only when neither of the above is set). **Prefer these discrete fields over a connection-string URL**: the username is an email address, which contains an `@`, and inside a URL that produces two `@` signs and the parser splits on the wrong one — surfacing as an authentication failure that sends you looking for a wrong password instead of a malformed URL. Port `465` implies TLS; any other port demands a `STARTTLS` upgrade (`rejectUnauthorized: true`, `minVersion: TLSv1.2`, not configurable, since password-reset links are sent through this channel). `nodemailer` is imported dynamically, so a deployment on Resend or the webhook never loads it. For Gmail specifically: `SMTP_PASS` must be a Google **App Password** (needs 2-Step Verification on the account; paste it with the displayed spaces removed), and `MAIL_FROM` below must carry the *same* mailbox as `SMTP_USER` (Gmail rewrites the `From` header to the authenticated account otherwise). A free Gmail account caps at roughly 500 messages/day, a beta-sized limit; production volume needs a real sending domain with SPF+DKIM. A legacy `SMTP_URL` connection string is still read as a fallback when none of the `SMTP_HOST`/`PORT`/`USER`/`PASS` fields are set. |
+| `MAIL_FROM` | From address for outbound email. Defaults to `Pharos <no-reply@ph-aros.com>`. Quote it if it contains `<` `>` and any shell script sources the env file directly (those characters are redirects to a shell). |
 | `WORKSPACE_EXPORT_MAX_DOCS` | Per-collection document cap for the workspace content export ([above](#workspace-content-export-gdpr-portability)). Non-numeric/non-positive falls back to `10000`; collections beyond it are flagged `truncated`. |
 
-When neither `RESEND_API_KEY` nor `SMTP_URL` is set, the mailer cannot deliver;
-in non-production it logs the message instead of sending, so invite/reset flows
-still work locally.
+When none of `RESEND_API_KEY`, `MAIL_WEBHOOK_URL`, or an SMTP option is set, the
+mailer cannot deliver; in non-production it logs the message instead of sending,
+so invite/reset flows still work locally. In production an unconfigured mailer
+fails **closed**: verification/reset tokens are simply not emailed, never leaked
+into an API response.
 
 ## See also
 
