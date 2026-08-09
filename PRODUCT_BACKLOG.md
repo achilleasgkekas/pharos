@@ -18,8 +18,8 @@
 > add-on)/P96 (admin center, 14 items A1-E2, δεσμευτική σειρά A→B1/C1→υπόλοιπα).
 >
 > **Κατάσταση ουράς (30ή σάρωση, 2026-08-08):** ενεργά buildable, όχι μπλοκαρισμένη. Ο builder καταναλώνει με
-> τη δεσμευτική σειρά της ομάδας Α: **P61 shipped 2026-08-08** (partial bill payments), **P69 επόμενο**
-> (year-over-year Reports). Η ουρά παραμένει μεγάλη (Proposed + unbuilt Approved, ~45+ items μεταξύ των δύο)
+> τη δεσμευτική σειρά της ομάδας Α: **P61 shipped 2026-08-08** (partial bill payments), **P69 shipped
+> 2026-08-09** (year-over-year Reports), **P84 επόμενο** (credit card utilization warning). Η ουρά παραμένει μεγάλη (Proposed + unbuilt Approved, ~45+ items μεταξύ των δύο)
 > οπότε ο ρυθμός νέων προτάσεων μένει χαμηλός (1-2/σάρωση) μέχρι να αδειάσει περισσότερο, αντί του συνηθισμένου
 > 3-5.
 >
@@ -650,8 +650,26 @@
   filter-by-custom-field ως follow-up ώστε το πρώτο slice να μείνει S· free-form key strings, όχι fixed schema
   (ίδιο idiom με το ήδη-υπάρχον relaxed-enum category/taxonomy pattern).
 
-### P69. Year-over-year ίδιου μήνα σύγκριση δαπανών (εποχιακό κόστος) στα Reports — S — OSS
-- **Αξία:** live-verified `apps/web/src/app/reports/page.tsx` — το monthly-spend chart είναι **μόνο rolling
+### P69. Year-over-year ίδιου μήνα σύγκριση δαπανών (εποχιακό κόστος) στα Reports — ✅ SHIPPED 2026-08-09 (pharos-daily-dev)
+
+- **Τι έγινε**: νέο pure module `lib/yearOverYear.ts` (`buildYearOverYear` + `shiftYear`, μηδέν DB, 15 tests)
+  που τρέφεται από το `totalByMonth` map που το `getReports` ήδη χτίζει πάνω σε ΟΛΕΣ τις εγγραφές Expense
+  (όχι μόνο στο rolling window), άρα ο ίδιος μήνας πέρσι είναι ήδη διαθέσιμος: **μηδέν νέο query, μηδέν νέο
+  model**. Νέο card «Year over year · same month» στο `ReportsClient` (grouped bars φέτος vs έναν χρόνο πριν
+  + headline γραμμή «Jul 26 · €X vs €Y (Jul 25) · ±%», κόκκινο όταν ανέβηκε, πράσινο όταν έπεσε) ακριβώς
+  κάτω από το cash-flow card. Σέβεται τον ήδη υπάρχοντα 6/12/24 selector (`?months=`).
+- **Δύο κανόνες ειλικρίνειας, επιβεβλημένοι στο lib και όχι αφημένοι στο UI**: (1) ο **τρέχων μήνας
+  εξαιρείται πάντα** (είναι μερικός, και ένας μισός μήνας δίπλα σε ολόκληρο διαβάζεται σαν ψεύτικη βελτίωση),
+  (2) μήνας χωρίς καταγραφή πέρσι δίνει `pct: null`, **ποτέ** ποσοστό (αύξηση από το μηδέν δεν έχει νόημα σε
+  %, και ένα «+100%» θα κατασκεύαζε γεγονός από ελλιπή δεδομένα). Το card **δεν renderάρεται καθόλου** όταν
+  κανένας μήνας δεν έχει περσινό νούμερο (`comparable === 0`), δηλαδή σε νέα εγκατάσταση με <13 μήνες
+  ιστορικό, όπως όριζε το builder default.
+- **Απόφαση που πάρθηκε μόνη της (καταγραφή)**: το spec έλεγε «επιλεγμένος μήνας φέτος vs ίδιος πέρσι».
+  Υλοποιήθηκε ως **ολόκληρη σειρά** πάνω στο υπάρχον παράθυρο (όλοι οι πλήρεις μήνες, ζεύγος ανά μήνα) αντί
+  για έναν μόνο μήνα με picker: το εποχιακό μοτίβο φαίνεται μόνο σε σειρά, το picker θα ήταν νέο state +
+  νέο URL param για λιγότερη πληροφορία. Το headline δίνει ούτως ή άλλως το «ένα νούμερο» για τον πιο
+  πρόσφατο συγκρίσιμο μήνα. MVP = μόνο total spend, per-category breakdown μένει follow-up όπως ορίστηκε.
+- **Αρχική ανάλυση (πριν το build):** live-verified `apps/web/src/app/reports/page.tsx` — το monthly-spend chart είναι **μόνο rolling
   window** (6/12/24 μήνες, `getReports(monthsBack)`, `sp.months` selector), **καμία** σύγκριση «αυτός ο μήνας
   vs τον ίδιο μήνα πέρσι» (`grep -rn "yoy\|year.over.year\|previousYear\|lastYear" apps/web/src/app/reports` =
   0 hits). Με δύο σπίτια διαφορετικού εποχιακού προφίλ (κεντρικό vs εξοχικό Kalamos, P34 per-space ήδη shipped)

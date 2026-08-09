@@ -15,6 +15,7 @@ import { computeMoneyAgenda } from '@/lib/moneyAgenda';
 import { computeSafeToSpend } from '@/lib/safeToSpend';
 import { goalProgress } from '@/lib/goals';
 import { buildMonthReview } from '@/lib/monthReview';
+import { buildYearOverYear } from '@/lib/yearOverYear';
 import { listEntriesNeedingRate } from '@/lib/fxAudit';
 import type { SerializedStatement } from '@/types';
 import { ReportsClient } from './ReportsClient';
@@ -48,6 +49,12 @@ function monthKey(d: Date): string {
 }
 function monthLabel(d: Date): string {
   return `${MN[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+}
+/** 'YYYY-MM' → 'Jul 26'. Same shape as monthLabel, without building a Date. */
+function labelFromKey(key: string): string {
+  const [y, m] = key.split('-');
+  const idx = Number(m) - 1;
+  return `${MN[idx] ?? m} ${y.slice(2)}`;
 }
 
 async function getReports(monthsBack = 12) {
@@ -199,6 +206,28 @@ async function getReports(monthsBack = 12) {
         .sort((a, b) => b.value - a.value)
         .slice(0, 10)
     : [];
+
+  // ── Year over year, same month (P69) ─────────────────────────────────────
+  // `totalByMonth` above is built from EVERY expense row, not just the rolling
+  // window, so the same month one year back is already in hand — no extra query.
+  // The current month is excluded inside the helper (it is partial), and the card
+  // is dropped entirely unless at least one month has a prior-year figure, so a
+  // fresh install never sees a chart drawn against zeros.
+  const yoyRaw = buildYearOverYear(totalByMonth, { now, months: monthsBack });
+  const yearOverYear =
+    yoyRaw.comparable > 0
+      ? {
+          comparable: yoyRaw.comparable,
+          rows: yoyRaw.rows.map((r) => ({ ...r, label: labelFromKey(r.key), prevLabel: labelFromKey(r.prevKey) })),
+          headline: yoyRaw.headline
+            ? {
+                ...yoyRaw.headline,
+                label: labelFromKey(yoyRaw.headline.key),
+                prevLabel: labelFromKey(yoyRaw.headline.prevKey),
+              }
+            : null,
+        }
+      : null;
 
   // ── Spend by store (top 8) ───────────────────────────────────────────────
   const storeMap = new Map<string, { total: number; count: number }>();
@@ -364,6 +393,7 @@ async function getReports(monthsBack = 12) {
     biggestPurchases,
     installmentPlans,
     incomeExpense,
+    yearOverYear,
     expenseByCategory,
     expenseBySpace,
     budgetVsActual,

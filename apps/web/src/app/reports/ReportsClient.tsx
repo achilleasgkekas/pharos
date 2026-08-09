@@ -50,6 +50,19 @@ type FxIssueRow = {
   href: string;
 };
 
+// Mirrors lib/yearOverYear.ts, plus the display labels the server attaches (that
+// module is pure and label-free so it stays trivially testable).
+type YoyRow = {
+  key: string;
+  prevKey: string;
+  label: string;
+  prevLabel: string;
+  current: number;
+  previous: number;
+  delta: number;
+  pct: number | null;
+};
+
 type NetWorthPoint = {
   period: string;
   assetsInventory: number;
@@ -109,6 +122,13 @@ type Data = {
   biggestPurchases: { store: string; total: number; date: string }[];
   installmentPlans: InstallmentPlanRow[];
   incomeExpense: { key: string; label: string; income: number; expense: number }[];
+  /** P69 same-month year-over-year. Null when under a year of history exists,
+   *  in which case the card is not rendered at all. */
+  yearOverYear: {
+    comparable: number;
+    rows: YoyRow[];
+    headline: YoyRow | null;
+  } | null;
   expenseByCategory: { name: string; value: number }[];
   expenseBySpace: { name: string; value: number }[];
   budgetVsActual: { name: string; budget: number; actual: number; carried?: number; effective?: number }[];
@@ -533,6 +553,48 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
           </>
         )}
       </Card>
+
+      {/* Year over year · same month (P69). Answers "is this normal for the season
+          or a real increase?", which the rolling monthly chart above cannot. Only
+          rendered once at least one month has a prior-year figure, and the current
+          (partial) month is deliberately absent from the series. */}
+      {data.yearOverYear && (
+        <Card title={t('reports.cYoy')}>
+          {data.yearOverYear.headline && (
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
+              <span className="text-[color:var(--color-text)]">{data.yearOverYear.headline.label}</span>
+              <span className="text-[color:var(--color-text-dim)]">
+                {cur()}{data.yearOverYear.headline.current.toLocaleString('en-GB')}
+                {' '}{t('reports.yoyVs')}{' '}
+                {cur()}{data.yearOverYear.headline.previous.toLocaleString('en-GB')} ({data.yearOverYear.headline.prevLabel})
+              </span>
+              {data.yearOverYear.headline.pct != null && (
+                <span
+                  className={`px-1.5 py-px rounded text-[11px] ${
+                    data.yearOverYear.headline.pct > 0
+                      ? 'text-[color:var(--color-red)] bg-[color:var(--color-red)]/10'
+                      : 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10'
+                  }`}
+                >
+                  {data.yearOverYear.headline.pct > 0 ? '+' : ''}{data.yearOverYear.headline.pct}%
+                </span>
+              )}
+            </div>
+          )}
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={data.yearOverYear.rows} margin={{ left: 0, right: 10, top: 6 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={44} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v: number, n) => [`${cur()}${v.toLocaleString('en-GB')}`, n]} cursor={{ fill: 'rgba(127,127,127,0.08)' }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="previous" name={t('reports.yoyLastYear')} radius={[5, 5, 0, 0]} fill="#4a4a4a" />
+              <Bar dataKey="current" name={t('reports.yoyThisYear')} radius={[5, 5, 0, 0]} fill="#00d4ff" />
+            </BarChart>
+          </ResponsiveContainer>
+          <p className="mt-2 text-[11px] text-[color:var(--color-text-faint)]">{t('reports.yoyHint')}</p>
+        </Card>
+      )}
 
       {/* Budget · this month (per category, actual vs budget). In envelope mode
           (P25) the limit is the rolling `effective` budget and a chip shows the
