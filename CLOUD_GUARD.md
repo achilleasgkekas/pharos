@@ -2064,3 +2064,87 @@ to keep the service safe». **Καμία εμφάνιση της λέξης «IP
 deploy (το deploy δεν είναι δουλειά μου, και η ροή είναι local-first), το `log` directive του
 caddy όσο λείπει το κείμενο Privacy, την επανεκκίνηση, τον ρόλο της Mongo, και **δεν έκανα
 φόρτο στον περιοριστή** για να μη μπει σε ban το IP του χειριστή.
+
+### Διόρθωση του ίδιου περάσματος, 03:10 UTC: το P1 ήταν λάθος χαρακτηρισμένο
+
+Μετά την καταγραφή, εμβάθυνα στα 19 αρχεία για να δώσω εκτελέσιμη λίστα στο `pharos-saas-core`.
+Η εμβάθυνση ανέτρεψε δύο ισχυρισμούς που κουβαλούσε το ημερολόγιό μου από τις 8/8, τους οποίους
+επανέλαβα και σήμερα χωρίς να τους ελέγξω. Τους διορθώνω.
+
+**1. Το `onedriveRefreshToken` ΔΕΝ εκτίθεται.** Το `lib/onedrive.ts` περνά κανονικά από την πύλη:
+`currentModel(AppConfig)` σε **και τα τέσσερα** σημεία (γραμμές 97, 161, 173, 181). Άρα κάθε
+λειτουργία OneDrive διαβάζει τη βάση του ΔΙΚΟΥ του tenant. Το token των 393 χαρακτήρων στο κοινό
+`appconfigs` είναι **ορφανό κατάλοιπο** της προ-tenancy εποχής, όχι ζωντανή διαδρομή.
+
+Επιπλέον, η `settings/page.tsx` όντως διαβάζει ασελίδιστα ολόκληρο το κοινό έγγραφο
+(`AppConfig.findOne({key:'singleton'}).lean()`, γραμμή 34), αλλά **δεν το προωθεί στον client**:
+προβάλλει μόνο booleans τύπου `hasKey: !!doc?.anthropicApiKey` και ονόματα μοντέλων. Καμία τιμή
+μυστικού δεν φεύγει προς τα έξω. Το «κοινό appconfigs με πεδία μυστικών» που έγραψα ήταν σωστό
+ως περιγραφή του εγγράφου και **λάθος ως περιγραφή κινδύνου**.
+
+**2. Δεν υπάρχει διαρροή περιεχομένου, γιατί το κοινό registry δεν έχει περιεχόμενο.** Μέτρησα
+κάθε μη κενή συλλογή:
+
+- `pharos_registry`: `accounts=2`, `memberships=2`, `tenants=2`, `auditevents=3`,
+  `platformconfigs=1`, `usages=1` (όλα σωστά control plane), και τα κατάλοιπα
+  `appconfigs=1`, `jobs=1`, `networthsnapshots=1`, `stores=22`.
+- `tenant_home`: `items=1`, `receipts=1`, `statements=1`, `stores=22`, `appconfigs=1`.
+
+**Μηδέν** receipts, items, statements, expenses, tasks, subscriptions στο κοινό. Άρα ένας
+δεύτερος πελάτης, μέσω των ασελίδιστων αναγνώσεων, δεν θα έβλεπε τα δεδομένα του Αχιλλέα:
+θα έβλεπε **μηδενικά**.
+
+**Τι μένει αληθινό, και είναι πιο μικρό αλλά πιο συγκεκριμένο:**
+
+- **Προσωπικά δεδομένα που όντως θα διέρρεαν**: `networthsnapshots=1`, δηλαδή ένα στιγμιότυπο
+  καθαρής θέσης, και `stores=22`, δηλαδή η λίστα καταστημάτων του Αχιλλέα. Αυτά τα δύο κάθονται
+  στο κοινό registry και τα διαβάζουν ασελίδιστες διαδρομές. Είναι το πραγματικό αιχμηρό, όχι
+  το token.
+- **Λειτουργικό σφάλμα, όχι διαρροή**: dashboard, search, reports, calendar, statements και
+  subscriptions ενός δεύτερου πελάτη θα διάβαζαν την κοινή βάση και θα έδειχναν άδειο, ενώ τα
+  δεδομένα του θα κάθονταν στο `tenant_<slug>`. Οι λειτουργίες σπάνε σιωπηλά.
+- **`api/mcp` και `api/calendar.ics`**: κάνουν `User.findOne({apiToken})` και
+  `User.findOne({calendarToken})` **χωρίς κανένα tenant scope**. Σήμερα δεν είναι διαρροή για
+  έναν απλό λόγο που τον μέτρησα: **μηδέν εγγραφές `User`** και στις τρεις βάσεις. Το `User`
+  είναι το self-hosted μοντέλο και δεν χρησιμοποιείται σε SaaS, οπότε και τα δύο endpoint
+  γυρίζουν 401 σε όλους. Πρακτικά, **MCP και calendar feed δεν λειτουργούν καθόλου στο hosted**.
+  Όταν συνδεθούν, η αναζήτηση token πρέπει να είναι tenant-scoped πριν γεμίσει η συλλογή.
+
+**Ακριβής απογραφή για το `pharos-saas-core`**, 19 αρχεία, ~95 ερωτήματα, 16 μοντέλα:
+
+| Αρχείο | connectDB | ερωτήματα | μοντέλα |
+|---|---|---|---|
+| `app/page.tsx` | 1 | 16 | Bill, Card, Goal, Item, Receipt, ShoppingListItem, Statement, Subscription, Task |
+| `app/search-actions.ts` | 1 | 12 | 12 μοντέλα περιεχομένου |
+| `app/aiTools.ts` | 1 | 11 | 12 μοντέλα περιεχομένου |
+| `app/jobActions.ts` | 9 | 10 | AppConfig, Job |
+| `app/settings/page.tsx` | 1 | 7 | AppConfig, Card, Item, Receipt, Statement, Subscription |
+| `app/reports/page.tsx` | 1 | 6 | Expense, Goal, Item, Receipt, Statement, Subscription |
+| `lib/jobRunner.ts` | 1 | 6 | Job |
+| `lib/moneyAgenda.ts` | 1 | 5 | Expense, Item, Statement, Subscription, Voucher |
+| `app/calendar/page.tsx` | 1 | 5 | Expense, Item, Statement, Subscription, Voucher |
+| `app/statements/page.tsx` | 1 | 3 | Card, Item, Statement |
+| `app/statements/cards.ts` | 4 | 3 | Card |
+| `app/settings/mcpActions.ts` | 3 | 3 | User |
+| `app/settings/calendarFeedActions.ts` | 3 | 3 | User |
+| `app/history/actions.ts` | 3 | 2 | Conversation |
+| `app/aiCommandActions.ts` | 1 | 2 | Conversation |
+| `app/subscriptions/page.tsx` | 1 | 2 | Card, Subscription |
+| `app/settings/healthActions.ts` | 2 | 2 | Job |
+| `app/api/mcp/route.ts` | 1 | 1 | User |
+| `app/api/calendar.ics/route.ts` | 1 | 1 | User |
+
+Το μοτίβο είναι παντού το ίδιο: `connectDB()` και απευθείας import μοντέλου, εκεί που τα **218**
+ήδη περασμένα αρχεία χρησιμοποιούν `currentModel(...)`. **Παγίδα για όποιον το πιάσει**: το
+`app/jobActions.test.ts:9` περιγράφει ρητά την απουσία πύλης ως αναμενόμενη
+(«no withRequestTenant/currentModel seam, matches what's actually»), οπότε η προσθήκη της πύλη
+θα απαιτήσει και ενημέρωση του test, αλλιώς θα φανεί σαν παλινδρόμηση.
+
+**Αναθεωρημένη βαρύτητα**: από **P1 λανθάνον** σε **P2**. Δεν υπάρχει διαδρομή έκθεσης μυστικού
+και δεν υπάρχει διαρροή περιεχομένου, επειδή το κοινό registry είναι άδειο από περιεχόμενο.
+Μένουν δύο προσωπικά αντικείμενα (`networthsnapshots`, `stores`) και ένα σύνολο λειτουργιών που
+θα σπάσουν σιωπηλά. **Η σύστασή μου να μείνει κλειστό το beta δεν αλλάζει**, γιατί ο δεύτερος
+πελάτης θα πάρει σπασμένο dashboard, αλλά ο λόγος είναι ορθότητα και όχι διαρροή, και αυτό
+αλλάζει το πόσο επείγον είναι.
+
+**Δεν άλλαξα κώδικα.** Τα 19 αρχεία ανήκουν στο `pharos-saas-core`.
