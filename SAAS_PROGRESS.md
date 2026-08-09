@@ -7863,3 +7863,72 @@ read-only pages. Το private beta μένει κλειστό μέχρι να τ�
 deploy routine), και **ΣΗΜ σειράς**: το κείμενο Privacy για το access log
 (`pharos-saas-core-20260807-1042` (β)) μπλοκάρει το `pharos-cloud-guard` εδώ και τέσσερα
 περάσματα — μπαίνει μόλις τελειώσει η πύλη, όπως ορίζει η εγκεκριμένη σειρά (α) → (γ) → (β).
+
+## 2026-08-09 — increment 154: η πύλη tenant, παρτίδα 2 (η οθόνη των καρτών, και οι δύο πλευρές της)
+
+Παρτίδα 2 από 5, στη σειρά που ορίζει το ASK `pharos-saas-core-20260807-1040`. Η παρτίδα 1
+(`8609dd3`) έκλεισε τον κάδο του `settings/actions.ts` και έβαλε το short-circuit στη ρίζα.
+
+**Γιατί η οθόνη ολόκληρη και όχι μόνο οι writers.** Το επόμενο στη λίστα ήταν το
+`statements/cards.ts`, τέσσερις writers πάνω στο `Card`. Διαβάζοντάς το φάνηκε ότι ο αναγνώστης
+της **ίδιας** οθόνης, το `statements/page.tsx`, έχει το ίδιο ελάττωμα, και αυτό είναι ο λόγος που
+η διαρροή δεν φαίνεται από το UI: writers και reader συμφωνούσαν απόλυτα, και οι δύο πάνω στην
+κοινή `pharos_registry`. Αν είχα γατεώσει μόνο τους writers, η οθόνη θα γινόταν **ορατά** χαλασμένη
+(γράφω κάρτα, δεν εμφανίζεται) ενώ σήμερα είναι αόρατα χαλασμένη. Οπότε η παρτίδα είναι η
+διεπαφή ολόκληρη: `cards.ts` (4 writers + `scanCard`) και το `getData()` του `page.tsx`
+(`Statement`, `Card`, `Item`). Το `statements/actions.ts` ήταν ήδη περασμένο, άρα η διαδρομή
+`/statements` κλείνει εδώ σαν σύνολο: το ίδιο αρχείο έγραφε ήδη tenant ενώ η σελίδα δίπλα του
+διάβαζε κοινό, δηλαδή ένα workspace επεξεργαζόταν το δικό του statement και έβλεπε το κοινό.
+
+**Το αιχμηρό: `deleteCard`.** Δεν είναι λάθος νούμερο σε dashboard, είναι μη αναστρέψιμη διαγραφή
+πάνω σε κοινή συλλογή, δηλαδή ίδιας φύσης με τον κάδο της παρτίδας 1 και ο λόγος που ήταν το
+επόμενο στη σειρά.
+
+**Το `scanCard` μπήκε κι αυτό μέσα στην πύλη, αν και δεν αγγίζει συλλογή**, και αυτό είναι το
+δεύτερο εύρημα του increment. Το `isFeatureEnabled('cards')` διαβάζει τους διακόπτες AI του
+workspace, και η κλήση AI περνά από `assertAiQuota`/`meterAiResult` που μετρούν πάνω στο
+`currentTenant()`. Χωρίς περιβάλλοντα tenant, το `currentTenant()` γυρίζει το `DEFAULT_TENANT`,
+που στο `enforceAiQuota` λύνει σε unlimited και στο `recordAiUsage` σε no-op: η σάρωση κάρτας
+ενός πελάτη ήταν **απεριόριστη και αχρέωτη**, με τους διακόπτες AI του operator, όχι τους δικούς
+του. Το ίδιο μοτίβο θα το ψάξω σε κάθε επόμενη παρτίδα: μια ενέργεια AI χωρίς DB δεν είναι
+αυτομάτως εκτός πύλης.
+
+**Verified**: `npm run type-check` exit 0. **ΟΛΟ το suite: 401 files / 6493 tests πράσινα**
+(4 skipped), μηδέν κόκκινα πριν και μετά. **6 νέα tests** (`cards.tenant.test.ts`, tenant-aware
+mock της ραφής όπως `actions.tenant.test.ts`), και επιβεβαιωμένα μη κενά: γυρίζοντας το `scoped()`
+πίσω σε σκέτο `CardModel` πέφτουν **5 από τα 6** (το 6ο είναι το `scanCard`, που περνά κατευθείαν
+από `withRequestTenant`, και το self-hosted parity οφείλει να περνά και στις δύο εκδοχές).
+**ΣΗΜ, ένα υπάρχον test χρειάστηκε διόρθωση**: το `cards.test.ts` (συμπεριφορά, όχι δρομολόγηση)
+δεν mock-άρει τη ραφή tenancy, οπότε μόλις το `cards.ts` άρχισε να την καλεί έπεφτε με
+`Cannot read properties of undefined (reading 'connection')` στα 9 από τα tests του. Μπήκε flat
+mock, ακριβώς όπως το `actions.crud.test.ts` δίπλα του: συμπεριφορά flat, δρομολόγηση tenant-aware,
+σε χωριστά αρχεία.
+
+**Probe στο deployed** (χωρίς αυτή την αλλαγή): `app.ph-aros.com/statements` και
+`home.ph-aros.com/statements` → **307** προς `/account/login?next=%2Fstatements`. Αυτό αποδεικνύει
+την πύλη αυθεντικοποίησης, **ΟΧΙ** τη δρομολόγηση βάσης: το redirect το κάνει το middleware πριν
+τρέξει το route. Render verification της οθόνης θα ήθελε σύνδεση με τα διαπιστευτήρια του
+Αχιλλέα, που δεν την κάνω unattended. Μηδέν Docker (καμία αλλαγή σε runtime wiring: TS μόνο,
+καμία dependency, κανένα env, κανένα compose).
+
+**Next task:** παρτίδα 3, οι υπόλοιποι writers: `setup/actions.ts`, `history/actions.ts`, μετά
+`aiCommandActions.ts` + `aiTools.ts`. **ΣΗΜ σχεδιασμού για το `jobActions.ts`**: δεν είναι απλό
+τύλιγμα σαν τα υπόλοιπα και δεν πρέπει να μπει στην ίδια παρτίδα. Το `Job.create()` γίνεται μέσα
+σε request (έχει tenant), αλλά ο `ensureProcessor()` του `lib/jobRunner.ts` τρέχει **εκτός
+request**, χωρίς περιβάλλοντα tenant. Γατεώνοντας μόνο το `jobActions.ts`, οι δουλειές θα
+γράφονται στη βάση του tenant και ο worker θα σαρώνει την κοινή: **καμία δουλειά δεν θα ξεκινούσε
+ποτέ**. Θέλει ή πεδίο tenant πάνω στο `Job` με per-tenant σάρωση, ή ουρά στο control plane. Το
+γράφω εδώ ως απόφαση που παίρνω στην παρτίδα 4, μαζί με το `lib/jobRunner.ts`, όχι νωρίτερα.
+
+**Το private beta μένει κλειστό** μέχρι να τελειώσουν και οι 5 παρτίδες. Το ASK
+`pharos-cloud-guard-20260808-1515` (πλήρης λίστα 19 αρχείων, και το κοινό `appconfigs` που κρατά
+ζωντανό `onedriveRefreshToken`) είναι ακόμα **OPEN**: η υλοποίηση της πύλης είναι κοινή και στις
+τρεις επιλογές του και προχωρά, το **αν** ανοίγει το beta και το τι γίνεται με το αδέσποτο token
+είναι απόφαση του Αχιλλέα, όχι δική μου.
+
+**## Needs Achilleas:** **Stripe keys**, **plan pricing**, το **πότε** μπαίνει το
+`SAAS_PURGE_EXECUTE=1`, το `- ./f2b:/var/lib/pharos/f2b` mount στο
+`deploy/docker-compose.prod.yml` (ανήκει στο deploy routine), η απάντηση στο ASK
+`pharos-cloud-guard-20260808-1515`, και το κείμενο Privacy για το access log
+(`pharos-saas-core-20260807-1042` (β)), που μπαίνει μόλις τελειώσει η πύλη κατά την εγκεκριμένη
+σειρά (α) → (γ) → (β).
