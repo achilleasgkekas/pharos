@@ -3,6 +3,35 @@
 > Παράγεται από τον web code-quality auditor (read-only). Ο builder routine καταναλώνει το «## Web Debt Queue» (μικρότερο + υψηλότερη προτεραιότητα πρώτα). Λεπτομέρειες ανά run στο `PROGRESS.md`.
 > Σύμβολα status: TODO · DOING · DONE.
 
+## Σύνοψη audit (2026-08-09 70ή σάρωση [reviewer routine]· type-check web EXIT 0· full vitest **6506/6510 passed (402/402 αρχεία, 4 skipped, ΜΗΔΕΝ fail)**· 13 commits ελέγχθηκαν [`3147c33..09d10e5`], 4 με πραγματικό κώδικα (`12b755b`/`4f84ea9`/`5b84f66`/`b7012b4` docs-only landing FAQ text), τα υπόλοιπα 9 καθαρά docs/backlog/guard· el.ts i18n gap σταθερό (30, en=1432/el=1402)· μηδέν committed secret· μηδέν νέο P1/P2· standing P2/S TODO `history/actions.ts` tenant-scoping αμετάβλητο, 10 ημέρες)
+
+> **Έλεγχος διαφοράς**: `git log 3147c33..HEAD` = 13 commits. Κώδικας διαβασμένος γραμμή-γραμμή:
+> **`12b755b`** (statements/cards.ts πλήρης tenant-gate) — οι 4 writers (create/update/delete/
+> toggleActive) έγραφαν στην κοινή βάση ενώ ο αναγνώστης της ίδιας οθόνης (statements/page.tsx)
+> ΚΑΙ διάβαζε από εκεί, άρα η διαρροή ήταν αόρατη από το UI (και οι δύο πλευρές συμφωνούσαν, λάθος
+> βάση) και το `deleteCard` θα έσβηνε κάρτα άλλου tenant. Το `scanCard` μπήκε κι αυτό στην πύλη αν
+> και δεν αγγίζει συλλογή, γιατί η δική του AI κλήση μετριέται στο πλάνο του tenant. Νέο
+> `cards.tenant.test.ts` (10 tests, mock-based ops-log ανά tenant, verified pattern ίδιο με τα ήδη
+> κλεισμένα money modules) + επέκταση του `cards.test.ts`. **`4f84ea9`** (P69 year-over-year
+> reports card) — νέο pure `lib/yearOverYear.ts` πάνω στο ήδη-υπάρχον `totalByMonth` map (μηδέν νέο
+> query)· δύο honesty rules ελέγχθηκαν στον κώδικα: ο τρέχων μήνας πάντα εξαιρείται (partial month
+> δεν συγκρίνεται), μήνας χωρίς περσινή καταγραφή δίνει `pct: null` όχι ψεύτικο ποσοστό. i18n
+> κλειδιά (`reports.yoy*`) verified παρόντα και στα δύο locales. 15 tests. **`5b84f66`**
+> (test-only, `syncState.test.ts` +139 γραμμές, 13 tests) καθαρό. **`b7012b4`** αγγίζει
+> `apps/landing/app/page.tsx` αλλά μόνο string literals (FAQ answers) — καμία δομική αλλαγή JSX.
+> Secrets sweep (grep key/token/password/PEM/BEGIN στο πλήρες diff) → μηδέν committed secret.
+> `npm run type-check` EXIT 0· `npx vitest run` πλήρης → **6506 passed/4 skipped/402 αρχεία, μηδέν
+> fail**.
+>
+> **Routine health**: όλα τα 18 scheduled tasks έχουν `lastRunAt` μέσα στο τελευταίο 24ωρο, κανένα
+> `enabled:false`, κανένα ορατό stall. Δύο OPEN entries στο `ASK_ACHILLEAS.md` από τον
+> `pharos-cloud-guard` (`20260808-0310` reboot+node:22, `20260808-1515` σειρά beta-opening vs. τα
+> 19 αρχεία tenant-gap) περιμένουν τον Αχιλλέα ~1.5 μέρες, όχι ακόμα stale αλλά αξίζει αναφορά.
+> Παρατηρήθηκε (χωρίς δράση, ήδη self-explained στο ίδιο το αρχείο) ότι υπάρχουν **δύο tracked
+> `SAAS_PROGRESS.md`** (root, ενεργό· `apps/web/SAAS_PROGRESS.md`, stale από 2026-07-30) — το
+> δεύτερο έχει ρητή σημείωση στο τέλος του «το log συνεχίζεται στο root» από μια παλιά κατά-λάθος
+> εγγραφή, οπότε δεν είναι ζωντανό bug, απλώς ιστορικό κατάλοιπο.
+
 ## Σύνοψη audit (2026-08-08 69η σάρωση [reviewer routine]· type-check web EXIT 0· full vitest **6472/6476 passed (399/399 αρχεία, 4 skipped, ΜΗΔΕΝ fail)** — το standing `aiConfig.tenant.test.ts` timeout flake ΔΕΝ εμφανίστηκε αυτή τη φορά, βλ. σημείωση παρακάτω· 14 commits ελέγχθηκαν [`3751b22..3147c33`]· **standing P1 [settings Trash tenancy gap] ΕΚΛΕΙΣΕ** (commit `8609dd3`, βλ. queue item)· ξεχωριστό cloud-guard P1 ΔΕΝ έκλεισε όπως νόμιζαν τα προηγούμενα περάσματα — μεγάλωσε σε **19 αρχεία** (owned by pharos-saas-core/cloud-guard, δύο OPEN ερωτήσεις ήδη στο ASK_ACHILLEAS)· el.ts i18n gap σταθερό (30, en=1427/el=1397)· μηδέν committed secret)
 
 > **Έλεγχος διαφοράς**: `git log 3751b22..HEAD` = 14 commits, τα μισά docs-only (backlog/progress/deploy-log entries,

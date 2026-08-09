@@ -11869,3 +11869,36 @@ model, μηδέν AI. (Μετά μένουν στην Α: P73 ως S, και τ�
   τους, δεν μπορεί να τα φτιάξει routine.
 - Δύο OPEN entries στο `ASK_ACHILLEAS.md` περιμένουν ακόμα εσένα (και τα δύο από το `pharos-cloud-guard`):
   `20260808-0310` (reboot kernel + `node:20→22`) και `20260808-1515` (σειρά beta-opening vs. tenant isolation).
+
+## 2026-08-09 (reviewer)
+
+**70ή σάρωση.** Έλεγξα τα 13 commits από `3147c33` έως `09d10e5` (9 docs-only, 4 με κώδικα).
+`npm run type-check` EXIT 0, `npx vitest run` πλήρης → **6506/6510 passed, 4 skipped, 402/402
+αρχεία, μηδέν fail**.
+
+- **`12b755b` (statements/cards.ts, tenant portal partίδα 2)** — γραμμή-γραμμή review, καλά
+  σχεδιασμένο και σωστά scoped. Οι 4 writers (create/update/delete/toggleActive) πλέον
+  `withRequestTenant` + `currentModel(CardModel)`, ίδιο recipe με τα ήδη κλεισμένα money modules·
+  το `scanCard` μπήκε κι αυτό στην πύλη παρότι δεν αγγίζει συλλογή, σωστά αιτιολογημένο (η AI
+  κλήση μετριέται στο πλάνο του tenant). Νέο `cards.tenant.test.ts` (10 tests, mock ops-log ανά
+  tenant) καλύπτει ακριβώς το invariant «deleteCard δεν φτάνει σε άλλο workspace». `statements/
+  page.tsx` (ο reader της ίδιας οθόνης) ενημερώθηκε συνεπώς στο ίδιο commit.
+- **`4f84ea9` (P69, year-over-year reports card)** — νέο pure `lib/yearOverYear.ts`, 15 tests,
+  μηδέν νέο query (τρέφεται από το ήδη-χτισμένο `totalByMonth`). Επαλήθευσα τους δύο κανόνες
+  ειλικρίνειας στον κώδικα (τρέχων μήνας πάντα εξαιρείται, μήνας χωρίς περσινή καταγραφή → `pct:
+  null` όχι ψεύτικο ποσοστό) και ότι τα i18n κλειδιά (`reports.yoy*`, `reports.cYoy`) υπάρχουν
+  πλήρη και στα δύο locales.
+- **`5b84f66`** test-only (`syncState.test.ts`, 13 tests) και **`b7012b4`** (landing FAQ, μόνο
+  string literals, καμία δομική αλλαγή) καθαρά.
+- Secrets sweep στο πλήρες diff → μηδέν committed secret. Marker ενημερώθηκε: `<!-- reviewed:
+  09d10e5 -->`. Πλήρες write-up στο `WEB_DEBT.md` (70ή σάρωση).
+- **Ουρά (WEB_DEBT.md)**: μηδέν νέο P1/P2 από αυτό το πέρασμα. Standing P2/S `history/actions.ts`
+  tenant-scoping παραμένει TODO (flagged 2026-07-30, 10 ημέρες) — μικρό/ασφαλές ίδιο recipe, αλλά
+  εκτός του "μόνο typo/missing-await" scope μου, αφήνεται στους builders. el.ts i18n gap σταθερό
+  στα 30 (en=1432/el=1402).
+- **Routine health**: και τα 18 scheduled tasks έχουν `lastRunAt` μέσα στο τελευταίο 24ωρο, κανένα
+  disabled, κανένα ορατό stall. Δύο OPEN entries του `pharos-cloud-guard` στο `ASK_ACHILLEAS.md`
+  (`20260808-0310`, `20260808-1515`) περιμένουν ακόμα εσένα, ~1.5 μέρες τώρα, όχι ακόμα stale.
+  Παρατήρησα (χωρίς δράση, ήδη self-explained) δύο tracked `SAAS_PROGRESS.md` αρχεία — το root
+  ενεργό, το `apps/web/SAAS_PROGRESS.md` stale από 2026-07-30 με ρητή σημείωση στο τέλος του ότι
+  το log συνεχίζεται στο root· ιστορικό κατάλοιπο, όχι ζωντανό bug.
