@@ -1,23 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/db';
-import { User } from '@/models/User';
+import { User as UserModel } from '@/models/User';
 import { TOOLS, execute } from '@/app/aiTools';
+import { apiTenant } from '@/lib/apiAuth';
+import { currentModel } from '@/lib/tenancy/connection';
+import { withTenant } from '@/lib/tenancy/current';
 
 // Remote MCP server (Streamable-HTTP, JSON-RPC 2.0) so an external Claude (mobile
 // app / Claude Code / MCP Inspector) can drive Pharos. Tools-only, so plain JSON
 // responses (no SSE) are enough. Bearer-token auth (per-user `apiToken`); this route
 // is exempt from the cookie middleware (see middleware.ts) and does its own check.
+//
+// TENANCY: this is the app's SECOND bearer-token door, and it had its own copy of the auth
+// lookup — so when `/api/v1` was taught to resolve the workspace from the host before looking a
+// token up, this one was left checking the DEFAULT (registry) `users` collection and then running
+// the tools against that same default database. In SaaS mode that means a token is neither found
+// in nor confined to the workspace whose subdomain was called. It now uses the SAME resolver as
+// `/api/v1` (`apiTenant`), and the ordering matters for the same reason it does there: the tenant
+// decides which database holds `users`, so it must be established BEFORE the token lookup.
+// SAAS_MODE off → DEFAULT_TENANT with no extra work, i.e. self-hosted is unchanged.
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const SERVER_INFO = { name: 'pharos', version: '1.0.0' };
 const PROTOCOL_VERSION = '2025-06-18';
 
+/** Runs inside the ambient tenant established by `POST`, so the token is looked up in THAT
+ *  workspace's `users` collection. A token minted in workspace A does not exist in B's database. */
 async function authed(req: NextRequest): Promise<boolean> {
   const m = (req.headers.get('authorization') || '').match(/^Bearer\s+(.+)$/i);
   const token = m?.[1]?.trim();
   if (!token) return false;
   await connectDB();
+  const User = await currentModel(UserModel);
   const u = await User.findOne({ apiToken: token }).select('_id').lean();
   return !!u;
 }
@@ -29,7 +44,21 @@ function rpcError(id: unknown, code: number, message: string, status = 200) {
   return NextResponse.json({ jsonrpc: '2.0', id, error: { code, message } }, { status });
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const tenant = await apiTenant();
+  if ('error' in tenant) {
+    // The body has not been parsed yet, so there is no JSON-RPC id to echo: answer with the same
+    // shape an auth failure uses (id null + the transport error code) and the HTTP status the
+    // resolver chose — 404 for a host that names no workspace, 403 for one that is not usable.
+    return NextResponse.json(
+      { jsonrpc: '2.0', id: null, error: { code: -32001, message: tenant.error } },
+      { status: tenant.status },
+    );
+  }
+  return withTenant(tenant, () => handle(req));
+}
+
+async function handle(req: NextRequest): Promise<NextResponse> {
   if (!(await authed(req))) {
     return NextResponse.json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Unauthorized' } }, { status: 401 });
   }

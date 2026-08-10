@@ -3,7 +3,17 @@
 // command bar both need the `TOOLS` array and the `execute()` dispatcher. This is a
 // server-only module (it pulls in Mongoose models) — never import it from a client
 // component. Behavior is identical to what `runAiCommand` used inline before.
+//
+// TENANCY: every model here is resolved per call through `currentModel()`, so the tools act on
+// the CALLER'S workspace database. `execute()` deliberately does NOT open the gate itself — it
+// runs inside the tenant its ENTRY POINT established, because the two entry points authenticate
+// with different credentials: `runAiCommand` (session cookie, via `withRequestTenant`) and
+// `/api/mcp` (bearer token, resolved from the host like `/api/v1`). Both are gated as of this
+// pass; a third caller that forgets would silently read the default database, so it must not be
+// added without a gate. Self-hosted has no ambient tenant and `currentModel` returns the
+// default-connection model, i.e. exactly the imported model — unchanged behaviour.
 import { connectDB } from '@/lib/db';
+import { currentModel } from '@/lib/tenancy/connection';
 import { suggestSubscription } from '@/lib/ollama';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { Subscription } from '@/models/Subscription';
@@ -278,19 +288,19 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
       // Currency is the deployment's base one (P9): the amount the assistant captured is spoken
       // in the user's own currency, so a hardcoded 'EUR' would mislabel it on a non-EUR install.
       const baseCurrency = (await getAppSettings()).currency || 'EUR';
-      await Subscription.create({ name: provider, provider, category, amount, currency: baseCurrency, billingCycle: cycle, startDate: new Date(), nextRenewal, active: true, notes, url });
+      await (await currentModel(Subscription)).create({ name: provider, provider, category, amount, currency: baseCurrency, billingCycle: cycle, startDate: new Date(), nextRenewal, active: true, notes, url });
       const sum = `subscription ${provider} ${currencySymbol(baseCurrency)}${amount}/${cycle}`;
       return { summary: sum, content: `Added ${sum}${renewalStr ? `, renews ${renewalStr}` : ''}` };
     }
     case 'add_task': {
       const tags = Array.isArray(input.tags) ? (input.tags as unknown[]).map(String) : [];
-      await Task.create({ title: s(input, 'title'), tags, status: 'todo' });
+      await (await currentModel(Task)).create({ title: s(input, 'title'), tags, status: 'todo' });
       return { summary: `task "${s(input, 'title')}"`, content: `Added task "${s(input, 'title')}"` };
     }
     case 'add_to_list': {
       const name = s(input, 'name').trim();
       const quantity = s(input, 'quantity').trim();
-      await ShoppingListItem.create({ name, quantity, checked: false });
+      await (await currentModel(ShoppingListItem)).create({ name, quantity, checked: false });
       return { summary: `${name}${quantity ? ` (${quantity})` : ''} → list`, content: `Added "${name}"${quantity ? ` ×${quantity}` : ''} to your shopping list` };
     }
     case 'add_item': {
@@ -308,7 +318,7 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
           ? { summary: `link → ${r.title}`, content: `That link matched your existing "${r.title}" — I added ${r.store}'s link and price (${price}) to it for comparison instead of creating a duplicate.` }
           : { summary: `item ${r.title}`, content: `Imported "${r.title}" from ${r.store} (${price}) with specs, photos and the link.` };
       }
-      await Item.create({ title: s(input, 'title'), status, category: s(input, 'category') || 'other', currentPrice: n(input, 'price') });
+      await (await currentModel(Item)).create({ title: s(input, 'title'), status, category: s(input, 'category') || 'other', currentPrice: n(input, 'price') });
       return { summary: `item "${s(input, 'title')}"`, content: `Added item "${s(input, 'title')}"` };
     }
     case 'log_price': {
@@ -316,7 +326,7 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
       const price = n(input, 'price');
       if (!name || !(price > 0)) return { summary: 'price', content: 'Need an item name and a price greater than 0.' };
       const rx = new RegExp(name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      const it = await Item.findOne({ title: rx }).select('_id title').lean();
+      const it = await (await currentModel(Item)).findOne({ title: rx }).select('_id title').lean();
       if (!it) return { summary: 'price', content: `No item matching "${name}".` };
       const r = await logItemPrice(String(it._id), price, s(input, 'store'));
       return r.ok
@@ -325,13 +335,23 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
     }
     case 'get_overview': {
       const mk = today().slice(0, 7);
+      // Resolve the five models on the CURRENT tenant's connection before querying: the whole
+      // overview is one workspace's money, and a single unscoped model here would quietly mix
+      // another database's numbers into the total.
+      const [ItemM, ReceiptM, SubM, StatementM, ExpenseM] = await Promise.all([
+        currentModel(Item),
+        currentModel(Receipt),
+        currentModel(Subscription),
+        currentModel(Statement),
+        currentModel(Expense),
+      ]);
       const [itemCount, receiptCount, subs, statements, expenses, ownedItems, settings] = await Promise.all([
-        Item.countDocuments(),
-        Receipt.countDocuments(),
-        Subscription.find({ active: true }).select('name amount billingCycle nextRenewal').lean(),
-        Statement.find().lean(),
-        Expense.find().select('kind amount period date category').lean(),
-        Item.find({ status: { $in: ['received', 'installed'] } }).select('purchasedPrice currentPrice warrantyUntil').lean(),
+        ItemM.countDocuments(),
+        ReceiptM.countDocuments(),
+        SubM.find({ active: true }).select('name amount billingCycle nextRenewal').lean(),
+        StatementM.find().lean(),
+        ExpenseM.find().select('kind amount period date category').lean(),
+        ItemM.find({ status: { $in: ['received', 'installed'] } }).select('purchasedPrice currentPrice warrantyUntil').lean(),
         getAppSettings(),
       ]);
       const monthlySubs = subs.reduce((t, x) => t + (x.billingCycle === 'yearly' ? (x.amount || 0) / 12 : x.amount || 0), 0);
@@ -373,8 +393,8 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
       const type = s(input, 'type');
       const id = s(input, 'id');
       const fields = input.fields && typeof input.fields === 'object' && !Array.isArray(input.fields) ? (input.fields as Record<string, unknown>) : {};
-      const Model = modelFor(type);
-      if (!Model || !/^[a-f\d]{24}$/i.test(id)) return { summary: 'update failed', content: `Need a valid type + id (use search_data first). Editable types: ${EDITABLE_TYPES.join(', ')}.` };
+      const Base = modelFor(type);
+      if (!Base || !/^[a-f\d]{24}$/i.test(id)) return { summary: 'update failed', content: `Need a valid type + id (use search_data first). Editable types: ${EDITABLE_TYPES.join(', ')}.` };
       if (!Object.keys(fields).length) return { summary: 'update failed', content: 'No fields given to change.' };
       const { allowed, blocked } = screenFields(type as EditableType, fields);
       // Refuse rather than quietly drop: an assistant told "done" would report a balance
@@ -382,7 +402,8 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
       if (!Object.keys(allowed).length) {
         return { summary: 'update failed', content: `Cannot change ${blocked.join(', ')} on a ${type} — edit that in the app.` };
       }
-      const r = await (Model as typeof Item).updateOne({ _id: id }, { $set: allowed });
+      const Model = await currentModel(Base as typeof Item);
+      const r = await Model.updateOne({ _id: id }, { $set: allowed });
       if (!(r.matchedCount ?? 0)) return { summary: 'update failed', content: `No ${type} with that id (search_data again — it may have been deleted).` };
       for (const p of REVALIDATE[type as EditableType]) revalidatePath(p);
       const note = blocked.length ? ` (ignored ${blocked.join(', ')} — not editable here)` : '';
@@ -391,12 +412,13 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
     case 'delete_record': {
       const type = s(input, 'type');
       const id = s(input, 'id');
-      const Model = modelFor(type);
-      if (!Model || !/^[a-f\d]{24}$/i.test(id)) return { summary: 'delete failed', content: `Need a valid type + id (use search_data first). Deletable types: ${EDITABLE_TYPES.join(', ')}.` };
+      const Base = modelFor(type);
+      if (!Base || !/^[a-f\d]{24}$/i.test(id)) return { summary: 'delete failed', content: `Need a valid type + id (use search_data first). Deletable types: ${EDITABLE_TYPES.join(', ')}.` };
       // Soft delete → recoverable from the Trash (Settings → Storage & data). Every model
       // reachable here carries the soft-delete plugin; that is exactly why `statement` is not
       // reachable here (see EDITABLE_MODELS).
-      const r = await (Model as typeof Item).updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+      const Model = await currentModel(Base as typeof Item);
+      const r = await Model.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
       if (!(r.matchedCount ?? 0)) return { summary: 'delete failed', content: `No ${type} with that id (search_data again — it may already be gone).` };
       for (const p of REVALIDATE[type as EditableType]) revalidatePath(p);
       return { summary: `deleted ${type}`, content: `Deleted the ${type} (recoverable from Settings → Trash for 30 days).` };

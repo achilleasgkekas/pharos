@@ -7,6 +7,8 @@ import { TOOLS, execute, SYSTEM, today } from './aiTools';
 import { connectDB } from '@/lib/db';
 import { assertCanWrite, getCurrentUser } from '@/lib/auth';
 import { Conversation } from '@/models/Conversation';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 
 export type AiCommandResult = {
   ok: boolean;
@@ -20,8 +22,19 @@ export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 
 /** Run a multi-turn conversation through Claude + tools. The client keeps the
  *  history (text turns) and sends it whole each call. Needs the Anthropic provider.
- *  The tool registry + executor live in `./aiTools` (shared with the MCP route). */
+ *  The tool registry + executor live in `./aiTools` (shared with the MCP route).
+ *
+ *  This is the ENTRY POINT that opens the tenant gate for the whole command-bar surface, and it
+ *  has to wrap everything, not just the database writes: `getAiConfig` picks up the workspace's
+ *  own API key and provider, `isFeatureEnabled` reads its AI switches, the Anthropic call is
+ *  metered against its plan, `execute()` acts on its records, and the transcript is stored in its
+ *  `conversations`. Ungated in SaaS mode, one workspace's assistant answered with the operator's
+ *  key, spent nobody's quota, and wrote to the shared registry database. */
 export async function runAiCommand(history: ChatTurn[], conversationId?: string): Promise<AiCommandResult> {
+  return withRequestTenant(() => runAiCommandInTenant(history, conversationId));
+}
+
+async function runAiCommandInTenant(history: ChatTurn[], conversationId?: string): Promise<AiCommandResult> {
   await assertCanWrite();
   if (!(await isFeatureEnabled('commandBar'))) return { ok: false, reply: '', actions: [], error: 'The AI command bar is turned off in Settings → AI.' };
   const turns = (history || []).filter((t) => t && typeof t.content === 'string' && t.content.trim());
@@ -72,6 +85,7 @@ export async function runAiCommand(history: ChatTurn[], conversationId?: string)
   let convId = conversationId;
   try {
     await connectDB();
+    const ConversationM = await currentModel(Conversation);
     const user = await getCurrentUser();
     const stored = [
       ...turns.map((t) => ({ role: t.role, content: t.content })),
@@ -80,9 +94,9 @@ export async function runAiCommand(history: ChatTurn[], conversationId?: string)
     const title = turns.find((t) => t.role === 'user')?.content.trim().slice(0, 80) || 'Conversation';
     const userTurns = stored.filter((m) => m.role === 'user').length;
     if (convId) {
-      await Conversation.updateOne({ _id: convId }, { $set: { messages: stored, title, turns: userTurns } });
+      await ConversationM.updateOne({ _id: convId }, { $set: { messages: stored, title, turns: userTurns } });
     } else {
-      const doc = await Conversation.create({ userId: user?.id ?? null, title, messages: stored, turns: userTurns });
+      const doc = await ConversationM.create({ userId: user?.id ?? null, title, messages: stored, turns: userTurns });
       convId = String(doc._id);
     }
   } catch {

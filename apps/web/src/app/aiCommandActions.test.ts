@@ -87,6 +87,11 @@ vi.mock('./aiTools', () => ({
   today: todayMock,
 }));
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
+// Behaviour tests stay FLAT: the gate runs the body as-is and the tenancy seam is a pass-through,
+// so the Conversation stub below is what gets written. Routing is pinned in
+// aiCommandActions.tenant.test.ts.
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<unknown>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
 vi.mock('@/lib/auth', () => ({ assertCanWrite: assertCanWriteMock, getCurrentUser: getCurrentUserMock }));
 vi.mock('@/models/Conversation', () => ({
   Conversation: { create: conversationCreate, updateOne: conversationUpdateOne },

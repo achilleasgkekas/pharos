@@ -30,6 +30,9 @@ const { connectDBMock, convFind, convDeleteOne, convDeleteMany, findQuery, reval
 });
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
+// Behaviour tests stay FLAT (see actions.tenant.test.ts for the routing half).
+vi.mock('@/lib/tenancy/request', () => ({ withRequestTenant: async (fn: () => Promise<unknown>) => fn() }));
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
 vi.mock('@/models/Conversation', () => ({
   Conversation: { find: convFind, deleteOne: convDeleteOne, deleteMany: convDeleteMany },
 }));

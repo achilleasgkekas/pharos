@@ -35,6 +35,10 @@ function model(tag: string) {
 }
 
 vi.mock('@/lib/db', () => ({ connectDB: async () => {} }));
+// Behaviour tests stay FLAT: the tenancy seam is a pass-through here, so the tagged stub above is
+// what execute() writes to. Routing (which database each tool lands in) is pinned separately in
+// aiTools.tenant.test.ts — same split as actions.crud.test.ts vs actions.tenant.test.ts.
+vi.mock('@/lib/tenancy/connection', () => ({ currentModel: async (m: unknown) => m }));
 vi.mock('@/models/Item', () => ({ Item: model('Item') }));
 vi.mock('@/models/Task', () => ({ Task: model('Task') }));
 vi.mock('@/models/Subscription', () => ({ Subscription: model('Subscription') }));

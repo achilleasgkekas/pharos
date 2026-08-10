@@ -59,7 +59,7 @@ export async function bearerUser(req: NextRequest): Promise<ApiUser | null> {
 }
 
 /** A workspace the request may not enter, rendered as the response the caller gets. */
-type TenantGateFailure = { status: 404 | 403; error: string };
+export type TenantGateFailure = { status: 404 | 403; error: string };
 
 /**
  * Resolve the workspace for an /api/v1 request from its HOST alone.
@@ -77,8 +77,14 @@ type TenantGateFailure = { status: 404 | 403; error: string };
  * lookup landing in the right database, not from a second membership check.
  *
  * SAAS_MODE off → DEFAULT_TENANT immediately, so the self-hosted app is untouched.
+ *
+ * EXPORTED for `/api/mcp`, which is the app's second bearer-token door: it speaks JSON-RPC, so it
+ * cannot reuse `withAuth` (whose failures are `{error}` JSON with HTTP status codes), but it must
+ * resolve the workspace by exactly the same rule. Sharing this function rather than copying it is
+ * the point — the copy is what let MCP keep authenticating against the default database after
+ * `/api/v1` was fixed.
  */
-async function apiTenant(): Promise<TenantContext | TenantGateFailure> {
+export async function apiTenant(): Promise<TenantContext | TenantGateFailure> {
   if (!saasMode()) return DEFAULT_TENANT;
   const h = await headers();
   const host =
