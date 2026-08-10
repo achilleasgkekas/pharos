@@ -7,7 +7,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-08-09 (31η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-08-10 (32η σάρωση planner).
 > **Ιστορικό σαρώσεων (συμπιεσμένο στην 30ή σάρωση, ήταν ~230 γραμμές σκαναρίσματος-προς-σκανάρισμα, τώρα
 > αυτό το block· τίποτα δεν χάθηκε, το αναλυτικό σκεπτικό ανά item μένει μέσα στο ίδιο item παρακάτω και στο
 > `PROGRESS.md`/`git log -p -- PRODUCT_BACKLOG.md` για όποιον θέλει το πλήρες historical trace):**
@@ -17,15 +17,17 @@
 > σειρά Α→Γ→Β**, + ξεχωριστά P94 (storage add-on, blocked σε Stripe price ids από τον Αχιλλέα)/P95 (BYO-key
 > add-on)/P96 (admin center, 14 items A1-E2, δεσμευτική σειρά A→B1/C1→υπόλοιπα).
 >
-> **Κατάσταση ουράς (31η σάρωση, 2026-08-09):** ενεργά buildable, όχι μπλοκαρισμένη. Ο builder καταναλώνει με
-> τη δεσμευτική σειρά της ομάδας Α: **P61 shipped 2026-08-08** (partial bill payments), **P69 shipped
-> 2026-08-09** (year-over-year Reports), **P84 shipped 2026-08-10** (credit card utilization badge),
-> **P73 επόμενο** (το τελευταίο S της ομάδας Α· μετά μένουν τα S/M P62, P64, P83). Η ουρά παραμένει μεγάλη (Proposed + unbuilt Approved, ~45+ items μεταξύ των δύο)
-> οπότε ο ρυθμός νέων προτάσεων μένει χαμηλός (1-2/σάρωση) μέχρι να αδειάσει περισσότερο, αντί του συνηθισμένου
-> 3-5.
+> **Κατάσταση ουράς (32η σάρωση, 2026-08-10):** ενεργά buildable, όχι μπλοκαρισμένη. **P84 shipped 2026-08-10**
+> (credit card utilization badge, το ίδιο session με αυτή τη σάρωση) — μετακινήθηκε από το `## Proposed` (όπου
+> είχε μείνει σωματικά, βλ. housekeeping-note παρακάτω) στο `## Done` σε αυτή τη σάρωση, καθαρό bookkeeping.
+> **P73 επόμενο** (το τελευταίο S της ομάδας Α· μετά μένουν τα S/M P62, P64, P83). Η ουρά παραμένει μεγάλη
+> (Proposed + unbuilt Approved, ~45+ items μεταξύ των δύο) οπότε ο ρυθμός νέων προτάσεων μένει χαμηλός
+> (1/σάρωση αυτή τη φορά) μέχρι να αδειάσει περισσότερο, αντί του συνηθισμένου 3-5. Νέο αυτή τη σάρωση:
+> **P101** (referral program, SaaS growth lever — καμία υπάρχουσα customer-acquisition μηχανική εκτός landing
+> copy, verified 0 hits `referral|inviteFriend|refCode`).
 >
-> **Dedupe αυτής της σάρωσης:** τρία Proposed items αφαιρέθηκαν ως redundant πριν προστεθεί οτιδήποτε νέο
-> (live-verified, όχι απλή υποψία) — **P97** («Item lending tracker») ήταν λέξη-προς-λέξη το ίδιο με το ήδη-
+> **Dedupe προηγούμενων σαρώσεων (31η):** τρία Proposed items αφαιρέθηκαν ως redundant πριν προστεθεί οτιδήποτε
+> νέο (live-verified, όχι απλή υποψία) — **P97** («Item lending tracker») ήταν λέξη-προς-λέξη το ίδιο με το ήδη-
 > **Approved P47** (ίδιος τίτλος, ίδιο σχήμα `lentTo`/`expectedReturnAt`)· **P98** («Utility usage kWh/m³») ίδιο
 > με το ήδη-**Approved P49** (ίδιο πεδίο consumption-vs-amount)· **P93** («Manual bank CSV/OFX import») παρέβλεψε
 > ότι το **PA1** (Bank/generic CSV import) έχει ήδη SHIPPED (2026-07-09) ακριβώς αυτό — column-mapper, dedupe,
@@ -33,6 +35,12 @@
 > είναι πολύ niche για ξεχωριστό item, δεν αξίζει slot στην ουρά. Η αιτία και στα τρία: παλιότερες σαρώσεις
 > έψαξαν με λάθος/στενά keywords (π.χ. `bankStatement|BankAccount` αντί `csvImport|CsvImportModal`) και δεν
 > βρήκαν το ήδη υπάρχον. Καμία απώλεια νοήματος· τα δύο πρώτα παραμένουν ζωντανά ως P47/P49 στο Approved.
+>
+> **⚠ Σημείωση εύρεσης αυτής της σάρωσης (32η):** το Network/UniFi module (`lib/unifi.ts`, `/network` σελίδα,
+> Settings tab, homepage κάρτα) αφαιρέθηκε πλήρως στις 2026-06-12 (commit `5eb912d`, ρητή απόφαση Αχιλλέα, βλ.
+> git log message) — το `CLAUDE.md` είναι stale σε αυτό (περιγράφει ακόμα το module ως ενεργό, το τελευταίο του
+> session-log entry προηγείται της αφαίρεσης). **Καμία μελλοντική σάρωση δεν πρέπει να προτείνει Network/UniFi
+> επεκτάσεις** βασιζόμενη στο `CLAUDE.md` χωρίς πρώτα να επιβεβαιώσει `find apps/web/src -iname "unifi*"` = 0.
 >
 > **Γνωστό ανοιχτό housekeeping (δεν είναι έγκριση, απλά σημείωση υγιεινής αρχείου):** αρκετά headers μέσα στο
 > `## Approved` παρακάτω είναι ήδη «✅ SHIPPED» και θα έπρεπε τυπικά να ζουν στο `## Done`, αλλά δεν
@@ -46,6 +54,26 @@
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P101. Referral program — «κάλεσε έναν φίλο» για extra AI calls/μήνα (SaaS growth lever) — S/M — SaaS
+- **Αξία:** live-verified `grep -rln "referral|inviteFriend|refCode" apps/web/src` = 0 hits, όπως και σε
+  `PRODUCT_BACKLOG.md`/`ROADMAP.md`/`TODO.md` = 0 hits — δεν έχει προταθεί ξανά. Το SaaS trial/billing σκέλος
+  είναι ήδη αρκετά ώριμο (`lib/billing/{plans,entitlements,usage,aiBilling}.ts`, `components/saas/QuotaBar.tsx`
+  δείχνει ήδη «X of Y used»), αλλά **καμία** ενέργεια απόκτησης πελατών εκτός landing-page copy δεν υπάρχει.
+  Ένα κλασικό low-CAC lever για ένα self-host-first προϊόν με ήδη υπάρχον 14ήμερο trial (`OWNER_DECISIONS.md`
+  #11): υπάρχων tenant μοιράζεται κωδικό/link, νέος tenant που κάνει signup μέσω αυτού δίνει και στους δύο ένα
+  προσωρινό bonus (π.χ. +X AI calls/μήνα ή +N ημέρες trial) αντί για καθαρά νομισματική έκπτωση (αποφυγή
+  Stripe/Paddle coupon-code πολυπλοκότητας στο πρώτο slice).
+- **Module:** `lib/tenancy/provision.ts` (νέο `referredBy` πεδίο στο tenant doc, capture στο signup flow αν
+  υπάρχει `?ref=` query param) + νέο `lib/billing/referrals.ts` (generate/lookup κωδικού ανά tenant, ίδιο
+  idiom με το ήδη-υπάρχον `apiToken`-style random slug) + Settings → Billing tab (δικό του link + «N successful
+  referrals» μετρητής) + bonus εφαρμόζεται μέσω του ήδη-υπάρχοντος `entitlements.ts` override μηχανισμού (όχι
+  νέο pricing μοντέλο).
+- **Ανοιχτή απόφαση (builder default):** MVP = **bonus AI calls, όχι μήνες δωρεάν** (πιο εύκολο reversible αν
+  γίνει κατάχρηση, μηδέν επίπτωση στο billing-cycle μηχανισμό)· ένα bonus **credit** ανά επιτυχημένο referral
+  (πρώτη πληρωμή του νέου tenant, όχι απλό signup, αποφυγή fake-account farming), όχι unlimited stacking (cap
+  π.χ. 5 ενεργά referral bonuses ταυτόχρονα)· self-host build = καμία αλλαγή/no-op (SaaS-only, ίδιο idiom με τα
+  υπόλοιπα billing-only items).
 
 ### P100. Budget «pace» / προβλεπόμενο μηνιαίο σύνολο ανά κατηγορία (Reports) — S — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified `grep -rn "projected|pace|onTrack|daysLeft" apps/web/src/app/reports` = 0 hits. Το ήδη-
@@ -199,29 +227,6 @@
 - **Ανοιχτή απόφαση (builder default):** group-key = normalized name (ίδιο `vendorKey`/normalize idiom με stores/
   expenses) + amount + billingCycle (ώστε δύο πραγματικά διαφορετικά πλάνα του ίδιου provider να ΜΗΝ merge-αριστούν
   κατά λάθος)· merge = keep-most-complete + union οποιωνδήποτε linked references, ίδιο idiom με τα υπόλοιπα 4.
-
-### P84. Credit card utilization warning (creditLimit vs πραγματικό outstanding) — S — OSS (κυρίως), dogfooding-heavy — ✅ SHIPPED 2026-08-10
-- **Shipped:** νέο pure `lib/cardUtilization.ts` (`buildCardUtilization` + `utilizationLevel`, 15 tests) + badge
-  «X% of limit» στο group header κάθε κάρτας στο `/statements` ΚΑΙ στη λίστα του Manage cards. Το outstanding
-  βγαίνει με τον ΙΔΙΟ κανόνα που ήδη χρησιμοποιεί το header (τελευταίο statement ανά κάρτα, `totalAmount −
-  paidAmount`, ποτέ άθροισμα περιόδων) ώστε το badge να μην μπορεί να διαφωνήσει με το νούμερο δίπλα του.
-  Κατώφλια 80% gold / 95% red, κενό `creditLimit` = κανένα badge (ο builder default τηρήθηκε αυτούσιος).
-  Το `runAlertChecks` κομμάτι μένει follow-up, όπως όριζε το ίδιο το item ώστε το πρώτο slice να μείνει S.
-- **Αξία:** live-verified: το `Card.creditLimit` (`statements/cards.ts`) αποθηκεύεται και εμφανίζεται ήδη στατικά
-  δίπλα στο όνομα της κάρτας (`StatementsClient.tsx:1482`, π.χ. «€3000 limit»), αλλά ποτέ δεν συγκρίνεται με το
-  πραγματικό outstanding balance που το ίδιο αρχείο ήδη υπολογίζει ανά κάρτα (`balance`/`t('st.outstanding')`,
-  γραμμή 230) — μηδέν utilization %, μηδέν χρωματικό warning, και **καμία** entry στο `runAlertChecks` (8 ήδη
-  υπάρχοντα alert kinds, κανένα card-limit). Ο χρήστης διαχειρίζεται ήδη πολλαπλές κάρτες με ενεργά δωδεκάμηνα
-  installment plans (CLAUDE.md, Εθνική Mastercard 7791 + άλλη) — «πόσο κοντά είμαι στο όριο μιας κάρτας» είναι
-  σήμερα κάτι που πρέπει να υπολογίσει νοερά, βλέποντας δύο ξεχωριστούς αριθμούς. Νέο μικρό: υπολογισμένο
-  `utilizationPct = outstanding / creditLimit` όταν `creditLimit > 0`, χρωματιστό badge (ίδιο idiom με τα ήδη-
-  υπάρχοντα temp/channel-utilization χρωματικά κατώφλια αλλού στο repo) όταν ≥80%/≥95%, + προαιρετική νέα γραμμή
-  στο `runAlertChecks` summary (ίδιο pattern με τα υπόλοιπα 8 alert kinds, dedupeKey-ready αν εγκριθεί μαζί με το P82).
-- **Module:** `app/statements/StatementsClient.tsx` (badge στην κάρτα) + `app/settings/actions.ts` `runAlertChecks`
-  (νέα προαιρετική γραμμή, reuse του ήδη-υπολογισμένου outstanding-per-card).
-- **Ανοιχτή απόφαση (builder default):** MVP = μόνο UI badge (κενό `creditLimit` = καμία αλλαγή, ίδιο idiom με τα
-  υπόλοιπα optional πεδία)· το alert-engine κομμάτι follow-up ώστε το πρώτο slice να μείνει S· κατώφλια 80%/95%
-  σταθερά αρχικά, χωρίς νέο per-card setting (αποφυγή over-engineering ενός S item).
 
 ### P83. Goal auto-contribution από αδιάθετο υπόλοιπο budget (P25 rollover → P12 goal) — S/M — OSS, dogfooding-heavy
 - **Αξία:** live-verified: το ίδιο το P12 (savings goals, ήδη shipped) καταγράφει ρητά στο δικό του «Builder
@@ -2164,6 +2169,14 @@
 ---
 
 ## Done
+
+### P84. Credit card utilization warning (creditLimit vs πραγματικό outstanding) — ✅ SHIPPED 2026-08-10 (pharos-daily-dev)
+- Νέο pure `lib/cardUtilization.ts` (`buildCardUtilization`/`utilizationLevel`, 15 tests) + badge «X% of limit» στο
+  group header κάθε κάρτας στο `/statements` ΚΑΙ στο Manage cards. Outstanding = τελευταίο statement ανά κάρτα
+  (ίδιος κανόνας με το ήδη-υπάρχον header number, ποτέ διαφωνεί μαζί του). Κατώφλια 80% gold / 95% red, κενό
+  `creditLimit` = κανένα badge. Builder default τηρήθηκε αυτούσιος (μόνο UI badge, το `runAlertChecks` follow-up
+  παραμένει ανοιχτό ως δικό του μελλοντικό item αν ζητηθεί). (Σημείωση σάρωσης 32: το item χτίστηκε ενώ ζούσε ακόμα
+  φυσικά στο `## Proposed` — μετακινήθηκε εδώ τώρα, καθαρά bookkeeping, καμία αλλαγή περιεχομένου.)
 
 ### P63. Backup/export λείπει 7 μοντέλα — data-loss ρίσκο σε restore, όχι απλά νέο feature — ✅ SHIPPED 2026-07-26 (pharos-daily-dev)
 > **Χτίστηκε χωρίς να περάσει από «Approved» σκόπιμα**, γιατί δεν είναι προϊοντική απόφαση: είναι defect fix σε
