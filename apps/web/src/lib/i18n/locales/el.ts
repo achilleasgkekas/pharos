@@ -1325,6 +1325,8 @@ export const el: Partial<Dict> = {
   'stm.noCardsHint': 'Δεν έχεις προσθέσει κάρτες. Πρόσθεσε μία για να εμφανίζεται στο dropdown.',
   'stm.charged': 'χρεώθηκε {amount} ({count})',
   'stm.limit': 'όριο {amount}',
+  'stm.utilPct': '{pct}% του ορίου',
+  'stm.utilTitle': '{used} από {limit} πιστωτικό όριο σε χρήση',
   'stm.activate': 'Ενεργοποίηση',
   'stm.deactivate': 'Απενεργοποίηση',
   'stm.newCard': 'Νέα κάρτα',

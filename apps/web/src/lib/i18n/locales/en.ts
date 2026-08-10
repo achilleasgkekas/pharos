@@ -1386,6 +1386,8 @@ export const en = {
   'stm.noCardsHint': "You haven't added any cards. Add one so it shows up in the dropdown.",
   'stm.charged': 'charged {amount} ({count})',
   'stm.limit': 'limit {amount}',
+  'stm.utilPct': '{pct}% of limit',
+  'stm.utilTitle': '{used} of {limit} credit limit in use',
   'stm.activate': 'Activate',
   'stm.deactivate': 'Deactivate',
   'stm.newCard': 'New card',

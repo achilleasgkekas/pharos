@@ -19,7 +19,8 @@
 >
 > **Κατάσταση ουράς (31η σάρωση, 2026-08-09):** ενεργά buildable, όχι μπλοκαρισμένη. Ο builder καταναλώνει με
 > τη δεσμευτική σειρά της ομάδας Α: **P61 shipped 2026-08-08** (partial bill payments), **P69 shipped
-> 2026-08-09** (year-over-year Reports), **P84 επόμενο** (credit card utilization warning). Η ουρά παραμένει μεγάλη (Proposed + unbuilt Approved, ~45+ items μεταξύ των δύο)
+> 2026-08-09** (year-over-year Reports), **P84 shipped 2026-08-10** (credit card utilization badge),
+> **P73 επόμενο** (το τελευταίο S της ομάδας Α· μετά μένουν τα S/M P62, P64, P83). Η ουρά παραμένει μεγάλη (Proposed + unbuilt Approved, ~45+ items μεταξύ των δύο)
 > οπότε ο ρυθμός νέων προτάσεων μένει χαμηλός (1-2/σάρωση) μέχρι να αδειάσει περισσότερο, αντί του συνηθισμένου
 > 3-5.
 >
@@ -199,7 +200,13 @@
   expenses) + amount + billingCycle (ώστε δύο πραγματικά διαφορετικά πλάνα του ίδιου provider να ΜΗΝ merge-αριστούν
   κατά λάθος)· merge = keep-most-complete + union οποιωνδήποτε linked references, ίδιο idiom με τα υπόλοιπα 4.
 
-### P84. Credit card utilization warning (creditLimit vs πραγματικό outstanding) — S — OSS (κυρίως), dogfooding-heavy
+### P84. Credit card utilization warning (creditLimit vs πραγματικό outstanding) — S — OSS (κυρίως), dogfooding-heavy — ✅ SHIPPED 2026-08-10
+- **Shipped:** νέο pure `lib/cardUtilization.ts` (`buildCardUtilization` + `utilizationLevel`, 15 tests) + badge
+  «X% of limit» στο group header κάθε κάρτας στο `/statements` ΚΑΙ στη λίστα του Manage cards. Το outstanding
+  βγαίνει με τον ΙΔΙΟ κανόνα που ήδη χρησιμοποιεί το header (τελευταίο statement ανά κάρτα, `totalAmount −
+  paidAmount`, ποτέ άθροισμα περιόδων) ώστε το badge να μην μπορεί να διαφωνήσει με το νούμερο δίπλα του.
+  Κατώφλια 80% gold / 95% red, κενό `creditLimit` = κανένα badge (ο builder default τηρήθηκε αυτούσιος).
+  Το `runAlertChecks` κομμάτι μένει follow-up, όπως όριζε το ίδιο το item ώστε το πρώτο slice να μείνει S.
 - **Αξία:** live-verified: το `Card.creditLimit` (`statements/cards.ts`) αποθηκεύεται και εμφανίζεται ήδη στατικά
   δίπλα στο όνομα της κάρτας (`StatementsClient.tsx:1482`, π.χ. «€3000 limit»), αλλά ποτέ δεν συγκρίνεται με το
   πραγματικό outstanding balance που το ίδιο αρχείο ήδη υπολογίζει ανά κάρτα (`balance`/`t('st.outstanding')`,

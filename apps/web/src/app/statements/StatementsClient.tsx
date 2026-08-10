@@ -23,6 +23,11 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/components/ui/cn';
 import type { SerializedStatement, SerializedTransaction, SerializedCard } from '@/types';
 import { periodLabel } from '@/lib/cards';
+import {
+  buildCardUtilization,
+  type CardUtilization,
+  type CardUtilizationIndex,
+} from '@/lib/cardUtilization';
 import { computeInstallmentPlans, type InstallmentPlan } from '@/lib/installments';
 import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { ReconcilePanel } from './ReconcilePanel';
@@ -203,6 +208,10 @@ export function StatementsClient({
     for (const s of latest.values()) total += s.totalAmount - s.paidAmount;
     return total;
   }, [statements]);
+  // P84: how much of each card's limit that same balance is using. Same source of
+  // truth as `balance` above (latest statement per card), so the badge can never
+  // contradict the outstanding figure printed next to it.
+  const utilization = useMemo(() => buildCardUtilization(cards, statements), [cards, statements]);
   const active = activeId ? statements.find((s) => s._id === activeId) ?? null : null;
 
   // Deep-link from global search
@@ -314,10 +323,11 @@ export function StatementsClient({
           {byCard.map(([card, list]) => (
             <div key={card}>
               <h2
-                className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.2em] mb-3"
+                className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.2em] mb-3 flex items-center gap-2"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
                 {card}
+                <UtilizationBadge u={utilization.byLabel.get(card)} />
               </h2>
               <div className="space-y-2">
                 {list.map((s) => (
@@ -349,13 +359,52 @@ export function StatementsClient({
       </Modal>
 
       <Modal open={showCards} onClose={() => setShowCards(false)} title={t("stm.manageCards")} size="xl">
-        <CardsManager cards={cards} statements={statements} />
+        <CardsManager cards={cards} statements={statements} utilization={utilization} />
       </Modal>
 
       <Modal open={showReconcile} onClose={() => setShowReconcile(false)} title={t('rec.title')} size="lg">
         <ReconcilePanel statements={statements.map((s) => ({ _id: s._id, card: s.card, period: s.period }))} />
       </Modal>
     </main>
+  );
+}
+
+// ─── Credit limit utilization (P84) ────────────────────────────────────────
+
+/**
+ * How much of a card's limit the current balance is using. Renders nothing when the
+ * card has no limit set, which is the common case: an empty `creditLimit` means we
+ * genuinely do not know the denominator, and a percentage of an unknown limit would
+ * be a fabricated number, not a softer one.
+ */
+function UtilizationBadge({ u, className }: { u?: CardUtilization; className?: string }) {
+  const t = useT();
+  if (!u) return null;
+  const color =
+    u.level === 'high'
+      ? 'var(--color-red)'
+      : u.level === 'warn'
+        ? 'var(--color-gold)'
+        : 'var(--color-text-faint)';
+  return (
+    <span
+      className={cn(
+        'shrink-0 px-1.5 py-0.5 rounded text-[9px] tracking-wider normal-case',
+        u.level === 'ok' ? 'bg-[color:var(--color-surface-2)]' : 'font-semibold',
+        className
+      )}
+      style={{
+        fontFamily: 'var(--font-mono)',
+        color,
+        background: u.level === 'ok' ? undefined : `color-mix(in srgb, ${color} 14%, transparent)`,
+      }}
+      title={t('stm.utilTitle', {
+        used: `${cur()}${u.outstanding.toFixed(2)}`,
+        limit: `${cur()}${u.creditLimit}`,
+      })}
+    >
+      {t('stm.utilPct', { pct: u.pct })}
+    </span>
   );
 }
 
@@ -1419,9 +1468,11 @@ const CARD_TYPES = [
 function CardsManager({
   cards,
   statements,
+  utilization,
 }: {
   cards: SerializedCard[];
   statements: SerializedStatement[];
+  utilization: CardUtilizationIndex;
 }) {
   const t = useT();
   const [editing, setEditing] = useState<SerializedCard | null>(null);
@@ -1475,6 +1526,7 @@ function CardsManager({
                 <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[color:var(--color-surface-3)] text-[color:var(--color-text-dim)]" style={{ fontFamily: 'var(--font-mono)' }}>
                   {c.kind}
                 </span>
+                <UtilizationBadge u={utilization.byCardId.get(c._id)} />
               </div>
               <div className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
                 {c.bank || c.type}
