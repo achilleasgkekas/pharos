@@ -174,3 +174,12 @@
   email verification.
 - **getTenantConnection readyState guard** (P3, dead-until-SaaS): ambiguous rebuild-semantic,
   0 importers — δεν επείγει.
+## TASK (owner-driven) 2026-08: Migration off Hetzner cloud -> self-hosted Proxmox
+
+Απόφαση Αχιλλέα: κλείνουμε τους Hetzner cloud servers και κάνουμε migrate τοπικά.
+
+- Στόχος: Proxmox host -> Ubuntu Server VM -> Docker compose prod -> έκθεση με Cloudflare Tunnel (cloudflared). Χωρίς public IP/ports, ο tunnel κάνει TLS + ingress. Ίδια domains (bakecore.gr / ph-aros.com) ώστε DNS + health checks να μείνουν σταθερά.
+- Βήματα: (1) provision Ubuntu VM στο Proxmox + Docker, (2) clone repo + secrets (.env.prod, ΠΟΤΕ στο git), (3) restore Mongo από backups/Storage Box, (4) docker compose prod up, (5) cloudflared tunnel + Cloudflare DNS, (6) verify στα domains, (7) flip Cloudflare origin απο Hetzner -> tunnel, verify, (8) shutdown Hetzner boxes.
+- Μετά το cutover: ενημέρωση του deploy routine ωστε να στοχεύει το νέο host (SSH στη VM ή deploy μεσα απο τη VM). Τα brains health-check URLs μενουν ίδια.
+- OWNER-ONLY: θέλει Proxmox + Cloudflare account + secrets. Τα autonomous brains ΔΕΝ το αγγίζουν, μόνο ενημέρωση.
+- ΣΗΜ: το interactive SSH απο το Mac στους cloud servers έχει σπάσει (publickey rotated μετα τις 4/8), οπότε cloud deploy μόνο μεσω των deploy routines (Run now) μέχρι τη μετάβαση.
