@@ -107,6 +107,12 @@ services:
       AUTH_COOKIE_SECURE: "true"
     volumes:
       - ./storage:/storage
+      # The fail2ban bridge. `deploy/f2b-bridge.sh` runs on the HOST (cron, every minute) and
+      # owns this directory: it writes state.json, which the app only reads, and it creates
+      # requests/ chowned to the container uid so /admin/firewall can drop a one-line unban
+      # request there. Without this mount the panel is blind — the app looks for
+      # /var/lib/pharos/f2b and finds nothing.
+      - ./f2b:/var/lib/pharos/f2b
     depends_on:
       mongo:
         condition: service_healthy
