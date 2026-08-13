@@ -616,23 +616,6 @@
   όταν υπάρχουν ≥2 users στο instance (single-user deployments δεν βλέπουν κανένα νέο UI, μηδέν clutter)· single-user
   self-host = μηδέν αλλαγή συμπεριφοράς.
 
-### P73. Recurring subscription cost-split among household members (family-plan «ποιος χρωστάει τι» ανά κύκλο) — S — OSS (κυρίως), βοηθά dogfooding
-- **Αξία:** live-verified `grep -n "split\|Split" apps/web/src/models/Subscription.ts` = 0 hits — το ήδη-shipped
-  P35 expense-splitting (`lib/split.ts`, pure/DB-free `SplitEntry`/`equalSplit`/`computeBalances`) καλύπτει μόνο
-  **Expenses**, όχι **Subscriptions**. Πραγματικό σενάριο: μια οικογενειακή συνδρομή (Netflix/Spotify/iCloud
-  family plan, YouTube Premium family) χρεώνεται αυτόματα κάθε μήνα στην κάρτα του Αχιλλέα αλλά μοιράζεται με
-  σπίτι/φίλους — σήμερα το «ποιος μου χρωστάει πόσο αυτόν τον μήνα» χρειάζεται είτε χειροκίνητη δημιουργία ενός
-  ξεχωριστού Expense κάθε κύκλο (διπλή καταχώρηση, εύκολο να ξεχαστεί), είτε καθόλου tracking. Reuse ατόφιο του
-  `lib/split.ts` (μηδέν νέος υπολογισμός) πάνω σε νέο optional `Subscription.split: SplitEntry[]` → κάθε φορά που
-  το `generateDueRecurring`-style μηχανισμό περνά έναν νέο κύκλο, το split εμφανίζεται στην κάρτα της συνδρομής
-  (ίδιο «⇄ €X owed» badge idiom με το ήδη-shipped Expenses UI). **Διακριτό** από P62 (split ΜΕΘΟΔΩΝ πληρωμής της
-  ίδιας αγοράς) — εδώ είναι split ΑΤΟΜΩΝ πάνω σε ΕΠΑΝΑΛΑΜΒΑΝΟΜΕΝΗ χρέωση, ίδιο μοτίβο με P35 αλλά σε άλλο μοντέλο.
-- **Module:** Subscriptions (νέο optional πεδίο + `SplitEditor` reuse από Expenses UI, ίδιο component/pattern).
-- **Ανοιχτή απόφαση (builder default):** το split ζει στο ίδιο το Subscription doc (static, ίδιο ποσό/μερίδιο κάθε
-  κύκλο) — ΟΧΙ per-cycle history αρχικά (MVP απλούστερο, «ισχύει μέχρι να το αλλάξεις»)· «settle»/balances tracking
-  reuse το ήδη-shipped `computeBalances` pattern των Expenses χωρίς νέο υπολογισμό· κενό `split[]` = σημερινή
-  συμπεριφορά αμετάβλητη.
-
 ### P72. Shipment/delivery tracking για items σε «ordered» status (tracking number + carrier + status) — S — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified: το `Item.status` έχει ήδη `'ordered'` (`ITEM_STATUSES` στο `models/Item.ts`) αλλά
   `grep -rn "trackingNumber|carrier|shipment|deliveryStatus" apps/web/src apps/mobile/src` = 0 hits παντού. Ο
@@ -2190,6 +2173,32 @@
 ---
 
 ## Done
+
+### P73. Recurring subscription cost-split among household members (family-plan «ποιος χρωστάει τι» ανά κύκλο) — ✅ SHIPPED 2026-08-13 (pharos-brain)
+- Νέο optional `Subscription.split: SplitEntry[]` (ίδιο σχήμα με `Expense.split`) + reuse ατόφιο των
+  `lib/split.ts` pure helpers (P35: `equalSplit`/`splitTotals`/`cleanSplit`, μηδέν νέος υπολογισμός). UI στο
+  `SubscriptionsClient.tsx`: cyan «⇄ €X owed» badge στην κάρτα συνδρομής (ίδιο idiom με το Expenses' SplitBadge)
+  + `SplitEditor` μέσα στη φόρμα (add/remove person, ποσό ανά γραμμή, «split equally» με προαιρετικό include-me,
+  per-row «mark paid back»). Ο `SplitEditor` **δεν** μοιράστηκε ως component (η φόρμα των Expenses έχει άλλο
+  form-state shape) — αντιγράφηκε σκόπιμα μικρός· τα ίδια i18n κλειδιά (`ex.split*`) ξαναχρησιμοποιήθηκαν αυτούσια
+  αντί για νέα `sub.split*` σε 8 locale αρχεία, γιατί το λεκτικό είναι γενικό («Split with people», «Split equally»),
+  όχι Expense-specific.
+- **Server**: το `createSubscription`/`updateSubscription` παραμένουν FormData-based (όχι το object+safeParse
+  pattern του Expenses) — το `split` περνά ως ΕΝΑ JSON-serialized πεδίο (`fd.set('split', JSON.stringify(split))`),
+  το Zod schema το κάνει `.transform()` με try/catch (malformed/absent JSON → `[]` αντί για validation error που θα
+  μπλόκαρε ολόκληρη την αποθήκευση), μετά `cleanSplit()` πριν το write. **+7 νέα tests** (`actions.test.ts`, 405→
+  ~448 lines): default κενό split, well-formed array καθαρίζεται σωστά (trim/round/boolean), nameless rows πέφτουν,
+  malformed JSON και JSON object (όχι array) και τα δύο degrade σε `[]` χωρίς exception, updateSubscription ίδιο
+  cleaning. Builder default τηρήθηκε αυτούσιος: static split (ένα ποσό/μερίδιο «μέχρι να το αλλάξεις», όχι
+  per-cycle history), κενό `split[]` = σημερινή συμπεριφορά αμετάβλητη.
+- **Εκκρεμεί (follow-up, όχι blocking)**: καμία cross-subscription «who owes you» balances επισκόπηση (το
+  Expenses' `BalancesModal`+`settlePerson` server action δεν αντιγράφηκε — το per-row settle μέσα στον editor
+  καλύπτει το MVP)· το `/api/v1/subscriptions` serializer (`serialize.ts`) δεν εκθέτει ακόμα το `split` πεδίο.
+- **Verified**: `npm run type-check` EXIT 0· `npx vitest run` πλήρες → **407/407 αρχεία, 6551 passed / 4 skipped**
+  (58/58 στο subscriptions+split scope)· `docker compose build web` + `up -d web` → **RestartCount 0**, `/login`
+  **307**, `/subscriptions` **307** (auth redirect, η διαδρομή σερβίρεται)· browser: τίτλος «Sign in · Pharos»,
+  **μηδέν console errors**. Docker mutex πάρθηκε/απελευθερώθηκε γύρω από build+boot, `docker builder prune -f` →
+  **2.42GB** ελευθερώθηκε.
 
 ### P84. Credit card utilization warning (creditLimit vs πραγματικό outstanding) — ✅ SHIPPED 2026-08-10 (pharos-daily-dev)
 - Νέο pure `lib/cardUtilization.ts` (`buildCardUtilization`/`utilizationLevel`, 15 tests) + badge «X% of limit» στο

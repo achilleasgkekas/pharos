@@ -11977,3 +11977,47 @@ badge**, η γραμμή στο `runAlertChecks` μένει follow-up ώστε �
 - Δύο OPEN entries στο `ASK_ACHILLEAS.md` περιμένουν ακόμα εσένα (και τα δύο από το `pharos-cloud-guard`):
   `20260808-0310` (reboot kernel + `node:20→22`, η εικόνα παραγωγής είναι πάνω από 4 μήνες χωρίς security
   patch) και `20260808-1515` (σειρά beta-opening vs. tenant isolation), ~2 μέρες τώρα.
+
+## 2026-08-13 13:10 — pharos-brain
+
+**Πρώτο run του νέου ενοποιημένου `pharos-brain`** (αντικατέστησε τον παλιό στόλο 8 routines,
+βλ. `~/.claude/scheduled-tasks/pharos-brain/SKILL.md`). Καμία εγγραφή αυτού του routine υπήρχε
+ακόμα σήμερα στο log, άρα το ημερήσιο budget (cap 3) ήταν στο 0/3.
+
+**Prod health**: και τα τρία endpoints υγιή — `ph-aros.com/` **200** (landing, βρέθηκε «self-host»
+στο περιεχόμενο), `app.ph-aros.com/account/login` **200**, `POST /api/cron/saas/trials-sweep`
+χωρίς token **401** (σωστό, το route προστατεύεται). Καμία ενέργεια χρειάστηκε εδώ.
+
+**Το ΕΝΑ πράγμα**: **P73, recurring subscription cost-split among household members** — το επόμενο
+task που είχε αφήσει ρητά το προηγούμενο run (2026-08-10, «τελευταίο S της ομάδας Α», έγκριση
+`pharos-saas-core-20260807`/22-item batch). Νέο optional `Subscription.split: SplitEntry[]` (ίδιο
+σχήμα με `Expense.split`) + reuse ατόφιο των `lib/split.ts` pure helpers (P35: equalSplit/
+splitTotals/cleanSplit, μηδέν νέος υπολογισμός) + UI στο `SubscriptionsClient.tsx` (badge «⇄ €X
+owed» στην κάρτα + `SplitEditor` στη φόρμα, ίδιο idiom με τα ήδη-shipped Expenses). Το server
+action (`createSubscription`/`updateSubscription`) είναι FormData-based, όχι object+safeParse σαν
+τα Expenses, οπότε το split περνά ως ένα JSON-serialized πεδίο με defensive `.transform()`
+(malformed/absent JSON → `[]`, ποτέ validation error που θα μπλόκαρε όλη τη φόρμα). Πλήρες
+write-up στο `PRODUCT_BACKLOG.md` (μετακινήθηκε από Approved → Done). Builder default τηρήθηκε
+αυτούσιος (static split, καμία per-cycle history, κενό split = σημερινή συμπεριφορά αμετάβλητη).
+**Δική μου επιλογή, καταγεγραμμένη**: δεν αντιγράφηκε το cross-subscription «who owes you»
+`BalancesModal`/`settlePerson` των Expenses (το per-row settle μέσα στον editor καλύπτει το MVP) —
+follow-up αν χρειαστεί· τα ίδια i18n κλειδιά `ex.split*` ξαναχρησιμοποιήθηκαν αυτούσια (γενικό
+λεκτικό, όχι Expense-specific) αντί για νέα `sub.split*` σε 8 locales.
+
+**Verified**: `npm run type-check` EXIT 0· `npx vitest run` πλήρες → **407/407 αρχεία, 6551
+passed / 4 skipped** (πρόσθεσα **+7 tests** στο `subscriptions/actions.test.ts` — default κενό
+split, well-formed array cleaning, nameless rows πέφτουν, malformed JSON degrade, JSON object
+[όχι array] degrade, updateSubscription ίδιο cleaning)· `docker compose build web` + `up -d web`
+→ **RestartCount 0**, `/login` **307**, `/subscriptions` **307** (auth redirect, σερβίρεται)·
+browser: τίτλος «Sign in · Pharos», μηδέν console errors (καμία ενεργή συνεδρία, δεν μπήκαν
+credentials). Docker mutex πάρθηκε/απελευθερώθηκε γύρω από build+boot, `docker builder prune -f`
+→ 2.42GB ελευθερώθηκε. Commit `0767115`, pushed στο `origin/main`.
+
+**Unshipped στην παραγωγή**: **40 commits** πίσω από το `e38d8d3` (7/8, το τελευταίο μετρημένο
+deployed sha, βλ. `DEPLOY_LOG.md`) — σκόπιμα, ο Αχιλλέας αποφάσισε να μην ξαναγίνει deploy στο
+Hetzner όσο προχωρά η μετάβαση σε self-hosted Proxmox (`MIGRATION_PROXMOX.md`, commit `c1ec565`).
+Δεν είναι δική μου ενέργεια, το routine δεν κάνει deploy ούτε αγγίζει τον server.
+
+**Επόμενο task**: τα S/M που έμειναν στην ομάδα Α, **P62** (split ΜΕΘΟΔΩΝ πληρωμής μιας αγοράς —
+διακριτό από το σημερινό P73 που είναι split ΑΤΟΜΩΝ) πρώτο, μετά **P64** και **P83**. Μετά αυτά η
+ομάδα Α κλείνει πλήρως και συνεχίζει η ομάδα C (dogfooding, αντικείμενα/εξοπλισμός).
