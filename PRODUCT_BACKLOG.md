@@ -7,7 +7,7 @@
 > **Τίποτα στο «Proposed» δεν χτίζεται μέχρι ο Αχιλλέας να το μετακινήσει στο «Approved».**
 > Οι builder routines τραβάνε ΜΟΝΟ από το «Approved». Το split OSS vs paid είναι δική του απόφαση.
 > Σύμβολα μεγέθους: S (μικρό) · M (μεσαίο) · L (μεγάλο). Track: OSS / SaaS / both.
-> Τελευταία ενημέρωση: 2026-08-10 (32η σάρωση planner).
+> Τελευταία ενημέρωση: 2026-08-13 (33η σάρωση planner).
 > **Ιστορικό σαρώσεων (συμπιεσμένο στην 30ή σάρωση, ήταν ~230 γραμμές σκαναρίσματος-προς-σκανάρισμα, τώρα
 > αυτό το block· τίποτα δεν χάθηκε, το αναλυτικό σκεπτικό ανά item μένει μέσα στο ίδιο item παρακάτω και στο
 > `PROGRESS.md`/`git log -p -- PRODUCT_BACKLOG.md` για όποιον θέλει το πλήρες historical trace):**
@@ -17,14 +17,13 @@
 > σειρά Α→Γ→Β**, + ξεχωριστά P94 (storage add-on, blocked σε Stripe price ids από τον Αχιλλέα)/P95 (BYO-key
 > add-on)/P96 (admin center, 14 items A1-E2, δεσμευτική σειρά A→B1/C1→υπόλοιπα).
 >
-> **Κατάσταση ουράς (32η σάρωση, 2026-08-10):** ενεργά buildable, όχι μπλοκαρισμένη. **P84 shipped 2026-08-10**
-> (credit card utilization badge, το ίδιο session με αυτή τη σάρωση) — μετακινήθηκε από το `## Proposed` (όπου
-> είχε μείνει σωματικά, βλ. housekeeping-note παρακάτω) στο `## Done` σε αυτή τη σάρωση, καθαρό bookkeeping.
-> **P73 επόμενο** (το τελευταίο S της ομάδας Α· μετά μένουν τα S/M P62, P64, P83). Η ουρά παραμένει μεγάλη
-> (Proposed + unbuilt Approved, ~45+ items μεταξύ των δύο) οπότε ο ρυθμός νέων προτάσεων μένει χαμηλός
-> (1/σάρωση αυτή τη φορά) μέχρι να αδειάσει περισσότερο, αντί του συνηθισμένου 3-5. Νέο αυτή τη σάρωση:
-> **P101** (referral program, SaaS growth lever — καμία υπάρχουσα customer-acquisition μηχανική εκτός landing
-> copy, verified 0 hits `referral|inviteFriend|refCode`).
+> **Κατάσταση ουράς (33η σάρωση, 2026-08-13):** ενεργά buildable, όχι μπλοκαρισμένη. Κανένα νέο SHIPPED από την
+> 32η σάρωση στο ίδιο το `PRODUCT_BACKLOG.md` (τα commits `a3398af`/`b7992c7` του git log είναι SaaS tenant-portal
+> δουλειά, εκτός backlog scope). **P73 φαίνεται ακόμα το επόμενο** (το τελευταίο S της ομάδας Α· μετά μένουν τα
+> S/M P62, P64, P83) — δεν βρέθηκε commit με «P73» στο git log, άρα αμετάβλητο από την προηγούμενη σάρωση. Η
+> ουρά παραμένει μεγάλη (Proposed + unbuilt Approved, ~45+ items μεταξύ των δύο) οπότε ο ρυθμός νέων προτάσεων
+> μένει χαμηλός (1/σάρωση) μέχρι να αδειάσει περισσότερο. Νέο αυτή τη σάρωση: **P102** (native Web Push
+> notifier channel, μηδέν εξωτερικός λογαριασμός — βλ. item για το verified gap).
 >
 > **Dedupe προηγούμενων σαρώσεων (31η):** τρία Proposed items αφαιρέθηκαν ως redundant πριν προστεθεί οτιδήποτε
 > νέο (live-verified, όχι απλή υποψία) — **P97** («Item lending tracker») ήταν λέξη-προς-λέξη το ίδιο με το ήδη-
@@ -54,6 +53,28 @@
 ## Proposed (awaiting Αχιλλέας)
 
 > Δεν χτίζονται μέχρι να μετακινηθούν στο «Approved» από τον Αχιλλέα.
+
+### P102. Native Web Push notifier channel (browser push, μηδέν εξωτερικός λογαριασμός) — S/M — OSS (κυρίως), βοηθά και SaaS
+- **Αξία:** live-verified `apps/web/src/lib/notifiers.shared.ts` → `NotifierType = 'ntfy' | 'discord' | 'slack' |
+  'telegram' | 'webhook'` — **οι πέντε** notifier κανάλια που ήδη υπάρχουν (P3 session 2026-06-29) απαιτούν όλα
+  έναν εξωτερικό λογαριασμό/service (ntfy.sh topic, Discord/Slack/Telegram bot, δικό σου webhook endpoint). Η
+  εφαρμογή έχει ήδη PWA manifest (`app/manifest.ts`, «Add to Home Screen», CLAUDE.md) αλλά **κανένα service
+  worker/push subscription** (`grep -rln "webpush|web-push|PushSubscription|serviceWorker" apps/web/src` = 0
+  hits) — άρα ένας self-hoster που απλά θέλει «πες μου όταν πέσει η τιμή» χωρίς να ανοίξει λογαριασμό πουθενά
+  σήμερα **δεν έχει καμία επιλογή** εκτός από να ανοίξει χειροκίνητα την εφαρμογή. Ταιριάζει άμεσα στο locked
+  design principle του project «privacy-first, local-first, no cloud lock-in» (CLAUDE.md) — το μόνο κανάλι
+  ειδοποιήσεων που δεν στέλνει τίποτα σε τρίτο server.
+- **Module:** νέο `public/sw.js` (minimal service worker, μόνο `push`/`notificationclick` handlers) + registration
+  hook στο ήδη-υπάρχον PWA install path· server-side `web-push` npm lib (VAPID keypair, generated once, αποθηκεύεται
+  στο `AppConfig` όπως τα υπόλοιπα integration secrets) + νέο `models/PushSubscription.ts` (endpoint/keys ανά
+  browser, ίδιο idiom με το διαγραμμένο mobile `pushTokens` αλλά web-native, ΟΧΙ Expo) + `lib/notifiers.ts` νέος
+  `'webpush'` case στο ήδη-υπάρχον `dispatchAlert()` fan-out (μηδέν αλλαγή στο ίδιο το alert-engine, απλά ένα
+  ακόμα κανάλι) + Settings → Notifications «Enable browser push» toggle (browser permission prompt, ίδιο idiom
+  με τα υπόλοιπα `ChannelCard`).
+- **Ανοιχτή απόφαση (builder default):** MVP = **μία active subscription ανά browser/device** (χωρίς cross-device
+  fan-out logic στο πρώτο slice, ίδιο simple-first idiom με τα άλλα S notifiers)· expired/invalid subscriptions
+  αφαιρούνται σιωπηλά στο επόμενο failed-send (καθαρό error-handling, όχι νέο UI για stale subscriptions)·
+  household multi-user (P31) = κάθε member κάνει το δικό του opt-in ξεχωριστά, καμία κεντρική ρύθμιση.
 
 ### P101. Referral program — «κάλεσε έναν φίλο» για extra AI calls/μήνα (SaaS growth lever) — S/M — SaaS
 - **Αξία:** live-verified `grep -rln "referral|inviteFriend|refCode" apps/web/src` = 0 hits, όπως και σε
