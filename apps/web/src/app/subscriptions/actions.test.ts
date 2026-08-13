@@ -393,6 +393,56 @@ describe('createSubscription / updateSubscription — multi-currency (P9)', () =
   });
 });
 
+// Household cost-split (P73). The form serializes SplitEntry[] as JSON into one FormData
+// field; the schema transform + cleanSplit() (lib/split.ts, shared with Expenses' P35)
+// parse and sanitize it. These pin: the default (no field submitted) is an empty split,
+// a well-formed array survives cleaning, and malformed/non-array JSON degrades to []
+// rather than throwing (a corrupt field must never block saving the rest of the form).
+describe('createSubscription / updateSubscription — cost-split (P73)', () => {
+  const baseForm = { name: 'Netflix Family', amount: '15', startDate: '2026-01-15' };
+
+  it('defaults to an empty split when the field is not submitted', async () => {
+    await createSubscription(fd(baseForm));
+    expect(subCreate.mock.calls[0][0].split).toEqual([]);
+  });
+
+  it('parses and cleans a well-formed split array', async () => {
+    const split = JSON.stringify([
+      { name: '  Maria  ', share: 5.005, settled: false },
+      { name: 'Nikos', share: 2.5, settled: true },
+    ]);
+    await createSubscription(fd({ ...baseForm, split }));
+    const doc = subCreate.mock.calls[0][0];
+    expect(doc.split).toEqual([
+      { name: 'Maria', share: 5.01, settled: false },
+      { name: 'Nikos', share: 2.5, settled: true },
+    ]);
+  });
+
+  it('drops nameless rows', async () => {
+    const split = JSON.stringify([{ name: '   ', share: 5, settled: false }]);
+    await createSubscription(fd({ ...baseForm, split }));
+    expect(subCreate.mock.calls[0][0].split).toEqual([]);
+  });
+
+  it('malformed JSON degrades to an empty split instead of throwing', async () => {
+    await expect(createSubscription(fd({ ...baseForm, split: '{not json' }))).resolves.toBeUndefined();
+    expect(subCreate.mock.calls[0][0].split).toEqual([]);
+  });
+
+  it('a JSON object (not an array) degrades to an empty split', async () => {
+    await createSubscription(fd({ ...baseForm, split: JSON.stringify({ name: 'oops' }) }));
+    expect(subCreate.mock.calls[0][0].split).toEqual([]);
+  });
+
+  it('updateSubscription cleans the split the same way', async () => {
+    const split = JSON.stringify([{ name: 'Maria', share: 5, settled: false }]);
+    await updateSubscription('sub1', fd({ ...baseForm, split }));
+    const update = subFindByIdAndUpdate.mock.calls[0][1];
+    expect(update.split).toEqual([{ name: 'Maria', share: 5, settled: false }]);
+  });
+});
+
 describe('trackDiscoveredSubscription — currency (P9)', () => {
   it('stamps the deployment base currency, not a hardcoded EUR', async () => {
     settingsState.currency = 'USD';

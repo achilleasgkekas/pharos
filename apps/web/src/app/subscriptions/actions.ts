@@ -14,6 +14,7 @@ import { discoverRecurringCandidates, type RecurringCandidate } from '@/lib/recu
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx, convertToBase, normalizeCurrency } from '@/lib/fx';
 import { assertCanWrite } from '@/lib/auth';
+import { cleanSplit } from '@/lib/split';
 
 export type SuggestResult =
   | { ok: true; data: ParsedSubscription }
@@ -53,6 +54,20 @@ const SubFormSchema = z.object({
   paymentMethod: z.string().default(''),
   url: z.string().default(''),
   notes: z.string().default(''),
+  // Household cost-split (P73): the form serializes the SplitEntry[] as JSON into one
+  // FormData field (the rest of this schema is flat strings). Malformed/absent JSON
+  // degrades to no split rather than a validation error.
+  split: z
+    .string()
+    .default('[]')
+    .transform((s) => {
+      try {
+        const arr = JSON.parse(s);
+        return Array.isArray(arr) ? arr : [];
+      } catch {
+        return [];
+      }
+    }),
 });
 
 /**
@@ -119,6 +134,7 @@ export async function createSubscription(formData: FormData) {
     await Subscription.create({
       ...parsed,
       ...money,
+      split: cleanSplit(parsed.split),
       startDate,
       trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,
       nextRenewal: computeNextRenewal(startDate, parsed.billingCycle),
@@ -139,6 +155,7 @@ export async function updateSubscription(id: string, formData: FormData) {
     await Subscription.findByIdAndUpdate(id, {
       ...parsed,
       ...money,
+      split: cleanSplit(parsed.split),
       startDate,
       trialEndsAt: parsed.trialEndsAt ? new Date(parsed.trialEndsAt) : null,
       nextRenewal: computeNextRenewal(startDate, parsed.billingCycle),

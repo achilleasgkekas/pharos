@@ -4,7 +4,7 @@ import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, form
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { useState, useTransition, useMemo } from 'react';
-import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Radar, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Power, Sparkles, Loader2, Search, LayoutGrid, List as ListIcon, SlidersHorizontal, Radar, X, Split as SplitIcon, CheckCircle2 } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -17,6 +17,7 @@ import type { SerializedSubscription, SerializedCard } from '@/types';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 import type { RecurringCandidate } from '@/lib/recurringDiscovery';
+import { equalSplit, splitTotals, type SplitEntry } from '@/lib/split';
 import {
   createSubscription,
   updateSubscription,
@@ -71,6 +72,8 @@ function monthlyEquivalent(amount: number, cycle: string): number {
   const c = CYCLES.find((x) => x.value === cycle);
   return amount * (c?.perMonth ?? 1);
 }
+
+const money = (n: number) => `${cur()}${(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -402,6 +405,28 @@ export function SubscriptionsClient({
   );
 }
 
+/** Cyan chip: this subscription is split with household members — shows what's still
+ *  owed to you (or ✓ when settled). Same idiom as Expenses' SplitBadge (P35/P73). */
+function SplitBadge({ split }: { split?: SplitEntry[] }) {
+  if (!split || split.length === 0) return null;
+  const { owed } = splitTotals(split);
+  const settledUp = owed <= 0.009;
+  return (
+    <span
+      title={settledUp ? 'Split — settled up' : `Split — ${money(owed)} owed to you`}
+      className={cn(
+        'text-[10px] font-bold rounded-md px-1.5 py-0.5 flex items-center gap-1',
+        settledUp
+          ? 'text-[color:var(--color-accent)] bg-[color:var(--color-accent)]/10 border border-[color:var(--color-accent)]/30'
+          : 'text-[color:var(--color-cyan)] bg-[color:var(--color-cyan)]/10 border border-[color:var(--color-cyan)]/30'
+      )}
+      style={{ fontFamily: 'var(--font-mono)' }}
+    >
+      <SplitIcon size={10} />{settledUp ? '✓' : money(owed)}
+    </span>
+  );
+}
+
 // ─── Sub Card ──────────────────────────────────────────────────────────────
 
 function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: string; onEdit: () => void }) {
@@ -455,6 +480,7 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
         </span>
         {/* P9: what the invoice actually says, when it is not in the base currency. */}
         <FxBadge doc={sub} base={base} />
+        <SplitBadge split={sub.split} />
       </div>
 
       {sub.active && d !== null && (
@@ -540,6 +566,9 @@ function SubForm({ sub, cards, fx, onSuccess, onDeleted }: { sub?: SerializedSub
     url: sub?.url ?? '',
     notes: sub?.notes ?? '',
   });
+  // Household cost-split (P73): kept outside `form` (which is flat strings mirrored 1:1
+  // into FormData fields) and serialized as JSON into its own field on submit.
+  const [split, setSplit] = useState<SplitEntry[]>(sub?.split ?? []);
 
   const set = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -579,6 +608,7 @@ function SubForm({ sub, cards, fx, onSuccess, onDeleted }: { sub?: SerializedSub
     e.preventDefault();
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => fd.set(k, v));
+    fd.set('split', JSON.stringify(split));
     startTransition(async () => {
       if (sub) await updateSubscription(sub._id, fd);
       else await createSubscription(fd);
@@ -680,6 +710,7 @@ function SubForm({ sub, cards, fx, onSuccess, onDeleted }: { sub?: SerializedSub
           {t('sub.trialHint')}
         </p>
       )}
+      <SplitEditor split={split} amount={Number(form.amount) || 0} onChange={setSplit} />
       <Field label="URL">
         <Input value={form.url} onChange={set('url')} placeholder="https://..." />
       </Field>
@@ -763,6 +794,70 @@ function SubFxFields({
           <span className="text-[color:var(--color-gold)]">⚠ {t('ex.fxNoRate', { base })}</span>
         )}
       </p>
+    </div>
+  );
+}
+
+/** Household cost-split (P73): who owes a share of this subscription each cycle. The
+ *  split is static (one amount per person, "until you change it" — no per-cycle
+ *  history) — same UI idiom and pure helpers (equalSplit/splitTotals) as Expenses'
+ *  SplitEditor (P35), reused as-is; the component itself is duplicated rather than
+ *  shared because the two forms don't share a form-state shape. */
+function SplitEditor({ split, amount, onChange }: { split: SplitEntry[]; amount: number; onChange: (s: SplitEntry[]) => void }) {
+  const t = useT();
+  const [includeSelf, setIncludeSelf] = useState(false);
+  const totals = splitTotals(split);
+  const yourShare = Math.round((amount - split.reduce((s, e) => s + (e.share || 0), 0)) * 100) / 100;
+
+  function setRow(i: number, p: Partial<SplitEntry>) {
+    onChange(split.map((r, idx) => (idx === i ? { ...r, ...p } : r)));
+  }
+  function addRow() { onChange([...split, { name: '', share: 0, settled: false }]); }
+  function removeRow(i: number) { onChange(split.filter((_, idx) => idx !== i)); }
+  function splitEqually() {
+    const names = split.map((r) => r.name);
+    const fresh = equalSplit(amount, names, includeSelf);
+    onChange(fresh.map((f) => ({ ...f, settled: split.find((r) => r.name.trim().toLowerCase() === f.name.toLowerCase())?.settled ?? false })));
+  }
+
+  return (
+    <div className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium flex items-center gap-1.5"><SplitIcon size={13} className="text-[color:var(--color-cyan)]" /> {t('ex.splitTitle')}</span>
+        {split.length > 0 && (
+          <span className="text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {t('ex.splitOwedYou', { amt: money(totals.owed) })}{totals.settled > 0 ? ` · ${t('ex.splitSettled', { amt: money(totals.settled) })}` : ''}
+          </span>
+        )}
+      </div>
+      {split.length === 0 ? (
+        <p className="text-[11px] text-[color:var(--color-text-faint)] mb-2">{t('ex.splitEmpty')}</p>
+      ) : (
+        <div className="space-y-1.5 mb-2">
+          {split.map((r, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <Input value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} placeholder={t('ex.splitName')} className="flex-1" />
+              <Input type="number" step="0.01" min="0" value={String(r.share)} onChange={(e) => setRow(i, { share: Number(e.target.value) || 0 })} className="w-24" />
+              <button type="button" onClick={() => setRow(i, { settled: !r.settled })} title={t('ex.splitMarkPaid')} className={cn('shrink-0 rounded-md p-1.5 border transition-colors', r.settled ? 'border-[color:var(--color-accent)] text-[color:var(--color-accent)]' : 'border-[color:var(--color-border)] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)]')}><CheckCircle2 size={14} /></button>
+              <button type="button" onClick={() => removeRow(i)} className="shrink-0 p-1.5 rounded-md text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)]"><X size={14} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-3 text-[11px]">
+        <button type="button" onClick={addRow} className="flex items-center gap-1 text-[color:var(--color-accent)] hover:opacity-80"><Plus size={12} /> {t('ex.splitAddPerson')}</button>
+        {split.some((r) => r.name.trim()) && (
+          <>
+            <button type="button" onClick={splitEqually} className="flex items-center gap-1 text-[color:var(--color-cyan)] hover:opacity-80"><SplitIcon size={12} /> {t('ex.splitEqually')}</button>
+            <label className="flex items-center gap-1 text-[color:var(--color-text-faint)]">
+              <input type="checkbox" checked={includeSelf} onChange={(e) => setIncludeSelf(e.target.checked)} className="accent-[color:var(--color-cyan)]" /> {t('ex.splitIncludeMe')}
+            </label>
+          </>
+        )}
+        {split.length > 0 && (
+          <span className="ml-auto text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>{t('ex.splitYourShare', { amt: money(yourShare) })}</span>
+        )}
+      </div>
     </div>
   );
 }

@@ -262,6 +262,8 @@ export type SerializedSubscription = {
   paymentMethod: string;
   notes: string;
   url: string;
+  // Recurring cost-split among household members (P73): same shape as Expense.split.
+  split: import('@/lib/split').SplitEntry[];
   createdAt: string;
   updatedAt: string;
 };

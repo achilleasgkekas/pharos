@@ -1,6 +1,19 @@
 import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
 import { softDeletePlugin } from '@/lib/softDelete';
 
+// Recurring cost-split among household members (P73). Same shape/semantics as
+// Expense.split (lib/split.ts, reused as-is): you pay the charge each cycle, each
+// entry is another person who owes their `share`, `settled` = paid back. Static —
+// one split applies "until you change it", no per-cycle history (MVP simplicity).
+const SplitEntrySchema = new Schema(
+  {
+    name: { type: String, default: '' },
+    share: { type: Number, default: 0 },
+    settled: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 const SubscriptionSchema = new Schema(
   {
     name: { type: String, required: true },
@@ -35,6 +48,8 @@ const SubscriptionSchema = new Schema(
     paymentMethod: { type: String, default: '' },
     notes: { type: String, default: '' },
     url: { type: String, default: '' },
+
+    split: { type: [SplitEntrySchema], default: [] },
 
     // Demo/sample-data mode (P1): see Item.isSample.
     isSample: { type: Boolean, default: false, index: true },
