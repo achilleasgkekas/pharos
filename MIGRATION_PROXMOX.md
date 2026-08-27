@@ -1,5 +1,10 @@
 # Μετακόμιση από Hetzner cloud σε self-hosted Proxmox
 
+> ✅ **ΟΛΟΚΛΗΡΩΘΗΚΕ (2026-08).** Η παραγωγή τρέχει πλέον στο apps VM **`10.0.1.11`** (Proxmox «flouda»),
+> origin = **GitHub** (private, read-only deploy key `gh-pharos`), έκθεση μέσω Cloudflare Tunnel, Hetzner
+> τερματίστηκε. Deploy = `deploy/deploy-update.sh`. Το παρακάτω είναι το ιστορικό runbook — για την
+> τρέχουσα, authoritative κατάσταση δες το **`OWNER_DECISIONS.md` → «⚙️ Υποδομή & Deploy»**.
+
 Runbook για τη μεταφορά του Pharos από το `128.140.126.136` σε δική μας Ubuntu VM πάνω σε
 Proxmox, με έκθεση μέσω Cloudflare Tunnel. Ίδια domains, ώστε DNS, health checks και τα URL των
 routines να μείνουν σταθερά.
