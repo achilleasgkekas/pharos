@@ -12021,3 +12021,57 @@ Hetzner όσο προχωρά η μετάβαση σε self-hosted Proxmox (`MIG
 **Επόμενο task**: τα S/M που έμειναν στην ομάδα Α, **P62** (split ΜΕΘΟΔΩΝ πληρωμής μιας αγοράς —
 διακριτό από το σημερινό P73 που είναι split ΑΤΟΜΩΝ) πρώτο, μετά **P64** και **P83**. Μετά αυτά η
 ομάδα Α κλείνει πλήρως και συνεχίζει η ομάδα C (dogfooding, αντικείμενα/εξοπλισμός).
+
+## 2026-08-28 02:55 — pharos-brain
+
+**Budget**: καμία δική μου εγγραφή σήμερα πριν από αυτή, άρα 0/3 (cap 3, `FLEET_BUDGET.md`).
+Καμία ANSWERED εγγραφή στο `ASK_ACHILLEAS.md` απευθύνεται στο `pharos-brain` — οι δύο ανοιχτές
+`pharos-cloud-guard` (`20260808-0310` kernel/node, `20260808-1515` σειρά beta vs tenant isolation)
+και η `pharos-deploy-20260813-0850` περιμένουν ακόμα εσένα, ~20 και ~15 μέρες αντίστοιχα.
+
+**Prod health**: και τα τρία endpoints υγιή — `ph-aros.com/` **200** (landing, βρέθηκε το περιεχόμενο
+waitlist/self-host), `app.ph-aros.com/account/login` **200**, `POST /api/cron/saas/trials-sweep` χωρίς
+token **401** (σωστά προστατευμένο). Καμία ενέργεια χρειάστηκε.
+
+**Το ΕΝΑ πράγμα**: **P62, split μιας αγοράς σε πολλαπλούς ΤΡΟΠΟΥΣ ΠΛΗΡΩΜΗΣ** — το επόμενο task που
+είχε αφήσει ρητά το προηγούμενο run. Νέο optional `Expense.paymentSplits: [{ method, amount,
+giftCardId }]` πάνω από το υπάρχον single `paymentMethod` (κενό array = προ-P62 συμπεριφορά, μηδέν
+migration) + νέο pure `lib/paymentSplit.ts` με όλη την αριθμητική. Σκόπιμα ΞΕΧΩΡΙΣΤΟ από το P35
+`lib/split.ts`: εκείνο μοιράζει μεταξύ ΑΤΟΜΩΝ, αυτό μεταξύ ΜΕΘΟΔΩΝ, τα δύο συνυπάρχουν χωρίς να
+ξέρει το ένα για το άλλο. Το ουσιαστικό κομμάτι είναι το κλείσιμο του κύκλου με το P32: μια γραμμή
+που δείχνει σε δωροκάρτα γράφει πλέον **αυτόματα** το ισόποσο use στο `GiftCard.uses[]`, οπότε
+πέφτει το υπόλοιπο της κάρτας χωρίς δεύτερη χειροκίνητη καταχώρηση. Νέο `GiftCardUse.expenseId`
+κάνει το mirroring idempotent (pull μόνο των δικών του εγγραφών πριν το push, οι χειροκίνητες uses
+έχουν `expenseId: ''` και δεν αγγίζονται ποτέ). Πλήρες write-up στο `PRODUCT_BACKLOG.md`
+(Approved → Done).
+**Δικές μου επιλογές, καταγεγραμμένες**: (α) το «άθροισμα = total» του item έγινε **προειδοποίηση +
+κουμπί «Συμπλήρωση στο σύνολο»**, ΟΧΙ απόρριψη — το ποσό συχνά διορθώνεται μετά τις γραμμές και το να
+μη σώζεται όλο το έξοδο για ένα λεπτό θα ήταν εχθρικό (ίδιο UI-side idiom με τον P35 guard)· (β) μόνο
+**Expenses**, όχι Receipts — αυτοτελές MVP, το `lib/paymentSplit.ts` είναι έτοιμο για reuse ατόφιο·
+(γ) i18n μόνο σε **en + el** (οι υπόλοιπες 6 γλώσσες είναι `Partial<Dict>` και πέφτουν στα αγγλικά,
+όπως το τεκμηριώνει το ίδιο το `locales.test.ts`)· (δ) το **soft** delete προς το Trash αφήνει προς
+το παρόν τη χρέωση πάνω στη δωροκάρτα (η εγγραφή είναι ανακτήσιμη· ο καθαρισμός ανήκει στο purge
+path, irreversible-delete έδαφος, εκτός «μικρό & ασφαλές»).
+
+**Verified**: `npm run type-check` EXIT 0· `npx vitest run` πλήρες → **409/409 αρχεία, 6584 passed /
+4 skipped, μηδέν fail** (+33 νέα tests: 18 pure + 15 στο νέο `actions.paymentSplit.test.ts` που
+καρφώνει «pull πριν το push», φίλτρο `{ expenseId }` και όχι blanket, συγχώνευση δύο γραμμών ίδιας
+κάρτας, και τα δύο never-throw μονοπάτια). Commit `fed03bb`, pushed στο `origin/main`.
+
+**ΑΛΛΑΓΗ ΠΕΡΙΒΑΛΛΟΝΤΟΣ ΣΤΟ MAC, αξίζει να το ξέρεις**: αυτό το μηχάνημα **δεν έχει πλέον ούτε
+`node_modules` ούτε Docker**. Το `apps/web/node_modules` έλειπε εντελώς (χρειάστηκε `npm ci`, 548
+πακέτα, για να τρέξει καν το type-check) και το `docker` δεν υπάρχει ούτε στο PATH ούτε ως
+`/Applications/Docker.app`. Στις 13/8 το προηγούμενο run έκανε κανονικά `docker compose build web`,
+άρα κάτι άλλαξε ενδιάμεσα. Συνέπεια: **η επαλήθευση σε browser δεν έγινε** αυτό το run (το STEP 4
+την ζητά μόνο αν η εφαρμογή ήδη τρέχει, και τίποτα δεν σέρβιρε το :3000). Αν αυτό ήταν σκόπιμο,
+όλα καλά και τα runs απλώς θα βασίζονται σε type-check + tests· αν όχι, χρειάζεται επανεγκατάσταση
+του Docker Desktop.
+
+**Unshipped στην παραγωγή**: **42 commits** πίσω από το `e38d8d3` (το τελευταίο μετρημένο deployed
+sha, βλ. `DEPLOY_LOG.md`) — σκόπιμα, όσο προχωρά η μετάβαση σε self-hosted Proxmox
+(`MIGRATION_PROXMOX.md`). Δεν κάνω deploy ούτε αγγίζω τον server.
+
+**Επόμενο task**: **P64** (receipt line-item category tagging — τα Reports σήμερα βλέπουν μόνο
+Expenses, καθόλου Receipts), μετά **P83**. Με αυτά κλείνει πλήρως η ομάδα Α και συνεχίζει η ομάδα C
+(dogfooding, αντικείμενα/εξοπλισμός). Σημείωση: το P64 αγγίζει το ίδιο Receipt model με το
+follow-up (α) του P62, οπότε ίσως αξίζει να μπει μαζί και το `paymentSplits` στα Receipts.
