@@ -2,6 +2,7 @@
 // may only export async functions.
 import type { SerializedExpense } from '@/types';
 import type { SplitEntry } from '@/lib/split';
+import type { PaymentSplitEntry } from '@/lib/paymentSplit';
 
 const GREEK: Record<string, string> = {
   α: 'a', β: 'v', γ: 'g', δ: 'd', ε: 'e', ζ: 'z', η: 'i', θ: 'th', ι: 'i', κ: 'k', λ: 'l', μ: 'm',
@@ -52,6 +53,12 @@ export function serializeExpense(e: Record<string, unknown>): SerializedExpense 
       ? (s.split as unknown[]).map((r): SplitEntry => {
           const e = r as Record<string, unknown>;
           return { name: String(e.name ?? ''), share: Number(e.share) || 0, settled: !!e.settled };
+        })
+      : [],
+    paymentSplits: Array.isArray(s.paymentSplits)
+      ? (s.paymentSplits as unknown[]).map((r): PaymentSplitEntry => {
+          const p = r as Record<string, unknown>;
+          return { method: String(p.method ?? ''), amount: Number(p.amount) || 0, giftCardId: String(p.giftCardId ?? '') };
         })
       : [],
     aiModel: s.aiModel ?? '',

@@ -14,6 +14,8 @@ import { getAppSettings } from '@/lib/appSettings';
 import { matchCategoryRule } from '@/lib/categoryRules';
 import { mirrorFileToRemote } from '@/lib/mirror';
 import { cleanSplit } from '@/lib/split';
+import { cleanPaymentSplits, giftCardSpend, type PaymentSplitEntry } from '@/lib/paymentSplit';
+import { GiftCard as GiftCardModel } from '@/models/GiftCard';
 import { resolveFx, normalizeCurrency } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -313,8 +315,56 @@ const UpdateSchema = z.object({
     )
     .max(50)
     .default([]),
+  // Payment-method split (P62): which of YOUR methods paid this one purchase.
+  // Absent/empty = paid with the single `paymentMethod` field, i.e. unchanged.
+  paymentSplits: z
+    .array(
+      z.object({
+        method: z.string().max(80).default(''),
+        amount: z.coerce.number().default(0),
+        giftCardId: z.string().max(64).default(''),
+      })
+    )
+    .max(20)
+    .default([])
+    // A malformed split is degraded to "no split" rather than rejected: it must never
+    // be the reason a whole expense fails to save (same posture as P73's subscriptions).
+    .catch([]),
   verified: z.boolean().default(false),
 });
+
+/**
+ * P62 — mirror an expense's payment split into the linked gift cards' `uses[]` logs,
+ * so a purchase partly paid from store credit lowers that card's balance without the
+ * user entering the same spend twice.
+ *
+ * Idempotent by construction: every entry it writes is tagged with `expenseId`, and
+ * the first step removes THIS expense's previously-mirrored entries from every card.
+ * So re-saving, moving the money to a different card, or clearing the split all end
+ * with exactly the rows the current split describes. Uses typed by hand on the card
+ * itself carry `expenseId: ''` and are never touched.
+ *
+ * Never throws: a bad/stale giftCardId (or a card deleted meanwhile) must not stop an
+ * expense from being saved. Runs inside the caller's tenant context.
+ */
+async function syncGiftCardUses(expenseId: string, splits: PaymentSplitEntry[], date: Date, vendor: string): Promise<void> {
+  try {
+    const spend = giftCardSpend(splits);
+    const GiftCard = await currentModel(GiftCardModel);
+    const had = await GiftCard.updateMany({ 'uses.expenseId': expenseId }, { $pull: { uses: { expenseId } } });
+    const note = (vendor || '').trim().slice(0, 200);
+    for (const [cardId, amount] of spend) {
+      try {
+        await GiftCard.updateOne({ _id: cardId }, { $push: { uses: { amount, date, note, expenseId } } });
+      } catch {
+        // Unknown/malformed card id — skip this row, keep the rest.
+      }
+    }
+    if (spend.size > 0 || (had?.modifiedCount ?? 0) > 0) revalidatePath('/vouchers');
+  } catch {
+    // Gift-card mirroring is a convenience; the expense itself is already saved.
+  }
+}
 
 export async function updateExpense(id: string, data: z.input<typeof UpdateSchema>): Promise<{ ok: boolean; error?: string }> {
   await assertCanWrite();
@@ -326,6 +376,7 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
     await connectDB();
     const Expense = await currentModel(ExpenseModel);
     const date = safeDate(d.date);
+    const splits = cleanPaymentSplits(d.paymentSplits);
     const fx = resolveFx({ amount: d.amount, currency: d.currency, fxRate: d.fxRate }, (await getAppSettings()).currency);
     await Expense.updateOne(
       { _id: id },
@@ -349,10 +400,12 @@ export async function updateExpense(id: string, data: z.input<typeof UpdateSchem
           paymentMethod: d.paymentMethod,
           notes: d.notes,
           split: cleanSplit(d.split),
+          paymentSplits: splits,
           verified: d.verified,
         },
       }
     );
+    await syncGiftCardUses(id, splits, date, d.vendor);
     revalidatePath('/expenses');
     revalidatePath('/income');
     return { ok: true };
@@ -373,6 +426,7 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
     await connectDB();
     const Expense = await currentModel(ExpenseModel);
     const date = safeDate(d.date);
+    const splits = cleanPaymentSplits(d.paymentSplits);
     const inherited = await inheritFromSeries(d.kind, vendorKey(d.vendor));
     // Apply a vendor→category auto-rule (P15) only when the user did NOT pick a category
     // (the form defaults to 'other'); an explicit choice always wins.
@@ -399,8 +453,10 @@ export async function addExpense(data: z.input<typeof UpdateSchema>): Promise<{ 
       paymentMethod: d.paymentMethod,
       notes: d.notes,
       split: cleanSplit(d.split),
+      paymentSplits: splits,
       verified: true,
     });
+    await syncGiftCardUses(String(exp._id), splits, date, d.vendor);
     revalidatePath('/expenses');
     revalidatePath('/income');
     return { ok: true, id: String(exp._id) };

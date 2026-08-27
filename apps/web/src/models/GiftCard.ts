@@ -9,6 +9,10 @@ const GiftCardUseSchema = new Schema(
     amount: { type: Number, required: true },
     date: { type: Date, default: () => new Date() },
     note: { type: String, default: '' },
+    // P62 — set when this use was created automatically from an Expense's payment
+    // split, so re-saving that expense can replace its own entries without touching
+    // the ones the user typed by hand here. '' = entered manually on the card.
+    expenseId: { type: String, default: '', index: true },
   },
   { _id: true }
 );

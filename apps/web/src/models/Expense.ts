@@ -60,6 +60,25 @@ const ExpenseSchema = new Schema(
       default: [],
     },
 
+    // Payment-method split (P62) — ONE purchase paid with SEVERAL methods (e.g. part
+    // gift card, part card). Empty array = paid with the single `paymentMethod` above,
+    // i.e. exactly the pre-P62 behaviour. `giftCardId` optionally points at a P32
+    // GiftCard, in which case saving mirrors the row into that card's `uses[]` log.
+    // Distinct from `split` above: that is between PEOPLE, this is between METHODS.
+    paymentSplits: {
+      type: [
+        new Schema(
+          {
+            method: { type: String, default: '' },
+            amount: { type: Number, default: 0 },
+            giftCardId: { type: String, default: '' },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+
     rawAiResponse: { type: String, default: '' },
     aiModel: { type: String, default: '' },
     aiParsedAt: { type: Date, default: null },

@@ -764,26 +764,6 @@
   category-normalization prompt idiom, `CATEGORY_PROMPT`)· η ενσωμάτωση στο Reports chart μπαίνει σε ξεχωριστό
   δεύτερο βήμα ώστε το πρώτο shippable slice να μείνει S.
 
-### P62. Split a purchase across multiple payment methods (κάρτα + gift card / cash) — S/M — OSS (κυρίως), βοηθά και SaaS
-- **Αξία:** το `Expense.paymentMethod` (και το αντίστοιχο πεδίο στα Receipts) είναι σήμερα **ένα** free-string —
-  αλλά μια πραγματική αγορά συχνά πληρώνεται με **περισσότερες από μία μεθόδους** (π.χ. €30 από δωροκάρτα IKEA
-  + €45 με κάρτα). Σήμερα αυτό είτε καταγράφεται σε ΜΙΑ μέθοδο (ανακριβές), είτε ο χρήστης πρέπει να ανοίξει
-  ξεχωριστά το gift card (P32, ήδη-shipped `GiftCard.uses[]` spend-log) και να καταχωρήσει το spend εκεί
-  **χειροκίνητα, δεύτερη φορά** — καμία σύνδεση σήμερα μεταξύ ενός Expense/Receipt record και ενός GiftCard use
-  (verified: το `GiftCardUseSchema` δεν έχει κανένα reference field προς Expense/Receipt). Νέο optional
-  `paymentSplits: [{method, amount, giftCardId?}]` πάνω στο ήδη-υπάρχον single-`paymentMethod` πεδίο (κενό array
-  = σημερινή συμπεριφορά αμετάβλητη, ΟΧΙ breaking) → όταν μια γραμμή δείχνει σε ένα linked gift card, η
-  αποθήκευση προσθέτει **αυτόματα** το ισόποσο use στο `GiftCard.uses[]` (reuse του ήδη-shipped balance
-  mechanism, μηδέν νέος υπολογισμός). **Διακριτό** από P35 (expense splitting = μεταξύ **ΑΤΟΜΩΝ** ποιος χρωστάει
-  τι· εδώ = μεταξύ **ΜΕΘΟΔΩΝ ΠΛΗΡΩΜΗΣ** της ίδιας αγοράς, ίδιου ατόμου) — τα δύο θα μπορούσαν θεωρητικά να
-  συνυπάρχουν αργότερα αλλά είναι ανεξάρτητα MVPs.
-- **Module:** Expenses/Receipts (νέο optional πεδίο στη φόρμα, ίδιο pattern με το SplitEditor του P35) +
-  Vouchers/GiftCard tab (auto-append use, reuse).
-- **Ανοιχτή απόφαση (builder default):** UI μόνο όταν ο χρήστης πατήσει ρητά «split payment» (κενό = single
-  method, καμία default-on αλλαγή στη φόρμα)· το άθροισμα των splits πρέπει να ισούται με το total (validation,
-  ίδιο idiom με το P35 equal-split guard)· `giftCardId` optional ανά γραμμή (μπορεί να είναι split χωρίς κανένα
-  gift card, π.χ. μισό μετρητά/μισό κάρτα — απλά δύο free-string μέθοδοι χωρίς αυτόματο side-effect).
-
 ### P61. Partial payments για Bills/payables (όχι μόνο δυαδικό paid/unpaid) — ✅ SHIPPED 2026-08-08 (pharos-daily-dev)
 
 - **Τι έγινε**: νέο optional `Bill.payments[]` subdoc (amount/date/note/expenseId, mirror του `GiftCardUseSchema`).
@@ -2173,6 +2153,48 @@
 ---
 
 ## Done
+
+### P62. Split a purchase across multiple payment methods (κάρτα + gift card / cash) — ✅ SHIPPED 2026-08-28 (pharos-brain)
+- Νέο optional `Expense.paymentSplits: [{ method, amount, giftCardId }]` **πάνω** από το ήδη-υπάρχον single
+  `paymentMethod` (κενό array = ακριβώς η προ-P62 συμπεριφορά, μηδέν breaking change, μηδέν migration). Νέο pure
+  module `lib/paymentSplit.ts` (`cleanPaymentSplits`/`paymentSplitTotal`/`paymentSplitRemainder`/
+  `paymentSplitsBalance`/`balancePaymentSplits`/`giftCardSpend`) — σκόπιμα ΞΕΧΩΡΙΣΤΟ από το `lib/split.ts` του P35:
+  εκείνο μοιράζει ένα έξοδο μεταξύ **ΑΤΟΜΩΝ** («ποιος μου χρωστάει»), αυτό μεταξύ **ΜΕΘΟΔΩΝ** («τι πλήρωσε τι»).
+  Τα δύο συνυπάρχουν στο ίδιο έξοδο χωρίς να ξέρει το ένα για το άλλο.
+- **Το κλείσιμο του κύκλου με το P32**: μια γραμμή που δείχνει σε δωροκάρτα γράφει **αυτόματα** το ισόποσο use στο
+  `GiftCard.uses[]`, οπότε το υπόλοιπο της κάρτας πέφτει χωρίς δεύτερη χειροκίνητη καταχώρηση — αυτό ήταν ακριβώς
+  το κενό που περιέγραφε το item (κανένα reference field δεν συνέδεε Expense και GiftCard use). Νέο
+  `GiftCardUseSchema.expenseId` (default `''`) κάνει το mirroring **idempotent**: το `syncGiftCardUses()` πρώτα
+  κάνει `$pull` ΜΟΝΟ τις εγγραφές αυτού του expense (`{ 'uses.expenseId': id }`) και μετά γράφει τις τρέχουσες,
+  άρα re-save / αλλαγή κάρτας / σβήσιμο του split συγκλίνουν αντί να στοιβάζουν διπλές χρεώσεις. Uses που ο
+  χρήστης έγραψε ο ίδιος πάνω στην κάρτα έχουν `expenseId: ''` και **δεν** μπαίνουν ποτέ στο φίλτρο. Δύο γραμμές
+  στην ίδια κάρτα συγχωνεύονται σε ΕΝΑ use (`giftCardSpend`).
+- **Ποτέ δεν μπλοκάρει την αποθήκευση**: το Zod πεδίο έχει `.catch([])` (malformed split → κενό, όχι validation
+  error), και το `syncGiftCardUses` είναι όλο σε try/catch με δεύτερο try/catch ανά κάρτα — stale/λάθος
+  `giftCardId` ή εντελώς μη διαθέσιμο GiftCard collection αφήνουν το ίδιο το έξοδο σωσμένο.
+- **UI** (`ExpensesClient.tsx`, `PaymentSplitEditor`, μόνο για `kind !== 'income'` όπως και ο SplitEditor του P35):
+  opt-in panel — μέχρι να πατήσεις «Add method» η φόρμα είναι ό,τι ήταν. Ανά γραμμή: ελεύθερος τρόπος + dropdown
+  δωροκάρτας (δείχνει το τρέχον υπόλοιπο, επιλογή κάρτας συμπληρώνει και το label) + ποσό. Νέα γραμμή προ-γεμίζει
+  με ό,τι δεν έχει κατανεμηθεί. Το `/expenses` φορτώνει μόνο live κάρτες (μη αρχειοθετημένες, υπόλοιπο > 0) ως
+  ελαφρύ `GiftCardOption[]` με **προϋπολογισμένο** balance, ώστε να μη στέλνονται ολόκληρα `uses[]` ιστορικά.
+- **Απόφαση πάνω στο «άθροισμα = total» validation του item**: υλοποιήθηκε ως **προειδοποίηση, όχι ως απόρριψη**
+  (κόκκινο «μένουν €X» / «€X πάνω από το σύνολο» + κουμπί «Συμπλήρωση στο σύνολο» που ρίχνει τη διαφορά στην
+  τελευταία γραμμή, το αντίστοιχο του «split equally» του P35). Λόγος: το ποσό συχνά διορθώνεται ΜΕΤΑ τις
+  γραμμές, και το να μη σώζεται ολόκληρο το έξοδο για ένα λεπτό διαφορά θα ήταν εχθρικό. Το ίδιο idiom με τον
+  P35 guard, που είναι επίσης UI-side.
+- **Εκκρεμεί (follow-up, όχι blocking)**: (α) τα **Receipts** δεν πήραν το πεδίο — το item τα ανέφερε, αλλά το
+  σκέλος Expenses είναι το αυτοτελές MVP (ίδιο μοντέλο, το `lib/paymentSplit.ts` είναι έτοιμο για reuse ατόφιο)·
+  (β) το `deleteExpense` είναι **soft** delete προς το Trash, οπότε ένα διαγραμμένο έξοδο αφήνει προς το παρόν τη
+  χρέωση πάνω στη δωροκάρτα (σκόπιμο: η εγγραφή είναι ανακτήσιμη· ο καθαρισμός ανήκει στο purge path, που είναι
+  irreversible-delete έδαφος και μένει εκτός «μικρό & ασφαλές»)· (γ) το `/api/v1/expenses` serializer δεν εκθέτει
+  ακόμα το `paymentSplits`.
+- **Verified**: `npm run type-check` EXIT 0· `npx vitest run` πλήρες → **409/409 αρχεία, 6584 passed / 4 skipped,
+  μηδέν fail** (**+33 νέα tests**: 18 στο `lib/paymentSplit.test.ts`, 15 στο νέο
+  `app/expenses/actions.paymentSplit.test.ts` που καρφώνει ρητά το «pull πριν το push», ότι το φίλτρο είναι
+  `{ expenseId }` και όχι blanket, τη συγχώνευση δύο γραμμών ίδιας κάρτας, και τα δύο never-throw μονοπάτια).
+  Τα 2 exhaustive shape assertions του `expenses/lib.test.ts` ενημερώθηκαν για το νέο πεδίο. **Καμία επαλήθευση
+  σε browser**: αυτό το μηχάνημα δεν έχει πλέον Docker ούτε `node_modules` (χρειάστηκε `npm ci` για να τρέξει
+  καν το type-check), οπότε δεν υπήρχε τρεχούμενη εφαρμογή να ελεγχθεί.
 
 ### P73. Recurring subscription cost-split among household members (family-plan «ποιος χρωστάει τι» ανά κύκλο) — ✅ SHIPPED 2026-08-13 (pharos-brain)
 - Νέο optional `Subscription.split: SplitEntry[]` (ίδιο σχήμα με `Expense.split`) + reuse ατόφιο των

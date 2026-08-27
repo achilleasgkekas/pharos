@@ -144,6 +144,9 @@ export type SerializedExpense = {
   notes: string;
   // Expense splitting (P35): people who owe you a share of this expense.
   split: import('@/lib/split').SplitEntry[];
+  // Payment-method split (P62): which of YOUR methods paid this one purchase.
+  // Empty = paid with the single `paymentMethod` above (pre-P62 behaviour).
+  paymentSplits: import('@/lib/paymentSplit').PaymentSplitEntry[];
   aiModel: string;
   aiParsedAt: string | null;
   verified: boolean;
@@ -173,6 +176,8 @@ export type SerializedGiftCardUse = {
   amount: number;
   date: string | null;
   note: string;
+  // P62: non-empty when this use was mirrored from an expense's payment split.
+  expenseId: string;
 };
 
 // P32 — gift-card / store-credit / prepaid with a decreasing monetary balance.
@@ -189,6 +194,12 @@ export type SerializedGiftCard = {
   createdAt: string;
   updatedAt: string;
 };
+
+// P62 — the minimum a payment-split row needs in order to offer a gift card as one
+// of the methods that paid a purchase: which card it is, and how much is still on it.
+// The balance is computed server-side so the expenses page never ships whole `uses[]`
+// histories just to render a picker.
+export type GiftCardOption = { _id: string; title: string; store: string; balance: number };
 
 // P20 — loyalty/membership card wallet entry (no monetary balance, unlike GiftCard).
 export type SerializedLoyaltyCard = {
