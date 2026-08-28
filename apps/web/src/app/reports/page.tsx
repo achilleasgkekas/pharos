@@ -1,4 +1,5 @@
 import { connectDB } from '@/lib/db';
+import { monthlyFactor } from '@/lib/billingCycle';
 import { Item } from '@/models/Item';
 import { Receipt } from '@/models/Receipt';
 import { Statement } from '@/models/Statement';
@@ -22,13 +23,6 @@ import { ReportsClient } from './ReportsClient';
 
 export const dynamic = 'force-dynamic';
 
-const CYCLE_PER_MONTH: Record<string, number> = {
-  weekly: 52 / 12,
-  monthly: 1,
-  quarterly: 1 / 3,
-  yearly: 1 / 12,
-  lifetime: 0,
-};
 
 const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -328,7 +322,7 @@ async function getReports(monthsBack = 12) {
   const subsByCat = new Map<string, number>();
   let monthlySubs = 0;
   for (const s of subs) {
-    const m = (s.amount || 0) * (CYCLE_PER_MONTH[s.billingCycle || 'monthly'] ?? 1);
+    const m = (s.amount || 0) * monthlyFactor(s.billingCycle || 'monthly');
     monthlySubs += m;
     subsByCat.set(s.category || 'other', (subsByCat.get(s.category || 'other') ?? 0) + m);
   }

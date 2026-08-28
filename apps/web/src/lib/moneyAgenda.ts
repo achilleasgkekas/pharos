@@ -1,4 +1,5 @@
 import { connectDB } from '@/lib/db';
+import { addCycle, cycleRenews } from '@/lib/billingCycle';
 import { Subscription } from '@/models/Subscription';
 import { Voucher } from '@/models/Voucher';
 import { Item } from '@/models/Item';
@@ -17,17 +18,11 @@ export type AgendaKind = 'renewal' | 'installments' | 'bill' | 'income' | 'warra
 export type AgendaEntry = { date: string; kind: AgendaKind; label: string; sub: string; amount: number | null; pinned?: boolean };
 export type AgendaMonth = { key: string; label: string; entries: AgendaEntry[]; out: number; inc: number };
 
-function addCycle(d: Date, cycle: string): Date {
-  const n = new Date(d);
-  if (cycle === 'weekly') n.setDate(n.getDate() + 7);
-  else if (cycle === 'quarterly') n.setMonth(n.getMonth() + 3);
-  else if (cycle === 'yearly') n.setFullYear(n.getFullYear() + 1);
-  else n.setMonth(n.getMonth() + 1); // monthly default
-  return n;
-}
 const mk = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+// English fallback wording for the non-i18n agenda strings (the /calendar page renders
+// its own translated copy). Keep in step with the cycles in lib/billingCycle.ts.
 const cycleWord = (c: string) =>
-  ({ weekly: 'weekly', monthly: 'monthly', quarterly: 'quarterly', yearly: 'yearly' } as Record<string, string>)[c] || c || 'monthly';
+  ({ weekly: 'weekly', monthly: 'monthly', quarterly: 'quarterly', yearly: 'yearly', biennial: 'every 2 years', lifetime: 'once' } as Record<string, string>)[c] || c || 'monthly';
 
 /** Compute the current-month + next-2-month money agenda. `now` is injectable for
  *  deterministic tests; defaults to the real clock. Reads the DB (connectDB first). */
@@ -70,6 +65,9 @@ export async function computeMoneyAgenda(now: Date = new Date()): Promise<{ mont
 
   // Subscription renewals — step each one forward through the window.
   for (const s of subs as { name?: string; amount?: number; billingCycle?: string; nextRenewal?: Date }[]) {
+    // A non-renewing cycle (lifetime) must not be stepped: addCycle returns the same
+    // date, which would push the identical entry once per guard iteration.
+    if (!cycleRenews(s.billingCycle || 'monthly')) continue;
     let d = new Date(s.nextRenewal as unknown as string);
     let guard = 0;
     while (d < windowEnd && guard < 8) {

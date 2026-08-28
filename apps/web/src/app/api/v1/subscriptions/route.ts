@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { BILLING_CYCLES } from '@/lib/billingCycle';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope } from '@/lib/apiList';
 import { readBody, strField, numField, enumField } from '@/lib/apiBody';
@@ -15,7 +16,7 @@ import { trim, type SubLean } from './serialize';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
+const CYCLES: readonly string[] = BILLING_CYCLES;
 
 /**
  * Deterministic auto-discovery of untracked recurring charges (P7), mirrors the

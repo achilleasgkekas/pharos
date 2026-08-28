@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { BILLING_CYCLES } from '@/lib/billingCycle';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
@@ -11,7 +12,7 @@ import { trim, type SubLean } from '../serialize';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'];
+const CYCLES: readonly string[] = BILLING_CYCLES;
 
 /** PATCH /api/v1/subscriptions/:id  { name?, amount?, billingCycle?, nextRenewal?, category?, active?, trialEndsAt?, firstChargeAmount?, currency?, fxRate? }
  *  trialEndsAt: an ISO date string sets it, `null` explicitly clears it (trial converted/cancelled).

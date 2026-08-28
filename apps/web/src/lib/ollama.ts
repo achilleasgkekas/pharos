@@ -1,4 +1,5 @@
 import { Ollama } from 'ollama';
+import { BILLING_CYCLE_VALUES } from '@/lib/billingCycle';
 import { z } from 'zod';
 import { STORE_NAMES } from './stores';
 import { resolveStore } from './storeService';
@@ -412,7 +413,7 @@ export const ParsedSubscriptionSchema = z.object({
   amount: z.coerce.number().default(0),
   currency: z.string().default('EUR'),
   billingCycle: z
-    .enum(['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'])
+    .enum(BILLING_CYCLE_VALUES)
     .catch('monthly'),
   url: z.string().default(''),
   notes: z.string().default(''),

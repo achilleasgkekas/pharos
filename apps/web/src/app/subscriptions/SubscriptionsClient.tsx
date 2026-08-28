@@ -1,5 +1,6 @@
 'use client';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
+import { BILLING_CYCLES, monthlyEquivalent, isBillingCycle } from '@/lib/billingCycle';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
@@ -48,13 +49,6 @@ function subCategoryOptions(current?: string): { value: string; label: string }[
   return list.map((v) => ({ value: v, label: SUB_LABELS[v] || v.charAt(0).toUpperCase() + v.slice(1) }));
 }
 
-const CYCLES = [
-  { value: 'weekly', label: 'Weekly', perMonth: 52 / 12 },
-  { value: 'monthly', label: 'Monthly', perMonth: 1 },
-  { value: 'quarterly', label: 'Quarterly', perMonth: 1 / 3 },
-  { value: 'yearly', label: 'Yearly', perMonth: 1 / 12 },
-  { value: 'lifetime', label: 'Lifetime', perMonth: 0 },
-];
 
 const selectClass =
   'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-4 py-2 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors';
@@ -68,10 +62,6 @@ function currencyCodes(base: string): string[] {
   return [...new Set([normalizeCurrency(base) || 'EUR', ...CURRENCIES.map((c) => c.code)])];
 }
 
-function monthlyEquivalent(amount: number, cycle: string): number {
-  const c = CYCLES.find((x) => x.value === cycle);
-  return amount * (c?.perMonth ?? 1);
-}
 
 const money = (n: number) => `${cur()}${(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -445,7 +435,7 @@ function SubCard({ sub, base, onEdit }: { sub: SerializedSubscription; base: str
     if (ok) startTransition(() => deleteSubscription(sub._id));
   }
   const d = daysUntil(sub.nextRenewal);
-  const cycleLabel = CYCLES.find((c) => c.value === sub.billingCycle) ? t(`cyc.${sub.billingCycle}` as TKey) : sub.billingCycle;
+  const cycleLabel = isBillingCycle(sub.billingCycle) ? t(`cyc.${sub.billingCycle}` as TKey) : sub.billingCycle;
 
   return (
     <div className="group bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-2xl p-4 hover:border-[color:var(--color-border-light)] transition-all">
@@ -682,8 +672,8 @@ function SubForm({ sub, cards, fx, onSuccess, onDeleted }: { sub?: SerializedSub
         )}
         <Field label={t('sub.fBillingCycle')}>
           <select value={form.billingCycle} onChange={set('billingCycle')} className={selectClass}>
-            {CYCLES.map((c) => (
-              <option key={c.value} value={c.value}>{t(`cyc.${c.value}` as TKey)}</option>
+            {BILLING_CYCLES.map((c) => (
+              <option key={c} value={c}>{t(`cyc.${c}` as TKey)}</option>
             ))}
           </select>
         </Field>

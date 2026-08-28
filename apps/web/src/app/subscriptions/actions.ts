@@ -8,13 +8,13 @@ import { suggestSubscription, type ParsedSubscription } from '@/lib/ollama';
 import { isFeatureEnabled } from '@/lib/aiFeatures.server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { addDays, addMonths, addWeeks, addYears, isBefore } from 'date-fns';
 import { vendorKey } from '@/app/expenses/lib';
 import { discoverRecurringCandidates, type RecurringCandidate } from '@/lib/recurringDiscovery';
 import { getAppSettings } from '@/lib/appSettings';
 import { resolveFx, convertToBase, normalizeCurrency } from '@/lib/fx';
 import { assertCanWrite } from '@/lib/auth';
 import { cleanSplit } from '@/lib/split';
+import { BILLING_CYCLE_VALUES, nextOccurrence } from '@/lib/billingCycle';
 
 export type SuggestResult =
   | { ok: true; data: ParsedSubscription }
@@ -37,7 +37,7 @@ export async function suggestSubscriptionInfo(name: string): Promise<SuggestResu
 }
 
 const CATEGORIES = ['streaming', 'cloud', 'software', 'gaming', 'news', 'fitness', 'other'] as const;
-const CYCLES = ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'] as const;
+const CYCLES = BILLING_CYCLE_VALUES;
 
 const SubFormSchema = z.object({
   name: z.string().min(1, 'Name required'),
@@ -75,29 +75,9 @@ const SubFormSchema = z.object({
  * Returns null for lifetime subscriptions (no renewal).
  */
 function computeNextRenewal(startDate: Date, cycle: string): Date | null {
-  if (cycle === 'lifetime') return null;
-
-  const step = (d: Date): Date => {
-    switch (cycle) {
-      case 'weekly': return addWeeks(d, 1);
-      case 'monthly': return addMonths(d, 1);
-      case 'quarterly': return addMonths(d, 3);
-      case 'yearly': return addYears(d, 1);
-      default: return addMonths(d, 1);
-    }
-  };
-
-  const now = new Date();
-  let next = new Date(startDate);
-  // Guard against pathological loops
-  let guard = 0;
-  while (isBefore(next, now) && guard < 1000) {
-    next = step(next);
-    guard++;
-  }
-  // If still in the past (future start date edge), nudge once
-  if (isBefore(next, now)) next = addDays(now, 1);
-  return next;
+  // The stepping itself lives in lib/billingCycle.ts so every cycle (biennial included)
+  // rolls forward the same way here, in the calendar and in the money agenda.
+  return nextOccurrence(startDate, cycle);
 }
 
 /**

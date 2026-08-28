@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { monthlyFactor } from '@/lib/billingCycle';
 import { withAuth } from '@/lib/apiAuth';
 import { connectDB } from '@/lib/db';
 import { Expense as ExpenseModel } from '@/models/Expense';
@@ -24,8 +25,6 @@ type Lean = { kind?: string; amount?: number; category?: string; date?: Date; pe
 type ItemLean = { _id?: unknown; status?: string; purchasedPrice?: number; currentPrice?: number; warrantyUntil?: string | Date; title?: string; category?: string };
 type ReceiptLean = { store?: string; date?: Date; total?: number };
 type SubLean = { amount?: number; billingCycle?: string; category?: string };
-// Monthly-equivalent multiplier per billing cycle. Mirrors web /reports CYCLE_PER_MONTH.
-const CYCLE_PER_MONTH: Record<string, number> = { weekly: 52 / 12, monthly: 1, quarterly: 1 / 3, yearly: 1 / 12, lifetime: 0 };
 const ymOf = (d: Lean): string => {
   if (d.period && /^\d{4}-\d{2}/.test(d.period)) return d.period.slice(0, 7);
   const dt = d.date ? new Date(d.date) : null;
@@ -255,7 +254,7 @@ export async function GET(req: NextRequest) {
     // ── Active subscriptions by category (monthly-equivalent). Mirrors web /reports. ──
     const subsByCat = new Map<string, number>();
     for (const sub of subs) {
-      const m = (sub.amount || 0) * (CYCLE_PER_MONTH[sub.billingCycle || 'monthly'] ?? 1);
+      const m = (sub.amount || 0) * monthlyFactor(sub.billingCycle || 'monthly');
       const k = sub.category || 'other';
       subsByCat.set(k, (subsByCat.get(k) ?? 0) + m);
     }

@@ -13,6 +13,7 @@
 // added without a gate. Self-hosted has no ambient tenant and `currentModel` returns the
 // default-connection model, i.e. exactly the imported model — unchanged behaviour.
 import { connectDB } from '@/lib/db';
+import { BILLING_CYCLES, isBillingCycle, monthlyEquivalent } from '@/lib/billingCycle';
 import { currentModel } from '@/lib/tenancy/connection';
 import { suggestSubscription } from '@/lib/ollama';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -140,7 +141,7 @@ export const TOOLS: AnthropicTool[] = [
       properties: {
         provider: { type: 'string', description: 'service name, e.g. "Microsoft 365 Family"' },
         amount: { type: 'number' },
-        billingCycle: { type: 'string', enum: ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'] },
+        billingCycle: { type: 'string', enum: [...BILLING_CYCLES] },
         category: { type: 'string', description: 'e.g. streaming, cloud, software, gaming' },
         nextRenewal: { type: 'string', description: 'next renewal date as YYYY-MM-DD, if the user gives one (e.g. "every Feb 7" → 2026-02-07)' },
         notes: { type: 'string' },
@@ -265,7 +266,7 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
       let amount = n(input, 'amount');
       let cycle = (s(input, 'billingCycle') || 'monthly').toLowerCase();
       if (/^annual/.test(cycle) || cycle === 'year') cycle = 'yearly';
-      if (!['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'].includes(cycle)) cycle = 'monthly';
+      if (!isBillingCycle(cycle)) cycle = 'monthly';
       let category = s(input, 'category') || 'other';
       let url = '';
       let notes = s(input, 'notes');
@@ -354,7 +355,9 @@ export async function execute(name: string, input: Record<string, unknown>): Pro
         ItemM.find({ status: { $in: ['received', 'installed'] } }).select('purchasedPrice currentPrice warrantyUntil').lean(),
         getAppSettings(),
       ]);
-      const monthlySubs = subs.reduce((t, x) => t + (x.billingCycle === 'yearly' ? (x.amount || 0) / 12 : x.amount || 0), 0);
+      // Every cycle, not just yearly: a weekly sub used to be counted at its weekly
+      // price as if that were the monthly cost, and quarterly/biennial the same way.
+      const monthlySubs = subs.reduce((t, x) => t + monthlyEquivalent(x.amount || 0, x.billingCycle || 'monthly'), 0);
       const plans = computeInstallmentPlans(JSON.parse(JSON.stringify(statements)) as SerializedStatement[]).filter((p) => !p.done);
       const owed = plans.reduce((t, p) => t + p.remainingAmount, 0);
       const inMonth = (e: { period?: string; date?: unknown }) => (e.period || String(e.date).slice(0, 7)) === mk;

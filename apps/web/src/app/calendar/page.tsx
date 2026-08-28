@@ -1,4 +1,5 @@
 import { connectDB } from '@/lib/db';
+import { addCycle, cycleRenews } from '@/lib/billingCycle';
 import { Subscription } from '@/models/Subscription';
 import { Statement } from '@/models/Statement';
 import { Item } from '@/models/Item';
@@ -16,14 +17,6 @@ import type { TFunc, TKey } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
-function addCycle(d: Date, cycle: string): Date {
-  const n = new Date(d);
-  if (cycle === 'weekly') n.setDate(n.getDate() + 7);
-  else if (cycle === 'quarterly') n.setMonth(n.getMonth() + 3);
-  else if (cycle === 'yearly') n.setFullYear(n.getFullYear() + 1);
-  else n.setMonth(n.getMonth() + 1); // monthly default
-  return n;
-}
 const mk = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
 async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBlock[]; dueThisMonth: number }> {
@@ -67,6 +60,9 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
   // Subscription renewals — step each one forward through the window (a monthly
   // sub shows up in all 3 months, a yearly only if it lands inside).
   for (const s of subs) {
+    // A non-renewing cycle (lifetime) must not be stepped: addCycle returns the same
+    // date, which would push the identical entry once per guard iteration.
+    if (!cycleRenews(s.billingCycle || 'monthly')) continue;
     let d = new Date(s.nextRenewal as unknown as string);
     let guard = 0;
     while (d < windowEnd && guard < 8) {

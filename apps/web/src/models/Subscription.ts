@@ -34,7 +34,8 @@ const SubscriptionSchema = new Schema(
     fxRate: { type: Number, default: 0 },
     billingCycle: {
       type: String,
-      enum: ['monthly', 'yearly', 'quarterly', 'weekly', 'lifetime'],
+      // Kept in sync with lib/billingCycle.ts (the single source of truth for cycles).
+      enum: ['monthly', 'yearly', 'quarterly', 'weekly', 'biennial', 'lifetime'],
       default: 'monthly',
     },
     startDate: { type: Date, required: true },
