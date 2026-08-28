@@ -538,3 +538,36 @@ pull ΕΙΝΑΙ η ασφάλεια.
 4. Βγάλε το schedule από το `pharos-deploy`. Δεν πρέπει να έχει.
 
 **Διάρκεια:** περίπου 4 λεπτά, όλα σε διάγνωση και ελέγχους υγείας.
+
+### Συνέχεια, ίδια μέρα, κατ' εντολή του Αχιλλέα: το alias διορθώθηκε
+
+**Έγιναν:** το alias `pharos` στο `~/.ssh/config` δείχνει πλέον στο `10.0.1.11` (κρατήθηκε αντίγραφο
+στο `config.bak-20260828`), και ενημερώθηκαν τα `pharos-deploy/SKILL.md` και
+`pharos-cloud-guard/SKILL.md`. Δεν έγινε deploy.
+
+**Ο χρήστης ΔΕΝ είναι ο `root`.** Το cloud-init της VM απαντά `Please login as the user "ubuntu"`,
+οπότε το alias λέει `User ubuntu`. Ο `ubuntu` είναι στα groups `docker` και `sudo`, άρα το script
+δεν θέλει sudo. Η σύνδεση επαληθεύτηκε: hostname `apps`, repo στο `/opt/pharos`.
+
+**Η VM είναι ΚΟΙΝΗ, δεν είναι μηχάνημα μόνο του Pharos.** Πάνω της τρέχουν η παραγωγή
+(`pharos-web`, `pharos-mongo`, `pharos-landing`), η ΤΟΠΙΚΗ εγκατάσταση (`pharos-local-*`), ολόκληρο
+το BakeCore, και homelab (portainer, netdata, uptime-kuma, dozzle, ntfy, wud, homelable, homepage).
+Ένα `docker system prune` εδώ ρίχνει και την παραγωγή του BakeCore. Μπήκε ρητή προειδοποίηση και
+στα δύο SKILL.
+
+**Η παραγωγή είναι 4 commits πίσω:** ο server είναι στο `0bb2c65`, το `origin/main` στο `eead779`
+(`fed03bb`, `3fe399b`, `3cc19ab`, `eead779`).
+
+**Δύο μπλοκαρίσματα, μετρημένα, και τα δύο ανοιχτά:**
+
+1. **Το `--check` γυρίζει 1 ενώ η παραγωγή είναι όντως υγιής.** Η `health()` στο
+   `deploy-update.sh` ελέγχει ακόμα container με όνομα `pharos-caddy`, που **δεν υπάρχει πια**:
+   μετά τη μετακόμιση όλα περνούν από έναν κοινό `caddy` (`caddy-cf:local`) και τον `cloudflared`.
+   Όλοι οι υπόλοιποι έλεγχοι περνούν. Άρα το STEP 2 αποτυγχάνει και το STEP 3 αρνείται με exit 1,
+   με μήνυμα «production is already unhealthy» που είναι ψευδής συναγερμός.
+2. **Το δέντρο στον server είναι βρόμικο, περίπου 1300 untracked.** Σχεδόν όλα είναι AppleDouble
+   `._*` του macOS από αντιγραφή, συν ένα `.vite/`. Το script αρνείται σε βρόμικο δέντρο εκ
+   σχεδιασμού, γιατί το rollback θα τα έσβηνε.
+
+Καμία από τις δύο δεν τη διόρθωσα: η πρώτη θέλει αλλαγή στο `deploy-update.sh`, η δεύτερη σβήσιμο
+αρχείων στον server, και καμία δεν ζητήθηκε. Μέχρι να λυθούν, **κανένα deploy δεν μπορεί να τρέξει**.
