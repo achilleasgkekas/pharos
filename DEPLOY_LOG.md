@@ -633,3 +633,70 @@ dogfooding γίνεται στο `pharos-local-*` και η παραγωγή δ�
 Άρα η επόμενη απόπειρα θα στείλει σωστά το `0bb2c65..origin/main` και θα γυρίσει σωστά πίσω.
 
 **Διάρκεια:** περίπου 25 λεπτά, κυρίως διάγνωση.
+
+## 2026-08-28 10:15 — DEPLOY ΕΠΙΤΥΧΕΣ: `0bb2c65` → `232084f` (exit 0)
+
+Δεύτερη απόπειρα της ίδιας μέρας, μετά το ξεμπλοκάρισμα των πέντε εμποδίων της προηγούμενης
+εγγραφής. **11 commits** στην παραγωγή:
+
+```
+232084f fix(deploy): unblock the pipeline after the Proxmox move, stop pharos-caddy fighting the shared proxy
+394beca feat(bills,expenses): every-2-years cycle here too, on the shared table
+01fc2e4 fix(receipts): make search find Greek text, and give the list filters worth using
+cc65ed3 feat(subscriptions): add an every-2-years billing cycle, from one shared cycle table
+056623c docs(deploy): retarget routines to the Proxmox VM
+93af6f8 docs(progress): log P64 φάση 1
+c11692b feat(receipts): per-line spend category (P64 φάση 1)
+eead779 docs(deploy): log blocked run
+3cc19ab docs(infra): record current Proxmox/GitHub deploy
+3fe399b docs(progress): log P62
+fed03bb feat(expenses): split one purchase across several payment methods (P62)
+```
+
+**Διόρθωση σε προηγούμενη μέτρηση:** είχε ειπωθεί «51 commits πίσω». Αυτό ήταν μετρημένο από το
+`e38d8d3`, το τελευταίο **Hetzner** deployed sha αυτού του log. Το πραγματικό checkout του server
+ήταν ήδη στο `0bb2c65`, άρα το αληθινό κενό ήταν **11 commits**, όπως το ανέφερε και η εγγραφή της
+28/8. Το `e38d8d3` δεν είναι πλέον χρήσιμο σημείο αναφοράς μετά τη μετακόμιση.
+
+**Ροή του script:** pre-flight health OK (πρώτη προσπάθεια) · σημείωση για 1303 untracked, αφέθηκαν
+ως έχουν · backup ok · currently deployed `0bb2c657` (από το stamp που είχε γραφτεί χειροκίνητα) ·
+shipping 11 · rebuilding **landing web** (ο `pharos-caddy` ΔΕΝ μπήκε, το profile gate δούλεψε) ·
+verifying → health OK (δεύτερη προσπάθεια) · `DEPLOYED: 0bb2c657 → 232084f3, healthy`.
+
+**Ανεξάρτητος έλεγχος, μετά το deploy:** `ph-aros.com/` **200** (388518 bytes, περιέχει self-host,
+ίδιο μέγεθος με πριν όπως αναμενόταν, το landing δεν άλλαξε) · `app.ph-aros.com/account/login`
+**200** και **90103 bytes**, από 89024 πριν, δηλαδή σερβίρεται όντως το νέο build ·
+`POST /api/cron/saas/trials-sweep` χωρίς token **401**.
+
+### ΤΟ BACKUP ΤΡΕΧΕΙ ΤΟΠΙΚΑ ΜΟΝΟ, ΜΕ ΡΗΤΗ ΕΓΚΡΙΣΗ
+
+Το offsite σκέλος απενεργοποιήθηκε για να ξεμπλοκάρει το deploy, κατ' εντολή του Αχιλλέα. Στο
+`deploy/.env.prod` η γραμμή `BACKUP_SSH=` σχολιάστηκε (αντίγραφο στο `.env.prod.bak-20260828`,
+δεν τυπώθηκε ποτέ περιεχόμενο). Το `backup.sh` πλέον τυπώνει τη δυνατή προειδοποίηση
+«No offsite target: these files are on the SAME DISK as the data they protect» και συνεχίζει.
+
+**Αυτό είναι προσωρινή κατάσταση, όχι λύση.** Μέχρι να μπει προορισμός, ένα χάλασμα δίσκου ή ένα
+λάθος `docker volume rm` παίρνει και τα δεδομένα και τα αντίγραφα. Μετριάζεται σήμερα από το ότι η
+παραγωγική βάση είναι ουσιαστικά άδεια (dump ~6 KB, storage 115 bytes).
+
+**Η δουλειά για το NAS ξεκίνησε αλλά ΔΕΝ ολοκληρώθηκε:**
+
+- Στόχος: DS923+ στο **10.0.1.5** (από το homelab inventory). Ping OK, αλλά **SSH κλειστό** σε 22,
+  2222, 31022 και rsync daemon κλειστός στο 873. Ανοιχτά μόνο τα DSM 31000/31001. Το SSH service
+  θέλει ενεργοποίηση στο DSM.
+- Φτιάχτηκε ζεύγος κλειδιών στη VM: `~ubuntu/.ssh/nas-backup` (ed25519, χωρίς passphrase γιατί το
+  τρέχει cron). Το ιδιωτικό δεν διαβάστηκε ποτέ. Δημόσιο:
+  `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO9KWLOhNFewHC8+BwR+y3m/Dwha2hERZ2IfGMCtx+f8 pharos-backup@apps`
+- **Ο Αχιλλέας δεν θέλει home directory** για τον χρήστη `backups`, άρα ο δρόμος του
+  `~/.ssh/authorized_keys` είναι κλειστός. Εναλλακτικές: rsync daemon στο DSM (θύρα 873, δικό του
+  secrets file, μηδέν home) ή rclone προς SMB/WebDAV μέσω `BACKUP_REMOTE` (το script το υποστηρίζει,
+  θέλει εγκατάσταση rclone στη VM).
+- **Σημείωση τοποθεσίας:** το DS923+ είναι στο ίδιο LAN με τη VM (10.0.1.5 vs 10.0.1.11). Είναι
+  δεύτερο αντίγραφο, όχι πραγματικά offsite. Το **DS223** (10.0.10.5) είναι ήδη σημειωμένο στο
+  inventory ως «offsite backup target».
+
+**Παραμένει ανοιχτό:** ο `ubuntu` ακόμα δεν έχει δικό του deploy key, οπότε το `git fetch` έγινε με
+`sudo` και μετά `chown -R ubuntu:ubuntu /opt/pharos/.git`. Θα χρειάζεται σε κάθε deploy μέχρι να
+μπει κλειδί.
+
+**Διάρκεια:** περίπου 12 λεπτά, τα 7 σε build (Next compile 3.6 λεπτά σε δύο πυρήνες).
