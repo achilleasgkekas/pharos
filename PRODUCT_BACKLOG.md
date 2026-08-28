@@ -249,7 +249,7 @@
   expenses) + amount + billingCycle (ώστε δύο πραγματικά διαφορετικά πλάνα του ίδιου provider να ΜΗΝ merge-αριστούν
   κατά λάθος)· merge = keep-most-complete + union οποιωνδήποτε linked references, ίδιο idiom με τα υπόλοιπα 4.
 
-### P83. Goal auto-contribution από αδιάθετο υπόλοιπο budget (P25 rollover → P12 goal) — S/M — OSS, dogfooding-heavy
+### P83. Goal auto-contribution από αδιάθετο υπόλοιπο budget (P25 rollover → P12 goal) — ✅ SHIPPED (MVP, manual sweep) 2026-08-29 (pharos-brain)
 - **Αξία:** live-verified: το ίδιο το P12 (savings goals, ήδη shipped) καταγράφει ρητά στο δικό του «Builder
   default τηρήθηκε»: «πολλά ταυτόχρονα goals· manual contributions μόνο (**auto-feed από κατηγορία = phase 2,
   δεν χτίστηκε**)» — ποτέ δεν προωθήθηκε σε δικό του backlog item έκτοτε (`grep -n "auto-feed" PRODUCT_BACKLOG.md`

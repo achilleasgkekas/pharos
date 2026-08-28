@@ -37,6 +37,12 @@ function makeGoalModel(tag: string) {
       log(tag, 'updateOne', { filter, update });
       return { matchedCount: 1 };
     },
+    // P83's already-swept guard. Always "not found" here: what the test cares about is
+    // WHICH database was asked, not the answer.
+    exists: async (filter: Record<string, unknown>) => {
+      log(tag, 'exists', { filter });
+      return null;
+    },
   };
 }
 
@@ -62,6 +68,7 @@ import {
   deleteGoal,
   addGoalContribution,
   removeGoalContribution,
+  sweepBudgetLeftoverToGoal,
 } from './goalsActions';
 
 const acme: TenantContext = {
@@ -130,6 +137,16 @@ describe('every goals action writes to the CURRENT tenant database', () => {
 
     expect(opsFor('default')).toEqual(['create']);
     expect(writes.get('acme')).toBeUndefined();
+  });
+
+  it('a budget sweep asks the CALLER workspace whether the month was already swept', async () => {
+    // The guard is a read against the goals collection. Run in the default database it
+    // would both miss this workspace's own sweep and leak that another workspace swept
+    // that category — so the lookup and the write must land on the same tenant.
+    await withTenant(acme, () => sweepBudgetLeftoverToGoal('g1', 'groceries', '2026-08', 60));
+    expect(opsFor('acme')).toEqual(['exists', 'findByIdAndUpdate']);
+    expect(opsFor('default')).toEqual([]);
+    expect(opsFor('globex')).toEqual([]);
   });
 
   it('a rejected contribution touches no database at all', async () => {

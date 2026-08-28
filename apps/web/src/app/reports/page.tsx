@@ -11,6 +11,7 @@ import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
 import { estimatedItemValue } from '@/lib/depreciation';
 import { categoryRollover, ROLLOVER_WINDOW } from '@/lib/budgetRollover';
+import { sweepableLeftover, sweptForMonth } from '@/lib/budgetSweep';
 import { receiptCategorySpend } from '@/lib/receiptCategorySpend';
 import { captureAndListSnapshots } from '@/lib/netWorth';
 import { computeMoneyAgenda } from '@/lib/moneyAgenda';
@@ -201,6 +202,11 @@ async function getReports(monthsBack = 12) {
       if ((totalByMonth.get(mk) ?? 0) > 0) rolloverMonthKeys.push(mk);
     }
   }
+  // P83 — every contribution already logged against an open goal, so the sweep button
+  // below can tell which categories of THIS month have already been moved to a goal.
+  // Flattened once here rather than per category (the list is tiny either way).
+  const allContributions = (goalsRaw as unknown as { contributions?: { amount?: number; note?: string }[] }[])
+    .flatMap((g) => g.contributions ?? []);
   const budgetVsActual = Object.entries(appSettings.budgets)
     .map(([name, budget]) => {
       const base = Math.round(budget);
@@ -208,7 +214,10 @@ async function getReports(monthsBack = 12) {
       if (!appSettings.budgetRollover) return { name, budget: base, actual };
       const priorSpends = rolloverMonthKeys.map((mk) => catByMonth.get(mk)?.get(name) ?? 0);
       const { carried, effective } = categoryRollover(base, priorSpends);
-      return { name, budget: base, actual, carried, effective };
+      // Whole euro still unspent in the envelope, offered to a savings goal. Zero once
+      // the category is on/over its limit, or once this month was already swept.
+      const leftover = sweepableLeftover(effective, actual, sweptForMonth(allContributions, name, thisMonthKey));
+      return { name, budget: base, actual, carried, effective, leftover };
     })
     .sort((a, b) => b.budget - a.budget);
   const expenseByCategory = [...expCatMap.entries()]
@@ -417,6 +426,7 @@ async function getReports(monthsBack = 12) {
     expenseBySpace,
     budgetVsActual,
     budgetRollover: appSettings.budgetRollover,
+    budgetMonthKey: thisMonthKey, // P83 — the month a sweep is booked against
     goals,
     summary: {
       receiptsTotal: Math.round(receiptsTotal),

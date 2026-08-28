@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { assertCanWrite } from '@/lib/auth';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
+import { isMonthKey, sweepNote } from '@/lib/budgetSweep';
 
 // P12 — CRUD + per-contribution add/remove for savings / financial goals.
 // Deterministic, no AI. `current` is derived (Σ contributions), never stored.
@@ -104,6 +105,51 @@ export async function removeGoalContribution(id: string, contributionId: string)
     await connectDB();
     const Model = await currentModel(Goal);
     await Model.findByIdAndUpdate(id, { $pull: { contributions: { _id: contributionId } } });
+    revalidatePath('/reports');
+    revalidatePath('/');
+    return { ok: true };
+  });
+}
+
+/**
+ * P83 — move a budget category's unspent leftover of one month into a goal.
+ *
+ * Deliberately NOT a new kind of record: it pushes an ordinary GoalContribution
+ * carrying the deterministic `sweepNote` note, so the money shows up in the goal's
+ * ledger like any manual entry and a mistaken sweep is undone with the same
+ * per-contribution delete button. The amount is computed by the same pure helper
+ * (`sweepableLeftover`) that the Reports budget card uses to label the button, and
+ * it is no more privileged than `addGoalContribution` above — the caller could
+ * always type that number by hand.
+ *
+ * The guard that DOES matter is the one below: one sweep per category+month, checked
+ * across every goal, so a double click (or a second goal) cannot move the same
+ * leftover twice.
+ */
+export async function sweepBudgetLeftoverToGoal(
+  goalId: string,
+  category: string,
+  monthKey: string,
+  amount: number
+): Promise<{ ok: boolean; error?: string }> {
+  return withRequestTenant(async () => {
+    await assertCanWrite();
+    const cat = String(category || '').trim();
+    const mk = String(monthKey || '').trim();
+    const amt = Number(amount);
+    if (!cat) return { ok: false, error: 'Pick a budget category' };
+    if (!isMonthKey(mk)) return { ok: false, error: 'Invalid month' };
+    if (!Number.isFinite(amt) || amt <= 0) return { ok: false, error: 'Nothing left to sweep' };
+    await connectDB();
+    const Model = await currentModel(Goal);
+    const note = sweepNote(cat, mk);
+    // Across ALL goals, not just this one: the leftover is a single pot, so it may
+    // only land once no matter which goal it was aimed at.
+    const already = await Model.exists({ contributions: { $elemMatch: { note } } });
+    if (already) return { ok: false, error: 'This month was already swept' };
+    await Model.findByIdAndUpdate(goalId, {
+      $push: { contributions: { amount: Math.round(amt * 100) / 100, note, date: new Date() } },
+    });
     revalidatePath('/reports');
     revalidatePath('/');
     return { ok: true };

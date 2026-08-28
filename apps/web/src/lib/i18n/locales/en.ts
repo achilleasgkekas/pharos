@@ -228,6 +228,8 @@ export const en = {
   'reports.cBudget': 'Budget · this month',
   'reports.cBudgetEnvelope': 'Budget · this month · envelope',
   'reports.budgetCarriedHint': 'Net unspent budget carried in from the last few complete months (envelope mode).',
+  'reports.sweepOffer': '{x} unspent · move to a goal',
+  'reports.sweepHint': "Put this category's unspent budget for the month into a savings goal. It is logged as an ordinary contribution, so you can remove it again.",
   'reports.cInstallments': 'Upcoming installments · next 6 months',
   'reports.cByStore': 'Spending by store · top 8',
   'reports.cInvByCat': 'Inventory value by category',

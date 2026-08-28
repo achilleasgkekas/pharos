@@ -28,6 +28,7 @@ const {
   goalCreate,
   goalFindByIdAndUpdate,
   goalUpdateOne,
+  goalExists,
   revalidatePathMock,
 } = vi.hoisted(() => ({
   connectDBMock: vi.fn(async () => {}),
@@ -35,13 +36,14 @@ const {
   goalCreate: vi.fn(async (_doc: Record<string, any>) => ({})),
   goalFindByIdAndUpdate: vi.fn(async (_id: string, _update: Record<string, any>) => ({})),
   goalUpdateOne: vi.fn(async (_filter: Record<string, any>, _update: Record<string, any>) => ({})),
+  goalExists: vi.fn(async (_filter: Record<string, any>) => null as null | { _id: string }),
   revalidatePathMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({ connectDB: connectDBMock }));
 vi.mock('@/lib/auth', () => ({ assertCanWrite: assertCanWriteMock }));
 vi.mock('@/models/Goal', () => ({
-  Goal: { create: goalCreate, findByIdAndUpdate: goalFindByIdAndUpdate, updateOne: goalUpdateOne },
+  Goal: { create: goalCreate, findByIdAndUpdate: goalFindByIdAndUpdate, updateOne: goalUpdateOne, exists: goalExists },
 }));
 vi.mock('next/cache', () => ({ revalidatePath: (...args: unknown[]) => revalidatePathMock(...args) }));
 // Tenancy seam mocked FLAT here (pass-through), so these tests keep pinning the CRUD behaviour
@@ -57,6 +59,7 @@ import {
   deleteGoal,
   addGoalContribution,
   removeGoalContribution,
+  sweepBudgetLeftoverToGoal,
 } from './goalsActions';
 
 function formData(fields: Record<string, string>): FormData {
@@ -79,6 +82,7 @@ beforeEach(() => {
   goalCreate.mockImplementation(async () => ({}));
   goalFindByIdAndUpdate.mockImplementation(async () => ({}));
   goalUpdateOne.mockImplementation(async () => ({}));
+  goalExists.mockImplementation(async () => null);
   revalidatePathMock.mockImplementation(() => undefined);
 });
 
@@ -269,5 +273,59 @@ describe('removeGoalContribution', () => {
     expect(goalFindByIdAndUpdate).toHaveBeenCalledWith('goal1', { $pull: { contributions: { _id: 'contrib1' } } });
     expect(revalidatePathMock).toHaveBeenCalledWith('/reports');
     expect(revalidatePathMock).toHaveBeenCalledWith('/');
+  });
+});
+
+// P83 — sweeping a budget category's unspent leftover into a goal. The amount itself is
+// computed by the pure lib/budgetSweep.ts (own test file); what is pinned here is the
+// action's contract: validate, refuse a second sweep of the same category+month across ALL
+// goals, and otherwise store a perfectly ordinary contribution.
+describe('sweepBudgetLeftoverToGoal', () => {
+  it('stores an ordinary contribution carrying the deterministic sweep note', async () => {
+    const res = await sweepBudgetLeftoverToGoal('g1', 'groceries', '2026-08', 60);
+    expect(res).toEqual({ ok: true });
+    expect(assertCanWriteMock).toHaveBeenCalledTimes(1);
+    const [id, update] = goalFindByIdAndUpdate.mock.calls[0];
+    expect(id).toBe('g1');
+    expect(update.$push.contributions.amount).toBe(60);
+    expect(update.$push.contributions.note).toBe('Budget sweep · groceries · 2026-08');
+    expect(update.$push.contributions.date).toBeInstanceOf(Date);
+    expect(revalidatePathMock).toHaveBeenCalledWith('/reports');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/');
+  });
+
+  it('checks for an earlier sweep across every goal, not just the target one', async () => {
+    await sweepBudgetLeftoverToGoal('g1', 'groceries', '2026-08', 60);
+    expect(goalExists).toHaveBeenCalledTimes(1);
+    expect(goalExists.mock.calls[0][0]).toEqual({
+      contributions: { $elemMatch: { note: 'Budget sweep · groceries · 2026-08' } },
+    });
+  });
+
+  it('refuses a second sweep of the same category+month and writes nothing', async () => {
+    goalExists.mockImplementation(async () => ({ _id: 'other-goal' }));
+    const res = await sweepBudgetLeftoverToGoal('g1', 'groceries', '2026-08', 60);
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/already swept/i);
+    expect(goalFindByIdAndUpdate).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a blank category, a malformed month, and a non-positive amount before any DB work', async () => {
+    expect((await sweepBudgetLeftoverToGoal('g1', '   ', '2026-08', 60)).ok).toBe(false);
+    expect((await sweepBudgetLeftoverToGoal('g1', 'groceries', '2026-8', 60)).ok).toBe(false);
+    expect((await sweepBudgetLeftoverToGoal('g1', 'groceries', '2026-08-01', 60)).ok).toBe(false);
+    expect((await sweepBudgetLeftoverToGoal('g1', 'groceries', '2026-08', 0)).ok).toBe(false);
+    expect((await sweepBudgetLeftoverToGoal('g1', 'groceries', '2026-08', -5)).ok).toBe(false);
+    expect((await sweepBudgetLeftoverToGoal('g1', 'groceries', '2026-08', Number.NaN)).ok).toBe(false);
+    expect(connectDBMock).not.toHaveBeenCalled();
+    expect(goalExists).not.toHaveBeenCalled();
+    expect(goalFindByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('trims the category so a stray space cannot bypass the already-swept guard', async () => {
+    await sweepBudgetLeftoverToGoal('g1', ' groceries ', ' 2026-08 ', 12.345);
+    expect(goalExists.mock.calls[0][0].contributions.$elemMatch.note).toBe('Budget sweep · groceries · 2026-08');
+    expect(goalFindByIdAndUpdate.mock.calls[0][1].$push.contributions.amount).toBe(12.35);
   });
 });

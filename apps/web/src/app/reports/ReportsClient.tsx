@@ -18,11 +18,11 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts';
-import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check } from 'lucide-react';
+import { Store, Package, CalendarClock, Receipt as ReceiptIcon, Layers, ShieldCheck, TrendingUp, CreditCard, Wallet, Target, Plus, Trash2, X, Sparkles, AlertTriangle, Check, ArrowRight } from 'lucide-react';
 import { formatMoney, convertToBase } from '@/lib/fx';
 import { applyFxRate, applyFxRateToCurrency } from './fxActions';
 import { FxRateButton } from '@/components/FxRateButton';
-import { createGoal, addGoalContribution, deleteGoal } from './goalsActions';
+import { createGoal, addGoalContribution, deleteGoal, sweepBudgetLeftoverToGoal } from './goalsActions';
 
 const PALETTE = ['#00ff88', '#00d4ff', '#ffd93d', '#a55eea', '#ff4757', '#00b894', '#fdcb6e', '#6c5ce7'];
 
@@ -131,8 +131,10 @@ type Data = {
   } | null;
   expenseByCategory: { name: string; value: number }[];
   expenseBySpace: { name: string; value: number }[];
-  budgetVsActual: { name: string; budget: number; actual: number; carried?: number; effective?: number }[];
+  budgetVsActual: { name: string; budget: number; actual: number; carried?: number; effective?: number; leftover?: number }[];
   budgetRollover?: boolean;
+  /** P83 — "YYYY-MM" a sweep of this month's leftover is booked against. */
+  budgetMonthKey?: string;
   goals: GoalRow[];
   /** P9 slice 7: records still holding a foreign amount with no rate (empty when single-currency). */
   fxIssues?: FxIssueRow[];
@@ -344,6 +346,8 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
   const avgMonth = Math.round(spend12 / Math.max(1, data.monthlySpend.filter((m) => m.total > 0).length || 1));
   const fxIssues = data.fxIssues ?? [];
   const fxBase = data.baseCurrency || 'EUR';
+  // P83 — goals still open (an already-reached goal is a pointless sweep target).
+  const openGoals = data.goals.filter((g) => !g.done);
 
   return (
     <main className="max-w-[1400px] mx-auto px-4 py-6 pb-24">
@@ -630,6 +634,12 @@ export function ReportsClient({ data, months = 12 }: { data: Data; months?: numb
                   <div className="h-2 rounded-full bg-[color:var(--color-surface-2)] overflow-hidden">
                     <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(pct, b.actual > 0 ? 3 : 0)}%`, background: over ? 'var(--color-red)' : 'var(--color-accent)' }} />
                   </div>
+                  {/* P83 — the unspent part of the envelope, offered to a savings goal.
+                      Hidden unless envelope mode is on, something is actually left, and
+                      there is an open goal to receive it. */}
+                  {rollover && (b.leftover ?? 0) > 0 && openGoals.length > 0 && data.budgetMonthKey && (
+                    <SweepToGoal category={b.name} monthKey={data.budgetMonthKey} amount={b.leftover as number} goals={openGoals} />
+                  )}
                 </div>
               );
             })}
@@ -982,6 +992,73 @@ function GoalItem({ g }: { g: GoalRow }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** P83 — one-click transfer of a budget category's unspent leftover into a goal.
+ *  Two steps on purpose: money never moves between "boxes" without the user first
+ *  seeing the amount and choosing where it lands. */
+function SweepToGoal({ category, monthKey, amount, goals }: { category: string; monthKey: string; amount: number; goals: GoalRow[] }) {
+  const t = useT();
+  const [pending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+  const [goalId, setGoalId] = useState(goals[0]?._id ?? '');
+  const [error, setError] = useState<string | null>(null);
+
+  function sweep() {
+    const target = goalId || goals[0]?._id;
+    if (!target) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await sweepBudgetLeftoverToGoal(target, category, monthKey, amount);
+      if (res.ok) setOpen(false);
+      else setError(res.error ?? t('common.failed'));
+    });
+  }
+
+  const label = `${cur()}${amount.toLocaleString('en-GB')}`;
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        title={t('reports.sweepHint')}
+        className="mt-1 flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-accent)] transition-colors"
+        style={{ fontFamily: 'var(--font-mono)' }}
+      >
+        <Target size={10} /> {t('reports.sweepOffer', { x: label })}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+      <select
+        value={goalId}
+        onChange={(e) => setGoalId(e.target.value)}
+        className="min-w-0 flex-1 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-2 py-1 text-[11px] text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)]"
+      >
+        {goals.map((g) => (
+          <option key={g._id} value={g._id}>{g.title}</option>
+        ))}
+      </select>
+      <button
+        onClick={sweep}
+        disabled={pending}
+        className="shrink-0 flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg bg-[color:var(--color-accent)]/10 text-[color:var(--color-accent)] hover:bg-[color:var(--color-accent)]/20 disabled:opacity-50"
+        style={{ fontFamily: 'var(--font-mono)' }}
+      >
+        <ArrowRight size={11} /> {label}
+      </button>
+      <button
+        onClick={() => { setOpen(false); setError(null); }}
+        className="shrink-0 text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] transition-colors"
+        aria-label={t('common.cancel')}
+      >
+        <X size={12} />
+      </button>
+      {error && <p className="w-full text-[10px] text-[color:var(--color-red)]">{error}</p>}
     </div>
   );
 }
