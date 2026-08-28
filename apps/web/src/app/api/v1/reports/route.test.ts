@@ -300,6 +300,37 @@ describe('income / expense sums + by-category', () => {
     expect(json.byCategory.some((c) => c.category === 'noise')).toBe(false);
   });
 
+  it('P64: tagged receipt line items join the same by-category breakdown', async () => {
+    expenseState.rows = [{ kind: 'expense', amount: 60, category: 'utilities', period: '2026-07' }];
+    receiptState.rows = [
+      {
+        store: 'Sklavenitis',
+        total: 119,
+        date: new Date(2026, 6, 3), // this month
+        lineItems: [
+          { qty: 2, price: 10, vatRate: 0, category: 'groceries' },
+          { qty: 1, price: 30, vatRate: 0, category: 'utilities' }, // merges with the expense row
+          { qty: 1, price: 99, vatRate: 0 }, // untagged → stays invisible
+        ],
+      },
+      {
+        store: 'Sklavenitis',
+        total: 10,
+        date: new Date(2025, 6, 3), // last year → outside the by-category window
+        lineItems: [{ qty: 1, price: 10, vatRate: 0, category: 'groceries' }],
+      },
+    ];
+    const res = await GET(makeReq());
+    const json = (await res.json()) as Body;
+    expect(json.byCategory).toEqual([
+      { category: 'utilities', total: 90 }, // 60 expense + 30 receipt line
+      { category: 'groceries', total: 20 }, // receipts only; last year's 10 excluded
+    ]);
+    // Οι αποδείξεις έχουν το δικό τους monthly-spend chart: τα σύνολα μένουν καθαρά Expense.
+    expect(json.thisMonth).toEqual({ income: 0, expense: 60, net: -60 });
+    expect(json.thisYear).toEqual({ income: 0, expense: 60, net: -60 });
+  });
+
   it('fills the monthly + cash-flow buckets by period', async () => {
     expenseState.rows = [
       { kind: 'expense', amount: 50, category: 'utilities', period: '2026-06' },

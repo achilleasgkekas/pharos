@@ -745,7 +745,7 @@
   server-side speech processing (browser κάνει όλη τη δουλειά, καμία ανησυχία privacy/κόστους πέρα από το ήδη
   υπάρχον AI-command call όταν πατηθεί send).
 
-### P64. Receipt line-item category tagging — ✅ SHIPPED (φάση 1) 2026-08-28 (pharos-brain)
+### P64. Receipt line-item category tagging — ✅ SHIPPED (φάσεις 1+2) 2026-08-28 (pharos-brain)
 
 - **Τι έγινε**: νέο optional `category` στο `LineItemSchema` (`models/Receipt.ts`), κενό = ακριβώς η
   προ-P64 συμπεριφορά, μηδέν migration. Ο line-item editor των Receipts απέκτησε ανά γραμμή picker
@@ -762,9 +762,22 @@
   με τα Expenses στο ίδιο breakdown, άρα κοινό λεξιλόγιο από την αρχή.
 - **Γνωστός περιορισμός**: ένα **re-scan ξαναγράφει τις γραμμές** και άρα χάνει τα χειροκίνητα tags
   (το ίδιο ίσχυε ήδη για `refinedName`/`matchedItemId`, δεν είναι νέα συμπεριφορά).
-- **Επόμενη φάση (δεν έγινε εδώ, σκόπιμα)**: το Reports category breakdown να αθροίζει τα
-  categorized line items δίπλα στα `Expense.category` ποσά. Χωρίς αυτό η φάση 1 απλώς αποθηκεύει
-  το tag, δεν αλλάζει ακόμα κανένα chart.
+- **Φάση 2, ΕΓΙΝΕ 2026-08-28**: τα Reports αθροίζουν πλέον τις categorized γραμμές δίπλα στα
+  `Expense.category` ποσά, οπότε η απόδειξη σούπερ μάρκετ σταματά να είναι αόρατη. Νέο pure
+  `lib/receiptCategorySpend.ts` (category → ποσό, ανά μήνα και all-time) που καταναλώνουν **και οι
+  δύο** call sites, το web `reports/page.tsx` και το `GET /api/v1/reports`, ώστε να μη διαφωνούν
+  ποτέ τα δύο νούμερα. Επηρεάζονται: το chart ανά κατηγορία, τα budget actuals του μήνα, και το
+  rollover παράθυρο του P25.
+- **Επιλογές της φάσης 2, καταγεγραμμένες**: (α) **κανένα setting**, το feature είναι opt-in εκ
+  κατασκευής — μετράνε μόνο γραμμές με μη κενή `category`, και κάθε γραμμή προ-P64 έχει `''`, άρα
+  σε εγκατάσταση χωρίς tags δεν κουνιέται ούτε ένα νούμερο· (β) οι αποδείξεις μπαίνουν ΜΟΝΟ στα
+  category-scoped αθροίσματα, **όχι** στο cash-flow ούτε στα μηνιαία/ετήσια σύνολα, γιατί έχουν ήδη
+  το δικό τους «Monthly spend» chart στην ίδια σελίδα και θα μετριόντουσαν δύο φορές· (γ) το ποσό
+  γραμμής υπολογίζεται **gross** (`qty × price × (1 + vatRate/100)`), στην ίδια βάση με το
+  `Expense.amount` — το `price` είναι στην πράξη η ΚΑΘΑΡΗ τιμή μονάδας, όπως το δείχνει ο ίδιος ο
+  line-item editor και το «∑ from products», παρά το αντίθετο σχόλιο στο `LineItemSchema`.
+- **Δεν άλλαξε το σχήμα του API**: κανένα νέο πεδίο στο `GET /api/v1/reports`, μόνο τα ποσά μέσα
+  στο ήδη υπάρχον `byCategory`/`budgets`, άρα μηδέν openapi drift.
 
 ### P64 (αρχικό spec, για ιστορικό) — S/M — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified διπλό κενό: (α) το `LineItemSchema` (`models/Receipt.ts`) έχει

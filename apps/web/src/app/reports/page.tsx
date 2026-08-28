@@ -11,6 +11,7 @@ import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
 import { estimatedItemValue } from '@/lib/depreciation';
 import { categoryRollover, ROLLOVER_WINDOW } from '@/lib/budgetRollover';
+import { receiptCategorySpend } from '@/lib/receiptCategorySpend';
 import { captureAndListSnapshots } from '@/lib/netWorth';
 import { computeMoneyAgenda } from '@/lib/moneyAgenda';
 import { computeSafeToSpend } from '@/lib/safeToSpend';
@@ -26,7 +27,14 @@ export const dynamic = 'force-dynamic';
 
 const MN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-type LeanReceipt = { store?: string; date?: string | Date | null; total?: number; vatAmount?: number };
+type LeanReceipt = {
+  store?: string;
+  date?: string | Date | null;
+  total?: number;
+  vatAmount?: number;
+  // P64: per-line spend category, fed into the same breakdown as Expense.category.
+  lineItems?: { qty?: number; price?: number; vatRate?: number; category?: string }[];
+};
 type LeanItem = {
   title?: string;
   category?: string;
@@ -55,7 +63,7 @@ async function getReports(monthsBack = 12) {
   await connectDB();
 
   const [receiptsRaw, itemsRaw, subsRaw, statementsRaw, expensesRaw, goalsRaw] = await Promise.all([
-    Receipt.find().select('store date total vatAmount').lean(),
+    Receipt.find().select('store date total vatAmount lineItems.qty lineItems.price lineItems.vatRate lineItems.category').lean(),
     Item.find().select('title category status purchasedPrice currentPrice purchasedAt warrantyUntil').lean(),
     Subscription.find({ active: true }).select('amount billingCycle category').lean(),
     Statement.find().lean(),
@@ -159,6 +167,23 @@ async function getReports(monthsBack = 12) {
       }
     }
   }
+  // ── P64 φάση 2: οι categorized γραμμές αποδείξεων στο ΙΔΙΟ breakdown ─────
+  // Μόνο γραμμές με tag μετράνε — κάθε γραμμή προ-P64 έχει `category: ''`, άρα όσο
+  // κανείς δεν έχει βάλει tag τα νούμερα εδώ μένουν ακριβώς όπως ήταν. Μπαίνουν ΜΟΝΟ
+  // στα category-scoped αθροίσματα (chart ανά κατηγορία, budget actuals, rollover
+  // παράθυρο) και ΟΧΙ στο cash-flow / στα μηνιαία-ετήσια σύνολα: οι αποδείξεις έχουν
+  // ήδη το δικό τους "Monthly spend" chart παραπάνω και θα μετριόντουσαν δύο φορές.
+  const rcSpend = receiptCategorySpend(receipts);
+  for (const [cat, amt] of rcSpend.all) expCatMap.set(cat, (expCatMap.get(cat) ?? 0) + amt);
+  for (const [mk, byCat] of rcSpend.byMonth) {
+    let target = catByMonth.get(mk);
+    if (!target) catByMonth.set(mk, (target = new Map<string, number>()));
+    for (const [cat, amt] of byCat) {
+      target.set(cat, (target.get(cat) ?? 0) + amt);
+      if (mk === thisMonthKey) thisMonthCat.set(cat, (thisMonthCat.get(cat) ?? 0) + amt);
+    }
+  }
+  for (const [mk, amt] of rcSpend.totalByMonth) totalByMonth.set(mk, (totalByMonth.get(mk) ?? 0) + amt);
   const incomeExpense = ie.map((m) => ({ ...m, income: Math.round(m.income), expense: Math.round(m.expense) }));
   // Budget vs actual (this month), per budgeted category. In envelope mode (P25)
   // each category also gets a `carried` (net unspent from recent complete months)

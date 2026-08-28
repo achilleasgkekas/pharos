@@ -11,6 +11,7 @@ import { currentModel } from '@/lib/tenancy/connection';
 import { getAppSettings } from '@/lib/appSettings';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { categoryRollover, ROLLOVER_WINDOW } from '@/lib/budgetRollover';
+import { receiptCategorySpend } from '@/lib/receiptCategorySpend';
 import { buildMonthReview } from '@/lib/monthReview';
 import { netWorthOf } from '@/lib/netWorth';
 import { computeMoneyAgenda } from '@/lib/moneyAgenda';
@@ -23,7 +24,13 @@ export const dynamic = 'force-dynamic';
 
 type Lean = { kind?: string; amount?: number; category?: string; date?: Date; period?: string; vendor?: string; vendorKey?: string; recurring?: boolean };
 type ItemLean = { _id?: unknown; status?: string; purchasedPrice?: number; currentPrice?: number; warrantyUntil?: string | Date; title?: string; category?: string };
-type ReceiptLean = { store?: string; date?: Date; total?: number };
+type ReceiptLean = {
+  store?: string;
+  date?: Date;
+  total?: number;
+  // P64: per-line spend category, summed into the same breakdown as Expense.category.
+  lineItems?: { qty?: number; price?: number; vatRate?: number; category?: string }[];
+};
 type SubLean = { amount?: number; billingCycle?: string; category?: string };
 const ymOf = (d: Lean): string => {
   if (d.period && /^\d{4}-\d{2}/.test(d.period)) return d.period.slice(0, 7);
@@ -55,7 +62,7 @@ export async function GET(req: NextRequest) {
       Expense.find({}).select('kind amount category date period vendor vendorKey recurring').lean() as Promise<Lean[]>,
       Item.find().select('status purchasedPrice currentPrice warrantyUntil title category').lean() as Promise<ItemLean[]>,
       Statement.find().lean(),
-      Receipt.find().select('store date total').lean() as Promise<ReceiptLean[]>,
+      Receipt.find().select('store date total lineItems.qty lineItems.price lineItems.vatRate lineItems.category').lean() as Promise<ReceiptLean[]>,
       Subscription.find({ active: true }).select('amount billingCycle category').lean() as Promise<SubLean[]>,
       getAppSettings(),
     ]);
@@ -173,6 +180,22 @@ export async function GET(req: NextRequest) {
         else { sum.yExp += amt; byCat[cat] = (byCat[cat] || 0) + amt; }
       }
     }
+    // P64 φάση 2 — οι categorized γραμμές αποδείξεων μπαίνουν στα ίδια category
+    // αθροίσματα, ώστε αυτό το endpoint να λέει ό,τι και το web /reports. Μόνο γραμμές
+    // με tag μετράνε (προ-P64 = κενό), και μόνο στα category-scoped νούμερα: τα
+    // `summary`/`monthly`/`incomeExpense` μένουν καθαρά Expense, όπως και στο web.
+    const rcSpend = receiptCategorySpend(receipts);
+    for (const [ym, byCatMonth] of rcSpend.byMonth) {
+      let target = catByMonth.get(ym);
+      if (!target) catByMonth.set(ym, (target = new Map<string, number>()));
+      for (const [cat, amt] of byCatMonth) {
+        target.set(cat, (target.get(cat) ?? 0) + amt);
+        if (ym === thisYM) thisMonthCat[cat] = (thisMonthCat[cat] || 0) + amt;
+        if (ym.startsWith(thisYear)) byCat[cat] = (byCat[cat] || 0) + amt;
+      }
+    }
+    for (const [ym, amt] of rcSpend.totalByMonth) totalByMonth.set(ym, (totalByMonth.get(ym) ?? 0) + amt);
+
     const byCategory = Object.entries(byCat).map(([category, total]) => ({ category, total })).sort((a, b) => b.total - a.total).slice(0, 8);
 
     // Budget vs actual (this month), per budgeted category. Mirrors web /reports "Budget · this month".
