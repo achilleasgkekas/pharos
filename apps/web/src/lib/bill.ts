@@ -1,3 +1,4 @@
+import { addCycle } from '@/lib/billingCycle';
 // P28 — pure, DB-free helpers for the bill / payable status tracker. A bill's
 // status is DERIVED from its due date and whether it has been paid, so both the
 // client list, the server actions, and the notification scan agree without any
@@ -111,10 +112,7 @@ export function billIsSettledByPayments(
 
 /** Advance a date by one billing cycle (used to spawn the next recurring instance). */
 export function nextBillDue(dueDate: string | Date, cycle: string): Date {
-  const n = new Date(dueDate);
-  if (cycle === 'weekly') n.setDate(n.getDate() + 7);
-  else if (cycle === 'quarterly') n.setMonth(n.getMonth() + 3);
-  else if (cycle === 'yearly') n.setFullYear(n.getFullYear() + 1);
-  else n.setMonth(n.getMonth() + 1); // monthly default
-  return n;
+  // Stepping lives in lib/billingCycle.ts so a bill, a recurring expense and a
+  // subscription all advance by the same rules (an unknown cycle still means monthly).
+  return addCycle(new Date(dueDate), cycle);
 }

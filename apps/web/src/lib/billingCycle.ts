@@ -99,3 +99,26 @@ export function nextOccurrence(start: Date, cycle: string, now: Date = new Date(
 export function cycleKey(cycle: string): string {
   return `cyc.${specOf(cycle).value}`;
 }
+
+// ── Recurring bills / expenses ────────────────────────────────────────────────
+// Bills (P28) and recurring expense series use the same cycles as subscriptions with
+// two differences: '' means "not recurring at all" (a one-off), and 'lifetime' has no
+// meaning — a thing you pay once is simply not recurring. They kept their own hand-
+// written lists and their own steppers (expenses/actions.ts and lib/bill.ts each had a
+// private copy), which is why the every-2-years cycle was missing here as well.
+
+export type RecurringCycle = '' | Exclude<BillingCycle, 'lifetime'>;
+
+/** Cycles a bill / recurring expense can have, '' (one-off) first. */
+export const RECURRING_CYCLES: readonly RecurringCycle[] = [
+  '',
+  ...SPECS.filter((c) => c.step !== null).map((c) => c.value as Exclude<BillingCycle, 'lifetime'>),
+];
+
+/** Tuple form for `z.enum(...)`. */
+export const RECURRING_CYCLE_VALUES = RECURRING_CYCLES as unknown as readonly [RecurringCycle, ...RecurringCycle[]];
+
+/** Is this one of the recurring-series cycles ('' included)? */
+export function isRecurringCycle(v: unknown): v is RecurringCycle {
+  return typeof v === 'string' && RECURRING_CYCLES.includes(v as RecurringCycle);
+}

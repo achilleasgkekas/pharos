@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { RECURRING_CYCLES } from '@/lib/billingCycle';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
@@ -34,7 +35,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof b.period === 'string') set.period = b.period;
     if (typeof b.recurring === 'boolean') set.recurring = b.recurring;
     // empty string clears the cycle; same enum guard as POST /api/v1/expenses
-    if (b.recurringCycle === '' || ['monthly', 'quarterly', 'yearly', 'weekly'].includes(String(b.recurringCycle))) set.recurringCycle = String(b.recurringCycle);
+    if (b.recurringCycle === '' || RECURRING_CYCLES.includes(String(b.recurringCycle) as never)) set.recurringCycle = String(b.recurringCycle);
     if (typeof b.paymentMethod === 'string') set.paymentMethod = b.paymentMethod;
     if (Array.isArray(b.split)) set.split = parseSplitField(b.split);
     if (typeof b.taxDeductible === 'boolean') set.taxDeductible = b.taxDeductible;

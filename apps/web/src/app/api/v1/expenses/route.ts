@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { RECURRING_CYCLES } from '@/lib/billingCycle';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope } from '@/lib/apiList';
 import { readBody, strField, numField, enumField, boolField } from '@/lib/apiBody';
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
       date,
       period: strField(b, 'period'),
       recurring: boolField(b, 'recurring'),
-      recurringCycle: enumField(b, 'recurringCycle', ['monthly', 'quarterly', 'yearly', 'weekly'], ''),
+      recurringCycle: enumField(b, 'recurringCycle', [...RECURRING_CYCLES], ''),
       paymentMethod: strField(b, 'paymentMethod'),
       notes: strField(b, 'notes'),
       split: parseSplitField(b.split),

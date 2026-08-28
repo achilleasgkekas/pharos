@@ -1689,7 +1689,7 @@ type RuleRow = {
   matchType: 'vendor' | 'text';
   category: string;
   recurring: boolean;
-  recurringCycle: '' | 'monthly' | 'quarterly' | 'yearly' | 'weekly';
+  recurringCycle: import('@/lib/billingCycle').RecurringCycle;
 };
 
 function CategoryRulesManager({ settings }: { settings: AppSettings }) {

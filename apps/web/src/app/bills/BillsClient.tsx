@@ -1,5 +1,6 @@
 'use client';
 import { useState, useTransition, useMemo } from 'react';
+import { RECURRING_CYCLES, type RecurringCycle } from '@/lib/billingCycle';
 import { Plus, Trash2, Check, Undo2, Archive, ArchiveRestore, CalendarClock, RotateCw, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -43,6 +44,18 @@ function dueLabel(bill: SerializedBill): string {
   if (days === 0) return `${date} · today`;
   return `${date} · in ${days}d`;
 }
+
+// This page is still the untranslated one (no useT yet), so the wording stays inline
+// English like the rest of it — only the VALUES come from lib/billingCycle, so the
+// repeat options cannot drift out of step with the model enum again.
+const CYCLE_LABELS: Record<RecurringCycle, string> = {
+  '': 'One-off',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  yearly: 'Yearly',
+  biennial: 'Every 2 years',
+};
 
 export function BillsClient({
   bills,
@@ -388,11 +401,9 @@ function BillForm({
         <div>
           <label className={label} style={{ fontFamily: 'var(--font-mono)' }}>Repeat</label>
           <select name="cycle" defaultValue={bill?.cycle || ''} className="w-full rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2)] px-3 py-2 text-sm">
-            <option value="">One-off</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="yearly">Yearly</option>
+            {RECURRING_CYCLES.map((c) => (
+              <option key={c} value={c}>{CYCLE_LABELS[c]}</option>
+            ))}
           </select>
         </div>
         <div>

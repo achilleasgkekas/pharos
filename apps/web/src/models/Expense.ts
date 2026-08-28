@@ -34,7 +34,8 @@ const ExpenseSchema = new Schema(
     // Recurring series: the user marks a vendor as recurring; scanned bills with the
     // same vendorKey are auto-linked into the series even when the amount varies.
     recurring: { type: Boolean, default: false },
-    recurringCycle: { type: String, enum: ['monthly', 'quarterly', 'yearly', 'weekly', ''], default: '' },
+    // Kept in sync with RECURRING_CYCLES in lib/billingCycle.ts.
+    recurringCycle: { type: String, enum: ['monthly', 'quarterly', 'yearly', 'weekly', 'biennial', ''], default: '' },
 
     filePath: { type: String, default: '' }, // /storage/expenses/...  (empty for manual entries)
     fileType: { type: String, default: '' },

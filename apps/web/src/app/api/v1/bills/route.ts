@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { RECURRING_CYCLES } from '@/lib/billingCycle';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { listParams, withSince, listEnvelope } from '@/lib/apiList';
 import { readBody, strField, numField, enumField } from '@/lib/apiBody';
@@ -12,7 +13,7 @@ import { trim, type BillLean } from './serialize';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CYCLES = ['', 'weekly', 'monthly', 'quarterly', 'yearly'] as const;
+const CYCLES = RECURRING_CYCLES;
 
 /** GET /api/v1/bills?archived=1&paid=0&limit&offset&updatedSince
  *  Default excludes archived bills (mirrors the web BillsClient default view). */

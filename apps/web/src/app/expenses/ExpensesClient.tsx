@@ -22,6 +22,7 @@ import type { SerializedExpense, SerializedCard, GiftCardOption } from '@/types'
 import { uploadExpense, updateExpense, addExpense, deleteExpense, rescanExpense, settlePerson, bulkUpdateExpenses } from './actions';
 import { equalSplit, splitTotals, computeBalances, type SplitEntry } from '@/lib/split';
 import { paymentSplitTotal, paymentSplitRemainder, paymentSplitsBalance, balancePaymentSplits, type PaymentSplitEntry } from '@/lib/paymentSplit';
+import { RECURRING_CYCLES } from '@/lib/billingCycle';
 import { TAX_CATEGORY_PRESETS } from '@/lib/taxonomies';
 import { CsvImportModal } from './CsvImportModal';
 import { ExpenseDuplicatesModal } from './ExpenseDuplicatesModal';
@@ -29,7 +30,7 @@ import { OpenInOneDriveButton } from '@/components/OpenInOneDriveButton';
 import { useT } from '@/components/LocaleProvider';
 import type { TKey } from '@/lib/i18n';
 
-const CYCLES = ['', 'monthly', 'quarterly', 'yearly', 'weekly'] as const;
+const CYCLES = RECURRING_CYCLES;
 // Filter sentinel for "records with no space assigned" (distinct from '' = no filter).
 const NO_SPACE = '\x00none';
 

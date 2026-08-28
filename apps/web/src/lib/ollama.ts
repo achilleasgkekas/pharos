@@ -1,5 +1,5 @@
 import { Ollama } from 'ollama';
-import { BILLING_CYCLE_VALUES } from '@/lib/billingCycle';
+import { BILLING_CYCLE_VALUES, RECURRING_CYCLE_VALUES } from '@/lib/billingCycle';
 import { z } from 'zod';
 import { STORE_NAMES } from './stores';
 import { resolveStore } from './storeService';
@@ -492,7 +492,7 @@ export const ParsedExpenseSchema = z.object({
   date: z.string().default(''),
   period: z.string().default(''),
   paymentMethod: z.string().default(''),
-  recurringCycle: z.enum(['monthly', 'quarterly', 'yearly', 'weekly', '']).catch(''),
+  recurringCycle: z.enum(RECURRING_CYCLE_VALUES).catch(''),
 });
 
 export type ParsedExpense = z.infer<typeof ParsedExpenseSchema>;

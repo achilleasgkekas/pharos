@@ -136,7 +136,7 @@ export type SerializedExpense = {
   date: string;
   period: string;
   recurring: boolean;
-  recurringCycle: 'monthly' | 'quarterly' | 'yearly' | 'weekly' | '';
+  recurringCycle: import('@/lib/billingCycle').RecurringCycle;
   filePath: string;
   fileType: string;
   thumbPath: string;
@@ -230,7 +230,7 @@ export type SerializedBill = {
   /** P61: optional manual instalments, base-currency. Empty = plain binary bill. */
   payments?: { _id: string; amount: number; date: string | null; note: string; expenseId: string }[];
   category: string;
-  cycle: '' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+  cycle: import('@/lib/billingCycle').RecurringCycle;
   notes: string;
   archived: boolean;
   linkedExpenseId: string;

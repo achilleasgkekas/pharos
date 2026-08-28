@@ -15,6 +15,7 @@ import { matchCategoryRule } from '@/lib/categoryRules';
 import { mirrorFileToRemote } from '@/lib/mirror';
 import { cleanSplit } from '@/lib/split';
 import { cleanPaymentSplits, giftCardSpend, type PaymentSplitEntry } from '@/lib/paymentSplit';
+import { addCycle, RECURRING_CYCLE_VALUES, type RecurringCycle } from '@/lib/billingCycle';
 import { GiftCard as GiftCardModel } from '@/models/GiftCard';
 import { resolveFx, normalizeCurrency } from '@/lib/fx';
 import { revalidatePath } from 'next/cache';
@@ -118,16 +119,6 @@ async function inheritFromSeries(kind: Kind, vKey: string): Promise<{ category?:
 function periodFrom(date: Date, parsedPeriod?: string): string {
   if (parsedPeriod && /^\d{4}-\d{2}$/.test(parsedPeriod)) return parsedPeriod;
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-/** Advance a date by one billing cycle. */
-function addCycle(d: Date, cycle: string): Date {
-  const n = new Date(d);
-  if (cycle === 'weekly') n.setDate(n.getDate() + 7);
-  else if (cycle === 'quarterly') n.setMonth(n.getMonth() + 3);
-  else if (cycle === 'yearly') n.setFullYear(n.getFullYear() + 1);
-  else n.setMonth(n.getMonth() + 1); // monthly default
-  return n;
 }
 
 /**
@@ -264,7 +255,7 @@ export async function uploadExpense(formData: FormData): Promise<UploadExpenseRe
       date,
       period: periodFrom(date, parsed?.period),
       recurring: rule?.recurring || inherited?.recurring || false,
-      recurringCycle: (rule?.recurringCycle || parsed?.recurringCycle || inherited?.recurringCycle || '') as '' | 'monthly' | 'quarterly' | 'yearly' | 'weekly',
+      recurringCycle: (rule?.recurringCycle || parsed?.recurringCycle || inherited?.recurringCycle || '') as RecurringCycle,
       paymentMethod: parsed?.paymentMethod || '',
       filePath: relativePath,
       fileType: file.type || (isPdf ? 'application/pdf' : `image/${ext}`),
@@ -301,7 +292,7 @@ const UpdateSchema = z.object({
   date: z.string(),
   period: z.string().default(''),
   recurring: z.boolean().default(false),
-  recurringCycle: z.enum(['monthly', 'quarterly', 'yearly', 'weekly', '']).default(''),
+  recurringCycle: z.enum(RECURRING_CYCLE_VALUES).default(''),
   paymentMethod: z.string().default(''),
   notes: z.string().default(''),
   // Expense splitting (P35): people who owe you a share of this expense.
@@ -648,7 +639,7 @@ export async function importExpensesCsv(
           date,
           period: periodFrom(date),
           recurring: rule?.recurring || inh?.recurring || false,
-          recurringCycle: (rule?.recurringCycle || inh?.recurringCycle || '') as '' | 'monthly' | 'quarterly' | 'yearly' | 'weekly',
+          recurringCycle: (rule?.recurringCycle || inh?.recurringCycle || '') as RecurringCycle,
           notes: r.notes,
           aiModel: 'csv-import',
           verified: true, // deterministic bank data, not an AI guess — no review queue

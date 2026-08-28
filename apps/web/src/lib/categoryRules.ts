@@ -9,8 +9,9 @@
 // rule array on the AppConfig singleton.
 
 import { vendorKey } from '@/app/expenses/lib';
+import { RECURRING_CYCLES, type RecurringCycle } from '@/lib/billingCycle';
 
-export type RecurringCycle = '' | 'monthly' | 'quarterly' | 'yearly' | 'weekly';
+export type { RecurringCycle } from '@/lib/billingCycle';
 
 export type CategoryRule = {
   /** Stable-ish id for React keys / edits (derived from match+category when absent). */
@@ -33,7 +34,9 @@ export type CategoryRule = {
   recurringCycle: RecurringCycle;
 };
 
-const CYCLES = new Set<string>(['monthly', 'quarterly', 'yearly', 'weekly']);
+// A rule may set any recurring cycle except "none" — leaving it empty already means
+// "leave as-is", which is handled by the `|| ''` fallback, not by this set.
+const CYCLES = new Set<string>(RECURRING_CYCLES.filter(Boolean));
 
 function makeId(match: string, category: string, i: number): string {
   return `${vendorKey(match) || 'r'}-${vendorKey(category) || 'c'}-${i}`;

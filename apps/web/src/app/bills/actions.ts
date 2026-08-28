@@ -1,5 +1,6 @@
 'use server';
 import { connectDB } from '@/lib/db';
+import { RECURRING_CYCLE_VALUES } from '@/lib/billingCycle';
 import { Bill as BillModel } from '@/models/Bill';
 import { withRequestTenant } from '@/lib/tenancy/request';
 import { currentModel } from '@/lib/tenancy/connection';
@@ -15,7 +16,7 @@ import { assertCanWrite } from '@/lib/auth';
 // P28 — CRUD + lifecycle (mark paid / unpaid) for bills / payables. Deterministic,
 // no AI. Status (paid/overdue/due-soon) is derived on read, never stored.
 
-const CYCLES = ['', 'weekly', 'monthly', 'quarterly', 'yearly'] as const;
+const CYCLES = RECURRING_CYCLE_VALUES;
 
 const BillFormSchema = z.object({
   title: z.string().min(1, 'Title required'),

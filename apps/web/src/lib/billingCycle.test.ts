@@ -8,6 +8,8 @@ import {
   addCycle,
   nextOccurrence,
   cycleKey,
+  RECURRING_CYCLES,
+  isRecurringCycle,
 } from './billingCycle';
 
 // This module exists because the cycle table used to be copy-pasted in seven places,
@@ -105,5 +107,24 @@ describe('cycleKey', () => {
   it('maps to the i18n key, falling back to monthly for junk', () => {
     expect(cycleKey('biennial')).toBe('cyc.biennial');
     expect(cycleKey('nope')).toBe('cyc.monthly');
+  });
+});
+
+describe('recurring bill / expense cycles', () => {
+  it('offers "not recurring" plus every renewing cycle, and no lifetime', () => {
+    expect(RECURRING_CYCLES).toContain('');
+    expect(RECURRING_CYCLES).toContain('biennial');
+    expect(RECURRING_CYCLES).not.toContain('lifetime');
+  });
+
+  it('lists the empty option first, then shortest to longest', () => {
+    expect(RECURRING_CYCLES).toEqual(['', 'weekly', 'monthly', 'quarterly', 'yearly', 'biennial']);
+  });
+
+  it('validates membership', () => {
+    expect(isRecurringCycle('')).toBe(true);
+    expect(isRecurringCycle('biennial')).toBe(true);
+    expect(isRecurringCycle('lifetime')).toBe(false);
+    expect(isRecurringCycle(null)).toBe(false);
   });
 });

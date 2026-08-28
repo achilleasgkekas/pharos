@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { RECURRING_CYCLES } from '@/lib/billingCycle';
 import { withAuth, apiError } from '@/lib/apiAuth';
 import { isObjectId, readBody } from '@/lib/apiBody';
 import { connectDB } from '@/lib/db';
@@ -12,7 +13,7 @@ import { trim, type BillLean } from '../serialize';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CYCLES = ['', 'weekly', 'monthly', 'quarterly', 'yearly'];
+const CYCLES: readonly string[] = RECURRING_CYCLES;
 
 /** PATCH /api/v1/bills/:id  { title?, vendor?, amount?, dueDate?, category?, cycle?, notes?,
  *  archived?, paid?, paidDate? }

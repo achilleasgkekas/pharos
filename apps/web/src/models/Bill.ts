@@ -41,7 +41,8 @@ const BillSchema = new Schema(
     category: { type: String, default: 'other' }, // reused when a payment logs an expense
     // '' = one-off. Otherwise a recurring template: paying it spawns the next
     // pending instance one cycle ahead (see markBillPaid).
-    cycle: { type: String, enum: ['', 'weekly', 'monthly', 'quarterly', 'yearly'], default: '' },
+    // Kept in sync with RECURRING_CYCLES in lib/billingCycle.ts.
+    cycle: { type: String, enum: ['', 'weekly', 'monthly', 'quarterly', 'yearly', 'biennial'], default: '' },
     notes: { type: String, default: '' },
     archived: { type: Boolean, default: false, index: true },
     linkedExpenseId: { type: String, default: '' }, // set when "mark paid" also logged an expense
