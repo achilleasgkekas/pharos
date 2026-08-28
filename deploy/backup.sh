@@ -29,7 +29,9 @@
 #
 # And one of these decides where the offsite copy goes (first one set wins):
 #   BACKUP_SSH        user@host:dir for rsync over SSH             (preferred; key auth)
-#   BACKUP_COPY_DIR   a MOUNTED directory to copy into             (NAS share, USB disk)
+#   BACKUP_COPY_DIR   a directory on a MOUNTED share to copy into  (NAS share, USB disk)
+#   BACKUP_COPY_MOUNT the mount point to assert, when BACKUP_COPY_DIR is a subdirectory of it
+#                     (default: BACKUP_COPY_DIR itself)
 #   BACKUP_REMOTE     an rclone remote
 #
 # e.g. a second instance living in /opt/pharos-local:
@@ -151,11 +153,17 @@ elif [ -n "${BACKUP_COPY_DIR:-}" ]; then
   # mounted, $BACKUP_COPY_DIR is just an empty directory on the SAME disk as the data. The copy
   # would succeed, the script would exit 0, and the backups would quietly be protecting nothing
   # while looking perfectly healthy. Refuse instead.
-  if ! mountpoint -q "$BACKUP_COPY_DIR" 2>/dev/null; then
-    echo "FATAL: BACKUP_COPY_DIR ($BACKUP_COPY_DIR) is not a mount point — the share is not" >&2
-    echo "       mounted, so copying there would leave the backups on the same disk as the data." >&2
+  # Two instances backing up to one share need a subdirectory each, or their retention windows
+  # fight: the shorter-KEEP_DAYS job prunes `mongo-*`/`storage-*` by glob and would happily delete
+  # the OTHER instance's older archives. A subdirectory is not itself a mount point, so the mount
+  # to verify is named separately.
+  BACKUP_COPY_MOUNT="${BACKUP_COPY_MOUNT:-$BACKUP_COPY_DIR}"
+  if ! mountpoint -q "$BACKUP_COPY_MOUNT" 2>/dev/null; then
+    echo "FATAL: $BACKUP_COPY_MOUNT is not a mount point — the share is not mounted, so copying" >&2
+    echo "       there would leave the backups on the same disk as the data they protect." >&2
     exit 1
   fi
+  mkdir -p "$BACKUP_COPY_DIR"
   cp -f "$DUMP" "$FILES" "$BACKUP_COPY_DIR/" || {
     echo "FATAL: offsite copy FAILED — the local copy exists but is not protected" >&2; exit 1
   }
