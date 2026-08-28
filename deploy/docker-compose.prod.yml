@@ -129,6 +129,9 @@ services:
     image: mongo:7
     container_name: pharos-mongo
     restart: unless-stopped
+    labels:
+      # WUD: only report real numeric versions (7.x/8), never windowsservercore/32bit garbage tags
+      wud.tag.include: '^\d+(\.\d+)*$'
     # NO ports. Reachable only from the compose network. If you need a shell, use
     # `docker exec -it pharos-mongo mongosh -u ... ` from the server itself.
     environment:
