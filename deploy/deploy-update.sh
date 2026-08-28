@@ -74,7 +74,13 @@ health() {
       "$APP/api/cron/saas/trials-sweep" 2>/dev/null)" = 401 ] || rc=1
     # Mongo is not public, so ask Docker instead of the network.
     [ "$(docker inspect pharos-mongo --format '{{.State.Health.Status}}' 2>/dev/null)" = healthy ] || rc=1
-    for c in pharos-web pharos-landing pharos-caddy; do
+    # Only the containers THIS stack owns. The edge (the shared `caddy` + `cloudflared`, which
+    # front BakeCore and the homelab too) is deliberately not asserted here: the three public
+    # probes above already prove the whole path through it, and coupling a Pharos deploy to
+    # containers this repo does not manage would refuse deploys over somebody else's change.
+    # This used to also assert `pharos-caddy`, which stopped existing when production moved to
+    # the shared proxy — so --check returned 1 for weeks while the site was perfectly healthy.
+    for c in pharos-web pharos-landing; do
       [ "$(docker inspect "$c" --format '{{.State.Running}}' 2>/dev/null)" = true ] || rc=1
     done
     [ $rc -eq 0 ] && { say "  health: OK (attempt $i)"; return 0; }
@@ -97,14 +103,21 @@ if ! health 3; then
   exit 1
 fi
 
-# A dirty tree means someone edited files on the server. Rolling back with `git checkout` would
-# silently discard that work, so stop instead.
-if [ -n "$(git status --porcelain)" ]; then
-  say "REFUSING: the working tree on the server has uncommitted changes. Rollback would discard"
-  say "them. Commit or clean them first:"
-  git status --short | head -10
+# Someone editing TRACKED files on the server is the case worth refusing: the rollback's
+# `git checkout` would silently discard that work. UNTRACKED files are a different story — neither
+# `git merge --ff-only` nor `git checkout` touches them, so they are never at risk, and refusing
+# over them blocks deploys for no gain. That is not hypothetical: a copy from a Mac left ~1300
+# AppleDouble `._*` files plus a `.vite/` cache in /opt/pharos, and this guard treated that junk
+# as unsaved work and blocked every deploy.
+DIRTY_TRACKED="$(git status --porcelain --untracked-files=no)"
+if [ -n "$DIRTY_TRACKED" ]; then
+  say "REFUSING: tracked files have been modified on the server. Rollback would discard those"
+  say "changes. Commit or restore them first:"
+  head -10 <<<"$DIRTY_TRACKED"
   exit 1
 fi
+UNTRACKED_N="$(git ls-files --others --exclude-standard | wc -l | tr -d ' ')"
+[ "$UNTRACKED_N" -gt 0 ] && say "  note: $UNTRACKED_N untracked file(s) present; left alone (never touched by pull or rollback)"
 
 say "[2/6] backup (a deploy is the likeliest moment to need one)"
 if ! "$HERE/backup.sh" >/tmp/pharos-deploy-backup.log 2>&1; then
@@ -153,11 +166,15 @@ CHANGED="$(git diff --name-only "$OLD" "$NEW")"
 # space-separated string this matched only the first entry, so FORCE=1 announced "rebuilding
 # everything" and rebuilt web alone — leaving the landing site on its old build while reporting a
 # healthy deploy. Same family as the two bugs above: the tool said it had done the work.
-[ "${FORCE_ALL:-}" = "1" ] && CHANGED="$(printf 'apps/web/\napps/landing/\ndeploy/')"
+[ "${FORCE_ALL:-}" = "1" ] && CHANGED="$(printf 'apps/web/\napps/landing/\ndeploy/docker-compose.prod.yml')"
 SERVICES=""
 grep -q '^apps/web/'      <<<"$CHANGED" && SERVICES="$SERVICES web"
 grep -q '^apps/landing/'  <<<"$CHANGED" && SERVICES="$SERVICES landing"
-grep -q '^deploy/'        <<<"$CHANGED" && SERVICES="$SERVICES caddy"
+# A change to the compose file itself has to reach the running containers, so recreate both apps.
+# This used to map ANY change under deploy/ to the `caddy` service — which on this host means
+# pharos-caddy, now profile-gated precisely because it would fight the shared proxy for 80/443.
+# Editing THIS script would have been enough to trigger that.
+grep -q '^deploy/docker-compose.prod.yml' <<<"$CHANGED" && SERVICES="$SERVICES web landing"
 SERVICES="$(tr ' ' '\n' <<<"$SERVICES" | sort -u | tr '\n' ' ' | sed 's/^ *//')"
 
 say "[5/6] rebuilding:${SERVICES:- (nothing, config only)}"

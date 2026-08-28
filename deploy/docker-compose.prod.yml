@@ -19,6 +19,14 @@ services:
       dockerfile: Dockerfile.caddy
     image: pharos-caddy:2.10-cf
     container_name: pharos-caddy
+    # NOT started by a plain `up -d`. Since the move to the Proxmox VM (2026-08) this box fronts
+    # EVERYTHING with one shared `caddy` container plus `cloudflared`, and that shared proxy owns
+    # host ports 80/443 and is attached to this stack's network, which is how production is served
+    # today. Bringing pharos-caddy up here would fight for those ports with the proxy that also
+    # serves BakeCore production and the homelab. The service is kept, behind a profile, because it
+    # is still the correct topology for a STANDALONE host (one VPS running only Pharos, terminating
+    # its own TLS): bring it back with `--profile standalone`.
+    profiles: ["standalone"]
     restart: unless-stopped
     ports:
       - "80:80"
