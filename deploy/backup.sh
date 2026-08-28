@@ -27,6 +27,11 @@
 #   STORAGE_DIR       files directory to archive                  (default deploy/storage)
 #   BACKUP_LABEL      infix so two instances do not collide       (default none)
 #
+# And one of these decides where the offsite copy goes (first one set wins):
+#   BACKUP_SSH        user@host:dir for rsync over SSH             (preferred; key auth)
+#   BACKUP_COPY_DIR   a MOUNTED directory to copy into             (NAS share, USB disk)
+#   BACKUP_REMOTE     an rclone remote
+#
 # e.g. a second instance living in /opt/pharos-local:
 #   ENV_FILE=/opt/pharos-local/.env MONGO_CONTAINER=pharos-local-mongo \
 #     STORAGE_DIR=/opt/pharos-local/storage BACKUP_LABEL=local deploy/backup.sh
@@ -136,6 +141,32 @@ if [ -n "${BACKUP_SSH:-}" ]; then
     echo "  pruned $(echo "$OLD" | wc -w | tr -d ' ') old file(s) offsite"
   fi
   echo "  -> $BACKUP_SSH"
+elif [ -n "${BACKUP_COPY_DIR:-}" ]; then
+  # A plain directory that is NOT this disk: an SMB/NFS share from a NAS, an attached USB disk.
+  # The dependency-free option when the destination speaks neither SSH nor rclone (a Synology
+  # with only SMB enabled, say) — rsync-over-ssh stays preferable where it is available, because
+  # this one is only as good as the mount underneath it.
+  #
+  # `mountpoint` is the whole safety property here, and it is not paranoia: if the share is not
+  # mounted, $BACKUP_COPY_DIR is just an empty directory on the SAME disk as the data. The copy
+  # would succeed, the script would exit 0, and the backups would quietly be protecting nothing
+  # while looking perfectly healthy. Refuse instead.
+  if ! mountpoint -q "$BACKUP_COPY_DIR" 2>/dev/null; then
+    echo "FATAL: BACKUP_COPY_DIR ($BACKUP_COPY_DIR) is not a mount point — the share is not" >&2
+    echo "       mounted, so copying there would leave the backups on the same disk as the data." >&2
+    exit 1
+  fi
+  cp -f "$DUMP" "$FILES" "$BACKUP_COPY_DIR/" || {
+    echo "FATAL: offsite copy FAILED — the local copy exists but is not protected" >&2; exit 1
+  }
+  # Read one back rather than trusting cp's exit code: a full or flaky share can accept the write
+  # and hand you a truncated file, which is the failure you would only find during a restore.
+  if ! gzip -t "$BACKUP_COPY_DIR/$(basename "$DUMP")" 2>/dev/null; then
+    echo "FATAL: the copy at $BACKUP_COPY_DIR is not a readable archive" >&2; exit 1
+  fi
+  find "$BACKUP_COPY_DIR" -maxdepth 1 -name 'mongo-*.archive.gz' -mtime "+$KEEP_DAYS" -delete 2>/dev/null || true
+  find "$BACKUP_COPY_DIR" -maxdepth 1 -name 'storage-*.tar.gz' -mtime "+$KEEP_DAYS" -delete 2>/dev/null || true
+  echo "  -> $BACKUP_COPY_DIR (verified readable)"
 elif [ -n "${BACKUP_REMOTE:-}" ]; then
   if ! command -v rclone >/dev/null 2>&1; then
     echo "FATAL: BACKUP_REMOTE is set but rclone is not installed" >&2; exit 1
@@ -149,7 +180,7 @@ elif [ -n "${BACKUP_REMOTE:-}" ]; then
 else
   echo "  !! No offsite target: these files are on the SAME DISK as the data they protect."
   echo "  !! A disk failure or a wrong 'docker volume rm' takes both. Set BACKUP_SSH (rsync, no"
-  echo "  !! dependencies) or BACKUP_REMOTE (rclone)."
+  echo "  !! dependencies), BACKUP_COPY_DIR (a mounted share) or BACKUP_REMOTE (rclone)."
 fi
 
 find "$OUT" -name 'mongo-*.archive.gz' -mtime "+$KEEP_DAYS" -delete
