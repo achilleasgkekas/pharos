@@ -1,5 +1,6 @@
 'use client';
 import { cur, currencySymbol, CURRENCIES } from "@/lib/money";
+import { matchesQuery, haystack, fold, sameLabel } from '@/lib/searchText';
 import { isForeignCurrency, normalizeCurrency, convertToBase, deriveFxRate, formatMoney, toPrinted } from '@/lib/fx';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
@@ -97,6 +98,12 @@ export function ReceiptsClient({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'parsed' | 'failed' | 'archived'>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'total-desc' | 'total-asc' | 'store'>('recent');
+  // A receipt is a dated purchase, so "when" and "what kind" are the two questions the
+  // list could not answer before: there was only store + status + a substring search.
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState('');
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -167,13 +174,38 @@ export function ReceiptsClient({
     ).then(refresh);
   }
 
-  // Distinct stores for the per-store filter dropdown
-  const stores = useMemo(
-    () => [...new Set(receipts.map((r) => r.store).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
-    [receipts]
-  );
+  // Distinct stores for the per-store filter dropdown. Deduped by FOLDED name: OCR
+  // spells one store several ways ("ΑΒ ΒΑΣΙΛΟΠΟΥΛΟΣ" / "ΑΒ Βασιλόπουλος"), which used
+  // to list it two or three times and make each entry select only part of its receipts.
+  const stores = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const r of receipts) {
+      const name = (r.store || '').trim();
+      if (!name) continue;
+      const key = fold(name);
+      if (!seen.has(key)) seen.set(key, name);
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [receipts]);
+
+  // Line-item categories actually present on the receipts (P64), so the dropdown only
+  // ever offers a value that will return something.
+  const usedCategories = useMemo(() => {
+    const seen = new Set<string>();
+    for (const r of receipts) for (const l of r.lineItems ?? []) if (l.category) seen.add(l.category);
+    return [...seen].sort((a, b) => a.localeCompare(b));
+  }, [receipts]);
+
+  // Same for payment methods.
+  const payments = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const r of receipts) {
+      const m = (r.paymentMethod || '').trim();
+      if (m && !seen.has(fold(m))) seen.set(fold(m), m);
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  }, [receipts]);
   const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
     const out = receipts.filter((r) => {
       // Archived receipts are hidden everywhere except the explicit "archived" view.
       if (statusFilter === 'archived') {
@@ -181,16 +213,40 @@ export function ReceiptsClient({
       } else if (r.archived) {
         return false;
       }
-      if (storeFilter && r.store !== storeFilter) return false;
+      // Compare folded, so picking "ΑΒ Βασιλόπουλος" also returns the receipts OCR
+      // saved as "ΑΒ ΒΑΣΙΛΟΠΟΥΛΟΣ".
+      if (storeFilter && !sameLabel(r.store, storeFilter)) return false;
       if (statusFilter !== 'all' && statusFilter !== 'archived') {
         const empty = r.total === 0 && (r.lineItems?.length ?? 0) === 0;
         if (statusFilter === 'verified' && !r.verified) return false;
         if (statusFilter === 'failed' && !(!r.verified && empty)) return false;
         if (statusFilter === 'parsed' && !(!r.verified && !empty)) return false;
       }
-      if (q) {
-        const hay = `${r.store} ${r.notes} ${(r.lineItems ?? []).map((l) => l.name || l.refinedName).join(' ')}`.toLowerCase();
-        if (!hay.includes(q)) return false;
+      // Date range: compare on the YYYY-MM-DD prefix so it is timezone-proof and both
+      // ends are inclusive (picking the same day twice shows that day's receipts).
+      if (dateFrom || dateTo) {
+        const day = (r.date || '').slice(0, 10);
+        if (!day) return false;
+        if (dateFrom && day < dateFrom) return false;
+        if (dateTo && day > dateTo) return false;
+      }
+      if (categoryFilter && !(r.lineItems ?? []).some((l) => l.category === categoryFilter)) return false;
+      if (paymentFilter && !sameLabel(r.paymentMethod || '', paymentFilter)) return false;
+      if (search.trim()) {
+        // Everything printed on the receipt is searchable, not just the store, the notes
+        // and one of the two name fields: BOTH the raw OCR name and the AI-refined one
+        // (a receipt says "ΓΑΛΑ ΦΡ 1,5L" while the refined name is "Γάλα φρέσκο"), the
+        // per-item category, the payment method, and the total and date as text so
+        // "45.20" or "2026-07" find a receipt too.
+        const hay = haystack(
+          r.store,
+          r.notes,
+          r.paymentMethod,
+          r.total,
+          (r.date || '').slice(0, 10),
+          (r.lineItems ?? []).map((l) => haystack(l.name, l.refinedName, l.category))
+        );
+        if (!matchesQuery(hay, search)) return false;
       }
       return true;
     });
@@ -208,7 +264,7 @@ export function ReceiptsClient({
           return new Date(b.date).getTime() - new Date(a.date).getTime();
       }
     });
-  }, [receipts, storeFilter, statusFilter, search, sortBy]);
+  }, [receipts, storeFilter, statusFilter, search, sortBy, dateFrom, dateTo, categoryFilter, paymentFilter]);
 
   // Deep-link from global search
   useOpenParam((id) => {
@@ -266,12 +322,31 @@ export function ReceiptsClient({
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  const anyRFilter = !!(storeFilter || statusFilter !== 'all' || search || sortBy !== 'recent');
+  const anyRFilter = !!(storeFilter || statusFilter !== 'all' || search || sortBy !== 'recent' || dateFrom || dateTo || categoryFilter || paymentFilter);
+  /** One-tap ranges for the two questions people actually ask a receipt archive. */
+  const applyDatePreset = (preset: 'thisMonth' | 'lastMonth' | 'thisYear') => {
+    const now = new Date();
+    const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (preset === 'thisYear') {
+      setDateFrom(`${now.getFullYear()}-01-01`);
+      setDateTo(ymd(now));
+      return;
+    }
+    const offset = preset === 'lastMonth' ? -1 : 0;
+    setDateFrom(ymd(new Date(now.getFullYear(), now.getMonth() + offset, 1)));
+    // Day 0 of the following month = the last day of this one, leap years included.
+    setDateTo(ymd(new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)));
+  };
+
   const resetRFilters = () => {
     setStoreFilter('');
     setStatusFilter('all');
     setSearch('');
     setSortBy('recent');
+    setDateFrom('');
+    setDateTo('');
+    setCategoryFilter('');
+    setPaymentFilter('');
   };
   const labelCls = 'text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-[0.12em] mb-1.5';
   const selCls =
@@ -303,6 +378,42 @@ export function ReceiptsClient({
         <div>
           <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('v.fStore')}</p>
           <SearchableSelect value={storeFilter} onChange={setStoreFilter} options={stores} placeholder={t('it.allStores')} clearable size="sm" className="w-full" />
+        </div>
+      )}
+      <div>
+        <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('rc.fltPeriod')}</p>
+        <div className="flex flex-col gap-1.5">
+          <Input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} aria-label={t('rc.fltFrom')} />
+          <Input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} aria-label={t('rc.fltTo')} />
+        </div>
+        <div className="flex flex-wrap gap-1 mt-1.5">
+          {([
+            ['thisMonth', t('rc.fltThisMonth')],
+            ['lastMonth', t('rc.fltLastMonth')],
+            ['thisYear', t('rc.fltThisYear')],
+          ] as const).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => applyDatePreset(k)}
+              className="text-[10px] px-2 py-1 rounded-md border border-[color:var(--color-border)] text-[color:var(--color-text-faint)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {usedCategories.length > 0 && (
+        <div>
+          <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('rc.fltCategory')}</p>
+          <SearchableSelect value={categoryFilter} onChange={setCategoryFilter} options={usedCategories} placeholder={t('rc.fltAllCategories')} clearable size="sm" className="w-full" />
+        </div>
+      )}
+      {payments.length > 0 && (
+        <div>
+          <p className={labelCls} style={{ fontFamily: 'var(--font-mono)' }}>{t('sub.fPayment')}</p>
+          <SearchableSelect value={paymentFilter} onChange={setPaymentFilter} options={payments} placeholder={t('rc.fltAllPayments')} clearable size="sm" className="w-full" />
         </div>
       )}
       <div>

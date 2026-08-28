@@ -1,5 +1,6 @@
 'use server';
 import { cur } from "@/lib/money";
+import { accentInsensitiveSource } from '@/lib/searchText';
 import { connectDB } from '@/lib/db';
 import { Item } from '@/models/Item';
 import { Receipt } from '@/models/Receipt';
@@ -58,7 +59,10 @@ type LoyaltyCardLean = { _id: unknown; title: string; store?: string; cardNumber
 type ShoppingListLean = { _id: unknown; name: string; quantity?: string; category?: string; brand?: string; checked?: boolean };
 
 function rx(query: string): RegExp {
-  return new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  // Accent-tolerant: Greek data is stored exactly as it was printed/OCR'd (usually
+  // unaccented CAPITALS) while people type accented lowercase, and Mongo does not
+  // apply collation to $regex — so the tolerance lives in the pattern. See lib/searchText.
+  return new RegExp(accentInsensitiveSource(query), 'i');
 }
 
 /** Search across every collection and return a flat, ranked-ish list of hits. */
