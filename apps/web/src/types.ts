@@ -78,6 +78,7 @@ export type SerializedLineItem = {
   qty: number;
   price: number;
   vatRate: number;
+  category?: string; // P64: optional per-line spend category ('' / absent = untagged)
   matchedItemId: string | null;
 };
 

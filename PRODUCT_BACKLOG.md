@@ -745,7 +745,28 @@
   server-side speech processing (browser κάνει όλη τη δουλειά, καμία ανησυχία privacy/κόστους πέρα από το ήδη
   υπάρχον AI-command call όταν πατηθεί send).
 
-### P64. Receipt line-item category tagging (τα Reports σήμερα «βλέπουν» μόνο Expenses, καθόλου Receipts) — S/M — OSS (κυρίως), dogfooding-heavy
+### P64. Receipt line-item category tagging — ✅ SHIPPED (φάση 1) 2026-08-28 (pharos-brain)
+
+- **Τι έγινε**: νέο optional `category` στο `LineItemSchema` (`models/Receipt.ts`), κενό = ακριβώς η
+  προ-P64 συμπεριφορά, μηδέν migration. Ο line-item editor των Receipts απέκτησε ανά γραμμή picker
+  με το ΙΔΙΟ taxonomy που χρησιμοποιεί η φόρμα Expenses (`settings.expenseCategories`, περνά από το
+  `receipts/page.tsx`), με «χωρίς κατηγορία» ως πρώτη επιλογή. Μια κατηγορία που αποθηκεύτηκε πριν
+  αλλάξει το taxonomy παραμένει επιλέξιμη (μπαίνει μπροστά στη λίστα), ώστε ένα edit των ρυθμίσεων
+  να μη σβήνει σιωπηλά παλιά tags. Το πεδίο ταξιδεύει και στο public API: `serializeLineItems()` το
+  επιστρέφει (`''` για γραμμές προ-P64) και ο `PATCH /api/v1/receipts/:id` sanitizer το δέχεται
+  trimmed, με το `docs/openapi.yaml` ενημερωμένο (ο `openapi.schema.test.ts` drift guard το απαιτεί).
+- **Επιλογές του builder, καταγεγραμμένες**: (α) το MVP είναι **μόνο manual tagging** — το
+  AI auto-suggest στο parse-time μένει follow-up, όπως το προέβλεπε το ίδιο το spec· (β) i18n μόνο σε
+  **en + el** (οι άλλες 6 γλώσσες είναι `Partial<Dict>` και πέφτουν στα αγγλικά)· (γ) reuse του
+  expense taxonomy αντί για νέα λίστα ρυθμίσεων — μια απόδειξη σούπερ μάρκετ πρέπει να αθροίζεται
+  με τα Expenses στο ίδιο breakdown, άρα κοινό λεξιλόγιο από την αρχή.
+- **Γνωστός περιορισμός**: ένα **re-scan ξαναγράφει τις γραμμές** και άρα χάνει τα χειροκίνητα tags
+  (το ίδιο ίσχυε ήδη για `refinedName`/`matchedItemId`, δεν είναι νέα συμπεριφορά).
+- **Επόμενη φάση (δεν έγινε εδώ, σκόπιμα)**: το Reports category breakdown να αθροίζει τα
+  categorized line items δίπλα στα `Expense.category` ποσά. Χωρίς αυτό η φάση 1 απλώς αποθηκεύει
+  το tag, δεν αλλάζει ακόμα κανένα chart.
+
+### P64 (αρχικό spec, για ιστορικό) — S/M — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified διπλό κενό: (α) το `LineItemSchema` (`models/Receipt.ts`) έχει
   `name/refinedName/qty/price/vatRate/matchedItemId` — **μηδέν category πεδίο**, ούτε καν σε επίπεδο ολόκληρης
   απόδειξης· (β) το `reports/page.tsx` category breakdown (spend-by-category chart, budgets-vs-actual) διαβάζει

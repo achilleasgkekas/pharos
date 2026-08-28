@@ -161,8 +161,8 @@ describe('happy 201 envelope', () => {
     expect(body.receipt.file).toBe('receipts/2026/02/x.pdf');
     // serializeLineItems: refinedName wins over name; defaults applied
     expect(body.receipt.lineItems).toEqual([
-      { name: 'Lenovo Tab M9', qty: 1, price: 155.96, vatRate: 24 },
-      { name: 'Case', qty: 2, price: 8, vatRate: 24 },
+      { name: 'Lenovo Tab M9', qty: 1, price: 155.96, vatRate: 24, category: '' },
+      { name: 'Case', qty: 2, price: 8, vatRate: 24, category: '' },
     ]);
     // upload-provided flags
     expect(body.receipt.aiUsed).toBe(true);

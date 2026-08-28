@@ -705,6 +705,8 @@ export const el: Partial<Dict> = {
   'rc.fVat': 'ΦΠΑ ({cur})',
   'rc.itemNamePlaceholder': 'Σωστό όνομα προϊόντος (AI)',
   'rc.rawTextPlaceholder': 'ακατέργαστο κείμενο απόδειξης',
+  'rc.lineCategory': 'κατηγορία δαπάνης για τη γραμμή',
+  'rc.lineCategoryNone': 'χωρίς κατηγορία',
   'rc.netVatGross': 'καθαρή {net} · ΦΠΑ {vat} · μικτή',
   'rc.addToInventory': 'Προσθήκη ειδών στην Αποθήκη',
   'rc.addToInventoryHint': 'Δημιουργεί/συνδέει είδη Αποθήκης με σωστά ονόματα + σύνδεση πίσω στην απόδειξη',

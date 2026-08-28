@@ -11,6 +11,11 @@ const LineItemSchema = new Schema(
     qty: { type: Number, default: 1 },
     price: { type: Number, default: 0 }, // gross unit price (with VAT)
     vatRate: { type: Number, default: 24 }, // per-item VAT % (GR: 24 / 13 / 6 / 0)
+    // P64: optional spend category for THIS line (from the expense taxonomy). Empty =
+    // untagged, exactly the pre-P64 behaviour. Distinct from Item.category (only the few
+    // lines promoted to tracked inventory) and from Expense.category (one tag for a whole
+    // record): a super-market receipt mixes groceries / household / electronics per line.
+    category: { type: String, default: '' },
     matchedItemId: { type: Schema.Types.ObjectId, ref: 'Item', default: null },
   },
   { _id: true }

@@ -130,6 +130,26 @@ describe('updateReceipt', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/receipts');
   });
 
+  // P64: per-line spend category. A payload written before the field existed (no
+  // `category` key) must still save, as '' — that is the untagged, pre-P64 state.
+  it('keeps a per-line category and defaults a missing one to "" (P64)', async () => {
+    receiptFindByIdAndUpdateLean.mockResolvedValueOnce({ _id: 'r1', store: 'Skroutz', date: new Date('2026-06-15'), total: 42, verified: false, filePath: '' });
+    await updateReceipt('r1', {
+      store: 'Skroutz',
+      date: '2026-06-15',
+      total: 42,
+      lineItems: [
+        { name: 'Milk', qty: 1, price: 1.5, vatRate: 13, category: 'groceries' },
+        { name: 'HDMI cable', qty: 1, price: 8, vatRate: 24 }, // pre-P64 shape
+      ],
+    } as any);
+    const [, update] = receiptFindByIdAndUpdate.mock.calls[0];
+    expect(update.lineItems).toEqual([
+      { name: 'Milk', refinedName: '', qty: 1, price: 1.5, vatRate: 13, category: 'groceries' },
+      { name: 'HDMI cable', refinedName: '', qty: 1, price: 8, vatRate: 24, category: '' },
+    ]);
+  });
+
   it('mirrors the file to remote when the updated doc is verified AND has a filePath', async () => {
     receiptFindByIdAndUpdateLean.mockResolvedValueOnce({
       _id: 'r1', store: 'Skroutz', date: '2026-06-15', total: 42, verified: true, filePath: 'receipts/2026/06/r1.pdf',

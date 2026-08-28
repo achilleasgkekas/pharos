@@ -31,6 +31,7 @@ const LineItemSchema = z.object({
   qty: z.coerce.number().default(1),
   price: z.coerce.number().default(0),
   vatRate: z.coerce.number().default(24),
+  category: z.string().default(''),
 });
 
 const UpdateReceiptSchema = z.object({
@@ -54,7 +55,7 @@ export type UploadResult =
   | { ok: true; id: string; aiUsed: boolean; aiError?: string }
   | { ok: false; error: string };
 
-type RawLineItem = { name?: string; refinedName?: string; qty?: number; price?: number; vatRate?: number };
+type RawLineItem = { name?: string; refinedName?: string; qty?: number; price?: number; vatRate?: number; category?: string };
 
 /** The vision model sometimes returns line items with a blank name (which fails the
  *  `required` validator) or fully-empty rows. Give each a usable name (falling back
@@ -69,6 +70,7 @@ function cleanLineItems(items: RawLineItem[] | undefined, defaultVat = 24) {
       qty: li.qty ?? 1,
       price: li.price ?? 0,
       vatRate: li.vatRate ?? defaultVat,
+      category: li.category ?? '',
     }));
 }
 

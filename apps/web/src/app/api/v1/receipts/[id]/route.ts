@@ -75,10 +75,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (Array.isArray(b.lineItems)) {
       // Sanitize edited line items. `price` is the stored unit NET (excl. VAT).
       // refinedName is cleared so the edited `name` wins (GET returns refinedName||name).
-      type LineIn = { name?: unknown; qty?: unknown; price?: unknown; vatRate?: unknown };
+      type LineIn = { name?: unknown; qty?: unknown; price?: unknown; vatRate?: unknown; category?: unknown };
       const numOr = (v: unknown, d: number, min = 0) => { const n = Number(v); return Number.isFinite(n) && n >= min ? n : d; };
       set.lineItems = (b.lineItems as LineIn[])
-        .map((l) => ({ name: String(l.name ?? '').trim(), refinedName: '', qty: numOr(l.qty, 1, 0.0001), price: numOr(l.price, 0), vatRate: numOr(l.vatRate, 0) }))
+        .map((l) => ({ name: String(l.name ?? '').trim(), refinedName: '', qty: numOr(l.qty, 1, 0.0001), price: numOr(l.price, 0), vatRate: numOr(l.vatRate, 0), category: String(l.category ?? '').trim() }))
         .filter((l) => l.name || l.price > 0);
     }
     // P9: touching ANY money field (or the currency/rate themselves) means the receipt has to

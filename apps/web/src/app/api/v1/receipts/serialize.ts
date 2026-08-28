@@ -10,8 +10,8 @@ export type ReceiptLean = {
 };
 
 // Stored line-item shape (as persisted on the Receipt) and the normalized API shape.
-type LineLean = { name?: string; refinedName?: string; qty?: number; price?: number; vatRate?: number };
-export type ReceiptLine = { name: string; qty: number; price: number; vatRate: number };
+type LineLean = { name?: string; refinedName?: string; qty?: number; price?: number; vatRate?: number; category?: string };
+export type ReceiptLine = { name: string; qty: number; price: number; vatRate: number; category: string };
 
 /**
  * Normalize stored receipt line items into the API shape. `refinedName` (AI-cleaned)
@@ -25,6 +25,7 @@ export function serializeLineItems(lines: unknown): ReceiptLine[] {
     qty: l.qty ?? 1,
     price: l.price ?? 0,
     vatRate: l.vatRate ?? 0,
+    category: l.category ?? '', // P64: '' = untagged
   }));
 }
 

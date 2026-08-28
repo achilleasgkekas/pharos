@@ -2442,6 +2442,7 @@ components:
         qty: { type: number }
         price: { type: number, description: Unit price NET of VAT, as stored. }
         vatRate: { type: number }
+        category: { type: string, description: "Optional spend category for this line (P64); empty string = untagged." }
     Receipt:
       type: object
       additionalProperties: true

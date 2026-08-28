@@ -17,7 +17,7 @@ describe('serializeLineItems', () => {
 
   it('prefers refinedName (AI-cleaned) over the raw name', () => {
     expect(serializeLineItems([{ name: 'RTX5080 GPU', refinedName: 'NVIDIA RTX 5080' }])).toEqual([
-      { name: 'NVIDIA RTX 5080', qty: 1, price: 0, vatRate: 0 },
+      { name: 'NVIDIA RTX 5080', qty: 1, price: 0, vatRate: 0, category: '' },
     ]);
   });
 
@@ -34,12 +34,12 @@ describe('serializeLineItems', () => {
   });
 
   it('applies defaults qty=1, price=0, vatRate=0 for missing numerics', () => {
-    expect(serializeLineItems([{ name: 'x' }])[0]).toEqual({ name: 'x', qty: 1, price: 0, vatRate: 0 });
+    expect(serializeLineItems([{ name: 'x' }])[0]).toEqual({ name: 'x', qty: 1, price: 0, vatRate: 0, category: '' });
   });
 
   it('preserves provided qty / price (unit NET) / vatRate, including zeros', () => {
     expect(serializeLineItems([{ name: 'Cable', qty: 3, price: 9.9, vatRate: 24 }])).toEqual([
-      { name: 'Cable', qty: 3, price: 9.9, vatRate: 24 },
+      { name: 'Cable', qty: 3, price: 9.9, vatRate: 24, category: '' },
     ]);
     // explicit zeros must survive the ?? defaulting (not be replaced by 1 / 0 accidentally)
     expect(serializeLineItems([{ name: 'Free sample', qty: 0, price: 0, vatRate: 0 }])[0]).toEqual({
@@ -47,7 +47,18 @@ describe('serializeLineItems', () => {
       qty: 0,
       price: 0,
       vatRate: 0,
+      category: '',
     });
+  });
+
+  it('returns a stored per-line category, and "" when the line predates the field (P64)', () => {
+    expect(serializeLineItems([
+      { name: 'Milk', qty: 1, price: 1.5, vatRate: 13, category: 'groceries' },
+      { name: 'Cable', qty: 1, price: 8, vatRate: 24 },
+    ])).toEqual([
+      { name: 'Milk', qty: 1, price: 1.5, vatRate: 13, category: 'groceries' },
+      { name: 'Cable', qty: 1, price: 8, vatRate: 24, category: '' },
+    ]);
   });
 
   it('normalizes multiple line items in order', () => {
@@ -56,8 +67,8 @@ describe('serializeLineItems', () => {
       { refinedName: 'B', price: 5 },
     ]);
     expect(out).toEqual([
-      { name: 'A', qty: 1, price: 0, vatRate: 0 },
-      { name: 'B', qty: 1, price: 5, vatRate: 0 },
+      { name: 'A', qty: 1, price: 0, vatRate: 0, category: '' },
+      { name: 'B', qty: 1, price: 5, vatRate: 0, category: '' },
     ]);
   });
 });

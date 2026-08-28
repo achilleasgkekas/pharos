@@ -64,6 +64,7 @@ export function ReceiptsClient({
   cards,
   ollamaUp,
   storeNames,
+  categories,
   emailInboxCount,
   baseCurrency,
   multiCurrency,
@@ -72,6 +73,7 @@ export function ReceiptsClient({
   cards: SerializedCard[];
   ollamaUp: boolean;
   storeNames: string[];
+  categories: string[]; // P64: expense taxonomy, for the per-line category picker
   emailInboxCount: number;
   baseCurrency: string;
   multiCurrency: boolean;
@@ -522,7 +524,7 @@ export function ReceiptsClient({
 
       {/* Detail modal */}
       {selected && (
-        <ReceiptDetailModal receipt={selected} cards={cards} storeNames={storeNames} fx={fx} onClose={() => setSelected(null)} />
+        <ReceiptDetailModal receipt={selected} cards={cards} storeNames={storeNames} categories={categories} fx={fx} onClose={() => setSelected(null)} />
       )}
 
       {/* Duplicate finder + merge */}
@@ -745,7 +747,7 @@ type EditState = {
   // `price` = unit NET (excl. VAT, the stored value). `grossStr` = the line GROSS
   // (qty × net × (1+rate)), kept as its own editable string so the user can type
   // the with-VAT figure freely; net and gross stay in sync both directions.
-  lineItems: { name: string; refinedName: string; qty: string; price: string; vatRate: string; grossStr: string }[];
+  lineItems: { name: string; refinedName: string; qty: string; price: string; vatRate: string; category: string; grossStr: string }[];
 };
 
 /** Currency codes for the picker, with the deployment's base one always first even
@@ -824,12 +826,14 @@ function ReceiptDetailModal({
   receipt,
   cards,
   storeNames,
+  categories,
   fx,
   onClose,
 }: {
   receipt: SerializedReceipt;
   cards: SerializedCard[];
   storeNames: string[];
+  categories: string[];
   fx: FxCtx;
   onClose: () => void;
 }) {
@@ -868,6 +872,7 @@ function ReceiptDetailModal({
           qty: li.qty.toString(),
           price,
           vatRate: (li.vatRate ?? 24).toString(),
+          category: li.category ?? '',
           grossStr: lineGross(price, li.qty.toString(), (li.vatRate ?? 24).toString()),
         };
       }),
@@ -930,6 +935,7 @@ function ReceiptDetailModal({
           qty: Number(li.qty) || 1,
           price: Number(li.price) || 0,
           vatRate: Number(li.vatRate) || 0,
+          category: li.category,
         })),
       });
       if (addToInventory) await addReceiptItemsToLibrary(receipt._id);
@@ -967,7 +973,7 @@ function ReceiptDetailModal({
 
   // Editing a net-side field (unit net price, qty, VAT%) keeps the NET stable and
   // recomputes the gross — the net is what the user typed, so it must not jump.
-  const updateLine = (i: number, k: 'name' | 'refinedName' | 'qty' | 'price' | 'vatRate', v: string) =>
+  const updateLine = (i: number, k: 'name' | 'refinedName' | 'qty' | 'price' | 'vatRate' | 'category', v: string) =>
     setForm((p) => ({
       ...p,
       lineItems: p.lineItems.map((li, idx) => {
@@ -997,7 +1003,7 @@ function ReceiptDetailModal({
       ...p,
       lineItems: [
         ...p.lineItems,
-        { name: '', refinedName: '', qty: '1', price: '0', vatRate: '24', grossStr: '0' },
+        { name: '', refinedName: '', qty: '1', price: '0', vatRate: '24', category: '', grossStr: '0' },
       ],
     }));
 
@@ -1243,6 +1249,23 @@ function ReceiptDetailModal({
                         className="flex-1 min-w-0 bg-transparent border-0 px-2 py-0.5 text-[10px] text-[color:var(--color-text-faint)] focus:outline-none focus:text-[color:var(--color-text-dim)]"
                         style={{ fontFamily: 'var(--font-mono)' }}
                       />
+                      {/* P64: per-line spend category. Empty = untagged (the pre-P64 state),
+                          so an untouched receipt keeps behaving exactly as before. */}
+                      <select
+                        value={li.category}
+                        onChange={(e) => updateLine(i, 'category', e.target.value)}
+                        title={t('rc.lineCategory')}
+                        className="shrink-0 max-w-[9rem] bg-[color:var(--color-surface-3)] border border-[color:var(--color-border)] rounded-md px-1 py-0.5 text-[10px] text-[color:var(--color-text-dim)] focus:outline-none focus:border-[color:var(--color-accent)]"
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      >
+                        <option value="">{t('rc.lineCategoryNone')}</option>
+                        {/* A category saved before the taxonomy was edited must stay selectable. */}
+                        {(categories.includes(li.category) || !li.category ? categories : [li.category, ...categories]).map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
                       <div
                         className="shrink-0 flex items-center gap-1 text-[10px] text-[color:var(--color-text-faint)] whitespace-nowrap"
                         style={{ fontFamily: 'var(--font-mono)' }}

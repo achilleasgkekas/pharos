@@ -168,7 +168,7 @@ describe('POST /api/v1/receipts/:id/rescan — success re-read + serialization',
       total: 193.39,
       notes: '',
     });
-    expect(body.receipt.lineItems).toEqual([{ name: 'Clean Name', qty: 1, price: 155.96, vatRate: 24 }]);
+    expect(body.receipt.lineItems).toEqual([{ name: 'Clean Name', qty: 1, price: 155.96, vatRate: 24, category: '' }]);
     expect(body.aiUsed).toBe(true);
     expect(body.model).toBe('ocr-pdf+qwen2.5:14b');
     expect(body.aiError).toBeUndefined();

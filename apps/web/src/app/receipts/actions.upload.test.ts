@@ -421,9 +421,9 @@ describe('uploadReceipt — line-item cleanup + persisted shape', () => {
     await uploadReceipt(fd);
     const lineItems = receiptCreate.mock.calls[0][0].lineItems;
     expect(lineItems).toHaveLength(3);
-    expect(lineItems[0]).toEqual({ name: 'Widget', refinedName: 'Widget', qty: 2, price: 5, vatRate: 24 });
-    expect(lineItems[1]).toEqual({ name: 'Item', refinedName: '', qty: 1, price: 3.5, vatRate: 24 });
-    expect(lineItems[2]).toEqual({ name: 'Cable', refinedName: '', qty: 1, price: 0, vatRate: 13 });
+    expect(lineItems[0]).toEqual({ name: 'Widget', refinedName: 'Widget', qty: 2, price: 5, vatRate: 24, category: '' });
+    expect(lineItems[1]).toEqual({ name: 'Item', refinedName: '', qty: 1, price: 3.5, vatRate: 24, category: '' });
+    expect(lineItems[2]).toEqual({ name: 'Cable', refinedName: '', qty: 1, price: 0, vatRate: 13, category: '' });
   });
 
   it('saves store fallback, EU day-first date, fileType/fileSize, always verified:false; fires webhook + revalidate', async () => {
@@ -537,7 +537,7 @@ describe('rescanReceipt', () => {
     expect(doc.store).toBe('Kotsovolos');
     expect(doc.total).toBe(99);
     expect(doc.paymentMethod).toBe('card');
-    expect(doc.lineItems).toEqual([{ name: 'Cable', refinedName: '', qty: 1, price: 5, vatRate: 24 }]);
+    expect(doc.lineItems).toEqual([{ name: 'Cable', refinedName: '', qty: 1, price: 5, vatRate: 24, category: '' }]);
     expect(doc.verified).toBe(false);
     expect(doc.aiParsedAt).toBeInstanceOf(Date);
     expect(doc.rawAiResponse).toBe('raw-text');

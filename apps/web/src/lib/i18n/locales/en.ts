@@ -751,6 +751,8 @@ export const en = {
   'rc.fVat': 'VAT ({cur})',
   'rc.itemNamePlaceholder': 'Proper product name (AI)',
   'rc.rawTextPlaceholder': 'raw receipt text',
+  'rc.lineCategory': 'spend category for this line',
+  'rc.lineCategoryNone': 'no category',
   'rc.netVatGross': 'net {net} · VAT {vat} · gross',
   'rc.addToInventory': 'Add items to the Inventory',
   'rc.addToInventoryHint': 'Creates/links Inventory items with proper names + links back to the receipt',

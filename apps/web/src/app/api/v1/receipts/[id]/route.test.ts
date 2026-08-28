@@ -206,9 +206,9 @@ describe('GET /api/v1/receipts/:id — serialization', () => {
     const res = await GET(makeReq(), ctx(OID));
     const { receipt } = await res.json();
     expect(receipt.lineItems).toEqual([
-      { name: 'Clean Name', qty: 2, price: 40, vatRate: 24 },
-      { name: 'only raw', qty: 1, price: 5, vatRate: 0 },
-      { name: 'named-only', qty: 1, price: 0, vatRate: 0 },
+      { name: 'Clean Name', qty: 2, price: 40, vatRate: 24, category: '' },
+      { name: 'only raw', qty: 1, price: 5, vatRate: 0, category: '' },
+      { name: 'named-only', qty: 1, price: 0, vatRate: 0, category: '' },
     ]);
   });
 
@@ -326,7 +326,7 @@ describe('PATCH /api/v1/receipts/:id — scalar coercion', () => {
 // prices, which /reports and "add items to inventory" would then read as base currency.
 describe('PATCH /api/v1/receipts/:id — multi-currency (P9)', () => {
   const setOf = () => (updateState.calls[0].update as { $set: Record<string, unknown> }).$set;
-  const line = (name: string, price: number) => ({ name, refinedName: '', qty: 1, price, vatRate: 24 });
+  const line = (name: string, price: number) => ({ name, refinedName: '', qty: 1, price, vatRate: 24, category: '' });
 
   it('converts total, net, VAT and every line price with the submitted rate', async () => {
     findByIdState.doc = receiptDoc({ currency: 'EUR', fxRate: 0 });
@@ -339,8 +339,8 @@ describe('PATCH /api/v1/receipts/:id — multi-currency (P9)', () => {
     const set = setOf();
     expect(set).toMatchObject({ total: 180, subtotal: 144, vatAmount: 36, currency: 'USD', origAmount: 200, fxRate: 0.9 });
     expect(set.lineItems).toEqual([
-      { name: 'A', refinedName: '', qty: 1, price: 90, vatRate: 24 },
-      { name: 'B', refinedName: '', qty: 1, price: 54, vatRate: 24 },
+      { name: 'A', refinedName: '', qty: 1, price: 90, vatRate: 24, category: '' },
+      { name: 'B', refinedName: '', qty: 1, price: 54, vatRate: 24, category: '' },
     ]);
   });
 
@@ -451,8 +451,23 @@ describe('PATCH /api/v1/receipts/:id — lineItems sanitizer', () => {
     expect(res.status).toBe(200);
     const set = (updateState.calls[0].update as { $set: Record<string, unknown> }).$set;
     expect(set.lineItems).toEqual([
-      { name: 'Widget', refinedName: '', qty: 3, price: 12.5, vatRate: 24 },
-      { name: 'Bare', refinedName: '', qty: 1, price: 0, vatRate: 0 },
+      { name: 'Widget', refinedName: '', qty: 3, price: 12.5, vatRate: 24, category: '' },
+      { name: 'Bare', refinedName: '', qty: 1, price: 0, vatRate: 0, category: '' },
+    ]);
+  });
+
+  // P64: the sanitizer must carry a submitted per-line category through (trimmed), and
+  // must not invent one for a client that does not know the field.
+  it('keeps and trims a submitted per-line category, missing one → "" (P64)', async () => {
+    const res = await PATCH(makeReq({ body: { lineItems: [
+      { name: 'Milk', price: 1.5, category: '  groceries  ' },
+      { name: 'Cable', price: 8 },
+    ] } }), ctx(OID));
+    expect(res.status).toBe(200);
+    const set = (updateState.calls[0].update as { $set: Record<string, unknown> }).$set;
+    expect(set.lineItems).toEqual([
+      { name: 'Milk', refinedName: '', qty: 1, price: 1.5, vatRate: 0, category: 'groceries' },
+      { name: 'Cable', refinedName: '', qty: 1, price: 8, vatRate: 0, category: '' },
     ]);
   });
 
@@ -463,8 +478,8 @@ describe('PATCH /api/v1/receipts/:id — lineItems sanitizer', () => {
     ] } }), ctx(OID));
     const set = (updateState.calls[0].update as { $set: Record<string, unknown> }).$set;
     expect(set.lineItems).toEqual([
-      { name: 'A', refinedName: '', qty: 1, price: 0, vatRate: 0 },
-      { name: 'B', refinedName: '', qty: 1, price: 0, vatRate: 0 },
+      { name: 'A', refinedName: '', qty: 1, price: 0, vatRate: 0, category: '' },
+      { name: 'B', refinedName: '', qty: 1, price: 0, vatRate: 0, category: '' },
     ]);
   });
 
@@ -476,7 +491,7 @@ describe('PATCH /api/v1/receipts/:id — lineItems sanitizer', () => {
     ] } }), ctx(OID));
     const set = (updateState.calls[0].update as { $set: Record<string, unknown> }).$set;
     expect(set.lineItems).toEqual([
-      { name: '', refinedName: '', qty: 1, price: 9.99, vatRate: 0 },
+      { name: '', refinedName: '', qty: 1, price: 9.99, vatRate: 0, category: '' },
     ]);
   });
 
