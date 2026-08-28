@@ -12121,3 +12121,56 @@ tags — ακριβώς όπως χάνει ήδη `refinedName`/`matchedItemId`
 **Επόμενο task**: **P64 φάση 2** — τα Reports να αθροίζουν τα categorized line items δίπλα στα
 `Expense.category` ποσά (χωρίς αυτό, η φάση 1 απλώς αποθηκεύει το tag και δεν αλλάζει κανένα chart).
 Μετά **P83** και κλείνει η ομάδα Α.
+
+## 2026-08-28 22:50 — pharos-brain
+
+**Budget**: δύο δικές μου εγγραφές σήμερα πριν από αυτή (02:55, 07:50), άρα 2/3 πριν ξεκινήσω
+(cap 3, `FLEET_BUDGET.md`) — αυτή είναι η τελευταία work-run της ημέρας. Καμία ANSWERED εγγραφή
+στο `ASK_ACHILLEAS.md` απευθύνεται στο `pharos-brain`· δεν χρειάστηκε να ανοίξω καινούργια.
+
+**Prod health**: και τα τρία endpoints υγιή — `ph-aros.com/` **200** με περιεχόμενο landing
+(βρέθηκε `self-host`), `app.ph-aros.com/account/login` **200**, `POST
+/api/cron/saas/trials-sweep` χωρίς token **401 `{"error":"unauthorized"}`**. Καμία ενέργεια.
+
+**Το ΕΝΑ πράγμα**: **P64 φάση 2, οι categorized γραμμές αποδείξεων μπαίνουν στο category
+breakdown** — ακριβώς το task που είχε αφήσει το προηγούμενο run. Η φάση 1 αποθήκευε το tag αλλά
+κανένα chart δεν το διάβαζε, οπότε η απόδειξη σούπερ μάρκετ έμενε αόρατη στα Reports. Νέο pure
+`lib/receiptCategorySpend.ts` (category → ποσό, ανά μήνα + all-time) που καταναλώνουν **και τα δύο**
+call sites, το web `reports/page.tsx` και το `GET /api/v1/reports`, ώστε να μη διαφωνούν ποτέ τα
+δύο νούμερα. Επηρεάζονται το chart ανά κατηγορία, τα budget actuals του μήνα και το rollover
+παράθυρο του P25. Commit `efcda28`, pushed.
+
+**Δικές μου επιλογές, καταγεγραμμένες**: (α) **κανένα setting / feature flag** — μετράνε μόνο
+γραμμές με μη κενή `category` και κάθε γραμμή προ-P64 έχει `''`, άρα σε εγκατάσταση χωρίς tags δεν
+κουνιέται ούτε ένα νούμερο· το feature είναι opt-in εκ κατασκευής και δεν άξιζε δεύτερος διακόπτης·
+(β) οι αποδείξεις μπαίνουν **ΜΟΝΟ** στα category-scoped αθροίσματα, όχι στο cash-flow ούτε στα
+μηνιαία/ετήσια σύνολα — έχουν ήδη το δικό τους «Monthly spend» chart στην ΙΔΙΑ σελίδα και θα
+μετριόντουσαν δύο φορές· (γ) το ποσό γραμμής υπολογίζεται **gross** (`qty × price × (1 +
+vatRate/100)`), στην ίδια βάση με το `Expense.amount`.
+
+**Εύρημα στην πορεία, αξίζει να το ξέρεις**: το σχόλιο στο `LineItemSchema` λέει ότι το `price`
+είναι «gross unit price (with VAT)», αλλά ο κώδικας το χρησιμοποιεί παντού ως **καθαρή** τιμή
+μονάδας — ο line-item editor δείχνει `qty × price × (1 + vatRate/100)` και το «∑ from products»
+χτίζει έτσι ακριβώς το `total`. Ακολούθησα τον κώδικα, όχι το σχόλιο (αν το άθροιζα net, κάθε
+κατηγορία θα έβγαινε ~24% χαμηλότερη από τα αντίστοιχα Expenses). Το σχόλιο μένει λάθος, μικρό
+καθάρισμα για κάποιο επόμενο run.
+
+**Verified**: `npm run type-check` EXIT 0 · `npx vitest run` πλήρες → **412/412 αρχεία, 6635 passed /
+4 skipped, μηδέν fail** (+12 νέα tests: 11 στο pure module, που καρφώνουν το gross ποσό, το qty
+fallback, το untagged = αόρατο, το trim του tag, και την αδατολόγητη απόδειξη που μετράει all-time
+αλλά σε κανέναν μήνα· συν 1 integration στο `api/v1/reports/route.test.ts` που αποδεικνύει ότι μια
+tagged γραμμή σμίγει με το `Expense.category` στο ίδιο `byCategory` ΕΝΩ τα `thisMonth`/`thisYear`
+μένουν καθαρά Expense). Το σχήμα του API δεν άλλαξε, άρα μηδέν openapi drift.
+**Δεν έγινε browser verification**: αυτό το Mac εξακολουθεί να μην έχει Docker (`docker` εκτός PATH)
+και τίποτα δεν σερβίρει το `:3000`.
+
+**Unshipped στην παραγωγή**: **12 commits** πίσω από το `232084f3`. **ΔΙΟΡΘΩΣΗ στη μέτρηση των δύο
+προηγούμενων εγγραφών μου**: έλεγαν «42» και «46 πίσω από το `e38d8d3`», αλλά το `e38d8d3` είναι το
+τελευταίο **Hetzner** sha και έπαψε να είναι σημείο αναφοράς μετά τη μετακόμιση στο Proxmox — το
+ίδιο το `DEPLOY_LOG.md` το γράφει ρητά. Το πραγματικό deployed sha είναι `232084f3` (deploy 28/8),
+άρα το αληθινό κενό ήταν πάντα πολύ μικρότερο. Δεν κάνω deploy ούτε αγγίζω τον server.
+
+**Επόμενο task**: **P83** — με αυτό κλείνει η ομάδα Α (χρήματα και ακρίβεια στα νούμερα) και
+συνεχίζει η ομάδα C. Μικρό προαιρετικό follow-up αν περισσέψει χώρος: το λάθος σχόλιο «gross unit
+price» στο `LineItemSchema`, και το AI auto-suggest κατηγορίας στο parse-time που το ίδιο το spec
+του P64 προέβλεπε ως follow-up.
