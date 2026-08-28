@@ -12075,3 +12075,49 @@ sha, βλ. `DEPLOY_LOG.md`) — σκόπιμα, όσο προχωρά η μετ�
 Expenses, καθόλου Receipts), μετά **P83**. Με αυτά κλείνει πλήρως η ομάδα Α και συνεχίζει η ομάδα C
 (dogfooding, αντικείμενα/εξοπλισμός). Σημείωση: το P64 αγγίζει το ίδιο Receipt model με το
 follow-up (α) του P62, οπότε ίσως αξίζει να μπει μαζί και το `paymentSplits` στα Receipts.
+
+## 2026-08-28 07:50 — pharos-brain
+
+**Budget**: μία δική μου εγγραφή σήμερα πριν από αυτή (02:55), άρα 1/3 πριν ξεκινήσω (cap 3,
+`FLEET_BUDGET.md`). Καμία ANSWERED εγγραφή στο `ASK_ACHILLEAS.md` απευθύνεται στο `pharos-brain`.
+Ανοιχτές και σε αναμονή για σένα: `pharos-deploy-20260828-0210` (το alias `pharos` στο `~/.ssh/config`
+δείχνει ακόμα στο παλιό Hetzner IP που έχει πλέον ανακυκλωθεί σε ξένο μηχάνημα), και οι δύο παλιές
+`pharos-cloud-guard`.
+
+**Prod health**: και τα τρία endpoints υγιή — `ph-aros.com/` **200** με περιεχόμενο landing
+(βρέθηκαν `waitlist`/`self-host`), `app.ph-aros.com/account/login` **200**, `POST
+/api/cron/saas/trials-sweep` χωρίς token **401 `{"error":"unauthorized"}`**. Καμία ενέργεια.
+
+**Το ΕΝΑ πράγμα**: **P64 φάση 1, κατηγορία δαπάνης ανά γραμμή απόδειξης** — το task που είχε αφήσει
+ρητά το προηγούμενο run. Νέο optional `category` στο `LineItemSchema` (κενό = ακριβώς η προ-P64
+συμπεριφορά, μηδέν migration) και picker ανά γραμμή στον ήδη-υπάρχοντα line-item editor. Το πεδίο
+ταξιδεύει και στο public API: `serializeLineItems()` το επιστρέφει (`''` για παλιές γραμμές), ο
+`PATCH /api/v1/receipts/:id` sanitizer το δέχεται trimmed, και το `docs/openapi.yaml` ενημερώθηκε
+γιατί το απαιτεί ο `openapi.schema.test.ts` drift guard.
+
+**Δικές μου επιλογές, καταγεγραμμένες**: (α) **reuse του expense taxonomy**
+(`settings.expenseCategories`) αντί για νέα λίστα ρυθμίσεων — ο λόγος ύπαρξης του P64 είναι να
+αθροίζονται οι αποδείξεις μαζί με τα Expenses στο ίδιο breakdown, άρα κοινό λεξιλόγιο από την αρχή·
+(β) μια αποθηκευμένη κατηγορία που δεν είναι πια στη λίστα **παραμένει επιλέξιμη** (μπαίνει μπροστά),
+ώστε ένα edit των ρυθμίσεων να μη σβήνει σιωπηλά παλιά tags· (γ) **μόνο manual tagging** σε αυτό το
+MVP, το AI auto-suggest στο parse-time μένει follow-up όπως το προέβλεπε το ίδιο το spec· (δ) i18n
+μόνο σε **en + el** (οι άλλες 6 είναι `Partial<Dict>` και πέφτουν στα αγγλικά).
+
+**Γνωστός περιορισμός, όχι νέος**: ένα re-scan ξαναγράφει όλες τις γραμμές, άρα χάνει τα χειροκίνητα
+tags — ακριβώς όπως χάνει ήδη `refinedName`/`matchedItemId`.
+
+**Verified**: `npm run type-check` EXIT 0· `npx vitest run` πλήρες → **409/409 αρχεία, 6587 passed /
+4 skipped, μηδέν fail** (+3 νέα tests που καρφώνουν το ουσιαστικό: το `updateReceipt` κρατά την
+κατηγορία και βάζει `''` σε payload προ-P64, ο PATCH sanitizer την trim-άρει, ο serializer τη
+γυρίζει· ενημερώθηκαν και 15 υπάρχοντα expectations που έλεγχαν το ακριβές σχήμα γραμμής).
+**Δεν έγινε browser verification**: αυτό το Mac εξακολουθεί να μην έχει Docker (`docker` εκτός PATH)
+και τίποτα δεν σερβίρει το `:3000`. Commit `c11692b`.
+
+**Unshipped στην παραγωγή**: **46 commits** πίσω από το `e38d8d3` (τελευταίο μετρημένο deployed sha,
+βλ. `DEPLOY_LOG.md`). Δεν κάνω deploy ούτε αγγίζω τον server· όποτε θες, τρέχεις το `pharos-deploy` —
+αλλά **πρώτα χρειάζεται να λυθεί το `pharos-deploy-20260828-0210`**, αλλιώς το `ssh pharos` δείχνει
+σε ξένο μηχάνημα.
+
+**Επόμενο task**: **P64 φάση 2** — τα Reports να αθροίζουν τα categorized line items δίπλα στα
+`Expense.category` ποσά (χωρίς αυτό, η φάση 1 απλώς αποθηκεύει το tag και δεν αλλάζει κανένα chart).
+Μετά **P83** και κλείνει η ομάδα Α.
