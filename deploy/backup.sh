@@ -158,12 +158,21 @@ elif [ -n "${BACKUP_COPY_DIR:-}" ]; then
   # the OTHER instance's older archives. A subdirectory is not itself a mount point, so the mount
   # to verify is named separately.
   BACKUP_COPY_MOUNT="${BACKUP_COPY_MOUNT:-$BACKUP_COPY_DIR}"
-  if ! mountpoint -q "$BACKUP_COPY_MOUNT" 2>/dev/null; then
-    echo "FATAL: $BACKUP_COPY_MOUNT is not a mount point — the share is not mounted, so copying" >&2
-    echo "       there would leave the backups on the same disk as the data they protect." >&2
+  # Touch the path first: with x-systemd.automount the share is deliberately NOT mounted while
+  # idle (so the NAS disks can spin down), and only an access brings it back.
+  mkdir -p "$BACKUP_COPY_DIR" 2>/dev/null || true
+  # `mountpoint` is NOT sufficient here, which cost a round of head-scratching: under
+  # x-systemd.automount the autofs placeholder is itself a mount point, so the check passed
+  # whether or not the share was actually up. The property that matters is not "is something
+  # mounted here" but "is this a DIFFERENT filesystem from the one holding the data" — compare
+  # device ids and let stat's failure (share down, path unreachable) fall into the same refusal.
+  COPY_DEV="$(stat -c %d "$BACKUP_COPY_DIR" 2>/dev/null || echo same)"
+  DATA_DEV="$(stat -c %d "$OUT" 2>/dev/null || echo same)"
+  if [ "$COPY_DEV" = "$DATA_DEV" ]; then
+    echo "FATAL: $BACKUP_COPY_DIR is on the SAME filesystem as $OUT — the share is not mounted," >&2
+    echo "       so copying there would leave the backups on the same disk as the data." >&2
     exit 1
   fi
-  mkdir -p "$BACKUP_COPY_DIR"
   cp -f "$DUMP" "$FILES" "$BACKUP_COPY_DIR/" || {
     echo "FATAL: offsite copy FAILED — the local copy exists but is not protected" >&2; exit 1
   }
