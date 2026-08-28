@@ -21,8 +21,14 @@ DUMP="${1:?usage: restore.sh <mongo-*.archive.gz> [storage-*.tar.gz]}"
 FILES="${2:-}"
 
 CONTAINER="${MONGO_CONTAINER:-pharos-mongo}"
-if [ -z "${MONGO_PASSWORD:-}" ] && [ -f "$HERE/.env.prod" ]; then
-  set -a; . "$HERE/.env.prod"; set +a
+# Where the storage archive is unpacked. It must be the PARENT of the bind-mounted `storage`
+# directory, because the archive holds a plain `storage/` entry. Overridable for the same reason
+# MONGO_CONTAINER is: a host can run a second Pharos whose files live somewhere else entirely
+# (e.g. STORAGE_PARENT=/opt/pharos-local for a self-hosted instance next to the hosted one).
+STORAGE_PARENT="${STORAGE_PARENT:-$HERE}"
+ENV_FILE="${ENV_FILE:-$HERE/.env.prod}"
+if [ -z "${MONGO_PASSWORD:-}" ] && [ -f "$ENV_FILE" ]; then
+  set -a; . "$ENV_FILE"; set +a
 fi
 USER_="${MONGO_USER:-pharos}"
 
@@ -55,12 +61,13 @@ docker exec "$CONTAINER" mongosh --quiet \
   print("  ok: " + db.tenants.getIndexes().length + " indexes on tenants, " + db.accounts.getIndexes().length + " on accounts");'
 
 if [ -n "$FILES" ]; then
-  echo "[2/2] restoring /storage"
+  echo "[2/2] restoring storage into $STORAGE_PARENT"
   [ -f "$FILES" ] || { echo "no such archive: $FILES" >&2; exit 1; }
+  [ -d "$STORAGE_PARENT" ] || { echo "no such directory: $STORAGE_PARENT" >&2; exit 1; }
   # Extracted alongside the compose file, which is where the bind mount points. Existing files
   # are overwritten; files added since the backup are left in place rather than deleted, because
   # an unexpected extra receipt is a much smaller problem than a deleted one.
-  tar -xzf "$FILES" -C "$HERE"
+  tar -xzf "$FILES" -C "$STORAGE_PARENT"
 else
   echo "[2/2] no storage archive given — databases restored, FILES NOT restored."
   echo "     Receipts and statements will 404 until you restore the matching storage-*.tar.gz."
