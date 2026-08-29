@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { defaultNotifyTypes } from '@/lib/alertTypes';
 
 // app/settings/actions.ts is the largest module in the repo (1810 lines, ~20 concerns),
 // split into one focused test file per concern (see actions.aiEngine.test.ts for the
@@ -723,5 +724,61 @@ describe('runAlertChecks · dispatch gating', () => {
       '🎯 1 deal(s): Deal item',
       '💳 installments this month: €30 (1 plans)',
     ]);
+  });
+});
+
+// P103: per-type toggles. Only the OUTBOUND summary is filtered — the bell and the P24
+// event webhooks keep the full picture, and a category switched off must not leave a
+// trace in the dedup baseline (or re-enabling it would stay silent forever).
+describe('runAlertChecks · per-type notification toggles (P103)', () => {
+  function withTypes(patch: Record<string, boolean>) {
+    getAppSettingsMock.mockImplementation(async () => ({
+      ...DEFAULT_SETTINGS,
+      notifyTypes: { ...defaultNotifyTypes(), ...patch },
+    }));
+  }
+  function oneDeal() {
+    itemFind.mockReset();
+    itemFind
+      .mockReturnValueOnce(chainSelectLean([{ title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
+      .mockReturnValueOnce(chainSelectLean([]));
+  }
+
+  it('an absent notifyTypes map sends everything, exactly as before P103', async () => {
+    oneDeal();
+    const result = await runAlertChecks();
+    expect(result.summary).toContain('🎯 1 deal(s): U7 Pro');
+  });
+
+  it('drops the line of a category that is switched off', async () => {
+    withTypes({ deals: false });
+    oneDeal();
+    const result = await runAlertChecks();
+    expect(result.summary).toBe('All clear — nothing to report.');
+    expect(dispatchAlertMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the categories that are still on', async () => {
+    withTypes({ deals: false });
+    oneDeal();
+    computeInstallmentPlansMock.mockImplementation(() => [{ done: false, remainingInstallments: 1, perAmount: 30 }]);
+    const result = await runAlertChecks();
+    expect(result.summary).toBe('💳 installments this month: €30 (1 plans)');
+  });
+
+  it('silences the installments line without touching the installment.due webhook', async () => {
+    withTypes({ installments: false });
+    computeInstallmentPlansMock.mockImplementation(() => [{ done: false, remainingInstallments: 1, perAmount: 30 }]);
+    const result = await runAlertChecks();
+    expect(result.summary).toBe('All clear — nothing to report.');
+    expect(dispatchEventWebhooksMock).toHaveBeenCalledWith('installment.due', { amount: 30, plans: 1 });
+  });
+
+  it('still feeds the in-app bell and the price.drop webhook for a silenced category', async () => {
+    withTypes({ deals: false });
+    oneDeal();
+    await runAlertChecks();
+    expect(generateNotificationsMock).toHaveBeenCalled();
+    expect(dispatchEventWebhooksMock).toHaveBeenCalledWith('price.drop', { items: [{ title: 'U7 Pro', target: 300 }] });
   });
 });

@@ -6,6 +6,7 @@ import {
   DEFAULT_SUBSCRIPTION_CATEGORIES,
 } from './taxonomies';
 import { resolveDepreciation } from './depreciation';
+import { defaultNotifyTypes } from './alertTypes';
 
 describe('numMap', () => {
   it('keeps only positive finite numbers', () => {
@@ -67,6 +68,7 @@ describe('normalizeSettings', () => {
       depreciation: resolveDepreciation(undefined),
       categoryRules: [],
       onboardingDismissed: false,
+      notifyTypes: defaultNotifyTypes(),
     };
     expect(normalizeSettings(null)).toEqual(expected);
     expect(normalizeSettings(undefined)).toEqual(expected);

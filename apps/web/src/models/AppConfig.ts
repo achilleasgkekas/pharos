@@ -141,6 +141,11 @@ const AppConfigSchema = new Schema(
     // always sends the full picture and never reads/writes this. Empty = nothing sent
     // yet, everything currently live counts as fresh.
     alertDispatchKeys: { type: [String], default: [] },
+    // Per-type outbound alert toggles (P103): { deals: true, budgets: false, ... }. Only an
+    // explicit `false` silences a category, so an empty/absent map means "send everything"
+    // and no existing install changes behaviour. Filters the outbound summary ONLY — the
+    // in-app bell keeps showing the full picture. See lib/alertTypes.ts for the key list.
+    notifyTypes: { type: Schema.Types.Mixed, default: {} },
     // Outbound delivery history (P80). Map `notifier:<id>` / `webhook:<id>` → the last
     // DELIVERY_LOG_CAP attempts (newest last, {at, ok, status, error, attempts}), written
     // by lib/deliveryLog.ts on every dispatch and shown per channel in Settings →

@@ -16,8 +16,9 @@ import { YnabImportModal } from './YnabImportModal';
 import type { StoreLite } from '@/lib/storeService';
 import type { AppSettings } from '@/lib/appSettings';
 import { rateForCategory } from '@/lib/depreciation';
-import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
+import { saveDefaults, runAlertChecks, getNotifierChannels, saveNotifierChannels, getNotifyTypes, saveNotifyTypes, testNotifierChannel, getDeliveryLogs, getWebhookSubscriptions, saveWebhookSubscriptions, testWebhookSubscription, savePrompt, resetPrompt, saveScraperAi, saveStorageConfig, testRemoteConnection, syncToRemote, getSyncManifest, syncOnedriveBatch, saveList, saveSpaces, getTrash, restoreFromTrash, purgeFromTrash, emptyTrash, startOnedriveAuth, pollOnedriveAuth, disconnectOnedriveAccount, testOnedriveConnection, saveImapConfigAction, testImapConnectionAction, checkImapInboxNow, type PromptEditorEntry, type ScraperAiConfig, type StorageInfo, type ListEditorEntry, type TrashRow, type ImapInfo } from './actions';
 import { NOTIFIER_TYPES, type NotifierConfig, type NotifierType } from '@/lib/notifiers.shared';
+import { ALERT_TYPES, type AlertType, type NotifyTypes } from '@/lib/alertTypes';
 import { notifierLogKey, webhookLogKey, type DeliveryLogEntry } from '@/lib/deliveryLog.shared';
 import { WEBHOOK_EVENTS, type WebhookSubscription, type WebhookEvent } from '@/lib/webhooks.shared';
 import { createCard, updateCard, deleteCard, toggleCardActive } from '@/app/statements/cards';
@@ -2202,13 +2203,19 @@ function NotificationsManager() {
   const [testing, setTesting] = useState<string>('');
   const [testMsgs, setTestMsgs] = useState<Record<string, string>>({});
   const [logs, setLogs] = useState<Record<string, DeliveryLogEntry[]>>({});
+  const [types, setTypes] = useState<NotifyTypes | null>(null);
 
   useEffect(() => {
     startTransition(async () => {
       setChannels(await getNotifierChannels());
       setLogs(await getDeliveryLogs());
+      setTypes(await getNotifyTypes());
     });
   }, []);
+
+  function toggleType(key: AlertType) {
+    setTypes((p) => (p ? { ...p, [key]: !p[key] } : p));
+  }
 
   function update(id: string, c: NotifierConfig) {
     setChannels((p) => (p ?? []).map((x) => (x.id === id ? c : x)));
@@ -2223,6 +2230,7 @@ function NotificationsManager() {
     setMsg('Saving…');
     startTransition(async () => {
       await saveNotifierChannels(channels ?? []);
+      if (types) await saveNotifyTypes(types);
       setMsg('Saved ✓');
     });
   }
@@ -2239,6 +2247,9 @@ function NotificationsManager() {
     setMsg('Checking…');
     startTransition(async () => {
       await saveNotifierChannels(channels ?? []);
+      // Persist the toggles first, otherwise the run below would still use the saved set
+      // and the summary would not match the checkboxes the owner is looking at.
+      if (types) await saveNotifyTypes(types);
       const r = await runAlertChecks();
       setMsg((r.sent ? '✓ Sent · ' : '(no enabled channels) · ') + r.summary.replace(/\n/g, ' · '));
       setLogs(await getDeliveryLogs()); // the dispatch just wrote new rows
@@ -2279,6 +2290,26 @@ function NotificationsManager() {
       <button type="button" onClick={add} className={cn(ghostBtn, 'w-full justify-center')}>
         <Plus size={13} /> Add channel
       </button>
+
+      <div className="pt-3 border-t border-[color:var(--color-border)]">
+        <p className="text-xs text-[color:var(--color-text-dim)] mb-2">
+          What gets pushed out — untick a category to keep it in the bell only. Saved with the button below.
+        </p>
+        {types === null ? (
+          <p className="text-xs text-[color:var(--color-text-faint)] py-2 flex items-center gap-2">
+            <Loader2 size={13} className="animate-spin" /> Loading alert types…
+          </p>
+        ) : (
+          <div className="grid gap-1 sm:grid-cols-2">
+            {ALERT_TYPES.map((at) => (
+              <label key={at.key} className="flex items-center gap-1.5 text-[11px] text-[color:var(--color-text-dim)]">
+                <input type="checkbox" checked={types[at.key]} onChange={() => toggleType(at.key)} />
+                {at.label}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-[color:var(--color-border)] mt-1">
         <button type="button" onClick={save} disabled={pending || channels === null} className={saveBtn}>

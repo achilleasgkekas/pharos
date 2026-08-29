@@ -58,6 +58,7 @@ import { AI_FEATURE_KEYS, type AiFeatureKey } from '@/lib/aiFeatures';
 import { PROVIDER_RECOMMEND, priceForModel, looksVisionModel, type FetchedModel, type AiProviderId } from '@/lib/aiModels';
 import { startDeviceCode, pollDeviceToken, getOnedriveCreds, disconnectOnedrive, testOnedrive, uploadToOnedrive, type DeviceCode } from '@/lib/onedrive';
 import { runNtfyTest } from '@/lib/notify';
+import { ALERT_TYPE_KEYS, resolveNotifyTypes, type NotifyTypes } from '@/lib/alertTypes';
 import { BACKUP_MODELS, BACKUP_KEYS } from '@/lib/backupModels';
 import { verifyBackupJson, formatBackupCounts, type BackupVerifyResult } from '@/lib/backupVerify';
 import { detectSyncStaleness, formatSyncStaleness } from '@/lib/syncStaleness';
@@ -429,6 +430,28 @@ export async function saveNotifierChannels(channels: NotifierConfig[]): Promise<
   return { ok: true };
 }
 
+/** Which alert categories are allowed out on the notifier channels (P103). */
+export async function getNotifyTypes(): Promise<NotifyTypes> {
+  await requireAdmin();
+  return (await getAppSettings()).notifyTypes;
+}
+
+/** Replace the per-type outbound alert toggles. Unknown keys are dropped and every known
+ *  key is written explicitly, so the stored map always matches the current registry. */
+export async function saveNotifyTypes(types: NotifyTypes): Promise<{ ok: boolean }> {
+  await requireAdmin();
+  await connectDB();
+  const clean = resolveNotifyTypes(types);
+  await (await scoped(AppConfig)).updateOne(
+    { key: 'singleton' },
+    { $set: { notifyTypes: Object.fromEntries(ALERT_TYPE_KEYS.map((k) => [k, clean[k]])) } },
+    { upsert: true }
+  );
+  invalidateAppSettings();
+  revalidatePath('/settings');
+  return { ok: true };
+}
+
 /** Send a one-off test to a single (possibly unsaved) channel config. */
 export async function testNotifierChannel(channel: NotifierConfig): Promise<{ ok: boolean; error?: string }> {
   await requireAdmin();
@@ -651,18 +674,27 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     previouslySent = new Set(cfgDoc?.alertDispatchKeys ?? []);
   }
 
+  // Per-type toggles (P103): a category the owner switched off in Settings → Notifications
+  // is emptied HERE, at the split, and not earlier — the raw arrays above still feed the
+  // in-app bell and the P24 event webhooks, which are separate audiences with their own
+  // settings. Emptying at the split also keeps a silenced category out of liveDispatchKeys,
+  // so nothing is recorded as "already sent" while it was muted and switching it back on
+  // reports whatever is still open instead of staying quiet forever.
+  // resolveNotifyTypes rather than a bare read: an unset/partial map means "send
+  // everything", so a doc written before P103 keeps behaving exactly as it did.
+  const nt = resolveNotifyTypes(s.notifyTypes);
   const period = new Date(now).toISOString().slice(0, 7); // YYYY-MM, same bucket the bell uses for installments
-  const dealsSplit = splitFreshAlerts(deals, (d) => `deal:${String(d._id)}`, previouslySent);
-  const expiringSplit = splitFreshAlerts(expiring, (w) => `warranty:${String(w._id)}`, previouslySent);
-  const returnsSplit = splitFreshAlerts(returnsClosing, (r) => `return:${String(r._id)}`, previouslySent);
-  const hikesSplit = splitFreshAlerts(hikes, (h) => `pricehike:${h.vendorKey}:${h.curr}`, previouslySent);
-  const trialsSplit = splitFreshAlerts(trialsEnding, (tr) => `trialend:${String(tr._id)}:${tr.iso}`, previouslySent);
-  const giftsSplit = splitFreshAlerts(giftsExpiring, (g) => `giftcard:${String(g._id)}:${g.iso}`, previouslySent);
-  const billsSplit = splitFreshAlerts(billsDue, (b) => `bill:${String(b._id)}:${b.iso}`, previouslySent);
-  const budgetsSplit = splitFreshAlerts(budgetsExceeded, (b) => `budget:${b.category}:${budgetMonthKey}`, previouslySent);
-  const installmentItems = dueThisMonth > 0 ? [{ key: `installments:${period}` }] : [];
+  const dealsSplit = splitFreshAlerts(nt.deals ? deals : [], (d) => `deal:${String(d._id)}`, previouslySent);
+  const expiringSplit = splitFreshAlerts(nt.warranty ? expiring : [], (w) => `warranty:${String(w._id)}`, previouslySent);
+  const returnsSplit = splitFreshAlerts(nt.returns ? returnsClosing : [], (r) => `return:${String(r._id)}`, previouslySent);
+  const hikesSplit = splitFreshAlerts(nt.priceHikes ? hikes : [], (h) => `pricehike:${h.vendorKey}:${h.curr}`, previouslySent);
+  const trialsSplit = splitFreshAlerts(nt.trials ? trialsEnding : [], (tr) => `trialend:${String(tr._id)}:${tr.iso}`, previouslySent);
+  const giftsSplit = splitFreshAlerts(nt.giftCards ? giftsExpiring : [], (g) => `giftcard:${String(g._id)}:${g.iso}`, previouslySent);
+  const billsSplit = splitFreshAlerts(nt.bills ? billsDue : [], (b) => `bill:${String(b._id)}:${b.iso}`, previouslySent);
+  const budgetsSplit = splitFreshAlerts(nt.budgets ? budgetsExceeded : [], (b) => `budget:${b.category}:${budgetMonthKey}`, previouslySent);
+  const installmentItems = nt.installments && dueThisMonth > 0 ? [{ key: `installments:${period}` }] : [];
   const installmentsSplit = splitFreshAlerts(installmentItems, (i) => i.key, previouslySent);
-  const syncStaleItems = syncStale ? [syncStale] : [];
+  const syncStaleItems = nt.syncStale && syncStale ? [syncStale] : [];
   const syncStaleSplit = splitFreshAlerts(syncStaleItems, (x) => `syncstale:${x.lastSyncAt ?? 'never'}`, previouslySent);
 
   // The full current live key set, across every category — persisted as the next
