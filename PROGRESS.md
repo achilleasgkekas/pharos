@@ -12328,3 +12328,51 @@ server component και κανένα test δεν εισάγει τη σελίδ�
 **Επόμενο task**: `app/calendar/page.tsx` με την ίδια διόρθωση, και μετά subscriptions /
 settings, ώστε να κλείσει όλη η οικογένεια πριν πιάσουμε ξανά feature από το approved queue
 (εκκρεμεί το P103, per-type notification toggles, εγκεκριμένο στο `259a0d7`).
+
+## 2026-08-29 14:40 — pharos-brain
+
+**Εκτός budget, κατ' εντολή του Αχιλλέα**: το cap 3/ημέρα είχε ήδη εξαντληθεί με την εγγραφή των
+14:05. Ο Αχιλλέας ήταν παρών και ζήτησε ρητά να συνεχίσω («go on»), οπότε αυτό το run έγινε
+**interactive, όχι unattended**. Το cap φράζει το ακυβέρνητο ξόδεμα, δεν φράζει τον ιδιοκτήτη.
+
+**Το ΕΝΑ πράγμα (τώρα ολόκληρη η οικογένεια)**: `app/calendar/page.tsx`,
+`app/subscriptions/page.tsx`, `app/settings/page.tsx`, με το ίδιο μοτίβο των `0079dbd` και
+`22ae000`. Commit `b2fec5b`. Σε SaaS mode το calendar έδειχνε ανανεώσεις, δόσεις, λήξεις εγγύησης
+και κουπονιών **άλλης βάσης**, το subscriptions τις συνδρομές και τις κάρτες της, το settings τα
+counts, τη λίστα καρτών και το `AppConfig` singleton της.
+
+**Το settings ήταν το χειρότερο των τριών και δεν το είχα δει**: τα `getAiConfig` και `getStores`
+χρησιμοποιούν σωστά `currentModel`, αλλά χωρίς ambient tenant έλυναν στο **default `AppConfig`**.
+Δηλαδή η σελίδα εμφάνιζε, **και ο client της επεξεργαζόταν**, τον AI provider, τα κλειδιά και τη
+λίστα καταστημάτων **άλλης βάσης**. Αυτό δεν είναι μόνο λάθος ανάγνωση, είναι γράψιμο σε ξένες
+ρυθμίσεις.
+
+**Το nesting είναι ασφαλές by design, το επιβεβαίωσα στον κώδικα πριν το κάνω**: το
+`withRequestTenant` κάνει short-circuit σε ήδη εγκατεστημένο context (`hasTenantContext()`), και
+το ίδιο το σχόλιο στο `lib/tenancy/request.ts` λέει ότι το `settings/actions.ts` μπαίνει 65+ φορές
+ανά action και μόνο το εξωτερικό δουλεύει. Άρα οι actions που καλούν οι σελίδες
+(`discoverUntrackedRecurring`, `getPromptsForEditor`, `getStorageInfo`, `getImapInfo`,
+`getListsForEditor`) **μαζεύονται πλέον πάνω στο ένα context** αντί να λύνει καθεμιά το δικό της.
+
+**Σάρωσα όλα τα `page.tsx` που εισάγουν μοντέλο, το feature plane έκλεισε**. Ό,τι μένει χωρίς
+wrap είναι σκόπιμο: τα `(saas)/account/*` και `admin/*` δουλεύουν σε control-plane μοντέλα
+(`Account`, `Tenant`, `Membership`, `Invite`, `AuditEvent`) που ανήκουν στη registry βάση.
+
+**ΝΕΟ ΕΥΡΗΜΑ, ΔΕΝ ΤΟ ΑΓΓΙΞΑ, ΘΕΛΕΙ ΑΠΟΦΑΣΗ**: τα `app/login/page.tsx` (:22) και
+`app/setup/page.tsx` (:23) κάνουν `User.countDocuments()` **απευθείας**, ενώ το `User` είναι
+κανονικό per-tenant μοντέλο (`lib/apiAuth.ts:53` το περνάει από `currentModel`). Άρα σε workspace
+subdomain μετρούν χρήστες στη **default** βάση. Το `/login` με μηδέν χρήστες εκεί κάνει
+`redirect('/setup')`. **Δεν το διόρθωσα επίτηδες**: είναι μονοπάτι auth gating και μια λάθος
+κίνηση κλειδώνει κόσμο έξω από την παραγωγή, ενώ επιπλέον δεν είναι καθαρό αν σε SaaS mode αυτές
+οι δύο σελίδες **πρέπει** να είναι tenant-scoped ή αν ανήκουν σκόπιμα στο default (το SaaS έχει
+δικό του `/account/login`). Θέλει ρητή απόφαση πριν αγγιχτεί.
+
+**Verified**: `npm run type-check` **EXIT 0** και για τα τρία αρχεία. Καμία επαλήθευση στον
+browser, το Mac εξακολουθεί να μην έχει Docker.
+
+**Unshipped στην παραγωγή**: **6 commits** μπροστά από το `b24762b` (`259a0d7`, `1bcb0bc`,
+`22ae000`, `3914e80`, `b2fec5b`, συν αυτή εδώ την εγγραφή), από τα οποία **δύο αγγίζουν κώδικα**
+και τα δύο είναι διορθώσεις tenancy. Δεν κάνω deploy.
+
+**Επόμενο task**: η απόφαση για τα `login`/`setup` παραπάνω. Αν κριθεί ότι δεν αλλάζουν, τότε
+P103 (per-type notification toggles) από το approved queue.
