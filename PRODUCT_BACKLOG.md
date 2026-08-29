@@ -281,7 +281,7 @@
 > **Νεοεγκεκριμένα 2026-08-03 (interactive, «approve all ως έχουν, προχώρα τα»):** P81, P66, P74, P48, P46, P40 — όλα S, με τη σειρά που παρατίθενται. Ο Αχιλλέας ενέκρινε ρητά τα builder defaults του κάθε item ως έχουν, οπότε **καμία «ανοιχτή απόφαση» δεν μένει ανοιχτή σε αυτά τα έξι**: ο builder υλοποιεί ό,τι γράφει το «Ανοιχτή απόφαση (builder default)» πεδίο τους αυτούσιο, χωρίς να ξαναρωτήσει.
 
 > **Νεοεγκεκριμένα 2026-08-28 (interactive, ζητήθηκε ρητά από τον Αχιλλέα):**
-> - **P103. Επιλογή τύπου notifications (ανά κατηγορία alert)** — S/M — both. Σήμερα το
+> - **P103. Επιλογή τύπου notifications (ανά κατηγορία alert)** — ✅ SHIPPED 2026-08-30 (`d1fe7b5`, pharos-brain) — S/M — both. Σήμερα το
 >   `runAlertChecks` στέλνει **ένα ενιαίο periodic summary** στο ntfy του χρήστη (`appconfigs.ntfyUrl`,
 >   Settings → Notifiers) με **όλες** τις γραμμές alert μαζί (budget over, return window closing,
 >   warranty expiring, low stock, recurring due κ.λπ.). Ο Αχιλλέας θέλει να **επιλέγει ΤΙ στέλνεται**:
