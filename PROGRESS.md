@@ -12280,3 +12280,51 @@ deploy, 28/8 10:15), μαζί με αυτή εδώ την εγγραφή. Το d
 **Επόμενο task**: η ίδια διόρθωση στο `app/page.tsx` (το dashboard), που είναι η σελίδα με τη
 μεγαλύτερη επισκεψιμότητα από τις τέσσερις που απομένουν, και μετά calendar / subscriptions /
 settings με τη σειρά.
+
+## 2026-08-29 14:05 — pharos-brain
+
+**Guards**: κανένα `ROUTINES_PAUSED`. Cap 3/ημέρα (`FLEET_BUDGET.md`), δύο δικές μου εγγραφές
+σήμερα (02:50, 08:20), άρα αυτό είναι το **3ο και τελευταίο work-run της ημέρας**.
+`ASK_ACHILLEAS.md`: καμία εγγραφή, ANSWERED ή OPEN, δεν απευθύνεται στο `pharos-brain`, και δεν
+χρειάστηκε να ανοίξω καινούργια (η επιλογή ήταν ήδη λυμένη από το προηγούμενο run).
+
+**Prod health**: `https://ph-aros.com/` **200** με πραγματικό περιεχόμενο landing (388 KB, 154
+αναφορές `self-host*`), `https://app.ph-aros.com/account/login` **200**, `POST
+/api/cron/saas/trials-sweep` χωρίς token → **401 `{"error":"unauthorized"}`**. Όλα υγιή.
+**Μία παρατήρηση χωρίς συνέπεια**: η λέξη `waitlist` **δεν υπάρχει πια** στο landing, οπότε ο
+έλεγχος του βήματος 2 περνά μόνο χάρη στο `self-host`. Δεν είναι βλάβη, το κείμενο απλώς άλλαξε.
+Αν κάποιο επόμενο run δει και τα δύο να λείπουν, τότε αξίζει ανησυχία.
+
+**Καλό νέο**: το deploy ξεμπλόκαρε. Το `232084f3 → b24762b9` πέρασε (exit 0, 595s, 06:50 UTC),
+οπότε **η χθεσινή διόρθωση tenancy στα Reports (`0079dbd`) είναι πλέον στην παραγωγή**.
+
+**Το ΕΝΑ πράγμα**: η ίδια διόρθωση στο **`app/page.tsx`, το dashboard**, ακριβώς όπως το πρότεινε
+το προηγούμενο run. Είναι η σελίδα με τη μεγαλύτερη επισκεψιμότητα και το `getStats` διάβαζε
+**εννιά** μοντέλα (`Item`, `Task`, `Receipt`, `Subscription`, `Statement`, `ShoppingListItem`,
+`Bill`, `Goal`, `Card`) κατευθείαν από τα imported models, δηλαδή πάνω στην default σύνδεση. Σε
+SaaS mode κάθε workspace έβλεπε τα counts, τα aggregates budget/spent, τα statements και τις
+δόσεις **της default βάσης** αντί για τα δικά του. Commit `22ae000`, pushed.
+
+**Κάτι που δεν περίμενα και το βρήκα στην πορεία**: το wrap διορθώνει **και δύο helpers** που η
+σελίδα ήδη καλούσε. Τα `getStorageConfig` και `getNotifiers` χρησιμοποιούν σωστά `currentModel`,
+αλλά χωρίς ambient tenant έλυναν στο **default `AppConfig`**, οπότε το onboarding checklist του
+dashboard ανέφερε το storage backend και την κατάσταση notifiers **άλλης βάσης**. Το
+`getAppSettings` ήταν ήδη ασφαλές μόνο του (`softRequestTenant` + `tenantModel`), οπότε δεν το
+άγγιξα. Δηλαδή το εύρημα ήταν λίγο μεγαλύτερο από ό,τι το είχα καταγράψει το πρωί.
+
+**Verified**: `npm run type-check` **EXIT 0**. **Καμία επαλήθευση στον browser**: αυτό το Mac
+εξακολουθεί να μην έχει Docker και το `:3000` δεν σερβίρεται, οπότε δεν υπάρχει σελίδα να
+ελεγχθεί ζωντανά. Δεν έτρεξα ολόκληρο το vitest: η αλλαγή είναι καθαρά rebinding μοντέλων μέσα σε
+server component και κανένα test δεν εισάγει τη σελίδα.
+
+**Απομένουν από την ίδια οικογένεια, δεν τα άγγιξα (ένα πράγμα ανά run)**: `app/calendar/page.tsx`
+(5 collections), `app/subscriptions/page.tsx`, `app/settings/page.tsx`. Ίδιο μοτίβο, ίδια
+διόρθωση.
+
+**Unshipped στην παραγωγή**: **4 commits** μπροστά από το `b24762b` (`259a0d7`, `1bcb0bc`,
+`22ae000`, συν αυτή εδώ την εγγραφή), από τα οποία **ένα μόνο αγγίζει κώδικα**. Η στοίβα είναι
+πλέον μικρή, χωρίς επείγον. Δεν κάνω deploy ούτε αγγίζω τον server.
+
+**Επόμενο task**: `app/calendar/page.tsx` με την ίδια διόρθωση, και μετά subscriptions /
+settings, ώστε να κλείσει όλη η οικογένεια πριν πιάσουμε ξανά feature από το approved queue
+(εκκρεμεί το P103, per-type notification toggles, εγκεκριμένο στο `259a0d7`).
