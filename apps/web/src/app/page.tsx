@@ -1,14 +1,16 @@
 import Link from 'next/link';
 import { connectDB } from '@/lib/db';
-import { Item } from '@/models/Item';
-import { Task } from '@/models/Task';
-import { Receipt } from '@/models/Receipt';
-import { Subscription } from '@/models/Subscription';
-import { Statement } from '@/models/Statement';
-import { ShoppingListItem } from '@/models/ShoppingListItem';
-import { Bill } from '@/models/Bill';
-import { Goal } from '@/models/Goal';
-import { Card as PaymentCard } from '@/models/Card';
+import { Item as ItemModel } from '@/models/Item';
+import { Task as TaskModel } from '@/models/Task';
+import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { Statement as StatementModel } from '@/models/Statement';
+import { ShoppingListItem as ShoppingListItemModel } from '@/models/ShoppingListItem';
+import { Bill as BillModel } from '@/models/Bill';
+import { Goal as GoalModel } from '@/models/Goal';
+import { Card as PaymentCardModel } from '@/models/Card';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { isAiReady } from '@/lib/ollama';
 import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { computeInstallmentPlans } from '@/lib/installments';
@@ -25,7 +27,17 @@ import type { TFunc } from '@/lib/i18n';
 export const dynamic = 'force-dynamic';
 
 async function getStats() {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
+  const Task = await currentModel(TaskModel);
+  const Receipt = await currentModel(ReceiptModel);
+  const Subscription = await currentModel(SubscriptionModel);
+  const Statement = await currentModel(StatementModel);
+  const ShoppingListItem = await currentModel(ShoppingListItemModel);
+  const Bill = await currentModel(BillModel);
+  const Goal = await currentModel(GoalModel);
+  const PaymentCard = await currentModel(PaymentCardModel);
 
   const [
     itemCount,
@@ -131,6 +143,7 @@ async function getStats() {
       notifyEnabled: notifiers.some((n) => n.enabled),
     },
   };
+  });
 }
 
 const mono = { fontFamily: 'var(--font-mono)' } as const;
