@@ -1,11 +1,13 @@
 import { connectDB } from '@/lib/db';
 import { monthlyFactor } from '@/lib/billingCycle';
-import { Item } from '@/models/Item';
-import { Receipt } from '@/models/Receipt';
-import { Statement } from '@/models/Statement';
-import { Subscription } from '@/models/Subscription';
-import { Expense } from '@/models/Expense';
-import { Goal } from '@/models/Goal';
+import { Item as ItemModel } from '@/models/Item';
+import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { Statement as StatementModel } from '@/models/Statement';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { Goal as GoalModel } from '@/models/Goal';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { OWNED_STATUSES, SHOPPING_STATUSES } from '@/lib/itemStatus';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { getAppSettings } from '@/lib/appSettings';
@@ -61,7 +63,14 @@ function labelFromKey(key: string): string {
 }
 
 async function getReports(monthsBack = 12) {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Receipt = await currentModel(ReceiptModel);
+  const Item = await currentModel(ItemModel);
+  const Subscription = await currentModel(SubscriptionModel);
+  const Statement = await currentModel(StatementModel);
+  const Expense = await currentModel(ExpenseModel);
+  const Goal = await currentModel(GoalModel);
 
   const [receiptsRaw, itemsRaw, subsRaw, statementsRaw, expensesRaw, goalsRaw] = await Promise.all([
     Receipt.find().select('store date total vatAmount lineItems.qty lineItems.price lineItems.vatRate lineItems.category').lean(),
@@ -444,6 +453,7 @@ async function getReports(monthsBack = 12) {
       expenseMonth: Math.round(expenseMonth),
     },
   };
+  });
 }
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ months?: string }> }) {
