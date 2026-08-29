@@ -900,3 +900,58 @@ schedule και ότι αν φύγει αυτόματα κάτι έχει ρυθ
 `IdentityFile` στο `Host pharos`, και αφαίρεση του cron από το `pharos-deploy`. Δεν άγγιξα ούτε το
 `~/.ssh/config` ούτε το schedule, είναι ρυθμίσεις του ιδιοκτήτη. Δεν έψαξα τον δίσκο για ιδιωτικά
 κλειδιά, ο έλεγχος ασφαλείας το έκοψε και σωστά έκανε.
+
+## 2026-08-29 06:50 UTC · DEPLOY ΕΠΙΤΥΧΕΣ: `232084f3` → `b24762b9` (exit 0, 595s)
+
+Το πρωινό μπλοκάρισμα λύθηκε στη διάρκεια της ίδιας συνεδρίας και το deploy έγινε κατ' εντολή του
+Αχιλλέα («προχώρα»).
+
+**Η αιτία του `Permission denied (publickey)` ήταν αλλού από εκεί που έδειχνε.** Το κλειδί ήταν
+**πάντα σωστά εγκατεστημένο** στον VM, το απέδειξε το ίδιο το `ssh-copy-id` («All keys were skipped
+because they already exist on the remote system»). Το πραγματικό αίτιο: το `id_ed25519` έχει
+**passphrase**, επιβεβαιωμένο με `ssh-keygen -y -P ""` που γύρισε «incorrect passphrase». Οι
+routines τρέχουν `ssh -o BatchMode=yes`, που απαγορεύει κάθε prompt, οπότε χωρίς ξεκλείδωτο κλειδί
+στον agent δεν υπάρχει τίποτα να προσφερθεί. Στις 28/8 δούλεψε επειδή ο agent το κρατούσε από
+interactive session, και άδειασε με το reboot. Λύση που εφάρμοσε ο Αχιλλέας:
+`ssh-add --apple-use-keychain ~/.ssh/id_ed25519`, που βάζει την passphrase στο Keychain ώστε να
+επιβιώνει σε reboot. **Εκκρεμεί ακόμα** να μπουν `IdentityFile`, `AddKeysToAgent yes`,
+`UseKeychain yes` στο `Host pharos`, αλλιώς ο agent δεν το ξαναφορτώνει μόνος του στο επόμενο login.
+
+**Και τα δύο «KNOWN BLOCKERS» του SKILL ήταν ΞΕΠΕΡΑΣΜΕΝΑ**, κάποιος τα είχε ήδη διορθώσει:
+- Η `health()` δεν ελέγχει πια το ανύπαρκτο `pharos-caddy`. Ελέγχει `pharos-web` και
+  `pharos-landing`, και αφήνει έξω τον κοινό `caddy`/`cloudflared` επειδή τα τρία δημόσια probes
+  αποδεικνύουν ήδη όλη τη διαδρομή. `--check` γύρισε **exit 0**.
+- Ο φρουρός βρόμικου δέντρου κοιτάει `--untracked-files=no`, δηλαδή **μόνο tracked** αλλαγές, που
+  ήταν κενές. Τα 1299 AppleDouble `._*` δεν εμποδίζουν τίποτα. **Καλό που δεν έγινε `git clean`**:
+  ανάμεσα στα untracked κάθεται το `deploy/.env.prod.bak-20260828`, που ένα τυφλό `git clean -fd`
+  θα το είχε σβήσει.
+
+**ΠΡΟΣΟΧΗ, εύρημα που αξίζει να μείνει: στάλθηκαν 18 commits, όχι 8.** Το ΒΗΜΑ 1 του SKILL λέει
+`git log HEAD..origin/main`, που μετράει το **δέντρο**. Το script όμως κρατάει χωριστά ποιο commit
+**τρέχει**, και ανέφερε «currently deployed: 232084f3» ενώ το `HEAD` του δέντρου ήταν στο `0d89ac6`.
+Δηλαδή το δέντρο είχε τραβηχτεί μπροστά κάποια στιγμή χειροκίνητα και **10 commits κάθονταν
+αχτίστα**, με τα containers να τρέχουν παλιότερο build. Ακριβώς το σενάριο που προειδοποιεί το
+SKILL («μην κάνεις `git pull` με το χέρι»). Το `HEAD..origin/main` υποτιμά το κενό όποτε συμβεί
+αυτό· η αλήθεια είναι το `[3/6] currently deployed`.
+
+**Ροή:** pre-flight OK, backup ok, rebuild `web` + `landing` (το `landing` βγήκε ολόκληρο από cache,
+το `web` χτίστηκε 526s με Next 15.5.22), recreate `pharos-mongo` + `pharos-web`.
+Στο `[6/6] verifying` η πρώτη απόπειρα έφαγε **502** και η δεύτερη πέρασε: φυσιολογικό ζέσταμα του
+container, το retry υπάρχει ακριβώς γι' αυτό, δεν είναι συμβάν. Οι δύο προειδοποιήσεις του build
+(`jose` / `CompressionStream` στο Edge Runtime, μέσω `src/lib/session.ts`) είναι παλιές και γνωστές.
+
+**Ανεξάρτητη επαλήθευση από έξω** (χωρίς `--resolve`, ώστε να περνάει από Cloudflare edge + tunnel):
+- `ph-aros.com/` · 200, 388 KB, περιέχει `self-host`
+- `app.ph-aros.com/account/login` · 200, 90 KB, **σώμα διαφορετικό** από το apex, άρα σωστά
+  ξεχωριστά upstream, κανένα regression στο routing
+- `POST /api/cron/saas/trials-sweep` χωρίς token · 401 `{"error":"unauthorized"}`
+- Containers: `pharos-web` up, `pharos-mongo` up healthy, `pharos-landing` up. Δέντρο στο `b24762b`.
+
+**Τι μπήκε στην παραγωγή, ουσιαστικά:** το `0079dbd` (tenancy scoping της σελίδας reports στη βάση
+του σωστού tenant), το `0a1a2af` (leftover budget προς savings goal), το `efcda28` (tagged receipt
+line items στο category breakdown), το `c6efd2a`/`f68efc0`/`edf4651`/`0d89ac6` (η αλυσίδα του
+offsite backup) και το `265428a` (φίλτρο tag στο wud για το mongo). Τα υπόλοιπα είναι docs.
+
+**Το cron ΔΕΝ έχει αφαιρεθεί ακόμα**: `0 5 * * *`, `enabled: true`, `nextRunAt` 2026-08-30T02:07Z.
+Η routine θα ξαναφύγει μόνη της αύριο το πρωί, ενώ το SKILL της λέει ότι δεν έχει schedule.
+Παραμένει ανοιχτό στο `pharos-deploy-20260828-0210`.
