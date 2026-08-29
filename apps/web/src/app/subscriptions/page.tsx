@@ -1,6 +1,8 @@
 import { connectDB } from '@/lib/db';
-import { Subscription } from '@/models/Subscription';
-import { Card } from '@/models/Card';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { Card as CardModel } from '@/models/Card';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { SubscriptionsClient } from './SubscriptionsClient';
 import { getAppSettings } from '@/lib/appSettings';
 import { discoverUntrackedRecurring } from './actions';
@@ -14,7 +16,10 @@ async function getData(): Promise<{
   cards: SerializedCard[];
   candidates: RecurringCandidate[];
 }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Subscription = await currentModel(SubscriptionModel);
+  const Card = await currentModel(CardModel);
   const [subs, cards, candidates] = await Promise.all([
     Subscription.find().sort({ active: -1, nextRenewal: 1 }).lean(),
     Card.find({ active: true }).sort({ name: 1 }).lean(),
@@ -25,6 +30,7 @@ async function getData(): Promise<{
     cards: JSON.parse(JSON.stringify(cards)),
     candidates,
   };
+  });
 }
 
 export default async function SubscriptionsPage() {

@@ -1,10 +1,12 @@
 import { connectDB } from '@/lib/db';
 import { addCycle, cycleRenews } from '@/lib/billingCycle';
-import { Subscription } from '@/models/Subscription';
-import { Statement } from '@/models/Statement';
-import { Item } from '@/models/Item';
-import { Voucher } from '@/models/Voucher';
-import { Expense } from '@/models/Expense';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { Statement as StatementModel } from '@/models/Statement';
+import { Item as ItemModel } from '@/models/Item';
+import { Voucher as VoucherModel } from '@/models/Voucher';
+import { Expense as ExpenseModel } from '@/models/Expense';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { computeInstallmentPlans } from '@/lib/installments';
 import type { SerializedStatement } from '@/types';
 import { CalendarClient, type Entry, type MonthBlock } from './CalendarClient';
@@ -20,7 +22,13 @@ export const dynamic = 'force-dynamic';
 const mk = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
 async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBlock[]; dueThisMonth: number }> {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Subscription = await currentModel(SubscriptionModel);
+  const Statement = await currentModel(StatementModel);
+  const Item = await currentModel(ItemModel);
+  const Voucher = await currentModel(VoucherModel);
+  const Expense = await currentModel(ExpenseModel);
   const now = new Date();
   const windowStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const windowEnd = new Date(now.getFullYear(), now.getMonth() + 3, 1);
@@ -122,6 +130,7 @@ async function getAgenda(t: TFunc, intlTag: string): Promise<{ months: MonthBloc
     m.inc = Math.round(m.inc * 100) / 100;
   }
   return { months, dueThisMonth: months[0].out };
+  });
 }
 
 export default async function CalendarPage() {

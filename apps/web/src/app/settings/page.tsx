@@ -1,10 +1,12 @@
 import { connectDB } from '@/lib/db';
-import { Item } from '@/models/Item';
-import { Receipt } from '@/models/Receipt';
-import { Statement } from '@/models/Statement';
-import { Subscription } from '@/models/Subscription';
-import { Card } from '@/models/Card';
-import { AppConfig } from '@/models/AppConfig';
+import { Item as ItemModel } from '@/models/Item';
+import { Receipt as ReceiptModel } from '@/models/Receipt';
+import { Statement as StatementModel } from '@/models/Statement';
+import { Subscription as SubscriptionModel } from '@/models/Subscription';
+import { Card as CardModel } from '@/models/Card';
+import { AppConfig as AppConfigModel } from '@/models/AppConfig';
+import { withRequestTenant } from '@/lib/tenancy/request';
+import { currentModel } from '@/lib/tenancy/connection';
 import { isOllamaHealthy, isAiReady } from '@/lib/ollama';
 import { getAiConfig } from '@/lib/aiConfig';
 import { getAppSettings } from '@/lib/appSettings';
@@ -18,7 +20,14 @@ import type { SerializedCard } from '@/types';
 export const dynamic = 'force-dynamic';
 
 async function getInfo() {
+  return withRequestTenant(async () => {
   await connectDB();
+  const Item = await currentModel(ItemModel);
+  const Receipt = await currentModel(ReceiptModel);
+  const Statement = await currentModel(StatementModel);
+  const Subscription = await currentModel(SubscriptionModel);
+  const Card = await currentModel(CardModel);
+  const AppConfig = await currentModel(AppConfigModel);
   const [items, receipts, statements, subscriptions, cards, cardList, ollamaUp, aiReady, cfg, installed, doc, stores, settings, prompts, scraperAi, storage, imap] =
     await Promise.all([
       Item.countDocuments(),
@@ -79,6 +88,7 @@ async function getInfo() {
       ready: aiReady, // provider-aware readiness (drives per-feature status chips)
     },
   };
+  });
 }
 
 export default async function SettingsPage() {
