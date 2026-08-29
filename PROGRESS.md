@@ -12227,3 +12227,56 @@ isolation bug στο SaaS mode και όχι μικρό. Αξίζει μια σ�
 **Επόμενο task**: ο έλεγχος tenancy στο `reports/page.tsx` παραπάνω, γιατί αν επιβεβαιωθεί
 προηγείται όλων. Αν αποδειχτεί ψευδής συναγερμός, συνέχεια με την **ομάδα C** (αντικείμενα και
 εξοπλισμός) από το approved queue.
+
+## 2026-08-29 08:20 — pharos-brain
+
+**Prod health**: `https://ph-aros.com/` **200** και το landing σερβίρει σωστά περιεχόμενο
+(βρέθηκαν `waitlist` και `self-host`), `https://app.ph-aros.com/account/login` **200**,
+`POST /api/cron/saas/trials-sweep` χωρίς token → **401 `{"error":"unauthorized"}`**. Όλα υγιή,
+τίποτα να διαγνώσω. Guard: κανένα `ROUTINES_PAUSED`, cap 3/ημέρα και σήμερα υπήρχε μία μόνο
+εγγραφή (02:50), άρα αυτό είναι το 2ο work-run. `ASK_ACHILLEAS.md`: καμία εγγραφή για
+`pharos-brain`, τίποτα ANSWERED να εφαρμοστεί, καμία νέα OPEN απόφαση δεν χρειάστηκε.
+
+**Το ΕΝΑ πράγμα**: επιβεβαίωσα και διόρθωσα τον συναγερμό tenancy που είχε σηκώσει το
+προηγούμενο run. **Δεν ήταν ψευδής**. Το `app/reports/page.tsx` διάβαζε τα `Receipt`, `Item`,
+`Subscription`, `Statement`, `Expense`, `Goal` κατευθείαν από τα imported models, δηλαδή πάνω
+στην **default σύνδεση** της mongoose, ενώ όλες οι μεταναστευμένες σελίδες (items, receipts,
+expenses, bills, tasks, statements, shopping, vouchers) περνάνε από `withRequestTenant` +
+`currentModel`. Σε SaaS mode αυτό σήμαινε ότι ολόκληρη η σελίδα διάβαζε τη default βάση αντί για
+τη βάση του workspace.
+
+**Και δεν ήταν μόνο ανάγνωση**: το `captureAndListSnapshots` (lib/netWorth.ts) γράφει το
+snapshot του τρέχοντος μήνα με `updateOne`. Χρησιμοποιεί σωστά `currentModel`, αλλά χωρίς
+ambient tenant το `currentTenant()` επιστρέφει τον DEFAULT, οπότε **η εγγραφή έπεφτε στην
+κοινή default βάση**: κάθε workspace που άνοιγε τα Reports έγραφε και ξαναδιάβαζε την ίδια
+σειρά net worth. Αυτό ανεβάζει το εύρημα από «λάθος δεδομένα» σε πραγματική διαρροή/μόλυνση
+μεταξύ tenants, άρα δικαιολογημένα P1.
+
+Η διόρθωση είναι η ίδια ακριβώς φόρμα με το `items/page.tsx`: τα model imports γίνονται
+`*Model` aliases, το σώμα του `getReports` τυλίγεται σε `withRequestTenant`, και τα έξι μοντέλα
+περνάνε από `currentModel`. **Το self-hosted δεν αλλάζει εξ ορισμού**: ο DEFAULT tenant δίνει
+κενό `dbNameFor`, το `tenantDb` επιστρέφει την default σύνδεση και το `tenantModel` γυρίζει το
+μοντέλο άθικτο. Commit `0079dbd`, pushed.
+
+**Το ίδιο λάθος υπάρχει και αλλού, δεν το άγγιξα (ένα πράγμα ανά run)**: το ίδιο pattern
+απευθείας model import μέσα σε server component το έχουν ακόμα το `app/page.tsx` (το dashboard,
+11 counts/aggregates), το `app/calendar/page.tsx` (5 collections), το
+`app/subscriptions/page.tsx` και το `app/settings/page.tsx`. Το `app/setup/page.tsx` κοιτάει
+μόνο `User.countDocuments()` και οι σελίδες κάτω από `(saas)/account` και `admin/` δουλεύουν
+σωστά πάνω στο control plane, άρα αυτές είναι εντάξει. Οι τέσσερις πρώτες είναι το ίδιο bug με
+το ίδιο ακριβώς μοτίβο διόρθωσης.
+
+**Verified**: `npm run type-check` **EXIT 0**. Κανένα test δεν εισάγει τη σελίδα (τα server
+components δεν έχουν unit tests εδώ), οπότε δεν έτρεξα ολόκληρο το vitest για μια αλλαγή που
+είναι καθαρά rebinding μοντέλων. **Καμία επαλήθευση στον browser**: αυτό το Mac εξακολουθεί να
+μην έχει Docker και το `:3000` δεν σερβίρεται.
+
+**Unshipped στην παραγωγή**: **17 commits** μπροστά από το `232084f` (το τελευταίο γνωστό
+deploy, 28/8 10:15), μαζί με αυτή εδώ την εγγραφή. Το deploy run της 29/8 μπλοκαρίστηκε
+(cron misfire + SSH auth failure), οπότε **η στοίβα μεγαλώνει**: το `pharos-deploy` θέλει
+χειροκίνητο τρέξιμο από τον Αχιλλέα όταν ξεμπλοκάρει το SSH. Αυτή η διόρθωση tenancy έχει
+νόημα μόνο αφού φτάσει στην παραγωγή.
+
+**Επόμενο task**: η ίδια διόρθωση στο `app/page.tsx` (το dashboard), που είναι η σελίδα με τη
+μεγαλύτερη επισκεψιμότητα από τις τέσσερις που απομένουν, και μετά calendar / subscriptions /
+settings με τη σειρά.
