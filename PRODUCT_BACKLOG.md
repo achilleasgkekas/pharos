@@ -280,6 +280,20 @@
 
 > **Νεοεγκεκριμένα 2026-08-03 (interactive, «approve all ως έχουν, προχώρα τα»):** P81, P66, P74, P48, P46, P40 — όλα S, με τη σειρά που παρατίθενται. Ο Αχιλλέας ενέκρινε ρητά τα builder defaults του κάθε item ως έχουν, οπότε **καμία «ανοιχτή απόφαση» δεν μένει ανοιχτή σε αυτά τα έξι**: ο builder υλοποιεί ό,τι γράφει το «Ανοιχτή απόφαση (builder default)» πεδίο τους αυτούσιο, χωρίς να ξαναρωτήσει.
 
+> **Νεοεγκεκριμένα 2026-08-28 (interactive, ζητήθηκε ρητά από τον Αχιλλέα):**
+> - **P103. Επιλογή τύπου notifications (ανά κατηγορία alert)** — S/M — both. Σήμερα το
+>   `runAlertChecks` στέλνει **ένα ενιαίο periodic summary** στο ntfy του χρήστη (`appconfigs.ntfyUrl`,
+>   Settings → Notifiers) με **όλες** τις γραμμές alert μαζί (budget over, return window closing,
+>   warranty expiring, low stock, recurring due κ.λπ.). Ο Αχιλλέας θέλει να **επιλέγει ΤΙ στέλνεται**:
+>   στο Settings → Notifiers, per-type toggles ώστε να ενεργοποιεί/απενεργοποιεί κάθε είδος alert
+>   ξεχωριστά. **Ανοιχτή απόφαση (builder default):** boolean toggle ανά τύπο alert αποθηκευμένο στο
+>   `appconfigs` (π.χ. `notifyTypes: { budgetOver: true, returnWindow: true, ... }`), **default όλα ON**
+>   (μη-breaking — η σημερινή συμπεριφορά μένει ίδια για υπάρχοντες χρήστες), το `runAlertChecks`
+>   φιλτράρει τις γραμμές με βάση το enabled set **πριν** στείλει, και αν δεν μείνει καμία γραμμή δεν
+>   στέλνει καθόλου. Μηδέν AI, reuse του υπάρχοντος notifier pipeline. Το UI = μια λίστα από checkboxes
+>   στο υπάρχον Notifiers panel. (Ζητήθηκε αφότου μπερδεύτηκε «ti akrivws stelnei» το ntfy — να το
+>   κάνει διαφανές και επιλέξιμο.)
+
 > **Νεοεγκεκριμένα 2026-08-07 (interactive, «το ABC μπορεί να γίνει approve»):** ο Αχιλλέας πέρασε
 > τρεις ολόκληρες θεματικές ομάδες από το review των 43 ανοιχτών items. **22 items, όλα εγκεκριμένα
 > ως έχουν** (ισχύει ο ίδιος κανόνας builder-defaults με τις 2026-08-03: καμία ανοιχτή απόφαση δεν
