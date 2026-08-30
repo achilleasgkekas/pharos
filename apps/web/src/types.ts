@@ -41,6 +41,13 @@ export type SerializedItem = {
   receiptIds: string[];
   photos: string[];
   attachments: SerializedAttachment[];
+  /** P55: resale bookkeeping, only meaningful on a `sold` item. `soldPrice` is ALWAYS
+   *  base currency (a resale is its own transaction, not the original receipt's rate). */
+  soldPrice: number | null;
+  soldAt: string | null;
+  soldTo: string;
+  /** Id of the Expense(kind='income') already created from this sale, else null. */
+  soldIncomeId: string | null;
   warrantyUntil: string | null;
   serialNumber: string;
   location: string;

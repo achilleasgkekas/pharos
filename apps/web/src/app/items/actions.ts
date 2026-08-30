@@ -29,6 +29,7 @@ import {
 } from '@/lib/fx';
 import type { SerializedItem, SerializedAttachment } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
+import { addExpense } from '@/app/expenses/actions';
 
 const CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'] as const;
 const STATUSES = ['researching', 'decided', 'ordered', 'received', 'installed', 'deferred', 'sold', 'broken'] as const;
@@ -52,6 +53,18 @@ const ItemFormSchema = z.object({
   currency: z.string().default(''),
   fxRate: z.coerce.number().min(0).default(0),
   purchasedFrom: z.string().default(''),
+  // P55 resale. Deliberately OUTSIDE the FX pipeline below: `fxRate` describes the
+  // original receipt, while a resale is a separate, usually local transaction, so
+  // `soldPrice` is taken as base currency exactly as typed. Blank = old behaviour.
+  soldPrice: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+    z.number().nullable().default(null)
+  ),
+  soldAt: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : new Date(String(v))),
+    z.date().nullable().default(null)
+  ),
+  soldTo: z.string().default(''),
   specs: z.string().default(''),
   notes: z.string().default(''),
   tags: z.string().default(''),
@@ -135,6 +148,49 @@ export async function updateItem(id: string, formData: FormData) {
     links: parsedLinks,
   });
   revalidatePath('/items');
+  });
+}
+
+/**
+ * P55 — book a recorded sale as income, ONE click, explicitly opt-in.
+ *
+ * Deliberately never automatic: plenty of people already type the sale in by hand (or it
+ * lands via a bank statement), and an automatic booking would double-count it. The created
+ * Expense id is written back to `soldIncomeId`, which is also the idempotency guard — a
+ * second click on an already-logged sale is refused instead of creating a twin.
+ *
+ * `soldPrice` is base currency by construction (see the model note), so no currency/fxRate
+ * is handed over and addExpense's own resolveFx passes the figure straight through.
+ */
+export async function logSaleAsIncome(
+  id: string
+): Promise<{ ok: boolean; expenseId?: string; error?: string }> {
+  await assertCanWrite();
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Item = await currentModel(ItemModel);
+    const item = await Item.findById(id).lean();
+    if (!item) return { ok: false, error: 'Item not found' };
+    if (item.soldIncomeId) return { ok: false, error: 'This sale is already logged as income' };
+    const price = Number(item.soldPrice) || 0;
+    if (price <= 0) return { ok: false, error: 'Set a sale price first' };
+
+    const soldOn = item.soldAt ? new Date(item.soldAt) : new Date();
+    const res = await addExpense({
+      kind: 'income',
+      vendor: (item.soldTo || '').trim() || item.title,
+      category: 'other',
+      amount: price,
+      date: soldOn.toISOString(),
+      notes: `Sold: ${item.title}`,
+      verified: true,
+    });
+    if (!res.ok || !res.id) return { ok: false, error: res.error || 'Could not log the income' };
+
+    await Item.updateOne({ _id: id }, { $set: { soldIncomeId: res.id } });
+    revalidatePath('/items');
+    revalidatePath('/income');
+    return { ok: true, expenseId: res.id };
   });
 }
 

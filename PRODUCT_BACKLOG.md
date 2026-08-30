@@ -920,7 +920,7 @@
   για N επιλεγμένα items» ως δεύτερο βήμα αν αξίζει· URL μέσα στο QR = relative-to-deployment path (self-host friendly,
   δουλεύει σε οποιοδήποτε domain/IP χωρίς hardcoded host).
 
-### P55. Item resale / disposal proceeds tracking (το «sold» status να αποθηκεύει κάτι) — S — OSS
+### P55. Item resale / disposal proceeds tracking (το «sold» status να αποθηκεύει κάτι) — ✅ SHIPPED 2026-08-30 (pharos-brain)
 - **Αξία:** το `Item.status` έχει ήδη τιμές **`sold`/`broken`** (verified: `models/Item.ts` `ITEM_STATUSES`) αλλά
   **κανένα πεδίο δεν αποθηκεύει τίποτα σχετικό με την πώληση** — το να βάλεις ένα item σε `sold` σήμερα είναι απλά
   μια ετικέτα, χωρίς τιμή πώλησης/αγοραστή/ημερομηνία. Ο Αχιλλέας αναβαθμίζει τακτικά hardware (Battle Station parts,

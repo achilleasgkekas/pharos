@@ -89,6 +89,19 @@ const ItemSchema = new Schema(
     photos: { type: [String], default: [] },
     attachments: { type: [AttachmentSchema], default: [] },
 
+    // P55: what actually happened when the item left the house. Only meaningful while
+    // `status` is 'sold'; all-empty keeps the pre-P55 behaviour, where 'sold' was a bare
+    // label that stored nothing. NOTE: unlike the three purchase-side prices above,
+    // `soldPrice` is ALWAYS in the deployment's base currency and is never FX-converted —
+    // `fxRate` belongs to the ORIGINAL receipt, and a later resale is a different
+    // transaction (usually local), so reusing that rate would invent a number.
+    soldPrice: { type: Number, default: null },
+    soldAt: { type: Date, default: null },
+    soldTo: { type: String, default: '' }, // free-form: a person, a marketplace, a shop
+    // Set once the optional "log as income" button has actually created the linked
+    // Expense(kind='income'), so a second click cannot double-count the same sale.
+    soldIncomeId: { type: Schema.Types.ObjectId, ref: 'Expense', default: null },
+
     warrantyUntil: { type: Date, default: null },
     serialNumber: { type: String, default: '' },
     location: { type: String, default: '' }, // where it physically lives (room / rack / shelf)

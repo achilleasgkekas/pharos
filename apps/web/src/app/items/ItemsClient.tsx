@@ -51,7 +51,7 @@ import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
 import { ItemDocuments } from './ItemDocuments';
-import { createItem, updateItem, deleteItem, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
+import { createItem, updateItem, deleteItem, logSaleAsIncome, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -1402,6 +1402,21 @@ function ItemDetailModal({
     });
   }
 
+  // P55 — opt-in only, and guarded server-side by `soldIncomeId` so a double click
+  // cannot book the same sale twice.
+  function handleLogSaleIncome() {
+    setActionMsg(null);
+    startTransition(async () => {
+      const r = await logSaleAsIncome(item._id);
+      if (!r.ok) {
+        setActionMsg({ text: r.error ?? 'Could not log the income', tone: 'err' });
+        return;
+      }
+      setActionMsg({ text: t('it.saleLoggedOk'), href: '/income', tone: 'ok' });
+      router.refresh();
+    });
+  }
+
   async function handleDelete() {
     const ok = await confirm({
       title: t('it.deleteItem'),
@@ -1422,6 +1437,14 @@ function ItemDetailModal({
   // Falls back to currentPrice only when there are no priced links — so a stale/seeded
   // currentPrice (e.g. €475 with no store) never shows over the actual store prices.
   const headlinePrice = item.purchasedPrice ? item.purchasedPrice : (bestLinkPrice(item)?.price ?? (item.currentPrice || 0));
+  // P55 — realized gain/loss on an actual sale, against what the item cost. Null when
+  // either half is missing: with no purchase price there is nothing to compare against,
+  // and a bare `sold` status with no recorded price stays the plain label it always was.
+  const soldFor = item.status === 'sold' && item.soldPrice != null && item.soldPrice > 0 ? item.soldPrice : null;
+  const realized =
+    soldFor != null && item.purchasedPrice != null && item.purchasedPrice > 0
+      ? Math.round((soldFor - item.purchasedPrice) * 100) / 100
+      : null;
 
   return (
     <>
@@ -1470,6 +1493,58 @@ function ItemDetailModal({
               </div>
             )}
           </div>
+
+          {/* P55 — the sale itself: what it fetched, from whom, and the realized gain/loss
+              against the purchase price. Only rendered once a price was actually recorded. */}
+          {soldFor != null && (
+            <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-3">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {t('it.soldForLabel')}
+                  </div>
+                  <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)' }}>
+                    {cur()}{soldFor}
+                  </div>
+                  {(item.soldTo || item.soldAt) && (
+                    <div className="text-xs text-[color:var(--color-text-dim)] mt-0.5">
+                      {item.soldTo}
+                      {item.soldTo && item.soldAt ? ' · ' : ''}
+                      {item.soldAt ? new Date(item.soldAt).toLocaleDateString('en-GB') : ''}
+                    </div>
+                  )}
+                </div>
+                {realized != null && (
+                  <div className="text-right">
+                    <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-mono)' }}>
+                      {t('it.realizedLabel')}
+                    </div>
+                    <div
+                      className={cn(
+                        'text-sm font-semibold',
+                        realized >= 0 ? 'text-[color:var(--color-accent)]' : 'text-[color:var(--color-red)]'
+                      )}
+                      style={{ fontFamily: 'var(--font-mono)' }}
+                    >
+                      {realized >= 0 ? '+' : '-'}{cur()}{Math.abs(realized)}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {item.soldIncomeId ? (
+                <div className="text-[11px] text-[color:var(--color-text-faint)]">
+                  {t('it.saleAlreadyLogged')}{' '}
+                  <a href="/income" className="underline text-[color:var(--color-cyan)]">
+                    {t('it.viewIncome')}
+                  </a>
+                </div>
+              ) : (
+                <Button variant="ghost" onClick={handleLogSaleIncome} disabled={pending} className="self-start">
+                  {t('it.logAsIncome')}
+                </Button>
+              )}
+            </div>
+          )}
 
           {/* Price-tracker target / deal */}
           {item.targetPrice ? (
@@ -1776,6 +1851,11 @@ type ItemFormState = {
   currency: string;
   fxRate: string;
   purchasedFrom: string;
+  /** P55: only shown while status is `sold`, but kept in state either way so flipping
+   *  the status back and forth never silently wipes a recorded sale. */
+  soldPrice: string;
+  soldAt: string;
+  soldTo: string;
   specs: string;
   notes: string;
   tags: string;
@@ -1821,6 +1901,11 @@ function ItemForm({
     currency: wasForeign ? normalizeCurrency(item?.currency) : normalizeCurrency(fx.base) || 'EUR',
     fxRate: wasForeign && item?.fxRate ? String(item.fxRate) : '',
     purchasedFrom: item?.purchasedFrom ?? '',
+    // P55: NOT run through printedPrice() — a resale is its own transaction and is
+    // stored in base currency, so there is nothing to un-convert.
+    soldPrice: item?.soldPrice != null ? String(item.soldPrice) : '',
+    soldAt: item?.soldAt ? item.soldAt.slice(0, 10) : '',
+    soldTo: item?.soldTo ?? '',
     specs: item?.specs ?? '',
     notes: item?.notes ?? '',
     tags: (item?.tags ?? []).join(', '),
@@ -1961,6 +2046,30 @@ function ItemForm({
           placeholder={t('it.fPurchasedPlaceholder')}
         />
       </Field>
+
+      {/* P55 — resale. Appears only on a `sold` item; everything here is optional, so
+          leaving it blank keeps `sold` behaving exactly as it did before (a bare label).
+          The amounts are base currency: see the note on ItemFormSchema.soldPrice. */}
+      {form.status === 'sold' && (
+        <>
+          <Field label={t('it.fSoldPrice', { cur: cur() })}>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.soldPrice}
+              onChange={set('soldPrice')}
+              placeholder={t('it.fSoldPricePlaceholder')}
+            />
+          </Field>
+          <Field label={t('it.fSoldAt')}>
+            <Input type="date" value={form.soldAt} onChange={set('soldAt')} />
+          </Field>
+          <Field label={t('it.fSoldTo')} className="md:col-span-2">
+            <Input value={form.soldTo} onChange={set('soldTo')} placeholder={t('it.fSoldToPlaceholder')} />
+          </Field>
+        </>
+      )}
 
       {/* Specs */}
       <Field label={t('it.fSpecs')} className="md:col-span-2">
