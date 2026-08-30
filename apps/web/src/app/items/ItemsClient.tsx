@@ -24,6 +24,7 @@ import {
   Merge,
   ImagePlus,
   Pencil,
+  Truck,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -37,6 +38,7 @@ import { CURRENCIES, currencySymbol } from '@/lib/money';
 import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency, toPrinted } from '@/lib/fx';
+import { COMMON_CARRIERS, hasKnownCarrier, resolveTrackingUrl } from '@/lib/tracking';
 import type { SerializedItem } from '@/types';
 import { VIEW_CONFIG, type ItemView } from '@/lib/itemStatus';
 import { type InstallmentPlan } from '@/lib/installments';
@@ -51,7 +53,7 @@ import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
 import { ItemDocuments } from './ItemDocuments';
-import { createItem, updateItem, deleteItem, logSaleAsIncome, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
+import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -1417,6 +1419,22 @@ function ItemDetailModal({
     });
   }
 
+  // P72 — one click for the common end of an order. Server-side the flip is conditional on
+  // the item still being `ordered`, so a stale tab cannot rewrite a status somebody else
+  // already moved past.
+  function handleArrived() {
+    setActionMsg(null);
+    startTransition(async () => {
+      const r = await markItemArrived(item._id);
+      if (!r.ok) {
+        setActionMsg({ text: r.error ?? 'Could not update the item', tone: 'err' });
+        return;
+      }
+      setActionMsg({ text: t('it.arrivedOk'), tone: 'ok' });
+      router.refresh();
+    });
+  }
+
   async function handleDelete() {
     const ok = await confirm({
       title: t('it.deleteItem'),
@@ -1441,6 +1459,11 @@ function ItemDetailModal({
   // either half is missing: with no purchase price there is nothing to compare against,
   // and a bare `sold` status with no recorded price stays the plain label it always was.
   const soldFor = item.status === 'sold' && item.soldPrice != null && item.soldPrice > 0 ? item.soldPrice : null;
+  // P72 — the parcel widget only exists while the order is open, and only once there is
+  // actually a number to show. `trackUrl` is null for an unknown carrier: no link at all
+  // beats a guessed link that lands on a 404.
+  const tracking = item.status === 'ordered' && (item.trackingNumber || '').trim() ? item : null;
+  const trackUrl = tracking ? resolveTrackingUrl(tracking) : null;
   const realized =
     soldFor != null && item.purchasedPrice != null && item.purchasedPrice > 0
       ? Math.round((soldFor - item.purchasedPrice) * 100) / 100
@@ -1543,6 +1566,39 @@ function ItemDetailModal({
                   {t('it.logAsIncome')}
                 </Button>
               )}
+            </div>
+          )}
+
+          {/* P72 — where the parcel is. A quick link, not a carrier integration: nothing
+              is polled, the number is shown for copy/paste, and "It arrived" saves the
+              trip through the edit form for the one status change that always follows. */}
+          {tracking && (
+            <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <Truck size={12} />
+                    {tracking.carrier?.trim() || t('it.trackingLabel')}
+                  </div>
+                  <div className="text-sm font-semibold break-all" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {tracking.trackingNumber}
+                  </div>
+                </div>
+                {trackUrl && (
+                  <a
+                    href={trackUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 inline-flex items-center gap-1.5 text-xs text-[color:var(--color-cyan)] underline"
+                  >
+                    <ExternalLink size={12} />
+                    {t('it.trackPackage')}
+                  </a>
+                )}
+              </div>
+              <Button variant="ghost" onClick={handleArrived} disabled={pending} className="self-start">
+                {t('it.markArrived')}
+              </Button>
             </div>
           )}
 
@@ -1856,6 +1912,11 @@ type ItemFormState = {
   soldPrice: string;
   soldAt: string;
   soldTo: string;
+  /** P72: only shown while status is `ordered`, kept in state on either side of a status
+   *  change for the same reason as the sale fields above. */
+  trackingNumber: string;
+  carrier: string;
+  trackingUrl: string;
   specs: string;
   notes: string;
   tags: string;
@@ -1906,6 +1967,9 @@ function ItemForm({
     soldPrice: item?.soldPrice != null ? String(item.soldPrice) : '',
     soldAt: item?.soldAt ? item.soldAt.slice(0, 10) : '',
     soldTo: item?.soldTo ?? '',
+    trackingNumber: item?.trackingNumber ?? '',
+    carrier: item?.carrier ?? '',
+    trackingUrl: item?.trackingUrl ?? '',
     specs: item?.specs ?? '',
     notes: item?.notes ?? '',
     tags: (item?.tags ?? []).join(', '),
@@ -2067,6 +2131,46 @@ function ItemForm({
           </Field>
           <Field label={t('it.fSoldTo')} className="md:col-span-2">
             <Input value={form.soldTo} onChange={set('soldTo')} placeholder={t('it.fSoldToPlaceholder')} />
+          </Field>
+        </>
+      )}
+
+      {/* P72 — parcel tracking. Appears only while the item is `ordered`; all three are
+          optional, so a blank block leaves `ordered` exactly as it behaved before. The
+          carrier list is a <datalist>, i.e. suggestions and never a whitelist — an
+          unlisted courier still saves, it just gets no auto-built link. */}
+      {form.status === 'ordered' && (
+        <>
+          <Field label={t('it.fTrackingNumber')}>
+            <Input
+              value={form.trackingNumber}
+              onChange={set('trackingNumber')}
+              placeholder={t('it.fTrackingNumberPlaceholder')}
+            />
+          </Field>
+          <Field label={t('it.fCarrier')}>
+            <Input
+              value={form.carrier}
+              onChange={set('carrier')}
+              list="item-carriers"
+              placeholder={t('it.fCarrierPlaceholder')}
+            />
+            <datalist id="item-carriers">
+              {COMMON_CARRIERS.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </Field>
+          <Field label={t('it.fTrackingUrl')} className="md:col-span-2">
+            <Input
+              value={form.trackingUrl}
+              onChange={set('trackingUrl')}
+              placeholder={
+                form.carrier && !form.trackingUrl && hasKnownCarrier(form.carrier)
+                  ? t('it.fTrackingUrlKnown', { carrier: form.carrier })
+                  : t('it.fTrackingUrlPlaceholder')
+              }
+            />
           </Field>
         </>
       )}

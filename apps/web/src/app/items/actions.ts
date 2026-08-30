@@ -65,6 +65,11 @@ const ItemFormSchema = z.object({
     z.date().nullable().default(null)
   ),
   soldTo: z.string().default(''),
+  // P72 parcel tracking. All three free strings, all optional: blank keeps `ordered`
+  // behaving exactly as it did before. `trackingUrl` is the manual override.
+  trackingNumber: z.string().default(''),
+  carrier: z.string().default(''),
+  trackingUrl: z.string().default(''),
   specs: z.string().default(''),
   notes: z.string().default(''),
   tags: z.string().default(''),
@@ -191,6 +196,31 @@ export async function logSaleAsIncome(
     revalidatePath('/items');
     revalidatePath('/income');
     return { ok: true, expenseId: res.id };
+  });
+}
+
+/**
+ * P72 — "it arrived": flip an ordered item to `received` from the tracking widget, so the
+ * common case is one click instead of open-form / change-status / save.
+ *
+ * Guarded on the CURRENT status rather than blindly setting it: the button only exists on
+ * an ordered item, but a stale tab could fire it against an item somebody already moved on,
+ * and silently rewriting a `sold` or `installed` item back to `received` would lose state.
+ * The tracking fields are deliberately KEPT — they are the record of how it got here.
+ */
+export async function markItemArrived(id: string): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Item = await currentModel(ItemModel);
+    const res = await Item.updateOne(
+      { _id: id, status: 'ordered' },
+      { $set: { status: 'received' } }
+    );
+    if (!res.matchedCount) return { ok: false, error: 'This item is no longer marked as ordered' };
+    revalidatePath('/items');
+    revalidatePath('/shopping');
+    return { ok: true };
   });
 }
 

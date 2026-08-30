@@ -102,6 +102,14 @@ const ItemSchema = new Schema(
     // Expense(kind='income'), so a second click cannot double-count the same sale.
     soldIncomeId: { type: Schema.Types.ObjectId, ref: 'Expense', default: null },
 
+    // P72: where the parcel is, while `status` is 'ordered'. Free-string carrier (same
+    // relaxed-enum idiom as category/status) so an unlisted courier still saves; the
+    // optional `trackingUrl` is a manual override for when a courier changes its public
+    // URL scheme, and beats the guessed template in lib/tracking.ts. No API polling.
+    trackingNumber: { type: String, default: '' },
+    carrier: { type: String, default: '' },
+    trackingUrl: { type: String, default: '' },
+
     warrantyUntil: { type: Date, default: null },
     serialNumber: { type: String, default: '' },
     location: { type: String, default: '' }, // where it physically lives (room / rack / shelf)

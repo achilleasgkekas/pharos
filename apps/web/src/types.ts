@@ -48,6 +48,11 @@ export type SerializedItem = {
   soldTo: string;
   /** Id of the Expense(kind='income') already created from this sale, else null. */
   soldIncomeId: string | null;
+  /** P72: parcel tracking while the item is `ordered`. `trackingUrl` is a manual override
+   *  that wins over the carrier link pattern guessed in lib/tracking.ts. */
+  trackingNumber: string;
+  carrier: string;
+  trackingUrl: string;
   warrantyUntil: string | null;
   serialNumber: string;
   location: string;

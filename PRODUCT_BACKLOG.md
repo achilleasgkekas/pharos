@@ -630,7 +630,7 @@
   όταν υπάρχουν ≥2 users στο instance (single-user deployments δεν βλέπουν κανένα νέο UI, μηδέν clutter)· single-user
   self-host = μηδέν αλλαγή συμπεριφοράς.
 
-### P72. Shipment/delivery tracking για items σε «ordered» status (tracking number + carrier + status) — S — OSS (κυρίως), dogfooding-heavy
+### P72. Shipment/delivery tracking για items σε «ordered» status (tracking number + carrier + status) — ✅ SHIPPED 2026-08-30 (pharos-brain) — S — OSS (κυρίως), dogfooding-heavy
 - **Αξία:** live-verified: το `Item.status` έχει ήδη `'ordered'` (`ITEM_STATUSES` στο `models/Item.ts`) αλλά
   `grep -rn "trackingNumber|carrier|shipment|deliveryStatus" apps/web/src apps/mobile/src` = 0 hits παντού. Ο
   Αχιλλέας παραγγέλνει τακτικά από πολλαπλά κανάλια με πολύ διαφορετικούς χρόνους παράδοσης (AliExpress 2-3
