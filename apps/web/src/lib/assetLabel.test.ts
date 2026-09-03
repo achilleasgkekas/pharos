@@ -82,6 +82,14 @@ describe('buildAssetLabelSheet', () => {
     expect(title.endsWith('…')).toBe(true);
   });
 
+  it('prints the tags in the order handed in — the sheet has to match the list on screen', () => {
+    const html = buildAssetLabelSheet(
+      ['Switch', 'AP', 'NAS'].map((title) => ({ title, subtitle: '', qrDataUrl: 'data:image/png;base64,AAA' })),
+    );
+    const titles = [...html.matchAll(/<div class="title">([^<]*)<\/div>/g)].map((m) => m[1]);
+    expect(titles).toEqual(['Switch', 'AP', 'NAS']);
+  });
+
   it('keeps a tag whole across a page break — half a QR scans as nothing', () => {
     expect(buildAssetLabelSheet([])).toContain('page-break-inside: avoid');
   });

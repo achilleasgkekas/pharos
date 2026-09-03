@@ -3,11 +3,8 @@ import { useEffect, useState } from 'react';
 import { QrCode as QrCodeIcon, Printer, Loader2 } from 'lucide-react';
 import { QrCode } from '@/components/QrCode';
 import { useT } from '@/components/LocaleProvider';
-import { assetLabelUrl, buildAssetLabelSheet } from '@/lib/assetLabel';
-
-/** Print resolution for the tag: a 30mm QR at ~300dpi. The on-screen preview is a separate,
- *  much smaller render — a screen-sized bitmap stretched onto paper scans badly. */
-const PRINT_QR_PX = 600;
+import { assetLabelUrl } from '@/lib/assetLabel';
+import { printAssetTags } from './printAssetTags';
 
 /**
  * P56 — the item's own QR asset tag. The code encodes this deployment's `/items?open=<id>`
@@ -32,14 +29,7 @@ export function ItemAssetTag({ itemId, title, subtitle }: { itemId: string; titl
     if (!url || printing) return;
     setPrinting(true);
     try {
-      const { default: QRCode } = await import('qrcode');
-      const qrDataUrl = await QRCode.toDataURL(url, {
-        width: PRINT_QR_PX,
-        margin: 2,
-        errorCorrectionLevel: 'M', // a sticker gets scuffed; M recovers ~15% of the code
-        color: { dark: '#000000', light: '#ffffff' },
-      });
-      printSheet(buildAssetLabelSheet([{ title, subtitle, qrDataUrl }]));
+      await printAssetTags([{ id: itemId, title, subtitle }]);
     } finally {
       setPrinting(false);
     }
@@ -73,22 +63,4 @@ export function ItemAssetTag({ itemId, title, subtitle }: { itemId: string; titl
       </div>
     </div>
   );
-}
-
-/** Prints a standalone HTML document without leaving the app. An off-screen iframe rather
- *  than `window.open` on purpose: a popup blocker silently swallows the new window, and the
- *  user is left clicking a button that appears to do nothing. */
-function printSheet(html: string) {
-  const frame = document.createElement('iframe');
-  frame.setAttribute('aria-hidden', 'true');
-  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-  frame.srcdoc = html;
-  frame.onload = () => {
-    frame.contentWindow?.focus();
-    frame.contentWindow?.print();
-    // The print dialog is modal but not awaitable; tearing the iframe down immediately
-    // cancels the job in some browsers, so it outlives the call by a beat.
-    setTimeout(() => frame.remove(), 1000);
-  };
-  document.body.appendChild(frame);
 }

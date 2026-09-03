@@ -25,6 +25,7 @@ import {
   ImagePlus,
   Pencil,
   Truck,
+  Printer,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -61,6 +62,7 @@ import { ItemPhotoGallery } from './ItemPhotoGallery';
 import { ItemDocuments } from './ItemDocuments';
 import { ItemAssetTag } from './ItemAssetTag';
 import { assetLabelSubtitle } from '@/lib/assetLabel';
+import { printAssetTags } from './printAssetTags';
 import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
@@ -129,6 +131,10 @@ const FLAG_DEFS: { key: string; label: string; test: (i: SerializedItem) => bool
     },
   },
 ];
+
+/** Above this many selected items the bulk tag sheet asks before it starts: every tag is a
+ *  600px QR rendered in this tab, and a whole inventory at once is a freeze and a ream. */
+const BULK_TAG_CONFIRM_AT = 40;
 
 const selectClass =
   'w-full bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-lg px-4 py-2 text-sm text-[color:var(--color-text)] focus:outline-none focus:border-[color:var(--color-accent)] transition-colors';
@@ -210,6 +216,7 @@ export function ItemsClient({
   const [layout, setLayout] = useState<'grid' | 'list'>(defaultView);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [printingTags, setPrintingTags] = useState(false);
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -342,6 +349,32 @@ export function ItemsClient({
       refresh();
     });
   }
+  // P56 (bulk) — one printable sheet of QR asset tags for the selected items, in the exact
+  // order they appear on screen: stickers and boxes get paired up by hand, so a sheet in a
+  // different order than the list is worse than no sheet. Inventory only, same rule as the
+  // single tag on the detail modal — a wishlist entry is not a physical object yet.
+  async function handlePrintTags() {
+    if (printingTags) return;
+    const sel = filtered.filter((i) => selectedIds.has(i._id));
+    if (sel.length === 0) return;
+    // Each tag is a 600px QR rendered in the browser; a whole inventory at once is a long
+    // freeze and a lot of paper, so a large run asks first instead of just starting.
+    if (sel.length > BULK_TAG_CONFIRM_AT) {
+      const ok = await confirm({
+        title: t('it.printTagsConfirmTitle', { n: sel.length }),
+        message: t('it.printTagsConfirmBody', { n: sel.length }),
+        confirmLabel: t('it.printTagsConfirmOk'),
+      });
+      if (!ok) return;
+    }
+    setPrintingTags(true);
+    try {
+      await printAssetTags(sel.map((i) => ({ id: i._id, title: i.title, subtitle: assetLabelSubtitle(i) })));
+    } finally {
+      setPrintingTags(false);
+    }
+  }
+
   const selectAllFiltered = () => setSelectedIds(new Set(filtered.map((i) => i._id)));
 
   // Manual merge of the selected items — covers different-title dupes that the
@@ -552,6 +585,17 @@ export function ItemsClient({
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-accent)] text-[color:var(--color-accent)] hover:opacity-80 transition-colors"
                       >
                         <Sparkles size={14} /> {t('it.aiFillAll', { n: selectedIds.size })}
+                      </button>
+                    )}
+                    {view === 'inventory' && selectedIds.size > 0 && (
+                      <button
+                        onClick={handlePrintTags}
+                        disabled={printingTags}
+                        title={t('it.printTagsTitle')}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] text-[color:var(--color-text-dim)] hover:text-[color:var(--color-text)] hover:border-[color:var(--color-accent)] transition-colors disabled:opacity-50"
+                      >
+                        {printingTags ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}{' '}
+                        {t('it.printTagsN', { n: selectedIds.size })}
                       </button>
                     )}
                     {selectedIds.size >= 2 && (
