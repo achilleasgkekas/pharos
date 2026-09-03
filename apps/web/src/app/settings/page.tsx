@@ -70,6 +70,7 @@ async function getInfo() {
       ollamaModel: cfg.ollamaModel,
       ollamaVisionModel: cfg.ollamaVisionModel,
       anthropicModel: cfg.anthropicModel,
+      anthropicWorkspaceId: cfg.anthropicWorkspaceId,
       hasKey: !!(doc?.anthropicApiKey || process.env.ANTHROPIC_API_KEY),
       openaiModel: cfg.openaiModel,
       hasOpenaiKey: !!cfg.openaiApiKey,

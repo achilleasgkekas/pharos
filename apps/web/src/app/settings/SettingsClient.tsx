@@ -60,6 +60,7 @@ type AiInfo = {
   ollamaModel: string;
   ollamaVisionModel: string;
   anthropicModel: string;
+  anthropicWorkspaceId: string;
   hasKey: boolean;
   openaiModel: string;
   hasOpenaiKey: boolean;
@@ -603,6 +604,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
   const [ollamaModel, setOllamaModel] = useState(ai.ollamaModel);
   const [visionModel, setVisionModel] = useState(ai.ollamaVisionModel);
   const [anthropicModel, setAnthropicModel] = useState(ai.anthropicModel);
+  const [anthropicWorkspaceId, setAnthropicWorkspaceId] = useState(ai.anthropicWorkspaceId);
   const [apiKey, setApiKey] = useState('');
   const [openaiModel, setOpenaiModel] = useState(ai.openaiModel);
   const [openaiKey, setOpenaiKey] = useState('');
@@ -625,6 +627,7 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
     fd.set('ollamaModel', ollamaModel.trim());
     fd.set('ollamaVisionModel', visionModel.trim());
     fd.set('anthropicModel', anthropicModel.trim());
+    fd.set('anthropicWorkspaceId', anthropicWorkspaceId.trim());
     fd.set('openaiModel', openaiModel.trim());
     fd.set('geminiModel', geminiModel.trim());
     fd.set('openrouterModel', openrouterModel.trim());
@@ -847,6 +850,22 @@ function AiSettings({ ai, ollamaUp }: { ai: AiInfo; ollamaUp: boolean }) {
             suggestions={CLAUDE_SUGGESTIONS}
             recommend={PROVIDER_RECOMMEND.anthropic}
           />
+          <Field label={t('set.anthropicWorkspaceId')}>
+            <input
+              type="text"
+              value={anthropicWorkspaceId}
+              onChange={(e) => setAnthropicWorkspaceId(e.target.value)}
+              placeholder="wrkspc_…"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
+              className={inputClass}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+            <p className="mt-1 text-[10px] text-[color:var(--color-text-faint)]" style={{ fontFamily: 'var(--font-mono)' }}>
+              {t('set.anthropicWorkspaceIdHint')}
+            </p>
+          </Field>
           <div className="flex items-center gap-2">
             <button
               type="button"

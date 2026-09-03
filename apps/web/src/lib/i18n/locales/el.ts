@@ -1060,6 +1060,8 @@ export const el: Partial<Dict> = {
   'set.download': 'Λήψη',
   'set.visionModelHint': 'Οι αποδείξεις/κάρτες θέλουν vision μοντέλο (qwen2.5vl / minicpm-v / llava). Ή τρέξε ollama pull <name> σε terminal.',
   'set.anthropicNote': 'Χρησιμοποιείται για αποδείξεις, statements & specs προϊόντων. Το Claude υποστηρίζει εικόνες + κείμενο.',
+  'set.anthropicWorkspaceId': 'Workspace ID (προαιρετικό)',
+  'set.anthropicWorkspaceIdHint': 'Χρειάζεται μόνο για identity-linked κλειδιά — το id του workspace στο οποίο ενεργεί το κλειδί.',
   'set.openaiHint': 'Διάλεξε μοντέλο με vision (gpt-4o / gpt-4o-mini) για να διαβάζονται και οι εικόνες αποδείξεων.',
   'set.geminiHint': 'Τα Gemini Flash διαβάζουν εικόνες native — καλή φθηνή προεπιλογή.',
   'set.openrouterHint': 'Ένα key, όλα τα μοντέλα — χρησιμοποίησε provider/model ids από openrouter.ai/models.',

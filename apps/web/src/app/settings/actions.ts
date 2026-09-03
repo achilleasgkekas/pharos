@@ -174,6 +174,10 @@ export async function saveAiConfig(formData: FormData): Promise<{ ok: boolean }>
     ollamaModel,
     ollamaVisionModel,
     anthropicModel: String(formData.get('anthropicModel') || '').trim() || 'claude-sonnet-4-5-20250929',
+    // Not a secret (a workspace id, not a key), so it is stored directly rather than through the
+    // "only overwrite when typed" path below — writing the trimmed value every save lets the user
+    // clear it by emptying the field.
+    anthropicWorkspaceId: String(formData.get('anthropicWorkspaceId') || '').trim(),
     openaiModel: String(formData.get('openaiModel') || '').trim(),
     geminiModel: String(formData.get('geminiModel') || '').trim(),
     openrouterModel: String(formData.get('openrouterModel') || '').trim(),
@@ -826,8 +830,9 @@ export async function testAnthropic(): Promise<{ ok: boolean; error?: string }> 
   const doc = await (await scoped(AppConfig)).findOne({ key: 'singleton' }).lean();
   const key = doc?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '';
   const model = doc?.anthropicModel || 'claude-sonnet-4-5-20250929';
+  const workspaceId = doc?.anthropicWorkspaceId || process.env.ANTHROPIC_WORKSPACE_ID || '';
   if (!key) return { ok: false, error: 'No API key saved yet' };
-  return anthropicTest(key, model);
+  return anthropicTest(key, model, workspaceId);
 }
 
 // ─── Editable AI prompts ─────────────────────────────────────────────────────

@@ -26,6 +26,20 @@ export function redactKey(s: string, apiKey: string): string {
   return out.replace(/sk-ant-[A-Za-z0-9_-]+/g, '[redacted]');
 }
 
+/** Standard request headers, plus `anthropic-workspace-id` when the key is identity-linked and
+ *  the user supplied a workspace id. Without that header such keys fail with HTTP 400
+ *  ("anthropic-workspace-id is required when authenticating with an identity-linked API key"). */
+function anthropicHeaders(apiKey: string, workspaceId?: string): Record<string, string> {
+  const h: Record<string, string> = {
+    'content-type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01',
+  };
+  const ws = workspaceId?.trim();
+  if (ws) h['anthropic-workspace-id'] = ws;
+  return h;
+}
+
 type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; source: { type: 'base64'; media_type: ImageMedia; data: string } };
@@ -36,6 +50,7 @@ type ContentBlock =
  */
 export async function anthropicJSON(opts: {
   apiKey: string;
+  workspaceId?: string;
   model: string;
   system: string;
   user: string;
@@ -49,11 +64,7 @@ export async function anthropicJSON(opts: {
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': opts.apiKey,
-      'anthropic-version': '2023-06-01',
-    },
+    headers: anthropicHeaders(opts.apiKey, opts.workspaceId),
     body: JSON.stringify({
       model: opts.model,
       max_tokens: 4096,
@@ -93,6 +104,7 @@ export type AnthropicMessage = { role: 'user' | 'assistant'; content: string | u
 /** Low-level Claude call with tool support. The caller runs the tool loop. */
 export async function anthropicRaw(opts: {
   apiKey: string;
+  workspaceId?: string;
   model: string;
   system: string;
   tools?: AnthropicTool[];
@@ -101,7 +113,7 @@ export async function anthropicRaw(opts: {
 }): Promise<{ content: AnthropicBlock[]; stopReason: string }> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': opts.apiKey, 'anthropic-version': '2023-06-01' },
+    headers: anthropicHeaders(opts.apiKey, opts.workspaceId),
     body: JSON.stringify({
       model: opts.model,
       max_tokens: opts.maxTokens ?? 1024,
@@ -125,15 +137,15 @@ export async function anthropicRaw(opts: {
 }
 
 /** Lightweight credential check used by the settings "Test" button. */
-export async function anthropicTest(apiKey: string, model: string): Promise<{ ok: boolean; error?: string }> {
+export async function anthropicTest(
+  apiKey: string,
+  model: string,
+  workspaceId?: string,
+): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: anthropicHeaders(apiKey, workspaceId),
       body: JSON.stringify({
         model,
         max_tokens: 8,

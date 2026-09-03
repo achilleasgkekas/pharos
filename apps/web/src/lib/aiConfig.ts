@@ -14,6 +14,11 @@ export type AiConfig = {
   ollamaVisionModel: string;
   anthropicApiKey: string;
   anthropicModel: string;
+  // Optional. Required only for identity-linked API keys (org/programmatic keys not scoped to
+  // a single workspace): the Anthropic API then rejects the call with HTTP 400 unless the
+  // request names the workspace via the `anthropic-workspace-id` header. Blank for the common
+  // case of a plain workspace key. Format: `wrkspc_…`.
+  anthropicWorkspaceId: string;
   openaiApiKey: string;
   openaiModel: string;
   geminiApiKey: string;
@@ -130,6 +135,7 @@ export async function getAiConfig(): Promise<AiConfig> {
     ollamaVisionModel?: string;
     anthropicApiKey?: string;
     anthropicModel?: string;
+    anthropicWorkspaceId?: string;
     openaiApiKey?: string;
     openaiModel?: string;
     geminiApiKey?: string;
@@ -166,6 +172,7 @@ export async function getAiConfig(): Promise<AiConfig> {
     ollamaVisionModel,
     anthropicApiKey: doc?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '',
     anthropicModel: doc?.anthropicModel || 'claude-sonnet-4-5-20250929',
+    anthropicWorkspaceId: doc?.anthropicWorkspaceId || process.env.ANTHROPIC_WORKSPACE_ID || '',
     openaiApiKey: doc?.openaiApiKey || process.env.OPENAI_API_KEY || '',
     openaiModel: doc?.openaiModel || 'gpt-4o-mini',
     geminiApiKey: doc?.geminiApiKey || process.env.GEMINI_API_KEY || '',

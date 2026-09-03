@@ -54,7 +54,7 @@ async function cloudJSON(
 ): Promise<{ json: unknown; raw: string; model: string } | null> {
   switch (cfg.provider) {
     case 'anthropic':
-      return anthropicJSON({ apiKey: cfg.anthropicApiKey, model: cfg.anthropicModel, system, user, imagesBase64 });
+      return anthropicJSON({ apiKey: cfg.anthropicApiKey, workspaceId: cfg.anthropicWorkspaceId, model: cfg.anthropicModel, system, user, imagesBase64 });
     case 'openai':
       return openaiCompatJSON({ baseUrl: 'https://api.openai.com/v1', apiKey: cfg.openaiApiKey, model: cfg.openaiModel, system, user, imagesBase64 });
     case 'openrouter':

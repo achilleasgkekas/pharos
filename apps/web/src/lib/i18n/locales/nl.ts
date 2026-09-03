@@ -696,6 +696,8 @@ export const nl: Partial<Dict> = {
   'set.download': 'Downloaden',
   'set.visionModelHint': 'Bonnen/kaarten hebben een vision-model nodig (qwen2.5vl / minicpm-v / llava). Of voer ollama pull <name> uit in een terminal.',
   'set.anthropicNote': 'Gebruikt voor bonnen, afschriften & productspecs. Claude ondersteunt afbeeldingen + tekst.',
+  'set.anthropicWorkspaceId': 'Workspace-ID (optioneel)',
+  'set.anthropicWorkspaceIdHint': 'Alleen voor identiteitsgekoppelde sleutels — de id van de workspace waarin deze sleutel werkt.',
   'set.openaiHint': 'Kies een vision-model (gpt-4o / gpt-4o-mini) zodat bonafbeeldingen ook geanalyseerd worden.',
   'set.geminiHint': 'Gemini Flash-modellen lezen afbeeldingen native — goede goedkope standaardkeuze.',
   'set.openrouterHint': 'Eén sleutel, alle modellen — gebruik provider/model-ids van openrouter.ai/models.',

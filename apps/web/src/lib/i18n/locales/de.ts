@@ -696,6 +696,8 @@ export const de: Partial<Dict> = {
   'set.download': 'Herunterladen',
   'set.visionModelHint': 'Belege/Karten brauchen ein Vision-Modell (qwen2.5vl / minicpm-v / llava). Oder führe ollama pull <name> in einem Terminal aus.',
   'set.anthropicNote': 'Wird für Belege, Auszüge & Produkt-Specs verwendet. Claude unterstützt Bilder + Text.',
+  'set.anthropicWorkspaceId': 'Workspace-ID (optional)',
+  'set.anthropicWorkspaceIdHint': 'Nur für identitätsgebundene Schlüssel — die ID des Workspace, in dem dieser Schlüssel agiert.',
   'set.openaiHint': 'Wähle ein vision-fähiges Modell (gpt-4o / gpt-4o-mini), damit auch Belegbilder erkannt werden.',
   'set.geminiHint': 'Gemini-Flash-Modelle lesen Bilder nativ — gute günstige Standardwahl.',
   'set.openrouterHint': 'Ein Schlüssel, alle Modelle — nutze provider/model-ids von openrouter.ai/models.',

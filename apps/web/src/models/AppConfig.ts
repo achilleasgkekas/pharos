@@ -17,6 +17,8 @@ const AppConfigSchema = new Schema(
     ollamaVisionModel: { type: String, default: '' }, // '' → OLLAMA_VISION_MODEL env
     anthropicApiKey: { type: String, default: '' }, // server-only, never sent to the client
     anthropicModel: { type: String, default: 'claude-sonnet-4-5-20250929' },
+    anthropicWorkspaceId: { type: String, default: '' }, // for identity-linked keys → anthropic-workspace-id header; not a secret
+
     // Cost guard: confirm (with a rough cost estimate) before starting a BULK AI job.
     // On by default so cloud (Anthropic) runs never start by accident.
     aiConfirmBulk: { type: Boolean, default: true },

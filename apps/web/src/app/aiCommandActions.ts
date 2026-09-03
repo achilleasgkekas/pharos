@@ -51,7 +51,7 @@ async function runAiCommandInTenant(history: ChatTurn[], conversationId?: string
 
   try {
     for (let i = 0; i < 6; i++) {
-      const { content } = await anthropicRaw({ apiKey: cfg.anthropicApiKey, model: cfg.anthropicModel, system: `${SYSTEM}\nToday is ${today()}.`, tools: TOOLS, messages, maxTokens: 1024 });
+      const { content } = await anthropicRaw({ apiKey: cfg.anthropicApiKey, workspaceId: cfg.anthropicWorkspaceId, model: cfg.anthropicModel, system: `${SYSTEM}\nToday is ${today()}.`, tools: TOOLS, messages, maxTokens: 1024 });
       const toolUses = content.filter((b): b is Extract<AnthropicBlock, { type: 'tool_use' }> => b.type === 'tool_use');
       const textOut = content
         .filter((b): b is Extract<AnthropicBlock, { type: 'text' }> => b.type === 'text')

@@ -505,7 +505,7 @@ describe('testAnthropic', () => {
     process.env.ANTHROPIC_API_KEY = 'env-key';
     try {
       await testAnthropic();
-      expect(anthropicTestMock).toHaveBeenCalledWith('env-key', 'claude-sonnet-4-5-20250929');
+      expect(anthropicTestMock).toHaveBeenCalledWith('env-key', 'claude-sonnet-4-5-20250929', '');
     } finally {
       if (prev === undefined) delete process.env.ANTHROPIC_API_KEY;
       else process.env.ANTHROPIC_API_KEY = prev;
@@ -515,7 +515,13 @@ describe('testAnthropic', () => {
   it('prefers the saved key + model over the env fallback', async () => {
     appConfigFindOneLean.mockResolvedValueOnce({ anthropicApiKey: 'saved-key', anthropicModel: 'claude-haiku' });
     await testAnthropic();
-    expect(anthropicTestMock).toHaveBeenCalledWith('saved-key', 'claude-haiku');
+    expect(anthropicTestMock).toHaveBeenCalledWith('saved-key', 'claude-haiku', '');
+  });
+
+  it('passes the saved workspace id through to anthropicTest (identity-linked keys)', async () => {
+    appConfigFindOneLean.mockResolvedValueOnce({ anthropicApiKey: 'saved-key', anthropicModel: 'claude-haiku', anthropicWorkspaceId: 'wrkspc_abc' });
+    await testAnthropic();
+    expect(anthropicTestMock).toHaveBeenCalledWith('saved-key', 'claude-haiku', 'wrkspc_abc');
   });
 });
 

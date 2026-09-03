@@ -1115,6 +1115,8 @@ export const en = {
   'set.download': 'Download',
   'set.visionModelHint': 'Receipts/cards need a vision model (qwen2.5vl / minicpm-v / llava). Or run ollama pull <name> in a terminal.',
   'set.anthropicNote': 'Used for receipts, statements & product specs. Images + text both supported by Claude.',
+  'set.anthropicWorkspaceId': 'Workspace ID (optional)',
+  'set.anthropicWorkspaceIdHint': 'Only needed for identity-linked keys — the id of the workspace this key acts in.',
   'set.openaiHint': 'Pick a vision-capable model (gpt-4o / gpt-4o-mini) so receipt images parse too.',
   'set.geminiHint': 'Gemini Flash models read images natively — good cheap default.',
   'set.openrouterHint': 'One key, every model — use provider/model ids from openrouter.ai/models.',

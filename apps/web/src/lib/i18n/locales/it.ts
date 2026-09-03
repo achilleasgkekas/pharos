@@ -696,6 +696,8 @@ export const it: Partial<Dict> = {
   'set.download': 'Scarica',
   'set.visionModelHint': 'Ricevute/carte richiedono un modello di visione (qwen2.5vl / minicpm-v / llava). Oppure esegui ollama pull <name> in un terminale.',
   'set.anthropicNote': 'Usato per ricevute, estratti e specifiche prodotto. Claude supporta immagini + testo.',
+  'set.anthropicWorkspaceId': 'Workspace ID (facoltativo)',
+  'set.anthropicWorkspaceIdHint': 'Solo per chiavi collegate all\'identità — l\'id del workspace in cui opera questa chiave.',
   'set.openaiHint': 'Scegli un modello con visione (gpt-4o / gpt-4o-mini) così vengono analizzate anche le immagini delle ricevute.',
   'set.geminiHint': 'I modelli Gemini Flash leggono le immagini in modo nativo — buona scelta predefinita ed economica.',
   'set.openrouterHint': 'Una chiave, tutti i modelli — usa id provider/model da openrouter.ai/models.',
