@@ -914,7 +914,7 @@
   (δεν κάνει pause/cancel μόνο του, αφήνει την απόφαση στον χρήστη)· καμία επίδραση σε subscriptions με `pausedUntil`
   ενεργό (P45) — αυτές είναι ήδη ρητά «σε παύση», δεν χρειάζονται νέο nudge.
 
-### P56. Printable QR asset-tag labels για inventory items (scan-to-view) — ✅ SHIPPED 2026-09-03 (`9eafef3`, pharos-brain, single-item· bulk sheet μένει follow-up) — S/M — OSS (dogfooding-heavy, «Personal Hub» fit)
+### P56. Printable QR asset-tag labels για inventory items (scan-to-view) — ✅ SHIPPED 2026-09-03 (`9eafef3`, pharos-brain, single-item) + 2026-09-04 (`6f06568`, bulk sheet για N επιλεγμένα — ΠΛΗΡΕΣ) — S/M — OSS (dogfooding-heavy, «Personal Hub» fit)
 - **Αξία:** ο Αχιλλέας έχει φυσικό εξοπλισμό σε κουτιά/rack/σπίτια (Battle Station parts, δίκτυο, 3D printer, 2 σπίτια)
   όπου το «ποιο κουτί/ράφι έχει τι» είναι καθαρά φυσικό πρόβλημα οργάνωσης — σήμερα το `Item.location` (free string,
   CLAUDE.md) λέει *πού πρέπει να είναι* αλλά τίποτα δεν γεφυρώνει το φυσικό αντικείμενο με την ψηφιακή εγγραφή του.
