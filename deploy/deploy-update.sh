@@ -48,7 +48,17 @@ say() { printf '%s\n' "$*"; }
 # deploy instead: idempotent, costs nothing once correct, and survives a host rebuild or a
 # fresh volume without needing a manual chown again. 1001 mirrors the image's `nextjs` user.
 mkdir -p "$HERE/storage"
-chown -R 1001:1001 "$HERE/storage" 2>/dev/null || true
+# chowning to a uid other than your own needs root. The earlier `chown … 2>/dev/null || true`
+# looked right but silently no-op'd whenever this script runs as a non-root user (the normal
+# case): the failure was swallowed and the storage stayed root/other-owned, so the "self-heal"
+# never actually healed and uploads kept hitting EACCES. Use sudo when not already root, and if
+# even that can't chown, say so loudly instead of hiding it. 1001 mirrors the image's `nextjs`.
+if [ "$(id -u)" = "0" ]; then
+  chown -R 1001:1001 "$HERE/storage"
+else
+  sudo chown -R 1001:1001 "$HERE/storage" 2>/dev/null \
+    || echo "WARN: could not chown $HERE/storage to 1001 — run this deploy as root or grant the deploy user passwordless sudo, otherwise receipt uploads fail with EACCES" >&2
+fi
 
 # ── health ──────────────────────────────────────────────────────────────────────────────────
 # Retries because a container that has just been recreated needs a moment; a single probe would
