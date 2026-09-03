@@ -666,7 +666,7 @@
   με το γιατί το `GiftCard.uses[]` μένει εκτός AI στο P66)· τιμή ποτέ σε plaintext state πέρα από το ανοιχτό
   detail view.
 
-### P70. Custom user-defined πεδία σε Items (structured key-value metadata) — S/M — OSS (κυρίως, dogfooding-heavy)
+### P70. Custom user-defined πεδία σε Items (structured key-value metadata) — ✅ SHIPPED 2026-09-03 (`6a1cd1e`, pharos-brain) — S/M — OSS (κυρίως, dogfooding-heavy)
 - **Αξία:** live-verified `models/Item.ts` έχει μόνο ένα ελεύθερο `specs` string (ενιαίο text blob) + `tags[]`,
   **κανένα structured key-value πεδίο** (`grep -n "customField" apps/web/src/models/Item.ts apps/web/src/app/items`
   = 0 hits). Για hardware-heavy inventory (Battle Station parts, δίκτυο εξοπλισμός, CLAUDE.md) ο χρήστης θα
@@ -678,6 +678,18 @@
 - **Ανοιχτή απόφαση (builder default):** MVP = μόνο πεδίο + εμφάνιση/edit (κενό = σημερινή συμπεριφορά αμετάβλητη)·
   filter-by-custom-field ως follow-up ώστε το πρώτο slice να μείνει S· free-form key strings, όχι fixed schema
   (ίδιο idiom με το ήδη-υπάρχον relaxed-enum category/taxonomy pattern).
+- **Τι έγινε**: νέο optional `customFields: [{key, value}]` στο `models/Item.ts` (κενό array = ακριβώς η προ-P70
+  εγγραφή), editor με γραμμές στη φόρμα του item και μικρός πίνακας στο detail. Οι κανόνες ζουν στο καθαρό
+  `lib/customFields.ts` ώστε να ισχύουν για οποιονδήποτε γράψει το πεδίο αργότερα (importer, API), όχι μόνο για
+  τη σημερινή φόρμα: γραμμή χωρίς key πέφτει, **κενή τιμή κρατιέται** (το «δεν το ξέρω ακόμα» είναι πραγματική
+  κατάσταση), διπλά keys μαζεύονται στο πρώτο case-insensitively ώστε μια κρυφή δεύτερη γραμμή να μη σκιάζει μια
+  ορατή τιμή, και το πολύ μεγάλο input κόβεται αντί να απορρίπτεται.
+- **Απόφαση που πάρθηκε μόνη της (καταγραφή)**: το free-text search box ψάχνει πλέον **και** στο όνομα και στην
+  τιμή του attribute. Είναι το μισό value proposition με μηδενικό κόστος (μια γραμμή στο υπάρχον predicate)· το
+  **structured filter-by-key** μένει follow-up όπως όριζε το builder default, δεν μπήκε.
+- **Τα caps δεν είναι αυθαίρετη αυστηρότητα** (50 πεδία, 60/500 χαρακτήρες): το array είναι **embedded** στο item
+  document και η σελίδα Items φορτώνει όλα τα owned items ολόκληρα, οπότε απεριόριστη λίστα θα πληρωνόταν σε κάθε
+  render της λίστας, όχι μόνο στο detail.
 
 ### P69. Year-over-year ίδιου μήνα σύγκριση δαπανών (εποχιακό κόστος) στα Reports — ✅ SHIPPED 2026-08-09 (pharos-daily-dev)
 
