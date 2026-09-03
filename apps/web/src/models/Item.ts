@@ -42,6 +42,18 @@ const AttachmentSchema = new Schema(
   { _id: false }
 );
 
+// P70: user-named attributes (MAC address, rack unit, firmware revision, licence key).
+// Distinct from `specs`, which is one free text blob: here the value carries its own label,
+// so it can be read back and searched by name. Keys are free strings, same relaxed idiom as
+// `category`. Normalisation, dedupe and the size caps live in lib/customFields.ts.
+const CustomFieldSchema = new Schema(
+  {
+    key: { type: String, required: true },
+    value: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
 const ItemSchema = new Schema(
   {
     num: { type: String, default: '' },
@@ -109,6 +121,9 @@ const ItemSchema = new Schema(
     trackingNumber: { type: String, default: '' },
     carrier: { type: String, default: '' },
     trackingUrl: { type: String, default: '' },
+
+    // P70: optional named attributes. Empty array = exactly the pre-P70 record.
+    customFields: { type: [CustomFieldSchema], default: [] },
 
     warrantyUntil: { type: Date, default: null },
     serialNumber: { type: String, default: '' },

@@ -29,6 +29,7 @@ import {
 } from '@/lib/fx';
 import type { SerializedItem, SerializedAttachment } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
+import { parseCustomFields } from '@/lib/customFields';
 import { addExpense } from '@/app/expenses/actions';
 
 const CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'] as const;
@@ -77,6 +78,9 @@ const ItemFormSchema = z.object({
   location: z.string().default(''),
   num: z.string().default(''),
   links: z.string().default('[]'), // JSON-encoded [{label,url}]
+  // P70: JSON-encoded [{key,value}]. Absent (an older client, or the API routes) parses to
+  // [], which is exactly the pre-P70 record — it never wipes anything a form did not send.
+  customFields: z.string().default('[]'),
 });
 
 function parseTags(raw: string): string[] {
@@ -114,7 +118,7 @@ export async function createItem(formData: FormData) {
   return withRequestTenant(async () => {
   const raw = Object.fromEntries(formData);
   const parsed = ItemFormSchema.parse(raw);
-  const { links, tags, ...rest } = parsed;
+  const { links, tags, customFields, ...rest } = parsed;
   const money = await resolveItemFx(parsed);
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -129,6 +133,7 @@ export async function createItem(formData: FormData) {
     currentPrice: cl ?? money.currentPrice,
     tags: parseTags(tags),
     links: parsedLinks,
+    customFields: parseCustomFields(customFields),
   });
   revalidatePath('/items');
   });
@@ -139,7 +144,7 @@ export async function updateItem(id: string, formData: FormData) {
   return withRequestTenant(async () => {
   const raw = Object.fromEntries(formData);
   const parsed = ItemFormSchema.parse(raw);
-  const { links, tags, ...rest } = parsed;
+  const { links, tags, customFields, ...rest } = parsed;
   const money = await resolveItemFx(parsed);
   await connectDB();
   const Item = await currentModel(ItemModel);
@@ -151,6 +156,7 @@ export async function updateItem(id: string, formData: FormData) {
     currentPrice: cl ?? money.currentPrice,
     tags: parseTags(tags),
     links: parsedLinks,
+    customFields: parseCustomFields(customFields),
   });
   revalidatePath('/items');
   });

@@ -53,6 +53,9 @@ export type SerializedItem = {
   trackingNumber: string;
   carrier: string;
   trackingUrl: string;
+  /** P70: user-named attributes. May be absent on documents written before P70 — read it
+   *  as `item.customFields ?? []`, lean queries do not fill schema defaults in. */
+  customFields: { key: string; value: string }[];
   warrantyUntil: string | null;
   serialNumber: string;
   location: string;

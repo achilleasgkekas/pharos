@@ -39,6 +39,12 @@ import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency, toPrinted } from '@/lib/fx';
 import { COMMON_CARRIERS, hasKnownCarrier, resolveTrackingUrl } from '@/lib/tracking';
+import {
+  customFieldsMatch,
+  MAX_KEY_LENGTH,
+  MAX_VALUE_LENGTH,
+  type CustomField,
+} from '@/lib/customFields';
 import type { SerializedItem } from '@/types';
 import { VIEW_CONFIG, type ItemView } from '@/lib/itemStatus';
 import { type InstallmentPlan } from '@/lib/installments';
@@ -273,7 +279,10 @@ export function ItemsClient({
           !item.title.toLowerCase().includes(q) &&
           !item.specs.toLowerCase().includes(q) &&
           !item.notes.toLowerCase().includes(q) &&
-          !item.tags.some((t) => t.toLowerCase().includes(q))
+          !item.tags.some((t) => t.toLowerCase().includes(q)) &&
+          // P70: a named attribute is searchable by BOTH its name and its value, so the
+          // box finds "mac" as well as the address itself. Structured filter-by-key later.
+          !customFieldsMatch(item.customFields, q)
         )
           return false;
       }
@@ -1713,6 +1722,26 @@ function ItemDetailModal({
             )}
           </div>
 
+          {/* P70 — the item's own named attributes. Rendered as plain text on purpose: these
+              are values the user typed for themselves, never links and never markup. */}
+          {(item.customFields ?? []).length > 0 && (
+            <div>
+              <p className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                {t('it.customFields')}
+              </p>
+              <dl className="rounded-lg border border-[color:var(--color-border)] divide-y divide-[color:var(--color-border)] overflow-hidden">
+                {(item.customFields ?? []).map((f, i) => (
+                  <div key={i} className="flex gap-3 px-3 py-1.5 text-xs">
+                    <dt className="w-32 shrink-0 text-[color:var(--color-text-faint)] break-words">{f.key}</dt>
+                    <dd className="min-w-0 flex-1 break-words" style={{ fontFamily: 'var(--font-mono)' }}>
+                      {f.value || '—'}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+
           {/* Where to buy (owned items only — wishlist shows store links in the PricePanel below) */}
           {view === 'inventory' && item.links.length > 0 && (
             <div>
@@ -1982,6 +2011,15 @@ function ItemForm({
       : []
   );
 
+  // P70: named attributes, edited as their own rows. Kept out of `form` (which is a flat
+  // string map posted field-by-field) for the same reason links are: it is an array.
+  const [customFields, setCustomFields] = useState<CustomField[]>(item?.customFields ?? []);
+
+  const updateCustomField = (i: number, k: 'key' | 'value', v: string) =>
+    setCustomFields((prev) => prev.map((f, idx) => (idx === i ? { ...f, [k]: v } : f)));
+  const addCustomField = () => setCustomFields((prev) => [...prev, { key: '', value: '' }]);
+  const removeCustomField = (i: number) => setCustomFields((prev) => prev.filter((_, idx) => idx !== i));
+
   const updateLink = (i: number, k: 'label' | 'url' | 'price', v: string) =>
     setLinks((prev) => prev.map((l, idx) => (idx === i ? { ...l, [k]: v } : l)));
   const addLink = () => setLinks((prev) => [...prev, { label: '', url: '', price: '' }]);
@@ -1997,6 +2035,9 @@ function ItemForm({
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => fd.set(k, v));
     fd.set('links', JSON.stringify(links.filter((l) => l.url.trim())));
+    // A row with no name is dropped here as well as server-side, so the editor shows the
+    // same outcome the record will have. The server rules are the ones that count.
+    fd.set('customFields', JSON.stringify(customFields.filter((f) => f.key.trim())));
     startTransition(async () => {
       if (item) {
         await updateItem(item._id, fd);
@@ -2276,6 +2317,58 @@ function ItemForm({
           ))}
           {links.length === 0 && (
             <p className="text-xs text-[color:var(--color-text-faint)] italic">{t('it.noLinks')}</p>
+          )}
+        </div>
+      </div>
+
+      {/* P70 — custom fields editor. Free-form names, no fixed schema and no admin list:
+          whatever the user calls the attribute is what gets stored. */}
+      <div className="md:col-span-2">
+        <div className="flex items-center justify-between mb-1.5">
+          <label
+            className="block text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
+            {t('it.customFieldsN', { n: customFields.length })}
+          </label>
+          <button
+            type="button"
+            onClick={addCustomField}
+            className="text-[10px] text-[color:var(--color-accent)] flex items-center gap-1 hover:opacity-80"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
+            <Plus size={11} /> {t('common.add')}
+          </button>
+        </div>
+        <div className="space-y-1.5">
+          {customFields.map((f, i) => (
+            <div key={i} className="flex gap-1.5 items-center">
+              <input
+                value={f.key}
+                onChange={(e) => updateCustomField(i, 'key', e.target.value)}
+                placeholder={t('it.fCustomFieldKey')}
+                maxLength={MAX_KEY_LENGTH}
+                className="w-32 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+              />
+              <input
+                value={f.value}
+                onChange={(e) => updateCustomField(i, 'value', e.target.value)}
+                placeholder={t('it.fCustomFieldValue')}
+                maxLength={MAX_VALUE_LENGTH}
+                className="flex-1 min-w-0 bg-[color:var(--color-surface-2)] border border-[color:var(--color-border)] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[color:var(--color-accent)]"
+                style={{ fontFamily: 'var(--font-mono)' }}
+              />
+              <button
+                type="button"
+                onClick={() => removeCustomField(i)}
+                className="text-[color:var(--color-text-faint)] hover:text-[color:var(--color-red)] transition-colors p-1 shrink-0"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ))}
+          {customFields.length === 0 && (
+            <p className="text-xs text-[color:var(--color-text-faint)] italic">{t('it.noCustomFields')}</p>
           )}
         </div>
       </div>
