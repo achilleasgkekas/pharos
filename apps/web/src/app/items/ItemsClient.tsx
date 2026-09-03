@@ -59,6 +59,8 @@ import { InstallmentPlanCard } from '@/components/InstallmentPlanCard';
 import { useOpenParam } from '@/components/useOpenParam';
 import { ItemPhotoGallery } from './ItemPhotoGallery';
 import { ItemDocuments } from './ItemDocuments';
+import { ItemAssetTag } from './ItemAssetTag';
+import { assetLabelSubtitle } from '@/lib/assetLabel';
 import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
@@ -1907,6 +1909,14 @@ function ItemDetailModal({
       <div className="mb-4">
         <ItemDocuments key={`docs-${item._id}-${item.updatedAt}`} itemId={item._id} attachments={item.attachments ?? []} />
       </div>
+
+      {/* P56 — printable QR asset tag. Owned inventory only: a wishlist entry is not a
+          physical object yet, so there is nothing to stick a sticker on. */}
+      {view === 'inventory' && (
+        <div className="mb-4">
+          <ItemAssetTag itemId={item._id} title={item.title} subtitle={assetLabelSubtitle(item)} />
+        </div>
+      )}
 
       <ItemForm key={`f-${item._id}-${item.updatedAt}`} item={item} fx={fx} onSuccess={onClose} onDelete={handleDelete} deletePending={pending} />
     </Modal>
