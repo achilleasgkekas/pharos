@@ -15,6 +15,7 @@ export const ALERT_TYPES = [
   { key: 'trials', label: 'Free trials ending' },
   { key: 'giftCards', label: 'Gift cards expiring with balance' },
   { key: 'bills', label: 'Bills due / overdue' },
+  { key: 'maintenance', label: 'Maintenance due on owned items' },
   { key: 'budgets', label: 'Budgets exceeded' },
   { key: 'syncStale', label: 'Remote backup fallen behind' },
 ] as const;

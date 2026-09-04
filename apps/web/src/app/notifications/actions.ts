@@ -15,12 +15,13 @@ import { currentModel } from '@/lib/tenancy/connection';
 import { currentTenant, withTenant } from '@/lib/tenancy/current';
 import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { billDaysUntilDue, billRemaining } from '@/lib/bill';
+import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
 import { computeInstallmentPlans } from '@/lib/installments';
 import { detectPriceHikes, type HikeEntry } from '@/lib/priceHike';
 import type { SerializedStatement } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
 
-export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'bill' | 'system';
+export type NotifKind = 'deal' | 'installment' | 'warranty' | 'pricehike' | 'trialend' | 'giftcard' | 'bill' | 'maintenance' | 'system';
 
 export type SerializedNotification = {
   _id: string;
@@ -33,7 +34,7 @@ export type SerializedNotification = {
 };
 
 type Alert = { dedupeKey: string; kind: NotifKind; title: string; body: string; href: string };
-const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill'] as const;
+const AUTO_KINDS = ['deal', 'installment', 'warranty', 'pricehike', 'trialend', 'giftcard', 'bill', 'maintenance'] as const;
 
 /** Recompute the live alerts (deals / warranties / installments-due) — the same
  *  three the ntfy check uses, but as structured payloads the bell can localize.
@@ -174,6 +175,23 @@ async function computeAlerts(): Promise<Alert[]> {
       title: b.title,
       body: `${days}|${billRemaining(b.amount, b.payments, null)}`,
       href: '/bills',
+    });
+  }
+
+  // Maintenance due (P41): an owned item whose service interval has come round. The
+  // dedupeKey carries the DUE date, so pressing "serviced today" moves the date, retires
+  // this alert and arms the next cycle — no separate "acknowledged" flag to drift.
+  const maintRows = (await Item.find({ maintenanceIntervalDays: { $gt: 0 }, status: { $in: MAINTENANCE_STATUSES } })
+    .select('title status maintenanceIntervalDays lastMaintenanceAt purchasedAt')
+    .lean()) as MaintenanceRow[];
+  for (const m of collectMaintenanceDue(maintRows, s.maintenanceAlertDays, now)) {
+    // body = "<days>" (raw; negative = overdue, formatted in the bell)
+    alerts.push({
+      dedupeKey: `maintenance:${String(m._id)}:${m.iso}`,
+      kind: 'maintenance',
+      title: m.title,
+      body: `${m.days}`,
+      href: `/items?open=${String(m._id)}`,
     });
   }
 

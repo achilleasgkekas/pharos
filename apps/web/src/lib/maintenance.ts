@@ -92,3 +92,44 @@ export function normalizeMaintenanceInterval(raw: unknown): number | null {
   if (!Number.isFinite(n) || n <= 0) return null;
   return Math.min(Math.round(n), 3650);
 }
+
+/** One inventory row as the alert scans need it (shape of the .lean() projection below). */
+export type MaintenanceRow = {
+  _id: unknown;
+  title: string;
+  status?: string | null;
+  maintenanceIntervalDays?: number | null;
+  lastMaintenanceAt?: string | Date | null;
+  purchasedAt?: string | Date | null;
+};
+
+/** A chore that is due (or overdue). `days` is negative once the date has passed. */
+export type MaintenanceDueEntry = { _id: unknown; title: string; days: number; iso: string };
+
+/**
+ * The items whose next service falls within `leadDays` — soonest (most overdue) first.
+ *
+ * Shared by BOTH alert paths on purpose: the in-app bell (computeAlerts) and the outbound
+ * summary (runAlertChecks) must agree on what is due, or the phone push and the bell would
+ * disagree about the same printer. There is deliberately NO lower bound: an overdue chore
+ * keeps nagging until someone presses "serviced today", exactly like an unpaid bill.
+ *
+ * The Mongo query can only filter on the stored interval, so the status re-check happens
+ * here — a sold or broken thing does not get serviced, and P41 hides the widget for it too.
+ */
+export function collectMaintenanceDue(
+  rows: MaintenanceRow[],
+  leadDays = 7,
+  now: number = Date.now()
+): MaintenanceDueEntry[] {
+  const out: MaintenanceDueEntry[] = [];
+  for (const r of rows) {
+    if (!maintenanceApplies(r.status)) continue;
+    const due = maintenanceNextDue(r.maintenanceIntervalDays, r.lastMaintenanceAt, r.purchasedAt);
+    if (!due) continue;
+    const days = Math.ceil((due.getTime() - now) / 86400000);
+    if (days > leadDays) continue;
+    out.push({ _id: r._id, title: r.title, days, iso: due.toISOString().slice(0, 10) });
+  }
+  return out.sort((a, b) => a.days - b.days);
+}

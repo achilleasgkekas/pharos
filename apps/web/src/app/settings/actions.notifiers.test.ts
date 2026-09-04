@@ -259,6 +259,7 @@ describe('saveDefaults', () => {
       trialAlertDays: 0,
       giftCardAlertDays: 0,
       billAlertDays: 0,
+      maintenanceAlertDays: 0, // blank form → 0, same explicit-zero rule as the siblings (P41)
       syncStaleDays: 0,
       autoAddStores: false,
       currency: 'EUR',

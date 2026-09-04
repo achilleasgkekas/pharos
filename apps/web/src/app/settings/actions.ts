@@ -13,6 +13,7 @@ import { LoyaltyCard } from '@/models/LoyaltyCard';
 import { giftCardBalance, giftCardDaysLeft } from '@/lib/giftcard';
 import { Bill } from '@/models/Bill';
 import { billDaysUntilDue } from '@/lib/bill';
+import { collectMaintenanceDue, MAINTENANCE_STATUSES, type MaintenanceRow } from '@/lib/maintenance';
 import { Card } from '@/models/Card';
 import { Task } from '@/models/Task';
 import { Expense } from '@/models/Expense';
@@ -346,6 +347,10 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
   // 0 is meaningful (bill due/overdue alerts off), so parse explicitly instead of `|| 5`.
   const billRaw = Number(formData.get('billAlertDays'));
   const billAlertDays = Number.isFinite(billRaw) ? Math.max(0, Math.min(90, Math.round(billRaw))) : 5;
+  // Lead time for the P41 maintenance chore. 0 is meaningful ("only once it is actually
+  // due"), and an overdue chore nags past it either way, so parse explicitly.
+  const maintRaw = Number(formData.get('maintenanceAlertDays'));
+  const maintenanceAlertDays = Number.isFinite(maintRaw) ? Math.max(0, Math.min(180, Math.round(maintRaw))) : 7;
   // 0 is meaningful (remote-mirror staleness alerts off), so parse explicitly (P48).
   const syncRaw = Number(formData.get('syncStaleDays'));
   const syncStaleDays = Number.isFinite(syncRaw) ? Math.max(0, Math.min(365, Math.round(syncRaw))) : 7;
@@ -366,6 +371,7 @@ export async function saveDefaults(formData: FormData): Promise<{ ok: boolean }>
         trialAlertDays,
         giftCardAlertDays,
         billAlertDays,
+        maintenanceAlertDays,
         syncStaleDays,
         autoAddStores: autoAdd,
         currency,
@@ -650,6 +656,15 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     .filter((b) => b.days !== null && (b.days as number) <= s.billAlertDays)
     .sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
 
+  // Maintenance due (P41): the only alert here about a chore rather than about money.
+  // Same helper the in-app bell uses (lib/maintenance.ts), so the phone push and the bell
+  // can never disagree about which printer is overdue. Mongo filters on the stored
+  // interval; the status re-check lives inside the helper.
+  const maintRows = (await (await scoped(Item)).find({ maintenanceIntervalDays: { $gt: 0 }, status: { $in: MAINTENANCE_STATUSES } })
+    .select('title status maintenanceIntervalDays lastMaintenanceAt purchasedAt')
+    .lean()) as MaintenanceRow[];
+  const maintenanceDue = collectMaintenanceDue(maintRows, s.maintenanceAlertDays, now);
+
   // Remote-mirror staleness (P48): the only alert here about the backup itself rather
   // than about money or things. Reads a stored timestamp, no network call — a NAS being
   // unreachable must not make the whole alert sweep slow or fail.
@@ -695,6 +710,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const trialsSplit = splitFreshAlerts(nt.trials ? trialsEnding : [], (tr) => `trialend:${String(tr._id)}:${tr.iso}`, previouslySent);
   const giftsSplit = splitFreshAlerts(nt.giftCards ? giftsExpiring : [], (g) => `giftcard:${String(g._id)}:${g.iso}`, previouslySent);
   const billsSplit = splitFreshAlerts(nt.bills ? billsDue : [], (b) => `bill:${String(b._id)}:${b.iso}`, previouslySent);
+  const maintenanceSplit = splitFreshAlerts(nt.maintenance ? maintenanceDue : [], (m) => `maintenance:${String(m._id)}:${m.iso}`, previouslySent);
   const budgetsSplit = splitFreshAlerts(nt.budgets ? budgetsExceeded : [], (b) => `budget:${b.category}:${budgetMonthKey}`, previouslySent);
   const installmentItems = nt.installments && dueThisMonth > 0 ? [{ key: `installments:${period}` }] : [];
   const installmentsSplit = splitFreshAlerts(installmentItems, (i) => i.key, previouslySent);
@@ -712,6 +728,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
     ...trialsSplit.keys,
     ...giftsSplit.keys,
     ...billsSplit.keys,
+    ...maintenanceSplit.keys,
     ...budgetsSplit.keys,
     ...installmentsSplit.keys,
     ...syncStaleSplit.keys,
@@ -725,6 +742,7 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
   const freshTrialsEnding = trialsSplit.fresh;
   const freshGiftsExpiring = giftsSplit.fresh;
   const freshBillsDue = billsSplit.fresh;
+  const freshMaintenanceDue = maintenanceSplit.fresh;
   const freshBudgetsExceeded = budgetsSplit.fresh;
   const dueThisMonthFresh = installmentsSplit.fresh.length > 0 ? dueThisMonth : 0;
   const freshSyncStale = syncStaleSplit.fresh.length > 0 ? syncStale : null;
@@ -767,6 +785,13 @@ export async function runAlertChecks(opts: { dedupe?: boolean } = {}): Promise<{
       `🧾 ${freshBillsDue.length} bill(s) due/overdue: ${freshBillsDue
         .slice(0, 5)
         .map((b) => `${b.title}${b.amount > 0 ? ` ${cur()}${b.amount.toFixed(0)}` : ''} (${(b.days ?? 0) < 0 ? `${-(b.days ?? 0)}d overdue` : `${b.days}d`})`)
+        .join(', ')}`
+    );
+  if (freshMaintenanceDue.length)
+    lines.push(
+      `🔧 ${freshMaintenanceDue.length} item(s) needing service: ${freshMaintenanceDue
+        .slice(0, 5)
+        .map((m) => `${m.title} (${m.days < 0 ? `${-m.days}d overdue` : `${m.days}d`})`)
         .join(', ')}`
     );
   if (freshBudgetsExceeded.length)

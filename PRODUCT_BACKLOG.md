@@ -1084,7 +1084,7 @@
   free-form `type` (όχι hardcoded enum, ώστε να καλύπτει τοπικές παραλλαγές εγγράφων)· optional κάτοχος (name string,
   για νοικοκυριά με πάνω από ένα άτομο, βλ. P31)· ίδιο renewal lead-time pattern με P28/P33 (`AppConfig` alert-days).
 
-### P41. Maintenance / service reminders για owned items (όχι εγγύηση, όχι χρέωση) — S/M — OSS (dogfooding-heavy)
+### P41. Maintenance / service reminders για owned items (όχι εγγύηση, όχι χρέωση) — ✅ SHIPPED 2026-09-04 (`5680469` πεδία + UI, pharos-brain· alert σε δεύτερο commit — ΠΛΗΡΕΣ) — S/M — OSS (dogfooding-heavy)
 - **Αξία:** η εγγύηση λήγει μια φορά· τα Bills/Subscriptions είναι οικονομικές υποχρεώσεις· αλλά πολλά owned
   αντικείμενα χρειάζονται **περιοδική φυσική συντήρηση χωρίς κόστος/λογαριασμό** — καθάρισμα φίλτρων στο UniFi
   rack, αλλαγή nozzle/καθάρισμα στο 3D printer, dust-cleaning στο Battle Station PC, rotation σε κάτι εποχικό.

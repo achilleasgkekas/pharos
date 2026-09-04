@@ -6,6 +6,7 @@ import {
   maintenanceDaysUntilDue,
   maintenanceState,
   normalizeMaintenanceInterval,
+  collectMaintenanceDue,
 } from './maintenance';
 
 const DAY = 86400000;
@@ -97,5 +98,58 @@ describe('normalizeMaintenanceInterval', () => {
   });
   it('caps a fat-fingered interval at ten years', () => {
     expect(normalizeMaintenanceInterval(99999)).toBe(3650);
+  });
+});
+
+describe('collectMaintenanceDue', () => {
+  // `iso` here is the helper the file already defines for "N days from NOW".
+  const row = (over: Record<string, unknown> = {}) => ({
+    _id: 'a',
+    title: 'Printer',
+    status: 'received',
+    maintenanceIntervalDays: 90,
+    lastMaintenanceAt: iso(-89), // due tomorrow
+    purchasedAt: null,
+    ...over,
+  });
+
+  it('picks up a chore inside the lead window and one already overdue', () => {
+    const due = collectMaintenanceDue([row()], 7, NOW);
+    expect(due).toHaveLength(1);
+    expect(due[0].days).toBe(1);
+    const overdue = collectMaintenanceDue([row({ lastMaintenanceAt: iso(-95) })], 7, NOW);
+    expect(overdue[0].days).toBe(-5);
+  });
+
+  it('ignores one that is still far out, and honours a wider lead time', () => {
+    const far = [row({ lastMaintenanceAt: iso(-60) })]; // due in 30d
+    expect(collectMaintenanceDue(far, 7, NOW)).toHaveLength(0);
+    expect(collectMaintenanceDue(far, 45, NOW)).toHaveLength(1);
+  });
+
+  it('skips items that are not in the house any more, whatever the interval says', () => {
+    for (const status of ['sold', 'broken', 'wishlist', 'ordered']) {
+      expect(collectMaintenanceDue([row({ status })], 7, NOW)).toHaveLength(0);
+    }
+  });
+
+  it('skips an unscheduled item and one with nothing to count from', () => {
+    expect(collectMaintenanceDue([row({ maintenanceIntervalDays: null })], 7, NOW)).toHaveLength(0);
+    expect(collectMaintenanceDue([row({ lastMaintenanceAt: null, purchasedAt: null })], 7, NOW)).toHaveLength(0);
+  });
+
+  it('falls back to the purchase date when the chore was never marked done', () => {
+    const due = collectMaintenanceDue([row({ lastMaintenanceAt: null, purchasedAt: iso(-100) })], 7, NOW);
+    expect(due[0].days).toBe(-10);
+  });
+
+  it('sorts most-overdue first and dates each entry for the dedupe key', () => {
+    const rows = [
+      row({ _id: 'b', title: 'Fan', lastMaintenanceAt: iso(-91) }),
+      row({ _id: 'c', title: 'Boiler', lastMaintenanceAt: iso(-120) }),
+    ];
+    const due = collectMaintenanceDue(rows, 7, NOW);
+    expect(due.map((d) => d.title)).toEqual(['Boiler', 'Fan']);
+    expect(due[0].iso).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

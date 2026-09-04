@@ -238,6 +238,7 @@ const DEFAULT_SETTINGS = {
   trialAlertDays: 2,
   giftCardAlertDays: 30,
   billAlertDays: 5,
+  maintenanceAlertDays: 7,
   syncStaleDays: 7,
   budgets: {} as Record<string, number>,
 };
@@ -246,8 +247,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   connectDBMock.mockImplementation(async () => {});
   getAppSettingsMock.mockImplementation(async () => ({ ...DEFAULT_SETTINGS }));
-  // Item.find is called twice in fixed order: deals query first, warranty query second.
-  itemFind.mockReturnValueOnce(chainSelectLean([])).mockReturnValueOnce(chainSelectLean([]));
+  // Item.find serves several queries here (deals, warranties, the P41 maintenance rows).
+  // A plain default rather than a fixed-length queue: a case that cares about ordering
+  // resets the mock and queues its own, and anything it leaves unset lands on this.
+  itemFind.mockReturnValue(chainSelectLean([]));
   receiptFind.mockReturnValue(chainSelectLean([]));
   statementFind.mockReturnValue(chainLean([]));
   // Expense.find is called twice in fixed order: hike rows first, budget rows second.
@@ -300,6 +303,7 @@ describe('runAlertChecks · all-clear baseline', () => {
 describe('runAlertChecks · deals', () => {
   it('counts an item as a deal when currentPrice is at or below its target', async () => {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
       .mockReturnValueOnce(chainSelectLean([]));
@@ -309,6 +313,7 @@ describe('runAlertChecks · deals', () => {
 
   it('prefers the lowest store-link price over currentPrice when it is cheaper', async () => {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(
         chainSelectLean([{ title: 'Switch', targetPrice: 500, currentPrice: 625, links: [{ price: 475 }, { price: 900 }] }])
@@ -320,6 +325,7 @@ describe('runAlertChecks · deals', () => {
 
   it('does not count an item with no priced source at all (currentPrice 0, no links)', async () => {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ title: 'No price', targetPrice: 100, currentPrice: 0, links: [] }]))
       .mockReturnValueOnce(chainSelectLean([]));
@@ -329,6 +335,7 @@ describe('runAlertChecks · deals', () => {
 
   it('does not count an item whose lowest price is still above target', async () => {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ title: 'Too pricey', targetPrice: 100, currentPrice: 150 }]))
       .mockReturnValueOnce(chainSelectLean([]));
@@ -338,6 +345,7 @@ describe('runAlertChecks · deals', () => {
 
   it('fires the price.drop webhook with title+target for every deal, and skips it when there are none', async () => {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
       .mockReturnValueOnce(chainSelectLean([]));
@@ -355,6 +363,7 @@ describe('runAlertChecks · warranty expiries', () => {
   it('includes an item expiring within the configured window, soonest first', async () => {
     getAppSettingsMock.mockImplementation(async () => ({ ...DEFAULT_SETTINGS, warrantyAlertDays: 90 }));
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([]))
       .mockReturnValueOnce(
@@ -369,6 +378,7 @@ describe('runAlertChecks · warranty expiries', () => {
 
   it('excludes an item already past its warranty (negative days)', async () => {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([]))
       .mockReturnValueOnce(chainSelectLean([{ title: 'Expired', warrantyUntil: daysFromNow(-5) }]));
@@ -379,6 +389,7 @@ describe('runAlertChecks · warranty expiries', () => {
   it('excludes an item beyond the alert window', async () => {
     getAppSettingsMock.mockImplementation(async () => ({ ...DEFAULT_SETTINGS, warrantyAlertDays: 30 }));
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([]))
       .mockReturnValueOnce(chainSelectLean([{ title: 'Far off', warrantyUntil: daysFromNow(60) }]));
@@ -388,6 +399,7 @@ describe('runAlertChecks · warranty expiries', () => {
 
   it('has no dedicated webhook event for warranty expiries', async () => {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([]))
       .mockReturnValueOnce(chainSelectLean([{ title: 'Soon', warrantyUntil: daysFromNow(5) }]));
@@ -715,6 +727,7 @@ describe('runAlertChecks · dispatch gating', () => {
 
   it('joins multiple signal lines with newlines, in scan order', async () => {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ title: 'Deal item', targetPrice: 100, currentPrice: 90 }]))
       .mockReturnValueOnce(chainSelectLean([]));
@@ -739,6 +752,7 @@ describe('runAlertChecks · per-type notification toggles (P103)', () => {
   }
   function oneDeal() {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
       .mockReturnValueOnce(chainSelectLean([]));

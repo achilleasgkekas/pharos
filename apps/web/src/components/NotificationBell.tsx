@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, Wallet, FileText, X } from 'lucide-react';
+import { Bell, Tag, ShieldCheck, CreditCard, TrendingUp, AlarmClock, Wallet, FileText, Wrench, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { cur } from '@/lib/money';
 import { useT } from '@/components/LocaleProvider';
@@ -16,7 +16,7 @@ import {
   type NotifKind,
 } from '@/app/notifications/actions';
 
-const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, giftcard: Wallet, bill: FileText, system: Bell };
+const KIND_ICON: Record<NotifKind, typeof Bell> = { deal: Tag, warranty: ShieldCheck, installment: CreditCard, pricehike: TrendingUp, trialend: AlarmClock, giftcard: Wallet, bill: FileText, maintenance: Wrench, system: Bell };
 const KIND_COLOR: Record<NotifKind, string> = {
   deal: 'var(--color-accent)',
   warranty: 'var(--color-gold)',
@@ -25,6 +25,7 @@ const KIND_COLOR: Record<NotifKind, string> = {
   trialend: 'var(--color-purple)',
   giftcard: 'var(--color-cyan)',
   bill: 'var(--color-gold)',
+  maintenance: 'var(--color-cyan)',
   system: 'var(--color-text-dim)',
 };
 
@@ -118,6 +119,11 @@ export function NotificationBell({ open, onOpenChange }: { open: boolean; onOpen
       const d = Number(days);
       const key = d < 0 ? 'notif.billOverdueSub' : d === 0 ? 'notif.billTodaySub' : 'notif.billDueSub';
       return { heading: n.title, sub: t(key, { days: Math.abs(d), amount: cur() + amount }) };
+    }
+    if (n.kind === 'maintenance') {
+      const d = Number(n.body);
+      const key = d < 0 ? 'notif.maintenanceOverdueSub' : d === 0 ? 'notif.maintenanceTodaySub' : 'notif.maintenanceSub';
+      return { heading: n.title, sub: t(key, { days: Math.abs(d) }) };
     }
     return { heading: n.title, sub: n.body };
   }

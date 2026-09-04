@@ -27,6 +27,7 @@ export type AppSettings = {
   trialAlertDays: number; // lead time (days) for free-trial "cancel before charge" alert (P33)
   giftCardAlertDays: number; // window (days) for "gift card expiring with balance" alert (P32); 0 = off
   billAlertDays: number; // lead-time (days) for "bill due / overdue" alert (P28); 0 = off
+  maintenanceAlertDays: number; // lead-time (days) for the "maintenance due" alert (P41); overdue nags regardless
   syncStaleDays: number; // days without a successful remote push before alerting (P48); 0 = off
   autoAddStores: boolean;
   ntfyUrl: string;
@@ -56,6 +57,7 @@ export type RawAppConfigDoc = {
   trialAlertDays?: number;
   giftCardAlertDays?: number;
   billAlertDays?: number;
+  maintenanceAlertDays?: number;
   syncStaleDays?: number;
   autoAddStores?: boolean;
   ntfyUrl?: string;
@@ -94,6 +96,7 @@ const DEFAULTS: AppSettings = {
   trialAlertDays: 2,
   giftCardAlertDays: 30,
   billAlertDays: 5,
+  maintenanceAlertDays: 7,
   syncStaleDays: 7,
   autoAddStores: true,
   ntfyUrl: '',
@@ -140,6 +143,8 @@ export function normalizeSettings(doc: RawAppConfigDoc | null | undefined): AppS
     trialAlertDays: typeof doc?.trialAlertDays === 'number' ? doc.trialAlertDays : DEFAULTS.trialAlertDays,
     giftCardAlertDays: typeof doc?.giftCardAlertDays === 'number' ? doc.giftCardAlertDays : DEFAULTS.giftCardAlertDays,
     billAlertDays: typeof doc?.billAlertDays === 'number' ? doc.billAlertDays : DEFAULTS.billAlertDays,
+    maintenanceAlertDays:
+      typeof doc?.maintenanceAlertDays === 'number' ? doc.maintenanceAlertDays : DEFAULTS.maintenanceAlertDays,
     syncStaleDays: typeof doc?.syncStaleDays === 'number' ? doc.syncStaleDays : DEFAULTS.syncStaleDays,
     autoAddStores: doc?.autoAddStores !== false,
     ntfyUrl: doc?.ntfyUrl || '',
@@ -181,7 +186,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     await connectDB();
     const Config = tenantModel(await tenantDb(ctx), AppConfig);
     doc = await Config.findOne({ key: 'singleton' })
-      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays syncStaleDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed notifyTypes')
+      .select('defaultItemView defaultWarrantyMonths warrantyAlertDays trialAlertDays giftCardAlertDays billAlertDays maintenanceAlertDays syncStaleDays autoAddStores ntfyUrl ntfyEnabled currency multiCurrency defaultVatRate defaultReturnWindowDays lists spaces budgets budgetRollover assetAccounts depreciation categoryRules onboardingDismissed notifyTypes')
       .lean();
   } catch {
     /* DB down → hard defaults */

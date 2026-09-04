@@ -203,6 +203,7 @@ const DEFAULT_SETTINGS = {
   trialAlertDays: 2,
   giftCardAlertDays: 30,
   billAlertDays: 5,
+  maintenanceAlertDays: 7,
   syncStaleDays: 7,
   budgets: {} as Record<string, number>,
 };
@@ -215,7 +216,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   connectDBMock.mockImplementation(async () => {});
   getAppSettingsMock.mockImplementation(async () => ({ ...DEFAULT_SETTINGS }));
-  itemFind.mockReturnValueOnce(chainSelectLean([])).mockReturnValueOnce(chainSelectLean([]));
+  itemFind.mockReturnValue(chainSelectLean([]));
   receiptFind.mockReturnValue(chainSelectLean([]));
   statementFind.mockReturnValue(chainLean([]));
   expenseFind.mockReturnValueOnce(chainSelectLean([])).mockReturnValueOnce(chainSelectLean([]));
@@ -242,6 +243,7 @@ beforeEach(() => {
 describe('runAlertChecks · dedupe off (default)', () => {
   it('never reads AppConfig at all — the manual button path is untouched', async () => {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
       .mockReturnValueOnce(chainSelectLean([]));
@@ -255,6 +257,7 @@ describe('runAlertChecks · dedupe off (default)', () => {
 describe('runAlertChecks · dedupe on, nothing previously sent', () => {
   it('shows every live signal — identical output to a non-dedupe run', async () => {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ _id: 'i1', title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
       .mockReturnValueOnce(chainSelectLean([]));
@@ -265,6 +268,7 @@ describe('runAlertChecks · dedupe on, nothing previously sent', () => {
 
   it('persists the full live key set once the send actually delivers', async () => {
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ _id: 'i1', title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
       .mockReturnValueOnce(chainSelectLean([]));
@@ -277,6 +281,7 @@ describe('runAlertChecks · dedupe on, a signal was already sent', () => {
   it('omits an unchanged warranty alert but still shows a fresh deal alongside it', async () => {
     mockDispatchKeys(['warranty:w1']);
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ _id: 'i1', title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
       .mockReturnValueOnce(chainSelectLean([{ _id: 'w1', title: 'Old warranty', warrantyUntil: new Date(Date.now() + 10 * 86400000).toISOString() }]));
@@ -296,6 +301,7 @@ describe('runAlertChecks · dedupe on, a signal was already sent', () => {
   it('everything already reported → "No new alerts", distinct from genuine all-clear, and no dispatch', async () => {
     mockDispatchKeys(['warranty:w1']);
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([]))
       .mockReturnValueOnce(chainSelectLean([{ _id: 'w1', title: 'Old warranty', warrantyUntil: new Date(Date.now() + 10 * 86400000).toISOString() }]));
@@ -315,6 +321,7 @@ describe('runAlertChecks · dedupe on, failed delivery must not advance the base
   it('does not persist alertDispatchKeys when dispatchAlert delivers to zero channels', async () => {
     dispatchAlertMock.mockImplementation(async () => ({ sent: 0, total: 0 })); // e.g. every notifier disabled
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ _id: 'i1', title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
       .mockReturnValueOnce(chainSelectLean([]));
@@ -328,6 +335,7 @@ describe('runAlertChecks · dedupe on, the bell and event webhooks are unaffecte
   it('still runs generateNotifications and event webhooks with the full undeduped data', async () => {
     mockDispatchKeys(['deal:i1']); // already-sent, so the outbound summary omits it
     itemFind.mockReset();
+    itemFind.mockReturnValue(chainSelectLean([])); // backstop for queries this case doesn't set
     itemFind
       .mockReturnValueOnce(chainSelectLean([{ _id: 'i1', title: 'U7 Pro', targetPrice: 300, currentPrice: 284 }]))
       .mockReturnValueOnce(chainSelectLean([]));
