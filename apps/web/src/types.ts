@@ -61,6 +61,11 @@ export type SerializedItem = {
    *  is what the next due date counts from. See lib/maintenance.ts. */
   maintenanceIntervalDays: number | null;
   lastMaintenanceAt: string | null;
+  /** P47: out on loan. `lentTo` empty = at home (every pre-P47 item); `expectedReturnAt`
+   *  null = lent with no deadline, which is never overdue. See lib/lending.ts. */
+  lentTo: string;
+  lentAt: string | null;
+  expectedReturnAt: string | null;
   warrantyUntil: string | null;
   serialNumber: string;
   location: string;

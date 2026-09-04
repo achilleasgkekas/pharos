@@ -27,6 +27,7 @@ import {
   Truck,
   Printer,
   Wrench,
+  HandHelping,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -42,6 +43,7 @@ import { FxRateButton } from '@/components/FxRateButton';
 import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency, toPrinted } from '@/lib/fx';
 import { COMMON_CARRIERS, hasKnownCarrier, resolveTrackingUrl } from '@/lib/tracking';
 import { maintenanceApplies, maintenanceDaysUntilDue, maintenanceState } from '@/lib/maintenance';
+import { isLentOut, lendingApplies, lendingDaysOut, lendingDaysUntilReturn, lendingState } from '@/lib/lending';
 import {
   customFieldsMatch,
   MAX_KEY_LENGTH,
@@ -65,7 +67,7 @@ import { ItemDocuments } from './ItemDocuments';
 import { ItemAssetTag } from './ItemAssetTag';
 import { assetLabelSubtitle } from '@/lib/assetLabel';
 import { printAssetTags } from './printAssetTags';
-import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, markMaintenanceDone, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
+import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, markMaintenanceDone, markItemReturned, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -153,6 +155,17 @@ function warrantyState(until: string | null, t: TFunc): { label: string; color: 
   const months = Math.max(1, Math.round(days / 30));
   if (days <= 90) return { label: t('it.wLeft', { n: months }), color: 'var(--color-gold)' };
   return { label: t('it.wUnder', { n: months }), color: 'var(--color-accent)' };
+}
+
+/** P47 — the "→ lent to X" pill for the list and grid cards. Null when the thing is home,
+ *  which is every pre-P47 item. Red once the agreed date has passed, gold as it nears, and
+ *  plain otherwise: an open-ended loan is a fact worth seeing, not a warning. */
+function lendBadge(item: SerializedItem, t: TFunc): { label: string; color: string } | null {
+  if (!isLentOut(item.status, item.lentTo)) return null;
+  const state = lendingState(item.status, item.lentTo, item.expectedReturnAt);
+  const color =
+    state === 'overdue' ? 'var(--color-red)' : state === 'due-soon' ? 'var(--color-gold)' : 'var(--color-text-dim)';
+  return { label: t('it.lentToX', { name: item.lentTo }), color };
 }
 
 // ─── Main page component ───────────────────────────────────────────────────
@@ -1085,6 +1098,7 @@ function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, se
   const best = view === 'shopping' ? bestLinkPrice(item) : null;
   const deal = view === 'shopping' && isDeal(item);
   const w = warrantyState(item.warrantyUntil, t);
+  const lend = lendBadge(item, t);
   const mainClick = selectMode ? onToggleSelect : onClick;
   return (
     <div
@@ -1131,6 +1145,7 @@ function ItemRow({ item, view, base, plan, onClick, selected, onToggleSelect, se
           <div className="flex items-center gap-2 flex-wrap text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
             <span className="uppercase tracking-wider">{item.num ? `${item.num} / ` : ''}{item.category}</span>
             {w && <span style={{ color: w.color }}>{w.label}</span>}
+            {lend && <span className="truncate max-w-[14rem]" style={{ color: lend.color }}>{lend.label}</span>}
             {plan && <span className="text-[color:var(--color-purple)]">{t('it.installmentsXY', { paid: plan.paidInstallments, total: plan.totalInstallments })}</span>}
             {best && (
               <span className="text-[color:var(--color-text-dim)]">
@@ -1311,6 +1326,18 @@ function ItemCard({
                   style={{ fontFamily: 'var(--font-mono)', background: `${w.color}1a`, color: w.color, border: `1px solid ${w.color}40` }}
                 >
                   {w.label}
+                </span>
+              ) : null;
+            })()}
+            {(() => {
+              const lend = lendBadge(item, t);
+              return lend ? (
+                <span
+                  className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider max-w-full"
+                  style={{ fontFamily: 'var(--font-mono)', background: `${lend.color}1a`, color: lend.color, border: `1px solid ${lend.color}40` }}
+                >
+                  <HandHelping size={9} className="shrink-0" />
+                  <span className="truncate">{lend.label}</span>
                 </span>
               ) : null;
             })()}
@@ -1508,6 +1535,22 @@ function ItemDetailModal({
     });
   }
 
+  // P47 — the loan is over. Same shape as handleMaintenanceDone: the server re-checks that
+  // the item is still out on loan, so a stale tab gets a message instead of wiping fields
+  // somebody has just re-filled.
+  function handleReturned() {
+    setActionMsg(null);
+    startTransition(async () => {
+      const r = await markItemReturned(item._id);
+      if (!r.ok) {
+        setActionMsg({ text: r.error ?? 'Could not update the item', tone: 'err' });
+        return;
+      }
+      setActionMsg({ text: t('it.lendReturnedOk'), tone: 'ok' });
+      router.refresh();
+    });
+  }
+
   async function handleDelete() {
     const ok = await confirm({
       title: t('it.deleteItem'),
@@ -1549,6 +1592,15 @@ function ItemDetailModal({
     : null;
   const maintColor =
     maintUrgency === 'overdue' ? 'var(--color-red)' : maintUrgency === 'due-soon' ? 'var(--color-gold)' : 'var(--color-text-dim)';
+  // P47 — the loan panel exists only while somebody actually has the thing. `lendDays` is
+  // null for an open-ended loan, which is never late; `lendOut` is then all there is to
+  // show, so the panel falls back to how long it has been gone (see lib/lending.ts).
+  const lentOut = isLentOut(item.status, item.lentTo);
+  const lendDays = lentOut ? lendingDaysUntilReturn(item.status, item.lentTo, item.expectedReturnAt) : null;
+  const lendOut = lentOut ? lendingDaysOut(item.status, item.lentTo, item.lentAt) : null;
+  const lendUrgency = lentOut ? lendingState(item.status, item.lentTo, item.expectedReturnAt) : null;
+  const lendColor =
+    lendUrgency === 'overdue' ? 'var(--color-red)' : lendUrgency === 'due-soon' ? 'var(--color-gold)' : 'var(--color-text-dim)';
   const realized =
     soldFor != null && item.purchasedPrice != null && item.purchasedPrice > 0
       ? Math.round((soldFor - item.purchasedPrice) * 100) / 100
@@ -1715,6 +1767,34 @@ function ItemDetailModal({
               </div>
               <Button variant="ghost" onClick={handleMaintenanceDone} disabled={pending} className="self-start">
                 {t('it.markMaintDone')}
+              </Button>
+            </div>
+          )}
+
+          {/* P47 — who has it and when it is due back, plus the one button that ends the
+              loan. Shown above the price rows on purpose: where the thing physically is
+              matters more than what it cost, once it is not in the house. */}
+          {lentOut && (
+            <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-3">
+              <div className="min-w-0">
+                <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                  <HandHelping size={12} />
+                  {t('it.lendLabel')}
+                </div>
+                <div className="text-sm font-semibold truncate" style={{ fontFamily: 'var(--font-mono)', color: lendColor }}>
+                  {t('it.lentToX', { name: item.lentTo })}
+                </div>
+                <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {lendDays === null
+                    ? t('it.lendNoDeadline')
+                    : lendDays < 0
+                      ? t('it.lendOverdue', { n: -lendDays })
+                      : t('it.lendDueIn', { n: lendDays })}
+                  {lendOut !== null && ` · ${t('it.lendOutFor', { n: lendOut })}`}
+                </div>
+              </div>
+              <Button variant="ghost" onClick={handleReturned} disabled={pending} className="self-start">
+                {t('it.markReturned')}
               </Button>
             </div>
           )}
@@ -2071,6 +2151,11 @@ type ItemFormState = {
    *  the same reason the sale and tracking fields above are. */
   maintenanceIntervalDays: string;
   lastMaintenanceAt: string;
+  /** P47: blank borrower = at home. Kept in state across a status change for the same
+   *  reason the sale and tracking fields above are. */
+  lentTo: string;
+  lentAt: string;
+  expectedReturnAt: string;
 };
 
 function ItemForm({
@@ -2126,6 +2211,9 @@ function ItemForm({
     location: item?.location ?? '',
     maintenanceIntervalDays: item?.maintenanceIntervalDays != null ? String(item.maintenanceIntervalDays) : '',
     lastMaintenanceAt: item?.lastMaintenanceAt ? item.lastMaintenanceAt.slice(0, 10) : '',
+    lentTo: item?.lentTo ?? '',
+    lentAt: item?.lentAt ? item.lentAt.slice(0, 10) : '',
+    expectedReturnAt: item?.expectedReturnAt ? item.expectedReturnAt.slice(0, 10) : '',
   });
   const [links, setLinks] = useState<{ label: string; url: string; price: string }[]>(
     item?.links?.length
@@ -2399,6 +2487,27 @@ function ItemForm({
           <Field label={t('it.fMaintLast')}>
             <Input type="date" value={form.lastMaintenanceAt} onChange={set('lastMaintenanceAt')} />
           </Field>
+        </>
+      )}
+
+      {/* P47 — lending. Owned items only, same reason as the maintenance block above. The
+          two dates only appear once a borrower is named: they mean nothing on their own,
+          and the server clears them anyway when the name is blank. */}
+      {lendingApplies(form.status) && (
+        <>
+          <Field label={t('it.fLentTo')}>
+            <Input value={form.lentTo} onChange={set('lentTo')} placeholder={t('it.fLentToPlaceholder')} />
+          </Field>
+          {form.lentTo.trim() ? (
+            <>
+              <Field label={t('it.fLentAt')}>
+                <Input type="date" value={form.lentAt} onChange={set('lentAt')} />
+              </Field>
+              <Field label={t('it.fExpectedReturn')}>
+                <Input type="date" value={form.expectedReturnAt} onChange={set('expectedReturnAt')} />
+              </Field>
+            </>
+          ) : null}
         </>
       )}
 

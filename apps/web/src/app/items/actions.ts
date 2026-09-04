@@ -31,6 +31,7 @@ import type { SerializedItem, SerializedAttachment } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
 import { parseCustomFields } from '@/lib/customFields';
 import { maintenanceApplies, normalizeMaintenanceInterval } from '@/lib/maintenance';
+import { isLentOut, lendingApplies, normalizeBorrower } from '@/lib/lending';
 import { addExpense } from '@/app/expenses/actions';
 
 const CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'] as const;
@@ -87,6 +88,17 @@ const ItemFormSchema = z.object({
     (v) => (v === '' || v === null || v === undefined ? null : new Date(String(v))),
     z.date().nullable().default(null)
   ),
+  // P47 lending. A blank borrower means "at home", which is every pre-P47 record; the two
+  // dates are only meaningful next to a name, and resolveLending() below enforces that.
+  lentTo: z.string().default(''),
+  lentAt: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : new Date(String(v))),
+    z.date().nullable().default(null)
+  ),
+  expectedReturnAt: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : new Date(String(v))),
+    z.date().nullable().default(null)
+  ),
   num: z.string().default(''),
   links: z.string().default('[]'), // JSON-encoded [{label,url}]
   // P70: JSON-encoded [{key,value}]. Absent (an older client, or the API routes) parses to
@@ -124,6 +136,29 @@ async function resolveItemFx(parsed: ItemPricesInput) {
   return resolveItemPrices(parsed, (await getAppSettings()).currency);
 }
 
+/**
+ * P47 — make the three lending fields consistent before they hit the database, so that no
+ * combination of them can describe a state that does not exist.
+ *
+ *  - Only an owned item can be out on loan; on anything else the whole trio is cleared,
+ *    which is what happens the moment a lent thing is marked sold or broken.
+ *  - No borrower means the item is home, so BOTH dates are wiped. Keeping a stale
+ *    `expectedReturnAt` on a returned item is exactly how a thing sitting on your shelf
+ *    would keep showing up as overdue.
+ *  - A borrower with no lend date gets today. Nobody wants to type a date to record
+ *    something they are handing over right now, and "how long has it been gone" needs it.
+ */
+function resolveLending(parsed: {
+  status: string;
+  lentTo: string;
+  lentAt: Date | null;
+  expectedReturnAt: Date | null;
+}): { lentTo: string; lentAt: Date | null; expectedReturnAt: Date | null } {
+  const lentTo = lendingApplies(parsed.status) ? normalizeBorrower(parsed.lentTo) : '';
+  if (!lentTo) return { lentTo: '', lentAt: null, expectedReturnAt: null };
+  return { lentTo, lentAt: parsed.lentAt ?? new Date(), expectedReturnAt: parsed.expectedReturnAt };
+}
+
 export async function createItem(formData: FormData) {
   await assertCanWrite();
   return withRequestTenant(async () => {
@@ -141,6 +176,7 @@ export async function createItem(formData: FormData) {
   await Item.create({
     ...rest,
     ...money,
+    ...resolveLending(parsed),
     currentPrice: cl ?? money.currentPrice,
     tags: parseTags(tags),
     links: parsedLinks,
@@ -164,6 +200,7 @@ export async function updateItem(id: string, formData: FormData) {
   await Item.findByIdAndUpdate(id, {
     ...rest,
     ...money,
+    ...resolveLending(parsed),
     currentPrice: cl ?? money.currentPrice,
     tags: parseTags(tags),
     links: parsedLinks,
@@ -266,6 +303,34 @@ export async function markMaintenanceDone(id: string): Promise<{ ok: boolean; at
     await Item.updateOne({ _id: id }, { $set: { lastMaintenanceAt: at } });
     revalidatePath('/items');
     return { ok: true, at: at.toISOString() };
+  });
+}
+
+/**
+ * P47 — "it came back": clear the loan in one click from the detail panel.
+ *
+ * Clearing the borrower IS the return, because the borrower name is the only flag the
+ * rest of the feature reads (see lib/lending.ts). The two dates go with it, so a thing
+ * back on the shelf cannot keep looking overdue from a deadline nobody cares about now.
+ *
+ * No loan history is kept, matching the backlog's builder default and markMaintenanceDone
+ * next door: what people want to know is where the drill is, and a log of every past
+ * borrower would need its own UI before it was worth the storage.
+ *
+ * Guarded on the item still being out on loan, for the same reason markItemArrived guards
+ * on `ordered`: a stale tab must not silently wipe fields somebody has just re-filled.
+ */
+export async function markItemReturned(id: string): Promise<{ ok: boolean; error?: string }> {
+  await assertCanWrite();
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Item = await currentModel(ItemModel);
+    const doc = await Item.findById(id).select('status lentTo').lean();
+    if (!doc) return { ok: false, error: 'Item not found' };
+    if (!isLentOut(doc.status, doc.lentTo)) return { ok: false, error: 'This item is not out on loan' };
+    await Item.updateOne({ _id: id }, { $set: { lentTo: '', lentAt: null, expectedReturnAt: null } });
+    revalidatePath('/items');
+    return { ok: true };
   });
 }
 

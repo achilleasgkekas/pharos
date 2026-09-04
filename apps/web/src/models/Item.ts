@@ -132,6 +132,14 @@ const ItemSchema = new Schema(
     maintenanceIntervalDays: { type: Number, default: null },
     lastMaintenanceAt: { type: Date, default: null },
 
+    // P47: out on loan to a friend or a relative. Empty `lentTo` = at home, which is
+    // every pre-P47 record. NOT a status: the thing is still owned, still under warranty
+    // and still on its maintenance clock, only its whereabouts changed, so it must keep
+    // counting in the inventory totals. `expectedReturnAt` null = no deadline agreed.
+    lentTo: { type: String, default: '' },
+    lentAt: { type: Date, default: null },
+    expectedReturnAt: { type: Date, default: null },
+
     warrantyUntil: { type: Date, default: null },
     serialNumber: { type: String, default: '' },
     location: { type: String, default: '' }, // where it physically lives (room / rack / shelf)
