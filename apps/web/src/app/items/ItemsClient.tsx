@@ -26,6 +26,7 @@ import {
   Pencil,
   Truck,
   Printer,
+  Wrench,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -40,6 +41,7 @@ import { FxBadge } from '@/components/FxBadge';
 import { FxRateButton } from '@/components/FxRateButton';
 import { convertToBase, deriveFxRate, formatMoney, isForeignCurrency, normalizeCurrency, toPrinted } from '@/lib/fx';
 import { COMMON_CARRIERS, hasKnownCarrier, resolveTrackingUrl } from '@/lib/tracking';
+import { maintenanceApplies, maintenanceDaysUntilDue, maintenanceState } from '@/lib/maintenance';
 import {
   customFieldsMatch,
   MAX_KEY_LENGTH,
@@ -63,7 +65,7 @@ import { ItemDocuments } from './ItemDocuments';
 import { ItemAssetTag } from './ItemAssetTag';
 import { assetLabelSubtitle } from '@/lib/assetLabel';
 import { printAssetTags } from './printAssetTags';
-import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
+import { createItem, updateItem, deleteItem, logSaleAsIncome, markItemArrived, markMaintenanceDone, previewItemFromUrl, confirmImportItem, aiFillItem, aiFillInfo, fetchItemPhotos, mergeItems, bulkUpdateItems, convertItemToTask, type DupItem } from './actions';
 import { useJobs } from '@/components/JobsProvider';
 import { enqueueAiFillItems, getBulkAiGuard } from '@/app/jobActions';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -1490,6 +1492,22 @@ function ItemDetailModal({
     });
   }
 
+  // P41 — restart the maintenance clock from today. Same shape as handleArrived: the
+  // server re-checks that the item is still owned and still scheduled, so a stale tab
+  // gets a message instead of writing a date onto something that moved on.
+  function handleMaintenanceDone() {
+    setActionMsg(null);
+    startTransition(async () => {
+      const r = await markMaintenanceDone(item._id);
+      if (!r.ok) {
+        setActionMsg({ text: r.error ?? 'Could not update the item', tone: 'err' });
+        return;
+      }
+      setActionMsg({ text: t('it.maintDoneOk'), tone: 'ok' });
+      router.refresh();
+    });
+  }
+
   async function handleDelete() {
     const ok = await confirm({
       title: t('it.deleteItem'),
@@ -1519,6 +1537,18 @@ function ItemDetailModal({
   // beats a guessed link that lands on a 404.
   const tracking = item.status === 'ordered' && (item.trackingNumber || '').trim() ? item : null;
   const trackUrl = tracking ? resolveTrackingUrl(tracking) : null;
+  // P41 — the maintenance widget only exists on an owned item that actually has a
+  // schedule. `maintDays` counts from the last service, or from the purchase date when
+  // the chore has never been marked done (see lib/maintenance.ts).
+  const maintOn = maintenanceApplies(item.status) && (item.maintenanceIntervalDays ?? 0) > 0;
+  const maintDays = maintOn
+    ? maintenanceDaysUntilDue(item.maintenanceIntervalDays, item.lastMaintenanceAt, item.purchasedAt)
+    : null;
+  const maintUrgency = maintOn
+    ? maintenanceState(item.maintenanceIntervalDays, item.lastMaintenanceAt, item.purchasedAt)
+    : null;
+  const maintColor =
+    maintUrgency === 'overdue' ? 'var(--color-red)' : maintUrgency === 'due-soon' ? 'var(--color-gold)' : 'var(--color-text-dim)';
   const realized =
     soldFor != null && item.purchasedPrice != null && item.purchasedPrice > 0
       ? Math.round((soldFor - item.purchasedPrice) * 100) / 100
@@ -1653,6 +1683,38 @@ function ItemDetailModal({
               </div>
               <Button variant="ghost" onClick={handleArrived} disabled={pending} className="self-start">
                 {t('it.markArrived')}
+              </Button>
+            </div>
+          )}
+
+          {/* P41 — when the next service falls due, and the one button that restarts the
+              clock. No cost, no history: this is a chore timer, not a service log. */}
+          {maintOn && (
+            <div className="bg-[color:var(--color-surface-2)] rounded-xl p-4 flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-[10px] text-[color:var(--color-text-faint)] uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                    <Wrench size={12} />
+                    {t('it.maintLabel')}
+                  </div>
+                  <div className="text-sm font-semibold" style={{ fontFamily: 'var(--font-mono)', color: maintColor }}>
+                    {maintDays === null
+                      ? t('it.maintEvery', { n: item.maintenanceIntervalDays as number })
+                      : maintDays < 0
+                        ? t('it.maintOverdue', { n: -maintDays })
+                        : t('it.maintDueIn', { n: maintDays })}
+                  </div>
+                  <div className="text-[10px] text-[color:var(--color-text-faint)] mt-0.5" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {t('it.maintEvery', { n: item.maintenanceIntervalDays as number })}
+                    {' · '}
+                    {item.lastMaintenanceAt
+                      ? t('it.maintLastOn', { d: item.lastMaintenanceAt.slice(0, 10) })
+                      : t('it.maintNever')}
+                  </div>
+                </div>
+              </div>
+              <Button variant="ghost" onClick={handleMaintenanceDone} disabled={pending} className="self-start">
+                {t('it.markMaintDone')}
               </Button>
             </div>
           )}
@@ -2005,6 +2067,10 @@ type ItemFormState = {
   tags: string;
   serialNumber: string;
   location: string;
+  /** P41: only shown while the item is owned, kept in state across a status change for
+   *  the same reason the sale and tracking fields above are. */
+  maintenanceIntervalDays: string;
+  lastMaintenanceAt: string;
 };
 
 function ItemForm({
@@ -2058,6 +2124,8 @@ function ItemForm({
     tags: (item?.tags ?? []).join(', '),
     serialNumber: item?.serialNumber ?? '',
     location: item?.location ?? '',
+    maintenanceIntervalDays: item?.maintenanceIntervalDays != null ? String(item.maintenanceIntervalDays) : '',
+    lastMaintenanceAt: item?.lastMaintenanceAt ? item.lastMaintenanceAt.slice(0, 10) : '',
   });
   const [links, setLinks] = useState<{ label: string; url: string; price: string }[]>(
     item?.links?.length
@@ -2314,6 +2382,25 @@ function ItemForm({
       <Field label={t('it.fLocation')}>
         <Input value={form.location} onChange={set('location')} placeholder={t('it.fLocationPlaceholder')} />
       </Field>
+
+      {/* P41 — maintenance schedule. Owned items only: a wishlist entry is not yet a thing
+          that can be serviced. Both blank leaves the item exactly as it was. */}
+      {maintenanceApplies(form.status) && (
+        <>
+          <Field label={t('it.fMaintInterval')}>
+            <Input
+              type="number"
+              min={0}
+              value={form.maintenanceIntervalDays}
+              onChange={set('maintenanceIntervalDays')}
+              placeholder={t('it.fMaintIntervalPlaceholder')}
+            />
+          </Field>
+          <Field label={t('it.fMaintLast')}>
+            <Input type="date" value={form.lastMaintenanceAt} onChange={set('lastMaintenanceAt')} />
+          </Field>
+        </>
+      )}
 
       {/* Links editor */}
       <div className="md:col-span-2">

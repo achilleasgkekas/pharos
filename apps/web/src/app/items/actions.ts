@@ -30,6 +30,7 @@ import {
 import type { SerializedItem, SerializedAttachment } from '@/types';
 import { assertCanWrite } from '@/lib/auth';
 import { parseCustomFields } from '@/lib/customFields';
+import { maintenanceApplies, normalizeMaintenanceInterval } from '@/lib/maintenance';
 import { addExpense } from '@/app/expenses/actions';
 
 const CATEGORIES = ['network', 'storage', 'compute', 'audio', 'video', 'mobile', 'peripheral', 'consumable', 'other'] as const;
@@ -76,6 +77,16 @@ const ItemFormSchema = z.object({
   tags: z.string().default(''),
   serialNumber: z.string().default(''),
   location: z.string().default(''),
+  // P41 maintenance schedule. Both blank keeps the item exactly as it was: an empty
+  // interval normalises to null ("no schedule"), never to 0, so the absence round-trips.
+  maintenanceIntervalDays: z.preprocess(
+    (v) => normalizeMaintenanceInterval(v === '' || v === null || v === undefined ? null : v),
+    z.number().nullable().default(null)
+  ),
+  lastMaintenanceAt: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : new Date(String(v))),
+    z.date().nullable().default(null)
+  ),
   num: z.string().default(''),
   links: z.string().default('[]'), // JSON-encoded [{label,url}]
   // P70: JSON-encoded [{key,value}]. Absent (an older client, or the API routes) parses to
@@ -227,6 +238,34 @@ export async function markItemArrived(id: string): Promise<{ ok: boolean; error?
     revalidatePath('/items');
     revalidatePath('/shopping');
     return { ok: true };
+  });
+}
+
+/**
+ * P41 — "serviced it": restart the maintenance clock from today, one click, straight from
+ * the detail panel. The MVP keeps no history on purpose (the backlog's builder default):
+ * what people actually want to know is when the next one is due, and a log would need its
+ * own UI to be worth storing.
+ *
+ * Guarded on the item still being owned AND still having a schedule, for the same reason
+ * markItemArrived() guards on `ordered`: a stale tab must not stamp a date onto an item
+ * somebody already sold, or onto one whose schedule was just removed.
+ */
+export async function markMaintenanceDone(id: string): Promise<{ ok: boolean; at?: string; error?: string }> {
+  await assertCanWrite();
+  return withRequestTenant(async () => {
+    await connectDB();
+    const Item = await currentModel(ItemModel);
+    const doc = await Item.findById(id).select('status maintenanceIntervalDays').lean();
+    if (!doc) return { ok: false, error: 'Item not found' };
+    if (!maintenanceApplies(doc.status)) return { ok: false, error: 'Maintenance only applies to an item you own' };
+    if (!normalizeMaintenanceInterval(doc.maintenanceIntervalDays)) {
+      return { ok: false, error: 'This item has no maintenance interval yet' };
+    }
+    const at = new Date();
+    await Item.updateOne({ _id: id }, { $set: { lastMaintenanceAt: at } });
+    revalidatePath('/items');
+    return { ok: true, at: at.toISOString() };
   });
 }
 

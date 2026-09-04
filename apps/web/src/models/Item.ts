@@ -125,6 +125,13 @@ const ItemSchema = new Schema(
     // P70: optional named attributes. Empty array = exactly the pre-P70 record.
     customFields: { type: [CustomFieldSchema], default: [] },
 
+    // P41: periodic physical maintenance (filter clean, nozzle change, dust-out). Both
+    // null = exactly the pre-P41 record. Distinct from `warrantyUntil` below, which
+    // expires once; this one restarts every time the chore is marked done. No cost and
+    // no money side: a serviced item that also cost something is an Expense, separately.
+    maintenanceIntervalDays: { type: Number, default: null },
+    lastMaintenanceAt: { type: Date, default: null },
+
     warrantyUntil: { type: Date, default: null },
     serialNumber: { type: String, default: '' },
     location: { type: String, default: '' }, // where it physically lives (room / rack / shelf)
