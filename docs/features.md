@@ -32,6 +32,7 @@ subscriptions, upcoming bills/renewals), recent activity, and module shortcuts.
 - [Bills & payables](#bills--payables)
 - [Vouchers](#vouchers)
 - [Calendar](#calendar)
+- [Save (savings forecast)](#save-savings-forecast)
 - [Reports](#reports)
 - [Tasks](#tasks)
 - [Network (UniFi)](#network-unifi)
@@ -451,6 +452,46 @@ projected bills, and expiries alongside your other events. The feed is authed by
 dedicated low-scope calendar token (not your full API bearer, so a leaked subscribe
 URL never grants API access); generate, copy, rotate, or revoke it in
 Settings → AI.
+
+## Save (savings forecast)
+
+A forward-looking planner (`/savings`) that answers three questions the rest of the
+app could not: what will my balance be on a given date, how much should I put aside,
+and will I make it. Deterministic and zero-AI, computed by a single pure engine
+(`lib/savingsPlan.ts`) from the ledger you already keep — nothing on the page is
+stored, and no new bookkeeping is asked of you.
+
+Highlights:
+
+- **A normal month, measured not assumed.** Income, spend and what is left over are
+  the *median* of your last six complete months, so one holiday or one bonus does not
+  become the new normal, and the current (part-finished) month never drags the figures
+  down. The page says out loud what it is standing on: a median over N months, a "thin"
+  one- or two-month guess, or nothing to forecast from yet. If income was recorded in
+  only a couple of those months, it says that too, because the forecast is then
+  pessimistic for a reason that is worth knowing.
+- **Balance on a date.** Pick any day within five years and get the projected balance,
+  interpolated inside its month rather than rounded to it, starting from the manual
+  account balances in Settings → Net worth (with a notice when none are on file, since
+  the forecast then only shows what you add from here).
+- **Obligations that end are the one thing that bends the line.** Historic spend already
+  contains your subscriptions and bills, so adding them again would charge you twice. A
+  card instalment plan is different: it is in every month behind you and in none of the
+  months after its last payment, so the projection gives that money back on the month it
+  frees up, and the chart shows the step.
+- **"Can I make it?"** Put in an amount and a date. The answer is a sentence — yes with
+  room, just about, not by then, or not until a normal month leaves something over — plus
+  what it costs per month, what you actually have spare, and the date you would get there
+  at your current rate (which accounts for those ending instalments, so a target can
+  become reachable sooner than flat arithmetic suggests).
+- **Where the gap could come from.** When a target does not fit, the shortfall is matched
+  against your active subscriptions, dearest first, and the shortest list that closes it is
+  named with the monthly cost of each. If the whole list still does not close it, it says so
+  rather than pretending.
+- **Goals (P12) live here too.** Any plan on screen can be saved as a goal, and every goal
+  is run through the same engine — progress bar, verdict, required rate and earliest date —
+  with contributions added inline. Goals stay visible in Reports as before; the two pages
+  read and write the same records.
 
 ## Reports
 

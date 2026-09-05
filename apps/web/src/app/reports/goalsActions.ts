@@ -12,6 +12,11 @@ import { isMonthKey, sweepNote } from '@/lib/budgetSweep';
 // P12 — CRUD + per-contribution add/remove for savings / financial goals.
 // Deterministic, no AI. `current` is derived (Σ contributions), never stored.
 //
+// Two pages render goals — the Reports card these actions were written for and the Save
+// tab, which runs each goal through the forecast (lib/savingsPlan.ts) — so every mutation
+// revalidates both. A contribution added on one page that left the other showing the old
+// figure would look like the app had lost the money.
+//
 // TENANCY: every action runs inside `withRequestTenant` and reaches Goal through
 // `currentModel`, the same shape as receipts/items/expenses/tasks. Without it these wrote to
 // the DEFAULT database in SaaS mode, so one workspace's savings goals would appear in — and be
@@ -35,6 +40,7 @@ export async function createGoal(formData: FormData): Promise<{ ok: boolean; err
     const Model = await currentModel(Goal);
     await Model.create({ ...raw, targetDate: safeDateOrNull(raw.targetDate), contributions: [], archived: false });
     revalidatePath('/reports');
+    revalidatePath('/savings');
     revalidatePath('/');
     return { ok: true };
   });
@@ -50,6 +56,7 @@ export async function updateGoal(id: string, formData: FormData): Promise<{ ok: 
     const Model = await currentModel(Goal);
     await Model.findByIdAndUpdate(id, { ...raw, targetDate: safeDateOrNull(raw.targetDate) });
     revalidatePath('/reports');
+    revalidatePath('/savings');
     revalidatePath('/');
     return { ok: true };
   });
@@ -63,6 +70,7 @@ export async function setGoalArchived(id: string, archived: boolean): Promise<{ 
     const Model = await currentModel(Goal);
     await Model.findByIdAndUpdate(id, { archived });
     revalidatePath('/reports');
+    revalidatePath('/savings');
     revalidatePath('/');
     return { ok: true };
   });
@@ -76,6 +84,7 @@ export async function deleteGoal(id: string): Promise<{ ok: boolean }> {
     // Soft delete → Trash (Settings → Storage & data). Purge happens from there.
     await Model.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
     revalidatePath('/reports');
+    revalidatePath('/savings');
     revalidatePath('/');
     return { ok: true };
   });
@@ -93,6 +102,7 @@ export async function addGoalContribution(id: string, amount: number, note = '',
       $push: { contributions: { amount: Math.round(amt * 100) / 100, note: String(note || '').slice(0, 200), date: safeDateOrNull(dateStr) ?? new Date() } },
     });
     revalidatePath('/reports');
+    revalidatePath('/savings');
     revalidatePath('/');
     return { ok: true };
   });
@@ -106,6 +116,7 @@ export async function removeGoalContribution(id: string, contributionId: string)
     const Model = await currentModel(Goal);
     await Model.findByIdAndUpdate(id, { $pull: { contributions: { _id: contributionId } } });
     revalidatePath('/reports');
+    revalidatePath('/savings');
     revalidatePath('/');
     return { ok: true };
   });
@@ -151,6 +162,7 @@ export async function sweepBudgetLeftoverToGoal(
       $push: { contributions: { amount: Math.round(amt * 100) / 100, note, date: new Date() } },
     });
     revalidatePath('/reports');
+    revalidatePath('/savings');
     revalidatePath('/');
     return { ok: true };
   });
